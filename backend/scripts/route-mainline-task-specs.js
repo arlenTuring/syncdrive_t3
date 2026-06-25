@@ -22,23 +22,26 @@ const DOCK_APPROACH_M = 25;
 const AT_STATION_M = 3;
 
 const ROUTE_MAINLINE_TASK_SPECS_BASE = {
+  // seq 為「每張訂單全域遞增」的序號（依行進順序），確保 task_id 唯一。
+  // 同一路線可有多個同類型動作（T3 與終點站各一次 PLATFORM_DOCKING），
+  // 若用站內局部序號會產生重複 task_id。
   'ROUTE-MAINLINE-DOWN': [
     { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, nodeId: 'ND-N2W-VOICE-01', station: 'N2W' },
     { type: 'STATION_DEPARTURE', seq: 1, nodeId: 'ND-N2W-DEP-01', station: 'N2W', mapAction: 'STATION_DEPARTURE' },
-    { type: 'PLATFORM_DOCKING', seq: 1, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
-    { type: 'OPEN_DOORS', seq: 2, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'CLOSE_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'STATION_DEPARTURE', seq: 4, nodeId: 'ND-T3-DEP-01', station: 'T3' },
-    { type: 'PLATFORM_DOCKING', seq: 1, nodeId: 'ND-S2W-STOP-01', station: 'S2W', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'PLATFORM_DOCKING', seq: 2, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'OPEN_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
+    { type: 'CLOSE_DOORS', seq: 4, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
+    { type: 'STATION_DEPARTURE', seq: 5, nodeId: 'ND-T3-DEP-01', station: 'T3' },
+    { type: 'PLATFORM_DOCKING', seq: 6, nodeId: 'ND-S2W-STOP-01', station: 'S2W', mapAction: 'PLATFORM_DOCKING' },
   ],
   'ROUTE-MAINLINE-UP': [
     { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, nodeId: 'ND-S2W-VOICE-01', station: 'S2W' },
     { type: 'STATION_DEPARTURE', seq: 1, nodeId: 'ND-S2W-DEP-01', station: 'S2W', mapAction: 'STATION_DEPARTURE' },
-    { type: 'PLATFORM_DOCKING', seq: 1, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
-    { type: 'OPEN_DOORS', seq: 2, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'CLOSE_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'STATION_DEPARTURE', seq: 4, nodeId: 'ND-T3-DEP-01', station: 'T3' },
-    { type: 'PLATFORM_DOCKING', seq: 1, nodeId: 'ND-N2W-STOP-01', station: 'N2W', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'PLATFORM_DOCKING', seq: 2, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'OPEN_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
+    { type: 'CLOSE_DOORS', seq: 4, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
+    { type: 'STATION_DEPARTURE', seq: 5, nodeId: 'ND-T3-DEP-01', station: 'T3' },
+    { type: 'PLATFORM_DOCKING', seq: 6, nodeId: 'ND-N2W-STOP-01', station: 'N2W', mapAction: 'PLATFORM_DOCKING' },
   ],
 };
 
