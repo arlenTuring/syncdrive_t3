@@ -140,6 +140,7 @@ export function MapAreaVehicleOverlay({
   vehicleFitMode = 'contain',
   vehicleBehavior,
   vehicleEditSizer = null,
+  livePositionTweenMs = 0,
 }: {
   areas: MapAreaObject[];
   vehicles: AreaVehicleLive[];
@@ -161,6 +162,11 @@ export function MapAreaVehicleOverlay({
     targetKey: string;
     onSizeChange: (width: number, height: number) => void;
   } | null;
+  /**
+   * 即時圖台位置補間（毫秒）。> 0 時對車輛標記的 left/top 套用線性 CSS transition，
+   * 讓 1Hz 的遙測座標在兩幀之間平滑滑動（避免「一格一格跳」）。0 表示即時定位（編輯器用）。
+   */
+  livePositionTweenMs?: number;
 }) {
   const areaById = useMemo(
     () => new Map(areas.map((a, i) => [a.id, { area: a, stackOrder: i }])),
@@ -282,6 +288,12 @@ export function MapAreaVehicleOverlay({
           left,
           top,
           zIndex,
+          ...(livePositionTweenMs > 0
+            ? {
+                transition: `left ${livePositionTweenMs}ms linear, top ${livePositionTweenMs}ms linear`,
+                willChange: 'left, top',
+              }
+            : null),
         };
 
         const coordLabel = showMqttCoords ? (

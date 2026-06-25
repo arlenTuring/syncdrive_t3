@@ -733,6 +733,7 @@ export function MapAreaCanvas({
                 vehicleFitMode={vehicleFitMode}
                 vehicleBehavior={vehicleBehavior}
                 vehicleEditSizer={vehicleEditSizer}
+                livePositionTweenMs={isEmbedded ? 1000 : 0}
               />
             ) : null}
             </div>
