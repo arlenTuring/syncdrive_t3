@@ -5,7 +5,10 @@ import { SecurityEventLog } from '../database/entities/security-event-log.entity
 import { SlotStatus_ } from '../database/entities/slot-status.entity';
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
 import { OrderService } from '../order/order.service';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { MqttService } from './mqtt.service';
+
+const invalidationMock = { emit: jest.fn(), emitOrderLifecycle: jest.fn(), emitEventCenter: jest.fn(), emitMaintenanceSlots: jest.fn() };
 
 describe('MqttService', () => {
   let service: MqttService;
@@ -29,6 +32,7 @@ describe('MqttService', () => {
         { provide: getRepositoryToken(TelemetryLog), useValue: repositoryMock },
         { provide: getRepositoryToken(SlotStatus_), useValue: repositoryMock },
         { provide: OrderService, useValue: orderServiceMock },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
       ],
     }).compile();
 

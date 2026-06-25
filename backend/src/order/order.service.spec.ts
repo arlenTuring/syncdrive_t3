@@ -10,6 +10,9 @@ import { OrderEvent } from '../database/entities/order-event.entity';
 import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { OrderService } from './order.service';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+
+const invalidationMock = { emit: jest.fn(), emitOrderLifecycle: jest.fn(), emitEventCenter: jest.fn(), emitMaintenanceSlots: jest.fn() };
 
 describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   let service: OrderService;
@@ -32,6 +35,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
         { provide: getRepositoryToken(OrderEvent), useValue: noop },
         { provide: OrderMqttPublisher, useValue: noop },
         { provide: OrderRouteService, useValue: noop },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
       ],
     }).compile();
     service = module.get(OrderService);

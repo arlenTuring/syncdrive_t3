@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RouteProgressWidget, RouteStation } from '../types';
-import { readMqttRouteProgress, resolveVehicleTrackPercent } from './resolveVehiclePosition';
+import { readMqttRouteProgress } from './resolveVehiclePosition';
 import { readOrderStatus } from './orderStatus';
 
 export function mqttPayloadIsFresh(
   payload: Record<string, unknown> | null,
-  maxAgeMs = 2500,
+  maxAgeMs = 4000,
 ): boolean {
   if (!payload) return false;
   const ts = Number(payload.timestamp ?? payload.updated_at);
@@ -15,16 +15,6 @@ export function mqttPayloadIsFresh(
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
-}
-
-/** 由 eta_remain（00:50 / 00:30:00）推算區段行進秒數 */
-export function parseEtaToSeconds(eta: unknown): number | undefined {
-  if (eta === null || eta === undefined || eta === '') return undefined;
-  const parts = String(eta).trim().split(':').map(Number);
-  if (parts.some((p) => Number.isNaN(p))) return undefined;
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return undefined;
 }
 
 export function trackPercentFromSegment(
@@ -41,10 +31,9 @@ export function trackPercentFromSegment(
   return clamp(a + t * (b - a), 0, 100);
 }
 
-/** MQTT 即時進度：每幀緩慢逼近目標，避免跳動 */
 function useSmoothMqttProgress(
   mqttTarget: number | undefined,
-  hasLiveMqtt: boolean,
+  enabled: boolean,
   rowKey: string,
   fallback: number,
 ): number {
@@ -60,12 +49,12 @@ function useSmoothMqttProgress(
   }, [rowKey, mqttTarget, fallback]);
 
   useEffect(() => {
-    if (!hasLiveMqtt || mqttTarget === undefined) return;
+    if (!enabled || mqttTarget === undefined) return;
     targetRef.current = mqttTarget;
-  }, [hasLiveMqtt, mqttTarget]);
+  }, [enabled, mqttTarget]);
 
   useEffect(() => {
-    if (!hasLiveMqtt) return;
+    if (!enabled) return;
 
     let raf = 0;
     const SMOOTH = 0.055;
@@ -86,127 +75,86 @@ function useSmoothMqttProgress(
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [hasLiveMqtt, rowKey]);
-
-  return hasLiveMqtt && mqttTarget !== undefined ? display : fallback;
-}
-
-/** SQL 輪詢進度：在兩次查詢之間平滑補間 */
-function useSmoothSqlProgress(
-  target: number,
-  enabled: boolean,
-  rowKey: string,
-): number {
-  const [display, setDisplay] = useState(target);
-  const currentRef = useRef(target);
-  const targetRef = useRef(target);
-
-  useEffect(() => {
-    currentRef.current = target;
-    targetRef.current = target;
-    setDisplay(target);
-  }, [rowKey]);
-
-  useEffect(() => {
-    targetRef.current = target;
-  }, [target]);
-
-  useEffect(() => {
-    if (!enabled) {
-      setDisplay(target);
-      currentRef.current = target;
-      return;
-    }
-
-    let raf = 0;
-    const SMOOTH = 0.08;
-
-    const tick = () => {
-      const goal = targetRef.current;
-      let cur = currentRef.current;
-      const delta = goal - cur;
-      if (Math.abs(delta) < 0.05) {
-        cur = goal;
-      } else {
-        cur += delta * SMOOTH;
-      }
-      currentRef.current = cur;
-      setDisplay(cur);
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
   }, [enabled, rowKey]);
 
-  return enabled ? display : target;
+  return enabled && mqttTarget !== undefined ? display : fallback;
 }
+
+export type AnimatedTrackPercentOptions = {
+  /** 班次卡：僅 MQTT current_leg，不讀 SQL segment／route_progress */
+  mqttOnly?: boolean;
+};
 
 /**
  * 正線／整備軌道進度：
- * - PENDING：固定於路線起點
- * - FAULTED：凍結位置
- * - PROCESSING：MQTT current_leg.eta_seconds 優先
+ * - PENDING：路線起點
+ * - PROCESSING：MQTT current_leg（每段 eta 各自 0→leg_eta_max）
+ * - 班次卡 mqttOnly：MQTT 短暫中斷時保留上一筆位置，不回退 SQL
  */
 export function useAnimatedTrackPercent(
   stations: RouteStation[],
-  widget: RouteProgressWidget,
+  _widget: RouteProgressWidget,
   variables: Record<string, unknown>,
   sqlRow: Record<string, unknown> | null,
-  rawProgress: unknown,
+  _rawProgress: unknown,
   mqttPayload: Record<string, unknown> | null,
+  options?: AnimatedTrackPercentOptions,
 ): number {
-  const staticPercent = resolveVehicleTrackPercent(
-    stations,
-    widget,
-    variables,
-    sqlRow,
-    rawProgress,
-    mqttPayload,
-  );
-
+  const mqttOnly = options?.mqttOnly ?? false;
   const orderStatus = readOrderStatus(variables, sqlRow, mqttPayload);
   const isPending = orderStatus === 'PENDING';
   const isFaulted = orderStatus === 'FAULTED';
   const isProcessing = orderStatus === 'PROCESSING';
 
+  const rowKey = String(variables.shift_key ?? variables.vehicle_code ?? 'default');
+  const origin =
+    stations.length >= 2
+      ? trackPercentFromSegment(stations, 0, 100)
+      : stations[0]?.value ?? 0;
+
   const mqttFresh = mqttPayloadIsFresh(mqttPayload);
-  const mqttTarget = mqttFresh ? readMqttRouteProgress(rawProgress, mqttPayload) : undefined;
-  const hasLiveMqttProgress =
+  const mqttTarget = mqttPayload
+    ? readMqttRouteProgress(mqttPayload, stations)
+    : undefined;
+
+  const lastMqttRef = useRef<number | undefined>(undefined);
+  if (mqttTarget !== undefined) {
+    lastMqttRef.current = mqttTarget;
+  }
+
+  const hasLiveMqtt =
     isProcessing
     && mqttPayload !== null
     && mqttTarget !== undefined
     && mqttFresh;
 
-  const rowKey = String(variables.shift_key ?? variables.vehicle_code ?? 'default');
-  const pendingOrigin = isPending && stations.length >= 2
-    ? trackPercentFromSegment(stations, 0, 100)
-    : staticPercent;
+  const holdMqtt =
+    mqttOnly
+    && isProcessing
+    && mqttTarget === undefined
+    && lastMqttRef.current !== undefined;
 
   const smoothMqttPercent = useSmoothMqttProgress(
     mqttTarget,
-    hasLiveMqttProgress,
+    hasLiveMqtt,
     rowKey,
-    pendingOrigin,
+    lastMqttRef.current ?? origin,
   );
 
-  const smoothSqlPercent = useSmoothSqlProgress(
-    staticPercent,
-    isProcessing && !hasLiveMqttProgress && !mqttFresh,
-    rowKey,
-  );
-
-  if (isPending && stations.length >= 2) {
-    return trackPercentFromSegment(stations, 0, 100);
+  if (isPending) {
+    return origin;
   }
   if (isFaulted) {
-    return staticPercent;
+    return lastMqttRef.current ?? origin;
   }
-  if (hasLiveMqttProgress) {
+  if (hasLiveMqtt) {
     return smoothMqttPercent;
   }
-  if (isProcessing && !mqttFresh) {
-    return smoothSqlPercent;
+  if (holdMqtt) {
+    return lastMqttRef.current!;
   }
-  return staticPercent;
+  if (mqttOnly) {
+    return origin;
+  }
+  return mqttTarget ?? origin;
 }

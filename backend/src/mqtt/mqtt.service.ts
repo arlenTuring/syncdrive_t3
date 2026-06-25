@@ -6,6 +6,7 @@ import { SecurityEventLog, EventCode, Severity } from '../database/entities/secu
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
 import { SlotStatus_ } from '../database/entities/slot-status.entity';
 import { OrderService } from '../order/order.service';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 
 @Injectable()
 export class MqttService {
@@ -23,6 +24,7 @@ export class MqttService {
     @InjectRepository(SlotStatus_)
     private slotStatusRepository: Repository<SlotStatus_>,
     private readonly orderService: OrderService,
+    private readonly datasourceInvalidation: DatasourceInvalidationService,
   ) {}
 
   async saveTelemetry(vehicleCode: string, payload: any) {
@@ -186,6 +188,7 @@ export class MqttService {
     });
 
     await this.securityEventLogRepository.save(newEvent);
+    this.datasourceInvalidation.emitEventCenter();
     this.logger.warn(`[Security Event] Vehicle ${vehicleCode} reported ${severity} event: ${event_code}`);
 
     if (severity === 'CRITICAL') {
@@ -256,5 +259,6 @@ export class MqttService {
     slotStatus.rawPayload = payload;
 
     await this.slotStatusRepository.save(slotStatus);
+    this.datasourceInvalidation.emitMaintenanceSlots();
   }
 }

@@ -130,7 +130,8 @@ function boundText(
     dataSourceId: DS,
     sqlQuery: sql,
     valueField,
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
     icon: opts?.iconImage ? undefined : opts?.icon,
     iconImage: opts?.iconImage,
     contentPadding: opts?.contentPadding,
@@ -195,7 +196,8 @@ function maintenanceSlotGrid(
     emptyHintFontSize: 14,
     dataSourceId: DS,
     sqlQuery: maintenanceSlotsSql(zone),
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
   };
 }
 
@@ -282,7 +284,8 @@ function vehicleDistributionWidget(x: number, y: number, w: number, h: number): 
     emptyHintFontSize: VEH_DIST_FS.legend,
     dataSourceId: DS,
     sqlQuery: VEHICLE_DISTRIBUTION_SQL,
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
   };
 }
 
@@ -296,7 +299,8 @@ function shiftProgressBar(x: number, y: number, w: number, h: number): ProgressB
     valueField: 'achievement_pct',
     dataSourceId: DS,
     sqlQuery: SHIFT_CENTER_SUMMARY_SQL,
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
     min: 0,
     max: 100,
     orientation: 'horizontal',
@@ -350,7 +354,8 @@ function statCard(
     valueField,
     dataSourceId: DS,
     sqlQuery: sql,
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
     valueFontSize: opts?.valueFontSize ?? FS.emphasis,
     labelFontSize: opts?.labelFontSize ?? FS.aux,
     unit: opts?.unit ?? '',
@@ -435,7 +440,8 @@ function eventBarTemplate(tplW: number, tplH: number): ChildWidget[] {
       severityStripColor: true,
       dataSourceId: DS,
       sqlQuery: idx('severity'),
-      refreshInterval: 15,
+      refreshInterval: 0,
+      refreshMode: 'event',
     },
     {
       ...boundText(pad + px(2), pad + py(6), stripW - px(4), py(18), 'category', idx('category'), EVENT_FS.label, '#030712', 'bold', 'center'),
@@ -1329,7 +1335,8 @@ const elements: CanvasElementProps[] = [
     slotKeyField: 'event_id',
     dataSourceId: DS,
     sqlQuery: EVENT_CENTER_LIST_SQL,
-    refreshInterval: 15,
+    refreshInterval: 0,
+    refreshMode: 'event',
     variableName: LIST_INDEX_VAR,
     groupVariableMode: 'index',
     groupTileFit: 'fixed',
@@ -1426,7 +1433,8 @@ const elements: CanvasElementProps[] = [
     groupRepeatMode: 'tile',
     dataSourceId: DS,
     sqlQuery: VEHICLE_STATUS_ROW_SQL,
-    refreshInterval: 60,
+    refreshInterval: 0,
+    refreshMode: 'event',
     variableName: 'row',
     iteratorField: 'vehicle_code',
     layoutMode: 'grid',
@@ -1702,7 +1710,8 @@ elements[5].children = [
     sqlQuery: CAPACITY_TREND_CHART_SQL,
     xField: 'time',
     yFields: ['forecast_util', 'actual_util'],
-    refreshInterval: 30,
+    refreshInterval: 0,
+    refreshMode: 'event',
   },
 ];
 

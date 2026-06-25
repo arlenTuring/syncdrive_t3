@@ -4,6 +4,7 @@
 //   'rest'     — 直接呼叫 REST API（回傳 JSON Array）
 
 import { useState, useCallback } from 'react';
+import { expandBuiltinSqlMacros } from '../constants/demoSql';
 
 export type DataSourceType = 'internal' | 'rest' | 'mqtt';
 
@@ -61,7 +62,7 @@ export interface DataSourceConfig {
 const STORAGE_KEY = 'syncdrive_datasources';
 
 // 預設的內建資料來源（指向本機後端）
-const DEFAULT_DATASOURCE: DataSourceConfig = {
+export const DEFAULT_DATASOURCE: DataSourceConfig = {
   id: 'default-internal',
   name: 'SyncDrive 本機資料庫',
   type: 'internal',
@@ -176,6 +177,11 @@ const QUERY_CACHE_TTL_MS = 2_000;
 const queryCache = new Map<string, { rows: Record<string, unknown>[]; at: number }>();
 const inflightQueries = new Map<string, Promise<Record<string, unknown>[]>>();
 
+/** 後端推送失效時清除快取，確保 event 模式拿到新資料 */
+export function clearDatasourceQueryCache(): void {
+  queryCache.clear();
+}
+
 export async function executeDatasourceQuery(
   datasourceId: string,
   sqlQuery: string,
@@ -188,7 +194,8 @@ export async function executeDatasourceQuery(
     throw new Error(`Data source type '${ds.type}' does not support SQL queries`);
   }
 
-  const cacheKey = `${datasourceId}::${sqlQuery}`;
+  const normalizedSql = expandBuiltinSqlMacros(sqlQuery);
+  const cacheKey = `${datasourceId}::${normalizedSql}`;
   const cached = queryCache.get(cacheKey);
   if (cached && Date.now() - cached.at < QUERY_CACHE_TTL_MS) {
     return cached.rows;
@@ -204,7 +211,7 @@ export async function executeDatasourceQuery(
       const res = await fetch(`${ds.backendUrl}/syncdrive-api/datasource/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: sqlQuery }),
+        body: JSON.stringify({ query: normalizedSql }),
         signal: controller.signal,
       });
       if (!res.ok) {

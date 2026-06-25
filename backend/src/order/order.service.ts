@@ -17,6 +17,7 @@ import { OrderEvent } from '../database/entities/order-event.entity';
 import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PROCESSING],
@@ -29,6 +30,7 @@ export type OperationCurrentLeg = {
   target_station_id?: string;
   distance_to_target_m?: number;
   eta_seconds?: number;
+  leg_eta_max?: number;
 };
 
 /** 模擬／場上回報：正線訂單生命週期快照（不限制同時 PROCESSING 台數） */
@@ -38,6 +40,23 @@ export type MainlineOrderLifecycleSnapshot = {
   tripCode: string;
   routeId: string;
   phase: 'pending' | 'processing';
+};
+
+/** 模擬／場上回報：整備任務訂單快照 */
+export type MaintenanceOrderLifecycleSnapshot = {
+  vehicleCode: string;
+  orderId: string;
+  tripCode: string;
+  phase: 'pending' | 'processing';
+  maintTypeLabel: string;
+  maintTypeBg: string;
+  maintTypeColor: string;
+  iconBgColor: string;
+  progressMarkerIcon: string;
+  yardSlotId?: string | null;
+  maintStation?: string | null;
+  segmentIndex: number;
+  routeProgress: number;
 };
 
 export type OperationMqttPayload = {
@@ -74,6 +93,7 @@ export class OrderService {
     private readonly orderEventRepository: Repository<OrderEvent>,
     private readonly orderMqttPublisher: OrderMqttPublisher,
     private readonly orderRouteService: OrderRouteService,
+    private readonly datasourceInvalidation: DatasourceInvalidationService,
   ) {}
 
   async createOrder(
@@ -123,6 +143,7 @@ export class OrderService {
       );
     }
 
+    this.datasourceInvalidation.emitOrderLifecycle(saved.vehicleCode);
     return saved;
   }
 
@@ -157,7 +178,9 @@ export class OrderService {
       fault_reason: reason ?? 'CRITICAL_EVENT',
       faulted_at: Date.now(),
     };
-    return this.orderRepository.save(order);
+    const saved = await this.orderRepository.save(order);
+    this.datasourceInvalidation.emitOrderLifecycle(code);
+    return saved;
   }
 
   /** 人工復歸：故障訂單恢復為進行中（示範／維運用） */
@@ -181,7 +204,9 @@ export class OrderService {
       faulted_at: null,
       recovered_at: Date.now(),
     };
-    return this.orderRepository.save(order);
+    const saved = await this.orderRepository.save(order);
+    this.datasourceInvalidation.emitOrderLifecycle(code);
+    return saved;
   }
 
   private async applyFaultToOrder(
@@ -199,7 +224,9 @@ export class OrderService {
       fault_reason: reason,
       faulted_at: Date.now(),
     };
-    return this.orderRepository.save(order);
+    const saved = await this.orderRepository.save(order);
+    this.datasourceInvalidation.emitOrderLifecycle(order.vehicleCode);
+    return saved;
   }
 
   async updateOrderStatus(id: string, statusStr: string): Promise<OperationOrder> {
@@ -226,7 +253,9 @@ export class OrderService {
       // bigint 欄位清空須用 null，不可用空字串
       order.completedAt = null;
     }
-    return this.orderRepository.save(order);
+    const saved = await this.orderRepository.save(order);
+    this.datasourceInvalidation.emitOrderLifecycle(saved.vehicleCode);
+    return saved;
   }
 
   /** 車端以 action_id 回報動作狀態（REST SSOT） */
@@ -350,6 +379,12 @@ export class OrderService {
     };
     if (legTarget && etaSec != null) {
       legEtaMax[legTarget] = Math.max(legEtaMax[legTarget] ?? 0, etaSec);
+    }
+    const legEtaMaxFromPayload = typeof currentLeg?.leg_eta_max === 'number'
+      ? Math.max(0, Math.round(currentLeg.leg_eta_max))
+      : null;
+    if (legTarget && legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0) {
+      legEtaMax[legTarget] = legEtaMaxFromPayload;
     }
     const maxEta = legTarget ? (legEtaMax[legTarget] ?? etaSec ?? 0) : 0;
 
@@ -554,6 +589,90 @@ export class OrderService {
     return ended;
   }
 
+  /**
+   * 示範 tick：依模擬器回報同步整備任務訂單（DEMO-ORD-*），車輛回正線時結束殘留任務。
+   */
+  async reconcileMaintenanceOrderLifecycle(
+    snapshots: ReadonlyArray<MaintenanceOrderLifecycleSnapshot>,
+  ): Promise<number> {
+    const activeOrderIds = new Set<string>();
+
+    for (const snap of snapshots) {
+      activeOrderIds.add(snap.orderId);
+      const order = await this.ensureMaintenanceShift(snap);
+      if (snap.phase === 'processing' && order.status === OrderStatus.PENDING) {
+        await this.updateOrderStatus(snap.orderId, 'processing');
+      }
+    }
+
+    const openOrders = await this.orderRepository.find({
+      where: {
+        lineKind: 'MAINTENANCE',
+        status: In([OrderStatus.PENDING, OrderStatus.PROCESSING]),
+      },
+    });
+
+    let ended = 0;
+    for (const order of openOrders) {
+      if (!order.id.startsWith('DEMO-ORD-')) continue;
+      if (activeOrderIds.has(order.id)) continue;
+      order.status = OrderStatus.END;
+      order.completedAt = String(Date.now());
+      await this.orderRepository.save(order);
+      ended += 1;
+    }
+
+    return ended;
+  }
+
+  private async ensureMaintenanceShift(
+    snap: MaintenanceOrderLifecycleSnapshot,
+  ): Promise<OperationOrder> {
+    const payloadPatch = {
+      yard_slot_id: snap.yardSlotId ?? null,
+      segment_index: snap.segmentIndex,
+      segment_remain_pct: Math.max(0, 100 - snap.routeProgress),
+      route_progress: snap.routeProgress,
+    };
+    const maintStation = snap.maintStation ?? snap.yardSlotId ?? undefined;
+    const existing = await this.orderRepository.findOne({ where: { id: snap.orderId } });
+    if (existing) {
+      existing.vehicleCode = snap.vehicleCode;
+      existing.tripCode = snap.tripCode;
+      existing.lineKind = 'MAINTENANCE';
+      existing.maintTypeLabel = snap.maintTypeLabel;
+      existing.maintTypeBg = snap.maintTypeBg;
+      existing.maintTypeColor = snap.maintTypeColor;
+      existing.iconBgColor = snap.iconBgColor;
+      existing.progressMarkerIcon = snap.progressMarkerIcon;
+      existing.maintStation = maintStation;
+      existing.nextStation = snap.yardSlotId ?? maintStation ?? existing.nextStation;
+      existing.payload = { ...(existing.payload ?? {}), ...payloadPatch };
+      if (existing.status === OrderStatus.END) {
+        existing.status = OrderStatus.PENDING;
+        existing.completedAt = null;
+      }
+      return this.orderRepository.save(existing);
+    }
+
+    const created = await this.createOrder({
+      order_id: snap.orderId,
+      vehicle_code: snap.vehicleCode,
+      trip_code: snap.tripCode,
+      line_kind: 'MAINTENANCE',
+      priority_level: 40,
+      payload: payloadPatch,
+    }, { initialStatus: OrderStatus.PENDING, skipAssign: true });
+    created.maintTypeLabel = snap.maintTypeLabel;
+    created.maintTypeBg = snap.maintTypeBg;
+    created.maintTypeColor = snap.maintTypeColor;
+    created.iconBgColor = snap.iconBgColor;
+    created.progressMarkerIcon = snap.progressMarkerIcon;
+    created.maintStation = maintStation;
+    created.nextStation = snap.yardSlotId ?? maintStation;
+    return this.orderRepository.save(created);
+  }
+
   private isShiftTripCode(raw: unknown): boolean {
     return typeof raw === 'string' && /^[DU]\d{4}$/i.test(raw.trim());
   }
@@ -571,6 +690,19 @@ export class OrderService {
     const etaSec = typeof currentLeg?.eta_seconds === 'number'
       ? Math.max(0, Math.round(currentLeg.eta_seconds))
       : null;
+    const legEtaMaxFromPayload = typeof currentLeg?.leg_eta_max === 'number'
+      ? Math.max(0, Math.round(currentLeg.leg_eta_max))
+      : null;
+
+    const prevPayload = (order.payload ?? {}) as Record<string, unknown>;
+    const legEtaMax: Record<string, number> = {
+      ...((prevPayload.leg_eta_max as Record<string, number> | undefined) ?? {}),
+    };
+    if (legTarget && legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0) {
+      legEtaMax[legTarget] = legEtaMaxFromPayload;
+    } else if (legTarget && etaSec != null) {
+      legEtaMax[legTarget] = Math.max(legEtaMax[legTarget] ?? 0, etaSec);
+    }
 
     order.tripCode = tripCode;
     order.vehicleCode = vehicleCode;
@@ -586,6 +718,7 @@ export class OrderService {
       ...(order.payload ?? {}),
       vehicle_phase: payload.vehicle_phase ?? 'AWAITING_DEPARTURE',
       current_leg: currentLeg ?? null,
+      leg_eta_max: legEtaMax,
       operation_action: payload.operation_action ?? null,
       route_progress: 0,
       segment_index: 0,

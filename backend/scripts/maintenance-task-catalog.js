@@ -66,10 +66,13 @@ function slotTaskKey(yardSlotId) {
 }
 
 function resolveTaskKey({ fleet_task: fleetTask, yard_slot_id: yardSlotId }) {
+  // 格位 ID 優先於 fleet_task（充電完成變 standby 時仍應顯示充電格）
+  const fromSlot = slotTaskKey(yardSlotId);
+  if (fromSlot) return fromSlot;
   const fromFleet = fleetTask ? FLEET_TASK_ALIAS[fleetTask] : undefined;
   if (fromFleet === null) return null;
   if (typeof fromFleet === 'string') return fromFleet;
-  return slotTaskKey(yardSlotId) ?? 'maintenance';
+  return 'maintenance';
 }
 
 /**

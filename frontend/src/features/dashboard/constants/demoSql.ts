@@ -6,6 +6,11 @@ export const LIST_INDEX_VAR = 'item';
 /** 示範查詢時間下界：過去 7 天（後端啟動時會 refresh 時間戳，此窗口作為雙重保險） */
 export const DAY_MS = `(EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint`;
 
+/** 將 localStorage／樣板殘留的 ${DAY_MS} 展開為可執行 SQL（避免 interpolateVariables 原樣送出） */
+export function expandBuiltinSqlMacros(sql: string): string {
+  return sql.replace(/\$\{DAY_MS\}/g, DAY_MS);
+}
+
 export const EVENT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_events,

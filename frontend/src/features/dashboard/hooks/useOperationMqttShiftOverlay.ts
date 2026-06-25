@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useMqttData } from '../elements/useMqttData';
 import { mergeOperationMqttShiftRow } from '../utils/mergeOperationMqttShiftRow';
+import { mqttPayloadIsFresh } from '../route-progress/useAnimatedTrackPercent';
 
 const DS_MQTT = 'default-mqtt';
 
@@ -23,9 +24,11 @@ export function useOperationMqttShiftOverlay(
     mqttState.data && typeof mqttState.data === 'object' && !('value' in mqttState.data)
       ? (mqttState.data as Record<string, unknown>)
       : null;
+  const freshPayload =
+    mqttPayload && mqttPayloadIsFresh(mqttPayload) ? mqttPayload : null;
 
   return useMemo(
-    () => mergeOperationMqttShiftRow(sqlRow, mqttPayload),
-    [sqlRow, mqttPayload],
+    () => mergeOperationMqttShiftRow(sqlRow, freshPayload),
+    [sqlRow, freshPayload],
   );
 }

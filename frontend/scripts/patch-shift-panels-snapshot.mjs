@@ -13,6 +13,7 @@ const templatePaths = [
 const sqlPath = resolve(__dirname, '../src/features/dashboard/constants/demoSql.ts');
 
 const DAY_MS = `(EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint`;
+const SHIFT_ROSTER_REFRESH_INTERVAL = 15;
 
 const sqlSource = readFileSync(sqlPath, 'utf8');
 function extractSql(name) {
@@ -30,11 +31,12 @@ function patchPlane(plane) {
   for (const el of plane.elements ?? []) {
     if (el.label === '正線班次' && el.isGroup) {
       el.sqlQuery = MAINLINE_SHIFTS_SQL;
-      el.refreshInterval = 2;
+      el.refreshInterval = SHIFT_ROSTER_REFRESH_INTERVAL;
       changed = true;
     }
     if (el.label === '整備班表' && el.isGroup) {
       el.sqlQuery = MAINTENANCE_SHIFTS_SQL;
+      el.refreshInterval = SHIFT_ROSTER_REFRESH_INTERVAL;
       changed = true;
     }
   }

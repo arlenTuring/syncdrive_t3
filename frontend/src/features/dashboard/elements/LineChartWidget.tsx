@@ -454,6 +454,9 @@ export function LineChartWidgetView({ widget }: { widget: LineChartWidget }) {
     dataSourceId: widget.dataSourceId,
     sqlQuery: widget.sqlQuery,
     dataUrl: widget.dataUrl,
+    refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    invalidateTags: widget.invalidateTags,
   });
   const hasSource = !!(widget.dataSourceId || widget.dataUrl);
   const modeLabel = widget.viewportMode === 'data-centered' ? '資料為中心' : '定軸';

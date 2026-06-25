@@ -5,7 +5,7 @@ import {
   MAINLINE_FLEET_STATUS_SQL,
 } from '../constants/demoSql';
 
-/** 內建群組 SQL：槽位名冊（低頻）；即時欄位由 MQTT operation/update */
+/** 內建群組 SQL：名冊 bootstrap（載入時查一次）；槽位增刪由 MQTT operation/update 即時驅動 */
 export const SHIFT_ROSTER_REFRESH_INTERVAL = 0;
 
 export function resolveBuiltinGroupSql(element: CanvasElementProps): {
@@ -22,8 +22,8 @@ export function resolveBuiltinGroupSql(element: CanvasElementProps): {
   return { sqlQuery: element.sqlQuery, refreshInterval: element.refreshInterval };
 }
 
-/** 正線營運 X/Y：Y 為當前正線名冊訂單數，非寫死場上容量（模擬器 4 台為示範設定） */
-export const MAINLINE_FLEET_REFRESH_INTERVAL = 15;
+/** 正線營運 X/Y：寫庫後推送失效，非 15s 輪詢 */
+export const MAINLINE_FLEET_REFRESH_INTERVAL = 0;
 
 export function resolveBuiltinFleetSql(content: string, valueField?: string): string | undefined {
   if (valueField === 'mainline_fleet_line' || content.includes('正線營運')) {

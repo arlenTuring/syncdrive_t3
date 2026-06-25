@@ -10,6 +10,7 @@ import {
   MAINLINE_FLEET_REFRESH_INTERVAL,
 } from './resolveBuiltinGroupSql';
 import { migrateChildWidgetGenerics } from './migrateWidgetGenerics';
+import { patchEventDrivenSqlRefresh } from './patchEventDrivenSqlRefresh';
 
 const DS_INTERNAL = 'default-internal';
 
@@ -31,13 +32,18 @@ export function needsShiftPanelsSimulationSqlFix(plane: DashboardPlane): boolean
     if (!el) continue;
     const sql = el.sqlQuery ?? '';
     if (sql.includes('${DAY_MS}')) return true;
-    if (!sql.includes('operation_route_stations')) return true;
-    if (label === '正線班次' && !sql.includes('order_action_states')) return true;
-    if (label === '正線班次' && sql.includes('DEMO-ORD')) return true;
-    if (label === '正線班次' && !sql.includes('trip_start_minutes')) return true;
-    if (label === '正線班次' && sql.includes('AND o.created_at >=')) return true;
-    if (label === '正線班次' && (el.refreshInterval ?? 0) > SHIFT_ROSTER_REFRESH_INTERVAL && (el.refreshInterval ?? 0) <= 2) return true;
-    if (label === '正線班次' && !sql.includes("payload->'current_leg'")) return true;
+    if ((el.refreshInterval ?? 0) === 0) return true;
+    if (label === '正線班次') {
+      if (!sql.includes('operation_route_stations')) return true;
+      if (!sql.includes('order_action_states')) return true;
+      if (sql.includes('DEMO-ORD')) return true;
+      if (!sql.includes('trip_start_minutes')) return true;
+      if (!sql.includes("payload->'current_leg'")) return true;
+    }
+    if (label === '整備班表') {
+      if (!sql.includes('WITH m0')) return true;
+      if (!sql.includes('zone_label')) return true;
+    }
   }
   return false;
 }
@@ -61,6 +67,8 @@ function patchFleetTextChild(child: ChildWidget): ChildWidget {
       ...text,
       sqlQuery: MAINLINE_FLEET_STATUS_SQL,
       refreshInterval: MAINLINE_FLEET_REFRESH_INTERVAL,
+      refreshMode: 'event',
+      invalidateTags: ['domain:mainline_shifts', 'table:operation_orders'],
     };
   }
   if (!text.content?.includes('正線營運')) return child;
@@ -71,6 +79,8 @@ function patchFleetTextChild(child: ChildWidget): ChildWidget {
     sqlQuery: MAINLINE_FLEET_STATUS_SQL,
     valueField: 'mainline_fleet_line',
     refreshInterval: MAINLINE_FLEET_REFRESH_INTERVAL,
+    refreshMode: 'event',
+    invalidateTags: ['domain:mainline_shifts', 'table:operation_orders'],
   };
 }
 
@@ -137,10 +147,12 @@ export function patchVehicleMonitorBadgeProtocol(plane: DashboardPlane): Dashboa
 
 /** 執行期資料修補（不變更版面座標） */
 export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlane {
-  return patchMainlineFleetStatusWidget(
-    patchShiftCardRouteProgressMqtt(
-      patchShiftPanelsSimulationSql(
-        patchVehicleMonitorBadgeProtocol(plane),
+  return patchEventDrivenSqlRefresh(
+    patchMainlineFleetStatusWidget(
+      patchShiftCardRouteProgressMqtt(
+        patchShiftPanelsSimulationSql(
+          patchVehicleMonitorBadgeProtocol(plane),
+        ),
       ),
     ),
   );

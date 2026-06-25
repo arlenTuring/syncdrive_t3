@@ -15,6 +15,11 @@ import {
 import { DualCanvasDefaultView } from './DualCanvasDefaultView';
 import { buildTemplatePreviewRow } from '../utils/groupTemplateContext';
 import { useOperationMqttShiftOverlay } from '../hooks/useOperationMqttShiftOverlay';
+import { useShiftFleetOperationMqtt } from '../hooks/useShiftFleetOperationMqtt';
+import {
+  mergeMainlineShiftRoster,
+  mergeMaintenanceShiftRoster,
+} from '../utils/mergeShiftRosterRows';
 import { Edit3, Variable } from 'lucide-react';
 
 function isShiftRosterGroup(label: string | undefined): boolean {
@@ -602,6 +607,8 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected: _is
     sqlQuery: builtinSql.sqlQuery,
     dataUrl: element.dataUrl,
     refreshInterval: builtinSql.refreshInterval ?? element.refreshInterval,
+    refreshMode: element.refreshMode,
+    invalidateTags: element.invalidateTags,
   });
 
   const gateSameAsMain = gate?.sqlQuery?.trim()
@@ -612,14 +619,28 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected: _is
     dataSourceId: isDualCanvasGroup(element) && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateDs : undefined,
     sqlQuery: isDualCanvasGroup(element) && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateSql : undefined,
     refreshInterval: gate?.refreshInterval ?? element.refreshInterval,
+    refreshMode: gate?.refreshMode ?? element.refreshMode,
+    invalidateTags: gate?.invalidateTags ?? element.invalidateTags,
   });
 
   const hasDataSource = !!(element.dataSourceId || element.dataUrl);
   const isPreviewMode = !hasDataSource;
   const isLoading = hasDataSource && loading;
-  const isEmpty = hasDataSource && !loading && data.length === 0;
+  const isShiftRoster = isShiftRosterGroup(element.label);
+  const fleetMqtt = useShiftFleetOperationMqtt(isShiftRoster && !isEditMode && hasDataSource);
   const dataRows = hasDataSource && data.length > 0 ? data : [];
-  const rows: (Record<string, unknown> | null)[] = isPreviewMode ? [null] : dataRows;
+  const mergedRows = useMemo(() => {
+    if (!isShiftRoster || isEditMode || isPreviewMode) return dataRows;
+    if (element.label === '正線班次') {
+      return mergeMainlineShiftRoster(dataRows, fleetMqtt);
+    }
+    if (element.label === '整備班表') {
+      return mergeMaintenanceShiftRoster(dataRows, fleetMqtt);
+    }
+    return dataRows;
+  }, [isShiftRoster, isEditMode, isPreviewMode, element.label, dataRows, fleetMqtt]);
+  const isEmpty = hasDataSource && !loading && mergedRows.length === 0;
+  const rows: (Record<string, unknown> | null)[] = isPreviewMode ? [null] : mergedRows;
 
   const gateRows = gateSameAsMain ? data : (gate?.sqlQuery?.trim() ? gateQuery.data : data);
   const gateRowCount = gateRows.length;

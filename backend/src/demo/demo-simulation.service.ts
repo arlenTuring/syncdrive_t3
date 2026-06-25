@@ -7,10 +7,15 @@ import * as os from 'os';
 import * as path from 'path';
 import { createRequire } from 'module';
 import { DashboardDemoSeedService } from '../database/dashboard-demo-seed.service';
-import { OrderService, type MainlineOrderLifecycleSnapshot } from '../order/order.service';
+import {
+  OrderService,
+  type MainlineOrderLifecycleSnapshot,
+  type MaintenanceOrderLifecycleSnapshot,
+} from '../order/order.service';
 import { CommandService } from '../command/command.service';
 import { CommandType } from '../database/entities/command-log.entity';
 import { VTMS_VEHICLE_CODE_PATTERN } from '../common/vehicle-codes';
+import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 
 const requireCjs = createRequire(__filename);
 
@@ -175,6 +180,7 @@ export class DemoSimulationService {
     private readonly dashboardDemoSeed: DashboardDemoSeedService,
     private readonly orderService: OrderService,
     private readonly commandService: CommandService,
+    private readonly datasourceInvalidation: DatasourceInvalidationService,
   ) {}
 
   async getStatus(): Promise<DemoSimulationStatus> {
@@ -573,6 +579,10 @@ export class DemoSimulationService {
           AND status IN ('PROCESSING', 'PENDING')
       `);
       await this.syncVehicleTrackSql();
+      this.datasourceInvalidation.emit(
+        [DS_TAGS.CAPACITY_TREND, DS_TAGS.SHIFT_CENTER, DS_TAGS.VEHICLE_MONITOR],
+        'demo_sql_tick',
+      );
     } catch (err) {
       this.logger.warn('Demo SQL tick failed', err);
     }
@@ -642,6 +652,7 @@ export class DemoSimulationService {
       const chargingInYard = getVehiclesInYardKind?.('charge') ?? [];
       const maintCatalog = this.resolveMaintenanceTaskCatalog();
       const mainlineSnapshots: MainlineOrderLifecycleSnapshot[] = [];
+      const maintenanceSnapshots: MaintenanceOrderLifecycleSnapshot[] = [];
 
       for (const vehicleId of VEHICLE_POOL) {
         const battery = getVehicleBattery(vehicleId);
@@ -686,6 +697,7 @@ export class DemoSimulationService {
           yard_slot_id?: string | null;
           cycleIndex?: number;
           legDepartMs?: number;
+          station?: string;
         } | null;
         if (!motion?.track) continue;
 
@@ -724,6 +736,25 @@ export class DemoSimulationService {
 
         const maintMeta = maintCatalog.resolveMaintenanceTaskMeta(motion);
         if (maintMeta) {
+          if (!isMainlineFleetMotion(motion)) {
+            const tripCode = maintCatalog.maintenanceTripCode(motion, maintMeta);
+            const yardRoute = yardRouteFromSlot(motion.yard_slot_id);
+            maintenanceSnapshots.push({
+              vehicleCode: vehicleId,
+              orderId: `DEMO-ORD-${vehicleId}`,
+              tripCode,
+              phase: maintMeta.order_status === 'PROCESSING' ? 'processing' : 'pending',
+              maintTypeLabel: String(maintMeta.maint_type_label ?? '整備'),
+              maintTypeBg: String(maintMeta.maint_type_bg ?? 'transparent'),
+              maintTypeColor: String(maintMeta.maint_type_color ?? '#FD9A00'),
+              iconBgColor: String(maintMeta.icon_bg_color ?? '#51A2FF'),
+              progressMarkerIcon: String(maintMeta.progress_marker_icon ?? 'Zap'),
+              yardSlotId: motion.yard_slot_id ?? null,
+              maintStation: typeof motion.station === 'string' ? motion.station : null,
+              segmentIndex: yardRoute.segmentIndex,
+              routeProgress: yardRoute.routeProgress,
+            });
+          }
           await this.dataSource.query(
             `
             UPDATE vehicle_monitor_demo
@@ -764,6 +795,19 @@ export class DemoSimulationService {
       } catch (err) {
         this.logger.warn(
           `reconcile mainline orders failed: ${(err as Error)?.message ?? err}`,
+        );
+      }
+
+      try {
+        const maintEnded = await this.orderService.reconcileMaintenanceOrderLifecycle(
+          maintenanceSnapshots,
+        );
+        if (maintEnded > 0) {
+          this.logger.debug(`reconcile maintenance orders: ended ${maintEnded} stale task(s)`);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `reconcile maintenance orders failed: ${(err as Error)?.message ?? err}`,
         );
       }
 

@@ -406,6 +406,8 @@ function operation(vehicleCode, motion) {
     return {
       vehicle_code: vehicleCode,
       timestamp: ts,
+      order_id: `DEMO-ORD-${vehicleCode}`,
+      yard_slot_id: motion.yard_slot_id ?? null,
       ...maintFields,
     };
   }

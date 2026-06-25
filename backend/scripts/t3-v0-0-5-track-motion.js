@@ -2168,11 +2168,11 @@ function getVehicleFleetTask(vehicleId) {
   const vehicle = fleetBatteryState?.vehicles?.[vehicleId];
   if (!vehicle) return 'unknown';
   if (vehicle.status === 'on_field') return 'shift_run';
-  if (vehicle.status === 'charging') {
-    return vehicle.yardSlot?.kind === 'charge' ? 'charge' : 'charge_queue';
-  }
-  if (vehicle.yardSlot?.kind === 'park') return 'park';
-  if (vehicle.yardSlot?.kind === 'maint') return 'maintenance';
+  const slotKind = vehicle.yardSlot?.kind;
+  if (slotKind === 'charge') return 'charge';
+  if (slotKind === 'park') return 'park';
+  if (slotKind === 'maint') return 'maintenance';
+  if (vehicle.status === 'charging') return 'charge_queue';
   return 'standby';
 }
 
@@ -2404,22 +2404,40 @@ const MAINLINE_LEG_MILESTONES = {
   T3_DEP: 0.68,
   TERM_ARR: 0.88,
 };
+/** 班次卡 route-progress 站點錨點（與 route_stations.remain_pct 一致） */
+const MAINLINE_T3_BAR_PCT = 45;
 const MAINLINE_SEGMENT_DIST_M = {
   TO_MID: 820,
   TO_TERM: 640,
 };
 
+/** 軌道 motion.progress (0–1) → 班次卡橫條 0–100（與圖台軌跡同一進度來源） */
+function mainlineRouteProgressPercent(progressRaw) {
+  const p = Math.max(0, Math.min(1, Number(progressRaw) || 0));
+  const { T3_ARR, T3_DEP, TERM_ARR } = MAINLINE_LEG_MILESTONES;
+  if (p >= TERM_ARR) return 100;
+  if (p >= T3_DEP) {
+    const span = TERM_ARR - T3_DEP;
+    const t = span > 0 ? (p - T3_DEP) / span : 1;
+    return Math.round(MAINLINE_T3_BAR_PCT + t * (100 - MAINLINE_T3_BAR_PCT));
+  }
+  if (p >= T3_ARR) return MAINLINE_T3_BAR_PCT;
+  if (T3_ARR <= 0) return 0;
+  return Math.round((p / T3_ARR) * MAINLINE_T3_BAR_PCT);
+}
+
 function buildPreDepartureCurrentLeg(tripCode, departEtaSeconds) {
-  const code = String(tripCode ?? '').trim().toUpperCase();
-  const origin = code.startsWith('U') ? 'S2W' : 'N2W';
   const eta = Math.max(0, Math.round(Number(departEtaSeconds) || 0));
+  // eta_seconds：到下一站（T3）剩餘時間；待發時為發車倒數
   return {
-    target_station_id: origin,
+    target_station_id: 'T3',
     distance_to_target_m: 0,
     eta_seconds: eta,
+    leg_eta_max: Math.max(eta, 1),
   };
 }
 
+/** 營運任務協議 current_leg：eta_seconds 永遠是到 target_station_id（下一站）剩餘秒數，非整條路線 */
 function buildMainlineCurrentLeg(tripCode, progressRaw) {
   const progress = Math.max(0, Math.min(1, Number(progressRaw) || 0));
   const legDurationSec = LEG_DURATION_MS / 1000;
@@ -2428,8 +2446,16 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
   const dest = isUp ? 'N2W' : 'S2W';
   const m = MAINLINE_LEG_MILESTONES;
 
+  const legEtaToMid = Math.round(m.T3_ARR * legDurationSec);
+  const legEtaToTerm = Math.round((m.TERM_ARR - m.T3_DEP) * legDurationSec);
+
   if (progress >= m.TERM_ARR) {
-    return { target_station_id: dest, distance_to_target_m: 0, eta_seconds: 0 };
+    return {
+      target_station_id: dest,
+      distance_to_target_m: 0,
+      eta_seconds: 0,
+      leg_eta_max: legEtaToTerm,
+    };
   }
   if (progress >= m.T3_DEP) {
     const remainFrac = m.TERM_ARR - progress;
@@ -2437,17 +2463,32 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
     const dist = eta > 0
       ? Math.max(0, Number(((remainFrac / (m.TERM_ARR - m.T3_DEP)) * MAINLINE_SEGMENT_DIST_M.TO_TERM).toFixed(1)))
       : 0;
-    return { target_station_id: dest, distance_to_target_m: dist, eta_seconds: eta };
+    return {
+      target_station_id: dest,
+      distance_to_target_m: dist,
+      eta_seconds: eta,
+      leg_eta_max: legEtaToTerm,
+    };
   }
   if (progress >= m.T3_ARR) {
-    return { target_station_id: mid, distance_to_target_m: 0, eta_seconds: 0 };
+    return {
+      target_station_id: mid,
+      distance_to_target_m: 0,
+      eta_seconds: 0,
+      leg_eta_max: legEtaToMid,
+    };
   }
   const remainFrac = m.T3_ARR - progress;
   const eta = Math.max(0, Math.round(remainFrac * legDurationSec));
   const dist = eta > 0
     ? Math.max(0, Number(((remainFrac / m.T3_ARR) * MAINLINE_SEGMENT_DIST_M.TO_MID).toFixed(1)))
     : 0;
-  return { target_station_id: mid, distance_to_target_m: dist, eta_seconds: eta };
+  return {
+    target_station_id: mid,
+    distance_to_target_m: dist,
+    eta_seconds: eta,
+    leg_eta_max: legEtaToMid,
+  };
 }
 
 const motionExports = {
@@ -2502,8 +2543,9 @@ const motionExports = {
   computeSignalLamps,
   signalsOnTravelSegment,
   buildMainlineCurrentLeg,
-  buildPreDepartureCurrentLeg,
+  mainlineRouteProgressPercent,
   MAINLINE_LEG_MILESTONES,
+  buildPreDepartureCurrentLeg,
 };
 
 Object.defineProperty(motionExports, 'YARD_CHARGING', {

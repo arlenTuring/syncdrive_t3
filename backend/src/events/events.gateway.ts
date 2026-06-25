@@ -53,4 +53,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   broadcastMqttMessage(topic: string, payload: any) {
     this.server.emit(`mqtt/${topic}`, payload);
   }
+
+  /** SQL 元件：後端寫庫後推送失效標籤，前端訂閱者重查（取代輪詢） */
+  broadcastDatasourceInvalidate(payload: { tags: string[]; at: number; reason?: string }) {
+    this.server.emit('datasource/invalidate', payload);
+  }
 }

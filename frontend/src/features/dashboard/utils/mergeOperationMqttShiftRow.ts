@@ -60,6 +60,25 @@ export function mergeOperationMqttShiftRow(
     return base;
   }
 
+  const runningPhase =
+    phase === 'TRANSITING'
+    || phase === 'DWELLING'
+    || phase === 'DOCKING'
+    || phase === 'CHARGING'
+    || phase === 'YARD_DWELLING';
+
+  if (orderStatus === 'PROCESSING' || runningPhase) {
+    const delayMin = Number(base.delay_minutes ?? 0);
+    const delayed = delayMin > 0;
+    base.order_status = 'PROCESSING';
+    base.status_label = delayed ? '延誤' : '準時';
+    base.status_bg = delayed ? 'rgba(255, 105, 0, 0.3)' : 'rgba(0, 212, 146, 0.3)';
+    base.status_color = delayed ? '#FF8904' : '#00D492';
+    base.card_border_color = delayed ? '#FF8904' : '#00D492';
+    base.is_alert = false;
+    return base;
+  }
+
   if (phase === 'AWAITING_DEPARTURE' || orderStatus === 'PENDING') {
     base.order_status = 'PENDING';
     base.status_label = '待發';

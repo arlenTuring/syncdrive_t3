@@ -1,5 +1,6 @@
 import React from 'react';
-import type { WidgetDataBinding } from '../types';
+import type { FreshnessPolicy, WidgetDataBinding } from '../types';
+import { resolveFreshness, FRESHNESS_POLICY_OPTIONS } from '../utils/resolveFreshness';
 import { DataSourcePicker } from './DataSourcePicker';
 import { DataSourceIdSelect } from './DataSourceIdSelect';
 
@@ -93,17 +94,36 @@ export function WidgetDataBindingSettings({
         </Field>
       )}
 
-      {(mode === 'sql' || mode === 'rest') && (
-        <Field label="自動重新整理 (秒)">
+      <Field label="更新方式">
+        <select
+          value={w.freshnessPolicy ?? 'auto'}
+          onChange={(e) => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
+          className={inputCls}
+        >
+          {FRESHNESS_POLICY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <p className="text-zinc-500 text-[10px] leading-snug mt-1">
+          {FRESHNESS_POLICY_OPTIONS.find((o) => o.value === (w.freshnessPolicy ?? 'auto'))?.hint}
+          <span className="block text-zinc-600 mt-0.5">目前由平台判定：{resolveFreshness(w).reason}</span>
+        </p>
+        {(w.freshnessPolicy ?? 'auto') === 'interval' && (
           <input
             type="number"
-            min={0}
-            value={w.refreshInterval || 0}
+            min={1}
+            value={w.refreshInterval || 15}
             onChange={(e) => onUpdate({ refreshInterval: +e.target.value })}
-            className={inputCls}
+            className={`${inputCls} mt-1.5`}
+            placeholder="每隔幾秒更新"
           />
-        </Field>
-      )}
+        )}
+        {(w.freshnessPolicy ?? 'auto') === 'interval' && (
+          <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
+            ⚠ 定時輪詢會對資料庫造成重複查詢，僅建議用於無法即時推送的資料。
+          </p>
+        )}
+      </Field>
     </div>
   );
 }

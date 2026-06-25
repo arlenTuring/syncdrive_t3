@@ -745,6 +745,7 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
     sqlRow,
     rawValue,
     mqttPayload,
+    { mqttOnly: isShiftCardTrack },
   );
   const isPending = readOrderStatus(variables as Record<string, unknown>, sqlRow, mqttPayload) === 'PENDING';
 

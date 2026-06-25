@@ -1,5 +1,16 @@
 // ─── 資料綁定介面 ──────────────────────────────────────────────
 
+/**
+ * 使用者面向的「資料新鮮度」策略（取代讓使用者背 refreshMode / invalidate tag）。
+ * 平台依此 + 資料來源型別，自動決定底層機制（stream / event / poll / once）。
+ * - auto：自動（建議）。平台依資料來源推斷：MQTT→即時、可推斷失效標籤的 SQL→有變更就更新、其餘→僅載入一次。
+ * - live：即時串流（MQTT）。
+ * - on_change：有變更就更新（寫庫後由後端推送，重查一次）。
+ * - interval：定時輪詢（需指定秒數；僅建議用於無法推送的來源）。
+ * - once：僅載入一次。
+ */
+export type FreshnessPolicy = 'auto' | 'live' | 'on_change' | 'interval' | 'once';
+
 export interface WidgetDataBinding {
   // 模式 A: 直接輸入 REST URL
   dataUrl?: string;
@@ -13,8 +24,22 @@ export interface WidgetDataBinding {
   mqttTopic?: string;
   mqttValuePath?: string; // JSON 路徑，如 'payload.speed'
 
-  // 通用設定
-  refreshInterval?: number; // 秒，針對 REST/SQL
+  // ── 使用者面向（建議只暴露這個）──────────────────
+  /** 資料新鮮度策略（預設 auto，由平台決定底層機制）。 */
+  freshnessPolicy?: FreshnessPolicy;
+
+  // ── 通用設定 ──────────────────────────────────────
+  refreshInterval?: number; // 秒，僅 freshnessPolicy='interval' / 舊 poll 模式使用
+  /**
+   * 底層更新機制（平台內部；一般使用者不應手動設定，由 freshnessPolicy 推導）：
+   * - stream：不走 SQL（綁 MQTT）
+   * - once：載入時查一次
+   * - event：寫庫後由後端推送失效標籤，觸發重查
+   * - poll：定時輪詢（legacy）
+   */
+  refreshMode?: 'stream' | 'once' | 'event' | 'poll';
+  /** 訂閱失效標籤；省略時由 inferInvalidateTagsFromSql(sqlQuery) 推斷 */
+  invalidateTags?: string[];
 }
 
 // ─── Widget (子元件) 型別 ──────────────────────────────────────────
@@ -411,7 +436,7 @@ export interface RouteProgressWidget extends WidgetBase, WidgetDataBinding {
 // ─── 新增元件型別 ─────────────────────────────────────────────────
 
 /** 色塊：純背景色矩形，作為底層裝飾，其他元件可覆蓋其上 */
-export interface ColorBlockWidget extends WidgetBase, Pick<WidgetDataBinding, 'dataSourceId' | 'sqlQuery' | 'refreshInterval' | 'mqttDataSourceId' | 'mqttTopic' | 'mqttValuePath'> {
+export interface ColorBlockWidget extends WidgetBase, Pick<WidgetDataBinding, 'dataSourceId' | 'sqlQuery' | 'refreshInterval' | 'refreshMode' | 'freshnessPolicy' | 'invalidateTags' | 'mqttDataSourceId' | 'mqttTopic' | 'mqttValuePath'> {
   type: 'color-block';
   backgroundColor: string;
   borderRadius: number;
@@ -800,6 +825,8 @@ export interface DualCanvasDisplayGate {
   dataSourceId?: string;
   sqlQuery?: string;
   refreshInterval?: number;
+  refreshMode?: WidgetDataBinding['refreshMode'];
+  invalidateTags?: string[];
   /**
    * 比較信號：
    * - rowCount：查詢回傳列數
@@ -853,6 +880,8 @@ export interface CanvasElementProps {
   sqlQuery?: string;
   dataUrl?: string;
   refreshInterval?: number;
+  refreshMode?: WidgetDataBinding['refreshMode'];
+  invalidateTags?: string[];
   // 變數設定
   iteratorField?: string;
   variableName?: string;
