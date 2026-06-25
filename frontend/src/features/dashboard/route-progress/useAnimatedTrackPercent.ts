@@ -40,42 +40,45 @@ function useSmoothMqttProgress(
   const [display, setDisplay] = useState(mqttTarget ?? fallback);
   const currentRef = useRef(mqttTarget ?? fallback);
   const targetRef = useRef(mqttTarget ?? fallback);
+  const rafRef = useRef(0);
 
+  // 換卡（rowKey 變）時重置基準，不在每次 mqttTarget 變動就 snap
   useEffect(() => {
     const seed = mqttTarget ?? fallback;
     currentRef.current = seed;
     targetRef.current = seed;
     setDisplay(seed);
-  }, [rowKey, mqttTarget, fallback]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowKey]);
 
+  // 目標更新時，只在「需要動畫」時啟動 rAF；到達目標即停止重排，避免常駐 60fps 迴圈
   useEffect(() => {
     if (!enabled || mqttTarget === undefined) return;
     targetRef.current = mqttTarget;
-  }, [enabled, mqttTarget]);
+    if (rafRef.current !== 0) return; // 已有動畫在跑
 
-  useEffect(() => {
-    if (!enabled) return;
-
-    let raf = 0;
-    const SMOOTH = 0.055;
-
+    const SMOOTH = 0.12;
     const tick = () => {
       const target = targetRef.current;
-      let cur = currentRef.current;
-      const delta = target - cur;
-      if (Math.abs(delta) < 0.03) {
-        cur = target;
-      } else {
-        cur += delta * SMOOTH;
+      const delta = target - currentRef.current;
+      if (Math.abs(delta) < 0.05) {
+        currentRef.current = target;
+        setDisplay(target);
+        rafRef.current = 0; // 抵達目標 → 停止迴圈（不再重排 rAF）
+        return;
       }
-      currentRef.current = cur;
-      setDisplay(cur);
-      raf = requestAnimationFrame(tick);
+      currentRef.current += delta * SMOOTH;
+      setDisplay(currentRef.current);
+      rafRef.current = requestAnimationFrame(tick);
     };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [enabled, mqttTarget]);
 
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [enabled, rowKey]);
+  // 卸載時清掉殘留 rAF
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = 0;
+  }, []);
 
   return enabled && mqttTarget !== undefined ? display : fallback;
 }

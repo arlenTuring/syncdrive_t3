@@ -49,45 +49,44 @@ export function useMqttData(opts: {
     const socket = acquireSocket(ds.backendUrl);
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      setState(s => ({ ...s, connected: true, error: null }));
-    });
-
-    socket.on('disconnect', () => {
-      setState(s => ({ ...s, connected: false }));
-    });
-
-    socket.on('connect_error', (err) => {
+    // 具名 handler：清理時逐一移除，避免在共用 socket 上累積洩漏
+    const onConnect = () => setState(s => ({ ...s, connected: true, error: null }));
+    const onDisconnect = () => setState(s => ({ ...s, connected: false }));
+    const onConnectError = (err: Error) =>
       setState(s => ({ ...s, connected: false, error: `連線失敗: ${err.message}` }));
-    });
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
+    if (socket.connected) setState(s => ({ ...s, connected: true, error: null }));
 
-    // 監聽轉發的 MQTT 主題
-    // 後端 EventsGateway 會 emit `mqtt/${topic}`
+    // 監聽轉發的 MQTT 主題（後端 EventsGateway emit `mqtt/${topic}`）
     const eventName = `mqtt/${finalTopic}`;
-    socket.on(eventName, (payload: any) => {
+    const onMessage = (payload: any) => {
       if (pausedRef.current) return;
 
       let extractedData = payload;
 
-      // 如果有指定 JSON 路徑，嘗試解析
-      if (mqttValuePath && payload) {
-        try {
-          const parts = mqttValuePath.split('.');
-          let temp = payload;
-          for (const p of parts) {
-            temp = temp[p];
-          }
-          extractedData = { value: temp }; // 包裝成物件以維持一致性
-        } catch (e) {
-          console.error(`[MQTT] Failed to extract path ${mqttValuePath}`, e);
+      // 安全取 JSON 路徑：缺欄位時為 undefined，絕不丟錯／洗版 console
+      // （營運訊息在靠站/車庫時可能無 current_leg，屬正常情形）
+      if (mqttValuePath && payload && typeof payload === 'object') {
+        const parts = mqttValuePath.split('.');
+        let temp: unknown = payload;
+        for (const p of parts) {
+          if (temp == null || typeof temp !== 'object') { temp = undefined; break; }
+          temp = (temp as Record<string, unknown>)[p];
         }
+        extractedData = { value: temp };
       }
 
       setState(s => ({ ...s, data: extractedData }));
-    });
+    };
+    socket.on(eventName, onMessage);
 
     return () => {
-      socket.off(eventName);
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
+      socket.off(eventName, onMessage);
       // 使用 releaseSocket 而非直接 disconnect，讓其他 Widget 可繼續複用連線
       releaseSocket(ds.backendUrl);
       socketRef.current = null;
