@@ -578,9 +578,31 @@ FROM (
 
 /** 整備班表：來自模擬同步的 DEMO-ORD 整備訂單（任務類型／場域格位與軌道模擬一致） */
 export const MAINTENANCE_SHIFTS_SQL = `
+WITH m0 AS (
+  SELECT
+    o.*,
+    COALESCE(NULLIF(o.next_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), 'E1') AS slot_id
+  FROM operation_orders o
+  WHERE o.order_id LIKE 'DEMO-ORD-%'
+    AND o.line_kind = 'MAINTENANCE'
+    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED', 'END')
+    AND o.created_at >= ${DAY_MS}
+),
+m AS (
+  SELECT
+    m0.*,
+    CASE
+      WHEN slot_id LIKE 'E%' THEN '充電區'
+      WHEN slot_id LIKE 'P%' THEN '臨停區'
+      WHEN slot_id LIKE 'H%' THEN '整備區'
+      WHEN slot_id LIKE 'W%' THEN '洗車區'
+      ELSE '場區'
+    END AS zone_label
+  FROM m0
+)
 SELECT
   o.order_id AS shift_key,
-  v.vehicle_code,
+  o.vehicle_code,
   COALESCE(o.trip_code, '—') AS trip_code,
   COALESCE(o.trip_code, '—') AS trip_header,
   COALESCE(o.maint_type_label, '充電') AS maint_type_label,
@@ -615,12 +637,12 @@ SELECT
     ELSE 'rgba(113,113,122,0.45)'
   END AS card_border_color,
   'S2W' AS st_a,
-  'E2' AS st_b,
-  'P1' AS st_c,
+  o.zone_label AS st_b,
+  o.slot_id AS st_c,
   json_build_array(
     json_build_object('name', 'S2W', 'remain_pct', 0),
-    json_build_object('name', 'E2', 'remain_pct', 50),
-    json_build_object('name', 'P1', 'remain_pct', 100)
+    json_build_object('name', o.zone_label, 'remain_pct', 50),
+    json_build_object('name', o.slot_id, 'remain_pct', 100)
   )::text AS route_stations,
   COALESCE((o.payload->>'segment_index')::int, 0) AS segment_index,
   COALESCE(
@@ -670,12 +692,8 @@ SELECT
   END AS icon_bg_color,
   COALESCE(o.progress_marker_icon, 'Zap') AS progress_marker_icon,
   'maintenance' AS line_kind
-FROM operation_orders o
+FROM m o
 JOIN vehicles v ON v.vehicle_code = o.vehicle_code
-WHERE o.order_id LIKE 'DEMO-ORD-%'
-  AND o.line_kind = 'MAINTENANCE'
-  AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED', 'END')
-  AND o.created_at >= ${DAY_MS}
-ORDER BY COALESCE(o.planned_start, o.created_at), v.vehicle_code
+ORDER BY COALESCE(o.planned_start, o.created_at), o.vehicle_code
 LIMIT 6
 `.trim();
