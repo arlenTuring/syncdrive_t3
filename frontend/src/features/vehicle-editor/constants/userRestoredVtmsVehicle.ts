@@ -1,0 +1,188 @@
+import {
+  DEFAULT_BODY_IMAGE,
+  DEFAULT_BODY_TINT,
+  DEFAULT_DOOR_COLOR,
+  DEFAULT_DOOR_IMAGE,
+  DEFAULT_LIGHT_IMAGE,
+} from './palette';
+import type { VehicleDefinition } from '../types';
+
+/** 使用者手動調整後的載具 id（從瀏覽器 localStorage 還原） */
+export const USER_RESTORED_VEHICLE_ID = 'sampleywe93qb';
+
+/** 四門獨立 MQTT 開度欄位（telemetry/update） */
+export const VTMS_DOOR_OPEN_PERCENT_FIELDS = [
+  'door_fl_open_percent',
+  'door_fr_open_percent',
+  'door_rl_open_percent',
+  'door_rr_open_percent',
+] as const;
+
+const MQTT_HEARTBEAT = {
+  mqttDataSourceId: 'default-mqtt',
+  mqttTopic: 'v1/vtms/PMS-01/health/heartbeat',
+} as const;
+
+const MQTT_TELEMETRY = {
+  mqttDataSourceId: 'default-mqtt',
+  mqttTopic: 'v1/vtms/PMS-01/telemetry/update',
+} as const;
+
+/**
+ * VTMS 巴士 PMS-01：260×78 橫向車體，四角落獨立車門。
+ * 元件座標為手動拉好後的版本，勿在 migrate 時重算尺寸。
+ */
+export function createUserRestoredVtmsVehicle(): VehicleDefinition {
+  return {
+    id: USER_RESTORED_VEHICLE_ID,
+    name: 'VTMS 巴士 · PMS-01',
+    width: 260,
+    height: 78,
+    backgroundColor: 'transparent',
+    previewData: {
+      vehicle_code: 'PMS-01',
+      trip_code: 'U0951',
+      badge_label: 'U0951',
+      direction_label: '上行',
+      overall_health: 'OK',
+      door_open_percent: 0,
+      door_fl_open_percent: 0,
+      door_fr_open_percent: 0,
+      door_rl_open_percent: 0,
+      door_rr_open_percent: 0,
+      head_light_on: true,
+      tail_light_on: true,
+      operation_actions: ['door_close', 'dispatch'],
+      operation_action: 'dispatch',
+    },
+    createdAt: 1781221794797,
+    updatedAt: 1781457750474,
+    elements: [
+      {
+        id: 'el5yofn5o',
+        type: 'body',
+        x: 0,
+        y: 0,
+        width: 260,
+        height: 78,
+        rotationDeg: 0,
+        defaultImage: DEFAULT_BODY_IMAGE,
+        defaultTintColor: DEFAULT_BODY_TINT,
+        imageRules: [],
+        ...MQTT_HEARTBEAT,
+      },
+      {
+        id: 'elx6omf8y',
+        type: 'light',
+        x: -56,
+        y: -49,
+        width: 76,
+        height: 167,
+        rotationDeg: 0,
+        defaultImage: DEFAULT_LIGHT_IMAGE,
+        visibilityField: 'head_light_on',
+        imageRules: [],
+        ...MQTT_TELEMETRY,
+      },
+      {
+        id: 'elk9m2tail',
+        type: 'light',
+        x: 240,
+        y: -49,
+        width: 76,
+        height: 167,
+        rotationDeg: 180,
+        defaultImage: DEFAULT_LIGHT_IMAGE,
+        visibilityField: 'tail_light_on',
+        imageRules: [],
+        ...MQTT_TELEMETRY,
+      },
+      {
+        id: 'elhofqpk0',
+        type: 'text',
+        x: 74,
+        y: 10,
+        width: 113,
+        height: 30,
+        rotationDeg: 0,
+        valueField: 'trip_code',
+        fontSize: 23,
+        fontWeight: 'bold',
+        color: '#ffffff',
+        textAlign: 'center',
+        ...MQTT_HEARTBEAT,
+      },
+      {
+        id: 'elqhufkx0',
+        type: 'text',
+        x: 78,
+        y: 33,
+        width: 104,
+        height: 30,
+        rotationDeg: 0,
+        valueField: 'vehicle_code',
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#ffffff',
+        textAlign: 'center',
+        ...MQTT_HEARTBEAT,
+      },
+      {
+        id: 'eldoorfl01',
+        type: 'door',
+        x: 0,
+        y: -1,
+        width: 56,
+        height: 9,
+        rotationDeg: 0,
+        doorImage: DEFAULT_DOOR_IMAGE,
+        defaultColor: DEFAULT_DOOR_COLOR,
+        openPercentField: 'door_fl_open_percent',
+        defaultOpenPercent: 0,
+        ...MQTT_TELEMETRY,
+      },
+      {
+        id: 'eldoorfr01',
+        type: 'door',
+        x: 0,
+        y: 70,
+        width: 56,
+        height: 9,
+        rotationDeg: 0,
+        doorImage: DEFAULT_DOOR_IMAGE,
+        defaultColor: DEFAULT_DOOR_COLOR,
+        openPercentField: 'door_fr_open_percent',
+        defaultOpenPercent: 0,
+        ...MQTT_TELEMETRY,
+      },
+      {
+        id: 'eldoorrl01',
+        type: 'door',
+        x: 204,
+        y: -1,
+        width: 56,
+        height: 9,
+        rotationDeg: 0,
+        doorImage: DEFAULT_DOOR_IMAGE,
+        defaultColor: DEFAULT_DOOR_COLOR,
+        openPercentField: 'door_rl_open_percent',
+        defaultOpenPercent: 0,
+        ...MQTT_TELEMETRY,
+      },
+      {
+        id: 'eldoorrr01',
+        type: 'door',
+        x: 204,
+        y: 70,
+        width: 56,
+        height: 9,
+        rotationDeg: 0,
+        doorImage: DEFAULT_DOOR_IMAGE,
+        defaultColor: DEFAULT_DOOR_COLOR,
+        openPercentField: 'door_rr_open_percent',
+        defaultOpenPercent: 0,
+        ...MQTT_TELEMETRY,
+      },
+    ],
+  };
+}

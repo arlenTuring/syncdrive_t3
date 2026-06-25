@@ -1,0 +1,1424 @@
+import type { RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MqttLiveEntry } from '../live/mqttLiveTypes'
+import { getMqttEntityId } from '../live/mqttEntityId'
+import type { PaletteItem } from '../constants/palette'
+import type { MapAreaLayout, MapAreaObject, MapPixelSize } from '../types/area'
+import type {
+  FacilityObject,
+  GeofenceFacility,
+  SlotEquipmentState,
+  SlotOccupancy,
+} from '../types/facility'
+import {
+  areaPxPerMeter,
+  isMeterInDomain,
+  meterToAreaLocalPx,
+} from '../utils/areaCoords'
+import {
+  areaLayoutResizeMapFreezeOffset,
+  resolveFacilityRenderPlacement,
+  resolveFacilityRenderPlacementDuringAreaResize,
+  resolveFacilitySnapRectCss,
+} from '../utils/facilityAreaCoords'
+import { findFacilityAtAreaLocalPx } from '../utils/facilityHitTest'
+import {
+  resolveAreaBorderStyle,
+  resolveAreaFillStyle,
+} from '../utils/areaLayoutStyle'
+import {
+  listRoadLinesForPaint,
+  resolveFacilityStackZ,
+  ROAD_LINE_LAYER_Z,
+  sortFacilitiesForPaint,
+} from '../utils/facilityLayerOrder'
+import {
+  extractFacilityFormat,
+  type FacilityFormatSnapshot,
+} from '../utils/facilityFormatPainter'
+import {
+  decodePaletteDragItem,
+  isAreaPaletteItem,
+  PALETTE_DRAG_MIME,
+} from '../utils/paletteDrag'
+import { FacilityNode } from './FacilityNode'
+import { FacilityDragGuidesOverlay } from './FacilityDragGuidesOverlay'
+import { GeofenceNode } from './GeofenceNode'
+import type { AlignGuideLine, SnapRect } from '../utils/facilityDragAlign'
+import { buildCrossAreaPeerSnapRects } from '../utils/facilityDragAlign'
+import { AreaRulerOverlay } from './AreaRulerOverlay'
+import { AreaDragTrack } from './AreaDragTrack'
+import {
+  facilityIdsInMarqueeRect,
+  type MarqueeRect,
+} from '../utils/facilityMarquee'
+
+const MIN_AREA_PX = 32
+/** 開始拖曳 Area 布局前所需移動距離（螢幕 px） */
+const LAYOUT_DRAG_START_PX = 4
+/** 框選開始前所需移動距離（螢幕 px） */
+const MARQUEE_START_PX = 4
+/** 邊界感應帶寬度（Area 內局部 px） */
+const EDGE_HIT_PX = 10
+/** 角落感應帶（優先於直邊） */
+const CORNER_HIT_PX = 14
+
+type AreaResizeEdge =
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'tl'
+  | 'tr'
+  | 'bl'
+  | 'br'
+
+function normalizeAreaLayoutSize(layout: MapAreaLayout): MapAreaLayout {
+  return {
+    ...layout,
+    wPx: Math.max(MIN_AREA_PX, layout.wPx),
+    hPx: Math.max(MIN_AREA_PX, layout.hPx),
+  }
+}
+
+/** 依拖曳位移調整外框；角落不鎖 domain 比例（避免未移動就跳位） */
+function layoutFromCornerResize(
+  start: MapAreaLayout,
+  edge: AreaResizeEdge,
+  dx: number,
+  dy: number,
+): MapAreaLayout {
+  let { xPx, yPx, wPx, hPx } = start
+
+  if (edge === 'right') {
+    wPx = start.wPx + dx
+  } else if (edge === 'left') {
+    wPx = start.wPx - dx
+    xPx = start.xPx + dx
+  } else if (edge === 'bottom') {
+    hPx = start.hPx + dy
+  } else if (edge === 'top') {
+    hPx = start.hPx - dy
+    yPx = start.yPx + dy
+  } else if (edge === 'br') {
+    wPx = start.wPx + dx
+    hPx = start.hPx + dy
+  } else if (edge === 'tr') {
+    wPx = start.wPx + dx
+    hPx = start.hPx - dy
+    yPx = start.yPx + dy
+  } else if (edge === 'bl') {
+    wPx = start.wPx - dx
+    hPx = start.hPx + dy
+    xPx = start.xPx + dx
+  } else if (edge === 'tl') {
+    wPx = start.wPx - dx
+    hPx = start.hPx - dy
+    xPx = start.xPx + dx
+    yPx = start.yPx + dy
+  }
+
+  return normalizeAreaLayoutSize({ ...start, xPx, yPx, wPx, hPx })
+}
+
+function hitAreaLayoutEdge(
+  localX: number,
+  localY: number,
+  wPx: number,
+  hPx: number,
+): AreaResizeEdge | null {
+  const onLeft = localX <= CORNER_HIT_PX
+  const onRight = localX >= wPx - CORNER_HIT_PX
+  const onTop = localY <= CORNER_HIT_PX
+  const onBottom = localY >= hPx - CORNER_HIT_PX
+
+  if (onTop && onLeft) return 'tl'
+  if (onTop && onRight) return 'tr'
+  if (onBottom && onLeft) return 'bl'
+  if (onBottom && onRight) return 'br'
+  if (localX <= EDGE_HIT_PX) return 'left'
+  if (localX >= wPx - EDGE_HIT_PX) return 'right'
+  if (localY <= EDGE_HIT_PX) return 'top'
+  if (localY >= hPx - EDGE_HIT_PX) return 'bottom'
+  return null
+}
+
+function cursorForAreaEdge(edge: AreaResizeEdge): string {
+  switch (edge) {
+    case 'left':
+    case 'right':
+      return 'ew-resize'
+    case 'top':
+    case 'bottom':
+      return 'ns-resize'
+    case 'tl':
+    case 'br':
+      return 'nwse-resize'
+    case 'tr':
+    case 'bl':
+      return 'nesw-resize'
+  }
+}
+
+type AreaNodeProps = {
+  area: MapAreaObject
+  selected: boolean
+  selectedFacilityIds: string[]
+  geofenceSelectedLabelId: string | null
+  readOnly: boolean
+  editMode: boolean
+  liveById?: Record<string, MqttLiveEntry>
+  slotPreview?: {
+    facilityId: string
+    occupancy: SlotOccupancy
+    equipment: SlotEquipmentState
+  } | null
+  onSelectArea: (areaId: string) => void
+  onSelectFacility: (
+    areaId: string,
+    facilityId: string | null,
+    options?: { additive?: boolean },
+  ) => void
+  onSelectFacilities?: (
+    areaId: string,
+    facilityIds: string[],
+    options?: { additive?: boolean },
+  ) => void
+  onSelectGeofenceLabel: (areaId: string, facilityId: string, labelId: string | null) => void
+  onFacilityDoubleClick?: (areaId: string, facilityId: string) => void
+  onDragFacility: (
+    areaId: string,
+    facilityId: string,
+    update: {
+      areaPosition: { x: number; y: number }
+      position: { x: number; y: number }
+    },
+  ) => void
+  onDragSessionStart?: () => void
+  onResizeFacility?: (
+    areaId: string,
+    facilityId: string,
+    areaSizePx: { w: number; h: number },
+  ) => void
+  onResizeSessionStart?: () => void
+  onPatchFacilityParameters?: (
+    areaId: string,
+    facilityId: string,
+    patch: Record<string, unknown>,
+  ) => void
+  onRotateLeft90: (areaId: string, facilityId: string) => void
+  onRotateRight90: (areaId: string, facilityId: string) => void
+  onRotateDelta: (areaId: string, facilityId: string, deltaDeg: number) => void
+  onTrackCornerEditStart?: () => void
+  onDeleteFacility?: (areaId: string, facilityId: string) => void
+  onUpdateGeofence?: (
+    areaId: string,
+    facilityId: string,
+    update: {
+      verticesMeters?: { x: number; y: number }[]
+      parameters?: Record<string, unknown>
+    },
+  ) => void
+  onGeofenceEditStart?: () => void
+  onPaletteDrop?: (
+    areaId: string,
+    item: PaletteItem,
+    areaPositionCenter: { x: number; y: number },
+  ) => void
+  /** 畫布 fit 視窗縮放比，供 Area 刻度 UI 補償 */
+  mapScale?: number
+  mapViewportRef?: RefObject<HTMLDivElement | null>
+  mapPixelSize?: MapPixelSize
+  onPatchAreaLayout?: (areaId: string, layout: MapAreaLayout) => void
+  /** 拉伸預覽：依新 layout 重算場域座標，區域座標不變 */
+  onAreaLayoutSessionStart?: () => void
+  /** 全選 Area：拖曳外框移動時一併平移所有 Area */
+  allAreasSelected?: boolean
+  onBulkAreasLayoutSessionStart?: () => void
+  onBulkAreasLayoutMove?: (dx: number, dy: number) => void
+  onBulkAreasLayoutCommit?: () => void
+  formatPaintSnapshot?: FacilityFormatSnapshot | null
+  onStartFormatPaint?: (snapshot: FacilityFormatSnapshot) => void
+  onFormatPaintTarget?: (areaId: string, facilityId: string) => void
+  onCancelFormatPaint?: () => void
+  onFacilityHover?: (
+    areaId: string,
+    facilityId: string,
+    hovered: boolean,
+  ) => void
+  showCenterLabel?: boolean
+  /** 選取元件時顯示圓形工具列（旋轉、格式複製、刪除等） */
+  showFacilityToolbars?: boolean
+  /** 與其他 Area 的繪製順序（用於選取時浮起） */
+  areaStackOrder?: number
+  /** 地圖上所有 Area（跨區對齊用） */
+  allAreas?: MapAreaObject[]
+  /** 導通掃描：附近可能涉及的軌道 id */
+  connectivityScanHighlightTrackIds?: readonly string[] | null
+}
+
+/** Area 外框拖曳軌道 z-index；內層含選中設施時須高於此值 */
+const AREA_DRAG_TRACK_Z = 5000
+const AREA_INNER_ELEVATED_Z = AREA_DRAG_TRACK_Z + 20
+
+export const AreaNode = memo(function AreaNode({
+  area,
+  areaStackOrder = 0,
+  selected,
+  selectedFacilityIds,
+  geofenceSelectedLabelId,
+  readOnly,
+  editMode,
+  liveById,
+  slotPreview = null,
+  onSelectArea,
+  onSelectFacility,
+  onSelectFacilities,
+  onSelectGeofenceLabel,
+  onFacilityDoubleClick,
+  onDragFacility,
+  onDragSessionStart,
+  onResizeFacility,
+  onResizeSessionStart,
+  onPatchFacilityParameters,
+  onRotateLeft90,
+  onRotateRight90,
+  onRotateDelta,
+  onTrackCornerEditStart,
+  onDeleteFacility,
+  onUpdateGeofence,
+  onGeofenceEditStart,
+  onPaletteDrop,
+  mapScale = 1,
+  mapViewportRef,
+  mapPixelSize,
+  onPatchAreaLayout,
+  onAreaLayoutSessionStart,
+  allAreasSelected = false,
+  onBulkAreasLayoutSessionStart,
+  onBulkAreasLayoutMove,
+  onBulkAreasLayoutCommit,
+  formatPaintSnapshot = null,
+  onStartFormatPaint,
+  onFormatPaintTarget,
+  onCancelFormatPaint,
+  onFacilityHover,
+  showCenterLabel = false,
+  showFacilityToolbars = true,
+  allAreas,
+  connectivityScanHighlightTrackIds = null,
+}: AreaNodeProps) {
+  const outerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const { layout, domain } = area
+  const canEditLayout =
+    editMode &&
+    !readOnly &&
+    !!mapPixelSize &&
+    !!onPatchAreaLayout
+  /** 檢視模式：Area 外框不攔截點擊，讓下層重疊區域的設施可被選取（如 U16） */
+  const viewModePointerPassthrough = !editMode
+  const hasSelectedFacility = selectedFacilityIds.length > 0
+  const elevateAreaStack = selected || hasSelectedFacility
+  const areaZIndex = elevateAreaStack
+    ? 10_000 + areaStackOrder
+    : 10 + areaStackOrder
+  const [liveLayout, setLiveLayout] = useState<MapAreaLayout | null>(null)
+  const liveLayoutRef = useRef<MapAreaLayout | null>(null)
+  const [draggingFacilityId, setDraggingFacilityId] = useState<string | null>(
+    null,
+  )
+  const [resizingFacilityId, setResizingFacilityId] = useState<string | null>(
+    null,
+  )
+  const [dragLiveAreaPos, setDragLiveAreaPos] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+  const [dragAlignGuides, setDragAlignGuides] = useState<AlignGuideLine[] | null>(
+    null,
+  )
+  const [dragStartPositions, setDragStartPositions] = useState<Record<
+    string,
+    { x: number; y: number }
+  > | null>(null)
+  const displayLayout = liveLayout ?? layout
+  /** 已提交的 layout；設施渲染／命中用此值，拉伸預覽時不隨 liveLayout 變動 */
+  const committedLayout = layout
+  const displayDomain = domain
+  const areaBorder = resolveAreaBorderStyle(displayLayout)
+  const areaFill = resolveAreaFillStyle(displayLayout)
+  const layoutSessionPushedRef = useRef(false)
+  const layoutPendingRef = useRef<
+    | {
+        kind: 'move' | 'resize'
+        edge?: AreaResizeEdge
+        startX: number
+        startY: number
+        layout: MapAreaLayout
+      }
+    | null
+  >(null)
+  const layoutDragRef = useRef<
+    | {
+        kind: 'move'
+        startX: number
+        startY: number
+        layout: MapAreaLayout
+      }
+    | {
+        kind: 'resize'
+        edge: AreaResizeEdge
+        startX: number
+        startY: number
+        layout: MapAreaLayout
+      }
+    | null
+  >(null)
+  const [hoverEdge, setHoverEdge] = useState<AreaResizeEdge | null>(null)
+  const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null)
+  const marqueePendingRef = useRef<{
+    startX: number
+    startY: number
+    shiftKey: boolean
+  } | null>(null)
+  const marqueeWindowCleanupRef = useRef<(() => void) | null>(null)
+  const marqueeActiveRef = useRef(false)
+
+  useEffect(
+    () => () => {
+      marqueeWindowCleanupRef.current?.()
+      marqueeWindowCleanupRef.current = null
+    },
+    [],
+  )
+
+  const clearMarqueeWindowListeners = useCallback(() => {
+    marqueeWindowCleanupRef.current?.()
+    marqueeWindowCleanupRef.current = null
+  }, [])
+
+  const layoutWindowCleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    liveLayoutRef.current = liveLayout
+  }, [liveLayout])
+
+  const clearLayoutDragState = useCallback(
+    (commit = false) => {
+      const wasBulkMove =
+        allAreasSelected &&
+        layoutDragRef.current?.kind === 'move' &&
+        !!onBulkAreasLayoutMove
+      const pendingLayout = liveLayoutRef.current
+      if (wasBulkMove && commit) {
+        onBulkAreasLayoutCommit?.()
+      } else if (commit && pendingLayout && onPatchAreaLayout && !wasBulkMove) {
+        onPatchAreaLayout(area.id, normalizeAreaLayoutSize(pendingLayout))
+      }
+      layoutPendingRef.current = null
+      layoutDragRef.current = null
+      layoutSessionPushedRef.current = false
+      setLiveLayout(null)
+      liveLayoutRef.current = null
+      layoutWindowCleanupRef.current?.()
+      layoutWindowCleanupRef.current = null
+    },
+    [
+      area.id,
+      allAreasSelected,
+      onBulkAreasLayoutCommit,
+      onBulkAreasLayoutMove,
+      onPatchAreaLayout,
+    ],
+  )
+
+  useEffect(() => {
+    if (!selected) {
+      clearLayoutDragState(true)
+    }
+  }, [selected, clearLayoutDragState])
+
+  useEffect(
+    () => () => {
+      clearLayoutDragState(true)
+    },
+    [clearLayoutDragState],
+  )
+
+  const { pxPerMeterX, pxPerMeterY } = areaPxPerMeter(committedLayout, displayDomain)
+  const domainSpan = {
+    w: displayDomain.xMaxM - displayDomain.xMinM,
+    h: displayDomain.yMaxM - displayDomain.yMinM,
+  }
+  const areaMeterContext = {
+    domain: displayDomain,
+    layout: committedLayout,
+  }
+
+  const clientToInnerLocal = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = innerRef.current
+      if (!el) return { x: 0, y: 0 }
+      const rect = el.getBoundingClientRect()
+      const scale = Math.max(0.01, mapScale)
+      return {
+        x: (clientX - rect.left) / scale,
+        y: (clientY - rect.top) / scale,
+      }
+    },
+    [mapScale],
+  )
+
+  const beginLayoutDrag = useCallback(
+    (pointerId: number) => {
+      const pending = layoutPendingRef.current
+      if (!pending) return
+      layoutPendingRef.current = null
+      layoutDragRef.current = {
+        kind: 'move',
+        startX: pending.startX,
+        startY: pending.startY,
+        layout: pending.layout,
+      }
+      try {
+        outerRef.current?.setPointerCapture(pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  )
+
+  const applyLayoutPointerMove = useCallback(
+    (clientX: number, clientY: number, pointerId: number) => {
+      const pending = layoutPendingRef.current
+      if (pending && !layoutDragRef.current) {
+        const dx = clientX - pending.startX
+        const dy = clientY - pending.startY
+        if (dx * dx + dy * dy >= LAYOUT_DRAG_START_PX * LAYOUT_DRAG_START_PX) {
+          beginLayoutDrag(pointerId)
+        }
+      }
+
+      const drag = layoutDragRef.current
+      if (!drag) return
+      if (!layoutSessionPushedRef.current) {
+        layoutSessionPushedRef.current = true
+        if (drag.kind === 'move' && allAreasSelected && onBulkAreasLayoutMove) {
+          onBulkAreasLayoutSessionStart?.()
+        } else {
+          onAreaLayoutSessionStart?.()
+        }
+      }
+      const scale = Math.max(0.01, mapScale)
+      const dx = (clientX - drag.startX) / scale
+      const dy = (clientY - drag.startY) / scale
+      if (drag.kind === 'move') {
+        if (allAreasSelected && onBulkAreasLayoutMove) {
+          onBulkAreasLayoutMove(dx, dy)
+          return
+        }
+        const next = normalizeAreaLayoutSize({
+          ...drag.layout,
+          xPx: drag.layout.xPx + dx,
+          yPx: drag.layout.yPx + dy,
+        })
+        setLiveLayout(next)
+        return
+      }
+      const next = layoutFromCornerResize(drag.layout, drag.edge, dx, dy)
+      setLiveLayout(next)
+    },
+    [
+      mapScale,
+      allAreasSelected,
+      onAreaLayoutSessionStart,
+      onBulkAreasLayoutSessionStart,
+      onBulkAreasLayoutMove,
+      beginLayoutDrag,
+    ],
+  )
+
+  const attachLayoutWindowListeners = useCallback(
+    (pointerId: number) => {
+      layoutWindowCleanupRef.current?.()
+      const onWindowMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
+        applyLayoutPointerMove(ev.clientX, ev.clientY, pointerId)
+      }
+      const onWindowUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
+        clearLayoutDragState(true)
+        try {
+          outerRef.current?.releasePointerCapture(pointerId)
+        } catch {
+          /* ignore */
+        }
+      }
+      window.addEventListener('pointermove', onWindowMove)
+      window.addEventListener('pointerup', onWindowUp)
+      window.addEventListener('pointercancel', onWindowUp)
+      layoutWindowCleanupRef.current = () => {
+        window.removeEventListener('pointermove', onWindowMove)
+        window.removeEventListener('pointerup', onWindowUp)
+        window.removeEventListener('pointercancel', onWindowUp)
+      }
+    },
+    [clearLayoutDragState, applyLayoutPointerMove],
+  )
+
+  const onLayoutPointerDown = useCallback(
+    (
+      e: React.PointerEvent<HTMLDivElement>,
+      kind: 'move' | 'resize',
+      edge?: AreaResizeEdge,
+    ) => {
+      if (!canEditLayout || !selected) return
+      e.stopPropagation()
+      e.preventDefault()
+      if (kind === 'resize' && allAreasSelected) return
+      if (kind === 'resize' && edge) {
+        layoutPendingRef.current = null
+        layoutDragRef.current = {
+          kind: 'resize',
+          edge,
+          startX: e.clientX,
+          startY: e.clientY,
+          layout,
+        }
+        outerRef.current?.setPointerCapture(e.pointerId)
+        attachLayoutWindowListeners(e.pointerId)
+        return
+      }
+      layoutPendingRef.current = {
+        kind: 'move',
+        startX: e.clientX,
+        startY: e.clientY,
+        layout,
+      }
+      outerRef.current?.setPointerCapture(e.pointerId)
+      attachLayoutWindowListeners(e.pointerId)
+    },
+    [allAreasSelected, canEditLayout, selected, layout, attachLayoutWindowListeners],
+  )
+
+  const updateHoverEdge = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (
+        !canEditLayout ||
+        !selected ||
+        layoutDragRef.current ||
+        layoutPendingRef.current
+      ) {
+        return
+      }
+      const rect = e.currentTarget.getBoundingClientRect()
+      const scale = Math.max(0.01, mapScale)
+      const localX = (e.clientX - rect.left) / scale
+      const localY = (e.clientY - rect.top) / scale
+      setHoverEdge(
+        hitAreaLayoutEdge(localX, localY, displayLayout.wPx, displayLayout.hPx),
+      )
+    },
+    [canEditLayout, selected, mapScale, displayLayout.wPx, displayLayout.hPx],
+  )
+
+  const clearHoverEdge = useCallback(() => {
+    if (layoutDragRef.current) return
+    setHoverEdge(null)
+  }, [])
+
+  const pickFacilityAtClient = useCallback(
+    (clientX: number, clientY: number) => {
+      const outer = outerRef.current
+      if (!outer) return null
+      const rect = outer.getBoundingClientRect()
+      const scale = Math.max(0.01, mapScale)
+      const localX = (clientX - rect.left) / scale
+      const localY = (clientY - rect.top) / scale
+      return findFacilityAtAreaLocalPx(
+        localX,
+        localY,
+        area.facilities,
+        displayDomain,
+        committedLayout,
+        domainSpan,
+      )
+    },
+    [
+      mapScale,
+      area.facilities,
+      displayDomain,
+      committedLayout,
+      domainSpan,
+    ],
+  )
+
+  const selectFacilityInViewMode = useCallback(
+    (facilityId: string, additive: boolean) => {
+      if (editMode) return
+      onSelectFacility(area.id, facilityId, { additive })
+    },
+    [editMode, onSelectFacility, area.id],
+  )
+
+  const onOuterPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      if (!canEditLayout) {
+        const hitFacilityId = pickFacilityAtClient(e.clientX, e.clientY)
+        if (hitFacilityId) {
+          selectFacilityInViewMode(hitFacilityId, e.shiftKey)
+        }
+        return
+      }
+      const t = e.target as HTMLElement
+      if (
+        t.closest('[data-facility-root]') ||
+        t.closest('[data-facility]') ||
+        t.closest('[data-geofence]')
+      ) {
+        return
+      }
+      const rect = e.currentTarget.getBoundingClientRect()
+      const scale = Math.max(0.01, mapScale)
+      const localX = (e.clientX - rect.left) / scale
+      const localY = (e.clientY - rect.top) / scale
+      const edge = hitAreaLayoutEdge(
+        localX,
+        localY,
+        displayLayout.wPx,
+        displayLayout.hPx,
+      )
+      if (edge && selected) {
+        onLayoutPointerDown(e, 'resize', edge)
+        return
+      }
+      const hitFacilityId = findFacilityAtAreaLocalPx(
+        localX,
+        localY,
+        area.facilities,
+        displayDomain,
+        displayLayout,
+        domainSpan,
+      )
+      if (hitFacilityId) {
+        if (formatPaintSnapshot) {
+          onFormatPaintTarget?.(area.id, hitFacilityId)
+          return
+        }
+        onSelectFacility(area.id, hitFacilityId, { additive: e.shiftKey })
+        return
+      }
+      if (formatPaintSnapshot) {
+        onCancelFormatPaint?.()
+      }
+    },
+    [
+      canEditLayout,
+      mapScale,
+      displayLayout,
+      area.facilities,
+      displayDomain,
+      domainSpan,
+      onLayoutPointerDown,
+      formatPaintSnapshot,
+      onFormatPaintTarget,
+      onCancelFormatPaint,
+      onSelectFacility,
+      area.id,
+      selected,
+      pickFacilityAtClient,
+      selectFacilityInViewMode,
+    ],
+  )
+
+  const onLayoutPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      applyLayoutPointerMove(e.clientX, e.clientY, e.pointerId)
+    },
+    [applyLayoutPointerMove],
+  )
+
+  const onLayoutPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      clearLayoutDragState(true)
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [clearLayoutDragState],
+  )
+
+  const handleInnerDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (!editMode || !onPaletteDrop || !innerRef.current) return
+      e.preventDefault()
+      e.stopPropagation()
+      const raw = e.dataTransfer.getData(PALETTE_DRAG_MIME)
+      const item = decodePaletteDragItem(raw)
+      if (!item || isAreaPaletteItem(item)) return
+      const rect = innerRef.current.getBoundingClientRect()
+      const scale = Math.max(0.01, mapScale)
+      const localX = (e.clientX - rect.left) / scale
+      const localY = (e.clientY - rect.top) / scale
+      onPaletteDrop(area.id, item, { x: localX, y: localY })
+    },
+    [editMode, onPaletteDrop, area.id, displayDomain, displayLayout, mapScale],
+  )
+
+  const onAreaDragTrackPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!canEditLayout || !selected || e.button !== 0) return
+      onLayoutPointerDown(e, 'move')
+    },
+    [canEditLayout, selected, onLayoutPointerDown],
+  )
+
+  const onAreaResizePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, edge: AreaResizeEdge) => {
+      if (!canEditLayout || !selected || e.button !== 0) return
+      e.stopPropagation()
+      e.preventDefault()
+      onLayoutPointerDown(e, 'resize', edge)
+    },
+    [canEditLayout, selected, onLayoutPointerDown],
+  )
+
+  const onInnerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      const t = e.target as HTMLElement
+      if (!editMode) {
+        if (
+          t.closest('[data-facility-root]:not([data-geofence-root])') ||
+          t.closest('[data-facility]:not([data-geofence])')
+        ) {
+          return
+        }
+        const hitFacilityId = pickFacilityAtClient(e.clientX, e.clientY)
+        if (hitFacilityId) {
+          e.stopPropagation()
+          selectFacilityInViewMode(hitFacilityId, e.shiftKey)
+        }
+        return
+      }
+      if (
+        t.closest('[data-facility-root]') ||
+        t.closest('[data-facility]') ||
+        t.closest('[data-geofence]') ||
+        t.closest('[data-geofence-label]') ||
+        t.closest('[data-geofence-handle]') ||
+        t.closest('[data-geofence-edge-add]') ||
+        t.closest('[data-geofence-scale-handle]')
+      ) {
+        return
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      clearMarqueeWindowListeners()
+
+      const local = clientToInnerLocal(e.clientX, e.clientY)
+      const edge = hitAreaLayoutEdge(
+        local.x,
+        local.y,
+        displayLayout.wPx,
+        displayLayout.hPx,
+      )
+      if (edge && canEditLayout && selected) {
+        onLayoutPointerDown(e, 'resize', edge)
+        return
+      }
+
+      const shiftKey = e.shiftKey
+      marqueePendingRef.current = {
+        startX: local.x,
+        startY: local.y,
+        shiftKey,
+      }
+      marqueeActiveRef.current = false
+      setMarqueeRect(null)
+
+      const onWindowMove = (ev: PointerEvent) => {
+        const pending = marqueePendingRef.current
+        if (!pending) return
+        const cur = clientToInnerLocal(ev.clientX, ev.clientY)
+        const dx = cur.x - pending.startX
+        const dy = cur.y - pending.startY
+        if (!marqueeActiveRef.current) {
+          if (dx * dx + dy * dy < MARQUEE_START_PX * MARQUEE_START_PX) return
+          marqueeActiveRef.current = true
+        }
+        setMarqueeRect({
+          x: pending.startX,
+          y: pending.startY,
+          w: dx,
+          h: dy,
+        })
+      }
+
+      const onWindowUp = (ev: PointerEvent) => {
+        clearMarqueeWindowListeners()
+        const pending = marqueePendingRef.current
+        if (!pending) return
+        const wasActive = marqueeActiveRef.current
+        marqueePendingRef.current = null
+        marqueeActiveRef.current = false
+        setMarqueeRect(null)
+
+        if (!editMode) return
+
+        if (wasActive && onSelectFacilities) {
+          const cur = clientToInnerLocal(ev.clientX, ev.clientY)
+          const rect: MarqueeRect = {
+            x: pending.startX,
+            y: pending.startY,
+            w: cur.x - pending.startX,
+            h: cur.y - pending.startY,
+          }
+          const ids = facilityIdsInMarqueeRect(
+            area.facilities,
+            rect,
+            displayDomain,
+            committedLayout,
+            domainSpan,
+          )
+          onSelectFacilities(area.id, ids, { additive: pending.shiftKey })
+          return
+        }
+
+        if (formatPaintSnapshot) {
+          onCancelFormatPaint?.()
+        }
+        onSelectArea(area.id)
+        onSelectFacility(area.id, null)
+      }
+
+      window.addEventListener('pointermove', onWindowMove)
+      window.addEventListener('pointerup', onWindowUp)
+      window.addEventListener('pointercancel', onWindowUp)
+      marqueeWindowCleanupRef.current = () => {
+        window.removeEventListener('pointermove', onWindowMove)
+        window.removeEventListener('pointerup', onWindowUp)
+        window.removeEventListener('pointercancel', onWindowUp)
+      }
+    },
+    [
+      editMode,
+      clientToInnerLocal,
+      clearMarqueeWindowListeners,
+      canEditLayout,
+      displayLayout.wPx,
+      displayLayout.hPx,
+      onLayoutPointerDown,
+      onSelectArea,
+      onSelectFacilities,
+      area.facilities,
+      area.id,
+      domain,
+      displayLayout,
+      domainSpan,
+      onSelectArea,
+      onSelectFacility,
+      formatPaintSnapshot,
+      onCancelFormatPaint,
+      pickFacilityAtClient,
+      selectFacilityInViewMode,
+    ],
+  )
+
+  const outerCursor = canEditLayout
+    ? hoverEdge
+      ? cursorForAreaEdge(hoverEdge)
+      : undefined
+    : undefined
+
+  const facilitySnapRect = useCallback(
+    (fac: FacilityObject): SnapRect => {
+      const rect = resolveFacilitySnapRectCss(
+        fac,
+        displayDomain,
+        committedLayout,
+        domainSpan,
+      )
+      return {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }
+    },
+    [displayDomain, committedLayout, domainSpan],
+  )
+
+  const crossAreaPeerSnapRects = useMemo(
+    () =>
+      allAreas && allAreas.length > 1
+        ? buildCrossAreaPeerSnapRects(allAreas, area.id)
+        : [],
+    [allAreas, area.id],
+  )
+
+  const peerSnapRectsFor = useCallback(
+    (excludeId: string): SnapRect[] => {
+      const sameArea = area.facilities
+        .filter((other) => other.id !== excludeId)
+        .map(facilitySnapRect)
+      return [...sameArea, ...crossAreaPeerSnapRects]
+    },
+    [area.facilities, facilitySnapRect, crossAreaPeerSnapRects],
+  )
+
+  const renderFacility = (
+    f: FacilityObject,
+    orderIndex: number,
+    opts?: { roadLineLayer?: boolean },
+  ) => {
+    const mqttLive = liveById?.[getMqttEntityId(f)]
+    const isSelected = selectedFacilityIds.includes(f.id)
+    const z = resolveFacilityStackZ(f, orderIndex, isSelected, opts)
+    const preview =
+      slotPreview && slotPreview.facilityId === f.id ? slotPreview : null
+
+    if (f.type === 'Geofence') {
+      const resizeDrag = layoutDragRef.current
+      const isAreaResizePreview =
+        liveLayout != null && resizeDrag?.kind === 'resize'
+      const geofenceFreeze =
+        isAreaResizePreview && resizeDrag
+          ? areaLayoutResizeMapFreezeOffset(resizeDrag.layout, liveLayout)
+          : { left: 0, top: 0 }
+      return (
+        <div
+          key={f.id}
+          data-facility-root
+          data-geofence-root
+          className="pointer-events-none absolute"
+          style={{
+            left: geofenceFreeze.left,
+            top: geofenceFreeze.top,
+            width: isAreaResizePreview ? committedLayout.wPx : displayLayout.wPx,
+            height: isAreaResizePreview ? committedLayout.hPx : displayLayout.hPx,
+            zIndex: z,
+          }}
+        >
+          <GeofenceNode
+            facility={f as GeofenceFacility}
+            selected={isSelected}
+            selectedLabelId={isSelected ? geofenceSelectedLabelId : null}
+            readOnly={readOnly || !editMode}
+            scaleX={pxPerMeterX}
+            scaleY={pxPerMeterY}
+            stackZIndex={z}
+            meterMode
+            mapScale={mapScale}
+            areaMeterContext={areaMeterContext}
+            worldRef={innerRef as RefObject<HTMLDivElement>}
+            onSelect={() => onSelectFacility(area.id, f.id)}
+            onSelectLabel={(_fid, labelId) =>
+              onSelectGeofenceLabel(area.id, f.id, labelId)
+            }
+            onUpdateGeofence={
+              onUpdateGeofence
+                ? (_id, update) => onUpdateGeofence(area.id, f.id, update)
+                : undefined
+            }
+            onGeofenceEditStart={onGeofenceEditStart}
+            onDelete={
+              onDeleteFacility && editMode
+                ? () => onDeleteFacility(area.id, f.id)
+                : undefined
+            }
+            formatPaintSnapshot={formatPaintSnapshot}
+            onStartFormatPaint={
+              editMode && onStartFormatPaint
+                ? () =>
+                    onStartFormatPaint(
+                      extractFacilityFormat(
+                        f,
+                        displayDomain,
+                        committedLayout,
+                        domainSpan,
+                      ),
+                    )
+                : undefined
+            }
+            onFormatPaintPick={
+              onFormatPaintTarget
+                ? () => onFormatPaintTarget(area.id, f.id)
+                : undefined
+            }
+            onCancelFormatPaint={onCancelFormatPaint}
+            showFacilityToolbar={showFacilityToolbars}
+          />
+        </div>
+      )
+    }
+
+    const resizeDrag = layoutDragRef.current
+    const isAreaResizePreview =
+      liveLayout != null && resizeDrag?.kind === 'resize'
+    const placement = isAreaResizePreview
+      ? resolveFacilityRenderPlacementDuringAreaResize(
+          f,
+          displayDomain,
+          resizeDrag.layout,
+          liveLayout,
+          domainSpan,
+        )
+      : resolveFacilityRenderPlacement(
+          f,
+          displayDomain,
+          committedLayout,
+          domainSpan,
+        )
+    const baseCss = placement.css
+    let displayCss = baseCss
+
+    if (dragStartPositions && dragLiveAreaPos && draggingFacilityId) {
+      const startDragPos = dragStartPositions[draggingFacilityId]
+      const startFacPos = dragStartPositions[f.id]
+      if (startDragPos && startFacPos) {
+        const dx = dragLiveAreaPos.x - startDragPos.x
+        const dy = dragLiveAreaPos.y - startDragPos.y
+        const livePos = {
+          x: startFacPos.x + dx,
+          y: startFacPos.y + dy,
+        }
+        displayCss = resolveFacilityRenderPlacement(
+          { ...f, areaPosition: livePos },
+          displayDomain,
+          committedLayout,
+          domainSpan,
+        ).css
+      }
+    } else if (
+      mqttLive?.positionMeters &&
+      isMeterInDomain(
+        mqttLive.positionMeters.x,
+        mqttLive.positionMeters.y,
+        displayDomain,
+      )
+    ) {
+      displayCss = resolveFacilityRenderPlacement(
+        {
+          ...f,
+          areaPosition: meterToAreaLocalPx(
+            mqttLive.positionMeters.x,
+            mqttLive.positionMeters.y,
+            displayDomain,
+            committedLayout,
+          ),
+        },
+        displayDomain,
+        committedLayout,
+        domainSpan,
+      ).css
+    }
+
+    const areaSize = placement.areaSize
+
+    return (
+      <div
+        key={f.id}
+        data-facility-root
+        className={`pointer-events-auto absolute overflow-visible`}
+        style={{
+          left: displayCss.left,
+          top: displayCss.top,
+          width: areaSize.w,
+          height: areaSize.h,
+          zIndex: z,
+        }}
+        onPointerDown={(e) => {
+          if (editMode || e.button !== 0) return
+          e.stopPropagation()
+          selectFacilityInViewMode(f.id, e.shiftKey)
+        }}
+      >
+        <FacilityNode
+          facility={f}
+          displayPosition={{ x: 0, y: 0 }}
+          areaAnchorPx={{ x: displayCss.left, y: displayCss.top }}
+          mqttLive={mqttLive}
+          slotPreview={preview}
+          selected={isSelected}
+          scaleX={pxPerMeterX}
+          scaleY={pxPerMeterY}
+          mapScale={mapScale}
+          meterMode
+          domainBoundsM={displayDomain}
+          areaMeterContext={areaMeterContext}
+          mapViewportRef={mapViewportRef}
+          readOnly={readOnly || !editMode}
+          worldRef={innerRef as RefObject<HTMLDivElement>}
+          onSelect={(id, options) => onSelectFacility(area.id, id, options)}
+          onOpenProperties={
+            onFacilityDoubleClick
+              ? () => onFacilityDoubleClick(area.id, f.id)
+              : undefined
+          }
+          onDrag={(_id, update) => {
+            if (!('areaPosition' in update)) return
+            setDragLiveAreaPos(update.areaPosition)
+            onDragFacility(area.id, f.id, update)
+          }}
+          onDragSessionStart={onDragSessionStart}
+          peerSnapRects={editMode ? peerSnapRectsFor(f.id) : []}
+          onAlignGuidesChange={
+            editMode ? (guides) => setDragAlignGuides(guides) : undefined
+          }
+          onFacilityResizeActiveChange={
+            editMode
+              ? (active) => {
+                  if (active) {
+                    setResizingFacilityId(f.id)
+                    setDragLiveAreaPos({
+                      x: f.areaPosition.x,
+                      y: f.areaPosition.y,
+                    })
+                  } else {
+                    setResizingFacilityId(null)
+                    setDragAlignGuides(null)
+                    setDragLiveAreaPos((pos) =>
+                      draggingFacilityId ? pos : null,
+                    )
+                  }
+                }
+              : undefined
+          }
+          onHoverChange={
+            editMode && onFacilityHover
+              ? (hovered) => onFacilityHover(area.id, f.id, hovered)
+              : undefined
+          }
+          onFacilityDragActiveChange={(active) => {
+            setDraggingFacilityId(active ? f.id : null)
+            if (active) {
+              const starts: Record<string, { x: number; y: number }> = {}
+              for (const id of selectedFacilityIds) {
+                const fac = area.facilities.find((x) => x.id === id)
+                if (fac) {
+                  starts[id] = { x: fac.areaPosition.x, y: fac.areaPosition.y }
+                }
+              }
+              setDragStartPositions(starts)
+            } else {
+              setDragLiveAreaPos(null)
+              setDragAlignGuides(null)
+              setDragStartPositions(null)
+            }
+          }}
+          onResize={
+            onResizeFacility
+              ? (_id, size) => onResizeFacility(area.id, f.id, size)
+              : undefined
+          }
+          onResizeSessionStart={onResizeSessionStart}
+          onPatchParameters={
+            onPatchFacilityParameters
+              ? (_id, patch) => onPatchFacilityParameters(area.id, f.id, patch)
+              : undefined
+          }
+          onRotateLeft90={() => onRotateLeft90(area.id, f.id)}
+          onRotateRight90={() => onRotateRight90(area.id, f.id)}
+          onRotateDelta={(_id, deg) => onRotateDelta(area.id, f.id, deg)}
+          onTrackCornerEditStart={onTrackCornerEditStart}
+          onDelete={
+            onDeleteFacility && editMode
+              ? () => onDeleteFacility(area.id, f.id)
+              : undefined
+          }
+          formatPaintSnapshot={formatPaintSnapshot}
+          onStartFormatPaint={
+            editMode && onStartFormatPaint
+              ? () =>
+                  onStartFormatPaint(
+                    extractFacilityFormat(
+                      f,
+                      displayDomain,
+                      committedLayout,
+                      domainSpan,
+                    ),
+                  )
+              : undefined
+          }
+          onFormatPaintPick={
+            onFormatPaintTarget
+              ? () => onFormatPaintTarget(area.id, f.id)
+              : undefined
+          }
+          onCancelFormatPaint={onCancelFormatPaint}
+          stackZIndex={
+            connectivityScanHighlightTrackIds?.includes(f.id) ? Math.max(z, 9000) : z
+          }
+          showFacilityToolbar={showFacilityToolbars}
+          connectivityScanHighlight={connectivityScanHighlightTrackIds?.includes(f.id) ?? false}
+        />
+      </div>
+    )
+  }
+
+  const transformFacilityId = draggingFacilityId ?? resizingFacilityId
+
+  const draggingRect =
+    transformFacilityId && dragLiveAreaPos
+      ? (() => {
+          const target = area.facilities.find((f) => f.id === transformFacilityId)
+          if (!target) return null
+          const snap = resolveFacilitySnapRectCss(
+            { ...target, areaPosition: dragLiveAreaPos },
+            displayDomain,
+            committedLayout,
+            domainSpan,
+          )
+          return {
+            left: snap.left,
+            top: snap.top,
+            width: snap.width,
+            height: snap.height,
+          }
+        })()
+      : null
+
+  return (
+    <div
+      ref={outerRef}
+      className={`absolute ${
+        liveLayout || transformFacilityId ? 'overflow-hidden' : 'overflow-visible'
+      }${viewModePointerPassthrough ? ' pointer-events-none' : ''}`}
+      style={{
+        left: displayLayout.xPx,
+        top: displayLayout.yPx,
+        width: displayLayout.wPx,
+        height: displayLayout.hPx,
+        zIndex: areaZIndex,
+        backgroundColor: areaFill.backgroundColor,
+        outline: selected ? '2px solid #22d3ee' : undefined,
+        outlineOffset: selected ? 0 : undefined,
+        border: `${areaBorder.borderWidthPx}px solid ${areaBorder.borderColor}`,
+        boxSizing: 'border-box',
+        cursor: outerCursor,
+      }}
+      onPointerDown={(e) => {
+        const t = e.target as HTMLElement
+        if (t.closest('[data-facility-root]:not([data-geofence-root])')) return
+        if (t.closest('[data-facility]:not([data-geofence])')) return
+        if (t.closest('[data-geofence]')) return
+        e.stopPropagation()
+        if (!selected) {
+          onSelectArea(area.id)
+          onSelectFacility(area.id, null)
+        }
+        onOuterPointerDown(e)
+      }}
+      onPointerMove={(e) => {
+        updateHoverEdge(e)
+        onLayoutPointerMove(e)
+      }}
+      onPointerUp={onLayoutPointerUp}
+      onPointerCancel={onLayoutPointerUp}
+      onPointerLeave={clearHoverEdge}
+      data-area-id={area.id}
+    >
+      {canEditLayout && selected && (
+        <AreaDragTrack
+          wPx={displayLayout.wPx}
+          hPx={displayLayout.hPx}
+          active={selected}
+          onMovePointerDown={onAreaDragTrackPointerDown}
+          onResizePointerDown={onAreaResizePointerDown}
+        />
+      )}
+      <div
+        ref={innerRef}
+        className={`relative h-full w-full overflow-visible${
+          viewModePointerPassthrough ? ' pointer-events-none' : ''
+        }`}
+        style={{
+          position: 'relative',
+          ...(hasSelectedFacility
+            ? { zIndex: AREA_INNER_ELEVATED_Z }
+            : {}),
+        }}
+        onDragOver={(e) => {
+          if (editMode && onPaletteDrop) e.preventDefault()
+        }}
+        onDrop={handleInnerDrop}
+        onPointerDown={onInnerPointerDown}
+      >
+        {area.showRuler && (
+          <AreaRulerOverlay
+            domain={displayDomain}
+            layout={displayLayout}
+            mapScale={mapScale}
+            showMoveHint={false}
+          />
+        )}
+        {sortFacilitiesForPaint(
+          area.facilities.filter((f) => f.type !== 'Geofence'),
+        ).map((f, orderIndex) => renderFacility(f, orderIndex))}
+        {listRoadLinesForPaint(area.facilities).length > 0 ? (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ zIndex: ROAD_LINE_LAYER_Z }}
+          >
+            {listRoadLinesForPaint(area.facilities).map((f, orderIndex) =>
+              renderFacility(f, orderIndex, { roadLineLayer: true }),
+            )}
+          </div>
+        ) : null}
+        {area.facilities
+          .filter((f) => f.type === 'Geofence')
+          .map((f, idx) =>
+            renderFacility(
+              f,
+              area.facilities.filter((x) => x.type !== 'Geofence').length + idx,
+            ),
+          )}
+        <FacilityDragGuidesOverlay
+          guides={dragAlignGuides ?? []}
+          activeRect={draggingRect}
+          bounds={{
+            left: 0,
+            top: 0,
+            width: committedLayout.wPx,
+            height: committedLayout.hPx,
+          }}
+        />
+        {marqueeRect && (
+          <div
+            className="pointer-events-none absolute z-[5000] border border-cyan-400/80 bg-cyan-400/10"
+            style={{
+              left: Math.min(marqueeRect.x, marqueeRect.x + marqueeRect.w),
+              top: Math.min(marqueeRect.y, marqueeRect.y + marqueeRect.h),
+              width: Math.abs(marqueeRect.w),
+              height: Math.abs(marqueeRect.h),
+            }}
+          />
+        )}
+        {showCenterLabel && (
+          <div className="pointer-events-none absolute inset-0 z-[1400] grid place-items-center">
+            <div className="max-w-[88%] rounded-xl border border-amber-300/70 bg-amber-950/65 px-4 py-3 text-center shadow-[0_0_20px_rgba(251,191,36,0.35)] backdrop-blur-sm">
+              <div className="text-xl font-extrabold tracking-wide text-amber-100 sm:text-2xl">
+                {area.customName.trim() || area.id}
+              </div>
+              <div className="mt-1 text-sm font-medium text-amber-200/95 sm:text-base">
+                場域範圍：橫向 {displayDomain.xMinM.toFixed(1)} ~{' '}
+                {displayDomain.xMaxM.toFixed(1)} m，縱向 {displayDomain.yMinM.toFixed(1)} ~{' '}
+                {displayDomain.yMaxM.toFixed(1)} m
+              </div>
+              <div className="mt-1 text-sm font-medium text-amber-200/95 sm:text-base">
+                像素尺寸：橫向 {Math.round(committedLayout.wPx)} px，縱向{' '}
+                {Math.round(committedLayout.hPx)} px
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})

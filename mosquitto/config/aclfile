@@ -1,0 +1,24 @@
+# ───────────────────────────────────────────────────────────────
+# Mosquitto ACL — 實作《MQTT 通訊架構與 Topic 命名規範》§三 隔離原則
+#
+# 假設：每台車以自身 vehicle_code 作為 MQTT username（例：PMS-05）。
+#   %u = 連線時的 username。
+# ───────────────────────────────────────────────────────────────
+
+# ── 車端 (SyncDrive)：套用於所有以 vehicle_code 登入的車輛 ──
+# 僅能發布至自身 ID 路徑
+pattern write v1/vtms/%u/#
+# 訂閱自身 ID 與全域廣播路徑
+pattern read v1/vtms/%u/#
+pattern read v1/vtms/all/#
+
+# ── 中心端 (VTMS Host)：全域發布與訂閱權限 ──
+user vtms-center
+topic readwrite v1/vtms/#
+# 場域設施頻道（月台門 PSD、號誌等）
+topic readwrite syncdrive/#
+
+# 後端 NestJS 訂閱端 / 發布端（與中心端同權限，亦可拆分成獨立帳號）
+user vtms-backend
+topic readwrite v1/vtms/#
+topic readwrite syncdrive/#

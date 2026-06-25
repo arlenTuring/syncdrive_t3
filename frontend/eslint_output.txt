@@ -1,0 +1,351 @@
+[0m
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx[24m
+    [2m1:35[22m  [31merror[39m  'useCallback' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [2m@typescript-eslint/no-unused-vars[22m
+   [2m46:10[22m  [31merror[39m  'resizingChildId' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [2m@typescript-eslint/no-unused-vars[22m
+   [2m49:10[22m  [31merror[39m  'currentChildPos' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [2m@typescript-eslint/no-unused-vars[22m
+   [2m50:10[22m  [31merror[39m  'currentChildSize' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [2m@typescript-eslint/no-unused-vars[22m
+  [2m289:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:289:12
+  287 |
+  288 |           {/* 頂點標籤 - 獨立定位確保顯示 */}
+> 289 |           <DistLabel val={currentCanvasPos.x} left={0} top={-40} horizontal />
+      |            ^^^^^^^^^ This component is created during render
+  290 |           <DistLabel val={currentCanvasPos.x + (isResizingCanvas ? currentCanvasSize.width : element.width)} left="100%" top={-40} horizontal />
+  291 |           <DistLabel val={currentCanvasPos.y} top={0} left={-45} />
+  292 |           <DistLabel val={currentCanvasPos.y + (isResizingCanvas ? currentCanvasSize.height : element.height)} top="100%" left={-45} />
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:134:21
+  132 |
+  133 |   // 引導線距離顯示元件
+> 134 |   const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 135 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 136 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 143 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 144 |   );
+      | ^^^^ The component is created during render here
+  145 |
+  146 |   return (
+  147 |     <Rnd  [2mreact-hooks/static-components[22m
+  [2m290:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:290:12
+  288 |           {/* 頂點標籤 - 獨立定位確保顯示 */}
+  289 |           <DistLabel val={currentCanvasPos.x} left={0} top={-40} horizontal />
+> 290 |           <DistLabel val={currentCanvasPos.x + (isResizingCanvas ? currentCanvasSize.width : element.width)} left="100%" top={-40} horizontal />
+      |            ^^^^^^^^^ This component is created during render
+  291 |           <DistLabel val={currentCanvasPos.y} top={0} left={-45} />
+  292 |           <DistLabel val={currentCanvasPos.y + (isResizingCanvas ? currentCanvasSize.height : element.height)} top="100%" left={-45} />
+  293 |
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:134:21
+  132 |
+  133 |   // 引導線距離顯示元件
+> 134 |   const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 135 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 136 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 143 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 144 |   );
+      | ^^^^ The component is created during render here
+  145 |
+  146 |   return (
+  147 |     <Rnd  [2mreact-hooks/static-components[22m
+  [2m291:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:291:12
+  289 |           <DistLabel val={currentCanvasPos.x} left={0} top={-40} horizontal />
+  290 |           <DistLabel val={currentCanvasPos.x + (isResizingCanvas ? currentCanvasSize.width : element.width)} left="100%" top={-40} horizontal />
+> 291 |           <DistLabel val={currentCanvasPos.y} top={0} left={-45} />
+      |            ^^^^^^^^^ This component is created during render
+  292 |           <DistLabel val={currentCanvasPos.y + (isResizingCanvas ? currentCanvasSize.height : element.height)} top="100%" left={-45} />
+  293 |
+  294 |           {/* 動態尺寸顯示 */}
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:134:21
+  132 |
+  133 |   // 引導線距離顯示元件
+> 134 |   const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 135 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 136 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 143 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 144 |   );
+      | ^^^^ The component is created during render here
+  145 |
+  146 |   return (
+  147 |     <Rnd           [2mreact-hooks/static-components[22m
+  [2m292:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:292:12
+  290 |           <DistLabel val={currentCanvasPos.x + (isResizingCanvas ? currentCanvasSize.width : element.width)} left="100%" top={-40} horizontal />
+  291 |           <DistLabel val={currentCanvasPos.y} top={0} left={-45} />
+> 292 |           <DistLabel val={currentCanvasPos.y + (isResizingCanvas ? currentCanvasSize.height : element.height)} top="100%" left={-45} />
+      |            ^^^^^^^^^ This component is created during render
+  293 |
+  294 |           {/* 動態尺寸顯示 */}
+  295 |           {isResizingCanvas && (
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:134:21
+  132 |
+  133 |   // 引導線距離顯示元件
+> 134 |   const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 135 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 136 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 143 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 144 |   );
+      | ^^^^ The component is created during render here
+  145 |
+  146 |   return (
+  147 |     <Rnd                                                         [2mreact-hooks/static-components[22m
+  [2m451:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:451:12
+  449 |
+  450 |           {/* 頂點標籤 (Child) */}
+> 451 |           <DistLabelChild val={curX} left={0} top={-30} horizontal />
+      |            ^^^^^^^^^^^^^^ This component is created during render
+  452 |           <DistLabelChild val={curX + curW} left="100%" top={-30} horizontal />
+  453 |           <DistLabelChild val={curY} top={0} left={-35} />
+  454 |           <DistLabelChild val={curY + curH} top="100%" left={-35} />
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:346:26
+  344 |   const label = { text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB', gauge: 'GAUGE', 'slot-grid': 'SLOTS' }[child.type];
+  345 |
+> 346 |   const DistLabelChild = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 347 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 348 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 355 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 356 |   );
+      | ^^^^ The component is created during render here
+  357 |
+  358 |   return (
+  359 |     <Rnd                  [2mreact-hooks/static-components[22m
+  [2m452:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:452:12
+  450 |           {/* 頂點標籤 (Child) */}
+  451 |           <DistLabelChild val={curX} left={0} top={-30} horizontal />
+> 452 |           <DistLabelChild val={curX + curW} left="100%" top={-30} horizontal />
+      |            ^^^^^^^^^^^^^^ This component is created during render
+  453 |           <DistLabelChild val={curY} top={0} left={-35} />
+  454 |           <DistLabelChild val={curY + curH} top="100%" left={-35} />
+  455 |
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:346:26
+  344 |   const label = { text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB', gauge: 'GAUGE', 'slot-grid': 'SLOTS' }[child.type];
+  345 |
+> 346 |   const DistLabelChild = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 347 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 348 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 355 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 356 |   );
+      | ^^^^ The component is created during render here
+  357 |
+  358 |   return (
+  359 |     <Rnd                  [2mreact-hooks/static-components[22m
+  [2m453:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:453:12
+  451 |           <DistLabelChild val={curX} left={0} top={-30} horizontal />
+  452 |           <DistLabelChild val={curX + curW} left="100%" top={-30} horizontal />
+> 453 |           <DistLabelChild val={curY} top={0} left={-35} />
+      |            ^^^^^^^^^^^^^^ This component is created during render
+  454 |           <DistLabelChild val={curY + curH} top="100%" left={-35} />
+  455 |
+  456 |           {isResizing && (
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:346:26
+  344 |   const label = { text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB', gauge: 'GAUGE', 'slot-grid': 'SLOTS' }[child.type];
+  345 |
+> 346 |   const DistLabelChild = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 347 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 348 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 355 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 356 |   );
+      | ^^^^ The component is created during render here
+  357 |
+  358 |   return (
+  359 |     <Rnd                      [2mreact-hooks/static-components[22m
+  [2m454:12[22m  [31merror[39m  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:454:12
+  452 |           <DistLabelChild val={curX + curW} left="100%" top={-30} horizontal />
+  453 |           <DistLabelChild val={curY} top={0} left={-35} />
+> 454 |           <DistLabelChild val={curY + curH} top="100%" left={-35} />
+      |            ^^^^^^^^^^^^^^ This component is created during render
+  455 |
+  456 |           {isResizing && (
+  457 |             <div style={{
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/CanvasElement.tsx:346:26
+  344 |   const label = { text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB', gauge: 'GAUGE', 'slot-grid': 'SLOTS' }[child.type];
+  345 |
+> 346 |   const DistLabelChild = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 347 |     <div style={{
+      | ^^^^^^^^^^^^^^^^^
+> 348 |       position: 'absolute', top, left, right, bottom,
+      …
+      | ^^^^^^^^^^^^^^^^^
+> 355 |     </div>
+      | ^^^^^^^^^^^^^^^^^
+> 356 |   );
+      | ^^^^ The component is created during render here
+  357 |
+  358 |   return (
+  359 |     <Rnd                                                                  [2mreact-hooks/static-components[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/PropertiesPanel.tsx[24m
+  [2m139:104[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m191:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m259:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m280:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m302:88[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m308:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m322:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m338:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m351:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m445:114[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m446:114[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m447:122[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m448:124[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m497:68[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m498:69[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m499:73[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m500:72[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m501:69[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m502:72[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/DataSourcePicker.tsx[24m
+  [2m44:21[22m  [31merror[39m  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/DataSourcePicker.tsx:44:21
+  42 |   }, []);
+  43 |
+> 44 |   useEffect(() => { loadTables(dataSourceId); }, [dataSourceId, loadTables]);
+     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  45 |
+  46 |   // ─── 選取資料表 → 載入欄位 → 產生 SELECT 範本 ────────────────
+  47 |   async function handleSelectTable(table: string) {  [2mreact-hooks/set-state-in-effect[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/TextWidget.tsx[24m
+  [2m21:61[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m27:17[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m40:55[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useMqttData.ts[24m
+  [2m26:7[22m   [31merror[39m  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useMqttData.ts:26:7
+  24 |   useEffect(() => {
+  25 |     if (!mqttDataSourceId || !mqttTopic) {
+> 26 |       setState({ data: null, connected: false, error: null });
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  27 |       return;
+  28 |     }
+  29 |  [2mreact-hooks/set-state-in-effect[22m
+  [2m55:36[22m  [31merror[39m  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useWidgetData.ts[24m
+  [2m24:16[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m32:21[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m47:21[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m67:3[22m   [33mwarning[39m  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/index.tsx[24m
+   [2m9:37[22m  [31merror[39m  'ChevronDown' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        [2m@typescript-eslint/no-unused-vars[22m
+   [2m9:91[22m  [31merror[39m  'Home' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [2m@typescript-eslint/no-unused-vars[22m
+   [2m9:97[22m  [31merror[39m  'Crosshair' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [2m@typescript-eslint/no-unused-vars[22m
+  [2m13:26[22m  [31merror[39m  'activePlaneId' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [2m@typescript-eslint/no-unused-vars[22m
+  [2m34:72[22m  [31merror[39m  Error: Cannot access variable before it is declared
+
+`setIsEditMode` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/index.tsx:34:72
+  32 |
+  33 |       const isMod = e.metaKey || e.ctrlKey;
+> 34 |       if (!isMod && e.key.toLowerCase() === 'e') { e.preventDefault(); setIsEditMode(v => !v); }
+     |                                                                        ^^^^^^^^^^^^^ `setIsEditMode` accessed before it is declared
+  35 |       if (isMod && e.key === 'c') { e.preventDefault(); copySelected(); }
+  36 |       if (isMod && e.key === 'v') { 
+  37 |         e.preventDefault(); 
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/index.tsx:59:22
+  57 |   const [showPlaneMenu, setShowPlaneMenu] = useState(false);
+  58 |   const [showSettings, setShowSettings] = useState(false);
+> 59 |   const [isEditMode, setIsEditMode] = useState(false);
+     |                      ^^^^^^^^^^^^^ `setIsEditMode` is declared here
+  60 |   const toggleEditMode = () => setIsEditMode(v => !v);
+  61 |
+  62 |   function handleCreatePlane(name: string, width: number, height: number) {  [2mreact-hooks/immutability[22m
+  [2m57:10[22m  [31merror[39m  'showPlaneMenu' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [2m@typescript-eslint/no-unused-vars[22m
+  [2m57:25[22m  [31merror[39m  'setShowPlaneMenu' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [2m@typescript-eslint/no-unused-vars[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/utils/collision.ts[24m
+  [2m42:81[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[31m[1m✖ 49 problems (48 errors, 1 warning)[22m[39m
+[31m[1m  0 errors and 1 warning potentially fixable with the `--fix` option.[22m[39m
+[0m

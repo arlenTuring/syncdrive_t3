@@ -1,0 +1,218 @@
+import { VariableProvider } from '../../dashboard/VariableContext';
+import type { VehicleDefinition } from '../types';
+import {
+  computeVehicleMapRenderBounds,
+  isLandscapeVehicleDefinition,
+  mapDisplayContentSize,
+} from '../utils/vehicleContentBounds';
+import { mapVehiclePivotRotateDeg } from '../../map-editor/vehicles/readVehicleHeading';
+import { computeVehicleRearAxleAnchorPx } from '../utils/vehicleRearAxleAnchor';
+import { VehicleElementRenderer } from './VehicleElementRenderer';
+
+export type VehicleMapLayoutMode = 'fill-container' | 'rear-axle-pivot';
+
+/** 橫向行駛（rotate≈0°/180°）才 counter-rotate；縱向時文字跟車体，不另轉 */
+function shouldCounterRotateMapText(rotateDeg: number): boolean {
+  const mod = ((rotateDeg % 180) + 180) % 180;
+  return mod <= 45 || mod >= 135;
+}
+
+function VehicleElementsLayer({
+  vehicle,
+  definition,
+  renderBounds,
+  livePayloadOnly,
+  textCounterRotateDeg = null,
+}: {
+  vehicle: VehicleDefinition;
+  definition: VehicleDefinition;
+  renderBounds: { x: number; y: number; width: number; height: number };
+  livePayloadOnly: boolean;
+  /** 圖台 rear-axle-pivot：橫向時抵消外層 heading，文字保持正立 */
+  textCounterRotateDeg?: number | null;
+}) {
+  return (
+    <div
+      className="relative overflow-visible"
+      style={{
+        width: definition.width,
+        height: definition.height,
+        left: -renderBounds.x,
+        top: -renderBounds.y,
+      }}
+    >
+      {vehicle.elements.map((el) => {
+        const counterText =
+          textCounterRotateDeg != null &&
+          Number.isFinite(textCounterRotateDeg) &&
+          el.type === 'text' &&
+          shouldCounterRotateMapText(textCounterRotateDeg);
+
+        const parts: string[] = [];
+        if (el.rotationDeg) parts.push(`rotate(${el.rotationDeg}deg)`);
+        if (counterText) parts.push(`rotate(${-textCounterRotateDeg}deg)`);
+
+        return (
+          <div
+            key={el.id}
+            className="absolute overflow-visible"
+            style={{
+              left: el.x,
+              top: el.y,
+              width: el.width,
+              height: el.height,
+              zIndex: el.type === 'text' ? 20 : 10,
+            }}
+          >
+            <div
+              className="relative h-full w-full"
+              style={{
+                transform: parts.length > 0 ? parts.join(' ') : undefined,
+                transformOrigin: 'center center',
+              }}
+            >
+              <VehicleElementRenderer
+                element={el}
+                vehicle={vehicle}
+                isEditMode={false}
+                livePayloadOnly={livePayloadOnly}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 載具樣板顯示。
+ * - fill-container：儀表板載具容器／校準框，車體填滿外框
+ * - rear-axle-pivot：圖台即時車輛，後軸對齊外層錨點並繞後軸旋轉
+ */
+export function VehicleDefinitionMapView({
+  definition,
+  liveData,
+  displayWidth,
+  displayHeight,
+  fitMode = 'contain',
+  layoutMode = 'fill-container',
+  livePayloadOnly = false,
+  mapHeadingRad,
+  mapSteeringRad,
+}: {
+  definition: VehicleDefinition;
+  liveData?: Record<string, unknown>;
+  displayWidth: number;
+  displayHeight: number;
+  fitMode?: 'contain' | 'stretch';
+  layoutMode?: VehicleMapLayoutMode;
+  livePayloadOnly?: boolean;
+  mapHeadingRad?: number | null;
+  mapSteeringRad?: number | null;
+}) {
+  const renderBounds = computeVehicleMapRenderBounds(definition);
+  const display = mapDisplayContentSize(definition, renderBounds);
+  const scaleX = displayWidth / Math.max(1, display.width);
+  const scaleY = displayHeight / Math.max(1, display.height);
+  const uniformScale = Math.min(scaleX, scaleY);
+  const landscape = isLandscapeVehicleDefinition(definition);
+
+  const vehicle: VehicleDefinition = {
+    ...definition,
+    previewData: {
+      ...(definition.previewData ?? {}),
+      ...(liveData ?? {}),
+    },
+  };
+
+  const sx = fitMode === 'stretch' ? scaleX : uniformScale;
+  const sy = fitMode === 'stretch' ? scaleY : uniformScale;
+  const scalePart = fitMode === 'stretch' ? `scale(${sx}, ${sy})` : `scale(${sx})`;
+
+  if (layoutMode === 'rear-axle-pivot') {
+    const pivot = computeVehicleRearAxleAnchorPx(
+      definition,
+      displayWidth,
+      displayHeight,
+      fitMode,
+    );
+    const pivotRotateDeg = mapVehiclePivotRotateDeg(
+      mapHeadingRad,
+      landscape,
+      mapSteeringRad,
+    );
+    const rotateDeg =
+      pivotRotateDeg != null
+        ? pivotRotateDeg
+        : landscape
+          ? 0
+          : -90;
+    const transform = `rotate(${rotateDeg}deg) ${scalePart}`;
+
+    return (
+      <div
+        className="pointer-events-none relative"
+        style={{ width: displayWidth, height: displayHeight, overflow: 'visible' }}
+      >
+        <VariableProvider variables={{}}>
+          {/*
+            外層 MapAreaVehicleOverlay 已把顯示框後軸對齊 MQTT 錨點（粉色十字）。
+            此層在框內擺放載具，使後軸落在 pivot，並繞後軸旋轉。
+          */}
+          <div
+            className="absolute"
+            style={{
+              // transform-origin 為內容未縮放 px；左上角須使後軸落在 pivot（顯示 px）
+              left: pivot.x - pivot.contentX,
+              top: pivot.y - pivot.contentY,
+              width: display.width,
+              height: display.height,
+              transform,
+              transformOrigin: `${pivot.contentX}px ${pivot.contentY}px`,
+            }}
+          >
+            <VehicleElementsLayer
+              vehicle={vehicle}
+              definition={definition}
+              renderBounds={renderBounds}
+              livePayloadOnly={livePayloadOnly}
+              textCounterRotateDeg={rotateDeg}
+            />
+          </div>
+        </VariableProvider>
+      </div>
+    );
+  }
+
+  const rotateDeg = landscape ? 0 : -90;
+  const transform = `translate(-50%, -50%) rotate(${rotateDeg}deg) ${scalePart}`;
+
+  return (
+    <div
+      className="pointer-events-none relative"
+      style={{ width: displayWidth, height: displayHeight, overflow: 'visible' }}
+    >
+      <VariableProvider variables={{}}>
+        <div
+          className="absolute"
+          style={{
+            left: displayWidth / 2,
+            top: displayHeight / 2,
+            width: renderBounds.width,
+            height: renderBounds.height,
+            transform,
+            transformOrigin: 'center center',
+          }}
+        >
+          <VehicleElementsLayer
+            vehicle={vehicle}
+            definition={definition}
+            renderBounds={renderBounds}
+            livePayloadOnly={livePayloadOnly}
+          />
+        </div>
+      </VariableProvider>
+    </div>
+  );
+}

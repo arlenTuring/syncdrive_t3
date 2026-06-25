@@ -1,0 +1,6196 @@
+{
+  "schemaVersion": 2,
+  "mapId": "t3-main-version",
+  "displayName": "軌道合併加道路線",
+  "version": "v0.1.6",
+  "createdAt": "2026-06-03T14:04:56.970Z",
+  "updatedAt": "2026-06-25T02:44:01.752Z",
+  "pixelSize": {
+    "width": 3152,
+    "height": 642
+  },
+  "pixelOrigin": {
+    "x": 516,
+    "y": 146
+  },
+  "areas": [
+    {
+      "id": "area-a",
+      "customName": "Area A · N2W 站台",
+      "layout": {
+        "xPx": 2377.626159358115,
+        "yPx": 210.16560291845363,
+        "wPx": 1281.0120619806466,
+        "hPx": 200.21171975884275,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 640,
+        "xMaxM": 960,
+        "yMinM": 360,
+        "yMaxM": 415
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "012",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D06",
+          "positionMeters": {
+            "x": 641.4828063048991,
+            "y": 383.33508288638507
+          },
+          "areaPosition": {
+            "x": 5.935914881739592,
+            "y": 84.94467409815073
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "R06",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 600,
+            "refFieldXMaxM": 650,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "013",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D05",
+          "positionMeters": {
+            "x": 686.4472541110667,
+            "y": 383.33508288638507
+          },
+          "areaPosition": {
+            "x": 185.9359148817396,
+            "y": 84.94467409815073
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D05",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 650,
+            "refFieldXMaxM": 700,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "014",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D04",
+          "positionMeters": {
+            "x": 731.4117019172344,
+            "y": 383.33508288638507
+          },
+          "areaPosition": {
+            "x": 365.93591488173956,
+            "y": 84.94467409815073
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D04",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.12109375,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 700,
+            "refFieldXMaxM": 750,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "015",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D03",
+          "positionMeters": {
+            "x": 776.2512484794961,
+            "y": 383.26320865770083
+          },
+          "areaPosition": {
+            "x": 545.4359148817396,
+            "y": 84.68303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D03",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelPlacement": "center",
+              "textAlign": "center",
+              "verticalAlign": "top",
+              "textWrap": "single"
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 750,
+            "refFieldXMaxM": 800,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "016",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D02",
+          "positionMeters": {
+            "x": 820.9654944543793,
+            "y": 383.33508288638507
+          },
+          "areaPosition": {
+            "x": 724.4343162448488,
+            "y": 84.94467409815073
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D02",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 800,
+            "refFieldXMaxM": 850,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "017",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D01",
+          "positionMeters": {
+            "x": 865.9299422605469,
+            "y": 383.26320865770083
+          },
+          "areaPosition": {
+            "x": 904.4343162448488,
+            "y": 84.68303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D01",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 850,
+            "refFieldXMaxM": 900,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "018",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U06",
+          "positionMeters": {
+            "x": 641.4828063048991,
+            "y": 369.6651035953235
+          },
+          "areaPosition": {
+            "x": 5.935914881739592,
+            "y": 35.18303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U06",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 600,
+            "refFieldXMaxM": 650,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "019",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U05",
+          "positionMeters": {
+            "x": 686.4472541110667,
+            "y": 369.7369778240077
+          },
+          "areaPosition": {
+            "x": 185.9359148817395,
+            "y": 35.44467409815073
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U05",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 650,
+            "refFieldXMaxM": 700,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "020",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U04",
+          "positionMeters": {
+            "x": 731.4117019172344,
+            "y": 369.6651035953235
+          },
+          "areaPosition": {
+            "x": 365.9359148817395,
+            "y": 35.18303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U04",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 700,
+            "refFieldXMaxM": 750,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "021",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U03",
+          "positionMeters": {
+            "x": 776.2512484794961,
+            "y": 369.6651035953235
+          },
+          "areaPosition": {
+            "x": 545.4359148817396,
+            "y": 35.18303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U03",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.1171875,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 750,
+            "refFieldXMaxM": 800,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "022",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U02",
+          "positionMeters": {
+            "x": 820.9654944543793,
+            "y": 369.6651035953235
+          },
+          "areaPosition": {
+            "x": 724.4343162448488,
+            "y": 35.18303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U02",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 800,
+            "refFieldXMaxM": 850,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "023",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U01",
+          "positionMeters": {
+            "x": 865.9299422605469,
+            "y": 369.6651035953235
+          },
+          "areaPosition": {
+            "x": 904.4343162448488,
+            "y": 35.18303659031068
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U01",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 850,
+            "refFieldXMaxM": 900,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "024",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R02",
+          "positionMeters": {
+            "x": 681.98430412657,
+            "y": 392.1938598992935
+          },
+          "areaPosition": {
+            "x": 168.07,
+            "y": 117.1925101111417
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -33.16796875,
+                "y": -3.2421875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R11"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "025",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R01",
+          "positionMeters": {
+            "x": 876.4330586643421,
+            "y": 392.1856186234981
+          },
+          "areaPosition": {
+            "x": 946.48,
+            "y": 117.16251011114173
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 33.859375,
+                "y": -3.47265625
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R12"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "026",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T01",
+          "positionMeters": {
+            "x": 916.7586742718402,
+            "y": 377.8400874386306
+          },
+          "areaPosition": {
+            "x": 1107.91,
+            "y": 64.94171975884274
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 33,
+            "h": 89
+          },
+          "rotationDeg": 102,
+          "parameters": {
+            "segmentId": "T01",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 268.6908752283517
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "027",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T02",
+          "positionMeters": {
+            "x": 915.9967766840134,
+            "y": 365.21445292010804
+          },
+          "areaPosition": {
+            "x": 1104.86,
+            "y": 18.98171975884273
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 33,
+            "h": 82
+          },
+          "rotationDeg": 78,
+          "parameters": {
+            "segmentId": "T02",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -0.8822489999373659,
+                "y": -4.388146721384619
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 267.3962486542366
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "028",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "P1",
+          "positionMeters": {
+            "x": 929.1538737170736,
+            "y": 369.38755672417244
+          },
+          "areaPosition": {
+            "x": 1157.53,
+            "y": 34.17270683782269
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 123.48135392585364,
+            "h": 101.53901292102006
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": -0.12109375
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 1000,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 107,
+            "purpose": "月台 P2"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "029",
+          "type": "Geofence",
+          "name": "Geofence",
+          "customName": "N2W車站",
+          "positionMeters": {
+            "x": 779.8893931747439,
+            "y": 385.74574558476786
+          },
+          "areaPosition": {
+            "x": 560,
+            "y": 93.72
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1280,
+            "hPx": 213
+          },
+          "areaSizePx": {
+            "w": 216,
+            "h": 86.62
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "verticesMeters": [
+              {
+                "x": 817.9514779877994,
+                "y": 360.85584044864345
+              },
+              {
+                "x": 869.5541604921907,
+                "y": 360.85584044864345
+              },
+              {
+                "x": 869.5541604921907,
+                "y": 411.1966967367097
+              },
+              {
+                "x": 817.9514779877994,
+                "y": 411.1966967367097
+              }
+            ],
+            "strokeStyle": "dashed",
+            "strokeWidthPx": 2,
+            "strokeColor": "#e2e8f0",
+            "fillEnabled": false,
+            "fillColor": "#5d6c83",
+            "labels": [
+              {
+                "id": "lbl-N2W",
+                "text": "N2W車站",
+                "x": 831.7112827064304,
+                "y": 362.9632198905604,
+                "rotationDeg": 0,
+                "fontSizePx": 19,
+                "fontWeight": "bold"
+              }
+            ],
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "141",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 823.0492857059521,
+            "y": 394.2272762138379
+          },
+          "areaPosition": {
+            "x": 732.7760716445822,
+            "y": 124.5945787896985
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 163.31648920053323,
+            "h": 20.105090728428777
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "142",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 823.0492857059521,
+            "y": 366.4915131791524
+          },
+          "areaPosition": {
+            "x": 732.7760716445822,
+            "y": 23.630491226096254
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 163.31648920053323,
+            "h": 20.105090728428777
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "mqttInstanceId": "142",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "161",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S01",
+          "positionMeters": {
+            "x": 779.8893931747439,
+            "y": 395.85553292776
+          },
+          "areaPosition": {
+            "x": 560,
+            "y": 130.5217801879391
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S10",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -38.62486094430447,
+                "y": -1.703125
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXM": 770,
+            "refFieldYM": 98,
+            "mqttInstanceId": "161"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "170",
+          "type": "RoadLine",
+          "name": "RoadLine",
+          "customName": "",
+          "positionMeters": {
+            "x": 640,
+            "y": 380.1405239844444
+          },
+          "areaPosition": {
+            "x": 0,
+            "y": 73.31579897763352
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 1087.9717900552487,
+            "h": 19.90830914353091
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "roadLineColor": "#060a12",
+            "pinToTop": true,
+            "mqttInstanceId": "170",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            }
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "180",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S07",
+          "positionMeters": {
+            "x": 775.412932593152,
+            "y": 360.00048903399244
+          },
+          "areaPosition": {
+            "x": 542.08,
+            "y": 0.0017801879390830777
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 180,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S09",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -35.28501719430447,
+                "y": -4.062500000000014
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 180.87808945698214
+            },
+            "refFieldXM": 760,
+            "refFieldYM": 108.25,
+            "mqttInstanceId": "180"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "174",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 828.6333526215077,
+            "y": 374.5323546054425
+          },
+          "areaPosition": {
+            "x": 755.13,
+            "y": 52.90086741274509
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "N2W上行",
+            "iconMode": "builtin",
+            "refFieldXM": 810,
+            "refFieldYM": 105.25,
+            "dockingLeg": "up",
+            "dockingStation": "N2W",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "visible": false
+            },
+            "purpose": "N2W 上行",
+            "nodeRole": "STOP",
+            "operationNodeId": "ND-N2W-STOP-01"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "175",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 853.6011112783214,
+            "y": 388.2018840580465
+          },
+          "areaPosition": {
+            "x": 855.08,
+            "y": 102.66086741274509
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "N2W下行",
+            "iconMode": "builtin",
+            "refFieldXM": 840,
+            "refFieldYM": 101.75,
+            "dockingLeg": "down",
+            "dockingStation": "N2W",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "visible": false
+            },
+            "purpose": "N2W 下行",
+            "nodeRole": "DEP",
+            "operationNodeId": "ND-N2W-DEP-01"
+          },
+          "currentState": "Normal"
+        }
+      ]
+    },
+    {
+      "id": "area-b",
+      "customName": "Area B · 下行正線過渡軌道",
+      "layout": {
+        "xPx": 537.4734457525387,
+        "yPx": 300.9623244155652,
+        "wPx": 1849.144555849907,
+        "hPx": 109.96514983933928,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 0,
+        "xMaxM": 640,
+        "yMinM": 380,
+        "yMaxM": 405
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "031",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U16",
+          "positionMeters": {
+            "x": 40.47741838480626,
+            "y": 388.25860656461157
+          },
+          "areaPosition": {
+            "x": 116.95093412675537,
+            "y": 36.32635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 109.56817373057989,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U16",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 103.5,
+            "refFieldXMaxM": 150,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "032",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U14",
+          "positionMeters": {
+            "x": 140.6986967057931,
+            "y": 388.3722789418899
+          },
+          "areaPosition": {
+            "x": 406.51910785733526,
+            "y": 36.82635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U14",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 200,
+            "refFieldXMaxM": 250,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "033",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U13",
+          "positionMeters": {
+            "x": 202.9977742092561,
+            "y": 388.3722789418899
+          },
+          "areaPosition": {
+            "x": 586.5191078573353,
+            "y": 36.82635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U13",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 250,
+            "refFieldXMaxM": 300,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "034",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U12",
+          "positionMeters": {
+            "x": 265.2968517127191,
+            "y": 388.25860656461157
+          },
+          "areaPosition": {
+            "x": 766.5191078573353,
+            "y": 36.32635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U12",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 300,
+            "refFieldXMaxM": 350,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "035",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U11",
+          "positionMeters": {
+            "x": 327.59592921618207,
+            "y": 388.25860656461157
+          },
+          "areaPosition": {
+            "x": 946.5191078573353,
+            "y": 36.32635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U11",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 350,
+            "refFieldXMaxM": 400,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "036",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U10",
+          "positionMeters": {
+            "x": 389.8950067196451,
+            "y": 388.25860656461157
+          },
+          "areaPosition": {
+            "x": 1126.5191078573353,
+            "y": 36.32635633366657
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U10",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 400,
+            "refFieldXMaxM": 450,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "037",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U09",
+          "positionMeters": {
+            "x": 452.19408422310806,
+            "y": 388.315468646105
+          },
+          "areaPosition": {
+            "x": 1306.5191078573353,
+            "y": 36.57647022613061
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U09",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 450,
+            "refFieldXMaxM": 500,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "038",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U08",
+          "positionMeters": {
+            "x": 514.4931617265711,
+            "y": 388.315468646105
+          },
+          "areaPosition": {
+            "x": 1486.5191078573353,
+            "y": 36.57647022613061
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U08",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 500,
+            "refFieldXMaxM": 550,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "039",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U07",
+          "positionMeters": {
+            "x": 576.792239230034,
+            "y": 388.3053189281406
+          },
+          "areaPosition": {
+            "x": 1666.5191078573353,
+            "y": 36.53182561585923
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U07",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 550,
+            "refFieldXMaxM": 600,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "157",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U15",
+          "positionMeters": {
+            "x": 78.39961920233011,
+            "y": 388.315468646105
+          },
+          "areaPosition": {
+            "x": 226.51910785733526,
+            "y": 36.57647022613061
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U15",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 150,
+            "refFieldXMaxM": 200,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107,
+            "mqttInstanceId": "157"
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "160",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S06",
+          "positionMeters": {
+            "x": 99.86196017818986,
+            "y": 380.7809770353277
+          },
+          "areaPosition": {
+            "x": 288.53,
+            "y": 3.4352102684356183
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 180,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S05",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -36.95689219430447,
+                "y": -4.1132812500000036
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 180.1932346997306
+            },
+            "refFieldXM": 175,
+            "refFieldYM": 108.25,
+            "mqttInstanceId": "160"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "168",
+          "type": "RoadLine",
+          "name": "RoadLine",
+          "customName": "",
+          "positionMeters": {
+            "x": 18.94930274063666,
+            "y": 393.28840710217617
+          },
+          "areaPosition": {
+            "x": 54.75,
+            "y": 58.45046712467766
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1849.144555849907,
+            "hPx": 109.96514983933928
+          },
+          "areaSizePx": {
+            "w": 1794.390587668088,
+            "h": 51.51468271466162
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "roadLineColor": "#060a12",
+            "pinToTop": true,
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            }
+          },
+          "currentState": "Normal"
+        }
+      ]
+    },
+    {
+      "id": "area-c",
+      "customName": "Area C · 上行正線過渡軌道",
+      "layout": {
+        "xPx": 573.7109723802303,
+        "yPx": 229.67722094658632,
+        "wPx": 1811.7076615524559,
+        "hPx": 125.06897392160681,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 80,
+        "xMaxM": 640,
+        "yMinM": 360,
+        "yMaxM": 380
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "042",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D15",
+          "positionMeters": {
+            "x": 138.93003726026842,
+            "y": 364.6781994007922
+          },
+          "areaPosition": {
+            "x": 190.65,
+            "y": 29.254879942887726
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D15",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 150,
+            "refFieldXMaxM": 200,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "043",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D14",
+          "positionMeters": {
+            "x": 194.56815269089162,
+            "y": 364.731316045498
+          },
+          "areaPosition": {
+            "x": 370.65,
+            "y": 29.58704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D14",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 200,
+            "refFieldXMaxM": 250,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "044",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D13",
+          "positionMeters": {
+            "x": 250.20626812151485,
+            "y": 364.731316045498
+          },
+          "areaPosition": {
+            "x": 550.65,
+            "y": 29.58704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D13",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 250,
+            "refFieldXMaxM": 300,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "045",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D12",
+          "positionMeters": {
+            "x": 305.8443835521381,
+            "y": 364.6781994007922
+          },
+          "areaPosition": {
+            "x": 730.65,
+            "y": 29.254879942887726
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D12",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 300,
+            "refFieldXMaxM": 350,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "046",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D11",
+          "positionMeters": {
+            "x": 361.4824989827613,
+            "y": 364.731316045498
+          },
+          "areaPosition": {
+            "x": 910.65,
+            "y": 29.58704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D11",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 350,
+            "refFieldXMaxM": 400,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "047",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D10",
+          "positionMeters": {
+            "x": 417.12061441338454,
+            "y": 364.6781994007922
+          },
+          "areaPosition": {
+            "x": 1090.65,
+            "y": 29.254879942887726
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D10",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 400,
+            "refFieldXMaxM": 450,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "048",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D09",
+          "positionMeters": {
+            "x": 472.75872984400775,
+            "y": 364.6781994007922
+          },
+          "areaPosition": {
+            "x": 1270.65,
+            "y": 29.254879942887726
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D09",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 450,
+            "refFieldXMaxM": 500,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "049",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D08",
+          "positionMeters": {
+            "x": 528.396845274631,
+            "y": 364.6513601644633
+          },
+          "areaPosition": {
+            "x": 1450.65,
+            "y": 29.08704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D08",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 500,
+            "refFieldXMaxM": 550,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "050",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D07",
+          "positionMeters": {
+            "x": 584.0349607052542,
+            "y": 364.6513601644633
+          },
+          "areaPosition": {
+            "x": 1630.65,
+            "y": 29.08704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D07",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.1171875,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 550,
+            "refFieldXMaxM": 600,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "051",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R05",
+          "positionMeters": {
+            "x": 204.54283038503726,
+            "y": 370.1447644902995
+          },
+          "areaPosition": {
+            "x": 402.92,
+            "y": 63.43976427390577
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -35.51953125,
+                "y": -3.04296875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R08"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "052",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R04",
+          "positionMeters": {
+            "x": 379.5710685105394,
+            "y": 370.1447644902995
+          },
+          "areaPosition": {
+            "x": 969.17,
+            "y": 63.43976427390577
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -34.63671875,
+                "y": -3.2421875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R09"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "053",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R03",
+          "positionMeters": {
+            "x": 543.966244575967,
+            "y": 370.1447644902995
+          },
+          "areaPosition": {
+            "x": 1501.02,
+            "y": 63.43976427390577
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -31.7265625,
+                "y": -3.7890625
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R10"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "143",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D16",
+          "positionMeters": {
+            "x": 89.36789745655501,
+            "y": 364.6513601644633
+          },
+          "areaPosition": {
+            "x": 30.30694927621159,
+            "y": 29.08704215546331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1811.7076615524559,
+            "hPx": 125.06897392160681
+          },
+          "areaSizePx": {
+            "w": 161.43918895584477,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D16",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "mqttInstanceId": "143",
+            "trackCornerRadiusMeters": {
+              "tl": 5,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "refFieldXMinM": 100,
+            "refFieldXMaxM": 150,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
+          },
+          "currentState": "Idle"
+        }
+      ]
+    },
+    {
+      "id": "area-d",
+      "customName": "Area D · T3 站台",
+      "layout": {
+        "xPx": 535.6299736456365,
+        "yPx": 244.9790152459418,
+        "wPx": 328.6416605680188,
+        "hPx": 486.40142520307825,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 50,
+        "xMaxM": 100,
+        "yMinM": 20,
+        "yMaxM": 355
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "057",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D17",
+          "positionMeters": {
+            "x": 60.56086717633629,
+            "y": 224.67735399782458
+          },
+          "areaPosition": {
+            "x": 69.41481851738882,
+            "y": 297.18016922787115
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 108.20627026987854
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D17",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "refFieldXMinM": 100,
+            "refFieldXMaxM": 103.5,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 150
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "063",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U18",
+          "positionMeters": {
+            "x": 68.44151423489043,
+            "y": 158.73671703386634
+          },
+          "areaPosition": {
+            "x": 121.21299723086294,
+            "y": 201.4380205769217
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 95.36576959498241
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U18",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.125,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "refFieldXMinM": 103.5,
+            "refFieldXMaxM": 107,
+            "refFieldYMinM": 150,
+            "refFieldYMaxM": 250
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "067",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S02",
+          "positionMeters": {
+            "x": 54.043918222975684,
+            "y": 254.81026528467436
+          },
+          "areaPosition": {
+            "x": 26.58,
+            "y": 340.9314856321746
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "mountDirection": "up",
+            "defaultLamp": "red",
+            "signalId": "S06",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -41.015625,
+                "y": -0.3046875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXM": 98,
+            "refFieldYM": 135
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "068",
+          "type": "Geofence",
+          "name": "Geofence",
+          "customName": "T3車站",
+          "positionMeters": {
+            "x": 58.51991800175463,
+            "y": 271.50416335421914
+          },
+          "areaPosition": {
+            "x": 56,
+            "y": 365.1701
+          },
+          "areaLayoutAnchor": {
+            "wPx": 200,
+            "hPx": 952
+          },
+          "areaSizePx": {
+            "w": 140,
+            "h": 215.9761
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "verticesMeters": [
+              {
+                "x": 55.235369622293575,
+                "y": 138.90473014231955
+              },
+              {
+                "x": 95.66047197924797,
+                "y": 138.90473014231955
+              },
+              {
+                "x": 95.66047197924797,
+                "y": 222.73108390791677
+              },
+              {
+                "x": 55.235369622293575,
+                "y": 222.73108390791677
+              }
+            ],
+            "strokeStyle": "dashed",
+            "strokeWidthPx": 2,
+            "strokeColor": "#e2e8f0",
+            "fillEnabled": false,
+            "fillColor": "rgba(56,189,248,0.08)",
+            "labels": [
+              {
+                "id": "lbl-T3",
+                "text": "T3車站",
+                "x": 83.6243881752593,
+                "y": 170.49779687608563,
+                "rotationDeg": 0,
+                "fontSizePx": 19,
+                "fontWeight": "bold"
+              }
+            ],
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "151",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D18",
+          "positionMeters": {
+            "x": 60.60400687670052,
+            "y": 158.73671703386634
+          },
+          "areaPosition": {
+            "x": 69.69836857267097,
+            "y": 201.4380205769217
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 95.36576959498241
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D18",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.125,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "mqttInstanceId": "151",
+            "refFieldXMinM": 100,
+            "refFieldXMaxM": 103.5,
+            "refFieldYMinM": 150,
+            "refFieldYMaxM": 250
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "152",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 53.18589045293761,
+            "y": 184.00137657311186
+          },
+          "areaPosition": {
+            "x": 20.940326576824305,
+            "y": 238.12090537441293
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 94,
+            "h": 22
+          },
+          "rotationDeg": 90,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "mqttInstanceId": "152",
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "154",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U17",
+          "positionMeters": {
+            "x": 68.3983745345262,
+            "y": 224.41812987302626
+          },
+          "areaPosition": {
+            "x": 120.92944717558079,
+            "y": 296.8037901719042
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 59.88546342023349
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U17",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "mqttInstanceId": "154",
+            "refFieldXMinM": 103.5,
+            "refFieldXMaxM": 107,
+            "refFieldYMinM": 107,
+            "refFieldYMaxM": 150
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "164",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U19",
+          "positionMeters": {
+            "x": 68.3983745345262,
+            "y": 117.49170991366262
+          },
+          "areaPosition": {
+            "x": 120.92944717558079,
+            "y": 141.55255715668827
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 59.88546342023349
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U19",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "mqttInstanceId": "164",
+            "refFieldXMinM": 103.5,
+            "refFieldXMaxM": 107,
+            "refFieldYMinM": 250,
+            "refFieldYMaxM": 300
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "165",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 69.1961163792499,
+            "y": 184.00137657311186
+          },
+          "areaPosition": {
+            "x": 126.17287126667267,
+            "y": 238.12090537441293
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 94,
+            "h": 22
+          },
+          "rotationDeg": 90,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "mqttInstanceId": "165",
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "166",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D19",
+          "positionMeters": {
+            "x": 60.60400687670052,
+            "y": 82.95287214507785
+          },
+          "areaPosition": {
+            "x": 69.69836857267097,
+            "y": 91.40407979699413
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 51.51462865819197,
+            "h": 110.0339407799274
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D19",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 0
+            },
+            "mqttInstanceId": "166",
+            "refFieldXMinM": 100,
+            "refFieldXMaxM": 103.5,
+            "refFieldYMinM": 250,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "173",
+          "type": "RoadLine",
+          "name": "RoadLine",
+          "customName": "",
+          "positionMeters": {
+            "x": 43.50356252366209,
+            "y": 186.18974392094447
+          },
+          "areaPosition": {
+            "x": -42.7,
+            "y": 241.29829342472237
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 325,
+            "h": 24
+          },
+          "rotationDeg": 90,
+          "parameters": {
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            },
+            "roadLineWidthPx": 4,
+            "roadLineColor": "#060a12"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "176",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 64.1793296095797,
+            "y": 202.81553524672123
+          },
+          "areaPosition": {
+            "x": 93.19836857267096,
+            "y": 265.43802057692176
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "T3下行",
+            "iconMode": "builtin",
+            "refFieldXM": 101.75,
+            "refFieldYM": 170,
+            "dockingLeg": "down",
+            "dockingStation": "T3",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            },
+            "purpose": "T3 下行",
+            "nodeRole": "STOP",
+            "operationNodeId": "ND-T3-STOP-01"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "177",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 71.66941448162842,
+            "y": 166.6042860263702
+          },
+          "areaPosition": {
+            "x": 142.42944717558078,
+            "y": 212.86129451972
+          },
+          "areaLayoutAnchor": {
+            "wPx": 328.6416605680188,
+            "hPx": 486.40142520307825
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "T3上行",
+            "iconMode": "builtin",
+            "refFieldXM": 105,
+            "refFieldYM": 230,
+            "dockingLeg": "up",
+            "dockingStation": "T3",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 20.4
+              },
+              "labelOffsetCustom": true
+            },
+            "purpose": "T3 上行",
+            "nodeRole": "STOP",
+            "operationNodeId": "ND-T3-STOP-01"
+          },
+          "currentState": "Normal"
+        }
+      ]
+    },
+    {
+      "id": "area-e",
+      "customName": "Area E · 下行正線過渡區",
+      "layout": {
+        "xPx": 582.2475265121096,
+        "yPx": 604.1955391420803,
+        "wPx": 1802.649031522316,
+        "hPx": 176.4009446134555,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 0,
+        "xMaxM": 640,
+        "yMinM": 40,
+        "yMaxM": 80
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "069",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D21",
+          "positionMeters": {
+            "x": 64.52725847680351,
+            "y": 61.259179683043996
+          },
+          "areaPosition": {
+            "x": 181.75,
+            "y": 93.75348444490353
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D21",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 150,
+            "refFieldXMaxM": 200,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "070",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D22",
+          "positionMeters": {
+            "x": 128.4332091003228,
+            "y": 61.250109436830144
+          },
+          "areaPosition": {
+            "x": 361.75,
+            "y": 93.71348444490354
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D22",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 200,
+            "refFieldXMaxM": 250,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "071",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D23",
+          "positionMeters": {
+            "x": 192.08708625193822,
+            "y": 61.250109436830144
+          },
+          "areaPosition": {
+            "x": 541.04,
+            "y": 93.71348444490354
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D23",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 250,
+            "refFieldXMaxM": 300,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "072",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D24",
+          "positionMeters": {
+            "x": 255.9894865448673,
+            "y": 61.27051749081131
+          },
+          "areaPosition": {
+            "x": 721.03,
+            "y": 93.80348444490355
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D24",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 300,
+            "refFieldXMaxM": 350,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "073",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D25",
+          "positionMeters": {
+            "x": 319.8954371683866,
+            "y": 61.19342039799358
+          },
+          "areaPosition": {
+            "x": 901.03,
+            "y": 93.46348444490354
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D25",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 350,
+            "refFieldXMaxM": 400,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "074",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D26",
+          "positionMeters": {
+            "x": 383.8013877919059,
+            "y": 61.188885274886644
+          },
+          "areaPosition": {
+            "x": 1081.03,
+            "y": 93.44348444490353
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D26",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 400,
+            "refFieldXMaxM": 450,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "075",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D27",
+          "positionMeters": {
+            "x": 447.70378808483497,
+            "y": 61.320403844987496
+          },
+          "areaPosition": {
+            "x": 1261.02,
+            "y": 94.02348444490354
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D27",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 450,
+            "refFieldXMaxM": 500,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "076",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D28",
+          "positionMeters": {
+            "x": 511.6061883777641,
+            "y": 61.31133359877364
+          },
+          "areaPosition": {
+            "x": 1441.01,
+            "y": 93.98348444490355
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D28",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 500,
+            "refFieldXMaxM": 550,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "077",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D29",
+          "positionMeters": {
+            "x": 575.5937966048579,
+            "y": 61.42471167644678
+          },
+          "areaPosition": {
+            "x": 1621.24,
+            "y": 94.48348444490355
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D29",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 550,
+            "refFieldXMaxM": 600,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "078",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T12",
+          "positionMeters": {
+            "x": 78.81350568568106,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 221.9892026487055,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 142.21532023048846,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T12",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "079",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T13",
+          "positionMeters": {
+            "x": 128.95429779679606,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 363.2177188031793,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T13",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "080",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T14",
+          "positionMeters": {
+            "x": 176.49677473010425,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 497.12771880317933,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T14",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "081",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T15",
+          "positionMeters": {
+            "x": 222.57063386226412,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 626.9011524642475,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T15",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "082",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T16",
+          "positionMeters": {
+            "x": 270.1131107955723,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 760.8111524642476,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T16",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "083",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T17",
+          "positionMeters": {
+            "x": 317.65558772888045,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 894.7211524642476,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T17",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "084",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T18",
+          "positionMeters": {
+            "x": 363.7294468610404,
+            "y": 41.80535066408094
+          },
+          "areaPosition": {
+            "x": 1024.494586125316,
+            "y": 7.961639062560177
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 133.91,
+            "h": 21.44
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T18",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "085",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T11",
+          "positionMeters": {
+            "x": 64.82748195486697,
+            "y": 41.75060035528267
+          },
+          "areaPosition": {
+            "x": 182.59562119058023,
+            "y": 7.7201889078128545
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 39.39358145812526,
+            "h": 87.26161573045447
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T11",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 3.939358145812526
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "087",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "H1",
+          "positionMeters": {
+            "x": 82.41459453257183,
+            "y": 49.64564108396066
+          },
+          "areaPosition": {
+            "x": 232.13217033975775,
+            "y": 42.53750496532538
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 132.96851615447386,
+            "h": 38.32473600657136
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -1.6015625,
+                "y": -1.354303657108602
+              }
+            },
+            "refFieldXMinM": 170,
+            "refFieldXMaxM": 200,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 333,
+            "purpose": "整備格 H1"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "088",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "H2",
+          "positionMeters": {
+            "x": 129.62281357618534,
+            "y": 49.64564108396066
+          },
+          "areaPosition": {
+            "x": 365.1006864942316,
+            "y": 42.53750496532538
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 132.96851615447386,
+            "h": 38.32473600657136
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 210,
+            "refFieldXMaxM": 240,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "整備格 H2"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "089",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "H3",
+          "positionMeters": {
+            "x": 176.83103261979886,
+            "y": 49.53226300628752
+          },
+          "areaPosition": {
+            "x": 498.06920264870547,
+            "y": 42.03750496532538
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 132.96851615447386,
+            "h": 38.32473600657136
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 250,
+            "refFieldXMaxM": 280,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "整備格 H3"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "090",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "M1",
+          "positionMeters": {
+            "x": 224.03925166341241,
+            "y": 49.48898751999218
+          },
+          "areaPosition": {
+            "x": 631.0377188031794,
+            "y": 41.84665904879776
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 131.8417168305341,
+            "h": 38.34483934015172
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 290,
+            "refFieldXMaxM": 320,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "保養格 M1"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "091",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "M2",
+          "positionMeters": {
+            "x": 270.84741969614646,
+            "y": 49.43859147279278
+          },
+          "areaPosition": {
+            "x": 762.8794356337135,
+            "y": 41.6244112905288
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 131.8417168305341,
+            "h": 38.34483934015172
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 330,
+            "refFieldXMaxM": 360,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "保養格 M2"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "092",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "M3",
+          "positionMeters": {
+            "x": 317.65558772888045,
+            "y": 49.354866490758894
+          },
+          "areaPosition": {
+            "x": 894.7211524642476,
+            "y": 41.25518214256576
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 131.8417168305341,
+            "h": 38.34483934015172
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 370,
+            "refFieldXMaxM": 400,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "保養格 M3"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "093",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "M4",
+          "positionMeters": {
+            "x": 364.4637557616145,
+            "y": 49.346992754061546
+          },
+          "areaPosition": {
+            "x": 1026.5628692947816,
+            "y": 41.2204587777895
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 131.8417168305341,
+            "h": 38.34483934015172
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 410,
+            "refFieldXMaxM": 440,
+            "refFieldYMinM": 320,
+            "refFieldYMaxM": 330,
+            "purpose": "保養格 M4"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "167",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D20",
+          "positionMeters": {
+            "x": 8.196045588431705,
+            "y": 61.31095269227908
+          },
+          "areaPosition": {
+            "x": 23.08530256609244,
+            "y": 93.9818046382673
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 160.4731942630593,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D20",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0,
+              "tr": 0,
+              "br": 0,
+              "bl": 5
+            },
+            "refFieldXMinM": 100,
+            "refFieldXMaxM": 150,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307,
+            "mqttInstanceId": "167"
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "171",
+          "type": "RoadLine",
+          "name": "RoadLine",
+          "customName": "",
+          "positionMeters": {
+            "x": 24.053693001417148,
+            "y": 69.05289818714141
+          },
+          "areaPosition": {
+            "x": 67.75057248990584,
+            "y": 128.12396709925733
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1802.649031522316,
+            "hPx": 176.4009446134555
+          },
+          "areaSizePx": {
+            "w": 1733.89845903241,
+            "h": 26.91697751419818
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "roadLineColor": "#060a12",
+            "pinToTop": true,
+            "mqttInstanceId": "171",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            }
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "181",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S03",
+          "positionMeters": {
+            "x": 29.36123398091692,
+            "y": 53.33802495705345
+          },
+          "areaPosition": {
+            "x": 82.7,
+            "y": 58.821005042551825
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 180,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S02",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -35.140625,
+                "y": -1.624999999999999
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 180.17050927667458
+            },
+            "refFieldXM": 125,
+            "refFieldYM": 308.5,
+            "mqttInstanceId": "181"
+          },
+          "currentState": "Normal"
+        }
+      ]
+    },
+    {
+      "id": "area-f",
+      "customName": "Area F · 上行正線過渡區",
+      "layout": {
+        "xPx": 640.7223122743219,
+        "yPx": 535.2229986284523,
+        "wPx": 1797.6181278391837,
+        "hPx": 102.62807244969045,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 100,
+        "xMaxM": 640,
+        "yMinM": 80,
+        "yMaxM": 100
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "098",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U21",
+          "positionMeters": {
+            "x": 137.03000040393175,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 123.27,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U21",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 150,
+            "refFieldXMaxM": 200,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "099",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U22",
+          "positionMeters": {
+            "x": 191.10155124929327,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 303.27,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U22",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 200,
+            "refFieldXMaxM": 250,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "100",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U23",
+          "positionMeters": {
+            "x": 245.17610606970172,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 483.28,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U23",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 250,
+            "refFieldXMaxM": 300,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "101",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U24",
+          "positionMeters": {
+            "x": 299.0313707116818,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 662.56,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U24",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 300,
+            "refFieldXMaxM": 350,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "102",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U25",
+          "positionMeters": {
+            "x": 353.09991758199635,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 842.55,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U25",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 350,
+            "refFieldXMaxM": 400,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "103",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U26",
+          "positionMeters": {
+            "x": 407.17146842735787,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 1022.55,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U26",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 400,
+            "refFieldXMaxM": 450,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "104",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U27",
+          "positionMeters": {
+            "x": 461.2400152976724,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 1202.54,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U27",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 450,
+            "refFieldXMaxM": 500,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "105",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U28",
+          "positionMeters": {
+            "x": 515.3115661430339,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 1382.54,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U28",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 500,
+            "refFieldXMaxM": 550,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "106",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U29",
+          "positionMeters": {
+            "x": 569.3831169883954,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 1562.54,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U29",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 550,
+            "refFieldXMaxM": 600,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "107",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S05",
+          "positionMeters": {
+            "x": 132.64119286031655,
+            "y": 88.33653636041097
+          },
+          "areaPosition": {
+            "x": 108.66,
+            "y": 42.7781328787868
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S03",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -37.23814219430447,
+                "y": -2.41796875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXM": 150,
+            "refFieldYM": 298
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "146",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R06",
+          "positionMeters": {
+            "x": 283.9213762254502,
+            "y": 86.03126650696103
+          },
+          "areaPosition": {
+            "x": 612.26,
+            "y": 30.948862801989414
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -36.7890625,
+                "y": -4.640625
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "146",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R05"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "147",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R07",
+          "positionMeters": {
+            "x": 434.5316731551108,
+            "y": 86.03126650696103
+          },
+          "areaPosition": {
+            "x": 1113.63,
+            "y": 30.948862801989414
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -32.83203125,
+                "y": -5.15625
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "147",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R04"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "148",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R08",
+          "positionMeters": {
+            "x": 592.3274783971106,
+            "y": 86.3118914793741
+          },
+          "areaPosition": {
+            "x": 1638.92,
+            "y": 32.38886280198941
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -34.63671875,
+                "y": -3.2421875
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "148",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R03"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "156",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U20",
+          "positionMeters": {
+            "x": 104.65796935943442,
+            "y": 80
+          },
+          "areaPosition": {
+            "x": 15.50601881377554,
+            "y": 0
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1797.6181278391837,
+            "hPx": 102.62807244969045
+          },
+          "areaSizePx": {
+            "w": 109.57388444681882,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U20",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 103.5,
+            "refFieldXMaxM": 150,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5,
+            "mqttInstanceId": "156"
+          },
+          "currentState": "Idle"
+        }
+      ]
+    },
+    {
+      "id": "area-g",
+      "customName": "Area G · S2W 站台",
+      "layout": {
+        "xPx": 2372.1107536124696,
+        "yPx": 482.04565144762745,
+        "wPx": 1504.5191230327096,
+        "hPx": 271.5125061587833,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 640,
+        "xMaxM": 960,
+        "yMinM": 40,
+        "yMaxM": 112
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "108",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U30",
+          "positionMeters": {
+            "x": 642.1852476007809,
+            "y": 70.64234705478688
+          },
+          "areaPosition": {
+            "x": 10.274208762300987,
+            "y": 115.55250615878333
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U30",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 600,
+            "refFieldXMaxM": 650,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "109",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U31",
+          "positionMeters": {
+            "x": 680.4699055477626,
+            "y": 70.58931082377225
+          },
+          "areaPosition": {
+            "x": 190.274208762301,
+            "y": 115.35250615878331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U31",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 650,
+            "refFieldXMaxM": 700,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "110",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U32",
+          "positionMeters": {
+            "x": 718.7545634947442,
+            "y": 70.5899460394256
+          },
+          "areaPosition": {
+            "x": 370.274208762301,
+            "y": 115.35490156147765
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U32",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 700,
+            "refFieldXMaxM": 750,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "111",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U33",
+          "positionMeters": {
+            "x": 756.7095479982934,
+            "y": 70.45937205778638
+          },
+          "areaPosition": {
+            "x": 548.724208762301,
+            "y": 114.8625061587833
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U33",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 750,
+            "refFieldXMaxM": 800,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "112",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U34",
+          "positionMeters": {
+            "x": 794.994205945275,
+            "y": 70.3771658997137
+          },
+          "areaPosition": {
+            "x": 728.724208762301,
+            "y": 114.55250615878333
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U34",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 800,
+            "refFieldXMaxM": 850,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "113",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "U35",
+          "positionMeters": {
+            "x": 833.2788638922566,
+            "y": 70.3771658997137
+          },
+          "areaPosition": {
+            "x": 908.724208762301,
+            "y": 114.55250615878333
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "U35",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 850,
+            "refFieldXMaxM": 900,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "114",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D30",
+          "positionMeters": {
+            "x": 642.1852476007809,
+            "y": 57.89508893041913
+          },
+          "areaPosition": {
+            "x": 10.274208762300987,
+            "y": 67.48250615878331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D30",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 600,
+            "refFieldXMaxM": 650,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "115",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D31",
+          "positionMeters": {
+            "x": 680.4699055477626,
+            "y": 57.91306422839876
+          },
+          "areaPosition": {
+            "x": 190.27420876230096,
+            "y": 67.55029113383054
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D31",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 650,
+            "refFieldXMaxM": 700,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "116",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D32",
+          "positionMeters": {
+            "x": 718.7545634947442,
+            "y": 57.71839648404118
+          },
+          "areaPosition": {
+            "x": 370.274208762301,
+            "y": 66.81619770134716
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D32",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 700,
+            "refFieldXMaxM": 750,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "117",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D33",
+          "positionMeters": {
+            "x": 756.7095479982934,
+            "y": 57.7300120281928
+          },
+          "areaPosition": {
+            "x": 548.724208762301,
+            "y": 66.85999999999999
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D33",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 750,
+            "refFieldXMaxM": 800,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "118",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D34",
+          "positionMeters": {
+            "x": 794.994205945275,
+            "y": 57.46483087311962
+          },
+          "areaPosition": {
+            "x": 728.724208762301,
+            "y": 65.85999999999999
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D34",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 800,
+            "refFieldXMaxM": 850,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "119",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "D35",
+          "positionMeters": {
+            "x": 833.2788638922566,
+            "y": 57.46483087311962
+          },
+          "areaPosition": {
+            "x": 908.724208762301,
+            "y": 65.85999999999999
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 180,
+            "h": 50
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "D35",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "trackCornerRadiusMeters": {
+              "tl": 0.1,
+              "tr": 0,
+              "br": 0,
+              "bl": 0.1
+            },
+            "refFieldXMinM": 850,
+            "refFieldXMaxM": 900,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "120",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T03",
+          "positionMeters": {
+            "x": 876.7106814076658,
+            "y": 65.2485623605984
+          },
+          "areaPosition": {
+            "x": 1112.924208762301,
+            "y": 95.2125061587833
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 33,
+            "h": 89
+          },
+          "rotationDeg": 102,
+          "parameters": {
+            "segmentId": "T03",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -0.02598896135221989,
+                "y": -0.12226845009172571
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 268.6908752283517
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "121",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T04",
+          "positionMeters": {
+            "x": 876.3916425914409,
+            "y": 52.52517054018723
+          },
+          "areaPosition": {
+            "x": 1111.424208762301,
+            "y": 47.23250615878331
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 33,
+            "h": 88
+          },
+          "rotationDeg": 78,
+          "parameters": {
+            "segmentId": "T04",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -1.0351394554889348,
+                "y": -4.2888584986220035
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 267.3962486542366
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "122",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "P2",
+          "positionMeters": {
+            "x": 887.369936548097,
+            "y": 56.97517207705925
+          },
+          "areaPosition": {
+            "x": 1163.04,
+            "y": 64.01349323776327
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 123.48135392585364,
+            "h": 101.53901292102006
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": -0.12109375
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 1000,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 307,
+            "purpose": "月台 P2"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "123",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R09",
+          "positionMeters": {
+            "x": 741.1914999771169,
+            "y": 78.88438694099686
+          },
+          "areaPosition": {
+            "x": 475.764208762301,
+            "y": 146.63329651108228
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -34.51171875,
+                "y": -3.2421875
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R02"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "124",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "R10",
+          "positionMeters": {
+            "x": 842.4833020307026,
+            "y": 78.75975179811246
+          },
+          "areaPosition": {
+            "x": 952,
+            "y": 146.16329651108228
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 102.74243159055794,
+            "h": 61.62920964770104
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "iconDisplay": "custom",
+            "customIconUrl": "facility/smart_pole_enable.png",
+            "defaultFillColor": "transparent",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 30.4375,
+                "y": -3.7734375
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "purpose": "智慧桿 R01"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "127",
+          "type": "Geofence",
+          "name": "Geofence",
+          "customName": "S2W",
+          "positionMeters": {
+            "x": 796.5417124943248,
+            "y": 55.855632069789046
+          },
+          "areaPosition": {
+            "x": 736,
+            "y": 59.7917
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1280,
+            "hPx": 205
+          },
+          "areaSizePx": {
+            "w": 216,
+            "h": 86.8403
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "verticesMeters": [
+              {
+                "x": 792.8651410261145,
+                "y": 61.93580549200315
+              },
+              {
+                "x": 836.5244849745103,
+                "y": 61.93580549200315
+              },
+              {
+                "x": 836.5244849745103,
+                "y": 112.33855337827138
+              },
+              {
+                "x": 792.8651410261145,
+                "y": 112.33855337827138
+              }
+            ],
+            "strokeStyle": "dashed",
+            "strokeWidthPx": 2,
+            "strokeColor": "#e2e8f0",
+            "fillEnabled": false,
+            "fillColor": "rgba(56,189,248,0.08)",
+            "labels": [
+              {
+                "id": "lbl-S2W",
+                "text": "S2W車站",
+                "x": 805.6298481155737,
+                "y": 103.9761934166069,
+                "rotationDeg": 0,
+                "fontSizePx": 19,
+                "fontWeight": "bold"
+              }
+            ],
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "149",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 796.7680617634851,
+            "y": 80.9751067027438
+          },
+          "areaPosition": {
+            "x": 737.064208762301,
+            "y": 154.51741543035456
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 163.31648920053323,
+            "h": 20.105090728428777
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "mqttInstanceId": "149",
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "150",
+          "type": "PSD",
+          "name": "Gate",
+          "customName": "",
+          "positionMeters": {
+            "x": 796.7680617634851,
+            "y": 54.515331049541906
+          },
+          "areaPosition": {
+            "x": 737.064208762301,
+            "y": 54.73741543035452
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 163.31648920053323,
+            "h": 20.105090728428777
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0,
+            "mqttInstanceId": "150",
+            "labelStyle": {
+              "fontSizePx": 16
+            },
+            "refFieldXM": null,
+            "refFieldYM": null
+          },
+          "currentState": "Open"
+        },
+        {
+          "id": "172",
+          "type": "RoadLine",
+          "name": "RoadLine",
+          "customName": "",
+          "positionMeters": {
+            "x": 640.3637042504963,
+            "y": 67.63381850813991
+          },
+          "areaPosition": {
+            "x": 1.71,
+            "y": 104.20732385947272
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 1091.7747875820876,
+            "h": 18.884389831695504
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "roadLineColor": "#060a12",
+            "pinToTop": true,
+            "mqttInstanceId": "172",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            }
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "182",
+          "type": "Signal",
+          "name": "Light",
+          "customName": "S04",
+          "positionMeters": {
+            "x": 747.7606774935457,
+            "y": 48.61906815061687
+          },
+          "areaPosition": {
+            "x": 506.65,
+            "y": 32.50256658787966
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 54.85737316976997,
+            "h": 40.84993957090365
+          },
+          "rotationDeg": 180,
+          "parameters": {
+            "mountDirection": "right",
+            "defaultLamp": "red",
+            "signalId": "S02",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": -38.328125,
+                "y": -2.117187499999999
+              },
+              "labelOffsetCustom": true,
+              "labelRotationDeg": 180.17050927667458
+            },
+            "refFieldXM": 750,
+            "refFieldYM": 308.5,
+            "mqttInstanceId": "182"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "178",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 801.5931604178847,
+            "y": 63.00406160718285
+          },
+          "areaPosition": {
+            "x": 759.75,
+            "y": 86.74847803885089
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "S2W上行",
+            "iconMode": "builtin",
+            "refFieldXM": 810,
+            "refFieldYM": 305.25,
+            "dockingLeg": "up",
+            "dockingStation": "S2W",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            },
+            "purpose": "S2W 上行",
+            "nodeRole": "DEP",
+            "operationNodeId": "ND-S2W-DEP-01"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "179",
+          "type": "DockingPoint",
+          "name": "DockingPoint",
+          "customName": "",
+          "positionMeters": {
+            "x": 824.10453929071,
+            "y": 75.04858967060667
+          },
+          "areaPosition": {
+            "x": 865.59,
+            "y": 132.1684780388509
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 10,
+            "h": 10
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "stationName": "S2W下行",
+            "iconMode": "builtin",
+            "refFieldXM": 840,
+            "refFieldYM": 301.75,
+            "dockingLeg": "down",
+            "dockingStation": "S2W",
+            "labelStyle": {
+              "visible": false,
+              "fontSizePx": 16
+            },
+            "purpose": "S2W 下行",
+            "nodeRole": "STOP",
+            "operationNodeId": "ND-S2W-STOP-01"
+          },
+          "currentState": "Normal"
+        }
+      ]
+    },
+    {
+      "id": "128",
+      "customName": "Area 128",
+      "layout": {
+        "xPx": 2129.757060512427,
+        "yPx": 150.4569108674294,
+        "wPx": 771.5729187087638,
+        "hPx": 127.13177233631993,
+        "borderPx": 0,
+        "borderColor": "transparent"
+      },
+      "domain": {
+        "xMinM": 640,
+        "xMaxM": 880,
+        "yMinM": 390,
+        "yMaxM": 415
+      },
+      "showRuler": false,
+      "mqtt": {
+        "topic": "v1/vtms/+/telemetry/update",
+        "vehicleIdField": "vehicle_code",
+        "xField": "x",
+        "yField": "y"
+      },
+      "view": {
+        "panXM": 0,
+        "panYM": 0,
+        "zoom": 1
+      },
+      "facilities": [
+        {
+          "id": "129",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "E1",
+          "positionMeters": {
+            "x": 821.0174076579615,
+            "y": 399.04612124072816
+          },
+          "areaPosition": {
+            "x": 581.950539848948,
+            "y": 46.001977044120025
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 138.81150373365477,
+            "h": 38
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "129",
+            "refFieldXMinM": 700,
+            "refFieldXMaxM": 730,
+            "refFieldYMinM": 50,
+            "refFieldYMaxM": 60,
+            "purpose": "E1 充電格"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "130",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "E2",
+          "positionMeters": {
+            "x": 777.0195461785731,
+            "y": 399.04612124072816
+          },
+          "areaPosition": {
+            "x": 440.50237985479976,
+            "y": 46.001977044120025
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 138.81150373365477,
+            "h": 38
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "130",
+            "refFieldXMinM": 660,
+            "refFieldXMaxM": 690,
+            "refFieldYMinM": 50,
+            "refFieldYMaxM": 60,
+            "purpose": "E2 充電格"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "131",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "E3",
+          "positionMeters": {
+            "x": 732.9718116354805,
+            "y": 399.04612124072816
+          },
+          "areaPosition": {
+            "x": 298.8938835884547,
+            "y": 46.001977044120025
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 138.81150373365477,
+            "h": 38
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "131",
+            "refFieldXMinM": 620,
+            "refFieldXMaxM": 650,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 60,
+            "purpose": "E3 充電格"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "132",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "E4",
+          "positionMeters": {
+            "x": 689.0011387082669,
+            "y": 399.04612124072816
+          },
+          "areaPosition": {
+            "x": 157.53313172162723,
+            "y": 46.001977044120025
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 138.81150373365477,
+            "h": 38
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#1e3a8a",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "132",
+            "refFieldXMinM": 580,
+            "refFieldXMaxM": 610,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 60,
+            "purpose": "E4 充電格"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "133",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "W1",
+          "positionMeters": {
+            "x": 641.7420056921793,
+            "y": 399.04612124072816
+          },
+          "areaPosition": {
+            "x": 5.600351734675172,
+            "y": 46.001977044120025
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 149.27193462129372,
+            "h": 38
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#4d1e1f",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0.234375,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "133",
+            "refFieldXMinM": 540,
+            "refFieldXMaxM": 570,
+            "refFieldYMinM": 50,
+            "refFieldYMaxM": 60,
+            "purpose": "洗車格 W1"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "134",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T06",
+          "positionMeters": {
+            "x": 819.6697582431315,
+            "y": 408.73789958285124
+          },
+          "areaPosition": {
+            "x": 577.6179990472955,
+            "y": 95.28729535311479
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 152.26,
+            "h": 20.03
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T06",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "134",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "135",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T07",
+          "positionMeters": {
+            "x": 776.46544163457,
+            "y": 408.6779224436997
+          },
+          "areaPosition": {
+            "x": 438.7209962702733,
+            "y": 94.98229535311478
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 141.74142538265312,
+            "h": 20.03
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T07",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "mqttInstanceId": "135",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "136",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T08",
+          "positionMeters": {
+            "x": 732.3763591033088,
+            "y": 408.6779224436997
+          },
+          "areaPosition": {
+            "x": 296.9795708876202,
+            "y": 94.98229535311478
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 141.74142538265312,
+            "h": 20.03
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T08",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "mqttInstanceId": "136",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "137",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T09",
+          "positionMeters": {
+            "x": 688.17347501988,
+            "y": 408.6779224436997
+          },
+          "areaPosition": {
+            "x": 154.87228635596892,
+            "y": 94.98229535311478
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 141.74142538265312,
+            "h": 20.03
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T09",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "mqttInstanceId": "137",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "138",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T10",
+          "positionMeters": {
+            "x": 644.0843924886188,
+            "y": 408.73789958285124
+          },
+          "areaPosition": {
+            "x": 13.130860973315805,
+            "y": 95.28729535311479
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 141.74142538265312,
+            "h": 20.03
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T10",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "color": "#cbd5e1"
+            },
+            "mqttInstanceId": "138",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        },
+        {
+          "id": "140",
+          "type": "Track",
+          "name": "Rail",
+          "customName": "T05",
+          "positionMeters": {
+            "x": 866.8751475418555,
+            "y": 390.098323178937
+          },
+          "areaPosition": {
+            "x": 729.3779990472955,
+            "y": 0.5
+          },
+          "areaLayoutAnchor": {
+            "wPx": 771.5729187087638,
+            "hPx": 127.13177233631993
+          },
+          "areaSizePx": {
+            "w": 32.77827467888899,
+            "h": 114.73978885245127
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "segmentId": "T05",
+            "defaultFillColor": "#1a2233",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
+            },
+            "mqttInstanceId": "140",
+            "refFieldXMinM": 0,
+            "refFieldXMaxM": 0,
+            "refFieldYMinM": 0,
+            "refFieldYMaxM": 0
+          },
+          "currentState": "Idle"
+        }
+      ]
+    }
+  ]
+}

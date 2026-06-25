@@ -1,0 +1,84 @@
+# 設備健康與異常告警協議 (Diagnostics Protocol) 規格書
+
+## 一、 協議定位與通訊基礎
+
+* **通訊協定**: MQTT
+* **Topic**: `v1/vtms/{vehicle_code}/health/heartbeat`
+* **發送頻率**: 1Hz (穩定心跳) 且於狀態變更時即時推播。
+* **核心用途**: 本協議定位為 SyncDrive-T3 系統的**「底層硬體異常事件訂閱與呼吸心跳機制」**。協議將龐雜的車端訊號強制收斂為「運算、感測、通訊、線控」四大子系統，其異常回報將直接作為中心端與車端觸發 MRM（最低風險操作）的安全狀態機連動依據。
+
+---
+
+## 二、 核心命名與代碼規範
+
+為確保跨系統的識別一致性與資料庫解析效能，嚴格定義以下格式：
+
+1. **車輛代號 (`vehicle_code`)**: `PMS-` + 兩碼數字。 (例：`PMS-01` ~ `PMS-11`)
+2. **命名規範 (`SCREAMING_SNAKE_CASE`)**: 所有的子系統節點名稱以及陣列內的錯誤碼 (`error_codes`) 字串，一律強制使用**全大寫英文及底線 (`SCREAMING_SNAKE_CASE`)**，嚴禁包含空格或特殊符號。
+
+---
+
+## 三、 MQTT Payload 格式範例
+
+以下範例情境：車輛 **PMS-05** 發生了感測器盲區以及 5G 網路延遲，導致整機健康狀態轉為 `ERROR`。
+
+```json
+{
+  "vehicle_code": "PMS-05",
+  "timestamp": 1716536357050,
+  "overall_health": "ERROR",
+  "subsystems": {
+    "COMPUTING": {
+      "status": "OK",
+      "error_codes": []
+    },
+    "SENSING": {
+      "status": "ERROR",
+      "error_codes": [
+        "LIDAR_FRONT_BLIND",
+        "RADAR_1_DISCONNECTED"
+      ]
+    },
+    "COMMUNICATION": {
+      "status": "WARNING",
+      "error_codes": [
+        "NETWORK_5G_LATENCY_HIGH"
+      ]
+    },
+    "CHASSIS": {
+      "status": "OK",
+      "error_codes": []
+    }
+  }
+}
+```
+
+---
+
+## 四、 欄位字典與業務邏輯實作指南
+
+### 1. 識別與健康總評層 (Identification & Overall Health)
+
+| JSON 欄位 | 型別 | 值域 / 實作邏輯說明 |
+| :--- | :--- | :--- |
+| `vehicle_code` | String | `PMS-01` ~ `PMS-11`。車輛之系統唯一識別碼。 |
+| `timestamp` | Long | Unix Epoch (ms)。產生此筆健康事件的絕對時間戳記。 |
+| `overall_health` | String | `OK`, `WARNING`, `ERROR`, `OFFLINE`。<br>**車輛整機健康總評**：只要四大子系統中有任一項為 `ERROR`，此值即必須為 `ERROR`。中心端 UI 的車輛健康告警燈號將直接綁定此欄位。<br>`OFFLINE` 為**中心端推導值**（心跳逾時/失聯時由中心標記，車端不主動上報），用於 UI 區分「失聯」與「故障」。 |
+
+### 2. 運算與感測子系統 (Computing & Sensing)
+
+| JSON 欄位 | 型別 | 值域 / 實作邏輯說明 |
+| :--- | :--- | :--- |
+| `subsystems.COMPUTING.status` | String | `OK`, `ERROR`。運算模組狀態 (自駕軟體與車載主機) 總評。 |
+| `subsystems.COMPUTING.error_codes`| Array | 具體錯誤代碼。例如 `["PATH_PLANNER_CRASH", "IPC_OVERHEAT"]`。正常時為空陣列 `[]`。 |
+| `subsystems.SENSING.status` | String | `OK`, `WARNING`, `ERROR`。感測模組狀態 (雷達、光達、攝影機、定位) 總評。<br>`WARNING` 用於非關鍵感知降級，`ERROR` 用於關鍵感知失效。 |
+| `subsystems.SENSING.error_codes` | Array | 具體錯誤代碼。例如 `["LIDAR_FRONT_BLIND", "GNSS_LOST"]`。正常時為空陣列 `[]`。 |
+
+### 3. 通訊與線控子系統 (Communication & Chassis)
+
+| JSON 欄位 | 型別 | 值域 / 實作邏輯說明 |
+| :--- | :--- | :--- |
+| `subsystems.COMMUNICATION.status` | String | `OK`, `WARNING`, `ERROR`。通訊模組狀態 (5G/LTE、V2X、遠端連線) 總評。 |
+| `subsystems.COMMUNICATION.error_codes`| Array | 具體錯誤代碼。例如 `["NETWORK_5G_LATENCY_HIGH", "OBU_V2X_FAULT"]`。正常時為空陣列 `[]`。 |
+| `subsystems.CHASSIS.status` | String | `OK`, `WARNING`, `ERROR`。線控與底盤模組狀態 (動力、煞車、轉向、能源) 總評。 |
+| `subsystems.CHASSIS.error_codes` | Array | 具體錯誤代碼。例如 `["BRAKE_SYSTEM_FAULT", "BATTERY_OVERHEAT"]`。正常時為空陣列 `[]`。 |

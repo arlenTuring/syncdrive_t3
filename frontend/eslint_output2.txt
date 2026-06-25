@@ -1,0 +1,76 @@
+[0m
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/PropertiesPanel.tsx[24m
+  [2m139:104[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m191:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m259:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m280:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m302:88[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m308:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m322:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m338:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m351:56[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m445:114[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m446:114[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m447:122[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m448:124[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m497:68[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m498:69[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m499:73[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m500:72[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m501:69[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m502:72[22m   [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/DataSourcePicker.tsx[24m
+  [2m44:21[22m  [31merror[39m  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/DataSourcePicker.tsx:44:21
+  42 |   }, []);
+  43 |
+> 44 |   useEffect(() => { loadTables(dataSourceId); }, [dataSourceId, loadTables]);
+     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  45 |
+  46 |   // ─── 選取資料表 → 載入欄位 → 產生 SELECT 範本 ────────────────
+  47 |   async function handleSelectTable(table: string) {  [2mreact-hooks/set-state-in-effect[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/TextWidget.tsx[24m
+  [2m21:61[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m27:17[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+  [2m40:55[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useMqttData.ts[24m
+  [2m26:7[22m   [31merror[39m  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useMqttData.ts:26:7
+  24 |   useEffect(() => {
+  25 |     if (!mqttDataSourceId || !mqttTopic) {
+> 26 |       setState({ data: null, connected: false, error: null });
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  27 |       return;
+  28 |     }
+  29 |  [2mreact-hooks/set-state-in-effect[22m
+  [2m55:36[22m  [31merror[39m  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [2m@typescript-eslint/no-explicit-any[22m
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/elements/useWidgetData.ts[24m
+  [2m24:16[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m32:21[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m47:21[22m  [31merror[39m    Unexpected any. Specify a different type                                                        [2m@typescript-eslint/no-explicit-any[22m
+  [2m67:3[22m   [33mwarning[39m  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+[4m/Users/arlen/Desktop/development/syncdrive_t3/frontend/src/features/dashboard/utils/collision.ts[24m
+  [2m42:81[22m  [31merror[39m  Unexpected any. Specify a different type  [2m@typescript-eslint/no-explicit-any[22m
+
+[31m[1m✖ 30 problems (29 errors, 1 warning)[22m[39m
+[31m[1m  0 errors and 1 warning potentially fixable with the `--fix` option.[22m[39m
+[0m

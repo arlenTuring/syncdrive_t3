@@ -1,0 +1,12 @@
+{
+  "name": "syncdrive-t3",
+  "private": true,
+  "description": "SyncDrive T3 monorepo root",
+  "scripts": {
+    "dev": "./scripts/dev-start.sh",
+    "dev:restart": "./scripts/dev-restart.sh",
+    "dev:stop": "./scripts/dev-stop.sh",
+    "dev:stop:all": "./scripts/dev-stop.sh --docker",
+    "dev:cleanup": "./scripts/dev-cleanup.sh"
+  }
+}

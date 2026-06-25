@@ -1,0 +1,36 @@
+# ── 相依套件 ─────────────────────────────
+node_modules/
+
+# ── 環境變數與機密（嚴禁提交）────────────
+.env
+.env.*
+!.env.example
+
+# ── 本機開發日誌（會持續增長，勿提交）──────
+.dev/*.log
+.dev/*.log.trim
+.dev/*.log.trimmer.pid
+.dev/*.pid
+
+# shell 暫存（磁碟滿時可能殘留）
+sh-thd-*
+
+# ── 建置產物 ────────────────────────────
+frontend/dist/
+backend/dist/
+coverage/
+backend/coverage/
+
+# ── 測試輸出 ────────────────────────────
+frontend/test-results/
+
+# ── 手工快照備份（改用 git 歷史）──────────
+.backups/
+.archive/
+
+# ── Mosquitto 密碼檔（含雜湊密碼，勿提交）──
+mosquitto/config/passwordfile
+
+# ── 作業系統 / 編輯器 ────────────────────
+.DS_Store
+*.swp

@@ -1,0 +1,286 @@
+// 資料來源管理 Store（LocalStorage 持久化）
+// 支援兩種類型：
+//   'internal' — 連線到 SyncDrive 後端的 PostgreSQL（透過後端 API 代理）
+//   'rest'     — 直接呼叫 REST API（回傳 JSON Array）
+
+import { useState, useCallback } from 'react';
+
+export type DataSourceType = 'internal' | 'rest' | 'mqtt';
+
+/** 屬性面板「SQL」分頁可選的資料來源類型 */
+export const SQL_BINDING_TYPES: readonly DataSourceType[] = ['internal'];
+/** 屬性面板「MQTT」分頁可選的資料來源類型 */
+export const MQTT_BINDING_TYPES: readonly DataSourceType[] = ['mqtt'];
+
+export type DataSourceBindingKind = 'sql' | 'mqtt';
+
+const BINDING_TYPES: Record<DataSourceBindingKind, readonly DataSourceType[]> = {
+  sql: SQL_BINDING_TYPES,
+  mqtt: MQTT_BINDING_TYPES,
+};
+
+export function getBindingTypes(kind: DataSourceBindingKind): readonly DataSourceType[] {
+  return BINDING_TYPES[kind];
+}
+
+export function getDataSourcesForBinding(kind: DataSourceBindingKind): DataSourceConfig[] {
+  const allowed = new Set(BINDING_TYPES[kind]);
+  return load().filter(d => allowed.has(d.type));
+}
+
+export function isDataSourceAllowedForBinding(
+  id: string | undefined,
+  kind: DataSourceBindingKind,
+): boolean {
+  if (!id) return true;
+  const ds = getDataSourceById(id);
+  if (!ds) return false;
+  return BINDING_TYPES[kind].includes(ds.type);
+}
+
+export function getDataSourceTypeLabel(type: DataSourceType): string {
+  switch (type) {
+    case 'internal': return 'SQL';
+    case 'mqtt': return 'MQTT';
+    case 'rest': return 'REST';
+    default: return type;
+  }
+}
+
+export interface DataSourceConfig {
+  id: string;
+  name: string;
+  type: DataSourceType;
+  backendUrl: string;   // internal/mqtt 型：後端 base URL (REST API 或 WebSocket)
+  // mqtt 型：預設訂閱主題
+  mqttTopic?: string;
+  description: string;
+  createdAt: number;
+}
+
+const STORAGE_KEY = 'syncdrive_datasources';
+
+// 預設的內建資料來源（指向本機後端）
+const DEFAULT_DATASOURCE: DataSourceConfig = {
+  id: 'default-internal',
+  name: 'SyncDrive 本機資料庫',
+  type: 'internal',
+  backendUrl: 'http://127.0.0.1:3000',
+  description: 'SyncDrive-T3 後端 PostgreSQL（TimescaleDB）',
+  createdAt: 0,
+};
+
+const DEFAULT_MQTT_DATASOURCE: DataSourceConfig = {
+  id: 'default-mqtt',
+  name: 'VTMS MQTT (Socket.IO)',
+  type: 'mqtt',
+  backendUrl: 'http://127.0.0.1:3000',
+  description: 'v1/vtms/{vehicle_code}/telemetry|operation|health',
+  mqttTopic: 'v1/vtms/+/telemetry/update',
+  createdAt: 0,
+};
+
+let _cachedSources: DataSourceConfig[] | null = null;
+
+function load(): DataSourceConfig[] {
+  if (_cachedSources) return _cachedSources;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const list: DataSourceConfig[] = raw ? JSON.parse(raw) : [DEFAULT_DATASOURCE];
+    const normalized = list.map((d) => ({
+      ...d,
+      backendUrl: d.backendUrl?.replace('//localhost:', '//127.0.0.1:') ?? d.backendUrl,
+    }));
+    if (!normalized.some((d) => d.id === DEFAULT_MQTT_DATASOURCE.id)) {
+      _cachedSources = [DEFAULT_DATASOURCE, DEFAULT_MQTT_DATASOURCE, ...normalized.filter((d) => d.id !== DEFAULT_DATASOURCE.id)];
+    } else {
+      _cachedSources = normalized;
+    }
+    return _cachedSources;
+  } catch {
+    _cachedSources = [DEFAULT_DATASOURCE, DEFAULT_MQTT_DATASOURCE];
+    return _cachedSources;
+  }
+}
+
+function save(list: DataSourceConfig[]) {
+  _cachedSources = null;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  window.dispatchEvent(new Event('syncdrive-datasources-changed'));
+}
+
+export interface MergeDataSourcesResult {
+  warnings: string[];
+}
+
+/** 匯入樣板時合併資料來源定義 */
+export function mergeTemplateDataSources(
+  templateSources: DataSourceConfig[],
+  options: { overwriteExisting?: boolean } = {},
+): MergeDataSourcesResult {
+  const warnings: string[] = [];
+  const map = new Map(load().map(d => [d.id, d]));
+
+  for (const ts of templateSources) {
+    const existing = map.get(ts.id);
+    if (!existing) {
+      map.set(ts.id, { ...ts });
+      warnings.push(`已新增資料來源「${ts.name}」（${ts.id}）`);
+      continue;
+    }
+    const urlDiff = existing.backendUrl !== ts.backendUrl;
+    const typeDiff = existing.type !== ts.type;
+    if (urlDiff || typeDiff) {
+      warnings.push(
+        `資料來源「${ts.id}」與樣板不同：本機 ${existing.type} @ ${existing.backendUrl}，樣板 ${ts.type} @ ${ts.backendUrl}`,
+      );
+      if (options.overwriteExisting) {
+        map.set(ts.id, { ...existing, ...ts, id: ts.id, createdAt: existing.createdAt });
+        warnings.push(`  → 已套用樣板連線設定`);
+      }
+    }
+  }
+
+  save(Array.from(map.values()));
+  return { warnings };
+}
+
+// ── 純函式 API（供 Widget 資料取得使用）──────────────────────────────
+
+export function getDataSources(): DataSourceConfig[] {
+  return load();
+}
+
+export function getDataSourceById(id: string): DataSourceConfig | null {
+  return load().find(d => d.id === id) ?? null;
+}
+
+/** 向後端寫入儀表板全部示範資料（車輛 + 事件 + 班次卡 + 運能 + 整備） */
+export async function seedDashboardAll(datasourceId = 'default-internal'): Promise<{ ok: boolean }> {
+  const ds = getDataSourceById(datasourceId);
+  if (!ds) throw new Error(`Data source '${datasourceId}' not found`);
+  const res = await fetch(`${ds.backendUrl}/syncdrive-api/datasource/seed-dashboard`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
+/** @deprecated 請改用 seedDashboardAll（含正線／整備班次卡） */
+export async function seedDashboardPanels(datasourceId = 'default-internal'): Promise<{ ok: boolean }> {
+  return seedDashboardAll(datasourceId);
+}
+
+const QUERY_CACHE_TTL_MS = 2_000;
+const queryCache = new Map<string, { rows: Record<string, unknown>[]; at: number }>();
+const inflightQueries = new Map<string, Promise<Record<string, unknown>[]>>();
+
+export async function executeDatasourceQuery(
+  datasourceId: string,
+  sqlQuery: string,
+  timeoutMs = 10_000,
+): Promise<Record<string, unknown>[]> {
+  const ds = getDataSourceById(datasourceId);
+  if (!ds) throw new Error(`Data source '${datasourceId}' not found`);
+
+  if (ds.type !== 'internal') {
+    throw new Error(`Data source type '${ds.type}' does not support SQL queries`);
+  }
+
+  const cacheKey = `${datasourceId}::${sqlQuery}`;
+  const cached = queryCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < QUERY_CACHE_TTL_MS) {
+    return cached.rows;
+  }
+
+  const existing = inflightQueries.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${ds.backendUrl}/syncdrive-api/datasource/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sqlQuery }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      const { rows } = await res.json() as { rows: Record<string, unknown>[] };
+      queryCache.set(cacheKey, { rows, at: Date.now() });
+      return rows;
+    } finally {
+      clearTimeout(timeoutId);
+      inflightQueries.delete(cacheKey);
+    }
+  })();
+
+  inflightQueries.set(cacheKey, promise);
+  return promise;
+}
+
+/** 取得資料來源的資料表清單 */
+export async function fetchTables(datasourceId: string): Promise<string[]> {
+  const ds = getDataSourceById(datasourceId);
+  if (!ds || ds.type !== 'internal') return [];
+  const res = await fetch(`${ds.backendUrl}/syncdrive-api/datasource/tables`);
+  const { tables } = await res.json();
+  return tables as string[];
+}
+
+/** 取得資料表的欄位清單 */
+export async function fetchTableSchema(
+  datasourceId: string,
+  tableName: string,
+): Promise<{ column_name: string; data_type: string }[]> {
+  const ds = getDataSourceById(datasourceId);
+  if (!ds || ds.type !== 'internal') return [];
+  const res = await fetch(
+    `${ds.backendUrl}/syncdrive-api/datasource/schema?table=${encodeURIComponent(tableName)}`
+  );
+  return res.json();
+}
+
+// ── React Hook（供 Settings 頁面使用）────────────────────────────────
+
+export function useDataSourceStore() {
+  const [dataSources, setDataSources] = useState<DataSourceConfig[]>(load);
+
+  const addDataSource = useCallback((config: Omit<DataSourceConfig, 'id' | 'createdAt'>) => {
+    const newDs: DataSourceConfig = {
+      ...config,
+      id: `ds-${Date.now()}`,
+      createdAt: Date.now(),
+    };
+    setDataSources(prev => {
+      const next = [...prev, newDs];
+      save(next);
+      return next;
+    });
+    return newDs;
+  }, []);
+
+  const updateDataSource = useCallback((id: string, patch: Partial<DataSourceConfig>) => {
+    setDataSources(prev => {
+      const next = prev.map(d => d.id === id ? { ...d, ...patch } : d);
+      save(next);
+      return next;
+    });
+  }, []);
+
+  const deleteDataSource = useCallback((id: string) => {
+    if (id === DEFAULT_DATASOURCE.id || id === DEFAULT_MQTT_DATASOURCE.id) return;
+    setDataSources(prev => {
+      const next = prev.filter(d => d.id !== id);
+      save(next);
+      return next;
+    });
+  }, []);
+
+  return { dataSources, addDataSource, updateDataSource, deleteDataSource };
+}
