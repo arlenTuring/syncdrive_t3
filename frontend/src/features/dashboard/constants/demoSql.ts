@@ -587,6 +587,13 @@ WITH m0 AS (
     AND o.line_kind = 'MAINTENANCE'
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED', 'END')
     AND o.created_at >= ${DAY_MS}
+    -- 若同車已在正線執勤，不在整備清單重複出現（避免「正線跑卻顯示充電」）
+    AND NOT EXISTS (
+      SELECT 1 FROM operation_orders ml
+      WHERE ml.vehicle_code = o.vehicle_code
+        AND ml.line_kind = 'MAINLINE'
+        AND ml.status IN ('PENDING', 'PROCESSING')
+    )
 ),
 m AS (
   SELECT
