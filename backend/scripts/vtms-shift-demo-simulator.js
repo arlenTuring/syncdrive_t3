@@ -318,6 +318,9 @@ function telemetry(vehicleCode, motion, speed, battery) {
   const faulted = isVehicleFaulted(vehicleCode);
   const cruiseSpeed = faulted || dwelling ? 0 : speed;
   const steer = steering_angle ?? 0;
+  // 頭燈隨車行方向：圖台以「車頭(head)朝 heading 方向」算繪，heading 已含上/下行方向，
+  // 故行進中點亮 head_light（位於車頭、即行進方向端），停等/故障時熄滅；tail 不亮。
+  const moving = cruiseSpeed > 0;
   const segmentLabel = typeof track === 'string' ? track.replace(/→.*/, '').trim() : '';
   const trip = isShiftTripCode(tripCode) ? String(tripCode).trim().toUpperCase() : undefined;
   return {
@@ -343,6 +346,8 @@ function telemetry(vehicleCode, motion, speed, battery) {
       gear: dwelling ? 'N' : 'D',
     },
     energy: { battery_level: battery },
+    head_light_on: moving,
+    tail_light_on: false,
     signals: {
       turn_indicator: resolveTurnIndicator(motion),
       hazard_light: faulted || Boolean(motion.hazard_light),
@@ -436,6 +441,8 @@ function operation(vehicleCode, motion) {
     trip_code: tripCode,
     line_kind: 'MAINLINE',
     route_id: routeId,
+    // 行進中訂單契約狀態，供前端 route 進度判定 isProcessing（缺漏會使 MQTT 即時進度被忽略）
+    order_status: 'PROCESSING',
     vehicle_phase: resolveVehiclePhase(vehicleCode, motion),
     current_leg: buildMainlineCurrentLeg(tripCode, motion.progress ?? 0),
     task_group: buildTaskGroup(orderId, tripCode, motion, { interlockActive }),
