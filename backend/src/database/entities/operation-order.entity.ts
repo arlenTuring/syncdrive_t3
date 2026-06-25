@@ -39,7 +39,7 @@ export class OperationOrder {
   createdAt: string;
 
   @Column({ type: 'bigint', name: 'completed_at', nullable: true })
-  completedAt: string;
+  completedAt: string | null;
 
   @Column({ name: 'line_kind', nullable: true })
   lineKind?: string;

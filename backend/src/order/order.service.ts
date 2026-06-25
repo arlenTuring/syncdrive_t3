@@ -173,7 +173,8 @@ export class OrderService {
 
     // SSOT：僅復原訂單契約狀態；vehicle_phase 留待車端下次回報更新，中心端不臆測。
     order.status = OrderStatus.PROCESSING;
-    order.completedAt = '';
+    // completed_at 為 bigint 欄位，清空須用 null（空字串會被 Postgres 拒絕）
+    order.completedAt = null;
     order.payload = {
       ...(order.payload ?? {}),
       fault_reason: null,
@@ -222,7 +223,8 @@ export class OrderService {
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
       order.completedAt = String(Date.now());
     } else if (targetStatus === OrderStatus.PROCESSING) {
-      order.completedAt = '';
+      // bigint 欄位清空須用 null，不可用空字串
+      order.completedAt = null;
     }
     return this.orderRepository.save(order);
   }

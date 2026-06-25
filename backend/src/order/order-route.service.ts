@@ -8,7 +8,6 @@ import {
   OrderActionState,
 } from '../database/entities/order-action-state.entity';
 import { RouteActionStatus } from '../database/entities/operation-route-station-action.entity';
-import { buildProtocolTaskId } from './task-group.util';
 
 export type TaskGroupItem = {
   task_id: string;
@@ -58,7 +57,9 @@ export class OrderRouteService {
 
     const rows: OrderActionState[] = templates.map((tpl) => {
       const station = stationByRow.get(tpl.stationRowId);
-      const actionId = buildProtocolTaskId(orderId, tpl.actionType, tpl.sequenceOrder);
+      // 以唯一的 action_template_id 組出動作狀態 PK：同一路線可有多個同類動作
+      // （如 T3 與 S2W 各一次 PLATFORM_DOCKING），用 (actionType, sequence) 會碰撞。
+      const actionId = `${orderId}_${tpl.id}`;
       return this.actionStateRepo.create({
         id: actionId,
         orderId,
@@ -71,6 +72,9 @@ export class OrderRouteService {
     });
 
     if (rows.length > 0) {
+      // 冪等具現化：先清掉同訂單殘留的動作狀態（order_action_states 與 operation_orders
+      // 之間無 FK 級聯，班次訂單 id 會重用，殘留列會造成 PK 衝突），再寫入全新 PENDING 列。
+      await this.actionStateRepo.delete({ orderId });
       await this.actionStateRepo.save(rows);
     }
   }
@@ -87,9 +91,17 @@ export class OrderRouteService {
 
       let row = await this.actionStateRepo.findOne({ where: { id: taskId } });
       if (!row && task.task_name) {
-        row = await this.actionStateRepo.findOne({
-          where: { orderId, actionType: String(task.task_name).trim() },
-        });
+        const actionType = String(task.task_name).trim();
+        const nodeId = task.task_params?.node_id
+          ? String(task.task_params.node_id).trim()
+          : null;
+        // 優先用 node_id 區分同類型多站動作（如 T3／S2W 各一次 PLATFORM_DOCKING）
+        if (nodeId) {
+          row = await this.actionStateRepo.findOne({ where: { orderId, actionType, nodeId } });
+        }
+        if (!row) {
+          row = await this.actionStateRepo.findOne({ where: { orderId, actionType } });
+        }
       }
       if (!row) continue;
 
