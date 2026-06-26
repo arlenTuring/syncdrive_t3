@@ -17,6 +17,7 @@ import {
 } from '../../map-editor/vehicles/resolveMapVehicleTrackSizing';
 import type { MapVehicleTemplateConfig } from '../utils/resolveMapVehicleTemplate';
 import { useMapMqttLive } from './useMapMqttLive';
+import { useDemoSimulation } from '../context/DemoSimulationContext';
 
 const NOOP_SELECT_AREA = (_id: string | null) => {};
 const NOOP_SELECT_FACILITY = (_areaId: string, _facilityId: string | null) => {};
@@ -54,6 +55,9 @@ export function MapPlatformLayer({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { liveById, areaVehicles: mqttVehicles } = useMapMqttLive(areas);
+  const { paused, transportPaused } = useDemoSimulation();
+  // 暫停發送/逐幀（transportPaused）或完全停止（paused）時瞬間定位，避免逐幀被 1200ms 補間拖成「頓」
+  const liveTweenMs = transportPaused || paused ? 0 : 1200;
 
   const areaVehicles = useMemo(() => {
     /** 編輯模式：地圖上不顯示車輛，僅保留畫布上的單一載具樣板 */
@@ -150,6 +154,7 @@ export function MapPlatformLayer({
         geofenceSelectedLabelId={null}
         viewportRef={viewportRef}
         displayMode="embedded"
+        livePositionTweenMs={liveTweenMs}
         readOnly
         editMode={false}
         liveById={liveById}

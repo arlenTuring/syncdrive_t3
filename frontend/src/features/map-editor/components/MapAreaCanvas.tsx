@@ -59,6 +59,8 @@ type MapAreaCanvasProps = {
    * 容器與地圖 pixelSize 相同時為 1:1。
    */
   displayMode?: MapAreaCanvasDisplayMode
+  /** 即時車輛位置補間毫秒；連續播放給 1200，暫停／逐幀請給 0（瞬間定位）。未傳則依 isEmbedded 預設。 */
+  livePositionTweenMs?: number
   /** 1 = 最放大，7 = 一屏看全圖；未傳則使用內建 state（預設 7） */
   zoomLevel?: number
   onZoomLevelChange?: (level: number) => void
@@ -184,6 +186,7 @@ export function MapAreaCanvas({
   readOnly = false,
   editMode = false,
   displayMode = 'editor',
+  livePositionTweenMs: livePositionTweenMsProp,
   zoomLevel: zoomLevelProp,
   onZoomLevelChange: onZoomLevelChangeProp,
   liveById,
@@ -733,7 +736,7 @@ export function MapAreaCanvas({
                 vehicleFitMode={vehicleFitMode}
                 vehicleBehavior={vehicleBehavior}
                 vehicleEditSizer={vehicleEditSizer}
-                livePositionTweenMs={isEmbedded ? 1200 : 0}
+                livePositionTweenMs={livePositionTweenMsProp ?? (isEmbedded ? 1200 : 0)}
               />
             ) : null}
             </div>
