@@ -302,15 +302,18 @@ export function MapAreaVehicleOverlay({
 
         const style: CSSProperties = {
           position: 'absolute',
-          left,
-          top,
+          left: 0,
+          top: 0,
+          // 以 transform 定位＋補間（GPU/compositor），主執行緒忙碌時動畫仍不中斷，
+          // 解決「走一段突然卡住再繼續」。left/top 補間是 layout-bound，會被 re-render/long task 卡住。
+          transform: `translate3d(${left}px, ${top}px, 0)`,
           zIndex,
           ...(livePositionTweenMs > 0
             ? teleported
               ? { transition: 'none' }
               : {
-                  transition: `left ${livePositionTweenMs}ms linear, top ${livePositionTweenMs}ms linear`,
-                  willChange: 'left, top',
+                  transition: `transform ${livePositionTweenMs}ms linear`,
+                  willChange: 'transform',
                 }
             : null),
         };
