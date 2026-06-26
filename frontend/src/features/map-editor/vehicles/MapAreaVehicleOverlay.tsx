@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import { VehicleDefinitionMapView } from '../../vehicle-editor/elements/VehicleDefinitionMapView';
@@ -34,6 +34,9 @@ import {
   MapVehicleBehaviorOverlay,
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
+
+/** 兩幀螢幕座標位移超過此值（px）即視為大跳躍，瞬間定位不補間 */
+const TELEPORT_SNAP_PX = 150;
 
 function radToDeg(rad: number): number {
   return (rad * 180) / Math.PI;
@@ -173,6 +176,14 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  // 判斷「大跳躍（發車／換段／重生）」用：committed=上一個 commit 的座標（render 時唯讀），
+  // staging=本次 render 暫存；commit 後才搬進 committed。如此在 StrictMode 雙重 render 下仍正確。
+  const committedPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
+  const stagingPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
+  stagingPosRef.current = new Map();
+  useEffect(() => {
+    committedPosRef.current = stagingPosRef.current;
+  });
 
   if (vehicles.length === 0) return null;
 
@@ -283,16 +294,24 @@ export function MapAreaVehicleOverlay({
         const bgColor = resolveMapVehicleBgColor(vehicle);
         const zIndex = 100 + stackOrder;
 
+        // 大跳躍偵測：與上一個 commit 的螢幕座標距離過大（發車離站、換段、重生、跨區）→ 瞬間定位避免「飄移」
+        const prevPos = committedPosRef.current.get(vehicle.vehicleId);
+        const teleported =
+          !prevPos || Math.hypot(left - prevPos.left, top - prevPos.top) > TELEPORT_SNAP_PX;
+        stagingPosRef.current.set(vehicle.vehicleId, { left, top });
+
         const style: CSSProperties = {
           position: 'absolute',
           left,
           top,
           zIndex,
           ...(livePositionTweenMs > 0
-            ? {
-                transition: `left ${livePositionTweenMs}ms linear, top ${livePositionTweenMs}ms linear`,
-                willChange: 'left, top',
-              }
+            ? teleported
+              ? { transition: 'none' }
+              : {
+                  transition: `left ${livePositionTweenMs}ms linear, top ${livePositionTweenMs}ms linear`,
+                  willChange: 'left, top',
+                }
             : null),
         };
 
