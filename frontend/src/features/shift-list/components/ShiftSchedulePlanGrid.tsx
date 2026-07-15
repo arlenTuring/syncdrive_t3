@@ -46,9 +46,11 @@ function TemplateTaskBar({
   const endMinute = task.startMinute + task.durationMinutes;
   const timeLabel = `${formatMinuteToHm(task.startMinute)}-${formatMinuteToHm(endMinute)}`;
 
+  const isSticky = task.durationMinutes >= 20;
+
   return (
     <div
-      className="absolute top-[2px] z-[2] flex items-center justify-start rounded-[4px] border border-zinc-700/60 bg-zinc-800/80 px-2 overflow-hidden"
+      className="absolute top-[2px] z-[2] flex items-center justify-start rounded-[4px] border border-zinc-700/60 bg-zinc-800/80 px-2 overflow-clip"
       style={{
         left: leftPx,
         width: widthPx,
@@ -57,7 +59,9 @@ function TemplateTaskBar({
       title={`${task.label} ${timeLabel}`}
     >
       <span
-        className="sticky left-[56px] shrink-0 max-w-full truncate text-[10px] font-normal leading-[18px] tracking-[0.5px] text-zinc-300"
+        className={`${
+          isSticky ? 'sticky left-[56px]' : ''
+        } shrink-0 max-w-full truncate text-[10px] font-normal leading-[18px] tracking-[0.5px] text-zinc-300`}
       >
         {task.label}
         <span className="opacity-70"> | {timeLabel}</span>
@@ -182,6 +186,7 @@ function ShiftScheduleBlockBar({
   const code = resolveBlockCode(block, blockIndex);
   const timeLabel = formatBlockTimeRange(block);
   const selectable = block.source === 'template_bar' && onSelect != null;
+  const isStickyLabel = durationMinutes >= 20;
 
   const hasError = useMemo(() => {
     if (!report || !report.errors) return false;
@@ -224,7 +229,7 @@ function ShiftScheduleBlockBar({
   return (
     <div
       id={`block-card-${block.id}`}
-      className={`absolute isolate flex flex-col justify-center overflow-hidden rounded-[4px] px-1 ${
+      className={`absolute isolate flex flex-col justify-center overflow-clip rounded-[4px] px-1 ${
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
         selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
@@ -273,7 +278,7 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
-      <div className="sticky left-[56px] z-[6] min-w-0 max-w-full px-1">
+      <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
           style={{ color: hasError ? '#FCA5A5' : hasWarning ? '#FDE68A' : colors.text }}
