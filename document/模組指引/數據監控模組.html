@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>數據監控模組 · 架構圖說 v3</title>
+  <style>
+    :root {
+      --bg: #0c0c0e;
+      --surface: #141416;
+      --border: #2a2a2e;
+      --text: #fafafa;
+      --muted: #71717a;
+      --accent: #38bdf8;
+      --layer: #1c1c1f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .page { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    header { margin-bottom: 2rem; }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.4rem; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 2.5rem;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+    }
+    .toc a:hover { background: var(--layer); }
+
+    /* ── 一個畫布區塊 ── */
+    .canvas-block {
+      margin-bottom: 3rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .canvas-block > .title {
+      margin: 0;
+      padding: 1rem 1.25rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      background: var(--layer);
+      border-bottom: 1px solid var(--border);
+    }
+    .figure {
+      margin: 0;
+      padding: 1.25rem;
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      overflow-y: hidden;
+      text-align: center;
+    }
+    .figure a {
+      display: inline-block;
+      line-height: 0;
+      cursor: zoom-in;
+    }
+    .figure img {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    /* 寬幅模組：等比縮至容器寬，不強制放大 */
+    .figure img.shot-wide {
+      width: 100%;
+      max-width: 100%;
+    }
+    .figure figcaption {
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .figure .hint {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: #52525b;
+    }
+
+    /* ── 架構樹 ── */
+    .arch { padding: 1.25rem; }
+    .layer {
+      margin-bottom: 1.25rem;
+      padding-left: 1rem;
+      border-left: 3px solid var(--accent);
+    }
+    .layer:last-child { margin-bottom: 0; }
+    .layer-head {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.6rem;
+    }
+    .layer-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin: -0.3rem 0 0.5rem;
+    }
+    .tree {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.9rem;
+    }
+    .tree li {
+      position: relative;
+      padding: 0.28rem 0 0.28rem 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .tree li:last-child { border-bottom: none; }
+    .tree li::before {
+      content: "├─";
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+    }
+    .tree li:last-child::before { content: "└─"; }
+    .tree .type {
+      display: inline-block;
+      min-width: 7.5rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      color: #a78bfa;
+    }
+    .tree .name { color: #e4e4e7; }
+
+    .overview-block { margin-bottom: 3rem; }
+    .overview-block .figure-wrap {
+      overflow-x: auto;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .overview-block .figure-wrap a {
+      display: inline-block;
+      line-height: 0;
+      cursor: zoom-in;
+    }
+    .overview-block img {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── 可摺疊參數規格 ── */
+    .spec-module { margin: 0; }
+    .spec-module > summary,
+    .spec-group > summary,
+    .spec-widget > summary {
+      list-style: none;
+      cursor: pointer;
+      user-select: none;
+    }
+    .spec-module > summary::-webkit-details-marker,
+    .spec-group > summary::-webkit-details-marker,
+    .spec-widget > summary::-webkit-details-marker { display: none; }
+
+    .spec-module > summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      background: var(--layer);
+      border-bottom: 1px solid var(--border);
+    }
+    .spec-module > summary::before {
+      content: '▸';
+      margin-right: 0.55rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .spec-module[open] > summary::before { content: '▾'; }
+    .spec-module .module-meta {
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .spec-flow {
+      margin: 0;
+      padding: 1rem 1.25rem;
+      font-size: 0.82rem;
+      color: #a1a1aa;
+      background: rgba(56, 189, 248, 0.06);
+      border-bottom: 1px solid var(--border);
+      line-height: 1.55;
+    }
+    .spec-flow code { font-size: 0.78rem; color: #7dd3fc; }
+
+    .spec-table-box {
+      margin: 0;
+      padding: 1rem 1.25rem;
+      background: var(--layer);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .spec-table-box h3 {
+      margin: 0 0 0.65rem;
+      font-size: 0.88rem;
+      color: #fafafa;
+    }
+    .spec-table-box .table-name {
+      font-family: ui-monospace, monospace;
+      font-size: 0.95rem;
+      color: #fde68a;
+    }
+    .spec-table-box .entity-ref {
+      margin: 0 0 0.75rem;
+      font-size: 0.76rem;
+      color: #71717a;
+    }
+    .col-map-table th { width: 28%; }
+    .col-map-table td code { color: #a5f3fc; }
+
+    .spec-group {
+      border-bottom: 1px solid var(--border);
+    }
+    .spec-group > summary {
+      padding: 0.85rem 1.25rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #e4e4e7;
+      background: rgba(255,255,255,0.02);
+    }
+    .spec-group > summary::before {
+      content: '▸ ';
+      color: var(--accent);
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+    }
+    .spec-group[open] > summary::before { content: '▾ '; }
+    .spec-group-body {
+      padding: 0 1.25rem 1.25rem;
+    }
+
+    .spec-widget {
+      margin-top: 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--layer);
+      overflow: hidden;
+    }
+    .spec-widget > summary {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.88rem;
+    }
+    .spec-widget > summary::before {
+      content: '▸';
+      color: var(--muted);
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    .spec-widget[open] > summary::before { content: '▾'; }
+    .spec-widget > summary .w-type {
+      font-family: ui-monospace, monospace;
+      font-size: 0.78rem;
+      color: #a78bfa;
+      min-width: 6.5rem;
+    }
+    .spec-widget > summary .w-name { color: #fafafa; }
+
+    .spec-body {
+      padding: 0 0.75rem 0.85rem;
+      font-size: 0.82rem;
+      color: #d4d4d8;
+    }
+    .spec-body h4 {
+      margin: 0.75rem 0 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .spec-body h4:first-child { margin-top: 0.25rem; }
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .param-table th,
+    .param-table td {
+      padding: 0.3rem 0.45rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+      vertical-align: top;
+    }
+    .param-table th {
+      width: 38%;
+      color: #71717a;
+      font-weight: 500;
+    }
+    .param-table code {
+      font-size: 0.76rem;
+      color: #fde68a;
+      word-break: break-all;
+    }
+    .spec-body pre {
+      margin: 0.35rem 0 0;
+      padding: 0.65rem 0.75rem;
+      background: #0a0a0b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      overflow-x: auto;
+      color: #e4e4e7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .spec-body .note {
+      margin: 0.5rem 0 0;
+      font-size: 0.78rem;
+      color: #71717a;
+    }
+    .spec-body ul.mqtt-list {
+      margin: 0.35rem 0 0;
+      padding-left: 1.1rem;
+      line-height: 1.5;
+    }
+    .spec-body ul.mqtt-list code { color: #7dd3fc; }
+
+    .overview-db {
+      margin-top: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .overview-db > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 1rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--layer);
+      border-bottom: 1px solid var(--border);
+    }
+    .overview-db > summary::-webkit-details-marker { display: none; }
+    .overview-db > summary::before {
+      content: '▸ ';
+      color: var(--accent);
+    }
+    .overview-db[open] > summary::before { content: '▾ '; }
+    .overview-db-body { padding: 1rem 1.25rem 1.25rem; }
+    .overview-db-intro {
+      margin: 0 0 1rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .db-index-table th { width: 32%; }
+    .db-index-table td code { color: #a5f3fc; }
+    .db-field-table th { width: 22%; }
+    .db-field-table td:nth-child(2) { width: 14%; color: #71717a; font-size: 0.76rem; }
+    .db-field-table td:nth-child(4) { width: 18%; font-size: 0.76rem; color: #a78bfa; }
+    .overview-db .spec-group { border: 1px solid var(--border); border-radius: 8px; margin-top: 0.5rem; }
+    .overview-db .spec-group > summary { border-radius: 8px 8px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>數據監控模組 · 架構圖說</h1>
+      <p>一個畫布一個標題 · 圖 + 可摺疊參數（資料表 / SQL / MQTT）· 點圖可開原尺寸</p>
+    </header>
+
+    <nav class="toc">
+      <a href="#overview">全覽</a>
+      <a href="#overview-db">資料表總覽</a>
+      <a href="#overview-mqtt">MQTT</a>
+      <a href="#overview-rest">REST API</a>
+      <a href="#event">事件中心</a>
+      <a href="#shift-center">班次中心</a>
+      <a href="#mainline">正線班次</a>
+      <a href="#maint-shift">整備班表</a>
+      <a href="#trend">運能趨勢</a>
+      <a href="#maint-dist">整備分佈</a>
+      <a href="#veh-dist">車輛分佈</a>
+      <a href="#map">即時圖台</a>
+      <a href="#veh-status">車輛狀態</a>
+    </nav>
+
+    <section id="overview" class="overview-block">
+      <h2 style="font-size:1.1rem;margin:0 0 1rem;">全覽</h2>
+      <div class="figure-wrap">
+        <a href="images/00-overview.png" target="_blank" rel="noopener">
+          <img src="images/00-overview.png" alt="全覽" />
+        </a>
+      </div>
+
+      <details id="overview-db" class="overview-db" open>
+        <summary>資料表總整理（10 張 · PostgreSQL）</summary>
+        <div class="overview-db-body">
+          <p class="overview-db-intro">
+            儀表板 SQL 元件透過 <code>default-internal</code> 查詢下列資料表；
+            <strong>即時圖台</strong>以 MQTT 為主、不直接查表。欄位說明對齊
+            <code>backend/src/database/entities/</code> 與 <code>demoSql.ts</code>。
+          </p>
+
+          <table class="param-table db-index-table">
+            <tr><th>資料表</th><th>使用模組</th></tr>
+            <tr><td><code>security_event_logs</code></td><td>事件中心</td></tr>
+            <tr><td><code>operation_orders</code></td><td>班次中心、正線班次、整備班表、車輛分佈、車輛狀態</td></tr>
+            <tr><td><code>vehicles</code></td><td>正線班次、車輛分佈、車輛狀態</td></tr>
+            <tr><td><code>operation_routes</code></td><td>正線班次</td></tr>
+            <tr><td><code>operation_route_stations</code></td><td>正線班次</td></tr>
+            <tr><td><code>order_action_states</code></td><td>正線班次（路線軌道站點動作）</td></tr>
+            <tr><td><code>capacity_trend_demo_points</code></td><td>運能趨勢</td></tr>
+            <tr><td><code>facility_slots</code></td><td>整備分佈、車輛分佈</td></tr>
+            <tr><td><code>slot_statuses</code></td><td>整備分佈、車輛分佈</td></tr>
+            <tr><td><code>vehicle_monitor_demo</code></td><td>車輛狀態</td></tr>
+          </table>
+
+          <!-- 1 -->
+          <details class="spec-group">
+            <summary><code>security_event_logs</code> — 安全事件紀錄</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>event_id</code></td><td>PK</td><td>事件唯一鍵；輪播 <code>slotKeyField</code></td><td>事件中心</td></tr>
+                <tr><td><code>vehicle_code</code></td><td>varchar</td><td>事件卡車輛編號</td><td>事件中心</td></tr>
+                <tr><td><code>event_code</code></td><td>enum</td><td>事件代碼；<code>message</code> 後備顯示</td><td>事件中心</td></tr>
+                <tr><td><code>severity</code></td><td>enum</td><td>INFO / WARNING / CRITICAL；左色條著色</td><td>事件中心</td></tr>
+                <tr><td><code>created_at</code></td><td>bigint ms</td><td>7 天篩選；格式化 <code>event_time</code></td><td>事件中心</td></tr>
+                <tr><td><code>category_label</code></td><td>varchar</td><td>事件類別（預設「線控」）</td><td>事件中心</td></tr>
+                <tr><td><code>display_message</code></td><td>text</td><td>主標題優先來源</td><td>事件中心</td></tr>
+                <tr><td><code>detail</code></td><td>text</td><td>主標題次選來源</td><td>事件中心</td></tr>
+                <tr><td><code>sub_label</code></td><td>varchar</td><td>副標（空則用 vehicle_code）</td><td>事件中心</td></tr>
+                <tr><td><code>is_acknowledged</code></td><td>boolean</td><td>KPI 已/未處理；狀態標籤；未讀圓點</td><td>事件中心</td></tr>
+                <tr><td><code>location</code> · <code>params</code></td><td>jsonb</td><td>寫庫保留；UI 未直接顯示</td><td>—</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 2 -->
+          <details class="spec-group">
+            <summary><code>operation_orders</code> — 營運訂單（核心）</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>order_id</code></td><td>PK</td><td>班次槽鍵 <code>shift_key</code></td><td>正線、整備</td></tr>
+                <tr><td><code>trip_code</code></td><td>varchar</td><td>班次代碼；正線徽章；車輛狀態 badge</td><td>正線、整備、車輛狀態</td></tr>
+                <tr><td><code>vehicle_code</code></td><td>varchar</td><td>車輛編號；JOIN 鍵</td><td>全部訂單相關</td></tr>
+                <tr><td><code>route_id</code></td><td>varchar</td><td>關聯路線與站點序列</td><td>正線班次</td></tr>
+                <tr><td><code>line_kind</code></td><td>varchar</td><td>MAINLINE / MAINTENANCE 分流</td><td>正線、整備、車輛狀態</td></tr>
+                <tr><td><code>status</code></td><td>enum</td><td>PENDING / PROCESSING / END / FAULTED；KPI、狀態徽章、車輛分佈</td><td>班次中心、正線、整備、分佈</td></tr>
+                <tr><td><code>priority_level</code></td><td>int</td><td>活躍訂單排序</td><td>車輛狀態</td></tr>
+                <tr><td><code>created_at</code></td><td>bigint ms</td><td>7 天窗口；班次 KPI 篩選</td><td>班次中心</td></tr>
+                <tr><td><code>delay_minutes</code></td><td>int</td><td>延誤判定 → status_label「延誤」</td><td>正線班次</td></tr>
+                <tr><td><code>next_station</code></td><td>varchar</td><td>下一站名稱</td><td>正線、整備</td></tr>
+                <tr><td><code>eta_remain</code></td><td>varchar</td><td>剩餘到站時間顯示</td><td>正線、整備</td></tr>
+                <tr><td><code>planned_start</code> · <code>planned_end</code></td><td>bigint ms</td><td>發車 / 結束時間</td><td>整備班表</td></tr>
+                <tr><td><code>maint_type_label</code></td><td>varchar</td><td>整備類型徽章（充電/洗車…）</td><td>整備班表、車輛狀態</td></tr>
+                <tr><td><code>maint_type_bg</code> · <code>maint_type_color</code></td><td>varchar</td><td>整備徽章配色</td><td>整備、車輛狀態</td></tr>
+                <tr><td><code>payload</code></td><td>jsonb</td><td>見下方子欄位（MQTT 同步寫入）</td><td>正線、整備</td></tr>
+                <tr><td><code>payload.yard_slot_id</code></td><td>json</td><td>整備格位；整備路線 st_b</td><td>整備班表、車輛狀態</td></tr>
+                <tr><td><code>payload.current_leg</code></td><td>json</td><td>當前路段；軌道 ETA（MQTT 即時）</td><td>正線班次</td></tr>
+                <tr><td><code>payload.segment_index</code></td><td>json</td><td>路線段索引</td><td>正線班次</td></tr>
+                <tr><td><code>payload.segment_remain_pct</code></td><td>json</td><td>段內進度百分比</td><td>正線班次</td></tr>
+                <tr><td><code>payload.route_progress</code></td><td>json</td><td>整備軌道進度</td><td>整備班表</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 3 -->
+          <details class="spec-group">
+            <summary><code>vehicles</code> — 車輛主檔</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>vehicle_code</code></td><td>varchar UK</td><td>車號；群組迭代鍵（PMS-%）</td><td>正線、分佈、狀態</td></tr>
+                <tr><td><code>display_name</code></td><td>varchar</td><td>顯示名稱（JOIN 正線卡）</td><td>正線班次</td></tr>
+                <tr><td><code>is_active</code></td><td>boolean</td><td>納入車輛分佈統計</td><td>車輛分佈、車輛狀態</td></tr>
+                <tr><td><code>id</code> · <code>created_at</code> · <code>updated_at</code></td><td>—</td><td>系統用；儀表板 UI 未顯示</td><td>—</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 4 -->
+          <details class="spec-group">
+            <summary><code>operation_routes</code> — 路線定義</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>route_id</code></td><td>PK</td><td>與訂單、站點表關聯</td><td>正線班次</td></tr>
+                <tr><td><code>route_name</code></td><td>varchar</td><td>路線名稱（後台）</td><td>—</td></tr>
+                <tr><td><code>line_kind</code></td><td>varchar</td><td>線別標記</td><td>正線班次</td></tr>
+                <tr><td><code>direction_letter</code></td><td>char U/D</td><td>衍生 <code>direction_label</code> 上行/下行</td><td>正線班次</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 5 -->
+          <details class="spec-group">
+            <summary><code>operation_route_stations</code> — 路線站點序列</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>station_row_id</code></td><td>PK</td><td>列識別</td><td>—</td></tr>
+                <tr><td><code>route_id</code></td><td>FK</td><td>所屬路線</td><td>正線班次</td></tr>
+                <tr><td><code>sequence_order</code></td><td>int</td><td>站點順序</td><td>正線班次</td></tr>
+                <tr><td><code>station_id</code></td><td>varchar</td><td>站點代碼（S2W、T3、N2W…）</td><td>正線班次</td></tr>
+                <tr><td><code>remain_pct</code></td><td>int 0–100</td><td>組裝 <code>route_stations</code> JSON 軌道</td><td>正線班次</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 6 -->
+          <details class="spec-group">
+            <summary><code>order_action_states</code> — 訂單站點動作狀態</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>action_id</code></td><td>PK</td><td>動作識別</td><td>—</td></tr>
+                <tr><td><code>order_id</code></td><td>FK</td><td>所屬班次訂單</td><td>正線班次</td></tr>
+                <tr><td><code>station_id</code></td><td>varchar</td><td>站點</td><td>正線班次</td></tr>
+                <tr><td><code>action_type</code></td><td>varchar</td><td>如 STATION_DEPARTURE</td><td>正線班次</td></tr>
+                <tr><td><code>action_status</code></td><td>enum</td><td>嵌入 <code>route_stations.actions</code> JSON</td><td>正線班次</td></tr>
+                <tr><td><code>trigger_offset_m</code></td><td>float</td><td>軌道動作觸發距離</td><td>正線班次</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 7 -->
+          <details class="spec-group">
+            <summary><code>capacity_trend_demo_points</code> — 運能趨勢示範點</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>point_id</code></td><td>PK</td><td>資料點識別</td><td>—</td></tr>
+                <tr><td><code>demo_set_id</code></td><td>varchar</td><td>固定 <code>'DEMO'</code> 篩選</td><td>運能趨勢</td></tr>
+                <tr><td><code>offset_minutes</code></td><td>int</td><td>相對現在的分鐘偏移 → X 軸時間</td><td>運能趨勢</td></tr>
+                <tr><td><code>utilization</code></td><td>int</td><td>KPI 即時/下段數值（相容欄）</td><td>運能趨勢</td></tr>
+                <tr><td><code>actual_util</code></td><td>int</td><td>折線「當前運能」Y 值</td><td>運能趨勢</td></tr>
+                <tr><td><code>forecast_util</code></td><td>int</td><td>折線「目標走勢」Y 值</td><td>運能趨勢</td></tr>
+                <tr><td><code>segment_code</code></td><td>varchar</td><td>IN_SERVICE / SCHEDULED 色帶</td><td>運能趨勢</td></tr>
+                <tr><td><code>is_anomaly</code> · <code>anomaly_label</code></td><td>bool / varchar</td><td>折線異常事件標註</td><td>運能趨勢</td></tr>
+                <tr><td><code>line_segment</code></td><td>varchar</td><td>內部分段（舊欄）</td><td>—</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 8 -->
+          <details class="spec-group">
+            <summary><code>facility_slots</code> — 場域格位定義（靜態）</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>slot_id</code></td><td>PK</td><td>格位 ID（如 E1、W2）；JOIN 狀態表</td><td>整備分佈</td></tr>
+                <tr><td><code>zone</code></td><td>varchar</td><td>整備區域名（整備-充電…）；分區查詢</td><td>整備分佈</td></tr>
+                <tr><td><code>facility_type</code></td><td>enum</td><td>充電/停車/一般</td><td>—</td></tr>
+                <tr><td><code>display_name</code></td><td>varchar</td><td>前端標籤（可選）</td><td>—</td></tr>
+                <tr><td><code>capacity</code></td><td>int</td><td>格位容量</td><td>—</td></tr>
+                <tr><td><code>is_active</code></td><td>boolean</td><td>是否納入儀表板統計</td><td>整備分佈、車輛分佈</td></tr>
+                <tr><td><code>description</code></td><td>text</td><td>說明</td><td>—</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 9 -->
+          <details class="spec-group">
+            <summary><code>slot_statuses</code> — 格位即時狀態</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>slot_id</code></td><td>PK FK</td><td>對應 <code>facility_slots</code></td><td>整備分佈</td></tr>
+                <tr><td><code>status</code></td><td>enum</td><td>AVAILABLE / OCCUPIED / CHARGING / ERROR；格位著色</td><td>整備分佈</td></tr>
+                <tr><td><code>vehicle_code</code></td><td>varchar</td><td>占用車輛；車輛分佈「整備中」判定</td><td>整備分佈、車輛分佈</td></tr>
+                <tr><td><code>last_updated</code></td><td>bigint ms</td><td>最後 MQTT 更新時間</td><td>—</td></tr>
+                <tr><td><code>raw_payload</code></td><td>jsonb</td><td>含 <code>occupancy</code> 等；區域占用數統計</td><td>整備分佈</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <!-- 10 -->
+          <details class="spec-group">
+            <summary><code>vehicle_monitor_demo</code> — 載具監控示範（PMS 車隊）</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
+                <tr><td><code>vehicle_code</code></td><td>PK</td><td>與 <code>vehicles</code> 對應</td><td>車輛狀態</td></tr>
+                <tr><td><code>overall_health</code></td><td>varchar</td><td>OK / ERROR；外框健康著色</td><td>車輛狀態</td></tr>
+                <tr><td><code>alert_message</code></td><td>varchar</td><td>警示輪播文字</td><td>車輛狀態</td></tr>
+                <tr><td><code>card_border_color</code></td><td>varchar</td><td>監控卡邊框色（SQL 後備）</td><td>車輛狀態</td></tr>
+                <tr><td><code>status_computing</code></td><td>varchar</td><td>「運算」子系統 pill</td><td>車輛狀態</td></tr>
+                <tr><td><code>status_sensing</code></td><td>varchar</td><td>「感測」pill</td><td>車輛狀態</td></tr>
+                <tr><td><code>status_communication</code></td><td>varchar</td><td>「通訊」pill</td><td>車輛狀態</td></tr>
+                <tr><td><code>status_chassis</code></td><td>varchar</td><td>「線控」pill</td><td>車輛狀態</td></tr>
+                <tr><td><code>badge_label</code> · <code>trip_badge_bg</code> · <code>trip_badge_color</code></td><td>varchar</td><td>任務徽章樣式（訂單優先時可被覆蓋）</td><td>車輛狀態</td></tr>
+                <tr><td><code>badge_outline</code></td><td>char</td><td>徽章外框樣式</td><td>車輛狀態</td></tr>
+                <tr><td><code>demo_speed</code></td><td>numeric</td><td>速度 gauge SQL 後備</td><td>車輛狀態</td></tr>
+                <tr><td><code>demo_load</code></td><td>numeric</td><td>電量 gauge SQL 後備</td><td>車輛狀態</td></tr>
+                <tr><td><code>segment_label</code></td><td>varchar</td><td>位置標籤（站點/場區）</td><td>車輛狀態</td></tr>
+              </table>
+              <p class="note" style="margin-top:0.5rem;font-size:0.78rem;color:#71717a;">
+                即時值優先來自 MQTT（<code>telemetry/update</code>、<code>health/heartbeat</code>、<code>operation/update</code>），上表為無 MQTT 時的 SQL 後備。
+              </p>
+            </div>
+          </details>
+
+        </div>
+      </details>
+
+      <details id="overview-mqtt" class="overview-db">
+        <summary>MQTT 總整理（Broker 訂閱 → 後端 → 儀表板）</summary>
+        <div class="overview-db-body">
+          <p class="overview-db-intro">
+            車端／模擬器發布至 MQTT Broker（預設 <code>127.0.0.1:1883</code>），後端
+            <code>mqtt.controller.ts</code> 訂閱後寫 Redis／PostgreSQL，再經
+            <strong>Socket.IO</strong> 轉發給前端元件。Widget 訂閱格式為
+            <code>mqtt/{完整 topic}</code> 或車隊 Hub 的 <code>telemetry|operation|health/{vehicle_code}</code>。
+          </p>
+
+          <table class="param-table db-index-table">
+            <tr><th>MQTT Topic（訂閱）</th><th>後端處理</th><th>寫入資料表</th><th>儀表板模組</th></tr>
+            <tr>
+              <td><code>v1/vtms/{vehicle_code}/telemetry/update</code></td>
+              <td>Redis 遙測快取；可選寫 <code>telemetry_logs</code></td>
+              <td>（通常不寫 PMS 示範車）</td>
+              <td>即時圖台、車輛狀態 gauge（速度/電量）</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/{vehicle_code}/health/heartbeat</code></td>
+              <td>Redis 健康；劣化時寫事件</td>
+              <td><code>security_event_logs</code></td>
+              <td>事件中心、車輛狀態（外框/警示）</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/{vehicle_code}/operation/update</code></td>
+              <td>Redis + 同步 <code>operation_orders</code></td>
+              <td><code>operation_orders</code>（payload）</td>
+              <td>正線班次、整備班表、圖台、車輛狀態</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/{vehicle_code}/event/report</code></td>
+              <td>驗證後 INSERT 事件</td>
+              <td><code>security_event_logs</code></td>
+              <td>事件中心（SQL 重查）</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/+/slot/status</code></td>
+              <td>Upsert 格位狀態</td>
+              <td><code>slot_statuses</code></td>
+              <td>整備分佈、車輛分佈</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/dashboard/capacity/live</code></td>
+              <td>轉發（不寫庫）</td>
+              <td>—</td>
+              <td>運能趨勢 KPI「即時數值」</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/+/status/+</code></td>
+              <td>僅 Socket 轉發</td>
+              <td>—</td>
+              <td>（預留擴充）</td>
+            </tr>
+            <tr>
+              <td><code>syncdrive/#</code></td>
+              <td>場域設施轉發</td>
+              <td>—</td>
+              <td>即時圖台設施 overlay</td>
+            </tr>
+            <tr>
+              <td><code>v1/vtms/+/command/ack</code></td>
+              <td>指令回執紀錄</td>
+              <td><code>command_logs</code></td>
+              <td>—（非 UI 元件）</td>
+            </tr>
+          </table>
+
+          <details class="spec-group" open>
+            <summary>儀表板 Widget 實際訂閱的 Topic 範本</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>Topic 範本</th><th>變數</th><th>用途 / valuePath</th><th>模組</th></tr>
+                <tr><td><code>v1/vtms/${vehicle_code}/operation/update</code></td><td><code>{vehicle_code}</code></td><td>班次軌道進度、位置文字</td><td>正線、整備、車輛狀態</td></tr>
+                <tr><td><code>v1/vtms/${vehicle_code}/telemetry/update</code></td><td><code>{vehicle_code}</code></td><td><code>kinematics.velocity</code>、<code>energy.battery_level</code></td><td>車輛狀態 gauge</td></tr>
+                <tr><td><code>v1/vtms/${vehicle_code}/health/heartbeat</code></td><td><code>{vehicle_code}</code></td><td>健康外框、alert-banner 輪播</td><td>車輛狀態</td></tr>
+                <tr><td><code>v1/vtms/PMS-01/operation/update</code></td><td>固定</td><td>圖台 overlay 載具</td><td>即時圖台</td></tr>
+                <tr><td><code>v1/vtms/dashboard/capacity/live</code></td><td>—</td><td>運能即時 KPI</td><td>運能趨勢</td></tr>
+                <tr><td><code>v1/vtms/+/telemetry/update</code></td><td>萬用字元</td><td>資料來源 <code>default-mqtt</code> 預設訂閱</td><td>圖台 ingest</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <details class="spec-group">
+            <summary>event/report 主要 Payload 欄位</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>必填</th><th>對應 DB</th></tr>
+                <tr><td><code>event_id</code></td><td>是</td><td><code>EVT-YYYYMMDD-XXXX</code> → <code>event_id</code></td></tr>
+                <tr><td><code>event_code</code></td><td>是</td><td><code>event_code</code>（白名單 enum）</td></tr>
+                <tr><td><code>severity</code></td><td>是</td><td><code>severity</code></td></tr>
+                <tr><td><code>timestamp</code></td><td>建議</td><td><code>created_at</code></td></tr>
+                <tr><td><code>detail</code> · <code>location</code> · <code>params</code></td><td>否</td><td><code>detail</code> / jsonb</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <details class="spec-group">
+            <summary>operation/update 常用 Payload 欄位（寫入 orders.payload）</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>欄位</th><th>用途</th><th>模組</th></tr>
+                <tr><td><code>trip_code</code> · <code>order_id</code></td><td>訂單識別、班次同步</td><td>正線、整備</td></tr>
+                <tr><td><code>current_leg.target_station_id</code></td><td>下一站</td><td>正線</td></tr>
+                <tr><td><code>current_leg.eta_seconds</code></td><td>軌道進度動畫</td><td>正線 route-progress</td></tr>
+                <tr><td><code>segment_index</code> · <code>segment_remain_pct</code></td><td>路段進度</td><td>正線</td></tr>
+                <tr><td><code>yard_slot_id</code></td><td>整備格位</td><td>整備班表</td></tr>
+                <tr><td><code>kinematics</code> · <code>pose</code></td><td>圖台車輛位置</td><td>即時圖台</td></tr>
+              </table>
+            </div>
+          </details>
+
+          <details class="spec-group">
+            <summary>Socket.IO 轉發事件（後端 → 前端，非 MQTT 直連）</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>Socket 事件</th><th>來源</th><th>前端用途</th></tr>
+                <tr><td><code>mqtt/{topic}</code></td><td>所有 MQTT 轉發</td><td>Widget <code>useMqttData</code> 訂閱</td></tr>
+                <tr><td><code>telemetry/{vehicle_code}</code></td><td>遙測</td><td>VehicleFleetMqttHub</td></tr>
+                <tr><td><code>operation/{vehicle_code}</code></td><td>營運</td><td>班次 MQTT overlay、圖台</td></tr>
+                <tr><td><code>health/{vehicle_code}</code></td><td>健康</td><td>車輛監控 Hub</td></tr>
+                <tr><td><code>security_event</code></td><td>事件上報</td><td>即時通知（主 UI 靠 SQL 重查）</td></tr>
+                <tr><td><code>datasource/invalidate</code></td><td>寫庫後推送</td><td>SQL 元件 <code>refreshMode: event</code> 重查</td></tr>
+              </table>
+              <p class="note" style="margin-top:0.5rem;">連線位址：與後端同源 WebSocket（預設 <code>http://localhost:3000</code>）。</p>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <details id="overview-rest" class="overview-db">
+        <summary>REST API 總整理（儀表板相關）</summary>
+        <div class="overview-db-body">
+          <p class="overview-db-intro">
+            基礎 URL：<code>{backendUrl}/syncdrive-api/…</code>（預設 <code>http://localhost:3000</code>）。
+            資料來源 <code>default-internal</code> 的 SQL 元件皆呼叫 <code>POST /datasource/query</code>。
+            Swagger：<code>/api</code>。
+          </p>
+
+          <details class="spec-group" open>
+            <summary><code>/syncdrive-api/datasource</code> — 資料查詢與種子</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>方法</th><th>路徑</th><th>用途</th><th>儀表板關聯</th></tr>
+                <tr><td>GET</td><td><code>/ping</code></td><td>測試 DB 連線</td><td>設定面板連線檢查</td></tr>
+                <tr><td>GET</td><td><code>/tables</code></td><td>列出 public 資料表</td><td>編輯器 SQL 輔助</td></tr>
+                <tr><td>GET</td><td><code>/schema?table=</code></td><td>查欄位結構</td><td>編輯器 SQL 輔助</td></tr>
+                <tr><td>POST</td><td><code>/query</code></td><td>執行 SELECT（body: <code>query</code>, <code>limit</code>）</td><td><strong>所有 SQL 綁定元件</strong></td></tr>
+                <tr><td>POST</td><td><code>/seed-panels</code></td><td>寫入事件／班次示範資料</td><td>事件中心、班次中心</td></tr>
+                <tr><td>POST</td><td><code>/seed-vehicles</code></td><td>寫入 PMS 車輛與訂單</td><td>車輛狀態、正線、整備</td></tr>
+                <tr><td>POST</td><td><code>/seed-dashboard</code></td><td>一次載入全部示範 SQL</td><td>啟動時 <code>seedDashboardAll()</code></td></tr>
+              </table>
+              <p class="note" style="margin-top:0.5rem;">
+                <code>/query</code> 僅允許 SELECT；前端 2 秒快取 + <code>datasource/invalidate</code> 失效重查。
+              </p>
+            </div>
+          </details>
+
+          <details class="spec-group" open>
+            <summary><code>/syncdrive-api/demo/simulation</code> — 示範模擬控制列</summary>
+            <div class="spec-group-body">
+              <table class="param-table db-field-table">
+                <tr><th>方法</th><th>路徑</th><th>用途</th></tr>
+                <tr><td>GET</td><td><code>/status</code></td><td>模擬執行狀態（運行中/暫停）</td></tr>
+                <tr><td>POST</td><td><code>/start</code></td><td>開始模擬（MQTT 發送 + SQL 更新）</td></tr>
+                <tr><td>POST</td><td><code>/pause</code></td><td>暫停模擬</td></tr>
+                <tr><td>GET</td><td><code>/transport</code></td><td>傳輸控制狀態（模擬器輪詢）</td></tr>
+                <tr><td>PATCH / POST</td><td><code>/transport</code> · <code>/transport/update</code></td><td>暫停傳輸、調整速度倍率</td></tr>
+                <tr><td>POST</td><td><code>/transport/step</code></td><td>暫停時逐幀 next/prev</td></tr>
+                <tr><td>POST</td><td><code>/transport/tick</code></td><td>模擬器回報虛擬時間</td></tr>
+                <tr><td>POST</td><td><code>/trigger-fault</code></td><td>觸發車輛緊急停車（→ event/report）</td></tr>
+                <tr><td>POST</td><td><code>/clear-fault</code></td><td>清除故障、復歸訂單</td></tr>
+                <tr><td>POST</td><td><code>/simulate-obstacle</code></td><td>觸發障礙物事件</td></tr>
+              </table>
+              <p class="note" style="margin-top:0.5rem;">
+                儀表板工具列「開始模擬／停止模擬」對應 <code>/start</code> 與 <code>/pause</code>。
+              </p>
+            </div>
+          </details>
+
+          <details class="spec-group">
+            <summary>資料流關係（SQL 元件 vs MQTT 元件）</summary>
+            <div class="spec-group-body">
+              <table class="param-table">
+                <tr><th>類型</th><th>取得方式</th><th>更新觸發</th></tr>
+                <tr><td>SQL 元件（stat-card、群組列表…）</td><td>REST <code>POST /datasource/query</code></td><td>MQTT 寫庫 → <code>datasource/invalidate</code> → 重查</td></tr>
+                <tr><td>MQTT 元件（gauge、route-progress…）</td><td>Socket.IO <code>mqtt/{topic}</code></td><td>Broker 即時推送</td></tr>
+                <tr><td>混合（運能即時 KPI）</td><td>SQL + MQTT <code>freshnessPolicy: once</code></td><td>兩者皆可</td></tr>
+              </table>
+            </div>
+          </details>
+        </div>
+      </details>
+    </section>
+
+    <!-- 1. 事件中心（含輪播） -->
+    <article id="event" class="canvas-block">
+      <details class="spec-module" open>
+        <summary>
+          <span><span class="module-title">事件中心</span></span>
+          <span class="module-meta">固定面板 + 事件輪播 · 點標題可摺疊整區</span>
+        </summary>
+
+        <figure class="figure">
+          <a href="images/01-event-block.png" target="_blank" rel="noopener">
+            <img class="shot-sm" src="images/01-event-block.png" alt="事件中心含輪播" />
+          </a>
+          <figcaption>上：KPI 面板 · 下：事件輪播群組<span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+
+        <div class="spec-flow">
+          <strong>資料流（共用）</strong> — 元件不直接訂 MQTT，而是綁定 SQL + <code>refreshMode: event</code>。
+          後端收到 MQTT 後<strong>寫入 PostgreSQL 資料表</strong>，再經 Socket.IO 推送
+          <code>datasource_invalidate</code>（標籤 <code>domain:event_center</code>、<code>table:security_event_log</code>），前端重查 SQL。
+          程式：<code>demoPlane.ts</code> · <code>demoSql.ts</code> · <code>mqtt.controller.ts</code>
+        </div>
+
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表：<span class="table-name">security_event_logs</span></h3>
+          <p class="entity-ref">Entity：<code>backend/src/database/entities/security-event-log.entity.ts</code> · 資料來源 <code>default-internal</code>（PostgreSQL）</p>
+          <table class="param-table col-map-table">
+            <tr><th>欄位</th><th>型別 / 說明</th><th>本模組用途</th></tr>
+            <tr><td><code>event_id</code></td><td>PK · <code>EVT-YYYYMMDD-XXXX</code></td><td>輪播群組 <code>slotKeyField</code>、列唯一鍵</td></tr>
+            <tr><td><code>vehicle_code</code></td><td>varchar</td><td>事件卡車輛編號；MQTT topic 中的車號寫入此欄</td></tr>
+            <tr><td><code>event_code</code></td><td>enum（如 <code>PATH_BLOCKED</code>）</td><td>寫庫來源；<code>message</code> 後備顯示</td></tr>
+            <tr><td><code>severity</code></td><td>enum · INFO / WARNING / CRITICAL</td><td>左色條著色</td></tr>
+            <tr><td><code>created_at</code></td><td>bigint（毫秒）</td><td>KPI / 列表時間篩選；轉成 <code>event_time</code> 顯示</td></tr>
+            <tr><td><code>category_label</code></td><td>varchar，可空</td><td>顯示為 <code>category</code>（預設「線控」）</td></tr>
+            <tr><td><code>display_message</code></td><td>text，可空</td><td>主標 <code>message</code> 優先來源</td></tr>
+            <tr><td><code>detail</code></td><td>text，可空</td><td><code>message</code> 次選來源</td></tr>
+            <tr><td><code>sub_label</code></td><td>varchar，可空</td><td>副標；空則 fallback <code>vehicle_code</code></td></tr>
+            <tr><td><code>is_acknowledged</code></td><td>boolean</td><td>KPI 已/未處理計數；<code>status_label</code>、未讀圓點</td></tr>
+            <tr><td><code>location</code> · <code>params</code></td><td>jsonb，可空</td><td>本模組 UI 未直接顯示</td></tr>
+          </table>
+          <p class="note" style="margin-top:0.65rem;">寫入來源：MQTT <code>v1/vtms/{vehicle_code}/event/report</code>（<code>handleEventReport</code>）；健康劣化時後端自動插入 <code>SYSTEM_HEALTH_DEGRADED</code>（<code>recordHealthDegradedEvent</code>）。</p>
+        </div>
+
+        <!-- ── 固定面板 ── -->
+        <details class="spec-group" open>
+          <summary>固定面板 · KPI 區（Canvas 330×196 px）</summary>
+          <div class="spec-group-body">
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">模組標題「事件中心」</span></summary>
+              <div class="spec-body">
+                <h4>版面參數</h4>
+                <table class="param-table">
+                  <tr><th>位置 / 尺寸</th><td><code>x:12</code> <code>y:12</code> <code>w:274</code> <code>h:24</code></td></tr>
+                  <tr><th>content</th><td><code>事件中心</code></td></tr>
+                  <tr><th>fontSize</th><td><code>16</code></td></tr>
+                  <tr><th>color</th><td><code>#F3F4F6</code></td></tr>
+                  <tr><th>fontWeight</th><td><code>bold</code></td></tr>
+                  <tr><th>lineHeight</th><td><code>1.25</code></td></tr>
+                  <tr><th>iconImage</th><td><code>/dashboard-icons/alerts/event_center.png</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <p class="note">無 — 靜態文字，不查詢資料庫。</p>
+                <h4>SQL</h4>
+                <p class="note">無 — 靜態文字，不綁資料來源。</p>
+                <h4>MQTT</h4>
+                <p class="note">無 — 不參與即時更新。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">stat-card</span><span class="w-name">今日總事件</span></summary>
+              <div class="spec-body">
+                <h4>版面參數</h4>
+                <table class="param-table">
+                  <tr><th>位置 / 尺寸</th><td><code>x:12</code> <code>y:42</code> <code>w:94</code> <code>h:54</code></td></tr>
+                  <tr><th>label</th><td><code>今日總事件</code></td></tr>
+                  <tr><th>valueField</th><td><code>total_events</code></td></tr>
+                  <tr><th>labelPosition</th><td><code>top</code></td></tr>
+                  <tr><th>contentAlign</th><td><code>left</code></td></tr>
+                  <tr><th>labelColor / valueColor</th><td><code>#99A1AF</code> / <code>#F3F4F6</code></td></tr>
+                  <tr><th>labelFontSize / valueFontSize</th><td><code>14</code> / <code>16</code></td></tr>
+                  <tr><th>dataSourceId</th><td><code>default-internal</code></td></tr>
+                  <tr><th>refreshMode</th><td><code>event</code>（<code>refreshInterval: 0</code>）</td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>聚合欄位</th><td><code>total_events</code> = <code>COUNT(*)</code></td></tr>
+                  <tr><th>時間篩選</th><td><code>created_at</code> ≥ 過去 7 天（毫秒）</td></tr>
+                  <tr><th>元件取值</th><td><code>valueField: total_events</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT
+  COUNT(*)::int AS total_events,
+  COUNT(*) FILTER (WHERE NOT COALESCE(is_acknowledged, false))::int AS unprocessed_events,
+  COUNT(*) FILTER (WHERE COALESCE(is_acknowledged, false))::int AS processed_events
+FROM security_event_logs
+WHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint</pre>
+                <p class="note">常數名 <code>EVENT_CENTER_SUMMARY_SQL</code>（三張 KPI 卡共用同一查詢，各取不同 <code>valueField</code>）。</p>
+                <h4>MQTT / 更新觸發</h4>
+                <ul class="mqtt-list">
+                  <li>失效標籤：<code>domain:event_center</code> · <code>table:security_event_log</code></li>
+                  <li>上游 MQTT → 寫庫 → 重查：<code>v1/vtms/{vehicle_code}/event/report</code></li>
+                  <li>健康劣化自動建事件：<code>v1/vtms/{vehicle_code}/health/heartbeat</code>（<code>SYSTEM_HEALTH_DEGRADED</code>）</li>
+                  <li>推送通道：Socket.IO <code>datasource_invalidate</code>（reason: <code>security_event</code>）</li>
+                </ul>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">stat-card</span><span class="w-name">未處理事件</span></summary>
+              <div class="spec-body">
+                <h4>版面參數</h4>
+                <table class="param-table">
+                  <tr><th>位置 / 尺寸</th><td><code>x:118</code> <code>y:42</code> <code>w:94</code> <code>h:54</code></td></tr>
+                  <tr><th>label</th><td><code>未處理事件</code></td></tr>
+                  <tr><th>valueField</th><td><code>unprocessed_events</code></td></tr>
+                  <tr><th>其餘樣式</th><td>同「今日總事件」</td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>聚合欄位</th><td><code>unprocessed_events</code> = <code>COUNT(*) FILTER (WHERE NOT is_acknowledged)</code></td></tr>
+                  <tr><th>時間篩選</th><td><code>created_at</code> ≥ 過去 7 天</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <p class="note">同 <code>EVENT_CENTER_SUMMARY_SQL</code>，取欄位 <code>unprocessed_events</code>（<code>security_event_logs.is_acknowledged = false</code> 計數）。</p>
+                <h4>MQTT</h4>
+                <p class="note">同 KPI 共用觸發鏈（見上）。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">stat-card</span><span class="w-name">已處理事件</span></summary>
+              <div class="spec-body">
+                <h4>版面參數</h4>
+                <table class="param-table">
+                  <tr><th>位置 / 尺寸</th><td><code>x:224</code> <code>y:42</code> <code>w:94</code> <code>h:54</code></td></tr>
+                  <tr><th>label</th><td><code>已處理事件</code></td></tr>
+                  <tr><th>valueField</th><td><code>processed_events</code></td></tr>
+                  <tr><th>其餘樣式</th><td>同「今日總事件」</td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>聚合欄位</th><td><code>processed_events</code> = <code>COUNT(*) FILTER (WHERE is_acknowledged)</code></td></tr>
+                  <tr><th>時間篩選</th><td><code>created_at</code> ≥ 過去 7 天</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <p class="note">同 <code>EVENT_CENTER_SUMMARY_SQL</code>，取欄位 <code>processed_events</code>（<code>security_event_logs.is_acknowledged = true</code> 計數）。</p>
+                <h4>MQTT</h4>
+                <p class="note">同 KPI 共用觸發鏈（見上）。</p>
+              </div>
+            </details>
+
+          </div>
+        </details>
+
+        <!-- ── 事件輪播群組 ── -->
+        <details class="spec-group" open>
+          <summary>群組 · 事件輪播（scroll · 雙畫板 · Canvas 330×84 範本）</summary>
+          <div class="spec-group-body">
+
+            <details class="spec-widget" open>
+              <summary><span class="w-type">canvas</span><span class="w-name">群組設定（事件輪播）</span></summary>
+              <div class="spec-body">
+                <h4>群組參數</h4>
+                <table class="param-table">
+                  <tr><th>label</th><td><code>事件輪播</code></td></tr>
+                  <tr><th>groupRepeatMode</th><td><code>scroll</code>（每 <code>groupScrollInterval: 4</code> 秒切換）</td></tr>
+                  <tr><th>slotKeyField</th><td><code>event_id</code></td></tr>
+                  <tr><th>variableName</th><td><code>item</code>（索引變數，範本內用 <code>{item}</code>）</td></tr>
+                  <tr><th>groupVariableMode</th><td><code>index</code></td></tr>
+                  <tr><th>templateWidth × Height</th><td><code>306 × 84</code></td></tr>
+                  <tr><th>dualCanvasEnabled</th><td><code>true</code></td></tr>
+                  <tr><th>childrenNormal</th><td>有資料時的事件卡範本（9 元件）</td></tr>
+                  <tr><th>childrenDefault</th><td>無資料時 <code>empty-state</code> 預設畫板</td></tr>
+                  <tr><th>displayGate</th><td><code>rowCount ≥ 1</code> → 顯示常態範本，否則預設畫板</td></tr>
+                  <tr><th>dataSourceId</th><td><code>default-internal</code></td></tr>
+                  <tr><th>refreshMode</th><td><code>event</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>列表鍵</th><td><code>event_id</code>（<code>slotKeyField</code>）</td></tr>
+                  <tr><th>排序</th><td><code>ORDER BY created_at DESC</code></td></tr>
+                  <tr><th>筆數上限</th><td><code>LIMIT 12</code>（輪播索引 <code>{item}</code> = 0…11）</td></tr>
+                  <tr><th>時間篩選</th><td><code>created_at</code> ≥ 過去 7 天</td></tr>
+                </table>
+                <h4>SQL（列表 · 驅動輪播列數）</h4>
+                <pre>SELECT
+  event_id,
+  COALESCE(category_label, '線控') AS category,
+  vehicle_code,
+  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,
+  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,
+  COALESCE(display_message, detail, event_code::text) AS message,
+  COALESCE(sub_label, vehicle_code) AS sub_label,
+  COALESCE(is_acknowledged, false) AS is_acknowledged,
+  severity::text AS severity
+FROM security_event_logs
+WHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint
+ORDER BY created_at DESC
+LIMIT 12</pre>
+                <p class="note">常數名 <code>EVENT_CENTER_LIST_SQL</code>。輪播索引 <code>{item}</code> = 0…11。</p>
+                <h4>MQTT / 更新觸發</h4>
+                <ul class="mqtt-list">
+                  <li>同 KPI 區 — 新事件寫入 <code>security_event_logs</code> 後整組列表重查</li>
+                  <li>MQTT 上報：<code>v1/vtms/{vehicle_code}/event/report</code></li>
+                  <li>Payload 必填：<code>event_id</code>（<code>EVT-YYYYMMDD-XXXX</code>）、<code>event_code</code>、<code>severity</code></li>
+                  <li>另廣播 Socket.IO <code>security_event</code>（供其他模組，本群組以 SQL 重查為主）</li>
+                </ul>
+              </div>
+            </details>
+
+            <p class="note" style="margin:0.75rem 0 0.35rem;font-size:0.78rem;color:#71717a;">
+              下列範本元件皆查詢<strong>同一資料表</strong> <code>security_event_logs</code>，以 <code>OFFSET {item}</code> 取列表第 N 筆。
+            </p>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">color-block</span><span class="w-name">卡片背景</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>尺寸</th><td>填滿範本 <code>306×84</code></td></tr>
+                  <tr><th>backgroundColor</th><td><code>rgba(212, 212, 216, 0.1)</code></td></tr>
+                  <tr><th>borderRadius</th><td><code>12</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <p class="note">無 — 純裝飾，不查 <code>security_event_logs</code>。</p>
+                <h4>SQL / MQTT</h4>
+                <p class="note">無 — 純裝飾底色。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">color-block</span><span class="w-name">左側嚴重度色條</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>severityStripColor</th><td><code>true</code>（依 severity 自動著色）</td></tr>
+                  <tr><th>預設色</th><td><code>#FB2C36</code></td></tr>
+                  <tr><th>valueField</th><td>（色條由 SQL 的 <code>severity</code> 驅動）</td></tr>
+                  <tr><th>refreshMode</th><td><code>event</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>severity</code> → 元件色條（INFO / WARNING / CRITICAL）</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT severity
+FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 事件上報 payload 的 <code>severity</code> 寫庫後重查。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">事件類別 category</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>category</code></td></tr>
+                  <tr><th>fontSize / color</th><td><code>14</code> · <code>#030712</code> · <code>bold</code></td></tr>
+                  <tr><th>位置</th><td>左色條內上方（置中）</td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>category_label</code> → SQL 別名 <code>category</code>（空則顯示「線控」）</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT category FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <p class="note">來源欄 <code>COALESCE(category_label, '線控')</code>。</p>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 由後端寫入事件紀錄後重查。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">車輛編號 vehicle_code</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>vehicle_code</code></td></tr>
+                  <tr><th>fontSize / color</th><td><code>14</code> · <code>#030712</code> · <code>bold</code></td></tr>
+                  <tr><th>位置</th><td>左色條內下方（置中）</td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>vehicle_code</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT vehicle_code FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <h4>MQTT</h4>
+                <p class="note">Topic 中的 <code>{vehicle_code}</code> 即此欄來源。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">status-badge</span><span class="w-name">狀態標籤 status_label</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>status_label</code></td></tr>
+                  <tr><th>badgeStyle</th><td><code>outline</code></td></tr>
+                  <tr><th>badgeVariant</th><td><code>compact</code></td></tr>
+                  <tr><th>outlineBorderColor</th><td><code>#99A1AF</code></td></tr>
+                  <tr><th>defaultLabel</th><td><code>—</code></td></tr>
+                  <tr><th>showDot</th><td><code>false</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>is_acknowledged</code> → SQL 衍生 <code>status_label</code>（尚未處理 / 已處理）</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT status_label FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <p class="note">值：<code>尚未處理</code> / <code>已處理</code>（由 <code>security_event_logs.is_acknowledged</code> 衍生）。</p>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 確認狀態目前由資料表欄位決定，非 MQTT 直送。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">事件時間 event_time</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>event_time</code></td></tr>
+                  <tr><th>textAlign</th><td><code>right</code></td></tr>
+                  <tr><th>color</th><td><code>#99A1AF</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>created_at</code>（bigint 毫秒）→ 格式化為 <code>event_time</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT event_time FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <p class="note">格式 <code>YYYY.MM.DD HH24:MI:SS</code>，由 <code>security_event_logs.created_at</code> 轉換。</p>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 上報 payload 的 <code>timestamp</code> 寫入 <code>created_at</code>。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">未讀圓點 dot</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>dot</code></td></tr>
+                  <tr><th>content 規則</th><td>未處理 → <code>●</code>；已處理 → 空字串（元件自動隱藏）</td></tr>
+                  <tr><th>color</th><td><code>#51A2FF</code></td></tr>
+                  <tr><th>fontSize</th><td><code>8</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>is_acknowledged</code> → 未確認顯示 <code>●</code>，已確認為空</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT CASE WHEN COALESCE(is_acknowledged, false) THEN '' ELSE '●' END AS dot
+FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 同 status_label。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">主標題 message</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>message</code></td></tr>
+                  <tr><th>fontSize</th><td><code>18</code>（headline）</td></tr>
+                  <tr><th>color / fontWeight</th><td><code>#F3F4F6</code> · <code>bold</code></td></tr>
+                  <tr><th>textWrap</th><td><code>nowrap</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位（優先序）</th><td><code>display_message</code> → <code>detail</code> → <code>event_code</code></td></tr>
+                  <tr><th>SQL 別名</th><td><code>message</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT message FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <p class="note">來源 <code>COALESCE(display_message, detail, event_code::text)</code>；後端依 <code>event_code</code> 解析中文 <code>display_message</code>。</p>
+                <h4>MQTT</h4>
+                <p class="note">上游 <code>event/report</code> payload：<code>event_code</code>、<code>detail</code> → 後端 <code>resolveEventDisplayMessage()</code>。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">副標 sub_label</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>valueField</th><td><code>sub_label</code></td></tr>
+                  <tr><th>fontSize / color</th><td><code>14</code> · <code>#99A1AF</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>security_event_logs</code></td></tr>
+                  <tr><th>欄位</th><td><code>sub_label</code>（空則 fallback <code>vehicle_code</code>）</td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT sub_label FROM ( … EVENT_CENTER_LIST_SQL … ) AS __rows
+LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
+                <p class="note">來源 <code>COALESCE(sub_label, vehicle_code)</code>。</p>
+                <h4>MQTT</h4>
+                <p class="note">間接 — 由 DB 欄位重查。</p>
+              </div>
+            </details>
+
+            <details class="spec-widget">
+              <summary><span class="w-type">empty-state</span><span class="w-name">尚無事件（預設畫板）</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>label</th><td><code>尚無事件</code></td></tr>
+                  <tr><th>emptyStateVariant</th><td><code>minimal-center</code></td></tr>
+                  <tr><th>labelFontSize</th><td>同輔助字級</td></tr>
+                  <tr><th>顯示條件</th><td>群組 <code>displayGate</code>：列表 <code>rowCount &lt; 1</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <p class="note">不直接查表；當 <code>security_event_logs</code> 在 7 天窗口內無列時，群組改顯示此預設畫板。</p>
+                <h4>SQL</h4>
+                <p class="note">無 — 預設畫板不綁查詢；由群組列表是否為空決定顯示。</p>
+                <h4>MQTT</h4>
+                <p class="note">無直接綁定；列表從有筆 → 0 筆時自動切換到此畫板。</p>
+              </div>
+            </details>
+
+          </div>
+        </details>
+
+      </details>
+    </article>
+
+    <!-- 2. 班次中心 -->
+    <article id="shift-center" class="canvas-block">
+      <details class="spec-module" open>
+        <summary>
+          <span><span class="module-title">班次中心</span></span>
+          <span class="module-meta">固定面板 · 8 元件</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/03-shift-center.png" target="_blank" rel="noopener">
+            <img class="shot-sm" src="images/03-shift-center.png" alt="班次中心" />
+          </a>
+          <figcaption><span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — SQL 綁定 <code>operation_orders</code>，<code>refreshMode: event</code>。
+          訂單生命週期變更（MQTT <code>operation/update</code> 寫庫）觸發
+          <code>datasource_invalidate</code>（<code>domain:shift_center</code> · <code>table:operation_orders</code>）。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表：<span class="table-name">operation_orders</span></h3>
+          <p class="entity-ref">主要 Entity · 篩選 <code>created_at</code> ≥ 7 天且 <code>DEMO-%</code> / <code>PMS-%</code></p>
+          <table class="param-table col-map-table">
+            <tr><th>欄位</th><th>說明</th><th>元件用途</th></tr>
+            <tr><td><code>status</code></td><td>PENDING / PROCESSING / END / FAULTED</td><td>KPI 完成、延誤計數；達成率</td></tr>
+            <tr><td><code>created_at</code></td><td>bigint 毫秒</td><td>時間窗口篩選</td></tr>
+            <tr><td><code>vehicle_code</code></td><td>車輛</td><td>示範資料篩選 <code>PMS-%</code></td></tr>
+            <tr><td><code>order_id</code></td><td>訂單鍵</td><td>示範 <code>DEMO-%</code></td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>固定面板 · KPI + 達成卡（Canvas 330×196）</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">模組標題</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4><p class="note">無 — 靜態。</p>
+                <h4>SQL / MQTT</h4><p class="note">無。</p>
+              </div>
+            </details>
+            <details class="spec-widget" open>
+              <summary><span class="w-type">stat-card ×3</span><span class="w-name">總共 / 完成 / 延誤班次</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>operation_orders</code></td></tr>
+                  <tr><th>total_shifts</th><td><code>COUNT(*)</code></td></tr>
+                  <tr><th>completed_shifts</th><td><code>COUNT(*) FILTER (status = 'END')</code></td></tr>
+                  <tr><th>delayed_shifts</th><td><code>COUNT(*) FILTER (status = 'FAULTED')</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>SELECT COUNT(*)::int AS total_shifts,
+  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,
+  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,
+  … achievement_pct, achievement_line, remaining_line …
+FROM operation_orders
+WHERE created_at >= (過去 7 天)
+  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%')</pre>
+                <p class="note">常數 <code>SHIFT_CENTER_SUMMARY_SQL</code>，三卡共用。</p>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>v1/vtms/{vehicle_code}/operation/update</code> → 更新訂單 → 重查</li>
+                  <li>失效標籤：<code>domain:shift_center</code> · <code>table:operation_orders</code></li>
+                </ul>
+              </div>
+            </details>
+            <details class="spec-widget">
+              <summary><span class="w-type">color-block</span><span class="w-name">達成卡背景</span></summary>
+              <div class="spec-body"><h4>資料表</h4><p class="note">無 — 裝飾。</p></div>
+            </details>
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">achievement_line / remaining_line</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>operation_orders</code></td></tr>
+                  <tr><th>achievement_line</th><td>SQL 字串聚合「達成了 N%」</td></tr>
+                  <tr><th>remaining_line</th><td>剩餘班次數文字</td></tr>
+                </table>
+                <h4>SQL</h4><p class="note">同 <code>SHIFT_CENTER_SUMMARY_SQL</code>。</p>
+                <h4>MQTT</h4><p class="note">同 KPI。</p>
+              </div>
+            </details>
+            <details class="spec-widget">
+              <summary><span class="w-type">progress-bar</span><span class="w-name">達成進度條</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>operation_orders</code></td></tr>
+                  <tr><th>valueField</th><td><code>achievement_pct</code>（0–100）</td></tr>
+                </table>
+                <h4>SQL</h4><p class="note">同 <code>SHIFT_CENTER_SUMMARY_SQL</code>。</p>
+                <h4>MQTT</h4><p class="note">同 KPI。</p>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 3. 正線班次 -->
+    <article id="mainline" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">正線班次</span></span>
+          <span class="module-meta">群組 6 槽 · 單槽 14 元件</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/04-mainline-shifts.png" target="_blank" rel="noopener">
+            <img class="shot-wide" src="images/04-mainline-shifts.png" alt="正線班次" />
+          </a>
+          <figcaption>6 槽 sticky-pool<span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — 群組 SQL 查 <code>operation_orders</code>（正線），範本欄位用變數 <code>{row.*}</code>；
+          <code>route-progress</code> 另訂 MQTT <code>operation/update</code> 更新軌道進度。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表</h3>
+          <table class="param-table col-map-table">
+            <tr><th>資料表</th><th>角色</th></tr>
+            <tr><td><code>operation_orders</code></td><td>主表 · 班次狀態、trip_code、payload 進度</td></tr>
+            <tr><td><code>vehicles</code></td><td>JOIN 顯示名稱</td></tr>
+            <tr><td><code>operation_routes</code></td><td>方向 letter（U/D）</td></tr>
+            <tr><td><code>operation_route_stations</code></td><td>站點序列 → <code>route_stations</code> JSON</td></tr>
+            <tr><td><code>order_action_states</code></td><td>站點動作狀態（軌道 actions）</td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>群組 · 正線班次（slots × 6 · sticky-pool · flip）</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget" open>
+              <summary><span class="w-type">canvas</span><span class="w-name">群組設定</span></summary>
+              <div class="spec-body">
+                <h4>群組參數</h4>
+                <table class="param-table">
+                  <tr><th>groupRepeatMode</th><td><code>slots</code> · <code>slotCount: 6</code></td></tr>
+                  <tr><th>slotKeyField</th><td><code>shift_key</code>（= <code>order_id</code>）</td></tr>
+                  <tr><th>variableName</th><td><code>row</code>（範本內 <code>{row.trip_code}</code> 等）</td></tr>
+                  <tr><th>groupSlotAssignment</th><td><code>sticky-pool</code></td></tr>
+                  <tr><th>groupTransition</th><td><code>flip</code></td></tr>
+                </table>
+                <h4>資料表</h4>
+                <p class="note">列表來自 <code>MAINLINE_SHIFTS_SQL</code>，主表 <code>operation_orders</code>（<code>line_kind = 'MAINLINE'</code>，<code>trip_code ~ '^[DU][0-9]{4}$'</code>）。</p>
+                <h4>SQL（摘要）</h4>
+                <pre>SELECT order_id AS shift_key, vehicle_code, trip_code,
+  direction_label, status_label, next_station, eta_remain,
+  route_stations, segment_index, segment_remain_pct, …
+FROM operation_orders o
+JOIN vehicles … JOIN operation_routes …
+WHERE line_kind = 'MAINLINE' AND status IN ('PENDING','PROCESSING','FAULTED')</pre>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>v1/vtms/{vehicle_code}/operation/update</code> → 更新 <code>operation_orders.payload</code></li>
+                  <li>失效：<code>domain:mainline_shifts</code> · <code>table:operation_orders</code></li>
+                </ul>
+              </div>
+            </details>
+            <details class="spec-group">
+              <summary>單槽範本元件（皆取值 <code>{row.*}</code>，無獨立 SQL）</summary>
+              <div class="spec-group-body">
+                <table class="param-table" style="margin-top:0.5rem">
+                  <tr><th>元件</th><th>欄位 / 來源表</th><th>MQTT</th></tr>
+                  <tr><td><code>color-block</code> 外框</td><td><code>row.card_border_color</code> ← <code>operation_orders.status</code></td><td>間接</td></tr>
+                  <tr><td><code>status-badge</code> 方向</td><td><code>row.direction_label</code> ← <code>operation_routes.direction_letter</code></td><td>—</td></tr>
+                  <tr><td><code>text</code> trip / vehicle</td><td><code>operation_orders.trip_code</code> · <code>vehicle_code</code></td><td>—</td></tr>
+                  <tr><td><code>status-badge</code> 狀態</td><td><code>row.status_label</code> ← <code>operation_orders.status</code> + <code>delay_minutes</code></td><td>—</td></tr>
+                  <tr><td><code>text</code> 站點 / ETA</td><td><code>next_station</code> · <code>eta_remain</code> ← payload / 路線</td><td>間接</td></tr>
+                  <tr><td><code>route-progress</code></td><td><code>route_stations</code> JSON · <code>segment_index</code></td><td><strong>直接</strong> <code>v1/vtms/${vehicle_code}/operation/update</code> · path <code>current_leg.eta_seconds</code></td></tr>
+                  <tr><td><code>text</code> 發車/結束</td><td><code>depart_time</code> · <code>end_time</code></td><td>—</td></tr>
+                </table>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 4. 整備班表 -->
+    <article id="maint-shift" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">整備班表</span></span>
+          <span class="module-meta">群組 4 槽 · 結構同正線</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/05-maintenance-shifts.png" target="_blank" rel="noopener">
+            <img class="shot-wide" src="images/05-maintenance-shifts.png" alt="整備班表" />
+          </a>
+          <figcaption>4 槽 sticky-pool<span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — <code>MAINTENANCE_SHIFTS_SQL</code> 查 <code>operation_orders</code>（<code>line_kind = 'MAINTENANCE'</code>）；
+          軌道元件同訂閱 <code>operation/update</code>。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表：<span class="table-name">operation_orders</span></h3>
+          <table class="param-table col-map-table">
+            <tr><th>欄位</th><th>用途</th></tr>
+            <tr><td><code>payload->>'yard_slot_id'</code></td><td>整備格位（E/W/P/H/M 前綴）</td></tr>
+            <tr><td><code>maint_type_label</code> / <code>maint_type_color</code></td><td>整備類型徽章</td></tr>
+            <tr><td><code>trip_code</code> · <code>vehicle_code</code></td><td>卡面標題</td></tr>
+            <tr><td><code>status</code></td><td>停留中 / 進行中 / 故障語意</td></tr>
+          </table>
+          <p class="note">篩選：無進行中正線訂單的整備車；每車 <code>DISTINCT ON (vehicle_code)</code> 一筆。</p>
+        </div>
+        <details class="spec-group" open>
+          <summary>群組 · 整備班表（slots × 4）</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget" open>
+              <summary><span class="w-type">canvas</span><span class="w-name">群組 + 範本差異</span></summary>
+              <div class="spec-body">
+                <h4>與正線差異</h4>
+                <table class="param-table">
+                  <tr><th>徽章</th><td><code>{row.maint_type_label}</code>（充電/洗車/臨停…）</td></tr>
+                  <tr><th>軌道</th><td><code>trackStyle: maintenance</code></td></tr>
+                  <tr><th>slotCount</th><td><code>4</code></td></tr>
+                </table>
+                <h4>SQL</h4>
+                <pre>… FROM operation_orders o WHERE line_kind = 'MAINTENANCE'
+  AND order_id LIKE 'DEMO-ORD-%' …</pre>
+                <p class="note">常數 <code>MAINTENANCE_SHIFTS_SQL</code>。</p>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>v1/vtms/{vehicle_code}/operation/update</code></li>
+                  <li>失效：<code>domain:maintenance_shifts</code></li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 5. 運能趨勢 -->
+    <article id="trend" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">運能趨勢</span></span>
+          <span class="module-meta">固定面板 · KPI + 折線圖</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/06-capacity-trend.png" target="_blank" rel="noopener">
+            <img class="shot-sm" src="images/06-capacity-trend.png" alt="運能趨勢" />
+          </a>
+          <figcaption><span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — KPI / 折線主要查 <code>capacity_trend_demo_points</code>；
+          「即時數值」另綁 MQTT <code>v1/vtms/dashboard/capacity/live</code>（<code>freshnessPolicy: once</code> 輔助）。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表：<span class="table-name">capacity_trend_demo_points</span></h3>
+          <table class="param-table col-map-table">
+            <tr><th>欄位</th><th>用途</th></tr>
+            <tr><td><code>offset_minutes</code></td><td>相對現在的時間偏移</td></tr>
+            <tr><td><code>utilization</code> / <code>actual_util</code> / <code>forecast_util</code></td><td>KPI 與折線 Y 值</td></tr>
+            <tr><td><code>segment_code</code></td><td>圖例色帶 IN_SERVICE / SCHEDULED</td></tr>
+            <tr><td><code>is_anomaly</code> · <code>anomaly_label</code></td><td>折線事件標註</td></tr>
+            <tr><td><code>demo_set_id</code></td><td>固定 <code>'DEMO'</code></td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>固定面板元件</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">模組標題</span></summary>
+              <div class="spec-body"><h4>資料表</h4><p class="note">無。</p></div>
+            </details>
+            <details class="spec-widget" open>
+              <summary><span class="w-type">stat-card ×4</span><span class="w-name">即時 / 目標 / 可用 / 下段</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>capacity_trend_demo_points</code>（子查詢）</td></tr>
+                  <tr><th>live_val</th><td>最近 offset 的 <code>utilization</code></td></tr>
+                  <tr><th>target_val</th><td>常數 1200（SQL 內寫死）</td></tr>
+                  <tr><th>avail_val</th><td>常數 200</td></tr>
+                  <tr><th>next_val</th><td><code>offset_minutes >= 30</code> 首筆 utilization</td></tr>
+                </table>
+                <h4>SQL</h4><p class="note"><code>CAPACITY_TREND_SUMMARY_SQL</code></p>
+                <h4>MQTT</h4>
+                <p class="note">僅「即時數值」卡額外綁 <code>v1/vtms/dashboard/capacity/live</code>（<code>default-mqtt</code>）。</p>
+              </div>
+            </details>
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">avail_hint / next_hint</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4><p class="note"><code>capacity_trend_demo_points</code>（hint 為 SQL 字串／時間格式化）。</p>
+                <h4>SQL</h4><p class="note">同 summary SQL 的 <code>avail_hint</code>、<code>next_hint</code> 欄。</p>
+              </div>
+            </details>
+            <details class="spec-widget">
+              <summary><span class="w-type">line-chart</span><span class="w-name">目標走勢 + 當前運能</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>主表</th><td><code>capacity_trend_demo_points</code></td></tr>
+                  <tr><th>xField</th><td><code>time</code>（由 offset 格式化 HH24:MI）</td></tr>
+                  <tr><th>series</th><td><code>forecast_util</code> · <code>actual_util</code></td></tr>
+                </table>
+                <h4>SQL</h4><p class="note"><code>CAPACITY_TREND_CHART_SQL</code></p>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li>可選：<code>v1/vtms/dashboard/capacity/live</code>（模擬器推送）</li>
+                  <li>失效：<code>domain:capacity_trend</code></li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 6. 整備分佈 -->
+    <article id="maint-dist" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">整備分佈</span></span>
+          <span class="module-meta">6 場區卡 · facility_slots + slot_statuses</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/07-maintenance-distribution.png" target="_blank" rel="noopener">
+            <img class="shot-sm" src="images/07-maintenance-distribution.png" alt="整備分佈" />
+          </a>
+          <figcaption>2×3 場區卡<span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — 格位定義在 <code>facility_slots</code>，即時狀態在 <code>slot_statuses</code>；
+          MQTT <code>v1/vtms/+/slot/status</code> 寫入後觸發 <code>domain:maintenance_slots</code> 重查。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表</h3>
+          <table class="param-table col-map-table">
+            <tr><th>資料表</th><th>角色</th></tr>
+            <tr><td><code>facility_slots</code></td><td>格位定義 · <code>zone</code>（整備-充電…）· <code>slot_id</code></td></tr>
+            <tr><td><code>slot_statuses</code></td><td>即時占用 · <code>status</code> · <code>vehicle_code</code> · <code>raw_payload</code></td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>標題列 + 場區卡 × 6（充電／洗車／保養／維修／調度／臨停）</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget">
+              <summary><span class="w-type">text</span><span class="w-name">標題 + header_line</span></summary>
+              <div class="spec-body">
+                <h4>資料表</h4>
+                <table class="param-table">
+                  <tr><th>header_line</th><td><code>facility_slots</code> ⋈ <code>slot_statuses</code> — 使用中區域數 / 總區域數</td></tr>
+                </table>
+                <h4>SQL</h4><p class="note"><code>MAINTENANCE_HEADER_LINE_SQL</code></p>
+              </div>
+            </details>
+            <details class="spec-widget" open>
+              <summary><span class="w-type">場區卡範本</span><span class="w-name">每區 3 元件</span></summary>
+              <div class="spec-body">
+                <table class="param-table">
+                  <tr><th>元件</th><th>資料表 / SQL</th><th>MQTT</th></tr>
+                  <tr><td><code>color-block</code></td><td>無</td><td>—</td></tr>
+                  <tr><td><code>text</code> 類別名</td><td>靜態標籤</td><td>—</td></tr>
+                  <tr><td><code>text</code> total</td><td><code>maintenanceZoneCountSql(zone)</code> · <code>facility_slots</code> + <code>slot_statuses</code></td><td>間接</td></tr>
+                  <tr><td><code>slot-grid</code></td><td><code>maintenanceSlotsSql(zone)</code> — 列出該區各 <code>slot_id</code> 狀態</td><td><code>v1/vtms/+/slot/status</code></td></tr>
+                </table>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>v1/vtms/+/slot/status</code> → <code>handleSlotStatus</code> → upsert <code>slot_statuses</code></li>
+                  <li>失效：<code>domain:maintenance_slots</code> · <code>table:slot_status</code></li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 7. 車輛分佈 -->
+    <article id="veh-dist" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">車輛分佈</span></span>
+          <span class="module-meta">segment-bar · 3 段比例</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/08-vehicle-distribution.png" target="_blank" rel="noopener">
+            <img class="shot-sm" src="images/08-vehicle-distribution.png" alt="車輛分佈" />
+          </a>
+          <figcaption><span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — 聚合查詢跨 <code>vehicles</code>、<code>operation_orders</code>、<code>slot_statuses</code> 推斷每台車狀態碼，再算比例。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表</h3>
+          <table class="param-table col-map-table">
+            <tr><th>資料表</th><th>判斷邏輯</th></tr>
+            <tr><td><code>vehicles</code></td><td>主體（<code>is_active</code> · PMS/AMR/AGV）</td></tr>
+            <tr><td><code>operation_orders</code></td><td>存在 <code>PROCESSING</code> → IN_SERVICE（營運中）</td></tr>
+            <tr><td><code>slot_statuses</code> + <code>facility_slots</code></td><td>整備區占用 → MAINTENANCE</td></tr>
+            <tr><td>（衍生）</td><td>其餘 → STANDBY（待命）</td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary><span class="w-type">segment-bar</span><span class="w-name">車輛分佈比例條</span></summary>
+          <div class="spec-group-body">
+            <details class="spec-widget" open>
+              <summary><span class="w-type">segment-bar</span><span class="w-name">營運中 / 整備中 / 待命</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>statusField</th><td><code>status_code</code></td></tr>
+                  <tr><th>pctField</th><td><code>pct</code></td></tr>
+                  <tr><th>countField</th><td><code>vehicle_count</code></td></tr>
+                </table>
+                <h4>資料表</h4><p class="note">見上表三張表聯合推斷。</p>
+                <h4>SQL</h4><p class="note"><code>VEHICLE_DISTRIBUTION_SQL</code></p>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>operation/update</code> · <code>slot/status</code> 變更後重查</li>
+                  <li>失效：<code>domain:vehicle_distribution</code></li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 8. 即時圖台 -->
+    <article id="map" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">即時圖台</span></span>
+          <span class="module-meta">map-platform + overlay</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/09-live-map.png" target="_blank" rel="noopener">
+            <img class="shot-wide" src="images/09-live-map.png" alt="即時圖台" />
+          </a>
+          <figcaption><span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — 圖台本體由 <code>MapPlatformLayer</code> 訂閱車隊 MQTT（telemetry / operation）；
+          overlay 多為靜態或單車 MQTT。無 SQL 查表驅動整張地圖。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組資料來源</h3>
+          <table class="param-table col-map-table">
+            <tr><th>類型</th><th>說明</th></tr>
+            <tr><td>地圖資產</td><td><code>mapId: t3-main-version</code>（圖編器 JSON，非 DB 表）</td></tr>
+            <tr><td>車輛定義</td><td><code>vehicle-editor</code> 協定檔 · VTMS PMS-01</td></tr>
+            <tr><td>即時資料</td><td>MQTT（見各 overlay）</td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>圖台本體</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget" open>
+              <summary><span class="w-type">map-platform</span><span class="w-name">MapPlatformLayer</span></summary>
+              <div class="spec-body">
+                <h4>參數</h4>
+                <table class="param-table">
+                  <tr><th>canvasKind</th><td><code>map-platform</code></td></tr>
+                  <tr><th>mapId</th><td><code>t3-main-version</code></td></tr>
+                  <tr><th>useDefaultVehicleDefinition</th><td><code>true</code></td></tr>
+                </table>
+                <h4>資料表</h4><p class="note">無 — 車輛位置來自 MQTT ingest（<code>mapMqttIngestPipeline</code>）。</p>
+                <h4>MQTT</h4>
+                <ul class="mqtt-list">
+                  <li><code>v1/vtms/{vehicle_code}/telemetry/update</code></li>
+                  <li><code>v1/vtms/{vehicle_code}/operation/update</code></li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </details>
+        <details class="spec-group">
+          <summary>Overlay 元件</summary>
+          <div class="spec-group-body">
+            <table class="param-table">
+              <tr><th>元件</th><th>資料表</th><th>MQTT</th></tr>
+              <tr><td><code>clock</code></td><td>無</td><td>無（本機時間）</td></tr>
+              <tr><td><code>status-badge</code> 全場狀態</td><td>無</td><td>無（靜態預設文案）</td></tr>
+              <tr><td><code>text</code> 班距 / 正線營運</td><td>無</td><td>無（示範靜態）</td></tr>
+              <tr><td><code>vehicle-container</code> PMS-01</td><td>無</td><td><code>v1/vtms/PMS-01/operation/update</code></td></tr>
+            </table>
+          </div>
+        </details>
+      </details>
+    </article>
+
+    <!-- 9. 車輛狀態 -->
+    <article id="veh-status" class="canvas-block">
+      <details class="spec-module">
+        <summary>
+          <span><span class="module-title">車輛狀態</span></span>
+          <span class="module-meta">群組 11 欄 · 單車監控卡</span>
+        </summary>
+        <figure class="figure">
+          <a href="images/10-vehicle-status.png" target="_blank" rel="noopener">
+            <img class="shot-wide" src="images/10-vehicle-status.png" alt="車輛狀態" />
+          </a>
+          <figcaption>11 欄 tile<span class="hint">點圖可開原尺寸</span></figcaption>
+        </figure>
+        <div class="spec-flow">
+          <strong>資料流</strong> — 群組 SQL 彙整 <code>vehicles</code>、<code>operation_orders</code>、<code>vehicle_monitor_demo</code>；
+          速度/電量/健康/位置等子元件另訂車輛 MQTT。
+        </div>
+        <div class="spec-table-box">
+          <h3>本模組使用的資料表</h3>
+          <table class="param-table col-map-table">
+            <tr><th>資料表</th><th>用途</th></tr>
+            <tr><td><code>vehicles</code></td><td>車隊主檔 · <code>vehicle_code</code>（PMS-%）</td></tr>
+            <tr><td><code>operation_orders</code></td><td>活躍訂單 → 任務徽章、線別、站點</td></tr>
+            <tr><td><code>vehicle_monitor_demo</code></td><td>示範遙測/健康/子系統狀態、速度電量 demo 欄</td></tr>
+          </table>
+        </div>
+        <details class="spec-group" open>
+          <summary>群組 · 車輛狀態（tile × 11 · <code>vehicle_code</code>）</summary>
+          <div class="spec-group-body">
+            <details class="spec-widget" open>
+              <summary><span class="w-type">canvas</span><span class="w-name">群組列表 SQL</span></summary>
+              <div class="spec-body">
+                <h4>群組參數</h4>
+                <table class="param-table">
+                  <tr><th>groupRepeatMode</th><td><code>tile</code></td></tr>
+                  <tr><th>gridColumns</th><td><code>11</code></td></tr>
+                  <tr><th>iteratorField</th><td><code>vehicle_code</code></td></tr>
+                  <tr><th>variableName</th><td><code>row</code></td></tr>
+                </table>
+                <h4>資料表</h4><p class="note">主查詢 <code>VEHICLE_STATUS_ROW_SQL</code>（三表 JOIN + LATERAL 活躍訂單）。</p>
+                <h4>MQTT（群組層）</h4>
+                <ul class="mqtt-list">
+                  <li>訂單/遙測變更 → <code>domain:vehicle_monitor</code> 重查 SQL</li>
+                </ul>
+              </div>
+            </details>
+            <details class="spec-group">
+              <summary>單車範本元件</summary>
+              <div class="spec-group-body">
+                <table class="param-table">
+                  <tr><th>元件</th><th>資料表欄位</th><th>MQTT Topic</th></tr>
+                  <tr><td><code>color-block</code> 外框</td><td><code>vehicle_monitor_demo.overall_health</code> → <code>card_border_color</code></td><td><code>v1/vtms/${vehicle_code}/health/heartbeat</code></td></tr>
+                  <tr><td><code>text</code> 車號</td><td><code>vehicles.vehicle_code</code></td><td>—</td></tr>
+                  <tr><td><code>status-badge</code> 任務</td><td><code>row.badge_label</code> ← 訂單 trip / 整備類型</td><td>—</td></tr>
+                  <tr><td><code>gauge</code> 速度</td><td><code>demo_speed</code>（SQL 後備）</td><td><code>telemetry/update</code> · <code>kinematics.velocity</code></td></tr>
+                  <tr><td><code>gauge</code> 電量</td><td><code>demo_load</code></td><td><code>telemetry/update</code> · <code>energy.battery_level</code></td></tr>
+                  <tr><td><code>alert-banner</code></td><td><code>vehicle_monitor_demo.alert_message</code></td><td><code>health/heartbeat</code></td></tr>
+                  <tr><td><code>text</code> 四子系統 pill</td><td><code>status_computing</code> 等</td><td>—（SQL）</td></tr>
+                  <tr><td><code>text</code> 位置</td><td><code>segment_label</code></td><td><code>operation/update</code></td></tr>
+                </table>
+              </div>
+            </details>
+          </div>
+        </details>
+      </details>
+    </article>
+
+  </div>
+</body>
+</html>

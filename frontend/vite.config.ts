@@ -16,3 +16,4 @@ export default defineConfig({
     },
   },
 })
+// force rebuild dev server to clear broken cache

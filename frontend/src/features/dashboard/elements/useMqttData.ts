@@ -3,7 +3,9 @@ import type { Socket } from 'socket.io-client';
 import { acquireSocket, releaseSocket } from './socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { useVariables, interpolateVariables } from '../VariableContext';
-import { useDemoSimulation } from '../context/DemoSimulationContext';
+import { useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
+import { useVehicleFleetMqttHubContext } from '../context/VehicleFleetMqttContext';
+import { parseVtmsVehicleTopic } from '../utils/vtmsTopic';
 
 interface MqttState {
   data: Record<string, unknown> | null;
@@ -11,9 +13,26 @@ interface MqttState {
   error: string | null;
 }
 
+function extractMqttValue(
+  payload: Record<string, unknown>,
+  mqttValuePath?: string,
+): Record<string, unknown> {
+  if (!mqttValuePath) return payload;
+  const parts = mqttValuePath.split('.');
+  let temp: unknown = payload;
+  for (const p of parts) {
+    if (temp == null || typeof temp !== 'object') {
+      temp = undefined;
+      break;
+    }
+    temp = (temp as Record<string, unknown>)[p];
+  }
+  return { value: temp };
+}
+
 /**
  * MQTT 即時資料訂閱 Hook
- * 透過 Socket.IO 連線到後端，並監聽轉發的 MQTT 訊息
+ * VTMS 車輛主題（telemetry / operation / health）改讀 VehicleFleetMqttHub，避免每 widget 重複訂閱。
  */
 export function useMqttData(opts: {
   mqttDataSourceId?: string;
@@ -23,33 +42,59 @@ export function useMqttData(opts: {
   const { mqttDataSourceId, mqttTopic, mqttValuePath } = opts;
   const [state, setState] = useState<MqttState>({ data: null, connected: false, error: null });
   const socketRef = useRef<Socket | null>(null);
-  const { paused } = useDemoSimulation();
+  const paused = useDemoSimulationPaused();
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const fleetHub = useVehicleFleetMqttHubContext();
   const vars = useVariables();
   const varsKey = useMemo(() => {
     const keys = Object.keys(vars).sort();
     return keys.map(k => `${k}:${String(vars[k])}`).join('|');
   }, [vars]);
 
+  const finalTopic = useMemo(() => {
+    if (!mqttTopic) return '';
+    return interpolateVariables(mqttTopic, vars);
+  }, [mqttTopic, varsKey]);
+
+  const fleetParsed = useMemo(
+    () => (finalTopic ? parseVtmsVehicleTopic(finalTopic) : null),
+    [finalTopic],
+  );
+
+  const useFleetHub = Boolean(
+    mqttDataSourceId
+    && fleetParsed
+    && fleetHub,
+  );
+
+  const fleetData = useMemo(() => {
+    if (!useFleetHub || !fleetParsed || !fleetHub) return null;
+    const raw = fleetHub[fleetParsed.stream].get(fleetParsed.vehicleCode);
+    if (!raw) return null;
+    return extractMqttValue(raw, mqttValuePath);
+  }, [useFleetHub, fleetParsed, fleetHub, mqttValuePath, fleetHub?.tick]);
+
   useEffect(() => {
+    if (useFleetHub) {
+      setState({ data: null, connected: false, error: null });
+      return;
+    }
+
     if (!mqttDataSourceId || !mqttTopic) {
       setState({ data: null, connected: false, error: null });
       return;
     }
 
-    const finalTopic = interpolateVariables(mqttTopic, vars);
     const ds = getDataSourceById(mqttDataSourceId);
     if (!ds || ds.type !== 'mqtt') {
       setState({ data: null, connected: false, error: '無效的 MQTT 資料來源' });
       return;
     }
 
-    // 使用共用 Socket singleton，避免每個 Widget 建立獨立 WebSocket 連線
     const socket = acquireSocket(ds.backendUrl);
     socketRef.current = socket;
 
-    // 具名 handler：清理時逐一移除，避免在共用 socket 上累積洩漏
     const onConnect = () => setState(s => ({ ...s, connected: true, error: null }));
     const onDisconnect = () => setState(s => ({ ...s, connected: false }));
     const onConnectError = (err: Error) =>
@@ -59,26 +104,14 @@ export function useMqttData(opts: {
     socket.on('connect_error', onConnectError);
     if (socket.connected) setState(s => ({ ...s, connected: true, error: null }));
 
-    // 監聽轉發的 MQTT 主題（後端 EventsGateway emit `mqtt/${topic}`）
     const eventName = `mqtt/${finalTopic}`;
-    const onMessage = (payload: any) => {
+    const onMessage = (payload: unknown) => {
       if (pausedRef.current) return;
-
-      let extractedData = payload;
-
-      // 安全取 JSON 路徑：缺欄位時為 undefined，絕不丟錯／洗版 console
-      // （營運訊息在靠站/車庫時可能無 current_leg，屬正常情形）
-      if (mqttValuePath && payload && typeof payload === 'object') {
-        const parts = mqttValuePath.split('.');
-        let temp: unknown = payload;
-        for (const p of parts) {
-          if (temp == null || typeof temp !== 'object') { temp = undefined; break; }
-          temp = (temp as Record<string, unknown>)[p];
-        }
-        extractedData = { value: temp };
-      }
-
-      setState(s => ({ ...s, data: extractedData }));
+      if (!payload || typeof payload !== 'object') return;
+      setState(s => ({
+        ...s,
+        data: extractMqttValue(payload as Record<string, unknown>, mqttValuePath),
+      }));
     };
     socket.on(eventName, onMessage);
 
@@ -87,11 +120,18 @@ export function useMqttData(opts: {
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
       socket.off(eventName, onMessage);
-      // 使用 releaseSocket 而非直接 disconnect，讓其他 Widget 可繼續複用連線
       releaseSocket(ds.backendUrl);
       socketRef.current = null;
     };
-  }, [mqttDataSourceId, mqttTopic, mqttValuePath, varsKey]);
+  }, [useFleetHub, mqttDataSourceId, mqttTopic, mqttValuePath, finalTopic]);
+
+  if (useFleetHub && fleetHub) {
+    return {
+      data: fleetData,
+      connected: fleetHub.connected,
+      error: null,
+    };
+  }
 
   return state;
 }

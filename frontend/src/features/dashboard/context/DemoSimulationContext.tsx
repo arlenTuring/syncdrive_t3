@@ -21,6 +21,11 @@ import {
   type DemoSimulationTransport,
   type SimulatedFaultEvent,
 } from '../api/demoSimulation';
+import {
+  DemoSimulationLiveProvider,
+  DemoSimulationPlaybackProvider,
+  type DemoSimulationPlayback,
+} from './DemoSimulationPlaybackContext';
 import { getDataSourceById } from '../store/useDataSourceStore';
 
 const TOOLBAR_VISIBLE_KEY = 'syncdrive-sim-transport-toolbar-visible';
@@ -91,6 +96,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
   const [liveClearEpoch, setLiveClearEpoch] = useState(0);
   const [lastSimulatedEvent, setLastSimulatedEvent] = useState<SimulatedFaultEvent | null>(null);
   const transportPatchAt = useRef(0);
+  const pollFingerprintRef = useRef('');
 
   const bumpLiveClear = useCallback(() => {
     setLiveClearEpoch((n) => n + 1);
@@ -110,19 +116,33 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const next = await fetchDemoSimulationStatus(backendUrl);
-      setStatus(next);
-      setTransport((prev) => {
-        if (!next.transport) return next.transport;
-        const patchRecent = Date.now() - transportPatchAt.current < 2000;
-        if (patchRecent && prev) {
-          return {
-            ...next.transport,
-            speedMultiplier: prev.speedMultiplier,
-            transportPaused: prev.transportPaused,
-          };
-        }
-        return next.transport;
-      });
+      const nextTransport = next.transport ?? null;
+      const fp = [
+        next.running,
+        next.paused,
+        next.source,
+        next.pid,
+        nextTransport?.transportPaused,
+        nextTransport?.speedMultiplier,
+        nextTransport?.virtualElapsedMs,
+        nextTransport?.stepNonce,
+      ].join('|');
+      if (fp !== pollFingerprintRef.current) {
+        pollFingerprintRef.current = fp;
+        setStatus(next);
+        setTransport((prev) => {
+          if (!next.transport) return next.transport;
+          const patchRecent = Date.now() - transportPatchAt.current < 2000;
+          if (patchRecent && prev) {
+            return {
+              ...next.transport,
+              speedMultiplier: prev.speedMultiplier,
+              transportPaused: prev.transportPaused,
+            };
+          }
+          return next.transport;
+        });
+      }
       if (next.transport?.lastSimulatedEvent) {
         setLastSimulatedEvent(next.transport.lastSimulatedEvent);
       }
@@ -135,9 +155,11 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
-    const id = setInterval(() => void refresh(), 3000);
+    if (!toolbarVisible && !status.running) return undefined;
+    const intervalMs = status.running ? 3000 : 10_000;
+    const id = setInterval(() => void refresh(), intervalMs);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [refresh, toolbarVisible, status.running]);
 
   const start = useCallback(async () => {
     setLoading(true);
@@ -361,6 +383,17 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
 
   const paused = !status.running;
   const transportPaused = transport?.transportPaused ?? false;
+  const speedMultiplier = Math.max(1, transport?.speedMultiplier ?? 1);
+
+  const playback = useMemo<DemoSimulationPlayback>(
+    () => ({
+      running: status.running,
+      paused,
+      transportPaused,
+      speedMultiplier,
+    }),
+    [status.running, paused, transportPaused, speedMultiplier],
+  );
 
   const value = useMemo(
     () => ({
@@ -412,9 +445,13 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <DemoSimulationContext.Provider value={value}>
-      {children}
-    </DemoSimulationContext.Provider>
+    <DemoSimulationPlaybackProvider value={playback}>
+      <DemoSimulationLiveProvider liveClearEpoch={liveClearEpoch}>
+        <DemoSimulationContext.Provider value={value}>
+          {children}
+        </DemoSimulationContext.Provider>
+      </DemoSimulationLiveProvider>
+    </DemoSimulationPlaybackProvider>
   );
 }
 

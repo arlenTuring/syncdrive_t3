@@ -7,14 +7,24 @@ import { readVehicleMetersFromPayload } from '../../map-editor/utils/areaVehicle
 import {
   buildTrackNetwork,
   isYardVehiclePayload,
+  parseYardSlotIdFromPayload,
   resolveVehiclePlacementAcrossAreas,
+  resolveYardFacilityPlacement,
   type TrackNetwork,
 } from '../../map-editor/vehicles/resolveVehicleTrackPlacement';
+import {
+  parseYardSlotFromPayload,
+  resolveYardFacilityFieldMeters,
+} from '../../map-editor/utils/yardFacilitySlots';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
+import { readSimElapsedMs } from '../utils/simClock';
+import { isVtmsVehicleStreamTopic } from '../utils/vtmsTopic';
 
 export type MapMqttFlushSnapshot = {
   liveById: Record<string, MqttLiveEntry>;
   areaVehicles: AreaVehicleLive[];
+  liveChanged: boolean;
+  vehiclesChanged: boolean;
 };
 
 function entityIdFromTopic(topic: string, pattern: string): string | null {
@@ -49,6 +59,73 @@ function topicMatchesArea(areaTopic: string | undefined, messageTopic: string): 
     return true;
   }
   return false;
+}
+
+type IndexedFacility = {
+  area: MapAreaObject;
+  facility: FacilityObject;
+  eid: string;
+};
+
+type FacilityIndex = {
+  byEntityKey: Map<string, IndexedFacility[]>;
+  areaPatterns: Array<{
+    area: MapAreaObject;
+    pattern: string;
+    facilities: IndexedFacility[];
+  }>;
+};
+
+function entityKeysForFacility(f: FacilityObject): string[] {
+  const keys = new Set<string>();
+  const inst = f.parameters?.mqttInstanceId;
+  if (typeof inst === 'string' && inst.trim()) keys.add(inst.trim());
+  const eid = getMqttEntityId(f);
+  keys.add(eid);
+  const tail = eid.split('/').pop();
+  if (tail) keys.add(tail);
+  return [...keys];
+}
+
+function buildFacilityIndex(areas: MapAreaObject[]): FacilityIndex {
+  const byEntityKey = new Map<string, IndexedFacility[]>();
+  const areaPatterns: FacilityIndex['areaPatterns'] = [];
+
+  for (const area of areas) {
+    const facilities: IndexedFacility[] = [];
+    for (const f of area.facilities) {
+      const eid = getMqttEntityId(f);
+      const indexed: IndexedFacility = { area, facility: f, eid };
+      facilities.push(indexed);
+      for (const key of entityKeysForFacility(f)) {
+        const list = byEntityKey.get(key) ?? [];
+        if (!list.some((item) => item.eid === eid)) list.push(indexed);
+        byEntityKey.set(key, list);
+      }
+    }
+    const pattern = area.mqtt?.topic?.trim();
+    if (pattern) areaPatterns.push({ area, pattern, facilities });
+  }
+
+  return { byEntityKey, areaPatterns };
+}
+
+function lookupIndexedFacilities(
+  index: FacilityIndex,
+  entityId: string,
+  matcher: (f: FacilityObject, entityId: string) => boolean,
+): IndexedFacility[] {
+  const direct = index.byEntityKey.get(entityId);
+  if (direct?.length) return direct;
+  const out: IndexedFacility[] = [];
+  for (const list of index.byEntityKey.values()) {
+    for (const item of list) {
+      if (matcher(item.facility, entityId) && !out.some((x) => x.eid === item.eid)) {
+        out.push(item);
+      }
+    }
+  }
+  return out;
 }
 
 export function vehicleVisualKey(payload: Record<string, unknown>): string {
@@ -99,6 +176,14 @@ type PendingVehicle = {
 };
 
 /** 營運欄位：合併 operation/update 至圖台載具 payload（telemetry 不含 trip_code） */
+const OPERATION_DOOR_FIELDS = [
+  'door_open_percent',
+  'door_fl_open_percent',
+  'door_fr_open_percent',
+  'door_rl_open_percent',
+  'door_rr_open_percent',
+] as const;
+
 function mergeOperationFields(
   telemetryPayload: Record<string, unknown>,
   operation: Record<string, unknown> | undefined,
@@ -106,35 +191,52 @@ function mergeOperationFields(
   if (!operation) return telemetryPayload;
   const trip = operation.trip_code ?? operation.tripCode;
   const leg = operation.current_leg;
-  const legTarget =
-    leg && typeof leg === 'object'
-      ? String((leg as { target_station_id?: unknown }).target_station_id ?? '').trim()
-      : '';
+  const doorFields: Record<string, unknown> = {};
+  for (const key of OPERATION_DOOR_FIELDS) {
+    if (operation[key] !== undefined) doorFields[key] = operation[key];
+  }
+  const opActions = operation.operation_actions;
   return {
     ...telemetryPayload,
+    ...doorFields,
     order_id: operation.order_id ?? telemetryPayload.order_id,
     trip_code: trip ?? telemetryPayload.trip_code,
     badge_label: trip ?? operation.badge_label ?? telemetryPayload.badge_label,
     vehicle_phase: operation.vehicle_phase ?? telemetryPayload.vehicle_phase,
+    dwelling: operation.dwelling ?? telemetryPayload.dwelling,
     line_kind: operation.line_kind ?? telemetryPayload.line_kind,
     operation_action: operation.operation_action ?? telemetryPayload.operation_action,
+    ...(Array.isArray(opActions) && opActions.length > 0
+      ? { operation_actions: opActions }
+      : {}),
     current_leg: leg ?? telemetryPayload.current_leg,
-    ...(legTarget && !telemetryPayload.segment_label
-      ? { segment_label: legTarget }
+    ...(telemetryPayload.yard_slot_id != null && telemetryPayload.yard_slot_id !== ''
+      ? { yard_slot_id: telemetryPayload.yard_slot_id }
+      : {}),
+    ...(operation.yard_slot_id != null && operation.yard_slot_id !== ''
+      ? { yard_slot_id: operation.yard_slot_id }
       : {}),
   };
 }
+
+type MergeCacheEntry = {
+  telRef: Record<string, unknown> | undefined;
+  opRef: Record<string, unknown> | undefined;
+  merged: Record<string, unknown>;
+};
 
 export function createMapMqttIngestPipeline(
   onFlush: (snapshot: MapMqttFlushSnapshot) => void,
 ) {
   let areas: MapAreaObject[] = [];
   let trackNetwork: TrackNetwork = { segments: [] };
+  let facilityIndex: FacilityIndex = { byEntityKey: new Map(), areaPatterns: [] };
   let rafId = 0;
   let liveBase: Record<string, MqttLiveEntry> = {};
   const livePatches = new Map<string, PendingLivePatch>();
   const pendingVehicles = new Map<string, PendingVehicle>();
   const operationByVehicle = new Map<string, Record<string, unknown>>();
+  const mergeCache = new Map<string, MergeCacheEntry>();
   const pendingVehicleRemovals = new Set<string>();
   const placementCache = new Map<string, PlacementCacheEntry>();
   const emittedVehicles = new Map<string, AreaVehicleLive>();
@@ -143,6 +245,48 @@ export function createMapMqttIngestPipeline(
 
   function posKey(xM: number, yM: number): string {
     return `${xM.toFixed(2)}|${yM.toFixed(2)}`;
+  }
+
+  function mergeOperationFieldsCached(
+    vehicleId: string,
+    telemetryPayload: Record<string, unknown>,
+    operation: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const cached = mergeCache.get(vehicleId);
+    if (
+      cached &&
+      cached.telRef === telemetryPayload &&
+      cached.opRef === operation
+    ) {
+      return cached.merged;
+    }
+    const merged = mergeOperationFields(telemetryPayload, operation);
+    mergeCache.set(vehicleId, {
+      telRef: telemetryPayload,
+      opRef: operation,
+      merged,
+    });
+    return merged;
+  }
+
+  function clearAllState() {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    liveBase = {};
+    livePatches.clear();
+    pendingVehicles.clear();
+    pendingVehicleRemovals.clear();
+    operationByVehicle.clear();
+    mergeCache.clear();
+    placementCache.clear();
+    emittedVehicles.clear();
+    lastAreaVehicles = [];
+    pendingIngest.length = 0;
+    trackNetwork = areas.length > 0 ? buildTrackNetwork(areas) : { segments: [] };
+    facilityIndex =
+      areas.length > 0 ? buildFacilityIndex(areas) : { byEntityKey: new Map(), areaPatterns: [] };
   }
 
   function scheduleFlush() {
@@ -182,14 +326,37 @@ export function createMapMqttIngestPipeline(
     return entityIdFromTopic(topic, pattern);
   }
 
+  function yardCoordsFromPayload(
+    payload: Record<string, unknown> | undefined,
+  ): { xM: number; yM: number; areaId: string } | null {
+    if (!payload) return null;
+    const yardSlot = parseYardSlotFromPayload(payload);
+    if (!yardSlot) return null;
+    const field = resolveYardFacilityFieldMeters(yardSlot.slotId, areas, {
+      subIndex: yardSlot.subIndex,
+    });
+    if (!field) return null;
+    return { xM: field.xM, yM: field.yM, areaId: field.area.id };
+  }
+
   function resolveAreaIdForVehicle(
     vehicleId: string,
     xM: number,
     yM: number,
     payload?: Record<string, unknown>,
   ): string | null {
-    const key = posKey(xM, yM);
     const preferYard = isYardVehiclePayload(payload);
+
+    if (preferYard && payload) {
+      const yardPlacement = resolveYardFacilityPlacement(areas, payload);
+      if (yardPlacement) {
+        const slotKey = parseYardSlotIdFromPayload(payload) ?? 'yard';
+        placementCache.set(vehicleId, { posKey: `yard:${slotKey}`, areaId: yardPlacement.area.id });
+        return yardPlacement.area.id;
+      }
+    }
+
+    const key = posKey(xM, yM);
     const cacheKey = preferYard ? `${key}|yard` : key;
     const cached = placementCache.get(vehicleId);
     if (cached?.posKey === cacheKey) return cached.areaId;
@@ -209,35 +376,29 @@ export function createMapMqttIngestPipeline(
   function ingestFacilityLive(topic: string, payloadObj: Record<string, unknown>) {
     const payloadStr = JSON.stringify(payloadObj);
 
-    // 內建設施 MQTT：syncdrive/{entityId}（例如 syncdrive/Gate/142）
     if (topic.startsWith('syncdrive/')) {
       const entityId = topic.slice('syncdrive/'.length);
-      for (const area of areas) {
-        for (const f of area.facilities) {
-          if (!facilityMatchesEntity(f, entityId)) continue;
-          const eid = getMqttEntityId(f);
-          const prev = liveBase[eid];
-          livePatches.set(eid, {
-            entityId: eid,
-            entry: mergePayloadIntoLive(prev, topic, payloadStr),
-          });
-        }
+      const targets = lookupIndexedFacilities(facilityIndex, entityId, facilityMatchesEntity);
+      for (const { eid } of targets) {
+        const prev = liveBase[eid];
+        livePatches.set(eid, {
+          entityId: eid,
+          entry: mergePayloadIntoLive(prev, topic, payloadStr),
+        });
       }
       return;
     }
 
-    for (const area of areas) {
-      const pattern = area.mqtt?.topic?.trim();
-      if (!pattern || !topicMatchesArea(pattern, topic)) continue;
+    for (const { area, pattern, facilities } of facilityIndex.areaPatterns) {
+      if (!topicMatchesArea(pattern, topic)) continue;
       const entityId = entityIdFromTopic(topic, pattern);
       if (!entityId) continue;
 
       const pos = readVehicleMetersFromPayload(payloadObj, area.mqtt);
       if (!pos) continue;
 
-      for (const f of area.facilities) {
-        if (!facilityMatchesEntity(f, entityId)) continue;
-        const eid = getMqttEntityId(f);
+      for (const { facility, eid } of facilities) {
+        if (!facilityMatchesEntity(facility, entityId)) continue;
         const prev = liveBase[eid];
         livePatches.set(eid, {
           entityId: eid,
@@ -254,27 +415,47 @@ export function createMapMqttIngestPipeline(
     if (!topic.includes('/operation/')) return;
     const vehicleId = resolveVehicleId(topic, payloadObj);
     if (!vehicleId) return;
+    if (operationByVehicle.get(vehicleId) === payloadObj) return;
     operationByVehicle.set(vehicleId, payloadObj);
+    mergeCache.delete(vehicleId);
+
+    const yardSnap = yardCoordsFromPayload(payloadObj);
+    if (yardSnap && isYardVehiclePayload(payloadObj)) {
+      const merged = mergeOperationFieldsCached(vehicleId, {}, payloadObj);
+      pendingVehicles.set(vehicleId, {
+        vehicleId,
+        topic,
+        payload: merged,
+        xM: yardSnap.xM,
+        yM: yardSnap.yM,
+        visualKey: vehicleVisualKey(merged),
+        updatedAt: Date.now(),
+      });
+    }
 
     const pending = pendingVehicles.get(vehicleId);
     if (pending) {
-      const merged = mergeOperationFields(pending.payload, payloadObj);
+      const merged = mergeOperationFieldsCached(vehicleId, pending.payload, payloadObj);
+      const snap = yardCoordsFromPayload(merged);
       pendingVehicles.set(vehicleId, {
         ...pending,
         payload: merged,
+        xM: snap?.xM ?? pending.xM,
+        yM: snap?.yM ?? pending.yM,
         visualKey: vehicleVisualKey(merged),
       });
     }
 
     const emitted = emittedVehicles.get(vehicleId);
     if (emitted) {
-      const merged = mergeOperationFields(emitted.payload ?? {}, payloadObj);
+      const merged = mergeOperationFieldsCached(vehicleId, emitted.payload ?? {}, payloadObj);
+      const snap = yardCoordsFromPayload(merged);
       pendingVehicles.set(vehicleId, {
         vehicleId,
         topic: emitted.topic,
         payload: merged,
-        xM: emitted.xM,
-        yM: emitted.yM,
+        xM: snap?.xM ?? emitted.xM,
+        yM: snap?.yM ?? emitted.yM,
         visualKey: vehicleVisualKey(merged),
         updatedAt: Date.now(),
       });
@@ -306,7 +487,21 @@ export function createMapMqttIngestPipeline(
     if (!pos) return;
 
     const operation = operationByVehicle.get(vehicleId);
-    const mergedPayload = mergeOperationFields(payloadObj, operation);
+    const mergedPayload = mergeOperationFieldsCached(vehicleId, payloadObj, operation);
+    const visualKey = vehicleVisualKey(mergedPayload);
+    const pendingSimMs = readSimElapsedMs(mergedPayload);
+
+    const emitted = emittedVehicles.get(vehicleId);
+    if (
+      emitted &&
+      emitted.xM === pos.x &&
+      emitted.yM === pos.y &&
+      emitted.payload &&
+      vehicleVisualKey(emitted.payload) === visualKey &&
+      readSimElapsedMs(emitted.payload) === pendingSimMs
+    ) {
+      return;
+    }
 
     pendingVehicles.set(vehicleId, {
       vehicleId,
@@ -314,22 +509,55 @@ export function createMapMqttIngestPipeline(
       payload: mergedPayload,
       xM: pos.x,
       yM: pos.y,
-      visualKey: vehicleVisualKey(mergedPayload),
+      visualKey,
       updatedAt: Date.now(),
     });
   }
 
+  /** VTMS 由 VehicleFleetMqttHub 單點訂閱；圖台每 tick 讀 Map，不再走 socket.onAny */
+  function ingestVtmsFromFleetHub(
+    telemetry: ReadonlyMap<string, Record<string, unknown>>,
+    operation: ReadonlyMap<string, Record<string, unknown>>,
+  ) {
+    if (areas.length === 0) return;
+
+    let touched = false;
+    const codes = new Set<string>();
+    for (const code of telemetry.keys()) codes.add(code);
+    for (const code of operation.keys()) codes.add(code);
+    if (codes.size === 0) return;
+
+    for (const vehicleId of codes) {
+      const op = operation.get(vehicleId);
+      if (op) {
+        ingestOperation(`v1/vtms/${vehicleId}/operation/update`, op);
+        touched = true;
+      }
+      const tel = telemetry.get(vehicleId);
+      if (tel) {
+        ingestVehicle(`v1/vtms/${vehicleId}/telemetry/update`, tel);
+        touched = true;
+      }
+    }
+
+    if (touched) scheduleFlush();
+  }
+
   function ingestLive(topic: string, payloadObj: Record<string, unknown>) {
+    if (isVtmsVehicleStreamTopic(topic)) return;
+
     ingestFacilityLive(topic, payloadObj);
     if (topic.includes('/operation/')) {
       ingestOperation(topic, payloadObj);
-    } else {
+    } else if (topic.includes('/telemetry/')) {
       ingestVehicle(topic, payloadObj);
     }
     scheduleFlush();
   }
 
   function ingest(topic: string, payloadObj: Record<string, unknown>) {
+    if (topic.includes('/health/')) return;
+    if (isVtmsVehicleStreamTopic(topic)) return;
     if (areas.length === 0) {
       pendingIngest.push({ topic, payloadObj });
       if (pendingIngest.length > 500) pendingIngest.shift();
@@ -349,27 +577,36 @@ export function createMapMqttIngestPipeline(
       next.delete(vehicleId);
     }
     for (const pending of pendingVehicles.values()) {
+      let xM = pending.xM;
+      let yM = pending.yM;
+      const yardSnap = yardCoordsFromPayload(pending.payload);
+      if (yardSnap && isYardVehiclePayload(pending.payload)) {
+        xM = yardSnap.xM;
+        yM = yardSnap.yM;
+      }
+
       const areaId = resolveAreaIdForVehicle(
         pending.vehicleId,
-        pending.xM,
-        pending.yM,
+        xM,
+        yM,
         pending.payload,
       );
       if (!areaId) {
-        if (isYardVehiclePayload(pending.payload)) {
-          next.delete(pending.vehicleId);
-        }
+        // 定位失敗時保留上一帧，勿因整備 MQTT 標記而刪除載具
         continue;
       }
 
       const prev = next.get(pending.vehicleId);
+      const prevSimMs = prev?.payload ? readSimElapsedMs(prev.payload) : undefined;
+      const pendingSimMs = readSimElapsedMs(pending.payload);
       if (
         prev &&
         prev.areaId === areaId &&
         prev.xM === pending.xM &&
         prev.yM === pending.yM &&
         prev.payload &&
-        vehicleVisualKey(prev.payload) === pending.visualKey
+        vehicleVisualKey(prev.payload) === pending.visualKey &&
+        prevSimMs === pendingSimMs
       ) {
         continue;
       }
@@ -377,8 +614,8 @@ export function createMapMqttIngestPipeline(
       next.set(pending.vehicleId, {
         areaId,
         vehicleId: pending.vehicleId,
-        xM: pending.xM,
-        yM: pending.yM,
+        xM,
+        yM,
         payload: pending.payload,
         topic: pending.topic,
         updatedAt: pending.updatedAt,
@@ -423,6 +660,8 @@ export function createMapMqttIngestPipeline(
     onFlush({
       liveById: nextLive,
       areaVehicles: nextVehicles,
+      liveChanged: hasLivePatches,
+      vehiclesChanged,
     });
   }
 
@@ -430,6 +669,7 @@ export function createMapMqttIngestPipeline(
     setAreas(nextAreas: MapAreaObject[]) {
       areas = nextAreas;
       trackNetwork = buildTrackNetwork(nextAreas);
+      facilityIndex = buildFacilityIndex(nextAreas);
       placementCache.clear();
 
       if (areas.length > 0 && pendingIngest.length > 0) {
@@ -440,7 +680,11 @@ export function createMapMqttIngestPipeline(
       } else if (areas.length > 0 && emittedVehicles.size > 0) {
         for (const vehicle of emittedVehicles.values()) {
           const operation = operationByVehicle.get(vehicle.vehicleId);
-          const merged = mergeOperationFields(vehicle.payload ?? {}, operation);
+          const merged = mergeOperationFieldsCached(
+            vehicle.vehicleId,
+            vehicle.payload ?? {},
+            operation,
+          );
           pendingVehicles.set(vehicle.vehicleId, {
             vehicleId: vehicle.vehicleId,
             topic: vehicle.topic,
@@ -455,26 +699,12 @@ export function createMapMqttIngestPipeline(
       }
     },
     ingest,
+    ingestVtmsFromFleetHub,
     reset() {
-      if (rafId !== 0) {
-        cancelAnimationFrame(rafId);
-        rafId = 0;
-      }
-      liveBase = {};
-      livePatches.clear();
-      pendingVehicles.clear();
-      pendingVehicleRemovals.clear();
-      operationByVehicle.clear();
-      placementCache.clear();
-      emittedVehicles.clear();
-      lastAreaVehicles = [];
-      pendingIngest.length = 0;
-      /** 保留 areas，重建 trackNetwork（否則 pause→start 後 MQTT 無法再定位） */
-      trackNetwork = areas.length > 0 ? buildTrackNetwork(areas) : { segments: [] };
+      clearAllState();
     },
     dispose() {
-      if (rafId !== 0) cancelAnimationFrame(rafId);
-      rafId = 0;
+      clearAllState();
     },
   };
 }

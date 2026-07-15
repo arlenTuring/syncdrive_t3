@@ -49,7 +49,7 @@ describe('MqttService', () => {
       order_id: '260624-D1401',
       trip_code: 'D1401',
       current_leg: {
-        target_station_id: 'T3',
+        target_station_id: 'station_3',
         distance_to_target_m: 120,
         eta_seconds: 42,
       },

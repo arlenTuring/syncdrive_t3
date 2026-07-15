@@ -17,11 +17,13 @@ cd "$ROOT"
 FORCE=false
 SEED=false
 AUTO_VTMS=false
+FRONTEND_DEV=false
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=true ;;
     --seed)  SEED=true ;;
     --demo)  AUTO_VTMS=true ;;
+    --dev)   FRONTEND_DEV=true ;;
   esac
 done
 
@@ -361,9 +363,16 @@ elif $FORCE || is_running "$FRONTEND_PID_FILE" || port_listen 5173; then
   sleep 1
 fi
 if $need_frontend; then
-  cyan "==> 啟動 Frontend (http://localhost:5173)"
   [[ -d "$ROOT/frontend/node_modules" ]] || (cd "$ROOT/frontend" && npm install)
-  start_process "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG" "$ROOT/frontend" "npm run dev"
+  if $FRONTEND_DEV; then
+    cyan "==> 啟動 Frontend 開發模式 (http://localhost:5173)"
+    start_process "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG" "$ROOT/frontend" "npm run dev"
+  else
+    cyan "==> 建置 Frontend (production)…"
+    (cd "$ROOT/frontend" && npm run build)
+    cyan "==> 啟動 Frontend 正式版 (http://localhost:5173)"
+    start_process "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG" "$ROOT/frontend" "npm run preview"
+  fi
 fi
 echo ""
 
@@ -376,7 +385,7 @@ green "=========================================="
 green " 全部服務已啟動"
 green "=========================================="
 echo ""
-echo "  儀表板        http://localhost:5173"
+echo "  儀表板        http://localhost:5173  (production build；熱更新請 dev-start.sh --dev)"
 echo "  後端 API      http://localhost:3000"
 echo "  Swagger       http://localhost:3000/api"
 echo "  資料庫 GUI    http://localhost:8080"

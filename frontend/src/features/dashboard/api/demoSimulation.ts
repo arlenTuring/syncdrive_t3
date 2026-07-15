@@ -11,9 +11,13 @@ export type DemoSimulationTransport = {
   running: boolean;
   transportPaused: boolean;
   speedMultiplier: number;
+  /** 已提交之模擬經過毫秒（tick 錨點，100ms 格） */
   virtualElapsedMs: number;
+  /** 上次 ack 牆鐘時刻；前端可外推：anchor + (now - lastAckWallMs) × speed */
+  lastAckWallMs?: number;
   stepNonce: number;
   tickMs: number;
+  simStartMs?: number | null;
   lastSimulatedEvent?: SimulatedFaultEvent | null;
 };
 

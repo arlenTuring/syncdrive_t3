@@ -47,7 +47,12 @@ export class DatasourceController {
   })
   async runQuery(@Body() body: { query: string; limit?: number }) {
     if (!body?.query) throw new BadRequestException('query is required');
-    return this.datasourceService.runQuery(body.query, body.limit ?? 200);
+    try {
+      return await this.datasourceService.runQuery(body.query, body.limit ?? 200);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(`SQL 查詢失敗：${msg}`);
+    }
   }
 
   /** 寫入事件中心／班次中心示範資料（可重複執行） */

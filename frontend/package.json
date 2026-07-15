@@ -7,7 +7,7 @@
     "dev": "vite --port 5173 --strictPort --logLevel warn",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "vite preview --port 5173 --strictPort --host",
     "generate:vtms-map": "node scripts/generate-vtms-main-loop-map.mjs",
     "generate:t3-map": "node scripts/generate-t3-rail-yard-map.mjs",
     "migrate:maps": "node scripts/migrate-map-dual-coords.mjs",

@@ -131,6 +131,28 @@ export interface MapFileAreaEntry {
   facilities: MapFileFacilityEntry[]
 }
 
+/** 路線群組：第一層目錄，內含多條營運路線 */
+export interface MapRouteGroup {
+  groupId: string
+  displayName: string
+  routeIds: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 地圖內營運路線：名稱由使用者定義，站序為 DockingPoint stationId */
+export interface MapPlannedRoute {
+  routeId: string
+  displayName: string
+  stationIds: string[]
+  /** 走完路線平均時間（秒）；不含月台門停靠 */
+  avgTravelTimeSeconds?: number | null
+  /** 走完路線最快時間（秒）；不含月台門停靠 */
+  minTravelTimeSeconds?: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface MapFileV2 {
   schemaVersion: typeof MAP_FILE_SCHEMA_VERSION
   mapId: string
@@ -145,6 +167,8 @@ export interface MapFileV2 {
   /** 畫布可視原點對應的內容座標（自上方／左側裁切後 > 0） */
   pixelOrigin?: { x: number; y: number }
   areas: MapFileAreaEntry[]
+  routeGroups?: MapRouteGroup[]
+  routes?: MapPlannedRoute[]
 }
 
 /** @deprecated v1 格式；匯入時自動升級為 v2 */

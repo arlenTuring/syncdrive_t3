@@ -18,6 +18,23 @@ import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import {
+  ExecutionStatusKey,
+  ShiftRecordListItem,
+  ShiftTab,
+  toShiftRecordListItem,
+} from './order-list.util';
+
+export type ListOrdersQuery = {
+  tab?: ShiftTab;
+  keyword?: string;
+  execution_status?: ExecutionStatusKey | 'all';
+  vehicle_code?: string;
+  planned_start_from?: string;
+  planned_start_to?: string;
+  page?: number;
+  page_size?: number;
+};
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PROCESSING],
@@ -153,6 +170,139 @@ export class OrderService {
       throw new NotFoundException(`Order with id '${id}' not found`);
     }
     return order;
+  }
+
+  async listOrders(query: ListOrdersQuery): Promise<{
+    items: ShiftRecordListItem[];
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const page = Math.max(1, Number(query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(query.page_size) || 20));
+    const tab: ShiftTab = query.tab === 'maintenance' ? 'maintenance' : 'mainline';
+
+    const qb = this.orderRepository.createQueryBuilder('o');
+
+    if (tab === 'maintenance') {
+      qb.andWhere(`o.line_kind = 'MAINTENANCE'`);
+    } else {
+      qb.andWhere(
+        `(o.line_kind = 'MAINLINE' OR (COALESCE(o.line_kind, '') <> 'MAINTENANCE' AND o.trip_code ~ '^[DU][0-9]{4}$'))`,
+      );
+    }
+
+    const vehicle = String(query.vehicle_code ?? '').trim().toUpperCase();
+    if (vehicle) {
+      qb.andWhere('o.vehicle_code = :vehicle', { vehicle });
+    }
+
+    const keyword = String(query.keyword ?? '').trim();
+    if (keyword) {
+      qb.andWhere(
+        `(
+          o.order_id ILIKE :kw
+          OR o.trip_code ILIKE :kw
+          OR o.vehicle_code ILIKE :kw
+          OR COALESCE(o.next_station, '') ILIKE :kw
+          OR COALESCE(o.maint_station, '') ILIKE :kw
+          OR COALESCE(o.payload->>'yard_slot_id', '') ILIKE :kw
+          OR (
+            CASE
+              WHEN o.trip_code ~ '^[Uu]' THEN 'S2W→T3→N2W'
+              WHEN o.trip_code ~ '^[Dd]' THEN 'N2W→T3→S2W'
+              ELSE ''
+            END
+          ) ILIKE :kw
+          OR (
+            o.line_kind = 'MAINTENANCE'
+            AND CONCAT(
+              'S2W→',
+              COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), o.next_station, '')
+            ) ILIKE :kw
+          )
+          OR EXISTS (
+            SELECT 1 FROM operation_route_stations rs
+            WHERE rs.route_id = o.route_id AND rs.station_id ILIKE :kw
+          )
+        )`,
+        { kw: `%${keyword}%` },
+      );
+    }
+
+    if (query.planned_start_from) {
+      qb.andWhere('o.planned_start >= :from', { from: query.planned_start_from });
+    }
+    if (query.planned_start_to) {
+      qb.andWhere('o.planned_start <= :to', { to: query.planned_start_to });
+    }
+
+    const execStatus = query.execution_status;
+    if (execStatus && execStatus !== 'all') {
+      switch (execStatus) {
+        case 'pending':
+          qb.andWhere('o.status = :st', { st: OrderStatus.PENDING });
+          break;
+        case 'running':
+          qb.andWhere(
+            'o.status = :st AND COALESCE(o.delay_minutes, 0) = 0',
+            { st: OrderStatus.PROCESSING },
+          );
+          break;
+        case 'delayed':
+          qb.andWhere(
+            'o.status = :st AND COALESCE(o.delay_minutes, 0) > 0',
+            { st: OrderStatus.PROCESSING },
+          );
+          break;
+        case 'faulted':
+          qb.andWhere('o.status = :st', { st: OrderStatus.FAULTED });
+          break;
+        case 'completed':
+          qb.andWhere('o.status = :st', { st: OrderStatus.END });
+          break;
+        default:
+          break;
+      }
+    }
+
+    qb.orderBy('o.planned_start', 'DESC', 'NULLS LAST').addOrderBy('o.created_at', 'DESC');
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+
+    return {
+      items: rows.map(toShiftRecordListItem),
+      total,
+      page,
+      page_size: pageSize,
+    };
+  }
+
+  async getOrderDetail(id: string) {
+    const order = await this.getOrderById(id);
+    const actions = await this.actionStateRepository.find({
+      where: { orderId: id },
+      order: { id: 'ASC' },
+    });
+    const item = toShiftRecordListItem(order);
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    return {
+      ...item,
+      actions: actions.map((a) => ({
+        action_id: a.id,
+        station_id: a.stationId,
+        action_type: a.actionType,
+        action_status: a.actionStatus,
+        node_id: a.nodeId ?? null,
+      })),
+      task_group: Array.isArray(payload.task_group) ? payload.task_group : [],
+      vehicle_phase: payload.vehicle_phase ?? null,
+      current_leg: payload.current_leg ?? null,
+    };
   }
 
   /** CRITICAL 安全事件或 vehicle_phase=FAULTED 時，將進行中訂單標記為故障 */
@@ -392,14 +542,22 @@ export class OrderService {
       orderId,
       order.routeId ?? routeId,
     );
+    const effectiveRouteId = order.routeId ?? routeId ?? null;
+    const routeStations = effectiveRouteId
+      ? await this.orderRouteService.getRouteStations(effectiveRouteId)
+      : [];
+    const midStationId = routeStations.length >= 2
+      ? routeStations[Math.min(1, routeStations.length - 1)].stationId
+      : null;
     const routeProgress = this.computeRouteProgressFromLeg(
       legTarget,
       etaSec,
       maxEta,
       computedProgress,
+      midStationId,
     );
-    const segmentIndex = legTarget && order.routeId
-      ? await this.resolveSegmentIndex(order.routeId ?? routeId, legTarget)
+    const segmentIndex = legTarget && midStationId
+      ? (legTarget === midStationId ? 0 : 1)
       : routeProgress < 50 ? 0 : 1;
     const segmentRemainPct = maxEta > 0 && etaSec != null
       ? Math.round((etaSec / maxEta) * 100)
@@ -779,10 +937,11 @@ export class OrderService {
     etaSec: number | null,
     maxEta: number,
     fallback: number,
+    midStationId: string | null,
   ): number {
     if (!legTarget || etaSec == null || maxEta <= 0) return fallback;
     const legFraction = Math.max(0, Math.min(1, (maxEta - etaSec) / maxEta));
-    if (legTarget === 'T3') {
+    if (midStationId && legTarget === midStationId) {
       if (etaSec === 0) return 50;
       return Math.round(legFraction * 50);
     }
@@ -794,10 +953,10 @@ export class OrderService {
     routeId: string | null | undefined,
     legTarget: string,
   ): Promise<number> {
-    if (!routeId) return legTarget === 'T3' ? 0 : 1;
+    if (!routeId) return 0;
     const stations = await this.orderRouteService.getRouteStations(routeId);
     if (stations.length < 2) return 0;
-    const mid = stations.find((s) => s.stationId === 'T3') ?? stations[1];
+    const mid = stations[Math.min(1, stations.length - 1)];
     return legTarget === mid.stationId ? 0 : 1;
   }
 

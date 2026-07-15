@@ -20,23 +20,28 @@ export function findRefFieldOverlaps(
   network: TrackNetwork,
   epsilonM2 = 1e-6,
 ): RefFieldOverlapReport[] {
-  const reports: RefFieldOverlapReport[] = [];
-  const segments = network.segments;
+  const reports: RefFieldOverlapReport[] = []
+  const uniqueByTrackId = new Map<string, TrackNetworkSegment>()
+  for (const seg of network.segments) {
+    if (!uniqueByTrackId.has(seg.trackId)) uniqueByTrackId.set(seg.trackId, seg)
+  }
+  const segments = [...uniqueByTrackId.values()]
 
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
-      const a = segments[i]!;
-      const b = segments[j]!;
-      const area = interiorOverlapAreaM2(a.bounds, b.bounds);
+      const a = segments[i]!
+      const b = segments[j]!
+      if (a.trackId === b.trackId) continue
+      const area = interiorOverlapAreaM2(a.bounds, b.bounds)
       if (area > epsilonM2) {
         reports.push({
           segmentAId: a.trackId,
           segmentBId: b.trackId,
           overlapAreaM2: area,
-        });
+        })
       }
     }
   }
 
-  return reports;
+  return reports
 }

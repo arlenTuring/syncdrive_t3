@@ -1,4 +1,5 @@
 import type { VariableMap } from '../VariableContext';
+import { maintTypeLabelColor, maintTypeLabelFromSlot } from './maintenanceTaskModel';
 
 /** 正線班次：D/U + 4 位時分（營運任務狀態協議 §三） */
 const SHIFT_TRIP_CODE_RE = /^[DU]\d{4}$/;
@@ -6,7 +7,7 @@ const SHIFT_TRIP_CODE_RE = /^[DU]\d{4}$/;
 export const ORDER_PRIORITY_LINE = 50;
 export const ORDER_PRIORITY_MAINT = 40;
 
-const ACTIVE_MAINLINE_STATUS = new Set(['PROCESSING']);
+const ACTIVE_MAINLINE_STATUS = new Set(['PENDING', 'PROCESSING']);
 const ACTIVE_MAINT_STATUS = new Set(['PENDING', 'PROCESSING']);
 
 export type VehicleMonitorBadgeKind = 'mainline' | 'maintenance' | 'none';
@@ -54,6 +55,8 @@ function mergeOperationContext(
     badge_label: variables.badge_label,
     badge_kind: variables.badge_kind,
     vehicle_phase: variables.vehicle_phase,
+    yard_slot_id: variables.yard_slot_id,
+    segment_label: variables.segment_label,
   };
   if (!operation) return base;
   for (const [key, value] of Object.entries(operation)) {
@@ -82,18 +85,35 @@ function isMaintenanceOrder(ctx: Record<string, unknown>): boolean {
   return pri === ORDER_PRIORITY_MAINT;
 }
 
-const EMPTY_BADGE: VehicleMonitorBadge = {
-  label: '',
-  bg: '',
-  color: '',
-  kind: 'none',
-};
+const MAINT_YARD_SLOT_RE = /^[EPWHMP]\d/i;
+
+function inferMaintLabelFromSlot(ctx: Record<string, unknown>, variables: VariableMap): string {
+  const slot =
+    readStr(ctx, 'yard_slot_id')
+    || readStr(variables, 'yard_slot_id')
+    || readStr(variables, 'segment_label')
+    || readStr(variables, 'next_station');
+  if (!slot || !MAINT_YARD_SLOT_RE.test(slot)) return '';
+  return maintTypeLabelFromSlot(slot);
+}
+
+function maintenanceBadgeFromLabel(
+  ctx: Record<string, unknown>,
+  label: string,
+): VehicleMonitorBadge {
+  return {
+    label,
+    bg: readStr(ctx, 'maint_type_bg') || readStr(ctx, 'trip_badge_bg') || '#422006',
+    color: readStr(ctx, 'maint_type_color') || readStr(ctx, 'trip_badge_color') || maintTypeLabelColor(label),
+    kind: 'maintenance',
+  };
+}
 
 /**
  * 車輛狀態卡右上角：優先 operation/update（營運任務協議），SQL 變數為後備。
  * 正線 → trip_code；整備 → maint_type_label（來自訂單／任務資料，不在此寫死文案）。
  */
-const ACTIVE_MAINLINE_PHASES = new Set(['TRANSITING', 'DWELLING', 'PRE_DEPARTURE']);
+const ACTIVE_MAINLINE_PHASES = new Set(['TRANSITING', 'DWELLING', 'PRE_DEPARTURE', 'AWAITING_DEPARTURE']);
 
 export function resolveVehicleMonitorBadge(
   variables: VariableMap,
@@ -128,12 +148,14 @@ export function resolveVehicleMonitorBadge(
   if (isMaintenanceOrder(ctx) && ACTIVE_MAINT_STATUS.has(status)) {
     const label = readStr(ctx, 'maint_type_label') || readStr(ctx, 'badge_label');
     if (label && !isShiftTripCode(label)) {
-      return {
-        label,
-        bg: readStr(ctx, 'maint_type_bg') || readStr(ctx, 'trip_badge_bg') || '#422006',
-        color: readStr(ctx, 'maint_type_color') || readStr(ctx, 'trip_badge_color') || '#fdba74',
-        kind: 'maintenance',
-      };
+      return maintenanceBadgeFromLabel(ctx, label);
+    }
+  }
+
+  const maintLabel = readStr(ctx, 'maint_type_label');
+  if (maintLabel && !isShiftTripCode(maintLabel)) {
+    if (phase === 'CHARGING' || phase === 'YARD_DWELLING' || phase === 'DOCKING') {
+      return maintenanceBadgeFromLabel(ctx, maintLabel);
     }
   }
 
@@ -149,14 +171,21 @@ export function resolveVehicleMonitorBadge(
       };
     }
     if (kind === 'maintenance' && !isShiftTripCode(fallback)) {
-      return {
-        label: fallback,
-        bg: readStr(ctx, 'maint_type_bg') || '#422006',
-        color: readStr(ctx, 'maint_type_color') || '#fdba74',
-        kind: 'maintenance',
-      };
+      return maintenanceBadgeFromLabel(ctx, fallback);
     }
   }
+
+  const inferred = inferMaintLabelFromSlot(ctx, variables);
+  if (inferred) {
+    return maintenanceBadgeFromLabel(ctx, inferred);
+  }
+
+  const EMPTY_BADGE: VehicleMonitorBadge = {
+    label: '',
+    bg: '',
+    color: '',
+    kind: 'none',
+  };
 
   return EMPTY_BADGE;
 }

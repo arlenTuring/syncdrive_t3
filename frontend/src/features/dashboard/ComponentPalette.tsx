@@ -267,8 +267,6 @@ export function ComponentPalette({
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        /** 避開右下角浮動模式切換鈕（Layers） */
-        paddingRight: 64,
       }}
     >
       {/* 用途篩選 */}

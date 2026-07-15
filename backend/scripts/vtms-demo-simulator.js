@@ -11,7 +11,7 @@ const VEHICLES = Array.from({ length: 11 }, (_, i) =>
   `PMS-${String(i + 1).padStart(2, '0')}`,
 );
 
-const TRIP_SEGMENTS = ['S2W', 'T3', 'N2W', 'D01', 'D12', 'D22', 'D33'];
+const TRIP_SEGMENTS = ['station_6', 'station_4', 'station_1', 'D01', 'D12', 'D22', 'D33'];
 
 /** 作動行為輪播（對應 dashboard operation_action / 圖示庫） */
 const OPERATION_ACTIONS = [

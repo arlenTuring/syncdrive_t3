@@ -26,7 +26,7 @@ import {
   type DualCanvasLane,
 } from './utils/dualCanvas';
 import { migrateChildWidgetGenerics } from './utils/migrateWidgetGenerics';
-import { patchDashboardRuntimeFixes } from './utils/migrateVehicleMonitorProtocol';
+import { needsDashboardRuntimePatch, patchDashboardRuntimeFixes } from './utils/migrateVehicleMonitorProtocol';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -87,7 +87,7 @@ function migrateCanvasElement(el: CanvasElementProps): CanvasElementProps {
   return next;
 }
 
-const DEMO_LAYOUT_VERSION = 113;
+const DEMO_LAYOUT_VERSION = 114;
 
 function freshDemoPlane(): DashboardPlane {
   return { ...cloneDemoPlane(), demoLayoutVersion: DEMO_LAYOUT_VERSION } as DashboardPlane;
@@ -717,7 +717,19 @@ function migratePlane(plane: DashboardPlane): DashboardPlane {
     next = patchDashboardRuntimeFixes(next);
     next = { ...next, demoLayoutVersion: DEMO_LAYOUT_VERSION } as DashboardPlane;
   }
-  return patchDashboardRuntimeFixes(next);
+  if (needsDashboardRuntimePatch(next)) {
+    next = patchDashboardRuntimeFixes(next);
+  }
+  return next;
+}
+
+let initialPlanesCache: DashboardPlane[] | null = null;
+
+function getInitialPlanes(): DashboardPlane[] {
+  if (!initialPlanesCache) {
+    initialPlanesCache = loadPlanes();
+  }
+  return initialPlanesCache;
 }
 
 function loadPlanes(): DashboardPlane[] {
@@ -745,8 +757,8 @@ function savePlanes(planes: DashboardPlane[]) {
 }
 
 export function useDashboardEditor() {
-  const [planes, setPlanes] = useState<DashboardPlane[]>(loadPlanes);
-  const [activePlaneId, setActivePlaneId] = useState<string | null>(() => loadPlanes()[0]?.id ?? null);
+  const [planes, setPlanes] = useState<DashboardPlane[]>(() => getInitialPlanes());
+  const [activePlaneId, setActivePlaneId] = useState<string | null>(() => getInitialPlanes()[0]?.id ?? null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);

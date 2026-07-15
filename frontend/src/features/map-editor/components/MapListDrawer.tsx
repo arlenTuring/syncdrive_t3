@@ -1,14 +1,17 @@
-import { Building2, ChevronLeft, MapPin, Radio, Zap } from 'lucide-react'
+import { Building2, ChevronLeft, GitBranch, MapPin, Radio, Zap } from 'lucide-react'
 import { useMemo } from 'react'
 import type { MapAreaObject } from '../types/area'
+import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import { RoutePlanningPanel } from './RoutePlanningPanel'
+import type { RouteGroupDraft } from './RouteGroupEditorView'
 import {
   collectDockingPointEntries,
   collectEquipmentEntries,
   collectFacilityEntries,
   type FacilityListEntry,
 } from '../utils/facilityListEntries'
-
-export type MapListDrawerTab = 'docking' | 'facility' | 'equipment' | null
+import type { RoutePlanningDraft } from '../utils/routePlanning'
+export type MapListDrawerTab = 'docking' | 'facility' | 'equipment' | 'routes' | null
 
 type Props = {
   areas: MapAreaObject[]
@@ -18,6 +21,32 @@ type Props = {
   selectedFacilityId: string | null
   onSelectEntry: (areaId: string, facilityId: string) => void
   onEntryDoubleClick: (areaId: string, facilityId: string) => void
+  mapRoutes: MapPlannedRoute[]
+  mapRouteGroups: MapRouteGroup[]
+  mapEditMode: boolean
+  routePlanningDraft: RoutePlanningDraft | null
+  routeGroupDraft: RouteGroupDraft | null
+  visibleRouteIds: ReadonlySet<string>
+  routePickMode: boolean
+  onStartNewRoute: (groupId: string | null) => void
+  onStartNewGroup: () => void
+  onEditRoute: (routeId: string) => void
+  onEditGroup: (groupId: string) => void
+  onDeleteGroup: (groupId: string) => void
+  onToggleRouteVisibility: (routeId: string) => void
+  onToggleGroupRouteVisibility: (routeIds: string[]) => void
+  onCancelRouteDraft: () => void
+  onCancelGroupDraft: () => void
+  onSaveRouteDraft: () => void
+  onSaveGroupDraft: () => void
+  onDeleteRoute: (routeId: string) => void
+  onDraftRouteNameChange: (name: string) => void
+  onDraftRouteAvgTravelTimeChange: (seconds: number | null) => void
+  onDraftRouteMinTravelTimeChange: (seconds: number | null) => void
+  onGroupDraftNameChange: (name: string) => void
+  onRemoveRouteStationAt: (index: number) => void
+  onMoveRouteStation: (from: number, to: number) => void
+  onAppendRouteStation: (stationId: string) => void
 }
 
 function formatRef(entry: FacilityListEntry): string {
@@ -128,6 +157,10 @@ const TAB_BUTTON_CLASS = {
     active: 'rounded-r-md border-violet-500/60 bg-violet-950/90 text-violet-200',
     idle: 'rounded-r-md border-zinc-700/80 bg-zinc-900/95 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200',
   },
+  routes: {
+    active: 'rounded-r-md border-amber-500/60 bg-amber-950/90 text-amber-200',
+    idle: 'rounded-r-md border-zinc-700/80 bg-zinc-900/95 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200',
+  },
 } as const
 
 export function MapListDrawer({
@@ -138,6 +171,32 @@ export function MapListDrawer({
   selectedFacilityId,
   onSelectEntry,
   onEntryDoubleClick,
+  mapRoutes,
+  mapRouteGroups,
+  mapEditMode,
+  routePlanningDraft,
+  routeGroupDraft,
+  visibleRouteIds,
+  routePickMode,
+  onStartNewRoute,
+  onStartNewGroup,
+  onEditRoute,
+  onEditGroup,
+  onDeleteGroup,
+  onToggleRouteVisibility,
+  onToggleGroupRouteVisibility,
+  onCancelRouteDraft,
+  onCancelGroupDraft,
+  onSaveRouteDraft,
+  onSaveGroupDraft,
+  onDeleteRoute,
+  onDraftRouteNameChange,
+  onDraftRouteAvgTravelTimeChange,
+  onDraftRouteMinTravelTimeChange,
+  onGroupDraftNameChange,
+  onRemoveRouteStationAt,
+  onMoveRouteStation,
+  onAppendRouteStation,
 }: Props) {
   const dockingEntries = useMemo(
     () => collectDockingPointEntries(areas),
@@ -158,7 +217,13 @@ export function MapListDrawer({
       ? '停靠清單'
       : openTab === 'facility'
         ? '設施清單'
-        : '設備清單'
+        : openTab === 'routes'
+          ? routePlanningDraft
+            ? routePlanningDraft.routeId
+              ? '編輯路線'
+              : '製作路線'
+            : '路線清單'
+          : '設備清單'
 
   return (
     <>
@@ -200,6 +265,18 @@ export function MapListDrawer({
             <Radio className="size-4 shrink-0" />
             <span style={{ writingMode: 'vertical-rl' }}>設備清單</span>
           </button>
+          <button
+            type="button"
+            title="路線清單"
+            onClick={() => onOpenTab(openTab === 'routes' ? null : 'routes')}
+            className={[
+              'mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+              openTab === 'routes' ? TAB_BUTTON_CLASS.routes.active : TAB_BUTTON_CLASS.routes.idle,
+            ].join(' ')}
+          >
+            <GitBranch className="size-4 shrink-0" />
+            <span style={{ writingMode: 'vertical-rl' }}>路線清單</span>
+          </button>
         </div>
 
         {panelOpen ? (
@@ -218,7 +295,37 @@ export function MapListDrawer({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {openTab === 'docking' ? (
+              {openTab === 'routes' ? (
+                <RoutePlanningPanel
+                  areas={areas}
+                  routeGroups={mapRouteGroups}
+                  routes={mapRoutes}
+                  editMode={mapEditMode}
+                  draft={routePlanningDraft}
+                  groupDraft={routeGroupDraft}
+                  visibleRouteIds={visibleRouteIds}
+                  pickMode={routePickMode}
+                  onStartNewRoute={onStartNewRoute}
+                  onStartNewGroup={onStartNewGroup}
+                  onEditRoute={onEditRoute}
+                  onEditGroup={onEditGroup}
+                  onDeleteGroup={onDeleteGroup}
+                  onToggleRouteVisibility={onToggleRouteVisibility}
+                  onToggleGroupRouteVisibility={onToggleGroupRouteVisibility}
+                  onCancelDraft={onCancelRouteDraft}
+                  onCancelGroupDraft={onCancelGroupDraft}
+                  onSaveDraft={onSaveRouteDraft}
+                  onSaveGroupDraft={onSaveGroupDraft}
+                  onDeleteRoute={onDeleteRoute}
+                  onDraftNameChange={onDraftRouteNameChange}
+                  onDraftAvgTravelTimeChange={onDraftRouteAvgTravelTimeChange}
+                  onDraftMinTravelTimeChange={onDraftRouteMinTravelTimeChange}
+                  onGroupDraftNameChange={onGroupDraftNameChange}
+                  onRemoveStationAt={onRemoveRouteStationAt}
+                  onMoveStation={onMoveRouteStation}
+                  onAppendStation={onAppendRouteStation}
+                />
+              ) : openTab === 'docking' ? (
                 <SectionBlock
                   title="停靠點"
                   entries={dockingEntries}

@@ -10,6 +10,7 @@ import {
   Undo2,
   ZoomIn,
   Component,
+  FlaskConical,
 } from 'lucide-react'
 type MapEditorToolbarProps = {
   mapEditorMode: 'view' | 'edit'
@@ -38,6 +39,10 @@ type MapEditorToolbarProps = {
   showZoomLevelBar?: boolean
   onToggleZoomLevelBar?: () => void
   zoomLevelBarToggleHint?: string
+  /** 底部測試器（斷路掃描 + MQTT 模擬） */
+  showTestDock?: boolean
+  onToggleTestDock?: () => void
+  testDockToggleHint?: string
   /** 編輯模式：裁減模式 */
   mapCanvasResizeActive?: boolean
   onToggleMapCanvasResize?: () => void
@@ -71,9 +76,12 @@ export function MapEditorToolbar({
   showAreaCenterLabels = false,
   onToggleAreaCenterLabels,
   areaCenterLabelsToggleHint,
-  showZoomLevelBar = true,
+  showZoomLevelBar = false,
   onToggleZoomLevelBar,
   zoomLevelBarToggleHint,
+  showTestDock = false,
+  onToggleTestDock,
+  testDockToggleHint,
   mapCanvasResizeActive = false,
   onToggleMapCanvasResize,
   mapCanvasResizeToggleHint,
@@ -264,6 +272,25 @@ export function MapEditorToolbar({
       </div>
 
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+        {onToggleTestDock && (
+          <button
+            type="button"
+            onClick={onToggleTestDock}
+            aria-pressed={showTestDock}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm ${
+              showTestDock
+                ? 'border-violet-600/70 bg-violet-950/60 text-violet-200'
+                : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+            }`}
+            title={testDockToggleHint ?? '顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）'}
+          >
+            <FlaskConical className="size-4 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">
+              {showTestDock ? '隱藏測試器' : '測試器'}
+            </span>
+          </button>
+        )}
+
         {onToggleZoomLevelBar && (
           <button
             type="button"
@@ -277,7 +304,7 @@ export function MapEditorToolbar({
             title={zoomLevelBarToggleHint ?? '顯示／隱藏底部圖台縮放列'}
           >
             <ZoomIn className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">縮放列</span>
+            <span className="hidden sm:inline">{showZoomLevelBar ? '隱藏縮放' : '縮放列'}</span>
           </button>
         )}
 

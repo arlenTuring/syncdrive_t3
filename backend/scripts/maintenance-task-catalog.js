@@ -7,36 +7,43 @@ const TASK_DEFS = {
   charge: {
     maint_type_label: '充電',
     maint_type_bg: '#422006',
-    maint_type_color: '#fdba74',
-    icon_bg_color: '#0284c7',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
     progress_marker_icon: 'Zap',
   },
   park: {
     maint_type_label: '臨停',
     maint_type_bg: '#27272a',
-    maint_type_color: '#a1a1aa',
-    icon_bg_color: '#64748b',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
     progress_marker_icon: 'CircleParking',
   },
   wash: {
     maint_type_label: '洗車',
     maint_type_bg: '#422006',
-    maint_type_color: '#fdba74',
-    icon_bg_color: '#0284c7',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
     progress_marker_icon: 'Droplets',
+  },
+  dispatch: {
+    maint_type_label: '調度',
+    maint_type_bg: '#422006',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
+    progress_marker_icon: 'ClipboardCheck',
   },
   maintenance: {
     maint_type_label: '整備',
     maint_type_bg: '#422006',
-    maint_type_color: '#fdba74',
-    icon_bg_color: '#0284c7',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
     progress_marker_icon: 'ClipboardCheck',
   },
   service: {
     maint_type_label: '保養',
     maint_type_bg: '#422006',
-    maint_type_color: '#fdba74',
-    icon_bg_color: '#0284c7',
+    maint_type_color: '#FD9A00',
+    icon_bg_color: '#51A2FF',
     progress_marker_icon: 'ClipboardCheck',
   },
 };
@@ -46,7 +53,7 @@ const SLOT_PREFIX_TASK = {
   E: 'charge',
   P: 'park',
   W: 'wash',
-  H: 'maintenance',
+  H: 'dispatch',
   M: 'service',
 };
 
@@ -105,8 +112,22 @@ function maintenanceTripCode(motion, meta) {
   return `S${key.slice(0, 4).toUpperCase().padEnd(4, '0')}`;
 }
 
+/** 一卡一任務：格位變更即新 order_id，舊任務由 reconcile 結束 */
+function maintenanceDemoOrderId(vehicleCode, yardSlotId) {
+  const vehicle = String(vehicleCode ?? '').trim().toUpperCase();
+  const slot = String(yardSlotId ?? '').trim().toUpperCase();
+  return slot ? `DEMO-ORD-${vehicle}-${slot}` : `DEMO-ORD-${vehicle}`;
+}
+
+/** 示範模式：整備車已在目標格（segment 0 剩餘 0%） */
+function maintenanceRouteProgress() {
+  return { segmentIndex: 0, routeProgress: 100 };
+}
+
 module.exports = {
   TASK_DEFS,
   resolveMaintenanceTaskMeta,
   maintenanceTripCode,
+  maintenanceDemoOrderId,
+  maintenanceRouteProgress,
 };

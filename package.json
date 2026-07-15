@@ -7,6 +7,10 @@
     "dev:restart": "./scripts/dev-restart.sh",
     "dev:stop": "./scripts/dev-stop.sh",
     "dev:stop:all": "./scripts/dev-stop.sh --docker",
-    "dev:cleanup": "./scripts/dev-cleanup.sh"
+    "dev:cleanup": "./scripts/dev-cleanup.sh",
+    "verify:dashboard": "node frontend/scripts/verify-dashboard-health.mjs",
+    "verify:dashboard:clean": "node scripts/clean-verify-artifacts.mjs",
+    "sync:builtin-maps": "npm run sync:builtin-maps --prefix frontend",
+    "docs": "echo '文件站啟動於 http://localhost:4000' && python3 -m http.server 4000 -d document"
   }
 }

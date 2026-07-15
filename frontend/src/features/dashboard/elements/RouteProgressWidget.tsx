@@ -1,5 +1,6 @@
 import { useWidgetData } from './useWidgetData';
 import { useMqttData } from './useMqttData';
+import { useShiftVehicleOperationMqtt } from '../context/ShiftFleetMqttContext';
 import type { RouteProgressWidget, RouteStation } from '../types';
 import {
   AlarmClock,
@@ -91,7 +92,9 @@ function DispatchTrack({
       {sortedStations.map((station) => {
         const stationPercent = ((station.value - minVal) / range) * 100;
         const isPassed = currentVal >= station.value;
-        const isTarget = station.name === nextSt;
+        const isTarget =
+          station.name === nextSt
+          || (station.stationId != null && station.stationId === nextSt);
         return (
           <div
             key={station.id}
@@ -416,7 +419,9 @@ function MaintenanceTrack({
       {sortedStations.map((station) => {
         const stationPercent = ((station.value - minVal) / range) * 100;
         const isPassed = currentVal >= station.value;
-        const isTarget = station.name === nextSt;
+        const isTarget =
+          station.name === nextSt
+          || (station.stationId != null && station.stationId === nextSt);
         return (
           <div
             key={station.id}
@@ -707,16 +712,25 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
       ? `v1/vtms/${String(variables.vehicle_code)}/operation/update`
       : undefined;
 
+  const fleetShiftPayload = useShiftVehicleOperationMqtt(
+    isShiftCardTrack && variables.vehicle_code
+      ? String(variables.vehicle_code)
+      : undefined,
+  );
+
   const mqttState = useMqttData({
-    mqttDataSourceId: widget.mqttDataSourceId ?? (shiftMqttTopic ? 'default-mqtt' : undefined),
-    mqttTopic: widget.mqttTopic ?? shiftMqttTopic,
+    mqttDataSourceId: widget.mqttDataSourceId ?? (shiftMqttTopic && !isShiftCardTrack ? 'default-mqtt' : undefined),
+    mqttTopic: isShiftCardTrack ? undefined : (widget.mqttTopic ?? shiftMqttTopic),
     mqttValuePath: widget.mqttValuePath,
   });
 
   const sqlRow = data.data[0] ?? null;
   const mqttRaw = mqttState.data as Record<string, unknown> | null;
-  const mqttPayloadRaw =
-    mqttRaw && !isWrappedMqttValue(mqttRaw) ? mqttRaw : null;
+  const mqttPayloadRaw = isShiftCardTrack
+    ? fleetShiftPayload
+    : mqttRaw && !isWrappedMqttValue(mqttRaw)
+      ? mqttRaw
+      : null;
   const mqttPayload =
     mqttPayloadRaw && mqttPayloadIsFresh(mqttPayloadRaw) ? mqttPayloadRaw : null;
 

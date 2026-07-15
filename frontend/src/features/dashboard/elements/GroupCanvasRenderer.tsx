@@ -15,7 +15,7 @@ import {
 import { DualCanvasDefaultView } from './DualCanvasDefaultView';
 import { buildTemplatePreviewRow } from '../utils/groupTemplateContext';
 import { useOperationMqttShiftOverlay } from '../hooks/useOperationMqttShiftOverlay';
-import { useShiftFleetOperationMqtt } from '../hooks/useShiftFleetOperationMqtt';
+import { useShiftFleetMqttMap } from '../context/ShiftFleetMqttContext';
 import {
   mergeMainlineShiftRoster,
   mergeMaintenanceShiftRoster,
@@ -627,7 +627,7 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected: _is
   const isPreviewMode = !hasDataSource;
   const isLoading = hasDataSource && loading;
   const isShiftRoster = isShiftRosterGroup(element.label);
-  const fleetMqtt = useShiftFleetOperationMqtt(isShiftRoster && !isEditMode && hasDataSource);
+  const fleetMqtt = useShiftFleetMqttMap();
   const dataRows = hasDataSource && data.length > 0 ? data : [];
   const mergedRows = useMemo(() => {
     if (!isShiftRoster || isEditMode || isPreviewMode) return dataRows;

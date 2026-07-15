@@ -11,10 +11,11 @@ export class OperationRouteStation {
   @Column({ name: 'sequence_order', type: 'int' })
   sequenceOrder: number;
 
+  /** 地圖停靠點 stationId（例 station_1） */
   @Column({ name: 'station_id' })
   stationId: string;
 
-  /** 路徑進度條上的相對位置 0–100 */
-  @Column({ name: 'remain_pct', type: 'int', default: 0 })
-  remainPct: number;
+  /** 停靠點別名（例 N2W上行站） */
+  @Column({ name: 'station_display_name', default: '' })
+  stationDisplayName: string;
 }

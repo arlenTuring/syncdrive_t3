@@ -3,13 +3,14 @@ import {
   resolveBuiltinMapIdFromLibraryEntry,
   resolveMapId,
 } from '../constants/builtinMaps'
+import { fetchPublishedMapDocument } from '../api/mapLibraryApi'
 import {
   createBlankArea,
   type MapAreaObject,
   type MapPixelOrigin,
   type MapPixelSize,
 } from '../types/area'
-import type { MapFileV2 } from '../types/mapFile'
+import type { MapFileV2, MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import {
   buildMapFileV2,
   parseMapFileJson,
@@ -98,6 +99,8 @@ function entryFromParsed(
       createdAt,
       updatedAt,
       pixelOrigin: parsed.pixelOrigin,
+      routes: parsed.routes,
+      routeGroups: parsed.routeGroups,
     },
   )
   return {
@@ -279,6 +282,8 @@ export function createBlankMapEntry(
     pixelSize,
     pixelOrigin: { x: 0, y: 0 },
     areas: [area],
+    routes: [],
+    routeGroups: [],
     createdAt: now,
     updatedAt: now,
   }
@@ -376,6 +381,8 @@ export function saveEditorStateToLibraryEntry(
     pixelOrigin: MapPixelOrigin
   },
   areas: MapAreaObject[],
+  routes: MapPlannedRoute[] = [],
+  routeGroups: MapRouteGroup[] = [],
 ): MapLibraryEntry {
   const now = nowIso()
   const mapDocument = buildMapFileV2(
@@ -388,6 +395,8 @@ export function saveEditorStateToLibraryEntry(
       createdAt: entry.createdAt,
       updatedAt: now,
       pixelOrigin: meta.pixelOrigin,
+      routes,
+      routeGroups,
     },
   )
   return {
@@ -405,17 +414,24 @@ export async function resolveMapJsonByMapId(mapId: string): Promise<{
   json: unknown
   source: 'library' | 'official' | 'builtin'
 } | null> {
-  const fromLibrary = findMapLibraryEntryByMapId(mapId)
+  const resolvedMapId = resolveMapId(mapId)
+
+  const fromBackend = await fetchPublishedMapDocument(resolvedMapId)
+  if (fromBackend) {
+    return { json: fromBackend, source: 'library' }
+  }
+
+  const fromLibrary = findMapLibraryEntryByMapId(resolvedMapId)
   if (fromLibrary) {
     return { json: fromLibrary.mapDocument, source: 'library' }
   }
 
-  const official = getMapOfficialVersion(mapId)
+  const official = getMapOfficialVersion(resolvedMapId)
   if (official) {
     return { json: JSON.parse(official) as unknown, source: 'official' }
   }
 
-  const builtin = BUILTIN_MAPS.find((m) => m.id === mapId)
+  const builtin = BUILTIN_MAPS.find((m) => m.id === resolvedMapId)
   if (builtin?.path) {
     const json = await fetchBuiltinJson(builtin.path)
     return { json, source: 'builtin' }
@@ -443,6 +459,15 @@ async function mergePlatformFromBuiltinPath(
 export async function resolveParsedMapForPlatform(mapId: string) {
   const resolvedMapId = resolveMapId(mapId)
   const builtinMeta = BUILTIN_MAPS.find((m) => m.id === resolvedMapId && m.path)
+
+  const fromBackend = await fetchPublishedMapDocument(resolvedMapId)
+  if (fromBackend) {
+    let parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(fromBackend))
+    if (builtinMeta?.path) {
+      parsed = await mergePlatformFromBuiltinPath(parsed, builtinMeta.path)
+    }
+    return parsed
+  }
 
   const fromLibrary = findMapLibraryEntryByMapId(resolvedMapId)
   if (fromLibrary) {

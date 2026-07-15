@@ -22,6 +22,55 @@ const requireCjs = createRequire(__filename);
 const MAINLINE_LEG_MINUTES = 6;
 const MAINT_TASK_MINUTES = 30;
 
+/** 地圖設施代號 → slot_statuses（整備分佈 UI 的 E1/P1/H1… 標籤由此反查） */
+const FACILITY_TO_MAINT_SLOT: Record<string, string> = {
+  E1: 'MAINT-CHG-01',
+  E2: 'MAINT-CHG-02',
+  E3: 'MAINT-CHG-03',
+  E4: 'MAINT-CHG-04',
+  P1: 'MAINT-PRK-01',
+  P2: 'MAINT-PRK-02',
+  P3: 'MAINT-PRK-03',
+  P4: 'MAINT-PRK-04',
+  W1: 'MAINT-WSH-01',
+  M1: 'MAINT-SVC-01',
+  M2: 'MAINT-SVC-02',
+  M3: 'MAINT-SVC-03',
+  M4: 'MAINT-SVC-04',
+  H1: 'MAINT-DSP-01',
+  H2: 'MAINT-DSP-02',
+  H3: 'MAINT-DSP-03',
+};
+
+const TRACK_OR_FACILITY_RE = /^([DU]\d{1,2}|E\d+|P[1-4]|H\d+|M\d+|W\d+)$/i;
+
+function trackOrFacilityFromMotion(motion: {
+  yard_slot_id?: string | null;
+  track?: string;
+}): string | null {
+  if (typeof motion.yard_slot_id === 'string' && motion.yard_slot_id.trim()) {
+    return motion.yard_slot_id.trim();
+  }
+  const trackPart =
+    typeof motion.track === 'string' ? motion.track.replace(/→.*/, '').trim() : '';
+  if (trackPart && TRACK_OR_FACILITY_RE.test(trackPart)) return trackPart;
+  return null;
+}
+
+type MaintenanceSlotMotionContext = {
+  VEHICLE_POOL: string[];
+  elapsed: number;
+  motionSimStartMs: number;
+  getVehicleFleetStatus: (id: string) => 'on_field' | 'charging' | 'standby';
+  getVehiclePublishMotion?: (
+    id: string,
+    elapsedMs: number,
+    simStartMs: number,
+    options?: { managed?: boolean },
+  ) => Record<string, unknown> | null;
+  getVehicleYardMotion?: (id: string) => Record<string, unknown> | null;
+};
+
 function formatEtaMmSs(progress: number, legMinutes: number): string {
   const totalSec = Math.max(
     0,
@@ -65,9 +114,9 @@ function mainlineStations(
 ): { stA: string; stB: string; stC: string; segmentIndex: number } {
   const isUp = leg === 'up';
   return {
-    stA: isUp ? 'S2W' : 'N2W',
-    stB: 'T3',
-    stC: isUp ? 'N2W' : 'S2W',
+    stA: isUp ? 'station_6' : 'station_2',
+    stB: isUp ? 'station_4' : 'station_3',
+    stC: isUp ? 'station_1' : 'station_5',
     segmentIndex: isUp ? 1 : 0,
   };
 }
@@ -101,13 +150,9 @@ function isMainlineFleetMotion(motion: {
   return motion.leg === 'down' || motion.leg === 'up';
 }
 
-function yardRouteFromSlot(slotId: string | null | undefined): { segmentIndex: number; routeProgress: number } {
-  const slot = String(slotId ?? '').toUpperCase();
-  if (slot.startsWith('P')) return { segmentIndex: 2, routeProgress: 85 };
-  if (slot.startsWith('E')) return { segmentIndex: 1, routeProgress: 50 };
-  if (slot.startsWith('W')) return { segmentIndex: 1, routeProgress: 40 };
-  if (slot.startsWith('H') || slot.startsWith('M')) return { segmentIndex: 0, routeProgress: 20 };
-  return { segmentIndex: 0, routeProgress: 15 };
+/** 整備軌道兩站 S2W→格位；車已在格上（routeProgress=100 → remain 0%） */
+function yardRouteFromSlot(_slotId?: string | null): { segmentIndex: number; routeProgress: number } {
+  return { segmentIndex: 0, routeProgress: 100 };
 }
 
 export type SimulatedFaultEvent = {
@@ -124,7 +169,10 @@ export type DemoSimulationTransport = {
   /** 傳輸暫停（程序仍運行，不自動發送；可逐幀） */
   transportPaused: boolean;
   speedMultiplier: number;
+  /** 已提交之模擬經過毫秒（tick 錨點，100ms 格） */
   virtualElapsedMs: number;
+  /** 上次 ack 牆鐘時刻；前端可外推：anchor + (now - lastAckWallMs) × speed */
+  lastAckWallMs?: number;
   stepNonce: number;
   tickMs: number;
   /** 模擬起點（毫秒）；MQTT 子程序與 SQL 同步須一致 */
@@ -172,6 +220,9 @@ export class DemoSimulationService {
   private lastSimulatedEvent: SimulatedFaultEvent | null = null;
   private pendingSimulatorAction: DemoSimulationTransport['pendingSimulatorAction'] = null;
   private syncVehicleTrackSqlPromise: Promise<void> | null = null;
+  /** 模擬 tick 很密（8x 下約 40+ Hz）；SQL 同步節流，避免打爆 Postgres */
+  private lastSyncVehicleTrackWallMs = 0;
+  private static readonly SYNC_TRACK_MIN_WALL_MS = 3000;
   private cachedMotionModulePath: string | null = null;
   private cachedMotionModule: Record<string, unknown> | null = null;
 
@@ -233,7 +284,7 @@ export class DemoSimulationService {
       this.transportPaused = patch.transportPaused;
     }
     if (patch.speedMultiplier !== undefined) {
-      this.speedMultiplier = Math.max(0.25, Math.min(15, patch.speedMultiplier));
+      this.speedMultiplier = Math.max(0.25, Math.min(8, patch.speedMultiplier));
     }
     return this.getTransport();
   }
@@ -251,7 +302,7 @@ export class DemoSimulationService {
       this.virtualElapsedMs += this.tickMs;
     }
     this.stepNonce += 1;
-    void this.syncVehicleTrackSql();
+    void this.syncVehicleTrackSql(true);
     return this.getTransport();
   }
 
@@ -266,7 +317,7 @@ export class DemoSimulationService {
     if (simulatedEvent?.vehicleCode && simulatedEvent?.eventCode) {
       this.lastSimulatedEvent = simulatedEvent;
     }
-    void this.syncVehicleTrackSql();
+    void this.syncVehicleTrackSql(false);
     return this.buildTransportState(this.isManagedRunning());
   }
 
@@ -330,6 +381,7 @@ export class DemoSimulationService {
       transportPaused: this.transportPaused,
       speedMultiplier: this.speedMultiplier,
       virtualElapsedMs: this.virtualElapsedMs,
+      lastAckWallMs: this.lastAckWallMs > 0 ? this.lastAckWallMs : undefined,
       stepNonce: this.stepNonce,
       tickMs: this.tickMs,
       simStartMs: this.getMotionSimStartMs(),
@@ -395,7 +447,7 @@ export class DemoSimulationService {
       this.transportPaused = file.transportPaused;
     }
     if (typeof file.speedMultiplier === 'number') {
-      this.speedMultiplier = file.speedMultiplier;
+      this.speedMultiplier = Math.max(0.25, Math.min(8, file.speedMultiplier));
     }
     if (typeof file.virtualElapsedMs === 'number') {
       this.virtualElapsedMs = file.virtualElapsedMs;
@@ -479,6 +531,9 @@ export class DemoSimulationService {
     await this.dashboardDemoSeed.reseedAll();
     await this.killAllSimulators();
 
+    await this.syncPublishedMapBeforeSimulator();
+    this.invalidateMotionModuleCache();
+
     const scriptPath = this.resolveSimulatorScript();
     if (!scriptPath) {
       throw new Error('找不到 vtms-shift-demo-simulator.js');
@@ -559,11 +614,7 @@ export class DemoSimulationService {
 
   private async tickSql() {
     try {
-      await this.dataSource.query(`
-        UPDATE capacity_trend_demo_points
-        SET offset_minutes = offset_minutes - 1
-        WHERE demo_set_id = 'DEMO'
-      `);
+      // 運能折線改由 MQTT / 查詢 offset 相對時間呈現；勿遞減 offset（會使 KPI JOIN 失敗）
       await this.dataSource.query(`
         UPDATE vehicle_monitor_demo
         SET demo_speed = LEAST(
@@ -580,7 +631,14 @@ export class DemoSimulationService {
       `);
       await this.syncVehicleTrackSql();
       this.datasourceInvalidation.emit(
-        [DS_TAGS.CAPACITY_TREND, DS_TAGS.SHIFT_CENTER, DS_TAGS.VEHICLE_MONITOR],
+        [
+          DS_TAGS.CAPACITY_TREND,
+          DS_TAGS.SHIFT_CENTER,
+          DS_TAGS.VEHICLE_MONITOR,
+          DS_TAGS.SLOT_STATUS,
+          DS_TAGS.MAINTENANCE_SLOTS,
+          DS_TAGS.VEHICLE_DISTRIBUTION,
+        ],
         'demo_sql_tick',
       );
     } catch (err) {
@@ -589,7 +647,16 @@ export class DemoSimulationService {
   }
 
   /** 依 v0.0.5 軌道路徑同步 SQL 示範列（segment / route_progress / 電量） */
-  private syncVehicleTrackSql(): Promise<void> {
+  private syncVehicleTrackSql(force = false): Promise<void> {
+    if (!force) {
+      const now = Date.now();
+      if (now - this.lastSyncVehicleTrackWallMs < DemoSimulationService.SYNC_TRACK_MIN_WALL_MS) {
+        return Promise.resolve();
+      }
+      this.lastSyncVehicleTrackWallMs = now;
+    } else {
+      this.lastSyncVehicleTrackWallMs = Date.now();
+    }
     if (this.syncVehicleTrackSqlPromise) {
       return this.syncVehicleTrackSqlPromise;
     }
@@ -602,7 +669,19 @@ export class DemoSimulationService {
   private async runSyncVehicleTrackSql() {
     this.rehydrateTransportFromFileIfOrphaned();
     const motionSimStartMs = this.getMotionSimStartMs();
-    if (motionSimStartMs == null) return;
+    const maintenanceSnapshots: MaintenanceOrderLifecycleSnapshot[] = [];
+    let slotMotion: MaintenanceSlotMotionContext | null = null;
+
+    if (motionSimStartMs == null) {
+      try {
+        await this.syncMaintenanceDistributionSlots(maintenanceSnapshots, null);
+        this.datasourceInvalidation.emitMaintenanceSlots();
+      } catch (err) {
+        this.logger.warn(`syncMaintenanceDistributionSlots failed: ${(err as Error)?.message ?? err}`);
+      }
+      return;
+    }
+
     try {
       const motionModulePath = this.resolveTrackMotionModule();
       if (!motionModulePath) return;
@@ -619,6 +698,11 @@ export class DemoSimulationService {
           simStartMs: number,
           options?: { managed?: boolean },
         ) => Record<string, unknown> | null;
+        getScheduledSlotPendingInfo?: (
+          id: string,
+          elapsedMs: number,
+          simStartMs: number,
+        ) => { tripCode?: string } | null;
         getVehiclePreDepartureMotion?: (
           id: string,
           elapsedMs: number,
@@ -631,7 +715,6 @@ export class DemoSimulationService {
           simStartMs: number,
           options?: { managed?: boolean },
         ) => Record<string, unknown> | null;
-        getVehiclesInYardKind?: (kind: 'charge' | 'park' | 'maint') => string[];
       };
       const {
         VEHICLE_POOL,
@@ -641,18 +724,24 @@ export class DemoSimulationService {
         getVehicleFleetStatus,
         getVehicleMotion,
         getVehiclePreDepartureMotion,
+        getScheduledSlotPendingInfo,
         getVehicleYardMotion,
         getVehiclePublishMotion,
-        getVehiclesInYardKind,
       } = motionModule;
 
       const elapsed = this.resolveMotionElapsedMs();
       tickFleetBatteryState(elapsed, motionSimStartMs);
+      slotMotion = {
+        VEHICLE_POOL,
+        elapsed,
+        motionSimStartMs,
+        getVehicleFleetStatus,
+        getVehiclePublishMotion,
+        getVehicleYardMotion,
+      };
 
-      const chargingInYard = getVehiclesInYardKind?.('charge') ?? [];
       const maintCatalog = this.resolveMaintenanceTaskCatalog();
       const mainlineSnapshots: MainlineOrderLifecycleSnapshot[] = [];
-      const maintenanceSnapshots: MaintenanceOrderLifecycleSnapshot[] = [];
 
       for (const vehicleId of VEHICLE_POOL) {
         const battery = getVehicleBattery(vehicleId);
@@ -739,11 +828,13 @@ export class DemoSimulationService {
           if (!isMainlineFleetMotion(motion)) {
             const tripCode = maintCatalog.maintenanceTripCode(motion, maintMeta);
             const yardRoute = yardRouteFromSlot(motion.yard_slot_id);
+            const yardSlotId =
+              typeof motion.yard_slot_id === 'string' ? motion.yard_slot_id.trim().toUpperCase() : '';
             maintenanceSnapshots.push({
               vehicleCode: vehicleId,
-              orderId: `DEMO-ORD-${vehicleId}`,
+              orderId: maintCatalog.maintenanceDemoOrderId(vehicleId, yardSlotId),
               tripCode,
-              phase: maintMeta.order_status === 'PROCESSING' ? 'processing' : 'pending',
+              phase: 'processing',
               maintTypeLabel: String(maintMeta.maint_type_label ?? '整備'),
               maintTypeBg: String(maintMeta.maint_type_bg ?? 'transparent'),
               maintTypeColor: String(maintMeta.maint_type_color ?? '#FD9A00'),
@@ -755,25 +846,37 @@ export class DemoSimulationService {
               routeProgress: yardRoute.routeProgress,
             });
           }
-          await this.dataSource.query(
-            `
-            UPDATE vehicle_monitor_demo
-            SET segment_label = $2,
-                demo_speed = 0,
-                badge_label = $3
-            WHERE vehicle_code = $1
-            `,
-            [vehicleId, motion.track, maintMeta?.maint_type_label ?? null],
-          );
+          const yardLabel = trackOrFacilityFromMotion(motion);
+          if (yardLabel) {
+            await this.dataSource.query(
+              `
+              UPDATE vehicle_monitor_demo
+              SET segment_label = $2,
+                  demo_speed = 0,
+                  badge_label = $3
+              WHERE vehicle_code = $1
+              `,
+              [vehicleId, yardLabel, maintMeta?.maint_type_label ?? null],
+            );
+          } else {
+            await this.dataSource.query(
+              `
+              UPDATE vehicle_monitor_demo
+              SET demo_speed = 0,
+                  badge_label = $2
+              WHERE vehicle_code = $1
+              `,
+              [vehicleId, maintMeta?.maint_type_label ?? null],
+            );
+          }
         }
       }
 
       for (const slot of getActiveFleet()) {
         const offsetMs = slot.offsetMin * 60 * 1000;
         if (elapsed >= offsetMs) continue;
-        const preMotion = getVehiclePreDepartureMotion?.(slot.id, elapsed, motionSimStartMs) as {
-          tripCode?: string;
-        } | null;
+        const preMotion = getScheduledSlotPendingInfo?.(slot.id, elapsed, motionSimStartMs)
+          ?? getVehiclePreDepartureMotion?.(slot.id, elapsed, motionSimStartMs);
         const preTrip = isShiftTripCode(preMotion?.tripCode) ? preMotion!.tripCode!.trim() : null;
         if (!preTrip) continue;
         const departMs = motionSimStartMs + offsetMs;
@@ -811,74 +914,113 @@ export class DemoSimulationService {
         );
       }
 
-      await this.dataSource.query(`
-        UPDATE slot_statuses
-        SET status = 'AVAILABLE', vehicle_code = NULL, last_updated = $1
-        WHERE slot_id LIKE 'MAINT-CHG-%'
-           OR slot_id LIKE 'MAINT-PRK-%'
-           OR slot_id LIKE 'MAINT-DSP-%'
-      `, [Date.now()]);
-
-      const chargeSlots = ['MAINT-CHG-01', 'MAINT-CHG-02', 'MAINT-CHG-03', 'MAINT-CHG-04'];
-      for (let i = 0; i < chargingInYard.length && i < chargeSlots.length; i += 1) {
-        await this.dataSource.query(
-          `
-          UPDATE slot_statuses
-          SET status = 'CHARGING',
-              vehicle_code = $2,
-              last_updated = $1
-          WHERE slot_id = $3
-          `,
-          [Date.now(), chargingInYard[i], chargeSlots[i]],
-        );
-      }
-
-      const parkedIds = getVehiclesInYardKind?.('park') ?? [];
-      const parkSlotByPlatform: Record<string, string> = {
-        P1: 'MAINT-PRK-01',
-        P2: 'MAINT-PRK-02',
-      };
-      const parkSlotUsed = new Set<string>();
-      for (const vehicleId of parkedIds) {
-        const yardMotion = getVehicleYardMotion?.(vehicleId) as {
-          yard_slot_id?: string | null;
-        } | null;
-        const platform = yardMotion?.yard_slot_id ?? null;
-        if (!platform || (platform !== 'P1' && platform !== 'P2')) continue;
-        const slotId = parkSlotByPlatform[platform];
-        if (!slotId || parkSlotUsed.has(slotId)) continue;
-        parkSlotUsed.add(slotId);
-        await this.dataSource.query(
-          `
-          UPDATE slot_statuses
-          SET status = 'OCCUPIED',
-              vehicle_code = $2,
-              last_updated = $1
-          WHERE slot_id = $3
-          `,
-          [Date.now(), vehicleId, slotId],
-        );
-      }
-
-      const maintStandbyIds = (getVehiclesInYardKind?.('maint') ?? []).filter(
-        (id) => getVehicleFleetStatus(id) === 'standby',
-      );
-      const dspSlots = ['MAINT-DSP-01', 'MAINT-DSP-02', 'MAINT-DSP-03'];
-      for (let i = 0; i < maintStandbyIds.length && i < dspSlots.length; i += 1) {
-        await this.dataSource.query(
-          `
-          UPDATE slot_statuses
-          SET status = 'OCCUPIED',
-              vehicle_code = $2,
-              last_updated = $1
-          WHERE slot_id = $3
-          `,
-          [Date.now(), maintStandbyIds[i], dspSlots[i]],
-        );
-      }
+      await this.syncMaintenanceDistributionSlots(maintenanceSnapshots, slotMotion);
+      this.datasourceInvalidation.emitMaintenanceSlots();
 
     } catch (err) {
       this.logger.warn(`syncVehicleTrackSql failed: ${(err as Error)?.message ?? err}`);
+    }
+  }
+
+  /** 整備分佈：依模擬 yard_slot_id 與整備訂單同步 slot_statuses */
+  private async syncMaintenanceDistributionSlots(
+    maintenanceSnapshots: ReadonlyArray<MaintenanceOrderLifecycleSnapshot>,
+    motion: MaintenanceSlotMotionContext | null,
+  ): Promise<void> {
+    const assignmentByVehicle = new Map<string, { facilityId: string; charging: boolean }>();
+
+    const ingest = (vehicleId: string, facilityId: string, charging: boolean) => {
+      const id = String(vehicleId ?? '').trim().toUpperCase();
+      const facility = String(facilityId ?? '').trim().toUpperCase();
+      if (!id || !facility) return;
+      if (!FACILITY_TO_MAINT_SLOT[facility]) return;
+      assignmentByVehicle.set(id, { facilityId: facility, charging });
+    };
+
+    if (motion) {
+      for (const vehicleId of motion.VEHICLE_POOL) {
+        const pub =
+          motion.getVehiclePublishMotion?.(
+            vehicleId,
+            motion.elapsed,
+            motion.motionSimStartMs,
+            { managed: true },
+          ) ?? motion.getVehicleYardMotion?.(vehicleId);
+        const yardSlotId = pub?.yard_slot_id;
+        const facilityId =
+          typeof yardSlotId === 'string' ? yardSlotId.trim().toUpperCase() : '';
+        if (!facilityId) continue;
+        ingest(vehicleId, facilityId, motion.getVehicleFleetStatus(vehicleId) === 'charging');
+      }
+    }
+
+    for (const snap of maintenanceSnapshots) {
+      const facilityId =
+        typeof snap.yardSlotId === 'string' ? snap.yardSlotId.trim().toUpperCase() : '';
+      if (!facilityId) continue;
+      const charging = String(snap.maintTypeLabel ?? '').includes('充電');
+      ingest(snap.vehicleCode, facilityId, charging);
+    }
+
+    const orderRows = (await this.dataSource.query(`
+      SELECT
+        o.vehicle_code,
+        NULLIF(TRIM(o.payload->>'yard_slot_id'), '') AS yard_slot_id,
+        o.maint_type_label
+      FROM operation_orders o
+      WHERE o.line_kind = 'MAINTENANCE'
+        AND o.status IN ('PENDING', 'PROCESSING')
+        AND NULLIF(TRIM(o.payload->>'yard_slot_id'), '') IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM operation_orders ml
+          WHERE ml.vehicle_code = o.vehicle_code
+            AND ml.line_kind = 'MAINLINE'
+            AND ml.status = 'PROCESSING'
+            AND COALESCE(
+              (SELECT demo_speed FROM vehicle_monitor_demo m WHERE m.vehicle_code = o.vehicle_code),
+              0
+            ) >= 1
+        )
+    `)) as Array<{ vehicle_code: string; yard_slot_id: string; maint_type_label: string | null }>;
+
+    for (const row of orderRows) {
+      const vehicleId = String(row.vehicle_code ?? '').trim().toUpperCase();
+      if (assignmentByVehicle.has(vehicleId)) continue;
+      ingest(
+        vehicleId,
+        String(row.yard_slot_id ?? '').trim().toUpperCase(),
+        String(row.maint_type_label ?? '').includes('充電'),
+      );
+    }
+
+    const now = Date.now();
+    await this.dataSource.query(
+      `
+      UPDATE slot_statuses
+      SET status = 'AVAILABLE',
+          vehicle_code = NULL,
+          last_updated = $1,
+          raw_payload = '{}'::jsonb
+      WHERE slot_id LIKE 'MAINT-%'
+      `,
+      [now],
+    );
+
+    for (const [vehicleId, { facilityId, charging }] of assignmentByVehicle) {
+      const slotId = FACILITY_TO_MAINT_SLOT[facilityId];
+      if (!slotId) continue;
+      const status = charging && facilityId.startsWith('E') ? 'CHARGING' : 'OCCUPIED';
+      await this.dataSource.query(
+        `
+        UPDATE slot_statuses
+        SET status = $2,
+            vehicle_code = $3,
+            last_updated = $1,
+            raw_payload = '{}'::jsonb
+        WHERE slot_id = $4
+        `,
+        [now, status, vehicleId, slotId],
+      );
     }
   }
 
@@ -890,9 +1032,22 @@ export class DemoSimulationService {
     return this.cachedMotionModule;
   }
 
+  private invalidateMotionModuleCache(): void {
+    if (this.cachedMotionModulePath) {
+      try {
+        delete require.cache[this.cachedMotionModulePath];
+      } catch {
+        /* ignore */
+      }
+    }
+    this.cachedMotionModulePath = null;
+    this.cachedMotionModule = null;
+  }
+
   private resolveMaintenanceTaskCatalog(): {
     resolveMaintenanceTaskMeta: (motion: Record<string, unknown>) => Record<string, unknown> | null;
     maintenanceTripCode: (motion: Record<string, unknown>, meta: Record<string, unknown>) => string;
+    maintenanceDemoOrderId: (vehicleCode: string, yardSlotId: string) => string;
   } {
     const candidates = [
       path.join(process.cwd(), 'scripts', 'maintenance-task-catalog.js'),
@@ -965,6 +1120,43 @@ export class DemoSimulationService {
             `MQTT broker 無法連線 (${host}:${port})，請先執行 npm run dev 啟動 Docker`,
           ),
         );
+      });
+    });
+  }
+
+  private resolveSyncPublishedMapScript(): string | null {
+    const candidates = [
+      path.join(process.cwd(), 'scripts', 'sync-published-map-from-api.js'),
+      path.join(process.cwd(), 'backend', 'scripts', 'sync-published-map-from-api.js'),
+      path.join(__dirname, '..', '..', 'scripts', 'sync-published-map-from-api.js'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return null;
+  }
+
+  /** 模擬器啟動前從 Map Library API 拉取最新地圖至 published-maps */
+  private async syncPublishedMapBeforeSimulator(): Promise<void> {
+    const scriptPath = this.resolveSyncPublishedMapScript();
+    if (!scriptPath) return;
+    const port = process.env.PORT ?? '3000';
+    const cwd = fs.existsSync(path.join(process.cwd(), 'backend', 'package.json'))
+      ? process.cwd()
+      : path.dirname(path.dirname(scriptPath));
+    await new Promise<void>((resolve) => {
+      const child = spawn(process.execPath, [scriptPath], {
+        cwd,
+        env: {
+          ...process.env,
+          SYNC_API: `http://127.0.0.1:${port}/syncdrive-api`,
+        },
+        stdio: 'inherit',
+      });
+      child.on('exit', () => resolve());
+      child.on('error', (err) => {
+        this.logger.warn(`map sync before simulator failed: ${err.message}`);
+        resolve();
       });
     });
   }

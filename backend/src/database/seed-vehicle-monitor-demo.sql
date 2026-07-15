@@ -24,7 +24,7 @@ INSERT INTO vehicle_monitor_demo (
   demo_speed, demo_load, segment_label
 ) VALUES
   ('PMS-01', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
-   NULL, '#7e57c2', '#f3e8ff', '0', 18.5, 88.0, 'N2W下行'),
+   NULL, '#7e57c2', '#f3e8ff', '0', 0, 88.0, 'P1'),
   ('PMS-02', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 17.2, 87.0, 'D12'),
   ('PMS-03', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
@@ -36,15 +36,15 @@ INSERT INTO vehicle_monitor_demo (
   ('PMS-06', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 17.5, 87.5, 'U08'),
   ('PMS-07', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
-   NULL, '#7e57c2', '#f3e8ff', '0', 17.0, 86.0, 'D20'),
+   NULL, '#7e57c2', '#f3e8ff', '0', 0, 86.0, 'H1'),
   ('PMS-08', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 15.5, 84.0, 'U28'),
   ('PMS-09', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
-   NULL, '#7e57c2', '#f3e8ff', '0', 16.0, 85.0, 'U18'),
+   NULL, '#7e57c2', '#f3e8ff', '0', 16.0, 85.0, 'D18'),
   ('PMS-10', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
-   NULL, '#7e57c2', '#f3e8ff', '0', 15.2, 83.5, '充電中'),
+   NULL, '#7e57c2', '#f3e8ff', '0', 0, 83.5, 'E1'),
   ('PMS-11', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
-   NULL, '#7e57c2', '#f3e8ff', '0', 14.8, 82.0, '臨停區')
+   NULL, '#7e57c2', '#f3e8ff', '0', 0, 82.0, 'P4')
 ON CONFLICT (vehicle_code) DO UPDATE SET
   overall_health = EXCLUDED.overall_health,
   alert_message = EXCLUDED.alert_message,

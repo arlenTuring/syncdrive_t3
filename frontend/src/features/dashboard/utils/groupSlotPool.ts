@@ -1,7 +1,7 @@
 export type SlotCell = { key: string; row: Record<string, unknown> } | null;
 
 /**
- * 固定格位池：班次結束釋放格位，候補班次依序填入（與 SQL 列順序無關）。
+ * 固定格位池：班次結束釋放格位，候補班次依序填入；最後左靠齊避免中間空洞。
  * 回傳 changedIndices：該格 key 變更時需播放替換動畫。
  */
 export function assignStickyPoolSlots(
@@ -54,5 +54,19 @@ export function assignStickyPoolSlots(
     if (prevKey !== key) changedIndices.push(i);
   }
 
-  return { slots: next, changedIndices };
+  // 左靠齊：避免中間留空洞（例如 PMS-05/06 班次結束後，PMS-01 仍卡在第 5 格）
+  const occupied = next.filter((c): c is NonNullable<SlotCell> => c !== null);
+  const compacted: SlotCell[] = [
+    ...occupied,
+    ...Array.from({ length: n - occupied.length }, () => null),
+  ];
+  for (let i = 0; i < n; i++) {
+    const beforeKey = next[i]?.key ?? null;
+    const afterKey = compacted[i]?.key ?? null;
+    if (beforeKey !== afterKey && !changedIndices.includes(i)) {
+      changedIndices.push(i);
+    }
+  }
+
+  return { slots: compacted, changedIndices };
 }

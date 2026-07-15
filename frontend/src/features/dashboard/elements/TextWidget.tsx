@@ -4,7 +4,13 @@ import { useWidgetData } from './useWidgetData';
 import { useMqttData } from './useMqttData';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { getSeverityStyle } from '../constants/severityTheme';
-import { resolveMqttFieldValue } from '../utils/mqttFieldResolve';
+import {
+  extractMqttWrappedValue,
+  formatMqttDisplayScalar,
+  resolveMqttFieldValue,
+  unwrapMqttPayload,
+} from '../utils/mqttFieldResolve';
+import { resolveVehicleLocationLabel } from '../utils/resolveVehicleLocationLabel';
 import { editPreviewTextStyle } from '../components/EditPreviewChrome';
 import {
   useIsEditMode,
@@ -48,16 +54,47 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
   });
 
   // content 本身先做變數插值（支援 {varName} 格式）
-  const interpolatedContent = interpolateVariables(widget.content, variables);
+  let interpolatedContent = interpolateVariables(widget.content, variables);
   const isTemplatePlaceholder = /\{[^{}]+\}/.test(widget.content);
+
+  // 複合模板（如「發車 {depart_time}」）：未注入的占位符改為 —，避免畫布露出 {…}
+  if (!isEditMode && isTemplatePlaceholder && /\{[^{}]+\}/.test(interpolatedContent)) {
+    interpolatedContent = interpolatedContent.replace(/\{([^{}]+)\}/g, (_, key: string) => {
+      const k = key.trim();
+      const val = variables[k];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        return String(val);
+      }
+      return '—';
+    });
+  }
 
   let displayValue: string = interpolatedContent;
   let rawValue: any = null;
   const colorField = widget.colorOnlyField ?? (widget.colorRulesEnabled ? widget.valueField : undefined);
 
-  if (mqttData.data !== null && !widget.colorOnlyField) {
-    rawValue = mqttData.data.value ?? mqttData.data;
-    displayValue = String(rawValue);
+  const isPureVariableTemplateEarly = /^\{[^{}]+\}$/.test(widget.content.trim());
+  const contentVarKeyEarly = isPureVariableTemplateEarly ? normalizeValueFieldKey(widget.content) : undefined;
+  const isVehicleLocationLabel = contentVarKeyEarly === 'segment_label';
+
+  if (isVehicleLocationLabel) {
+    const operation = mqttData.data !== null ? unwrapMqttPayload(mqttData.data) : null;
+    const loc = resolveVehicleLocationLabel({ variables, operation });
+    const hasLocContext = mqttData.data !== null
+      || variables.segment_label !== undefined
+      || variables.yard_slot_id !== undefined
+      || variables.line_kind !== undefined
+      || variables.trip_code !== undefined;
+    if (hasLocContext) {
+      displayValue = loc;
+      if (loc !== '—') rawValue = loc;
+    }
+  } else if (mqttData.data !== null && !widget.colorOnlyField) {
+    const mqttScalar = formatMqttDisplayScalar(extractMqttWrappedValue(mqttData.data));
+    if (mqttScalar !== undefined) {
+      rawValue = extractMqttWrappedValue(mqttData.data);
+      displayValue = mqttScalar;
+    }
   } else if (fleetSql && !widget.colorOnlyField && sqlData.data.length > 0) {
     rawValue = sqlData.data[0].mainline_fleet_line ?? sqlData.data[0].content;
     if (rawValue !== undefined && rawValue !== null) {

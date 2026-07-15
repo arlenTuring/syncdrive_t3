@@ -8,6 +8,8 @@ import { HEALTH_STATUS_BORDER } from '../constants/healthStatusTheme';
 import {
   resolveVehicleMonitorBadge,
 } from '../utils/resolveVehicleMonitorBadge';
+import { formatMqttDisplayScalar } from '../utils/mqttFieldResolve';
+import { resolveVehicleLocationLabel } from '../utils/resolveVehicleLocationLabel';
 import {
   useIsEditMode,
   resolveWidgetEditPreview,
@@ -547,11 +549,15 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
   }
 
   const segField = widget.segmentLabelField ?? 'segment_label';
-  const seg =
-    (widget.segmentLabelPath && operPayload && getByPath(operPayload, widget.segmentLabelPath)) ||
-    (variables[segField] !== undefined ? String(variables[segField]) : undefined) ||
-    (sqlRow?.[segField] as string | undefined) ||
-    '—';
+  const seg = resolveVehicleLocationLabel({
+    variables,
+    operation: operPayload,
+    telemetry: telPayload,
+  });
+  const segFallback =
+    formatMqttDisplayScalar(variables[segField])
+    ?? formatMqttDisplayScalar(sqlRow?.[segField]);
+  const segDisplay = seg !== '—' ? seg : (segFallback ?? '—');
 
   const title =
     variables.unit_display !== undefined
@@ -604,9 +610,9 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
   const renderTripCode = isEditPreview && !tripCode.trim()
     ? resolveWidgetEditPreview({ valueField: 'trip_code', type: 'unit-telemetry-card' })
     : tripCode;
-  const renderSeg = isEditPreview && String(seg) === '—'
+  const renderSeg = isEditPreview && segDisplay === '—'
     ? resolveWidgetEditPreview({ valueField: 'segment_label', type: 'unit-telemetry-card' })
-    : String(seg);
+    : segDisplay;
   const renderSpeedDash = isEditPreview ? false : speedDash;
   const previewWrap = (node: React.ReactNode) => (
     <WidgetEditPreviewOutline

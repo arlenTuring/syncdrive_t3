@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { clearDatasourceQueryCache, executeDatasourceQuery } from '../store/useDataSourceStore';
+import { clearDatasourceQueryCacheForTags, executeDatasourceQuery } from '../store/useDataSourceStore';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { expandBuiltinSqlMacros } from '../constants/demoSql';
 import { subscribeDatasourceInvalidation } from '../utils/datasourceInvalidationBus';
@@ -64,6 +64,15 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     const fetchData = async () => {
       if (dataSourceId && sqlQuery?.trim()) {
         const finalSql = interpolateVariables(expandBuiltinSqlMacros(sqlQuery), vars);
+        if (/\{[a-zA-Z_]\w*\}/.test(finalSql)) {
+          if (import.meta.env.DEV) {
+            console.warn('[useWidgetData] 略過含未替換變數的 SQL:', finalSql.slice(0, 120));
+          }
+          if (!aborted) {
+            setState({ data: lastGoodData.current, loading: false, error: null });
+          }
+          return;
+        }
         try {
           const rows = await executeDatasourceQuery(dataSourceId, finalSql, FETCH_TIMEOUT_MS);
           if (aborted) return;
@@ -121,7 +130,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
         if (!tagsOverlap(invalidateTags, payload.tags)) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          clearDatasourceQueryCache();
+          clearDatasourceQueryCacheForTags(payload.tags);
           void fetchData();
         }, 200);
       });

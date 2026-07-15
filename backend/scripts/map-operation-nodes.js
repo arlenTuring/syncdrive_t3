@@ -1,26 +1,20 @@
 /**
- * 地圖 DockingPoint ↔ 營運路線 node_id 橋接（前後端腳本共用）
+ * 地圖 DockingPoint ↔ 營運站點橋接（前後端腳本共用）
  *
- * - 從 MapFileV2 擷取 operationNodeId、座標、站點
- * - T3 正線：依 dockingLeg + dockingStation 推斷節點角色（STOP / DEP）
- * - 格式：ND-{站點代碼}-{節點角色}-{序號}
+ * - 從 MapFileV2 擷取 stationId、別名、座標
+ * - stationId 為停靠點唯一識別（例 station_1）
  */
 const fs = require('fs');
 const path = require('path');
+const {
+  resolveMapJsonPath: resolvePublishedOrBuiltinMapPath,
+} = require('./map-published-store');
 
-const NODE_ID_PATTERN = /^ND-[A-Z0-9_]+-[A-Z0-9_]+-\d{2}$/;
-
-const DOCKING_POINT_NODE_ID_KEY = 'operationNodeId';
+const DOCKING_POINT_STATION_ID_KEY = 'stationId';
 const DOCKING_POINT_STATION_NAME_KEY = 'stationName';
-const DOCKING_POINT_NODE_ROLE_KEY = 'nodeRole';
 const DOCKING_POINT_LEG_KEY = 'dockingLeg';
+/** @deprecated 僅舊地圖遷移推斷別名 */
 const DOCKING_POINT_STATION_KEY = 'dockingStation';
-
-/** T3 正線：物理停靠點 → 協議節點角色 */
-const MAINLINE_DOCKING_NODE_ROLES = {
-  down: { N2W: 'DEP', T3: 'STOP', S2W: 'STOP' },
-  up: { N2W: 'STOP', T3: 'STOP', S2W: 'DEP' },
-};
 
 const DEFAULT_MAP_PATHS = {
   't3-main-version': path.join(
@@ -30,34 +24,11 @@ const DEFAULT_MAP_PATHS = {
 };
 
 function resolveMapJsonPath(mapId) {
-  const key = String(mapId ?? '').trim();
-  if (!key) return null;
-  if (DEFAULT_MAP_PATHS[key]) return DEFAULT_MAP_PATHS[key];
-  const candidate = path.join(
-    __dirname,
-    '../../frontend/public/maps',
-    `${key}.json`,
-  );
-  return fs.existsSync(candidate) ? candidate : null;
+  return resolvePublishedOrBuiltinMapPath(mapId);
 }
 
 function normalizeStationNameInput(raw) {
   return String(raw ?? '').trim().replace(/\s+/g, ' ');
-}
-
-function stationNameToNodeToken(stationName) {
-  const n = normalizeStationNameInput(stationName);
-  if (!n) return '';
-  if (/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(n)) {
-    return n.toUpperCase().replace(/-/g, '_');
-  }
-  const slug = n
-    .normalize('NFKD')
-    .replace(/[^\w]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toUpperCase()
-    .slice(0, 24);
-  return slug || 'STATION';
 }
 
 function parseDockingLeg(raw) {
@@ -70,11 +41,20 @@ function parseDockingStation(raw) {
   return null;
 }
 
-function inferMainlineNodeRole(dockingLeg, dockingStation) {
+function defaultStationDisplayName(dockingLeg, dockingStation) {
   const leg = parseDockingLeg(dockingLeg);
   const station = parseDockingStation(dockingStation);
-  if (!leg || !station) return null;
-  return MAINLINE_DOCKING_NODE_ROLES[leg]?.[station] ?? 'STOP';
+  if (!leg || !station) return '';
+  return `${station}${leg === 'down' ? '下行' : '上行'}`;
+}
+
+function effectiveStationName(params) {
+  const name = normalizeStationNameInput(params?.[DOCKING_POINT_STATION_NAME_KEY]);
+  if (name) return name;
+  return defaultStationDisplayName(
+    params?.[DOCKING_POINT_LEG_KEY],
+    params?.[DOCKING_POINT_STATION_KEY],
+  );
 }
 
 function routeIdForDockingLeg(dockingLeg) {
@@ -84,189 +64,124 @@ function routeIdForDockingLeg(dockingLeg) {
   return null;
 }
 
-function generateOperationNodeId(stationToken, existingIds, nodeRole = 'STOP') {
-  const station = stationNameToNodeToken(stationToken);
-  if (!station) throw new Error('站點代碼不可為空');
-  const base = `ND-${station}-${nodeRole}`;
-  let seq = 1;
-  let id = `${base}-${String(seq).padStart(2, '0')}`;
-  while (existingIds.has(id)) {
-    seq += 1;
-    id = `${base}-${String(seq).padStart(2, '0')}`;
-  }
-  return id;
-}
-
-function getStationTokenFromParams(params) {
-  const dockingStation = parseDockingStation(params?.[DOCKING_POINT_STATION_KEY]);
-  if (dockingStation) return dockingStation;
-  const stationName = normalizeStationNameInput(params?.[DOCKING_POINT_STATION_NAME_KEY]);
-  if (!stationName) return '';
-  if (/^(N2W|T3|S2W)$/i.test(stationName)) return stationName.toUpperCase();
-  return stationNameToNodeToken(stationName);
-}
-
-function resolveNodeRoleFromParams(params) {
-  const explicit = String(params?.[DOCKING_POINT_NODE_ROLE_KEY] ?? '').trim().toUpperCase();
-  if (explicit) return explicit;
-  return inferMainlineNodeRole(
-    params?.[DOCKING_POINT_LEG_KEY],
-    params?.[DOCKING_POINT_STATION_KEY],
-  ) ?? 'STOP';
-}
-
-function defaultStationDisplayName(dockingLeg, dockingStation) {
-  const leg = parseDockingLeg(dockingLeg);
-  const station = parseDockingStation(dockingStation);
-  if (!leg || !station) return '';
-  return `${station}${leg === 'down' ? '下行' : '上行'}`;
-}
-
-function ensureDockingPointParams(params, existingIds, canonicalByStationRole = new Map()) {
-  const next = { ...(params ?? {}) };
-  const leg = parseDockingLeg(next[DOCKING_POINT_LEG_KEY]);
-  const routeStation = parseDockingStation(next[DOCKING_POINT_STATION_KEY]);
-
-  if (!normalizeStationNameInput(next[DOCKING_POINT_STATION_NAME_KEY]) && leg && routeStation) {
-    next[DOCKING_POINT_STATION_NAME_KEY] = defaultStationDisplayName(leg, routeStation);
-  }
-
-  const nodeRole = resolveNodeRoleFromParams(next);
-  next[DOCKING_POINT_NODE_ROLE_KEY] = nodeRole;
-
-  const existingNodeId = String(next[DOCKING_POINT_NODE_ID_KEY] ?? '').trim();
-  if (!existingNodeId) {
-    const stationToken = getStationTokenFromParams(next);
-    if (stationToken) {
-      const canonKey = `${stationToken}|${nodeRole}`;
-      let nodeId = canonicalByStationRole.get(canonKey);
-      if (!nodeId) {
-        nodeId = generateOperationNodeId(stationToken, existingIds, nodeRole);
-        canonicalByStationRole.set(canonKey, nodeId);
-      }
-      next[DOCKING_POINT_NODE_ID_KEY] = nodeId;
-      existingIds.add(nodeId);
-    }
-  } else if (NODE_ID_PATTERN.test(existingNodeId)) {
-    existingIds.add(existingNodeId);
-    const stationToken = getStationTokenFromParams(next);
-    if (stationToken) {
-      canonicalByStationRole.set(`${stationToken}|${nodeRole}`, existingNodeId);
-    }
-  }
-
-  return next;
-}
-
 /**
  * @param {object} map - MapFileV2
  * @returns {import('./map-operation-nodes.types').OperationNodeRegistry}
  */
-function collectOperationNodesFromMap(map) {
-  const nodes = [];
+function collectStationsFromMap(map) {
+  const stations = [];
   const byId = new Map();
   const byRouteStationAction = new Map();
-  const existingIds = new Set();
-  const canonicalByStationRole = new Map();
 
   for (const area of map?.areas ?? []) {
     for (const facility of area?.facilities ?? []) {
       if (facility?.type !== 'DockingPoint') continue;
 
-      const params = ensureDockingPointParams(
-        facility.parameters ?? {},
-        existingIds,
-        canonicalByStationRole,
-      );
+      const params = facility.parameters ?? {};
       const xM = params.refFieldXM;
       const yM = params.refFieldYM;
       if (typeof xM !== 'number' || typeof yM !== 'number') continue;
 
-      const dockingLeg = parseDockingLeg(params[DOCKING_POINT_LEG_KEY]);
-      const routeStation = parseDockingStation(params[DOCKING_POINT_STATION_KEY]);
-      const nodeId = String(params[DOCKING_POINT_NODE_ID_KEY] ?? '').trim();
-      if (!nodeId) continue;
+      const stationId = String(params[DOCKING_POINT_STATION_ID_KEY] ?? '').trim();
+      if (!stationId) continue;
 
-      const nodeRole = resolveNodeRoleFromParams(params);
+      const dockingLeg = parseDockingLeg(params[DOCKING_POINT_LEG_KEY]);
       const routeId = routeIdForDockingLeg(dockingLeg);
-      const actionType =
-        nodeRole === 'DEP' ? 'STATION_DEPARTURE' : 'PLATFORM_DOCKING';
+      const stationName = effectiveStationName(params) || stationId;
 
       const entry = {
-        nodeId,
-        nodeRole,
-        stationName: normalizeStationNameInput(params[DOCKING_POINT_STATION_NAME_KEY]),
-        routeStation: routeStation ?? undefined,
+        stationId,
+        stationName,
         dockingLeg: dockingLeg ?? undefined,
         routeId: routeId ?? undefined,
-        actionType,
         xM,
         yM,
         facilityId: String(facility.id),
         areaId: String(area.id),
       };
 
-      nodes.push(entry);
-      byId.set(nodeId, entry);
+      stations.push(entry);
+      byId.set(stationId, entry);
 
-      if (routeId && routeStation) {
-        byRouteStationAction.set(`${routeId}|${routeStation}|${actionType}`, entry);
+      if (routeId) {
+        byRouteStationAction.set(`${routeId}|${stationId}|PLATFORM_DOCKING`, entry);
+        byRouteStationAction.set(`${routeId}|${stationId}|STATION_DEPARTURE`, entry);
       }
     }
   }
 
-  return { nodes, byId, byRouteStationAction, mapId: map?.mapId ?? null };
+  return {
+    stations,
+    nodes: stations,
+    byId,
+    byRouteStationAction,
+    mapId: map?.mapId ?? null,
+  };
+}
+
+/** @deprecated 相容舊名稱 */
+function collectOperationNodesFromMap(map) {
+  return collectStationsFromMap(map);
+}
+
+function loadStationsFromMapFile(mapPath) {
+  const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+  return collectStationsFromMap(map);
 }
 
 function loadOperationNodesFromMapFile(mapPath) {
-  const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-  return collectOperationNodesFromMap(map);
+  return loadStationsFromMapFile(mapPath);
 }
 
 function loadOperationNodeRegistry(mapId = 't3-main-version') {
   const mapPath = resolveMapJsonPath(mapId);
   if (!mapPath) {
-    return { nodes: [], byId: new Map(), byRouteStationAction: new Map(), mapId: null };
+    return {
+      stations: [],
+      nodes: [],
+      byId: new Map(),
+      byRouteStationAction: new Map(),
+      mapId: null,
+    };
   }
   try {
-    return loadOperationNodesFromMapFile(mapPath);
+    return loadStationsFromMapFile(mapPath);
   } catch {
-    return { nodes: [], byId: new Map(), byRouteStationAction: new Map(), mapId: null };
+    return {
+      stations: [],
+      nodes: [],
+      byId: new Map(),
+      byRouteStationAction: new Map(),
+      mapId: null,
+    };
   }
 }
 
-function resolveNodeIdForRouteAction(registry, routeId, stationId, actionType) {
-  const key = `${routeId}|${stationId}|${actionType}`;
-  const fromMap = registry.byRouteStationAction.get(key);
-  if (fromMap?.nodeId) return fromMap.nodeId;
-  return null;
+function resolveStationById(registry, stationId) {
+  return registry?.byId?.get(stationId) ?? null;
 }
 
-function distanceM(x1, y1, x2, y2) {
-  return Math.hypot(x1 - x2, y1 - y2);
+/** @deprecated 請改用 resolveStationById */
+function resolveNodeIdForRouteAction(registry, routeId, stationId, actionType) {
+  const key = `${routeId}|${stationId}|${actionType}`;
+  const hit = registry?.byRouteStationAction?.get(key);
+  return hit?.stationId ?? null;
+}
+
+function distanceM(ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 module.exports = {
-  DOCKING_POINT_NODE_ID_KEY,
-  DOCKING_POINT_STATION_NAME_KEY,
-  DOCKING_POINT_NODE_ROLE_KEY,
-  DOCKING_POINT_LEG_KEY,
-  DOCKING_POINT_STATION_KEY,
-  MAINLINE_DOCKING_NODE_ROLES,
-  NODE_ID_PATTERN,
-  resolveMapJsonPath,
-  normalizeStationNameInput,
-  stationNameToNodeToken,
-  parseDockingLeg,
-  parseDockingStation,
-  inferMainlineNodeRole,
-  routeIdForDockingLeg,
-  generateOperationNodeId,
-  defaultStationDisplayName,
-  ensureDockingPointParams,
+  collectStationsFromMap,
   collectOperationNodesFromMap,
+  loadStationsFromMapFile,
   loadOperationNodesFromMapFile,
   loadOperationNodeRegistry,
+  resolveMapJsonPath,
+  resolveStationById,
   resolveNodeIdForRouteAction,
   distanceM,
 };

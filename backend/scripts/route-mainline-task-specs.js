@@ -23,25 +23,24 @@ const AT_STATION_M = 3;
 
 const ROUTE_MAINLINE_TASK_SPECS_BASE = {
   // seq 為「每張訂單全域遞增」的序號（依行進順序），確保 task_id 唯一。
-  // 同一路線可有多個同類型動作（T3 與終點站各一次 PLATFORM_DOCKING），
-  // 若用站內局部序號會產生重複 task_id。
+  // stationId 對應地圖 DockingPoint.parameters.stationId
   'ROUTE-MAINLINE-DOWN': [
-    { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, nodeId: 'ND-N2W-VOICE-01', station: 'N2W' },
-    { type: 'STATION_DEPARTURE', seq: 1, nodeId: 'ND-N2W-DEP-01', station: 'N2W', mapAction: 'STATION_DEPARTURE' },
-    { type: 'PLATFORM_DOCKING', seq: 2, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
-    { type: 'OPEN_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'CLOSE_DOORS', seq: 4, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'STATION_DEPARTURE', seq: 5, nodeId: 'ND-T3-DEP-01', station: 'T3' },
-    { type: 'PLATFORM_DOCKING', seq: 6, nodeId: 'ND-S2W-STOP-01', station: 'S2W', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, stationId: 'station_2' },
+    { type: 'STATION_DEPARTURE', seq: 1, stationId: 'station_2', mapAction: 'STATION_DEPARTURE' },
+    { type: 'PLATFORM_DOCKING', seq: 2, stationId: 'station_3', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'OPEN_DOORS', seq: 3, stationId: 'station_3' },
+    { type: 'CLOSE_DOORS', seq: 4, stationId: 'station_3' },
+    { type: 'STATION_DEPARTURE', seq: 5, stationId: 'station_3' },
+    { type: 'PLATFORM_DOCKING', seq: 6, stationId: 'station_5', mapAction: 'PLATFORM_DOCKING' },
   ],
   'ROUTE-MAINLINE-UP': [
-    { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, nodeId: 'ND-S2W-VOICE-01', station: 'S2W' },
-    { type: 'STATION_DEPARTURE', seq: 1, nodeId: 'ND-S2W-DEP-01', station: 'S2W', mapAction: 'STATION_DEPARTURE' },
-    { type: 'PLATFORM_DOCKING', seq: 2, nodeId: 'ND-T3-STOP-01', station: 'T3', mapAction: 'PLATFORM_DOCKING' },
-    { type: 'OPEN_DOORS', seq: 3, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'CLOSE_DOORS', seq: 4, nodeId: 'ND-T3-DOOR-01', station: 'T3' },
-    { type: 'STATION_DEPARTURE', seq: 5, nodeId: 'ND-T3-DEP-01', station: 'T3' },
-    { type: 'PLATFORM_DOCKING', seq: 6, nodeId: 'ND-N2W-STOP-01', station: 'N2W', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'PRE_DEPARTURE_BROADCAST', seq: 0, stationId: 'station_6' },
+    { type: 'STATION_DEPARTURE', seq: 1, stationId: 'station_6', mapAction: 'STATION_DEPARTURE' },
+    { type: 'PLATFORM_DOCKING', seq: 2, stationId: 'station_4', mapAction: 'PLATFORM_DOCKING' },
+    { type: 'OPEN_DOORS', seq: 3, stationId: 'station_4' },
+    { type: 'CLOSE_DOORS', seq: 4, stationId: 'station_4' },
+    { type: 'STATION_DEPARTURE', seq: 5, stationId: 'station_4' },
+    { type: 'PLATFORM_DOCKING', seq: 6, stationId: 'station_1', mapAction: 'PLATFORM_DOCKING' },
   ],
 };
 
@@ -56,10 +55,10 @@ function resolveSpecsForRoute(routeId) {
     const fromMap = resolveNodeIdForRouteAction(
       NODE_REGISTRY,
       routeId,
-      spec.station,
+      spec.stationId,
       spec.mapAction,
     );
-    return fromMap ? { ...spec, nodeId: fromMap } : { ...spec };
+    return fromMap ? { ...spec, mapStationId: fromMap } : { ...spec };
   });
 }
 
@@ -75,65 +74,78 @@ function routeIdForTrip(tripCode) {
   return null;
 }
 
-function isOriginStation(routeId, station) {
-  return routeId === 'ROUTE-MAINLINE-DOWN' ? station === 'N2W' : station === 'S2W';
+function isOriginStation(routeId, stationId) {
+  return routeId === 'ROUTE-MAINLINE-DOWN'
+    ? stationId === 'station_2'
+    : stationId === 'station_6';
 }
 
-function isAtStation(leg, station) {
+function midStationIdForRoute(routeId) {
+  return routeId === 'ROUTE-MAINLINE-DOWN' ? 'station_3' : 'station_4';
+}
+
+function isAtStation(leg, stationId) {
   return (
-    leg.target_station_id === station
+    leg.target_station_id === stationId
     && (leg.distance_to_target_m ?? 999) <= AT_STATION_M
   );
 }
 
-function isApproachingStation(leg, station) {
+function isApproachingStation(leg, stationId) {
   return (
-    leg.target_station_id === station
+    leg.target_station_id === stationId
     && (leg.distance_to_target_m ?? 999) <= DOCK_APPROACH_M
   );
 }
 
+function motionAtStation(motion, stationId) {
+  if (motion?.stationId === stationId) return true;
+  const hit = NODE_REGISTRY.byId.get(stationId);
+  if (!hit?.stationName) return false;
+  return String(motion?.station ?? '').includes(hit.stationName.replace(/站$/, ''));
+}
+
 function resolveTaskStatusFromMapNode(spec, motion, routeId, leg) {
   const mapKey = spec.mapAction
-    ? `${routeId}|${spec.station}|${spec.mapAction}`
+    ? `${routeId}|${spec.stationId}|${spec.mapAction}`
     : null;
   const node =
     (mapKey ? NODE_REGISTRY.byRouteStationAction.get(mapKey) : null)
-    ?? NODE_REGISTRY.byId.get(spec.nodeId);
+    ?? NODE_REGISTRY.byId.get(spec.stationId);
 
   if (node && typeof motion?.x === 'number' && typeof motion?.y === 'number') {
     const dist = distanceM(motion.x, motion.y, node.xM, node.yM);
 
     if (spec.type === 'PLATFORM_DOCKING') {
-      if (motion.dwelling && String(motion.station ?? '').includes(spec.station)) {
+      if (motion.dwelling && motionAtStation(motion, spec.stationId)) {
         return 'COMPLETED';
       }
       if (dist <= NODE_DONE_RADIUS_M) return 'COMPLETED';
       if (dist <= NODE_TRIGGER_RADIUS_M) return 'IN_PROGRESS';
-      if (isApproachingStation(leg, spec.station)) return 'IN_PROGRESS';
+      if (isApproachingStation(leg, spec.stationId)) return 'IN_PROGRESS';
       return 'PENDING';
     }
 
     if (spec.type === 'STATION_DEPARTURE' && spec.mapAction) {
       if (motion.dwelling && dist <= NODE_TRIGGER_RADIUS_M) return 'IN_PROGRESS';
       if (!motion.dwelling && dist > NODE_TRIGGER_RADIUS_M) return 'COMPLETED';
-      if (isAtStation(leg, spec.station) && motion.dwelling) return 'IN_PROGRESS';
+      if (isAtStation(leg, spec.stationId) && motion.dwelling) return 'IN_PROGRESS';
       return 'PENDING';
     }
   }
 
   if (spec.type === 'PLATFORM_DOCKING') {
-    if (motion.dwelling && String(motion.station ?? '').includes(spec.station)) {
+    if (motion.dwelling && motionAtStation(motion, spec.stationId)) {
       return 'COMPLETED';
     }
-    if (isAtStation(leg, spec.station) && motion.dwelling) return 'COMPLETED';
-    if (isApproachingStation(leg, spec.station)) return 'IN_PROGRESS';
+    if (isAtStation(leg, spec.stationId) && motion.dwelling) return 'COMPLETED';
+    if (isApproachingStation(leg, spec.stationId)) return 'IN_PROGRESS';
     return 'PENDING';
   }
 
   if (spec.type === 'STATION_DEPARTURE' && spec.mapAction) {
-    if (isAtStation(leg, spec.station) && motion.dwelling) return 'IN_PROGRESS';
-    if (!motion.dwelling && leg.target_station_id !== spec.station) return 'COMPLETED';
+    if (isAtStation(leg, spec.stationId) && motion.dwelling) return 'IN_PROGRESS';
+    if (!motion.dwelling && leg.target_station_id !== spec.stationId) return 'COMPLETED';
     return 'PENDING';
   }
 
@@ -141,9 +153,9 @@ function resolveTaskStatusFromMapNode(spec, motion, routeId, leg) {
 }
 
 function resolveVoiceBroadcast(spec, motion, routeId, leg) {
-  if (!isOriginStation(routeId, spec.station)) return 'PENDING';
+  if (!isOriginStation(routeId, spec.stationId)) return 'PENDING';
 
-  const node = NODE_REGISTRY.byId.get(spec.nodeId);
+  const node = NODE_REGISTRY.byId.get(spec.stationId);
   if (node && typeof motion?.x === 'number' && typeof motion?.y === 'number' && motion.dwelling) {
     const dist = distanceM(motion.x, motion.y, node.xM, node.yM);
     if (dist <= NODE_TRIGGER_RADIUS_M) return 'IN_PROGRESS';
@@ -151,9 +163,10 @@ function resolveVoiceBroadcast(spec, motion, routeId, leg) {
 
   if (!motion.dwelling && (motion.progress ?? 0) > 0.01) return 'COMPLETED';
 
+  const mid = midStationIdForRoute(routeId);
   if (
     motion.dwelling
-    && leg.target_station_id === 'T3'
+    && leg.target_station_id === mid
     && (leg.distance_to_target_m ?? 0) >= VOICE_BROADCAST_MIN_DISTANCE_M
   ) {
     return 'IN_PROGRESS';
@@ -174,8 +187,8 @@ function doorOpenPercent(motion) {
 }
 
 function resolveOpenDoors(spec, motion, leg) {
-  if (!isAtStation(leg, spec.station) || !motion.dwelling) return 'PENDING';
-  const doorNode = NODE_REGISTRY.byId.get(spec.nodeId);
+  if (!isAtStation(leg, spec.stationId) || !motion.dwelling) return 'PENDING';
+  const doorNode = NODE_REGISTRY.byId.get(spec.stationId);
   if (doorNode && typeof motion?.x === 'number' && typeof motion?.y === 'number') {
     const dist = distanceM(motion.x, motion.y, doorNode.xM, doorNode.yM);
     if (dist > NODE_TRIGGER_RADIUS_M) return 'PENDING';
@@ -188,8 +201,8 @@ function resolveOpenDoors(spec, motion, leg) {
 
 function resolveCloseDoors(spec, motion, leg) {
   const pct = doorOpenPercent(motion);
-  if (!isAtStation(leg, spec.station)) {
-    if (!motion.dwelling && leg.target_station_id !== spec.station && pct <= 10) {
+  if (!isAtStation(leg, spec.stationId)) {
+    if (!motion.dwelling && leg.target_station_id !== spec.stationId && pct <= 10) {
       return 'COMPLETED';
     }
     return 'PENDING';
@@ -201,8 +214,8 @@ function resolveCloseDoors(spec, motion, leg) {
 }
 
 function resolveGenericStationDeparture(spec, motion, leg) {
-  if (isAtStation(leg, spec.station) && motion.dwelling) return 'IN_PROGRESS';
-  if (!motion.dwelling && leg.target_station_id !== spec.station) return 'COMPLETED';
+  if (isAtStation(leg, spec.stationId) && motion.dwelling) return 'IN_PROGRESS';
+  if (!motion.dwelling && leg.target_station_id !== spec.stationId) return 'COMPLETED';
   return 'PENDING';
 }
 
@@ -252,7 +265,7 @@ function buildTaskGroup(orderId, tripCode, motion, options = {}) {
     return {
       task_id: id,
       task_name: spec.type,
-      task_params: { node_id: spec.nodeId },
+      task_params: { station_id: spec.stationId },
       status,
       actual_start_time: status !== 'PENDING' ? now - 3000 : null,
       actual_end_time: status === 'COMPLETED' ? now : null,

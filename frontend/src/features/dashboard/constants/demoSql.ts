@@ -119,19 +119,25 @@ WHERE created_at >= ${DAY_MS}
   AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%')
 `.trim();
 
-/** 運能趨勢區 KPI 列（即時／目標／可用／下段）— 由 DB 示範表依目前時間推算 */
+/** 運能趨勢區 KPI 列（即時／目標／可用／下段）— 不依固定 offset 格點，避免 tick 後 JOIN 失敗 */
 export const CAPACITY_TREND_SUMMARY_SQL = `
 SELECT
-  live.utilization::int AS live_val,
+  (
+    SELECT utilization FROM capacity_trend_demo_points
+    WHERE demo_set_id = 'DEMO'
+    ORDER BY ABS(offset_minutes)
+    LIMIT 1
+  )::int AS live_val,
   1200 AS target_val,
   200 AS avail_val,
   '可調度2輛' AS avail_hint,
-  nxt.utilization::int AS next_val,
+  (
+    SELECT utilization FROM capacity_trend_demo_points
+    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30
+    ORDER BY offset_minutes ASC
+    LIMIT 1
+  )::int AS next_val,
   to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint
-FROM capacity_trend_demo_points live
-JOIN capacity_trend_demo_points nxt
-  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60
-WHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0
 `.trim();
 
 /** 運能趨勢折線：當前運能（過去～現在）+ 預期走勢（現在～未來） */
@@ -162,9 +168,9 @@ SELECT
     CASE
       WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
       WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
-      WHEN fs.zone = '整備-保養' THEN 'M1'
+      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
       WHEN fs.zone = '整備-維修' THEN 'M2'
-      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
+      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
       WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')
       ELSE fs.slot_id
     END
@@ -180,14 +186,18 @@ ORDER BY fs.slot_id ASC
 export function maintenanceZoneCountSql(zone: string): string {
   const z = zone.replace(/'/g, "''");
   return `
-SELECT COUNT(*)::int AS total
+SELECT COALESCE(SUM(
+  CASE
+    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0
+      THEN (st.raw_payload->>'occupancy')::int
+    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL
+      THEN 1
+    ELSE 0
+  END
+), 0)::int AS total
 FROM facility_slots fs
 LEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id
 WHERE fs.zone = '${z}' AND fs.is_active = true
-  AND (
-    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')
-    OR st.vehicle_code IS NOT NULL
-  )
 `.trim();
 }
 
@@ -200,7 +210,8 @@ FROM facility_slots fs
 LEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id
 WHERE fs.zone LIKE '整備-%' AND fs.is_active = true
   AND (
-    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')
+    COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0
+    OR st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')
     OR st.vehicle_code IS NOT NULL
   )
 `.trim();
@@ -253,24 +264,34 @@ SELECT DISTINCT ON (v.vehicle_code)
   active_order.maint_type_color,
   CASE
     WHEN active_order.line_kind = 'MAINLINE'
-      AND active_order.status = 'PROCESSING'
+      AND active_order.status IN ('PENDING', 'PROCESSING')
       AND active_order.trip_code ~ '^[DU][0-9]{4}$'
       THEN active_order.trip_code
     WHEN active_order.line_kind = 'MAINTENANCE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
       AND NULLIF(TRIM(active_order.maint_type_label), '') IS NOT NULL
       THEN active_order.maint_type_label
+    WHEN NULLIF(TRIM(maint_order.yard_slot_id), '') IS NOT NULL THEN
+      CASE
+        WHEN maint_order.yard_slot_id LIKE 'E%' THEN '充電'
+        WHEN maint_order.yard_slot_id LIKE 'P%' THEN '臨停'
+        WHEN maint_order.yard_slot_id LIKE 'W%' THEN '洗車'
+        WHEN maint_order.yard_slot_id LIKE 'H%' THEN '調度'
+        WHEN maint_order.yard_slot_id LIKE 'M%' THEN '保養'
+        ELSE '整備'
+      END
     ELSE NULL
   END AS badge_label,
   CASE
     WHEN active_order.line_kind = 'MAINLINE'
-      AND active_order.status = 'PROCESSING'
+      AND active_order.status IN ('PENDING', 'PROCESSING')
       AND active_order.trip_code ~ '^[DU][0-9]{4}$'
       THEN 'mainline'
     WHEN active_order.line_kind = 'MAINTENANCE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
       AND NULLIF(TRIM(active_order.maint_type_label), '') IS NOT NULL
       THEN 'maintenance'
+    WHEN NULLIF(TRIM(maint_order.yard_slot_id), '') IS NOT NULL THEN 'maintenance'
     ELSE NULL
   END AS badge_kind,
   CASE
@@ -289,10 +310,37 @@ SELECT DISTINCT ON (v.vehicle_code)
   COALESCE(m.status_sensing, 'OK') AS status_sensing,
   COALESCE(m.status_communication, 'OK') AS status_communication,
   COALESCE(m.status_chassis, 'OK') AS status_chassis,
-  COALESCE(
-    m.segment_label,
-    ('D' || (32 + (SUBSTRING(v.vehicle_code FROM '[0-9]+'))::int % 18))::text
-  ) AS segment_label,
+  CASE
+    WHEN active_order.line_kind = 'MAINLINE'
+      AND active_order.status = 'PROCESSING'
+      THEN COALESCE(
+        NULLIF(NULLIF(TRIM(m.segment_label), ''), '—'),
+        NULLIF(TRIM(maint_order.yard_slot_id), ''),
+        ('D' || (32 + (SUBSTRING(v.vehicle_code FROM '[0-9]+'))::int % 18))::text
+      )
+    WHEN active_order.line_kind = 'MAINLINE'
+      AND active_order.status IN ('PENDING', 'FAULTED')
+      THEN COALESCE(
+        NULLIF(TRIM(active_order.yard_slot_id), ''),
+        NULLIF(TRIM(maint_order.yard_slot_id), ''),
+        NULLIF(NULLIF(TRIM(m.segment_label), ''), '—'),
+        ('D' || (32 + (SUBSTRING(v.vehicle_code FROM '[0-9]+'))::int % 18))::text
+      )
+    ELSE COALESCE(
+      NULLIF(TRIM(active_order.yard_slot_id), ''),
+      NULLIF(TRIM(maint_order.yard_slot_id), ''),
+      NULLIF(NULLIF(TRIM(m.segment_label), ''), '—'),
+      ('D' || (32 + (SUBSTRING(v.vehicle_code FROM '[0-9]+'))::int % 18))::text
+    )
+  END AS segment_label,
+  CASE
+    WHEN active_order.line_kind = 'MAINLINE' AND active_order.status = 'PROCESSING'
+      THEN NULLIF(TRIM(maint_order.yard_slot_id), '')
+    ELSE COALESCE(
+      NULLIF(TRIM(active_order.yard_slot_id), ''),
+      NULLIF(TRIM(maint_order.yard_slot_id), '')
+    )
+  END AS yard_slot_id,
   COALESCE(
     m.demo_speed,
     ((18 + (SUBSTRING(v.vehicle_code FROM '[0-9]+'))::int % 8)
@@ -306,13 +354,39 @@ FROM vehicles v
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
 LEFT JOIN LATERAL (
   SELECT o3.priority_level, o3.line_kind, o3.status, o3.trip_code,
-         o3.maint_type_label, o3.maint_type_bg, o3.maint_type_color
+         o3.maint_type_label, o3.maint_type_bg, o3.maint_type_color,
+         NULLIF(TRIM(o3.payload->>'yard_slot_id'), '') AS yard_slot_id
   FROM operation_orders o3
   WHERE o3.vehicle_code = v.vehicle_code
     AND o3.status IN ('PENDING', 'PROCESSING', 'FAULTED')
-  ORDER BY o3.priority_level DESC, o3.created_at DESC
+  ORDER BY
+    CASE
+      WHEN o3.line_kind = 'MAINLINE'
+        AND o3.status = 'PENDING'
+        AND o3.trip_code ~ '^[DU][0-9]{4}$'
+        THEN 3
+      WHEN o3.line_kind = 'MAINLINE'
+        AND o3.status = 'PROCESSING'
+        AND COALESCE(m.demo_speed, 0) >= 1
+        THEN 3
+      WHEN o3.line_kind = 'MAINTENANCE'
+        AND COALESCE(m.demo_speed, 0) < 1
+        THEN 2
+      ELSE 1
+    END DESC,
+    o3.priority_level DESC,
+    o3.created_at DESC
   LIMIT 1
 ) active_order ON true
+LEFT JOIN LATERAL (
+  SELECT NULLIF(TRIM(o4.payload->>'yard_slot_id'), '') AS yard_slot_id
+  FROM operation_orders o4
+  WHERE o4.vehicle_code = v.vehicle_code
+    AND o4.line_kind = 'MAINTENANCE'
+    AND o4.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+  ORDER BY o4.created_at DESC
+  LIMIT 1
+) maint_order ON true
 LEFT JOIN operation_orders o
   ON o.vehicle_code = v.vehicle_code AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
 WHERE v.is_active = true
@@ -376,8 +450,8 @@ route_json AS (
     o.order_id,
     json_agg(
       json_build_object(
-        'name', rs.station_id,
-        'remain_pct', rs.remain_pct,
+        'name', COALESCE(NULLIF(rs.station_display_name, ''), rs.station_id),
+        'station_id', rs.station_id,
         'actions', COALESCE((
           SELECT json_agg(json_build_object(
             'action_id', a.action_id,
@@ -402,6 +476,8 @@ SELECT
   CASE WHEN o.trip_direction = 'D' THEN '下行' ELSE '上行' END AS direction_label,
   CASE WHEN o.trip_direction = 'D' THEN '#8E51FF' ELSE '#51A2FF' END AS direction_pill_bg,
   '#FFFFFF' AS direction_pill_color,
+  '下一站' AS station_label,
+  '剩餘到站' AS eta_label,
   o.status AS order_status,
   CASE
     WHEN o.status = 'FAULTED' THEN '故障'
@@ -431,30 +507,37 @@ SELECT
     WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.45)'
     ELSE 'rgba(113,113,122,0.35)'
   END AS card_border_color,
-  o.route_origin AS st_a,
-  o.route_mid AS st_b,
-  o.route_destination AS st_c,
-  COALESCE(rj.route_stations, '[]') AS route_stations,
+  CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END AS st_a,
+  CASE WHEN o.trip_direction = 'U' THEN 'T3上行' ELSE 'T3下行' END AS st_b,
+  CASE WHEN o.trip_direction = 'U' THEN 'N2W上行' ELSE 'S2W下行' END AS st_c,
+  COALESCE(
+    NULLIF(rj.route_stations, '[]'),
+    CASE
+      WHEN o.trip_direction = 'U' THEN
+        '[{"name":"S2W上行","station_id":"station_6"},{"name":"T3上行","station_id":"station_4"},{"name":"N2W上行","station_id":"station_1"}]'
+      ELSE '[{"name":"N2W下行","station_id":"station_2"},{"name":"T3下行","station_id":"station_3"},{"name":"S2W下行","station_id":"station_5"}]'
+    END
+  ) AS route_stations,
   CASE WHEN o.trip_direction = 'U' THEN 1 ELSE 0 END AS trip_leg_hint,
   CASE
     WHEN o.status = 'PENDING' THEN 0
     WHEN o.status = 'FAULTED' THEN COALESCE((o.payload->>'segment_index')::int, 0)
-    WHEN COALESCE(o.payload->'current_leg'->>'target_station_id', o.route_mid, 'T3') = COALESCE(o.route_mid, 'T3') THEN 0
+    WHEN COALESCE(o.payload->'current_leg'->>'target_station_id', o.route_mid) = COALESCE(o.route_mid, 'station_3') THEN 0
     ELSE 1
   END AS segment_index,
   CASE
     WHEN o.status = 'PENDING' THEN 100
-    WHEN o.status = 'FAULTED' THEN COALESCE((o.payload->>'segment_remain_pct')::int, 100)
+    WHEN o.status = 'FAULTED' THEN COALESCE(FLOOR((o.payload->>'segment_remain_pct')::numeric)::int, 100)
     ELSE COALESCE(
-      (o.payload->>'segment_remain_pct')::int,
+      FLOOR((o.payload->>'segment_remain_pct')::numeric)::int,
       CASE
         WHEN jsonb_typeof(o.payload->'current_leg') = 'object'
-          AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::int, 0) = 0
+          AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0
           AND COALESCE((o.payload->'current_leg'->>'distance_to_target_m')::numeric, 0) <= 0
         THEN 0
-        WHEN COALESCE((o.payload->'current_leg'->>'eta_seconds')::int, 0) = 0 THEN 100
+        WHEN COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0 THEN 100
         WHEN COALESCE(
-          (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::int,
+          (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric,
           0
         ) > 0 THEN ROUND(
           (o.payload->'current_leg'->>'eta_seconds')::numeric
@@ -466,18 +549,27 @@ SELECT
     )
   END AS segment_remain_pct,
   COALESCE(
-    NULLIF(TRIM(o.next_station), ''),
-    CASE
-      WHEN o.status = 'PENDING' THEN COALESCE(o.route_origin, 'S2W')
-      WHEN NOT EXISTS (
-        SELECT 1 FROM order_action_states a
-        WHERE a.order_id = o.order_id
-          AND a.station_id = o.route_mid
-          AND a.action_type = 'STATION_DEPARTURE'
-          AND a.action_status = 'COMPLETED'
-      ) THEN COALESCE(o.route_mid, 'T3')
-      ELSE COALESCE(o.route_destination, o.route_mid)
-    END
+    (
+      SELECT COALESCE(NULLIF(TRIM(rs.station_display_name), ''), rs.station_id)
+      FROM operation_route_stations rs
+      WHERE rs.route_id = o.route_id
+        AND rs.station_id = COALESCE(
+          NULLIF(TRIM(o.next_station), ''),
+          CASE
+            WHEN o.status = 'PENDING' THEN o.route_origin
+            WHEN NOT EXISTS (
+              SELECT 1 FROM order_action_states a
+              WHERE a.order_id = o.order_id
+                AND a.station_id = o.route_mid
+                AND a.action_type = 'STATION_DEPARTURE'
+                AND a.action_status = 'COMPLETED'
+            ) THEN o.route_mid
+            ELSE COALESCE(o.route_destination, o.route_mid)
+          END
+        )
+      LIMIT 1
+    ),
+    CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END
   ) AS next_station,
   CASE
     WHEN o.status = 'PENDING' AND o.trip_start_minutes IS NOT NULL THEN
@@ -497,9 +589,9 @@ SELECT
         ) % 60
       )::int::text, 2, '0')
     ELSE COALESCE(
-      LPAD((GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::int, 0)) / 60)::int::text, 2, '0')
+      LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0))) / 60)::int::text, 2, '0')
       || ':'
-      || LPAD((GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::int, 0)) % 60)::int::text, 2, '0'),
+      || LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0)))::int % 60)::text, 2, '0'),
       NULLIF(TRIM(o.eta_remain), ''),
       '00:00'
     )
@@ -581,99 +673,82 @@ FROM (
 ) s
 `.trim();
 
-/** 整備班表：來自模擬同步的 DEMO-ORD 整備訂單（任務類型／場域格位與軌道模擬一致） */
+/** 整備班表：一卡一任務，軌道 S2W→格位；示範模式車已在格上 */
 export const MAINTENANCE_SHIFTS_SQL = `
 WITH m0 AS (
   SELECT
     o.*,
-    COALESCE(NULLIF(o.next_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), 'E1') AS slot_id
+    COALESCE(
+      NULLIF(TRIM(o.payload->>'yard_slot_id'), ''),
+      NULLIF(TRIM(o.next_station), '')
+    ) AS slot_id
   FROM operation_orders o
   WHERE o.order_id LIKE 'DEMO-ORD-%'
     AND o.line_kind = 'MAINTENANCE'
-    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED', 'END')
+    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     AND o.created_at >= ${DAY_MS}
-    -- 若同車已在正線執勤，不在整備清單重複出現（避免「正線跑卻顯示充電」）
+    AND COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), NULLIF(TRIM(o.next_station), '')) IS NOT NULL
     AND NOT EXISTS (
       SELECT 1 FROM operation_orders ml
       WHERE ml.vehicle_code = o.vehicle_code
         AND ml.line_kind = 'MAINLINE'
         AND ml.status IN ('PENDING', 'PROCESSING')
     )
-),
-m AS (
-  SELECT
-    m0.*,
-    CASE
-      WHEN slot_id LIKE 'E%' THEN '充電區'
-      WHEN slot_id LIKE 'P%' THEN '臨停區'
-      WHEN slot_id LIKE 'H%' THEN '整備區'
-      WHEN slot_id LIKE 'W%' THEN '洗車區'
-      ELSE '場區'
-    END AS zone_label
-  FROM m0
 )
-SELECT
+SELECT DISTINCT ON (o.vehicle_code)
   o.order_id AS shift_key,
   o.vehicle_code,
   COALESCE(o.trip_code, '—') AS trip_code,
   COALESCE(o.trip_code, '—') AS trip_header,
-  COALESCE(o.maint_type_label, '充電') AS maint_type_label,
-  COALESCE(o.maint_type_bg, 'transparent') AS maint_type_bg,
-  COALESCE(o.maint_type_color, '#FD9A00') AS maint_type_color,
   CASE
-    WHEN o.status = 'END' THEN '已完成'
-    WHEN o.status = 'FAULTED' THEN '滯留中'
+    WHEN slot_id LIKE 'E%' THEN '充電'
+    WHEN slot_id LIKE 'P%' THEN '臨停'
+    WHEN slot_id LIKE 'W%' THEN '洗車'
+    WHEN slot_id LIKE 'H%' THEN '調度'
+    WHEN slot_id LIKE 'M%' THEN '保養'
+    ELSE COALESCE(o.maint_type_label, '整備')
+  END AS maint_type_label,
+  COALESCE(o.maint_type_bg, 'transparent') AS maint_type_bg,
+  CASE
+    WHEN slot_id LIKE 'P%' OR COALESCE(o.maint_type_label, '') = '臨停' THEN '#FD9A00'
+    ELSE COALESCE(o.maint_type_color, '#FD9A00')
+  END AS maint_type_color,
+  CASE
+    WHEN o.status = 'FAULTED' THEN '進行中'
     WHEN o.status = 'PENDING' THEN '停留中'
-    WHEN o.status = 'PROCESSING' THEN '進行中'
-    ELSE '停留中'
+    ELSE '進行中'
   END AS status_label,
   CASE
     WHEN o.status = 'END' THEN '#422006'
-    WHEN o.status = 'FAULTED' THEN 'rgba(255, 100, 103, 0.3)'
     WHEN o.status = 'PENDING' THEN '#27272a'
-    WHEN o.status = 'PROCESSING' THEN 'rgba(0, 212, 146, 0.3)'
+    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN 'rgba(0, 212, 146, 0.3)'
     ELSE '#27272a'
   END AS status_bg,
   CASE
     WHEN o.status = 'END' THEN '#fb923c'
-    WHEN o.status = 'FAULTED' THEN '#FF6467'
     WHEN o.status = 'PENDING' THEN '#a1a1aa'
-    WHEN o.status = 'PROCESSING' THEN '#00BC7D'
+    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#00BC7D'
     ELSE '#a1a1aa'
   END AS status_color,
   CASE
     WHEN o.status = 'END' THEN 'rgba(249,115,22,0.75)'
-    WHEN o.status = 'FAULTED' THEN '#FB2C36'
     WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.55)'
-    WHEN o.status = 'PROCESSING' THEN '#009966'
+    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#009966'
     ELSE 'rgba(113,113,122,0.45)'
   END AS card_border_color,
   'S2W' AS st_a,
-  o.zone_label AS st_b,
+  o.slot_id AS st_b,
   o.slot_id AS st_c,
   json_build_array(
     json_build_object('name', 'S2W', 'remain_pct', 0),
-    json_build_object('name', o.zone_label, 'remain_pct', 50),
     json_build_object('name', o.slot_id, 'remain_pct', 100)
   )::text AS route_stations,
-  COALESCE((o.payload->>'segment_index')::int, 0) AS segment_index,
-  COALESCE(
-    (o.payload->>'segment_remain_pct')::int,
-    (o.payload->>'route_progress')::int,
-    CASE
-      WHEN o.status = 'FAULTED' THEN 55
-      WHEN o.status = 'END' THEN 100
-      ELSE 28
-    END
-  ) AS segment_remain_pct,
-  COALESCE(
-    NULLIF(o.maint_station, ''),
-    NULLIF(o.next_station, ''),
-    NULLIF(o.payload->>'yard_slot_id', ''),
-    'E2'
-  ) AS next_station,
+  0 AS segment_index,
+  0 AS segment_remain_pct,
+  o.slot_id AS next_station,
+  '整備站點' AS station_label,
   CASE
-    WHEN o.status IN ('END', 'FAULTED') THEN '逾時滯留'
+    WHEN o.status = 'END' THEN '逾時滯留'
     ELSE '完成預估'
   END AS eta_label,
   COALESCE(o.eta_remain, '00:30:00') AS eta_remain,
@@ -681,31 +756,20 @@ SELECT
   to_char(to_timestamp(COALESCE(o.planned_end, o.created_at + 1800000) / 1000.0), 'HH24:MI') AS end_time,
   COALESCE(
     (o.payload->>'route_progress')::int,
-    CASE
-      WHEN o.status = 'END' THEN 100
-      WHEN o.status = 'FAULTED' THEN 50
-      WHEN o.status = 'PENDING' THEN 25
-      ELSE 50
-    END
+    100
   ) AS route_progress,
-  (o.status = 'FAULTED') AS is_alert,
+  false AS is_alert,
   CASE
-    WHEN o.status = 'FAULTED' THEN 'repair'
-    WHEN COALESCE(o.maint_type_label, '') LIKE '%充電%' THEN 'charging'
-    WHEN COALESCE(o.maint_type_label, '') LIKE '%洗%' THEN 'wash'
-    WHEN COALESCE(o.maint_type_label, '') LIKE '%臨停%' THEN 'parking'
-    WHEN COALESCE(o.maint_type_label, '') LIKE '%保養%' THEN 'maintenance'
-    WHEN COALESCE(o.maint_type_label, '') LIKE '%整備%' THEN 'maintenance'
-    ELSE 'charging'
+    WHEN slot_id LIKE 'E%' THEN 'charging'
+    WHEN slot_id LIKE 'W%' THEN 'wash'
+    WHEN slot_id LIKE 'P%' THEN 'parking'
+    WHEN slot_id LIKE 'M%' THEN 'maintenance'
+    WHEN slot_id LIKE 'H%' THEN 'dispatch'
+    ELSE 'maintenance'
   END AS operation_action,
-  CASE
-    WHEN o.status = 'FAULTED' THEN '#FB2C36'
-    ELSE COALESCE(o.icon_bg_color, '#51A2FF')
-  END AS icon_bg_color,
-  COALESCE(o.progress_marker_icon, 'Zap') AS progress_marker_icon,
+  '#51A2FF' AS icon_bg_color,
   'maintenance' AS line_kind
-FROM m o
-JOIN vehicles v ON v.vehicle_code = o.vehicle_code
-ORDER BY COALESCE(o.planned_start, o.created_at), o.vehicle_code
-LIMIT 6
+FROM m0 o
+ORDER BY o.vehicle_code, o.created_at DESC
+LIMIT 12
 `.trim();

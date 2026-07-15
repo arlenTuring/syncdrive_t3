@@ -7,9 +7,9 @@ import {
 import { meterToAreaLocalPx } from './areaCoords'
 import { getComponentPurpose } from './facilityArea'
 import {
-  getDockingPointNodeId,
   getDockingPointStationName,
 } from './dockingPointFacility'
+import { getWaypointCode } from './waypointFacility'
 import { usesRefFieldBounds } from './facilityRefFieldBinding'
 import { getValidRefFieldBounds, isZeroRefFieldBoundsSpan } from './facilityRefFieldBounds'
 import { getRefFieldPosition } from './facilityRefFieldPosition'
@@ -35,6 +35,10 @@ function resolveListTitle(f: FacilityObject): string {
   if (f.type === 'DockingPoint') {
     const station = getDockingPointStationName(f)
     if (station) return station
+  }
+  if (f.type === 'Waypoint') {
+    const code = getWaypointCode(f)
+    if (code) return code
   }
   const custom = f.customName.trim()
   if (custom) return custom
@@ -111,9 +115,8 @@ function facilityAreaPx(
 }
 
 function resolveListPurpose(f: FacilityObject): string {
-  if (f.type === 'DockingPoint') {
-    const nodeId = getDockingPointNodeId(f)
-    if (nodeId) return nodeId
+  if (f.type === 'DockingPoint' || f.type === 'Waypoint') {
+    return ''
   }
   return getComponentPurpose(f)
 }

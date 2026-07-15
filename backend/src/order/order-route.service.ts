@@ -12,7 +12,7 @@ import { RouteActionStatus } from '../database/entities/operation-route-station-
 export type TaskGroupItem = {
   task_id: string;
   task_name: string;
-  task_params?: { node_id?: string; junction_id?: string };
+  task_params?: { node_id?: string; junction_id?: string; station_id?: string };
   status: string;
   actual_start_time?: number | null;
   actual_end_time?: number | null;
@@ -95,8 +95,13 @@ export class OrderRouteService {
         const nodeId = task.task_params?.node_id
           ? String(task.task_params.node_id).trim()
           : null;
-        // 優先用 node_id 區分同類型多站動作（如 T3／S2W 各一次 PLATFORM_DOCKING）
-        if (nodeId) {
+        const stationId = task.task_params?.station_id
+          ? String(task.task_params.station_id).trim()
+          : null;
+        if (stationId) {
+          row = await this.actionStateRepo.findOne({ where: { orderId, actionType, stationId } });
+        }
+        if (!row && nodeId) {
           row = await this.actionStateRepo.findOne({ where: { orderId, actionType, nodeId } });
         }
         if (!row) {
@@ -124,19 +129,25 @@ export class OrderRouteService {
     if (stations.length === 0) return 0;
 
     const actions = await this.actionStateRepo.find({ where: { orderId } });
+    const lastIndex = stations.length - 1;
     let maxRemain = 0;
-    for (const station of stations) {
+    for (let i = 0; i < stations.length; i += 1) {
+      const station = stations[i];
+      const anchor =
+        lastIndex <= 0 ? 100 : Math.round((i / lastIndex) * 100);
       const stationActions = actions.filter((a) => a.stationId === station.stationId);
       const allDone = stationActions.length > 0
         && stationActions.every((a) => a.actionStatus === RouteActionStatus.COMPLETED);
       if (allDone) {
-        maxRemain = Math.max(maxRemain, station.remainPct);
+        maxRemain = Math.max(maxRemain, anchor);
       } else {
         const inProgress = stationActions.some(
           (a) => a.actionStatus === RouteActionStatus.IN_PROGRESS,
         );
         if (inProgress) {
-          maxRemain = Math.max(maxRemain, Math.max(0, station.remainPct - 10));
+          const prevAnchor =
+            i <= 0 ? 0 : Math.round(((i - 1) / lastIndex) * 100);
+          maxRemain = Math.max(maxRemain, Math.round((prevAnchor + anchor) / 2));
         }
       }
     }

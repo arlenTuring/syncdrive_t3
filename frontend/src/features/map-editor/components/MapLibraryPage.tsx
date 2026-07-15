@@ -4,6 +4,7 @@ import {
   FileText,
   FolderOpen,
   Loader2,
+  MapPin,
   Pencil,
   Plus,
   Trash2,
@@ -28,6 +29,11 @@ import {
 } from '../utils/mapLibraryStorage'
 import { NewMapPixelDialog } from './NewMapPixelDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
+import {
+  fetchMapLibraryBackendStatus,
+  isMapLibraryEntryActive,
+  setActiveMapLibraryEntry,
+} from '../api/mapLibraryApi'
 
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
@@ -45,6 +51,18 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   const [pasteText, setPasteText] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+  const [activeMapId, setActiveMapId] = useState<string | null>(null)
+  const [activeLibraryId, setActiveLibraryId] = useState<string | null>(null)
+  const [activatingLibraryId, setActivatingLibraryId] = useState<string | null>(
+    null,
+  )
+
+  const refreshActiveStatus = useCallback(async () => {
+    const status = await fetchMapLibraryBackendStatus()
+    if (!status) return
+    setActiveMapId(status.activeMapId)
+    setActiveLibraryId(status.activeLibraryId)
+  }, [])
 
   const refreshEntries = useCallback(async () => {
     setLoading(true)
@@ -52,13 +70,14 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     try {
       const seeded = await ensureMapLibrarySeeded()
       setEntries(seeded)
+      await refreshActiveStatus()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setEntries(readMapLibrary())
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [refreshActiveStatus])
 
   useEffect(() => {
     void refreshEntries()
@@ -164,6 +183,27 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     }
   }, [importParsed, pasteText])
 
+  const handleSetActive = useCallback(
+    async (entry: MapLibraryEntry) => {
+      if (isMapLibraryEntryActive(entry, activeMapId, activeLibraryId)) return
+      setActivatingLibraryId(entry.libraryId)
+      try {
+        const result = await setActiveMapLibraryEntry(entry)
+        if (!result.ok) {
+          alert(
+            `設為當前使用地圖失敗：${result.error ?? '請確認後端已啟動'}`,
+          )
+          return
+        }
+        setActiveMapId(result.mapId)
+        setActiveLibraryId(entry.libraryId)
+      } finally {
+        setActivatingLibraryId(null)
+      }
+    },
+    [activeLibraryId, activeMapId],
+  )
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-zinc-950 text-zinc-100">
       <div className="border-b border-zinc-800 bg-zinc-900/90 px-4 py-3">
@@ -176,6 +216,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               <h1 className="text-lg font-semibold text-zinc-100">地圖清單</h1>
               <p className="mt-1 text-sm text-zinc-400">
                 選擇要編輯的地圖，或建立空白地圖、複製、匯入／導出地圖描述檔。
+                「設為當前使用」後，儀表板模擬與後端 API 會讀取該圖。
               </p>
             </div>
           </div>
@@ -270,6 +311,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               <thead className="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">名稱</th>
+                  <th className="px-4 py-3 font-medium">狀態</th>
                   <th className="px-4 py-3 font-medium">版本</th>
                   <th className="px-4 py-3 font-medium">目標解析度</th>
                   <th className="px-4 py-3 font-medium">建立日期</th>
@@ -278,8 +320,18 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {entries.map((entry) => (
-                  <tr key={entry.libraryId} className="hover:bg-zinc-900/50">
+                {entries.map((entry) => {
+                  const isActive = isMapLibraryEntryActive(
+                    entry,
+                    activeMapId,
+                    activeLibraryId,
+                  )
+                  const isActivating = activatingLibraryId === entry.libraryId
+                  return (
+                  <tr
+                    key={entry.libraryId}
+                    className={isActive ? 'bg-cyan-950/20 hover:bg-cyan-950/30' : 'hover:bg-zinc-900/50'}
+                  >
                     <td className="px-4 py-3">
                       {renamingId === entry.libraryId ? (
                         <input
@@ -309,6 +361,16 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                         </div>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      {isActive ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/50 bg-cyan-950/50 px-2 py-0.5 text-[10px] font-medium text-cyan-200">
+                          <MapPin className="size-3 shrink-0" aria-hidden />
+                          使用中
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-zinc-600">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-zinc-300">
                       {entry.version}
                     </td>
@@ -323,6 +385,22 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {!isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetActive(entry)}
+                            disabled={isActivating}
+                            className="inline-flex items-center gap-1 rounded-md border border-amber-600/50 bg-amber-950/40 px-2 py-1 text-xs text-amber-100 hover:bg-amber-900/50 disabled:opacity-50"
+                            title="設為當前使用地圖（同步至後端，供模擬器與 API 讀取）"
+                          >
+                            {isActivating ? (
+                              <Loader2 className="size-3 animate-spin" aria-hidden />
+                            ) : (
+                              <MapPin className="size-3" aria-hidden />
+                            )}
+                            設為當前使用
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => onOpenMap(entry.libraryId)}
@@ -366,7 +444,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

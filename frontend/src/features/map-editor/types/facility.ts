@@ -7,6 +7,7 @@ export type FacilityType =
   | 'Track'
   | 'Pole'
   | 'DockingPoint'
+  | 'Waypoint'
   | 'RoadLine'
 
 export type FacilityName =
@@ -21,6 +22,7 @@ export type FacilityName =
   | 'Rail'
   | 'SmartPole'
   | 'DockingPoint'
+  | 'Waypoint'
   | 'RoadLine'
 
 /** 旋轉角度（度），可為任意數值以利微調 */
@@ -48,6 +50,9 @@ export type PoleState = 'Normal' | 'Error'
 /** 停靠點（站點標記；預設藍點，可換自訂圖示） */
 export type DockingPointState = 'Normal' | 'Inactive'
 
+/** 途經點（必經點位；預設綠點，不顯示名稱） */
+export type WaypointState = 'Normal' | 'Inactive'
+
 /** 道路線（純視覺標記） */
 export type RoadLineState = 'Normal'
 
@@ -64,6 +69,7 @@ export type NonSlotFacilityState =
   | TrackState
   | PoleState
   | DockingPointState
+  | WaypointState
   | RoadLineState
   | FacilityAreaState
   | GeofenceState
@@ -109,6 +115,7 @@ export type FacilityObject =
         | 'Pole'
         | 'Facility'
         | 'DockingPoint'
+        | 'Waypoint'
         | 'RoadLine'
       name: FacilityName
       customName: string

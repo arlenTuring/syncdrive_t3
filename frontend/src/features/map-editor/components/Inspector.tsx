@@ -46,6 +46,7 @@ import {
 import { TrackInspectorSection } from './TrackInspectorSection'
 import { SignalInspectorSection } from './SignalInspectorSection'
 import { DockingPointInspectorSection } from './DockingPointInspectorSection'
+import { WaypointInspectorSection } from './WaypointInspectorSection'
 import { RoadLineInspectorSection } from './RoadLineInspectorSection'
 import { GeofenceInspectorSection } from './GeofenceInspectorSection'
 import { FacilityInspectorSection } from './FacilityInspectorSection'
@@ -328,6 +329,7 @@ type InspectorProps = {
   /** 全圖 Area（停靠點站名唯一性、節點 ID 產生） */
   mapAreas?: MapAreaObject[]
   onApplyDockingPoint?: (facility: FacilityObject) => void
+  onApplyWaypoint?: (facility: FacilityObject) => void
 }
 
 export function Inspector({
@@ -350,6 +352,7 @@ export function Inspector({
   areaLayout: _areaLayout,
   mapAreas = [],
   onApplyDockingPoint,
+  onApplyWaypoint,
 }: InspectorProps) {
   void _domainMaxM
   void _areaLayout
@@ -430,6 +433,7 @@ export function Inspector({
               placeholder="001"
             />
           </div>
+          {facility.type !== 'Waypoint' ? (
           <div>
             <label htmlFor="facility-custom" className="mb-1 block text-[10px] text-zinc-500">
               自訂顯示名稱
@@ -445,8 +449,9 @@ export function Inspector({
               placeholder="選填"
             />
           </div>
+          ) : null}
           {onPatchParameters &&
-          (facility.type === 'Facility' || facility.type === 'DockingPoint') ? (
+          facility.type === 'Facility' ? (
             <div>
               <label htmlFor="facility-purpose" className="mb-1 block text-[10px] text-zinc-500">
                 用途
@@ -468,7 +473,7 @@ export function Inspector({
                 placeholder="選填"
               />
               <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
-                說明此元件的實際用途，由您自行填寫；清單描述會顯示於 Area 名稱之後。
+                選填；僅顯示於右側設施清單（Area 名稱之後），圖台上不顯示。
               </p>
             </div>
           ) : null}
@@ -485,7 +490,9 @@ export function Inspector({
               onFieldBlur={onFieldBlur}
             />
           )}
-          {onPatchParameters && facility.type !== 'Geofence' && (
+          {onPatchParameters &&
+            facility.type !== 'Geofence' &&
+            facility.type !== 'Waypoint' && (
             <FacilityLabelStyleSection
               facility={facility}
               readOnly={readOnly}
@@ -1088,6 +1095,16 @@ export function Inspector({
             onFieldBlur={onFieldBlur}
           />
         ) : null}
+        {facility.type === 'Waypoint' && onApplyWaypoint ? (
+          <WaypointInspectorSection
+            facility={facility}
+            areas={mapAreas}
+            readOnly={readOnly}
+            onApplyWaypoint={onApplyWaypoint}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+          />
+        ) : null}
         {facility.type === 'RoadLine' && onPatchParameters ? (
           <RoadLineInspectorSection
             facility={facility}
@@ -1102,7 +1119,8 @@ export function Inspector({
         facility.type !== 'Track' &&
         facility.type !== 'Facility' &&
         facility.type !== 'Signal' &&
-        facility.type !== 'RoadLine' ? (
+        facility.type !== 'RoadLine' &&
+        facility.type !== 'Waypoint' ? (
           <InspectorSection title={`顯示狀態（${facility.type}）`}>
             <select
               id="facility-state"

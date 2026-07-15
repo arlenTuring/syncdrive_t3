@@ -1,34 +1,28 @@
 import { useMemo } from 'react';
-import { useMqttData } from '../elements/useMqttData';
 import { mergeOperationMqttShiftRow } from '../utils/mergeOperationMqttShiftRow';
 import { mqttPayloadIsFresh } from '../route-progress/useAnimatedTrackPercent';
+import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
+import { useShiftVehicleOperationMqtt } from '../context/ShiftFleetMqttContext';
+import { extrapolateLegEtaSeconds } from '../utils/simClock';
+import { useSimClockFrame } from '../utils/simClockFrame';
 
-const DS_MQTT = 'default-mqtt';
-
-/** 班次／整備卡：訂閱該車 operation/update，合併即時營運欄位 */
+/** 班次／整備卡：合併全車隊 MQTT operation/update，合併即時營運欄位 */
 export function useOperationMqttShiftOverlay(
   vehicleCode: string | undefined,
   sqlRow: Record<string, unknown> | null,
   enabled: boolean,
 ): Record<string, unknown> {
-  const topic = enabled && vehicleCode
-    ? `v1/vtms/${vehicleCode}/operation/update`
-    : undefined;
-
-  const mqttState = useMqttData({
-    mqttDataSourceId: topic ? DS_MQTT : undefined,
-    mqttTopic: topic,
-  });
-
-  const mqttPayload =
-    mqttState.data && typeof mqttState.data === 'object' && !('value' in mqttState.data)
-      ? (mqttState.data as Record<string, unknown>)
-      : null;
+  const { running, paused, transportPaused, speedMultiplier } = useDemoSimulationPlayback();
+  const simPlaying = running && !paused && !transportPaused;
+  const fleetPayload = useShiftVehicleOperationMqtt(enabled ? vehicleCode : undefined);
   const freshPayload =
-    mqttPayload && mqttPayloadIsFresh(mqttPayload) ? mqttPayload : null;
+    fleetPayload && mqttPayloadIsFresh(fleetPayload) ? fleetPayload : null;
+  const simTick = useSimClockFrame(enabled && simPlaying && !!freshPayload);
 
-  return useMemo(
-    () => mergeOperationMqttShiftRow(sqlRow, freshPayload),
-    [sqlRow, freshPayload],
-  );
+  return useMemo(() => {
+    const etaOverride = freshPayload
+      ? extrapolateLegEtaSeconds(freshPayload, speedMultiplier, simPlaying)
+      : undefined;
+    return mergeOperationMqttShiftRow(sqlRow, freshPayload, etaOverride);
+  }, [sqlRow, freshPayload, simPlaying, speedMultiplier, simTick]);
 }

@@ -2,15 +2,17 @@
  * VTMS 班次演示模擬器（v0.0.5 參照場域）
  *
  * 車隊：PMS-01～11 池輪替；示範場景預設場上 4 台、間隔 3 分鐘（見 ACTIVE_SLOT_COUNT，可調，非後端硬性上限）
- * 規則1（D）：N2W下行 → D02–D18 → T3下行 → D20–D34 → S2W下行（每站 36s）
- * 規則2（U）：S2W上行 → U34–U18 → T3上行 → U16–U02 → N2W上行（每站 36s）
+ * 規則1（D）：N2W下行 → D01–D16 → T3下行 → D20–D33 → S2W下行（每站 36s）
+ * 規則2（U）：S2W上行 → U35–U20 → T3上行 → U16–U03 → N2W上行（每站 36s）
  * 規則3：1→2 無限循環；規則4：四台車 3 分鐘發車；規則5：不跨軌道；號誌前 20m
  *
  * MANAGED=1 時由後端 TRANSPORT_API 控制速度、暫停、逐幀。
+ * MQTT 發布：每 TELEMETRY_SIM_INTERVAL_MS 場域時間一筆（rosbag --rate；倍速↑牆鐘發送↑）。
  */
 const {
   resolveMaintenanceTaskMeta,
   maintenanceTripCode,
+  maintenanceDemoOrderId,
 } = require('./maintenance-task-catalog');
 const {
   ROUTE_MAINLINE_TASK_SPECS,
@@ -25,6 +27,7 @@ const {
   psdOpenPercentAtDwellMs,
   T3_DOCKING_STOPS,
   T3_SIGNAL_REGISTRY,
+  printDockingStopsAudit,
   computeSignalLamps,
   tickFleetBatteryState,
   resetFleetBatteryState,
@@ -34,6 +37,7 @@ const {
   getVehiclePublishMotion,
   VEHICLE_POOL,
   buildMainlineCurrentLeg,
+  buildPlannedRouteCurrentLeg,
   buildPreDepartureCurrentLeg,
 } = require('./t3-v0-0-5-track-motion');
 const mqtt = require('mqtt');
@@ -43,16 +47,28 @@ const TRANSPORT_API = process.env.TRANSPORT_API || '';
 const TRANSPORT_STATE_FILE = process.env.TRANSPORT_STATE_FILE || '';
 const SYNC_API = process.env.SYNC_API
   || (TRANSPORT_API ? TRANSPORT_API.replace(/\/demo\/simulation\/?$/, '') : 'http://127.0.0.1:3000/syncdrive-api');
-const POLL_MS = 100;
+const POLL_MS = 50;
+/** 非 MANAGED 模式之 fleet 輪詢間隔（牆鐘 1s，此路徑無倍速） */
 const MQTT_PUBLISH_INTERVAL_MS = 1000;
+/**
+ * MANAGED 模式：依「場域時間」取樣間隔節流（rosbag --rate 模型）。
+ * 倍速越高 → 相同場域間隔在牆鐘上越密（1x≈5Hz telemetry，12x≈60Hz/車）。
+ */
+const TELEMETRY_SIM_INTERVAL_MS = 200;
+const OPERATION_SIM_INTERVAL_MS = 400;
+const HEALTH_SIM_INTERVAL_MS = 5000;
 const TOTAL_DURATION_MS = 60 * 60 * 1000;
 
 const MQTT_OPTS_TELEMETRY = { retain: false };
 const MQTT_OPTS_OPERATION = { retain: true };
 const MQTT_OPTS_HEALTH = { retain: true };
 
-/** 每車 1Hz MQTT 節流（協議 telemetry / operation / health） */
-const lastMqttPublishByVehicle = new Map();
+/** 每車上次 MQTT 發布時之模擬經過毫秒（非 managed 模式） */
+const lastMqttPublishVirtualMsByVehicle = new Map();
+/** MANAGED 模式：上次發布時的 virtualElapsedMs（依 kind 分開） */
+const lastManagedPublishSimMs = new Map();
+/** 設施 MQTT：payload 未變則不重發 */
+const lastFacilityPayloadByTopic = new Map();
 
 /** 車端訂單狀態（assign → REST processing → MQTT update → REST end） */
 const vehicleOrders = new Map();
@@ -262,12 +278,42 @@ function isShiftTripCode(code) {
   return typeof code === 'string' && /^[DU]\d{4}$/.test(code.trim());
 }
 
-function shouldPublishVehicleMqtt(vehicleId) {
-  const now = Date.now();
-  const last = lastMqttPublishByVehicle.get(vehicleId) ?? 0;
-  if (now - last < MQTT_PUBLISH_INTERVAL_MS) return false;
-  lastMqttPublishByVehicle.set(vehicleId, now);
+function shouldPublishVehicleMqtt(vehicleId, virtualElapsedMs, { force = false } = {}) {
+  if (force) return true;
+  const last = lastMqttPublishVirtualMsByVehicle.get(vehicleId) ?? -Infinity;
+  if (virtualElapsedMs - last < MQTT_PUBLISH_INTERVAL_MS) return false;
+  lastMqttPublishVirtualMsByVehicle.set(vehicleId, virtualElapsedMs);
   return true;
+}
+
+function managedSimIntervalMs(kind) {
+  if (kind === 'telemetry') return TELEMETRY_SIM_INTERVAL_MS;
+  if (kind === 'operation') return OPERATION_SIM_INTERVAL_MS;
+  if (kind === 'health') return HEALTH_SIM_INTERVAL_MS;
+  return TELEMETRY_SIM_INTERVAL_MS;
+}
+
+/** rosbag 式：每 TELEMETRY_SIM_INTERVAL_MS 場域時間一筆；倍速由 accrual 自動加密牆鐘發送 */
+function shouldPublishManagedKind(vehicleId, kind, virtualElapsedMs, { force = false } = {}) {
+  if (force) return true;
+  const interval = managedSimIntervalMs(kind);
+  const key = `${vehicleId}:${kind}`;
+  const last = lastManagedPublishSimMs.get(key) ?? -Infinity;
+  if (virtualElapsedMs - last < interval) return false;
+  lastManagedPublishSimMs.set(key, virtualElapsedMs);
+  return true;
+}
+
+function clearManagedPublishSimMs() {
+  lastManagedPublishSimMs.clear();
+}
+
+function publishJsonIfChanged(client, topic, payloadObj) {
+  const { timestamp: _ts, ...stable } = payloadObj;
+  const stableKey = JSON.stringify(stable);
+  if (lastFacilityPayloadByTopic.get(topic) === stableKey) return;
+  lastFacilityPayloadByTopic.set(topic, stableKey);
+  client.publish(topic, JSON.stringify(payloadObj));
 }
 
 function buildPredictionPath(x, y, heading, speedKmh, seconds = 4) {
@@ -312,22 +358,67 @@ function resolveMaintenanceOperationFields(motion) {
   };
 }
 
+function simTimeFields(simElapsedMs, simStartMs) {
+  const ms = Number(simElapsedMs) || 0;
+  return {
+    sim_elapsed_ms: Math.round(ms * 10) / 10,
+    sim_timestamp: simStartMs + ms,
+    sim_start_ms: simStartMs,
+  };
+}
+
+/** MANAGED：timestamp 對齊場域時間；非 MANAGED：牆鐘（相容舊 demo） */
+function eventTimestamp(simElapsedMs, simStartMs) {
+  const fields = simTimeFields(simElapsedMs, simStartMs);
+  return process.env.MANAGED === '1' ? fields.sim_timestamp : Date.now();
+}
+
+function resolveTelemetryLights(vehicleCode, motion, cruiseSpeed) {
+  if (isVehicleFaulted(vehicleCode)) {
+    return { head_light_on: false, tail_light_on: false };
+  }
+  // 主線軌道營運（含號誌停等、站停）：不因速度歸零而關燈
+  if (isMainlineShiftMotion(motion) || motion.fleet_task === 'shift_run') {
+    return {
+      head_light_on: motion.head_light_on !== false,
+      tail_light_on: Boolean(motion.tail_light_on),
+    };
+  }
+  const moving = cruiseSpeed > 0;
+  return { head_light_on: moving, tail_light_on: false };
+}
+
 /** 車輛動態協議：僅空間與運動學（不含營運業務欄位） */
-function telemetry(vehicleCode, motion, speed, battery) {
+function telemetry(vehicleCode, motion, speed, battery, simElapsedMs, simStartMs) {
   const { x, y, heading, steering_angle, dwelling, tripCode, track } = motion;
   const faulted = isVehicleFaulted(vehicleCode);
-  const cruiseSpeed = faulted || dwelling ? 0 : speed;
+  let cruiseSpeed = faulted || dwelling ? 0 : speed;
+  if (
+    !faulted
+    && !dwelling
+    && motion.ease_out_stop
+    && typeof motion.eventElapsedMs === 'number'
+    && typeof motion.eventDurationMs === 'number'
+    && motion.eventDurationMs > 0
+  ) {
+    const rawT = Math.max(0, Math.min(1, motion.eventElapsedMs / motion.eventDurationMs));
+    cruiseSpeed = speed * 3 * (1 - rawT) ** 2;
+  }
   const steer = steering_angle ?? 0;
-  // 頭燈隨車行方向：圖台以「車頭(head)朝 heading 方向」算繪，heading 已含上/下行方向，
-  // 故行進中點亮 head_light（位於車頭、即行進方向端），停等/故障時熄滅；tail 不亮。
-  const moving = cruiseSpeed > 0;
+  const lights = resolveTelemetryLights(vehicleCode, motion, cruiseSpeed);
   const segmentLabel = typeof track === 'string' ? track.replace(/→.*/, '').trim() : '';
   const trip = isShiftTripCode(tripCode) ? String(tripCode).trim().toUpperCase() : undefined;
+  const yardSlotId =
+    typeof motion.yard_slot_id === 'string' && motion.yard_slot_id.trim()
+      ? motion.yard_slot_id.trim()
+      : undefined;
   return {
     vehicle_code: vehicleCode,
-    timestamp: Date.now(),
+    timestamp: eventTimestamp(simElapsedMs, simStartMs),
+    ...simTimeFields(simElapsedMs, simStartMs),
     ...(trip ? { trip_code: trip, badge_label: trip } : {}),
     ...(segmentLabel ? { segment_label: segmentLabel } : {}),
+    ...(yardSlotId ? { yard_slot_id: yardSlotId } : {}),
     global_pose: { latitude: 25.0776, longitude: 121.2325, altitude: 6.0 },
     local_pose: {
       position: { x, y, z: 6.0 },
@@ -346,8 +437,8 @@ function telemetry(vehicleCode, motion, speed, battery) {
       gear: dwelling ? 'N' : 'D',
     },
     energy: { battery_level: battery },
-    head_light_on: moving,
-    tail_light_on: false,
+    ...lights,
+    ...(dwelling ? { dwelling: true } : {}),
     signals: {
       turn_indicator: resolveTurnIndicator(motion),
       hazard_light: faulted || Boolean(motion.hazard_light),
@@ -395,19 +486,24 @@ function isMainlineShiftMotion(motion) {
   );
 }
 
-function operation(vehicleCode, motion) {
-  const ts = Date.now();
+function operation(vehicleCode, motion, simElapsedMs, simStartMs) {
+  const ts = eventTimestamp(simElapsedMs, simStartMs);
+  const simFields = simTimeFields(simElapsedMs, simStartMs);
 
   if (!isMainlineShiftMotion(motion)) {
     const maintFields = resolveMaintenanceOperationFields(motion);
     if (!maintFields) {
-      return { vehicle_code: vehicleCode, timestamp: ts };
+      return { vehicle_code: vehicleCode, timestamp: ts, ...simFields };
     }
+    const yardSlotId =
+      typeof motion.yard_slot_id === 'string' ? motion.yard_slot_id.trim().toUpperCase() : '';
     return {
       vehicle_code: vehicleCode,
       timestamp: ts,
-      order_id: `DEMO-ORD-${vehicleCode}`,
-      yard_slot_id: motion.yard_slot_id ?? null,
+      ...simFields,
+      order_id: maintenanceDemoOrderId(vehicleCode, yardSlotId),
+      yard_slot_id: yardSlotId || null,
+      order_status: 'PROCESSING',
       ...maintFields,
     };
   }
@@ -415,13 +511,14 @@ function operation(vehicleCode, motion) {
   const tripCode = String(motion.tripCode).trim().toUpperCase();
   const departMs = motion.legDepartMs ?? ts;
   const orderId = demoOrderId(tripCode, departMs);
-  const routeId = routeIdForTrip(tripCode);
+  const routeId = motion.plannedRouteId ?? routeIdForTrip(tripCode);
 
   if (isPreDepartureMainline(motion)) {
     const departEtaSeconds = motion.departEtaSeconds ?? 0;
     return {
       vehicle_code: vehicleCode,
       timestamp: ts,
+      ...simFields,
       order_id: orderId,
       trip_code: tripCode,
       line_kind: 'MAINLINE',
@@ -439,6 +536,7 @@ function operation(vehicleCode, motion) {
   const payload = {
     vehicle_code: vehicleCode,
     timestamp: ts,
+    ...simFields,
     order_id: orderId,
     trip_code: tripCode,
     line_kind: 'MAINLINE',
@@ -446,14 +544,30 @@ function operation(vehicleCode, motion) {
     // 行進中訂單契約狀態，供前端 route 進度判定 isProcessing（缺漏會使 MQTT 即時進度被忽略）
     order_status: 'PROCESSING',
     vehicle_phase: resolveVehiclePhase(vehicleCode, motion),
-    current_leg: buildMainlineCurrentLeg(tripCode, motion.progress ?? 0),
+    current_leg: motion.plannedStationIds
+      ? buildPlannedRouteCurrentLeg(
+          motion.plannedStationIds,
+          motion.progress ?? 0,
+          (motion.plannedLegDurationMs ?? 6 * 60 * 1000) / 1000,
+        )
+      : buildMainlineCurrentLeg(tripCode, motion.progress ?? 0),
     task_group: buildTaskGroup(orderId, tripCode, motion, { interlockActive }),
   };
 
+  Object.assign(payload, resolveDoorFields(motion));
+
   const opFromTasks = deriveOperationActionFromTaskGroup(payload.task_group);
-  if (opFromTasks) {
+  const motionOp = motion.operation_action;
+  const doorOps = new Set(['door_open', 'door_close', 'psd_open', 'psd_close']);
+  if (typeof motionOp === 'string' && doorOps.has(motionOp)) {
+    payload.operation_action = motionOp;
+  } else if (opFromTasks) {
     payload.operation_action = opFromTasks;
-    Object.assign(payload, resolveDoorFields(motion));
+  } else if (typeof motionOp === 'string' && motionOp) {
+    payload.operation_action = motionOp;
+  }
+  if (Array.isArray(motion.operation_actions) && motion.operation_actions.length > 0) {
+    payload.operation_actions = motion.operation_actions;
   }
 
   return payload;
@@ -469,27 +583,61 @@ function maybeEndMainlineOrder(vehicleId, motion, opPayload) {
   }
 }
 
-function publishVehicleMqtt(client, vehicleId, motion, battery, opPayload, idx = 0) {
-  if (!shouldPublishVehicleMqtt(vehicleId)) return;
+function publishVehicleMqtt(
+  client,
+  vehicleId,
+  motion,
+  battery,
+  opPayload,
+  idx = 0,
+  virtualElapsedMs = 0,
+  simStartMs = 0,
+  publishOpts = {},
+) {
+  const managed = process.env.MANAGED === '1';
+  const force = !!publishOpts.force;
 
   const speed = motion.dwelling ? 0 : 8 + Math.sin(Date.now() / 4000 + idx) * 2;
-  client.publish(
-    `v1/vtms/${vehicleId}/telemetry/update`,
-    JSON.stringify(telemetry(vehicleId, motion, speed, battery)),
-    MQTT_OPTS_TELEMETRY,
-  );
-  client.publish(
-    `v1/vtms/${vehicleId}/health/heartbeat`,
-    JSON.stringify(health(vehicleId)),
-    MQTT_OPTS_HEALTH,
-  );
+
+  if (managed) {
+    if (shouldPublishManagedKind(vehicleId, 'telemetry', virtualElapsedMs, { force })) {
+      client.publish(
+        `v1/vtms/${vehicleId}/telemetry/update`,
+        JSON.stringify(telemetry(vehicleId, motion, speed, battery, virtualElapsedMs, simStartMs)),
+        MQTT_OPTS_TELEMETRY,
+      );
+    }
+    if (shouldPublishManagedKind(vehicleId, 'health', virtualElapsedMs, { force })) {
+      client.publish(
+        `v1/vtms/${vehicleId}/health/heartbeat`,
+        JSON.stringify(health(vehicleId)),
+        MQTT_OPTS_HEALTH,
+      );
+    }
+  } else {
+    if (!shouldPublishVehicleMqtt(vehicleId, virtualElapsedMs, { force })) return;
+    client.publish(
+      `v1/vtms/${vehicleId}/telemetry/update`,
+      JSON.stringify(telemetry(vehicleId, motion, speed, battery, virtualElapsedMs, simStartMs)),
+      MQTT_OPTS_TELEMETRY,
+    );
+    client.publish(
+      `v1/vtms/${vehicleId}/health/heartbeat`,
+      JSON.stringify(health(vehicleId)),
+      MQTT_OPTS_HEALTH,
+    );
+  }
 
   const isMainline = isShiftTripCode(opPayload.trip_code);
-  if (isMainline && opPayload.order_id && process.env.MANAGED !== '1') {
+  if (isMainline && opPayload.order_id && !managed) {
     const state = vehicleOrders.get(vehicleId);
     if (!state || state.status !== 'PROCESSING' || state.orderId !== opPayload.order_id) {
       return;
     }
+  }
+
+  if (managed) {
+    if (!shouldPublishManagedKind(vehicleId, 'operation', virtualElapsedMs, { force })) return;
   }
 
   client.publish(
@@ -588,7 +736,7 @@ function flushPendingSimulatedEventAck(localVirtualElapsed) {
   void ackTransportTick(localVirtualElapsed, event);
 }
 
-function publishFleet(client, elapsedMs, simStartMs) {
+function publishFleet(client, elapsedMs, simStartMs, publishOpts = {}) {
   tickFleetBatteryState(elapsedMs, simStartMs);
   const activeFleet = getActiveFleet();
   const psdByEntityId = new Map();
@@ -602,9 +750,19 @@ function publishFleet(client, elapsedMs, simStartMs) {
     if (!motion) continue;
 
     const idx = activeFleet.findIndex((v) => v.id === vehicleId);
-    const opPayload = operation(vehicleId, motion);
+    const opPayload = operation(vehicleId, motion, elapsedMs, simStartMs);
     maybeEndMainlineOrder(vehicleId, motion, opPayload);
-    publishVehicleMqtt(client, vehicleId, motion, battery, opPayload, Math.max(0, idx));
+    publishVehicleMqtt(
+      client,
+      vehicleId,
+      motion,
+      battery,
+      opPayload,
+      Math.max(0, idx),
+      elapsedMs,
+      simStartMs,
+      publishOpts,
+    );
 
     if (motion.leg === 'yard') continue;
 
@@ -625,33 +783,30 @@ function publishFleet(client, elapsedMs, simStartMs) {
   ]);
   for (const entityId of allPsdIds) {
     const pct = psdByEntityId.get(entityId) ?? 0;
-    client.publish(
-      entityId.startsWith('syncdrive/') ? entityId : `syncdrive/${entityId}`,
-      JSON.stringify({
-        openPercent: pct,
-        state: pct >= 99.5 ? 'Open' : pct <= 0.5 ? 'Closed' : 'Moving',
-        alarm: false,
-        timestamp: Date.now(),
-      }),
-    );
+    const topic = entityId.startsWith('syncdrive/') ? entityId : `syncdrive/${entityId}`;
+    publishJsonIfChanged(client, topic, {
+      openPercent: pct,
+      state: pct >= 99.5 ? 'Open' : pct <= 0.5 ? 'Closed' : 'Moving',
+      alarm: false,
+      timestamp: Date.now(),
+    });
   }
 
   // 號誌：預設紅燈；車輛停等 5s 後綠燈；通過後恢復紅燈
   const signalLamps = computeSignalLamps(elapsedMs, simStartMs);
   for (const signal of T3_SIGNAL_REGISTRY) {
     const lamp = signalLamps.get(signal.entityId) ?? 'red';
-    client.publish(
-      `syncdrive/${signal.entityId}`,
-      JSON.stringify({
-        lamp,
-        signal: lamp,
-        timestamp: Date.now(),
-      }),
-    );
+    publishJsonIfChanged(client, `syncdrive/${signal.entityId}`, {
+      lamp,
+      signal: lamp,
+      timestamp: Date.now(),
+    });
   }
 }
 
 async function main() {
+  printDockingStopsAudit();
+
   const client = mqtt.connect(MQTT_URL, {
     clientId: `vtms-shift-demo-${process.pid}`,
     clean: true,
@@ -702,6 +857,9 @@ async function main() {
       simStartMs = resolveSimStartMs(transport);
     }
     resetFleetBatteryState(simStartMs);
+    lastMqttPublishVirtualMsByVehicle.clear();
+    clearManagedPublishSimMs();
+    lastFacilityPayloadByTopic.clear();
 
     if (!managed) {
       publishFleet(client, 0, simStartMs);
@@ -739,6 +897,9 @@ async function main() {
       if (nextSimStartMs !== simStartMs) {
         simStartMs = nextSimStartMs;
         resetFleetBatteryState(simStartMs);
+        lastMqttPublishVirtualMsByVehicle.clear();
+        clearManagedPublishSimMs();
+        lastFacilityPayloadByTopic.clear();
         localVirtualElapsed = transport.virtualElapsedMs ?? localVirtualElapsed;
         accrualMs = 0;
       }
@@ -747,15 +908,12 @@ async function main() {
       const realDelta = now - lastPollAt;
       lastPollAt = now;
 
-      if (typeof transport.virtualElapsedMs === 'number') {
-        localVirtualElapsed = transport.virtualElapsedMs;
-      }
-
+      // 勿每輪詢以 API 外推值覆寫 localVirtualElapsed（會與 accrualMs 雙重計時、造成跳秒）
       if (transport.transportPaused) {
         if (transport.stepNonce > lastStepNonce) {
           lastStepNonce = transport.stepNonce;
           localVirtualElapsed = transport.virtualElapsedMs;
-          publishFleet(client, localVirtualElapsed, simStartMs);
+          publishFleet(client, localVirtualElapsed, simStartMs, { force: true });
           void ackTransportTick(localVirtualElapsed);
           flushPendingSimulatedEventAck(localVirtualElapsed);
         }
@@ -763,12 +921,14 @@ async function main() {
       }
 
       accrualMs += realDelta * transport.speedMultiplier;
+      const simNow = localVirtualElapsed + accrualMs;
+      publishFleet(client, simNow, simStartMs, { managed: true });
+
       let advanced = false;
       while (accrualMs >= transport.tickMs) {
         accrualMs -= transport.tickMs;
         localVirtualElapsed += transport.tickMs;
         advanced = true;
-        publishFleet(client, localVirtualElapsed, simStartMs);
       }
       if (advanced) {
         void ackTransportTick(localVirtualElapsed);

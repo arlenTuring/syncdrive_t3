@@ -100,6 +100,7 @@ export function defaultSizeMetersForType(type: FacilityType): {
     case 'Pole':
       return { ...POLE_DEFAULT_SIZE_M }
     case 'DockingPoint':
+    case 'Waypoint':
       return { w: 4, h: 4 }
     case 'RoadLine':
       return { w: 40, h: 1.2 }

@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "mapId": "t3-main-version",
   "displayName": "軌道合併加道路線",
-  "version": "v0.1.6",
+  "version": "v0.1.10",
   "createdAt": "2026-06-03T14:04:56.970Z",
-  "updatedAt": "2026-06-25T02:44:01.752Z",
+  "updatedAt": "2026-06-28T08:15:06.157Z",
   "pixelSize": {
     "width": 3152,
     "height": 642
@@ -618,7 +618,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R11"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -660,7 +660,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R12"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -671,11 +671,11 @@
           "customName": "T01",
           "positionMeters": {
             "x": 916.7586742718402,
-            "y": 377.8400874386306
+            "y": 378.1147966318099
           },
           "areaPosition": {
             "x": 1107.91,
-            "y": 64.94171975884274
+            "y": 65.94171975884274
           },
           "areaLayoutAnchor": {
             "wPx": 1281.0120619806466,
@@ -685,18 +685,18 @@
             "w": 33,
             "h": 89
           },
-          "rotationDeg": 102,
+          "rotationDeg": 90,
           "parameters": {
             "segmentId": "T01",
             "defaultFillColor": "#1a2233",
             "labelStyle": {
               "fontSizePx": 16,
               "labelOffsetPx": {
-                "x": 0,
-                "y": 0
+                "x": 0.49999999999999956,
+                "y": 5.9453125
               },
               "labelOffsetCustom": true,
-              "labelRotationDeg": 268.6908752283517
+              "labelRotationDeg": 270.0738774466745
             },
             "refFieldXMinM": 0,
             "refFieldXMaxM": 0,
@@ -711,12 +711,12 @@
           "name": "Rail",
           "customName": "T02",
           "positionMeters": {
-            "x": 915.9967766840134,
-            "y": 365.21445292010804
+            "x": 915.884365564498,
+            "y": 364.92051408340615
           },
           "areaPosition": {
-            "x": 1104.86,
-            "y": 18.98171975884273
+            "x": 1104.41,
+            "y": 17.911719758842736
           },
           "areaLayoutAnchor": {
             "wPx": 1281.0120619806466,
@@ -726,18 +726,18 @@
             "w": 33,
             "h": 82
           },
-          "rotationDeg": 78,
+          "rotationDeg": 90,
           "parameters": {
             "segmentId": "T02",
             "defaultFillColor": "#1a2233",
             "labelStyle": {
               "fontSizePx": 16,
               "labelOffsetPx": {
-                "x": -0.8822489999373659,
-                "y": -4.388146721384619
+                "x": -1.3783427499373664,
+                "y": 2.0063845286153814
               },
               "labelOffsetCustom": true,
-              "labelRotationDeg": 267.3962486542366
+              "labelRotationDeg": 269.899439774945
             },
             "refFieldXMinM": 0,
             "refFieldXMaxM": 0,
@@ -753,11 +753,11 @@
           "customName": "P1",
           "positionMeters": {
             "x": 929.1538737170736,
-            "y": 369.38755672417244
+            "y": 383.7684183354619
           },
           "areaPosition": {
             "x": 1157.53,
-            "y": 34.17270683782269
+            "y": 86.52210747073514
           },
           "areaLayoutAnchor": {
             "wPx": 1281.0120619806466,
@@ -765,7 +765,7 @@
           },
           "areaSizePx": {
             "w": 123.48135392585364,
-            "h": 101.53901292102006
+            "h": 47.26961228810762
           },
           "rotationDeg": 0,
           "parameters": {
@@ -781,8 +781,8 @@
             "refFieldXMinM": 1000,
             "refFieldXMaxM": 1050,
             "refFieldYMinM": 100,
-            "refFieldYMaxM": 107,
-            "purpose": "月台 P2"
+            "refFieldYMaxM": 103.5,
+            "purpose": "臨停格"
           },
           "currentState": "Normal"
         },
@@ -1042,7 +1042,7 @@
           "id": "174",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "N2W上行",
           "positionMeters": {
             "x": 828.6333526215077,
             "y": 374.5323546054425
@@ -1066,14 +1066,12 @@
             "refFieldXM": 810,
             "refFieldYM": 105.25,
             "dockingLeg": "up",
-            "dockingStation": "N2W",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
             },
-            "purpose": "N2W 上行",
-            "nodeRole": "STOP",
-            "operationNodeId": "ND-N2W-STOP-01"
+            "purpose": "N2W上行",
+            "stationId": "station_1"
           },
           "currentState": "Normal"
         },
@@ -1081,7 +1079,7 @@
           "id": "175",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "N2W下行",
           "positionMeters": {
             "x": 853.6011112783214,
             "y": 388.2018840580465
@@ -1105,14 +1103,53 @@
             "refFieldXM": 840,
             "refFieldYM": 101.75,
             "dockingLeg": "down",
-            "dockingStation": "N2W",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
             },
-            "purpose": "N2W 下行",
-            "nodeRole": "DEP",
-            "operationNodeId": "ND-N2W-DEP-01"
+            "purpose": "N2W下行",
+            "stationId": "station_2"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "183",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "P2",
+          "positionMeters": {
+            "x": 929.1540505909225,
+            "y": 369.52749376104487
+          },
+          "areaPosition": {
+            "x": 1157.530708054793,
+            "y": 34.68210747073512
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1281.0120619806466,
+            "hPx": 200.21171975884275
+          },
+          "areaSizePx": {
+            "w": 123.48135392585364,
+            "h": 47.26961228810762
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": -0.12109375
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 1000,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107,
+            "purpose": "臨停格",
+            "mqttInstanceId": "183"
           },
           "currentState": "Normal"
         }
@@ -2131,7 +2168,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R08"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -2173,7 +2210,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R09"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -2215,7 +2252,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R10"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -2449,20 +2486,20 @@
           "parameters": {
             "verticesMeters": [
               {
-                "x": 55.235369622293575,
-                "y": 138.90473014231955
+                "x": 54.522608232381145,
+                "y": 141.717273300734
               },
               {
-                "x": 95.66047197924797,
-                "y": 138.90473014231955
+                "x": 94.94771058933554,
+                "y": 141.717273300734
               },
               {
-                "x": 95.66047197924797,
-                "y": 222.73108390791677
+                "x": 94.94771058933554,
+                "y": 225.54362706633125
               },
               {
-                "x": 55.235369622293575,
-                "y": 222.73108390791677
+                "x": 54.522608232381145,
+                "y": 225.54362706633125
               }
             ],
             "strokeStyle": "dashed",
@@ -2474,8 +2511,8 @@
               {
                 "id": "lbl-T3",
                 "text": "T3車站",
-                "x": 83.6243881752593,
-                "y": 170.49779687608563,
+                "x": 82.91162678534687,
+                "y": 173.31034003450006,
                 "rotationDeg": 0,
                 "fontSizePx": 19,
                 "fontWeight": "bold"
@@ -2787,7 +2824,7 @@
           "id": "176",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "T3下行",
           "positionMeters": {
             "x": 64.1793296095797,
             "y": 202.81553524672123
@@ -2811,14 +2848,12 @@
             "refFieldXM": 101.75,
             "refFieldYM": 170,
             "dockingLeg": "down",
-            "dockingStation": "T3",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
             },
-            "purpose": "T3 下行",
-            "nodeRole": "STOP",
-            "operationNodeId": "ND-T3-STOP-01"
+            "purpose": "T3下行",
+            "stationId": "station_3"
           },
           "currentState": "Normal"
         },
@@ -2826,7 +2861,7 @@
           "id": "177",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "T3上行",
           "positionMeters": {
             "x": 71.66941448162842,
             "y": 166.6042860263702
@@ -2850,7 +2885,6 @@
             "refFieldXM": 105,
             "refFieldYM": 230,
             "dockingLeg": "up",
-            "dockingStation": "T3",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16,
@@ -2860,9 +2894,8 @@
               },
               "labelOffsetCustom": true
             },
-            "purpose": "T3 上行",
-            "nodeRole": "STOP",
-            "operationNodeId": "ND-T3-STOP-01"
+            "purpose": "T3上行",
+            "stationId": "station_4"
           },
           "currentState": "Normal"
         }
@@ -3641,7 +3674,7 @@
             "refFieldXMaxM": 200,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 333,
-            "purpose": "整備格 H1"
+            "purpose": "調度格"
           },
           "currentState": "Normal"
         },
@@ -3681,7 +3714,7 @@
             "refFieldXMaxM": 240,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "整備格 H2"
+            "purpose": "調度格"
           },
           "currentState": "Normal"
         },
@@ -3721,7 +3754,7 @@
             "refFieldXMaxM": 280,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "整備格 H3"
+            "purpose": "調度格"
           },
           "currentState": "Normal"
         },
@@ -3750,13 +3783,18 @@
           "parameters": {
             "defaultFillColor": "#312e81",
             "labelStyle": {
-              "fontSizePx": 16
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": -0.12109375
+              },
+              "labelOffsetCustom": true
             },
             "refFieldXMinM": 290,
             "refFieldXMaxM": 320,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "保養格 M1"
+            "purpose": "保養格"
           },
           "currentState": "Normal"
         },
@@ -3796,7 +3834,7 @@
             "refFieldXMaxM": 360,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "保養格 M2"
+            "purpose": "保養格"
           },
           "currentState": "Normal"
         },
@@ -3831,7 +3869,7 @@
             "refFieldXMaxM": 400,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "保養格 M3"
+            "purpose": "保養格"
           },
           "currentState": "Normal"
         },
@@ -3860,13 +3898,18 @@
           "parameters": {
             "defaultFillColor": "#312e81",
             "labelStyle": {
-              "fontSizePx": 16
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": 0
+              },
+              "labelOffsetCustom": true
             },
             "refFieldXMinM": 410,
             "refFieldXMaxM": 440,
             "refFieldYMinM": 320,
             "refFieldYMaxM": 330,
-            "purpose": "保養格 M4"
+            "purpose": "保養格"
           },
           "currentState": "Normal"
         },
@@ -4510,7 +4553,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R05"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -4553,7 +4596,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R04"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -4596,7 +4639,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R03"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -5247,18 +5290,18 @@
             "w": 33,
             "h": 89
           },
-          "rotationDeg": 102,
+          "rotationDeg": 90,
           "parameters": {
             "segmentId": "T03",
             "defaultFillColor": "#1a2233",
             "labelStyle": {
               "fontSizePx": 16,
               "labelOffsetPx": {
-                "x": -0.02598896135221989,
-                "y": -0.12226845009172571
+                "x": -0.025988961352220178,
+                "y": 4.604294049908274
               },
               "labelOffsetCustom": true,
-              "labelRotationDeg": 268.6908752283517
+              "labelRotationDeg": 270.1432180337472
             },
             "refFieldXMinM": 0,
             "refFieldXMaxM": 0,
@@ -5274,11 +5317,11 @@
           "customName": "T04",
           "positionMeters": {
             "x": 876.3916425914409,
-            "y": 52.52517054018723
+            "y": 52.259989385114054
           },
           "areaPosition": {
             "x": 1111.424208762301,
-            "y": 47.23250615878331
+            "y": 46.23250615878331
           },
           "areaLayoutAnchor": {
             "wPx": 1504.5191230327096,
@@ -5288,18 +5331,18 @@
             "w": 33,
             "h": 88
           },
-          "rotationDeg": 78,
+          "rotationDeg": 90,
           "parameters": {
             "segmentId": "T04",
             "defaultFillColor": "#1a2233",
             "labelStyle": {
               "fontSizePx": 16,
               "labelOffsetPx": {
-                "x": -1.0351394554889348,
-                "y": -4.2888584986220035
+                "x": -1.0351394554889353,
+                "y": 4.1134852513779965
               },
               "labelOffsetCustom": true,
-              "labelRotationDeg": 267.3962486542366
+              "labelRotationDeg": 269.7144797054448
             },
             "refFieldXMinM": 0,
             "refFieldXMaxM": 0,
@@ -5312,14 +5355,14 @@
           "id": "122",
           "type": "Facility",
           "name": "FacilityArea",
-          "customName": "P2",
+          "customName": "P3",
           "positionMeters": {
             "x": 887.369936548097,
-            "y": 56.97517207705925
+            "y": 70.87266205115213
           },
           "areaPosition": {
             "x": 1163.04,
-            "y": 64.01349323776327
+            "y": 116.4210256291872
           },
           "areaLayoutAnchor": {
             "wPx": 1504.5191230327096,
@@ -5327,7 +5370,7 @@
           },
           "areaSizePx": {
             "w": 123.48135392585364,
-            "h": 101.53901292102006
+            "h": 49.131480529596125
           },
           "rotationDeg": 0,
           "parameters": {
@@ -5343,8 +5386,8 @@
             "refFieldXMinM": 1000,
             "refFieldXMaxM": 1050,
             "refFieldYMinM": 300,
-            "refFieldYMaxM": 307,
-            "purpose": "月台 P2"
+            "refFieldYMaxM": 303.5,
+            "purpose": "臨停格"
           },
           "currentState": "Normal"
         },
@@ -5386,7 +5429,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R02"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -5428,7 +5471,7 @@
             "refFieldXMaxM": 0,
             "refFieldYMinM": 0,
             "refFieldYMaxM": 0,
-            "purpose": "智慧桿 R01"
+            "purpose": "智慧桿"
           },
           "currentState": "Normal"
         },
@@ -5457,20 +5500,20 @@
           "parameters": {
             "verticesMeters": [
               {
-                "x": 792.8651410261145,
-                "y": 61.93580549200315
+                "x": 792.8229191972378,
+                "y": 55.69103138008731
               },
               {
-                "x": 836.5244849745103,
-                "y": 61.93580549200315
+                "x": 836.4822631456335,
+                "y": 55.69103138008731
               },
               {
-                "x": 836.5244849745103,
-                "y": 112.33855337827138
+                "x": 836.4822631456335,
+                "y": 106.09377926635554
               },
               {
-                "x": 792.8651410261145,
-                "y": 112.33855337827138
+                "x": 792.8229191972378,
+                "y": 106.09377926635554
               }
             ],
             "strokeStyle": "dashed",
@@ -5482,8 +5525,8 @@
               {
                 "id": "lbl-S2W",
                 "text": "S2W車站",
-                "x": 805.6298481155737,
-                "y": 103.9761934166069,
+                "x": 805.587626286697,
+                "y": 97.73141930469106,
                 "rotationDeg": 0,
                 "fontSizePx": 19,
                 "fontWeight": "bold"
@@ -5649,7 +5692,7 @@
           "id": "178",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "S2W下行",
           "positionMeters": {
             "x": 801.5931604178847,
             "y": 63.00406160718285
@@ -5668,19 +5711,17 @@
           },
           "rotationDeg": 0,
           "parameters": {
-            "stationName": "S2W上行",
+            "stationName": "S2W下行",
             "iconMode": "builtin",
             "refFieldXM": 810,
             "refFieldYM": 305.25,
             "dockingLeg": "up",
-            "dockingStation": "S2W",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
             },
-            "purpose": "S2W 上行",
-            "nodeRole": "DEP",
-            "operationNodeId": "ND-S2W-DEP-01"
+            "purpose": "S2W下行",
+            "stationId": "station_5"
           },
           "currentState": "Normal"
         },
@@ -5688,7 +5729,7 @@
           "id": "179",
           "type": "DockingPoint",
           "name": "DockingPoint",
-          "customName": "",
+          "customName": "S2W上行",
           "positionMeters": {
             "x": 824.10453929071,
             "y": 75.04858967060667
@@ -5707,19 +5748,58 @@
           },
           "rotationDeg": 0,
           "parameters": {
-            "stationName": "S2W下行",
+            "stationName": "S2W上行",
             "iconMode": "builtin",
             "refFieldXM": 840,
             "refFieldYM": 301.75,
             "dockingLeg": "down",
-            "dockingStation": "S2W",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
             },
-            "purpose": "S2W 下行",
-            "nodeRole": "STOP",
-            "operationNodeId": "ND-S2W-STOP-01"
+            "purpose": "S2W上行",
+            "stationId": "station_6"
+          },
+          "currentState": "Normal"
+        },
+        {
+          "id": "184",
+          "type": "Facility",
+          "name": "FacilityArea",
+          "customName": "P4",
+          "positionMeters": {
+            "x": 887.369936548097,
+            "y": 57.60943844652927
+          },
+          "areaPosition": {
+            "x": 1163.04,
+            "y": 66.40531617591658
+          },
+          "areaLayoutAnchor": {
+            "wPx": 1504.5191230327096,
+            "hPx": 271.5125061587833
+          },
+          "areaSizePx": {
+            "w": 123.48135392585364,
+            "h": 45.07493949428401
+          },
+          "rotationDeg": 0,
+          "parameters": {
+            "defaultFillColor": "#312e81",
+            "labelStyle": {
+              "fontSizePx": 16,
+              "labelOffsetPx": {
+                "x": 0,
+                "y": -0.12109375
+              },
+              "labelOffsetCustom": true
+            },
+            "refFieldXMinM": 1000,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307,
+            "purpose": "臨停格",
+            "mqttInstanceId": "184"
           },
           "currentState": "Normal"
         }
@@ -5792,7 +5872,7 @@
             "refFieldXMaxM": 730,
             "refFieldYMinM": 50,
             "refFieldYMaxM": 60,
-            "purpose": "E1 充電格"
+            "purpose": "充電格"
           },
           "currentState": "Normal"
         },
@@ -5833,7 +5913,7 @@
             "refFieldXMaxM": 690,
             "refFieldYMinM": 50,
             "refFieldYMaxM": 60,
-            "purpose": "E2 充電格"
+            "purpose": "充電格"
           },
           "currentState": "Normal"
         },
@@ -5872,9 +5952,9 @@
             "mqttInstanceId": "131",
             "refFieldXMinM": 620,
             "refFieldXMaxM": 650,
-            "refFieldYMinM": 0,
+            "refFieldYMinM": 50,
             "refFieldYMaxM": 60,
-            "purpose": "E3 充電格"
+            "purpose": "充電格"
           },
           "currentState": "Normal"
         },
@@ -5913,9 +5993,9 @@
             "mqttInstanceId": "132",
             "refFieldXMinM": 580,
             "refFieldXMaxM": 610,
-            "refFieldYMinM": 0,
+            "refFieldYMinM": 50,
             "refFieldYMaxM": 60,
-            "purpose": "E4 充電格"
+            "purpose": "充電格"
           },
           "currentState": "Normal"
         },
@@ -5956,7 +6036,7 @@
             "refFieldXMaxM": 570,
             "refFieldYMinM": 50,
             "refFieldYMaxM": 60,
-            "purpose": "洗車格 W1"
+            "purpose": "洗車格"
           },
           "currentState": "Normal"
         },

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type {
   MapAreaLayout,
@@ -173,6 +173,8 @@ type MapAreaCanvasProps = {
   /** 清單跳轉：地圖像素座標（含 origin） */
   facilityFocusTarget?: { x: number; y: number; token: number } | null
   onFacilityDoubleClick?: (areaId: string, facilityId: string) => void
+  /** 路線製作預覽 overlay（地圖 content 像素座標） */
+  routePlanningOverlay?: ReactNode
 }
 
 export function MapAreaCanvas({
@@ -236,6 +238,7 @@ export function MapAreaCanvas({
   connectivityScan = null,
   facilityFocusTarget = null,
   onFacilityDoubleClick,
+  routePlanningOverlay = null,
 }: MapAreaCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapScaleRef = useRef(1)
@@ -722,6 +725,7 @@ export function MapAreaCanvas({
               connectivityScan.phase === 'flashing') ? (
               <TrackConnectivityScanOverlay scanState={connectivityScan} />
             ) : null}
+            {routePlanningOverlay}
             {areaVehicles && areaVehicles.length > 0 ? (
               <MapAreaVehicleOverlay
                 areas={areas}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SyncDrive T3 文件中心</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple-dark.css" />
+  <style>
+    :root {
+      --base-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      --base-font-size: 15px;
+      --base-line-height: 1.7;
+      --sidebar-width: 260px;
+      --sidebar-nav-link-color--active: #42b983;
+      --sidebar-nav-link-border-color--active: #42b983;
+      --cover-heading-color: #42b983;
+    }
+
+    /* 側邊欄分類標題 */
+    .sidebar-nav > ul > li > p {
+      font-weight: 700;
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #999;
+      margin: 1.2em 0 0.4em;
+      padding: 0;
+    }
+
+    /* 表格美化 */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+    th, td {
+      border: 1px solid #3a3a3a;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: #2a2a2a;
+      font-weight: 600;
+    }
+
+    /* Mermaid 圖表背景 */
+    .mermaid {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 1em 0;
+      overflow-x: auto;
+    }
+
+    /* 搜尋框 */
+    .search input {
+      border-radius: 6px !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">載入中...</div>
+  <script>
+    window.$docsify = {
+      name: 'SyncDrive T3',
+      nameLink: '/',
+      repo: '',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      search: {
+        placeholder: '搜尋文件...',
+        noData: '沒有找到結果',
+        paths: 'auto',
+        depth: 3,
+      },
+      copyCode: {
+        buttonText: '複製',
+        errorText: '複製失敗',
+        successText: '已複製',
+      },
+      pagination: {
+        previousText: '上一篇',
+        nextText: '下一篇',
+        crossChapter: true,
+        crossChapterText: true,
+      },
+      markdown: {
+        renderer: {
+          // 讓 mermaid 區塊在渲染後觸發 mermaid.init
+          code: function (code, lang) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid">' + code + '</div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          },
+        },
+      },
+    };
+  </script>
+  <!-- Docsify 核心 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <!-- 搜尋 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <!-- 複製按鈕 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+  <!-- 分頁導覽 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
+  <!-- Mermaid 圖表渲染 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    // Docsify 每次路由切換後重新渲染 mermaid
+    window.$docsify.plugins = (window.$docsify.plugins || []).concat(function (hook) {
+      hook.doneEach(function () {
+        mermaid.run({ querySelector: '.mermaid' });
+      });
+    });
+  </script>
+</body>
+</html>

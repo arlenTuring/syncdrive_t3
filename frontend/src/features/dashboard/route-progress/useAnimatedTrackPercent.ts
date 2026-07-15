@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RouteProgressWidget, RouteStation } from '../types';
-import { readMqttRouteProgress } from './resolveVehiclePosition';
+import { readMqttRouteProgress, routeProgressFromCurrentLeg } from './resolveVehiclePosition';
 import { readOrderStatus } from './orderStatus';
+import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
+import { extrapolateLegEtaSeconds } from '../utils/simClock';
+import { useSimClockFrame } from '../utils/simClockFrame';
 
 export function mqttPayloadIsFresh(
   payload: Record<string, unknown> | null,
@@ -31,16 +34,46 @@ export function trackPercentFromSegment(
   return clamp(a + t * (b - a), 0, 100);
 }
 
+function readMqttRouteProgressSim(
+  mqttPayload: Record<string, unknown> | null,
+  stations: RouteStation[],
+  speedMultiplier: number,
+  playing: boolean,
+): number | undefined {
+  if (!mqttPayload?.current_leg || typeof mqttPayload.current_leg !== 'object') {
+    return undefined;
+  }
+  const leg = mqttPayload.current_leg as Record<string, unknown>;
+  const eta = extrapolateLegEtaSeconds(mqttPayload, speedMultiplier, playing);
+  return routeProgressFromCurrentLeg({ ...leg, eta_seconds: eta }, stations);
+}
+
+/** 模擬播放：依 sim 時鐘連續推進進度（共用 tick，非每卡獨立 rAF） */
+function useSimClockTrackProgress(
+  mqttPayload: Record<string, unknown> | null,
+  stations: RouteStation[],
+  enabled: boolean,
+  fallback: number,
+  speedMultiplier: number,
+  playing: boolean,
+): number {
+  useSimClockFrame(enabled && playing);
+  if (!enabled) return fallback;
+  return readMqttRouteProgressSim(mqttPayload, stations, speedMultiplier, playing) ?? fallback;
+}
+
 function useSmoothMqttProgress(
   mqttTarget: number | undefined,
   enabled: boolean,
   rowKey: string,
   fallback: number,
+  speedMultiplier: number,
 ): number {
   const [display, setDisplay] = useState(mqttTarget ?? fallback);
   const currentRef = useRef(mqttTarget ?? fallback);
   const targetRef = useRef(mqttTarget ?? fallback);
   const rafRef = useRef(0);
+  const smoothFactor = Math.min(0.4, 0.12 * Math.max(1, speedMultiplier));
 
   // 換卡（rowKey 變）時重置基準，不在每次 mqttTarget 變動就 snap
   useEffect(() => {
@@ -57,7 +90,6 @@ function useSmoothMqttProgress(
     targetRef.current = mqttTarget;
     if (rafRef.current !== 0) return; // 已有動畫在跑
 
-    const SMOOTH = 0.12;
     const tick = () => {
       const target = targetRef.current;
       const delta = target - currentRef.current;
@@ -67,12 +99,12 @@ function useSmoothMqttProgress(
         rafRef.current = 0; // 抵達目標 → 停止迴圈（不再重排 rAF）
         return;
       }
-      currentRef.current += delta * SMOOTH;
+      currentRef.current += delta * smoothFactor;
       setDisplay(currentRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
-  }, [enabled, mqttTarget]);
+  }, [enabled, mqttTarget, smoothFactor]);
 
   // 卸載時清掉殘留 rAF
   useEffect(() => () => {
@@ -104,6 +136,8 @@ export function useAnimatedTrackPercent(
   options?: AnimatedTrackPercentOptions,
 ): number {
   const mqttOnly = options?.mqttOnly ?? false;
+  const { speedMultiplier, running, paused, transportPaused } = useDemoSimulationPlayback();
+  const simPlaying = running && !paused && !transportPaused;
   const orderStatus = readOrderStatus(variables, sqlRow, mqttPayload);
   const isPending = orderStatus === 'PENDING';
   const isFaulted = orderStatus === 'FAULTED';
@@ -137,11 +171,21 @@ export function useAnimatedTrackPercent(
     && mqttTarget === undefined
     && lastMqttRef.current !== undefined;
 
+  const simClockPercent = useSimClockTrackProgress(
+    mqttPayload,
+    stations,
+    hasLiveMqtt && simPlaying,
+    lastMqttRef.current ?? origin,
+    speedMultiplier,
+    simPlaying,
+  );
+
   const smoothMqttPercent = useSmoothMqttProgress(
     mqttTarget,
-    hasLiveMqtt,
+    hasLiveMqtt && !simPlaying,
     rowKey,
     lastMqttRef.current ?? origin,
+    speedMultiplier,
   );
 
   if (isPending) {
@@ -151,12 +195,17 @@ export function useAnimatedTrackPercent(
     return lastMqttRef.current ?? origin;
   }
   if (hasLiveMqtt) {
-    return smoothMqttPercent;
+    return simPlaying ? simClockPercent : smoothMqttPercent;
   }
   if (holdMqtt) {
     return lastMqttRef.current!;
   }
   if (mqttOnly) {
+    const segIdx = Number(sqlRow?.segment_index ?? variables.segment_index ?? 0);
+    const segRem = Number(sqlRow?.segment_remain_pct ?? variables.segment_remain_pct ?? 0);
+    if (stations.length >= 2 && Number.isFinite(segIdx) && Number.isFinite(segRem)) {
+      return trackPercentFromSegment(stations, segIdx, segRem);
+    }
     return origin;
   }
   return mqttTarget ?? origin;

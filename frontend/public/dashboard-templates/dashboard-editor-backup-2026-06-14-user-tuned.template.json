@@ -2372,7 +2372,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           },
           {
@@ -2488,7 +2488,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           },
           {
@@ -2604,7 +2604,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           },
           {
@@ -2720,7 +2720,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           },
           {
@@ -2836,7 +2836,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           },
           {
@@ -2952,7 +2952,7 @@
             "slotFontSize": 14,
             "emptyHintFontSize": 14,
             "dataSourceId": "default-internal",
-            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+            "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
             "refreshInterval": 15
           }
         ]

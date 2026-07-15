@@ -47,6 +47,7 @@ State fields:
 - `Track` (`name`: `Rail`)
 - `Pole` (`name`: `SmartPole`)
 - `DockingPoint` (`name`: `DockingPoint`) — 地圖停靠點／營運節點參照
+- `Waypoint` (`name`: `Waypoint`) — 途經點；自駕車必經點位（預設綠色圓點）
 
 ## Parameters by component
 
@@ -83,14 +84,19 @@ State fields:
 
 #### DockingPoint（停靠點）
 
-- `stationName` — 使用者設定的站點名稱（同一圖台內不可重複；T3 範本可為 `T3下行` 等）
-- `dockingStation` — 正線站點代碼（`N2W` | `T3` | `S2W`）；用於節點 ID 站點代碼與路線對照
+- `stationId` — **站點唯一識別**（使用者可編輯；預設 `station_1`、`station_2`…；圖台內不可重複）。對應營運協議 `task_params.station_id` 與 MQTT `current_leg.target_station_id`。
+- `stationName` — 站點別名（例 `N2W下行`）；同一圖台內不可重複
 - `dockingLeg` — 軌道方向（`down` | `up`）；對應 `ROUTE-MAINLINE-DOWN` / `ROUTE-MAINLINE-UP`
-- `nodeRole` — 系統推斷或寫入的節點角色（`STOP` | `DEP` | …）；與 `dockingLeg`+`dockingStation` 對應 seed 的 `node_id` 後綴
-- `operationNodeId` — **系統自動產生**、唯讀；對應營運協議 `task_params.node_id`（格式 `ND-{站點代碼}-{節點角色}-{序號}`，例 `ND-T3-STOP-01`）。同站同角色共用同一 ID（如 T3 上下行停靠皆為 `ND-T3-STOP-01`）。建立後不隨顯示名稱變更。
 - `refFieldXM` / `refFieldYM` — 參照場域座標（單點，與 Signal 相同）
 - `iconMode`: `dot` | `builtin` | `custom`（預設 `dot`）
 - `customIconUrl`: 自訂圖示 URL（`iconMode` 為 `custom` 時）
+
+#### Waypoint（途經點）
+
+- `waypointCode` — **途經點唯一代號**（使用者可編輯；預設 `waypoint_1`、`waypoint_2`…；全圖不可重複）。圖台以綠色圓點顯示，不顯示名稱。
+- `refFieldXM` / `refFieldYM` — 參照場域座標（單點，與 DockingPoint 相同）
+
+> **已廢止（載入時自動剝除）**：`dockingStation`、`operationNodeId`、`nodeRole`
 
 範例：
 
@@ -102,8 +108,9 @@ State fields:
   "customName": "",
   "positionMeters": { "x": 120, "y": 80 },
   "parameters": {
-    "stationName": "T3",
-    "operationNodeId": "ND-T3-STOP-01",
+    "stationId": "station_3",
+    "stationName": "T3下行",
+    "dockingLeg": "down",
     "refFieldXM": 937.5,
     "refFieldYM": 251.2,
     "iconMode": "builtin"

@@ -341,6 +341,8 @@ export interface SlotGridWidget extends WidgetBase, WidgetDataBinding {
 export interface RouteStation {
   id: string;
   name: string;
+  /** 地圖停靠點 stationId（與 MQTT current_leg.target_station_id 對應） */
+  stationId?: string;
   value: number; // 軌道上的錨點位置 0–100（等距站點由系統計算）
   /** 前往此站之進度段上的剩餘距離 %（0=已到站，100=剛離開前站），供推算用 */
   remainPct?: number;

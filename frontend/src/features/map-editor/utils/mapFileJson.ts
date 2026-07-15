@@ -36,7 +36,11 @@ import {
   type MapFileFacilityEntry,
   type MapFileV1,
   type MapFileV2,
+  type MapPlannedRoute,
+  type MapRouteGroup,
 } from '../types/mapFile'
+import { parseMapRoutes } from './routePlanning'
+import { parseMapRouteGroups } from './routeGroupPlanning'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
 import { syncGeofenceFacility } from './geofence'
 import { sanitizeFacilitiesForEditor } from './sanitizeFacility'
@@ -92,6 +96,7 @@ const FACILITY_TYPES = [
   'Track',
   'Pole',
   'DockingPoint',
+  'Waypoint',
   'RoadLine',
   'Zone',
 ] as const
@@ -393,6 +398,8 @@ export type ParsedMapFile = {
   pixelSize: MapPixelSize
   pixelOrigin: { x: number; y: number }
   areas: MapAreaObject[]
+  routeGroups: MapRouteGroup[]
+  routes: MapPlannedRoute[]
   createdAt?: string
   updatedAt?: string
 }
@@ -416,6 +423,8 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       pixelSize,
       pixelOrigin: parsePixelOrigin(json.pixelOrigin),
       areas: areas.length > 0 ? areas : [createBlankArea('1', pixelSize)],
+      routes: parseMapRoutes(json.routes),
+      routeGroups: parseMapRouteGroups(json.routeGroups),
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
     }
@@ -430,6 +439,8 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       pixelSize,
       pixelOrigin: { x: 0, y: 0 },
       areas: migrateV1ToAreas(json, pixelSize),
+      routes: [],
+      routeGroups: [],
     }
   }
 
@@ -499,9 +510,13 @@ export function buildMapFileV2(
     createdAt?: string
     updatedAt?: string
     pixelOrigin?: { x: number; y: number }
+    routes?: MapPlannedRoute[]
+    routeGroups?: MapRouteGroup[]
   },
 ): MapFileV2 {
   const origin = parsePixelOrigin(options?.pixelOrigin)
+  const routes = options?.routes ?? []
+  const routeGroups = options?.routeGroups ?? []
   return {
     schemaVersion: MAP_FILE_SCHEMA_VERSION,
     mapId,
@@ -513,6 +528,8 @@ export function buildMapFileV2(
     pixelSize: clampMapPixelSize(pixelSize),
     ...(origin.x > 0 || origin.y > 0 ? { pixelOrigin: origin } : {}),
     areas: areas.map(areaToMapEntry),
+    ...(routeGroups.length > 0 ? { routeGroups } : {}),
+    ...(routes.length > 0 ? { routes } : {}),
   }
 }
 

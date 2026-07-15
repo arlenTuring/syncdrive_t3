@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, type LogLevel } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 /** 解析 CORS 允許來源；留空或 '*' 代表全部放行（僅開發用）。 */
@@ -23,6 +24,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: resolveNestLogLevels(),
   });
+
+  const bodyLimit = process.env.REQUEST_BODY_LIMIT ?? '10mb';
+  app.use(json({ limit: bodyLimit }));
+  app.use(urlencoded({ extended: true, limit: bodyLimit }));
 
   // 啟用 CORS（來源由 CORS_ORIGIN 控制，預設開發全開）
   app.enableCors({ origin: resolveCorsOrigin() });

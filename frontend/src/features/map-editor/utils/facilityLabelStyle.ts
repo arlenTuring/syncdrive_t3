@@ -253,7 +253,9 @@ export function resolveLabelRotationDeg(style: FacilityLabelStyle): number {
 export function getFacilityLabelStyle(facility: FacilityObject): FacilityLabelStyle {
   const parsed = parseFacilityLabelStyle(facility.parameters?.[LABEL_STYLE_PARAM_KEY])
   if (
-    (facility.type === 'RoadLine' || facility.type === 'DockingPoint') &&
+    (facility.type === 'RoadLine' ||
+      facility.type === 'DockingPoint' ||
+      facility.type === 'Waypoint') &&
     parsed.visible === undefined
   ) {
     return { ...parsed, visible: false }

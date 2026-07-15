@@ -1,0 +1,52 @@
+---
+description: 儀表板／模擬相關改動完成後，Agent 須自行跑健康檢查並回報截圖，勿要求使用者貼 Console 截圖
+alwaysApply: true
+---
+
+# 儀表板改動 — 自行驗收
+
+當你修改以下任一範圍時，**完成前必須自行驗證**，不得在未驗證前宣稱「應該沒問題」：
+
+- `frontend/src/features/dashboard/**`
+- `backend/src/demo/**`
+- `backend/scripts/*simulator*`
+- `backend/scripts/t3-v0-0-5-track-motion.js`
+- `frontend/src/features/dashboard/constants/demoSql.ts`
+
+## 驗收步驟
+
+1. **確認服務在跑**
+   - 後端：`curl -s -m 3 http://127.0.0.1:3000/syncdrive-api/datasource/ping` → HTTP 200
+   - 前端：用 `http://localhost:5173`（**不要用** `127.0.0.1:5173`，Vite 綁 IPv6）
+   - 若無回應：執行 `npm run dev:restart` 後再試
+
+2. **跑驗證腳本**
+   ```bash
+   npm run verify:dashboard
+   ```
+   或：`node frontend/scripts/verify-dashboard-health.mjs`
+
+3. **讀取結果**
+   - 報告：`.dev/verify/report.json`
+   - 截圖：`.dev/verify/01-dashboard-load.png`、`02-dashboard-sim-12x.png`
+   - 若有失敗：讀 `00-error-state.png` 與 `consoleErrors`，修到全過再回報
+
+4. **回報使用者**
+   - 列出 `report.json` 中 failed 的 checks（若有）
+   - 附上截圖路徑或內嵌關鍵截圖
+   - 摘要 Console：不得有 `datasource/query 400`、`invalid input syntax for type integer`
+
+5. **清理暫存（必做）**
+   - 回報完成後立即執行：
+     ```bash
+     npm run verify:dashboard:clean
+     ```
+   - 刪除 `.dev/verify/` 下所有截圖、`report.json` 與錯誤截圖
+   - **不要**把驗收產物留在專案裡；使用者不需要手動刪
+
+## 禁止
+
+- 不要要求使用者貼 Console 或 DevTools 截圖（除非 Playwright 無法重現且本機服務確實無法啟動）
+- 不要跳過 SQL 健康檢查（MAINLINE / CAPACITY / MAINTENANCE）
+- 不要只改程式碼而不跑 `verify:dashboard`
+- 不要驗收後留下 `.dev/verify/` 暫存檔

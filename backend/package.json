@@ -14,7 +14,7 @@
     "start:prod": "node dist/main",
     "seed:dashboard": "nest build && node dist/database/run-seed.js",
     "demo:vtms": "node scripts/vtms-demo-simulator.js",
-    "demo:vtms-shift": "node scripts/vtms-shift-demo-simulator.js",
+    "demo:vtms-shift": "node scripts/sync-published-map-from-api.js && node scripts/vtms-shift-demo-simulator.js",
     "db:cleanup": "node scripts/cleanup-old-data.js --days 3",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

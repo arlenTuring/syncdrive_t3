@@ -9,7 +9,7 @@ import {
 } from '../features/dashboard/constants/demoPlane'
 import { patchDashboardRuntimeFixes } from '../features/dashboard/utils/migrateVehicleMonitorProtocol'
 
-const DEMO_LAYOUT_VERSION = 113;
+const DEMO_LAYOUT_VERSION = 114;
 
 /** 儀表板平面 localStorage */
 export const DASHBOARD_PLANES_STORAGE_KEY = 'syncdrive_dashboard_planes'

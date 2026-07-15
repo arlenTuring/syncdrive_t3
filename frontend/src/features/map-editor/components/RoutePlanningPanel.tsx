@@ -1,0 +1,491 @@
+import {
+  ArrowDown,
+  ArrowUp,
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  Save,
+  X,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { MapAreaObject } from '../types/area'
+import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import { RouteGroupEditorView, type RouteGroupDraft } from './RouteGroupEditorView'
+import { RouteGroupListView } from './RouteGroupListView'
+import {
+  stationDisplayLabel,
+  formatRouteTravelTimeSummary,
+  isRouteTravelTimePairValid,
+  isRoutePlanningDraftSavable,
+  type RoutePlanningDraft,
+} from '../utils/routePlanning'
+import {
+  partitionStationsForRouteAppend,
+  resolveRoutePreviewGeometry,
+} from '../utils/routeTrackPath'
+
+type Props = {
+  areas: MapAreaObject[]
+  routeGroups: MapRouteGroup[]
+  routes: MapPlannedRoute[]
+  editMode: boolean
+  draft: RoutePlanningDraft | null
+  groupDraft: RouteGroupDraft | null
+  visibleRouteIds: ReadonlySet<string>
+  pickMode: boolean
+  onStartNewRoute: (groupId: string | null) => void
+  onStartNewGroup: () => void
+  onEditRoute: (routeId: string) => void
+  onEditGroup: (groupId: string) => void
+  onDeleteGroup: (groupId: string) => void
+  onToggleRouteVisibility: (routeId: string) => void
+  onToggleGroupRouteVisibility: (routeIds: string[]) => void
+  onCancelDraft: () => void
+  onCancelGroupDraft: () => void
+  onSaveDraft: () => void
+  onSaveGroupDraft: () => void
+  onDeleteRoute: (routeId: string) => void
+  onDraftNameChange: (name: string) => void
+  onDraftAvgTravelTimeChange: (seconds: number | null) => void
+  onDraftMinTravelTimeChange: (seconds: number | null) => void
+  onGroupDraftNameChange: (name: string) => void
+  onRemoveStationAt: (index: number) => void
+  onMoveStation: (from: number, to: number) => void
+  onAppendStation: (stationId: string) => void
+}
+
+export function RoutePlanningPanel({
+  areas,
+  routeGroups,
+  routes,
+  editMode,
+  draft,
+  groupDraft,
+  visibleRouteIds,
+  pickMode,
+  onStartNewRoute,
+  onStartNewGroup,
+  onEditRoute,
+  onEditGroup,
+  onDeleteGroup,
+  onToggleRouteVisibility,
+  onToggleGroupRouteVisibility,
+  onCancelDraft,
+  onCancelGroupDraft,
+  onSaveDraft,
+  onSaveGroupDraft,
+  onDeleteRoute,
+  onDraftNameChange,
+  onDraftAvgTravelTimeChange,
+  onDraftMinTravelTimeChange,
+  onGroupDraftNameChange,
+  onRemoveStationAt,
+  onMoveStation,
+  onAppendStation,
+}: Props) {
+  const editingRoute = draft !== null
+  const editingGroup = groupDraft !== null
+  const [dropdownStationId, setDropdownStationId] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const canSave = Boolean(draft && isRoutePlanningDraftSavable(draft))
+
+  const travelTimeInvalid =
+    draft != null
+    && !isRouteTravelTimePairValid(draft.avgTravelTimeSeconds, draft.minTravelTimeSeconds)
+    && (draft.avgTravelTimeSeconds != null || draft.minTravelTimeSeconds != null)
+
+  const routePreview = useMemo(() => {
+    if (!draft || draft.stationIds.length < 2) return null
+    return resolveRoutePreviewGeometry(areas, draft.stationIds)
+  }, [areas, draft])
+
+  const routeWarnings = routePreview?.warnings ?? []
+
+  const stationPartition = useMemo(() => {
+    if (!draft) return { selectable: [], disabled: [] }
+    return partitionStationsForRouteAppend(areas, draft.stationIds)
+  }, [areas, draft])
+
+  const { selectable: selectableStations, disabled: disabledStations } =
+    stationPartition
+
+  useEffect(() => {
+    if (
+      dropdownStationId &&
+      !selectableStations.some((s) => s.stationId === dropdownStationId)
+    ) {
+      setDropdownStationId('')
+    }
+  }, [dropdownStationId, selectableStations])
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!pickerRef.current?.contains(e.target as Node)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [pickerOpen])
+
+  const selectedStationLabel = useMemo(() => {
+    if (!dropdownStationId) return null
+    const hit =
+      selectableStations.find((s) => s.stationId === dropdownStationId) ??
+      disabledStations.find((s) => s.stationId === dropdownStationId)
+    return hit ? `${hit.stationName} (${hit.stationId})` : null
+  }, [dropdownStationId, selectableStations, disabledStations])
+
+  const appendFromDropdown = () => {
+    if (!dropdownStationId) return
+    if (!selectableStations.some((s) => s.stationId === dropdownStationId)) {
+      return
+    }
+    onAppendStation(dropdownStationId)
+    setDropdownStationId('')
+    setPickerOpen(false)
+  }
+
+  const pickStation = (stationId: string) => {
+    setDropdownStationId(stationId)
+    setPickerOpen(false)
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {editingGroup && groupDraft ? (
+        <RouteGroupEditorView
+          draft={groupDraft}
+          editMode={editMode}
+          onBack={onCancelGroupDraft}
+          onSave={onSaveGroupDraft}
+          onNameChange={onGroupDraftNameChange}
+        />
+      ) : !editingRoute ? (
+        <RouteGroupListView
+          areas={areas}
+          routeGroups={routeGroups}
+          routes={routes}
+          editMode={editMode}
+          visibleRouteIds={visibleRouteIds}
+          onToggleRouteVisibility={onToggleRouteVisibility}
+          onToggleGroupRouteVisibility={onToggleGroupRouteVisibility}
+          onEditRoute={onEditRoute}
+          onDeleteRoute={onDeleteRoute}
+          onEditGroup={onEditGroup}
+          onDeleteGroup={onDeleteGroup}
+          onStartNewRoute={onStartNewRoute}
+          onStartNewGroup={onStartNewGroup}
+        />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <button
+            type="button"
+            onClick={onCancelDraft}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-600/80 bg-zinc-950/60 px-2.5 py-2 text-left text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-100"
+          >
+            <ChevronLeft className="size-4 shrink-0" aria-hidden />
+            回到路線清單
+          </button>
+
+          <p className="text-[11px] font-semibold text-zinc-200">
+            {draft.routeId ? '編輯路線' : '製作路線'}
+          </p>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-zinc-400">
+              路線名稱
+            </label>
+            <input
+              type="text"
+              value={draft.displayName}
+              onChange={(e) => onDraftNameChange(e.target.value)}
+              placeholder="例如：N2W 下行"
+              disabled={!editMode}
+              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-zinc-400">
+              <span className="text-red-400">*</span> 行駛時間（秒）
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[9px] text-zinc-500">平均時間</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={draft.avgTravelTimeSeconds ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    onDraftAvgTravelTimeChange(
+                      raw === '' ? null : Math.max(1, Math.round(Number(raw) || 0)),
+                    )
+                  }}
+                  placeholder="請輸入"
+                  disabled={!editMode}
+                  className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[9px] text-zinc-500">最快時間</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={draft.minTravelTimeSeconds ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    onDraftMinTravelTimeChange(
+                      raw === '' ? null : Math.max(1, Math.round(Number(raw) || 0)),
+                    )
+                  }}
+                  placeholder="請輸入"
+                  disabled={!editMode}
+                  className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
+                />
+              </label>
+            </div>
+            <p className="mt-1 text-[9px] leading-snug text-zinc-600">
+              自駕車走完此路線的行駛時間（不含月台門停靠）；正線路線必填，最快時間不可大於平均時間
+            </p>
+            {travelTimeInvalid ? (
+              <p className="mt-1 text-[9px] text-red-400">
+                請填寫平均與最快時間，且最快時間須 ≤ 平均時間
+              </p>
+            ) : null}
+            {formatRouteTravelTimeSummary(
+              draft.avgTravelTimeSeconds,
+              draft.minTravelTimeSeconds,
+            ) ? (
+              <p className="mt-1 text-[9px] text-zinc-500">
+                圖台預覽：
+                {formatRouteTravelTimeSummary(
+                  draft.avgTravelTimeSeconds,
+                  draft.minTravelTimeSeconds,
+                )}
+              </p>
+            ) : null}
+          </div>
+
+          <div
+            className={[
+              'rounded-md border px-2.5 py-2 text-[10px]',
+              pickMode
+                ? 'border-amber-500/50 bg-amber-950/30 text-amber-100'
+                : 'border-zinc-700/70 bg-zinc-950/50 text-zinc-400',
+            ].join(' ')}
+          >
+            {pickMode
+              ? '點選地圖上可連接的停靠點，或從下方清單加入；灰色站點無法從目前路線末端連接。'
+              : '請進入編輯模式以加入站點。'}
+          </div>
+
+          {editMode ? (
+            <div className="space-y-2">
+              <label className="block text-[10px] font-medium text-zinc-400">
+                從清單加入停靠點
+              </label>
+              <div className="flex gap-1">
+                <div ref={pickerRef} className="relative min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((v) => !v)}
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-left text-[11px] text-zinc-100 hover:border-amber-500/50 focus:border-amber-500/60 focus:outline-none"
+                  >
+                    <span
+                      className={
+                        selectedStationLabel ? 'truncate' : 'truncate text-zinc-500'
+                      }
+                    >
+                      {selectedStationLabel ??
+                        (selectableStations.length === 0 &&
+                        disabledStations.length > 0
+                          ? '目前無可連接站點'
+                          : selectableStations.length === 0
+                            ? '所有停靠點已加入'
+                            : '選擇停靠點…')}
+                    </span>
+                    <ChevronDown
+                      className={[
+                        'size-3.5 shrink-0 text-zinc-500 transition',
+                        pickerOpen ? 'rotate-180' : '',
+                      ].join(' ')}
+                    />
+                  </button>
+                  {pickerOpen ? (
+                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl">
+                      {selectableStations.length > 0 ? (
+                        <div className="px-1 pb-1">
+                          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                            可加入
+                          </p>
+                          {selectableStations.map((station) => (
+                            <button
+                              key={station.stationId}
+                              type="button"
+                              onClick={() => pickStation(station.stationId)}
+                              className={[
+                                'w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-zinc-800',
+                                dropdownStationId === station.stationId
+                                  ? 'bg-amber-950/40 text-amber-100'
+                                  : 'text-zinc-100',
+                              ].join(' ')}
+                            >
+                              {station.stationName}{' '}
+                              <span className="font-mono text-[10px] text-zinc-500">
+                                ({station.stationId})
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      {disabledStations.length > 0 ? (
+                        <div className="border-t border-zinc-800 px-1 pt-1">
+                          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">
+                            無法連接（不可選）
+                          </p>
+                          {disabledStations.map((station) => (
+                            <div
+                              key={station.stationId}
+                              className="cursor-not-allowed rounded px-2 py-1.5 opacity-45"
+                            >
+                              <p className="text-[11px] text-zinc-500">
+                                {station.stationName}
+                              </p>
+                              <p className="text-[9px] text-zinc-600">
+                                {station.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={appendFromDropdown}
+                  disabled={!dropdownStationId}
+                  className="shrink-0 rounded-md border border-amber-500/50 bg-amber-950/40 px-2 py-1.5 text-[10px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40"
+                >
+                  加入
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {routeWarnings.length > 0 ? (
+            <div className="space-y-1.5 rounded-md border border-red-500/40 bg-red-950/30 px-2.5 py-2">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold text-red-200">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                站序連通異常
+              </p>
+              <ul className="space-y-1">
+                {routeWarnings.map((w) => (
+                  <li
+                    key={`${w.fromStationId}-${w.toStationId}`}
+                    className="text-[10px] leading-snug text-red-100/90"
+                  >
+                    {w.message}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[9px] text-red-200/70">
+                請調整站序順序，或移除無法連通的站點。
+              </p>
+            </div>
+          ) : null}
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <p className="mb-1.5 text-[10px] font-medium text-zinc-400">
+              站序（{draft.stationIds.length}）
+            </p>
+            {draft.stationIds.length === 0 ? (
+              <p className="rounded border border-dashed border-zinc-700/60 px-2 py-4 text-center text-[10px] text-zinc-600">
+                尚未選站
+              </p>
+            ) : (
+              <ol className="space-y-1">
+                {draft.stationIds.map((stationId, index) => (
+                  <li
+                    key={`${stationId}-${index}`}
+                    className="flex items-center gap-1 rounded border border-zinc-700/80 bg-zinc-950/60 px-1.5 py-1"
+                  >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[9px] font-bold text-amber-200">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[10px] font-medium text-zinc-200">
+                        {stationDisplayLabel(areas, stationId)}
+                      </p>
+                      <p className="truncate font-mono text-[9px] text-zinc-500">
+                        {stationId}
+                      </p>
+                    </div>
+                    {editMode ? (
+                      <div className="flex shrink-0 flex-col">
+                        <button
+                          type="button"
+                          title="上移"
+                          disabled={index === 0}
+                          onClick={() => onMoveStation(index, index - 1)}
+                          className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+                        >
+                          <ArrowUp className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          title="下移"
+                          disabled={index === draft.stationIds.length - 1}
+                          onClick={() => onMoveStation(index, index + 1)}
+                          className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+                        >
+                          <ArrowDown className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          title="移除"
+                          onClick={() => onRemoveStationAt(index)}
+                          className="rounded p-0.5 text-zinc-500 hover:bg-red-950/50 hover:text-red-300"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          {editMode ? (
+            <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-700/80 pt-2">
+              <button
+                type="button"
+                onClick={onSaveDraft}
+                disabled={!canSave || routeWarnings.length > 0}
+                className="flex flex-1 items-center justify-center gap-1 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-2 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-40"
+              >
+                <Save className="size-3.5" />
+                儲存路線
+              </button>
+              <button
+                type="button"
+                onClick={onCancelDraft}
+                className="rounded-md border border-zinc-600 px-2 py-1.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+              >
+                回到清單
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}

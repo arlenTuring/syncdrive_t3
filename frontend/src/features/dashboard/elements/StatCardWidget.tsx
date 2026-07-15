@@ -51,6 +51,9 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
     sqlQuery: widget.sqlQuery,
     dataUrl: widget.dataUrl,
     refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    freshnessPolicy: widget.mqttTopic ? 'once' : widget.freshnessPolicy,
+    invalidateTags: widget.invalidateTags,
   });
 
   const mqttData = useMqttData({

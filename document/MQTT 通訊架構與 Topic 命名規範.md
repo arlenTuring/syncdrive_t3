@@ -1,0 +1,104 @@
+## ## MQTT 通訊架構與 Topic 命名規範
+
+### 零、 術語與系統定義 (Definitions)
+為確保開發邊界對齊，特此定義本系統之縮寫與權責：
+* **VTMS (Vehicle & Traffic Management System)**：整體交通管理系統。
+* **VTMS Host**：中心管理主機 (ICL 側)，同時為 MQTT Broker 之所在地。
+* **VTMS Agent**：安裝於路側之通訊代理。
+* **SyncDrive**：台灣智慧駕駛 (Turing Drive) 研發之車載管理系統 (車端)。
+* **Scope (規範範疇)**：本協議僅定義 **SyncDrive ↔ VTMS Host** 之通訊。凡資料 Publish 至 Host Broker 後，其內部往 Agent/SCADA 之路由由 ICL 端處理。
+
+### 一、 核心 Topic 命名結構
+
+本系統採用 RESTful-like 階層式 Topic 命名結構，以支援通配符 (Wildcard) 訂閱與權限控管 (ACL)：
+`{version}/{domain}/{vehicle_code}/{channel}/{action}`
+
+**階層定義與允許值：**
+1.  **`{version}` (版本號)**：當前固定為 `v1`。
+2.  **`{domain}` (領域/場域)**：當前固定為 `vtms`。
+3.  **`{vehicle_code}` (車輛實體)**：
+    * **特定車輛**：格式為 `PMS-01` ~ `PMS-11`（連字號分隔）。
+    * **廣播代碼 (Magic Value)**：固定為 `all`。用於中心端對全車隊下發指令。
+4.  **`{channel}` (通訊通道)**：對應系統的四大核心協議。
+    * `telemetry`：第一類 車輛動態協議
+    * `operation`：第二類 營運任務狀態協議
+    * `health`：第三類 設備健康與異常告警協議
+    * `command`：第四類 動態控制指令 (中心至車端)
+    * `event`：第四類 特殊事件上報 (車端至中心)
+5.  **`{action}` (行為動作)**：定義該 Topic 的具體操作性質。
+    * `update`：持續性的狀態推播
+    * `heartbeat`：週期性的健康心跳
+    * `execute`：執行指令
+    * `ack`：指令確認回覆
+    * `report`：突發事件上報
+    * `assign`：中心端發車與優先權宣告（搭配 `operation` channel，中心 ➔ 車端，retain: false）
+
+---
+
+### 二、 四大協議 Topic 映射對照表
+
+| 協議類別 | 傳輸方向 | 具體 Topic 路徑範例 (以 PMS-05 為例) | Retain 設定 |
+| :--- | :--- | :--- | :--- |
+| **第一類：車輛動態** | 車端 ➔ 中心 | `v1/vtms/PMS-05/telemetry/update` | `false` |
+| **第二類：營運任務** | 車端 ➔ 中心 | `v1/vtms/PMS-05/operation/update` | **`true`** |
+| **第三類：設備健康** | 車端 ➔ 中心 | `v1/vtms/PMS-05/health/heartbeat` | **`true`** |
+| **第四類：動態控制** | 中心 ➔ 車端 | `v1/vtms/PMS-05/command/execute` | `false` |
+| **第四類：廣播指令** | 中心 ➔ 車隊 | `v1/vtms/all/command/execute` | `false` |
+| **第四類：指令確認** | 車端 ➔ 中心 | `v1/vtms/PMS-05/command/ack` | `false` |
+| **第四類：特殊事件** | 車端 ➔ 中心 | `v1/vtms/PMS-05/event/report` | `false` |
+
+> **Retain 實作規範**：標示為 `true` 者，由 **發布端 (Publisher)** 於發送時設定 `retain=true` 標誌。Broker 會保留最後一筆訊息，確保訂閱者在中斷重連後能立即取得最新狀態。
+
+---
+
+### 三、 實作開發與 ACL 權限規範
+
+1.  **SyncDrive 雙重訂閱責任 (Double Subscription)**：
+    為確保全域廣播指令之送達，SyncDrive 實作時必須同時訂閱以下兩個路徑：
+    * 自身 ID 路徑：`v1/vtms/{vehicle_code}/#`
+    * 全域廣播路徑：`v1/vtms/all/#`
+2.  **中心端 (VTMS Host) 訂閱與 Wildcard 應用**：
+    * **全車隊聚合 (橫向)**：如 `v1/vtms/+/telemetry/update`，用於 GIS 圖台總覽。
+    * **單車全頻道監控 (縱向)**：如 **`v1/vtms/{vehicle_code}/+/+`**，用於單一車輛之遠端診斷與詳細狀態同步渲染。
+3.  **存取控制 (ACL) 隔離原則**：
+    * **車端權限**：SyncDrive 僅具備發布至自身 ID Topic 的權限，並限制訂閱自身 ID 與 `all` 路徑。
+    * **中心端權限**：VTMS Host 具備全域 Topic 之發布與訂閱權限。
+
+---
+
+### 四、 Payload 共通資料格式規範 (硬性約束)
+
+所有 MQTT 傳輸的 Payload 內容必須為 JSON 格式，並嚴格遵守以下防漂移 (Anti-drift) 約束：
+
+1.  **根目錄標識 (Root Level Identifiers)**：
+    每個 JSON 的最外層 (Root) 必須包含 `vehicle_code` 與 `timestamp` 兩個屬性。**嚴禁包裹於 `params`、`data` 或任何子物件中**。
+    ```json
+    {
+      "vehicle_code": "PMS-05",
+      "timestamp": 1713868200000,
+      ...
+    }
+    ```
+2.  **時間戳記格式 (Timestamp)**：
+    全系統統一採用 **13 位 Unix Epoch (ms)** 格式 (Long)。**屏除 ISO 8601 字串**。
+3.  **字串命名約定 (Naming Convention)**：
+    JSON 內所有的系統狀態碼、事件代碼 (Event Codes)、錯誤代碼 (Error Codes) 及指令動作 (Actions)，一律強制使用 **`SCREAMING_SNAKE_CASE`** (全大寫蛇形命名法)。
+
+---
+
+### 五、 協議治理規範 (Governance)
+本協議之通訊頻道 (`channel`) 與動作 (`action`) 定義採閉鎖式管理。**嚴禁任何單方面之架構擴張**。未來若有新增、刪除或修訂需求，必須由 **工研院 (ICL)** 與 **台灣智慧駕駛 (SyncDrive)** 雙方技術代表共同審閱通過後方可實施。
+
+---
+
+### 六、 中心端／場域擴充頻道 (Center & Facility Extensions)
+
+> 下列 Topic 屬 **車端 (SyncDrive) ↔ 中心 (VTMS Host)** 核心協議之**外圍**，由中心端與場域設施使用，不在第一～四類閉鎖集合內。**現況實作中已存在，特此補錄以對齊文件與程式碼**；後續若調整仍適用 §五 治理流程。
+
+| Topic 範例 | 用途 | 方向 |
+| :--- | :--- | :--- |
+| `v1/vtms/{vehicle_code}/operation/assign` | 中心端發車與優先權宣告 | 中心 ➔ 車端 |
+| `v1/vtms/{slot_id}/slot/status` | 月台/廠區格位佔用狀態 | 設施 ➔ 中心 |
+| `v1/vtms/{vehicle_code}/status/{type}` | 通用狀態轉發（前端 widget 訂閱） | 設施/車端 ➔ 中心 |
+| `v1/vtms/dashboard/capacity/live` | 儀表板運能即時資料 | 中心內部 |
+| `syncdrive/#` | 場域設施（月台門 PSD、號誌等）原生 Topic | 設施 ➔ 中心 |

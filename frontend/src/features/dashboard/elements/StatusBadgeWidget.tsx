@@ -3,6 +3,7 @@ import { useWidgetData } from './useWidgetData';
 import { useMqttData } from './useMqttData';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { resolveVehicleMonitorBadge } from '../utils/resolveVehicleMonitorBadge';
+import { resolveMainlineStatusStyleFromLabel } from '../utils/mainlineTaskModel';
 import { editPreviewTextStyle } from '../components/EditPreviewChrome';
 import {
   useIsEditMode,
@@ -14,6 +15,11 @@ import {
 function isVehicleMonitorBadgeWidget(widget: StatusBadgeWidget): boolean {
   const field = widget.valueField?.trim() ?? '';
   return field.includes('badge_label') || field.includes('trip_code');
+}
+
+function isShiftStatusLabelBadge(widget: StatusBadgeWidget): boolean {
+  const field = widget.valueField?.trim() ?? '';
+  return field.includes('status_label');
 }
 
 export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget }) {
@@ -46,10 +52,14 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
 
   let rawValue: string = '';
   let hasLiveData = false;
+  let resolvedBadge: ReturnType<typeof resolveVehicleMonitorBadge> | null = null;
 
   if (vehicleBadge) {
-    const badge = resolveVehicleMonitorBadge(variables, { operation: operationPayload });
-    rawValue = badge.label;
+    resolvedBadge = resolveVehicleMonitorBadge(variables, { operation: operationPayload });
+    rawValue = resolvedBadge.label;
+    if (!rawValue) {
+      rawValue = String(variables.badge_label ?? variables.maint_type_label ?? '').trim();
+    }
     hasLiveData = !!rawValue || !!operationPayload;
   } else if (mqttData.data !== null) {
     rawValue = String(mqttData.data.value ?? mqttData.data);
@@ -77,27 +87,35 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
     });
   }
 
-  const resolvedBadge = vehicleBadge
-    ? resolveVehicleMonitorBadge(variables, { operation: operationPayload })
+  const resolvedBadgeFinal = vehicleBadge
+    ? (resolvedBadge ?? resolveVehicleMonitorBadge(variables, { operation: operationPayload }))
     : null;
 
   const rule = widget.rules.find(r => r.value === rawValue);
-  let bgColor = (resolvedBadge?.bg || rule?.bgColor) || widget.defaultBgColor;
-  let textColor = (resolvedBadge?.color || rule?.textColor) || widget.defaultTextColor;
+  let bgColor = (resolvedBadgeFinal?.bg || rule?.bgColor) || widget.defaultBgColor;
+  let textColor = (resolvedBadgeFinal?.color || rule?.textColor) || widget.defaultTextColor;
   const label = vehicleBadge
     ? rawValue
     : (rule?.label ?? (rawValue || widget.defaultLabel));
 
+  const shiftStatusStyle = isShiftStatusLabelBadge(widget) && label
+    ? resolveMainlineStatusStyleFromLabel(label)
+    : null;
+  if (shiftStatusStyle) {
+    bgColor = shiftStatusStyle.status_bg;
+    textColor = shiftStatusStyle.status_color;
+  } else {
+    if (widget.variableBgKey && variables[widget.variableBgKey] !== undefined && !resolvedBadgeFinal?.bg) {
+      bgColor = String(variables[widget.variableBgKey]);
+    }
+    if (widget.variableColorKey && variables[widget.variableColorKey] !== undefined && !resolvedBadgeFinal?.color) {
+      textColor = String(variables[widget.variableColorKey]);
+    }
+  }
   if (vehicleBadge && !label) {
     return <div style={{ width: '100%', height: '100%' }} />;
   }
 
-  if (widget.variableBgKey && variables[widget.variableBgKey] !== undefined && !resolvedBadge?.bg) {
-    bgColor = String(variables[widget.variableBgKey]);
-  }
-  if (widget.variableColorKey && variables[widget.variableColorKey] !== undefined && !resolvedBadge?.color) {
-    textColor = String(variables[widget.variableColorKey]);
-  }
   const outline = widget.badgeStyle === 'outline'
     || (widget.outlineFromVarKey
       ? String(variables[widget.outlineFromVarKey] ?? '') === '1'

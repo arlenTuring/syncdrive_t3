@@ -40,19 +40,24 @@ export function isYardVehiclePayload(
   payload: Record<string, unknown> | undefined,
 ): boolean {
   if (!payload) return false;
+  const yardSlot = payload.yard_slot_id ?? payload.yardSlotId;
+  if (typeof yardSlot === 'string' && yardSlot.trim()) return true;
   const leg = payload.current_leg;
   if (leg === 'yard') return true;
   const trip = payload.trip_code ?? payload.tripCode;
   if (trip === 'YARD') return true;
   const segment = payload.segment_label;
-  if (typeof segment !== 'string') return false;
-  const label = segment.trim();
-  return (
-    label.startsWith('充電 ') ||
-    label.startsWith('充電等候 ') ||
-    label.startsWith('臨停 ') ||
-    label.startsWith('整備 ')
-  );
+  if (typeof segment === 'string') {
+    const label = segment.trim();
+    if (/^(E\d+|P[1-4]|H\d+|M\d+|W\d+)$/i.test(label)) return true;
+    return (
+      label.startsWith('充電 ') ||
+      label.startsWith('充電等候 ') ||
+      label.startsWith('臨停 ') ||
+      label.startsWith('整備 ')
+    );
+  }
+  return false;
 }
 
 function locateInAreaDomain(

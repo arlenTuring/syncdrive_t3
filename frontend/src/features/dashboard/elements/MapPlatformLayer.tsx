@@ -3,32 +3,20 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Map as MapIcon } from 'lucide-react';
-import { MapAreaCanvas } from '../../map-editor/components/MapAreaCanvas';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
 import { DEFAULT_MAP_PIXEL_SIZE } from '../../map-editor/types/area';
 import { resolveMapId } from '../../map-editor/constants/builtinMaps';
 import { resolveParsedMapForPlatform } from '../../map-editor/utils/mapLibraryStorage';
 import { buildTrackNetwork } from '../../map-editor/vehicles/resolveVehicleTrackPlacement';
 import { buildDemoAreaVehicles } from '../../map-editor/vehicles/demoAreaVehicles';
-import { DEFAULT_MAP_VEHICLE_ICON } from '../../map-editor/vehicles/defaultMapVehicleIcon';
 import {
   DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX,
   DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX,
 } from '../../map-editor/vehicles/resolveMapVehicleTrackSizing';
 import type { MapVehicleTemplateConfig } from '../utils/resolveMapVehicleTemplate';
 import { useMapMqttLive } from './useMapMqttLive';
-import { useDemoSimulation } from '../context/DemoSimulationContext';
-
-const NOOP_SELECT_AREA = (_id: string | null) => {};
-const NOOP_SELECT_FACILITY = (_areaId: string, _facilityId: string | null) => {};
-const NOOP_DRAG = (
-  _areaId: string,
-  _facilityId: string,
-  _update: {
-    areaPosition: { x: number; y: number }
-    position: { x: number; y: number }
-  },
-) => {}
+import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
+import { MapSimVehicleMotionBridge } from './MapSimVehicleMotionBridge';
 
 export function MapPlatformLayer({
   mapId,
@@ -55,12 +43,12 @@ export function MapPlatformLayer({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { liveById, areaVehicles: mqttVehicles } = useMapMqttLive(areas);
-  const { paused, transportPaused } = useDemoSimulation();
-  // 暫停發送/逐幀（transportPaused）或完全停止（paused）時瞬間定位，避免逐幀被 1200ms 補間拖成「頓」
-  const liveTweenMs = transportPaused || paused ? 0 : 1200;
+  const { paused, transportPaused, running, speedMultiplier } = useDemoSimulationPlayback();
+  const simPlaybackActive = running && !paused && !transportPaused;
+  /** 模擬中：存滿 3 幀 MQTT 後從第 1 幀 lerp 播放；暫停／逐幀瞬間定位；非模擬用 CSS 補間 */
+  const liveTweenMs = simPlaybackActive ? 0 : transportPaused || paused ? 0 : 1200;
 
-  const areaVehicles = useMemo(() => {
-    /** 編輯模式：地圖上不顯示車輛，僅保留畫布上的單一載具樣板 */
+  const areaVehiclesRaw = useMemo(() => {
     if (isEditMode) return [];
     if (mqttVehicles.length > 0) return mqttVehicles;
     if (showDemoVehicles) return buildDemoAreaVehicles(areas);
@@ -145,26 +133,19 @@ export function MapPlatformLayer({
 
   return (
     <div className="relative h-full min-h-[120px] w-full overflow-hidden bg-zinc-950">
-      <MapAreaCanvas
+      <MapSimVehicleMotionBridge
         pixelSize={pixelSize}
         pixelOrigin={pixelOrigin}
         areas={areas}
-        selectedAreaId={null}
-        selectedFacilityIds={[]}
-        geofenceSelectedLabelId={null}
-        viewportRef={viewportRef}
-        displayMode="embedded"
-        livePositionTweenMs={liveTweenMs}
-        readOnly
-        editMode={false}
+        vehiclesRaw={areaVehiclesRaw}
+        simPlaybackActive={simPlaybackActive}
+        speedMultiplier={speedMultiplier}
+        liveTweenMs={liveTweenMs}
         liveById={liveById}
-        areaVehicles={areaVehicles}
         showVehicleTelemetry={showVehicleTelemetry}
-        vehicleIconSpec={DEFAULT_MAP_VEHICLE_ICON}
         vehicleDefinition={vehicleDefinition}
         vehicleDisplayWidthPx={vehicleDisplayWidthPx}
         vehicleDisplayHeightPx={vehicleDisplayHeightPx}
-        vehicleFitMode="stretch"
         vehicleBehavior={
           vehicleTemplate
             ? {
@@ -175,13 +156,7 @@ export function MapPlatformLayer({
               }
             : undefined
         }
-        vehicleEditSizer={null}
-        slotPreview={null}
-        onSelectArea={NOOP_SELECT_AREA}
-        onSelectFacility={NOOP_SELECT_FACILITY}
-        onSelectGeofenceLabel={() => {}}
-        onDragFacility={NOOP_DRAG}
-        onDragSessionStart={() => {}}
+        viewportRef={viewportRef}
       />
     </div>
   );

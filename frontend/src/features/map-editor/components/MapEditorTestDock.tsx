@@ -42,8 +42,8 @@ export function MapEditorTestDock({
   onSelectIssue,
   paletteOpen = false,
 }: MapEditorTestDockProps) {
-  const [expanded, setExpanded] = useState(true)
-  const [tab, setTab] = useState<MapEditorTestDockTab>('connectivity')
+  const [expanded, setExpanded] = useState(false)
+  const [tab, setTab] = useState<MapEditorTestDockTab>('mqtt')
 
   const bottomClass = paletteOpen ? 'bottom-28 sm:bottom-32' : 'bottom-3'
 
@@ -51,14 +51,14 @@ export function MapEditorTestDock({
     <div
       className={`pointer-events-none absolute left-3 right-3 z-[48] sm:left-4 sm:right-4 ${bottomClass}`}
       role="region"
-      aria-label="測試控制面板"
+      aria-label="測試器"
     >
       <div className="pointer-events-auto mx-auto flex max-w-5xl flex-col overflow-hidden rounded-xl border border-zinc-600/40 bg-zinc-950/45 shadow-lg backdrop-blur-md">
         <div className="flex shrink-0 items-center gap-2 border-b border-zinc-700/40 px-2 py-1.5 sm:px-3">
           <div
             className="flex rounded-lg border border-zinc-700/50 bg-zinc-900/40 p-0.5"
             role="tablist"
-            aria-label="測試模式"
+            aria-label="測試器模式"
           >
             <button
               type="button"

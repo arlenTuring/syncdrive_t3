@@ -90,7 +90,7 @@ export class MqttService {
     });
     const now = Date.now();
     const cached = this.operationSyncCache.get(vehicleCode);
-    if (cached?.key === syncKey && now - cached.at < 800) return;
+    if (cached?.key === syncKey && now - cached.at < 2500) return;
     this.operationSyncCache.set(vehicleCode, { at: now, key: syncKey });
 
     try {

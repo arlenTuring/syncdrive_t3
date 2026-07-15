@@ -83,7 +83,7 @@ const ICON = {
 } as const;
 
 /** 變更此值可強制所有使用者下次載入時取得新範例版面 */
-export const DEMO_LAYOUT_SEED = '121-protocol-rest-flow-enter-exit';
+export const DEMO_LAYOUT_SEED = '114-syncdrive-master-jun28-104418';
 
 function cid() {
   return Math.random().toString(36).slice(2, 9);
@@ -198,6 +198,7 @@ function maintenanceSlotGrid(
     sqlQuery: maintenanceSlotsSql(zone),
     refreshInterval: 0,
     refreshMode: 'event',
+    invalidateTags: ['domain:maintenance_slots', 'table:slot_status'],
   };
 }
 
@@ -286,6 +287,7 @@ function vehicleDistributionWidget(x: number, y: number, w: number, h: number): 
     sqlQuery: VEHICLE_DISTRIBUTION_SQL,
     refreshInterval: 0,
     refreshMode: 'event',
+    invalidateTags: ['domain:vehicle_distribution', 'table:operation_orders', 'table:slot_status'],
   };
 }
 
@@ -591,7 +593,7 @@ function maintenanceShiftCardShell(cardW: number, cardH: number): ColorBlockWidg
   return {
     ...colorBlock(0, 0, cardW, cardH, '#18181B', 12),
     borderWidth: 1,
-    borderColor: '#FB2C36',
+    borderColor: '#009966',
     bindBorderColorVar: 'card_border_color',
   };
 }
@@ -627,8 +629,8 @@ function maintenanceStatusBadge(x: number, y: number, w: number, h: number): Sta
     height: h,
     valueField: '{status_label}',
     defaultLabel: '—',
-    defaultBgColor: 'rgba(255, 100, 103, 0.3)',
-    defaultTextColor: '#FF6467',
+    defaultBgColor: 'rgba(0, 212, 146, 0.3)',
+    defaultTextColor: '#00BC7D',
     showDot: true,
     fontSize: MAINLINE_CARD_FS.status,
     badgeVariant: 'compact',
@@ -676,6 +678,7 @@ function shiftRouteTrack(x: number, y: number, w: number, h: number): RouteProgr
     width: w,
     height: h,
     variant: 'track',
+    trackStyle: 'mainline',
     stationSource: 'json',
     stationsJsonVarKey: 'route_stations',
     segmentIndexVarKey: 'segment_index',
@@ -764,7 +767,7 @@ function dispatchCardTemplate(cardW: number, cardH: number): ChildWidget[] {
       fontSize: 16,
       contentPadding: '0',
     },
-    staticText(leftColX + textX, midY + colPadY, px(58), py(18), '下一站', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
+    staticText(leftColX + textX, midY + colPadY, px(58), py(18), '{station_label}', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
     {
       ...staticText(leftColX + textX, midY + colPadY + py(18), px(58), py(20), '{next_station}', MAINLINE_CARD_FS.value, '#F3F4F6', 'normal', 'left', 1.25),
       id: cid(),
@@ -778,7 +781,7 @@ function dispatchCardTemplate(cardW: number, cardH: number): ChildWidget[] {
       fontSize: 16,
       contentPadding: '0',
     },
-    staticText(rightColX + textX, midY + colPadY, px(72), py(18), '剩餘到站', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
+    staticText(rightColX + textX, midY + colPadY, px(72), py(18), '{eta_label}', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
     {
       ...staticText(rightColX + textX, midY + colPadY + py(18), px(72), py(20), '{eta_remain}', MAINLINE_CARD_FS.value, '#F3F4F6', 'normal', 'left', 1.25),
       id: cid(),
@@ -853,7 +856,7 @@ function maintenanceCardTemplate(cardW: number, cardH: number): ChildWidget[] {
       fontSize: 16,
       contentPadding: '0',
     },
-    staticText(leftColX + textX, midY + colPadY, px(58), py(18), '整備站點', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
+    staticText(leftColX + textX, midY + colPadY, px(58), py(18), '{station_label}', MAINLINE_CARD_FS.label, '#99A1AF', 'normal', 'left', 1.29),
     {
       ...staticText(leftColX + textX, midY + colPadY + py(18), px(58), py(20), '{next_station}', MAINLINE_CARD_FS.value, '#F3F4F6', 'normal', 'left', 1.25),
       id: cid(),
@@ -1169,7 +1172,6 @@ function vehicleStatusCardTemplate(slotW: number, slotH: number): ChildWidget[] 
       lineHeight: 1.29,
       mqttDataSourceId: MQTT,
       mqttTopic: 'v1/vtms/${vehicle_code}/operation/update',
-      mqttValuePath: 'current_leg.target_station_id',
     },
   );
 
@@ -1274,8 +1276,9 @@ const MAINT_ROW_GAP = 4;
 const MAINT_COL_GAP = 4;
 const MAINT_CARD_W = 312;
 
-/** 車輛分佈 Figma：padding 12/12/8、內容 628、條列區 45 */
-const VEH_DIST_PAD = { top: 12, x: 12, bottom: 8 };
+/** 車輛分佈 Figma：padding 12/12/4、內容 628×75（標題 24 + gap 6 + 條 45） */
+const VEH_DIST_PAD = { top: 12, x: 12, bottom: 4 };
+const VEH_DIST_CONTENT_H = 75;
 const VEH_DIST_CONTENT_W = 628;
 const VEH_DIST_FS = { title: 16, legend: 14, bar: 14, tag: 14 } as const;
 
@@ -1375,7 +1378,8 @@ const elements: CanvasElementProps[] = [
     templateHeight: MAINLINE_CARD_H,
     dataSourceId: DS,
     sqlQuery: MAINLINE_SHIFTS_SQL,
-    refreshInterval: 2,
+    refreshInterval: 0,
+    refreshMode: 'event',
     variableName: 'row',
     iteratorField: 'shift_key',
   },
@@ -1401,7 +1405,8 @@ const elements: CanvasElementProps[] = [
     templateHeight: MAINT_CARD_H,
     dataSourceId: DS,
     sqlQuery: MAINTENANCE_SHIFTS_SQL,
-    refreshInterval: 2,
+    refreshInterval: 0,
+    refreshMode: 'event',
     variableName: 'row',
     iteratorField: 'shift_key',
   },
@@ -1589,6 +1594,7 @@ elements[5].children = [
     id: cid(),
     mqttDataSourceId: MQTT,
     mqttTopic: CAPACITY_TOPIC,
+    freshnessPolicy: 'once',
     refreshInterval: 0,
   },
   statCard(TREND_PAD.x + TREND_KPI_W + TREND_KPI_GAP, trendKpiY, TREND_KPI_W, TREND_KPI_ROW_H, '目標數值', 'target_val', CAPACITY_TREND_SUMMARY_SQL, {
@@ -1724,7 +1730,7 @@ elements[7].children = [
     VEH_DIST_PAD.x,
     VEH_DIST_PAD.top,
     VEH_DIST_CONTENT_W,
-    VEH_DIST_PANEL_H - VEH_DIST_PAD.top - VEH_DIST_PAD.bottom,
+    VEH_DIST_CONTENT_H,
   ),
 ];
 

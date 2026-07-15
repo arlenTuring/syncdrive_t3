@@ -17,13 +17,39 @@ type CurrentLeg = {
   leg_eta_max?: unknown;
 };
 
+function normalizeCurrentLeg(
+  leg: Record<string, unknown>,
+  payload?: Record<string, unknown> | null,
+): CurrentLeg {
+  const target = String(leg.target_station_id ?? '').trim();
+  let legEtaMax = num(leg.leg_eta_max);
+  if ((legEtaMax === undefined || legEtaMax <= 0) && payload && target) {
+    const bucket = payload.leg_eta_max;
+    if (bucket && typeof bucket === 'object') {
+      legEtaMax = num((bucket as Record<string, unknown>)[target]);
+    }
+  }
+  return {
+    ...leg,
+    leg_eta_max: legEtaMax,
+  };
+}
+
+function stationIndex(stations: RouteStation[], target: string): number {
+  const t = target.trim();
+  return stations.findIndex(
+    (s) => s.name === t || s.stationId === t || s.id === t,
+  );
+}
+
 function stationAnchor(stations: RouteStation[], target: string): number | undefined {
-  const hit = stations.find((s) => s.name === target);
-  return hit?.value;
+  const idx = stationIndex(stations, target);
+  if (idx < 0) return undefined;
+  return stations[idx]?.value;
 }
 
 function previousStationAnchor(stations: RouteStation[], target: string): number {
-  const idx = stations.findIndex((s) => s.name === target);
+  const idx = stationIndex(stations, target);
   if (idx <= 0) return stations[0]?.value ?? 0;
   return stations[idx - 1].value;
 }
@@ -59,7 +85,7 @@ export function routeProgressFromCurrentLeg(
   return clamp(prevAnchor + legComplete * span, 0, 100);
 }
 
-/** 班次卡進度：僅來自 MQTT current_leg（不用 SQL／route_progress） */
+/** 班次卡進度：由 MQTT current_leg（target_station_id + eta）反推軌道錨點 */
 export function readMqttRouteProgress(
   mqttPayload?: Record<string, unknown> | null,
   stations: RouteStation[] = [],
@@ -69,7 +95,10 @@ export function readMqttRouteProgress(
   const leg = mqttPayload.current_leg;
   if (!leg || typeof leg !== 'object') return undefined;
 
-  return routeProgressFromCurrentLeg(leg as CurrentLeg, stations);
+  return routeProgressFromCurrentLeg(
+    normalizeCurrentLeg(leg as Record<string, unknown>, mqttPayload),
+    stations,
+  );
 }
 
 /**

@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { expandBuiltinSqlMacros } from '../constants/demoSql';
+import { inferInvalidateTagsFromSql, tagsOverlap } from '../utils/inferInvalidateTagsFromSql';
 
 export type DataSourceType = 'internal' | 'rest' | 'mqtt';
 
@@ -174,12 +175,55 @@ export async function seedDashboardPanels(datasourceId = 'default-internal'): Pr
 }
 
 const QUERY_CACHE_TTL_MS = 2_000;
+const QUERY_CACHE_MAX_ENTRIES = 128;
 const queryCache = new Map<string, { rows: Record<string, unknown>[]; at: number }>();
 const inflightQueries = new Map<string, Promise<Record<string, unknown>[]>>();
+
+/** 清除過期與超量 SQL 快取（避免長時間運行後 Map 無限膨脹） */
+export function pruneDatasourceQueryCache(now = Date.now()): void {
+  for (const [key, entry] of queryCache) {
+    if (now - entry.at >= QUERY_CACHE_TTL_MS) {
+      queryCache.delete(key);
+    }
+  }
+  if (queryCache.size <= QUERY_CACHE_MAX_ENTRIES) return;
+  const sorted = [...queryCache.entries()].sort((a, b) => a[1].at - b[1].at);
+  const drop = sorted.length - QUERY_CACHE_MAX_ENTRIES;
+  for (let i = 0; i < drop; i += 1) {
+    queryCache.delete(sorted[i][0]);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.setInterval(() => pruneDatasourceQueryCache(), 60_000);
+  window.addEventListener('visibilitychange', () => {
+    if (document.hidden) pruneDatasourceQueryCache();
+  });
+}
 
 /** 後端推送失效時清除快取，確保 event 模式拿到新資料 */
 export function clearDatasourceQueryCache(): void {
   queryCache.clear();
+}
+
+/** 僅清除與失效標籤重疊的 SQL 快取（避免整池清空造成查詢雪崩） */
+export function clearDatasourceQueryCacheForTags(incomingTags: string[]): void {
+  if (incomingTags.length === 0) {
+    queryCache.clear();
+    return;
+  }
+  for (const [cacheKey] of queryCache) {
+    const sep = cacheKey.indexOf('::');
+    if (sep < 0) {
+      queryCache.delete(cacheKey);
+      continue;
+    }
+    const sql = cacheKey.slice(sep + 2);
+    const tags = inferInvalidateTagsFromSql(sql);
+    if (tagsOverlap(tags, incomingTags)) {
+      queryCache.delete(cacheKey);
+    }
+  }
 }
 
 export async function executeDatasourceQuery(
@@ -216,10 +260,21 @@ export async function executeDatasourceQuery(
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`);
+        const rawMsg = (err as { message?: string | string[] }).message;
+        const msg = Array.isArray(rawMsg) ? rawMsg.join('; ') : rawMsg;
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[datasource/query] HTTP ${res.status}:`,
+            msg ?? '(no message)',
+            '\nSQL:',
+            normalizedSql.slice(0, 200),
+          );
+        }
+        throw new Error(msg ?? `HTTP ${res.status}`);
       }
       const { rows } = await res.json() as { rows: Record<string, unknown>[] };
       queryCache.set(cacheKey, { rows, at: Date.now() });
+      pruneDatasourceQueryCache();
       return rows;
     } finally {
       clearTimeout(timeoutId);

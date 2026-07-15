@@ -1,103 +1,75 @@
-function formatEtaSeconds(sec: number): string {
-  const total = Math.max(0, Math.round(sec));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
+import { enrichMaintenanceShiftFields } from './maintenanceTaskModel';
+import { enrichMainlineShiftFields } from './mainlineTaskModel';
+import { SHIFT_TRIP_CODE_PATTERN } from '../constants/vtmsVehiclePool';
 
 function readLeg(payload: Record<string, unknown>) {
   const leg = payload.current_leg;
   return leg && typeof leg === 'object' ? (leg as Record<string, unknown>) : null;
 }
 
-/** 將 operation/update MQTT 覆寫到班次卡 SQL 名冊列（即時欄位優先） */
+function isMainlineContext(base: Record<string, unknown>, mqttPayload: Record<string, unknown> | null): boolean {
+  const baseKind = String(base.line_kind ?? '').toUpperCase();
+  if (baseKind === 'MAINLINE') return true;
+  if (baseKind === 'MAINTENANCE') return false;
+
+  const trip = String(mqttPayload?.trip_code ?? base.trip_code ?? '').trim();
+  if (SHIFT_TRIP_CODE_PATTERN.test(trip)) return true;
+
+  const mqttKind = String(mqttPayload?.line_kind ?? '').toUpperCase();
+  if (mqttKind === 'MAINLINE') return true;
+  if (mqttKind === 'MAINTENANCE') return false;
+
+  return !mqttPayload?.maint_type_label;
+}
+
+/** 將 operation/update MQTT 覆寫到班次卡 SQL 名冊列（正線／整備分流） */
 export function mergeOperationMqttShiftRow(
   sqlRow: Record<string, unknown> | null,
   mqttPayload: Record<string, unknown> | null,
+  etaSecondsOverride?: number,
 ): Record<string, unknown> {
   const base = { ...(sqlRow ?? {}) };
-  if (!mqttPayload) return base;
-
-  const phase = String(mqttPayload.vehicle_phase ?? '').toUpperCase();
-  const orderStatus = String(mqttPayload.order_status ?? '').toUpperCase();
-  const lineKind = String(mqttPayload.line_kind ?? base.line_kind ?? '').toUpperCase();
+  if (!mqttPayload) {
+    const lineKind = String(base.line_kind ?? '').toUpperCase();
+    if (lineKind === 'MAINTENANCE') {
+      return enrichMaintenanceShiftFields(base);
+    }
+    return enrichMainlineShiftFields(base);
+  }
 
   if (mqttPayload.trip_code) {
     base.trip_code = mqttPayload.trip_code;
-    base.trip_header = mqttPayload.trip_code;
+    base.trip_header = `${mqttPayload.trip_code} ${base.vehicle_code ?? mqttPayload.vehicle_code ?? ''}`.trim();
   }
   if (mqttPayload.order_id) {
     base.order_id = mqttPayload.order_id;
     base.shift_key = mqttPayload.order_id;
+  }
+  if (mqttPayload.vehicle_code) {
+    base.vehicle_code = mqttPayload.vehicle_code;
   }
   if (mqttPayload.operation_action) {
     base.operation_action = mqttPayload.operation_action;
   }
 
   const leg = readLeg(mqttPayload);
-  if (leg?.target_station_id) {
-    base.next_station = String(leg.target_station_id);
-  }
-  if (typeof leg?.eta_seconds === 'number') {
-    base.eta_remain = formatEtaSeconds(leg.eta_seconds);
-  }
+  const legEta =
+    typeof etaSecondsOverride === 'number' && Number.isFinite(etaSecondsOverride)
+      ? etaSecondsOverride
+      : typeof leg?.eta_seconds === 'number'
+        ? leg.eta_seconds
+        : undefined;
 
-  if (lineKind === 'MAINTENANCE' || mqttPayload.maint_type_label) {
-    if (mqttPayload.maint_type_label) base.maint_type_label = mqttPayload.maint_type_label;
-    if (mqttPayload.maint_type_bg) base.maint_type_bg = mqttPayload.maint_type_bg;
-    if (mqttPayload.maint_type_color) base.maint_type_color = mqttPayload.maint_type_color;
-    if (mqttPayload.badge_label) base.badge_label = mqttPayload.badge_label;
-    return base;
+  // 正線 SQL 列優先：避免整備 MQTT retain 把「待發」標籤配上整備綠色
+  if (isMainlineContext(base, mqttPayload)) {
+    if (mqttPayload.order_status) base.order_status = mqttPayload.order_status;
+    return enrichMainlineShiftFields(base, mqttPayload, legEta);
   }
 
-  if (phase === 'FAULTED' || orderStatus === 'FAULTED') {
-    base.order_status = 'FAULTED';
-    base.status_label = '故障';
-    base.status_bg = 'rgba(255, 100, 103, 0.3)';
-    base.status_color = '#FF6467';
-    base.card_border_color = '#FF6467';
-    base.is_alert = true;
-    return base;
-  }
-
-  const runningPhase =
-    phase === 'TRANSITING'
-    || phase === 'DWELLING'
-    || phase === 'DOCKING'
-    || phase === 'CHARGING'
-    || phase === 'YARD_DWELLING';
-
-  if (orderStatus === 'PROCESSING' || runningPhase) {
-    const delayMin = Number(base.delay_minutes ?? 0);
-    const delayed = delayMin > 0;
-    base.order_status = 'PROCESSING';
-    base.status_label = delayed ? '延誤' : '準時';
-    base.status_bg = delayed ? 'rgba(255, 105, 0, 0.3)' : 'rgba(0, 212, 146, 0.3)';
-    base.status_color = delayed ? '#FF8904' : '#00D492';
-    base.card_border_color = delayed ? '#FF8904' : '#00D492';
-    base.is_alert = false;
-    return base;
-  }
-
-  if (phase === 'AWAITING_DEPARTURE' || orderStatus === 'PENDING') {
-    base.order_status = 'PENDING';
-    base.status_label = '待發';
-    base.status_bg = '#27272a';
-    base.status_color = '#9CA3AF';
-    base.card_border_color = '#52525b';
-    base.is_alert = false;
-    if (!base.operation_action) base.operation_action = 'music';
-    return base;
-  }
-
-  const delayMin = Number(base.delay_minutes ?? 0);
-  const delayed = delayMin > 0;
-  base.order_status = 'PROCESSING';
-  base.status_label = delayed ? '延誤' : '準時';
-  base.status_bg = delayed ? 'rgba(255, 105, 0, 0.3)' : 'rgba(0, 212, 146, 0.3)';
-  base.status_color = delayed ? '#FF8904' : '#00D492';
-  base.card_border_color = delayed ? '#FF8904' : '#00D492';
-  base.is_alert = false;
-
-  return base;
+  if (mqttPayload.maint_type_label) base.maint_type_label = mqttPayload.maint_type_label;
+  if (mqttPayload.maint_type_bg) base.maint_type_bg = mqttPayload.maint_type_bg;
+  if (mqttPayload.maint_type_color) base.maint_type_color = mqttPayload.maint_type_color;
+  if (mqttPayload.badge_label) base.badge_label = mqttPayload.badge_label;
+  if (mqttPayload.order_status) base.order_status = mqttPayload.order_status;
+  return enrichMaintenanceShiftFields(base, mqttPayload, legEta);
 }

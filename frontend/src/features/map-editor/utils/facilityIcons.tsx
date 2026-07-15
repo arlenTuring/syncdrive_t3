@@ -1,6 +1,7 @@
 import {
   BatteryCharging,
   Car,
+  CircleDot,
   DoorClosed,
   Droplets,
   LayoutGrid,
@@ -30,6 +31,7 @@ export const PALETTE_ICON_BY_NAME: Record<
   Rail: TrainTrack,
   SmartPole: Radio,
   DockingPoint: MapPin,
+  Waypoint: CircleDot,
   RoadLine: Minus,
 }
 

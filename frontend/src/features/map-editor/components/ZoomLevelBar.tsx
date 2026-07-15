@@ -1,4 +1,4 @@
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { X, ZoomIn, ZoomOut } from 'lucide-react'
 import { ZOOM_LEVEL_COUNT } from '../utils/zoom'
 
 type ZoomLevelBarProps = {
@@ -9,6 +9,7 @@ type ZoomLevelBarProps = {
   paletteOpen?: boolean
   /** 底部測試控制面板存在時上移，避免重疊 */
   testDockOffset?: boolean
+  onDismiss?: () => void
 }
 
 export function ZoomLevelBar({
@@ -17,6 +18,7 @@ export function ZoomLevelBar({
   disabled = false,
   paletteOpen = false,
   testDockOffset = false,
+  onDismiss,
 }: ZoomLevelBarProps) {
   const clamp = (n: number) =>
     Math.max(1, Math.min(ZOOM_LEVEL_COUNT, n))
@@ -81,6 +83,18 @@ export function ZoomLevelBar({
       >
         <ZoomOut className="size-5" aria-hidden />
       </button>
+
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="ml-0.5 rounded-full p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
+          title="隱藏縮放列（仍可用滑鼠滾輪縮放；頂部工具列「縮放列」可再開啟）"
+          aria-label="隱藏縮放列"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      ) : null}
     </div>
   )
 }

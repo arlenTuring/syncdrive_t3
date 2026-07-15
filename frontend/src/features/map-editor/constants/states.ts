@@ -11,6 +11,7 @@ import type {
   FacilityAreaState,
   GeofenceState,
   DockingPointState,
+  WaypointState,
   RoadLineState,
 } from '../types/facility'
 
@@ -54,6 +55,11 @@ export const DOCKING_POINT_STATES: readonly DockingPointState[] = [
   'Inactive',
 ] as const
 
+export const WAYPOINT_STATES: readonly WaypointState[] = [
+  'Normal',
+  'Inactive',
+] as const
+
 export const ROAD_LINE_STATES: readonly RoadLineState[] = ['Normal'] as const
 
 export const FACILITY_AREA_STATES: readonly FacilityAreaState[] = [
@@ -77,6 +83,7 @@ export const STATES_BY_TYPE: Record<
   Track: TRACK_STATES,
   Pole: POLE_STATES,
   DockingPoint: DOCKING_POINT_STATES,
+  Waypoint: WAYPOINT_STATES,
   RoadLine: ROAD_LINE_STATES,
   Facility: FACILITY_AREA_STATES,
   Geofence: GEOFENCE_STATES,

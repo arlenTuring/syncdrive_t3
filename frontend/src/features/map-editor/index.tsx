@@ -15,6 +15,7 @@ import { TrajectoryPanel } from './components/TrajectoryPanel'
 import { LeaveEditConfirmDialog } from './components/LeaveEditConfirmDialog'
 import { MapAreaCanvas } from './components/MapAreaCanvas'
 import { MapListDrawer, type MapListDrawerTab } from './components/MapListDrawer'
+import { RoutePlanningOverlay, routeColorForIndex } from './components/RoutePlanningOverlay'
 import { MapCanvas } from './components/MapCanvas'
 import { MapEditorTestDock } from './components/MapEditorTestDock'
 import { useTrackConnectivityScan } from './hooks/useTrackConnectivityScan'
@@ -97,7 +98,24 @@ import {
 import {
   resolveFacilityFocusPx,
 } from './utils/facilityListEntries'
-import { ensureDockingPointNodeIdsInAreas } from './utils/dockingPointNodeId'
+import { ensureDockingPointStationIdsInAreas, generateNextStationId } from './utils/dockingPointStationId'
+import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
+import { getDockingPointStationId } from './utils/dockingPointFacility'
+import { canAppendStationToRoute } from './utils/routeTrackPath'
+import type { MapPlannedRoute, MapRouteGroup } from './types/mapFile'
+import {
+  generateNextRouteId,
+  isRoutePlanningDraftSavable,
+  type RoutePlanningDraft,
+} from './utils/routePlanning'
+import {
+  assignRouteToGroup,
+  ensureRouteGroupsForRoutes,
+  findRouteGroupForRoute,
+  generateNextRouteGroupId,
+  removeRouteFromAllGroups,
+} from './utils/routeGroupPlanning'
+import type { RouteGroupDraft } from './components/RouteGroupEditorView'
 import {
   MAP_PIXEL_ZOOM_DEFAULT_LEVEL,
 } from './utils/mapPixelZoom'
@@ -120,6 +138,7 @@ import {
   upsertMapLibraryEntry,
   writeMapLibrary,
 } from './utils/mapLibraryStorage'
+import { publishMapLibraryEntryToBackend } from './api/mapLibraryApi'
 import {
   type EditSessionSnapshot,
   isEditSessionDirty,
@@ -176,7 +195,6 @@ function worldBoundsFromExtent(extent: MapExtentMeters): MapWorldBounds {
 const LS_TRAJECTORY_ZOOM_X = 'syncdrive_trajectory_zoom_factor_x'
 const LS_TRAJECTORY_ZOOM_Y = 'syncdrive_trajectory_zoom_factor_y'
 const LS_TRAJECTORY_ZOOM_LEGACY = 'syncdrive_trajectory_zoom_factor'
-const LS_MAP_ZOOM_BAR_VISIBLE = 'syncdrive_map_zoom_bar_visible'
 const LS_MAP_FACILITY_TOOLBARS_VISIBLE = 'syncdrive_map_facility_toolbars_visible'
 
 function readStoredFacilityToolbarsVisible(): boolean {
@@ -187,18 +205,6 @@ function readStoredFacilityToolbarsVisible(): boolean {
     if (raw === '1') return true
   } catch {
     /* ignore */
-  }
-  return true
-}
-
-function readStoredZoomBarVisible(): boolean {
-  if (typeof window === 'undefined') return true
-  try {
-    const raw = localStorage.getItem(LS_MAP_ZOOM_BAR_VISIBLE)
-    if (raw === '0' || raw === 'false') return false
-    if (raw === '1' || raw === 'true') return true
-  } catch {
-    /* fallthrough */
   }
   return true
 }
@@ -253,7 +259,8 @@ export default function MapEditorApp({
   const [paletteOpen, setPaletteOpen] = useState(false)
   /** Map 像素畫布縮放：1 近、7 遠（一屏看全圖） */
   const [mapZoomLevel, setMapZoomLevel] = useState(MAP_PIXEL_ZOOM_DEFAULT_LEVEL)
-  const [showZoomLevelBar, setShowZoomLevelBar] = useState(readStoredZoomBarVisible)
+  const [showZoomLevelBar, setShowZoomLevelBar] = useState(false)
+  const [showTestDock, setShowTestDock] = useState(false)
   const [showFacilityToolbars, setShowFacilityToolbars] = useState(
     readStoredFacilityToolbarsVisible,
   )
@@ -318,6 +325,16 @@ export default function MapEditorApp({
 
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true)
   const [listDrawerTab, setListDrawerTab] = useState<MapListDrawerTab>(null)
+  const [mapRoutes, setMapRoutes] = useState<MapPlannedRoute[]>([])
+  const [mapRouteGroups, setMapRouteGroups] = useState<MapRouteGroup[]>([])
+  const [routePlanningDraft, setRoutePlanningDraft] =
+    useState<RoutePlanningDraft | null>(null)
+  const [routeGroupDraft, setRouteGroupDraft] = useState<RouteGroupDraft | null>(
+    null,
+  )
+  const [visibleRouteIds, setVisibleRouteIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   const [facilityFocusTarget, setFacilityFocusTarget] = useState<{
     x: number
     y: number
@@ -345,6 +362,8 @@ export default function MapEditorApp({
   const trajectoryScaleXRef = useRef(1)
   const trajectoryScaleYRef = useRef(1)
   const areasRef = useRef(areas)
+  const mapRoutesRef = useRef(mapRoutes)
+  const mapRouteGroupsRef = useRef(mapRouteGroups)
   const selectedAreaIdRef = useRef(selectedAreaId)
   const selectedFacilityIdsRef = useRef(selectedFacilityIds)
   const multiDragStartRef = useRef<{
@@ -375,10 +394,12 @@ export default function MapEditorApp({
 
   useEffect(() => {
     areasRef.current = areas
+    mapRoutesRef.current = mapRoutes
+    mapRouteGroupsRef.current = mapRouteGroups
     selectedAreaIdRef.current = selectedAreaId
     selectedFacilityIdsRef.current = selectedFacilityIds
     clipboardRef.current = clipboard
-  }, [areas, selectedAreaId, selectedFacilityIds, clipboard])
+  }, [areas, mapRoutes, mapRouteGroups, selectedAreaId, selectedFacilityIds, clipboard])
 
   const updateSelection = useCallback(
     (areaId: string | null, facilityIds: string[] | null) => {
@@ -517,10 +538,6 @@ export default function MapEditorApp({
     localStorage.setItem(LS_TRAJECTORY_ZOOM_X, String(trajectoryZoomFactorX))
     localStorage.setItem(LS_TRAJECTORY_ZOOM_Y, String(trajectoryZoomFactorY))
   }, [trajectoryZoomFactorX, trajectoryZoomFactorY])
-
-  useEffect(() => {
-    localStorage.setItem(LS_MAP_ZOOM_BAR_VISIBLE, showZoomLevelBar ? '1' : '0')
-  }, [showZoomLevelBar])
 
   useEffect(() => {
     localStorage.setItem(
@@ -784,11 +801,20 @@ export default function MapEditorApp({
       setMapPixelSize(loaded.pixelSize)
       setMapPixelOrigin(loaded.pixelOrigin)
       setAreas(
-        ensureDockingPointNodeIdsInAreas(
-          applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+        ensureWaypointCodesInAreas(
+          ensureDockingPointStationIdsInAreas(
+            applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+          ),
         ),
       )
       setNextNumericId(nextNumericIdFromAreas(loaded.areas))
+      setMapRoutes(loaded.routes ?? [])
+      setMapRouteGroups(
+        ensureRouteGroupsForRoutes(loaded.routes ?? [], loaded.routeGroups ?? []),
+      )
+      setRoutePlanningDraft(null)
+      setRouteGroupDraft(null)
+      setVisibleRouteIds(new Set())
       clearSelection()
       setLoadedMapMeta({
         libraryId,
@@ -818,8 +844,297 @@ export default function MapEditorApp({
         pixelOrigin: mapPixelOriginRef.current,
       },
       areasRef.current,
+      mapRoutesRef.current,
+      mapRouteGroupsRef.current,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
+    void publishMapLibraryEntryToBackend(updated)
+  }, [])
+
+  const routePlanningPickMode =
+    listDrawerTab === 'routes' &&
+    routePlanningDraft !== null &&
+    mapEditorMode === 'edit'
+
+  const routeOverlayPreview = useMemo(() => {
+    if (routePlanningDraft && routePlanningDraft.stationIds.length > 0) {
+      return {
+        stationIds: routePlanningDraft.stationIds,
+        color: 'rgba(251, 191, 36, 0.95)',
+        label: routePlanningDraft.displayName.trim() || '編輯中路線',
+        emphasized: true,
+        avgTravelTimeSeconds: routePlanningDraft.avgTravelTimeSeconds,
+        minTravelTimeSeconds: routePlanningDraft.minTravelTimeSeconds,
+      }
+    }
+    return null
+  }, [routePlanningDraft])
+
+  const routeOverlaySaved = useMemo(() => {
+    if (routePlanningDraft) return []
+    return mapRoutes
+      .map((route, index) => ({ route, index }))
+      .filter(({ route }) => visibleRouteIds.has(route.routeId))
+      .map(({ route, index }) => ({
+        route,
+        color: routeColorForIndex(index),
+        emphasized: true,
+      }))
+  }, [mapRoutes, visibleRouteIds, routePlanningDraft])
+
+  const onStartNewRoute = useCallback(
+    (groupId: string | null) => {
+      if (mapEditorMode !== 'edit') return
+      setRouteGroupDraft(null)
+      setRoutePlanningDraft({
+        routeId: null,
+        displayName: '',
+        stationIds: [],
+        groupId,
+        avgTravelTimeSeconds: null,
+        minTravelTimeSeconds: null,
+      })
+      setListDrawerTab('routes')
+    },
+    [mapEditorMode],
+  )
+
+  const onEditRoute = useCallback(
+    (routeId: string) => {
+      const route = mapRoutes.find((r) => r.routeId === routeId)
+      if (!route) return
+      const group = findRouteGroupForRoute(mapRouteGroups, routeId)
+      setRouteGroupDraft(null)
+      setRoutePlanningDraft({
+        routeId: route.routeId,
+        displayName: route.displayName,
+        stationIds: [...route.stationIds],
+        groupId: group?.groupId ?? null,
+        avgTravelTimeSeconds: route.avgTravelTimeSeconds ?? null,
+        minTravelTimeSeconds: route.minTravelTimeSeconds ?? null,
+      })
+      setListDrawerTab('routes')
+    },
+    [mapRoutes, mapRouteGroups],
+  )
+
+  const onCancelRouteDraft = useCallback(() => {
+    setRoutePlanningDraft(null)
+  }, [])
+
+  const onSaveRouteDraft = useCallback(() => {
+    const draft = routePlanningDraft
+    if (!draft || !isRoutePlanningDraftSavable(draft)) return
+    const displayName = draft.displayName.trim()
+    pushHistory()
+    const now = new Date().toISOString()
+    const groupId = draft.groupId
+    const travelTimes = {
+      avgTravelTimeSeconds: draft.avgTravelTimeSeconds ?? null,
+      minTravelTimeSeconds: draft.minTravelTimeSeconds ?? null,
+    }
+
+    if (draft.routeId) {
+      const routeId = draft.routeId
+      setMapRoutes((prev) =>
+        prev.map((r) => {
+          if (r.routeId !== routeId) return r
+          const { taskType: _legacy, ...routeRest } = r as typeof r & { taskType?: unknown }
+          return {
+            ...routeRest,
+            displayName,
+            stationIds: [...draft.stationIds],
+            ...travelTimes,
+            updatedAt: now,
+          }
+        }),
+      )
+    } else {
+      setMapRoutes((prev) => {
+        const routeId = generateNextRouteId(prev)
+        setMapRouteGroups((groups) => assignRouteToGroup(groups, routeId, groupId))
+        return [
+          ...prev,
+          {
+            routeId,
+            displayName,
+            stationIds: [...draft.stationIds],
+            ...travelTimes,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]
+      })
+    }
+    setRoutePlanningDraft(null)
+  }, [routePlanningDraft, pushHistory])
+
+  const onDeleteRoute = useCallback(
+    (routeId: string) => {
+      const route = mapRoutes.find((r) => r.routeId === routeId)
+      const label = route?.displayName ?? routeId
+      if (!window.confirm(`確定刪除路線「${label}」？此動作無法復原。`)) return
+      pushHistory()
+      setMapRoutes((prev) => prev.filter((r) => r.routeId !== routeId))
+      setMapRouteGroups((prev) => removeRouteFromAllGroups(prev, routeId))
+      setRoutePlanningDraft(null)
+      setVisibleRouteIds((prev) => {
+        if (!prev.has(routeId)) return prev
+        const next = new Set(prev)
+        next.delete(routeId)
+        return next
+      })
+    },
+    [mapRoutes, pushHistory],
+  )
+
+  const onDraftRouteNameChange = useCallback((name: string) => {
+    setRoutePlanningDraft((d) => (d ? { ...d, displayName: name } : d))
+  }, [])
+
+  const onDraftRouteAvgTravelTimeChange = useCallback((avgTravelTimeSeconds: number | null) => {
+    setRoutePlanningDraft((d) => (d ? { ...d, avgTravelTimeSeconds } : d))
+  }, [])
+
+  const onDraftRouteMinTravelTimeChange = useCallback((minTravelTimeSeconds: number | null) => {
+    setRoutePlanningDraft((d) => (d ? { ...d, minTravelTimeSeconds } : d))
+  }, [])
+
+  const onStartNewGroup = useCallback(() => {
+    if (mapEditorMode !== 'edit') return
+    setRoutePlanningDraft(null)
+    setRouteGroupDraft({
+      groupId: null,
+      displayName: '',
+    })
+    setListDrawerTab('routes')
+  }, [mapEditorMode])
+
+  const onEditGroup = useCallback(
+    (groupId: string) => {
+      const group = mapRouteGroups.find((g) => g.groupId === groupId)
+      if (!group) return
+      setRoutePlanningDraft(null)
+      setRouteGroupDraft({
+        groupId: group.groupId,
+        displayName: group.displayName,
+      })
+      setListDrawerTab('routes')
+    },
+    [mapRouteGroups],
+  )
+
+  const onCancelGroupDraft = useCallback(() => {
+    setRouteGroupDraft(null)
+  }, [])
+
+  const onSaveGroupDraft = useCallback(() => {
+    const draft = routeGroupDraft
+    if (!draft) return
+    const displayName = draft.displayName.trim()
+    if (!displayName) return
+    pushHistory()
+    const now = new Date().toISOString()
+    setMapRouteGroups((prev) => {
+      if (draft.groupId) {
+        return prev.map((g) =>
+          g.groupId === draft.groupId
+            ? {
+                ...g,
+                displayName,
+                updatedAt: now,
+              }
+            : g,
+        )
+      }
+      const groupId = generateNextRouteGroupId(prev)
+      return [
+        ...prev,
+        {
+          groupId,
+          displayName,
+          routeIds: [],
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]
+    })
+    setRouteGroupDraft(null)
+  }, [routeGroupDraft, pushHistory])
+
+  const onDeleteGroup = useCallback(
+    (groupId: string) => {
+      const group = mapRouteGroups.find((g) => g.groupId === groupId)
+      const label = group?.displayName ?? '此路線群組'
+      if (
+        !window.confirm(
+          `確定刪除「${label}」？群組內的路線將移至「未分組」，路線本身不會被刪除。`,
+        )
+      ) {
+        return
+      }
+      pushHistory()
+      setMapRouteGroups((prev) => prev.filter((g) => g.groupId !== groupId))
+      setRouteGroupDraft(null)
+    },
+    [mapRouteGroups, pushHistory],
+  )
+
+  const onGroupDraftNameChange = useCallback((name: string) => {
+    setRouteGroupDraft((d) => (d ? { ...d, displayName: name } : d))
+  }, [])
+
+  const onRemoveRouteStationAt = useCallback((index: number) => {
+    setRoutePlanningDraft((d) => {
+      if (!d) return d
+      return {
+        ...d,
+        stationIds: d.stationIds.filter((_, i) => i !== index),
+      }
+    })
+  }, [])
+
+  const onMoveRouteStation = useCallback((from: number, to: number) => {
+    setRoutePlanningDraft((d) => {
+      if (!d || to < 0 || to >= d.stationIds.length) return d
+      const next = [...d.stationIds]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return { ...d, stationIds: next }
+    })
+  }, [])
+
+  const onAppendRouteStation = useCallback((stationId: string) => {
+    const id = stationId.trim()
+    if (!id) return
+    setRoutePlanningDraft((d) => {
+      if (!d || d.stationIds.includes(id)) return d
+      if (!canAppendStationToRoute(areasRef.current, d.stationIds, id)) return d
+      return { ...d, stationIds: [...d.stationIds, id] }
+    })
+  }, [])
+
+  const onToggleRouteVisibility = useCallback((routeId: string) => {
+    setVisibleRouteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(routeId)) next.delete(routeId)
+      else next.add(routeId)
+      return next
+    })
+  }, [])
+
+  const onToggleGroupRouteVisibility = useCallback((routeIds: string[]) => {
+    if (routeIds.length === 0) return
+    setVisibleRouteIds((prev) => {
+      const allVisible = routeIds.every((id) => prev.has(id))
+      const next = new Set(prev)
+      if (allVisible) {
+        for (const id of routeIds) next.delete(id)
+      } else {
+        for (const id of routeIds) next.add(id)
+      }
+      return next
+    })
   }, [])
 
   const openLibraryMap = useCallback(
@@ -843,6 +1158,8 @@ export default function MapEditorApp({
   const enterEditMode = useCallback(() => {
     setEditSessionBaseline({
       areas: structuredClone(areas),
+      routeGroups: structuredClone(mapRouteGroups),
+      routes: structuredClone(mapRoutes),
       nextNumericId,
       loadedMapMeta: { ...loadedMapMeta },
     })
@@ -872,6 +1189,8 @@ export default function MapEditorApp({
     }
   }, [
     areas,
+    mapRouteGroups,
+    mapRoutes,
     nextNumericId,
     loadedMapMeta,
     resetHistory,
@@ -889,6 +1208,8 @@ export default function MapEditorApp({
       !isEditSessionDirty(
         editSessionBaseline,
         areas,
+        mapRouteGroups,
+        mapRoutes,
         nextNumericId,
         loadedMapMeta,
       )
@@ -907,6 +1228,8 @@ export default function MapEditorApp({
     mapEditorMode,
     editSessionBaseline,
     areas,
+    mapRouteGroups,
+    mapRoutes,
     nextNumericId,
     loadedMapMeta,
     clearSelection,
@@ -919,6 +1242,8 @@ export default function MapEditorApp({
         isEditSessionDirty(
           editSessionBaseline,
           areas,
+          mapRouteGroups,
+          mapRoutes,
           nextNumericId,
           loadedMapMeta,
         )
@@ -941,6 +1266,7 @@ export default function MapEditorApp({
     mapEditorMode,
     editSessionBaseline,
     areas,
+    mapRoutes,
     nextNumericId,
     loadedMapMeta,
     clearSelection,
@@ -963,8 +1289,11 @@ export default function MapEditorApp({
           pixelOrigin,
         },
         currentAreas,
+        mapRoutesRef.current,
+        mapRouteGroupsRef.current,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
+      void publishMapLibraryEntryToBackend(updated)
     }
     clearMapDraft(meta.libraryId)
     setMapPixelSize(pixelSize)
@@ -990,6 +1319,8 @@ export default function MapEditorApp({
     const b = editSessionBaseline
     if (!b) return
     setAreas(structuredClone(b.areas))
+    setMapRouteGroups(structuredClone(b.routeGroups))
+    setMapRoutes(structuredClone(b.routes))
     setNextNumericId(b.nextNumericId)
     setLoadedMapMeta({ ...b.loadedMapMeta })
     setMapPixelSize(b.loadedMapMeta.pixelSize)
@@ -1045,8 +1376,11 @@ export default function MapEditorApp({
             pixelOrigin: mapPixelOriginRef.current,
           },
           areasRef.current,
+          mapRoutesRef.current,
+          mapRouteGroupsRef.current,
         )
         writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
+        void publishMapLibraryEntryToBackend(updated)
       }
       clearMapDraft(libraryId)
       const savedAt = new Date()
@@ -1068,6 +1402,8 @@ export default function MapEditorApp({
   }, [
     mapEditorMode,
     areas,
+    mapRouteGroups,
+    mapRoutes,
     nextNumericId,
     mapPixelSize.width,
     mapPixelSize.height,
@@ -1521,6 +1857,7 @@ export default function MapEditorApp({
         }
       }
       if (item.type === 'DockingPoint') {
+        const stationId = generateNextStationId(areasRef.current ?? [])
         return {
           id,
           type: 'DockingPoint',
@@ -1531,9 +1868,28 @@ export default function MapEditorApp({
           rotation: 0,
           currentState: getDefaultStateForType('DockingPoint'),
           parameters: {
+            stationId,
             stationName: '',
             purpose: '',
             ...defaultRefFieldParametersForType('DockingPoint'),
+            labelStyle: { visible: false },
+          },
+        }
+      }
+      if (item.type === 'Waypoint') {
+        const waypointCode = generateNextWaypointCode(areasRef.current ?? [])
+        return {
+          id,
+          type: 'Waypoint',
+          name: 'Waypoint',
+          customName: '',
+          areaPosition,
+          position: positionMeters,
+          rotation: 0,
+          currentState: getDefaultStateForType('Waypoint'),
+          parameters: {
+            waypointCode,
+            ...defaultRefFieldParametersForType('Waypoint'),
             labelStyle: { visible: false },
           },
         }
@@ -1711,7 +2067,20 @@ export default function MapEditorApp({
             return { ...p, mqttInstanceId: id }
           })(),
         }
-    mapAreaFacilities(areaId, (facilities) => [...facilities, newFacility])
+    const pastedFacility =
+      newFacility.type === 'Waypoint'
+        ? ensureWaypointCode(
+            {
+              ...newFacility,
+              parameters: {
+                ...(newFacility.parameters ?? {}),
+                waypointCode: generateNextWaypointCode(areasRef.current ?? []),
+              },
+            },
+            areasRef.current ?? [],
+          )
+        : newFacility
+    mapAreaFacilities(areaId, (facilities) => [...facilities, pastedFacility])
     updateSelection(areaId, [id])
     setNextNumericId((n) => n + 1)
   }, [nextNumericId, pushHistory, mapAreaFacilities, updateSelection])
@@ -1920,6 +2289,14 @@ export default function MapEditorApp({
     [pushHistory, mapSelectedFacility],
   )
 
+  const onApplyWaypoint = useCallback(
+    (facility: FacilityObject) => {
+      pushHistory()
+      mapSelectedFacility(() => facility)
+    },
+    [pushHistory, mapSelectedFacility],
+  )
+
   const onPatchFacilityParameters = useCallback(
     (areaId: string, facilityId: string, patch: Record<string, unknown>) => {
       mapAreaFacilities(areaId, (facilities) =>
@@ -2029,6 +2406,31 @@ export default function MapEditorApp({
         updateSelection(areaId, [])
         return
       }
+
+      if (routePlanningPickMode && routePlanningDraft) {
+        const area = areasRef.current.find((a) => a.id === areaId)
+        const facility = area?.facilities.find((f) => f.id === facilityId)
+        if (facility?.type === 'DockingPoint') {
+          const stationId = getDockingPointStationId(facility)
+          if (
+            stationId &&
+            canAppendStationToRoute(
+              areasRef.current,
+              routePlanningDraft.stationIds,
+              stationId,
+            )
+          ) {
+            setRoutePlanningDraft((d) => {
+              if (!d) return d
+              if (d.stationIds.includes(stationId)) return d
+              return { ...d, stationIds: [...d.stationIds, stationId] }
+            })
+          }
+          updateSelection(areaId, [facilityId])
+          return
+        }
+      }
+
       const currentArea = selectedAreaIdRef.current
       const currentIds = selectedFacilityIdsRef.current
       if (options?.additive && currentArea === areaId) {
@@ -2051,7 +2453,7 @@ export default function MapEditorApp({
       }
       updateSelection(areaId, [facilityId])
     },
-    [updateSelection],
+    [updateSelection, routePlanningPickMode, routePlanningDraft],
   )
 
   const onFacilityDoubleClick = useCallback(
@@ -2487,6 +2889,13 @@ export default function MapEditorApp({
     setShowZoomLevelBar((v) => !v)
   }, [])
 
+  const onToggleTestDock = useCallback(() => {
+    setShowTestDock((prev) => {
+      if (prev) connectivityScan.resetScan()
+      return !prev
+    })
+  }, [connectivityScan])
+
   const onToggleFacilityToolbars = useCallback(() => {
     setShowFacilityToolbars((v) => !v)
   }, [])
@@ -2521,6 +2930,9 @@ export default function MapEditorApp({
           showZoomLevelBar={showZoomLevelBar}
           onToggleZoomLevelBar={onToggleZoomLevelBar}
           zoomLevelBarToggleHint="顯示／隱藏底部圖台縮放列（1 近～7 遠）"
+          showTestDock={showTestDock}
+          onToggleTestDock={onToggleTestDock}
+          testDockToggleHint="顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）"
           mapCanvasResizeActive={mapCropModeActive}
           onToggleMapCanvasResize={
             mapEditorMode === 'edit' ? onToggleCropMode : undefined
@@ -2736,9 +3148,18 @@ export default function MapEditorApp({
                 onBulkAreasLayoutCommit={
                   mapEditorMode === 'edit' ? onBulkAreasLayoutCommit : undefined
                 }
-                connectivityScan={connectivityScan.state}
+                connectivityScan={showTestDock ? connectivityScan.state : null}
                 facilityFocusTarget={facilityFocusTarget}
                 onFacilityDoubleClick={onFacilityDoubleClick}
+                routePlanningOverlay={
+                  routeOverlayPreview || routeOverlaySaved.length > 0 ? (
+                    <RoutePlanningOverlay
+                      areas={areas}
+                      activePreview={routeOverlayPreview}
+                      savedRoutes={routeOverlaySaved}
+                    />
+                  ) : null
+                }
               />
             </div>
             <div
@@ -2775,10 +3196,11 @@ export default function MapEditorApp({
               level={mapZoomLevel}
               onLevelChange={setMapZoomLevel}
               paletteOpen={mapEditorMode === 'edit' && paletteOpen}
-              testDockOffset
+              testDockOffset={showTestDock}
+              onDismiss={() => setShowZoomLevelBar(false)}
             />
           )}
-          {isMapWorkspace && mapScreen === 'editor' && (
+          {isMapWorkspace && mapScreen === 'editor' && showTestDock && (
             <MapEditorTestDock
               facilities={allFacilities}
               liveById={liveById}
@@ -2841,6 +3263,32 @@ export default function MapEditorApp({
             selectedFacilityId={primarySelectedFacilityId}
             onSelectEntry={onListEntrySelect}
             onEntryDoubleClick={onListEntryDoubleClick}
+            mapRoutes={mapRoutes}
+            mapRouteGroups={mapRouteGroups}
+            mapEditMode={mapEditorMode === 'edit'}
+            routePlanningDraft={routePlanningDraft}
+            routeGroupDraft={routeGroupDraft}
+            visibleRouteIds={visibleRouteIds}
+            routePickMode={routePlanningPickMode}
+            onStartNewRoute={onStartNewRoute}
+            onStartNewGroup={onStartNewGroup}
+            onEditRoute={onEditRoute}
+            onEditGroup={onEditGroup}
+            onDeleteGroup={onDeleteGroup}
+            onToggleRouteVisibility={onToggleRouteVisibility}
+            onToggleGroupRouteVisibility={onToggleGroupRouteVisibility}
+            onCancelRouteDraft={onCancelRouteDraft}
+            onCancelGroupDraft={onCancelGroupDraft}
+            onSaveRouteDraft={onSaveRouteDraft}
+            onSaveGroupDraft={onSaveGroupDraft}
+            onDeleteRoute={onDeleteRoute}
+            onDraftRouteNameChange={onDraftRouteNameChange}
+            onDraftRouteAvgTravelTimeChange={onDraftRouteAvgTravelTimeChange}
+            onDraftRouteMinTravelTimeChange={onDraftRouteMinTravelTimeChange}
+            onGroupDraftNameChange={onGroupDraftNameChange}
+            onRemoveRouteStationAt={onRemoveRouteStationAt}
+            onMoveRouteStation={onMoveRouteStation}
+            onAppendRouteStation={onAppendRouteStation}
           />
         )}
 
@@ -2869,9 +3317,7 @@ export default function MapEditorApp({
                     domainMaxM={selectedAreaDomainMaxM}
                     areaLayout={selectedArea?.layout}
                     onChangeId={onChangeId}
-                    onChangeCustomName={(customName) =>
-                      updateSelected({ customName })
-                    }
+                    onChangeCustomName={(customName) => updateSelected({ customName })}
                     onChangeNonSlotState={(state) => {
                       pushHistory()
                       updateSelected({ currentState: state })
@@ -2902,6 +3348,9 @@ export default function MapEditorApp({
                     mapAreas={areas}
                     onApplyDockingPoint={
                       readOnlyCanvas ? undefined : onApplyDockingPoint
+                    }
+                    onApplyWaypoint={
+                      readOnlyCanvas ? undefined : onApplyWaypoint
                     }
                     onDelete={() => {
                       deleteSelected()

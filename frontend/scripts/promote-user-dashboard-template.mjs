@@ -9,7 +9,7 @@
  *   node scripts/promote-user-dashboard-template.mjs \
  *     "/path/SyncDrive-總控大屏-3840-1080-dashboard-template-2026-06-21_113617.json" 113
  */
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -42,6 +42,7 @@ const masterTemplateOut = resolve(templatesDir, 'syncdrive-master-dashboard-3840
 if (existsSync(snapshotOut)) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const preserved = resolve(backupsDir, `demoPlane.snapshot.before-promote-${stamp}.json`);
+  mkdirSync(backupsDir, { recursive: true });
   copyFileSync(snapshotOut, preserved);
   console.log(`已備份現有 snapshot → ${preserved}`);
 }

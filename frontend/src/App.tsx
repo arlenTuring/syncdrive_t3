@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import DashboardEditor from './features/dashboard';
 import MapEditorApp   from './features/map-editor';
+import ScheduleManagementApp from './features/schedule-management';
 import { AppSettingsModal } from './components/AppSettingsModal';
 import {
   LayoutDashboard, Map, ChevronRight, Route,
-  Cpu, Activity, Layers, Settings,
+  Cpu, Activity, Layers, Settings, CalendarDays,
 } from 'lucide-react';
 
-type AppMode = 'home' | 'dashboard' | 'map' | 'trajectory';
+type AppMode = 'home' | 'dashboard' | 'map' | 'trajectory' | 'schedule-management';
 
 // ─── 首頁 ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,16 @@ function HomePage({ onSelect }: { onSelect: (m: AppMode) => void }) {
           tag="TRAJECTORY"
           features={['車輛軌跡回放', '原始數據檢視', '地圖座標對照', '多車輛軌跡目錄']}
           onClick={() => onSelect('trajectory')}
+        />
+        <ModeCard
+          icon={<CalendarDays size={32} />}
+          title="班表管理模組"
+          subtitle="Schedule Management"
+          description="管理班次運行紀錄、時間模板、班表清單與整備任務，作為班表系統的規劃與營運入口。"
+          accent="#f59e0b"
+          tag="SCHEDULE"
+          features={['班次運行紀錄', '時間模板管理', '班表清單管理', '整備任務管理']}
+          onClick={() => onSelect('schedule-management')}
         />
       </div>
 
@@ -175,61 +186,6 @@ function ModeCard({
   );
 }
 
-// ─── 浮動模式切換按鈕 ─────────────────────────────────────────────────────────
-
-function ModeSwitcher({ mode, onSwitch }: { mode: AppMode; onSwitch: (m: AppMode) => void }) {
-  const [open, setOpen] = useState(false);
-  if (mode === 'home') return null;
-  /** 儀表板底部有元件列，切換鈕上移避免遮住最右側元件 */
-  const bottomPx = mode === 'dashboard' ? 112 : 24;
-  return (
-    <div style={{ position: 'fixed', bottom: bottomPx, right: 24, zIndex: 9999 }}>
-      {open && (
-        <div style={{
-          position: 'absolute', bottom: 52, right: 0,
-          background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 12, padding: 8, minWidth: 180,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          display: 'flex', flexDirection: 'column', gap: 4,
-        }}>
-          <SwitchBtn icon={<LayoutDashboard size={14} />} label="儀表板編輯器" active={mode === 'dashboard'} onClick={() => { onSwitch('dashboard'); setOpen(false); }} />
-          <SwitchBtn icon={<Map size={14} />} label="地圖編輯器" active={mode === 'map'} onClick={() => { onSwitch('map'); setOpen(false); }} />
-          <SwitchBtn icon={<Route size={14} />} label="軌跡圖台" active={mode === 'trajectory'} onClick={() => { onSwitch('trajectory'); setOpen(false); }} />
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-          <SwitchBtn icon={<Cpu size={14} />} label="返回首頁" active={false} onClick={() => { onSwitch('home'); setOpen(false); }} accent="#94a3b8" />
-        </div>
-      )}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: 44, height: 44, borderRadius: 12,
-          background: open ? '#1e293b' : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: 'white', transition: 'all 0.2s',
-        }}
-        title="切換模式"
-      >
-        <Layers size={18} />
-      </button>
-    </div>
-  );
-}
-
-function SwitchBtn({ icon, label, active, onClick, accent = '#0ea5e9' }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; accent?: string }) {
-  return (
-    <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-      borderRadius: 8, border: 'none', background: active ? `${accent}18` : 'transparent',
-      color: active ? accent : '#94a3b8', fontSize: 12, cursor: 'pointer',
-      width: '100%', textAlign: 'left', transition: 'all 0.15s',
-    }}>
-      {icon} {label}
-    </button>
-  );
-}
-
 // ─── 根元件 ─────────────────────────────────────────────────────────────────────
 
 function GlobalSettingsButton({ onClick }: { onClick: () => void }) {
@@ -305,7 +261,12 @@ function App() {
         <MapEditorApp workspace="trajectory" onBackToHome={() => setMode('home')} />
       </div>
 
-      <ModeSwitcher mode={mode} onSwitch={setMode} />
+      {mode === 'schedule-management' ? (
+        <div className="flex h-full min-h-0 w-full">
+          <ScheduleManagementApp onBackToHome={() => setMode('home')} />
+        </div>
+      ) : null}
+
     </div>
   );
 }

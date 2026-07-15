@@ -1228,3 +1228,74 @@ export function issueMapPx(
   if (!seg) return null;
   return fieldToMapPx(issue.fieldPoint.xM, issue.fieldPoint.yM, seg);
 }
+
+/** 路線預覽：軌道鄰接圖與段 lookup */
+export function buildTrackRoutingContext(areas: import('../types/area').MapAreaObject[]) {
+  const network = buildTrackNetwork(areas);
+  const segmentById = new Map<string, TrackNetworkSegment>();
+  for (const seg of network.segments) {
+    if (!segmentById.has(seg.trackId)) segmentById.set(seg.trackId, seg);
+  }
+  const adj = buildAdjacency(network.segments);
+  return { segmentById, adj };
+}
+
+/** 沿軌道鏈採樣為地圖像素折線 */
+export function sampleTrackChainMapPx(
+  orderedTrackIds: string[],
+  segmentById: Map<string, TrackNetworkSegment>,
+): Array<{ x: number; y: number }> {
+  return buildContinuousChainPath(orderedTrackIds, segmentById).map((p) => p.mapPx);
+}
+
+export function fieldPointToMapPx(
+  xM: number,
+  yM: number,
+  seg: TrackNetworkSegment,
+): { x: number; y: number } | null {
+  return fieldToMapPx(xM, yM, seg);
+}
+
+export function sampleTrackSegmentBetweenFieldPoints(
+  seg: TrackNetworkSegment,
+  from: { xM: number; yM: number },
+  to: { xM: number; yM: number },
+  stepM = SAMPLE_STEP_M,
+): Array<{ x: number; y: number }> {
+  const dist = Math.hypot(to.xM - from.xM, to.yM - from.yM);
+  const steps = Math.max(1, Math.ceil(dist / stepM));
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const xM = from.xM + (to.xM - from.xM) * t;
+    const yM = from.yM + (to.yM - from.yM) * t;
+    const px = fieldToMapPx(xM, yM, seg);
+    if (px) out.push(px);
+  }
+  return out;
+}
+
+export function findClosestIndexOnScanPath(
+  path: ScanPathPoint[],
+  xM: number,
+  yM: number,
+): number {
+  if (path.length === 0) return 0;
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < path.length; i++) {
+    const d = Math.hypot(path[i]!.xM - xM, path[i]!.yM - yM);
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+export function buildContinuousChainPathForTrackIds(
+  orderedIds: string[],
+  segmentById: Map<string, TrackNetworkSegment>,
+): ScanPathPoint[] {
+  return buildContinuousChainPath(orderedIds, segmentById);
+}

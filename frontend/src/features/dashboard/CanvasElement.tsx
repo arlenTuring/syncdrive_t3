@@ -584,6 +584,7 @@ export function CanvasElement({
       )}
       <div
         ref={innerRef}
+        data-dashboard-canvas={element.label || undefined}
         style={{
           width: '100%', height: '100%', borderRadius: 4, position: 'relative',
           overflow: isEditMode ? 'visible' : 'hidden',

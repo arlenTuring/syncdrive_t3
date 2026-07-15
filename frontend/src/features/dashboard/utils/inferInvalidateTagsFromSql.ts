@@ -28,7 +28,7 @@ export function inferInvalidateTagsFromSql(sql: string | undefined): string[] {
     tags.add('domain:vehicle_monitor');
     tags.add('table:vehicle_monitor_demo');
   }
-  if (s.includes('SLOT_STATUS') || s.includes('MAINTENANCE_SLOT') || s.includes('YARD_SLOT')) {
+  if (s.includes('SLOT_STATUS') || s.includes('SLOT_STATUSES') || s.includes('FACILITY_SLOTS') || s.includes('MAINTENANCE_SLOT') || s.includes('YARD_SLOT')) {
     tags.add('domain:maintenance_slots');
     tags.add('table:slot_status');
   }

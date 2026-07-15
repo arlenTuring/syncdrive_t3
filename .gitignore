@@ -9,6 +9,9 @@ node_modules/
 # ── 本機開發執行期產物（日誌、PID、除錯截圖，勿提交）──
 .dev/
 
+# 地圖庫 API 發佈快取（由編輯器 PUT，模擬器 GET）
+backend/data/published-maps/*.json
+
 # shell 暫存（磁碟滿時可能殘留）
 sh-thd-*
 

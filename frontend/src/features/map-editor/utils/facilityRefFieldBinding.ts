@@ -19,6 +19,7 @@ export const REF_FIELD_POINT_FACILITY_TYPES: FacilityType[] = [
   'Pole',
   'PSD',
   'DockingPoint',
+  'Waypoint',
 ]
 
 /** 參照場域為範圍（min/max）：軌道、設施、圍籬 */

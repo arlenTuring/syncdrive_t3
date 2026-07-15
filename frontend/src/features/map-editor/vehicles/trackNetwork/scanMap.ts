@@ -15,6 +15,16 @@ function trackCodeFromFacility(track: FacilityObject): string | null {
   return null;
 }
 
+/** 同時以 segmentId 註冊別名（如 D06 / R06）供 MQTT 定位 */
+function trackCodesFromFacility(track: FacilityObject): string[] {
+  const codes = new Set<string>();
+  const primary = trackCodeFromFacility(track);
+  if (primary) codes.add(primary);
+  const segId = track.parameters?.segmentId;
+  if (typeof segId === 'string' && segId.trim()) codes.add(segId.trim());
+  return [...codes];
+}
+
 /**
  * 掃描全圖 Track refField，建立場域座標網路。
  * Area 只帶出各 Track 的 canvas 渲染錨點，不作分區或定位依據。
@@ -39,6 +49,19 @@ export function buildTrackNetwork(areas: MapAreaObject[]): TrackNetwork {
         track,
         renderArea: area,
       });
+      const aliases = trackCodesFromFacility(track);
+      const primary = trackCodeFromFacility(track);
+      for (const alias of aliases) {
+        if (alias === primary) continue;
+        segments.push({
+          trackId: track.id,
+          trackCode: alias,
+          bounds,
+          horizontal: span.w >= span.h,
+          track,
+          renderArea: area,
+        });
+      }
     }
   }
 

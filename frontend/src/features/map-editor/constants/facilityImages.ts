@@ -13,5 +13,6 @@ export const FACILITY_BACKGROUND_BY_NAME: Record<FacilityName, string | null> = 
   Rail: '/assets/facilities/rail.png',
   SmartPole: SMART_POLE_ENABLE_ICON,
   DockingPoint: null,
+  Waypoint: null,
   RoadLine: null,
 }

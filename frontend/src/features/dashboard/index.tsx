@@ -20,6 +20,7 @@ import { GroupTemplateExitDialog } from './components/GroupTemplateExitDialog';
 import { notifyCloseCanvasChildList } from './utils/canvasChildList';
 import { VariableProvider } from './VariableContext';
 import { DemoSimulationProvider } from './context/DemoSimulationContext';
+import { VehicleFleetMqttProvider } from './context/VehicleFleetMqttContext';
 import {
   buildGroupIndexPreviewVariables,
   computeSubcanvasEditPlane,
@@ -620,6 +621,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   // ─── 編輯器視圖 ───
   return (
     <DemoSimulationProvider>
+    <VehicleFleetMqttProvider>
     <BindingHealthProvider
       plane={activePlane ?? displayPlane}
       enabled={!!activePlane && !editingGroup}
@@ -1053,6 +1055,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     <SimulationTransportToolbar />
     </FormatPainterProvider>
     </BindingHealthProvider>
+    </VehicleFleetMqttProvider>
     </DemoSimulationProvider>
   );
 }

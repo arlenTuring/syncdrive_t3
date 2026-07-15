@@ -1,9 +1,12 @@
-import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget } from '../types';
+import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget, StatusBadgeWidget, SlotGridWidget, CanvasElementProps, ColorBlockWidget } from '../types';
 import {
   VEHICLE_STATUS_ROW_SQL,
   MAINLINE_SHIFTS_SQL,
   MAINTENANCE_SHIFTS_SQL,
   MAINLINE_FLEET_STATUS_SQL,
+  VEHICLE_DISTRIBUTION_SQL,
+  maintenanceSlotsSql,
+  maintenanceZoneCountSql,
 } from '../constants/demoSql';
 import {
   SHIFT_ROSTER_REFRESH_INTERVAL,
@@ -11,8 +14,64 @@ import {
 } from './resolveBuiltinGroupSql';
 import { migrateChildWidgetGenerics } from './migrateWidgetGenerics';
 import { patchEventDrivenSqlRefresh } from './patchEventDrivenSqlRefresh';
+import { inferInvalidateTagsFromSql } from './inferInvalidateTagsFromSql';
 
 const DS_INTERNAL = 'default-internal';
+
+const MAINT_ZONE_FROM_SQL = /WHERE\s+fs\.zone\s*=\s*'(整備-[^']+)'/;
+
+/** 舊版整備分布 SQL 將保養／維修格位標籤寫死為 M1/M2 */
+export function isStaleMaintenanceSlotSql(sql: string | undefined): boolean {
+  if (!sql?.includes('facility_slots')) return false;
+  return sql.includes("THEN 'M1'") || sql.includes("THEN 'M2'");
+}
+
+function patchMaintenanceDistributionChild(child: ChildWidget): ChildWidget {
+  let patched: ChildWidget = child;
+
+  if (child.type === 'slot-grid') {
+    const sg = child as SlotGridWidget;
+    const sql = sg.sqlQuery;
+    if (sg.nameField === 'slot_label' && isStaleMaintenanceSlotSql(sql)) {
+      const zone = sql?.match(MAINT_ZONE_FROM_SQL)?.[1];
+      if (zone) {
+        patched = { ...sg, sqlQuery: maintenanceSlotsSql(zone) };
+      }
+    }
+  }
+
+  if (child.type === 'text') {
+    const text = child as TextWidget;
+    const sql = text.sqlQuery;
+    if (text.valueField === 'total' && sql?.includes('facility_slots') && isStaleMaintenanceSlotSql(sql)) {
+      const zone = sql?.match(MAINT_ZONE_FROM_SQL)?.[1];
+      if (zone) {
+        patched = { ...text, sqlQuery: maintenanceZoneCountSql(zone) };
+      }
+    }
+  }
+
+  const nested = (patched as { children?: ChildWidget[] }).children;
+  if (Array.isArray(nested) && nested.length > 0) {
+    return {
+      ...patched,
+      children: nested.map(patchMaintenanceDistributionChild),
+    } as unknown as ChildWidget;
+  }
+
+  return patched;
+}
+
+/** 整備分布格位標籤：M1–M4 由 slot_id 推導（修正 localStorage 殘留 M1 寫死） */
+export function patchMaintenanceDistributionSql(plane: DashboardPlane): DashboardPlane {
+  return {
+    ...plane,
+    elements: plane.elements.map((el) => ({
+      ...el,
+      children: (el.children ?? []).map(patchMaintenanceDistributionChild),
+    })),
+  };
+}
 
 export function needsVehicleMonitorBadgeProtocolFix(plane: DashboardPlane): boolean {
   const el = plane.elements.find((e) => e.label === '車輛狀態' && e.isGroup);
@@ -39,10 +98,14 @@ export function needsShiftPanelsSimulationSqlFix(plane: DashboardPlane): boolean
       if (sql.includes('DEMO-ORD')) return true;
       if (!sql.includes('trip_start_minutes')) return true;
       if (!sql.includes("payload->'current_leg'")) return true;
+      if (sql.includes('rs.remain_pct')) return true;
+      if (sql.includes("'T3' AS st_b")) return true;
+      if (!sql.includes('station_display_name')) return true;
     }
     if (label === '整備班表') {
       if (!sql.includes('WITH m0')) return true;
-      if (!sql.includes('zone_label')) return true;
+      if (!sql.includes("'S2W' AS st_a")) return true;
+      if (sql.includes('zone_label')) return true;
     }
   }
   return false;
@@ -113,6 +176,49 @@ function patchShiftRouteProgressChild(child: ChildWidget): ChildWidget {
   };
 }
 
+/** 車輛分佈 segment-bar：修正高度裁切、補失效標籤 */
+function patchVehicleDistributionSegmentBar(children: ChildWidget[]): ChildWidget[] {
+  return children.map((child) => {
+    if (child.type !== 'segment-bar') return child;
+    const bar = child as import('../types').SegmentBarWidget;
+    return {
+      ...bar,
+      height: Math.max(bar.height ?? 0, 75),
+      refreshMode: bar.refreshMode ?? 'event',
+      refreshInterval: 0,
+      sqlQuery: VEHICLE_DISTRIBUTION_SQL,
+      invalidateTags: [
+        'domain:vehicle_distribution',
+        'table:operation_orders',
+        'table:slot_status',
+      ],
+    };
+  });
+}
+
+/** 整備班表卡：故障告警邏輯未上線前，外框／狀態徽章預設改為綠色 */
+function patchMaintenanceCardTemplateDefaults(children: ChildWidget[]): ChildWidget[] {
+  return children.map((child) => {
+    if (child.type === 'color-block') {
+      const cb = child as ColorBlockWidget;
+      if (cb.bindBorderColorVar === 'card_border_color' && cb.borderColor === '#FB2C36') {
+        return { ...cb, borderColor: '#009966' };
+      }
+    }
+    if (child.type === 'status-badge') {
+      const sb = child as StatusBadgeWidget;
+      if (sb.variableBgKey === 'status_bg' && sb.defaultTextColor === '#FF6467') {
+        return {
+          ...sb,
+          defaultBgColor: 'rgba(0, 212, 146, 0.3)',
+          defaultTextColor: '#00BC7D',
+        };
+      }
+    }
+    return child;
+  });
+}
+
 /** 班次／整備任務列：強制套用最新 SQL（避免 localStorage 殘留舊 DEMO-ORD 查詢） */
 export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardPlane {
   return {
@@ -122,10 +228,60 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
         return { ...el, sqlQuery: MAINLINE_SHIFTS_SQL, refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL };
       }
       if (el.label === '整備班表' && el.isGroup) {
-        return { ...el, sqlQuery: MAINTENANCE_SHIFTS_SQL, refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL };
+        return {
+          ...el,
+          sqlQuery: MAINTENANCE_SHIFTS_SQL,
+          refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
+          children: patchMaintenanceCardTemplateDefaults(el.children ?? []),
+        };
+      }
+      if (el.label === '車輛分佈' && el.isGroup) {
+        return {
+          ...el,
+          children: patchVehicleDistributionSegmentBar(el.children ?? []),
+        };
       }
       return el;
     }),
+  };
+}
+
+/** 位置列：訂單 yard_slot_id（E1）；正線無格位時 fallback SQL segment_label */
+export function patchVehicleMonitorLocationMqtt(plane: DashboardPlane): DashboardPlane {
+  return {
+    ...plane,
+    elements: plane.elements.map((el) => {
+      if (el.label !== '車輛狀態' || !el.isGroup) return el;
+      return {
+        ...el,
+        children: (el.children ?? []).map((child) => patchVehicleLocationTextChild(child)),
+      };
+    }),
+  };
+}
+
+function patchVehicleLocationTextChild(child: ChildWidget): ChildWidget {
+  if (child.type !== 'text') return child;
+  const text = child as TextWidget;
+  if (!text.content?.includes('{segment_label}')) return child;
+  const { mqttValuePath: _removed, ...rest } = text;
+  return {
+    ...rest,
+    mqttDataSourceId: text.mqttDataSourceId ?? 'default-mqtt',
+    mqttTopic: 'v1/vtms/${vehicle_code}/operation/update',
+  };
+}
+
+function patchVehicleMonitorBadgeMqtt(child: ChildWidget): ChildWidget {
+  if (child.type !== 'status-badge') return child;
+  const badge = child as StatusBadgeWidget;
+  const field = badge.valueField?.trim() ?? '';
+  if (!field.includes('badge_label') && !field.includes('trip_code')) return child;
+  if (badge.mqttTopic === 'v1/vtms/${vehicle_code}/operation/update') return child;
+  return {
+    ...badge,
+    mqttDataSourceId: badge.mqttDataSourceId ?? 'default-mqtt',
+    mqttTopic: 'v1/vtms/${vehicle_code}/operation/update',
   };
 }
 
@@ -139,19 +295,94 @@ export function patchVehicleMonitorBadgeProtocol(plane: DashboardPlane): Dashboa
       return {
         ...el,
         sqlQuery: VEHICLE_STATUS_ROW_SQL,
-        children: (el.children ?? []).map((child) => migrateChildWidgetGenerics(child)),
+        children: (el.children ?? []).map((child) =>
+          patchVehicleMonitorBadgeMqtt(migrateChildWidgetGenerics(child)),
+        ),
       };
     }),
   };
 }
 
+/** 舊樣板：徽章缺 MQTT 時仍補上 operation/update */
+export function patchVehicleMonitorBadgeMqttOnly(plane: DashboardPlane): DashboardPlane {
+  return {
+    ...plane,
+    elements: plane.elements.map((el) => {
+      if (el.label !== '車輛狀態' || !el.isGroup) return el;
+      return {
+        ...el,
+        children: (el.children ?? []).map((child) => patchVehicleMonitorBadgeMqtt(child)),
+      };
+    }),
+  };
+}
+
+function widgetNeedsEventDrivenRefresh(w: ChildWidget): boolean {
+  const sql = (w as { sqlQuery?: string }).sqlQuery;
+  if (!sql?.trim()) return false;
+  const binding = w as { refreshInterval?: number; refreshMode?: string };
+  if (binding.refreshMode === 'event' || binding.refreshMode === 'stream') return false;
+  if (binding.refreshMode === 'poll') return false;
+  return inferInvalidateTagsFromSql(sql).length > 0
+    && (binding.refreshInterval ?? 0) > 0;
+}
+
+function canvasNeedsEventDrivenRefresh(el: CanvasElementProps): boolean {
+  if (
+    el.sqlQuery?.trim()
+    && inferInvalidateTagsFromSql(el.sqlQuery).length > 0
+    && (el.refreshInterval ?? 0) > 0
+    && el.refreshMode !== 'poll'
+  ) {
+    return true;
+  }
+  for (const child of el.children ?? []) {
+    if (widgetNeedsEventDrivenRefresh(child)) return true;
+  }
+  for (const child of [...(el.childrenDefault ?? []), ...(el.childrenNormal ?? [])]) {
+    if (widgetNeedsEventDrivenRefresh(child)) return true;
+  }
+  return false;
+}
+
+/** 執行期 patch 是否仍需要（已是最新樣板時跳過整棵樹 walk） */
+export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
+  if (needsVehicleMonitorBadgeProtocolFix(plane)) return true;
+  if (needsShiftPanelsSimulationSqlFix(plane)) return true;
+  if (isStaleMaintenanceSlotSqlOnPlane(plane)) return true;
+  if (canvasNeedsEventDrivenRefreshOnPlane(plane)) return true;
+  return false;
+}
+
+function isStaleMaintenanceSlotSqlOnPlane(plane: DashboardPlane): boolean {
+  for (const el of plane.elements) {
+    for (const child of el.children ?? []) {
+      if (child.type === 'slot-grid' || child.type === 'text') {
+        const sql = (child as { sqlQuery?: string }).sqlQuery;
+        if (isStaleMaintenanceSlotSql(sql)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function canvasNeedsEventDrivenRefreshOnPlane(plane: DashboardPlane): boolean {
+  return plane.elements.some(canvasNeedsEventDrivenRefresh);
+}
+
 /** 執行期資料修補（不變更版面座標） */
 export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlane {
   return patchEventDrivenSqlRefresh(
-    patchMainlineFleetStatusWidget(
-      patchShiftCardRouteProgressMqtt(
-        patchShiftPanelsSimulationSql(
-          patchVehicleMonitorBadgeProtocol(plane),
+    patchMaintenanceDistributionSql(
+      patchMainlineFleetStatusWidget(
+        patchShiftCardRouteProgressMqtt(
+          patchShiftPanelsSimulationSql(
+            patchVehicleMonitorLocationMqtt(
+              patchVehicleMonitorBadgeMqttOnly(
+                patchVehicleMonitorBadgeProtocol(plane),
+              ),
+            ),
+          ),
         ),
       ),
     ),

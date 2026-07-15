@@ -23,6 +23,9 @@ import { OperationRouteStation } from './database/entities/operation-route-stati
 import { OperationRouteStationAction } from './database/entities/operation-route-station-action.entity';
 import { OrderActionState } from './database/entities/order-action-state.entity';
 import { OrderEvent } from './database/entities/order-event.entity';
+import { TimeTemplate } from './database/entities/time-template.entity';
+import { MaintenanceTask } from './database/entities/maintenance-task.entity';
+import { OperationShift } from './database/entities/operation-shift.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -30,6 +33,9 @@ import { DatasourceModule } from './datasource/datasource.module';
 import { FacilityModule } from './facility/facility.module';
 import { DemoSimulationModule } from './demo/demo-simulation.module';
 import { MapModule } from './map/map.module';
+import { TimeTemplateModule } from './time-template/time-template.module';
+import { MaintenanceTaskModule } from './maintenance-task/maintenance-task.module';
+import { OperationShiftModule } from './operation-shift/operation-shift.module';
 import { DatabaseInitService } from './database/database-init.service';
 
 @Module({
@@ -52,7 +58,7 @@ import { DatabaseInitService } from './database/database-init.service';
           OperatorActionLog, SpeedLimitConfig, JunctionInterlockLog, FieldEquipmentStatus,
           FacilitySlot, SlotStatus_, CapacityTrendDemoPoint,
           OperationRoute, OperationRouteStation, OperationRouteStationAction,
-          OrderActionState, OrderEvent,
+          OrderActionState, OrderEvent, TimeTemplate, MaintenanceTask, OperationShift,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
@@ -73,6 +79,9 @@ import { DatabaseInitService } from './database/database-init.service';
     FacilityModule,
     DemoSimulationModule,
     MapModule,
+    TimeTemplateModule,
+    MaintenanceTaskModule,
+    OperationShiftModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

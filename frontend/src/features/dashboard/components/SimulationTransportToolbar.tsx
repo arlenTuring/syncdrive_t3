@@ -13,8 +13,10 @@ import {
 } from 'lucide-react';
 import { useDemoSimulation } from '../context/DemoSimulationContext';
 import { VTMS_DEMO_VEHICLE_CODES } from '../api/demoSimulation';
+import type { DemoSimulationTransport } from '../api/demoSimulation';
+import { useSimClockFrame } from '../utils/simClockFrame';
 
-const SPEED_STOPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 15] as const;
+const SPEED_STOPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8] as const;
 const HOLD_REPEAT_DELAY_MS = 350;
 const HOLD_REPEAT_INTERVAL_MS = 80;
 
@@ -78,14 +80,71 @@ function useHoldStepAction(
 }
 
 function formatElapsed(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
+  const totalSec = Math.max(0, ms) / 1000;
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
+  const secFrac = totalSec % 60;
+  const secStr = secFrac.toFixed(2).padStart(5, '0');
   if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${h}:${String(m).padStart(2, '0')}:${secStr}`;
   }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${secStr}`;
+}
+
+type SimEpoch = { baseMs: number; wallAt: number; speed: number };
+
+function readEpochFromTransport(transport: DemoSimulationTransport | null): SimEpoch {
+  const baseMs = transport?.virtualElapsedMs ?? 0;
+  const wallAt =
+    transport?.lastAckWallMs && Number.isFinite(transport.lastAckWallMs)
+      ? transport.lastAckWallMs
+      : Date.now();
+  const speed = transport?.speedMultiplier ?? 1;
+  return { baseMs, wallAt, speed };
+}
+
+function extrapolateMs(epoch: SimEpoch): number {
+  return epoch.baseMs + (Date.now() - epoch.wallAt) * epoch.speed;
+}
+
+/**
+ * 虛擬時鐘顯示：單一連續外推，不依 status 輪詢重設錨點（輪詢會帶 tick 格點造成跳秒）。
+ * 僅在暫停／逐幀／倍速變更／開始時重設錨點。
+ */
+function useLiveVirtualElapsedMs(
+  transport: DemoSimulationTransport | null,
+  running: boolean,
+): number {
+  const epochRef = useRef<SimEpoch>(readEpochFromTransport(transport));
+  const frozenMsRef = useRef(0);
+
+  const transportPaused = transport?.transportPaused ?? false;
+  const stepNonce = transport?.stepNonce ?? 0;
+  const speed = transport?.speedMultiplier ?? 1;
+  const active = running && !transportPaused;
+
+  useSimClockFrame(active);
+
+  // 開始、逐幀、暫停切換：採用伺服器錨點
+  useEffect(() => {
+    if (!running) return;
+    epochRef.current = readEpochFromTransport(transport);
+    if (transportPaused) {
+      frozenMsRef.current = transport?.virtualElapsedMs ?? 0;
+    }
+  }, [running, transportPaused, stepNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 倍速變更：以當下顯示值重設錨點，不 snap 到伺服器格點
+  useEffect(() => {
+    if (!running || transportPaused) return;
+    const now = Date.now();
+    const current = extrapolateMs(epochRef.current);
+    epochRef.current = { baseMs: current, wallAt: now, speed };
+  }, [speed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!running) return 0;
+  if (transportPaused) return transport?.virtualElapsedMs ?? frozenMsRef.current;
+  return extrapolateMs({ ...epochRef.current, speed });
 }
 
 function nearestSpeedIndex(speed: number): number {
@@ -129,6 +188,7 @@ export function SimulationTransportToolbar() {
   const managed = running && status.source === 'managed';
   const transportPaused = transport?.transportPaused ?? false;
   const speed = transport?.speedMultiplier ?? 1;
+  const liveVirtualMs = useLiveVirtualElapsedMs(transport, running);
   const speedIndex = useMemo(() => nearestSpeedIndex(speed), [speed]);
   const holdPrev = useHoldStepAction(stepPrevFrame, loading);
   const holdNext = useHoldStepAction(stepNextFrame, loading);
@@ -282,7 +342,7 @@ export function SimulationTransportToolbar() {
               <div className="shrink-0 text-right text-[10px] text-zinc-500">
                 <div>虛擬時間</div>
                 <div className="font-mono text-sm text-cyan-300">
-                  {formatElapsed(transport?.virtualElapsedMs ?? 0)}
+                  {formatElapsed(liveVirtualMs)}
                 </div>
               </div>
             </div>

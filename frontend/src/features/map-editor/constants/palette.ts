@@ -66,6 +66,12 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: '停靠點 — 站點標記；參照場域座標與站點名稱',
   },
   {
+    label: '途經點',
+    type: 'Waypoint',
+    name: 'Waypoint',
+    hint: '途經點 — 自駕車必經點位；預設綠色標記，代號全圖唯一',
+  },
+  {
     label: '道路線',
     type: 'RoadLine',
     name: 'RoadLine',

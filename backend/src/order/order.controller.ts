@@ -34,6 +34,43 @@ export class OrderController {
     return result;
   }
 
+  @Get('list')
+  @ApiOperation({ summary: '班次運行紀錄列表（分頁、篩選）' })
+  async listOrders(
+    @Query('tab') tab?: string,
+    @Query('keyword') keyword?: string,
+    @Query('execution_status') execution_status?: string,
+    @Query('vehicle_code') vehicle_code?: string,
+    @Query('planned_start_from') planned_start_from?: string,
+    @Query('planned_start_to') planned_start_to?: string,
+    @Query('page') page?: string,
+    @Query('page_size') page_size?: string,
+  ) {
+    return this.orderService.listOrders({
+      tab: tab === 'maintenance' ? 'maintenance' : 'mainline',
+      keyword,
+      execution_status: execution_status as
+        | 'pending'
+        | 'running'
+        | 'delayed'
+        | 'faulted'
+        | 'completed'
+        | 'all'
+        | undefined,
+      vehicle_code,
+      planned_start_from,
+      planned_start_to,
+      page: page ? Number(page) : undefined,
+      page_size: page_size ? Number(page_size) : undefined,
+    });
+  }
+
+  @Get('detail')
+  @ApiOperation({ summary: '班次運行紀錄詳情（含站點動作與 task_group）' })
+  async orderDetail(@Query('id') id: string) {
+    return this.orderService.getOrderDetail(id);
+  }
+
   @Get('queryById')
   @ApiOperation({ summary: '查詢訂單內容' })
   async queryOrder(@Query('id') id: string) {

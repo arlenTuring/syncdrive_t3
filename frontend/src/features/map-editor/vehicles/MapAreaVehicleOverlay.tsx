@@ -12,6 +12,7 @@ import {
   parseYardSlotIdFromPayload,
   resolveVehiclePlacementAcrossAreas,
   resolveTrackCodeForDisplay,
+  type VehiclePlacementAcrossAreas,
 } from './resolveVehicleTrackPlacement';
 import {
   readVehicleHeadingRad,
@@ -34,9 +35,7 @@ import {
   MapVehicleBehaviorOverlay,
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
-
-/** 兩幀螢幕座標位移超過此值（px）即視為大跳躍，瞬間定位不補間 */
-const TELEPORT_SNAP_PX = 150;
+import { readLegSnapKey } from '../../dashboard/utils/simClock';
 
 function radToDeg(rad: number): number {
   return (rad * 180) / Math.PI;
@@ -176,13 +175,52 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  const placementCacheRef = useRef<
+    Map<string, { inputKey: string; placement: VehiclePlacementAcrossAreas | null }>
+  >(new Map());
+
+  useEffect(() => {
+    const activeIds = new Set(vehicles.map((v) => v.vehicleId));
+    for (const id of placementCacheRef.current.keys()) {
+      if (!activeIds.has(id)) placementCacheRef.current.delete(id);
+    }
+  }, [vehicles]);
+
+  function resolveCachedPlacement(
+    vehicle: AreaVehicleLive,
+    network: ReturnType<typeof buildTrackNetwork>,
+  ): VehiclePlacementAcrossAreas | null {
+    const preferYard = isYardVehiclePayload(vehicle.payload);
+    const inputKey = [
+      vehicle.xM.toFixed(2),
+      vehicle.yM.toFixed(2),
+      preferYard ? 'y' : 't',
+      readLegSnapKey(vehicle.payload ?? {}),
+    ].join('|');
+    const cached = placementCacheRef.current.get(vehicle.vehicleId);
+    if (cached?.inputKey === inputKey) return cached.placement;
+    const placement = resolveVehiclePlacementAcrossAreas(
+      areas,
+      vehicle.xM,
+      vehicle.yM,
+      network,
+      { preferYardPlacement: preferYard, payload: vehicle.payload },
+    );
+    placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement });
+    return placement;
+  }
+
   // 判斷「大跳躍（發車／換段／重生）」用：committed=上一個 commit 的座標（render 時唯讀），
   // staging=本次 render 暫存；commit 後才搬進 committed。如此在 StrictMode 雙重 render 下仍正確。
   const committedPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
+  const committedLegRef = useRef<Map<string, string>>(new Map());
   const stagingPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
+  const stagingLegRef = useRef<Map<string, string>>(new Map());
   stagingPosRef.current = new Map();
+  stagingLegRef.current = new Map();
   useEffect(() => {
     committedPosRef.current = stagingPosRef.current;
+    committedLegRef.current = stagingLegRef.current;
   });
 
   if (vehicles.length === 0) return null;
@@ -194,16 +232,7 @@ export function MapAreaVehicleOverlay({
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
       {vehicles.map((vehicle) => {
         const preferYard = isYardVehiclePayload(vehicle.payload);
-        const placement = resolveVehiclePlacementAcrossAreas(
-          areas,
-          vehicle.xM,
-          vehicle.yM,
-          trackNetwork,
-          {
-            preferYardPlacement: preferYard,
-            payload: vehicle.payload,
-          },
-        );
+        const placement = resolveCachedPlacement(vehicle, trackNetwork);
         if (!placement) return null;
         const { area, stackOrder } = {
           area: placement.area,
@@ -251,7 +280,8 @@ export function MapAreaVehicleOverlay({
           ? (rearAxleAnchor?.y ?? markerH / 2) / markerH
           : iconSpec.anchorY;
 
-        const livePayload = vehicle.payload;
+        const livePayload = vehicle.payload as Record<string, unknown> | undefined;
+        const liveData = livePayload ?? {};
 
         const anchorLocal = preferYard
           ? vehicleDefinition
@@ -294,11 +324,13 @@ export function MapAreaVehicleOverlay({
         const bgColor = resolveMapVehicleBgColor(vehicle);
         const zIndex = 100 + stackOrder;
 
-        // 大跳躍偵測：與上一個 commit 的螢幕座標距離過大（發車離站、換段、重生、跨區）→ 瞬間定位避免「飄移」
+        // 大跳躍：首幀或班次／站別切換（發車、換 leg）→ 瞬間定位；高倍速行進仍走 CSS 補間
         const prevPos = committedPosRef.current.get(vehicle.vehicleId);
-        const teleported =
-          !prevPos || Math.hypot(left - prevPos.left, top - prevPos.top) > TELEPORT_SNAP_PX;
+        const legKey = readLegSnapKey(livePayload);
+        const prevLeg = committedLegRef.current.get(vehicle.vehicleId);
+        const teleported = !prevPos || (prevLeg != null && legKey !== prevLeg && legKey !== '');
         stagingPosRef.current.set(vehicle.vehicleId, { left, top });
+        stagingLegRef.current.set(vehicle.vehicleId, legKey);
 
         const style: CSSProperties = {
           position: 'absolute',
@@ -355,7 +387,7 @@ export function MapAreaVehicleOverlay({
                 <div className="pointer-events-none">
                   <VehicleDefinitionMapView
                     definition={vehicleDefinition}
-                    liveData={livePayload}
+                    liveData={liveData}
                     displayWidth={displayW}
                     displayHeight={displayH}
                     fitMode={vehicleFitMode}
@@ -370,7 +402,7 @@ export function MapAreaVehicleOverlay({
                     config={vehicleBehavior}
                     vehicleCenterX={displayW / 2}
                     vehicleCenterY={displayH / 2}
-                    liveData={livePayload}
+                    liveData={liveData}
                   />
                 ) : null}
                 {showEditSizer ? (
@@ -379,7 +411,7 @@ export function MapAreaVehicleOverlay({
                       definition={vehicleDefinition}
                       widthPx={displayW}
                       heightPx={displayH}
-                      liveData={livePayload}
+                      liveData={liveData}
                       overlayOnly
                       onSizeChange={vehicleEditSizer.onSizeChange}
                     />

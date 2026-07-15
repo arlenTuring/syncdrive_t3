@@ -2,17 +2,20 @@ import { useEffect, useState } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import {
-  DOCKING_POINT_ICON_MODE_KEY,
   DOCKING_POINT_CUSTOM_ICON_KEY,
+  DOCKING_POINT_ICON_MODE_KEY,
+  DOCKING_POINT_STATION_ID_KEY,
   DOCKING_POINT_STATION_NAME_KEY,
-  getDockingPointNodeId,
+  getDockingPointStationId,
+  getDockingPointStationName,
   parseDockingPointIconMode,
 } from '../utils/dockingPointFacility'
 import {
-  isDockingStationNameTaken,
+  normalizeStationIdInput,
   normalizeStationNameInput,
+  patchDockingPointStationId,
   patchDockingPointStationName,
-} from '../utils/dockingPointNodeId'
+} from '../utils/dockingPointStationId'
 
 type Props = {
   facility: FacilityObject
@@ -36,33 +39,51 @@ export function DockingPointInspectorSection({
   if (facility.type !== 'DockingPoint') return null
 
   const params = facility.parameters ?? {}
+  const committedId =
+    typeof params[DOCKING_POINT_STATION_ID_KEY] === 'string'
+      ? params[DOCKING_POINT_STATION_ID_KEY]
+      : getDockingPointStationId(facility)
   const committedName =
     typeof params[DOCKING_POINT_STATION_NAME_KEY] === 'string'
       ? params[DOCKING_POINT_STATION_NAME_KEY]
-      : ''
-  const nodeId = getDockingPointNodeId(facility)
+      : getDockingPointStationName(facility)
   const iconMode = parseDockingPointIconMode(params[DOCKING_POINT_ICON_MODE_KEY])
   const customIconUrl =
     typeof params[DOCKING_POINT_CUSTOM_ICON_KEY] === 'string'
       ? params[DOCKING_POINT_CUSTOM_ICON_KEY]
       : ''
 
+  const [draftId, setDraftId] = useState(committedId)
   const [draftName, setDraftName] = useState(committedName)
+  const [idError, setIdError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
 
   useEffect(() => {
+    setDraftId(committedId)
     setDraftName(committedName)
+    setIdError(null)
     setNameError(null)
-  }, [facility.id, committedName])
+  }, [facility.id, committedId, committedName])
+
+  const commitStationId = () => {
+    const normalized = normalizeStationIdInput(draftId)
+    if (!normalized) {
+      setIdError('請輸入站點 ID')
+      return
+    }
+    const result = patchDockingPointStationId(facility, areas, normalized)
+    if (result.error) {
+      setIdError(result.error)
+      return
+    }
+    setIdError(null)
+    onApplyDockingPoint(result.facility)
+  }
 
   const commitStationName = () => {
     const normalized = normalizeStationNameInput(draftName)
     if (!normalized) {
       setNameError('請輸入站點名稱')
-      return
-    }
-    if (isDockingStationNameTaken(areas, normalized, facility.id)) {
-      setNameError('站點名稱不可與其他停靠點重複')
       return
     }
     const result = patchDockingPointStationName(facility, areas, normalized)
@@ -79,12 +100,52 @@ export function DockingPointInspectorSection({
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
         停靠點
       </h3>
+
+      <div>
+        <label
+          htmlFor="docking-station-id"
+          className="mb-1 block text-[10px] text-zinc-500"
+        >
+          站點 ID
+        </label>
+        <input
+          id="docking-station-id"
+          readOnly={readOnly}
+          value={draftId}
+          onChange={(e) => {
+            setDraftId(e.target.value)
+            if (idError) setIdError(null)
+          }}
+          onFocus={onFieldFocus}
+          onBlur={() => {
+            onFieldBlur()
+            if (!readOnly) commitStationId()
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
+            }
+          }}
+          placeholder="例：station_1"
+          className={`w-full rounded border bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60 ${
+            idError ? 'border-red-600' : 'border-zinc-600'
+          }`}
+        />
+        {idError ? (
+          <p className="mt-1 text-[10px] text-red-400">{idError}</p>
+        ) : (
+          <p className="mt-1 text-[10px] text-zinc-600">
+            全圖唯一；新建預設 station_1、station_2…，可自行修改。
+          </p>
+        )}
+      </div>
+
       <div>
         <label
           htmlFor="docking-station-name"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          站點名稱
+          站點名稱（別名）
         </label>
         <input
           id="docking-station-name"
@@ -104,7 +165,7 @@ export function DockingPointInspectorSection({
               e.currentTarget.blur()
             }
           }}
-          placeholder="例：T3、S2W、D02"
+          placeholder="例：N2W上行站、T3下行站"
           className={`w-full rounded border bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60 ${
             nameError ? 'border-red-600' : 'border-zinc-600'
           }`}
@@ -113,21 +174,11 @@ export function DockingPointInspectorSection({
           <p className="mt-1 text-[10px] text-red-400">{nameError}</p>
         ) : (
           <p className="mt-1 text-[10px] text-zinc-600">
-            名稱不可重複；系統會依名稱自動產生節點 ID（對應營運協議 node_id）。
+            顯示用別名，不可與其他停靠點重複。
           </p>
         )}
       </div>
-      <div>
-        <label className="mb-1 block text-[10px] text-zinc-500">
-          營運節點 ID（系統）
-        </label>
-        <div className="rounded border border-zinc-700/80 bg-zinc-950/80 px-2 py-1.5 font-mono text-[11px] text-cyan-200/90">
-          {nodeId || '— 請先設定站點名稱 —'}
-        </div>
-        <p className="mt-1 text-[10px] text-zinc-600">
-          用於 MQTT task_params.node_id；建立後不隨顯示名稱變更。
-        </p>
-      </div>
+
       <div>
         <label
           htmlFor="docking-icon-mode"
@@ -158,6 +209,7 @@ export function DockingPointInspectorSection({
           <option value="custom">自訂圖片 URL</option>
         </select>
       </div>
+
       {iconMode === 'custom' && (
         <div>
           <label
@@ -179,7 +231,7 @@ export function DockingPointInspectorSection({
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             placeholder="https://… 或 /map-editor-icons/…"
-            className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 read-only:opacity-80"
+            className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 read-only:opacity-80"
           />
         </div>
       )}

@@ -2,6 +2,8 @@ import type { RouteProgressWidget, RouteStation } from '../types';
 
 export interface RouteStationJsonItem {
   name?: string;
+  station_id?: string;
+  stationId?: string;
   remain_pct?: number;
   remainPct?: number;
 }
@@ -51,6 +53,7 @@ export function resolveRouteStations(
       return items.map((item, i) => ({
         id: `json-${i}`,
         name: String(item.name ?? `站${i + 1}`),
+        stationId: String(item.station_id ?? item.stationId ?? '').trim() || undefined,
         value: anchors[i] ?? 0,
         remainPct: num(item.remain_pct ?? item.remainPct),
       }));

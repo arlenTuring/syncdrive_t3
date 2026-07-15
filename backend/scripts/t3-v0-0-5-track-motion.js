@@ -1,8 +1,8 @@
 /**
- * T3 軌道合併加道路線 v0.1.6 參照場域（MQTT / SQL 示範共用）
+ * T3 軌道合併加道路線 v0.1.10 參照場域（MQTT / SQL 示範共用）
  *
- * 規則1（D 軌道）：N2W下行 → D02–D18 → T3下行 → D20–D34 → S2W下行（每站 36s）
- * 規則2（U 軌道）：S2W上行 → U34–U18 → T3上行 → U16–U02 → N2W上行（每站 36s）
+ * 規則1（D 軌道）：N2W下行 → D01–D16 → T3下行 → D20–D33 → S2W下行（每站 36s）
+ * 規則2（U 軌道）：S2W上行 → U35–U20 → T3上行 → U16–U03 → N2W上行（每站 36s）
  * 規則3：規則1 → 規則2 無限循環
  * 規則4（示範場景）：場上 4 台（PMS-01～11 池輪替），間隔 3 分鐘 — 僅模擬器設定，非系統容量上限
  * 規則5：不跨軌道（D 走 D、U 走 U）；號誌前 20m 停等 5s
@@ -37,6 +37,8 @@ const U_UPPER_LANE_Y = (U_UPPER_Y_MIN + U_UPPER_Y_MAX) / 2;
 const U_LOWER_LANE_Y = (U_LOWER_Y_MIN + U_LOWER_Y_MAX) / 2;
 
 const VEHICLE_POOL = Array.from({ length: 11 }, (_, i) => `PMS-${String(i + 1).padStart(2, '0')}`);
+/** 場上四台示範車（0/3/6/9 分鐘發車） */
+const ACTIVE_SLOT_VEHICLE_IDS = ['PMS-01', 'PMS-02', 'PMS-08', 'PMS-11'];
 const ACTIVE_SLOT_COUNT = 4;
 const SLOT_OFFSETS_MIN = [0, 3, 6, 9];
 const BATTERY_DRAIN_PER_MIN = 3;
@@ -106,30 +108,9 @@ function refFieldSubslotCenter(bounds, subIndex, capacity, options = {}) {
   };
 }
 
-const PARKING_PLATFORM_CAPACITY = { P1: 2, P2: 2 };
-
-/** P1/P2 月台內兩格並排（沿 Y 切分）；軌道 T 不可停車 */
-const PARKING_PLATFORM_SLOTS = [
-  { id: 'P1', subIndex: 1, platform: 'P1' },
-  { id: 'P1', subIndex: 0, platform: 'P1' },
-  { id: 'P2', subIndex: 1, platform: 'P2' },
-  { id: 'P2', subIndex: 0, platform: 'P2' },
-];
+const PARKING_SLOT_IDS = ['P1', 'P2', 'P3', 'P4'];
 
 const YARD_MAINT_FACILITY_IDS = ['H1', 'H2', 'H3', 'M1', 'M2', 'M3', 'M4', 'W1'];
-
-function resolvePlatformSubslotCenter(platformId, subIndex, facilitiesByName) {
-  const platform = facilitiesByName.get(platformId);
-  if (!platform?.parameters) return null;
-  const bounds = getValidRefFieldBoundsFromParams(platform.parameters);
-  if (!bounds) return null;
-  const capacity = PARKING_PLATFORM_CAPACITY[platformId] ?? 1;
-  const center = refFieldSubslotCenter(bounds, subIndex, capacity, { splitAxis: 'y' });
-  return {
-    ...center,
-    heading: (readFacilityRotationDeg(platform) * Math.PI) / 180,
-  };
-}
 
 function facilityFieldCenterMeters(facility) {
   const params = facility.parameters ?? {};
@@ -154,34 +135,43 @@ function readFacilityRotationDeg(facility) {
 }
 
 function loadParkingSlotsFromMap(facilitiesByName) {
-  return PARKING_PLATFORM_SLOTS.map((slot) => {
-    const center = resolvePlatformSubslotCenter(slot.platform, slot.subIndex, facilitiesByName);
+  return PARKING_SLOT_IDS.map((id) => {
+    const facility = facilitiesByName.get(id);
+    const center = facility ? withHeading(facilityFieldCenterMeters(facility), facility) : null;
     if (!center) return null;
-    return {
-      id: slot.id,
-      subIndex: slot.subIndex,
-      x: center.x,
-      y: center.y,
-      ...(typeof center.heading === 'number' ? { heading: center.heading } : {}),
-    };
+    return { id, x: center.x, y: center.y, ...(typeof center.heading === 'number' ? { heading: center.heading } : {}) };
   }).filter(Boolean);
 }
 
-const T3_MAIN_MAP_PATH = path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
+function withHeading(center, facility) {
+  return center
+    ? {
+        ...center,
+        heading: (readFacilityRotationDeg(facility) * Math.PI) / 180,
+      }
+    : null;
+}
+
+const { resolveMapJsonPath } = require('./map-published-store');
+
+const T3_MAIN_MAP_PATH =
+  resolveMapJsonPath('t3-main-version')
+  ?? path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
 
 function buildYardSlotFallback() {
+  /** 與 t3-main-version.json v0.1.10 refField 中心對齊（P1–P4 臨停格） */
   return {
     charging: [
       { id: 'E1', x: 715, y: 55, heading: 0 },
       { id: 'E2', x: 675, y: 55, heading: 0 },
-      { id: 'E3', x: 635, y: 30, heading: 0 },
-      { id: 'E4', x: 595, y: 30, heading: 0 },
+      { id: 'E3', x: 635, y: 55, heading: 0 },
+      { id: 'E4', x: 595, y: 55, heading: 0 },
     ],
     parking: [
-      { id: 'P1', subIndex: 1, x: 1025, y: 105.25, heading: 0 },
-      { id: 'P1', subIndex: 0, x: 1025, y: 101.75, heading: 0 },
-      { id: 'P2', subIndex: 1, x: 1025, y: 305.25, heading: 0 },
-      { id: 'P2', subIndex: 0, x: 1025, y: 301.75, heading: 0 },
+      { id: 'P1', x: 1025, y: 101.75, heading: 0 },
+      { id: 'P2', x: 1025, y: 105.25, heading: 0 },
+      { id: 'P3', x: 1025, y: 301.75, heading: 0 },
+      { id: 'P4', x: 1025, y: 305.25, heading: 0 },
     ],
     maint: [
       { id: 'H1', x: 185, y: 326.5, heading: 0 },
@@ -317,9 +307,8 @@ function resetFleetBatteryState(simStartMs) {
     vehicles,
   };
   for (let slotIndex = 0; slotIndex < slots.length; slotIndex += 1) {
-    const vehicleId = VEHICLE_POOL[slotIndex];
-    deployVehicleToSlot(vehicleId);
-    slots[slotIndex].vehicleId = vehicleId;
+    slots[slotIndex].vehicleId =
+      ACTIVE_SLOT_VEHICLE_IDS[slotIndex] ?? VEHICLE_POOL[slotIndex];
   }
   rebalanceYardSlots();
   return fleetBatteryState;
@@ -389,10 +378,7 @@ function rebalanceYardSlots() {
     chargeIdx += 1;
   }
 
-  const parkSlots = yardParking().map((slot) => ({
-    slotId: slot.id,
-    subIndex: slot.subIndex ?? 0,
-  }));
+  const parkSlots = yardParking().map((slot) => slot.id);
 
   const standbyFull = VEHICLE_POOL.filter((id) => {
     const vehicle = fleetBatteryState.vehicles[id];
@@ -404,8 +390,7 @@ function rebalanceYardSlots() {
   for (const id of standbyFull) {
     const vehicle = fleetBatteryState.vehicles[id];
     if (parkIdx < parkSlots.length) {
-      const ps = parkSlots[parkIdx];
-      vehicle.yardSlot = { kind: 'park', slotId: ps.slotId, subIndex: ps.subIndex };
+      vehicle.yardSlot = { kind: 'park', slotId: parkSlots[parkIdx] };
       parkIdx += 1;
       continue;
     }
@@ -445,6 +430,16 @@ function tickFleetBatteryState(elapsedMs, simStartMs) {
 
   for (const slot of fleetBatteryState.slots) {
     if (!slot.vehicleId) continue;
+    const scheduled = fleetBatteryState.vehicles[slot.vehicleId];
+    if (!scheduled || scheduled.status === 'on_field') continue;
+    const offsetMs = slot.offsetMin * 60 * 1000;
+    if (elapsedMs >= offsetMs) {
+      deployVehicleToSlot(slot.vehicleId);
+    }
+  }
+
+  for (const slot of fleetBatteryState.slots) {
+    if (!slot.vehicleId) continue;
     const vehicle = fleetBatteryState.vehicles[slot.vehicleId];
     if (vehicle.status !== 'on_field') continue;
 
@@ -480,7 +475,7 @@ function tickFleetBatteryState(elapsedMs, simStartMs) {
 function getActiveFleet() {
   if (!fleetBatteryState) {
     return SLOT_OFFSETS_MIN.map((offsetMin, slotIndex) => ({
-      id: VEHICLE_POOL[slotIndex],
+      id: ACTIVE_SLOT_VEHICLE_IDS[slotIndex] ?? VEHICLE_POOL[slotIndex],
       offsetMin,
       slotIndex,
     }));
@@ -509,19 +504,23 @@ function getFleet() {
   return getActiveFleet();
 }
 
-/** 每個停靠點總停站 36 秒（2s 開門 + 32s 月台 + 2s 關門） */
+/** 每個停靠點總停站 36 秒 */
 const DOCKING_DWELL_MS = 36 * 1000;
-/** 月台門（PSD）開/關時間：需先於車門動作 */
-const PSD_OPEN_MS = 1000;
+/** 進站後先停穩，再開月台門／車門 */
+const STOP_SETTLE_MS = 1500;
+/** 月台門與車門同步開啟（同時開始、同時完成） */
+const DOOR_SYNC_OPEN_MS = 2000;
 const PSD_CLOSE_MS = 1000;
-const DOOR_OPEN_MS = 2000;
 const DOOR_CLOSE_MS = 2000;
 /**
- * 停靠 36s 內動作順序：
- * 進站：月台門開 → 車門開 → 停留 → 離站：月台門關 → 車門關
+ * 停靠順序：停穩 → 月台門＋車門同步開 → 停留 → 車門關 → 月台門關
  */
 const STATION_DWELL_MS =
-  DOCKING_DWELL_MS - PSD_OPEN_MS - PSD_CLOSE_MS - DOOR_OPEN_MS - DOOR_CLOSE_MS;
+  DOCKING_DWELL_MS - STOP_SETTLE_MS - DOOR_SYNC_OPEN_MS - PSD_CLOSE_MS - DOOR_CLOSE_MS;
+/** @deprecated 與 DOOR_SYNC_OPEN_MS 相同，保留匯出相容 */
+const PSD_OPEN_MS = DOOR_SYNC_OPEN_MS;
+/** @deprecated 與 DOOR_SYNC_OPEN_MS 相同，保留匯出相容 */
+const DOOR_OPEN_MS = DOOR_SYNC_OPEN_MS;
 /** 四門依序開／關的時間差（毫秒） */
 const DOOR_STAGGER_MS = 350;
 const DOOR_OPEN_PERCENT_FIELDS = [
@@ -533,9 +532,13 @@ const DOOR_OPEN_PERCENT_FIELDS = [
 const DISPATCH_MS = 2500;
 const INTER_STATION_TRAVEL_MS = 5000;
 const VERTICAL_TRAVEL_MS = 60 * 1000;
-/** 轉角後先橫移進直行柱，再南北行駛（避免斜切軌道分類死角） */
-const COLUMN_ENTRY_MS = 5000;
+/** 轉角後先橫移進直行柱（僅剩餘距離微調，不再長距離切到 junction） */
+const COLUMN_ENTRY_MS = 2000;
 const TURN_MS = 5000;
+/** 轉彎後軸路徑尺度（公尺）；倍率 × 此值決定轉角出彎距離 */
+const TURN_INNER_RADIUS_M = W * 0.55;
+/** 後軸過進彎段 2/3 處即開始轉 heading（D16 西向約 x=133，不在段底硬轉） */
+const TURN_START_SEGMENT_FRAC = 2 / 3;
 const SIGNAL_WAIT_MS = 5000;
 const SIGNAL_STOP_DISTANCE_M = 20;
 const SIGNAL_AXIS_TOLERANCE_M = 1.5;
@@ -563,15 +566,20 @@ const HEADING = {
 /** 停靠點站停（地圖 customName 如 N2W下行、S2W下行） */
 const T3_DOCKING_STOPS_FALLBACK = {
   down: [
-    { id: 'n2w-down', name: 'N2W下行', label: 'N2W下行', x: 840, y: 101.75, heading: HEADING.WEST },
-    { id: 't3-down', name: 'T3下行', label: 'T3下行', x: 101.75, y: 170, heading: HEADING.SOUTH },
-    { id: 's2w-down', name: 'S2W下行', label: 'S2W下行', x: 810, y: 305.25, heading: HEADING.EAST },
+    { id: 'n2w-down', stationId: 'station_2', name: 'N2W下行', label: 'N2W下行', station: 'N2W', x: 840, y: 101.75, heading: HEADING.WEST },
+    { id: 't3-down', stationId: 'station_3', name: 'T3下行', label: 'T3下行', station: 'T3', x: 101.75, y: 170, heading: HEADING.SOUTH },
+    { id: 's2w-down', stationId: 'station_5', name: 'S2W下行', label: 'S2W下行', station: 'S2W', x: 810, y: 305.25, heading: HEADING.EAST },
   ],
   up: [
-    { id: 's2w-up', name: 'S2W上行', label: 'S2W上行', x: 840, y: 301.75, heading: HEADING.WEST },
-    { id: 't3-up', name: 'T3上行', label: 'T3上行', x: 105.25, y: 230, heading: HEADING.NORTH },
-    { id: 'n2w-up', name: 'N2W上行', label: 'N2W上行', x: 810, y: 105.25, heading: HEADING.EAST },
+    { id: 's2w-up', stationId: 'station_6', name: 'S2W上行', label: 'S2W上行', station: 'S2W', x: 840, y: 301.75, heading: HEADING.WEST },
+    { id: 't3-up', stationId: 'station_4', name: 'T3上行', label: 'T3上行', station: 'T3', x: 105, y: 230, heading: HEADING.NORTH },
+    { id: 'n2w-up', stationId: 'station_1', name: 'N2W上行', label: 'N2W上行', station: 'N2W', x: 810, y: 105.25, heading: HEADING.EAST },
   ],
+};
+
+const MAINLINE_STATION_IDS_BY_LEG = {
+  down: ['station_2', 'station_3', 'station_5'],
+  up: ['station_6', 'station_4', 'station_1'],
 };
 
 function dockingSortKey(name) {
@@ -612,21 +620,16 @@ function parseDockingStation(raw) {
 }
 
 function mergeDockingStops(parsed, fallback) {
-  const stationOrder = ['N2W', 'T3', 'S2W'];
   const out = { down: [], up: [] };
   for (const leg of ['down', 'up']) {
-    for (const station of stationOrder) {
-      const fromParsed = parsed[leg].find((s) => s.station === station);
+    for (const stationId of MAINLINE_STATION_IDS_BY_LEG[leg]) {
+      const fromParsed = parsed[leg].find((s) => s.stationId === stationId);
       if (fromParsed) {
         out[leg].push(fromParsed);
         continue;
       }
-      const fb = fallback[leg].find((s) => {
-        if (station === 'N2W') return s.id.includes('n2w');
-        if (station === 'T3') return s.id.includes('t3');
-        return s.id.includes('s2w');
-      });
-      if (fb) out[leg].push({ ...fb, station });
+      const fb = fallback[leg].find((s) => s.stationId === stationId);
+      if (fb) out[leg].push({ ...fb });
     }
   }
   return out;
@@ -708,13 +711,31 @@ function assignPsdsToDocks(mapDockingByArea, mapPsdByArea) {
   return { psdByDockingLabel, allPsdEntityIds };
 }
 
+function parsePlannedRoutesFromMap(raw, byStationId) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const routeId = String(item.routeId ?? '').trim();
+    const displayName = String(item.displayName ?? '').trim();
+    const stationIds = Array.isArray(item.stationIds)
+      ? item.stationIds.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+    if (!routeId || !displayName || stationIds.length < 2) continue;
+    if (!stationIds.every((id) => byStationId[id])) continue;
+    out.push({ routeId, displayName, stationIds });
+  }
+  return out;
+}
+
 function loadT3DockingStops() {
   const parsed = { down: [], up: [] };
   const byLabel = {};
+  const byStationId = {};
   const mapDockingByArea = new Map(); // areaId -> docking entries (with positionMeters)
   const mapPsdByArea = new Map(); // areaId -> psd entries
   try {
-    const mapPath = path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
+    const mapPath = T3_MAIN_MAP_PATH;
     const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
     for (const area of map.areas ?? []) {
       for (const facility of area.facilities ?? []) {
@@ -724,9 +745,11 @@ function loadT3DockingStops() {
         const y = params.refFieldYM;
         if (typeof x !== 'number' || typeof y !== 'number') continue;
 
-        let leg = parseDockingLeg(params.dockingLeg);
         let station = parseDockingStation(params.dockingStation);
-        const name = String(facility.customName || params.stationName || '').trim();
+        const stationId = String(params.stationId ?? '').trim();
+        const name = String(params.stationName || facility.customName || '').trim();
+        /** 站點名稱（S2W下行）優先於 dockingLeg，避免地圖 leg 欄位與名稱不一致 */
+        let leg = inferLegFromLabel(name) ?? parseDockingLeg(params.dockingLeg);
 
         if (!leg && name.includes('下行')) leg = 'down';
         if (!leg && name.includes('上行')) leg = 'up';
@@ -734,7 +757,7 @@ function loadT3DockingStops() {
         if (!station && name.includes('T3')) station = 'T3';
         if (!station && name.includes('S2W')) station = 'S2W';
 
-        if (!leg || !station) continue;
+        if (!leg || (!stationId && !station)) continue;
 
         const label = resolveDockingLabel(name, station, leg);
         const labelLeg = inferLegFromLabel(label) ?? leg;
@@ -742,15 +765,12 @@ function loadT3DockingStops() {
 
         const entry = {
           id: String(facility.id),
+          stationId: stationId || undefined,
           name: name || label,
           label,
           station: labelStation,
           x,
           y,
-          operationNodeId:
-            typeof params.operationNodeId === 'string'
-              ? params.operationNodeId.trim()
-              : undefined,
           heading: inferDockingHeadingFromKeys(labelStation, labelLeg),
           positionMeters:
             facility.positionMeters &&
@@ -762,6 +782,7 @@ function loadT3DockingStops() {
         };
         parsed[labelLeg].push(entry);
         byLabel[label] = entry;
+        if (stationId) byStationId[stationId] = entry;
 
         if (!mapDockingByArea.has(entry.areaId)) mapDockingByArea.set(entry.areaId, []);
         mapDockingByArea.get(entry.areaId).push(entry);
@@ -783,11 +804,13 @@ function loadT3DockingStops() {
     }
     parsed.down.sort(
       (a, b) =>
-        dockingStationSortKey(a.station) - dockingStationSortKey(b.station),
+        MAINLINE_STATION_IDS_BY_LEG.down.indexOf(a.stationId)
+        - MAINLINE_STATION_IDS_BY_LEG.down.indexOf(b.stationId),
     );
     parsed.up.sort(
       (a, b) =>
-        dockingStationSortKey(a.station) - dockingStationSortKey(b.station),
+        MAINLINE_STATION_IDS_BY_LEG.up.indexOf(a.stationId)
+        - MAINLINE_STATION_IDS_BY_LEG.up.indexOf(b.stationId),
     );
     if (parsed.down.length > 0 || parsed.up.length > 0) {
       const merged = mergeDockingStops(parsed, T3_DOCKING_STOPS_FALLBACK);
@@ -802,6 +825,11 @@ function loadT3DockingStops() {
         }
       }
       merged.byLabel = byLabel;
+      merged.byStationId = byStationId;
+      merged.plannedRoutes = parsePlannedRoutesFromMap(map.routes, byStationId);
+      merged.mapVersion = map.version ?? null;
+      merged.mapUpdatedAt = map.updatedAt ?? null;
+      merged.mapPath = mapPath;
       const psdMap = assignPsdsToDocks(mapDockingByArea, mapPsdByArea);
       merged.psdByDockingLabel = psdMap.psdByDockingLabel;
       merged.allPsdEntityIds = psdMap.allPsdEntityIds;
@@ -810,10 +838,11 @@ function loadT3DockingStops() {
   } catch {
     /* use fallback */
   }
-  const fallback = { ...T3_DOCKING_STOPS_FALLBACK, byLabel: {} };
+  const fallback = { ...T3_DOCKING_STOPS_FALLBACK, byLabel: {}, byStationId: {}, plannedRoutes: [] };
   for (const leg of ['down', 'up']) {
     for (const stop of fallback[leg]) {
       fallback.byLabel[stop.label] = { ...stop, station: inferStationFromLabel(stop.label) ?? stop.station };
+      if (stop.stationId) fallback.byStationId[stop.stationId] = fallback.byLabel[stop.label];
     }
   }
   fallback.psdByDockingLabel = { ...KNOWN_PSD_BY_DOCKING_LABEL };
@@ -822,6 +851,56 @@ function loadT3DockingStops() {
 }
 
 const T3_DOCKING_STOPS = loadT3DockingStops();
+
+const DOCKING_STOP_LABELS = [
+  'N2W下行',
+  'T3下行',
+  'S2W下行',
+  'S2W上行',
+  'T3上行',
+  'N2W上行',
+];
+
+const DOCKING_TRACK_FAMILY = {
+  'N2W下行': 'D',
+  'T3下行': 'D',
+  'S2W下行': 'D',
+  'S2W上行': 'U',
+  'T3上行': 'U',
+  'N2W上行': 'U',
+};
+
+function resolveDockStop(label) {
+  const raw = getDockingStopByLabel(label);
+  const family = DOCKING_TRACK_FAMILY[label] ?? 'D';
+  const stop = dockOnTrackFamily(raw, family);
+  return { label, raw, stop, family };
+}
+
+/** 模擬器啟動時列印：內建地图版本與各停靠點 refField → 停站座標 */
+function printDockingStopsAudit() {
+  const ver = T3_DOCKING_STOPS.mapVersion ?? 'fallback';
+  const at = T3_DOCKING_STOPS.mapUpdatedAt ?? '';
+  console.log(
+    `[t3-motion] 停靠點來源 ${path.basename(T3_MAIN_MAP_PATH)} ${ver}${at ? ` (${at})` : ''}`,
+  );
+  for (const label of DOCKING_STOP_LABELS) {
+    const { raw, stop, family } = resolveDockStop(label);
+    const deg = ((stop.heading * 180) / Math.PI).toFixed(0);
+    console.log(
+      `  ${label}: refField (${raw.x}, ${raw.y}) → 停站 (${stop.x}, ${stop.y}) [${family}軌] heading=${deg}°`,
+    );
+  }
+  const planned = T3_DOCKING_STOPS.plannedRoutes ?? [];
+  if (planned.length > 0) {
+    console.log(`[t3-motion] 地圖路線清單 ${planned.length} 條（模擬將依此站序行進）`);
+    for (const route of planned) {
+      console.log(`  ${route.displayName} (${route.routeId}): ${route.stationIds.join(' → ')}`);
+    }
+  } else {
+    console.log('[t3-motion] 地圖尚無 routes[] 路線清單，使用預設 D/U 正線軌跡');
+  }
+}
 
 function getDockingStopByLabel(label) {
   const hit = T3_DOCKING_STOPS.byLabel?.[label];
@@ -922,7 +1001,7 @@ const T3_SIGNAL_STOPS_FALLBACK = [
 
 function loadT3SignalsFromMap() {
   try {
-    const mapPath = path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
+    const mapPath = T3_MAIN_MAP_PATH;
     const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
     const stops = [];
     const registryByEntity = new Map();
@@ -1144,7 +1223,7 @@ TRACK.U19 = v(T3_U_X_MIN, 250, 300, T3_U_X_MAX);
 function normalizeTrackCode(name) {
   if (!name || typeof name !== 'string') return null;
   const trimmed = name.trim().toUpperCase();
-  const match = trimmed.match(/^([DUT])(\d{1,2})$/);
+  const match = trimmed.match(/^([DUTR])(\d{1,2})$/);
   if (!match) return null;
   return `${match[1]}${String(Number(match[2])).padStart(2, '0')}`;
 }
@@ -1152,7 +1231,7 @@ function normalizeTrackCode(name) {
 /** 自 t3-main-version 載入 refField；segment_label 與前端 locate 一致 */
 function loadMapRefFieldSegments() {
   try {
-    const mapPath = path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
+    const mapPath = T3_MAIN_MAP_PATH;
     const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
     const segments = [];
     for (const area of map.areas ?? []) {
@@ -1172,6 +1251,7 @@ function loadMapRefFieldSegments() {
         const trackCode =
           normalizeTrackCode(facility.customName) ||
           normalizeTrackCode(params.segmentId);
+        const segmentAlias = normalizeTrackCode(params.segmentId);
         segments.push({
           trackId: facility.id,
           trackCode,
@@ -1179,6 +1259,9 @@ function loadMapRefFieldSegments() {
         });
         if (trackCode) {
           TRACK[trackCode] = { xMinM, xMaxM, yMinM, yMaxM };
+          if (segmentAlias && segmentAlias !== trackCode) {
+            TRACK[segmentAlias] = { xMinM, xMaxM, yMinM, yMaxM };
+          }
         }
       }
     }
@@ -1362,6 +1445,188 @@ function steerSignForSweep(sweepRad) {
   return sweepRad > 0 ? 1 : -1;
 }
 
+function headingCardinalLabel(h) {
+  const eps = 0.05;
+  if (Math.abs(h) < eps || Math.abs(h - 2 * Math.PI) < eps) return 'E';
+  if (Math.abs(h - HEADING.SOUTH) < eps) return 'S';
+  if (Math.abs(h - HEADING.WEST) < eps || Math.abs(h + HEADING.WEST) < eps) return 'W';
+  if (Math.abs(h - HEADING.NORTH) < eps) return 'N';
+  return null;
+}
+
+/**
+ * 90° 轉角：進彎段 2/3 起點 → 出彎段（如 D17）橫向中心 + 沿出彎方向進入。
+ */
+const TURN_EXIT_TRACK = {
+  'W-S': 'D17',
+  'S-E': 'D20',
+  'W-N': 'U17',
+  'N-E': 'U16',
+};
+/** 沿出彎段進入深度（W-S：D17 南向） */
+const TURN_EXIT_SEGMENT_FRAC = 0.22;
+/** 轉彎：先對齊出彎軸（x 或 y），再沿另一軸深入，避免斜切到相鄰軌道 */
+const TURN_AXIS_SECOND_DELAY = 0.42;
+
+function smoothstep01(t) {
+  const u = clamp01(t);
+  return u * u * (3 - 2 * u);
+}
+
+function sampleTurnAxisPath(start, end, te, primaryAxis) {
+  const delay = TURN_AXIS_SECOND_DELAY;
+  if (primaryAxis === 'x') {
+    const xT = Math.min(1, te / delay);
+    const yT = te <= delay ? 0 : (te - delay) / (1 - delay);
+    return {
+      x: start.x + (end.x - start.x) * smoothstep01(xT),
+      y: start.y + (end.y - start.y) * smoothstep01(yT),
+    };
+  }
+  if (primaryAxis === 'y') {
+    const yT = Math.min(1, te / delay);
+    const xT = te <= delay ? 0 : (te - delay) / (1 - delay);
+    return {
+      x: start.x + (end.x - start.x) * smoothstep01(xT),
+      y: start.y + (end.y - start.y) * smoothstep01(yT),
+    };
+  }
+  return { x: end.x, y: end.y };
+}
+
+function sampleTurnPath(path, eased, fromHeading, toHeading) {
+  const key = turnArcKey(fromHeading, toHeading);
+  const start = { x: path.startX, y: path.startY };
+  const end = { x: path.endX, y: path.endY };
+  if (key === 'W-S' || key === 'W-N') {
+    return sampleTurnAxisPath(start, end, eased, 'x');
+  }
+  if (key === 'S-E' || key === 'N-E') {
+    return sampleTurnAxisPath(start, end, eased, 'y');
+  }
+  return sampleTurnBezier(path, eased);
+}
+
+function sampleTurnHeadingForPath(event, eased) {
+  const key = turnArcKey(event.fromHeading, event.toHeading);
+  const delay = TURN_AXIS_SECOND_DELAY;
+  if (key === 'W-S' || key === 'W-N' || key === 'S-E' || key === 'N-E') {
+    if (eased <= delay) return event.fromHeading;
+    const local = (eased - delay) / (1 - delay);
+    return lerpAngleSweep(event.fromHeading, event.headingSweepRad, local);
+  }
+  return lerpAngleSweep(event.fromHeading, event.headingSweepRad, eased);
+}
+
+function turnArcKey(fromHeading, toHeading) {
+  return `${headingCardinalLabel(fromHeading)}-${headingCardinalLabel(toHeading)}`;
+}
+
+function turnExitPoint(junctionX, junctionY, fromHeading, toHeading) {
+  const key = turnArcKey(fromHeading, toHeading);
+  const code = TURN_EXIT_TRACK[key];
+  const box = code ? TRACK[code] : null;
+  const f = TURN_EXIT_SEGMENT_FRAC;
+  if (box) {
+    const cx = (box.xMinM + box.xMaxM) / 2;
+    const cy = (box.yMinM + box.yMaxM) / 2;
+    if (key === 'W-S') {
+      return { x: cx, y: box.yMinM + (box.yMaxM - box.yMinM) * f };
+    }
+    if (key === 'S-E') {
+      return { x: box.xMinM + (box.xMaxM - box.xMinM) * f, y: cy };
+    }
+    if (key === 'W-N') {
+      return { x: uColumnCenterX(), y: junctionY - LEN * f };
+    }
+    if (key === 'N-E') {
+      return { x: box.xMinM + (box.xMaxM - box.xMinM) * f, y: cy };
+    }
+  }
+  const label = headingCardinalLabel(toHeading);
+  if (label === 'S') return { x: junctionX, y: junctionY + LEN * f };
+  if (label === 'N') return { x: junctionX, y: junctionY - LEN * f };
+  if (label === 'E') return { x: junctionX + LEN * f, y: junctionY };
+  if (label === 'W') return { x: junctionX - LEN * f, y: junctionY };
+  return { x: junctionX, y: junctionY };
+}
+
+function turnBezierControl(start, end, fromHeading, toHeading) {
+  const key = turnArcKey(fromHeading, toHeading);
+  if (key === 'W-S' || key === 'W-N') {
+    return {
+      x: end.x + (start.x - end.x) * 0.22,
+      y: start.y + (end.y - start.y) * 0.48,
+    };
+  }
+  if (key === 'S-E' || key === 'N-E') {
+    return {
+      x: start.x + (end.x - start.x) * 0.48,
+      y: end.y + (start.y - end.y) * 0.22,
+    };
+  }
+  return { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+}
+
+function turnApproachStart(junctionX, junctionY, fromHeading) {
+  const label = headingCardinalLabel(fromHeading);
+  const f = TURN_START_SEGMENT_FRAC;
+  const along = LEN * f;
+  if (label === 'W') {
+    const westBound = Math.floor(junctionX / LEN) * LEN;
+    return { x: westBound + along, y: junctionY };
+  }
+  if (label === 'E') {
+    const westBound = Math.floor(junctionX / LEN) * LEN;
+    return { x: westBound + LEN * (1 - f), y: junctionY };
+  }
+  if (label === 'S') {
+    /** 南向進彎：起點須在 junction 北側（沿 D 柱下行），不可用格線 northBound+2/3 以免越過 T3 彎道 */
+    return { x: junctionX, y: junctionY - LEN * (1 - f) };
+  }
+  if (label === 'N') {
+    const northBound = Math.floor(junctionY / LEN) * LEN;
+    return { x: junctionX, y: northBound + LEN * (1 - f) };
+  }
+  return { x: junctionX, y: junctionY };
+}
+
+function resolveInnerTurnArc(junctionX, junctionY, fromHeading, toHeading) {
+  const key = turnArcKey(fromHeading, toHeading);
+  if (!TURN_EXIT_TRACK[key] && headingCardinalLabel(fromHeading) == null) {
+    return {
+      startX: junctionX,
+      startY: junctionY,
+      endX: junctionX,
+      endY: junctionY,
+      ctrlX: junctionX,
+      ctrlY: junctionY,
+      pivot: true,
+    };
+  }
+  const start = turnApproachStart(junctionX, junctionY, fromHeading);
+  const exit = turnExitPoint(junctionX, junctionY, fromHeading, toHeading);
+  const ctrl = turnBezierControl(start, exit, fromHeading, toHeading);
+  return {
+    startX: start.x,
+    startY: start.y,
+    endX: exit.x,
+    endY: exit.y,
+    ctrlX: ctrl.x,
+    ctrlY: ctrl.y,
+    pivot: false,
+  };
+}
+
+function sampleTurnBezier(path, t) {
+  const u = clamp01(t);
+  const o = 1 - u;
+  return {
+    x: o * o * path.startX + 2 * o * u * path.ctrlX + u * u * path.endX,
+    y: o * o * path.startY + 2 * o * u * path.ctrlY + u * u * path.endY,
+  };
+}
+
 function dUpperCenter(n) {
   const xMax = 900 - (n - 1) * LEN;
   return {
@@ -1398,6 +1663,17 @@ function uUpperCenter(n) {
   };
 }
 
+/** 東向進 N2W上行：僅跑中心仍在 dockX 以西的 U 段，避免 U01 過站再倒車 */
+function uUpperCentersEastboundBeforeDock(dockX) {
+  const out = [];
+  for (let n = 16; n >= 1; n -= 1) {
+    const st = uUpperCenter(n);
+    if (st.x > dockX + 0.5) continue;
+    out.push(st);
+  }
+  return out;
+}
+
 function trackCenter(trackCode) {
   const box = TRACK[trackCode];
   if (!box) return null;
@@ -1412,22 +1688,25 @@ function dwellDurationMs() {
   return DOCKING_DWELL_MS;
 }
 
+function dwellPhaseBounds() {
+  const openStart = STOP_SETTLE_MS;
+  const openEnd = openStart + DOOR_SYNC_OPEN_MS;
+  const dwellHoldEnd = openEnd + STATION_DWELL_MS;
+  const doorCloseEnd = dwellHoldEnd + DOOR_CLOSE_MS;
+  const psdCloseEnd = doorCloseEnd + PSD_CLOSE_MS;
+  return { openStart, openEnd, dwellHoldEnd, doorCloseEnd, psdCloseEnd };
+}
+
 function psdOpenPercentAtDwellMs(elapsedInEvent) {
   if (elapsedInEvent <= 0) return 0;
-  const psdOpenEnd = PSD_OPEN_MS;
-  const vehicleDoorOpenEnd = PSD_OPEN_MS + DOOR_OPEN_MS;
-  const dwellEnd = vehicleDoorOpenEnd + STATION_DWELL_MS;
-  const psdCloseStart = dwellEnd;
-  const psdCloseEnd = psdCloseStart + PSD_CLOSE_MS;
-
-  if (elapsedInEvent < psdOpenEnd) {
-    return Math.round((elapsedInEvent / PSD_OPEN_MS) * 100);
+  const { openStart, openEnd, dwellHoldEnd, doorCloseEnd, psdCloseEnd } = dwellPhaseBounds();
+  if (elapsedInEvent < openStart) return 0;
+  if (elapsedInEvent < openEnd) {
+    return Math.round(((elapsedInEvent - openStart) / DOOR_SYNC_OPEN_MS) * 100);
   }
-  if (elapsedInEvent < psdCloseStart) {
-    return 100;
-  }
+  if (elapsedInEvent < doorCloseEnd) return 100;
   if (elapsedInEvent < psdCloseEnd) {
-    return Math.round((1 - (elapsedInEvent - psdCloseStart) / PSD_CLOSE_MS) * 100);
+    return Math.round((1 - (elapsedInEvent - doorCloseEnd) / PSD_CLOSE_MS) * 100);
   }
   return 0;
 }
@@ -1442,6 +1721,8 @@ function travelEvent(x0, y0, x1, y1, heading, durationMs, options = {}) {
     heading,
     durationMs,
     approachTurnTo: options.approachTurnTo ?? null,
+    /** 進站前減速至完全停止（ease-out，終點速度為 0） */
+    easeOutStop: options.easeOutStop ?? false,
   };
 }
 
@@ -1506,18 +1787,43 @@ function appendStationRun(timeline, start, stations, heading) {
   return { x: cx, y: cy };
 }
 
-function appendAxisAlignedTravel(timeline, x0, y0, x1, y1, primaryHeading, durationMs) {
+/** 僅跑進指定站點列表中、沿 heading 方向已越過起點的段（避免停靠點在段西側時先回頭） */
+function appendStationRunAhead(timeline, start, stations, heading) {
+  const ahead =
+    heading === HEADING.WEST
+      ? stations.filter((st) => st.x <= start.x + 0.5)
+      : heading === HEADING.EAST
+        ? stations.filter((st) => st.x >= start.x - 0.5)
+        : heading === HEADING.SOUTH
+          ? stations.filter((st) => st.y >= start.y - 0.5)
+          : heading === HEADING.NORTH
+            ? stations.filter((st) => st.y <= start.y + 0.5)
+            : stations;
+  if (ahead.length === 0) return { x: start.x, y: start.y };
+  return appendStationRun(timeline, start, ahead, heading);
+}
+
+function appendAxisAlignedTravel(
+  timeline,
+  x0,
+  y0,
+  x1,
+  y1,
+  primaryHeading,
+  durationMs,
+  options = {},
+) {
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
   if (dx < 0.5 && dy < 0.5) return;
 
   if (dx < 0.5) {
     const vHeading = y1 >= y0 ? HEADING.SOUTH : HEADING.NORTH;
-    appendTravelWithSignalStops(timeline, x0, y0, x1, y1, vHeading, durationMs);
+    appendTravelWithSignalStops(timeline, x0, y0, x1, y1, vHeading, durationMs, options);
     return;
   }
   if (dy < 0.5) {
-    appendTravelWithSignalStops(timeline, x0, y0, x1, y1, primaryHeading, durationMs);
+    appendTravelWithSignalStops(timeline, x0, y0, x1, y1, primaryHeading, durationMs, options);
     return;
   }
 
@@ -1532,13 +1838,13 @@ function appendAxisAlignedTravel(timeline, x0, y0, x1, y1, primaryHeading, durat
   if (horizontalFirst) {
     appendTravelWithSignalStops(timeline, x0, y0, x1, y0, primaryHeading, midMs);
     const vHeading = y1 >= y0 ? HEADING.SOUTH : HEADING.NORTH;
-    appendTravelWithSignalStops(timeline, x1, y0, x1, y1, vHeading, remainMs);
+    appendTravelWithSignalStops(timeline, x1, y0, x1, y1, vHeading, remainMs, options);
     return;
   }
 
   appendTravelWithSignalStops(timeline, x0, y0, x0, y1, primaryHeading, midMs);
   const hHeading = x1 >= x0 ? HEADING.EAST : HEADING.WEST;
-  appendTravelWithSignalStops(timeline, x0, y1, x1, y1, hHeading, remainMs);
+  appendTravelWithSignalStops(timeline, x0, y1, x1, y1, hHeading, remainMs, options);
 }
 
 function appendDockingDwell(
@@ -1549,20 +1855,33 @@ function appendDockingDwell(
   travelMs = INTER_STATION_TRAVEL_MS,
   dwellLabel,
 ) {
+  const dx = docking.x - from.x;
+  const dy = docking.y - from.y;
+  const approachHeading =
+    Math.abs(dx) >= Math.abs(dy)
+      ? dx >= 0
+        ? HEADING.EAST
+        : HEADING.WEST
+      : dy >= 0
+        ? HEADING.SOUTH
+        : HEADING.NORTH;
   appendAxisAlignedTravel(
     timeline,
     from.x,
     from.y,
     docking.x,
     docking.y,
-    travelHeading,
+    approachHeading,
     travelMs,
+    { easeOutStop: true },
   );
   timeline.push(
     dwellEvent({
       x: docking.x,
       y: docking.y,
       heading: docking.heading,
+      station: dwellLabel || docking.station || docking.name || docking.id,
+      stationId: docking.stationId,
       track: dwellLabel || docking.station || docking.name || docking.id,
     }),
   );
@@ -1570,8 +1889,41 @@ function appendDockingDwell(
 }
 
 function appendCornerEntry(timeline, x0, y0, x1, y1, fromHeading, toHeading, entryMs = COLUMN_ENTRY_MS) {
-  timeline.push(travelEvent(x0, y0, x1, y1, fromHeading, entryMs));
+  const path = resolveInnerTurnArc(x1, y1, fromHeading, toHeading);
+  const dist = Math.hypot(x0 - path.startX, y0 - path.startY);
+  if (dist > 0.5) {
+    const ms = Math.min(entryMs, Math.max(600, Math.round((dist / 6) * 1000)));
+    timeline.push(travelEvent(x0, y0, path.startX, path.startY, fromHeading, ms));
+  }
   timeline.push(turnEvent(x1, y1, fromHeading, toHeading));
+  return { x: path.endX, y: path.endY };
+}
+
+/** 直行到進彎段 2/3 點後立即 turn（不在段底硬轉） */
+function appendApproachToTurn(timeline, pos, junctionX, junctionY, fromHeading, toHeading) {
+  const path = resolveInnerTurnArc(junctionX, junctionY, fromHeading, toHeading);
+  const dist = Math.hypot(pos.x - path.startX, pos.y - path.startY);
+  if (dist > 0.5) {
+    const ms = Math.min(INTER_STATION_TRAVEL_MS, Math.max(600, Math.round((dist / 6) * 1000)));
+    appendTravelWithSignalStops(
+      timeline,
+      pos.x,
+      pos.y,
+      path.startX,
+      path.startY,
+      fromHeading,
+      ms,
+    );
+  }
+  return appendCornerEntry(
+    timeline,
+    path.startX,
+    path.startY,
+    junctionX,
+    junctionY,
+    fromHeading,
+    toHeading,
+  );
 }
 
 /** 號誌固定 5s、停靠固定 36s，其餘事件等比縮放至 leg 總長 6 分鐘 */
@@ -1628,24 +1980,28 @@ function rule1StartOnDTrack(n2wDown) {
   return dockOnTrackFamily(n2wDown, 'D');
 }
 
-/** 將地圖停靠點 ref 對齊到指定軌道族正線（優先使用地圖 ref 座標） */
+/**
+ * 停靠點停站座標：直接使用地圖 DockingPoint refFieldXM/refFieldYM（站點名稱如 S2W下行）。
+ * T3 僅 X 對齊 D/U 柱心；其餘僅在 refFieldY 明顯偏離正線時才 snap 至軌道族 Y。
+ */
 function dockOnTrackFamily(docking, family) {
+  let x = docking.x;
+  let y = docking.y;
   if (docking.station === 'T3') {
     const colX = family === 'D' ? dColumnCenterX() : uColumnCenterX();
     return { x: colX, y: docking.y, heading: docking.heading };
   }
-  const targetY =
-    family === 'D'
-      ? docking.station === 'S2W'
-        ? D_LOWER_LANE_Y
-        : D_UPPER_LANE_Y
-      : docking.station === 'S2W'
-        ? U_LOWER_LANE_Y
-        : U_UPPER_LANE_Y;
-  if (Math.abs(docking.y - targetY) <= 2) {
-    return { x: docking.x, y: docking.y, heading: docking.heading };
+  if (docking.station === 'S2W') {
+    const laneY = family === 'D' ? D_LOWER_LANE_Y : U_LOWER_LANE_Y;
+    if (Math.abs(y - laneY) > 2) y = laneY;
+    return { x, y, heading: docking.heading };
   }
-  return { x: docking.x, y: targetY, heading: docking.heading };
+  if (docking.station === 'N2W') {
+    const laneY = family === 'D' ? D_UPPER_LANE_Y : U_UPPER_LANE_Y;
+    if (Math.abs(y - laneY) > 2) y = laneY;
+    return { x, y, heading: docking.heading };
+  }
+  return { x, y, heading: docking.heading };
 }
 
 function isDockingTrackLabel(label) {
@@ -1705,7 +2061,7 @@ function resolveMotionTrack(x, y, fallback, trackFamily) {
   return code ?? fallback ?? classifyT3FieldTrack(x, y);
 }
 
-/** 規則1：全程 D 軌道（N2W下行 → D02–D18 → T3下行 → D20–D34 → S2W下行） */
+/** 規則1：全程 D 軌道（N2W下行 → D01–D16 → T3下行 → D20–D33 → S2W下行） */
 function buildRule1Timeline() {
   const timeline = [];
   const n2wDown = getDockingStopByLabel('N2W下行');
@@ -1719,25 +2075,23 @@ function buildRule1Timeline() {
   pushNamedDockingDwell(timeline, rule1Start, 'N2W下行');
 
   const upperWest = [];
-  for (let n = 2; n <= 16; n++) upperWest.push(dUpperCenter(n));
-  pos = appendStationRun(timeline, pos, upperWest, HEADING.WEST);
+  for (let n = 1; n <= 15; n++) upperWest.push(dUpperCenter(n));
+  pos = appendStationRunAhead(timeline, pos, upperWest, HEADING.WEST);
 
-  appendCornerEntry(
+  pos = appendApproachToTurn(
     timeline,
-    pos.x,
-    pos.y,
+    pos,
     dColX,
     D_UPPER_LANE_Y,
     HEADING.WEST,
     HEADING.SOUTH,
   );
-  pos = { x: dColX, y: D_UPPER_LANE_Y };
 
   const t3DwellY = t3Down.y;
   appendTravelWithSignalStops(
     timeline,
-    dColX,
-    D_UPPER_LANE_Y,
+    pos.x,
+    pos.y,
     dColX,
     t3DwellY,
     HEADING.SOUTH,
@@ -1749,19 +2103,18 @@ function buildRule1Timeline() {
     'T3下行',
   );
 
-  appendTravelWithSignalStops(
+  pos = { x: dColX, y: t3DwellY };
+  pos = appendApproachToTurn(
     timeline,
-    dColX,
-    t3DwellY,
+    pos,
     dColX,
     D_LOWER_LANE_Y,
     HEADING.SOUTH,
-    verticalLegMs,
+    HEADING.EAST,
   );
-  timeline.push(turnEvent(dColX, D_LOWER_LANE_Y, HEADING.SOUTH, HEADING.EAST));
-  pos = { x: dColX, y: D_LOWER_LANE_Y };
 
   const lowerEast = [];
+  /** D20–D33 後直接進 S2W下行停靠點；不可先至 D34 段心 (825) 再倒車 */
   for (let n = 20; n <= 33; n++) lowerEast.push(dLowerCenter(n));
   pos = appendStationRun(timeline, pos, lowerEast, HEADING.EAST);
 
@@ -1778,7 +2131,7 @@ function buildRule1Timeline() {
   return normalizeLegDuration(timeline, TARGET_LEG_DURATION_MS);
 }
 
-/** 規則2：全程 U 軌道（S2W上行 → U34–U18 → T3上行 → U16–U02 → N2W上行） */
+/** 規則2：全程 U 軌道（S2W上行 → U35–U20 → T3上行 → U16–U03 → N2W上行） */
 function buildRule2Timeline() {
   const timeline = [];
   const s2wUp = getDockingStopByLabel('S2W上行');
@@ -1792,39 +2145,25 @@ function buildRule2Timeline() {
   pushNamedDockingDwell(timeline, s2wStart, 'S2W上行');
 
   pos = rejoinLaneY(timeline, pos, U_LOWER_LANE_Y, HEADING.WEST);
-  if (pos.x < uLowerCenter(34).x - 0.5) {
-    appendTravelWithSignalStops(
-      timeline,
-      pos.x,
-      pos.y,
-      uLowerCenter(34).x,
-      U_LOWER_LANE_Y,
-      HEADING.EAST,
-      INTER_STATION_TRAVEL_MS,
-    );
-    pos = { x: uLowerCenter(34).x, y: U_LOWER_LANE_Y };
-  }
 
   const lowerWest = [];
-  for (let n = 34; n >= 20; n--) lowerWest.push(uLowerCenter(n));
-  pos = appendStationRun(timeline, pos, lowerWest, HEADING.WEST);
+  for (let n = 35; n >= 20; n--) lowerWest.push(uLowerCenter(n));
+  pos = appendStationRunAhead(timeline, pos, lowerWest, HEADING.WEST);
 
-  appendCornerEntry(
+  pos = appendApproachToTurn(
     timeline,
-    pos.x,
-    pos.y,
+    pos,
     uColX,
     U_LOWER_LANE_Y,
     HEADING.WEST,
     HEADING.NORTH,
   );
-  pos = { x: uColX, y: U_LOWER_LANE_Y };
 
   const t3DwellY = t3Up.y;
   appendTravelWithSignalStops(
     timeline,
-    uColX,
-    U_LOWER_LANE_Y,
+    pos.x,
+    pos.y,
     uColX,
     t3DwellY,
     HEADING.NORTH,
@@ -1836,23 +2175,23 @@ function buildRule2Timeline() {
     'T3上行',
   );
 
+  const northEastArc = resolveInnerTurnArc(uColX, U_UPPER_LANE_Y, HEADING.NORTH, HEADING.EAST);
   appendTravelWithSignalStops(
     timeline,
     uColX,
     t3DwellY,
-    uColX,
-    U_UPPER_LANE_Y,
+    northEastArc.startX,
+    northEastArc.startY,
     HEADING.NORTH,
     verticalLegMs,
   );
   timeline.push(turnEvent(uColX, U_UPPER_LANE_Y, HEADING.NORTH, HEADING.EAST));
-  pos = { x: uColX, y: U_UPPER_LANE_Y };
-
-  const upperEast = [];
-  for (let n = 16; n >= 3; n--) upperEast.push(uUpperCenter(n));
-  pos = appendStationRun(timeline, pos, upperEast, HEADING.EAST);
+  pos = { x: northEastArc.endX, y: northEastArc.endY };
 
   const n2wDock = dockOnTrackFamily(n2wUp, 'U');
+  const upperEast = uUpperCentersEastboundBeforeDock(n2wDock.x);
+  pos = appendStationRun(timeline, pos, upperEast, HEADING.EAST);
+
   appendDockingDwell(
     timeline,
     pos,
@@ -1873,16 +2212,138 @@ function buildUpTimeline() {
   return buildRule2Timeline();
 }
 
+function getDockingByStationId(stationId) {
+  const id = String(stationId ?? '').trim();
+  if (!id) return null;
+  return T3_DOCKING_STOPS.byStationId?.[id] ?? null;
+}
+
+function inferTravelHeadingBetween(x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? HEADING.EAST : HEADING.WEST;
+  }
+  return dy >= 0 ? HEADING.SOUTH : HEADING.NORTH;
+}
+
+function resolvePlannedRouteTrackFamily(stops) {
+  const first = stops[0];
+  if (first?.label && DOCKING_TRACK_FAMILY[first.label]) {
+    return DOCKING_TRACK_FAMILY[first.label];
+  }
+  const leg = inferLegFromLabel(first?.label) ?? 'down';
+  return leg === 'up' ? 'U' : 'D';
+}
+
+/** 依地圖路線清單 stationIds 建立軌道行進時間軸（站間沿軌道族座標移動） */
+function stationIdsKey(stationIds) {
+  return stationIds.map((id) => String(id).trim()).join(',');
+}
+
+function isSameStationIdSequence(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((id, i) => String(id).trim() === String(b[i]).trim());
+}
+
+/**
+ * 地圖路線若與正線站序一致，直接沿用 buildRule1/2 完整軌道軌跡（含 D01–D33 等段），
+ * 避免站間直線插值導致車輛切過場域道路。
+ */
+function buildPlannedRouteTimeline(stationIds) {
+  const ids = stationIds.map((id) => String(id).trim()).filter(Boolean);
+  if (ids.length < 2) return [];
+
+  if (isSameStationIdSequence(ids, MAINLINE_STATION_IDS_BY_LEG.down)) {
+    return buildRule1Timeline();
+  }
+  if (isSameStationIdSequence(ids, MAINLINE_STATION_IDS_BY_LEG.up)) {
+    return buildRule2Timeline();
+  }
+
+  const stops = ids.map((id) => getDockingByStationId(id)).filter(Boolean);
+  if (stops.length < 2) return [];
+
+  const timeline = [];
+  const family = resolvePlannedRouteTrackFamily(stops);
+  const first = dockOnTrackFamily(stops[0], family);
+  let pos = { x: first.x, y: first.y };
+
+  pushNamedDockingDwell(
+    timeline,
+    first,
+    first.label || first.name || ids[0],
+  );
+
+  for (let i = 1; i < stops.length; i++) {
+    const raw = stops[i];
+    const docked = dockOnTrackFamily(raw, family);
+    pos = appendDockingDwell(
+      timeline,
+      pos,
+      docked,
+      docked.heading ?? inferTravelHeadingBetween(pos.x, pos.y, docked.x, docked.y),
+      INTER_STATION_TRAVEL_MS,
+      docked.label || docked.name || raw.stationId,
+    );
+  }
+
+  return normalizeLegDuration(timeline, TARGET_LEG_DURATION_MS);
+}
+
+function buildPlannedRoutePlan() {
+  const routes = T3_DOCKING_STOPS.plannedRoutes ?? [];
+  const plan = [];
+  for (const route of routes) {
+    const stops = route.stationIds.map((id) => getDockingByStationId(id)).filter(Boolean);
+    const timeline = buildPlannedRouteTimeline(route.stationIds);
+    const durationMs = timelineDurationMs(timeline);
+    if (durationMs <= 0 || stops.length < 2) continue;
+    plan.push({
+      routeId: route.routeId,
+      displayName: route.displayName,
+      stationIds: route.stationIds,
+      timeline,
+      durationMs,
+      trackFamily: resolvePlannedRouteTrackFamily(stops),
+    });
+  }
+  return plan;
+}
+
 const ROUTE_TIMELINE_DOWN = buildDownTimeline();
 const ROUTE_TIMELINE_UP = buildUpTimeline();
+const PLANNED_ROUTE_PLAN = buildPlannedRoutePlan();
+const USE_PLANNED_MAP_ROUTES = PLANNED_ROUTE_PLAN.length > 0;
+const MAP_PLANNED_ROUTES = T3_DOCKING_STOPS.plannedRoutes ?? [];
+
+function resolvePlannedRouteLegAtLocal(localMs) {
+  let cursor = 0;
+  for (let i = 0; i < PLANNED_ROUTE_PLAN.length; i++) {
+    const plan = PLANNED_ROUTE_PLAN[i];
+    if (localMs < cursor + plan.durationMs) {
+      return {
+        plan,
+        planIndex: i,
+        legLocal: localMs - cursor,
+      };
+    }
+    cursor += plan.durationMs;
+  }
+  return null;
+}
 
 function timelineDurationMs(timeline) {
   return timeline.reduce((sum, ev) => sum + ev.durationMs, 0);
 }
 
 const LEG_DURATION_MS = TARGET_LEG_DURATION_MS;
-/** 一趟下行＋上行完整週期 */
-const CYCLE_MS = LEG_DURATION_MS * 2;
+const PLANNED_CYCLE_MS = PLANNED_ROUTE_PLAN.reduce((sum, plan) => sum + plan.durationMs, 0);
+/** 一趟完整週期：地圖路線清單串接，或預設下行＋上行 */
+const CYCLE_MS =
+  USE_PLANNED_MAP_ROUTES && PLANNED_CYCLE_MS > 0
+    ? PLANNED_CYCLE_MS
+    : LEG_DURATION_MS * 2;
 
 /** 舊版比例（文件／測試相容） */
 const SEG1_FRAC = 2.5 / 6;
@@ -1902,7 +2363,8 @@ const ROUTE_SEG_UP = [
 ];
 
 function sampleTravel(event, elapsedInEvent, trackFamily) {
-  const localT = event.durationMs > 0 ? clamp01(elapsedInEvent / event.durationMs) : 1;
+  const rawT = event.durationMs > 0 ? clamp01(elapsedInEvent / event.durationMs) : 1;
+  const localT = event.easeOutStop ? 1 - (1 - rawT) ** 3 : rawT;
   const x = lerp(event.x0, event.x1, localT);
   const y = lerp(event.y0, event.y1, localT);
   let steering_angle = 0;
@@ -1923,6 +2385,7 @@ function sampleTravel(event, elapsedInEvent, trackFamily) {
     operation_actions: [],
     ...zeroDoorOpenPercents(),
     dwelling: false,
+    ease_out_stop: event.easeOutStop ?? false,
     track: resolveMotionTrack(x, y, null, trackFamily),
     eventElapsedMs: elapsedInEvent,
     eventDurationMs: event.durationMs,
@@ -1959,42 +2422,56 @@ function sampleDoorOpenPercents(elapsedInEvent, doorOpenEnd, dwellEnd, doorClose
   return doors;
 }
 
+function sampleSyncedDoorOpenPercents(syncElapsed, syncOpenMs, holdEndSync, closeEndSync) {
+  const doors = {};
+  for (const key of DOOR_OPEN_PERCENT_FIELDS) {
+    if (syncElapsed < syncOpenMs) {
+      doors[key] = Math.round(lerp(0, 100, clamp01(syncElapsed / syncOpenMs)));
+    } else if (syncElapsed < holdEndSync) {
+      doors[key] = 100;
+    } else if (syncElapsed < closeEndSync) {
+      const t = syncElapsed - holdEndSync;
+      doors[key] = Math.round(lerp(100, 0, clamp01(t / DOOR_CLOSE_MS)));
+    } else {
+      doors[key] = 0;
+    }
+  }
+  doors.door_open_percent = Math.max(...DOOR_OPEN_PERCENT_FIELDS.map((k) => doors[k]));
+  return doors;
+}
+
 function sampleDwell(event, elapsedInEvent, trackFamily) {
-  const psdOpenEnd = PSD_OPEN_MS;
-  const doorOpenStart = psdOpenEnd;
-  const doorOpenEnd = doorOpenStart + DOOR_OPEN_MS;
-  const dwellEnd = doorOpenEnd + STATION_DWELL_MS;
-  const psdCloseStart = dwellEnd;
-  const psdCloseEnd = psdCloseStart + PSD_CLOSE_MS;
-  const doorCloseStart = psdCloseEnd;
-  const doorCloseEnd = doorCloseStart + DOOR_CLOSE_MS;
+  const { openStart, openEnd, dwellHoldEnd, doorCloseEnd, psdCloseEnd } = dwellPhaseBounds();
 
   let operation_action = null;
   let operation_actions = [];
-  // 車門：必須晚於月台門開啟
-  const vehicleElapsed = Math.max(0, elapsedInEvent - doorOpenStart);
-  const doorFields = sampleDoorOpenPercents(
-    vehicleElapsed,
-    DOOR_OPEN_MS,
-    DOOR_OPEN_MS + STATION_DWELL_MS,
-    DOOR_OPEN_MS + STATION_DWELL_MS + DOOR_CLOSE_MS,
-  );
+  let doorFields = zeroDoorOpenPercents();
 
-  if (elapsedInEvent < psdOpenEnd) {
-    operation_action = 'psd_open';
-    operation_actions = ['psd_open'];
-  } else if (elapsedInEvent < doorOpenEnd) {
+  if (elapsedInEvent >= openStart && elapsedInEvent < doorCloseEnd) {
+    const syncElapsed = Math.max(0, elapsedInEvent - openStart);
+    doorFields = sampleSyncedDoorOpenPercents(
+      syncElapsed,
+      DOOR_SYNC_OPEN_MS,
+      DOOR_SYNC_OPEN_MS + STATION_DWELL_MS,
+      DOOR_SYNC_OPEN_MS + STATION_DWELL_MS + DOOR_CLOSE_MS,
+    );
+  }
+
+  if (elapsedInEvent < openStart) {
+    operation_action = null;
+    operation_actions = [];
+  } else if (elapsedInEvent < openEnd) {
     operation_action = 'door_open';
     operation_actions = ['psd_open', 'door_open'];
-  } else if (elapsedInEvent < psdCloseStart) {
+  } else if (elapsedInEvent < dwellHoldEnd) {
     operation_action = 'door_open';
     operation_actions = ['psd_open', 'door_open'];
+  } else if (elapsedInEvent < doorCloseEnd) {
+    operation_action = 'door_close';
+    operation_actions = ['door_close'];
   } else if (elapsedInEvent < psdCloseEnd) {
     operation_action = 'psd_close';
     operation_actions = ['psd_close'];
-  } else if (elapsedInEvent < doorCloseEnd) {
-    operation_action = 'door_close';
-    operation_actions = ['psd_close', 'door_close'];
   }
 
   return {
@@ -2007,6 +2484,7 @@ function sampleDwell(event, elapsedInEvent, trackFamily) {
     ...doorFields,
     dwelling: true,
     station: event.station,
+    stationId: event.stationId,
     track: resolveMotionTrack(event.x, event.y, event.station, trackFamily),
     eventElapsedMs: elapsedInEvent,
     eventDurationMs: event.durationMs,
@@ -2017,20 +2495,29 @@ function sampleTurn(event, elapsedInEvent, trackFamily) {
   const localT = event.durationMs > 0 ? clamp01(elapsedInEvent / event.durationMs) : 1;
   const eased = 0.5 - 0.5 * Math.cos(localT * Math.PI);
   const sweep = event.headingSweepRad;
-  const heading = lerpAngleSweep(event.fromHeading, sweep, eased);
+  const heading = sampleTurnHeadingForPath(event, eased);
   const sign = steerSignForSweep(sweep);
   const steering_angle = Math.sin(localT * Math.PI) * MAX_STEER_RAD * sign;
 
+  const path = resolveInnerTurnArc(event.x, event.y, event.fromHeading, event.toHeading);
+  let x = event.x;
+  let y = event.y;
+  if (!path.pivot) {
+    const pt = sampleTurnPath(path, eased, event.fromHeading, event.toHeading);
+    x = pt.x;
+    y = pt.y;
+  }
+
   return {
-    x: event.x,
-    y: event.y,
+    x,
+    y,
     heading,
     steering_angle,
     operation_action: null,
     operation_actions: [],
     ...zeroDoorOpenPercents(),
     dwelling: false,
-    track: resolveMotionTrack(event.x, event.y, null, trackFamily),
+    track: resolveMotionTrack(x, y, null, trackFamily),
     eventElapsedMs: elapsedInEvent,
     eventDurationMs: event.durationMs,
   };
@@ -2142,10 +2629,7 @@ function resolveYardCoords(yardSlot) {
     return { x: slot.x, y: slot.y, heading: slot.heading ?? 0 };
   }
   if (yardSlot.kind === 'park') {
-    const subIndex = typeof yardSlot.subIndex === 'number' ? yardSlot.subIndex : 0;
-    const slot = yardParking().find(
-      (s) => s.id === yardSlot.slotId && (s.subIndex ?? 0) === subIndex,
-    );
+    const slot = yardParking().find((s) => s.id === yardSlot.slotId);
     if (!slot) return null;
     return { x: slot.x, y: slot.y, heading: slot.heading ?? 0 };
   }
@@ -2161,6 +2645,9 @@ function yardStationLabel(yardSlot, vehicleStatus) {
     return `充電等候 ${yardSlot.slotId}`;
   }
   if (yardSlot.kind === 'park') return `臨停 ${yardSlot.slotId}`;
+  if (/^H\d/i.test(yardSlot.slotId)) return `調度 ${yardSlot.slotId}`;
+  if (/^M\d/i.test(yardSlot.slotId)) return `保養 ${yardSlot.slotId}`;
+  if (/^W\d/i.test(yardSlot.slotId)) return `洗車 ${yardSlot.slotId}`;
   return `整備 ${yardSlot.slotId}`;
 }
 
@@ -2182,6 +2669,7 @@ function getVehicleYardMotion(vehicleId) {
   if (!vehicle || vehicle.status === 'on_field') return null;
   const coords = resolveYardCoords(vehicle.yardSlot);
   if (!coords) return null;
+  const slotId = vehicle.yardSlot?.slotId ?? null;
   const station = yardStationLabel(vehicle.yardSlot, vehicle.status);
   const fleetTask = getVehicleFleetTask(vehicleId);
   return motionWithDefaultLights({
@@ -2190,7 +2678,7 @@ function getVehicleYardMotion(vehicleId) {
     progress: 0,
     tripCode: 'YARD',
     directionLabel: station,
-    track: station,
+    track: slotId ?? station,
     yard_slot_id: vehicle.yardSlot?.slotId ?? null,
     ...(typeof vehicle.yardSlot?.subIndex === 'number'
       ? { yard_sub_index: vehicle.yardSlot.subIndex }
@@ -2215,14 +2703,6 @@ function getVehiclePublishMotion(vehicleId, elapsedMs, simStartMs, options = {})
       yard_slot_id: null,
     };
   }
-  const preDeparture = getVehiclePreDepartureMotion(vehicleId, elapsedMs, simStartMs);
-  if (preDeparture) {
-    return {
-      ...preDeparture,
-      fleet_task: 'pre_departure',
-      yard_slot_id: null,
-    };
-  }
   return getVehicleYardMotion(vehicleId);
 }
 
@@ -2237,33 +2717,39 @@ function tripCode(direction, date) {
   return `${direction}${hh}${mm}`;
 }
 
-/** 尚未出發的車輛：固定於規則1起點 N2W下行 */
-function getVehiclePreDepartureMotion(vehicleId, elapsedMs, simStartMs) {
-  const vehicle = getActiveFleet().find((v) => v.id === vehicleId);
-  if (!vehicle) return null;
-  const offsetMs = vehicle.offsetMin * 60 * 1000;
+/** 已排班、尚未上場：仍在 P1–P4 臨停（供訂單／SQL 推算班次，不作地圖座標） */
+function getScheduledSlotPendingInfo(vehicleId, elapsedMs, simStartMs) {
+  const slot = fleetBatteryState?.slots?.find((s) => s.vehicleId === vehicleId);
+  if (!slot) return null;
+  const offsetMs = slot.offsetMin * 60 * 1000;
   if (elapsedMs >= offsetMs) return null;
-  const n2wDown = getDockingStopByLabel('N2W下行');
-  const rule1Start = rule1StartOnDTrack(n2wDown);
+  const vehicle = fleetBatteryState?.vehicles?.[vehicleId];
+  if (!vehicle || vehicle.status === 'on_field') return null;
   const downDepartMs = simStartMs + offsetMs;
   const remainMs = Math.max(0, offsetMs - elapsedMs);
-  return motionWithDefaultLights({
+  return {
+    tripCode: tripCode('D', new Date(downDepartMs)),
+    legDepartMs: downDepartMs,
+    departEtaSeconds: Math.max(0, remainMs / 1000),
+  };
+}
+
+/** @deprecated 待发車改在 P1–P4；保留供舊呼叫端，不再用於 MQTT 座標 */
+function getVehiclePreDepartureMotion(vehicleId, elapsedMs, simStartMs) {
+  const pending = getScheduledSlotPendingInfo(vehicleId, elapsedMs, simStartMs);
+  if (!pending) return null;
+  const yard = getVehicleYardMotion(vehicleId);
+  if (!yard) return null;
+  return {
+    ...yard,
+    ...pending,
+    preDeparture: true,
+    fleet_task: 'pre_departure',
     active: false,
     leg: 'down',
     progress: 0,
-    tripCode: tripCode('D', new Date(downDepartMs)),
-    legDepartMs: downDepartMs,
-    departEtaSeconds: Math.max(0, Math.ceil(remainMs / 1000)),
-    preDeparture: true,
     directionLabel: '規則1·D線',
-    track: 'N2W下行',
-    x: rule1Start.x,
-    y: rule1Start.y,
-    heading: rule1Start.heading,
-    steering_angle: 0,
-    dwelling: true,
-    station: 'N2W下行',
-  });
+  };
 }
 
 function hasPassedSignalRef(signal, x, y, heading) {
@@ -2309,6 +2795,16 @@ function signalLampPhaseForVehicle(signal, timeline, localMs) {
 }
 
 function getVehicleLegTimeline(localMs) {
+  if (USE_PLANNED_MAP_ROUTES) {
+    const hit = resolvePlannedRouteLegAtLocal(localMs);
+    if (hit) {
+      return {
+        timeline: hit.plan.timeline,
+        legLocal: hit.legLocal,
+        plannedPlan: hit.plan,
+      };
+    }
+  }
   if (localMs < LEG_DURATION_MS) {
     return { timeline: ROUTE_TIMELINE_DOWN, legLocal: localMs };
   }
@@ -2354,6 +2850,38 @@ function getVehicleMotion(vehicleId, elapsedMs, simStartMs, options = {}) {
   const cycleMs = CYCLE_MS;
   const local = (elapsedMs - offsetMs) % cycleMs;
   const cycleIndex = Math.floor((elapsedMs - offsetMs) / cycleMs);
+
+  if (USE_PLANNED_MAP_ROUTES) {
+    const hit = resolvePlannedRouteLegAtLocal(local);
+    if (!hit) return null;
+    const { plan, planIndex, legLocal } = hit;
+    const progress = plan.durationMs > 0 ? legLocal / plan.durationMs : 0;
+    let legCursor = 0;
+    for (let i = 0; i < planIndex; i++) {
+      legCursor += PLANNED_ROUTE_PLAN[i].durationMs;
+    }
+    const legDepartMs = simStartMs + offsetMs + cycleIndex * cycleMs + legCursor;
+    const departDate = new Date(legDepartMs);
+    const directionLetter = planIndex % 2 === 0 ? 'D' : 'U';
+    const pos = motionWithDefaultLights(
+      sampleTimeline(plan.timeline, legLocal, { trackFamily: plan.trackFamily }),
+    );
+    return {
+      active: true,
+      leg: `planned-${planIndex}`,
+      progress,
+      tripCode: tripCode(directionLetter, departDate),
+      plannedRouteId: plan.routeId,
+      plannedRouteName: plan.displayName,
+      plannedStationIds: plan.stationIds,
+      plannedLegDurationMs: plan.durationMs,
+      cycleIndex,
+      legDepartMs,
+      downDepartMs: legDepartMs,
+      directionLabel: plan.displayName,
+      ...pos,
+    };
+  }
 
   const downDepartMs = simStartMs + offsetMs + cycleIndex * cycleMs;
   const upDepartMs = downDepartMs + LEG_DURATION_MS;
@@ -2426,12 +2954,47 @@ function mainlineRouteProgressPercent(progressRaw) {
   return Math.round((p / T3_ARR) * MAINLINE_T3_BAR_PCT);
 }
 
+function fractionalEtaSeconds(remainFrac, legDurationSec) {
+  return Math.max(0, Math.round(remainFrac * legDurationSec * 10) / 10);
+}
+
 function buildPreDepartureCurrentLeg(tripCode, departEtaSeconds) {
-  const eta = Math.max(0, Math.round(Number(departEtaSeconds) || 0));
-  // eta_seconds：到下一站（T3）剩餘時間；待發時為發車倒數
+  const eta = Math.max(0, Math.round(Number(departEtaSeconds) * 10) / 10);
+  const isUp = String(tripCode ?? '').trim().toUpperCase().startsWith('U');
+  const mid = isUp ? 'station_4' : 'station_3';
   return {
-    target_station_id: 'T3',
+    target_station_id: mid,
     distance_to_target_m: 0,
+    eta_seconds: eta,
+    leg_eta_max: Math.max(eta, 1),
+  };
+}
+
+/** 地圖路線清單：依站序與進度推算 current_leg */
+function buildPlannedRouteCurrentLeg(stationIds, progressRaw, legDurationSec) {
+  const progress = Math.max(0, Math.min(1, Number(progressRaw) || 0));
+  const ids = (stationIds ?? []).map((id) => String(id).trim()).filter(Boolean);
+  if (ids.length < 2) {
+    return {
+      target_station_id: ids[0] ?? '',
+      distance_to_target_m: 0,
+      eta_seconds: 0,
+      leg_eta_max: 1,
+    };
+  }
+  const segCount = ids.length - 1;
+  const segWidth = 1 / segCount;
+  const segIndex = Math.min(segCount - 1, Math.floor(progress / segWidth));
+  const targetId = ids[segIndex + 1];
+  const segStart = segIndex * segWidth;
+  const segProgress = segWidth > 0 ? (progress - segStart) / segWidth : 1;
+  const remainFrac = Math.max(0, 1 - segProgress);
+  const segDurationSec = legDurationSec / segCount;
+  const eta = fractionalEtaSeconds(remainFrac, segDurationSec);
+  return {
+    target_station_id: targetId,
+    distance_to_target_m:
+      eta > 0 ? Math.max(0, Number((remainFrac * 140).toFixed(1))) : 0,
     eta_seconds: eta,
     leg_eta_max: Math.max(eta, 1),
   };
@@ -2442,8 +3005,8 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
   const progress = Math.max(0, Math.min(1, Number(progressRaw) || 0));
   const legDurationSec = LEG_DURATION_MS / 1000;
   const isUp = String(tripCode ?? '').trim().toUpperCase().startsWith('U');
-  const mid = 'T3';
-  const dest = isUp ? 'N2W' : 'S2W';
+  const mid = isUp ? 'station_4' : 'station_3';
+  const dest = isUp ? 'station_1' : 'station_5';
   const m = MAINLINE_LEG_MILESTONES;
 
   const legEtaToMid = Math.round(m.T3_ARR * legDurationSec);
@@ -2459,7 +3022,7 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
   }
   if (progress >= m.T3_DEP) {
     const remainFrac = m.TERM_ARR - progress;
-    const eta = Math.max(0, Math.round(remainFrac * legDurationSec));
+    const eta = fractionalEtaSeconds(remainFrac, legDurationSec);
     const dist = eta > 0
       ? Math.max(0, Number(((remainFrac / (m.TERM_ARR - m.T3_DEP)) * MAINLINE_SEGMENT_DIST_M.TO_TERM).toFixed(1)))
       : 0;
@@ -2479,7 +3042,7 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
     };
   }
   const remainFrac = m.T3_ARR - progress;
-  const eta = Math.max(0, Math.round(remainFrac * legDurationSec));
+  const eta = fractionalEtaSeconds(remainFrac, legDurationSec);
   const dist = eta > 0
     ? Math.max(0, Number(((remainFrac / m.T3_ARR) * MAINLINE_SEGMENT_DIST_M.TO_MID).toFixed(1)))
     : 0;
@@ -2493,6 +3056,7 @@ function buildMainlineCurrentLeg(tripCode, progressRaw) {
 
 const motionExports = {
   VEHICLE_POOL,
+  ACTIVE_SLOT_VEHICLE_IDS,
   ACTIVE_SLOT_COUNT,
   SLOT_OFFSETS_MIN,
   getActiveFleet,
@@ -2512,6 +3076,7 @@ const motionExports = {
   motionTrackCode,
   getVehicleMotion,
   getVehiclePreDepartureMotion,
+  getScheduledSlotPendingInfo,
   getVehicleYardMotion,
   getVehiclePublishMotion,
   getVehicleFleetTask,
@@ -2528,6 +3093,8 @@ const motionExports = {
   SEG2_FRAC,
   SEG3_FRAC,
   DOCKING_DWELL_MS,
+  STOP_SETTLE_MS,
+  DOOR_SYNC_OPEN_MS,
   PSD_OPEN_MS,
   PSD_CLOSE_MS,
   STATION_DWELL_MS,
@@ -2535,14 +3102,28 @@ const motionExports = {
   DOOR_CLOSE_MS,
   psdOpenPercentAtDwellMs,
   T3_DOCKING_STOPS,
+  T3_MAIN_MAP_PATH,
+  printDockingStopsAudit,
+  resolveDockStop,
   T3_SIGNAL_REGISTRY,
   DISPATCH_MS,
   TURN_MS,
+  TURN_INNER_RADIUS_M,
+  TURN_START_SEGMENT_FRAC,
+  TURN_EXIT_SEGMENT_FRAC,
+  TURN_EXIT_TRACK,
+  resolveInnerTurnArc,
+  turnApproachStart,
   SIGNAL_WAIT_MS,
   getT3SignalStops: () => T3_SIGNAL_STOPS,
   computeSignalLamps,
   signalsOnTravelSegment,
+  MAINLINE_STATION_IDS_BY_LEG,
+  MAP_PLANNED_ROUTES,
+  PLANNED_ROUTE_PLAN,
+  USE_PLANNED_MAP_ROUTES,
   buildMainlineCurrentLeg,
+  buildPlannedRouteCurrentLeg,
   mainlineRouteProgressPercent,
   MAINLINE_LEG_MILESTONES,
   buildPreDepartureCurrentLeg,

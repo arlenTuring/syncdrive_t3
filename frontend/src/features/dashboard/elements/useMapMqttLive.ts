@@ -4,7 +4,9 @@ import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { acquireSocket, releaseSocket } from './socketManager';
-import { useDemoSimulation } from '../context/DemoSimulationContext';
+import { useDemoSimulationLiveClearEpoch, useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
+import { useVehicleFleetMqttHubContext } from '../context/VehicleFleetMqttContext';
+import { isVtmsVehicleStreamTopic } from '../utils/vtmsTopic';
 import { createMapMqttIngestPipeline } from './mapMqttIngestPipeline';
 
 export type MapMqttLiveState = {
@@ -15,22 +17,29 @@ export type MapMqttLiveState = {
 /**
  * 圖台容器：訂閱 Area MQTT，更新設施 live 狀態與 Area 內車輛座標。
  *
- * 效能策略（不降低 MQTT / DB 頻率）：
- * - Socket 訊息 → ingest 緩衝（不觸發 React）
- * - requestAnimationFrame 每幀最多一次 setState
- * - 視覺狀態未變的載具重用物件參考，避免 11 台車重繪連鎖
+ * 效能策略：
+ * - VTMS 車輛：VehicleFleetMqttHub 單點訂閱 → hub.tick 驅動 ingest（不再 socket.onAny 重複消化）
+ * - 設施 / syncdrive：socket.onAny 僅處理非 VTMS topic
+ * - requestAnimationFrame 每幀最多一次 flush
+ * - live / vehicles 分開 setState，避免不必要的整棵樹重繪
+ * - pause / liveClearEpoch：reset pipeline 並清空 React 快照
  */
 export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   const [liveById, setLiveById] = useState<Record<string, MqttLiveEntry>>({});
   const [areaVehicles, setAreaVehicles] = useState<AreaVehicleLive[]>([]);
-  const { liveClearEpoch } = useDemoSimulation();
+  const liveClearEpoch = useDemoSimulationLiveClearEpoch();
+  const paused = useDemoSimulationPaused();
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const fleetHub = useVehicleFleetMqttHubContext();
+  const ingestCountRef = useRef(0);
 
   const pipelineRef = useRef<ReturnType<typeof createMapMqttIngestPipeline> | null>(null);
 
   useEffect(() => {
     const pipeline = createMapMqttIngestPipeline((snapshot) => {
-      setLiveById(snapshot.liveById);
-      setAreaVehicles(snapshot.areaVehicles);
+      if (snapshot.liveChanged) setLiveById(snapshot.liveById);
+      if (snapshot.vehiclesChanged) setAreaVehicles(snapshot.areaVehicles);
     });
     pipelineRef.current = pipeline;
     return () => {
@@ -46,8 +55,20 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   }, [liveClearEpoch]);
 
   useEffect(() => {
+    if (!paused) return;
+    pipelineRef.current?.reset();
+    setLiveById({});
+    setAreaVehicles([]);
+  }, [paused]);
+
+  useEffect(() => {
     pipelineRef.current?.setAreas(areas);
   }, [areas]);
+
+  useEffect(() => {
+    if (paused || areas.length === 0 || !fleetHub) return;
+    pipelineRef.current?.ingestVtmsFromFleetHub(fleetHub.telemetry, fleetHub.operation);
+  }, [fleetHub?.tick, paused, areas]);
 
   useEffect(() => {
     if (areas.length === 0) return undefined;
@@ -58,20 +79,37 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
     const socket = acquireSocket(ds.backendUrl);
 
     const onAnyMessage = (eventName: string, payload: unknown) => {
+      if (pausedRef.current) return;
       if (!eventName.startsWith('mqtt/')) return;
       if (!payload || typeof payload !== 'object') return;
 
       const topic = eventName.slice('mqtt/'.length);
+      if (topic.includes('/health/')) return;
+      if (isVtmsVehicleStreamTopic(topic)) return;
+
       const payloadObj = payload as Record<string, unknown>;
 
+      if (import.meta.env.DEV) ingestCountRef.current += 1;
       pipelineRef.current?.ingest(topic, payloadObj);
     };
 
     socket.onAny(onAnyMessage);
 
+    let statsTimer: ReturnType<typeof setInterval> | undefined;
+    if (import.meta.env.DEV) {
+      statsTimer = setInterval(() => {
+        const n = ingestCountRef.current;
+        ingestCountRef.current = 0;
+        if (n > 0) {
+          console.info(`[MapMqttLive] ~${Math.round(n / 10)} facility msg/s (10s window)`);
+        }
+      }, 10_000);
+    }
+
     return () => {
       socket.offAny(onAnyMessage);
       releaseSocket(ds.backendUrl);
+      if (statsTimer) clearInterval(statsTimer);
     };
   }, [areas]);
 

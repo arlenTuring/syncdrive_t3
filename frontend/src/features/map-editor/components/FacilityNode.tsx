@@ -236,9 +236,12 @@ export const FacilityNode = memo(function FacilityNode({
   const mapExtent = useMapExtent()
   const Icon = PALETTE_ICON_BY_NAME[facility.name]
   const isDockingPoint = facility.type === 'DockingPoint'
+  const isWaypoint = facility.type === 'Waypoint'
   const label = isDockingPoint
     ? resolveDockingPointMapLabel(facility)
-    : facility.customName.trim() || facility.name
+    : isWaypoint
+      ? ''
+      : facility.customName.trim() || facility.name
   const showRot =
     mqttLive?.rotationDeg !== undefined
       ? mqttLive.rotationDeg
@@ -355,7 +358,7 @@ export const FacilityNode = memo(function FacilityNode({
   const useDraggableMapLabel = facilityUsesDraggableMapLabel(facility)
   const poleVisual = isPole ? resolvePoleVisualLayout(nw, nh) : null
   const iconWorld =
-    isDockingPoint || (isFacilityArea && isIconOnlyFacilityArea)
+    isDockingPoint || isWaypoint || (isFacilityArea && isIconOnlyFacilityArea)
       ? Math.max(18, Math.min(nw * 0.88, nh * 0.88))
       : isPole && poleVisual
         ? Math.max(10, Math.min(poleVisual.frameW, poleVisual.frameH))
@@ -364,6 +367,9 @@ export const FacilityNode = memo(function FacilityNode({
           : Math.max(18, Math.min(minDim * 0.76))
   const signalScale = Math.min(nw / 32, nh / 38) * 0.92
   const dockingDotSize = Math.max(10, Math.min(iconWorld * 0.5, 22))
+  const waypointDotSize = Math.round(
+    Math.max(4, Math.min(iconWorld * 0.2, 9)) * 1.1,
+  )
   const labelStyle = getFacilityLabelStyle(facility)
   const labelCss = resolveLabelCss(labelStyle, minDim, facility.type)
   const showLabel = shouldShowFacilityLabel(labelStyle)
@@ -1319,7 +1325,7 @@ export const FacilityNode = memo(function FacilityNode({
           }}
           className={[
             'min-h-0 overflow-visible transition',
-            isPsd || isSignal || isDockingPoint || (isFacilityArea && useDraggableMapLabel)
+            isPsd || isSignal || isDockingPoint || isWaypoint || (isFacilityArea && useDraggableMapLabel)
               ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
               : isPole
                 ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
@@ -1341,7 +1347,7 @@ export const FacilityNode = memo(function FacilityNode({
                     ? 'ring-2 ring-cyan-400/80 bg-zinc-800/95'
                     : 'bg-zinc-800/90 hover:border-zinc-500',
                 ].join(' ')
-              : isPsd || isSignal || isDockingPoint || (isFacilityArea && useDraggableMapLabel)
+              : isPsd || isSignal || isDockingPoint || isWaypoint || (isFacilityArea && useDraggableMapLabel)
                 ? selected
                   ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                   : 'hover:ring-1 hover:ring-cyan-500/40'
@@ -1427,6 +1433,21 @@ export const FacilityNode = memo(function FacilityNode({
                       : 'bg-blue-500 ring-blue-300/70',
                   ].join(' ')}
                   style={{ width: dockingDotSize, height: dockingDotSize }}
+                  aria-hidden
+                />
+              }
+            />
+          ) : isWaypoint ? (
+            <FacilityIconLabelLayout
+              icon={
+                <div
+                  className={[
+                    'shrink-0 rounded-full',
+                    facility.currentState === 'Inactive'
+                      ? 'bg-zinc-500'
+                      : 'bg-emerald-500',
+                  ].join(' ')}
+                  style={{ width: waypointDotSize, height: waypointDotSize }}
                   aria-hidden
                 />
               }
