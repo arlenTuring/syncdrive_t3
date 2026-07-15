@@ -3,23 +3,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
   buildAttributeIntervalLegends,
-  formatMinutesToTime,
   parseStoredTemplateBody,
-  parseTimeToMinutes,
   type TimeSlotAttribute,
   type TimeSlotInterval,
   type ScheduleTask,
 } from '../../time-templates/types/editor';
-import { TimeOfDayPicker } from '../../time-templates/components/TimeOfDayPicker';
 import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import { AttributeLegendBadgeChip } from '../../time-templates/components/AttributeLegendBadgeChip';
 import type { ShiftScheduleCreateDraft, ShiftScheduleSelectedRoute } from '../types/create';
 import { isShiftScheduleOutputFresh } from '../types/create';
-import { applyManualBlockStartAdjustment } from '../utils/adjustShiftSchedulePlan';
 import { buildShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutput';
 import type {
   FeasibilityIssue,
-  GeneratedScheduleBlock,
   GeneratedSchedulePlan,
   ShiftScheduleFeasibilityReport,
   ShiftScheduleStoredOutput,
@@ -75,16 +70,7 @@ function FeasibilityMessages({
   );
 }
 
-function findBlockById(
-  plan: GeneratedSchedulePlan,
-  blockId: string,
-): GeneratedScheduleBlock | null {
-  for (const timeline of plan.timelines) {
-    const found = timeline.blocks.find((block) => block.id === blockId);
-    if (found) return found;
-  }
-  return null;
-}
+
 
 function revalidatePlan(
   plan: GeneratedSchedulePlan,
@@ -146,7 +132,6 @@ export function StepShiftScheduleAdjust({
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [editStartTime, setEditStartTime] = useState('');
   const [highlightedBlockId, setHighlightedBlockId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -159,6 +144,34 @@ export function StepShiftScheduleAdjust({
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current);
       }
+    };
+  }, []);
+
+  const undoRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    undoRef.current = handleUndo;
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const isCmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+      const isUndo = event.key.toLowerCase() === 'z' && isCmdOrCtrl;
+
+      if (isUndo) {
+        event.preventDefault();
+        undoRef.current();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -191,8 +204,18 @@ export function StepShiftScheduleAdjust({
         if (storedOutput.plan) {
           setPlan(storedOutput.plan);
           setReport(storedOutput.feasibilityReport);
-          setHistory([{ plan: storedOutput.plan, report: storedOutput.feasibilityReport }]);
-          setHistoryIndex(0);
+          setHistory((prev) => {
+            if (prev.length === 0) {
+              return [{ plan: storedOutput.plan!, report: storedOutput.feasibilityReport }];
+            }
+            return prev;
+          });
+          setHistoryIndex((prevIndex) => {
+            if (prevIndex === -1) {
+              return 0;
+            }
+            return prevIndex;
+          });
         } else {
           setPlan(null);
           setReport(null);
@@ -221,18 +244,7 @@ export function StepShiftScheduleAdjust({
     shiftId,
   ]);
 
-  const selectedBlock = useMemo(
-    () => (plan && selectedBlockId ? findBlockById(plan, selectedBlockId) : null),
-    [plan, selectedBlockId],
-  );
 
-  useEffect(() => {
-    if (!selectedBlock) {
-      setEditStartTime('');
-      return;
-    }
-    setEditStartTime(formatMinutesToTime(selectedBlock.plannedStartMinute));
-  }, [selectedBlock]);
 
   const periodLegends = useMemo(
     () => buildAttributeIntervalLegends(intervals, attributes),
@@ -287,24 +299,7 @@ export function StepShiftScheduleAdjust({
     }
   };
 
-  const applyStartAdjustment = async () => {
-    if (!plan || !selectedBlockId) return;
-    const newStartMinute = parseTimeToMinutes(editStartTime);
-    if (newStartMinute == null) return;
 
-    const adjusted = applyManualBlockStartAdjustment({
-      plan,
-      blockId: selectedBlockId,
-      newStartMinute,
-      selectedRoutes: draft.routeGroups.selectedRoutes,
-      minimumRecoveryTimeSeconds: draft.routeGroups.minimumRecoveryTimeSeconds ?? 0,
-      intervals,
-      attributes,
-    });
-    if (!adjusted) return;
-
-    pushNewState(adjusted.plan, adjusted.report);
-  };
 
   const handleDeleteBlock = () => {
     if (!plan || !selectedBlockId) return;
@@ -568,39 +563,7 @@ export function StepShiftScheduleAdjust({
         </>
       )}
 
-      {selectedBlock ? (
-        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-3 shrink-0">
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-zinc-500">已選任務</div>
-            <div className="truncate text-sm text-zinc-100">
-              {selectedBlock.label}
-              {selectedBlock.routeName ? ` · ${selectedBlock.routeName}` : ''}
-            </div>
-          </div>
-          <div className="w-[160px]">
-            <div className="mb-1 text-xs text-zinc-500">計畫發車（10 秒刻度）</div>
-            <TimeOfDayPicker
-              label="發車"
-              value={editStartTime}
-              onChange={setEditStartTime}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => void applyStartAdjustment()}
-            className="h-[34px] rounded-lg bg-[#2B7FFF] px-3 text-sm font-medium text-white hover:bg-[#2569e6]"
-          >
-            套用
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedBlockId(null)}
-            className="h-[34px] rounded-lg border border-zinc-700 px-3 text-sm text-zinc-300 hover:bg-zinc-800/60"
-          >
-            取消選取
-          </button>
-        </div>
-      ) : null}
+
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex-1 min-h-0 flex flex-col">
