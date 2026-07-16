@@ -86,6 +86,7 @@ function CreateStepSidebar({
   draft,
   nameUniqueOk,
   turnaroundLimitSeconds,
+  isScheduleInvalidated,
   onBack,
   onDiscard,
   onStepClick,
@@ -95,6 +96,7 @@ function CreateStepSidebar({
   draft: ShiftScheduleCreateDraft;
   nameUniqueOk: boolean;
   turnaroundLimitSeconds: number | null;
+  isScheduleInvalidated: boolean;
   onBack: () => void;
   onDiscard: () => void;
   onStepClick: (step: CreateShiftScheduleStep) => void;
@@ -130,16 +132,19 @@ function CreateStepSidebar({
                 turnaroundLimitSeconds,
               );
             const unlocked = item.step <= maxReachedStep;
+            const isStepLockedByInvalidation = isScheduleInvalidated && item.step >= 5;
+            const canClick = unlocked && !isStepLockedByInvalidation;
+
             return (
               <li key={item.step}>
                 <button
                   type="button"
-                  disabled={!unlocked}
-                  onClick={() => unlocked && onStepClick(item.step)}
+                  disabled={!canClick}
+                  onClick={() => canClick && onStepClick(item.step)}
                   className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
                     active
                       ? 'bg-[rgba(43,127,255,0.12)]'
-                      : unlocked
+                      : canClick
                         ? 'hover:bg-zinc-900/80'
                         : 'cursor-not-allowed opacity-50'
                   }`}
@@ -154,12 +159,20 @@ function CreateStepSidebar({
                     className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${
                       active
                         ? 'bg-[#2B7FFF] text-white'
-                        : completed
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-zinc-800 text-zinc-500'
+                        : isStepLockedByInvalidation
+                          ? 'bg-amber-500 text-zinc-950 font-bold text-xs'
+                          : completed
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-zinc-800 text-zinc-500'
                     }`}
                   >
-                    {completed ? <Check className="size-3.5" strokeWidth={2.5} /> : item.step}
+                    {isStepLockedByInvalidation ? (
+                      '!'
+                    ) : completed ? (
+                      <Check className="size-3.5" strokeWidth={2.5} />
+                    ) : (
+                      item.step
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10px] uppercase tracking-wider text-zinc-600">
@@ -471,6 +484,27 @@ export function CreateShiftSchedulePage({
     return isShiftScheduleStepComplete(draft, nameUnique, turnaroundLimitSeconds);
   }, [draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
 
+  const isScheduleInvalidated = useMemo(() => {
+    return draft.maxReachedStep >= 5 && draft.scheduleOutput === null;
+  }, [draft.maxReachedStep, draft.scheduleOutput]);
+
+  const handleRebuildAndGoToStep5 = async () => {
+    setLoading(true);
+    try {
+      await flushAutoSave();
+      setDraft((prev) => ({
+        ...prev,
+        currentStep: 5,
+        maxReachedStep: Math.max(prev.maxReachedStep, 5) as CreateShiftScheduleStep,
+        scheduleOutput: null,
+      }));
+    } catch (e) {
+      alert('儲存草稿失敗：' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const goToStep = useCallback((step: CreateShiftScheduleStep) => {
     void flushAutoSave().finally(() =>
       setDraft((prev) => ({
@@ -530,6 +564,7 @@ export function CreateShiftSchedulePage({
         draft={draft}
         nameUniqueOk={nameUniqueOk}
         turnaroundLimitSeconds={turnaroundLimitSeconds}
+        isScheduleInvalidated={isScheduleInvalidated}
         onBack={handleBack}
         onDiscard={() => void handleDiscard()}
         onStepClick={(step) => {
@@ -545,6 +580,11 @@ export function CreateShiftSchedulePage({
         <div className="min-h-0 flex-1 overflow-auto p-8">
           <div className="relative flex min-h-full flex-col rounded-2xl border border-zinc-800/80 bg-[#111113] p-8 pt-14">
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
+            {isScheduleInvalidated && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4) && (
+              <div className="mb-6 flex items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400 font-medium shrink-0 animate-pulse">
+                <span>⚠️ 關鍵設定變更，班表已失效，請點擊重新生成按鈕</span>
+              </div>
+            )}
             {loading ? (
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                 <Loader2 className="size-6 animate-spin" />
@@ -614,18 +654,29 @@ export function CreateShiftSchedulePage({
             >
               上一步
             </button>
-            <button
-              type="button"
-              onClick={draft.currentStep === 6 ? handleFinish : handleNext}
-              disabled={!canGoNext || loading || Boolean(loadError)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                canGoNext && !loading && !loadError
-                  ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
-                  : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
-              }`}
-            >
-              {draft.currentStep === 6 ? '儲存建立' : '下一步'}
-            </button>
+            {isScheduleInvalidated && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4) ? (
+              <button
+                type="button"
+                onClick={handleRebuildAndGoToStep5}
+                disabled={loading || Boolean(loadError)}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400 transition"
+              >
+                儲存並重新生成班表
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={draft.currentStep === 6 ? handleFinish : handleNext}
+                disabled={!canGoNext || loading || Boolean(loadError)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  canGoNext && !loading && !loadError
+                    ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
+                    : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
+                }`}
+              >
+                {draft.currentStep === 6 ? '儲存建立' : '下一步'}
+              </button>
+            )}
           </div>
         </footer>
       </div>
