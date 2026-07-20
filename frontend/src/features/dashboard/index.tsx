@@ -410,16 +410,16 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   // ─── 列表視圖 ───
   if (view === 'list') {
     return (
-      <div className="flex flex-col w-full h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
-        <header className="flex items-center gap-3 px-6 h-14 bg-zinc-900 border-b border-zinc-800 shrink-0 z-20">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+        <header className="z-20 flex h-14 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-6">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <div className="flex items-center gap-2.5 text-cyan-400 font-bold text-lg">
+          <div className="flex items-center gap-2.5 text-lg font-bold text-cyan-400">
             <LayoutGrid size={20} />
-            <span>SyncDrive Dashboard</span>
+            <span>儀表板管理</span>
           </div>
           <div className="flex-1" />
           <button onClick={() => setShowSettings(true)}
-            className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
             <Settings size={20} />
           </button>
         </header>
@@ -627,7 +627,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
       enabled={!!activePlane && !editingGroup}
     >
     <FormatPainterProvider value={formatPainterApi}>
-    <div className="flex flex-col w-full h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
 
       {/* ── 頂部工具列（載具內嵌編輯時由 VehicleEditorEmbed 自帶單一工具列） ── */}
       {!editingVehicleContainer && (
