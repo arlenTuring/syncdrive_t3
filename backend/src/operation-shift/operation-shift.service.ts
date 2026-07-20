@@ -181,6 +181,44 @@ export class OperationShiftService {
     return toOperationShiftListItem(saved);
   }
 
+  /**
+   * 參數生成班表 → 複製成手動製作草稿。
+   * 不修改來源資料；新草稿 body.creationMode = 'manual'。
+   */
+  async duplicateAsManualDraft(id: string): Promise<OperationShiftListItem> {
+    const source = await this.getShiftById(id);
+    const sourceBody = source.body ?? {};
+    if (sourceBody.creationMode === 'manual') {
+      throw new BadRequestException('手動製作的班表無法再複製成手動製作');
+    }
+
+    const baseName = source.name.trim() || UNTITLED_OPERATION_SHIFT_NAME;
+    let candidate = `${baseName}(手動)`;
+    let suffix = 2;
+    while (!(await this.isShiftNameUnique(candidate))) {
+      candidate = `${baseName}(手動 ${suffix})`;
+      suffix += 1;
+    }
+
+    const now = String(Date.now());
+    const body: Record<string, unknown> = {
+      ...JSON.parse(JSON.stringify(sourceBody)) as Record<string, unknown>,
+      creationMode: 'manual',
+    };
+    const row = this.repo.create({
+      id: this.generateShiftId(),
+      name: candidate,
+      publishStatus: OperationShiftPublishStatus.DRAFT,
+      usageStatus: OperationShiftUsageStatus.IDLE,
+      body,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const saved = await this.repo.save(row);
+    return toOperationShiftListItem(saved);
+  }
+
   async deleteShift(id: string): Promise<void> {
     const row = await this.getShiftById(id);
     if (row.usageStatus === OperationShiftUsageStatus.IN_USE) {

@@ -1,11 +1,26 @@
 import type { ShiftScheduleStoredOutput } from '../utils/schedule-engine/types';
 import {
+  emptyMaintenanceEntrySlackBySectionInput,
+  normalizeEmptyIntervalMainlineSlackSecondsInput,
+  normalizeMaintenanceEntrySlackBySectionInput,
+  buildMaintenanceEntrySlackFingerprint,
+  parseEmptyIntervalMainlineSlackSeconds,
+  type MaintenanceEntrySlackBySectionInput,
+} from '../utils/resolveMaintenanceEntrySlackSeconds';
+import {
+  emptyMaintenanceSectionCodeBySection,
+  normalizeMaintenanceSectionCodeBySection,
+  buildMaintenanceSectionCodeFingerprint,
+  isMaintenanceSectionCodesComplete,
+  type MaintenanceSectionCodeBySection,
+} from '../utils/maintenanceSectionCode';
+import {
   SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS,
-  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_PERCENT,
+  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_SECONDS,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
   SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS,
   normalizeSwitchBufferAfterSeconds,
-  normalizeDwellSlackPercent,
+  normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
   snapUpToClockAlignSeconds,
@@ -18,17 +33,18 @@ import {
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
   resolveNextRouteInExecutionOrder,
+  resolveInterTripGapSeconds,
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
 } from '../utils/schedule-engine/physics';
 
 export {
   SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS,
-  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_PERCENT,
+  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_SECONDS,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
   SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS,
   normalizeSwitchBufferAfterSeconds,
-  normalizeDwellSlackPercent,
+  normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
   snapUpToClockAlignSeconds,
@@ -41,6 +57,7 @@ export {
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
   resolveNextRouteInExecutionOrder,
+  resolveInterTripGapSeconds,
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
 };
@@ -76,22 +93,52 @@ export type ShiftScheduleBasicDraft = {
   remarks: string;
 };
 
+/** 參數生成（引擎）或手動製作（拖拉班次卡） */
+export type ShiftScheduleCreationMode = 'parametric' | 'manual';
+
 export type ShiftScheduleMaintenanceTaskDraft = {
   taskId: string;
   taskName: string;
   /** 略過整備任務設定時為 true */
   skipped: boolean;
+  /**
+   * 各整備區塊的正線優先讓渡餘裕（秒，字串表單值）。
+   * 屬班表策略參數，不寫入整備任務本體；手動製作可不填。
+   */
+  entrySlackBySection: MaintenanceEntrySlackBySectionInput;
+  /**
+   * 各整備區塊代號（1–2 大寫英文字母，無預設）。
+   * 班次代號 = 整備代號 + 列碼(A/B/C…) + 開始 HHMM。
+   */
+  sectionCodeBySection: MaintenanceSectionCodeBySection;
+  /** 選定整備任務各區塊是否啟用（載入 detail 後寫入，供代號必填判斷） */
+  sectionEnabled: {
+    charging: boolean;
+    carWash: boolean;
+    maintenance: boolean;
+    preTrip: boolean;
+    mobile: boolean;
+  };
 };
 
 export type ShiftScheduleTimeTemplateDraft = {
   templateId: string;
   templateName: string;
+  /**
+   * 空時段正線讓渡餘裕（秒）。僅當時間模板全日有未排定時間屬性的空時段時使用；
+   * 無空時段時可忽略（預設仍為 600）。
+   */
+  emptyIntervalMainlineSlackSeconds: string;
 };
 
 import type { TaskTypeKey } from '../../time-templates/types/editor';
 import {
   resolveRouteTravelTimesFromBody,
 } from '../../map-editor/utils/routePlanning';
+import {
+  parseStationLegTravels,
+  type ShiftScheduleStationLegTravel,
+} from '../utils/stationLegTravel';
 
 /** 單一站點停靠時間（班表 Step 4） */
 export type ShiftScheduleStationDwell = {
@@ -101,9 +148,12 @@ export type ShiftScheduleStationDwell = {
   dwellSeconds: number | null;
 };
 
+export type { ShiftScheduleStationLegTravel };
+
 export type ShiftScheduleSelectedRoute = {
   routeId: string;
   routeName: string;
+  /** 路線代號（必填）：班次卡／衝突訊息顯示用，非固定 D／U */
   routeCode?: string | null;
   groupId: string;
   groupName: string;
@@ -111,6 +161,11 @@ export type ShiftScheduleSelectedRoute = {
   stationDwells: ShiftScheduleStationDwell[];
   /** 各站停靠時間已確認鎖定 */
   stationDwellsConfirmed: boolean;
+  /**
+   * 相鄰站間行駛時間（由地圖點位拓撲展開快照）。
+   * 完整時引擎／站點時刻以此為準；缺省則回退整線 avg/min 與均分估算。
+   */
+  stationLegTravels: ShiftScheduleStationLegTravel[];
   avgTravelTimeSeconds: number | null;
   minTravelTimeSeconds: number | null;
   /** 執行順序（1 起算，跨所有已選路線）；排班時同任務類型依此順序輪替 */
@@ -121,10 +176,10 @@ export type ShiftScheduleSelectedRoute = {
    */
   switchBufferAfterSeconds: number;
   /**
-   * 靠站緩衝百分比（路線局域）。有效停靠 = 停靠 × (1 + 緩衝%)。
+   * 靠站緩衝秒數（路線局域）。各站有效停靠 = 停靠 + 緩衝秒數（停靠為 0 時不加）。
    * 用於吸收開關門硬體延遲與靠站作業緩衝。
    */
-  dwellSlackPercent: number;
+  dwellSlackSeconds: number;
 };
 
 export type ShiftScheduleRouteGroupsDraft = {
@@ -137,6 +192,8 @@ export type ShiftScheduleRouteGroupsDraft = {
 };
 
 export type ShiftScheduleCreateDraft = {
+  /** 參數生成 | 手動製作 */
+  creationMode: ShiftScheduleCreationMode;
   basic: ShiftScheduleBasicDraft;
   maintenanceTask: ShiftScheduleMaintenanceTaskDraft;
   timeTemplate: ShiftScheduleTimeTemplateDraft;
@@ -147,7 +204,7 @@ export type ShiftScheduleCreateDraft = {
   maxReachedStep: CreateShiftScheduleStep;
 };
 
-export const SHIFT_SCHEDULE_UNTITLED_NAME = '未完成的正線班表';
+export const SHIFT_SCHEDULE_UNTITLED_NAME = '未完成的班表';
 
 export function resolveShiftScheduleDraftName(name: string): string {
   const trimmed = name.trim();
@@ -160,15 +217,37 @@ export function displayShiftScheduleDraftName(storedName: string): string {
   return trimmed;
 }
 
-export function emptyShiftScheduleCreateDraft(): ShiftScheduleCreateDraft {
+export function emptyShiftScheduleCreateDraft(
+  creationMode: ShiftScheduleCreationMode = 'parametric',
+): ShiftScheduleCreateDraft {
   return {
+    creationMode,
     basic: {
       name: '',
       version: '',
       remarks: '',
     },
-    maintenanceTask: { taskId: '', taskName: '', skipped: false },
-    timeTemplate: { templateId: '', templateName: '' },
+    maintenanceTask: {
+      taskId: '',
+      taskName: '',
+      skipped: false,
+      entrySlackBySection: emptyMaintenanceEntrySlackBySectionInput(),
+      sectionCodeBySection: emptyMaintenanceSectionCodeBySection(),
+      sectionEnabled: {
+        charging: false,
+        carWash: false,
+        maintenance: false,
+        preTrip: false,
+        mobile: false,
+      },
+    },
+    timeTemplate: {
+      templateId: '',
+      templateName: '',
+      emptyIntervalMainlineSlackSeconds: normalizeEmptyIntervalMainlineSlackSecondsInput(
+        undefined,
+      ),
+    },
     routeGroups: {
       mapId: '',
       selectedRoutes: [],
@@ -293,16 +372,66 @@ export function shouldInvalidateShiftScheduleOutput(
   prev: ShiftScheduleCreateDraft,
   next: ShiftScheduleCreateDraft,
 ): boolean {
-  if (JSON.stringify(prev.maintenanceTask) !== JSON.stringify(next.maintenanceTask)) {
-    return true;
+  if (!prev.scheduleOutput?.plan) return false;
+
+  // 與產出班表當下比對：語意未變則不失效（避免誤觸或正規化觸發 onChange）
+  if (isShiftScheduleOutputFresh({ ...next, scheduleOutput: prev.scheduleOutput })) {
+    return false;
   }
-  if (JSON.stringify(prev.timeTemplate) !== JSON.stringify(next.timeTemplate)) {
-    return true;
+
+  return true;
+}
+
+export type RouteGroupsCycleSummary = {
+  recoverySeconds: number;
+  totalMinTravelSeconds: number;
+  totalAvgTravelSeconds: number;
+  totalDwellWithSlackSeconds: number;
+  totalSwitchBufferSeconds: number;
+  totalMinCycleSeconds: number;
+  totalAvgCycleSeconds: number;
+};
+
+/** Step 4 通盤循環綜合值（與路線群組步驟底部看板同源） */
+export function summarizeRouteGroupsCycle(
+  routeGroups: ShiftScheduleRouteGroupsDraft,
+): RouteGroupsCycleSummary {
+  const recoverySeconds = normalizeMinimumRecoveryTimeSeconds(
+    routeGroups.minimumRecoveryTimeSeconds,
+  );
+  let totalMinTravelSeconds = 0;
+  let totalAvgTravelSeconds = 0;
+  let totalDwellWithSlackSeconds = 0;
+  let totalSwitchBufferSeconds = 0;
+
+  for (const route of routeGroups.selectedRoutes) {
+    totalMinTravelSeconds += route.minTravelTimeSeconds ?? 0;
+    totalAvgTravelSeconds += route.avgTravelTimeSeconds ?? 0;
+    totalSwitchBufferSeconds += normalizeSwitchBufferAfterSeconds(
+      route.switchBufferAfterSeconds,
+    );
+    for (const dwell of route.stationDwells) {
+      totalDwellWithSlackSeconds += applyDwellSlackSeconds(
+        dwell.dwellSeconds ?? 0,
+        route.dwellSlackSeconds,
+      );
+    }
   }
-  if (JSON.stringify(prev.routeGroups) !== JSON.stringify(next.routeGroups)) {
-    return true;
-  }
-  return false;
+
+  const totalMinCycleSeconds =
+    totalMinTravelSeconds + totalDwellWithSlackSeconds + totalSwitchBufferSeconds + recoverySeconds;
+  const totalAvgCycleSeconds =
+    totalAvgTravelSeconds + totalDwellWithSlackSeconds + totalSwitchBufferSeconds + recoverySeconds;
+
+  return {
+    recoverySeconds,
+    totalMinTravelSeconds,
+    totalAvgTravelSeconds,
+    totalDwellWithSlackSeconds,
+    totalSwitchBufferSeconds,
+    totalMinCycleSeconds,
+    totalAvgCycleSeconds,
+  };
 }
 
 export function isShiftScheduleOutputFresh(draft: ShiftScheduleCreateDraft): boolean {
@@ -319,6 +448,47 @@ export function isShiftScheduleOutputFresh(draft: ShiftScheduleCreateDraft): boo
   if (
     !draft.maintenanceTask.skipped
     && output.maintenanceTaskBinding.taskId !== draft.maintenanceTask.taskId.trim()
+  ) {
+    return false;
+  }
+
+  const currentMaintSlackFingerprint = buildMaintenanceEntrySlackFingerprint(
+    draft.maintenanceTask.entrySlackBySection,
+  );
+  const storedMaintSlackFingerprint =
+    output.maintenanceTaskBinding.entrySlackFingerprint;
+  if (
+    draft.creationMode !== 'manual'
+    && (
+      !storedMaintSlackFingerprint
+      || storedMaintSlackFingerprint !== currentMaintSlackFingerprint
+    )
+  ) {
+    return false;
+  }
+
+  const currentSectionCodeFingerprint = buildMaintenanceSectionCodeFingerprint(
+    draft.maintenanceTask.sectionCodeBySection,
+  );
+  const storedSectionCodeFingerprint =
+    output.maintenanceTaskBinding.sectionCodeFingerprint;
+  if (
+    !storedSectionCodeFingerprint
+    || storedSectionCodeFingerprint !== currentSectionCodeFingerprint
+  ) {
+    return false;
+  }
+
+  const currentEmptySlack = parseEmptyIntervalMainlineSlackSeconds(
+    draft.timeTemplate.emptyIntervalMainlineSlackSeconds,
+  );
+  const storedEmptySlack = output.timeTemplateRef.emptyIntervalMainlineSlackSeconds;
+  if (
+    draft.creationMode !== 'manual'
+    && (
+      storedEmptySlack == null
+      || storedEmptySlack !== currentEmptySlack
+    )
   ) {
     return false;
   }
@@ -350,13 +520,24 @@ export function serializeShiftScheduleBody(
 ): Record<string, unknown> {
   return {
     editorVersion: SHIFT_SCHEDULE_BODY_EDITOR_VERSION,
+    creationMode: draft.creationMode,
     version: draft.basic.version,
     remarks: draft.basic.remarks,
     maintenanceTaskId: draft.maintenanceTask.taskId,
     maintenanceTaskName: draft.maintenanceTask.taskName,
     maintenanceTaskSkipped: draft.maintenanceTask.skipped,
+    maintenanceEntrySlackBySection: normalizeMaintenanceEntrySlackBySectionInput(
+      draft.maintenanceTask.entrySlackBySection,
+    ),
+    maintenanceSectionCodeBySection: normalizeMaintenanceSectionCodeBySection(
+      draft.maintenanceTask.sectionCodeBySection,
+    ),
+    maintenanceSectionEnabled: draft.maintenanceTask.sectionEnabled,
     timeTemplateId: draft.timeTemplate.templateId,
     timeTemplateName: draft.timeTemplate.templateName,
+    emptyIntervalMainlineSlackSeconds: normalizeEmptyIntervalMainlineSlackSecondsInput(
+      draft.timeTemplate.emptyIntervalMainlineSlackSeconds,
+    ),
     routeGroupsMapId: draft.routeGroups.mapId,
     selectedRoutes: draft.routeGroups.selectedRoutes,
     minimumRecoveryTimeSeconds: draft.routeGroups.minimumRecoveryTimeSeconds,
@@ -421,19 +602,26 @@ export function parseShiftScheduleSelectedRoutes(raw: unknown): ShiftScheduleSel
     out.push({
       routeId,
       routeName: typeof o.routeName === 'string' ? o.routeName : '',
-      routeCode: typeof o.routeCode === 'string' ? o.routeCode : undefined,
+      routeCode:
+        typeof o.routeCode === 'string' && o.routeCode.trim()
+          ? o.routeCode.trim().toUpperCase()
+          : undefined,
       groupId: typeof o.groupId === 'string' ? o.groupId : '',
       groupName: typeof o.groupName === 'string' ? o.groupName : '',
       stationIds,
       stationDwells,
       stationDwellsConfirmed: o.stationDwellsConfirmed === true,
+      stationLegTravels: parseStationLegTravels(o.stationLegTravels),
       ...resolveRouteTravelTimesFromBody(o),
       executionOrder:
         typeof o.executionOrder === 'number' && o.executionOrder > 0
           ? Math.round(o.executionOrder)
           : 0,
       switchBufferAfterSeconds: normalizeSwitchBufferAfterSeconds(o.switchBufferAfterSeconds),
-      dwellSlackPercent: normalizeDwellSlackPercent(o.dwellSlackPercent),
+      // 舊草稿 dwellSlackPercent 改為秒數；數值沿用（10% → 10 秒）
+      dwellSlackSeconds: normalizeDwellSlackSeconds(
+        o.dwellSlackSeconds ?? o.dwellSlackPercent,
+      ),
     });
   }
   return normalizeSelectedRouteExecutionOrders(out);
@@ -473,6 +661,8 @@ export function buildShiftScheduleDraftFromStored(
   );
 
   return {
+    creationMode:
+      body.creationMode === 'manual' ? 'manual' : 'parametric',
     basic: {
       name: displayShiftScheduleDraftName(name),
       version: typeof body.version === 'string' ? body.version : '',
@@ -485,11 +675,27 @@ export function buildShiftScheduleDraftFromStored(
           ? body.maintenanceTaskName
           : '',
       skipped: body.maintenanceTaskSkipped === true,
+      entrySlackBySection: normalizeMaintenanceEntrySlackBySectionInput(
+        body.maintenanceEntrySlackBySection
+        && typeof body.maintenanceEntrySlackBySection === 'object'
+          ? (body.maintenanceEntrySlackBySection as Partial<MaintenanceEntrySlackBySectionInput>)
+          : undefined,
+      ),
+      sectionCodeBySection: normalizeMaintenanceSectionCodeBySection(
+        body.maintenanceSectionCodeBySection
+        && typeof body.maintenanceSectionCodeBySection === 'object'
+          ? (body.maintenanceSectionCodeBySection as Partial<MaintenanceSectionCodeBySection>)
+          : undefined,
+      ),
+      sectionEnabled: parseSectionEnabled(body.maintenanceSectionEnabled),
     },
     timeTemplate: {
       templateId: typeof body.timeTemplateId === 'string' ? body.timeTemplateId : '',
       templateName:
         typeof body.timeTemplateName === 'string' ? body.timeTemplateName : '',
+      emptyIntervalMainlineSlackSeconds: normalizeEmptyIntervalMainlineSlackSecondsInput(
+        body.emptyIntervalMainlineSlackSeconds,
+      ),
     },
     routeGroups: {
       mapId: typeof body.routeGroupsMapId === 'string' ? body.routeGroupsMapId : '',
@@ -501,6 +707,25 @@ export function buildShiftScheduleDraftFromStored(
     scheduleOutput: parseShiftScheduleStoredOutput(body.scheduleOutput),
     currentStep,
     maxReachedStep,
+  };
+}
+
+function parseSectionEnabled(raw: unknown): ShiftScheduleMaintenanceTaskDraft['sectionEnabled'] {
+  const base = {
+    charging: false,
+    carWash: false,
+    maintenance: false,
+    preTrip: false,
+    mobile: false,
+  };
+  if (!raw || typeof raw !== 'object') return base;
+  const o = raw as Record<string, unknown>;
+  return {
+    charging: o.charging === true,
+    carWash: o.carWash === true,
+    maintenance: o.maintenance === true,
+    preTrip: o.preTrip === true,
+    mobile: o.mobile === true,
   };
 }
 
@@ -518,13 +743,28 @@ export function isCreateShiftScheduleStepComplete(
     return isShiftScheduleBasicStepComplete(draft.basic) && nameUniqueOk;
   }
   if (step === 2) {
-    return draft.maintenanceTask.skipped || draft.maintenanceTask.taskId.trim().length > 0;
+    if (draft.maintenanceTask.skipped) return true;
+    if (!draft.maintenanceTask.taskId.trim()) return false;
+    return isMaintenanceSectionCodesComplete(
+      draft.maintenanceTask.sectionCodeBySection,
+      draft.maintenanceTask.sectionEnabled,
+    );
   }
   if (step === 3) {
     return draft.timeTemplate.templateId.trim().length > 0;
   }
   if (step === 4) {
     const routes = draft.routeGroups.selectedRoutes;
+    if (draft.creationMode === 'manual') {
+      return (
+        routes.length > 0
+        && routes.every(
+          (route) =>
+            route.executionOrder > 0
+            && Boolean(route.routeCode?.trim()),
+        )
+      );
+    }
     const recoverySeconds = draft.routeGroups.minimumRecoveryTimeSeconds;
     return (
       recoverySeconds !== null
@@ -532,11 +772,15 @@ export function isCreateShiftScheduleStepComplete(
       && routes.every(
         (route) =>
           route.executionOrder > 0
+          && Boolean(route.routeCode?.trim())
           && isSelectedRouteDwellReady(route, turnaroundLimitSeconds, recoverySeconds ?? undefined),
       )
     );
   }
   if (step === 5) {
+    if (draft.creationMode === 'manual') {
+      return draft.scheduleOutput?.plan != null;
+    }
     return (
       draft.scheduleOutput?.plan != null
       && draft.scheduleOutput.feasibilityReport.ok === true

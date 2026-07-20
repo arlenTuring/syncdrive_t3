@@ -8,7 +8,9 @@ import {
   computeCapacityPphpd,
   emptyEditorDraft,
   isCreateTemplateStepComplete,
+  isCreateTemplateStepUnlocked,
   isCreateTemplateStep1Complete,
+  isCreateTemplateStep2Complete,
   resolveTimeTemplateDraftName,
   serializeEditorDraftBody,
   type CreateTemplateStep,
@@ -105,7 +107,7 @@ function CreateStepSidebar({
               !active
               && item.step <= maxReachedStep
               && isCreateTemplateStepComplete(item.step, draft);
-            const unlocked = item.step <= maxReachedStep;
+            const unlocked = isCreateTemplateStepUnlocked(item.step, maxReachedStep, draft);
             return (
               <button
                 key={item.step}
@@ -157,7 +159,7 @@ function CreateStepSidebar({
               !active
               && item.step <= maxReachedStep
               && isCreateTemplateStepComplete(item.step, draft);
-            const unlocked = item.step <= maxReachedStep;
+            const unlocked = isCreateTemplateStepUnlocked(item.step, maxReachedStep, draft);
             return (
               <li key={item.step}>
                 <button
@@ -492,6 +494,7 @@ export function CreateTimeTemplateModal({
   const canGoNext = useMemo(() => {
     if (loading || loadError) return false;
     if (step === 1) return isCreateTemplateStep1Complete(draft);
+    if (step === 2) return isCreateTemplateStep2Complete(draft);
     return true;
   }, [draft, loadError, loading, step]);
 
@@ -541,7 +544,9 @@ export function CreateTimeTemplateModal({
         onBack={handleBack}
         onDiscard={() => void handleDiscard()}
         onStepClick={(next) => {
-          if (next <= maxReachedStep) goToStep(next);
+          if (isCreateTemplateStepUnlocked(next, maxReachedStep, draft)) {
+            goToStep(next);
+          }
         }}
       />
 

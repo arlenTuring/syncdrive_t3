@@ -1,21 +1,57 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchMaintenanceTaskDetail, fetchMaintenanceTaskList } from '../../maintenance-tasks/api/maintenanceTasksApi';
 import { MaintenanceTaskPreviewContent } from '../../maintenance-tasks/components/MaintenanceTaskPreviewContent';
 import { buildMaintenanceTaskDraftFromStored } from '../../maintenance-tasks/types/create';
 import type { MaintenanceTaskListItem } from '../../maintenance-tasks/types';
-import type { ShiftScheduleMaintenanceTaskDraft } from '../types/create';
+import type {
+  ShiftScheduleCreationMode,
+  ShiftScheduleMaintenanceTaskDraft,
+} from '../types/create';
+import {
+  emptyMaintenanceEntrySlackBySectionInput,
+  normalizeMaintenanceEntrySlackBySectionInput,
+  type MaintenanceEntrySlackSectionKey,
+} from '../utils/resolveMaintenanceEntrySlackSeconds';
+import {
+  emptyMaintenanceSectionCodeBySection,
+  findMaintenanceSectionCodeIssues,
+  normalizeMaintenanceSectionCodeBySection,
+  sanitizeMaintenanceSectionCodeInput,
+  type MaintenanceSectionCodeKey,
+} from '../utils/maintenanceSectionCode';
+import { MainlineSlackSecondsField } from './MainlineSlackSecondsField';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
 
 const SELECT_CLASS =
   'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
 
+const CODE_INPUT_CLASS =
+  'h-[42px] w-24 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm uppercase tracking-wider text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+
 type StepShiftMaintenanceTaskProps = {
   draft: ShiftScheduleMaintenanceTaskDraft;
+  creationMode?: ShiftScheduleCreationMode;
   onChange: (next: ShiftScheduleMaintenanceTaskDraft) => void;
 };
 
-export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenanceTaskProps) {
+function resolveSectionEnabled(
+  previewDraft: ReturnType<typeof buildMaintenanceTaskDraftFromStored>,
+): ShiftScheduleMaintenanceTaskDraft['sectionEnabled'] {
+  return {
+    charging: previewDraft.charging.stepEnabled,
+    carWash: previewDraft.carWash.stepEnabled,
+    maintenance: previewDraft.maintenance.stepEnabled,
+    preTrip: previewDraft.preTrip.stepEnabled,
+    mobile: previewDraft.mobile.stepEnabled,
+  };
+}
+
+export function StepShiftMaintenanceTask({
+  draft,
+  creationMode = 'parametric',
+  onChange,
+}: StepShiftMaintenanceTaskProps) {
   const [items, setItems] = useState<MaintenanceTaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +60,19 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
   const [previewDraft, setPreviewDraft] = useState(
     () => buildMaintenanceTaskDraftFromStored('', {}),
   );
+
+  const entrySlackBySection = normalizeMaintenanceEntrySlackBySectionInput(
+    draft.entrySlackBySection,
+  );
+  const sectionCodeBySection = normalizeMaintenanceSectionCodeBySection(
+    draft.sectionCodeBySection,
+  );
+  const sectionEnabled = draft.sectionEnabled;
+  const codeIssues = findMaintenanceSectionCodeIssues(
+    sectionCodeBySection,
+    sectionEnabled,
+  );
+  const codeIssueByKey = new Map(codeIssues.map((issue) => [issue.key, issue.message]));
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +100,9 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
     };
   }, []);
 
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
   useEffect(() => {
     if (!draft.taskId) {
       setPreviewDraft(buildMaintenanceTaskDraftFromStored('', {}));
@@ -65,7 +117,25 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
     void fetchMaintenanceTaskDetail(draft.taskId)
       .then((detail) => {
         if (cancelled) return;
-        setPreviewDraft(buildMaintenanceTaskDraftFromStored(detail.name, detail.body ?? {}));
+        const nextPreview = buildMaintenanceTaskDraftFromStored(
+          detail.name,
+          detail.body ?? {},
+        );
+        setPreviewDraft(nextPreview);
+        const enabled = resolveSectionEnabled(nextPreview);
+        const current = draftRef.current;
+        const same =
+          current.sectionEnabled.charging === enabled.charging
+          && current.sectionEnabled.carWash === enabled.carWash
+          && current.sectionEnabled.maintenance === enabled.maintenance
+          && current.sectionEnabled.preTrip === enabled.preTrip
+          && current.sectionEnabled.mobile === enabled.mobile;
+        if (!same) {
+          onChange({
+            ...current,
+            sectionEnabled: enabled,
+          });
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -80,6 +150,8 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
     return () => {
       cancelled = true;
     };
+    // 僅跟隨 taskId；onChange 以 draftRef 讀最新草稿
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.taskId]);
 
   const handleSelect = (taskId: string) => {
@@ -88,7 +160,106 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
       taskId,
       taskName: item?.name ?? '',
       skipped: false,
+      entrySlackBySection: emptyMaintenanceEntrySlackBySectionInput(),
+      sectionCodeBySection: emptyMaintenanceSectionCodeBySection(),
+      sectionEnabled: {
+        charging: false,
+        carWash: false,
+        maintenance: false,
+        preTrip: false,
+        mobile: false,
+      },
     });
+  };
+
+  const patchEntrySlack = (key: MaintenanceEntrySlackSectionKey, value: string) => {
+    onChange({
+      ...draft,
+      entrySlackBySection: {
+        ...entrySlackBySection,
+        [key]: value,
+      },
+    });
+  };
+
+  const patchSectionCode = (key: MaintenanceSectionCodeKey, value: string) => {
+    onChange({
+      ...draft,
+      sectionCodeBySection: {
+        ...sectionCodeBySection,
+        [key]: sanitizeMaintenanceSectionCodeInput(value),
+      },
+    });
+  };
+
+  const sectionCodeField = (key: MaintenanceSectionCodeKey) => {
+    const issue = codeIssueByKey.get(key);
+    return (
+      <div className="space-y-1.5">
+        <label className="block">
+          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
+            <span className="text-red-500">*</span>
+            整備代號
+          </span>
+          <input
+            type="text"
+            value={sectionCodeBySection[key]}
+            onChange={(e) => patchSectionCode(key, e.target.value)}
+            placeholder="例：M"
+            maxLength={2}
+            className={`${CODE_INPUT_CLASS} ${issue ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/30' : ''}`}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <p className="text-xs text-zinc-500">
+          1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻
+        </p>
+        {issue ? <p className="text-xs text-red-400">{issue}</p> : null}
+      </div>
+    );
+  };
+
+  const slackField = (key: MaintenanceEntrySlackSectionKey) => (
+    <MainlineSlackSecondsField
+      label="正線優先讓渡餘裕"
+      value={entrySlackBySection[key]}
+      onChange={(value) => patchEntrySlack(key, value)}
+      prefixText="正線可壓縮整備開頭，最多"
+    />
+  );
+
+  const sectionExtras = {
+    charging: (
+      <div className="space-y-4">
+        {sectionCodeField('charging')}
+        {creationMode === 'parametric' ? slackField('charging') : null}
+      </div>
+    ),
+    carWash: (
+      <div className="space-y-4">
+        {sectionCodeField('carWash')}
+        {creationMode === 'parametric' ? slackField('carWash') : null}
+      </div>
+    ),
+    maintenance: (
+      <div className="space-y-4">
+        {sectionCodeField('maintenance')}
+        {creationMode === 'parametric' ? slackField('maintenance') : null}
+      </div>
+    ),
+    preTrip: (
+      <div className="space-y-4">
+        {sectionCodeField('preTrip')}
+        {creationMode === 'parametric' ? slackField('preTrip') : null}
+      </div>
+    ),
+    mobile: (
+      <div className="space-y-4">
+        {sectionCodeField('mobile')}
+        {creationMode === 'parametric' ? slackField('mobile') : null}
+      </div>
+    ),
   };
 
   return (
@@ -145,11 +316,13 @@ export function StepShiftMaintenanceTask({ draft, onChange }: StepShiftMaintenan
           </div>
         ) : (
           <div className="p-5">
-            <MaintenanceTaskPreviewContent draft={previewDraft} />
+            <MaintenanceTaskPreviewContent
+              draft={previewDraft}
+              sectionExtras={sectionExtras}
+            />
           </div>
         )}
       </div>
     </div>
   );
 }
-

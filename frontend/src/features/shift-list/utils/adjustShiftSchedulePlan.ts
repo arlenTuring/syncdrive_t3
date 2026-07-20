@@ -9,6 +9,7 @@ import {
   validateRouteSwitchBuffers,
   validateTimelineCapacity,
   validateTimelineOverlaps,
+  validateRotationCyclesComplete,
 } from './schedule-engine/validate';
 import type {
   FeasibilityIssue,
@@ -129,7 +130,13 @@ export function revalidateAdjustedPlan(args: {
     errors,
   );
   validateTimelineOverlaps(args.plan.timelines, errors);
-  validateRouteSwitchBuffers(args.plan.timelines, routeById, errors);
+  validateRotationCyclesComplete(args.plan.timelines, args.selectedRoutes.length, errors);
+  validateRouteSwitchBuffers(
+    args.plan.timelines,
+    routeById,
+    errors,
+    args.minimumRecoveryTimeSeconds,
+  );
   validatePassengerHeadway(
     allBlocks,
     args.intervals,

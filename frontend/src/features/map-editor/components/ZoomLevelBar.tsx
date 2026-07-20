@@ -5,7 +5,7 @@ type ZoomLevelBarProps = {
   level: number
   onLevelChange: (level: number) => void
   disabled?: boolean
-  /** 底部資產列展開時略上移 */
+  /** 底部元件庫橫列展開時上移 */
   paletteOpen?: boolean
   /** 底部測試控制面板存在時上移，避免重疊 */
   testDockOffset?: boolean
@@ -26,8 +26,8 @@ export function ZoomLevelBar({
 
   const bottomClass = paletteOpen
     ? testDockOffset
-      ? 'bottom-52 sm:bottom-56'
-      : 'bottom-28 sm:bottom-32'
+      ? 'bottom-36 sm:bottom-40'
+      : 'bottom-28 sm:bottom-28'
     : testDockOffset
       ? 'bottom-36 sm:bottom-40'
       : 'bottom-6'

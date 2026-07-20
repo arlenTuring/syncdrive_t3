@@ -2,17 +2,26 @@ export type PublishStatusKey = 'draft' | 'published';
 
 export type UsageStatusKey = 'idle' | 'in_use';
 
+export type CreationModeKey = 'parametric' | 'manual';
+
 export type OperationShiftListItem = {
   shift_id: string;
   name: string;
   time_template_name: string;
   version: string;
+  creation_mode: CreationModeKey;
+  creation_mode_label: string;
   publish_status: PublishStatusKey;
   publish_status_label: string;
   usage_status: UsageStatusKey;
   usage_status_label: string;
   created_at: string;
   updated_at: string;
+};
+
+export const CREATION_MODE_LABEL: Record<CreationModeKey, string> = {
+  parametric: '參數生成',
+  manual: '手動製作',
 };
 
 export const USAGE_STATUS_OPTIONS: Array<{ value: UsageStatusKey | 'all'; label: string }> = [
@@ -51,5 +60,16 @@ export const PUBLISH_TAG_STYLE: Record<PublishStatusKey, StatusTagStyle> = {
   draft: {
     container: 'bg-zinc-800/80',
     dot: 'bg-zinc-500',
+  },
+};
+
+export const CREATION_MODE_TAG_STYLE: Record<CreationModeKey, StatusTagStyle> = {
+  parametric: {
+    container: 'bg-[rgba(43,127,255,0.2)]',
+    dot: 'bg-[#2B7FFF]',
+  },
+  manual: {
+    container: 'bg-[rgba(245,158,11,0.2)]',
+    dot: 'bg-[#F59E0B]',
   },
 };

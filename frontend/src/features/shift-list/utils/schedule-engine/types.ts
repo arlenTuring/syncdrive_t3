@@ -1,5 +1,8 @@
 import type { ScheduleEngineTaskType, ScheduleTask } from '../../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import type {
+  ShiftScheduleSelectedRoute,
+  ShiftScheduleStationDwell,
+} from '../../types/create';
 
 export type ScheduleBlockSource = 'template_bar' | 'transition';
 
@@ -19,12 +22,18 @@ export type GeneratedScheduleBlock = {
   travelSeconds: number;
   dwellSeconds: number;
   source: ScheduleBlockSource;
+  /** 手動製作：此班次卡各站靠站秒數（選定路線後可編輯） */
+  stationDwells?: ShiftScheduleStationDwell[];
+  /** 手動製作：此班次卡靠站緩衝秒數 */
+  dwellSlackSeconds?: number;
 };
 
 export type FeasibilityViolationCode =
   | 'MISSING_TEMPLATE_TASKS'
   | 'NO_ROUTE_FOR_TASK_TYPE'
   | 'MISSING_TRAVEL_TIME'
+  | 'STATION_LEG_TRAVEL_INCOMPLETE'
+  | 'STATION_LEG_TRAVEL_INVALID'
   | 'ANCHOR_CONFLICT'
   | 'TIMELINE_OVERLAP'
   | 'HEADWAY_PHYSICAL_IMPOSSIBLE'
@@ -34,7 +43,9 @@ export type FeasibilityViolationCode =
   | 'ROUTE_SWITCH_BUFFER_INSUFFICIENT'
   | 'CLOCK_ALIGN_VIOLATION'
   | 'TURNAROUND_LIMIT_EXCEEDED'
-  | 'ROUTE_ROTATION_OVER_TURNAROUND';
+  | 'ROUTE_ROTATION_OVER_TURNAROUND'
+  /** 時間線上正線未跑完路線群組一整輪（例：只跑下行未跑上行） */
+  | 'ROTATION_CYCLE_INCOMPLETE';
 
 export type FeasibilityIssue = {
   code: FeasibilityViolationCode;
@@ -65,6 +76,12 @@ export type ShiftScheduleFeasibilityReport = {
   warnings: FeasibilityIssue[];
 };
 
+/** Step 5 手動調整的還原／復原歷史（寫入草稿 scheduleOutput） */
+export type PlanAdjustHistoryEntry = {
+  plan: GeneratedSchedulePlan;
+  feasibilityReport: ShiftScheduleFeasibilityReport;
+};
+
 export type GenerateShiftScheduleResult = {
   plan: GeneratedSchedulePlan | null;
   report: ShiftScheduleFeasibilityReport;
@@ -84,6 +101,10 @@ export type ShiftScheduleMaintenanceTaskBinding = {
   skipped: boolean;
   /** 整備任務完整 body（設施、途經點、觸發條件等） */
   body: Record<string, unknown> | null;
+  /** 班表 Step 2 各整備區塊正線優先讓渡餘裕指紋，供新鮮度比對 */
+  entrySlackFingerprint?: string;
+  /** 班表 Step 2 各整備區塊代號指紋 */
+  sectionCodeFingerprint?: string;
   publishStatus?: string;
   usageStatus?: string;
   sourceUpdatedAt?: string;
@@ -100,6 +121,8 @@ export type ShiftScheduleStoredOutput = {
   timeTemplateRef: {
     templateId: string;
     templateName: string;
+    /** 空時段正線讓渡餘裕（秒），供新鮮度比對與引擎回放 */
+    emptyIntervalMainlineSlackSeconds?: number;
   };
   routeGroupsRef: {
     mapId: string;
@@ -107,6 +130,9 @@ export type ShiftScheduleStoredOutput = {
     /** 恢復時間、靠站緩衝、切換緩衝等參數指紋，供新鮮度比對 */
     paramsFingerprint?: string;
   };
+  /** Step 5 還原／復原棧；與 plan 同步寫入草稿 */
+  planAdjustHistory?: PlanAdjustHistoryEntry[];
+  planAdjustHistoryIndex?: number;
 };
 
 export type ResolvedTemplateTask = {

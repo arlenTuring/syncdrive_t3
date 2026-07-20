@@ -171,6 +171,28 @@ export class TimeTemplateService {
     await this.repo.delete({ id });
   }
 
+  /** 複製為新草稿：名稱為原名＋「 複製模板」；發布／使用狀態重置 */
+  async duplicateAsNewDraft(id: string): Promise<TimeTemplateListItem> {
+    const source = await this.getTemplateById(id);
+    const baseName = source.name.trim() || UNTITLED_DRAFT_NAME;
+    const name = `${baseName} 複製模板`;
+    const body = JSON.parse(JSON.stringify(source.body ?? {})) as Record<string, unknown>;
+
+    const now = String(Date.now());
+    const row = this.repo.create({
+      id: this.generateTemplateId(),
+      name,
+      publishStatus: TimeTemplatePublishStatus.DRAFT,
+      usageStatus: TimeTemplateUsageStatus.IDLE,
+      body,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const saved = await this.repo.save(row);
+    return toTimeTemplateListItem(saved);
+  }
+
   private generateTemplateId(): string {
     const suffix = Date.now().toString(36).toUpperCase().slice(-8);
     return `TT-DRAFT-${suffix}`;

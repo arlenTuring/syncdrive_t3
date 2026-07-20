@@ -1,10 +1,18 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchTimeTemplateDetail, fetchTimeTemplateList } from '../../time-templates/api/timeTemplatesApi';
 import { StepOverallPreview } from '../../time-templates/components/StepOverallPreview';
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import type { TimeTemplateListItem } from '../../time-templates/types';
-import type { ShiftScheduleTimeTemplateDraft } from '../types/create';
+import type {
+  ShiftScheduleCreationMode,
+  ShiftScheduleTimeTemplateDraft,
+} from '../types/create';
+import { templateHasEmptyAttributePeriods } from '../utils/emptyAttributeIntervals';
+import {
+  normalizeEmptyIntervalMainlineSlackSecondsInput,
+} from '../utils/resolveMaintenanceEntrySlackSeconds';
+import { MainlineSlackSecondsField } from './MainlineSlackSecondsField';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
 
 const SELECT_CLASS =
@@ -12,10 +20,15 @@ const SELECT_CLASS =
 
 type StepShiftTimeTemplateProps = {
   draft: ShiftScheduleTimeTemplateDraft;
+  creationMode?: ShiftScheduleCreationMode;
   onChange: (next: ShiftScheduleTimeTemplateDraft) => void;
 };
 
-export function StepShiftTimeTemplate({ draft, onChange }: StepShiftTimeTemplateProps) {
+export function StepShiftTimeTemplate({
+  draft,
+  creationMode = 'parametric',
+  onChange,
+}: StepShiftTimeTemplateProps) {
   const [items, setItems] = useState<TimeTemplateListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +36,11 @@ export function StepShiftTimeTemplate({ draft, onChange }: StepShiftTimeTemplate
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState('');
   const [previewData, setPreviewData] = useState(() => parseStoredTemplateBody({}));
+
+  const hasEmptyIntervals = useMemo(
+    () => templateHasEmptyAttributePeriods(previewData.intervals),
+    [previewData.intervals],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +108,9 @@ export function StepShiftTimeTemplate({ draft, onChange }: StepShiftTimeTemplate
       ...draft,
       templateId,
       templateName: item?.name ?? '',
+      emptyIntervalMainlineSlackSeconds: normalizeEmptyIntervalMainlineSlackSecondsInput(
+        undefined,
+      ),
     });
   };
 
@@ -130,6 +151,34 @@ export function StepShiftTimeTemplate({ draft, onChange }: StepShiftTimeTemplate
           )}
         </label>
       </div>
+
+      {draft.templateId
+        && creationMode === 'parametric'
+        && !previewLoading
+        && !previewError
+        && hasEmptyIntervals && (
+        <div className="mt-6 max-w-3xl shrink-0 space-y-3 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-5">
+          <div>
+            <h3 className="text-sm font-medium text-zinc-100">空時段正線讓渡餘裕</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              此模板在 00:00–24:00 內有未排定時間屬性的空時段；正線結束後可占用空時段開頭，不可提前占用空時段尾端。改動後需重新生成班表。
+            </p>
+          </div>
+          <MainlineSlackSecondsField
+            label="空時段正線讓渡餘裕"
+            value={normalizeEmptyIntervalMainlineSlackSecondsInput(
+              draft.emptyIntervalMainlineSlackSeconds,
+            )}
+            onChange={(emptyIntervalMainlineSlackSeconds) =>
+              onChange({
+                ...draft,
+                emptyIntervalMainlineSlackSeconds,
+              })
+            }
+            prefixText="正線結束後可占用空時段開頭，最多"
+          />
+        </div>
+      )}
 
       <div className="mt-8 flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
         {!draft.templateId ? (

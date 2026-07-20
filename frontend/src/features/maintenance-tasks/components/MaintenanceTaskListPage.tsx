@@ -30,6 +30,8 @@ type MaintenanceTaskListPageProps = {
   onBackToHome?: () => void;
   onCreateClick?: () => void;
   onEditClick?: (taskId: string) => void;
+  /** 開啟整備任務第七步「任務檢視」 */
+  onPreviewClick?: (taskId: string) => void;
 };
 
 const PAGE_SIZE = 20;
@@ -38,6 +40,7 @@ export function MaintenanceTaskListPage({
   onBackToHome,
   onCreateClick,
   onEditClick,
+  onPreviewClick,
 }: MaintenanceTaskListPageProps) {
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -203,7 +206,7 @@ export function MaintenanceTaskListPage({
           <thead>
             <tr className="border-b border-zinc-800 text-left text-zinc-500">
               <th className="py-3 pr-4 font-medium">整備任務名稱</th>
-              <th className="py-3 pr-4 font-medium">整備任務預覽</th>
+              <th className="py-3 pr-4 font-medium">任務檢視</th>
               <th className="py-3 pr-4 font-medium">使用狀態</th>
               <th className="py-3 pr-4 font-medium">發布狀態</th>
               <th className="py-3 pr-4 font-medium">建立時間</th>
@@ -235,7 +238,7 @@ export function MaintenanceTaskListPage({
                   <td className="py-3 pr-4">
                     <button
                       type="button"
-                      onClick={() => alert('任務檢視功能開發中')}
+                      onClick={() => onPreviewClick?.(row.task_id)}
                       className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
                     >
                       任務檢視

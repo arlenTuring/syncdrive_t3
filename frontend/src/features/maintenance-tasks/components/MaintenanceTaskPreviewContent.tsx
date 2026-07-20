@@ -104,11 +104,23 @@ export function PreviewList({ items }: { items: string[] }) {
 type MaintenanceTaskPreviewContentProps = {
   draft: MaintenanceTaskCreateDraft;
   onEditStep?: (step: CreateMaintenanceTaskStep) => void;
+  /**
+   * 班表 Step 2 用：插入各整備區塊內容頂部（例如正線優先讓渡餘裕）。
+   * key 對應充電／洗車／保養／行前／機動。
+   */
+  sectionExtras?: Partial<{
+    charging: ReactNode;
+    carWash: ReactNode;
+    maintenance: ReactNode;
+    preTrip: ReactNode;
+    mobile: ReactNode;
+  }>;
 };
 
 export function MaintenanceTaskPreviewContent({
   draft,
   onEditStep,
+  sectionExtras,
 }: MaintenanceTaskPreviewContentProps) {
   const charging = normalizeChargingDraft(draft.charging);
   const carWash = normalizeCarWashDraft(draft.carWash);
@@ -169,6 +181,16 @@ export function MaintenanceTaskPreviewContent({
     CREATE_MAINTENANCE_TASK_STEPS.map((s) => [s.step, s.label]),
   ) as Record<number, string>;
 
+  const wrapSection = (extra: ReactNode | undefined, body: ReactNode) => {
+    if (!extra) return body;
+    return (
+      <div className="space-y-4">
+        {extra}
+        {body}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <PreviewSection step={1} title={stepLabels[1]} onEdit={onEditStep}>
@@ -180,43 +202,58 @@ export function MaintenanceTaskPreviewContent({
       </PreviewSection>
 
       <PreviewSection step={2} title={stepLabels[2]} enabled={charging.stepEnabled} onEdit={onEditStep}>
-        <PreviewList items={chargingLines} />
+        {wrapSection(
+          charging.stepEnabled ? sectionExtras?.charging : undefined,
+          <PreviewList items={chargingLines} />,
+        )}
       </PreviewSection>
 
       <PreviewSection step={3} title={stepLabels[3]} enabled={carWash.stepEnabled} onEdit={onEditStep}>
-        <PreviewList items={carWashLines} />
+        {wrapSection(
+          carWash.stepEnabled ? sectionExtras?.carWash : undefined,
+          <PreviewList items={carWashLines} />,
+        )}
       </PreviewSection>
 
       <PreviewSection step={4} title={stepLabels[4]} enabled={maintenance.stepEnabled} onEdit={onEditStep}>
-        <PreviewList items={maintenanceLines} />
+        {wrapSection(
+          maintenance.stepEnabled ? sectionExtras?.maintenance : undefined,
+          <PreviewList items={maintenanceLines} />,
+        )}
       </PreviewSection>
 
       <PreviewSection step={5} title={stepLabels[5]} enabled={preTrip.stepEnabled} onEdit={onEditStep}>
-        <PreviewList
-          items={[
-            ...preTrip.equipmentRows
-              .filter((row) => row.mapCode)
-              .map((row) => formatEquipmentRowPreviewLine(row)),
-            ...(preTrip.operationDurationMinutes
-              ? [`單次作業時長 ${preTrip.operationDurationMinutes} 分鐘`]
-              : []),
-          ]}
-        />
+        {wrapSection(
+          preTrip.stepEnabled ? sectionExtras?.preTrip : undefined,
+          <PreviewList
+            items={[
+              ...preTrip.equipmentRows
+                .filter((row) => row.mapCode)
+                .map((row) => formatEquipmentRowPreviewLine(row)),
+              ...(preTrip.operationDurationMinutes
+                ? [`單次作業時長 ${preTrip.operationDurationMinutes} 分鐘`]
+                : []),
+            ]}
+          />,
+        )}
       </PreviewSection>
 
       <PreviewSection step={6} title={stepLabels[6]} enabled={mobile.stepEnabled} onEdit={onEditStep}>
-        <PreviewList
-          items={[
-            ...mobile.equipmentRows
-              .filter((row) => row.mapCode)
-              .map((row) => formatEquipmentRowPreviewLine(row)),
-            ...(mobile.durationFollowTemplate !== false
-              ? ['作業時長：依排班調度決定時長']
-              : mobile.operationDurationMinutes
-              ? [`單次作業時長 ${mobile.operationDurationMinutes} 分鐘`]
-              : []),
-          ]}
-        />
+        {wrapSection(
+          mobile.stepEnabled ? sectionExtras?.mobile : undefined,
+          <PreviewList
+            items={[
+              ...mobile.equipmentRows
+                .filter((row) => row.mapCode)
+                .map((row) => formatEquipmentRowPreviewLine(row)),
+              ...(mobile.durationFollowTemplate !== false
+                ? ['作業時長：依排班調度決定時長']
+                : mobile.operationDurationMinutes
+                ? [`單次作業時長 ${mobile.operationDurationMinutes} 分鐘`]
+                : []),
+            ]}
+          />,
+        )}
       </PreviewSection>
     </div>
   );

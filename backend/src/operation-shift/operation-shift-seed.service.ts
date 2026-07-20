@@ -17,24 +17,6 @@ const SEED_ROWS: Array<{
   updatedAt: string;
 }> = [
   {
-    id: 'OS-ROUTINE-BASE',
-    name: '基礎常規班表',
-    usageStatus: OperationShiftUsageStatus.IN_USE,
-    publishStatus: OperationShiftPublishStatus.PUBLISHED,
-    body: { version: 'v0.1.0', timeTemplateName: '基礎常規' },
-    createdAt: String(new Date('2027-05-01T08:30:00').getTime()),
-    updatedAt: String(new Date('2027-05-01T09:15:00').getTime()),
-  },
-  {
-    id: 'OS-HOLIDAY',
-    name: '法定假日班表',
-    usageStatus: OperationShiftUsageStatus.IN_USE,
-    publishStatus: OperationShiftPublishStatus.PUBLISHED,
-    body: { version: 'v0.1.0', timeTemplateName: '法定假日恆定' },
-    createdAt: String(new Date('2027-05-01T08:30:00').getTime()),
-    updatedAt: String(new Date('2027-05-01T09:15:00').getTime()),
-  },
-  {
     id: 'OS-DRAFT-01',
     name: '試行調整班表',
     usageStatus: OperationShiftUsageStatus.IDLE,

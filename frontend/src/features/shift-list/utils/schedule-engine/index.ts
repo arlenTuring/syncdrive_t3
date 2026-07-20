@@ -21,14 +21,16 @@ export {
 
 export {
   SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS,
-  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_PERCENT,
+  SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_SECONDS,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
   SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS,
+  STATION_ARRIVAL_MAX_AVG_STRETCH,
   normalizeSwitchBufferAfterSeconds,
-  normalizeDwellSlackPercent,
+  normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
   snapUpToClockAlignSeconds,
+  snapDownToClockAlignSeconds,
   isClockAlignedSeconds,
   sortSelectedRoutesByExecutionOrder,
   sumStationDwellSeconds,
@@ -38,6 +40,8 @@ export {
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
   resolveNextRouteInExecutionOrder,
+  resolveInterTripGapSeconds,
+  resolveFleetPhysicalHeadwayFloorSeconds,
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
 } from './physics';
@@ -51,10 +55,12 @@ export {
 
 export {
   generateDeparturesFromHeadway,
+  generateDirectionalDeparturesFromHeadway,
   assignDeparturesToEarliestTimeline,
   buildIntervalEndSecondByDepartureStart,
   TIMETABLE_GENERATION_ALGORITHM,
   type HeadwayDeparture,
+  type DirectionalHeadwayDeparture,
   type TimetableGenerationAlgorithm,
 } from './generateDepartures';
 
@@ -65,6 +71,12 @@ export {
   expandRowBlocks,
   ROUTE_ASSIGNMENT_ALGORITHM,
 } from './expand';
+
+export {
+  applyRotationCycleCompletion,
+  buildRotationCompletionTasks,
+  ROTATION_CYCLE_COMPLETION_ALGORITHM,
+} from './completeRotationCycles';
 
 export {
   assignPassengerRoutesConstraintGreedy,
@@ -79,6 +91,9 @@ export {
   validatePassengerHeadway,
   validateTimelineCapacity,
   validateRouteSwitchBuffers,
+  validateRotationCyclesComplete,
+  resolveHeadwaySecondsAtMinute,
+  resolvePairHeadwaySeconds,
 } from './validate';
 
 export {

@@ -11,6 +11,15 @@ export function computeCapacityPphpd(
   return Math.round((vehicleCapacity * 3600) / headwaySeconds);
 }
 
+/** pphpd 反推等效班距（秒）；與 computeCapacityPphpd 互為近似反運算 */
+export function computeHeadwaySecondsFromPphpd(
+  vehicleCapacity: number,
+  pphpd: number | null,
+): number | null {
+  if (pphpd == null || pphpd <= 0 || vehicleCapacity <= 0) return null;
+  return Math.round((vehicleCapacity * 3600) / pphpd);
+}
+
 export type TimeSlotAttribute = {
   id: string;
   name: string;
@@ -688,6 +697,29 @@ export function computeUncoveredRangesForRow(
   return uncovered;
 }
 
+/** 營運時段內、尚無任務覆蓋的缺漏（含列號）。 */
+export type ScheduleTimeGap = MinuteRange & {
+  rowIndex: number;
+};
+
+/** 列出所有列在營運時段內的時間缺漏（短於最小任務時長者略過）。 */
+export function listScheduleTimeGaps(
+  rowCount: number,
+  tasks: ScheduleTask[],
+  activeRanges: MinuteRange[],
+  minDurationMinutes = SCHEDULE_TASK_MIN_DURATION_MINUTES,
+): ScheduleTimeGap[] {
+  if (rowCount <= 0 || activeRanges.length === 0) return [];
+  const gaps: ScheduleTimeGap[] = [];
+  for (let rowIndex = 1; rowIndex <= rowCount; rowIndex += 1) {
+    for (const range of computeUncoveredRangesForRow(rowIndex, tasks, activeRanges)) {
+      if (range.end - range.start < minDurationMinutes) continue;
+      gaps.push({ rowIndex, start: range.start, end: range.end });
+    }
+  }
+  return gaps;
+}
+
 /** 為所有列的營運時段空餘時間建立填補任務。 */
 export function buildTasksToFillEmptyScheduleSlots(
   rowCount: number,
@@ -848,19 +880,46 @@ export function isCreateTemplateStep1Complete(draft: TimeTemplateEditorDraft): b
   );
 }
 
+/** 任務排班完成：營運時段內每一列都沒有可放任務的時間缺漏。 */
+export function isCreateTemplateStep2Complete(draft: TimeTemplateEditorDraft): boolean {
+  const confirmedIntervals = draft.intervals.filter((slot) => !slot.isDraft);
+  const activeRanges = parseIntervalMinuteRanges(confirmedIntervals);
+  if (activeRanges.length === 0) return false;
+  return listScheduleTimeGaps(draft.scheduleRowCount, draft.tasks, activeRanges).length === 0;
+}
+
 export function isCreateTemplateStepComplete(
   step: CreateTemplateStep,
   draft: TimeTemplateEditorDraft,
 ): boolean {
   if (step === 1) return isCreateTemplateStep1Complete(draft);
+  if (step === 2) return isCreateTemplateStep2Complete(draft);
+  return true;
+}
+
+/** 步驟是否可點選／進入（整體預覽需任務排班已無缺漏）。 */
+export function isCreateTemplateStepUnlocked(
+  step: CreateTemplateStep,
+  maxReachedStep: CreateTemplateStep,
+  draft: TimeTemplateEditorDraft,
+): boolean {
+  if (step > maxReachedStep) return false;
+  if (step >= 3 && !isCreateTemplateStep2Complete(draft)) return false;
   return true;
 }
 
 export function serializeEditorDraftBody(draft: TimeTemplateEditorDraft): Record<string, unknown> {
+  const vehicleCapacity = Number.isFinite(draft.vehicleCapacity) && draft.vehicleCapacity > 0
+    ? Math.round(draft.vehicleCapacity)
+    : VEHICLE_CAPACITY_DEFAULT;
   return {
     editorVersion: 1,
-    vehicleCapacity: draft.vehicleCapacity,
-    attributes: draft.attributes,
+    vehicleCapacity,
+    attributes: draft.attributes.map((attr) => ({
+      ...attr,
+      // 寫回時以目前載運量重算，避免舊資料 pphpd 與載運量脫鉤
+      capacityPphpd: computeCapacityPphpd(vehicleCapacity, attr.headwaySeconds),
+    })),
     intervals: draft.intervals,
     tasks: draft.tasks,
     scheduleRowCount: draft.scheduleRowCount,
@@ -868,11 +927,42 @@ export function serializeEditorDraftBody(draft: TimeTemplateEditorDraft): Record
 }
 
 export type StoredTemplatePreviewData = {
+  /** 車體載運量（人／車）；舊模板缺欄時會由屬性 pphpd／班距回推或落回預設 */
+  vehicleCapacity: number;
   attributes: TimeSlotAttribute[];
   intervals: TimeSlotInterval[];
   tasks: ScheduleTask[];
   scheduleRowCount: number;
 };
+
+/**
+ * 自模板 body 解析車體載運量。
+ * 優先讀 `vehicleCapacity`；缺漏時依屬性 capacityPphpd × headway 反推；再不行用預設。
+ */
+export function resolveVehicleCapacityFromBody(
+  body: Record<string, unknown>,
+  attributes: TimeSlotAttribute[] = [],
+): number {
+  const raw = body.vehicleCapacity;
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    return Math.round(raw);
+  }
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
+  }
+
+  for (const attr of attributes) {
+    if (attr.isDraft) continue;
+    const headway = attr.headwaySeconds;
+    const pphpd = attr.capacityPphpd;
+    if (headway == null || headway <= 0 || !Number.isFinite(pphpd) || pphpd <= 0) continue;
+    const inferred = Math.round((pphpd * headway) / 3600);
+    if (inferred > 0) return inferred;
+  }
+
+  return VEHICLE_CAPACITY_DEFAULT;
+}
 
 export function parseStoredTemplateBody(body: Record<string, unknown>): StoredTemplatePreviewData {
   const attributes = Array.isArray(body.attributes)
@@ -886,17 +976,15 @@ export function parseStoredTemplateBody(body: Record<string, unknown>): StoredTe
   const scheduleRowCount = typeof body.scheduleRowCount === 'number' && body.scheduleRowCount > 0
     ? body.scheduleRowCount
     : SCHEDULE_ROW_COUNT_INITIAL;
+  const vehicleCapacity = resolveVehicleCapacityFromBody(body, attributes);
 
-  return { attributes, intervals, tasks, scheduleRowCount };
+  return { vehicleCapacity, attributes, intervals, tasks, scheduleRowCount };
 }
 
 export function buildEditorDraftFromStored(
   name: string,
   body: Record<string, unknown>,
 ): TimeTemplateEditorDraft {
-  const vehicleCapacity = typeof body.vehicleCapacity === 'number' && body.vehicleCapacity > 0
-    ? body.vehicleCapacity
-    : VEHICLE_CAPACITY_DEFAULT;
   const attributes = Array.isArray(body.attributes)
     ? (body.attributes as TimeSlotAttribute[])
     : [];
@@ -908,6 +996,7 @@ export function buildEditorDraftFromStored(
   const scheduleRowCount = typeof body.scheduleRowCount === 'number' && body.scheduleRowCount > 0
     ? body.scheduleRowCount
     : SCHEDULE_ROW_COUNT_INITIAL;
+  const vehicleCapacity = resolveVehicleCapacityFromBody(body, attributes);
 
   return {
     name: displayTimeTemplateDraftName(name),

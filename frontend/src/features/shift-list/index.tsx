@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { NavigateToSetupModal } from '../maintenance-tasks/components/NavigateToSetupModal';
 import { CreateShiftSchedulePage } from './components/CreateShiftSchedulePage';
 import { ShiftListPage } from './components/ShiftListPage';
+import { ShiftScheduleResultPreviewPage } from './components/ShiftScheduleResultPreviewPage';
 import {
   leaveShiftListEditor,
   navigateToShiftListCreate,
   navigateToShiftListEdit,
+  navigateToShiftListPreview,
   readShiftListLocation,
   type ShiftListLocation,
 } from './navigation';
+import type { ShiftScheduleCreationMode } from './types/create';
 
 type ShiftListAppProps = {
   onBackToHome?: () => void;
@@ -19,6 +22,8 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
   const [location, setLocation] = useState<ShiftListLocation>(() => readShiftListLocation());
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [listReloadKey, setListReloadKey] = useState(0);
+  const [pendingCreationMode, setPendingCreationMode] =
+    useState<ShiftScheduleCreationMode>('parametric');
 
   useEffect(() => {
     const onPopState = () => {
@@ -41,7 +46,8 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
     setShowSetupModal(false);
   }, []);
 
-  const confirmCreateNavigation = useCallback(() => {
+  const startCreate = useCallback((mode: ShiftScheduleCreationMode) => {
+    setPendingCreationMode(mode);
     setShowSetupModal(false);
     navigateToShiftListCreate();
     setLocation({ screen: 'create' });
@@ -57,6 +63,11 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
     setLocation({ screen: 'create', editShiftId: shiftId });
   }, []);
 
+  const openPreview = useCallback((shiftId: string) => {
+    navigateToShiftListPreview(shiftId);
+    setLocation({ screen: 'preview', editShiftId: shiftId });
+  }, []);
+
   return (
     <>
       {location.screen === 'list' && (
@@ -65,19 +76,38 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
           onBackToHome={embedded ? undefined : onBackToHome}
           onCreateClick={openCreateFlow}
           onEditClick={openEdit}
+          onPreviewClick={openPreview}
         />
       )}
 
       {location.screen === 'create' && (
         <CreateShiftSchedulePage
+          key={location.editShiftId ?? `new-${pendingCreationMode}`}
           editShiftId={location.editShiftId}
+          initialCreationMode={
+            location.editShiftId ? 'parametric' : pendingCreationMode
+          }
           onBack={backToList}
           onSavedDraft={reloadList}
         />
       )}
 
+      {location.screen === 'preview' && location.editShiftId && (
+        <ShiftScheduleResultPreviewPage
+          key={`preview-${location.editShiftId}`}
+          shiftId={location.editShiftId}
+          onBack={backToList}
+        />
+      )}
+
       {showSetupModal && (
-        <NavigateToSetupModal onClose={closeSetupModal} onConfirm={confirmCreateNavigation} />
+        <NavigateToSetupModal
+          onClose={closeSetupModal}
+          onConfirm={() => startCreate('parametric')}
+          onSecondary={() => startCreate('manual')}
+          primaryLabel="參數生成"
+          secondaryLabel="手動製作"
+        />
       )}
     </>
   );

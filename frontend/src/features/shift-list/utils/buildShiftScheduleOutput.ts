@@ -5,13 +5,38 @@ import { runShiftScheduleEngineForDraft } from './runShiftScheduleEngineForDraft
 import type {
   ShiftScheduleMaintenanceTaskBinding,
   ShiftScheduleStoredOutput,
+  PlanAdjustHistoryEntry,
 } from './schedule-engine/types';
+import {
+  buildMaintenanceEntrySlackFingerprint,
+  normalizeMaintenanceEntrySlackBySectionInput,
+  parseEmptyIntervalMainlineSlackSeconds,
+} from './resolveMaintenanceEntrySlackSeconds';
+import {
+  buildMaintenanceSectionCodeFingerprint,
+  normalizeMaintenanceSectionCodeBySection,
+} from './maintenanceSectionCode';
+import {
+  createEmptyManualSchedulePlan,
+  emptyManualFeasibilityReport,
+  resolveManualScheduleRowCount,
+} from './buildManualShiftScheduleOutput';
 
 export async function buildMaintenanceTaskBinding(
   draft: ShiftScheduleCreateDraft,
   backendUrl?: string,
 ): Promise<ShiftScheduleMaintenanceTaskBinding> {
   const boundAt = new Date().toISOString();
+  const entrySlackFingerprint = buildMaintenanceEntrySlackFingerprint(
+    normalizeMaintenanceEntrySlackBySectionInput(
+      draft.maintenanceTask.entrySlackBySection,
+    ),
+  );
+  const sectionCodeFingerprint = buildMaintenanceSectionCodeFingerprint(
+    normalizeMaintenanceSectionCodeBySection(
+      draft.maintenanceTask.sectionCodeBySection,
+    ),
+  );
 
   if (draft.maintenanceTask.skipped || !draft.maintenanceTask.taskId.trim()) {
     return {
@@ -19,6 +44,8 @@ export async function buildMaintenanceTaskBinding(
       taskName: draft.maintenanceTask.taskName.trim(),
       skipped: true,
       body: null,
+      entrySlackFingerprint,
+      sectionCodeFingerprint,
       boundAt,
     };
   }
@@ -33,6 +60,8 @@ export async function buildMaintenanceTaskBinding(
     taskName: detail.name,
     skipped: false,
     body: detail.body ?? {},
+    entrySlackFingerprint,
+    sectionCodeFingerprint,
     publishStatus: detail.publish_status,
     usageStatus: detail.usage_status,
     sourceUpdatedAt: detail.updated_at,
@@ -44,6 +73,42 @@ export async function buildShiftScheduleStoredOutput(
   draft: ShiftScheduleCreateDraft,
   options: { shiftId?: string; backendUrl?: string } = {},
 ): Promise<ShiftScheduleStoredOutput> {
+  if (draft.creationMode === 'manual') {
+    const [rowCount, maintenanceTaskBinding] = await Promise.all([
+      resolveManualScheduleRowCount(
+        draft.timeTemplate.templateId,
+        options.backendUrl,
+      ),
+      buildMaintenanceTaskBinding(draft, options.backendUrl),
+    ]);
+    const plan = createEmptyManualSchedulePlan({
+      scheduleRowCount: rowCount,
+      shiftId: options.shiftId,
+    });
+    const feasibilityReport = emptyManualFeasibilityReport();
+    return {
+      outputVersion: 1,
+      generatedAt: plan.generatedAt,
+      plan,
+      feasibilityReport,
+      maintenanceTaskBinding,
+      timeTemplateRef: {
+        templateId: draft.timeTemplate.templateId,
+        templateName: draft.timeTemplate.templateName,
+        emptyIntervalMainlineSlackSeconds: parseEmptyIntervalMainlineSlackSeconds(
+          draft.timeTemplate.emptyIntervalMainlineSlackSeconds,
+        ),
+      },
+      routeGroupsRef: {
+        mapId: draft.routeGroups.mapId,
+        selectedRouteIds: draft.routeGroups.selectedRoutes.map((route) => route.routeId),
+        paramsFingerprint: buildRouteGroupsParamsFingerprint(draft.routeGroups),
+      },
+      planAdjustHistory: [{ plan, feasibilityReport }],
+      planAdjustHistoryIndex: 0,
+    };
+  }
+
   const [engineResult, maintenanceTaskBinding] = await Promise.all([
     runShiftScheduleEngineForDraft(draft, options),
     buildMaintenanceTaskBinding(draft, options.backendUrl),
@@ -58,12 +123,23 @@ export async function buildShiftScheduleStoredOutput(
     timeTemplateRef: {
       templateId: draft.timeTemplate.templateId,
       templateName: draft.timeTemplate.templateName,
+      emptyIntervalMainlineSlackSeconds: parseEmptyIntervalMainlineSlackSeconds(
+        draft.timeTemplate.emptyIntervalMainlineSlackSeconds,
+      ),
     },
     routeGroupsRef: {
       mapId: draft.routeGroups.mapId,
       selectedRouteIds: draft.routeGroups.selectedRoutes.map((route) => route.routeId),
       paramsFingerprint: buildRouteGroupsParamsFingerprint(draft.routeGroups),
     },
+    ...(engineResult.plan
+      ? {
+          planAdjustHistory: [
+            { plan: engineResult.plan, feasibilityReport: engineResult.report },
+          ],
+          planAdjustHistoryIndex: 0,
+        }
+      : {}),
   };
 }
 
@@ -99,6 +175,12 @@ export function parseShiftScheduleStoredOutput(
       binding.body && typeof binding.body === 'object' && !Array.isArray(binding.body)
         ? (binding.body as Record<string, unknown>)
         : null,
+    ...(typeof binding.entrySlackFingerprint === 'string'
+      ? { entrySlackFingerprint: binding.entrySlackFingerprint }
+      : {}),
+    ...(typeof binding.sectionCodeFingerprint === 'string'
+      ? { sectionCodeFingerprint: binding.sectionCodeFingerprint }
+      : {}),
     ...(typeof binding.publishStatus === 'string'
       ? { publishStatus: binding.publishStatus }
       : {}),
@@ -125,6 +207,15 @@ export function parseShiftScheduleStoredOutput(
       templateId: typeof templateRef.templateId === 'string' ? templateRef.templateId : '',
       templateName:
         typeof templateRef.templateName === 'string' ? templateRef.templateName : '',
+      ...(typeof templateRef.emptyIntervalMainlineSlackSeconds === 'number'
+        && Number.isFinite(templateRef.emptyIntervalMainlineSlackSeconds)
+        && templateRef.emptyIntervalMainlineSlackSeconds >= 0
+        ? {
+            emptyIntervalMainlineSlackSeconds: Math.round(
+              templateRef.emptyIntervalMainlineSlackSeconds,
+            ),
+          }
+        : {}),
     },
     routeGroupsRef: {
       mapId: typeof routeRef.mapId === 'string' ? routeRef.mapId : '',
@@ -135,7 +226,38 @@ export function parseShiftScheduleStoredOutput(
         ? { paramsFingerprint: routeRef.paramsFingerprint }
         : {}),
     },
+    ...(parsePlanAdjustHistory(o.planAdjustHistory, o.planAdjustHistoryIndex) ?? {}),
   };
+}
+
+function parsePlanAdjustHistory(
+  rawHistory: unknown,
+  rawIndex: unknown,
+): Pick<ShiftScheduleStoredOutput, 'planAdjustHistory' | 'planAdjustHistoryIndex'> | null {
+  if (!Array.isArray(rawHistory) || rawHistory.length === 0) return null;
+  const entries: PlanAdjustHistoryEntry[] = [];
+  for (const item of rawHistory) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const plan = parseGeneratedSchedulePlan(row.plan);
+    const reportRaw = row.feasibilityReport;
+    if (!plan || !reportRaw || typeof reportRaw !== 'object') continue;
+    const report = reportRaw as Record<string, unknown>;
+    entries.push({
+      plan,
+      feasibilityReport: {
+        ok: report.ok === true,
+        errors: parseFeasibilityIssues(report.errors),
+        warnings: parseFeasibilityIssues(report.warnings),
+      },
+    });
+  }
+  if (entries.length === 0) return null;
+  const indexRaw = typeof rawIndex === 'number' && Number.isFinite(rawIndex)
+    ? Math.floor(rawIndex)
+    : entries.length - 1;
+  const planAdjustHistoryIndex = Math.min(Math.max(0, indexRaw), entries.length - 1);
+  return { planAdjustHistory: entries, planAdjustHistoryIndex };
 }
 
 function parseFeasibilityIssues(raw: unknown) {

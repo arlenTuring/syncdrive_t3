@@ -55,6 +55,12 @@ export class TimeTemplateController {
     return { ok: true };
   }
 
+  @Post('detail/:id/duplicate')
+  @ApiOperation({ summary: '複製時間模板為新草稿（原名＋「 複製模板」）' })
+  async duplicateDraft(@Param('id') id: string) {
+    return this.timeTemplateService.duplicateAsNewDraft(id);
+  }
+
   @Post('draft')
   @ApiOperation({ summary: '建立時間模板草稿' })
   async createDraft(@Body() body: { name?: string; body?: Record<string, unknown> }) {

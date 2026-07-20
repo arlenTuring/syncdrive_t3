@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  Copy,
   Download,
   FileText,
   Loader2,
@@ -16,6 +17,7 @@ import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import {
   downloadTimeTemplatesJson,
   deleteTimeTemplate,
+  duplicateTimeTemplateDraft,
   exportTimeTemplates,
   fetchTimeTemplateList,
 } from '../api/timeTemplatesApi';
@@ -52,6 +54,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
   const [editTemplateId, setEditTemplateId] = useState<string | null>(null);
   const [previewTarget, setPreviewTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -168,6 +171,19 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
       alert(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDuplicate = async (row: TimeTemplateListItem) => {
+    setDuplicatingId(row.template_id);
+    setOpenMenuId(null);
+    try {
+      await duplicateTimeTemplateDraft(row.template_id);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -362,6 +378,19 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                         >
                           <Pencil className="size-4 text-zinc-400" />
                           編輯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDuplicate(row)}
+                          disabled={duplicatingId === row.template_id}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {duplicatingId === row.template_id ? (
+                            <Loader2 className="size-4 animate-spin text-zinc-400" />
+                          ) : (
+                            <Copy className="size-4 text-zinc-400" />
+                          )}
+                          複製
                         </button>
                         <button
                           type="button"

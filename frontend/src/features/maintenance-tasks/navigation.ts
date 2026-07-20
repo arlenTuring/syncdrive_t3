@@ -1,14 +1,20 @@
 export const MAINTENANCE_TASK_CREATE_HASH = '#maintenance-tasks/create';
 
-export type MaintenanceTaskScreen = 'list' | 'create';
+export type MaintenanceTaskScreen = 'list' | 'create' | 'preview';
 
 export type MaintenanceTaskLocation = {
   screen: MaintenanceTaskScreen;
   editTaskId?: string;
+  /** 進入編輯器時要開啟的步驟（可選） */
+  initialStep?: number;
 };
 
 export function maintenanceTaskEditHash(taskId: string): string {
   return `#maintenance-tasks/edit/${encodeURIComponent(taskId)}`;
+}
+
+export function maintenanceTaskPreviewHash(taskId: string): string {
+  return `#maintenance-tasks/preview/${encodeURIComponent(taskId)}`;
 }
 
 export function isMaintenanceTaskCreateHash(hash = window.location.hash): boolean {
@@ -21,7 +27,15 @@ export function parseMaintenanceTaskEditId(hash = window.location.hash): string 
   return decodeURIComponent(match[1]);
 }
 
+export function parseMaintenanceTaskPreviewId(hash = window.location.hash): string | undefined {
+  const match = hash.match(/^#maintenance-tasks\/preview\/(.+)$/);
+  if (!match) return undefined;
+  return decodeURIComponent(match[1]);
+}
+
 export function readMaintenanceTaskLocation(): MaintenanceTaskLocation {
+  const previewTaskId = parseMaintenanceTaskPreviewId();
+  if (previewTaskId) return { screen: 'preview', editTaskId: previewTaskId };
   const editTaskId = parseMaintenanceTaskEditId();
   if (editTaskId) return { screen: 'create', editTaskId };
   if (isMaintenanceTaskCreateHash()) return { screen: 'create' };
@@ -40,8 +54,20 @@ export function navigateToMaintenanceTaskEdit(taskId: string): void {
   );
 }
 
+export function navigateToMaintenanceTaskPreview(taskId: string): void {
+  window.history.pushState(
+    { maintenanceTaskScreen: 'preview', editTaskId: taskId },
+    '',
+    maintenanceTaskPreviewHash(taskId),
+  );
+}
+
 export function isMaintenanceTaskEditorHash(hash = window.location.hash): boolean {
-  return isMaintenanceTaskCreateHash(hash) || Boolean(parseMaintenanceTaskEditId(hash));
+  return (
+    isMaintenanceTaskCreateHash(hash)
+    || Boolean(parseMaintenanceTaskEditId(hash))
+    || Boolean(parseMaintenanceTaskPreviewId(hash))
+  );
 }
 
 export function leaveMaintenanceTaskEditor(): void {

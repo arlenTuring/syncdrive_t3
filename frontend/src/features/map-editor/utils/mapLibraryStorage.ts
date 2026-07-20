@@ -11,6 +11,8 @@ import {
   type MapPixelSize,
 } from '../types/area'
 import type { MapFileV2, MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import type { PointTopology } from '../types/pointTopology'
+import { emptyPointTopology } from '../types/pointTopology'
 import {
   buildMapFileV2,
   parseMapFileJson,
@@ -95,12 +97,14 @@ function entryFromParsed(
     parsed.pixelSize,
     parsed.areas,
     {
+      description: parsed.description,
       version: parsed.version,
       createdAt,
       updatedAt,
       pixelOrigin: parsed.pixelOrigin,
       routes: parsed.routes,
       routeGroups: parsed.routeGroups,
+      pointTopology: parsed.pointTopology,
     },
   )
   return {
@@ -284,6 +288,7 @@ export function createBlankMapEntry(
     areas: [area],
     routes: [],
     routeGroups: [],
+    pointTopology: emptyPointTopology(),
     createdAt: now,
     updatedAt: now,
   }
@@ -383,6 +388,7 @@ export function saveEditorStateToLibraryEntry(
   areas: MapAreaObject[],
   routes: MapPlannedRoute[] = [],
   routeGroups: MapRouteGroup[] = [],
+  pointTopology?: PointTopology,
 ): MapLibraryEntry {
   const now = nowIso()
   const mapDocument = buildMapFileV2(
@@ -391,12 +397,14 @@ export function saveEditorStateToLibraryEntry(
     meta.pixelSize,
     areas,
     {
+      description: entry.mapDocument.description,
       version: meta.version.trim() || DEFAULT_MAP_VERSION,
       createdAt: entry.createdAt,
       updatedAt: now,
       pixelOrigin: meta.pixelOrigin,
       routes,
       routeGroups,
+      pointTopology,
     },
   )
   return {

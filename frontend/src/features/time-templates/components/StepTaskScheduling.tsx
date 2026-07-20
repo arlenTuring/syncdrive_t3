@@ -5,6 +5,7 @@ import {
   Info,
   Plus,
   Redo2,
+  ScanSearch,
   SlidersHorizontal,
   Tag,
   Trash2,
@@ -35,10 +36,12 @@ import {
   hexToRgba,
   getInactiveRangesWithinBar,
   isScheduleSlotActive,
+  listScheduleTimeGaps,
   parseIntervalMinuteRanges,
   clampScheduleMinute,
   updateScheduleTask,
   type ScheduleTask,
+  type ScheduleTimeGap,
   type TaskTypeKey,
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -528,6 +531,41 @@ function FillEmptySlotsControl({
   );
 }
 
+function ScheduleGapCheckButton({
+  gaps,
+  onJump,
+}: {
+  gaps: ScheduleTimeGap[];
+  onJump: () => void;
+}) {
+  const hasGaps = gaps.length > 0;
+  return (
+    <button
+      type="button"
+      disabled={!hasGaps}
+      onClick={onJump}
+      className={`mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition ${
+        hasGaps
+          ? 'border border-amber-500/50 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
+          : 'cursor-not-allowed border border-zinc-800 bg-zinc-900/60 text-zinc-600'
+      }`}
+      title={
+        hasGaps
+          ? `發現 ${gaps.length} 處時間缺漏，點擊跳至下一處`
+          : '營運時段內任務已填滿，無需檢查'
+      }
+    >
+      <ScanSearch className="size-3.5 shrink-0" aria-hidden />
+      時間缺漏檢查
+      {hasGaps ? (
+        <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-100">
+          {gaps.length}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 /* ── Sidebar Card ── */
 
 function SidebarCard({
@@ -804,7 +842,10 @@ export function StepTaskScheduling({
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('split');
   const [historyVersion, setHistoryVersion] = useState(0);
   const [historyFlash, setHistoryFlash] = useState<'undo' | 'redo' | null>(null);
+  const [highlightedGap, setHighlightedGap] = useState<ScheduleTimeGap | null>(null);
+  const [gapJumpIndex, setGapJumpIndex] = useState(0);
   const gridRef = useRef<HTMLDivElement>(null);
+  const gapHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const taskSettingsFormRef = useRef<TaskSettingsFormHandle>(null);
   const tasksRef = useRef(tasks);
   const rowCountRef = useRef(rowCount);
@@ -922,6 +963,52 @@ export function StepTaskScheduling({
     () => parseIntervalMinuteRanges(intervals),
     [intervals],
   );
+
+  const scheduleGaps = useMemo(
+    () => listScheduleTimeGaps(rowCount, tasks, activeIntervalRanges),
+    [activeIntervalRanges, rowCount, tasks],
+  );
+
+  useEffect(() => {
+    if (scheduleGaps.length === 0) {
+      setGapJumpIndex(0);
+      setHighlightedGap(null);
+      return;
+    }
+    setGapJumpIndex((prev) => prev % scheduleGaps.length);
+  }, [scheduleGaps]);
+
+  useEffect(() => {
+    return () => {
+      if (gapHighlightTimerRef.current) clearTimeout(gapHighlightTimerRef.current);
+    };
+  }, []);
+
+  const jumpToNextScheduleGap = useCallback(() => {
+    if (scheduleGaps.length === 0) return;
+    const index = gapJumpIndex % scheduleGaps.length;
+    const gap = scheduleGaps[index]!;
+    setGapJumpIndex((index + 1) % scheduleGaps.length);
+    setHighlightedGap(gap);
+    if (gapHighlightTimerRef.current) clearTimeout(gapHighlightTimerRef.current);
+    gapHighlightTimerRef.current = setTimeout(() => setHighlightedGap(null), 2400);
+
+    const grid = gridRef.current;
+    if (!grid) return;
+    const leftPx =
+      ROW_LABEL_WIDTH + (gap.start / SCHEDULE_SLOT_MINUTES) * slotWidthPx - grid.clientWidth * 0.18;
+    const rowEl = grid.querySelector(
+      `[data-schedule-row="${gap.rowIndex}"]`,
+    ) as HTMLElement | null;
+    const topPx = rowEl
+      ? Math.max(0, rowEl.offsetTop - grid.clientHeight * 0.25)
+      : grid.scrollTop;
+    grid.scrollTo({
+      left: Math.max(0, leftPx),
+      top: topPx,
+      behavior: 'smooth',
+    });
+  }, [gapJumpIndex, scheduleGaps, slotWidthPx]);
 
   const highlightedAttributeId = useMemo(() => {
     if (!selectedIntervalId) return null;
@@ -1298,9 +1385,12 @@ export function StepTaskScheduling({
             {/* Data rows */}
             {rows.map((row) => {
               const rowTasks = tasks.filter((t) => t.rowIndex === row);
+              const rowHighlight =
+                highlightedGap?.rowIndex === row ? highlightedGap : null;
               return (
                 <div
                   key={row}
+                  data-schedule-row={row}
                   className="relative flex border-b border-zinc-800/50"
                   onClick={() => setSelectedTaskId(null)}
                 >
@@ -1338,6 +1428,18 @@ export function StepTaskScheduling({
                         />
                       );
                     })}
+                    {rowHighlight ? (
+                      <div
+                        className="pointer-events-none absolute inset-y-0.5 z-[3] rounded-md border border-amber-400/80 bg-amber-400/25 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                        style={{
+                          left: (rowHighlight.start / SCHEDULE_SLOT_MINUTES) * slotWidthPx,
+                          width:
+                            ((rowHighlight.end - rowHighlight.start) / SCHEDULE_SLOT_MINUTES)
+                            * slotWidthPx,
+                        }}
+                        aria-hidden
+                      />
+                    ) : null}
                     {/* Render task bars overlaid on top of grid cells */}
                     {rowTasks.map((task) => (
                       <TaskBar
@@ -1412,6 +1514,10 @@ export function StepTaskScheduling({
           <FillEmptySlotsControl
             disabled={activeIntervalRanges.length === 0}
             onConfirmFill={fillEmptySlots}
+          />
+          <ScheduleGapCheckButton
+            gaps={scheduleGaps}
+            onJump={jumpToNextScheduleGap}
           />
         </SidebarCard>
 

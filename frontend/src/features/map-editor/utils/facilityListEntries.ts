@@ -75,7 +75,8 @@ function resolveListRefField(
   return { text, key: `${facility.position.x}|${facility.position.y}` }
 }
 
-function resolveListFieldMeters(
+/** 設施在地圖上的實際場域座標（公尺）；有 bounds 時取中心 */
+export function resolveFacilityFieldMeters(
   facility: FacilityObject,
 ): { xM: number; yM: number } {
   const bounds = getValidRefFieldBounds(facility.parameters)
@@ -96,7 +97,7 @@ function facilityAreaPx(
   area: MapAreaObject,
   facility: FacilityObject,
 ): { pxX: number; pxY: number } {
-  const { xM, yM } = resolveListFieldMeters(facility)
+  const { xM, yM } = resolveFacilityFieldMeters(facility)
 
   if (facility.type === 'Track') {
     const local = fieldPositionToTrackAreaLocal(xM, yM, facility, area, {

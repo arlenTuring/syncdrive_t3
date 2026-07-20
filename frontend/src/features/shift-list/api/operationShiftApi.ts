@@ -131,6 +131,21 @@ export async function duplicateOperationShiftDraft(
   return res.json() as Promise<OperationShiftListItem>;
 }
 
+/** 參數生成 → 複製成手動製作草稿（不修改來源） */
+export async function duplicateOperationShiftAsManualDraft(
+  shiftId: string,
+  backendUrl = resolveOperationShiftBackendUrl(),
+): Promise<OperationShiftListItem> {
+  const res = await fetch(
+    `${backendUrl}/syncdrive-api/operation-shift/detail/${encodeURIComponent(shiftId)}/duplicate-as-manual`,
+    { method: 'POST' },
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, '複製成手動製作失敗'));
+  }
+  return res.json() as Promise<OperationShiftListItem>;
+}
+
 export async function deleteOperationShift(
   shiftId: string,
   backendUrl = resolveOperationShiftBackendUrl(),

@@ -45,7 +45,7 @@ export function MapEditorTestDock({
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<MapEditorTestDockTab>('mqtt')
 
-  const bottomClass = paletteOpen ? 'bottom-28 sm:bottom-32' : 'bottom-3'
+  const bottomClass = 'bottom-3'
 
   return (
     <div

@@ -11,6 +11,9 @@ export type OperationShiftListItem = {
   name: string;
   time_template_name: string;
   version: string;
+  /** 建立方式：參數生成 / 手動製作 */
+  creation_mode: 'parametric' | 'manual';
+  creation_mode_label: string;
   publish_status: OperationShiftPublishStatus;
   publish_status_label: string;
   usage_status: OperationShiftUsageStatus;
@@ -40,9 +43,17 @@ export function operationShiftPublishStatusLabel(status: OperationShiftPublishSt
   return status === OperationShiftPublishStatus.PUBLISHED ? '已發布' : '草稿區';
 }
 
+export function operationShiftCreationModeLabel(mode: 'parametric' | 'manual'): string {
+  return mode === 'manual' ? '手動製作' : '參數生成';
+}
+
 function readBodyString(body: Record<string, unknown>, key: string): string {
   const value = body[key];
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function readCreationMode(body: Record<string, unknown>): 'parametric' | 'manual' {
+  return body.creationMode === 'manual' ? 'manual' : 'parametric';
 }
 
 export function toOperationShiftListItem(row: OperationShift): OperationShiftListItem {
@@ -50,12 +61,15 @@ export function toOperationShiftListItem(row: OperationShift): OperationShiftLis
   const timeTemplateName =
     readBodyString(body, 'timeTemplateName') || readBodyString(body, 'time_template_name');
   const version = readBodyString(body, 'version');
+  const creationMode = readCreationMode(body);
 
   return {
     shift_id: row.id,
     name: row.name,
     time_template_name: timeTemplateName || '—',
     version: version || '—',
+    creation_mode: creationMode,
+    creation_mode_label: operationShiftCreationModeLabel(creationMode),
     publish_status: row.publishStatus,
     publish_status_label: operationShiftPublishStatusLabel(row.publishStatus),
     usage_status: row.usageStatus,

@@ -1,4 +1,13 @@
-import { AlertCircle, ArrowLeft, Check, ClipboardList, Loader2, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  ClipboardList,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   checkOperationShiftNameUnique,
@@ -18,6 +27,7 @@ import {
   isShiftScheduleStepComplete,
   resolveShiftScheduleDraftName,
   serializeShiftScheduleBody,
+  isShiftScheduleOutputFresh,
   shouldInvalidateShiftScheduleOutput,
   type CreateShiftScheduleStep,
   type ShiftScheduleCreateDraft,
@@ -33,6 +43,8 @@ type CreateShiftSchedulePageProps = {
   onBack: () => void;
   onSavedDraft?: () => void;
   editShiftId?: string;
+  /** 新建時指定參數生成或手動製作；編輯既有草稿時以 body.creationMode 為準 */
+  initialCreationMode?: 'parametric' | 'manual';
 };
 
 const INPUT_CLASS =
@@ -114,7 +126,7 @@ function CreateStepSidebar({
         </button>
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
           <ClipboardList className="size-4 text-[#2B7FFF]" />
-          建立正線班表
+          建立班表
         </div>
       </div>
 
@@ -132,7 +144,11 @@ function CreateStepSidebar({
                 turnaroundLimitSeconds,
               );
             const unlocked = item.step <= maxReachedStep;
-            const isStepLockedByInvalidation = isScheduleInvalidated && item.step >= 5;
+            // 第 5 步：班表失效即鎖；第 6 步：僅「到過第六步」才顯示黃驚嘆號並鎖住
+            const isStepLockedByInvalidation =
+              isScheduleInvalidated
+              && item.step >= 5
+              && item.step <= maxReachedStep;
             const canClick = unlocked && !isStepLockedByInvalidation;
 
             return (
@@ -141,12 +157,19 @@ function CreateStepSidebar({
                   type="button"
                   disabled={!canClick}
                   onClick={() => canClick && onStepClick(item.step)}
+                  title={
+                    isStepLockedByInvalidation
+                      ? '班表已失效，請先重新生成後再進入'
+                      : undefined
+                  }
                   className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
                     active
                       ? 'bg-[rgba(43,127,255,0.12)]'
                       : canClick
                         ? 'hover:bg-zinc-900/80'
-                        : 'cursor-not-allowed opacity-50'
+                        : isStepLockedByInvalidation
+                          ? 'cursor-not-allowed'
+                          : 'cursor-not-allowed opacity-50'
                   }`}
                 >
                   {active && (
@@ -160,14 +183,14 @@ function CreateStepSidebar({
                       active
                         ? 'bg-[#2B7FFF] text-white'
                         : isStepLockedByInvalidation
-                          ? 'bg-amber-500 text-zinc-950 font-bold text-xs'
+                          ? 'bg-amber-400 text-zinc-950'
                           : completed
                             ? 'bg-emerald-500/20 text-emerald-400'
                             : 'bg-zinc-800 text-zinc-500'
                     }`}
                   >
                     {isStepLockedByInvalidation ? (
-                      '!'
+                      <AlertTriangle className="size-3.5" strokeWidth={2.5} aria-hidden />
                     ) : completed ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
@@ -279,9 +302,12 @@ export function CreateShiftSchedulePage({
   onBack,
   onSavedDraft,
   editShiftId,
+  initialCreationMode = 'parametric',
 }: CreateShiftSchedulePageProps) {
   const isEditing = Boolean(editShiftId);
-  const [draft, setDraft] = useState<ShiftScheduleCreateDraft>(() => emptyShiftScheduleCreateDraft());
+  const [draft, setDraft] = useState<ShiftScheduleCreateDraft>(() =>
+    emptyShiftScheduleCreateDraft(initialCreationMode),
+  );
   const [savedShiftId, setSavedShiftId] = useState<string | undefined>(editShiftId);
   const [loading, setLoading] = useState(isEditing);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -356,6 +382,12 @@ export function CreateShiftSchedulePage({
       setHydrated(true);
       setDraft((prev) => {
         const next = typeof value === 'function' ? value(prev) : value;
+        if (
+          prev.scheduleOutput?.plan
+          && isShiftScheduleOutputFresh({ ...next, scheduleOutput: prev.scheduleOutput })
+        ) {
+          return { ...next, scheduleOutput: prev.scheduleOutput };
+        }
         if (shouldInvalidateShiftScheduleOutput(prev, next)) {
           return { ...next, scheduleOutput: null };
         }
@@ -485,13 +517,20 @@ export function CreateShiftSchedulePage({
   }, [draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
 
   const isScheduleInvalidated = useMemo(() => {
-    return draft.maxReachedStep >= 5 && draft.scheduleOutput === null;
-  }, [draft.maxReachedStep, draft.scheduleOutput]);
+    if (draft.maxReachedStep < 5) return false;
+    if (!draft.scheduleOutput?.plan) return true;
+    return !isShiftScheduleOutputFresh(draft);
+  }, [draft]);
+
+  const showInvalidationChrome =
+    isScheduleInvalidated
+    && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4);
 
   const handleRebuildAndGoToStep5 = async () => {
     setLoading(true);
     try {
       await flushAutoSave();
+      // 不論目前在 2/3/4 哪一步，一律跳到第 5 步；由第 5 步依失效狀態自動重新生成
       setDraft((prev) => ({
         ...prev,
         currentStep: 5,
@@ -505,13 +544,18 @@ export function CreateShiftSchedulePage({
     }
   };
 
+  const navigateToStepFromPreview = useCallback((step: CreateShiftScheduleStep) => {
+    if (step > draft.maxReachedStep) return;
+    if (isScheduleInvalidated && step >= 5) return;
+    setDraft((prev) => ({ ...prev, currentStep: step }));
+  }, [draft.maxReachedStep, isScheduleInvalidated]);
+
   const goToStep = useCallback((step: CreateShiftScheduleStep) => {
     void flushAutoSave().finally(() =>
       setDraft((prev) => ({
         ...prev,
         currentStep: step,
         maxReachedStep: Math.max(prev.maxReachedStep, step) as CreateShiftScheduleStep,
-        ...(step === 5 ? { scheduleOutput: null } : {}),
       })),
     );
   }, [flushAutoSave]);
@@ -578,11 +622,18 @@ export function CreateShiftSchedulePage({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-8">
-          <div className="relative flex min-h-full flex-col rounded-2xl border border-zinc-800/80 bg-[#111113] p-8 pt-14">
+          <div
+            className={`relative flex min-h-full flex-col rounded-2xl bg-[#111113] p-8 pt-14 ${
+              showInvalidationChrome
+                ? 'border-2 border-amber-400'
+                : 'border border-zinc-800/80'
+            }`}
+          >
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
-            {isScheduleInvalidated && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4) && (
-              <div className="mb-6 flex items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400 font-medium shrink-0 animate-pulse">
-                <span>⚠️ 關鍵設定變更，班表已失效，請點擊重新生成按鈕</span>
+            {showInvalidationChrome && (
+              <div className="mb-6 flex shrink-0 items-center justify-center gap-2 px-4 py-1 text-sm font-medium text-amber-400">
+                <AlertTriangle className="size-4 shrink-0" strokeWidth={2.25} aria-hidden />
+                <span>關鍵設定變更，班表已失效，請點擊重新生成按鈕</span>
               </div>
             )}
             {loading ? (
@@ -606,6 +657,7 @@ export function CreateShiftSchedulePage({
                 {draft.currentStep === 2 && (
                   <StepShiftMaintenanceTask
                     draft={draft.maintenanceTask}
+                    creationMode={draft.creationMode}
                     onChange={(maintenanceTask) =>
                       updateDraft((prev) => ({ ...prev, maintenanceTask }))
                     }
@@ -614,6 +666,7 @@ export function CreateShiftSchedulePage({
                 {draft.currentStep === 3 && (
                   <StepShiftTimeTemplate
                     draft={draft.timeTemplate}
+                    creationMode={draft.creationMode}
                     onChange={(timeTemplate) =>
                       updateDraft((prev) => ({ ...prev, timeTemplate }))
                     }
@@ -623,6 +676,7 @@ export function CreateShiftSchedulePage({
                   <StepShiftRouteGroups
                     draft={draft.routeGroups}
                     timeTemplateId={draft.timeTemplate.templateId}
+                    creationMode={draft.creationMode}
                     onChange={(routeGroups) =>
                       updateDraft((prev) => ({ ...prev, routeGroups }))
                     }
@@ -636,7 +690,11 @@ export function CreateShiftSchedulePage({
                   />
                 )}
                 {draft.currentStep === 6 && (
-                  <StepShiftSchedulePreview draft={draft} />
+                  <StepShiftSchedulePreview
+                    draft={draft}
+                    turnaroundLimitSeconds={turnaroundLimitSeconds}
+                    onNavigateToStep={navigateToStepFromPreview}
+                  />
                 )}
               </>
             )}
@@ -654,13 +712,14 @@ export function CreateShiftSchedulePage({
             >
               上一步
             </button>
-            {isScheduleInvalidated && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4) ? (
+            {showInvalidationChrome ? (
               <button
                 type="button"
-                onClick={handleRebuildAndGoToStep5}
+                onClick={() => void handleRebuildAndGoToStep5()}
                 disabled={loading || Boolean(loadError)}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400 transition"
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
+                <RefreshCw className="size-4" aria-hidden />
                 儲存並重新生成班表
               </button>
             ) : (

@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronLeft,
+  Info,
   Save,
   X,
 } from 'lucide-react'
@@ -14,20 +15,23 @@ import { RouteGroupEditorView, type RouteGroupDraft } from './RouteGroupEditorVi
 import { RouteGroupListView } from './RouteGroupListView'
 import {
   stationDisplayLabel,
-  formatRouteTravelTimeSummary,
   isRouteTravelTimePairValid,
   isRoutePlanningDraftSavable,
   type RoutePlanningDraft,
 } from '../utils/routePlanning'
+import { resolveRoutePreviewGeometry } from '../utils/routeTrackPath'
+import type { PointTopology } from '../types/pointTopology'
 import {
-  partitionStationsForRouteAppend,
-  resolveRoutePreviewGeometry,
-} from '../utils/routeTrackPath'
+  buildTopologyRouteTravelBreakdown,
+  formatTopologyLegSummary,
+  partitionStationsForTopologyRouteAppend,
+} from '../utils/topologyRouteTravel'
 
 type Props = {
   areas: MapAreaObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
+  pointTopology: PointTopology
   editMode: boolean
   draft: RoutePlanningDraft | null
   groupDraft: RouteGroupDraft | null
@@ -58,11 +62,12 @@ export function RoutePlanningPanel({
   areas,
   routeGroups,
   routes,
+  pointTopology,
   editMode,
   draft,
   groupDraft,
   visibleRouteIds,
-  pickMode,
+  pickMode: _pickMode,
   onStartNewRoute,
   onStartNewGroup,
   onEditRoute,
@@ -88,7 +93,42 @@ export function RoutePlanningPanel({
   const [dropdownStationId, setDropdownStationId] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
-  const canSave = Boolean(draft && isRoutePlanningDraftSavable(draft))
+
+  const topologyBreakdown = useMemo(() => {
+    if (!draft || draft.stationIds.length < 2) return null
+    return buildTopologyRouteTravelBreakdown(pointTopology, areas, draft.stationIds)
+  }, [draft, pointTopology, areas])
+
+  const canSave = Boolean(
+    draft
+    && isRoutePlanningDraftSavable(draft)
+    && topologyBreakdown?.pathsComplete
+    && topologyBreakdown?.timesComplete,
+  )
+
+  // 整線行駛時間由拓撲自動加總
+  useEffect(() => {
+    if (!draft || !editMode) return
+    if (!topologyBreakdown) {
+      if (draft.avgTravelTimeSeconds != null) onDraftAvgTravelTimeChange(null)
+      if (draft.minTravelTimeSeconds != null) onDraftMinTravelTimeChange(null)
+      return
+    }
+    const nextAvg = topologyBreakdown.timesComplete
+      ? topologyBreakdown.totalAvgTravelTimeSeconds
+      : null
+    const nextMin = topologyBreakdown.timesComplete
+      ? topologyBreakdown.totalMinTravelTimeSeconds
+      : null
+    if (draft.avgTravelTimeSeconds !== nextAvg) onDraftAvgTravelTimeChange(nextAvg)
+    if (draft.minTravelTimeSeconds !== nextMin) onDraftMinTravelTimeChange(nextMin)
+  }, [
+    draft,
+    editMode,
+    topologyBreakdown,
+    onDraftAvgTravelTimeChange,
+    onDraftMinTravelTimeChange,
+  ])
 
   const travelTimeInvalid =
     draft != null
@@ -100,12 +140,17 @@ export function RoutePlanningPanel({
     return resolveRoutePreviewGeometry(areas, draft.stationIds)
   }, [areas, draft])
 
+  // 軌道預覽警告僅供參考；路線是否成立改由拓撲決定
   const routeWarnings = routePreview?.warnings ?? []
 
   const stationPartition = useMemo(() => {
     if (!draft) return { selectable: [], disabled: [] }
-    return partitionStationsForRouteAppend(areas, draft.stationIds)
-  }, [areas, draft])
+    return partitionStationsForTopologyRouteAppend(
+      pointTopology,
+      areas,
+      draft.stationIds,
+    )
+  }, [pointTopology, areas, draft])
 
   const { selectable: selectableStations, disabled: disabledStations } =
     stationPartition
@@ -168,6 +213,7 @@ export function RoutePlanningPanel({
           areas={areas}
           routeGroups={routeGroups}
           routes={routes}
+          pointTopology={pointTopology}
           editMode={editMode}
           visibleRouteIds={visibleRouteIds}
           onToggleRouteVisibility={onToggleRouteVisibility}
@@ -205,85 +251,6 @@ export function RoutePlanningPanel({
               disabled={!editMode}
               className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none"
             />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-[10px] font-medium text-zinc-400">
-              <span className="text-red-400">*</span> 行駛時間（秒）
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="mb-1 block text-[9px] text-zinc-500">平均時間</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  value={draft.avgTravelTimeSeconds ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value.trim()
-                    onDraftAvgTravelTimeChange(
-                      raw === '' ? null : Math.max(1, Math.round(Number(raw) || 0)),
-                    )
-                  }}
-                  placeholder="請輸入"
-                  disabled={!editMode}
-                  className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[9px] text-zinc-500">最快時間</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  value={draft.minTravelTimeSeconds ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value.trim()
-                    onDraftMinTravelTimeChange(
-                      raw === '' ? null : Math.max(1, Math.round(Number(raw) || 0)),
-                    )
-                  }}
-                  placeholder="請輸入"
-                  disabled={!editMode}
-                  className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none disabled:opacity-50"
-                />
-              </label>
-            </div>
-            <p className="mt-1 text-[9px] leading-snug text-zinc-600">
-              自駕車走完此路線的行駛時間（不含月台門停靠）；正線路線必填，最快時間不可大於平均時間
-            </p>
-            {travelTimeInvalid ? (
-              <p className="mt-1 text-[9px] text-red-400">
-                請填寫平均與最快時間，且最快時間須 ≤ 平均時間
-              </p>
-            ) : null}
-            {formatRouteTravelTimeSummary(
-              draft.avgTravelTimeSeconds,
-              draft.minTravelTimeSeconds,
-            ) ? (
-              <p className="mt-1 text-[9px] text-zinc-500">
-                圖台預覽：
-                {formatRouteTravelTimeSummary(
-                  draft.avgTravelTimeSeconds,
-                  draft.minTravelTimeSeconds,
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <div
-            className={[
-              'rounded-md border px-2.5 py-2 text-[10px]',
-              pickMode
-                ? 'border-amber-500/50 bg-amber-950/30 text-amber-100'
-                : 'border-zinc-700/70 bg-zinc-950/50 text-zinc-400',
-            ].join(' ')}
-          >
-            {pickMode
-              ? '點選地圖上可連接的停靠點，或從下方清單加入；灰色站點無法從目前路線末端連接。'
-              : '請進入編輯模式以加入站點。'}
           </div>
 
           {editMode ? (
@@ -381,24 +348,21 @@ export function RoutePlanningPanel({
           ) : null}
 
           {routeWarnings.length > 0 ? (
-            <div className="space-y-1.5 rounded-md border border-red-500/40 bg-red-950/30 px-2.5 py-2">
-              <p className="flex items-center gap-1.5 text-[10px] font-semibold text-red-200">
-                <AlertTriangle className="size-3.5 shrink-0" />
-                站序連通異常
+            <div className="space-y-1.5 rounded-md border border-zinc-700/50 bg-zinc-950/40 px-2.5 py-2">
+              <p className="flex items-center gap-1.5 text-[9px] font-medium text-zinc-500">
+                <AlertTriangle className="size-3 shrink-0" />
+                地圖軌道預覽（僅參考，不影響路線是否成立）
               </p>
               <ul className="space-y-1">
                 {routeWarnings.map((w) => (
                   <li
                     key={`${w.fromStationId}-${w.toStationId}`}
-                    className="text-[10px] leading-snug text-red-100/90"
+                    className="text-[9px] leading-snug text-zinc-600"
                   >
                     {w.message}
                   </li>
                 ))}
               </ul>
-              <p className="text-[9px] text-red-200/70">
-                請調整站序順序，或移除無法連通的站點。
-              </p>
             </div>
           ) : null}
 
@@ -412,64 +376,179 @@ export function RoutePlanningPanel({
               </p>
             ) : (
               <ol className="space-y-1">
-                {draft.stationIds.map((stationId, index) => (
-                  <li
-                    key={`${stationId}-${index}`}
-                    className="flex items-center gap-1 rounded border border-zinc-700/80 bg-zinc-950/60 px-1.5 py-1"
-                  >
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[9px] font-bold text-amber-200">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[10px] font-medium text-zinc-200">
-                        {stationDisplayLabel(areas, stationId)}
-                      </p>
-                      <p className="truncate font-mono text-[9px] text-zinc-500">
-                        {stationId}
-                      </p>
-                    </div>
-                    {editMode ? (
-                      <div className="flex shrink-0 flex-col">
-                        <button
-                          type="button"
-                          title="上移"
-                          disabled={index === 0}
-                          onClick={() => onMoveStation(index, index - 1)}
-                          className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-                        >
-                          <ArrowUp className="size-3" />
-                        </button>
-                        <button
-                          type="button"
-                          title="下移"
-                          disabled={index === draft.stationIds.length - 1}
-                          onClick={() => onMoveStation(index, index + 1)}
-                          className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-                        >
-                          <ArrowDown className="size-3" />
-                        </button>
-                        <button
-                          type="button"
-                          title="移除"
-                          onClick={() => onRemoveStationAt(index)}
-                          className="rounded p-0.5 text-zinc-500 hover:bg-red-950/50 hover:text-red-300"
-                        >
-                          <X className="size-3" />
-                        </button>
+                {draft.stationIds.map((stationId, index) => {
+                  const leg =
+                    topologyBreakdown && index < draft.stationIds.length - 1
+                      ? topologyBreakdown.legs[index]
+                      : null
+                  return (
+                    <li key={`${stationId}-${index}`} className="space-y-1">
+                      <div className="flex items-center gap-1 rounded border border-zinc-700/80 bg-zinc-950/60 px-1.5 py-1">
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[9px] font-bold text-amber-200">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[10px] font-medium text-zinc-200">
+                            {stationDisplayLabel(areas, stationId)}
+                          </p>
+                          <p className="truncate font-mono text-[9px] text-zinc-500">
+                            {stationId}
+                          </p>
+                        </div>
+                        {editMode ? (
+                          <div className="flex shrink-0 flex-col">
+                            <button
+                              type="button"
+                              title="上移"
+                              disabled={index === 0}
+                              onClick={() => onMoveStation(index, index - 1)}
+                              className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+                            >
+                              <ArrowUp className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="下移"
+                              disabled={index === draft.stationIds.length - 1}
+                              onClick={() => onMoveStation(index, index + 1)}
+                              className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+                            >
+                              <ArrowDown className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="移除"
+                              onClick={() => onRemoveStationAt(index)}
+                              className="rounded p-0.5 text-zinc-500 hover:bg-red-950/50 hover:text-red-300"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </li>
-                ))}
+                      {leg ? (
+                        <div
+                          className={[
+                            'ml-6 rounded border px-2 py-1 text-[9px] leading-snug',
+                            leg.pathFound && leg.metricsComplete
+                              ? 'border-zinc-800 bg-zinc-950/40 text-zinc-400'
+                              : 'border-amber-800/50 bg-amber-950/20 text-amber-200/90',
+                          ].join(' ')}
+                        >
+                          → {stationDisplayLabel(areas, leg.toStationId)}
+                          {' · '}
+                          {formatTopologyLegSummary(leg)}
+                          {leg.nodePath.length > 2 ? (
+                            <span className="text-zinc-600">
+                              {' '}
+                              （經 {leg.nodePath.length - 2} 途經點）
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
               </ol>
             )}
           </div>
+
+          {/* 選定至少 2 站後才顯示拓撲加總結果 */}
+          {draft.stationIds.length >= 2 ? (
+            <div
+              className={[
+                'shrink-0 rounded-lg border px-3 py-2.5 transition',
+                topologyBreakdown?.timesComplete
+                  ? 'border-cyan-700/50 bg-gradient-to-b from-cyan-950/40 to-zinc-950/80'
+                  : 'border-zinc-700/70 bg-zinc-950/70',
+              ].join(' ')}
+            >
+              <div className="mb-2 flex items-center gap-1">
+                <p className="text-[10px] font-semibold text-zinc-200">
+                  拓撲加總結果
+                </p>
+                <span className="group relative inline-flex">
+                  <button
+                    type="button"
+                    className="rounded p-0.5 text-zinc-400 transition hover:text-zinc-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/60"
+                    aria-label="行駛時間說明"
+                  >
+                    <Info className="size-3.5" strokeWidth={2} aria-hidden />
+                  </button>
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-56 rounded-md border border-zinc-600 bg-zinc-900 px-2.5 py-2 text-[10px] leading-relaxed text-zinc-200 shadow-xl group-hover:block group-focus-within:block"
+                  >
+                    <span className="block">依站序在點位拓撲上自動加總。</span>
+                    <span className="mt-1 block text-zinc-400">
+                      可經途經點；不含月台門停靠。
+                    </span>
+                    {topologyBreakdown?.totalDistanceMeters != null ? (
+                      <span className="mt-1.5 block border-t border-zinc-700/80 pt-1.5 tabular-nums text-zinc-100">
+                        距離：{topologyBreakdown.totalDistanceMeters} m
+                      </span>
+                    ) : (
+                      <span className="mt-1.5 block border-t border-zinc-700/80 pt-1.5 text-zinc-500">
+                        距離：尚無完整資料
+                      </span>
+                    )}
+                    <span className="mt-1 block text-zinc-500">
+                      請在「編輯點位拓撲」補齊連線與時間。
+                    </span>
+                  </span>
+                </span>
+              </div>
+
+              {topologyBreakdown?.timesComplete ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md bg-zinc-950/60 px-2.5 py-2">
+                    <p className="text-[9px] text-zinc-400">平均時間</p>
+                    <p className="mt-0.5 text-base font-semibold tabular-nums text-zinc-50">
+                      {draft.avgTravelTimeSeconds}
+                      <span className="ml-1 text-[10px] font-normal text-zinc-400">秒</span>
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-zinc-950/60 px-2.5 py-2">
+                    <p className="text-[9px] text-zinc-400">最快時間</p>
+                    <p className="mt-0.5 text-base font-semibold tabular-nums text-zinc-50">
+                      {draft.minTravelTimeSeconds}
+                      <span className="ml-1 text-[10px] font-normal text-zinc-400">秒</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[10px] leading-snug text-zinc-400">
+                  {!topologyBreakdown?.pathsComplete
+                    ? '拓撲尚無此站序組合，無法計算行駛時間。'
+                    : '拓撲路徑已連通，請補齊各段最快／平均時間。'}
+                </p>
+              )}
+
+              {topologyBreakdown?.timesComplete
+                && topologyBreakdown.totalDistanceMeters != null ? (
+                <p className="mt-2 text-[10px] tabular-nums text-zinc-400">
+                  距離 {topologyBreakdown.totalDistanceMeters} m
+                </p>
+              ) : null}
+
+              {travelTimeInvalid ? (
+                <p className="mt-1.5 text-[9px] text-red-400">
+                  加總異常：最快時間須 ≤ 平均時間
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="shrink-0 rounded-lg border border-dashed border-zinc-700/70 px-3 py-2.5 text-center text-[10px] text-zinc-500">
+              選定至少 2 個停靠點後，此處會顯示拓撲加總的行駛時間
+            </p>
+          )}
 
           {editMode ? (
             <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-700/80 pt-2">
               <button
                 type="button"
                 onClick={onSaveDraft}
-                disabled={!canSave || routeWarnings.length > 0}
+                disabled={!canSave}
                 className="flex flex-1 items-center justify-center gap-1 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-2 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-40"
               >
                 <Save className="size-3.5" />

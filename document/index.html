@@ -14,6 +14,110 @@
       --sidebar-nav-link-color--active: #42b983;
       --sidebar-nav-link-border-color--active: #42b983;
       --cover-heading-color: #42b983;
+      --content-max-width: 1120px;
+      --theme-color: #42b983;
+    }
+
+    .markdown-section {
+      max-width: var(--content-max-width);
+      padding: 36px 48px 72px;
+    }
+
+    .markdown-section h1 {
+      font-size: 2.25rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.25rem;
+    }
+
+    .markdown-section h2 {
+      border-bottom: 1px solid #31363b;
+      margin-top: 2.8rem;
+      padding-bottom: 0.45rem;
+    }
+
+    .markdown-section h3 {
+      color: #dce7e3;
+      margin-top: 2rem;
+    }
+
+    .markdown-section blockquote {
+      background: rgba(66, 185, 131, 0.09);
+      border-left: 4px solid #42b983;
+      border-radius: 0 8px 8px 0;
+      color: #d8e5df;
+      padding: 14px 18px;
+    }
+
+    .markdown-section code {
+      border: 1px solid #343a40;
+      border-radius: 5px;
+      padding: 0.12em 0.36em;
+    }
+
+    .doc-hero {
+      background:
+        radial-gradient(circle at 85% 15%, rgba(66, 185, 131, 0.18), transparent 32%),
+        linear-gradient(135deg, #20272a, #171b1d);
+      border: 1px solid #35413d;
+      border-radius: 16px;
+      margin: 0 0 28px;
+      overflow: hidden;
+      padding: 34px 38px;
+    }
+
+    .doc-hero h2 {
+      border: 0;
+      font-size: 2rem;
+      margin: 2px 0 8px;
+      padding: 0;
+    }
+
+    .doc-hero p {
+      color: #b8c5c0;
+      margin: 0;
+    }
+
+    .doc-hero .doc-eyebrow {
+      color: #62d5a3;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+
+    .doc-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 20px 0 30px;
+    }
+
+    .doc-card {
+      background: #202529;
+      border: 1px solid #343b3f;
+      border-radius: 10px;
+      color: inherit !important;
+      display: flex;
+      flex-direction: column;
+      min-height: 82px;
+      padding: 16px 18px;
+      text-decoration: none !important;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .doc-card:hover {
+      border-color: #42b983;
+      transform: translateY(-2px);
+    }
+
+    .doc-card strong {
+      color: #6be0ad;
+      font-size: 1rem;
+      margin-bottom: 5px;
+    }
+
+    .doc-card span {
+      color: #aeb9b5;
+      font-size: 0.88rem;
     }
 
     /* 側邊欄分類標題 */
@@ -55,6 +159,20 @@
     /* 搜尋框 */
     .search input {
       border-radius: 6px !important;
+    }
+
+    @media (max-width: 768px) {
+      .markdown-section {
+        padding: 24px 20px 56px;
+      }
+
+      .doc-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .doc-hero {
+        padding: 25px 22px;
+      }
     }
   </style>
 </head>

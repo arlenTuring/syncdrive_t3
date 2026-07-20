@@ -1,4 +1,5 @@
 import type { FacilityName, FacilityType } from './facility'
+import type { PointTopology } from './pointTopology'
 
 /** 地圖檔 JSON 版本（匯入時向下相容 v1） */
 export const MAP_FILE_SCHEMA_VERSION = 2
@@ -62,6 +63,8 @@ export interface MapGeofenceLabel {
   rotationDeg?: number
   fontSizePx?: number
   fontWeight?: 'normal' | 'bold'
+  labelBoxWidthPx?: number
+  labelBoxHeightPx?: number
 }
 
 /** Geofence 多邊形與樣式參數（皆放在 parameters 內） */
@@ -72,6 +75,8 @@ export interface MapGeofenceParameters {
   strokeColor?: string
   fillEnabled?: boolean
   fillColor?: string
+  /** 填色不透明度 0–1 */
+  fillOpacity?: number
   labels?: MapGeofenceLabel[]
   /** 參照場域範圍（公尺，min/max；未設定可為 null） */
   refFieldXMinM?: number | null
@@ -169,6 +174,8 @@ export interface MapFileV2 {
   areas: MapFileAreaEntry[]
   routeGroups?: MapRouteGroup[]
   routes?: MapPlannedRoute[]
+  /** 點位拓撲（停靠點／途經點有向時間距離網路） */
+  pointTopology?: PointTopology
 }
 
 /** @deprecated v1 格式；匯入時自動升級為 v2 */

@@ -4,9 +4,22 @@ import { useEffect } from 'react';
 type NavigateToSetupModalProps = {
   onClose: () => void;
   onConfirm: () => void;
+  /**
+   * 第二個按鈕（可選）：例如「手動製作」等分支流程。
+   * 若未提供則僅顯示 primary 按鈕。
+   */
+  onSecondary?: () => void;
+  primaryLabel?: string;
+  secondaryLabel?: string;
 };
 
-export function NavigateToSetupModal({ onClose, onConfirm }: NavigateToSetupModalProps) {
+export function NavigateToSetupModal({
+  onClose,
+  onConfirm,
+  onSecondary,
+  primaryLabel = '前往設定',
+  secondaryLabel,
+}: NavigateToSetupModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -50,13 +63,24 @@ export function NavigateToSetupModal({ onClose, onConfirm }: NavigateToSetupModa
         </p>
 
         <div className="mt-8 flex justify-end">
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6]"
-          >
-            前往設定
-          </button>
+          <div className="flex gap-3">
+            {onSecondary && secondaryLabel ? (
+              <button
+                type="button"
+                onClick={onSecondary}
+                className="inline-flex h-[38px] items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900/40 px-5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:border-zinc-600"
+              >
+                {secondaryLabel}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6]"
+            >
+              {primaryLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,21 +1,17 @@
 import type { ScheduleTask } from '../../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import {
-  normalizeSwitchBufferAfterSeconds,
+  resolveInterTripGapSeconds,
   sumStationDwellSecondsWithSlack,
   snapUpToClockAlignSeconds,
 } from './physics';
 import { minuteToSecond } from './types';
+import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
 
-/** 約束貪婪路線指派（Constraint-Greedy Route Assignment） */
+/** 約束貪婪路線指派（Constraint-Greedy Route Assignment）— 執行順序為硬輪替 */
 export const ROUTE_ASSIGNMENT_ALGORITHM = 'constraint-greedy-v1' as const;
 
 export type RouteAssignmentAlgorithm = typeof ROUTE_ASSIGNMENT_ALGORITHM;
-
-type TimelineState = {
-  lastRouteId: string | null;
-  lastEndSecond: number | null;
-};
 
 export type RouteAssignmentDecision = {
   taskId: string;
@@ -33,20 +29,15 @@ function resolvePassengerOccupancy(route: ShiftScheduleSelectedRoute): {
   travelSeconds: number;
   dwellSeconds: number;
 } | null {
-  if (!route.avgTravelTimeSeconds || route.avgTravelTimeSeconds <= 0) return null;
-  if (
-    route.minTravelTimeSeconds != null
-    && route.minTravelTimeSeconds > route.avgTravelTimeSeconds
-  ) {
-    return null;
-  }
+  const travel = resolveEffectiveRouteTravelSeconds(route);
+  if (!travel) return null;
   const dwellSeconds = sumStationDwellSecondsWithSlack(
     route.stationDwells,
-    route.dwellSlackPercent,
+    route.dwellSlackSeconds,
   );
   if (dwellSeconds == null) return null;
-  const travelSeconds = route.avgTravelTimeSeconds;
-  const minTravelSeconds = route.minTravelTimeSeconds ?? travelSeconds;
+  const travelSeconds = travel.avgTravelTimeSeconds;
+  const minTravelSeconds = travel.minTravelTimeSeconds;
   return {
     travelSeconds,
     dwellSeconds,
@@ -69,8 +60,8 @@ function findNextPassengerAnchorSecond(
 }
 
 /**
- * 評分愈低愈佳。
- * 硬約束違規加巨大懲罰；軟目標：少換線、多恢復裕度、負載均衡、尊重執行順序。
+ * 評分愈低愈佳（診斷／破平手用）。
+ * 硬約束：下一錨點衝突、兩趟空檔不足（恢復 + 換線相加）。
  */
 export function scoreRouteCandidate(args: {
   route: ShiftScheduleSelectedRoute;
@@ -97,7 +88,11 @@ export function scoreRouteCandidate(args: {
     usageCount,
   } = args;
 
-  const minTravel = route.minTravelTimeSeconds ?? route.avgTravelTimeSeconds ?? 0;
+  const minTravel =
+    resolveEffectiveRouteTravelSeconds(route)?.minTravelTimeSeconds
+    ?? route.minTravelTimeSeconds
+    ?? route.avgTravelTimeSeconds
+    ?? 0;
   const dwellSeconds = occupancySeconds - travelSeconds;
   const minOccupancy = snapUpToClockAlignSeconds(minTravel + dwellSeconds);
   const minEndSecond = startSecond + minOccupancy;
@@ -114,7 +109,6 @@ export function scoreRouteCandidate(args: {
       feasible = false;
       score += 500_000 + (minimumRecoveryTimeSeconds - gapAfterMin);
     } else {
-      // min 可行，接著看 avg 的衝突情況（有衝突則加 penalty 進行軟限制）
       const avgEndSecond = startSecond + occupancySeconds;
       const gapAfterAvg = nextAnchorSecond - avgEndSecond;
       if (gapAfterAvg < 0) {
@@ -127,20 +121,22 @@ export function scoreRouteCandidate(args: {
     }
   }
 
-  if (
-    previousRouteId != null
-    && previousEndSecond != null
-    && previousRouteId !== route.routeId
-  ) {
+  if (previousRouteId != null && previousEndSecond != null) {
+    const isRouteSwitch = previousRouteId !== route.routeId;
+    const requiredGap = resolveInterTripGapSeconds({
+      minimumRecoveryTimeSeconds,
+      previousRouteSwitchBufferSeconds: previousSwitchBufferSeconds,
+      isRouteSwitch,
+    });
     const gapBefore = startSecond - previousEndSecond;
-    if (previousSwitchBufferSeconds > 0 && gapBefore < previousSwitchBufferSeconds) {
+    if (gapBefore < requiredGap) {
       feasible = false;
-      score += 800_000 + (previousSwitchBufferSeconds - gapBefore);
-    } else {
+      score += 800_000 + (requiredGap - gapBefore);
+    } else if (isRouteSwitch) {
       score += 40 + Math.max(0, previousSwitchBufferSeconds) * 0.1;
+    } else {
+      score -= 5;
     }
-  } else if (previousRouteId != null && previousRouteId === route.routeId) {
-    score -= 5;
   }
 
   score += Math.max(0, route.executionOrder) * 2;
@@ -151,9 +147,9 @@ export function scoreRouteCandidate(args: {
 }
 
 /**
- * 依時間線逐趟做約束貪婪指派。
- * 發車錨點不變；只決定每趟正線用哪條路線。
- * 可行時優先遵守執行順序輪流；不可行時改選代價最低的可行路線。
+ * 依執行順序硬輪替指派路線（下行→上行→…）。
+ * 發車錨點不變；不再為「可行性」改選其他路線，以保證來回約束與週期補完一致。
+ * 不可行時仍寫入該順序路線，交由 validate 報錯。
  */
 export function assignPassengerRoutesConstraintGreedy(args: {
   passengerTasksByRow: Map<number, ScheduleTask[]>;
@@ -177,13 +173,17 @@ export function assignPassengerRoutesConstraintGreedy(args: {
     return a.routeName.localeCompare(b.routeName, 'zh-Hant');
   });
 
+  if (orderedRoutes.length === 0) return decisions;
+
   const rows = [...passengerTasksByRow.keys()].sort((a, b) => a - b);
 
   for (const row of rows) {
     const rowTasks = [...(passengerTasksByRow.get(row) ?? [])].sort(
       (a, b) => a.startMinute - b.startMinute || a.id.localeCompare(b.id),
     );
-    const state: TimelineState = { lastRouteId: null, lastEndSecond: null };
+    let lastRouteId: string | null = null;
+    let lastEndSecond: number | null = null;
+    let lastSwitchBufferSeconds = 0;
     let rotationIndex = 0;
 
     for (const task of rowTasks) {
@@ -193,83 +193,50 @@ export function assignPassengerRoutesConstraintGreedy(args: {
         task.id,
         startSecond,
       );
-      const preferredRouteId =
-        orderedRoutes.length > 0
-          ? orderedRoutes[rotationIndex % orderedRoutes.length]!.routeId
-          : null;
-
-      let best: RouteAssignmentDecision | null = null;
-
-      for (const route of orderedRoutes) {
-        const occupancy = resolvePassengerOccupancy(route);
-        if (!occupancy) continue;
-
-        const previousRoute = state.lastRouteId
-          ? orderedRoutes.find((item) => item.routeId === state.lastRouteId)
-          : null;
-        const previousSwitchBufferSeconds = previousRoute
-          ? normalizeSwitchBufferAfterSeconds(previousRoute.switchBufferAfterSeconds)
-          : 0;
-
-        const { score: baseScore, feasible } = scoreRouteCandidate({
-          route,
-          occupancySeconds: occupancy.occupancySeconds,
-          travelSeconds: occupancy.travelSeconds,
-          startSecond,
-          nextAnchorSecond,
-          previousRouteId: state.lastRouteId,
-          previousEndSecond: state.lastEndSecond,
-          previousSwitchBufferSeconds,
-          minimumRecoveryTimeSeconds,
-          usageCount: usageCount.get(route.routeId) ?? 0,
-        });
-
-        // 可行時強烈偏好輪流順序；不可行時改選其他路線
-        let score = baseScore;
-        if (preferredRouteId != null && route.routeId === preferredRouteId) {
-          score -= 100;
-        }
-
-        const decision: RouteAssignmentDecision = {
-          taskId: task.id,
-          route,
-          occupancySeconds: occupancy.occupancySeconds,
-          travelSeconds: occupancy.travelSeconds,
-          dwellSeconds: occupancy.dwellSeconds,
-          score,
-          feasible,
-        };
-
-        if (
-          !best
-          || (feasible && !best.feasible)
-          || (feasible === best.feasible && score < best.score)
-          || (
-            feasible === best.feasible
-            && score === best.score
-            && route.executionOrder < best.route.executionOrder
-          )
-        ) {
-          best = decision;
-        }
+      const route = orderedRoutes[rotationIndex % orderedRoutes.length]!;
+      const occupancy = resolvePassengerOccupancy(route);
+      if (!occupancy) {
+        rotationIndex += 1;
+        continue;
       }
 
-      if (!best) continue;
+      const { score, feasible } = scoreRouteCandidate({
+        route,
+        occupancySeconds: occupancy.occupancySeconds,
+        travelSeconds: occupancy.travelSeconds,
+        startSecond,
+        nextAnchorSecond,
+        previousRouteId: lastRouteId,
+        previousEndSecond: lastEndSecond,
+        previousSwitchBufferSeconds: lastSwitchBufferSeconds,
+        minimumRecoveryTimeSeconds,
+        usageCount: usageCount.get(route.routeId) ?? 0,
+      });
 
-      // 如果有發車錨點衝突，動態壓縮到最大允許範圍但不少於最快佔用
-      const bestOccupancy = resolvePassengerOccupancy(best.route);
-      if (bestOccupancy) {
-        const minOccupancy = bestOccupancy.minOccupancySeconds;
-        const maxAllowed = nextAnchorSecond != null ? nextAnchorSecond - startSecond : null;
-        if (maxAllowed != null && best.occupancySeconds > maxAllowed) {
-          best.occupancySeconds = Math.max(minOccupancy, maxAllowed);
-        }
+      const decision: RouteAssignmentDecision = {
+        taskId: task.id,
+        route,
+        occupancySeconds: occupancy.occupancySeconds,
+        travelSeconds: occupancy.travelSeconds,
+        dwellSeconds: occupancy.dwellSeconds,
+        score,
+        feasible,
+      };
+
+      // 若與下一錨點衝突，動態壓縮到最大允許範圍但不少於最快占用
+      const maxAllowed = nextAnchorSecond != null ? nextAnchorSecond - startSecond : null;
+      if (maxAllowed != null && decision.occupancySeconds > maxAllowed) {
+        decision.occupancySeconds = Math.max(
+          occupancy.minOccupancySeconds,
+          maxAllowed,
+        );
       }
 
-      decisions.set(task.id, best);
-      usageCount.set(best.route.routeId, (usageCount.get(best.route.routeId) ?? 0) + 1);
-      state.lastRouteId = best.route.routeId;
-      state.lastEndSecond = startSecond + best.occupancySeconds;
+      decisions.set(task.id, decision);
+      usageCount.set(route.routeId, (usageCount.get(route.routeId) ?? 0) + 1);
+      lastRouteId = route.routeId;
+      lastEndSecond = startSecond + decision.occupancySeconds;
+      lastSwitchBufferSeconds = route.switchBufferAfterSeconds;
       rotationIndex += 1;
     }
   }

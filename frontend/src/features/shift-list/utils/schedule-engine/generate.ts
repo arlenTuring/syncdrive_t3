@@ -21,6 +21,7 @@ import {
   validateTimelineCapacity,
   validateTimelineOverlaps,
   validateTurnaroundLimits,
+  validateRotationCyclesComplete,
 } from './validate';
 
 export type GenerateShiftScheduleInput = {
@@ -82,6 +83,7 @@ export function generateShiftSchedule(
     ctx,
     engineInput.maintenanceBody,
     errors,
+    warnings,
   );
 
   const tasksByRow = groupTasksByRow(engineInput.confirmedTasks);
@@ -106,7 +108,13 @@ export function generateShiftSchedule(
   );
 
   validateTimelineOverlaps(timelines, errors);
-  validateRouteSwitchBuffers(timelines, routeById, errors);
+  validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
+  validateRouteSwitchBuffers(
+    timelines,
+    routeById,
+    errors,
+    engineInput.minimumRecoveryTimeSeconds,
+  );
   validatePassengerHeadway(
     allBlocks,
     engineInput.intervals,

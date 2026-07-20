@@ -14,11 +14,13 @@ import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesA
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
 import type {
+  ShiftScheduleCreationMode,
   ShiftScheduleRouteGroupsDraft,
   ShiftScheduleSelectedRoute,
   ShiftScheduleStationDwell,
 } from '../types/create';
 import {
+  applyDwellSlackSeconds,
   areStationDwellsComplete,
   isMainlineRouteWithinTurnaroundLimit,
   moveSelectedRouteExecutionOrder,
@@ -29,7 +31,7 @@ import {
   resolveNextRouteInExecutionOrder,
   sortSelectedRoutesByExecutionOrder,
   normalizeSwitchBufferAfterSeconds,
-  normalizeDwellSlackPercent,
+  normalizeDwellSlackSeconds,
 } from '../types/create';
 import {
   loadShiftRouteGroupCatalog,
@@ -42,6 +44,7 @@ type StepShiftRouteGroupsProps = {
   draft: ShiftScheduleRouteGroupsDraft;
   onChange: (next: ShiftScheduleRouteGroupsDraft) => void;
   timeTemplateId: string;
+  creationMode?: ShiftScheduleCreationMode;
 };
 
 type GroupSelectionState = 'none' | 'partial' | 'all';
@@ -141,9 +144,7 @@ function StationDwellEditor({
   );
 
   const totalDwellWithSlack = route.stationDwells.reduce((sum, d) => {
-    const sec = d.dwellSeconds ?? 0;
-    const slack = route.dwellSlackPercent / 100;
-    return sum + Math.ceil(sec * (1 + slack));
+    return sum + applyDwellSlackSeconds(d.dwellSeconds ?? 0, route.dwellSlackSeconds);
   }, 0);
   const totalMinSum = (route.minTravelTimeSeconds ?? 0) + (minimumRecoveryTimeSeconds ?? 0) + totalDwellWithSlack;
   const totalAvgSum = (route.avgTravelTimeSeconds ?? 0) + (minimumRecoveryTimeSeconds ?? 0) + totalDwellWithSlack;
@@ -181,13 +182,13 @@ function StationDwellEditor({
           <div className="flex items-center gap-1.5">
             <input
               type="text"
-              inputMode="decimal"
-              value={String(route.dwellSlackPercent)}
+              inputMode="numeric"
+              value={String(route.dwellSlackSeconds)}
               onChange={(e) => onUpdateDwellSlack(e.target.value)}
               className={DWELL_INPUT_CLASS}
-              aria-label={`${route.routeName} 靠站緩衝百分比`}
+              aria-label={`${route.routeName} 靠站緩衝秒數`}
             />
-            <span className="text-xs text-zinc-500">%</span>
+            <span className="text-xs text-zinc-500">秒</span>
           </div>
         </label>
       </div>
@@ -335,6 +336,7 @@ function SelectedRoutesSummaryPanel({
   routes,
   turnaroundLimitSeconds,
   minimumRecoveryTimeSeconds,
+  creationMode = 'parametric',
   onMove,
   onUpdateSwitchBuffer,
   onUpdateRouteCode,
@@ -345,6 +347,7 @@ function SelectedRoutesSummaryPanel({
   routes: ShiftScheduleSelectedRoute[];
   turnaroundLimitSeconds: number | null;
   minimumRecoveryTimeSeconds: number | null;
+  creationMode?: ShiftScheduleCreationMode;
   onMove: (routeId: string, direction: 'up' | 'down') => void;
   onUpdateSwitchBuffer: (routeId: string, value: string) => void;
   onUpdateRouteCode: (routeId: string, value: string) => void;
@@ -352,6 +355,7 @@ function SelectedRoutesSummaryPanel({
   onUpdateDwellSlack: (routeId: string, value: string) => void;
   onUpdateRecoveryTime: (value: string) => void;
 }) {
+  const isManual = creationMode === 'manual';
   const orderedRoutes = useMemo(
     () => sortSelectedRoutesByExecutionOrder(routes),
     [routes],
@@ -359,35 +363,38 @@ function SelectedRoutesSummaryPanel({
 
   return (
     <section className="flex min-h-[220px] shrink-0 flex-col border-t border-zinc-800/80 bg-zinc-950/20 pt-4">
-      {/* 恢復時間設定（移動到已選路線的上方） */}
-      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
-        <label className="block">
-          <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-            最低恢復時間（秒）
-            <InfoTooltip
-              content="每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。"
-              example="輸入「30」代表最少保留 30 秒恢復空檔。"
-            />
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={minimumRecoveryTimeSeconds ?? ''}
-              onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
-              placeholder="必填，如 30"
-              className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
-              aria-label="最低恢復時間"
-            />
-            <span className="text-sm text-zinc-500">秒</span>
-          </div>
-        </label>
-      </div>
+      {!isManual ? (
+        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+              最低恢復時間（秒）
+              <InfoTooltip
+                content="每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。"
+                example="輸入「30」代表最少保留 30 秒恢復空檔。"
+              />
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={minimumRecoveryTimeSeconds ?? ''}
+                onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
+                placeholder="必填，如 30"
+                className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
+                aria-label="最低恢復時間"
+              />
+              <span className="text-sm text-zinc-500">秒</span>
+            </div>
+          </label>
+        </div>
+      ) : null}
 
       <div className="mb-3 shrink-0 px-1">
         <h3 className="text-sm font-medium text-zinc-100">已選路線</h3>
         <p className="mt-1 text-xs text-zinc-500">
-          依 ↑↓ 調整執行順序；在路線之間設定切換緩衝（秒）。內容隨上方停靠設定同步更新。
+          {isManual
+            ? '依 ↑↓ 調整執行順序，並為每條路線填寫路線代號（手動製作班次卡用）。'
+            : '依 ↑↓ 調整執行順序；在路線之間設定切換緩衝（秒）。內容隨上方停靠設定同步更新。'}
         </p>
       </div>
 
@@ -412,35 +419,54 @@ function SelectedRoutesSummaryPanel({
                       <span className="text-sm font-medium text-zinc-100">
                         {route.routeName}
                       </span>
-                      <span className="text-xs text-zinc-500">{route.groupName}</span>
-
-                      {/* 路線代號編輯 */}
-                      <div className="flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900/80 px-1.5 py-0.5 ml-auto">
-                        <span className="text-[9px] text-zinc-500 font-medium">代號:</span>
+                      <label className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900/80 px-1.5 py-0.5">
+                        <span className="text-[10px] font-medium text-zinc-400">
+                          代號
+                          <span className="text-rose-400" aria-hidden>
+                            *
+                          </span>
+                        </span>
                         <input
                           type="text"
                           value={route.routeCode ?? ''}
                           maxLength={3}
-                          onChange={(e) => onUpdateRouteCode(route.routeId, e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase())}
+                          required
+                          onChange={(e) =>
+                            onUpdateRouteCode(
+                              route.routeId,
+                              e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
+                            )
+                          }
                           className="w-8 bg-transparent text-center text-xs font-bold text-[#2B7FFF] focus:outline-none"
-                          title="路線代號，例如 D, U"
-                          aria-label={`${route.routeName} 路線代號`}
+                          title="路線代號（必填，班次卡顯示用）"
+                          aria-label={`${route.routeName} 路線代號（必填）`}
+                          aria-required
                         />
-                      </div>
+                      </label>
+                      <span className="text-xs text-zinc-500">{route.groupName}</span>
                     </div>
+                    {!route.routeCode?.trim() ? (
+                      <p className="text-[11px] text-amber-400/90">
+                        {isManual
+                          ? '請填寫路線代號，供手動製作班次代號使用。'
+                          : '請填寫路線代號；變更後需重新產生班表。'}
+                      </p>
+                    ) : null}
 
-                    <StationDwellEditor
-                      route={route}
-                      turnaroundLimitSeconds={turnaroundLimitSeconds}
-                      minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
-                      onUpdateDwell={(stationId, val) => onUpdateDwell(route.routeId, stationId, val)}
-                      onUpdateDwellSlack={(val) => onUpdateDwellSlack(route.routeId, val)}
-                    />
+                    {!isManual ? (
+                      <StationDwellEditor
+                        route={route}
+                        turnaroundLimitSeconds={turnaroundLimitSeconds}
+                        minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
+                        onUpdateDwell={(stationId, val) => onUpdateDwell(route.routeId, stationId, val)}
+                        onUpdateDwellSlack={(val) => onUpdateDwellSlack(route.routeId, val)}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>
 
-              {orderedRoutes.length > 1 && nextRoute ? (
+              {!isManual && orderedRoutes.length > 1 && nextRoute ? (
                 <div className="ml-10 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-zinc-800/80 bg-zinc-950/30 px-3 py-2">
                   <span className="text-xs text-zinc-500">
                     切換至「{nextRoute.routeName}」緩衝
@@ -552,6 +578,7 @@ export function StepShiftRouteGroups({
   draft,
   onChange,
   timeTemplateId,
+  creationMode = 'parametric',
 }: StepShiftRouteGroupsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -593,6 +620,10 @@ export function StepShiftRouteGroups({
                   ...selected,
                   stationIds: [...meta.stationIds],
                   stationDwells: buildStationDwells(meta, selected.stationDwells),
+                  // 地圖拓撲／路線時間更新後，重載目錄時一併刷新 leg 快照
+                  stationLegTravels: meta.stationLegTravels.map((leg) => ({ ...leg })),
+                  avgTravelTimeSeconds: meta.avgTravelTimeSeconds,
+                  minTravelTimeSeconds: meta.minTravelTimeSeconds,
                 };
               }),
           ),
@@ -673,6 +704,7 @@ export function StepShiftRouteGroups({
     stationIds: [...route.stationIds],
     stationDwells: buildStationDwells(route, existing?.stationDwells),
     stationDwellsConfirmed: existing?.stationDwellsConfirmed === true,
+    stationLegTravels: route.stationLegTravels.map((leg) => ({ ...leg })),
     avgTravelTimeSeconds: route.avgTravelTimeSeconds,
     minTravelTimeSeconds: route.minTravelTimeSeconds,
     executionOrder:
@@ -682,7 +714,7 @@ export function StepShiftRouteGroups({
     switchBufferAfterSeconds: normalizeSwitchBufferAfterSeconds(
       existing?.switchBufferAfterSeconds,
     ),
-    dwellSlackPercent: normalizeDwellSlackPercent(existing?.dwellSlackPercent),
+    dwellSlackSeconds: normalizeDwellSlackSeconds(existing?.dwellSlackSeconds),
   });
 
   const toggleRoute = (
@@ -754,18 +786,11 @@ export function StepShiftRouteGroups({
   };
 
   const updateDwellSlack = (routeId: string, raw: string) => {
-    const cleaned = raw.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    const normalized =
-      parts.length <= 1
-        ? cleaned
-        : `${parts[0] ?? ''}.${(parts[1] ?? '').slice(0, 1)}`;
-    const percent =
-      normalized === '' || normalized === '.'
-        ? 0
-        : normalizeDwellSlackPercent(Number(normalized));
+    const digits = raw.replace(/\D/g, '');
+    const seconds =
+      digits === '' ? 0 : normalizeDwellSlackSeconds(Number(digits));
     patchSelectedRoute(routeId, {
-      dwellSlackPercent: percent,
+      dwellSlackSeconds: seconds,
       stationDwellsConfirmed: false,
     });
   };
@@ -798,7 +823,8 @@ export function StepShiftRouteGroups({
 
   const updateRouteCode = (routeId: string, val: string) => {
     patchSelectedRoute(routeId, {
-      routeCode: val,
+      routeCode: val.trim() ? val.trim().toUpperCase() : null,
+      stationDwellsConfirmed: false,
     });
   };
 
@@ -808,9 +834,7 @@ export function StepShiftRouteGroups({
   const totalAvgTravel = draft.selectedRoutes.reduce((acc, r) => acc + (r.avgTravelTimeSeconds ?? 0), 0);
   const totalDwells = draft.selectedRoutes.reduce((acc, r) => {
     return acc + r.stationDwells.reduce((sum, d) => {
-      const sec = d.dwellSeconds ?? 0;
-      const slack = r.dwellSlackPercent / 100;
-      return sum + Math.ceil(sec * (1 + slack));
+      return sum + applyDwellSlackSeconds(d.dwellSeconds ?? 0, r.dwellSlackSeconds);
     }, 0);
   }, 0);
   const totalSwitchBuffer = draft.selectedRoutes.reduce((acc, r) => acc + (r.switchBufferAfterSeconds ?? 0), 0);
@@ -884,6 +908,7 @@ export function StepShiftRouteGroups({
                 routes={draft.selectedRoutes}
                 turnaroundLimitSeconds={turnaroundLimitSeconds}
                 minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
+                creationMode={creationMode}
                 onMove={moveRouteOrder}
                 onUpdateSwitchBuffer={updateSwitchBuffer}
                 onUpdateRouteCode={updateRouteCode}
@@ -892,7 +917,7 @@ export function StepShiftRouteGroups({
                 onUpdateRecoveryTime={updateRecoveryTime}
               />
               
-              {/* 通盤可行性對抗看板 */}
+              {creationMode !== 'manual' ? (
               <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-zinc-200">通盤可行性對抗</h4>
@@ -904,7 +929,6 @@ export function StepShiftRouteGroups({
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {/* 最快循環大卡片 */}
                   <div className={`rounded-lg border p-4 transition-all duration-300 ${
                     isOver 
                       ? 'border-red-500/30 bg-red-500/5' 
@@ -921,7 +945,6 @@ export function StepShiftRouteGroups({
                     </div>
                   </div>
 
-                  {/* 平均循環大卡片 */}
                   <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
                     <div className="text-xs font-medium text-zinc-400">完整循環平均時間</div>
                     <div className="mt-2 text-2xl font-bold tabular-nums text-zinc-200">
@@ -933,14 +956,13 @@ export function StepShiftRouteGroups({
                   </div>
                 </div>
 
-                {/* 可行性警示訊息 */}
                 {turnaroundLimitSeconds != null && (
                   <div className="mt-3">
                     {isOver ? (
                       <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
                         <span>
-                          <strong>校驗未通過</strong>：完整循環最快時間（{formatSecondsLabel(totalMinCycle)}）大於車輛折返時限限制（{formatSecondsLabel(turnaroundLimitSeconds)}）。請縮短停靠時間、靠站緩衝百分比，或降低最低恢復時間。
+                          <strong>校驗未通過</strong>：完整循環最快時間（{formatSecondsLabel(totalMinCycle)}）大於車輛折返時限限制（{formatSecondsLabel(turnaroundLimitSeconds)}）。請縮短停靠時間、靠站緩衝秒數，或降低最低恢復時間。
                         </span>
                       </div>
                     ) : (
@@ -954,6 +976,7 @@ export function StepShiftRouteGroups({
                   </div>
                 )}
               </div>
+              ) : null}
             </div>
           ) : null}
         </div>

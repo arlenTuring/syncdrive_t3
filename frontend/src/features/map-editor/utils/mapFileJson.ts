@@ -39,8 +39,10 @@ import {
   type MapPlannedRoute,
   type MapRouteGroup,
 } from '../types/mapFile'
+import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { parseMapRouteGroups } from './routeGroupPlanning'
+import { parsePointTopology } from './pointTopology'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
 import { syncGeofenceFacility } from './geofence'
 import { sanitizeFacilitiesForEditor } from './sanitizeFacility'
@@ -394,14 +396,23 @@ function migrateV1ToAreas(json: MapFileV1, pixelSize: MapPixelSize): MapAreaObje
 export type ParsedMapFile = {
   mapId: string
   displayName: string
+  /** 地圖說明；匯入／匯出／儲存時需 round-trip */
+  description?: string
   version: string
   pixelSize: MapPixelSize
   pixelOrigin: { x: number; y: number }
   areas: MapAreaObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
+  pointTopology: PointTopology
   createdAt?: string
   updatedAt?: string
+}
+
+function parseOptionalDescription(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : undefined
 }
 
 function parsePixelOrigin(
@@ -419,12 +430,14 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     return {
       mapId: json.mapId,
       displayName: json.displayName,
+      description: parseOptionalDescription(json.description),
       version: json.version?.trim() || 'v0.0.1',
       pixelSize,
       pixelOrigin: parsePixelOrigin(json.pixelOrigin),
       areas: areas.length > 0 ? areas : [createBlankArea('1', pixelSize)],
       routes: parseMapRoutes(json.routes),
       routeGroups: parseMapRouteGroups(json.routeGroups),
+      pointTopology: parsePointTopology(json.pointTopology),
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
     }
@@ -435,12 +448,14 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     return {
       mapId: json.mapId,
       displayName: json.displayName,
+      description: parseOptionalDescription(json.description),
       version: 'v0.0.1',
       pixelSize,
       pixelOrigin: { x: 0, y: 0 },
       areas: migrateV1ToAreas(json, pixelSize),
       routes: [],
       routeGroups: [],
+      pointTopology: parsePointTopology(undefined),
     }
   }
 
@@ -512,16 +527,19 @@ export function buildMapFileV2(
     pixelOrigin?: { x: number; y: number }
     routes?: MapPlannedRoute[]
     routeGroups?: MapRouteGroup[]
+    pointTopology?: PointTopology
   },
 ): MapFileV2 {
   const origin = parsePixelOrigin(options?.pixelOrigin)
   const routes = options?.routes ?? []
   const routeGroups = options?.routeGroups ?? []
+  const pointTopology = options?.pointTopology
+  const description = parseOptionalDescription(options?.description)
   return {
     schemaVersion: MAP_FILE_SCHEMA_VERSION,
     mapId,
     displayName,
-    description: options?.description,
+    ...(description ? { description } : {}),
     version: options?.version?.trim() || 'v0.0.1',
     ...(options?.createdAt ? { createdAt: options.createdAt } : {}),
     ...(options?.updatedAt ? { updatedAt: options.updatedAt } : {}),
@@ -530,6 +548,9 @@ export function buildMapFileV2(
     areas: areas.map(areaToMapEntry),
     ...(routeGroups.length > 0 ? { routeGroups } : {}),
     ...(routes.length > 0 ? { routes } : {}),
+    ...(pointTopology && (pointTopology.nodes.length > 0 || pointTopology.edges.length > 0)
+      ? { pointTopology }
+      : {}),
   }
 }
 

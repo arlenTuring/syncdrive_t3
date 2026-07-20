@@ -128,6 +128,20 @@ export async function deleteTimeTemplate(
   }
 }
 
+export async function duplicateTimeTemplateDraft(
+  templateId: string,
+  backendUrl = resolveTimeTemplatesBackendUrl(),
+): Promise<TimeTemplateListItem> {
+  const res = await fetch(
+    `${backendUrl}/syncdrive-api/time-template/detail/${encodeURIComponent(templateId)}/duplicate`,
+    { method: 'POST' },
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, '複製時間模板失敗'));
+  }
+  return res.json() as Promise<TimeTemplateListItem>;
+}
+
 export async function exportTimeTemplates(
   ids: string[],
   backendUrl = resolveTimeTemplatesBackendUrl(),

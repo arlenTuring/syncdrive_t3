@@ -12,6 +12,7 @@ import {
   sumStationDwellSecondsWithSlack,
   snapUpToClockAlignSeconds,
   isClockAlignedSeconds,
+  resolveInterTripGapSeconds,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
 } from './physics';
 import type {
@@ -21,16 +22,21 @@ import type {
   SchedulingContext,
 } from './types';
 import { minuteToSecond, secondToMinute, pushIssue } from './types';
+import {
+  describeStationLegTravelIssue,
+  resolveEffectiveRouteTravelSeconds,
+} from '../stationLegTravel';
 
 export { ROUTE_ASSIGNMENT_ALGORITHM };
 
 function resolvePassengerOccupancy(
   route: ShiftScheduleSelectedRoute,
 ): { occupancySeconds: number; travelSeconds: number; dwellSeconds: number } {
-  const travelSeconds = route.avgTravelTimeSeconds ?? 0;
+  const travel = resolveEffectiveRouteTravelSeconds(route);
+  const travelSeconds = travel?.avgTravelTimeSeconds ?? route.avgTravelTimeSeconds ?? 0;
   const dwellSeconds = sumStationDwellSecondsWithSlack(
     route.stationDwells,
-    route.dwellSlackPercent,
+    route.dwellSlackSeconds,
   ) ?? 0;
   const rawOccupancy = travelSeconds + dwellSeconds;
   return {
@@ -140,6 +146,7 @@ export function resolveTemplateTasks(
   ctx: SchedulingContext,
   maintenanceBody: Record<string, unknown> | null,
   errors: FeasibilityIssue[],
+  warnings: FeasibilityIssue[] = [],
 ): Map<string, ResolvedTemplateTask> {
   const passengerTasks = confirmedTasks.filter((task) => task.taskType === 'passenger');
   const passengerByRow = groupTasksByRow(passengerTasks);
@@ -151,6 +158,7 @@ export function resolveTemplateTasks(
 
   const sortedTasks = sortTemplateTasks(confirmedTasks);
   const resolvedByTaskId = new Map<string, ResolvedTemplateTask>();
+  const warnedIncompleteLegRouteIds = new Set<string>();
 
   for (const task of sortedTasks) {
     const needsRoute = task.taskType === 'passenger';
@@ -168,28 +176,43 @@ export function resolveTemplateTasks(
     }
 
     if (isMainlineTaskType(task.taskType)) {
-      if (!route?.avgTravelTimeSeconds || route.avgTravelTimeSeconds <= 0) {
+      if (!route) {
+        continue;
+      }
+      const effectiveTravel = resolveEffectiveRouteTravelSeconds(route);
+      if (!effectiveTravel) {
         pushIssue(errors, {
           code: 'MISSING_TRAVEL_TIME',
           severity: 'error',
-          message: `正線任務「${task.label}」所分配路線缺少平均行駛時間`,
-          detail: { templateTaskId: task.id, routeId: route?.routeId },
+          message: `正線任務「${task.label}」所分配路線缺少有效行駛時間`,
+          detail: { templateTaskId: task.id, routeId: route.routeId },
+        });
+        continue;
+      }
+      const legIssue = describeStationLegTravelIssue(route.stationIds, route.stationLegTravels);
+      if (legIssue?.code === 'invalid') {
+        pushIssue(errors, {
+          code: 'STATION_LEG_TRAVEL_INVALID',
+          severity: 'error',
+          message: `路線「${route.routeName}」：${legIssue.message}`,
+          detail: { routeId: route.routeId, templateTaskId: task.id },
         });
         continue;
       }
       if (
-        route.minTravelTimeSeconds != null
-        && route.minTravelTimeSeconds > route.avgTravelTimeSeconds
+        legIssue?.code === 'incomplete'
+        && route.stationIds.length >= 2
+        && !warnedIncompleteLegRouteIds.has(route.routeId)
       ) {
-        pushIssue(errors, {
-          code: 'MISSING_TRAVEL_TIME',
-          severity: 'error',
-          message: `路線「${route.routeName}」最快行駛時間大於平均行駛時間`,
-          detail: { routeId: route.routeId },
+        warnedIncompleteLegRouteIds.add(route.routeId);
+        pushIssue(warnings, {
+          code: 'STATION_LEG_TRAVEL_INCOMPLETE',
+          severity: 'warning',
+          message: `路線「${route.routeName}」：${legIssue.message}`,
+          detail: { routeId: route.routeId, templateTaskId: task.id },
         });
-        continue;
       }
-      if (sumStationDwellSecondsWithSlack(route.stationDwells, route.dwellSlackPercent) == null) {
+      if (sumStationDwellSecondsWithSlack(route.stationDwells, route.dwellSlackSeconds) == null) {
         pushIssue(errors, {
           code: 'MISSING_TRAVEL_TIME',
           severity: 'error',
@@ -247,19 +270,18 @@ export function expandRowBlocks(
     if (!resolved) continue;
 
     const plannedStartSecond = minuteToSecond(task.startMinute);
-    const plannedEndSecond = plannedStartSecond + resolved.occupancySeconds;
 
-    // 非正線任務（充電、保養、機動）可以被前面的班次向後推遲，但鎖定其計畫結束邊界以壓縮時長
+    // 非正線任務（充電、保養、機動）：正線佔用開頭時延後開始、鎖住原結束時間並壓縮時長。
+    // 只縮短被佔用的這段整備，不因此平移後續其他整備視窗。
     let startSecond = plannedStartSecond;
     if (task.taskType !== 'passenger') {
+      const originalEndSecond = plannedStartSecond + resolved.occupancySeconds;
       startSecond = Math.max(plannedStartSecond, cursorSecond);
       startSecond = snapUpToClockAlignSeconds(startSecond);
-      const actualEnd = Math.max(startSecond, plannedEndSecond);
-      resolved.occupancySeconds = actualEnd - startSecond;
+      if (startSecond > plannedStartSecond) {
+        resolved.occupancySeconds = Math.max(0, originalEndSecond - startSecond);
+      }
     }
-
-    const barBlock = buildTemplateBarBlock(resolved, startSecond);
-    blocks.push(barBlock);
 
     if (!isClockAlignedSeconds(startSecond)) {
       pushIssue(errors, {
@@ -280,7 +302,11 @@ export function expandRowBlocks(
     const maxAllowedOccupancy = nextAnchorSecond != null ? nextAnchorSecond - startSecond : null;
 
     if (task.taskType === 'passenger' && resolved.route) {
-      const minTravel = resolved.route.minTravelTimeSeconds ?? resolved.route.avgTravelTimeSeconds ?? 0;
+      const minTravel =
+        resolveEffectiveRouteTravelSeconds(resolved.route)?.minTravelTimeSeconds
+        ?? resolved.route.minTravelTimeSeconds
+        ?? resolved.route.avgTravelTimeSeconds
+        ?? 0;
       const dwells = resolved.dwellSeconds;
       const minOccupancy = snapUpToClockAlignSeconds(minTravel + dwells);
 
@@ -312,6 +338,10 @@ export function expandRowBlocks(
     }
 
     const endSecond = startSecond + resolved.occupancySeconds;
+    // 必須在頭尾裁剪完成後才建立區塊，否則尾端讓渡只改到 resolved，
+    // 畫面與最終重疊驗證仍會保留原整備結束時間。
+    const barBlock = buildTemplateBarBlock(resolved, startSecond);
+    blocks.push(barBlock);
 
     if (nextAnchorSecond != null && !isClockAlignedSeconds(nextAnchorSecond)) {
       pushIssue(errors, {
@@ -326,18 +356,38 @@ export function expandRowBlocks(
       });
     }
 
-    // 只有正線任務後面才需要校驗最低恢復時間
+    // 正線之間：空檔 ≥ 恢復；換路線時另加前一路線換線緩衝（相加）
     if (task.taskType === 'passenger' && nextAnchorSecond != null && endSecond < nextAnchorSecond) {
+      const nextTask = rowTasks.find(
+        (item) =>
+          item.taskType === 'passenger'
+          && item.id !== task.id
+          && minuteToSecond(item.startMinute) === nextAnchorSecond,
+      );
+      const nextResolved = nextTask ? resolvedByTaskId.get(nextTask.id) : undefined;
+      const isRouteSwitch = Boolean(
+        resolved.route
+        && nextResolved?.route
+        && resolved.route.routeId !== nextResolved.route.routeId,
+      );
+      const requiredGap = resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds,
+        previousRouteSwitchBufferSeconds: resolved.route?.switchBufferAfterSeconds,
+        isRouteSwitch,
+      });
       const gapSeconds = nextAnchorSecond - endSecond;
-      if (gapSeconds < minimumRecoveryTimeSeconds) {
+      if (gapSeconds < requiredGap) {
         pushIssue(errors, {
-          code: 'RECOVERY_INSUFFICIENT',
+          code: isRouteSwitch ? 'ROUTE_SWITCH_BUFFER_INSUFFICIENT' : 'RECOVERY_INSUFFICIENT',
           severity: 'error',
-          message: `時間線 ${task.rowIndex}：${task.label} 與下一發車錨點之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
+          message: isRouteSwitch
+            ? `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒）`
+            : `時間線 ${task.rowIndex}：${task.label} 與下一發車錨點之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
           detail: {
             timelineRow: task.rowIndex,
             templateTaskId: task.id,
             gapSeconds,
+            requiredGapSeconds: requiredGap,
             minimumRecoveryTimeSeconds,
             nextAnchorMinute: secondToMinute(nextAnchorSecond),
           },

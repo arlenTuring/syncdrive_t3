@@ -11,4 +11,5 @@ export type {
   SchedulingContext,
   ShiftScheduleMaintenanceTaskBinding,
   ShiftScheduleStoredOutput,
+  PlanAdjustHistoryEntry,
 } from './schedule-engine/types';

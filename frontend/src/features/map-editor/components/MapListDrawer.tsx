@@ -1,7 +1,10 @@
-import { Building2, ChevronLeft, GitBranch, MapPin, Radio, Zap } from 'lucide-react'
+import { Building2, ChevronLeft, GitBranch, LayoutGrid, MapPin, Radio, Zap } from 'lucide-react'
 import { useMemo } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import type { PointTopology } from '../types/pointTopology'
+import type { PaletteItem } from '../constants/palette'
+import { AssetPaletteBar } from './AssetPaletteBar'
 import { RoutePlanningPanel } from './RoutePlanningPanel'
 import type { RouteGroupDraft } from './RouteGroupEditorView'
 import {
@@ -11,7 +14,7 @@ import {
   type FacilityListEntry,
 } from '../utils/facilityListEntries'
 import type { RoutePlanningDraft } from '../utils/routePlanning'
-export type MapListDrawerTab = 'docking' | 'facility' | 'equipment' | 'routes' | null
+export type MapListDrawerTab = 'docking' | 'facility' | 'equipment' | 'routes' | 'palette' | null
 
 type Props = {
   areas: MapAreaObject[]
@@ -47,6 +50,10 @@ type Props = {
   onRemoveRouteStationAt: (index: number) => void
   onMoveRouteStation: (from: number, to: number) => void
   onAppendRouteStation: (stationId: string) => void
+  onOpenPointTopology?: () => void
+  pointTopology: PointTopology
+  /** 編輯模式下從元件庫加入資產 */
+  onPickPaletteItem?: (item: PaletteItem) => void
 }
 
 function formatRef(entry: FacilityListEntry): string {
@@ -161,6 +168,10 @@ const TAB_BUTTON_CLASS = {
     active: 'rounded-r-md border-amber-500/60 bg-amber-950/90 text-amber-200',
     idle: 'rounded-r-md border-zinc-700/80 bg-zinc-900/95 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200',
   },
+  palette: {
+    active: 'rounded-r-md border-cyan-500/60 bg-cyan-950/90 text-cyan-200',
+    idle: 'rounded-r-md border-zinc-700/80 bg-zinc-900/95 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200',
+  },
 } as const
 
 export function MapListDrawer({
@@ -197,6 +208,9 @@ export function MapListDrawer({
   onRemoveRouteStationAt,
   onMoveRouteStation,
   onAppendRouteStation,
+  onOpenPointTopology,
+  pointTopology,
+  onPickPaletteItem,
 }: Props) {
   const dockingEntries = useMemo(
     () => collectDockingPointEntries(areas),
@@ -210,11 +224,12 @@ export function MapListDrawer({
     () => collectEquipmentEntries(areas),
     [areas],
   )
-  const panelOpen = openTab !== null
+  const panelOpen = openTab !== null && openTab !== 'palette'
+  const paletteOpen = openTab === 'palette'
 
   const panelTitle =
     openTab === 'docking'
-      ? '停靠清單'
+      ? '點位清單'
       : openTab === 'facility'
         ? '設施清單'
         : openTab === 'routes'
@@ -228,25 +243,32 @@ export function MapListDrawer({
   return (
     <>
       <div className="pointer-events-none absolute inset-y-0 left-0 z-40 flex">
-        <div className="pointer-events-auto flex h-full flex-col items-stretch pt-16">
+        {/* 僅按鈕可點；空白區不攔截，避免擋住其他左緣 UI */}
+        <div
+          className={[
+            'pointer-events-none flex h-full flex-col items-stretch pt-16',
+            // 抽屜開啟時底部留給整塊抽屜，避免雙把手重疊
+            paletteOpen ? 'pb-24' : 'pb-3',
+          ].join(' ')}
+        >
           <button
             type="button"
-            title="停靠清單"
+            title="點位清單"
             onClick={() => onOpenTab(openTab === 'docking' ? null : 'docking')}
             className={[
-              'flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+              'pointer-events-auto flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
               openTab === 'docking' ? TAB_BUTTON_CLASS.docking.active : TAB_BUTTON_CLASS.docking.idle,
             ].join(' ')}
           >
             <MapPin className="size-4 shrink-0" />
-            <span style={{ writingMode: 'vertical-rl' }}>停靠清單</span>
+            <span style={{ writingMode: 'vertical-rl' }}>點位清單</span>
           </button>
           <button
             type="button"
             title="設施清單"
             onClick={() => onOpenTab(openTab === 'facility' ? null : 'facility')}
             className={[
-              'mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+              'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
               openTab === 'facility' ? TAB_BUTTON_CLASS.facility.active : TAB_BUTTON_CLASS.facility.idle,
             ].join(' ')}
           >
@@ -258,7 +280,7 @@ export function MapListDrawer({
             title="設備清單"
             onClick={() => onOpenTab(openTab === 'equipment' ? null : 'equipment')}
             className={[
-              'mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+              'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
               openTab === 'equipment' ? TAB_BUTTON_CLASS.equipment.active : TAB_BUTTON_CLASS.equipment.idle,
             ].join(' ')}
           >
@@ -270,17 +292,32 @@ export function MapListDrawer({
             title="路線清單"
             onClick={() => onOpenTab(openTab === 'routes' ? null : 'routes')}
             className={[
-              'mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+              'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
               openTab === 'routes' ? TAB_BUTTON_CLASS.routes.active : TAB_BUTTON_CLASS.routes.idle,
             ].join(' ')}
           >
             <GitBranch className="size-4 shrink-0" />
             <span style={{ writingMode: 'vertical-rl' }}>路線清單</span>
           </button>
+
+          {mapEditMode && onPickPaletteItem && !paletteOpen ? (
+            <button
+              type="button"
+              title="元件庫"
+              onClick={() => onOpenTab('palette')}
+              className={[
+                'pointer-events-auto mt-auto flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+                TAB_BUTTON_CLASS.palette.idle,
+              ].join(' ')}
+            >
+              <LayoutGrid className="size-4 shrink-0" />
+              <span style={{ writingMode: 'vertical-rl' }}>元件庫</span>
+            </button>
+          ) : null}
         </div>
 
         {panelOpen ? (
-          <div className="pointer-events-auto flex h-full w-72 max-w-[min(18rem,100%)] flex-col overflow-hidden border-r border-zinc-700/80 bg-zinc-900/95 shadow-2xl backdrop-blur-sm">
+          <div className="pointer-events-auto flex h-full w-80 max-w-[min(20rem,100%)] flex-col overflow-hidden border-r border-zinc-700/80 bg-zinc-900/95 shadow-2xl backdrop-blur-sm">
             <div className="flex shrink-0 items-center justify-between border-b border-zinc-700/80 px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
                 {panelTitle}
@@ -300,6 +337,7 @@ export function MapListDrawer({
                   areas={areas}
                   routeGroups={mapRouteGroups}
                   routes={mapRoutes}
+                  pointTopology={pointTopology}
                   editMode={mapEditMode}
                   draft={routePlanningDraft}
                   groupDraft={routeGroupDraft}
@@ -326,14 +364,26 @@ export function MapListDrawer({
                   onAppendStation={onAppendRouteStation}
                 />
               ) : openTab === 'docking' ? (
-                <SectionBlock
-                  title="停靠點"
-                  entries={dockingEntries}
-                  selectedAreaId={selectedAreaId}
-                  selectedFacilityId={selectedFacilityId}
-                  onSelectEntry={onSelectEntry}
-                  onEntryDoubleClick={onEntryDoubleClick}
-                />
+                <div className="space-y-3">
+                  {onOpenPointTopology ? (
+                    <button
+                      type="button"
+                      onClick={onOpenPointTopology}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-600/70 bg-cyan-950/50 px-3 py-2 text-[11px] font-medium text-cyan-100 transition hover:bg-cyan-900/70"
+                    >
+                      <GitBranch className="size-3.5 shrink-0" />
+                      編輯點位拓撲
+                    </button>
+                  ) : null}
+                  <SectionBlock
+                    title="停靠點"
+                    entries={dockingEntries}
+                    selectedAreaId={selectedAreaId}
+                    selectedFacilityId={selectedFacilityId}
+                    onSelectEntry={onSelectEntry}
+                    onEntryDoubleClick={onEntryDoubleClick}
+                  />
+                </div>
               ) : openTab === 'facility' ? (
                 <SectionBlock
                   title="設施"
@@ -379,6 +429,13 @@ export function MapListDrawer({
           </div>
         ) : null}
       </div>
+
+      {paletteOpen && onPickPaletteItem ? (
+        <AssetPaletteBar
+          onPick={onPickPaletteItem}
+          onToggle={() => onOpenTab(null)}
+        />
+      ) : null}
     </>
   )
 }

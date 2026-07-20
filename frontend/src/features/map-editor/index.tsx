@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Loader2, Plus, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -7,12 +7,12 @@ import {
   useRef,
   useState,
 } from 'react'
-import { AssetPaletteBar } from './components/AssetPaletteBar'
 import { MapEditorToolbar } from './components/MapEditorToolbar'
 import { MapLibraryPage } from './components/MapLibraryPage'
 import { Inspector } from './components/Inspector'
 import { TrajectoryPanel } from './components/TrajectoryPanel'
 import { LeaveEditConfirmDialog } from './components/LeaveEditConfirmDialog'
+import { PointTopologyEditorDialog } from './components/PointTopologyEditorDialog'
 import { MapAreaCanvas } from './components/MapAreaCanvas'
 import { MapListDrawer, type MapListDrawerTab } from './components/MapListDrawer'
 import { RoutePlanningOverlay, routeColorForIndex } from './components/RoutePlanningOverlay'
@@ -101,8 +101,13 @@ import {
 import { ensureDockingPointStationIdsInAreas, generateNextStationId } from './utils/dockingPointStationId'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
-import { canAppendStationToRoute } from './utils/routeTrackPath'
+import { canAppendStationToTopologyRoute, isTopologyRouteCombinationValid } from './utils/topologyRouteTravel'
 import type { MapPlannedRoute, MapRouteGroup } from './types/mapFile'
+import { emptyPointTopology, type PointTopology } from './types/pointTopology'
+import {
+  buildTopologyFacilityFingerprint,
+  syncPointTopologyWithAreas,
+} from './utils/pointTopology'
 import {
   generateNextRouteId,
   isRoutePlanningDraftSavable,
@@ -256,7 +261,6 @@ export default function MapEditorApp({
   const [nextNumericId, setNextNumericId] = useState(1)
   const [liveById, setLiveById] = useState<Record<string, MqttLiveEntry>>({})
   const [mqttLog, setMqttLog] = useState<MqttLogLine[]>([])
-  const [paletteOpen, setPaletteOpen] = useState(false)
   /** Map 像素畫布縮放：1 近、7 遠（一屏看全圖） */
   const [mapZoomLevel, setMapZoomLevel] = useState(MAP_PIXEL_ZOOM_DEFAULT_LEVEL)
   const [showZoomLevelBar, setShowZoomLevelBar] = useState(false)
@@ -325,8 +329,49 @@ export default function MapEditorApp({
 
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true)
   const [listDrawerTab, setListDrawerTab] = useState<MapListDrawerTab>(null)
+  const paletteOpen = mapEditorMode === 'edit' && listDrawerTab === 'palette'
   const [mapRoutes, setMapRoutes] = useState<MapPlannedRoute[]>([])
   const [mapRouteGroups, setMapRouteGroups] = useState<MapRouteGroup[]>([])
+  const [pointTopology, setPointTopology] = useState<PointTopology>(() =>
+    emptyPointTopology(),
+  )
+  const [pointTopologyEditorOpen, setPointTopologyEditorOpen] = useState(false)
+  /** 停靠點／途經點增刪或標籤關鍵欄變更時，自動同步拓撲節點 */
+  const topologyFacilityFingerprint = useMemo(
+    () => buildTopologyFacilityFingerprint(areas),
+    [areas],
+  )
+  useEffect(() => {
+    setPointTopology((prev) => {
+      const next = syncPointTopologyWithAreas(prev, areas)
+      if (
+        next.nodes.length === prev.nodes.length
+        && next.edges.length === prev.edges.length
+        && next.nodes.every((node, i) => {
+          const p = prev.nodes[i]
+          return (
+            p != null
+            && p.id === node.id
+            && p.kind === node.kind
+            && p.label === node.label
+            && p.stationId === node.stationId
+            && p.x === node.x
+            && p.y === node.y
+            && p.color === node.color
+          )
+        })
+        && next.edges.every((edge, i) => {
+          const p = prev.edges[i]
+          return p != null && p.id === edge.id
+        })
+      ) {
+        return prev
+      }
+      return next
+    })
+    // areas 經 fingerprint 閘控；此處讀最新 areas 即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fingerprint 已涵蓋設施增刪／標籤
+  }, [topologyFacilityFingerprint])
   const [routePlanningDraft, setRoutePlanningDraft] =
     useState<RoutePlanningDraft | null>(null)
   const [routeGroupDraft, setRouteGroupDraft] = useState<RouteGroupDraft | null>(
@@ -364,6 +409,7 @@ export default function MapEditorApp({
   const areasRef = useRef(areas)
   const mapRoutesRef = useRef(mapRoutes)
   const mapRouteGroupsRef = useRef(mapRouteGroups)
+  const pointTopologyRef = useRef(pointTopology)
   const selectedAreaIdRef = useRef(selectedAreaId)
   const selectedFacilityIdsRef = useRef(selectedFacilityIds)
   const multiDragStartRef = useRef<{
@@ -396,10 +442,11 @@ export default function MapEditorApp({
     areasRef.current = areas
     mapRoutesRef.current = mapRoutes
     mapRouteGroupsRef.current = mapRouteGroups
+    pointTopologyRef.current = pointTopology
     selectedAreaIdRef.current = selectedAreaId
     selectedFacilityIdsRef.current = selectedFacilityIds
     clipboardRef.current = clipboard
-  }, [areas, mapRoutes, mapRouteGroups, selectedAreaId, selectedFacilityIds, clipboard])
+  }, [areas, mapRoutes, mapRouteGroups, pointTopology, selectedAreaId, selectedFacilityIds, clipboard])
 
   const updateSelection = useCallback(
     (areaId: string | null, facilityIds: string[] | null) => {
@@ -792,7 +839,7 @@ export default function MapEditorApp({
   const exitMapEditorChromeAfterLoad = useCallback(() => {
     setMapEditorMode('view')
     setEditSessionBaseline(null)
-    setPaletteOpen(false)
+    setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
   }, [])
 
   /** 由地圖清單載入 */
@@ -811,6 +858,9 @@ export default function MapEditorApp({
       setMapRoutes(loaded.routes ?? [])
       setMapRouteGroups(
         ensureRouteGroupsForRoutes(loaded.routes ?? [], loaded.routeGroups ?? []),
+      )
+      setPointTopology(
+        syncPointTopologyWithAreas(loaded.pointTopology, loaded.areas),
       )
       setRoutePlanningDraft(null)
       setRouteGroupDraft(null)
@@ -846,6 +896,7 @@ export default function MapEditorApp({
       areasRef.current,
       mapRoutesRef.current,
       mapRouteGroupsRef.current,
+      pointTopologyRef.current,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
     void publishMapLibraryEntryToBackend(updated)
@@ -875,12 +926,15 @@ export default function MapEditorApp({
     return mapRoutes
       .map((route, index) => ({ route, index }))
       .filter(({ route }) => visibleRouteIds.has(route.routeId))
+      .filter(({ route }) =>
+        isTopologyRouteCombinationValid(pointTopology, areas, route.stationIds),
+      )
       .map(({ route, index }) => ({
         route,
         color: routeColorForIndex(index),
         emphasized: true,
       }))
-  }, [mapRoutes, visibleRouteIds, routePlanningDraft])
+  }, [mapRoutes, visibleRouteIds, routePlanningDraft, pointTopology, areas])
 
   const onStartNewRoute = useCallback(
     (groupId: string | null) => {
@@ -1109,7 +1163,12 @@ export default function MapEditorApp({
     if (!id) return
     setRoutePlanningDraft((d) => {
       if (!d || d.stationIds.includes(id)) return d
-      if (!canAppendStationToRoute(areasRef.current, d.stationIds, id)) return d
+      if (!canAppendStationToTopologyRoute(
+        pointTopologyRef.current,
+        areasRef.current,
+        d.stationIds,
+        id,
+      )) return d
       return { ...d, stationIds: [...d.stationIds, id] }
     })
   }, [])
@@ -1160,6 +1219,7 @@ export default function MapEditorApp({
       areas: structuredClone(areas),
       routeGroups: structuredClone(mapRouteGroups),
       routes: structuredClone(mapRoutes),
+      pointTopology: structuredClone(pointTopology),
       nextNumericId,
       loadedMapMeta: { ...loadedMapMeta },
     })
@@ -1191,6 +1251,7 @@ export default function MapEditorApp({
     areas,
     mapRouteGroups,
     mapRoutes,
+    pointTopology,
     nextNumericId,
     loadedMapMeta,
     resetHistory,
@@ -1210,6 +1271,7 @@ export default function MapEditorApp({
         areas,
         mapRouteGroups,
         mapRoutes,
+        pointTopology,
         nextNumericId,
         loadedMapMeta,
       )
@@ -1217,7 +1279,7 @@ export default function MapEditorApp({
       clearMapDraft(loadedMapMeta.libraryId)
       setMapEditorMode('view')
       setEditSessionBaseline(null)
-      setPaletteOpen(false)
+      setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
       clearSelection()
       setAutosaveStatus('idle')
       setAutosaveTimeLabel('')
@@ -1230,6 +1292,7 @@ export default function MapEditorApp({
     areas,
     mapRouteGroups,
     mapRoutes,
+    pointTopology,
     nextNumericId,
     loadedMapMeta,
     clearSelection,
@@ -1244,6 +1307,7 @@ export default function MapEditorApp({
           areas,
           mapRouteGroups,
           mapRoutes,
+          pointTopology,
           nextNumericId,
           loadedMapMeta,
         )
@@ -1255,7 +1319,7 @@ export default function MapEditorApp({
       clearMapDraft(loadedMapMeta.libraryId)
       setMapEditorMode('view')
       setEditSessionBaseline(null)
-      setPaletteOpen(false)
+      setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
       clearSelection()
       setAutosaveStatus('idle')
       setAutosaveTimeLabel('')
@@ -1267,6 +1331,8 @@ export default function MapEditorApp({
     editSessionBaseline,
     areas,
     mapRoutes,
+    mapRouteGroups,
+    pointTopology,
     nextNumericId,
     loadedMapMeta,
     clearSelection,
@@ -1291,6 +1357,7 @@ export default function MapEditorApp({
         currentAreas,
         mapRoutesRef.current,
         mapRouteGroupsRef.current,
+        pointTopologyRef.current,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
       void publishMapLibraryEntryToBackend(updated)
@@ -1305,7 +1372,7 @@ export default function MapEditorApp({
     setLeaveEditDialogOpen(false)
     setMapEditorMode('view')
     setEditSessionBaseline(null)
-    setPaletteOpen(false)
+    setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
     resetHistory()
     setAutosaveStatus('saved')
     setAutosaveTimeLabel(`已儲存 ${new Date().toLocaleTimeString()}`)
@@ -1321,6 +1388,7 @@ export default function MapEditorApp({
     setAreas(structuredClone(b.areas))
     setMapRouteGroups(structuredClone(b.routeGroups))
     setMapRoutes(structuredClone(b.routes))
+    setPointTopology(structuredClone(b.pointTopology))
     setNextNumericId(b.nextNumericId)
     setLoadedMapMeta({ ...b.loadedMapMeta })
     setMapPixelSize(b.loadedMapMeta.pixelSize)
@@ -1331,7 +1399,7 @@ export default function MapEditorApp({
     setLeaveEditDialogOpen(false)
     setMapEditorMode('view')
     setEditSessionBaseline(null)
-    setPaletteOpen(false)
+    setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
     setAutosaveStatus('idle')
     setAutosaveTimeLabel('')
     if (leaveEditNavigateToLibrary) {
@@ -1378,6 +1446,7 @@ export default function MapEditorApp({
           areasRef.current,
           mapRoutesRef.current,
           mapRouteGroupsRef.current,
+          pointTopologyRef.current,
         )
         writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
         void publishMapLibraryEntryToBackend(updated)
@@ -1404,6 +1473,7 @@ export default function MapEditorApp({
     areas,
     mapRouteGroups,
     mapRoutes,
+    pointTopology,
     nextNumericId,
     mapPixelSize.width,
     mapPixelSize.height,
@@ -2414,7 +2484,8 @@ export default function MapEditorApp({
           const stationId = getDockingPointStationId(facility)
           if (
             stationId &&
-            canAppendStationToRoute(
+            canAppendStationToTopologyRoute(
+              pointTopologyRef.current,
               areasRef.current,
               routePlanningDraft.stationIds,
               stationId,
@@ -2714,7 +2785,7 @@ export default function MapEditorApp({
       if (e.key === 'Escape') {
         if (isTextEditingTarget(e.target)) return
         if (editOnly()) {
-          setPaletteOpen(false)
+          setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
           setAllAreasSelected(false)
           if (mapCropModeActive) {
             exitCropMode()
@@ -3227,31 +3298,6 @@ export default function MapEditorApp({
               onZoomFactorYChange={setTrajectoryZoomFactorY}
             />
           )}
-
-          {isMapWorkspace && mapScreen === 'editor' && mapEditorMode === 'edit' && paletteOpen && (
-            <AssetPaletteBar onPick={addFromPalette} />
-          )}
-
-          {isMapWorkspace && mapScreen === 'editor' && mapEditorMode === 'edit' && (
-            <button
-              type="button"
-              onClick={() => setPaletteOpen((o) => !o)}
-              className={`absolute left-6 z-50 flex size-12 items-center justify-center rounded-full border border-zinc-600 bg-zinc-800 text-zinc-100 shadow-lg transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 ${
-                paletteOpen
-                  ? 'bottom-52 sm:bottom-56'
-                  : 'bottom-36 sm:bottom-40'
-              }`}
-              title={paletteOpen ? '收合資產列' : '展開資產列（加入設施）'}
-              aria-expanded={paletteOpen}
-              aria-label={paletteOpen ? '收合資產列' : '展開資產列'}
-            >
-              {paletteOpen ? (
-                <X className="size-6" strokeWidth={2} aria-hidden />
-              ) : (
-                <Plus className="size-6" strokeWidth={2} aria-hidden />
-              )}
-            </button>
-          )}
         </div>
 
         {isMapWorkspace && mapScreen === 'editor' && (
@@ -3289,8 +3335,26 @@ export default function MapEditorApp({
             onRemoveRouteStationAt={onRemoveRouteStationAt}
             onMoveRouteStation={onMoveRouteStation}
             onAppendRouteStation={onAppendRouteStation}
+            onOpenPointTopology={() => setPointTopologyEditorOpen(true)}
+            pointTopology={pointTopology}
+            onPickPaletteItem={mapEditorMode === 'edit' ? addFromPalette : undefined}
           />
         )}
+
+        {isMapWorkspace && mapScreen === 'editor' ? (
+          <PointTopologyEditorDialog
+            open={pointTopologyEditorOpen}
+            areas={areas}
+            topology={pointTopology}
+            onClose={() => setPointTopologyEditorOpen(false)}
+            onApply={(next) => {
+              // 拓撲對話框本身即可編輯；套用後進入地圖編輯模式以便儲存
+              if (mapEditorMode !== 'edit') setMapEditorMode('edit')
+              setPointTopology(next)
+              setPointTopologyEditorOpen(false)
+            }}
+          />
+        ) : null}
 
         {isMapWorkspace && mapScreen === 'editor' &&
           (!inspectorCollapsed ? (

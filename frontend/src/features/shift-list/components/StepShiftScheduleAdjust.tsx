@@ -1,4 +1,4 @@
-import { AlertCircle, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2 } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -7,6 +7,7 @@ import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
   type ScheduleTask,
+  type TaskTypeKey,
 } from '../../time-templates/types/editor';
 import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import { AttributeLegendBadgeChip } from '../../time-templates/components/AttributeLegendBadgeChip';
@@ -16,16 +17,67 @@ import { buildShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutpu
 import type {
   FeasibilityIssue,
   GeneratedSchedulePlan,
+  PlanAdjustHistoryEntry,
   ShiftScheduleFeasibilityReport,
   ShiftScheduleStoredOutput,
 } from '../utils/shiftScheduleEngine.types';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
+import { CapacityTrendChart } from './CapacityTrendChart';
+import { ManualScheduleEditorSidebar } from './ManualScheduleEditorSidebar';
+import {
+  applyManualBlockDwells,
+  applyManualBlockRoute,
+  applyManualBlockTimeRange,
+  deleteManualScheduleBlock,
+  duplicateManualScheduleBlock,
+  hydrateManualPlanStationDwellsFromRoutes,
+  insertManualScheduleBlock,
+} from '../utils/manualScheduleEdit';
 import {
   validateTimelineOverlaps,
   validatePassengerHeadway,
   validateRouteSwitchBuffers,
   validateTimelineCapacity,
+  validateRotationCyclesComplete,
 } from '../utils/schedule-engine/validate';
+
+type AdjustTab = 'schedule' | 'capacity';
+
+function applyHistoryToOutput(
+  base: ShiftScheduleStoredOutput,
+  history: PlanAdjustHistoryEntry[],
+  historyIndex: number,
+): ShiftScheduleStoredOutput {
+  const entry = history[historyIndex];
+  if (!entry) return base;
+  return {
+    ...base,
+    generatedAt: entry.plan.generatedAt,
+    plan: entry.plan,
+    feasibilityReport: entry.feasibilityReport,
+    planAdjustHistory: history,
+    planAdjustHistoryIndex: historyIndex,
+  };
+}
+
+function resolveHistoryFromOutput(
+  storedOutput: ShiftScheduleStoredOutput,
+): { history: PlanAdjustHistoryEntry[]; historyIndex: number } {
+  if (storedOutput.planAdjustHistory && storedOutput.planAdjustHistory.length > 0) {
+    const historyIndex = Math.min(
+      Math.max(0, storedOutput.planAdjustHistoryIndex ?? 0),
+      storedOutput.planAdjustHistory.length - 1,
+    );
+    return { history: storedOutput.planAdjustHistory, historyIndex };
+  }
+  if (storedOutput.plan) {
+    return {
+      history: [{ plan: storedOutput.plan, feasibilityReport: storedOutput.feasibilityReport }],
+      historyIndex: 0,
+    };
+  }
+  return { history: [], historyIndex: -1 };
+}
 
 function FeasibilityMessages({
   report,
@@ -84,6 +136,7 @@ function revalidatePlan(
   const routeById = new Map(selectedRoutes.map((r) => [r.routeId, r] as const));
 
   validateTimelineOverlaps(plan.timelines, errors);
+  validateRotationCyclesComplete(plan.timelines, selectedRoutes.length, errors);
   validateRouteSwitchBuffers(plan.timelines, routeById, errors);
   validatePassengerHeadway(
     allBlocks,
@@ -124,9 +177,12 @@ export function StepShiftScheduleAdjust({
   shiftId,
   onScheduleOutputReady,
 }: StepShiftScheduleAdjustProps) {
+  const isManual = draft.creationMode === 'manual';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<GeneratedSchedulePlan | null>(null);
+  const planRef = useRef<GeneratedSchedulePlan | null>(null);
+  planRef.current = plan;
   const [report, setReport] = useState<ShiftScheduleFeasibilityReport | null>(null);
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
@@ -135,9 +191,13 @@ export function StepShiftScheduleAdjust({
   const [highlightedBlockId, setHighlightedBlockId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [history, setHistory] = useState<{ plan: GeneratedSchedulePlan; report: ShiftScheduleFeasibilityReport }[]>([]);
+  const [history, setHistory] = useState<PlanAdjustHistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdjustTab>('schedule');
+  const [vehicleCapacity, setVehicleCapacity] = useState(50);
+  const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -148,24 +208,34 @@ export function StepShiftScheduleAdjust({
   }, []);
 
   const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
   useEffect(() => {
     undoRef.current = handleUndo;
+    redoRef.current = handleRedo;
   });
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
+    if (!isManual) return;
 
-      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-      const isCmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
-      const isUndo = event.key.toLowerCase() === 'z' && isCmdOrCtrl;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // 手動製作：即使焦點在側欄輸入框，也以班表歷史為準（欄位多為即時寫入）
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod) return;
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === 'z' && !event.shiftKey && !event.altKey;
+      const isRedo =
+        (key === 'z' && event.shiftKey && !event.altKey)
+        || (key === 'y' && !event.shiftKey && !event.altKey);
 
       if (isUndo) {
         event.preventDefault();
         undoRef.current();
+        return;
+      }
+      if (isRedo) {
+        event.preventDefault();
+        redoRef.current();
       }
     };
 
@@ -173,7 +243,30 @@ export function StepShiftScheduleAdjust({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [isManual]);
+
+  // 重生成確認 modal：Enter 預設取消（不會誤重算）
+  useEffect(() => {
+    if (!showRebuildConfirm) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Enter') {
+        setShowRebuildConfirm(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showRebuildConfirm]);
+
+  useEffect(() => {
+    if (!duplicateWarning) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Enter') {
+        setDuplicateWarning(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [duplicateWarning]);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,11 +276,12 @@ export function StepShiftScheduleAdjust({
     void (async () => {
       try {
         let storedOutput = draft.scheduleOutput;
+        const needsRegen = !storedOutput?.plan || !isShiftScheduleOutputFresh(draft);
 
-        if (!isShiftScheduleOutputFresh(draft)) {
+        if (needsRegen) {
           storedOutput = await buildShiftScheduleStoredOutput(draft, { shiftId });
           if (cancelled) return;
-          void onScheduleOutputReady(storedOutput);
+          void onScheduleOutputReady(storedOutput, { flush: true });
         }
 
         if (!storedOutput) {
@@ -201,24 +295,43 @@ export function StepShiftScheduleAdjust({
         setIntervals(template.intervals.filter((slot) => !slot.isDraft));
         setAttributes(template.attributes.filter((attr) => !attr.isDraft));
         setTemplateTasks(template.tasks ?? []);
-        if (storedOutput.plan) {
-          setPlan(storedOutput.plan);
-          setReport(storedOutput.feasibilityReport);
-          setHistory((prev) => {
-            if (prev.length === 0) {
-              return [{ plan: storedOutput.plan!, report: storedOutput.feasibilityReport }];
+        setVehicleCapacity(template.vehicleCapacity);
+
+        const { history: restoredHistory, historyIndex: restoredIndex } =
+          resolveHistoryFromOutput(storedOutput);
+
+        if (restoredHistory.length > 0 && restoredIndex >= 0) {
+          const current = restoredHistory[restoredIndex]!;
+          let nextPlan = current.plan;
+          let nextHistory = restoredHistory;
+          // 參數生成→手動複製的班次卡缺少各站靠站；進入手動介面時從路線設定補回
+          if (draft.creationMode === 'manual') {
+            const hydrated = hydrateManualPlanStationDwellsFromRoutes({
+              plan: current.plan,
+              routes: draft.routeGroups.selectedRoutes,
+            });
+            if (hydrated !== current.plan) {
+              nextPlan = hydrated;
+              nextHistory = restoredHistory.map((entry, index) =>
+                index === restoredIndex
+                  ? { ...entry, plan: hydrated }
+                  : entry,
+              );
+              void onScheduleOutputReady(
+                applyHistoryToOutput(storedOutput, nextHistory, restoredIndex),
+                { flush: true },
+              );
             }
-            return prev;
-          });
-          setHistoryIndex((prevIndex) => {
-            if (prevIndex === -1) {
-              return 0;
-            }
-            return prevIndex;
-          });
+          }
+          setHistory(nextHistory);
+          setHistoryIndex(restoredIndex);
+          setPlan(nextPlan);
+          setReport(current.feasibilityReport);
         } else {
           setPlan(null);
           setReport(null);
+          setHistory([]);
+          setHistoryIndex(-1);
         }
         setSelectedBlockId(null);
       } catch (e) {
@@ -236,10 +349,10 @@ export function StepShiftScheduleAdjust({
       cancelled = true;
     };
   }, [
+    draft.creationMode,
     draft.maintenanceTask,
     draft.timeTemplate,
     draft.routeGroups,
-    draft.scheduleOutput,
     onScheduleOutputReady,
     shiftId,
   ]);
@@ -251,47 +364,77 @@ export function StepShiftScheduleAdjust({
     [attributes, intervals],
   );
 
+  const undoShortcutLabel = useMemo(() => {
+    const isMac =
+      typeof navigator !== 'undefined'
+      && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+    return isMac ? '⌘Z' : 'Ctrl+Z';
+  }, []);
+
+  const redoShortcutLabel = useMemo(() => {
+    const isMac =
+      typeof navigator !== 'undefined'
+      && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+    return isMac ? '⇧⌘Z' : 'Ctrl+Y';
+  }, []);
+
   const pushNewState = (
     newPlan: GeneratedSchedulePlan,
     newReport: ShiftScheduleFeasibilityReport,
   ) => {
     const nextHistory = history.slice(0, historyIndex + 1);
-    const newState = { plan: newPlan, report: newReport };
+    const newState: PlanAdjustHistoryEntry = { plan: newPlan, feasibilityReport: newReport };
     nextHistory.push(newState);
+    const nextIndex = nextHistory.length - 1;
     setHistory(nextHistory);
-    setHistoryIndex(nextHistory.length - 1);
+    setHistoryIndex(nextIndex);
     setPlan(newPlan);
     setReport(newReport);
 
     const base = draft.scheduleOutput;
     if (base) {
-      void onScheduleOutputReady({
-        ...base,
-        generatedAt: newPlan.generatedAt,
-        plan: newPlan,
-        feasibilityReport: newReport,
-      }, { flush: true });
+      void onScheduleOutputReady(
+        applyHistoryToOutput(base, nextHistory, nextIndex),
+        { flush: true },
+      );
     }
   };
 
-  const handleRebuild = async () => {
+  const performRebuild = async () => {
+    const snapshotHistory = history;
+    const snapshotIndex = historyIndex;
+
     setLoading(true);
     setError(null);
     try {
       const storedOutput = await buildShiftScheduleStoredOutput(draft, {
         shiftId,
       });
-      void onScheduleOutputReady(storedOutput, { flush: true });
-      if (storedOutput.plan) {
-        setPlan(storedOutput.plan);
-        setReport(storedOutput.feasibilityReport);
-        setHistory([{ plan: storedOutput.plan, report: storedOutput.feasibilityReport }]);
-        setHistoryIndex(0);
-      } else {
-        setPlan(null);
-        setReport(null);
+
+      if (!storedOutput.plan) {
+        throw new Error('無法重新生成班表產出');
       }
+
+      const newEntry: PlanAdjustHistoryEntry = {
+        plan: storedOutput.plan,
+        feasibilityReport: storedOutput.feasibilityReport,
+      };
+
+      // 重新生成視為「新增一個版本」：讓 Undo 可以回到重生成前。
+      const nextHistory = snapshotHistory.slice(0, snapshotIndex + 1);
+      nextHistory.push(newEntry);
+      const nextIndex = nextHistory.length - 1;
+
+      setHistory(nextHistory);
+      setHistoryIndex(nextIndex);
+      setPlan(newEntry.plan);
+      setReport(newEntry.feasibilityReport);
       setSelectedBlockId(null);
+
+      void onScheduleOutputReady(
+        applyHistoryToOutput(storedOutput, nextHistory, nextIndex),
+        { flush: true },
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -299,15 +442,29 @@ export function StepShiftScheduleAdjust({
     }
   };
 
+  const requestRebuild = () => setShowRebuildConfirm(true);
 
 
-  const handleDeleteBlock = () => {
-    if (!plan || !selectedBlockId) return;
+
+  const handleDeleteBlock = (blockId?: string) => {
+    const targetId = blockId ?? selectedBlockId;
+    if (!plan || !targetId) return;
+
+    if (isManual) {
+      const current = planRef.current;
+      if (!current) return;
+      const result = deleteManualScheduleBlock({ plan: current, blockId: targetId });
+      if (!result) return;
+      planRef.current = result.plan;
+      pushNewState(result.plan, result.report);
+      setSelectedBlockId((prev) => (prev === targetId ? null : prev));
+      return;
+    }
 
     // 1. 複製 plan 並過濾掉選取的 block
     const updatedTimelines = plan.timelines.map((timeline) => ({
       ...timeline,
-      blocks: timeline.blocks.filter((b) => b.id !== selectedBlockId),
+      blocks: timeline.blocks.filter((b) => b.id !== targetId),
     }));
 
     const newPlan = {
@@ -326,8 +483,144 @@ export function StepShiftScheduleAdjust({
 
     // 3. 寫入歷史棧並取消選取
     pushNewState(newPlan, newReport);
-    setSelectedBlockId(null);
+    setSelectedBlockId((prev) => (prev === targetId ? null : prev));
   };
+
+  const handleDuplicateBlock = (blockId?: string) => {
+    if (!isManual) return;
+    const targetId = blockId ?? selectedBlockId;
+    if (!targetId) return;
+    const current = planRef.current;
+    if (!current) return;
+    const result = duplicateManualScheduleBlock({ plan: current, blockId: targetId });
+    if (!result.ok) {
+      setDuplicateWarning(result.reason);
+      return;
+    }
+    planRef.current = result.plan;
+    pushNewState(result.plan, result.report);
+    setSelectedBlockId(result.blockId);
+  };
+
+  const handleDropTaskType = (
+    timelineRow: number,
+    startMinute: number,
+    taskType: TaskTypeKey,
+  ) => {
+    if (!isManual) return;
+    const current = planRef.current;
+    if (!current) return;
+    const result = insertManualScheduleBlock({
+      plan: current,
+      timelineRow,
+      startMinute,
+      taskType,
+      selectedRoutes: draft.routeGroups.selectedRoutes,
+      sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+    });
+    if (!result) return;
+    planRef.current = result.plan;
+    pushNewState(result.plan, result.report);
+    setSelectedBlockId(result.blockId);
+  };
+
+  const handleCommitBlockTimeRange = (
+    blockId: string,
+    startMinute: number,
+    endMinute: number,
+  ) => {
+    if (!isManual) return;
+    const current = planRef.current;
+    if (!current) return;
+    const result = applyManualBlockTimeRange({
+      plan: current,
+      blockId,
+      startMinute,
+      endMinute,
+    });
+    if (!result) return;
+    planRef.current = result.plan;
+    pushNewState(result.plan, result.report);
+  };
+
+  const handlePreviewBlockTimeRange = (
+    blockId: string,
+    startMinute: number,
+    endMinute: number,
+  ) => {
+    if (!isManual) return;
+    const current = planRef.current;
+    if (!current) return;
+    const result = applyManualBlockTimeRange({
+      plan: current,
+      blockId,
+      startMinute,
+      endMinute,
+    });
+    if (!result) return;
+    planRef.current = result.plan;
+    setPlan(result.plan);
+    setReport(result.report);
+  };
+
+  const handleApplySelectedBlock = (next: {
+    startMinute: number;
+    endMinute: number;
+    routeId: string | null;
+  }) => {
+    if (!selectedBlockId || !isManual) return;
+    const current = planRef.current;
+    if (!current) return;
+    let working = current;
+    const timeResult = applyManualBlockTimeRange({
+      plan: working,
+      blockId: selectedBlockId,
+      startMinute: next.startMinute,
+      endMinute: next.endMinute,
+    });
+    if (!timeResult) return;
+    working = timeResult.plan;
+
+    const route =
+      next.routeId
+        ? draft.routeGroups.selectedRoutes.find((item) => item.routeId === next.routeId) ?? null
+        : null;
+    const routeResult = applyManualBlockRoute({
+      plan: working,
+      blockId: selectedBlockId,
+      route,
+    });
+    if (!routeResult) return;
+    planRef.current = routeResult.plan;
+    pushNewState(routeResult.plan, routeResult.report);
+  };
+
+  const handleApplyDwells = (next: {
+    stationDwells: import('../types/create').ShiftScheduleStationDwell[];
+    dwellSlackSeconds: number;
+  }) => {
+    if (!selectedBlockId || !isManual) return;
+    const current = planRef.current;
+    if (!current) return;
+    const result = applyManualBlockDwells({
+      plan: current,
+      blockId: selectedBlockId,
+      stationDwells: next.stationDwells,
+      dwellSlackSeconds: next.dwellSlackSeconds,
+    });
+    if (!result) return;
+    planRef.current = result.plan;
+    pushNewState(result.plan, result.report);
+  };
+
+  const selectedBlock = useMemo(() => {
+    if (!plan || !selectedBlockId) return null;
+    for (const timeline of plan.timelines) {
+      const found = timeline.blocks.find((block) => block.id === selectedBlockId);
+      if (found) return found;
+    }
+    return null;
+  }, [plan, selectedBlockId]);
 
   const handleUndo = () => {
     if (historyIndex <= 0) return;
@@ -336,17 +629,15 @@ export function StepShiftScheduleAdjust({
 
     setHistoryIndex(prevIndex);
     setPlan(prev.plan);
-    setReport(prev.report);
+    setReport(prev.feasibilityReport);
     setSelectedBlockId(null);
 
     const base = draft.scheduleOutput;
     if (base) {
-      void onScheduleOutputReady({
-        ...base,
-        generatedAt: prev.plan.generatedAt,
-        plan: prev.plan,
-        feasibilityReport: prev.report,
-      }, { flush: true });
+      void onScheduleOutputReady(
+        applyHistoryToOutput(base, history, prevIndex),
+        { flush: true },
+      );
     }
   };
 
@@ -357,17 +648,15 @@ export function StepShiftScheduleAdjust({
 
     setHistoryIndex(nextIndex);
     setPlan(next.plan);
-    setReport(next.report);
+    setReport(next.feasibilityReport);
     setSelectedBlockId(null);
 
     const base = draft.scheduleOutput;
     if (base) {
-      void onScheduleOutputReady({
-        ...base,
-        generatedAt: next.plan.generatedAt,
-        plan: next.plan,
-        feasibilityReport: next.report,
-      }, { flush: true });
+      void onScheduleOutputReady(
+        applyHistoryToOutput(base, history, nextIndex),
+        { flush: true },
+      );
     }
   };
 
@@ -379,26 +668,31 @@ export function StepShiftScheduleAdjust({
     let targetBlockId: string | null = null;
     if (typeof d.blockId === 'string') {
       targetBlockId = d.blockId;
+    } else if (typeof d.nextBlockId === 'string') {
+      targetBlockId = d.nextBlockId;
+    } else if (typeof d.laterBlockId === 'string') {
+      // 班距類警告：優先定位「後一班」（間隔偏短的那一對）
+      targetBlockId = d.laterBlockId;
     } else if (typeof d.earlierBlockId === 'string') {
       targetBlockId = d.earlierBlockId;
-    } else if (typeof d.laterBlockId === 'string') {
-      targetBlockId = d.laterBlockId;
-    } else if (typeof d.routeId === 'string' && typeof d.earlierDepartureMinute === 'number') {
-      // 根據 routeId 與發車分鐘來回溯 block
+    } else if (typeof d.routeId === 'string' && typeof d.laterDepartureMinute === 'number') {
       for (const timeline of plan.timelines) {
         const found = timeline.blocks.find(
-          (b) => b.routeId === d.routeId && b.plannedStartMinute === d.earlierDepartureMinute
+          (b) =>
+            b.routeId === d.routeId
+            && Math.abs(b.plannedStartMinute - (d.laterDepartureMinute as number)) < 1e-9,
         );
         if (found) {
           targetBlockId = found.id;
           break;
         }
       }
-    } else if (typeof d.routeId === 'string' && typeof d.laterDepartureMinute === 'number') {
-      // 根據 routeId 與發車分鐘來回溯 block
+    } else if (typeof d.routeId === 'string' && typeof d.earlierDepartureMinute === 'number') {
       for (const timeline of plan.timelines) {
         const found = timeline.blocks.find(
-          (b) => b.routeId === d.routeId && b.plannedStartMinute === d.laterDepartureMinute
+          (b) =>
+            b.routeId === d.routeId
+            && Math.abs(b.plannedStartMinute - (d.earlierDepartureMinute as number)) < 1e-9,
         );
         if (found) {
           targetBlockId = found.id;
@@ -454,7 +748,7 @@ export function StepShiftScheduleAdjust({
         <button
           type="button"
           disabled={!selectedBlockId}
-          onClick={handleDeleteBlock}
+          onClick={() => handleDeleteBlock()}
           className={`p-1.5 rounded transition ${
             selectedBlockId
               ? 'text-zinc-300 hover:text-red-400 hover:bg-zinc-800/60'
@@ -464,6 +758,22 @@ export function StepShiftScheduleAdjust({
         >
           <Trash2 className="size-4" />
         </button>
+
+        {isManual ? (
+          <button
+            type="button"
+            disabled={!selectedBlockId}
+            onClick={() => handleDuplicateBlock()}
+            className={`p-1.5 rounded transition ${
+              selectedBlockId
+                ? 'text-zinc-300 hover:text-sky-300 hover:bg-zinc-800/60'
+                : 'text-zinc-600 cursor-not-allowed opacity-40'
+            }`}
+            title="增生已選班次"
+          >
+            <CopyPlus className="size-4" />
+          </button>
+        ) : null}
 
         <div className="w-px h-4 bg-zinc-800" />
 
@@ -477,7 +787,7 @@ export function StepShiftScheduleAdjust({
               ? 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
               : 'text-zinc-600 cursor-not-allowed opacity-40'
           }`}
-          title="還原 (Undo)"
+          title={isManual ? `還原 (${undoShortcutLabel})` : '還原 (Undo)'}
         >
           <Undo className="size-4" />
         </button>
@@ -492,10 +802,33 @@ export function StepShiftScheduleAdjust({
               ? 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
               : 'text-zinc-600 cursor-not-allowed opacity-40'
           }`}
-          title="重複 (Redo)"
+          title={isManual ? `重做 (${redoShortcutLabel})` : '重複 (Redo)'}
         >
           <Redo className="size-4" />
         </button>
+
+        {!isManual ? (
+          <>
+            <div className="w-px h-4 bg-zinc-800" />
+
+            {/* 重新生成班表 */}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                requestRebuild();
+              }}
+              className={`p-1.5 rounded transition ${
+                loading
+                  ? 'text-zinc-600 cursor-not-allowed opacity-40'
+                  : 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
+              }`}
+              title="重新生成班表"
+            >
+              <RefreshCw className="size-4" />
+            </button>
+          </>
+        ) : null}
 
         <div className="w-px h-4 bg-zinc-800" />
 
@@ -514,81 +847,218 @@ export function StepShiftScheduleAdjust({
 
   return (
     <div className={isMaximized ? "fixed inset-0 z-50 bg-[#0c1017] p-6 flex flex-col overflow-y-auto" : "flex min-h-0 flex-1 flex-col"}>
-      {isMaximized ? (
-        // 全螢幕極致化排版 (如設計稿二)
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-100">
-            調整自動生成的班表細節
-          </h2>
-          <div className="flex items-center gap-3">
-            {periodLegends.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                {periodLegends.map((item) => (
-                  <AttributeLegendBadgeChip key={item.attributeId} item={item} />
-                ))}
-              </div>
-            )}
-            {renderToolbar()}
-          </div>
-        </div>
-      ) : (
-        // 一般嵌入式排版
-        <>
-          <div className="mb-4 flex shrink-0 items-center justify-between">
-            <h2 className="text-base font-medium text-zinc-100">
-              調整自動生成的班表細節
-            </h2>
-            <div className="flex items-center gap-2">
+      {showRebuildConfirm && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
+          onClick={() => setShowRebuildConfirm(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rebuild-schedule-title"
+            className="w-full max-w-[520px] rounded-2xl bg-[#222225] px-8 py-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2
+                id="rebuild-schedule-title"
+                className="text-lg font-semibold leading-7 text-[#F3F4F6]"
+              >
+                確認重新生成班表
+              </h2>
               <button
                 type="button"
-                onClick={handleRebuild}
-                className="flex h-[32px] items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition"
+                onClick={() => setShowRebuildConfirm(false)}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+                aria-label="關閉"
               >
-                <RefreshCw className="size-3.5" />
-                重新生成排班
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-zinc-400">
+              重新生成班表將會用目前的設定重新計算所有班次。
+              你可以在此步驟中使用「還原 (Undo)」回到重生成前的版本。
+            </p>
+
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRebuildConfirm(false)}
+                autoFocus
+                className="inline-flex h-[38px] items-center justify-center rounded-lg px-5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  setShowRebuildConfirm(false);
+                  await performRebuild();
+                }}
+                className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:opacity-50"
+              >
+                確認重新生成
               </button>
             </div>
           </div>
-
-          <div className="mb-3 flex shrink-0 items-center justify-between">
-            {periodLegends.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {periodLegends.map((item) => (
-                  <AttributeLegendBadgeChip key={item.attributeId} item={item} />
-                ))}
-              </div>
-            ) : <div />}
-            {renderToolbar()}
-          </div>
-        </>
+        </div>
       )}
 
+      {duplicateWarning ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
+          onClick={() => setDuplicateWarning(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="duplicate-warning-title"
+            className="w-full max-w-[520px] rounded-2xl bg-[#222225] px-8 py-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2
+                id="duplicate-warning-title"
+                className="text-lg font-semibold leading-7 text-[#F3F4F6]"
+              >
+                無法增生班次
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDuplicateWarning(null)}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+                aria-label="關閉"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
 
+            <p className="mt-4 text-sm leading-6 text-zinc-400">
+              {duplicateWarning === '沒有足夠的空間可以增生'
+                ? '目前空間不足，無法在原班次右側增生一模一樣的班次。請先調整鄰近班次或縮短原班次後再試。'
+                : duplicateWarning}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <div className="flex items-center gap-5 border-b border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => setActiveTab('schedule')}
+              className={`relative pb-2 text-sm transition ${
+                activeTab === 'schedule'
+                  ? 'font-medium text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              班次預覽
+              {activeTab === 'schedule' ? (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+              ) : null}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('capacity')}
+              className={`relative pb-2 text-sm transition ${
+                activeTab === 'capacity'
+                  ? 'font-medium text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              運能趨勢
+              {activeTab === 'capacity' ? (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+              ) : null}
+            </button>
+          </div>
+
+          {periodLegends.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 pb-2">
+              {periodLegends.map((item) => (
+                <AttributeLegendBadgeChip key={item.attributeId} item={item} />
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {renderToolbar()}
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex-1 min-h-0 flex flex-col">
-          {plan ? (
-            <ShiftSchedulePlanGrid
+        {/* 保持掛載以免切換運能趨勢後橫移位置被重置 */}
+        <div
+          className={`flex min-h-0 flex-1 flex-col gap-4 ${
+            activeTab === 'schedule' ? '' : 'hidden'
+          }`}
+        >
+          <div className={`flex min-h-0 flex-1 ${isManual ? 'flex-row gap-3' : 'flex-col'}`}>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {plan ? (
+                <ShiftSchedulePlanGrid
+                  plan={plan}
+                  intervals={intervals}
+                  attributes={attributes}
+                  templateTasks={templateTasks}
+                  selectedBlockId={selectedBlockId}
+                  onSelectBlock={setSelectedBlockId}
+                  report={isManual ? null : report}
+                  highlightedBlockId={highlightedBlockId}
+                  selectedRoutes={draft.routeGroups.selectedRoutes}
+                  minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
+                  sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                  showTemplateTasks
+                  interactiveEdit={isManual}
+                  onDropTaskType={isManual ? handleDropTaskType : undefined}
+                  onCommitBlockTimeRange={isManual ? handleCommitBlockTimeRange : undefined}
+                  onPreviewBlockTimeRange={isManual ? handlePreviewBlockTimeRange : undefined}
+                  onDeleteBlock={isManual ? handleDeleteBlock : undefined}
+                  onDuplicateBlock={isManual ? handleDuplicateBlock : undefined}
+                />
+              ) : (
+                <PanelNoData message="無法生成班表" className="min-h-[240px]" />
+              )}
+            </div>
+            {isManual ? (
+              <ManualScheduleEditorSidebar
+                selectedBlock={selectedBlock}
+                selectedRoutes={draft.routeGroups.selectedRoutes}
+                sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                onApplyBlock={handleApplySelectedBlock}
+                onApplyDwells={handleApplyDwells}
+              />
+            ) : null}
+          </div>
+
+          {report && !isManual ? (
+            <div className="max-h-[300px] shrink-0 overflow-y-auto rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-2">
+              <div className="mb-2 px-1 text-xs font-semibold text-zinc-400">
+                系統可行性檢驗報告與錯誤原因對照清單
+              </div>
+              <FeasibilityMessages report={report} onIssueClick={handleIssueClick} />
+            </div>
+          ) : null}
+        </div>
+
+        {activeTab === 'capacity' ? (
+          plan ? (
+            <CapacityTrendChart
               plan={plan}
               intervals={intervals}
               attributes={attributes}
-              templateTasks={templateTasks}
-              selectedBlockId={selectedBlockId}
-              onSelectBlock={setSelectedBlockId}
-              report={report}
-              highlightedBlockId={highlightedBlockId}
+              vehicleCapacity={vehicleCapacity}
+              selectedRoutes={draft.routeGroups.selectedRoutes}
+              className="min-h-[280px]"
             />
           ) : (
-            <PanelNoData message="無法生成班表" className="min-h-[240px]" />
-          )}
-        </div>
-
-        {report && (
-          <div className="shrink-0 max-h-[300px] overflow-y-auto rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-2">
-            <div className="mb-2 px-1 text-xs font-semibold text-zinc-400">系統可行性檢驗報告與錯誤原因對照清單</div>
-            <FeasibilityMessages report={report} onIssueClick={handleIssueClick} />
-          </div>
-        )}
+            <PanelNoData message="無法生成運能趨勢" className="min-h-[240px]" />
+          )
+        ) : null}
       </div>
     </div>
   );

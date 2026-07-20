@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CreateMaintenanceTaskPage } from './components/CreateMaintenanceTaskPage';
 import { MaintenanceTaskListPage } from './components/MaintenanceTaskListPage';
+import { MaintenanceTaskResultPreviewPage } from './components/MaintenanceTaskResultPreviewPage';
 import { NavigateToSetupModal } from './components/NavigateToSetupModal';
 import {
   leaveMaintenanceTaskEditor,
   navigateToMaintenanceTaskCreate,
   navigateToMaintenanceTaskEdit,
+  navigateToMaintenanceTaskPreview,
   readMaintenanceTaskLocation,
   type MaintenanceTaskLocation,
 } from './navigation';
@@ -57,6 +59,11 @@ export default function MaintenanceTasksApp({ onBackToHome, embedded }: Maintena
     setLocation({ screen: 'create', editTaskId: taskId });
   }, []);
 
+  const openTaskPreview = useCallback((taskId: string) => {
+    navigateToMaintenanceTaskPreview(taskId);
+    setLocation({ screen: 'preview', editTaskId: taskId });
+  }, []);
+
   return (
     <>
       {location.screen === 'list' && (
@@ -65,14 +72,24 @@ export default function MaintenanceTasksApp({ onBackToHome, embedded }: Maintena
           onBackToHome={embedded ? undefined : onBackToHome}
           onCreateClick={openCreateFlow}
           onEditClick={openEdit}
+          onPreviewClick={openTaskPreview}
         />
       )}
 
       {location.screen === 'create' && (
         <CreateMaintenanceTaskPage
+          key={location.editTaskId ?? 'new'}
           editTaskId={location.editTaskId}
           onBack={backToList}
           onSavedDraft={reloadList}
+        />
+      )}
+
+      {location.screen === 'preview' && location.editTaskId && (
+        <MaintenanceTaskResultPreviewPage
+          key={`preview-${location.editTaskId}`}
+          taskId={location.editTaskId}
+          onBack={backToList}
         />
       )}
 

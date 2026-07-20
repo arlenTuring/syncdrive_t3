@@ -73,6 +73,12 @@ export class OperationShiftController {
     return this.operationShiftService.duplicateAsNewDraft(id);
   }
 
+  @Post('detail/:id/duplicate-as-manual')
+  @ApiOperation({ summary: '參數生成班表複製成手動製作草稿' })
+  async duplicateAsManualDraft(@Param('id') id: string) {
+    return this.operationShiftService.duplicateAsManualDraft(id);
+  }
+
   @Patch('detail/:id')
   @ApiOperation({ summary: '更新班表草稿' })
   async updateDraft(

@@ -3,6 +3,7 @@ import {
   ChevronRight,
   ClipboardList,
   Copy,
+  FilePenLine,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -15,21 +16,31 @@ import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
 import {
   deleteOperationShift,
+  duplicateOperationShiftAsManualDraft,
   duplicateOperationShiftDraft,
   fetchOperationShiftList,
 } from '../api/operationShiftApi';
 import {
+  CREATION_MODE_LABEL,
+  CREATION_MODE_TAG_STYLE,
   USAGE_STATUS_OPTIONS,
   USAGE_TAG_STYLE,
   PUBLISH_TAG_STYLE,
+  type CreationModeKey,
   type OperationShiftListItem,
   type UsageStatusKey,
 } from '../types';
+
+function resolveCreationMode(row: OperationShiftListItem): CreationModeKey {
+  return row.creation_mode === 'manual' ? 'manual' : 'parametric';
+}
 
 type ShiftListPageProps = {
   onBackToHome?: () => void;
   onCreateClick?: () => void;
   onEditClick?: (shiftId: string) => void;
+  /** 開啟最後一步「整體預覽」唯讀結果 */
+  onPreviewClick?: (shiftId: string) => void;
 };
 
 const PAGE_SIZE = 20;
@@ -38,6 +49,7 @@ export function ShiftListPage({
   onBackToHome,
   onCreateClick,
   onEditClick,
+  onPreviewClick,
 }: ShiftListPageProps) {
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -50,6 +62,7 @@ export function ShiftListPage({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [copyingAsManualId, setCopyingAsManualId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -133,6 +146,20 @@ export function ShiftListPage({
     }
   };
 
+  const handleCopyAsManual = async (row: OperationShiftListItem) => {
+    if (resolveCreationMode(row) !== 'parametric') return;
+    setCopyingAsManualId(row.shift_id);
+    setOpenMenuId(null);
+    try {
+      await duplicateOperationShiftAsManualDraft(row.shift_id);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCopyingAsManualId(null);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
       <header className="border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
@@ -188,7 +215,7 @@ export function ShiftListPage({
           className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
         >
           <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          建立正線班表
+          建立班表
         </button>
       </div>
 
@@ -203,8 +230,8 @@ export function ShiftListPage({
             <tr className="border-b border-zinc-800 text-left text-zinc-500">
               <th className="py-3 pr-4 font-medium">班表名稱</th>
               <th className="py-3 pr-4 font-medium">班表預覽</th>
-              <th className="py-3 pr-4 font-medium">運能評估</th>
               <th className="py-3 pr-4 font-medium">時間模板</th>
+              <th className="py-3 pr-4 font-medium">建立方式</th>
               <th className="py-3 pr-4 font-medium">使用狀態</th>
               <th className="py-3 pr-4 font-medium">發布狀態</th>
               <th className="py-3 pr-4 font-medium">版本編號</th>
@@ -226,7 +253,9 @@ export function ShiftListPage({
                 </td>
               </tr>
             ) : (
-              items.map((row) => (
+              items.map((row) => {
+                const creationMode = resolveCreationMode(row);
+                return (
                 <tr
                   key={row.shift_id}
                   className="border-b border-zinc-800/60 hover:bg-zinc-900/50"
@@ -235,22 +264,19 @@ export function ShiftListPage({
                   <td className="py-3 pr-4">
                     <button
                       type="button"
-                      onClick={() => onEditClick?.(row.shift_id)}
+                      onClick={() => onPreviewClick?.(row.shift_id)}
                       className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
                     >
                       班表預覽
                     </button>
                   </td>
-                  <td className="py-3 pr-4">
-                    <button
-                      type="button"
-                      onClick={() => alert('運能趨勢功能開發中')}
-                      className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
-                    >
-                      運能趨勢
-                    </button>
-                  </td>
                   <td className="py-3 pr-4 text-zinc-300">{row.time_template_name}</td>
+                  <td className="py-3 pr-4">
+                    <StatusTag
+                      label={row.creation_mode_label || CREATION_MODE_LABEL[creationMode]}
+                      style={CREATION_MODE_TAG_STYLE[creationMode]}
+                    />
+                  </td>
                   <td className="py-3 pr-4">
                     <StatusTag
                       label={row.usage_status_label}
@@ -278,7 +304,7 @@ export function ShiftListPage({
                     {openMenuId === row.shift_id && (
                       <div
                         ref={menuRef}
-                        className="absolute right-0 top-full z-20 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
+                        className="absolute right-0 top-full z-20 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
                       >
                         {row.publish_status === 'draft' && (
                           <button
@@ -293,19 +319,6 @@ export function ShiftListPage({
                             編輯
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => void handleDuplicate(row)}
-                          disabled={duplicatingId === row.shift_id}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                        >
-                          {duplicatingId === row.shift_id ? (
-                            <Loader2 className="size-4 animate-spin text-zinc-400" />
-                          ) : (
-                            <Copy className="size-4 text-zinc-400" />
-                          )}
-                          以此複製新版
-                        </button>
                         <button
                           type="button"
                           onClick={() => void handleDelete(row)}
@@ -324,11 +337,48 @@ export function ShiftListPage({
                           )}
                           刪除
                         </button>
+                        {creationMode === 'parametric' && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDuplicate(row)}
+                            disabled={duplicatingId === row.shift_id}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                          >
+                            {duplicatingId === row.shift_id ? (
+                              <Loader2 className="size-4 animate-spin text-zinc-400" />
+                            ) : (
+                              <Copy className="size-4 text-zinc-400" />
+                            )}
+                            複製成參數生成班表
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void (creationMode === 'parametric'
+                              ? handleCopyAsManual(row)
+                              : handleDuplicate(row))
+                          }
+                          disabled={
+                            copyingAsManualId === row.shift_id
+                            || duplicatingId === row.shift_id
+                          }
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                        >
+                          {copyingAsManualId === row.shift_id
+                          || (creationMode === 'manual' && duplicatingId === row.shift_id) ? (
+                            <Loader2 className="size-4 animate-spin text-zinc-400" />
+                          ) : (
+                            <FilePenLine className="size-4 text-zinc-400" />
+                          )}
+                          複製成手動製作班表
+                        </button>
                       </div>
                     )}
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

@@ -15,10 +15,14 @@ import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import { organizeRoutesByGroups } from '../utils/routeGroupPlanning'
 import { stationDisplayLabel, formatRouteTravelTimeSummary } from '../utils/routePlanning'
+import type { PointTopology } from '../types/pointTopology'
+import { buildTopologyRouteTravelBreakdown } from '../utils/topologyRouteTravel'
+
 type Props = {
   areas: MapAreaObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
+  pointTopology: PointTopology
   editMode: boolean
   visibleRouteIds: ReadonlySet<string>
   onToggleRouteVisibility: (routeId: string) => void
@@ -118,6 +122,7 @@ function RowActionsMenu({
 function RouteRow({
   areas,
   route,
+  pointTopology,
   editMode,
   isVisible,
   menuKey,
@@ -130,6 +135,7 @@ function RouteRow({
 }: {
   areas: MapAreaObject[]
   route: MapPlannedRoute
+  pointTopology: PointTopology
   editMode: boolean
   isVisible: boolean
   menuKey: MenuKey
@@ -143,41 +149,94 @@ function RouteRow({
   const pathLabel =
     route.stationIds.map((id) => stationDisplayLabel(areas, id)).join(' → ') ||
     '（無有效站點）'
+  const topology = useMemo(
+    () =>
+      route.stationIds.length >= 2
+        ? buildTopologyRouteTravelBreakdown(pointTopology, areas, route.stationIds)
+        : null,
+    [route.stationIds, pointTopology, areas],
+  )
+  const topologyAvailable = Boolean(
+    topology?.pathsComplete && topology?.timesComplete,
+  )
+  const topologyPathOk = Boolean(topology?.pathsComplete)
+  const timeSummary = topologyAvailable
+    ? formatRouteTravelTimeSummary(
+        topology!.totalAvgTravelTimeSeconds,
+        topology!.totalMinTravelTimeSeconds,
+      )
+    : formatRouteTravelTimeSummary(
+        route.avgTravelTimeSeconds,
+        route.minTravelTimeSeconds,
+      )
 
   return (
     <div
       className={[
-        'ml-3 flex items-stretch gap-1 rounded-md border border-zinc-800/80 bg-zinc-950/30',
-        isVisible ? 'border-cyan-500/30' : '',
+        'ml-3 flex items-stretch gap-1 rounded-md border',
+        topologyAvailable
+          ? isVisible
+            ? 'border-cyan-500/30 bg-zinc-950/30'
+            : 'border-zinc-800/80 bg-zinc-950/30'
+          : 'border-zinc-800/50 bg-zinc-950/20 opacity-45',
       ].join(' ')}
+      title={
+        topologyAvailable
+          ? undefined
+          : topologyPathOk
+            ? '拓撲路徑已連但時間未完整 — 路線不可用'
+            : '拓撲無此站序組合 — 路線不可用'
+      }
     >
       <button
         type="button"
         onClick={onToggleVisibility}
-        title={isVisible ? '隱藏地圖路線' : '顯示地圖路線'}
+        disabled={!topologyAvailable}
+        title={
+          !topologyAvailable
+            ? '拓撲組合不成立，無法顯示'
+            : isVisible
+              ? '隱藏地圖路線'
+              : '顯示地圖路線'
+        }
         className={[
           'flex shrink-0 items-center justify-center rounded-l-md px-2 transition-colors',
-          isVisible
-            ? 'text-cyan-300 hover:bg-cyan-950/40'
-            : 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300',
+          !topologyAvailable
+            ? 'cursor-not-allowed text-zinc-700'
+            : isVisible
+              ? 'text-cyan-300 hover:bg-cyan-950/40'
+              : 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300',
         ].join(' ')}
       >
-        {isVisible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+        {isVisible && topologyAvailable ? (
+          <Eye className="size-3.5" />
+        ) : (
+          <EyeOff className="size-3.5" />
+        )}
       </button>
       <div className="min-w-0 flex-1 py-2 pr-1">
         <div className="flex items-center gap-1.5">
-          <p className="min-w-0 truncate text-[11px] font-medium text-zinc-200">{route.displayName}</p>
+          <p
+            className={[
+              'min-w-0 truncate text-[11px] font-medium',
+              topologyAvailable ? 'text-zinc-200' : 'text-zinc-500',
+            ].join(' ')}
+          >
+            {route.displayName}
+          </p>
         </div>
-        <p className="mt-0.5 truncate text-[10px] text-zinc-500">{pathLabel}</p>
-        {formatRouteTravelTimeSummary(
-          route.avgTravelTimeSeconds,
-          route.minTravelTimeSeconds,
-        ) ? (
+        <p className="mt-0.5 truncate text-[10px] text-zinc-600">{pathLabel}</p>
+        {timeSummary && topologyAvailable ? (
           <p className="mt-0.5 text-[9px] text-zinc-600">
-            {formatRouteTravelTimeSummary(
-              route.avgTravelTimeSeconds,
-              route.minTravelTimeSeconds,
-            )}
+            {timeSummary}
+            {topology?.totalDistanceMeters != null
+              ? ` · ${topology.totalDistanceMeters} m`
+              : ''}
+          </p>
+        ) : null}
+        {!topologyAvailable ? (
+          <p className="mt-0.5 text-[9px] text-zinc-600">
+            {topologyPathOk ? '拓撲時間未完整 · 不可用' : '拓撲無此組合 · 不可用'}
           </p>
         ) : null}
       </div>
@@ -199,6 +258,7 @@ export function RouteGroupListView({
   areas,
   routeGroups,
   routes,
+  pointTopology,
   editMode,
   visibleRouteIds,
   onToggleRouteVisibility,
@@ -321,6 +381,7 @@ export function RouteGroupListView({
                           key={route.routeId}
                           areas={areas}
                           route={route}
+                          pointTopology={pointTopology}
                           editMode={editMode}
                           isVisible={visibleRouteIds.has(route.routeId)}
                           menuKey={`route:${route.routeId}`}
@@ -361,6 +422,7 @@ export function RouteGroupListView({
                     key={route.routeId}
                     areas={areas}
                     route={route}
+                    pointTopology={pointTopology}
                     editMode={editMode}
                     isVisible={visibleRouteIds.has(route.routeId)}
                     menuKey={`route:${route.routeId}`}
