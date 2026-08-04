@@ -1,4 +1,6 @@
 import type { ShiftScheduleCreateDraft } from '../../types/create';
+import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
+import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import type {
   FeasibilityIssue,
   GeneratedSchedulePlan,
@@ -13,8 +15,11 @@ import {
   expandRowBlocks,
   groupTasksByRow,
   resolveTemplateTasks,
-  ROUTE_ASSIGNMENT_ALGORITHM,
 } from './expand';
+import {
+  routeAssignmentAlgorithmId,
+  resolveLockedRotationMinSeconds,
+} from './routeSuccessorPolicy';
 import {
   validatePassengerHeadway,
   validateRouteSwitchBuffers,
@@ -22,6 +27,7 @@ import {
   validateTimelineOverlaps,
   validateTurnaroundLimits,
   validateRotationCyclesComplete,
+  validateStationTimingsWithinBlocks,
 } from './validate';
 
 export type GenerateShiftScheduleInput = {
@@ -36,6 +42,8 @@ export type GenerateShiftScheduleInput = {
    * headway：依班距自動生成正線時刻並掛時間線（§4.2；建立班表 adapter 使用）
    */
   passengerTimetableMode?: PassengerTimetableMode;
+  /** 目前啟用地圖拓樸抽出的首班起點站；未傳則不插調度 */
+  firstTripOrigins?: MaintenanceFirstTripOrigin[];
 };
 
 /**
@@ -55,8 +63,10 @@ export function generateShiftSchedule(
       maintenanceTaskBody: input.maintenanceTaskBody,
       turnaroundLimitSeconds: input.turnaroundLimitSeconds,
       passengerTimetableMode: input.passengerTimetableMode ?? 'template',
+      firstTripOrigins: input.firstTripOrigins,
     },
     errors,
+    warnings,
   );
 
   if (!engineInput) {
@@ -68,6 +78,7 @@ export function generateShiftSchedule(
     scheduleRowCount: engineInput.scheduleRowCount,
     passengerRoutes: engineInput.passengerRoutes,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    successorPolicy: engineInput.successorPolicy,
   };
 
   validateTurnaroundLimits(
@@ -76,6 +87,7 @@ export function generateShiftSchedule(
     engineInput.turnaroundLimitSeconds,
     errors,
     warnings,
+    resolveLockedRotationMinSeconds(engineInput.successorPolicy),
   );
 
   const resolvedByTaskId = resolveTemplateTasks(
@@ -84,10 +96,11 @@ export function generateShiftSchedule(
     engineInput.maintenanceBody,
     errors,
     warnings,
+    engineInput.firstTripOrigins,
   );
 
   const tasksByRow = groupTasksByRow(engineInput.confirmedTasks);
-  const timelines: GeneratedSchedulePlan['timelines'] = [];
+  let timelines: GeneratedSchedulePlan['timelines'] = [];
 
   for (let row = 1; row <= engineInput.scheduleRowCount; row += 1) {
     const rowTasks = tasksByRow.get(row) ?? [];
@@ -96,11 +109,22 @@ export function generateShiftSchedule(
       resolvedByTaskId,
       errors,
       engineInput.minimumRecoveryTimeSeconds,
+      engineInput.passengerRoutes,
     );
     if (blocks.length > 0) {
       timelines.push({ row, blocks });
     }
   }
+
+  timelines = insertMaintenanceEntryServiceTrips({
+    timelines,
+    selectedRoutes: engineInput.selectedRoutes,
+    firstTripOrigins: engineInput.firstTripOrigins,
+    maintenanceBody: engineInput.maintenanceBody,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    warnings,
+  });
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(
@@ -108,12 +132,19 @@ export function generateShiftSchedule(
   );
 
   validateTimelineOverlaps(timelines, errors);
+  validateStationTimingsWithinBlocks(
+    timelines,
+    engineInput.selectedRoutes,
+    errors,
+  );
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
   validateRouteSwitchBuffers(
     timelines,
     routeById,
     errors,
     engineInput.minimumRecoveryTimeSeconds,
+    engineInput.passengerRoutes,
+    engineInput.successorPolicy,
   );
   validatePassengerHeadway(
     allBlocks,
@@ -138,7 +169,7 @@ export function generateShiftSchedule(
     generatedAt: new Date().toISOString(),
     scheduleRowCount: engineInput.scheduleRowCount,
     timelines,
-    routeAssignmentAlgorithm: ROUTE_ASSIGNMENT_ALGORITHM,
+    routeAssignmentAlgorithm: routeAssignmentAlgorithmId(engineInput.successorPolicy),
     ...(engineInput.timetableGenerationAlgorithm
       ? { timetableGenerationAlgorithm: engineInput.timetableGenerationAlgorithm }
       : {}),

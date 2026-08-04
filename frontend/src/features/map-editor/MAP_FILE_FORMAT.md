@@ -1,8 +1,54 @@
-# Map File V1 Format
+# Map File Format（現行 schemaVersion **2**）
 
-This document describes the JSON contract used by the map editor.
+地圖清單「導出／匯入」與編輯器儲存使用的 JSON 契約。  
+匯出前請先在編輯器**儲存地圖**（導出的是圖書館內最後一次存檔的 `mapDocument`）。
 
-## Top-level shape
+## Top-level shape（V2）
+
+```json
+{
+  "schemaVersion": 2,
+  "mapId": "my-map-id",
+  "displayName": "顯示名稱",
+  "description": "optional",
+  "version": "v0.0.1",
+  "createdAt": "optional ISO",
+  "updatedAt": "optional ISO",
+  "pixelSize": { "width": 1920, "height": 1080 },
+  "pixelOrigin": { "x": 0, "y": 0 },
+  "areas": [],
+  "routeGroups": [],
+  "routes": [],
+  "visibleRouteIds": ["route-1"],
+  "pointTopology": { "version": 1, "nodes": [], "edges": [] }
+}
+```
+
+- `areas[]`：各 Area 及其 `facilities[]`（含 `TrackCrossover`、`Facility.facilityDockingPoint` 等）
+- `routes`／`routeGroups`：營運路線與群組（可省略若為空）
+- `visibleRouteIds`：地圖上要顯示的路線 id（眼睛開關）。省略或 `[]`＝全部隱藏；**載入／匯入依此還原，不強制全開**
+- `pointTopology`：路網拓撲（節點＋有向邊；可省略若為空）。細節見 `document/點位拓撲規格.md`
+- 場域公尺座標：原點**左下**，x 向右、y 向上（與編輯器參照場域一致）
+
+### 會完整 round-trip 的新元件／資料
+
+| 資料 | JSON 位置 |
+|---|---|
+| 虛擬渡線 `TrackCrossover` | `areas[].facilities[]`，`parameters.trackCrossoverPortals`（`a`／`b`：`xM`/`yM`/`attachedTrackId`/`waypointCode`/`alias`） |
+| 設施停靠點 | `Facility.parameters.facilityDockingPoint`：`{ xM, yM, alias? }` |
+| 路網拓撲 | 頂層 `pointTopology`（含 `facility-docking`、`crossover-waypoint` 等 kind） |
+| 路線／群組 | 頂層 `routes`、`routeGroups` |
+| 路線可視 | 頂層 `visibleRouteIds`（眼睛開關） |
+
+### 不會寫入地圖 JSON
+
+- 編修紀錄（IndexedDB）
+
+---
+
+## Legacy：Map File V1（匯入時自動升級為 V2）
+
+舊檔仍可匯入：
 
 ```json
 {
@@ -19,8 +65,7 @@ This document describes the JSON contract used by the map editor.
 }
 ```
 
-- `coordinateSystem.extentMeters` defines the editable field size (width × height in meters). Any positive values within editor limits are allowed (default for new maps: `960 x 420`).
-- Coordinates are absolute meters with origin at top-left; `x` grows right, `y` grows down.
+- V1 使用單一 `facilities[]`（無 `areas`）；匯入後升級為 V2 Area 結構。
 
 ## Facility entry fields
 
@@ -39,16 +84,25 @@ State fields:
 
 ## Supported facility types
 
-- `Slot` (`name`: `Parking | Charging | Wash | Repair`)
-- `Zone` (`name`: `ZoneArea`)
+### 分類（暫定）
+
+- **設備（equipment）**：`Signal` 紅綠燈、`Pole` 智慧桿、`PSD` 月台門 — 元件庫拖入對應類型；**不可**用 `Facility.purpose` 文字代替。
+- **設施（facility area）**：`Facility`（`name`: `FacilityArea`）大型區塊 — 充電格／停車格／維修格等，用途寫在 `parameters.purpose`。
+- 其他：`Geofence`、`Track`、`DockingPoint`、`Waypoint`、`RoadLine`、`Slot`（legacy）
+
+### 類型清單
+
+- `Slot` (`name`: `Parking | Charging | Wash | Repair`) — legacy
+- `Facility` (`name`: `FacilityArea`) — 大型設施區塊
 - `Geofence` (`name`: `Geofence`)
-- `PSD` (`name`: `Gate`)
-- `Signal` (`name`: `Light`)
+- `PSD` (`name`: `Gate`) — 設備／月台門
+- `Signal` (`name`: `Light`) — 設備／紅綠燈
 - `Track` (`name`: `Rail`)
-- `Pole` (`name`: `SmartPole`)
+- `Pole` (`name`: `SmartPole`) — 設備／智慧桿
 - `DockingPoint` (`name`: `DockingPoint`) — 地圖停靠點／營運節點參照
 - `Waypoint` (`name`: `Waypoint`) — 途經點；自駕車必經點位（預設綠色圓點）
-
+- `RoadLine` (`name`: `RoadLine`)
+- `TrackCrossover` (`name`: `TrackCrossover`) — 虛擬渡線；端點 A／B 為途經點，可入路線與拓撲
 ## Parameters by component
 
 ### Shared/common
@@ -75,28 +129,30 @@ State fields:
 
 ### Zone / Facility / DockingPoint
 
-- `purpose` — 使用者填寫的元件用途（選填；清單描述會顯示於 Area 名稱之後）
+- `purpose` — **僅大型設施區塊（`type: Facility`）**：充電格、停車格、維修格等用途文字（選填；清單描述會顯示於 Area 名稱之後）。**不可**用來把設施標成紅綠燈／智慧桿／月台門。
 - `remarks` — 滑鼠懸停提示（選填；不應作為用途或類型判斷依據）
 - `defaultFillColor`
 - `colorRules: [{ "fieldPath": "status", "operator": "eq", "compareValue": "occupied", "color": "#0e7490" }]`
 - `iconDisplay`: `none` | `builtin` | `custom`
 - `customIconUrl`: image URL when `iconDisplay` is `custom`
+- `facilityDockingPoint`: `{ "xM": number, "yM": number, "alias"?: string }` — **設施停靠點**（選填）。場域絕對公尺座標，必須落在本設施 `refFieldXMinM`–`XMaxM` / `YMinM`–`YMaxM` 範圍內。`alias` 為顯示別名（選填）；未設定時預設為「設施名稱＋停靠點」。圖上以綠色圓點顯示於設施內，可拖曳但不可超出設施外框；亦會出現在點位清單「設施停靠點」分類，並可在路網拓撲以 `kind: "facility-docking"`、`id: "fdock:<facilityId>"` 載入。
 
 #### DockingPoint（停靠點）
 
 - `stationId` — **站點唯一識別**（使用者可編輯；預設 `station_1`、`station_2`…；圖台內不可重複）。對應營運協議 `task_params.station_id` 與 MQTT `current_leg.target_station_id`。
-- `stationName` — 站點別名（例 `N2W下行`）；同一圖台內不可重複
-- `dockingLeg` — 軌道方向（`down` | `up`）；對應 `ROUTE-MAINLINE-DOWN` / `ROUTE-MAINLINE-UP`
+- ~~`stationName`~~ — **已廢止**；顯示名稱改用設施的 `customName`（載入時會把舊 `stationName` 遷入 `customName` 後移除）
+- ~~`dockingLeg`~~ — **已廢止**（舊上下行標記）；載入時剝除。路線預覽僅依座標吸附最近軌道，不依賴此欄位
 - `refFieldXM` / `refFieldYM` — 參照場域座標（單點，與 Signal 相同）
 - `iconMode`: `dot` | `builtin` | `custom`（預設 `dot`）
 - `customIconUrl`: 自訂圖示 URL（`iconMode` 為 `custom` 時）
 
 #### Waypoint（途經點）
 
-- `waypointCode` — **途經點唯一代號**（使用者可編輯；預設 `waypoint_1`、`waypoint_2`…；全圖不可重複）。圖台以綠色圓點顯示，不顯示名稱。
+- `waypointCode` — **途經點唯一代號**（使用者可編輯；預設 `waypoint_1`、`waypoint_2`…；全圖不可重複）。圖台以綠色圓點顯示。
+- ~~`waypointName`~~ — **已廢止**；顯示名稱改用 `customName`（載入時遷移後移除）
 - `refFieldXM` / `refFieldYM` — 參照場域座標（單點，與 DockingPoint 相同）
 
-> **已廢止（載入時自動剝除）**：`dockingStation`、`operationNodeId`、`nodeRole`
+> **已廢止（載入時自動剝除）**：`dockingStation`、`dockingLeg`、`operationNodeId`、`nodeRole`
 
 範例：
 
@@ -105,12 +161,10 @@ State fields:
   "id": "42",
   "type": "DockingPoint",
   "name": "DockingPoint",
-  "customName": "",
+  "customName": "T3下行",
   "positionMeters": { "x": 120, "y": 80 },
   "parameters": {
     "stationId": "station_3",
-    "stationName": "T3下行",
-    "dockingLeg": "down",
     "refFieldXM": 937.5,
     "refFieldYM": 251.2,
     "iconMode": "builtin"
@@ -143,6 +197,32 @@ State fields:
   "tr": 1.5,
   "br": 0,
   "bl": 3.0
+}
+```
+
+### TrackCrossover（虛擬渡線）
+
+- `trackCrossoverColor` / `trackCrossoverColorOpacity`
+- `trackCrossoverStrokePx` / `trackCrossoverCenterGapPct`
+- `trackCrossoverBgColor` / `trackCrossoverBgOpacity`
+- `trackCrossoverPortals`:
+
+```json
+{
+  "a": {
+    "xM": 40,
+    "yM": 20,
+    "attachedTrackId": "151",
+    "waypointCode": "xo_3_a",
+    "alias": "終點別名"
+  },
+  "b": {
+    "xM": 40,
+    "yM": 40,
+    "attachedTrackId": "063",
+    "waypointCode": "xo_3_b",
+    "alias": "起點別名"
+  }
 }
 ```
 

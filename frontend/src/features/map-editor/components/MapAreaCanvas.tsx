@@ -106,6 +106,8 @@ type MapAreaCanvasProps = {
     facilityId: string,
     labelId: string | null,
   ) => void
+  /** 點選畫布／Area 空白（非設施）時：收合側欄抽屜等 */
+  onEmptyMapPointerDown?: () => void
   onDragFacility: (
     areaId: string,
     facilityId: string,
@@ -206,6 +208,7 @@ export function MapAreaCanvas({
   onSelectFacility,
   onSelectFacilities,
   onSelectGeofenceLabel,
+  onEmptyMapPointerDown,
   onDragFacility,
   onDragSessionStart,
   onResizeFacility,
@@ -579,7 +582,10 @@ export function MapAreaCanvas({
         ) {
           return
         }
-        if (!t.closest('[data-area-id]')) onSelectArea(null)
+        if (!t.closest('[data-area-id]')) {
+          onEmptyMapPointerDown?.()
+          onSelectArea(null)
+        }
       }}
     >
       <div
@@ -680,6 +686,7 @@ export function MapAreaCanvas({
                 onSelectArea={(id) => onSelectArea(id)}
                 onSelectFacility={onSelectFacility}
                 onSelectFacilities={onSelectFacilities}
+                onEmptyMapPointerDown={onEmptyMapPointerDown}
                 onSelectGeofenceLabel={
                   onSelectGeofenceLabel ??
                   ((_a, _f, _l) => {

@@ -1,8 +1,29 @@
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute } from '../types/mapFile'
-import { domainHeightM, domainWidthM } from './areaCoords'
+import {
+  areaPositionToCssTopLeft,
+  domainHeightM,
+  domainWidthM,
+  meterToAreaLocalPx,
+} from './areaCoords'
 import { resolveFacilityRenderPlacement } from './facilityAreaCoords'
 import { collectStationsFromAreas } from './dockingPointStationId'
+import {
+  getFacilityDockingPoint,
+  resolveFacilityDockingPointListTitle,
+} from './facilityDockingPoint'
+import { parseFacilityIdFromFacilityDockingTopologyNodeId } from './pointTopology'
+import { fieldPositionToFacilityAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import {
+  collectCrossoverPortalWaypointsFromAreas,
+  collectWaypointsFromAreas,
+} from './waypointCode'
+import { resolveWaypointDisplayName } from './waypointFacility'
+import {
+  parseCrossoverPortalTopologyNodeId,
+  getCrossoverPortals,
+  resolveCrossoverPortalDisplayName,
+} from './trackCrossoverFacility'
 
 export type RoutePlanningDraft = {
   routeId: string | null
@@ -69,6 +90,10 @@ export function formatRouteTravelTimeSummary(
 export function isRoutePlanningDraftSavable(draft: RoutePlanningDraft): boolean {
   if (!draft.displayName.trim() || draft.stationIds.length < 2) {
     return false
+  }
+  // 行駛時間可選：特殊站序未必能由拓撲加總，仍允許先存路線
+  if (draft.avgTravelTimeSeconds == null && draft.minTravelTimeSeconds == null) {
+    return true
   }
   return isRouteTravelTimePairValid(
     draft.avgTravelTimeSeconds,
@@ -146,22 +171,167 @@ export function resolveDockingPointNodeMapPx(
   }
 }
 
+/** 設施停靠點（fdock:<facilityId>）→ 圖台 px */
+export function resolveFacilityDockingRouteStopMapPx(
+  areas: MapAreaObject[],
+  stationId: string,
+): { x: number; y: number; stationName: string; xM: number; yM: number } | null {
+  const facilityId = parseFacilityIdFromFacilityDockingTopologyNodeId(stationId)
+  if (!facilityId) return null
+  for (const area of areas) {
+    const facility = area.facilities.find((f) => f.id === facilityId)
+    if (facility?.type !== 'Facility') continue
+    const dock = getFacilityDockingPoint(facility)
+    if (!dock) continue
+    // fieldPositionToFacilityAreaLocal 回傳區域座標（左下原點），須轉成 CSS 左上再加 Area 外框
+    const local = fieldPositionToFacilityAreaLocal(
+      dock.xM,
+      dock.yM,
+      facility,
+      area,
+      { extrapolate: false },
+    )
+    if (!local) continue
+    const css = areaPositionToCssTopLeft(local, { w: 0, h: 0 }, area.layout.hPx)
+    return {
+      x: area.layout.xPx + css.left,
+      y: area.layout.yPx + css.top,
+      stationName: resolveFacilityDockingPointListTitle(facility),
+      xM: dock.xM,
+      yM: dock.yM,
+    }
+  }
+  return null
+}
+
+/** 虛擬渡線端點途經點（waypointCode 或 xowp:…）→ 圖台 px */
+export function resolveCrossoverPortalRouteStopMapPx(
+  areas: MapAreaObject[],
+  stationId: string,
+): { x: number; y: number; stationName: string; xM: number; yM: number } | null {
+  const trimmed = stationId.trim()
+  if (!trimmed) return null
+
+  const byCode = collectCrossoverPortalWaypointsFromAreas(areas).find(
+    (s) => s.stationId === trimmed || s.topologyNodeId === trimmed,
+  )
+  const ref = byCode
+    ? { facilityId: byCode.facilityId, key: byCode.portalKey }
+    : parseCrossoverPortalTopologyNodeId(trimmed)
+  if (!ref) return null
+
+  for (const area of areas) {
+    const facility = area.facilities.find((f) => f.id === ref.facilityId)
+    if (facility?.type !== 'TrackCrossover') continue
+    const portals = getCrossoverPortals(facility)
+    const portal = portals?.[ref.key]
+    if (!portal) continue
+    // portal.xM/yM 已是場域公尺；用 Area 座標系換算。
+    // 不可走 fieldPositionToFacilityAreaLocal：虛擬渡線通常沒有參照場域範圍，會整段找不到畫面站位。
+    const areaLocal = meterToAreaLocalPx(
+      portal.xM,
+      portal.yM,
+      area.domain,
+      area.layout,
+    )
+    const css = areaPositionToCssTopLeft(areaLocal, { w: 0, h: 0 }, area.layout.hPx)
+    return {
+      x: area.layout.xPx + css.left,
+      y: area.layout.yPx + css.top,
+      stationName: byCode?.stationName ?? resolveCrossoverPortalDisplayName(portal),
+      xM: portal.xM,
+      yM: portal.yM,
+    }
+  }
+  return null
+}
+
 export function resolveRouteStationPoints(
   areas: MapAreaObject[],
   stationIds: string[],
 ): RouteStationPoint[] {
   const stations = collectStationsFromAreas(areas)
   const byId = new Map(stations.map((s) => [s.stationId, s]))
+  const waypoints = collectWaypointsFromAreas(areas)
+  const waypointById = new Map(waypoints.map((s) => [s.stationId, s]))
   const out: RouteStationPoint[] = []
   for (const stationId of stationIds) {
+    const fdock = resolveFacilityDockingRouteStopMapPx(areas, stationId)
+    if (fdock) {
+      out.push({
+        stationId,
+        stationName: fdock.stationName,
+        x: fdock.x,
+        y: fdock.y,
+      })
+      continue
+    }
+
+    const crossover = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
+    if (crossover) {
+      out.push({
+        stationId,
+        stationName: crossover.stationName,
+        x: crossover.x,
+        y: crossover.y,
+      })
+      continue
+    }
+
+    const waypoint =
+      waypointById.get(stationId)
+      ?? waypoints.find((s) => s.facilityId === stationId)
+    if (waypoint) {
+      const area = areas.find((a) => a.id === waypoint.areaId)
+      const facility = area?.facilities.find((f) => f.id === waypoint.facilityId)
+      if (area && facility) {
+        const { css, areaSize } = resolveFacilityRenderPlacement(
+          facility,
+          area.domain,
+          area.layout,
+        )
+        out.push({
+          stationId,
+          stationName: waypoint.stationName,
+          x: area.layout.xPx + css.left + areaSize.w / 2,
+          y: area.layout.yPx + css.top + areaSize.h / 2,
+        })
+        continue
+      }
+      // 途經點資料在但算不出畫面座標：仍占位，避免站序與編號錯位
+      out.push({
+        stationId,
+        stationName: waypoint.stationName,
+        x: Number.NaN,
+        y: Number.NaN,
+      })
+      continue
+    }
+
     const station = byId.get(stationId)
-    if (!station) continue
+    if (!station) {
+      out.push({
+        stationId,
+        stationName: stationId,
+        x: Number.NaN,
+        y: Number.NaN,
+      })
+      continue
+    }
     const px = resolveDockingPointNodeMapPx(
       areas,
       station.areaId,
       station.facilityId,
     )
-    if (!px) continue
+    if (!px) {
+      out.push({
+        stationId,
+        stationName: station.stationName,
+        x: Number.NaN,
+        y: Number.NaN,
+      })
+      continue
+    }
     out.push({
       stationId,
       stationName: station.stationName,
@@ -176,6 +346,34 @@ export function stationDisplayLabel(
   areas: MapAreaObject[],
   stationId: string,
 ): string {
+  const fdockFacilityId = parseFacilityIdFromFacilityDockingTopologyNodeId(stationId)
+  if (fdockFacilityId) {
+    for (const area of areas) {
+      const facility = area.facilities.find((f) => f.id === fdockFacilityId)
+      if (facility?.type === 'Facility' && getFacilityDockingPoint(facility)) {
+        return resolveFacilityDockingPointListTitle(facility)
+      }
+    }
+  }
+
+  const crossover = collectCrossoverPortalWaypointsFromAreas(areas).find(
+    (s) => s.stationId === stationId || s.topologyNodeId === stationId,
+  )
+  if (crossover) return crossover.stationName
+
+  const crossoverPx = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
+  if (crossoverPx) return crossoverPx.stationName
+
+  const waypoint = collectWaypointsFromAreas(areas).find(
+    (s) => s.stationId === stationId || s.facilityId === stationId,
+  )
+  if (waypoint) return waypoint.stationName
+
+  for (const area of areas) {
+    const facility = area.facilities.find((f) => f.id === stationId && f.type === 'Waypoint')
+    if (facility) return resolveWaypointDisplayName(facility)
+  }
+
   const station = collectStationsFromAreas(areas).find((s) => s.stationId === stationId)
   return station?.stationName || stationId
 }

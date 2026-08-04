@@ -40,7 +40,6 @@ export function MapEditorTestDock({
   onStopScan,
   onResetScan,
   onSelectIssue,
-  paletteOpen = false,
 }: MapEditorTestDockProps) {
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<MapEditorTestDockTab>('mqtt')

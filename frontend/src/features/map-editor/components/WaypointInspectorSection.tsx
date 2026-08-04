@@ -60,7 +60,7 @@ export function WaypointInspectorSection({
         途經點
       </h3>
       <p className="text-[10px] leading-relaxed text-zinc-500">
-        自駕車前往目標時必須經過的點位；圖台以綠色標記顯示，不顯示名稱。
+        自駕車前往目標時必須經過的點位；顯示名稱請填上方「自訂顯示名稱」。
       </p>
 
       <div>

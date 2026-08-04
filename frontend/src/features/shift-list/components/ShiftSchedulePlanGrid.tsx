@@ -12,6 +12,7 @@ import {
   SCHEDULE_SLOT_WIDTH_DEFAULT,
   SCHEDULE_TIME_AXIS_TEXT_CLASS,
   SCHEDULE_ENGINE_TASK_TYPE_COLORS,
+  ENTRY_SERVICE_COLOR_SET,
   blendHexOnBase,
   formatSelectedIntervalHoverContent,
   getInactiveRangesWithinBar,
@@ -26,15 +27,17 @@ import type {
   ShiftScheduleFeasibilityReport,
 } from '../utils/shiftScheduleEngine.types';
 import type { ScheduleTask } from '../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../types/create';
+import type {
+  ShiftScheduleSelectedRoute,
+  ShiftScheduleStationLegTravel,
+} from '../types/create';
 import {
-  normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   normalizeSwitchBufferAfterSeconds,
-  sumStationDwellSecondsWithSlack,
 } from '../types/create';
 import {
   buildBlockStationDepartures,
+  resolveBlockStationDwellInputs,
   resolveRouteForBlock,
   type BlockStationStopTime,
 } from '../utils/buildBlockStationDepartures';
@@ -59,6 +62,15 @@ const MANUAL_MIN_DURATION_MINUTES = MANUAL_BLOCK_MIN_DURATION_SECONDS / 60;
 
 const GRID_SLOT_MINUTES = 10;
 const GRID_VISIBLE_SLOTS = 144; // 24 hours * 6 slots/hour
+/** 預設：每 10 分鐘格約 216px */
+const GRID_SLOT_WIDTH_BASE = Math.round(SCHEDULE_SLOT_WIDTH_DEFAULT * 1.5);
+const GRID_SLOT_WIDTH_MIN = Math.round(GRID_SLOT_WIDTH_BASE / 2.5);
+const GRID_SLOT_WIDTH_MAX = Math.round(GRID_SLOT_WIDTH_BASE * 4);
+/**
+ * 班次卡底部「HH:MM:SS - HH:MM:SS」完整顯示約需寬度（含左色條與內距）。
+ * 自動縮放以此為下限，依最短班次推算格寬。
+ */
+const BLOCK_TIME_RANGE_MIN_PX = 136;
 
 type HoverCardPos = {
   top: number;
@@ -111,17 +123,22 @@ function IntervalAxisHoverCard({
 /** 班次卡算法對照：頂部一行摘要 + 站↔站時間軸 */
 function BlockAlgorithmHoverCard({
   routeName,
+  blockCode,
   summary,
   stops,
   legs,
   pos,
+  hideStrategyBuffers = false,
 }: {
   routeName: string;
+  /** 班次卡代號（如 TN0942） */
+  blockCode?: string | null;
   summary: {
     topologyMinSeconds: number | null;
     topologyAvgSeconds: number | null;
     actualTravelSeconds: number;
-    dwellEffectiveSeconds: number;
+    /** 各站靠站秒數加總（不含緩衝） */
+    dwellBaseSeconds: number;
     dwellSlackSeconds: number;
     switchBufferSeconds: number;
     recoverySeconds: number;
@@ -129,31 +146,43 @@ function BlockAlgorithmHoverCard({
   stops: BlockStationStopTime[];
   legs: ShiftScheduleStationLegTravel[];
   pos: HoverCardPos;
+  /** 手動製作：不顯示換線／恢復（僅卡上靠站與緩衝） */
+  hideStrategyBuffers?: boolean;
 }) {
   const sec = (value: number | null | undefined) =>
     value == null || !Number.isFinite(value) ? '—' : `${Math.round(value)}s`;
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-[300px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      className="pointer-events-none fixed z-[10050] w-[440px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
       style={{ top: pos.top, left: pos.left }}
       role="tooltip"
     >
-      <div className="truncate text-[11px] font-semibold leading-4 text-zinc-100">
-        {routeName}
+      <div className="flex min-w-0 items-baseline gap-1.5 text-[11px] leading-4">
+        {blockCode ? (
+          <span className="shrink-0 font-semibold tabular-nums text-sky-300">
+            {blockCode}
+          </span>
+        ) : null}
+        <span className="min-w-0 truncate font-semibold text-zinc-100">
+          {routeName}
+        </span>
       </div>
       <p className="mt-1 text-[10px] leading-[14px] tabular-nums text-zinc-400">
         行駛 {sec(summary.actualTravelSeconds)}
         <span className="text-zinc-600">（均 {sec(summary.topologyAvgSeconds)} · 快 {sec(summary.topologyMinSeconds)}）</span>
         <span className="text-zinc-600"> · </span>
-        靠站 {sec(summary.dwellEffectiveSeconds)}
-        {summary.dwellSlackSeconds > 0 ? (
-          <span className="text-zinc-600">（+{sec(summary.dwellSlackSeconds)}/站）</span>
+        靠站 {sec(summary.dwellBaseSeconds)}
+        <span className="text-zinc-600"> · </span>
+        緩衝 {sec(summary.dwellSlackSeconds)}
+        {!hideStrategyBuffers ? (
+          <>
+            <span className="text-zinc-600"> · </span>
+            換線 {sec(summary.switchBufferSeconds)}
+            <span className="text-zinc-600"> · </span>
+            恢復 {sec(summary.recoverySeconds)}
+          </>
         ) : null}
-        <span className="text-zinc-600"> · </span>
-        換線 {sec(summary.switchBufferSeconds)}
-        <span className="text-zinc-600"> · </span>
-        恢復 {sec(summary.recoverySeconds)}
       </p>
 
       {stops.length === 0 ? (
@@ -166,18 +195,74 @@ function BlockAlgorithmHoverCard({
             const showLeg = index < stops.length - 1;
             return (
               <li key={`${stop.order}-${stop.stationId}`} className="min-w-0">
-                <div className="flex items-baseline gap-1.5 text-zinc-300">
+                <div className="flex min-w-0 items-baseline gap-1.5 text-zinc-300">
                   <span className="w-3 shrink-0 tabular-nums text-zinc-500">{stop.order}</span>
                   <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
                     {stop.stationName}
                   </span>
                   <span className="shrink-0 tabular-nums text-zinc-400">
-                    {formatMinuteToHms(stop.arrivalMinute)}
-                    <span className="text-zinc-600">→</span>
-                    {formatMinuteToHms(stop.departureMinute)}
+                    {(() => {
+                      const isFirst = index === 0;
+                      const isLast = index === stops.length - 1;
+                      // 首站：本卡出發點，只顯示出發（抵達屬上一卡末站）
+                      if (isFirst && !isLast) {
+                        return (
+                          <>
+                            <span className="text-zinc-600">出發 </span>
+                            {formatMinuteToHms(stop.departureMinute)}
+                          </>
+                        );
+                      }
+                      // 末站：抵達後完成靠站／緩衝，不以「出發」稱呼
+                      if (isLast && !isFirst) {
+                        return (
+                          <>
+                            <span className="text-zinc-600">抵達 </span>
+                            {formatMinuteToHms(stop.arrivalMinute)}
+                            <span className="mx-1 text-zinc-600">靠站完成 </span>
+                            {formatMinuteToHms(stop.departureMinute)}
+                          </>
+                        );
+                      }
+                      // 單一站卡
+                      if (
+                        Math.round(stop.arrivalMinute * 60)
+                        === Math.round(stop.departureMinute * 60)
+                      ) {
+                        return (
+                          <>
+                            <span className="text-zinc-600">出發 </span>
+                            {formatMinuteToHms(stop.departureMinute)}
+                          </>
+                        );
+                      }
+                      if (isFirst && isLast) {
+                        return (
+                          <>
+                            <span className="text-zinc-600">出發 </span>
+                            {formatMinuteToHms(stop.arrivalMinute)}
+                            <span className="mx-1 text-zinc-600">靠站完成 </span>
+                            {formatMinuteToHms(stop.departureMinute)}
+                          </>
+                        );
+                      }
+                      // 中途站
+                      return (
+                        <>
+                          <span className="text-zinc-600">抵達 </span>
+                          {formatMinuteToHms(stop.arrivalMinute)}
+                          <span className="mx-1 text-zinc-600">出發 </span>
+                          {formatMinuteToHms(stop.departureMinute)}
+                        </>
+                      );
+                    })()}
                   </span>
-                  <span className="w-9 shrink-0 text-right tabular-nums text-zinc-500">
-                    {sec(stop.dwellSeconds)}
+                  <span className="shrink-0 text-right tabular-nums text-zinc-500">
+                    靠站 {sec(stop.baseDwellSeconds)}
+                    <span className="text-zinc-600"> · </span>
+                    緩衝 {sec(summary.dwellSlackSeconds > 0 && stop.baseDwellSeconds > 0
+                      ? summary.dwellSlackSeconds
+                      : 0)}
                   </span>
                 </div>
                 {showLeg ? (
@@ -272,17 +357,59 @@ function formatBlockTimeRange(block: GeneratedScheduleBlock): string {
   return `${formatMinuteToHms(block.plannedStartMinute)} - ${formatMinuteToHms(block.plannedEndMinute)}`;
 }
 
+/** 依產出最短班次時長自動推算格寬，使起迄時間盡量完整顯示。 */
+export function computeAutoSlotWidthPx(plan: GeneratedSchedulePlan): number {
+  let minDurationMinutes = Number.POSITIVE_INFINITY;
+  for (const timeline of plan.timelines) {
+    for (const block of timeline.blocks) {
+      const duration = block.plannedEndMinute - block.plannedStartMinute;
+      if (duration > 0 && duration < minDurationMinutes) {
+        minDurationMinutes = duration;
+      }
+    }
+  }
+  if (!Number.isFinite(minDurationMinutes)) {
+    return GRID_SLOT_WIDTH_BASE;
+  }
+  const needed =
+    (BLOCK_TIME_RANGE_MIN_PX * GRID_SLOT_MINUTES) / minDurationMinutes;
+  return Math.round(
+    Math.min(
+      GRID_SLOT_WIDTH_MAX,
+      Math.max(GRID_SLOT_WIDTH_MIN, Math.max(GRID_SLOT_WIDTH_BASE, needed)),
+    ),
+  );
+}
+
 function resolveBlockCode(
   block: GeneratedScheduleBlock,
   index: number,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
+  // 進場載客：代號 = 整備代號 + 路線代號 + 開始時刻（taskType 為 passenger，須先判 source）
+  if (block.source === 'entry_service') {
+    return buildScheduleBlockTripCode({
+      prefixCode: `${block.entryServiceSectionCode ?? ''}${block.routeCode ?? ''}`,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+      includeColumnCode: false,
+    });
+  }
+
   if (block.taskType === 'passenger') {
     return buildScheduleBlockTripCode({
       prefixCode: block.routeCode,
       timelineRow: block.timelineRow,
       startMinute: block.plannedStartMinute,
       includeColumnCode: false,
+    });
+  }
+
+  if (block.taskType === 'dispatch' || block.source === 'dispatch') {
+    return buildScheduleBlockTripCode({
+      prefixCode: 'D',
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
     });
   }
 
@@ -456,6 +583,8 @@ function ShiftScheduleBlockBar({
   minimumRecoveryTimeSeconds = null,
   sectionCodes = null,
   interactiveEdit = false,
+  hideStrategyBuffers = false,
+  previousPassengerBlock = null,
   onCommitTimeRange,
   onPreviewTimeRange,
   onDeleteBlock,
@@ -473,12 +602,18 @@ function ShiftScheduleBlockBar({
   minimumRecoveryTimeSeconds?: number | null;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   interactiveEdit?: boolean;
+  hideStrategyBuffers?: boolean;
+  /** 同列前一正線卡；關節站時刻對齊用 */
+  previousPassengerBlock?: GeneratedScheduleBlock | null;
   onCommitTimeRange?: (blockId: string, startMinute: number, endMinute: number) => void;
   onPreviewTimeRange?: (blockId: string, startMinute: number, endMinute: number) => void;
   onDeleteBlock?: (blockId: string) => void;
   onDuplicateBlock?: (blockId: string) => void;
 }) {
-  const colors = SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
+  const colors =
+    block.source === 'entry_service'
+      ? ENTRY_SERVICE_COLOR_SET
+      : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
   const widthPx = (durationMinutes / GRID_SLOT_MINUTES) * slotWidthPx;
   const leftPx = (block.plannedStartMinute / GRID_SLOT_MINUTES) * slotWidthPx;
@@ -491,10 +626,17 @@ function ShiftScheduleBlockBar({
       ),
     [activeIntervalRanges, block.plannedEndMinute, block.plannedStartMinute],
   );
-  const isIdleLike = block.taskType === 'idle' || block.source === 'transition';
+  const isIdleLike =
+    block.taskType === 'idle'
+    || block.source === 'transition'
+    || block.taskType === 'dispatch'
+    || block.source === 'dispatch';
   const code = resolveBlockCode(block, blockIndex, sectionCodes);
   const timeLabel = formatBlockTimeRange(block);
-  const selectable = block.source === 'template_bar' && onSelect != null;
+  const selectable =
+    block.source === 'template_bar'
+    && block.taskType !== 'dispatch'
+    && onSelect != null;
   const isStickyLabel = durationMinutes >= 20;
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
 
@@ -503,28 +645,47 @@ function ShiftScheduleBlockBar({
     [block, selectedRoutes],
   );
 
+  const previousRoute = useMemo(
+    () =>
+      previousPassengerBlock
+        ? resolveRouteForBlock(previousPassengerBlock, selectedRoutes)
+        : null,
+    [previousPassengerBlock, selectedRoutes],
+  );
+
   const stationStops = useMemo(() => {
     if (block.taskType !== 'passenger') return [];
-    return buildBlockStationDepartures(block, route);
-  }, [block, route]);
+    return buildBlockStationDepartures(block, route, {
+      previousBlock: previousPassengerBlock,
+      previousRoute,
+    });
+  }, [block, route, previousPassengerBlock, previousRoute]);
 
   const algorithmSummary = useMemo(() => {
     const travel = route ? resolveEffectiveRouteTravelSeconds(route) : null;
-    const dwellSlackSeconds = normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
-    const dwellEffective =
-      route != null
-        ? sumStationDwellSecondsWithSlack(route.stationDwells, dwellSlackSeconds)
-        : null;
+    const dwellInputs = resolveBlockStationDwellInputs(block, route);
+    const dwellSlackSeconds = dwellInputs?.dwellSlackSeconds ?? 0;
+    const dwellBaseSeconds =
+      dwellInputs != null
+        ? dwellInputs.stations.reduce(
+            (sum, station) => sum + Math.max(0, station.dwellSeconds ?? 0),
+            0,
+          )
+        : Math.max(0, block.dwellSeconds);
     return {
       topologyMinSeconds: travel?.minTravelTimeSeconds ?? route?.minTravelTimeSeconds ?? null,
       topologyAvgSeconds: travel?.avgTravelTimeSeconds ?? route?.avgTravelTimeSeconds ?? null,
       actualTravelSeconds: block.travelSeconds,
-      dwellEffectiveSeconds: dwellEffective ?? block.dwellSeconds,
+      dwellBaseSeconds,
       dwellSlackSeconds,
       switchBufferSeconds: normalizeSwitchBufferAfterSeconds(route?.switchBufferAfterSeconds),
       recoverySeconds: normalizeMinimumRecoveryTimeSeconds(minimumRecoveryTimeSeconds),
     };
-  }, [block.dwellSeconds, block.travelSeconds, minimumRecoveryTimeSeconds, route]);
+  }, [
+    block,
+    minimumRecoveryTimeSeconds,
+    route,
+  ]);
 
   const topologyLegs = useMemo(
     () => route?.stationLegTravels ?? [],
@@ -825,17 +986,19 @@ function ShiftScheduleBlockBar({
             {block.label}
           </div>
         )}
-        <div className="truncate text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
+        <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
           {timeLabel}
         </div>
       </div>
       {stationHoverPos && showStationInfo ? (
         <BlockAlgorithmHoverCard
           routeName={block.routeName ?? block.label}
+          blockCode={code}
           summary={algorithmSummary}
           stops={stationStops}
           legs={topologyLegs}
           pos={stationHoverPos}
+          hideStrategyBuffers={hideStrategyBuffers}
         />
       ) : null}
     </div>
@@ -854,6 +1017,8 @@ export type ShiftSchedulePlanGridProps = {
   selectedRoutes?: ShiftScheduleSelectedRoute[];
   /** Step 4 最低恢復時間；供班次卡 i 對照顯示 */
   minimumRecoveryTimeSeconds?: number | null;
+  /** 手動製作：hover 不顯示換線／恢復參數 */
+  hideStrategyBuffers?: boolean;
   /** Step 2 整備區塊代號；非正線班次代號用 */
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   /** 手動製作：隱藏時間模板任務列（僅留空白時間軸） */
@@ -887,6 +1052,7 @@ export function ShiftSchedulePlanGrid({
   highlightedBlockId = null,
   selectedRoutes = [],
   minimumRecoveryTimeSeconds = null,
+  hideStrategyBuffers = false,
   sectionCodes = null,
   showTemplateTasks = true,
   interactiveEdit = false,
@@ -896,7 +1062,7 @@ export function ShiftSchedulePlanGrid({
   onDeleteBlock,
   onDuplicateBlock,
 }: ShiftSchedulePlanGridProps) {
-  const slotWidthPx = Math.round(SCHEDULE_SLOT_WIDTH_DEFAULT * 1.5);
+  const slotWidthPx = useMemo(() => computeAutoSlotWidthPx(plan), [plan]);
   const activeIntervalRanges = useMemo(
     () => parseIntervalMinuteRanges(intervals.filter((slot) => !slot.isDraft)),
     [intervals],
@@ -1004,7 +1170,13 @@ export function ShiftSchedulePlanGrid({
                   ))}
                   {rowBlocks
                     .filter((block) => block.source !== 'transition')
-                    .map((block, index) => (
+                    .map((block, index, visibleBlocks) => {
+                      const previousPassengerBlock =
+                        [...visibleBlocks.slice(0, index)]
+                          .reverse()
+                          .find((item) => item.taskType === 'passenger')
+                        ?? null;
+                      return (
                       <ShiftScheduleBlockBar
                         key={block.id}
                         block={block}
@@ -1019,12 +1191,15 @@ export function ShiftSchedulePlanGrid({
                         minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
                         sectionCodes={sectionCodes}
                         interactiveEdit={interactiveEdit}
+                        hideStrategyBuffers={hideStrategyBuffers}
+                        previousPassengerBlock={previousPassengerBlock}
                         onCommitTimeRange={onCommitBlockTimeRange}
                         onPreviewTimeRange={onPreviewBlockTimeRange}
                         onDeleteBlock={onDeleteBlock}
                         onDuplicateBlock={onDuplicateBlock}
                       />
-                    ))}
+                      );
+                    })}
                   <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
                 </div>
               </div>

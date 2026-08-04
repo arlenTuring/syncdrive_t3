@@ -2,17 +2,24 @@ import {
   isMainlineTaskType,
   type ScheduleTask,
 } from '../../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import {
+  resolveSelectedRouteInstanceId,
+  type ShiftScheduleSelectedRoute,
+} from '../../types/create';
 import { resolveMaintenanceOccupancySeconds } from '../resolveMaintenanceOccupancySeconds';
 import {
   assignPassengerRoutesConstraintGreedy,
   ROUTE_ASSIGNMENT_ALGORITHM,
 } from './assignRoutes';
+import { buildYardRotationExitByTaskType } from '../maintenancePostTaskPolicy';
+import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import {
   sumStationDwellSecondsWithSlack,
   snapUpToClockAlignSeconds,
   isClockAlignedSeconds,
   resolveInterTripGapSeconds,
+  resolvePassengerRouteOccupancy,
+  shouldIncludeRecoveryForRouteSwitch,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
 } from './physics';
 import type {
@@ -32,17 +39,14 @@ export { ROUTE_ASSIGNMENT_ALGORITHM };
 function resolvePassengerOccupancy(
   route: ShiftScheduleSelectedRoute,
 ): { occupancySeconds: number; travelSeconds: number; dwellSeconds: number } {
-  const travel = resolveEffectiveRouteTravelSeconds(route);
-  const travelSeconds = travel?.avgTravelTimeSeconds ?? route.avgTravelTimeSeconds ?? 0;
-  const dwellSeconds = sumStationDwellSecondsWithSlack(
-    route.stationDwells,
-    route.dwellSlackSeconds,
-  ) ?? 0;
-  const rawOccupancy = travelSeconds + dwellSeconds;
+  const resolved = resolvePassengerRouteOccupancy(route);
+  if (!resolved) {
+    return { occupancySeconds: 0, travelSeconds: 0, dwellSeconds: 0 };
+  }
   return {
-    travelSeconds,
-    dwellSeconds,
-    occupancySeconds: snapUpToClockAlignSeconds(rawOccupancy),
+    travelSeconds: resolved.travelSeconds,
+    dwellSeconds: resolved.dwellSeconds,
+    occupancySeconds: resolved.occupancySeconds,
   };
 }
 
@@ -126,6 +130,9 @@ function buildTemplateBarBlock(
     taskType: resolved.task.taskType,
     label: resolved.task.label,
     templateTaskId: resolved.task.id,
+    routeInstanceId: resolved.route
+      ? resolveSelectedRouteInstanceId(resolved.route)
+      : undefined,
     routeId: resolved.route?.routeId,
     routeName: resolved.route?.routeName,
     routeCode: resolved.route?.routeCode ?? undefined,
@@ -147,13 +154,22 @@ export function resolveTemplateTasks(
   maintenanceBody: Record<string, unknown> | null,
   errors: FeasibilityIssue[],
   warnings: FeasibilityIssue[] = [],
+  firstTripOrigins: MaintenanceFirstTripOrigin[] = [],
 ): Map<string, ResolvedTemplateTask> {
   const passengerTasks = confirmedTasks.filter((task) => task.taskType === 'passenger');
   const passengerByRow = groupTasksByRow(passengerTasks);
+  const allTasksByRow = groupTasksByRow(confirmedTasks);
+  const yardRotationExitByTaskType = buildYardRotationExitByTaskType({
+    origins: firstTripOrigins,
+    maintenanceBody,
+  });
   const assignments = assignPassengerRoutesConstraintGreedy({
     passengerTasksByRow: passengerByRow,
     passengerRoutes: ctx.passengerRoutes,
     minimumRecoveryTimeSeconds: ctx.minimumRecoveryTimeSeconds,
+    allTasksByRow,
+    yardRotationExitByTaskType,
+    successorPolicy: ctx.successorPolicy,
   });
 
   const sortedTasks = sortTemplateTasks(confirmedTasks);
@@ -231,7 +247,11 @@ export function resolveTemplateTasks(
         }
       : resolveOccupancy(task, route, maintenanceBody);
 
+    // 正線讓渡把整備開頭吃光後，任務時長可為 0：略過即可，不是缺行駛時間。
     if (occupancy.occupancySeconds <= 0) {
+      if (task.taskType !== 'passenger' && task.durationMinutes <= 0) {
+        continue;
+      }
       pushIssue(errors, {
         code: 'MISSING_TRAVEL_TIME',
         severity: 'error',
@@ -261,9 +281,16 @@ export function expandRowBlocks(
   resolvedByTaskId: Map<string, ResolvedTemplateTask>,
   errors: FeasibilityIssue[],
   minimumRecoveryTimeSeconds: number,
+  rotationRoutes: ShiftScheduleSelectedRoute[] = [],
 ): GeneratedScheduleBlock[] {
   const blocks: GeneratedScheduleBlock[] = [];
   let cursorSecond = 0;
+  const routesForRecovery =
+    rotationRoutes.length > 0
+      ? rotationRoutes
+      : [...resolvedByTaskId.values()]
+          .map((item) => item.route)
+          .filter((route): route is ShiftScheduleSelectedRoute => Boolean(route));
 
   for (const task of rowTasks) {
     const resolved = resolvedByTaskId.get(task.id);
@@ -331,15 +358,11 @@ export function expandRowBlocks(
         }
       }
     } else {
-      // 非正線任務（充電、保養）可以提早結束，直接裁剪其占用而不報錯
-      if (maxAllowedOccupancy != null && resolved.occupancySeconds > maxAllowedOccupancy) {
-        resolved.occupancySeconds = Math.max(0, maxAllowedOccupancy);
-      }
+      // 非正線：只允許正線壓縮開頭（延後開始、鎖住原結束）。
+      // 不得為下一個正線錨點提前結束整備；若與後續正線重疊，交由最終驗證處理。
     }
 
     const endSecond = startSecond + resolved.occupancySeconds;
-    // 必須在頭尾裁剪完成後才建立區塊，否則尾端讓渡只改到 resolved，
-    // 畫面與最終重疊驗證仍會保留原整備結束時間。
     const barBlock = buildTemplateBarBlock(resolved, startSecond);
     blocks.push(barBlock);
 
@@ -356,7 +379,7 @@ export function expandRowBlocks(
       });
     }
 
-    // 正線之間：空檔 ≥ 恢復；換路線時另加前一路線換線緩衝（相加）
+    // 正線之間：空檔 ≥ 恢復（折返／同路線）或僅換線緩衝（導通中段）
     if (task.taskType === 'passenger' && nextAnchorSecond != null && endSecond < nextAnchorSecond) {
       const nextTask = rowTasks.find(
         (item) =>
@@ -370,10 +393,22 @@ export function expandRowBlocks(
         && nextResolved?.route
         && resolved.route.routeId !== nextResolved.route.routeId,
       );
+      const includeRecovery =
+        !isRouteSwitch
+        || !resolved.route
+        || !nextResolved?.route
+        || shouldIncludeRecoveryForRouteSwitch({
+          previousRoute: resolved.route,
+          nextRoute: nextResolved.route,
+          rotationRoutes: routesForRecovery,
+        });
       const requiredGap = resolveInterTripGapSeconds({
         minimumRecoveryTimeSeconds,
         previousRouteSwitchBufferSeconds: resolved.route?.switchBufferAfterSeconds,
         isRouteSwitch,
+        includeRecovery,
+        previousRoute: resolved.route ?? undefined,
+        nextRoute: nextResolved?.route ?? undefined,
       });
       const gapSeconds = nextAnchorSecond - endSecond;
       if (gapSeconds < requiredGap) {
@@ -381,7 +416,9 @@ export function expandRowBlocks(
           code: isRouteSwitch ? 'ROUTE_SWITCH_BUFFER_INSUFFICIENT' : 'RECOVERY_INSUFFICIENT',
           severity: 'error',
           message: isRouteSwitch
-            ? `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒）`
+            ? includeRecovery
+              ? `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒）`
+              : `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需換線緩衝 ${requiredGap} 秒）`
             : `時間線 ${task.rowIndex}：${task.label} 與下一發車錨點之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
           detail: {
             timelineRow: task.rowIndex,

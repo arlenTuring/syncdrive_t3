@@ -114,8 +114,8 @@ export type TaskTypeKey =
   | 'standby'
   | 'servicing';
 
-/** 排班引擎產物：過渡空檔沿用 idle，非模板任務類型 */
-export type ScheduleEngineTaskType = TaskTypeKey | 'idle';
+/** 排班引擎產物：過渡空檔沿用 idle；調度＝整備後開往首班起點站 */
+export type ScheduleEngineTaskType = TaskTypeKey | 'idle' | 'dispatch';
 
 export const TASK_TYPE_OPTIONS: Array<{
   key: TaskTypeKey;
@@ -625,6 +625,12 @@ export const SCHEDULE_ENGINE_TASK_TYPE_COLORS: Record<ScheduleEngineTaskType, Ta
     bg: taskTypeBarBackground('#27272A', [82, 82, 91]),
     text: '#A1A1AA',
   },
+  dispatch: {
+    bar: '#38BDF8',
+    base: '#0C4A6E',
+    bg: taskTypeBarBackground('#0C4A6E', [56, 189, 248]),
+    text: '#BAE6FD',
+  },
 };
 
 export function resolveScheduleEngineTaskTypeColors(
@@ -633,6 +639,17 @@ export function resolveScheduleEngineTaskTypeColors(
   if (!taskType) return null;
   return SCHEDULE_ENGINE_TASK_TYPE_COLORS[taskType] ?? null;
 }
+
+/**
+ * 進場載客（保養尾端長出、載客開往首班起點站）專用色卡。
+ * 與正線藍、保養紫、調度天藍區隔（青綠）；為 source 級用色，不歸任務類型。
+ */
+export const ENTRY_SERVICE_COLOR_SET: TaskTypeColorSet = {
+  bar: '#2DD4BF',
+  base: '#0F3D3A',
+  bg: taskTypeBarBackground('#0F3D3A', [45, 212, 191]),
+  text: '#99F6E4',
+};
 
 export function migrateScheduleTasks(tasks: ScheduleTask[]): ScheduleTask[] {
   return tasks.map((task) => {

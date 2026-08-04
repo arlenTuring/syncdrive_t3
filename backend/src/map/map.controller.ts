@@ -105,7 +105,10 @@ export class MapController {
   }
 
   @Get(':mapId/field-equipment')
-  @ApiOperation({ summary: '擷取地圖場域設備（充電樁、號誌、智慧桿等）' })
+  @ApiOperation({
+    summary:
+      '擷取地圖場域物件（設備：紅綠燈／智慧桿／月台門；設施：充電格等大型區塊）',
+  })
   getFieldEquipment(
     @Param('mapId') mapId: string,
     @Query('kind') kind?: string,
@@ -114,9 +117,12 @@ export class MapController {
       'charging',
       'signal',
       'smart_pole',
+      'platform_door',
       'car_wash',
       'maintenance',
       'yard_slot',
+      'equipment',
+      'facility',
       'all',
     ]);
     const resolved = allowed.has(kind ?? '') ? kind! : 'all';
@@ -126,9 +132,12 @@ export class MapController {
         | 'charging'
         | 'signal'
         | 'smart_pole'
+        | 'platform_door'
         | 'car_wash'
         | 'maintenance'
         | 'yard_slot'
+        | 'equipment'
+        | 'facility'
         | 'all',
     );
   }

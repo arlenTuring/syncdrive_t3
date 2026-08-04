@@ -748,9 +748,8 @@ function loadT3DockingStops() {
         let station = parseDockingStation(params.dockingStation);
         const stationId = String(params.stationId ?? '').trim();
         const name = String(params.stationName || facility.customName || '').trim();
-        /** 站點名稱（S2W下行）優先於 dockingLeg，避免地圖 leg 欄位與名稱不一致 */
-        let leg = inferLegFromLabel(name) ?? parseDockingLeg(params.dockingLeg);
-
+        /** 僅由站點名稱推斷上下行語意（demo 用）；不再讀 dockingLeg */
+        let leg = inferLegFromLabel(name);
         if (!leg && name.includes('下行')) leg = 'down';
         if (!leg && name.includes('上行')) leg = 'up';
         if (!station && name.includes('N2W')) station = 'N2W';

@@ -21,6 +21,35 @@ import {
 } from './facilityRefFieldPosition'
 import { applyZeroRefFieldBoundsToFacility } from './refFieldZeroPolicy'
 import type { ParsedMapFile } from './mapFileJson'
+import { emptyPointTopology } from '../types/pointTopology'
+
+/**
+ * 內建檔較新時仍保留本機編輯的路線／群組／點位拓撲。
+ * （內建 public/maps 通常不含這些欄位，整份覆寫會把使用者資料洗掉。）
+ */
+export function mergeBuiltinRefreshPreservingEditorData(
+  remoteParsed: ParsedMapFile,
+  localParsed: ParsedMapFile,
+): ParsedMapFile {
+  const localTopo = localParsed.pointTopology
+  const hasLocalTopo =
+    (localTopo?.nodes?.length ?? 0) > 0 || (localTopo?.edges?.length ?? 0) > 0
+  return {
+    ...remoteParsed,
+    routes:
+      (localParsed.routes?.length ?? 0) > 0
+        ? localParsed.routes
+        : (remoteParsed.routes ?? []),
+    routeGroups:
+      (localParsed.routeGroups?.length ?? 0) > 0
+        ? localParsed.routeGroups
+        : (remoteParsed.routeGroups ?? []),
+    pointTopology: hasLocalTopo
+      ? localTopo!
+      : (remoteParsed.pointTopology ?? emptyPointTopology()),
+  }
+}
+
 
 function localNeedsRefFields(
   facility: FacilityObject,

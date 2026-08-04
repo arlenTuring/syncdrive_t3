@@ -4,12 +4,16 @@ import {
   fieldPositionToFacilityAreaLocal,
   fieldPositionToTrackAreaLocal,
 } from '../vehicles/resolveVehicleTrackPlacement'
-import { meterToAreaLocalPx } from './areaCoords'
+import { areaPositionToCssTopLeft, meterToAreaLocalPx } from './areaCoords'
 import { getComponentPurpose } from './facilityArea'
 import {
   getDockingPointStationName,
 } from './dockingPointFacility'
-import { getWaypointCode } from './waypointFacility'
+import {
+  getFacilityDockingPoint,
+  resolveFacilityDockingPointListTitle,
+} from './facilityDockingPoint'
+import { resolveWaypointDisplayName } from './waypointFacility'
 import { usesRefFieldBounds } from './facilityRefFieldBinding'
 import { getValidRefFieldBounds, isZeroRefFieldBoundsSpan } from './facilityRefFieldBounds'
 import { getRefFieldPosition } from './facilityRefFieldPosition'
@@ -29,16 +33,20 @@ export type FacilityListEntry = {
   refFieldKey: string
   pxX: number
   pxY: number
+  /** 點位分類：正線停靠點 vs 設施內停靠點 */
+  pointKind?: 'docking' | 'facility-docking'
 }
 
 function resolveListTitle(f: FacilityObject): string {
   if (f.type === 'DockingPoint') {
+    const custom = f.customName.trim()
+    if (custom) return custom
     const station = getDockingPointStationName(f)
     if (station) return station
   }
   if (f.type === 'Waypoint') {
-    const code = getWaypointCode(f)
-    if (code) return code
+    const name = resolveWaypointDisplayName(f)
+    if (name) return name
   }
   const custom = f.customName.trim()
   if (custom) return custom
@@ -122,7 +130,11 @@ function resolveListPurpose(f: FacilityObject): string {
   return getComponentPurpose(f)
 }
 
-function toListEntry(area: MapAreaObject, f: FacilityObject): FacilityListEntry {
+function toListEntry(
+  area: MapAreaObject,
+  f: FacilityObject,
+  overrides?: Partial<FacilityListEntry>,
+): FacilityListEntry {
   const { pxX, pxY } = facilityAreaPx(area, f)
   const { text: refFieldText, key: refFieldKey } = resolveListRefField(f)
   return {
@@ -136,6 +148,8 @@ function toListEntry(area: MapAreaObject, f: FacilityObject): FacilityListEntry 
     refFieldKey,
     pxX,
     pxY,
+    pointKind: f.type === 'DockingPoint' ? 'docking' : undefined,
+    ...overrides,
   }
 }
 
@@ -169,19 +183,55 @@ export function collectDockingPointEntries(
   return collectByType(areas, ['DockingPoint'])
 }
 
+/** 大型設施內設定的設施停靠點（點位清單分類用） */
+export function collectFacilityDockingPointEntries(
+  areas: MapAreaObject[],
+): FacilityListEntry[] {
+  const out: FacilityListEntry[] = []
+  for (const area of areas) {
+    for (const f of area.facilities) {
+      if (f.type !== 'Facility') continue
+      const point = getFacilityDockingPoint(f)
+      if (!point) continue
+      const local = fieldPositionToFacilityAreaLocal(point.xM, point.yM, f, area, {
+        extrapolate: false,
+      })
+      const pxX = local?.x ?? facilityAreaPx(area, f).pxX
+      const pxY = local?.y ?? facilityAreaPx(area, f).pxY
+      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
+      out.push(
+        toListEntry(area, f, {
+          name: resolveFacilityDockingPointListTitle(f),
+          purpose: getComponentPurpose(f) || '設施停靠點',
+          refFieldText: `${fmt(point.xM)}, ${fmt(point.yM)} m`,
+          refFieldKey: `fdock|${point.xM}|${point.yM}`,
+          pxX,
+          pxY,
+          pointKind: 'facility-docking',
+        }),
+      )
+    }
+  }
+  return sortEntries(out)
+}
+
 export function collectFacilityEntries(
   areas: MapAreaObject[],
 ): FacilityListEntry[] {
+  /** 設施清單：大型區塊（充電格／停車格／維修格等） */
   return collectByType(areas, ['Facility'])
 }
 
 export function collectEquipmentEntries(areas: MapAreaObject[]): {
   signals: FacilityListEntry[]
   poles: FacilityListEntry[]
+  psds: FacilityListEntry[]
 } {
+  /** 設備清單：紅綠燈、智慧桿、月台門 */
   return {
     signals: collectByType(areas, ['Signal']),
     poles: collectByType(areas, ['Pole']),
+    psds: collectByType(areas, ['PSD']),
   }
 }
 
@@ -194,6 +244,28 @@ export function resolveFacilityFocusPx(
   if (!area) return null
   const facility = area.facilities.find((f) => f.id === facilityId)
   if (!facility) return null
+
+  // 有設施停靠點時，清單／對焦優先對準該點
+  if (facility.type === 'Facility') {
+    const dock = getFacilityDockingPoint(facility)
+    if (dock) {
+      const local = fieldPositionToFacilityAreaLocal(
+        dock.xM,
+        dock.yM,
+        facility,
+        area,
+        { extrapolate: false },
+      )
+      if (local) {
+        const css = areaPositionToCssTopLeft(local, { w: 0, h: 0 }, area.layout.hPx)
+        return {
+          x: area.layout.xPx + css.left,
+          y: area.layout.yPx + css.top,
+        }
+      }
+    }
+  }
+
   const local = facilityAreaPx(area, facility)
   return {
     x: area.layout.xPx + local.pxX,

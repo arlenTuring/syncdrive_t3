@@ -130,7 +130,12 @@ export function revalidateAdjustedPlan(args: {
     errors,
   );
   validateTimelineOverlaps(args.plan.timelines, errors);
-  validateRotationCyclesComplete(args.plan.timelines, args.selectedRoutes.length, errors);
+  validateRotationCyclesComplete(
+    args.plan.timelines,
+    args.selectedRoutes.filter((route) => !route.backupForInstanceId && !route.backupForRouteId)
+      .length,
+    errors,
+  );
   validateRouteSwitchBuffers(
     args.plan.timelines,
     routeById,

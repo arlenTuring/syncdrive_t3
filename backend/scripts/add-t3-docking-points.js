@@ -1,18 +1,13 @@
 /**
  * Merge T3 docking points into frontend/public/maps/t3-main-version.json.
  *
- * - refFieldXM/refFieldYM + dockingLeg/dockingStation are authoritative for simulation
- * - customName / stationName default empty (no display label)
- * - Canvas layout preserved when an entry already exists
+ * - refFieldXM / refFieldYM + stationId 為座標與識別
+ * - customName 為顯示名稱（不含 dockingLeg / dockingStation）
+ * - 已有設施時保留 canvas layout
  */
 const fs = require('fs');
 const path = require('path');
-const {
-  ensureDockingPointParams,
-  collectOperationNodesFromMap,
-  DOCKING_POINT_NODE_ID_KEY,
-  DOCKING_POINT_NODE_ROLE_KEY,
-} = require('./map-operation-nodes');
+const { collectOperationNodesFromMap } = require('./map-operation-nodes');
 
 const MAP_PATH = path.join(__dirname, '../../frontend/public/maps/t3-main-version.json');
 
@@ -39,13 +34,13 @@ function lerp(value, inMin, inMax, outMin, outMax) {
   return outMin + t * (outMax - outMin);
 }
 
-/** @type {Array<{ areaId: string, id: string, dockingLeg: 'down'|'up', dockingStation: 'N2W'|'T3'|'S2W', refFieldXM: number, refFieldYM: number, layout: (area: object)=>{positionMeters:{x:number,y:number}} }>} */
+/** @type {Array<{ areaId: string, id: string, stationId: string, customName: string, refFieldXM: number, refFieldYM: number, layout: (area: object)=>{positionMeters:{x:number,y:number}} }>} */
 const DOCKING_SPECS = [
   {
     areaId: 'area-a',
     id: '174',
-    dockingLeg: 'up',
-    dockingStation: 'N2W',
+    stationId: 'station_1',
+    customName: 'N2W上行',
     refFieldXM: 810,
     refFieldYM: 105.25,
     layout: () => ({ positionMeters: { x: 810, y: 369.6651035953235 } }),
@@ -53,8 +48,8 @@ const DOCKING_SPECS = [
   {
     areaId: 'area-a',
     id: '175',
-    dockingLeg: 'down',
-    dockingStation: 'N2W',
+    stationId: 'station_2',
+    customName: 'N2W下行',
     refFieldXM: 840,
     refFieldYM: 101.75,
     layout: () => ({ positionMeters: { x: 840, y: 383.33508288638507 } }),
@@ -62,8 +57,8 @@ const DOCKING_SPECS = [
   {
     areaId: 'area-d',
     id: '176',
-    dockingLeg: 'down',
-    dockingStation: 'T3',
+    stationId: 'station_3',
+    customName: 'T3下行',
     refFieldXM: 101.75,
     refFieldYM: 170,
     layout: () => ({
@@ -73,8 +68,8 @@ const DOCKING_SPECS = [
   {
     areaId: 'area-d',
     id: '177',
-    dockingLeg: 'up',
-    dockingStation: 'T3',
+    stationId: 'station_4',
+    customName: 'T3上行',
     refFieldXM: 105,
     refFieldYM: 230,
     layout: (area) => {
@@ -95,8 +90,8 @@ const DOCKING_SPECS = [
   {
     areaId: 'area-g',
     id: '178',
-    dockingLeg: 'up',
-    dockingStation: 'S2W',
+    stationId: 'station_5',
+    customName: 'S2W下行',
     refFieldXM: 810,
     refFieldYM: 305.25,
     layout: () => ({ positionMeters: { x: 810, y: 57.46483087311962 } }),
@@ -104,15 +99,15 @@ const DOCKING_SPECS = [
   {
     areaId: 'area-g',
     id: '179',
-    dockingLeg: 'down',
-    dockingStation: 'S2W',
+    stationId: 'station_6',
+    customName: 'S2W上行',
     refFieldXM: 840,
     refFieldYM: 301.75,
     layout: () => ({ positionMeters: { x: 840, y: 70.3771658997137 } }),
   },
 ];
 
-function buildDockingFacility(spec, area, existing, existingIds, canonicalByStationRole) {
+function buildDockingFacility(spec, area, existing) {
   const positionMeters =
     existing?.positionMeters ?? spec.layout(area).positionMeters;
   const areaPosition =
@@ -132,11 +127,23 @@ function buildDockingFacility(spec, area, existing, existingIds, canonicalByStat
       return { w: sizeM * pxPerMeterX, h: sizeM * pxPerMeterY };
     })();
 
+  const prev = existing?.parameters ?? {};
+  const parameters = { ...prev };
+  delete parameters.dockingLeg;
+  delete parameters.dockingStation;
+  delete parameters.operationNodeId;
+  delete parameters.nodeRole;
+  delete parameters.stationName;
+  parameters.stationId = spec.stationId;
+  parameters.iconMode = prev.iconMode ?? 'dot';
+  parameters.refFieldXM = spec.refFieldXM;
+  parameters.refFieldYM = spec.refFieldYM;
+
   return {
     id: spec.id,
     type: 'DockingPoint',
     name: 'DockingPoint',
-    customName: '',
+    customName: existing?.customName?.trim() ? existing.customName : spec.customName,
     positionMeters,
     areaPosition,
     areaLayoutAnchor: existing?.areaLayoutAnchor ?? {
@@ -145,28 +152,13 @@ function buildDockingFacility(spec, area, existing, existingIds, canonicalByStat
     },
     areaSizePx,
     rotationDeg: existing?.rotationDeg ?? 0,
-    parameters: ensureDockingPointParams(
-      {
-        ...(existing?.parameters ?? {}),
-        [DOCKING_POINT_NODE_ID_KEY]: undefined,
-        [DOCKING_POINT_NODE_ROLE_KEY]: undefined,
-        iconMode: existing?.parameters?.iconMode ?? 'dot',
-        dockingLeg: spec.dockingLeg,
-        dockingStation: spec.dockingStation,
-        refFieldXM: spec.refFieldXM,
-        refFieldYM: spec.refFieldYM,
-      },
-      existingIds,
-      canonicalByStationRole,
-    ),
+    parameters,
     currentState: existing?.currentState ?? 'Normal',
   };
 }
 
 function main() {
   const map = JSON.parse(fs.readFileSync(MAP_PATH, 'utf8'));
-  const existingIds = new Set();
-  const canonicalByStationRole = new Map();
 
   for (const spec of DOCKING_SPECS) {
     const area = map.areas.find((a) => a.id === spec.areaId);
@@ -175,24 +167,18 @@ function main() {
     const existing = (area.facilities ?? []).find(
       (f) =>
         f.type === 'DockingPoint' &&
-        (f.id === spec.id ||
-          f.parameters?.dockingLeg === spec.dockingLeg &&
-            f.parameters?.dockingStation === spec.dockingStation),
+        (f.id === spec.id || f.parameters?.stationId === spec.stationId),
     );
 
     area.facilities = (area.facilities ?? []).filter(
       (f) =>
         !(
           f.type === 'DockingPoint' &&
-          (f.id === spec.id ||
-            (f.parameters?.dockingLeg === spec.dockingLeg &&
-              f.parameters?.dockingStation === spec.dockingStation))
+          (f.id === spec.id || f.parameters?.stationId === spec.stationId)
         ),
     );
 
-    area.facilities.push(
-      buildDockingFacility(spec, area, existing, existingIds, canonicalByStationRole),
-    );
+    area.facilities.push(buildDockingFacility(spec, area, existing));
   }
 
   const registry = collectOperationNodesFromMap(map);
@@ -200,7 +186,7 @@ function main() {
   fs.writeFileSync(MAP_PATH, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
   console.log(`Merged ${DOCKING_SPECS.length} docking points`);
   for (const node of registry.nodes) {
-    console.log(`  ${node.stationName} → ${node.nodeId} @ (${node.xM}, ${node.yM})`);
+    console.log(`  ${node.stationName} → ${node.stationId} @ (${node.xM}, ${node.yM})`);
   }
 }
 

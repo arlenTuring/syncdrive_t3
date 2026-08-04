@@ -4,7 +4,7 @@ import { CreateShiftSchedulePage } from './components/CreateShiftSchedulePage';
 import { ShiftListPage } from './components/ShiftListPage';
 import { ShiftScheduleResultPreviewPage } from './components/ShiftScheduleResultPreviewPage';
 import {
-  leaveShiftListEditor,
+  clearShiftListEditorHash,
   navigateToShiftListCreate,
   navigateToShiftListEdit,
   navigateToShiftListPreview,
@@ -19,11 +19,20 @@ type ShiftListAppProps = {
 };
 
 export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppProps) {
-  const [location, setLocation] = useState<ShiftListLocation>(() => readShiftListLocation());
+  // VTMS 側欄切入時一律從清單開始，不還原上次未關閉的編輯／預覽 hash
+  const [location, setLocation] = useState<ShiftListLocation>(() =>
+    embedded ? { screen: 'list' } : readShiftListLocation(),
+  );
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [listReloadKey, setListReloadKey] = useState(0);
   const [pendingCreationMode, setPendingCreationMode] =
     useState<ShiftScheduleCreationMode>('parametric');
+
+  useEffect(() => {
+    if (embedded) {
+      clearShiftListEditorHash();
+    }
+  }, [embedded]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -55,7 +64,8 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
 
   const backToList = useCallback(() => {
     setShowSetupModal(false);
-    leaveShiftListEditor();
+    clearShiftListEditorHash();
+    setLocation({ screen: 'list' });
   }, []);
 
   const openEdit = useCallback((shiftId: string) => {

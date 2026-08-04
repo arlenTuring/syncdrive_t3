@@ -3,6 +3,7 @@ export type {
   ScheduleBlockSource,
   GeneratedScheduleBlock,
   FeasibilityViolationCode,
+  FeasibilityIssueKind,
   FeasibilityIssue,
   GeneratedScheduleTimeline,
   GeneratedSchedulePlan,

@@ -73,7 +73,12 @@ export function findFacilityAtAreaLocalPx(
 ): string | null {
   const { pxPerMeterX, pxPerMeterY } = areaPxPerMeter(layout, domain)
   const sorted = sortFacilitiesForPaint(
-    facilities.filter((f) => f.type !== 'Geofence' && f.type !== 'RoadLine'),
+    facilities.filter(
+      (f) =>
+        f.type !== 'Geofence'
+        && f.type !== 'RoadLine'
+        && f.type !== 'TrackCrossover',
+    ),
   )
   for (let i = sorted.length - 1; i >= 0; i--) {
     const f = sorted[i]

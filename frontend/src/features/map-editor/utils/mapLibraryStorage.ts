@@ -27,8 +27,11 @@ import {
   applyRefFieldZeroPolicyToParsed,
   builtinRefFieldsNeedMerge,
   mergeBuiltinRefFieldsIntoParsed,
+  mergeBuiltinRefreshPreservingEditorData,
   mergePlatformRefFieldsFromBuiltin,
 } from './mergeBuiltinRefFields'
+
+export { mergeBuiltinRefreshPreservingEditorData } from './mergeBuiltinRefFields'
 
 export const MAP_LIBRARY_STORAGE_KEY = 'syncdrive-map-library-v1'
 export const DEFAULT_MAP_VERSION = 'v0.0.1'
@@ -104,6 +107,7 @@ function entryFromParsed(
       pixelOrigin: parsed.pixelOrigin,
       routes: parsed.routes,
       routeGroups: parsed.routeGroups,
+      visibleRouteIds: parsed.visibleRouteIds,
       pointTopology: parsed.pointTopology,
     },
   )
@@ -205,11 +209,10 @@ export async function refreshStaleBuiltinMapEntries(
       const needsRefMerge = builtinRefFieldsNeedMerge(localParsed, remoteParsed)
       if (!remoteIsNewer && !needsRefMerge) continue
 
-      const parsed = applyRefFieldZeroPolicyToParsed(
-        remoteIsNewer
-          ? remoteParsed
-          : mergeBuiltinRefFieldsIntoParsed(localParsed, remoteParsed),
-      )
+      const merged = remoteIsNewer
+        ? mergeBuiltinRefreshPreservingEditorData(remoteParsed, localParsed)
+        : mergeBuiltinRefFieldsIntoParsed(localParsed, remoteParsed)
+      const parsed = applyRefFieldZeroPolicyToParsed(merged)
       next[i] = entryFromParsed(parsed, {
         libraryId: entry.libraryId,
         builtinId: entry.builtinId,
@@ -219,10 +222,9 @@ export async function refreshStaleBuiltinMapEntries(
       refreshed++
       if (remoteIsNewer) {
         try {
+          // 只清草稿；勿清 official 備份，避免拓撲／路線無法還原
           localStorage.removeItem(`${MAP_DRAFT_PREFIX}${entry.libraryId}`)
           localStorage.removeItem(`${MAP_DRAFT_PREFIX}${entry.builtinId}`)
-          localStorage.removeItem(`${MAP_OFFICIAL_PREFIX}${entry.libraryId}`)
-          localStorage.removeItem(`${MAP_OFFICIAL_PREFIX}${entry.builtinId}`)
         } catch {
           /* ignore */
         }
@@ -389,6 +391,7 @@ export function saveEditorStateToLibraryEntry(
   routes: MapPlannedRoute[] = [],
   routeGroups: MapRouteGroup[] = [],
   pointTopology?: PointTopology,
+  visibleRouteIds: readonly string[] = [],
 ): MapLibraryEntry {
   const now = nowIso()
   const mapDocument = buildMapFileV2(
@@ -404,6 +407,7 @@ export function saveEditorStateToLibraryEntry(
       pixelOrigin: meta.pixelOrigin,
       routes,
       routeGroups,
+      visibleRouteIds: [...visibleRouteIds],
       pointTopology,
     },
   )

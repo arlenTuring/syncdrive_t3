@@ -9,7 +9,7 @@ import type {
   ShiftScheduleStationDwell,
 } from '../types/create';
 import {
-  applyDwellSlackSeconds,
+  applyStationDwellWithSlack,
   normalizeDwellSlackSeconds,
 } from './schedule-engine/physics';
 import {
@@ -103,7 +103,7 @@ function resolveManualBlockLabel(taskType: TaskTypeKey): string {
   return TASK_TYPE_OPTIONS.find((item) => item.key === taskType)?.label ?? taskType;
 }
 
-/** 靠站＋緩衝合計秒數（未填站視為 0） */
+/** 靠站＋緩衝合計秒數（未填站視為 0；不停靠／換線停靠不加緩衝） */
 export function resolveManualBlockDwellTotalSeconds(
   block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSeconds'>,
 ): number {
@@ -113,8 +113,8 @@ export function resolveManualBlockDwellTotalSeconds(
   }
   const slack = normalizeDwellSlackSeconds(block.dwellSlackSeconds ?? 0);
   let total = 0;
-  for (const dwell of dwells) {
-    total += applyDwellSlackSeconds(Math.max(0, dwell.dwellSeconds ?? 0), slack);
+  for (const [index, dwell] of dwells.entries()) {
+    total += applyStationDwellWithSlack(dwell, slack, index);
   }
   return total;
 }

@@ -37,9 +37,15 @@ function passengerRoute(
     routeName: name,
     groupId: 'g1',
     groupName: 'G1',
-    stationIds: ['S1'],
+    // 雙站：首站停靠不計入占用，終站停靠才計入（與引擎 physics 一致）
+    stationIds: [`${id}-origin`, `${id}-terminal`],
     stationDwells: [
-      { stationId: 'S1', stationName: 'S1', dwellSeconds },
+      { stationId: `${id}-origin`, stationName: `${id}-origin`, dwellSeconds: 0 },
+      {
+        stationId: `${id}-terminal`,
+        stationName: `${id}-terminal`,
+        dwellSeconds,
+      },
     ],
     stationDwellsConfirmed: true,
     stationLegTravels: [],
@@ -151,9 +157,9 @@ describe('generateShiftSchedule', () => {
   });
 
   it('allows small delay within one headway when vehicle is slightly late', () => {
-    // 正線視窗 10:00–10:30；一圈 1260s + 恢復 30s = 1290s > 班距 600s。
-    // 10:10 脈衝延後會超過一個班距 → 略過；
-    // 10:20 脈衝只需延後到 10:21:30（90s < 600s）→ 允許小幅延後掛上。
+    // 正線視窗 10:00–10:30；一圈均 1260s + 恢復 30s。
+    // 10:10 脈衝：用均就緒太晚；壓到快後可掛上（本測驗證快補班）。
+    // 占用改為最快 1080s → 10:00–10:18，下一班約 10:18:30。
     const tasks: ScheduleTask[] = [
       {
         id: 't1',
@@ -177,8 +183,8 @@ describe('generateShiftSchedule', () => {
     );
     assert.equal(bars.length, 2);
     assert.equal(bars[0]!.plannedStartMinute, 600);
-    assert.equal(bars[0]!.plannedEndMinute, 621);
-    assert.equal(bars[1]!.plannedStartMinute, 621.5);
+    assert.equal(bars[0]!.plannedEndMinute, 618);
+    assert.equal(bars[1]!.plannedStartMinute, 618.5);
   });
 
   it('fails when physics end exceeds next anchor on same timeline', () => {
@@ -475,7 +481,7 @@ describe('generateShiftSchedule', () => {
     assert.equal(result.plan!.timelines[0]!.blocks[0]!.travelSeconds, 100);
   });
 
-  it('snaps occupancy up to 10-second clock grid (S3)', () => {
+  it('snaps occupancy down to 10-second clock grid within avg (S3)', () => {
     const tasks: ScheduleTask[] = [
       {
         id: 't1',
@@ -501,7 +507,8 @@ describe('generateShiftSchedule', () => {
 
     assert.equal(result.report.ok, true);
     const block = result.plan!.timelines[0]!.blocks[0]!;
-    assert.equal(block.plannedEndMinute, 600 + 140 / 60);
+    // 101+36=137 → snap↓130（不大於均）
+    assert.equal(block.plannedEndMinute, 600 + 130 / 60);
   });
 
   it('fails when anchor is not on 10-second grid (S3)', () => {
@@ -609,7 +616,7 @@ describe('generateShiftSchedule', () => {
         },
       ],
     };
-    // 空檔 120s，但需恢復 0 + 換線 120 = 120；再縮到 60s 空檔才算不足
+    // 空檔 120s，但需換線 120（中段不扣恢復）；再縮到 60s 空檔才算不足
     plan.timelines[0]!.blocks[1]!.plannedStartMinute = 603;
     const errors: FeasibilityIssue[] = [];
     validateRouteSwitchBuffers(
@@ -619,7 +626,7 @@ describe('generateShiftSchedule', () => {
       0,
     );
     assert.ok(errors.some((issue) => issue.code === 'ROUTE_SWITCH_BUFFER_INSUFFICIENT'));
-    // 恢復＋換線相加：空檔 180s、恢復 30、換線 120 → 需 150，應通過
+    // 中段僅換線：空檔 180s、恢復 30（不計入）、換線 120 → 需 120，應通過
     const okErrors: FeasibilityIssue[] = [];
     plan.timelines[0]!.blocks[1]!.plannedStartMinute = 605;
     validateRouteSwitchBuffers(
@@ -743,7 +750,7 @@ describe('generateShiftSchedule', () => {
 
     assert.equal(result.report.ok, true);
     assert.ok(result.plan);
-    assert.equal(result.plan!.timetableGenerationAlgorithm, 'periodic-directional-headway-eat-v1');
+    assert.equal(result.plan!.timetableGenerationAlgorithm, 'periodic-cycle-headway-v2');
     assert.equal(result.plan!.routeAssignmentAlgorithm, 'constraint-greedy-v1');
 
     const passengerBars = result.plan!.timelines
@@ -791,14 +798,13 @@ describe('rotation cycle completion（來回約束）', () => {
     });
 
     assert.equal(additions.length, 1);
-    // 最後一趟 10:00+440s=1040s → +30s 恢復 +0s 換線（測試路線預設）→ 1070s
-    // 若有換線緩衝則再相加（見下方真實參數測試）
-    assert.equal(Math.round(additions[0]!.startMinute * 60), 1070);
+    // 最後一趟 10:00+440s=1040s → 導通中段換線不重複扣恢復（僅換線緩衝，此測為 0）→ 1040s
+    assert.equal(Math.round(additions[0]!.startMinute * 60), 1040);
     assert.equal(additions[0]!.taskType, 'passenger');
     assert.equal(additions[0]!.rowIndex, 1);
   });
 
-  it('adds recovery + switch buffer when completing a return trip', () => {
+  it('adds switch buffer only on mid-ring return (recovery reserved for wrap)', () => {
     const downWithSwitch = passengerRoute('r-down', '下行路線', 320, 265, 1, 36, 20, 10);
     // 三站 (36+10)=46 → 138s；占用 snap(320+138)=460（此測以模板 duration 440 為準）
     downWithSwitch.stationDwells = [
@@ -840,8 +846,8 @@ describe('rotation cycle completion（來回約束）', () => {
     });
 
     assert.equal(additions.length, 1);
-    // 1040 + 30 恢復 + 20 換線 = 1090s → 00:18:10
-    assert.equal(Math.round(additions[0]!.startMinute * 60), 1090);
+    // 中段下行→上行：僅換線 20（恢復留給折返繞回）→ 1040+20=1060s
+    assert.equal(Math.round(additions[0]!.startMinute * 60), 1060);
   });
 
   it('completes cycle at end of day even without non-passenger tasks', () => {
@@ -865,7 +871,8 @@ describe('rotation cycle completion（來回約束）', () => {
 
     assert.equal(additions.length, 1);
     assert.equal(additions[0]!.rowIndex, 2);
-    assert.equal(Math.round(additions[0]!.startMinute * 60), 470);
+    // 中段換線不扣恢復 → 440s
+    assert.equal(Math.round(additions[0]!.startMinute * 60), 440);
   });
 
   it('no-op when every cycle is already complete', () => {
@@ -1029,6 +1036,9 @@ describe('rotation cycle completion（來回約束）', () => {
   });
 
   it('withdraws an auto-generated outbound when no legal return slot exists', () => {
+    // 即使壓到快也排不進回程（整備太早 + 同方向班距被另一車佔住）
+    const tightDown = passengerRoute('r-down', '下行路線', 300, 280, 1, 140);
+    const tightUp = passengerRoute('r-up', '上行路線', 300, 280, 2, 140);
     const tasks: ScheduleTask[] = [
       {
         id: 'template-pax-slot-r-down-1-0',
@@ -1067,7 +1077,7 @@ describe('rotation cycle completion（來回約束）', () => {
 
     const result = applyRotationCycleCompletion({
       tasks,
-      passengerRoutes: [downRoute, upRoute],
+      passengerRoutes: [tightDown, tightUp],
       scheduleRowCount: 2,
       minimumRecoveryTimeSeconds: 30,
       intervals: [
@@ -1291,7 +1301,7 @@ describe('rotation cycle completion（來回約束）', () => {
       }
     }
 
-    // 方向感知掛車後：列2 = D 00:10 + U 00:20（皆在班距格位上，無需週期補完延後）
+    // 完整交路掛車後：列2 = D 00:10，接著立即完成 U，不再等另一個 route 脈衝。
     const row2 = result.plan!.timelines.find((timeline) => timeline.row === 2)!;
     const row2Bars = row2.blocks
       .filter((block) => block.source === 'template_bar' && block.taskType === 'passenger')
@@ -1300,7 +1310,7 @@ describe('rotation cycle completion（來回約束）', () => {
     assert.equal(row2Bars[0]!.routeId, 'r-down');
     assert.equal(Math.round(row2Bars[0]!.plannedStartMinute * 60), 600);
     assert.equal(row2Bars[1]!.routeId, 'r-up');
-    assert.equal(Math.round(row2Bars[1]!.plannedStartMinute * 60), 1200);
+    assert.equal(Math.round(row2Bars[1]!.plannedStartMinute * 60), 1040);
 
     // 回程 00:27:20 結束，充電仍準時 00:30 開始
     const row2Charging = row2.blocks.find((block) => block.taskType === 'charging');
@@ -1322,7 +1332,8 @@ describe('rotation cycle completion（來回約束）', () => {
 
   it('allows opening a cycle that finishes within maintenance entry slack (可偷整備開頭)', () => {
     // 餘裕 600＝最多可晚於充電開始 600s 才結束來回
-    // 00:20 開新輪：來回約 910s → 約 00:35 結束；充電 00:30+600=00:40 → 應可發
+    // 第二個 00:10 脈衝在上一輪完成後立刻補掛（約 00:15:10），
+    // 完整來回於充電前結束，不得為等待整點脈衝而閒置。
     const body = {
       editorVersion: 1,
       vehicleCapacity: 50,
@@ -1383,7 +1394,7 @@ describe('rotation cycle completion（來回約束）', () => {
     const startsWithSlack = withSlack.plan!.timelines[0]!.blocks
       .filter((block) => block.taskType === 'passenger')
       .map((block) => Math.round(block.plannedStartMinute * 60));
-    assert.ok(startsWithSlack.includes(1200), '有 600s 餘裕時 00:20 應可開新輪');
+    assert.ok(startsWithSlack.includes(910), '上一輪完成後應立即補掛漏掉的 00:10 脈衝');
 
     const withoutSlack = generateShiftSchedule({
       draft: buildDraft({
@@ -1418,10 +1429,9 @@ describe('rotation cycle completion（來回約束）', () => {
     assert.ok(!startsNoSlack.includes(1200), '餘裕 0 時 00:20 來回會超過充電開始，應不發');
   });
 
-  it('pre-dispatches from the maintenance tail so mainline capacity is ready at window start', () => {
-    // 10:00 才是使用者宣告的正線視窗，但 09:00–10:00 整備可讓渡尾端 600s。
-    // 引擎應從 09:50 的班距脈衝開始出車，並把整備尾端裁到實際首班，
-    // 而不是等到 10:00 後才逐車投入、造成交接期間運能缺口。
+  it('does not pre-dispatch by cutting the preceding maintenance tail', () => {
+    // 讓渡餘裕只允許占用「接下整備開頭」；
+    // 09:00–10:00 整備不得為了 10:00 正線視窗被提前裁尾出車。
     const tasks: ScheduleTask[] = [];
     for (let row = 1; row <= 4; row += 1) {
       tasks.push(
@@ -1504,17 +1514,14 @@ describe('rotation cycle completion（來回約束）', () => {
         block.taskType === 'passenger'
         && Math.round(block.plannedStartMinute * 60) < 10 * 3600,
     );
-    assert.ok(preDispatched.length > 0, '應在 10:00 前由整備尾端提前出車');
+    assert.equal(preDispatched.length, 0, '不得提前裁整備尾端出車');
 
     for (const timeline of result.plan!.timelines) {
-      const firstPassenger = timeline.blocks
-        .filter((block) => block.taskType === 'passenger')
-        .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0];
       const servicing = timeline.blocks.find((block) => block.taskType === 'servicing');
-      if (!firstPassenger || !servicing) continue;
+      if (!servicing) continue;
       assert.ok(
-        servicing.plannedEndMinute <= firstPassenger.plannedStartMinute,
-        `row ${timeline.row} 整備尾端必須讓渡給首班正線`,
+        Math.abs(servicing.plannedEndMinute - 10 * 60) < 1e-6,
+        `row ${timeline.row} 整備結束時間應維持 10:00，實際=${servicing.plannedEndMinute}`,
       );
     }
   });
@@ -2088,5 +2095,403 @@ describe('generateDeparturesFromHeadway', () => {
     assert.equal(tasks[0]!.rowIndex, 1);
     // second departure ideally 10:01 but timeline busy until 10:03 → delayed
     assert.ok(tasks[1]!.startMinute >= tasks[0]!.startMinute + 180 / 60);
+  });
+});
+
+describe('cycle pulse vehicle assignment regressions', () => {
+  it('uses both available vehicles while rows 1-8 are under maintenance', () => {
+    const down = {
+      ...passengerRoute('r-down-loop', '主線下行', 320, 265, 1, 80),
+      stationIds: ['p1', 't3'],
+      stationDwells: [
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 0 },
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 80 },
+      ],
+      serviceDirectionId: 'down',
+    };
+    const up = {
+      ...passengerRoute('r-up-loop', '主線上行', 320, 265, 2, 80),
+      stationIds: ['t3', 'p1'],
+      stationDwells: [
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 0 },
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 80 },
+      ],
+      serviceDirectionId: 'up',
+    };
+    const tasks: ScheduleTask[] = [
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `maintenance-${index + 1}`,
+        rowIndex: index + 1,
+        taskType: 'servicing' as const,
+        startMinute: 0,
+        durationMinutes: 60,
+        label: '保養',
+      })),
+      {
+        id: 'vehicle-9-mainline',
+        rowIndex: 9,
+        taskType: 'passenger',
+        startMinute: 0,
+        durationMinutes: 60,
+        label: '正線',
+      },
+      {
+        id: 'vehicle-10-mainline',
+        rowIndex: 10,
+        taskType: 'passenger',
+        startMinute: 0,
+        durationMinutes: 60,
+        label: '正線',
+      },
+    ];
+    const body = {
+      editorVersion: 1,
+      vehicleCapacity: 70,
+      scheduleRowCount: 10,
+      attributes: [{
+        id: 'attr-600',
+        name: '離峰',
+        color: '#0f0',
+        headwaySeconds: 600,
+        capacityPphpd: 420,
+        isDraft: false,
+      }],
+      intervals: [{
+        id: 'slot-midnight',
+        attributeId: 'attr-600',
+        name: '凌晨',
+        startTime: '00:00',
+        endTime: '01:00',
+        isDraft: false,
+      }],
+      tasks,
+    };
+
+    const result = generateShiftSchedule({
+      draft: buildDraft({
+        routeGroups: {
+          mapId: 'map-1',
+          selectedRoutes: [down, up],
+          minimumRecoveryTimeSeconds: 30,
+        },
+      }),
+      templateBody: body,
+      passengerTimetableMode: 'template',
+    });
+
+    assert.equal(
+      result.report.ok,
+      true,
+      result.report.errors.map((issue) => issue.message).join('; '),
+    );
+    const rowsWithPassenger = result.plan!.timelines
+      .filter((timeline) =>
+        timeline.blocks.some(
+          (block) => block.taskType === 'passenger' && block.source === 'template_bar',
+        ),
+      )
+      .map((timeline) => timeline.row)
+      .sort((a, b) => a - b);
+    assert.deepEqual(rowsWithPassenger, [9, 10]);
+
+    for (const row of rowsWithPassenger) {
+      const routeIds = result.plan!.timelines
+        .find((timeline) => timeline.row === row)!
+        .blocks
+        .filter((block) => block.taskType === 'passenger')
+        .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)
+        .map((block) => block.routeId);
+      for (let i = 0; i < routeIds.length; i += 2) {
+        assert.deepEqual(routeIds.slice(i, i + 2), ['r-down-loop', 'r-up-loop']);
+      }
+    }
+  });
+
+  it('after 行前 at T, starts cycle from T-origin route (not locked to NT pulse index 0)', () => {
+    const down = {
+      ...passengerRoute('r-nt', 'NT', 260, 200, 1, 40),
+      stationIds: ['p1', 't3'],
+      stationDwells: [
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 0 },
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'down',
+    };
+    const up = {
+      ...passengerRoute('r-tn', 'TN', 260, 200, 2, 40),
+      stationIds: ['t3', 'p1'],
+      stationDwells: [
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 0 },
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'up',
+    };
+    const body = {
+      editorVersion: 1,
+      vehicleCapacity: 70,
+      scheduleRowCount: 1,
+      attributes: [{
+        id: 'attr-600',
+        name: '離峰',
+        color: '#0f0',
+        headwaySeconds: 600,
+        capacityPphpd: 420,
+        isDraft: false,
+      }],
+      intervals: [{
+        id: 'slot-night',
+        attributeId: 'attr-600',
+        name: '凌晨',
+        startTime: '01:00',
+        endTime: '02:00',
+        isDraft: false,
+      }],
+      tasks: [
+        {
+          id: 'insp-1',
+          rowIndex: 1,
+          taskType: 'inspection' as const,
+          startMinute: 30,
+          durationMinutes: 20,
+          label: '行前',
+        },
+        {
+          id: 'pax-win-1',
+          rowIndex: 1,
+          taskType: 'passenger' as const,
+          startMinute: 60,
+          durationMinutes: 60,
+          label: '正線',
+        },
+      ],
+    };
+
+    const result = generateShiftSchedule({
+      draft: buildDraft({
+        routeGroups: {
+          mapId: 'map-1',
+          selectedRoutes: [down, up],
+          minimumRecoveryTimeSeconds: 30,
+        },
+        maintenanceTask: {
+          skipped: false,
+          taskId: 'MT-1',
+          taskName: '整備',
+          entrySlackBySection: {
+            maintenance: 0,
+            charging: 0,
+            carWash: 0,
+            preTrip: 0,
+            mobile: 0,
+          },
+        },
+      }),
+      templateBody: body,
+      maintenanceTaskBody: {
+        preTrip: {
+          stepEnabled: true,
+          equipmentRows: [{ id: 'fac-m1', mapCode: 'M1' }],
+        },
+      },
+      firstTripOrigins: [{
+        stationId: 't3',
+        label: 'T3',
+        deadheadSeconds: 0,
+        facilityNodeIds: ['fac-m1'],
+        facilityLabels: ['M1'],
+      }],
+      passengerTimetableMode: 'template',
+    });
+
+    assert.equal(
+      result.report.ok,
+      true,
+      result.report.errors.map((issue) => issue.message).join('; '),
+    );
+    const phaseRejects = result.report.errors.filter((issue) =>
+      JSON.stringify(issue.detail ?? {}).includes('出場站／輪替相位不允許此起班路線'),
+    );
+    assert.equal(phaseRejects.length, 0);
+
+    const firstPassenger = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks
+      .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar')
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0];
+    assert.ok(firstPassenger, 'row 1 should get passenger after 行前');
+    assert.equal(
+      firstPassenger!.routeId,
+      'r-tn',
+      '行前出場 T 應對齊 TN（t3 起點），而非被脈衝鎖死在 NT',
+    );
+    assert.ok(firstPassenger!.plannedStartMinute >= 60);
+  });
+
+  it('yields an already-placed same-direction trip so a yard-exit car can take the pulse', () => {
+    const down = {
+      ...passengerRoute('r-nt', 'NT', 280, 220, 1, 40),
+      stationIds: ['p1', 't3'],
+      stationDwells: [
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 0 },
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'down',
+    };
+    const up = {
+      ...passengerRoute('r-tn', 'TN', 280, 220, 2, 40),
+      stationIds: ['t3', 'p1'],
+      stationDwells: [
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 0 },
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'up',
+    };
+    // 車 2 跑到 01:00 進充電；車 1 行前後 01:00 開窗且相位＝TN。
+    // 車 2 最後一輪的 TN 會堵住班距；讓路後車 1 應承接 01:00 脈衝。
+    const body = {
+      editorVersion: 1,
+      vehicleCapacity: 70,
+      scheduleRowCount: 2,
+      attributes: [{
+        id: 'attr-600',
+        name: '離峰',
+        color: '#0f0',
+        headwaySeconds: 600,
+        capacityPphpd: 420,
+        isDraft: false,
+      }],
+      intervals: [{
+        id: 'slot-night',
+        attributeId: 'attr-600',
+        name: '凌晨',
+        startTime: '00:00',
+        endTime: '02:00',
+        isDraft: false,
+      }],
+      tasks: [
+        {
+          id: 'insp-1',
+          rowIndex: 1,
+          taskType: 'inspection' as const,
+          startMinute: 30,
+          durationMinutes: 20,
+          label: '行前',
+        },
+        {
+          id: 'pax-win-1',
+          rowIndex: 1,
+          taskType: 'passenger' as const,
+          startMinute: 60,
+          durationMinutes: 60,
+          label: '正線',
+        },
+        {
+          id: 'pax-win-2',
+          rowIndex: 2,
+          taskType: 'passenger' as const,
+          startMinute: 0,
+          durationMinutes: 60,
+          label: '正線',
+        },
+        {
+          id: 'chg-2',
+          rowIndex: 2,
+          taskType: 'charging' as const,
+          startMinute: 60,
+          durationMinutes: 60,
+          label: '充電',
+        },
+      ],
+    };
+
+    const result = generateShiftSchedule({
+      draft: buildDraft({
+        routeGroups: {
+          mapId: 'map-1',
+          selectedRoutes: [down, up],
+          minimumRecoveryTimeSeconds: 10,
+        },
+        maintenanceTask: {
+          skipped: false,
+          taskId: 'MT-1',
+          taskName: '整備',
+          entrySlackBySection: {
+            maintenance: 600,
+            charging: 600,
+            carWash: 0,
+            preTrip: 0,
+            mobile: 0,
+          },
+        },
+      }),
+      templateBody: body,
+      maintenanceTaskBody: {
+        preTrip: {
+          stepEnabled: true,
+          equipmentRows: [{ id: 'fac-m1', mapCode: 'M1' }],
+        },
+      },
+      firstTripOrigins: [{
+        stationId: 't3',
+        label: 'T3',
+        deadheadSeconds: 0,
+        facilityNodeIds: ['fac-m1'],
+        facilityLabels: ['M1'],
+      }],
+      passengerTimetableMode: 'template',
+    });
+
+    const unservedAt0100 = result.report.errors.filter(
+      (issue) =>
+        issue.code === 'UNSERVED_SERVICE_PULSE'
+        && String(issue.message).includes('01:00'),
+    );
+    assert.equal(
+      unservedAt0100.length,
+      0,
+      unservedAt0100.map((issue) => JSON.stringify(issue.detail)).join('; '),
+    );
+
+    const row1Passengers = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks
+      .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar')
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    assert.ok(row1Passengers.length >= 1, 'yard-exit row should receive passenger trips');
+    assert.equal(row1Passengers[0]!.routeId, 'r-tn');
+    assert.ok(
+      row1Passengers[0]!.plannedStartMinute >= 60
+      && row1Passengers[0]!.plannedStartMinute < 70,
+      `expected row1 TN near 01:00, got ${row1Passengers[0]!.plannedStartMinute}`,
+    );
+
+    const tnTrips = result.plan!.timelines
+      .flatMap((timeline) =>
+        timeline.blocks
+          .filter(
+            (block) =>
+              block.taskType === 'passenger'
+              && block.routeId === 'r-tn'
+              && block.plannedStartMinute >= 45
+              && block.plannedStartMinute <= 85,
+          )
+          .map((block) => ({
+            row: timeline.row,
+            start: block.plannedStartMinute,
+          })),
+      )
+      .sort((a, b) => a.start - b.start || a.row - b.row);
+
+    const row1Tn = tnTrips.find((trip) => trip.row === 1);
+    const row2TnAfter = tnTrips.find(
+      (trip) => trip.row === 2 && row1Tn != null && trip.start >= row1Tn.start - 1e-9,
+    );
+    assert.ok(row1Tn, `row1 TN missing: ${JSON.stringify(tnTrips)}`);
+    if (row2TnAfter) {
+      assert.ok(
+        row2TnAfter.start - row1Tn!.start >= 10 - 1e-9,
+        `TN headway broken after yield: ${JSON.stringify(tnTrips)}`,
+      );
+    }
   });
 });

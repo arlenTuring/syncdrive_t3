@@ -3,6 +3,7 @@ import {
   Crosshair,
   Frame,
   Highlighter,
+  History,
   LogOut,
   Pencil,
   Redo2,
@@ -17,6 +18,7 @@ type MapEditorToolbarProps = {
   onEnterEdit: () => void
   onLeaveEdit: () => void
   onBackToLibrary: () => void
+  onOpenRevisionHistory?: () => void
   mapDisplayName: string
   mapVersion: string
   onMapDisplayNameChange: (value: string) => void
@@ -61,6 +63,7 @@ export function MapEditorToolbar({
   onEnterEdit,
   onLeaveEdit,
   onBackToLibrary,
+  onOpenRevisionHistory,
   mapDisplayName,
   mapVersion,
   onMapDisplayNameChange,
@@ -168,6 +171,18 @@ export function MapEditorToolbar({
               <span className="hidden sm:inline">重做</span>
             </button>
           </div>
+        )}
+
+        {onOpenRevisionHistory && (
+          <button
+            type="button"
+            onClick={onOpenRevisionHistory}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-900/90 px-2 py-1 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-2.5 sm:text-xs"
+            title="編修紀錄：還原先前自動／正式儲存的圖台快照"
+          >
+            <History className="size-3.5 shrink-0 sm:size-4" aria-hidden />
+            <span className="hidden sm:inline">編修紀錄</span>
+          </button>
         )}
 
         {mapEditorMode === 'edit' && onToggleRulers && (

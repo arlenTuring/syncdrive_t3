@@ -23,8 +23,8 @@ export const MIN_FACILITY_SIZE_M = 0.1
 /** 軌道窄邊預設寬度（公尺） */
 export const TRACK_RAIL_WIDTH_M = 3.5
 
-/** 智慧電桿圖台預設尺寸（公尺）：窄寬、偏高 */
-export const POLE_DEFAULT_SIZE_M = { w: 1.5, h: 3.5 } as const
+/** 智慧電桿圖台預設尺寸（公尺）：寬為舊預設 2 倍、高為 3 倍 */
+export const POLE_DEFAULT_SIZE_M = { w: 3, h: 10.5 } as const
 
 /** smart_pole_enable.png 內燈頭＋燈桿大致範圍（方圖內比例，不含透明邊） */
 const POLE_ASSET_CONTENT = {
@@ -44,7 +44,7 @@ export type PoleVisualLayout = {
 
 /**
  * 智慧電桿選取框與圖示排版（Area 內 px）。
- * 框線貼齊素材內容區，以 overflow 裁掉 PNG 透明邊與光暈餘量。
+ * @deprecated 圖台改為 object-contain 撐滿 areaSizePx；保留供舊程式參考。
  */
 export function resolvePoleVisualLayout(
   areaW: number,
@@ -104,6 +104,9 @@ export function defaultSizeMetersForType(type: FacilityType): {
       return { w: 4, h: 4 }
     case 'RoadLine':
       return { w: 40, h: 1.2 }
+    case 'TrackCrossover':
+      // 預設約覆蓋一節平行股交叉區（寬沿軌道、高跨 U/D 間距）
+      return { w: 28, h: 14 }
     case 'Facility':
       return { w: 24, h: 18 }
     case 'Geofence':

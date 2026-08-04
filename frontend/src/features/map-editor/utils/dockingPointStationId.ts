@@ -1,6 +1,7 @@
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import {
+  DOCKING_POINT_LEG_KEY,
   DOCKING_POINT_NODE_ID_KEY,
   DOCKING_POINT_STATION_ID_KEY,
   DOCKING_POINT_STATION_KEY,
@@ -78,11 +79,11 @@ export function isStationIdTaken(
 }
 
 function effectiveStationName(facility: FacilityObject): string {
-  const name = getDockingPointStationName(facility)
-  if (name) return name
-  const leg = getDockingPointLeg(facility)
-  const routeStation = getDockingPointRouteStation(facility)
-  if (leg && routeStation) return defaultDockingStationDisplayName(leg, routeStation)
+  const custom = facility.customName.trim()
+  if (custom) return custom
+  // 舊圖 stationName 僅作遷移備援
+  const legacy = getDockingPointStationName(facility)
+  if (legacy) return legacy
   return ''
 }
 
@@ -108,6 +109,7 @@ function stripLegacyDockingParams(params: Record<string, unknown>): Record<strin
   const next = { ...params }
   delete next[DOCKING_POINT_NODE_ID_KEY]
   delete next[DOCKING_POINT_STATION_KEY]
+  delete next[DOCKING_POINT_LEG_KEY]
   delete next.nodeRole
   return next
 }
@@ -132,27 +134,43 @@ function migrateDockingPointFacility(
   }
 
   let params = { ...(facility.parameters ?? {}) }
+  let nextFacility = facility
   let changed = false
 
-  if (!getDockingPointStationName({ ...facility, parameters: params })) {
-    const leg = getDockingPointLeg({ ...facility, parameters: params })
-    const routeStation = getDockingPointRouteStation({ ...facility, parameters: params })
-    if (leg && routeStation) {
-      params[DOCKING_POINT_STATION_NAME_KEY] = defaultDockingStationDisplayName(leg, routeStation)
+  // 舊站點別名 → 自訂顯示名稱，並移除 stationName
+  const legacyName = getDockingPointStationName({ ...facility, parameters: params })
+  if (!facility.customName.trim()) {
+    if (legacyName) {
+      nextFacility = { ...nextFacility, customName: legacyName }
       changed = true
+    } else {
+      const leg = getDockingPointLeg({ ...facility, parameters: params })
+      const routeStation = getDockingPointRouteStation({ ...facility, parameters: params })
+      if (leg && routeStation) {
+        nextFacility = {
+          ...nextFacility,
+          customName: defaultDockingStationDisplayName(leg, routeStation),
+        }
+        changed = true
+      }
     }
   }
+  if (DOCKING_POINT_STATION_NAME_KEY in params) {
+    delete params[DOCKING_POINT_STATION_NAME_KEY]
+    changed = true
+  }
 
-  if (!getDockingPointStationId({ ...facility, parameters: params })) {
+  if (!getDockingPointStationId({ ...nextFacility, parameters: params })) {
     params[DOCKING_POINT_STATION_ID_KEY] = nextAvailableStationId(assignedIds)
     changed = true
   } else {
-    assignedIds.add(getDockingPointStationId({ ...facility, parameters: params }))
+    assignedIds.add(getDockingPointStationId({ ...nextFacility, parameters: params }))
   }
 
   const hadLegacy =
     DOCKING_POINT_NODE_ID_KEY in params
     || DOCKING_POINT_STATION_KEY in params
+    || DOCKING_POINT_LEG_KEY in params
     || 'nodeRole' in params
   if (hadLegacy) {
     params = stripLegacyDockingParams(params)
@@ -164,7 +182,7 @@ function migrateDockingPointFacility(
   }
 
   return {
-    facility: { ...facility, parameters: params },
+    facility: { ...nextFacility, parameters: params },
     changed: true,
   }
 }
@@ -272,7 +290,6 @@ export function collectStationsFromAreas(areas: MapAreaObject[]) {
   const stations: Array<{
     stationId: string
     stationName: string
-    dockingLeg?: string
     xM: number
     yM: number
     facilityId: string
@@ -282,16 +299,22 @@ export function collectStationsFromAreas(areas: MapAreaObject[]) {
   for (const area of areas) {
     for (const f of area.facilities) {
       if (f.type !== 'DockingPoint') continue
-      const params = f.parameters ?? {}
-      const xM = params.refFieldXM
-      const yM = params.refFieldYM
-      if (typeof xM !== 'number' || typeof yM !== 'number') continue
       const stationId = getDockingPointStationId(f)
       if (!stationId) continue
+      const params = f.parameters ?? {}
+      // 與途經點一致：參照場域未填時回退到圖台 position，避免新建停靠點從清單消失
+      const xM =
+        typeof params.refFieldXM === 'number' && Number.isFinite(params.refFieldXM)
+          ? params.refFieldXM
+          : f.position.x
+      const yM =
+        typeof params.refFieldYM === 'number' && Number.isFinite(params.refFieldYM)
+          ? params.refFieldYM
+          : f.position.y
+      if (!Number.isFinite(xM) || !Number.isFinite(yM)) continue
       stations.push({
         stationId,
         stationName: effectiveStationName(f) || stationId,
-        dockingLeg: getDockingPointLeg(f) ?? undefined,
         xM,
         yM,
         facilityId: f.id,

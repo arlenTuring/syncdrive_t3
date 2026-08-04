@@ -6,6 +6,8 @@ import { emptyPointTopology } from '../types/pointTopology'
 import {
   buildTopologyRouteTravelBreakdown,
   findDirectedTopologyPath,
+  partitionStationsForTopologyRouteAppend,
+  resolveTopologyDockingNodeId,
 } from './topologyRouteTravel'
 
 function facility(
@@ -34,7 +36,12 @@ const areas: MapAreaObject[] = [
       facility({
         id: 'f1',
         type: 'DockingPoint',
-        parameters: { stationId: 'S1', stationName: '站一' },
+        parameters: {
+          stationId: 'S1',
+          stationName: '站一',
+          refFieldXM: 10,
+          refFieldYM: 10,
+        },
       }),
       facility({
         id: 'f2',
@@ -44,7 +51,12 @@ const areas: MapAreaObject[] = [
       facility({
         id: 'f3',
         type: 'DockingPoint',
-        parameters: { stationId: 'S2', stationName: '站二' },
+        parameters: {
+          stationId: 'S2',
+          stationName: '站二',
+          refFieldXM: 80,
+          refFieldYM: 10,
+        },
       }),
     ],
   },
@@ -151,5 +163,247 @@ describe('topologyRouteTravel', () => {
     assert.equal(breakdown.timesComplete, false)
     assert.equal(breakdown.totalAvgTravelTimeSeconds, 40)
     assert.equal(breakdown.totalMinTravelTimeSeconds, null)
+  })
+
+  it('includes categorized facility docking stops in route append options', () => {
+    const areasWithDock: MapAreaObject[] = [
+      {
+        ...areas[0]!,
+        facilities: [
+          ...areas[0]!.facilities,
+          facility({
+            id: 'p1',
+            type: 'Facility',
+            customName: 'P1',
+            parameters: {
+              refFieldXMinM: 0,
+              refFieldXMaxM: 20,
+              refFieldYMinM: 0,
+              refFieldYMaxM: 20,
+              facilityDockingPoint: { xM: 5, yM: 10 },
+            },
+          }),
+        ],
+      },
+    ]
+    const topology = {
+      ...emptyPointTopology(),
+      nodes: [
+        { id: 'f1', kind: 'docking' as const, label: '站一', stationId: 'S1', x: 0, y: 0, color: '#111111' },
+        { id: 'fdock:p1', kind: 'facility-docking' as const, label: 'P1停', x: 10, y: 0, color: '#e59a2d' },
+        { id: 'f3', kind: 'docking' as const, label: '站二', stationId: 'S2', x: 20, y: 0, color: '#333333' },
+      ],
+      edges: [
+        {
+          id: 'e:f1->fdock',
+          fromNodeId: 'f1',
+          toNodeId: 'fdock:p1',
+          minTravelTimeSeconds: 8,
+          avgTravelTimeSeconds: 10,
+          distanceMeters: 30,
+        },
+        {
+          id: 'e:fdock->f3',
+          fromNodeId: 'fdock:p1',
+          toNodeId: 'f3',
+          minTravelTimeSeconds: 12,
+          avgTravelTimeSeconds: 15,
+          distanceMeters: 40,
+        },
+      ],
+    }
+
+    assert.equal(
+      resolveTopologyDockingNodeId(topology, areasWithDock, 'fdock:p1'),
+      'fdock:p1',
+    )
+
+    const emptyRoute = partitionStationsForTopologyRouteAppend(
+      topology,
+      areasWithDock,
+      [],
+    )
+    assert.ok(emptyRoute.selectable.some((s) => s.kind === 'docking'))
+    assert.ok(emptyRoute.selectable.some((s) => s.kind === 'facility-docking' && s.stationId === 'fdock:p1'))
+
+    const afterFirst = partitionStationsForTopologyRouteAppend(
+      topology,
+      areasWithDock,
+      ['S1'],
+    )
+    assert.ok(
+      afterFirst.selectable.some(
+        (s) => s.kind === 'facility-docking' && s.stationId === 'fdock:p1',
+      ),
+    )
+    assert.ok(afterFirst.selectable.some((s) => s.stationId === 'S2'))
+    assert.equal(afterFirst.disabled.length, 0)
+
+    const breakdown = buildTopologyRouteTravelBreakdown(
+      topology,
+      areasWithDock,
+      ['S1', 'fdock:p1', 'S2'],
+    )
+    assert.equal(breakdown.timesComplete, true)
+    assert.equal(breakdown.totalMinTravelTimeSeconds, 20)
+    assert.equal(breakdown.totalAvgTravelTimeSeconds, 25)
+  })
+
+  it('resolves and appends crossover portal waypoints by code', () => {
+    const areasWithXo: MapAreaObject[] = [
+      {
+        id: '1',
+        customName: 'A',
+        layout: { xPx: 0, yPx: 0, wPx: 800, hPx: 600, borderPx: 1 },
+        domain: { xMinM: 0, xMaxM: 100, yMinM: 0, yMaxM: 100 },
+        view: { panXM: 0, panYM: 0, zoom: 1 },
+        facilities: [
+          facility({
+            id: 'f1',
+            type: 'DockingPoint',
+            parameters: {
+              stationId: 'S1',
+              stationName: '站一',
+              refFieldXM: 10,
+              refFieldYM: 10,
+            },
+          }),
+          facility({
+            id: 'xo1',
+            type: 'TrackCrossover',
+            parameters: {
+              trackCrossoverPortals: {
+                a: {
+                  xM: 40,
+                  yM: 10,
+                  attachedTrackId: null,
+                  waypointCode: 'xo_1_a',
+                  alias: '渡線A',
+                },
+                b: {
+                  xM: 60,
+                  yM: 10,
+                  attachedTrackId: null,
+                  waypointCode: 'xo_1_b',
+                },
+              },
+            },
+          }),
+          facility({
+            id: 'f3',
+            type: 'DockingPoint',
+            parameters: {
+              stationId: 'S2',
+              stationName: '站二',
+              refFieldXM: 80,
+              refFieldYM: 10,
+            },
+          }),
+        ],
+      },
+    ]
+
+    const topology = {
+      ...emptyPointTopology(),
+      nodes: [
+        {
+          id: 'f1',
+          kind: 'docking' as const,
+          label: '站一',
+          stationId: 'S1',
+          x: 0,
+          y: 0,
+          color: '#111111',
+        },
+        {
+          id: 'xowp:xo1:a',
+          kind: 'crossover-waypoint' as const,
+          label: '渡線A',
+          stationId: 'xo_1_a',
+          x: 10,
+          y: 0,
+          color: '#2a9fbf',
+        },
+        {
+          id: 'xowp:xo1:b',
+          kind: 'crossover-waypoint' as const,
+          label: 'xo_1_b',
+          stationId: 'xo_1_b',
+          x: 15,
+          y: 0,
+          color: '#2a9fbf',
+        },
+        {
+          id: 'f3',
+          kind: 'docking' as const,
+          label: '站二',
+          stationId: 'S2',
+          x: 20,
+          y: 0,
+          color: '#333333',
+        },
+      ],
+      edges: [
+        {
+          id: 'e:f1->a',
+          fromNodeId: 'f1',
+          toNodeId: 'xowp:xo1:a',
+          minTravelTimeSeconds: 5,
+          avgTravelTimeSeconds: 6,
+          distanceMeters: 10,
+        },
+        {
+          id: 'e:a->b',
+          fromNodeId: 'xowp:xo1:a',
+          toNodeId: 'xowp:xo1:b',
+          minTravelTimeSeconds: 4,
+          avgTravelTimeSeconds: 5,
+          distanceMeters: 8,
+        },
+        {
+          id: 'e:b->f3',
+          fromNodeId: 'xowp:xo1:b',
+          toNodeId: 'f3',
+          minTravelTimeSeconds: 7,
+          avgTravelTimeSeconds: 9,
+          distanceMeters: 12,
+        },
+      ],
+    }
+
+    assert.equal(
+      resolveTopologyDockingNodeId(topology, areasWithXo, 'xo_1_a'),
+      'xowp:xo1:a',
+    )
+    assert.equal(
+      resolveTopologyDockingNodeId(topology, areasWithXo, 'xowp:xo1:b'),
+      'xowp:xo1:b',
+    )
+
+    const emptyRoute = partitionStationsForTopologyRouteAppend(
+      topology,
+      areasWithXo,
+      [],
+    )
+    assert.ok(
+      emptyRoute.selectable.some(
+        (s) => s.kind === 'crossover-waypoint' && s.stationId === 'xo_1_a',
+      ),
+    )
+    assert.ok(
+      emptyRoute.selectable.some(
+        (s) => s.kind === 'crossover-waypoint' && s.stationId === 'xo_1_b',
+      ),
+    )
+
+    const breakdown = buildTopologyRouteTravelBreakdown(
+      topology,
+      areasWithXo,
+      ['S1', 'xo_1_a', 'xo_1_b', 'S2'],
+    )
+    assert.equal(breakdown.pathsComplete, true)
+    assert.equal(breakdown.timesComplete, true)
+    assert.equal(breakdown.totalMinTravelTimeSeconds, 16)
+    assert.equal(breakdown.totalAvgTravelTimeSeconds, 20)
   })
 })

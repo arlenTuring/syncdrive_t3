@@ -1,4 +1,11 @@
-import type { ShiftScheduleStoredOutput } from '../utils/schedule-engine/types';
+import {
+  emptyShiftScheduleActionSettingsDraft,
+  isActionSettingsDraftComplete,
+  parseShiftScheduleActionSettings,
+  syncActionSettingsWithSelectedRoutes,
+  type ShiftScheduleActionSettingsDraft,
+} from '../utils/actionSettings';
+import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
 import {
   emptyMaintenanceEntrySlackBySectionInput,
   normalizeEmptyIntervalMainlineSlackSecondsInput,
@@ -23,12 +30,16 @@ import {
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
+  resolveStationDwellMode,
+  stationDwellSkipsSlack,
+  applyStationDwellWithSlack,
   snapUpToClockAlignSeconds,
   isClockAlignedSeconds,
   sortSelectedRoutesByExecutionOrder,
   sumStationDwellSeconds,
   sumStationDwellSecondsWithSlack,
   areStationDwellsComplete,
+  isStationDwellEntryComplete,
   resolveRouteCycleSeconds,
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
@@ -36,7 +47,42 @@ import {
   resolveInterTripGapSeconds,
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
+  isStationDwellRequired,
+  looksLikeDefaultCrossoverPortalStationId,
+  resolveStationDwellListRole,
+  formatStationDwellRoleLabel,
 } from '../utils/schedule-engine/physics';
+import { parseShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutput';
+import {
+  emptyShiftRouteRelationGraph,
+  parseShiftRouteRelationGraph,
+  syncRouteRelationGraphWithRoutes,
+  type ShiftRouteRelationGraph,
+} from '../utils/routeRelationGraph';
+import {
+  emptyShiftRouteThroughAnchorsDraft,
+  isThroughVerificationCurrent,
+  parseShiftRouteThroughAnchorsDraft,
+  type ShiftRouteThroughAnchorsDraft,
+} from '../utils/routeRelationThroughCycles';
+
+export type {
+  ShiftRouteRelationGraph,
+  ShiftRouteRelationLink,
+  ShiftRouteRelationNextKind,
+  ShiftRouteRelationNode,
+} from '../utils/routeRelationGraph';
+export type { ShiftRouteThroughAnchorsDraft } from '../utils/routeRelationThroughCycles';
+export {
+  emptyShiftRouteRelationGraph,
+  parseShiftRouteRelationGraph,
+  syncRouteRelationGraphWithRoutes,
+} from '../utils/routeRelationGraph';
+export {
+  emptyShiftRouteThroughAnchorsDraft,
+  isThroughVerificationCurrent,
+  parseShiftRouteThroughAnchorsDraft,
+} from '../utils/routeRelationThroughCycles';
 
 export {
   SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS,
@@ -47,12 +93,16 @@ export {
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
+  resolveStationDwellMode,
+  stationDwellSkipsSlack,
+  applyStationDwellWithSlack,
   snapUpToClockAlignSeconds,
   isClockAlignedSeconds,
   sortSelectedRoutesByExecutionOrder,
   sumStationDwellSeconds,
   sumStationDwellSecondsWithSlack,
   areStationDwellsComplete,
+  isStationDwellEntryComplete,
   resolveRouteCycleSeconds,
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
@@ -60,9 +110,13 @@ export {
   resolveInterTripGapSeconds,
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
+  isStationDwellRequired,
+  looksLikeDefaultCrossoverPortalStationId,
+  resolveStationDwellListRole,
+  formatStationDwellRoleLabel,
 };
 
-export type CreateShiftScheduleStep = 1 | 2 | 3 | 4 | 5 | 6;
+export type CreateShiftScheduleStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const CREATE_SHIFT_SCHEDULE_STEPS: Array<{
   step: CreateShiftScheduleStep;
@@ -72,8 +126,9 @@ export const CREATE_SHIFT_SCHEDULE_STEPS: Array<{
   { step: 2, label: '整備任務' },
   { step: 3, label: '時間模板' },
   { step: 4, label: '路線群組' },
-  { step: 5, label: '調整班表' },
-  { step: 6, label: '整體預覽' },
+  { step: 5, label: '行動設定' },
+  { step: 6, label: '調整班表' },
+  { step: 7, label: '整體預覽' },
 ];
 
 export const CREATE_SHIFT_SCHEDULE_STEP_HEADERS: Record<CreateShiftScheduleStep, string> = {
@@ -81,11 +136,12 @@ export const CREATE_SHIFT_SCHEDULE_STEP_HEADERS: Record<CreateShiftScheduleStep,
   2: '選擇整備任務規則包',
   3: '選擇時間模板',
   4: '設定路線群組與停靠時間',
-  5: '調整自動生成的班表細節',
-  6: '確認班表細節並完成建立',
+  5: '設定站間行動清單',
+  6: '調整自動生成的班表細節',
+  7: '確認班表細節並完成建立',
 };
 
-export const SHIFT_SCHEDULE_BODY_EDITOR_VERSION = 2;
+export const SHIFT_SCHEDULE_BODY_EDITOR_VERSION = 3;
 
 export type ShiftScheduleBasicDraft = {
   name: string;
@@ -103,6 +159,7 @@ export type ShiftScheduleMaintenanceTaskDraft = {
   skipped: boolean;
   /**
    * 各整備區塊的正線優先讓渡餘裕（秒，字串表單值）。
+   * 正線回程來不及時最多可占用整備開頭此秒數；整備結束時間不變。
    * 屬班表策略參數，不寫入整備任務本體；手動製作可不填。
    */
   entrySlackBySection: MaintenanceEntrySlackBySectionInput;
@@ -141,16 +198,38 @@ import {
 } from '../utils/stationLegTravel';
 
 /** 單一站點停靠時間（班表 Step 4） */
+export type ShiftStationDwellMode = 'seconds' | 'no_stop' | 'line_change';
+
 export type ShiftScheduleStationDwell = {
   stationId: string;
   stationName: string;
-  /** 停靠秒數；未填為 null */
+  /**
+   * 停靠秒數。
+   * - dwellMode=seconds：必填正整數
+   * - no_stop／line_change：固定 0，且不加靠站緩衝
+   * - 首站／虛擬渡線等 dwellRequired=false：固定 0
+   */
   dwellSeconds: number | null;
+  /**
+   * 停靠方式；未設定時視為 seconds（舊草稿相容）。
+   * no_stop＝不停靠；line_change＝換線停靠（兩者實際秒數皆 0、不加緩衝）。
+   */
+  dwellMode?: ShiftStationDwellMode;
+  /**
+   * 是否需填寫停靠時間。
+   * false＝首站（出發）／虛擬渡線端點等（僅顯示「首站／途經」，不設秒數）。
+   */
+  dwellRequired?: boolean;
 };
 
 export type { ShiftScheduleStationLegTravel };
 
 export type ShiftScheduleSelectedRoute = {
+  /**
+   * 槽內條目唯一鍵（主路線／備用各一）。
+   * 同一 catalog routeId 可出現在不同槽（例如 A 槽主路線同時是 B 槽備用）。
+   */
+  instanceId: string;
   routeId: string;
   routeName: string;
   /** 路線代號（必填）：班次卡／衝突訊息顯示用，非固定 D／U */
@@ -168,11 +247,11 @@ export type ShiftScheduleSelectedRoute = {
   stationLegTravels: ShiftScheduleStationLegTravel[];
   avgTravelTimeSeconds: number | null;
   minTravelTimeSeconds: number | null;
-  /** 執行順序（1 起算，跨所有已選路線）；排班時同任務類型依此順序輪替 */
+  /** 執行順序（1 起算，僅主路線）；排班時同任務類型依此順序輪替 */
   executionOrder: number;
   /**
-   * 完成此路線後、切換至下一條路線前的緩衝秒數（循環：最後一條接回第一條）。
-   * 泛用平台：不限定折返語意，僅表示路線切換所需時間。
+   * 完成此路線後、切換至其他路線前的緩衝秒數。
+   * 實際接續對象依排班／關聯設定而定，UI 不預先標示「接哪一條」。
    */
   switchBufferAfterSeconds: number;
   /**
@@ -180,7 +259,125 @@ export type ShiftScheduleSelectedRoute = {
    * 用於吸收開關門硬體延遲與靠站作業緩衝。
    */
   dwellSlackSeconds: number;
+  /**
+   * 備用路線：指向所屬主路線槽的 instanceId。
+   * 未設定／null＝主路線（參與執行順序與排班輪替）。
+   */
+  backupForInstanceId?: string | null;
+  /**
+   * @deprecated 舊草稿相容：指向主路線 routeId。新資料請用 backupForInstanceId。
+   */
+  backupForRouteId?: string | null;
+  /**
+   * 服務方向標籤 id（同向班距／運能用）。未設定＝暫不歸組。
+   * 必須對應 routeGroups.serviceDirectionTags 內的 id。
+   */
+  serviceDirectionId?: string | null;
+  /**
+   * 服務方向顯示名稱（冗餘備份）。
+   * 標籤清單若遺失，運能圖仍可用此欄顯示，避免露出 UUID。
+   */
+  serviceDirectionName?: string | null;
 };
+
+/** 服務方向標籤：同標籤的路線視為同一方向流（班距／運能） */
+export type ShiftScheduleServiceDirectionTag = {
+  id: string;
+  name: string;
+};
+
+export function createServiceDirectionTagId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `sdir-${crypto.randomUUID()}`;
+  }
+  return `sdir-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function parseShiftScheduleServiceDirectionTags(
+  raw: unknown,
+): ShiftScheduleServiceDirectionTag[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ShiftScheduleServiceDirectionTag[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const id = typeof o.id === 'string' ? o.id.trim() : '';
+    const name = typeof o.name === 'string' ? o.name.trim() : '';
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name });
+  }
+  return out;
+}
+
+/**
+ * 標籤清單遺失但路線仍掛著 serviceDirectionId 時，從路線重建標籤，
+ * 避免運能圖只剩 UUID、以及 parse 時把方向指派清掉。
+ */
+export function recoverServiceDirectionTagsFromRoutes(
+  tags: ShiftScheduleServiceDirectionTag[],
+  routes: ShiftScheduleSelectedRoute[],
+): ShiftScheduleServiceDirectionTag[] {
+  const byId = new Map(tags.map((tag) => [tag.id, tag] as const));
+  let autoIndex = 0;
+  for (const route of routes) {
+    const id = route.serviceDirectionId?.trim();
+    if (!id || byId.has(id)) continue;
+    autoIndex += 1;
+    const fromRoute = route.serviceDirectionName?.trim();
+    byId.set(id, {
+      id,
+      name: fromRoute || `服務方向 ${autoIndex}`,
+    });
+  }
+  return [...byId.values()];
+}
+
+export function createSelectedRouteInstanceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `sel-${crypto.randomUUID()}`;
+  }
+  return `sel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function resolveSelectedRouteInstanceId(route: ShiftScheduleSelectedRoute): string {
+  const id = route.instanceId?.trim();
+  return id || route.routeId;
+}
+
+export function isPrimarySelectedRoute(route: ShiftScheduleSelectedRoute): boolean {
+  return !route.backupForInstanceId?.trim() && !route.backupForRouteId?.trim();
+}
+
+/** 此主路線槽內已佔用的 catalog routeId（主＋備用），單槽不可重複 */
+export function listRouteIdsInPrimarySlot(
+  routes: ShiftScheduleSelectedRoute[],
+  primaryInstanceId: string,
+): Set<string> {
+  const primaryId = primaryInstanceId.trim();
+  const primary = routes.find(
+    (item) =>
+      resolveSelectedRouteInstanceId(item) === primaryId && isPrimarySelectedRoute(item),
+  );
+  const out = new Set<string>();
+  if (!primary) return out;
+  out.add(primary.routeId);
+  for (const route of routes) {
+    if (route.backupForInstanceId?.trim() === primaryId) {
+      out.add(route.routeId);
+      continue;
+    }
+    if (
+      !route.backupForInstanceId?.trim()
+      && route.backupForRouteId?.trim() === primary.routeId
+      && !isPrimarySelectedRoute(route)
+    ) {
+      out.add(route.routeId);
+    }
+  }
+  return out;
+}
 
 export type ShiftScheduleRouteGroupsDraft = {
   mapId: string;
@@ -189,6 +386,18 @@ export type ShiftScheduleRouteGroupsDraft = {
    * 恢復時間（秒）：同 timeline 兩趟正線之間至少保留的可吸收延誤空檔。
    */
   minimumRecoveryTimeSeconds: number | null;
+  /**
+   * 服務方向標籤清單（使用者自訂）。
+   * 各路線以 serviceDirectionId 單選其一；同標籤＝同向班距／運能。
+   */
+  serviceDirectionTags?: ShiftScheduleServiceDirectionTag[];
+  /** 路線關聯圖（方格接續）；舊草稿缺省為空 */
+  routeRelationGraph?: ShiftRouteRelationGraph;
+  /**
+   * 折返錨點＋已鎖定全優先路線組合（參數生成必填）。
+   * 舊草稿缺省視為未鎖定；鎖定後引擎只走這些組合。
+   */
+  throughAnchors?: ShiftRouteThroughAnchorsDraft;
 };
 
 export type ShiftScheduleCreateDraft = {
@@ -198,7 +407,9 @@ export type ShiftScheduleCreateDraft = {
   maintenanceTask: ShiftScheduleMaintenanceTaskDraft;
   timeTemplate: ShiftScheduleTimeTemplateDraft;
   routeGroups: ShiftScheduleRouteGroupsDraft;
-  /** Step 5 引擎產物 + 整備任務綁定；Step 6 唯讀預覽用 */
+  /** Step 5：站間行動設定（參數生成／手動製作共用） */
+  actionSettings: ShiftScheduleActionSettingsDraft;
+  /** Step 6 引擎產物 + 整備任務綁定；Step 7 唯讀預覽用 */
   scheduleOutput: ShiftScheduleStoredOutput | null;
   currentStep: CreateShiftScheduleStep;
   maxReachedStep: CreateShiftScheduleStep;
@@ -252,7 +463,11 @@ export function emptyShiftScheduleCreateDraft(
       mapId: '',
       selectedRoutes: [],
       minimumRecoveryTimeSeconds: null,
+      serviceDirectionTags: [],
+      routeRelationGraph: emptyShiftRouteRelationGraph(),
+      throughAnchors: emptyShiftRouteThroughAnchorsDraft(),
     },
+    actionSettings: emptyShiftScheduleActionSettingsDraft(),
     scheduleOutput: null,
     currentStep: 1,
     maxReachedStep: 1,
@@ -263,11 +478,24 @@ export function emptyStationDwellsFromIds(
   stationIds: string[],
   stationNameById?: ReadonlyMap<string, string>,
 ): ShiftScheduleStationDwell[] {
-  return stationIds.map((stationId) => ({
-    stationId,
-    stationName: stationNameById?.get(stationId) ?? stationId,
-    dwellSeconds: null,
-  }));
+  return stationIds.map((stationId, index) => {
+    const isOrigin = index === 0;
+    const isCrossover = looksLikeDefaultCrossoverPortalStationId(stationId);
+    if (isOrigin || isCrossover) {
+      return {
+        stationId,
+        stationName: stationNameById?.get(stationId) ?? stationId,
+        dwellSeconds: 0,
+        dwellRequired: false,
+      };
+    }
+    return {
+      stationId,
+      stationName: stationNameById?.get(stationId) ?? stationId,
+      dwellSeconds: null,
+      dwellMode: 'seconds' as const,
+    };
+  });
 }
 
 export function isSelectedRouteDwellReady(
@@ -288,15 +516,52 @@ export function isSelectedRouteDwellReady(
 export function normalizeSelectedRouteExecutionOrders(
   routes: ShiftScheduleSelectedRoute[],
 ): ShiftScheduleSelectedRoute[] {
-  return sortSelectedRoutesByExecutionOrder(routes).map((route, index) => ({
+  const withIds = routes.map((route, index) => ({
+    ...route,
+    instanceId: route.instanceId?.trim()
+      ? route.instanceId.trim()
+      : `${isPrimarySelectedRoute(route) ? 'p' : 'b'}-${route.routeId || 'x'}-${index}`,
+  }));
+
+  const primaries = sortSelectedRoutesByExecutionOrder(
+    withIds.filter((route) => isPrimarySelectedRoute(route)),
+  ).map((route, index) => ({
     ...route,
     executionOrder: index + 1,
+    backupForInstanceId: null,
+    backupForRouteId: null,
   }));
+  const primaryByInstanceId = new Map(
+    primaries.map((route) => [resolveSelectedRouteInstanceId(route), route] as const),
+  );
+  const primaryByRouteId = new Map(primaries.map((route) => [route.routeId, route] as const));
+
+  const backups = withIds
+    .filter((route) => !isPrimarySelectedRoute(route))
+    .map((route) => {
+      const byInstance = route.backupForInstanceId?.trim();
+      const parent =
+        (byInstance ? primaryByInstanceId.get(byInstance) : null)
+        ?? (route.backupForRouteId?.trim()
+          ? primaryByRouteId.get(route.backupForRouteId.trim())
+          : null);
+      if (!parent) return null;
+      return {
+        ...route,
+        backupForInstanceId: resolveSelectedRouteInstanceId(parent),
+        backupForRouteId: parent.routeId,
+        executionOrder: parent.executionOrder,
+      };
+    })
+    .filter((route): route is ShiftScheduleSelectedRoute => route != null);
+
+  return [...primaries, ...backups];
 }
 
 export function nextExecutionOrder(routes: ShiftScheduleSelectedRoute[]): number {
-  if (routes.length === 0) return 1;
-  return routes.reduce((max, route) => Math.max(max, route.executionOrder), 0) + 1;
+  const primaries = routes.filter((route) => isPrimarySelectedRoute(route));
+  if (primaries.length === 0) return 1;
+  return primaries.reduce((max, route) => Math.max(max, route.executionOrder), 0) + 1;
 }
 
 /** @deprecated 請改用 nextExecutionOrder */
@@ -312,27 +577,69 @@ export function moveSelectedRouteExecutionOrder(
   routeId: string,
   direction: 'up' | 'down',
 ): ShiftScheduleSelectedRoute[] {
-  const sorted = sortSelectedRoutesByExecutionOrder(routes);
-  const index = sorted.findIndex((route) => route.routeId === routeId);
+  const primaries = sortSelectedRoutesByExecutionOrder(
+    routes.filter((route) => isPrimarySelectedRoute(route)),
+  );
+  const index = primaries.findIndex(
+    (route) =>
+      resolveSelectedRouteInstanceId(route) === routeId || route.routeId === routeId,
+  );
   if (index < 0) return routes;
 
   const swapIndex = direction === 'up' ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= sorted.length) return routes;
+  if (swapIndex < 0 || swapIndex >= primaries.length) return routes;
 
-  const reordered = [...sorted];
+  const reordered = [...primaries];
   const tmp = reordered[index]!;
   reordered[index] = reordered[swapIndex]!;
   reordered[swapIndex] = tmp;
 
-  const orderByRouteId = new Map(
-    reordered.map((route, idx) => [route.routeId, idx + 1] as const),
+  const orderByInstanceId = new Map(
+    reordered.map((route, idx) => [resolveSelectedRouteInstanceId(route), idx + 1] as const),
   );
 
   return normalizeSelectedRouteExecutionOrders(
-    routes.map((route) => ({
-      ...route,
-      executionOrder: orderByRouteId.get(route.routeId) ?? route.executionOrder,
-    })),
+    routes.map((route) => {
+      if (!isPrimarySelectedRoute(route)) return route;
+      return {
+        ...route,
+        executionOrder:
+          orderByInstanceId.get(resolveSelectedRouteInstanceId(route)) ?? route.executionOrder,
+      };
+    }),
+  );
+}
+
+/** 將指定正線設為火車頭（執行順序第 1）；其餘依原相對順序順延 */
+export function setSelectedRouteAsHead(
+  routes: ShiftScheduleSelectedRoute[],
+  routeId: string,
+): ShiftScheduleSelectedRoute[] {
+  const primaries = sortSelectedRoutesByExecutionOrder(
+    routes.filter((route) => isPrimarySelectedRoute(route)),
+  );
+  const index = primaries.findIndex(
+    (route) =>
+      resolveSelectedRouteInstanceId(route) === routeId || route.routeId === routeId,
+  );
+  if (index < 0) return routes;
+  if (index === 0) return normalizeSelectedRouteExecutionOrders(routes);
+
+  const target = primaries[index]!;
+  const reordered = [target, ...primaries.filter((_, i) => i !== index)];
+  const orderByInstanceId = new Map(
+    reordered.map((route, idx) => [resolveSelectedRouteInstanceId(route), idx + 1] as const),
+  );
+
+  return normalizeSelectedRouteExecutionOrders(
+    routes.map((route) => {
+      if (!isPrimarySelectedRoute(route)) return route;
+      return {
+        ...route,
+        executionOrder:
+          orderByInstanceId.get(resolveSelectedRouteInstanceId(route)) ?? route.executionOrder,
+      };
+    }),
   );
 }
 
@@ -345,8 +652,11 @@ export function resolveRouteOrderPosition(
   canMoveUp: boolean;
   canMoveDown: boolean;
 } {
-  const route = routes.find((item) => item.routeId === routeId);
-  if (!route) {
+  const route = routes.find(
+    (item) =>
+      resolveSelectedRouteInstanceId(item) === routeId || item.routeId === routeId,
+  );
+  if (!route || !isPrimarySelectedRoute(route)) {
     return {
       executionOrder: 0,
       showControls: false,
@@ -355,8 +665,12 @@ export function resolveRouteOrderPosition(
     };
   }
 
-  const sorted = sortSelectedRoutesByExecutionOrder(routes);
-  const index = sorted.findIndex((item) => item.routeId === routeId);
+  const sorted = sortSelectedRoutesByExecutionOrder(
+    routes.filter((item) => isPrimarySelectedRoute(item)),
+  );
+  const index = sorted.findIndex(
+    (item) => resolveSelectedRouteInstanceId(item) === resolveSelectedRouteInstanceId(route),
+  );
 
   return {
     executionOrder: route.executionOrder,
@@ -365,8 +679,6 @@ export function resolveRouteOrderPosition(
     canMoveDown: index >= 0 && index < sorted.length - 1,
   };
 }
-
-import { parseShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutput';
 
 export function shouldInvalidateShiftScheduleOutput(
   prev: ShiftScheduleCreateDraft,
@@ -410,10 +722,11 @@ export function summarizeRouteGroupsCycle(
     totalSwitchBufferSeconds += normalizeSwitchBufferAfterSeconds(
       route.switchBufferAfterSeconds,
     );
-    for (const dwell of route.stationDwells) {
-      totalDwellWithSlackSeconds += applyDwellSlackSeconds(
-        dwell.dwellSeconds ?? 0,
+    for (const [index, dwell] of route.stationDwells.entries()) {
+      totalDwellWithSlackSeconds += applyStationDwellWithSlack(
+        dwell,
         route.dwellSlackSeconds,
+        index,
       );
     }
   }
@@ -541,6 +854,14 @@ export function serializeShiftScheduleBody(
     routeGroupsMapId: draft.routeGroups.mapId,
     selectedRoutes: draft.routeGroups.selectedRoutes,
     minimumRecoveryTimeSeconds: draft.routeGroups.minimumRecoveryTimeSeconds,
+    serviceDirectionTags: recoverServiceDirectionTagsFromRoutes(
+      draft.routeGroups.serviceDirectionTags ?? [],
+      draft.routeGroups.selectedRoutes,
+    ),
+    routeRelationGraph: draft.routeGroups.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+    throughAnchors:
+      draft.routeGroups.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
+    actionSettings: draft.actionSettings,
     scheduleOutput: draft.scheduleOutput,
     currentStep: draft.currentStep,
     maxReachedStep: draft.maxReachedStep,
@@ -558,20 +879,40 @@ function parseStationDwells(
       const o = item as Record<string, unknown>;
       const stationId = typeof o.stationId === 'string' ? o.stationId.trim() : '';
       if (!stationId) continue;
+      const dwellRequired =
+        o.dwellRequired === false
+          ? false
+          : o.dwellRequired === true
+            ? true
+            : undefined;
+      const dwellMode: ShiftStationDwellMode | undefined =
+        o.dwellMode === 'no_stop' || o.dwellMode === 'line_change' || o.dwellMode === 'seconds'
+          ? o.dwellMode
+          : undefined;
       const dwellRaw = o.dwellSeconds;
-      const dwellSeconds =
-        typeof dwellRaw === 'number'
-        && Number.isFinite(dwellRaw)
-        && dwellRaw > 0
-          ? Math.round(dwellRaw)
-          : null;
+      let dwellSeconds: number | null = null;
+      if (dwellMode === 'no_stop' || dwellMode === 'line_change') {
+        dwellSeconds = 0;
+      } else if (typeof dwellRaw === 'number' && Number.isFinite(dwellRaw)) {
+        const rounded = Math.round(dwellRaw);
+        if (dwellRequired === false || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+          dwellSeconds = Math.max(0, rounded);
+        } else if (rounded > 0) {
+          dwellSeconds = rounded;
+        }
+      } else if (dwellRequired === false || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+        dwellSeconds = 0;
+      }
       byId.set(stationId, {
         stationId,
         stationName:
           typeof o.stationName === 'string' && o.stationName.trim()
             ? o.stationName
             : stationId,
-        dwellSeconds,
+        dwellSeconds:
+          dwellMode === 'no_stop' || dwellMode === 'line_change' ? 0 : dwellSeconds,
+        ...(dwellMode ? { dwellMode } : {}),
+        ...(dwellRequired !== undefined ? { dwellRequired } : {}),
       });
     }
   }
@@ -580,9 +921,27 @@ function parseStationDwells(
     return [...byId.values()];
   }
 
-  return stationIds.map((stationId) => {
+  return stationIds.map((stationId, index) => {
     const existing = byId.get(stationId);
-    if (existing) return existing;
+    if (existing) {
+      if (index === 0) {
+        return {
+          ...existing,
+          dwellSeconds: 0,
+          dwellRequired: false,
+          dwellMode: undefined,
+        };
+      }
+      return existing;
+    }
+    if (index === 0 || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+      return {
+        stationId,
+        stationName: stationId,
+        dwellSeconds: 0,
+        dwellRequired: false,
+      };
+    }
     return { stationId, stationName: stationId, dwellSeconds: null };
   });
 }
@@ -600,6 +959,10 @@ export function parseShiftScheduleSelectedRoutes(raw: unknown): ShiftScheduleSel
       : [];
     const stationDwells = parseStationDwells(o.stationDwells, stationIds);
     out.push({
+      instanceId:
+        typeof o.instanceId === 'string' && o.instanceId.trim()
+          ? o.instanceId.trim()
+          : '',
       routeId,
       routeName: typeof o.routeName === 'string' ? o.routeName : '',
       routeCode:
@@ -622,20 +985,41 @@ export function parseShiftScheduleSelectedRoutes(raw: unknown): ShiftScheduleSel
       dwellSlackSeconds: normalizeDwellSlackSeconds(
         o.dwellSlackSeconds ?? o.dwellSlackPercent,
       ),
+      backupForInstanceId:
+        typeof o.backupForInstanceId === 'string' && o.backupForInstanceId.trim()
+          ? o.backupForInstanceId.trim()
+          : null,
+      backupForRouteId:
+        typeof o.backupForRouteId === 'string' && o.backupForRouteId.trim()
+          ? o.backupForRouteId.trim()
+          : null,
+      serviceDirectionId:
+        typeof o.serviceDirectionId === 'string' && o.serviceDirectionId.trim()
+          ? o.serviceDirectionId.trim()
+          : null,
+      serviceDirectionName:
+        typeof o.serviceDirectionName === 'string' && o.serviceDirectionName.trim()
+          ? o.serviceDirectionName.trim()
+          : null,
     });
   }
   return normalizeSelectedRouteExecutionOrders(out);
 }
 
-function migrateStepFromEditorV1(step: number): CreateShiftScheduleStep {
+function migrateStepFromEditorV1(step: number): number {
   if (step === 2) return 3;
   if (step === 3) return 2;
-  if (step >= 1 && step <= 6) return step as CreateShiftScheduleStep;
-  return 1;
+  return step;
+}
+
+/** editor v2（六步）→ v3：在路線群組後插入行動設定 */
+function migrateStepFromEditorV2(step: number): number {
+  if (step >= 5) return step + 1;
+  return step;
 }
 
 function clampStep(step: number): CreateShiftScheduleStep {
-  return Math.min(6, Math.max(1, step)) as CreateShiftScheduleStep;
+  return Math.min(7, Math.max(1, step)) as CreateShiftScheduleStep;
 }
 
 export function buildShiftScheduleDraftFromStored(
@@ -650,14 +1034,24 @@ export function buildShiftScheduleDraftFromStored(
   const rawMaxReachedStep =
     typeof body.maxReachedStep === 'number' ? body.maxReachedStep : rawCurrentStep;
 
-  const currentStep = clampStep(
-    editorVersion >= 2 ? rawCurrentStep : migrateStepFromEditorV1(rawCurrentStep),
-  );
-  const maxReachedStep = clampStep(
-    Math.max(
-      currentStep,
-      editorVersion >= 2 ? rawMaxReachedStep : migrateStepFromEditorV1(rawMaxReachedStep),
-    ),
+  let migratedCurrent = rawCurrentStep;
+  let migratedMax = rawMaxReachedStep;
+  if (editorVersion < 2) {
+    migratedCurrent = migrateStepFromEditorV1(migratedCurrent);
+    migratedMax = migrateStepFromEditorV1(migratedMax);
+  }
+  if (editorVersion < 3) {
+    migratedCurrent = migrateStepFromEditorV2(migratedCurrent);
+    migratedMax = migrateStepFromEditorV2(migratedMax);
+  }
+
+  const currentStep = clampStep(migratedCurrent);
+  const maxReachedStep = clampStep(Math.max(currentStep, migratedMax));
+
+  const selectedRoutes = parseShiftScheduleSelectedRoutes(body.selectedRoutes);
+  const actionSettings = syncActionSettingsWithSelectedRoutes(
+    parseShiftScheduleActionSettings(body.actionSettings),
+    selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
   );
 
   return {
@@ -699,11 +1093,40 @@ export function buildShiftScheduleDraftFromStored(
     },
     routeGroups: {
       mapId: typeof body.routeGroupsMapId === 'string' ? body.routeGroupsMapId : '',
-      selectedRoutes: parseShiftScheduleSelectedRoutes(body.selectedRoutes),
+      selectedRoutes: (() => {
+        const tags = recoverServiceDirectionTagsFromRoutes(
+          parseShiftScheduleServiceDirectionTags(body.serviceDirectionTags),
+          selectedRoutes,
+        );
+        const tagById = new Map(tags.map((tag) => [tag.id, tag] as const));
+        return selectedRoutes.map((route) => {
+          const id = route.serviceDirectionId?.trim() || null;
+          if (!id || !tagById.has(id)) {
+            return { ...route, serviceDirectionId: null, serviceDirectionName: null };
+          }
+          const tag = tagById.get(id)!;
+          return {
+            ...route,
+            serviceDirectionId: id,
+            serviceDirectionName:
+              route.serviceDirectionName?.trim() || tag.name,
+          };
+        });
+      })(),
       minimumRecoveryTimeSeconds: normalizeMinimumRecoveryTimeSeconds(
         body.minimumRecoveryTimeSeconds,
       ),
+      serviceDirectionTags: recoverServiceDirectionTagsFromRoutes(
+        parseShiftScheduleServiceDirectionTags(body.serviceDirectionTags),
+        selectedRoutes,
+      ),
+      routeRelationGraph: syncRouteRelationGraphWithRoutes(
+        parseShiftRouteRelationGraph(body.routeRelationGraph),
+        selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+      ),
+      throughAnchors: parseShiftRouteThroughAnchorsDraft(body.throughAnchors),
     },
+    actionSettings,
     scheduleOutput: parseShiftScheduleStoredOutput(body.scheduleOutput),
     currentStep,
     maxReachedStep,
@@ -761,14 +1184,24 @@ export function isCreateShiftScheduleStepComplete(
         && routes.every(
           (route) =>
             route.executionOrder > 0
-            && Boolean(route.routeCode?.trim()),
+            && Boolean(route.routeCode?.trim())
+            && isSelectedRouteDwellReady(route, turnaroundLimitSeconds, 0),
         )
       );
     }
     const recoverySeconds = draft.routeGroups.minimumRecoveryTimeSeconds;
+    const primaryRoutes = routes.filter((route) => isPrimarySelectedRoute(route));
+    const throughOk = isThroughVerificationCurrent({
+      anchors: draft.routeGroups.throughAnchors,
+      routes: primaryRoutes,
+      graph: draft.routeGroups.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+      minimumRecoveryTimeSeconds: recoverySeconds,
+      turnaroundLimitSeconds,
+    });
     return (
       recoverySeconds !== null
       && routes.length > 0
+      && throughOk
       && routes.every(
         (route) =>
           route.executionOrder > 0
@@ -778,6 +1211,10 @@ export function isCreateShiftScheduleStepComplete(
     );
   }
   if (step === 5) {
+    // 允許空白行動；已建立的行動須填完
+    return isActionSettingsDraftComplete(draft.actionSettings);
+  }
+  if (step === 6) {
     if (draft.creationMode === 'manual') {
       return draft.scheduleOutput?.plan != null;
     }
@@ -786,10 +1223,40 @@ export function isCreateShiftScheduleStepComplete(
       && draft.scheduleOutput.feasibilityReport.ok === true
     );
   }
-  if (step === 6) {
+  if (step === 7) {
     return draft.scheduleOutput?.plan != null;
   }
   return true;
+}
+
+/** 依建立方式取得可見步驟 */
+export function resolveVisibleCreateShiftSteps(
+  creationMode: ShiftScheduleCreationMode,
+): Array<{ step: CreateShiftScheduleStep; label: string }> {
+  void creationMode;
+  return CREATE_SHIFT_SCHEDULE_STEPS.map(({ step, label }) => ({ step, label }));
+}
+
+/** 下一步 */
+export function resolveNextCreateShiftStep(
+  current: CreateShiftScheduleStep,
+  creationMode: ShiftScheduleCreationMode,
+): CreateShiftScheduleStep | null {
+  const visible = resolveVisibleCreateShiftSteps(creationMode);
+  const index = visible.findIndex((item) => item.step === current);
+  if (index < 0 || index >= visible.length - 1) return null;
+  return visible[index + 1]!.step;
+}
+
+/** 上一步 */
+export function resolvePreviousCreateShiftStep(
+  current: CreateShiftScheduleStep,
+  creationMode: ShiftScheduleCreationMode,
+): CreateShiftScheduleStep | null {
+  const visible = resolveVisibleCreateShiftSteps(creationMode);
+  const index = visible.findIndex((item) => item.step === current);
+  if (index <= 0) return null;
+  return visible[index - 1]!.step;
 }
 
 export function isShiftScheduleStepComplete(

@@ -7,6 +7,7 @@ import { emptyPointTopology } from '../types/pointTopology'
 import {
   buildMapFileV2,
   facilityToMapEntry,
+  migrateMisclassifiedSmartPoleEntry,
   parseMapFileJson,
 } from './mapFileJson'
 
@@ -187,7 +188,6 @@ describe('mapFileJson', () => {
         parameters: {
           stationId: 'ST-A',
           stationName: 'A 站',
-          dockingLeg: 'inbound',
         },
       }),
       baseFacility({
@@ -283,5 +283,236 @@ describe('mapFileJson', () => {
     // facilityToMapEntry 也應保留 parameters 鍵
     const trackEntry = facilityToMapEntry(byId.get('trk-1')!)
     assert.equal(trackEntry.parameters?.segmentId, 'R01')
+  })
+
+  it('round-trips TrackCrossover portals, facilityDockingPoint, and topology kinds', () => {
+    const facilities = [
+      baseFacility({
+        id: 'fac-p1',
+        type: 'Facility',
+        name: 'FacilityArea',
+        currentState: 'Normal',
+        parameters: {
+          purpose: '停車格',
+          refFieldXMinM: 0,
+          refFieldXMaxM: 20,
+          refFieldYMinM: 0,
+          refFieldYMaxM: 10,
+          facilityDockingPoint: { xM: 5, yM: 4 },
+        },
+      }),
+      baseFacility({
+        id: 'xo-3',
+        type: 'TrackCrossover',
+        name: 'TrackCrossover',
+        currentState: 'Normal',
+        parameters: {
+          trackCrossoverColor: '#94a3b8',
+          trackCrossoverStrokePx: 12,
+          trackCrossoverPortals: {
+            a: {
+              xM: 40,
+              yM: 20,
+              attachedTrackId: 'trk-u',
+              waypointCode: 'xo_3_a',
+              alias: '下行轉S2W正線終點',
+            },
+            b: {
+              xM: 40,
+              yM: 40,
+              attachedTrackId: 'trk-d',
+              waypointCode: 'xo_3_b',
+              alias: '下行轉S2W正線起點',
+            },
+          },
+        },
+      }),
+      baseFacility({
+        id: 'dock-2',
+        type: 'DockingPoint',
+        name: 'DockingPoint',
+        customName: 'N2W下行',
+        currentState: 'Normal',
+        parameters: {
+          stationId: 'station_2',
+          refFieldXM: 100,
+          refFieldYM: 50,
+        },
+      }),
+    ]
+
+    const area = {
+      ...createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE),
+      facilities,
+    }
+
+    const doc = buildMapFileV2('map-xo', '渡線與拓撲', DEFAULT_MAP_PIXEL_SIZE, [area], {
+      routes: [
+        {
+          routeId: 'route-down',
+          displayName: '下行',
+          stationIds: ['fdock:fac-p1', 'station_2', 'xo_3_b'],
+          avgTravelTimeSeconds: 180,
+          minTravelTimeSeconds: 150,
+        },
+      ],
+      routeGroups: [
+        { groupId: 'g-down', displayName: '下行路線群組', routeIds: ['route-down'] },
+      ],
+      pointTopology: {
+        ...emptyPointTopology(),
+        nodes: [
+          {
+            id: 'fdock:fac-p1',
+            kind: 'facility-docking',
+            label: 'P1停',
+            x: 10,
+            y: 20,
+            color: '#e59a2d',
+          },
+          {
+            id: 'dock-2',
+            kind: 'docking',
+            label: 'N2W下行',
+            stationId: 'station_2',
+            x: 30,
+            y: 40,
+            color: '#22c55e',
+          },
+          {
+            id: 'xowp:xo-3:b',
+            kind: 'crossover-waypoint',
+            label: '下行轉S2W正線起點',
+            stationId: 'xo_3_b',
+            x: 50,
+            y: 60,
+            color: '#2a9fbf',
+          },
+        ],
+        edges: [
+          {
+            id: 'e1',
+            fromNodeId: 'fdock:fac-p1',
+            toNodeId: 'dock-2',
+            minTravelTimeSeconds: 10,
+            avgTravelTimeSeconds: 10,
+            distanceMeters: 100,
+            curveOffsetX: 12,
+            curveOffsetY: -4,
+          },
+          {
+            id: 'e2',
+            fromNodeId: 'dock-2',
+            toNodeId: 'xowp:xo-3:b',
+            minTravelTimeSeconds: 140,
+            avgTravelTimeSeconds: 170,
+            distanceMeters: 810,
+          },
+        ],
+      },
+    })
+
+    const json = JSON.parse(JSON.stringify(doc)) as unknown
+    const parsed = parseMapFileJson(json)
+    const rebuilt = buildMapFileV2(
+      parsed.mapId,
+      parsed.displayName,
+      parsed.pixelSize,
+      parsed.areas,
+      {
+        routes: parsed.routes,
+        routeGroups: parsed.routeGroups,
+        pointTopology: parsed.pointTopology,
+      },
+    )
+
+    const xo = parsed.areas[0]!.facilities.find((f) => f.id === 'xo-3')
+    assert.equal(xo?.type, 'TrackCrossover')
+    const portals = xo?.parameters?.trackCrossoverPortals as {
+      a: { waypointCode: string; attachedTrackId: string; alias?: string }
+      b: { waypointCode: string; attachedTrackId: string; alias?: string }
+    }
+    assert.equal(portals.a.waypointCode, 'xo_3_a')
+    assert.equal(portals.b.waypointCode, 'xo_3_b')
+    assert.equal(portals.a.attachedTrackId, 'trk-u')
+    assert.equal(portals.b.attachedTrackId, 'trk-d')
+    assert.equal(portals.b.alias, '下行轉S2W正線起點')
+
+    const fac = parsed.areas[0]!.facilities.find((f) => f.id === 'fac-p1')
+    assert.deepEqual(fac?.parameters?.facilityDockingPoint, { xM: 5, yM: 4 })
+
+    assert.equal(parsed.routes[0]?.stationIds.length, 3)
+    assert.equal(parsed.routeGroups[0]?.groupId, 'g-down')
+    assert.equal(parsed.pointTopology.nodes.length, 3)
+    assert.equal(parsed.pointTopology.edges.length, 2)
+    const edge1 = parsed.pointTopology.edges.find((e) => e.id === 'e1')
+    assert.equal(edge1?.distanceMeters, 100)
+    assert.equal(edge1?.curveOffsetX, 12)
+    assert.equal(edge1?.curveOffsetY, -4)
+
+    const rebuiltXo = rebuilt.areas[0]!.facilities.find((f) => f.id === 'xo-3')
+    assert.deepEqual(
+      rebuiltXo?.parameters?.trackCrossoverPortals,
+      xo?.parameters?.trackCrossoverPortals,
+    )
+    assert.equal(rebuilt.pointTopology?.edges.length, 2)
+  })
+
+  it('round-trips visibleRouteIds and does not force all visible when missing', () => {
+    const area = createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE)
+    const routes = [
+      {
+        routeId: 'route-a',
+        displayName: 'A',
+        stationIds: ['s1'],
+      },
+      {
+        routeId: 'route-b',
+        displayName: 'B',
+        stationIds: ['s2'],
+      },
+    ]
+    const doc = buildMapFileV2('map-vis', '可視', DEFAULT_MAP_PIXEL_SIZE, [area], {
+      routes,
+      visibleRouteIds: ['route-b', 'route-missing', 'route-b'],
+    })
+    assert.deepEqual(doc.visibleRouteIds, ['route-b'])
+
+    const parsed = parseMapFileJson(JSON.parse(JSON.stringify(doc)))
+    assert.deepEqual(parsed.visibleRouteIds, ['route-b'])
+
+    const legacy = buildMapFileV2('map-legacy', '舊', DEFAULT_MAP_PIXEL_SIZE, [area], {
+      routes,
+    })
+    // build 一律寫入陣列；模擬缺欄舊檔
+    const { visibleRouteIds: _drop, ...withoutVis } = legacy
+    const parsedLegacy = parseMapFileJson(withoutVis)
+    assert.deepEqual(parsedLegacy.visibleRouteIds, [])
+  })
+
+  it('migrates Facility+purpose 智慧桿 to Pole equipment', () => {
+    const migrated = migrateMisclassifiedSmartPoleEntry({
+      id: '052',
+      type: 'Facility',
+      name: 'FacilityArea',
+      customName: 'R04',
+      positionMeters: { x: 1, y: 2 },
+      rotationDeg: 0,
+      areaSizePx: { w: 100, h: 60 },
+      parameters: {
+        purpose: '智慧桿',
+        customIconUrl: 'facility/smart_pole_enable.png',
+        refFieldXMinM: 0,
+        refFieldXMaxM: 0,
+        refFieldYMinM: 0,
+        refFieldYMaxM: 0,
+      },
+    })
+    assert.equal(migrated.type, 'Pole')
+    assert.equal(migrated.name, 'SmartPole')
+    assert.equal(migrated.parameters?.purpose, undefined)
+    assert.equal(migrated.parameters?.defaultFillColor, 'transparent')
+    assert.equal(migrated.parameters?.customIconUrl, 'facility/smart_pole_enable.png')
+    assert.deepEqual(migrated.areaSizePx, { w: 30, h: 105 })
   })
 })

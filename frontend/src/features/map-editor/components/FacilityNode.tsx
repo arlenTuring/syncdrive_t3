@@ -18,7 +18,6 @@ import {
   facilityNodeWorldSize,
   getFacilitySizeMeters,
   MIN_FACILITY_SIZE_M,
-  resolvePoleVisualLayout,
 } from '../constants/facilityDimensions'
 import {
   metersToWorldPx,
@@ -34,6 +33,13 @@ import {
   resolveDockingPointIconUrl,
   resolveDockingPointMapLabel,
 } from '../utils/dockingPointFacility'
+import {
+  alongToFacilityDockingPoint,
+  facilityDockingPointToAlong,
+  getFacilityDockingPoint,
+  type FacilityDockingPoint,
+} from '../utils/facilityDockingPoint'
+import { getValidRefFieldBounds } from '../utils/facilityRefFieldBounds'
 import { FacilityDraggableLabel } from './FacilityDraggableLabel'
 import { FacilityIconLabelLayout } from './FacilityIconLabelLayout'
 import { PlatformDoorGraphic } from './PlatformDoorGraphic'
@@ -74,6 +80,7 @@ import {
   cssTopLeftToAreaPosition,
   domainHeightM,
   domainWidthM,
+  meterToAreaLocalPx,
 } from '../utils/areaCoords'
 import type { MapAreaDomain, MapAreaLayout } from '../types/area'
 import { FacilityTransformOverlay } from './FacilityTransformOverlay'
@@ -88,6 +95,36 @@ import {
   parseRoadLineWidthPx,
 } from '../utils/roadLineFacility'
 import { RoadLineGraphic } from './RoadLineGraphic'
+import {
+  TrackCrossoverGraphic,
+  portalsToAreaCssPoints,
+  strokePxFromWidthHandlePointer,
+} from './TrackCrossoverGraphic'
+import type { TrackNetworkSegment } from '../vehicles/trackNetwork/types'
+import {
+  dragCrossoverPortal,
+  ensureCrossoverPortals,
+  clampTrackCrossoverStrokePx,
+  parseTrackCrossoverColor,
+  parseTrackCrossoverColorOpacity,
+  parseTrackCrossoverStrokePx,
+  parseTrackCrossoverCenterGapPct,
+  parseTrackCrossoverBgColor,
+  parseTrackCrossoverBgOpacity,
+  TRACK_CROSSOVER_STROKE_PX_KEY,
+  translateCrossoverPortals,
+  type CrossoverPortalKey,
+  type CrossoverPortals,
+} from '../utils/trackCrossoverFacility'
+import {
+  buildCrossoverSnapUiForPoint,
+  mergeCrossoverSnapUi,
+  type CrossoverSnapUi,
+} from '../utils/crossoverSnapUi'
+import {
+  clientPointToFieldMeters,
+  syncLayoutFromCrossoverPortals,
+} from '../utils/trackCrossoverLayout'
 import { resolveMapEditorAssetUrl } from '../utils/mapEditorAssetUrl'
 import {
   canApplyFacilityFormat,
@@ -189,6 +226,14 @@ type FacilityNodeProps = {
   connectivityScanHighlight?: boolean
   /** 導通掃描：斷點閃爍三次 */
   connectivityScanFlashing?: boolean
+  /** 虛擬渡線：供端點吸附軌道中心 */
+  crossoverSegmentById?: Map<string, TrackNetworkSegment> | null
+  /** 虛擬渡線拖曳：此軌道為鄰近候選（先標示） */
+  crossoverSnapHighlight?: boolean
+  /** 虛擬渡線拖曳：此軌道為目前勾子目標 */
+  crossoverSnapPrimary?: boolean
+  /** 回報 Area：鄰近軌道標示 + 勾子疊層 */
+  onCrossoverSnapUiChange?: (ui: CrossoverSnapUi | null) => void
 }
 
 export const FacilityNode = memo(function FacilityNode({
@@ -232,6 +277,10 @@ export const FacilityNode = memo(function FacilityNode({
   showFacilityToolbar = true,
   connectivityScanHighlight = false,
   connectivityScanFlashing = false,
+  crossoverSegmentById = null,
+  crossoverSnapHighlight = false,
+  crossoverSnapPrimary = false,
+  onCrossoverSnapUiChange,
 }: FacilityNodeProps) {
   const mapExtent = useMapExtent()
   const Icon = PALETTE_ICON_BY_NAME[facility.name]
@@ -283,11 +332,19 @@ export const FacilityNode = memo(function FacilityNode({
             : undefined,
         )
       : null
-  const { w: nw, h: nh } = areaSizePx
-    ? { w: areaSizePx.w, h: areaSizePx.h }
-    : meterMode
-      ? { w: sizeMeters.w * scaleX, h: sizeMeters.h * scaleY }
-      : facilityNodeWorldSize(facility)
+  const isTrackCrossoverEarly = facility.type === 'TrackCrossover'
+  /** 虛擬渡線：整區疊層自由線（與圍籬／拓撲線相同），不用 AABB 方框尺寸 */
+  const { w: nw, h: nh } =
+    isTrackCrossoverEarly && meterMode && areaMeterContext
+      ? {
+          w: areaMeterContext.layout.wPx,
+          h: areaMeterContext.layout.hPx,
+        }
+      : areaSizePx
+        ? { w: areaSizePx.w, h: areaSizePx.h }
+        : meterMode
+          ? { w: sizeMeters.w * scaleX, h: sizeMeters.h * scaleY }
+          : facilityNodeWorldSize(facility)
   const minDim = Math.min(nw, nh)
   const widthM = worldPxToMeters(nw)
   const heightM = worldPxToMeters(nh)
@@ -301,7 +358,272 @@ export const FacilityNode = memo(function FacilityNode({
   const isPole = facility.type === 'Pole'
   const isTrack = facility.type === 'Track'
   const isRoadLine = facility.type === 'RoadLine'
+  const isTrackCrossover = facility.type === 'TrackCrossover'
   const isFacilityArea = facility.type === 'Facility'
+  const [crossoverPortalPreview, setCrossoverPortalPreview] =
+    useState<CrossoverPortals | null>(null)
+  const [crossoverStrokePreview, setCrossoverStrokePreview] = useState<
+    number | null
+  >(null)
+  const crossoverWidthDragRef = useRef<{
+    pointerId: number
+  } | null>(null)
+  const facilityDockingBounds = isFacilityArea
+    ? getValidRefFieldBounds(facility.parameters)
+    : null
+  const facilityDockingPoint = isFacilityArea
+    ? getFacilityDockingPoint(facility)
+    : null
+  const [dockingDragPreview, setDockingDragPreview] =
+    useState<FacilityDockingPoint | null>(null)
+  const [dockingPointActive, setDockingPointActive] = useState(false)
+  const [dockingPointHovered, setDockingPointHovered] = useState(false)
+  const dockingDragRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    startAlongX: number
+    startAlongY: number
+    bodyW: number
+    bodyH: number
+    rotDeg: number
+  } | null>(null)
+  const displayDockingPoint = dockingDragPreview ?? facilityDockingPoint
+  const dockingAlong =
+    displayDockingPoint && facilityDockingBounds
+      ? facilityDockingPointToAlong(displayDockingPoint, facilityDockingBounds)
+      : null
+  const dockingPointFocused = dockingPointActive || dockingDragPreview != null
+
+  const onFacilityDockingPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (
+        readOnly
+        || !onPatchParameters
+        || !facilityDockingBounds
+        || !dockingAlong
+      ) {
+        return
+      }
+      e.stopPropagation()
+      e.preventDefault()
+      onSelect(facility.id)
+      setDockingPointActive(true)
+      setDockingDragPreview(
+        alongToFacilityDockingPoint(
+          dockingAlong.alongX,
+          dockingAlong.alongY,
+          facilityDockingBounds,
+        ),
+      )
+      dockingDragRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startAlongX: dockingAlong.alongX,
+        startAlongY: dockingAlong.alongY,
+        bodyW: nw,
+        bodyH: nh,
+        rotDeg: showRot,
+      }
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    [
+      dockingAlong,
+      facility.id,
+      facilityDockingBounds,
+      nh,
+      nw,
+      onPatchParameters,
+      onSelect,
+      readOnly,
+      showRot,
+    ],
+  )
+
+  const onFacilityDockingPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dockingDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId || !facilityDockingBounds) return
+      e.stopPropagation()
+      const dx = e.clientX - drag.startClientX
+      const dy = e.clientY - drag.startClientY
+      const rad = (drag.rotDeg * Math.PI) / 180
+      const cos = Math.cos(rad)
+      const sin = Math.sin(rad)
+      // 螢幕位移 → 設施本體未旋轉座標系（右、下）
+      const localDx = dx * cos + dy * sin
+      const localDy = -dx * sin + dy * cos
+      const alongX = clamp(
+        drag.startAlongX + localDx / Math.max(1, drag.bodyW),
+        0,
+        1,
+      )
+      const alongY = clamp(
+        drag.startAlongY - localDy / Math.max(1, drag.bodyH),
+        0,
+        1,
+      )
+      setDockingDragPreview(
+        alongToFacilityDockingPoint(alongX, alongY, facilityDockingBounds),
+      )
+    },
+    [facilityDockingBounds],
+  )
+
+  const onFacilityDockingPointerEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dockingDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      e.stopPropagation()
+      dockingDragRef.current = null
+      setDockingPointActive(false)
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      setDockingDragPreview((preview) => {
+        if (preview && onPatchParameters) {
+          const existing = getFacilityDockingPoint(facility)
+          onPatchParameters(facility.id, {
+            facilityDockingPoint: {
+              xM: preview.xM,
+              yM: preview.yM,
+              ...(existing?.alias ? { alias: existing.alias } : {}),
+            },
+          })
+        }
+        return null
+      })
+    },
+    [facility, onPatchParameters],
+  )
+
+  const applyCrossoverPortalsUpdate = useCallback(
+    (nextPortals: CrossoverPortals) => {
+      if (!areaMeterContext || !onPatchParameters) return
+      const sync = syncLayoutFromCrossoverPortals(
+        nextPortals,
+        areaMeterContext.domain,
+        areaMeterContext.layout,
+      )
+      onPatchParameters(facility.id, sync.parametersPatch)
+      onResize?.(facility.id, sync.areaSizePx)
+      onDrag(facility.id, {
+        areaPosition: sync.areaPosition,
+        position: sync.position,
+      })
+    },
+    [areaMeterContext, facility.id, onDrag, onPatchParameters, onResize],
+  )
+
+  const onCrossoverPortalPointerDown = useCallback(
+    (key: CrossoverPortalKey, e: React.PointerEvent<SVGCircleElement>) => {
+      if (readOnly || !onPatchParameters || !areaMeterContext) return
+      if (!crossoverSegmentById) return
+      e.stopPropagation()
+      e.preventDefault()
+      onSelect(facility.id)
+      onDragSessionStart?.()
+      const startPortals = ensureCrossoverPortals(facility)
+      crossoverPortalDragRef.current = {
+        key,
+        pointerId: e.pointerId,
+        startPortals,
+      }
+      setCrossoverPortalPreview(startPortals)
+      const portal = startPortals[key]
+      onCrossoverSnapUiChange?.(
+        buildCrossoverSnapUiForPoint(
+          portal.xM,
+          portal.yM,
+          key,
+          crossoverSegmentById,
+          portal.attachedTrackId,
+        ),
+      )
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [
+      areaMeterContext,
+      crossoverSegmentById,
+      facility,
+      onCrossoverSnapUiChange,
+      onDragSessionStart,
+      onPatchParameters,
+      onSelect,
+      readOnly,
+    ],
+  )
+
+  const onCrossoverPortalPointerMove = useCallback(
+    (e: React.PointerEvent<SVGCircleElement>) => {
+      const drag = crossoverPortalDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      if (!areaMeterContext || !crossoverSegmentById || !worldRef.current) return
+      e.stopPropagation()
+      const field = clientPointToFieldMeters(
+        e.clientX,
+        e.clientY,
+        worldRef.current,
+        mapScale,
+        areaMeterContext.domain,
+        areaMeterContext.layout,
+      )
+      const next = dragCrossoverPortal(
+        drag.startPortals,
+        drag.key,
+        field.xM,
+        field.yM,
+        crossoverSegmentById,
+      )
+      drag.startPortals = next
+      setCrossoverPortalPreview(next)
+      const portal = next[drag.key]
+      onCrossoverSnapUiChange?.(
+        buildCrossoverSnapUiForPoint(
+          field.xM,
+          field.yM,
+          drag.key,
+          crossoverSegmentById,
+          portal.attachedTrackId,
+        ),
+      )
+    },
+    [
+      areaMeterContext,
+      crossoverSegmentById,
+      mapScale,
+      onCrossoverSnapUiChange,
+      worldRef,
+    ],
+  )
+
+  const onCrossoverPortalPointerEnd = useCallback(
+    (e: React.PointerEvent<SVGCircleElement>) => {
+      const drag = crossoverPortalDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      e.stopPropagation()
+      crossoverPortalDragRef.current = null
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      onCrossoverSnapUiChange?.(null)
+      setCrossoverPortalPreview((preview) => {
+        if (preview) applyCrossoverPortalsUpdate(preview)
+        return null
+      })
+    },
+    [applyCrossoverPortalsUpdate, onCrossoverSnapUiChange],
+  )
+
   const dockingIconUrl = isDockingPoint ? resolveDockingPointIconUrl(facility) : null
   const facilityDisplay = isFacilityArea
     ? resolveFacilityDisplay(facility, mqttLive)
@@ -337,6 +659,116 @@ export const FacilityNode = memo(function FacilityNode({
   const roadLineColor = isRoadLine
     ? parseRoadLineColor(facility.parameters?.roadLineColor)
     : ''
+  const trackCrossoverColor = isTrackCrossover
+    ? parseTrackCrossoverColor(facility.parameters?.trackCrossoverColor)
+    : ''
+  const trackCrossoverColorOpacity = isTrackCrossover
+    ? parseTrackCrossoverColorOpacity(
+        facility.parameters?.trackCrossoverColorOpacity,
+      )
+    : 100
+  const trackCrossoverStrokePx = isTrackCrossover
+    ? parseTrackCrossoverStrokePx(facility.parameters?.trackCrossoverStrokePx)
+    : 0
+  const trackCrossoverCenterGapPct = isTrackCrossover
+    ? parseTrackCrossoverCenterGapPct(
+        facility.parameters?.trackCrossoverCenterGapPct,
+      )
+    : 0
+  const trackCrossoverBgColor = isTrackCrossover
+    ? parseTrackCrossoverBgColor(facility.parameters?.trackCrossoverBgColor)
+    : null
+  const trackCrossoverBgOpacity = isTrackCrossover
+    ? parseTrackCrossoverBgOpacity(facility.parameters?.trackCrossoverBgOpacity)
+    : 35
+  const crossoverPortals = isTrackCrossover
+    ? (crossoverPortalPreview ?? ensureCrossoverPortals(facility))
+    : null
+  const crossoverPortalsLocal =
+    crossoverPortals && areaMeterContext
+      ? portalsToAreaCssPoints(
+          crossoverPortals,
+          areaMeterContext.layout,
+          (xM, yM) =>
+            meterToAreaLocalPx(
+              xM,
+              yM,
+              areaMeterContext.domain,
+              areaMeterContext.layout,
+            ),
+        )
+      : []
+  const trackCrossoverStrokeDisplay =
+    crossoverStrokePreview ?? trackCrossoverStrokePx
+
+  const onCrossoverWidthPointerDown = useCallback(
+    (e: React.PointerEvent<SVGRectElement>) => {
+      if (readOnly || !onPatchParameters) return
+      e.stopPropagation()
+      e.preventDefault()
+      onSelect(facility.id)
+      onDragSessionStart?.()
+      crossoverWidthDragRef.current = { pointerId: e.pointerId }
+      setCrossoverStrokePreview(trackCrossoverStrokePx)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [
+      facility.id,
+      onDragSessionStart,
+      onPatchParameters,
+      onSelect,
+      readOnly,
+      trackCrossoverStrokePx,
+    ],
+  )
+
+  const onCrossoverWidthPointerMove = useCallback(
+    (e: React.PointerEvent<SVGRectElement>) => {
+      const drag = crossoverWidthDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      if (!worldRef.current) return
+      e.stopPropagation()
+      const css = clientToAreaLocalPx(
+        e.clientX,
+        e.clientY,
+        worldRef.current,
+        mapScale,
+      )
+      if (crossoverPortalsLocal.length === 0) return
+      const raw = strokePxFromWidthHandlePointer(crossoverPortalsLocal, css)
+      if (raw == null) return
+      setCrossoverStrokePreview(clampTrackCrossoverStrokePx(raw))
+    },
+    [crossoverPortalsLocal, mapScale, worldRef],
+  )
+
+  const onCrossoverWidthPointerEnd = useCallback(
+    (e: React.PointerEvent<SVGRectElement>) => {
+      const drag = crossoverWidthDragRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      e.stopPropagation()
+      crossoverWidthDragRef.current = null
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      setCrossoverStrokePreview((preview) => {
+        if (preview != null && onPatchParameters) {
+          onPatchParameters(facility.id, {
+            [TRACK_CROSSOVER_STROKE_PX_KEY]: preview,
+          })
+        }
+        return null
+      })
+    },
+    [facility.id, onPatchParameters],
+  )
+
   const signalDisplay =
     facility.type === 'Signal' ? resolveSignalDisplay(facility, mqttLive) : null
 
@@ -353,16 +785,14 @@ export const FacilityNode = memo(function FacilityNode({
     isFacilityArea ||
     facility.type === 'Track' ||
     isRoadLine ||
+    isTrackCrossover ||
     (nw >= nh * 4 && nh < 60)
   /** 世界座標邊長；外層 scale(sx,sy) 後，圖示約佔卡片可讀比例 */
   const useDraggableMapLabel = facilityUsesDraggableMapLabel(facility)
-  const poleVisual = isPole ? resolvePoleVisualLayout(nw, nh) : null
   const iconWorld =
     isDockingPoint || isWaypoint || (isFacilityArea && isIconOnlyFacilityArea)
       ? Math.max(18, Math.min(nw * 0.88, nh * 0.88))
-      : isPole && poleVisual
-        ? Math.max(10, Math.min(poleVisual.frameW, poleVisual.frameH))
-        : useWideRow
+      : useWideRow
           ? Math.max(18, Math.min(nh * 0.88, nw * 0.42))
           : Math.max(18, Math.min(minDim * 0.76))
   const signalScale = Math.min(nw / 32, nh / 38) * 0.92
@@ -389,9 +819,6 @@ export const FacilityNode = memo(function FacilityNode({
     nh,
     { mapLabelMode: useDraggableMapLabel },
   )
-  const poleRingClass = selected
-    ? 'ring-2 ring-cyan-400/90 ring-offset-0'
-    : 'hover:ring-1 hover:ring-cyan-500/40'
   const canEditLabel =
     !readOnly && showLabel && !!onPatchParameters && useDraggableMapLabel
 
@@ -410,17 +837,19 @@ export const FacilityNode = memo(function FacilityNode({
   )
   const slotSubFontWorld = Math.max(8, Math.min(12, minDim * 0.12))
 
-  const { padX: hitPadX, padY: hitPadY } = meterMode
-    ? areaSizePx
-      ? { padX: 0, padY: 0 }
-      : (() => {
-          const minHitM = facilityHitPadMeters(facility)
-          return {
-            padX: Math.max(0, (minHitM * scaleX - nw) / 2),
-            padY: Math.max(0, (minHitM * scaleY - nh) / 2),
-          }
-        })()
-    : facilityHitPadWorld(facility)
+  const { padX: hitPadX, padY: hitPadY } = isTrackCrossover
+    ? { padX: 0, padY: 0 }
+    : meterMode
+      ? areaSizePx
+        ? { padX: 0, padY: 0 }
+        : (() => {
+            const minHitM = facilityHitPadMeters(facility)
+            return {
+              padX: Math.max(0, (minHitM * scaleX - nw) / 2),
+              padY: Math.max(0, (minHitM * scaleY - nh) / 2),
+            }
+          })()
+      : facilityHitPadWorld(facility)
 
   /** 固定可點尺寸；僅補償地圖縮放，不隨元件大小變化 */
   const toolbarScreenScale = facilityToolbarScreenScale(
@@ -497,10 +926,23 @@ export const FacilityNode = memo(function FacilityNode({
     (isDragging ||
       isResizing ||
       (selected && isRoadLine) ||
-      (selected && showRotNorm !== 0))
+      (selected && showRotNorm !== 0 && !isTrackCrossover))
   const rotAabb = resolveRotatedRectAabb(nw, nh, showRotNorm)
   const aabbBottomCenterLeft = hitPadX + rotAabb.offsetLeft + rotAabb.w / 2
   const aabbBottomPx = hitPadY + rotAabb.offsetTop + rotAabb.h
+  const crossoverMidLocal = (() => {
+    if (!isTrackCrossover || crossoverPortalsLocal.length === 0) return null
+    let sx = 0
+    let sy = 0
+    for (const p of crossoverPortalsLocal) {
+      sx += p.x
+      sy += p.y
+    }
+    return {
+      x: sx / crossoverPortalsLocal.length,
+      y: sy / crossoverPortalsLocal.length,
+    }
+  })()
   const draggingRef = useRef(false)
   const dragHistoryPushedRef = useRef(false)
   const resizingRef = useRef(false)
@@ -523,6 +965,17 @@ export const FacilityNode = memo(function FacilityNode({
   const grabOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartClientRef = useRef({ x: 0, y: 0 })
   const dragStartMeterRef = useRef<{ x: number; y: number } | null>(null)
+  const crossoverDragStartPortalsRef = useRef<CrossoverPortals | null>(null)
+  const crossoverDragStartFieldRef = useRef<{ xM: number; yM: number } | null>(
+    null,
+  )
+  const crossoverSegmentByIdRef = useRef(crossoverSegmentById)
+  crossoverSegmentByIdRef.current = crossoverSegmentById
+  const crossoverPortalDragRef = useRef<{
+    key: CrossoverPortalKey
+    pointerId: number
+    startPortals: CrossoverPortals
+  } | null>(null)
   const grabOffsetLocalRef = useRef({ x: 0, y: 0 })
   const dragActiveRef = useRef(false)
   const DRAG_START_PX = 4
@@ -670,7 +1123,10 @@ export const FacilityNode = memo(function FacilityNode({
       dragHistoryPushedRef.current = false
       setIsDragging(false)
       dragStartMeterRef.current = null
+      crossoverDragStartPortalsRef.current = null
+      crossoverDragStartFieldRef.current = null
       grabOffsetLocalRef.current = { x: 0, y: 0 }
+      onCrossoverSnapUiChange?.(null)
       onAlignGuidesChangeRef.current?.(null)
       releaseMapViewportScroll()
       onFacilityDragActiveChange?.(false)
@@ -683,7 +1139,7 @@ export const FacilityNode = memo(function FacilityNode({
         }
       }
     },
-    [clearDragWindowListeners, onFacilityDragActiveChange, releaseMapViewportScroll],
+    [clearDragWindowListeners, onCrossoverSnapUiChange, onFacilityDragActiveChange, releaseMapViewportScroll],
   )
 
   const applyDragMove = useCallback(
@@ -706,6 +1162,56 @@ export const FacilityNode = memo(function FacilityNode({
 
       const id = facilityRef.current.id
       const meterCtx = areaMeterContextRef.current
+
+      // 虛擬渡線：整組拖移＝平移端點；已接合端點鎖在原軌道
+      if (
+        meterMode
+        && meterCtx
+        && facilityRef.current.type === 'TrackCrossover'
+        && onPatchParameters
+        && crossoverSegmentByIdRef.current
+        && crossoverDragStartPortalsRef.current
+        && crossoverDragStartFieldRef.current
+      ) {
+        const { domain, layout } = meterCtx
+        const field = clientPointToFieldMeters(
+          clientX,
+          clientY,
+          world,
+          mapScaleRef.current,
+          domain,
+          layout,
+        )
+        const dxM = field.xM - crossoverDragStartFieldRef.current.xM
+        const dyM = field.yM - crossoverDragStartFieldRef.current.yM
+        const nextPortals = translateCrossoverPortals(
+          crossoverDragStartPortalsRef.current,
+          dxM,
+          dyM,
+          crossoverSegmentByIdRef.current,
+        )
+        const sync = syncLayoutFromCrossoverPortals(nextPortals, domain, layout)
+        onPatchParameters(id, sync.parametersPatch)
+        onResize?.(id, sync.areaSizePx)
+        onDrag(id, {
+          areaPosition: sync.areaPosition,
+          position: sync.position,
+        })
+        onCrossoverSnapUiChange?.(
+          mergeCrossoverSnapUi(
+            (['a', 'b'] as const).map((key) =>
+              buildCrossoverSnapUiForPoint(
+                nextPortals[key].xM,
+                nextPortals[key].yM,
+                key,
+                crossoverSegmentByIdRef.current!,
+                nextPortals[key].attachedTrackId,
+              ),
+            ),
+          ),
+        )
+        return
+      }
 
       if (meterMode && meterCtx) {
         const { domain, layout } = meterCtx
@@ -806,8 +1312,11 @@ export const FacilityNode = memo(function FacilityNode({
     },
     [
       meterMode,
+      onCrossoverSnapUiChange,
       onDrag,
       onDragSessionStart,
+      onPatchParameters,
+      onResize,
       scaleX,
       scaleY,
       worldRef,
@@ -861,6 +1370,10 @@ export const FacilityNode = memo(function FacilityNode({
       if ((e.target as HTMLElement).closest('[data-track-corner-handle]')) return
       if ((e.target as HTMLElement).closest('[data-facility-label-drag]')) return
       if ((e.target as HTMLElement).closest('[data-facility-label-rotate-handle]'))
+        return
+      if ((e.target as HTMLElement).closest('[data-crossover-portal-handle]'))
+        return
+      if ((e.target as HTMLElement).closest('[data-crossover-width-handle]'))
         return
 
       if (formatPaintSnapshot) {
@@ -916,8 +1429,25 @@ export const FacilityNode = memo(function FacilityNode({
           x: local.x - cssAnchor.left,
           y: local.y - cssAnchor.top,
         }
+        if (f.type === 'TrackCrossover' && crossoverSegmentByIdRef.current) {
+          crossoverDragStartPortalsRef.current = ensureCrossoverPortals(f)
+          const field = clientPointToFieldMeters(
+            e.clientX,
+            e.clientY,
+            world,
+            mapScaleRef.current,
+            areaMeterContext.domain,
+            areaMeterContext.layout,
+          )
+          crossoverDragStartFieldRef.current = field
+        } else {
+          crossoverDragStartPortalsRef.current = null
+          crossoverDragStartFieldRef.current = null
+        }
       } else {
         dragStartMeterRef.current = null
+        crossoverDragStartPortalsRef.current = null
+        crossoverDragStartFieldRef.current = null
         const p = clientToWorldCoords(e.clientX, e.clientY, world, scaleX, scaleY)
         const dp = displayPosRef.current
         grabOffsetRef.current = { x: p.x - dp.x, y: p.y - dp.y }
@@ -1233,7 +1763,11 @@ export const FacilityNode = memo(function FacilityNode({
       data-facility
       data-facility-root
         className={`absolute left-0 top-0 touch-none select-none ${
-          isRoadLine ? 'overflow-visible pointer-events-auto' : ''
+          isTrackCrossover
+            ? 'overflow-visible pointer-events-none'
+            : isRoadLine
+              ? 'overflow-visible pointer-events-auto'
+              : ''
         }`}
       title={
         isFacilityArea && facilityRemarks
@@ -1287,13 +1821,15 @@ export const FacilityNode = memo(function FacilityNode({
           </div>
         )}
       <div
-        className={`absolute overflow-visible ${bodyCursorClass}`}
+        className={`absolute overflow-visible ${bodyCursorClass} ${
+          isTrackCrossover ? 'pointer-events-none' : ''
+        }`}
         style={{
           left: hitPadX,
           top: hitPadY,
           width: nw,
           height: nh,
-          transform: `rotate(${showRot}deg)`,
+          transform: isTrackCrossover ? undefined : `rotate(${showRot}deg)`,
           transformOrigin: 'center center',
           cursor: bodyCursor,
         }}
@@ -1325,12 +1861,12 @@ export const FacilityNode = memo(function FacilityNode({
           }}
           className={[
             'min-h-0 overflow-visible transition',
-            isPsd || isSignal || isDockingPoint || isWaypoint || (isFacilityArea && useDraggableMapLabel)
+            isPsd || isSignal || isDockingPoint || isWaypoint || isPole || (isFacilityArea && useDraggableMapLabel)
               ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
-              : isPole
-                ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
               : isTrack || isRoadLine
                 ? 'flex size-full items-center justify-center border-0 p-0 shadow-none bg-transparent'
+                : isTrackCrossover
+                  ? 'relative size-full border-0 p-0 shadow-none bg-transparent'
                 : isFacilityArea
                   ? 'flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-400/60 p-1 text-zinc-100 shadow-md'
                   : [
@@ -1347,7 +1883,7 @@ export const FacilityNode = memo(function FacilityNode({
                     ? 'ring-2 ring-cyan-400/80 bg-zinc-800/95'
                     : 'bg-zinc-800/90 hover:border-zinc-500',
                 ].join(' ')
-              : isPsd || isSignal || isDockingPoint || isWaypoint || (isFacilityArea && useDraggableMapLabel)
+              : isPsd || isSignal || isDockingPoint || isWaypoint || isPole || (isFacilityArea && useDraggableMapLabel)
                 ? selected
                   ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                   : 'hover:ring-1 hover:ring-cyan-500/40'
@@ -1355,6 +1891,8 @@ export const FacilityNode = memo(function FacilityNode({
                   ? selected
                     ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                     : 'hover:ring-1 hover:ring-cyan-500/35'
+                  : isTrackCrossover
+                    ? ''
                   : isFacilityArea
                     ? selected
                       ? 'ring-2 ring-cyan-400/95 ring-offset-0'
@@ -1369,6 +1907,11 @@ export const FacilityNode = memo(function FacilityNode({
             isTrack && connectivityScanHighlight
               ? 'ring-2 ring-amber-400/75 ring-offset-0 outline outline-2 outline-amber-400/45'
               : '',
+            isTrack && crossoverSnapHighlight
+              ? crossoverSnapPrimary
+                ? 'ring-2 ring-amber-300 ring-offset-0 outline outline-2 outline-amber-400/80 shadow-[0_0_18px_rgba(250,204,21,0.55)]'
+                : 'ring-2 ring-cyan-400/80 ring-offset-0 outline outline-2 outline-cyan-400/50 shadow-[0_0_14px_rgba(56,189,248,0.4)]'
+              : '',
             isTrack && connectivityScanFlashing
               ? 'animate-connectivity-scan-flash-loop'
               : '',
@@ -1376,25 +1919,14 @@ export const FacilityNode = memo(function FacilityNode({
             .filter(Boolean)
             .join(' ')}
         >
-          {!isTrack && isPole && bgUrl && !imageError && poleVisual ? (
-            <div
-              className={`relative shrink-0 overflow-hidden rounded-sm transition ${poleRingClass}`}
-              style={{ width: poleVisual.frameW, height: poleVisual.frameH }}
-            >
-              <img
-                src={bgUrl}
-                alt={label}
-                className="pointer-events-none absolute max-w-none"
-                style={{
-                  width: poleVisual.iconSide,
-                  height: poleVisual.iconSide,
-                  left: poleVisual.imgLeft,
-                  top: poleVisual.imgTop,
-                  opacity: 0.95,
-                }}
-                onError={() => setImageError(true)}
-              />
-            </div>
+          {!isTrack && isPole && bgUrl && !imageError ? (
+            <img
+              src={bgUrl}
+              alt={label}
+              className="pointer-events-none size-full object-contain"
+              style={{ opacity: facility.currentState === 'Error' ? 0.55 : 0.95 }}
+              onError={() => setImageError(true)}
+            />
           ) : isRoadLine && roadLineStyle ? (
             <div className="relative size-full" style={{ isolation: 'isolate' }}>
               <RoadLineGraphic
@@ -1403,6 +1935,32 @@ export const FacilityNode = memo(function FacilityNode({
                 style={roadLineStyle}
                 strokeWidthPx={roadLineWidthPx}
                 color={roadLineColor}
+              />
+            </div>
+          ) : isTrackCrossover ? (
+            <div
+              className="relative size-full overflow-visible pointer-events-none"
+              style={{ isolation: 'isolate' }}
+            >
+              <TrackCrossoverGraphic
+                width={nw}
+                height={nh}
+                portalsLocal={crossoverPortalsLocal}
+                color={trackCrossoverColor}
+                colorOpacity={trackCrossoverColorOpacity}
+                strokeWidthPx={trackCrossoverStrokeDisplay}
+                centerGapPct={trackCrossoverCenterGapPct}
+                bgColor={trackCrossoverBgColor}
+                bgOpacity={trackCrossoverBgOpacity}
+                emphasized={selected}
+                interactive={!readOnly && !!crossoverSegmentById}
+                showWidthHandles={selected && !readOnly}
+                onPortalPointerDown={onCrossoverPortalPointerDown}
+                onPortalPointerMove={onCrossoverPortalPointerMove}
+                onPortalPointerUp={onCrossoverPortalPointerEnd}
+                onWidthPointerDown={onCrossoverWidthPointerDown}
+                onWidthPointerMove={onCrossoverWidthPointerMove}
+                onWidthPointerUp={onCrossoverWidthPointerEnd}
               />
             </div>
           ) : isDockingPoint && dockingIconUrl && !dockingIconError ? (
@@ -1480,22 +2038,9 @@ export const FacilityNode = memo(function FacilityNode({
                 </div>
               }
             />
-          ) : isPole && Icon && poleVisual ? (
-            <div
-              className={`relative shrink-0 overflow-hidden rounded-sm text-cyan-300 transition ${poleRingClass}`}
-              style={{ width: poleVisual.frameW, height: poleVisual.frameH }}
-            >
-              <div
-                className="absolute max-w-none text-cyan-300"
-                style={{
-                  width: poleVisual.iconSide,
-                  height: poleVisual.iconSide,
-                  left: poleVisual.imgLeft,
-                  top: poleVisual.imgTop,
-                }}
-              >
-                <Icon className="size-full" strokeWidth={1.75} />
-              </div>
+          ) : isPole && Icon ? (
+            <div className="flex size-full items-center justify-center text-cyan-300">
+              <Icon className="size-[85%] max-h-full max-w-full" strokeWidth={1.75} />
             </div>
           ) : !isTrack && !isPole && !isSignal && !isDockingPoint && bgUrl && !imageError ? (
             <div
@@ -1572,7 +2117,7 @@ export const FacilityNode = memo(function FacilityNode({
                 <Icon className="size-full" strokeWidth={1.75} />
               </div>
             )
-          ) : !isTrack && !isRoadLine && !isFacilityArea ? (
+          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityArea ? (
             <div
               className="shrink-0 text-cyan-300"
               style={{ width: iconWorld, height: iconWorld }}
@@ -1628,13 +2173,13 @@ export const FacilityNode = memo(function FacilityNode({
             {label}
           </div>
         )}
-        {selected && (
+        {selected && !isTrackCrossover && (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 z-[74] border-2 border-cyan-400/95"
           />
         )}
-        {selected && !readOnly && onResize && (
+        {selected && !readOnly && onResize && !isTrackCrossover && (
           <>
             {([
               ['left', { left: -7, top: 0, width: 14, height: nh }],
@@ -1664,7 +2209,10 @@ export const FacilityNode = memo(function FacilityNode({
                 onPointerCancel={endResize}
               >
                 <div
-                  className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40 opacity-0 transition-opacity group-hover:opacity-100"
+                  className={[
+                    'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40 transition-opacity',
+                    isPole ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                  ].join(' ')}
                   title="拖曳此邊調整大小"
                 />
               </div>
@@ -1759,6 +2307,83 @@ export const FacilityNode = memo(function FacilityNode({
             }
           />
         ) : null}
+        {isFacilityArea && dockingAlong && displayDockingPoint ? (
+          <div
+            data-facility-docking-point
+            className={[
+              'absolute z-[90] touch-none',
+              readOnly || !onPatchParameters
+                ? 'pointer-events-none'
+                : 'cursor-grab active:cursor-grabbing',
+            ].join(' ')}
+            style={{
+              left: dockingAlong.alongX * nw,
+              top: (1 - dockingAlong.alongY) * nh,
+              transform: `translate(-50%, -50%) scale(${
+                dockingPointFocused ? 1.2 : dockingPointHovered ? 1.1 : 1
+              })`,
+              transition: dockingPointFocused ? 'none' : 'transform 120ms ease-out',
+            }}
+            title={
+              readOnly
+                ? `設施停靠點 ${displayDockingPoint.xM.toFixed(2)}, ${displayDockingPoint.yM.toFixed(2)} m`
+                : `拖曳設施停靠點（${displayDockingPoint.xM.toFixed(2)}, ${displayDockingPoint.yM.toFixed(2)} m）`
+            }
+            onPointerEnter={() => {
+              if (!readOnly) setDockingPointHovered(true)
+            }}
+            onPointerLeave={() => setDockingPointHovered(false)}
+            onPointerDown={onFacilityDockingPointerDown}
+            onPointerMove={onFacilityDockingPointerMove}
+            onPointerUp={onFacilityDockingPointerEnd}
+            onPointerCancel={onFacilityDockingPointerEnd}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              onOpenProperties?.()
+            }}
+          >
+            {/* 加大可點熱區，視覺圓點維持 75% 大小 */}
+            <div
+              className="relative flex items-center justify-center"
+              style={{
+                width: Math.max(22, Math.min(Math.min(nw, nh) * 0.28, 32)),
+                height: Math.max(22, Math.min(Math.min(nw, nh) * 0.28, 32)),
+              }}
+            >
+              {dockingPointFocused || dockingPointHovered ? (
+                <span
+                  className={[
+                    'pointer-events-none absolute inset-0 rounded-full',
+                    dockingPointFocused
+                      ? 'bg-cyan-400/25 ring-2 ring-cyan-300/90'
+                      : 'bg-emerald-400/15 ring-1 ring-emerald-200/70',
+                  ].join(' ')}
+                  aria-hidden
+                />
+              ) : null}
+              <div
+                className={[
+                  'rounded-full shadow-md ring-2 transition-colors',
+                  dockingPointFocused
+                    ? 'bg-emerald-300 ring-cyan-200 shadow-cyan-400/40'
+                    : dockingPointHovered
+                      ? 'bg-emerald-400 ring-emerald-100'
+                      : 'bg-emerald-500 ring-emerald-300/70',
+                ].join(' ')}
+                style={{
+                  width: Math.max(7.5, Math.min(Math.min(nw, nh) * 0.135, 13.5)),
+                  height: Math.max(7.5, Math.min(Math.min(nw, nh) * 0.135, 13.5)),
+                }}
+                aria-hidden
+              />
+            </div>
+            {dockingPointFocused && displayDockingPoint ? (
+              <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-cyan-500/40 bg-zinc-950/95 px-1.5 py-0.5 font-mono text-[9px] text-cyan-100 shadow-lg">
+                {displayDockingPoint.xM.toFixed(2)}, {displayDockingPoint.yM.toFixed(2)} m
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {showTransformSizeOverlay && (
@@ -1770,7 +2395,7 @@ export const FacilityNode = memo(function FacilityNode({
           anchorLeft={aabbBottomCenterLeft}
           anchorTop={aabbBottomPx + 6}
           showSize
-          usePx={isRoadLine}
+          usePx={isRoadLine || isTrackCrossover}
         />
       )}
 
@@ -1779,11 +2404,14 @@ export const FacilityNode = memo(function FacilityNode({
           data-facility-toolbar
           className="pointer-events-none absolute z-[5020] flex flex-col items-center gap-1 pt-1"
           style={{
-            left: aabbBottomCenterLeft,
-            top:
-              aabbBottomPx +
-              (showTransformSizeOverlay ? 26 : 6) +
-              (useDraggableMapLabel ? 28 : 0),
+            left: crossoverMidLocal
+              ? hitPadX + crossoverMidLocal.x
+              : aabbBottomCenterLeft,
+            top: crossoverMidLocal
+              ? hitPadY + crossoverMidLocal.y + 14
+              : aabbBottomPx +
+                (showTransformSizeOverlay ? 26 : 6) +
+                (useDraggableMapLabel ? 28 : 0),
             transform: `translateX(-50%) scale(${toolbarScreenScale})`,
             transformOrigin: 'top center',
           }}
@@ -1791,36 +2419,40 @@ export const FacilityNode = memo(function FacilityNode({
           <div
             className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
             role="toolbar"
-            aria-label="旋轉"
+            aria-label={isTrackCrossover ? '線徑操作' : '旋轉'}
           >
-            <button
-              type="button"
-              title="逆時針微調 1°"
-              onClick={() => onRotateDelta(facility.id, -1)}
-              className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-            >
-              <RotateCcw className="size-4" aria-hidden />
-            </button>
-            <span className="mx-0.5 min-w-[2rem] text-center font-mono text-xs leading-none text-cyan-400/90">
-              {angleLabel}
-            </span>
-            <button
-              type="button"
-              title="順時針微調 1°"
-              onClick={() => onRotateDelta(facility.id, 1)}
-              className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-            >
-              <RotateCw className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              title="順時針轉 90°"
-              onClick={() => onRotateRight90(facility.id)}
-              className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-            >
-              <RotateCwSquare className="size-4" aria-hidden />
-            </button>
-            {onStartFormatPaint && (
+            {!isTrackCrossover ? (
+              <>
+                <button
+                  type="button"
+                  title="逆時針微調 1°"
+                  onClick={() => onRotateDelta(facility.id, -1)}
+                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                >
+                  <RotateCcw className="size-4" aria-hidden />
+                </button>
+                <span className="mx-0.5 min-w-[2rem] text-center font-mono text-xs leading-none text-cyan-400/90">
+                  {angleLabel}
+                </span>
+                <button
+                  type="button"
+                  title="順時針微調 1°"
+                  onClick={() => onRotateDelta(facility.id, 1)}
+                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                >
+                  <RotateCw className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  title="順時針轉 90°"
+                  onClick={() => onRotateRight90(facility.id)}
+                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                >
+                  <RotateCwSquare className="size-4" aria-hidden />
+                </button>
+              </>
+            ) : null}
+            {!isTrackCrossover && onStartFormatPaint && (
               <button
                 type="button"
                 title="複製格式（大小、角度、填色、框線有無與線型、字級；僅可貼到相同元件）"

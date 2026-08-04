@@ -1,4 +1,4 @@
-import { Building2, ChevronLeft, GitBranch, LayoutGrid, MapPin, Radio, Zap } from 'lucide-react'
+import { Building2, ChevronLeft, DoorOpen, GitBranch, LayoutGrid, MapPin, Network, Radio, Zap } from 'lucide-react'
 import { useMemo } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
@@ -10,6 +10,7 @@ import type { RouteGroupDraft } from './RouteGroupEditorView'
 import {
   collectDockingPointEntries,
   collectEquipmentEntries,
+  collectFacilityDockingPointEntries,
   collectFacilityEntries,
   type FacilityListEntry,
 } from '../utils/facilityListEntries'
@@ -216,11 +217,15 @@ export function MapListDrawer({
     () => collectDockingPointEntries(areas),
     [areas],
   )
+  const facilityDockingEntries = useMemo(
+    () => collectFacilityDockingPointEntries(areas),
+    [areas],
+  )
   const facilityEntries = useMemo(
     () => collectFacilityEntries(areas),
     [areas],
   )
-  const { signals: signalEntries, poles: poleEntries } = useMemo(
+  const { signals: signalEntries, poles: poleEntries, psds: psdEntries } = useMemo(
     () => collectEquipmentEntries(areas),
     [areas],
   )
@@ -300,19 +305,35 @@ export function MapListDrawer({
             <span style={{ writingMode: 'vertical-rl' }}>路線清單</span>
           </button>
 
-          {mapEditMode && onPickPaletteItem && !paletteOpen ? (
-            <button
-              type="button"
-              title="元件庫"
-              onClick={() => onOpenTab('palette')}
-              className={[
-                'pointer-events-auto mt-auto flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
-                TAB_BUTTON_CLASS.palette.idle,
-              ].join(' ')}
-            >
-              <LayoutGrid className="size-4 shrink-0" />
-              <span style={{ writingMode: 'vertical-rl' }}>元件庫</span>
-            </button>
+          {onOpenPointTopology || (mapEditMode && onPickPaletteItem && !paletteOpen) ? (
+            <div className="pointer-events-auto mt-auto flex flex-col">
+              {onOpenPointTopology ? (
+                <button
+                  type="button"
+                  title="路網拓撲"
+                  onClick={onOpenPointTopology}
+                  className="flex w-11 flex-col items-center justify-center gap-1 border border-l-0 border-cyan-700/60 bg-cyan-950/80 py-3 text-[10px] font-medium text-cyan-100 shadow-lg backdrop-blur-sm transition hover:bg-cyan-900/90"
+                >
+                  <Network className="size-4 shrink-0" />
+                  <span style={{ writingMode: 'vertical-rl' }}>路網拓撲</span>
+                </button>
+              ) : null}
+              {mapEditMode && onPickPaletteItem && !paletteOpen ? (
+                <button
+                  type="button"
+                  title="元件庫"
+                  onClick={() => onOpenTab('palette')}
+                  className={[
+                    'flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
+                    onOpenPointTopology ? 'mt-2' : '',
+                    TAB_BUTTON_CLASS.palette.idle,
+                  ].join(' ')}
+                >
+                  <LayoutGrid className="size-4 shrink-0" />
+                  <span style={{ writingMode: 'vertical-rl' }}>元件庫</span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -364,41 +385,62 @@ export function MapListDrawer({
                   onAppendStation={onAppendRouteStation}
                 />
               ) : openTab === 'docking' ? (
+                <div className="space-y-4">
+                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                    正線停靠點來自元件庫；設施停靠點在大型設施屬性中設定，綠色圓點標示於設施內。
+                  </p>
+                  <section>
+                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400/90">
+                      <MapPin className="size-3.5" />
+                      停靠點
+                    </h4>
+                    <SectionBlock
+                      title="停靠點"
+                      entries={dockingEntries}
+                      selectedAreaId={selectedAreaId}
+                      selectedFacilityId={selectedFacilityId}
+                      onSelectEntry={onSelectEntry}
+                      onEntryDoubleClick={onEntryDoubleClick}
+                    />
+                  </section>
+                  <section>
+                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                      <MapPin className="size-3.5" />
+                      設施停靠點
+                    </h4>
+                    <SectionBlock
+                      title="設施停靠點"
+                      entries={facilityDockingEntries}
+                      selectedAreaId={selectedAreaId}
+                      selectedFacilityId={selectedFacilityId}
+                      onSelectEntry={onSelectEntry}
+                      onEntryDoubleClick={onEntryDoubleClick}
+                    />
+                  </section>
+                </div>
+              ) : openTab === 'facility' ? (
                 <div className="space-y-3">
-                  {onOpenPointTopology ? (
-                    <button
-                      type="button"
-                      onClick={onOpenPointTopology}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-600/70 bg-cyan-950/50 px-3 py-2 text-[11px] font-medium text-cyan-100 transition hover:bg-cyan-900/70"
-                    >
-                      <GitBranch className="size-3.5 shrink-0" />
-                      編輯點位拓撲
-                    </button>
-                  ) : null}
+                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                    大型區塊：充電格、停車格、維修格等（type = Facility，用途於屬性填寫）。
+                  </p>
                   <SectionBlock
-                    title="停靠點"
-                    entries={dockingEntries}
+                    title="設施"
+                    entries={facilityEntries}
                     selectedAreaId={selectedAreaId}
                     selectedFacilityId={selectedFacilityId}
                     onSelectEntry={onSelectEntry}
                     onEntryDoubleClick={onEntryDoubleClick}
                   />
                 </div>
-              ) : openTab === 'facility' ? (
-                <SectionBlock
-                  title="設施"
-                  entries={facilityEntries}
-                  selectedAreaId={selectedAreaId}
-                  selectedFacilityId={selectedFacilityId}
-                  onSelectEntry={onSelectEntry}
-                  onEntryDoubleClick={onEntryDoubleClick}
-                />
               ) : (
                 <div className="space-y-4">
+                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                    設備：紅綠燈、智慧桿、月台門（請由元件庫拖入對應類型，勿用「設施」填用途代替）。
+                  </p>
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400/90">
                       <Radio className="size-3.5" />
-                      紅綠燈（Signal）
+                      紅綠燈
                     </h4>
                     <SectionBlock
                       title="紅綠燈"
@@ -417,6 +459,20 @@ export function MapListDrawer({
                     <SectionBlock
                       title="智慧桿"
                       entries={poleEntries}
+                      selectedAreaId={selectedAreaId}
+                      selectedFacilityId={selectedFacilityId}
+                      onSelectEntry={onSelectEntry}
+                      onEntryDoubleClick={onEntryDoubleClick}
+                    />
+                  </section>
+                  <section>
+                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+                      <DoorOpen className="size-3.5" />
+                      月台門
+                    </h4>
+                    <SectionBlock
+                      title="月台門"
+                      entries={psdEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
                       onSelectEntry={onSelectEntry}

@@ -4,7 +4,7 @@
   "displayName": "軌道合併加道路線",
   "version": "v0.1.10",
   "createdAt": "2026-06-03T14:04:56.970Z",
-  "updatedAt": "2026-06-28T08:15:06.157Z",
+  "updatedAt": "2026-07-29T02:47:50.879Z",
   "pixelSize": {
     "width": 3152,
     "height": 642
@@ -582,8 +582,8 @@
         },
         {
           "id": "024",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R02",
           "positionMeters": {
             "x": 681.98430412657,
@@ -598,8 +598,8 @@
             "hPx": 200.21171975884275
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -613,19 +613,14 @@
                 "y": -3.2421875
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
         {
           "id": "025",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R01",
           "positionMeters": {
             "x": 876.4330586643421,
@@ -640,8 +635,8 @@
             "hPx": 200.21171975884275
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -655,12 +650,7 @@
                 "y": -3.47265625
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
@@ -698,10 +688,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 270.0738774466745
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
           },
           "currentState": "Idle"
         },
@@ -739,10 +729,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 269.899439774945
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
           },
           "currentState": "Idle"
         },
@@ -1065,7 +1055,6 @@
             "iconMode": "builtin",
             "refFieldXM": 810,
             "refFieldYM": 105.25,
-            "dockingLeg": "up",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
@@ -1102,7 +1091,6 @@
             "iconMode": "builtin",
             "refFieldXM": 840,
             "refFieldYM": 101.75,
-            "dockingLeg": "down",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
@@ -2132,8 +2120,8 @@
         },
         {
           "id": "051",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R05",
           "positionMeters": {
             "x": 204.54283038503726,
@@ -2148,8 +2136,8 @@
             "hPx": 125.06897392160681
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -2163,19 +2151,14 @@
                 "y": -3.04296875
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
         {
           "id": "052",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R04",
           "positionMeters": {
             "x": 379.5710685105394,
@@ -2190,8 +2173,8 @@
             "hPx": 125.06897392160681
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -2205,19 +2188,14 @@
                 "y": -3.2421875
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
         {
           "id": "053",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R03",
           "positionMeters": {
             "x": 543.966244575967,
@@ -2232,8 +2210,8 @@
             "hPx": 125.06897392160681
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -2247,12 +2225,7 @@
                 "y": -3.7890625
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
@@ -2847,7 +2820,6 @@
             "iconMode": "builtin",
             "refFieldXM": 101.75,
             "refFieldYM": 170,
-            "dockingLeg": "down",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
@@ -2884,7 +2856,6 @@
             "iconMode": "builtin",
             "refFieldXM": 105,
             "refFieldYM": 230,
-            "dockingLeg": "up",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16,
@@ -4516,8 +4487,8 @@
         },
         {
           "id": "146",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R06",
           "positionMeters": {
             "x": 283.9213762254502,
@@ -4532,8 +4503,8 @@
             "hPx": 102.62807244969045
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -4548,19 +4519,14 @@
               },
               "labelOffsetCustom": true
             },
-            "mqttInstanceId": "146",
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            "mqttInstanceId": "146"
           },
           "currentState": "Normal"
         },
         {
           "id": "147",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R07",
           "positionMeters": {
             "x": 434.5316731551108,
@@ -4575,8 +4541,8 @@
             "hPx": 102.62807244969045
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -4591,19 +4557,14 @@
               },
               "labelOffsetCustom": true
             },
-            "mqttInstanceId": "147",
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            "mqttInstanceId": "147"
           },
           "currentState": "Normal"
         },
         {
           "id": "148",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R08",
           "positionMeters": {
             "x": 592.3274783971106,
@@ -4618,8 +4579,8 @@
             "hPx": 102.62807244969045
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -4634,12 +4595,7 @@
               },
               "labelOffsetCustom": true
             },
-            "mqttInstanceId": "148",
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            "mqttInstanceId": "148"
           },
           "currentState": "Normal"
         },
@@ -5303,10 +5259,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 270.1432180337472
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1000,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
           },
           "currentState": "Idle"
         },
@@ -5344,10 +5300,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 269.7144797054448
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1000,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
           },
           "currentState": "Idle"
         },
@@ -5393,8 +5349,8 @@
         },
         {
           "id": "123",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R09",
           "positionMeters": {
             "x": 741.1914999771169,
@@ -5409,8 +5365,8 @@
             "hPx": 271.5125061587833
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -5424,19 +5380,14 @@
                 "y": -3.2421875
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
         {
           "id": "124",
-          "type": "Facility",
-          "name": "FacilityArea",
+          "type": "Pole",
+          "name": "SmartPole",
           "customName": "R10",
           "positionMeters": {
             "x": 842.4833020307026,
@@ -5451,8 +5402,8 @@
             "hPx": 271.5125061587833
           },
           "areaSizePx": {
-            "w": 102.74243159055794,
-            "h": 61.62920964770104
+            "w": 30,
+            "h": 105
           },
           "rotationDeg": 0,
           "parameters": {
@@ -5466,12 +5417,7 @@
                 "y": -3.7734375
               },
               "labelOffsetCustom": true
-            },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0,
-            "purpose": "智慧桿"
+            }
           },
           "currentState": "Normal"
         },
@@ -5715,7 +5661,6 @@
             "iconMode": "builtin",
             "refFieldXM": 810,
             "refFieldYM": 305.25,
-            "dockingLeg": "up",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
@@ -5752,7 +5697,6 @@
             "iconMode": "builtin",
             "refFieldXM": 840,
             "refFieldYM": 301.75,
-            "dockingLeg": "down",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16

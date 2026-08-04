@@ -181,6 +181,9 @@ import {
 } from './utils/facilityFormatPainter'
 import { defaultRefFieldParametersForType } from './utils/facilityRefFieldBinding'
 import { defaultRoadLineParameters } from './utils/roadLineFacility'
+import {
+  defaultTrackCrossoverParameters,
+} from './utils/trackCrossoverFacility'
 import type { MapWorldBounds } from './utils/mapViewport'
 
 type LoadedMapMeta = EditSessionSnapshot['loadedMapMeta']
@@ -336,7 +339,7 @@ export default function MapEditorApp({
     emptyPointTopology(),
   )
   const [pointTopologyEditorOpen, setPointTopologyEditorOpen] = useState(false)
-  /** 停靠點／途經點增刪或標籤關鍵欄變更時，自動同步拓撲節點 */
+  /** 已載入路網的點位／設施被刪除或改名時，對帳刷新標籤並移除失效節點 */
   const topologyFacilityFingerprint = useMemo(
     () => buildTopologyFacilityFingerprint(areas),
     [areas],
@@ -424,6 +427,7 @@ export default function MapEditorApp({
   const mapPixelOriginRef = useRef(mapPixelOrigin)
   const mapExtentMetersRef = useRef(mapExtentMeters)
   const mapEditorModeRef = useRef(mapEditorMode)
+  const pointTopologyEditorOpenRef = useRef(pointTopologyEditorOpen)
   const workspaceRef = useRef(workspace)
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoveredFacilityRef = useRef<{
@@ -436,6 +440,7 @@ export default function MapEditorApp({
   mapPixelOriginRef.current = mapPixelOrigin
   mapExtentMetersRef.current = mapExtentMeters
   mapEditorModeRef.current = mapEditorMode
+  pointTopologyEditorOpenRef.current = pointTopologyEditorOpen
   workspaceRef.current = workspace
 
   useEffect(() => {
@@ -1939,7 +1944,6 @@ export default function MapEditorApp({
           currentState: getDefaultStateForType('DockingPoint'),
           parameters: {
             stationId,
-            stationName: '',
             purpose: '',
             ...defaultRefFieldParametersForType('DockingPoint'),
             labelStyle: { visible: false },
@@ -1976,6 +1980,24 @@ export default function MapEditorApp({
           currentState: getDefaultStateForType('RoadLine'),
           parameters: {
             ...defaultRoadLineParameters(),
+          },
+        }
+      }
+      if (item.type === 'TrackCrossover') {
+        return {
+          id,
+          type: 'TrackCrossover',
+          name: 'TrackCrossover',
+          customName: '',
+          areaPosition,
+          position: positionMeters,
+          rotation: 0,
+          currentState: getDefaultStateForType('TrackCrossover'),
+          parameters: {
+            ...defaultTrackCrossoverParameters(
+              positionMeters.x,
+              positionMeters.y,
+            ),
           },
         }
       }
@@ -2149,7 +2171,15 @@ export default function MapEditorApp({
             },
             areasRef.current ?? [],
           )
-        : newFacility
+        : newFacility.type === 'DockingPoint'
+          ? {
+              ...newFacility,
+              parameters: {
+                ...(newFacility.parameters ?? {}),
+                stationId: generateNextStationId(areasRef.current ?? []),
+              },
+            }
+          : newFacility
     mapAreaFacilities(areaId, (facilities) => [...facilities, pastedFacility])
     updateSelection(areaId, [id])
     setNextNumericId((n) => n + 1)
@@ -2449,14 +2479,22 @@ export default function MapEditorApp({
       if (areaId === null) {
         clearSelection()
         setAllAreasSelected(false)
+        setListDrawerTab(null)
+        setInspectorCollapsed(true)
         return
       }
       setAllAreasSelected(false)
       updateSelection(areaId, [])
       setGeofenceSelectedLabelId(null)
     },
-    [clearSelection, updateSelection, mapEditorMode],
+    [clearSelection, updateSelection],
   )
+
+  /** 點畫布／Area 空白：收合左側清單與右側屬性抽屜 */
+  const onEmptyMapPointerDown = useCallback(() => {
+    setListDrawerTab(null)
+    setInspectorCollapsed(true)
+  }, [])
 
   const onToggleCropMode = useCallback(() => {
     if (mapEditorMode !== 'edit') return
@@ -2794,6 +2832,9 @@ export default function MapEditorApp({
         }
         return
       }
+
+      // 路網拓撲對話框開啟時，快捷鍵由對話框自行處理（避免 Cmd+Z 一次還原整張地圖）
+      if (pointTopologyEditorOpenRef.current) return
 
       const mod = e.metaKey || e.ctrlKey
       if (mod && e.key.toLowerCase() === 'a') {
@@ -3134,6 +3175,7 @@ export default function MapEditorApp({
                 onSelectFacility={onSelectFacility}
                 onSelectFacilities={onSelectFacilities}
                 onSelectGeofenceLabel={onSelectGeofenceLabel}
+                onEmptyMapPointerDown={onEmptyMapPointerDown}
                 onDragFacility={onDragFacility}
                 onDragSessionStart={onDragSessionStart}
                 onResizeFacility={
@@ -3226,6 +3268,7 @@ export default function MapEditorApp({
                   routeOverlayPreview || routeOverlaySaved.length > 0 ? (
                     <RoutePlanningOverlay
                       areas={areas}
+                      pointTopology={pointTopology}
                       activePreview={routeOverlayPreview}
                       savedRoutes={routeOverlaySaved}
                     />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
 import DashboardEditor from '../dashboard';
 import MapEditorApp from '../map-editor';
 import ShiftRecordsApp from '../shift-records';
@@ -52,7 +53,9 @@ export default function ScheduleManagementApp({
             className="absolute inset-0 flex min-h-0 flex-col bg-[#0a0a0b]"
             style={{ display: view === 'map' ? 'flex' : 'none' }}
           >
-            <MapEditorApp workspace="map" />
+            <ViewErrorBoundary title="場域管理載入失敗">
+              <MapEditorApp workspace="map" />
+            </ViewErrorBoundary>
           </div>
         ) : null}
 
@@ -61,7 +64,9 @@ export default function ScheduleManagementApp({
             className="absolute inset-0 flex min-h-0 flex-col bg-[#0a0a0b]"
             style={{ display: view === 'trajectory' ? 'flex' : 'none' }}
           >
-            <MapEditorApp workspace="trajectory" />
+            <ViewErrorBoundary title="載具軌跡圖台載入失敗">
+              <MapEditorApp workspace="trajectory" />
+            </ViewErrorBoundary>
           </div>
         ) : null}
       </main>

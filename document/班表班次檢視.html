@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>班次 · 時間列</title>
+  <style>
+    :root {
+      --bg: #121516;
+      --panel: #1b2124;
+      --border: #31403a;
+      --text: #e8eeeb;
+      --muted: #9aaaa3;
+      --accent: #42b983;
+      --danger: #e07070;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 90% 0%, rgba(66, 185, 131, 0.12), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px; }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    .lead { margin: 0 0 18px; color: var(--muted); }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+    label {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 0.78rem; color: var(--muted); min-width: 120px;
+    }
+    input {
+      background: #101416; border: 1px solid #3a4843; border-radius: 8px;
+      color: var(--text); padding: 8px 10px; font: inherit; min-width: 140px;
+    }
+    button {
+      appearance: none; border: 0; border-radius: 999px; background: var(--accent);
+      color: #062516; font-weight: 700; padding: 10px 18px; cursor: pointer; font: inherit;
+    }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    button.secondary {
+      background: transparent; color: var(--accent); border: 1px solid var(--accent);
+    }
+    .page-nav { margin-bottom: 14px; }
+    .status { margin-top: 10px; font-size: 0.86rem; color: var(--muted); }
+    .status.err { color: var(--danger); }
+    .status.ok { color: #6be0ad; }
+    .meta {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px; margin-top: 8px; font-size: 0.85rem;
+    }
+    .meta span { color: var(--muted); }
+
+    .tabs-shell {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #171c1e;
+    }
+    .tab-list {
+      display: flex; flex-wrap: wrap; gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: #12181a; padding: 0 6px; overflow-x: auto;
+    }
+    .tab-btn {
+      appearance: none; border: 0; border-radius: 0; background: transparent;
+      color: var(--muted); font: inherit; font-weight: 600; font-size: 0.88rem;
+      padding: 12px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #cfe8dc; }
+    .tab-btn[aria-selected="true"] {
+      color: #9ceed0; border-bottom-color: var(--accent);
+      background: rgba(66, 185, 131, 0.08);
+    }
+    .tab-btn .count {
+      display: inline-block; margin-left: 6px; min-width: 1.4em; padding: 0 6px;
+      border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+      color: #062516; background: #3d7a5f;
+    }
+    .tab-btn[aria-selected="true"] .count { background: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .row-head {
+      padding: 16px 18px 12px;
+      background: linear-gradient(135deg, rgba(66,185,131,0.16), rgba(66,185,131,0.04));
+      border-bottom: 1px solid var(--border);
+    }
+    .row-title { margin: 0; font-size: 1.2rem; font-weight: 800; color: #9ceed0; }
+    .row-sub {
+      margin: 4px 0 0; color: var(--muted); font-size: 0.82rem;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+
+    .trip { border-bottom: 1px solid var(--border); }
+    .trip:last-child { border-bottom: 0; }
+    .trip-head {
+      padding: 12px 16px;
+      background: #141a1c;
+      border-bottom: 1px solid #24302c;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px 16px;
+      align-items: start;
+    }
+    .trip-head-actions {
+      display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+    }
+    .field-list {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+    .field-list th,
+    .field-list td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #24302c;
+      text-align: left;
+      vertical-align: top;
+    }
+    .field-list tr:last-child th,
+    .field-list tr:last-child td { border-bottom: 0; }
+    .field-list th {
+      width: 9.5em;
+      color: var(--muted);
+      font-weight: 600;
+      background: transparent;
+      white-space: nowrap;
+    }
+    .field-list td {
+      color: var(--text);
+      font-family: ui-monospace, Menlo, monospace;
+      word-break: break-word;
+    }
+    .field-list td.null { color: #667772; }
+    .station-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px 16px;
+      background: #12181a;
+    }
+    .station-card {
+      border: 1px solid #2a3531;
+      border-radius: 10px;
+      background: #141a1c;
+      overflow: hidden;
+    }
+    .station-card-head {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #24302c;
+      background: #101616;
+    }
+    .station-card-title {
+      margin: 0; font-size: 0.92rem; font-weight: 700; color: #9ceed0;
+    }
+    .trip-code { font-size: 1.05rem; font-weight: 800; color: #9ceed0; margin: 0; }
+    .trip-meta { color: var(--muted); font-size: 0.82rem; }
+    .trip-toggle {
+      appearance: none; border: 1px solid #3c5248; border-radius: 999px;
+      background: #15201c; color: #9fd9bc; font: inherit; font-size: 0.75rem;
+      font-weight: 700; padding: 5px 12px; cursor: pointer; min-width: 4.5em;
+    }
+    .trip-toggle[aria-expanded="true"] {
+      background: rgba(66,185,131,0.18); border-color: var(--accent); color: #9ceed0;
+    }
+    .trip-body[hidden] { display: none; }
+    .trip-json-wrap { background: #101416; border-bottom: 1px solid #24302c; }
+    .trip-json-wrap[hidden] { display: none; }
+    .fold-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      margin-top: 10px;
+    }
+    .row-head-actions {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      margin-top: 10px;
+    }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #2a3330; text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: #14191b; font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    .tag {
+      display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+      border: 1px solid #3c5248; color: #9fd9bc;
+    }
+    .detail-btn {
+      appearance: none; border: 1px solid #3c5248; border-radius: 999px;
+      background: #15201c; color: #9fd9bc; font: inherit; font-size: 0.72rem;
+      font-weight: 700; padding: 4px 10px; cursor: pointer;
+    }
+    .detail-btn[aria-expanded="true"] {
+      background: rgba(66,185,131,0.18); border-color: var(--accent); color: #9ceed0;
+    }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    tr.detail-row td { padding: 0; background: #101416; }
+    tr.detail-row[hidden],
+    .detail-row[hidden] { display: none; }
+    .station-card > .detail-row { border-top: 1px solid #24302c; background: #101416; }
+    .detail-box { padding: 14px 16px 16px; }
+    .detail-title {
+      margin: 0 0 10px; font-size: 0.78rem; color: var(--muted); font-weight: 700;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .kv {
+      border: 1px solid #2a3531;
+      border-radius: 10px;
+      background: #141a1c;
+      padding: 8px 10px;
+      min-height: 52px;
+    }
+    .kv .k {
+      display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 2px;
+    }
+    .kv .v {
+      display: block; font-size: 0.88rem; word-break: break-word;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    .kv .v.null { color: #667772; }
+    pre.schema-json {
+      margin: 0; padding: 12px 14px; overflow-x: auto; max-height: 360px;
+      background: #0c1012; border-radius: 10px; border: 1px solid #24302c;
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem;
+      line-height: 1.45; color: #c9e6d8; white-space: pre;
+    }
+    details.raw {
+      margin-top: 12px;
+      border-top: 1px solid #24302c;
+      padding-top: 10px;
+    }
+    details.raw summary {
+      cursor: pointer; color: #9fd9bc; font-size: 0.78rem; font-weight: 700;
+      list-style: none;
+    }
+    details.raw summary::-webkit-details-marker { display: none; }
+    details.raw pre {
+      margin: 10px 0 0; padding: 10px 12px; overflow-x: auto; max-height: 220px;
+      background: #0c1012; border-radius: 8px;
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.74rem; color: #c9e6d8;
+      white-space: pre;
+    }
+    .empty { color: var(--muted); padding: 20px; text-align: center; }
+    pre.data-json, pre.schema-json {
+      margin: 0; padding: 12px 14px; overflow-x: auto; max-height: 420px;
+      background: #0c1012; border-radius: 10px; border: 1px solid #24302c;
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem;
+      line-height: 1.45; color: #c9e6d8; white-space: pre;
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.62);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; z-index: 40;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal {
+      width: min(920px, 100%); max-height: min(86vh, 900px); overflow: auto;
+      background: #151b1d; border: 1px solid var(--border); border-radius: 14px;
+    }
+    .modal-head {
+      position: sticky; top: 0; z-index: 1;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      justify-content: space-between; padding: 14px 16px;
+      background: #12181a; border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 { margin: 0; font-size: 1.05rem; color: #9ceed0; }
+    .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .modal-body { padding: 14px 16px 18px; }
+    .modal-body .hint { margin: 0 0 10px; color: var(--muted); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-nav">
+      <button id="btnBack" class="secondary" type="button">← 上一頁</button>
+    </div>
+    <h1>班次 · 時間列</h1>
+    <p class="lead">頁籤為時間列。班次以欄位清單呈現，預設收合；展開後站序也是欄位清單，再按「JSON」看完整欄位／原始 JSON。</p>
+
+    <div class="panel">
+      <div class="row">
+        <label>from<input id="from" value="00:00:00" /></label>
+        <label>to<input id="to" value="24:00:00" /></label>
+        <button id="btnLoad" type="button">載入班次</button>
+        <button id="btnSchema" class="secondary" type="button">欄位 Schema</button>
+      </div>
+      <div class="fold-bar">
+        <button id="btnExpandAll" class="secondary" type="button">全部展開</button>
+        <button id="btnCollapseAll" class="secondary" type="button">全部收合</button>
+      </div>
+      <div class="status" id="status">尚未請求。</div>
+      <div class="meta" id="meta" hidden></div>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <div class="modal-backdrop" id="schemaModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="schemaTitle">
+      <div class="modal-head">
+        <h2 id="schemaTitle">欄位 Schema（說明）</h2>
+        <div class="modal-actions">
+          <button id="btnCloseSchema" type="button">關閉</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="hint">這裡只解釋欄位名稱與型別，不是某一筆班次的實際值。</p>
+        <pre class="schema-json" id="schemaPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://127.0.0.1:3000';
+    const $ = (id) => document.getElementById(id);
+
+    const TRIP_FIELDS = [
+      ['trip_code', '班次代號'],
+      ['block_id', 'block_id'],
+      ['timeline_row', '時間列'],
+      ['task_type', '任務類型'],
+      ['source', '來源'],
+      ['route_id', '路線 ID'],
+      ['route_code', '路線代號'],
+      ['route_name', '路線名稱'],
+      ['card_start', '卡開始'],
+      ['card_end', '卡結束'],
+      ['card_start_second', '卡開始（秒）'],
+      ['card_end_second', '卡結束（秒）'],
+    ];
+
+    const STATION_FIELDS = [
+      ['order', '序'],
+      ['station_id', '站點 ID'],
+      ['station_name', '站點名稱'],
+      ['role', '角色'],
+      ['arrival', '抵達'],
+      ['departure', '出發'],
+      ['dwell_complete', '靠站完成'],
+      ['base_dwell_seconds', '靠站（秒）'],
+      ['dwell_seconds', '有效停靠（秒）'],
+      ['travel_to_next_seconds', '行駛至下站（秒）'],
+    ];
+
+    const TRIPS_JSON_SCHEMA = {
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      $id: 'https://syncdrive.local/schemas/timetable-trips-response.json',
+      title: 'TimetableTripsResponse',
+      description: 'GET /syncdrive-api/operation-shift/timetable/trips 回應',
+      type: 'object',
+      required: ['meta', 'filter', 'trip_count', 'trips'],
+      additionalProperties: false,
+      properties: {
+        meta: {
+          type: 'object',
+          required: ['shift_id', 'name', 'publish_status', 'source', 'updated_at'],
+          additionalProperties: false,
+          properties: {
+            shift_id: { type: 'string', description: '班表 ID' },
+            name: { type: 'string', description: '班表名稱' },
+            publish_status: { type: 'string', description: '發布狀態' },
+            source: {
+              type: 'string',
+              enum: ['published', 'draft_fallback'],
+              description: '資料來源：已發布或草稿 fallback',
+            },
+            generated_at: { type: ['string', 'null'], description: '產生時間 ISO；可能 null' },
+            updated_at: { type: 'string', description: '更新時間戳字串' },
+            map_id: { type: ['string', 'null'], description: '地圖 ID' },
+          },
+        },
+        filter: {
+          type: 'object',
+          required: ['from', 'to', 'from_second', 'to_second'],
+          additionalProperties: false,
+          properties: {
+            from: { type: 'string', description: '時間窗起 HH:MM:SS' },
+            to: { type: 'string', description: '時間窗迄 HH:MM:SS' },
+            from_second: { type: 'integer', minimum: 0, description: '時間窗起（秒）' },
+            to_second: { type: 'integer', minimum: 0, description: '時間窗迄（秒）' },
+          },
+        },
+        trip_count: { type: 'integer', minimum: 0, description: '班次數' },
+        trips: {
+          type: 'array',
+          description: '班次清單（僅載客）',
+          items: { $ref: '#/definitions/TimetableTrip' },
+        },
+      },
+      definitions: {
+        TimetableTrip: {
+          type: 'object',
+          required: [
+            'trip_code', 'block_id', 'timeline_row', 'task_type', 'source',
+            'card_start', 'card_end', 'card_start_second', 'card_end_second', 'stations',
+          ],
+          additionalProperties: false,
+          properties: {
+            trip_code: { type: 'string', description: '班次代號（路線代號＋HHMM）' },
+            block_id: { type: 'string', description: '引擎內部 block id' },
+            timeline_row: { type: 'integer', description: '時間列索引' },
+            task_type: { type: 'string', description: '任務類型（如 passenger）' },
+            source: { type: 'string', description: '條來源（如 template_bar）' },
+            route_id: { type: ['string', 'null'], description: '路線 ID' },
+            route_code: { type: ['string', 'null'], description: '路線代號' },
+            route_name: { type: ['string', 'null'], description: '路線名稱' },
+            card_start: { type: 'string', description: '卡開始 HH:MM:SS' },
+            card_end: { type: 'string', description: '卡結束 HH:MM:SS' },
+            card_start_second: { type: 'integer', description: '卡開始（秒）' },
+            card_end_second: { type: 'integer', description: '卡結束（秒）' },
+            stations: {
+              type: 'array',
+              description: '站序時刻',
+              items: { $ref: '#/definitions/TimetableTripStation' },
+            },
+          },
+        },
+        TimetableTripStation: {
+          type: 'object',
+          required: [
+            'order', 'station_id', 'station_name', 'role',
+            'arrival', 'departure', 'dwell_complete',
+            'base_dwell_seconds', 'dwell_seconds', 'travel_to_next_seconds',
+          ],
+          additionalProperties: false,
+          properties: {
+            order: { type: 'integer', minimum: 1, description: '站序' },
+            station_id: { type: 'string', description: '站點 ID' },
+            station_name: { type: 'string', description: '站點名稱' },
+            role: {
+              type: 'string',
+              enum: ['origin', 'intermediate', 'terminal'],
+              description: '首站／中途／末站',
+            },
+            arrival: { type: ['string', 'null'], description: '抵達；首站通常 null' },
+            departure: { type: ['string', 'null'], description: '出發；末站通常 null' },
+            dwell_complete: { type: ['string', 'null'], description: '靠站完成（末站＝卡結束）' },
+            base_dwell_seconds: { type: 'integer', minimum: 0, description: '設定靠站秒數' },
+            dwell_seconds: { type: 'integer', minimum: 0, description: '有效停靠秒數' },
+            travel_to_next_seconds: {
+              type: ['integer', 'null'],
+              description: '行駛至下站秒數；末站 null',
+            },
+          },
+        },
+      },
+    };
+
+    function escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function fmt(v) {
+      if (v === null || v === undefined) return { text: 'null', isNull: true };
+      if (typeof v === 'object') return { text: JSON.stringify(v), isNull: false };
+      return { text: String(v), isNull: false };
+    }
+
+    function renderFieldList(rows) {
+      return `
+        <table class="field-list">
+          <tbody>
+            ${rows.map((row) => {
+              const isNull = row.value == null || row.value === '';
+              const text = isNull ? '—' : String(row.value);
+              return `
+                <tr>
+                  <th>${escapeHtml(row.label)}</th>
+                  <td class="${isNull ? 'null' : ''}">${escapeHtml(text)}</td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function renderKvGrid(obj, fields) {
+      return renderFieldList(fields.map(([key, label]) => {
+        const raw = obj[key];
+        if (raw === null || raw === undefined) return { label: `${label}（${key}）`, value: null };
+        if (typeof raw === 'object') return { label: `${label}（${key}）`, value: JSON.stringify(raw) };
+        return { label: `${label}（${key}）`, value: String(raw) };
+      }));
+    }
+
+    function renderDataBox(title, obj, fields) {
+      return `
+        <div class="detail-box">
+          <p class="detail-title">${escapeHtml(title)} · 欄位清單</p>
+          ${renderKvGrid(obj, fields)}
+          <details class="raw">
+            <summary>實際 JSON（可摺疊）</summary>
+            <pre class="data-json">${escapeHtml(JSON.stringify(obj, null, 2))}</pre>
+          </details>
+        </div>`;
+    }
+
+    function roleLabel(role) {
+      if (role === 'origin') return '首站';
+      if (role === 'terminal') return '末站';
+      return '中途';
+    }
+
+    function readQueryDefaults() {
+      const q = new URLSearchParams(location.search);
+      if (q.get('from')) $('from').value = q.get('from');
+      if (q.get('to')) $('to').value = q.get('to');
+    }
+
+    function apiUrl() {
+      const qs = new URLSearchParams();
+      if ($('from').value.trim()) qs.set('from', $('from').value.trim());
+      if ($('to').value.trim()) qs.set('to', $('to').value.trim());
+      return `${API_BASE}/syncdrive-api/operation-shift/timetable/trips?${qs}`;
+    }
+
+    function bindDetailDrawers(root) {
+      root.querySelectorAll('.detail-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const row = document.getElementById(btn.dataset.drawerId);
+          if (!row) return;
+          const open = row.hasAttribute('hidden');
+          row.toggleAttribute('hidden', !open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? '收合' : (btn.dataset.label || 'JSON');
+        });
+      });
+    }
+
+    function selectTab(rowId) {
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.setAttribute('aria-selected', btn.dataset.rowId === String(rowId) ? 'true' : 'false');
+      });
+      document.querySelectorAll('.tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.rowId === String(rowId));
+      });
+    }
+
+    function groupByTimelineRow(trips) {
+      const map = new Map();
+      for (const trip of trips) {
+        const row = Number(trip.timeline_row) || 0;
+        if (!map.has(row)) map.set(row, []);
+        map.get(row).push(trip);
+      }
+      return [...map.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([timeline_row, rowTrips]) => ({
+          timeline_row,
+          trip_count: rowTrips.length,
+          trips: rowTrips.sort((a, b) => a.card_start_second - b.card_start_second),
+        }));
+    }
+
+    function setTripExpanded(tripEl, expanded) {
+      const body = tripEl.querySelector('.trip-body');
+      const toggle = tripEl.querySelector('.trip-toggle');
+      if (!body || !toggle) return;
+      body.hidden = !expanded;
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      toggle.textContent = expanded ? '收合' : '展開';
+      if (!expanded) {
+        tripEl.querySelectorAll('.detail-row, .trip-json-wrap').forEach((row) => {
+          row.hidden = true;
+        });
+        tripEl.querySelectorAll('.detail-btn').forEach((btn) => {
+          btn.setAttribute('aria-expanded', 'false');
+          btn.textContent = btn.dataset.label || 'JSON';
+        });
+      }
+    }
+
+    function setAllTripsExpanded(expanded, root = document) {
+      const scope = root.querySelector('.tab-panel.active') || root;
+      scope.querySelectorAll('article.trip').forEach((tripEl) => {
+        setTripExpanded(tripEl, expanded);
+      });
+    }
+
+    function bindTripFolds(root) {
+      root.querySelectorAll('.trip-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tripEl = btn.closest('article.trip');
+          if (!tripEl) return;
+          const open = btn.getAttribute('aria-expanded') !== 'true';
+          setTripExpanded(tripEl, open);
+        });
+      });
+      root.querySelectorAll('[data-expand-all]').forEach((btn) => {
+        btn.addEventListener('click', () => setAllTripsExpanded(true, root));
+      });
+      root.querySelectorAll('[data-collapse-all]').forEach((btn) => {
+        btn.addEventListener('click', () => setAllTripsExpanded(false, root));
+      });
+    }
+
+    function renderTrip(trip, rowIndex, tripIndex) {
+      const tripJsonId = `t-json-${rowIndex}-${tripIndex}`;
+      const stationCount = (trip.stations || []).length;
+      const summaryList = renderFieldList([
+        { label: '班次代號', value: trip.trip_code },
+        { label: '路線', value: trip.route_name ?? trip.route_code ?? null },
+        { label: '時間', value: `${trip.card_start} → ${trip.card_end}` },
+        { label: '站數', value: `${stationCount} 站` },
+        { label: '來源', value: trip.source },
+        { label: '時間列', value: trip.timeline_row },
+      ]);
+
+      const stationCards = (trip.stations || []).map((s, j) => {
+        const jsonId = `s-json-${rowIndex}-${tripIndex}-${j}`;
+        const departOrComplete = s.departure ?? s.dwell_complete;
+        return `
+          <article class="station-card">
+            <div class="station-card-head">
+              <h4 class="station-card-title">#${s.order} ${escapeHtml(s.station_name)} · ${roleLabel(s.role)}</h4>
+              <button type="button" class="detail-btn" data-drawer-id="${jsonId}" data-label="JSON" aria-expanded="false">JSON</button>
+            </div>
+            ${renderFieldList([
+              { label: '站點 ID', value: s.station_id },
+              { label: '角色', value: roleLabel(s.role) },
+              { label: '抵達', value: s.arrival },
+              { label: '出發／靠站完成', value: departOrComplete },
+              { label: '靠站', value: `${s.base_dwell_seconds ?? 0}s` },
+              { label: '有效停靠', value: `${s.dwell_seconds ?? 0}s` },
+              { label: '行駛至下站', value: s.travel_to_next_seconds == null ? null : `${s.travel_to_next_seconds}s` },
+            ])}
+            <div class="detail-row" id="${jsonId}" hidden>
+              ${renderDataBox('站點', s, STATION_FIELDS)}
+            </div>
+          </article>`;
+      }).join('');
+
+      return `
+        <article class="trip">
+          <div class="trip-head">
+            <div class="trip-summary">${summaryList}</div>
+            <div class="trip-head-actions">
+              <button type="button" class="trip-toggle" aria-expanded="false">展開</button>
+              <button type="button" class="detail-btn" data-drawer-id="${tripJsonId}" data-label="JSON" aria-expanded="false">JSON</button>
+            </div>
+          </div>
+          <div class="trip-json-wrap" id="${tripJsonId}" hidden>
+            ${renderDataBox('班次', trip, TRIP_FIELDS)}
+          </div>
+          <div class="trip-body" hidden>
+            <div class="station-list">${stationCards}</div>
+          </div>
+        </article>`;
+    }
+
+    function render(payload) {
+      const groups = groupByTimelineRow(payload.trips || []);
+      if (!groups.length) {
+        $('result').innerHTML = '<div class="panel empty">此範圍沒有班次。</div>';
+        return;
+      }
+
+      const firstRow = groups[0].timeline_row;
+      const tabButtons = groups.map((g) => `
+        <button type="button" class="tab-btn" data-row-id="${g.timeline_row}"
+          aria-selected="${g.timeline_row === firstRow ? 'true' : 'false'}">
+          時間列 ${g.timeline_row}<span class="count">${g.trip_count}</span>
+        </button>`).join('');
+
+      const panels = groups.map((g, rowIndex) => `
+        <div class="tab-panel${g.timeline_row === firstRow ? ' active' : ''}" data-row-id="${g.timeline_row}">
+          <div class="row-head">
+            <h2 class="row-title">時間列 ${g.timeline_row}</h2>
+            <p class="row-sub">${g.trip_count} 班 · 預設收合</p>
+            <div class="row-head-actions">
+              <button type="button" class="secondary" data-expand-all>全部展開</button>
+              <button type="button" class="secondary" data-collapse-all>全部收合</button>
+            </div>
+          </div>
+          ${g.trips.map((trip, tripIndex) => renderTrip(trip, rowIndex, tripIndex)).join('')}
+        </div>`).join('');
+
+      $('result').innerHTML = `
+        <div class="tabs-shell">
+          <div class="tab-list" role="tablist">${tabButtons}</div>
+          ${panels}
+        </div>`;
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => selectTab(btn.dataset.rowId));
+      });
+      bindDetailDrawers($('result'));
+      bindTripFolds($('result'));
+      setAllTripsExpanded(false, $('result'));
+      selectTab(firstRow);
+    }
+
+    function renderMeta(payload) {
+      const m = payload.meta || {};
+      const f = payload.filter || {};
+      const groups = groupByTimelineRow(payload.trips || []);
+      const box = $('meta');
+      box.hidden = false;
+      box.innerHTML = `
+        <div><span>班表</span><br>${escapeHtml(m.name || '—')}</div>
+        <div><span>時間列數</span><br>${groups.length}</div>
+        <div><span>班次數</span><br>${payload.trip_count ?? (payload.trips || []).length}</div>
+        <div><span>時間窗</span><br>${escapeHtml(f.from || '—')} ~ ${escapeHtml(f.to || '—')}</div>
+      `;
+    }
+
+    async function load() {
+      const status = $('status');
+      const btn = $('btnLoad');
+      btn.disabled = true;
+      status.className = 'status';
+      status.textContent = '載入中…';
+      try {
+        const res = await fetch(apiUrl());
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        status.className = 'status ok';
+        status.textContent = '成功';
+        renderMeta(data);
+        render(data);
+        const next = new URL(location.href);
+        next.searchParams.set('from', $('from').value.trim());
+        next.searchParams.set('to', $('to').value.trim());
+        history.replaceState(null, '', next.toString());
+      } catch (err) {
+        status.className = 'status err';
+        status.textContent = `失敗：${err.message || err}`;
+        $('result').innerHTML = '';
+        $('meta').hidden = true;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    readQueryDefaults();
+    $('btnLoad').addEventListener('click', load);
+    $('schemaPre').textContent = JSON.stringify(TRIPS_JSON_SCHEMA, null, 2);
+    $('btnSchema').addEventListener('click', () => { $('schemaModal').hidden = false; });
+    $('btnCloseSchema').addEventListener('click', () => { $('schemaModal').hidden = true; });
+    $('schemaModal').addEventListener('click', (ev) => {
+      if (ev.target === $('schemaModal')) $('schemaModal').hidden = true;
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') $('schemaModal').hidden = true;
+    });
+    $('btnBack').addEventListener('click', () => {
+      if (history.length > 1) history.back();
+      else location.href = '/#/班表Timetable-API';
+    });
+    $('btnExpandAll').addEventListener('click', () => setAllTripsExpanded(true, $('result')));
+    $('btnCollapseAll').addEventListener('click', () => setAllTripsExpanded(false, $('result')));
+    load();
+  </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import { organizeRoutesByGroups } from '../utils/routeGroupPlanning'
@@ -66,55 +67,94 @@ function RowActionsMenu({
   onDelete: () => void
 }) {
   const open = openMenuKey === menuKey
-  const menuRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const portalRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      setMenuPos(null)
+      return
+    }
+    const updatePos = () => {
+      const btn = buttonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    updatePos()
+    window.addEventListener('resize', updatePos)
+    window.addEventListener('scroll', updatePos, true)
+    return () => {
+      window.removeEventListener('resize', updatePos)
+      window.removeEventListener('scroll', updatePos, true)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
-        onCloseMenu()
+      const target = e.target as Node
+      if (rootRef.current?.contains(target) || portalRef.current?.contains(target)) {
+        return
       }
+      onCloseMenu()
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open, onCloseMenu])
 
   return (
-    <div ref={menuRef} className="relative shrink-0">
+    <div ref={rootRef} className="relative shrink-0 self-start">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => onOpenMenu(menuKey)}
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenMenu(menuKey)
+        }}
         title="更多操作"
         className="flex items-center justify-center rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
       >
         <MoreHorizontal className="size-3.5" />
       </button>
-      {open ? (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[7.5rem] overflow-hidden rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl">
-          <button
-            type="button"
-            onClick={() => {
-              onCloseMenu()
-              onEdit()
-            }}
-            className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
-          >
-            <Pencil className="size-3 text-zinc-400" />
-            編輯
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onCloseMenu()
-              onDelete()
-            }}
-            className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] text-red-300 hover:bg-red-950/40"
-          >
-            <Trash2 className="size-3 text-red-400" />
-            刪除
-          </button>
-        </div>
-      ) : null}
+      {open && menuPos
+        ? createPortal(
+            <div
+              ref={portalRef}
+              className="fixed z-[12000] w-max overflow-hidden rounded-md border border-zinc-600 bg-zinc-950 py-0.5 shadow-xl"
+              style={{ top: menuPos.top, right: menuPos.right }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onCloseMenu()
+                  onEdit()
+                }}
+                className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
+              >
+                <Pencil className="size-3 shrink-0 text-zinc-400" />
+                編輯
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onCloseMenu()
+                  onDelete()
+                }}
+                className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-red-300 hover:bg-red-950/40"
+              >
+                <Trash2 className="size-3 shrink-0 text-red-400" />
+                刪除
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
@@ -170,6 +210,15 @@ function RouteRow({
         route.minTravelTimeSeconds,
       )
 
+  const unavailableDetail = useMemo(() => {
+    if (topologyAvailable) return null
+    if (route.stationIds.length < 2) return '站序不足 2 站'
+    const legHint = topology?.legs.find((leg) => leg.message)?.message
+    if (legHint) return legHint
+    if (topologyPathOk) return '拓撲路徑已連通，但尚有邊未填完整行駛時間'
+    return '拓撲尚無此站序組合的有向路徑'
+  }, [topologyAvailable, topologyPathOk, topology, route.stationIds.length])
+
   return (
     <div
       className={[
@@ -178,14 +227,14 @@ function RouteRow({
           ? isVisible
             ? 'border-cyan-500/30 bg-zinc-950/30'
             : 'border-zinc-800/80 bg-zinc-950/30'
-          : 'border-zinc-800/50 bg-zinc-950/20 opacity-45',
+          : 'border-amber-800/40 bg-amber-950/15',
       ].join(' ')}
       title={
         topologyAvailable
           ? undefined
-          : topologyPathOk
-            ? '拓撲路徑已連但時間未完整 — 路線不可用'
-            : '拓撲無此站序組合 — 路線不可用'
+          : unavailableDetail
+            ? `不可用 · ${unavailableDetail}`
+            : '路線目前不可用'
       }
     >
       <button
@@ -194,7 +243,7 @@ function RouteRow({
         disabled={!topologyAvailable}
         title={
           !topologyAvailable
-            ? '拓撲組合不成立，無法顯示'
+            ? '拓撲尚未就緒，無法在地圖顯示'
             : isVisible
               ? '隱藏地圖路線'
               : '顯示地圖路線'
@@ -202,7 +251,7 @@ function RouteRow({
         className={[
           'flex shrink-0 items-center justify-center rounded-l-md px-2 transition-colors',
           !topologyAvailable
-            ? 'cursor-not-allowed text-zinc-700'
+            ? 'cursor-not-allowed text-zinc-500'
             : isVisible
               ? 'text-cyan-300 hover:bg-cyan-950/40'
               : 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300',
@@ -215,28 +264,28 @@ function RouteRow({
         )}
       </button>
       <div className="min-w-0 flex-1 py-2 pr-1">
-        <div className="flex items-center gap-1.5">
-          <p
-            className={[
-              'min-w-0 truncate text-[11px] font-medium',
-              topologyAvailable ? 'text-zinc-200' : 'text-zinc-500',
-            ].join(' ')}
-          >
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 truncate text-[11px] font-medium text-zinc-100">
             {route.displayName}
           </p>
+          {!topologyAvailable ? (
+            <span className="shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-1 py-px text-[8px] font-semibold tracking-wide text-amber-200">
+              不可用
+            </span>
+          ) : null}
         </div>
-        <p className="mt-0.5 truncate text-[10px] text-zinc-600">{pathLabel}</p>
+        <p className="mt-0.5 truncate text-[10px] text-zinc-400">{pathLabel}</p>
         {timeSummary && topologyAvailable ? (
-          <p className="mt-0.5 text-[9px] text-zinc-600">
+          <p className="mt-0.5 text-[9px] text-zinc-500">
             {timeSummary}
             {topology?.totalDistanceMeters != null
               ? ` · ${topology.totalDistanceMeters} m`
               : ''}
           </p>
         ) : null}
-        {!topologyAvailable ? (
-          <p className="mt-0.5 text-[9px] text-zinc-600">
-            {topologyPathOk ? '拓撲時間未完整 · 不可用' : '拓撲無此組合 · 不可用'}
+        {!topologyAvailable && unavailableDetail ? (
+          <p className="mt-0.5 text-[9px] leading-snug text-amber-200/90">
+            缺少：{unavailableDetail}
           </p>
         ) : null}
       </div>

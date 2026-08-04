@@ -20,23 +20,27 @@ import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesA
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
 import {
-  CREATE_SHIFT_SCHEDULE_STEPS,
   buildShiftScheduleDraftFromStored,
   emptyShiftScheduleCreateDraft,
   isCreateShiftScheduleStepComplete,
   isShiftScheduleStepComplete,
+  resolveNextCreateShiftStep,
+  resolvePreviousCreateShiftStep,
   resolveShiftScheduleDraftName,
+  resolveVisibleCreateShiftSteps,
   serializeShiftScheduleBody,
   isShiftScheduleOutputFresh,
   shouldInvalidateShiftScheduleOutput,
   type CreateShiftScheduleStep,
   type ShiftScheduleCreateDraft,
 } from '../types/create';
+import { StepShiftActionSettings } from './StepShiftActionSettings';
 import { StepShiftMaintenanceTask } from './StepShiftMaintenanceTask';
 import { StepShiftRouteGroups } from './StepShiftRouteGroups';
 import { StepShiftScheduleAdjust } from './StepShiftScheduleAdjust';
 import { StepShiftSchedulePreview } from './StepShiftSchedulePreview';
 import { StepShiftTimeTemplate } from './StepShiftTimeTemplate';
+import { syncActionSettingsWithSelectedRoutes } from '../utils/actionSettings';
 import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
 
 type CreateShiftSchedulePageProps = {
@@ -132,24 +136,30 @@ function CreateStepSidebar({
 
       <nav className="min-h-0 flex-1 overflow-auto px-3 py-4">
         <ol className="space-y-1">
-          {CREATE_SHIFT_SCHEDULE_STEPS.map((item) => {
+          {(() => {
+            const visibleSteps = resolveVisibleCreateShiftSteps(draft.creationMode);
+            return visibleSteps.map((item, index) => {
             const active = item.step === currentStep;
-            const completed =
-              !active
-              && item.step <= maxReachedStep
-              && isCreateShiftScheduleStepComplete(
-                item.step,
+            const priorAndSelfComplete = visibleSteps.slice(0, index + 1).every((entry) =>
+              isCreateShiftScheduleStepComplete(
+                entry.step,
                 draft,
                 nameUniqueOk,
                 turnaroundLimitSeconds,
-              );
+              ),
+            );
+            const completed =
+              !active
+              && item.step <= maxReachedStep
+              && priorAndSelfComplete;
             const unlocked = item.step <= maxReachedStep;
-            // 第 5 步：班表失效即鎖；第 6 步：僅「到過第六步」才顯示黃驚嘆號並鎖住
+            // 調整班表(6)／整體預覽(7)：班表失效即鎖
             const isStepLockedByInvalidation =
               isScheduleInvalidated
-              && item.step >= 5
+              && item.step >= 6
               && item.step <= maxReachedStep;
             const canClick = unlocked && !isStepLockedByInvalidation;
+            const displayIndex = index + 1;
 
             return (
               <li key={item.step}>
@@ -194,12 +204,12 @@ function CreateStepSidebar({
                     ) : completed ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
-                      item.step
+                      displayIndex
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10px] uppercase tracking-wider text-zinc-600">
-                      STEP {item.step}
+                      STEP {displayIndex}
                     </span>
                     <span
                       className={`block truncate text-sm ${
@@ -212,7 +222,8 @@ function CreateStepSidebar({
                 </button>
               </li>
             );
-          })}
+          });
+          })()}
         </ol>
       </nav>
 
@@ -517,24 +528,31 @@ export function CreateShiftSchedulePage({
   }, [draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
 
   const isScheduleInvalidated = useMemo(() => {
-    if (draft.maxReachedStep < 5) return false;
+    // 手動製作不走引擎重新生成；改設定後不鎖步驟、不顯示黃框失效提示
+    if (draft.creationMode === 'manual') return false;
+    if (draft.maxReachedStep < 6) return false;
     if (!draft.scheduleOutput?.plan) return true;
     return !isShiftScheduleOutputFresh(draft);
   }, [draft]);
 
   const showInvalidationChrome =
     isScheduleInvalidated
-    && (draft.currentStep === 2 || draft.currentStep === 3 || draft.currentStep === 4);
+    && (
+      draft.currentStep === 2
+      || draft.currentStep === 3
+      || draft.currentStep === 4
+      || draft.currentStep === 5
+    );
 
-  const handleRebuildAndGoToStep5 = async () => {
+  const handleRebuildAndGoToAdjust = async () => {
     setLoading(true);
     try {
       await flushAutoSave();
-      // 不論目前在 2/3/4 哪一步，一律跳到第 5 步；由第 5 步依失效狀態自動重新生成
+      // 跳到調整班表（第 6 步）；由該步依失效狀態自動重新生成
       setDraft((prev) => ({
         ...prev,
-        currentStep: 5,
-        maxReachedStep: Math.max(prev.maxReachedStep, 5) as CreateShiftScheduleStep,
+        currentStep: 6,
+        maxReachedStep: Math.max(prev.maxReachedStep, 6) as CreateShiftScheduleStep,
         scheduleOutput: null,
       }));
     } catch (e) {
@@ -546,7 +564,7 @@ export function CreateShiftSchedulePage({
 
   const navigateToStepFromPreview = useCallback((step: CreateShiftScheduleStep) => {
     if (step > draft.maxReachedStep) return;
-    if (isScheduleInvalidated && step >= 5) return;
+    if (isScheduleInvalidated && step >= 6) return;
     setDraft((prev) => ({ ...prev, currentStep: step }));
   }, [draft.maxReachedStep, isScheduleInvalidated]);
 
@@ -556,6 +574,13 @@ export function CreateShiftSchedulePage({
         ...prev,
         currentStep: step,
         maxReachedStep: Math.max(prev.maxReachedStep, step) as CreateShiftScheduleStep,
+        actionSettings:
+          step === 5
+            ? syncActionSettingsWithSelectedRoutes(
+                prev.actionSettings,
+                prev.routeGroups.selectedRoutes,
+              )
+            : prev.actionSettings,
       })),
     );
   }, [flushAutoSave]);
@@ -585,18 +610,20 @@ export function CreateShiftSchedulePage({
   }, [onBack, onSavedDraft]);
 
   const handlePrevious = () => {
-    if (draft.currentStep <= 1) return;
-    goToStep((draft.currentStep - 1) as CreateShiftScheduleStep);
+    const prev = resolvePreviousCreateShiftStep(draft.currentStep, draft.creationMode);
+    if (prev == null) return;
+    goToStep(prev);
   };
 
   const handleNext = () => {
     if (!canGoNext) return;
-    if (draft.currentStep >= 6) return;
-    goToStep((draft.currentStep + 1) as CreateShiftScheduleStep);
+    const next = resolveNextCreateShiftStep(draft.currentStep, draft.creationMode);
+    if (next == null) return;
+    goToStep(next);
   };
 
   const handleFinish = () => {
-    if (!canGoNext || draft.currentStep !== 6) return;
+    if (!canGoNext || draft.currentStep !== 7) return;
     void flushAutoSave().finally(onBack);
   };
 
@@ -678,18 +705,43 @@ export function CreateShiftSchedulePage({
                     timeTemplateId={draft.timeTemplate.templateId}
                     creationMode={draft.creationMode}
                     onChange={(routeGroups) =>
-                      updateDraft((prev) => ({ ...prev, routeGroups }))
+                      updateDraft((prev) => {
+                        const nextRouteGroups =
+                          typeof routeGroups === 'function'
+                            ? routeGroups(prev.routeGroups)
+                            : routeGroups;
+                        return {
+                          ...prev,
+                          routeGroups: nextRouteGroups,
+                          actionSettings: syncActionSettingsWithSelectedRoutes(
+                            prev.actionSettings,
+                            nextRouteGroups.selectedRoutes.filter(
+                              (route) => !route.backupForInstanceId && !route.backupForRouteId,
+                            ),
+                          ),
+                        };
+                      })
                     }
                   />
                 )}
                 {draft.currentStep === 5 && (
+                  <StepShiftActionSettings
+                    draft={draft.actionSettings}
+                    selectedRoutes={draft.routeGroups.selectedRoutes}
+                    mapId={draft.routeGroups.mapId}
+                    onChange={(actionSettings) =>
+                      updateDraft((prev) => ({ ...prev, actionSettings }))
+                    }
+                  />
+                )}
+                {draft.currentStep === 6 && (
                   <StepShiftScheduleAdjust
                     draft={draft}
                     shiftId={savedShiftId}
                     onScheduleOutputReady={handleScheduleOutputReady}
                   />
                 )}
-                {draft.currentStep === 6 && (
+                {draft.currentStep === 7 && (
                   <StepShiftSchedulePreview
                     draft={draft}
                     turnaroundLimitSeconds={turnaroundLimitSeconds}
@@ -715,7 +767,7 @@ export function CreateShiftSchedulePage({
             {showInvalidationChrome ? (
               <button
                 type="button"
-                onClick={() => void handleRebuildAndGoToStep5()}
+                onClick={() => void handleRebuildAndGoToAdjust()}
                 disabled={loading || Boolean(loadError)}
                 className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -725,7 +777,7 @@ export function CreateShiftSchedulePage({
             ) : (
               <button
                 type="button"
-                onClick={draft.currentStep === 6 ? handleFinish : handleNext}
+                onClick={draft.currentStep === 7 ? handleFinish : handleNext}
                 disabled={!canGoNext || loading || Boolean(loadError)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                   canGoNext && !loading && !loadError
@@ -733,7 +785,7 @@ export function CreateShiftSchedulePage({
                     : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
                 }`}
               >
-                {draft.currentStep === 6 ? '儲存建立' : '下一步'}
+                {draft.currentStep === 7 ? '儲存建立' : '下一步'}
               </button>
             )}
           </div>

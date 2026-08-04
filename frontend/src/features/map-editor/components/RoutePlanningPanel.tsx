@@ -25,7 +25,74 @@ import {
   buildTopologyRouteTravelBreakdown,
   formatTopologyLegSummary,
   partitionStationsForTopologyRouteAppend,
+  type TopologyRouteAppendOption,
 } from '../utils/topologyRouteTravel'
+
+function groupRouteAppendOptionsByKind(options: TopologyRouteAppendOption[]) {
+  return {
+    docking: options.filter((option) => option.kind === 'docking'),
+    facilityDocking: options.filter((option) => option.kind === 'facility-docking'),
+    waypoint: options.filter((option) => option.kind === 'waypoint'),
+    crossoverWaypoint: options.filter((option) => option.kind === 'crossover-waypoint'),
+  }
+}
+
+function RouteAppendOptionGroup({
+  title,
+  titleClassName,
+  options,
+  disabled,
+  dropdownStationId,
+  onPick,
+}: {
+  title: string
+  titleClassName: string
+  options: TopologyRouteAppendOption[]
+  disabled?: boolean
+  dropdownStationId: string
+  onPick: (stationId: string) => void
+}) {
+  if (options.length === 0) return null
+  return (
+    <div className="px-1 pb-1">
+      <p className={['px-2 py-1 text-[9px] font-semibold uppercase tracking-wider', titleClassName].join(' ')}>
+        {title}
+      </p>
+      {options.map((station) => (
+        disabled ? (
+          <div
+            key={station.stationId}
+            className="cursor-not-allowed rounded px-2 py-1.5 opacity-45"
+          >
+            <p className="text-[11px] text-zinc-500">
+              {station.stationName}
+            </p>
+            <p className="text-[9px] text-zinc-600">
+              {station.reason}
+            </p>
+          </div>
+        ) : (
+          <button
+            key={station.stationId}
+            type="button"
+            onClick={() => onPick(station.stationId)}
+            className={[
+              'w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-zinc-800',
+              dropdownStationId === station.stationId
+                ? 'bg-amber-950/40 text-amber-100'
+                : 'text-zinc-100',
+            ].join(' ')}
+          >
+            {station.stationName}{' '}
+            <span className="font-mono text-[10px] text-zinc-500">
+              ({station.stationId})
+            </span>
+          </button>
+        )
+      ))}
+    </div>
+  )
+}
 
 type Props = {
   areas: MapAreaObject[]
@@ -99,12 +166,7 @@ export function RoutePlanningPanel({
     return buildTopologyRouteTravelBreakdown(pointTopology, areas, draft.stationIds)
   }, [draft, pointTopology, areas])
 
-  const canSave = Boolean(
-    draft
-    && isRoutePlanningDraftSavable(draft)
-    && topologyBreakdown?.pathsComplete
-    && topologyBreakdown?.timesComplete,
-  )
+  const canSave = Boolean(draft && isRoutePlanningDraftSavable(draft))
 
   // 整線行駛時間由拓撲自動加總
   useEffect(() => {
@@ -154,6 +216,15 @@ export function RoutePlanningPanel({
 
   const { selectable: selectableStations, disabled: disabledStations } =
     stationPartition
+
+  const selectableGroups = useMemo(
+    () => groupRouteAppendOptionsByKind(selectableStations),
+    [selectableStations],
+  )
+  const disabledGroups = useMemo(
+    () => groupRouteAppendOptionsByKind(disabledStations),
+    [disabledStations],
+  )
 
   useEffect(() => {
     if (
@@ -271,12 +342,9 @@ export function RoutePlanningPanel({
                       }
                     >
                       {selectedStationLabel ??
-                        (selectableStations.length === 0 &&
-                        disabledStations.length > 0
-                          ? '目前無可連接站點'
-                          : selectableStations.length === 0
-                            ? '所有停靠點已加入'
-                            : '選擇停靠點…')}
+                        (selectableStations.length === 0
+                          ? '所有停靠點已加入'
+                          : '選擇停靠點…')}
                     </span>
                     <ChevronDown
                       className={[
@@ -288,48 +356,74 @@ export function RoutePlanningPanel({
                   {pickerOpen ? (
                     <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl">
                       {selectableStations.length > 0 ? (
-                        <div className="px-1 pb-1">
-                          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
-                            可加入
-                          </p>
-                          {selectableStations.map((station) => (
-                            <button
-                              key={station.stationId}
-                              type="button"
-                              onClick={() => pickStation(station.stationId)}
-                              className={[
-                                'w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-zinc-800',
-                                dropdownStationId === station.stationId
-                                  ? 'bg-amber-950/40 text-amber-100'
-                                  : 'text-zinc-100',
-                              ].join(' ')}
-                            >
-                              {station.stationName}{' '}
-                              <span className="font-mono text-[10px] text-zinc-500">
-                                ({station.stationId})
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                        <>
+                          <RouteAppendOptionGroup
+                            title="正線停靠點"
+                            titleClassName="text-blue-400/80"
+                            options={selectableGroups.docking}
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="設施停靠點"
+                            titleClassName="text-amber-400/80"
+                            options={selectableGroups.facilityDocking}
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="途經點"
+                            titleClassName="text-emerald-400/80"
+                            options={selectableGroups.waypoint}
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="渡線途經點"
+                            titleClassName="text-violet-400/80"
+                            options={selectableGroups.crossoverWaypoint}
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                        </>
                       ) : null}
                       {disabledStations.length > 0 ? (
-                        <div className="border-t border-zinc-800 px-1 pt-1">
+                        <div className="border-t border-zinc-800 pt-1">
                           <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">
                             無法連接（不可選）
                           </p>
-                          {disabledStations.map((station) => (
-                            <div
-                              key={station.stationId}
-                              className="cursor-not-allowed rounded px-2 py-1.5 opacity-45"
-                            >
-                              <p className="text-[11px] text-zinc-500">
-                                {station.stationName}
-                              </p>
-                              <p className="text-[9px] text-zinc-600">
-                                {station.reason}
-                              </p>
-                            </div>
-                          ))}
+                          <RouteAppendOptionGroup
+                            title="正線停靠點"
+                            titleClassName="text-zinc-600"
+                            options={disabledGroups.docking}
+                            disabled
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="設施停靠點"
+                            titleClassName="text-zinc-600"
+                            options={disabledGroups.facilityDocking}
+                            disabled
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="途經點"
+                            titleClassName="text-zinc-600"
+                            options={disabledGroups.waypoint}
+                            disabled
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title="渡線途經點"
+                            titleClassName="text-zinc-600"
+                            options={disabledGroups.crossoverWaypoint}
+                            disabled
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -479,7 +573,7 @@ export function RoutePlanningPanel({
                     role="tooltip"
                     className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-56 rounded-md border border-zinc-600 bg-zinc-900 px-2.5 py-2 text-[10px] leading-relaxed text-zinc-200 shadow-xl group-hover:block group-focus-within:block"
                   >
-                    <span className="block">依站序在點位拓撲上自動加總。</span>
+                    <span className="block">依站序在路網拓撲上自動加總。</span>
                     <span className="mt-1 block text-zinc-400">
                       可經途經點；不含月台門停靠。
                     </span>
@@ -493,7 +587,7 @@ export function RoutePlanningPanel({
                       </span>
                     )}
                     <span className="mt-1 block text-zinc-500">
-                      請在「編輯點位拓撲」補齊連線與時間。
+                      請在「編輯路網拓撲」補齊連線與時間。
                     </span>
                   </span>
                 </span>

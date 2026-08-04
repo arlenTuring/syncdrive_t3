@@ -174,7 +174,12 @@ export interface MapFileV2 {
   areas: MapFileAreaEntry[]
   routeGroups?: MapRouteGroup[]
   routes?: MapPlannedRoute[]
-  /** 點位拓撲（停靠點／途經點有向時間距離網路） */
+  /**
+   * 地圖上要顯示的路線 id 列表（眼睛開關）。
+   * 省略或空陣列＝全部隱藏；匯入／載入時依此還原，不強制全開。
+   */
+  visibleRouteIds?: string[]
+  /** 點位拓撲／路網拓撲（停靠點／途經點／設施有向時間距離網路） */
   pointTopology?: PointTopology
 }
 

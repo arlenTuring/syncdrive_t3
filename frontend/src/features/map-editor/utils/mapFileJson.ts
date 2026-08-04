@@ -100,6 +100,7 @@ const FACILITY_TYPES = [
   'DockingPoint',
   'Waypoint',
   'RoadLine',
+  'TrackCrossover',
   'Zone',
 ] as const
 
@@ -109,6 +110,46 @@ const SLOT_NAMES = ['Parking', 'Charging', 'Wash', 'Repair'] as const
 export function migrateFacilityType(type: string): FacilityType {
   if (type === 'Zone') return 'Facility'
   return type as FacilityType
+}
+
+/**
+ * 舊資料誤用 Facility + purpose「智慧桿」／智慧桿圖示建立者，改為真正的設備 Pole。
+ */
+export function migrateMisclassifiedSmartPoleEntry(entry: MapFileFacilityEntry): MapFileFacilityEntry {
+  const rawType = migrateFacilityType(String(entry.type ?? ''))
+  if (rawType !== 'Facility') return entry
+
+  const parameters =
+    entry.parameters && typeof entry.parameters === 'object'
+      ? { ...(entry.parameters as Record<string, unknown>) }
+      : {}
+  const purpose = typeof parameters.purpose === 'string' ? parameters.purpose.trim() : ''
+  const iconUrl =
+    typeof parameters.customIconUrl === 'string' ? parameters.customIconUrl : ''
+  const looksLikeSmartPole =
+    purpose === '智慧桿' || /smart_pole/i.test(iconUrl)
+
+  if (!looksLikeSmartPole) return entry
+
+  const nextParams: Record<string, unknown> = { ...parameters }
+  delete nextParams.purpose
+  // Pole 使用單點參照場域，清掉設施區塊的 bounds 占位
+  delete nextParams.refFieldXMinM
+  delete nextParams.refFieldXMaxM
+  delete nextParams.refFieldYMinM
+  delete nextParams.refFieldYMaxM
+  nextParams.defaultFillColor = 'transparent'
+
+  // 預設高瘦尺寸（畫素）；圖示 object-contain 撐滿，勿沿用設施區塊舊框
+  const areaSizePx = { w: 30, h: 105 }
+
+  return {
+    ...entry,
+    type: 'Pole',
+    name: 'SmartPole',
+    areaSizePx,
+    parameters: nextParams,
+  }
 }
 
 /** 舊版 ZoneArea → FacilityArea */
@@ -188,24 +229,25 @@ function parseFacilityEntryMeters(
   domain: { xMinM: number; xMaxM: number; yMinM: number; yMaxM: number },
   layout: MapAreaLayout,
 ): FacilityObject {
-  const rawType = String(entry.type)
+  const migratedEntry = migrateMisclassifiedSmartPoleEntry(entry)
+  const rawType = String(migratedEntry.type)
   const type = migrateFacilityType(rawType)
   if (!FACILITY_TYPES.includes(rawType as (typeof FACILITY_TYPES)[number]) && type !== 'Facility') {
     throw new Error(`第 ${index + 1} 筆設施: 不支援的 type「${rawType}」`)
   }
-  const pm = entry.positionMeters
+  const pm = migratedEntry.positionMeters
   if (typeof pm?.x !== 'number' || typeof pm?.y !== 'number') {
     throw new Error(`第 ${index + 1} 筆設施: positionMeters 需為 { x, y } 數字`)
   }
-  const sizeFromFile = sizeMetersFromMapEntry(entry, domain)
-  const rotation = typeof entry.rotationDeg === 'number' ? entry.rotationDeg : 0
-  const name = migrateFacilityName(type, String(entry.name ?? ''))
+  const sizeFromFile = sizeMetersFromMapEntry(migratedEntry, domain)
+  const rotation = typeof migratedEntry.rotationDeg === 'number' ? migratedEntry.rotationDeg : 0
+  const name = migrateFacilityName(type, String(migratedEntry.name ?? ''))
   const parameters =
-    entry.parameters && typeof entry.parameters === 'object'
-      ? { ...entry.parameters }
+    migratedEntry.parameters && typeof migratedEntry.parameters === 'object'
+      ? { ...migratedEntry.parameters }
       : undefined
   const position = { x: pm.x, y: pm.y }
-  const areaPositionFromFile = entry.areaPosition ?? entry.areaPositionPx
+  const areaPositionFromFile = migratedEntry.areaPosition ?? migratedEntry.areaPositionPx
   const areaPosition =
     areaPositionFromFile &&
     typeof areaPositionFromFile.x === 'number' &&
@@ -214,10 +256,10 @@ function parseFacilityEntryMeters(
       : meterToAreaLocalPx(position.x, position.y, domain, layout)
   const sizeMetersProp = sizeFromFile ?? undefined
   const areaSizePx =
-    entry.areaSizePx &&
-    typeof entry.areaSizePx.w === 'number' &&
-    typeof entry.areaSizePx.h === 'number'
-      ? { w: entry.areaSizePx.w, h: entry.areaSizePx.h }
+    migratedEntry.areaSizePx &&
+    typeof migratedEntry.areaSizePx.w === 'number' &&
+    typeof migratedEntry.areaSizePx.h === 'number'
+      ? { w: migratedEntry.areaSizePx.w, h: migratedEntry.areaSizePx.h }
       : sizeMetersProp
         ? {
             w: metersToWorldPx(sizeMetersProp.w),
@@ -225,46 +267,46 @@ function parseFacilityEntryMeters(
           }
         : defaultCanvasSizePxForType(type)
   const areaLayoutAnchor =
-    entry.areaLayoutAnchor &&
-    typeof entry.areaLayoutAnchor.wPx === 'number' &&
-    typeof entry.areaLayoutAnchor.hPx === 'number'
-      ? { wPx: entry.areaLayoutAnchor.wPx, hPx: entry.areaLayoutAnchor.hPx }
+    migratedEntry.areaLayoutAnchor &&
+    typeof migratedEntry.areaLayoutAnchor.wPx === 'number' &&
+    typeof migratedEntry.areaLayoutAnchor.hPx === 'number'
+      ? { wPx: migratedEntry.areaLayoutAnchor.wPx, hPx: migratedEntry.areaLayoutAnchor.hPx }
       : { wPx: layout.wPx, hPx: layout.hPx }
   const layoutAnchorSpread = { areaLayoutAnchor }
 
   if (type === 'Slot') {
-    const so = entry.slotOccupancy
-    const se = entry.slotEquipmentState
+    const so = migratedEntry.slotOccupancy
+    const se = migratedEntry.slotEquipmentState
     if (isSlotOccupancy(so) && isSlotEquipmentState(se)) {
       return {
-        id: String(entry.id),
+        id: String(migratedEntry.id),
         type: 'Slot',
         name,
-        customName: String(entry.customName ?? ''),
+        customName: String(migratedEntry.customName ?? ''),
         areaPosition,
         position,
         rotation,
         slotOccupancy: so,
         slotEquipmentState: se,
         ...layoutAnchorSpread,
-        ...slotEnabledFromMapEntry(entry),
+        ...slotEnabledFromMapEntry(migratedEntry),
         ...(areaSizePx ? { areaSizePx } : {}),
         parameters,
       }
     }
-    const migrated = migrateLegacySlotState(String(entry.currentState ?? 'Empty'))
+    const migrated = migrateLegacySlotState(String(migratedEntry.currentState ?? 'Empty'))
     return {
-      id: String(entry.id),
+      id: String(migratedEntry.id),
       type: 'Slot',
       name,
-      customName: String(entry.customName ?? ''),
+      customName: String(migratedEntry.customName ?? ''),
       areaPosition,
       position,
       rotation,
       slotOccupancy: migrated.slotOccupancy,
       slotEquipmentState: migrated.slotEquipmentState,
       ...layoutAnchorSpread,
-      ...slotEnabledFromMapEntry(entry),
+      ...slotEnabledFromMapEntry(migratedEntry),
       ...(areaSizePx ? { areaSizePx } : {}),
       parameters,
     }
@@ -272,10 +314,10 @@ function parseFacilityEntryMeters(
 
   if (type === 'Geofence') {
     const gf = {
-      id: String(entry.id),
+      id: String(migratedEntry.id),
       type: 'Geofence' as const,
       name: 'Geofence' as const,
-      customName: String(entry.customName ?? ''),
+      customName: String(migratedEntry.customName ?? ''),
       areaPosition,
       position,
       rotation,
@@ -290,13 +332,13 @@ function parseFacilityEntryMeters(
   const nonSlotType = type as Exclude<FacilityType, 'Slot' | 'Geofence'>
   const defaultState = getDefaultStateForType(nonSlotType)
   const allowed = STATES_BY_TYPE[nonSlotType]
-  const rawState = entry.currentState as NonSlotFacilityState
+  const rawState = migratedEntry.currentState as NonSlotFacilityState
   const currentState = allowed.includes(rawState) ? rawState : defaultState
   return {
-    id: String(entry.id),
+    id: String(migratedEntry.id),
     type: nonSlotType,
     name,
-    customName: String(entry.customName ?? ''),
+    customName: String(migratedEntry.customName ?? ''),
     areaPosition,
     position,
     rotation,
@@ -404,6 +446,8 @@ export type ParsedMapFile = {
   areas: MapAreaObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
+  /** 使用者最後設定的路線可視 id；缺欄＝空（不強制全開） */
+  visibleRouteIds: string[]
   pointTopology: PointTopology
   createdAt?: string
   updatedAt?: string
@@ -423,10 +467,30 @@ function parsePixelOrigin(
   return { x, y }
 }
 
+/** 僅保留仍存在於 routes 的 id；缺欄或非陣列 → []（載入時不強制全開） */
+export function parseVisibleRouteIds(
+  raw: unknown,
+  routes: MapPlannedRoute[],
+): string[] {
+  if (!Array.isArray(raw)) return []
+  const known = new Set(routes.map((r) => r.routeId))
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const id = item.trim()
+    if (!id || !known.has(id) || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
 export function parseMapFileJson(json: unknown): ParsedMapFile {
   if (isMapFileV2(json)) {
     const pixelSize = clampMapPixelSize(json.pixelSize ?? DEFAULT_MAP_PIXEL_SIZE)
     const areas = (json.areas ?? []).map((a, i) => parseAreaEntry(a, i))
+    const routes = parseMapRoutes(json.routes)
     return {
       mapId: json.mapId,
       displayName: json.displayName,
@@ -435,8 +499,9 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       pixelSize,
       pixelOrigin: parsePixelOrigin(json.pixelOrigin),
       areas: areas.length > 0 ? areas : [createBlankArea('1', pixelSize)],
-      routes: parseMapRoutes(json.routes),
+      routes,
       routeGroups: parseMapRouteGroups(json.routeGroups),
+      visibleRouteIds: parseVisibleRouteIds(json.visibleRouteIds, routes),
       pointTopology: parsePointTopology(json.pointTopology),
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
@@ -455,6 +520,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       areas: migrateV1ToAreas(json, pixelSize),
       routes: [],
       routeGroups: [],
+      visibleRouteIds: [],
       pointTopology: parsePointTopology(undefined),
     }
   }
@@ -527,6 +593,7 @@ export function buildMapFileV2(
     pixelOrigin?: { x: number; y: number }
     routes?: MapPlannedRoute[]
     routeGroups?: MapRouteGroup[]
+    visibleRouteIds?: string[]
     pointTopology?: PointTopology
   },
 ): MapFileV2 {
@@ -535,6 +602,10 @@ export function buildMapFileV2(
   const routeGroups = options?.routeGroups ?? []
   const pointTopology = options?.pointTopology
   const description = parseOptionalDescription(options?.description)
+  const visibleRouteIds = parseVisibleRouteIds(
+    options?.visibleRouteIds ?? [],
+    routes,
+  )
   return {
     schemaVersion: MAP_FILE_SCHEMA_VERSION,
     mapId,
@@ -548,6 +619,8 @@ export function buildMapFileV2(
     areas: areas.map(areaToMapEntry),
     ...(routeGroups.length > 0 ? { routeGroups } : {}),
     ...(routes.length > 0 ? { routes } : {}),
+    // 一律寫入，空陣列＝使用者關掉全部；與「缺欄」舊檔區隔
+    visibleRouteIds,
     ...(pointTopology && (pointTopology.nodes.length > 0 || pointTopology.edges.length > 0)
       ? { pointTopology }
       : {}),

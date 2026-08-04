@@ -3,10 +3,11 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  ChevronDown,
-  ChevronRight,
-  FolderOpen,
   Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeIntegerInput } from '../../maintenance-tasks/utils/numericInput';
@@ -17,19 +18,34 @@ import type {
   ShiftScheduleCreationMode,
   ShiftScheduleRouteGroupsDraft,
   ShiftScheduleSelectedRoute,
+  ShiftScheduleServiceDirectionTag,
   ShiftScheduleStationDwell,
+  ShiftStationDwellMode,
 } from '../types/create';
 import {
-  applyDwellSlackSeconds,
+  applyStationDwellWithSlack,
   areStationDwellsComplete,
+  createSelectedRouteInstanceId,
+  createServiceDirectionTagId,
+  emptyShiftRouteRelationGraph,
   isMainlineRouteWithinTurnaroundLimit,
+  isPrimarySelectedRoute,
+  isSelectedRouteDwellReady,
+  isStationDwellRequired,
+  looksLikeDefaultCrossoverPortalStationId,
   moveSelectedRouteExecutionOrder,
+  setSelectedRouteAsHead,
   nextExecutionOrder,
   normalizeMinimumRecoveryTimeSeconds,
   normalizeSelectedRouteExecutionOrders,
   resolveRouteOrderPosition,
   resolveNextRouteInExecutionOrder,
+  resolveSelectedRouteInstanceId,
+  resolveStationDwellListRole,
+  formatStationDwellRoleLabel,
+  resolveStationDwellMode,
   sortSelectedRoutesByExecutionOrder,
+  syncRouteRelationGraphWithRoutes,
   normalizeSwitchBufferAfterSeconds,
   normalizeDwellSlackSeconds,
 } from '../types/create';
@@ -38,70 +54,35 @@ import {
   type ShiftRouteGroupCatalogItem,
   type ShiftRouteOption,
 } from '../utils/shiftRouteGroupCatalog';
+import { RouteRelationGraphEditor } from './RouteRelationGraphEditor';
+import { HelpTip } from './HelpTip';
+import { ShiftMenuSelect } from './ShiftMenuSelect';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
+import {
+  buildThroughVerificationFingerprint,
+  computeRouteThroughPaths,
+  emptyShiftRouteThroughAnchorsDraft,
+  isThroughVerificationCurrent,
+  type RouteThroughCycle,
+} from '../utils/routeRelationThroughCycles';
+import { resolveRouteOriginStation } from '../utils/routeRelationGraph';
 
 type StepShiftRouteGroupsProps = {
   draft: ShiftScheduleRouteGroupsDraft;
-  onChange: (next: ShiftScheduleRouteGroupsDraft) => void;
+  onChange: (
+    next:
+      | ShiftScheduleRouteGroupsDraft
+      | ((prev: ShiftScheduleRouteGroupsDraft) => ShiftScheduleRouteGroupsDraft),
+  ) => void;
   timeTemplateId: string;
   creationMode?: ShiftScheduleCreationMode;
 };
 
-type GroupSelectionState = 'none' | 'partial' | 'all';
-
 const DWELL_INPUT_CLASS =
-  'h-8 w-20 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 w-20 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2 text-center text-xs tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 disabled:cursor-not-allowed disabled:opacity-60';
 
-function resolveGroupSelectionState(
-  group: ShiftRouteGroupCatalogItem,
-  selectedRouteIds: ReadonlySet<string>,
-): GroupSelectionState {
-  if (group.routes.length === 0) return 'none';
-  const selectedCount = group.routes.filter((r) => selectedRouteIds.has(r.routeId)).length;
-  if (selectedCount === 0) return 'none';
-  if (selectedCount === group.routes.length) return 'all';
-  return 'partial';
-}
-
-function TriStateCheckbox({
-  state,
-  disabled,
-  onToggle,
-  label,
-}: {
-  state: GroupSelectionState;
-  disabled?: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.indeterminate = state === 'partial';
-    }
-  }, [state]);
-
-  const title =
-    state === 'all'
-      ? `取消選取「${label}」內全部路線`
-      : state === 'partial'
-        ? `「${label}」部分路線已選，點擊全選`
-        : `全選「${label}」內全部路線`;
-
-  return (
-    <input
-      ref={inputRef}
-      type="checkbox"
-      checked={state === 'all'}
-      disabled={disabled}
-      onChange={onToggle}
-      title={title}
-      aria-label={title}
-      className="size-4 shrink-0 rounded border-zinc-600 bg-zinc-900 accent-[#2B7FFF] disabled:opacity-40"
-    />
-  );
-}
+const DWELL_STATIC_CLASS =
+  'flex h-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-900/40 px-2.5 text-xs text-zinc-500';
 
 function formatSecondsLabel(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '—';
@@ -115,71 +96,167 @@ function buildStationDwells(
   const byId = new Map((existing ?? []).map((item) => [item.stationId, item]));
   return route.stationIds.map((stationId, index) => {
     const prev = byId.get(stationId);
+    const isOrigin = index === 0;
+    const flagged = route.stationDwellRequired?.[index];
+    const dwellRequired = isOrigin
+      ? false
+      : flagged === false
+        ? false
+        : flagged === true
+          ? true
+          : prev?.dwellRequired === false
+            ? false
+            : !looksLikeDefaultCrossoverPortalStationId(stationId);
+    const dwellMode = dwellRequired
+      ? (prev?.dwellMode === 'no_stop' || prev?.dwellMode === 'line_change' || prev?.dwellMode === 'seconds'
+          ? prev.dwellMode
+          : 'seconds')
+      : undefined;
+    const dwellSeconds = !dwellRequired
+      ? 0
+      : dwellMode === 'no_stop' || dwellMode === 'line_change'
+        ? 0
+        : (prev?.dwellSeconds ?? null);
     return {
       stationId,
-      stationName: route.stationNames[index] ?? prev?.stationName ?? stationId,
-      dwellSeconds: prev?.dwellSeconds ?? null,
+      stationName:
+        route.stationNames[index]
+        ?? prev?.stationName
+        ?? stationId,
+      dwellSeconds,
+      ...(dwellMode ? { dwellMode } : {}),
+      dwellRequired,
     };
   });
+}
+
+function findCatalogRoute(
+  catalog: ShiftRouteGroupCatalogItem[],
+  routeId: string,
+): { group: ShiftRouteGroupCatalogItem; route: ShiftRouteOption } | null {
+  for (const group of catalog) {
+    const route = group.routes.find((item) => item.routeId === routeId);
+    if (route) return { group, route };
+  }
+  return null;
 }
 
 function StationDwellEditor({
   route,
   turnaroundLimitSeconds,
   minimumRecoveryTimeSeconds,
-  onUpdateDwell,
+  hideRecoveryInSummary = false,
+  showSwitchBuffer = false,
+  onUpdateDwellSeconds,
+  onUpdateDwellMode,
   onUpdateDwellSlack,
+  onUpdateSwitchBuffer,
 }: {
   route: ShiftScheduleSelectedRoute;
   turnaroundLimitSeconds: number | null;
   minimumRecoveryTimeSeconds: number | null;
-  onUpdateDwell: (stationId: string, value: string) => void;
+  hideRecoveryInSummary?: boolean;
+  showSwitchBuffer?: boolean;
+  onUpdateDwellSeconds: (stationId: string, value: string) => void;
+  onUpdateDwellMode: (stationId: string, mode: ShiftStationDwellMode) => void;
   onUpdateDwellSlack: (value: string) => void;
+  onUpdateSwitchBuffer?: (value: string) => void;
 }) {
   const dwellsComplete = areStationDwellsComplete(route.stationDwells);
+  const recoveryForBudget = hideRecoveryInSummary
+    ? 0
+    : (minimumRecoveryTimeSeconds ?? 0);
   const withinLimit = isMainlineRouteWithinTurnaroundLimit(
     route,
     turnaroundLimitSeconds,
-    minimumRecoveryTimeSeconds ?? 0,
+    recoveryForBudget,
   );
 
-  const totalDwellWithSlack = route.stationDwells.reduce((sum, d) => {
-    return sum + applyDwellSlackSeconds(d.dwellSeconds ?? 0, route.dwellSlackSeconds);
+  const totalDwellWithSlack = route.stationDwells.reduce((sum, d, index) => {
+    return sum + applyStationDwellWithSlack(d, route.dwellSlackSeconds, index);
   }, 0);
-  const totalMinSum = (route.minTravelTimeSeconds ?? 0) + (minimumRecoveryTimeSeconds ?? 0) + totalDwellWithSlack;
-  const totalAvgSum = (route.avgTravelTimeSeconds ?? 0) + (minimumRecoveryTimeSeconds ?? 0) + totalDwellWithSlack;
+  const recoverySeconds = hideRecoveryInSummary ? 0 : (minimumRecoveryTimeSeconds ?? 0);
+  const totalMinSum = (route.minTravelTimeSeconds ?? 0) + recoverySeconds + totalDwellWithSlack;
+  const totalAvgSum = (route.avgTravelTimeSeconds ?? 0) + recoverySeconds + totalDwellWithSlack;
   const showIncompleteWarning = !dwellsComplete;
   const showTurnaroundWarning = dwellsComplete && !withinLimit;
+  const cycleLabel = hideRecoveryInSummary
+    ? '最快一趟 + 靠站總和(含緩衝)'
+    : '最快一趟 + 恢復 + 靠站總和(含緩衝)';
+  const avgCycleLabel = hideRecoveryInSummary
+    ? '平均一趟 + 靠站總和(含緩衝)'
+    : '平均一趟 + 恢復 + 靠站總和(含緩衝)';
+  const breakdownSuffix = hideRecoveryInSummary
+    ? `(${route.minTravelTimeSeconds ?? 0}s 行駛 + ${totalDwellWithSlack}s 靠站)`
+    : `(${route.minTravelTimeSeconds ?? 0}s 行駛 + ${recoverySeconds}s 恢復 + ${totalDwellWithSlack}s 靠站)`;
+  const avgBreakdownSuffix = hideRecoveryInSummary
+    ? `(${route.avgTravelTimeSeconds ?? 0}s 行駛 + ${totalDwellWithSlack}s 靠站)`
+    : `(${route.avgTravelTimeSeconds ?? 0}s 行駛 + ${recoverySeconds}s 恢復 + ${totalDwellWithSlack}s 靠站)`;
 
   return (
-    <div className="ml-10 mt-2 space-y-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-3 py-3">
-      <p className="text-[11px] text-[#2B7FFF]/90 flex items-center gap-1 font-medium">
-        💡 提示：請輸入各站靠站時間。預設為空白表示必定要填寫，若輸入「0」秒則表示不停靠該站。
-      </p>
-
+    <div className="mt-2 space-y-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-3 py-3">
       <div className="flex flex-wrap items-end gap-3">
-        {route.stationDwells.map((dwell) => (
-          <label key={dwell.stationId} className="block">
-            <span className="mb-1 block text-[11px] text-zinc-500" title="填寫 0 秒預設為不停靠此站">{dwell.stationName}</span>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
-                onChange={(e) => onUpdateDwell(dwell.stationId, e.target.value.replace(/\D/g, ''))}
-                placeholder="必填"
-                title="填寫 0 秒預設為不停靠此站"
-                className={DWELL_INPUT_CLASS}
-                aria-label={`${dwell.stationName} 停靠秒數`}
-              />
-              <span className="text-xs text-zinc-500">秒</span>
-            </div>
-          </label>
-        ))}
+        {route.stationDwells.map((dwell, index) => {
+          const role = resolveStationDwellListRole(dwell, index);
+          if (role !== 'editable') {
+            const roleLabel = formatStationDwellRoleLabel(role);
+            return (
+              <div key={dwell.stationId} className="block text-center">
+                <span className="mb-1 block text-[11px] text-zinc-500">{dwell.stationName}</span>
+                <div
+                  className={DWELL_STATIC_CLASS}
+                  aria-label={`${dwell.stationName} ${roleLabel}`}
+                >
+                  {roleLabel}
+                </div>
+              </div>
+            );
+          }
+          const mode = resolveStationDwellMode(dwell);
+          return (
+            <label key={dwell.stationId} className="block text-center">
+              <span className="mb-1 block text-[11px] text-zinc-500">
+                站點:{dwell.stationName}
+              </span>
+              <div className="flex h-8 items-center justify-center gap-1.5">
+                <ShiftMenuSelect
+                  label={`${dwell.stationName} 停靠方式`}
+                  hideLabel
+                  size="sm"
+                  value={mode}
+                  options={[
+                    { value: 'seconds', label: '秒數' },
+                    { value: 'no_stop', label: '不停靠' },
+                    { value: 'line_change', label: '換線停靠' },
+                  ]}
+                  onChange={(next) =>
+                    onUpdateDwellMode(dwell.stationId, next as ShiftStationDwellMode)
+                  }
+                  widthClass="w-[100px] shrink-0"
+                  panelWidth={112}
+                  aria-label={`${dwell.stationName} 停靠方式`}
+                />
+                {mode === 'seconds' ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
+                    onChange={(e) =>
+                      onUpdateDwellSeconds(dwell.stationId, e.target.value.replace(/\D/g, ''))
+                    }
+                    placeholder="必填"
+                    className={DWELL_INPUT_CLASS}
+                    aria-label={`${dwell.stationName} 停靠秒數`}
+                  />
+                ) : null}
+              </div>
+            </label>
+          );
+        })}
 
-        <label className="block">
+        <label className="block text-center">
           <span className="mb-1 block text-[11px] text-zinc-500">靠站緩衝</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex h-8 items-center justify-center gap-1.5">
             <input
               type="text"
               inputMode="numeric"
@@ -188,15 +265,30 @@ function StationDwellEditor({
               className={DWELL_INPUT_CLASS}
               aria-label={`${route.routeName} 靠站緩衝秒數`}
             />
-            <span className="text-xs text-zinc-500">秒</span>
           </div>
         </label>
+
+        {showSwitchBuffer && onUpdateSwitchBuffer ? (
+          <label className="block text-center">
+            <span className="mb-1 block text-[11px] text-zinc-500">換線緩衝</span>
+            <div className="flex h-8 items-center justify-center gap-1.5">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={String(route.switchBufferAfterSeconds)}
+                onChange={(e) => onUpdateSwitchBuffer(e.target.value)}
+                className={DWELL_INPUT_CLASS}
+                aria-label={`${route.routeName} 換線緩衝秒數`}
+              />
+            </div>
+          </label>
+        ) : null}
       </div>
 
       <div className="mt-2 space-y-1">
         {showIncompleteWarning && (
           <p className="text-[10px] text-zinc-500">
-            ⚠️ 停靠時間尚未填寫完整（不可留空，不停靠請填 0 秒）。
+            ⚠️ 停靠設定尚未填寫完整（選秒數時不可留空）。
           </p>
         )}
         {showTurnaroundWarning && (
@@ -205,372 +297,312 @@ function StationDwellEditor({
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-zinc-500 font-medium justify-start">
-          <span className="text-zinc-400">最快一趟 + 恢復 + 靠站總和(含緩衝)：</span>
-          <span className="tabular-nums text-zinc-300">
-            {formatSecondsLabel(totalMinSum)}
-          </span>
-          <span className="text-zinc-600">
-            ({route.minTravelTimeSeconds ?? 0}s 行駛 + {minimumRecoveryTimeSeconds ?? 0}s 恢復 + {totalDwellWithSlack}s 靠站)
-          </span>
+        <div className="flex flex-wrap items-center justify-start gap-x-1.5 gap-y-1 text-[10px] font-medium text-zinc-500">
+          <span className="text-zinc-400">{cycleLabel}：</span>
+          <span className="tabular-nums text-zinc-300">{formatSecondsLabel(totalMinSum)}</span>
+          <span className="text-zinc-600">{breakdownSuffix}</span>
           <span className="text-zinc-600">·</span>
-          <span className="text-zinc-400">平均一趟 + 恢復 + 靠站總和(含緩衝)：</span>
-          <span className="tabular-nums text-zinc-300">
-            {formatSecondsLabel(totalAvgSum)}
-          </span>
-          <span className="text-zinc-600">
-            ({route.avgTravelTimeSeconds ?? 0}s 行駛 + {minimumRecoveryTimeSeconds ?? 0}s 恢復 + {totalDwellWithSlack}s 靠站)
-          </span>
+          <span className="text-zinc-400">{avgCycleLabel}：</span>
+          <span className="tabular-nums text-zinc-300">{formatSecondsLabel(totalAvgSum)}</span>
+          <span className="text-zinc-600">{avgBreakdownSuffix}</span>
         </div>
       </div>
     </div>
   );
 }
 
-
 function RouteOrderControls({
-  executionOrder,
   showArrows,
   canMoveUp,
   canMoveDown,
   onMove,
 }: {
-  executionOrder: number;
   showArrows: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (direction: 'up' | 'down') => void;
 }) {
-  if (executionOrder <= 0) return null;
+  if (!showArrows) return null;
 
   return (
-    <div
-      className="flex shrink-0 items-center gap-1"
-      onClick={(event) => event.preventDefault()}
-      onMouseDown={(event) => event.stopPropagation()}
-    >
-      <span
-        className="flex size-6 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-xs font-semibold tabular-nums text-[#7CB8FF]"
-        title="執行順序"
+    <div className="flex shrink-0 flex-col">
+      <button
+        type="button"
+        title="提前順序"
+        disabled={!canMoveUp}
+        onClick={() => onMove('up')}
+        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
       >
-        {executionOrder}
-      </span>
-      {showArrows ? (
-        <div className="flex flex-col">
-          <button
-            type="button"
-            title="提前順序"
-            disabled={!canMoveUp}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onMove('up');
-            }}
-            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-          >
-            <ArrowUp className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title="延後順序"
-            disabled={!canMoveDown}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onMove('down');
-            }}
-            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-          >
-            <ArrowDown className="size-3.5" />
-          </button>
-        </div>
-      ) : null}
+        <ArrowUp className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        title="延後順序"
+        disabled={!canMoveDown}
+        onClick={() => onMove('down')}
+        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+      >
+        <ArrowDown className="size-3.5" />
+      </button>
     </div>
   );
 }
 
-function RouteCheckboxRow({
-  route,
-  checked,
-  disabled,
-  onToggle,
-}: {
-  route: ShiftRouteOption;
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div>
-      <label
-        className={`ml-3 flex items-start gap-3 rounded-lg border px-3 py-2.5 transition ${
-          disabled
-            ? 'cursor-not-allowed border-zinc-800/60 bg-zinc-950/20 opacity-60'
-            : checked
-              ? 'cursor-pointer border-[#2B7FFF]/40 bg-[rgba(43,127,255,0.08)]'
-              : 'cursor-pointer border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700'
-        }`}
-      >
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={onToggle}
-          className="mt-0.5 size-4 shrink-0 rounded border-zinc-600 bg-zinc-900 accent-[#2B7FFF] disabled:opacity-40"
-        />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium text-zinc-100">{route.label}</span>
-            <span className="text-[10px] text-zinc-500 font-normal">
-              最快一趟: {formatSecondsLabel(route.minTravelTimeSeconds)} · 平均一趟: {formatSecondsLabel(route.avgTravelTimeSeconds)}
-            </span>
-          </span>
-          <span className="mt-0.5 block truncate text-xs text-zinc-500">{route.stationPathLabel}</span>
-        </span>
-      </label>
-    </div>
-  );
-}
-
-function SelectedRoutesSummaryPanel({
-  routes,
-  turnaroundLimitSeconds,
+function RecoveryAndServiceDirectionBar({
   minimumRecoveryTimeSeconds,
-  creationMode = 'parametric',
-  onMove,
-  onUpdateSwitchBuffer,
-  onUpdateRouteCode,
-  onUpdateDwell,
-  onUpdateDwellSlack,
   onUpdateRecoveryTime,
+  serviceDirectionTags,
+  onAddTag,
+  onRemoveTag,
 }: {
-  routes: ShiftScheduleSelectedRoute[];
-  turnaroundLimitSeconds: number | null;
   minimumRecoveryTimeSeconds: number | null;
-  creationMode?: ShiftScheduleCreationMode;
-  onMove: (routeId: string, direction: 'up' | 'down') => void;
-  onUpdateSwitchBuffer: (routeId: string, value: string) => void;
-  onUpdateRouteCode: (routeId: string, value: string) => void;
-  onUpdateDwell: (routeId: string, stationId: string, value: string) => void;
-  onUpdateDwellSlack: (routeId: string, value: string) => void;
   onUpdateRecoveryTime: (value: string) => void;
+  serviceDirectionTags: ShiftScheduleServiceDirectionTag[];
+  onAddTag: (name: string) => void;
+  onRemoveTag: (id: string) => void;
 }) {
-  const isManual = creationMode === 'manual';
-  const orderedRoutes = useMemo(
-    () => sortSelectedRoutesByExecutionOrder(routes),
-    [routes],
-  );
+  const [drafting, setDrafting] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (drafting) inputRef.current?.focus();
+  }, [drafting]);
+
+  const commitDraft = () => {
+    const name = draftName.trim();
+    if (!name) {
+      setDrafting(false);
+      setDraftName('');
+      return;
+    }
+    onAddTag(name);
+    setDraftName('');
+    setDrafting(false);
+  };
 
   return (
-    <section className="flex min-h-[220px] shrink-0 flex-col border-t border-zinc-800/80 bg-zinc-950/20 pt-4">
-      {!isManual ? (
-        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-              最低恢復時間（秒）
-              <InfoTooltip
-                content="每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。"
-                example="輸入「30」代表最少保留 30 秒恢復空檔。"
-              />
-            </span>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={minimumRecoveryTimeSeconds ?? ''}
-                onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
-                placeholder="必填，如 30"
-                className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
-                aria-label="最低恢復時間"
-              />
-              <span className="text-sm text-zinc-500">秒</span>
-            </div>
-          </label>
+    <div className="flex flex-wrap items-start gap-6 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+      <label className="block">
+        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+          <HelpTip label="最低恢復時間說明">
+            <p>每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。</p>
+            <p className="mt-1 text-zinc-500">輸入「30」代表最少保留 30 秒恢復空檔。</p>
+          </HelpTip>
+          最低恢復時間（秒）
+        </span>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={minimumRecoveryTimeSeconds ?? ''}
+            onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
+            placeholder="必填，如 30"
+            className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
+            aria-label="最低恢復時間"
+          />
+          <span className="text-sm text-zinc-500">秒</span>
         </div>
-      ) : null}
+      </label>
 
-      <div className="mb-3 shrink-0 px-1">
-        <h3 className="text-sm font-medium text-zinc-100">已選路線</h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          {isManual
-            ? '依 ↑↓ 調整執行順序，並為每條路線填寫路線代號（手動製作班次卡用）。'
-            : '依 ↑↓ 調整執行順序；在路線之間設定切換緩衝（秒）。內容隨上方停靠設定同步更新。'}
-        </p>
+      <div className="min-w-0 flex-1">
+        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+          <HelpTip label="服務方向說明" widthClass="w-64">
+            <p>
+              服務方向標示哪些路線的班次算同一向。同一趟車連續跑的同向路段只算一班；運能用相鄰班次班距換算，再分桶均化顯示。
+            </p>
+            <p className="mt-1 text-zinc-500">
+              與下方關聯圖的輪替接續不同；關聯圖是車怎麼換線，服務方向是乘客看到的同向服務。
+            </p>
+            <p className="mt-1 text-zinc-500">例如可建「往 T3」「往南港」，再於各路線卡單選一個。</p>
+          </HelpTip>
+          服務方向
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {serviceDirectionTags.map((tag) => (
+            <span
+              key={tag.id}
+              className="inline-flex h-9 items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 pl-2.5 pr-1 text-sm text-sky-100"
+            >
+              {tag.name}
+              <button
+                type="button"
+                title={`刪除「${tag.name}」`}
+                aria-label={`刪除服務方向 ${tag.name}`}
+                onClick={() => onRemoveTag(tag.id)}
+                className="rounded-md p-1 text-sky-200/70 hover:bg-sky-500/20 hover:text-sky-50"
+              >
+                <X className="size-3.5" />
+              </button>
+            </span>
+          ))}
+
+          {drafting ? (
+            <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-950 px-1.5">
+              <input
+                ref={inputRef}
+                type="text"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    setDrafting(false);
+                    setDraftName('');
+                  }
+                }}
+                placeholder="方向名稱"
+                maxLength={24}
+                className="w-28 bg-transparent px-1.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
+                aria-label="新服務方向名稱"
+              />
+              <button
+                type="button"
+                title="確認新增"
+                aria-label="確認新增服務方向"
+                onClick={commitDraft}
+                disabled={!draftName.trim()}
+                className="rounded-md p-1 text-emerald-400 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Check className="size-4" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                title="取消"
+                aria-label="取消新增服務方向"
+                onClick={() => {
+                  setDrafting(false);
+                  setDraftName('');
+                }}
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              title="新增服務方向"
+              aria-label="新增服務方向"
+              onClick={() => setDrafting(true)}
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-dashed border-zinc-600 text-zinc-400 hover:border-sky-500/50 hover:text-sky-200"
+            >
+              <Plus className="size-4" />
+            </button>
+          )}
+        </div>
       </div>
-
-      <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {orderedRoutes.map((route) => {
-          const orderPosition = resolveRouteOrderPosition(routes, route.routeId);
-          const nextRoute = resolveNextRouteInExecutionOrder(routes, route.routeId);
-
-          return (
-            <li key={route.routeId} className="space-y-2">
-              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-3 py-3">
-                <div className="flex items-start gap-2">
-                  <RouteOrderControls
-                    executionOrder={orderPosition.executionOrder}
-                    showArrows={orderPosition.showControls}
-                    canMoveUp={orderPosition.canMoveUp}
-                    canMoveDown={orderPosition.canMoveDown}
-                    onMove={(direction) => onMove(route.routeId, direction)}
-                  />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-zinc-100">
-                        {route.routeName}
-                      </span>
-                      <label className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900/80 px-1.5 py-0.5">
-                        <span className="text-[10px] font-medium text-zinc-400">
-                          代號
-                          <span className="text-rose-400" aria-hidden>
-                            *
-                          </span>
-                        </span>
-                        <input
-                          type="text"
-                          value={route.routeCode ?? ''}
-                          maxLength={3}
-                          required
-                          onChange={(e) =>
-                            onUpdateRouteCode(
-                              route.routeId,
-                              e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
-                            )
-                          }
-                          className="w-8 bg-transparent text-center text-xs font-bold text-[#2B7FFF] focus:outline-none"
-                          title="路線代號（必填，班次卡顯示用）"
-                          aria-label={`${route.routeName} 路線代號（必填）`}
-                          aria-required
-                        />
-                      </label>
-                      <span className="text-xs text-zinc-500">{route.groupName}</span>
-                    </div>
-                    {!route.routeCode?.trim() ? (
-                      <p className="text-[11px] text-amber-400/90">
-                        {isManual
-                          ? '請填寫路線代號，供手動製作班次代號使用。'
-                          : '請填寫路線代號；變更後需重新產生班表。'}
-                      </p>
-                    ) : null}
-
-                    {!isManual ? (
-                      <StationDwellEditor
-                        route={route}
-                        turnaroundLimitSeconds={turnaroundLimitSeconds}
-                        minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
-                        onUpdateDwell={(stationId, val) => onUpdateDwell(route.routeId, stationId, val)}
-                        onUpdateDwellSlack={(val) => onUpdateDwellSlack(route.routeId, val)}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-
-              {!isManual && orderedRoutes.length > 1 && nextRoute ? (
-                <div className="ml-10 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-zinc-800/80 bg-zinc-950/30 px-3 py-2">
-                  <span className="text-xs text-zinc-500">
-                    切換至「{nextRoute.routeName}」緩衝
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={String(route.switchBufferAfterSeconds)}
-                    onChange={(e) => onUpdateSwitchBuffer(route.routeId, e.target.value)}
-                    className={DWELL_INPUT_CLASS}
-                    aria-label={`${route.routeName} 切換至 ${nextRoute.routeName} 緩衝秒數`}
-                  />
-                  <span className="pb-1 text-xs text-zinc-500">秒</span>
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-    </section>
+    </div>
   );
 }
 
-function RouteGroupSection({
-  group,
-  expanded,
-  selectionState,
-  onToggleExpanded,
-  onToggleGroup,
-  selectedRouteIds,
-  onToggleRoute,
+function RoutePickerBar({
+  catalog,
+  excludedRouteIds,
+  selectedRouteId,
+  onSelectRouteId,
+  onConfirm,
+  confirmLabel = '確認新增',
+  emptyHint = '請先選擇一條路線',
+  title = '新增路線',
+  expanded = true,
+  onExpand,
+  onCancel,
 }: {
-  group: ShiftRouteGroupCatalogItem;
-  expanded: boolean;
-  selectionState: GroupSelectionState;
-  onToggleExpanded: () => void;
-  onToggleGroup: () => void;
-  selectedRouteIds: ReadonlySet<string>;
-  onToggleRoute: (route: ShiftRouteOption) => void;
+  catalog: ShiftRouteGroupCatalogItem[];
+  excludedRouteIds: ReadonlySet<string>;
+  selectedRouteId: string;
+  onSelectRouteId: (routeId: string) => void;
+  onConfirm: (routeId: string) => void;
+  confirmLabel?: string;
+  emptyHint?: string;
+  title?: string;
+  /** false 時只顯示整列按鈕；點擊後才展開下拉＋勾選 */
+  expanded?: boolean;
+  onExpand?: () => void;
+  onCancel?: () => void;
 }) {
-  const selectedInGroup = group.routes.filter((r) => selectedRouteIds.has(r.routeId)).length;
-  const hasRoutes = group.routes.length > 0;
+  const availableGroups = useMemo(
+    () =>
+      catalog
+        .map((group) => ({
+          ...group,
+          routes: group.routes.filter((route) => !excludedRouteIds.has(route.routeId)),
+        }))
+        .filter((group) => group.routes.length > 0),
+    [catalog, excludedRouteIds],
+  );
+
+  const canConfirm = Boolean(selectedRouteId) && !excludedRouteIds.has(selectedRouteId);
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={onExpand}
+        disabled={availableGroups.length === 0}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#2B7FFF]/40 bg-[rgba(43,127,255,0.06)] px-4 py-4 text-sm font-medium text-zinc-200 transition hover:border-[#2B7FFF]/70 hover:bg-[rgba(43,127,255,0.1)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Plus className="size-4 text-[#7CB8FF]" />
+        {title}
+      </button>
+    );
+  }
 
   return (
-    <section
-      className={[
-        'overflow-hidden rounded-xl border bg-zinc-950/30 transition-colors',
-        selectionState === 'all'
-          ? 'border-[#2B7FFF]/35'
-          : selectionState === 'partial'
-            ? 'border-[#2B7FFF]/20'
-            : 'border-zinc-800/80',
-      ].join(' ')}
-    >
-      <div className="flex items-stretch gap-2 px-3 py-3 sm:px-4">
-        <div className="flex shrink-0 items-center">
-          <TriStateCheckbox
-            state={selectionState}
-            disabled={!hasRoutes}
-            onToggle={onToggleGroup}
-            label=""
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#2B7FFF]/35 bg-[rgba(43,127,255,0.06)] px-4 py-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-zinc-200">
+            <Plus className="size-4 text-[#7CB8FF]" />
+            {title}
+          </span>
+          <ShiftMenuSelect
+            label={title}
+            hideLabel
+            value={selectedRouteId}
+            placeholder={availableGroups.length === 0 ? '沒有可選路線' : emptyHint}
+            groups={availableGroups.map((group) => ({
+              label: group.groupName,
+              options: group.routes.map((route) => ({
+                value: route.routeId,
+                label: route.label,
+              })),
+            }))}
+            onChange={onSelectRouteId}
+            disabled={availableGroups.length === 0}
+            widthClass="min-w-[220px] flex-1"
+            panelWidth={280}
+            aria-label={title}
           />
         </div>
         <button
           type="button"
-          onClick={onToggleExpanded}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left transition hover:opacity-90"
+          disabled={!canConfirm || availableGroups.length === 0}
+          onClick={() => {
+            if (!selectedRouteId || excludedRouteIds.has(selectedRouteId)) return;
+            onConfirm(selectedRouteId);
+          }}
+          title={confirmLabel}
+          aria-label={confirmLabel}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
         >
-          {expanded ? (
-            <ChevronDown className="size-4 shrink-0 text-zinc-500" />
-          ) : (
-            <ChevronRight className="size-4 shrink-0 text-zinc-500" />
-          )}
-          <FolderOpen className="size-4 shrink-0 text-sky-400/90" />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">
-            {group.groupName}
-          </span>
-          {hasRoutes ? (
-            <span className="shrink-0 text-xs text-zinc-500">
-              {selectedInGroup > 0
-                ? `已選 ${selectedInGroup}/${group.routes.length}`
-                : `${group.routes.length} 條路線`}
-            </span>
-          ) : null}
+          <Check className="size-5" strokeWidth={2.5} />
         </button>
       </div>
-
-      {expanded ? (
-        <div className="space-y-2 border-t border-zinc-800/80 px-3 pb-3 pt-2">
-          {group.routes.length === 0 ? (
-            <p className="px-1 py-2 text-xs text-zinc-600">此群組尚無路線</p>
-          ) : (
-            group.routes.map((route) => (
-              <RouteCheckboxRow
-                key={route.routeId}
-                route={route}
-                checked={selectedRouteIds.has(route.routeId)}
-                onToggle={() => onToggleRoute(route)}
-              />
-            ))
-          )}
-        </div>
+      {onCancel ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-1 text-xs text-zinc-500 hover:text-zinc-300"
+        >
+          取消
+        </button>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -584,9 +616,16 @@ export function StepShiftRouteGroups({
   const [error, setError] = useState<string | null>(null);
   const [mapDisplayName, setMapDisplayName] = useState('');
   const [catalog, setCatalog] = useState<ShiftRouteGroupCatalogItem[]>([]);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [turnaroundLimitSeconds, setTurnaroundLimitSeconds] = useState<number | null>(null);
   const [turnaroundLoading, setTurnaroundLoading] = useState(false);
+
+  const [pendingAddRouteId, setPendingAddRouteId] = useState('');
+  const [addPrimaryOpen, setAddPrimaryOpen] = useState(false);
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+  const [pendingEditRouteId, setPendingEditRouteId] = useState('');
+  const [throughResults, setThroughResults] = useState<RouteThroughCycle[] | null>(null);
+  const [lastCheckFingerprint, setLastCheckFingerprint] = useState<string | null>(null);
+
   const draftRef = useRef(draft);
   const onChangeRef = useRef(onChange);
   draftRef.current = draft;
@@ -607,26 +646,45 @@ export function StepShiftRouteGroups({
         const routeMeta = new Map(
           result.groups.flatMap((g) => g.routes.map((r) => [r.routeId, r] as const)),
         );
-        onChangeRef.current({
-          mapId: result.mapId,
-          minimumRecoveryTimeSeconds: draftRef.current.minimumRecoveryTimeSeconds,
-          selectedRoutes: normalizeSelectedRouteExecutionOrders(
-            draftRef.current.selectedRoutes
-              .filter((selected) => validRouteIds.has(selected.routeId))
-              .map((selected) => {
-                const meta = routeMeta.get(selected.routeId);
-                if (!meta) return selected;
+        const nextRoutes = normalizeSelectedRouteExecutionOrders(
+          draftRef.current.selectedRoutes
+            .filter(
+              (selected) =>
+                isPrimarySelectedRoute(selected) && validRouteIds.has(selected.routeId),
+            )
+            .map((selected) => {
+              const meta = routeMeta.get(selected.routeId);
+              if (!meta) {
                 return {
                   ...selected,
-                  stationIds: [...meta.stationIds],
-                  stationDwells: buildStationDwells(meta, selected.stationDwells),
-                  // 地圖拓撲／路線時間更新後，重載目錄時一併刷新 leg 快照
-                  stationLegTravels: meta.stationLegTravels.map((leg) => ({ ...leg })),
-                  avgTravelTimeSeconds: meta.avgTravelTimeSeconds,
-                  minTravelTimeSeconds: meta.minTravelTimeSeconds,
+                  backupForInstanceId: null,
+                  backupForRouteId: null,
                 };
-              }),
+              }
+              return {
+                ...selected,
+                stationIds: [...meta.stationIds],
+                stationDwells: buildStationDwells(meta, selected.stationDwells),
+                stationLegTravels: meta.stationLegTravels.map((leg) => ({ ...leg })),
+                avgTravelTimeSeconds: meta.avgTravelTimeSeconds,
+                minTravelTimeSeconds: meta.minTravelTimeSeconds,
+                backupForInstanceId: null,
+                backupForRouteId: null,
+              };
+            }),
+        );
+        onChangeRef.current({
+          ...draftRef.current,
+          mapId: result.mapId,
+          minimumRecoveryTimeSeconds: draftRef.current.minimumRecoveryTimeSeconds,
+          selectedRoutes: nextRoutes,
+          serviceDirectionTags: draftRef.current.serviceDirectionTags ?? [],
+          routeRelationGraph: syncRouteRelationGraphWithRoutes(
+            draftRef.current.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+            nextRoutes,
           ),
+          throughAnchors:
+            draftRef.current.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
         });
       })
       .catch((e) => {
@@ -670,137 +728,269 @@ export function StepShiftRouteGroups({
     };
   }, [timeTemplateId]);
 
-  const selectedRouteIds = useMemo(
-    () => new Set(draft.selectedRoutes.map((r) => r.routeId)),
+  const primaryRouteIds = useMemo(
+    () =>
+      new Set(
+        draft.selectedRoutes
+          .filter((route) => isPrimarySelectedRoute(route))
+          .map((route) => route.routeId),
+      ),
     [draft.selectedRoutes],
   );
 
-  const selectedById = useMemo(
-    () => new Map(draft.selectedRoutes.map((r) => [r.routeId, r] as const)),
+  const selectedByInstanceId = useMemo(
+    () =>
+      new Map(
+        draft.selectedRoutes.map(
+          (r) => [resolveSelectedRouteInstanceId(r), r] as const,
+        ),
+      ),
+    [draft.selectedRoutes],
+  );
+
+  const primaryRoutes = useMemo(
+    () =>
+      sortSelectedRoutesByExecutionOrder(
+        draft.selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+      ),
     [draft.selectedRoutes],
   );
 
   const patchSelectedRoute = (
-    routeId: string,
+    instanceId: string,
     patch: Partial<ShiftScheduleSelectedRoute>,
   ) => {
-    onChange({
-      ...draft,
-      selectedRoutes: draft.selectedRoutes.map((route) =>
-        route.routeId === routeId ? { ...route, ...patch } : route,
-      ),
+    const affectsThrough =
+      'stationDwells' in patch
+      || 'dwellSlackSeconds' in patch
+      || 'switchBufferAfterSeconds' in patch
+      || 'minTravelTimeSeconds' in patch
+      || 'avgTravelTimeSeconds' in patch
+      || 'stationLegTravels' in patch;
+    if (affectsThrough) {
+      setThroughResults(null);
+      setLastCheckFingerprint(null);
+    }
+    onChange((prev) => {
+      const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+      return {
+        ...prev,
+        selectedRoutes: prev.selectedRoutes.map((route) =>
+          resolveSelectedRouteInstanceId(route) === instanceId ? { ...route, ...patch } : route,
+        ),
+        ...(affectsThrough
+          ? {
+              throughAnchors: {
+                ...anchors,
+                verifiedFingerprint: null,
+                verifiedPathCount: 0,
+              },
+            }
+          : {}),
+      };
+    });
+  };
+
+  const commitSelectedRoutes = (selectedRoutes: ShiftScheduleSelectedRoute[]) => {
+    const normalized = normalizeSelectedRouteExecutionOrders(
+      selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+    );
+    setThroughResults(null);
+    onChange((prev) => {
+      const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+      return {
+        ...prev,
+        selectedRoutes: normalized,
+        routeRelationGraph: syncRouteRelationGraphWithRoutes(
+          prev.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+          normalized,
+        ),
+        throughAnchors: {
+          ...anchors,
+          verifiedFingerprint: null,
+          verifiedPathCount: 0,
+        },
+      };
     });
   };
 
   const toSelected = (
     group: ShiftRouteGroupCatalogItem,
     route: ShiftRouteOption,
-    existing?: ShiftScheduleSelectedRoute,
+    options?: {
+      existing?: ShiftScheduleSelectedRoute;
+      executionOrder?: number;
+    },
   ): ShiftScheduleSelectedRoute => ({
+    instanceId: options?.existing?.instanceId?.trim() || createSelectedRouteInstanceId(),
     routeId: route.routeId,
     routeName: route.label,
+    routeCode: options?.existing?.routeCode,
     groupId: group.groupId,
     groupName: group.groupName,
     stationIds: [...route.stationIds],
-    stationDwells: buildStationDwells(route, existing?.stationDwells),
-    stationDwellsConfirmed: existing?.stationDwellsConfirmed === true,
+    stationDwells: buildStationDwells(route, options?.existing?.stationDwells),
+    stationDwellsConfirmed: false,
     stationLegTravels: route.stationLegTravels.map((leg) => ({ ...leg })),
     avgTravelTimeSeconds: route.avgTravelTimeSeconds,
     minTravelTimeSeconds: route.minTravelTimeSeconds,
     executionOrder:
-      existing?.executionOrder && existing.executionOrder > 0
-        ? existing.executionOrder
-        : nextExecutionOrder(draft.selectedRoutes),
+      options?.executionOrder
+      ?? options?.existing?.executionOrder
+      ?? nextExecutionOrder(draft.selectedRoutes),
     switchBufferAfterSeconds: normalizeSwitchBufferAfterSeconds(
-      existing?.switchBufferAfterSeconds,
+      options?.existing?.switchBufferAfterSeconds,
     ),
-    dwellSlackSeconds: normalizeDwellSlackSeconds(existing?.dwellSlackSeconds),
+    dwellSlackSeconds: normalizeDwellSlackSeconds(options?.existing?.dwellSlackSeconds),
+    backupForInstanceId: null,
+    backupForRouteId: null,
   });
 
-  const toggleRoute = (
-    group: ShiftRouteGroupCatalogItem,
-    route: ShiftRouteOption,
-  ) => {
-    const exists = selectedRouteIds.has(route.routeId);
-    const nextSelected = exists
-      ? normalizeSelectedRouteExecutionOrders(
-          draft.selectedRoutes.filter((r) => r.routeId !== route.routeId),
-        )
-      : normalizeSelectedRouteExecutionOrders([
-          ...draft.selectedRoutes,
-          toSelected(group, route),
-        ]);
+  const confirmAddPrimary = (routeId: string) => {
+    const id = routeId.trim();
+    if (!id) return;
+    const found = findCatalogRoute(catalog, id);
+    if (!found || primaryRouteIds.has(id)) return;
+    commitSelectedRoutes([
+      ...draft.selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+      toSelected(found.group, found.route),
+    ]);
+    setPendingAddRouteId('');
+    setAddPrimaryOpen(false);
+  };
+
+  const replaceRoute = (oldInstanceId: string, newRouteId: string) => {
+    const found = findCatalogRoute(catalog, newRouteId);
+    if (!found) return;
+    const existing = selectedByInstanceId.get(oldInstanceId);
+    if (!existing) return;
+
+    const excluded = new Set(primaryRouteIds);
+    excluded.delete(existing.routeId);
+    if (excluded.has(newRouteId)) return;
+
+    commitSelectedRoutes(
+      draft.selectedRoutes
+        .filter((route) => isPrimarySelectedRoute(route))
+        .map((route) => {
+          if (resolveSelectedRouteInstanceId(route) !== oldInstanceId) return route;
+          return toSelected(found.group, found.route, {
+            existing,
+            executionOrder: existing.executionOrder,
+          });
+        }),
+    );
+  };
+
+  const deletePrimary = (instanceId: string) => {
+    commitSelectedRoutes(
+      draft.selectedRoutes.filter((r) => {
+        if (!isPrimarySelectedRoute(r)) return false;
+        return resolveSelectedRouteInstanceId(r) !== instanceId;
+      }),
+    );
+    if (editingRouteId === instanceId) setEditingRouteId(null);
+  };
+
+  const moveRouteOrder = (instanceId: string, direction: 'up' | 'down') => {
+    commitSelectedRoutes(
+      moveSelectedRouteExecutionOrder(
+        draft.selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+        instanceId,
+        direction,
+      ),
+    );
+  };
+
+  const setRouteAsHead = (instanceId: string) => {
+    const anchors = draft.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+    const startInstanceIds = anchors.startInstanceIds.includes(instanceId)
+      ? anchors.startInstanceIds
+      : [...anchors.startInstanceIds, instanceId];
+    const endInstanceIds = anchors.endInstanceIds.filter((id) => id !== instanceId);
+    const normalized = normalizeSelectedRouteExecutionOrders(
+      setSelectedRouteAsHead(
+        draft.selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+        instanceId,
+      ),
+    );
+    setThroughResults(null);
     onChange({
       ...draft,
-      selectedRoutes: nextSelected,
+      selectedRoutes: normalized,
+      routeRelationGraph: syncRouteRelationGraphWithRoutes(
+        draft.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+        normalized,
+      ),
+      throughAnchors: {
+        ...anchors,
+        startInstanceIds,
+        endInstanceIds,
+        verifiedFingerprint: null,
+        verifiedPathCount: 0,
+      },
     });
   };
 
-  const moveRouteOrder = (routeId: string, direction: 'up' | 'down') => {
-    onChange({
-      ...draft,
-      selectedRoutes: moveSelectedRouteExecutionOrder(draft.selectedRoutes, routeId, direction),
-    });
-  };
-
-  const toggleGroup = (group: ShiftRouteGroupCatalogItem) => {
-    if (group.routes.length === 0) return;
-    const state = resolveGroupSelectionState(group, selectedRouteIds);
-    if (state === 'all') {
-      const groupRouteIds = new Set(group.routes.map((r) => r.routeId));
-      onChange({
-        ...draft,
-        selectedRoutes: normalizeSelectedRouteExecutionOrders(
-          draft.selectedRoutes.filter((r) => !groupRouteIds.has(r.routeId)),
-        ),
-      });
-      return;
-    }
-    const existingById = new Map(draft.selectedRoutes.map((r) => [r.routeId, r] as const));
-    const toAdd = group.routes
-      .filter((route) => !existingById.has(route.routeId))
-      .map((route) => ({
-        ...toSelected(group, route),
-        executionOrder: 0,
-      }));
-    onChange({
-      ...draft,
-      selectedRoutes: normalizeSelectedRouteExecutionOrders([
-        ...draft.selectedRoutes,
-        ...toAdd,
-      ]),
-    });
-  };
-
-  const updateDwell = (routeId: string, stationId: string, raw: string) => {
+  const updateDwellSeconds = (instanceId: string, stationId: string, raw: string) => {
     const digits = sanitizeIntegerInput(raw);
     const dwellSeconds = digits === '' ? null : Math.max(1, Number(digits));
-    const current = selectedById.get(routeId);
+    const current = selectedByInstanceId.get(instanceId);
     if (!current) return;
-    patchSelectedRoute(routeId, {
+    const target = current.stationDwells.find((dwell) => dwell.stationId === stationId);
+    if (target && !isStationDwellRequired(target)) return;
+    patchSelectedRoute(instanceId, {
       stationDwellsConfirmed: false,
       stationDwells: current.stationDwells.map((dwell) =>
-        dwell.stationId === stationId ? { ...dwell, dwellSeconds } : dwell,
+        dwell.stationId === stationId
+          ? { ...dwell, dwellMode: 'seconds', dwellSeconds }
+          : dwell,
       ),
     });
   };
 
-  const updateDwellSlack = (routeId: string, raw: string) => {
+  const updateDwellMode = (
+    instanceId: string,
+    stationId: string,
+    mode: ShiftStationDwellMode,
+  ) => {
+    const current = selectedByInstanceId.get(instanceId);
+    if (!current) return;
+    const target = current.stationDwells.find((dwell) => dwell.stationId === stationId);
+    if (target && !isStationDwellRequired(target)) return;
+    patchSelectedRoute(instanceId, {
+      stationDwellsConfirmed: false,
+      stationDwells: current.stationDwells.map((dwell) => {
+        if (dwell.stationId !== stationId) return dwell;
+        if (mode === 'no_stop' || mode === 'line_change') {
+          return { ...dwell, dwellMode: mode, dwellSeconds: 0 };
+        }
+        return {
+          ...dwell,
+          dwellMode: 'seconds',
+          dwellSeconds: dwell.dwellSeconds != null && dwell.dwellSeconds > 0
+            ? dwell.dwellSeconds
+            : null,
+        };
+      }),
+    });
+  };
+
+  const updateDwellSlack = (instanceId: string, raw: string) => {
     const digits = raw.replace(/\D/g, '');
-    const seconds =
-      digits === '' ? 0 : normalizeDwellSlackSeconds(Number(digits));
-    patchSelectedRoute(routeId, {
+    const seconds = digits === '' ? 0 : normalizeDwellSlackSeconds(Number(digits));
+    patchSelectedRoute(instanceId, {
       dwellSlackSeconds: seconds,
       stationDwellsConfirmed: false,
     });
   };
 
-
-
   const updateRecoveryTime = (raw: string) => {
     const digits = raw.replace(/\D/g, '');
     const seconds =
       digits === '' ? null : normalizeMinimumRecoveryTimeSeconds(Number(digits));
+    const anchors = draft.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+    setThroughResults(null);
     onChange({
       ...draft,
       minimumRecoveryTimeSeconds: seconds,
@@ -808,46 +998,538 @@ export function StepShiftRouteGroups({
         ...route,
         stationDwellsConfirmed: false,
       })),
+      throughAnchors: {
+        ...anchors,
+        verifiedFingerprint: null,
+        verifiedPathCount: 0,
+      },
     });
   };
 
-  const updateSwitchBuffer = (routeId: string, raw: string) => {
+  const serviceDirectionTags = draft.serviceDirectionTags ?? [];
+
+  const addServiceDirectionTag = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onChange((prev) => {
+      const existing = prev.serviceDirectionTags ?? [];
+      if (existing.some((tag) => tag.name === trimmed)) return prev;
+      return {
+        ...prev,
+        serviceDirectionTags: [
+          ...existing,
+          { id: createServiceDirectionTagId(), name: trimmed },
+        ],
+      };
+    });
+  };
+
+  const removeServiceDirectionTag = (id: string) => {
+    onChange((prev) => ({
+      ...prev,
+      serviceDirectionTags: (prev.serviceDirectionTags ?? []).filter((tag) => tag.id !== id),
+      selectedRoutes: prev.selectedRoutes.map((route) =>
+        route.serviceDirectionId === id
+          ? { ...route, serviceDirectionId: null, serviceDirectionName: null }
+          : route,
+      ),
+    }));
+  };
+
+  const updateServiceDirectionId = (instanceId: string, tagId: string) => {
+    const trimmed = tagId.trim();
+    const tag = trimmed
+      ? serviceDirectionTags.find((item) => item.id === trimmed)
+      : null;
+    patchSelectedRoute(instanceId, {
+      serviceDirectionId: trimmed || null,
+      serviceDirectionName: tag?.name?.trim() || null,
+    });
+  };
+
+  const updateSwitchBuffer = (instanceId: string, raw: string) => {
     const digits = sanitizeIntegerInput(raw);
     const switchBufferAfterSeconds =
       digits === '' ? 0 : normalizeSwitchBufferAfterSeconds(Number(digits));
-    patchSelectedRoute(routeId, {
+    patchSelectedRoute(instanceId, {
       switchBufferAfterSeconds,
       stationDwellsConfirmed: false,
     });
   };
 
-  const updateRouteCode = (routeId: string, val: string) => {
-    patchSelectedRoute(routeId, {
+  const updateRouteCode = (instanceId: string, val: string) => {
+    patchSelectedRoute(instanceId, {
       routeCode: val.trim() ? val.trim().toUpperCase() : null,
       stationDwellsConfirmed: false,
     });
   };
 
-  const isGroupOpen = (groupId: string) => !collapsed[groupId];
+  /** 新增／編輯：排除已選路線 catalog id */
+  const excludedForAddPrimary = primaryRouteIds;
 
-  const totalMinTravel = draft.selectedRoutes.reduce((acc, r) => acc + (r.minTravelTimeSeconds ?? 0), 0);
-  const totalAvgTravel = draft.selectedRoutes.reduce((acc, r) => acc + (r.avgTravelTimeSeconds ?? 0), 0);
-  const totalDwells = draft.selectedRoutes.reduce((acc, r) => {
-    return acc + r.stationDwells.reduce((sum, d) => {
-      return sum + applyDwellSlackSeconds(d.dwellSeconds ?? 0, r.dwellSlackSeconds);
-    }, 0);
-  }, 0);
-  const totalSwitchBuffer = draft.selectedRoutes.reduce((acc, r) => acc + (r.switchBufferAfterSeconds ?? 0), 0);
-  
-  const totalMinCycle = totalMinTravel + totalDwells + totalSwitchBuffer + (draft.minimumRecoveryTimeSeconds ?? 0);
-  const totalAvgCycle = totalAvgTravel + totalDwells + totalSwitchBuffer + (draft.minimumRecoveryTimeSeconds ?? 0);
+  const excludedForEdit = (instance: ShiftScheduleSelectedRoute) => {
+    const next = new Set(primaryRouteIds);
+    next.delete(instance.routeId);
+    return next;
+  };
+
+  const throughAnchors = draft.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+  const startInstanceIds = throughAnchors.startInstanceIds;
+  const endInstanceIds = throughAnchors.endInstanceIds;
+
+  const headRoute = useMemo(
+    () => primaryRoutes.find((route) => route.executionOrder === 1) ?? null,
+    [primaryRoutes],
+  );
+  const headInstanceId = headRoute
+    ? resolveSelectedRouteInstanceId(headRoute)
+    : null;
+
+  const patchThroughAnchors = (
+    patch: Partial<ReturnType<typeof emptyShiftRouteThroughAnchorsDraft>>,
+  ) => {
+    setThroughResults(null);
+    onChange({
+      ...draft,
+      throughAnchors: {
+        ...throughAnchors,
+        ...patch,
+        verifiedFingerprint: null,
+        verifiedPathCount: 0,
+      },
+    });
+  };
+
+  useEffect(() => {
+    const valid = new Set(primaryRoutes.map((route) => resolveSelectedRouteInstanceId(route)));
+    let nextStarts = startInstanceIds.filter((id) => valid.has(id));
+    let nextEnds = endInstanceIds.filter((id) => valid.has(id));
+    // 起算／結算互斥：同卡同時存在時保留起算
+    const conflict = new Set(nextStarts.filter((id) => nextEnds.includes(id)));
+    if (conflict.size > 0) {
+      nextEnds = nextEnds.filter((id) => !conflict.has(id));
+    }
+    if (
+      nextStarts.length === startInstanceIds.length
+      && nextEnds.length === endInstanceIds.length
+      && nextStarts.every((id, i) => id === startInstanceIds[i])
+      && nextEnds.every((id, i) => id === endInstanceIds[i])
+    ) {
+      return;
+    }
+    onChange((prev) => {
+      const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+      return {
+        ...prev,
+        throughAnchors: {
+          ...anchors,
+          startInstanceIds: nextStarts,
+          endInstanceIds: nextEnds,
+          verifiedFingerprint: null,
+          verifiedPathCount: 0,
+        },
+      };
+    });
+    setThroughResults(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 僅在路線集合變化時清理失效起算／結算
+  }, [primaryRoutes]);
+
+  const throughVerified = useMemo(
+    () =>
+      isThroughVerificationCurrent({
+        anchors: throughAnchors,
+        routes: primaryRoutes,
+        graph: draft.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+        minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
+        turnaroundLimitSeconds,
+      }),
+    [
+      throughAnchors,
+      primaryRoutes,
+      draft.routeRelationGraph,
+      draft.minimumRecoveryTimeSeconds,
+      turnaroundLimitSeconds,
+    ],
+  );
+
+  const currentCheckFingerprint = useMemo(
+    () =>
+      buildThroughVerificationFingerprint({
+        startInstanceIds,
+        endInstanceIds,
+        routes: primaryRoutes,
+        graph: draft.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+        minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
+        turnaroundLimitSeconds,
+      }),
+    [
+      startInstanceIds,
+      endInstanceIds,
+      primaryRoutes,
+      draft.routeRelationGraph,
+      draft.minimumRecoveryTimeSeconds,
+      turnaroundLimitSeconds,
+    ],
+  );
+
+  /** 僅顯示與目前輸入一致的檢查結果，避免舊結果＋「請重新檢查」造成誤解 */
+  const freshThroughResults =
+    throughResults != null
+    && lastCheckFingerprint != null
+    && lastCheckFingerprint === currentCheckFingerprint
+      ? throughResults
+      : null;
+
+  const referenceCycle = useMemo(() => {
+    if (!freshThroughResults || freshThroughResults.length === 0) return null;
+    const priorityOnly = freshThroughResults.filter((item) => item.secondaryCount === 0);
+    const pool = priorityOnly.length > 0 ? priorityOnly : freshThroughResults;
+    return [...pool].sort((a, b) => {
+      if (a.secondaryCount !== b.secondaryCount) return a.secondaryCount - b.secondaryCount;
+      return a.minCycleSeconds - b.minCycleSeconds;
+    })[0] ?? null;
+  }, [freshThroughResults]);
+
   const hasLimit = turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0;
-  const isOver = hasLimit && totalMinCycle > (turnaroundLimitSeconds ?? 0);
+  const isOver =
+    hasLimit
+    && referenceCycle != null
+    && referenceCycle.minCycleSeconds > (turnaroundLimitSeconds ?? 0);
+  const hasPriorityPath =
+    freshThroughResults != null && freshThroughResults.some((item) => item.secondaryCount === 0);
+  const graphHasLinks = (draft.routeRelationGraph?.links.length ?? 0) > 0;
+  const cycleMarksReady = startInstanceIds.length > 0 && endInstanceIds.length > 0;
+  const headInStarts =
+    headInstanceId == null || startInstanceIds.includes(headInstanceId);
+
+  const runThroughVerification = () => {
+    if (!cycleMarksReady || !graphHasLinks) return;
+    const graph = draft.routeRelationGraph ?? emptyShiftRouteRelationGraph();
+    const paths = computeRouteThroughPaths({
+      startInstanceIds,
+      endInstanceIds,
+      routes: primaryRoutes,
+      graph,
+      minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
+    });
+    const checkFingerprint = buildThroughVerificationFingerprint({
+      startInstanceIds,
+      endInstanceIds,
+      routes: primaryRoutes,
+      graph,
+      minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
+      turnaroundLimitSeconds,
+    });
+    setThroughResults(paths);
+    setLastCheckFingerprint(checkFingerprint);
+    const priorityPaths = paths.filter((item) => item.secondaryCount === 0);
+    const best =
+      priorityPaths.length === 0
+        ? null
+        : [...priorityPaths].sort((a, b) => a.minCycleSeconds - b.minCycleSeconds)[0]
+          ?? null;
+    const overLimit =
+      turnaroundLimitSeconds != null
+      && turnaroundLimitSeconds > 0
+      && best != null
+      && best.minCycleSeconds > turnaroundLimitSeconds;
+    const headOk = headInStarts;
+    if (priorityPaths.length === 0 || overLimit || !headOk) {
+      onChange({
+        ...draft,
+        throughAnchors: {
+          ...throughAnchors,
+          verifiedFingerprint: null,
+          verifiedPathCount: 0,
+        },
+      });
+      return;
+    }
+    // 路線模式：清掉舊站點錨點，避免指紋比對混入 stationIds 導致「有結果卻未通過」
+    onChange({
+      ...draft,
+      throughAnchors: {
+        ...throughAnchors,
+        startStationIds: [],
+        endStationIds: [],
+        verifiedFingerprint: checkFingerprint,
+        verifiedPathCount: priorityPaths.length,
+      },
+    });
+  };
+
+  const toggleStartInstance = (instanceId: string) => {
+    if (startInstanceIds.includes(instanceId)) {
+      patchThroughAnchors({
+        startInstanceIds: startInstanceIds.filter((id) => id !== instanceId),
+      });
+      return;
+    }
+    // 起算與結算互斥：設起算時清掉同卡結算
+    patchThroughAnchors({
+      startInstanceIds: [...startInstanceIds, instanceId],
+      endInstanceIds: endInstanceIds.filter((id) => id !== instanceId),
+    });
+  };
+
+  const toggleEndInstance = (instanceId: string) => {
+    if (endInstanceIds.includes(instanceId)) {
+      patchThroughAnchors({
+        endInstanceIds: endInstanceIds.filter((id) => id !== instanceId),
+      });
+      return;
+    }
+    // 起算與結算互斥：設結算時清掉同卡起算
+    patchThroughAnchors({
+      endInstanceIds: [...endInstanceIds, instanceId],
+      startInstanceIds: startInstanceIds.filter((id) => id !== instanceId),
+    });
+  };
+
+  const throughGateStatus:
+    | 'missingGraph'
+    | 'missingMarks'
+    | 'headNotInStarts'
+    | 'stale'
+    | 'failed'
+    | 'noPriority'
+    | 'overLimit'
+    | 'passed' =
+    throughVerified
+      ? 'passed'
+      : !graphHasLinks
+        ? 'missingGraph'
+        : !cycleMarksReady
+          ? 'missingMarks'
+          : !headInStarts
+            ? 'headNotInStarts'
+            : freshThroughResults != null && freshThroughResults.length === 0
+              ? 'failed'
+              : freshThroughResults != null && !hasPriorityPath
+                ? 'noPriority'
+                : freshThroughResults != null && isOver
+                  ? 'overLimit'
+                  : 'stale';
+
+  const isManual = creationMode === 'manual';
+
+  const nextStepBlockers = useMemo(() => {
+    if (isManual) return [] as string[];
+    const blockers: string[] = [];
+    if (draft.minimumRecoveryTimeSeconds == null) {
+      blockers.push('尚未填寫最低恢復時間');
+    }
+    if (!graphHasLinks) {
+      blockers.push('關聯圖尚無連線');
+    } else if (!cycleMarksReady) {
+      blockers.push('尚未設好「由此起算」與「到此結算」');
+    } else if (!headInStarts) {
+      blockers.push('首班車必須也是起算路線');
+    } else if (!throughVerified) {
+      if (throughGateStatus === 'overLimit') {
+        blockers.push('優先路線組合超過折返時限');
+      } else if (throughGateStatus === 'noPriority') {
+        blockers.push('尚無全優先路線組合');
+      } else if (throughGateStatus === 'failed') {
+        blockers.push('找不到從起算到結算的路徑');
+      } else {
+        blockers.push('請按右下角「開始檢查路線組合」確認後才能下一步');
+      }
+    }
+    const recovery = draft.minimumRecoveryTimeSeconds;
+    if (recovery != null) {
+      const notReady = primaryRoutes.filter(
+        (route) => !isSelectedRouteDwellReady(route, turnaroundLimitSeconds, recovery),
+      );
+      if (notReady.length > 0) {
+        blockers.push(`尚有 ${notReady.length} 條路線靠站時間未填完，或單線超過折返時限`);
+      }
+    }
+    return blockers;
+  }, [
+    isManual,
+    draft.minimumRecoveryTimeSeconds,
+    graphHasLinks,
+    cycleMarksReady,
+    headInStarts,
+    throughVerified,
+    throughGateStatus,
+    primaryRoutes,
+    turnaroundLimitSeconds,
+  ]);
+
+  const renderConfiguredCard = (route: ShiftScheduleSelectedRoute) => {
+    const instanceId = resolveSelectedRouteInstanceId(route);
+    const isEditing = editingRouteId === instanceId;
+    const orderPosition = resolveRouteOrderPosition(primaryRoutes, instanceId);
+    const nextRoute = !isManual
+      ? resolveNextRouteInExecutionOrder(primaryRoutes, route.routeId)
+      : null;
+    // 多路線才顯示換線緩衝欄；不標「接哪一條」——結合關係在參數／關聯圖確定前未知
+    const showSwitchBuffer = !isManual && primaryRoutes.length > 1 && Boolean(nextRoute);
+
+    return (
+      <div
+        key={instanceId}
+        className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-4 py-3"
+      >
+        <div className="flex items-start gap-3">
+          {orderPosition ? (
+            <RouteOrderControls
+              showArrows={orderPosition.showControls}
+              canMoveUp={orderPosition.canMoveUp}
+              canMoveDown={orderPosition.canMoveDown}
+              onMove={(direction) => moveRouteOrder(instanceId, direction)}
+            />
+          ) : null}
+
+          <div className="min-w-0 flex-1 space-y-2">
+            {isEditing ? (
+              <div className="space-y-2">
+                <RoutePickerBar
+                  catalog={catalog}
+                  excludedRouteIds={excludedForEdit(route)}
+                  selectedRouteId={pendingEditRouteId}
+                  onSelectRouteId={setPendingEditRouteId}
+                  onConfirm={(nextRouteId) => {
+                    if (!nextRouteId) return;
+                    replaceRoute(instanceId, nextRouteId);
+                    setEditingRouteId(null);
+                    setPendingEditRouteId('');
+                  }}
+                  confirmLabel="確認更換路線"
+                  emptyHint="重新選擇路線"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingRouteId(null);
+                    setPendingEditRouteId('');
+                  }}
+                  className="text-xs text-zinc-500 hover:text-zinc-300"
+                >
+                  取消編輯
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {orderPosition.executionOrder === 1 ? (
+                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+                    起始
+                  </span>
+                ) : null}
+                <span className="text-sm font-medium text-zinc-100">{route.routeName}</span>
+                <label className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900/80 px-1.5 py-0.5">
+                  <span className="text-[10px] font-medium text-zinc-400">
+                    代號
+                    <span className="text-rose-400" aria-hidden>
+                      *
+                    </span>
+                  </span>
+                  <input
+                    type="text"
+                    value={route.routeCode ?? ''}
+                    maxLength={3}
+                    required
+                    onChange={(e) =>
+                      updateRouteCode(
+                        instanceId,
+                        e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
+                      )
+                    }
+                    className="w-8 bg-transparent text-center text-xs font-bold text-[#2B7FFF] focus:outline-none"
+                    title="路線代號（必填，班次卡顯示用）"
+                    aria-label={`${route.routeName} 路線代號（必填）`}
+                    aria-required
+                  />
+                </label>
+                <span className="text-xs text-zinc-500">{route.groupName}</span>
+                {!isManual ? (
+                  <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                    <span className="shrink-0">服務方向</span>
+                    <select
+                      value={route.serviceDirectionId ?? ''}
+                      onChange={(e) => updateServiceDirectionId(instanceId, e.target.value)}
+                      disabled={serviceDirectionTags.length === 0}
+                      className="h-7 max-w-[140px] rounded-md border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200 focus:border-[#2B7FFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`${route.routeName} 服務方向`}
+                      title={
+                        serviceDirectionTags.length === 0
+                          ? '請先在上方新增服務方向'
+                          : '選擇此路線所屬服務方向（單選）'
+                      }
+                    >
+                      <option value="">未設定</option>
+                      {serviceDirectionTags.map((tag) => (
+                        <option key={tag.id} value={tag.id}>
+                          {tag.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+            )}
+
+            {!isEditing && !route.routeCode?.trim() ? (
+              <p className="text-[11px] text-amber-400/90">
+                {isManual
+                  ? '請填寫路線代號，供手動製作班次代號使用。'
+                  : '請填寫路線代號；變更後需重新產生班表。'}
+              </p>
+            ) : null}
+
+            {!isEditing ? (
+              <StationDwellEditor
+                route={route}
+                turnaroundLimitSeconds={turnaroundLimitSeconds}
+                minimumRecoveryTimeSeconds={isManual ? 0 : draft.minimumRecoveryTimeSeconds}
+                hideRecoveryInSummary={isManual}
+                showSwitchBuffer={showSwitchBuffer}
+                onUpdateDwellSeconds={(stationId, val) =>
+                  updateDwellSeconds(instanceId, stationId, val)
+                }
+                onUpdateDwellMode={(stationId, mode) =>
+                  updateDwellMode(instanceId, stationId, mode)
+                }
+                onUpdateDwellSlack={(val) => updateDwellSlack(instanceId, val)}
+                onUpdateSwitchBuffer={(val) => updateSwitchBuffer(instanceId, val)}
+              />
+            ) : null}
+          </div>
+
+          {!isEditing ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                title="編輯路線"
+                onClick={() => {
+                  setEditingRouteId(instanceId);
+                  setPendingEditRouteId(route.routeId);
+                }}
+                className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                <Pencil className="size-4" />
+              </button>
+              <button
+                type="button"
+                title="刪除"
+                onClick={() => deletePrimary(instanceId)}
+                className="rounded-lg p-2 text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="mb-6 shrink-0">
-        <h2 className="text-base font-medium text-zinc-100">選擇要套用的路線群組</h2>
+        <h2 className="text-base font-medium text-zinc-100">配置路線群組</h2>
         {!loading && !error && mapDisplayName ? (
           <p className="mt-1 text-xs text-zinc-500">
             資料來源：目前使用地圖「{mapDisplayName}」
@@ -879,120 +1561,217 @@ export function StepShiftRouteGroups({
           </p>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="flex flex-col gap-3 pb-4">
-              {catalog.map((group) => (
-                <RouteGroupSection
-                  key={group.groupId}
-                  group={group}
-                  expanded={isGroupOpen(group.groupId)}
-                  selectionState={resolveGroupSelectionState(group, selectedRouteIds)}
-                  onToggleExpanded={() =>
-                    setCollapsed((prev) => ({
-                      ...prev,
-                      [group.groupId]: !prev[group.groupId],
-                    }))
-                  }
-                  onToggleGroup={() => toggleGroup(group)}
-                  selectedRouteIds={selectedRouteIds}
-                  onToggleRoute={(route) => toggleRoute(group, route)}
-                />
-              ))}
-            </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 pb-4">
+          {!isManual ? (
+            <RecoveryAndServiceDirectionBar
+              minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
+              onUpdateRecoveryTime={updateRecoveryTime}
+              serviceDirectionTags={serviceDirectionTags}
+              onAddTag={addServiceDirectionTag}
+              onRemoveTag={removeServiceDirectionTag}
+            />
+          ) : null}
+
+          <div className="space-y-3">
+            {primaryRoutes.map((route) => renderConfiguredCard(route))}
+
+            <RoutePickerBar
+              catalog={catalog}
+              excludedRouteIds={excludedForAddPrimary}
+              selectedRouteId={pendingAddRouteId}
+              onSelectRouteId={setPendingAddRouteId}
+              onConfirm={confirmAddPrimary}
+              confirmLabel="確認新增路線"
+              emptyHint="依群組選擇路線"
+              title="新增路線"
+              expanded={addPrimaryOpen}
+              onExpand={() => setAddPrimaryOpen(true)}
+              onCancel={() => {
+                setAddPrimaryOpen(false);
+                setPendingAddRouteId('');
+              }}
+            />
           </div>
 
-          {draft.selectedRoutes.length > 0 ? (
-            <div className="mt-4 shrink-0 space-y-4 border-t border-zinc-800 bg-zinc-950/40 p-4">
-              <SelectedRoutesSummaryPanel
-                routes={draft.selectedRoutes}
-                turnaroundLimitSeconds={turnaroundLimitSeconds}
-                minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
-                creationMode={creationMode}
-                onMove={moveRouteOrder}
-                onUpdateSwitchBuffer={updateSwitchBuffer}
-                onUpdateRouteCode={updateRouteCode}
-                onUpdateDwell={updateDwell}
-                onUpdateDwellSlack={updateDwellSlack}
-                onUpdateRecoveryTime={updateRecoveryTime}
+          {primaryRoutes.length > 0 ? (
+            <div className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50">
+              <RouteRelationGraphEditor
+                framed={false}
+                routes={primaryRoutes}
+                graph={draft.routeRelationGraph ?? emptyShiftRouteRelationGraph()}
+                headInstanceId={headInstanceId}
+                startInstanceIds={startInstanceIds}
+                endInstanceIds={endInstanceIds}
+                onChange={(routeRelationGraph) => {
+                  setThroughResults(null);
+                  onChange({
+                    ...draft,
+                    routeRelationGraph,
+                    throughAnchors: {
+                      ...throughAnchors,
+                      verifiedFingerprint: null,
+                      verifiedPathCount: 0,
+                    },
+                  });
+                }}
+                onSetHead={(instanceId) => setRouteAsHead(instanceId)}
+                onToggleStartInstance={toggleStartInstance}
+                onToggleEndInstance={toggleEndInstance}
               />
-              
-              {creationMode !== 'manual' ? (
-              <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-zinc-200">通盤可行性對抗</h4>
-                  {turnaroundLimitSeconds != null && (
-                    <span className="text-xs text-zinc-500">
-                      車輛折返時限限制: {formatSecondsLabel(turnaroundLimitSeconds)}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className={`rounded-lg border p-4 transition-all duration-300 ${
-                    isOver 
-                      ? 'border-red-500/30 bg-red-500/5' 
-                      : 'border-emerald-500/20 bg-emerald-500/5'
-                  }`}>
-                    <div className="text-xs font-medium text-zinc-400">完整循環最快時間</div>
-                    <div className={`mt-2 text-2xl font-bold tabular-nums ${
-                      isOver ? 'text-red-400' : 'text-emerald-400'
-                    }`}>
-                      {formatSecondsLabel(totalMinCycle)}
-                    </div>
-                    <div className="mt-1.5 text-[10px] text-zinc-500 font-medium">
-                      ({totalMinTravel}s 行駛 + {totalDwells}s 停靠 + {totalSwitchBuffer}s 切換 + {draft.minimumRecoveryTimeSeconds ?? 0}s 恢復)
-                    </div>
-                  </div>
 
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                    <div className="text-xs font-medium text-zinc-400">完整循環平均時間</div>
-                    <div className="mt-2 text-2xl font-bold tabular-nums text-zinc-200">
-                      {formatSecondsLabel(totalAvgCycle)}
+              {!isManual ? (
+                <div className="space-y-3 border-t border-zinc-800/70 px-4 py-3">
+                  {throughGateStatus === 'missingGraph' ? (
+                    <p className="text-[11px] text-zinc-500">請先在關聯圖拉好路線接續（至少一條連線）。</p>
+                  ) : throughGateStatus === 'missingMarks' ? (
+                    <p className="text-[11px] text-zinc-400">
+                      請至少各設一條「由此起算」與「到此結算」，並設好首班車。
+                    </p>
+                  ) : throughGateStatus === 'headNotInStarts' ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                      <span>首班車必須也是「由此起算」的其中一條。</span>
+                    </p>
+                  ) : throughGateStatus === 'failed' ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                      <span>找不到從起算走到結算的路徑，請檢查優先連線。</span>
+                    </p>
+                  ) : throughGateStatus === 'noPriority' ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                      <span>目前只有含次要連線的路徑，請補上全優先接續。</span>
+                    </p>
+                  ) : null}
+
+                  {freshThroughResults != null && freshThroughResults.length > 0 ? (
+                    <div className="space-y-1">
+                      {freshThroughResults.map((cycle) => {
+                        const rowOver =
+                          hasLimit && cycle.minCycleSeconds > (turnaroundLimitSeconds ?? 0);
+                        const isReference = referenceCycle?.id === cycle.id;
+                        return (
+                          <div
+                            key={cycle.id}
+                            className="flex items-start justify-between gap-6 py-2.5 text-sm"
+                          >
+                            <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
+                              {cycle.labels.map((label, labelIndex) => (
+                                <span key={`${cycle.id}-${labelIndex}`} className="contents">
+                                  {labelIndex > 0 ? (
+                                    <span
+                                      className={[
+                                        'inline-flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
+                                        cycle.linkKinds[labelIndex - 1] === 'secondary'
+                                          ? 'bg-violet-500/30 text-violet-100'
+                                          : 'bg-sky-500/30 text-sky-100',
+                                      ].join(' ')}
+                                    >
+                                      {cycle.linkKinds[labelIndex - 1] === 'secondary'
+                                        ? '次'
+                                        : '優'}
+                                    </span>
+                                  ) : null}
+                                  <span className="font-medium text-zinc-100">{label}</span>
+                                </span>
+                              ))}
+                              <span className="text-zinc-600">·</span>
+                              <span
+                                className={
+                                  cycle.secondaryCount === 0 ? 'text-sky-300' : 'text-violet-300'
+                                }
+                              >
+                                {cycle.secondaryCount === 0
+                                  ? '全優先'
+                                  : `次要×${cycle.secondaryCount}`}
+                              </span>
+                              {isReference ? (
+                                <>
+                                  <span className="text-zinc-600">·</span>
+                                  <span className="text-emerald-300">優先採用</span>
+                                </>
+                              ) : cycle.secondaryCount > 0 ? (
+                                <>
+                                  <span className="text-zinc-600">·</span>
+                                  <span className="text-violet-200/80">備用</span>
+                                </>
+                              ) : null}
+                            </div>
+                            <div
+                              className={[
+                                'shrink-0 space-y-0.5 text-right tabular-nums',
+                                rowOver ? 'text-red-400' : 'text-zinc-200',
+                              ].join(' ')}
+                            >
+                              <div className="text-sm">
+                                <span className="text-zinc-500">快 </span>
+                                {formatSecondsLabel(cycle.minCycleSeconds)}
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-zinc-500">均 </span>
+                                {formatSecondsLabel(cycle.avgCycleSeconds)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="mt-1.5 text-[10px] text-zinc-500 font-medium">
-                      ({totalAvgTravel}s 行駛 + {totalDwells}s 停靠 + {totalSwitchBuffer}s 切換 + {draft.minimumRecoveryTimeSeconds ?? 0}s 恢復)
-                    </div>
+                  ) : null}
+
+                  {throughGateStatus === 'overLimit' && referenceCycle ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                      <span>
+                        優先採用（{referenceCycle.labels.join('→')}）最快{' '}
+                        {formatSecondsLabel(referenceCycle.minCycleSeconds)}
+                        、平均 {formatSecondsLabel(referenceCycle.avgCycleSeconds)}
+                        大於折返時限（{formatSecondsLabel(turnaroundLimitSeconds)}）。
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {throughGateStatus === 'passed' && referenceCycle ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                      <span>
+                        已確認：{referenceCycle.labels.join('→')}
+                        {hasLimit ? '，符合折返時限' : ''}
+                        。可以下一步。
+                      </span>
+                    </p>
+                  ) : throughGateStatus === 'passed' ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                      <span>路線組合仍有效。可以下一步。</span>
+                    </p>
+                  ) : null}
+
+                  <div className="flex flex-col items-end gap-2">
+                    {nextStepBlockers.length > 0 ? (
+                      <div className="w-full rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-left text-[11px] text-amber-100/90">
+                        <p className="font-medium text-amber-200">下一步尚無法使用：</p>
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-amber-100/80">
+                          {nextStepBlockers.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={!cycleMarksReady || !graphHasLinks}
+                      onClick={runThroughVerification}
+                      className="rounded-md border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 px-3 py-1.5 text-xs font-medium text-[#9ec5ff] hover:bg-[#2B7FFF]/25 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {throughVerified ? '重新檢查路線組合' : '開始檢查路線組合'}
+                    </button>
                   </div>
                 </div>
-
-                {turnaroundLimitSeconds != null && (
-                  <div className="mt-3">
-                    {isOver ? (
-                      <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
-                        <span>
-                          <strong>校驗未通過</strong>：完整循環最快時間（{formatSecondsLabel(totalMinCycle)}）大於車輛折返時限限制（{formatSecondsLabel(turnaroundLimitSeconds)}）。請縮短停靠時間、靠站緩衝秒數，或降低最低恢復時間。
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-                        <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-                        <span>
-                          <strong>校驗通過</strong>：完整循環最快時間符合車輛折返時限限制。
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
               ) : null}
             </div>
           ) : null}
         </div>
       )}
     </div>
-  );
-}
-
-function InfoTooltip({ content, example }: { content: string; example?: string }) {
-  return (
-    <span className="group relative inline-flex cursor-help items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-400 size-3.5 hover:bg-zinc-700 hover:text-zinc-200">
-      ?
-      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 w-60 -translate-x-1/2 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[11px] font-normal leading-normal text-zinc-300 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-50">
-        {content}
-        {example && <span className="mt-1 block text-zinc-500">{example}</span>}
-      </span>
-    </span>
   );
 }

@@ -25,10 +25,30 @@ import {
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   normalizeSwitchBufferAfterSeconds,
+  formatStationDwellRoleLabel,
+  resolveStationDwellListRole,
+  resolveStationDwellMode,
   sortSelectedRoutesByExecutionOrder,
   sumStationDwellSecondsWithSlack,
   summarizeRouteGroupsCycle,
 } from '../types/create';
+import {
+  fetchMediaLibraryOptions,
+  type MediaLibraryOption,
+} from '../api/mediaLibraryApi';
+import {
+  SHIFT_ACTION_ZONE_LABELS,
+  isMediaBehavior,
+  labelForActionBehavior,
+  labelForOffsetUnit,
+  resolveShiftActionCategory,
+} from '../utils/actionSettingsCatalog';
+import type { ShiftRouteSegmentAction } from '../utils/actionSettings';
+import {
+  loadActionFacilityGroups,
+  resolveFacilityTargetLabel,
+  type ActionFacilityTypeGroup,
+} from '../utils/actionFacilityOptions';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 
@@ -46,6 +66,83 @@ type StepShiftSchedulePreviewProps = {
 function formatSeconds(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds)) return '—';
   return `${Math.round(seconds)} 秒`;
+}
+
+function formatActionReviewLine(
+  action: ShiftRouteSegmentAction,
+  mediaById: Map<string, MediaLibraryOption>,
+  facilityGroups: ActionFacilityTypeGroup[],
+): string {
+  const category = resolveShiftActionCategory(action.categoryId);
+  const parts: string[] = [category?.label ?? '未選類別'];
+
+  if (
+    category
+    && category.offsetUnits.length > 0
+    && action.offsetValue != null
+    && action.offsetUnit
+  ) {
+    parts.push(
+      `${category.offsetLabel ?? ''}${action.offsetValue}${labelForOffsetUnit(action.offsetUnit)}`,
+    );
+  }
+
+  if (category?.requiresTargetSelect) {
+    const targetLabel = resolveFacilityTargetLabel(
+      action.targetKind,
+      action.targetId,
+      facilityGroups,
+    );
+    parts.push(targetLabel || '未選設施');
+  }
+
+  if (action.behavior) {
+    if (isMediaBehavior(action.behavior)) {
+      const resourceId = action.resourceId?.trim() ?? '';
+      const media = resourceId ? mediaById.get(resourceId) : undefined;
+      if (media) {
+        const kindLabel = media.kind === 'group' ? '媒體群組' : '音樂';
+        parts.push(`播放${kindLabel}「${media.name}」`);
+      } else if (resourceId) {
+        parts.push(`播放音樂「${resourceId}」`);
+      } else {
+        parts.push(`${labelForActionBehavior(action.behavior)}（未選媒體）`);
+      }
+    } else {
+      parts.push(labelForActionBehavior(action.behavior));
+    }
+  }
+
+  return parts.join(' · ');
+}
+
+function ActionZoneReviewBlock({
+  zoneLabel,
+  actions,
+  mediaById,
+  facilityGroups,
+}: {
+  zoneLabel: string;
+  actions: ShiftRouteSegmentAction[];
+  mediaById: Map<string, MediaLibraryOption>;
+  facilityGroups: ActionFacilityTypeGroup[];
+}) {
+  if (actions.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-dashed border-zinc-700/60 bg-zinc-950/50 px-3 py-2.5">
+      <p className="text-[11px] font-medium tracking-wide text-zinc-400">{zoneLabel}</p>
+      <ul className="mt-1.5 space-y-1">
+        {actions.map((action, index) => (
+          <li key={action.id} className="text-xs text-zinc-300">
+            <span className="mr-1.5 font-semibold uppercase text-[#7CB8FF]">
+              {String.fromCharCode(97 + index)}.
+            </span>
+            {formatActionReviewLine(action, mediaById, facilityGroups)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function ReviewSection({
@@ -187,14 +284,13 @@ function RouteGroupsCycleSummaryPanel({
 function RouteReviewCard({
   route,
   recoverySeconds,
+  compact = false,
 }: {
   route: ShiftScheduleSelectedRoute;
   recoverySeconds: number;
+  /** 手動製作：列出站點名稱，不顯示路線預設靠站／緩衝秒數（各班次卡可不同） */
+  compact?: boolean;
 }) {
-  const dwellSlack = normalizeDwellSlackSeconds(route.dwellSlackSeconds);
-  const switchBuffer = normalizeSwitchBufferAfterSeconds(route.switchBufferAfterSeconds);
-  const dwellWithSlack = sumStationDwellSecondsWithSlack(route.stationDwells, dwellSlack);
-
   return (
     <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -212,11 +308,57 @@ function RouteReviewCard({
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             群組 {route.groupName || '—'}
-            {route.stationDwellsConfirmed ? ' · 停靠已確認' : ' · 停靠未確認'}
+            {compact
+              ? null
+              : route.stationDwellsConfirmed
+                ? ' · 停靠已確認'
+                : ' · 停靠未確認'}
           </p>
         </div>
       </div>
 
+      {compact ? (
+        <div className="mt-3">
+          <p className="mb-1.5 text-xs text-zinc-500">站點</p>
+          {route.stationDwells.length === 0 ? (
+            <p className="text-xs text-zinc-600">無站點資料</p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {route.stationDwells.map((dwell, index) => (
+                <li
+                  key={`${route.routeId}-${dwell.stationId}`}
+                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-300"
+                >
+                  <span className="mr-1 tabular-nums text-zinc-500">{index + 1}.</span>
+                  <span className="text-zinc-200">{dwell.stationName || dwell.stationId}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <RouteReviewCardParametricDetails
+          route={route}
+          recoverySeconds={recoverySeconds}
+        />
+      )}
+    </div>
+  );
+}
+
+function RouteReviewCardParametricDetails({
+  route,
+  recoverySeconds,
+}: {
+  route: ShiftScheduleSelectedRoute;
+  recoverySeconds: number;
+}) {
+  const dwellSlack = normalizeDwellSlackSeconds(route.dwellSlackSeconds);
+  const switchBuffer = normalizeSwitchBufferAfterSeconds(route.switchBufferAfterSeconds);
+  const dwellWithSlack = sumStationDwellSecondsWithSlack(route.stationDwells, dwellSlack);
+
+  return (
+    <>
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <p className="text-zinc-500">平均行駛</p>
@@ -246,17 +388,27 @@ function RouteReviewCard({
           <p className="text-xs text-zinc-600">無站點資料</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
-            {route.stationDwells.map((dwell) => (
-              <li
-                key={`${route.routeId}-${dwell.stationId}`}
-                className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-300"
-              >
-                <span className="text-zinc-200">{dwell.stationName}</span>
-                <span className="ml-1.5 tabular-nums text-zinc-500">
-                  {formatSeconds(dwell.dwellSeconds)}
-                </span>
-              </li>
-            ))}
+            {route.stationDwells.map((dwell, index) => {
+              const role = resolveStationDwellListRole(dwell, index);
+              const mode = resolveStationDwellMode(dwell);
+              const modeLabel =
+                role !== 'editable'
+                  ? formatStationDwellRoleLabel(role)
+                  : mode === 'no_stop'
+                    ? '不停靠'
+                    : mode === 'line_change'
+                      ? '換線停靠'
+                      : formatSeconds(dwell.dwellSeconds);
+              return (
+                <li
+                  key={`${route.routeId}-${dwell.stationId}`}
+                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-300"
+                >
+                  <span className="text-zinc-200">{dwell.stationName}</span>
+                  <span className="ml-1.5 tabular-nums text-zinc-500">{modeLabel}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
         <p className="mt-2 text-[11px] text-zinc-500">
@@ -269,7 +421,7 @@ function RouteReviewCard({
           <span className="tabular-nums text-zinc-300">{formatSeconds(recoverySeconds)}</span>
         </p>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -286,11 +438,20 @@ export function StepShiftSchedulePreview({
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
   const [templateLoading, setTemplateLoading] = useState(true);
   const [vehicleCapacity, setVehicleCapacity] = useState(50);
-
+  const [mediaOptions, setMediaOptions] = useState<MediaLibraryOption[]>([]);
+  const [facilityGroups, setFacilityGroups] = useState<ActionFacilityTypeGroup[]>([]);
   const orderedRoutes = useMemo(
     () => sortSelectedRoutesByExecutionOrder(draft.routeGroups.selectedRoutes),
     [draft.routeGroups.selectedRoutes],
   );
+
+  const mediaById = useMemo(() => {
+    const map = new Map<string, MediaLibraryOption>();
+    for (const item of mediaOptions) {
+      map.set(item.id, item);
+    }
+    return map;
+  }, [mediaOptions]);
 
   const recoverySeconds = normalizeMinimumRecoveryTimeSeconds(
     draft.routeGroups.minimumRecoveryTimeSeconds,
@@ -300,6 +461,39 @@ export function StepShiftSchedulePreview({
     () => summarizeRouteGroupsCycle(draft.routeGroups),
     [draft.routeGroups],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMediaLibraryOptions()
+      .then((items) => {
+        if (!cancelled) setMediaOptions(items);
+      })
+      .catch(() => {
+        if (!cancelled) setMediaOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const mapId = draft.routeGroups.mapId;
+    if (!mapId.trim()) {
+      setFacilityGroups([]);
+      return;
+    }
+    void loadActionFacilityGroups(mapId)
+      .then((groups) => {
+        if (!cancelled) setFacilityGroups(groups);
+      })
+      .catch(() => {
+        if (!cancelled) setFacilityGroups([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.routeGroups.mapId]);
 
   useEffect(() => {
     const templateId = output?.timeTemplateRef.templateId ?? draft.timeTemplate.templateId;
@@ -393,11 +587,15 @@ export function StepShiftSchedulePreview({
           ) : (
             <div className="space-y-3">
               <div className="rounded-lg border border-zinc-800/60 bg-zinc-950/30 px-3 py-2 text-xs text-zinc-400">
-                <span>策略參數｜最低恢復時間 </span>
-                <span className="tabular-nums text-zinc-200">
-                  {formatSeconds(recoverySeconds)}
-                </span>
-                <span className="mx-2 text-zinc-700">·</span>
+                {draft.creationMode !== 'manual' ? (
+                  <>
+                    <span>策略參數｜最低恢復時間 </span>
+                    <span className="tabular-nums text-zinc-200">
+                      {formatSeconds(recoverySeconds)}
+                    </span>
+                    <span className="mx-2 text-zinc-700">·</span>
+                  </>
+                ) : null}
                 <span>已選路線 </span>
                 <span className="tabular-nums text-zinc-200">{orderedRoutes.length}</span>
                 <span className="mx-2 text-zinc-700">·</span>
@@ -419,13 +617,114 @@ export function StepShiftSchedulePreview({
                   key={route.routeId}
                   route={route}
                   recoverySeconds={recoverySeconds}
+                  compact={draft.creationMode === 'manual'}
                 />
               ))}
             </div>
           )}
         </ReviewSection>
 
-        <ReviewSection step={5} title="調整班表" onNavigate={onNavigateToStep}>
+        <ReviewSection step={5} title="行動設定" onNavigate={onNavigateToStep}>
+            {draft.actionSettings.routes.every((route) => {
+              const stationCount = (route.stations ?? []).reduce(
+                (sum, station) =>
+                  sum + station.beforeArrive.length + station.afterArrive.length,
+                0,
+              );
+              const movingCount = (route.movingLegs ?? []).reduce(
+                (sum, leg) => sum + leg.actions.length,
+                0,
+              );
+              return stationCount + movingCount === 0;
+            }) ? (
+              <p className="text-sm text-zinc-500">未設定站間行動</p>
+            ) : (
+              <div className="space-y-4">
+                {draft.actionSettings.routes.map((route) => {
+                  const stations = route.stations ?? [];
+                  const movingLegs = route.movingLegs ?? [];
+                  const hasAnyAction =
+                    stations.some(
+                      (station) =>
+                        station.beforeArrive.length > 0
+                        || station.afterArrive.length > 0,
+                    )
+                    || movingLegs.some((leg) => leg.actions.length > 0);
+                  if (!hasAnyAction) return null;
+
+                  return (
+                    <div
+                      key={route.routeId}
+                      className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3"
+                    >
+                      <p className="text-sm font-medium text-zinc-100">
+                        {route.routeName}
+                        {route.routeCode ? (
+                          <span className="ml-2 text-xs text-zinc-500">{route.routeCode}</span>
+                        ) : null}
+                      </p>
+
+                      <div className="mt-3 space-y-4">
+                        {stations.map((station, stationIndex) => {
+                          const nextStation = stations[stationIndex + 1];
+                          const movingLeg = nextStation
+                            ? movingLegs.find(
+                                (leg) =>
+                                  leg.fromStationId === station.stationId
+                                  && leg.toStationId === nextStation.stationId,
+                              )
+                            : null;
+                          const hasStationActions =
+                            station.beforeArrive.length > 0
+                            || station.afterArrive.length > 0
+                            || (movingLeg?.actions.length ?? 0) > 0;
+                          if (!hasStationActions) return null;
+
+                          return (
+                            <div key={station.stationId} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="flex size-6 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-[10px] font-semibold tabular-nums text-[#7CB8FF]">
+                                  {stationIndex + 1}
+                                </span>
+                                <span className="text-xs font-medium text-zinc-200">
+                                  {station.stationName}
+                                </span>
+                              </div>
+
+                              <div className="space-y-2 pl-1">
+                                <ActionZoneReviewBlock
+                                  zoneLabel={SHIFT_ACTION_ZONE_LABELS.before_arrive}
+                                  actions={station.beforeArrive}
+                                  mediaById={mediaById}
+                                  facilityGroups={facilityGroups}
+                                />
+                                <ActionZoneReviewBlock
+                                  zoneLabel={SHIFT_ACTION_ZONE_LABELS.after_arrive}
+                                  actions={station.afterArrive}
+                                  mediaById={mediaById}
+                                  facilityGroups={facilityGroups}
+                                />
+                                {movingLeg ? (
+                                  <ActionZoneReviewBlock
+                                    zoneLabel={`${SHIFT_ACTION_ZONE_LABELS.moving} · ${movingLeg.fromStationName} → ${movingLeg.toStationName}`}
+                                    actions={movingLeg.actions}
+                                    mediaById={mediaById}
+                                    facilityGroups={facilityGroups}
+                                  />
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ReviewSection>
+
+        <ReviewSection step={6} title="調整班表" onNavigate={onNavigateToStep}>
           {!output ? (
             <PanelNoData
               message="尚無班表產出，請先回到「調整班表」重新生成"
@@ -456,7 +755,7 @@ export function StepShiftSchedulePreview({
                 </div>
               )}
 
-              <div className="mb-3 flex flex-wrap items-center gap-4">
+              <div className="mb-3 flex shrink-0 flex-wrap items-center gap-4">
                 <div className="flex items-center gap-5 border-b border-zinc-800/80">
                   <button
                     type="button"
@@ -512,6 +811,7 @@ export function StepShiftSchedulePreview({
                     templateTasks={templateTasks}
                     selectedRoutes={draft.routeGroups.selectedRoutes}
                     minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
+                    hideStrategyBuffers={draft.creationMode === 'manual'}
                   />
                 ) : (
                   <PanelNoData message="班表產出缺少班次資料" className="min-h-[240px]" />
@@ -530,6 +830,7 @@ export function StepShiftSchedulePreview({
                     attributes={attributes}
                     vehicleCapacity={vehicleCapacity}
                     selectedRoutes={draft.routeGroups.selectedRoutes}
+                    serviceDirectionTags={draft.routeGroups.serviceDirectionTags}
                     className="min-h-[280px]"
                   />
                 )

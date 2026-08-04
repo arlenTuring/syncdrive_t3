@@ -4,20 +4,25 @@ export type FieldEquipmentKind =
   | 'charging'
   | 'signal'
   | 'smart_pole'
+  | 'platform_door'
   | 'car_wash'
   | 'maintenance'
   | 'yard_slot'
+  | 'equipment'
+  | 'facility'
   | 'all';
 
 export type FieldEquipmentItem = {
   equipmentId: string;
   mapCode: string;
   equipmentKind: string;
+  objectCategory?: 'equipment' | 'facility';
   label: string;
   purpose?: string;
   mqttInstanceId?: string;
   areaId: string;
   areaName: string;
+  facilityType?: string;
 };
 
 export type FieldEquipmentResponse = {

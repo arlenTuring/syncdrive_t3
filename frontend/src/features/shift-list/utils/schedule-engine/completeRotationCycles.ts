@@ -1,5 +1,6 @@
 import type {
   ScheduleTask,
+  TaskTypeKey,
   TimeSlotAttribute,
   TimeSlotInterval,
 } from '../../../time-templates/types/editor';
@@ -7,13 +8,13 @@ import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import {
   resolveFleetPhysicalHeadwayFloorSeconds,
   resolveInterTripGapSeconds,
+  resolvePassengerRouteOccupancy,
+  shouldIncludeRecoveryForRouteSwitch,
   snapUpToClockAlignSeconds,
-  sumStationDwellSecondsWithSlack,
 } from './physics';
 import { resolvePairHeadwaySeconds } from './validate';
 import type { FeasibilityIssue } from './types';
 import { minuteToSecond, secondToMinute, pushIssue } from './types';
-import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
 import {
   resolveMaintenanceEntrySlackSeconds,
   type MaintenanceEntrySlackBySection,
@@ -22,6 +23,12 @@ import {
   findEmptyRangeStartingAt,
   listEmptyAttributeMinuteRanges,
 } from '../emptyAttributeIntervals';
+import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
+import {
+  resolveRouteIndexInRotation,
+  resolveStartInstanceId,
+  type RouteSuccessorPolicy,
+} from './routeSuccessorPolicy';
 
 /** 週期補完（rotation-cycle completion）算法識別碼 */
 export const ROTATION_CYCLE_COMPLETION_ALGORITHM = 'rotation-cycle-completion-v1' as const;
@@ -56,16 +63,11 @@ function pushSorted(list: number[], value: number): void {
 }
 
 function resolveOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
-  const travelSeconds =
-    resolveEffectiveRouteTravelSeconds(route)?.avgTravelTimeSeconds
-    ?? route.avgTravelTimeSeconds
-    ?? 0;
-  const dwellSeconds = sumStationDwellSecondsWithSlack(
-    route.stationDwells,
-    route.dwellSlackSeconds,
-  ) ?? 0;
-  if (travelSeconds <= 0) return 0;
-  return snapUpToClockAlignSeconds(travelSeconds + dwellSeconds);
+  return resolvePassengerRouteOccupancy(route)?.occupancySeconds ?? 0;
+}
+
+function resolveMinOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
+  return resolvePassengerRouteOccupancy(route)?.minOccupancySeconds ?? 0;
 }
 
 /**
@@ -73,12 +75,13 @@ function resolveOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
  * 才能進入整備任務（充電、保養）或收班；不允許車輛停在對側終點站。
  *
  * 回程班次的發車時刻：
- * 1. 物理下限：前趟結束 + 恢復 + 換線緩衝（相加）
+ * 1. 物理下限：前趟結束 + 恢復／換線（導通中段僅換線）
  * 2. 同方向班距對齊（可退讓：見上限）
  * 3. 上限 A：若補完本可在觸發整備前完成，禁止班距把回程推過整備起點
  * 4. 上限 B：不得與同車後續已掛正線重叠或吃掉換線／恢復空檔
  * 5. 整備視窗彈性：回程可吃進整備開頭；整備延後開始、鎖尾壓縮
  * 6. 日界保護：對齊跨日則退車隊物理班距，再不行回物理下限
+ * 7. 占用預設用均；對不齊班距時可壓到快以趕上
  */
 export function applyRotationCycleCompletion(args: {
   tasks: ScheduleTask[];
@@ -93,6 +96,13 @@ export function applyRotationCycleCompletion(args: {
   maintenanceEntrySlackBySection?: MaintenanceEntrySlackBySection | null;
   /** 空時段正線讓渡餘裕：無接下整備時，回程可占用相鄰空時段開頭 */
   emptyIntervalMainlineSlackSeconds?: number;
+  /**
+   * 整備類型 → 出場站：行前／充電／機動結束後，下一串正線輪替相位對齊該站起點。
+   * 與 assignDirectionalDepartures／assignRoutes 共用同一策略表。
+   */
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  /** Step 4 繼任策略：開輪相位與次要備援 */
+  successorPolicy?: RouteSuccessorPolicy;
   /** 補完失敗時寫入（缺物理量等） */
   errors?: FeasibilityIssue[];
 }): ScheduleTask[] {
@@ -105,6 +115,8 @@ export function applyRotationCycleCompletion(args: {
     attributes = [],
     maintenanceEntrySlackBySection = null,
     emptyIntervalMainlineSlackSeconds = 600,
+    yardRotationExitByTaskType = {},
+    successorPolicy,
     errors,
   } = args;
   const emptyRanges = listEmptyAttributeMinuteRanges(intervals);
@@ -130,6 +142,8 @@ export function applyRotationCycleCompletion(args: {
     if (rowTasks.length === 0) continue;
 
     let rotationIndex = 0;
+    /** 本段正線已發車數；成輪＝此數為路線數整數倍（與相位無關） */
+    let stretchPassengerCount = 0;
     let lastPassengerEndSecond: number | null = null;
     const passengerStarts: { startSecond: number; ordinal: number }[] = [];
     let partialPassengerTasks: CompletionJob['partialPassengerTasks'] = [];
@@ -146,7 +160,8 @@ export function applyRotationCycleCompletion(args: {
           startSecond,
         });
         rotationIndex += 1;
-        if (rotationIndex % routeCount === 0) {
+        stretchPassengerCount += 1;
+        if (stretchPassengerCount % routeCount === 0) {
           partialPassengerTasks = [];
         }
         lastPassengerEndSecond =
@@ -154,8 +169,8 @@ export function applyRotationCycleCompletion(args: {
         continue;
       }
 
-      if (rotationIndex % routeCount !== 0 && lastPassengerEndSecond != null) {
-        const missingCount = routeCount - (rotationIndex % routeCount);
+      if (stretchPassengerCount % routeCount !== 0 && lastPassengerEndSecond != null) {
+        const missingCount = routeCount - (stretchPassengerCount % routeCount);
         jobs.push({
           row,
           startRotationIndex: rotationIndex,
@@ -165,15 +180,32 @@ export function applyRotationCycleCompletion(args: {
           partialPassengerTasks: [...partialPassengerTasks],
         });
         rotationIndex += missingCount;
+        stretchPassengerCount += missingCount;
         partialPassengerTasks = [];
       }
+
+      // 整備結束後：下一串正線輪替相位對齊出場站（行前／充電／機動）；無出場則從 0
+      const exitStationId = yardRotationExitByTaskType[task.taskType];
+      let phase = 0;
+      if (successorPolicy) {
+        const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+        if (startId) {
+          const index = resolveRouteIndexInRotation(successorPolicy, startId);
+          phase = index >= 0 ? index : 0;
+        }
+      } else if (exitStationId) {
+        phase = resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
+      }
+      stretchPassengerCount = 0;
+      rotationIndex =
+        Math.ceil(rotationIndex / routeCount) * routeCount + phase;
     }
 
-    if (rotationIndex % routeCount !== 0 && lastPassengerEndSecond != null) {
+    if (stretchPassengerCount % routeCount !== 0 && lastPassengerEndSecond != null) {
       jobs.push({
         row,
         startRotationIndex: rotationIndex,
-        missingCount: routeCount - (rotationIndex % routeCount),
+        missingCount: routeCount - (stretchPassengerCount % routeCount),
         lastPassengerEndSecond,
         deferTaskId: null,
         partialPassengerTasks: [...partialPassengerTasks],
@@ -323,80 +355,146 @@ export function applyRotationCycleCompletion(args: {
     }
 
     for (let i = 0; i < job.missingCount; i += 1) {
-      const route = passengerRoutes[rotationIndex % routeCount]!;
-      const occupancySeconds = resolveOccupancySeconds(route);
-      if (occupancySeconds <= 0) {
+      const previousRoute = passengerRoutes[(rotationIndex - 1 + routeCount) % routeCount]!;
+      const primaryRoute = passengerRoutes[rotationIndex % routeCount]!;
+      // 只走鎖定輪替（全優先／執行順序）；不再嘗試次要備援走法
+      const candidateRoutes: ShiftScheduleSelectedRoute[] = [primaryRoute];
+
+      let placedRoute: ShiftScheduleSelectedRoute | null = null;
+      let placedStartSecond: number | null = null;
+      let placedOccupancy = 0;
+      let lastFail:
+        | {
+            route: ShiftScheduleSelectedRoute;
+            physicalEarliestSecond: number;
+            latestStartSecond: number;
+            nextPassengerStartSecond: number | null;
+            reason: 'missing_occupancy' | 'no_slot';
+          }
+        | null = null;
+
+      for (const route of candidateRoutes) {
+        const avgOccupancy = resolveOccupancySeconds(route);
+        const minOccupancy = resolveMinOccupancySeconds(route);
+        if (avgOccupancy <= 0) {
+          lastFail = {
+            route,
+            physicalEarliestSecond: lastEndSecond,
+            latestStartSecond: lastEndSecond,
+            nextPassengerStartSecond: null,
+            reason: 'missing_occupancy',
+          };
+          continue;
+        }
+
+        const isRouteSwitch = previousRoute.routeId !== route.routeId;
+        const includeRecovery = shouldIncludeRecoveryForRouteSwitch({
+          previousRoute,
+          nextRoute: route,
+          rotationRoutes: passengerRoutes,
+        });
+        const physicalEarliestSecond = snapUpToClockAlignSeconds(
+          lastEndSecond + resolveInterTripGapSeconds({
+            minimumRecoveryTimeSeconds,
+            previousRouteSwitchBufferSeconds: previousRoute.switchBufferAfterSeconds,
+            isRouteSwitch,
+            includeRecovery,
+            previousRoute,
+            nextRoute: route,
+          }),
+        );
+
+        const tryWithOccupancy = (occupancySeconds: number): boolean => {
+          const nextPassenger = findNextPassenger(job.row, lastEndSecond);
+          let latestStartSecond = DAY_END_SECOND - occupancySeconds;
+          if (nextPassenger) {
+            const gapBeforeNext = resolveInterTripGapSeconds({
+              minimumRecoveryTimeSeconds,
+              previousRouteSwitchBufferSeconds: route.switchBufferAfterSeconds,
+              isRouteSwitch: route.routeId !== nextPassenger.route.routeId,
+              includeRecovery: shouldIncludeRecoveryForRouteSwitch({
+                previousRoute: route,
+                nextRoute: nextPassenger.route,
+                rotationRoutes: passengerRoutes,
+              }),
+              previousRoute: route,
+              nextRoute: nextPassenger.route,
+            });
+            latestStartSecond = Math.min(
+              latestStartSecond,
+              nextPassenger.startSecond - occupancySeconds - gapBeforeNext,
+            );
+          }
+
+          if (deferLatestCompletionSecond != null) {
+            latestStartSecond = Math.min(
+              latestStartSecond,
+              deferLatestCompletionSecond - occupancySeconds,
+            );
+          }
+
+          const startSecond = alignToSameRouteHeadway({
+            route,
+            physicalEarliestSecond,
+            occupancySeconds,
+            latestStartSecond,
+            requireTargetHeadway,
+          });
+
+          if (startSecond == null) {
+            lastFail = {
+              route,
+              physicalEarliestSecond,
+              latestStartSecond,
+              nextPassengerStartSecond: nextPassenger?.startSecond ?? null,
+              reason: 'no_slot',
+            };
+            return false;
+          }
+
+          placedRoute = route;
+          placedStartSecond = startSecond;
+          placedOccupancy = occupancySeconds;
+          return true;
+        };
+
+        // 平常用均；對不齊班距再壓到快
+        if (tryWithOccupancy(avgOccupancy)) break;
+        if (
+          minOccupancy > 0
+          && minOccupancy < avgOccupancy
+          && tryWithOccupancy(minOccupancy)
+        ) {
+          break;
+        }
+      }
+
+      if (!placedRoute || placedStartSecond == null) {
         placedAll = false;
-        if (errors) {
+        if (lastFail?.reason === 'missing_occupancy' && errors) {
           pushIssue(errors, {
             code: 'ROTATION_CYCLE_INCOMPLETE',
             severity: 'error',
             message: `時間線 ${job.row} 無法補完路線群組回程（缺有效行駛或停靠時間），車輛可能停在對側終點`,
             detail: {
               timelineRow: job.row,
-              routeId: route.routeId,
+              routeId: lastFail.route.routeId,
               lastPassengerEndSecond: job.lastPassengerEndSecond,
             },
           });
-        }
-        break;
-      }
-
-      const previousRoute = passengerRoutes[(rotationIndex - 1 + routeCount) % routeCount]!;
-      const physicalEarliestSecond = snapUpToClockAlignSeconds(
-        lastEndSecond + resolveInterTripGapSeconds({
-          minimumRecoveryTimeSeconds,
-          previousRouteSwitchBufferSeconds: previousRoute.switchBufferAfterSeconds,
-          isRouteSwitch: previousRoute.routeId !== route.routeId,
-        }),
-      );
-
-      // 上限 B：同車下一班已掛正線，須留足換線／恢復空檔
-      const nextPassenger = findNextPassenger(job.row, lastEndSecond);
-      let latestStartSecond = DAY_END_SECOND - occupancySeconds;
-      if (nextPassenger) {
-        const gapBeforeNext = resolveInterTripGapSeconds({
-          minimumRecoveryTimeSeconds,
-          previousRouteSwitchBufferSeconds: route.switchBufferAfterSeconds,
-          isRouteSwitch: route.routeId !== nextPassenger.route.routeId,
-        });
-        latestStartSecond = Math.min(
-          latestStartSecond,
-          nextPassenger.startSecond - occupancySeconds - gapBeforeNext,
-        );
-      }
-
-      // 上限 A：回程必須在「整備開始＋切入餘裕」前完成。
-      // 餘裕限制的是完成回程，不是只要在期限前發車即可。
-      if (deferLatestCompletionSecond != null) {
-        latestStartSecond = Math.min(
-          latestStartSecond,
-          deferLatestCompletionSecond - occupancySeconds,
-        );
-      }
-
-      const startSecond = alignToSameRouteHeadway({
-        route,
-        physicalEarliestSecond,
-        occupancySeconds,
-        latestStartSecond,
-        requireTargetHeadway,
-      });
-
-      if (startSecond == null) {
-        placedAll = false;
-        if (!requireTargetHeadway && errors) {
+        } else if (!requireTargetHeadway && lastFail && errors) {
           pushIssue(errors, {
             code: 'ROTATION_CYCLE_INCOMPLETE',
             severity: 'error',
-            message: `時間線 ${job.row} 無法補完回程：與同車後續正線或整備時窗衝突（物理最早 ${physicalEarliestSecond}s，最晚可發 ${latestStartSecond}s）`,
+            message: `時間線 ${job.row} 無法補完回程：與同車後續正線或整備時窗衝突（物理最早 ${lastFail.physicalEarliestSecond}s，最晚可發 ${lastFail.latestStartSecond}s）`,
             detail: {
               timelineRow: job.row,
-              routeId: route.routeId,
-              physicalEarliestSecond,
-              latestStartSecond,
-              nextPassengerStartSecond: nextPassenger?.startSecond ?? null,
+              routeId: lastFail.route.routeId,
+              physicalEarliestSecond: lastFail.physicalEarliestSecond,
+              latestStartSecond: lastFail.latestStartSecond,
+              nextPassengerStartSecond: lastFail.nextPassengerStartSecond,
               deferTaskId: job.deferTaskId,
+              triedSecondary: candidateRoutes.length > 1,
             },
           });
         }
@@ -404,17 +502,22 @@ export function applyRotationCycleCompletion(args: {
       }
 
       const addition: ScheduleTask = {
-        id: `pax-cycle-completion-${job.row}-${startSecond}`,
+        id: `pax-cycle-completion-${job.row}-${placedStartSecond}`,
         rowIndex: job.row,
         taskType: 'passenger',
-        startMinute: secondToMinute(startSecond),
-        durationMinutes: Math.max(1, occupancySeconds / 60),
+        startMinute: secondToMinute(placedStartSecond),
+        durationMinutes: Math.max(1, placedOccupancy / 60),
         label: '正線',
       };
       jobAdditions.push(addition);
-      pushSorted(departuresByRouteId.get(route.routeId)!, startSecond);
+      // TypeScript 不會追蹤 tryWithOccupancy closure 內的指派；上方 null guard
+      // 已保證成功放置，此處固定為實際 route。
+      const committedRoute = placedRoute as ShiftScheduleSelectedRoute;
+      const depList = departuresByRouteId.get(committedRoute.routeId);
+      if (depList) pushSorted(depList, placedStartSecond);
+      else departuresByRouteId.set(committedRoute.routeId, [placedStartSecond]);
 
-      lastEndSecond = startSecond + occupancySeconds;
+      lastEndSecond = placedStartSecond + placedOccupancy;
       rotationIndex += 1;
     }
 

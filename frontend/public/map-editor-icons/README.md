@@ -6,22 +6,22 @@
 
 ```
 map-editor-icons/
-  traffic-signals/    交通號誌（紅綠燈、號誌狀態燈等）
-  facility/           設施（駐車、充電、洗車、維修、月台門、智慧桿等）
+  traffic-signals/    設備／交通號誌（紅綠燈等）
+  facility/           大型設施區塊圖示（駐車、充電、洗車、維修）＋智慧桿圖檔
   zones/              區域識別（T3、N2W、S2W、虛線框區域標示等）
   roads/              道路（軌道段、轉角、終端匯流、支線等）
 ```
 
 ## 建議檔名範例
 
-### traffic-signals／交通號誌
+### traffic-signals／設備・交通號誌
 - `signal-normal.png`、`signal-warning.png`、`signal-fault.png`
 - `sensor-r.png`、`sensor-s.png`（若與號誌同一視覺系統可放此類）
 
-### facility／設施
+### facility／大型設施區塊（與設備分開）
 - `parking.png`、`charging.png`、`wash.png`、`repair.png`
-- `smart-pole.png`
-- **月台門（PSD）**：圖台以程式元件 `PlatformDoorGraphic` 繪製，開度由 MQTT／SQL 的 **0–100%** 線性控制，不需門片圖檔
+- 智慧桿圖檔目前仍放此目錄：`smart_pole_enable.png`（元件類型為設備 `Pole`）
+- **月台門（PSD，設備）**：圖台以程式元件 `PlatformDoorGraphic` 繪製，開度由 MQTT／SQL 的 **0–100%** 線性控制，不需門片圖檔
 
 ### zones／區域識別
 - `zone-t3.png`、`zone-n2w.png`、`zone-s2w.png`

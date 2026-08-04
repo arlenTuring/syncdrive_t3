@@ -5,16 +5,12 @@ import {
   DOCKING_POINT_CUSTOM_ICON_KEY,
   DOCKING_POINT_ICON_MODE_KEY,
   DOCKING_POINT_STATION_ID_KEY,
-  DOCKING_POINT_STATION_NAME_KEY,
   getDockingPointStationId,
-  getDockingPointStationName,
   parseDockingPointIconMode,
 } from '../utils/dockingPointFacility'
 import {
   normalizeStationIdInput,
-  normalizeStationNameInput,
   patchDockingPointStationId,
-  patchDockingPointStationName,
 } from '../utils/dockingPointStationId'
 
 type Props = {
@@ -43,10 +39,6 @@ export function DockingPointInspectorSection({
     typeof params[DOCKING_POINT_STATION_ID_KEY] === 'string'
       ? params[DOCKING_POINT_STATION_ID_KEY]
       : getDockingPointStationId(facility)
-  const committedName =
-    typeof params[DOCKING_POINT_STATION_NAME_KEY] === 'string'
-      ? params[DOCKING_POINT_STATION_NAME_KEY]
-      : getDockingPointStationName(facility)
   const iconMode = parseDockingPointIconMode(params[DOCKING_POINT_ICON_MODE_KEY])
   const customIconUrl =
     typeof params[DOCKING_POINT_CUSTOM_ICON_KEY] === 'string'
@@ -54,16 +46,12 @@ export function DockingPointInspectorSection({
       : ''
 
   const [draftId, setDraftId] = useState(committedId)
-  const [draftName, setDraftName] = useState(committedName)
   const [idError, setIdError] = useState<string | null>(null)
-  const [nameError, setNameError] = useState<string | null>(null)
 
   useEffect(() => {
     setDraftId(committedId)
-    setDraftName(committedName)
     setIdError(null)
-    setNameError(null)
-  }, [facility.id, committedId, committedName])
+  }, [facility.id, committedId])
 
   const commitStationId = () => {
     const normalized = normalizeStationIdInput(draftId)
@@ -80,26 +68,14 @@ export function DockingPointInspectorSection({
     onApplyDockingPoint(result.facility)
   }
 
-  const commitStationName = () => {
-    const normalized = normalizeStationNameInput(draftName)
-    if (!normalized) {
-      setNameError('請輸入站點名稱')
-      return
-    }
-    const result = patchDockingPointStationName(facility, areas, normalized)
-    if (result.error) {
-      setNameError(result.error)
-      return
-    }
-    setNameError(null)
-    onApplyDockingPoint(result.facility)
-  }
-
   return (
     <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/12 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
         停靠點
       </h3>
+      <p className="text-[10px] leading-relaxed text-zinc-500">
+        顯示名稱請填上方「自訂顯示名稱」。
+      </p>
 
       <div>
         <label
@@ -136,45 +112,6 @@ export function DockingPointInspectorSection({
         ) : (
           <p className="mt-1 text-[10px] text-zinc-600">
             全圖唯一；新建預設 station_1、station_2…，可自行修改。
-          </p>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor="docking-station-name"
-          className="mb-1 block text-[10px] text-zinc-500"
-        >
-          站點名稱（別名）
-        </label>
-        <input
-          id="docking-station-name"
-          readOnly={readOnly}
-          value={draftName}
-          onChange={(e) => {
-            setDraftName(e.target.value)
-            if (nameError) setNameError(null)
-          }}
-          onFocus={onFieldFocus}
-          onBlur={() => {
-            onFieldBlur()
-            if (!readOnly) commitStationName()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.currentTarget.blur()
-            }
-          }}
-          placeholder="例：N2W上行站、T3下行站"
-          className={`w-full rounded border bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60 ${
-            nameError ? 'border-red-600' : 'border-zinc-600'
-          }`}
-        />
-        {nameError ? (
-          <p className="mt-1 text-[10px] text-red-400">{nameError}</p>
-        ) : (
-          <p className="mt-1 text-[10px] text-zinc-600">
-            顯示用別名，不可與其他停靠點重複。
           </p>
         )}
       </div>

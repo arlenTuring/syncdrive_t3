@@ -1,4 +1,4 @@
-import type { TaskTypeKey } from '../../time-templates/types/editor';
+import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
 
 /** 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設） */
 export type MaintenanceSectionCodeBySection = {
@@ -119,7 +119,7 @@ export function buildMaintenanceSectionCodeFingerprint(
  * servicing（保養／洗車視窗）優先保養，其次洗車。
  */
 export function resolveMaintenanceSectionCodeForTaskType(
-  taskType: TaskTypeKey,
+  taskType: ScheduleEngineTaskType,
   codes: MaintenanceSectionCodeBySection | null | undefined,
 ): string | null {
   if (!codes) return null;
@@ -149,8 +149,12 @@ export function timelineRowToColumnCode(rowIndex: number): string {
   return out || '?';
 }
 
+/**
+ * 班次代號用的開始時刻 HHMM。
+ * 以「時鐘分鐘」為準：01:09:40 → 0109（不用 round，否則會進位成 0110）。
+ */
 export function formatMinuteToHmCompact(minute: number): string {
-  const total = Math.max(0, Math.round(minute));
+  const total = Math.max(0, Math.floor(minute));
   const hh = Math.floor(total / 60) % 24;
   const mm = total % 60;
   return `${String(hh).padStart(2, '0')}${String(mm).padStart(2, '0')}`;
@@ -176,4 +180,63 @@ export function buildScheduleBlockTripCode(args: {
     return `${prefix}${time}`;
   }
   return `${prefix}${timelineRowToColumnCode(args.timelineRow)}${time}`;
+}
+
+/** 與班次卡顯示相同的代號（含進場載客／調度／整備） */
+export function resolveGeneratedBlockTripCode(
+  block: {
+    source?: string;
+    taskType: ScheduleEngineTaskType | string;
+    routeCode?: string;
+    routeId?: string;
+    entryServiceSectionCode?: string;
+    timelineRow: number;
+    plannedStartMinute: number;
+  },
+  index = 0,
+  sectionCodes?: MaintenanceSectionCodeBySection | null,
+): string {
+  if (block.source === 'entry_service') {
+    return buildScheduleBlockTripCode({
+      prefixCode: `${block.entryServiceSectionCode ?? ''}${block.routeCode ?? ''}`,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+      includeColumnCode: false,
+    });
+  }
+
+  if (block.taskType === 'passenger') {
+    return buildScheduleBlockTripCode({
+      prefixCode: block.routeCode,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+      includeColumnCode: false,
+    });
+  }
+
+  if (block.taskType === 'dispatch' || block.source === 'dispatch') {
+    return buildScheduleBlockTripCode({
+      prefixCode: 'D',
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+    });
+  }
+
+  if (block.taskType !== 'idle' && block.source !== 'transition') {
+    const sectionCode = resolveMaintenanceSectionCodeForTaskType(
+      block.taskType as ScheduleEngineTaskType,
+      sectionCodes,
+    );
+    return buildScheduleBlockTripCode({
+      prefixCode: sectionCode,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+    });
+  }
+
+  if (block.routeId) {
+    const compact = block.routeId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (compact.length >= 4) return compact.slice(0, 5);
+  }
+  return `T${String(index + 1).padStart(4, '0')}`;
 }

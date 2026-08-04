@@ -1,6 +1,7 @@
 import { memo, useId, useMemo } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute } from '../types/mapFile'
+import type { PointTopology } from '../types/pointTopology'
 import { resolveRoutePreviewGeometry } from '../utils/routeTrackPath'
 import {
   formatRouteTravelTimeSummary,
@@ -19,6 +20,7 @@ type RoutePreview = {
 
 type RoutePlanningOverlayProps = {
   areas: MapAreaObject[]
+  pointTopology?: PointTopology | null
   activePreview: RoutePreview | null
   savedRoutes?: Array<{
     route: MapPlannedRoute
@@ -167,6 +169,7 @@ function RoutePathLayer({
   layerKey,
   stations,
   pathPx,
+  pathLegs,
   brokenLegs,
   color,
   emphasized = false,
@@ -177,6 +180,7 @@ function RoutePathLayer({
   layerKey: string
   stations: RouteStationPoint[]
   pathPx: Array<{ x: number; y: number }>
+  pathLegs?: Array<Array<{ x: number; y: number }>>
   brokenLegs: Array<Array<{ x: number; y: number }>>
   color: string
   emphasized?: boolean
@@ -185,7 +189,12 @@ function RoutePathLayer({
   minTravelTimeSeconds?: number | null
 }) {
   const markerId = `${layerKey}-arrow-end`
-  const linePoints = pathPx.map((p) => `${p.x},${p.y}`).join(' ')
+  const legs =
+    pathLegs && pathLegs.length > 0
+      ? pathLegs.filter((leg) => leg.length >= 2)
+      : pathPx.length >= 2
+        ? [pathPx]
+        : []
   const badgeR = emphasized ? 12 : 10
   const arrows = useMemo(
     () => samplePathDirectionArrows(pathPx, emphasized ? 28 : 38),
@@ -197,7 +206,7 @@ function RoutePathLayer({
     [pathPx],
   )
 
-  if (stations.length === 0 && pathPx.length === 0) return null
+  if (stations.length === 0 && legs.length === 0) return null
 
   return (
     <g>
@@ -223,19 +232,23 @@ function RoutePathLayer({
         </marker>
       </defs>
 
-      {pathPx.length >= 2 ? (
+      {legs.map((leg, legIndex) => (
         <polyline
+          key={`${layerKey}-leg-${legIndex}`}
           fill="none"
           stroke={color}
           strokeWidth={emphasized ? 3.5 : 2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeLinecap="square"
+          strokeLinejoin="miter"
+          strokeMiterlimit={2}
           strokeDasharray={emphasized ? undefined : '8 6'}
           opacity={emphasized ? 0.85 : 0.4}
-          markerEnd={`url(#${markerId})`}
-          points={linePoints}
+          markerEnd={
+            legIndex === legs.length - 1 ? `url(#${markerId})` : undefined
+          }
+          points={leg.map((p) => `${p.x},${p.y}`).join(' ')}
         />
-      ) : null}
+      ))}
 
       {brokenLegs.map((leg, i) =>
         leg.length >= 2 ? (
@@ -263,7 +276,8 @@ function RoutePathLayer({
         />
       ))}
 
-      {stations.map((p, i) => (
+      {stations.map((p, i) =>
+        Number.isFinite(p.x) && Number.isFinite(p.y) ? (
         <g key={`${p.stationId}-${i}`}>
           <circle
             cx={p.x}
@@ -291,7 +305,8 @@ function RoutePathLayer({
             {i + 1}
           </text>
         </g>
-      ))}
+        ) : null,
+      )}
 
       {emphasized && timeSummary && timeLabelPos ? (
         <RouteTravelTimeLabel
@@ -308,6 +323,7 @@ function RoutePathLayer({
 
 export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
   areas,
+  pointTopology = null,
   activePreview,
   savedRoutes = [],
 }: RoutePlanningOverlayProps) {
@@ -316,9 +332,13 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
   const activeGeometry = useMemo(
     () =>
       activePreview
-        ? resolveRoutePreviewGeometry(areas, activePreview.stationIds)
+        ? resolveRoutePreviewGeometry(
+            areas,
+            activePreview.stationIds,
+            pointTopology,
+          )
         : null,
-    [areas, activePreview],
+    [areas, pointTopology, activePreview],
   )
 
   const savedLayers = useMemo(
@@ -327,9 +347,13 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
         route,
         color,
         emphasized,
-        geometry: resolveRoutePreviewGeometry(areas, route.stationIds),
+        geometry: resolveRoutePreviewGeometry(
+          areas,
+          route.stationIds,
+          pointTopology,
+        ),
       })),
-    [areas, savedRoutes],
+    [areas, pointTopology, savedRoutes],
   )
 
   const hasContent =
@@ -350,6 +374,7 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
               layerKey={`${uid}-saved-${route.routeId}`}
               stations={geometry.stations}
               pathPx={geometry.pathPx}
+              pathLegs={geometry.pathLegs}
               brokenLegs={geometry.brokenLegs}
               color={color}
               emphasized={emphasized ?? true}
@@ -364,6 +389,7 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
             layerKey={`${uid}-active`}
             stations={activeGeometry.stations}
             pathPx={activeGeometry.pathPx}
+            pathLegs={activeGeometry.pathLegs}
             brokenLegs={activeGeometry.brokenLegs}
             color={activePreview.color}
             emphasized={activePreview.emphasized ?? true}

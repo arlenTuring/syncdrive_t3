@@ -26,6 +26,7 @@ import { OrderEvent } from './database/entities/order-event.entity';
 import { TimeTemplate } from './database/entities/time-template.entity';
 import { MaintenanceTask } from './database/entities/maintenance-task.entity';
 import { OperationShift } from './database/entities/operation-shift.entity';
+import { MediaLibraryItem } from './database/entities/media-library-item.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -36,6 +37,8 @@ import { MapModule } from './map/map.module';
 import { TimeTemplateModule } from './time-template/time-template.module';
 import { MaintenanceTaskModule } from './maintenance-task/maintenance-task.module';
 import { OperationShiftModule } from './operation-shift/operation-shift.module';
+import { MediaLibraryModule } from './media-library/media-library.module';
+import { DevLogModule } from './dev-log/dev-log.module';
 import { DatabaseInitService } from './database/database-init.service';
 
 @Module({
@@ -59,6 +62,7 @@ import { DatabaseInitService } from './database/database-init.service';
           FacilitySlot, SlotStatus_, CapacityTrendDemoPoint,
           OperationRoute, OperationRouteStation, OperationRouteStationAction,
           OrderActionState, OrderEvent, TimeTemplate, MaintenanceTask, OperationShift,
+          MediaLibraryItem,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
@@ -82,6 +86,8 @@ import { DatabaseInitService } from './database/database-init.service';
     TimeTemplateModule,
     MaintenanceTaskModule,
     OperationShiftModule,
+    MediaLibraryModule,
+    DevLogModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

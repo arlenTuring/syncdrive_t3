@@ -17,7 +17,7 @@ export function isFacilityPinToTop(f: FacilityObject): boolean {
 
 function facilityPaintTier(f: FacilityObject): 'pinned' | 'roadLine' | 'normal' {
   if (isFacilityPinToTop(f)) return 'pinned'
-  if (f.type === 'RoadLine') return 'roadLine'
+  if (f.type === 'RoadLine' || f.type === 'TrackCrossover') return 'roadLine'
   return 'normal'
 }
 
@@ -40,7 +40,7 @@ export function resolveFacilityStackZ(
 
 /**
  * 繪製順序（主圖層）：一般設施 → 手動置頂。
- * 道路線改由 AreaNode 內獨立疊加層繪製，不參與此排序。
+ * 道路線／虛擬渡線改由 AreaNode 內獨立疊加層繪製，不參與此排序。
  */
 export function sortFacilitiesForPaint<T extends FacilityObject>(
   facilities: T[],
@@ -48,7 +48,7 @@ export function sortFacilitiesForPaint<T extends FacilityObject>(
   const normal: T[] = []
   const pinned: T[] = []
   for (const f of facilities) {
-    if (f.type === 'RoadLine') continue
+    if (f.type === 'RoadLine' || f.type === 'TrackCrossover') continue
     if (isFacilityPinToTop(f)) pinned.push(f)
     else normal.push(f)
   }
@@ -58,5 +58,7 @@ export function sortFacilitiesForPaint<T extends FacilityObject>(
 export function listRoadLinesForPaint<T extends FacilityObject>(
   facilities: T[],
 ): T[] {
-  return facilities.filter((f) => f.type === 'RoadLine')
+  return facilities.filter(
+    (f) => f.type === 'RoadLine' || f.type === 'TrackCrossover',
+  )
 }

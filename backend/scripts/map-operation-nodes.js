@@ -3,6 +3,7 @@
  *
  * - 從 MapFileV2 擷取 stationId、別名、座標
  * - stationId 為停靠點唯一識別（例 station_1）
+ * - 不依賴 dockingLeg（已廢止）；routeId 僅在顯示名稱含「上行／下行」時推斷（相容舊 demo）
  */
 const fs = require('fs');
 const path = require('path');
@@ -12,16 +13,8 @@ const {
 
 const DOCKING_POINT_STATION_ID_KEY = 'stationId';
 const DOCKING_POINT_STATION_NAME_KEY = 'stationName';
-const DOCKING_POINT_LEG_KEY = 'dockingLeg';
-/** @deprecated 僅舊地圖遷移推斷別名 */
+/** @deprecated */
 const DOCKING_POINT_STATION_KEY = 'dockingStation';
-
-const DEFAULT_MAP_PATHS = {
-  't3-main-version': path.join(
-    __dirname,
-    '../../frontend/public/maps/t3-main-version.json',
-  ),
-};
 
 function resolveMapJsonPath(mapId) {
   return resolvePublishedOrBuiltinMapPath(mapId);
@@ -31,36 +24,30 @@ function normalizeStationNameInput(raw) {
   return String(raw ?? '').trim().replace(/\s+/g, ' ');
 }
 
-function parseDockingLeg(raw) {
-  if (raw === 'down' || raw === 'up') return raw;
-  return null;
-}
-
 function parseDockingStation(raw) {
   if (raw === 'N2W' || raw === 'T3' || raw === 'S2W') return raw;
   return null;
 }
 
-function defaultStationDisplayName(dockingLeg, dockingStation) {
-  const leg = parseDockingLeg(dockingLeg);
+function defaultStationDisplayName(dockingStation) {
   const station = parseDockingStation(dockingStation);
-  if (!leg || !station) return '';
-  return `${station}${leg === 'down' ? '下行' : '上行'}`;
+  if (!station) return '';
+  return station;
 }
 
-function effectiveStationName(params) {
+function effectiveStationName(facility, params) {
+  const custom = normalizeStationNameInput(facility?.customName);
+  if (custom) return custom;
   const name = normalizeStationNameInput(params?.[DOCKING_POINT_STATION_NAME_KEY]);
   if (name) return name;
-  return defaultStationDisplayName(
-    params?.[DOCKING_POINT_LEG_KEY],
-    params?.[DOCKING_POINT_STATION_KEY],
-  );
+  return defaultStationDisplayName(params?.[DOCKING_POINT_STATION_KEY]);
 }
 
-function routeIdForDockingLeg(dockingLeg) {
-  const leg = parseDockingLeg(dockingLeg);
-  if (leg === 'down') return 'ROUTE-MAINLINE-DOWN';
-  if (leg === 'up') return 'ROUTE-MAINLINE-UP';
+/** 僅相容舊 T3 demo：從顯示名稱推斷正線 routeId；泛用圖台可無此欄位 */
+function routeIdFromStationName(stationName) {
+  const name = String(stationName ?? '');
+  if (name.includes('下行')) return 'ROUTE-MAINLINE-DOWN';
+  if (name.includes('上行')) return 'ROUTE-MAINLINE-UP';
   return null;
 }
 
@@ -85,14 +72,12 @@ function collectStationsFromMap(map) {
       const stationId = String(params[DOCKING_POINT_STATION_ID_KEY] ?? '').trim();
       if (!stationId) continue;
 
-      const dockingLeg = parseDockingLeg(params[DOCKING_POINT_LEG_KEY]);
-      const routeId = routeIdForDockingLeg(dockingLeg);
-      const stationName = effectiveStationName(params) || stationId;
+      const stationName = effectiveStationName(facility, params) || stationId;
+      const routeId = routeIdFromStationName(stationName);
 
       const entry = {
         stationId,
         stationName,
-        dockingLeg: dockingLeg ?? undefined,
         routeId: routeId ?? undefined,
         xM,
         yM,

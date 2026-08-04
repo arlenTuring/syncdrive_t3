@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>站點 ETA</title>
+  <style>
+    :root {
+      --bg: #121516;
+      --panel: #1b2124;
+      --border: #31403a;
+      --text: #e8eeeb;
+      --muted: #9aaaa3;
+      --accent: #42b983;
+      --warn: #e6b84d;
+      --danger: #e07070;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 90% 0%, rgba(66, 185, 131, 0.12), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 64px; }
+    h1 { margin: 0 0 6px; font-size: 1.55rem; letter-spacing: -0.02em; }
+    .lead { margin: 0 0 22px; color: var(--muted); }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: end;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-width: 120px;
+    }
+    input {
+      background: #101416;
+      border: 1px solid #3a4843;
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 10px;
+      font: inherit;
+      min-width: 140px;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #062516;
+      font-weight: 700;
+      padding: 10px 18px;
+      cursor: pointer;
+      font: inherit;
+    }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    button.secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .page-nav { margin-bottom: 14px; }
+    .status { margin-top: 10px; font-size: 0.86rem; color: var(--muted); }
+    .status.err { color: var(--danger); }
+    .status.ok { color: #6be0ad; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.85rem;
+    }
+    .meta span { color: var(--muted); }
+    .tabs-shell {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #171c1e;
+    }
+    .tab-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: #12181a;
+      padding: 0 6px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #cfe8dc; }
+    .tab-btn[aria-selected="true"] {
+      color: #9ceed0;
+      border-bottom-color: var(--accent);
+      background: rgba(66, 185, 131, 0.08);
+    }
+    .tab-btn .count {
+      display: inline-block;
+      margin-left: 6px;
+      min-width: 1.4em;
+      padding: 0 6px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #062516;
+      background: #3d7a5f;
+    }
+    .tab-btn[aria-selected="true"] .count { background: var(--accent); }
+    .tab-panel { display: none; padding: 0; }
+    .tab-panel.active { display: block; }
+    .station-head {
+      padding: 16px 18px 12px;
+      background: linear-gradient(135deg, rgba(66,185,131,0.16), rgba(66,185,131,0.04));
+      border-bottom: 1px solid var(--border);
+    }
+    .station-alias {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #9ceed0;
+    }
+    .station-sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #2a3330;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      background: #14191b;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
+    .tag {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      border: 1px solid #3c5248;
+      color: #9fd9bc;
+    }
+    .tag.warn {
+      border-color: #6a5a2a;
+      color: var(--warn);
+      background: rgba(230, 184, 77, 0.08);
+    }
+    .note {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      color: var(--warn);
+    }
+    .empty { color: var(--muted); padding: 20px; text-align: center; }
+    .detail-btn {
+      appearance: none;
+      border: 1px solid #3c5248;
+      border-radius: 999px;
+      background: #15201c;
+      color: #9fd9bc;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .detail-btn:hover { border-color: var(--accent); color: #c7f0dc; }
+    .detail-btn[aria-expanded="true"] {
+      background: rgba(66, 185, 131, 0.18);
+      border-color: var(--accent);
+      color: #9ceed0;
+    }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    tr.detail-row td {
+      padding: 0;
+      border-bottom: 1px solid #2a3330;
+      background: #101416;
+    }
+    tr.detail-row[hidden] { display: none; }
+    .detail-box { padding: 14px 16px 16px; }
+    .detail-title {
+      margin: 0 0 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .kv {
+      border: 1px solid #2a3531;
+      border-radius: 10px;
+      background: #141a1c;
+      padding: 8px 10px;
+      min-height: 52px;
+    }
+    .kv .k {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .kv .v {
+      display: block;
+      font-size: 0.88rem;
+      word-break: break-word;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    .kv .v.null { color: #667772; }
+    pre.schema-json {
+      margin: 0;
+      padding: 12px 14px;
+      overflow-x: auto;
+      max-height: 360px;
+      background: #0c1012;
+      border-radius: 10px;
+      border: 1px solid #24302c;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      color: #c9e6d8;
+      white-space: pre;
+    }
+    pre.data-json {
+      margin: 0;
+      padding: 12px 14px;
+      overflow-x: auto;
+      max-height: 420px;
+      background: #0c1012;
+      border-radius: 10px;
+      border: 1px solid #24302c;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      color: #c9e6d8;
+      white-space: pre;
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.62);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; z-index: 40;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal {
+      width: min(920px, 100%); max-height: min(86vh, 900px); overflow: auto;
+      background: #151b1d; border: 1px solid var(--border); border-radius: 14px;
+    }
+    .modal-head {
+      position: sticky; top: 0; z-index: 1;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      justify-content: space-between; padding: 14px 16px;
+      background: #12181a; border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 { margin: 0; font-size: 1.05rem; color: #9ceed0; }
+    .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .modal-body { padding: 14px 16px 18px; }
+    .modal-body .hint { margin: 0 0 10px; color: var(--muted); font-size: 0.82rem; }
+    details.raw {
+      margin-top: 12px;
+      border-top: 1px solid #24302c;
+      padding-top: 10px;
+    }
+    details.raw summary {
+      cursor: pointer;
+      color: #9fd9bc;
+      font-size: 0.78rem;
+      font-weight: 700;
+      list-style: none;
+    }
+    details.raw summary::-webkit-details-marker { display: none; }
+    details.raw pre {
+      margin: 10px 0 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      max-height: 220px;
+      background: #0c1012;
+      border-radius: 8px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.74rem;
+      color: #c9e6d8;
+      white-space: pre;
+    }
+    @media (max-width: 720px) {
+      table { display: block; overflow-x: auto; }
+      .tab-btn { padding: 10px 12px; font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-nav">
+      <button id="btnBack" class="secondary" type="button">← 上一頁</button>
+    </div>
+    <h1>站點 ETA</h1>
+    <p class="lead">頁籤為停靠點別名。每列「JSON」展開該筆實際資料；欄位名稱說明請看上方「欄位 Schema」。</p>
+
+    <div class="panel">
+      <div class="row">
+        <label>from
+          <input id="from" value="00:00:00" placeholder="00:00:00" />
+        </label>
+        <label>to
+          <input id="to" value="24:00:00" placeholder="24:00:00" />
+        </label>
+        <label>station_id（空＝全停靠點）
+          <input id="stationId" value="" placeholder="例如 station_4" />
+        </label>
+        <button id="btnFetch" type="button">取得站點 ETA</button>
+        <button id="btnSchema" class="secondary" type="button">欄位 Schema</button>
+      </div>
+      <div class="status" id="status">尚未請求。</div>
+      <div class="meta" id="meta" hidden></div>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <div class="modal-backdrop" id="schemaModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="schemaTitle">
+      <div class="modal-head">
+        <h2 id="schemaTitle">欄位 Schema（說明）</h2>
+        <div class="modal-actions">
+          <button id="btnCloseSchema" type="button">關閉</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="hint">這裡只解釋欄位名稱與型別，不是某一筆 ETA 的實際值。</p>
+        <pre class="schema-json" id="schemaPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://127.0.0.1:3000';
+    const $ = (id) => document.getElementById(id);
+
+    const ETA_FIELDS = [
+      ['station_id', '站點 ID'],
+      ['station_alias', '站別名'],
+      ['station_name', '站點名稱'],
+      ['role', '角色'],
+      ['eta_arrive', '到站'],
+      ['eta_depart', '離站／靠站完成'],
+      ['eta_arrive_second', '到站（秒）'],
+      ['eta_depart_second', '離站（秒）'],
+      ['non_stop', '不停靠'],
+      ['base_dwell_seconds', '靠站（秒）'],
+      ['buffer_seconds', '緩衝（秒）'],
+      ['dwell_seconds', '有效停靠（秒）'],
+      ['trip_code', '班次代號'],
+      ['block_id', 'block_id'],
+      ['timeline_row', '時間列'],
+      ['route_code', '路線代號'],
+      ['route_name', '路線名稱'],
+      ['vehicle_id', '車輛'],
+    ];
+
+    const STATION_ETAS_JSON_SCHEMA = {
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      $id: 'https://syncdrive.local/schemas/timetable-station-etas-response.json',
+      title: 'TimetableStationEtasResponse',
+      description: 'GET /syncdrive-api/operation-shift/timetable/station-etas 回應',
+      type: 'object',
+      required: ['meta', 'filter', 'eta_count', 'etas', 'stations'],
+      additionalProperties: false,
+      properties: {
+        meta: {
+          type: 'object',
+          required: ['shift_id', 'name', 'publish_status', 'source', 'updated_at'],
+          additionalProperties: false,
+          properties: {
+            shift_id: { type: 'string', description: '班表 ID' },
+            name: { type: 'string', description: '班表名稱' },
+            publish_status: { type: 'string', description: '發布狀態' },
+            source: {
+              type: 'string',
+              enum: ['published', 'draft_fallback'],
+              description: '資料來源：已發布或草稿 fallback',
+            },
+            generated_at: { type: ['string', 'null'], description: '產生時間 ISO；可能 null' },
+            updated_at: { type: 'string', description: '更新時間戳字串' },
+            map_id: { type: ['string', 'null'], description: '地圖 ID' },
+          },
+        },
+        filter: {
+          type: 'object',
+          required: [
+            'from', 'to', 'from_second', 'to_second',
+            'station_id', 'passenger_stops_only',
+          ],
+          additionalProperties: false,
+          properties: {
+            from: { type: 'string', description: '時間窗起 HH:MM:SS' },
+            to: { type: 'string', description: '時間窗迄 HH:MM:SS' },
+            from_second: { type: 'integer', minimum: 0, description: '時間窗起（秒）' },
+            to_second: { type: 'integer', minimum: 0, description: '時間窗迄（秒）' },
+            station_id: {
+              type: ['string', 'null'],
+              description: '單一站過濾；null 表示全停靠點',
+            },
+            passenger_stops_only: {
+              type: 'boolean',
+              description: '僅載客停靠點（排除 crossover 等）',
+            },
+          },
+        },
+        eta_count: { type: 'integer', minimum: 0, description: '事件總數' },
+        etas: {
+          type: 'array',
+          description: '扁平 ETA 事件（時間序）',
+          items: { $ref: '#/definitions/StationEtaEvent' },
+        },
+        stations: {
+          type: 'array',
+          description: '依站分組（含地圖全部停靠點別名；eta_count 可為 0）',
+          items: { $ref: '#/definitions/StationEtaGroup' },
+        },
+      },
+      definitions: {
+        StationEtaEvent: {
+          type: 'object',
+          required: [
+            'station_id', 'station_alias', 'station_name', 'role',
+            'eta_arrive', 'eta_depart', 'eta_arrive_second', 'eta_depart_second',
+            'non_stop', 'base_dwell_seconds', 'dwell_seconds', 'buffer_seconds',
+            'trip_code', 'block_id', 'timeline_row', 'route_code', 'route_name',
+            'vehicle_id',
+          ],
+          additionalProperties: false,
+          properties: {
+            station_id: { type: 'string', description: '站點 ID' },
+            station_alias: { type: 'string', description: '地圖停靠點別名' },
+            station_name: { type: 'string', description: '站點名稱' },
+            role: {
+              type: 'string',
+              enum: ['origin', 'intermediate', 'terminal'],
+              description: '首站／中途／末站',
+            },
+            eta_arrive: { type: ['string', 'null'], description: '計畫抵達；首站通常 null' },
+            eta_depart: {
+              type: ['string', 'null'],
+              description: '離站；末站為靠站完成（卡結束）',
+            },
+            eta_arrive_second: { type: ['integer', 'null'], description: '到站秒數' },
+            eta_depart_second: { type: ['integer', 'null'], description: '離站秒數' },
+            non_stop: { type: 'boolean', description: '到站＝離站（不停靠）' },
+            base_dwell_seconds: { type: 'integer', minimum: 0, description: '設定靠站秒數' },
+            dwell_seconds: { type: 'integer', minimum: 0, description: '有效停靠秒數' },
+            buffer_seconds: { type: 'integer', minimum: 0, description: '緩衝秒數' },
+            trip_code: { type: 'string', description: '班次代號' },
+            block_id: { type: 'string', description: '引擎內部 block id' },
+            timeline_row: { type: 'integer', description: '時間列' },
+            route_code: { type: ['string', 'null'], description: '路線代號' },
+            route_name: { type: ['string', 'null'], description: '路線名稱' },
+            vehicle_id: {
+              type: 'null',
+              description: '車輛號碼尚未綁定；固定 null',
+            },
+          },
+        },
+        StationEtaGroup: {
+          type: 'object',
+          required: ['station_id', 'station_alias', 'station_name', 'eta_count', 'etas'],
+          additionalProperties: false,
+          properties: {
+            station_id: { type: 'string' },
+            station_alias: { type: 'string' },
+            station_name: { type: 'string' },
+            eta_count: { type: 'integer', minimum: 0 },
+            etas: {
+              type: 'array',
+              items: { $ref: '#/definitions/StationEtaEvent' },
+            },
+          },
+        },
+      },
+    };
+
+    function buildEtaUrl() {
+      const qs = new URLSearchParams();
+      if ($('from').value.trim()) qs.set('from', $('from').value.trim());
+      if ($('to').value.trim()) qs.set('to', $('to').value.trim());
+      if ($('stationId').value.trim()) qs.set('station_id', $('stationId').value.trim());
+      return `${API_BASE}/syncdrive-api/operation-shift/timetable/station-etas?${qs}`;
+    }
+
+    function roleLabel(role) {
+      if (role === 'origin') return '首站';
+      if (role === 'terminal') return '末站';
+      return '中途';
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function fmt(v) {
+      if (v === null || v === undefined) return { text: 'null', isNull: true };
+      if (typeof v === 'object') return { text: JSON.stringify(v), isNull: false };
+      return { text: String(v), isNull: false };
+    }
+
+    function renderKvGrid(obj, fields) {
+      return `
+        <div class="kv-grid">
+          ${fields.map(([key, label]) => {
+            const { text, isNull } = fmt(obj[key]);
+            return `
+              <div class="kv">
+                <span class="k">${escapeHtml(label)} · ${escapeHtml(key)}</span>
+                <span class="v${isNull ? ' null' : ''}">${escapeHtml(text)}</span>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    function renderDataBox(obj) {
+      return `
+        <div class="detail-box">
+          <p class="detail-title">ETA · 實際 JSON</p>
+          <pre class="data-json">${escapeHtml(JSON.stringify(obj, null, 2))}</pre>
+          <details class="raw" open>
+            <summary>欄位值（可讀）</summary>
+            ${renderKvGrid(obj, ETA_FIELDS)}
+          </details>
+        </div>`;
+    }
+
+    function timeCell(arrive, depart, nonStop) {
+      const same = nonStop || (arrive && depart && arrive === depart);
+      if (same) {
+        const t = depart ?? arrive ?? '—';
+        return `
+          <td class="mono">
+            ${escapeHtml(arrive ?? '—')}
+            <span class="note">到站＝離站（不停靠）</span>
+          </td>
+          <td class="mono">
+            ${escapeHtml(t)}
+            <span class="note">不停靠</span>
+          </td>`;
+      }
+      return `
+        <td class="mono">${escapeHtml(arrive ?? '—')}</td>
+        <td class="mono">${escapeHtml(depart ?? '—')}</td>`;
+    }
+
+    function selectTab(stationId) {
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.setAttribute('aria-selected', btn.dataset.stationId === stationId ? 'true' : 'false');
+      });
+      document.querySelectorAll('.tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.stationId === stationId);
+      });
+    }
+
+    function renderStationTable(g, stationIndex) {
+      const etas = g.etas || [];
+      if (!etas.length) {
+        return `
+          <div class="station-head">
+            <h2 class="station-alias">${escapeHtml(g.station_alias)}</h2>
+            <p class="station-sub">${escapeHtml(g.station_id)} · 0 筆事件</p>
+          </div>
+          <p class="empty">此地圖停靠點在目前時間窗沒有 ETA（仍列入頁籤）。</p>`;
+      }
+      const rows = etas.map((e, rowIndex) => {
+        const jsonId = `eta-json-${stationIndex}-${rowIndex}`;
+        return `
+        <tr>
+          ${timeCell(e.eta_arrive, e.eta_depart, e.non_stop)}
+          <td>${e.base_dwell_seconds ?? 0}s</td>
+          <td>${e.buffer_seconds ?? 0}s</td>
+          <td>${e.dwell_seconds ?? 0}s</td>
+          <td>
+            <span class="tag">${roleLabel(e.role)}</span>
+            ${e.non_stop ? '<span class="tag warn">不停靠</span>' : ''}
+          </td>
+          <td class="mono">${escapeHtml(e.trip_code)}</td>
+          <td>${escapeHtml(e.route_name ?? e.route_code ?? '—')}</td>
+          <td>列 ${e.timeline_row}</td>
+          <td class="mono">${escapeHtml(e.vehicle_id ?? '—')}</td>
+          <td>
+            <button type="button" class="detail-btn" data-drawer-id="${jsonId}" data-label="JSON" aria-expanded="false">JSON</button>
+          </td>
+        </tr>
+        <tr class="detail-row" id="${jsonId}" hidden>
+          <td colspan="11">${renderDataBox(e)}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div class="station-head">
+          <h2 class="station-alias">${escapeHtml(g.station_alias)}</h2>
+          <p class="station-sub">${escapeHtml(g.station_id)} · ${g.eta_count ?? (g.etas || []).length} 筆事件</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>到站</th>
+              <th>離站／靠站完成</th>
+              <th>靠站</th>
+              <th>緩衝</th>
+              <th>有效停靠</th>
+              <th>角色</th>
+              <th>班次</th>
+              <th>路線</th>
+              <th>時間線</th>
+              <th>車輛</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function bindDetailDrawers(root) {
+      root.querySelectorAll('.detail-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const drawer = document.getElementById(btn.dataset.drawerId);
+          if (!drawer) return;
+          const willOpen = drawer.hasAttribute('hidden');
+          drawer.toggleAttribute('hidden', !willOpen);
+          btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+          btn.textContent = willOpen ? '收合' : (btn.dataset.label || 'JSON');
+        });
+      });
+    }
+
+    function renderStations(payload) {
+      const stations = payload.stations?.length ? payload.stations : [];
+      if (!stations.length) {
+        $('result').innerHTML = '<div class="panel empty">此時間範圍內沒有停靠點 ETA。</div>';
+        return;
+      }
+
+      const firstId = stations[0].station_id;
+      const tabButtons = stations.map((s, index) => `
+        <button
+          type="button"
+          class="tab-btn"
+          role="tab"
+          data-station-id="${escapeHtml(s.station_id)}"
+          aria-selected="${index === 0 ? 'true' : 'false'}"
+        >${escapeHtml(s.station_alias)}<span class="count">${s.eta_count}</span></button>
+      `).join('');
+
+      const panels = stations.map((g, index) => `
+        <div
+          class="tab-panel${index === 0 ? ' active' : ''}"
+          data-station-id="${escapeHtml(g.station_id)}"
+        >${renderStationTable(g, index)}</div>
+      `).join('');
+
+      $('result').innerHTML = `
+        <div class="tabs-shell">
+          <div class="tab-list" role="tablist">${tabButtons}</div>
+          ${panels}
+        </div>
+      `;
+
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => selectTab(btn.dataset.stationId));
+      });
+      bindDetailDrawers($('result'));
+      selectTab(firstId);
+    }
+
+    function renderMeta(payload) {
+      const m = payload.meta || {};
+      const f = payload.filter || {};
+      const box = $('meta');
+      box.hidden = false;
+      box.innerHTML = `
+        <div><span>班表</span><br>${escapeHtml(m.name || '—')}</div>
+        <div><span>停靠點數</span><br>${(payload.stations || []).length}</div>
+        <div><span>事件數</span><br>${payload.eta_count ?? 0}</div>
+        <div><span>時間窗</span><br>${escapeHtml(f.from || '—')} ~ ${escapeHtml(f.to || '—')}</div>
+      `;
+    }
+
+    function readQueryDefaults() {
+      const q = new URLSearchParams(location.search);
+      if (q.get('from')) $('from').value = q.get('from');
+      if (q.get('to')) $('to').value = q.get('to');
+      if (q.get('station_id')) $('stationId').value = q.get('station_id');
+    }
+
+    async function fetchEtas() {
+      const btn = $('btnFetch');
+      const status = $('status');
+      btn.disabled = true;
+      status.className = 'status';
+      status.textContent = '請求中…';
+      try {
+        const res = await fetch(buildEtaUrl());
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch {
+          throw new Error(`非 JSON 回應 HTTP ${res.status}`);
+        }
+        if (!res.ok) {
+          const msg = Array.isArray(data.message) ? data.message.join('、') : data.message;
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        status.className = 'status ok';
+        status.textContent = '成功';
+        renderMeta(data);
+        renderStations(data);
+        const next = new URL(location.href);
+        next.searchParams.set('from', $('from').value.trim());
+        next.searchParams.set('to', $('to').value.trim());
+        if ($('stationId').value.trim()) next.searchParams.set('station_id', $('stationId').value.trim());
+        else next.searchParams.delete('station_id');
+        history.replaceState(null, '', next.toString());
+      } catch (err) {
+        status.className = 'status err';
+        status.textContent = `失敗：${err.message || err}`;
+        $('result').innerHTML = '';
+        $('meta').hidden = true;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    readQueryDefaults();
+    $('btnFetch').addEventListener('click', fetchEtas);
+    $('schemaPre').textContent = JSON.stringify(STATION_ETAS_JSON_SCHEMA, null, 2);
+    $('btnSchema').addEventListener('click', () => { $('schemaModal').hidden = false; });
+    $('btnCloseSchema').addEventListener('click', () => { $('schemaModal').hidden = true; });
+    $('schemaModal').addEventListener('click', (ev) => {
+      if (ev.target === $('schemaModal')) $('schemaModal').hidden = true;
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') $('schemaModal').hidden = true;
+    });
+    $('btnBack').addEventListener('click', () => {
+      if (history.length > 1) history.back();
+      else location.href = '/#/班表Timetable-API';
+    });
+    fetchEtas();
+  </script>
+</body>
+</html>

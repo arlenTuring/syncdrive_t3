@@ -4,7 +4,7 @@
   "displayName": "軌道合併加道路線",
   "version": "v0.1.10",
   "createdAt": "2026-06-03T14:04:56.970Z",
-  "updatedAt": "2026-06-28T08:15:06.157Z",
+  "updatedAt": "2026-07-29T02:47:50.886Z",
   "pixelSize": {
     "width": 3152,
     "height": 642
@@ -698,10 +698,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 270.0738774466745
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 100,
+            "refFieldYMaxM": 103.5
           },
           "currentState": "Idle"
         },
@@ -739,10 +739,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 269.899439774945
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1050,
+            "refFieldYMinM": 103.5,
+            "refFieldYMaxM": 107
           },
           "currentState": "Idle"
         },
@@ -1065,7 +1065,6 @@
             "iconMode": "builtin",
             "refFieldXM": 810,
             "refFieldYM": 105.25,
-            "dockingLeg": "up",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
@@ -1102,7 +1101,6 @@
             "iconMode": "builtin",
             "refFieldXM": 840,
             "refFieldYM": 101.75,
-            "dockingLeg": "down",
             "labelStyle": {
               "fontSizePx": 16,
               "visible": false
@@ -2847,7 +2845,6 @@
             "iconMode": "builtin",
             "refFieldXM": 101.75,
             "refFieldYM": 170,
-            "dockingLeg": "down",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
@@ -2884,7 +2881,6 @@
             "iconMode": "builtin",
             "refFieldXM": 105,
             "refFieldYM": 230,
-            "dockingLeg": "up",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16,
@@ -5303,10 +5299,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 270.1432180337472
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1000,
+            "refFieldYMinM": 300,
+            "refFieldYMaxM": 303.5
           },
           "currentState": "Idle"
         },
@@ -5344,10 +5340,10 @@
               "labelOffsetCustom": true,
               "labelRotationDeg": 269.7144797054448
             },
-            "refFieldXMinM": 0,
-            "refFieldXMaxM": 0,
-            "refFieldYMinM": 0,
-            "refFieldYMaxM": 0
+            "refFieldXMinM": 900,
+            "refFieldXMaxM": 1000,
+            "refFieldYMinM": 303.5,
+            "refFieldYMaxM": 307
           },
           "currentState": "Idle"
         },
@@ -5715,7 +5711,6 @@
             "iconMode": "builtin",
             "refFieldXM": 810,
             "refFieldYM": 305.25,
-            "dockingLeg": "up",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16
@@ -5752,7 +5747,6 @@
             "iconMode": "builtin",
             "refFieldXM": 840,
             "refFieldYM": 301.75,
-            "dockingLeg": "down",
             "labelStyle": {
               "visible": false,
               "fontSizePx": 16

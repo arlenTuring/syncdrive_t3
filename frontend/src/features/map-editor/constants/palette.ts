@@ -21,13 +21,31 @@ export const AREA_PALETTE_ITEM: AreaPaletteItem = {
   hint: '畫布上的區塊容器，用於群組放置元件',
 }
 
-/** 資產列：設施僅可拖入 Area 內 */
+/** 資產列：僅可拖入 Area 內。分類見 facilityTaxonomy（設備 vs 設施）。 */
 export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
   {
     label: '設施',
     type: 'Facility',
     name: 'FacilityArea',
-    hint: '設施 — 區域填色與 MQTT 規則；可設定用途、備註與圖示',
+    hint: '設施（大型區塊）— 充電格／停車格／維修格等；用途請在屬性填寫',
+  },
+  {
+    label: '紅綠燈',
+    type: 'Signal',
+    name: 'Light',
+    hint: '設備 — 紅綠燈（Signal / Light）',
+  },
+  {
+    label: '智慧桿',
+    type: 'Pole',
+    name: 'SmartPole',
+    hint: '設備 — 智慧桿（Pole / SmartPole）',
+  },
+  {
+    label: '月台門',
+    type: 'PSD',
+    name: 'Gate',
+    hint: '設備 — 月台門（PSD / Gate）',
   },
   {
     label: '電子圍籬',
@@ -36,28 +54,10 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: '電子圍籬 — 多邊形範圍（僅在所屬 Area 顯示）',
   },
   {
-    label: '月台門',
-    type: 'PSD',
-    name: 'Gate',
-    hint: '月台門 PSD / Gate',
-  },
-  {
-    label: '紅綠燈',
-    type: 'Signal',
-    name: 'Light',
-    hint: '號誌 Signal / Light',
-  },
-  {
     label: '軌道',
     type: 'Track',
     name: 'Rail',
     hint: '軌道 Track / Rail',
-  },
-  {
-    label: '智慧桿',
-    type: 'Pole',
-    name: 'SmartPole',
-    hint: '智慧桿 Pole / SmartPole',
   },
   {
     label: '停靠點',
@@ -76,6 +76,12 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     type: 'RoadLine',
     name: 'RoadLine',
     hint: '道路線 — 純視覺標記；可調線型、線寬與長度',
+  },
+  {
+    label: '虛擬渡線',
+    type: 'TrackCrossover',
+    name: 'TrackCrossover',
+    hint: '虛擬渡線 — PPT 式自由線徑（兩端任意拖）；X 形請放兩條',
   },
 ] as const
 

@@ -48,8 +48,10 @@ import { SignalInspectorSection } from './SignalInspectorSection'
 import { DockingPointInspectorSection } from './DockingPointInspectorSection'
 import { WaypointInspectorSection } from './WaypointInspectorSection'
 import { RoadLineInspectorSection } from './RoadLineInspectorSection'
+import { TrackCrossoverInspectorSection } from './TrackCrossoverInspectorSection'
 import { GeofenceInspectorSection } from './GeofenceInspectorSection'
 import { FacilityInspectorSection } from './FacilityInspectorSection'
+import { FacilityDockingPointInspectorSection } from './FacilityDockingPointInspectorSection'
 import { FacilityLayerSection } from './FacilityLayerSection'
 import { FacilityRefFieldPositionSection } from './FacilityRefFieldPositionSection'
 import { FacilityRefFieldBoundsSection } from './FacilityRefFieldBoundsSection'
@@ -433,7 +435,6 @@ export function Inspector({
               placeholder="001"
             />
           </div>
-          {facility.type !== 'Waypoint' ? (
           <div>
             <label htmlFor="facility-custom" className="mb-1 block text-[10px] text-zinc-500">
               自訂顯示名稱
@@ -449,7 +450,6 @@ export function Inspector({
               placeholder="選填"
             />
           </div>
-          ) : null}
           {onPatchParameters &&
           facility.type === 'Facility' ? (
             <div>
@@ -470,10 +470,10 @@ export function Inspector({
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
                 className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
-                placeholder="選填"
+                placeholder="例：充電格、停車格、維修格"
               />
               <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
-                選填；僅顯示於右側設施清單（Area 名稱之後），圖台上不顯示。
+                選填；僅用於大型設施區塊分類說明（清單顯示）。紅綠燈／智慧桿／月台門請用元件庫「設備」類型，勿在此填寫代替。
               </p>
             </div>
           ) : null}
@@ -634,7 +634,7 @@ export function Inspector({
           />
         ) : null}
 
-        {onPatchParameters && facility.type !== 'RoadLine' && (
+        {onPatchParameters && facility.type !== 'RoadLine' && facility.type !== 'TrackCrossover' && (
           <InspectorSection
             title="MQTT 對接"
             className="border-amber-900/35 bg-amber-950/12"
@@ -1075,6 +1075,15 @@ export function Inspector({
             onFieldBlur={onFieldBlur}
           />
         ) : null}
+        {facility.type === 'Facility' && onPatchParameters ? (
+          <FacilityDockingPointInspectorSection
+            facility={facility}
+            readOnly={readOnly}
+            onPatchParameters={onPatchParameters}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+          />
+        ) : null}
         {facility.type === 'Signal' && onPatchParameters ? (
           <SignalInspectorSection
             facility={facility}
@@ -1114,12 +1123,23 @@ export function Inspector({
             onFieldBlur={onFieldBlur}
           />
         ) : null}
+        {facility.type === 'TrackCrossover' && onPatchParameters ? (
+          <TrackCrossoverInspectorSection
+            facility={facility}
+            readOnly={readOnly}
+            onPatchParameters={onPatchParameters}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+            mapAreas={mapAreas}
+          />
+        ) : null}
         {facility.type !== 'Slot' &&
         facility.type !== 'Geofence' &&
         facility.type !== 'Track' &&
         facility.type !== 'Facility' &&
         facility.type !== 'Signal' &&
         facility.type !== 'RoadLine' &&
+        facility.type !== 'TrackCrossover' &&
         facility.type !== 'Waypoint' ? (
           <InspectorSection title={`顯示狀態（${facility.type}）`}>
             <select

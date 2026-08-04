@@ -98,9 +98,17 @@ body {
   cursor: pointer;
 }
 
+.schedule-time-zoom-slider.is-compact {
+  height: 4px;
+}
+
 .schedule-time-zoom-slider::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 9999px;
+}
+
+.schedule-time-zoom-slider.is-compact::-webkit-slider-runnable-track {
+  height: 4px;
 }
 
 .schedule-time-zoom-slider::-webkit-slider-thumb {
@@ -111,7 +119,15 @@ body {
   border-radius: 50%;
   border: none;
   background: #2b7fff;
+  box-shadow: 0 0 0 2px rgba(43, 127, 255, 0.25);
   cursor: pointer;
+}
+
+.schedule-time-zoom-slider.is-compact::-webkit-slider-thumb {
+  width: 10px;
+  height: 10px;
+  margin-top: -3px;
+  box-shadow: none;
 }
 
 .schedule-time-zoom-slider::-moz-range-track {
@@ -120,10 +136,18 @@ body {
   background: #3f3f46;
 }
 
+.schedule-time-zoom-slider.is-compact::-moz-range-track {
+  height: 4px;
+}
+
 .schedule-time-zoom-slider::-moz-range-progress {
   height: 8px;
   border-radius: 9999px;
   background: #2b7fff;
+}
+
+.schedule-time-zoom-slider.is-compact::-moz-range-progress {
+  height: 4px;
 }
 
 .schedule-time-zoom-slider::-moz-range-thumb {
@@ -133,6 +157,11 @@ body {
   border-radius: 50%;
   background: #2b7fff;
   cursor: pointer;
+}
+
+.schedule-time-zoom-slider.is-compact::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
 }
 
 /* 任務排班 — 復原／重做按鈕觸發閃爍 */

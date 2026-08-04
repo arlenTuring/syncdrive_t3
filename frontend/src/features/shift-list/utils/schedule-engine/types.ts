@@ -3,8 +3,14 @@ import type {
   ShiftScheduleSelectedRoute,
   ShiftScheduleStationDwell,
 } from '../../types/create';
+import type { RouteSuccessorPolicy } from './routeSuccessorPolicy';
 
-export type ScheduleBlockSource = 'template_bar' | 'transition';
+export type ScheduleBlockSource =
+  | 'template_bar'
+  | 'transition'
+  | 'dispatch'
+  /** 進場載客：保養尾端長出、載客開往真正首班起點站的短交路（不算輪替，計入運能） */
+  | 'entry_service';
 
 export type GeneratedScheduleBlock = {
   id: string;
@@ -13,6 +19,8 @@ export type GeneratedScheduleBlock = {
   label: string;
   templateTaskId?: string;
   routeId?: string;
+  /** 同 routeId 可重複選取時，用來綁定關聯圖節點。舊產物可由 selected routes 唯一反查。 */
+  routeInstanceId?: string;
   routeName?: string;
   routeCode?: string;
   /** 模板甘特上的發車錨點（分鐘，自 00:00 起） */
@@ -26,6 +34,12 @@ export type GeneratedScheduleBlock = {
   stationDwells?: ShiftScheduleStationDwell[];
   /** 手動製作：此班次卡靠站緩衝秒數 */
   dwellSlackSeconds?: number;
+  /** 調度班次：首班起點站 stationId */
+  firstTripOriginStationId?: string;
+  /** 調度班次：首班起點站顯示名 */
+  firstTripOriginLabel?: string;
+  /** 進場載客：來源整備區段代號（班次代號 = 整備代號 + 路線代號 + 開始時刻） */
+  entryServiceSectionCode?: string;
 };
 
 export type FeasibilityViolationCode =
@@ -34,24 +48,43 @@ export type FeasibilityViolationCode =
   | 'MISSING_TRAVEL_TIME'
   | 'STATION_LEG_TRAVEL_INCOMPLETE'
   | 'STATION_LEG_TRAVEL_INVALID'
+  | 'STATION_TIMING_INFEASIBLE'
   | 'ANCHOR_CONFLICT'
   | 'TIMELINE_OVERLAP'
   | 'HEADWAY_PHYSICAL_IMPOSSIBLE'
   | 'HEADWAY_BELOW_TARGET'
+  | 'UNSERVED_SERVICE_PULSE'
   | 'INSUFFICIENT_TIMELINES'
   | 'RECOVERY_INSUFFICIENT'
   | 'ROUTE_SWITCH_BUFFER_INSUFFICIENT'
+  /** 有關聯圖，但 through verification／全優先路徑無法建立可信 successor。 */
+  | 'ROUTE_SUCCESSOR_POLICY_INVALID'
+  /** 同一車時間線的相鄰正線未依 successor 行駛。 */
+  | 'ROUTE_SUCCESSOR_MISMATCH'
+  /** 舊班次僅存 routeId，且無法唯一解析 selected route instance。 */
+  | 'ROUTE_INSTANCE_AMBIGUOUS'
+  /** 前趟終點站與後趟起點站不連續。 */
+  | 'ROUTE_STATION_DISCONTINUITY'
   | 'CLOCK_ALIGN_VIOLATION'
   | 'TURNAROUND_LIMIT_EXCEEDED'
   | 'ROUTE_ROTATION_OVER_TURNAROUND'
   /** 時間線上正線未跑完路線群組一整輪（例：只跑下行未跑上行） */
-  | 'ROTATION_CYCLE_INCOMPLETE';
+  | 'ROTATION_CYCLE_INCOMPLETE'
+  /** 保養／行前後調度無法接到首班起點站 */
+  | 'MAINTENANCE_DISPATCH_UNREACHABLE';
+
+/** 策略說明｜演算法極限｜可調整建議（見 feasibilityIssueMeta.ts） */
+export type FeasibilityIssueKind = 'policy' | 'limit' | 'actionable';
 
 export type FeasibilityIssue = {
   code: FeasibilityViolationCode;
   severity: 'error' | 'warning';
   message: string;
   detail?: Record<string, unknown>;
+  /** 議題分類；缺省時由 code 推導 */
+  kind?: FeasibilityIssueKind;
+  /** 給使用者的調整建議或極限說明 */
+  guidance?: string;
 };
 
 export type GeneratedScheduleTimeline = {
@@ -92,6 +125,8 @@ export type SchedulingContext = {
   scheduleRowCount: number;
   passengerRoutes: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds: number;
+  /** Step 4 關聯圖／折返錨點繼任策略 */
+  successorPolicy?: RouteSuccessorPolicy;
 };
 
 /** 班表產出時綁定的整備任務快照，供管理引擎引用 */
@@ -143,12 +178,7 @@ export type ResolvedTemplateTask = {
   dwellSeconds: number;
 };
 
-export function pushIssue(
-  bucket: FeasibilityIssue[],
-  issue: FeasibilityIssue,
-): void {
-  bucket.push(issue);
-}
+export { pushIssue } from './feasibilityIssueMeta';
 
 export function minuteToSecond(minute: number): number {
   return Math.round(minute * 60);

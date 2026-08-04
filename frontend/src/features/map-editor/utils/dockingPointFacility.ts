@@ -6,6 +6,7 @@ export const DOCKING_POINT_STATION_NAME_KEY = 'stationName'
 /** @deprecated 舊欄位，載入時遷移後不再寫入 */
 export const DOCKING_POINT_NODE_ID_KEY = 'operationNodeId'
 export const DOCKING_POINT_NODE_ROLE_KEY = 'nodeRole'
+/** @deprecated 已廢止；載入時剝除，不再用於路線／吸附 */
 export const DOCKING_POINT_LEG_KEY = 'dockingLeg'
 /** @deprecated 舊欄位，載入時遷移後不再寫入 */
 export const DOCKING_POINT_STATION_KEY = 'dockingStation'
@@ -33,6 +34,7 @@ export function getDockingPointStationName(facility: FacilityObject): string {
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
+/** @deprecated 僅舊地圖遷移推斷預設別名；新邏輯勿再依賴 */
 export function getDockingPointLeg(facility: FacilityObject): 'down' | 'up' | null {
   if (facility.type !== 'DockingPoint') return null
   const raw = facility.parameters?.[DOCKING_POINT_LEG_KEY]
@@ -49,6 +51,7 @@ export function getDockingPointRouteStation(
   return null
 }
 
+/** @deprecated 僅舊地圖遷移用 */
 export function defaultDockingStationDisplayName(
   leg: 'down' | 'up',
   routeStation: 'N2W' | 'T3' | 'S2W',
@@ -57,12 +60,12 @@ export function defaultDockingStationDisplayName(
 }
 
 export function resolveDockingPointMapLabel(facility: FacilityObject): string {
-  const stationName = getDockingPointStationName(facility)
-  if (stationName) return stationName
-  const stationId = getDockingPointStationId(facility)
-  if (stationId) return stationId
   const custom = facility.customName.trim()
   if (custom) return custom
+  const legacy = getDockingPointStationName(facility)
+  if (legacy) return legacy
+  const stationId = getDockingPointStationId(facility)
+  if (stationId) return stationId
   return ''
 }
 

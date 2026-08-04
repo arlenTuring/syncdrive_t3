@@ -13,7 +13,7 @@ export type FacilityColorRule = {
 }
 
 export type FacilityAreaParameters = {
-  /** 使用者填寫的設施用途（如充電格、洗車格）；平台不推斷 */
+  /** 大型設施用途（充電格、停車格、維修格等）；不作為設備類型判斷 */
   purpose?: string
   remarks?: string
   defaultFillColor?: string

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   OperationShiftPublishStatus,
   OperationShiftUsageStatus,
@@ -52,6 +52,42 @@ export class OperationShiftController {
     };
   }
 
+  @Get('timetable/trips')
+  @ApiOperation({
+    summary: '取得班表班次清單（含各站時刻）',
+    description:
+      '讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。可用 from/to 過濾卡時間重疊區間。',
+  })
+  @ApiQuery({ name: 'from', required: false, description: 'HH:MM:SS 或秒，預設 00:00:00' })
+  @ApiQuery({ name: 'to', required: false, description: 'HH:MM:SS 或秒，預設 24:00:00' })
+  async getTimetableTrips(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.operationShiftService.getTimetableTrips({ from, to });
+  }
+
+  @Get('timetable/station-etas')
+  @ApiOperation({
+    summary: '取得各站計畫 ETA（抵達／離站）',
+    description:
+      '由班表推算之站點事件流；vehicle_id 暫為 null。可用 from/to、station_id 濾波。',
+  })
+  @ApiQuery({ name: 'from', required: false, description: 'HH:MM:SS 或秒，預設 00:00:00' })
+  @ApiQuery({ name: 'to', required: false, description: 'HH:MM:SS 或秒，預設 24:00:00' })
+  @ApiQuery({ name: 'station_id', required: false, description: '只取單一站' })
+  async getStationEtas(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('station_id') station_id?: string,
+  ) {
+    return this.operationShiftService.getStationEtas({
+      from,
+      to,
+      station_id,
+    });
+  }
+
   @Get('detail/:id')
   @ApiOperation({ summary: '取得班表詳情（含 body）' })
   async getShiftDetail(@Param('id') id: string) {
@@ -65,6 +101,12 @@ export class OperationShiftController {
       name: body?.name ?? '',
       body: body?.body ?? {},
     });
+  }
+
+  @Post('detail/:id/publish')
+  @ApiOperation({ summary: '發布班表（供 timetable API 優先讀取）' })
+  async publishShift(@Param('id') id: string) {
+    return this.operationShiftService.publishShift(id);
   }
 
   @Post('detail/:id/duplicate')

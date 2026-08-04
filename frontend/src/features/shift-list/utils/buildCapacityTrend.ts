@@ -6,44 +6,73 @@ import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../types/create';
-import { sortSelectedRoutesByExecutionOrder } from '../types/create';
+import type { ShiftScheduleSelectedRoute, ShiftScheduleServiceDirectionTag } from '../types/create';
+import {
+  recoverServiceDirectionTagsFromRoutes,
+  sortSelectedRoutesByExecutionOrder,
+} from '../types/create';
 import type { GeneratedScheduleBlock, GeneratedSchedulePlan } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
 
 export const CAPACITY_DAY_MINUTES = 24 * 60;
 
+/** @deprecated 舊上下行標籤；運能已改為以服務方向／路線為方向流 */
 export type ServiceDirection = 'up' | 'down';
+
+/**
+ * 運能趨勢聚合方式：
+ * - serviceDirection：同服務方向的班次併成一流，以相鄰班距換 pphpd（分桶均化）
+ * - route：每條路線各自一條流（診斷用）
+ */
+export type CapacityTrendViewMode = 'serviceDirection' | 'route';
+
+/** @deprecated 舊別名；請用 serviceDirection */
+export type CapacityTrendViewModeLegacyGroup = 'group';
+
+/** 一條運能方向流（服務方向或單一路線） */
+export type CapacityRouteStream = {
+  streamKey: string;
+  kind: CapacityTrendViewMode;
+  routeId: string | null;
+  groupId: string | null;
+  serviceDirectionId: string | null;
+  label: string;
+  color: string;
+  departureCount: number;
+};
 
 export type CapacityTrendSample = {
   /** 自 00:00 起算的分鐘 */
   minute: number;
   /**
-   * 該分鐘的供給運能（pphpd）。
-   * 上行／下行分別依班距換算後取平均（與模板單向目標 band 對照）。
+   * 各路線流 pphpd 的平均（僅供與模板單向目標對照／摘要）。
+   * 真正的 per-direction 值在 pphpdByStream。
    */
   pphpd: number;
   /** 該分鐘仍在執行正線的車輛數（輔助資訊） */
   activeVehicleCount: number;
   /**
-   * 與 pphpd 對齊的等效班距（秒）＝ vehicleCapacity × 3600 / pphpd。
-   * 分桶／平滑後不再顯示瞬时班距，避免與運能數字矛盾。
+   * 與摘要 pphpd 對齊的等效班距（秒）＝ vehicleCapacity × 3600 / pphpd。
    */
   headwaySeconds: number | null;
-  /** 該分鐘有有效班距的方向數 */
-  activeDirectionCount: number;
-  /** 各方向 pphpd（供 tooltip 細節） */
-  pphpdByDirection: Partial<Record<ServiceDirection, number>>;
-  /** 各方向等效班距秒（由該向 pphpd 反推，與運能一致） */
-  headwayByDirection: Partial<Record<ServiceDirection, number>>;
+  /** 該分鐘有有效班距的路線流數量 */
+  activeStreamCount: number;
+  /** 各路線流 pphpd */
+  pphpdByStream: Record<string, number>;
+  /** 各路線流等效班距秒 */
+  headwayByStream: Record<string, number>;
 };
 
 export type CapacityTrendSeries = {
   vehicleCapacity: number;
   samples: CapacityTrendSample[];
+  /** 有發車的路線流（圖上各畫一條線） */
+  streams: CapacityRouteStream[];
   maxPphpd: number;
-  /** 正線發車趟次數（template_bar passenger） */
+  /** 已納入運能計算的正線發車趟次 */
   departureCount: number;
+  /** 班表上的正線 template_bar 總數 */
+  passengerBlockCount: number;
 };
 
 type DepartureEvent = {
@@ -56,315 +85,361 @@ type HeadwaySegment = {
   headwaySeconds: number;
 };
 
-const SERVICE_DIRECTIONS: ServiceDirection[] = ['up', 'down'];
-
-function resolveDirectionFromRoute(route: ShiftScheduleSelectedRoute): ServiceDirection | null {
-  const code = route.routeCode?.trim().toUpperCase();
-  if (code === 'U' || code === 'UP') return 'up';
-  if (code === 'D' || code === 'DOWN') return 'down';
-  if (route.routeName.includes('上行')) return 'up';
-  if (route.routeName.includes('下行')) return 'down';
-  return null;
+function isCapacityPassengerBlock(block: GeneratedScheduleBlock): boolean {
+  return (
+    block.taskType === 'passenger'
+    && (block.source === 'template_bar' || block.source === 'entry_service')
+  );
 }
 
-function resolveDirectionFromBlock(block: GeneratedScheduleBlock): ServiceDirection | null {
-  const code = block.routeCode?.trim().toUpperCase();
-  if (code === 'U' || code === 'UP') return 'up';
-  if (code === 'D' || code === 'DOWN') return 'down';
-
-  const name = block.routeName ?? '';
-  if (name.includes('上行')) return 'up';
-  if (name.includes('下行')) return 'down';
-  return null;
-}
-
-/**
- * 由路線群組建立 routeId → 方向對照。
- * 產品慣例：執行順序第 1 條為下行、第 2 條為上行（下行→上行輪替）。
- */
-export function buildDirectionByRouteId(
-  selectedRoutes: ShiftScheduleSelectedRoute[],
-): Map<string, ServiceDirection> {
-  const map = new Map<string, ServiceDirection>();
-  const sorted = sortSelectedRoutesByExecutionOrder(selectedRoutes);
-
-  for (const [index, route] of sorted.entries()) {
-    const explicit = resolveDirectionFromRoute(route);
-    if (explicit) {
-      map.set(route.routeId, explicit);
-      continue;
-    }
-    if (sorted.length === 2) {
-      map.set(route.routeId, index === 0 ? 'down' : 'up');
-    }
-  }
-
-  return map;
-}
-
-/**
- * 服務方向鍵：僅回傳 up / down；無法判定時回傳 null（不納入錯誤的 timeline 分流）。
- */
-export function resolveDepartureStreamKey(
-  block: GeneratedScheduleBlock,
-  directionByRouteId?: Map<string, ServiceDirection>,
-): ServiceDirection | null {
-  const fromBlock = resolveDirectionFromBlock(block);
-  if (fromBlock) return fromBlock;
-
-  if (block.routeId && directionByRouteId?.has(block.routeId)) {
-    return directionByRouteId.get(block.routeId) ?? null;
-  }
-
-  return null;
-}
-
-function collectDeparturesByDirection(
-  plan: GeneratedSchedulePlan | null | undefined,
-  directionByRouteId?: Map<string, ServiceDirection>,
-): Map<ServiceDirection, DepartureEvent[]> {
-  const byDirection = new Map<ServiceDirection, DepartureEvent[]>([
-    ['up', []],
-    ['down', []],
-  ]);
-
-  for (const timeline of plan?.timelines ?? []) {
-    for (const block of timeline.blocks) {
-      if (block.taskType !== 'passenger' || block.source !== 'template_bar') continue;
-      const direction = resolveDepartureStreamKey(block, directionByRouteId);
-      if (!direction) continue;
-
-      const list = byDirection.get(direction)!;
-      list.push({ startSecond: minuteToSecond(block.plannedStartMinute) });
-    }
-  }
-
-  for (const list of byDirection.values()) {
-    list.sort((a, b) => a.startSecond - b.startSecond);
-  }
-
-  return byDirection;
-}
+const STREAM_COLORS = [
+  '#7CB8FF',
+  '#5EEAD4',
+  '#FBBF24',
+  '#F472B6',
+  '#A78BFA',
+  '#34D399',
+  '#FB923C',
+  '#E879F9',
+];
 
 /**
  * 運能換算用的最短有效班距（秒）。
- * 低於此值的同方向連發視為「同班次／補完偽影」而非服務班距
- * （例如日界回程補完造成 10 秒連發 → pphpd 虛增至數萬）。
+ * 低於此值的同路線連發視為「同班次／補完偽影」而非服務班距。
  */
 export const MIN_CAPACITY_HEADWAY_SECONDS = 60;
 
 /**
  * 趨勢線分桶（分鐘）。
- * 尖峰軟延後班距常在目標上下交替（例如 180／220），每分鐘階梯會畫成梳子；
- * 分桶取時長加權平均後再做鄰近平滑。
+ * 尖峰軟延後班距常在目標上下交替；分桶取平均後再做鄰近平滑。
  */
 export const CAPACITY_TREND_BUCKET_MINUTES = 10;
 
 /** 分桶後對 pphpd 做鄰近移動平均的半寬（點數）；1 → 三點平滑 */
 export const CAPACITY_TREND_SMOOTH_HALF_WIDTH = 1;
 
-/**
- * 將每分鐘樣本收成固定分鐘桶的時長加權平均，供趨勢線使用。
- * 總量與方向細項用同一套平均，避免 tooltip「班距 180／運能却是 1155」。
- */
-export function bucketCapacitySamples(
-  samples: CapacityTrendSample[],
-  bucketMinutes: number,
-): CapacityTrendSample[] {
-  if (samples.length === 0 || bucketMinutes <= 1) return samples;
-
-  const byMinute = new Map(samples.map((sample) => [sample.minute, sample] as const));
-  const out: CapacityTrendSample[] = [];
-
-  for (
-    let bucketStart = 0;
-    bucketStart <= CAPACITY_DAY_MINUTES;
-    bucketStart += bucketMinutes
-  ) {
-    const bucketEnd = Math.min(CAPACITY_DAY_MINUTES, bucketStart + bucketMinutes - 1);
-    const group: CapacityTrendSample[] = [];
-    for (let minute = bucketStart; minute <= bucketEnd; minute += 1) {
-      const sample = byMinute.get(minute);
-      if (sample) group.push(sample);
-    }
-    if (group.length === 0) continue;
-
-    let pphpdSum = 0;
-    let pphpdCount = 0;
-    let vehicleSum = 0;
-    const dirPphpdSum: Partial<Record<ServiceDirection, number>> = {};
-    const dirPphpdCount: Partial<Record<ServiceDirection, number>> = {};
-    const dirHeadwaySum: Partial<Record<ServiceDirection, number>> = {};
-    const dirHeadwayCount: Partial<Record<ServiceDirection, number>> = {};
-
-    for (const item of group) {
-      if (item.activeDirectionCount > 0) {
-        pphpdSum += item.pphpd;
-        pphpdCount += 1;
-      }
-      vehicleSum += item.activeVehicleCount;
-      for (const direction of SERVICE_DIRECTIONS) {
-        const dirPphpd = item.pphpdByDirection[direction];
-        if (dirPphpd != null) {
-          dirPphpdSum[direction] = (dirPphpdSum[direction] ?? 0) + dirPphpd;
-          dirPphpdCount[direction] = (dirPphpdCount[direction] ?? 0) + 1;
-        }
-        const dirHeadway = item.headwayByDirection[direction];
-        if (dirHeadway != null) {
-          dirHeadwaySum[direction] = (dirHeadwaySum[direction] ?? 0) + dirHeadway;
-          dirHeadwayCount[direction] = (dirHeadwayCount[direction] ?? 0) + 1;
-        }
+function countPassengerTemplateBars(
+  plan: GeneratedSchedulePlan | null | undefined,
+): number {
+  let count = 0;
+  for (const timeline of plan?.timelines ?? []) {
+    for (const block of timeline.blocks) {
+      if (block.taskType === 'passenger' && block.source === 'template_bar') {
+        count += 1;
       }
     }
-
-    const pphpdByDirection: Partial<Record<ServiceDirection, number>> = {};
-    const headwayByDirection: Partial<Record<ServiceDirection, number>> = {};
-    for (const direction of SERVICE_DIRECTIONS) {
-      const pCount = dirPphpdCount[direction] ?? 0;
-      if (pCount > 0) {
-        pphpdByDirection[direction] = Math.round((dirPphpdSum[direction] ?? 0) / pCount);
-      }
-      const hCount = dirHeadwayCount[direction] ?? 0;
-      if (hCount > 0) {
-        headwayByDirection[direction] = Math.round((dirHeadwaySum[direction] ?? 0) / hCount);
-      }
-    }
-
-    const directionalHeadways = SERVICE_DIRECTIONS.flatMap((direction) => {
-      const headway = headwayByDirection[direction];
-      return headway == null ? [] : [headway];
-    });
-    const activeDirectionCount = Object.keys(pphpdByDirection).length;
-
-    out.push({
-      minute: bucketStart,
-      pphpd: pphpdCount === 0 ? 0 : Math.round(pphpdSum / pphpdCount),
-      headwaySeconds:
-        directionalHeadways.length === 0
-          ? null
-          : Math.round(
-              directionalHeadways.reduce((sum, value) => sum + value, 0)
-                / directionalHeadways.length,
-            ),
-      activeVehicleCount: Math.round(vehicleSum / group.length),
-      activeDirectionCount,
-      pphpdByDirection,
-      headwayByDirection,
-    });
   }
-
-  // 確保 24:00 端點存在，便於畫滿全日
-  const last = out[out.length - 1];
-  if (last && last.minute !== CAPACITY_DAY_MINUTES) {
-    const endSample = byMinute.get(CAPACITY_DAY_MINUTES) ?? last;
-    out.push({ ...endSample, minute: CAPACITY_DAY_MINUTES });
-  }
-
-  return out;
+  return count;
 }
 
 /**
- * 對分桶後運能做鄰近移動平均，並用同一套結果反推等效班距。
- * 保證 tooltip 的班距與 pphpd 永遠可用同一公式對得起來。
+ * 單一路線流鍵（route 模式）。
+ * 無 routeId 時退回代號／名稱，仍避免把不同路線混成一桶。
  */
-export function smoothCapacityTrendSamples(
-  samples: CapacityTrendSample[],
-  vehicleCapacity: number,
-  halfWidth: number = CAPACITY_TREND_SMOOTH_HALF_WIDTH,
-): CapacityTrendSample[] {
-  if (samples.length === 0 || halfWidth <= 0) {
-    return syncHeadwaysWithPphpd(samples, vehicleCapacity);
+export function resolveCapacityStreamKey(
+  block: GeneratedScheduleBlock,
+): string | null {
+  const routeId = block.routeId?.trim();
+  if (routeId) return routeId;
+
+  const code = block.routeCode?.trim().toUpperCase();
+  if (code) return `code:${code}`;
+
+  const name = block.routeName?.trim();
+  if (name) return `name:${name}`;
+
+  return null;
+}
+
+/** 路線群組流鍵；找不到群組時退回單一路線鍵，避免丟資料 */
+export function resolveCapacityGroupStreamKey(
+  block: GeneratedScheduleBlock,
+  routeById: Map<string, ShiftScheduleSelectedRoute>,
+): string | null {
+  const routeId = block.routeId?.trim();
+  if (routeId) {
+    const route = routeById.get(routeId);
+    if (route?.groupId?.trim()) return `group:${route.groupId.trim()}`;
   }
+  return resolveCapacityStreamKey(block);
+}
 
-  const smoothed = samples.map((sample, index) => {
-    if (sample.activeDirectionCount === 0 && sample.pphpd === 0) return sample;
+/** 服務方向流鍵；未設定服務方向時退回單一路線鍵 */
+export function resolveCapacityServiceDirectionStreamKey(
+  routeKey: string,
+  routeById: Map<string, ShiftScheduleSelectedRoute>,
+): string {
+  const route = routeById.get(routeKey);
+  const serviceDirectionId = route?.serviceDirectionId?.trim();
+  if (serviceDirectionId) return `sdir:${serviceDirectionId}`;
+  return routeKey;
+}
 
-    let pphpdSum = 0;
-    let pphpdCount = 0;
-    const dirPphpdSum: Partial<Record<ServiceDirection, number>> = {};
-    const dirPphpdCount: Partial<Record<ServiceDirection, number>> = {};
-
-    for (
-      let i = Math.max(0, index - halfWidth);
-      i <= Math.min(samples.length - 1, index + halfWidth);
-      i += 1
-    ) {
-      const neighbor = samples[i]!;
-      if (neighbor.activeDirectionCount === 0 && neighbor.pphpd === 0) continue;
-      pphpdSum += neighbor.pphpd;
-      pphpdCount += 1;
-      for (const direction of SERVICE_DIRECTIONS) {
-        const dirPphpd = neighbor.pphpdByDirection[direction];
-        if (dirPphpd == null) continue;
-        dirPphpdSum[direction] = (dirPphpdSum[direction] ?? 0) + dirPphpd;
-        dirPphpdCount[direction] = (dirPphpdCount[direction] ?? 0) + 1;
-      }
-    }
-    if (pphpdCount === 0) return sample;
-
-    const pphpdByDirection: Partial<Record<ServiceDirection, number>> = {};
-    for (const direction of SERVICE_DIRECTIONS) {
-      const count = dirPphpdCount[direction] ?? 0;
-      if (count > 0) {
-        pphpdByDirection[direction] = Math.round((dirPphpdSum[direction] ?? 0) / count);
-      }
-    }
-
+function resolveStreamMeta(
+  streamKey: string,
+  mode: CapacityTrendViewMode,
+  block: GeneratedScheduleBlock | undefined,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  serviceDirectionTags: ShiftScheduleServiceDirectionTag[],
+): Pick<
+  CapacityRouteStream,
+  'kind' | 'routeId' | 'groupId' | 'serviceDirectionId' | 'label'
+> {
+  if (mode === 'serviceDirection' && streamKey.startsWith('sdir:')) {
+    const serviceDirectionId = streamKey.slice('sdir:'.length);
+    const tag = serviceDirectionTags.find((item) => item.id === serviceDirectionId);
+    const members = selectedRoutes.filter(
+      (route) => route.serviceDirectionId?.trim() === serviceDirectionId,
+    );
+    const member = members[0];
+    const fromMemberName = members
+      .map((route) => route.serviceDirectionName?.trim())
+      .find((name) => name);
+    const label =
+      tag?.name?.trim()
+      || fromMemberName
+      || '服務方向';
     return {
-      ...sample,
-      pphpd: Math.round(pphpdSum / pphpdCount),
-      pphpdByDirection,
-      activeDirectionCount: Object.keys(pphpdByDirection).length,
+      kind: 'serviceDirection',
+      routeId: null,
+      groupId: member?.groupId?.trim() || null,
+      serviceDirectionId,
+      label,
     };
-  });
+  }
 
-  return syncHeadwaysWithPphpd(smoothed, vehicleCapacity);
+  const fromSelected = selectedRoutes.find((route) => route.routeId === streamKey);
+  if (fromSelected) {
+    const code = fromSelected.routeCode?.trim();
+    return {
+      kind: 'route',
+      routeId: fromSelected.routeId,
+      groupId: fromSelected.groupId?.trim() || null,
+      serviceDirectionId: fromSelected.serviceDirectionId?.trim() || null,
+      label: code ? `${code} ${fromSelected.routeName}`.trim() : fromSelected.routeName,
+    };
+  }
+
+  if (block?.routeCode?.trim() && block.routeName?.trim()) {
+    return {
+      kind: 'route',
+      routeId: block.routeId?.trim() || null,
+      groupId: null,
+      serviceDirectionId: null,
+      label: `${block.routeCode.trim()} ${block.routeName.trim()}`,
+    };
+  }
+  if (block?.routeName?.trim()) {
+    return {
+      kind: 'route',
+      routeId: block.routeId?.trim() || null,
+      groupId: null,
+      serviceDirectionId: null,
+      label: block.routeName.trim(),
+    };
+  }
+  if (block?.routeCode?.trim()) {
+    return {
+      kind: 'route',
+      routeId: block.routeId?.trim() || null,
+      groupId: null,
+      serviceDirectionId: null,
+      label: block.routeCode.trim(),
+    };
+  }
+  if (streamKey.startsWith('code:')) {
+    return {
+      kind: 'route',
+      routeId: null,
+      groupId: null,
+      serviceDirectionId: null,
+      label: streamKey.slice(5),
+    };
+  }
+  if (streamKey.startsWith('name:')) {
+    return {
+      kind: 'route',
+      routeId: null,
+      groupId: null,
+      serviceDirectionId: null,
+      label: streamKey.slice(5),
+    };
+  }
+  return {
+    kind: 'route',
+    routeId: block?.routeId?.trim() || null,
+    groupId: null,
+    serviceDirectionId: null,
+    label: streamKey,
+  };
 }
 
-/** 以顯示中的 pphpd 反推等效班距，確保與運能數字一致 */
-export function syncHeadwaysWithPphpd(
-  samples: CapacityTrendSample[],
-  vehicleCapacity: number,
-): CapacityTrendSample[] {
-  return samples.map((sample) => {
-    const headwayByDirection: Partial<Record<ServiceDirection, number>> = {};
-    for (const direction of SERVICE_DIRECTIONS) {
-      const dirPphpd = sample.pphpdByDirection[direction];
-      if (dirPphpd == null || dirPphpd <= 0) continue;
-      const headway = computeHeadwaySecondsFromPphpd(vehicleCapacity, dirPphpd);
-      if (headway != null) headwayByDirection[direction] = headway;
+type CollectedStreams = {
+  byStream: Map<string, DepartureEvent[]>;
+  sampleBlockByStream: Map<string, GeneratedScheduleBlock>;
+};
+
+/** 一律以「路線」為單位收集發車；服務方向聚合時再合併發車序列 */
+function collectDeparturesByRoute(
+  plan: GeneratedSchedulePlan | null | undefined,
+): CollectedStreams {
+  const byStream = new Map<string, DepartureEvent[]>();
+  const sampleBlockByStream = new Map<string, GeneratedScheduleBlock>();
+
+  for (const timeline of plan?.timelines ?? []) {
+    for (const block of timeline.blocks) {
+      if (!isCapacityPassengerBlock(block)) continue;
+      const routeKey = resolveCapacityStreamKey(block);
+      if (!routeKey) continue;
+
+      const list = byStream.get(routeKey) ?? [];
+      list.push({ startSecond: minuteToSecond(block.plannedStartMinute) });
+      byStream.set(routeKey, list);
+
+      if (!sampleBlockByStream.has(routeKey)) {
+        sampleBlockByStream.set(routeKey, block);
+      }
     }
-    const headwaySeconds = computeHeadwaySecondsFromPphpd(vehicleCapacity, sample.pphpd);
-    return {
-      ...sample,
-      headwaySeconds,
-      headwayByDirection,
-    };
-  });
+  }
+
+  for (const list of byStream.values()) {
+    list.sort((a, b) => a.startSecond - b.startSecond);
+  }
+
+  return { byStream, sampleBlockByStream };
 }
 
 /**
- * 同一方向內，跨所有時間線的相鄰實際發車間隔定義班距區段 [d_i, d_{i+1})。
- * 間隔過短的連發會被收斂為同一班「波次」，不產生虛高運能。
+ * 服務方向發車：同一時間線上、同向連續**不同路線**路段（如 NT→TS）只算 **一趟班次**
+ * （取該趟第一個發車）。同一起始路線再開一趟則另計，避免把串接路段算成兩倍運能。
+ * Map key 已是流鍵（`sdir:…` 或未標籤的路線鍵）。
  */
-function buildHeadwaySegments(departures: DepartureEvent[]): HeadwaySegment[] {
-  const uniqueSeconds = [...new Set(departures.map((event) => event.startSecond))].sort(
-    (a, b) => a - b,
+function collectDeparturesByServiceDirection(
+  plan: GeneratedSchedulePlan | null | undefined,
+  routeById: Map<string, ShiftScheduleSelectedRoute>,
+): CollectedStreams {
+  const byStream = new Map<string, DepartureEvent[]>();
+  const sampleBlockByStream = new Map<string, GeneratedScheduleBlock>();
+
+  for (const timeline of plan?.timelines ?? []) {
+    const blocks = timeline.blocks
+      .filter(isCapacityPassengerBlock)
+      .slice()
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+
+    let runStreamKey: string | null = null;
+    let runStartRouteKey: string | null = null;
+    let runStartSecond: number | null = null;
+    let runSampleBlock: GeneratedScheduleBlock | null = null;
+
+    const flushRun = () => {
+      if (runStreamKey == null || runStartSecond == null) return;
+      const list = byStream.get(runStreamKey) ?? [];
+      list.push({ startSecond: runStartSecond });
+      byStream.set(runStreamKey, list);
+      if (runSampleBlock && !sampleBlockByStream.has(runStreamKey)) {
+        sampleBlockByStream.set(runStreamKey, runSampleBlock);
+      }
+      runStreamKey = null;
+      runStartRouteKey = null;
+      runStartSecond = null;
+      runSampleBlock = null;
+    };
+
+    for (const block of blocks) {
+      const routeKey = resolveCapacityStreamKey(block);
+      if (!routeKey) {
+        flushRun();
+        continue;
+      }
+      const streamKey = resolveCapacityServiceDirectionStreamKey(routeKey, routeById);
+
+      if (streamKey === runStreamKey) {
+        if (routeKey === runStartRouteKey) {
+          // 同向又從同一起始路線出發＝下一趟班次
+          flushRun();
+        } else {
+          // 同向、不同路線＝串接路段，併入本趟
+          continue;
+        }
+      } else {
+        flushRun();
+      }
+
+      runStreamKey = streamKey;
+      runStartRouteKey = routeKey;
+      runStartSecond = minuteToSecond(block.plannedStartMinute);
+      runSampleBlock = block;
+    }
+    flushRun();
+  }
+
+  for (const list of byStream.values()) {
+    list.sort((a, b) => a.startSecond - b.startSecond);
+  }
+
+  return { byStream, sampleBlockByStream };
+}
+
+/**
+ * route 模式：路線鍵即流鍵。
+ * serviceDirection 模式：有服務方向則 `sdir:<id>`（同標籤合併），否則維持單一路線鍵。
+ */
+function resolveStreamKeyForRouteKey(
+  routeKey: string,
+  mode: CapacityTrendViewMode,
+  routeById: Map<string, ShiftScheduleSelectedRoute>,
+): string {
+  if (mode === 'route') return routeKey;
+  return resolveCapacityServiceDirectionStreamKey(routeKey, routeById);
+}
+
+function orderStreamKeys(
+  streamKeys: string[],
+  mode: CapacityTrendViewMode,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+): string[] {
+  const sortedRoutes = sortSelectedRoutesByExecutionOrder(selectedRoutes);
+
+  if (mode === 'serviceDirection') {
+    const directionOrder = new Map<string, number>();
+    for (const [index, route] of sortedRoutes.entries()) {
+      const key = route.serviceDirectionId?.trim()
+        ? `sdir:${route.serviceDirectionId.trim()}`
+        : route.routeId;
+      if (!directionOrder.has(key)) directionOrder.set(key, index);
+    }
+    return [...streamKeys].sort((a, b) => {
+      const ai = directionOrder.get(a);
+      const bi = directionOrder.get(b);
+      if (ai != null && bi != null) return ai - bi;
+      if (ai != null) return -1;
+      if (bi != null) return 1;
+      return a.localeCompare(b);
+    });
+  }
+
+  const orderIndex = new Map(
+    sortedRoutes.map((route, index) => [route.routeId, index] as const),
   );
+  return [...streamKeys].sort((a, b) => {
+    const ai = orderIndex.get(a);
+    const bi = orderIndex.get(b);
+    if (ai != null && bi != null) return ai - bi;
+    if (ai != null) return -1;
+    if (bi != null) return 1;
+    return a.localeCompare(b);
+  });
+}
 
-  // 波次收斂：過近的同方向發車只保留第一班，避免日界補完等偽影
-  const platoonLeadSeconds: number[] = [];
-  for (const second of uniqueSeconds) {
-    const previous = platoonLeadSeconds[platoonLeadSeconds.length - 1];
-    if (previous == null || second - previous >= MIN_CAPACITY_HEADWAY_SECONDS) {
-      platoonLeadSeconds.push(second);
-    }
-  }
-
+/**
+ * 同一發車秒序列的相鄰間隔 → 班距區段 [d_i, d_{i+1})。
+ */
+function buildHeadwaySegmentsFromLeadSeconds(leadSeconds: number[]): HeadwaySegment[] {
   const segments: HeadwaySegment[] = [];
-  for (let i = 0; i < platoonLeadSeconds.length - 1; i += 1) {
-    const startSecond = platoonLeadSeconds[i]!;
-    const endSecond = platoonLeadSeconds[i + 1]!;
+  for (let i = 0; i < leadSeconds.length - 1; i += 1) {
+    const startSecond = leadSeconds[i]!;
+    const endSecond = leadSeconds[i + 1]!;
     const gapSeconds = endSecond - startSecond;
     if (gapSeconds < MIN_CAPACITY_HEADWAY_SECONDS) continue;
     segments.push({
@@ -374,6 +449,37 @@ function buildHeadwaySegments(departures: DepartureEvent[]): HeadwaySegment[] {
     });
   }
   return segments;
+}
+
+/**
+ * 同一路線流內，跨所有時間線的相鄰實際發車間隔定義班距區段 [d_i, d_{i+1})。
+ */
+function buildHeadwaySegments(departures: DepartureEvent[]): HeadwaySegment[] {
+  return buildHeadwaySegmentsFromLeadSeconds(uniqueDepartureLeadSeconds(departures, true));
+}
+
+/**
+ * 發車秒序列（排序去重）。
+ * @param platoonFilter 為 true 時，過近連發視為同班次偽影只留先頭（單路線診斷用）。
+ *   服務方向應為 false：已先合併同向連續路段，此處保留各趟班次。
+ */
+function uniqueDepartureLeadSeconds(
+  departures: DepartureEvent[],
+  platoonFilter: boolean,
+): number[] {
+  const uniqueSeconds = [...new Set(departures.map((event) => event.startSecond))].sort(
+    (a, b) => a - b,
+  );
+  if (!platoonFilter) return uniqueSeconds;
+
+  const platoonLeadSeconds: number[] = [];
+  for (const second of uniqueSeconds) {
+    const previous = platoonLeadSeconds[platoonLeadSeconds.length - 1];
+    if (previous == null || second - previous >= MIN_CAPACITY_HEADWAY_SECONDS) {
+      platoonLeadSeconds.push(second);
+    }
+  }
+  return platoonLeadSeconds;
 }
 
 function findSegmentAt(
@@ -406,12 +512,181 @@ function countActiveVehiclesAt(
   return count;
 }
 
+function averageRecordValues(record: Record<string, number>): number | null {
+  const values = Object.values(record);
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+/**
+ * 將每分鐘樣本收成固定分鐘桶的平均，供趨勢線使用。
+ */
+export function bucketCapacitySamples(
+  samples: CapacityTrendSample[],
+  bucketMinutes: number,
+  streamKeys: string[],
+): CapacityTrendSample[] {
+  if (samples.length === 0 || bucketMinutes <= 1) return samples;
+
+  const byMinute = new Map(samples.map((sample) => [sample.minute, sample] as const));
+  const out: CapacityTrendSample[] = [];
+
+  for (
+    let bucketStart = 0;
+    bucketStart <= CAPACITY_DAY_MINUTES;
+    bucketStart += bucketMinutes
+  ) {
+    const bucketEnd = Math.min(CAPACITY_DAY_MINUTES, bucketStart + bucketMinutes - 1);
+    const group: CapacityTrendSample[] = [];
+    for (let minute = bucketStart; minute <= bucketEnd; minute += 1) {
+      const sample = byMinute.get(minute);
+      if (sample) group.push(sample);
+    }
+    if (group.length === 0) continue;
+
+    let pphpdSum = 0;
+    let pphpdCount = 0;
+    let vehicleSum = 0;
+    const streamPphpdSum: Record<string, number> = {};
+    const streamPphpdCount: Record<string, number> = {};
+
+    for (const item of group) {
+      if (item.activeStreamCount > 0) {
+        pphpdSum += item.pphpd;
+        pphpdCount += 1;
+      }
+      vehicleSum += item.activeVehicleCount;
+      for (const key of streamKeys) {
+        const streamPphpd = item.pphpdByStream[key];
+        if (streamPphpd == null) continue;
+        streamPphpdSum[key] = (streamPphpdSum[key] ?? 0) + streamPphpd;
+        streamPphpdCount[key] = (streamPphpdCount[key] ?? 0) + 1;
+      }
+    }
+
+    const pphpdByStream: Record<string, number> = {};
+    for (const key of streamKeys) {
+      const count = streamPphpdCount[key] ?? 0;
+      if (count > 0) {
+        pphpdByStream[key] = Math.round((streamPphpdSum[key] ?? 0) / count);
+      }
+    }
+
+    out.push({
+      minute: bucketStart,
+      pphpd: pphpdCount === 0 ? 0 : Math.round(pphpdSum / pphpdCount),
+      headwaySeconds: null,
+      activeVehicleCount: Math.round(vehicleSum / group.length),
+      activeStreamCount: Object.keys(pphpdByStream).length,
+      pphpdByStream,
+      headwayByStream: {},
+    });
+  }
+
+  const last = out[out.length - 1];
+  if (last && last.minute !== CAPACITY_DAY_MINUTES) {
+    const endSample = byMinute.get(CAPACITY_DAY_MINUTES) ?? last;
+    out.push({
+      ...endSample,
+      minute: CAPACITY_DAY_MINUTES,
+      headwaySeconds: null,
+      headwayByStream: {},
+    });
+  }
+
+  return out;
+}
+
+/** 以顯示中的 pphpd 反推等效班距，確保與運能數字一致 */
+export function syncHeadwaysWithPphpd(
+  samples: CapacityTrendSample[],
+  vehicleCapacity: number,
+  streamKeys: string[],
+): CapacityTrendSample[] {
+  return samples.map((sample) => {
+    const headwayByStream: Record<string, number> = {};
+    for (const key of streamKeys) {
+      const streamPphpd = sample.pphpdByStream[key];
+      if (streamPphpd == null || streamPphpd <= 0) continue;
+      const headway = computeHeadwaySecondsFromPphpd(vehicleCapacity, streamPphpd);
+      if (headway != null) headwayByStream[key] = headway;
+    }
+    return {
+      ...sample,
+      headwaySeconds: computeHeadwaySecondsFromPphpd(vehicleCapacity, sample.pphpd),
+      headwayByStream,
+    };
+  });
+}
+
+/**
+ * 對分桶後運能做鄰近移動平均，並用同一套結果反推等效班距。
+ */
+export function smoothCapacityTrendSamples(
+  samples: CapacityTrendSample[],
+  vehicleCapacity: number,
+  streamKeys: string[],
+  halfWidth: number = CAPACITY_TREND_SMOOTH_HALF_WIDTH,
+): CapacityTrendSample[] {
+  if (samples.length === 0 || halfWidth <= 0) {
+    return syncHeadwaysWithPphpd(samples, vehicleCapacity, streamKeys);
+  }
+
+  const smoothed = samples.map((sample, index) => {
+    if (sample.activeStreamCount === 0 && sample.pphpd === 0) return sample;
+
+    let pphpdSum = 0;
+    let pphpdCount = 0;
+    const streamPphpdSum: Record<string, number> = {};
+    const streamPphpdCount: Record<string, number> = {};
+
+    for (
+      let i = Math.max(0, index - halfWidth);
+      i <= Math.min(samples.length - 1, index + halfWidth);
+      i += 1
+    ) {
+      const neighbor = samples[i]!;
+      if (neighbor.activeStreamCount === 0 && neighbor.pphpd === 0) continue;
+      pphpdSum += neighbor.pphpd;
+      pphpdCount += 1;
+      for (const key of streamKeys) {
+        const streamPphpd = neighbor.pphpdByStream[key];
+        if (streamPphpd == null) continue;
+        streamPphpdSum[key] = (streamPphpdSum[key] ?? 0) + streamPphpd;
+        streamPphpdCount[key] = (streamPphpdCount[key] ?? 0) + 1;
+      }
+    }
+    if (pphpdCount === 0) return sample;
+
+    const pphpdByStream: Record<string, number> = {};
+    for (const key of streamKeys) {
+      const count = streamPphpdCount[key] ?? 0;
+      if (count > 0) {
+        pphpdByStream[key] = Math.round((streamPphpdSum[key] ?? 0) / count);
+      }
+    }
+
+    return {
+      ...sample,
+      pphpd: Math.round(pphpdSum / pphpdCount),
+      pphpdByStream,
+      activeStreamCount: Object.keys(pphpdByStream).length,
+    };
+  });
+
+  return syncHeadwaysWithPphpd(smoothed, vehicleCapacity, streamKeys);
+}
+
 /**
  * 依第五步最終班表計算運能趨勢。
  *
- * 學術定義（TCQSM / per-direction offered capacity）：
- *   pphpd_dir = vehicleCapacity × (3600 / headwaySeconds_dir)
- *   headwaySeconds_dir = 同一方向、跨所有時間線的相鄰實際發車間隔
+ * pphpd 定義：vehicleCapacity × (3600 / headwaySeconds)
+ *
+ * 方向流：
+ * - serviceDirection（預設）：同服務方向標籤＝同向**班次**；
+ *   同一時間線上連續同向路段只算一趟，再以相鄰班次班距換 pphpd
+ *   （10 分桶＋鄰近平滑做均化顯示）。未設標籤的路線各自獨立。
+ * - route：每條 routeId 各自用瞬間相鄰班距（診斷用）。
  *
  * 發車時刻取 plannedStartMinute（與班表卡片一致）。
  */
@@ -419,67 +694,101 @@ export function buildCapacityTrendFromPlan(args: {
   plan: GeneratedSchedulePlan | null | undefined;
   vehicleCapacity: number;
   selectedRoutes?: ShiftScheduleSelectedRoute[];
+  /** 服務方向標籤（顯示名稱）；缺省則用 id */
+  serviceDirectionTags?: ShiftScheduleServiceDirectionTag[];
+  /**
+   * serviceDirection＝同向班次班距（分桶均化）；
+   * route＝各路線分開。
+   * 相容舊呼叫：`group` 視為 `serviceDirection`。
+   */
+  viewMode?: CapacityTrendViewMode | 'group';
   /** 取樣間隔（分鐘），預設 1 */
   sampleStepMinutes?: number;
 }): CapacityTrendSeries {
   const vehicleCapacity = Math.max(1, Math.round(args.vehicleCapacity || 0));
   const step = Math.max(1, args.sampleStepMinutes ?? 1);
-  const directionByRouteId = args.selectedRoutes?.length
-    ? buildDirectionByRouteId(args.selectedRoutes)
-    : undefined;
-  const departuresByDirection = collectDeparturesByDirection(args.plan, directionByRouteId);
-  const segmentsByDirection = new Map<ServiceDirection, HeadwaySegment[]>();
+  const selectedRoutes = args.selectedRoutes ?? [];
+  const serviceDirectionTags = recoverServiceDirectionTagsFromRoutes(
+    args.serviceDirectionTags ?? [],
+    selectedRoutes,
+  );
+  const rawMode = args.viewMode ?? 'serviceDirection';
+  const viewMode: CapacityTrendViewMode =
+    rawMode === 'group' ? 'serviceDirection' : rawMode;
+  const passengerBlockCount = countPassengerTemplateBars(args.plan);
+  const routeById = new Map(selectedRoutes.map((route) => [route.routeId, route] as const));
 
-  let departureCount = 0;
-  for (const direction of SERVICE_DIRECTIONS) {
-    const departures = departuresByDirection.get(direction) ?? [];
-    departureCount += departures.length;
-    segmentsByDirection.set(direction, buildHeadwaySegments(departures));
+  // serviceDirection：同向連續路段併成一趟班次；route：各路線分開
+  const collected =
+    viewMode === 'serviceDirection'
+      ? collectDeparturesByServiceDirection(args.plan, routeById)
+      : collectDeparturesByRoute(args.plan);
+  const streamKeys = orderStreamKeys(
+    [...collected.byStream.keys()],
+    viewMode,
+    selectedRoutes,
+  );
+
+  const departuresByStream = new Map<string, DepartureEvent[]>();
+  for (const streamKey of streamKeys) {
+    const list = [...(collected.byStream.get(streamKey) ?? [])];
+    list.sort((a, b) => a.startSecond - b.startSecond);
+    departuresByStream.set(streamKey, list);
   }
+
+  const segmentsByStream = new Map<string, HeadwaySegment[]>();
+  let departureCount = 0;
+  for (const streamKey of streamKeys) {
+    const departures = departuresByStream.get(streamKey) ?? [];
+    departureCount += departures.length;
+    // 服務方向班次已去重連續路段，不再做偽影連發過濾；route 仍過濾
+    const leadSeconds = uniqueDepartureLeadSeconds(departures, viewMode === 'route');
+    segmentsByStream.set(streamKey, buildHeadwaySegmentsFromLeadSeconds(leadSeconds));
+  }
+
+  const streams: CapacityRouteStream[] = streamKeys.map((streamKey, index) => {
+    const departures = departuresByStream.get(streamKey) ?? [];
+    const sampleBlock = collected.sampleBlockByStream.get(streamKey);
+    const meta = resolveStreamMeta(
+      streamKey,
+      viewMode,
+      sampleBlock,
+      selectedRoutes,
+      serviceDirectionTags,
+    );
+    return {
+      streamKey,
+      ...meta,
+      color: STREAM_COLORS[index % STREAM_COLORS.length]!,
+      departureCount: departures.length,
+    };
+  });
 
   const resolveAt = (minute: number): CapacityTrendSample => {
     const sampleSecond = minuteToSecond(minute);
-    const pphpdByDirection: Partial<Record<ServiceDirection, number>> = {};
-    const headwayByDirection: Partial<Record<ServiceDirection, number>> = {};
-    const directionalPphpd: number[] = [];
-    const directionalHeadways: number[] = [];
+    const pphpdByStream: Record<string, number> = {};
+    const headwayByStream: Record<string, number> = {};
 
-    for (const direction of SERVICE_DIRECTIONS) {
-      const segments = segmentsByDirection.get(direction) ?? [];
-      const segment = findSegmentAt(segments, sampleSecond);
+    for (const streamKey of streamKeys) {
+      const segment = findSegmentAt(segmentsByStream.get(streamKey) ?? [], sampleSecond);
       if (!segment) continue;
-
       const pphpd = computeCapacityPphpd(vehicleCapacity, segment.headwaySeconds);
-      pphpdByDirection[direction] = pphpd;
-      headwayByDirection[direction] = segment.headwaySeconds;
-      directionalPphpd.push(pphpd);
-      directionalHeadways.push(segment.headwaySeconds);
+      pphpdByStream[streamKey] = pphpd;
+      headwayByStream[streamKey] = segment.headwaySeconds;
     }
 
-    const activeDirectionCount = directionalPphpd.length;
-    const pphpd =
-      activeDirectionCount === 0
-        ? 0
-        : Math.round(
-            directionalPphpd.reduce((sum, value) => sum + value, 0)
-              / activeDirectionCount,
-          );
-    const headwaySeconds =
-      activeDirectionCount === 0
-        ? null
-        : Math.round(
-            directionalHeadways.reduce((sum, value) => sum + value, 0)
-              / activeDirectionCount,
-          );
+    const activeStreamCount = Object.keys(pphpdByStream).length;
+    const pphpd = averageRecordValues(pphpdByStream) ?? 0;
+    const headwaySeconds = averageRecordValues(headwayByStream);
 
     return {
       minute,
       pphpd,
       activeVehicleCount: countActiveVehiclesAt(args.plan, minute),
       headwaySeconds,
-      activeDirectionCount,
-      pphpdByDirection,
-      headwayByDirection,
+      activeStreamCount,
+      pphpdByStream,
+      headwayByStream,
     };
   };
 
@@ -491,28 +800,34 @@ export function buildCapacityTrendFromPlan(args: {
     rawSamples.push(resolveAt(CAPACITY_DAY_MINUTES));
   }
 
-  // 趨勢線分桶 + 鄰近平滑，並反推等效班距，讓 tooltip 數字自洽。
   const samples = smoothCapacityTrendSamples(
-    bucketCapacitySamples(rawSamples, CAPACITY_TREND_BUCKET_MINUTES),
+    bucketCapacitySamples(rawSamples, CAPACITY_TREND_BUCKET_MINUTES, streamKeys),
     vehicleCapacity,
+    streamKeys,
   );
 
   const maxPphpd = samples.reduce((max, sample) => {
-    // 班距低於有效下限的樣本不參與 max（與軸高一致，避免圖例／摘要被污染）
+    let sampleMax = 0;
+    for (const value of Object.values(sample.pphpdByStream)) {
+      sampleMax = Math.max(sampleMax, value);
+    }
+    if (sampleMax <= 0 && sample.pphpd > 0) sampleMax = sample.pphpd;
     if (
       sample.headwaySeconds != null
       && sample.headwaySeconds < MIN_CAPACITY_HEADWAY_SECONDS
     ) {
       return max;
     }
-    return Math.max(max, sample.pphpd);
+    return Math.max(max, sampleMax);
   }, 0);
 
   return {
     vehicleCapacity,
     samples,
+    streams,
     maxPphpd,
     departureCount,
+    passengerBlockCount,
   };
 }
 
@@ -574,7 +889,6 @@ export function resolveCapacityAxisMax(
     (max, attr) => Math.max(max, attr.isDraft ? 0 : attr.capacityPphpd),
     0,
   );
-  // 實際值若超過目標 1.5 倍（或目標+400），視為異常尖峰，不納入軸高
   const reasonableActual =
     targetMax > 0
       ? Math.min(actualMaxPphpd, Math.max(targetMax * 1.5, targetMax + 400))
@@ -591,17 +905,26 @@ export function formatMinuteAsHm(minute: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-function formatDirectionLabel(direction: ServiceDirection): string {
-  return direction === 'up' ? '上行' : '下行';
+export function formatRouteStreamHeadwayTooltip(
+  headwayByStream: Record<string, number>,
+  streams: CapacityRouteStream[],
+): string | null {
+  const labelByKey = new Map(streams.map((stream) => [stream.streamKey, stream.label]));
+  const parts = Object.entries(headwayByStream).map(([key, headway]) => {
+    const label = labelByKey.get(key) ?? key;
+    return `${label} ${headway.toLocaleString('en-US')} 秒`;
+  });
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/** @deprecated 改用 formatRouteStreamHeadwayTooltip */
 export function formatDirectionalHeadwayTooltip(
   headwayByDirection: Partial<Record<ServiceDirection, number>>,
 ): string | null {
-  const parts = SERVICE_DIRECTIONS.flatMap((direction) => {
+  const parts = (['up', 'down'] as const).flatMap((direction) => {
     const headway = headwayByDirection[direction];
     if (headway == null) return [];
-    return [`${formatDirectionLabel(direction)} ${headway.toLocaleString('en-US')} 秒`];
+    return [`${direction === 'up' ? '上行' : '下行'} ${headway.toLocaleString('en-US')} 秒`];
   });
   return parts.length > 0 ? parts.join(' · ') : null;
 }

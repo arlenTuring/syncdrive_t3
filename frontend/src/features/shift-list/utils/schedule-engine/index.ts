@@ -2,6 +2,7 @@ export type {
   ScheduleBlockSource,
   GeneratedScheduleBlock,
   FeasibilityViolationCode,
+  FeasibilityIssueKind,
   FeasibilityIssue,
   GeneratedScheduleTimeline,
   GeneratedSchedulePlan,
@@ -29,6 +30,9 @@ export {
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
   applyDwellSlackSeconds,
+  resolveStationDwellMode,
+  stationDwellSkipsSlack,
+  applyStationDwellWithSlack,
   snapUpToClockAlignSeconds,
   snapDownToClockAlignSeconds,
   isClockAlignedSeconds,
@@ -36,13 +40,24 @@ export {
   sumStationDwellSeconds,
   sumStationDwellSecondsWithSlack,
   areStationDwellsComplete,
+  isStationDwellEntryComplete,
+  isStationDwellRequired,
+  looksLikeDefaultCrossoverPortalStationId,
+  resolveStationDwellListRole,
+  formatStationDwellRoleLabel,
   resolveRouteCycleSeconds,
   resolveRouteMinTurnaroundBudgetSeconds,
   isMainlineRouteWithinTurnaroundLimit,
   resolveNextRouteInExecutionOrder,
   resolveInterTripGapSeconds,
+  shouldIncludeRecoveryForRouteSwitch,
+  resolvePassengerRouteOccupancy,
+  resolveOccupancyClampedToTravelBounds,
   resolveFleetPhysicalHeadwayFloorSeconds,
   resolveRouteRotationMinSeconds,
+  resolveRouteOriginStationId,
+  resolveRouteTerminalStationId,
+  routesShareTurnaroundStation,
   buildRouteGroupsParamsFingerprint,
 } from './physics';
 
@@ -69,7 +84,6 @@ export {
   groupTasksByRow,
   resolveTemplateTasks,
   expandRowBlocks,
-  ROUTE_ASSIGNMENT_ALGORITHM,
 } from './expand';
 
 export {
@@ -81,9 +95,25 @@ export {
 export {
   assignPassengerRoutesConstraintGreedy,
   scoreRouteCandidate,
+  ROUTE_ASSIGNMENT_ALGORITHM,
   type RouteAssignmentDecision,
   type RouteAssignmentAlgorithm,
 } from './assignRoutes';
+
+export {
+  buildRouteSuccessorPolicy,
+  resolveStartInstanceId,
+  resolveNextInstanceId,
+  listNextInstanceCandidates,
+  estimatePolicyCycleSeconds,
+  resolveLockedRotationMinSeconds,
+  routeAssignmentAlgorithmId,
+  rotationCompletionAlgorithmId,
+  ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+  ROUTE_SUCCESSOR_ALGORITHM_RING,
+  type RouteSuccessorPolicy,
+  type RouteSuccessorAlgorithm,
+} from './routeSuccessorPolicy';
 
 export {
   validateTurnaroundLimits,
@@ -95,6 +125,13 @@ export {
   resolveHeadwaySecondsAtMinute,
   resolvePairHeadwaySeconds,
 } from './validate';
+
+export {
+  enrichFeasibilityIssue,
+  resolveFeasibilityIssueMeta,
+  resolveFeasibilityIssueKind,
+  type FeasibilityIssueMeta,
+} from './feasibilityIssueMeta';
 
 export {
   generateShiftSchedule,

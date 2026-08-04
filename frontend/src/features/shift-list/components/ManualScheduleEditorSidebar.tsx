@@ -9,8 +9,14 @@ import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import type {
   ShiftScheduleSelectedRoute,
   ShiftScheduleStationDwell,
+  ShiftStationDwellMode,
 } from '../types/create';
-import { normalizeDwellSlackSeconds } from '../types/create';
+import {
+  formatStationDwellRoleLabel,
+  normalizeDwellSlackSeconds,
+  resolveStationDwellListRole,
+  resolveStationDwellMode,
+} from '../types/create';
 import type { GeneratedScheduleBlock } from '../utils/schedule-engine/types';
 import {
   resolveManualBlockDwellTotalSeconds,
@@ -203,6 +209,26 @@ function ManualBlockSettingsForm({
     [stationDwells, dwellSlackText],
   );
 
+  const showDwellEditor =
+    block.taskType === 'passenger' && Boolean(routeId) && stationDwells.length > 0;
+
+  const blockDurationSeconds = useMemo(() => {
+    const startMinute = parseMinuteInput(startText);
+    const endMinute = parseMinuteInput(endText);
+    if (startMinute == null || endMinute == null || endMinute <= startMinute) {
+      return Math.max(
+        0,
+        Math.round((block.plannedEndMinute - block.plannedStartMinute) * 60),
+      );
+    }
+    return Math.max(0, Math.round((endMinute - startMinute) * 60));
+  }, [startText, endText, block.plannedStartMinute, block.plannedEndMinute]);
+
+  const durationShorterThanDwells =
+    showDwellEditor
+    && dwellTotalSeconds > 0
+    && blockDurationSeconds < dwellTotalSeconds;
+
   const commitDwells = (
     nextDwells: ShiftScheduleStationDwell[],
     nextSlackRaw: string,
@@ -244,9 +270,6 @@ function ManualBlockSettingsForm({
       routeId: block.taskType === 'passenger' ? (routeId || null) : null,
     });
   };
-
-  const showDwellEditor =
-    block.taskType === 'passenger' && Boolean(routeId) && stationDwells.length > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -339,37 +362,93 @@ function ManualBlockSettingsForm({
             </span>
           </div>
           <div className="space-y-1.5">
-            {stationDwells.map((dwell) => (
-              <label
-                key={dwell.stationId}
-                className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2"
-              >
-                <span className="truncate text-[11px] text-zinc-400" title={dwell.stationName}>
-                  {dwell.stationName || dwell.stationId}
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
-                  placeholder="秒"
-                  className={SMALL_INPUT_CLASS}
-                  aria-label={`${dwell.stationName} 靠站秒數`}
-                  onChange={(event) => {
-                    const digits = event.target.value.replace(/\D/g, '');
-                    const nextDwells = stationDwells.map((item) =>
-                      item.stationId === dwell.stationId
-                        ? {
-                            ...item,
-                            dwellSeconds: digits === '' ? null : Math.max(0, Number(digits)),
+            {stationDwells.map((dwell, index) => {
+              const role = resolveStationDwellListRole(dwell, index);
+              if (role !== 'editable') {
+                return (
+                  <div
+                    key={dwell.stationId}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+                  >
+                    <span className="truncate text-[11px] text-zinc-400" title={dwell.stationName}>
+                      {dwell.stationName || dwell.stationId}
+                    </span>
+                    <span className="rounded-md border border-zinc-800/80 bg-zinc-900/40 px-2.5 py-1.5 text-[11px] text-zinc-500">
+                      {formatStationDwellRoleLabel(role)}
+                    </span>
+                  </div>
+                );
+              }
+              const mode = resolveStationDwellMode(dwell);
+              return (
+                <div
+                  key={dwell.stationId}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+                >
+                  <span
+                    className="truncate text-[11px] text-zinc-400"
+                    title={`站點:${dwell.stationName || dwell.stationId}`}
+                  >
+                    站點:{dwell.stationName || dwell.stationId}
+                  </span>
+                  <div className="flex items-center justify-center gap-1">
+                    <select
+                      value={mode}
+                      className="h-8 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-1 text-center text-[11px] text-zinc-100"
+                      aria-label={`${dwell.stationName} 停靠方式`}
+                      onChange={(event) => {
+                        const nextMode = event.target.value as ShiftStationDwellMode;
+                        const nextDwells = stationDwells.map((item) => {
+                          if (item.stationId !== dwell.stationId) return item;
+                          if (nextMode === 'no_stop' || nextMode === 'line_change') {
+                            return { ...item, dwellMode: nextMode, dwellSeconds: 0 };
                           }
-                        : item,
-                    );
-                    setStationDwells(nextDwells);
-                    commitDwells(nextDwells, dwellSlackText);
-                  }}
-                />
-              </label>
-            ))}
+                          return {
+                            ...item,
+                            dwellMode: 'seconds',
+                            dwellSeconds:
+                              item.dwellSeconds != null && item.dwellSeconds > 0
+                                ? item.dwellSeconds
+                                : null,
+                          };
+                        });
+                        setStationDwells(nextDwells);
+                        commitDwells(nextDwells, dwellSlackText);
+                      }}
+                    >
+                      <option value="seconds">秒數</option>
+                      <option value="no_stop">不停靠</option>
+                      <option value="line_change">換線停靠</option>
+                    </select>
+                    {mode === 'seconds' ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
+                        placeholder="必填"
+                        className={`${SMALL_INPUT_CLASS} text-center`}
+                        aria-label={`${dwell.stationName} 靠站秒數`}
+                        onChange={(event) => {
+                          const digits = event.target.value.replace(/\D/g, '');
+                          const nextDwells = stationDwells.map((item) =>
+                            item.stationId === dwell.stationId
+                              ? {
+                                  ...item,
+                                  dwellMode: 'seconds' as const,
+                                  dwellSeconds:
+                                    digits === '' ? null : Math.max(1, Number(digits)),
+                                }
+                              : item,
+                          );
+                          setStationDwells(nextDwells);
+                          commitDwells(nextDwells, dwellSlackText);
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <label className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2 pt-1">
             <span className="text-[11px] text-zinc-400">停靠緩衝（秒）</span>
@@ -389,6 +468,15 @@ function ManualBlockSettingsForm({
           <p className="text-[10px] leading-4 text-zinc-500">
             縮短班次卡時不得少於靠站＋緩衝合計。變更後若需更長會自動延長結束時間。
           </p>
+          {durationShorterThanDwells ? (
+            <p
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-4 text-amber-200"
+              role="status"
+            >
+              ⚠️ 目前班次長度（{blockDurationSeconds} 秒）小於靠站＋緩衝合計（{dwellTotalSeconds}{' '}
+              秒）。請拉長班次卡，或減少各站靠站／停靠緩衝。
+            </p>
+          ) : null}
         </div>
       ) : null}
 

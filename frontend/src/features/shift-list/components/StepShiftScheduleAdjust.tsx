@@ -1,4 +1,4 @@
-import { AlertCircle, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -16,11 +16,20 @@ import { isShiftScheduleOutputFresh } from '../types/create';
 import { buildShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutput';
 import type {
   FeasibilityIssue,
+  GeneratedScheduleBlock,
   GeneratedSchedulePlan,
   PlanAdjustHistoryEntry,
   ShiftScheduleFeasibilityReport,
   ShiftScheduleStoredOutput,
 } from '../utils/shiftScheduleEngine.types';
+import {
+  resolveFeasibilityIssueMeta,
+  type FeasibilityIssueKind,
+} from '../utils/schedule-engine/feasibilityIssueMeta';
+import {
+  resolveGeneratedBlockTripCode,
+  type MaintenanceSectionCodeBySection,
+} from '../utils/maintenanceSectionCode';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 import { ManualScheduleEditorSidebar } from './ManualScheduleEditorSidebar';
@@ -79,44 +88,291 @@ function resolveHistoryFromOutput(
   return { history: [], historyIndex: -1 };
 }
 
+function kindBadgeClass(kind: FeasibilityIssueKind, severity: 'error' | 'warning'): string {
+  if (kind === 'policy') {
+    return severity === 'error'
+      ? 'border-sky-500/40 bg-sky-500/15 text-sky-200'
+      : 'border-sky-500/40 bg-sky-500/10 text-sky-200';
+  }
+  if (kind === 'limit') {
+    return severity === 'error'
+      ? 'border-violet-500/40 bg-violet-500/15 text-violet-200'
+      : 'border-violet-500/40 bg-violet-500/10 text-violet-200';
+  }
+  return severity === 'error'
+    ? 'border-amber-500/40 bg-amber-500/15 text-amber-100'
+    : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+}
+
+/** 能對到班次卡才算可跳轉；參數／整輪類議題通常沒有目標。 */
+function resolveFeasibilityIssueJumpBlockId(
+  issue: FeasibilityIssue,
+  plan: GeneratedSchedulePlan,
+): string | null {
+  const d = issue.detail;
+  if (!d) return null;
+
+  if (typeof d.blockId === 'string') return d.blockId;
+  if (typeof d.yardBlockId === 'string') return d.yardBlockId;
+  if (typeof d.passengerBlockId === 'string') return d.passengerBlockId;
+  if (typeof d.nextBlockId === 'string') return d.nextBlockId;
+  if (typeof d.laterBlockId === 'string') return d.laterBlockId;
+  if (typeof d.earlierBlockId === 'string') return d.earlierBlockId;
+
+  if (typeof d.routeId === 'string' && typeof d.laterDepartureMinute === 'number') {
+    for (const timeline of plan.timelines) {
+      const found = timeline.blocks.find(
+        (b) =>
+          b.routeId === d.routeId
+          && Math.abs(b.plannedStartMinute - (d.laterDepartureMinute as number)) < 1e-9,
+      );
+      if (found) return found.id;
+    }
+  }
+  if (typeof d.routeId === 'string' && typeof d.earlierDepartureMinute === 'number') {
+    for (const timeline of plan.timelines) {
+      const found = timeline.blocks.find(
+        (b) =>
+          b.routeId === d.routeId
+          && Math.abs(b.plannedStartMinute - (d.earlierDepartureMinute as number)) < 1e-9,
+      );
+      if (found) return found.id;
+    }
+  }
+  if (typeof d.timelineRow === 'number') {
+    const timeline = plan.timelines.find((item) => item.row === d.timelineRow);
+    return timeline?.blocks[0]?.id ?? null;
+  }
+  return null;
+}
+
+function findPlanBlock(
+  plan: GeneratedSchedulePlan,
+  blockId: string,
+): { block: GeneratedScheduleBlock; index: number } | null {
+  for (const timeline of plan.timelines) {
+    const index = timeline.blocks.findIndex((b) => b.id === blockId);
+    if (index >= 0) return { block: timeline.blocks[index]!, index };
+  }
+  return null;
+}
+
+/** 每則議題對應的班次代號（與甘特卡相同規則） */
+function resolveFeasibilityIssueTripCode(
+  issue: FeasibilityIssue,
+  plan: GeneratedSchedulePlan | null,
+  sectionCodes?: MaintenanceSectionCodeBySection | null,
+): string {
+  const fromDetail = issue.detail?.tripCode;
+  if (typeof fromDetail === 'string' && fromDetail.trim()) return fromDetail.trim();
+
+  if (!plan) {
+    const row = issue.detail?.timelineRow;
+    return typeof row === 'number' ? `L${row}` : '----';
+  }
+
+  const blockId = resolveFeasibilityIssueJumpBlockId(issue, plan);
+  if (blockId) {
+    const found = findPlanBlock(plan, blockId);
+    if (found) {
+      return resolveGeneratedBlockTripCode(found.block, found.index, sectionCodes);
+    }
+  }
+
+  const row = issue.detail?.timelineRow;
+  if (typeof row === 'number') return `L${row}`;
+  if (typeof issue.detail?.routeId === 'string') {
+    const compact = String(issue.detail.routeId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (compact) return compact.slice(0, 8);
+  }
+  return '----';
+}
+
+type IssueGroupModel = {
+  key: string;
+  code: FeasibilityIssue['code'];
+  severity: 'error' | 'warning';
+  issues: FeasibilityIssue[];
+};
+
+function groupFeasibilityIssues(
+  errors: FeasibilityIssue[],
+  warnings: FeasibilityIssue[],
+): IssueGroupModel[] {
+  const order: IssueGroupModel[] = [];
+  const indexByKey = new Map<string, number>();
+
+  const push = (issue: FeasibilityIssue, severity: 'error' | 'warning') => {
+    const key = `${severity}:${issue.code}`;
+    const existing = indexByKey.get(key);
+    if (existing != null) {
+      order[existing]!.issues.push(issue);
+      return;
+    }
+    indexByKey.set(key, order.length);
+    order.push({ key, code: issue.code, severity, issues: [issue] });
+  };
+
+  for (const issue of errors) push(issue, 'error');
+  for (const issue of warnings) push(issue, 'warning');
+  return order;
+}
+
+function IssueGroupCard({
+  group,
+  plan,
+  sectionCodes,
+  defaultExpanded,
+  onIssueClick,
+}: {
+  group: IssueGroupModel;
+  plan: GeneratedSchedulePlan | null;
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
+  defaultExpanded: boolean;
+  onIssueClick: (issue: FeasibilityIssue) => void;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const sample = group.issues[0]!;
+  const meta = resolveFeasibilityIssueMeta(sample);
+  const shellBase =
+    group.severity === 'error'
+      ? 'border-red-500/30 bg-red-500/10 text-red-300'
+      : meta.kind === 'policy'
+        ? 'border-sky-500/30 bg-sky-500/10 text-sky-100'
+        : meta.kind === 'limit'
+          ? 'border-violet-500/30 bg-violet-500/10 text-violet-100'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  const icon =
+    group.severity === 'error'
+      ? 'text-red-400'
+      : meta.kind === 'policy'
+        ? 'text-sky-300'
+        : meta.kind === 'limit'
+          ? 'text-violet-300'
+          : 'text-amber-400';
+  const jumpHint =
+    group.severity === 'error' ? 'text-red-400/90' : meta.kind === 'policy'
+      ? 'text-sky-300/90'
+      : meta.kind === 'limit'
+        ? 'text-violet-300/90'
+        : 'text-amber-400/90';
+
+  return (
+    <div className={`rounded-lg border ${shellBase}`}>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition hover:bg-white/[0.03]"
+        aria-expanded={expanded}
+      >
+        <AlertCircle className={`mt-0.5 size-4 shrink-0 ${icon}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${kindBadgeClass(meta.kind, group.severity)}`}
+            >
+              {meta.kindLabel}
+            </span>
+            <span className="text-sm font-medium text-zinc-100">{meta.groupTitle}</span>
+            <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
+              {group.issues.length} 則
+            </span>
+          </div>
+          {!expanded ? (
+            <div className="mt-1 truncate text-[11px] opacity-70">
+              {group.issues
+                .slice(0, 3)
+                .map((issue) => resolveFeasibilityIssueTripCode(issue, plan, sectionCodes))
+                .join(' · ')}
+              {group.issues.length > 3 ? ` · 另 ${group.issues.length - 3} 則` : ''}
+            </div>
+          ) : null}
+        </div>
+        {expanded ? (
+          <ChevronDown className="mt-0.5 size-4 shrink-0 opacity-70" />
+        ) : (
+          <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-70" />
+        )}
+      </button>
+
+      {expanded ? (
+        <div className="space-y-2 border-t border-white/10 px-3 py-2">
+          <p className="text-[11px] leading-relaxed opacity-80">{meta.guidance}</p>
+          <ul className="space-y-1.5">
+            {group.issues.map((issue, index) => {
+              const tripCode = resolveFeasibilityIssueTripCode(issue, plan, sectionCodes);
+              const jumpable =
+                plan != null && resolveFeasibilityIssueJumpBlockId(issue, plan) != null;
+              const rowKey = `${group.key}-${index}-${tripCode}-${issue.message}`;
+              if (jumpable) {
+                return (
+                  <li key={rowKey}>
+                    <button
+                      type="button"
+                      onClick={() => onIssueClick(issue)}
+                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-left transition hover:border-white/25 hover:bg-black/30"
+                    >
+                      <span className="shrink-0 rounded border border-white/15 bg-black/30 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-zinc-100">
+                        {tripCode}
+                      </span>
+                      <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
+                        {issue.message}
+                      </span>
+                      <span className={`shrink-0 text-[10px] ${jumpHint}`}>跳轉 ⚡</span>
+                    </button>
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={rowKey}
+                  className="flex items-start gap-2 rounded-md border border-white/10 bg-black/20 px-2.5 py-2"
+                >
+                  <span className="shrink-0 rounded border border-white/15 bg-black/30 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-zinc-100">
+                    {tripCode}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
+                    {issue.message}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FeasibilityMessages({
   report,
+  plan,
+  sectionCodes,
   onIssueClick,
 }: {
   report: ShiftScheduleFeasibilityReport;
+  plan: GeneratedSchedulePlan | null;
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
-  if (report.ok && report.warnings.length === 0) return null;
+  const groups = useMemo(
+    () => groupFeasibilityIssues(report.errors, report.warnings),
+    [report.errors, report.warnings],
+  );
+
+  if (groups.length === 0) return null;
 
   return (
     <div className="mb-4 space-y-2">
-      {report.errors.map((issue) => (
-        <button
-          type="button"
-          key={`${issue.code}-${issue.message}-${JSON.stringify(issue.detail)}`}
-          onClick={() => onIssueClick(issue)}
-          className="flex w-full items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-left text-sm text-red-300 transition hover:bg-red-500/20 hover:border-red-500/50 focus:outline-none focus:ring-1 focus:ring-red-500/40"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-400" />
-          <div className="flex-1 min-w-0 flex items-center justify-between gap-2 flex-wrap">
-            <span className="font-medium">{issue.message}</span>
-            <span className="text-[10px] text-red-400/90 font-normal shrink-0">（點擊自動跳轉並閃爍定位 ⚡）</span>
-          </div>
-        </button>
-      ))}
-      {report.warnings.map((issue) => (
-        <button
-          type="button"
-          key={`${issue.code}-${issue.message}-${JSON.stringify(issue.detail)}`}
-          onClick={() => onIssueClick(issue)}
-          className="flex w-full items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm text-amber-200 transition hover:bg-amber-500/20 hover:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/40"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-400" />
-          <div className="flex-1 min-w-0 flex items-center justify-between gap-2 flex-wrap">
-            <span className="font-medium">{issue.message}</span>
-            <span className="text-[10px] text-amber-400/90 font-normal shrink-0">（點擊自動跳轉並閃爍定位 ⚡）</span>
-          </div>
-        </button>
+      {groups.map((group) => (
+        <IssueGroupCard
+          key={group.key}
+          group={group}
+          plan={plan}
+          sectionCodes={sectionCodes}
+          defaultExpanded={group.issues.length === 1}
+          onIssueClick={onIssueClick}
+        />
       ))}
     </div>
   );
@@ -136,7 +392,11 @@ function revalidatePlan(
   const routeById = new Map(selectedRoutes.map((r) => [r.routeId, r] as const));
 
   validateTimelineOverlaps(plan.timelines, errors);
-  validateRotationCyclesComplete(plan.timelines, selectedRoutes.length, errors);
+  validateRotationCyclesComplete(
+    plan.timelines,
+    selectedRoutes.filter((route) => !route.backupForInstanceId && !route.backupForRouteId).length,
+    errors,
+  );
   validateRouteSwitchBuffers(plan.timelines, routeById, errors);
   validatePassengerHeadway(
     allBlocks,
@@ -662,66 +922,25 @@ export function StepShiftScheduleAdjust({
 
   const handleIssueClick = (issue: FeasibilityIssue) => {
     if (!plan) return;
-    const d = issue.detail;
-    if (!d) return;
+    const targetBlockId = resolveFeasibilityIssueJumpBlockId(issue, plan);
+    if (!targetBlockId) return;
 
-    let targetBlockId: string | null = null;
-    if (typeof d.blockId === 'string') {
-      targetBlockId = d.blockId;
-    } else if (typeof d.nextBlockId === 'string') {
-      targetBlockId = d.nextBlockId;
-    } else if (typeof d.laterBlockId === 'string') {
-      // 班距類警告：優先定位「後一班」（間隔偏短的那一對）
-      targetBlockId = d.laterBlockId;
-    } else if (typeof d.earlierBlockId === 'string') {
-      targetBlockId = d.earlierBlockId;
-    } else if (typeof d.routeId === 'string' && typeof d.laterDepartureMinute === 'number') {
-      for (const timeline of plan.timelines) {
-        const found = timeline.blocks.find(
-          (b) =>
-            b.routeId === d.routeId
-            && Math.abs(b.plannedStartMinute - (d.laterDepartureMinute as number)) < 1e-9,
-        );
-        if (found) {
-          targetBlockId = found.id;
-          break;
-        }
-      }
-    } else if (typeof d.routeId === 'string' && typeof d.earlierDepartureMinute === 'number') {
-      for (const timeline of plan.timelines) {
-        const found = timeline.blocks.find(
-          (b) =>
-            b.routeId === d.routeId
-            && Math.abs(b.plannedStartMinute - (d.earlierDepartureMinute as number)) < 1e-9,
-        );
-        if (found) {
-          targetBlockId = found.id;
-          break;
-        }
-      }
+    setSelectedBlockId(targetBlockId);
+    setHighlightedBlockId(targetBlockId);
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
     }
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedBlockId(null);
+    }, 3000);
 
-    if (targetBlockId) {
-      // 1. 選取該卡片
-      setSelectedBlockId(targetBlockId);
-      // 2. 設置閃爍狀態
-      setHighlightedBlockId(targetBlockId);
-      if (highlightTimeoutRef.current) {
-        clearTimeout(highlightTimeoutRef.current);
+    const targetId = targetBlockId;
+    setTimeout(() => {
+      const el = document.getElementById(`block-card-${targetId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       }
-      highlightTimeoutRef.current = setTimeout(() => {
-        setHighlightedBlockId(null);
-      }, 3000); // 3秒後自動停止閃爍
-
-      // 3. 跳過去那個地方（Scroll Into View）
-      const targetId = targetBlockId;
-      setTimeout(() => {
-        const el = document.getElementById(`block-card-${targetId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        }
-      }, 50);
-    }
+    }, 50);
   };
 
   if (loading) {
@@ -743,16 +962,15 @@ export function StepShiftScheduleAdjust({
 
   const renderToolbar = () => {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-zinc-900/80 border border-zinc-800 px-2 py-1 select-none shrink-0">
-        {/* 垃圾桶 */}
+      <div className="flex shrink-0 select-none items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-2 py-1">
         <button
           type="button"
           disabled={!selectedBlockId}
           onClick={() => handleDeleteBlock()}
-          className={`p-1.5 rounded transition ${
+          className={`rounded p-1.5 transition ${
             selectedBlockId
-              ? 'text-zinc-300 hover:text-red-400 hover:bg-zinc-800/60'
-              : 'text-zinc-600 cursor-not-allowed opacity-40'
+              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-red-400'
+              : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
           title="刪除已選班次"
         >
@@ -764,10 +982,10 @@ export function StepShiftScheduleAdjust({
             type="button"
             disabled={!selectedBlockId}
             onClick={() => handleDuplicateBlock()}
-            className={`p-1.5 rounded transition ${
+            className={`rounded p-1.5 transition ${
               selectedBlockId
-                ? 'text-zinc-300 hover:text-sky-300 hover:bg-zinc-800/60'
-                : 'text-zinc-600 cursor-not-allowed opacity-40'
+                ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-sky-300'
+                : 'cursor-not-allowed text-zinc-600 opacity-40'
             }`}
             title="增生已選班次"
           >
@@ -775,32 +993,30 @@ export function StepShiftScheduleAdjust({
           </button>
         ) : null}
 
-        <div className="w-px h-4 bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-800" />
 
-        {/* Undo */}
         <button
           type="button"
           disabled={historyIndex <= 0}
           onClick={handleUndo}
-          className={`p-1.5 rounded transition ${
+          className={`rounded p-1.5 transition ${
             historyIndex > 0
-              ? 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
-              : 'text-zinc-600 cursor-not-allowed opacity-40'
+              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+              : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
           title={isManual ? `還原 (${undoShortcutLabel})` : '還原 (Undo)'}
         >
           <Undo className="size-4" />
         </button>
 
-        {/* Redo */}
         <button
           type="button"
           disabled={historyIndex >= history.length - 1}
           onClick={handleRedo}
-          className={`p-1.5 rounded transition ${
+          className={`rounded p-1.5 transition ${
             historyIndex < history.length - 1
-              ? 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
-              : 'text-zinc-600 cursor-not-allowed opacity-40'
+              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+              : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
           title={isManual ? `重做 (${redoShortcutLabel})` : '重複 (Redo)'}
         >
@@ -809,19 +1025,17 @@ export function StepShiftScheduleAdjust({
 
         {!isManual ? (
           <>
-            <div className="w-px h-4 bg-zinc-800" />
-
-            {/* 重新生成班表 */}
+            <div className="h-4 w-px bg-zinc-800" />
             <button
               type="button"
               disabled={loading}
               onClick={() => {
                 requestRebuild();
               }}
-              className={`p-1.5 rounded transition ${
+              className={`rounded p-1.5 transition ${
                 loading
-                  ? 'text-zinc-600 cursor-not-allowed opacity-40'
-                  : 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60'
+                  ? 'cursor-not-allowed text-zinc-600 opacity-40'
+                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
               }`}
               title="重新生成班表"
             >
@@ -830,14 +1044,13 @@ export function StepShiftScheduleAdjust({
           </>
         ) : null}
 
-        <div className="w-px h-4 bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-800" />
 
-        {/* 放大 / 縮小 */}
         <button
           type="button"
           onClick={() => setIsMaximized(!isMaximized)}
-          className="p-1.5 rounded text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/60 transition"
-          title={isMaximized ? "還原視窗" : "放大至全螢幕"}
+          className="rounded p-1.5 text-zinc-300 transition hover:bg-zinc-800/60 hover:text-zinc-100"
+          title={isMaximized ? '還原視窗' : '放大至全螢幕'}
         >
           {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
         </button>
@@ -945,49 +1158,44 @@ export function StepShiftScheduleAdjust({
           </div>
         </div>
       ) : null}
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-4">
-          <div className="flex items-center gap-5 border-b border-zinc-800/80">
-            <button
-              type="button"
-              onClick={() => setActiveTab('schedule')}
-              className={`relative pb-2 text-sm transition ${
-                activeTab === 'schedule'
-                  ? 'font-medium text-zinc-100'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              班次預覽
-              {activeTab === 'schedule' ? (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
-              ) : null}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('capacity')}
-              className={`relative pb-2 text-sm transition ${
-                activeTab === 'capacity'
-                  ? 'font-medium text-zinc-100'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              運能趨勢
-              {activeTab === 'capacity' ? (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
-              ) : null}
-            </button>
-          </div>
-
-          {periodLegends.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 pb-2">
-              {periodLegends.map((item) => (
-                <AttributeLegendBadgeChip key={item.attributeId} item={item} />
-              ))}
-            </div>
-          ) : null}
+      <div className="mb-3 flex shrink-0 items-center gap-4">
+        <div className="flex shrink-0 items-center gap-5 border-b border-zinc-800/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab('schedule')}
+            className={`relative pb-2 text-sm transition ${
+              activeTab === 'schedule'
+                ? 'font-medium text-zinc-100'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            班次預覽
+            {activeTab === 'schedule' ? (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('capacity')}
+            className={`relative pb-2 text-sm transition ${
+              activeTab === 'capacity'
+                ? 'font-medium text-zinc-100'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            運能趨勢
+            {activeTab === 'capacity' ? (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+            ) : null}
+          </button>
         </div>
 
-        {renderToolbar()}
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-2">
+          {periodLegends.map((item) => (
+            <AttributeLegendBadgeChip key={item.attributeId} item={item} />
+          ))}
+          {renderToolbar()}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -1011,6 +1219,7 @@ export function StepShiftScheduleAdjust({
                   highlightedBlockId={highlightedBlockId}
                   selectedRoutes={draft.routeGroups.selectedRoutes}
                   minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
+                  hideStrategyBuffers={isManual}
                   sectionCodes={draft.maintenanceTask.sectionCodeBySection}
                   showTemplateTasks
                   interactiveEdit={isManual}
@@ -1040,7 +1249,12 @@ export function StepShiftScheduleAdjust({
               <div className="mb-2 px-1 text-xs font-semibold text-zinc-400">
                 系統可行性檢驗報告與錯誤原因對照清單
               </div>
-              <FeasibilityMessages report={report} onIssueClick={handleIssueClick} />
+              <FeasibilityMessages
+                report={report}
+                plan={plan}
+                sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                onIssueClick={handleIssueClick}
+              />
             </div>
           ) : null}
         </div>
@@ -1053,6 +1267,7 @@ export function StepShiftScheduleAdjust({
               attributes={attributes}
               vehicleCapacity={vehicleCapacity}
               selectedRoutes={draft.routeGroups.selectedRoutes}
+              serviceDirectionTags={draft.routeGroups.serviceDirectionTags}
               className="min-h-[280px]"
             />
           ) : (

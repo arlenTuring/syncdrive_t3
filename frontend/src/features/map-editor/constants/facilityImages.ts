@@ -15,4 +15,5 @@ export const FACILITY_BACKGROUND_BY_NAME: Record<FacilityName, string | null> = 
   DockingPoint: null,
   Waypoint: null,
   RoadLine: null,
+  TrackCrossover: null,
 }

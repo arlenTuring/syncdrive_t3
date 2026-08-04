@@ -27,6 +27,7 @@ import {
   writeMapLibrary,
   type MapLibraryEntry,
 } from '../utils/mapLibraryStorage'
+import { clearMapRevisionsForLibrary } from '../utils/mapRevisionHistory'
 import { NewMapPixelDialog } from './NewMapPixelDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
 import {
@@ -135,6 +136,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         return
       }
       persistEntries(deleteMapLibraryEntry(readMapLibrary(), entry.libraryId))
+      void clearMapRevisionsForLibrary(entry.libraryId)
     },
     [persistEntries],
   )

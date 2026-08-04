@@ -95,7 +95,7 @@ export function buildMaintenanceEntrySlackFingerprint(
 
 /**
  * 依時間模板非正線 taskType，讀取班表草稿各整備區塊的正線優先讓渡餘裕（秒）。
- * 同一數值同時約束「正線壓縮整備開頭」與「為下個正線視窗壓縮整備尾端」。
+ * 語意：正線回程來不及時，最多可占用整備開頭此秒數；整備結束時間不得因此提前。
  * 缺省 → 600。
  */
 export function resolveMaintenanceEntrySlackSeconds(

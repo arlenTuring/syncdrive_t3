@@ -11,6 +11,7 @@ import {
   Radio,
   Signal as SignalIcon,
   TrainTrack,
+  Waypoints,
   Wrench,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -33,6 +34,7 @@ export const PALETTE_ICON_BY_NAME: Record<
   DockingPoint: MapPin,
   Waypoint: CircleDot,
   RoadLine: Minus,
+  TrackCrossover: Waypoints,
 }
 
 /** Area 容器圖示（資產列） */

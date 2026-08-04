@@ -5,6 +5,11 @@ import {
   type TimeSlotInterval,
 } from '../../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import { resolveSelectedRouteInstanceId } from '../../types/create';
+import {
+  resolveRouteOriginStation,
+  resolveRouteTerminalStation,
+} from '../routeRelationGraph';
 import {
   sumStationDwellSecondsWithSlack,
   snapUpToClockAlignSeconds,
@@ -20,6 +25,16 @@ import type {
 } from './types';
 import { minuteToSecond, secondToMinute, pushIssue } from './types';
 import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
+import {
+  buildBlockStationDepartures,
+  resolveBlockStationDepartureFeasibility,
+  resolveRouteForBlock,
+} from '../buildBlockStationDepartures';
+import {
+  ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+  resolveNextInstanceId,
+  type RouteSuccessorPolicy,
+} from './routeSuccessorPolicy';
 
 export function resolveHeadwaySecondsAtMinute(
   minute: number,
@@ -55,13 +70,14 @@ export function resolvePairHeadwaySeconds(
   return Math.max(earlier ?? 0, later ?? 0);
 }
 
-/** 1.6 折返時限：單路線 error、多路線一整輪 warning */
+/** 1.6 折返時限：單路線 error；多路線一整輪用鎖定組合（有則）或執行順序加總 warning */
 export function validateTurnaroundLimits(
   selectedRoutes: ShiftScheduleSelectedRoute[],
   minimumRecoveryTimeSeconds: number,
   turnaroundLimitSeconds: number | null,
   errors: FeasibilityIssue[],
   warnings: FeasibilityIssue[],
+  lockedRotationMinSeconds: number | null = null,
 ): void {
   if (turnaroundLimitSeconds == null || turnaroundLimitSeconds <= 0) return;
 
@@ -84,15 +100,22 @@ export function validateTurnaroundLimits(
   }
 
   if (selectedRoutes.length > 1) {
-    const rotationMin = resolveRouteRotationMinSeconds(selectedRoutes);
+    const rotationMin =
+      lockedRotationMinSeconds != null && lockedRotationMinSeconds > 0
+        ? lockedRotationMinSeconds
+        : resolveRouteRotationMinSeconds(selectedRoutes);
     if (rotationMin != null && rotationMin > turnaroundLimitSeconds) {
       pushIssue(warnings, {
         code: 'ROUTE_ROTATION_OVER_TURNAROUND',
         severity: 'warning',
-        message: `多路線一整輪加切換緩衝（${rotationMin} 秒）超過車輛折返時限（${turnaroundLimitSeconds} 秒）`,
+        message:
+          lockedRotationMinSeconds != null
+            ? `鎖定全優先路線組合最快一輪（${rotationMin} 秒）超過車輛折返時限（${turnaroundLimitSeconds} 秒）`
+            : `多路線一整輪加切換緩衝（${rotationMin} 秒）超過車輛折返時限（${turnaroundLimitSeconds} 秒）`,
         detail: {
           rotationMinSeconds: rotationMin,
           turnaroundLimitSeconds,
+          lockedCombination: lockedRotationMinSeconds != null,
         },
       });
     }
@@ -111,26 +134,84 @@ export function validateTimelineOverlaps(
     for (let i = 0; i < sorted.length - 1; i += 1) {
       const current = sorted[i]!;
       const next = sorted[i + 1]!;
-      if (current.plannedEndMinute > next.plannedStartMinute + 1e-9) {
-        const currentLabel = formatBlockConflictLabel(current);
-        const nextLabel = formatBlockConflictLabel(next);
-        pushIssue(errors, {
-          code: 'TIMELINE_OVERLAP',
-          severity: 'error',
-          message: `時間線 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
-          detail: {
-            timelineRow: timeline.row,
-            blockId: current.id,
-            nextBlockId: next.id,
-            earlierLabel: currentLabel,
-            laterLabel: nextLabel,
-            earlierEndMinute: current.plannedEndMinute,
-            laterStartMinute: next.plannedStartMinute,
-          },
-        });
-      }
+      if (current.plannedEndMinute <= next.plannedStartMinute + 1e-9) continue;
+
+      // 調度可與保養／行前尾端重疊，但重疊不得超過調度本身時長（不到站佔位）
+      if (isAllowedMaintenanceDispatchOverlap(current, next)) continue;
+      // 進場載客可偷保養尾端：載客串起點不早於保養開始即允許重疊
+      if (isAllowedEntryServiceOverlap(current, next)) continue;
+
+      const currentLabel = formatBlockConflictLabel(current);
+      const nextLabel = formatBlockConflictLabel(next);
+      pushIssue(errors, {
+        code: 'TIMELINE_OVERLAP',
+        severity: 'error',
+        message: `時間線 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
+        detail: {
+          timelineRow: timeline.row,
+          blockId: current.id,
+          nextBlockId: next.id,
+          earlierLabel: currentLabel,
+          laterLabel: nextLabel,
+          earlierEndMinute: current.plannedEndMinute,
+          laterStartMinute: next.plannedStartMinute,
+        },
+      });
     }
   }
+}
+
+function isYardWindowForDispatchOverlap(block: GeneratedScheduleBlock): boolean {
+  return (
+    block.source === 'template_bar'
+    && (block.taskType === 'servicing' || block.taskType === 'inspection')
+  );
+}
+
+function isAllowedMaintenanceDispatchOverlap(
+  earlier: GeneratedScheduleBlock,
+  later: GeneratedScheduleBlock,
+): boolean {
+  const yardThenDispatch =
+    isYardWindowForDispatchOverlap(earlier) && later.source === 'dispatch';
+  const dispatchThenYard =
+    earlier.source === 'dispatch' && isYardWindowForDispatchOverlap(later);
+  if (!yardThenDispatch && !dispatchThenYard) return false;
+
+  const yard = yardThenDispatch ? earlier : later;
+  const dispatch = yardThenDispatch ? later : earlier;
+  const dispatchDuration = dispatch.plannedEndMinute - dispatch.plannedStartMinute;
+  if (dispatchDuration <= 0) return false;
+
+  const overlapStart = Math.max(yard.plannedStartMinute, dispatch.plannedStartMinute);
+  const overlapEnd = Math.min(yard.plannedEndMinute, dispatch.plannedEndMinute);
+  const overlap = overlapEnd - overlapStart;
+  if (overlap <= 0) return true;
+  // 重疊 ≤ 調度時長，且調度結束不得早於整備結束超過「調度全長」（即最多吃掉整段空駛）
+  return overlap <= dispatchDuration + 1e-9;
+}
+
+/**
+ * 進場載客（載客調度）偷保養尾端：允許與保養（servicing）視窗重疊，
+ * 但載客串的起點不得早於保養開始（只偷尾巴，不吃整段之前）。
+ */
+function isAllowedEntryServiceOverlap(
+  earlier: GeneratedScheduleBlock,
+  later: GeneratedScheduleBlock,
+): boolean {
+  const yardThenEntry =
+    earlier.source === 'template_bar'
+    && earlier.taskType === 'servicing'
+    && later.source === 'entry_service';
+  const entryThenYard =
+    earlier.source === 'entry_service'
+    && later.source === 'template_bar'
+    && later.taskType === 'servicing';
+  if (!yardThenEntry && !entryThenYard) return false;
+
+  const yard = yardThenEntry ? earlier : later;
+  const entry = yardThenEntry ? later : earlier;
+  return entry.plannedStartMinute >= yard.plannedStartMinute - 1e-9;
 }
 
 function formatBlockConflictLabel(block: GeneratedScheduleBlock): string {
@@ -256,10 +337,25 @@ function validateSameRouteHeadway(
       attributes,
     );
     if (headwayTarget != null && gapSeconds < headwayTarget) {
+      const earlierHw = resolveHeadwaySecondsAtMinute(
+        secondToMinute(current.startSecond),
+        intervals,
+        attributes,
+      );
+      const laterHw = resolveHeadwaySecondsAtMinute(
+        secondToMinute(next.startSecond),
+        intervals,
+        attributes,
+      );
+      const straddlesInterval =
+        earlierHw != null && laterHw != null && earlierHw !== laterHw;
       pushIssue(warnings, {
         code: 'HEADWAY_BELOW_TARGET',
         severity: 'warning',
-        message: `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於時段班距 ${headwayTarget} 秒（取兩班時段較嚴者）`,
+        kind: 'limit',
+        message: straddlesInterval
+          ? `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於跨時段班距下限 ${headwayTarget} 秒（兩時段 ${earlierHw}/${laterHw}，取較嚴者；此對班多半非乾淨脈衝）`
+          : `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於時段班距 ${headwayTarget} 秒（多半來自補完／延後／多車擠班）`,
         detail: {
           earlierBlockId: current.blockId,
           laterBlockId: next.blockId,
@@ -267,6 +363,9 @@ function validateSameRouteHeadway(
           laterDepartureMinute: secondToMinute(next.startSecond),
           gapSeconds,
           targetHeadwaySeconds: headwayTarget,
+          earlierIntervalHeadwaySeconds: earlierHw,
+          laterIntervalHeadwaySeconds: laterHw,
+          straddlesInterval,
           routeId: current.routeId,
         },
       });
@@ -332,15 +431,27 @@ export function validateTimelineCapacity(
 }
 
 /**
- * S1＋S2：同一時間線相鄰正線空檔須 ≥ 恢復時間；
- * 換路線時另加前一路線換線緩衝（兩者相加）。
+ * S1＋S2：同一時間線相鄰正線空檔須 ≥ 恢復時間（折返／同路線）
+ * 或僅換線緩衝（導通中段繼任）。
  */
 export function validateRouteSwitchBuffers(
   timelines: GeneratedSchedulePlan['timelines'],
   routeById: Map<string, ShiftScheduleSelectedRoute>,
   errors: FeasibilityIssue[],
   minimumRecoveryTimeSeconds = 0,
+  rotationRoutes: ShiftScheduleSelectedRoute[] = [],
+  successorPolicy?: RouteSuccessorPolicy,
 ): void {
+  const routesForRecovery =
+    rotationRoutes.length > 0 ? rotationRoutes : [...routeById.values()];
+  if (successorPolicy) {
+    validateRouteSuccessorContinuity(
+      timelines,
+      routesForRecovery,
+      errors,
+      successorPolicy,
+    );
+  }
   for (const timeline of timelines) {
     const passengerBars = [...timeline.blocks]
       .filter((block) => block.source === 'template_bar' && block.taskType === 'passenger' && block.routeId)
@@ -353,10 +464,23 @@ export function validateRouteSwitchBuffers(
 
       const isRouteSwitch = current.routeId !== next.routeId;
       const route = routeById.get(current.routeId);
+      const nextRoute = routeById.get(next.routeId);
+      const includeRecovery =
+        !isRouteSwitch
+        || !route
+        || !nextRoute
+        || shouldIncludeRecoveryForTimelineSuccessor(
+          route,
+          nextRoute,
+          routesForRecovery,
+        );
       const requiredGap = resolveInterTripGapSeconds({
         minimumRecoveryTimeSeconds,
         previousRouteSwitchBufferSeconds: route?.switchBufferAfterSeconds,
         isRouteSwitch,
+        includeRecovery,
+        previousRoute: route ?? undefined,
+        nextRoute: nextRoute ?? undefined,
       });
       if (requiredGap <= 0) continue;
 
@@ -367,14 +491,18 @@ export function validateRouteSwitchBuffers(
         pushIssue(errors, {
           code: 'ROUTE_SWITCH_BUFFER_INSUFFICIENT',
           severity: 'error',
-          message: `時間線 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`,
+          message: includeRecovery
+            ? `時間線 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`
+            : `時間線 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需換線緩衝 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`,
           detail: {
             timelineRow: timeline.row,
             fromRouteId: current.routeId,
             toRouteId: next.routeId,
             requiredGapSeconds: requiredGap,
             minimumRecoveryTimeSeconds,
-            requiredBufferSeconds: requiredGap - minimumRecoveryTimeSeconds,
+            requiredBufferSeconds: includeRecovery
+              ? requiredGap - minimumRecoveryTimeSeconds
+              : requiredGap,
             actualGapSeconds: gapSeconds,
           },
         });
@@ -392,6 +520,261 @@ export function validateRouteSwitchBuffers(
           },
         });
       }
+    }
+  }
+}
+
+function shouldIncludeRecoveryForTimelineSuccessor(
+  previousRoute: ShiftScheduleSelectedRoute,
+  nextRoute: ShiftScheduleSelectedRoute,
+  rotationRoutes: ShiftScheduleSelectedRoute[],
+): boolean {
+  if (previousRoute.routeId === nextRoute.routeId) return true;
+  const previousInstanceId = resolveSelectedRouteInstanceId(previousRoute);
+  const nextInstanceId = resolveSelectedRouteInstanceId(nextRoute);
+  const previousIndex = rotationRoutes.findIndex(
+    (route) => resolveSelectedRouteInstanceId(route) === previousInstanceId,
+  );
+  const nextIndex = rotationRoutes.findIndex(
+    (route) => resolveSelectedRouteInstanceId(route) === nextInstanceId,
+  );
+  if (previousIndex < 0 || nextIndex < 0 || rotationRoutes.length <= 1) return true;
+  if (nextIndex !== (previousIndex + 1) % rotationRoutes.length) return true;
+  return nextIndex === 0;
+}
+
+function resolveBlockRouteInstance(args: {
+  block: GeneratedScheduleBlock;
+  routes: ShiftScheduleSelectedRoute[];
+  timelineRow: number;
+  errors: FeasibilityIssue[];
+}): ShiftScheduleSelectedRoute | null {
+  const explicitInstanceId = args.block.routeInstanceId?.trim();
+  if (explicitInstanceId) {
+    const explicit = args.routes.find(
+      (route) => resolveSelectedRouteInstanceId(route) === explicitInstanceId,
+    );
+    if (explicit) return explicit;
+    pushIssue(args.errors, {
+      code: 'ROUTE_INSTANCE_AMBIGUOUS',
+      severity: 'error',
+      message: `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 指定的路線實例 ${explicitInstanceId} 不在目前 selected routes`,
+      detail: {
+        timelineRow: args.timelineRow,
+        blockId: args.block.id,
+        routeId: args.block.routeId,
+        routeInstanceId: explicitInstanceId,
+      },
+    });
+    return null;
+  }
+
+  const candidates = args.routes.filter(
+    (route) => route.routeId === args.block.routeId,
+  );
+  if (candidates.length === 1) return candidates[0]!;
+
+  pushIssue(args.errors, {
+    code: 'ROUTE_INSTANCE_AMBIGUOUS',
+    severity: 'error',
+    message:
+      candidates.length > 1
+        ? `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 僅有 routeId，無法在 ${candidates.length} 個同路線實例中判定關聯圖節點`
+        : `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 無法解析對應路線實例`,
+    detail: {
+      timelineRow: args.timelineRow,
+      blockId: args.block.id,
+      routeId: args.block.routeId,
+      routeInstanceId: args.block.routeInstanceId,
+      candidateInstanceIds: candidates.map(resolveSelectedRouteInstanceId),
+    },
+  });
+  return null;
+}
+
+/**
+ * 硬約束：同車相鄰 passenger blocks 必須依 instance successor，
+ * 且前趟 terminal station 必須等於後趟 origin station。
+ * 若兩班正線之間隔了整備／充電等非正線，交路由出場相位重新開輪，不套用本檢查。
+ */
+export function validateRouteSuccessorContinuity(
+  timelines: GeneratedSchedulePlan['timelines'],
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  errors: FeasibilityIssue[],
+  successorPolicy?: RouteSuccessorPolicy,
+): void {
+  if (successorPolicy && !successorPolicy.valid) {
+    pushIssue(errors, {
+      code: 'ROUTE_SUCCESSOR_POLICY_INVALID',
+      severity: 'error',
+      message: `關聯圖繼任策略無效（${successorPolicy.issue ?? 'UNKNOWN'}），禁止退回 executionOrder 產班`,
+      detail: {
+        algorithm: successorPolicy.algorithm,
+        policyIssue: successorPolicy.issue,
+      },
+    });
+    return;
+  }
+  // 無 Step 4 關聯圖的舊資料只能使用相容 ring；其測試／資料可能沒有可供
+  // 地理驗證的真實端點。硬 successor 與停靠點連續性只對已驗證 graph 啟用。
+  if (
+    !successorPolicy
+    || successorPolicy.algorithm !== ROUTE_SUCCESSOR_ALGORITHM_GRAPH
+  ) {
+    return;
+  }
+  if (selectedRoutes.length === 0) return;
+
+  const orderedInstanceIds = selectedRoutes.map(resolveSelectedRouteInstanceId);
+
+  for (const timeline of timelines) {
+    const passengerBlocks = [...timeline.blocks]
+      .filter(
+        (block) =>
+          block.source === 'template_bar'
+          && block.taskType === 'passenger'
+          && block.routeId,
+      )
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+
+    for (let i = 0; i < passengerBlocks.length - 1; i += 1) {
+      const currentBlock = passengerBlocks[i]!;
+      const nextBlock = passengerBlocks[i + 1]!;
+      // 中間隔了充電／保養／行前／機動等非正線時，交路由出場相位或進場載客重新對齊，
+      // 不要求與進整備前最後一班無縫 successor。
+      if (hasNonPassengerBetween(timeline.blocks, currentBlock, nextBlock)) {
+        continue;
+      }
+      const currentRoute = resolveBlockRouteInstance({
+        block: currentBlock,
+        routes: selectedRoutes,
+        timelineRow: timeline.row,
+        errors,
+      });
+      const nextRoute = resolveBlockRouteInstance({
+        block: nextBlock,
+        routes: selectedRoutes,
+        timelineRow: timeline.row,
+        errors,
+      });
+      if (!currentRoute || !nextRoute) continue;
+
+      const currentInstanceId = resolveSelectedRouteInstanceId(currentRoute);
+      const nextInstanceId = resolveSelectedRouteInstanceId(nextRoute);
+      const expectedInstanceId = successorPolicy
+        ? resolveNextInstanceId(successorPolicy, currentInstanceId)?.instanceId
+        : orderedInstanceIds[
+          (orderedInstanceIds.indexOf(currentInstanceId) + 1)
+          % orderedInstanceIds.length
+        ];
+
+      if (!expectedInstanceId || expectedInstanceId !== nextInstanceId) {
+        pushIssue(errors, {
+          code: 'ROUTE_SUCCESSOR_MISMATCH',
+          severity: 'error',
+          message: `時間線 ${timeline.row}：${currentRoute.routeCode}（${currentInstanceId}）下一趟應為 ${expectedInstanceId ?? '無可用 successor'}，實際為 ${nextRoute.routeCode}（${nextInstanceId}）`,
+          detail: {
+            timelineRow: timeline.row,
+            earlierBlockId: currentBlock.id,
+            laterBlockId: nextBlock.id,
+            fromInstanceId: currentInstanceId,
+            expectedInstanceId,
+            actualInstanceId: nextInstanceId,
+          },
+        });
+      }
+
+      const terminalStationId =
+        resolveRouteTerminalStation(currentRoute)?.stationId ?? null;
+      const originStationId =
+        resolveRouteOriginStation(nextRoute)?.stationId ?? null;
+      if (
+        !terminalStationId
+        || !originStationId
+        || terminalStationId !== originStationId
+      ) {
+        pushIssue(errors, {
+          code: 'ROUTE_STATION_DISCONTINUITY',
+          severity: 'error',
+          message: `時間線 ${timeline.row}：${currentRoute.routeCode} 終點 ${terminalStationId ?? '未知'} 無法銜接 ${nextRoute.routeCode} 起點 ${originStationId ?? '未知'}`,
+          detail: {
+            timelineRow: timeline.row,
+            earlierBlockId: currentBlock.id,
+            laterBlockId: nextBlock.id,
+            fromInstanceId: currentInstanceId,
+            toInstanceId: nextInstanceId,
+            terminalStationId,
+            originStationId,
+          },
+        });
+      }
+    }
+  }
+}
+
+/** 兩班正線之間是否夾了非正線任務（整備／充電／行前／機動等） */
+function hasNonPassengerBetween(
+  blocks: GeneratedScheduleBlock[],
+  earlier: GeneratedScheduleBlock,
+  later: GeneratedScheduleBlock,
+): boolean {
+  const windowStart = earlier.plannedEndMinute;
+  const windowEnd = later.plannedStartMinute;
+  if (windowEnd <= windowStart + 1e-9) return false;
+  return blocks.some(
+    (block) =>
+      block.taskType !== 'passenger'
+      && block.plannedStartMinute < windowEnd - 1e-9
+      && block.plannedEndMinute > windowStart + 1e-9,
+  );
+}
+
+/** 逐站明細與班次卡共用同一秒級預算；不可讓末站出發超過 block end。 */
+export function validateStationTimingsWithinBlocks(
+  timelines: GeneratedSchedulePlan['timelines'],
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  errors: FeasibilityIssue[],
+): void {
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.taskType !== 'passenger' || block.source !== 'template_bar') continue;
+      const route = resolveRouteForBlock(block, selectedRoutes);
+      const feasibility = resolveBlockStationDepartureFeasibility(block, route);
+      if (!feasibility) continue;
+
+      const stops = buildBlockStationDepartures(block, route);
+      const blockStartSecond = minuteToSecond(block.plannedStartMinute);
+      const blockEndSecond = minuteToSecond(block.plannedEndMinute);
+      const lastDepartureSecond =
+        stops.length > 0
+          ? minuteToSecond(stops[stops.length - 1]!.departureMinute)
+          : null;
+      if (
+        feasibility.feasible
+        && stops.length > 0
+        && lastDepartureSecond != null
+        && lastDepartureSecond <= blockEndSecond
+        && minuteToSecond(stops[0]!.arrivalMinute) >= blockStartSecond
+      ) {
+        continue;
+      }
+
+      pushIssue(errors, {
+        code: 'STATION_TIMING_INFEASIBLE',
+        severity: 'error',
+        message:
+          `時間線 ${timeline.row}：${block.routeCode ?? block.routeName ?? block.label}`
+          + ' 的完整停靠／站間時間無法放入班次卡秒數',
+        detail: {
+          timelineRow: timeline.row,
+          blockId: block.id,
+          routeId: block.routeId,
+          blockStartSecond,
+          blockEndSecond,
+          lastDepartureSecond,
+          feasibility,
+        },
+      });
     }
   }
 }

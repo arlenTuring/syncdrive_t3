@@ -71,5 +71,14 @@ describe('maintenanceSectionCode', () => {
         startMinute: 0,
       }),
     ).toBe('----');
+    // 01:09:40 → ST0109（秒數不進位到下一分）
+    expect(
+      buildScheduleBlockTripCode({
+        prefixCode: 'ST',
+        timelineRow: 1,
+        startMinute: 1 * 60 + 9 + 40 / 60,
+        includeColumnCode: false,
+      }),
+    ).toBe('ST0109');
   });
 });

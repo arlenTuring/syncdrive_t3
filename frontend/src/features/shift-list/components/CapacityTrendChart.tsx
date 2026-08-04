@@ -1,21 +1,22 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../types/create';
+import type { ShiftScheduleSelectedRoute, ShiftScheduleServiceDirectionTag } from '../types/create';
 import type { GeneratedSchedulePlan } from '../utils/shiftScheduleEngine.types';
 import {
   buildCapacityPeriodBands,
   buildCapacityTrendFromPlan,
   CAPACITY_DAY_MINUTES,
-  CAPACITY_TREND_BUCKET_MINUTES,
   formatMinuteAsHm,
   resolveCapacityAxisMax,
   resolveCapacityPeriodAtMinute,
-  formatDirectionalHeadwayTooltip,
+  formatRouteStreamHeadwayTooltip,
   formatCapacityGapHint,
   type CapacityTrendSample,
+  type CapacityRouteStream,
 } from '../utils/buildCapacityTrend';
 
 type CapacityTrendChartProps = {
@@ -25,6 +26,8 @@ type CapacityTrendChartProps = {
   /** 時間模板車體載運量（人／車） */
   vehicleCapacity: number;
   selectedRoutes?: ShiftScheduleSelectedRoute[];
+  /** Step 4 服務方向標籤（運能流顯示名稱） */
+  serviceDirectionTags?: ShiftScheduleServiceDirectionTag[];
   className?: string;
 };
 
@@ -44,25 +47,22 @@ function yForPphpd(pphpd: number, axisMax: number): number {
   return PAD.top + PLOT_H * (1 - ratio);
 }
 
-function buildAreaPath(samples: CapacityTrendSample[], axisMax: number): string {
-  if (samples.length === 0) return '';
-  const first = samples[0]!;
-  const last = samples[samples.length - 1]!;
-  const baseline = yForPphpd(0, axisMax);
-  let d = `M ${xForMinute(first.minute)} ${baseline}`;
+function buildStreamLinePath(
+  samples: CapacityTrendSample[],
+  streamKey: string,
+  axisMax: number,
+): string {
+  const points: Array<{ minute: number; pphpd: number }> = [];
   for (const sample of samples) {
-    d += ` L ${xForMinute(sample.minute)} ${yForPphpd(sample.pphpd, axisMax)}`;
+    const pphpd = sample.pphpdByStream[streamKey];
+    if (pphpd == null) continue;
+    points.push({ minute: sample.minute, pphpd });
   }
-  d += ` L ${xForMinute(last.minute)} ${baseline} Z`;
-  return d;
-}
-
-function buildLinePath(samples: CapacityTrendSample[], axisMax: number): string {
-  if (samples.length === 0) return '';
-  return samples
-    .map((sample, index) => {
-      const x = xForMinute(sample.minute);
-      const y = yForPphpd(sample.pphpd, axisMax);
+  if (points.length === 0) return '';
+  return points
+    .map((point, index) => {
+      const x = xForMinute(point.minute);
+      const y = yForPphpd(point.pphpd, axisMax);
       return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
     })
     .join(' ');
@@ -85,16 +85,39 @@ function sampleAtMinute(
   return best;
 }
 
+function streamHasDrawableLine(
+  samples: CapacityTrendSample[],
+  stream: CapacityRouteStream,
+): boolean {
+  return samples.some((sample) => sample.pphpdByStream[stream.streamKey] != null);
+}
+
 export function CapacityTrendChart({
   plan,
   intervals,
   attributes,
   vehicleCapacity,
   selectedRoutes,
+  serviceDirectionTags,
   className = '',
 }: CapacityTrendChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverMinute, setHoverMinute] = useState<number | null>(null);
+  const [hiddenStreamKeys, setHiddenStreamKeys] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
+  const toggleStreamVisibility = (streamKey: string) => {
+    setHiddenStreamKeys((previous) => {
+      const next = new Set(previous);
+      if (next.has(streamKey)) {
+        next.delete(streamKey);
+      } else {
+        next.add(streamKey);
+      }
+      return next;
+    });
+  };
 
   const series = useMemo(
     () =>
@@ -104,9 +127,11 @@ export function CapacityTrendChart({
           ? vehicleCapacity
           : 50,
         selectedRoutes,
+        serviceDirectionTags,
+        viewMode: 'serviceDirection',
         sampleStepMinutes: 1,
       }),
-    [plan, vehicleCapacity, selectedRoutes],
+    [plan, vehicleCapacity, selectedRoutes, serviceDirectionTags],
   );
 
   const bands = useMemo(
@@ -134,6 +159,16 @@ export function CapacityTrendChart({
     return ticks;
   }, []);
 
+  const drawableStreams = useMemo(
+    () => series.streams.filter((stream) => streamHasDrawableLine(series.samples, stream)),
+    [series.samples, series.streams],
+  );
+
+  const visibleStreams = useMemo(
+    () => drawableStreams.filter((stream) => !hiddenStreamKeys.has(stream.streamKey)),
+    [drawableStreams, hiddenStreamKeys],
+  );
+
   const hoverSample =
     hoverMinute == null ? null : sampleAtMinute(series.samples, hoverMinute);
   const hoverBand =
@@ -151,9 +186,6 @@ export function CapacityTrendChart({
     setHoverMinute(minute);
   };
 
-  const areaPath = buildAreaPath(series.samples, axisMax);
-  const linePath = buildLinePath(series.samples, axisMax);
-
   const tooltipLeft =
     hoverSample == null
       ? 0
@@ -164,7 +196,7 @@ export function CapacityTrendChart({
   const tooltipTop =
     hoverSample == null
       ? 0
-      : Math.max(8, yForPphpd(hoverSample.pphpd, axisMax) - 96);
+      : Math.max(8, yForPphpd(Math.max(hoverSample.pphpd, 1), axisMax) - 96);
 
   const capacityGapHint =
     hoverSample == null
@@ -176,27 +208,49 @@ export function CapacityTrendChart({
           targetHeadwaySeconds: hoverBand?.headwaySeconds,
         });
 
-  const safeVehicleCapacity =
-    Number.isFinite(vehicleCapacity) && vehicleCapacity > 0
-      ? Math.round(vehicleCapacity)
-      : series.vehicleCapacity;
+  const canDraw = drawableStreams.length > 0;
 
   return (
     <div className={`flex min-h-0 flex-col ${className}`}>
-      <p className="mb-3 text-xs text-zinc-400">
-        藍線為 {CAPACITY_TREND_BUCKET_MINUTES}{' '}
-        分鐘區間的供給運能（pphpd）；各時段細虛線為該段要求運能（與下方色帶同色）。載運量{' '}
-        <span className="font-medium tabular-nums text-zinc-200">
-          {safeVehicleCapacity} 人／車
-        </span>
-        {series.departureCount > 0 ? (
-          <span className="ml-2 text-zinc-600">
-            · 最終班表 {series.departureCount} 趟正線發車
-          </span>
-        ) : null}
-      </p>
-
       <div className="relative overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0b0d12]">
+        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/60 px-3 py-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {drawableStreams.map((stream) => {
+              const hidden = hiddenStreamKeys.has(stream.streamKey);
+              return (
+                <button
+                  key={stream.streamKey}
+                  type="button"
+                  onClick={() => toggleStreamVisibility(stream.streamKey)}
+                  aria-pressed={!hidden}
+                  title={hidden ? `顯示 ${stream.label}` : `隱藏 ${stream.label}`}
+                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                    hidden
+                      ? 'border-zinc-800 bg-transparent text-zinc-600 hover:text-zinc-400'
+                      : 'border-zinc-800/80 bg-zinc-900/70 text-zinc-300 hover:text-zinc-100'
+                  }`}
+                >
+                  <span
+                    className="inline-block h-0.5 w-3 rounded-full"
+                    style={{
+                      backgroundColor: stream.color,
+                      opacity: hidden ? 0.35 : 1,
+                    }}
+                    aria-hidden
+                  />
+                  <span className="max-w-[180px] truncate">{stream.label}</span>
+                  {hidden ? (
+                    <EyeOff className="size-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <Eye className="size-3.5 shrink-0" aria-hidden />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="relative">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
@@ -204,16 +258,8 @@ export function CapacityTrendChart({
           onPointerMove={onPointerMove}
           onPointerLeave={() => setHoverMinute(null)}
           role="img"
-          aria-label="運能趨勢折線圖"
+          aria-label="運能趨勢折線圖（依服務方向）"
         >
-          <defs>
-            <linearGradient id="capacityAreaFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2B7FFF" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#2B7FFF" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
-          {/* 格線 */}
           {yTicks.map((tick) => {
             const y = yForPphpd(tick, axisMax);
             return (
@@ -274,20 +320,22 @@ export function CapacityTrendChart({
             pphpd
           </text>
 
-          {/* 面積 + 供給折線 */}
-          {areaPath ? <path d={areaPath} fill="url(#capacityAreaFill)" /> : null}
-          {linePath ? (
-            <path
-              d={linePath}
-              fill="none"
-              stroke="#7CB8FF"
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ) : null}
+          {visibleStreams.map((stream) => {
+            const path = buildStreamLinePath(series.samples, stream.streamKey, axisMax);
+            if (!path) return null;
+            return (
+              <path
+                key={`line-${stream.streamKey}`}
+                d={path}
+                fill="none"
+                stroke={stream.color}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            );
+          })}
 
-          {/* 各時段要求運能：細虛線（與下方色帶同色）＋中段標註 */}
           {bands.map((band) => {
             if (!(band.capacityPphpd > 0)) return null;
             const x1 = xForMinute(band.startMinute);
@@ -296,7 +344,6 @@ export function CapacityTrendChart({
             const midX = (x1 + x2) / 2;
             const label = band.capacityPphpd.toLocaleString('en-US');
             const bandWidth = x2 - x1;
-            // 過窄時段略過文字，避免擠成一團
             if (bandWidth < 28) {
               return (
                 <line
@@ -348,7 +395,6 @@ export function CapacityTrendChart({
             );
           })}
 
-          {/* 時段色帶 */}
           {bands.map((band) => {
             const x = xForMinute(band.startMinute);
             const w = Math.max(1, xForMinute(band.endMinute) - x);
@@ -366,7 +412,6 @@ export function CapacityTrendChart({
             );
           })}
 
-          {/* Hover 十字線 */}
           {hoverSample ? (
             <g>
               <line
@@ -375,14 +420,6 @@ export function CapacityTrendChart({
                 y1={PAD.top}
                 y2={PAD.top + PLOT_H}
                 stroke="rgba(255,255,255,0.55)"
-                strokeDasharray="4 4"
-              />
-              <line
-                x1={PAD.left}
-                x2={PAD.left + PLOT_W}
-                y1={yForPphpd(hoverSample.pphpd, axisMax)}
-                y2={yForPphpd(hoverSample.pphpd, axisMax)}
-                stroke="rgba(255,255,255,0.35)"
                 strokeDasharray="4 4"
               />
               {hoverBand != null && hoverBand.capacityPphpd > 0 ? (
@@ -395,21 +432,28 @@ export function CapacityTrendChart({
                   strokeWidth={1.5}
                 />
               ) : null}
-              <circle
-                cx={xForMinute(hoverSample.minute)}
-                cy={yForPphpd(hoverSample.pphpd, axisMax)}
-                r={4}
-                fill="#7CB8FF"
-                stroke="#0b0d12"
-                strokeWidth={2}
-              />
+              {visibleStreams.map((stream) => {
+                const pphpd = hoverSample.pphpdByStream[stream.streamKey];
+                if (pphpd == null) return null;
+                return (
+                  <circle
+                    key={`dot-${stream.streamKey}`}
+                    cx={xForMinute(hoverSample.minute)}
+                    cy={yForPphpd(pphpd, axisMax)}
+                    r={4}
+                    fill={stream.color}
+                    stroke="#0b0d12"
+                    strokeWidth={2}
+                  />
+                );
+              })}
             </g>
           ) : null}
         </svg>
 
         {hoverSample ? (
           <div
-            className="pointer-events-none absolute z-10 min-w-[168px] max-w-[260px] rounded-lg border border-zinc-700/80 bg-[#141820]/95 px-3 py-2 shadow-lg backdrop-blur-sm"
+            className="pointer-events-none absolute z-10 min-w-[168px] max-w-[280px] rounded-lg border border-zinc-700/80 bg-[#141820]/95 px-3 py-2 shadow-lg backdrop-blur-sm"
             style={{
               left: `${(tooltipLeft / CHART_WIDTH) * 100}%`,
               top: `${(tooltipTop / CHART_HEIGHT) * 100}%`,
@@ -426,9 +470,12 @@ export function CapacityTrendChart({
               </span>
             </div>
             <p className="text-xs text-zinc-300">
-              等效班距{' '}
+              班距{' '}
               <span className="tabular-nums text-zinc-100">
-                {formatDirectionalHeadwayTooltip(hoverSample.headwayByDirection)
+                {formatRouteStreamHeadwayTooltip(
+                  hoverSample.headwayByStream,
+                  visibleStreams,
+                )
                   ?? (hoverSample.headwaySeconds != null
                     ? `${hoverSample.headwaySeconds.toLocaleString('en-US')} 秒`
                     : '—')}
@@ -439,23 +486,33 @@ export function CapacityTrendChart({
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5 text-xs text-zinc-300">
-              供給{' '}
-              <span className="tabular-nums text-zinc-100">
-                {hoverSample.pphpd.toLocaleString('en-US')} pphpd
-              </span>
+            <div className="mt-0.5 space-y-0.5 text-xs text-zinc-300">
+              {visibleStreams.map((stream) => {
+                const pphpd = hoverSample.pphpdByStream[stream.streamKey];
+                if (pphpd == null) return null;
+                return (
+                  <p key={`tip-${stream.streamKey}`} className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block size-1.5 rounded-full"
+                      style={{ backgroundColor: stream.color }}
+                      aria-hidden
+                    />
+                    <span className="truncate text-zinc-400">{stream.label}</span>
+                    <span className="ml-auto tabular-nums text-zinc-100">
+                      {pphpd.toLocaleString('en-US')} pphpd
+                    </span>
+                  </p>
+                );
+              })}
               {hoverBand != null && hoverBand.capacityPphpd > 0 ? (
-                <span className="ml-1 text-zinc-500">
-                  ／要求{' '}
-                  <span
-                    className="tabular-nums"
-                    style={{ color: hoverBand.color }}
-                  >
+                <p className="text-zinc-500">
+                  要求{' '}
+                  <span className="tabular-nums" style={{ color: hoverBand.color }}>
                     {hoverBand.capacityPphpd.toLocaleString('en-US')}
                   </span>
-                </span>
+                </p>
               ) : null}
-            </p>
+            </div>
             <p className="mt-0.5 text-xs text-zinc-500">
               在跑正線{' '}
               <span className="tabular-nums text-zinc-400">
@@ -464,18 +521,21 @@ export function CapacityTrendChart({
               <span className="ml-1">（參考）</span>
             </p>
             {capacityGapHint ? (
-              <p className="mt-1.5 max-w-[220px] text-[11px] leading-snug text-amber-200/90">
+              <p className="mt-1.5 max-w-[240px] text-[11px] leading-snug text-amber-200/90">
                 {capacityGapHint}
               </p>
             ) : null}
           </div>
         ) : null}
 
-        {series.departureCount < 2 ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0d12]/70 text-sm text-zinc-500">
-            需要至少兩趟正線發車才能繪製運能趨勢
+        {!canDraw ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0d12]/70 px-6 text-center text-sm text-zinc-500">
+            {series.passengerBlockCount >= 2
+              ? '班表有正線班次，但同一服務方向尚不足兩趟發車，無法計算班距／運能。請確認路線已指派並重新生成班表。'
+              : '需要同一服務方向至少兩趟正線發車才能繪製運能趨勢'}
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

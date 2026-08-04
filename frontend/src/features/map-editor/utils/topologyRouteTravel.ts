@@ -1,7 +1,24 @@
 import type { MapAreaObject } from '../types/area'
 import type { PointTopology, PointTopologyEdge } from '../types/pointTopology'
 import { collectStationsFromAreas } from './dockingPointStationId'
+import {
+  getFacilityDockingPoint,
+  resolveFacilityDockingPointListTitle,
+} from './facilityDockingPoint'
+import {
+  facilityDockingTopologyNodeId,
+  parseFacilityIdFromFacilityDockingTopologyNodeId,
+} from './pointTopology'
 import { stationDisplayLabel } from './routePlanning'
+import {
+  collectCrossoverPortalWaypointsFromAreas,
+  collectWaypointsFromAreas,
+} from './waypointCode'
+import { getWaypointCode } from './waypointFacility'
+import {
+  crossoverPortalTopologyNodeId,
+  parseCrossoverPortalTopologyNodeId,
+} from './trackCrossoverFacility'
 
 export type TopologyStationLegBreakdown = {
   fromStationId: string
@@ -43,8 +60,41 @@ function buildOutgoingMap(topology: PointTopology): Map<string, PointTopologyEdg
   return map
 }
 
+function findFacilityInAreas(areas: MapAreaObject[], facilityId: string) {
+  for (const area of areas) {
+    const facility = area.facilities.find((f) => f.id === facilityId)
+    if (facility) return { area, facility }
+  }
+  return null
+}
+
+function collectFacilityDockingRouteStopsFromAreas(areas: MapAreaObject[]) {
+  const stops: Array<{
+    stationId: string
+    stationName: string
+    facilityId: string
+    areaId: string
+    kind: 'facility-docking'
+  }> = []
+
+  for (const area of areas) {
+    for (const facility of area.facilities) {
+      if (facility.type !== 'Facility') continue
+      if (!getFacilityDockingPoint(facility)) continue
+      stops.push({
+        stationId: facilityDockingTopologyNodeId(facility.id),
+        stationName: resolveFacilityDockingPointListTitle(facility),
+        facilityId: facility.id,
+        areaId: area.id,
+        kind: 'facility-docking',
+      })
+    }
+  }
+  return stops
+}
+
 /**
- * 站點 stationId → 拓撲停靠節點 facility id。
+ * 站點 stationId → 拓撲停靠節點 id（正線停靠＝facility id；設施停靠＝fdock:facilityId）。
  */
 export function resolveTopologyDockingNodeId(
   topology: PointTopology,
@@ -53,15 +103,87 @@ export function resolveTopologyDockingNodeId(
 ): string | null {
   const trimmed = stationId.trim()
   if (!trimmed) return null
+
+  const fdockFacilityId = parseFacilityIdFromFacilityDockingTopologyNodeId(trimmed)
+  if (fdockFacilityId) {
+    const nodeId = facilityDockingTopologyNodeId(fdockFacilityId)
+    const fromTopo = topology.nodes.find(
+      (node) => node.kind === 'facility-docking' && node.id === nodeId,
+    )
+    if (fromTopo) return fromTopo.id
+
+    const hit = findFacilityInAreas(areas, fdockFacilityId)
+    if (hit?.facility.type === 'Facility' && getFacilityDockingPoint(hit.facility)) {
+      return nodeId
+    }
+    return null
+  }
+
   const fromTopo = topology.nodes.find(
     (node) => node.kind === 'docking' && node.stationId === trimmed,
   )
   if (fromTopo) return fromTopo.id
 
+  const fromCrossoverTopo = topology.nodes.find(
+    (node) =>
+      node.kind === 'crossover-waypoint'
+      && (node.stationId === trimmed || node.id === trimmed),
+  )
+  if (fromCrossoverTopo) return fromCrossoverTopo.id
+
+  const crossoverRef = parseCrossoverPortalTopologyNodeId(trimmed)
+  if (crossoverRef) {
+    const nodeId = crossoverPortalTopologyNodeId(
+      crossoverRef.facilityId,
+      crossoverRef.key,
+    )
+    const exists = topology.nodes.some(
+      (node) => node.kind === 'crossover-waypoint' && node.id === nodeId,
+    )
+    if (exists) return nodeId
+  }
+
+  const fromCrossoverAreas = collectCrossoverPortalWaypointsFromAreas(areas).find(
+    (stop) => stop.stationId === trimmed || stop.topologyNodeId === trimmed,
+  )
+  if (fromCrossoverAreas) {
+    const node = topology.nodes.find(
+      (n) => n.kind === 'crossover-waypoint' && n.id === fromCrossoverAreas.topologyNodeId,
+    )
+    return node?.id ?? fromCrossoverAreas.topologyNodeId
+  }
+
   const fromAreas = collectStationsFromAreas(areas).find(
     (station) => station.stationId === trimmed,
   )
-  return fromAreas?.facilityId ?? null
+  if (fromAreas) return fromAreas.facilityId
+
+  const fromWaypointTopo = topology.nodes.find(
+    (node) => node.kind === 'waypoint' && node.id === trimmed,
+  )
+  if (fromWaypointTopo) return fromWaypointTopo.id
+
+  const waypoint = collectWaypointsFromAreas(areas).find(
+    (stop) => stop.stationId === trimmed || stop.facilityId === trimmed,
+  )
+  if (waypoint) {
+    const node = topology.nodes.find(
+      (n) => n.kind === 'waypoint' && n.id === waypoint.facilityId,
+    )
+    return node?.id ?? waypoint.facilityId
+  }
+
+  // 若呼叫端直接傳 waypointCode，但拓撲尚未載入該節點，仍嘗試用地圖設施 id
+  for (const area of areas) {
+    for (const facility of area.facilities) {
+      if (facility.type !== 'Waypoint') continue
+      if (getWaypointCode(facility) === trimmed || facility.id === trimmed) {
+        return facility.id
+      }
+    }
+  }
+
+  return null
 }
 
 /**
@@ -196,7 +318,7 @@ export function buildTopologyStationLegBreakdown(
       distanceMeters: null,
       pathFound: false,
       metricsComplete: false,
-      message: `點位拓撲缺少有向路徑：${fromLabel} → ${toLabel}`,
+      message: `路網拓撲缺少有向路徑：${fromLabel} → ${toLabel}`,
     }
   }
 
@@ -257,9 +379,9 @@ export function buildTopologyRouteTravelBreakdown(
   }
 
   if (stationIds.length >= 2 && topology.nodes.length === 0) {
-    warnings.unshift('此地圖尚未建立點位拓撲，無法由拓撲加總行駛時間')
+    warnings.unshift('此地圖尚未建立路網拓撲，無法由拓撲加總行駛時間')
   } else if (stationIds.length >= 2 && !pathsComplete) {
-    warnings.unshift('站序無法完全依拓撲連通，請至「編輯點位拓撲」補齊有向連線')
+    warnings.unshift('站序無法完全依拓撲連通，請至「編輯路網拓撲」補齊有向連線')
   } else if (stationIds.length >= 2 && !timesComplete) {
     warnings.unshift('拓撲路徑已連通，請為每一條邊填寫最快／平均時間')
   }
@@ -312,6 +434,7 @@ export function isTopologyRoutePathConnected(
 export type TopologyRouteAppendOption = {
   stationId: string
   stationName: string
+  kind: 'docking' | 'facility-docking' | 'waypoint' | 'crossover-waypoint'
   reason?: string
 }
 
@@ -321,85 +444,37 @@ export type TopologyRouteAppendPartition = {
 }
 
 /**
- * 依拓撲有向連通性，決定下一個可加入的停靠點（不再用軌道幾何）。
- * 空站序：凡拓撲中有對應停靠節點者可選。
+ * 路線清單加站：不依上行／下行、道路或拓撲有向連通限制。
+ * 僅排除已在站序中的點；特殊案例可自由組站。
  */
 export function partitionStationsForTopologyRouteAppend(
-  topology: PointTopology,
+  _topology: PointTopology,
   areas: MapAreaObject[],
   currentStationIds: string[],
 ): TopologyRouteAppendPartition {
-  const all = collectStationsFromAreas(areas)
   const inRoute = new Set(currentStationIds)
-  const candidates = all
-    .filter((s) => !inRoute.has(s.stationId))
+  const selectable: TopologyRouteAppendOption[] = [
+    ...collectStationsFromAreas(areas).map((station) => ({
+      stationId: station.stationId,
+      stationName: station.stationName,
+      kind: 'docking' as const,
+    })),
+    ...collectFacilityDockingRouteStopsFromAreas(areas),
+    ...collectWaypointsFromAreas(areas).map((stop) => ({
+      stationId: stop.stationId,
+      stationName: stop.stationName,
+      kind: 'waypoint' as const,
+    })),
+    ...collectCrossoverPortalWaypointsFromAreas(areas).map((stop) => ({
+      stationId: stop.stationId,
+      stationName: stop.stationName,
+      kind: 'crossover-waypoint' as const,
+    })),
+  ]
+    .filter((candidate) => !inRoute.has(candidate.stationId))
     .sort((a, b) => a.stationName.localeCompare(b.stationName, 'zh-Hant'))
 
-  const selectable: TopologyRouteAppendOption[] = []
-  const disabled: TopologyRouteAppendOption[] = []
-
-  if (topology.nodes.filter((n) => n.kind === 'docking').length === 0) {
-    return {
-      selectable: [],
-      disabled: candidates.map((s) => ({
-        stationId: s.stationId,
-        stationName: s.stationName,
-        reason: '尚未建立點位拓撲',
-      })),
-    }
-  }
-
-  const lastId = currentStationIds[currentStationIds.length - 1]
-
-  for (const candidate of candidates) {
-    const candNode = resolveTopologyDockingNodeId(
-      topology,
-      areas,
-      candidate.stationId,
-    )
-    if (!candNode) {
-      disabled.push({
-        stationId: candidate.stationId,
-        stationName: candidate.stationName,
-        reason: '不在點位拓撲中',
-      })
-      continue
-    }
-
-    if (!lastId) {
-      selectable.push({
-        stationId: candidate.stationId,
-        stationName: candidate.stationName,
-      })
-      continue
-    }
-
-    const lastNode = resolveTopologyDockingNodeId(topology, areas, lastId)
-    if (!lastNode) {
-      disabled.push({
-        stationId: candidate.stationId,
-        stationName: candidate.stationName,
-        reason: '路線末端不在拓撲中',
-      })
-      continue
-    }
-
-    const path = findDirectedTopologyPath(topology, lastNode, candNode)
-    if (path) {
-      selectable.push({
-        stationId: candidate.stationId,
-        stationName: candidate.stationName,
-      })
-    } else {
-      disabled.push({
-        stationId: candidate.stationId,
-        stationName: candidate.stationName,
-        reason: '拓撲無有向路徑',
-      })
-    }
-  }
-
-  return { selectable, disabled }
+  return { selectable, disabled: [] }
 }
 
 export function canAppendStationToTopologyRoute(
@@ -408,10 +483,12 @@ export function canAppendStationToTopologyRoute(
   currentStationIds: string[],
   candidateStationId: string,
 ): boolean {
+  const id = candidateStationId.trim()
+  if (!id || currentStationIds.includes(id)) return false
   const { selectable } = partitionStationsForTopologyRouteAppend(
     topology,
     areas,
     currentStationIds,
   )
-  return selectable.some((s) => s.stationId === candidateStationId)
+  return selectable.some((s) => s.stationId === id)
 }

@@ -20,7 +20,6 @@ const mapPublishedStore = require(
 export type MapStationDto = {
   stationId: string;
   stationName: string;
-  dockingLeg?: 'down' | 'up';
   routeId?: string;
   xM: number;
   yM: number;
@@ -40,11 +39,14 @@ export type FieldEquipmentDto = {
   equipmentId: string;
   mapCode: string;
   equipmentKind: string;
+  /** equipment = 紅綠燈／智慧桿／月台門；facility = 大型區塊 */
+  objectCategory?: 'equipment' | 'facility';
   label: string;
   purpose?: string;
   mqttInstanceId?: string;
   areaId: string;
   areaName: string;
+  facilityType?: string;
 };
 
 export type MapWaypointDto = {
@@ -81,7 +83,6 @@ const mapWaypoints = require(
 function toStationDto(entry: {
   stationId: string;
   stationName: string;
-  dockingLeg?: string;
   routeId?: string;
   xM: number;
   yM: number;
@@ -91,10 +92,6 @@ function toStationDto(entry: {
   return {
     stationId: entry.stationId,
     stationName: entry.stationName,
-    dockingLeg:
-      entry.dockingLeg === 'down' || entry.dockingLeg === 'up'
-        ? entry.dockingLeg
-        : undefined,
     routeId: entry.routeId,
     xM: entry.xM,
     yM: entry.yM,
@@ -295,9 +292,12 @@ export class MapService implements OnModuleInit {
       | 'charging'
       | 'signal'
       | 'smart_pole'
+      | 'platform_door'
       | 'car_wash'
       | 'maintenance'
       | 'yard_slot'
+      | 'equipment'
+      | 'facility'
       | 'all' = 'all',
   ): {
     mapId: string;
