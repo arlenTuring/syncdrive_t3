@@ -177,13 +177,13 @@ describe('buildRouteSuccessorPolicy', () => {
     expect(policy.throughCycles.some((c) => c.secondaryCount === 0)).toBe(true);
     expect(resolveStartInstanceId(policy)).toBe('A');
     expect(resolveNextInstanceId(policy, 'A')?.instanceId).toBe('B');
-    // 次要連線不再作為排班走法（未指定偏好時）
+    // 次要連線在 allowSecondary 時可用
     expect(resolveNextInstanceId(policy, 'A', { allowSecondary: true })?.instanceId).toBe('B');
     expect(resolveNextInstanceId(policy, 'A', { allowSecondary: true })?.kind).toBe(
       'priority',
     );
-    // B 終站 P2 為折返錨點 → 下一輪回到 A
-    expect(resolveNextInstanceId(policy, 'B')?.instanceId).toBe('A');
+    // B 無出邊：不得發明繞回 A
+    expect(resolveNextInstanceId(policy, 'B')).toBeNull();
     expect(routeAssignmentAlgorithmId(policy)).toBe(
       'route-assignment-relation-graph-v1',
     );
@@ -226,6 +226,124 @@ describe('buildRouteSuccessorPolicy', () => {
 
     expect(policy.algorithm).toBe(ROUTE_SUCCESSOR_ALGORITHM_GRAPH);
     expect(policy.canonicalCycleInstanceIds).toEqual(secondary!.instanceIds);
+    // 偏好路徑 A→D 的邊為次要，存在於圖上 → 跟偏好
     expect(resolveNextInstanceId(policy, 'A')?.instanceId).toBe('D');
+    expect(resolveNextInstanceId(policy, 'A')?.kind).toBe('secondary');
+  });
+
+  it('never invents preferred-cycle wrap when the closing edge is missing', () => {
+    const longRoutes = [
+      makeRoute({
+        instanceId: 'NTB',
+        routeId: 'NTB',
+        stationIds: ['P10', 'P3'],
+        executionOrder: 1,
+      }),
+      makeRoute({
+        instanceId: 'TS',
+        routeId: 'TS',
+        stationIds: ['P3', 'P4'],
+        executionOrder: 2,
+      }),
+      makeRoute({
+        instanceId: 'ST',
+        routeId: 'ST',
+        stationIds: ['P4', 'P1'],
+        executionOrder: 3,
+      }),
+      makeRoute({
+        instanceId: 'TN',
+        routeId: 'TN',
+        stationIds: ['P1', 'P2'],
+        executionOrder: 4,
+      }),
+      makeRoute({
+        instanceId: 'NT',
+        routeId: 'NT',
+        stationIds: ['P2', 'P3'],
+        executionOrder: 5,
+      }),
+    ];
+    const longGraph: ShiftRouteRelationGraph = {
+      nodes: longRoutes.map((route, i) => ({
+        instanceId: route.instanceId!,
+        x: i,
+        y: 0,
+      })),
+      links: [
+        {
+          id: 'NTB-TS',
+          fromInstanceId: 'NTB',
+          toInstanceId: 'TS',
+          nextKind: 'priority',
+        },
+        {
+          id: 'TS-ST',
+          fromInstanceId: 'TS',
+          toInstanceId: 'ST',
+          nextKind: 'priority',
+        },
+        {
+          id: 'ST-TN',
+          fromInstanceId: 'ST',
+          toInstanceId: 'TN',
+          nextKind: 'priority',
+        },
+        {
+          id: 'TN-NT',
+          fromInstanceId: 'TN',
+          toInstanceId: 'NT',
+          nextKind: 'priority',
+        },
+        {
+          id: 'NT-TS',
+          fromInstanceId: 'NT',
+          toInstanceId: 'TS',
+          nextKind: 'priority',
+        },
+        // 刻意沒有 TN→NTB
+      ],
+    };
+    const anchors: ShiftRouteThroughAnchorsDraft = {
+      startStationIds: [],
+      endStationIds: [],
+      startInstanceIds: ['NTB', 'NT'],
+      endInstanceIds: ['TN'],
+      verifiedFingerprint: null,
+      verifiedPathCount: 0,
+      preferredThroughCycleId: null,
+    };
+    anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
+      startInstanceIds: anchors.startInstanceIds,
+      endInstanceIds: anchors.endInstanceIds,
+      routes: longRoutes,
+      graph: longGraph,
+      minimumRecoveryTimeSeconds: 30,
+    });
+    anchors.verifiedPathCount = 2;
+    const probe = buildRouteSuccessorPolicy({
+      routes: longRoutes,
+      graph: longGraph,
+      throughAnchors: anchors,
+      minimumRecoveryTimeSeconds: 30,
+    });
+    const preferred = probe.throughCycles.find(
+      (cycle) => cycle.instanceIds.join('>') === 'NTB>TS>ST>TN',
+    );
+    expect(preferred == null).toBe(false);
+    anchors.preferredThroughCycleId = preferred!.id;
+
+    const policy = buildRouteSuccessorPolicy({
+      routes: longRoutes,
+      graph: longGraph,
+      throughAnchors: anchors,
+      minimumRecoveryTimeSeconds: 30,
+    });
+
+    expect(policy.canonicalCycleInstanceIds).toEqual(['NTB', 'TS', 'ST', 'TN']);
+    // 行前出 T3(=P1) → TN；下一跳必須是圖上 TN→NT，不得硬接 NTB
+    expect(resolveStartInstanceId(policy, 'P1')).toBe('TN');
+    expect(resolveNextInstanceId(policy, 'TN')?.instanceId).toBe('NT');
+    assert.notEqual(resolveNextInstanceId(policy, 'TN')?.instanceId, 'NTB');
   });
 });

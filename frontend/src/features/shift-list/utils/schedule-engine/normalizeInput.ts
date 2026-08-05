@@ -48,9 +48,10 @@ import {
 import {
   buildRouteSuccessorPolicy,
   estimatePolicyCycleSeconds,
-  ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+  resolveNextInstanceId,
   resolveRouteIndexInRotation,
   resolveStartInstanceId,
+  ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
 import { emptyShiftRouteRelationGraph } from '../routeRelationGraph';
@@ -205,6 +206,7 @@ function cycleViolatesSameRouteHeadway(args: {
  *
  * 班距脈衝只決定第一段的開始；後續 route legs 必須沿同車 successor chain
  * 連續完成，不能再各自等待另一個班距脈衝。
+ * 圖模式只沿關聯圖短邊走，不得用偏好路徑無邊繞回。
  */
 function buildPlannedCycleLegs(args: {
   startRouteIndex: number;
@@ -212,6 +214,7 @@ function buildPlannedCycleLegs(args: {
   passengerRoutes: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds: number;
   useMinimumOccupancy?: boolean;
+  successorPolicy?: RouteSuccessorPolicy;
 }): PlannedCycleLeg[] {
   const {
     startRouteIndex,
@@ -219,7 +222,72 @@ function buildPlannedCycleLegs(args: {
     passengerRoutes,
     minimumRecoveryTimeSeconds,
     useMinimumOccupancy = false,
+    successorPolicy,
   } = args;
+
+  if (
+    successorPolicy
+    && successorPolicy.valid
+    && successorPolicy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_GRAPH
+  ) {
+    const startRoute = passengerRoutes[startRouteIndex];
+    if (!startRoute) return [];
+    const maxHops = Math.max(1, successorPolicy.canonicalCycleInstanceIds.length);
+    const legs: PlannedCycleLeg[] = [];
+    let cursor = startSecond;
+    let previousRoute: ShiftScheduleSelectedRoute | null = null;
+    let currentId = resolveSelectedRouteInstanceId(startRoute);
+
+    for (let hop = 0; hop < maxHops; hop += 1) {
+      const route =
+        successorPolicy.routesByInstanceId.get(currentId)
+        ?? (hop === 0 ? startRoute : null);
+      if (!route) break;
+      if (previousRoute) {
+        cursor = snapUpToClockAlignSeconds(
+          cursor
+            + resolveInterTripGapSeconds({
+              minimumRecoveryTimeSeconds,
+              previousRouteSwitchBufferSeconds: previousRoute.switchBufferAfterSeconds,
+              isRouteSwitch: previousRoute.routeId !== route.routeId,
+              includeRecovery: shouldIncludeRecoveryForRouteSwitch({
+                previousRoute,
+                nextRoute: route,
+                rotationRoutes: passengerRoutes,
+              }),
+              previousRoute,
+              nextRoute: route,
+            }),
+        );
+      }
+      const occupancy = resolvePassengerRouteOccupancy(route);
+      const occupancySeconds = occupancy
+        ? useMinimumOccupancy
+          ? occupancy.minOccupancySeconds
+          : occupancy.occupancySeconds
+        : 0;
+      if (occupancySeconds <= 0) return [];
+      const endSecond = cursor + occupancySeconds;
+      const routeIndex = Math.max(
+        0,
+        resolveRouteIndexInRotation(successorPolicy, currentId),
+      );
+      legs.push({
+        route,
+        routeIndex: routeIndex >= 0 ? routeIndex : hop,
+        startSecond: cursor,
+        occupancySeconds,
+        endSecond,
+      });
+      cursor = endSecond;
+      previousRoute = route;
+      const next = resolveNextInstanceId(successorPolicy, currentId);
+      if (!next) break;
+      currentId = next.instanceId;
+    }
+    return legs;
+  }
+
   const routeCount = passengerRoutes.length;
   if (routeCount === 0) return [];
 
@@ -343,6 +411,21 @@ type TrackedPassengerLeg = {
   /** 同輪第一腿的 taskIndex */
   cycleAnchorTaskIndex: number;
 };
+
+function isAcceptablePlannedCycleLength(
+  legs: PlannedCycleLeg[],
+  routeCount: number,
+  successorPolicy?: RouteSuccessorPolicy,
+): boolean {
+  if (legs.length === 0) return false;
+  if (
+    successorPolicy?.valid
+    && successorPolicy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_GRAPH
+  ) {
+    return true;
+  }
+  return legs.length === routeCount;
+}
 
 function isHeadwayBlockedRejection(reason: string | undefined): boolean {
   if (!reason) return false;
@@ -706,8 +789,9 @@ function assignDirectionalDepartures(args: {
         passengerRoutes,
         minimumRecoveryTimeSeconds,
         useMinimumOccupancy: false,
+        successorPolicy,
       });
-      if (plannedLegs.length !== routeCount) {
+      if (!isAcceptablePlannedCycleLength(plannedLegs, routeCount, successorPolicy)) {
         rejectionByRow.set(row, '無法展開完整交路占用');
         return;
       }
@@ -743,13 +827,19 @@ function assignDirectionalDepartures(args: {
             passengerRoutes,
             minimumRecoveryTimeSeconds,
             useMinimumOccupancy: true,
+            successorPolicy,
           });
+          const minimumOk = isAcceptablePlannedCycleLength(
+            minimumLegs,
+            routeCount,
+            successorPolicy,
+          );
           const minimumEnd =
-            minimumLegs.length === routeCount
+            minimumOk
               ? minimumLegs[minimumLegs.length - 1]!.endSecond
               : Number.POSITIVE_INFINITY;
           const minimumConflict =
-            minimumLegs.length === routeCount
+            minimumOk
               ? cycleViolatesSameRouteHeadway({
                   legs: minimumLegs,
                   trackedLegs,
@@ -1057,13 +1147,19 @@ function assignDirectionalDepartures(args: {
               passengerRoutes,
               minimumRecoveryTimeSeconds,
               useMinimumOccupancy: true,
+              successorPolicy,
             });
+            const minimumOk = isAcceptablePlannedCycleLength(
+              minimumLegs,
+              routeCount,
+              successorPolicy,
+            );
             const minimumEnd =
-              minimumLegs.length === routeCount
+              minimumOk
                 ? minimumLegs[minimumLegs.length - 1]!.endSecond
                 : Number.POSITIVE_INFINITY;
             const minimumConflict =
-              minimumLegs.length === routeCount
+              minimumOk
                 ? cycleViolatesSameRouteHeadway({
                     legs: minimumLegs,
                     trackedLegs,
@@ -1085,8 +1181,9 @@ function assignDirectionalDepartures(args: {
           passengerRoutes,
           minimumRecoveryTimeSeconds,
           useMinimumOccupancy: useMinimumCycle,
+          successorPolicy,
         });
-        if (previewLegs.length !== routeCount) continue;
+        if (!isAcceptablePlannedCycleLength(previewLegs, routeCount, successorPolicy)) continue;
         const headwayForYield = (
           route: ShiftScheduleSelectedRoute,
           _leg: PlannedCycleLeg,
@@ -1227,8 +1324,9 @@ function assignDirectionalDepartures(args: {
       passengerRoutes,
       minimumRecoveryTimeSeconds,
       useMinimumOccupancy: chosenUseMinimumCycle,
+      successorPolicy,
     });
-    if (cycleLegs.length !== routeCount) continue;
+    if (!isAcceptablePlannedCycleLength(cycleLegs, routeCount, successorPolicy)) continue;
 
     let finalTaskIndex = -1;
     let cycleAnchorTaskIndex = tasks.length;
@@ -1266,8 +1364,8 @@ function assignDirectionalDepartures(args: {
       startSecond: finalLeg.startSecond,
       occupancyUsed: finalLeg.occupancySeconds,
     };
-    // 一個班距脈衝已完整展開整輪；下一次仍從同一相位開輪。
-    rotationIndex[chosenRow] += routeCount;
+    // 一個班距脈衝已展開本輪腿數；下一次仍從同一相位開輪。
+    rotationIndex[chosenRow] += Math.max(cycleLegs.length, 1);
   }
 
   return tasks;

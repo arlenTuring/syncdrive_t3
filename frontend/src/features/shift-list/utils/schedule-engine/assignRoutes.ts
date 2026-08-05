@@ -1,11 +1,14 @@
 import type { ScheduleTask, TaskTypeKey } from '../../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import { resolveSelectedRouteInstanceId } from '../../types/create';
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
 import { shouldApplyYardExitRotationAlign } from '../maintenancePostTaskPolicy';
 import {
+  resolveNextInstanceId,
   resolveRouteIndexInRotation,
   resolveStartInstanceId,
   routeAssignmentAlgorithmId,
+  ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
 import {
@@ -202,7 +205,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
 
   if (orderedRoutes.length === 0) return decisions;
 
-  // 有策略時輪替順序已是 rotationRoutes，不再重排以免打亂導通環
+  // 有策略時輪替順序已是 rotationRoutes，不再重排以免打亂導通偏好
   const rotationRoutes = successorPolicy?.rotationRoutes?.length
     ? successorPolicy.rotationRoutes
     : orderedRoutes;
@@ -222,6 +225,8 @@ export function assignPassengerRoutesConstraintGreedy(args: {
     let lastEndSecond: number | null = null;
     let lastSwitchBufferSeconds = 0;
     let rotationIndex = 0;
+    let lastInstanceId: string | null = null;
+    let forceStartAfterYard = false;
 
     for (const task of rowTasks) {
       const startSecond = minuteToSecond(task.startMinute);
@@ -245,6 +250,8 @@ export function assignPassengerRoutesConstraintGreedy(args: {
             if (startId) {
               const index = resolveRouteIndexInRotation(successorPolicy, startId);
               offset = index >= 0 ? index : 0;
+              lastInstanceId = null;
+              forceStartAfterYard = true;
             }
           } else {
             offset =
@@ -253,9 +260,13 @@ export function assignPassengerRoutesConstraintGreedy(args: {
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount + offset;
         } else if (precedingYard.taskType === 'servicing') {
-          // 保養後由進場載客接到首班起點；無出場站時開輪對齊環起點（NT）
+          // 保養後由進場載客接到首班起點；無出場站時開輪對齊偏好起點
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount;
+          if (successorPolicy) {
+            lastInstanceId = null;
+            forceStartAfterYard = true;
+          }
         }
         // 充電／行前／機動無明確出場站，或整備後無正線：延續進整備前輪替
       }
@@ -265,7 +276,46 @@ export function assignPassengerRoutesConstraintGreedy(args: {
         task.id,
         startSecond,
       );
-      const route = rotationRoutes[rotationIndex % rotationRoutes.length]!;
+
+      let route: ShiftScheduleSelectedRoute | null = null;
+      if (
+        successorPolicy
+        && successorPolicy.valid
+        && successorPolicy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_GRAPH
+      ) {
+        if (forceStartAfterYard || !lastInstanceId) {
+          const startId =
+            forceStartAfterYard
+              ? resolveStartInstanceId(
+                  successorPolicy,
+                  precedingYard
+                    ? yardRotationExitByTaskType[precedingYard.taskType]
+                    : null,
+                )
+              : resolveStartInstanceId(successorPolicy);
+          route = startId
+            ? successorPolicy.routesByInstanceId.get(startId) ?? null
+            : rotationRoutes[rotationIndex % rotationRoutes.length] ?? null;
+          forceStartAfterYard = false;
+        } else {
+          const next = resolveNextInstanceId(successorPolicy, lastInstanceId);
+          route = next
+            ? successorPolicy.routesByInstanceId.get(next.instanceId) ?? null
+            : null;
+          // 圖上斷線：不得發明偏好繞回；只好用偏好相位的下一條並標記可不可行於 score
+          if (!route) {
+            route = rotationRoutes[rotationIndex % rotationRoutes.length] ?? null;
+          }
+        }
+      } else {
+        route = rotationRoutes[rotationIndex % rotationRoutes.length]!;
+      }
+
+      if (!route) {
+        rotationIndex += 1;
+        continue;
+      }
+
       const occupancy = resolvePassengerOccupancy(route);
       if (!occupancy) {
         rotationIndex += 1;
@@ -303,6 +353,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
       lastRoute = route;
       lastEndSecond = startSecond + decision.occupancySeconds;
       lastSwitchBufferSeconds = route.switchBufferAfterSeconds;
+      lastInstanceId = resolveSelectedRouteInstanceId(route);
       rotationIndex += 1;
     }
 
