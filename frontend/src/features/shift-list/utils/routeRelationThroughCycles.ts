@@ -415,6 +415,12 @@ export type ShiftRouteThroughAnchorsDraft = {
   verifiedFingerprint: string | null;
   /** 通過時找到的最短路徑數 */
   verifiedPathCount: number;
+  /**
+   * 使用者指定「優先採用」的導通組合 id（RouteThroughCycle.id）。
+   * 排班以該組合為輪替；約束衝突時才改派其他／備用。
+   * 為 null 時預設採全優先中最快者（若無全優先則採整體最快）。
+   */
+  preferredThroughCycleId: string | null;
 };
 
 export function emptyShiftRouteThroughAnchorsDraft(): ShiftRouteThroughAnchorsDraft {
@@ -425,7 +431,31 @@ export function emptyShiftRouteThroughAnchorsDraft(): ShiftRouteThroughAnchorsDr
     endInstanceIds: [],
     verifiedFingerprint: null,
     verifiedPathCount: 0,
+    preferredThroughCycleId: null,
   };
+}
+
+/** 解析優先採用組合；無效偏好時回退全優先最快（再退整體最快） */
+export function resolvePreferredThroughCycle(
+  cycles: RouteThroughCycle[],
+  preferredThroughCycleId?: string | null,
+): RouteThroughCycle | null {
+  if (cycles.length === 0) return null;
+  const preferredId = preferredThroughCycleId?.trim() || '';
+  if (preferredId) {
+    const hit = cycles.find((item) => item.id === preferredId);
+    if (hit) return hit;
+  }
+  const priorityOnly = cycles.filter((item) => item.secondaryCount === 0);
+  const pool = priorityOnly.length > 0 ? priorityOnly : cycles;
+  return (
+    [...pool].sort((a, b) => {
+      if (a.minCycleSeconds !== b.minCycleSeconds) {
+        return a.minCycleSeconds - b.minCycleSeconds;
+      }
+      return a.id.localeCompare(b.id);
+    })[0] ?? null
+  );
 }
 
 export function parseShiftRouteThroughAnchorsDraft(
@@ -461,6 +491,10 @@ export function parseShiftRouteThroughAnchorsDraft(
     typeof o.verifiedPathCount === 'number' && Number.isFinite(o.verifiedPathCount)
       ? Math.max(0, Math.round(o.verifiedPathCount))
       : 0;
+  const preferredThroughCycleId =
+    typeof o.preferredThroughCycleId === 'string' && o.preferredThroughCycleId.trim()
+      ? o.preferredThroughCycleId.trim()
+      : null;
   return {
     startStationIds: [...new Set(startStationIds)],
     endStationIds: [...new Set(endStationIds)],
@@ -468,6 +502,7 @@ export function parseShiftRouteThroughAnchorsDraft(
     endInstanceIds: [...new Set(endInstanceIds)],
     verifiedFingerprint,
     verifiedPathCount,
+    preferredThroughCycleId,
   };
 }
 

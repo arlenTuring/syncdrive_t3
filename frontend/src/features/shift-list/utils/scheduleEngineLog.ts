@@ -107,6 +107,8 @@ export function buildScheduleEngineLogPayload(args: {
         endStationIds: draft.routeGroups.throughAnchors?.endStationIds ?? [],
         verifiedPathCount:
           draft.routeGroups.throughAnchors?.verifiedPathCount ?? 0,
+        preferredThroughCycleId:
+          draft.routeGroups.throughAnchors?.preferredThroughCycleId ?? null,
         hasVerifiedFingerprint: Boolean(
           draft.routeGroups.throughAnchors?.verifiedFingerprint,
         ),

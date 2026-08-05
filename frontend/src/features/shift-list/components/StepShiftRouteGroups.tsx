@@ -63,6 +63,7 @@ import {
   computeRouteThroughPaths,
   emptyShiftRouteThroughAnchorsDraft,
   isThroughVerificationCurrent,
+  resolvePreferredThroughCycle,
   type RouteThroughCycle,
 } from '../utils/routeRelationThroughCycles';
 import { resolveRouteOriginStation } from '../utils/routeRelationGraph';
@@ -1096,6 +1097,11 @@ export function StepShiftRouteGroups({
         ...patch,
         verifiedFingerprint: null,
         verifiedPathCount: 0,
+        // 結構變更時清掉偏好，避免指到已不存在的組合
+        preferredThroughCycleId:
+          patch.preferredThroughCycleId !== undefined
+            ? patch.preferredThroughCycleId
+            : null,
       },
     });
   };
@@ -1182,25 +1188,48 @@ export function StepShiftRouteGroups({
 
   const referenceCycle = useMemo(() => {
     if (!freshThroughResults || freshThroughResults.length === 0) return null;
-    const priorityOnly = freshThroughResults.filter((item) => item.secondaryCount === 0);
-    const pool = priorityOnly.length > 0 ? priorityOnly : freshThroughResults;
-    return [...pool].sort((a, b) => {
-      if (a.secondaryCount !== b.secondaryCount) return a.secondaryCount - b.secondaryCount;
-      return a.minCycleSeconds - b.minCycleSeconds;
-    })[0] ?? null;
-  }, [freshThroughResults]);
+    return resolvePreferredThroughCycle(
+      freshThroughResults,
+      throughAnchors.preferredThroughCycleId,
+    );
+  }, [freshThroughResults, throughAnchors.preferredThroughCycleId]);
 
   const hasLimit = turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0;
   const isOver =
     hasLimit
     && referenceCycle != null
     && referenceCycle.minCycleSeconds > (turnaroundLimitSeconds ?? 0);
-  const hasPriorityPath =
-    freshThroughResults != null && freshThroughResults.some((item) => item.secondaryCount === 0);
   const graphHasLinks = (draft.routeRelationGraph?.links.length ?? 0) > 0;
   const cycleMarksReady = startInstanceIds.length > 0 && endInstanceIds.length > 0;
   const headInStarts =
     headInstanceId == null || startInstanceIds.includes(headInstanceId);
+
+  const selectPreferredThroughCycle = (cycle: RouteThroughCycle) => {
+    const overLimit =
+      turnaroundLimitSeconds != null
+      && turnaroundLimitSeconds > 0
+      && cycle.minCycleSeconds > turnaroundLimitSeconds;
+    if (overLimit) {
+      onChange({
+        ...draft,
+        throughAnchors: {
+          ...throughAnchors,
+          preferredThroughCycleId: cycle.id,
+          verifiedFingerprint: null,
+          verifiedPathCount: 0,
+        },
+      });
+      return;
+    }
+    onChange({
+      ...draft,
+      throughAnchors: {
+        ...throughAnchors,
+        preferredThroughCycleId: cycle.id,
+        // 指紋不變時維持已通過；僅切換偏好
+      },
+    });
+  };
 
   const runThroughVerification = () => {
     if (!cycleMarksReady || !graphHasLinks) return;
@@ -1222,23 +1251,22 @@ export function StepShiftRouteGroups({
     });
     setThroughResults(paths);
     setLastCheckFingerprint(checkFingerprint);
-    const priorityPaths = paths.filter((item) => item.secondaryCount === 0);
-    const best =
-      priorityPaths.length === 0
-        ? null
-        : [...priorityPaths].sort((a, b) => a.minCycleSeconds - b.minCycleSeconds)[0]
-          ?? null;
+    const preferred = resolvePreferredThroughCycle(
+      paths,
+      throughAnchors.preferredThroughCycleId,
+    );
     const overLimit =
       turnaroundLimitSeconds != null
       && turnaroundLimitSeconds > 0
-      && best != null
-      && best.minCycleSeconds > turnaroundLimitSeconds;
+      && preferred != null
+      && preferred.minCycleSeconds > turnaroundLimitSeconds;
     const headOk = headInStarts;
-    if (priorityPaths.length === 0 || overLimit || !headOk) {
+    if (paths.length === 0 || preferred == null || overLimit || !headOk) {
       onChange({
         ...draft,
         throughAnchors: {
           ...throughAnchors,
+          preferredThroughCycleId: preferred?.id ?? null,
           verifiedFingerprint: null,
           verifiedPathCount: 0,
         },
@@ -1252,8 +1280,9 @@ export function StepShiftRouteGroups({
         ...throughAnchors,
         startStationIds: [],
         endStationIds: [],
+        preferredThroughCycleId: preferred.id,
         verifiedFingerprint: checkFingerprint,
-        verifiedPathCount: priorityPaths.length,
+        verifiedPathCount: paths.length,
       },
     });
   };
@@ -1295,7 +1324,7 @@ export function StepShiftRouteGroups({
     | 'noPriority'
     | 'overLimit'
     | 'passed' =
-    throughVerified
+    throughVerified && !isOver
       ? 'passed'
       : !graphHasLinks
         ? 'missingGraph'
@@ -1305,9 +1334,9 @@ export function StepShiftRouteGroups({
             ? 'headNotInStarts'
             : freshThroughResults != null && freshThroughResults.length === 0
               ? 'failed'
-              : freshThroughResults != null && !hasPriorityPath
-                ? 'noPriority'
-                : freshThroughResults != null && isOver
+              : freshThroughResults != null && isOver
+                ? 'overLimit'
+                : throughVerified && isOver
                   ? 'overLimit'
                   : 'stale';
 
@@ -1325,12 +1354,10 @@ export function StepShiftRouteGroups({
       blockers.push('尚未設好「由此起算」與「到此結算」');
     } else if (!headInStarts) {
       blockers.push('首班車必須也是起算路線');
-    } else if (!throughVerified) {
-      if (throughGateStatus === 'overLimit') {
-        blockers.push('優先路線組合超過折返時限');
-      } else if (throughGateStatus === 'noPriority') {
-        blockers.push('尚無全優先路線組合');
-      } else if (throughGateStatus === 'failed') {
+    } else if (throughGateStatus === 'overLimit') {
+      blockers.push('優先採用的路線組合超過折返時限');
+    } else if (!throughVerified || throughGateStatus !== 'passed') {
+      if (throughGateStatus === 'failed') {
         blockers.push('找不到從起算到結算的路徑');
       } else {
         blockers.push('請按右下角「開始檢查路線組合」確認後才能下一步');
@@ -1611,6 +1638,7 @@ export function StepShiftRouteGroups({
                       ...throughAnchors,
                       verifiedFingerprint: null,
                       verifiedPathCount: 0,
+                      preferredThroughCycleId: null,
                     },
                   });
                 }}
@@ -1637,23 +1665,29 @@ export function StepShiftRouteGroups({
                       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
                       <span>找不到從起算走到結算的路徑，請檢查優先連線。</span>
                     </p>
-                  ) : throughGateStatus === 'noPriority' ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
-                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
-                      <span>目前只有含次要連線的路徑，請補上全優先接續。</span>
-                    </p>
                   ) : null}
 
                   {freshThroughResults != null && freshThroughResults.length > 0 ? (
                     <div className="space-y-1">
+                      <p className="pb-1 text-[11px] text-zinc-500">
+                        點選一列設為「優先採用」：排班會盡量走這組，約束衝突時才改派其他組合。
+                      </p>
                       {freshThroughResults.map((cycle) => {
                         const rowOver =
                           hasLimit && cycle.minCycleSeconds > (turnaroundLimitSeconds ?? 0);
                         const isReference = referenceCycle?.id === cycle.id;
                         return (
-                          <div
+                          <button
                             key={cycle.id}
-                            className="flex items-start justify-between gap-6 py-2.5 text-sm"
+                            type="button"
+                            onClick={() => selectPreferredThroughCycle(cycle)}
+                            aria-pressed={isReference}
+                            className={[
+                              'flex w-full items-start justify-between gap-6 rounded-md px-2 py-2.5 text-left text-sm transition-colors',
+                              isReference
+                                ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40'
+                                : 'hover:bg-zinc-800/50',
+                            ].join(' ')}
                           >
                             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
                               {cycle.labels.map((label, labelIndex) => (
@@ -1690,12 +1724,12 @@ export function StepShiftRouteGroups({
                                   <span className="text-zinc-600">·</span>
                                   <span className="text-emerald-300">優先採用</span>
                                 </>
-                              ) : cycle.secondaryCount > 0 ? (
+                              ) : (
                                 <>
                                   <span className="text-zinc-600">·</span>
-                                  <span className="text-violet-200/80">備用</span>
+                                  <span className="text-zinc-500">點選採用</span>
                                 </>
-                              ) : null}
+                              )}
                             </div>
                             <div
                               className={[
@@ -1712,7 +1746,7 @@ export function StepShiftRouteGroups({
                                 {formatSecondsLabel(cycle.avgCycleSeconds)}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>

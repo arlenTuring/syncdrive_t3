@@ -1,8 +1,8 @@
 /**
  * 路線繼任策略：把 Step 4 關聯圖 + 折返錨點轉成排班引擎可用的輪替環。
  *
- * - `relation-graph-through-anchors-v1`：以已鎖定的**全優先**折返組合為硬輪替環；
- *   引擎只走這組，不另找次要或其他走法。
+ * - `relation-graph-through-anchors-v1`：以使用者「優先採用」的折返組合為硬輪替環
+ *   （未指定時預設全優先最快）；站位等約束才改派其他／備用。
  * - `execution-order-ring-v1`：完全沒有關聯圖時才用執行順序硬輪替（相容舊資料）。
  */
 
@@ -18,6 +18,7 @@ import {
   computeRouteThroughPaths,
   emptyShiftRouteThroughAnchorsDraft,
   isThroughVerificationCurrent,
+  resolvePreferredThroughCycle,
   type RouteThroughCycle,
   type ShiftRouteThroughAnchorsDraft,
 } from '../routeRelationThroughCycles';
@@ -64,18 +65,11 @@ function occupancySeconds(route: ShiftScheduleSelectedRoute): number {
   return resolvePassengerRouteOccupancy(route)?.occupancySeconds ?? 0;
 }
 
-function pickCanonicalCycle(cycles: RouteThroughCycle[]): RouteThroughCycle | null {
-  if (cycles.length === 0) return null;
-  const priorityOnly = cycles.filter((item) => item.secondaryCount === 0);
-  const pool = priorityOnly.length > 0 ? priorityOnly : [];
-  // 圖模式只採全優先；若無全優先則不建圖策略（由呼叫端退回 ring）
-  if (pool.length === 0) return null;
-  return [...pool].sort((a, b) => {
-    if (a.minCycleSeconds !== b.minCycleSeconds) {
-      return a.minCycleSeconds - b.minCycleSeconds;
-    }
-    return a.id.localeCompare(b.id);
-  })[0] ?? null;
+function pickCanonicalCycle(
+  cycles: RouteThroughCycle[],
+  preferredThroughCycleId?: string | null,
+): RouteThroughCycle | null {
+  return resolvePreferredThroughCycle(cycles, preferredThroughCycleId);
 }
 
 function buildRingPolicy(
@@ -172,8 +166,10 @@ export function buildRouteSuccessorPolicy(input: {
     graph,
     minimumRecoveryTimeSeconds: recovery,
   });
-  const priorityCycles = throughCycles.filter((item) => item.secondaryCount === 0);
-  const canonical = pickCanonicalCycle(priorityCycles);
+  const canonical = pickCanonicalCycle(
+    throughCycles,
+    anchors.preferredThroughCycleId,
+  );
   if (!canonical || canonical.instanceIds.length === 0) {
     return buildInvalidGraphPolicy(routes, 'NO_PRIORITY_THROUGH_PATH');
   }
@@ -188,7 +184,7 @@ export function buildRouteSuccessorPolicy(input: {
     return buildInvalidGraphPolicy(routes, 'THROUGH_PATH_ROUTE_MISSING');
   }
 
-  // 只沿鎖定組合建優先繼任；次要連線不進入排班走法
+  // 只沿「優先採用」組合建硬繼任；其他組合僅供約束改派／診斷
   const prioritySuccessors = new Map<string, string[]>();
   for (let i = 0; i < canonical.instanceIds.length - 1; i += 1) {
     const from = canonical.instanceIds[i]!;
@@ -238,7 +234,7 @@ export function buildRouteSuccessorPolicy(input: {
     startInstanceIds: canonicalFirstStarts,
     endInstanceIds,
     canonicalCycleInstanceIds: [...canonical.instanceIds],
-    throughCycles: priorityCycles,
+    throughCycles,
   };
 }
 
@@ -448,13 +444,18 @@ export function estimatePolicyCycleSeconds(
   return total;
 }
 
-/** 鎖定全優先組合的最快一輪秒數；無圖模式時回傳 null */
+/** 鎖定「優先採用」組合的一輪秒數；無圖模式時回傳 null */
 export function resolveLockedRotationMinSeconds(
   policy: RouteSuccessorPolicy,
 ): number | null {
   if (policy.algorithm !== ROUTE_SUCCESSOR_ALGORITHM_GRAPH) return null;
-  const canonical = pickCanonicalCycle(policy.throughCycles);
-  return canonical?.minCycleSeconds ?? null;
+  const ids = policy.canonicalCycleInstanceIds;
+  const matched = policy.throughCycles.find(
+    (cycle) =>
+      cycle.instanceIds.length === ids.length
+      && cycle.instanceIds.every((id, index) => id === ids[index]),
+  );
+  return matched?.minCycleSeconds ?? null;
 }
 
 export function routeAssignmentAlgorithmId(

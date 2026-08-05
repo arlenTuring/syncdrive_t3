@@ -117,6 +117,7 @@ describe('buildRouteSuccessorPolicy', () => {
         endInstanceIds: [],
         verifiedFingerprint: null,
         verifiedPathCount: 0,
+        preferredThroughCycleId: null,
       },
       minimumRecoveryTimeSeconds: 30,
     });
@@ -151,6 +152,7 @@ describe('buildRouteSuccessorPolicy', () => {
       endInstanceIds: [],
       verifiedFingerprint: null,
       verifiedPathCount: 0,
+      preferredThroughCycleId: null,
     };
     anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
       startStationIds: anchors.startStationIds,
@@ -169,13 +171,13 @@ describe('buildRouteSuccessorPolicy', () => {
     });
 
     expect(policy.algorithm).toBe(ROUTE_SUCCESSOR_ALGORITHM_GRAPH);
-    // 全優先 A→B 為鎖定組合；含次要的 A→D 不進排班
+    // 未指定偏好時鎖定全優先 A→B；含次要的 A→D 仍列在診斷用 throughCycles
     expect(policy.canonicalCycleInstanceIds).toEqual(['A', 'B']);
     expect(policy.rotationRoutes.map((r) => r.routeId)).toEqual(['A', 'B']);
-    expect(policy.throughCycles.every((c) => c.secondaryCount === 0)).toBe(true);
+    expect(policy.throughCycles.some((c) => c.secondaryCount === 0)).toBe(true);
     expect(resolveStartInstanceId(policy)).toBe('A');
     expect(resolveNextInstanceId(policy, 'A')?.instanceId).toBe('B');
-    // 次要連線不再作為排班走法
+    // 次要連線不再作為排班走法（未指定偏好時）
     expect(resolveNextInstanceId(policy, 'A', { allowSecondary: true })?.instanceId).toBe('B');
     expect(resolveNextInstanceId(policy, 'A', { allowSecondary: true })?.kind).toBe(
       'priority',
@@ -185,5 +187,45 @@ describe('buildRouteSuccessorPolicy', () => {
     expect(routeAssignmentAlgorithmId(policy)).toBe(
       'route-assignment-relation-graph-v1',
     );
+  });
+
+  it('honors preferredThroughCycleId even when the path uses secondary links', () => {
+    const anchors: ShiftRouteThroughAnchorsDraft = {
+      startStationIds: ['P1'],
+      endStationIds: ['P1', 'P2'],
+      startInstanceIds: [],
+      endInstanceIds: [],
+      verifiedFingerprint: null,
+      verifiedPathCount: 0,
+      preferredThroughCycleId: null,
+    };
+    anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
+      startStationIds: anchors.startStationIds,
+      endStationIds: anchors.endStationIds,
+      routes,
+      graph,
+      minimumRecoveryTimeSeconds: 30,
+    });
+    anchors.verifiedPathCount = 2;
+    const probing = buildRouteSuccessorPolicy({
+      routes,
+      graph,
+      throughAnchors: anchors,
+      minimumRecoveryTimeSeconds: 30,
+    });
+    const secondary = probing.throughCycles.find((cycle) => cycle.secondaryCount > 0);
+    expect(secondary == null).toBe(false);
+    anchors.preferredThroughCycleId = secondary!.id;
+
+    const policy = buildRouteSuccessorPolicy({
+      routes,
+      graph,
+      throughAnchors: anchors,
+      minimumRecoveryTimeSeconds: 30,
+    });
+
+    expect(policy.algorithm).toBe(ROUTE_SUCCESSOR_ALGORITHM_GRAPH);
+    expect(policy.canonicalCycleInstanceIds).toEqual(secondary!.instanceIds);
+    expect(resolveNextInstanceId(policy, 'A')?.instanceId).toBe('D');
   });
 });

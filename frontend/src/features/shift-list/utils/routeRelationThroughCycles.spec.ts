@@ -6,6 +6,7 @@ import {
   collectThroughStationOptions,
   computeRouteThroughPaths,
   isThroughVerificationCurrent,
+  resolvePreferredThroughCycle,
 } from './routeRelationThroughCycles';
 import type { ShiftRouteRelationGraph } from './routeRelationGraph';
 
@@ -192,6 +193,7 @@ describe('through verification fingerprint gate', () => {
           endInstanceIds: [],
           verifiedFingerprint: fingerprint,
           verifiedPathCount: 1,
+          preferredThroughCycleId: null,
         },
         routes,
         graph,
@@ -207,6 +209,7 @@ describe('through verification fingerprint gate', () => {
           endInstanceIds: [],
           verifiedFingerprint: fingerprint,
           verifiedPathCount: 1,
+          preferredThroughCycleId: null,
         },
         routes,
         graph,
@@ -222,11 +225,65 @@ describe('through verification fingerprint gate', () => {
           endInstanceIds: [],
           verifiedFingerprint: fingerprint,
           verifiedPathCount: 0,
+          preferredThroughCycleId: null,
         },
         routes,
         graph,
         minimumRecoveryTimeSeconds: 30,
       }),
     ).toBe(false);
+  });
+});
+
+describe('resolvePreferredThroughCycle', () => {
+  const cycles = [
+    {
+      id: 'slow-priority',
+      instanceIds: ['A', 'B'],
+      labels: ['A', 'B'],
+      startStationId: 's1',
+      startStationName: 's1',
+      endStationId: 's2',
+      endStationName: 's2',
+      hopCount: 2,
+      secondaryCount: 0,
+      linkKinds: ['priority' as const],
+      minTravelSeconds: 100,
+      avgTravelSeconds: 110,
+      dwellSeconds: 10,
+      switchBufferSeconds: 0,
+      recoverySeconds: 30,
+      minCycleSeconds: 200,
+      avgCycleSeconds: 220,
+    },
+    {
+      id: 'fast-secondary',
+      instanceIds: ['A', 'D'],
+      labels: ['A', 'D'],
+      startStationId: 's1',
+      startStationName: 's1',
+      endStationId: 's3',
+      endStationName: 's3',
+      hopCount: 2,
+      secondaryCount: 1,
+      linkKinds: ['secondary' as const],
+      minTravelSeconds: 80,
+      avgTravelSeconds: 90,
+      dwellSeconds: 10,
+      switchBufferSeconds: 0,
+      recoverySeconds: 30,
+      minCycleSeconds: 150,
+      avgCycleSeconds: 160,
+    },
+  ];
+
+  it('defaults to fastest full-priority cycle', () => {
+    expect(resolvePreferredThroughCycle(cycles, null)?.id).toBe('slow-priority');
+  });
+
+  it('honors explicit preferred id including secondary', () => {
+    expect(resolvePreferredThroughCycle(cycles, 'fast-secondary')?.id).toBe(
+      'fast-secondary',
+    );
   });
 });
