@@ -1278,6 +1278,7 @@ describe('rotation cycle completion（來回約束）', () => {
       passengerTimetableMode: 'template',
     });
 
+    // 末站後接充電 ≠ 繼續佔正線末站；此情境仍應可完成來回
     assert.equal(result.report.ok, true);
     assert.ok(result.plan);
 
@@ -2325,6 +2326,118 @@ describe('cycle pulse vehicle assignment regressions', () => {
       '行前出場 T 應對齊 TN（t3 起點），而非被脈衝鎖死在 NT',
     );
     assert.ok(firstPassenger!.plannedStartMinute >= 60);
+  });
+
+  it('after 行前 with only 機動 (no 正線), does not hang passenger toward exit', () => {
+    const down = {
+      ...passengerRoute('r-nt', 'NT', 260, 200, 1, 40),
+      stationIds: ['p1', 't3'],
+      stationDwells: [
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 0 },
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'down',
+    };
+    const up = {
+      ...passengerRoute('r-tn', 'TN', 260, 200, 2, 40),
+      stationIds: ['t3', 'p1'],
+      stationDwells: [
+        { stationId: 't3', stationName: 'T3', dwellSeconds: 0 },
+        { stationId: 'p1', stationName: 'P1', dwellSeconds: 40 },
+      ],
+      serviceDirectionId: 'up',
+    };
+    const body = {
+      editorVersion: 1,
+      vehicleCapacity: 70,
+      scheduleRowCount: 1,
+      attributes: [{
+        id: 'attr-600',
+        name: '離峰',
+        color: '#0f0',
+        headwaySeconds: 600,
+        capacityPphpd: 420,
+        isDraft: false,
+      }],
+      intervals: [{
+        id: 'slot-night',
+        attributeId: 'attr-600',
+        name: '凌晨',
+        startTime: '01:00',
+        endTime: '02:00',
+        isDraft: false,
+      }],
+      tasks: [
+        {
+          id: 'insp-1',
+          rowIndex: 1,
+          taskType: 'inspection' as const,
+          startMinute: 30,
+          durationMinutes: 20,
+          label: '行前',
+        },
+        {
+          id: 'sb-1',
+          rowIndex: 1,
+          taskType: 'standby' as const,
+          startMinute: 60,
+          durationMinutes: 60,
+          label: '機動',
+        },
+      ],
+    };
+
+    const result = generateShiftSchedule({
+      draft: buildDraft({
+        routeGroups: {
+          mapId: 'map-1',
+          selectedRoutes: [down, up],
+          minimumRecoveryTimeSeconds: 30,
+        },
+        maintenanceTask: {
+          skipped: false,
+          taskId: 'MT-1',
+          taskName: '整備',
+          entrySlackBySection: {
+            maintenance: 0,
+            charging: 0,
+            carWash: 0,
+            preTrip: 0,
+            mobile: 0,
+          },
+        },
+      }),
+      templateBody: body,
+      maintenanceTaskBody: {
+        preTrip: {
+          stepEnabled: true,
+          equipmentRows: [{ id: 'fac-m1', mapCode: 'M1' }],
+        },
+      },
+      firstTripOrigins: [{
+        stationId: 't3',
+        label: 'T3',
+        deadheadSeconds: 0,
+        facilityNodeIds: ['fac-m1'],
+        facilityLabels: ['M1'],
+      }],
+      passengerTimetableMode: 'template',
+    });
+
+    const passengerBars = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks
+      .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar');
+    assert.equal(
+      passengerBars.length,
+      0,
+      '純機動列不應為了行前出場對齊而掛正線（不必特地跑向 N2W／T 出場方向）',
+    );
+    const standby = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks
+      .find((block) => block.taskType === 'standby');
+    assert.ok(standby, '應保留機動視窗');
   });
 
   it('yields an already-placed same-direction trip so a yard-exit car can take the pulse', () => {

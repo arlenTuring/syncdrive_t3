@@ -57,6 +57,8 @@ const MEDIA_FIELD_WIDTH_CLASS = 'w-[168px]';
 const MENU_PANEL_WIDTH = 160;
 const menuPanelClass =
   'absolute flex max-h-[312px] flex-col items-stretch overflow-hidden rounded-lg bg-[#18181B] py-1 shadow-lg shadow-black/40';
+const menuListClass =
+  'flex max-h-[304px] w-full flex-col items-stretch overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]';
 
 function menuOptionClass(active: boolean, disabled = false) {
   return [

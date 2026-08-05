@@ -17,6 +17,7 @@ import {
   resolveFleetPhysicalHeadwayFloorSeconds,
   resolveRouteMinTurnaroundBudgetSeconds,
   resolveRouteRotationMinSeconds,
+  routesShareTurnaroundStation,
 } from './physics';
 import type {
   FeasibilityIssue,
@@ -30,6 +31,10 @@ import {
   resolveBlockStationDepartureFeasibility,
   resolveRouteForBlock,
 } from '../buildBlockStationDepartures';
+import {
+  collectStationBerthOccupancies,
+  findStationBerthCollisions,
+} from '../stationBerthOccupancy';
 import {
   ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
   resolveNextInstanceId,
@@ -444,10 +449,16 @@ export function validateRouteSwitchBuffers(
 ): void {
   const routesForRecovery =
     rotationRoutes.length > 0 ? rotationRoutes : [...routeById.values()];
+  // 連續性解析須含備用（站位約束可能改派）；輪替／恢復空檔仍用主路線環
+  const continuityByInstance = new Map<string, ShiftScheduleSelectedRoute>();
+  for (const route of [...routeById.values(), ...routesForRecovery]) {
+    continuityByInstance.set(resolveSelectedRouteInstanceId(route), route);
+  }
+  const routesForContinuity = [...continuityByInstance.values()];
   if (successorPolicy) {
     validateRouteSuccessorContinuity(
       timelines,
-      routesForRecovery,
+      routesForContinuity,
       errors,
       successorPolicy,
     );
@@ -541,6 +552,21 @@ function shouldIncludeRecoveryForTimelineSuccessor(
   if (previousIndex < 0 || nextIndex < 0 || rotationRoutes.length <= 1) return true;
   if (nextIndex !== (previousIndex + 1) % rotationRoutes.length) return true;
   return nextIndex === 0;
+}
+
+function isBackupOfExpectedInstance(
+  nextRoute: ShiftScheduleSelectedRoute,
+  expectedInstanceId: string,
+  routes: ShiftScheduleSelectedRoute[],
+): boolean {
+  const byInstance = nextRoute.backupForInstanceId?.trim();
+  if (byInstance && byInstance === expectedInstanceId) return true;
+  const byRouteId = nextRoute.backupForRouteId?.trim();
+  if (!byRouteId) return false;
+  const expected = routes.find(
+    (route) => resolveSelectedRouteInstanceId(route) === expectedInstanceId,
+  );
+  return Boolean(expected && byRouteId === expected.routeId);
 }
 
 function resolveBlockRouteInstance(args: {
@@ -668,7 +694,21 @@ export function validateRouteSuccessorContinuity(
           % orderedInstanceIds.length
         ];
 
-      if (!expectedInstanceId || expectedInstanceId !== nextInstanceId) {
+      const successorMatchesExpected =
+        Boolean(expectedInstanceId)
+        && (
+          expectedInstanceId === nextInstanceId
+          || (
+            isBackupOfExpectedInstance(
+              nextRoute,
+              expectedInstanceId!,
+              selectedRoutes,
+            )
+            && routesShareTurnaroundStation(currentRoute, nextRoute)
+          )
+        );
+
+      if (!successorMatchesExpected) {
         pushIssue(errors, {
           code: 'ROUTE_SUCCESSOR_MISMATCH',
           severity: 'error',
@@ -776,6 +816,61 @@ export function validateStationTimingsWithinBlocks(
         },
       });
     }
+  }
+}
+
+const MAX_BERTH_COLLISION_REPORTS = 40;
+
+/**
+ * 硬約束：不同車不得同時佔用同一停靠點（到站～離站自然區間重疊）。
+ */
+export function validateStationBerthCollisions(
+  timelines: GeneratedSchedulePlan['timelines'],
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  errors: FeasibilityIssue[],
+): void {
+  const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes);
+  const collisions = findStationBerthCollisions(occupancies, selectedRoutes);
+  let reported = 0;
+  for (const hit of collisions) {
+    if (reported >= MAX_BERTH_COLLISION_REPORTS) {
+      pushIssue(errors, {
+        code: 'STATION_BERTH_COLLISION',
+        severity: 'error',
+        kind: 'limit',
+        message:
+          `另有 ${collisions.length - reported} 處停靠點站位碰撞未逐條列出（共 ${collisions.length} 處）`,
+        detail: { totalCollisions: collisions.length, reported },
+      });
+      break;
+    }
+    const earlierLabel =
+      `${hit.earlier.routeCode ?? '正線'} 時間線 ${hit.earlier.timelineRow}`
+      + ` ${formatMinuteHms(hit.earlier.startMinute)}–${formatMinuteHms(hit.earlier.endMinute)}`;
+    const laterLabel =
+      `${hit.later.routeCode ?? '正線'} 時間線 ${hit.later.timelineRow}`
+      + ` ${formatMinuteHms(hit.later.startMinute)}–${formatMinuteHms(hit.later.endMinute)}`;
+    pushIssue(errors, {
+      code: 'STATION_BERTH_COLLISION',
+      severity: 'error',
+      kind: 'limit',
+      message:
+        `${hit.stationName} 站位碰撞：${earlierLabel} 與 ${laterLabel}`
+        + `（在站重疊 ${Math.round(hit.overlapSeconds)} 秒）`,
+      detail: {
+        stationId: hit.stationId,
+        stationName: hit.stationName,
+        earlierBlockId: hit.earlier.blockId,
+        laterBlockId: hit.later.blockId,
+        earlierTimelineRow: hit.earlier.timelineRow,
+        laterTimelineRow: hit.later.timelineRow,
+        overlapSeconds: hit.overlapSeconds,
+        clearanceGapSeconds: hit.clearanceGapSeconds,
+        requiredClearanceSeconds: hit.requiredClearanceSeconds,
+        blockId: hit.later.blockId,
+      },
+    });
+    reported += 1;
   }
 }
 

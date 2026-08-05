@@ -390,7 +390,7 @@
       ['dwell_seconds', '有效停靠（秒）'],
       ['trip_code', '班次代號'],
       ['block_id', 'block_id'],
-      ['timeline_row', '時間列'],
+      ['timeline_row', '車列'],
       ['route_code', '路線代號'],
       ['route_name', '路線名稱'],
       ['vehicle_id', '車輛'],
@@ -490,7 +490,7 @@
             buffer_seconds: { type: 'integer', minimum: 0, description: '緩衝秒數' },
             trip_code: { type: 'string', description: '班次代號' },
             block_id: { type: 'string', description: '引擎內部 block id' },
-            timeline_row: { type: 'integer', description: '時間列' },
+            timeline_row: { type: 'integer', description: '車列' },
             route_code: { type: ['string', 'null'], description: '路線代號' },
             route_name: { type: ['string', 'null'], description: '路線名稱' },
             vehicle_id: {
@@ -623,7 +623,7 @@
           </td>
           <td class="mono">${escapeHtml(e.trip_code)}</td>
           <td>${escapeHtml(e.route_name ?? e.route_code ?? '—')}</td>
-          <td>列 ${e.timeline_row}</td>
+          <td>車列 ${e.timeline_row}</td>
           <td class="mono">${escapeHtml(e.vehicle_id ?? '—')}</td>
           <td>
             <button type="button" class="detail-btn" data-drawer-id="${jsonId}" data-label="JSON" aria-expanded="false">JSON</button>
@@ -650,7 +650,7 @@
               <th>角色</th>
               <th>班次</th>
               <th>路線</th>
-              <th>時間線</th>
+              <th>車列</th>
               <th>車輛</th>
               <th></th>
             </tr>

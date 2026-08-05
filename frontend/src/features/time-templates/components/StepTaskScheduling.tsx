@@ -316,9 +316,9 @@ function ScheduleTaskToolbar({
       role="toolbar"
       aria-label="任務排班工具列"
     >
-      {/* 左側：整趟路線秒數 */}
-      <div className="flex items-center gap-1.5">
-        <label className="text-[11px] text-zinc-500 whitespace-nowrap">整趟路線秒數:</label>
+      {/* 左側：完整交路週期（供建議列數） */}
+      <div className="flex items-center gap-1.5" title="請填完整交路一輪秒數（含各方向與折返），不是單線。建議列數＝ceil(此值÷班距)；短時段會再建議多 1 列。">
+        <label className="text-[11px] text-zinc-500 whitespace-nowrap">完整交路秒數:</label>
         <input
           type="number"
           min={1}
@@ -331,7 +331,7 @@ function ScheduleTaskToolbar({
           className="h-[26px] w-[72px] rounded-md border border-zinc-700/60 bg-zinc-900/80 px-2 text-center text-[11px] tabular-nums text-zinc-200 outline-none focus:border-zinc-500"
           placeholder="600"
         />
-        <span className="text-[10px] text-zinc-600 whitespace-nowrap">秒（參考用）</span>
+        <span className="text-[10px] text-zinc-600 whitespace-nowrap">秒（建議列數用）</span>
       </div>
 
       {/* 右側：操作按鈕群組 */}

@@ -6,7 +6,16 @@ function parsePositiveMinutesString(raw: string | undefined): number | null {
   return Number.parseInt(raw, 10) * 60;
 }
 
-/** 從整備任務 body 解析各模板任務類型的預估占用秒數（不含路線行駛）。 */
+/**
+ * 從整備任務 body 解析各模板任務類型的預估占用秒數（不含路線行駛）。
+ *
+ * 回傳 null → expand 改用時間模板橫條時長。
+ *
+ * 行前／充電／保養：班表占用以模板橫條為準。整備任務裡的「單次作業時長」
+ * 僅供任務說明；不可拿來把橫條尾巴砍短（正線讓渡餘裕只可吃「下一段整備開頭」）。
+ *
+ * 機動：預設跟模板（durationFollowTemplate !== false）；僅手動關閉跟隨時才用作業時長。
+ */
 export function resolveMaintenanceOccupancySeconds(
   taskType: TaskTypeKey,
   maintenanceBody: Record<string, unknown> | null | undefined,
@@ -14,16 +23,8 @@ export function resolveMaintenanceOccupancySeconds(
   if (!maintenanceBody) return null;
 
   if (taskType === 'inspection') {
-    const preTrip =
-      maintenanceBody.preTrip && typeof maintenanceBody.preTrip === 'object'
-        ? (maintenanceBody.preTrip as Record<string, unknown>)
-        : null;
-    if (!preTrip || preTrip.stepEnabled === false) return null;
-    return parsePositiveMinutesString(
-      typeof preTrip.operationDurationMinutes === 'string'
-        ? preTrip.operationDurationMinutes
-        : undefined,
-    );
+    // 一律跟時間模板橫條；勿用 operationDurationMinutes 覆蓋班表長度
+    return null;
   }
 
   if (taskType === 'standby') {

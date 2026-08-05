@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>班次 · 時間列</title>
+  <title>班次 · 車列</title>
   <style>
     :root {
       --bg: #121516;
@@ -103,19 +103,71 @@
       font-family: ui-monospace, Menlo, monospace;
     }
 
-    .trip { border-bottom: 1px solid var(--border); }
-    .trip:last-child { border-bottom: 0; }
-    .trip-head {
-      padding: 12px 16px;
-      background: #141a1c;
-      border-bottom: 1px solid #24302c;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 12px 16px;
-      align-items: start;
+    .trip-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
     }
-    .trip-head-actions {
-      display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+    .trip-table > thead > tr > th {
+      position: sticky; top: 0; z-index: 1;
+      padding: 10px 12px;
+      color: var(--muted);
+      background: #14191b;
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .trip-table > tbody > tr > td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #2a3330;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .trip-summary-row td.mono {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    .trip-code {
+      font-weight: 800;
+      color: #9ceed0;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    .trip-actions {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      white-space: nowrap;
+    }
+    .trip-body-cell {
+      padding: 0 !important;
+      background: #12181a;
+    }
+    .trip-body-cell[hidden],
+    .trip-json-cell[hidden] { display: none; }
+    .trip-json-cell {
+      padding: 0 !important;
+      background: #101416;
+    }
+    .station-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .station-table th,
+    .station-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #2a3330;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .station-table th {
+      color: var(--muted);
+      background: #101616;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .station-table .mono {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, Menlo, monospace;
     }
     .field-list {
       width: 100%;
@@ -144,31 +196,6 @@
       word-break: break-word;
     }
     .field-list td.null { color: #667772; }
-    .station-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 12px 14px 16px;
-      background: #12181a;
-    }
-    .station-card {
-      border: 1px solid #2a3531;
-      border-radius: 10px;
-      background: #141a1c;
-      overflow: hidden;
-    }
-    .station-card-head {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid #24302c;
-      background: #101616;
-    }
-    .station-card-title {
-      margin: 0; font-size: 0.92rem; font-weight: 700; color: #9ceed0;
-    }
-    .trip-code { font-size: 1.05rem; font-weight: 800; color: #9ceed0; margin: 0; }
-    .trip-meta { color: var(--muted); font-size: 0.82rem; }
     .trip-toggle {
       appearance: none; border: 1px solid #3c5248; border-radius: 999px;
       background: #15201c; color: #9fd9bc; font: inherit; font-size: 0.75rem;
@@ -177,9 +204,6 @@
     .trip-toggle[aria-expanded="true"] {
       background: rgba(66,185,131,0.18); border-color: var(--accent); color: #9ceed0;
     }
-    .trip-body[hidden] { display: none; }
-    .trip-json-wrap { background: #101416; border-bottom: 1px solid #24302c; }
-    .trip-json-wrap[hidden] { display: none; }
     .fold-bar {
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
       margin-top: 10px;
@@ -189,10 +213,6 @@
       margin-top: 10px;
     }
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid #2a3330; text-align: left; vertical-align: top; }
-    th { color: var(--muted); background: #14191b; font-weight: 600; }
-    tr:last-child td { border-bottom: 0; }
     .tag {
       display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
       border: 1px solid #3c5248; color: #9fd9bc;
@@ -206,10 +226,8 @@
       background: rgba(66,185,131,0.18); border-color: var(--accent); color: #9ceed0;
     }
     .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-    tr.detail-row td { padding: 0; background: #101416; }
-    tr.detail-row[hidden],
-    .detail-row[hidden] { display: none; }
-    .station-card > .detail-row { border-top: 1px solid #24302c; background: #101416; }
+    tr.detail-row > td { padding: 0; background: #101416; }
+    tr.detail-row[hidden] { display: none; }
     .detail-box { padding: 14px 16px 16px; }
     .detail-title {
       margin: 0 0 10px; font-size: 0.78rem; color: var(--muted); font-weight: 700;
@@ -291,8 +309,8 @@
     <div class="page-nav">
       <button id="btnBack" class="secondary" type="button">← 上一頁</button>
     </div>
-    <h1>班次 · 時間列</h1>
-    <p class="lead">頁籤為時間列。班次以欄位清單呈現，預設收合；展開後站序也是欄位清單，再按「JSON」看完整欄位／原始 JSON。</p>
+    <h1>班次 · 車列</h1>
+    <p class="lead">頁籤為車列。班次以橫列摘要呈現，預設收合；展開後看站序橫列，再按「JSON」看完整欄位。</p>
 
     <div class="panel">
       <div class="row">
@@ -333,8 +351,9 @@
     const TRIP_FIELDS = [
       ['trip_code', '班次代號'],
       ['block_id', 'block_id'],
-      ['timeline_row', '時間列'],
+      ['timeline_row', '車列'],
       ['task_type', '任務類型'],
+      ['label', '任務名稱'],
       ['source', '來源'],
       ['route_id', '路線 ID'],
       ['route_code', '路線代號'],
@@ -414,7 +433,8 @@
           properties: {
             trip_code: { type: 'string', description: '班次代號（路線代號＋HHMM）' },
             block_id: { type: 'string', description: '引擎內部 block id' },
-            timeline_row: { type: 'integer', description: '時間列索引' },
+            timeline_row: { type: 'integer', description: '車列索引' },
+            label: { type: ['string', 'null'], description: '任務顯示名' },
             task_type: { type: 'string', description: '任務類型（如 passenger）' },
             source: { type: 'string', description: '條來源（如 template_bar）' },
             route_id: { type: ['string', 'null'], description: '路線 ID' },
@@ -553,6 +573,19 @@
       });
     }
 
+    function taskTypeLabel(taskType) {
+      const map = {
+        passenger: '正線',
+        charging: '充電',
+        inspection: '行前',
+        standby: '機動',
+        servicing: '保養',
+        dispatch: '調度',
+        idle: '空檔',
+      };
+      return map[taskType] || taskType || '—';
+    }
+
     function groupByTimelineRow(trips) {
       const map = new Map();
       for (const trip of trips) {
@@ -570,14 +603,14 @@
     }
 
     function setTripExpanded(tripEl, expanded) {
-      const body = tripEl.querySelector('.trip-body');
+      const body = tripEl.querySelector('.trip-body-cell');
       const toggle = tripEl.querySelector('.trip-toggle');
       if (!body || !toggle) return;
       body.hidden = !expanded;
       toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       toggle.textContent = expanded ? '收合' : '展開';
       if (!expanded) {
-        tripEl.querySelectorAll('.detail-row, .trip-json-wrap').forEach((row) => {
+        tripEl.querySelectorAll('.detail-row, .trip-json-cell').forEach((row) => {
           row.hidden = true;
         });
         tripEl.querySelectorAll('.detail-btn').forEach((btn) => {
@@ -589,7 +622,7 @@
 
     function setAllTripsExpanded(expanded, root = document) {
       const scope = root.querySelector('.tab-panel.active') || root;
-      scope.querySelectorAll('article.trip').forEach((tripEl) => {
+      scope.querySelectorAll('tbody.trip').forEach((tripEl) => {
         setTripExpanded(tripEl, expanded);
       });
     }
@@ -597,7 +630,7 @@
     function bindTripFolds(root) {
       root.querySelectorAll('.trip-toggle').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const tripEl = btn.closest('article.trip');
+          const tripEl = btn.closest('tbody.trip');
           if (!tripEl) return;
           const open = btn.getAttribute('aria-expanded') !== 'true';
           setTripExpanded(tripEl, open);
@@ -614,55 +647,66 @@
     function renderTrip(trip, rowIndex, tripIndex) {
       const tripJsonId = `t-json-${rowIndex}-${tripIndex}`;
       const stationCount = (trip.stations || []).length;
-      const summaryList = renderFieldList([
-        { label: '班次代號', value: trip.trip_code },
-        { label: '路線', value: trip.route_name ?? trip.route_code ?? null },
-        { label: '時間', value: `${trip.card_start} → ${trip.card_end}` },
-        { label: '站數', value: `${stationCount} 站` },
-        { label: '來源', value: trip.source },
-        { label: '時間列', value: trip.timeline_row },
-      ]);
-
-      const stationCards = (trip.stations || []).map((s, j) => {
+      const stationRows = (trip.stations || []).map((s, j) => {
         const jsonId = `s-json-${rowIndex}-${tripIndex}-${j}`;
         const departOrComplete = s.departure ?? s.dwell_complete;
         return `
-          <article class="station-card">
-            <div class="station-card-head">
-              <h4 class="station-card-title">#${s.order} ${escapeHtml(s.station_name)} · ${roleLabel(s.role)}</h4>
+          <tr>
+            <td>${s.order}</td>
+            <td>${escapeHtml(s.station_name)}<div class="trip-meta mono" style="color:var(--muted);font-size:0.75rem">${escapeHtml(s.station_id)}</div></td>
+            <td><span class="tag">${roleLabel(s.role)}</span></td>
+            <td class="mono">${escapeHtml(s.arrival ?? '—')}</td>
+            <td class="mono">${escapeHtml(departOrComplete ?? '—')}</td>
+            <td class="mono">${s.base_dwell_seconds ?? 0}s</td>
+            <td class="mono">${s.dwell_seconds ?? 0}s</td>
+            <td class="mono">${s.travel_to_next_seconds == null ? '—' : `${s.travel_to_next_seconds}s`}</td>
+            <td>
               <button type="button" class="detail-btn" data-drawer-id="${jsonId}" data-label="JSON" aria-expanded="false">JSON</button>
-            </div>
-            ${renderFieldList([
-              { label: '站點 ID', value: s.station_id },
-              { label: '角色', value: roleLabel(s.role) },
-              { label: '抵達', value: s.arrival },
-              { label: '出發／靠站完成', value: departOrComplete },
-              { label: '靠站', value: `${s.base_dwell_seconds ?? 0}s` },
-              { label: '有效停靠', value: `${s.dwell_seconds ?? 0}s` },
-              { label: '行駛至下站', value: s.travel_to_next_seconds == null ? null : `${s.travel_to_next_seconds}s` },
-            ])}
-            <div class="detail-row" id="${jsonId}" hidden>
-              ${renderDataBox('站點', s, STATION_FIELDS)}
-            </div>
-          </article>`;
+            </td>
+          </tr>
+          <tr class="detail-row" id="${jsonId}" hidden>
+            <td colspan="9">${renderDataBox('站點', s, STATION_FIELDS)}</td>
+          </tr>`;
       }).join('');
 
       return `
-        <article class="trip">
-          <div class="trip-head">
-            <div class="trip-summary">${summaryList}</div>
-            <div class="trip-head-actions">
-              <button type="button" class="trip-toggle" aria-expanded="false">展開</button>
+        <tbody class="trip">
+          <tr class="trip-summary-row">
+            <td>
+              <div class="trip-actions">
+                <button type="button" class="trip-toggle" aria-expanded="false">展開</button>
+              </div>
+            </td>
+            <td class="trip-code">${escapeHtml(trip.trip_code)}</td>
+            <td><span class="tag">${escapeHtml(taskTypeLabel(trip.task_type))}</span></td>
+            <td>${escapeHtml(trip.route_name ?? trip.label ?? trip.route_code ?? '—')}</td>
+            <td class="mono">${escapeHtml(trip.card_start)} → ${escapeHtml(trip.card_end)}</td>
+            <td class="mono">${stationCount}</td>
+            <td>${escapeHtml(trip.source)}</td>
+            <td class="mono">${escapeHtml(String(trip.timeline_row))}</td>
+            <td>
               <button type="button" class="detail-btn" data-drawer-id="${tripJsonId}" data-label="JSON" aria-expanded="false">JSON</button>
-            </div>
-          </div>
-          <div class="trip-json-wrap" id="${tripJsonId}" hidden>
-            ${renderDataBox('班次', trip, TRIP_FIELDS)}
-          </div>
-          <div class="trip-body" hidden>
-            <div class="station-list">${stationCards}</div>
-          </div>
-        </article>`;
+            </td>
+          </tr>
+          <tr class="trip-json-cell" id="${tripJsonId}" hidden>
+            <td colspan="9">${renderDataBox('班次', trip, TRIP_FIELDS)}</td>
+          </tr>
+          <tr class="trip-body-cell" hidden>
+            <td colspan="9">
+              ${stationCount === 0
+                ? '<p class="empty" style="margin:0;padding:16px">此任務無站序（整備／充電／行前等佔窗任務）。</p>'
+                : `<table class="station-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>站點</th><th>角色</th><th>抵達</th><th>出發／靠站完成</th>
+                    <th>靠站</th><th>有效停靠</th><th>行駛至下站</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>${stationRows}</tbody>
+              </table>`}
+            </td>
+          </tr>
+        </tbody>`;
     }
 
     function render(payload) {
@@ -676,20 +720,37 @@
       const tabButtons = groups.map((g) => `
         <button type="button" class="tab-btn" data-row-id="${g.timeline_row}"
           aria-selected="${g.timeline_row === firstRow ? 'true' : 'false'}">
-          時間列 ${g.timeline_row}<span class="count">${g.trip_count}</span>
+          車列 ${g.timeline_row}<span class="count">${g.trip_count}</span>
         </button>`).join('');
 
       const panels = groups.map((g, rowIndex) => `
         <div class="tab-panel${g.timeline_row === firstRow ? ' active' : ''}" data-row-id="${g.timeline_row}">
           <div class="row-head">
-            <h2 class="row-title">時間列 ${g.timeline_row}</h2>
+            <h2 class="row-title">車列 ${g.timeline_row}</h2>
             <p class="row-sub">${g.trip_count} 班 · 預設收合</p>
             <div class="row-head-actions">
               <button type="button" class="secondary" data-expand-all>全部展開</button>
               <button type="button" class="secondary" data-collapse-all>全部收合</button>
             </div>
           </div>
-          ${g.trips.map((trip, tripIndex) => renderTrip(trip, rowIndex, tripIndex)).join('')}
+          <div style="overflow-x:auto">
+            <table class="trip-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>班次代號</th>
+                  <th>任務</th>
+                  <th>路線／名稱</th>
+                  <th>時間</th>
+                  <th>站數</th>
+                  <th>來源</th>
+                  <th>車列</th>
+                  <th></th>
+                </tr>
+              </thead>
+              ${g.trips.map((trip, tripIndex) => renderTrip(trip, rowIndex, tripIndex)).join('')}
+            </table>
+          </div>
         </div>`).join('');
 
       $('result').innerHTML = `
@@ -714,7 +775,7 @@
       box.hidden = false;
       box.innerHTML = `
         <div><span>班表</span><br>${escapeHtml(m.name || '—')}</div>
-        <div><span>時間列數</span><br>${groups.length}</div>
+        <div><span>車列數</span><br>${groups.length}</div>
         <div><span>班次數</span><br>${payload.trip_count ?? (payload.trips || []).length}</div>
         <div><span>時間窗</span><br>${escapeHtml(f.from || '—')} ~ ${escapeHtml(f.to || '—')}</div>
       `;

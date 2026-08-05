@@ -11,7 +11,13 @@ import {
 } from '../emptyAttributeIntervals';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
-import { buildYardRotationExitByTaskType } from '../maintenancePostTaskPolicy';
+import {
+  buildYardRotationExitByTaskType,
+  isStandbyDispatchableForMainline,
+  shouldApplyYardExitRotationAlign,
+} from '../maintenancePostTaskPolicy';
+import { resolveRouteClearanceInsertGapSeconds } from '../stationClearanceInsert';
+import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
 import type { TaskTypeKey } from '../../../time-templates/types/editor';
 import {
   sortSelectedRoutesByExecutionOrder,
@@ -74,7 +80,10 @@ export type EngineInput = {
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
   passengerRoutes: ShiftScheduleSelectedRoute[];
+  /** 主路線（輪替／班距）；不含備用 */
   selectedRoutes: ShiftScheduleSelectedRoute[];
+  /** Step 4 備用路線（站位約束改派用；不進輪替） */
+  backupRoutes: ShiftScheduleSelectedRoute[];
   maintenanceBody: Record<string, unknown> | null;
   maintenanceEntrySlackBySection: MaintenanceEntrySlackBySection;
   emptyIntervalMainlineSlackSeconds: number;
@@ -156,6 +165,40 @@ type PlannedCycleLeg = {
   occupancySeconds: number;
   endSecond: number;
 };
+
+/**
+ * 整輪各腿相對已掛同向班次，是否都滿足目標班距（含過去與未來）。
+ * 過往只擋「候選發車之前」，且未來只守物理地板 → 會允許 ~20s 級同向重疊。
+ */
+function cycleViolatesSameRouteHeadway(args: {
+  legs: PlannedCycleLeg[];
+  trackedLegs: TrackedPassengerLeg[];
+  requiredHeadwayFor: (
+    route: ShiftScheduleSelectedRoute,
+    leg: PlannedCycleLeg,
+    legIndex: number,
+  ) => number;
+  excludeTaskIndexes?: Set<number>;
+}): string | null {
+  const { legs, trackedLegs, requiredHeadwayFor, excludeTaskIndexes } = args;
+  for (let legIndex = 0; legIndex < legs.length; legIndex += 1) {
+    const leg = legs[legIndex]!;
+    const required = requiredHeadwayFor(leg.route, leg, legIndex);
+    if (required <= 0) continue;
+    for (const other of trackedLegs) {
+      if (excludeTaskIndexes?.has(other.taskIndex)) continue;
+      if (other.routeId !== leg.route.routeId) continue;
+      const gap = Math.abs(leg.startSecond - other.startSecond);
+      if (gap < required) {
+        return (
+          `同方向班距不足（本輪 ${leg.startSecond}s 對已掛 ${other.startSecond}s，`
+          + `間隔 ${gap}s < 目標 ${required}s）`
+        );
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * 從指定相位展開一整個合法交路。
@@ -354,10 +397,12 @@ function latestDepartureOnRoute(
  * - 正線視窗結束前開出的整輪，可在切入餘裕內占用下一整備開頭。
  * - 不得提前結束前一整備來預出車（讓渡餘裕只作用於整備開頭）。
  * - 跨入新正線視窗時，輪替對齊整輪邊界（與 assignRoutes 硬輪替一致）。
- * - 視窗前若為行前／充電／機動且拓樸有明確出場站，輪替相位對齊該站起點路線
- *   （例：行前出場 T3 → 首班 TN／TS，而非固定從執行順序第 0 條開始）。
+ * - 視窗前若為行前／充電／機動且拓樸有明確出場站，且該列之後仍有正線模板，
+ *   輪替相位才對齊該站起點路線（例：行前出場 T3 → 首班 TN／TS）。
+ *   純機動、無後續正線時不對齊、不強制跑出場方向。
  * - 班距地板只看候選發車之前的同方向班次，避免被已掛但更晚的交路中段腿卡死。
- * - 機動視窗可視為可派正線（正線優先，不代表必須占滿機動）。
+ * - 機動視窗可視為可派正線，但僅限「該機動開始後仍有正線視窗」的列
+ *   （正線優先，不代表必須占滿機動；純機動列不派正線）。
  * - 保養的最壞出場交路由展開後 insertMaintenanceEntryServiceTrips 處理。
  */
 function assignDirectionalDepartures(args: {
@@ -369,6 +414,8 @@ function assignDirectionalDepartures(args: {
   rowActiveWindows?: Map<number, ActivePassengerWindow[]>;
   /** 非正線模板任務（判斷視窗前整備類型） */
   nonPassengerTasks?: ScheduleTask[];
+  /** 全部模板任務（判斷整備後是否還有正線） */
+  templateTasks?: ScheduleTask[];
   /** 整備類型 → 出場站 stationId（行前／充電／機動） */
   yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
   /** Step 4 繼任策略；提供時以策略決定開輪相位與整輪估時 */
@@ -383,6 +430,7 @@ function assignDirectionalDepartures(args: {
     minimumRecoveryTimeSeconds,
     rowActiveWindows,
     nonPassengerTasks = [],
+    templateTasks = [],
     yardRotationExitByTaskType = {},
     successorPolicy,
     warnings,
@@ -424,15 +472,44 @@ function assignDirectionalDepartures(args: {
   };
 
   /**
+   * 行前／充電／機動後「調撥開輪」相對前車的插入間距：
+   * 衝突站靠站／離站＋遲到佔站＋緩衝％，**不用**營運班距／車隊物理地板。
+   */
+  const clearanceInsertGapSecondsForRoute = (
+    route: ShiftScheduleSelectedRoute,
+  ): number =>
+    resolveRouteClearanceInsertGapSeconds(
+      route,
+      resolveEffectiveRouteTravelSeconds(route),
+    );
+
+  const isYardExitClearanceInsert = (
+    row: number,
+    windowStartSecond: number,
+  ): boolean => {
+    const preceding = findPrecedingNonPassengerTask(
+      nonPassengerTasks,
+      row,
+      windowStartSecond,
+    );
+    if (!preceding) return false;
+    return (
+      preceding.taskType === 'inspection'
+      || preceding.taskType === 'charging'
+      || preceding.taskType === 'standby'
+    );
+  };
+
+  /**
    * 班距地板只看「候選發車之前」的同方向班次。
-   * 不可拿已掛上、但時刻更晚的交路中段腿（例如 NT 開輪後的 TN）當地板，
-   * 否則行前／機動出場要從 TN 起班時會被未來腿卡死。
+   * 行前調撥開輪改用車站清除間距；一般營運仍用目標班距。
    */
   const headwayFloorForRoute = (
     route: ShiftScheduleSelectedRoute,
     fallbackHeadwaySeconds: number,
     excludeTaskIndexes?: Set<number>,
     beforeSecond?: number,
+    options?: { clearanceInsert?: boolean },
   ): number => {
     const priorSecond =
       beforeSecond == null
@@ -448,9 +525,10 @@ function assignDirectionalDepartures(args: {
             excludeTaskIndexes,
           );
     if (priorSecond == null) return 0;
-    return snapUpToClockAlignSeconds(
-      priorSecond + requiredHeadwayForRoute(route, fallbackHeadwaySeconds),
-    );
+    const gapSeconds = options?.clearanceInsert
+      ? clearanceInsertGapSecondsForRoute(route)
+      : requiredHeadwayForRoute(route, fallbackHeadwaySeconds);
+    return snapUpToClockAlignSeconds(priorSecond + gapSeconds);
   };
 
   const findWindow = (
@@ -483,7 +561,15 @@ function assignDirectionalDepartures(args: {
     );
     if (!preceding) return 0;
     const exitStationId = yardRotationExitByTaskType[preceding.taskType];
-    if (exitStationId) {
+    const yardEndMinute = preceding.startMinute + preceding.durationMinutes;
+    if (
+      shouldApplyYardExitRotationAlign({
+        exitStationId,
+        templateTasks,
+        row,
+        yardEndMinute,
+      })
+    ) {
       if (successorPolicy) {
         const startId = resolveStartInstanceId(successorPolicy, exitStationId);
         if (!startId) return 0;
@@ -495,7 +581,7 @@ function assignDirectionalDepartures(args: {
     if (preceding.taskType === 'servicing') {
       return 0;
     }
-    // 充電／行前／機動無明確出場：延續進入整備前的輪替相位
+    // 充電／行前／機動無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;
   };
 
@@ -520,32 +606,39 @@ function assignDirectionalDepartures(args: {
       row: number,
       excludeTaskIndexes?: Set<number>,
       beforeSecond?: number,
+      windowStartSecond?: number,
     ): {
       headwayFloor: number;
       maxDelaySeconds: number;
       requiredHeadway: number;
       startRoute: ShiftScheduleSelectedRoute;
+      clearanceInsert: boolean;
     } => {
       const startRoute = passengerRoutes[resolveStartRouteIndex(row)]!;
-      const requiredHeadway = requiredHeadwayForRoute(
-        startRoute,
-        departure.headwaySeconds,
-      );
+      const clearanceInsert =
+        windowStartSecond != null
+        && isYardExitClearanceInsert(row, windowStartSecond);
+      const requiredHeadway = clearanceInsert
+        ? clearanceInsertGapSecondsForRoute(startRoute)
+        : requiredHeadwayForRoute(startRoute, departure.headwaySeconds);
       const headwayFloor = headwayFloorForRoute(
         startRoute,
         departure.headwaySeconds,
         excludeTaskIndexes,
         beforeSecond,
+        { clearanceInsert },
       );
       const hasPriorSameDirection = headwayFloor > 0;
       /**
        * 開班／該方向尚無前班：最多小幅延後 120s（避免 00:00 上行拖到 00:07:50）。
        * 營運中已有同方向前班：只要延後不跨越下一脈衝即可掛上。
+       * 行前調撥：requiredHeadway 已是清除間距（通常遠小於營運班距）。
        */
       return {
         startRoute,
         requiredHeadway,
         headwayFloor,
+        clearanceInsert,
         maxDelaySeconds: hasPriorSameDirection
           ? Math.max(0, requiredHeadway - SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS)
           : 120,
@@ -573,7 +666,12 @@ function assignDirectionalDepartures(args: {
         earliestFree,
         winAtPulse.dispatchStartSecond,
       );
-      const gate = resolveRowHeadwayGate(row, undefined, provisionalEarliest);
+      const gate = resolveRowHeadwayGate(
+        row,
+        undefined,
+        provisionalEarliest,
+        winAtPulse.startSecond,
+      );
       const startSecond = Math.max(provisionalEarliest, gate.headwayFloor);
       const delay = startSecond - departure.startSecond;
       if (delay > gate.maxDelaySeconds) {
@@ -592,31 +690,40 @@ function assignDirectionalDepartures(args: {
         return;
       }
 
-      // 僅擋下與未來同方向腿「物理過近」（車隊物理地板），避免 20s 級碰撞；
-      // 不用完整班距去擋，否則尖峰會拒掉過多合法插空並觸發讓路副作用。
+      // 整輪：開輪腿若為行前調撥用清除間距；其後各腿仍守營運班距。
+      const headwayForLeg = (
+        route: ShiftScheduleSelectedRoute,
+        _leg: PlannedCycleLeg,
+        legIndex: number,
+      ) =>
+        gate.clearanceInsert && legIndex === 0
+          ? clearanceInsertGapSecondsForRoute(route)
+          : requiredHeadwayForRoute(route, departure.headwaySeconds);
+      let useMinimumCycle = false;
+      let plannedLegs = buildPlannedCycleLegs({
+        startRouteIndex,
+        startSecond,
+        passengerRoutes,
+        minimumRecoveryTimeSeconds,
+        useMinimumOccupancy: false,
+      });
+      if (plannedLegs.length !== routeCount) {
+        rejectionByRow.set(row, '無法展開完整交路占用');
+        return;
+      }
       {
-        const startRoute = passengerRoutes[startRouteIndex]!;
-        const physicalFloor = resolveFleetPhysicalHeadwayFloorSeconds(
-          startRoute,
-          scheduleRowCount,
-        );
-        if (physicalFloor > 0) {
-          for (const leg of trackedLegs) {
-            if (leg.routeId !== startRoute.routeId) continue;
-            if (leg.startSecond <= startSecond) continue;
-            if (leg.startSecond - startSecond < physicalFloor) {
-              rejectionByRow.set(
-                row,
-                `同方向未來班次物理過近（${leg.startSecond}s）`,
-              );
-              return;
-            }
-          }
+        const conflict = cycleViolatesSameRouteHeadway({
+          legs: plannedLegs,
+          trackedLegs,
+          requiredHeadwayFor: headwayForLeg,
+        });
+        if (conflict) {
+          rejectionByRow.set(row, conflict);
+          return;
         }
       }
 
       const phase = rotationPhaseByRow[row] ?? 0;
-      let useMinimumCycle = false;
       if (
         rotation % routeCount === phase
         && winAtPulse.nextMaintenanceStartSecond != null
@@ -641,25 +748,20 @@ function assignDirectionalDepartures(args: {
             minimumLegs.length === routeCount
               ? minimumLegs[minimumLegs.length - 1]!.endSecond
               : Number.POSITIVE_INFINITY;
-          const minimumPreservesHeadway = minimumLegs.every((leg) => {
-            const previousDeparture = latestDepartureBefore(
-              trackedLegs,
-              leg.route.routeId,
-              leg.startSecond,
-            );
-            if (previousDeparture == null) return true;
-            const routeHeadway = requiredHeadwayForRoute(
-              leg.route,
-              departure.headwaySeconds,
-            );
-            return leg.startSecond - previousDeparture >= routeHeadway;
-          });
-          if (minimumEnd > latestAllowedEnd || !minimumPreservesHeadway) {
+          const minimumConflict =
+            minimumLegs.length === routeCount
+              ? cycleViolatesSameRouteHeadway({
+                  legs: minimumLegs,
+                  trackedLegs,
+                  requiredHeadwayFor: headwayForLeg,
+                })
+              : '無法展開完整交路占用';
+          if (minimumEnd > latestAllowedEnd || minimumConflict) {
             rejectionByRow.set(
               row,
               `完整交路均／快最早結束 ${startSecond + cycleNeed}s/${minimumEnd}s，`
               + (
-                !minimumPreservesHeadway
+                minimumConflict
                   ? '快模式會壓低同方向班距'
                   : `超過整備讓渡上限 ${latestAllowedEnd}s`
               ),
@@ -667,6 +769,7 @@ function assignDirectionalDepartures(args: {
             return;
           }
           useMinimumCycle = true;
+          plannedLegs = minimumLegs;
         }
       }
 
@@ -688,8 +791,13 @@ function assignDirectionalDepartures(args: {
       row: number,
       windowsByRow = rowActiveWindows,
     ): ActivePassengerWindow | null => {
-      const { maxDelaySeconds } = resolveRowHeadwayGate(row);
       let winAtPulse = findWindow(row, departure.startSecond, windowsByRow);
+      const probeGate = resolveRowHeadwayGate(
+        row,
+        undefined,
+        undefined,
+        winAtPulse?.startSecond,
+      );
       if (!winAtPulse && windowsByRow) {
         // 換班邊界：脈衝稍早於下一個正線視窗時，可延後到新車開始值勤，
         // 但仍不得跨下一脈衝或超過一般 soft-delay 上限。
@@ -697,7 +805,8 @@ function assignDirectionalDepartures(args: {
           (win) =>
             win.dispatchStartSecond > departure.startSecond
             && win.dispatchStartSecond < nextPulseSecond
-            && win.dispatchStartSecond - departure.startSecond <= maxDelaySeconds,
+            && win.dispatchStartSecond - departure.startSecond
+              <= probeGate.maxDelaySeconds,
         ) ?? null;
       }
       if (!winAtPulse) {
@@ -851,6 +960,7 @@ function assignDirectionalDepartures(args: {
           row,
           exclude,
           provisionalEarliest,
+          winAtPulse.startSecond,
         );
         const desiredStart = Math.max(
           provisionalEarliest,
@@ -952,20 +1062,19 @@ function assignDirectionalDepartures(args: {
               minimumLegs.length === routeCount
                 ? minimumLegs[minimumLegs.length - 1]!.endSecond
                 : Number.POSITIVE_INFINITY;
-            const minimumPreservesHeadway = minimumLegs.every((leg) => {
-              const previousDeparture = latestDepartureBefore(
-                trackedLegs,
-                leg.route.routeId,
-                leg.startSecond,
-                exclude,
-              );
-              if (previousDeparture == null) return true;
-              return (
-                leg.startSecond - previousDeparture
-                >= requiredHeadwayForRoute(leg.route, departure.headwaySeconds)
-              );
-            });
-            if (minimumEnd > latestAllowedEnd || !minimumPreservesHeadway) continue;
+            const minimumConflict =
+              minimumLegs.length === routeCount
+                ? cycleViolatesSameRouteHeadway({
+                    legs: minimumLegs,
+                    trackedLegs,
+                    requiredHeadwayFor: (route, _leg, legIndex) =>
+                      gateWithoutBlocker.clearanceInsert && legIndex === 0
+                        ? clearanceInsertGapSecondsForRoute(route)
+                        : requiredHeadwayForRoute(route, departure.headwaySeconds),
+                    excludeTaskIndexes: exclude,
+                  })
+                : 'missing';
+            if (minimumEnd > latestAllowedEnd || minimumConflict) continue;
             useMinimumCycle = true;
           }
         }
@@ -978,20 +1087,44 @@ function assignDirectionalDepartures(args: {
           useMinimumOccupancy: useMinimumCycle,
         });
         if (previewLegs.length !== routeCount) continue;
-        const previewOk = previewLegs.every((leg) => {
-          const previousDeparture = latestDepartureBefore(
+        const headwayForYield = (
+          route: ShiftScheduleSelectedRoute,
+          _leg: PlannedCycleLeg,
+          legIndex: number,
+        ) =>
+          gateWithoutBlocker.clearanceInsert && legIndex === 0
+            ? clearanceInsertGapSecondsForRoute(route)
+            : requiredHeadwayForRoute(route, departure.headwaySeconds);
+        if (
+          cycleViolatesSameRouteHeadway({
+            legs: previewLegs,
             trackedLegs,
-            leg.route.routeId,
-            leg.startSecond,
-            exclude,
-          );
-          if (previousDeparture == null) return true;
-          return (
-            leg.startSecond - previousDeparture
-            >= requiredHeadwayForRoute(leg.route, departure.headwaySeconds)
-          );
-        });
-        if (!previewOk) continue;
+            requiredHeadwayFor: headwayForYield,
+            excludeTaskIndexes: exclude,
+          })
+        ) {
+          continue;
+        }
+        // 讓路後的新時刻也要與候選整輪守班距
+        {
+          let yieldHeadwayOk = true;
+          for (let legIndex = 0; legIndex < previewLegs.length; legIndex += 1) {
+            const leg = previewLegs[legIndex]!;
+            const required = headwayForYield(leg.route, leg, legIndex);
+            if (required <= 0) continue;
+            for (const chainLeg of chain) {
+              if (chainLeg.routeId !== leg.route.routeId) continue;
+              const newStart = shiftedStarts.get(chainLeg.taskIndex);
+              if (newStart == null) continue;
+              if (Math.abs(leg.startSecond - newStart) < required) {
+                yieldHeadwayOk = false;
+                break;
+              }
+            }
+            if (!yieldHeadwayOk) break;
+          }
+          if (!yieldHeadwayOk) continue;
+        }
 
         // 出場相位剛開窗優先；回推秒數與候選延遲愈小愈好
         const yardOpenBonus = rotation % routeCount === phase && phase !== 0 ? 0 : 1e8;
@@ -1259,6 +1392,9 @@ export function normalizeEngineInput(
   const selectedRoutes = args.draft.routeGroups.selectedRoutes.filter((route) =>
     !route.backupForInstanceId && !route.backupForRouteId,
   );
+  const backupRoutes = args.draft.routeGroups.selectedRoutes.filter((route) =>
+    Boolean(route.backupForInstanceId?.trim() || route.backupForRouteId?.trim()),
+  );
   const orderedSelected = sortSelectedRoutesByExecutionOrder(selectedRoutes);
   const minimumRecovery = normalizeMinimumRecoveryTimeSeconds(
     args.draft.routeGroups.minimumRecoveryTimeSeconds,
@@ -1349,9 +1485,12 @@ export function normalizeEngineInput(
     for (let r = 1; r <= template.scheduleRowCount; r += 1) {
       rowActiveWindows.set(r, []);
     }
-    const dispatchWindowTasks = templateTasks.filter(
-      (task) => task.taskType === 'passenger' || task.taskType === 'standby',
-    );
+    const dispatchWindowTasks = templateTasks.filter((task) => {
+      if (task.taskType === 'passenger') return true;
+      if (task.taskType !== 'standby') return false;
+      // 純機動列不派正線；僅「機動之後仍有正線」才把機動當可派視窗
+      return isStandbyDispatchableForMainline(templateTasks, task);
+    });
     for (const pTask of dispatchWindowTasks) {
       const startSec = pTask.startMinute * 60;
       const endSec = (pTask.startMinute + pTask.durationMinutes) * 60;
@@ -1386,6 +1525,7 @@ export function normalizeEngineInput(
       minimumRecoveryTimeSeconds: minimumRecovery,
       rowActiveWindows,
       nonPassengerTasks,
+      templateTasks,
       yardRotationExitByTaskType,
       successorPolicy,
       warnings,
@@ -1419,6 +1559,7 @@ export function normalizeEngineInput(
     attributes: template.attributes,
     passengerRoutes,
     selectedRoutes,
+    backupRoutes,
     maintenanceBody,
     maintenanceEntrySlackBySection: slackBySection,
     emptyIntervalMainlineSlackSeconds,

@@ -1,6 +1,7 @@
 import type { ScheduleTask, TaskTypeKey } from '../../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
+import { shouldApplyYardExitRotationAlign } from '../maintenancePostTaskPolicy';
 import {
   resolveRouteIndexInRotation,
   resolveStartInstanceId,
@@ -228,7 +229,16 @@ export function assignPassengerRoutesConstraintGreedy(args: {
       const precedingYard = findPrecedingYardTask(task, allRowTasks);
       if (precedingYard) {
         const exitStationId = yardRotationExitByTaskType[precedingYard.taskType];
-        if (exitStationId) {
+        const yardEndMinute =
+          precedingYard.startMinute + precedingYard.durationMinutes;
+        if (
+          shouldApplyYardExitRotationAlign({
+            exitStationId,
+            templateTasks: allRowTasks,
+            row,
+            yardEndMinute,
+          })
+        ) {
           let offset = 0;
           if (successorPolicy) {
             const startId = resolveStartInstanceId(successorPolicy, exitStationId);
@@ -247,7 +257,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount;
         }
-        // 充電／行前／機動無明確出場站：延續進整備前輪替，勿誤鎖回 NT
+        // 充電／行前／機動無明確出場站，或整備後無正線：延續進整備前輪替
       }
 
       const nextAnchorSecond = findNextPassengerAnchorSecond(

@@ -28,7 +28,9 @@ import {
   validateTurnaroundLimits,
   validateRotationCyclesComplete,
   validateStationTimingsWithinBlocks,
+  validateStationBerthCollisions,
 } from './validate';
+import { enforceStationBerthConstraints } from '../stationBerthConstraint';
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -126,15 +128,35 @@ export function generateShiftSchedule(
     warnings,
   });
 
+  // 站位約束需要主＋備用；輪替仍只用主路線
+  const routesForBerth = [
+    ...engineInput.selectedRoutes,
+    ...engineInput.backupRoutes,
+  ];
+
+  // 站位占用硬約束：延後 → 備用；解不開的留給 STATION_BERTH_COLLISION
+  timelines = enforceStationBerthConstraints({
+    timelines,
+    selectedRoutes: routesForBerth,
+    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    successorPolicy: engineInput.successorPolicy,
+    warnings,
+  }).timelines;
+
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(
-    engineInput.selectedRoutes.map((route) => [route.routeId, route] as const),
+    routesForBerth.map((route) => [route.routeId, route] as const),
   );
 
   validateTimelineOverlaps(timelines, errors);
   validateStationTimingsWithinBlocks(
     timelines,
-    engineInput.selectedRoutes,
+    routesForBerth,
+    errors,
+  );
+  validateStationBerthCollisions(
+    timelines,
+    routesForBerth,
     errors,
   );
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);

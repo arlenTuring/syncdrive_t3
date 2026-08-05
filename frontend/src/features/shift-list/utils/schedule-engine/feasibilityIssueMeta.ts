@@ -30,6 +30,9 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_LEG_TRAVEL_INCOMPLETE: '站間 leg 不完整',
   STATION_LEG_TRAVEL_INVALID: '站間 leg 無效',
   STATION_TIMING_INFEASIBLE: '逐站時刻超出班次卡',
+  STATION_BERTH_COLLISION: '停靠點站位碰撞',
+  STATION_BERTH_DELAYED: '站位約束延後',
+  STATION_BERTH_BACKUP_USED: '站位約束改派備用',
   ANCHOR_CONFLICT: '錨點衝突',
   TIMELINE_OVERLAP: '時間線任務重疊',
   HEADWAY_PHYSICAL_IMPOSSIBLE: '班距低於物理下限',
@@ -74,6 +77,21 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '班次卡秒數不足以容納完整停靠、最快站間行駛與 10 秒到站對齊。請延長該趟、修正 leg／停靠秒數，或重新生成。',
+  },
+  STATION_BERTH_COLLISION: {
+    kind: 'limit',
+    guidance:
+      '生成時已嘗試「延後發車／改派備用」仍無法清開同一停靠點的到站～離站重疊。請加時間線、縮短靠站、或手動改備援點。這不是班距警告。',
+  },
+  STATION_BERTH_DELAYED: {
+    kind: 'policy',
+    guidance:
+      '站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。',
+  },
+  STATION_BERTH_BACKUP_USED: {
+    kind: 'policy',
+    guidance:
+      '站位超限時，僅在關聯圖繼任成立下成對改派備用槽（TN→TNB 且圖上下一主線→其備用）。不會留下 TN 再接 NTB。',
   },
   ANCHOR_CONFLICT: {
     kind: 'limit',

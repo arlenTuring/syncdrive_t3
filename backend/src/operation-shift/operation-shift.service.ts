@@ -274,7 +274,7 @@ export class OperationShiftService {
     const { row, source } = await this.resolveTimetableShift();
     const range = parseTimeRangeQuery({ from: query.from, to: query.to });
     const body = row.body ?? {};
-    const trips = expandTimetableTrips({ body, range, passengerOnly: true });
+    const trips = expandTimetableTrips({ body, range, passengerOnly: false });
     return {
       meta: this.toTimetableMeta(row, source),
       filter: {

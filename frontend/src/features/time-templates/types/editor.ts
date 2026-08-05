@@ -1,3 +1,5 @@
+import { recommendFleetRowCount } from '../utils/recommendFleetRowCount';
+
 export const VEHICLE_CAPACITY_MIN = 1;
 export const VEHICLE_CAPACITY_MAX = 200;
 export const VEHICLE_CAPACITY_DEFAULT = 50;
@@ -1154,14 +1156,25 @@ export function formatSelectedIntervalHoverContent(
     `運能　${formatCapacityLabel(attribute?.capacityPphpd ?? 0)}`,
   ];
   const headway = attribute?.headwaySeconds;
-  if (
-    estimatedTripSeconds != null
-    && estimatedTripSeconds > 0
-    && headway != null
-    && headway > 0
-  ) {
-    const recommended = Math.ceil(estimatedTripSeconds / headway);
-    lines.push(`建議車輛數　${recommended} 台`);
+  const start = parseIntervalStartMinutes(interval.startTime);
+  const end = parseIntervalEndMinutes(interval.endTime);
+  const intervalDurationSeconds =
+    start != null && end != null && end > start ? (end - start) * 60 : null;
+  const fleet = recommendFleetRowCount({
+    cycleSeconds: estimatedTripSeconds ?? 0,
+    headwaySeconds: headway ?? 0,
+    intervalDurationSeconds,
+  });
+  if (fleet) {
+    lines.push(
+      `建議時間線　${fleet.recommended} 列`
+      + (fleet.recommended !== fleet.theoreticalMin
+        ? `（理論下限 ${fleet.theoreticalMin}）`
+        : ''),
+    );
+    for (const tip of fleet.tips.slice(0, 2)) {
+      lines.push(tip);
+    }
   }
   return { title: intervalName, lines };
 }

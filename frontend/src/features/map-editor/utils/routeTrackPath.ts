@@ -2,6 +2,7 @@ import type { MapAreaObject } from '../types/area'
 import { collectStationsFromAreas } from './dockingPointStationId'
 import {
   resolveCrossoverPortalRouteStopMapPx,
+  resolveDockingPointNodeMapPx,
   resolveFacilityDockingRouteStopMapPx,
   resolveRouteStationPoints,
   stationDisplayLabel,
@@ -16,6 +17,7 @@ import {
   parseCrossoverPortalTopologyNodeId,
 } from './trackCrossoverFacility'
 import {
+  areaLocalPxToMeter,
   areaPositionToCssTopLeft,
   meterToAreaLocalPx,
 } from './areaCoords'
@@ -48,6 +50,11 @@ const SNAP_MAX_M = 12
 const SNAP_MAX_ALONG_OVERHANG_M = 55
 /** 懸伸吸附時離中心線的最大橫向偏差（須小於上下行走廊間距，避免吸到對向股） */
 const SNAP_MAX_LATERAL_M = 1.75
+/**
+ * 路線站序續吸同股時可略放寬橫向（停靠點常貼邊界）；
+ * 仍須明顯小於上下行間距，避免真的跨到對向股。
+ */
+const SNAP_CONTINUITY_MAX_LATERAL_M = 2.6
 /** 站標接到軌道路徑的允許 stub 長度（px）；超過視為吸錯股／跨走廊，改標斷線 */
 const MAX_STITCH_STUB_PX = 48
 
@@ -125,6 +132,19 @@ function isWithinSnapDistance(projected: {
   if (projected.lateral > SNAP_MAX_LATERAL_M) return false
   if (projected.alongOverhang <= 0 && projected.dist <= SNAP_MAX_M) return true
   // 臨停格：貼中心線但略超出軌道端點
+  return (
+    projected.alongOverhang > 0
+    && projected.alongOverhang <= SNAP_MAX_ALONG_OVERHANG_M
+  )
+}
+
+function isWithinContinuitySnapDistance(projected: {
+  dist: number
+  lateral: number
+  alongOverhang: number
+}): boolean {
+  if (projected.lateral > SNAP_CONTINUITY_MAX_LATERAL_M) return false
+  if (projected.alongOverhang <= 0 && projected.dist <= SNAP_MAX_M) return true
   return (
     projected.alongOverhang > 0
     && projected.alongOverhang <= SNAP_MAX_ALONG_OVERHANG_M
@@ -287,6 +307,10 @@ function appendPathPoints(
 }
 
 const ORTHO_EPS_PX = 0.75
+/** 畫面站標幾乎共線水平：視為同一走廊站序，可補直連 */
+const BADGE_CORRIDOR_ALIGN_MAX_DY_PX = 28
+const BADGE_CORRIDOR_ALIGN_MIN_DX_PX = 6
+const BADGE_CORRIDOR_ALIGN_MAX_DX_PX = 520
 
 /**
  * 兩點之間改成直角折線（先水平再垂直，或先垂直再水平）。
@@ -311,6 +335,29 @@ export function rightAngleConnectPx(
     return [{ ...from }, { x: from.x, y: to.y }, { ...to }]
   }
   return [{ ...from }, { x: to.x, y: from.y }, { ...to }]
+}
+
+function areBadgesSameHorizontalCorridor(
+  fromPx: { x: number; y: number },
+  toPx: { x: number; y: number },
+): boolean {
+  const dx = Math.abs(toPx.x - fromPx.x)
+  const dy = Math.abs(toPx.y - fromPx.y)
+  return (
+    dy <= BADGE_CORRIDOR_ALIGN_MAX_DY_PX
+    && dx >= BADGE_CORRIDOR_ALIGN_MIN_DX_PX
+    && dx <= BADGE_CORRIDOR_ALIGN_MAX_DX_PX
+  )
+}
+
+/** 同廊站標直連（水平優先直角） */
+function badgeCorridorConnectPx(
+  fromPx: { x: number; y: number },
+  toPx: { x: number; y: number },
+): Array<{ x: number; y: number }> {
+  return ensureRightAnglePathPx(
+    rightAngleConnectPx(fromPx, toPx, 'horizontal-first'),
+  )
 }
 
 /** 去掉共線中間點，只留端點與轉角 */
@@ -468,6 +515,7 @@ function resolveTopologyAssistedTrackLegPx(
   if (!breakdown.pathFound || breakdown.nodePath.length < 2) return null
 
   const snaps: TrackSnap[] = []
+  let continuityTrackId: string | null = null
   for (const nodeId of breakdown.nodePath) {
     const field = resolveTopologyNodeFieldMeters(areas, nodeId, topology)
     if (!field) continue
@@ -481,8 +529,12 @@ function resolveTopologyAssistedTrackLegPx(
       field.yM,
       segmentById,
       prefer,
+      continuityTrackId,
     )
-    if (snap) snaps.push(snap)
+    if (snap) {
+      snaps.push(snap)
+      continuityTrackId = snap.trackId
+    }
   }
   if (snaps.length < 2) return null
 
@@ -507,12 +559,15 @@ function resolveTopologyAssistedTrackLegPx(
 /**
  * 依已接合軌道／最近軌道吸附。不做上下行等語意偏好（泛用圖台只認幾何）。
  * 有 preferTrackId（渡線 attachedTrackId）時以接合為準，不因偏離中心線而放棄。
+ * continuityTrackId：路線上一站已吸附的軌道；兩站同走廊（如 U02 的 2→3）優先續吸同股，
+ * 避免第二點因橫向微偏被吸到對向股而畫出垂直跳線。
  */
 function snapFieldPointToTrackForStop(
   xM: number,
   yM: number,
   segmentById: Map<string, TrackNetworkSegment>,
   preferTrackId: string | null = null,
+  continuityTrackId: string | null = null,
 ): TrackSnap | null {
   if (preferTrackId) {
     const seg = segmentById.get(preferTrackId)
@@ -534,7 +589,63 @@ function snapFieldPointToTrackForStop(
   }
 
   const candidates = listSnapCandidates(xM, yM, segmentById)
-  return candidates[0] ?? null
+
+  const nearest = candidates[0] ?? null
+
+  if (continuityTrackId) {
+    const continued = candidates.find((c) => c.trackId === continuityTrackId)
+    if (continued) {
+      // 幾何最近若已明顯更貼另一股（常見：上一站 D、本站 U），不可續吸對向股
+      if (
+        nearest
+        && nearest.trackId !== continued.trackId
+        && nearest.lateral + 0.35 < continued.lateral
+      ) {
+        return {
+          trackId: nearest.trackId,
+          xM: nearest.xM,
+          yM: nearest.yM,
+          mapPx: nearest.mapPx,
+        }
+      }
+      return {
+        trackId: continued.trackId,
+        xM: continued.xM,
+        yM: continued.yM,
+        mapPx: continued.mapPx,
+      }
+    }
+    const contSeg = segmentById.get(continuityTrackId)
+    if (contSeg) {
+      const projected = projectOntoSegmentCenterline(xM, yM, contSeg)
+      // 同股續吸：略放寬橫向，避免邊界點被吸到對向股
+      if (isWithinContinuitySnapDistance(projected)) {
+        if (
+          nearest
+          && nearest.trackId !== continuityTrackId
+          && nearest.lateral + 0.35 < projected.lateral
+        ) {
+          return {
+            trackId: nearest.trackId,
+            xM: nearest.xM,
+            yM: nearest.yM,
+            mapPx: nearest.mapPx,
+          }
+        }
+        const mapPx = fieldPointToMapPx(projected.xM, projected.yM, contSeg)
+        if (mapPx) {
+          return {
+            trackId: continuityTrackId,
+            xM: projected.xM,
+            yM: projected.yM,
+            mapPx,
+          }
+        }
+      }
+    }
+  }
+
+  return nearest
 }
 
 function resolvePreferTrackIdForStation(
@@ -659,6 +770,7 @@ function stitchBadgeToTrackPath(
       return null
     }
   }
+  // allowLongStub：允許臨停懸伸；對向股跳線改由站序續吸同股避免
   const out: Array<{ x: number; y: number }> = []
   appendPathPoints(out, head)
   appendPathPoints(out, mid)
@@ -698,7 +810,34 @@ function resolveStationFieldMeters(
   stationId: string,
 ): { xM: number; yM: number } | null {
   const docking = collectStationsFromAreas(areas).find((s) => s.stationId === stationId)
-  if (docking) return { xM: docking.xM, yM: docking.yM }
+  if (docking) {
+    // 吸附與畫面站標同源：有放置 areaPosition 時用站標中心，避免 refField 偏 D、圖標在 U
+    const area = areas.find((a) => a.id === docking.areaId)
+    const facility = area?.facilities.find((f) => f.id === docking.facilityId)
+    const ap = facility?.areaPosition
+    const placedOffOrigin =
+      !!ap
+      && Number.isFinite(ap.x)
+      && Number.isFinite(ap.y)
+      && (Math.abs(ap.x) > 1 || Math.abs(ap.y) > 1)
+    if (area && placedOffOrigin) {
+      const mapPx = resolveDockingPointNodeMapPx(
+        areas,
+        docking.areaId,
+        docking.facilityId,
+      )
+      if (mapPx) {
+        const localX = mapPx.x - area.layout.xPx
+        const localFromTop = mapPx.y - area.layout.yPx
+        const areaY = area.layout.hPx - localFromTop
+        const m = areaLocalPxToMeter(localX, areaY, area.domain, area.layout)
+        if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
+          return { xM: m.x, yM: m.y }
+        }
+      }
+    }
+    return { xM: docking.xM, yM: docking.yM }
+  }
 
   const waypoint = collectWaypointsFromAreas(areas).find(
     (s) => s.stationId === stationId || s.facilityId === stationId,
@@ -776,18 +915,31 @@ export function resolveRoutePreviewGeometry(
     hasTracks ? resolveStationFieldMeters(areas, stationId) : null,
   )
 
-  const snaps: Array<TrackSnap | null> = stationIds.map((stationId, i) => {
-    if (!hasTracks) return null
+  const snaps: Array<TrackSnap | null> = []
+  let continuityTrackId: string | null = null
+  for (let i = 0; i < stationIds.length; i++) {
+    const stationId = stationIds[i]!
+    if (!hasTracks) {
+      snaps.push(null)
+      continue
+    }
     const field = fields[i]
-    if (!field) return null
+    if (!field) {
+      snaps.push(null)
+      continuityTrackId = null
+      continue
+    }
     const preferTrackId = resolvePreferTrackIdForStation(areas, stationId)
-    return snapFieldPointToTrackForStop(
+    const snap = snapFieldPointToTrackForStop(
       field.xM,
       field.yM,
       segmentById,
       preferTrackId,
+      continuityTrackId,
     )
-  })
+    snaps.push(snap)
+    continuityTrackId = snap?.trackId ?? null
+  }
 
   const pathPx: Array<{ x: number; y: number }> = []
   const pathLegs: Array<Array<{ x: number; y: number }>> = []
@@ -868,6 +1020,17 @@ export function resolveRoutePreviewGeometry(
         points = stitched && stitched.length >= 2 ? stitched : assisted
         onTrack = points != null && points.length >= 2
       }
+    }
+
+    /**
+     * 同廊強制直連（必須在軌道／拓樸之後覆蓋）：
+     * 站標已在同一水平廊（如 U02 的 2→3）時，預覽必須跟站標水平連，
+     * 不可沿用異股吸附「成功」的長段 D 騎行 + 短垂直落地——
+     * 那種路徑 totalDx 很大，舊的 verticalJump 判定會失效。
+     */
+    if (areBadgesSameHorizontalCorridor(fromPx, toPx)) {
+      points = badgeCorridorConnectPx(fromPx, toPx)
+      onTrack = true
     }
 
     if (!onTrack || !points) {

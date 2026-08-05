@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
+import { meterToAreaLocalPx } from './areaCoords'
 import {
   TRACK_CROSSOVER_PORTALS_KEY,
   crossoverPortalTopologyNodeId,
@@ -688,5 +689,175 @@ describe('resolveRoutePreviewGeometry corridor separation', () => {
       maxDy = Math.max(maxDy, Math.abs(leg[i + 1]!.y - leg[i]!.y))
     }
     assert.ok(maxDy < 80, `unexpected vertical corridor jump (${maxDy.toFixed(1)} px)`)
+  })
+
+  it('keeps consecutive stops on same U02 corridor without D02 vertical jump', () => {
+    // 模擬圖面：2、3 都在 U02；3 微偏靠近 D／U 界線，獨立吸附容易吃到 D02
+    const layout = { xPx: 0, yPx: 0, wPx: 2000, hPx: 1200, borderPx: 1 }
+    const domain = { xMinM: 0, xMaxM: 200, yMinM: 0, yMaxM: 80 }
+    const areas: MapAreaObject[] = [
+      {
+        id: '1',
+        customName: 'N2W',
+        layout,
+        domain,
+        view: { panXM: 0, panYM: 0, zoom: 1 },
+        facilities: [
+          facility({
+            id: 'd02',
+            type: 'Track',
+            customName: 'D02',
+            parameters: {
+              refFieldXMinM: 40,
+              refFieldXMaxM: 160,
+              refFieldYMinM: 20,
+              refFieldYMaxM: 23.5,
+            },
+          }),
+          facility({
+            id: 'u02',
+            type: 'Track',
+            customName: 'U02',
+            parameters: {
+              refFieldXMinM: 40,
+              refFieldXMaxM: 160,
+              refFieldYMinM: 23.5,
+              refFieldYMaxM: 27,
+            },
+          }),
+          facility({
+            id: 's2',
+            type: 'DockingPoint',
+            customName: '停靠2',
+            areaPosition: meterToAreaLocalPx(110, 25.2, domain, layout),
+            position: { x: 110, y: 25.2 },
+            areaLayoutAnchor: { wPx: 24, hPx: 24 },
+            areaSizePx: { w: 24, h: 24 },
+            parameters: {
+              stationId: 'station_2',
+              refFieldXM: 110,
+              refFieldYM: 25.2,
+            },
+          }),
+          facility({
+            id: 's3',
+            type: 'DockingPoint',
+            customName: '停靠3',
+            // 畫面站標仍在 U；refField 偏界線靠近 D
+            areaPosition: meterToAreaLocalPx(70, 25.2, domain, layout),
+            position: { x: 70, y: 25.2 },
+            areaLayoutAnchor: { wPx: 24, hPx: 24 },
+            areaSizePx: { w: 24, h: 24 },
+            parameters: {
+              stationId: 'station_3',
+              refFieldXM: 70,
+              refFieldYM: 23.2,
+            },
+          }),
+        ],
+      },
+    ]
+
+    const geo = resolveRoutePreviewGeometry(areas, ['station_2', 'station_3'])
+    assert.equal(geo.brokenLegs.length, 0, geo.warnings.map((w) => w.message).join('; '))
+    assert.equal(geo.pathLegs.length, 1, 'must draw one connected leg between 2 and 3')
+    assert.equal(geo.followsTracks, true)
+    const leg = geo.pathLegs[0]!
+    assert.ok(leg && leg.length >= 2)
+    let maxDy = 0
+    for (let i = 0; i < leg.length - 1; i++) {
+      maxDy = Math.max(maxDy, Math.abs(leg[i + 1]!.y - leg[i]!.y))
+    }
+    assert.ok(
+      maxDy < 40,
+      `2→3 must stay on U02 without vertical D jump (${maxDy.toFixed(1)} px)`,
+    )
+  })
+
+  it('overrides successful D→U vertical stitch when badges share U corridor', () => {
+    // 站標畫面在 U02 共線；吸附一點在 D、一點在 U 時軌道會「成功」長段騎 D 再垂落到 3
+    // → 必須改畫站標水平直連（不可依賴 verticalJump／totalDx 比例）
+    const layout = { xPx: 0, yPx: 0, wPx: 2000, hPx: 800, borderPx: 1 }
+    const domain = { xMinM: 0, xMaxM: 200, yMinM: 0, yMaxM: 100 }
+    const areas: MapAreaObject[] = [
+      {
+        id: '1',
+        customName: 'N2W',
+        layout,
+        domain,
+        view: { panXM: 0, panYM: 0, zoom: 1 },
+        facilities: [
+          facility({
+            id: 'd02',
+            type: 'Track',
+            customName: 'D02',
+            parameters: {
+              refFieldXMinM: 40,
+              refFieldXMaxM: 160,
+              refFieldYMinM: 20,
+              refFieldYMaxM: 23.5,
+            },
+          }),
+          facility({
+            id: 'u02',
+            type: 'Track',
+            customName: 'U02',
+            parameters: {
+              refFieldXMinM: 40,
+              refFieldXMaxM: 160,
+              refFieldYMinM: 23.5,
+              refFieldYMaxM: 27,
+            },
+          }),
+          facility({
+            id: 's2',
+            type: 'DockingPoint',
+            customName: '停靠2',
+            // 畫面站標在 U；refField 偏 D → 異股吸附仍會走出軌道跳線
+            areaPosition: meterToAreaLocalPx(120, 25.2, domain, layout),
+            position: { x: 120, y: 25.2 },
+            areaLayoutAnchor: { wPx: 24, hPx: 24 },
+            areaSizePx: { w: 24, h: 24 },
+            parameters: {
+              stationId: 'station_2',
+              refFieldXM: 120,
+              refFieldYM: 22,
+            },
+          }),
+          facility({
+            id: 's3',
+            type: 'DockingPoint',
+            customName: '停靠3',
+            areaPosition: meterToAreaLocalPx(80, 25.2, domain, layout),
+            position: { x: 80, y: 25.2 },
+            areaLayoutAnchor: { wPx: 24, hPx: 24 },
+            areaSizePx: { w: 24, h: 24 },
+            parameters: {
+              stationId: 'station_3',
+              refFieldXM: 80,
+              refFieldYM: 25.2,
+            },
+          }),
+        ],
+      },
+    ]
+    const geo = resolveRoutePreviewGeometry(areas, ['station_2', 'station_3'])
+    assert.equal(geo.brokenLegs.length, 0, geo.warnings.map((w) => w.message).join('; '))
+    assert.ok(geo.pathLegs[0] && geo.pathLegs[0]!.length >= 2)
+    const leg = geo.pathLegs[0]!
+    const start = leg[0]!
+    const end = leg[leg.length - 1]!
+    assert.ok(
+      Math.abs(end.x - start.x) > 20,
+      `2→3 must run horizontally, got dx=${Math.abs(end.x - start.x).toFixed(1)}`,
+    )
+    let maxDy = 0
+    for (let i = 0; i < leg.length - 1; i++) {
+      maxDy = Math.max(maxDy, Math.abs(leg[i + 1]!.y - leg[i]!.y))
+    }
+    assert.ok(
+      maxDy < 40,
+      `must not keep D→U vertical jump (${maxDy.toFixed(1)} px)`,
+    )
   })
 })

@@ -145,6 +145,58 @@ describe('expandTimetableTrips', () => {
     expect(etas.every((e) => typeof e.non_stop === 'boolean')).toBe(true);
   });
 
+  it('includes servicing / inspection / charging when passengerOnly is false', () => {
+    const mixed = {
+      selectedRoutes: [],
+      scheduleOutput: {
+        plan: {
+          timelines: [
+            {
+              row: 1,
+              blocks: [
+                {
+                  id: 'sv1',
+                  timelineRow: 1,
+                  taskType: 'servicing',
+                  label: '保養',
+                  plannedStartMinute: 0,
+                  plannedEndMinute: 30,
+                  source: 'template_bar',
+                },
+                {
+                  id: 'pax1',
+                  timelineRow: 1,
+                  taskType: 'passenger',
+                  routeId: 'st',
+                  routeCode: 'ST',
+                  plannedStartMinute: 30,
+                  plannedEndMinute: 40,
+                  source: 'template_bar',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const all = expandTimetableTrips({
+      body: mixed,
+      range: parseTimeRangeQuery({}),
+      passengerOnly: false,
+    });
+    expect(all.map((t) => t.task_type)).toEqual(['servicing', 'passenger']);
+    expect(all[0]!.trip_code.startsWith('SV')).toBe(true);
+    expect(all[0]!.label).toBe('保養');
+    expect(all[0]!.stations).toEqual([]);
+
+    const paxOnly = expandTimetableTrips({
+      body: mixed,
+      range: parseTimeRangeQuery({}),
+      passengerOnly: true,
+    });
+    expect(paxOnly.map((t) => t.task_type)).toEqual(['passenger']);
+  });
+
   it('filters virtual crossover portals from passenger-stop etas', () => {
     const withXo = {
       selectedRoutes: [

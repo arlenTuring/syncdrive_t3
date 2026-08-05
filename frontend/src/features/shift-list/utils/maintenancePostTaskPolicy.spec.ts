@@ -3,7 +3,10 @@ import { describe, it } from 'node:test';
 import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import {
   buildYardRotationExitByTaskType,
+  isStandbyDispatchableForMainline,
   resolveYardPostTaskPolicy,
+  rowHasPassengerTemplateAtOrAfter,
+  shouldApplyYardExitRotationAlign,
 } from './maintenancePostTaskPolicy';
 
 const origins: MaintenanceFirstTripOrigin[] = [
@@ -133,5 +136,63 @@ describe('buildYardRotationExitByTaskType', () => {
     assert.equal(map.charging, 'N2W-D');
     assert.equal(map.standby, 'N2W-D');
     assert.equal(map.servicing, undefined);
+  });
+});
+
+describe('yard exit align / standby dispatch gates', () => {
+  const tasks = [
+    { rowIndex: 1, taskType: 'inspection', startMinute: 0 },
+    { rowIndex: 1, taskType: 'standby', startMinute: 60 },
+    { rowIndex: 2, taskType: 'inspection', startMinute: 0 },
+    { rowIndex: 2, taskType: 'standby', startMinute: 60 },
+    { rowIndex: 2, taskType: 'passenger', startMinute: 120 },
+  ];
+
+  it('rowHasPassengerTemplateAtOrAfter detects later mainline only', () => {
+    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 1, 30), false);
+    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 30), true);
+    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 120), true);
+    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 121), false);
+  });
+
+  it('pure standby is not dispatchable; standby before passenger is', () => {
+    assert.equal(
+      isStandbyDispatchableForMainline(tasks, { rowIndex: 1, startMinute: 60 }),
+      false,
+    );
+    assert.equal(
+      isStandbyDispatchableForMainline(tasks, { rowIndex: 2, startMinute: 60 }),
+      true,
+    );
+  });
+
+  it('exit rotation align only when mainline follows the yard', () => {
+    assert.equal(
+      shouldApplyYardExitRotationAlign({
+        exitStationId: 'T3-D',
+        templateTasks: tasks,
+        row: 1,
+        yardEndMinute: 30,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldApplyYardExitRotationAlign({
+        exitStationId: 'T3-D',
+        templateTasks: tasks,
+        row: 2,
+        yardEndMinute: 30,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldApplyYardExitRotationAlign({
+        exitStationId: null,
+        templateTasks: tasks,
+        row: 2,
+        yardEndMinute: 30,
+      }),
+      false,
+    );
   });
 });

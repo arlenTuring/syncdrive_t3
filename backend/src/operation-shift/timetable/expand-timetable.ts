@@ -47,6 +47,8 @@ export type TimetableTripDto = {
   block_id: string;
   timeline_row: number;
   task_type: string;
+  /** 任務顯示名（保養／行前／充電等）；正線常為空 */
+  label: string | null;
   source: string;
   route_id: string | null;
   route_code: string | null;
@@ -301,15 +303,19 @@ export function extractPlanBlocks(body: Record<string, unknown>): TimetableBlock
 export function expandTimetableTrips(args: {
   body: Record<string, unknown>;
   range: TimeRangeFilter;
-  /** 預設僅正線／進場載客 */
+  /**
+   * true：只載客正線（含進場載客 entry_service）。
+   * false：載入全部任務（保養／行前／充電／機動／調度等）；仍略過 transition。
+   * 預設 false。
+   */
   passengerOnly?: boolean;
 }): TimetableTripDto[] {
   const routes = parseSelectedRoutes(args.body);
   const blocks = extractPlanBlocks(args.body);
-  const passengerOnly = args.passengerOnly !== false;
+  const passengerOnly = args.passengerOnly === true;
   const trips: TimetableTripDto[] = [];
 
-  let passengerIndex = 0;
+  let tripIndex = 0;
   for (const block of blocks) {
     if (block.source === 'transition') continue;
     if (passengerOnly && block.taskType !== 'passenger') continue;
@@ -320,18 +326,19 @@ export function expandTimetableTrips(args: {
 
     const route = resolveRouteForBlock(block, routes);
     const stops = buildTimetableStationStops(block, route);
-    const tripCode = resolveTimetableTripCode(block, passengerIndex);
-    passengerIndex += 1;
+    const tripCode = resolveTimetableTripCode(block, tripIndex);
+    tripIndex += 1;
 
     trips.push({
       trip_code: tripCode,
       block_id: block.id,
       timeline_row: block.timelineRow,
       task_type: block.taskType,
+      label: block.label?.trim() || null,
       source: block.source ?? 'template_bar',
       route_id: block.routeId ?? route?.routeId ?? null,
       route_code: block.routeCode ?? route?.routeCode ?? null,
-      route_name: block.routeName ?? route?.routeName ?? null,
+      route_name: block.routeName ?? route?.routeName ?? block.label ?? null,
       card_start: formatSecondToHms(startSecond),
       card_end: formatSecondToHms(endSecond),
       card_start_second: startSecond,
@@ -355,6 +362,7 @@ export function expandStationEtas(args: {
   const trips = expandTimetableTrips({
     body: args.body,
     range: { fromSecond: 0, toSecond: DAY_END_SECOND },
+    /** ETA 站顯只看正線停靠點事件 */
     passengerOnly: true,
   });
   const stationFilter = args.stationId?.trim() || null;

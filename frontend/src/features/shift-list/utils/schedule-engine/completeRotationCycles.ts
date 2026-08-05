@@ -24,6 +24,7 @@ import {
   listEmptyAttributeMinuteRanges,
 } from '../emptyAttributeIntervals';
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
+import { shouldApplyYardExitRotationAlign } from '../maintenancePostTaskPolicy';
 import {
   resolveRouteIndexInRotation,
   resolveStartInstanceId,
@@ -184,17 +185,28 @@ export function applyRotationCycleCompletion(args: {
         partialPassengerTasks = [];
       }
 
-      // 整備結束後：下一串正線輪替相位對齊出場站（行前／充電／機動）；無出場則從 0
+      // 整備結束後：若該列之後仍有正線，輪替相位對齊出場站（行前／充電／機動）
       const exitStationId = yardRotationExitByTaskType[task.taskType];
+      const yardEndMinute = task.startMinute + task.durationMinutes;
       let phase = 0;
-      if (successorPolicy) {
-        const startId = resolveStartInstanceId(successorPolicy, exitStationId);
-        if (startId) {
-          const index = resolveRouteIndexInRotation(successorPolicy, startId);
-          phase = index >= 0 ? index : 0;
+      if (
+        shouldApplyYardExitRotationAlign({
+          exitStationId,
+          templateTasks: rowTasks,
+          row,
+          yardEndMinute,
+        })
+      ) {
+        if (successorPolicy) {
+          const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+          if (startId) {
+            const index = resolveRouteIndexInRotation(successorPolicy, startId);
+            phase = index >= 0 ? index : 0;
+          }
+        } else {
+          phase =
+            resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
         }
-      } else if (exitStationId) {
-        phase = resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
       }
       stretchPassengerCount = 0;
       rotationIndex =

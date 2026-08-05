@@ -14,13 +14,14 @@ import {
   computeTurnaroundLimitSegments,
   type TurnaroundLimitSegment,
 } from '../utils/turnaroundLimitSegments';
+import { recommendFleetRowCount } from '../utils/recommendFleetRowCount';
 import { ScheduleTimelineBackground } from './scheduleTimelineBackground';
 
 export const TURNAROUND_LIMIT_ROW_HEIGHT_PX = 30;
 
 const TURNAROUND_LIMIT_ROW_TITLE = '正線建議';
 const TURNAROUND_LIMIT_ROW_HINT =
-  '依據設定的班距與整趟路線時間，建議合適的載客車輛數。';
+  '建議車輛＝ceil(完整交路週期÷班距)。週期請填一整輪（非單線）；短時段常需再加列。';
 
 type TurnaroundLimitGridProps = {
   tasks: ScheduleTask[];
@@ -54,22 +55,30 @@ function TurnaroundLimitHoverCard({
   estimatedTripSeconds?: number | null;
 }) {
   const existingVehicles = segment.activePassengerCount;
-  const recommendedVehicles =
-    segment.headwaySeconds && segment.headwaySeconds > 0 && estimatedTripSeconds
-      ? Math.ceil(estimatedTripSeconds / segment.headwaySeconds)
-      : null;
+  const intervalDurationSeconds =
+    (segment.endMinute - segment.startMinute) * 60;
+  const fleet = recommendFleetRowCount({
+    cycleSeconds: estimatedTripSeconds ?? 0,
+    headwaySeconds: segment.headwaySeconds ?? 0,
+    intervalDurationSeconds,
+  });
+  const recommendedVehicles = fleet?.recommended ?? null;
+  const theoreticalMin = fleet?.theoreticalMin ?? null;
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-max max-w-[240px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      className="pointer-events-none fixed z-[10050] w-max max-w-[280px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
       style={{ top: pos.top, left: pos.left }}
       role="tooltip"
     >
       <div className="text-[11px] font-medium leading-4 text-zinc-100">
-        已排：{existingVehicles} 台
+        已排正線：{existingVehicles} 列
       </div>
       <div className="text-[11px] font-medium leading-4 text-zinc-100">
-        建議：{recommendedVehicles != null ? `${recommendedVehicles} 台` : '—'}
+        建議列數：{recommendedVehicles != null ? `${recommendedVehicles} 列` : '—'}
+        {theoreticalMin != null && theoreticalMin !== recommendedVehicles
+          ? `（理論下限 ${theoreticalMin}）`
+          : null}
       </div>
       <div className="mt-1 space-y-0.5 text-[10px] leading-4 tabular-nums text-[#F3F4F6]">
         <div>開始：{formatMinuteAsHms(segment.startMinute)}</div>
@@ -78,6 +87,13 @@ function TurnaroundLimitHoverCard({
           <div>班距：{segment.headwaySeconds} 秒</div>
         ) : null}
       </div>
+      {fleet?.tips?.length ? (
+        <ul className="mt-1.5 space-y-0.5 border-t border-zinc-800 pt-1.5 text-[10px] leading-4 text-zinc-400">
+          {fleet.tips.map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
+        </ul>
+      ) : null}
       <div
         className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
         aria-hidden
@@ -198,13 +214,15 @@ export function TurnaroundLimitGrid({
               ((segment.endMinute - segment.startMinute) / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
             
             const existingVehicles = segment.activePassengerCount;
-            const recommendedVehicles =
-              segment.headwaySeconds && segment.headwaySeconds > 0 && estimatedTripSeconds
-                ? Math.ceil(estimatedTripSeconds / segment.headwaySeconds)
-                : null;
+            const fleet = recommendFleetRowCount({
+              cycleSeconds: estimatedTripSeconds ?? 0,
+              headwaySeconds: segment.headwaySeconds ?? 0,
+              intervalDurationSeconds: (segment.endMinute - segment.startMinute) * 60,
+            });
+            const recommendedVehicles = fleet?.recommended ?? null;
 
-            const label = `已排: ${existingVehicles}台, 建議: ${
-              recommendedVehicles != null ? `${recommendedVehicles}台` : '—台'
+            const label = `已排: ${existingVehicles}列, 建議: ${
+              recommendedVehicles != null ? `${recommendedVehicles}列` : '—列'
             }`;
 
             return (
