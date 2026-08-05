@@ -1358,9 +1358,9 @@ export function StepShiftRouteGroups({
       ) {
         blockers.push('找不到從起算到結算的路徑');
       } else if (listedIsStale || listedThroughCycles.length === 0) {
-        blockers.push('請按右下角「開始檢查／重新檢查路線組合」確認後才能下一步');
+        blockers.push('請按右下角「重新檢查路線組合」確認後才能下一步');
       } else {
-        blockers.push('請按右下角「開始檢查路線組合」確認後才能下一步');
+        blockers.push('請按右下角「產生路線組合」確認後才能下一步');
       }
     }
     const recovery = draft.minimumRecoveryTimeSeconds;
@@ -1796,6 +1796,16 @@ export function StepShiftRouteGroups({
                   ) : null}
 
                   <div className="flex flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      disabled={!cycleMarksReady || !graphHasLinks}
+                      onClick={runThroughVerification}
+                      className="rounded-md border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 px-3 py-1.5 text-xs font-medium text-[#9ec5ff] hover:bg-[#2B7FFF]/25 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {listedThroughCycles.length > 0
+                        ? '重新檢查路線組合'
+                        : '產生路線組合'}
+                    </button>
                     {nextStepBlockers.length > 0 ? (
                       <div className="w-full rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-left text-[11px] text-amber-100/90">
                         <p className="font-medium text-amber-200">下一步尚無法使用：</p>
@@ -1806,14 +1816,6 @@ export function StepShiftRouteGroups({
                         </ul>
                       </div>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled={!cycleMarksReady || !graphHasLinks}
-                      onClick={runThroughVerification}
-                      className="rounded-md border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 px-3 py-1.5 text-xs font-medium text-[#9ec5ff] hover:bg-[#2B7FFF]/25 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {throughVerified ? '重新檢查路線組合' : '開始檢查路線組合'}
-                    </button>
                   </div>
                 </div>
               ) : null}

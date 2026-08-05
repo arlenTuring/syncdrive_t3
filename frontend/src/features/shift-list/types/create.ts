@@ -1191,8 +1191,13 @@ export function isCreateShiftScheduleStepComplete(
     }
     const recoverySeconds = draft.routeGroups.minimumRecoveryTimeSeconds;
     const primaryRoutes = routes.filter((route) => isPrimarySelectedRoute(route));
+    const anchors = draft.routeGroups.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+    const preferredId = anchors.preferredThroughCycleId?.trim() || '';
+    const preferredOk =
+      preferredId.length > 0
+      && (anchors.listedThroughCycles ?? []).some((cycle) => cycle.id === preferredId);
     const throughOk = isThroughVerificationCurrent({
-      anchors: draft.routeGroups.throughAnchors,
+      anchors,
       routes: primaryRoutes,
       graph: draft.routeGroups.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
       minimumRecoveryTimeSeconds: recoverySeconds,
@@ -1201,6 +1206,7 @@ export function isCreateShiftScheduleStepComplete(
     return (
       recoverySeconds !== null
       && routes.length > 0
+      && preferredOk
       && throughOk
       && routes.every(
         (route) =>
