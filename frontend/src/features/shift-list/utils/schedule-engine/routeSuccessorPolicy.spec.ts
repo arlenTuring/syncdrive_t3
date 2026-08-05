@@ -118,6 +118,8 @@ describe('buildRouteSuccessorPolicy', () => {
         verifiedFingerprint: null,
         verifiedPathCount: 0,
         preferredThroughCycleId: null,
+        listedThroughCycles: [],
+        listedFingerprint: null,
       },
       minimumRecoveryTimeSeconds: 30,
     });
@@ -153,6 +155,8 @@ describe('buildRouteSuccessorPolicy', () => {
       verifiedFingerprint: null,
       verifiedPathCount: 0,
       preferredThroughCycleId: null,
+      listedThroughCycles: [],
+      listedFingerprint: null,
     };
     anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
       startStationIds: anchors.startStationIds,
@@ -198,6 +202,8 @@ describe('buildRouteSuccessorPolicy', () => {
       verifiedFingerprint: null,
       verifiedPathCount: 0,
       preferredThroughCycleId: null,
+      listedThroughCycles: [],
+      listedFingerprint: null,
     };
     anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
       startStationIds: anchors.startStationIds,
@@ -312,6 +318,8 @@ describe('buildRouteSuccessorPolicy', () => {
       verifiedFingerprint: null,
       verifiedPathCount: 0,
       preferredThroughCycleId: null,
+      listedThroughCycles: [],
+      listedFingerprint: null,
     };
     anchors.verifiedFingerprint = buildThroughVerificationFingerprint({
       startInstanceIds: anchors.startInstanceIds,

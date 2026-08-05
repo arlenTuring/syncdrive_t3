@@ -417,10 +417,16 @@ export type ShiftRouteThroughAnchorsDraft = {
   verifiedPathCount: number;
   /**
    * 使用者指定「優先採用」的導通組合 id（RouteThroughCycle.id）。
-   * 排班以該組合為輪替；約束衝突時才改派其他／備用。
-   * 為 null 時預設採全優先中最快者（若無全優先則採整體最快）。
+   * Step 4 必須點選後才能下一步；排班以此為開輪偏好。
    */
   preferredThroughCycleId: string | null;
+  /**
+   * 最近一次「檢查路線組合」算出的清單（持久保存；回 Step 4 仍顯示）。
+   * 僅在使用者再按檢查時覆寫。
+   */
+  listedThroughCycles: RouteThroughCycle[];
+  /** 算出 listedThroughCycles 當下的輸入指紋（用來判斷清單是否過時） */
+  listedFingerprint: string | null;
 };
 
 export function emptyShiftRouteThroughAnchorsDraft(): ShiftRouteThroughAnchorsDraft {
@@ -432,7 +438,23 @@ export function emptyShiftRouteThroughAnchorsDraft(): ShiftRouteThroughAnchorsDr
     verifiedFingerprint: null,
     verifiedPathCount: 0,
     preferredThroughCycleId: null,
+    listedThroughCycles: [],
+    listedFingerprint: null,
   };
+}
+
+/** 全優先在前、次要在後；同層再依最快秒數 */
+export function sortListedThroughCycles(
+  cycles: RouteThroughCycle[],
+): RouteThroughCycle[] {
+  return [...cycles].sort((a, b) => {
+    if (a.secondaryCount === 0 && b.secondaryCount > 0) return -1;
+    if (a.secondaryCount > 0 && b.secondaryCount === 0) return 1;
+    if (a.minCycleSeconds !== b.minCycleSeconds) {
+      return a.minCycleSeconds - b.minCycleSeconds;
+    }
+    return a.id.localeCompare(b.id);
+  });
 }
 
 /** 解析優先採用組合；無效偏好時回退全優先最快（再退整體最快） */
@@ -448,14 +470,46 @@ export function resolvePreferredThroughCycle(
   }
   const priorityOnly = cycles.filter((item) => item.secondaryCount === 0);
   const pool = priorityOnly.length > 0 ? priorityOnly : cycles;
-  return (
-    [...pool].sort((a, b) => {
-      if (a.minCycleSeconds !== b.minCycleSeconds) {
-        return a.minCycleSeconds - b.minCycleSeconds;
-      }
-      return a.id.localeCompare(b.id);
-    })[0] ?? null
-  );
+  return sortListedThroughCycles(pool)[0] ?? null;
+}
+
+function parseRouteThroughCycle(raw: unknown): RouteThroughCycle | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === 'string' ? o.id.trim() : '';
+  if (!id) return null;
+  const instanceIds = Array.isArray(o.instanceIds)
+    ? o.instanceIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim())
+    : [];
+  if (instanceIds.length === 0) return null;
+  const labels = Array.isArray(o.labels)
+    ? o.labels.map((item) => (typeof item === 'string' ? item : String(item ?? '')))
+    : instanceIds;
+  const linkKinds = Array.isArray(o.linkKinds)
+    ? o.linkKinds.map((item) => (item === 'secondary' ? 'secondary' as const : 'priority' as const))
+    : [];
+  const num = (value: unknown, fallback = 0) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return {
+    id,
+    instanceIds,
+    labels,
+    startStationId: typeof o.startStationId === 'string' ? o.startStationId : '',
+    startStationName: typeof o.startStationName === 'string' ? o.startStationName : '',
+    endStationId: typeof o.endStationId === 'string' ? o.endStationId : '',
+    endStationName: typeof o.endStationName === 'string' ? o.endStationName : '',
+    hopCount: Math.max(1, Math.round(num(o.hopCount, instanceIds.length))),
+    secondaryCount: Math.max(0, Math.round(num(o.secondaryCount, 0))),
+    linkKinds,
+    minTravelSeconds: Math.round(num(o.minTravelSeconds)),
+    avgTravelSeconds: Math.round(num(o.avgTravelSeconds)),
+    dwellSeconds: Math.round(num(o.dwellSeconds)),
+    switchBufferSeconds: Math.round(num(o.switchBufferSeconds)),
+    recoverySeconds: Math.round(num(o.recoverySeconds)),
+    minCycleSeconds: Math.round(num(o.minCycleSeconds)),
+    avgCycleSeconds: Math.round(num(o.avgCycleSeconds)),
+  };
 }
 
 export function parseShiftRouteThroughAnchorsDraft(
@@ -495,6 +549,17 @@ export function parseShiftRouteThroughAnchorsDraft(
     typeof o.preferredThroughCycleId === 'string' && o.preferredThroughCycleId.trim()
       ? o.preferredThroughCycleId.trim()
       : null;
+  const listedThroughCycles = Array.isArray(o.listedThroughCycles)
+    ? sortListedThroughCycles(
+        o.listedThroughCycles
+          .map((item) => parseRouteThroughCycle(item))
+          .filter((item): item is RouteThroughCycle => item != null),
+      )
+    : [];
+  const listedFingerprint =
+    typeof o.listedFingerprint === 'string' && o.listedFingerprint.trim()
+      ? o.listedFingerprint.trim()
+      : null;
   return {
     startStationIds: [...new Set(startStationIds)],
     endStationIds: [...new Set(endStationIds)],
@@ -503,6 +568,8 @@ export function parseShiftRouteThroughAnchorsDraft(
     verifiedFingerprint,
     verifiedPathCount,
     preferredThroughCycleId,
+    listedThroughCycles,
+    listedFingerprint,
   };
 }
 

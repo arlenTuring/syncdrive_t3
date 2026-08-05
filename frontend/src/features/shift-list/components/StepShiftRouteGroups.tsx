@@ -63,7 +63,7 @@ import {
   computeRouteThroughPaths,
   emptyShiftRouteThroughAnchorsDraft,
   isThroughVerificationCurrent,
-  resolvePreferredThroughCycle,
+  sortListedThroughCycles,
   type RouteThroughCycle,
 } from '../utils/routeRelationThroughCycles';
 import { resolveRouteOriginStation } from '../utils/routeRelationGraph';
@@ -624,8 +624,6 @@ export function StepShiftRouteGroups({
   const [addPrimaryOpen, setAddPrimaryOpen] = useState(false);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [pendingEditRouteId, setPendingEditRouteId] = useState('');
-  const [throughResults, setThroughResults] = useState<RouteThroughCycle[] | null>(null);
-  const [lastCheckFingerprint, setLastCheckFingerprint] = useState<string | null>(null);
 
   const draftRef = useRef(draft);
   const onChangeRef = useRef(onChange);
@@ -769,8 +767,7 @@ export function StepShiftRouteGroups({
       || 'avgTravelTimeSeconds' in patch
       || 'stationLegTravels' in patch;
     if (affectsThrough) {
-      setThroughResults(null);
-      setLastCheckFingerprint(null);
+      // 結構變更只讓驗證失效；清單保留到使用者再按檢查
     }
     onChange((prev) => {
       const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
@@ -796,7 +793,6 @@ export function StepShiftRouteGroups({
     const normalized = normalizeSelectedRouteExecutionOrders(
       selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
     );
-    setThroughResults(null);
     onChange((prev) => {
       const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
       return {
@@ -915,7 +911,6 @@ export function StepShiftRouteGroups({
         instanceId,
       ),
     );
-    setThroughResults(null);
     onChange({
       ...draft,
       selectedRoutes: normalized,
@@ -991,7 +986,6 @@ export function StepShiftRouteGroups({
     const seconds =
       digits === '' ? null : normalizeMinimumRecoveryTimeSeconds(Number(digits));
     const anchors = draft.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
-    setThroughResults(null);
     onChange({
       ...draft,
       minimumRecoveryTimeSeconds: seconds,
@@ -1089,7 +1083,6 @@ export function StepShiftRouteGroups({
   const patchThroughAnchors = (
     patch: Partial<ReturnType<typeof emptyShiftRouteThroughAnchorsDraft>>,
   ) => {
-    setThroughResults(null);
     onChange({
       ...draft,
       throughAnchors: {
@@ -1136,7 +1129,6 @@ export function StepShiftRouteGroups({
         },
       };
     });
-    setThroughResults(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 僅在路線集合變化時清理失效起算／結算
   }, [primaryRoutes]);
 
@@ -1178,21 +1170,24 @@ export function StepShiftRouteGroups({
     ],
   );
 
-  /** 僅顯示與目前輸入一致的檢查結果，避免舊結果＋「請重新檢查」造成誤解 */
-  const freshThroughResults =
-    throughResults != null
-    && lastCheckFingerprint != null
-    && lastCheckFingerprint === currentCheckFingerprint
-      ? throughResults
-      : null;
+  /** 持久清單：回 Step 4 仍顯示；僅按「檢查」時覆寫 */
+  const listedThroughCycles = useMemo(
+    () => sortListedThroughCycles(throughAnchors.listedThroughCycles ?? []),
+    [throughAnchors.listedThroughCycles],
+  );
+  const listedIsStale =
+    listedThroughCycles.length > 0
+    && (
+      !throughAnchors.listedFingerprint
+      || throughAnchors.listedFingerprint !== currentCheckFingerprint
+    );
+  const hasExplicitPreferred = Boolean(throughAnchors.preferredThroughCycleId?.trim());
 
   const referenceCycle = useMemo(() => {
-    if (!freshThroughResults || freshThroughResults.length === 0) return null;
-    return resolvePreferredThroughCycle(
-      freshThroughResults,
-      throughAnchors.preferredThroughCycleId,
-    );
-  }, [freshThroughResults, throughAnchors.preferredThroughCycleId]);
+    const preferredId = throughAnchors.preferredThroughCycleId?.trim();
+    if (!preferredId || listedThroughCycles.length === 0) return null;
+    return listedThroughCycles.find((item) => item.id === preferredId) ?? null;
+  }, [listedThroughCycles, throughAnchors.preferredThroughCycleId]);
 
   const hasLimit = turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0;
   const isOver =
@@ -1209,24 +1204,19 @@ export function StepShiftRouteGroups({
       turnaroundLimitSeconds != null
       && turnaroundLimitSeconds > 0
       && cycle.minCycleSeconds > turnaroundLimitSeconds;
-    if (overLimit) {
-      onChange({
-        ...draft,
-        throughAnchors: {
-          ...throughAnchors,
-          preferredThroughCycleId: cycle.id,
-          verifiedFingerprint: null,
-          verifiedPathCount: 0,
-        },
-      });
-      return;
-    }
+    const listFresh =
+      throughAnchors.listedFingerprint != null
+      && throughAnchors.listedFingerprint === currentCheckFingerprint
+      && listedThroughCycles.some((item) => item.id === cycle.id);
+    const canVerify =
+      listFresh && !overLimit && headInStarts && graphHasLinks && cycleMarksReady;
     onChange({
       ...draft,
       throughAnchors: {
         ...throughAnchors,
         preferredThroughCycleId: cycle.id,
-        // 指紋不變時維持已通過；僅切換偏好
+        verifiedFingerprint: canVerify ? currentCheckFingerprint : null,
+        verifiedPathCount: canVerify ? listedThroughCycles.length : 0,
       },
     });
   };
@@ -1234,13 +1224,15 @@ export function StepShiftRouteGroups({
   const runThroughVerification = () => {
     if (!cycleMarksReady || !graphHasLinks) return;
     const graph = draft.routeRelationGraph ?? emptyShiftRouteRelationGraph();
-    const paths = computeRouteThroughPaths({
-      startInstanceIds,
-      endInstanceIds,
-      routes: primaryRoutes,
-      graph,
-      minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
-    });
+    const paths = sortListedThroughCycles(
+      computeRouteThroughPaths({
+        startInstanceIds,
+        endInstanceIds,
+        routes: primaryRoutes,
+        graph,
+        minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
+      }),
+    );
     const checkFingerprint = buildThroughVerificationFingerprint({
       startInstanceIds,
       endInstanceIds,
@@ -1249,40 +1241,34 @@ export function StepShiftRouteGroups({
       minimumRecoveryTimeSeconds: draft.minimumRecoveryTimeSeconds,
       turnaroundLimitSeconds,
     });
-    setThroughResults(paths);
-    setLastCheckFingerprint(checkFingerprint);
-    const preferred = resolvePreferredThroughCycle(
-      paths,
-      throughAnchors.preferredThroughCycleId,
-    );
+    const previousPreferredId = throughAnchors.preferredThroughCycleId?.trim() || null;
+    const preferredStillValid =
+      previousPreferredId != null && paths.some((item) => item.id === previousPreferredId)
+        ? paths.find((item) => item.id === previousPreferredId)!
+        : null;
     const overLimit =
       turnaroundLimitSeconds != null
       && turnaroundLimitSeconds > 0
-      && preferred != null
-      && preferred.minCycleSeconds > turnaroundLimitSeconds;
+      && preferredStillValid != null
+      && preferredStillValid.minCycleSeconds > turnaroundLimitSeconds;
     const headOk = headInStarts;
-    if (paths.length === 0 || preferred == null || overLimit || !headOk) {
-      onChange({
-        ...draft,
-        throughAnchors: {
-          ...throughAnchors,
-          preferredThroughCycleId: preferred?.id ?? null,
-          verifiedFingerprint: null,
-          verifiedPathCount: 0,
-        },
-      });
-      return;
-    }
-    // 路線模式：清掉舊站點錨點，避免指紋比對混入 stationIds 導致「有結果卻未通過」
+    // 檢查只更新清單；未點選「優先採用」不得視為通過
+    const canVerify =
+      paths.length > 0
+      && preferredStillValid != null
+      && !overLimit
+      && headOk;
     onChange({
       ...draft,
       throughAnchors: {
         ...throughAnchors,
         startStationIds: [],
         endStationIds: [],
-        preferredThroughCycleId: preferred.id,
-        verifiedFingerprint: checkFingerprint,
-        verifiedPathCount: paths.length,
+        listedThroughCycles: paths,
+        listedFingerprint: checkFingerprint,
+        preferredThroughCycleId: preferredStillValid?.id ?? null,
+        verifiedFingerprint: canVerify ? checkFingerprint : null,
+        verifiedPathCount: canVerify ? paths.length : 0,
       },
     });
   };
@@ -1321,10 +1307,10 @@ export function StepShiftRouteGroups({
     | 'headNotInStarts'
     | 'stale'
     | 'failed'
-    | 'noPriority'
+    | 'missingPreferred'
     | 'overLimit'
     | 'passed' =
-    throughVerified && !isOver
+    throughVerified && !isOver && hasExplicitPreferred && referenceCycle != null
       ? 'passed'
       : !graphHasLinks
         ? 'missingGraph'
@@ -1332,13 +1318,20 @@ export function StepShiftRouteGroups({
           ? 'missingMarks'
           : !headInStarts
             ? 'headNotInStarts'
-            : freshThroughResults != null && freshThroughResults.length === 0
+            : throughAnchors.listedFingerprint === currentCheckFingerprint
+              && listedThroughCycles.length === 0
               ? 'failed'
-              : freshThroughResults != null && isOver
-                ? 'overLimit'
-                : throughVerified && isOver
+              : throughAnchors.listedFingerprint === currentCheckFingerprint
+                && listedThroughCycles.length > 0
+                && !hasExplicitPreferred
+                ? 'missingPreferred'
+                : throughAnchors.listedFingerprint === currentCheckFingerprint
+                  && listedThroughCycles.length > 0
+                  && isOver
                   ? 'overLimit'
-                  : 'stale';
+                  : throughVerified && isOver
+                    ? 'overLimit'
+                    : 'stale';
 
   const isManual = creationMode === 'manual';
 
@@ -1354,11 +1347,18 @@ export function StepShiftRouteGroups({
       blockers.push('尚未設好「由此起算」與「到此結算」');
     } else if (!headInStarts) {
       blockers.push('首班車必須也是起算路線');
+    } else if (!hasExplicitPreferred || referenceCycle == null) {
+      blockers.push('尚未選擇優先採用的路線組合');
     } else if (throughGateStatus === 'overLimit') {
       blockers.push('優先採用的路線組合超過折返時限');
     } else if (!throughVerified || throughGateStatus !== 'passed') {
-      if (throughGateStatus === 'failed') {
+      if (
+        throughAnchors.listedFingerprint === currentCheckFingerprint
+        && listedThroughCycles.length === 0
+      ) {
         blockers.push('找不到從起算到結算的路徑');
+      } else if (listedIsStale || listedThroughCycles.length === 0) {
+        blockers.push('請按右下角「開始檢查／重新檢查路線組合」確認後才能下一步');
       } else {
         blockers.push('請按右下角「開始檢查路線組合」確認後才能下一步');
       }
@@ -1379,10 +1379,16 @@ export function StepShiftRouteGroups({
     graphHasLinks,
     cycleMarksReady,
     headInStarts,
+    hasExplicitPreferred,
+    referenceCycle,
     throughVerified,
     throughGateStatus,
     primaryRoutes,
     turnaroundLimitSeconds,
+    throughAnchors.listedFingerprint,
+    currentCheckFingerprint,
+    listedThroughCycles.length,
+    listedIsStale,
   ]);
 
   const renderConfiguredCard = (route: ShiftScheduleSelectedRoute) => {
@@ -1630,7 +1636,6 @@ export function StepShiftRouteGroups({
                 startInstanceIds={startInstanceIds}
                 endInstanceIds={endInstanceIds}
                 onChange={(routeRelationGraph) => {
-                  setThroughResults(null);
                   onChange({
                     ...draft,
                     routeRelationGraph,
@@ -1665,14 +1670,22 @@ export function StepShiftRouteGroups({
                       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
                       <span>找不到從起算走到結算的路徑，請檢查優先連線。</span>
                     </p>
+                  ) : throughGateStatus === 'missingPreferred' ? (
+                    <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                      <span>請在下方清單點選一列設為「優先採用」後才能下一步。</span>
+                    </p>
                   ) : null}
 
-                  {freshThroughResults != null && freshThroughResults.length > 0 ? (
+                  {listedThroughCycles.length > 0 ? (
                     <div className="space-y-1">
                       <p className="pb-1 text-[11px] text-zinc-500">
-                        點選一列設為「優先採用」：排班會盡量走這組，約束衝突時才改派其他組合。
+                        點選一列設為「優先採用」（全優先在上、次要在下）。
+                        {listedIsStale
+                          ? ' 清單可能已過時，變更關聯後請再按檢查更新。'
+                          : ' 排班會盡量走這組，約束衝突時才改派其他組合。'}
                       </p>
-                      {freshThroughResults.map((cycle) => {
+                      {listedThroughCycles.map((cycle) => {
                         const rowOver =
                           hasLimit && cycle.minCycleSeconds > (turnaroundLimitSeconds ?? 0);
                         const isReference = referenceCycle?.id === cycle.id;
@@ -1686,7 +1699,9 @@ export function StepShiftRouteGroups({
                               'flex w-full items-start justify-between gap-6 rounded-md px-2 py-2.5 text-left text-sm transition-colors',
                               isReference
                                 ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40'
-                                : 'hover:bg-zinc-800/50',
+                                : listedIsStale
+                                  ? 'opacity-80 hover:bg-zinc-800/50'
+                                  : 'hover:bg-zinc-800/50',
                             ].join(' ')}
                           >
                             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
