@@ -555,16 +555,36 @@ export function enforceStationBerthConstraints(args: {
               nextRoute: assumedNext,
             })
           : 0;
-      const maxAllowed = maxDelayAllowedSeconds({
-        preferredStartSecond,
-        occupancySeconds: evaluated.occupancySeconds,
-        nextSameRowStartSecond:
-          nextPassenger != null
-            ? minuteToSecond(nextPassenger.plannedStartMinute)
-            : null,
-        gapBeforeNextSeconds: gapBeforeNext,
-        maxDelaySeconds,
-      });
+    const nextMaintenance =
+      blockIndex >= 0
+        ? rowBlocks.slice(blockIndex + 1).find(
+            (item) =>
+              item.source === 'template_bar'
+              && item.taskType !== 'passenger'
+              && (
+                item.taskType === 'charging'
+                || item.taskType === 'servicing'
+                || item.taskType === 'inspection'
+                || item.taskType === 'standby'
+              ),
+          )
+        : undefined;
+    const nextCaps: number[] = [];
+    if (nextPassenger != null) {
+      nextCaps.push(minuteToSecond(nextPassenger.plannedStartMinute));
+    }
+    if (nextMaintenance != null) {
+      nextCaps.push(minuteToSecond(nextMaintenance.plannedStartMinute));
+    }
+    const nextSameRowStartSecond =
+      nextCaps.length > 0 ? Math.min(...nextCaps) : null;
+    const maxAllowed = maxDelayAllowedSeconds({
+      preferredStartSecond,
+      occupancySeconds: evaluated.occupancySeconds,
+      nextSameRowStartSecond,
+      gapBeforeNextSeconds: gapBeforeNext,
+      maxDelaySeconds,
+    });
       return {
         route,
         delaySeconds: evaluated.delaySeconds,

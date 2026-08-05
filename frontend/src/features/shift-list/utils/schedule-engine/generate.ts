@@ -31,6 +31,7 @@ import {
   validateStationBerthCollisions,
 } from './validate';
 import { enforceStationBerthConstraints } from '../stationBerthConstraint';
+import { applyMainlineMaintenanceEntryYield } from '../mainlineMaintenanceEntryYield';
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -128,6 +129,8 @@ export function generateShiftSchedule(
     warnings,
   });
 
+  timelines = applyMainlineMaintenanceEntryYield(timelines);
+
   // 站位約束需要主＋備用；輪替仍只用主路線
   const routesForBerth = [
     ...engineInput.selectedRoutes,
@@ -142,6 +145,9 @@ export function generateShiftSchedule(
     successorPolicy: engineInput.successorPolicy,
     warnings,
   }).timelines;
+
+  // 站位延後等後處理後，再套一次正線優先讓渡，避免正線尾端與整備開頭重疊
+  timelines = applyMainlineMaintenanceEntryYield(timelines);
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(
