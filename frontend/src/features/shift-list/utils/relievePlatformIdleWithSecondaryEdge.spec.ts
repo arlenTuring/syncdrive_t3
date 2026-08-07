@@ -393,3 +393,107 @@ describe('relievePlatformIdleWithSecondaryEdge', () => {
     assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
   });
 });
+
+/**
+ * 使用者實際的關聯圖形狀（2026-08-08）：主線與備用是<strong>成對的替身</strong>，
+ * 停不同的站位，而不是「繞出去再繞回來」。
+ *
+ *   ST ─優→ TN（終點 N2W下行出發）─優→ NT（起點 N2W下行出發）─優→ TS
+ *   ST ─次→ TNB（終點 備用N2W）───優→ NTB（起點 備用N2W）───優→ TS
+ *
+ * 車跑完 TN 停在 N2W下行出發、等著跑 NT 從那裡出發，這段空等擋住別台車時，
+ * 正解是整對換成 TNB→NTB 停到備用站位，時刻完全不動。
+ */
+describe('滯留改停備用站位（成對替身）', () => {
+  const st = route({ routeId: 'st', routeCode: 'ST', stationIds: ['S2W', 'T3上行'] });
+  const tn = route({ routeId: 'tn', routeCode: 'TN', stationIds: ['T3上行', 'N2W下行出發'] });
+  const nt = route({ routeId: 'nt', routeCode: 'NT', stationIds: ['N2W下行出發', 'T3下行'] });
+  const tnb = route({ routeId: 'tnb', routeCode: 'TNB', stationIds: ['T3上行', '備用N2W'] });
+  const ntb = route({ routeId: 'ntb', routeCode: 'NTB', stationIds: ['備用N2W', 'T3下行'] });
+  const ts = route({ routeId: 'ts', routeCode: 'TS', stationIds: ['T3下行', 'S2W'] });
+  /** 別列車：也要用到 N2W下行出發 */
+  const rival = route({ routeId: 'rival', routeCode: 'RIVAL', stationIds: ['Q', 'N2W下行出發'] });
+  const allRoutes = [st, tn, nt, tnb, ntb, ts, rival];
+
+  function policy(): RouteSuccessorPolicy {
+    return {
+      algorithm: ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+      valid: true,
+      routesByInstanceId: new Map([
+        ['st', st], ['tn', tn], ['nt', nt],
+        ['tnb', tnb], ['ntb', ntb], ['ts', ts], ['rival', rival],
+      ]),
+      rotationRoutes: [nt, ts, st, tn],
+      prioritySuccessors: new Map([
+        ['st', ['tn']],
+        ['tn', ['nt']],
+        ['nt', ['ts']],
+        ['tnb', ['ntb']],
+        ['ntb', ['ts']],
+        ['ts', ['st']],
+      ]),
+      secondarySuccessors: new Map([['st', ['tnb']]]),
+      startInstanceIds: ['nt'],
+      endInstanceIds: new Set(['tn']),
+      canonicalCycleInstanceIds: ['nt', 'ts', 'st', 'tn'],
+      throughCycles: [],
+    };
+  }
+
+  /** row1：ST → TN（停在 N2W下行出發）→ 空等 → NT。row2：別台車也要 N2W下行出發 */
+  function timelines(): GeneratedScheduleTimeline[] {
+    const mk = (
+      id: string, row: number, start: number, routeId: string, code: string,
+    ) => block({
+      id, timelineRow: row,
+      plannedStartMinute: start,
+      plannedEndMinute: start + 170 / 60,
+      routeId, routeCode: code, routeInstanceId: routeId,
+    });
+    return [
+      { row: 1, blocks: [mk('st1', 1, 56, 'st', 'ST'), mk('tn1', 1, 60, 'tn', 'TN'), mk('nt1', 1, 70, 'nt', 'NT')] },
+      { row: 2, blocks: [mk('rival1', 2, 65, 'rival', 'RIVAL')] },
+    ];
+  }
+
+  it('整對換成備用替身、時刻完全不動', () => {
+    const warnings: never[] = [];
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: timelines(),
+      selectedRoutes: allRoutes,
+      successorPolicy: policy(),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: warnings as never,
+    });
+
+    const row1 = result.find((t) => t.row === 1)!;
+    const tnBlock = row1.blocks.find((b) => b.id === 'tn1')!;
+    const ntBlock = row1.blocks.find((b) => b.id === 'nt1')!;
+    assert.equal(tnBlock.routeId, 'tnb', 'TN 應換成 TNB');
+    assert.equal(ntBlock.routeId, 'ntb', 'NT 應換成 NTB');
+    // 發車時刻不得改變——這是這個做法相對「延後」最重要的性質
+    assert.equal(tnBlock.plannedStartMinute, 60);
+    assert.equal(ntBlock.plannedStartMinute, 70);
+    // 不是靠插入班次解決的
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+    assert.equal(row1.blocks.length, 3, '不應多出任何班次');
+    assert.equal((warnings[0] as { code: string }).code, 'STATION_BERTH_BACKUP_USED');
+  });
+
+  it('沒有備用替身可換（關聯圖沒那條次要邊）→ 不動', () => {
+    const p = policy();
+    p.secondarySuccessors = new Map();
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: timelines(),
+      selectedRoutes: allRoutes,
+      successorPolicy: p,
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.find((b) => b.id === 'tn1')!.routeId, 'tn');
+    assert.equal(row1.blocks.find((b) => b.id === 'nt1')!.routeId, 'nt');
+  });
+});

@@ -225,6 +225,285 @@ function tryBuildReliefBlocks(args: {
   return blocks;
 }
 
+/** 關聯圖上這個節點的全部出邊（優先在前、次要在後） */
+function listGraphSuccessorIds(
+  successorPolicy: RouteSuccessorPolicy,
+  instanceId: string,
+): string[] {
+  return [
+    ...(successorPolicy.prioritySuccessors.get(instanceId) ?? []),
+    ...(successorPolicy.secondarySuccessors.get(instanceId) ?? []),
+  ];
+}
+
+type BerthSwapPair = {
+  parkTrip: { instanceId: string; route: ShiftScheduleSelectedRoute };
+  leaveTrip: { instanceId: string; route: ShiftScheduleSelectedRoute };
+};
+
+/**
+ * 找一組「停在別的站位」的替身路線（文件 §8.2）。
+ *
+ * 車跑完 A 停在 X、等著跑 B 從 X 出發，而 X 被別台車需要時，最省的解法
+ * <strong>不是繞路、也不是延後</strong>，而是把這一對班次換成停別的站位的替身：
+ * A → A'（終點不是 X）、B → B'（起點不是 X）。<strong>時刻完全不動</strong>，
+ * 只換路線，所以對班距零影響——這正是使用者在關聯圖上準備備用路線的用意。
+ *
+ * 換過去必須整條接得起來：前一趟接得上 A'、A' 接得上 B'、B' 接得上後一趟。
+ */
+function findBerthSwapPair(args: {
+  successorPolicy: RouteSuccessorPolicy;
+  /** 前一趟（決定 A' 有哪些合法選擇）；沒有前一趟就不限制出邊 */
+  previousInstanceId: string | null;
+  /** 後一趟（B' 必須接得上它）；沒有就不限制 */
+  followingInstanceId: string | null;
+  currentParkInstanceId: string;
+  currentLeaveInstanceId: string;
+  /** 要讓出來的站位 */
+  parkedStationId: string;
+  /** A' 必須從這裡發車（＝ A 原本的起點站，車是從那裡開過來的） */
+  requiredParkTripOriginStationId: string;
+}): BerthSwapPair | null {
+  const {
+    successorPolicy,
+    previousInstanceId,
+    followingInstanceId,
+    currentParkInstanceId,
+    currentLeaveInstanceId,
+    parkedStationId,
+    requiredParkTripOriginStationId,
+  } = args;
+
+  const parkCandidateIds = previousInstanceId
+    ? listGraphSuccessorIds(successorPolicy, previousInstanceId)
+    : [...successorPolicy.routesByInstanceId.keys()];
+
+  for (const parkId of parkCandidateIds) {
+    if (parkId === currentParkInstanceId) continue;
+    const parkRoute = successorPolicy.routesByInstanceId.get(parkId);
+    if (!parkRoute || !resolvePassengerRouteOccupancy(parkRoute)) continue;
+    // 車是從原本的起點站開過來的，替身也得從那裡發車
+    if (routeStartStation(parkRoute) !== requiredParkTripOriginStationId) continue;
+    const parkTerminal = routeEndStation(parkRoute);
+    // 換了還是停同一個站位就沒意義
+    if (!parkTerminal || parkTerminal === parkedStationId) continue;
+
+    for (const leaveId of listGraphSuccessorIds(successorPolicy, parkId)) {
+      if (leaveId === currentLeaveInstanceId) continue;
+      const leaveRoute = successorPolicy.routesByInstanceId.get(leaveId);
+      if (!leaveRoute || !resolvePassengerRouteOccupancy(leaveRoute)) continue;
+      // 停哪就從哪出發
+      if (routeStartStation(leaveRoute) !== parkTerminal) continue;
+      if (followingInstanceId) {
+        // 換完還要接得回原本排定的後一趟
+        if (!listGraphSuccessorIds(successorPolicy, leaveId).includes(followingInstanceId)) {
+          continue;
+        }
+        const followingRoute = successorPolicy.routesByInstanceId.get(followingInstanceId);
+        if (!followingRoute) continue;
+        if (routeEndStation(leaveRoute) !== routeStartStation(followingRoute)) continue;
+      }
+      return {
+        parkTrip: { instanceId: parkId, route: parkRoute },
+        leaveTrip: { instanceId: leaveId, route: leaveRoute },
+      };
+    }
+  }
+  return null;
+}
+
+/** 該站位在這段時間內有沒有被<strong>別列</strong>車佔著 */
+function stationBusyForOtherRows(
+  occupancies: StationBerthOccupancy[],
+  stationId: string,
+  selfTimelineRow: number,
+  fromMinute: number,
+  toMinute: number,
+): boolean {
+  return occupancies.some(
+    (occ) =>
+      occ.stationId === stationId
+      && occ.timelineRow !== selfTimelineRow
+      && occ.startMinute < toMinute - 1e-9
+      && occ.protectedUntilMinute > fromMinute + 1e-9,
+  );
+}
+
+/** 同一列、依時間排序的正線班次（用來找前一趟／後一趟） */
+function sameRowMainlineBlocks(
+  timeline: GeneratedScheduleTimeline,
+): GeneratedScheduleBlock[] {
+  return [...timeline.blocks]
+    .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar')
+    .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+}
+
+function instanceIdOf(
+  block: GeneratedScheduleBlock,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+): string | null {
+  const trimmed = block.routeInstanceId?.trim();
+  if (trimmed) return trimmed;
+  const route = resolveRouteForBlock(block, selectedRoutes);
+  return route ? route.instanceId?.trim() || route.routeId : null;
+}
+
+/**
+ * 策略一：把「停在爭用站位的那一對班次」換成停別的站位的替身路線。
+ * 成功就地改寫並回報 <code>STATION_BERTH_BACKUP_USED</code>，回傳 true。
+ */
+function trySwapToBackupBerth(args: {
+  timelines: GeneratedScheduleTimeline[];
+  occupancies: StationBerthOccupancy[];
+  timeline: GeneratedScheduleTimeline;
+  /** 跑完之後停在爭用站位的那一趟 */
+  parkBlock: GeneratedScheduleBlock;
+  /** 等到時間才從該站位開走的那一趟 */
+  leaveBlock: GeneratedScheduleBlock;
+  parkedStationId: string;
+  parkedStationName: string;
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  successorPolicy: RouteSuccessorPolicy;
+  minimumRecoveryTimeSeconds: number;
+  warnings: FeasibilityIssue[];
+}): boolean {
+  const {
+    occupancies,
+    timeline,
+    parkBlock,
+    leaveBlock,
+    parkedStationId,
+    parkedStationName,
+    selectedRoutes,
+    successorPolicy,
+    minimumRecoveryTimeSeconds,
+    warnings,
+  } = args;
+
+  if (leaveBlock.taskType !== 'passenger' || leaveBlock.source !== 'template_bar') {
+    return false;
+  }
+  const parkRoute = resolveRouteForBlock(parkBlock, selectedRoutes);
+  const leaveRoute = resolveRouteForBlock(leaveBlock, selectedRoutes);
+  if (!parkRoute || !leaveRoute) return false;
+  const parkInstanceId = instanceIdOf(parkBlock, selectedRoutes);
+  const leaveInstanceId = instanceIdOf(leaveBlock, selectedRoutes);
+  if (!parkInstanceId || !leaveInstanceId) return false;
+  const parkOrigin = routeStartStation(parkRoute);
+  if (!parkOrigin) return false;
+
+  const ordered = sameRowMainlineBlocks(timeline);
+  const parkIndex = ordered.findIndex((block) => block.id === parkBlock.id);
+  const leaveIndex = ordered.findIndex((block) => block.id === leaveBlock.id);
+  if (parkIndex < 0 || leaveIndex < 0) return false;
+  const previousBlock = parkIndex > 0 ? ordered[parkIndex - 1] : null;
+  const followingBlock = leaveIndex + 1 < ordered.length ? ordered[leaveIndex + 1] : null;
+
+  const pair = findBerthSwapPair({
+    successorPolicy,
+    previousInstanceId: previousBlock ? instanceIdOf(previousBlock, selectedRoutes) : null,
+    followingInstanceId: followingBlock
+      ? instanceIdOf(followingBlock, selectedRoutes)
+      : null,
+    currentParkInstanceId: parkInstanceId,
+    currentLeaveInstanceId: leaveInstanceId,
+    parkedStationId,
+    requiredParkTripOriginStationId: parkOrigin,
+  });
+  if (!pair) return false;
+
+  const parkOccupancy = resolvePassengerRouteOccupancy(pair.parkTrip.route);
+  const leaveOccupancy = resolvePassengerRouteOccupancy(pair.leaveTrip.route);
+  if (!parkOccupancy || !leaveOccupancy) return false;
+
+  // 時刻不動，只換路線；但替身的行駛時間不一樣，結束時刻要重算並確認還排得下
+  const parkStartSecond = minuteToSecond(parkBlock.plannedStartMinute);
+  const parkEndSecond = parkStartSecond + parkOccupancy.occupancySeconds;
+  const leaveStartSecond = minuteToSecond(leaveBlock.plannedStartMinute);
+  const leaveEndSecond = leaveStartSecond + leaveOccupancy.occupancySeconds;
+
+  const parkToLeaveGap = gapBetween({
+    minimumRecoveryTimeSeconds,
+    fromRoute: pair.parkTrip.route,
+    toRoute: pair.leaveTrip.route,
+    rotationRoutes: selectedRoutes,
+  });
+  if (parkEndSecond + parkToLeaveGap > leaveStartSecond + 1e-9) return false;
+
+  if (followingBlock) {
+    const followingRoute = resolveRouteForBlock(followingBlock, selectedRoutes);
+    if (!followingRoute) return false;
+    const leaveToFollowingGap = gapBetween({
+      minimumRecoveryTimeSeconds,
+      fromRoute: pair.leaveTrip.route,
+      toRoute: followingRoute,
+      rotationRoutes: selectedRoutes,
+    });
+    if (
+      leaveEndSecond + leaveToFollowingGap
+      > minuteToSecond(followingBlock.plannedStartMinute) + 1e-9
+    ) {
+      return false;
+    }
+  }
+
+  // 換過去的新站位不能同樣被別列車佔著，否則只是把碰撞搬家
+  const newParkStationId = routeEndStation(pair.parkTrip.route)!;
+  if (
+    stationBusyForOtherRows(
+      occupancies,
+      newParkStationId,
+      parkBlock.timelineRow,
+      secondToMinute(parkEndSecond),
+      leaveBlock.plannedStartMinute,
+    )
+  ) {
+    return false;
+  }
+
+  const fromLabel = `${parkBlock.routeCode ?? parkRoute.routeCode ?? parkRoute.routeName}`
+    + ` → ${leaveBlock.routeCode ?? leaveRoute.routeCode ?? leaveRoute.routeName}`;
+  const toLabel = `${pair.parkTrip.route.routeCode ?? pair.parkTrip.route.routeName}`
+    + ` → ${pair.leaveTrip.route.routeCode ?? pair.leaveTrip.route.routeName}`;
+
+  parkBlock.routeId = pair.parkTrip.route.routeId;
+  parkBlock.routeInstanceId = pair.parkTrip.instanceId;
+  parkBlock.routeName = pair.parkTrip.route.routeName;
+  parkBlock.routeCode = pair.parkTrip.route.routeCode ?? undefined;
+  parkBlock.plannedEndMinute = secondToMinute(parkEndSecond);
+  parkBlock.travelSeconds = parkOccupancy.travelSeconds;
+  parkBlock.dwellSeconds = parkOccupancy.dwellSeconds;
+
+  leaveBlock.routeId = pair.leaveTrip.route.routeId;
+  leaveBlock.routeInstanceId = pair.leaveTrip.instanceId;
+  leaveBlock.routeName = pair.leaveTrip.route.routeName;
+  leaveBlock.routeCode = pair.leaveTrip.route.routeCode ?? undefined;
+  leaveBlock.plannedEndMinute = secondToMinute(leaveEndSecond);
+  leaveBlock.travelSeconds = leaveOccupancy.travelSeconds;
+  leaveBlock.dwellSeconds = leaveOccupancy.dwellSeconds;
+
+  pushIssue(warnings, {
+    code: 'STATION_BERTH_BACKUP_USED',
+    severity: 'warning',
+    kind: 'policy',
+    message:
+      `時間線 ${parkBlock.timelineRow}：跑完後會停在「${parkedStationName}」擋住別台車，`
+      + `已改跑備用路線停到別的站位（${fromLabel} 改為 ${toLabel}；發車時刻不變）`,
+    detail: {
+      timelineRow: parkBlock.timelineRow,
+      stationId: parkedStationId,
+      stationName: parkedStationName,
+      blockId: parkBlock.id,
+      earlierBlockId: parkBlock.id,
+      laterBlockId: leaveBlock.id,
+      fromRouteIds: [parkRoute.routeId, leaveRoute.routeId],
+      toRouteIds: [pair.parkTrip.route.routeId, pair.leaveTrip.route.routeId],
+      newParkStationId,
+    },
+  });
+  return true;
+}
+
 export function relievePlatformIdleWithSecondaryEdge(args: {
   timelines: GeneratedScheduleTimeline[];
   selectedRoutes: ShiftScheduleSelectedRoute[];
@@ -286,6 +565,27 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
         && Math.abs(b.plannedStartMinute - nextStartMinute) < 1e-6,
     );
     if (!nextBlock) continue;
+
+    // 策略一（優先）：換一組停別的站位的替身路線。時刻完全不動，對班距零影響，
+    // 所以能用就先用；換不成才考慮繞路（策略二，會多開班次也會吃掉空檔）。
+    if (
+      trySwapToBackupBerth({
+        timelines,
+        occupancies,
+        timeline,
+        parkBlock: earlierBlock,
+        leaveBlock: nextBlock,
+        parkedStationId: hit.stationId,
+        parkedStationName: hit.stationName,
+        selectedRoutes,
+        successorPolicy,
+        minimumRecoveryTimeSeconds,
+        warnings,
+      })
+    ) {
+      handledEarlierBlockIds.add(earlierBlock.id);
+      continue;
+    }
 
     const reliefBlocks = tryBuildReliefBlocks({
       earlierBlock,
