@@ -88,6 +88,30 @@ const routeLoopElsewhere = route({
 /** 另一列在 T3 撞上 earlierBlock 空等期間的車 */
 const routeOther = route({ routeId: 'other', routeCode: 'OTHER', stationIds: ['U', 'T3'] });
 
+/** 兩跳繞法（使用者實際的備用路線形狀）：T3 → 備用站，再 備用站 → T3 */
+const routeOutLeg = route({
+  routeId: 'out-leg',
+  routeCode: 'OUTLEG',
+  stationIds: ['T3', 'BACKUP'],
+  avgTravelTimeSeconds: 60,
+  minTravelTimeSeconds: 50,
+});
+const routeBackLeg = route({
+  routeId: 'back-leg',
+  routeCode: 'BACKLEG',
+  stationIds: ['BACKUP', 'T3'],
+  avgTravelTimeSeconds: 60,
+  minTravelTimeSeconds: 50,
+});
+/** 兩跳但回程太久，塞不進空等區間 */
+const routeBackLegLong = route({
+  routeId: 'back-leg-long',
+  routeCode: 'BACKLEGLONG',
+  stationIds: ['BACKUP', 'T3'],
+  avgTravelTimeSeconds: 900,
+  minTravelTimeSeconds: 850,
+});
+
 function successorPolicy(secondary: Map<string, string[]>): RouteSuccessorPolicy {
   return {
     algorithm: ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
@@ -99,6 +123,9 @@ function successorPolicy(secondary: Map<string, string[]>): RouteSuccessorPolicy
       ['loop-long', routeLoopLong],
       ['loop-elsewhere', routeLoopElsewhere],
       ['other', routeOther],
+      ['out-leg', routeOutLeg],
+      ['back-leg', routeBackLeg],
+      ['back-leg-long', routeBackLegLong],
     ]),
     rotationRoutes: [routeA, routeANext],
     prioritySuccessors: new Map([['a', ['a-next']]]),
@@ -284,5 +311,60 @@ describe('relievePlatformIdleWithSecondaryEdge', () => {
     });
     const row1 = result.find((t) => t.row === 1)!;
     assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+  });
+  it('兩跳繞法：T3 出去到備用站再繞回 T3，兩段都插入', () => {
+    const warnings: never[] = [];
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeOutLeg, routeBackLeg, routeOther],
+      successorPolicy: successorPolicy(
+        new Map([
+          ['a', ['out-leg']],
+          ['out-leg', ['back-leg']],
+        ]),
+      ),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: warnings as never,
+    });
+
+    const row1 = result.find((t) => t.row === 1)!;
+    const relief = row1.blocks
+      .filter((b) => b.source === 'relief_loop')
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    assert.equal(relief.length, 2, '兩跳都要插入');
+    assert.deepEqual(relief.map((b) => b.routeId), ['out-leg', 'back-leg']);
+    // 整條路徑必須夾在 A 結束與 A-next 開始之間
+    assert.ok(relief[0]!.plannedStartMinute >= 60 + 170 / 60 - 1e-9);
+    assert.ok(relief[1]!.plannedEndMinute <= 70 + 1e-6);
+    // 兩跳之間不得重疊
+    assert.ok(relief[1]!.plannedStartMinute >= relief[0]!.plannedEndMinute - 1e-9);
+    assert.equal(warnings.length, 1);
+    assert.equal(
+      (warnings[0] as { detail: { reliefHopCount: number } }).detail.reliefHopCount,
+      2,
+    );
+  });
+
+  it('兩跳但回程太久塞不進空等 → 整條放棄，不留半條在版面上', () => {
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeOutLeg, routeBackLegLong, routeOther],
+      successorPolicy: successorPolicy(
+        new Map([
+          ['a', ['out-leg']],
+          ['out-leg', ['back-leg-long']],
+        ]),
+      ),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(
+      row1.blocks.some((b) => b.source === 'relief_loop'),
+      false,
+      '第一跳也不可以留下',
+    );
   });
 });

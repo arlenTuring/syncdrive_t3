@@ -22,10 +22,12 @@ import {
   type TaskTypeKey,
 } from '../../time-templates/types/editor';
 import type {
+  FeasibilityIssue,
   GeneratedScheduleBlock,
   GeneratedSchedulePlan,
   ShiftScheduleFeasibilityReport,
 } from '../utils/shiftScheduleEngine.types';
+import { resolveFeasibilityIssueMeta } from '../utils/schedule-engine/feasibilityIssueMeta';
 import type { ScheduleTask } from '../../time-templates/types/editor';
 import type {
   ShiftScheduleSelectedRoute,
@@ -83,6 +85,113 @@ type HoverCardPos = {
   top: number;
   left: number;
 };
+
+/**
+ * 這則 issue 是不是指向這張班次卡。
+ *
+ * 站位碰撞類的 issue 會同時牽涉兩張卡（earlier／later），兩張都要標記，
+ * 否則使用者只看得到其中一邊、對不出是跟誰撞。
+ */
+function matchIssuesForBlock(
+  issues: FeasibilityIssue[] | undefined,
+  blockId: string,
+  templateTaskId: string | undefined,
+): FeasibilityIssue[] {
+  if (!issues?.length) return [];
+  return issues.filter((issue) => {
+    const d = issue.detail;
+    if (!d) return false;
+    return (
+      d.blockId === blockId
+      || d.nextBlockId === blockId
+      || d.earlierBlockId === blockId
+      || d.laterBlockId === blockId
+      || d.templateTaskId === blockId
+      || (templateTaskId != null && d.templateTaskId === templateTaskId)
+    );
+  });
+}
+
+/** 班次卡 ⚠ 的 hover 卡：列出這張卡實際命中的錯誤與警告內容 */
+function BlockIssueHoverCard({
+  blockCode,
+  errors,
+  warnings,
+  pos,
+}: {
+  blockCode?: string | null;
+  errors: FeasibilityIssue[];
+  warnings: FeasibilityIssue[];
+  pos: HoverCardPos;
+}) {
+  const rows = [
+    ...errors.map((issue) => ({ issue, severity: 'error' as const })),
+    ...warnings.map((issue) => ({ issue, severity: 'warning' as const })),
+  ];
+  if (rows.length === 0) return null;
+
+  return createPortal(
+    <div
+      className="pointer-events-none fixed z-[10050] w-[460px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      style={{ top: pos.top, left: pos.left }}
+      role="tooltip"
+    >
+      <div className="flex items-baseline gap-1.5 text-[11px] leading-4">
+        {blockCode ? (
+          <span className="shrink-0 font-semibold tabular-nums text-sky-300">
+            {blockCode}
+          </span>
+        ) : null}
+        <span className="font-semibold text-zinc-100">
+          {errors.length > 0 ? '錯誤與警告' : '警告'}
+          <span className="ml-1 text-zinc-500">（{rows.length} 則）</span>
+        </span>
+      </div>
+      <ul className="mt-1 max-h-[320px] space-y-1 overflow-hidden">
+        {rows.map(({ issue, severity }, index) => {
+          const meta = resolveFeasibilityIssueMeta(issue);
+          return (
+            <li
+              key={`${issue.code}-${index}`}
+              className={
+                severity === 'error'
+                  ? 'rounded border border-red-800/50 bg-red-950/30 px-1.5 py-1'
+                  : 'rounded border border-amber-700/40 bg-amber-950/30 px-1.5 py-1'
+              }
+            >
+              <div className="flex items-baseline gap-1 text-[10px] leading-[14px]">
+                <span
+                  className={
+                    severity === 'error'
+                      ? 'shrink-0 font-semibold text-red-300'
+                      : 'shrink-0 font-semibold text-amber-300'
+                  }
+                >
+                  {meta.groupTitle}
+                </span>
+                <span className="shrink-0 text-zinc-600">·</span>
+                <span className="shrink-0 text-zinc-500">{meta.kindLabel}</span>
+                <span className="shrink-0 text-zinc-600">·</span>
+                <span className="min-w-0 font-mono text-[9px] text-zinc-500">
+                  {issue.code}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[10px] leading-[14px] text-zinc-200">
+                {issue.message}
+              </p>
+              {meta.guidance ? (
+                <p className="mt-0.5 text-[10px] leading-[14px] text-zinc-400">
+                  {meta.guidance}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>,
+    document.body,
+  );
+}
 
 /** 頂部時間軸 hover 卡片（與建立時間模板相同內容格式） */
 function IntervalAxisHoverCard({
@@ -756,6 +865,7 @@ function ShiftScheduleBlockBar({
     && onSelect != null;
   const isStickyLabel = durationMinutes >= 20;
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
+  const [issueHoverPos, setIssueHoverPos] = useState<HoverCardPos | null>(null);
 
   const route = useMemo(
     () => resolveRouteForBlock(block, selectedRoutes),
@@ -811,37 +921,16 @@ function ShiftScheduleBlockBar({
 
   const showStationInfo = Boolean(block.routeName) && block.taskType === 'passenger';
 
-  const hasError = useMemo(() => {
-    if (!report || !report.errors) return false;
-    return report.errors.some((issue) => {
-      const d = issue.detail;
-      if (!d) return false;
-      return (
-        d.blockId === block.id
-        || d.nextBlockId === block.id
-        || d.earlierBlockId === block.id
-        || d.laterBlockId === block.id
-        || d.templateTaskId === block.id
-        || d.templateTaskId === block.templateTaskId
-      );
-    });
-  }, [report, block.id, block.templateTaskId]);
-
-  const hasWarning = useMemo(() => {
-    if (!report || !report.warnings) return false;
-    return report.warnings.some((issue) => {
-      const d = issue.detail;
-      if (!d) return false;
-      return (
-        d.blockId === block.id
-        || d.nextBlockId === block.id
-        || d.earlierBlockId === block.id
-        || d.laterBlockId === block.id
-        || d.templateTaskId === block.id
-        || d.templateTaskId === block.templateTaskId
-      );
-    });
-  }, [report, block.id, block.templateTaskId]);
+  const blockErrors = useMemo(
+    () => matchIssuesForBlock(report?.errors, block.id, block.templateTaskId),
+    [report, block.id, block.templateTaskId],
+  );
+  const blockWarnings = useMemo(
+    () => matchIssuesForBlock(report?.warnings, block.id, block.templateTaskId),
+    [report, block.id, block.templateTaskId],
+  );
+  const hasError = blockErrors.length > 0;
+  const hasWarning = blockWarnings.length > 0;
 
   let extraBorderClass = '';
   let extraStyle: CSSProperties = {};
@@ -856,6 +945,14 @@ function ShiftScheduleBlockBar({
   const onStationInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setStationHoverPos({
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  };
+
+  const onIssueIconEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setIssueHoverPos({
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
     });
@@ -1090,8 +1187,26 @@ function ShiftScheduleBlockBar({
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
           style={{ color: hasError ? '#FCA5A5' : hasWarning ? '#FDE68A' : colors.text }}
         >
-          {hasError && <AlertTriangle className="size-3 text-red-400 shrink-0" />}
-          {hasWarning && !hasError && <AlertTriangle className="size-3 text-amber-400 shrink-0" />}
+          {hasError || hasWarning ? (
+            <button
+              type="button"
+              className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 hover:bg-white/10"
+              aria-label={`${code} ${hasError ? '錯誤' : '警告'}內容`}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerEnter={onIssueIconEnter}
+              onPointerLeave={() => setIssueHoverPos(null)}
+            >
+              <AlertTriangle
+                className={
+                  hasError
+                    ? 'size-3 shrink-0 text-red-400'
+                    : 'size-3 shrink-0 text-amber-400'
+                }
+                aria-hidden
+              />
+            </button>
+          ) : null}
           <span className="truncate">{code}</span>
         </div>
         {block.routeName ? (
@@ -1138,6 +1253,14 @@ function ShiftScheduleBlockBar({
           entryServiceBerthCheck={
             block.source === 'entry_service' ? block.entryServiceBerthCheck : undefined
           }
+        />
+      ) : null}
+      {showChrome && issueHoverPos ? (
+        <BlockIssueHoverCard
+          blockCode={code}
+          errors={blockErrors}
+          warnings={blockWarnings}
+          pos={issueHoverPos}
         />
       ) : null}
     </div>

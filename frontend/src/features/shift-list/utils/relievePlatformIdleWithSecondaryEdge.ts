@@ -6,10 +6,14 @@
  * 也不能把「不重疊」的規則放鬆，所以只剩兩條路：這台車自己快點走，或是先繞去
  * 別的站位等，時間到了再回來接原本排定的下一段。
  *
- * 這裡做的是後者：如果該站位有關聯圖次要邊，且次要邊繞一趟的時間剛好塞得進
- * 這段空等、繞完又能直接接上原本排定的下一段起點站，就插入這一趟「站位讓渡」
+ * 這裡做的是後者：沿關聯圖的<strong>次要邊</strong>找一條能繞回「下一段起點站」的
+ * 路徑（廣度優先，最多 {@link MAX_RELIEF_HOPS} 跳），若整條路徑的時間剛好塞得進
+ * 這段空等、繞完又接得回原本排定的下一段，就把這幾段「站位讓渡」插進去
  * ——車照樣載客（計入運能），只是不算輪替圈數，也不受班距約束（跟進場載客
  * entry_service 同一類特例）。
+ *
+ * 出去繞一圈常常是兩跳（例如 T3上行 → 備用N2W上行，再 備用N2W下行 → T3下行），
+ * 所以不能只找一跳；但也不能無限延伸，跳數上限見 {@link MAX_RELIEF_HOPS}。
  *
  * 塞不進去、或該站根本沒有次要邊：不硬解，維持 STATION_BERTH_PROTECTION_GAP
  * 警告，回報給使用者自己決定要不要調整關聯圖或增加時間線。
@@ -67,90 +71,145 @@ function gapBetween(args: {
 }
 
 /**
- * 對單一「跑完一輪、空等時撞到別列車」的情況，試著找一條次要邊塞進空檔。
- * 找得到就回傳要插入的區塊；找不到回傳 null（呼叫端維持原樣，交給最終驗證回報）。
+ * 讓渡路徑最多幾跳。
+ *
+ * 出去繞一圈通常是「出去 → 回來」兩跳（例如 T3上行 → 備用N2W上行，
+ * 再 備用N2W下行 → T3下行）。給到 3 跳留一點餘地，但不能再多——
+ * 跳數一多就變成替使用者發明一條長路徑，而且每一跳都在載客，
+ * 排錯的代價不是「少一班」而是「多開一班錯的」。
  */
-function tryBuildReliefBlock(args: {
+const MAX_RELIEF_HOPS = 3;
+
+type ReliefHop = {
+  instanceId: string;
+  route: ShiftScheduleSelectedRoute;
+};
+
+/**
+ * 從 <code>fromInstanceId</code> 出發，沿關聯圖的<strong>次要邊</strong>找一條
+ * 能回到 <code>requiredTerminalStationId</code> 的路徑（廣度優先，最短的先回傳）。
+ *
+ * 只走次要邊：優先邊是正常輪替要用的，拿去繞路會打亂交路。
+ * 同一個節點不重複進入，避免在環上繞不完。
+ */
+function findReliefChain(args: {
+  successorPolicy: RouteSuccessorPolicy;
+  fromInstanceId: string;
+  requiredTerminalStationId: string;
+}): ReliefHop[] | null {
+  const { successorPolicy, fromInstanceId, requiredTerminalStationId } = args;
+  const queue: Array<{ instanceId: string; chain: ReliefHop[] }> = [
+    { instanceId: fromInstanceId, chain: [] },
+  ];
+  const visited = new Set<string>([fromInstanceId]);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.chain.length >= MAX_RELIEF_HOPS) continue;
+    const nextIds = successorPolicy.secondarySuccessors.get(current.instanceId) ?? [];
+    for (const nextId of nextIds) {
+      if (visited.has(nextId)) continue;
+      const route = successorPolicy.routesByInstanceId.get(nextId);
+      if (!route) continue;
+      // 沒有占用資料的路線算不出時刻，整條路徑就不可用
+      if (!resolvePassengerRouteOccupancy(route)) continue;
+      const chain = [...current.chain, { instanceId: nextId, route }];
+      if (routeEndStation(route) === requiredTerminalStationId) return chain;
+      visited.add(nextId);
+      queue.push({ instanceId: nextId, chain });
+    }
+  }
+  return null;
+}
+
+/**
+ * 對單一「跑完一輪、空等時撞到別列車」的情況，試著找一條次要邊路徑塞進空檔。
+ * 找得到就回傳要插入的區塊（可能不只一段）；找不到回傳空陣列
+ * （呼叫端維持原樣，交給最終驗證回報）。
+ */
+function tryBuildReliefBlocks(args: {
   earlierBlock: GeneratedScheduleBlock;
   nextBlock: GeneratedScheduleBlock;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   successorPolicy: RouteSuccessorPolicy;
   minimumRecoveryTimeSeconds: number;
-}): GeneratedScheduleBlock | null {
+}): GeneratedScheduleBlock[] {
   const { earlierBlock, nextBlock, selectedRoutes, successorPolicy, minimumRecoveryTimeSeconds } =
     args;
 
   // 只在「下一段是真正排定的正線」時才處理；下一段是整備等其他情況，
   // 讓渡沒有明確的回程目標站，交給既有的整備讓渡／推移邏輯處理。
   if (nextBlock.taskType !== 'passenger' || nextBlock.source !== 'template_bar') {
-    return null;
+    return [];
   }
-  if (!nextBlock.routeId) return null;
+  if (!nextBlock.routeId) return [];
 
   const earlierRoute = resolveRouteForBlock(earlierBlock, selectedRoutes);
   const nextRoute = resolveRouteForBlock(nextBlock, selectedRoutes);
-  if (!earlierRoute || !nextRoute) return null;
+  if (!earlierRoute || !nextRoute) return [];
 
   const earlierInstanceId =
     earlierBlock.routeInstanceId?.trim()
     || earlierRoute.instanceId?.trim()
     || earlierRoute.routeId;
   const requiredNextOrigin = routeStartStation(nextRoute);
-  if (!requiredNextOrigin) return null;
+  if (!requiredNextOrigin) return [];
 
-  const secondaryIds = successorPolicy.secondarySuccessors.get(earlierInstanceId) ?? [];
-  if (secondaryIds.length === 0) return null;
+  const chain = findReliefChain({
+    successorPolicy,
+    fromInstanceId: earlierInstanceId,
+    requiredTerminalStationId: requiredNextOrigin,
+  });
+  if (!chain || chain.length === 0) return [];
 
-  const earlierEndSecond = minuteToSecond(earlierBlock.plannedEndMinute);
+  // 依序把每一跳排進空檔；任何一跳排不下就整條放棄，不留半條路徑在版面上
   const nextStartSecond = minuteToSecond(nextBlock.plannedStartMinute);
+  const blocks: GeneratedScheduleBlock[] = [];
+  let cursorSecond = minuteToSecond(earlierBlock.plannedEndMinute);
+  let previousRoute = earlierRoute;
 
-  for (const secondaryInstanceId of secondaryIds) {
-    const reliefRoute = successorPolicy.routesByInstanceId.get(secondaryInstanceId);
-    if (!reliefRoute) continue;
-    const reliefTerminal = routeEndStation(reliefRoute);
-    // MVP：只走「一次次要邊就直接接回下一段起點站」這種最簡單、最安全的情況；
-    // 需要多跳才能繞回去的路徑不在這次範圍內，留給使用者自己調整關聯圖。
-    if (!reliefTerminal || reliefTerminal !== requiredNextOrigin) continue;
-
-    const occupancy = resolvePassengerRouteOccupancy(reliefRoute);
-    if (!occupancy) continue;
-
-    const outGap = gapBetween({
-      minimumRecoveryTimeSeconds,
-      fromRoute: earlierRoute,
-      toRoute: reliefRoute,
-      rotationRoutes: selectedRoutes,
-    });
-    const reliefStartSecond = earlierEndSecond + outGap;
-    const reliefEndSecond = reliefStartSecond + occupancy.occupancySeconds;
-
-    const returnGap = gapBetween({
-      minimumRecoveryTimeSeconds,
-      fromRoute: reliefRoute,
-      toRoute: nextRoute,
-      rotationRoutes: selectedRoutes,
-    });
-    if (reliefEndSecond + returnGap > nextStartSecond + 1e-9) continue;
-
-    return {
-      id: `relief-${earlierBlock.id}-${reliefRoute.routeId}-${reliefStartSecond}`,
+  for (const hop of chain) {
+    const occupancy = resolvePassengerRouteOccupancy(hop.route);
+    if (!occupancy) return [];
+    const startSecond =
+      cursorSecond
+      + gapBetween({
+        minimumRecoveryTimeSeconds,
+        fromRoute: previousRoute,
+        toRoute: hop.route,
+        rotationRoutes: selectedRoutes,
+      });
+    const endSecond = startSecond + occupancy.occupancySeconds;
+    blocks.push({
+      id: `relief-${earlierBlock.id}-${hop.route.routeId}-${startSecond}`,
       timelineRow: earlierBlock.timelineRow,
       taskType: 'passenger',
-      label: `站位讓渡 · ${reliefRoute.routeName || reliefRoute.routeId}`,
-      routeId: reliefRoute.routeId,
-      routeInstanceId: secondaryInstanceId,
-      routeName: reliefRoute.routeName,
-      routeCode: reliefRoute.routeCode ?? undefined,
-      anchorStartMinute: secondToMinute(reliefStartSecond),
-      plannedStartMinute: secondToMinute(reliefStartSecond),
-      plannedEndMinute: secondToMinute(reliefEndSecond),
+      label: `站位讓渡 · ${hop.route.routeName || hop.route.routeId}`,
+      routeId: hop.route.routeId,
+      routeInstanceId: hop.instanceId,
+      routeName: hop.route.routeName,
+      routeCode: hop.route.routeCode ?? undefined,
+      anchorStartMinute: secondToMinute(startSecond),
+      plannedStartMinute: secondToMinute(startSecond),
+      plannedEndMinute: secondToMinute(endSecond),
       travelSeconds: occupancy.travelSeconds,
       dwellSeconds: occupancy.dwellSeconds,
       source: 'relief_loop',
-    };
+    });
+    cursorSecond = endSecond;
+    previousRoute = hop.route;
   }
 
-  return null;
+  // 繞完還要接得回原本排定的下一段，接不上就整條放棄
+  const returnGap = gapBetween({
+    minimumRecoveryTimeSeconds,
+    fromRoute: previousRoute,
+    toRoute: nextRoute,
+    rotationRoutes: selectedRoutes,
+  });
+  if (cursorSecond + returnGap > nextStartSecond + 1e-9) return [];
+
+  return blocks;
 }
 
 export function relievePlatformIdleWithSecondaryEdge(args: {
@@ -215,34 +274,38 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
     );
     if (!nextBlock) continue;
 
-    const reliefBlock = tryBuildReliefBlock({
+    const reliefBlocks = tryBuildReliefBlocks({
       earlierBlock,
       nextBlock,
       selectedRoutes,
       successorPolicy,
       minimumRecoveryTimeSeconds,
     });
-    if (!reliefBlock) continue;
+    if (reliefBlocks.length === 0) continue;
 
-    timeline.blocks.push(reliefBlock);
+    timeline.blocks.push(...reliefBlocks);
     timeline.blocks.sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
     handledEarlierBlockIds.add(earlierBlock.id);
 
+    const pathLabel = reliefBlocks
+      .map((relief) => relief.routeCode ?? relief.routeName)
+      .join(' → ');
     pushIssue(warnings, {
       code: 'STATION_BERTH_RELIEF_INSERTED',
       severity: 'warning',
       kind: 'policy',
       message:
         `時間線 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等會撞到別列車，`
-        + `已插入次要邊「${reliefBlock.routeCode ?? reliefBlock.routeName}」先繞去別站等`,
+        + `已沿次要邊「${pathLabel}」先繞去別站等`,
       detail: {
         timelineRow: earlierBlock.timelineRow,
         stationId: hit.stationId,
         stationName: hit.stationName,
         earlierBlockId: earlierBlock.id,
         nextBlockId: nextBlock.id,
-        reliefBlockId: reliefBlock.id,
-        reliefRouteId: reliefBlock.routeId,
+        reliefBlockIds: reliefBlocks.map((relief) => relief.id),
+        reliefRouteIds: reliefBlocks.map((relief) => relief.routeId),
+        reliefHopCount: reliefBlocks.length,
       },
     });
   }
