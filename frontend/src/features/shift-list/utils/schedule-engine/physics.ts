@@ -19,6 +19,22 @@ export const SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS = 10;
 /** 預設恢復時間（秒）：同一 timeline 兩趟正線之間至少保留的可吸收延誤空檔 */
 export const SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS = 30;
 
+/**
+ * 預設碰撞保護時間（秒）。
+ *
+ * 意義：A 車從某站位發車後，要多久才確定已經駛離「會互相碰撞的那一段空間」。
+ * 反過來看，B 車也要花同樣的時間，才能從那一段空間的外緣開進站位。
+ * 所以兩台車在同一個站位的最小間隔是<strong>兩倍</strong>這個值：
+ *
+ *   B 車到站時刻 ≥ A 車實際離站時刻 + 2 × 碰撞保護時間
+ *
+ * 「A 車實際離站時刻」是排班上真的開走的那一刻——A 車如果因為調度關係要在
+ * 站上滯留到下一個任務才走，就以那個滯留結束時刻為準，不是它跑完這一趟的時刻。
+ *
+ * 這是<strong>防碰撞下限</strong>，不是拉近班距的目標；班距約束照舊，兩者取較嚴的。
+ */
+export const SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS = 30;
+
 export function normalizeSwitchBufferAfterSeconds(raw: unknown): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
     return SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS;
@@ -36,6 +52,13 @@ export function normalizeDwellSlackSeconds(raw: unknown): number {
 export function normalizeMinimumRecoveryTimeSeconds(raw: unknown): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
     return SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS;
+  }
+  return Math.round(raw);
+}
+
+export function normalizeCollisionProtectionSeconds(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
+    return SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS;
   }
   return Math.round(raw);
 }
@@ -501,6 +524,8 @@ export function resolveRouteRotationMinSeconds(
 /** 路線群組物理參數指紋（新鮮度／失效判斷用） */
 export function buildRouteGroupsParamsFingerprint(input: {
   minimumRecoveryTimeSeconds: number | null;
+  /** 改動碰撞保護時間會改變站位判定，產出必須重生成 */
+  collisionProtectionSeconds?: number | null;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   routeRelationGraph?: {
     nodes: Array<{ instanceId: string; x: number; y: number }>;
@@ -555,6 +580,9 @@ export function buildRouteGroupsParamsFingerprint(input: {
     minimumRecoveryTimeSeconds: input.minimumRecoveryTimeSeconds != null
       ? normalizeMinimumRecoveryTimeSeconds(input.minimumRecoveryTimeSeconds)
       : null,
+    collisionProtectionSeconds: normalizeCollisionProtectionSeconds(
+      input.collisionProtectionSeconds,
+    ),
     routes,
     routeRelationGraph: {
       nodes: [...relation.nodes]

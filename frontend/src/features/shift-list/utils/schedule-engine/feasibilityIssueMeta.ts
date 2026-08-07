@@ -15,6 +15,8 @@ export type FeasibilityIssueMeta = {
   kindLabel: string;
   /** 同類型摺疊群組標題 */
   groupTitle: string;
+  /** 對應《排班引擎算法全覽-審核.html》章節錨點，逐則問題頁用來附「詳見 §N」連結 */
+  docAnchor: { id: string; label: string } | null;
 };
 
 const KIND_LABEL: Record<FeasibilityIssueKind, string> = {
@@ -31,8 +33,9 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_LEG_TRAVEL_INVALID: '站間 leg 無效',
   STATION_TIMING_INFEASIBLE: '逐站時刻超出班次卡',
   STATION_BERTH_COLLISION: '停靠點站位碰撞',
+  STATION_BERTH_PROTECTION_GAP: '碰撞保護時間不足',
   STATION_BERTH_DELAYED: '站位約束延後',
-  STATION_BERTH_BACKUP_USED: '站位約束改派備用',
+  STATION_BERTH_BACKUP_USED: '站位約束改選路線',
   ANCHOR_CONFLICT: '錨點衝突',
   TIMELINE_OVERLAP: '時間線任務重疊',
   HEADWAY_PHYSICAL_IMPOSSIBLE: '班距低於物理下限',
@@ -52,7 +55,41 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
 };
 
-const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle'>> = {
+/** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
+export const ALL_FEASIBILITY_VIOLATION_CODES: FeasibilityViolationCode[] =
+  Object.keys(GROUP_TITLE) as FeasibilityViolationCode[];
+
+const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: string }>> = {
+  MISSING_TEMPLATE_TASKS: { id: 's3', label: '§3 完整流水線' },
+  NO_ROUTE_FOR_TASK_TYPE: { id: 's3', label: '§3 完整流水線' },
+  MISSING_TRAVEL_TIME: { id: 's3', label: '§3 完整流水線' },
+  STATION_LEG_TRAVEL_INCOMPLETE: { id: 's3', label: '§3 完整流水線' },
+  STATION_LEG_TRAVEL_INVALID: { id: 's3', label: '§3 完整流水線' },
+  STATION_TIMING_INFEASIBLE: { id: 's9', label: '§9 Expand 與物理占用' },
+  ANCHOR_CONFLICT: { id: 's9', label: '§9 Expand 與物理占用' },
+  STATION_BERTH_COLLISION: { id: 's8', label: '§8 站位約束決策' },
+  STATION_BERTH_PROTECTION_GAP: { id: 's8', label: '§8 站位約束決策' },
+  STATION_BERTH_DELAYED: { id: 's8', label: '§8 站位約束決策' },
+  STATION_BERTH_BACKUP_USED: { id: 's8', label: '§8 站位約束決策' },
+  TIMELINE_OVERLAP: { id: 's6', label: '§6 整備讓渡：開頭 vs 尾巴' },
+  HEADWAY_PHYSICAL_IMPOSSIBLE: { id: 's5', label: '§5 掛車決策（脈衝）' },
+  HEADWAY_BELOW_TARGET: { id: 's5', label: '§5 掛車決策（脈衝）' },
+  UNSERVED_SERVICE_PULSE: { id: 's5', label: '§5 掛車決策（脈衝）' },
+  INSUFFICIENT_TIMELINES: { id: 's14', label: '§14 端到端範例（車隊下限）' },
+  RECOVERY_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
+  ROUTE_SWITCH_BUFFER_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
+  CLOCK_ALIGN_VIOLATION: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
+  ROUTE_SUCCESSOR_POLICY_INVALID: { id: 's7', label: '§7 關聯圖與下一跳決策' },
+  ROUTE_SUCCESSOR_MISMATCH: { id: 's7', label: '§7 關聯圖與下一跳決策' },
+  ROUTE_INSTANCE_AMBIGUOUS: { id: 's7', label: '§7 關聯圖與下一跳決策' },
+  ROUTE_STATION_DISCONTINUITY: { id: 's7', label: '§7 關聯圖與下一跳決策' },
+  TURNAROUND_LIMIT_EXCEEDED: { id: 's3', label: '§3 完整流水線' },
+  ROUTE_ROTATION_OVER_TURNAROUND: { id: 's3', label: '§3 完整流水線' },
+  ROTATION_CYCLE_INCOMPLETE: { id: 's1', label: '§1 核心原則（服從順序）' },
+  MAINTENANCE_DISPATCH_UNREACHABLE: { id: 's10', label: '§10 進場載客' },
+};
+
+const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
   MISSING_TEMPLATE_TASKS: {
     kind: 'actionable',
     guidance: '請回到 Step 3 確認時間模板有正線視窗與有效班距，或檢查模板是否載入成功。',
@@ -83,6 +120,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     guidance:
       '生成時已嘗試「延後發車／改派備用」仍無法清開同一停靠點的到站～離站重疊。請加時間線、縮短靠站、或手動改備援點。這不是班距警告。',
   },
+  STATION_BERTH_PROTECTION_GAP: {
+    kind: 'actionable',
+    guidance:
+      '兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。',
+  },
   STATION_BERTH_DELAYED: {
     kind: 'policy',
     guidance:
@@ -91,7 +133,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   STATION_BERTH_BACKUP_USED: {
     kind: 'policy',
     guidance:
-      '站位超限時，僅在關聯圖繼任成立下成對改派備用槽（TN→TNB 且圖上下一主線→其備用）。不會留下 TN 再接 NTB。',
+      '站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。',
   },
   ANCHOR_CONFLICT: {
     kind: 'limit',
@@ -115,7 +157,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   UNSERVED_SERVICE_PULSE: {
     kind: 'limit',
     guidance:
-      '此班距脈衝沒有任何可用車能在下一脈衝前承接，實際 PPHPD 會下降（警告，非硬錯誤）。請檢查可用車視窗、整備錯開、機動可派或交路週期。',
+      '此班距脈衝在一般與補掛輪都找不到能及時出發的車，實際 PPHPD 會下降（警告，非硬錯誤）。請檢查可用車視窗、整備錯開、機動可派、交路週期，或增加時間線列數。',
   },
   INSUFFICIENT_TIMELINES: {
     kind: 'actionable',
@@ -189,6 +231,7 @@ export function resolveFeasibilityIssueMeta(
     guidance: issue.guidance?.trim() || defaults.guidance,
     kindLabel: KIND_LABEL[kind],
     groupTitle: GROUP_TITLE[issue.code] ?? issue.code,
+    docAnchor: DOC_ANCHOR[issue.code] ?? null,
   };
 }
 

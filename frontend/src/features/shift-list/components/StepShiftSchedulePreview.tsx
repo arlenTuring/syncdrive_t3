@@ -24,6 +24,7 @@ import type {
 import {
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
+  normalizeCollisionProtectionSeconds,
   normalizeSwitchBufferAfterSeconds,
   formatStationDwellRoleLabel,
   resolveStationDwellListRole,
@@ -592,6 +593,15 @@ export function StepShiftSchedulePreview({
                     <span>策略參數｜最低恢復時間 </span>
                     <span className="tabular-nums text-zinc-200">
                       {formatSeconds(recoverySeconds)}
+                    </span>
+                    <span className="mx-2 text-zinc-700">·</span>
+                    <span>碰撞保護時間 </span>
+                    <span className="tabular-nums text-zinc-200">
+                      {formatSeconds(
+                        normalizeCollisionProtectionSeconds(
+                          draft.routeGroups.collisionProtectionSeconds,
+                        ),
+                      )}
                     </span>
                     <span className="mx-2 text-zinc-700">·</span>
                   </>

@@ -5,7 +5,10 @@ import {
   syncActionSettingsWithSelectedRoutes,
   type ShiftScheduleActionSettingsDraft,
 } from '../utils/actionSettings';
-import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
+import {
+  CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
+  type ShiftScheduleStoredOutput,
+} from '../utils/schedule-engine/types';
 import {
   emptyMaintenanceEntrySlackBySectionInput,
   normalizeEmptyIntervalMainlineSlackSecondsInput,
@@ -26,9 +29,11 @@ import {
   SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_SECONDS,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
   SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS,
+  SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
   normalizeSwitchBufferAfterSeconds,
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
+  normalizeCollisionProtectionSeconds,
   applyDwellSlackSeconds,
   resolveStationDwellMode,
   stationDwellSkipsSlack,
@@ -89,9 +94,11 @@ export {
   SHIFT_SCHEDULE_DEFAULT_DWELL_SLACK_SECONDS,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
   SHIFT_SCHEDULE_DEFAULT_RECOVERY_TIME_SECONDS,
+  SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
   normalizeSwitchBufferAfterSeconds,
   normalizeDwellSlackSeconds,
   normalizeMinimumRecoveryTimeSeconds,
+  normalizeCollisionProtectionSeconds,
   applyDwellSlackSeconds,
   resolveStationDwellMode,
   stationDwellSkipsSlack,
@@ -387,6 +394,12 @@ export type ShiftScheduleRouteGroupsDraft = {
    */
   minimumRecoveryTimeSeconds: number | null;
   /**
+   * 碰撞保護時間（秒）：A 車從某站位發車後，要多久才確定駛離會互相碰撞的那段空間。
+   * 後車到站不得早於前車實際離站 + 2 × 此值（前車滯留在站上時以真正開走的時刻起算）。
+   * null＝沿用預設 30 秒。這是防碰撞下限，不影響班距目標。
+   */
+  collisionProtectionSeconds?: number | null;
+  /**
    * 服務方向標籤清單（使用者自訂）。
    * 各路線以 serviceDirectionId 單選其一；同標籤＝同向班距／運能。
    */
@@ -463,6 +476,7 @@ export function emptyShiftScheduleCreateDraft(
       mapId: '',
       selectedRoutes: [],
       minimumRecoveryTimeSeconds: null,
+      collisionProtectionSeconds: null,
       serviceDirectionTags: [],
       routeRelationGraph: emptyShiftRouteRelationGraph(),
       throughAnchors: emptyShiftRouteThroughAnchorsDraft(),
@@ -751,6 +765,11 @@ export function isShiftScheduleOutputFresh(draft: ShiftScheduleCreateDraft): boo
   const output = draft.scheduleOutput;
   if (!output || !output.plan) return false;
 
+  // 版本號不符即表示算碼／引擎邏輯已更新，作廢快取重新計算
+  if (output.outputVersion !== CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION) {
+    return false;
+  }
+
   if (output.timeTemplateRef.templateId !== draft.timeTemplate.templateId.trim()) {
     return false;
   }
@@ -854,6 +873,7 @@ export function serializeShiftScheduleBody(
     routeGroupsMapId: draft.routeGroups.mapId,
     selectedRoutes: draft.routeGroups.selectedRoutes,
     minimumRecoveryTimeSeconds: draft.routeGroups.minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds: draft.routeGroups.collisionProtectionSeconds ?? null,
     serviceDirectionTags: recoverServiceDirectionTagsFromRoutes(
       draft.routeGroups.serviceDirectionTags ?? [],
       draft.routeGroups.selectedRoutes,
@@ -1115,6 +1135,9 @@ export function buildShiftScheduleDraftFromStored(
       })(),
       minimumRecoveryTimeSeconds: normalizeMinimumRecoveryTimeSeconds(
         body.minimumRecoveryTimeSeconds,
+      ),
+      collisionProtectionSeconds: normalizeCollisionProtectionSeconds(
+        body.collisionProtectionSeconds,
       ),
       serviceDirectionTags: recoverServiceDirectionTagsFromRoutes(
         parseShiftScheduleServiceDirectionTags(body.serviceDirectionTags),

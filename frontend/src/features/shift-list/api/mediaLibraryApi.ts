@@ -1,4 +1,5 @@
 import { getDataSourceById } from '../../dashboard/store/useDataSourceStore';
+import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
 
 export type MediaLibraryKind = 'media' | 'group';
 
@@ -9,7 +10,7 @@ export type MediaLibraryOption = {
 };
 
 export function resolveMediaLibraryBackendUrl(): string {
-  return getDataSourceById('default-internal')?.backendUrl ?? 'http://127.0.0.1:3000';
+  return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
 }
 
 export async function fetchMediaLibraryOptions(

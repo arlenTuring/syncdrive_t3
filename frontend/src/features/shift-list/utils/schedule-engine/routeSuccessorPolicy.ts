@@ -535,7 +535,9 @@ export function estimatePolicyCycleSeconds(
     }
     total += occupancySeconds(route);
     prevRoute = route;
-    const next = resolveNextInstanceId(policy, currentId);
+    const next =
+      resolveNextInstanceId(policy, currentId)
+      ?? resolveNextInstanceId(policy, currentId, { allowSecondary: true });
     if (!next) break;
     currentId = next.instanceId;
   }

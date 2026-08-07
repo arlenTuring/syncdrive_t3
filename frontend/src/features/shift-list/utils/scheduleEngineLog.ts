@@ -1,12 +1,16 @@
 import type { ShiftScheduleCreateDraft } from '../types/create';
+import { resolveSelectedRouteInstanceId } from '../types/create';
 import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import { buildYardRotationExitByTaskType } from './maintenancePostTaskPolicy';
 import { resolveYardPostTaskPolicy } from './maintenancePostTaskPolicy';
+import { formatScheduleClockHms } from './scheduleDayCycle';
+import { evaluateScheduleAcceptance } from './scheduleAcceptance';
 import type {
   FeasibilityIssue,
   GenerateShiftScheduleResult,
   GeneratedScheduleBlock,
 } from './schedule-engine/types';
+import type { TimeSlotAttribute, TimeSlotInterval } from '../../time-templates/types/editor';
 
 /**
  * 排班引擎生成 log：每次按下「生成」後，把輸入摘要＋完整報錯＋各 timeline
@@ -15,12 +19,7 @@ import type {
  */
 
 function formatMinuteAsClock(minute: number): string {
-  const totalSeconds = Math.round(minute * 60);
-  const hh = Math.floor(totalSeconds / 3600);
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+  return formatScheduleClockHms(minute);
 }
 
 function summarizeBlock(block: GeneratedScheduleBlock) {
@@ -30,6 +29,10 @@ function summarizeBlock(block: GeneratedScheduleBlock) {
     taskType: block.taskType,
     source: block.source,
     routeCode: block.routeCode ?? null,
+    // debug：班距後處理（repair）用 routeId/routeInstanceId 解析路線與分組，
+    // 跟 routeCode 是兩回事——之前完全沒記錄，查不出解析失敗的案例。
+    routeId: block.routeId ?? null,
+    routeInstanceId: block.routeInstanceId ?? null,
     label: block.label,
     ...(block.entryServiceSectionCode
       ? { entryServiceSectionCode: block.entryServiceSectionCode }
@@ -56,6 +59,9 @@ export function buildScheduleEngineLogPayload(args: {
   maintenanceBody?: Record<string, unknown> | null;
   mapId: string;
   shiftId?: string;
+  /** 時間模板時段／屬性班距——debug 用重播（repro）需要真實班距目標，先前 log 沒帶這塊 */
+  intervals?: TimeSlotInterval[];
+  attributes?: TimeSlotAttribute[];
 }) {
   const {
     draft,
@@ -64,6 +70,8 @@ export function buildScheduleEngineLogPayload(args: {
     maintenanceBody = null,
     mapId,
     shiftId,
+    intervals = [],
+    attributes = [],
   } = args;
   const { plan, report } = result;
   const body = draft.maintenanceTask.skipped ? null : maintenanceBody;
@@ -89,6 +97,10 @@ export function buildScheduleEngineLogPayload(args: {
     input: {
       selectedRoutes: draft.routeGroups.selectedRoutes.map((route) => ({
         executionOrder: route.executionOrder,
+        // debug：resolveRouteForBlock 用這兩個 id 對應 block.routeId／routeInstanceId，
+        // 之前完全沒記錄，查不出「後處理解析不到路線、整段靜默放棄」的案例。
+        routeId: route.routeId,
+        routeInstanceId: resolveSelectedRouteInstanceId(route),
         routeCode: route.routeCode ?? null,
         routeName: route.routeName,
         groupName: route.groupName,
@@ -101,6 +113,19 @@ export function buildScheduleEngineLogPayload(args: {
         dwellSlackSeconds: route.dwellSlackSeconds,
       })),
       minimumRecoveryTimeSeconds: draft.routeGroups.minimumRecoveryTimeSeconds,
+      intervals: intervals.map((interval) => ({
+        id: interval.id,
+        attributeId: interval.attributeId,
+        name: interval.name,
+        startTime: interval.startTime,
+        endTime: interval.endTime,
+      })),
+      attributes: attributes.map((attribute) => ({
+        id: attribute.id,
+        name: attribute.name,
+        headwaySeconds: attribute.headwaySeconds,
+        capacityPphpd: attribute.capacityPphpd,
+      })),
       throughAnchors: {
         startStationIds:
           draft.routeGroups.throughAnchors?.startStationIds ?? [],
@@ -150,6 +175,7 @@ export function buildScheduleEngineLogPayload(args: {
       warningsByCode: groupIssuesByCode(report.warnings),
       errors: report.errors,
       warnings: report.warnings,
+      acceptance: evaluateScheduleAcceptance(report),
     },
     plan: plan
       ? {
@@ -175,18 +201,53 @@ export async function postScheduleEngineLog(args: {
 }): Promise<void> {
   const { label, payload, backendUrl } = args;
   try {
-    const res = await fetch(`${backendUrl}/syncdrive-api/dev-log/schedule-engine`, {
+    // 與 Vite proxy 對齊：優先走相對路徑，避免 localhost / 127.0.0.1 交叉造成 Failed to fetch
+    const endpoint = backendUrl?.trim()
+      ? `${backendUrl.replace(/\/$/, '')}/syncdrive-api/dev-log/schedule-engine`
+      : '/syncdrive-api/dev-log/schedule-engine';
+    const body = JSON.stringify({ label, payload });
+    // 過大的 body 容易讓瀏覽器 fetch 直接 Failed to fetch；截斷 timelines 細節
+    const maxBytes = 2_000_000;
+    const trimmedBody =
+      body.length > maxBytes
+        ? JSON.stringify({
+            label,
+            payload: {
+              truncated: true,
+              reason: `payload ${body.length} bytes exceeds ${maxBytes}`,
+              summary:
+                payload && typeof payload === 'object'
+                  ? {
+                      report: (payload as { report?: unknown }).report,
+                      shiftId: (payload as { shiftId?: unknown }).shiftId,
+                    }
+                  : null,
+            },
+          })
+        : body;
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, payload }),
+      body: trimmedBody,
     });
     if (!res.ok) {
       console.warn(`[schedule-engine] 生成 log 寫檔失敗（HTTP ${res.status}）`);
       return;
     }
-    const data = (await res.json()) as { file?: string };
+    const data = (await res.json()) as {
+      file?: string;
+      lastIssues?: { jsonFile?: string; htmlUpdated?: boolean };
+    };
     if (data.file) {
       console.info(`[schedule-engine] 生成 log 已寫入 backend/${data.file}`);
+    }
+    if (data.lastIssues?.jsonFile) {
+      console.info(
+        `[schedule-engine] 最近問題快照已覆寫 ${data.lastIssues.jsonFile}` +
+          (data.lastIssues.htmlFile
+            ? ` → ${data.lastIssues.htmlFile}`
+            : ''),
+      );
     }
   } catch (error) {
     console.warn('[schedule-engine] 生成 log 寫檔失敗', error);

@@ -18,6 +18,10 @@ import {
 import { parsePositiveRouteSeconds } from '../../map-editor/utils/routePlanning';
 import { collectCrossoverPortalWaypointsFromAreas } from '../../map-editor/utils/waypointCode';
 import {
+  buildMaintenanceFirstTripOriginsFromTopology,
+  type MaintenanceFirstTripOrigin,
+} from './maintenanceFirstTripOrigins';
+import {
   buildStationLegTravelsFromTopology,
   type ShiftScheduleStationLegTravel,
 } from './stationLegTravel';
@@ -42,12 +46,53 @@ export type ShiftRouteGroupCatalogItem = {
   routes: ShiftRouteOption[];
 };
 
+export type ShiftRouteGroupMapOption = {
+  mapId: string;
+  displayName: string;
+};
+
 async function resolveActiveMapId(): Promise<string> {
   const status = await fetchMapLibraryBackendStatus();
   if (status?.activeMapId) {
     return resolveMapId(status.activeMapId);
   }
   return 't3-main-version';
+}
+
+async function listAvailableMaps(
+  activeMapId: string,
+  activeDisplayName?: string | null,
+): Promise<ShiftRouteGroupMapOption[]> {
+  const byId = new Map<string, ShiftRouteGroupMapOption>();
+  try {
+    const status = await fetchMapLibraryBackendStatus();
+    for (const map of status?.maps ?? []) {
+      const mapId = resolveMapId(map.mapId);
+      if (!mapId) continue;
+      byId.set(mapId, {
+        mapId,
+        displayName: map.displayName?.trim() || mapId,
+      });
+    }
+  } catch {
+    // 後端不可用時至少保留目前選中地圖
+  }
+  const resolvedActive = resolveMapId(activeMapId);
+  if (resolvedActive && !byId.has(resolvedActive)) {
+    byId.set(resolvedActive, {
+      mapId: resolvedActive,
+      displayName: activeDisplayName?.trim() || resolvedActive,
+    });
+  }
+  if (byId.size === 0) {
+    byId.set('t3-main-version', {
+      mapId: 't3-main-version',
+      displayName: '軌道合併加道路線',
+    });
+  }
+  return [...byId.values()].sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, 'zh-Hant'),
+  );
 }
 
 function collectFacilityDockingStationNames(
@@ -100,21 +145,40 @@ function buildRouteOption(
   };
 }
 
-export async function loadShiftRouteGroupCatalog(): Promise<{
+/**
+ * 載入班表步驟四用的路線群組。
+ * preferredMapId 有值時強制用該 map JSON（含 pointTopology）；否則用目前啟用地圖。
+ */
+export async function loadShiftRouteGroupCatalog(
+  preferredMapId?: string,
+): Promise<{
   mapId: string;
   mapDisplayName: string;
   groups: ShiftRouteGroupCatalogItem[];
+  availableMaps: ShiftRouteGroupMapOption[];
+  firstTripOrigins: MaintenanceFirstTripOrigin[];
 }> {
-  const mapId = await resolveActiveMapId();
+  const preferred = preferredMapId?.trim()
+    ? resolveMapId(preferredMapId.trim())
+    : '';
+  const mapId = preferred || (await resolveActiveMapId());
+  const availableMaps = await listAvailableMaps(mapId);
   const parsed = await resolveParsedMapForPlatform(mapId);
   if (!parsed) {
-    return { mapId, mapDisplayName: mapId, groups: [] };
+    return {
+      mapId,
+      mapDisplayName: availableMaps.find((m) => m.mapId === mapId)?.displayName ?? mapId,
+      groups: [],
+      availableMaps,
+      firstTripOrigins: [],
+    };
   }
 
   const routes = parsed.routes ?? [];
   const routeGroups = ensureRouteGroupsForRoutes(routes, parsed.routeGroups ?? []);
   const { sections, ungrouped } = organizeRoutesByGroups(routeGroups, routes);
   const topology = parsed.pointTopology ?? emptyPointTopology();
+  const firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(topology);
 
   const stations = collectStationsFromAreas(parsed.areas);
   const stationNameById = new Map(
@@ -155,9 +219,25 @@ export async function loadShiftRouteGroupCatalog(): Promise<{
     });
   }
 
+  const mapDisplayName = parsed.displayName?.trim()
+    || availableMaps.find((m) => m.mapId === parsed.mapId)?.displayName
+    || parsed.mapId;
+
+  // 解析後名稱可能比庫列更準（文件 displayName）
+  const mapsWithResolvedName = availableMaps.some((m) => m.mapId === parsed.mapId)
+    ? availableMaps.map((m) =>
+        m.mapId === parsed.mapId ? { ...m, displayName: mapDisplayName } : m,
+      )
+    : [
+        ...availableMaps,
+        { mapId: parsed.mapId, displayName: mapDisplayName },
+      ];
+
   return {
     mapId: parsed.mapId,
-    mapDisplayName: parsed.displayName,
+    mapDisplayName,
     groups,
+    availableMaps: mapsWithResolvedName,
+    firstTripOrigins,
   };
 }

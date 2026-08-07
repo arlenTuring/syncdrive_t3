@@ -260,7 +260,8 @@ export function assignPassengerRoutesConstraintGreedy(args: {
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount + offset;
         } else if (precedingYard.taskType === 'servicing') {
-          // 保養後由進場載客接到首班起點；無出場站時開輪對齊偏好起點
+          // 保養有拓樸出場站時已走上方對齊分支。此處僅無明確出場時的兜底：
+          // 開輪對齊偏好 canonical 起點，但仍重置 instance 鏈。
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount;
           if (successorPolicy) {

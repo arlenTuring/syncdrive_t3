@@ -1,6 +1,7 @@
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
+import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
   GeneratedSchedulePlan,
@@ -30,8 +31,19 @@ import {
   validateStationTimingsWithinBlocks,
   validateStationBerthCollisions,
 } from './validate';
-import { enforceStationBerthConstraints } from '../stationBerthConstraint';
-import { applyMainlineMaintenanceEntryYield } from '../mainlineMaintenanceEntryYield';
+import {
+  enforceStationBerthConstraints,
+  STATION_BERTH_WAIT_MAX_DELAY_SECONDS,
+} from '../stationBerthConstraint';
+import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
+import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
+import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
+
+import {
+  applyMainlineMaintenanceEntryYield,
+  pushPassengerPastPrecedingYard,
+} from '../mainlineMaintenanceEntryYield';
+import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -48,6 +60,31 @@ export type GenerateShiftScheduleInput = {
   /** 目前啟用地圖拓樸抽出的首班起點站；未傳則不插調度 */
   firstTripOrigins?: MaintenanceFirstTripOrigin[];
 };
+
+/**
+ * 幾何後處理收斂迴圈的輪數上限。
+ * 正常 2–3 輪就不動了；上限只是防呆，避免互相破壞的處理無限來回。
+ */
+const GEOMETRY_CONVERGENCE_MAX_ROUNDS = 8;
+
+/**
+ * 版面指紋：把每個區塊的「身分＋起迄」壓成字串，用來判斷這一輪有沒有任何變化。
+ * 只看時間與存在與否——這正是幾何後處理會改動的東西。
+ */
+function fingerprintTimelines(
+  timelines: GeneratedSchedulePlan['timelines'],
+): string {
+  const parts: string[] = [];
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      parts.push(
+        `${timeline.row}|${block.id}|${block.plannedStartMinute}|${block.plannedEndMinute}`,
+      );
+    }
+  }
+  parts.sort();
+  return parts.join('\n');
+}
 
 /**
  * 排班引擎主入口：依策略文件 1.1–1.8、S1–S4 與優化算法展開班表。
@@ -121,33 +158,98 @@ export function generateShiftSchedule(
 
   timelines = insertMaintenanceEntryServiceTrips({
     timelines,
-    selectedRoutes: engineInput.selectedRoutes,
+    selectedRoutes: [
+      ...engineInput.selectedRoutes,
+      ...engineInput.backupRoutes,
+    ],
     firstTripOrigins: engineInput.firstTripOrigins,
     maintenanceBody: engineInput.maintenanceBody,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
     warnings,
   });
 
-  timelines = applyMainlineMaintenanceEntryYield(timelines);
-
-  // 站位約束需要主＋備用；輪替仍只用主路線
+  // 站位約束需要全選路線（含草稿相容 backupFor*）；輪替仍只用主路線
   const routesForBerth = [
     ...engineInput.selectedRoutes,
     ...engineInput.backupRoutes,
   ];
 
-  // 站位占用硬約束：延後 → 備用；解不開的留給 STATION_BERTH_COLLISION
-  timelines = enforceStationBerthConstraints({
-    timelines,
-    selectedRoutes: routesForBerth,
-    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-    successorPolicy: engineInput.successorPolicy,
-    warnings,
-  }).timelines;
+  // ── 幾何後處理：收斂迴圈 ────────────────────────────────────────────────
+  //
+  // 這幾道處理彼此會互相破壞：站位延後把班距擠亂、補班距又把班次推進整備、
+  // 讓渡與推移再把站位擠回衝突、撤掉不成輪尾巴又釋放出新的空檔。
+  //
+  // 舊版是一段手工排定的固定序列（讓渡×3、站位×2、推移×3、班距修復×1），
+  // 順序全靠試出來，且必然漏接——最典型的是：trim 撤掉不成輪尾巴所釋放的站位，
+  // 班距修復早就跑完了看不到，那些落差就一路留到 validate 變成 HEADWAY_BELOW_TARGET。
+  //
+  // 改為跑到不動點：每輪跑完整組處理，版面沒有任何變化就結束。
+  // 這樣「某一步釋放的空間，下一輪其他步驟就能用到」，不必人工推演順序。
+  for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
+    const before = fingerprintTimelines(timelines);
 
-  // 站位延後等後處理後，再套一次正線優先讓渡，避免正線尾端與整備開頭重疊
-  timelines = applyMainlineMaintenanceEntryYield(timelines);
+    // 站位占用：拓撲候選中選局部無衝突解（可延後／可改線／可等）
+    // 第一輪保守並收集警告；之後放寬延後上限，處理連鎖擠回來的殘餘衝突。
+    timelines = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: routesForBerth,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      successorPolicy: engineInput.successorPolicy,
+      warnings: round === 0 ? warnings : undefined,
+      ...(round === 0
+        ? {}
+        : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
+    }).timelines;
+
+    // 班距太疏 → 把後車往前拉回目標
+    timelines = densifyRouteHeadwaysAfterBerth({
+      timelines,
+      selectedRoutes: routesForBerth,
+      intervals: engineInput.intervals,
+      attributes: engineInput.attributes,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    });
+
+    // 班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕
+    timelines = repairRouteHeadwaysBelowTarget({
+      timelines,
+      selectedRoutes: routesForBerth,
+      intervals: engineInput.intervals,
+      attributes: engineInput.attributes,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    });
+
+    // 正線可吃接下來那段整備的開頭（有重疊才讓）
+    timelines = applyMainlineMaintenanceEntryYield(timelines);
+
+    // 不准佔用整備尾巴：壓到前一段整備的正線，整趟推到整備結束之後
+    timelines = pushPassengerPastPrecedingYard(timelines);
+
+    // 撤掉不成輪的尾巴。放在迴圈內是有意的——它釋放出來的站位與空檔，
+    // 下一輪的班距修復才用得到（這正是舊版固定序列漏接的地方）。
+    timelines = trimIncompleteRotationCyclesOnTimelines({
+      timelines,
+      routeCount: engineInput.passengerRoutes.length,
+    }).timelines;
+
+    if (fingerprintTimelines(timelines) === before) break;
+  }
+
+  // 整備後首班代號：所有幾何後處理完成後再標記，避免站位／讓渡弄丟前綴。
+  // 規則：整備（保養／行前／充電／機動）後第一個正線一律掛「整備代號+路線代號」。
+  timelines = tagYardDispatchTrips({
+    timelines,
+    origins: engineInput.firstTripOrigins,
+    maintenanceBody: engineInput.maintenanceBody,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    selectedRoutes: engineInput.selectedRoutes,
+  });
+  timelines = scrubMidMainlineDispatchArtifacts(timelines);
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(
@@ -164,6 +266,11 @@ export function generateShiftSchedule(
     timelines,
     routesForBerth,
     errors,
+    {
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      // 碰撞保護不足是「該拉開但沒拉開」，不是物理上兩台車疊在一起：走警告不擋生成
+      warnings,
+    },
   );
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
   validateRouteSwitchBuffers(
@@ -204,7 +311,7 @@ export function generateShiftSchedule(
   };
 
   const ok =
-    errors.length === 0
+    computeScheduleGateOk(errors)
     && resolvedByTaskId.size === engineInput.confirmedTasks.length;
   return {
     plan: plan,

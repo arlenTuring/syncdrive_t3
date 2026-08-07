@@ -41,8 +41,14 @@ function formatMinuteAsHms(totalMinutes: number): string {
 }
 
 type HoverCardPos = {
+  clientX: number;
+  clientY: number;
+};
+
+type PlacedHoverCard = {
   top: number;
   left: number;
+  maxHeight: number;
 };
 
 function TurnaroundLimitHoverCard({
@@ -54,6 +60,8 @@ function TurnaroundLimitHoverCard({
   pos: HoverCardPos;
   estimatedTripSeconds?: number | null;
 }) {
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState<PlacedHoverCard | null>(null);
   const existingVehicles = segment.activePassengerCount;
   const intervalDurationSeconds =
     (segment.endMinute - segment.startMinute) * 60;
@@ -65,10 +73,39 @@ function TurnaroundLimitHoverCard({
   const recommendedVehicles = fleet?.recommended ?? null;
   const theoreticalMin = fleet?.theoreticalMin ?? null;
 
+  useLayoutEffect(() => {
+    const tip = tipRef.current;
+    if (!tip) return;
+
+    const gap = 12;
+    const viewPad = 8;
+    const spaceAbove = Math.max(48, pos.clientY - viewPad - gap);
+    const maxHeight = Math.min(140, spaceAbove);
+    const tipRect = tip.getBoundingClientRect();
+    const half = tipRect.width / 2;
+    const left = Math.min(
+      Math.max(pos.clientX, half + viewPad),
+      window.innerWidth - half - viewPad,
+    );
+    setPlaced({
+      top: pos.clientY - gap,
+      left,
+      maxHeight,
+    });
+  }, [pos.clientX, pos.clientY, existingVehicles, recommendedVehicles, theoreticalMin, segment.startMinute, segment.endMinute, segment.headwaySeconds]);
+
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-max max-w-[280px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
-      style={{ top: pos.top, left: pos.left }}
+      ref={tipRef}
+      className={[
+        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-zinc-700/90 bg-zinc-950 px-2.5 py-1.5 shadow-xl shadow-black/40',
+        placed ? 'opacity-100' : 'opacity-0',
+      ].join(' ')}
+      style={{
+        top: placed?.top ?? pos.clientY,
+        left: placed?.left ?? pos.clientX,
+        maxHeight: placed?.maxHeight ?? 140,
+      }}
       role="tooltip"
     >
       <div className="text-[11px] font-medium leading-4 text-zinc-100">
@@ -80,20 +117,13 @@ function TurnaroundLimitHoverCard({
           ? `（理論下限 ${theoreticalMin}）`
           : null}
       </div>
-      <div className="mt-1 space-y-0.5 text-[10px] leading-4 tabular-nums text-[#F3F4F6]">
+      <div className="mt-1 space-y-0.5 text-[10px] leading-[14px] tabular-nums text-zinc-300">
         <div>開始：{formatMinuteAsHms(segment.startMinute)}</div>
         <div>結束：{formatMinuteAsHms(segment.endMinute)}</div>
         {segment.headwaySeconds ? (
           <div>班距：{segment.headwaySeconds} 秒</div>
         ) : null}
       </div>
-      {fleet?.tips?.length ? (
-        <ul className="mt-1.5 space-y-0.5 border-t border-zinc-800 pt-1.5 text-[10px] leading-4 text-zinc-400">
-          {fleet.tips.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-      ) : null}
       <div
         className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
         aria-hidden
@@ -116,45 +146,18 @@ function TurnaroundLimitCell({
   label: string;
   estimatedTripSeconds?: number | null;
 }) {
-  const cellRef = useRef<HTMLDivElement>(null);
-  const [hovered, setHovered] = useState(false);
   const [pos, setPos] = useState<HoverCardPos | null>(null);
-
-  useLayoutEffect(() => {
-    if (!hovered) {
-      setPos(null);
-      return;
-    }
-
-    const update = () => {
-      const el = cellRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setPos({
-        top: rect.top - 8,
-        left: rect.left + rect.width / 2,
-      });
-    };
-
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [hovered]);
 
   return (
     <div
-      ref={cellRef}
       className={`absolute inset-y-0 z-[1] flex items-center justify-center border-x border-zinc-700 bg-zinc-900/85 text-[11px] font-medium tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS} transition-colors hover:bg-zinc-800/85 hover:border-zinc-500`}
       style={{ left: leftPx, width: widthPx }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={(e) => setPos({ clientX: e.clientX, clientY: e.clientY })}
+      onMouseMove={(e) => setPos({ clientX: e.clientX, clientY: e.clientY })}
+      onMouseLeave={() => setPos(null)}
     >
       <span className="truncate px-1">{label}</span>
-      {hovered && pos ? (
+      {pos ? (
         <TurnaroundLimitHoverCard
           segment={segment}
           pos={pos}

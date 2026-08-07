@@ -16,6 +16,54 @@ import {
 } from './stationClearanceInsert';
 import { resolveEffectiveRouteTravelSeconds } from './stationLegTravel';
 
+/**
+ * 同一列（同一台車）在這個區塊之後，下一個任務幾分鐘開始。
+ * <strong>沒有下一個任務就回傳 null</strong>——當天沒排定的事就不假設，
+ * 不去猜「這台車會一直停到某個時間點」，只在真的有排定的空檔時才視為佔用。
+ *
+ * 這是「站位碰撞」判定裡容易漏掉的一塊：一個區塊自己的 <code>plannedEndMinute</code>
+ * 只代表「這個排班動作結束」，不代表「車子離開了這個站」。車子到站之後，
+ * 如果下一個任務要等很久才開始，車子其實還停在原地——這段時間站位仍然被佔用。
+ */
+export function resolveSameRowNextBlockStartMinute(
+  timelines: GeneratedSchedulePlan['timelines'],
+  block: { id: string; timelineRow: number; plannedEndMinute: number },
+): number | null {
+  const row = timelines.find((t) => t.row === block.timelineRow);
+  if (!row) return null;
+  let next: number | null = null;
+  for (const other of row.blocks) {
+    if (other.id === block.id) continue;
+    if (other.plannedStartMinute + 1e-9 < block.plannedEndMinute) continue;
+    if (next == null || other.plannedStartMinute < next) next = other.plannedStartMinute;
+  }
+  return next;
+}
+
+/**
+ * 這個間隔要超過多久才算「車子真的在原地閒置等待」，不是正常換線／恢復的落差。
+ * 同站折返（下行接上行）中間常有幾秒到幾十秒的換線空檔，那不是閒置，是正常接續，
+ * 不該被算進站位佔用；只有明顯偏長的落差（例如車子要等好幾分鐘才排下一個任務）
+ * 才代表車子確實還停在原地佔著站位。
+ */
+const MEANINGFUL_IDLE_GAP_SECONDS = 60;
+
+/**
+ * 同一列在這個區塊之後，是否真的有一段「閒置等待」的空檔（超過
+ * {@link MEANINGFUL_IDLE_GAP_SECONDS}）；有則回傳下一個任務的開始分鐘，
+ * 否則回傳 null（正常換線接續，不視為站位延伸佔用）。
+ */
+export function resolveSameRowIdleOccupiedUntilMinute(
+  timelines: GeneratedSchedulePlan['timelines'],
+  block: { id: string; timelineRow: number; plannedEndMinute: number },
+): number | null {
+  const nextStart = resolveSameRowNextBlockStartMinute(timelines, block);
+  if (nextStart == null) return null;
+  const idleGapSeconds = (nextStart - block.plannedEndMinute) * 60;
+  if (idleGapSeconds <= MEANINGFUL_IDLE_GAP_SECONDS) return null;
+  return nextStart;
+}
+
 export type StationBerthOccupancy = {
   stationId: string;
   stationName: string;
@@ -27,17 +75,36 @@ export type StationBerthOccupancy = {
   startMinute: number;
   /** 離站／可出發（分鐘）＝該站自然在站時間結束 */
   endMinute: number;
+  /**
+   * 別台車最早可以進這個站位的時刻（分鐘）。
+   * ＝ 實際離站（含末站滯留） + 2 × 碰撞保護時間。
+   * 沒開啟碰撞保護、也沒有滯留時就等於 {@link endMinute}。
+   * 顯示訊息一律用 startMinute／endMinute；這個欄位只拿來判定碰撞。
+   */
+  protectedUntilMinute: number;
 };
+
+export type StationBerthCollisionKind =
+  /** 兩台車的到離站區間真的重疊——同一時刻兩台車都在站位上 */
+  | 'overlap'
+  /**
+   * 區間沒重疊，但後車進站太貼著前車離站，不滿足
+   * 「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」。
+   */
+  | 'protection_gap';
 
 export type StationBerthCollision = {
   stationId: string;
   stationName: string;
+  kind: StationBerthCollisionKind;
   earlier: StationBerthOccupancy;
   later: StationBerthOccupancy;
   overlapSeconds: number;
   /** 後車進站與前車離站的間距（秒）；重疊時為負 */
   clearanceGapSeconds: number;
   requiredClearanceSeconds: number;
+  /** 還差幾秒才滿足碰撞保護（kind='protection_gap' 時 > 0） */
+  protectionShortfallSeconds: number;
 };
 
 /**
@@ -49,9 +116,18 @@ export type StationBerthCollision = {
 export function collectStationBerthOccupancies(
   timelines: GeneratedSchedulePlan['timelines'],
   selectedRoutes: ShiftScheduleSelectedRoute[],
+  /**
+   * 碰撞保護設定。不給、給 null、或秒數 ≤ 0 ＝完全關閉：只判定到離站區間重疊，
+   * 末站滯留與碰撞保護時間都不計入，等同 2026-08-07 之前的行為。
+   */
+  protection?: { collisionProtectionSeconds: number } | null,
 ): StationBerthOccupancy[] {
   const out: StationBerthOccupancy[] = [];
   const minPresenceMin = SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS / 60;
+  const protectionOn = (protection?.collisionProtectionSeconds ?? 0) > 0;
+  const protectionMin = protectionOn
+    ? (protection!.collisionProtectionSeconds * 2) / 60
+    : 0;
 
   for (const timeline of timelines) {
     const blocks = [...timeline.blocks].sort(
@@ -91,6 +167,19 @@ export function collectStationBerthOccupancies(
           }
         }
 
+        // 別台車最早可以進來的時刻。兩塊各自獨立：
+        // 1) 末站滯留——這一趟跑完後車還停在原地等下一個任務，站位一直被佔著。
+        //    只有末站會滯留（車開過中間站不會停在那裡等）。
+        // 2) 碰撞保護時間 ×2——A 車駛離衝突區要一份，B 車開進來要另一份。
+        let protectedUntilMinute = endMinute;
+        if (protectionOn && isTerminal) {
+          const idleUntil = resolveSameRowIdleOccupiedUntilMinute(timelines, block);
+          if (idleUntil != null) {
+            protectedUntilMinute = Math.max(protectedUntilMinute, idleUntil);
+          }
+        }
+        protectedUntilMinute += protectionMin;
+
         out.push({
           stationId: stop.stationId,
           stationName: stop.stationName,
@@ -100,6 +189,7 @@ export function collectStationBerthOccupancies(
           routeId: block.routeId ?? route.routeId,
           startMinute,
           endMinute,
+          protectedUntilMinute,
         });
       }
     }
@@ -157,24 +247,37 @@ export function findStationBerthCollisions(
       for (let j = i + 1; j < sorted.length; j += 1) {
         const later = sorted[j]!;
         if (later.timelineRow === earlier.timelineRow) continue;
-        if (later.startMinute >= earlier.endMinute + requiredMin - 1e-12) break;
+        // 已排序，後面的只會更晚：一旦連碰撞保護都清得開就不必再往後看
+        const protectedFloor = Math.max(
+          earlier.endMinute + requiredMin,
+          earlier.protectedUntilMinute,
+        );
+        if (later.startMinute >= protectedFloor - 1e-12) break;
 
         const overlapMin =
           Math.min(earlier.endMinute, later.endMinute)
           - Math.max(earlier.startMinute, later.startMinute);
-        if (overlapMin <= 1e-9) {
-          if (later.startMinute >= earlier.endMinute + requiredMin - 1e-12) break;
-          continue;
-        }
+        const shortfallMin = Math.max(
+          0,
+          earlier.protectedUntilMinute - later.startMinute,
+        );
+        // requiredClearance 只用來決定要不要繼續往後看，本身不構成碰撞
+        // （2026-08-07 之前就是這樣，這裡不改）。真正會回報的只有兩種：
+        // 區間重疊，或不滿足碰撞保護。
+        if (overlapMin <= 1e-9 && shortfallMin <= 1e-9) continue;
+        const kind: StationBerthCollisionKind =
+          overlapMin > 1e-9 ? 'overlap' : 'protection_gap';
 
         collisions.push({
           stationId: earlier.stationId,
           stationName: earlier.stationName,
+          kind,
           earlier,
           later,
-          overlapSeconds: minuteToSecond(overlapMin),
+          overlapSeconds: minuteToSecond(Math.max(0, overlapMin)),
           clearanceGapSeconds: minuteToSecond(later.startMinute - earlier.endMinute),
           requiredClearanceSeconds: required,
+          protectionShortfallSeconds: minuteToSecond(shortfallMin),
         });
       }
     }

@@ -1,7 +1,6 @@
 import { fetchMaintenanceTaskDetail } from '../../maintenance-tasks/api/maintenanceTasksApi';
 import {
   fetchTimeTemplateDetail,
-  resolveTimeTemplatesBackendUrl,
 } from '../../time-templates/api/timeTemplatesApi';
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
@@ -12,6 +11,7 @@ import {
   buildScheduleEngineLogPayload,
   postScheduleEngineLog,
 } from './scheduleEngineLog';
+import { buildScheduleEngineLastIssuesSnapshot } from './scheduleEngineLastIssues';
 import {
   generateShiftSchedule,
   type GenerateShiftScheduleResult,
@@ -85,16 +85,27 @@ export async function runShiftScheduleEngineForDraft(
   const fromDraft = draft.routeGroups.mapId?.trim();
   let mapId = fromDraft ? resolveMapId(fromDraft) : '';
   if (!mapId) {
-    const status = await fetchMapLibraryBackendStatus();
-    mapId = status?.activeMapId
-      ? resolveMapId(status.activeMapId)
-      : 't3-main-version';
+    try {
+      const status = await fetchMapLibraryBackendStatus();
+      mapId = status?.activeMapId
+        ? resolveMapId(status.activeMapId)
+        : 't3-main-version';
+    } catch {
+      mapId = 't3-main-version';
+    }
   }
 
-  const mapDocument = await resolveParsedMapForPlatform(mapId);
-  const firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
-    mapDocument?.pointTopology ?? emptyPointTopology(),
+  let firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
+    emptyPointTopology(),
   );
+  try {
+    const mapDocument = await resolveParsedMapForPlatform(mapId);
+    firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
+      mapDocument?.pointTopology ?? emptyPointTopology(),
+    );
+  } catch (mapError) {
+    console.warn('[schedule-engine] 地圖拓樸載入失敗，改用空首班起點', mapError);
+  }
 
   const result = generateShiftSchedule({
     shiftId,
@@ -107,17 +118,28 @@ export async function runShiftScheduleEngineForDraft(
   });
 
   // 開發輔助：每次生成把輸入摘要與完整報錯寫成 log 檔（fire-and-forget）。
+  // lastIssues 另會覆寫 .dev JSON＋審核 HTML「最近一次生成」區塊。
+  const lastIssues = buildScheduleEngineLastIssuesSnapshot({
+    draft,
+    result,
+    shiftId,
+  });
   void postScheduleEngineLog({
     label: shiftId || 'draft',
-    payload: buildScheduleEngineLogPayload({
-      draft,
-      result,
-      firstTripOrigins,
-      maintenanceBody: maintenanceTaskBody,
-      mapId,
-      shiftId,
-    }),
-    backendUrl: backendUrl ?? resolveTimeTemplatesBackendUrl(),
+    payload: {
+      ...buildScheduleEngineLogPayload({
+        draft,
+        result,
+        firstTripOrigins,
+        maintenanceBody: maintenanceTaskBody,
+        mapId,
+        shiftId,
+        intervals: parsed.intervals,
+        attributes: parsed.attributes,
+      }),
+      lastIssues,
+    },
+    backendUrl: backendUrl ?? '',
   });
 
   return result;

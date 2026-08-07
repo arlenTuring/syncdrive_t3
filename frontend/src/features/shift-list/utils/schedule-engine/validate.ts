@@ -31,12 +31,14 @@ import {
   resolveBlockStationDepartureFeasibility,
   resolveRouteForBlock,
 } from '../buildBlockStationDepartures';
+import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDayCycle';
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
 } from '../stationBerthOccupancy';
 import {
   ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+  listNextInstanceCandidates,
   resolveNextInstanceId,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
@@ -136,32 +138,46 @@ export function validateTimelineOverlaps(
     const sorted = [...timeline.blocks]
       .filter((block) => block.source !== 'transition')
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
-    for (let i = 0; i < sorted.length - 1; i += 1) {
+    for (let i = 0; i < sorted.length; i += 1) {
       const current = sorted[i]!;
-      const next = sorted[i + 1]!;
-      if (current.plannedEndMinute <= next.plannedStartMinute + 1e-9) continue;
+      for (let j = i + 1; j < sorted.length; j += 1) {
+        const next = sorted[j]!;
+        // 線性相鄰才可能重疊；日循環上仍要比「午夜後 vs 清晨保養」
+        const linearAdjacent =
+          current.plannedEndMinute > next.plannedStartMinute + 1e-9;
+        const dayCycleHit = blocksConflictOnDayCycle(
+          current.plannedStartMinute,
+          current.plannedEndMinute,
+          next.plannedStartMinute,
+          next.plannedEndMinute,
+        );
+        if (!linearAdjacent && !dayCycleHit) continue;
 
-      // 調度可與保養／行前尾端重疊，但重疊不得超過調度本身時長（不到站佔位）
-      if (isAllowedMaintenanceDispatchOverlap(current, next)) continue;
-      // 進場載客可偷保養尾端：載客串起點不早於保養開始即允許重疊
-      if (isAllowedEntryServiceOverlap(current, next)) continue;
+        // 調度可吃接下整備／行前開頭（不可偷尾巴）；重疊不得超過調度本身時長
+        if (isAllowedMaintenanceDispatchOverlap(current, next)) continue;
+        // 進場載客可偷保養尾端：載客串起點不早於保養開始即允許重疊
+        if (isAllowedEntryServiceOverlap(current, next)) continue;
+        // 反向順序也可能：next 為整備、current 為午夜後正線等
+        if (isAllowedMaintenanceDispatchOverlap(next, current)) continue;
+        if (isAllowedEntryServiceOverlap(next, current)) continue;
 
-      const currentLabel = formatBlockConflictLabel(current);
-      const nextLabel = formatBlockConflictLabel(next);
-      pushIssue(errors, {
-        code: 'TIMELINE_OVERLAP',
-        severity: 'error',
-        message: `時間線 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
-        detail: {
-          timelineRow: timeline.row,
-          blockId: current.id,
-          nextBlockId: next.id,
-          earlierLabel: currentLabel,
-          laterLabel: nextLabel,
-          earlierEndMinute: current.plannedEndMinute,
-          laterStartMinute: next.plannedStartMinute,
-        },
-      });
+        const currentLabel = formatBlockConflictLabel(current);
+        const nextLabel = formatBlockConflictLabel(next);
+        pushIssue(errors, {
+          code: 'TIMELINE_OVERLAP',
+          severity: 'error',
+          message: `時間線 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
+          detail: {
+            timelineRow: timeline.row,
+            blockId: current.id,
+            nextBlockId: next.id,
+            earlierLabel: currentLabel,
+            laterLabel: nextLabel,
+            earlierEndMinute: current.plannedEndMinute,
+            laterStartMinute: next.plannedStartMinute,
+          },
+        });
+      }
     }
   }
 }
@@ -177,22 +193,22 @@ function isAllowedMaintenanceDispatchOverlap(
   earlier: GeneratedScheduleBlock,
   later: GeneratedScheduleBlock,
 ): boolean {
-  const yardThenDispatch =
-    isYardWindowForDispatchOverlap(earlier) && later.source === 'dispatch';
+  // 禁止整備／行前 → 調度（偷尾巴）。只允許調度／空駛壓進「接下整備開頭」。
   const dispatchThenYard =
     earlier.source === 'dispatch' && isYardWindowForDispatchOverlap(later);
-  if (!yardThenDispatch && !dispatchThenYard) return false;
+  if (!dispatchThenYard) return false;
 
-  const yard = yardThenDispatch ? earlier : later;
-  const dispatch = yardThenDispatch ? later : earlier;
+  const yard = later;
+  const dispatch = earlier;
   const dispatchDuration = dispatch.plannedEndMinute - dispatch.plannedStartMinute;
   if (dispatchDuration <= 0) return false;
+  // 必須自整備起點當下或之前已發（吃開頭）；中途切入不算
+  if (dispatch.plannedStartMinute > yard.plannedStartMinute + 1e-9) return false;
 
   const overlapStart = Math.max(yard.plannedStartMinute, dispatch.plannedStartMinute);
   const overlapEnd = Math.min(yard.plannedEndMinute, dispatch.plannedEndMinute);
   const overlap = overlapEnd - overlapStart;
   if (overlap <= 0) return true;
-  // 重疊 ≤ 調度時長，且調度結束不得早於整備結束超過「調度全長」（即最多吃掉整段空駛）
   return overlap <= dispatchDuration + 1e-9;
 }
 
@@ -229,11 +245,7 @@ function formatBlockConflictLabel(block: GeneratedScheduleBlock): string {
 }
 
 function formatMinuteHms(minute: number): string {
-  const totalSeconds = Math.max(0, Math.round(minute * 60));
-  const hh = Math.floor(totalSeconds / 3600);
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  return formatScheduleClockHms(minute);
 }
 
 export function validatePassengerHeadway(
@@ -354,6 +366,13 @@ function validateSameRouteHeadway(
       );
       const straddlesInterval =
         earlierHw != null && laterHw != null && earlierHw !== laterHw;
+      const deficitSeconds = headwayTarget - gapSeconds;
+      const severityBand =
+        deficitSeconds <= 30
+          ? 'mild'
+          : deficitSeconds > 180
+            ? 'severe'
+            : 'moderate';
       pushIssue(warnings, {
         code: 'HEADWAY_BELOW_TARGET',
         severity: 'warning',
@@ -368,6 +387,8 @@ function validateSameRouteHeadway(
           laterDepartureMinute: secondToMinute(next.startSecond),
           gapSeconds,
           targetHeadwaySeconds: headwayTarget,
+          deficitSeconds,
+          severityBand,
           earlierIntervalHeadwaySeconds: earlierHw,
           laterIntervalHeadwaySeconds: laterHw,
           straddlesInterval,
@@ -687,38 +708,49 @@ export function validateRouteSuccessorContinuity(
 
       const currentInstanceId = resolveSelectedRouteInstanceId(currentRoute);
       const nextInstanceId = resolveSelectedRouteInstanceId(nextRoute);
-      const expectedInstanceId = successorPolicy
-        ? resolveNextInstanceId(successorPolicy, currentInstanceId)?.instanceId
-        : orderedInstanceIds[
-          (orderedInstanceIds.indexOf(currentInstanceId) + 1)
-          % orderedInstanceIds.length
-        ];
+      const allowedNextIds = successorPolicy
+        ? new Set(
+            listNextInstanceCandidates(successorPolicy, currentInstanceId, {
+              allowSecondary: true,
+            }).map((item) => item.instanceId),
+          )
+        : new Set([
+            orderedInstanceIds[
+              (orderedInstanceIds.indexOf(currentInstanceId) + 1)
+              % orderedInstanceIds.length
+            ]!,
+          ]);
+      const preferredNextId = successorPolicy
+        ? resolveNextInstanceId(successorPolicy, currentInstanceId, {
+            allowSecondary: true,
+          })?.instanceId
+        : [...allowedNextIds][0];
 
       const successorMatchesExpected =
-        Boolean(expectedInstanceId)
-        && (
-          expectedInstanceId === nextInstanceId
-          || (
-            isBackupOfExpectedInstance(
-              nextRoute,
-              expectedInstanceId!,
-              selectedRoutes,
-            )
-            && routesShareTurnaroundStation(currentRoute, nextRoute)
+        allowedNextIds.has(nextInstanceId)
+        || (
+          Boolean(preferredNextId)
+          && isBackupOfExpectedInstance(
+            nextRoute,
+            preferredNextId!,
+            selectedRoutes,
           )
+          && routesShareTurnaroundStation(currentRoute, nextRoute)
         );
 
       if (!successorMatchesExpected) {
         pushIssue(errors, {
           code: 'ROUTE_SUCCESSOR_MISMATCH',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${currentRoute.routeCode}（${currentInstanceId}）下一趟應為 ${expectedInstanceId ?? '無可用 successor'}，實際為 ${nextRoute.routeCode}（${nextInstanceId}）`,
+          message: `時間線 ${timeline.row}：${currentRoute.routeCode}（${currentInstanceId}）下一趟應為關聯圖合法出邊`
+            + `（偏好 ${preferredNextId ?? '無'}），實際為 ${nextRoute.routeCode}（${nextInstanceId}）`,
           detail: {
             timelineRow: timeline.row,
             earlierBlockId: currentBlock.id,
             laterBlockId: nextBlock.id,
             fromInstanceId: currentInstanceId,
-            expectedInstanceId,
+            expectedInstanceId: preferredNextId,
+            allowedNextInstanceIds: [...allowedNextIds],
             actualInstanceId: nextInstanceId,
           },
         });
@@ -828,21 +860,32 @@ export function validateStationBerthCollisions(
   timelines: GeneratedSchedulePlan['timelines'],
   selectedRoutes: ShiftScheduleSelectedRoute[],
   errors: FeasibilityIssue[],
+  options?: {
+    /**
+     * 碰撞保護時間（秒）。不給就只檢查到離站區間重疊（舊行為）；
+     * 給了才會另外檢查「後車到站 ≥ 前車實際離站 + 2 × 此值」。
+     */
+    collisionProtectionSeconds?: number;
+    /** 碰撞保護不足只是警告，不擋生成；沒給就退回寫進 errors。 */
+    warnings?: FeasibilityIssue[];
+  },
 ): void {
-  const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes);
+  const collisionProtectionSeconds = options?.collisionProtectionSeconds;
+  const occupancies = collectStationBerthOccupancies(
+    timelines,
+    selectedRoutes,
+    collisionProtectionSeconds != null ? { collisionProtectionSeconds } : null,
+  );
   const collisions = findStationBerthCollisions(occupancies, selectedRoutes);
+  const protectionSink = options?.warnings ?? errors;
   let reported = 0;
+  let protectionReported = 0;
   for (const hit of collisions) {
-    if (reported >= MAX_BERTH_COLLISION_REPORTS) {
-      pushIssue(errors, {
-        code: 'STATION_BERTH_COLLISION',
-        severity: 'error',
-        kind: 'limit',
-        message:
-          `另有 ${collisions.length - reported} 處停靠點站位碰撞未逐條列出（共 ${collisions.length} 處）`,
-        detail: { totalCollisions: collisions.length, reported },
-      });
-      break;
+    const isProtectionGap = hit.kind === 'protection_gap';
+    const sink = isProtectionGap ? protectionSink : errors;
+    const count = isProtectionGap ? protectionReported : reported;
+    if (count >= MAX_BERTH_COLLISION_REPORTS) {
+      continue;
     }
     const earlierLabel =
       `${hit.earlier.routeCode ?? '正線'} 時間線 ${hit.earlier.timelineRow}`
@@ -850,32 +893,71 @@ export function validateStationBerthCollisions(
     const laterLabel =
       `${hit.later.routeCode ?? '正線'} 時間線 ${hit.later.timelineRow}`
       + ` ${formatMinuteHms(hit.later.startMinute)}–${formatMinuteHms(hit.later.endMinute)}`;
-    pushIssue(errors, {
+    const detail = {
+      stationId: hit.stationId,
+      stationName: hit.stationName,
+      earlierBlockId: hit.earlier.blockId,
+      laterBlockId: hit.later.blockId,
+      earlierTimelineRow: hit.earlier.timelineRow,
+      laterTimelineRow: hit.later.timelineRow,
+      overlapSeconds: hit.overlapSeconds,
+      clearanceGapSeconds: hit.clearanceGapSeconds,
+      requiredClearanceSeconds: hit.requiredClearanceSeconds,
+      protectionShortfallSeconds: hit.protectionShortfallSeconds,
+      blockId: hit.later.blockId,
+    };
+    if (isProtectionGap) {
+      pushIssue(sink, {
+        code: 'STATION_BERTH_PROTECTION_GAP',
+        severity: 'warning',
+        kind: 'actionable',
+        message:
+          `${hit.stationName} 碰撞保護不足：${earlierLabel} 與 ${laterLabel}`
+          + `（還差 ${Math.round(hit.protectionShortfallSeconds)} 秒）`,
+        detail,
+      });
+      protectionReported += 1;
+      continue;
+    }
+    pushIssue(sink, {
       code: 'STATION_BERTH_COLLISION',
       severity: 'error',
       kind: 'limit',
       message:
         `${hit.stationName} 站位碰撞：${earlierLabel} 與 ${laterLabel}`
         + `（在站重疊 ${Math.round(hit.overlapSeconds)} 秒）`,
-      detail: {
-        stationId: hit.stationId,
-        stationName: hit.stationName,
-        earlierBlockId: hit.earlier.blockId,
-        laterBlockId: hit.later.blockId,
-        earlierTimelineRow: hit.earlier.timelineRow,
-        laterTimelineRow: hit.later.timelineRow,
-        overlapSeconds: hit.overlapSeconds,
-        clearanceGapSeconds: hit.clearanceGapSeconds,
-        requiredClearanceSeconds: hit.requiredClearanceSeconds,
-        blockId: hit.later.blockId,
-      },
+      detail,
     });
     reported += 1;
+  }
+
+  const overlapTotal = collisions.filter((hit) => hit.kind === 'overlap').length;
+  if (overlapTotal > reported) {
+    pushIssue(errors, {
+      code: 'STATION_BERTH_COLLISION',
+      severity: 'error',
+      kind: 'limit',
+      message:
+        `另有 ${overlapTotal - reported} 處停靠點站位碰撞未逐條列出（共 ${overlapTotal} 處）`,
+      detail: { totalCollisions: overlapTotal, reported },
+    });
+  }
+  const protectionTotal = collisions.length - overlapTotal;
+  if (protectionTotal > protectionReported) {
+    pushIssue(protectionSink, {
+      code: 'STATION_BERTH_PROTECTION_GAP',
+      severity: 'warning',
+      kind: 'limit',
+      message:
+        `另有 ${protectionTotal - protectionReported} 處碰撞保護不足未逐條列出（共 ${protectionTotal} 處）`,
+      detail: { totalCollisions: protectionTotal, reported: protectionReported },
+    });
   }
 }
 
 /**
- * 硬約束：每條時間線的正線趟數須為路線群組大小的整數倍（跑完一整輪才能收班／進整備）。
+ * 硬約束：每條時間線在每一個整備段內的正線趟數須為路線群組大小的整數倍
+ * （跑完一整輪才能進充電／收班；全天總數整除不算過關）。
  */
 export function validateRotationCyclesComplete(
   timelines: GeneratedSchedulePlan['timelines'],
@@ -883,27 +965,61 @@ export function validateRotationCyclesComplete(
   errors: FeasibilityIssue[],
 ): void {
   if (routeCount <= 1) return;
-  for (const timeline of timelines) {
-    const passengerBars = [...timeline.blocks]
-      .filter((block) => block.source === 'template_bar' && block.taskType === 'passenger')
-      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
-    if (passengerBars.length === 0) continue;
-    if (passengerBars.length % routeCount === 0) continue;
 
-    const last = passengerBars[passengerBars.length - 1]!;
-    const lastLabel = last.routeCode ?? last.routeName ?? last.label;
-    pushIssue(errors, {
-      code: 'ROTATION_CYCLE_INCOMPLETE',
-      severity: 'error',
-      message: `時間線 ${timeline.row} 未跑完路線群組來回（正線 ${passengerBars.length} 趟，須為 ${routeCount} 的整數倍）。最後一趟：${lastLabel}`,
-      detail: {
-        timelineRow: timeline.row,
-        passengerTripCount: passengerBars.length,
-        routeCount,
-        blockId: last.id,
-        lastRouteId: last.routeId,
-        lastRouteName: last.routeName,
-      },
-    });
+  const isYard = (block: GeneratedScheduleBlock): boolean => {
+    if (block.source !== 'template_bar') return false;
+    return (
+      block.taskType === 'charging'
+      || block.taskType === 'servicing'
+      || block.taskType === 'inspection'
+      || block.taskType === 'standby'
+    );
+  };
+
+  for (const timeline of timelines) {
+    const ordered = [...timeline.blocks].sort(
+      (a, b) =>
+        a.plannedStartMinute - b.plannedStartMinute
+        || a.id.localeCompare(b.id),
+    );
+
+    let stretch: GeneratedScheduleBlock[] = [];
+    const flush = () => {
+      if (stretch.length === 0) return;
+      if (stretch.length % routeCount === 0) {
+        stretch = [];
+        return;
+      }
+      const last = stretch[stretch.length - 1]!;
+      const lastLabel = last.routeCode ?? last.routeName ?? last.label;
+      pushIssue(errors, {
+        code: 'ROTATION_CYCLE_INCOMPLETE',
+        severity: 'error',
+        message:
+          `時間線 ${timeline.row} 整備前未跑完路線群組來回`
+          + `（本段正線 ${stretch.length} 趟，須為 ${routeCount} 的整數倍）。`
+          + `最後一趟：${lastLabel}`,
+        detail: {
+          timelineRow: timeline.row,
+          passengerTripCount: stretch.length,
+          routeCount,
+          blockId: last.id,
+          lastRouteId: last.routeId,
+          lastRouteName: last.routeName,
+        },
+      });
+      stretch = [];
+    };
+
+    for (const block of ordered) {
+      if (isYard(block)) {
+        flush();
+        continue;
+      }
+      if (block.source === 'template_bar' && block.taskType === 'passenger') {
+        stretch.push(block);
+      }
+    }
+    flush();
   }
 }

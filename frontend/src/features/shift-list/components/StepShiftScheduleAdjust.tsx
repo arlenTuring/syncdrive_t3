@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -13,7 +13,10 @@ import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import { AttributeLegendBadgeChip } from '../../time-templates/components/AttributeLegendBadgeChip';
 import type { ShiftScheduleCreateDraft, ShiftScheduleSelectedRoute } from '../types/create';
 import { isShiftScheduleOutputFresh } from '../types/create';
-import { buildShiftScheduleStoredOutput } from '../utils/buildShiftScheduleOutput';
+import {
+  buildShiftScheduleStoredOutput,
+  trimPlanAdjustHistoryForPersist,
+} from '../utils/buildShiftScheduleOutput';
 import type {
   FeasibilityIssue,
   GeneratedScheduleBlock,
@@ -26,6 +29,11 @@ import {
   resolveFeasibilityIssueMeta,
   type FeasibilityIssueKind,
 } from '../utils/schedule-engine/feasibilityIssueMeta';
+import {
+  evaluateScheduleAcceptance,
+  layerSortKey,
+  resolveIssueDisplayLayerFromIssue,
+} from '../utils/scheduleAcceptance';
 import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
@@ -59,13 +67,15 @@ function applyHistoryToOutput(
 ): ShiftScheduleStoredOutput {
   const entry = history[historyIndex];
   if (!entry) return base;
+  // 畫面用的 plan 取自「未裁切」的目前位置；只有要寫進草稿的歷史才裁切
+  const persisted = trimPlanAdjustHistoryForPersist(history, historyIndex);
   return {
     ...base,
     generatedAt: entry.plan.generatedAt,
     plan: entry.plan,
     feasibilityReport: entry.feasibilityReport,
-    planAdjustHistory: history,
-    planAdjustHistoryIndex: historyIndex,
+    planAdjustHistory: persisted.history,
+    planAdjustHistoryIndex: persisted.historyIndex,
   };
 }
 
@@ -215,7 +225,24 @@ function groupFeasibilityIssues(
 
   for (const issue of errors) push(issue, 'error');
   for (const issue of warnings) push(issue, 'warning');
-  return order;
+
+  // 硬錯誤 → 極限 → 可調 → 策略
+  return order.sort((a, b) => {
+    const layerA = resolveIssueDisplayLayerFromIssue({
+      code: a.code,
+      severity: a.severity,
+      kind: a.issues[0]?.kind,
+    });
+    const layerB = resolveIssueDisplayLayerFromIssue({
+      code: b.code,
+      severity: b.severity,
+      kind: b.issues[0]?.kind,
+    });
+    const diff = layerSortKey(layerA) - layerSortKey(layerB);
+    if (diff !== 0) return diff;
+    if (a.severity !== b.severity) return a.severity === 'error' ? -1 : 1;
+    return a.code.localeCompare(b.code);
+  });
 }
 
 function IssueGroupCard({
@@ -355,25 +382,111 @@ function FeasibilityMessages({
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
+  const [viewMode, setViewMode] = useState<'all' | 'hard' | 'hidePolicy'>('hidePolicy');
+
+  const acceptance = useMemo(() => evaluateScheduleAcceptance(report), [report]);
+
   const groups = useMemo(
     () => groupFeasibilityIssues(report.errors, report.warnings),
     [report.errors, report.warnings],
   );
 
+  const errorCount = report.errors.length;
+  const warningCount = report.warnings.length;
+  const visibleGroups = groups.filter((g) => {
+    if (viewMode === 'hard') return g.severity === 'error';
+    if (viewMode === 'hidePolicy') {
+      const layer = resolveIssueDisplayLayerFromIssue({
+        code: g.code,
+        severity: g.severity,
+        kind: g.issues[0]?.kind,
+      });
+      return layer !== 'policy';
+    }
+    return true;
+  });
+
   if (groups.length === 0) return null;
 
   return (
     <div className="mb-4 space-y-2">
-      {groups.map((group) => (
-        <IssueGroupCard
-          key={group.key}
-          group={group}
-          plan={plan}
-          sectionCodes={sectionCodes}
-          defaultExpanded={group.issues.length === 1}
-          onIssueClick={onIssueClick}
-        />
-      ))}
+      <div className="mb-2 space-y-1.5 px-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {errorCount > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-400 ring-1 ring-red-500/30">
+              <AlertCircle className="size-3 shrink-0" />
+              {errorCount} 硬錯誤
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-500/25">
+              ✓ 硬閘通過
+            </span>
+          )}
+          {acceptance.qualityPassed ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300/90 ring-1 ring-emerald-500/20">
+              品質目標通過
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300 ring-1 ring-amber-500/25">
+              品質未達標
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="text-[11px] text-zinc-500">
+              警告 {warningCount}
+              {acceptance.policyNoiseCount > 0
+                ? `（策略 ${acceptance.policyNoiseCount}）`
+                : ''}
+            </span>
+          )}
+          <div className="flex-1" />
+          <div className="inline-flex rounded-full bg-zinc-900/80 p-0.5 ring-1 ring-zinc-700/80">
+            {(
+              [
+                ['hidePolicy', '隱藏策略'],
+                ['hard', '僅硬錯誤'],
+                ['all', '全部'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                  viewMode === mode
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {mode === 'hidePolicy' ? <Filter className="size-3 shrink-0" /> : null}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[10px] leading-4 text-zinc-500">
+          硬閘＝0 錯誤才算通過；策略延後／改線預設隱藏。品質目標另要求無未承接脈衝與班距低於目標。
+        </p>
+      </div>
+      {visibleGroups.map((group) => {
+        const layer = resolveIssueDisplayLayerFromIssue({
+          code: group.code,
+          severity: group.severity,
+          kind: group.issues[0]?.kind,
+        });
+        return (
+          <IssueGroupCard
+            key={group.key}
+            group={group}
+            plan={plan}
+            sectionCodes={sectionCodes}
+            defaultExpanded={
+              layer === 'hard' || (layer !== 'policy' && group.issues.length === 1)
+            }
+            onIssueClick={onIssueClick}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -417,7 +530,7 @@ function revalidatePlan(
   );
 
   return {
-    ok: errors.length === 0,
+    ok: computeScheduleGateOk(errors),
     errors,
     warnings,
   };
@@ -548,7 +661,30 @@ export function StepShiftScheduleAdjust({
           throw new Error('無法生成班表產出');
         }
 
-        const templateDetail = await fetchTimeTemplateDetail(draft.timeTemplate.templateId);
+        let templateDetail: Awaited<ReturnType<typeof fetchTimeTemplateDetail>>;
+        try {
+          templateDetail = await fetchTimeTemplateDetail(draft.timeTemplate.templateId);
+        } catch (templateError) {
+          // 班表已生成時，模板重載失敗不應蓋掉可行性報告（常見：Failed to fetch）
+          if (cancelled) return;
+          console.warn('[shift-schedule] 時間模板重載失敗', templateError);
+          const { history: restoredHistory, historyIndex: restoredIndex } =
+            resolveHistoryFromOutput(storedOutput);
+          if (restoredHistory.length > 0 && restoredIndex >= 0) {
+            const current = restoredHistory[restoredIndex]!;
+            setHistory(restoredHistory);
+            setHistoryIndex(restoredIndex);
+            setPlan(current.plan);
+            setReport(current.feasibilityReport);
+          }
+          setError(
+            templateError instanceof Error
+              ? `時間模板重載失敗：${templateError.message}`
+              : '時間模板重載失敗',
+          );
+          setLoading(false);
+          return;
+        }
         if (cancelled) return;
 
         const template = parseStoredTemplateBody(templateDetail.body ?? {});
@@ -952,7 +1088,7 @@ export function StepShiftScheduleAdjust({
     );
   }
 
-  if (error) {
+  if (error && !plan) {
     return (
       <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
         {error}
@@ -1060,6 +1196,11 @@ export function StepShiftScheduleAdjust({
 
   return (
     <div className={isMaximized ? "fixed inset-0 z-50 bg-[#0c1017] p-6 flex flex-col overflow-y-auto" : "flex min-h-0 flex-1 flex-col"}>
+      {error && plan ? (
+        <div className="mb-3 shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {error}
+        </div>
+      ) : null}
       {showRebuildConfirm && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"

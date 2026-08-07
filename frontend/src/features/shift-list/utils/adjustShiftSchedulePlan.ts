@@ -19,6 +19,7 @@ import type {
 } from './schedule-engine/types';
 import { minuteToSecond, secondToMinute, pushIssue } from './schedule-engine/types';
 import { isClockAlignedSeconds, SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS } from './schedule-engine/physics';
+import { computeScheduleGateOk } from './scheduleAcceptance';
 
 function rebuildRowTransitions(
   bars: GeneratedScheduleBlock[],
@@ -161,7 +162,7 @@ export function revalidateAdjustedPlan(args: {
   );
 
   return {
-    ok: errors.length === 0,
+    ok: computeScheduleGateOk(errors),
     errors,
     warnings,
   };

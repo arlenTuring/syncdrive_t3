@@ -40,6 +40,27 @@ export type GeneratedScheduleBlock = {
   firstTripOriginLabel?: string;
   /** 進場載客：來源整備區段代號（班次代號 = 整備代號 + 路線代號 + 開始時刻） */
   entryServiceSectionCode?: string;
+  /**
+   * 調度營運班次（entry_service）落點診斷（文件 §10.3）——
+   * 只在這一段抵達某個站位時實際查得到「該站淨空時刻」才會寫入；
+   * 沒有別的車佔著那個站位就不寫（代表這段完全不受站位限制）。
+   */
+  entryServiceBerthCheck?: {
+    /** 這一段抵達的站位 */
+    arriveStationId: string;
+    /** 該站淨空時刻（分鐘，自 00:00 起） */
+    berthClearMinute: number;
+    /** 抵達時刻 − 淨空時刻（秒）；正值代表還有餘裕，理論上不應為負 */
+    slackSeconds: number;
+  };
+  /**
+   * 調度班次前綴（Yard Dispatch Prefix）：
+   * 整備（行前／充電／機動）出場站 ≠ 首班路線首站時，引擎在整備後第一個正線班次
+   * 上寫入此前綴（= 整備代號 + 路線代號，如「ATN」）。
+   * 班次代號顯示為 `{yardDispatchPrefix}{HHMM}`（不含列碼）。
+   * 僅 taskType=passenger source=template_bar 的班次可能有此欄位。
+   */
+  yardDispatchPrefix?: string;
 };
 
 export type FeasibilityViolationCode =
@@ -50,9 +71,11 @@ export type FeasibilityViolationCode =
   | 'STATION_LEG_TRAVEL_INVALID'
   | 'STATION_TIMING_INFEASIBLE'
   | 'STATION_BERTH_COLLISION'
+  /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
+  | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */
   | 'STATION_BERTH_DELAYED'
-  /** 生成期延後超過上限、改派備用路線（警告） */
+  /** 生成期站位約束依拓撲改選路線（警告；代號沿用） */
   | 'STATION_BERTH_BACKUP_USED'
   | 'ANCHOR_CONFLICT'
   | 'TIMELINE_OVERLAP'
@@ -152,8 +175,11 @@ export type ShiftScheduleMaintenanceTaskBinding = {
 };
 
 /** 寫入 operation_shifts.body 的班表產出（Step 5 生成、Step 6 確認） */
+/** 排班產出儲存版本號：引擎邏輯／代號規則變更時遞增，自動作廢舊版快取 */
+export const CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION = 2;
+
 export type ShiftScheduleStoredOutput = {
-  outputVersion: 1;
+  outputVersion: number;
   generatedAt: string;
   plan: GeneratedSchedulePlan | null;
   feasibilityReport: ShiftScheduleFeasibilityReport;

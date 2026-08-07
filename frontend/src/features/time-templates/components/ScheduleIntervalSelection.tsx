@@ -9,8 +9,16 @@ import {
 } from '../types/editor';
 
 type HoverCardPos = {
+  /** 游標 Y（視窗座標）；提示浮在游標上方 */
+  clientY: number;
+  /** 游標 X（視窗座標） */
+  clientX: number;
+};
+
+type PlacedHoverCard = {
   top: number;
   left: number;
+  maxHeight: number;
 };
 
 function IntervalAttributeHoverCard({
@@ -26,16 +34,49 @@ function IntervalAttributeHoverCard({
 }) {
   const content = formatSelectedIntervalHoverContent(interval, attribute, estimatedTripSeconds);
   const accent = attribute?.color ?? '#7C86FF';
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState<PlacedHoverCard | null>(null);
+  const contentKey = `${content.title}\n${content.lines.join('\n')}`;
+
+  useLayoutEffect(() => {
+    const tip = tipRef.current;
+    if (!tip) return;
+
+    const gap = 12;
+    const viewPad = 8;
+    const spaceAbove = Math.max(48, pos.clientY - viewPad - gap);
+    const maxHeight = Math.min(160, spaceAbove);
+
+    const tipRect = tip.getBoundingClientRect();
+    const half = tipRect.width / 2;
+    const left = Math.min(
+      Math.max(pos.clientX, half + viewPad),
+      window.innerWidth - half - viewPad,
+    );
+    setPlaced({
+      top: pos.clientY - gap,
+      left,
+      maxHeight,
+    });
+  }, [pos.clientX, pos.clientY, contentKey]);
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-max max-w-[220px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-3 py-2.5 shadow-2xl shadow-black/50"
-      style={{ top: pos.top, left: pos.left }}
+      ref={tipRef}
+      className={[
+        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-zinc-700/90 bg-zinc-950 px-2.5 py-1.5 shadow-xl shadow-black/40',
+        placed ? 'opacity-100' : 'opacity-0',
+      ].join(' ')}
+      style={{
+        top: placed?.top ?? pos.clientY,
+        left: placed?.left ?? pos.clientX,
+        maxHeight: placed?.maxHeight ?? 160,
+      }}
       role="tooltip"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <span
-          className="inline-block size-2 shrink-0 rounded-full"
+          className="inline-block size-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: accent }}
           aria-hidden
         />
@@ -43,7 +84,7 @@ function IntervalAttributeHoverCard({
           {content.title}
         </span>
       </div>
-      <div className="mt-2 space-y-1 text-[10px] leading-[15px] text-zinc-300">
+      <div className="mt-1 space-y-0.5 text-[10px] leading-[14px] text-zinc-300">
         {content.lines.map((line) => (
           <div key={line}>{line}</div>
         ))}
@@ -76,50 +117,26 @@ function ScheduleIntervalHeaderHit({
   onSelect,
   estimatedTripSeconds,
 }: ScheduleIntervalHeaderHitProps) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const [hovered, setHovered] = useState(false);
   const [pos, setPos] = useState<HoverCardPos | null>(null);
-  const showTooltip = hovered;
-
-  useLayoutEffect(() => {
-    if (!showTooltip) {
-      setPos(null);
-      return;
-    }
-
-    const update = () => {
-      const el = anchorRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setPos({
-        top: rect.top - 8,
-        left: rect.left + rect.width / 2,
-      });
-    };
-
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [showTooltip]);
 
   return (
     <>
       <button
-        ref={anchorRef}
         type="button"
         aria-pressed={selected}
         aria-label={`${interval.name} ${interval.startTime} — ${interval.endTime}`}
         className="pointer-events-auto absolute inset-y-0 cursor-pointer border-0 bg-transparent p-0"
         style={{ left: leftPx, width: widthPx }}
         onClick={() => onSelect(interval.id)}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={(e) => {
+          setPos({ clientX: e.clientX, clientY: e.clientY });
+        }}
+        onMouseMove={(e) => {
+          setPos({ clientX: e.clientX, clientY: e.clientY });
+        }}
+        onMouseLeave={() => setPos(null)}
       />
-      {showTooltip && pos ? (
+      {pos ? (
         <IntervalAttributeHoverCard
           interval={interval}
           attribute={attribute}

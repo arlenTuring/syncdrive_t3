@@ -14,6 +14,7 @@ import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrig
 import {
   buildYardRotationExitByTaskType,
   isStandbyDispatchableForMainline,
+  resolveContiguousYardBusyUntilMinute,
   shouldApplyYardExitRotationAlign,
 } from '../maintenancePostTaskPolicy';
 import { resolveRouteClearanceInsertGapSeconds } from '../stationClearanceInsert';
@@ -22,6 +23,7 @@ import type { TaskTypeKey } from '../../../time-templates/types/editor';
 import {
   sortSelectedRoutesByExecutionOrder,
   normalizeMinimumRecoveryTimeSeconds,
+  normalizeCollisionProtectionSeconds,
   resolveInterTripGapSeconds,
   resolvePassengerRouteOccupancy,
   shouldIncludeRecoveryForRouteSwitch,
@@ -81,14 +83,22 @@ export type EngineInput = {
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
   passengerRoutes: ShiftScheduleSelectedRoute[];
-  /** 主路線（輪替／班距）；不含備用 */
+  /** 主路線（輪替／班距）；不含僅掛 backupFor* 的草稿相容列 */
   selectedRoutes: ShiftScheduleSelectedRoute[];
-  /** Step 4 備用路線（站位約束改派用；不進輪替） */
+  /**
+   * 草稿相容：曾以 backupFor* 標的路線。站位／開站候選會併入 successorPolicy.routesByInstanceId；
+   * 真正下一跳仍以關聯圖優／次邊為準，不是「誰的備用槽」。
+   */
   backupRoutes: ShiftScheduleSelectedRoute[];
   maintenanceBody: Record<string, unknown> | null;
   maintenanceEntrySlackBySection: MaintenanceEntrySlackBySection;
   emptyIntervalMainlineSlackSeconds: number;
   minimumRecoveryTimeSeconds: number;
+  /**
+   * 碰撞保護時間（秒）：後車到站不得早於前車實際離站 + 2 × 此值。
+   * 站位求解、班距補疏／修復、整備後調度班次、最終驗證共用同一個值。
+   */
+  collisionProtectionSeconds: number;
   turnaroundLimitSeconds: number | null;
   passengerTimetableMode: PassengerTimetableMode;
   timetableGenerationAlgorithm?: string;
@@ -281,7 +291,12 @@ function buildPlannedCycleLegs(args: {
       });
       cursor = endSecond;
       previousRoute = route;
-      const next = resolveNextInstanceId(successorPolicy, currentId);
+      // 成輪優先：優先邊斷開時改走次要短邊，不可半輪收在 ST。
+      const next =
+        resolveNextInstanceId(successorPolicy, currentId)
+        ?? resolveNextInstanceId(successorPolicy, currentId, {
+          allowSecondary: true,
+        });
       if (!next) break;
       currentId = next.instanceId;
     }
@@ -422,9 +437,47 @@ function isAcceptablePlannedCycleLength(
     successorPolicy?.valid
     && successorPolicy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_GRAPH
   ) {
-    return true;
+    // 關聯圖同樣必須走完 canonical 全輪（例如 NT→TS→ST→TN），
+    // 不得因邊斷開或 map 缺員就掛出半輪進充電。
+    const expected = Math.max(
+      1,
+      successorPolicy.canonicalCycleInstanceIds.length || routeCount,
+    );
+    return legs.length === expected;
   }
   return legs.length === routeCount;
+}
+
+/**
+ * 整備讓渡政策：
+ * - 可借「開頭」：整輪結束可落入 nextMaintStart + entrySlack
+ * - 不可在整備開始後再發車（避免充電中段幽靈班，再被 push 整段過保養）
+ * - 不可超讓渡上限（偷尾巴另由 push 處理）
+ */
+function cycleViolatesMaintenanceEntryPolicy(args: {
+  legs: PlannedCycleLeg[];
+  nextMaintenanceStartSecond: number | null;
+  entrySlackSeconds: number;
+}): string | null {
+  const { legs, nextMaintenanceStartSecond } = args;
+  if (nextMaintenanceStartSecond == null || legs.length === 0) return null;
+  const maintStart = nextMaintenanceStartSecond;
+  const latestEnd = maintStart + Math.max(0, args.entrySlackSeconds);
+
+  for (const leg of legs) {
+    if (leg.startSecond + 1e-9 >= maintStart) {
+      return (
+        `正線不得於整備開始後發車`
+        + `（${leg.startSecond}s ≥ 整備 ${maintStart}s；只能借開頭、不可中段再發）`
+      );
+    }
+  }
+
+  const last = legs[legs.length - 1]!;
+  if (last.endSecond > latestEnd + 1e-9) {
+    return `整輪結束 ${last.endSecond}s 超過整備讓渡上限 ${latestEnd}s`;
+  }
+  return null;
 }
 
 function isHeadwayBlockedRejection(reason: string | undefined): boolean {
@@ -432,6 +485,8 @@ function isHeadwayBlockedRejection(reason: string | undefined): boolean {
   return (
     reason.startsWith('最早可發延遲')
     || reason === '最早可發已跨下一脈衝'
+    || reason.startsWith('同方向班距不足')
+    || reason.includes('壓低同方向班距')
   );
 }
 
@@ -661,10 +716,7 @@ function assignDirectionalDepartures(args: {
       }
       return resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
     }
-    if (preceding.taskType === 'servicing') {
-      return 0;
-    }
-    // 充電／行前／機動無明確出場，或整備後無正線：延續進入整備前的輪替相位
+    // 充電／行前／機動／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;
   };
 
@@ -734,6 +786,11 @@ function assignDirectionalDepartures(args: {
     let chosenUseMinimumCycle = false;
     let bestScore = Number.POSITIVE_INFINITY;
     const rejectionByRow = new Map<number, string>();
+    /** strict＝一般掛車；recovery＝漏掛後放寬跨脈衝／延後上限再搶一次 */
+    const hangPolicy = {
+      maxDelayScale: 1,
+      pulseSlackSeconds: 0,
+    };
 
     const evaluateRow = (
       row: number,
@@ -755,22 +812,64 @@ function assignDirectionalDepartures(args: {
         provisionalEarliest,
         winAtPulse.startSecond,
       );
-      const startSecond = Math.max(provisionalEarliest, gate.headwayFloor);
+      let startSecond = Math.max(provisionalEarliest, gate.headwayFloor);
+      // 整備連串（保養→行前…）內不得掛正線：起點若落在串內，硬推到串尾
+      {
+        const busyUntilMinute = resolveContiguousYardBusyUntilMinute(
+          nonPassengerTasks,
+          row,
+          secondToMinute(startSecond),
+        );
+        if (
+          busyUntilMinute != null
+          && startSecond < minuteToSecondApprox(busyUntilMinute) - 1e-9
+        ) {
+          startSecond = snapUpToClockAlignSeconds(
+            minuteToSecondApprox(busyUntilMinute),
+          );
+        }
+      }
       const delay = startSecond - departure.startSecond;
-      if (delay > gate.maxDelaySeconds) {
+      const maxDelaySeconds = Math.max(
+        0,
+        Math.round(gate.maxDelaySeconds * hangPolicy.maxDelayScale),
+      );
+      if (delay > maxDelaySeconds) {
         rejectionByRow.set(
           row,
-          `最早可發延遲 ${delay}s，超過上限 ${gate.maxDelaySeconds}s`,
+          `最早可發延遲 ${delay}s，超過上限 ${maxDelaySeconds}s`,
         );
         return;
       }
-      if (startSecond >= nextPulseSecond) {
-        rejectionByRow.set(row, '最早可發已跨下一脈衝');
+      const pulseDeadline =
+        nextPulseSecond + Math.max(0, hangPolicy.pulseSlackSeconds);
+      if (startSecond >= pulseDeadline) {
+        rejectionByRow.set(
+          row,
+          hangPolicy.pulseSlackSeconds > 0
+            ? '最早可發已超出補掛允許的跨脈衝範圍'
+            : '最早可發已跨下一脈衝',
+        );
         return;
       }
       if (startSecond >= winAtPulse.endSecond || !findWindow(row, startSecond)) {
         rejectionByRow.set(row, '最早可發已超出正線視窗');
         return;
+      }
+      // 推過整備串後仍不得坐落任一整備內（銜接點以外）
+      {
+        const busyUntilMinute = resolveContiguousYardBusyUntilMinute(
+          nonPassengerTasks,
+          row,
+          secondToMinute(startSecond),
+        );
+        if (
+          busyUntilMinute != null
+          && secondToMinute(startSecond) < busyUntilMinute - 1e-9
+        ) {
+          rejectionByRow.set(row, '最早可發仍落在整備任務內');
+          return;
+        }
       }
 
       // 整輪：開輪腿若為行前調撥用清除間距；其後各腿仍守營運班距。
@@ -796,11 +895,70 @@ function assignDirectionalDepartures(args: {
         return;
       }
       {
-        const conflict = cycleViolatesSameRouteHeadway({
+        let conflict = cycleViolatesSameRouteHeadway({
           legs: plannedLegs,
           trackedLegs,
           requiredHeadwayFor: headwayForLeg,
         });
+        // 被已掛、但更晚的同向班次卡住時：往後推到對方＋所需班距（承接脈衝優先於準點）
+        for (let bumpAttempt = 0; conflict && bumpAttempt < 24; bumpAttempt += 1) {
+          let neededBump = 0;
+          for (let legIndex = 0; legIndex < plannedLegs.length; legIndex += 1) {
+            const leg = plannedLegs[legIndex]!;
+            const required = headwayForLeg(leg.route, leg, legIndex);
+            if (required <= 0) continue;
+            for (const other of trackedLegs) {
+              if (other.routeId !== leg.route.routeId) continue;
+              const gap = Math.abs(leg.startSecond - other.startSecond);
+              if (gap + 1e-9 >= required) continue;
+              if (leg.startSecond > other.startSecond + 1e-9) {
+                neededBump = -1;
+                break;
+              }
+              neededBump = Math.max(
+                neededBump,
+                other.startSecond + required - leg.startSecond,
+              );
+            }
+            if (neededBump < 0) break;
+          }
+          if (neededBump < 0) break;
+          if (neededBump <= 1e-9) break;
+          startSecond = snapUpToClockAlignSeconds(startSecond + neededBump);
+          const bumpedDelay = startSecond - departure.startSecond;
+          if (bumpedDelay > maxDelaySeconds) {
+            rejectionByRow.set(
+              row,
+              `同方向班距不足且前推延遲 ${bumpedDelay}s 超過上限 ${maxDelaySeconds}s`,
+            );
+            return;
+          }
+          if (startSecond >= pulseDeadline) {
+            rejectionByRow.set(row, '同方向班距前推已跨下一脈衝');
+            return;
+          }
+          if (startSecond >= winAtPulse.endSecond || !findWindow(row, startSecond)) {
+            rejectionByRow.set(row, '同方向班距前推已超出正線視窗');
+            return;
+          }
+          plannedLegs = buildPlannedCycleLegs({
+            startRouteIndex,
+            startSecond,
+            passengerRoutes,
+            minimumRecoveryTimeSeconds,
+            useMinimumOccupancy: useMinimumCycle,
+            successorPolicy,
+          });
+          if (!isAcceptablePlannedCycleLength(plannedLegs, routeCount, successorPolicy)) {
+            rejectionByRow.set(row, '無法展開完整交路占用');
+            return;
+          }
+          conflict = cycleViolatesSameRouteHeadway({
+            legs: plannedLegs,
+            trackedLegs,
+            requiredHeadwayFor: headwayForLeg,
+          });
+        }
         if (conflict) {
           rejectionByRow.set(row, conflict);
           return;
@@ -863,6 +1021,19 @@ function assignDirectionalDepartures(args: {
         }
       }
 
+      // 一律守整備讓渡：可借開頭結束，但任何一腿不得在整備開始後發車。
+      {
+        const entryPolicyViolation = cycleViolatesMaintenanceEntryPolicy({
+          legs: plannedLegs,
+          nextMaintenanceStartSecond: winAtPulse.nextMaintenanceStartSecond,
+          entrySlackSeconds: winAtPulse.entrySlackSeconds,
+        });
+        if (entryPolicyViolation) {
+          rejectionByRow.set(row, entryPolicyViolation);
+          return;
+        }
+      }
+
       const score =
         delay * 1e9
         + (compressionPenalty + (useMinimumCycle ? 1 : 0)) * 1e7
@@ -894,9 +1065,13 @@ function assignDirectionalDepartures(args: {
         winAtPulse = (windowsByRow.get(row) ?? []).find(
           (win) =>
             win.dispatchStartSecond > departure.startSecond
-            && win.dispatchStartSecond < nextPulseSecond
+            && win.dispatchStartSecond
+              < nextPulseSecond + Math.max(0, hangPolicy.pulseSlackSeconds)
             && win.dispatchStartSecond - departure.startSecond
-              <= probeGate.maxDelaySeconds,
+              <= Math.max(
+                0,
+                Math.round(probeGate.maxDelaySeconds * hangPolicy.maxDelayScale),
+              ),
         ) ?? null;
       }
       if (!winAtPulse) {
@@ -981,19 +1156,17 @@ function assignDirectionalDepartures(args: {
     };
 
     // 1) 平常：上一趟用均（已採用占用）
-    for (let row = 1; row <= scheduleRowCount; row += 1) {
-      const winAtPulse = prepareRowWindow(row);
-      if (!winAtPulse) continue;
-      const { freeAtUsed } = resolveFreeTimes(row);
-      evaluateRow(row, freeAtUsed, winAtPulse, null, 0);
-    }
-
-    // 2) 僅當用均完全掛不上，才把上一趟壓到快再試
-    if (chosenRow < 0) {
+    const scoreAllRows = (mode: 'normal' | 'compress') => {
       for (let row = 1; row <= scheduleRowCount; row += 1) {
         const winAtPulse = prepareRowWindow(row);
         if (!winAtPulse) continue;
-        const { freeAtMin, prevMinOccupancy, canCompressPrevious } = resolveFreeTimes(row);
+        if (mode === 'normal') {
+          const { freeAtUsed } = resolveFreeTimes(row);
+          evaluateRow(row, freeAtUsed, winAtPulse, null, 0);
+          continue;
+        }
+        const { freeAtMin, prevMinOccupancy, canCompressPrevious } =
+          resolveFreeTimes(row);
         if (!canCompressPrevious || prevMinOccupancy == null) continue;
         const prev = lastPassengerByRow[row]!;
         evaluateRow(
@@ -1004,9 +1177,33 @@ function assignDirectionalDepartures(args: {
           prev.occupancyUsed - prevMinOccupancy,
         );
       }
+    };
+
+    scoreAllRows('normal');
+
+    // 2) 僅當用均完全掛不上，才把上一趟壓到快再試
+    if (chosenRow < 0) {
+      scoreAllRows('compress');
     }
 
-    // 3) 同方向班距讓路：僅因班距地板太晚而掛不上時，回推已掛衝突班次
+    // 3) 補掛：尖峰／肩段放大延遲與跨脈衝餘裕後再評分（讓路前先擴門檻）
+    if (chosenRow < 0) {
+      const isPeakLikeHeadway = departure.headwaySeconds <= 240;
+      const isShoulderLikeHeadway = departure.headwaySeconds >= 400;
+      hangPolicy.maxDelayScale = isPeakLikeHeadway ? 3 : isShoulderLikeHeadway ? 4 : 2;
+      hangPolicy.pulseSlackSeconds = Math.max(
+        departure.headwaySeconds * (isPeakLikeHeadway ? 2 : isShoulderLikeHeadway ? 3 : 1),
+        SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS * 6,
+      );
+      bestScore = Number.POSITIVE_INFINITY;
+      rejectionByRow.clear();
+      scoreAllRows('normal');
+      if (chosenRow < 0) {
+        scoreAllRows('compress');
+      }
+    }
+
+    // 4) 同方向班距讓路：僅因班距擋住時，回推已掛衝突班次
     if (chosenRow < 0) {
       type YieldPlan = {
         row: number;
@@ -1057,8 +1254,17 @@ function assignDirectionalDepartures(args: {
           gateWithoutBlocker.headwayFloor,
         );
         const delay = desiredStart - departure.startSecond;
-        if (delay > gateWithoutBlocker.maxDelaySeconds) continue;
-        if (desiredStart >= nextPulseSecond) continue;
+        const yieldMaxDelay = Math.max(
+          0,
+          Math.round(gateWithoutBlocker.maxDelaySeconds * hangPolicy.maxDelayScale),
+        );
+        if (delay > yieldMaxDelay) continue;
+        if (
+          desiredStart
+          >= nextPulseSecond + Math.max(0, hangPolicy.pulseSlackSeconds)
+        ) {
+          continue;
+        }
         if (desiredStart >= winAtPulse.endSecond || !findWindow(row, desiredStart)) {
           continue;
         }
@@ -1184,6 +1390,15 @@ function assignDirectionalDepartures(args: {
           successorPolicy,
         });
         if (!isAcceptablePlannedCycleLength(previewLegs, routeCount, successorPolicy)) continue;
+        if (
+          cycleViolatesMaintenanceEntryPolicy({
+            legs: previewLegs,
+            nextMaintenanceStartSecond: winAtPulse.nextMaintenanceStartSecond,
+            entrySlackSeconds: winAtPulse.entrySlackSeconds,
+          })
+        ) {
+          continue;
+        }
         const headwayForYield = (
           route: ShiftScheduleSelectedRoute,
           _leg: PlannedCycleLeg,
@@ -1300,6 +1515,7 @@ function assignDirectionalDepartures(args: {
             intervalId: departure.intervalId,
             intervalName: departure.intervalName,
             rowRejections: Object.fromEntries(rejectionByRow),
+            recoveredAttempt: true,
           },
         });
       }
@@ -1327,6 +1543,19 @@ function assignDirectionalDepartures(args: {
       successorPolicy,
     });
     if (!isAcceptablePlannedCycleLength(cycleLegs, routeCount, successorPolicy)) continue;
+    {
+      const winAtCommit = findWindow(chosenRow, chosenStartSecond);
+      if (
+        winAtCommit
+        && cycleViolatesMaintenanceEntryPolicy({
+          legs: cycleLegs,
+          nextMaintenanceStartSecond: winAtCommit.nextMaintenanceStartSecond,
+          entrySlackSeconds: winAtCommit.entrySlackSeconds,
+        })
+      ) {
+        continue;
+      }
+    }
 
     let finalTaskIndex = -1;
     let cycleAnchorTaskIndex = tasks.length;
@@ -1412,6 +1641,10 @@ function deferNonPassengerTasksAfterCycleSpill(
     }
 
     if (deferredStartSecond <= originalStartSecond) continue;
+    // 記住模板原起點，避免後續幽靈正線被 push 走後充電開頭無法縮回。
+    if (task.templateStartMinute == null) {
+      task.templateStartMinute = task.startMinute;
+    }
     task.startMinute = secondToMinute(deferredStartSecond);
     task.durationMinutes = Math.max(
       0,
@@ -1497,7 +1730,10 @@ export function normalizeEngineInput(
   const minimumRecovery = normalizeMinimumRecoveryTimeSeconds(
     args.draft.routeGroups.minimumRecoveryTimeSeconds,
   );
-  const successorPolicy = buildRouteSuccessorPolicy({
+  const collisionProtection = normalizeCollisionProtectionSeconds(
+    args.draft.routeGroups.collisionProtectionSeconds,
+  );
+  let successorPolicy = buildRouteSuccessorPolicy({
     routes: orderedSelected,
     graph:
       args.draft.routeGroups.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
@@ -1505,6 +1741,14 @@ export function normalizeEngineInput(
       args.draft.routeGroups.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
     minimumRecoveryTimeSeconds: minimumRecovery,
   });
+  // 同起點備選路線（舊草稿 backupFor*）併入拓撲表，供開站／站位候選；不改動導通環
+  if (successorPolicy.valid && backupRoutes.length > 0) {
+    const routesByInstanceId = new Map(successorPolicy.routesByInstanceId);
+    for (const route of backupRoutes) {
+      routesByInstanceId.set(resolveSelectedRouteInstanceId(route), route);
+    }
+    successorPolicy = { ...successorPolicy, routesByInstanceId };
+  }
   if (!successorPolicy.valid) {
     pushIssue(errors, {
       code: 'ROUTE_SUCCESSOR_POLICY_INVALID',
@@ -1662,6 +1906,7 @@ export function normalizeEngineInput(
     maintenanceEntrySlackBySection: slackBySection,
     emptyIntervalMainlineSlackSeconds,
     minimumRecoveryTimeSeconds: minimumRecovery,
+    collisionProtectionSeconds: collisionProtection,
     turnaroundLimitSeconds:
       args.turnaroundLimitSeconds == null || !Number.isFinite(args.turnaroundLimitSeconds)
         ? null

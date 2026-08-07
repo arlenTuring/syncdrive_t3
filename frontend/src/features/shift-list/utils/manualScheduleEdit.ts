@@ -27,6 +27,7 @@ import type {
   GeneratedSchedulePlan,
   ShiftScheduleFeasibilityReport,
 } from './schedule-engine/types';
+import { computeScheduleGateOk } from './scheduleAcceptance';
 
 const MIN_DURATION_MINUTES = MANUAL_BLOCK_MIN_DURATION_SECONDS / 60;
 
@@ -63,7 +64,7 @@ export function revalidateManualPlan(plan: GeneratedSchedulePlan): ShiftSchedule
   const errors: ShiftScheduleFeasibilityReport['errors'] = [];
   validateTimelineOverlaps(plan.timelines, errors);
   return {
-    ok: errors.length === 0,
+    ok: computeScheduleGateOk(errors),
     errors,
     warnings: [],
   };

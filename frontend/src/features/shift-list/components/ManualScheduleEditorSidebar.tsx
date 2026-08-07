@@ -18,6 +18,7 @@ import {
   resolveStationDwellMode,
 } from '../types/create';
 import type { GeneratedScheduleBlock } from '../utils/schedule-engine/types';
+import { formatScheduleClockHms } from '../utils/scheduleDayCycle';
 import {
   resolveManualBlockDwellTotalSeconds,
   resolveManualBlockMinDurationMinutes,
@@ -81,11 +82,7 @@ function TripTypeChip({ taskKey, label }: { taskKey: TaskTypeKey; label: string 
 }
 
 function formatMinuteInput(minute: number): string {
-  const totalSeconds = Math.max(0, Math.round(minute * 60));
-  const hh = Math.floor(totalSeconds / 3600) % 24;
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  return formatScheduleClockHms(minute);
 }
 
 function parseMinuteInput(raw: string): number | null {

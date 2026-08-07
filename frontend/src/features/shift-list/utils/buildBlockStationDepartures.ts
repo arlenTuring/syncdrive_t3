@@ -2,6 +2,7 @@ import type {
   ShiftScheduleSelectedRoute,
   ShiftScheduleStationDwell,
 } from '../types/create';
+import { resolveSelectedRouteInstanceId } from '../types/create';
 import {
   applyStationDwellWithSlack,
   normalizeDwellSlackSeconds,
@@ -387,6 +388,13 @@ export function resolveRouteForBlock(
   selectedRoutes: ShiftScheduleSelectedRoute[] | null | undefined,
 ): ShiftScheduleSelectedRoute | null {
   if (!selectedRoutes?.length) return null;
+  if (block.routeInstanceId?.trim()) {
+    const instanceId = block.routeInstanceId.trim();
+    const byInstance = selectedRoutes.find(
+      (route) => resolveSelectedRouteInstanceId(route) === instanceId,
+    );
+    if (byInstance) return byInstance;
+  }
   if (block.routeId) {
     const byId = selectedRoutes.find((route) => route.routeId === block.routeId);
     if (byId) return byId;

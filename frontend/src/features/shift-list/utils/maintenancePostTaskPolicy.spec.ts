@@ -1,198 +1,135 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import {
   buildYardRotationExitByTaskType,
-  isStandbyDispatchableForMainline,
+  resolveContiguousYardBusyUntilMinute,
   resolveYardPostTaskPolicy,
-  rowHasPassengerTemplateAtOrAfter,
-  shouldApplyYardExitRotationAlign,
-} from './maintenancePostTaskPolicy';
+} from './maintenancePostTaskPolicy.ts';
+import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins.ts';
 
-const origins: MaintenanceFirstTripOrigin[] = [
+const ORIGINS: MaintenanceFirstTripOrigin[] = [
   {
-    stationId: 'T3-D',
-    label: 'T3下行',
-    deadheadSeconds: 120,
-    facilityNodeIds: ['fac-insp', 'fac-w1'],
-    facilityLabels: ['INSP', 'W1'],
+    stationId: 'station_2',
+    label: 'N2W下行出發',
+    deadheadSeconds: 0,
+    facilityNodeIds: ['e1'],
+    facilityLabels: ['E1', 'E2'],
   },
   {
-    stationId: 'N2W-D',
-    label: 'N2W下行',
-    deadheadSeconds: 180,
-    facilityNodeIds: ['fac-e1', 'fac-p1'],
-    facilityLabels: ['E1', 'P1'],
-  },
-  {
-    stationId: 'S2W-U',
-    label: 'S2W上行',
-    deadheadSeconds: 150,
-    facilityNodeIds: ['fac-m1'],
-    facilityLabels: ['M1'],
+    stationId: 'station_4',
+    label: 'T3上行',
+    deadheadSeconds: 0,
+    facilityNodeIds: ['m1'],
+    facilityLabels: ['M1', 'M2', 'M3', 'M4', 'H1'],
   },
 ];
 
-describe('resolveYardPostTaskPolicy', () => {
-  it('inspection: phase-align to preTrip exit; no entry service', () => {
+const BODY = {
+  maintenance: {
+    stepEnabled: true,
+    equipmentRows: [
+      { mapCode: 'M1' },
+      { mapCode: 'M2' },
+    ],
+  },
+  preTrip: {
+    stepEnabled: true,
+    equipmentRows: [{ mapCode: 'H1' }],
+  },
+  charging: {
+    stepEnabled: true,
+    equipmentRows: [{ mapCode: 'E1' }],
+  },
+};
+
+describe('resolveContiguousYardBusyUntilMinute', () => {
+  it('extends through 保養→行前 chain at the junction', () => {
+    const tasks = [
+      {
+        rowIndex: 1,
+        taskType: 'servicing',
+        startMinute: 2 * 60,
+        durationMinutes: 7 * 60 + 30,
+      },
+      {
+        rowIndex: 1,
+        taskType: 'inspection',
+        startMinute: 9 * 60 + 30,
+        durationMinutes: 30,
+      },
+    ];
+    assert.equal(
+      resolveContiguousYardBusyUntilMinute(tasks, 1, 9 * 60 + 30),
+      10 * 60,
+    );
+    assert.equal(
+      resolveContiguousYardBusyUntilMinute(tasks, 1, 9 * 60 + 29),
+      10 * 60,
+    );
+  });
+
+  it('returns null outside yard occupation', () => {
+    const tasks = [
+      {
+        rowIndex: 1,
+        taskType: 'servicing',
+        startMinute: 2 * 60,
+        durationMinutes: 7 * 60 + 30,
+      },
+    ];
+    assert.equal(
+      resolveContiguousYardBusyUntilMinute(tasks, 1, 10 * 60),
+      null,
+    );
+  });
+});
+
+describe('resolveYardPostTaskPolicy servicing exit', () => {
+  it('aligns servicing rotation exit to T3上行 for M-series facilities', () => {
+    const policy = resolveYardPostTaskPolicy({
+      taskType: 'servicing',
+      origins: ORIGINS,
+      maintenanceBody: BODY,
+    });
+    assert.equal(policy.rotationExitStationId, 'station_4');
+    assert.equal(policy.allowEntryService, true);
+    assert.deepEqual(policy.entryServiceExitStationIds, ['station_4']);
+  });
+
+  it('lets 行前 (inspection) produce a post-maintenance dispatch trip too', () => {
+    // 行前設施（H1）同樣離正線起點站有距離，做完之後車要開過去才能上工，
+    // 因此與保養一樣要產生調度營運班次（代號 P）。舊版把 inspection 寫死為不允許。
     const policy = resolveYardPostTaskPolicy({
       taskType: 'inspection',
-      origins,
-      maintenanceBody: {
-        preTrip: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '1', mapCode: 'INSP', waypointCode: '' }],
-        },
-      },
-    });
-    assert.equal(policy.rotationExitStationId, 'T3-D');
-    assert.equal(policy.allowEntryService, false);
-  });
-
-  it('charging: phase-align only when unique exit', () => {
-    const unique = resolveYardPostTaskPolicy({
-      taskType: 'charging',
-      origins,
-      maintenanceBody: {
-        charging: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '1', mapCode: 'E1', waypointCode: '' }],
-        },
-      },
-    });
-    assert.equal(unique.rotationExitStationId, 'N2W-D');
-    assert.equal(unique.allowEntryService, false);
-
-    const multi = resolveYardPostTaskPolicy({
-      taskType: 'charging',
-      origins,
-      maintenanceBody: {
-        charging: {
-          stepEnabled: true,
-          equipmentRows: [
-            { id: '1', mapCode: 'E1', waypointCode: '' },
-            { id: '2', mapCode: 'INSP', waypointCode: '' },
-          ],
-        },
-      },
-    });
-    assert.equal(multi.rotationExitStationId, null);
-  });
-
-  it('servicing: entry service with filtered exits; no phase align', () => {
-    const policy = resolveYardPostTaskPolicy({
-      taskType: 'servicing',
-      origins,
-      maintenanceBody: {
-        maintenance: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '1', mapCode: 'M1', waypointCode: '' }],
-        },
-        carWash: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '2', mapCode: 'W1', waypointCode: '' }],
-        },
-      },
-    });
-    assert.equal(policy.rotationExitStationId, null);
-    assert.equal(policy.allowEntryService, true);
-    assert.deepEqual(
-      [...policy.entryServiceExitStationIds].sort(),
-      ['S2W-U', 'T3-D'].sort(),
-    );
-  });
-
-  it('servicing falls back to all topology exits when no facility codes', () => {
-    const policy = resolveYardPostTaskPolicy({
-      taskType: 'servicing',
-      origins,
-      maintenanceBody: {},
+      origins: ORIGINS,
+      maintenanceBody: BODY,
     });
     assert.equal(policy.allowEntryService, true);
-    assert.equal(policy.entryServiceExitStationIds.length, 3);
+    assert.deepEqual(policy.entryServiceExitStationIds, ['station_4']);
   });
-});
 
-describe('buildYardRotationExitByTaskType', () => {
-  it('includes inspection / charging / standby when exits resolve', () => {
+  it('keeps 充電/機動 without dispatch trips (facilities are near the origin)', () => {
+    for (const taskType of ['charging', 'standby'] as const) {
+      const policy = resolveYardPostTaskPolicy({
+        taskType,
+        origins: ORIGINS,
+        maintenanceBody: BODY,
+      });
+      assert.equal(
+        policy.allowEntryService,
+        false,
+        `${taskType} must not produce a dispatch trip`,
+      );
+    }
+  });
+
+  it('includes servicing in yardRotationExitByTaskType map', () => {
     const map = buildYardRotationExitByTaskType({
-      origins,
-      maintenanceBody: {
-        preTrip: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '1', mapCode: 'INSP', waypointCode: '' }],
-        },
-        charging: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '2', mapCode: 'E1', waypointCode: '' }],
-        },
-        mobile: {
-          stepEnabled: true,
-          equipmentRows: [{ id: '3', mapCode: 'P1', waypointCode: '' }],
-        },
-      },
+      origins: ORIGINS,
+      maintenanceBody: BODY,
     });
-    assert.equal(map.inspection, 'T3-D');
-    assert.equal(map.charging, 'N2W-D');
-    assert.equal(map.standby, 'N2W-D');
-    assert.equal(map.servicing, undefined);
-  });
-});
-
-describe('yard exit align / standby dispatch gates', () => {
-  const tasks = [
-    { rowIndex: 1, taskType: 'inspection', startMinute: 0 },
-    { rowIndex: 1, taskType: 'standby', startMinute: 60 },
-    { rowIndex: 2, taskType: 'inspection', startMinute: 0 },
-    { rowIndex: 2, taskType: 'standby', startMinute: 60 },
-    { rowIndex: 2, taskType: 'passenger', startMinute: 120 },
-  ];
-
-  it('rowHasPassengerTemplateAtOrAfter detects later mainline only', () => {
-    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 1, 30), false);
-    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 30), true);
-    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 120), true);
-    assert.equal(rowHasPassengerTemplateAtOrAfter(tasks, 2, 121), false);
-  });
-
-  it('pure standby is not dispatchable; standby before passenger is', () => {
-    assert.equal(
-      isStandbyDispatchableForMainline(tasks, { rowIndex: 1, startMinute: 60 }),
-      false,
-    );
-    assert.equal(
-      isStandbyDispatchableForMainline(tasks, { rowIndex: 2, startMinute: 60 }),
-      true,
-    );
-  });
-
-  it('exit rotation align only when mainline follows the yard', () => {
-    assert.equal(
-      shouldApplyYardExitRotationAlign({
-        exitStationId: 'T3-D',
-        templateTasks: tasks,
-        row: 1,
-        yardEndMinute: 30,
-      }),
-      false,
-    );
-    assert.equal(
-      shouldApplyYardExitRotationAlign({
-        exitStationId: 'T3-D',
-        templateTasks: tasks,
-        row: 2,
-        yardEndMinute: 30,
-      }),
-      true,
-    );
-    assert.equal(
-      shouldApplyYardExitRotationAlign({
-        exitStationId: null,
-        templateTasks: tasks,
-        row: 2,
-        yardEndMinute: 30,
-      }),
-      false,
-    );
+    assert.equal(map.servicing, 'station_4');
+    assert.equal(map.inspection, 'station_4');
+    assert.equal(map.charging, 'station_2');
   });
 });

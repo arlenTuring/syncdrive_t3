@@ -5,6 +5,7 @@ import type { GeneratedScheduleBlock } from './schedule-engine/types';
 import {
   enforceStationBerthConstraints,
   resolveBerthClearDelaySeconds,
+  STATION_BERTH_WAIT_MAX_DELAY_SECONDS,
   type BerthWindowSec,
 } from './stationBerthConstraint';
 import {
@@ -166,7 +167,7 @@ describe('stationBerthConstraint', () => {
     assert.equal(after.length, 0, 'delay should clear berth overlap');
   });
 
-  it('switches to backup when delay would exceed max and turnaround stays continuous', () => {
+  it('switches to same-origin alt when delay would exceed max', () => {
     const primary = route({
       instanceId: 'sel-primary',
       routeId: 'main',
@@ -271,7 +272,7 @@ describe('stationBerthConstraint', () => {
     assert.equal(collisions.length, 0);
   });
 
-  it('does not swap to backup that breaks TN→NT turnaround continuity', () => {
+  it('does not pick NTB after TN when origin station differs from TN terminal', () => {
     const tn = route({
       instanceId: 'sel-tn',
       routeId: 'tn',
@@ -379,7 +380,7 @@ describe('stationBerthConstraint', () => {
     assert.equal(repaired.backupSwitchedCount, 0);
   });
 
-  it('when spare needed, co-swaps TN→TNB and NT→NTB (never TN→NTB)', () => {
+  it('when priority berth blocked, picks same-origin topology alt; next hop follows chosen terminal', () => {
     const tn = route({
       instanceId: 'sel-tn',
       routeId: 'tn',
@@ -469,7 +470,7 @@ describe('stationBerthConstraint', () => {
       minTravelTimeSeconds: 50,
     });
 
-    // 他車佔死 P1，TN 無法延；必須成對改 TNB→NTB
+    // 他車佔死 P1；開站選 TNB（同起點無衝突），下一腳依 TNB 終點自然接到 NTB
     const timelines = [
       {
         row: 9,
@@ -519,12 +520,15 @@ describe('stationBerthConstraint', () => {
     const byId = new Map(
       repaired.timelines.flatMap((t) => t.blocks).map((b) => [b.id, b] as const),
     );
-    assert.equal(byId.get('tn')!.routeCode, 'TNB', 'outbound spare must be TNB not TN');
-    assert.equal(byId.get('nt')!.routeCode, 'NTB', 'return spare must be NTB with TNB');
-    assert.notEqual(byId.get('tn')!.routeCode, 'TN');
+    assert.equal(byId.get('tn')!.routeCode, 'TNB', 'same-origin alt when TN berth blocked');
+    assert.equal(
+      byId.get('nt')!.routeCode,
+      'NTB',
+      'next hop follows TNB terminal (not a predeclared backup-pair swap)',
+    );
   });
 
-  it('refuses backup pair when timeline next is not graph successor', () => {
+  it('never picks a hop that breaks station continuity from previous', () => {
     const tn = route({
       instanceId: 'sel-tn',
       routeId: 'tn',
@@ -560,27 +564,6 @@ describe('stationBerthConstraint', () => {
         {
           fromStationId: 'P1',
           toStationId: 'T3D',
-          avgTravelTimeSeconds: 60,
-          minTravelTimeSeconds: 50,
-        },
-      ],
-      avgTravelTimeSeconds: 60,
-      minTravelTimeSeconds: 50,
-    });
-    const ts = route({
-      instanceId: 'sel-ts',
-      routeId: 'ts',
-      routeCode: 'TS',
-      executionOrder: 3,
-      stationIds: ['P1', 'S2'],
-      stationDwells: [
-        { stationId: 'P1', stationName: 'P1', dwellSeconds: 0, dwellRequired: false },
-        { stationId: 'S2', stationName: 'S2', dwellSeconds: 40 },
-      ],
-      stationLegTravels: [
-        {
-          fromStationId: 'P1',
-          toStationId: 'S2',
           avgTravelTimeSeconds: 60,
           minTravelTimeSeconds: 50,
         },
@@ -630,7 +613,323 @@ describe('stationBerthConstraint', () => {
       avgTravelTimeSeconds: 60,
       minTravelTimeSeconds: 50,
     });
-    // 圖上 TN→NT，但時間線下一趟卻是 TS → 不得成對改派
+    // TN 清得開時不得為了站位去接異點 NTB；保持 TN→NT
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'tn',
+            timelineRow: 1,
+            plannedStartMinute: 100,
+            plannedEndMinute: 103,
+            routeId: 'tn',
+            routeInstanceId: 'sel-tn',
+            routeCode: 'TN',
+          }),
+          block({
+            id: 'nt',
+            timelineRow: 1,
+            plannedStartMinute: 103.5,
+            plannedEndMinute: 106.5,
+            routeId: 'nt',
+            routeInstanceId: 'sel-nt',
+            routeCode: 'NT',
+          }),
+        ],
+      },
+    ];
+    const repaired = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn, nt, tnb, ntb],
+      maxDelaySeconds: 10,
+      successorPolicy: graphPolicy([tn, nt]),
+    });
+    const byId = new Map(
+      repaired.timelines.flatMap((t) => t.blocks).map((b) => [b.id, b] as const),
+    );
+    assert.equal(byId.get('tn')!.routeCode, 'TN');
+    assert.equal(byId.get('nt')!.routeCode, 'NT');
+    assert.equal(repaired.backupSwitchedCount, 0);
+  });
+
+  it('delays for berth even when same-row next trip is tightly packed', () => {
+    const tn = route({
+      instanceId: 'sel-tn',
+      routeId: 'tn',
+      routeCode: 'TN',
+      stationIds: ['T3U', 'P1'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3上行', dwellSeconds: 50, dwellRequired: true },
+        { stationId: 'P1', stationName: 'P1', dwellSeconds: 40 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'P1',
+          avgTravelTimeSeconds: 60,
+          minTravelTimeSeconds: 50,
+        },
+      ],
+      avgTravelTimeSeconds: 60,
+      minTravelTimeSeconds: 50,
+    });
+    const nt = route({
+      instanceId: 'sel-nt',
+      routeId: 'nt',
+      routeCode: 'NT',
+      stationIds: ['P1', 'T3D'],
+      stationDwells: [
+        { stationId: 'P1', stationName: 'P1', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'T3D', stationName: 'T3D', dwellSeconds: 40 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'P1',
+          toStationId: 'T3D',
+          avgTravelTimeSeconds: 60,
+          minTravelTimeSeconds: 50,
+        },
+      ],
+      avgTravelTimeSeconds: 60,
+      minTravelTimeSeconds: 50,
+    });
+    // row1 佔 T3U；row2 想幾乎同時進站，但後面馬上排了下一班（以前會把延後上限夾成 0）
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'hold',
+            timelineRow: 1,
+            plannedStartMinute: 100,
+            plannedEndMinute: 100 + 3,
+            routeId: 'tn',
+            routeInstanceId: 'sel-tn',
+            routeCode: 'TN',
+          }),
+        ],
+      },
+      {
+        row: 2,
+        blocks: [
+          block({
+            id: 'contested',
+            timelineRow: 2,
+            plannedStartMinute: 100 + 10 / 60,
+            plannedEndMinute: 100 + 10 / 60 + 3,
+            routeId: 'tn',
+            routeInstanceId: 'sel-tn',
+            routeCode: 'TN',
+          }),
+          block({
+            id: 'next',
+            timelineRow: 2,
+            plannedStartMinute: 100 + 10 / 60 + 3,
+            plannedEndMinute: 100 + 10 / 60 + 6,
+            routeId: 'nt',
+            routeInstanceId: 'sel-nt',
+            routeCode: 'NT',
+          }),
+        ],
+      },
+    ];
+    const repaired = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn, nt],
+      maxDelaySeconds: 120,
+      minimumRecoveryTimeSeconds: 0,
+      successorPolicy: graphPolicy([tn, nt]),
+    });
+    const collisions = findStationBerthCollisions(
+      collectStationBerthOccupancies(repaired.timelines, [tn, nt]),
+      [tn, nt],
+    );
+    assert.equal(collisions.length, 0, 'tight next trip must not block berth delay');
+    const contested = repaired.timelines
+      .flatMap((t) => t.blocks)
+      .find((b) => b.id === 'contested')!;
+    const next = repaired.timelines.flatMap((t) => t.blocks).find((b) => b.id === 'next')!;
+    assert.ok(
+      contested.plannedEndMinute <= next.plannedStartMinute + 1e-9,
+      'same-row next must be pushed after berth delay',
+    );
+  });
+
+  it('delays origin berth collision even when charging follows on the same row', () => {
+    const st = route({
+      instanceId: 'sel-st',
+      routeId: 'st',
+      routeCode: 'ST',
+      stationIds: ['T3U', 'S2'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3上行', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'S2', stationName: 'S2', dwellSeconds: 40 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'S2',
+          avgTravelTimeSeconds: 160,
+          minTravelTimeSeconds: 150,
+        },
+      ],
+      avgTravelTimeSeconds: 160,
+      minTravelTimeSeconds: 150,
+    });
+    // 兩台車同一秒搶 T3上行 10 秒門檻；後車同列後面還有充電（舊邏輯會把延後上限夾死）
+    const timelines = [
+      {
+        row: 4,
+        blocks: [
+          block({
+            id: 'tn-a',
+            timelineRow: 4,
+            plannedStartMinute: 18 * 60 + 57,
+            plannedEndMinute: 18 * 60 + 57 + 3,
+            routeId: 'st',
+            routeInstanceId: 'sel-st',
+            routeCode: 'ST',
+          }),
+          {
+            id: 'chg-a',
+            timelineRow: 4,
+            taskType: 'charging' as const,
+            label: '充電',
+            source: 'template_bar' as const,
+            plannedStartMinute: 18 * 60 + 57 + 3.1,
+            plannedEndMinute: 19 * 60 + 30,
+            travelSeconds: 0,
+            dwellSeconds: 0,
+            anchorStartMinute: 18 * 60 + 57 + 3.1,
+          },
+        ],
+      },
+      {
+        row: 10,
+        blocks: [
+          block({
+            id: 'tn-b',
+            timelineRow: 10,
+            plannedStartMinute: 18 * 60 + 57,
+            plannedEndMinute: 18 * 60 + 57 + 3,
+            routeId: 'st',
+            routeInstanceId: 'sel-st',
+            routeCode: 'ST',
+          }),
+          {
+            id: 'chg-b',
+            timelineRow: 10,
+            taskType: 'charging' as const,
+            label: '充電',
+            source: 'template_bar' as const,
+            plannedStartMinute: 18 * 60 + 57 + 3.1,
+            plannedEndMinute: 19 * 60 + 30,
+            travelSeconds: 0,
+            dwellSeconds: 0,
+            anchorStartMinute: 18 * 60 + 57 + 3.1,
+          },
+        ],
+      },
+    ];
+    const repaired = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [st],
+      maxDelaySeconds: 120,
+      minimumRecoveryTimeSeconds: 0,
+    });
+    const collisions = findStationBerthCollisions(
+      collectStationBerthOccupancies(repaired.timelines, [st]),
+      [st],
+    );
+    assert.equal(collisions.length, 0, 'must delay even if charging is tightly after');
+  });
+
+  it('after topology reassign, pushes next same-row trip so timelines do not overlap', () => {
+    const tn = route({
+      instanceId: 'sel-tn',
+      routeId: 'tn',
+      routeCode: 'TN',
+      stationIds: ['T3U', 'P1'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3U', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'P1', stationName: 'P1', dwellSeconds: 90 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'P1',
+          avgTravelTimeSeconds: 60,
+          minTravelTimeSeconds: 50,
+        },
+      ],
+      avgTravelTimeSeconds: 60,
+      minTravelTimeSeconds: 50,
+      executionOrder: 1,
+    });
+    const nt = route({
+      instanceId: 'sel-nt',
+      routeId: 'nt',
+      routeCode: 'NT',
+      stationIds: ['P1', 'T3D'],
+      stationDwells: [
+        { stationId: 'P1', stationName: 'P1', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'T3D', stationName: 'T3D', dwellSeconds: 40 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'P1',
+          toStationId: 'T3D',
+          avgTravelTimeSeconds: 60,
+          minTravelTimeSeconds: 50,
+        },
+      ],
+      avgTravelTimeSeconds: 60,
+      minTravelTimeSeconds: 50,
+      executionOrder: 2,
+    });
+    const tnb = route({
+      instanceId: 'sel-tnb',
+      routeId: 'tnb',
+      routeCode: 'TNB',
+      backupForInstanceId: 'sel-tn',
+      stationIds: ['T3U', 'P2'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3U', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'P2', stationName: 'P2', dwellSeconds: 100 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'P2',
+          avgTravelTimeSeconds: 80,
+          minTravelTimeSeconds: 70,
+        },
+      ],
+      avgTravelTimeSeconds: 80,
+      minTravelTimeSeconds: 70,
+    });
+    const ntb = route({
+      instanceId: 'sel-ntb',
+      routeId: 'ntb',
+      routeCode: 'NTB',
+      backupForInstanceId: 'sel-nt',
+      stationIds: ['P2', 'T3D'],
+      stationDwells: [
+        { stationId: 'P2', stationName: 'P2', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'T3D', stationName: 'T3D', dwellSeconds: 40 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'P2',
+          toStationId: 'T3D',
+          avgTravelTimeSeconds: 60,
+          minTravelTimeSeconds: 50,
+        },
+      ],
+      avgTravelTimeSeconds: 60,
+      minTravelTimeSeconds: 50,
+    });
     const timelines = [
       {
         row: 9,
@@ -659,27 +958,340 @@ describe('stationBerthConstraint', () => {
             routeCode: 'TN',
           }),
           block({
-            id: 'ts',
+            id: 'nt',
             timelineRow: 1,
-            plannedStartMinute: 104,
-            plannedEndMinute: 107,
-            routeId: 'ts',
-            routeInstanceId: 'sel-ts',
-            routeCode: 'TS',
+            plannedStartMinute: 100.5 + 2,
+            plannedEndMinute: 100.5 + 5,
+            routeId: 'nt',
+            routeInstanceId: 'sel-nt',
+            routeCode: 'NT',
           }),
         ],
       },
     ];
     const repaired = enforceStationBerthConstraints({
       timelines,
-      selectedRoutes: [tn, nt, ts, tnb, ntb],
+      selectedRoutes: [tn, nt, tnb, ntb],
       maxDelaySeconds: 10,
+      minimumRecoveryTimeSeconds: 0,
       successorPolicy: graphPolicy([tn, nt]),
     });
-    assert.equal(
-      repaired.timelines.flatMap((t) => t.blocks).find((b) => b.id === 'tn')!.routeCode,
-      'TN',
-      'must not spare-swap when next leg is not graph successor',
+    const byId = new Map(
+      repaired.timelines.flatMap((t) => t.blocks).map((b) => [b.id, b] as const),
     );
+    const first = byId.get('tn')!;
+    const second = byId.get('nt')!;
+    assert.ok(
+      first.plannedEndMinute <= second.plannedStartMinute + 1e-9,
+      `expected no overlap: end ${first.plannedEndMinute} vs start ${second.plannedStartMinute}`,
+    );
+  });
+
+  it('fixture TN1120/ST1300: same-second dual-row origin overlap is delayed clear', () => {
+    const tn = route({
+      routeId: 'tn',
+      routeCode: 'TN',
+      stationIds: ['T3U', 'N2W'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3上行', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'N2W', stationName: 'N2W下行出發', dwellSeconds: 10 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'N2W',
+          avgTravelTimeSeconds: 160,
+          minTravelTimeSeconds: 160,
+        },
+      ],
+      avgTravelTimeSeconds: 160,
+      minTravelTimeSeconds: 160,
+    });
+    // 兩列同一秒發車（11:20:00 量級）：與報表 TN1120 時間線 3/4 同秒重疊同構
+    const startMin = 11 * 60 + 20;
+    const durations = 170 / 60;
+    const timelines = [
+      {
+        row: 3,
+        blocks: [
+          block({
+            id: 'row3',
+            timelineRow: 3,
+            plannedStartMinute: startMin,
+            plannedEndMinute: startMin + durations,
+            routeId: 'tn',
+            routeCode: 'TN',
+            travelSeconds: 160,
+            dwellSeconds: 10,
+          }),
+        ],
+      },
+      {
+        row: 4,
+        blocks: [
+          block({
+            id: 'row4',
+            timelineRow: 4,
+            plannedStartMinute: startMin,
+            plannedEndMinute: startMin + durations,
+            routeId: 'tn',
+            routeCode: 'TN',
+            travelSeconds: 160,
+            dwellSeconds: 10,
+          }),
+        ],
+      },
+    ];
+
+    const before = findStationBerthCollisions(
+      collectStationBerthOccupancies(timelines, [tn]),
+      [tn],
+    );
+    assert.ok(before.length > 0, 'fixture must start with a collision');
+
+    const repaired = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      maxDelaySeconds: 120,
+    });
+    const after = findStationBerthCollisions(
+      collectStationBerthOccupancies(repaired.timelines, [tn]),
+      [tn],
+    );
+    assert.equal(after.length, 0);
+    const row4 = repaired.timelines
+      .flatMap((t) => t.blocks)
+      .find((b) => b.id === 'row4')!;
+    assert.ok(row4.plannedStartMinute > startMin);
+  });
+
+  it('fixture: densify/yield-style re-overlap is cleared by final WAIT pass', () => {
+    const tn = route({
+      routeId: 'tn',
+      routeCode: 'TN',
+      stationIds: ['T3U', 'N2W'],
+      stationDwells: [
+        { stationId: 'T3U', stationName: 'T3上行', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'N2W', stationName: 'N2W下行出發', dwellSeconds: 10 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'T3U',
+          toStationId: 'N2W',
+          avgTravelTimeSeconds: 160,
+          minTravelTimeSeconds: 160,
+        },
+      ],
+      avgTravelTimeSeconds: 160,
+      minTravelTimeSeconds: 160,
+    });
+    const startMin = 13 * 60;
+    const durations = 170 / 60;
+    let timelines = [
+      {
+        row: 5,
+        blocks: [
+          block({
+            id: 'r5',
+            timelineRow: 5,
+            plannedStartMinute: startMin,
+            plannedEndMinute: startMin + durations,
+            routeId: 'tn',
+            routeCode: 'TN',
+            travelSeconds: 160,
+            dwellSeconds: 10,
+          }),
+        ],
+      },
+      {
+        row: 6,
+        blocks: [
+          block({
+            id: 'r6',
+            timelineRow: 6,
+            plannedStartMinute: startMin,
+            plannedEndMinute: startMin + durations,
+            routeId: 'tn',
+            routeCode: 'TN',
+            travelSeconds: 160,
+            dwellSeconds: 10,
+          }),
+        ],
+      },
+    ];
+
+    timelines = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      maxDelaySeconds: 120,
+    }).timelines;
+    assert.equal(
+      findStationBerthCollisions(collectStationBerthOccupancies(timelines, [tn]), [tn])
+        .length,
+      0,
+    );
+
+    // 模擬後處理把兩班又推回同秒（densify／yield／push 的副作用）
+    for (const timeline of timelines) {
+      for (const b of timeline.blocks) {
+        b.plannedStartMinute = startMin;
+        b.plannedEndMinute = startMin + durations;
+      }
+    }
+    assert.ok(
+      findStationBerthCollisions(collectStationBerthOccupancies(timelines, [tn]), [tn])
+        .length > 0,
+    );
+
+    timelines = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS,
+    }).timelines;
+    assert.equal(
+      findStationBerthCollisions(collectStationBerthOccupancies(timelines, [tn]), [tn])
+        .length,
+      0,
+      'final WAIT berth pass must clear reintroduced same-second overlap',
+    );
+  });
+});
+
+describe('碰撞保護時間（生成期求解）', () => {
+  const tn = route({ routeId: 'tn', routeCode: 'TN' });
+
+  /**
+   * 兩台不同車。路線 A（不停靠）→ P1（停 50 秒），行駛 120 秒。
+   * 前車 60:00 發車、62:00 到 P1、62:50 離開；後車 61:20 發車、63:20 到 P1。
+   * 兩者只差 30 秒——區間沒重疊，但不夠 2×30＝60 秒。
+   */
+  function tightPair() {
+    return [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'earlier',
+            timelineRow: 1,
+            plannedStartMinute: 60,
+            plannedEndMinute: 60 + 170 / 60,
+            routeId: 'tn',
+            routeCode: 'TN',
+          }),
+        ],
+      },
+      {
+        row: 2,
+        blocks: [
+          block({
+            id: 'later',
+            timelineRow: 2,
+            plannedStartMinute: 60 + 80 / 60,
+            plannedEndMinute: 60 + 80 / 60 + 170 / 60,
+            routeId: 'tn',
+            routeCode: 'TN',
+          }),
+        ],
+      },
+    ];
+  }
+
+  function laterStartSecond(timelines: ReturnType<typeof tightPair>): number {
+    const later = timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((candidate) => candidate.id === 'later')!;
+    return Math.round(later.plannedStartMinute * 60);
+  }
+
+  it('關閉時不動——區間本來就沒重疊', () => {
+    const timelines = tightPair();
+    const before = laterStartSecond(timelines);
+    const solved = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      maxDelaySeconds: 300,
+    });
+    assert.equal(solved.delayedCount, 0);
+    assert.equal(laterStartSecond(solved.timelines), before);
+  });
+
+  it('開啟時把後車延後到滿足 2×碰撞保護時間', () => {
+    const timelines = tightPair();
+    const before = laterStartSecond(timelines);
+    const solved = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      collisionProtectionSeconds: 30,
+      maxDelaySeconds: 300,
+    });
+    assert.equal(solved.delayedCount, 1);
+    // 原本只隔 30 秒，補到 60 秒＝再往後 30 秒
+    assert.equal(laterStartSecond(solved.timelines) - before, 30);
+
+    const after = findStationBerthCollisions(
+      collectStationBerthOccupancies(solved.timelines, [tn], {
+        collisionProtectionSeconds: 30,
+      }),
+      [tn],
+    );
+    assert.equal(after.length, 0, '延後後不應再有保護不足');
+  });
+  it('同一台車自己折返不受碰撞保護——不會被自己的前一趟擋住', () => {
+    // 同一列（同一台車）：60:00 出發，62:00 到 P1，62:50 靠站結束，
+    // 63:20 從 P1 開下一趟回程——只隔 30 秒，但這是同一台車在折返站交接，
+    // 不可能自己撞自己，不該被要求隔 2×30＝60 秒。
+    const tnBack = route({
+      routeId: 'tn-back',
+      routeCode: 'TNB',
+      executionOrder: 2,
+      stationIds: ['P1', 'A'],
+      stationDwells: [
+        { stationId: 'P1', stationName: 'P1停靠點', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'A', stationName: 'A', dwellSeconds: 50 },
+      ],
+      stationLegTravels: [
+        {
+          fromStationId: 'P1',
+          toStationId: 'A',
+          avgTravelTimeSeconds: 120,
+          minTravelTimeSeconds: 100,
+        },
+      ],
+    });
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'outbound',
+            timelineRow: 1,
+            plannedStartMinute: 60,
+            plannedEndMinute: 60 + 170 / 60,
+            routeId: 'tn',
+            routeCode: 'TN',
+          }),
+          block({
+            id: 'inbound',
+            timelineRow: 1,
+            plannedStartMinute: 60 + 200 / 60,
+            plannedEndMinute: 60 + 200 / 60 + 170 / 60,
+            routeId: 'tn-back',
+            routeCode: 'TNB',
+            routeInstanceId: 'tn-back',
+          }),
+        ],
+      },
+    ];
+    const solved = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn, tnBack],
+      collisionProtectionSeconds: 30,
+      maxDelaySeconds: 300,
+    });
+    assert.equal(solved.delayedCount, 0, '同一台車折返不該被碰撞保護延後');
+    const inbound = solved.timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((candidate) => candidate.id === 'inbound')!;
+    assert.equal(Math.round(inbound.plannedStartMinute * 60), 60 * 60 + 200);
   });
 });

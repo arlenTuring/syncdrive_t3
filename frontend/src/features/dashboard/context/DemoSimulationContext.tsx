@@ -27,16 +27,13 @@ import {
   type DemoSimulationPlayback,
 } from './DemoSimulationPlaybackContext';
 import { getDataSourceById } from '../store/useDataSourceStore';
+import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
 
 const TOOLBAR_VISIBLE_KEY = 'syncdrive-sim-transport-toolbar-visible';
 
 /** 開發模式走 Vite 代理，避免 localhost IPv6 / 跨域問題 */
 function resolveSimulationBackendUrl(): string {
-  if (import.meta.env.DEV) {
-    return '';
-  }
-  const configured = getDataSourceById('default-internal')?.backendUrl ?? 'http://127.0.0.1:3000';
-  return configured.replace('//localhost:', '//127.0.0.1:');
+  return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
 }
 
 type DemoSimulationContextValue = {

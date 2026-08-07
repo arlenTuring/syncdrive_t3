@@ -572,6 +572,11 @@ export type ScheduleTask = {
   startMinute: number;     // minutes from 00:00
   durationMinutes: number; // default 30
   label: string;           // task display name
+  /**
+   * 模板原始開始（分鐘）。引擎讓渡／進場溢出可能把 `startMinute` 往後推；
+   * 保留此值讓後續讓渡可在幽靈正線被推走後縮回模板開頭。
+   */
+  templateStartMinute?: number;
 };
 
 /** Figma TaskBar colors — opaque bg so bars don't shift hue over the grid. */
@@ -1172,9 +1177,6 @@ export function formatSelectedIntervalHoverContent(
         ? `（理論下限 ${fleet.theoreticalMin}）`
         : ''),
     );
-    for (const tip of fleet.tips.slice(0, 2)) {
-      lines.push(tip);
-    }
   }
   return { title: intervalName, lines };
 }

@@ -213,10 +213,14 @@ describe('insertMaintenanceEntryServiceTrips', () => {
   }
 
   it('builds the worst-case load-bearing chain (S2W→T3→N2W) ending at first trip', () => {
+    // 2026-08-07 更正：調度營運班次不得佔用保養尾巴，整條串必須在保養結束之後
+    // 才發車（文件 §10）。留 30 分鐘保養→首班空檔，足夠塞下 15 分鐘的兩段鏈。
+    const timelines = scenarioTimelines();
+    timelines[0]!.blocks[0]!.plannedEndMinute = 9 * 60 + 30;
     const origins = buildMaintenanceFirstTripOriginsFromTopology(topologyFixture());
     const warnings: Array<{ code: string }> = [];
     const next = insertMaintenanceEntryServiceTrips({
-      timelines: scenarioTimelines(),
+      timelines,
       selectedRoutes,
       firstTripOrigins: origins,
       sectionCodes,
@@ -235,19 +239,21 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     );
     // 末段緊接首班發車
     assert.equal(entries[1]!.plannedEndMinute, 10 * 60);
-    // 皆載客（passenger）且不早於保養開始
+    // 皆載客（passenger）且不早於保養<strong>結束</strong>——不准佔用保養尾巴
     for (const entry of entries) {
       assert.equal(entry.taskType, 'passenger');
-      assert.ok(entry.plannedStartMinute >= 8 * 60 - 1e-9);
+      assert.ok(
+        entry.plannedStartMinute >= 9 * 60 + 30 - 1e-9,
+        '調度營運班次不得早於保養結束時刻發車',
+      );
     }
-    // 偷保養尾巴：最早一段起點早於保養結束
-    assert.ok(entries[0]!.plannedStartMinute < 10 * 60);
     assert.equal(entries[0]!.entryServiceSectionCode, 'M');
   });
 
   it('still builds worst-case chain when first-trip origin is itself an exit station', () => {
     // 首班 TN 起點 T3 也是出場站；仍應從較遠出場 S2W 長 ST 進場載客
     const timelines = scenarioTimelines();
+    timelines[0]!.blocks[0]!.plannedEndMinute = 9 * 60 + 30;
     timelines[0]!.blocks[1]!.routeId = 'route-tn';
     timelines[0]!.blocks[1]!.routeCode = 'TN';
     timelines[0]!.blocks[1]!.routeName = 'T3→N2W';
@@ -268,10 +274,13 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     assert.equal(entries.length, 1);
     assert.equal(entries[0]!.routeId, 'route-st');
     assert.equal(entries[0]!.plannedEndMinute, 10 * 60);
+    assert.ok(entries[0]!.plannedStartMinute >= 9 * 60 + 30 - 1e-9);
   });
 
   it('builds chain to N2W even when N2W is also listed as an exit', () => {
     // 對應實務截圖：首班 NT（N2W 起點），N2W／T3／S2W 皆為出場 → 仍應長最壞交路
+    const timelines = scenarioTimelines();
+    timelines[0]!.blocks[0]!.plannedEndMinute = 9 * 60 + 30;
     const origins = [
       ...buildMaintenanceFirstTripOriginsFromTopology(topologyFixture()),
       {
@@ -284,7 +293,7 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     ];
     const warnings: Array<{ code: string }> = [];
     const next = insertMaintenanceEntryServiceTrips({
-      timelines: scenarioTimelines(),
+      timelines,
       selectedRoutes,
       firstTripOrigins: origins,
       sectionCodes,
@@ -301,11 +310,12 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     );
   });
 
-  it('drops earliest hops that cannot fit before maintenance start', () => {
+  it('drops the longer candidate that cannot fit before first trip, keeps the shorter one', () => {
+    // 2026-08-07 更正：邊界不再是「保養開始」（不准偷尾巴，那條界線已作廢），
+    // 而是「保養結束→首班」中間的空檔夠不夠長。
+    // 空檔 12 分鐘：兩段鏈需 15 分鐘（ST 5 + TN 10）放不下 → 改落地僅 TN（10 分鐘剛好）。
     const timelines = scenarioTimelines();
-    // 保養只有 9:57–10:00，僅容得下末段（TN 10 分鐘也放不下 → 全砍）；改成 9:50 起容 TN
-    timelines[0]!.blocks[0]!.plannedStartMinute = 9 * 60 + 50;
-    timelines[0]!.blocks[0]!.anchorStartMinute = 9 * 60 + 50;
+    timelines[0]!.blocks[0]!.plannedEndMinute = 9 * 60 + 48;
     const origins = buildMaintenanceFirstTripOriginsFromTopology(topologyFixture());
     const warnings: Array<{ code: string }> = [];
     const next = insertMaintenanceEntryServiceTrips({
@@ -317,29 +327,72 @@ describe('insertMaintenanceEntryServiceTrips', () => {
       warnings: warnings as never,
     });
     const entries = next[0]!.blocks.filter((b) => b.source === 'entry_service');
-    // TN 需 10 分鐘（9:50–10:00），ST 起點 9:45 早於保養開始 9:50 → 砍掉
     assert.equal(entries.length, 1);
     assert.equal(entries[0]!.routeId, 'route-tn');
+    assert.ok(entries[0]!.plannedStartMinute >= 9 * 60 + 48 - 1e-9);
   });
 
-  it('falls back to shorter safe chain when longest would chase previous train', () => {
-    // 另車已在 ST 09:45 發車；最長鏈亦要在 ST@09:45 插入會追撞 → 改落地僅 TN（T3 亦為出場站）
+  it('falls back to shorter chain when the longer one would arrive while another vehicle is still idling at the shared station', () => {
+    // 2026-08-07 更正：舊測試用「車隊物理班距」擋插入，那個機制已移除
+    // （調度班次不受班距約束）。改測真正會擋住它的東西——站位淨空：
+    // 另一列（row2）跑完一趟後在 T3-D 閒置了一段時間才排下一個任務，
+    // 這段閒置期間 T3-D 仍算被它佔著。兩段鏈的 ST 那一段需要在這段閒置期
+    // 中途抵達 T3-D，抵達不了 → 改退回只走 TN（TN 只碰 N2W-D，不受影響）。
+    //
+    // 用專用路線（帶 stationDwells）而非共用的 routeNt：
+    // buildBlockStationDepartures 靠 route.stationDwells 才能算出站點窗口，
+    // 共用夾具的 routeNt/routeTn/routeSt 全都是空陣列（其他測試從不需要
+    // 對它們算窗口，只拿來當鏈接錨點），這裡是唯一需要真正算出窗口的測試。
+    const routeNtWithDwell = makeRoute({
+      routeId: 'route-nt-dwell',
+      routeCode: 'NT',
+      routeName: 'N2W→T3',
+      stationIds: ['N2W-D', 'T3-D'],
+      executionOrder: 1,
+      avgTravelTimeSeconds: 600,
+      stationDwells: [
+        { stationId: 'N2W-D', stationName: 'N2W-D', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'T3-D', stationName: 'T3-D', dwellSeconds: 20, dwellRequired: true },
+      ],
+    });
     const timelines = scenarioTimelines();
+    timelines[0]!.blocks[0]!.plannedEndMinute = 9 * 60 + 30;
     timelines.push({
       row: 2,
       blocks: [
         {
-          id: 'other-st',
+          id: 'other-arrive-t3',
           timelineRow: 2,
           taskType: 'passenger',
-          label: '正線 ST',
-          routeId: 'route-st',
-          routeCode: 'ST',
-          routeName: 'S2W→T3',
-          anchorStartMinute: 9 * 60 + 45,
-          plannedStartMinute: 9 * 60 + 45,
-          plannedEndMinute: 9 * 60 + 50,
-          travelSeconds: 300,
+          label: '正線 NT',
+          routeId: 'route-nt-dwell',
+          routeCode: 'NT',
+          routeName: 'N2W→T3',
+          anchorStartMinute: 9 * 60 + 30,
+          plannedStartMinute: 9 * 60 + 30,
+          plannedEndMinute: 9 * 60 + 40,
+          travelSeconds: 600,
+          dwellSeconds: 0,
+          source: 'template_bar',
+        },
+        {
+          // row2 的下一個任務要等到 9:55 才開始——9:40 到 9:55 這段，
+          // 這台車其實還停在 T3-D（閒置超過門檻，算佔用）。
+          // 故意用 route-tn（stationDwells 是空陣列）：這個區塊本身不會產生
+          // 任何站位窗（buildBlockStationDepartures 因缺停靠資料回傳空站點），
+          // 只用它的 plannedStartMinute 標記「row2 下一個任務何時開始」，
+          // 確保這則測試量到的是閒置延伸邏輯本身，不是被第二個窗口意外擋住。
+          id: 'other-next-task',
+          timelineRow: 2,
+          taskType: 'passenger',
+          label: '正線 TN',
+          routeId: 'route-tn',
+          routeCode: 'TN',
+          routeName: 'T3→N2W',
+          anchorStartMinute: 9 * 60 + 55,
+          plannedStartMinute: 9 * 60 + 55,
+          plannedEndMinute: 10 * 60 + 5,
+          travelSeconds: 600,
           dwellSeconds: 0,
           source: 'template_bar',
         },
@@ -349,16 +402,21 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     const warnings: Array<{ code: string }> = [];
     const next = insertMaintenanceEntryServiceTrips({
       timelines,
-      selectedRoutes,
+      selectedRoutes: [...selectedRoutes, routeNtWithDwell],
       firstTripOrigins: origins,
       sectionCodes,
       minimumRecoveryTimeSeconds: 0,
+      // 「別的車還停在原地」這件事屬於防碰撞判定的一部分，
+      // 碰撞保護時間填 0 就整組關閉；這裡要測的正是它，所以要打開。
+      // 給 1 秒（實際加 2 秒）是為了讓保護時間本身幾乎不影響時刻，
+      // 單獨驗證「末站滯留也算佔用」這一條。
+      collisionProtectionSeconds: 1,
       warnings: warnings as never,
     });
     const entries = next[0]!.blocks
       .filter((b) => b.source === 'entry_service')
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
-    assert.equal(entries.length, 1, '最長不安全時改插較短安全交路');
+    assert.equal(entries.length, 1, '兩段鏈的 T3-D 站位被別的車佔著，應退回較短鏈');
     assert.equal(entries[0]!.routeId, 'route-tn');
     assert.equal(entries[0]!.plannedEndMinute, 10 * 60);
   });

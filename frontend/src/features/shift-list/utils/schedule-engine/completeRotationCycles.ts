@@ -575,6 +575,7 @@ export function applyRotationCycleCompletion(args: {
     const remainingSeconds = Math.max(0, originalEndSecond - shiftedStart);
     return {
       ...task,
+      templateStartMinute: task.templateStartMinute ?? task.startMinute,
       startMinute: secondToMinute(shiftedStart),
       durationMinutes: remainingSeconds / 60,
     };

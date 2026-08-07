@@ -307,5 +307,4 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/operation-shift/timetable/station-e
 
 ## 5. 相關文件
 
-- [現行策略 · 同站折返關節](排班引擎現行策略.md)
-- [排班引擎規格](排班引擎規格.md)
+- [排班引擎算法全覽（審核）](排班引擎算法全覽-審核.html)

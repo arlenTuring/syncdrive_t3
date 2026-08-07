@@ -1,8 +1,9 @@
 import { getDataSourceById } from '../../dashboard/store/useDataSourceStore';
+import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
 import type { ExecutionStatusKey, ShiftRecordListItem, ShiftTab } from '../types';
 
 export function resolveShiftRecordsBackendUrl(): string {
-  return getDataSourceById('default-internal')?.backendUrl ?? 'http://127.0.0.1:3000';
+  return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
 }
 
 export type ShiftRecordListQuery = {

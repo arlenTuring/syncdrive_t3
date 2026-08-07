@@ -2,10 +2,11 @@ import { fetchMaintenanceTaskDetail } from '../../maintenance-tasks/api/maintena
 import type { ShiftScheduleCreateDraft } from '../types/create';
 import { buildRouteGroupsParamsFingerprint } from './schedule-engine/physics';
 import { runShiftScheduleEngineForDraft } from './runShiftScheduleEngineForDraft';
-import type {
-  ShiftScheduleMaintenanceTaskBinding,
-  ShiftScheduleStoredOutput,
-  PlanAdjustHistoryEntry,
+import {
+  CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
+  type ShiftScheduleMaintenanceTaskBinding,
+  type ShiftScheduleStoredOutput,
+  type PlanAdjustHistoryEntry,
 } from './schedule-engine/types';
 import {
   buildMaintenanceEntrySlackFingerprint,
@@ -87,7 +88,7 @@ export async function buildShiftScheduleStoredOutput(
     });
     const feasibilityReport = emptyManualFeasibilityReport();
     return {
-      outputVersion: 1,
+      outputVersion: CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
       generatedAt: plan.generatedAt,
       plan,
       feasibilityReport,
@@ -115,7 +116,7 @@ export async function buildShiftScheduleStoredOutput(
   ]);
 
   return {
-    outputVersion: 1,
+    outputVersion: CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
     generatedAt: new Date().toISOString(),
     plan: engineResult.plan,
     feasibilityReport: engineResult.report,
@@ -148,7 +149,7 @@ export function parseShiftScheduleStoredOutput(
 ): ShiftScheduleStoredOutput | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  if (o.outputVersion !== 1) return null;
+  if (typeof o.outputVersion !== 'number' || o.outputVersion < 1) return null;
 
   const generatedAt = typeof o.generatedAt === 'string' ? o.generatedAt : '';
   const feasibilityReport = o.feasibilityReport;
@@ -194,7 +195,7 @@ export function parseShiftScheduleStoredOutput(
   };
 
   return {
-    outputVersion: 1,
+    outputVersion: typeof o.outputVersion === 'number' ? o.outputVersion : CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
     generatedAt,
     plan: parseGeneratedSchedulePlan(o.plan),
     feasibilityReport: {
@@ -230,6 +231,39 @@ export function parseShiftScheduleStoredOutput(
   };
 }
 
+/**
+ * 存進草稿的復原歷史筆數上限。
+ *
+ * 每一筆都是<strong>完整班表副本</strong>（實測約 0.5 MB：plan 0.38 + 可行性報告 0.15）。
+ * 舊版無上限累積，手動調整約 19 次後草稿就突破後端 10 MB 上限
+ * （REQUEST_BODY_LIMIT，見 backend/src/main.ts），儲存草稿的 PATCH 直接回
+ * 413 request entity too large——使用者從此存不了檔。
+ *
+ * 8 筆 ≈ 4 MB，對 10 MB 上限留有充裕餘裕。
+ */
+export const PERSISTED_PLAN_ADJUST_HISTORY_LIMIT = 8;
+
+/**
+ * 裁切復原歷史成「含目前所在位置」的最後 N 筆，並把索引換算到裁切後的座標。
+ * 保留目前位置往前的步數（復原用）；目前位置在中段時也盡量保留後面的重做步數。
+ */
+export function trimPlanAdjustHistoryForPersist(
+  history: PlanAdjustHistoryEntry[],
+  historyIndex: number,
+): { history: PlanAdjustHistoryEntry[]; historyIndex: number } {
+  if (history.length <= PERSISTED_PLAN_ADJUST_HISTORY_LIMIT) {
+    return { history, historyIndex };
+  }
+  const safeIndex = Math.min(Math.max(0, historyIndex), history.length - 1);
+  const end = Math.max(safeIndex + 1, PERSISTED_PLAN_ADJUST_HISTORY_LIMIT);
+  const start = Math.max(0, end - PERSISTED_PLAN_ADJUST_HISTORY_LIMIT);
+  const trimmed = history.slice(start, start + PERSISTED_PLAN_ADJUST_HISTORY_LIMIT);
+  return {
+    history: trimmed,
+    historyIndex: Math.min(Math.max(0, safeIndex - start), trimmed.length - 1),
+  };
+}
+
 function parsePlanAdjustHistory(
   rawHistory: unknown,
   rawIndex: unknown,
@@ -257,7 +291,13 @@ function parsePlanAdjustHistory(
     ? Math.floor(rawIndex)
     : entries.length - 1;
   const planAdjustHistoryIndex = Math.min(Math.max(0, indexRaw), entries.length - 1);
-  return { planAdjustHistory: entries, planAdjustHistoryIndex };
+  // 舊草稿可能存了無上限的歷史（實測 17 筆＝8.75 MB）；載入時就裁掉，
+  // 避免一開啟又原樣存回去再次撞 413。
+  const trimmed = trimPlanAdjustHistoryForPersist(entries, planAdjustHistoryIndex);
+  return {
+    planAdjustHistory: trimmed.history,
+    planAdjustHistoryIndex: trimmed.historyIndex,
+  };
 }
 
 function parseFeasibilityIssues(raw: unknown) {

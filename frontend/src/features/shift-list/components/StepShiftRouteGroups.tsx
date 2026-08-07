@@ -37,6 +37,7 @@ import {
   setSelectedRouteAsHead,
   nextExecutionOrder,
   normalizeMinimumRecoveryTimeSeconds,
+  normalizeCollisionProtectionSeconds,
   normalizeSelectedRouteExecutionOrders,
   resolveRouteOrderPosition,
   resolveNextRouteInExecutionOrder,
@@ -49,9 +50,11 @@ import {
   normalizeSwitchBufferAfterSeconds,
   normalizeDwellSlackSeconds,
 } from '../types/create';
+import type { MaintenanceFirstTripOrigin } from '../utils/maintenanceFirstTripOrigins';
 import {
   loadShiftRouteGroupCatalog,
   type ShiftRouteGroupCatalogItem,
+  type ShiftRouteGroupMapOption,
   type ShiftRouteOption,
 } from '../utils/shiftRouteGroupCatalog';
 import { RouteRelationGraphEditor } from './RouteRelationGraphEditor';
@@ -352,12 +355,16 @@ function RouteOrderControls({
 function RecoveryAndServiceDirectionBar({
   minimumRecoveryTimeSeconds,
   onUpdateRecoveryTime,
+  collisionProtectionSeconds,
+  onUpdateCollisionProtection,
   serviceDirectionTags,
   onAddTag,
   onRemoveTag,
 }: {
   minimumRecoveryTimeSeconds: number | null;
   onUpdateRecoveryTime: (value: string) => void;
+  collisionProtectionSeconds: number | null;
+  onUpdateCollisionProtection: (value: string) => void;
   serviceDirectionTags: ShiftScheduleServiceDirectionTag[];
   onAddTag: (name: string) => void;
   onRemoveTag: (id: string) => void;
@@ -401,6 +408,35 @@ function RecoveryAndServiceDirectionBar({
             placeholder="必填，如 30"
             className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
             aria-label="最低恢復時間"
+          />
+          <span className="text-sm text-zinc-500">秒</span>
+        </div>
+      </label>
+
+      <label className="block">
+        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+          <HelpTip label="碰撞保護時間說明" widthClass="w-72">
+            <p>
+              前車從某個停靠點發車後，要多久才確定已經駛離會互相碰撞的那段空間。後車也要花同樣的時間才能從那段空間外緣開進來，所以兩台車在同一個停靠點的最小間隔是<strong>兩倍</strong>這個值。
+            </p>
+            <p className="mt-1 text-zinc-500">
+              規則：後車到站時刻 ≥ 前車實際離站時刻 + 2 × 碰撞保護時間。前車如果因為調度要滯留在站上，以它真正開走的時刻起算。
+            </p>
+            <p className="mt-1 text-zinc-500">
+              這是防碰撞下限，不是把班次擠近的目標；班距約束照舊，兩者取較嚴的。輸入「30」代表兩台車至少隔 60 秒。
+            </p>
+          </HelpTip>
+          碰撞保護時間（秒）
+        </span>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={collisionProtectionSeconds ?? ''}
+            onChange={(e) => onUpdateCollisionProtection(e.target.value.replace(/\D/g, ''))}
+            placeholder="預設 30"
+            className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
+            aria-label="碰撞保護時間"
           />
           <span className="text-sm text-zinc-500">秒</span>
         </div>
@@ -607,6 +643,21 @@ function RoutePickerBar({
   );
 }
 
+function formatFirstTripOriginsHint(
+  origins: MaintenanceFirstTripOrigin[],
+): string | null {
+  if (origins.length === 0) return null;
+  const parts = origins.slice(0, 4).map((origin) => {
+    const facilities =
+      origin.facilityLabels.length > 0
+        ? origin.facilityLabels.join('、')
+        : '整備設施';
+    return `${facilities} → ${origin.label}`;
+  });
+  const more = origins.length > 4 ? ` 等 ${origins.length} 處` : '';
+  return `整備出場（路網拓樸）：${parts.join('；')}${more}`;
+}
+
 export function StepShiftRouteGroups({
   draft,
   onChange,
@@ -616,6 +667,10 @@ export function StepShiftRouteGroups({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapDisplayName, setMapDisplayName] = useState('');
+  const [availableMaps, setAvailableMaps] = useState<ShiftRouteGroupMapOption[]>([]);
+  const [firstTripOriginsHint, setFirstTripOriginsHint] = useState<string | null>(null);
+  /** 使用者／草稿選定的地圖；空字串＝初次載入時跟場域管理目前使用地圖 */
+  const [preferredMapId, setPreferredMapId] = useState(() => draft.mapId.trim());
   const [catalog, setCatalog] = useState<ShiftRouteGroupCatalogItem[]>([]);
   const [turnaroundLimitSeconds, setTurnaroundLimitSeconds] = useState<number | null>(null);
   const [turnaroundLoading, setTurnaroundLoading] = useState(false);
@@ -634,17 +689,23 @@ export function StepShiftRouteGroups({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void loadShiftRouteGroupCatalog()
+    void loadShiftRouteGroupCatalog(preferredMapId || undefined)
       .then((result) => {
         if (cancelled) return;
         setCatalog(result.groups);
         setMapDisplayName(result.mapDisplayName);
+        setAvailableMaps(result.availableMaps);
+        setFirstTripOriginsHint(formatFirstTripOriginsHint(result.firstTripOrigins));
+        setPreferredMapId((prev) => (prev === result.mapId ? prev : result.mapId));
         const validRouteIds = new Set(
           result.groups.flatMap((g) => g.routes.map((r) => r.routeId)),
         );
         const routeMeta = new Map(
           result.groups.flatMap((g) => g.routes.map((r) => [r.routeId, r] as const)),
         );
+        const mapChanged =
+          draftRef.current.mapId.trim() !== ''
+          && draftRef.current.mapId.trim() !== result.mapId;
         const nextRoutes = normalizeSelectedRouteExecutionOrders(
           draftRef.current.selectedRoutes
             .filter(
@@ -663,7 +724,10 @@ export function StepShiftRouteGroups({
               return {
                 ...selected,
                 stationIds: [...meta.stationIds],
-                stationDwells: buildStationDwells(meta, selected.stationDwells),
+                stationDwells: buildStationDwells(
+                  meta,
+                  mapChanged ? undefined : selected.stationDwells,
+                ),
                 stationLegTravels: meta.stationLegTravels.map((leg) => ({ ...leg })),
                 avgTravelTimeSeconds: meta.avgTravelTimeSeconds,
                 minTravelTimeSeconds: meta.minTravelTimeSeconds,
@@ -690,6 +754,7 @@ export function StepShiftRouteGroups({
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));
           setCatalog([]);
+          setFirstTripOriginsHint(null);
         }
       })
       .finally(() => {
@@ -698,7 +763,7 @@ export function StepShiftRouteGroups({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preferredMapId]);
 
   useEffect(() => {
     if (!timeTemplateId.trim()) {
@@ -999,6 +1064,16 @@ export function StepShiftRouteGroups({
         verifiedPathCount: 0,
       },
     });
+  };
+
+  // 碰撞保護時間只影響站位間隔判定，不影響交路循環時間，
+  // 所以不必作廢導通驗證與各站停靠確認——只要重新生成班表即可
+  // （paramsFingerprint 已含此值，產出會自動被判定為過期）。
+  const updateCollisionProtection = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    const seconds =
+      digits === '' ? null : normalizeCollisionProtectionSeconds(Number(digits));
+    onChange({ ...draft, collisionProtectionSeconds: seconds });
   };
 
   const serviceDirectionTags = draft.serviceDirectionTags ?? [];
@@ -1559,13 +1634,23 @@ export function StepShiftRouteGroups({
     );
   };
 
+  const mapSelectOptions = useMemo(
+    () =>
+      availableMaps.map((map) => ({
+        value: map.mapId,
+        label: map.displayName,
+      })),
+    [availableMaps],
+  );
+  const selectedMapId = draft.mapId.trim() || preferredMapId;
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
-      <div className="mb-6 shrink-0">
-        <h2 className="text-base font-medium text-zinc-100">配置路線群組</h2>
-        {!loading && !error && mapDisplayName ? (
+      <div className="mb-6 shrink-0 space-y-3">
+        <div>
+          <h2 className="text-base font-medium text-zinc-100">配置路線群組</h2>
           <p className="mt-1 text-xs text-zinc-500">
-            資料來源：目前使用地圖「{mapDisplayName}」
+            選擇場域管理地圖後，以此 mapId 的 JSON（含路網拓樸）載入路線與整備出場站
             {turnaroundLoading
               ? ' · 載入折返時限…'
               : turnaroundLimitSeconds != null
@@ -1574,6 +1659,29 @@ export function StepShiftRouteGroups({
                   ? ' · 時間模板尚無可計算的折返時限'
                   : ' · 請先選擇時間模板'}
           </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <ShiftMenuSelect
+            label="場域地圖"
+            value={selectedMapId}
+            placeholder="選擇地圖"
+            options={mapSelectOptions}
+            widthClass="w-[280px] shrink-0"
+            panelWidth={280}
+            disabled={loading || mapSelectOptions.length === 0}
+            onChange={(mapId) => {
+              if (!mapId || mapId === selectedMapId) return;
+              setPreferredMapId(mapId);
+            }}
+          />
+          {!loading && !error && mapDisplayName ? (
+            <p className="pb-2 text-xs text-zinc-500">
+              已載入 mapId：{selectedMapId || '—'}
+            </p>
+          ) : null}
+        </div>
+        {!loading && !error && firstTripOriginsHint ? (
+          <p className="text-xs text-zinc-400">{firstTripOriginsHint}</p>
         ) : null}
       </div>
 
@@ -1590,7 +1698,7 @@ export function StepShiftRouteGroups({
         <div className="flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
           <ShiftSelectionEmptyState />
           <p className="pb-8 text-center text-xs text-zinc-500">
-            請至地圖編輯器建立路線群組與路線，並設為目前使用地圖
+            請至地圖編輯器建立路線群組與路線，並在上方選擇該場域地圖
           </p>
         </div>
       ) : (
@@ -1599,6 +1707,8 @@ export function StepShiftRouteGroups({
             <RecoveryAndServiceDirectionBar
               minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
               onUpdateRecoveryTime={updateRecoveryTime}
+              collisionProtectionSeconds={draft.collisionProtectionSeconds ?? null}
+              onUpdateCollisionProtection={updateCollisionProtection}
               serviceDirectionTags={serviceDirectionTags}
               onAddTag={addServiceDirectionTag}
               onRemoveTag={removeServiceDirectionTag}

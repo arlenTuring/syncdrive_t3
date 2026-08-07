@@ -1718,6 +1718,11 @@ describe('rotation cycle completion（來回約束）', () => {
           mapId: 'map-1',
           selectedRoutes: [downRoute, upRoute],
           minimumRecoveryTimeSeconds: 30,
+          // 這幾則是班距行為的迴歸測試，寫在碰撞保護時間問世之前：
+          // 終點站停靠時間長、班距短，單一站位本來就塞不下連續兩台車
+          // （例：終站停 140 秒、班距 180 秒，只剩 40 秒淨空）。
+          // 這裡關掉碰撞保護，讓它們專心驗班距；碰撞保護另有專屬測試。
+          collisionProtectionSeconds: 0,
         },
       }),
       templateBody: body,
@@ -1800,6 +1805,11 @@ describe('rotation cycle completion（來回約束）', () => {
             ],
           })),
           minimumRecoveryTimeSeconds: 30,
+          // 這幾則是班距行為的迴歸測試，寫在碰撞保護時間問世之前：
+          // 終點站停靠時間長、班距短，單一站位本來就塞不下連續兩台車
+          // （例：終站停 140 秒、班距 180 秒，只剩 40 秒淨空）。
+          // 這裡關掉碰撞保護，讓它們專心驗班距；碰撞保護另有專屬測試。
+          collisionProtectionSeconds: 0,
         },
       }),
       templateBody: body,
@@ -1906,6 +1916,11 @@ describe('rotation cycle completion（來回約束）', () => {
             withPhysics(passengerRoute('r-up', '上行路線', 320, 265, 2, 36, 20, 10)),
           ],
           minimumRecoveryTimeSeconds: 30,
+          // 這幾則是班距行為的迴歸測試，寫在碰撞保護時間問世之前：
+          // 終點站停靠時間長、班距短，單一站位本來就塞不下連續兩台車
+          // （例：終站停 140 秒、班距 180 秒，只剩 40 秒淨空）。
+          // 這裡關掉碰撞保護，讓它們專心驗班距；碰撞保護另有專屬測試。
+          collisionProtectionSeconds: 0,
         },
       }),
       templateBody: body,
@@ -1992,6 +2007,11 @@ describe('rotation cycle completion（來回約束）', () => {
             withPhysics(passengerRoute('r-up', '上行路線', 320, 265, 2, 36, 20, 10)),
           ],
           minimumRecoveryTimeSeconds: 30,
+          // 這幾則是班距行為的迴歸測試，寫在碰撞保護時間問世之前：
+          // 終點站停靠時間長、班距短，單一站位本來就塞不下連續兩台車
+          // （例：終站停 140 秒、班距 180 秒，只剩 40 秒淨空）。
+          // 這裡關掉碰撞保護，讓它們專心驗班距；碰撞保護另有專屬測試。
+          collisionProtectionSeconds: 0,
         },
       }),
       templateBody: body,

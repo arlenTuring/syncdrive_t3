@@ -9,11 +9,14 @@ import type { ShiftScheduleSelectedRoute } from '../types/create';
 import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import { resolveYardPostTaskPolicy } from './maintenancePostTaskPolicy';
 import {
-  resolveFleetPhysicalHeadwayFloorSeconds,
   resolveInterTripGapSeconds,
   resolvePassengerRouteOccupancy,
   shouldIncludeRecoveryForRouteSwitch,
 } from './schedule-engine/physics';
+import {
+  projectBlockBerthWindowsSeconds,
+  projectProtectedBerthWindowsSeconds,
+} from './stationBerthConstraint';
 import type {
   FeasibilityIssue,
   GeneratedScheduleBlock,
@@ -22,21 +25,21 @@ import type {
 import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/types';
 
 /**
- * 進場載客交路（載客調度）：
+ * 整備後的調度營運班次（文件 §10）。
  *
- * 以「這台車真正的首班正線」為錨點往回推。保養結束後，車輛不見得停在首班起點站，
- * 因此在保養尾端長出一串「真實路線」的載客短交路，時間對齊成剛好在首班發車前抵達，
- * 佔用（偷）保養尾巴。串越長偷得越多，但不得早於保養開始；偷不過就砍掉最早那幾段。
+ * 車子做完保養或行前，人車還在場內，離要跑的正線起點站有一段距離。
+ * 這段「開過去上工」的路上會經過站點，所以順便載客，不要空車跑。
  *
- * 特性：
- * - 用真實路線的行駛＋停靠時間（可算出最大要多久）。
- * - 計入運能（PPHPD），但不算輪替（真正首班仍是那班正線）。
- * - 代號＝整備代號＋路線代號＋開始時刻；色卡另一色。
- * - 安全插入：已知同路線上一班／下一班，保養尾巴只塞不會追撞的發車；
- *   由最長可達交路往短試，落地第一條「時間夠且安全」的串。
- * - 即使首班起點本身也是出場站，仍以其他出場站的最壞距離往回長交路
- *  （車實際可能停在較遠設施）。
- * - 僅保養（servicing）可被偷尾巴；出場站優先依 maintenance+carWash 設施過濾。
+ * 規則（2026-08-07 更正）：
+ * - **不得佔用任何整備的尾巴**。整條串必須在整備串<strong>結束之後</strong>才發車。
+ *   （舊版會把班次塞進保養視窗內偷尾巴，已廢除。）
+ * - 適用保養（代號 M）與行前（代號 P）；充電、機動不適用——那兩種設施離起點站近。
+ * - **不受同方向班距約束**：它的任務是盡快上工，不是補班距缺口。
+ *   唯一要讓的是站位——抵達時該站位須已被 A 車淨空（見 resolveBerthClearMinute）。
+ * - 計入運能（PPHPD），但不算輪替圈數（真正首班仍是後面那班正線）。
+ * - 代號 = 整備區段代號 + 路線代號 + 發車時刻。
+ * - 候選串由長到短試（車可能停在較遠設施），取第一條可行者；
+ *   都不可行就略過，回報 MAINTENANCE_DISPATCH_UNREACHABLE（警告）。
  */
 
 type RouteHop = {
@@ -48,6 +51,8 @@ type PlacedHop = {
   hop: RouteHop;
   startMinute: number;
   endMinute: number;
+  /** 這一段抵達站位時查到的站位淨空診斷；沒有別的車佔著就是 null（見文件 §10.3） */
+  berthCheck: { arriveStationId: string; berthClearMinute: number } | null;
 };
 
 function routeStartStation(route: ShiftScheduleSelectedRoute): string | null {
@@ -136,37 +141,9 @@ function collectRouteDepartureSeconds(
   return byRoute;
 }
 
-/**
- * 安全插入判定：已知同路線上一班／下一班，新發車與兩側間隔皆不得低於
- * 車隊物理班距下限（否則會追撞或被追）。
- */
-function isSafeToInsertDeparture(args: {
-  route: ShiftScheduleSelectedRoute;
-  departureSecond: number;
-  existing: number[] | undefined;
-  timelineCount: number;
-}): boolean {
-  const { route, departureSecond, existing, timelineCount } = args;
-  if (!existing || existing.length === 0) return true;
-
-  const floor = resolveFleetPhysicalHeadwayFloorSeconds(route, timelineCount);
-  if (floor <= 0) return true;
-
-  let previous: number | null = null;
-  let next: number | null = null;
-  for (const other of existing) {
-    if (other <= departureSecond) {
-      previous = other;
-      continue;
-    }
-    next = other;
-    break;
-  }
-
-  if (previous != null && departureSecond - previous < floor - 1e-6) return false;
-  if (next != null && next - departureSecond < floor - 1e-6) return false;
-  return true;
-}
+// 註：舊版這裡有 isSafeToInsertDeparture()，用「車隊物理班距下限」擋調度班次插入。
+// 已移除——調度營運班次不受同方向班距約束（文件 §10.2），
+// 它唯一要讓的是站位，改由 resolveBerthClearMinute() 處理。
 
 /** 對齊首班往前排一串 hop；回傳各段起迄分鐘。 */
 function placeChainAgainstFirstTrip(args: {
@@ -202,7 +179,7 @@ function placeChainAgainstFirstTrip(args: {
     });
     const endMinute = afterStartMinute - secondToMinute(gapSeconds);
     const startMinute = endMinute - secondToMinute(hop.durationSeconds);
-    placed.unshift({ hop, startMinute, endMinute });
+    placed.unshift({ hop, startMinute, endMinute, berthCheck: null });
     afterStartMinute = startMinute;
     afterRouteId = hop.route.routeId;
     afterRoute = hop.route;
@@ -210,25 +187,109 @@ function placeChainAgainstFirstTrip(args: {
   return placed;
 }
 
+/** 站位淨空的安全餘裕：20%（文件 §10.3） */
+const BERTH_CLEARANCE_SAFETY_RATIO = 1.2;
+
 /**
- * 挑選可安全插入的進場載客串：
- * 1. 候選由長到短（最壞出場距離優先）
- * 2. 砍掉早於保養開始的出場側段落
- * 3. 每一段相對同路線上一班／下一班都須安全
- * 4. 取第一條通過者（即最長可安全落地）
+ * 目標站位什麼時候空出來（文件 §10.3）。
+ *
+ * A 車 = 原本停在該站、或即將到站的那一班。它到站之後還要佔用站位一段時間：
+ * 停靠秒數 + 停靠緩衝（兩者已含在站位佔用窗內）+ 換線緩衝 + 恢復時間，
+ * 全部乘上安全餘裕，才算真正淨空。
+ *
+ * 這些數字全部屬於 A 車，與 P 車（整備後開過來的調度班次）無關；
+ * P 車只貢獻行駛時間，由呼叫端扣除。
+ *
+ * 站位佔用窗一律走 {@link projectProtectedBerthWindowsSeconds}——
+ * 它已經把「A 車滯留在末站等下一個任務」與「碰撞保護時間 ×2」兩件事算進尾端，
+ * 這裡不再自己算一遍，全引擎只有那一份定義。
+ */
+function resolveBerthClearMinute(args: {
+  stationId: string;
+  /** 2026-08-07 更正：之前只傳「這一列」的區塊，看不到其他車輛，抓不出跨車碰撞。
+   *  必須查全部時間線——目標站位可能被任何一台車佔著，不是只有同一列。 */
+  timelines: GeneratedScheduleTimeline[];
+  routeById: Map<string, ShiftScheduleSelectedRoute>;
+  minimumRecoveryTimeSeconds: number;
+  collisionProtectionSeconds: number;
+  /**
+   * 這個調度班次要掛在哪一列。同一列＝同一台車，它自己前後的班次不可能跟它撞，
+   * 要跳過；不跳過的話車子會被自己的前一趟擋住，白白延後。
+   */
+  selfTimelineRow: number;
+  /** 只看這個時刻之後仍在佔用的車；更早已離站的不算 */
+  notBeforeMinute: number;
+}): number | null {
+  const protection = {
+    collisionProtectionSeconds: args.collisionProtectionSeconds,
+    timelines: args.timelines,
+  };
+  let clearMinute: number | null = null;
+  for (const timeline of args.timelines) {
+    if (timeline.row === args.selfTimelineRow) continue;
+    for (const block of timeline.blocks) {
+      if (block.taskType !== 'passenger') continue;
+      const route = block.routeId ? args.routeById.get(block.routeId) : undefined;
+      if (!route) continue;
+      // 兩份窗一一對應（受保護的那份是自然窗逐筆加工出來的）：
+      // 自然窗＝A 車真正的到離站時刻，20% 安全餘裕只能乘在這上面；
+      // 受保護窗的尾端＝滯留＋碰撞保護，是另一條獨立下限。
+      const naturalWindows = projectBlockBerthWindowsSeconds(block, route);
+      const protectedWindows = projectProtectedBerthWindowsSeconds(
+        block,
+        route,
+        protection,
+      );
+      for (let wi = 0; wi < naturalWindows.length; wi += 1) {
+        const win = naturalWindows[wi]!;
+        const protectedWin = protectedWindows[wi] ?? win;
+        if (win.stationId !== args.stationId) continue;
+        const endMinute = secondToMinute(protectedWin.endSecond);
+        if (endMinute <= args.notBeforeMinute - 1e-9) continue;
+
+        // 物理下限：A 車離站後還要換線、恢復才輪到下一台進站
+        const extraSeconds =
+          Math.max(0, route.switchBufferAfterSeconds ?? 0)
+          + Math.max(0, args.minimumRecoveryTimeSeconds);
+        const occupancySeconds = Math.max(0, win.endSecond - win.startSecond);
+        const physicsEstimateSecond =
+          win.startSecond
+          + (occupancySeconds + extraSeconds) * BERTH_CLEARANCE_SAFETY_RATIO;
+
+        const clearSecond = Math.max(physicsEstimateSecond, protectedWin.endSecond);
+        const candidate = secondToMinute(clearSecond);
+        clearMinute = clearMinute == null ? candidate : Math.max(clearMinute, candidate);
+      }
+    }
+  }
+  return clearMinute;
+}
+
+/**
+ * 挑選調度營運班次的落點（文件 §10.3）。
+ *
+ * 規則：
+ * 1. 整條串必須在整備<strong>結束之後</strong>才發車——不得佔用任何整備尾巴。
+ * 2. 抵達目標站時，該站位必須已經淨空（A 車走了）。P 車在路上的時間可以抵掉一部分等待。
+ * 3. 尾端仍須接得上該車真正的首班正線。
+ * 4. <strong>不檢查同方向班距</strong>——調度班次的任務是盡快上工，不受班距約束。
+ * 5. 候選由長到短試，取第一條可行者。
  */
 function pickSafeEntryPlacement(args: {
   candidates: RouteHop[][];
   firstTripStartMinute: number;
   firstTripRouteId: string;
-  yardStartMinute: number;
-  /** 僅偷保養尾巴：進場載客發車須落在保養視窗內 */
+  /** 整備串結束時刻：調度班次不得早於此發車 */
   yardEndMinute: number;
   exitStationIds: Set<string>;
   minimumRecoveryTimeSeconds: number;
+  collisionProtectionSeconds: number;
   rotationRoutes: ShiftScheduleSelectedRoute[];
-  departureSecondsByRoute: Map<string, number[]>;
-  timelineCount: number;
+  /** 全部時間線——站位淨空判定要看<strong>其他</strong>車輛，不是只有這台車自己那一列 */
+  timelines: GeneratedScheduleTimeline[];
+  /** 這個調度班次要掛在哪一列；同一列是同一台車，不參與碰撞判定 */
+  selfTimelineRow: number;
+  routeById: Map<string, ShiftScheduleSelectedRoute>;
 }): PlacedHop[] | null {
   for (const chain of args.candidates) {
     const placed = placeChainAgainstFirstTrip({
@@ -238,55 +299,105 @@ function pickSafeEntryPlacement(args: {
       minimumRecoveryTimeSeconds: args.minimumRecoveryTimeSeconds,
       rotationRoutes: args.rotationRoutes,
     });
-    // 發車落在保養視窗內（偷尾巴）；可跑出保養結束之後接到首班
-    const fitting = placed.filter(
-      (item) =>
-        item.startMinute >= args.yardStartMinute - 1e-9
-        && item.startMinute < args.yardEndMinute - 1e-9,
-    );
-    if (fitting.length === 0) continue;
+    if (placed.length === 0) continue;
 
-    // 尾端須仍接到首班
-    const lastFitting = fitting[fitting.length - 1]!;
-    const lastPlaced = placed[placed.length - 1]!;
-    if (lastFitting.hop.route.routeId !== lastPlaced.hop.route.routeId) continue;
-    if (Math.abs(lastFitting.endMinute - lastPlaced.endMinute) > 1e-9) continue;
+    // 規則 1：整條串都必須落在整備結束之後
+    if (placed[0]!.startMinute < args.yardEndMinute - 1e-9) continue;
 
-    // 砍出場側後，剩餘第一段起點仍須是可出場站（不可憑空出現在中間站）
-    const firstStart = routeStartStation(fitting[0]!.hop.route);
+    // 第一段起點必須是合法出場站（車只能從設施出場站冒出來）
+    const firstStart = routeStartStation(placed[0]!.hop.route);
     if (!firstStart || !args.exitStationIds.has(firstStart)) continue;
 
-    const allSafe = fitting.every((item) =>
-      isSafeToInsertDeparture({
-        route: item.hop.route,
-        departureSecond: minuteToSecond(item.startMinute),
-        existing: args.departureSecondsByRoute.get(item.hop.route.routeId),
-        timelineCount: args.timelineCount,
-      }),
-    );
-    if (!allSafe) continue;
+    // 規則 2：每一段抵達下一站時，站位須已淨空。順便把查到的淨空時刻記在
+    // item.berthCheck 上——這是唯一算過這件事的地方，UI hover 直接讀，不重算。
+    let berthOk = true;
+    for (const item of placed) {
+      const arriveStation = routeEndStation(item.hop.route);
+      if (!arriveStation) continue;
+      const clearMinute = resolveBerthClearMinute({
+        stationId: arriveStation,
+        timelines: args.timelines,
+        routeById: args.routeById,
+        minimumRecoveryTimeSeconds: args.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: args.collisionProtectionSeconds,
+        selfTimelineRow: args.selfTimelineRow,
+        notBeforeMinute: args.yardEndMinute,
+      });
+      if (clearMinute == null) continue;
+      item.berthCheck = { arriveStationId: arriveStation, berthClearMinute: clearMinute };
+      if (item.endMinute < clearMinute - 1e-9) {
+        berthOk = false;
+        break;
+      }
+    }
+    if (!berthOk) continue;
 
-    return fitting;
+    return placed;
   }
   return null;
 }
 
-/** 保養與首班正線之間不得夾其他整備（行前／充電等），否則不算「保養後直接上場」 */
-function findImmediatePassengerAfterYard(
+/** 整備類型：可被「保養後進場」略過、串到保養後的尾巴 */
+function isYardTemplateBar(block: GeneratedScheduleBlock): boolean {
+  if (block.source !== 'template_bar') return false;
+  return (
+    block.taskType === 'servicing'
+    || block.taskType === 'inspection'
+    || block.taskType === 'charging'
+    || block.taskType === 'standby'
+  );
+}
+
+/**
+ * 從某整備起點往後找：連續整備串結束後的首班正線。
+ * 回傳 passenger 與可偷尾巴的「串尾結束時間」（最後一段整備的 plannedEnd）。
+ */
+function findPassengerAfterContiguousYard(
   sorted: GeneratedScheduleBlock[],
   yardIndex: number,
-): GeneratedScheduleBlock | null {
+): {
+  passenger: GeneratedScheduleBlock;
+  chainEndMinute: number;
+  chainStartMinute: number;
+} | null {
+  const yard = sorted[yardIndex]!;
+  let chainEndMinute = yard.plannedEndMinute;
+  let chainStartMinute = yard.plannedStartMinute;
   for (let j = yardIndex + 1; j < sorted.length; j += 1) {
     const block = sorted[j]!;
     if (block.source === 'entry_service' || block.source === 'transition') continue;
     if (block.taskType === 'idle') continue;
     if (block.taskType === 'passenger' && block.source === 'template_bar') {
-      return block;
+      return {
+        passenger: block,
+        chainEndMinute,
+        chainStartMinute,
+      };
     }
-    // 夾了其他整備任務 → 此保養不直接接正線
-    if (block.source === 'template_bar') return null;
+    if (isYardTemplateBar(block)) {
+      chainEndMinute = Math.max(chainEndMinute, block.plannedEndMinute);
+      chainStartMinute = Math.min(chainStartMinute, block.plannedStartMinute);
+      continue;
+    }
+    return null;
   }
   return null;
+}
+
+/** 整備緊鄰前一格已是正線 → 正線中段，不准再插進場載客 */
+function isYardPrecededByMainline(
+  sorted: GeneratedScheduleBlock[],
+  yardIndex: number,
+): boolean {
+  for (let j = yardIndex - 1; j >= 0; j -= 1) {
+    const block = sorted[j]!;
+    if (block.source === 'transition' || block.taskType === 'idle') continue;
+    return (
+      block.taskType === 'passenger'
+      && (block.source === 'template_bar' || block.source === 'entry_service')
+    );
+  }
+  return false;
 }
 
 export function insertMaintenanceEntryServiceTrips(args: {
@@ -296,6 +407,8 @@ export function insertMaintenanceEntryServiceTrips(args: {
   maintenanceBody?: Record<string, unknown> | null;
   sectionCodes: MaintenanceSectionCodeBySection | null | undefined;
   minimumRecoveryTimeSeconds: number;
+  /** 碰撞保護時間（秒）；預設 0＝維持舊行為 */
+  collisionProtectionSeconds?: number;
   warnings: FeasibilityIssue[];
 }): GeneratedScheduleTimeline[] {
   const {
@@ -305,25 +418,21 @@ export function insertMaintenanceEntryServiceTrips(args: {
     maintenanceBody = null,
     sectionCodes,
     minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds = 0,
     warnings,
   } = args;
   if (firstTripOrigins.length === 0 || selectedRoutes.length === 0) return timelines;
 
-  const servicingPolicy = resolveYardPostTaskPolicy({
-    taskType: 'servicing',
-    origins: firstTripOrigins,
-    maintenanceBody,
-  });
-  if (!servicingPolicy.allowEntryService) return timelines;
-
-  const exitStationIds = new Set(
-    servicingPolicy.entryServiceExitStationIds.length > 0
-      ? servicingPolicy.entryServiceExitStationIds
-      : firstTripOrigins.map((origin) => origin.stationId),
+  // 保養（M）與行前（P）都會產生調度營運班次；只要其中一種可用就往下跑。
+  const dispatchCapableTaskTypes = ['servicing', 'inspection'] as const;
+  const anyDispatchAllowed = dispatchCapableTaskTypes.some(
+    (taskType) =>
+      resolveYardPostTaskPolicy({ taskType, origins: firstTripOrigins, maintenanceBody })
+        .allowEntryService,
   );
+  if (!anyDispatchAllowed) return timelines;
+
   const routeById = new Map(selectedRoutes.map((route) => [route.routeId, route] as const));
-  const sectionCode = resolveMaintenanceSectionCodeForTaskType('servicing', sectionCodes);
-  const timelineCount = Math.max(1, timelines.length);
 
   // 安全插入基準：含已落地的進場載客，動態更新上一班／下一班
   const departureSecondsByRoute = collectRouteDepartureSeconds(timelines);
@@ -348,19 +457,68 @@ export function insertMaintenanceEntryServiceTrips(args: {
         continue;
       }
 
-      const nextPassenger = findImmediatePassengerAfterYard(sorted, i);
-      if (!nextPassenger?.routeId) continue;
+      // 出場站與代號都依「這一段整備是哪一種」決定：保養→M、行前→P。
+      const exitStationIds = new Set(
+        yardPolicy.entryServiceExitStationIds.length > 0
+          ? yardPolicy.entryServiceExitStationIds
+          : firstTripOrigins.map((origin) => origin.stationId),
+      );
+      const sectionCode = resolveMaintenanceSectionCodeForTaskType(
+        yard.taskType,
+        sectionCodes,
+      );
+
+      const afterYard = findPassengerAfterContiguousYard(sorted, i);
+      if (!afterYard?.passenger.routeId) continue;
+      const nextPassenger = afterYard.passenger;
+
+      // 整備被 defer／擠在正線中段：前一格已是正線，不准再插進場載客
+      if (isYardPrecededByMainline(sorted, i)) continue;
+
+      // 連續整備串只在串首嘗試一次，避免保養／行前各發一則略過
+      if (i > 0) {
+        let predIsYard = false;
+        for (let j = i - 1; j >= 0; j -= 1) {
+          const prev = sorted[j]!;
+          if (prev.source === 'transition' || prev.taskType === 'idle') continue;
+          predIsYard = isYardTemplateBar(prev);
+          break;
+        }
+        if (predIsYard) continue;
+      }
 
       const firstRoute = routeById.get(nextPassenger.routeId);
       const originStationId = firstRoute ? routeStartStation(firstRoute) : null;
       if (!originStationId) continue;
-      // 即使 origin 也是出場站，仍要試其他出場站 → origin 的最壞交路
+
+      // 檢查 nextPassenger 前是否有緊鄰的前一班正線
+      // 若前一班正線的終點站與 nextPassenger 起點站相同（列車已在正線上運營抵達起點），
+      // 則車已經在起點，不需要也不得插入進場載客
+      const prevBlockIndex = sorted.findIndex((b) => b.id === nextPassenger.id) - 1;
+      if (prevBlockIndex >= 0) {
+        const prevBlock = sorted[prevBlockIndex]!;
+        if (prevBlock.taskType === 'passenger' && prevBlock.routeId) {
+          const prevRoute = routeById.get(prevBlock.routeId);
+          const prevEndStation = prevRoute ? routeEndStation(prevRoute) : null;
+          if (prevEndStation && prevEndStation === originStationId) {
+            // 車輛已由前一班正線載客抵達本班起點站，跳過進場載客
+            continue;
+          }
+        }
+      }
 
       const candidates = listEntryChainCandidates({
         originStationId,
         exitStationIds,
         selectedRoutes,
       });
+
+      // 若出場站集合中只有首班起點站本身（設施出場 == 路線首站），車已在起點，
+      // 不需要進場載客；直接跳過。
+      if (candidates.length === 0 && exitStationIds.has(originStationId)) {
+        continue;
+      }
+
       if (candidates.length === 0) {
         pushIssue(warnings, {
           code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
@@ -378,17 +536,19 @@ export function insertMaintenanceEntryServiceTrips(args: {
         continue;
       }
 
+      // 整備串（保養→行前…）結束之後才發車；不得佔用任何整備尾巴
       const fitting = pickSafeEntryPlacement({
         candidates,
         firstTripStartMinute: nextPassenger.plannedStartMinute,
         firstTripRouteId: nextPassenger.routeId,
-        yardStartMinute: yard.plannedStartMinute,
-        yardEndMinute: yard.plannedEndMinute,
+        yardEndMinute: afterYard.chainEndMinute,
         exitStationIds,
         minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds,
         rotationRoutes: selectedRoutes,
-        departureSecondsByRoute,
-        timelineCount,
+        timelines,
+        selfTimelineRow: timeline.row,
+        routeById,
       });
 
       if (!fitting) {
@@ -410,6 +570,19 @@ export function insertMaintenanceEntryServiceTrips(args: {
       }
 
       for (const item of fitting) {
+        // 檢查該時間線上是否已經存在同時間段運行的既有正線班次 (template_bar)
+        // 若已有既有正線班次，絕不得插入進場載客覆蓋原有的正線班次
+        const overlapsExistingPassenger = sorted.some(
+          (b) =>
+            b.taskType === 'passenger'
+            && b.source === 'template_bar'
+            && b.plannedStartMinute < item.endMinute - 1e-9
+            && b.plannedEndMinute > item.startMinute + 1e-9,
+        );
+        if (overlapsExistingPassenger) {
+          continue;
+        }
+
         const block: GeneratedScheduleBlock = {
           id: `entry-${yard.id}-${item.hop.route.routeId}-${Math.round(item.startMinute * 60)}`,
           timelineRow: timeline.row,
@@ -426,6 +599,15 @@ export function insertMaintenanceEntryServiceTrips(args: {
           source: 'entry_service',
           firstTripOriginStationId: originStationId,
           entryServiceSectionCode: sectionCode ?? undefined,
+          entryServiceBerthCheck: item.berthCheck
+            ? {
+                arriveStationId: item.berthCheck.arriveStationId,
+                berthClearMinute: item.berthCheck.berthClearMinute,
+                slackSeconds: Math.round(
+                  (item.endMinute - item.berthCheck.berthClearMinute) * 60,
+                ),
+              }
+            : undefined,
         };
         extras.push(block);
         const list = departureSecondsByRoute.get(item.hop.route.routeId) ?? [];

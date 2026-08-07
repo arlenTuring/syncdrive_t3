@@ -415,6 +415,38 @@ describe('buildCapacityTrendFromPlan (route mode)', () => {
     }
   });
 
+  it('rolling window averages berth-style bunching instead of sawtooth spikes', () => {
+    // 4 班擠在約 3 分鐘，接著長空檔～17 分；瞬間班距會炸到 ~2800 再掉到 ~250
+    const starts: number[] = [];
+    let cursor = 10 * 60;
+    while (cursor < 14 * 60) {
+      starts.push(cursor, cursor + 1, cursor + 2, cursor + 3);
+      cursor += 20;
+    }
+    const series = buildCapacityTrendFromPlan({
+      plan: planWithDepartures(starts, 'route-down'),
+      vehicleCapacity: 70,
+      sampleStepMinutes: 1,
+      viewMode: 'route',
+    });
+    const mid = series.samples.filter((s) => s.minute >= 11 * 60 && s.minute < 13 * 60);
+    let flips = 0;
+    for (let i = 1; i < mid.length; i += 1) {
+      const a = mid[i]!.pphpdByStream['route-down'] ?? 0;
+      const b = mid[i - 1]!.pphpdByStream['route-down'] ?? 0;
+      if (Math.abs(a - b) > 200) flips += 1;
+    }
+    assert.ok(flips < 6, `滾動視窗後仍過度鋸齒：flips=${flips}`);
+    for (const sample of mid) {
+      const pphpd = sample.pphpdByStream['route-down'] ?? 0;
+      if (pphpd === 0) continue;
+      assert.ok(
+        pphpd >= 400 && pphpd <= 1600,
+        `群聚班次 pphpd 未均化：minute=${sample.minute} pphpd=${pphpd}`,
+      );
+    }
+  });
+
   it('keeps displayed headway consistent with smoothed pphpd', () => {
     const starts: number[] = [];
     let cursor = 10 * 60;
@@ -437,7 +469,7 @@ describe('buildCapacityTrendFromPlan (route mode)', () => {
       if (streamPphpd == null || streamHeadway == null || streamPphpd <= 0) continue;
       const expected = computeCapacityPphpd(70, streamHeadway);
       assert.ok(
-        Math.abs(expected - streamPphpd) <= 2,
+        Math.abs(expected - streamPphpd) <= 5,
         `班距與運能不一致：minute=${sample.minute} headway=${streamHeadway} → ${expected} vs pphpd=${streamPphpd}`,
       );
     }

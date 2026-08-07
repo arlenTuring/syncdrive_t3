@@ -136,7 +136,7 @@ function buildTemplateBarBlock(
     routeId: resolved.route?.routeId,
     routeName: resolved.route?.routeName,
     routeCode: resolved.route?.routeCode ?? undefined,
-    anchorStartMinute: resolved.task.startMinute,
+    anchorStartMinute: resolved.task.templateStartMinute ?? resolved.task.startMinute,
     plannedStartMinute: secondToMinute(startSecond),
     plannedEndMinute: secondToMinute(endSecond),
     travelSeconds: resolved.travelSeconds,
@@ -300,6 +300,7 @@ export function expandRowBlocks(
 
     // 非正線任務（充電、保養、機動）：正線佔用開頭時延後開始、鎖住原結束時間並壓縮時長。
     // 只縮短被佔用的這段整備，不因此平移後續其他整備視窗。
+    // 正線：不得早於同列 cursor（前一段整備／正線結束），避免偷行前／整備尾巴。
     let startSecond = plannedStartSecond;
     if (task.taskType !== 'passenger') {
       const originalEndSecond = plannedStartSecond + resolved.occupancySeconds;
@@ -308,6 +309,8 @@ export function expandRowBlocks(
       if (startSecond > plannedStartSecond) {
         resolved.occupancySeconds = Math.max(0, originalEndSecond - startSecond);
       }
+    } else if (cursorSecond > plannedStartSecond + 1e-9) {
+      startSecond = snapUpToClockAlignSeconds(cursorSecond);
     }
 
     if (!isClockAlignedSeconds(startSecond)) {

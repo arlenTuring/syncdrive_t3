@@ -21,7 +21,7 @@ export type ServiceDirection = 'up' | 'down';
 
 /**
  * 運能趨勢聚合方式：
- * - serviceDirection：同服務方向的班次併成一流，以相鄰班距換 pphpd（分桶均化）
+ * - serviceDirection：同服務方向的班次併成一流，以滾動視窗平均班距換 pphpd
  * - route：每條路線各自一條流（診斷用）
  */
 export type CapacityTrendViewMode = 'serviceDirection' | 'route';
@@ -111,12 +111,18 @@ export const MIN_CAPACITY_HEADWAY_SECONDS = 60;
 
 /**
  * 趨勢線分桶（分鐘）。
- * 尖峰軟延後班距常在目標上下交替；分桶取平均後再做鄰近平滑。
+ * 滾動視窗運能後再分桶取樣，避免點數過多。
  */
 export const CAPACITY_TREND_BUCKET_MINUTES = 10;
 
 /** 分桶後對 pphpd 做鄰近移動平均的半寬（點數）；1 → 三點平滑 */
 export const CAPACITY_TREND_SMOOTH_HALF_WIDTH = 1;
+
+/**
+ * 運能計算視窗（分鐘）＝真正的「每小時」含義。
+ * 用過去 window 分鐘內的同向班次數 × 載客量，避免站位微延後造成的密→疏瞬间班距把曲線畫成鋸齒。
+ */
+export const CAPACITY_ROLLING_WINDOW_MINUTES = 60;
 
 function countPassengerTemplateBars(
   plan: GeneratedSchedulePlan | null | undefined,
@@ -494,6 +500,39 @@ function findSegmentAt(
   return null;
 }
 
+/**
+ * 過去 windowSeconds 內「落在視窗中的相鄰班距」做平均，再換 pphpd。
+ * 比「只用當下那一格瞬間班距」更能代表小時運能：密疏交錯會被平均掉。
+ */
+export function resolveRollingWindowCapacity(args: {
+  leadSeconds: number[];
+  sampleSecond: number;
+  vehicleCapacity: number;
+  windowSeconds: number;
+}): { pphpd: number; headwaySeconds: number } | null {
+  const { leadSeconds, sampleSecond, vehicleCapacity, windowSeconds } = args;
+  if (windowSeconds <= 0 || vehicleCapacity <= 0 || leadSeconds.length < 2) return null;
+  const windowStart = sampleSecond - windowSeconds;
+  let gapSum = 0;
+  let gapCount = 0;
+  for (let i = 0; i < leadSeconds.length - 1; i += 1) {
+    const start = leadSeconds[i]!;
+    const end = leadSeconds[i + 1]!;
+    const gap = end - start;
+    if (gap < MIN_CAPACITY_HEADWAY_SECONDS) continue;
+    // 班距時段與取樣視窗 [windowStart, sampleSecond] 有交集才計入
+    if (end <= windowStart || start > sampleSecond) continue;
+    gapSum += gap;
+    gapCount += 1;
+  }
+  if (gapCount <= 0) return null;
+  const meanHeadway = gapSum / gapCount;
+  return {
+    pphpd: computeCapacityPphpd(vehicleCapacity, meanHeadway),
+    headwaySeconds: Math.round(meanHeadway),
+  };
+}
+
 function countActiveVehiclesAt(
   plan: GeneratedSchedulePlan | null | undefined,
   minute: number,
@@ -680,13 +719,14 @@ export function smoothCapacityTrendSamples(
 /**
  * 依第五步最終班表計算運能趨勢。
  *
- * pphpd 定義：vehicleCapacity × (3600 / headwaySeconds)
+ * pphpd 定義：vehicleCapacity × (3600 / 平均班距)
+ * 平均班距取「過去 CAPACITY_ROLLING_WINDOW_MINUTES 分鐘」同向班次數推得
+ * （= 視窗內班次數換算的每小時運能），再經分桶＋鄰近平滑顯示。
  *
  * 方向流：
  * - serviceDirection（預設）：同服務方向標籤＝同向**班次**；
- *   同一時間線上連續同向路段只算一趟，再以相鄰班次班距換 pphpd
- *   （10 分桶＋鄰近平滑做均化顯示）。未設標籤的路線各自獨立。
- * - route：每條 routeId 各自用瞬間相鄰班距（診斷用）。
+ *   同一時間線上連續同向路段只算一趟。未設標籤的路線各自獨立。
+ * - route：每條 routeId 各自計算（診斷用）。
  *
  * 發車時刻取 plannedStartMinute（與班表卡片一致）。
  */
@@ -730,20 +770,21 @@ export function buildCapacityTrendFromPlan(args: {
   );
 
   const departuresByStream = new Map<string, DepartureEvent[]>();
+  const leadSecondsByStream = new Map<string, number[]>();
   for (const streamKey of streamKeys) {
     const list = [...(collected.byStream.get(streamKey) ?? [])];
     list.sort((a, b) => a.startSecond - b.startSecond);
     departuresByStream.set(streamKey, list);
+    // 服務方向班次已去重連續路段，不再做偽影連發過濾；route 仍過濾
+    leadSecondsByStream.set(
+      streamKey,
+      uniqueDepartureLeadSeconds(list, viewMode === 'route'),
+    );
   }
 
-  const segmentsByStream = new Map<string, HeadwaySegment[]>();
   let departureCount = 0;
   for (const streamKey of streamKeys) {
-    const departures = departuresByStream.get(streamKey) ?? [];
-    departureCount += departures.length;
-    // 服務方向班次已去重連續路段，不再做偽影連發過濾；route 仍過濾
-    const leadSeconds = uniqueDepartureLeadSeconds(departures, viewMode === 'route');
-    segmentsByStream.set(streamKey, buildHeadwaySegmentsFromLeadSeconds(leadSeconds));
+    departureCount += (departuresByStream.get(streamKey) ?? []).length;
   }
 
   const streams: CapacityRouteStream[] = streamKeys.map((streamKey, index) => {
@@ -764,17 +805,23 @@ export function buildCapacityTrendFromPlan(args: {
     };
   });
 
+  const windowSeconds = CAPACITY_ROLLING_WINDOW_MINUTES * 60;
+
   const resolveAt = (minute: number): CapacityTrendSample => {
     const sampleSecond = minuteToSecond(minute);
     const pphpdByStream: Record<string, number> = {};
     const headwayByStream: Record<string, number> = {};
 
     for (const streamKey of streamKeys) {
-      const segment = findSegmentAt(segmentsByStream.get(streamKey) ?? [], sampleSecond);
-      if (!segment) continue;
-      const pphpd = computeCapacityPphpd(vehicleCapacity, segment.headwaySeconds);
-      pphpdByStream[streamKey] = pphpd;
-      headwayByStream[streamKey] = segment.headwaySeconds;
+      const rolling = resolveRollingWindowCapacity({
+        leadSeconds: leadSecondsByStream.get(streamKey) ?? [],
+        sampleSecond,
+        vehicleCapacity,
+        windowSeconds,
+      });
+      if (!rolling) continue;
+      pphpdByStream[streamKey] = rolling.pphpd;
+      headwayByStream[streamKey] = rolling.headwaySeconds;
     }
 
     const activeStreamCount = Object.keys(pphpdByStream).length;

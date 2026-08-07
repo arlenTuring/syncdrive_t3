@@ -206,6 +206,15 @@ export function resolveGeneratedBlockTripCode(
   }
 
   if (block.taskType === 'passenger') {
+    // 調度班次：整備出場站 ≠ 首班首站時，代號前加整備代號前綴（如 ATN1706）
+    if (block.yardDispatchPrefix) {
+      return buildScheduleBlockTripCode({
+        prefixCode: block.yardDispatchPrefix,
+        timelineRow: block.timelineRow,
+        startMinute: block.plannedStartMinute,
+        includeColumnCode: false,
+      });
+    }
     return buildScheduleBlockTripCode({
       prefixCode: block.routeCode,
       timelineRow: block.timelineRow,

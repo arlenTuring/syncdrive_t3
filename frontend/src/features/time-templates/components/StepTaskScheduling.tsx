@@ -630,6 +630,7 @@ function TaskBar({
   onMove: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const barRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   const colors = TASK_TYPE_COLORS[task.taskType];
   const widthPx = (task.durationMinutes / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
@@ -640,6 +641,58 @@ function TaskBar({
     () => getInactiveRangesWithinBar(task.startMinute, endMinute, activeIntervalRanges),
     [task.startMinute, endMinute, activeIntervalRanges],
   );
+
+  /**
+   * 標籤預設置中；僅左緣快被遮住時用 transform 貼齊可視左緣。
+   * 直接改 DOM style（rAF 節流），避免捲動時整列 React re-render 造成抖動。
+   */
+  useEffect(() => {
+    const bar = barRef.current;
+    const label = labelRef.current;
+    if (!bar || !label) return;
+    const grid = bar.closest('[data-schedule-grid-scroll]');
+    if (!(grid instanceof HTMLElement)) return;
+
+    let raf = 0;
+    let lastShift = Number.NaN;
+    const edgePad = 6;
+    const apply = () => {
+      raf = 0;
+      const scrollLeft = grid.scrollLeft;
+      const visibleLeft = Math.max(0, scrollLeft - leftPx);
+      const labelWidth = Math.max(1, label.offsetWidth);
+      const idealLeft = widthPx / 2 - labelWidth / 2;
+      const targetLeft = Math.max(idealLeft, visibleLeft + edgePad);
+      const maxLeft = Math.max(edgePad, widthPx - labelWidth - edgePad);
+      const clampedLeft = Math.min(targetLeft, maxLeft);
+      const shift = clampedLeft - idealLeft;
+      if (Number.isFinite(lastShift) && Math.abs(shift - lastShift) < 0.5) return;
+      lastShift = shift;
+      label.style.transform = shift <= 0.5 ? 'none' : `translate3d(${shift}px, 0, 0)`;
+    };
+
+    const onScrollOrResize = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(apply);
+    };
+
+    apply();
+    grid.addEventListener('scroll', onScrollOrResize, { passive: true });
+    const observer = new ResizeObserver(onScrollOrResize);
+    observer.observe(grid);
+    observer.observe(label);
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      grid.removeEventListener('scroll', onScrollOrResize);
+      observer.disconnect();
+    };
+  }, [
+    leftPx,
+    widthPx,
+    timeLabel,
+    task.label,
+    slotWidthPx,
+  ]);
 
   const resolveResizeEdge = useCallback(
     (clientX: number, target: EventTarget | null): ResizeEdge | null => {
@@ -686,7 +739,7 @@ function TaskBar({
   return (
     <div
       ref={barRef}
-      className="absolute top-[2px] isolate flex items-center overflow-hidden rounded-[4px] transition-shadow"
+      className="absolute top-[2px] isolate overflow-hidden rounded-[4px] transition-shadow"
       style={{
         left: leftPx,
         width: widthPx,
@@ -769,9 +822,11 @@ function TaskBar({
         className="pointer-events-none absolute inset-y-0 left-0 z-[2] w-1"
         style={{ backgroundColor: colors.bar }}
       />
+      {/* 預設置中；快被遮住時以 translate3d 絲滑貼齊可視左緣 */}
       <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center px-1.5">
         <span
-          className="max-w-full truncate text-center text-[10px] font-normal leading-[18px] tracking-[0.5px]"
+          ref={labelRef}
+          className="max-w-full truncate text-center text-[10px] font-normal leading-[18px] tracking-[0.5px] will-change-transform"
           style={{ color: colors.text }}
         >
           {task.label}
@@ -1299,7 +1354,11 @@ export function StepTaskScheduling({
         ) : null}
 
         {/* Grid */}
-        <div ref={gridRef} className="min-h-0 flex-1 overflow-auto">
+        <div
+          ref={gridRef}
+          data-schedule-grid-scroll
+          className="min-h-0 flex-1 overflow-auto"
+        >
           <div
             className="relative min-w-max"
             style={{ width: SCHEDULE_VISIBLE_SLOTS * slotWidthPx + ROW_LABEL_WIDTH }}
@@ -1349,6 +1408,17 @@ export function StepTaskScheduling({
                   >
                     24:00
                   </span>
+                  <ScheduleIntervalHeaderHits
+                    intervals={intervals}
+                    attributes={attributes}
+                    slotWidthPx={slotWidthPx}
+                    scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
+                    trackWidthPx={trackWidthPx}
+                    rowLabelWidth={0}
+                    selectedIntervalId={selectedIntervalId}
+                    onSelectIntervalId={toggleIntervalSelection}
+                    estimatedTripSeconds={estimatedTripSeconds}
+                  />
                 </div>
               </div>
 
@@ -1368,17 +1438,6 @@ export function StepTaskScheduling({
                 trackWidthPx={trackWidthPx}
                 rowLabelWidth={ROW_LABEL_WIDTH}
                 selectedIntervalId={selectedIntervalId}
-              />
-              <ScheduleIntervalHeaderHits
-                intervals={intervals}
-                attributes={attributes}
-                slotWidthPx={slotWidthPx}
-                scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
-                trackWidthPx={trackWidthPx}
-                rowLabelWidth={ROW_LABEL_WIDTH}
-                selectedIntervalId={selectedIntervalId}
-                onSelectIntervalId={toggleIntervalSelection}
-                estimatedTripSeconds={estimatedTripSeconds}
               />
             </div>
 

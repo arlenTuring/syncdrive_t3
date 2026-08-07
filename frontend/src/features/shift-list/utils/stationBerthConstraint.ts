@@ -1,12 +1,11 @@
 /**
  * 停靠點站位佔用約束（生成期）：
  * 1) 依發車時刻順序預約各站「到站～離站」
- * 2) 衝突時先延後整趟（10 秒格）
- * 3) 延後超過上限 → 改派該主線槽的備用路線（改停備援點）
+ * 2) 在關聯圖拓撲候選中選局部無衝突解（優先邊 → 次要邊 → 同起點）
+ * 3) 可延後／可等；選了哪條路線就定在那條終點，下一趟再由該節點出邊決定
  * 4) 仍解不了才留給 validate 的 STATION_BERTH_COLLISION
  */
 import {
-  isPrimarySelectedRoute,
   resolveSelectedRouteInstanceId,
   type ShiftScheduleSelectedRoute,
 } from '../types/create';
@@ -26,7 +25,7 @@ import {
   shouldIncludeRecoveryForRouteSwitch,
 } from './schedule-engine/physics';
 import {
-  resolveNextInstanceId,
+  listNextInstanceCandidates,
   type RouteSuccessorPolicy,
 } from './schedule-engine/routeSuccessorPolicy';
 import type {
@@ -35,15 +34,37 @@ import type {
   GeneratedSchedulePlan,
 } from './schedule-engine/types';
 import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/types';
+import { resolveSameRowIdleOccupiedUntilMinute } from './stationBerthOccupancy';
 
-/** 超過此延後秒數才考慮改派備用（可被同列下一錨點空間再夾緊） */
+/** 單一路線為清站位可接受的最大延後（秒）；可被同列整備開頭再夾緊 */
 export const DEFAULT_STATION_BERTH_MAX_DELAY_SECONDS = 120;
+
+/** 換線後可等待銜接時，不以「下一正線時刻」硬夾延後上限 */
+export const STATION_BERTH_WAIT_MAX_DELAY_SECONDS = 1800;
+
+/**
+ * 同類型站位約束 warning 每次 enforceStationBerthConstraints 的報告上限。
+ * 超出後累計計數，結束時補一則「另有 N 則未顯示」摘要，避免 warning fatigue。
+ */
+export const DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT = 50;
 
 export type BerthWindowSec = {
   stationId: string;
   stationName: string;
   startSecond: number;
+  /**
+   * 佔用尾端。走 {@link projectProtectedBerthWindowsSeconds} 時已含末站滯留與
+   * 碰撞保護時間；同一台車彼此比對時要改用 {@link naturalEndSecond}。
+   */
   endSecond: number;
+  /** 自然離站尾端（不含滯留與碰撞保護）。沒開保護時等於 endSecond。 */
+  naturalEndSecond?: number;
+  /**
+   * 這個窗屬於哪一列（哪一台車）。
+   * <strong>碰撞保護是不同車之間的事</strong>——同一台車前後兩趟在折返站交接
+   * （到站、停一下、再從同一站開出）不可能自己撞自己，不該被要求隔 2 × 保護時間。
+   */
+  timelineRow?: number;
 };
 
 export type StationBerthConstraintResult = {
@@ -100,10 +121,88 @@ export function projectBlockBerthWindowsSeconds(
       stationName: stop.stationName,
       startSecond,
       endSecond,
+      naturalEndSecond: endSecond,
+      timelineRow: block.timelineRow,
     });
   }
 
   return out;
+}
+
+/**
+ * 碰撞保護的計算材料。
+ *
+ * 全引擎只有這一份「兩台車在同一個站位要隔多久」的定義；
+ * 站位求解、班距補疏、班距修復、整備後調度班次、最終驗證全部走
+ * {@link projectProtectedBerthWindowsSeconds}，不各自維護一套判斷
+ * ——過去五處各算各的，其中一處漏掉跨列掃描，就漏放了真實碰撞。
+ */
+export type BerthProtectionContext = {
+  /**
+   * 碰撞保護時間（秒）。B 車到站不得早於 A 車實際離站 + 2 × 此值。
+   *
+   * <strong>0 ＝整組防碰撞判定關閉</strong>：不加保護時間，也不把末站滯留算進佔用，
+   * 完全退回 2026-08-07 之前「只要求到離站區間不重疊」的行為。
+   * 使用者把欄位填 0 就是這個意思——一個數字一個開關，不要有半開的狀態。
+   */
+  collisionProtectionSeconds: number;
+  /**
+   * 全部時間線。用來判斷 A 車跑完這一趟之後是不是還滯留在末站——
+   * 有滯留就以「真的開走的時刻」為準，不是「跑完這一趟的時刻」。
+   * 不給就只用班次自己的到離站時刻。
+   */
+  timelines?: GeneratedSchedulePlan['timelines'];
+};
+
+/**
+ * 受碰撞保護的站位佔用窗（秒）。
+ *
+ * 在 {@link projectBlockBerthWindowsSeconds} 的自然到離站區間上做兩件事：
+ * 1. <strong>末站滯留</strong>：這一趟結束後如果車還停在末站等下一個任務，
+ *    佔用延長到真正開走的時刻（{@link resolveSameRowIdleOccupiedUntilMinute}）。
+ * 2. <strong>碰撞保護</strong>：每個站位的佔用尾端再加 2 × 碰撞保護時間。
+ *
+ * 兩台車的窗只要不重疊，就同時滿足「不同時佔位」與「到站晚於前車離站 + 2×保護」。
+ * 因為兩邊都加了同樣的尾巴，這個判定是對稱的，誰先誰後都成立。
+ *
+ * 注意這是<strong>防碰撞下限</strong>：它只會把班次往外推，不會拿來當「可以擠到這麼近」
+ * 的目標。班距約束在各自的呼叫端照舊執行，最後取較嚴的一邊。
+ */
+export function projectProtectedBerthWindowsSeconds(
+  block: GeneratedScheduleBlock,
+  route: ShiftScheduleSelectedRoute,
+  protection?: BerthProtectionContext | null,
+): BerthWindowSec[] {
+  const windows = projectBlockBerthWindowsSeconds(block, route);
+  if (!protection || protection.collisionProtectionSeconds <= 0) return windows;
+  if (windows.length === 0) return windows;
+
+  const protectionSeconds = protection.collisionProtectionSeconds * 2;
+
+  // 末站滯留：只有最後一個站位會被延長——車開過中間站時不會停在那裡等。
+  let idleUntilSecond: number | null = null;
+  if (protection.timelines) {
+    const idleUntilMinute = resolveSameRowIdleOccupiedUntilMinute(
+      protection.timelines,
+      block,
+    );
+    if (idleUntilMinute != null) idleUntilSecond = minuteToSecond(idleUntilMinute);
+  }
+
+  const lastIndex = windows.length - 1;
+  return windows.map((win, index) => {
+    // 滯留是「車真的還停在那裡」，屬於自然佔用的一部分，所以也寫進 naturalEndSecond；
+    // 碰撞保護時間才是只對別台車生效的那一段。
+    const naturalEnd =
+      index === lastIndex && idleUntilSecond != null
+        ? Math.max(win.endSecond, idleUntilSecond)
+        : win.endSecond;
+    return {
+      ...win,
+      naturalEndSecond: naturalEnd,
+      endSecond: naturalEnd + protectionSeconds,
+    };
+  });
 }
 
 /**
@@ -120,12 +219,22 @@ export function resolveBerthClearDelaySeconds(
   for (let iter = 0; iter < 24; iter += 1) {
     let bump = 0;
     for (const win of proposed) {
-      const a0 = win.startSecond + delay;
-      const a1 = win.endSecond + delay;
       for (const prior of booked) {
         if (prior.stationId !== win.stationId) continue;
-        if (a0 < prior.endSecond - 1e-9 && a1 > prior.startSecond + 1e-9) {
-          bump = Math.max(bump, prior.endSecond - a0);
+        // 同一列＝同一台車：碰撞保護不適用（自己不會撞自己），改用自然離站尾端。
+        // 跨列才是真正的兩台車，用含保護時間的尾端。
+        const sameVehicle =
+          win.timelineRow != null
+          && prior.timelineRow != null
+          && win.timelineRow === prior.timelineRow;
+        const priorEnd = sameVehicle
+          ? prior.naturalEndSecond ?? prior.endSecond
+          : prior.endSecond;
+        const winEnd = sameVehicle ? win.naturalEndSecond ?? win.endSecond : win.endSecond;
+        const a0 = win.startSecond + delay;
+        const a1 = winEnd + delay;
+        if (a0 < priorEnd - 1e-9 && a1 > prior.startSecond + 1e-9) {
+          bump = Math.max(bump, priorEnd - a0);
         }
       }
     }
@@ -135,27 +244,8 @@ export function resolveBerthClearDelaySeconds(
   return delay;
 }
 
-export function listBackupRoutesForPrimary(
-  routes: ShiftScheduleSelectedRoute[],
-  primary: ShiftScheduleSelectedRoute,
-): ShiftScheduleSelectedRoute[] {
-  const primaryId = resolveSelectedRouteInstanceId(primary);
-  return routes.filter((route) => {
-    if (isPrimarySelectedRoute(route)) return false;
-    if (route.backupForInstanceId?.trim() === primaryId) return true;
-    if (
-      !route.backupForInstanceId?.trim()
-      && route.backupForRouteId?.trim() === primary.routeId
-    ) {
-      return true;
-    }
-    return false;
-  });
-}
-
 /**
  * 改派／候選路線不得拆掉同車交路：前趟終點＝本趟起點、本趟終點＝後趟起點。
- * （TN 末站「N2W下行出發」不能接「[備用]N2W下行」起點的 NTB）
  */
 export function routePreservesTurnaroundContinuity(args: {
   route: ShiftScheduleSelectedRoute;
@@ -176,121 +266,122 @@ export function routePreservesTurnaroundContinuity(args: {
   return true;
 }
 
+export type TopologyRouteCandidate = {
+  route: ShiftScheduleSelectedRoute;
+  /** 越小越優先 */
+  rank: number;
+  source: 'planned' | 'priority' | 'secondary' | 'ring' | 'same_origin';
+};
+
 /**
- * 主線交路 TN→NT 的備援必須成對：TNB→NTB（同站折返接續）。
- * 禁止只留 TN、下一趟改 NTB。
- *
- * 若提供 successorPolicy：nextPrimary 必須等於圖上 resolveNext(thisPrimary)，
- * 否則不成對（關聯圖硬約束）。
+ * 站位／交路候選＝關聯圖拓撲（優→次）＋同起點可銜接路線。
+ * 不是「誰是誰的備用槽」；在 T3 選 TN 或 TNB，取決於前一跳出邊與站位是否清得開。
  */
-export function findContinuousBackupPair(args: {
+export function listTopologyRouteCandidates(args: {
   selectedRoutes: ShiftScheduleSelectedRoute[];
-  thisPrimary: ShiftScheduleSelectedRoute;
-  nextPrimary: ShiftScheduleSelectedRoute;
+  currentRoute: ShiftScheduleSelectedRoute;
   previousRoute: ShiftScheduleSelectedRoute | null;
-  nextNextRoute: ShiftScheduleSelectedRoute | null;
   successorPolicy?: RouteSuccessorPolicy | null;
-}): {
-  thisBackup: ShiftScheduleSelectedRoute;
-  nextBackup: ShiftScheduleSelectedRoute;
-} | null {
-  if (args.successorPolicy?.valid) {
-    const expected = resolveGraphExpectedNextPrimary(
-      args.successorPolicy,
-      args.thisPrimary,
-      args.selectedRoutes,
-    );
+}): TopologyRouteCandidate[] {
+  const { selectedRoutes, currentRoute, previousRoute, successorPolicy } = args;
+  const byId = new Map<string, TopologyRouteCandidate>();
+
+  const put = (
+    route: ShiftScheduleSelectedRoute,
+    rank: number,
+    source: TopologyRouteCandidate['source'],
+  ) => {
+    const id = resolveSelectedRouteInstanceId(route);
+    const prev = byId.get(id);
+    if (!prev || rank < prev.rank) {
+      byId.set(id, { route, rank, source });
+    }
+  };
+
+  put(currentRoute, 0, 'planned');
+
+  const policy = successorPolicy?.valid ? successorPolicy : null;
+  if (previousRoute) {
     if (
-      !expected
-      || resolveSelectedRouteInstanceId(expected)
-        !== resolveSelectedRouteInstanceId(args.nextPrimary)
+      !routePreservesTurnaroundContinuity({
+        route: currentRoute,
+        previousRoute,
+        nextRoute: null,
+      })
     ) {
-      return null;
+      byId.delete(resolveSelectedRouteInstanceId(currentRoute));
     }
   }
-
-  for (const thisBackup of listBackupRoutesForPrimary(
-    args.selectedRoutes,
-    args.thisPrimary,
-  )) {
-    for (const nextBackup of listBackupRoutesForPrimary(
-      args.selectedRoutes,
-      args.nextPrimary,
-    )) {
+  if (previousRoute && policy) {
+    const previousId = resolveSelectedRouteInstanceId(previousRoute);
+    for (const next of listNextInstanceCandidates(policy, previousId, {
+      allowSecondary: true,
+    })) {
+      const route =
+        policy.routesByInstanceId.get(next.instanceId)
+        ?? selectedRoutes.find(
+          (item) => resolveSelectedRouteInstanceId(item) === next.instanceId,
+        );
+      if (!route) continue;
       if (
         !routePreservesTurnaroundContinuity({
-          route: thisBackup,
-          previousRoute: args.previousRoute,
-          nextRoute: nextBackup,
+          route,
+          previousRoute,
+          nextRoute: null,
         })
       ) {
         continue;
       }
+      const rank =
+        next.kind === 'secondary' ? 20 : next.kind === 'ring' ? 15 : 10;
+      put(route, rank, next.kind);
+    }
+  } else if (!previousRoute && policy) {
+    const origin = resolveRouteOriginStationId(currentRoute);
+    if (origin) {
+      for (const [instanceId, route] of policy.routesByInstanceId) {
+        if (resolveRouteOriginStationId(route) !== origin) continue;
+        const preferIdx = policy.canonicalCycleInstanceIds.indexOf(instanceId);
+        const startIdx = policy.startInstanceIds.indexOf(instanceId);
+        if (preferIdx >= 0) {
+          put(route, 10 + preferIdx, 'priority');
+        } else if (startIdx >= 0) {
+          put(route, 30 + startIdx, 'same_origin');
+        } else {
+          put(route, 40, 'same_origin');
+        }
+      }
+    }
+  }
+
+  for (const route of selectedRoutes) {
+    if (previousRoute) {
       if (
         !routePreservesTurnaroundContinuity({
-          route: nextBackup,
-          previousRoute: thisBackup,
-          nextRoute: args.nextNextRoute,
+          route,
+          previousRoute,
+          nextRoute: null,
         })
       ) {
         continue;
       }
-      return { thisBackup, nextBackup };
+    } else {
+      const origin = resolveRouteOriginStationId(currentRoute);
+      if (!origin || resolveRouteOriginStationId(route) !== origin) continue;
     }
+    put(route, 50, 'same_origin');
   }
-  return null;
-}
 
-/**
- * 關聯圖／鎖定環：主線 P 的下一主線是誰。
- */
-export function resolveGraphExpectedNextPrimary(
-  policy: RouteSuccessorPolicy,
-  thisPrimary: ShiftScheduleSelectedRoute,
-  selectedRoutes: ShiftScheduleSelectedRoute[],
-): ShiftScheduleSelectedRoute | null {
-  if (!policy.valid) return null;
-  const primary = isPrimarySelectedRoute(thisPrimary)
-    ? thisPrimary
-    : resolvePrimaryForRoute(selectedRoutes, thisPrimary);
-  const currentId = resolveSelectedRouteInstanceId(primary);
-  const next = resolveNextInstanceId(policy, currentId);
-  if (!next) return null;
+  // 若前一跳改選後沒有任一連續候選，仍保留本趟（留給驗證／延後）
+  if (byId.size === 0) {
+    put(currentRoute, 100, 'planned');
+  }
 
-  const fromPolicy = policy.routesByInstanceId.get(next.instanceId);
-  if (fromPolicy && isPrimarySelectedRoute(fromPolicy)) return fromPolicy;
-
-  return (
-    selectedRoutes.find(
-      (route) =>
-        isPrimarySelectedRoute(route)
-        && resolveSelectedRouteInstanceId(route) === next.instanceId,
-    ) ?? null
+  return [...byId.values()].sort(
+    (a, b) =>
+      a.rank - b.rank
+      || (a.route.routeCode ?? '').localeCompare(b.route.routeCode ?? ''),
   );
-}
-
-function resolvePrimaryForRoute(
-  routes: ShiftScheduleSelectedRoute[],
-  route: ShiftScheduleSelectedRoute,
-): ShiftScheduleSelectedRoute {
-  if (isPrimarySelectedRoute(route)) return route;
-  const byInstance = route.backupForInstanceId?.trim();
-  if (byInstance) {
-    const hit = routes.find(
-      (item) =>
-        isPrimarySelectedRoute(item)
-        && resolveSelectedRouteInstanceId(item) === byInstance,
-    );
-    if (hit) return hit;
-  }
-  const byRouteId = route.backupForRouteId?.trim();
-  if (byRouteId) {
-    const hit = routes.find(
-      (item) => isPrimarySelectedRoute(item) && item.routeId === byRouteId,
-    );
-    if (hit) return hit;
-  }
-  return route;
 }
 
 function withProposedStart(
@@ -358,11 +449,59 @@ function maxDelayAllowedSeconds(args: {
   return snapUpToClockAlignSeconds(Math.max(0, cap));
 }
 
+/**
+ * 「可以等」＝同列下一正線開得晚，不是跟前一趟時間線重疊。
+ * 提交本趟後若下一腳開始早於本趟結束＋空檔，整趟平移開。
+ */
+export function pushSameRowNextAfterPrevious(args: {
+  previousBlock: GeneratedScheduleBlock;
+  previousRoute: ShiftScheduleSelectedRoute;
+  nextPassenger: GeneratedScheduleBlock | undefined | null;
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  minimumRecoveryTimeSeconds: number;
+}): number {
+  const {
+    previousBlock,
+    previousRoute,
+    nextPassenger,
+    selectedRoutes,
+    minimumRecoveryTimeSeconds,
+  } = args;
+  if (!nextPassenger) return 0;
+  const nextRoute = resolveRouteForBlock(nextPassenger, selectedRoutes);
+  const gapSeconds = nextRoute
+    ? resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds,
+        previousRouteSwitchBufferSeconds: previousRoute.switchBufferAfterSeconds,
+        isRouteSwitch: previousRoute.routeId !== nextRoute.routeId,
+        includeRecovery: shouldIncludeRecoveryForRouteSwitch({
+          previousRoute,
+          nextRoute,
+          rotationRoutes: selectedRoutes,
+        }),
+        previousRoute,
+        nextRoute,
+      })
+    : Math.max(0, minimumRecoveryTimeSeconds);
+  const prevEnd = minuteToSecond(previousBlock.plannedEndMinute);
+  const earliestStart = snapUpToClockAlignSeconds(prevEnd + gapSeconds);
+  const nextStart = minuteToSecond(nextPassenger.plannedStartMinute);
+  if (nextStart + 1e-9 >= earliestStart) return 0;
+  const occupancySeconds = Math.max(
+    SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
+    minuteToSecond(nextPassenger.plannedEndMinute) - nextStart,
+  );
+  nextPassenger.plannedStartMinute = secondToMinute(earliestStart);
+  nextPassenger.plannedEndMinute = secondToMinute(earliestStart + occupancySeconds);
+  return earliestStart - nextStart;
+}
+
 function evaluateCandidate(args: {
   block: GeneratedScheduleBlock;
   route: ShiftScheduleSelectedRoute;
   preferredStartSecond: number;
   booked: BerthWindowSec[];
+  protection: BerthProtectionContext;
 }): { delaySeconds: number; occupancySeconds: number; windows: BerthWindowSec[] } {
   const occupancySeconds = occupancySecondsForBlockRoute(args.block, args.route);
   const probe = withProposedStart(
@@ -371,35 +510,61 @@ function evaluateCandidate(args: {
     occupancySeconds,
     args.route,
   );
-  const windows = projectBlockBerthWindowsSeconds(probe, args.route);
+  const windows = projectProtectedBerthWindowsSeconds(probe, args.route, args.protection);
   const delaySeconds = resolveBerthClearDelaySeconds(windows, args.booked);
   return { delaySeconds, occupancySeconds, windows };
 }
 
 /**
- * 生成後約束修復：延後 → 備用；就地改写 timelines。
- * successorPolicy：關聯圖硬約束——成對備用必須鏡像圖上繼任。
+ * 站位約束：在拓撲候選中挑延後最少且清得開的局部解；就地改写 timelines。
+ * 選線後不強制成對改下一腳——下一趟稍後依「新前一跳」的出邊再排，可等。
  */
 export function enforceStationBerthConstraints(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   selectedRoutes: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds?: number;
+  /** 碰撞保護時間（秒）；預設 0＝維持舊行為（只要求區間不重疊） */
+  collisionProtectionSeconds?: number;
   maxDelaySeconds?: number;
   successorPolicy?: RouteSuccessorPolicy | null;
   warnings?: FeasibilityIssue[];
+  /**
+   * 每種站位約束 warning code 最多寫入幾則；超出後補一則匯總 warning，而不是逐則塞入。
+   * 預設 DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT。
+   */
+  maxWarningsPerCode?: number;
 }): StationBerthConstraintResult {
   const {
     selectedRoutes,
     minimumRecoveryTimeSeconds = 0,
+    collisionProtectionSeconds = 0,
     maxDelaySeconds = DEFAULT_STATION_BERTH_MAX_DELAY_SECONDS,
     successorPolicy = null,
     warnings,
+    maxWarningsPerCode = DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT,
   } = args;
+
+  // 各 code 已報告計數（P4：超出上限後改推匯總摘要）
+  const warnCount: Record<string, number> = {};
+  const pushBerthWarning = (issue: FeasibilityIssue) => {
+    if (!warnings) return;
+    const key = issue.code;
+    warnCount[key] = (warnCount[key] ?? 0) + 1;
+    if (warnCount[key] <= maxWarningsPerCode) {
+      pushIssue(warnings, issue);
+    }
+  };
 
   const timelines = args.timelines.map((timeline) => ({
     ...timeline,
     blocks: timeline.blocks.map((block) => ({ ...block })),
   }));
+
+  // 就地改寫 timelines，所以滯留判定讀到的一定是當下最新的版面
+  const protection: BerthProtectionContext = {
+    collisionProtectionSeconds,
+    timelines,
+  };
 
   const passengerBlocks: GeneratedScheduleBlock[] = [];
   for (const timeline of timelines) {
@@ -446,313 +611,179 @@ export function enforceStationBerthConstraints(args: {
             (item) => item.taskType === 'passenger',
           )
         : undefined;
+    // 前一正線可能已被改寫：候選下一跳以改寫後拓撲為準
     const previousRoute =
       previousPassenger != null
         ? resolveRouteForBlock(previousPassenger, selectedRoutes)
         : null;
-    const nextRouteForContinuity =
-      nextPassenger != null
-        ? resolveRouteForBlock(nextPassenger, selectedRoutes)
-        : null;
 
-    const nextNextPassenger =
-      nextPassenger != null && blockIndex >= 0
-        ? rowBlocks
-            .slice(blockIndex + 1)
-            .filter((item) => item.taskType === 'passenger')[1]
-        : undefined;
-    const nextNextRoute =
-      nextNextPassenger != null
-        ? resolveRouteForBlock(nextNextPassenger, selectedRoutes)
-        : null;
-
-    const primary = resolvePrimaryForRoute(selectedRoutes, initialRoute);
-    const nextPrimary =
-      nextRouteForContinuity != null
-        ? resolvePrimaryForRoute(selectedRoutes, nextRouteForContinuity)
-        : null;
-
-    // 單腳備用：僅當仍接得上「目前下一趟」（常失敗：TNB 接不住 NT）
-    const backups = listBackupRoutesForPrimary(selectedRoutes, primary);
-    const candidates: ShiftScheduleSelectedRoute[] = [initialRoute];
-    for (const backup of backups) {
-      if (
-        !routePreservesTurnaroundContinuity({
-          route: backup,
-          previousRoute,
-          nextRoute: nextRouteForContinuity,
-        })
-      ) {
-        continue;
-      }
-      if (
-        !candidates.some(
-          (c) =>
-            c.routeId === backup.routeId
-            && resolveSelectedRouteInstanceId(c)
-              === resolveSelectedRouteInstanceId(backup),
-        )
-      ) {
-        candidates.push(backup);
-      }
-    }
-
-    // 成對備用：TN→TNB 且同列下一主線 NT→NTB（遵守交路，不用 TN→NTB）
-    const backupPair =
-      nextPrimary && nextPassenger
-        ? findContinuousBackupPair({
-            selectedRoutes,
-            thisPrimary: primary,
-            nextPrimary,
-            previousRoute,
-            nextNextRoute,
-            successorPolicy,
-          })
-        : null;
-    if (
-      backupPair
-      && !candidates.some(
-        (c) =>
-          resolveSelectedRouteInstanceId(c)
-          === resolveSelectedRouteInstanceId(backupPair.thisBackup),
-      )
-    ) {
-      candidates.push(backupPair.thisBackup);
-    }
+    const topologyCandidates = listTopologyRouteCandidates({
+      selectedRoutes,
+      currentRoute: initialRoute,
+      previousRoute,
+      successorPolicy,
+    });
 
     type Choice = {
       route: ShiftScheduleSelectedRoute;
+      rank: number;
+      source: TopologyRouteCandidate['source'];
       delaySeconds: number;
       occupancySeconds: number;
       windows: BerthWindowSec[];
       maxAllowed: number;
-      pairedNextRoute: ShiftScheduleSelectedRoute | null;
     };
 
-    const scoreRoute = (
-      route: ShiftScheduleSelectedRoute,
-      assumedNext: ShiftScheduleSelectedRoute | null,
-      pairedNextRoute: ShiftScheduleSelectedRoute | null,
-    ): Choice => {
+    const scoreCandidate = (candidate: TopologyRouteCandidate): Choice => {
+      const { route } = candidate;
       const evaluated = evaluateCandidate({
         block,
         route,
         preferredStartSecond,
         booked,
+        protection,
       });
-      const gapBeforeNext =
-        nextPassenger != null && assumedNext
-          ? resolveInterTripGapSeconds({
-              minimumRecoveryTimeSeconds,
-              previousRouteSwitchBufferSeconds: route.switchBufferAfterSeconds,
-              isRouteSwitch: route.routeId !== assumedNext.routeId,
-              includeRecovery: shouldIncludeRecoveryForRouteSwitch({
-                previousRoute: route,
-                nextRoute: assumedNext,
-                rotationRoutes: selectedRoutes.filter((r) => isPrimarySelectedRoute(r)),
-              }),
-              previousRoute: route,
-              nextRoute: assumedNext,
-            })
-          : 0;
-    const nextMaintenance =
-      blockIndex >= 0
-        ? rowBlocks.slice(blockIndex + 1).find(
-            (item) =>
-              item.source === 'template_bar'
-              && item.taskType !== 'passenger'
-              && (
-                item.taskType === 'charging'
-                || item.taskType === 'servicing'
-                || item.taskType === 'inspection'
-                || item.taskType === 'standby'
-              ),
-          )
-        : undefined;
-    const nextCaps: number[] = [];
-    if (nextPassenger != null) {
-      nextCaps.push(minuteToSecond(nextPassenger.plannedStartMinute));
-    }
-    if (nextMaintenance != null) {
-      nextCaps.push(minuteToSecond(nextMaintenance.plannedStartMinute));
-    }
-    const nextSameRowStartSecond =
-      nextCaps.length > 0 ? Math.min(...nextCaps) : null;
-    const maxAllowed = maxDelayAllowedSeconds({
-      preferredStartSecond,
-      occupancySeconds: evaluated.occupancySeconds,
-      nextSameRowStartSecond,
-      gapBeforeNextSeconds: gapBeforeNext,
-      maxDelaySeconds,
-    });
+      // 站位延後只受預設上限限制。不要用後面的充電／整備牆把上限夾成 0，
+      // 否則 10～30 秒的站位衝突解不掉；整備開頭重疊交給後續正線讓渡處理。
+      const maxAllowed = maxDelayAllowedSeconds({
+        preferredStartSecond,
+        occupancySeconds: evaluated.occupancySeconds,
+        nextSameRowStartSecond: null,
+        gapBeforeNextSeconds: 0,
+        maxDelaySeconds,
+      });
       return {
         route,
+        rank: candidate.rank,
+        source: candidate.source,
         delaySeconds: evaluated.delaySeconds,
         occupancySeconds: evaluated.occupancySeconds,
         windows: evaluated.windows,
         maxAllowed,
-        pairedNextRoute,
       };
     };
 
-    const scored: Choice[] = [];
-    for (const route of candidates) {
-      const isPairLead =
-        backupPair != null
-        && resolveSelectedRouteInstanceId(route)
-          === resolveSelectedRouteInstanceId(backupPair.thisBackup);
-      const assumedNext = isPairLead
-        ? backupPair!.nextBackup
-        : nextRouteForContinuity;
-      scored.push(
-        scoreRoute(route, assumedNext, isPairLead ? backupPair!.nextBackup : null),
+    const scored = topologyCandidates.map(scoreCandidate);
+    const feasible = scored
+      .filter((c) => c.delaySeconds <= c.maxAllowed + 1e-9)
+      .sort(
+        (a, b) =>
+          a.delaySeconds - b.delaySeconds
+          || a.rank - b.rank
+          || a.occupancySeconds - b.occupancySeconds,
       );
-    }
-
-    const primaryChoice = scored.find((c) => c.route === initialRoute) ?? scored[0]!;
-    let chosen = primaryChoice;
-
-    if (primaryChoice.delaySeconds > primaryChoice.maxAllowed) {
-      const backupOk = scored
-        .filter((c) => c.route !== initialRoute)
-        .filter((c) => c.delaySeconds <= c.maxAllowed)
-        .sort((a, b) => {
-          // 成對備用優先於殘缺單腳（避免 TN 接到異點 NTB）
-          const ap = a.pairedNextRoute ? 0 : 1;
-          const bp = b.pairedNextRoute ? 0 : 1;
-          if (ap !== bp) return ap - bp;
-          return a.delaySeconds - b.delaySeconds || a.occupancySeconds - b.occupancySeconds;
-        });
-      if (backupOk[0]) {
-        chosen = backupOk[0]!;
-      } else {
-        const backupBetter = scored
-          .filter((c) => c.route !== initialRoute)
-          .sort((a, b) => a.delaySeconds - b.delaySeconds);
-        if (
-          backupBetter[0]
-          && backupBetter[0].delaySeconds < primaryChoice.delaySeconds
-        ) {
-          chosen = backupBetter[0]!;
-        }
-      }
-    } else if (primaryChoice.delaySeconds > 0) {
-      // 仍以主路線延後為優先；不為了少延幾秒就換備用
-      chosen = primaryChoice;
-    }
-
-    // 硬閘：前趟主線不得接到異點備用（TN→NTB）
-    if (
-      previousRoute
-      && isPrimarySelectedRoute(previousRoute)
-      && !isPrimarySelectedRoute(chosen.route)
-      && !routePreservesTurnaroundContinuity({
-        route: chosen.route,
-        previousRoute,
-        nextRoute: null,
-      })
-    ) {
-      chosen = primaryChoice;
-    }
-
-    const finalDelay = chosen.delaySeconds;
-    const canClear = finalDelay <= chosen.maxAllowed + 1e-9;
-
-    if (!canClear && finalDelay > 0) {
-      unresolvedCount += 1;
-      // 仍盡力延到上限內，剩餘碰撞留給驗證
-      const appliedDelay = Math.min(finalDelay, chosen.maxAllowed);
-      const startSecond = preferredStartSecond + appliedDelay;
-      const patched = withProposedStart(
-        block,
-        startSecond,
-        chosen.occupancySeconds,
-        chosen.route,
-      );
-      Object.assign(block, patched);
-      const windows = projectBlockBerthWindowsSeconds(block, chosen.route);
-      for (const win of windows) booked.push(win);
-      if (appliedDelay > 0) delayedCount += 1;
-      continue;
-    }
-
-    const startSecond = preferredStartSecond + finalDelay;
-    const patched = withProposedStart(
-      block,
-      startSecond,
-      chosen.occupancySeconds,
-      chosen.route,
+    const bestEffort = [...scored].sort(
+      (a, b) =>
+        a.delaySeconds - b.delaySeconds
+        || a.rank - b.rank
+        || a.occupancySeconds - b.occupancySeconds,
     );
-    Object.assign(block, patched);
-
-    if (chosen.pairedNextRoute && nextPassenger) {
-      const nextStart = minuteToSecond(nextPassenger.plannedStartMinute);
-      const nextOcc = occupancySecondsForBlockRoute(
-        nextPassenger,
-        chosen.pairedNextRoute,
-      );
-      Object.assign(
-        nextPassenger,
-        withProposedStart(nextPassenger, nextStart, nextOcc, chosen.pairedNextRoute),
-      );
-      backupSwitchedCount += 1;
-      if (warnings) {
-        pushIssue(warnings, {
-          code: 'STATION_BERTH_BACKUP_USED',
-          severity: 'warning',
-          message:
-            `站位約束改派備用交路 ${chosen.route.routeCode ?? chosen.route.routeName}`
-            + ` → ${chosen.pairedNextRoute.routeCode ?? chosen.pairedNextRoute.routeName}`
-            + `（取代 ${initialRoute.routeCode ?? initialRoute.routeName}`
-            + ` → ${nextRouteForContinuity?.routeCode ?? nextRouteForContinuity?.routeName ?? '下一趟'}）`,
-          detail: {
-            blockId: block.id,
-            pairedBlockId: nextPassenger.id,
-            timelineRow: block.timelineRow,
-            fromRouteId: initialRoute.routeId,
-            toRouteId: chosen.route.routeId,
-            pairedToRouteId: chosen.pairedNextRoute.routeId,
-            delaySeconds: finalDelay,
-          },
-        });
-      }
-    } else if (chosen.route !== initialRoute) {
-      backupSwitchedCount += 1;
-      if (warnings) {
-        pushIssue(warnings, {
-          code: 'STATION_BERTH_BACKUP_USED',
-          severity: 'warning',
-          message: `站位延後超過上限，已改派備用「${chosen.route.routeName}」`,
-          detail: {
-            blockId: block.id,
-            timelineRow: block.timelineRow,
-            fromRouteId: initialRoute.routeId,
-            toRouteId: chosen.route.routeId,
-            delaySeconds: finalDelay,
-          },
-        });
-      }
+    const chosen = feasible[0] ?? bestEffort[0]!;
+    // scoreCandidate.maxAllowed 等於呼叫端 maxDelaySeconds（目前未再夾 next）
+    const delayCap = Math.max(0, maxDelaySeconds);
+    let appliedDelay = Math.min(Math.max(0, chosen.delaySeconds), delayCap);
+    if (chosen.delaySeconds > delayCap + 1e-9) {
+      unresolvedCount += 1;
     }
 
-    if (finalDelay > 0) {
+    let startSecond = preferredStartSecond + appliedDelay;
+    Object.assign(
+      block,
+      withProposedStart(block, startSecond, chosen.occupancySeconds, chosen.route),
+    );
+
+    // 改選／延後後「可等」下一腳，但同列不得與本趟重疊
+    pushSameRowNextAfterPrevious({
+      previousBlock: block,
+      previousRoute: chosen.route,
+      nextPassenger,
+      selectedRoutes,
+      minimumRecoveryTimeSeconds,
+    });
+
+    if (
+      resolveSelectedRouteInstanceId(chosen.route)
+      !== resolveSelectedRouteInstanceId(initialRoute)
+    ) {
+      backupSwitchedCount += 1;
+      pushBerthWarning({
+        code: 'STATION_BERTH_BACKUP_USED',
+        severity: 'warning',
+        message:
+          `站位約束依關聯圖拓撲改選「${chosen.route.routeCode ?? chosen.route.routeName}」`
+          + `（取代 ${initialRoute.routeCode ?? initialRoute.routeName}，來源 ${chosen.source}）`,
+        detail: {
+          blockId: block.id,
+          timelineRow: block.timelineRow,
+          fromRouteId: initialRoute.routeId,
+          toRouteId: chosen.route.routeId,
+          delaySeconds: appliedDelay,
+          topologySource: chosen.source,
+          topologyRank: chosen.rank,
+        },
+      });
+    }
+
+    if (appliedDelay > 0) {
       delayedCount += 1;
-      if (warnings) {
-        pushIssue(warnings, {
-          code: 'STATION_BERTH_DELAYED',
-          severity: 'warning',
-          message: `為避開站位碰撞，已延後 ${finalDelay} 秒（${chosen.route.routeCode ?? chosen.route.routeName}）`,
-          detail: {
-            blockId: block.id,
-            timelineRow: block.timelineRow,
-            delaySeconds: finalDelay,
-            routeId: chosen.route.routeId,
-          },
+      pushBerthWarning({
+        code: 'STATION_BERTH_DELAYED',
+        severity: 'warning',
+        message: `為避開站位碰撞，已延後 ${appliedDelay} 秒（${chosen.route.routeCode ?? chosen.route.routeName}）`,
+        detail: {
+          blockId: block.id,
+          timelineRow: block.timelineRow,
+          delaySeconds: appliedDelay,
+          routeId: chosen.route.routeId,
+        },
+      });
+    }
+
+    // 若仍與已預約重疊，在 delayCap 內再補延；仍清不開則不預約，留給下一輪／最終 pass
+    let committed = projectProtectedBerthWindowsSeconds(block, chosen.route, protection);
+    let residual = resolveBerthClearDelaySeconds(committed, booked);
+    if (residual > 1e-9) {
+      const room = Math.max(0, delayCap - appliedDelay);
+      const bump = Math.min(residual, room);
+      if (bump > 1e-9) {
+        appliedDelay += bump;
+        startSecond = preferredStartSecond + appliedDelay;
+        Object.assign(
+          block,
+          withProposedStart(block, startSecond, chosen.occupancySeconds, chosen.route),
+        );
+        pushSameRowNextAfterPrevious({
+          previousBlock: block,
+          previousRoute: chosen.route,
+          nextPassenger,
+          selectedRoutes,
+          minimumRecoveryTimeSeconds,
         });
+        committed = projectProtectedBerthWindowsSeconds(block, chosen.route, protection);
+        residual = resolveBerthClearDelaySeconds(committed, booked);
       }
     }
 
-    const committed = projectBlockBerthWindowsSeconds(block, chosen.route);
-    for (const win of committed) booked.push(win);
+    if (residual <= 1e-9) {
+      for (const win of committed) booked.push(win);
+    } else {
+      unresolvedCount += 1;
+    }
+  }
+
+  // P4：超出 maxWarningsPerCode 的部分補摘要 warning
+  if (warnings) {
+    for (const [code, count] of Object.entries(warnCount)) {
+      if (count > maxWarningsPerCode) {
+        const hidden = count - maxWarningsPerCode;
+        pushIssue(warnings, {
+          code: code as FeasibilityIssue['code'],
+          severity: 'warning',
+          message: `（以上已顯示 ${maxWarningsPerCode} 則；另有 ${hidden} 則相同類型的站位約束 warning 未列出）`,
+          detail: { hiddenCount: hidden, totalCount: count },
+        });
+      }
+    }
   }
 
   return {

@@ -48,6 +48,13 @@ import {
   type MaintenanceSectionCodeBySection,
 } from '../utils/maintenanceSectionCode';
 import { minuteFromClientX, resolveManualBlockMinDurationMinutes } from '../utils/manualScheduleEdit';
+import {
+  SCHEDULE_DAY_MINUTES,
+  formatScheduleClockHm,
+  formatScheduleClockHms,
+  formatScheduleClockRangeHms,
+  splitIntoDayCycleSegments,
+} from '../utils/scheduleDayCycle';
 import { MANUAL_BLOCK_MIN_DURATION_SECONDS } from '../utils/buildManualShiftScheduleOutput';
 
 const ROW_HEIGHT_PX = 82;
@@ -129,6 +136,7 @@ function BlockAlgorithmHoverCard({
   legs,
   pos,
   hideStrategyBuffers = false,
+  entryServiceBerthCheck,
 }: {
   routeName: string;
   /** 班次卡代號（如 TN0942） */
@@ -148,6 +156,8 @@ function BlockAlgorithmHoverCard({
   pos: HoverCardPos;
   /** 手動製作：不顯示換線／恢復（僅卡上靠站與緩衝） */
   hideStrategyBuffers?: boolean;
+  /** 調度營運班次（entry_service）落點診斷；見文件 §10.3 */
+  entryServiceBerthCheck?: GeneratedScheduleBlock['entryServiceBerthCheck'];
 }) {
   const sec = (value: number | null | undefined) =>
     value == null || !Number.isFinite(value) ? '—' : `${Math.round(value)}s`;
@@ -184,6 +194,25 @@ function BlockAlgorithmHoverCard({
           </>
         ) : null}
       </p>
+      {entryServiceBerthCheck ? (
+        <p className="mt-1 rounded border border-amber-700/40 bg-amber-950/30 px-1.5 py-1 text-[10px] leading-[14px] tabular-nums text-amber-200">
+          <span className="font-semibold">調度營運班次插入餘裕</span>
+          <span className="text-amber-400/80"> · </span>
+          抵達 {stops.find((s) => s.stationId === entryServiceBerthCheck.arriveStationId)?.stationName
+            ?? entryServiceBerthCheck.arriveStationId}
+          <span className="text-amber-400/80"> · </span>
+          站位淨空 {formatMinuteToHms(entryServiceBerthCheck.berthClearMinute)}
+          <span className="text-amber-400/80"> · </span>
+          餘裕{' '}
+          <span
+            className={
+              entryServiceBerthCheck.slackSeconds < 0 ? 'font-semibold text-red-400' : 'font-semibold'
+            }
+          >
+            {entryServiceBerthCheck.slackSeconds}s
+          </span>
+        </p>
+      ) : null}
 
       {stops.length === 0 ? (
         <p className="mt-2 text-[10px] text-zinc-500">尚無站點資料</p>
@@ -296,9 +325,18 @@ function BlockAlgorithmHoverCard({
 }
 
 function formatMinuteToHm(minute: number): string {
-  const hh = Math.floor(minute / 60);
-  const mm = Math.round(minute % 60);
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return formatScheduleClockHm(minute);
+}
+
+function formatMinuteToHms(minute: number): string {
+  return formatScheduleClockHms(minute);
+}
+
+function formatBlockTimeRange(block: GeneratedScheduleBlock): string {
+  return formatScheduleClockRangeHms(
+    block.plannedStartMinute,
+    block.plannedEndMinute,
+  );
 }
 
 function TemplateTaskBar({
@@ -308,53 +346,53 @@ function TemplateTaskBar({
   task: ScheduleTask;
   slotWidthPx: number;
 }) {
-  const widthPx = (task.durationMinutes / GRID_SLOT_MINUTES) * slotWidthPx;
-  const leftPx = (task.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
   const endMinute = task.startMinute + task.durationMinutes;
+  const segments = splitIntoDayCycleSegments(task.startMinute, endMinute);
   const timeLabel = `${formatMinuteToHm(task.startMinute)}-${formatMinuteToHm(endMinute)}`;
-
   const isSticky = task.durationMinutes >= 20;
 
+  if (segments.length === 0) return null;
+
   return (
-    <div
-      className="pointer-events-none absolute top-[2px] z-[2] flex items-center justify-start overflow-clip rounded-[4px] border border-zinc-700/60 bg-zinc-800/80 px-2"
-      style={{
-        left: leftPx,
-        width: widthPx,
-        height: TEMPLATE_TASK_BAR_HEIGHT,
-      }}
-      title={`${task.label} ${timeLabel}`}
-      aria-hidden
-    >
-      <span
-        className={`${
-          isSticky ? 'sticky left-[56px]' : ''
-        } shrink-0 max-w-full truncate text-[10px] font-normal leading-[18px] tracking-[0.5px] text-zinc-300`}
-      >
-        {task.label}
-        <span className="opacity-70"> | {timeLabel}</span>
-      </span>
-    </div>
+    <>
+      {segments.map((seg, index) => {
+        const leftPx = (seg.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
+        const widthPx =
+          ((seg.endMinute - seg.startMinute) / GRID_SLOT_MINUTES) * slotWidthPx;
+        return (
+          <div
+            key={`${task.id}-${index}`}
+            className="pointer-events-none absolute top-[2px] z-[2] flex items-center justify-start overflow-clip rounded-[4px] border border-zinc-700/60 bg-zinc-800/80 px-2"
+            style={{
+              left: leftPx,
+              width: Math.max(widthPx, 4),
+              height: TEMPLATE_TASK_BAR_HEIGHT,
+            }}
+            title={`${task.label} ${timeLabel}`}
+            aria-hidden
+          >
+            {index === 0 ? (
+              <span
+                className={`${
+                  isSticky ? 'sticky left-[56px]' : ''
+                } shrink-0 max-w-full truncate text-[10px] font-normal leading-[18px] tracking-[0.5px] text-zinc-300`}
+              >
+                {task.label}
+                <span className="opacity-70"> | {timeLabel}</span>
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
 function formatSlotLabel(slotIndex: number): string {
   const totalMinutes = slotIndex * GRID_SLOT_MINUTES;
-  const hh = Math.floor(totalMinutes / 60);
+  const hh = Math.floor(totalMinutes / 60) % 24;
   const mm = totalMinutes % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-}
-
-function formatMinuteToHms(minute: number): string {
-  const totalSeconds = Math.max(0, Math.round(minute * 60));
-  const hh = Math.floor(totalSeconds / 3600);
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-}
-
-function formatBlockTimeRange(block: GeneratedScheduleBlock): string {
-  return `${formatMinuteToHms(block.plannedStartMinute)} - ${formatMinuteToHms(block.plannedEndMinute)}`;
 }
 
 /** 依產出最短班次時長自動推算格寬，使起迄時間盡量完整顯示。 */
@@ -397,6 +435,15 @@ function resolveBlockCode(
   }
 
   if (block.taskType === 'passenger') {
+    // 調度班次：整備出場站 ≠ 首班首站時，代號前加整備代號前綴（如 ATN1706）
+    if (block.yardDispatchPrefix) {
+      return buildScheduleBlockTripCode({
+        prefixCode: block.yardDispatchPrefix,
+        timelineRow: block.timelineRow,
+        startMinute: block.plannedStartMinute,
+        includeColumnCode: false,
+      });
+    }
     return buildScheduleBlockTripCode({
       prefixCode: block.routeCode,
       timelineRow: block.timelineRow,
@@ -570,6 +617,63 @@ function ScheduleIntervalAxisHit({
   );
 }
 
+/**
+ * P5: 未服務運能缺口標記——在時間軸上顯示 UNSERVED_SERVICE_PULSE 紅色豪線。
+ */
+function UnservedPulseMarkers({
+  report,
+  slotWidthPx,
+}: {
+  report: ShiftScheduleFeasibilityReport | null;
+  slotWidthPx: number;
+}) {
+  const markers = useMemo(() => {
+    if (!report) return [];
+    const out: { departureSecond: number; message: string }[] = [];
+    for (const issue of report.warnings) {
+      if (issue.code !== 'UNSERVED_SERVICE_PULSE') continue;
+      const sec = issue.detail?.departureSecond;
+      if (typeof sec !== 'number') continue;
+      out.push({ departureSecond: sec, message: issue.message });
+    }
+    return out;
+  }, [report]);
+
+  if (markers.length === 0) return null;
+
+  return (
+    <>
+      {markers.map(({ departureSecond, message }) => {
+        const minuteFromMidnight = departureSecond / 60;
+        const leftPx = (minuteFromMidnight / GRID_SLOT_MINUTES) * slotWidthPx;
+        return (
+          <div
+            key={`unserved-${departureSecond}`}
+            className="group pointer-events-auto absolute bottom-0 top-0 z-[8] w-0"
+            style={{ left: leftPx }}
+            role="img"
+            aria-label={message}
+          >
+            {/* 紅色豪線 */}
+            <div className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-red-500/70" />
+            {/* 上方小三角標記 */}
+            <div className="absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-red-500/90" />
+            {/* Hover tooltip */}
+            <div
+              className="pointer-events-none absolute left-1/2 top-full z-[10060] mt-1 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-red-500/40 bg-zinc-950 px-2.5 py-2 text-[10px] leading-snug text-red-300 shadow-xl shadow-black/50 group-hover:block"
+              role="tooltip"
+            >
+              <span className="mb-0.5 block font-semibold">&#9888; 未承接跨距</span>
+              {message}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+
 function ShiftScheduleBlockBar({
   block,
   blockIndex,
@@ -615,8 +719,21 @@ function ShiftScheduleBlockBar({
       ? ENTRY_SERVICE_COLOR_SET
       : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
-  const widthPx = (durationMinutes / GRID_SLOT_MINUTES) * slotWidthPx;
-  const leftPx = (block.plannedStartMinute / GRID_SLOT_MINUTES) * slotWidthPx;
+  const daySegments = useMemo(
+    () =>
+      splitIntoDayCycleSegments(
+        block.plannedStartMinute,
+        block.plannedEndMinute,
+      ),
+    [block.plannedStartMinute, block.plannedEndMinute],
+  );
+  const stayInsideCalendarDay =
+    block.plannedStartMinute >= 0 - 1e-9
+    && block.plannedEndMinute <= SCHEDULE_DAY_MINUTES + 1e-9;
+  const interactiveOnSegments =
+    interactiveEdit
+    && daySegments.length === 1
+    && stayInsideCalendarDay;
   const inactiveRanges = useMemo(
     () =>
       getInactiveRangesWithinBar(
@@ -748,7 +865,7 @@ function ShiftScheduleBlockBar({
     event: ReactPointerEvent<HTMLElement>,
     mode: 'move' | 'resize-start' | 'resize-end',
   ) => {
-    if (!interactiveEdit || block.source !== 'template_bar') return;
+    if (!interactiveOnSegments || block.source !== 'template_bar') return;
     if (!onCommitTimeRange && !onPreviewTimeRange) return;
     event.preventDefault();
     event.stopPropagation();
@@ -826,13 +943,21 @@ function ShiftScheduleBlockBar({
   };
 
   return (
+    <>
+      {daySegments.map((seg, segIndex) => {
+        const leftPx = (seg.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
+        const widthPx =
+          ((seg.endMinute - seg.startMinute) / GRID_SLOT_MINUTES) * slotWidthPx;
+        const showChrome = segIndex === 0;
+        return (
     <div
-      id={`block-card-${block.id}`}
+      key={`${block.id}-day-${segIndex}`}
+      id={showChrome ? `block-card-${block.id}` : undefined}
       className={`absolute isolate flex flex-col justify-center overflow-hidden rounded-[4px] px-1 ${
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
         selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
-      } ${selectable ? (interactiveEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${extraBorderClass}`}
+      } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${extraBorderClass}`}
       style={{
         left: leftPx,
         width: Math.max(widthPx, 4),
@@ -844,7 +969,7 @@ function ShiftScheduleBlockBar({
       }}
       title={`${block.label} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`}
       role={selectable ? 'button' : undefined}
-      tabIndex={selectable ? 0 : undefined}
+      tabIndex={selectable && showChrome ? 0 : undefined}
       onClick={
         selectable
           ? (event) => {
@@ -854,12 +979,12 @@ function ShiftScheduleBlockBar({
           : undefined
       }
       onPointerDown={
-        selectable && interactiveEdit
+        selectable && interactiveOnSegments
           ? (event) => beginInteractiveDrag(event, 'move')
           : undefined
       }
       onKeyDown={
-        selectable
+        selectable && showChrome
           ? (event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -869,7 +994,7 @@ function ShiftScheduleBlockBar({
           : undefined
       }
     >
-      {interactiveEdit && selectable ? (
+      {interactiveOnSegments && selectable ? (
         <>
           <div
             className="absolute inset-y-0 left-0 z-[9] cursor-ew-resize"
@@ -938,6 +1063,15 @@ function ShiftScheduleBlockBar({
         />
       )}
       {inactiveRanges.map((range) => {
+        // 跨夜條帶已改畫在 00:00 後，與絕對分鐘軸不成比例，略過 inactive 叠層
+        if (
+          durationMinutes <= 0
+          || daySegments.length !== 1
+          || block.plannedEndMinute > SCHEDULE_DAY_MINUTES + 1e-9
+          || block.plannedStartMinute >= SCHEDULE_DAY_MINUTES - 1e-9
+        ) {
+          return null;
+        }
         const leftPct =
           ((range.start - block.plannedStartMinute) / durationMinutes) * 100;
         const widthPct = ((range.end - range.start) / durationMinutes) * 100;
@@ -950,6 +1084,7 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
+      {showChrome ? (
       <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
@@ -990,7 +1125,8 @@ function ShiftScheduleBlockBar({
           {timeLabel}
         </div>
       </div>
-      {stationHoverPos && showStationInfo ? (
+      ) : null}
+      {showChrome && stationHoverPos && showStationInfo ? (
         <BlockAlgorithmHoverCard
           routeName={block.routeName ?? block.label}
           blockCode={code}
@@ -999,9 +1135,15 @@ function ShiftScheduleBlockBar({
           legs={topologyLegs}
           pos={stationHoverPos}
           hideStrategyBuffers={hideStrategyBuffers}
+          entryServiceBerthCheck={
+            block.source === 'entry_service' ? block.entryServiceBerthCheck : undefined
+          }
         />
       ) : null}
     </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -1097,6 +1239,8 @@ export function ShiftSchedulePlanGrid({
                   slotWidthPx={slotWidthPx}
                   interactive
                 />
+                {/* P5: 未服務運能缺口標記 */}
+                <UnservedPulseMarkers report={report} slotWidthPx={slotWidthPx} />
                 {timeSlots.map((slot) => (
                   <div
                     key={slot}
