@@ -1,0 +1,288 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import type { ShiftScheduleSelectedRoute } from '../types/create';
+import type { GeneratedScheduleBlock, GeneratedScheduleTimeline } from './schedule-engine/types';
+import { ROUTE_SUCCESSOR_ALGORITHM_GRAPH } from './schedule-engine/routeSuccessorPolicy';
+import type { RouteSuccessorPolicy } from './schedule-engine/routeSuccessorPolicy';
+import { relievePlatformIdleWithSecondaryEdge } from './relievePlatformIdleWithSecondaryEdge';
+
+function route(partial: Partial<ShiftScheduleSelectedRoute> & {
+  routeId: string;
+  routeCode: string;
+  stationIds: string[];
+}): ShiftScheduleSelectedRoute {
+  return {
+    instanceId: partial.instanceId ?? partial.routeId,
+    routeName: partial.routeName ?? partial.routeCode,
+    groupId: 'g',
+    groupName: 'g',
+    executionOrder: partial.executionOrder ?? 1,
+    avgTravelTimeSeconds: 120,
+    minTravelTimeSeconds: 100,
+    switchBufferAfterSeconds: 0,
+    dwellSlackSeconds: 0,
+    stationDwells: partial.stationIds.map((stationId, index) => ({
+      stationId,
+      stationName: stationId,
+      dwellSeconds: index === 0 ? 0 : 30,
+    })),
+    stationLegTravels: [],
+    stationDwellsConfirmed: true,
+    backupForInstanceId: null,
+    backupForRouteId: null,
+    ...partial,
+  } as ShiftScheduleSelectedRoute;
+}
+
+function block(
+  partial: Partial<GeneratedScheduleBlock> & {
+    id: string;
+    timelineRow: number;
+    plannedStartMinute: number;
+    plannedEndMinute: number;
+  },
+): GeneratedScheduleBlock {
+  return {
+    taskType: 'passenger',
+    label: '正線',
+    source: 'template_bar',
+    travelSeconds: 120,
+    dwellSeconds: 30,
+    anchorStartMinute: partial.plannedStartMinute,
+    routeId: partial.routeId ?? 'a',
+    routeCode: partial.routeCode ?? 'A',
+    routeName: 'A',
+    routeInstanceId: partial.routeInstanceId ?? partial.routeId ?? 'a',
+    ...partial,
+  } as GeneratedScheduleBlock;
+}
+
+/** 路線 A：X→T3（車跑完一輪，最後停在 T3） */
+const routeA = route({ routeId: 'a', routeCode: 'A', stationIds: ['X', 'T3'] });
+/** 路線 A-next：T3→Z（下一個脈衝排定的下一段，起點正是 T3） */
+const routeANext = route({ routeId: 'a-next', routeCode: 'ANEXT', stationIds: ['T3', 'Z'] });
+/** 路線 LOOP：T3→Y→T3，繞一圈又回到 T3——次要邊，終點正好等於 A-next 的起點站 */
+const routeLoop = route({
+  routeId: 'loop',
+  routeCode: 'LOOP',
+  stationIds: ['T3', 'Y', 'T3'],
+  avgTravelTimeSeconds: 60,
+  minTravelTimeSeconds: 50,
+});
+/** 路線 LOOP-LONG：跟 LOOP 一樣繞回 T3，但太久，塞不進空等區間 */
+const routeLoopLong = route({
+  routeId: 'loop-long',
+  routeCode: 'LOOPLONG',
+  stationIds: ['T3', 'W', 'T3'],
+  avgTravelTimeSeconds: 900,
+  minTravelTimeSeconds: 850,
+});
+/** 路線 LOOP-ELSEWHERE：次要邊存在，但終點不是 T3，接不回下一段 */
+const routeLoopElsewhere = route({
+  routeId: 'loop-elsewhere',
+  routeCode: 'LOOPELSEWHERE',
+  stationIds: ['T3', 'V'],
+  avgTravelTimeSeconds: 60,
+  minTravelTimeSeconds: 50,
+});
+/** 另一列在 T3 撞上 earlierBlock 空等期間的車 */
+const routeOther = route({ routeId: 'other', routeCode: 'OTHER', stationIds: ['U', 'T3'] });
+
+function successorPolicy(secondary: Map<string, string[]>): RouteSuccessorPolicy {
+  return {
+    algorithm: ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+    valid: true,
+    routesByInstanceId: new Map([
+      ['a', routeA],
+      ['a-next', routeANext],
+      ['loop', routeLoop],
+      ['loop-long', routeLoopLong],
+      ['loop-elsewhere', routeLoopElsewhere],
+      ['other', routeOther],
+    ]),
+    rotationRoutes: [routeA, routeANext],
+    prioritySuccessors: new Map([['a', ['a-next']]]),
+    secondarySuccessors: secondary,
+    startInstanceIds: ['a'],
+    endInstanceIds: new Set(['a-next']),
+    canonicalCycleInstanceIds: ['a', 'a-next'],
+    throughCycles: [],
+  };
+}
+
+/**
+ * row1：A（X→T3，60:00 出發，到 T3 後很快靠站結束）跑完後，
+ * 排定的下一段 A-next（T3→Z）要等到 70:00 才發車——中間空等 10 分鐘。
+ * row2：另一台車 Other（U→T3）在這段空等期間到了 T3，兩者撞上。
+ */
+function idleCollisionTimelines(): GeneratedScheduleTimeline[] {
+  return [
+    {
+      row: 1,
+      blocks: [
+        block({
+          id: 'a-in',
+          timelineRow: 1,
+          plannedStartMinute: 60,
+          plannedEndMinute: 60 + 170 / 60,
+          routeId: 'a',
+          routeCode: 'A',
+          routeInstanceId: 'a',
+        }),
+        block({
+          id: 'a-next',
+          timelineRow: 1,
+          plannedStartMinute: 70,
+          plannedEndMinute: 70 + 170 / 60,
+          routeId: 'a-next',
+          routeCode: 'ANEXT',
+          routeInstanceId: 'a-next',
+        }),
+      ],
+    },
+    {
+      row: 2,
+      blocks: [
+        block({
+          id: 'other-in',
+          timelineRow: 2,
+          plannedStartMinute: 65,
+          plannedEndMinute: 65 + 170 / 60,
+          routeId: 'other',
+          routeCode: 'OTHER',
+          routeInstanceId: 'other',
+        }),
+      ],
+    },
+  ];
+}
+
+describe('relievePlatformIdleWithSecondaryEdge', () => {
+  it('有次要邊迴圈、時間塞得下、終點接得回下一段起點站 → 插入站位讓渡', () => {
+    const warnings: never[] = [];
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeLoop, routeOther],
+      successorPolicy: successorPolicy(new Map([['a', ['loop']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: warnings as never,
+    });
+
+    const row1 = result.find((t) => t.row === 1)!;
+    const relief = row1.blocks.find((b) => b.source === 'relief_loop');
+    assert.ok(relief, '應該插入 relief_loop 區塊');
+    assert.equal(relief!.routeId, 'loop');
+    // 讓渡必須夾在 A 結束與 A-next 開始之間，不得咬到任何一段
+    assert.ok(relief!.plannedStartMinute >= 60 + 170 / 60 - 1e-9);
+    assert.ok(relief!.plannedEndMinute <= 70 + 1e-6);
+    assert.equal(warnings.length, 1);
+    assert.equal((warnings[0] as { code: string }).code, 'STATION_BERTH_RELIEF_INSERTED');
+  });
+
+  it('沒有次要邊 → 不插入，時間線原樣不變', () => {
+    const timelines = idleCollisionTimelines();
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines,
+      selectedRoutes: [routeA, routeANext, routeOther],
+      successorPolicy: successorPolicy(new Map()),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.length, 2);
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+  });
+
+  it('次要邊終點不是下一段起點站 → 不插入', () => {
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeLoopElsewhere, routeOther],
+      successorPolicy: successorPolicy(new Map([['a', ['loop-elsewhere']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+  });
+
+  it('次要邊終點對，但繞一圈太久塞不進空等區間 → 不插入', () => {
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeLoopLong, routeOther],
+      successorPolicy: successorPolicy(new Map([['a', ['loop-long']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+  });
+
+  it('碰撞保護時間為 0（整組關閉）→ 直接不處理，回傳原時間線', () => {
+    const timelines = idleCollisionTimelines();
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines,
+      selectedRoutes: [routeA, routeANext, routeLoop, routeOther],
+      successorPolicy: successorPolicy(new Map([['a', ['loop']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 0,
+      warnings: [],
+    });
+    assert.equal(result, timelines);
+  });
+
+  it('沒有 successorPolicy（或無效）→ 直接不處理，回傳原時間線', () => {
+    const timelines = idleCollisionTimelines();
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines,
+      selectedRoutes: [routeA, routeANext, routeLoop, routeOther],
+      successorPolicy: null,
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    assert.equal(result, timelines);
+  });
+
+  it('沒有真的滯留（同列緊接著就是下一段）→ 不插入，即使有現成次要邊', () => {
+    const timelines: GeneratedScheduleTimeline[] = [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'a-in',
+            timelineRow: 1,
+            plannedStartMinute: 60,
+            plannedEndMinute: 60 + 170 / 60,
+            routeId: 'a',
+            routeCode: 'A',
+            routeInstanceId: 'a',
+          }),
+          block({
+            id: 'a-next',
+            timelineRow: 1,
+            // 緊接著發車（換線間隔內），不是滯留
+            plannedStartMinute: 60 + 170 / 60 + 30 / 60,
+            plannedEndMinute: 60 + 340 / 60,
+            routeId: 'a-next',
+            routeCode: 'ANEXT',
+            routeInstanceId: 'a-next',
+          }),
+        ],
+      },
+    ];
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines,
+      selectedRoutes: [routeA, routeANext, routeLoop],
+      successorPolicy: successorPolicy(new Map([['a', ['loop']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
+  });
+});

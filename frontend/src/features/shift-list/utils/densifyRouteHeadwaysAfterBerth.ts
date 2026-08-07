@@ -131,10 +131,11 @@ export function densifyRouteHeadwaysAfterBerth(args: {
     ...timeline,
     blocks: timeline.blocks.map((block) => ({ ...block })),
   }));
-  const protection: BerthProtectionContext = {
-    collisionProtectionSeconds,
-    timelines,
-  };
+  // 站位求解只用「2 × 碰撞保護時間」這條約束，刻意<strong>不</strong>把末站滯留算進來：
+  // 滯留長度由班距脈衝決定，往後延只會讓滯留變短、衝突照舊，卻會把班次延到上限，
+  // 連帶讓 densify 拉不回班距、運能崩掉。滯留改由最終驗證回報、
+  // 由整備後調度班次與站位讓渡去實際處理（詳見 BerthProtectionContext 註解）。
+  const protection: BerthProtectionContext = { collisionProtectionSeconds };
 
   const byRoute = new Map<string, GeneratedScheduleBlock[]>();
   for (const timeline of timelines) {

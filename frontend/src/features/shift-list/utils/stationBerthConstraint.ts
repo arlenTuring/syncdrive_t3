@@ -147,11 +147,26 @@ export type BerthProtectionContext = {
    */
   collisionProtectionSeconds: number;
   /**
-   * 全部時間線。用來判斷 A 車跑完這一趟之後是不是還滯留在末站——
-   * 有滯留就以「真的開走的時刻」為準，不是「跑完這一趟的時刻」。
-   * 不給就只用班次自己的到離站時刻。
+   * 要把「末站滯留」算進佔用時，傳全部時間線；不傳就只用班次自己的到離站時刻。
+   *
+   * <strong>只有「對滯留做得出決策」的呼叫端才可以傳。</strong>
+   * 目前是：最終驗證（回報）、整備後調度班次落點（可換交路或略過）、
+   * 站位讓渡（可插次要邊繞開）。
+   *
+   * <strong>站位求解器／densify／repair 一律不可傳</strong>，原因不是保守，是這個
+   * 約束對它們無效且有害：
+   * 1. <strong>槓桿不對。</strong>它們唯一能做的是「把這一趟往後延」，但滯留長度
+   *    取決於「下一個任務何時開始」（由班距脈衝決定，改不了）。往後延只會讓滯留
+   *    變短、衝突照舊，於是每輪都延到上限（後幾輪是 1800 秒）卻永遠解不掉。
+   * 2. <strong>會毀掉班距。</strong>densify 的工作是把班次往前拉回目標班距以拉高
+   *    PPHPD；滯留佔用讓每個共用站位看起來幾乎全天被佔滿，densify 一趟都拉不動，
+   *    運能直接崩掉（2026-08-08 實測：600 秒規則班距變成
+   *    00:30→00:52→01:02→01:27，見 §17）。
+   *
+   * 一句話：<strong>滯留佔用是「判斷與決策」的輸入，不是「排點」的約束</strong>；
+   * 2 × 碰撞保護時間才是排點約束（小幅延後就能解，槓桿對得上）。
    */
-  timelines?: GeneratedSchedulePlan['timelines'];
+  idleOccupancyTimelines?: GeneratedSchedulePlan['timelines'];
 };
 
 /**
@@ -180,10 +195,11 @@ export function projectProtectedBerthWindowsSeconds(
   const protectionSeconds = protection.collisionProtectionSeconds * 2;
 
   // 末站滯留：只有最後一個站位會被延長——車開過中間站時不會停在那裡等。
+  // 只有傳了 idleOccupancyTimelines 的呼叫端才算滯留（理由見型別註解）。
   let idleUntilSecond: number | null = null;
-  if (protection.timelines) {
+  if (protection.idleOccupancyTimelines) {
     const idleUntilMinute = resolveSameRowIdleOccupiedUntilMinute(
-      protection.timelines,
+      protection.idleOccupancyTimelines,
       block,
     );
     if (idleUntilMinute != null) idleUntilSecond = minuteToSecond(idleUntilMinute);
@@ -561,10 +577,11 @@ export function enforceStationBerthConstraints(args: {
   }));
 
   // 就地改寫 timelines，所以滯留判定讀到的一定是當下最新的版面
-  const protection: BerthProtectionContext = {
-    collisionProtectionSeconds,
-    timelines,
-  };
+  // 站位求解只用「2 × 碰撞保護時間」這條約束，刻意<strong>不</strong>把末站滯留算進來：
+  // 滯留長度由班距脈衝決定，往後延只會讓滯留變短、衝突照舊，卻會把班次延到上限，
+  // 連帶讓 densify 拉不回班距、運能崩掉。滯留改由最終驗證回報、
+  // 由整備後調度班次與站位讓渡去實際處理（詳見 BerthProtectionContext 註解）。
+  const protection: BerthProtectionContext = { collisionProtectionSeconds };
 
   const passengerBlocks: GeneratedScheduleBlock[] = [];
   for (const timeline of timelines) {

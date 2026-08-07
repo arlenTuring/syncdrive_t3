@@ -53,6 +53,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   ROUTE_ROTATION_OVER_TURNAROUND: '路線組合超過折返時限',
   ROTATION_CYCLE_INCOMPLETE: '未跑完一整輪',
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
+  STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
 };
 
 /** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -87,6 +88,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   ROUTE_ROTATION_OVER_TURNAROUND: { id: 's3', label: '§3 完整流水線' },
   ROTATION_CYCLE_INCOMPLETE: { id: 's1', label: '§1 核心原則（服從順序）' },
   MAINTENANCE_DISPATCH_UNREACHABLE: { id: 's10', label: '§10 進場載客' },
+  STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -209,6 +211,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。',
+  },
+  STATION_BERTH_RELIEF_INSERTED: {
+    kind: 'policy',
+    guidance:
+      '車跑完一輪、在共用站位空等下一個脈衝時會撞到別列車，已自動沿關聯圖次要邊插入一段讓它先去別站等，時間到了再回來接原排定的下一段。屬正常求解，不是錯誤；若不想要這種讓渡，可在關聯圖移除該次要邊。',
   },
 };
 

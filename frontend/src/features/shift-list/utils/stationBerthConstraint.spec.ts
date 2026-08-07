@@ -1294,4 +1294,71 @@ describe('碰撞保護時間（生成期求解）', () => {
       .find((candidate) => candidate.id === 'inbound')!;
     assert.equal(Math.round(inbound.plannedStartMinute * 60), 60 * 60 + 200);
   });
+
+  it('求解器不得因「別列車在末站滯留」而延後班次——那會毀掉班距', () => {
+    // row1 的車 62:50 靠站結束，但下一個任務要到 70:00 才開始，中間滯留 7 分鐘。
+    // row2 的車 64:00 到 P1——已經超過 row1 自然離站 62:50 + 2×30 秒保護，
+    // 依「排點只看 2×保護時間」的規則不該被延後。
+    //
+    // 若把滯留佔用也當成排點約束，row2 會被推到 71:00 之後；densify 因此拉不動
+    // 任何班次，實測會讓 600 秒規則班距崩成 00:30→00:52→01:02→01:27。
+    // 滯留改由最終驗證回報、由整備後調度班次與站位讓渡實際處理。
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          block({
+            id: 'idler',
+            timelineRow: 1,
+            plannedStartMinute: 60,
+            plannedEndMinute: 60 + 170 / 60,
+            routeId: 'tn',
+            routeCode: 'TN',
+          }),
+          {
+            id: 'idler-next',
+            timelineRow: 1,
+            taskType: 'charging' as const,
+            label: '充電',
+            source: 'template_bar' as const,
+            plannedStartMinute: 70,
+            plannedEndMinute: 100,
+            anchorStartMinute: 70,
+            travelSeconds: 0,
+            dwellSeconds: 0,
+          } as GeneratedScheduleBlock,
+        ],
+      },
+      {
+        row: 2,
+        blocks: [
+          block({
+            id: 'follower',
+            timelineRow: 2,
+            plannedStartMinute: 62,
+            plannedEndMinute: 62 + 170 / 60,
+            routeId: 'tn',
+            routeCode: 'TN',
+          }),
+        ],
+      },
+    ];
+
+    const solved = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [tn],
+      collisionProtectionSeconds: 30,
+      maxDelaySeconds: 1800,
+    });
+
+    const follower = solved.timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((candidate) => candidate.id === 'follower')!;
+    assert.equal(
+      Math.round(follower.plannedStartMinute * 60),
+      62 * 60,
+      '不該因為前車滯留而被延後',
+    );
+    assert.equal(solved.delayedCount, 0);
+  });
 });

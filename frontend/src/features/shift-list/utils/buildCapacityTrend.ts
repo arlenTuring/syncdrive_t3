@@ -88,7 +88,11 @@ type HeadwaySegment = {
 function isCapacityPassengerBlock(block: GeneratedScheduleBlock): boolean {
   return (
     block.taskType === 'passenger'
-    && (block.source === 'template_bar' || block.source === 'entry_service')
+    && (
+      block.source === 'template_bar'
+      || block.source === 'entry_service'
+      || block.source === 'relief_loop'
+    )
   );
 }
 

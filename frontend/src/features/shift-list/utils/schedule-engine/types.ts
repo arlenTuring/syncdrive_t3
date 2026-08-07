@@ -10,7 +10,13 @@ export type ScheduleBlockSource =
   | 'transition'
   | 'dispatch'
   /** 進場載客：保養尾端長出、載客開往真正首班起點站的短交路（不算輪替，計入運能） */
-  | 'entry_service';
+  | 'entry_service'
+  /**
+   * 站位讓渡：車跑完一輪，在共用站位空等下一個班距脈衝時會撞到別列車，
+   * 改讓它沿關聯圖次要邊先開去別站等，時間到了再回來接原本排定的下一段
+   * （不算輪替，計入運能；見文件 §8.2）。
+   */
+  | 'relief_loop';
 
 export type GeneratedScheduleBlock = {
   id: string;
@@ -99,7 +105,9 @@ export type FeasibilityViolationCode =
   /** 時間線上正線未跑完路線群組一整輪（例：只跑下行未跑上行） */
   | 'ROTATION_CYCLE_INCOMPLETE'
   /** 保養／行前後調度無法接到首班起點站 */
-  | 'MAINTENANCE_DISPATCH_UNREACHABLE';
+  | 'MAINTENANCE_DISPATCH_UNREACHABLE'
+  /** 站位讓渡：已插入次要邊讓車先去別站等，避開共用站位碰撞（資訊性） */
+  | 'STATION_BERTH_RELIEF_INSERTED';
 
 /** 策略說明｜演算法極限｜可調整建議（見 feasibilityIssueMeta.ts） */
 export type FeasibilityIssueKind = 'policy' | 'limit' | 'actionable';

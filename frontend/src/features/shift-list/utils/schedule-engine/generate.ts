@@ -37,6 +37,7 @@ import {
 } from '../stationBerthConstraint';
 import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
 import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
+import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
 import {
@@ -203,6 +204,16 @@ export function generateShiftSchedule(
         ? {}
         : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
     }).timelines;
+
+    // 跑完一輪在共用站位空等下一個脈衝時撞到別列車 → 有次要邊就先繞去別站等
+    timelines = relievePlatformIdleWithSecondaryEdge({
+      timelines,
+      selectedRoutes: routesForBerth,
+      successorPolicy: engineInput.successorPolicy,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      warnings: round === 0 ? warnings : [],
+    });
 
     // 班距太疏 → 把後車往前拉回目標
     timelines = densifyRouteHeadwaysAfterBerth({

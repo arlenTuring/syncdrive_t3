@@ -220,9 +220,11 @@ function resolveBerthClearMinute(args: {
   /** 只看這個時刻之後仍在佔用的車；更早已離站的不算 */
   notBeforeMinute: number;
 }): number | null {
+  // 調度班次的落點是引擎自己挑的（可換交路、可略過），所以這裡「算得起」滯留佔用
+  // ——查得到別台車還停在目標站位，就換一條候選鏈或不插這一趟。
   const protection = {
     collisionProtectionSeconds: args.collisionProtectionSeconds,
-    timelines: args.timelines,
+    idleOccupancyTimelines: args.timelines,
   };
   let clearMinute: number | null = null;
   for (const timeline of args.timelines) {

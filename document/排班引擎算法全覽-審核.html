@@ -716,6 +716,40 @@
     這一段只會發生在該趟的<strong>末站</strong>——車開過中間站不會停在那裡等。
     等待落差在 60 秒以內的不算滯留，那是正常的換線接續。
   </p>
+  <p class="note">
+    <strong>但滯留佔用是「判斷與決策」的輸入，不是「排點」的約束。</strong>
+    這兩件事必須分開，否則班距會整個崩掉（2026-08-08 踩過，見 §17）：
+  </p>
+  <table>
+    <thead><tr><th>誰在用</th><th>算不算滯留</th><th>為什麼</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>最終驗證</td><td>算</td>
+        <td>它的工作是<strong>回報</strong>，不會動班次，算得越準越好</td>
+      </tr>
+      <tr>
+        <td>整備後調度班次落點（§10）</td><td>算</td>
+        <td>它可以<strong>換一條候選交路鏈、或乾脆不插這一趟</strong>，對滯留做得出決策</td>
+      </tr>
+      <tr>
+        <td>站位讓渡（§8.2）</td><td>算</td>
+        <td>它可以<strong>插次要邊把車繞開</strong>，正是專門用來解滯留衝突的</td>
+      </tr>
+      <tr>
+        <td>站位求解器／班距補疏／班距修復</td><td><strong>不算</strong></td>
+        <td>
+          它們唯一能做的是「把這一趟往後延」，但滯留長度取決於「下一個任務何時開始」
+          （班距脈衝決定，改不了）——往後延只會讓滯留變短、衝突照舊，於是每輪都延到
+          上限卻永遠解不掉，還讓班距補疏一趟都拉不動。<strong>槓桿根本不對。</strong>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    這幾處全部走同一個 <code>projectProtectedBerthWindowsSeconds()</code>；要不要算滯留，
+    由呼叫端傳不傳 <code>idleOccupancyTimelines</code> 決定。
+    <strong>2 × 碰撞保護時間則是所有呼叫端都套用的排點約束</strong>——那個小幅延後就能解，槓桿對得上。
+  </p>
   <p>
     <strong>只管不同車，不管同一台車。</strong>碰撞保護處理的是兩台車在同一個站位交接，
     同一台車前後兩趟在折返站交接（到站、停一下、再從同一站開出）根本不可能自己撞自己，
@@ -729,7 +763,8 @@
   <p>
     <strong>只有一份定義。</strong>站位求解、班距補疏、班距修復、整備後調度班次、最終驗證，
     五處全部呼叫 <code>projectProtectedBerthWindowsSeconds()</code> 取得同一份「受保護的站位佔用窗」，
-    沒有任何一處自己算。過去五處各算各的，其中一處還漏掉跨列掃描，就漏放了真實碰撞（見 §17）。
+    沒有任何一處自己算（差別只在上表的「算不算滯留」）。
+    過去五處各算各的，其中一處還漏掉跨列掃描，就漏放了真實碰撞（見 §17）。
   </p>
   <p>
     把欄位填 <strong>0 就是整組防碰撞判定關閉</strong>：不加保護時間，也不把末站滯留算進佔用，
@@ -744,6 +779,41 @@
     <strong>已知限制：</strong>單一站位只能停一台車。終點站停靠時間長又要壓短班距時
     （例：終站停 140 秒、班距 180 秒，只剩 40 秒淨空），再加 60 秒保護就是物理上排不出來，
     引擎會持續回報保護不足。這種情況要改的是停靠時間、班距或站位數，不是把保護時間調小蓋掉警告。
+  </p>
+
+  <h3>8.2 車跑完一輪、空等下一個脈衝時撞到別列車，怎麼辦</h3>
+  <p>
+    有一種碰撞保護抓到的情況，不是兩台車排太近，而是<strong>一台車跑完一整輪交路後，
+    在某個共用站位空等下一個班距脈衝才會被指派新的一輪</strong>——這段空等一樣算佔用
+    （見 §8.1「只管不同車，不管同一台車」——這裡是不同車：等待的這台跟撞上它的那台
+    是不同時間線、不同的車）。如果好幾條路線都在同一個共用站位這樣輪流空等，
+    單一站位放不下，就會連續報一長串 <code>STATION_BERTH_PROTECTION_GAP</code>。
+  </p>
+  <p>
+    單一站位不能開分身，這種情況只剩兩條路：這台車自己快點走，或是先繞去別站等，
+    時間到了再回來接原本排定的下一段。引擎做的是後者，<strong>只在關聯圖上有次要邊、
+    而且繞一趟的時間剛好塞得進這段空等、繞完又直接接得上下一段起點站</strong>時才插入：
+  </p>
+  <ol>
+    <li>找出「跑完一輪、空等時會撞到別列車」的那一段（同一時間線內，自然結束到下一個已排定任務之間有滯留，且滯留期間確實跟別的時間線在該站位撞上）。</li>
+    <li>查關聯圖，這段所屬路線在該站位有沒有次要邊。</li>
+    <li>算次要邊那趟的發車與到站時刻，<strong>只接受終點正好等於下一段起點站</strong>的次要邊
+    ——不繞多跳去找路徑，避免猜錯使用者真正想要的迂迴方式。</li>
+    <li>算完的時刻若能塞進空等的區間（含前後換線／恢復間隔）而不晚於下一段原定發車，
+    就插入這一段「站位讓渡」；哪一種都不成立就不插，維持原本的
+    <code>STATION_BERTH_PROTECTION_GAP</code> 警告，回報給使用者自己決定。</li>
+  </ol>
+  <p>
+    插入的這一段跟進場載客（entry_service）同一類特例：<code>source: 'relief_loop'</code>，
+    照樣載客、計入運能，但不算輪替圈數、不受班距約束。成功插入時額外回報
+    <code>STATION_BERTH_RELIEF_INSERTED</code>（資訊性警告，不擋生成），讓使用者知道
+    引擎動過班次、可以去關聯圖確認這條次要邊是不是真的可以這樣用。
+  </p>
+  <p class="note">
+    <strong>已知限制：</strong>目前只處理「一次次要邊直接接回下一段起點站」這種最簡單的情況。
+    需要繞兩跳以上才能接回去、或該站根本沒有次要邊，引擎不會替使用者發明路徑——
+    這種情況通常代表關聯圖本身需要調整（加一條次要邊、或重新想這個共用站位的整體分流），
+    不是演算法能單靠這一站位的資訊解決的，見文件開頭「基本上要看整體關聯，不是只處理一個樞紐」。
   </p>
 </section>
 
@@ -1036,6 +1106,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
+      <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
   <p>更細的 issue 文案／建議見 <code>feasibilityIssueMeta.ts</code>；本頁為排班調度唯一說明文件。逐則實測見 <a href="./排班引擎最近問題.html">最近一次生成的問題</a>，代號一致，可交叉核對。</p>
@@ -1293,6 +1364,42 @@ backend/src/dev-log/
     <li>
       <strong>改動碰撞保護時間會讓既有產出失效：</strong>此值已納入
       <code>buildRouteGroupsParamsFingerprint()</code>，改了就要重新生成，不會沿用舊班表。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · 滯留佔用被誤當成排點約束，班距整個崩掉</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>加入碰撞保護後，運能趨勢圖上實際 PPHPD 整天遠低於目標線
+      （目標 700／630／485，實際大多趴在底部）。回歸測試量出來更直接：本來應該是
+      600 秒規則班距的情境，變成
+      <code>00:30 → 00:52 → 01:02 → 01:27 → 01:32 → 01:41</code>——完全亂掉。
+    </li>
+    <li>
+      <strong>根因：</strong>把「末站滯留也算佔用」這條規則<strong>一併套進了站位求解器、
+      班距補疏（densify）與班距修復（repair）</strong>。這三處唯一能做的動作是「把班次往後延」，
+      但滯留長度是由班距脈衝決定的，往後延只會讓滯留變短、衝突照舊——
+      <strong>槓桿根本不對</strong>。於是每一輪都延到上限（後幾輪上限是 1800 秒）卻永遠解不掉；
+      更糟的是 densify 的工作是把班次往前拉回目標班距來拉高運能，滯留佔用讓每個共用站位
+      看起來幾乎全天被佔滿，它一趟都拉不動，運能直接垮掉。
+    </li>
+    <li>
+      <strong>解法：</strong>把「滯留佔用」從<strong>排點約束</strong>降為<strong>判斷與決策的輸入</strong>。
+      由呼叫端傳不傳 <code>idleOccupancyTimelines</code> 決定：最終驗證（回報）、
+      整備後調度班次落點（可換交路或略過）、站位讓渡（可插次要邊繞開）傳；
+      站位求解器／densify／repair 一律不傳。
+      <strong>2 × 碰撞保護時間仍然所有呼叫端都套用</strong>——那個小幅延後就能解，槓桿對得上。
+      對照表見 §8.1。
+    </li>
+    <li>
+      <strong>驗證：</strong>改完後原本被迫關掉碰撞保護的四則班距迴歸測試，
+      有三則可以在保護開啟（30 秒）下通過並已改回；剩一則的 fixture
+      （終站停 140 秒、班距 180 秒，只剩 40 秒淨空）是物理上排不出來，維持關閉並註明原因。
+    </li>
+    <li>
+      <strong>防再犯：</strong><code>stationBerthConstraint.spec.ts</code> 加了一則
+      「求解器不得因別列車在末站滯留而延後班次」的迴歸測試；把滯留加回求解器就會紅。
+      這個決策看起來很像漏掉，沒有測試釘住的話很容易被「好心補上」。
     </li>
   </ul>
 
