@@ -30,6 +30,7 @@ import {
   earliestStartPastBlockerOnDayCycle,
 } from './scheduleDayCycle';
 import { resolveContiguousYardBusyUntilMinute } from './maintenancePostTaskPolicy';
+import { MEANINGFUL_IDLE_GAP_SECONDS } from './stationBerthOccupancy';
 
 function isYieldableMaintenanceBlock(block: GeneratedScheduleBlock): boolean {
   if (block.source !== 'template_bar') return false;
@@ -62,6 +63,41 @@ function canOccupierYieldMaint(
     return occupier.source === 'entry_service';
   }
   return true;
+}
+
+/**
+ * 這個正線區塊所屬「連續在外運行」那一串的起點分鐘。
+ *
+ * 從它往前走，只要中間沒有夾著<strong>別的</strong>整備、而且前後銜接得上
+ * （空檔不超過 {@link MEANINGFUL_IDLE_GAP_SECONDS}），就算同一串連續運行——
+ * 車一路在路上，從來沒有進去過整備。
+ *
+ * <code>excludeMaintId</code> 是正在評估的那一段整備：讓渡的重點就是
+ * 「它的開始時刻會往後移」，所以它自己不能拿來切斷這串運行，
+ * 否則「跑到超過原定整備開始」的那幾腿永遠判不出來跟前面是同一串。
+ *
+ * 中間停下來等（空檔超過門檻）就不算同一串——那代表車當時是閒著的，
+ * 沒有「來不及回來」這回事，不該拿讓渡餘裕去壓縮整備。
+ */
+function resolveContinuousRunStartMinute(
+  ordered: GeneratedScheduleBlock[],
+  occupier: GeneratedScheduleBlock,
+  excludeMaintId: string,
+): number {
+  const index = ordered.findIndex((block) => block.id === occupier.id);
+  if (index < 0) return occupier.plannedStartMinute;
+  let runStart = occupier.plannedStartMinute;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const prev = ordered[i]!;
+    if (prev.id === excludeMaintId) continue;
+    // 車真的進去過別的整備：這串運行到此為止
+    if (isYieldableMaintenanceBlock(prev)) break;
+    if (!isYieldOccupyingBlock(prev)) continue;
+    const gapSeconds = (runStart - prev.plannedEndMinute) * 60;
+    if (gapSeconds > MEANINGFUL_IDLE_GAP_SECONDS) break;
+    runStart = Math.min(runStart, prev.plannedStartMinute);
+  }
+  return runStart;
 }
 
 /** 正線（非進場載客）不可壓任何整備尾巴；進場載客僅允許偷保養尾巴。 */
@@ -105,9 +141,13 @@ export function applyMainlineMaintenanceEntryYield(
         if (!isYieldOccupyingBlock(other)) continue;
         // 保養（servicing）不允許普通正線讓渡開頭；由 pushPassengerPastPrecedingYard 處理
         if (!canOccupierYieldMaint(other, maint)) continue;
-        // 只吃開頭：正線必須在「模板整備起點」之前已發車。
+        // 只吃開頭：這一串連續運行必須在「模板整備起點」之前就已發車。
+        // 判斷用的是<strong>整串</strong>的起點，不是這一腿自己的起點——
+        // 一輪跑到超過整備開始時刻，後面幾腿的起點本來就會晚於整備，
+        // 但車從頭到尾都在路上、根本還沒進去整備，那正是讓渡要處理的情況。
         // 與整備同時起點（例保養尾接行前 09:30）＝不得讓渡壓縮整備，改由 push 推過整串。
-        if (other.plannedStartMinute >= floorStartMinute - 1e-9) continue;
+        const runStartMinute = resolveContinuousRunStartMinute(ordered, other, maint.id);
+        if (runStartMinute >= floorStartMinute - 1e-9) continue;
         if (
           other.plannedStartMinute < lockedEndMinute - 1e-9
           && other.plannedEndMinute > floorStartMinute + 1e-9
@@ -175,6 +215,23 @@ export function pushPassengerPastPrecedingYard(
         if (dropIds.has(prev.id)) continue;
         if (!isYieldableMaintenanceBlock(prev)) continue;
         if (!mustNotStealYardTail(current, prev)) continue;
+
+        // 讓渡進行中的整串正線不推：這串從整備原定開始之前就出發了，車一路在路上，
+        // 根本還沒進去整備。該往後移的是整備開始時刻（applyMainlineMaintenanceEntryYield
+        // 已在同一輪先做過），不是把正線推走——推走會讓班次落到整備結束之後、
+        // 超出正線視窗而被撤掉，等於讓渡餘裕白設。
+        if (canOccupierYieldMaint(current, prev)) {
+          const yardFloorMinute = Math.min(
+            prev.plannedStartMinute,
+            prev.anchorStartMinute,
+          );
+          const runStartMinute = resolveContinuousRunStartMinute(
+            ordered,
+            current,
+            prev.id,
+          );
+          if (runStartMinute < yardFloorMinute - 1e-9) continue;
+        }
 
         const clearMinute = earliestStartPastBlockerOnDayCycle(
           current.plannedStartMinute,

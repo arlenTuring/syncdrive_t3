@@ -46,7 +46,7 @@ export function resolveSameRowNextBlockStartMinute(
  * 不該被算進站位佔用；只有明顯偏長的落差（例如車子要等好幾分鐘才排下一個任務）
  * 才代表車子確實還停在原地佔著站位。
  */
-const MEANINGFUL_IDLE_GAP_SECONDS = 60;
+export const MEANINGFUL_IDLE_GAP_SECONDS = 60;
 
 /**
  * 同一列在這個區塊之後，是否真的有一段「閒置等待」的空檔（超過

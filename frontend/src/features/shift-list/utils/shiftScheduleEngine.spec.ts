@@ -1430,6 +1430,102 @@ describe('rotation cycle completion（來回約束）', () => {
     assert.ok(!startsNoSlack.includes(1200), '餘裕 0 時 00:20 來回會超過充電開始，應不發');
   });
 
+  it('整輪可跑過整備原定開始時刻，整備讓渡改晚開始並鎖住原結束（2026-08-08）', () => {
+    // 讓渡的本質是「整備開始時刻往後移」，不是「正線在整備進行中偷跑」。
+    // 車 00:23:20 出發跑一整輪（兩腿），第二腿 00:30:40 才發車——晚於充電原定的
+    // 00:30，但這台車從 00:23:20 就一直在路上、根本還沒進去整備，所以合法。
+    // 充電改成 00:38:00 開始、結束仍鎖在 01:30（時長被壓縮，這是使用者要的）。
+    //
+    // 舊版逐腿檢查「不得晚於整備開始」會把這一輪整個擋掉，等於讓渡餘裕形同無效
+    // （實測 600 秒與 3000 秒產出完全相同）。
+    const body = {
+      editorVersion: 1,
+      vehicleCapacity: 50,
+      scheduleRowCount: 2,
+      attributes: [
+        {
+          id: 'attr-1',
+          name: '離峰',
+          color: '#00ff00',
+          headwaySeconds: 700,
+          capacityPphpd: 300,
+          isDraft: false,
+        },
+      ],
+      intervals: [
+        {
+          id: 'slot-1',
+          attributeId: 'attr-1',
+          name: '凌晨',
+          startTime: '00:00',
+          endTime: '00:30',
+          isDraft: false,
+        },
+      ],
+      tasks: [1, 2].flatMap((row) => [
+        { id: `w${row}`, rowIndex: row, taskType: 'passenger', startMinute: 0, durationMinutes: 30, label: '正線' },
+        { id: `c${row}`, rowIndex: row, taskType: 'charging', startMinute: 30, durationMinutes: 60, label: '充電' },
+      ]) as ScheduleTask[],
+    };
+
+    const run = (slackSeconds: string) =>
+      generateShiftSchedule({
+        draft: buildDraft({
+          maintenanceTask: {
+            taskId: 'mt-1',
+            taskName: '整備',
+            skipped: false,
+            entrySlackBySection: {
+              charging: slackSeconds,
+              carWash: slackSeconds,
+              maintenance: slackSeconds,
+              preTrip: slackSeconds,
+              mobile: slackSeconds,
+            },
+          },
+          routeGroups: {
+            mapId: 'map-1',
+            selectedRoutes: [downRoute, upRoute],
+            minimumRecoveryTimeSeconds: 30,
+          },
+        }),
+        templateBody: body,
+        maintenanceTaskBody: { charging: { stepEnabled: true } },
+        passengerTimetableMode: 'template',
+      });
+
+    const withSlack = run('600');
+    assert.equal(withSlack.report.ok, true);
+    const row1 = withSlack.plan!.timelines.find((timeline) => timeline.row === 1)!;
+    const paxStarts = row1.blocks
+      .filter((block) => block.taskType === 'passenger')
+      .map((block) => Math.round(block.plannedStartMinute * 60));
+    // 00:23:20 = 1400s 這一輪要掛上，第二腿 00:30:40 = 1840s 晚於充電原定 1800s
+    assert.ok(paxStarts.includes(1400), '整輪應自 00:23:20 發車');
+    assert.ok(paxStarts.includes(1840), '第二腿可晚於整備原定開始（車還在路上）');
+
+    const charging = row1.blocks.find((block) => block.taskType === 'charging')!;
+    assert.equal(
+      Math.round(charging.plannedStartMinute * 60),
+      2280,
+      '充電開始讓渡到整輪結束 00:38:00',
+    );
+    assert.equal(
+      Math.round(charging.plannedEndMinute * 60),
+      90 * 60,
+      '充電結束鎖住不動（時長被壓縮，不是整段往後挪）',
+    );
+
+    // 餘裕不足時仍須擋下：整輪結束 00:38:00 超過 00:30 + 300s = 00:35
+    const tightSlack = run('300');
+    assert.equal(tightSlack.report.ok, true);
+    const tightStarts = tightSlack.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks.filter((block) => block.taskType === 'passenger')
+      .map((block) => Math.round(block.plannedStartMinute * 60));
+    assert.ok(!tightStarts.includes(1400), '餘裕只有 300 秒時這一輪應不發');
+  });
+
   it('does not pre-dispatch by cutting the preceding maintenance tail', () => {
     // 讓渡餘裕只允許占用「接下整備開頭」；
     // 09:00–10:00 整備不得為了 10:00 正線視窗被提前裁尾出車。

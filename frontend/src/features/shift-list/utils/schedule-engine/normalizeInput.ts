@@ -450,9 +450,20 @@ function isAcceptablePlannedCycleLength(
 
 /**
  * 整備讓渡政策：
- * - 可借「開頭」：整輪結束可落入 nextMaintStart + entrySlack
- * - 不可在整備開始後再發車（避免充電中段幽靈班，再被 push 整段過保養）
- * - 不可超讓渡上限（偷尾巴另由 push 處理）
+ *
+ * 讓渡的本質是「<strong>整備開始時刻會往後移</strong>」，不是「正線可以在整備進行中偷跑」。
+ * 車一路在外面跑，跑到超過原定整備開始時刻也沒關係（在餘裕內），整備就晚點開始
+ * （開始往後推、結束鎖住不動、時長被壓縮）。真正不該發生的是
+ * <strong>車已經進去整備了，卻又冒出一段正線</strong>。
+ *
+ * 所以只檢查兩件事：
+ * - <strong>整輪必須在整備開始前發車</strong>——代表這台車在整備開始時就已經在路上了。
+ *   中段各腿可以晚於整備開始，那只是同一台車還沒回來，整備本來就會等它。
+ * - 整輪結束不得超過 nextMaintStart + entrySlack（讓渡餘裕上限）。
+ *
+ * 2026-08-08 更正：舊版檢查<strong>每一腿</strong>都不得晚於整備開始，等於把餘裕廢掉——
+ * 一輪四腿只要總長超過「整備開始 − 發車時刻」，就必然有某一腿晚於整備開始而被擋，
+ * 使用者設的 10 分鐘讓渡餘裕形同無效（實測 600 秒與 3000 秒產出完全相同）。
  */
 function cycleViolatesMaintenanceEntryPolicy(args: {
   legs: PlannedCycleLeg[];
@@ -464,13 +475,12 @@ function cycleViolatesMaintenanceEntryPolicy(args: {
   const maintStart = nextMaintenanceStartSecond;
   const latestEnd = maintStart + Math.max(0, args.entrySlackSeconds);
 
-  for (const leg of legs) {
-    if (leg.startSecond + 1e-9 >= maintStart) {
-      return (
-        `正線不得於整備開始後發車`
-        + `（${leg.startSecond}s ≥ 整備 ${maintStart}s；只能借開頭、不可中段再發）`
-      );
-    }
+  const first = legs[0]!;
+  if (first.startSecond + 1e-9 >= maintStart) {
+    return (
+      `整輪須於整備開始前發車`
+      + `（${first.startSecond}s ≥ 整備 ${maintStart}s；車已進整備就得等整備做完才出來）`
+    );
   }
 
   const last = legs[legs.length - 1]!;
