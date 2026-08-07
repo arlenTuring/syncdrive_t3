@@ -460,15 +460,34 @@ export function insertMaintenanceEntryServiceTrips(args: {
       }
 
       // 出場站與代號都依「這一段整備是哪一種」決定：保養→M、行前→P。
-      const exitStationIds = new Set(
-        yardPolicy.entryServiceExitStationIds.length > 0
-          ? yardPolicy.entryServiceExitStationIds
-          : firstTripOrigins.map((origin) => origin.stationId),
-      );
       const sectionCode = resolveMaintenanceSectionCodeForTaskType(
         yard.taskType,
         sectionCodes,
       );
+
+      // 2026-08-08 修正：這裡原本在查不到出場站時退回「全部首班起點站」，
+      // 等於認為車可以從路網上任何一站冒出來——實際上車就停在該整備設施的出場站。
+      // 行前設施在 M、出來接 T3上行，卻因為這個退路排出「從 N2W 發車」的 PNT 班次，
+      // 而那台車根本不在 N2W。查不到就<strong>不排</strong>，回報讓使用者去補設施拓樸。
+      if (yardPolicy.entryServiceExitStationIds.length === 0) {
+        pushIssue(warnings, {
+          code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
+          severity: 'warning',
+          kind: 'actionable',
+          message:
+            `時間線 ${timeline.row}：「${yard.label}」查不到出場站，`
+            + '無法判斷車做完之後停在哪一站，因此不排整備後的調度營運班次'
+            + '（請確認整備任務有設定該區段的設施，且設施在路網拓樸上有對應的停靠點）',
+          detail: {
+            timelineRow: timeline.row,
+            yardBlockId: yard.id,
+            yardTaskType: yard.taskType,
+            tripCode: resolveGeneratedBlockTripCode(yard, i, sectionCodes),
+          },
+        });
+        continue;
+      }
+      const exitStationIds = new Set(yardPolicy.entryServiceExitStationIds);
 
       const afterYard = findPassengerAfterContiguousYard(sorted, i);
       if (!afterYard?.passenger.routeId) continue;

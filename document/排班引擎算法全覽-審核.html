@@ -1177,6 +1177,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站不是該設施的出場站——車不在那裡，開不了（見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1580,6 +1581,40 @@ backend/src/dev-log/
       <strong>教訓：</strong>使用者說「我也給了你其他的備用路線了 你可以停在其他站位」時，
       我把「停在其他站位」讀成「開去別的地方繞一圈」。<strong>做之前應該先把他的關聯圖要過來對，
       而不是照自己的想像設計。</strong>這一版白做了一輪。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · 查不到整備出場站就當「哪裡都能出場」，排出車不在的班次</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>使用者看到 <code>PNT1000</code>——行前（P）後面跟著一段
+      <code>NT</code>（N2W → T3），10:00:00 發車。但行前設施在 <strong>M</strong>，
+      拓樸上出來接的是 <strong>T3上行</strong>；車做完行前停在 T3上行，
+      <strong>根本不在 N2W</strong>，這班開不了。
+    </li>
+    <li>
+      <strong>根因：</strong><code>insertMaintenanceEntryServiceTrips</code> 決定
+      「車可以從哪一站出場」時寫了一條退路：
+      <code>entryServiceExitStationIds.length &gt; 0 ? … : firstTripOrigins.map(o =&gt; o.stationId)</code>。
+      查不到該整備區段的出場站，就退回<strong>全部首班起點站</strong>——
+      等於認為車可以從路網上任何一站冒出來。行前的設施代碼沒解析到時就走這條，
+      於是 N2W 也成了合法出場站。
+    </li>
+    <li>
+      <strong>解法（兩層）：</strong>
+      <ol>
+        <li>移掉那條退路。查不到出場站就<strong>不排</strong>調度營運班次，
+        回報 <code>MAINTENANCE_DISPATCH_UNREACHABLE</code> 請使用者去補設施拓樸。</li>
+        <li>新增最後一關 <code>validateYardExitContinuity</code>：整備結束後的第一段班次，
+        起點站必須等於該設施的出場站，否則回報
+        <code>YARD_EXIT_STATION_MISMATCH</code>（error，擋生成）。
+        不管是哪條路徑排出來的都擋，不要再讓物理上做不到的班表流到使用者手上。</li>
+      </ol>
+    </li>
+    <li>
+      <strong>教訓：</strong>「查不到就放寬」是最危險的預設。查不到代表<strong>不知道</strong>，
+      不知道就該停下來問，不是假設「哪裡都可以」。這種退路平常看不出來，
+      一旦資料缺一角就會安靜地產出錯誤結果。
     </li>
   </ul>
 

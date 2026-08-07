@@ -107,7 +107,9 @@ export type FeasibilityViolationCode =
   /** 保養／行前後調度無法接到首班起點站 */
   | 'MAINTENANCE_DISPATCH_UNREACHABLE'
   /** 站位讓渡：已插入次要邊讓車先去別站等，避開共用站位碰撞（資訊性） */
-  | 'STATION_BERTH_RELIEF_INSERTED';
+  | 'STATION_BERTH_RELIEF_INSERTED'
+  /** 整備結束後的第一段班次，起點站不是該整備設施的出場站——車不在那裡，開不了 */
+  | 'YARD_EXIT_STATION_MISMATCH';
 
 /** 策略說明｜演算法極限｜可調整建議（見 feasibilityIssueMeta.ts） */
 export type FeasibilityIssueKind = 'policy' | 'limit' | 'actionable';

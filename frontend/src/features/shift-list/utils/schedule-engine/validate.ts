@@ -930,7 +930,9 @@ export function validateStationBerthCollisions(
       /** 該站位的佔用窗（通常只有幾秒，與班次卡起訖不同） */
       earlierBerthWindow: [hit.earlier.startMinute, hit.earlier.endMinute],
       laterBerthWindow: [hit.later.startMinute, hit.later.endMinute],
-      earlierBerthFreeMinute: hit.earlier.protectedUntilMinute,
+      earlierActualDepartMinute: hit.earlier.actualDepartMinute,
+      earlierBerthClearMinute: hit.earlier.berthClearMinute,
+      earlierEarliestNextArrivalMinute: hit.earlier.protectedUntilMinute,
       overlapSeconds: hit.overlapSeconds,
       clearanceGapSeconds: hit.clearanceGapSeconds,
       requiredClearanceSeconds: hit.requiredClearanceSeconds,
@@ -943,9 +945,11 @@ export function validateStationBerthCollisions(
         severity: 'warning',
         kind: 'actionable',
         message:
-          `${hit.stationName}：${earlierLabel} 這台車要到`
-          + ` ${formatMinuteHms(hit.earlier.protectedUntilMinute)} 才會把站位讓出來，`
-          + `但 ${laterLabel} 已經到站，還差 ${Math.round(hit.protectionShortfallSeconds)} 秒`,
+          `${hit.stationName}：${earlierLabel} 到`
+          + ` ${formatMinuteHms(hit.earlier.actualDepartMinute)} 才離站、`
+          + `${formatMinuteHms(hit.earlier.berthClearMinute)} 駛離會互撞的路段，`
+          + `所以別台車最早只能 ${formatMinuteHms(hit.earlier.protectedUntilMinute)} 到站；`
+          + `但 ${laterLabel} 提早 ${Math.round(hit.protectionShortfallSeconds)} 秒就到了`,
         detail,
       });
       protectionReported += 1;
@@ -984,6 +988,84 @@ export function validateStationBerthCollisions(
         `另有 ${protectionTotal - protectionReported} 處碰撞保護不足未逐條列出（共 ${protectionTotal} 處）`,
       detail: { totalCollisions: protectionTotal, reported: protectionReported },
     });
+  }
+}
+
+/**
+ * 硬約束：每條時間線在每一個整備段內的正線趟數須為路線群組大小的整數倍
+ * 整備做完之後，車就停在<strong>該設施的出場站</strong>。所以整備結束後的第一段班次，
+ * 起點站一定要是那一站——不是的話，那台車根本不在起點，這班開不了。
+ *
+ * 2026-08-08 加入。實際踩到的案例：行前設施在 M、出來接 T3上行，
+ * 引擎卻排出一段 <code>PNT</code>（行前後跑 NT，起點 N2W）。成因是插入調度營運班次時，
+ * 查不到出場站就退回「全部首班起點站」，等於認為車可以從任何一站冒出來。
+ * 那個退路已移除，這道驗證則是<strong>最後一關</strong>：不管是哪條路徑排出來的，
+ * 只要起點站接不上出場站就擋下來，不要再讓物理上做不到的班表流到使用者手上。
+ */
+export function validateYardExitContinuity(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  /** 整備類型 → 出場站 stationId；查不到的類型不檢查 */
+  yardRotationExitByTaskType: Partial<Record<string, string>>;
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
+  errors: FeasibilityIssue[];
+}): void {
+  const { timelines, selectedRoutes, yardRotationExitByTaskType, errors } = args;
+
+  const isYardBlock = (block: GeneratedScheduleBlock): boolean =>
+    block.source === 'template_bar'
+    && (block.taskType === 'charging'
+      || block.taskType === 'servicing'
+      || block.taskType === 'inspection'
+      || block.taskType === 'standby');
+
+  for (const timeline of timelines) {
+    const ordered = [...timeline.blocks].sort(
+      (a, b) => a.plannedStartMinute - b.plannedStartMinute
+        || a.id.localeCompare(b.id),
+    );
+
+    for (let i = 0; i < ordered.length; i += 1) {
+      const yard = ordered[i]!;
+      if (!isYardBlock(yard)) continue;
+      const exitStationId = yardRotationExitByTaskType[yard.taskType];
+      if (!exitStationId) continue;
+
+      // 連續整備串（保養→行前）只看串尾那一段的出場站
+      let next: GeneratedScheduleBlock | null = null;
+      for (let j = i + 1; j < ordered.length; j += 1) {
+        const candidate = ordered[j]!;
+        if (candidate.taskType === 'idle' || candidate.source === 'transition') continue;
+        if (isYardBlock(candidate)) { next = null; break; }
+        if (candidate.taskType === 'passenger') { next = candidate; }
+        break;
+      }
+      if (!next) continue;
+
+      const route = resolveRouteForBlock(next, selectedRoutes);
+      const originStationId = route?.stationIds[0]?.trim() || null;
+      if (!originStationId || originStationId === exitStationId) continue;
+
+      pushIssue(errors, {
+        code: 'YARD_EXIT_STATION_MISMATCH',
+        severity: 'error',
+        kind: 'actionable',
+        message:
+          `時間線 ${timeline.row}：「${yard.label}」做完後車停在出場站，`
+          + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null)}`
+          + ` 是從別的站發車，車不在那裡開不了`
+          + `（出場站 ${exitStationId}，這班的起點站 ${originStationId}）`,
+        detail: {
+          timelineRow: timeline.row,
+          yardBlockId: yard.id,
+          yardTaskType: yard.taskType,
+          blockId: next.id,
+          exitStationId,
+          originStationId,
+          routeId: next.routeId,
+        },
+      });
+    }
   }
 }
 

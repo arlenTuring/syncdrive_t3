@@ -30,6 +30,7 @@ import {
   validateRotationCyclesComplete,
   validateStationTimingsWithinBlocks,
   validateStationBerthCollisions,
+  validateYardExitContinuity,
 } from './validate';
 import {
   enforceStationBerthConstraints,
@@ -284,6 +285,14 @@ export function generateShiftSchedule(
       sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     },
   );
+  // 整備做完車就停在出場站，接著那一段一定要從那一站發車——不是的話車不在，開不了
+  validateYardExitContinuity({
+    timelines,
+    selectedRoutes: routesForBerth,
+    yardRotationExitByTaskType: engineInput.yardRotationExitByTaskType,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    errors,
+  });
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
   validateRouteSwitchBuffers(
     timelines,

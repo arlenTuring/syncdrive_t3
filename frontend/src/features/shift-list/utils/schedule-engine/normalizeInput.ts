@@ -99,6 +99,8 @@ export type EngineInput = {
    * 站位求解、班距補疏／修復、整備後調度班次、最終驗證共用同一個值。
    */
   collisionProtectionSeconds: number;
+  /** 整備類型 → 出場站 stationId；驗證「整備後第一段班次接不接得上」要用 */
+  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string>>;
   turnaroundLimitSeconds: number | null;
   passengerTimetableMode: PassengerTimetableMode;
   timetableGenerationAlgorithm?: string;
@@ -1917,6 +1919,7 @@ export function normalizeEngineInput(
     emptyIntervalMainlineSlackSeconds,
     minimumRecoveryTimeSeconds: minimumRecovery,
     collisionProtectionSeconds: collisionProtection,
+    yardRotationExitByTaskType,
     turnaroundLimitSeconds:
       args.turnaroundLimitSeconds == null || !Number.isFinite(args.turnaroundLimitSeconds)
         ? null

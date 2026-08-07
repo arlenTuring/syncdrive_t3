@@ -85,10 +85,24 @@ export type StationBerthOccupancy = {
   blockStartMinute: number;
   blockEndMinute: number;
   /**
-   * 別台車最早可以進這個站位的時刻（分鐘）。
-   * ＝ 實際離站（含末站滯留） + 2 × 碰撞保護時間。
-   * 沒開啟碰撞保護、也沒有滯留時就等於 {@link endMinute}。
-   * 顯示訊息一律用 startMinute／endMinute；這個欄位只拿來判定碰撞。
+   * 這台車<strong>真正開走</strong>的時刻（分鐘）＝ 自然離站，含末站滯留。
+   * 沒開啟碰撞保護時就等於 {@link endMinute}。
+   */
+  actualDepartMinute: number;
+  /**
+   * <strong>站位淨空</strong>的時刻（分鐘）＝ 實際離站 + 1 × 碰撞保護時間。
+   * 這一刻起這台車已經駛離會互撞的那段空間，站位真的空出來了。
+   */
+  berthClearMinute: number;
+  /**
+   * <strong>別台車最早可以到站</strong>的時刻（分鐘）＝ 實際離站 + 2 × 碰撞保護時間。
+   *
+   * 為什麼是兩倍：站位在 {@link berthClearMinute} 就空了，但後車也要花同樣的時間
+   * 才能從那段空間的外緣開進站位。所以「站位空出來的時刻」與
+   * 「別台車最早可以到的時刻」是兩個不同的數字，回報時不要混用
+   * ——寫成「站位要到某某時刻才讓出來」是錯的（2026-08-08 使用者指正）。
+   *
+   * 顯示訊息一律用 startMinute／endMinute（班次卡看得到的）；這個欄位只拿來判定碰撞。
    */
   protectedUntilMinute: number;
 };
@@ -180,14 +194,17 @@ export function collectStationBerthOccupancies(
         // 1) 末站滯留——這一趟跑完後車還停在原地等下一個任務，站位一直被佔著。
         //    只有末站會滯留（車開過中間站不會停在那裡等）。
         // 2) 碰撞保護時間 ×2——A 車駛離衝突區要一份，B 車開進來要另一份。
-        let protectedUntilMinute = endMinute;
+        let actualDepartMinute = endMinute;
         if (protectionOn && isTerminal) {
           const idleUntil = resolveSameRowIdleOccupiedUntilMinute(timelines, block);
           if (idleUntil != null) {
-            protectedUntilMinute = Math.max(protectedUntilMinute, idleUntil);
+            actualDepartMinute = Math.max(actualDepartMinute, idleUntil);
           }
         }
-        protectedUntilMinute += protectionMin;
+        // 站位淨空 = 實際離站 + 1 × 保護時間（車已駛離互撞路段）
+        // 別台車最早可到 = 實際離站 + 2 × 保護時間（後車也要開進來）
+        const berthClearMinute = actualDepartMinute + protectionMin / 2;
+        const protectedUntilMinute = actualDepartMinute + protectionMin;
 
         out.push({
           stationId: stop.stationId,
@@ -200,6 +217,8 @@ export function collectStationBerthOccupancies(
           endMinute,
           blockStartMinute: block.plannedStartMinute,
           blockEndMinute: block.plannedEndMinute,
+          actualDepartMinute,
+          berthClearMinute,
           protectedUntilMinute,
         });
       }

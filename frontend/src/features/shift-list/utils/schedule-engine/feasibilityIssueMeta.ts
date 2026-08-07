@@ -54,6 +54,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   ROTATION_CYCLE_INCOMPLETE: '未跑完一整輪',
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
   STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
+  YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
 };
 
 /** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -89,6 +90,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   ROTATION_CYCLE_INCOMPLETE: { id: 's1', label: '§1 核心原則（服從順序）' },
   MAINTENANCE_DISPATCH_UNREACHABLE: { id: 's10', label: '§10 進場載客' },
   STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
+  YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -125,7 +127,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   STATION_BERTH_PROTECTION_GAP: {
     kind: 'actionable',
     guidance:
-      '兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。',
+      '兩台車在同一停靠點沒有真的重疊，但後車到站太早。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」——站位在「前車離站 + 1 倍」就空了，後車還要花同樣的時間才能開進來，所以是兩倍。前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。',
   },
   STATION_BERTH_DELAYED: {
     kind: 'policy',
@@ -211,6 +213,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。',
+  },
+  YARD_EXIT_STATION_MISMATCH: {
+    kind: 'actionable',
+    guidance:
+      '車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。',
   },
   STATION_BERTH_RELIEF_INSERTED: {
     kind: 'policy',
