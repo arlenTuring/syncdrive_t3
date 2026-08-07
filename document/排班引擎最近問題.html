@@ -115,7 +115,7 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-07T19:09:04.681Z
+      更新：2026-08-07T19:24:50.832Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0806」
       · ok=<code>true</code>
@@ -820,7 +820,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 11:08:20–11:08:30 與 TN 時間線 4 11:23:40–11:23:50（還差 430 秒）</p>
+  <p class="msg">N2W下行出發：TN1104（時間線 2） 11:04:40–11:08:20 這台車要到 11:30:50 才會把站位讓出來，但 PTN1120（時間線 4） 11:20:00–11:23:40 已經到站，還差 430 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=21）</p>
@@ -836,7 +836,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 11:08:20–11:08:30 與 NT 時間線 4 11:23:50–11:24:00（還差 420 秒）</p>
+  <p class="msg">N2W下行出發：TN1104（時間線 2） 11:04:40–11:08:20 這台車要到 11:30:50 才會把站位讓出來，但 NT1123（時間線 4） 11:23:50–11:27:20 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=22）</p>
@@ -852,7 +852,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 12:38:20–12:38:30 與 TN 時間線 2 12:45:30–12:45:40（還差 930 秒）</p>
+  <p class="msg">N2W下行出發：TN1234（時間線 1） 12:34:40–12:38:20 這台車要到 13:01:00 才會把站位讓出來，但 TN1241（時間線 2） 12:41:50–12:45:30 已經到站，還差 930 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=23）</p>
@@ -868,7 +868,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 19:09:40–19:09:50 與 TN 時間線 4 19:14:00–19:14:10（還差 230 秒）</p>
+  <p class="msg">N2W下行出發：TN1906（時間線 1） 19:06:00–19:09:40 這台車要到 19:17:50 才會把站位讓出來，但 MTN1910（時間線 4） 19:10:20–19:14:00 已經到站，還差 230 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=24）</p>
@@ -884,7 +884,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 19:09:40–19:09:50 與 NT 時間線 4 19:14:10–19:14:20（還差 220 秒）</p>
+  <p class="msg">N2W下行出發：TN1906（時間線 1） 19:06:00–19:09:40 這台車要到 19:17:50 才會把站位讓出來，但 NT1914（時間線 4） 19:14:10–19:17:40 已經到站，還差 220 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=25）</p>
@@ -900,7 +900,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 20:00:50–20:01:00 與 TN 時間線 1 20:19:10–20:19:20（還差 710 秒）</p>
+  <p class="msg">N2W下行出發：TN1957（時間線 2） 19:57:10–20:00:50 這台車要到 20:31:00 才會把站位讓出來，但 TN2015（時間線 1） 20:15:30–20:19:10 已經到站，還差 710 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=26）</p>
@@ -916,7 +916,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 20:00:50–20:01:00 與 TN 時間線 3 20:22:00–20:22:10（還差 540 秒）</p>
+  <p class="msg">N2W下行出發：TN1957（時間線 2） 19:57:10–20:00:50 這台車要到 20:31:00 才會把站位讓出來，但 TN2018（時間線 3） 20:18:20–20:22:00 已經到站，還差 540 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=27）</p>
@@ -932,7 +932,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 20:00:50–20:01:00 與 NT 時間線 3 20:22:10–20:22:20（還差 530 秒）</p>
+  <p class="msg">N2W下行出發：TN1957（時間線 2） 19:57:10–20:00:50 這台車要到 20:31:00 才會把站位讓出來，但 NT2022（時間線 3） 20:22:10–20:25:40 已經到站，還差 530 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=28）</p>
@@ -948,7 +948,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 20:00:50–20:01:00 與 TN 時間線 4 20:28:40–20:28:50（還差 140 秒）</p>
+  <p class="msg">N2W下行出發：TN1957（時間線 2） 19:57:10–20:00:50 這台車要到 20:31:00 才會把站位讓出來，但 TN2025（時間線 4） 20:25:00–20:28:40 已經到站，還差 140 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=29）</p>
@@ -964,7 +964,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 2 20:00:50–20:01:00 與 NT 時間線 4 20:28:50–20:29:00（還差 130 秒）</p>
+  <p class="msg">N2W下行出發：TN1957（時間線 2） 19:57:10–20:00:50 這台車要到 20:31:00 才會把站位讓出來，但 NT2028（時間線 4） 20:28:50–20:32:20 已經到站，還差 130 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=30）</p>
@@ -980,7 +980,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 20:19:10–20:19:20 與 TN 時間線 3 20:22:00–20:22:10（還差 540 秒）</p>
+  <p class="msg">N2W下行出發：TN2015（時間線 1） 20:15:30–20:19:10 這台車要到 20:31:00 才會把站位讓出來，但 TN2018（時間線 3） 20:18:20–20:22:00 已經到站，還差 540 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
@@ -996,7 +996,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 20:19:10–20:19:20 與 NT 時間線 3 20:22:10–20:22:20（還差 530 秒）</p>
+  <p class="msg">N2W下行出發：TN2015（時間線 1） 20:15:30–20:19:10 這台車要到 20:31:00 才會把站位讓出來，但 NT2022（時間線 3） 20:22:10–20:25:40 已經到站，還差 530 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
@@ -1012,7 +1012,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 20:19:10–20:19:20 與 TN 時間線 4 20:28:40–20:28:50（還差 140 秒）</p>
+  <p class="msg">N2W下行出發：TN2015（時間線 1） 20:15:30–20:19:10 這台車要到 20:31:00 才會把站位讓出來，但 TN2025（時間線 4） 20:25:00–20:28:40 已經到站，還差 140 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
@@ -1028,7 +1028,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發 碰撞保護不足：TN 時間線 1 20:19:10–20:19:20 與 NT 時間線 4 20:28:50–20:29:00（還差 130 秒）</p>
+  <p class="msg">N2W下行出發：TN2015（時間線 1） 20:15:30–20:19:10 這台車要到 20:31:00 才會把站位讓出來，但 NT2028（時間線 4） 20:28:50–20:32:20 已經到站，還差 130 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
@@ -1044,7 +1044,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:16:30–10:17:20 與 NTB 時間線 9 10:23:20–10:24:10（還差 590 秒）</p>
+  <p class="msg">T3下行：NT1013（時間線 1） 10:13:50–10:17:20 這台車要到 10:33:10 才會把站位讓出來，但 NTB1020（時間線 9） 10:20:40–10:24:10 已經到站，還差 590 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
@@ -1060,7 +1060,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:16:30–10:17:20 與 TS 時間線 9 10:24:10–10:24:20（還差 540 秒）</p>
+  <p class="msg">T3下行：NT1013（時間線 1） 10:13:50–10:17:20 這台車要到 10:33:10 才會把站位讓出來，但 TS1024（時間線 9） 10:24:10–10:27:30 已經到站，還差 540 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
@@ -1076,7 +1076,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:16:30–10:17:20 與 NT 時間線 2 10:25:20–10:26:10（還差 470 秒）</p>
+  <p class="msg">T3下行：NT1013（時間線 1） 10:13:50–10:17:20 這台車要到 10:33:10 才會把站位讓出來，但 NT1022（時間線 2） 10:22:40–10:26:10 已經到站，還差 470 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
@@ -1092,7 +1092,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:16:30–10:17:20 與 NTB 時間線 10 10:29:20–10:30:10（還差 230 秒）</p>
+  <p class="msg">T3下行：NT1013（時間線 1） 10:13:50–10:17:20 這台車要到 10:33:10 才會把站位讓出來，但 NTB1026（時間線 10） 10:26:40–10:30:10 已經到站，還差 230 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
@@ -1108,7 +1108,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:16:30–10:17:20 與 TS 時間線 10 10:30:10–10:30:20（還差 180 秒）</p>
+  <p class="msg">T3下行：NT1013（時間線 1） 10:13:50–10:17:20 這台車要到 10:33:10 才會把站位讓出來，但 TS1030（時間線 10） 10:30:10–10:33:30 已經到站，還差 180 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
@@ -1124,7 +1124,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 10:25:20–10:26:10 與 NTB 時間線 10 10:29:20–10:30:10（還差 460 秒）</p>
+  <p class="msg">T3下行：NT1022（時間線 2） 10:22:40–10:26:10 這台車要到 10:37:00 才會把站位讓出來，但 NTB1026（時間線 10） 10:26:40–10:30:10 已經到站，還差 460 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
@@ -1140,7 +1140,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 10:25:20–10:26:10 與 TS 時間線 10 10:30:10–10:30:20（還差 410 秒）</p>
+  <p class="msg">T3下行：NT1022（時間線 2） 10:22:40–10:26:10 這台車要到 10:37:00 才會把站位讓出來，但 TS1030（時間線 10） 10:30:10–10:33:30 已經到站，還差 410 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
@@ -1156,7 +1156,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 10:25:20–10:26:10 與 TSB 時間線 1 10:32:10–10:32:20（還差 290 秒）</p>
+  <p class="msg">T3下行：NT1022（時間線 2） 10:22:40–10:26:10 這台車要到 10:37:00 才會把站位讓出來，但 TSB1032（時間線 1） 10:32:10–10:35:30 已經到站，還差 290 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=42）</p>
@@ -1172,7 +1172,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 10 10:43:10–10:44:00 與 NT 時間線 1 10:46:20–10:47:10（還差 170 秒）</p>
+  <p class="msg">T3下行：NTB1040（時間線 10） 10:40:30–10:44:00 這台車要到 10:49:10 才會把站位讓出來，但 NT1043（時間線 1） 10:43:40–10:47:10 已經到站，還差 170 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=43）</p>
@@ -1188,7 +1188,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 10:46:20–10:47:10 與 TS 時間線 10 10:48:10–10:48:20（還差 130 秒）</p>
+  <p class="msg">T3下行：NT1043（時間線 1） 10:43:40–10:47:10 這台車要到 10:50:20 才會把站位讓出來，但 TS1048（時間線 10） 10:48:10–10:51:30 已經到站，還差 130 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=44）</p>
@@ -1204,7 +1204,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 3 11:28:30–11:29:20 與 NT 時間線 2 11:32:30–11:33:20（還差 170 秒）</p>
+  <p class="msg">T3下行：NTB1125（時間線 3） 11:25:50–11:29:20 這台車要到 11:35:20 才會把站位讓出來，但 NT1129（時間線 2） 11:29:50–11:33:20 已經到站，還差 170 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
@@ -1220,7 +1220,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 11:32:30–11:33:20 與 TS 時間線 3 11:34:20–11:34:30（還差 280 秒）</p>
+  <p class="msg">T3下行：NT1129（時間線 2） 11:29:50–11:33:20 這台車要到 11:39:00 才會把站位讓出來，但 TS1134（時間線 3） 11:34:20–11:37:40 已經到站，還差 280 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=46）</p>
@@ -1236,7 +1236,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 11:39:10–11:40:00 與 NTB 時間線 4 11:41:00–11:41:50（還差 240 秒）</p>
+  <p class="msg">T3下行：NT1136（時間線 1） 11:36:30–11:40:00 這台車要到 11:45:00 才會把站位讓出來，但 NTB1138（時間線 4） 11:38:20–11:41:50 已經到站，還差 240 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=47）</p>
@@ -1252,7 +1252,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 4 11:41:00–11:41:50 與 TS 時間線 1 11:44:00–11:44:10（還差 300 秒）</p>
+  <p class="msg">T3下行：NTB1138（時間線 4） 11:38:20–11:41:50 這台車要到 11:49:00 才會把站位讓出來，但 TS1144（時間線 1） 11:44:00–11:47:20 已經到站，還差 300 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=48）</p>
@@ -1268,7 +1268,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 3 11:49:10–11:50:00 與 NT 時間線 2 11:53:40–11:54:30（還差 170 秒）</p>
+  <p class="msg">T3下行：NTB1146（時間線 3） 11:46:30–11:50:00 這台車要到 11:56:30 才會把站位讓出來，但 NT1151（時間線 2） 11:51:00–11:54:30 已經到站，還差 170 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=49）</p>
@@ -1284,7 +1284,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 11:53:40–11:54:30 與 TS 時間線 3 11:55:30–11:55:40（還差 420 秒）</p>
+  <p class="msg">T3下行：NT1151（時間線 2） 11:51:00–11:54:30 這台車要到 12:02:30 才會把站位讓出來，但 TS1155（時間線 3） 11:55:30–11:58:50 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=50）</p>
@@ -1300,7 +1300,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 2 11:53:40–11:54:30 與 NT 時間線 1 11:59:40–12:00:30（還差 170 秒）</p>
+  <p class="msg">T3下行：NT1151（時間線 2） 11:51:00–11:54:30 這台車要到 12:02:30 才會把站位讓出來，但 NT1157（時間線 1） 11:57:00–12:00:30 已經到站，還差 170 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=51）</p>
@@ -1316,7 +1316,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 11:59:40–12:00:30 與 TS 時間線 2 12:01:30–12:01:40（還差 420 秒）</p>
+  <p class="msg">T3下行：NT1157（時間線 1） 11:57:00–12:00:30 這台車要到 12:08:30 才會把站位讓出來，但 TS1201（時間線 2） 12:01:30–12:04:50 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
@@ -1332,7 +1332,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 11:59:40–12:00:30 與 NTB 時間線 4 12:02:40–12:03:30（還差 350 秒）</p>
+  <p class="msg">T3下行：NT1157（時間線 1） 11:57:00–12:00:30 這台車要到 12:08:30 才會把站位讓出來，但 NTB1200（時間線 4） 12:00:00–12:03:30 已經到站，還差 350 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=53）</p>
@@ -1348,7 +1348,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 4 12:02:40–12:03:30 與 TS 時間線 1 12:07:30–12:07:40（還差 420 秒）</p>
+  <p class="msg">T3下行：NTB1200（時間線 4） 12:00:00–12:03:30 這台車要到 12:14:30 才會把站位讓出來，但 TS1207（時間線 1） 12:07:30–12:10:50 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=54）</p>
@@ -1364,7 +1364,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 4 12:02:40–12:03:30 與 NTB 時間線 3 12:08:40–12:09:30（還差 350 秒）</p>
+  <p class="msg">T3下行：NTB1200（時間線 4） 12:00:00–12:03:30 這台車要到 12:14:30 才會把站位讓出來，但 NTB1206（時間線 3） 12:06:00–12:09:30 已經到站，還差 350 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=55）</p>
@@ -1380,7 +1380,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 3 12:08:40–12:09:30 與 TS 時間線 4 12:13:30–12:13:40（還差 420 秒）</p>
+  <p class="msg">T3下行：NTB1206（時間線 3） 12:06:00–12:09:30 這台車要到 12:20:30 才會把站位讓出來，但 TS1213（時間線 4） 12:13:30–12:16:50 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>
@@ -1396,7 +1396,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 3 12:08:40–12:09:30 與 NT 時間線 2 12:14:40–12:15:30（還差 350 秒）</p>
+  <p class="msg">T3下行：NTB1206（時間線 3） 12:06:00–12:09:30 這台車要到 12:20:30 才會把站位讓出來，但 NT1212（時間線 2） 12:12:00–12:15:30 已經到站，還差 350 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=57）</p>
@@ -1412,7 +1412,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 3 12:08:40–12:09:30 與 TSB 時間線 2 12:15:30–12:15:40（還差 300 秒）</p>
+  <p class="msg">T3下行：NTB1206（時間線 3） 12:06:00–12:09:30 這台車要到 12:20:30 才會把站位讓出來，但 TSB1215（時間線 2） 12:15:30–12:18:50 已經到站，還差 300 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=58）</p>
@@ -1428,7 +1428,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NT 時間線 1 12:20:40–12:21:30 與 NTB 時間線 4 12:26:20–12:27:10（還差 170 秒）</p>
+  <p class="msg">T3下行：NT1218（時間線 1） 12:18:00–12:21:30 這台車要到 12:29:10 才會把站位讓出來，但 NTB1223（時間線 4） 12:23:40–12:27:10 已經到站，還差 170 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=59）</p>
@@ -1444,7 +1444,7 @@
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行 碰撞保護不足：NTB 時間線 4 12:26:20–12:27:10 與 TS 時間線 1 12:28:10–12:28:20（還差 420 秒）</p>
+  <p class="msg">T3下行：NTB1223（時間線 4） 12:23:40–12:27:10 這台車要到 12:35:10 才會把站位讓出來，但 TS1228（時間線 1） 12:28:10–12:31:30 已經到站，還差 420 秒</p>
   <p class="guide">兩台車在同一停靠點沒有真的重疊，但後車進站太貼著前車離站。規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」；前車若因調度滯留在站上，以真正開走的時刻起算。請拉開這兩班、加時間線，或在 Step 4 調低碰撞保護時間。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=60）</p>
@@ -1562,8 +1562,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=priority · timelineRow=1 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=67）</p>
 </article>
@@ -1578,8 +1578,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=68）</p>
 </article>
@@ -1594,8 +1594,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=69）</p>
 </article>
@@ -1610,8 +1610,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=1 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=70）</p>
 </article>
@@ -1626,8 +1626,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=71）</p>
 </article>
@@ -1642,8 +1642,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=72）</p>
 </article>
@@ -1658,8 +1658,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=secondary · timelineRow=9 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=73）</p>
 </article>
@@ -1674,8 +1674,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=74）</p>
 </article>
@@ -1690,8 +1690,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=9 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=75）</p>
 </article>
@@ -1706,8 +1706,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=76）</p>
 </article>
@@ -1722,8 +1722,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=secondary · timelineRow=10 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=77）</p>
 </article>
@@ -1738,8 +1738,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=10 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=78）</p>
 </article>
@@ -1754,8 +1754,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=priority · timelineRow=1 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=79）</p>
 </article>
@@ -1770,8 +1770,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=80）</p>
 </article>
@@ -1786,8 +1786,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=81）</p>
 </article>
@@ -1802,8 +1802,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=1 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=82）</p>
 </article>
@@ -1818,8 +1818,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=83）</p>
 </article>
@@ -1834,8 +1834,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=84）</p>
 </article>
@@ -1850,8 +1850,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=secondary · timelineRow=9 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=85）</p>
 </article>
@@ -1866,8 +1866,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=86）</p>
 </article>
@@ -1882,8 +1882,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=9 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=87）</p>
 </article>
@@ -1898,8 +1898,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=88）</p>
 </article>
@@ -1914,8 +1914,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=secondary · timelineRow=10 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=89）</p>
 </article>
@@ -1930,8 +1930,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=10 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=90）</p>
 </article>
@@ -1946,8 +1946,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=priority · timelineRow=1 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=91）</p>
 </article>
@@ -1962,8 +1962,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=92）</p>
 </article>
@@ -1978,8 +1978,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=93）</p>
 </article>
@@ -1994,8 +1994,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=1 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=94）</p>
 </article>
@@ -2010,8 +2010,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=95）</p>
 </article>
@@ -2026,8 +2026,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=96）</p>
 </article>
@@ -2042,8 +2042,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=secondary · timelineRow=9 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=97）</p>
 </article>
@@ -2058,8 +2058,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=98）</p>
 </article>
@@ -2074,8 +2074,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=9 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=99）</p>
 </article>
@@ -2090,8 +2090,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=100）</p>
 </article>
@@ -2106,8 +2106,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=secondary · timelineRow=10 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=101）</p>
 </article>
@@ -2122,8 +2122,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=10 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=102）</p>
 </article>
@@ -2138,8 +2138,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=priority · timelineRow=1 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=103）</p>
 </article>
@@ -2154,8 +2154,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=104）</p>
 </article>
@@ -2170,8 +2170,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=1 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=105）</p>
 </article>
@@ -2186,8 +2186,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=106）</p>
 </article>
@@ -2202,8 +2202,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=secondary · timelineRow=3 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=107）</p>
 </article>
@@ -2218,8 +2218,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NTB」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NTB」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=3 · fromRouteId=route_1 · toRouteId=route_7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=108）</p>
 </article>
@@ -2234,8 +2234,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=2 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=109）</p>
 </article>
@@ -2250,8 +2250,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=110）</p>
 </article>
@@ -2266,8 +2266,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「NT」（取代 TN，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「NT」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_5 · toRouteId=route_1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=111）</p>
 </article>
@@ -2282,8 +2282,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=priority · timelineRow=2 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=112）</p>
 </article>
@@ -2298,8 +2298,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TS」（取代 NT，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TS」（原本是「NT」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=1 · fromRouteId=route_1 · toRouteId=route_2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=113）</p>
 </article>
@@ -2314,8 +2314,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TN」（取代 ST，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TN」（原本是「ST」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=0 · topologySource=priority · timelineRow=2 · fromRouteId=route_4 · toRouteId=route_5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=114）</p>
 </article>
@@ -2330,8 +2330,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「TNB」（取代 TN，來源 secondary）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「TNB」（原本是「TN」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=120 · topologySource=secondary · timelineRow=4 · fromRouteId=route_5 · toRouteId=route_6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=115）</p>
 </article>
@@ -2346,8 +2346,8 @@
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">站位約束依關聯圖拓撲改選「ST」（取代 TS，來源 priority）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="msg">為避開停靠點衝突，這一趟改跑「ST」（原本是「TS」）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">delaySeconds=30 · topologySource=priority · timelineRow=1 · fromRouteId=route_2 · toRouteId=route_4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=116）</p>
 </article>
@@ -2363,7 +2363,7 @@
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
   <p class="msg">（以上已顯示 50 則；另有 120 則相同類型的站位約束 warning 未列出）</p>
-  <p class="guide">站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=117）</p>
 </article>

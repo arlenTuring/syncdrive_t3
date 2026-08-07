@@ -103,6 +103,17 @@ const routeBackLeg = route({
   avgTravelTimeSeconds: 60,
   minTravelTimeSeconds: 50,
 });
+/**
+ * 終點對（回到 T3），但<strong>起點不是車現在停的地方</strong>——
+ * 車停在 T3，這條卻要從 ELSEWHERE 發車，車根本開不過去。
+ */
+const routeWrongOrigin = route({
+  routeId: 'wrong-origin',
+  routeCode: 'WRONGORIGIN',
+  stationIds: ['ELSEWHERE', 'T3'],
+  avgTravelTimeSeconds: 60,
+  minTravelTimeSeconds: 50,
+});
 /** 兩跳但回程太久，塞不進空等區間 */
 const routeBackLegLong = route({
   routeId: 'back-leg-long',
@@ -126,6 +137,7 @@ function successorPolicy(secondary: Map<string, string[]>): RouteSuccessorPolicy
       ['out-leg', routeOutLeg],
       ['back-leg', routeBackLeg],
       ['back-leg-long', routeBackLegLong],
+      ['wrong-origin', routeWrongOrigin],
     ]),
     rotationRoutes: [routeA, routeANext],
     prioritySuccessors: new Map([['a', ['a-next']]]),
@@ -366,5 +378,18 @@ describe('relievePlatformIdleWithSecondaryEdge', () => {
       false,
       '第一跳也不可以留下',
     );
+  });
+
+  it('次要邊終點對，但起點不是車現在停的站 → 不插入（車開不過去）', () => {
+    const result = relievePlatformIdleWithSecondaryEdge({
+      timelines: idleCollisionTimelines(),
+      selectedRoutes: [routeA, routeANext, routeWrongOrigin, routeOther],
+      successorPolicy: successorPolicy(new Map([['a', ['wrong-origin']]])),
+      minimumRecoveryTimeSeconds: 30,
+      collisionProtectionSeconds: 30,
+      warnings: [],
+    });
+    const row1 = result.find((t) => t.row === 1)!;
+    assert.equal(row1.blocks.some((b) => b.source === 'relief_loop'), false);
   });
 });

@@ -95,11 +95,13 @@ type ReliefHop = {
 function findReliefChain(args: {
   successorPolicy: RouteSuccessorPolicy;
   fromInstanceId: string;
+  /** 車現在實際停在哪一站——第一跳必須從這裡發車，否則車根本開不了那一趟 */
+  fromStationId: string;
   requiredTerminalStationId: string;
 }): ReliefHop[] | null {
-  const { successorPolicy, fromInstanceId, requiredTerminalStationId } = args;
-  const queue: Array<{ instanceId: string; chain: ReliefHop[] }> = [
-    { instanceId: fromInstanceId, chain: [] },
+  const { successorPolicy, fromInstanceId, fromStationId, requiredTerminalStationId } = args;
+  const queue: Array<{ instanceId: string; stationId: string; chain: ReliefHop[] }> = [
+    { instanceId: fromInstanceId, stationId: fromStationId, chain: [] },
   ];
   const visited = new Set<string>([fromInstanceId]);
 
@@ -113,10 +115,16 @@ function findReliefChain(args: {
       if (!route) continue;
       // 沒有占用資料的路線算不出時刻，整條路徑就不可用
       if (!resolvePassengerRouteOccupancy(route)) continue;
+      // 站點必須接得起來：這一趟的起站要正好是車現在所在的站。
+      // 關聯圖的邊理論上已隱含連續性，但這裡是自己走圖找路徑，不能假設——
+      // 少了這一關就可能排出「車在 A 站，卻要它跑一趟從 B 站發車」的班次。
+      if (routeStartStation(route) !== current.stationId) continue;
+      const terminal = routeEndStation(route);
+      if (!terminal) continue;
       const chain = [...current.chain, { instanceId: nextId, route }];
-      if (routeEndStation(route) === requiredTerminalStationId) return chain;
+      if (terminal === requiredTerminalStationId) return chain;
       visited.add(nextId);
-      queue.push({ instanceId: nextId, chain });
+      queue.push({ instanceId: nextId, stationId: terminal, chain });
     }
   }
   return null;
@@ -155,9 +163,14 @@ function tryBuildReliefBlocks(args: {
   const requiredNextOrigin = routeStartStation(nextRoute);
   if (!requiredNextOrigin) return [];
 
+  // 車現在停在前一趟的終點站；讓渡路徑必須從這裡出發，繞完回到下一段的起點站
+  const parkedStationId = routeEndStation(earlierRoute);
+  if (!parkedStationId) return [];
+
   const chain = findReliefChain({
     successorPolicy,
     fromInstanceId: earlierInstanceId,
+    fromStationId: parkedStationId,
     requiredTerminalStationId: requiredNextOrigin,
   });
   if (!chain || chain.length === 0) return [];
