@@ -333,4 +333,22 @@ describe('碰撞保護時間', () => {
     });
     assert.equal(p1Hits(timelines).length, 0);
   });
+
+  it('回報用的欄位帶的是班次卡起訖，不是幾秒的站位佔用窗', () => {
+    // 2026-08-08 使用者回報：hover 顯示 11:08:20–11:08:30，但班次卡是
+    // 11:04:40–11:08:20，兩個數字對不起來。原因是訊息拿站位佔用窗當班次時間用。
+    // 佔用窗常常只有 10 秒（末站 minPresence），跟畫面上的班次卡本來就是兩回事。
+    const timelines = twoCarsAtP1({ laterArriveMinute: 62 + 70 / 60 });
+    const occs = collectStationBerthOccupancies(timelines, [tn], {
+      collisionProtectionSeconds: 30,
+    });
+    const p1 = occs.find((occ) => occ.stationId === 'P1' && occ.blockId === 'a')!;
+    // 站位佔用窗：62:00 到站、62:40 靠站結束
+    assert.equal(Math.round(p1.startMinute * 60), 62 * 60);
+    assert.equal(Math.round(p1.endMinute * 60), 62 * 60 + 40);
+    // 班次卡起訖：60:00 發車、跑完 170 秒
+    assert.equal(Math.round(p1.blockStartMinute * 60), 60 * 60);
+    assert.equal(Math.round(p1.blockEndMinute * 60), 60 * 60 + 160);
+    assert.notEqual(p1.blockStartMinute, p1.startMinute);
+  });
 });

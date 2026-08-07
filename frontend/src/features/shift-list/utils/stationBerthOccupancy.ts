@@ -76,6 +76,15 @@ export type StationBerthOccupancy = {
   /** 離站／可出發（分鐘）＝該站自然在站時間結束 */
   endMinute: number;
   /**
+   * 這個佔用所屬<strong>班次卡</strong>的起訖（分鐘）。
+   *
+   * 跟 startMinute／endMinute 是兩回事：後者是「在這一站佔著站位的那幾秒」，
+   * 常常只有 10 秒；班次卡上顯示的是整趟的起訖。回報訊息一定要用班次卡的時間，
+   * 否則使用者拿訊息去對畫面會對不起來（2026-08-08 踩過）。
+   */
+  blockStartMinute: number;
+  blockEndMinute: number;
+  /**
    * 別台車最早可以進這個站位的時刻（分鐘）。
    * ＝ 實際離站（含末站滯留） + 2 × 碰撞保護時間。
    * 沒開啟碰撞保護、也沒有滯留時就等於 {@link endMinute}。
@@ -189,6 +198,8 @@ export function collectStationBerthOccupancies(
           routeId: block.routeId ?? route.routeId,
           startMinute,
           endMinute,
+          blockStartMinute: block.plannedStartMinute,
+          blockEndMinute: block.plannedEndMinute,
           protectedUntilMinute,
         });
       }

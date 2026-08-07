@@ -80,10 +80,10 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   RECOVERY_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
   CLOCK_ALIGN_VIOLATION: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
-  ROUTE_SUCCESSOR_POLICY_INVALID: { id: 's7', label: '§7 關聯圖與下一跳決策' },
-  ROUTE_SUCCESSOR_MISMATCH: { id: 's7', label: '§7 關聯圖與下一跳決策' },
-  ROUTE_INSTANCE_AMBIGUOUS: { id: 's7', label: '§7 關聯圖與下一跳決策' },
-  ROUTE_STATION_DISCONTINUITY: { id: 's7', label: '§7 關聯圖與下一跳決策' },
+  ROUTE_SUCCESSOR_POLICY_INVALID: { id: 's7', label: '§7 關聯圖：一台車跑完這條接哪條' },
+  ROUTE_SUCCESSOR_MISMATCH: { id: 's7', label: '§7 關聯圖：一台車跑完這條接哪條' },
+  ROUTE_INSTANCE_AMBIGUOUS: { id: 's7', label: '§7 關聯圖：一台車跑完這條接哪條' },
+  ROUTE_STATION_DISCONTINUITY: { id: 's7', label: '§7 關聯圖：一台車跑完這條接哪條' },
   TURNAROUND_LIMIT_EXCEEDED: { id: 's3', label: '§3 完整流水線' },
   ROUTE_ROTATION_OVER_TURNAROUND: { id: 's3', label: '§3 完整流水線' },
   ROTATION_CYCLE_INCOMPLETE: { id: 's1', label: '§1 核心原則（服從順序）' },
@@ -135,7 +135,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   STATION_BERTH_BACKUP_USED: {
     kind: 'policy',
     guidance:
-      '站位無衝突時，依關聯圖優先／次要出邊（或同起點可銜接路線）改選下一跳。選線後定在該終點；下一趟再排，可等待銜接，不是「備用槽成對置換」。',
+      '這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。',
   },
   ANCHOR_CONFLICT: {
     kind: 'limit',

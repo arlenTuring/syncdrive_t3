@@ -1484,6 +1484,37 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 碰撞訊息拿站位佔用窗當班次時間，使用者對不起來</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>使用者 hover 班次卡 ⚠，看到「TN 時間線 2 11:08:20–11:08:30」，
+      但那張卡明明寫著 11:04:40–11:08:20。<strong>訊息裡的每一個數字都對不上畫面。</strong>
+    </li>
+    <li>
+      <strong>根因：</strong>訊息用的是<strong>站位佔用窗</strong>
+      （<code>StationBerthOccupancy.startMinute／endMinute</code>）——那是「在這一站佔著站位的那幾秒」，
+      末站常常只有 10 秒（minPresence）。班次卡顯示的是整趟的起訖，兩者本來就是不同東西，
+      但訊息把它排版成班次時間的樣子，等於在誤導。
+    </li>
+    <li>
+      <strong>解法：</strong><code>StationBerthOccupancy</code> 補上
+      <code>blockStartMinute／blockEndMinute</code>，訊息一律改用班次卡起訖；
+      同時把稱呼從「路線代號＋時間線」改成<strong>班次代號</strong>（如 <code>PTN1120</code>），
+      跟畫面上看到的一致。站位佔用窗與「站位何時讓出來」改放 <code>detail</code>，
+      需要精確數字時才查。
+    </li>
+    <li>
+      <strong>順手清掉的黑話：</strong>「下一跳」「拓撲」「來源 priority」「備用槽成對置換」
+      這些只有寫程式的人看得懂的詞，全部從使用者看得到的訊息與建議裡拿掉，改成白話。
+      使用者原話：「不要講什麼下一跳好嗎 我真的看不懂」。
+    </li>
+    <li>
+      <strong>教訓：</strong>同一個概念在程式裡有兩種時間（佔用窗 vs 班次卡），
+      對外回報時<strong>一定要用使用者畫面上看得到的那一種</strong>。
+      內部精確度放 <code>detail</code>，不要塞進 message 裡冒充。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

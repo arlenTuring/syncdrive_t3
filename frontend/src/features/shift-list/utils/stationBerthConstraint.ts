@@ -727,8 +727,8 @@ export function enforceStationBerthConstraints(args: {
         code: 'STATION_BERTH_BACKUP_USED',
         severity: 'warning',
         message:
-          `站位約束依關聯圖拓撲改選「${chosen.route.routeCode ?? chosen.route.routeName}」`
-          + `（取代 ${initialRoute.routeCode ?? initialRoute.routeName}，來源 ${chosen.source}）`,
+          `為避開停靠點衝突，這一趟改跑「${chosen.route.routeCode ?? chosen.route.routeName}」`
+          + `（原本是「${initialRoute.routeCode ?? initialRoute.routeName}」）`,
         detail: {
           blockId: block.id,
           timelineRow: block.timelineRow,

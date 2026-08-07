@@ -281,6 +281,7 @@ export function generateShiftSchedule(
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       // 碰撞保護不足是「該拉開但沒拉開」，不是物理上兩台車疊在一起：走警告不擋生成
       warnings,
+      sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     },
   );
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);

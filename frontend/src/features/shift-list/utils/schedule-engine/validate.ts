@@ -35,7 +35,12 @@ import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDay
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
+  type StationBerthOccupancy,
 } from '../stationBerthOccupancy';
+import {
+  resolveGeneratedBlockTripCode,
+  type MaintenanceSectionCodeBySection,
+} from '../maintenanceSectionCode';
 import {
   ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
   listNextInstanceCandidates,
@@ -868,6 +873,8 @@ export function validateStationBerthCollisions(
     collisionProtectionSeconds?: number;
     /** 碰撞保護不足只是警告，不擋生成；沒給就退回寫進 errors。 */
     warnings?: FeasibilityIssue[];
+    /** 整備區塊代號，用來把班次代號（如 PTN1120）算出來寫進訊息 */
+    sectionCodes?: MaintenanceSectionCodeBySection | null;
   },
 ): void {
   const collisionProtectionSeconds = options?.collisionProtectionSeconds;
@@ -878,6 +885,25 @@ export function validateStationBerthCollisions(
   );
   const collisions = findStationBerthCollisions(occupancies, selectedRoutes);
   const protectionSink = options?.warnings ?? errors;
+
+  // 用班次代號稱呼班次（畫面上看到的就是代號），不要只講路線代號＋時間線
+  const blockById = new Map<string, GeneratedScheduleBlock>();
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) blockById.set(block.id, block);
+  }
+  const tripCodeOf = (occ: StationBerthOccupancy): string => {
+    const block = blockById.get(occ.blockId);
+    if (!block) return occ.routeCode ?? '正線';
+    return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null);
+  };
+  /**
+   * 訊息一律用<strong>班次卡的起訖</strong>，不要用站位佔用窗——
+   * 佔用窗常常只有 10 秒，跟畫面上的班次卡對不起來（2026-08-08 使用者回報）。
+   */
+  const labelOf = (occ: StationBerthOccupancy): string =>
+    `${tripCodeOf(occ)}（時間線 ${occ.timelineRow}）`
+    + ` ${formatMinuteHms(occ.blockStartMinute)}–${formatMinuteHms(occ.blockEndMinute)}`;
+
   let reported = 0;
   let protectionReported = 0;
   for (const hit of collisions) {
@@ -887,19 +913,24 @@ export function validateStationBerthCollisions(
     if (count >= MAX_BERTH_COLLISION_REPORTS) {
       continue;
     }
-    const earlierLabel =
-      `${hit.earlier.routeCode ?? '正線'} 時間線 ${hit.earlier.timelineRow}`
-      + ` ${formatMinuteHms(hit.earlier.startMinute)}–${formatMinuteHms(hit.earlier.endMinute)}`;
-    const laterLabel =
-      `${hit.later.routeCode ?? '正線'} 時間線 ${hit.later.timelineRow}`
-      + ` ${formatMinuteHms(hit.later.startMinute)}–${formatMinuteHms(hit.later.endMinute)}`;
+    const earlierLabel = labelOf(hit.earlier);
+    const laterLabel = labelOf(hit.later);
     const detail = {
       stationId: hit.stationId,
       stationName: hit.stationName,
       earlierBlockId: hit.earlier.blockId,
       laterBlockId: hit.later.blockId,
+      earlierTripCode: tripCodeOf(hit.earlier),
+      laterTripCode: tripCodeOf(hit.later),
       earlierTimelineRow: hit.earlier.timelineRow,
       laterTimelineRow: hit.later.timelineRow,
+      /** 班次卡起訖（畫面上看到的） */
+      earlierBlockRange: [hit.earlier.blockStartMinute, hit.earlier.blockEndMinute],
+      laterBlockRange: [hit.later.blockStartMinute, hit.later.blockEndMinute],
+      /** 該站位的佔用窗（通常只有幾秒，與班次卡起訖不同） */
+      earlierBerthWindow: [hit.earlier.startMinute, hit.earlier.endMinute],
+      laterBerthWindow: [hit.later.startMinute, hit.later.endMinute],
+      earlierBerthFreeMinute: hit.earlier.protectedUntilMinute,
       overlapSeconds: hit.overlapSeconds,
       clearanceGapSeconds: hit.clearanceGapSeconds,
       requiredClearanceSeconds: hit.requiredClearanceSeconds,
@@ -912,8 +943,9 @@ export function validateStationBerthCollisions(
         severity: 'warning',
         kind: 'actionable',
         message:
-          `${hit.stationName} 碰撞保護不足：${earlierLabel} 與 ${laterLabel}`
-          + `（還差 ${Math.round(hit.protectionShortfallSeconds)} 秒）`,
+          `${hit.stationName}：${earlierLabel} 這台車要到`
+          + ` ${formatMinuteHms(hit.earlier.protectedUntilMinute)} 才會把站位讓出來，`
+          + `但 ${laterLabel} 已經到站，還差 ${Math.round(hit.protectionShortfallSeconds)} 秒`,
         detail,
       });
       protectionReported += 1;
@@ -925,7 +957,7 @@ export function validateStationBerthCollisions(
       kind: 'limit',
       message:
         `${hit.stationName} 站位碰撞：${earlierLabel} 與 ${laterLabel}`
-        + `（在站重疊 ${Math.round(hit.overlapSeconds)} 秒）`,
+        + ` 同時佔用同一個停靠點，重疊 ${Math.round(hit.overlapSeconds)} 秒`,
       detail,
     });
     reported += 1;
