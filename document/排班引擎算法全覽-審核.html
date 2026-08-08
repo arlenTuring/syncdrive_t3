@@ -1177,7 +1177,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
-      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合允許多值（同一任務類型的設施可能落在不同站），實務上目前每種都是單一值：充電→N2W，保養／行前／機動→T3上行（見 §10）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行前／機動→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1828,7 +1828,7 @@ backend/src/dev-log/
     </li>
   </ul>
 
-  <h3>2026-08-08 · 出場站集合混進洗車 W1，害外掛不插、車直接瞬移到 N2W</h3>
+  <h3>2026-08-08 · 出場站集合與洗車 W1：兩次都判錯，最後定調在「servicing 是合併視窗」</h3>
   <ul>
     <li>
       <strong>症狀：</strong><code>YARD_EXIT_STATION_MISMATCH</code> 13 則，形狀完全一致：
@@ -1843,58 +1843,68 @@ backend/src/dev-log/
       <strong>放寬後 13 則歸零，但那是把真 bug 蓋掉。</strong>
     </li>
     <li>
-      <strong>使用者指出的關鍵事實：</strong>時間模板裡<strong>根本沒有洗車</strong>。
-      查 <code>TaskTypeKey</code> 只有
-      <code>passenger｜charging｜inspection｜standby｜servicing</code>——
-      洗車不是可排班的任務類型，是整備中心裡的一個步驟，
-      沒有任何模板任務會派到 W1。實測模板 JSON 也搜不到 <code>carWash</code>／<code>洗車</code>。
+      <strong>第二次判斷（也是錯的）：</strong>使用者指出時間模板裡沒排洗車。
+      查 <code>TaskTypeKey</code> 確實只有
+      <code>passenger｜charging｜inspection｜standby｜servicing</code>，
+      沒有洗車，就推論「carWash 不是任務類型，不該進出場站集合」，
+      把 <code>resolveServicingExitStationIds()</code> 的 carWash 拿掉。
+      指標很漂亮（外掛從 13 升到 26、mismatch 0），<strong>但前提是錯的</strong>。
     </li>
     <li>
-      <strong>真根因：</strong><code>resolveServicingExitStationIds()</code> 無條件把
-      <code>maintenance</code> 與 <code>carWash</code> 兩組設施代號聯集。
-      W1 的停靠站 N2W 因此混進保養的出場站集合，
-      造成 <code>exitStationIds.has(originStationId)</code> 成立 →
-      <code>dispatchIsRequired = false</code> → <strong>外掛班次不插</strong> →
-      車沒有任何移動就從 N2W 發車。驗證器報 <code>YARD_EXIT_STATION_MISMATCH</code>
-      是<strong>完全正確</strong>的。
+      <strong>使用者的更正：</strong>整備任務固定<strong>五類</strong>——
+      充電／洗車／保養／行前／機動，各自在場域設定 step 2 有對應設施分類。
+      「這次模板沒排洗車，不代表洗車不用遵守規則。」
     </li>
     <li>
-      <strong>解法：</strong><code>resolveServicingExitStationIds()</code> 與
-      servicing 的 <code>rotationExitStationId</code> 都只看
-      <code>maintenance</code> 設施代號，不再併入 <code>carWash</code>。
-      修完後出場站對照完全符合場域設定：
+      <strong>定調的關鍵事實</strong>（<code>editor.ts</code> 的 <code>servicing</code> 說明）：
+      <blockquote>
+        休息窗口：洗車、保養、閒置合併為此類型／
+        模板只定窗口長度；洗車／保養／閒置不在模板分別排定
+      </blockquote>
+      洗車<strong>沒有自己的 <code>TaskTypeKey</code></strong>，
+      是因為它跟保養、閒置合併成 <code>servicing</code> 這個休息窗口——
+      不是因為它不存在。實際做哪一項由車輛回報數據在窗口內決定，
+      <strong>排班當下無從得知</strong>。所以 M 系停靠站與 W1 停靠站<strong>都是</strong>合法出場站，
+      原本的聯集是對的，已還原。
+    </li>
+    <li>
+      <strong>最終狀態：</strong>
       <table>
         <thead><tr><th>任務類型</th><th>設施</th><th>出場站</th></tr></thead>
         <tbody>
           <tr><td>充電 charging</td><td>E1–E4</td><td><code>station_2</code>（N2W）</td></tr>
-          <tr><td>保養 servicing</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
           <tr><td>行前 inspection</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
           <tr><td>機動 standby</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+          <tr><td>保養視窗 servicing</td><td>M1–M4 <strong>+ W1</strong></td><td><code>station_4</code>（T3上行）<strong>或</strong> <code>station_2</code>（N2W）</td></tr>
         </tbody>
       </table>
-      實測：<code>errors 0</code>、<code>YARD_EXIT_STATION_MISMATCH 0</code>、
-      <code>MAINTENANCE_DISPATCH_UNREACHABLE 0</code>，
-      外掛班次 26 班全在 route_5／route_6（TN／TNB，T3→N2W 方向）。
-      <code>HEADWAY_BELOW_TARGET</code> 32 → 37——外掛真的插進去了，多佔 5 處班距，
-      這是正確代價。
+      <code>errors 0</code>、<code>YARD_EXIT_STATION_MISMATCH 0</code>、
+      <code>MAINTENANCE_DISPATCH_UNREACHABLE 0</code>、外掛 13 班、
+      <code>HEADWAY_BELOW_TARGET 32</code>。
+      多值集合（<code>buildYardExitStationOptionsByTaskType()</code>）是這個模型的<strong>必需品</strong>，
+      不是防禦性設計：servicing 的出場站本質上就是二選一。
     </li>
     <li>
-      <strong>保留多值集合：</strong><code>buildYardExitStationOptionsByTaskType()</code>
-      與 <code>yardExitStationOptionsByTaskType</code> 留著。
-      同一任務類型的設施<strong>可能</strong>落在不同站，集合是結構上正確的形狀；
-      只是拿掉 carWash 之後，這份資料每種任務都恰好是單一值。
+      <strong>遺留問題（未修，需產品決策）：班次代號與幾何不一致。</strong>
+      <code>resolveMaintenanceSectionCodeForTaskType()</code> 對 servicing 回傳
+      <code>n.maintenance || n.carWash</code>——只要有保養代號就一律標 <strong>M</strong>。
+      但實測 26 筆保養視窗中，<strong>13 筆的幾何只有「做洗車 W1」才成立</strong>
+      （下一班從 N2W 起跑），另 13 筆才是保養（T3上行）。
+      也就是<strong>卡片標 M（保養），排班卻把車綁在 W1（洗車）</strong>。
+      要修有兩條路：讓引擎在視窗內<strong>決定</strong>做哪一項並據此標代號，
+      或讓引擎<strong>不對出場站下注</strong>（兩站都要能接）。屬產品決策，尚未動。
     </li>
     <li>
-      <strong>教訓（兩層）：</strong>
+      <strong>教訓（同一件事連錯兩次）：</strong>
       <ol>
-        <li><strong>設施分組 ≠ 任務類型。</strong>整備中心的 step（洗車）與時間模板的
-        <code>TaskTypeKey</code> 是兩套東西，聯集它們會生出「車根本到不了的出場站」。
-        判斷某個設施該不該進某任務類型的集合，要回頭看 <code>TaskTypeKey</code> 有沒有它。</li>
-        <li><strong>驗證器報錯時，先假設它是對的。</strong>這次是驗證器抓到真問題，
-        我卻去放寬驗證器讓數字歸零。
-        <strong>指標歸零不等於問題解決</strong>——要能說出「車實際怎麼從 A 移動到 B」，
-        說不出來就是還沒找到根因。</li>
+        <li>第一次：驗證器報 mismatch，我去<strong>放寬驗證器</strong>讓數字歸零。</li>
+        <li>第二次：使用者說模板沒洗車，我去<strong>刪掉 carWash</strong>讓數字歸零。</li>
       </ol>
+      兩次都靠「指標變好」自我背書，兩次都沒去讀
+      <code>TaskTypeKey</code> 旁邊那段講 servicing 是合併視窗的說明。
+      <strong>一個列舉型別缺了某個值，要先問「是不是被合併進別的值」，
+      不能直接推論「這個概念不存在」。</strong>
+      枚舉是實作選擇，領域概念才是事實來源。
     </li>
   </ul>
 

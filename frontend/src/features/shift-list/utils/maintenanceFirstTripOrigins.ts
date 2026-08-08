@@ -235,14 +235,17 @@ export function resolveInspectionExitStationId(
 }
 
 /**
- * 保養可出場站集合：只依 maintenance 設施代號（例 M1–M4）過濾拓樸。
+ * 保養視窗可出場站集合：依 maintenance + carWash 設施代號過濾拓樸。
  *
- * 刻意<strong>不</strong>併入 carWash：洗車不是可排班的任務類型
- * （`TaskTypeKey` 只有 passenger／charging／inspection／standby／servicing），
- * 它是整備中心裡的一個步驟。把 W1 的停靠站併進來，會讓
- * `entryServiceExitStationIds` 多出一個車根本到不了的站（例 N2W），
- * 連帶讓 `dispatchIsRequired` 誤判為 false、外掛班次不插，
- * 車就「瞬移」到那一站發車。
+ * 兩者<strong>都要</strong>納入。時間模板的 `servicing` 是「休息窗口」，
+ * 洗車／保養／閒置合併為此類型（見 `TaskTypeKey` 說明）：模板只定窗口長度，
+ * 實際做哪一項由車輛回報數據在窗口內決定。排班當下無從得知，
+ * 因此車出場後可能在 M 系設施的停靠站（例 T3上行），也可能在 W1 的（例 N2W），
+ * 兩站都是合法出場站。
+ *
+ * 使用者沒把洗車排進某一版時間模板，不代表洗車不適用這條規則——
+ * 整備任務固定五類（充電／洗車／保養／行前／機動），各自在場域設定 step 2
+ * 有對應設施分類，規則依設施走，不依某次模板有沒有排到。
  *
  * 若 body 無代號或對不到任何站，回傳全部拓樸出場站（維持最壞情況語意）。
  */
@@ -250,7 +253,10 @@ export function resolveServicingExitStationIds(
   origins: MaintenanceFirstTripOrigin[],
   maintenanceBody: Record<string, unknown> | null | undefined,
 ): string[] {
-  const codes = extractFacilityMapCodes(maintenanceBody, 'maintenance');
+  const codes = [
+    ...extractFacilityMapCodes(maintenanceBody, 'maintenance'),
+    ...extractFacilityMapCodes(maintenanceBody, 'carWash'),
+  ];
   const uniqueCodes = [...new Set(codes)];
   if (uniqueCodes.length === 0) {
     return origins.map((origin) => origin.stationId);
