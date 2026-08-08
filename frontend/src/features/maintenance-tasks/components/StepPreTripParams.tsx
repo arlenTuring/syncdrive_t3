@@ -9,6 +9,7 @@ type StepPreTripParamsProps = {
 export function StepPreTripParams({ draft, onChange }: StepPreTripParamsProps) {
   return (
     <StepStationDurationParams
+      preferredFacilityPurpose="保養格"
       title="填入行前任務"
       draft={draft}
       onChange={onChange}

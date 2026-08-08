@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_MAINTENANCE_MAP_ID,
-  fetchMapFieldEquipment,
+  fetchYardFacilityEquipment,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
 import {
@@ -36,7 +36,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchMapFieldEquipment(DEFAULT_MAINTENANCE_MAP_ID, 'charging')
+    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, '充電格')
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);
@@ -95,7 +95,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
           equipmentError={equipmentError}
           equipmentHint={
             equipment.length > 0
-              ? `可載入最多 ${equipment.length} 座充電設施（${equipment.map((e) => e.mapCode).join('、')}）`
+              ? `場域共 ${equipment.length} 座設施格可掛載（${equipment.map((e) => e.mapCode).join('、')}）；掛哪一座由整備任務決定，不受地圖用途限制`
               : undefined
           }
           newRow={() => ({

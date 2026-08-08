@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_MAINTENANCE_MAP_ID,
-  fetchMaintenanceStationEquipment,
+  fetchYardFacilityEquipment,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
 import {
@@ -22,6 +22,11 @@ type StepStationDurationParamsProps = {
   draft: StationDurationTaskDraft;
   onChange: (next: StationDurationTaskDraft) => void;
   showFollowTemplateCheckbox?: boolean;
+  /**
+   * 設施下拉的偏好排序用途（例「保養格」／「調度格」）。
+   * 只影響排序，不影響可選範圍——任何設施格都掛得上。
+   */
+  preferredFacilityPurpose?: string;
 };
 
 export function StepStationDurationParams({
@@ -29,6 +34,7 @@ export function StepStationDurationParams({
   draft,
   onChange,
   showFollowTemplateCheckbox = false,
+  preferredFacilityPurpose,
 }: StepStationDurationParamsProps) {
   const task = normalizeStationDurationDraft(draft);
   const patchTask = (patch: Partial<StationDurationTaskDraft>) =>
@@ -42,7 +48,7 @@ export function StepStationDurationParams({
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchMaintenanceStationEquipment(DEFAULT_MAINTENANCE_MAP_ID)
+    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, preferredFacilityPurpose)
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);
@@ -59,7 +65,7 @@ export function StepStationDurationParams({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preferredFacilityPurpose]);
 
   return (
     <StepSectionToggle
@@ -117,7 +123,7 @@ export function StepStationDurationParams({
           equipmentError={equipmentError}
           equipmentHint={
             equipment.length > 0
-              ? `可載入最多 ${equipment.length} 座設施（${equipment.map((e) => e.mapCode).join('、')}）`
+              ? `場域共 ${equipment.length} 座設施格可掛載（${equipment.map((e) => e.mapCode).join('、')}）；掛哪一座由整備任務決定，不受地圖用途限制`
               : undefined
           }
           newRow={() => ({

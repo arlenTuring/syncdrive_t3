@@ -1909,6 +1909,49 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 整備任務可掛任何設施格——用途是給人看的分類，不是限制</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>整備任務 Step 2「載入設施」的<code>＋</code>按不下去。
+      充電任務只看得到 E1–E4，四座掛滿之後就永久變灰，想掛 M1 也掛不了。
+    </li>
+    <li>
+      <strong>根因：</strong>每個 step 各自硬篩設施用途——
+      充電 <code>fetchMapFieldEquipment(mapId, 'charging')</code>、
+      洗車 <code>fetchCarWashFieldEquipment</code>、
+      保養／行前／機動 <code>fetchMaintenanceStationEquipment</code>。
+      加上 <code>canAddRow = rows.length &lt; equipment.length</code>，
+      可選集合被篩到剩四座、又剛好掛滿四座，<code>＋</code> 就死了。
+    </li>
+    <li>
+      <strong>觀念更正：</strong>地圖上的「用途」（充電格／保養格／洗車格／調度格）
+      是<strong>給人看的分類</strong>，不是對整備任務的約束。
+      哪一格歸哪個整備任務，應該由<strong>整備任務自己決定</strong>——
+      充電任務掛 M1 是合法的。
+    </li>
+    <li>
+      <strong>解法：</strong>新增 <code>fetchYardFacilityEquipment(mapId, preferredPurpose?)</code>，
+      抓 <code>kind=all</code> 後只濾掉「不是停車位」的設備
+      （號誌／智慧桿／月台門），其餘設施格全部可選。
+      <code>preferredPurpose</code> 只影響<strong>排序</strong>（把常用那類排前面），不縮小範圍。
+      五個 step 各自傳自己的偏好：充電格／洗車格／保養格／保養格（行前）／調度格（機動）。
+      行前與機動共用 <code>StepStationDurationParams</code>，因此加了
+      <code>preferredFacilityPurpose</code> prop 讓兩者各自指定。
+    </li>
+    <li>
+      <strong>順帶查到的設定問題：</strong>機動（mobile）目前掛的是 M1–M4（保養格），
+      而地圖上 H1–H3 才是調度格，且<strong>沒有任何整備任務區段掛到 H 系</strong>。
+      結果 22 張出場移動卡全擠在 M1–M4，H 系整組閒置，
+      4 則 <code>YARD_EXIT_MOVE_UNRESOLVED</code>「設施不夠分」就是這樣來的。
+      這是 Step 2 的資料設定，不是程式問題——修好 <code>＋</code> 之後就補得起來。
+    </li>
+    <li>
+      <strong>教訓：</strong>把「人類的分類標籤」寫成「系統的硬約束」，
+      平常看不出來，直到某一類剛好用滿才變成一個按不下去的按鈕。
+      分類要拿來<strong>排序與提示</strong>，不要拿來<strong>過濾可選集合</strong>。
+    </li>
+  </ul>
+
   <h3>2026-08-08 · 新增出場移動卡（整備代號+EX）與獨立的洗車任務類型</h3>
   <ul>
     <li>

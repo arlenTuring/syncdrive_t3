@@ -2,7 +2,7 @@ import { Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_MAINTENANCE_MAP_ID,
-  fetchMaintenanceStationEquipment,
+  fetchYardFacilityEquipment,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
 import {
@@ -49,7 +49,7 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchMaintenanceStationEquipment(DEFAULT_MAINTENANCE_MAP_ID)
+    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, '保養格')
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);
@@ -213,7 +213,7 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
           equipmentError={equipmentError}
           equipmentHint={
             equipment.length > 0
-              ? `可載入最多 ${equipment.length} 座保養設施（${equipment.map((e) => e.mapCode).join('、')}）`
+              ? `場域共 ${equipment.length} 座設施格可掛載（${equipment.map((e) => e.mapCode).join('、')}）；掛哪一座由整備任務決定，不受地圖用途限制`
               : undefined
           }
           newRow={() => ({
