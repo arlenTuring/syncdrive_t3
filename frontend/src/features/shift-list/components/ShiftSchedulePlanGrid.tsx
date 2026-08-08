@@ -217,6 +217,53 @@ function BlockIssueHoverCard({
   );
 }
 
+/** 出場移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
+function YardExitMoveHoverCard({
+  code,
+  block,
+  pos,
+}: {
+  code: string;
+  block: GeneratedScheduleBlock;
+  pos: HoverCardPos;
+}) {
+  const CARD_WIDTH = 260;
+  const MARGIN = 12;
+  const viewportWidth = typeof window === 'undefined' ? 1600 : window.innerWidth;
+  const halfWidth = CARD_WIDTH / 2;
+  const clampedLeft = Math.min(
+    Math.max(pos.left, halfWidth + MARGIN),
+    Math.max(halfWidth + MARGIN, viewportWidth - halfWidth - MARGIN),
+  );
+
+  return createPortal(
+    <div
+      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      style={{ top: pos.top, left: clampedLeft }}
+      role="tooltip"
+    >
+      <div className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</div>
+      <div className="mt-0.5 text-[11px] leading-4 text-zinc-100">
+        {block.yardExitFacilityLabel ?? '整備設施'}
+        {' → '}
+        {block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}
+      </div>
+      <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
+        {formatBlockTimeRange(block)}（{block.travelSeconds} 秒）
+      </div>
+      <p className="mt-1 text-[10px] leading-[14px] text-zinc-500">
+        整備做完後把車從設施開到轉乘站；結束時刻貼齊下一段發車。
+      </p>
+      {block.yardExitAteYardTail ? (
+        <p className="mt-0.5 text-[10px] leading-[14px] text-amber-400">
+          ※ 空間不足，已佔用整備尾巴時間
+        </p>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}
+
 /** 頂部時間軸 hover 卡片（與建立時間模板相同內容格式） */
 function IntervalAxisHoverCard({
   interval,
@@ -906,6 +953,7 @@ function ShiftScheduleBlockBar({
   const isStickyLabel = durationMinutes >= 20;
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
   const [issueHoverPos, setIssueHoverPos] = useState<HoverCardPos | null>(null);
+  const [yardExitHoverPos, setYardExitHoverPos] = useState<HoverCardPos | null>(null);
 
   const route = useMemo(
     () => resolveRouteForBlock(block, selectedRoutes),
@@ -993,6 +1041,14 @@ function ShiftScheduleBlockBar({
   const onIssueIconEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setIssueHoverPos({
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  };
+
+  const onYardExitInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setYardExitHoverPos({
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
     });
@@ -1234,6 +1290,19 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
+      {isYardExitMove ? (
+        <button
+          type="button"
+          className="pointer-events-auto absolute inset-0 z-[6] flex items-center justify-center text-zinc-100/80 hover:text-zinc-50"
+          aria-label={`${code} 出場移動內容`}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerEnter={onYardExitInfoEnter}
+          onPointerLeave={() => setYardExitHoverPos(null)}
+        >
+          <Info className="size-3" aria-hidden />
+        </button>
+      ) : null}
       {showChrome && !isYardExitMove ? (
       <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
@@ -1315,6 +1384,9 @@ function ShiftScheduleBlockBar({
           warnings={blockWarnings}
           pos={issueHoverPos}
         />
+      ) : null}
+      {isYardExitMove && yardExitHoverPos ? (
+        <YardExitMoveHoverCard code={code} block={block} pos={yardExitHoverPos} />
       ) : null}
     </div>
         );
