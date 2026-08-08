@@ -904,6 +904,48 @@ export function validateStationBerthCollisions(
     `${tripCodeOf(occ)}（時間線 ${occ.timelineRow}）`
     + ` ${formatMinuteHms(occ.blockStartMinute)}–${formatMinuteHms(occ.blockEndMinute)}`;
 
+  /**
+   * 同一個停靠點最多同時停了幾台車（不同時間線才算）。
+   * 佔用區間用「到站 → 真正開走」——真正開走含末站滯留，
+   * 這才是車實際佔著站位的時間，不是只有靠站那幾十秒。
+   */
+  const peakConcurrentAtStation = (stationId: string): {
+    peak: number;
+    atMinute: number;
+    longestIdle: StationBerthOccupancy | null;
+  } => {
+    const spans = occupancies.filter((occ) => occ.stationId === stationId);
+    const events: Array<{ minute: number; delta: number }> = [];
+    let longestIdle: StationBerthOccupancy | null = null;
+    for (const occ of spans) {
+      events.push({ minute: occ.startMinute, delta: 1 });
+      events.push({ minute: occ.actualDepartMinute, delta: -1 });
+      const idle = occ.actualDepartMinute - occ.startMinute;
+      if (!longestIdle || idle > longestIdle.actualDepartMinute - longestIdle.startMinute) {
+        longestIdle = occ;
+      }
+    }
+    events.sort((a, b) => a.minute - b.minute || b.delta - a.delta);
+    let current = 0;
+    let peak = 0;
+    let atMinute = 0;
+    for (const event of events) {
+      current += event.delta;
+      if (current > peak) {
+        peak = current;
+        atMinute = event.minute;
+      }
+    }
+    return { peak, atMinute, longestIdle };
+  };
+
+  const protectionByStation = new Map<string, {
+    stationId: string;
+    stationName: string;
+    pairCount: number;
+    worst: (typeof collisions)[number];
+  }>();
+
   let reported = 0;
   let protectionReported = 0;
   for (const hit of collisions) {
@@ -940,18 +982,20 @@ export function validateStationBerthCollisions(
       blockId: hit.later.blockId,
     };
     if (isProtectionGap) {
-      pushIssue(sink, {
-        code: 'STATION_BERTH_PROTECTION_GAP',
-        severity: 'warning',
-        kind: 'actionable',
-        message:
-          `${hit.stationName}：${earlierLabel} 到`
-          + ` ${formatMinuteHms(hit.earlier.actualDepartMinute)} 才離站、`
-          + `${formatMinuteHms(hit.earlier.berthClearMinute)} 駛離會互撞的路段，`
-          + `所以別台車最早只能 ${formatMinuteHms(hit.earlier.protectedUntilMinute)} 到站；`
-          + `但 ${laterLabel} 提早 ${Math.round(hit.protectionShortfallSeconds)} 秒就到了`,
-        detail,
-      });
+      // 碰撞保護不足往往是<strong>同一個結構性問題</strong>被拆成幾百對班次
+      // （例：一個停靠點同時停了 4 台車，就會兩兩配對出一大堆）。
+      // 逐對列出只是噪音，先累積起來，迴圈結束後每個站位彙總成一則。
+      const bucket = protectionByStation.get(hit.stationId) ?? {
+        stationId: hit.stationId,
+        stationName: hit.stationName,
+        pairCount: 0,
+        worst: hit,
+      };
+      bucket.pairCount += 1;
+      if (hit.protectionShortfallSeconds > bucket.worst.protectionShortfallSeconds) {
+        bucket.worst = hit;
+      }
+      protectionByStation.set(hit.stationId, bucket);
       protectionReported += 1;
       continue;
     }
@@ -967,6 +1011,42 @@ export function validateStationBerthCollisions(
     reported += 1;
   }
 
+  for (const bucket of protectionByStation.values()) {
+    const { peak, atMinute, longestIdle } = peakConcurrentAtStation(bucket.stationId);
+    const idleMinutes = longestIdle
+      ? (longestIdle.actualDepartMinute - longestIdle.startMinute)
+      : 0;
+    const longestLabel = longestIdle
+      ? `${tripCodeOf(longestIdle)}（時間線 ${longestIdle.timelineRow}）`
+        + ` ${formatMinuteHms(longestIdle.startMinute)} 到站、`
+        + `${formatMinuteHms(longestIdle.actualDepartMinute)} 才開走，`
+        + `停了 ${idleMinutes.toFixed(1)} 分鐘`
+      : '';
+    pushIssue(protectionSink, {
+      code: 'STATION_BERTH_PROTECTION_GAP',
+      severity: 'warning',
+      kind: 'actionable',
+      message:
+        `${bucket.stationName}：同時最多有 ${peak} 台車停在這裡`
+        + `（${formatMinuteHms(atMinute)}），但一個停靠點只能停 1 台。`
+        + `共 ${bucket.pairCount} 對班次不滿足碰撞保護`
+        + (longestLabel ? `。停最久的是 ${longestLabel}` : ''),
+      detail: {
+        stationId: bucket.stationId,
+        stationName: bucket.stationName,
+        peakConcurrentVehicles: peak,
+        peakAtMinute: atMinute,
+        affectedPairCount: bucket.pairCount,
+        longestIdleBlockId: longestIdle?.blockId ?? null,
+        longestIdleMinutes: idleMinutes,
+        blockId: bucket.worst.later.blockId,
+        earlierBlockId: bucket.worst.earlier.blockId,
+        laterBlockId: bucket.worst.later.blockId,
+        worstShortfallSeconds: bucket.worst.protectionShortfallSeconds,
+      },
+    });
+  }
+
   const overlapTotal = collisions.filter((hit) => hit.kind === 'overlap').length;
   if (overlapTotal > reported) {
     pushIssue(errors, {
@@ -978,17 +1058,7 @@ export function validateStationBerthCollisions(
       detail: { totalCollisions: overlapTotal, reported },
     });
   }
-  const protectionTotal = collisions.length - overlapTotal;
-  if (protectionTotal > protectionReported) {
-    pushIssue(protectionSink, {
-      code: 'STATION_BERTH_PROTECTION_GAP',
-      severity: 'warning',
-      kind: 'limit',
-      message:
-        `另有 ${protectionTotal - protectionReported} 處碰撞保護不足未逐條列出（共 ${protectionTotal} 處）`,
-      detail: { totalCollisions: protectionTotal, reported: protectionReported },
-    });
-  }
+  // 碰撞保護不足已改成「每個站位一則彙總」，不再逐對列出，所以沒有「另有 N 則」的概念。
 }
 
 /**
