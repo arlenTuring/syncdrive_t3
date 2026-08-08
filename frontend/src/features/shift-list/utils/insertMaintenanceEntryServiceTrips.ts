@@ -497,16 +497,28 @@ export function insertMaintenanceEntryServiceTrips(args: {
       // 下面每一個 continue 都可能讓外掛沒被插入，所以只要「非插不可」卻跳過，
       // 一律回報，不再靜默（2026-08-08：行前那兩列完全沒插外掛也沒任何警告，查了很久）。
 
-      // 連續整備串只在串首嘗試一次，避免保養／行前各發一則略過
-      if (i > 0) {
-        let predIsYard = false;
-        for (let j = i - 1; j >= 0; j -= 1) {
-          const prev = sorted[j]!;
-          if (prev.source === 'transition' || prev.taskType === 'idle') continue;
-          predIsYard = isYardTemplateBar(prev);
+      // 連續整備串（例 充電→行前）只在<strong>串尾</strong>處理一次。
+      //
+      // 2026-08-08 更正：舊版處理「串首」。車其實是從串尾那一段出來的，
+      // 出場站、能不能插外掛都該由串尾決定。串首是充電時
+      // （allowEntryService=false）會在上面第一道檢查就被跳掉且不回報，
+      // 而串尾的行前又因為「前面是整備」被這裡跳掉——兩邊互推，
+      // 整列完全沒有外掛也沒有任何警告，查很久才找到。
+      {
+        let hasYardAfter = false;
+        for (let j = i + 1; j < sorted.length; j += 1) {
+          const next = sorted[j]!;
+          if (
+            next.source === 'transition'
+            || next.source === 'entry_service'
+            || next.taskType === 'idle'
+          ) {
+            continue;
+          }
+          hasYardAfter = isYardTemplateBar(next);
           break;
         }
-        if (predIsYard) continue;
+        if (hasYardAfter) continue;
       }
 
       const firstRoute = routeById.get(nextPassenger.routeId);

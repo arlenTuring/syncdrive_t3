@@ -1798,6 +1798,36 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 連續整備串「只在串首處理」，串首是充電就整串沒人管</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>上一則修完重新生成，<code>YARD_EXIT_STATION_MISMATCH</code>
+      還是 26 則，而且行前那幾列<strong>連新加的 <code>reportSkip</code> 都沒觸發</strong>
+      ——代表流程比想像中更早就跳掉了。
+    </li>
+    <li>
+      <strong>查法：</strong>先確認 commit 時間（12:54）早於生成時間（12:57），排除「改動沒生效」。
+      再直接打 <code>insertMaintenanceEntryServiceTrips()</code> 重現使用者那一列的形狀——
+      單獨的行前<strong>會</strong>插入外掛，所以函式本身是對的，差異一定在資料形狀。
+      逐一試整備串的組合，<code>充電 → 行前 → 正線</code> 重現成功：<strong>0 外掛、0 警告</strong>。
+    </li>
+    <li>
+      <strong>根因：</strong>連續整備串的規則是「<strong>只在串首處理一次</strong>」。
+      串首是充電（<code>allowEntryService=false</code>）→ 第一道檢查就靜默 <code>continue</code>；
+      串尾的行前又因為「前面是整備」被跳掉。<strong>兩邊互推，沒人處理，而且都不回報。</strong>
+    </li>
+    <li>
+      <strong>解法：</strong>改成在<strong>串尾</strong>處理。車是從串尾那一段出來的，
+      出場站、能不能插外掛，本來就該由串尾決定
+      （<code>充電→行前</code> 串，車出來時人在行前的出場站）。
+    </li>
+    <li>
+      <strong>教訓：</strong>「只處理串首／串尾」這種去重規則，
+      <strong>必須挑「有能力處理」的那一端</strong>，不能挑固定的一端。
+      挑錯端的後果不是報錯，是<strong>安靜地什麼都不做</strong>——這輪連續兩次都栽在這種靜默路徑上。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>
