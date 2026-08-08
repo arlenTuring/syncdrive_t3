@@ -289,6 +289,32 @@ export function resolveYardPostTaskPolicy(args: {
  * - <strong>'validate'</strong>（驗證車在不在該站用）：含全部有出場站的類型。
  *   驗證要問的是「車實際停在哪」，跟輪的相位無關。
  */
+/**
+ * 「這一種整備做完，車<strong>可能</strong>停在哪幾站」。
+ *
+ * 保養涵蓋保養設施（M 系→T3上行）與洗車（W1→N2W），兩者都算 servicing，
+ * 光看班次卡分不出這一趟是哪一種，所以可能的出場站不只一個。
+ * 驗證「車在不在起點站」時必須接受<strong>全部</strong>可能，
+ * 只拿偏好的那一個去比對會把合法班次誤判成錯誤（2026-08-08）。
+ */
+export function buildYardExitStationOptionsByTaskType(args: {
+  origins: MaintenanceFirstTripOrigin[];
+  maintenanceBody: Record<string, unknown> | null | undefined;
+}): Partial<Record<TaskTypeKey, string[]>> {
+  const map: Partial<Record<TaskTypeKey, string[]>> = {};
+  for (const taskType of ['inspection', 'charging', 'standby', 'servicing'] as const) {
+    const policy = resolveYardPostTaskPolicy({
+      taskType,
+      origins: args.origins,
+      maintenanceBody: args.maintenanceBody,
+    });
+    const options = new Set(policy.entryServiceExitStationIds);
+    if (policy.rotationExitStationId) options.add(policy.rotationExitStationId);
+    if (options.size > 0) map[taskType] = [...options];
+  }
+  return map;
+}
+
 export function buildYardRotationExitByTaskType(args: {
   origins: MaintenanceFirstTripOrigin[];
   maintenanceBody: Record<string, unknown> | null | undefined;

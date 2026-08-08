@@ -643,20 +643,26 @@ export function insertMaintenanceEntryServiceTrips(args: {
       });
 
       if (!fitting) {
-        pushIssue(warnings, {
-          code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
-          severity: 'warning',
-          kind: 'policy',
-          message: `時間線 ${timeline.row}：略過「${yard.label}」後的進場載客——尾巴時間不夠，或會追上同路線前一班`,
-          detail: {
-            timelineRow: timeline.row,
-            yardBlockId: yard.id,
-            passengerBlockId: nextPassenger.id,
-            originStationId,
-            candidateCount: candidates.length,
-            tripCode: resolveGeneratedBlockTripCode(yard, i, sectionCodes),
-          },
-        });
+        // 車已停在合法出場站時，這班進場載客只是「順路多跑一趟」的加分項，
+        // 排不進去不影響班表合法性（首班仍從出場站發車，validateYardExitContinuity
+        // 也不會有話說），因此不回報。只有 dispatchIsRequired（車停在別處、
+        // 非靠這班不可）卻仍排不進去，才是真的接不上、必須讓使用者知道。
+        if (dispatchIsRequired) {
+          pushIssue(warnings, {
+            code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
+            severity: 'warning',
+            kind: 'policy',
+            message: `時間線 ${timeline.row}：略過「${yard.label}」後的進場載客——尾巴時間不夠，或會追上同路線前一班`,
+            detail: {
+              timelineRow: timeline.row,
+              yardBlockId: yard.id,
+              passengerBlockId: nextPassenger.id,
+              originStationId,
+              candidateCount: candidates.length,
+              tripCode: resolveGeneratedBlockTripCode(yard, i, sectionCodes),
+            },
+          });
+        }
         continue;
       }
 

@@ -1176,8 +1176,8 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>TURNAROUND_LIMIT_EXCEEDED</code></td><td>error</td><td>單路線最快一圈已超折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
-      <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
-      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站不是該設施的出場站——車不在那裡，開不了（見 §10）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該設施的任一出場站集合內</strong>——車不在那裡，開不了。設施可有多個出場站（保養＝機廠 T3上行＋洗車 W1 N2W），只要命中其中一個就算合法（見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1825,6 +1825,107 @@ backend/src/dev-log/
       <strong>教訓：</strong>「只處理串首／串尾」這種去重規則，
       <strong>必須挑「有能力處理」的那一端</strong>，不能挑固定的一端。
       挑錯端的後果不是報錯，是<strong>安靜地什麼都不做</strong>——這輪連續兩次都栽在這種靜默路徑上。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · 出場站不是單一值，是集合——驗證過嚴誤報 13 則</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong><code>YARD_EXIT_STATION_MISMATCH</code> 13 則，形狀完全一致：
+      <code>列 N | servicing | 出場 T3上行 → 這班起點 N2W下行出發 | 路線 NT</code>。
+    </li>
+    <li>
+      <strong>根因：</strong>保養的 <code>entryServiceExitStationIds</code> 實際是
+      <code>["station_4"(機廠→T3上行), "station_2"(洗車 W1→N2W)]</code>，
+      但驗證只拿<strong>單一偏好值</strong> <code>rotationExitStationId = station_4</code> 去比。
+      車洗完車停在 N2W、從 N2W 正常起跑 NT——完全合法，卻被判不符。
+      <strong>是驗證過嚴，不是排班錯。</strong>
+    </li>
+    <li>
+      <strong>解法：</strong>新增 <code>buildYardExitStationOptionsByTaskType()</code>，
+      回傳 <code>Partial&lt;Record&lt;TaskTypeKey, string[]&gt;&gt;</code>——
+      <code>entryServiceExitStationIds</code> 與 <code>rotationExitStationId</code> 的聯集。
+      <code>EngineInput.yardExitStationByTaskType</code> 換成
+      <code>yardExitStationOptionsByTaskType</code>，
+      <code>validateYardExitContinuity</code> 改成
+      <code>exitOptions.includes(originStationId)</code> 即放行。13 則 → 0。
+    </li>
+    <li>
+      <strong>教訓：</strong>「出場站」在資料模型裡一直是<strong>集合</strong>（一個設施可有多個出入口），
+      是驗證端自己把它塌縮成單一值。<strong>驗證器的資料形狀必須跟來源一致</strong>，
+      塌縮多值成單值＝製造假錯誤。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · 加分項排不進去不是錯——13 則 MAINTENANCE_DISPATCH_UNREACHABLE 誤報</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>13 則 <code>MAINTENANCE_DISPATCH_UNREACHABLE</code>，
+      全是保養，訊息一律「尾巴時間不夠，或會追上同路線前一班」。
+      但同一次生成的 <code>YARD_EXIT_STATION_MISMATCH</code> 是 0——
+      <strong>沒有任何一班從非法站點起跑</strong>，兩者互相矛盾。
+    </li>
+    <li>
+      <strong>根因：</strong><code>if (!fitting)</code> 無條件回報。
+      但 <code>pickSafeEntryPlacement</code> 只在 <code>mandatory=true</code> 時回 fallback；
+      <code>dispatchIsRequired=false</code>（車已停在合法出場站）時回 <code>null</code> 是<strong>設計行為</strong>。
+      這種情況下外掛只是「順路多跑一趟」的加分項，排不進去不影響班表合法性。
+    </li>
+    <li>
+      <strong>解法：</strong>回報改成 <code>if (dispatchIsRequired)</code> 才發。13 則 → 0，
+      <code>errors</code> 維持 0。
+    </li>
+    <li>
+      <strong>教訓：</strong>同一個 <code>null</code> 回傳值承載兩種語意（「真的接不上」與「不需要也沒排上」）時，
+      <strong>回報條件必須跟著呼叫端的意圖走，不能只看回傳值</strong>。
+      判斷依據就在旁邊的 <code>mandatory</code> 參數裡。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · HEADWAY_BELOW_TARGET 32 則的歸因——不是 bug，是運能飽和</h3>
+  <ul>
+    <li>
+      <strong>背景：</strong>外掛改成 <code>mandatory</code> 強插後，
+      <code>HEADWAY_BELOW_TARGET</code> 由 14 升到 32，需要確認是不是回歸。
+    </li>
+    <li>
+      <strong>差分實驗</strong>（把 <code>mandatory: dispatchIsRequired</code> 暫時改成 <code>false</code>）：
+      <table>
+        <thead><tr><th>指標</th><th><code>mandatory</code> 開</th><th><code>mandatory</code> 關</th></tr></thead>
+        <tbody>
+          <tr><td><code>STATION_BERTH_COLLISION</code></td><td>0</td><td><strong>2（error 級硬碰撞）</strong></td></tr>
+          <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>0</td><td>10</td></tr>
+          <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>13</td><td>23</td></tr>
+          <tr><td><code>HEADWAY_BELOW_TARGET</code></td><td>32</td><td>14</td></tr>
+        </tbody>
+      </table>
+      <strong>取捨明確：</strong>用 18 則班距警告，換掉 2 則實體硬碰撞 + 10 則出場站不連續。
+      實體不可能 &gt; 服務品質，方向正確，<code>mandatory</code> 保留。
+    </li>
+    <li>
+      <strong>32 則的歸因</strong>（在 <code>pushLaterForward</code> 每個 <code>return false</code> 上掛探針，
+      再用 <code>detail.laterBlockId</code> 對回違規清單）：
+      <table>
+        <thead><tr><th>原因</th><th>數量</th><th>意義</th></tr></thead>
+        <tbody>
+          <tr><td>缺口 ≤ 20s，落在 <code>REPAIR_SLACK_SECONDS = 20</code> 容差內</td><td>5</td><td>修復器刻意不動（已標 <code>mild</code>），動它只會連鎖擾動</td></tr>
+          <tr><td><code>ceiling-locked</code>：<code>vehicleCeiling === laterStart</code></td><td>13</td><td>同列車下一班已緊貼，一秒都推不動——車輛排程飽和</td></tr>
+          <tr><td><code>berth-blocked</code>：推到頂線仍撞站位（<code>clampedDelay = 130s</code>）</td><td>14</td><td>站位飽和</td></tr>
+        </tbody>
+      </table>
+      <strong>結論：27 則是真實運能／站位飽和，5 則是刻意容差。沒有 bug 要修</strong>——
+      要降只能加車、加站位、或放寬班距目標，屬營運參數決策，不是演算法缺陷。
+    </li>
+    <li>
+      <strong>為什麼佔位會讓班次變「密」而非「疏」：</strong>外掛佔住站位
+      → <code>STATION_BERTH_DELAYED</code> 把 A 班往後推 → <strong>A 與 A+1 的間隔縮短</strong>。
+      修復器該把 A+1 也往後推，但 A+1 撞到同列天花板或站位，推不動，缺口就留下來。
+    </li>
+    <li>
+      <strong>教訓：</strong>指標變差先做<strong>差分實驗</strong>再下結論。
+      這次「32 比 14 差」看起來像回歸，實際是拿警告換錯誤的正確取捨；
+      而 32 的內部組成要靠探針才看得出來——
+      <strong>總數是沒有行動力的數字，歸因才有。</strong>
     </li>
   </ul>
 

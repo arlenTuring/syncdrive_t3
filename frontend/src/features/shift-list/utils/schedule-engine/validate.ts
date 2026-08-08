@@ -1075,12 +1075,16 @@ export function validateStationBerthCollisions(
 export function validateYardExitContinuity(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   selectedRoutes: ShiftScheduleSelectedRoute[];
-  /** 整備類型 → 出場站 stationId；查不到的類型不檢查 */
-  yardRotationExitByTaskType: Partial<Record<string, string>>;
+  /**
+   * 整備類型 → 車<strong>可能</strong>停在哪幾站。
+   * 保養涵蓋保養設施（M 系→T3上行）與洗車（W1→N2W），光看班次卡分不出是哪一種，
+   * 所以要接受全部可能；只拿偏好的那一站比對會把合法班次誤判成錯誤（2026-08-08）。
+   */
+  yardExitStationOptionsByTaskType: Partial<Record<string, string[]>>;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   errors: FeasibilityIssue[];
 }): void {
-  const { timelines, selectedRoutes, yardRotationExitByTaskType, errors } = args;
+  const { timelines, selectedRoutes, yardExitStationOptionsByTaskType, errors } = args;
 
   // stationId 對使用者沒有意義（畫面上看到的是站名），訊息一律用站名
   const stationNameById = new Map<string, string>();
@@ -1111,8 +1115,8 @@ export function validateYardExitContinuity(args: {
     for (let i = 0; i < ordered.length; i += 1) {
       const yard = ordered[i]!;
       if (!isYardBlock(yard)) continue;
-      const exitStationId = yardRotationExitByTaskType[yard.taskType];
-      if (!exitStationId) continue;
+      const exitOptions = yardExitStationOptionsByTaskType[yard.taskType] ?? [];
+      if (exitOptions.length === 0) continue;
 
       // 連續整備串（保養→行前）只看串尾那一段的出場站
       let next: GeneratedScheduleBlock | null = null;
@@ -1127,7 +1131,9 @@ export function validateYardExitContinuity(args: {
 
       const route = resolveRouteForBlock(next, selectedRoutes);
       const originStationId = route?.stationIds[0]?.trim() || null;
-      if (!originStationId || originStationId === exitStationId) continue;
+      // 只要起點站是「任何一個可能的出場站」就合法
+      if (!originStationId || exitOptions.includes(originStationId)) continue;
+      const exitStationId = exitOptions[0]!;
 
       // 站名比 stationId 好認；來源決定是哪一條程式路徑排出來的，查錯時最關鍵
       const sourceLabel =
@@ -1142,7 +1148,7 @@ export function validateYardExitContinuity(args: {
         kind: 'actionable',
         message:
           `時間線 ${timeline.row}：「${yard.label}」做完後車停在`
-          + `「${stationLabel(exitStationId)}」，`
+          + `「${exitOptions.map(stationLabel).join('」或「')}」，`
           + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null)}`
           + `（${sourceLabel}）是從「${stationLabel(originStationId)}」發車，`
           + '車不在那裡開不了',
@@ -1153,7 +1159,8 @@ export function validateYardExitContinuity(args: {
           blockId: next.id,
           blockSource: next.source,
           exitStationId,
-          exitStationName: stationLabel(exitStationId),
+          exitStationOptions: exitOptions,
+          exitStationName: exitOptions.map(stationLabel).join(' / '),
           originStationId,
           originStationName: stationLabel(originStationId),
           routeId: next.routeId,
