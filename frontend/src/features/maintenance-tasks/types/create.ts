@@ -4,7 +4,7 @@ import {
   isPositiveIntegerUpTo,
 } from '../utils/numericInput';
 
-export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   step: CreateMaintenanceTaskStep;
@@ -14,9 +14,10 @@ export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   { step: 2, label: '充電任務' },
   { step: 3, label: '洗車任務' },
   { step: 4, label: '保養任務' },
-  { step: 5, label: '行前任務' },
-  { step: 6, label: '機動任務' },
-  { step: 7, label: '任務檢視' },
+  { step: 5, label: '調度任務' },
+  { step: 6, label: '行前任務' },
+  { step: 7, label: '機動任務' },
+  { step: 8, label: '任務檢視' },
 ];
 
 export type MaintenanceTaskBasicDraft = {
@@ -87,6 +88,19 @@ export type StationDurationTaskDraft = {
 export type MaintenanceTaskPreTripDraft = StationDurationTaskDraft;
 
 export type MaintenanceTaskMobileDraft = StationDurationTaskDraft;
+
+/**
+ * 調度任務：只負責<strong>載入調度設施</strong>，沒有觸發條件也沒有作業時長。
+ *
+ * 用途是「車暫時不能跑正線，先找個地方停一下」——
+ * 由調度入廠卡（PI）開進來、調度出廠卡（PO）開回首站。
+ * 停多久由排班決定（看什麼時候有班次可接），不是這裡設定的固定值，
+ * 所以沒有 operationDurationMinutes。
+ */
+export type MaintenanceTaskParkingDraft = {
+  stepEnabled: boolean;
+  equipmentRows: MaintenanceFacilityEquipmentRow[];
+};
 
 /** 設施代號：不指定 */
 export const PRE_TRIP_STATION_UNSPECIFIED = MAINTENANCE_STATION_UNSPECIFIED;
@@ -163,6 +177,7 @@ export type MaintenanceTaskCreateDraft = {
   charging: MaintenanceTaskChargingDraft;
   carWash: MaintenanceTaskCarWashDraft;
   maintenance: MaintenanceTaskMaintenanceDraft;
+  parking: MaintenanceTaskParkingDraft;
   preTrip: MaintenanceTaskPreTripDraft;
   mobile: MaintenanceTaskMobileDraft;
   currentStep: CreateMaintenanceTaskStep;
@@ -206,6 +221,10 @@ export function emptyMaintenanceTaskPreTripDraft(): MaintenanceTaskPreTripDraft 
 
 export function emptyMaintenanceTaskMobileDraft(): MaintenanceTaskMobileDraft {
   return emptyStationDurationTaskDraft();
+}
+
+export function emptyMaintenanceTaskParkingDraft(): MaintenanceTaskParkingDraft {
+  return { stepEnabled: true, equipmentRows: [] };
 }
 
 export function emptyStationDurationTaskDraft(): StationDurationTaskDraft {
@@ -349,6 +368,7 @@ export function emptyMaintenanceTaskCreateDraft(): MaintenanceTaskCreateDraft {
     charging: emptyMaintenanceTaskChargingDraft(),
     carWash: emptyMaintenanceTaskCarWashDraft(),
     maintenance: emptyMaintenanceTaskMaintenanceDraft(),
+    parking: emptyMaintenanceTaskParkingDraft(),
     preTrip: emptyMaintenanceTaskPreTripDraft(),
     mobile: emptyMaintenanceTaskMobileDraft(),
     currentStep: 1,
@@ -584,6 +604,22 @@ function parseStationDurationDraft(
   });
 }
 
+function parseParkingDraft(body: Record<string, unknown>): MaintenanceTaskParkingDraft {
+  const section =
+    body.parking && typeof body.parking === 'object'
+      ? (body.parking as Record<string, unknown>)
+      : null;
+  if (!section) return emptyMaintenanceTaskParkingDraft();
+  return {
+    stepEnabled:
+      typeof section.stepEnabled === 'boolean' ? section.stepEnabled : true,
+    equipmentRows: parseFacilityEquipmentRows(
+      section.equipmentRows,
+      newStationDurationEquipmentRowId,
+    ),
+  };
+}
+
 function parsePreTripDraft(body: Record<string, unknown>): MaintenanceTaskPreTripDraft {
   return parseStationDurationDraft(body, 'preTrip', emptyMaintenanceTaskPreTripDraft);
 }
@@ -643,6 +679,14 @@ export function serializeMaintenanceTaskBody(
         durationMinutes: row.durationMinutes,
       })),
     },
+    parking: {
+      stepEnabled: draft.parking.stepEnabled,
+      equipmentRows: draft.parking.equipmentRows.map((row) => ({
+        id: row.id,
+        mapCode: row.mapCode,
+        ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
+      })),
+    },
     preTrip: {
       stepEnabled: draft.preTrip.stepEnabled,
       equipmentRows: draft.preTrip.equipmentRows.map((row) => ({
@@ -669,7 +713,7 @@ export function buildMaintenanceTaskDraftFromStored(
   body: Record<string, unknown>,
 ): MaintenanceTaskCreateDraft {
   const currentStep =
-    typeof body.currentStep === 'number' && body.currentStep >= 1 && body.currentStep <= 7
+    typeof body.currentStep === 'number' && body.currentStep >= 1 && body.currentStep <= 8
       ? (body.currentStep as CreateMaintenanceTaskStep)
       : 1;
 
@@ -677,7 +721,7 @@ export function buildMaintenanceTaskDraftFromStored(
     typeof body.maxReachedStep === 'number' ? body.maxReachedStep : currentStep;
   const maxReachedStep = Math.max(
     currentStep,
-    Math.min(7, Math.max(1, maxReachedStepRaw)),
+    Math.min(8, Math.max(1, maxReachedStepRaw)),
   ) as CreateMaintenanceTaskStep;
 
   return {
@@ -689,6 +733,7 @@ export function buildMaintenanceTaskDraftFromStored(
     charging: parseChargingDraft(body),
     carWash: parseCarWashDraft(body),
     maintenance: parseMaintenanceDraft(body),
+    parking: parseParkingDraft(body),
     preTrip: parsePreTripDraft(body),
     mobile: parseMobileDraft(body),
     currentStep,

@@ -25,6 +25,7 @@ import {
 import { StepChargingParams } from './StepChargingParams';
 import { StepCarWashParams } from './StepCarWashParams';
 import { StepMaintenanceParams } from './StepMaintenanceParams';
+import { StepParkingParams } from './StepParkingParams';
 import { StepPreTripParams } from './StepPreTripParams';
 import { StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
@@ -573,24 +574,30 @@ export function CreateMaintenanceTaskPage({
                   />
                 )}
                 {draft.currentStep === 5 && (
+                  <StepParkingParams
+                    draft={draft.parking}
+                    onChange={(parking) => updateDraft((prev) => ({ ...prev, parking }))}
+                  />
+                )}
+                {draft.currentStep === 6 && (
                   <StepPreTripParams
                     draft={draft.preTrip}
                     onChange={(preTrip) => updateDraft((prev) => ({ ...prev, preTrip }))}
                   />
                 )}
-                {draft.currentStep === 6 && (
+                {draft.currentStep === 7 && (
                   <StepMobileParams
                     draft={draft.mobile}
                     onChange={(mobile) => updateDraft((prev) => ({ ...prev, mobile }))}
                   />
                 )}
-                {draft.currentStep === 7 && (
+                {draft.currentStep === 8 && (
                   <StepSchedulePreview
                     draft={draft}
                     scrollRootRef={previewScrollRef}
                     onReachedBottom={setPreviewReachedBottom}
                     onEditStep={(step) => {
-                      if (step >= 1 && step <= 6) goToStep(step);
+                      if (step >= 1 && step <= 7) goToStep(step);
                     }}
                   />
                 )}
