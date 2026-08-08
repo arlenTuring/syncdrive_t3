@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -19,6 +19,13 @@ import {
   normalizeMinimumRecoveryTimeSeconds,
 } from '../utils/schedule-engine/physics';
 import { ScheduleAnalysisReportPanel } from './ScheduleAnalysisReportPanel';
+import {
+  PUBLISH_STATE_LABEL,
+  resolveSchedulePublishState,
+  runSchedulePublishCheck,
+  toPublishCheckRecord,
+  type SchedulePublishCheckRecord,
+} from '../utils/schedulePublishCheck';
 import {
   buildShiftScheduleStoredOutput,
   trimPlanAdjustHistoryForPersist,
@@ -565,6 +572,9 @@ export function StepShiftScheduleAdjust({
   planRef.current = plan;
   const [report, setReport] = useState<ShiftScheduleFeasibilityReport | null>(null);
   const [showAnalysisReport, setShowAnalysisReport] = useState(false);
+  const [publishCheck, setPublishCheck] = useState<SchedulePublishCheckRecord | null>(
+    draft.scheduleOutput?.publishCheck ?? null,
+  );
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
@@ -1116,6 +1126,28 @@ export function StepShiftScheduleAdjust({
     draft.routeGroups.collisionProtectionSeconds,
   ]);
 
+  // 發布前檢查：可重跑的動作。班表可以手動改，所以指紋對不上就回到「未檢查」
+  const publishState = resolveSchedulePublishState(publishCheck, plan);
+
+  const handleRunPublishCheck = () => {
+    if (!plan) return;
+    const result = runSchedulePublishCheck({
+      plan,
+      selectedRoutes: draft.routeGroups.selectedRoutes,
+      collisionProtectionSeconds:
+        draft.routeGroups.collisionProtectionSeconds
+        ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
+      sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+    });
+    const record = toPublishCheckRecord(result, new Date().toISOString());
+    setPublishCheck(record);
+    // 檢查結果要跟著班表存起來，清單欄位才讀得到
+    const base = draft.scheduleOutput;
+    if (base) {
+      void onScheduleOutputReady({ ...base, publishCheck: record }, { flush: true });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center gap-2 text-zinc-500">
@@ -1218,6 +1250,30 @@ export function StepShiftScheduleAdjust({
         ) : null}
 
         <div className="h-4 w-px bg-zinc-800" />
+
+        <button
+          type="button"
+          disabled={!plan}
+          onClick={handleRunPublishCheck}
+          className={`rounded p-1.5 transition ${
+            !plan
+              ? 'cursor-not-allowed text-zinc-600 opacity-40'
+              : publishState === 'blocked'
+                ? 'text-red-400 hover:bg-zinc-800/60 hover:text-red-300'
+                : publishState === 'ready'
+                  ? 'text-emerald-400 hover:bg-zinc-800/60 hover:text-emerald-300'
+                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+          }`}
+          title={
+            publishState === 'blocked'
+              ? `發布前檢查：${PUBLISH_STATE_LABEL.blocked}（${publishCheck?.publishBlockingCount ?? 0} 項擋發布）— 點擊重新檢查`
+              : publishState === 'ready'
+                ? `發布前檢查：${PUBLISH_STATE_LABEL.ready} — 點擊重新檢查`
+                : '發布前檢查（尚未檢查或班表已變動）'
+          }
+        >
+          <ShieldCheck className="size-4" />
+        </button>
 
         <button
           type="button"

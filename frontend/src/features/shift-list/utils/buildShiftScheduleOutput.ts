@@ -228,6 +228,46 @@ export function parseShiftScheduleStoredOutput(
         : {}),
     },
     ...(parsePlanAdjustHistory(o.planAdjustHistory, o.planAdjustHistoryIndex) ?? {}),
+    ...(parsePublishCheck(o.publishCheck) ?? {}),
+  };
+}
+
+/**
+ * 發布前檢查紀錄。欄位不完整就整筆丟掉——寧可回到「未檢查」重跑一次，
+ * 也不要用半殘的紀錄推出「可發布」。
+ */
+function parsePublishCheck(
+  raw: unknown,
+): Pick<ShiftScheduleStoredOutput, 'publishCheck'> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (
+    typeof o.checkedAt !== 'string'
+    || typeof o.planFingerprint !== 'string'
+    || typeof o.publishSafe !== 'boolean'
+  ) {
+    return null;
+  }
+  const byCode: Record<string, number> = {};
+  if (o.publishBlockingByCode && typeof o.publishBlockingByCode === 'object') {
+    for (const [code, count] of Object.entries(
+      o.publishBlockingByCode as Record<string, unknown>,
+    )) {
+      if (typeof count === 'number' && Number.isFinite(count)) byCode[code] = count;
+    }
+  }
+  return {
+    publishCheck: {
+      checkedAt: o.checkedAt,
+      planFingerprint: o.planFingerprint,
+      publishSafe: o.publishSafe,
+      publishBlockingCount:
+        typeof o.publishBlockingCount === 'number'
+        && Number.isFinite(o.publishBlockingCount)
+          ? o.publishBlockingCount
+          : 0,
+      publishBlockingByCode: byCode,
+    },
   };
 }
 

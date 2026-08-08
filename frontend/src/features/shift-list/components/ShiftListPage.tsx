@@ -26,6 +26,8 @@ import {
   USAGE_STATUS_OPTIONS,
   USAGE_TAG_STYLE,
   PUBLISH_TAG_STYLE,
+  PUBLISH_CHECK_LABEL,
+  PUBLISH_CHECK_TAG_STYLE,
   type CreationModeKey,
   type OperationShiftListItem,
   type UsageStatusKey,
@@ -234,6 +236,7 @@ export function ShiftListPage({
               <th className="py-3 pr-4 font-medium">建立方式</th>
               <th className="py-3 pr-4 font-medium">使用狀態</th>
               <th className="py-3 pr-4 font-medium">發布狀態</th>
+              <th className="py-3 pr-4 font-medium">檢查狀態</th>
               <th className="py-3 pr-4 font-medium">版本編號</th>
               <th className="w-10 py-3" />
             </tr>
@@ -287,6 +290,15 @@ export function ShiftListPage({
                     <StatusTag
                       label={row.publish_status_label}
                       style={PUBLISH_TAG_STYLE[row.publish_status]}
+                    />
+                  </td>
+                  <td className="py-3 pr-4">
+                    <StatusTag
+                      label={
+                        row.publish_check_label
+                        ?? PUBLISH_CHECK_LABEL[row.publish_check_state ?? 'unchecked']
+                      }
+                      style={PUBLISH_CHECK_TAG_STYLE[row.publish_check_state ?? 'unchecked']}
                     />
                   </td>
                   <td className="py-3 pr-4 font-mono text-zinc-400">{row.version}</td>

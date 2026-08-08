@@ -236,6 +236,18 @@ export type ShiftScheduleStoredOutput = {
   /** Step 5 還原／復原棧；與 plan 同步寫入草稿 */
   planAdjustHistory?: PlanAdjustHistoryEntry[];
   planAdjustHistoryIndex?: number;
+  /**
+   * 發布前檢查紀錄。班表可以手動改，所以檢查是<strong>可重跑的動作</strong>，
+   * 不是生成時算一次就算數；`planFingerprint` 對不上目前的 plan
+   * 就代表檢查後又被改過，狀態回到「未檢查」。詳見 schedulePublishCheck.ts。
+   */
+  publishCheck?: {
+    checkedAt: string;
+    planFingerprint: string;
+    publishSafe: boolean;
+    publishBlockingCount: number;
+    publishBlockingByCode: Record<string, number>;
+  };
 };
 
 export type ResolvedTemplateTask = {

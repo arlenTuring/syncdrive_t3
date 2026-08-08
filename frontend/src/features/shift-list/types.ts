@@ -15,8 +15,35 @@ export type OperationShiftListItem = {
   publish_status_label: string;
   usage_status: UsageStatusKey;
   usage_status_label: string;
+  /** 發布前檢查狀態（站位重疊／碰撞保護）；與 publish_status 的草稿／已發布是兩件事 */
+  publish_check_state?: PublishCheckStateKey;
+  publish_check_label?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type PublishCheckStateKey = 'unchecked' | 'blocked' | 'ready';
+
+/** 檢查狀態標籤樣式：不建議發布用紅、可發布用綠、未檢查用灰 */
+export const PUBLISH_CHECK_TAG_STYLE: Record<PublishCheckStateKey, StatusTagStyle> = {
+  unchecked: {
+    container: 'bg-zinc-800/80',
+    dot: 'bg-zinc-500',
+  },
+  blocked: {
+    container: 'bg-[rgba(239,68,68,0.2)]',
+    dot: 'bg-[#EF4444]',
+  },
+  ready: {
+    container: 'bg-[rgba(0,212,146,0.2)]',
+    dot: 'bg-[#00D492]',
+  },
+};
+
+export const PUBLISH_CHECK_LABEL: Record<PublishCheckStateKey, string> = {
+  unchecked: '未檢查',
+  blocked: '不建議發布',
+  ready: '可發布',
 };
 
 export const CREATION_MODE_LABEL: Record<CreationModeKey, string> = {
