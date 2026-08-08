@@ -157,6 +157,8 @@ export async function loadShiftRouteGroupCatalog(
   groups: ShiftRouteGroupCatalogItem[];
   availableMaps: ShiftRouteGroupMapOption[];
   firstTripOrigins: MaintenanceFirstTripOrigin[];
+  /** 完整拓樸：整備／調度入廠卡要自己尋路，只有 origins 不夠 */
+  pointTopology: PointTopology;
 }> {
   const preferred = preferredMapId?.trim()
     ? resolveMapId(preferredMapId.trim())
@@ -171,6 +173,7 @@ export async function loadShiftRouteGroupCatalog(
       groups: [],
       availableMaps,
       firstTripOrigins: [],
+      pointTopology: emptyPointTopology(),
     };
   }
 
@@ -239,5 +242,6 @@ export async function loadShiftRouteGroupCatalog(
     groups,
     availableMaps: mapsWithResolvedName,
     firstTripOrigins,
+    pointTopology: topology,
   };
 }

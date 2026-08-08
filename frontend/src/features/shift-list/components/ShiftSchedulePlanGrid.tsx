@@ -217,8 +217,23 @@ function BlockIssueHoverCard({
   );
 }
 
-/** 出場移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
-function YardExitMoveHoverCard({
+/** 四張移動小卡的名稱與說明；卡面只印兩個字母，其餘靠 hover */
+const MOVE_CARD_TITLE: Record<'MO' | 'MI' | 'PI' | 'PO', string> = {
+  MO: '整備出廠',
+  MI: '整備入廠',
+  PI: '調度入廠',
+  PO: '調度出廠',
+};
+
+const MOVE_CARD_HINT: Record<'MO' | 'MI' | 'PI' | 'PO', string> = {
+  MO: '整備做完後把車從設施開到轉乘站；結束時刻貼齊下一段發車。',
+  MI: '車輛不能再跑正線，提前開進整備設施；到了整備就直接開始（整備開始提前、結束不動）。',
+  PI: '車輛暫時無法接正線，先開進調度設施停放；必須先跑完停靠站放下客人才會進廠。',
+  PO: '暫停結束，把車從調度設施開回首站接正線。',
+};
+
+/** 移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
+function MoveCardHoverCard({
   code,
   block,
   pos,
@@ -242,17 +257,25 @@ function YardExitMoveHoverCard({
       style={{ top: pos.top, left: clampedLeft }}
       role="tooltip"
     >
-      <div className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</div>
-      <div className="mt-0.5 text-[11px] leading-4 text-zinc-100">
-        {block.yardExitFacilityLabel ?? '整備設施'}
-        {' → '}
-        {block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}
+      <div className="flex items-baseline gap-1.5">
+        <span className="rounded bg-zinc-800 px-1 py-0.5 text-[10px] font-bold text-zinc-100">
+          {block.moveCardTag}
+        </span>
+        <span className="text-[11px] font-semibold text-zinc-100">
+          {block.moveCardTag ? MOVE_CARD_TITLE[block.moveCardTag] : '移動'}
+        </span>
+        <span className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</span>
+      </div>
+      <div className="mt-1 text-[11px] leading-4 text-zinc-100">
+        {block.moveCardTag === 'MI' || block.moveCardTag === 'PI'
+          ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '設施'}`
+          : `${block.yardExitFacilityLabel ?? '設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`}
       </div>
       <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
         {formatBlockTimeRange(block)}（{block.travelSeconds} 秒）
       </div>
       <p className="mt-1 text-[10px] leading-[14px] text-zinc-500">
-        整備做完後把車從設施開到轉乘站；結束時刻貼齊下一段發車。
+        {block.moveCardTag ? MOVE_CARD_HINT[block.moveCardTag] : ''}
       </p>
       {block.yardExitAteYardTail ? (
         <p className="mt-0.5 text-[10px] leading-[14px] text-amber-400">
@@ -907,10 +930,13 @@ function ShiftScheduleBlockBar({
 }) {
   // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
   // 單一顏色、卡內不放內容，說明全部交給 hover。
-  const isYardExitMove = block.source === 'yard_exit_move';
+  // 這四張移動小卡（MO／MI／PI／PO）通常只有幾十秒寬，塞不下完整班次代號，
+  // 卡面只印兩個字母，完整資訊全部交給 hover。
+  const moveCardTag = block.moveCardTag;
+  const isMoveCard = moveCardTag != null;
   // 調度營運班次（entry_service）就是載客正線，沿用正線色卡，
   // 不再另立一種顏色——它跟正線是同一件事，只是不算輪、不受班距約束。
-  const colors = isYardExitMove
+  const colors = isMoveCard
     ? YARD_EXIT_MOVE_COLOR_SET
     : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
@@ -939,7 +965,7 @@ function ShiftScheduleBlockBar({
     [activeIntervalRanges, block.plannedEndMinute, block.plannedStartMinute],
   );
   const isIdleLike =
-    !isYardExitMove
+    !isMoveCard
     && (block.taskType === 'idle'
       || block.source === 'transition'
       || block.taskType === 'dispatch'
@@ -953,7 +979,7 @@ function ShiftScheduleBlockBar({
   const isStickyLabel = durationMinutes >= 20;
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
   const [issueHoverPos, setIssueHoverPos] = useState<HoverCardPos | null>(null);
-  const [yardExitHoverPos, setYardExitHoverPos] = useState<HoverCardPos | null>(null);
+  const [moveCardHoverPos, setMoveCardHoverPos] = useState<HoverCardPos | null>(null);
 
   const route = useMemo(
     () => resolveRouteForBlock(block, selectedRoutes),
@@ -1046,9 +1072,9 @@ function ShiftScheduleBlockBar({
     });
   };
 
-  const onYardExitInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const onMoveCardInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setYardExitHoverPos({
+    setMoveCardHoverPos({
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
     });
@@ -1154,7 +1180,7 @@ function ShiftScheduleBlockBar({
       style={{
         left: leftPx,
         // 出場移動卡給一個看得到的最小寬度，否則 30 秒在日尺度上幾乎是 0 px
-        width: Math.max(widthPx, isYardExitMove ? 12 : 4),
+        width: Math.max(widthPx, isMoveCard ? 22 : 4),
         height: REAL_TASK_BAR_HEIGHT,
         top: REAL_TASK_BAR_TOP,
         backgroundColor: colors.bg,
@@ -1162,7 +1188,7 @@ function ShiftScheduleBlockBar({
         ...extraStyle,
       }}
       title={
-        isYardExitMove
+        isMoveCard
           ? [
               `${code} · 出場移動`,
               `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
@@ -1290,20 +1316,23 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
-      {isYardExitMove ? (
+      {isMoveCard ? (
         <button
           type="button"
           className="pointer-events-auto absolute inset-0 z-[6] flex items-center justify-center text-zinc-100/80 hover:text-zinc-50"
-          aria-label={`${code} 出場移動內容`}
+          aria-label={`${code} ${MOVE_CARD_TITLE[moveCardTag!]}內容`}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
-          onPointerEnter={onYardExitInfoEnter}
-          onPointerLeave={() => setYardExitHoverPos(null)}
+          onPointerEnter={onMoveCardInfoEnter}
+          onPointerLeave={() => setMoveCardHoverPos(null)}
         >
-          <Info className="size-3" aria-hidden />
+          <span className="text-[9px] font-bold leading-none tracking-tight">
+            {moveCardTag}
+          </span>
+          <Info className="ml-0.5 size-2.5 shrink-0 opacity-70" aria-hidden />
         </button>
       ) : null}
-      {showChrome && !isYardExitMove ? (
+      {showChrome && !isMoveCard ? (
       <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
@@ -1385,8 +1414,8 @@ function ShiftScheduleBlockBar({
           pos={issueHoverPos}
         />
       ) : null}
-      {isYardExitMove && yardExitHoverPos ? (
-        <YardExitMoveHoverCard code={code} block={block} pos={yardExitHoverPos} />
+      {isMoveCard && moveCardHoverPos ? (
+        <MoveCardHoverCard code={code} block={block} pos={moveCardHoverPos} />
       ) : null}
     </div>
         );

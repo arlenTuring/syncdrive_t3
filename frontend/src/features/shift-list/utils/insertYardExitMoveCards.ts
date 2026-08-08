@@ -20,8 +20,8 @@ import {
 } from './schedule-engine/types';
 
 /**
- * 出場移動卡（班次代號 = 整備代號 + EX）
- * ======================================
+ * 整備出廠卡（MO · Maintenance Out）
+ * ==================================
  *
  * 整備做完之後，車還停在整備設施裡（例 M2 那一格），並不在正線的轉乘站上。
  * 這張卡就是把它從設施開到轉乘站的那一段，時長直接取路網拓樸上
@@ -279,6 +279,7 @@ export function insertYardExitMoveCards(args: {
       travelSeconds: chosen.deadheadSeconds,
       dwellSeconds: 0,
       source: 'yard_exit_move',
+      moveCardTag: 'MO',
       yardExitFacilityNodeId: chosen.nodeId,
       yardExitFacilityLabel: chosen.label,
       yardExitStationId: origin.stationId,

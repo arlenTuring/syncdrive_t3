@@ -29,7 +29,23 @@ export type ScheduleBlockSource =
    * 空間不夠時（整備結束到發車之間塞不下這段空駛），
    * 這是<strong>全系統唯一</strong>可以佔用整備尾巴時間的卡。
    */
-  | 'yard_exit_move';
+  | 'yard_exit_move'
+  /**
+   * 整備入廠卡（MI）：車輛確定不能再跑正線時，<strong>提前</strong>開進接下來
+   * 預計進入的整備區。卡片結束＝車抵達設施，整備就從那一刻直接開始——
+   * 整備<strong>開始時刻提前、結束時刻不動</strong>，所以整備時長變長。
+   * 與 MO 剛好對稱：MO 吃整備尾巴，MI 長整備的頭。
+   */
+  | 'yard_entry_move'
+  /**
+   * 調度入廠卡（PI）：車輛無可奈何得先停一下時，開進調度設施暫停。
+   * 前提是<strong>必須先跑完停靠站把客人放下</strong>——它只是暫停，不是收班。
+   */
+  | 'park_entry_move'
+  /**
+   * 調度出廠卡（PO）：暫停結束，把車從調度設施開回<strong>首站</strong>接正線。
+   */
+  | 'park_exit_move';
 
 export type GeneratedScheduleBlock = {
   id: string;
@@ -72,6 +88,11 @@ export type GeneratedScheduleBlock = {
   /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */
   yardExitAteYardTail?: boolean;
   /**
+   * 卡面代號：MO／MI／PI／PO。這種卡通常只有幾十秒寬，塞不下完整班次代號，
+   * 所以卡面只印這兩個字母，完整資訊放 hover。
+   */
+  moveCardTag?: 'MO' | 'MI' | 'PI' | 'PO';
+  /**
    * 調度營運班次（entry_service）落點診斷（文件 §10.3）——
    * 只在這一段抵達某個站位時實際查得到「該站淨空時刻」才會寫入；
    * 沒有別的車佔著那個站位就不寫（代表這段完全不受站位限制）。
@@ -104,6 +125,8 @@ export type FeasibilityViolationCode =
   | 'STATION_BERTH_COLLISION'
   /** 出場移動卡（整備代號+EX）排不出來：設施未設定／拓樸沒有邊／設施被佔（警告） */
   | 'YARD_EXIT_MOVE_UNRESOLVED'
+  /** 整備入廠卡（MI）排不出來：拓樸到不了該設施／設施未設定／設施被佔（警告） */
+  | 'YARD_ENTRY_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */

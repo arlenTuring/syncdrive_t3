@@ -1,7 +1,9 @@
+import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertYardExitMoveCards } from '../insertYardExitMoveCards';
+import { insertYardEntryMoveCards } from '../insertYardEntryMoveCards';
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
@@ -63,6 +65,8 @@ export type GenerateShiftScheduleInput = {
   passengerTimetableMode?: PassengerTimetableMode;
   /** 目前啟用地圖拓樸抽出的首班起點站；未傳則不插調度 */
   firstTripOrigins?: MaintenanceFirstTripOrigin[];
+  /** 完整路網拓樸；整備／調度入廠卡尋路用 */
+  pointTopology?: PointTopology | null;
 };
 
 /**
@@ -108,6 +112,7 @@ export function generateShiftSchedule(
       turnaroundLimitSeconds: input.turnaroundLimitSeconds,
       passengerTimetableMode: input.passengerTimetableMode ?? 'template',
       firstTripOrigins: input.firstTripOrigins,
+      pointTopology: input.pointTopology,
     },
     errors,
     warnings,
@@ -264,6 +269,27 @@ export function generateShiftSchedule(
     selectedRoutes: engineInput.selectedRoutes,
   });
   timelines = scrubMidMainlineDispatchArtifacts(timelines);
+
+  // 整備入廠卡（MI）：車確定不能再跑正線時，提前開進接下來要進的整備區。
+  // 必須排在出場卡之前——它會把整備開始時刻往前拉，出場卡貼齊的是「下一段發車」，
+  // 兩者互不干擾，但整備段的時間要先定案。
+  const yardEntryMove = insertYardEntryMoveCards({
+    timelines,
+    topology: engineInput.pointTopology,
+    maintenanceBody: engineInput.maintenanceBody,
+    selectedRoutes: engineInput.selectedRoutes,
+    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+  });
+  timelines = yardEntryMove.timelines;
+  for (const skip of yardEntryMove.skipped) {
+    pushIssue(warnings, {
+      code: 'YARD_ENTRY_MOVE_UNRESOLVED',
+      severity: 'warning',
+      kind: 'policy',
+      message: `時間線 ${skip.timelineRow}：「${skip.taskType}」排不出整備入廠卡——${skip.reason}`,
+      detail: { timelineRow: skip.timelineRow, taskType: skip.taskType, reason: skip.reason },
+    });
+  }
 
   // 出場移動卡（整備代號+EX）：把車從整備設施開到轉乘站的那一段。
   // 放在所有幾何後處理「之後」是刻意的——它往前貼齊後面那一段的發車時刻，

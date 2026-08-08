@@ -1,3 +1,4 @@
+import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import {
   DEFAULT_MAINTENANCE_ENTRY_SLACK_SECONDS,
   parseEmptyIntervalMainlineSlackSeconds,
@@ -112,6 +113,11 @@ export type EngineInput = {
   firstTripOrigins: MaintenanceFirstTripOrigin[];
   /** Step 4 關聯圖／折返錨點繼任策略 */
   successorPolicy: RouteSuccessorPolicy;
+  /**
+   * 完整路網拓樸。整備／調度入廠卡要自己找「站 → 設施」的路徑
+   * （設施之間 N×M 種組合，不可能要使用者一條條畫），只有 firstTripOrigins 不夠。
+   */
+  pointTopology?: PointTopology | null;
 };
 
 export type NormalizeInputArgs = {
@@ -127,6 +133,8 @@ export type NormalizeInputArgs = {
   passengerTimetableMode?: PassengerTimetableMode;
   /** 目前啟用地圖拓樸的首班起點站目錄 */
   firstTripOrigins?: MaintenanceFirstTripOrigin[];
+  /** 完整拓樸；入廠卡尋路用 */
+  pointTopology?: PointTopology | null;
 };
 
 function resolveRouteOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
@@ -1997,5 +2005,6 @@ export function normalizeEngineInput(
     timetableGenerationAlgorithm,
     firstTripOrigins,
     successorPolicy,
+    pointTopology: args.pointTopology ?? null,
   };
 }
