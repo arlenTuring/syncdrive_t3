@@ -271,6 +271,7 @@ function formatEdgeBrief(edge: PointTopologyEdge): string {
 
 function EdgeArrow({
   edge,
+  twin,
   from,
   to,
   parallelIndex,
@@ -288,6 +289,11 @@ function EdgeArrow({
   onDoubleClickEdge,
 }: {
   edge: PointTopologyEdge
+  /**
+   * 對向邊。有值＝這一對節點是雙向：只畫<strong>一條</strong>線、兩端各一個箭頭，
+   * 不畫成兩條平行線（兩條線在畫面上很擠，也讓人以為是兩條不同的路）。
+   */
+  twin: PointTopologyEdge | null
   from: PointTopologyNode
   to: PointTopologyNode
   parallelIndex: 0 | 1
@@ -327,8 +333,15 @@ function EdgeArrow({
         : '#8b8b92'
   const opacity = selected || emphasized ? 1 : dimmed ? 0.22 : isServiceLink ? 0.72 : 0.88
   const markerId = `topo-arrow-${edge.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
-  const brief = formatEdgeBrief(edge)
-  const boxW = Math.min(160, Math.max(72, brief.length * 7 + 16))
+  const startMarkerId = `${markerId}-start`
+  const twinBrief = twin ? formatEdgeBrief(twin) : ''
+  const selfBrief = formatEdgeBrief(edge)
+  // 雙向且兩邊時間距離一樣時只顯示一組，不要讓標籤變兩倍長；不一樣才分開標
+  const brief =
+    twin && twinBrief && twinBrief !== selfBrief
+      ? `→ ${selfBrief} ／ ← ${twinBrief}`
+      : selfBrief
+  const boxW = Math.min(260, Math.max(72, brief.length * 7 + 16))
   const boxH = 22
   const clearGap = 6
   const side = parallelIndex === 1 ? -1 : 1
@@ -364,6 +377,19 @@ function EdgeArrow({
         >
           <path d="M0,0 L6,3 L0,6 Z" fill={stroke} />
         </marker>
+        {twin ? (
+          <marker
+            id={startMarkerId}
+            markerWidth="8"
+            markerHeight="8"
+            refX="0"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path d="M6,0 L0,3 L6,6 Z" fill={stroke} />
+          </marker>
+        ) : null}
       </defs>
       <path d={pathD} fill="none" stroke="transparent" strokeWidth={16} />
       <path
@@ -373,6 +399,7 @@ function EdgeArrow({
         strokeWidth={strokeWidth}
         strokeDasharray={isServiceLink ? '5 5' : undefined}
         markerEnd={`url(#${markerId})`}
+        markerStart={twin ? `url(#${startMarkerId})` : undefined}
       />
       {(selected || emphasized || bending || customBend || !isServiceLink) && (
         <circle
@@ -631,20 +658,18 @@ export function PointTopologyEditorDialog({
   )
   const hasInvalidTravelTimes = invalidTravelEdges.length > 0
 
-  const parallelIndexByEdgeId = useMemo(() => {
-    const map = new Map<string, 0 | 1>()
+  /** edgeId → 對向邊；沒有對向就不在表內 */
+  const twinEdgeByEdgeId = useMemo(() => {
+    const byPair = new Map<string, PointTopologyEdge>()
     for (const edge of draft.edges) {
-      const hasReverse = draft.edges.some(
-        (other) =>
-          other.fromNodeId === edge.toNodeId && other.toNodeId === edge.fromNodeId,
-      )
-      if (hasReverse && edge.fromNodeId > edge.toNodeId) {
-        map.set(edge.id, 1)
-      } else {
-        map.set(edge.id, 0)
-      }
+      byPair.set(`${edge.fromNodeId}->${edge.toNodeId}`, edge)
     }
-    return map
+    const out = new Map<string, PointTopologyEdge>()
+    for (const edge of draft.edges) {
+      const opposite = byPair.get(`${edge.toNodeId}->${edge.fromNodeId}`)
+      if (opposite) out.set(edge.id, opposite)
+    }
+    return out
   }, [draft.edges])
 
   /** 同一個發車停靠點的多條整備線：依入射角排序後分扇 */
@@ -761,7 +786,7 @@ export function PointTopologyEditorDialog({
         edgeBendStartRef.current = { ...start, moved: true }
       }
       const isDispatch = isDispatchAfterServiceEdge(from, to)
-      const parallelIndex = parallelIndexByEdgeId.get(edge.id) ?? 0
+      const parallelIndex = 0 as const
       const path = resolvePointTopologyEdgePath(from, to, {
         parallelIndex,
         fanIndex: dispatchFanByEdgeId.fanIndex.get(edge.id) ?? 0,
@@ -789,7 +814,6 @@ export function PointTopologyEditorDialog({
       bendingEdgeId,
       canvasLocalPoint,
       nodeById,
-      parallelIndexByEdgeId,
       dispatchFanByEdgeId,
     ],
   )
@@ -1168,7 +1192,7 @@ export function PointTopologyEditorDialog({
     const to = nodeById.get(selectedEdge.toNodeId)
     if (!from || !to) return null
     return resolvePointTopologyEdgePath(from, to, {
-      parallelIndex: parallelIndexByEdgeId.get(selectedEdge.id) ?? 0,
+      parallelIndex: 0,
       fanIndex: dispatchFanByEdgeId.fanIndex.get(selectedEdge.id) ?? 0,
       fanCount: dispatchFanByEdgeId.fanCount.get(selectedEdge.id) ?? 1,
       isDispatch: isDispatchAfterServiceEdge(from, to),
@@ -1178,7 +1202,6 @@ export function PointTopologyEditorDialog({
   }, [
     selectedEdge,
     nodeById,
-    parallelIndexByEdgeId,
     dispatchFanByEdgeId,
   ])
 
@@ -1496,7 +1519,24 @@ export function PointTopologyEditorDialog({
                     const from = nodeById.get(edge.fromNodeId)
                     const to = nodeById.get(edge.toNodeId)
                     if (!from || !to) return null
-                    const selected = selectedEdgeId === edge.id
+                    // 雙向的一對只畫一條（兩端各一個箭頭）。
+                    // 由「被選中的那一條」代表；都沒選就由 id 較小的代表，
+                    // 這樣選誰都看得到自己的線是實心高亮的。
+                    const twin = twinEdgeByEdgeId.get(edge.id) ?? null
+                    if (twin) {
+                      const representative =
+                        selectedEdgeId === edge.id
+                          ? edge.id
+                          : selectedEdgeId === twin.id
+                            ? twin.id
+                            : edge.id < twin.id
+                              ? edge.id
+                              : twin.id
+                      if (representative !== edge.id) return null
+                    }
+                    const selected =
+                      selectedEdgeId === edge.id
+                      || (twin != null && selectedEdgeId === twin.id)
                     const focusActive = Boolean(selectedNodeId || selectedEdgeId)
                     const touchesSelectedNode =
                       selectedNodeId === edge.fromNodeId
@@ -1508,9 +1548,10 @@ export function PointTopologyEditorDialog({
                       <EdgeArrow
                         key={edge.id}
                         edge={edge}
+                        twin={twin}
                         from={from}
                         to={to}
-                        parallelIndex={parallelIndexByEdgeId.get(edge.id) ?? 0}
+                        parallelIndex={0}
                         fanIndex={dispatchFanByEdgeId.fanIndex.get(edge.id) ?? 0}
                         fanCount={dispatchFanByEdgeId.fanCount.get(edge.id) ?? 1}
                         selected={selected}
