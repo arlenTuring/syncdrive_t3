@@ -115,27 +115,27 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-08T04:57:31.794Z
+      更新：2026-08-08T05:03:28.004Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0806」
       · ok=<code>false</code>
-      · 錯誤 28／警告 178／共 206 則
+      · 錯誤 28／警告 198／共 226 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 28→28（±0） · 警告 178→178（±0） · severe 1→1（±0） · moderate 0→0（±0） · mild 0→0（±0）</p>
+    <p class="meta delta">與上次生成相比：錯誤 28→28（±0） · 警告 178→198（+20） · severe 1→1（±0） · moderate 0→0（±0） · mild 0→0（±0）</p>
   </header>
   
 <section class="accept">
   <h2>驗收定義</h2>
   <p class="accept-pill gate-fail">硬閘 gatePassed=<code>false</code>（report.ok=<code>false</code>）· 硬錯誤 28</p>
   <p class="accept-pill gate-warn">品質目標 qualityPassed=<code>false</code> · 未清零：UNSERVED_SERVICE_PULSE×1</p>
-  <p class="meta">策略噪音 176／極限警告 1／可調警告 1</p>
+  <p class="meta">策略噪音 196／極限警告 1／可調警告 1</p>
   <p class="meta">硬錯誤代號：STATION_BERTH_COLLISION×2、YARD_EXIT_STATION_MISMATCH×26</p>
   <ul class="criteria"><li>硬閘（ok=true）：errors 必須為 0（含站位碰撞、未跑完迴圈、時間線重疊等）。</li><li>警告不阻擋硬閘：策略延後／改線、略過進場載客、班距低於目標、肩段未承接脈衝。</li><li>品質目標（qualityPassed）：另要求 0×UNSERVED_SERVICE_PULSE 與 0×HEADWAY_BELOW_TARGET；未達標仍可 ok=true。</li><li>策略說明預設摺疊，不計入「失敗體感」主列表。</li></ul>
 </section>
   
 <section class="cause-summary">
-  <h2>成因摘要（依代號 × 嚴重度分群，7 群 · 共 206 則）</h2>
+  <h2>成因摘要（依代號 × 嚴重度分群，7 群 · 共 226 則）</h2>
   <table>
     <thead><tr><th>分類</th><th>代號</th><th>嚴重度</th><th>則數</th><th>平均落差</th><th>範例</th></tr></thead>
     <tbody>
@@ -177,7 +177,7 @@
       <td><span class="band-none">—</span></td>
       <td>119</td>
       <td>—</td>
-      <td><a href="#issue-37">#37</a> <a href="#issue-38">#38</a> <a href="#issue-39">#39</a></td>
+      <td><a href="#issue-57">#57</a> <a href="#issue-58">#58</a> <a href="#issue-59">#59</a></td>
     </tr>
     <tr>
       <td>站位約束延後</td>
@@ -185,13 +185,13 @@
       <td><span class="band-none">—</span></td>
       <td>51</td>
       <td>—</td>
-      <td><a href="#issue-156">#156</a> <a href="#issue-157">#157</a> <a href="#issue-158">#158</a></td>
+      <td><a href="#issue-176">#176</a> <a href="#issue-177">#177</a> <a href="#issue-178">#178</a></td>
     </tr>
     <tr>
       <td>略過進場載客</td>
       <td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td>
       <td><span class="band-none">—</span></td>
-      <td>6</td>
+      <td>26</td>
       <td>—</td>
       <td><a href="#issue-31">#31</a> <a href="#issue-32">#32</a> <a href="#issue-33">#33</a></td>
     </tr></tbody>
@@ -984,11 +984,75 @@
 
 <section class="layer layer-policy">
   <details class="layer-fold">
-    <summary>策略說明（不阻擋驗收） · 176 則（預設摺疊）</summary>
+    <summary>策略說明（不阻擋驗收） · 196 則（預設摺疊）</summary>
     <div class="list">
 <article id="issue-31" class="row warning kind-policy layer-policy">
   <div class="row-head">
     <span class="idx">#31</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PA0930</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 1：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
+</article>
+
+<article id="issue-32" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#32</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MA1430</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 1：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
+</article>
+
+<article id="issue-33" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#33</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PB0930</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 2：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
+</article>
+
+<article id="issue-34" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#34</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MB1430</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 2：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
+</article>
+
+<article id="issue-35" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#35</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -999,12 +1063,44 @@
   <p class="msg">時間線 3：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
 </article>
 
-<article id="issue-32" class="row warning kind-policy layer-policy">
+<article id="issue-36" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#32</span>
+    <span class="idx">#36</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PC1050</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 3：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
+</article>
+
+<article id="issue-37" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#37</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MC1550</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 3：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
+</article>
+
+<article id="issue-38" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#38</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1015,76 +1111,300 @@
   <p class="msg">時間線 4：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
 </article>
 
-<article id="issue-33" class="row warning kind-policy layer-policy">
+<article id="issue-39" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#33</span>
+    <span class="idx">#39</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ME0000</span>
+    <span class="trip">PD1050</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 4：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
+</article>
+
+<article id="issue-40" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#40</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MD1550</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 4：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
+</article>
+
+<article id="issue-41" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#41</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PE0450</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 5：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
+</article>
+
+<article id="issue-42" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#42</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ME0940</span>
   </div>
   <h2>略過進場載客</h2>
   <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
   <p class="msg">時間線 5：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=42）</p>
 </article>
 
-<article id="issue-34" class="row warning kind-policy layer-policy">
+<article id="issue-43" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#34</span>
+    <span class="idx">#43</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">MF0000</span>
+    <span class="trip">ME1730</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 5：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=43）</p>
+</article>
+
+<article id="issue-44" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#44</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PF0450</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 6：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=44）</p>
+</article>
+
+<article id="issue-45" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#45</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MF0940</span>
   </div>
   <h2>略過進場載客</h2>
   <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
   <p class="msg">時間線 6：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
 </article>
 
-<article id="issue-35" class="row warning kind-policy layer-policy">
+<article id="issue-46" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#35</span>
+    <span class="idx">#46</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">MI0000</span>
+    <span class="trip">MF1730</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 6：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=46）</p>
+</article>
+
+<article id="issue-47" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#47</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PG0630</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 7：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=47）</p>
+</article>
+
+<article id="issue-48" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#48</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MG1100</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 7：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=48）</p>
+</article>
+
+<article id="issue-49" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#49</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MG1900</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 7：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=49）</p>
+</article>
+
+<article id="issue-50" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#50</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PH0630</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 8：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=50）</p>
+</article>
+
+<article id="issue-51" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#51</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MH1100</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 8：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=51）</p>
+</article>
+
+<article id="issue-52" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#52</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MH1900</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 8：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
+</article>
+
+<article id="issue-53" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#53</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">PI0750</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 9：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=53）</p>
+</article>
+
+<article id="issue-54" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#54</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MI1230</span>
   </div>
   <h2>略過進場載客</h2>
   <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
   <p class="msg">時間線 9：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=54）</p>
 </article>
 
-<article id="issue-36" class="row warning kind-policy layer-policy">
+<article id="issue-55" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#36</span>
+    <span class="idx">#55</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">MJ0000</span>
+    <span class="trip">PJ0750</span>
+  </div>
+  <h2>略過進場載客</h2>
+  <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
+  <p class="msg">時間線 10：略過「行前」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
+  <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=55）</p>
+</article>
+
+<article id="issue-56" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#56</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">MJ1230</span>
   </div>
   <h2>略過進場載客</h2>
   <p class="code"><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></p>
   <p class="msg">時間線 10：略過「保養」後的進場載客——尾巴時間不夠，或會追上同路線前一班</p>
   <p class="guide">時間不夠或不追班時才會接；接不上就略過，交給後面的車。要強制接上可加長保養尾巴或拉開前班間距。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 進場載客</a></p>
-  <p class="detail-compact">candidateCount=1 · timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
+  <p class="detail-compact">candidateCount=1 · timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>
 </article>
 
-<article id="issue-37" class="row warning kind-policy layer-policy">
+<article id="issue-57" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#37</span>
+    <span class="idx">#57</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1095,12 +1415,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=57）</p>
 </article>
 
-<article id="issue-38" class="row warning kind-policy layer-policy">
+<article id="issue-58" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#38</span>
+    <span class="idx">#58</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1111,12 +1431,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=58）</p>
 </article>
 
-<article id="issue-39" class="row warning kind-policy layer-policy">
+<article id="issue-59" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#39</span>
+    <span class="idx">#59</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1127,12 +1447,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=59）</p>
 </article>
 
-<article id="issue-40" class="row warning kind-policy layer-policy">
+<article id="issue-60" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#40</span>
+    <span class="idx">#60</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1143,12 +1463,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=60）</p>
 </article>
 
-<article id="issue-41" class="row warning kind-policy layer-policy">
+<article id="issue-61" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#41</span>
+    <span class="idx">#61</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1159,12 +1479,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=61）</p>
 </article>
 
-<article id="issue-42" class="row warning kind-policy layer-policy">
+<article id="issue-62" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#42</span>
+    <span class="idx">#62</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1175,12 +1495,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=42）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=62）</p>
 </article>
 
-<article id="issue-43" class="row warning kind-policy layer-policy">
+<article id="issue-63" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#43</span>
+    <span class="idx">#63</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1191,12 +1511,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=43）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=63）</p>
 </article>
 
-<article id="issue-44" class="row warning kind-policy layer-policy">
+<article id="issue-64" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#44</span>
+    <span class="idx">#64</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1207,12 +1527,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=44）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=64）</p>
 </article>
 
-<article id="issue-45" class="row warning kind-policy layer-policy">
+<article id="issue-65" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#45</span>
+    <span class="idx">#65</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1223,12 +1543,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=65）</p>
 </article>
 
-<article id="issue-46" class="row warning kind-policy layer-policy">
+<article id="issue-66" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#46</span>
+    <span class="idx">#66</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1239,12 +1559,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=46）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=66）</p>
 </article>
 
-<article id="issue-47" class="row warning kind-policy layer-policy">
+<article id="issue-67" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#47</span>
+    <span class="idx">#67</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1255,12 +1575,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=47）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=67）</p>
 </article>
 
-<article id="issue-48" class="row warning kind-policy layer-policy">
+<article id="issue-68" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#48</span>
+    <span class="idx">#68</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1271,12 +1591,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=48）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=68）</p>
 </article>
 
-<article id="issue-49" class="row warning kind-policy layer-policy">
+<article id="issue-69" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#49</span>
+    <span class="idx">#69</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1287,12 +1607,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=49）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=69）</p>
 </article>
 
-<article id="issue-50" class="row warning kind-policy layer-policy">
+<article id="issue-70" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#50</span>
+    <span class="idx">#70</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1303,12 +1623,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=50）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=70）</p>
 </article>
 
-<article id="issue-51" class="row warning kind-policy layer-policy">
+<article id="issue-71" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#51</span>
+    <span class="idx">#71</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1319,12 +1639,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=51）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=71）</p>
 </article>
 
-<article id="issue-52" class="row warning kind-policy layer-policy">
+<article id="issue-72" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#52</span>
+    <span class="idx">#72</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1335,12 +1655,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=72）</p>
 </article>
 
-<article id="issue-53" class="row warning kind-policy layer-policy">
+<article id="issue-73" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#53</span>
+    <span class="idx">#73</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1351,12 +1671,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=53）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=73）</p>
 </article>
 
-<article id="issue-54" class="row warning kind-policy layer-policy">
+<article id="issue-74" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#54</span>
+    <span class="idx">#74</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1367,12 +1687,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=54）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=74）</p>
 </article>
 
-<article id="issue-55" class="row warning kind-policy layer-policy">
+<article id="issue-75" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#55</span>
+    <span class="idx">#75</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1383,12 +1703,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=55）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=75）</p>
 </article>
 
-<article id="issue-56" class="row warning kind-policy layer-policy">
+<article id="issue-76" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#56</span>
+    <span class="idx">#76</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1399,12 +1719,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=76）</p>
 </article>
 
-<article id="issue-57" class="row warning kind-policy layer-policy">
+<article id="issue-77" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#57</span>
+    <span class="idx">#77</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1415,12 +1735,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=57）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=77）</p>
 </article>
 
-<article id="issue-58" class="row warning kind-policy layer-policy">
+<article id="issue-78" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#58</span>
+    <span class="idx">#78</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1431,12 +1751,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=58）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=78）</p>
 </article>
 
-<article id="issue-59" class="row warning kind-policy layer-policy">
+<article id="issue-79" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#59</span>
+    <span class="idx">#79</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1447,12 +1767,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=59）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=79）</p>
 </article>
 
-<article id="issue-60" class="row warning kind-policy layer-policy">
+<article id="issue-80" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#60</span>
+    <span class="idx">#80</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1463,12 +1783,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=60）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=80）</p>
 </article>
 
-<article id="issue-61" class="row warning kind-policy layer-policy">
+<article id="issue-81" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#61</span>
+    <span class="idx">#81</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1479,12 +1799,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=61）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=81）</p>
 </article>
 
-<article id="issue-62" class="row warning kind-policy layer-policy">
+<article id="issue-82" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#62</span>
+    <span class="idx">#82</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1495,12 +1815,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=62）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=82）</p>
 </article>
 
-<article id="issue-63" class="row warning kind-policy layer-policy">
+<article id="issue-83" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#63</span>
+    <span class="idx">#83</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1511,12 +1831,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=63）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=83）</p>
 </article>
 
-<article id="issue-64" class="row warning kind-policy layer-policy">
+<article id="issue-84" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#64</span>
+    <span class="idx">#84</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1527,12 +1847,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=64）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=84）</p>
 </article>
 
-<article id="issue-65" class="row warning kind-policy layer-policy">
+<article id="issue-85" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#65</span>
+    <span class="idx">#85</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1543,12 +1863,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=65）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=85）</p>
 </article>
 
-<article id="issue-66" class="row warning kind-policy layer-policy">
+<article id="issue-86" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#66</span>
+    <span class="idx">#86</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1559,12 +1879,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=66）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=86）</p>
 </article>
 
-<article id="issue-67" class="row warning kind-policy layer-policy">
+<article id="issue-87" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#67</span>
+    <span class="idx">#87</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1575,12 +1895,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=67）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=87）</p>
 </article>
 
-<article id="issue-68" class="row warning kind-policy layer-policy">
+<article id="issue-88" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#68</span>
+    <span class="idx">#88</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1591,327 +1911,7 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=68）</p>
-</article>
-
-<article id="issue-69" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#69</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1136</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=69）</p>
-</article>
-
-<article id="issue-70" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#70</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1142</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=70）</p>
-</article>
-
-<article id="issue-71" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#71</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1148</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=71）</p>
-</article>
-
-<article id="issue-72" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#72</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1154</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=72）</p>
-</article>
-
-<article id="issue-73" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#73</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1200</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=73）</p>
-</article>
-
-<article id="issue-74" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#74</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1206</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=74）</p>
-</article>
-
-<article id="issue-75" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#75</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1212</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=75）</p>
-</article>
-
-<article id="issue-76" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#76</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1218</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=76）</p>
-</article>
-
-<article id="issue-77" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#77</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1224</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=77）</p>
-</article>
-
-<article id="issue-78" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#78</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1230</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=78）</p>
-</article>
-
-<article id="issue-79" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#79</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1236</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=79）</p>
-</article>
-
-<article id="issue-80" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#80</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1242</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=80）</p>
-</article>
-
-<article id="issue-81" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#81</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1248</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=81）</p>
-</article>
-
-<article id="issue-82" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#82</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1302</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=82）</p>
-</article>
-
-<article id="issue-83" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#83</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1310</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=83）</p>
-</article>
-
-<article id="issue-84" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#84</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1316</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=84）</p>
-</article>
-
-<article id="issue-85" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#85</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1322</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=85）</p>
-</article>
-
-<article id="issue-86" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#86</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1328</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=86）</p>
-</article>
-
-<article id="issue-87" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#87</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1334</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=87）</p>
-</article>
-
-<article id="issue-88" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#88</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">TNB1340</span>
-  </div>
-  <h2>站位約束改選路線</h2>
-  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
-  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=88）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=88）</p>
 </article>
 
 <article id="issue-89" class="row warning kind-policy layer-policy">
@@ -1920,7 +1920,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1346</span>
+    <span class="trip">TNB1136</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1936,6 +1936,326 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
+    <span class="trip">TNB1142</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=90）</p>
+</article>
+
+<article id="issue-91" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#91</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1148</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=91）</p>
+</article>
+
+<article id="issue-92" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#92</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1154</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=92）</p>
+</article>
+
+<article id="issue-93" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#93</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1200</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=93）</p>
+</article>
+
+<article id="issue-94" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#94</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1206</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=94）</p>
+</article>
+
+<article id="issue-95" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#95</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1212</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=95）</p>
+</article>
+
+<article id="issue-96" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#96</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1218</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=96）</p>
+</article>
+
+<article id="issue-97" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#97</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1224</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=97）</p>
+</article>
+
+<article id="issue-98" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#98</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1230</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=98）</p>
+</article>
+
+<article id="issue-99" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#99</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1236</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=99）</p>
+</article>
+
+<article id="issue-100" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#100</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1242</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=100）</p>
+</article>
+
+<article id="issue-101" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#101</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1248</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=101）</p>
+</article>
+
+<article id="issue-102" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#102</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1302</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=102）</p>
+</article>
+
+<article id="issue-103" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#103</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1310</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=103）</p>
+</article>
+
+<article id="issue-104" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#104</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1316</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=104）</p>
+</article>
+
+<article id="issue-105" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#105</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1322</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=105）</p>
+</article>
+
+<article id="issue-106" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#106</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1328</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=106）</p>
+</article>
+
+<article id="issue-107" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#107</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1334</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=107）</p>
+</article>
+
+<article id="issue-108" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#108</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1340</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=108）</p>
+</article>
+
+<article id="issue-109" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#109</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TNB1346</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=109）</p>
+</article>
+
+<article id="issue-110" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#110</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
     <span class="trip">TNB1352</span>
   </div>
   <h2>站位約束改選路線</h2>
@@ -1943,12 +2263,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=90）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=110）</p>
 </article>
 
-<article id="issue-91" class="row warning kind-policy layer-policy">
+<article id="issue-111" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#91</span>
+    <span class="idx">#111</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1959,12 +2279,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=91）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=111）</p>
 </article>
 
-<article id="issue-92" class="row warning kind-policy layer-policy">
+<article id="issue-112" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#92</span>
+    <span class="idx">#112</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1975,12 +2295,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=92）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=112）</p>
 </article>
 
-<article id="issue-93" class="row warning kind-policy layer-policy">
+<article id="issue-113" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#93</span>
+    <span class="idx">#113</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1991,12 +2311,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=93）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=113）</p>
 </article>
 
-<article id="issue-94" class="row warning kind-policy layer-policy">
+<article id="issue-114" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#94</span>
+    <span class="idx">#114</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2007,12 +2327,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=94）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=114）</p>
 </article>
 
-<article id="issue-95" class="row warning kind-policy layer-policy">
+<article id="issue-115" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#95</span>
+    <span class="idx">#115</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2023,12 +2343,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=95）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=115）</p>
 </article>
 
-<article id="issue-96" class="row warning kind-policy layer-policy">
+<article id="issue-116" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#96</span>
+    <span class="idx">#116</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2039,12 +2359,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=96）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=116）</p>
 </article>
 
-<article id="issue-97" class="row warning kind-policy layer-policy">
+<article id="issue-117" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#97</span>
+    <span class="idx">#117</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2055,12 +2375,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=97）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=117）</p>
 </article>
 
-<article id="issue-98" class="row warning kind-policy layer-policy">
+<article id="issue-118" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#98</span>
+    <span class="idx">#118</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2071,12 +2391,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=98）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=118）</p>
 </article>
 
-<article id="issue-99" class="row warning kind-policy layer-policy">
+<article id="issue-119" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#99</span>
+    <span class="idx">#119</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2087,12 +2407,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=99）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=119）</p>
 </article>
 
-<article id="issue-100" class="row warning kind-policy layer-policy">
+<article id="issue-120" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#100</span>
+    <span class="idx">#120</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2103,12 +2423,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=100）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=120）</p>
 </article>
 
-<article id="issue-101" class="row warning kind-policy layer-policy">
+<article id="issue-121" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#101</span>
+    <span class="idx">#121</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2119,12 +2439,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=101）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=121）</p>
 </article>
 
-<article id="issue-102" class="row warning kind-policy layer-policy">
+<article id="issue-122" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#102</span>
+    <span class="idx">#122</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2135,12 +2455,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=102）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=122）</p>
 </article>
 
-<article id="issue-103" class="row warning kind-policy layer-policy">
+<article id="issue-123" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#103</span>
+    <span class="idx">#123</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2151,12 +2471,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=103）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=123）</p>
 </article>
 
-<article id="issue-104" class="row warning kind-policy layer-policy">
+<article id="issue-124" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#104</span>
+    <span class="idx">#124</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2167,12 +2487,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=104）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=124）</p>
 </article>
 
-<article id="issue-105" class="row warning kind-policy layer-policy">
+<article id="issue-125" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#105</span>
+    <span class="idx">#125</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2183,12 +2503,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=105）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=125）</p>
 </article>
 
-<article id="issue-106" class="row warning kind-policy layer-policy">
+<article id="issue-126" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#106</span>
+    <span class="idx">#126</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2199,12 +2519,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=106）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=126）</p>
 </article>
 
-<article id="issue-107" class="row warning kind-policy layer-policy">
+<article id="issue-127" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#107</span>
+    <span class="idx">#127</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2215,12 +2535,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=107）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=127）</p>
 </article>
 
-<article id="issue-108" class="row warning kind-policy layer-policy">
+<article id="issue-128" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#108</span>
+    <span class="idx">#128</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2231,12 +2551,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=108）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=128）</p>
 </article>
 
-<article id="issue-109" class="row warning kind-policy layer-policy">
+<article id="issue-129" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#109</span>
+    <span class="idx">#129</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2247,12 +2567,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=109）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=129）</p>
 </article>
 
-<article id="issue-110" class="row warning kind-policy layer-policy">
+<article id="issue-130" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#110</span>
+    <span class="idx">#130</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2263,12 +2583,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=110）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=130）</p>
 </article>
 
-<article id="issue-111" class="row warning kind-policy layer-policy">
+<article id="issue-131" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#111</span>
+    <span class="idx">#131</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2279,12 +2599,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=111）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=131）</p>
 </article>
 
-<article id="issue-112" class="row warning kind-policy layer-policy">
+<article id="issue-132" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#112</span>
+    <span class="idx">#132</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2295,12 +2615,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=112）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=132）</p>
 </article>
 
-<article id="issue-113" class="row warning kind-policy layer-policy">
+<article id="issue-133" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#113</span>
+    <span class="idx">#133</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2311,12 +2631,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=113）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=133）</p>
 </article>
 
-<article id="issue-114" class="row warning kind-policy layer-policy">
+<article id="issue-134" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#114</span>
+    <span class="idx">#134</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2327,12 +2647,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=114）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=134）</p>
 </article>
 
-<article id="issue-115" class="row warning kind-policy layer-policy">
+<article id="issue-135" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#115</span>
+    <span class="idx">#135</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2343,12 +2663,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=115）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=135）</p>
 </article>
 
-<article id="issue-116" class="row warning kind-policy layer-policy">
+<article id="issue-136" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#116</span>
+    <span class="idx">#136</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2359,12 +2679,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=116）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=136）</p>
 </article>
 
-<article id="issue-117" class="row warning kind-policy layer-policy">
+<article id="issue-137" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#117</span>
+    <span class="idx">#137</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2375,12 +2695,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=117）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=137）</p>
 </article>
 
-<article id="issue-118" class="row warning kind-policy layer-policy">
+<article id="issue-138" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#118</span>
+    <span class="idx">#138</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2391,12 +2711,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=118）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=138）</p>
 </article>
 
-<article id="issue-119" class="row warning kind-policy layer-policy">
+<article id="issue-139" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#119</span>
+    <span class="idx">#139</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2407,12 +2727,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=119）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=139）</p>
 </article>
 
-<article id="issue-120" class="row warning kind-policy layer-policy">
+<article id="issue-140" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#120</span>
+    <span class="idx">#140</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2423,12 +2743,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=120）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=140）</p>
 </article>
 
-<article id="issue-121" class="row warning kind-policy layer-policy">
+<article id="issue-141" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#121</span>
+    <span class="idx">#141</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2439,12 +2759,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=121）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=141）</p>
 </article>
 
-<article id="issue-122" class="row warning kind-policy layer-policy">
+<article id="issue-142" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#122</span>
+    <span class="idx">#142</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2455,12 +2775,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=122）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=142）</p>
 </article>
 
-<article id="issue-123" class="row warning kind-policy layer-policy">
+<article id="issue-143" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#123</span>
+    <span class="idx">#143</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2471,12 +2791,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=123）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=143）</p>
 </article>
 
-<article id="issue-124" class="row warning kind-policy layer-policy">
+<article id="issue-144" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#124</span>
+    <span class="idx">#144</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2487,12 +2807,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=124）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=144）</p>
 </article>
 
-<article id="issue-125" class="row warning kind-policy layer-policy">
+<article id="issue-145" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#125</span>
+    <span class="idx">#145</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2503,12 +2823,12 @@
   <p class="msg">時間線 9：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=125）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=145）</p>
 </article>
 
-<article id="issue-126" class="row warning kind-policy layer-policy">
+<article id="issue-146" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#126</span>
+    <span class="idx">#146</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2519,12 +2839,12 @@
   <p class="msg">時間線 10：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=126）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=146）</p>
 </article>
 
-<article id="issue-127" class="row warning kind-policy layer-policy">
+<article id="issue-147" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#127</span>
+    <span class="idx">#147</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2535,12 +2855,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=127）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=147）</p>
 </article>
 
-<article id="issue-128" class="row warning kind-policy layer-policy">
+<article id="issue-148" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#128</span>
+    <span class="idx">#148</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2551,12 +2871,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=128）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=148）</p>
 </article>
 
-<article id="issue-129" class="row warning kind-policy layer-policy">
+<article id="issue-149" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#129</span>
+    <span class="idx">#149</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2567,12 +2887,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=129）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=149）</p>
 </article>
 
-<article id="issue-130" class="row warning kind-policy layer-policy">
+<article id="issue-150" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#130</span>
+    <span class="idx">#150</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2583,12 +2903,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=130）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=150）</p>
 </article>
 
-<article id="issue-131" class="row warning kind-policy layer-policy">
+<article id="issue-151" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#131</span>
+    <span class="idx">#151</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2599,12 +2919,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=131）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=151）</p>
 </article>
 
-<article id="issue-132" class="row warning kind-policy layer-policy">
+<article id="issue-152" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#132</span>
+    <span class="idx">#152</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2615,12 +2935,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=132）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=152）</p>
 </article>
 
-<article id="issue-133" class="row warning kind-policy layer-policy">
+<article id="issue-153" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#133</span>
+    <span class="idx">#153</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2631,12 +2951,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=133）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=153）</p>
 </article>
 
-<article id="issue-134" class="row warning kind-policy layer-policy">
+<article id="issue-154" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#134</span>
+    <span class="idx">#154</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2647,12 +2967,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=134）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=154）</p>
 </article>
 
-<article id="issue-135" class="row warning kind-policy layer-policy">
+<article id="issue-155" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#135</span>
+    <span class="idx">#155</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2663,12 +2983,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=135）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=155）</p>
 </article>
 
-<article id="issue-136" class="row warning kind-policy layer-policy">
+<article id="issue-156" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#136</span>
+    <span class="idx">#156</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2679,12 +2999,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=136）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=156）</p>
 </article>
 
-<article id="issue-137" class="row warning kind-policy layer-policy">
+<article id="issue-157" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#137</span>
+    <span class="idx">#157</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2695,12 +3015,12 @@
   <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=137）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=157）</p>
 </article>
 
-<article id="issue-138" class="row warning kind-policy layer-policy">
+<article id="issue-158" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#138</span>
+    <span class="idx">#158</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2711,12 +3031,12 @@
   <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=138）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=158）</p>
 </article>
 
-<article id="issue-139" class="row warning kind-policy layer-policy">
+<article id="issue-159" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#139</span>
+    <span class="idx">#159</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2727,12 +3047,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=139）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=159）</p>
 </article>
 
-<article id="issue-140" class="row warning kind-policy layer-policy">
+<article id="issue-160" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#140</span>
+    <span class="idx">#160</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2743,12 +3063,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=140）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=160）</p>
 </article>
 
-<article id="issue-141" class="row warning kind-policy layer-policy">
+<article id="issue-161" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#141</span>
+    <span class="idx">#161</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2759,12 +3079,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=141）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=161）</p>
 </article>
 
-<article id="issue-142" class="row warning kind-policy layer-policy">
+<article id="issue-162" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#142</span>
+    <span class="idx">#162</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2775,12 +3095,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=142）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=162）</p>
 </article>
 
-<article id="issue-143" class="row warning kind-policy layer-policy">
+<article id="issue-163" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#143</span>
+    <span class="idx">#163</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2791,12 +3111,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=143）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=163）</p>
 </article>
 
-<article id="issue-144" class="row warning kind-policy layer-policy">
+<article id="issue-164" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#144</span>
+    <span class="idx">#164</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2807,12 +3127,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=144）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=164）</p>
 </article>
 
-<article id="issue-145" class="row warning kind-policy layer-policy">
+<article id="issue-165" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#145</span>
+    <span class="idx">#165</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2823,12 +3143,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=145）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=165）</p>
 </article>
 
-<article id="issue-146" class="row warning kind-policy layer-policy">
+<article id="issue-166" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#146</span>
+    <span class="idx">#166</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2839,12 +3159,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=146）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=166）</p>
 </article>
 
-<article id="issue-147" class="row warning kind-policy layer-policy">
+<article id="issue-167" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#147</span>
+    <span class="idx">#167</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2855,12 +3175,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=147）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=167）</p>
 </article>
 
-<article id="issue-148" class="row warning kind-policy layer-policy">
+<article id="issue-168" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#148</span>
+    <span class="idx">#168</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2871,12 +3191,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=148）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=168）</p>
 </article>
 
-<article id="issue-149" class="row warning kind-policy layer-policy">
+<article id="issue-169" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#149</span>
+    <span class="idx">#169</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2887,12 +3207,12 @@
   <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=149）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=169）</p>
 </article>
 
-<article id="issue-150" class="row warning kind-policy layer-policy">
+<article id="issue-170" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#150</span>
+    <span class="idx">#170</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2903,12 +3223,12 @@
   <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=150）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=170）</p>
 </article>
 
-<article id="issue-151" class="row warning kind-policy layer-policy">
+<article id="issue-171" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#151</span>
+    <span class="idx">#171</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2919,12 +3239,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=151）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=171）</p>
 </article>
 
-<article id="issue-152" class="row warning kind-policy layer-policy">
+<article id="issue-172" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#152</span>
+    <span class="idx">#172</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2935,12 +3255,12 @@
   <p class="msg">時間線 5：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=152）</p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=172）</p>
 </article>
 
-<article id="issue-153" class="row warning kind-policy layer-policy">
+<article id="issue-173" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#153</span>
+    <span class="idx">#173</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2951,12 +3271,12 @@
   <p class="msg">時間線 6：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=153）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=173）</p>
 </article>
 
-<article id="issue-154" class="row warning kind-policy layer-policy">
+<article id="issue-174" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#154</span>
+    <span class="idx">#174</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2967,12 +3287,12 @@
   <p class="msg">時間線 8：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=154）</p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=174）</p>
 </article>
 
-<article id="issue-155" class="row warning kind-policy layer-policy">
+<article id="issue-175" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#155</span>
+    <span class="idx">#175</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2983,12 +3303,12 @@
   <p class="msg">時間線 7：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=155）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=175）</p>
 </article>
 
-<article id="issue-156" class="row warning kind-policy layer-policy">
+<article id="issue-176" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#156</span>
+    <span class="idx">#176</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2999,12 +3319,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=156）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=176）</p>
 </article>
 
-<article id="issue-157" class="row warning kind-policy layer-policy">
+<article id="issue-177" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#157</span>
+    <span class="idx">#177</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3015,12 +3335,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=157）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=177）</p>
 </article>
 
-<article id="issue-158" class="row warning kind-policy layer-policy">
+<article id="issue-178" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#158</span>
+    <span class="idx">#178</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3031,12 +3351,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=158）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=178）</p>
 </article>
 
-<article id="issue-159" class="row warning kind-policy layer-policy">
+<article id="issue-179" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#159</span>
+    <span class="idx">#179</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3047,12 +3367,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=159）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=179）</p>
 </article>
 
-<article id="issue-160" class="row warning kind-policy layer-policy">
+<article id="issue-180" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#160</span>
+    <span class="idx">#180</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3063,12 +3383,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=160）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=180）</p>
 </article>
 
-<article id="issue-161" class="row warning kind-policy layer-policy">
+<article id="issue-181" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#161</span>
+    <span class="idx">#181</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3079,12 +3399,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=161）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=181）</p>
 </article>
 
-<article id="issue-162" class="row warning kind-policy layer-policy">
+<article id="issue-182" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#162</span>
+    <span class="idx">#182</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3095,12 +3415,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=162）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=182）</p>
 </article>
 
-<article id="issue-163" class="row warning kind-policy layer-policy">
+<article id="issue-183" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#163</span>
+    <span class="idx">#183</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3111,12 +3431,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=163）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=183）</p>
 </article>
 
-<article id="issue-164" class="row warning kind-policy layer-policy">
+<article id="issue-184" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#164</span>
+    <span class="idx">#184</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3127,12 +3447,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=164）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=184）</p>
 </article>
 
-<article id="issue-165" class="row warning kind-policy layer-policy">
+<article id="issue-185" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#165</span>
+    <span class="idx">#185</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3143,12 +3463,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=165）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=185）</p>
 </article>
 
-<article id="issue-166" class="row warning kind-policy layer-policy">
+<article id="issue-186" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#166</span>
+    <span class="idx">#186</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3159,12 +3479,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=166）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=186）</p>
 </article>
 
-<article id="issue-167" class="row warning kind-policy layer-policy">
+<article id="issue-187" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#167</span>
+    <span class="idx">#187</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3175,12 +3495,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=167）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=187）</p>
 </article>
 
-<article id="issue-168" class="row warning kind-policy layer-policy">
+<article id="issue-188" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#168</span>
+    <span class="idx">#188</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3191,12 +3511,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=168）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=188）</p>
 </article>
 
-<article id="issue-169" class="row warning kind-policy layer-policy">
+<article id="issue-189" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#169</span>
+    <span class="idx">#189</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3207,12 +3527,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=169）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=189）</p>
 </article>
 
-<article id="issue-170" class="row warning kind-policy layer-policy">
+<article id="issue-190" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#170</span>
+    <span class="idx">#190</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3223,12 +3543,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=170）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=190）</p>
 </article>
 
-<article id="issue-171" class="row warning kind-policy layer-policy">
+<article id="issue-191" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#171</span>
+    <span class="idx">#191</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3239,12 +3559,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=171）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=191）</p>
 </article>
 
-<article id="issue-172" class="row warning kind-policy layer-policy">
+<article id="issue-192" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#172</span>
+    <span class="idx">#192</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3255,12 +3575,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=172）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=192）</p>
 </article>
 
-<article id="issue-173" class="row warning kind-policy layer-policy">
+<article id="issue-193" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#173</span>
+    <span class="idx">#193</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3271,12 +3591,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=173）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=193）</p>
 </article>
 
-<article id="issue-174" class="row warning kind-policy layer-policy">
+<article id="issue-194" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#174</span>
+    <span class="idx">#194</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3287,12 +3607,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=174）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=194）</p>
 </article>
 
-<article id="issue-175" class="row warning kind-policy layer-policy">
+<article id="issue-195" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#175</span>
+    <span class="idx">#195</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3303,12 +3623,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=175）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=195）</p>
 </article>
 
-<article id="issue-176" class="row warning kind-policy layer-policy">
+<article id="issue-196" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#176</span>
+    <span class="idx">#196</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3319,12 +3639,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=176）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=196）</p>
 </article>
 
-<article id="issue-177" class="row warning kind-policy layer-policy">
+<article id="issue-197" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#177</span>
+    <span class="idx">#197</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3335,12 +3655,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=177）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=197）</p>
 </article>
 
-<article id="issue-178" class="row warning kind-policy layer-policy">
+<article id="issue-198" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#178</span>
+    <span class="idx">#198</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3351,12 +3671,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=178）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=198）</p>
 </article>
 
-<article id="issue-179" class="row warning kind-policy layer-policy">
+<article id="issue-199" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#179</span>
+    <span class="idx">#199</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3367,12 +3687,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=179）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=199）</p>
 </article>
 
-<article id="issue-180" class="row warning kind-policy layer-policy">
+<article id="issue-200" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#180</span>
+    <span class="idx">#200</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3383,12 +3703,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=180）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=200）</p>
 </article>
 
-<article id="issue-181" class="row warning kind-policy layer-policy">
+<article id="issue-201" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#181</span>
+    <span class="idx">#201</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3399,12 +3719,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=181）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=201）</p>
 </article>
 
-<article id="issue-182" class="row warning kind-policy layer-policy">
+<article id="issue-202" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#182</span>
+    <span class="idx">#202</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3415,12 +3735,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=182）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=202）</p>
 </article>
 
-<article id="issue-183" class="row warning kind-policy layer-policy">
+<article id="issue-203" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#183</span>
+    <span class="idx">#203</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3431,12 +3751,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=183）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=203）</p>
 </article>
 
-<article id="issue-184" class="row warning kind-policy layer-policy">
+<article id="issue-204" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#184</span>
+    <span class="idx">#204</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3447,12 +3767,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=184）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=204）</p>
 </article>
 
-<article id="issue-185" class="row warning kind-policy layer-policy">
+<article id="issue-205" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#185</span>
+    <span class="idx">#205</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3463,12 +3783,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=185）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=205）</p>
 </article>
 
-<article id="issue-186" class="row warning kind-policy layer-policy">
+<article id="issue-206" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#186</span>
+    <span class="idx">#206</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3479,12 +3799,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=186）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=206）</p>
 </article>
 
-<article id="issue-187" class="row warning kind-policy layer-policy">
+<article id="issue-207" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#187</span>
+    <span class="idx">#207</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3495,12 +3815,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=187）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=207）</p>
 </article>
 
-<article id="issue-188" class="row warning kind-policy layer-policy">
+<article id="issue-208" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#188</span>
+    <span class="idx">#208</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3511,12 +3831,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=188）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=208）</p>
 </article>
 
-<article id="issue-189" class="row warning kind-policy layer-policy">
+<article id="issue-209" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#189</span>
+    <span class="idx">#209</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3527,12 +3847,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=189）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=209）</p>
 </article>
 
-<article id="issue-190" class="row warning kind-policy layer-policy">
+<article id="issue-210" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#190</span>
+    <span class="idx">#210</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3543,12 +3863,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=190）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=210）</p>
 </article>
 
-<article id="issue-191" class="row warning kind-policy layer-policy">
+<article id="issue-211" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#191</span>
+    <span class="idx">#211</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3559,12 +3879,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=191）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=211）</p>
 </article>
 
-<article id="issue-192" class="row warning kind-policy layer-policy">
+<article id="issue-212" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#192</span>
+    <span class="idx">#212</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3575,12 +3895,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=192）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=212）</p>
 </article>
 
-<article id="issue-193" class="row warning kind-policy layer-policy">
+<article id="issue-213" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#193</span>
+    <span class="idx">#213</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3591,12 +3911,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=193）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=213）</p>
 </article>
 
-<article id="issue-194" class="row warning kind-policy layer-policy">
+<article id="issue-214" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#194</span>
+    <span class="idx">#214</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3607,12 +3927,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=194）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=214）</p>
 </article>
 
-<article id="issue-195" class="row warning kind-policy layer-policy">
+<article id="issue-215" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#195</span>
+    <span class="idx">#215</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3623,12 +3943,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=195）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=215）</p>
 </article>
 
-<article id="issue-196" class="row warning kind-policy layer-policy">
+<article id="issue-216" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#196</span>
+    <span class="idx">#216</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3639,12 +3959,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=196）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=216）</p>
 </article>
 
-<article id="issue-197" class="row warning kind-policy layer-policy">
+<article id="issue-217" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#197</span>
+    <span class="idx">#217</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3655,12 +3975,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=197）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=217）</p>
 </article>
 
-<article id="issue-198" class="row warning kind-policy layer-policy">
+<article id="issue-218" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#198</span>
+    <span class="idx">#218</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3671,12 +3991,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=198）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=218）</p>
 </article>
 
-<article id="issue-199" class="row warning kind-policy layer-policy">
+<article id="issue-219" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#199</span>
+    <span class="idx">#219</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3687,12 +4007,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=199）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=219）</p>
 </article>
 
-<article id="issue-200" class="row warning kind-policy layer-policy">
+<article id="issue-220" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#200</span>
+    <span class="idx">#220</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3703,12 +4023,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=200）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=220）</p>
 </article>
 
-<article id="issue-201" class="row warning kind-policy layer-policy">
+<article id="issue-221" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#201</span>
+    <span class="idx">#221</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3719,12 +4039,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=201）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=221）</p>
 </article>
 
-<article id="issue-202" class="row warning kind-policy layer-policy">
+<article id="issue-222" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#202</span>
+    <span class="idx">#222</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3735,12 +4055,12 @@
   <p class="msg">為避開站位碰撞，已延後 90 秒（NT）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=90 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=202）</p>
+  <p class="detail-compact">delaySeconds=90 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=222）</p>
 </article>
 
-<article id="issue-203" class="row warning kind-policy layer-policy">
+<article id="issue-223" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#203</span>
+    <span class="idx">#223</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3751,12 +4071,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=203）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=223）</p>
 </article>
 
-<article id="issue-204" class="row warning kind-policy layer-policy">
+<article id="issue-224" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#204</span>
+    <span class="idx">#224</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3767,12 +4087,12 @@
   <p class="msg">為避開站位碰撞，已延後 90 秒（NT）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=90 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=204）</p>
+  <p class="detail-compact">delaySeconds=90 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=224）</p>
 </article>
 
-<article id="issue-205" class="row warning kind-policy layer-policy">
+<article id="issue-225" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#205</span>
+    <span class="idx">#225</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3783,12 +4103,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=205）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=225）</p>
 </article>
 
-<article id="issue-206" class="row warning kind-policy layer-policy">
+<article id="issue-226" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#206</span>
+    <span class="idx">#226</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3799,7 +4119,7 @@
   <p class="msg">（以上已顯示 50 則；另有 195 則相同類型的站位約束 warning 未列出）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=206）</p>
+  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=226）</p>
 </article></div>
   </details>
 </section>

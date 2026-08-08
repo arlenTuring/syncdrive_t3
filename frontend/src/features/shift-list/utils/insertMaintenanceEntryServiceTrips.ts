@@ -217,8 +217,15 @@ function resolveBerthClearMinute(args: {
    * 要跳過；不跳過的話車子會被自己的前一趟擋住，白白延後。
    */
   selfTimelineRow: number;
-  /** 只看這個時刻之後仍在佔用的車；更早已離站的不算 */
-  notBeforeMinute: number;
+  /**
+   * 這班調度班次預計幾分鐘抵達該站位。
+   *
+   * 2026-08-08 修正：舊版傳的是「整備結束時刻」，然後在整天的佔用窗裡取
+   * <strong>最大</strong>淨空時刻——等於拿「今天最後一台車幾點離開」去擋一班早上的車，
+   * 實測算出 24:14，任何時刻抵達都被拒，外掛整批插不進去。
+   * 要問的是「<strong>我到的當下有沒有人佔著</strong>」，不是「今天最晚誰在」。
+   */
+  arriveMinute: number;
 }): number | null {
   // 調度班次的落點是引擎自己挑的（可換交路、可略過），所以這裡「算得起」滯留佔用
   // ——查得到別台車還停在目標站位，就換一條候選鏈或不插這一趟。
@@ -246,8 +253,6 @@ function resolveBerthClearMinute(args: {
         const win = naturalWindows[wi]!;
         const protectedWin = protectedWindows[wi] ?? win;
         if (win.stationId !== args.stationId) continue;
-        const endMinute = secondToMinute(protectedWin.endSecond);
-        if (endMinute <= args.notBeforeMinute - 1e-9) continue;
 
         // 物理下限：A 車離站後還要換線、恢復才輪到下一台進站
         const extraSeconds =
@@ -259,6 +264,11 @@ function resolveBerthClearMinute(args: {
           + (occupancySeconds + extraSeconds) * BERTH_CLEARANCE_SAFETY_RATIO;
 
         const clearSecond = Math.max(physicsEstimateSecond, protectedWin.endSecond);
+        const arriveSecond = minuteToSecond(args.arriveMinute);
+        // 只有「我到的當下真的還佔著」的車才擋：比我早到（或同時），而且還沒清空。
+        // 我到之後才來的、以及早就走了的，都與這一趟無關。
+        if (win.startSecond > arriveSecond + 1e-9) continue;
+        if (clearSecond <= arriveSecond + 1e-9) continue;
         const candidate = secondToMinute(clearSecond);
         clearMinute = clearMinute == null ? candidate : Math.max(clearMinute, candidate);
       }
@@ -284,6 +294,13 @@ function pickSafeEntryPlacement(args: {
   /** 整備串結束時刻：調度班次不得早於此發車 */
   yardEndMinute: number;
   exitStationIds: Set<string>;
+  /**
+   * 下一班正線的起點站不是整備出場站——車不靠這一趟過去就開不了那一班。
+   * 這種情況<strong>站位被佔不得否決整條鏈</strong>：不插外掛車也不會憑空出現在起點，
+   * 只是把真實的站位衝突藏起來，變成一份物理上做不到的班表。
+   * 照插，衝突交給最終驗證回報（2026-08-08）。
+   */
+  mandatory: boolean;
   minimumRecoveryTimeSeconds: number;
   collisionProtectionSeconds: number;
   rotationRoutes: ShiftScheduleSelectedRoute[];
@@ -293,6 +310,7 @@ function pickSafeEntryPlacement(args: {
   selfTimelineRow: number;
   routeById: Map<string, ShiftScheduleSelectedRoute>;
 }): PlacedHop[] | null {
+  let fallback: PlacedHop[] | null = null;
   for (const chain of args.candidates) {
     const placed = placeChainAgainstFirstTrip({
       chain,
@@ -323,7 +341,7 @@ function pickSafeEntryPlacement(args: {
         minimumRecoveryTimeSeconds: args.minimumRecoveryTimeSeconds,
         collisionProtectionSeconds: args.collisionProtectionSeconds,
         selfTimelineRow: args.selfTimelineRow,
-        notBeforeMinute: args.yardEndMinute,
+        arriveMinute: item.endMinute,
       });
       if (clearMinute == null) continue;
       item.berthCheck = { arriveStationId: arriveStation, berthClearMinute: clearMinute };
@@ -332,11 +350,15 @@ function pickSafeEntryPlacement(args: {
         break;
       }
     }
-    if (!berthOk) continue;
+    if (!berthOk) {
+      // 非插不可時先記下來，全部候選都撞站位的話仍要挑一條插進去
+      if (args.mandatory && fallback == null) fallback = placed;
+      continue;
+    }
 
     return placed;
   }
-  return null;
+  return args.mandatory ? fallback : null;
 }
 
 /** 整備類型：可被「保養後進場」略過、串到保養後的尾巴 */
@@ -611,6 +633,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
         firstTripRouteId: nextPassenger.routeId,
         yardEndMinute: afterYard.chainEndMinute,
         exitStationIds,
+        mandatory: dispatchIsRequired,
         minimumRecoveryTimeSeconds,
         collisionProtectionSeconds,
         rotationRoutes: selectedRoutes,
