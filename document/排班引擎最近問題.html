@@ -115,14 +115,14 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-08T02:55:46.909Z
+      更新：2026-08-08T03:08:00.383Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0806」
       · ok=<code>false</code>
       · 錯誤 4／警告 185／共 189 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→4（+4） · 警告 185→185（±0） · severe 3→3（±0） · moderate 4→4（±0） · mild 3→3（±0）</p>
+    <p class="meta delta">與上次生成相比：錯誤 4→4（±0） · 警告 185→185（±0） · severe 3→3（±0） · moderate 4→4（±0） · mild 3→3（±0）</p>
   </header>
   
 <section class="accept">
@@ -240,7 +240,7 @@
   </div>
   <h2>整備出場站接不上</h2>
   <p class="code"><code>YARD_EXIT_STATION_MISMATCH</code></p>
-  <p class="msg">時間線 1：「行前」做完後車停在出場站，但接著排的 PNT1000 是從別的站發車，車不在那裡開不了（出場站 station_4，這班的起點站 station_2）</p>
+  <p class="msg">時間線 1：「行前」做完後車停在「T3上行」，但接著排的 PNT1000（一般正線（整備後第一班））是從「N2W下行出發」發車，車不在那裡開不了</p>
   <p class="guide">車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <details><summary>detail</summary><pre>{
@@ -248,9 +248,13 @@
   &quot;yardBlockId&quot;: &quot;task-1786017237664-falc&quot;,
   &quot;yardTaskType&quot;: &quot;inspection&quot;,
   &quot;blockId&quot;: &quot;template-pax-slot-1783563609611-route_5-73-1-36120&quot;,
+  &quot;blockSource&quot;: &quot;template_bar&quot;,
   &quot;exitStationId&quot;: &quot;station_4&quot;,
+  &quot;exitStationName&quot;: &quot;T3上行&quot;,
   &quot;originStationId&quot;: &quot;station_2&quot;,
-  &quot;routeId&quot;: &quot;route_1&quot;
+  &quot;originStationName&quot;: &quot;N2W下行出發&quot;,
+  &quot;routeId&quot;: &quot;route_1&quot;,
+  &quot;routeCode&quot;: &quot;NT&quot;
 }</pre></details>
 </article>
 
@@ -264,7 +268,7 @@
   </div>
   <h2>整備出場站接不上</h2>
   <p class="code"><code>YARD_EXIT_STATION_MISMATCH</code></p>
-  <p class="msg">時間線 1：「保養」做完後車停在出場站，但接著排的 MNT1738 是從別的站發車，車不在那裡開不了（出場站 station_4，這班的起點站 station_2）</p>
+  <p class="msg">時間線 1：「保養」做完後車停在「T3上行」，但接著排的 MNT1738（一般正線（整備後第一班））是從「N2W下行出發」發車，車不在那裡開不了</p>
   <p class="guide">車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <details><summary>detail</summary><pre>{
@@ -272,9 +276,13 @@
   &quot;yardBlockId&quot;: &quot;task-1786001836575-ut7i&quot;,
   &quot;yardTaskType&quot;: &quot;servicing&quot;,
   &quot;blockId&quot;: &quot;template-pax-slot-1783563654507-route_5-146-1-63530&quot;,
+  &quot;blockSource&quot;: &quot;template_bar&quot;,
   &quot;exitStationId&quot;: &quot;station_4&quot;,
+  &quot;exitStationName&quot;: &quot;T3上行&quot;,
   &quot;originStationId&quot;: &quot;station_2&quot;,
-  &quot;routeId&quot;: &quot;route_1&quot;
+  &quot;originStationName&quot;: &quot;N2W下行出發&quot;,
+  &quot;routeId&quot;: &quot;route_1&quot;,
+  &quot;routeCode&quot;: &quot;NT&quot;
 }</pre></details>
 </article>
 
@@ -288,7 +296,7 @@
   </div>
   <h2>整備出場站接不上</h2>
   <p class="code"><code>YARD_EXIT_STATION_MISMATCH</code></p>
-  <p class="msg">時間線 2：「行前」做完後車停在出場站，但接著排的 PNT1006 是從別的站發車，車不在那裡開不了（出場站 station_4，這班的起點站 station_2）</p>
+  <p class="msg">時間線 2：「行前」做完後車停在「T3上行」，但接著排的 PNT1006（一般正線（整備後第一班））是從「N2W下行出發」發車，車不在那裡開不了</p>
   <p class="guide">車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <details><summary>detail</summary><pre>{
@@ -296,9 +304,13 @@
   &quot;yardBlockId&quot;: &quot;task-1786018210740-3vqx&quot;,
   &quot;yardTaskType&quot;: &quot;inspection&quot;,
   &quot;blockId&quot;: &quot;template-pax-slot-1783563609611-route_5-74-1-36480&quot;,
+  &quot;blockSource&quot;: &quot;template_bar&quot;,
   &quot;exitStationId&quot;: &quot;station_4&quot;,
+  &quot;exitStationName&quot;: &quot;T3上行&quot;,
   &quot;originStationId&quot;: &quot;station_2&quot;,
-  &quot;routeId&quot;: &quot;route_1&quot;
+  &quot;originStationName&quot;: &quot;N2W下行出發&quot;,
+  &quot;routeId&quot;: &quot;route_1&quot;,
+  &quot;routeCode&quot;: &quot;NT&quot;
 }</pre></details>
 </article>
 
@@ -312,7 +324,7 @@
   </div>
   <h2>整備出場站接不上</h2>
   <p class="code"><code>YARD_EXIT_STATION_MISMATCH</code></p>
-  <p class="msg">時間線 2：「保養」做完後車停在出場站，但接著排的 MNT1733 是從別的站發車，車不在那裡開不了（出場站 station_4，這班的起點站 station_2）</p>
+  <p class="msg">時間線 2：「保養」做完後車停在「T3上行」，但接著排的 MNT1733（一般正線（整備後第一班））是從「N2W下行出發」發車，車不在那裡開不了</p>
   <p class="guide">車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <details><summary>detail</summary><pre>{
@@ -320,9 +332,13 @@
   &quot;yardBlockId&quot;: &quot;task-1786001843574-sqc7&quot;,
   &quot;yardTaskType&quot;: &quot;servicing&quot;,
   &quot;blockId&quot;: &quot;template-pax-slot-1783563654507-route_5-145-1-63170&quot;,
+  &quot;blockSource&quot;: &quot;template_bar&quot;,
   &quot;exitStationId&quot;: &quot;station_4&quot;,
+  &quot;exitStationName&quot;: &quot;T3上行&quot;,
   &quot;originStationId&quot;: &quot;station_2&quot;,
-  &quot;routeId&quot;: &quot;route_1&quot;
+  &quot;originStationName&quot;: &quot;N2W下行出發&quot;,
+  &quot;routeId&quot;: &quot;route_1&quot;,
+  &quot;routeCode&quot;: &quot;NT&quot;
 }</pre></details>
 </article></div>
   </details>

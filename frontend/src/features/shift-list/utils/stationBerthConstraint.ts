@@ -512,6 +512,36 @@ export function pushSameRowNextAfterPrevious(args: {
   return earliestStart - nextStart;
 }
 
+/** 整備區塊：車進去之後就不在正線上，出來時停在該設施的出場站 */
+function isYardBlockForContinuity(block: GeneratedScheduleBlock): boolean {
+  if (block.source !== 'template_bar') return false;
+  return (
+    block.taskType === 'charging'
+    || block.taskType === 'servicing'
+    || block.taskType === 'inspection'
+    || block.taskType === 'standby'
+  );
+}
+
+/**
+ * 同一列往前找「可以拿來要求站點連續」的前一趟正線。
+ *
+ * <strong>碰到整備就停</strong>並回傳 undefined——車進了整備，位置由整備的出場站決定，
+ * 整備前那一趟的終點站已經不能用來推斷車現在在哪。這一班要當成重新起頭。
+ */
+function resolveSameRowPreviousPassengerBeforeYard(
+  rowBlocks: GeneratedScheduleBlock[],
+  blockIndex: number,
+): GeneratedScheduleBlock | undefined {
+  if (blockIndex <= 0) return undefined;
+  for (let i = blockIndex - 1; i >= 0; i -= 1) {
+    const candidate = rowBlocks[i]!;
+    if (isYardBlockForContinuity(candidate)) return undefined;
+    if (candidate.taskType === 'passenger') return candidate;
+  }
+  return undefined;
+}
+
 function evaluateCandidate(args: {
   block: GeneratedScheduleBlock;
   route: ShiftScheduleSelectedRoute;
@@ -622,13 +652,15 @@ export function enforceStationBerthConstraints(args: {
       blockIndex >= 0
         ? rowBlocks.slice(blockIndex + 1).find((item) => item.taskType === 'passenger')
         : undefined;
-    const previousPassenger =
-      blockIndex > 0
-        ? [...rowBlocks.slice(0, blockIndex)].reverse().find(
-            (item) => item.taskType === 'passenger',
-          )
-        : undefined;
-    // 前一正線可能已被改寫：候選下一跳以改寫後拓撲為準
+    // 中間夾著整備就<strong>不算</strong>有前一趟：車進去整備、出來是停在整備的出場站，
+    // 跟整備前那一趟的終點站無關。忽略這件事的話，求解器會拿整備前那趟的終點
+    // 去要求站點連續，把「整備後第一班」改成從別站發車的路線——車根本不在那裡。
+    // （2026-08-08 實測：行前出場站 T3上行、對齊已正確給 TN，卻被這裡改成 NT。）
+    const previousPassenger = resolveSameRowPreviousPassengerBeforeYard(
+      rowBlocks,
+      blockIndex,
+    );
+    // 前一正線可能已被改寫：候選以改寫後拓撲為準
     const previousRoute =
       previousPassenger != null
         ? resolveRouteForBlock(previousPassenger, selectedRoutes)

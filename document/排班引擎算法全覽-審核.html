@@ -1618,6 +1618,39 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 站位求解器把「整備後第一班」改成從別站發車的路線</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>新加的 <code>YARD_EXIT_STATION_MISMATCH</code> 一次抓出 4 則——
+      行前與保養做完後車停在 T3上行，接著排的班次卻是從 N2W下行出發 發車。
+      hover 標明來源是「<strong>一般正線（整備後第一班）</strong>」，
+      代表不是調度營運班次那條路徑。
+    </li>
+    <li>
+      <strong>先排除的：</strong>合成案例直接打
+      <code>assignPassengerRoutesConstraintGreedy</code>，輪替相位對齊<strong>是好的</strong>
+      ——行前出場站 T3上行，第一班正確給 TN。所以路線指派沒問題。
+    </li>
+    <li>
+      <strong>真正根因：</strong><code>enforceStationBerthConstraints</code> 往前找
+      「前一趟正線」時<strong>無視中間夾著整備</strong>，然後拿那一趟的終點站要求站點連續。
+      車進了整備、出來是停在整備的<strong>出場站</strong>，跟整備前那趟的終點無關。
+      於是起點對的 TN 被當成「接不起來」刪掉，選了起點錯的 NT。
+      合成案例重現：<code>after</code> 本來是 TN，跑完求解器變成 NT、
+      <code>backupSwitchedCount = 1</code>。
+    </li>
+    <li>
+      <strong>解法：</strong>往前找前一趟正線時<strong>碰到整備就停</strong>並視為「沒有前一趟」，
+      這一班當成重新起頭（候選只限與目前路線同起點）。修完重跑：
+      <code>after</code> 維持 TN、<code>backupSwitchedCount = 0</code>。
+    </li>
+    <li>
+      <strong>這則是新驗證抓出來的。</strong>沒有 <code>YARD_EXIT_STATION_MISMATCH</code>
+      的話，這 4 則會一直安靜地存在——班表上看起來很正常，實際上車不在那一站。
+      <strong>「把規則寫成驗證」比「相信自己改對了」有用。</strong>
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

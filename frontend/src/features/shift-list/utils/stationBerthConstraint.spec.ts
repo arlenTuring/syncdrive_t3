@@ -1362,3 +1362,87 @@ describe('碰撞保護時間（生成期求解）', () => {
     assert.equal(solved.delayedCount, 0);
   });
 });
+
+describe('整備後第一班不得被站位求解器改成別站發車的路線', () => {
+  // 2026-08-08 使用者實測：行前／保養出場站是 T3上行，輪替對齊也正確給了 TN，
+  // 但站位求解器把它改成 NT（起點 N2W下行出發）——車在 T3上行，這班開不了。
+  // 成因：求解器找「前一趟正線」時無視中間夾著整備，拿整備前那趟的終點站
+  // 去要求站點連續，於是把起點對的 TN 從候選刪掉、選了起點錯的 NT。
+  const NT = route({
+    routeId: 'nt', routeCode: 'NT', executionOrder: 1,
+    stationIds: ['N2W', 'T3D'],
+    stationDwells: [
+      { stationId: 'N2W', stationName: 'N2W', dwellSeconds: 0, dwellRequired: false },
+      { stationId: 'T3D', stationName: 'T3D', dwellSeconds: 20 },
+    ],
+    stationLegTravels: [
+      { fromStationId: 'N2W', toStationId: 'T3D', avgTravelTimeSeconds: 200, minTravelTimeSeconds: 180 },
+    ],
+  });
+  const TN = route({
+    routeId: 'tn2', routeCode: 'TN', executionOrder: 2,
+    stationIds: ['T3U', 'N2W'],
+    stationDwells: [
+      { stationId: 'T3U', stationName: 'T3U', dwellSeconds: 0, dwellRequired: false },
+      { stationId: 'N2W', stationName: 'N2W', dwellSeconds: 20 },
+    ],
+    stationLegTravels: [
+      { fromStationId: 'T3U', toStationId: 'N2W', avgTravelTimeSeconds: 200, minTravelTimeSeconds: 180 },
+    ],
+  });
+
+  const policy: RouteSuccessorPolicy = {
+    algorithm: ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
+    valid: true,
+    routesByInstanceId: new Map([['nt', NT], ['tn2', TN]]),
+    rotationRoutes: [NT, TN],
+    prioritySuccessors: new Map([['nt', ['tn2']], ['tn2', ['nt']]]),
+    secondarySuccessors: new Map(),
+    startInstanceIds: ['nt'],
+    endInstanceIds: new Set(['tn2']),
+    canonicalCycleInstanceIds: ['nt', 'tn2'],
+    throughCycles: [],
+  };
+
+  it('中間夾著整備時，不拿整備前那趟的終點站要求站點連續', () => {
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          // 進整備前最後一趟：TN，終點 N2W
+          block({
+            id: 'pre', timelineRow: 1,
+            plannedStartMinute: 560, plannedEndMinute: 560 + 220 / 60,
+            routeId: 'tn2', routeCode: 'TN', routeInstanceId: 'tn2',
+          }),
+          {
+            id: 'insp', timelineRow: 1, taskType: 'inspection' as const,
+            label: '行前', source: 'template_bar' as const,
+            plannedStartMinute: 570, plannedEndMinute: 600,
+            anchorStartMinute: 570, travelSeconds: 0, dwellSeconds: 0,
+          } as GeneratedScheduleBlock,
+          // 行前出場站是 T3U，所以這一班必須是 TN（起點 T3U）
+          block({
+            id: 'after', timelineRow: 1,
+            plannedStartMinute: 600, plannedEndMinute: 600 + 220 / 60,
+            routeId: 'tn2', routeCode: 'TN', routeInstanceId: 'tn2',
+          }),
+        ],
+      },
+    ];
+
+    const solved = enforceStationBerthConstraints({
+      timelines,
+      selectedRoutes: [NT, TN],
+      successorPolicy: policy,
+      collisionProtectionSeconds: 30,
+      maxDelaySeconds: 300,
+    });
+
+    const after = solved.timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((candidate) => candidate.id === 'after')!;
+    assert.equal(after.routeId, 'tn2', '整備後第一班不得被改成起點在別站的路線');
+    assert.equal(solved.backupSwitchedCount, 0);
+  });
+});
