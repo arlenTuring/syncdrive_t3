@@ -1766,6 +1766,38 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 外掛班次被一條「靜默跳過」擋掉，整整兩列毫無線索</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>行前做完車停在 T3上行，接著排的卻是 <code>PNT</code>
+      （P + <strong>NT</strong>，從 N2W下行出發 發車）。使用者一眼認出：
+      「調度營運班次要趕快到 N2W，應該是 <strong>TN 或 TNB</strong> 才對」。
+    </li>
+    <li>
+      <strong>查法：</strong>看 <code>YARD_EXIT_STATION_MISMATCH</code> 的
+      <code>blockSource</code> 是 <code>template_bar</code>，代表外掛根本沒被插入。
+      再對 <code>MAINTENANCE_DISPATCH_UNREACHABLE</code>——只有保養那幾列有，
+      <strong>行前那兩列一則都沒有</strong>。連「略過」都沒回報，代表是靜默 <code>continue</code>。
+    </li>
+    <li>
+      <strong>根因：</strong><code>isYardPrecededByMainline()</code>——
+      「整備被擠在正線中段就不准再插外掛」。行前夾在日間正線中段時這條就成立，
+      整列直接跳過。但這條規則<strong>只在「車已經在下一班的起點站」時才對</strong>；
+      車不在那裡的話，外掛是<strong>必要</strong>的，不能因為整備前面剛好是正線就跳過。
+    </li>
+    <li>
+      <strong>解法：</strong>把條件收緊成
+      <code>isYardPrecededByMainline(...) && exitStationIds.has(originStationId)</code>。
+      另外加一個 <code>reportSkip()</code>：只要「下一班起點站 ≠ 出場站」（外掛非插不可）
+      卻走到任何一個 <code>continue</code>，一律回報，不再靜默。
+    </li>
+    <li>
+      <strong>教訓：</strong>這一輪查了很久，全部卡在「<strong>沒有任何訊息</strong>」。
+      有警告的路徑（保養）三分鐘定位，靜默的路徑（行前）要逐行讀程式。
+      <strong>在「這件事非做不可」的分支上放 continue，一定要留下紀錄。</strong>
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

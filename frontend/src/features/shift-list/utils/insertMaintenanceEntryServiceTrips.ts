@@ -493,8 +493,9 @@ export function insertMaintenanceEntryServiceTrips(args: {
       if (!afterYard?.passenger.routeId) continue;
       const nextPassenger = afterYard.passenger;
 
-      // 整備被 defer／擠在正線中段：前一格已是正線，不准再插進場載客
-      if (isYardPrecededByMainline(sorted, i)) continue;
+      // 這一段整備的出場站與下一班正線的起點站——兩者不同就一定要靠外掛把車送過去。
+      // 下面每一個 continue 都可能讓外掛沒被插入，所以只要「非插不可」卻跳過，
+      // 一律回報，不再靜默（2026-08-08：行前那兩列完全沒插外掛也沒任何警告，查了很久）。
 
       // 連續整備串只在串首嘗試一次，避免保養／行前各發一則略過
       if (i > 0) {
@@ -512,6 +513,37 @@ export function insertMaintenanceEntryServiceTrips(args: {
       const originStationId = firstRoute ? routeStartStation(firstRoute) : null;
       if (!originStationId) continue;
 
+      // 整備被 defer／擠在正線中段時，本來就不該再多插一趟外掛。
+      // 但這只在「車已經在下一班的起點站」時成立——
+      // 2026-08-08 更正：若下一班正線的起點站不是整備出場站，車根本開不了那一班，
+      // 外掛就是必要的，不能因為整備前面剛好是正線就靜默跳過
+      // （行前夾在日間正線中段時就是這種情況，整整兩列完全沒插外掛也沒任何警告）。
+      if (isYardPrecededByMainline(sorted, i) && exitStationIds.has(originStationId)) {
+        continue;
+      }
+
+      /** 車不在下一班的起點站——外掛非插不可；此時任何跳過都要留下紀錄 */
+      const dispatchIsRequired = !exitStationIds.has(originStationId);
+      const reportSkip = (reason: string) => {
+        if (!dispatchIsRequired) return;
+        pushIssue(warnings, {
+          code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
+          severity: 'warning',
+          kind: 'actionable',
+          message:
+            `時間線 ${timeline.row}：「${yard.label}」做完後車在出場站，`
+            + `但下一班正線從別的站發車，需要調度營運班次接過去——${reason}`,
+          detail: {
+            timelineRow: timeline.row,
+            yardBlockId: yard.id,
+            yardTaskType: yard.taskType,
+            passengerBlockId: nextPassenger.id,
+            originStationId,
+            reason,
+          },
+        });
+      };
+
       // 檢查 nextPassenger 前是否有緊鄰的前一班正線
       // 若前一班正線的終點站與 nextPassenger 起點站相同（列車已在正線上運營抵達起點），
       // 則車已經在起點，不需要也不得插入進場載客
@@ -522,7 +554,10 @@ export function insertMaintenanceEntryServiceTrips(args: {
           const prevRoute = routeById.get(prevBlock.routeId);
           const prevEndStation = prevRoute ? routeEndStation(prevRoute) : null;
           if (prevEndStation && prevEndStation === originStationId) {
-            // 車輛已由前一班正線載客抵達本班起點站，跳過進場載客
+            // 車輛已由前一班正線載客抵達本班起點站，跳過進場載客。
+            // 但若這一段整備的出場站不是那一站，車其實在整備裡待過、人在出場站，
+            // 這個跳過就會漏掉必要的外掛——非插不可時留下紀錄。
+            reportSkip('前一班正線的終點站與本班起點站相同，判定車已在起點');
             continue;
           }
         }
