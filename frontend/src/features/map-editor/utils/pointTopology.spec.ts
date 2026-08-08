@@ -11,6 +11,9 @@ import {
   canReconnectDirectedEdge,
   canReversePointTopologyEdge,
   collectSubtreeNodeIds,
+  findOppositePointTopologyEdgeId,
+  isPointTopologyEdgeBidirectional,
+  makePointTopologyEdgeBidirectional,
   colorForTopologyNodeKind,
   curveOffsetFromDesiredMidpoint,
   facilityDockingTopologyNodeId,
@@ -233,6 +236,76 @@ describe('pointTopology', () => {
     const blocked = reversePointTopologyEdge(withBoth, 'e:a->b')
     assert.equal(blocked.newEdgeId, null)
     assert.equal(blocked.topology.edges.length, 2)
+  })
+
+  it('設為雙向：自動補一條反向邊，時間與距離沿用原邊', () => {
+    const topology = {
+      ...emptyPointTopology(),
+      nodes: [
+        { id: 'a', kind: 'facility' as const, label: 'E4', x: 0, y: 0, color: '#111111' },
+        { id: 'b', kind: 'docking' as const, label: 'N2W', x: 10, y: 10, color: '#222222' },
+      ],
+      edges: [
+        {
+          id: 'e:a->b',
+          fromNodeId: 'a',
+          toNodeId: 'b',
+          minTravelTimeSeconds: 30,
+          avgTravelTimeSeconds: 30,
+          distanceMeters: 100,
+          curveOffsetX: 12,
+          curveOffsetY: 8,
+        },
+      ],
+    }
+
+    assert.equal(isPointTopologyEdgeBidirectional(topology, 'e:a->b'), false)
+    assert.equal(findOppositePointTopologyEdgeId(topology, 'e:a->b'), null)
+
+    const { topology: both, newEdgeId } = makePointTopologyEdgeBidirectional(
+      topology,
+      'e:a->b',
+    )
+    assert.equal(newEdgeId, 'e:b->a')
+    assert.equal(both.edges.length, 2)
+    const reverse = both.edges.find((edge) => edge.id === 'e:b->a')!
+    assert.equal(reverse.fromNodeId, 'b')
+    assert.equal(reverse.toNodeId, 'a')
+    assert.equal(reverse.minTravelTimeSeconds, 30)
+    assert.equal(reverse.avgTravelTimeSeconds, 30)
+    assert.equal(reverse.distanceMeters, 100)
+    // 彎折不沿用，否則兩條線會疊在一起
+    assert.equal(reverse.curveOffsetX, null)
+    assert.equal(reverse.curveOffsetY, null)
+    // 原邊不動
+    assert.equal(both.edges.find((edge) => edge.id === 'e:a->b')!.curveOffsetX, 12)
+
+    assert.equal(isPointTopologyEdgeBidirectional(both, 'e:a->b'), true)
+    assert.equal(findOppositePointTopologyEdgeId(both, 'e:a->b'), 'e:b->a')
+  })
+
+  it('已經雙向時再設一次不會重複建邊', () => {
+    const topology = {
+      ...emptyPointTopology(),
+      nodes: [
+        { id: 'a', kind: 'facility' as const, label: 'E4', x: 0, y: 0, color: '#111111' },
+        { id: 'b', kind: 'docking' as const, label: 'N2W', x: 10, y: 10, color: '#222222' },
+      ],
+      edges: [
+        {
+          id: 'e:a->b',
+          fromNodeId: 'a',
+          toNodeId: 'b',
+          minTravelTimeSeconds: 30,
+          avgTravelTimeSeconds: 30,
+          distanceMeters: 100,
+        },
+      ],
+    }
+    const { topology: both } = makePointTopologyEdgeBidirectional(topology, 'e:a->b')
+    const again = makePointTopologyEdgeBidirectional(both, 'e:a->b')
+    assert.equal(again.newEdgeId, null)
+    assert.equal(again.topology.edges.length, 2)
   })
 
   it('preserves layout when re-syncing existing nodes', () => {

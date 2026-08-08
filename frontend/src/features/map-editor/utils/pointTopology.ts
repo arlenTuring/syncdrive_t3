@@ -910,6 +910,67 @@ export function reversePointTopologyEdge(
 }
 
 /**
+ * 設為雙向：在 from→to 之外自動補一條 to→from，時間與距離沿用原邊。
+ *
+ * 資料模型本來就是有向邊、且「兩節點之間最多兩條邊」，所以雙向不另立旗標，
+ * 就是把反向那一條補齊——這樣所有讀拓樸的地方（整備後發車、站間行駛、
+ * 路徑搜尋）都不必為了雙向改任何一行；一條反向有向邊本來就走得通。
+ *
+ * 對向已存在時不動作（已經是雙向了）。回傳新邊 id（沒建立則為 null）。
+ */
+export function makePointTopologyEdgeBidirectional(
+  topology: PointTopology,
+  edgeId: string,
+): { topology: PointTopology; newEdgeId: string | null } {
+  const edge = topology.edges.find((item) => item.id === edgeId)
+  if (!edge) return { topology, newEdgeId: null }
+  if (hasDirectedEdge(topology, edge.toNodeId, edge.fromNodeId)) {
+    return { topology, newEdgeId: null }
+  }
+  const fromNodeId = edge.toNodeId
+  const toNodeId = edge.fromNodeId
+  const newEdgeId = createPointTopologyEdgeId(fromNodeId, toNodeId)
+  const reverse: PointTopologyEdge = {
+    ...edge,
+    id: newEdgeId,
+    fromNodeId,
+    toNodeId,
+    // 線徑彎折不沿用：兩條線同弦反向，套同一組偏移會疊在一起看不出是兩條
+    curveOffsetX: null,
+    curveOffsetY: null,
+  }
+  return {
+    topology: { ...topology, edges: [...topology.edges, reverse] },
+    newEdgeId,
+  }
+}
+
+/** 這條邊的對向是否已存在（＝這一對節點已經是雙向） */
+export function isPointTopologyEdgeBidirectional(
+  topology: PointTopology,
+  edgeId: string,
+): boolean {
+  const edge = topology.edges.find((item) => item.id === edgeId)
+  if (!edge) return false
+  return hasDirectedEdge(topology, edge.toNodeId, edge.fromNodeId)
+}
+
+/** 找這條邊的對向邊 id；沒有回 null */
+export function findOppositePointTopologyEdgeId(
+  topology: PointTopology,
+  edgeId: string,
+): string | null {
+  const edge = topology.edges.find((item) => item.id === edgeId)
+  if (!edge) return null
+  return (
+    topology.edges.find(
+      (item) =>
+        item.fromNodeId === edge.toNodeId && item.toNodeId === edge.fromNodeId,
+    )?.id ?? null
+  )
+}
+
+/**
  * 以 from→to 方向展開子樹（含起點）：跟隨向外邊，不走回已訪節點。
  */
 export function collectSubtreeNodeIds(

@@ -21,6 +21,9 @@ import {
   canAddDirectedEdge,
   canReconnectDirectedEdge,
   canReversePointTopologyEdge,
+  findOppositePointTopologyEdgeId,
+  isPointTopologyEdgeBidirectional,
+  makePointTopologyEdgeBidirectional,
   collectSubtreeNodeIds,
   createPointTopologyEdgeId,
   curveOffsetFromDesiredMidpoint,
@@ -1865,6 +1868,25 @@ export function PointTopologyEditorDialog({
                   }
                   readOnly={false}
                   canReverse={canReversePointTopologyEdge(draft, selectedEdge.id)}
+                  isBidirectional={isPointTopologyEdgeBidirectional(
+                    draft,
+                    selectedEdge.id,
+                  )}
+                  onMakeBidirectional={() => {
+                    const { topology, newEdgeId } =
+                      makePointTopologyEdgeBidirectional(draft, selectedEdge.id)
+                    if (!newEdgeId) return
+                    pushHistoryBaseline(draft)
+                    setDraft(topology)
+                  }}
+                  onRemoveOpposite={() => {
+                    const oppositeId = findOppositePointTopologyEdgeId(
+                      draft,
+                      selectedEdge.id,
+                    )
+                    if (!oppositeId) return
+                    applyDraft((prev) => removePointTopologyEdge(prev, oppositeId))
+                  }}
                   onChange={(patch) => {
                     applyDraft((prev) =>
                       updatePointTopologyEdge(prev, selectedEdge.id, patch),
@@ -2014,6 +2036,9 @@ function EdgePropertiesForm({
   roleHint,
   readOnly,
   canReverse,
+  isBidirectional,
+  onMakeBidirectional,
+  onRemoveOpposite,
   onChange,
   onReverse,
   onResetBend,
@@ -2025,6 +2050,10 @@ function EdgePropertiesForm({
   roleHint?: string
   readOnly: boolean
   canReverse: boolean
+  /** 對向邊已存在＝這一對節點已經是雙向 */
+  isBidirectional: boolean
+  onMakeBidirectional: () => void
+  onRemoveOpposite: () => void
   onChange: (
     patch: Partial<
       Pick<
@@ -2057,6 +2086,30 @@ function EdgePropertiesForm({
       </div>
       {!readOnly ? (
         <div className="space-y-1">
+          {isBidirectional ? (
+            <>
+              <div className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-center text-xs font-medium text-emerald-200">
+                已設為雙向
+              </div>
+              <button
+                type="button"
+                onClick={onRemoveOpposite}
+                title="刪除對向那一條，恢復成單向"
+                className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+              >
+                改回單向（刪除對向邊）
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onMakeBidirectional}
+              title="自動補一條反向連線，時間與距離沿用這一條"
+              className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-900/50"
+            >
+              設為雙向（自動補 {toLabel} → {fromLabel}）
+            </button>
+          )}
           <button
             type="button"
             disabled={!canReverse}
