@@ -15,7 +15,10 @@ import {
  * | 行前 inspection | preTrip 設施→停靠 | 對齊出場站起點路線* | 有，代號 P |
  * | 充電 charging | charging 設施→停靠 | 僅單一出場站時對齊* | 無 |
  * | 機動 standby | mobile 設施→停靠 | 僅單一出場站時對齊* | 無 |
- * | 保養 servicing | maintenance+carWash 設施→停靠 | **對齊出場站**（例 M 系→T3→TN）* | 有，代號 M |
+ * | 保養 servicing | maintenance 設施→停靠 | **對齊出場站**（例 M 系→T3→TN）* | 有，代號 M |
+ *
+ * 洗車（carWash／W1）不在表內：它不是 `TaskTypeKey`，是整備中心的步驟，
+ * 沒有任何時間模板任務會派到它，因此不得出現在任何任務類型的出場站集合。
  *
  * 調度營運班次一律在整備<strong>結束之後</strong>才發車（不得佔用整備尾巴），
  * 且不受同方向班距約束；只受站位淨空限制。詳見文件 §10。
@@ -258,12 +261,11 @@ export function resolveYardPostTaskPolicy(args: {
     const entryStations = resolveServicingExitStationIds(origins, maintenanceBody);
     return {
       rotationExitStationId:
+        // 只看 maintenance 設施（M 系）；carWash 不是任務類型，不得併入，
+        // 理由見 resolveServicingExitStationIds 的註解。
         resolvePreferredExitStationId(
           origins,
-          [
-            ...extractFacilityMapCodes(maintenanceBody, 'maintenance'),
-            ...extractFacilityMapCodes(maintenanceBody, 'carWash'),
-          ],
+          extractFacilityMapCodes(maintenanceBody, 'maintenance'),
         )
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),

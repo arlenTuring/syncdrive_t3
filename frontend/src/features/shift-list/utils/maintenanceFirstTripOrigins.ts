@@ -235,17 +235,22 @@ export function resolveInspectionExitStationId(
 }
 
 /**
- * 保養／洗車可出場站集合：依 maintenance + carWash 設施代號過濾拓樸。
+ * 保養可出場站集合：只依 maintenance 設施代號（例 M1–M4）過濾拓樸。
+ *
+ * 刻意<strong>不</strong>併入 carWash：洗車不是可排班的任務類型
+ * （`TaskTypeKey` 只有 passenger／charging／inspection／standby／servicing），
+ * 它是整備中心裡的一個步驟。把 W1 的停靠站併進來，會讓
+ * `entryServiceExitStationIds` 多出一個車根本到不了的站（例 N2W），
+ * 連帶讓 `dispatchIsRequired` 誤判為 false、外掛班次不插，
+ * 車就「瞬移」到那一站發車。
+ *
  * 若 body 無代號或對不到任何站，回傳全部拓樸出場站（維持最壞情況語意）。
  */
 export function resolveServicingExitStationIds(
   origins: MaintenanceFirstTripOrigin[],
   maintenanceBody: Record<string, unknown> | null | undefined,
 ): string[] {
-  const codes = [
-    ...extractFacilityMapCodes(maintenanceBody, 'maintenance'),
-    ...extractFacilityMapCodes(maintenanceBody, 'carWash'),
-  ];
+  const codes = extractFacilityMapCodes(maintenanceBody, 'maintenance');
   const uniqueCodes = [...new Set(codes)];
   if (uniqueCodes.length === 0) {
     return origins.map((origin) => origin.stationId);

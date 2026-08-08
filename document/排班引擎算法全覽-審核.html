@@ -1177,7 +1177,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
-      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該設施的任一出場站集合內</strong>——車不在那裡，開不了。設施可有多個出場站（保養＝機廠 T3上行＋洗車 W1 N2W），只要命中其中一個就算合法（見 §10）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合允許多值（同一任務類型的設施可能落在不同站），實務上目前每種都是單一值：充電→N2W，保養／行前／機動→T3上行（見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1828,32 +1828,73 @@ backend/src/dev-log/
     </li>
   </ul>
 
-  <h3>2026-08-08 · 出場站不是單一值，是集合——驗證過嚴誤報 13 則</h3>
+  <h3>2026-08-08 · 出場站集合混進洗車 W1，害外掛不插、車直接瞬移到 N2W</h3>
   <ul>
     <li>
       <strong>症狀：</strong><code>YARD_EXIT_STATION_MISMATCH</code> 13 則，形狀完全一致：
       <code>列 N | servicing | 出場 T3上行 → 這班起點 N2W下行出發 | 路線 NT</code>。
     </li>
     <li>
-      <strong>根因：</strong>保養的 <code>entryServiceExitStationIds</code> 實際是
-      <code>["station_4"(機廠→T3上行), "station_2"(洗車 W1→N2W)]</code>，
-      但驗證只拿<strong>單一偏好值</strong> <code>rotationExitStationId = station_4</code> 去比。
-      車洗完車停在 N2W、從 N2W 正常起跑 NT——完全合法，卻被判不符。
-      <strong>是驗證過嚴，不是排班錯。</strong>
+      <strong>第一次判斷（錯的）：</strong>看到保養的
+      <code>entryServiceExitStationIds</code> 是
+      <code>["station_4"(機廠 M 系→T3上行), "station_2"(洗車 W1→N2W)]</code>，
+      而驗證只拿單一偏好值 <code>station_4</code> 去比，
+      就認定「洗完車停 N2W 起跑 NT 是合法的，驗證過嚴」，把驗證放寬成集合比對。
+      <strong>放寬後 13 則歸零，但那是把真 bug 蓋掉。</strong>
     </li>
     <li>
-      <strong>解法：</strong>新增 <code>buildYardExitStationOptionsByTaskType()</code>，
-      回傳 <code>Partial&lt;Record&lt;TaskTypeKey, string[]&gt;&gt;</code>——
-      <code>entryServiceExitStationIds</code> 與 <code>rotationExitStationId</code> 的聯集。
-      <code>EngineInput.yardExitStationByTaskType</code> 換成
-      <code>yardExitStationOptionsByTaskType</code>，
-      <code>validateYardExitContinuity</code> 改成
-      <code>exitOptions.includes(originStationId)</code> 即放行。13 則 → 0。
+      <strong>使用者指出的關鍵事實：</strong>時間模板裡<strong>根本沒有洗車</strong>。
+      查 <code>TaskTypeKey</code> 只有
+      <code>passenger｜charging｜inspection｜standby｜servicing</code>——
+      洗車不是可排班的任務類型，是整備中心裡的一個步驟，
+      沒有任何模板任務會派到 W1。實測模板 JSON 也搜不到 <code>carWash</code>／<code>洗車</code>。
     </li>
     <li>
-      <strong>教訓：</strong>「出場站」在資料模型裡一直是<strong>集合</strong>（一個設施可有多個出入口），
-      是驗證端自己把它塌縮成單一值。<strong>驗證器的資料形狀必須跟來源一致</strong>，
-      塌縮多值成單值＝製造假錯誤。
+      <strong>真根因：</strong><code>resolveServicingExitStationIds()</code> 無條件把
+      <code>maintenance</code> 與 <code>carWash</code> 兩組設施代號聯集。
+      W1 的停靠站 N2W 因此混進保養的出場站集合，
+      造成 <code>exitStationIds.has(originStationId)</code> 成立 →
+      <code>dispatchIsRequired = false</code> → <strong>外掛班次不插</strong> →
+      車沒有任何移動就從 N2W 發車。驗證器報 <code>YARD_EXIT_STATION_MISMATCH</code>
+      是<strong>完全正確</strong>的。
+    </li>
+    <li>
+      <strong>解法：</strong><code>resolveServicingExitStationIds()</code> 與
+      servicing 的 <code>rotationExitStationId</code> 都只看
+      <code>maintenance</code> 設施代號，不再併入 <code>carWash</code>。
+      修完後出場站對照完全符合場域設定：
+      <table>
+        <thead><tr><th>任務類型</th><th>設施</th><th>出場站</th></tr></thead>
+        <tbody>
+          <tr><td>充電 charging</td><td>E1–E4</td><td><code>station_2</code>（N2W）</td></tr>
+          <tr><td>保養 servicing</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+          <tr><td>行前 inspection</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+          <tr><td>機動 standby</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+        </tbody>
+      </table>
+      實測：<code>errors 0</code>、<code>YARD_EXIT_STATION_MISMATCH 0</code>、
+      <code>MAINTENANCE_DISPATCH_UNREACHABLE 0</code>，
+      外掛班次 26 班全在 route_5／route_6（TN／TNB，T3→N2W 方向）。
+      <code>HEADWAY_BELOW_TARGET</code> 32 → 37——外掛真的插進去了，多佔 5 處班距，
+      這是正確代價。
+    </li>
+    <li>
+      <strong>保留多值集合：</strong><code>buildYardExitStationOptionsByTaskType()</code>
+      與 <code>yardExitStationOptionsByTaskType</code> 留著。
+      同一任務類型的設施<strong>可能</strong>落在不同站，集合是結構上正確的形狀；
+      只是拿掉 carWash 之後，這份資料每種任務都恰好是單一值。
+    </li>
+    <li>
+      <strong>教訓（兩層）：</strong>
+      <ol>
+        <li><strong>設施分組 ≠ 任務類型。</strong>整備中心的 step（洗車）與時間模板的
+        <code>TaskTypeKey</code> 是兩套東西，聯集它們會生出「車根本到不了的出場站」。
+        判斷某個設施該不該進某任務類型的集合，要回頭看 <code>TaskTypeKey</code> 有沒有它。</li>
+        <li><strong>驗證器報錯時，先假設它是對的。</strong>這次是驗證器抓到真問題，
+        我卻去放寬驗證器讓數字歸零。
+        <strong>指標歸零不等於問題解決</strong>——要能說出「車實際怎麼從 A 移動到 B」，
+        說不出來就是還沒找到根因。</li>
+      </ol>
     </li>
   </ul>
 
