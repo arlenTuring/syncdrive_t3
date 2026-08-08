@@ -693,6 +693,18 @@ export const ENTRY_SERVICE_COLOR_SET: TaskTypeColorSet = {
   text: '#99F6E4',
 };
 
+/**
+ * 出場移動卡（整備設施 → 轉乘站）專用色卡。
+ * 這種卡常常只有 30 秒，畫出來是幾個 px 的細條，所以用高彩度實心色
+ * 讓它在整備卡與正線卡之間仍然看得出來；內容全部交給 hover。
+ */
+export const YARD_EXIT_MOVE_COLOR_SET: TaskTypeColorSet = {
+  bar: '#FACC15',
+  base: '#4A3B0B',
+  bg: '#B4890F',
+  text: '#1F1400',
+};
+
 export function migrateScheduleTasks(tasks: ScheduleTask[]): ScheduleTask[] {
   return tasks.map((task) => {
     const taskType = migrateLegacyScheduleTaskType(task.taskType) ?? 'servicing';

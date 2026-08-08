@@ -65,6 +65,8 @@ export type GeneratedScheduleBlock = {
   yardExitFacilityLabel?: string;
   /** 出場移動：抵達的轉乘站 stationId */
   yardExitStationId?: string;
+  /** 出場移動：抵達的轉乘站顯示名（例 T3上行） */
+  yardExitStationLabel?: string;
   /** 出場移動：來源整備區段代號（班次代號 = 該代號 + EX，例 MEX／PEX／EEX／WEX） */
   yardExitSectionCode?: string;
   /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */

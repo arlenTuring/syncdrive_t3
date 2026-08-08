@@ -13,6 +13,7 @@ import {
   SCHEDULE_TIME_AXIS_TEXT_CLASS,
   SCHEDULE_ENGINE_TASK_TYPE_COLORS,
   ENTRY_SERVICE_COLOR_SET,
+  YARD_EXIT_MOVE_COLOR_SET,
   blendHexOnBase,
   formatSelectedIntervalHoverContent,
   getInactiveRangesWithinBar,
@@ -557,6 +558,17 @@ function resolveBlockCode(
   index: number,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
+  // 出場移動：代號 = 整備代號 + EX（Exit），例 MEX／PEX／EEX／WEX。
+  // 必須排在 dispatch 分支之前——它的 taskType 也是 dispatch，會被誤判成 D。
+  if (block.source === 'yard_exit_move') {
+    const base = block.yardExitSectionCode?.trim();
+    return buildScheduleBlockTripCode({
+      prefixCode: base ? `${base}EX` : null,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+    });
+  }
+
   // 進場載客：代號 = 整備代號 + 路線代號 + 開始時刻（taskType 為 passenger，須先判 source）
   if (block.source === 'entry_service') {
     return buildScheduleBlockTripCode({
@@ -847,10 +859,16 @@ function ShiftScheduleBlockBar({
   onDeleteBlock?: (blockId: string) => void;
   onDuplicateBlock?: (blockId: string) => void;
 }) {
+  // 出場移動卡通常只有 30 秒，畫出來是幾個 px 的細條。
+  // 塞代號／路線／時刻進去只會變成「D... 出... 02:45:5」這種讀不了的碎字，
+  // 所以它走另一套畫法：純色細條 + 一個方向記號，內容全部交給 hover。
+  const isYardExitMove = block.source === 'yard_exit_move';
   const colors =
     block.source === 'entry_service'
       ? ENTRY_SERVICE_COLOR_SET
-      : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
+      : isYardExitMove
+        ? YARD_EXIT_MOVE_COLOR_SET
+        : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
   const daySegments = useMemo(
     () =>
@@ -1081,14 +1099,27 @@ function ShiftScheduleBlockBar({
       } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${extraBorderClass}`}
       style={{
         left: leftPx,
-        width: Math.max(widthPx, 4),
+        // 出場移動卡給一個看得到的最小寬度，否則 30 秒在日尺度上幾乎是 0 px
+        width: Math.max(widthPx, isYardExitMove ? 12 : 4),
         height: REAL_TASK_BAR_HEIGHT,
         top: REAL_TASK_BAR_TOP,
         backgroundColor: colors.bg,
         zIndex: highlighted ? 50 : (block.source === 'template_bar' ? 2 : 1),
         ...extraStyle,
       }}
-      title={`${block.label} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`}
+      title={
+        isYardExitMove
+          ? [
+              `${code} · 出場移動`,
+              `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
+              `${timeLabel}（${block.travelSeconds} 秒）`,
+              '整備做完後把車從設施開到轉乘站；結束時刻貼齊下一段發車',
+              block.yardExitAteYardTail ? '※ 空間不足，已佔用整備尾巴' : '',
+            ]
+              .filter(Boolean)
+              .join('\n')
+          : `${block.label} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
+      }
       role={selectable ? 'button' : undefined}
       tabIndex={selectable && showChrome ? 0 : undefined}
       onClick={
@@ -1205,7 +1236,16 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
-      {showChrome ? (
+      {isYardExitMove ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center text-[9px] font-bold leading-none"
+          style={{ color: colors.text }}
+          aria-hidden
+        >
+          ⇥
+        </div>
+      ) : null}
+      {showChrome && !isYardExitMove ? (
       <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"

@@ -1965,6 +1965,17 @@ backend/src/dev-log/
       等那個決定之後再處理。
     </li>
     <li>
+      <strong>畫法：</strong>這種卡常常只有 30 秒，在日尺度上是幾個 px。
+      照一般班次卡畫會變成「<code>D... 出... 02:45:5</code>」這種讀不了的碎字，
+      所以它走另一套：<strong>高彩度實心細條（琥珀色）＋ 一個 ⇥ 記號</strong>，
+      最小寬度 12px，卡內完全不放文字，內容全部交給 hover
+      （代號、設施→轉乘站、時刻與秒數、有沒有吃到整備尾巴）。
+      另外 <code>ShiftSchedulePlanGrid.tsx</code> 裡的 <code>resolveBlockCode()</code>
+      是與 <code>maintenanceSectionCode.ts</code> 平行的第二份實作，
+      漏了 <code>yard_exit_move</code> 分支就會掉進 <code>dispatch</code> 變成 <code>D</code>——
+      新增 source 時兩份都要補。
+    </li>
+    <li>
       <strong>查到的坑：</strong><code>firstTripOriginStationId</code> 這個欄位名很誤導——
       它在調度營運班次上存的是<strong>要把車送到的首班起點站（終點側）</strong>，
       不是這一段自己的起點。拿它當起點會查到完全另一站，
