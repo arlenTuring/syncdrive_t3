@@ -1909,6 +1909,65 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 四張移動小卡（MO／MI／PI／PO）與拓樸自動尋路</h3>
+  <ul>
+    <li>
+      <strong>命名定案。</strong>原本的「出場移動卡」正名為<strong>整備出廠卡</strong>，
+      並補齊另外三張：
+      <table>
+        <thead><tr><th>卡</th><th>代號</th><th>時機</th><th>規則</th></tr></thead>
+        <tbody>
+          <tr><td>整備出廠</td><td><code>MO</code></td><td>整備做完 → 轉乘站</td><td>往前貼齊下一段發車；空間不夠吃整備<strong>尾巴</strong></td></tr>
+          <tr><td>整備入廠</td><td><code>MI</code></td><td>確定不能再跑正線 → 提前進整備區</td><td>到了整備直接開始：整備<strong>開始提前、結束不動</strong>（時長變長）</td></tr>
+          <tr><td>調度入廠</td><td><code>PI</code></td><td>沒班次可接、空檔長到佔死站位</td><td><strong>必須先跑完停靠站放下客人</strong>才進廠</td></tr>
+          <tr><td>調度出廠</td><td><code>PO</code></td><td>暫停結束</td><td>開回下一段班次的起點站，不繞複雜路徑</td></tr>
+        </tbody>
+      </table>
+      MO 與 MI 剛好對稱：<strong>MO 吃整備的尾巴，MI 長整備的頭</strong>。
+    </li>
+    <li>
+      <strong>卡面只印兩個字母。</strong>這種卡常常只有 30 秒寬，塞不下完整班次代號，
+      所以卡面就是 <code>MO</code>／<code>MI</code>／<code>PI</code>／<code>PO</code> ＋ 一個小 i，
+      名稱、方向、時刻、規則說明全部交給 hover。
+    </li>
+    <li>
+      <strong>路徑一律由拓樸自己找</strong>（<code>findTopologyPath</code>，Dijkstra）。
+      設施之間有 N×M 種組合，不可能要使用者一條條畫；而且換一張地圖就要重畫。
+      <strong>方向嚴格遵守拓樸、不自動補反向邊</strong>——實測場域裡 M 系設施
+      出廠接 T3<strong>上行</strong>、入廠要走 T3<strong>下行</strong>，反過來就是逆行。
+      雙向是使用者在拓樸編輯器按「設為雙向」明確補上反向邊才成立。
+    </li>
+    <li>
+      <strong>PI 的觸發條件</strong>：接下來沒有任何班次可接，且空檔 ≥
+      <code>PARK_IDLE_THRESHOLD_SECONDS</code>（預設 900 秒）。
+      門檻的意義是「這段時間真的沒班可接」——一個停靠點只能停一台車，
+      車在那裡乾等就是把別台車擋在外面。太短就進廠划不來（來回移動本身要時間）。
+    </li>
+    <li>
+      <strong>MI 與 PI 的分工</strong>：中間<strong>有</strong>整備任務的空檔歸 MI
+      （那是預定要進廠做事）；中間<strong>沒有</strong>整備、純粹沒班次可跑的才歸 PI／PO。
+    </li>
+    <li>
+      <strong>新增整備任務第五步「調度任務」</strong>：只載入調度設施，
+      沒有觸發條件也沒有作業時長——停多久由排班決定，不是設一個固定值。
+      步驟從 7 步變 8 步，行前／機動往後移。
+    </li>
+    <li>
+      <strong>實測（真實資料）：</strong>MO 22 張、MI 16 張、<code>errors 0</code>。
+      列 1：<code>02:53:40 正線結束 → 02:54:10-02:54:40 MI（N2W下行出發→E2）→
+      02:54:40-04:30:00 充電</code>（開始提前、結束 04:30 不動）。
+      PI／PO 以注入的 H1–H3 設定實測 9 對、0 略過。
+    </li>
+    <li>
+      <strong>踩到的坑：</strong>引擎原本只拿得到 <code>firstTripOrigins</code>
+      （由拓樸衍生的「設施→首班起點站」清單），拿不到完整拓樸，所以入廠卡一開始
+      永遠找不到路。管線要一路補：
+      <code>shiftRouteGroupCatalog</code> 回傳 <code>pointTopology</code> →
+      <code>GenerateShiftScheduleInput</code> → <code>EngineInput</code>。
+      <strong>衍生資料夠用的時候不會有人發現原始資料沒接進來，直到需要它為止。</strong>
+    </li>
+  </ul>
+
   <h3>2026-08-09 · 碰撞保護尖峰併發把同一台車算成兩台；剩下的是關聯圖給不出第二個停靠選擇</h3>
   <ul>
     <li>

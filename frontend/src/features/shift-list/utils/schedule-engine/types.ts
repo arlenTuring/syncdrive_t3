@@ -127,6 +127,8 @@ export type FeasibilityViolationCode =
   | 'YARD_EXIT_MOVE_UNRESOLVED'
   /** 整備入廠卡（MI）排不出來：拓樸到不了該設施／設施未設定／設施被佔（警告） */
   | 'YARD_ENTRY_MOVE_UNRESOLVED'
+  /** 調度入／出廠卡（PI／PO）排不出來：拓樸進不去或出不來／設施被佔（警告） */
+  | 'PARK_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */
