@@ -60,6 +60,23 @@ export const POLICY_NOISE_CODES: ReadonlySet<FeasibilityViolationCode> = new Set
 export const QUALITY_BLOCKING_WARNING_CODES: ReadonlySet<FeasibilityViolationCode> =
   new Set(['UNSERVED_SERVICE_PULSE', 'HEADWAY_BELOW_TARGET']);
 
+/**
+ * 安全閘：<strong>不擋生成、不擋編輯，但擋發布</strong>。
+ *
+ * 這一層放的是「物理上做不到／有行車安全疑慮」的問題，
+ * 跟 <code>QUALITY_BLOCKING_WARNING_CODES</code>（服務品質沒達標）本質不同：
+ * 班距差 40 秒是可以接受後再調的，
+ * 但「一個停靠點同時停 3 台車」不是品質差，是<strong>做不到</strong>。
+ *
+ * 之所以不擋生成：班表產得出來使用者才看得到問題、才能手動改。
+ * 擋在發布這一關，既不會讓人對著空白畫面，也不會讓不安全的班表上線。
+ */
+export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
+  new Set([
+    'STATION_BERTH_COLLISION',
+    'STATION_BERTH_PROTECTION_GAP',
+  ]);
+
 /** 常見硬錯誤代號（文件／報表用；實際硬閘以 severity=error 為準） */
 export const DOCUMENTED_HARD_ERROR_CODES: readonly FeasibilityViolationCode[] = [
   'STATION_BERTH_COLLISION',
@@ -96,6 +113,13 @@ export type ScheduleAcceptanceSummary = {
   /** 無未承接脈衝、無班距低於目標 */
   qualityPassed: boolean;
   qualityFailByCode: Record<string, number>;
+  /**
+   * 安全閘：沒有任何站位重疊／碰撞保護不足。
+   * false 時班表仍可編輯、可儲存，但<strong>不建議發布</strong>。
+   */
+  publishSafe: boolean;
+  publishBlockingCount: number;
+  publishBlockingByCode: Record<string, number>;
   policyNoiseCount: number;
   limitWarningCount: number;
   actionableWarningCount: number;
@@ -158,9 +182,15 @@ export function evaluateScheduleAcceptance(
   }
 
   const gatePassed = computeScheduleGateOk(report.errors);
+  const publishBlockingIssues = [...report.errors, ...report.warnings].filter(
+    (issue) => PUBLISH_BLOCKING_CODES.has(issue.code),
+  );
 
   return {
     gatePassed,
+    publishSafe: publishBlockingIssues.length === 0,
+    publishBlockingCount: publishBlockingIssues.length,
+    publishBlockingByCode: countByCode(publishBlockingIssues),
     hardErrorCount: report.errors.length,
     hardErrorsByCode,
     qualityPassed: qualityFailIssues.length === 0,

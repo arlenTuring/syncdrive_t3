@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -13,6 +13,12 @@ import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import { AttributeLegendBadgeChip } from '../../time-templates/components/AttributeLegendBadgeChip';
 import type { ShiftScheduleCreateDraft, ShiftScheduleSelectedRoute } from '../types/create';
 import { isShiftScheduleOutputFresh } from '../types/create';
+import { buildScheduleAnalysisReport } from '../utils/buildScheduleAnalysisReport';
+import {
+  SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
+  normalizeMinimumRecoveryTimeSeconds,
+} from '../utils/schedule-engine/physics';
+import { ScheduleAnalysisReportPanel } from './ScheduleAnalysisReportPanel';
 import {
   buildShiftScheduleStoredOutput,
   trimPlanAdjustHistoryForPersist,
@@ -30,6 +36,7 @@ import {
   type FeasibilityIssueKind,
 } from '../utils/schedule-engine/feasibilityIssueMeta';
 import {
+  computeScheduleGateOk,
   evaluateScheduleAcceptance,
   layerSortKey,
   resolveIssueDisplayLayerFromIssue,
@@ -557,6 +564,7 @@ export function StepShiftScheduleAdjust({
   const planRef = useRef<GeneratedSchedulePlan | null>(null);
   planRef.current = plan;
   const [report, setReport] = useState<ShiftScheduleFeasibilityReport | null>(null);
+  const [showAnalysisReport, setShowAnalysisReport] = useState(false);
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
@@ -1079,6 +1087,35 @@ export function StepShiftScheduleAdjust({
     }, 50);
   };
 
+  // 分析報表：純計算，跟著 plan／時段／路線走；plan 還沒好就不算
+  const analysisReport = useMemo(() => {
+    if (!plan) return null;
+    const rotationRoutes = draft.routeGroups.selectedRoutes.filter(
+      (route) => !route.backupForInstanceId && !route.backupForRouteId,
+    );
+    return buildScheduleAnalysisReport({
+      plan,
+      intervals,
+      attributes,
+      passengerRoutes: rotationRoutes,
+      selectedRoutes: draft.routeGroups.selectedRoutes,
+      minimumRecoveryTimeSeconds:
+        normalizeMinimumRecoveryTimeSeconds(
+          draft.routeGroups.minimumRecoveryTimeSeconds,
+        ),
+      collisionProtectionSeconds:
+        draft.routeGroups.collisionProtectionSeconds
+        ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
+    });
+  }, [
+    plan,
+    intervals,
+    attributes,
+    draft.routeGroups.selectedRoutes,
+    draft.routeGroups.minimumRecoveryTimeSeconds,
+    draft.routeGroups.collisionProtectionSeconds,
+  ]);
+
   if (loading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center gap-2 text-zinc-500">
@@ -1179,6 +1216,30 @@ export function StepShiftScheduleAdjust({
             </button>
           </>
         ) : null}
+
+        <div className="h-4 w-px bg-zinc-800" />
+
+        <button
+          type="button"
+          disabled={!analysisReport}
+          onClick={() => setShowAnalysisReport((open) => !open)}
+          className={`rounded p-1.5 transition ${
+            !analysisReport
+              ? 'cursor-not-allowed text-zinc-600 opacity-40'
+              : showAnalysisReport
+                ? 'bg-zinc-800/80 text-zinc-100'
+                : analysisReport.hasFindings
+                  ? 'text-amber-400 hover:bg-zinc-800/60 hover:text-amber-300'
+                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+          }`}
+          title={
+            analysisReport?.hasFindings
+              ? `班表分析報表（${analysisReport.suggestions.length} 項待處理）`
+              : '班表分析報表'
+          }
+        >
+          <ClipboardList className="size-4" />
+        </button>
 
         <div className="h-4 w-px bg-zinc-800" />
 
@@ -1346,6 +1407,14 @@ export function StepShiftScheduleAdjust({
             activeTab === 'schedule' ? '' : 'hidden'
           }`}
         >
+          {showAnalysisReport && analysisReport ? (
+            <div className="min-h-[240px] shrink-0 basis-2/5">
+              <ScheduleAnalysisReportPanel
+                report={analysisReport}
+                onClose={() => setShowAnalysisReport(false)}
+              />
+            </div>
+          ) : null}
           <div className={`flex min-h-0 flex-1 ${isManual ? 'flex-row gap-3' : 'flex-col'}`}>
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {plan ? (
