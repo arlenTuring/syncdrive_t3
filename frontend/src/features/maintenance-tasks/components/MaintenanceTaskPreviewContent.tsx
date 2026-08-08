@@ -125,6 +125,7 @@ export function MaintenanceTaskPreviewContent({
   const charging = normalizeChargingDraft(draft.charging);
   const carWash = normalizeCarWashDraft(draft.carWash);
   const maintenance = normalizeMaintenanceDraft(draft.maintenance);
+  const parking = draft.parking;
   const preTrip = normalizePreTripDraft(draft.preTrip);
   const mobile = normalizeMobileDraft(draft.mobile);
 
@@ -222,7 +223,18 @@ export function MaintenanceTaskPreviewContent({
         )}
       </PreviewSection>
 
-      <PreviewSection step={5} title={stepLabels[5]} enabled={preTrip.stepEnabled} onEdit={onEditStep}>
+      <PreviewSection step={5} title={stepLabels[5]} enabled={parking.stepEnabled} onEdit={onEditStep}>
+        {wrapSection(
+          undefined,
+          <PreviewList
+            items={parking.equipmentRows
+              .filter((row) => row.mapCode.trim().length > 0)
+              .map((row) => formatEquipmentRowPreviewLine(row))}
+          />,
+        )}
+      </PreviewSection>
+
+      <PreviewSection step={6} title={stepLabels[6]} enabled={preTrip.stepEnabled} onEdit={onEditStep}>
         {wrapSection(
           preTrip.stepEnabled ? sectionExtras?.preTrip : undefined,
           <PreviewList
@@ -238,7 +250,7 @@ export function MaintenanceTaskPreviewContent({
         )}
       </PreviewSection>
 
-      <PreviewSection step={6} title={stepLabels[6]} enabled={mobile.stepEnabled} onEdit={onEditStep}>
+      <PreviewSection step={7} title={stepLabels[7]} enabled={mobile.stepEnabled} onEdit={onEditStep}>
         {wrapSection(
           mobile.stepEnabled ? sectionExtras?.mobile : undefined,
           <PreviewList

@@ -15,6 +15,7 @@ import {
   isCreateMaintenanceTaskStepComplete,
   isMaintenanceStepComplete,
   isChargingStepComplete,
+  isParkingStepComplete,
   isPreTripStepComplete,
   isMobileStepComplete,
   resolveMaintenanceTaskDraftName,
@@ -424,9 +425,12 @@ export function CreateMaintenanceTaskPage({
       return isMaintenanceStepComplete(draft.maintenance);
     }
     if (draft.currentStep === 5) {
-      return isPreTripStepComplete(draft.preTrip);
+      return isParkingStepComplete(draft.parking);
     }
     if (draft.currentStep === 6) {
+      return isPreTripStepComplete(draft.preTrip);
+    }
+    if (draft.currentStep === 7) {
       return isMobileStepComplete(draft.mobile);
     }
     return true;
@@ -436,6 +440,7 @@ export function CreateMaintenanceTaskPage({
     draft.carWash,
     draft.charging,
     draft.maintenance,
+    draft.parking,
     draft.preTrip,
     draft.mobile,
     draft.currentStep,
@@ -485,7 +490,7 @@ export function CreateMaintenanceTaskPage({
 
   const handleNext = () => {
     if (!canGoNext) return;
-    if (draft.currentStep >= 7) return;
+    if (draft.currentStep >= 8) return;
     goToStep((draft.currentStep + 1) as CreateMaintenanceTaskStep);
   };
 
@@ -510,7 +515,7 @@ export function CreateMaintenanceTaskPage({
       && draft.maxReachedStep > 1
       && draft.basic.name.trim().length > 0);
 
-  const isLastStep = draft.currentStep === 7;
+  const isLastStep = draft.currentStep === 8;
   const primaryActionEnabled = isLastStep
     ? previewReachedBottom && !loading && !loadError && !completing
     : canGoNext;

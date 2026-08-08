@@ -819,6 +819,16 @@ export function isMaintenanceStepComplete(
   return true;
 }
 
+/**
+ * 調度任務只要有設施就算完成——它沒有作業時長（停多久由排班決定），
+ * 所以不能沿用 isStationDurationStepComplete（那會要求 operationDurationMinutes）。
+ */
+export function isParkingStepComplete(parking: MaintenanceTaskParkingDraft): boolean {
+  if (!parking.stepEnabled) return true;
+  if (parking.equipmentRows.length === 0) return false;
+  return parking.equipmentRows.every((row) => row.mapCode.trim().length > 0);
+}
+
 export function isPreTripStepComplete(preTrip: MaintenanceTaskPreTripDraft): boolean {
   return isStationDurationStepComplete(preTrip);
 }
@@ -856,8 +866,9 @@ export function isCreateMaintenanceTaskStepComplete(
   if (step === 2) return isChargingStepComplete(draft.charging);
   if (step === 3) return isCarWashStepComplete(draft.carWash);
   if (step === 4) return isMaintenanceStepComplete(draft.maintenance);
-  if (step === 5) return isPreTripStepComplete(draft.preTrip);
-  if (step === 6) return isMobileStepComplete(draft.mobile);
+  if (step === 5) return isParkingStepComplete(draft.parking);
+  if (step === 6) return isPreTripStepComplete(draft.preTrip);
+  if (step === 7) return isMobileStepComplete(draft.mobile);
   return true;
 }
 
