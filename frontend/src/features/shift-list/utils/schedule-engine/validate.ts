@@ -915,14 +915,43 @@ export function validateStationBerthCollisions(
     longestIdle: StationBerthOccupancy | null;
   } => {
     const spans = occupancies.filter((occ) => occ.stationId === stationId);
-    const events: Array<{ minute: number; delta: number }> = [];
     let longestIdle: StationBerthOccupancy | null = null;
     for (const occ of spans) {
-      events.push({ minute: occ.startMinute, delta: 1 });
-      events.push({ minute: occ.actualDepartMinute, delta: -1 });
       const idle = occ.actualDepartMinute - occ.startMinute;
       if (!longestIdle || idle > longestIdle.actualDepartMinute - longestIdle.startMinute) {
         longestIdle = occ;
+      }
+    }
+
+    // 同一台車在同一站可能留下兩段占用：前一趟「到站」與下一趟「發車」，
+    // 兩段在轉頭的那一刻首尾相接。直接掃描會在接點瞬間 +1 才 -1，
+    // 把一台車算成兩台（實測 N2W 因此報成 4 台，實際只有 3 台）。
+    // 車不會跟自己碰撞，先<strong>依時間線合併</strong>相接／重疊的占用再掃描。
+    const byRow = new Map<number, Array<{ start: number; end: number }>>();
+    for (const occ of spans) {
+      const list = byRow.get(occ.timelineRow) ?? [];
+      list.push({ start: occ.startMinute, end: occ.actualDepartMinute });
+      byRow.set(occ.timelineRow, list);
+    }
+
+    const events: Array<{ minute: number; delta: number }> = [];
+    for (const list of byRow.values()) {
+      list.sort((a, b) => a.start - b.start || a.end - b.end);
+      let merged: { start: number; end: number } | null = null;
+      for (const span of list) {
+        if (merged && span.start <= merged.end + 1e-9) {
+          merged.end = Math.max(merged.end, span.end);
+          continue;
+        }
+        if (merged) {
+          events.push({ minute: merged.start, delta: 1 });
+          events.push({ minute: merged.end, delta: -1 });
+        }
+        merged = { ...span };
+      }
+      if (merged) {
+        events.push({ minute: merged.start, delta: 1 });
+        events.push({ minute: merged.end, delta: -1 });
       }
     }
     events.sort((a, b) => a.minute - b.minute || b.delta - a.delta);

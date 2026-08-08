@@ -1909,6 +1909,75 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 碰撞保護尖峰併發把同一台車算成兩台；剩下的是關聯圖給不出第二個停靠選擇</h3>
+  <ul>
+    <li>
+      <strong>症狀：</strong>兩則 <code>STATION_BERTH_PROTECTION_GAP</code>——
+      N2W下行出發「同時最多有 <strong>4</strong> 台車」（35 對班次）、
+      T3下行「同時最多有 <strong>4</strong> 台車」（5 對）。
+    </li>
+    <li>
+      <strong>Bug（已修）：同一台車被算成兩台。</strong>
+      車在終點站轉頭時會留下<strong>兩段</strong>占用：前一趟的「到站」與下一趟的「發車」，
+      兩段在轉頭那一刻首尾相接。<code>peakConcurrentAtStation()</code> 直接掃事件，
+      在接點會先 +1 再 -1，於是一台車被記成兩台。
+      實測 N2W 05:35:30 的「4 台」其實是列 4、列 3、列 6，只有 3 台——
+      列 6 的到站（…–05:35:20）與發車（05:35:30–…）是同一台車。
+      <strong>車不會跟自己碰撞</strong>，改成先依 <code>timelineRow</code>
+      合併相接／重疊的占用再掃描。兩站都由 4 修正為 3。
+    </li>
+    <li>
+      <strong>剩下的不是程式問題，是關聯圖的可停選擇不夠。</strong>
+      把真實資料的關聯圖倒出來（12 條邊）：
+      <table>
+        <thead><tr><th>前一趟</th><th>可接的後一趟</th><th>停哪</th></tr></thead>
+        <tbody>
+          <tr><td><code>ST</code>（S2W上行→T3上行）</td><td><code>TN</code>／<code>TNB</code></td><td><strong>兩個選擇</strong>：N2W下行出發 或 [備用]N2W上行停靠</td></tr>
+          <tr><td><code>STB</code>（S2W上行出發→T3上行）</td><td><code>TN</code>／<code>TNB</code></td><td><strong>兩個選擇</strong></td></tr>
+          <tr><td><code>TN</code>（T3上行→N2W下行出發）</td><td><code>NT</code></td><td>只有 T3下行</td></tr>
+          <tr><td><code>TNB</code>（T3上行→N2W上行停靠）</td><td><code>NTB</code></td><td>只有 T3下行</td></tr>
+          <tr><td><code>TS</code>（T3下行→S2W）</td><td><code>ST</code></td><td>只有一條</td></tr>
+          <tr><td><code>TSB</code>（T3下行→S2W下行停靠）</td><td><code>STB</code></td><td>只有一條</td></tr>
+        </tbody>
+      </table>
+      也就是：<strong>N 向終點區只有 2 個停靠位</strong>
+      （N2W下行出發＋[備用]N2W上行停靠），但尖峰有 3 台車空等；
+      <strong>T3下行完全沒有備用雙胞胎</strong>——<code>TN→NT</code> 與
+      <code>TNB→NTB</code> 都只有一條出邊，車跑完 N→T 一定停在 T3下行，無處可換。
+    </li>
+    <li>
+      <strong>讓渡機制的實測數字</strong>（在 <code>trySwapToBackupBerth</code>／
+      <code>findBerthSwapPair</code>／<code>findReliefChain</code> 掛探針）：
+      <ul>
+        <li><code>swapped-backup</code> 107 次成功（＝<code>STATION_BERTH_BACKUP_USED</code>）</li>
+        <li><code>no-swap-pair</code> 1382 次：前一趟在圖上<strong>只有 1 個後繼</strong>，沒有替身可換</li>
+        <li><code>leave-not-mainline</code> 489 次：下一段是充電／保養，設計上不歸讓渡管</li>
+        <li><code>findReliefChain</code> <strong>0 次成功</strong>：全圖只有 4 條次要邊，
+        3 跳內沒有回得到原站的環。（試過放寬成「第一跳次要、回程允許主要邊」，
+        數字完全沒動，已回退——<strong>差分實驗否決了這個猜想</strong>。）</li>
+      </ul>
+    </li>
+    <li>
+      <strong>要真的消掉這兩則，只有三條路</strong>（都在使用者的設定，不在程式）：
+      <ol>
+        <li>關聯圖補一條<strong>終點在別站的 T3下行備用雙胞胎</strong>
+        （例「N2W下行&gt;[備用]T3下行停靠」），並把 <code>TN</code>／<code>TNB</code> 接到它——
+        T3下行那 5 對才有機會化解。</li>
+        <li>N 向再加一個備用停靠位；目前 2 個位子塞不下 3 台空等的車。</li>
+        <li>減少該時段的時間線列數，或把多餘的車安排進整備／機動。</li>
+      </ol>
+    </li>
+    <li>
+      <strong>教訓：</strong>掃描線算併發時，<strong>先問「同一個實體會不會產生多段區間」</strong>。
+      首尾相接的兩段在事件點上看起來就是重疊，
+      但那是同一台車轉頭，不是兩台車搶位。
+      另外——<strong>「機制沒有觸發」不等於「機制壞了」</strong>：
+      這次讓渡一次都沒插入，查下去是圖上根本沒有第二個選擇，
+      程式的行為完全正確。掛探針數清楚每一個 <code>return</code> 的次數，
+      比讀程式碼猜快得多。
+    </li>
+  </ul>
+
   <h3>2026-08-08 · 整備任務可掛任何設施格——用途是給人看的分類，不是限制</h3>
   <ul>
     <li>
