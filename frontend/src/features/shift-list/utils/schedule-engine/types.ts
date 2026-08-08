@@ -16,7 +16,20 @@ export type ScheduleBlockSource =
    * 改讓它沿關聯圖次要邊先開去別站等，時間到了再回來接原本排定的下一段
    * （不算輪替，計入運能；見文件 §8.2）。
    */
-  | 'relief_loop';
+  | 'relief_loop'
+  /**
+   * 出場移動：整備做完後，車還停在整備設施裡（例 M2），
+   * 這一段把它從設施開到該設施在拓樸上連到的轉乘站（例 T3上行）。
+   * 時長取拓樸上該「設施 → 站」邊的空駛秒數，不需要另外規劃路徑。
+   *
+   * 排法是<strong>往前貼</strong>：結束時刻貼齊後面那一段的發車時刻（零秒緩衝），
+   * 由此往前推出開始時刻——不是整備一做完就開出去，而是要走之前才就位，
+   * 免得白白佔著轉乘站的站格。後面那一段（調度營運班次或正線）<strong>時間不動</strong>。
+   *
+   * 空間不夠時（整備結束到發車之間塞不下這段空駛），
+   * 這是<strong>全系統唯一</strong>可以佔用整備尾巴時間的卡。
+   */
+  | 'yard_exit_move';
 
 export type GeneratedScheduleBlock = {
   id: string;
@@ -46,6 +59,16 @@ export type GeneratedScheduleBlock = {
   firstTripOriginLabel?: string;
   /** 進場載客：來源整備區段代號（班次代號 = 整備代號 + 路線代號 + 開始時刻） */
   entryServiceSectionCode?: string;
+  /** 出場移動：出發的整備設施節點 id（具體到哪一台，例 M2 那一格） */
+  yardExitFacilityNodeId?: string;
+  /** 出場移動：出發的整備設施顯示名／代號（例 M2） */
+  yardExitFacilityLabel?: string;
+  /** 出場移動：抵達的轉乘站 stationId */
+  yardExitStationId?: string;
+  /** 出場移動：來源整備區段代號（班次代號 = 該代號 + EX，例 MEX／PEX／EEX／WEX） */
+  yardExitSectionCode?: string;
+  /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */
+  yardExitAteYardTail?: boolean;
   /**
    * 調度營運班次（entry_service）落點診斷（文件 §10.3）——
    * 只在這一段抵達某個站位時實際查得到「該站淨空時刻」才會寫入；
@@ -77,6 +100,8 @@ export type FeasibilityViolationCode =
   | 'STATION_LEG_TRAVEL_INVALID'
   | 'STATION_TIMING_INFEASIBLE'
   | 'STATION_BERTH_COLLISION'
+  /** 出場移動卡（整備代號+EX）排不出來：設施未設定／拓樸沒有邊／設施被佔（警告） */
+  | 'YARD_EXIT_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */

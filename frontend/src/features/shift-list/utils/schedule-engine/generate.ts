@@ -1,6 +1,7 @@
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
+import { insertYardExitMoveCards } from '../insertYardExitMoveCards';
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
@@ -46,6 +47,7 @@ import {
   pushPassengerPastPrecedingYard,
 } from '../mainlineMaintenanceEntryYield';
 import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
+import { pushIssue } from './feasibilityIssueMeta';
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -262,6 +264,27 @@ export function generateShiftSchedule(
     selectedRoutes: engineInput.selectedRoutes,
   });
   timelines = scrubMidMainlineDispatchArtifacts(timelines);
+
+  // 出場移動卡（整備代號+EX）：把車從整備設施開到轉乘站的那一段。
+  // 放在所有幾何後處理「之後」是刻意的——它往前貼齊後面那一段的發車時刻，
+  // 後面那一段的時間必須已經定案，先插會被之後的班距修復推走而失去貼齊。
+  const yardExitMove = insertYardExitMoveCards({
+    timelines,
+    origins: engineInput.firstTripOrigins,
+    maintenanceBody: engineInput.maintenanceBody,
+    selectedRoutes: engineInput.selectedRoutes,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+  });
+  timelines = yardExitMove.timelines;
+  for (const skip of yardExitMove.skipped) {
+    pushIssue(warnings, {
+      code: 'YARD_EXIT_MOVE_UNRESOLVED',
+      severity: 'warning',
+      kind: 'policy',
+      message: `時間線 ${skip.timelineRow}：「${skip.taskType}」排不出出場移動卡——${skip.reason}`,
+      detail: { timelineRow: skip.timelineRow, taskType: skip.taskType, reason: skip.reason },
+    });
+  }
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(

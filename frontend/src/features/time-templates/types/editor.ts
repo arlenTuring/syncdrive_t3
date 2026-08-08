@@ -109,12 +109,21 @@ export function intervalDurationTableLabel(startTime: string, endTime: string): 
   return `${hh}小時${mm}分鐘`;
 }
 
+/**
+ * 整備任務固定五類（充電／洗車／保養／行前／機動），各自在場域設定 step 2
+ * 有對應設施分類，加上正線共六種。
+ *
+ * 洗車（`washing`）與保養（`servicing`）是<strong>各自獨立</strong>的類型：
+ * 模板上排洗車就是洗車、排保養就是保養，不再是「休息窗口內由系統決定」。
+ * 兩者的整備設施不同（洗車 W 系、保養 M 系），出場站因此也不同。
+ */
 export type TaskTypeKey =
   | 'passenger'
   | 'charging'
   | 'inspection'
   | 'standby'
-  | 'servicing';
+  | 'servicing'
+  | 'washing';
 
 /** 排班引擎產物：過渡空檔沿用 idle；調度＝整備後開往首班起點站 */
 export type ScheduleEngineTaskType = TaskTypeKey | 'idle' | 'dispatch';
@@ -128,6 +137,7 @@ export const TASK_TYPE_OPTIONS: Array<{
   { key: 'inspection', label: '行前' },
   { key: 'standby', label: '機動' },
   { key: 'servicing', label: '保養' },
+  { key: 'washing', label: '洗車' },
 ];
 
 /** 時間模板任務類型說明（側欄 chip 提示用） */
@@ -170,18 +180,37 @@ export const TASK_TYPE_DESCRIPTIONS: Record<
   servicing: {
     title: '保養',
     bullets: [
-      '休息窗口：洗車、保養、閒置合併為此類型',
-      '車輛回報數據後，系統在窗口內決定實際作業',
-      '模板只定窗口長度；洗車／保養／閒置不在模板分別排定',
+      '於模板固定排保養時段（對應整備設施 M 系）',
+      '可參考整備任務「保養」的預估作業時間',
+      '結束後由出場移動卡（MEX）把車開到該設施的轉乘站',
+    ],
+  },
+  washing: {
+    title: '洗車',
+    bullets: [
+      '於模板固定排洗車時段（對應整備設施 W 系）',
+      '可參考整備任務「洗車」的預估作業時間',
+      '結束後由出場移動卡（WEX）把車開到該設施的轉乘站',
     ],
   },
 };
 
-const LEGACY_SCHEDULE_TASK_TYPES = new Set(['idle', 'wash', 'maintenance']);
+/**
+ * 舊資料的任務類型代碼。`wash` 早年就是洗車，現在洗車有了自己的
+ * `washing` 類型，直譯回去比併進保養忠實（併進保養會讓車被算成從
+ * M 系設施出場，實際上它在 W 系）。`idle`／`maintenance` 沒有更貼切的
+ * 對應，仍歸保養。
+ */
+const LEGACY_SCHEDULE_TASK_TYPE_MAP: Record<string, TaskTypeKey> = {
+  idle: 'servicing',
+  maintenance: 'servicing',
+  wash: 'washing',
+};
 
 export function migrateLegacyScheduleTaskType(raw: unknown): TaskTypeKey | null {
   if (typeof raw !== 'string') return null;
-  if (LEGACY_SCHEDULE_TASK_TYPES.has(raw)) return 'servicing';
+  const mapped = LEGACY_SCHEDULE_TASK_TYPE_MAP[raw];
+  if (mapped) return mapped;
   return parseTaskTypeKey(raw);
 }
 
@@ -200,7 +229,7 @@ export function isMainlineTaskType(key: TaskTypeKey | null | undefined): boolean
 }
 
 export function isServicingWindowTaskType(key: TaskTypeKey | null | undefined): boolean {
-  return key === 'servicing';
+  return key === 'servicing' || key === 'washing';
 }
 
 export const PERIOD_LEGEND_FALLBACK: Array<{ label: string; chipClass: string }> = [
@@ -612,6 +641,12 @@ export const TASK_TYPE_COLORS: Record<
     bar: '#FF6900',
     base: '#462E1F',
     bg: taskTypeBarBackground('#462E1F', [255, 105, 0]),
+    text: '#F3F4F6',
+  },
+  washing: {
+    bar: '#00B8DB',
+    base: '#123C46',
+    bg: taskTypeBarBackground('#123C46', [0, 184, 219]),
     text: '#F3F4F6',
   },
 };

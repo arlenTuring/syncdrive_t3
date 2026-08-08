@@ -55,6 +55,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
   STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
+  YARD_EXIT_MOVE_UNRESOLVED: '出場移動卡排不出來',
 };
 
 /** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -91,6 +92,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   MAINTENANCE_DISPATCH_UNREACHABLE: { id: 's10', label: '§10 進場載客' },
   STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
+  YARD_EXIT_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -218,6 +220,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。',
+  },
+  YARD_EXIT_MOVE_UNRESOLVED: {
+    kind: 'actionable',
+    guidance:
+      '出場移動卡（整備代號+EX）負責把車從整備設施開到轉乘站。排不出來代表這三件事之一：整備任務沒設定該區段的設施、設施在路網拓樸上沒有連到那一站、或該設施在那個時段被別列車佔著。請回 Step 2 補設施，或到路網拓樸補「設施→停靠」的邊與行駛時間。',
   },
   STATION_BERTH_RELIEF_INSERTED: {
     kind: 'policy',

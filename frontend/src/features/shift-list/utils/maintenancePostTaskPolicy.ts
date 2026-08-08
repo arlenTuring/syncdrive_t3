@@ -3,7 +3,7 @@ import {
   extractFacilityMapCodes,
   resolvePreferredExitStationId,
   resolveExitStationIdsForFacilityCodes,
-  resolveServicingExitStationIds,
+  resolveYardExitStationIdsForSection,
   type MaintenanceFirstTripOrigin,
 } from './maintenanceFirstTripOrigins';
 
@@ -15,13 +15,12 @@ import {
  * | 行前 inspection | preTrip 設施→停靠 | 對齊出場站起點路線* | 有，代號 P |
  * | 充電 charging | charging 設施→停靠 | 僅單一出場站時對齊* | 無 |
  * | 機動 standby | mobile 設施→停靠 | 僅單一出場站時對齊* | 無 |
- * | 保養 servicing | maintenance+carWash 設施→停靠 | **對齊出場站**（例 M 系→T3→TN）* | 有，代號 M |
+ * | 保養 servicing | maintenance 設施→停靠 | **對齊出場站**（例 M 系→T3→TN）* | 有，代號 M |
+ * | 洗車 washing | carWash 設施→停靠 | 同保養 | 有，代號 W |
  *
  * 整備任務固定五類：充電／洗車／保養／行前／機動，各自在場域設定 step 2
- * 有對應設施分類。其中<strong>洗車沒有自己的 `TaskTypeKey`</strong>——
- * 時間模板的 `servicing` 是「洗車／保養／閒置」合併的休息窗口，
- * 模板只定窗口長度，實際做哪一項由車輛回報數據在窗口內決定。
- * 因此 servicing 的出場站集合必須同時涵蓋 M 系與 W1 的停靠站。
+ * 有對應設施分類，<strong>一對一，不做聯集</strong>。
+ * 洗車有自己的 `TaskTypeKey`（`washing`）：模板上排洗車就是洗車、排保養就是保養。
  *
  * 調度營運班次一律在整備<strong>結束之後</strong>才發車（不得佔用整備尾巴），
  * 且不受同方向班距約束；只受站位淨空限制。詳見文件 §10。
@@ -39,6 +38,7 @@ const YARD_TASK_TYPES = new Set([
   'servicing',
   'inspection',
   'standby',
+  'washing',
 ]);
 
 export function isYardTemplateTaskType(taskType: string): boolean {
@@ -258,21 +258,41 @@ export function resolveYardPostTaskPolicy(args: {
     };
   }
 
+  if (taskType === 'washing') {
+    // 洗車與保養同型：設施離首發站遠，靠外掛的調度營運班次把車送過去；輪仍從首發站起算
+    const entryStations = resolveYardExitStationIdsForSection(
+      origins,
+      maintenanceBody,
+      'carWash',
+    );
+    return {
+      rotationExitStationId:
+        resolvePreferredExitStationId(
+          origins,
+          extractFacilityMapCodes(maintenanceBody, 'carWash'),
+        )
+        ?? (entryStations[0] ?? null),
+      alignRotationToExitStation: false,
+      allowEntryService: true,
+      entryServiceExitStationIds: entryStations,
+    };
+  }
+
   if (taskType === 'servicing') {
     // 保養設施（例 M1–M4）→ 拓樸出場站（例 T3上行）；開輪必須對齊該站起點路線（TN），
     // 不可因「進場載客另有管道」就強制 phase 0（NT／N2W）——車還在場內。
-    const entryStations = resolveServicingExitStationIds(origins, maintenanceBody);
+    const entryStations = resolveYardExitStationIdsForSection(
+      origins,
+      maintenanceBody,
+      'maintenance',
+    );
     return {
       rotationExitStationId:
-        // maintenance 與 carWash 都要納入：servicing 是「洗車／保養／閒置」
-        // 合併的休息窗口，排班當下不知道會做哪一項，
-        // 兩組設施的停靠站都是合法出場站。理由見 resolveServicingExitStationIds。
+        // 只看 maintenance（M 系）。洗車已是獨立的 washing 類型，
+        // 兩者一對一，不再聯集。
         resolvePreferredExitStationId(
           origins,
-          [
-            ...extractFacilityMapCodes(maintenanceBody, 'maintenance'),
-            ...extractFacilityMapCodes(maintenanceBody, 'carWash'),
-          ],
+          extractFacilityMapCodes(maintenanceBody, 'maintenance'),
         )
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
@@ -311,7 +331,13 @@ export function buildYardExitStationOptionsByTaskType(args: {
   maintenanceBody: Record<string, unknown> | null | undefined;
 }): Partial<Record<TaskTypeKey, string[]>> {
   const map: Partial<Record<TaskTypeKey, string[]>> = {};
-  for (const taskType of ['inspection', 'charging', 'standby', 'servicing'] as const) {
+  for (const taskType of [
+    'inspection',
+    'charging',
+    'standby',
+    'servicing',
+    'washing',
+  ] as const) {
     const policy = resolveYardPostTaskPolicy({
       taskType,
       origins: args.origins,
@@ -336,6 +362,7 @@ export function buildYardRotationExitByTaskType(args: {
     'charging',
     'standby',
     'servicing',
+    'washing',
   ] as const) {
     const policy = resolveYardPostTaskPolicy({
       taskType,

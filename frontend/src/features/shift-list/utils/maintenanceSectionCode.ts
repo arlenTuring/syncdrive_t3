@@ -116,7 +116,7 @@ export function buildMaintenanceSectionCodeFingerprint(
 
 /**
  * 依時間模板 taskType 取整備區塊代號。
- * servicing（保養／洗車視窗）優先保養，其次洗車。
+ * 洗車有自己的 taskType（washing），不再與保養共用一個視窗。
  */
 export function resolveMaintenanceSectionCodeForTaskType(
   taskType: ScheduleEngineTaskType,
@@ -127,11 +127,13 @@ export function resolveMaintenanceSectionCodeForTaskType(
   if (taskType === 'charging') return n.charging || null;
   if (taskType === 'inspection') return n.preTrip || null;
   if (taskType === 'standby') return n.mobile || null;
-  if (taskType === 'servicing') {
-    return n.maintenance || n.carWash || null;
-  }
+  if (taskType === 'servicing') return n.maintenance || null;
+  if (taskType === 'washing') return n.carWash || null;
   return null;
 }
+
+/** 出場移動卡代號後綴（Exit）：整備代號 + EX，例 MEX／PEX／EEX／WEX */
+export const YARD_EXIT_MOVE_CODE_SUFFIX = 'EX';
 
 /**
  * 時間線列碼：第 1 列車 → A、第 2 → B、第 3 → C…
@@ -190,12 +192,24 @@ export function resolveGeneratedBlockTripCode(
     routeCode?: string;
     routeId?: string;
     entryServiceSectionCode?: string;
+    yardExitSectionCode?: string;
     timelineRow: number;
     plannedStartMinute: number;
   },
   index = 0,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
+  if (block.source === 'yard_exit_move') {
+    // 出場移動卡：整備代號 + EX（Exit），例 MEX／PEX／EEX／WEX。
+    // 帶列碼，跟整備卡一致——它屬於某一台車的場內動作，不是路線班次。
+    const base = block.yardExitSectionCode?.trim();
+    return buildScheduleBlockTripCode({
+      prefixCode: base ? `${base}${YARD_EXIT_MOVE_CODE_SUFFIX}` : null,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+    });
+  }
+
   if (block.source === 'entry_service') {
     return buildScheduleBlockTripCode({
       prefixCode: `${block.entryServiceSectionCode ?? ''}${block.routeCode ?? ''}`,

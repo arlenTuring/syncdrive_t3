@@ -1178,6 +1178,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
       <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行前／機動→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_MOVE_UNRESOLVED</code></td><td>warn</td><td>出場移動卡（整備代號+EX）排不出來：整備任務沒設定該區段設施／設施在拓樸上沒有連到那一站／該設施當時被別列車佔著（見 §10.4）</td><td><code>insertYardExitMoveCards.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1905,6 +1906,70 @@ backend/src/dev-log/
       <strong>一個列舉型別缺了某個值，要先問「是不是被合併進別的值」，
       不能直接推論「這個概念不存在」。</strong>
       枚舉是實作選擇，領域概念才是事實來源。
+    </li>
+  </ul>
+
+  <h3>2026-08-08 · 新增出場移動卡（整備代號+EX）與獨立的洗車任務類型</h3>
+  <ul>
+    <li>
+      <strong>缺的東西：</strong>整備做完之後，車還停在整備設施裡（例 M2 那一格），
+      並不在正線的轉乘站上。舊版沒有模型化這一段移動——車等於<strong>從設施瞬移到站上</strong>。
+      先前 <code>resolveYardDispatchLeadSeconds()</code> 只是偷偷預留了這段時間，沒有實體卡片。
+    </li>
+    <li>
+      <strong>出場移動卡的三條規則：</strong>
+      <ol>
+        <li><strong>往前貼、零秒緩衝。</strong>結束時刻貼齊後面那一段的發車時刻，由此往前推開始時刻。
+        不是整備一做完就開出去——那樣會白白佔著轉乘站的站格；是要走之前才就位。</li>
+        <li><strong>後面那一段時間不動。</strong>調度營運班次（外掛）或正線一律維持原時刻，只在它前面塞卡。</li>
+        <li><strong>空間不夠才吃整備尾巴。</strong>整備結束到發車之間塞不下這段空駛時
+        （極端是整備做完零秒就要發車），把整備區塊的結束時刻往前縮。
+        <strong>全系統只有這張卡有這個特權</strong>，且前提就是空間真的不夠。</li>
+      </ol>
+    </li>
+    <li>
+      <strong>時長不用另外算：</strong>路網拓樸的「設施 → 停靠」邊已經有行駛時間，
+      <code>MaintenanceFirstTripOrigin.deadheadSeconds</code> 早就在讀它。
+      這次把它拆成逐台設施的 <code>facilities: MaintenanceFacilityExit[]</code>——
+      卡片要標到<strong>具體哪一台</strong>（M1／M2…），聚合值是最壞值，不能用。
+      同一台設施同一時刻不給兩列車用（M1–M4 就是 4 個名額）。
+    </li>
+    <li>
+      <strong>班次代號：</strong>整備代號 + <code>EX</code>（Exit）——
+      行前 <code>PEX</code>、保養 <code>MEX</code>、充電 <code>EEX</code>、洗車 <code>WEX</code>、機動 <code>HEX</code>。
+      帶列碼，跟整備卡一致：它是某一台車的場內動作，不是路線班次。
+    </li>
+    <li>
+      <strong>洗車升格為獨立任務類型。</strong><code>TaskTypeKey</code> 加回
+      <code>washing</code>，時間模板編輯器出現「洗車」選項。
+      整備任務五類（充電／洗車／保養／行前／機動）與設施區段
+      <strong>一對一，不再聯集</strong>——<code>servicing</code> 只吃 M 系、
+      <code>washing</code> 只吃 W 系。舊資料的 <code>wash</code> 直譯成
+      <code>washing</code>（併進保養會讓車被算成從 M 系出場，實際上它在 W 系）。
+      這也一併解掉了先前記錄的「卡片標 M、幾何卻綁在 W1」不一致。
+    </li>
+    <li>
+      <strong>插入時機：</strong>放在<strong>所有幾何後處理之後</strong>。
+      它往前貼齊後面那一段的發車時刻，那個時刻必須已經定案；
+      先插會被之後的班距修復推走而失去貼齊。
+    </li>
+    <li>
+      <strong>實測（真實資料）：</strong><code>errors 0</code>，出場移動卡 22 張
+      （M1×8、M2×8、M3×3、M4×3），吃整備尾巴 0 張，
+      <code>YARD_EXIT_MOVE_UNRESOLVED</code> 4 則——全是
+      「同時段保養的車超過 4 台，M1–M4 不夠分」，屬真實設施容量限制。
+    </li>
+    <li>
+      <strong>入場方向（正線跑完開進設施）本輪不做。</strong>
+      已知會牽出「充電與保養設施不同位置，車要怎麼從充電走到保養」的問題，
+      等那個決定之後再處理。
+    </li>
+    <li>
+      <strong>查到的坑：</strong><code>firstTripOriginStationId</code> 這個欄位名很誤導——
+      它在調度營運班次上存的是<strong>要把車送到的首班起點站（終點側）</strong>，
+      不是這一段自己的起點。拿它當起點會查到完全另一站，
+      症狀是「M 系設施都沒有連到 station_2」這種看起來像拓樸缺資料的假錯誤。
+      起點一律用路線的 <code>stationIds[0]</code>。
     </li>
   </ul>
 
