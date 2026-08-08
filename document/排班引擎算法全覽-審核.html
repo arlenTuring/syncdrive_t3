@@ -2008,11 +2008,17 @@ backend/src/dev-log/
       等那個決定之後再處理。
     </li>
     <li>
-      <strong>畫法：</strong>這種卡常常只有 30 秒，在日尺度上是幾個 px。
-      照一般班次卡畫會變成「<code>D... 出... 02:45:5</code>」這種讀不了的碎字，
-      所以它走另一套：<strong>高彩度實心細條（琥珀色）＋ 一個 ⇥ 記號</strong>，
-      最小寬度 12px，卡內完全不放文字，內容全部交給 hover
-      （代號、設施→轉乘站、時刻與秒數、有沒有吃到整備尾巴）。
+      <strong>畫法：</strong>走與其他班次卡<strong>同一套版型</strong>——
+      左色條 ＋ 代號（<code>MEXA0245</code>）＋ 說明（<code>⇥ M1 &gt; T3上行</code>）＋ 時刻，
+      最小寬度 12px（30 秒在日尺度上幾乎是 0 px）。
+      <strong>配色跟著它來源的整備任務走</strong>（保養紫、充電綠、洗車青…）——
+      出場移動是那一段整備的延伸，同色系才看得出車是從哪一種整備出來的，
+      也才跟整個色票融合。hover 再補完整資訊
+      （設施 → 轉乘站、時刻與秒數、有沒有吃到整備尾巴）。
+      走過兩版彎路：先是照一般卡硬塞三行文字擠成
+      「<code>D... 出... 02:45:5</code>」；再來矯枉過正做成一塊沒有任何文字的
+      琥珀色方塊——<strong>卡片一定要能自己說明自己是什麼</strong>，
+      只靠 hover 不夠。
       另外 <code>ShiftSchedulePlanGrid.tsx</code> 裡的 <code>resolveBlockCode()</code>
       是與 <code>maintenanceSectionCode.ts</code> 平行的第二份實作，
       漏了 <code>yard_exit_move</code> 分支就會掉進 <code>dispatch</code> 變成 <code>D</code>——

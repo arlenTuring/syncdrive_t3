@@ -693,20 +693,6 @@ export const ENTRY_SERVICE_COLOR_SET: TaskTypeColorSet = {
   text: '#99F6E4',
 };
 
-/**
- * 出場移動卡（整備設施 → 轉乘站）專用色卡。
- *
- * 這是一張<strong>附屬</strong>的小卡，不是與正線／調度同級的班次卡：
- * 用低彩度的暗琥珀，只要能跟旁邊區分開就夠，不要搶視覺。
- * 內容全部交給 hover。
- */
-export const YARD_EXIT_MOVE_COLOR_SET: TaskTypeColorSet = {
-  bar: '#B45309',
-  base: '#2B2007',
-  bg: '#3D2E0C',
-  text: '#D9A441',
-};
-
 export function migrateScheduleTasks(tasks: ScheduleTask[]): ScheduleTask[] {
   return tasks.map((task) => {
     const taskType = migrateLegacyScheduleTaskType(task.taskType) ?? 'servicing';

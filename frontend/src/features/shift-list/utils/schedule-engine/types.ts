@@ -69,6 +69,12 @@ export type GeneratedScheduleBlock = {
   yardExitStationLabel?: string;
   /** 出場移動：來源整備區段代號（班次代號 = 該代號 + EX，例 MEX／PEX／EEX／WEX） */
   yardExitSectionCode?: string;
+  /**
+   * 出場移動：來源整備任務類型（servicing／washing／charging／inspection／standby）。
+   * 卡片配色跟著它走——出場移動是那一段整備的延伸，
+   * 用同色系才看得出「這台車是從哪一種整備出來的」。
+   */
+  yardExitTaskType?: ScheduleEngineTaskType;
   /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */
   yardExitAteYardTail?: boolean;
   /**
