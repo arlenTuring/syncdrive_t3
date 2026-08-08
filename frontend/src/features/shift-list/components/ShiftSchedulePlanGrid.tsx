@@ -12,7 +12,7 @@ import {
   SCHEDULE_SLOT_WIDTH_DEFAULT,
   SCHEDULE_TIME_AXIS_TEXT_CLASS,
   SCHEDULE_ENGINE_TASK_TYPE_COLORS,
-  ENTRY_SERVICE_COLOR_SET,
+  YARD_EXIT_MOVE_COLOR_SET,
   blendHexOnBase,
   formatSelectedIntervalHoverContent,
   getInactiveRangesWithinBar,
@@ -858,17 +858,14 @@ function ShiftScheduleBlockBar({
   onDeleteBlock?: (blockId: string) => void;
   onDuplicateBlock?: (blockId: string) => void;
 }) {
-  // 出場移動卡走與其他卡<strong>同一套</strong>版型（左色條＋代號＋說明＋時刻），
-  // 只是內容改成「設施 → 轉乘站」。配色跟著它來源的整備任務走——
-  // 它是那一段整備的延伸，同色系才看得出車是從哪一種整備出來的。
+  // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
+  // 單一顏色、卡內不放內容，說明全部交給 hover。
   const isYardExitMove = block.source === 'yard_exit_move';
-  const colors =
-    block.source === 'entry_service'
-      ? ENTRY_SERVICE_COLOR_SET
-      : isYardExitMove
-        ? SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.yardExitTaskType ?? 'servicing']
-          ?? SCHEDULE_ENGINE_TASK_TYPE_COLORS.servicing
-        : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
+  // 調度營運班次（entry_service）就是載客正線，沿用正線色卡，
+  // 不再另立一種顏色——它跟正線是同一件事，只是不算輪、不受班距約束。
+  const colors = isYardExitMove
+    ? YARD_EXIT_MOVE_COLOR_SET
+    : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
   const daySegments = useMemo(
     () =>
@@ -1237,7 +1234,7 @@ function ShiftScheduleBlockBar({
           />
         );
       })}
-      {showChrome ? (
+      {showChrome && !isYardExitMove ? (
       <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
@@ -1265,16 +1262,6 @@ function ShiftScheduleBlockBar({
           ) : null}
           <span className="truncate">{code}</span>
         </div>
-        {isYardExitMove ? (
-          <div className="flex min-w-0 items-center gap-0.5 truncate text-[11px] font-medium leading-tight text-zinc-200/90">
-            <span className="shrink-0" aria-hidden>⇥</span>
-            <span className="truncate">
-              {block.yardExitFacilityLabel ?? '整備設施'}
-              {' > '}
-              {block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}
-            </span>
-          </div>
-        ) : null}
         {block.routeName ? (
           <div className="flex min-w-0 items-center gap-0.5 truncate text-[11px] leading-tight text-zinc-200/90 font-medium">
             <span className="truncate">{block.routeName}</span>

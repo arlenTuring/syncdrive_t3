@@ -2008,21 +2008,25 @@ backend/src/dev-log/
       等那個決定之後再處理。
     </li>
     <li>
-      <strong>畫法：</strong>走與其他班次卡<strong>同一套版型</strong>——
-      左色條 ＋ 代號（<code>MEXA0245</code>）＋ 說明（<code>⇥ M1 &gt; T3上行</code>）＋ 時刻，
-      最小寬度 12px（30 秒在日尺度上幾乎是 0 px）。
-      <strong>配色跟著它來源的整備任務走</strong>（保養紫、充電綠、洗車青…）——
-      出場移動是那一段整備的延伸，同色系才看得出車是從哪一種整備出來的，
-      也才跟整個色票融合。hover 再補完整資訊
-      （設施 → 轉乘站、時刻與秒數、有沒有吃到整備尾巴）。
-      走過兩版彎路：先是照一般卡硬塞三行文字擠成
-      「<code>D... 出... 02:45:5</code>」；再來矯枉過正做成一塊沒有任何文字的
-      琥珀色方塊——<strong>卡片一定要能自己說明自己是什麼</strong>，
-      只靠 hover 不夠。
+      <strong>畫法：</strong>這張卡常常只有 30 秒，寬度只有幾個 px，塞不下任何文字，
+      所以刻意<strong>只用單一顏色</strong>、卡內不放內容，說明全部交給 hover
+      （代號、設施 → 轉乘站、時刻與秒數、有沒有吃到整備尾巴），最小寬度 12px。
+      顏色用中性石板灰：它不是載客班次，不該套任何一種營運色。
+      走過三版彎路——照一般卡硬塞三行文字擠成
+      「<code>D... 出... 02:45:5</code>」→ 矯枉過正做成無字琥珀方塊 →
+      改成完整版型但字仍然塞不下。<strong>寬度先天不夠時，
+      要接受「卡內不表達、hover 才表達」，不要硬塞。</strong>
       另外 <code>ShiftSchedulePlanGrid.tsx</code> 裡的 <code>resolveBlockCode()</code>
       是與 <code>maintenanceSectionCode.ts</code> 平行的第二份實作，
       漏了 <code>yard_exit_move</code> 分支就會掉進 <code>dispatch</code> 變成 <code>D</code>——
       新增 source 時兩份都要補。
+    </li>
+    <li>
+      <strong>調度營運班次（entry_service）改回正線色。</strong>
+      它本來有一張自己的青綠色卡（<code>ENTRY_SERVICE_COLOR_SET</code>），
+      但它<strong>就是載客正線</strong>，只是不算輪、不受班距約束——
+      那是排班規則上的差別，不是視覺上該分家的理由。已改為沿用正線色卡，
+      該色卡刪除。
     </li>
     <li>
       <strong>查到的坑：</strong><code>firstTripOriginStationId</code> 這個欄位名很誤導——

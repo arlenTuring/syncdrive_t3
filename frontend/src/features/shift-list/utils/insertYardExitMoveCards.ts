@@ -283,7 +283,6 @@ export function insertYardExitMoveCards(args: {
       yardExitFacilityLabel: chosen.label,
       yardExitStationId: origin.stationId,
       yardExitStationLabel: origin.label,
-      yardExitTaskType: yard.taskType,
       yardExitSectionCode:
         resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes)
         ?? undefined,

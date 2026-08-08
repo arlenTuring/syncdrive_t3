@@ -683,16 +683,19 @@ export function resolveScheduleEngineTaskTypeColors(
 }
 
 /**
- * 進場載客（保養尾端長出、載客開往首班起點站）專用色卡。
- * 與正線藍、保養紫、調度天藍區隔（青綠）；為 source 級用色，不歸任務類型。
+ * 出場移動卡（整備設施 → 轉乘站）專用色卡。
+ *
+ * 這張卡常常只有 30 秒，寬度只有幾個 px，塞不下任何文字，
+ * 所以刻意<strong>只用單一顏色</strong>、卡內不放內容，說明全部交給 hover。
+ * 用中性石板灰：它不是載客班次，不該套任何一種營運色；
+ * 灰階與格線同調，不會在密集的班表上搶視覺。
  */
-export const ENTRY_SERVICE_COLOR_SET: TaskTypeColorSet = {
-  bar: '#2DD4BF',
-  base: '#0F3D3A',
-  bg: taskTypeBarBackground('#0F3D3A', [45, 212, 191]),
-  text: '#99F6E4',
+export const YARD_EXIT_MOVE_COLOR_SET: TaskTypeColorSet = {
+  bar: '#94A3B8',
+  base: '#2A3341',
+  bg: '#475569',
+  text: '#E2E8F0',
 };
-
 export function migrateScheduleTasks(tasks: ScheduleTask[]): ScheduleTask[] {
   return tasks.map((task) => {
     const taskType = migrateLegacyScheduleTaskType(task.taskType) ?? 'servicing';
