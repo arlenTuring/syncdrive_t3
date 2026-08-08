@@ -101,6 +101,8 @@ export type EngineInput = {
   collisionProtectionSeconds: number;
   /** 整備類型 → 出場站 stationId；驗證「整備後第一段班次接不接得上」要用 */
   yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string>>;
+  /** 各整備類型的實際出場站（含保養／行前）；驗證「車在不在那一站」用 */
+  yardExitStationByTaskType: Partial<Record<TaskTypeKey, string>>;
   turnaroundLimitSeconds: number | null;
   passengerTimetableMode: PassengerTimetableMode;
   timetableGenerationAlgorithm?: string;
@@ -1787,9 +1789,17 @@ export function normalizeEngineInput(
   );
   const emptyRanges = listEmptyAttributeMinuteRanges(template.intervals);
   const firstTripOrigins = args.firstTripOrigins ?? [];
+  // 相位對齊只認「車真的停在那裡、沒有外掛班次可送」的類型（充電／機動）
   const yardRotationExitByTaskType = buildYardRotationExitByTaskType({
     origins: firstTripOrigins,
     maintenanceBody,
+    purpose: 'align',
+  });
+  // 驗證則要看全部類型的實際出場站
+  const yardExitStationByTaskType = buildYardRotationExitByTaskType({
+    origins: firstTripOrigins,
+    maintenanceBody,
+    purpose: 'validate',
   });
 
   const templateTasks = template.tasks.filter(
@@ -1920,6 +1930,7 @@ export function normalizeEngineInput(
     minimumRecoveryTimeSeconds: minimumRecovery,
     collisionProtectionSeconds: collisionProtection,
     yardRotationExitByTaskType,
+    yardExitStationByTaskType,
     turnaroundLimitSeconds:
       args.turnaroundLimitSeconds == null || !Number.isFinite(args.turnaroundLimitSeconds)
         ? null

@@ -1686,6 +1686,54 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 觀念錯誤：外掛的調度營運班次被當成「輪的起點」</h3>
+  <div class="callout">
+    <strong>使用者原話：</strong>「掛整備開頭的調度營運班次他是一種<strong>外掛</strong>，
+    目的只是要趕快到首發站 N2W 進行任務……我一直都認為<strong>還是從 N2W 開始起算</strong>，
+    我從來沒有說因為這樣改變輪的結構。」
+  </div>
+  <ul>
+    <li>
+      <strong>做錯的地方：</strong>引擎把「整備後第一班」當成輪替的起點，
+      用出場站去對齊相位。行前／保養的出場站是 T3上行，於是整輪被鎖成
+      <code>TN→NT→TS→ST</code>、收尾停在 T3上行。<strong>所有經過整備的車相位全被鎖在同一格</strong>，
+      每輪之間都停在同一站，六列車就全部擠在 T3上行 排隊（40/40 碰撞集中在那裡）。
+    </li>
+    <li>
+      <strong>正確的觀念：</strong>整備後的調度營運班次是<strong>外掛</strong>——
+      它不算輪、不受班距約束，唯一任務是把車從出場站送到<strong>首發站</strong>。
+      輪仍然從首發站（關聯圖的起點，例 N2W）起算，<strong>結構不變</strong>。
+    </li>
+    <li>
+      <strong>改法：</strong><code>YardPostTaskPolicy</code> 新增
+      <code>alignRotationToExitStation</code>，把「車停在哪」與「輪從哪起算」分成兩件事：
+      <ul>
+        <li><strong>保養／行前 = false</strong>：有外掛可送，輪從首發站起算。</li>
+        <li><strong>充電／機動 = true</strong>：沒有外掛，車真的就停在出場站，第一段只能從那裡發。</li>
+      </ul>
+      <code>buildYardRotationExitByTaskType</code> 加上 <code>purpose</code>：
+      <code>'align'</code>（相位對齊，只含 true 的類型）與 <code>'validate'</code>
+      （驗證車在不在該站，含全部）。
+    </li>
+    <li>
+      <strong>效果（實測）：</strong>行前出場後產出變成
+      <code>entry_service r-tn @55</code>（外掛送車）→
+      <code>template_bar r-nt @60</code>（輪從首發站起算）→ r-tn → r-nt …
+      正是使用者描述的模型。
+    </li>
+    <li>
+      <strong>兩則測試把錯誤觀念寫死了，已改寫並更名：</strong>
+      原本的「after 行前 at T, starts cycle from T-origin route」斷言整備後第一班是 TN
+      ——那正是要改掉的行為。改成斷言「外掛存在且在輪的第一段之前，輪的第一段是 r-nt」。
+      <strong>這是產品規則改變，不是為了讓測試過而放寬。</strong>
+    </li>
+    <li>
+      <strong>教訓：</strong>「車停在哪」跟「輪從哪起算」是兩件事，被我合成同一個欄位
+      （<code>rotationExitStationId</code>）就分不開了。一個欄位同時承載兩種語意，
+      早晚會有一邊被錯用。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

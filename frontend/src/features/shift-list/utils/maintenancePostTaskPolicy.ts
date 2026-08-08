@@ -156,8 +156,27 @@ export function shouldApplyYardExitRotationAlign(args: {
 }
 
 export type YardPostTaskPolicy = {
-  /** 結束後輪替相位應對齊的出場站（null＝維持執行順序第 0 條） */
+  /**
+   * 這一種整備做完之後，車實際停在哪一站（出場站）。
+   * 只表達「車在哪」，<strong>不代表輪要從這裡起算</strong>——見
+   * {@link alignRotationToExitStation}。
+   */
   rotationExitStationId: string | null;
+  /**
+   * 輪替相位要不要對齊到出場站。
+   *
+   * <strong>false（保養／行前）</strong>：出場站離首發站有一段距離，車會先跑一趟
+   * <strong>外掛的調度營運班次</strong>把自己送到首發站，那一趟不算輪、也不受班距約束。
+   * 輪仍然<strong>從首發站（關聯圖的起點，例 N2W）起算</strong>，結構不變。
+   *
+   * <strong>true（充電／機動）</strong>：設施就在首發站附近、沒有外掛班次，
+   * 車真的就停在出場站，第一段只能從那裡發車。
+   *
+   * 2026-08-08 更正：舊版兩種都對齊，等於讓「外掛班次」改寫了輪的起點——
+   * 行前出場站是 T3上行，整輪就被鎖成 TN→NT→TS→ST、收尾停在 T3上行，
+   * 於是所有經過整備的車全部堆在 T3上行 排隊。外掛不該改變輪的結構。
+   */
+  alignRotationToExitStation: boolean;
   /** 是否允許在此任務尾端插入進場載客 */
   allowEntryService: boolean;
   /** 進場載客可用的出場站集合（allowEntryService 時有意義） */
@@ -166,6 +185,7 @@ export type YardPostTaskPolicy = {
 
 const EMPTY_POLICY: YardPostTaskPolicy = {
   rotationExitStationId: null,
+  alignRotationToExitStation: false,
   allowEntryService: false,
   entryServiceExitStationIds: [],
 };
@@ -199,6 +219,8 @@ export function resolveYardPostTaskPolicy(args: {
         resolvePreferredExitStationId(origins, preTripCodes)
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
+      // 行前設施離首發站遠，靠外掛的調度營運班次把車送過去；輪仍從首發站起算
+      alignRotationToExitStation: false,
       allowEntryService: true,
       entryServiceExitStationIds: entryStations,
     };
@@ -210,6 +232,8 @@ export function resolveYardPostTaskPolicy(args: {
         origins,
         extractFacilityMapCodes(maintenanceBody, 'charging'),
       ),
+      // 充電沒有外掛班次，車真的就停在出場站，第一段只能從那裡發車
+      alignRotationToExitStation: true,
       allowEntryService: false,
       entryServiceExitStationIds: [],
     };
@@ -221,6 +245,8 @@ export function resolveYardPostTaskPolicy(args: {
         origins,
         extractFacilityMapCodes(maintenanceBody, 'mobile'),
       ),
+      // 機動同充電：沒有外掛班次，車就在出場站
+      alignRotationToExitStation: true,
       allowEntryService: false,
       entryServiceExitStationIds: [],
     };
@@ -241,6 +267,8 @@ export function resolveYardPostTaskPolicy(args: {
         )
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
+      // 保養同行前：靠外掛班次送到首發站，輪不改結構
+      alignRotationToExitStation: false,
       allowEntryService: true,
       entryServiceExitStationIds: entryStations,
     };
@@ -250,13 +278,23 @@ export function resolveYardPostTaskPolicy(args: {
 }
 
 /**
- * 建立「任務類型 → 輪替出場站」對照，供掛車／指派／週期補完共用。
- * 僅含有明確出場站的類型。
+ * 建立「任務類型 → 出場站」對照。
+ *
+ * <code>purpose</code> 決定要不要把「靠外掛班次送到首發站」的類型包含進來：
+ *
+ * - <strong>'align'</strong>（掛車／路線指派用）：只含
+ *   {@link YardPostTaskPolicy.alignRotationToExitStation} 為 true 的類型
+ *   （充電／機動）。保養／行前不含——它們的車會由外掛的調度營運班次送到首發站，
+ *   <strong>輪仍從首發站起算，不可被出場站改寫相位</strong>。
+ * - <strong>'validate'</strong>（驗證車在不在該站用）：含全部有出場站的類型。
+ *   驗證要問的是「車實際停在哪」，跟輪的相位無關。
  */
 export function buildYardRotationExitByTaskType(args: {
   origins: MaintenanceFirstTripOrigin[];
   maintenanceBody: Record<string, unknown> | null | undefined;
+  purpose?: 'align' | 'validate';
 }): Partial<Record<TaskTypeKey, string>> {
+  const purpose = args.purpose ?? 'align';
   const map: Partial<Record<TaskTypeKey, string>> = {};
   for (const taskType of [
     'inspection',
@@ -269,9 +307,9 @@ export function buildYardRotationExitByTaskType(args: {
       origins: args.origins,
       maintenanceBody: args.maintenanceBody,
     });
-    if (policy.rotationExitStationId) {
-      map[taskType] = policy.rotationExitStationId;
-    }
+    if (!policy.rotationExitStationId) continue;
+    if (purpose === 'align' && !policy.alignRotationToExitStation) continue;
+    map[taskType] = policy.rotationExitStationId;
   }
   return map;
 }

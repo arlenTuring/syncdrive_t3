@@ -289,7 +289,8 @@ export function generateShiftSchedule(
   validateYardExitContinuity({
     timelines,
     selectedRoutes: routesForBerth,
-    yardRotationExitByTaskType: engineInput.yardRotationExitByTaskType,
+    // 驗證問的是「車實際停在哪」，跟輪的相位無關，所以用 validate 版（含保養／行前）
+    yardRotationExitByTaskType: engineInput.yardExitStationByTaskType,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     errors,
   });

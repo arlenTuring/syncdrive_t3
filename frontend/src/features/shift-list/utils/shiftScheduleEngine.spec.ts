@@ -2311,7 +2311,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
     }
   });
 
-  it('after 行前 at T, starts cycle from T-origin route (not locked to NT pulse index 0)', () => {
+  it('行前出場後由外掛班次送到首發站，輪仍從首發站起算（不因整備改變輪的結構）', () => {
     const down = {
       ...passengerRoute('r-nt', 'NT', 260, 200, 1, 40),
       stationIds: ['p1', 't3'],
@@ -2422,13 +2422,31 @@ describe('cycle pulse vehicle assignment regressions', () => {
       .blocks
       .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar')
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0];
+    // 2026-08-08 觀念更正：整備後的調度營運班次是「外掛」——它只負責把車從
+    // 出場站（t3）送到首發站（p1），不算輪、也不受班距約束。
+    // 輪仍然從首發站起算（r-nt），<strong>不會因為整備在別站就把輪的起點改掉</strong>。
+    // 舊版把整備後第一班當成輪的起點，導致所有經過整備的車相位被鎖死、
+    // 每輪收尾都停在同一站，全部擠在那裡排隊（見 §17）。
+    const row1Passengers = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks
+      .filter((block) => block.taskType === 'passenger')
+      .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+
+    const dispatch = row1Passengers.find((block) => block.source === 'entry_service');
+    assert.ok(dispatch, '行前出場應插入外掛的調度營運班次');
+    assert.equal(dispatch!.routeId, 'r-tn', '外掛走 t3→p1 把車送到首發站');
+
     assert.ok(firstPassenger, 'row 1 should get passenger after 行前');
     assert.equal(
       firstPassenger!.routeId,
-      'r-tn',
-      '行前出場 T 應對齊 TN（t3 起點），而非被脈衝鎖死在 NT',
+      'r-nt',
+      '輪從首發站 p1 起算（r-nt），不被整備出場站改寫',
     );
-    assert.ok(firstPassenger!.plannedStartMinute >= 60);
+    assert.ok(
+      dispatch!.plannedStartMinute < firstPassenger!.plannedStartMinute,
+      '外掛必須在輪的第一段之前，才能把車送到首發站',
+    );
   });
 
   it('after 行前 with only 機動 (no 正線), does not hang passenger toward exit', () => {
@@ -2674,11 +2692,22 @@ describe('cycle pulse vehicle assignment regressions', () => {
       .filter((block) => block.taskType === 'passenger' && block.source === 'template_bar')
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
     assert.ok(row1Passengers.length >= 1, 'yard-exit row should receive passenger trips');
-    assert.equal(row1Passengers[0]!.routeId, 'r-tn');
+    // 同上：外掛送到首發站，輪從首發站（r-nt）起算
+    assert.equal(row1Passengers[0]!.routeId, 'r-nt');
+    // 外掛班次要先把車從 t3 送到 p1，所以輪的第一段會落在外掛之後的那個脈衝，
+    // 比舊版（直接從 t3 起輪）晚一格——這是正確的，車本來就還沒到首發站。
+    const row1Dispatch = result.plan!.timelines
+      .find((timeline) => timeline.row === 1)!
+      .blocks.find((block) => block.source === 'entry_service');
+    assert.ok(row1Dispatch, '行前出場應插入外掛的調度營運班次');
+    assert.ok(
+      row1Passengers[0]!.plannedStartMinute > row1Dispatch!.plannedStartMinute,
+      '輪的第一段必須在外掛之後',
+    );
     assert.ok(
       row1Passengers[0]!.plannedStartMinute >= 60
-      && row1Passengers[0]!.plannedStartMinute < 70,
-      `expected row1 TN near 01:00, got ${row1Passengers[0]!.plannedStartMinute}`,
+      && row1Passengers[0]!.plannedStartMinute <= 75,
+      `expected row1 first cycle leg soon after 01:00, got ${row1Passengers[0]!.plannedStartMinute}`,
     );
 
     const tnTrips = result.plan!.timelines

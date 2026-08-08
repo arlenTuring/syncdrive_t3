@@ -92,6 +92,7 @@ describe('resolveYardPostTaskPolicy servicing exit', () => {
       maintenanceBody: BODY,
     });
     assert.equal(policy.rotationExitStationId, 'station_4');
+    assert.equal(policy.alignRotationToExitStation, false, '保養靠外掛送車，輪不改起點');
     assert.equal(policy.allowEntryService, true);
     assert.deepEqual(policy.entryServiceExitStationIds, ['station_4']);
   });
@@ -128,8 +129,18 @@ describe('resolveYardPostTaskPolicy servicing exit', () => {
       origins: ORIGINS,
       maintenanceBody: BODY,
     });
-    assert.equal(map.servicing, 'station_4');
-    assert.equal(map.inspection, 'station_4');
+    // 2026-08-08：預設 purpose='align' 只含「車真的停在出場站、沒有外掛可送」的類型。
+    // 保養／行前有外掛班次會把車送到首發站，輪不從出場站起算，所以不列入相位對齊。
+    assert.equal(map.servicing, undefined);
+    assert.equal(map.inspection, undefined);
     assert.equal(map.charging, 'station_2');
+
+    const validateMap = buildYardRotationExitByTaskType({
+      origins: ORIGINS,
+      maintenanceBody: BODY,
+      purpose: 'validate',
+    });
+    assert.equal(validateMap.servicing, 'station_4', '驗證用要知道車實際停在哪');
+    assert.equal(validateMap.inspection, 'station_4');
   });
 });
