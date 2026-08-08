@@ -130,10 +130,34 @@ function BlockIssueHoverCard({
   ];
   if (rows.length === 0) return null;
 
+  // 一張卡可能有好幾則，往上開會頂出畫面外、內容被切掉（使用者回報看不到全部）。
+  // 上方空間不夠就改成往下開，左右也夾在畫面內，並依實際可用高度給捲動空間。
+  const CARD_WIDTH = 460;
+  const MARGIN = 12;
+  const viewportHeight = typeof window === 'undefined' ? 900 : window.innerHeight;
+  const viewportWidth = typeof window === 'undefined' ? 1600 : window.innerWidth;
+  const spaceAbove = pos.top - MARGIN;
+  const spaceBelow = viewportHeight - pos.top - MARGIN;
+  const openDownwards = spaceBelow > spaceAbove;
+  const availableHeight = Math.max(160, openDownwards ? spaceBelow : spaceAbove);
+  const halfWidth = CARD_WIDTH / 2;
+  const clampedLeft = Math.min(
+    Math.max(pos.left, halfWidth + MARGIN),
+    Math.max(halfWidth + MARGIN, viewportWidth - halfWidth - MARGIN),
+  );
+
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-[460px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
-      style={{ top: pos.top, left: pos.left }}
+      className={
+        'fixed z-[10050] w-[460px] -translate-x-1/2 overflow-y-auto rounded-lg'
+        + ' border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50'
+        + (openDownwards ? '' : ' -translate-y-full')
+      }
+      style={{
+        top: openDownwards ? pos.top + 16 : pos.top,
+        left: clampedLeft,
+        maxHeight: availableHeight,
+      }}
       role="tooltip"
     >
       <div className="flex items-baseline gap-1.5 text-[11px] leading-4">
@@ -147,7 +171,7 @@ function BlockIssueHoverCard({
           <span className="ml-1 text-zinc-500">（{rows.length} 則）</span>
         </span>
       </div>
-      <ul className="mt-1 max-h-[320px] space-y-1 overflow-hidden">
+      <ul className="mt-1 space-y-1">
         {rows.map(({ issue, severity }, index) => {
           const meta = resolveFeasibilityIssueMeta(issue);
           return (

@@ -1012,6 +1012,19 @@ export function validateYardExitContinuity(args: {
 }): void {
   const { timelines, selectedRoutes, yardRotationExitByTaskType, errors } = args;
 
+  // stationId 對使用者沒有意義（畫面上看到的是站名），訊息一律用站名
+  const stationNameById = new Map<string, string>();
+  for (const route of selectedRoutes) {
+    for (const dwell of route.stationDwells ?? []) {
+      const name = dwell.stationName?.trim();
+      if (name && !stationNameById.has(dwell.stationId)) {
+        stationNameById.set(dwell.stationId, name);
+      }
+    }
+  }
+  const stationLabel = (stationId: string): string =>
+    stationNameById.get(stationId) ?? stationId;
+
   const isYardBlock = (block: GeneratedScheduleBlock): boolean =>
     block.source === 'template_bar'
     && (block.taskType === 'charging'
@@ -1046,23 +1059,35 @@ export function validateYardExitContinuity(args: {
       const originStationId = route?.stationIds[0]?.trim() || null;
       if (!originStationId || originStationId === exitStationId) continue;
 
+      // 站名比 stationId 好認；來源決定是哪一條程式路徑排出來的，查錯時最關鍵
+      const sourceLabel =
+        next.source === 'entry_service'
+          ? '整備後的調度營運班次'
+          : next.source === 'relief_loop'
+            ? '站位讓渡班次'
+            : '一般正線（整備後第一班）';
       pushIssue(errors, {
         code: 'YARD_EXIT_STATION_MISMATCH',
         severity: 'error',
         kind: 'actionable',
         message:
-          `時間線 ${timeline.row}：「${yard.label}」做完後車停在出場站，`
+          `時間線 ${timeline.row}：「${yard.label}」做完後車停在`
+          + `「${stationLabel(exitStationId)}」，`
           + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null)}`
-          + ` 是從別的站發車，車不在那裡開不了`
-          + `（出場站 ${exitStationId}，這班的起點站 ${originStationId}）`,
+          + `（${sourceLabel}）是從「${stationLabel(originStationId)}」發車，`
+          + '車不在那裡開不了',
         detail: {
           timelineRow: timeline.row,
           yardBlockId: yard.id,
           yardTaskType: yard.taskType,
           blockId: next.id,
+          blockSource: next.source,
           exitStationId,
+          exitStationName: stationLabel(exitStationId),
           originStationId,
+          originStationName: stationLabel(originStationId),
           routeId: next.routeId,
+          routeCode: next.routeCode,
         },
       });
     }
