@@ -15,6 +15,7 @@ import {
   buildYardRotationExitByTaskType,
   isStandbyDispatchableForMainline,
   resolveContiguousYardBusyUntilMinute,
+  resolveYardPostTaskPolicy,
   shouldApplyYardExitRotationAlign,
 } from '../maintenancePostTaskPolicy';
 import { resolveRouteClearanceInsertGapSeconds } from '../stationClearanceInsert';
@@ -1687,6 +1688,47 @@ function findPrecedingNonPassengerTask(
   return best;
 }
 
+/**
+ * 整備結束到「輪的第一段可以發車」之間要留多久。
+ *
+ * 保養／行前的設施離首發站有一段距離，車做完之後要先跑一趟<strong>外掛的調度營運班次</strong>
+ * 才會到首發站。這段時間必須先預留，否則輪的第一段緊貼整備結束就發車，
+ * 外掛根本塞不進去——結果是車還在出場站、班次卻從首發站發車（YARD_EXIT_STATION_MISMATCH）。
+ *
+ * 回傳「最短的一條外掛路線占用 + 恢復時間」。充電／機動沒有外掛（車就在出場站附近），回 0。
+ */
+function resolveYardDispatchLeadSeconds(args: {
+  taskType: string;
+  origins: MaintenanceFirstTripOrigin[];
+  maintenanceBody: Record<string, unknown> | null;
+  passengerRoutes: ShiftScheduleSelectedRoute[];
+  minimumRecoveryTimeSeconds: number;
+}): number {
+  const policy = resolveYardPostTaskPolicy({
+    taskType: args.taskType,
+    origins: args.origins,
+    maintenanceBody: args.maintenanceBody,
+  });
+  if (!policy.allowEntryService) return 0;
+  const exits = new Set(policy.entryServiceExitStationIds);
+  if (exits.size === 0) return 0;
+  const cycleStartStationId = args.passengerRoutes[0]?.stationIds[0]?.trim();
+  if (!cycleStartStationId) return 0;
+
+  let shortest: number | null = null;
+  for (const route of args.passengerRoutes) {
+    const origin = route.stationIds[0]?.trim();
+    const terminal = route.stationIds[route.stationIds.length - 1]?.trim();
+    if (!origin || !terminal) continue;
+    if (!exits.has(origin) || terminal !== cycleStartStationId) continue;
+    const occupancy = resolvePassengerRouteOccupancy(route)?.occupancySeconds;
+    if (occupancy == null) continue;
+    if (shortest == null || occupancy < shortest) shortest = occupancy;
+  }
+  if (shortest == null) return 0;
+  return shortest + Math.max(0, args.minimumRecoveryTimeSeconds);
+}
+
 function buildHeadwayPassengerTasks(args: {
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
@@ -1870,11 +1912,27 @@ export function normalizeEngineInput(
         emptyRanges,
         emptyIntervalMainlineSlackSeconds,
       });
+      // 保養／行前之後要先跑外掛班次把車送到首發站，這段時間必須預留給它
+      const precedingYard = findPrecedingNonPassengerTask(
+        nonPassengerTasks,
+        pTask.rowIndex,
+        startSec,
+      );
+      const dispatchLeadSeconds = precedingYard
+        ? resolveYardDispatchLeadSeconds({
+            taskType: precedingYard.taskType,
+            origins: firstTripOrigins,
+            maintenanceBody,
+            passengerRoutes,
+            minimumRecoveryTimeSeconds: minimumRecovery,
+          })
+        : 0;
       const list = rowActiveWindows.get(pTask.rowIndex) ?? [];
       list.push({
         startSecond: startSec,
         // 讓渡餘裕只可占用接下整備開頭，不可提前裁前一整備尾端出車。
-        dispatchStartSecond: startSec,
+        // 另外預留外掛班次把車從出場站送到首發站的時間（沒有外掛時為 0）。
+        dispatchStartSecond: startSec + dispatchLeadSeconds,
         endSecond: endSec,
         nextMaintenanceStartSecond: spill.nextMaintenanceStartSecond,
         entrySlackSeconds: spill.entrySlackSeconds,

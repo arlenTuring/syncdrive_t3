@@ -1734,6 +1734,38 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-08 · 觀念修對了，但沒替外掛班次留時間</h3>
+  <ul>
+    <li>
+      <strong>成果先講：</strong>把「外掛不改寫輪的起點」修好之後，
+      <code>STATION_BERTH_PROTECTION_GAP</code> 從 <strong>308 則降到 1 則</strong>。
+      T3上行 的排隊結構整個消失。
+    </li>
+    <li>
+      <strong>但冒出 26 則 <code>YARD_EXIT_STATION_MISMATCH</code>：</strong>
+      行前／保養做完車停在 T3上行，接著排的卻是從 N2W下行出發 發車的 NT。
+      同時有 6 則「略過進場載客——尾巴時間不夠」。
+    </li>
+    <li>
+      <strong>根因：</strong>正線視窗的 <code>dispatchStartSecond</code> 直接等於
+      <code>startSecond</code>，也就是<strong>輪的第一段可以緊貼整備結束就發車</strong>。
+      外掛班次要從 T3上行 跑到 N2W 才把車送到，它得排在第一段<strong>之前</strong>——
+      但前面已經沒有空間（整備 09:30–10:00，第一段就排在 10:00:00），
+      所以外掛整條被拒，車還在出場站、班次卻從首發站發車。
+    </li>
+    <li>
+      <strong>解法：</strong>新增 <code>resolveYardDispatchLeadSeconds()</code>，
+      建視窗時先算「最短的一條外掛路線占用 + 恢復時間」，
+      把 <code>dispatchStartSecond</code> 往後推那麼多。
+      充電／機動沒有外掛（車就在出場站附近），回 0，行為不變。
+    </li>
+    <li>
+      <strong>教訓：</strong>改了「誰先誰後」的結構，就要同時檢查
+      <strong>前面那件事有沒有空間可以做</strong>。這次是把輪的起點讓回首發站，
+      卻忘了外掛需要一段路程時間才送得到——結構對了、時間沒留，等於沒改。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>
