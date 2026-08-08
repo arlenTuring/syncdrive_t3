@@ -115,27 +115,27 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-08T15:25:30.753Z
+      更新：2026-08-08T15:46:05.389Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0806」
       · ok=<code>true</code>
-      · 錯誤 0／警告 220／共 220 則
+      · 錯誤 0／警告 216／共 216 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 207→220（+13） · severe 4→5（+1） · moderate 24→20（-4） · mild 5→13（+8）</p>
+    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 216→216（±0） · severe 5→5（±0） · moderate 20→20（±0） · mild 13→13（±0）</p>
   </header>
   
 <section class="accept">
   <h2>驗收定義</h2>
   <p class="accept-pill gate-ok">硬閘 gatePassed=<code>true</code>（report.ok=<code>true</code>）· 硬錯誤 0</p>
   <p class="accept-pill gate-warn">品質目標 qualityPassed=<code>false</code> · 未清零：UNSERVED_SERVICE_PULSE×1、HEADWAY_BELOW_TARGET×37</p>
-  <p class="meta">策略噪音 180／極限警告 38／可調警告 2</p>
+  <p class="meta">策略噪音 176／極限警告 38／可調警告 2</p>
   
   <ul class="criteria"><li>硬閘（ok=true）：errors 必須為 0（含站位碰撞、未跑完迴圈、時間線重疊等）。</li><li>警告不阻擋硬閘：策略延後／改線、略過進場載客、班距低於目標、肩段未承接脈衝。</li><li>品質目標（qualityPassed）：另要求 0×UNSERVED_SERVICE_PULSE 與 0×HEADWAY_BELOW_TARGET；未達標仍可 ok=true。</li><li>策略說明預設摺疊，不計入「失敗體感」主列表。</li></ul>
 </section>
   
 <section class="cause-summary">
-  <h2>成因摘要（依代號 × 嚴重度分群，8 群 · 共 220 則）</h2>
+  <h2>成因摘要（依代號 × 嚴重度分群，7 群 · 共 216 則）</h2>
   <table>
     <thead><tr><th>分類</th><th>代號</th><th>嚴重度</th><th>則數</th><th>平均落差</th><th>範例</th></tr></thead>
     <tbody>
@@ -194,14 +194,6 @@
       <td>51</td>
       <td>—</td>
       <td><a href="#issue-166">#166</a> <a href="#issue-167">#167</a> <a href="#issue-168">#168</a></td>
-    </tr>
-    <tr>
-      <td>出場移動卡排不出來</td>
-      <td><code>YARD_EXIT_MOVE_UNRESOLVED</code></td>
-      <td><span class="band-none">—</span></td>
-      <td>4</td>
-      <td>—</td>
-      <td><a href="#issue-217">#217</a> <a href="#issue-218">#218</a> <a href="#issue-219">#219</a></td>
     </tr></tbody>
   </table>
 </section>
@@ -1130,7 +1122,7 @@
 
 <section class="layer layer-policy">
   <details class="layer-fold">
-    <summary>策略說明（不阻擋驗收） · 180 則（預設摺疊）</summary>
+    <summary>策略說明（不阻擋驗收） · 176 則（預設摺疊）</summary>
     <div class="list">
 <article id="issue-41" class="row warning kind-policy layer-policy">
   <div class="row-head">
@@ -3946,70 +3938,6 @@
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=216）</p>
-</article>
-
-<article id="issue-217" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#217</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">L7</span>
-  </div>
-  <h2>出場移動卡排不出來</h2>
-  <p class="code"><code>YARD_EXIT_MOVE_UNRESOLVED</code></p>
-  <p class="msg">時間線 7：「servicing」排不出出場移動卡——設施都被別列車佔著，或空駛時間長到蓋掉整段整備</p>
-  <p class="guide">出場移動卡（整備代號+EX）負責把車從整備設施開到轉乘站。排不出來代表這三件事之一：整備任務沒設定該區段的設施、設施在路網拓樸上沒有連到那一站、或該設施在那個時段被別列車佔著。請回 Step 2 補設施，或到路網拓樸補「設施→停靠」的邊與行駛時間。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=217）</p>
-</article>
-
-<article id="issue-218" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#218</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">L8</span>
-  </div>
-  <h2>出場移動卡排不出來</h2>
-  <p class="code"><code>YARD_EXIT_MOVE_UNRESOLVED</code></p>
-  <p class="msg">時間線 8：「servicing」排不出出場移動卡——設施都被別列車佔著，或空駛時間長到蓋掉整段整備</p>
-  <p class="guide">出場移動卡（整備代號+EX）負責把車從整備設施開到轉乘站。排不出來代表這三件事之一：整備任務沒設定該區段的設施、設施在路網拓樸上沒有連到那一站、或該設施在那個時段被別列車佔著。請回 Step 2 補設施，或到路網拓樸補「設施→停靠」的邊與行駛時間。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=218）</p>
-</article>
-
-<article id="issue-219" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#219</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">L3</span>
-  </div>
-  <h2>出場移動卡排不出來</h2>
-  <p class="code"><code>YARD_EXIT_MOVE_UNRESOLVED</code></p>
-  <p class="msg">時間線 3：「servicing」排不出出場移動卡——設施都被別列車佔著，或空駛時間長到蓋掉整段整備</p>
-  <p class="guide">出場移動卡（整備代號+EX）負責把車從整備設施開到轉乘站。排不出來代表這三件事之一：整備任務沒設定該區段的設施、設施在路網拓樸上沒有連到那一站、或該設施在那個時段被別列車佔著。請回 Step 2 補設施，或到路網拓樸補「設施→停靠」的邊與行駛時間。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=219）</p>
-</article>
-
-<article id="issue-220" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#220</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">L4</span>
-  </div>
-  <h2>出場移動卡排不出來</h2>
-  <p class="code"><code>YARD_EXIT_MOVE_UNRESOLVED</code></p>
-  <p class="msg">時間線 4：「servicing」排不出出場移動卡——設施都被別列車佔著，或空駛時間長到蓋掉整段整備</p>
-  <p class="guide">出場移動卡（整備代號+EX）負責把車從整備設施開到轉乘站。排不出來代表這三件事之一：整備任務沒設定該區段的設施、設施在路網拓樸上沒有連到那一站、或該設施在那個時段被別列車佔著。請回 Step 2 補設施，或到路網拓樸補「設施→停靠」的邊與行駛時間。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=220）</p>
 </article></div>
   </details>
 </section>

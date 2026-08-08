@@ -1101,8 +1101,12 @@ function ShiftScheduleBlockBar({
         left: leftPx,
         // 出場移動卡給一個看得到的最小寬度，否則 30 秒在日尺度上幾乎是 0 px
         width: Math.max(widthPx, isYardExitMove ? 12 : 4),
-        height: REAL_TASK_BAR_HEIGHT,
-        top: REAL_TASK_BAR_TOP,
+        // 出場移動卡壓低壓扁：它是附屬於後面那一段的小卡，
+        // 高度做滿會讓它看起來跟調度營運卡同級，視覺上喧賓奪主。
+        height: isYardExitMove
+          ? Math.max(REAL_TASK_BAR_HEIGHT - 16, 12)
+          : REAL_TASK_BAR_HEIGHT,
+        top: isYardExitMove ? REAL_TASK_BAR_TOP + 8 : REAL_TASK_BAR_TOP,
         backgroundColor: colors.bg,
         zIndex: highlighted ? 50 : (block.source === 'template_bar' ? 2 : 1),
         ...extraStyle,
@@ -1238,7 +1242,7 @@ function ShiftScheduleBlockBar({
       })}
       {isYardExitMove ? (
         <div
-          className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center text-[9px] font-bold leading-none"
+          className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center text-[8px] leading-none opacity-80"
           style={{ color: colors.text }}
           aria-hidden
         >
