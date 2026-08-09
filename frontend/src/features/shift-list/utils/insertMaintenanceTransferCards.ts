@@ -102,9 +102,23 @@ export type MaintenanceTransferCardsResult = {
   laterTaskCompressed: number;
   skipped: Array<{
     timelineRow: number;
+    /** 對應的整備任務區塊 id，讓警告能掛回那張卡（UI 靠這個標 ⚠） */
+    blockId?: string;
     taskType?: string;
     fromTaskType?: string;
     toTaskType?: string;
+    reason: string;
+  }>;
+  /**
+   * 整段時間內找不到任何一台空設施的整備任務——車沒地方停，是產能不足，
+   * 跟「移動卡排不出來」（路徑問題）分開回報，處置方式完全不同。
+   */
+  facilityUnavailable: Array<{
+    timelineRow: number;
+    blockId: string;
+    taskType: string;
+    /** 該類設施總數（0 代表根本沒設定） */
+    facilityCount: number;
     reason: string;
   }>;
 };
@@ -142,13 +156,17 @@ export function insertMaintenanceTransferCards(args: {
     sectionCodes,
   } = args;
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
+  const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
   let inserted = 0;
   let ateYardTail = 0;
   let yardHeadExtended = 0;
   let laterTaskCompressed = 0;
 
   if (!topology || topology.nodes.length === 0) {
-    return { timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed, skipped };
+    return {
+      timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
+      skipped, facilityUnavailable,
+    };
   }
 
   /**
@@ -362,6 +380,7 @@ export function insertMaintenanceTransferCards(args: {
       if (!fromNodeId) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: yard.id,
           taskType: yard.taskType,
           reason: `前一段載客的終點站在拓樸上找不到對應節點（${stationId ?? '未知'}）`,
         });
@@ -372,6 +391,7 @@ export function insertMaintenanceTransferCards(args: {
       if (facilities.length === 0) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: yard.id,
           taskType: yard.taskType,
           reason: '整備任務沒設定這一類的設施，或設施不在拓樸上',
         });
@@ -418,6 +438,7 @@ export function insertMaintenanceTransferCards(args: {
       if (!chosen) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: yard.id,
           taskType: yard.taskType,
           reason: `排不出入廠卡：${describeReject(tally, facilities.length)}`,
         });
@@ -472,6 +493,7 @@ export function insertMaintenanceTransferCards(args: {
       if (allExitFacilities.length === 0 || entryFacilities.length === 0) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: later.id,
           fromTaskType: earlier.taskType,
           toTaskType: later.taskType,
           reason: '其中一種整備類型沒設定設施，或設施不在拓樸上',
@@ -488,6 +510,7 @@ export function insertMaintenanceTransferCards(args: {
       if (exitFacilities.length === 0) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: later.id,
           fromTaskType: earlier.taskType,
           toTaskType: later.taskType,
           reason: `來源設施已被固定在 ${earlierAssigned!.label}（入廠或前一段轉場定案），這裡到不了`,
@@ -609,6 +632,7 @@ export function insertMaintenanceTransferCards(args: {
       if (!chosen) {
         skipped.push({
           timelineRow: timeline.row,
+          blockId: later.id,
           fromTaskType: earlier.taskType,
           toTaskType: later.taskType,
           reason:
@@ -730,6 +754,7 @@ export function insertMaintenanceTransferCards(args: {
     if (!stationId) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: '下一段載客查不到起點站',
       });
@@ -739,6 +764,7 @@ export function insertMaintenanceTransferCards(args: {
     if (!stationNodeId) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: `${stationId} 在拓樸上找不到對應節點`,
       });
@@ -750,6 +776,7 @@ export function insertMaintenanceTransferCards(args: {
     if (allFacilities.length === 0) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: '整備任務沒設定這一類的設施，或設施不在拓樸上',
       });
@@ -765,6 +792,7 @@ export function insertMaintenanceTransferCards(args: {
     if (facilities.length === 0) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: `設施已被固定在 ${yardAssigned!.label}（入廠或前一段轉場定案），這裡到不了`,
       });
@@ -782,6 +810,7 @@ export function insertMaintenanceTransferCards(args: {
     if (candidates.length === 0) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: `整備設定的設施拓樸上都沒有連到 ${stationId}`,
       });
@@ -821,6 +850,7 @@ export function insertMaintenanceTransferCards(args: {
     if (!chosen) {
       skipped.push({
         timelineRow: timeline.row,
+        blockId: yard.id,
         taskType: yard.taskType,
         reason: `排不出出廠卡：${describeReject(tally, candidates.length)}`,
       });
@@ -861,9 +891,61 @@ export function insertMaintenanceTransferCards(args: {
     inserted += 1;
   }
 
+  // ---- 收尾：每一段整備都必須有一台實體設施，不管有沒有排出移動卡 ----
+  //
+  // 車在整備廠裡一定佔著某一格，這是跟「移動卡排不排得出來」無關的獨立事實。
+  // 前面三段只有在<strong>成功插出卡</strong>時才會綁設施——所以出現過這種
+  // 破口：移動卡因為路徑／時間排不出來（或那一段根本不需要移動卡，例如前面
+  // 沒有載客可回溯），整備任務就一路沒有設施，既沒佔位、也沒有任何標記，
+  // 畫面上看起來只是一張普通的整備卡，使用者完全不知道車其實沒地方停。
+  //
+  // 這裡補掃一遍：還沒綁設施的，就用它自己的完整時長去找一台空的補上；
+  // 真的一台都不空，才是產能不足——標記在區塊上並單獨回報，
+  // 讓 UI 可以把「沒地方停」直接畫在卡面，而不是靜靜地少一段資訊。
+  for (const timeline of timelines) {
+    for (const yard of timeline.blocks) {
+      if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
+      if (yardBlockFacility.has(yard.id)) continue;
+
+      const facilities = facilityNodesFor(yard.taskType);
+      if (facilities.length === 0) {
+        yard.yardFacilityUnavailable = true;
+        facilityUnavailable.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          facilityCount: 0,
+          reason: '這一類整備沒有設定任何設施，或設定的設施不在路網拓樸上',
+        });
+        continue;
+      }
+
+      const startSecond = minuteToSecond(yard.plannedStartMinute);
+      const endSecond = minuteToSecond(yard.plannedEndMinute);
+      const free = facilities.find((facility) =>
+        moveCardFacilityIsFree(bookings, facility.id, startSecond, endSecond, timeline.row));
+      if (free) {
+        assignYardFacility(yard, free.id, free.label || free.id);
+        continue;
+      }
+
+      yard.yardFacilityUnavailable = true;
+      facilityUnavailable.push({
+        timelineRow: timeline.row,
+        blockId: yard.id,
+        taskType: yard.taskType,
+        facilityCount: facilities.length,
+        reason: `這段時間 ${facilities.length} 台設施全被別列車佔著，這台車沒地方停`,
+      });
+    }
+  }
+
   for (const timeline of timelines) {
     timeline.blocks.sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
   }
 
-  return { timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed, skipped };
+  return {
+    timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
+    skipped, facilityUnavailable,
+  };
 }

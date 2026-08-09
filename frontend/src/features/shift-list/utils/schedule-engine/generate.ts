@@ -302,10 +302,28 @@ export function generateShiftSchedule(
       message: `時間線 ${skip.timelineRow}：${label}排不出整備轉場卡——${skip.reason}`,
       detail: {
         timelineRow: skip.timelineRow,
+        blockId: skip.blockId,
         taskType: skip.taskType,
         fromTaskType: skip.fromTaskType,
         toTaskType: skip.toTaskType,
         reason: skip.reason,
+      },
+    });
+  }
+  // 整備設施不足：車根本沒地方停。跟上面「移動卡排不出來」分開回報——
+  // 那是路徑問題（補拓樸的邊），這是產能問題（加設施／錯開整備時段）。
+  for (const item of maintenanceTransfer.facilityUnavailable) {
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_FACILITY_UNAVAILABLE',
+      severity: 'warning',
+      kind: 'limit',
+      message: `時間線 ${item.timelineRow}：「${item.taskType}」沒有可用設施——${item.reason}`,
+      detail: {
+        timelineRow: item.timelineRow,
+        blockId: item.blockId,
+        taskType: item.taskType,
+        facilityCount: item.facilityCount,
+        reason: item.reason,
       },
     });
   }

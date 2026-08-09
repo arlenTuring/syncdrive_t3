@@ -766,6 +766,53 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       },
     ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
 
+    it('沒排出任何移動卡的整備任務，也要補一台設施；一台都不空才標記為無可用設施', () => {
+      // 兩列車的保養完全同時段，只有一台 M1——第一列拿到，第二列沒地方停。
+      // 兩列都沒有前後的載客可回溯，所以三段規則都不會插任何移動卡：
+      // 舊版會讓兩列都靜靜地沒有設施、也沒有任何警告，畫面上看不出問題。
+      const yardOnlyRow = (row: number) => ({
+        row,
+        blocks: [
+          {
+            id: `yard-${row}`,
+            timelineRow: row,
+            taskType: 'servicing',
+            label: '保養',
+            anchorStartMinute: 10 * 60,
+            plannedStartMinute: 10 * 60,
+            plannedEndMinute: 12 * 60,
+            travelSeconds: 0,
+            dwellSeconds: 0,
+            source: 'template_bar',
+          },
+        ],
+      });
+      const timelines = [yardOnlyRow(1), yardOnlyRow(2)] as never as GeneratedSchedulePlan['timelines'];
+
+      const result = insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      assert.equal(result.inserted, 0, '這個情境本來就不會有移動卡');
+      const first = timelines[0]!.blocks[0]!;
+      const second = timelines[1]!.blocks[0]!;
+      assert.equal(first.yardFacilityLabel, 'M1', '沒有移動卡也要補上設施');
+      assert.ok(!first.yardFacilityUnavailable);
+      assert.equal(second.yardFacilityLabel, undefined, '只有一台 M1，第二列沒地方停');
+      assert.equal(second.yardFacilityUnavailable, true, '沒地方停必須標記出來，不能靜默');
+
+      assert.equal(result.facilityUnavailable.length, 1);
+      assert.equal(result.facilityUnavailable[0]!.blockId, 'yard-2', '要帶 blockId 才能把警告掛回那張卡');
+      assert.equal(result.facilityUnavailable[0]!.facilityCount, 1);
+      assert.match(result.facilityUnavailable[0]!.reason, /沒地方停/);
+    });
+
     it('入廠卡的「設施空不空」檢查窗，必須涵蓋整段整備時長，不是只有抵達前那一小段', () => {
       // 回歸測試：舊版檢查的是 [抵達, 原訂整備開始] 那一小段、佔用的卻是整段，
       // 兩個窗口對不上——別列車早就訂走整段的 M1，第二列還是會被判定成空的，

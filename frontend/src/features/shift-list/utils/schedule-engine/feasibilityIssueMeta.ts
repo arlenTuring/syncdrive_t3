@@ -56,6 +56,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
+  MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
   PARK_MOVE_UNRESOLVED: '調度入／出廠卡排不出來',
 };
 
@@ -94,6 +95,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
+  MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
   PARK_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
 };
 
@@ -227,6 +229,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '調度入／出廠卡（PI／PO）讓車在「接下來沒班次可接、空檔又長到會佔死終點站站位」時先開進調度設施暫停。排不出來多半是整備任務第 5 步沒設定調度設施，或拓樸上少了「站 → 設施」「設施 → 站」其中一個方向的邊（可到路網拓樸把該邊設為雙向）。',
+  },
+  MAINTENANCE_FACILITY_UNAVAILABLE: {
+    kind: 'limit',
+    guidance:
+      '這一段整備的整段時間內，該類設施沒有任何一台是空的——車實際上沒地方停，班表這一段在物理上做不到。這跟「轉場卡排不出來」是兩回事：那是路徑問題（補拓樸的邊就好），這是產能問題。可試：在整備任務為這一類多掛幾台設施、把同時段的整備任務錯開（不要全擠在同一個時段）、或減少該時段安排整備的車數。若訊息顯示設施數為 0，代表這一類整備根本沒設定設施，或設定的設施在路網拓樸上找不到。',
   },
   MAINTENANCE_TRANSFER_UNRESOLVED: {
     kind: 'policy',

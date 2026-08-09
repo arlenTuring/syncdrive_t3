@@ -109,6 +109,13 @@ export type GeneratedScheduleBlock = {
   /** 整備任務區塊本身：實際停留設施的顯示名／代號（例 M2） */
   yardFacilityLabel?: string;
   /**
+   * 整備任務區塊本身：<strong>整段時間內沒有任何一台該類設施是空的</strong>。
+   * 車實際上沒地方停——這不是「移動卡排不出來」（那只是路徑問題），
+   * 是產能不足。UI 必須把這件事直接標在卡面上，不能只靠 hover，
+   * 否則使用者看到的就只是一張「沒掛設施」的普通整備卡，完全不知道出事。
+   */
+  yardFacilityUnavailable?: boolean;
+  /**
    * 調度營運班次（entry_service）落點診斷（文件 §10.3）——
    * 只在這一段抵達某個站位時實際查得到「該站淨空時刻」才會寫入；
    * 沒有別的車佔著那個站位就不寫（代表這段完全不受站位限制）。
@@ -145,6 +152,12 @@ export type FeasibilityViolationCode =
    * 同一個模組、同一個代號——見 insertMaintenanceTransferCards.ts。
    */
   | 'MAINTENANCE_TRANSFER_UNRESOLVED'
+  /**
+   * 整備設施不足：這一段整備的<strong>整段時間內，該類設施沒有任何一台是空的</strong>
+   * ——車沒地方停。這跟轉場卡排不出來（路徑問題）是兩回事，處置也不同：
+   * 前者要加設施／錯開整備時段，後者是補拓樸的邊（警告）。
+   */
+  | 'MAINTENANCE_FACILITY_UNAVAILABLE'
   /** 調度入／出廠卡（PI／PO）排不出來：拓樸進不去或出不來／設施被佔（警告） */
   | 'PARK_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */

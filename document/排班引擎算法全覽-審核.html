@@ -1264,7 +1264,7 @@ validateRotationCyclesComplete
 validateRouteSwitchBuffers
 validatePassengerHeadway
 validateTimelineCapacity   ← 多為 warning</pre>
-  <p>下表為 <code>FeasibilityViolationCode</code> 全部 31 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。</p>
+  <p>下表為 <code>FeasibilityViolationCode</code> 全部 32 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。</p>
   <table>
     <thead><tr><th>代號</th><th>嚴重度</th><th>語意</th><th>來源檔</th></tr></thead>
     <tbody>
@@ -1297,6 +1297,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
       <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行前／機動→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></td><td>warn</td><td>整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：整備任務沒設定該區段設施／拓樸上沒有可通的邊或路徑／設施當時被別列車佔著。三種轉場共用同一個模組、同一個代號（見 §10.4）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_FACILITY_UNAVAILABLE</code></td><td>warn</td><td>整備設施不足：這一段整備的<strong>整段時間內該類設施沒有任何一台是空的</strong>，車沒地方停。跟轉場卡排不出來（路徑問題）分開回報，處置完全不同——這是產能問題，要加設施或錯開整備時段（見 §10.5）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
       <tr><td><code>PARK_MOVE_UNRESOLVED</code></td><td>warn</td><td>調度入／出廠卡（PI／PO）排不出來：兩段正線之間空檔長到會佔死站位，但拓樸進不去或出不來調度設施、或設施當時被別列車佔著（見 §10.4）</td><td><code>insertParkMoveCards.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
@@ -3170,6 +3171,74 @@ backend/src/dev-log/
       一次，寫的人以為在講同一件事，實際上一個講的是移動那一小段、一個講的是
       停留整段。凡是「先檢查再登記」的配對，都要回頭確認兩邊的參數是不是
       真的同一個東西——不一致時症狀往往不是報錯，而是安靜地產生物理上做不到的結果。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · 「很多整備都沒有設施掛」——沒地方停的車，先前完全不會被標記</h3>
+  <div class="callout warn">
+    使用者：「MB0430 我很確定我看了整段都沒有出場入場。你是不是存在沒有空間放
+    車子的問題？是的話你要標示出來，不然我不知道。我看很多整備都沒有設施掛。」
+    ——判斷完全正確：確實有車沒地方停，而且<strong>先前一則警告都不會發</strong>。
+  </div>
+  <ul>
+    <li>
+      <strong>破口一：設施只有在「成功插出移動卡」時才會被綁定。</strong>
+      車在整備廠裡一定佔著某一格，這是跟「移動卡排不排得出來」<strong>無關</strong>的
+      獨立事實。但前面三段規則都是在插卡成功的路徑上才呼叫
+      <code>assignYardFacility()</code>——只要移動卡因為路徑不通、時間不夠而排不出來，
+      或那一段根本不需要移動卡（例如前面沒有載客可以回溯起點站，
+      <code>if (!previousPassenger?.routeId) continue;</code> 直接靜默跳過），
+      整備任務就一路沒有設施：既沒佔位、也沒有任何標記。真實資料上
+      72 段整備裡有 18 段是這種狀態。
+    </li>
+    <li>
+      <strong>破口二：警告沒帶 <code>blockId</code>，卡片連不上警告。</strong>
+      UI 是用 <code>detail.blockId</code> 把 issue 掛回班次卡（<code>matchIssuesForBlock()</code>），
+      而轉場卡的 skip 只帶了 <code>timelineRow</code> 跟 <code>taskType</code>——
+      就算有發警告，那張卡上也不會出現 ⚠。使用者「不然我不知道」講的就是這件事。
+    </li>
+    <li>
+      <strong>修法一：收尾補掃。</strong>三段跑完後掃一遍所有整備區塊，
+      還沒綁設施的就用它<strong>自己的完整時長</strong>去找一台空的補上
+      （只綁設施、不插卡——這一段本來就不需要移動卡）。真的一台都不空，
+      才是產能不足：在區塊上標記 <code>yardFacilityUnavailable</code>，
+      並用<strong>獨立的新代號</strong> <code>MAINTENANCE_FACILITY_UNAVAILABLE</code>
+      回報。刻意跟 <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 分開——
+      那是路徑問題（補拓樸的邊就好），這是產能問題（加設施／錯開整備時段），
+      混在同一個代號裡使用者根本分不出該做哪一件事。
+    </li>
+    <li>
+      <strong>修法二：所有 skip 都帶上 <code>blockId</code></strong>，警告因此能正確掛回
+      對應的整備卡。
+    </li>
+    <li>
+      <strong>修法三：直接畫在卡面，不只放 hover。</strong>沒地方停是硬性的物理
+      問題，卡面文字直接顯示「<code>保養 · ⚠ 無可用設施</code>」並轉為紅字。
+      只放 hover 等於沒說——使用者看到的就只是一張「沒掛設施」的普通整備卡。
+    </li>
+    <li>
+      <strong>驗證：</strong>72 段整備 → 57 段有設施、15 段標記無可用設施、
+      <strong>0 段靜默無標記</strong>（先前 18 段靜默）。補掃本身還替 3 段
+      原本沒設施、但實際上有空位的整備補上了設施。
+      <code>MAINTENANCE_FACILITY_UNAVAILABLE</code> 15 則新警告，全部帶
+      <code>blockId</code>。設施重疊維持 0、<code>errorsByCode</code> 維持空、
+      <code>report.ok = true</code>。新增 1 則測試（沒有移動卡也要補設施／
+      一台都不空要標記且帶 blockId）。<code>tsc</code> 23、
+      測試 344 pass／9 fail、<code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>嚴重度選擇：</strong>用 warning 不用 error。車沒地方停在物理上確實
+      做不到，理論上該擋發布；但目前這份真實資料就有 15 段，直接升成 error 會
+      讓整份班表無法產生、使用者反而更難逐步調整。折衷是「警告 + 卡面紅字標記」，
+      讓它顯眼到不可能忽略，但不阻斷流程。若之後希望它變成擋發布的硬閘門，
+      改 <code>severity</code> 一個字即可。
+    </li>
+    <li>
+      <strong>教訓：</strong>「沒有結果」跟「有問題」是兩種不同的狀態，程式很容易
+      把後者靜靜地當成前者處理掉——這次的 <code>continue</code> 每一個單獨看都很
+      合理（沒有前一段載客、路徑不通、時間不夠），但合起來造成「整備任務沒有設施」
+      這個明明是異常的狀態完全沒有出口。凡是在迴圈裡 <code>continue</code> 掉某個
+      主體，都要回頭問：這個主體最後有沒有人負責交代它的下場？
     </li>
   </ul>
 

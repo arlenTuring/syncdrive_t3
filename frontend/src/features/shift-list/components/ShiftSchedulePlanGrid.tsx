@@ -1155,7 +1155,7 @@ function ShiftScheduleBlockBar({
             ]
               .filter(Boolean)
               .join('\n')
-          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
+          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
       }
       role={selectable ? 'button' : undefined}
       tabIndex={selectable && showChrome ? 0 : undefined}
@@ -1339,10 +1339,12 @@ function ShiftScheduleBlockBar({
         ) : (
           <div
             className="truncate text-[11px] leading-tight opacity-90 font-medium"
-            style={{ color: colors.text }}
+            style={{ color: block.yardFacilityUnavailable ? '#FCA5A5' : colors.text }}
           >
             {block.label}
             {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
+            {/* 沒地方停是產能問題，必須直接寫在卡面——只放 hover 使用者不會發現 */}
+            {block.yardFacilityUnavailable ? ' · ⚠ 無可用設施' : ''}
           </div>
         )}
         <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
