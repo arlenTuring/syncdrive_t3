@@ -187,7 +187,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(result.inserted, 1, '第一條線正常插卡，第二條線因為轉折點衝突排不進去');
       assert.equal(result.skipped.length, 1);
       assert.equal(result.skipped[0]!.timelineRow, 2);
-      assert.match(result.skipped[0]!.reason, /轉折點的時間太近/);
+      assert.match(result.skipped[0]!.reason, /轉折點撞上/);
 
       const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move');
       assert.ok(row1Card, '先處理的時間線不受影響');
@@ -238,7 +238,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       }));
       const result = run(p, BODY, reversed);
       assert.equal(result.inserted, 0);
-      assert.match(result.skipped[0]!.reason, /到不了任何一座該類設施/);
+      assert.match(result.skipped[0]!.reason, /沒有可通的路徑/);
     });
 
     it('沒有拓樸時安靜略過，不當成錯誤', () => {
@@ -437,7 +437,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const result = run(timelines);
       assert.equal(result.inserted, 2);
       assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /設施都被別列車佔著/);
+      assert.match(result.skipped[0]!.reason, /被別列車佔著/);
     });
 
     it('拓樸上設施沒有連到下一段起點站時，回報而不硬塞', () => {
@@ -687,7 +687,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const result = run(p);
       assert.equal(result.inserted, 0);
       assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /推過結束時刻/);
+      assert.match(result.skipped[0]!.reason, /塞不進這段空檔/);
       // 兩段都維持原樣
       assert.equal(p.timelines[0]!.blocks[0]!.plannedEndMinute, 430);
     });
@@ -765,6 +765,72 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         stationIds: ['station_b', 'station_y'],
       },
     ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
+
+    it('入廠卡的「設施空不空」檢查窗，必須涵蓋整段整備時長，不是只有抵達前那一小段', () => {
+      // 回歸測試：舊版檢查的是 [抵達, 原訂整備開始] 那一小段、佔用的卻是整段，
+      // 兩個窗口對不上——別列車早就訂走整段的 M1，第二列還是會被判定成空的，
+      // 於是兩台車同時被排進同一格保養位（真實資料上抓到 35 組這種重疊）。
+      //
+      // 第 1 列：正線 09:59 結束 → 10:00 抵達 M1，保養 10:30–12:00（佔 M1 到 12:00）
+      // 第 2 列：正線 08:59 結束 → 09:00 抵達 M1，保養 09:30–11:00
+      //   舊版檢查窗 [09:00, 09:30] 跟第 1 列的 [10:00, 12:00] 不重疊 → 誤判為可用
+      //   新版檢查窗 [09:00, 11:00] 跟第 1 列重疊 → 正確擋下
+      const yardRow = (row: number, paxEnd: number, yardStart: number, yardEnd: number) => ({
+        row,
+        blocks: [
+          {
+            id: `pax-${row}`,
+            timelineRow: row,
+            taskType: 'passenger',
+            label: 'AI',
+            routeId: 'a-in',
+            anchorStartMinute: paxEnd - 30,
+            plannedStartMinute: paxEnd - 30,
+            plannedEndMinute: paxEnd,
+            travelSeconds: 1800,
+            dwellSeconds: 0,
+            source: 'template_bar',
+          },
+          {
+            id: `yard-${row}`,
+            timelineRow: row,
+            taskType: 'servicing',
+            label: '保養',
+            anchorStartMinute: yardStart,
+            plannedStartMinute: yardStart,
+            plannedEndMinute: yardEnd,
+            travelSeconds: 0,
+            dwellSeconds: 0,
+            source: 'template_bar',
+          },
+        ],
+      });
+
+      const timelines = [
+        yardRow(1, 9 * 60 + 59, 10 * 60 + 30, 12 * 60),
+        yardRow(2, 8 * 60 + 59, 9 * 60 + 30, 11 * 60),
+      ] as never as GeneratedSchedulePlan['timelines'];
+
+      const result = insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      const row1Yard = timelines[0]!.blocks.find((b) => b.id === 'yard-1')!;
+      const row2Yard = timelines[1]!.blocks.find((b) => b.id === 'yard-2')!;
+      // 只有一台 M1，兩列的保養時段重疊 → 只能有一列拿到
+      const assigned = [row1Yard.yardFacilityLabel, row2Yard.yardFacilityLabel]
+        .filter((x) => x != null);
+      assert.equal(assigned.length, 1, '同一格 M1 不得同時指派給兩列車');
+      assert.equal(result.inserted, 1);
+      assert.equal(result.skipped.length, 1);
+      assert.match(result.skipped[0]!.reason, /被別列車佔著/);
+    });
 
     it('入廠卡先佔走 M1，出廠卡在同一時段就排不進同一台設施', () => {
       const timelines: GeneratedSchedulePlan['timelines'] = [
