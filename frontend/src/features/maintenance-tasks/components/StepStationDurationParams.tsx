@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  DEFAULT_MAINTENANCE_MAP_ID,
   fetchYardFacilityEquipment,
+  resolveActiveMaintenanceMapId,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
+import { fetchMapStations } from '../api/waypointsApi';
 import {
   newStationDurationEquipmentRowId,
   normalizeStationDurationDraft,
@@ -27,6 +28,13 @@ type StepStationDurationParamsProps = {
    * 只影響排序，不影響可選範圍——任何設施格都掛得上。
    */
   preferredFacilityPurpose?: string;
+  /**
+   * 把地圖上的<strong>停靠站</strong>也一併列進可選清單。
+   * <strong>只有待命任務會開</strong>：待命的車就是在場上候用，可以直接停在
+   * 正線停靠站等待；其他整備任務一定要進實體設施格（充電要有充電樁、
+   * 保養要有維修坑），不能佔著正線站位當工作區。
+   */
+  includeStations?: boolean;
 };
 
 export function StepStationDurationParams({
@@ -35,6 +43,7 @@ export function StepStationDurationParams({
   onChange,
   showFollowTemplateCheckbox = false,
   preferredFacilityPurpose,
+  includeStations = false,
 }: StepStationDurationParamsProps) {
   const task = normalizeStationDurationDraft(draft);
   const patchTask = (patch: Partial<StationDurationTaskDraft>) =>
@@ -48,10 +57,30 @@ export function StepStationDurationParams({
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, preferredFacilityPurpose)
-      .then((res) => {
+    void (async () => {
+      const facilities = await fetchYardFacilityEquipment(undefined, preferredFacilityPurpose);
+      if (!includeStations) return facilities.items;
+      // 停靠站排在設施格之後——設施才是主要選項，停靠站是待命才有的額外選擇
+      const mapId = await resolveActiveMaintenanceMapId();
+      const stations = await fetchMapStations(mapId);
+      return [
+        ...facilities.items,
+        ...stations.stations.map((station): FieldEquipmentItem => ({
+          equipmentId: station.facilityId,
+          // 存的是站名——引擎比對拓樸節點時用的就是節點顯示名
+          mapCode: station.stationName,
+          equipmentKind: 'docking',
+          objectCategory: 'facility',
+          label: station.stationName,
+          purpose: '停靠站',
+          areaId: station.areaId,
+          areaName: '停靠站',
+        })),
+      ];
+    })()
+      .then((items) => {
         if (cancelled) return;
-        setEquipment(res.items);
+        setEquipment(items);
       })
       .catch((error) => {
         if (!cancelled) {
@@ -65,7 +94,7 @@ export function StepStationDurationParams({
     return () => {
       cancelled = true;
     };
-  }, [preferredFacilityPurpose]);
+  }, [preferredFacilityPurpose, includeStations]);
 
   return (
     <StepSectionToggle

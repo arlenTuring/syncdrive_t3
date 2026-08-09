@@ -1,6 +1,6 @@
 import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { DEFAULT_MAINTENANCE_MAP_ID } from '../api/fieldEquipmentApi';
+import { resolveActiveMaintenanceMapId } from '../api/fieldEquipmentApi';
 import type { FieldEquipmentItem } from '../api/fieldEquipmentApi';
 import {
   fetchMapWaypoints,
@@ -46,7 +46,8 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
     let cancelled = false;
     setLoadingWaypoints(true);
     setWaypointError(null);
-    void fetchMapWaypoints(DEFAULT_MAINTENANCE_MAP_ID)
+    void resolveActiveMaintenanceMapId()
+      .then((mapId) => fetchMapWaypoints(mapId))
       .then((result) => {
         if (cancelled) return;
         setWaypoints(result.items);

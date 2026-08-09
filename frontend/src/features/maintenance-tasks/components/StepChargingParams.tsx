@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  DEFAULT_MAINTENANCE_MAP_ID,
   fetchYardFacilityEquipment,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
@@ -36,7 +35,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, '充電格')
+    void fetchYardFacilityEquipment(undefined, '充電格')
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);

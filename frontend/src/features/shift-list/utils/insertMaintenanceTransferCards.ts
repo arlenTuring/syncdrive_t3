@@ -293,8 +293,14 @@ export function insertMaintenanceTransferCards(args: {
       codes = extractFacilityMapCodes(maintenanceBody, section);
       codesBySection.set(section, codes);
     }
+    // 待命（standby）可以停在正線停靠站上候用，所以它的可用節點含 docking；
+    // 其他整備任務一定要進實體設施格（充電要有充電樁、保養要有維修坑），
+    // 不能佔著正線站位當工作區。整備任務 UI 也只有待命那一步會把停靠站列進來。
+    const allowDocking = taskType === 'standby';
     return topology.nodes.filter(
-      (node) => node.kind === 'facility' && nodeMatchesMoveCardCodes(node, codes!),
+      (node) =>
+        (node.kind === 'facility' || (allowDocking && node.kind === 'docking'))
+        && nodeMatchesMoveCardCodes(node, codes!),
     );
   };
 

@@ -30,13 +30,49 @@ export type FieldEquipmentResponse = {
   items: FieldEquipmentItem[];
 };
 
-export const DEFAULT_MAINTENANCE_MAP_ID = 't3-main-version';
+/**
+ * 後備地圖 id：查不到啟用地圖時才用。
+ * <strong>不要直接拿它去打 API</strong>——整備任務要掛的是使用者<strong>目前啟用</strong>
+ * 那張地圖上的設施，請改用 {@link resolveActiveMaintenanceMapId}。
+ * 先前各步驟直接寫死這個常數，結果排班引擎讀啟用地圖、整備任務 UI 讀內建地圖，
+ * 兩邊看到的設施清單不一樣——使用者在地圖上刪掉的格子仍出現在下拉裡。
+ */
+export const FALLBACK_MAINTENANCE_MAP_ID = 't3-main-version';
+
+/** @deprecated 改用 {@link resolveActiveMaintenanceMapId}；保留只為相容既有匯入 */
+export const DEFAULT_MAINTENANCE_MAP_ID = FALLBACK_MAINTENANCE_MAP_ID;
+
+let activeMapIdPromise: Promise<string> | null = null;
+
+/**
+ * 目前啟用的地圖 id（跟排班引擎 runShiftScheduleEngineForDraft 同一套解析）。
+ * 同一個 session 內只查一次；查不到就退回內建地圖，不讓整個步驟開不起來。
+ */
+export async function resolveActiveMaintenanceMapId(): Promise<string> {
+  if (!activeMapIdPromise) {
+    activeMapIdPromise = (async () => {
+      try {
+        const [{ resolveMapId }, { fetchMapLibraryBackendStatus }] = await Promise.all([
+          import('../../map-editor/constants/builtinMaps'),
+          import('../../map-editor/api/mapLibraryApi'),
+        ]);
+        const status = await fetchMapLibraryBackendStatus();
+        const resolved = status?.activeMapId ? resolveMapId(status.activeMapId) : '';
+        return resolved || FALLBACK_MAINTENANCE_MAP_ID;
+      } catch {
+        return FALLBACK_MAINTENANCE_MAP_ID;
+      }
+    })();
+  }
+  return activeMapIdPromise;
+}
 
 export async function fetchMapFieldEquipment(
-  mapId = DEFAULT_MAINTENANCE_MAP_ID,
+  mapId?: string,
   kind: FieldEquipmentKind = 'charging',
   backendUrl = resolveMaintenanceTasksBackendUrl(),
 ): Promise<FieldEquipmentResponse> {
+  mapId ??= await resolveActiveMaintenanceMapId();
   const qs = kind === 'all' ? '' : `?kind=${encodeURIComponent(kind)}`;
   const res = await fetch(
     `${backendUrl}/syncdrive-api/map/${encodeURIComponent(mapId)}/field-equipment${qs}`,
@@ -53,9 +89,10 @@ function isCarWashEquipment(item: FieldEquipmentItem): boolean {
 
 /** 洗車設備：優先 car_wash；若後端尚未重啟導致空陣列，改從 yard_slot / all 篩 W* */
 export async function fetchCarWashFieldEquipment(
-  mapId = DEFAULT_MAINTENANCE_MAP_ID,
+  mapId?: string,
   backendUrl = resolveMaintenanceTasksBackendUrl(),
 ): Promise<FieldEquipmentResponse> {
+  mapId ??= await resolveActiveMaintenanceMapId();
   const primary = await fetchMapFieldEquipment(mapId, 'car_wash', backendUrl);
   if (primary.items.length > 0) return primary;
 
@@ -85,9 +122,10 @@ function isMaintenanceStation(item: FieldEquipmentItem): boolean {
 }
 
 export async function fetchMaintenanceStationEquipment(
-  mapId = DEFAULT_MAINTENANCE_MAP_ID,
+  mapId?: string,
   backendUrl = resolveMaintenanceTasksBackendUrl(),
 ): Promise<FieldEquipmentResponse> {
+  mapId ??= await resolveActiveMaintenanceMapId();
   const primary = await fetchMapFieldEquipment(mapId, 'maintenance', backendUrl);
   if (primary.items.length > 0) return primary;
 
@@ -134,10 +172,11 @@ function isYardSlotFacility(item: FieldEquipmentItem): boolean {
  * `preferredPurpose` 只影響<strong>排序</strong>（把常用的那類排前面），不影響可選範圍。
  */
 export async function fetchYardFacilityEquipment(
-  mapId = DEFAULT_MAINTENANCE_MAP_ID,
+  mapId?: string,
   preferredPurpose?: string,
   backendUrl = resolveMaintenanceTasksBackendUrl(),
 ): Promise<FieldEquipmentResponse> {
+  mapId ??= await resolveActiveMaintenanceMapId();
   const all = await fetchMapFieldEquipment(mapId, 'all', backendUrl);
   const items = all.items.filter(isYardSlotFacility);
   if (!preferredPurpose) return { mapId: all.mapId, items };

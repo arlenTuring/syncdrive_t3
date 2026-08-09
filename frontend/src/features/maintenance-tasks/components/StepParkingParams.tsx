@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  DEFAULT_MAINTENANCE_MAP_ID,
   fetchYardFacilityEquipment,
 } from '../api/fieldEquipmentApi';
 import type { FieldEquipmentItem } from '../api/fieldEquipmentApi';
@@ -33,7 +32,7 @@ export function StepParkingParams({ draft, onChange }: StepParkingParamsProps) {
     let cancelled = false;
     // loadingEquipment 初值就是 true、error 初值就是 null，
     // 不必在 effect 開頭再 set 一次（那會觸發多餘的 render）
-    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, '調度格')
+    void fetchYardFacilityEquipment(undefined, '調度格')
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);

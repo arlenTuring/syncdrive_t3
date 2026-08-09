@@ -1,7 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
-  DEFAULT_MAINTENANCE_MAP_ID,
   fetchYardFacilityEquipment,
   type FieldEquipmentItem,
 } from '../api/fieldEquipmentApi';
@@ -49,7 +48,7 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
     let cancelled = false;
     setLoadingEquipment(true);
     setEquipmentError(null);
-    void fetchYardFacilityEquipment(DEFAULT_MAINTENANCE_MAP_ID, '保養格')
+    void fetchYardFacilityEquipment(undefined, '保養格')
       .then((res) => {
         if (cancelled) return;
         setEquipment(res.items);
