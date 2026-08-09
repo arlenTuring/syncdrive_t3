@@ -182,6 +182,8 @@ export type ShiftScheduleMaintenanceTaskDraft = {
     maintenance: boolean;
     preTrip: boolean;
     mobile: boolean;
+    /** 整備任務第 5 步「調度任務」是否啟用；決定 parkIn／parkOut 代號是否必填 */
+    parking: boolean;
   };
 };
 
@@ -463,6 +465,7 @@ export function emptyShiftScheduleCreateDraft(
         maintenance: false,
         preTrip: false,
         mobile: false,
+        parking: false,
       },
     },
     timeTemplate: {
@@ -1163,6 +1166,7 @@ function parseSectionEnabled(raw: unknown): ShiftScheduleMaintenanceTaskDraft['s
     maintenance: false,
     preTrip: false,
     mobile: false,
+    parking: false,
   };
   if (!raw || typeof raw !== 'object') return base;
   const o = raw as Record<string, unknown>;
@@ -1172,6 +1176,7 @@ function parseSectionEnabled(raw: unknown): ShiftScheduleMaintenanceTaskDraft['s
     maintenance: o.maintenance === true,
     preTrip: o.preTrip === true,
     mobile: o.mobile === true,
+    parking: o.parking === true,
   };
 }
 

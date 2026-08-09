@@ -44,6 +44,7 @@ function resolveSectionEnabled(
     maintenance: previewDraft.maintenance.stepEnabled,
     preTrip: previewDraft.preTrip.stepEnabled,
     mobile: previewDraft.mobile.stepEnabled,
+    parking: previewDraft.parking.stepEnabled,
   };
 }
 
@@ -68,9 +69,16 @@ export function StepShiftMaintenanceTask({
     draft.sectionCodeBySection,
   );
   const sectionEnabled = draft.sectionEnabled;
+  // 代號驗證要對到 MaintenanceSectionCodeKey（含 parkIn／parkOut），
+  // 但 sectionEnabled 只有單一 parking 開關——調度入／出廠代號跟著它一起必填。
+  const codeEnabled = {
+    ...sectionEnabled,
+    parkIn: sectionEnabled.parking,
+    parkOut: sectionEnabled.parking,
+  };
   const codeIssues = findMaintenanceSectionCodeIssues(
     sectionCodeBySection,
-    sectionEnabled,
+    codeEnabled,
   );
   const codeIssueByKey = new Map(codeIssues.map((issue) => [issue.key, issue.message]));
 
@@ -129,7 +137,8 @@ export function StepShiftMaintenanceTask({
           && current.sectionEnabled.carWash === enabled.carWash
           && current.sectionEnabled.maintenance === enabled.maintenance
           && current.sectionEnabled.preTrip === enabled.preTrip
-          && current.sectionEnabled.mobile === enabled.mobile;
+          && current.sectionEnabled.mobile === enabled.mobile
+          && current.sectionEnabled.parking === enabled.parking;
         if (!same) {
           onChange({
             ...current,
@@ -168,6 +177,7 @@ export function StepShiftMaintenanceTask({
         maintenance: false,
         preTrip: false,
         mobile: false,
+        parking: false,
       },
     });
   };
@@ -192,20 +202,23 @@ export function StepShiftMaintenanceTask({
     });
   };
 
-  const sectionCodeField = (key: MaintenanceSectionCodeKey) => {
+  const sectionCodeField = (
+    key: MaintenanceSectionCodeKey,
+    options?: { label?: string; placeholder?: string; description?: string },
+  ) => {
     const issue = codeIssueByKey.get(key);
     return (
       <div className="space-y-1.5">
         <label className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            整備代號
+            {options?.label ?? '整備代號'}
           </span>
           <input
             type="text"
             value={sectionCodeBySection[key]}
             onChange={(e) => patchSectionCode(key, e.target.value)}
-            placeholder="例：M"
+            placeholder={options?.placeholder ?? '例：M'}
             maxLength={2}
             className={`${CODE_INPUT_CLASS} ${issue ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/30' : ''}`}
             autoComplete="off"
@@ -213,7 +226,8 @@ export function StepShiftMaintenanceTask({
           />
         </label>
         <p className="text-xs text-zinc-500">
-          1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻
+          {options?.description
+            ?? '1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻'}
         </p>
         {issue ? <p className="text-xs text-red-400">{issue}</p> : null}
       </div>
@@ -246,6 +260,24 @@ export function StepShiftMaintenanceTask({
       <div className="space-y-4">
         {sectionCodeField('maintenance')}
         {creationMode === 'parametric' ? slackField('maintenance') : null}
+      </div>
+    ),
+    parking: (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {sectionCodeField('parkIn', {
+            label: '調度入廠代號',
+            placeholder: '例：I',
+            description:
+              '1–2 個大寫英文字母；車暫停時開進調度設施的那張卡（PI）用這個代號',
+          })}
+          {sectionCodeField('parkOut', {
+            label: '調度出廠代號',
+            placeholder: '例：O',
+            description:
+              '1–2 個大寫英文字母；車回到正線的那張卡（PO）用這個代號',
+          })}
+        </div>
       </div>
     ),
     preTrip: (

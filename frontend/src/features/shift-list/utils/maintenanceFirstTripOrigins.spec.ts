@@ -173,6 +173,8 @@ describe('insertMaintenanceEntryServiceTrips', () => {
     maintenance: 'M',
     preTrip: '',
     mobile: '',
+    parkIn: '',
+    parkOut: '',
   };
 
   function scenarioTimelines(): GeneratedScheduleTimeline[] {

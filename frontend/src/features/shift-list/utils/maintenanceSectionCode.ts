@@ -1,12 +1,21 @@
 import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
 
-/** 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設） */
+/**
+ * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
+ *
+ * parkIn／parkOut 是調度入／出廠卡（PI／PO）專用：這兩張卡不像
+ * 整備出／入廠卡（MO／MI）只有幾十秒寬，常常橫跨一整段空檔，
+ * 卡片本身就有足夠長度顯示完整班次代號，所以跟其他區塊一樣
+ * 讓使用者自訂代號，而不是沿用來源整備任務的代號。
+ */
 export type MaintenanceSectionCodeBySection = {
   charging: string;
   carWash: string;
   maintenance: string;
   preTrip: string;
   mobile: string;
+  parkIn: string;
+  parkOut: string;
 };
 
 export type MaintenanceSectionCodeKey = keyof MaintenanceSectionCodeBySection;
@@ -18,6 +27,8 @@ export function emptyMaintenanceSectionCodeBySection(): MaintenanceSectionCodeBy
     maintenance: '',
     preTrip: '',
     mobile: '',
+    parkIn: '',
+    parkOut: '',
   };
 }
 
@@ -45,6 +56,8 @@ export function normalizeMaintenanceSectionCodeBySection(
     maintenance: normalizeMaintenanceSectionCodeInput(raw.maintenance ?? base.maintenance),
     preTrip: normalizeMaintenanceSectionCodeInput(raw.preTrip ?? base.preTrip),
     mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile),
+    parkIn: normalizeMaintenanceSectionCodeInput(raw.parkIn ?? base.parkIn),
+    parkOut: normalizeMaintenanceSectionCodeInput(raw.parkOut ?? base.parkOut),
   };
 }
 
@@ -111,6 +124,8 @@ export function buildMaintenanceSectionCodeFingerprint(
     `maintenance:${n.maintenance}`,
     `preTrip:${n.preTrip}`,
     `mobile:${n.mobile}`,
+    `parkIn:${n.parkIn}`,
+    `parkOut:${n.parkOut}`,
   ].join('|');
 }
 

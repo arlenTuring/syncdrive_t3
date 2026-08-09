@@ -32,6 +32,8 @@ const SECTION_CODES: MaintenanceSectionCodeBySection = {
   maintenance: 'M',
   preTrip: 'P',
   mobile: 'S',
+  parkIn: 'I',
+  parkOut: 'O',
 };
 
 function makeBlock(overrides: Partial<GeneratedScheduleBlock> & { id: string }): GeneratedScheduleBlock {

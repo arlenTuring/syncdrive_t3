@@ -1909,6 +1909,38 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 調度入／出廠代號改由使用者在班表 Step「整備任務」自訂</h3>
+  <ul>
+    <li>
+      <strong>背景：</strong>MO／MI 是幾十秒寬的小卡，卡面塞不下完整班次代號，
+      所以只印兩個字母 ＋ hover。<strong>PI／PO 常常橫跨一整段空檔</strong>
+      （實測 11:21–11:36 這種量級），卡片本身就有足夠長度，
+      因此比照其他整備區塊（充電／洗車／保養／行前／機動），
+      讓使用者自己設定代號，而不是沿用來源整備任務的代號。
+    </li>
+    <li>
+      <strong>新增兩個欄位。</strong><code>MaintenanceSectionCodeBySection</code>
+      加入 <code>parkIn</code>（調度入廠代號，PI 用）與
+      <code>parkOut</code>（調度出廠代號，PO 用），UI 放在班表 Step「整備任務」
+      的「調度任務」區塊——兩個並排的「整備代號」輸入格，驗證規則
+      （1–2 個大寫英文字母、互不重複）與其他區塊完全一致。
+    </li>
+    <li>
+      <strong>啟用開關共用。</strong>調度任務只有一個 <code>parking.stepEnabled</code>，
+      沒有分「入廠」「出廠」兩個開關，所以驗證時把
+      <code>parkIn</code>／<code>parkOut</code> 兩個代號都繫在同一個 <code>parking</code>
+      布林值上（一起必填、一起免填）。
+    </li>
+    <li>
+      <strong>本輪只做設定介面，尚未接進引擎。</strong>過程中發現
+      <code>resolveBlockCode()</code> 對 <code>yard_entry_move</code>／
+      <code>park_entry_move</code>／<code>park_exit_move</code> 這三個 source
+      沒有專屬分支，會落進 <code>taskType === 'dispatch'</code> 的通用分支，
+      吐出「D0930」這種代號，而不是使用者剛設定的自訂代號。這是延續 MO
+      當初漏接分支的同一類坑，留給下一輪接引擎時一併修。
+    </li>
+  </ul>
+
   <h3>2026-08-09 · 四張移動小卡（MO／MI／PI／PO）與拓樸自動尋路</h3>
   <ul>
     <li>

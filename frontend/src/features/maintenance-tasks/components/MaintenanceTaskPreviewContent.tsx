@@ -112,6 +112,7 @@ type MaintenanceTaskPreviewContentProps = {
     charging: ReactNode;
     carWash: ReactNode;
     maintenance: ReactNode;
+    parking: ReactNode;
     preTrip: ReactNode;
     mobile: ReactNode;
   }>;
@@ -225,7 +226,7 @@ export function MaintenanceTaskPreviewContent({
 
       <PreviewSection step={5} title={stepLabels[5]} enabled={parking.stepEnabled} onEdit={onEditStep}>
         {wrapSection(
-          undefined,
+          parking.stepEnabled ? sectionExtras?.parking : undefined,
           <PreviewList
             items={parking.equipmentRows
               .filter((row) => row.mapCode.trim().length > 0)
