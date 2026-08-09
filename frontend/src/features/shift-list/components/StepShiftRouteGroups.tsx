@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeIntegerInput } from '../../maintenance-tasks/utils/numericInput';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
+import { computeTurnaroundLimitSegments } from '../../time-templates/utils/turnaroundLimitSegments';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
 import type {
   ShiftScheduleCreationMode,
@@ -91,6 +92,17 @@ const DWELL_STATIC_CLASS =
 function formatSecondsLabel(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '—';
   return `${seconds}秒`;
+}
+
+/** 折返時限是哪一段時段算出來的——訊息要指名那一段，使用者才知道回模板改哪裡 */
+function formatClockRange(startMinute: number, endMinute: number): string {
+  const hhmm = (minute: number) => {
+    const total = Math.max(0, Math.round(minute));
+    const hh = Math.floor(total / 60) % 24;
+    const mm = total % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  };
+  return `${hhmm(startMinute)}–${hhmm(endMinute)}`;
 }
 
 function buildStationDwells(
@@ -302,7 +314,8 @@ function StationDwellEditor({
             {turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0
               ? ` ${formatSecondsLabel(totalMinSum - turnaroundLimitSeconds)}`
               : ''}
-            。要嘛縮短這條線的行駛時間／靠站秒數／恢復時間，要嘛回時間模板放寬折返時限。
+            。要嘛縮短這條線的行駛時間／靠站秒數／恢復時間，
+            要嘛回時間模板把時限撐大（時限＝該時段正線列數 × 班距，不是直接填的欄位）。
           </p>
         )}
 
@@ -678,6 +691,17 @@ export function StepShiftRouteGroups({
   const [preferredMapId, setPreferredMapId] = useState(() => draft.mapId.trim());
   const [catalog, setCatalog] = useState<ShiftRouteGroupCatalogItem[]>([]);
   const [turnaroundLimitSeconds, setTurnaroundLimitSeconds] = useState<number | null>(null);
+  /**
+   * 折返時限是<strong>算出來的</strong>，不是某個欄位填的：
+   * 該時段同時在跑的正線列數 × 該時段班距，再取全天最小的那一段。
+   * 使用者看到數字卻找不到哪裡改，所以要把「是哪一段在擋、怎麼組成的」一起講。
+   */
+  const [turnaroundBinding, setTurnaroundBinding] = useState<{
+    startMinute: number;
+    endMinute: number;
+    activePassengerCount: number;
+    headwaySeconds: number | null;
+  } | null>(null);
   const [turnaroundLoading, setTurnaroundLoading] = useState(false);
 
   const [pendingAddRouteId, setPendingAddRouteId] = useState('');
@@ -773,6 +797,7 @@ export function StepShiftRouteGroups({
   useEffect(() => {
     if (!timeTemplateId.trim()) {
       setTurnaroundLimitSeconds(null);
+      setTurnaroundBinding(null);
       setTurnaroundLoading(false);
       return;
     }
@@ -782,12 +807,32 @@ export function StepShiftRouteGroups({
       .then((detail) => {
         if (cancelled) return;
         const body = parseStoredTemplateBody(detail.body ?? {});
-        setTurnaroundLimitSeconds(
-          resolveStrictestTurnaroundLimitSeconds(body.tasks, body.intervals, body.attributes),
+        const limit = resolveStrictestTurnaroundLimitSeconds(
+          body.tasks, body.intervals, body.attributes,
+        );
+        setTurnaroundLimitSeconds(limit);
+        // 找出實際在擋的那一段——全天最小的那個時限就是它
+        const segments = computeTurnaroundLimitSegments(
+          body.tasks, body.intervals, body.attributes,
+        );
+        const binding = limit == null
+          ? null
+          : segments.find((seg) => seg.turnaroundLimitSeconds === limit) ?? null;
+        setTurnaroundBinding(
+          binding
+            ? {
+                startMinute: binding.startMinute,
+                endMinute: binding.endMinute,
+                activePassengerCount: binding.activePassengerCount,
+                headwaySeconds: binding.headwaySeconds,
+              }
+            : null,
         );
       })
       .catch(() => {
-        if (!cancelled) setTurnaroundLimitSeconds(null);
+        if (cancelled) return;
+        setTurnaroundLimitSeconds(null);
+        setTurnaroundBinding(null);
       })
       .finally(() => {
         if (!cancelled) setTurnaroundLoading(false);
@@ -1939,10 +1984,32 @@ export function StepShiftRouteGroups({
                                 {formatSecondsLabel(shortfall)} 就會通過。
                               </li>
                               <li>
-                                <span className="text-zinc-200">放寬折返時限</span>
-                                ——回「建立時間模板」調整，目前是{' '}
-                                {formatSecondsLabel(limit)}。這是車輛能連續運轉多久的上限，
-                                放寬前請確認營運上真的可以。
+                                <span className="text-zinc-200">把折返時限撐大</span>
+                                ——它<strong>不是一個可以直接填的欄位</strong>，是算出來的：
+                                <span className="text-zinc-200">
+                                  該時段同時在跑的正線列數 × 該時段班距
+                                </span>
+                                ，再取全天最小的那一段。
+                                {turnaroundBinding ? (
+                                  <>
+                                    {' '}目前卡住的是{' '}
+                                    <span className="font-medium text-amber-300">
+                                      {formatClockRange(
+                                        turnaroundBinding.startMinute,
+                                        turnaroundBinding.endMinute,
+                                      )}
+                                    </span>
+                                    {' '}這一段：{turnaroundBinding.activePassengerCount} 列正線 ×{' '}
+                                    {formatSecondsLabel(turnaroundBinding.headwaySeconds)} 班距 ={' '}
+                                    {formatSecondsLabel(limit)}。
+                                    要撐大就<strong>回時間模板</strong>對這一段做其中一件事：
+                                    多排一列正線，或把該時段屬性的班距拉長。
+                                  </>
+                                ) : (
+                                  <>
+                                    {' '}要撐大就回時間模板：多排一列正線，或把該時段的班距拉長。
+                                  </>
+                                )}
                               </li>
                             </ul>
                           </div>
