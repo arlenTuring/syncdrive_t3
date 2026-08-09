@@ -210,6 +210,15 @@ export function insertMaintenanceTransferCards(args: {
   collisionProtectionSeconds: number;
   /** 整備區塊代號；用來把來源／目的整備類型的代號算好寫進卡片 */
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  /**
+   * 只跑「決定去哪」就回來，不產生任何卡片。
+   *
+   * 站位求解器在收斂迴圈裡跑，而卡片必須等時刻定案後才能插（要貼齊下一段發車）。
+   * 待命佔的停靠站又得讓求解器<strong>在迴圈裡</strong>看得到，否則只能事後報錯、
+   * 沒有任何閃避的機會。所以把「決定去哪」跟「插卡」拆成兩次呼叫：
+   * 迴圈前先決定（decideOnly），迴圈後再插卡（沿用已寫在區塊上的地點）。
+   */
+  decideOnly?: boolean;
 }): MaintenanceTransferCardsResult {
   const {
     timelines,
@@ -220,6 +229,7 @@ export function insertMaintenanceTransferCards(args: {
     minimumRecoveryTimeSeconds,
     collisionProtectionSeconds,
     sectionCodes,
+    decideOnly = false,
   } = args;
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
@@ -335,6 +345,10 @@ export function insertMaintenanceTransferCards(args: {
     yardBlockFacility.set(block.id, { nodeId, label });
     block.yardFacilityNodeId = nodeId;
     block.yardFacilityLabel = label;
+    // 停的是正線停靠站才記 stationId——它要進站位佔用表；設施格不佔正線站位
+    const node = nodeById.get(nodeId);
+    block.yardFacilityStationId =
+      node?.kind === 'docking' ? node.stationId?.trim() || undefined : undefined;
 
     const startSecond = minuteToSecond(block.plannedStartMinute);
     const endSecond = minuteToSecond(block.plannedEndMinute);
@@ -539,6 +553,28 @@ export function insertMaintenanceTransferCards(args: {
     return { nodeId: firstEdge.toNodeId, instant: referenceInstant + edgeSeconds(firstEdge, 'avg') };
   }
 
+  // 前一次 decideOnly 呼叫的結果，哪些要沿用、哪些要重算：
+  //
+  // <strong>佔了正線停靠站的待命必須原封不動</strong>——站位求解器整個收斂迴圈
+  // 都是照那個地點在閃避的，這時候改地點等於推翻求解結果。
+  //
+  // 其餘的（停設施格的）<strong>重新決定</strong>：迴圈會推移時刻，用迴圈前的
+  // 舊時刻挑出來的設施，到這時候可能已經不適用了。它們不佔正線站位，
+  // 重挑不會動搖求解器的任何前提。
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (!YARD_TASK_TYPES.has(block.taskType)) continue;
+      const nodeId = block.yardFacilityNodeId;
+      if (!nodeId || yardBlockFacility.has(block.id)) continue;
+      if (block.yardFacilityStationId) {
+        assignYardFacility(block, nodeId, block.yardFacilityLabel ?? nodeId);
+      } else if (!decideOnly) {
+        block.yardFacilityNodeId = undefined;
+        block.yardFacilityLabel = undefined;
+      }
+    }
+  }
+
   // ---- 決定去哪：先真整備、後待命 ----
   //
   // 這一段<strong>只決定每一段整備停在哪一台設施／哪一個停靠站</strong>，
@@ -678,6 +714,13 @@ export function insertMaintenanceTransferCards(args: {
       );
       if (picked) assignYardStay(slot.block, picked.nodeId, picked.label);
     }
+  }
+
+  if (decideOnly) {
+    return {
+      timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
+      skipped, facilityUnavailable,
+    };
   }
 
   // ---- 入廠（MI）：只在串首補，開始時刻提前、結束不動 ----

@@ -637,6 +637,33 @@ export function enforceStationBerthConstraints(args: {
   }
 
   const booked: BerthWindowSec[] = [];
+
+  // 待命停在正線停靠站＝那一格整段時間被佔死，別台車進不來。
+  // 這些窗必須<strong>先</strong>放進 booked，求解器才會把它當成既成事實去閃避
+  // （延後發車／改派備用路線）。只餵給最終驗證是不夠的——那時迴圈早就結束，
+  // 只能報「撞了」而沒有任何調整的機會，等於有報沒有解。
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.taskType !== 'standby') continue;
+      const stationId = block.yardFacilityStationId?.trim();
+      if (!stationId) continue;
+      const startSecond = minuteToSecond(block.plannedStartMinute);
+      const naturalEndSecond = Math.max(
+        minuteToSecond(block.plannedEndMinute),
+        startSecond + minPresenceSeconds(),
+      );
+      booked.push({
+        stationId,
+        stationName: block.yardFacilityLabel ?? stationId,
+        startSecond,
+        // 車開走之後別台車還要 2 × 保護時間才進得來，跟正線同一套規則
+        endSecond: naturalEndSecond + collisionProtectionSeconds * 2,
+        naturalEndSecond,
+        timelineRow: block.timelineRow,
+      });
+    }
+  }
+
   let delayedCount = 0;
   let backupSwitchedCount = 0;
   let unresolvedCount = 0;

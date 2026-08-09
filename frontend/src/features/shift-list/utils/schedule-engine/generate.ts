@@ -188,6 +188,27 @@ export function generateShiftSchedule(
     ...engineInput.backupRoutes,
   ];
 
+  // 待命要停在哪，必須在站位求解<strong>之前</strong>就決定。
+  //
+  // 待命停在正線停靠站等於把那一格佔住整段時間，站位求解器要有機會閃避
+  // （延後發車、改派備用路線、讓渡）。但插卡必須等時刻定案後才能做——卡要貼齊
+  // 下一段發車。所以拆成兩趟：這裡只決定地點寫進區塊，迴圈跑完再插卡。
+  //
+  // 只決定一次、不在迴圈裡每輪重算：地點若跟著求解結果一直變，會跟求解器互相
+  // 追著跑，而收斂判定看的是時刻指紋、抓不到這種來回。時刻在迴圈裡的漂移
+  // 由最後的站位驗證負責回報。
+  insertMaintenanceTransferCards({
+    timelines,
+    topology: engineInput.pointTopology,
+    areas: engineInput.areas,
+    maintenanceBody: engineInput.maintenanceBody,
+    selectedRoutes: engineInput.selectedRoutes,
+    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    decideOnly: true,
+  });
+
   // ── 幾何後處理：收斂迴圈 ────────────────────────────────────────────────
   //
   // 這幾道處理彼此會互相破壞：站位延後把班距擠亂、補班距又把班次推進整備、

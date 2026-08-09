@@ -134,7 +134,11 @@ export type StationBerthCollision = {
  * 蒐集各停靠點跨車在站區間。
  *
  * 佔用＝該班在該站「到站～離站」的自然時間（還沒出發前本來就在這個空間），
- * **不是**正線結束後把充電／保養／行檢／待命硬掛在末站上。
+ * **不是**正線結束後把充電／保養／行檢硬掛在末站上（那是沒有明確地點的推測）。
+ *
+ * 唯一的例外是<strong>待命停在正線停靠站</strong>：那是使用者指定、引擎也挑定的
+ * 明確地點，車整段時間真的停在那一格，別台車進不來、那條路線也排不了。
+ * 這種佔用一定要算進來，否則排出來的班表是假的。
  */
 export function collectStationBerthOccupancies(
   timelines: GeneratedSchedulePlan['timelines'],
@@ -158,6 +162,29 @@ export function collectStationBerthOccupancies(
     );
 
     for (const block of blocks) {
+      // 待命停在正線停靠站：整段時間都實實在在佔著那一格。
+      // 這跟「正線跑完把整備硬掛在末站」不一樣——那是沒有明確地點的推測，
+      // 這是使用者指定、引擎也挑定的地點，車真的停在那裡，別台車進不來。
+      if (block.taskType === 'standby' && block.yardFacilityStationId) {
+        const startMinute = block.plannedStartMinute;
+        const endMinute = Math.max(block.plannedEndMinute, startMinute + minPresenceMin);
+        out.push({
+          stationId: block.yardFacilityStationId,
+          stationName: block.yardFacilityLabel ?? block.yardFacilityStationId,
+          timelineRow: timeline.row,
+          blockId: block.id,
+          routeCode: null,
+          routeId: null,
+          startMinute,
+          endMinute,
+          blockStartMinute: block.plannedStartMinute,
+          blockEndMinute: block.plannedEndMinute,
+          actualDepartMinute: endMinute,
+          berthClearMinute: endMinute + protectionMin / 2,
+          protectedUntilMinute: endMinute + protectionMin,
+        });
+        continue;
+      }
       if (block.taskType !== 'passenger') continue;
       const route = resolveRouteForBlock(block, selectedRoutes);
       if (!route) continue;

@@ -3569,6 +3569,64 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-10 · 待命佔住正線停靠站：從「有報沒有解」變成求解器真的會閃避</h3>
+  <div class="callout">
+    使用者：「待命如果跟停靠站有關係的，他在那邊待命就是把那一格佔下來了，
+    但這樣是沒有關係的……相對的，那條路線也會因此而不能安排。」
+    ——並明確要求<strong>要解</strong>，解不了才報告哪裡有問題。
+  </div>
+  <ul>
+    <li>
+      <strong>先前的狀況：完全看不見。</strong><code>collectStationBerthOccupancies()</code>
+      只統計 <code>taskType === 'passenger'</code> 的區塊。待命停在停靠站，
+      碰撞檢查一無所知，別的車照樣被排進同一格。
+    </li>
+    <li>
+      <strong>雞生蛋問題：</strong>站位求解器在收斂迴圈裡跑（第 8 輪就結束），
+      而待命地點原本是在迴圈<strong>之後</strong>的插卡階段才決定的。順序不改的話，
+      待命佔位只能事後報錯，沒有任何閃避的機會。
+      而插卡又必須留在最後——卡要貼齊下一段發車，時刻得先定案。
+      <br /><br />
+      <strong>解法：把一次呼叫拆成兩趟。</strong>迴圈前先跑
+      <code>decideOnly</code>（只決定地點、寫進區塊、不產生卡片），迴圈後再跑完整的
+      插卡並沿用已定案的地點。決定與插卡分離，兩邊各自留在它該在的位置。
+    </li>
+    <li>
+      <strong>只鎖住「真的佔了站位」的那些。</strong>第一版把<strong>所有</strong>
+      迴圈前的決定都鎖死，結果非待命的整備被迫用迴圈前的舊時刻，掉了一塊。
+      改成：<code>yardFacilityStationId</code> 有值的（＝佔了正線站位）原封不動——
+      求解器整輪都是照那個地點在閃避，這時改地點等於推翻求解結果；
+      其餘停設施格的則用<strong>迴圈後的正確時刻重新決定</strong>，它們不佔正線站位，
+      重挑不動搖求解器的任何前提。數字才回到基準。
+    </li>
+    <li>
+      <strong>又一個「有報沒有解」的坑：求解器跟驗證器用的是兩套佔用計算。</strong>
+      <code>collectStationBerthOccupancies()</code>（驗證器用）改好之後，
+      實測發現求解器 <code>stationBerthConstraint.ts</code> <strong>沒有用它</strong>
+      ——它自己另外算一份 <code>booked: BerthWindowSec[]</code>，而且從空陣列開始、
+      只裝正線。只改驗證器等於「撞了會講，但一次都沒閃過」。
+      求解器那邊也要<strong>預先</strong>把待命佔的窗放進 <code>booked</code>，
+      它才會當成既成事實去閃避。
+    </li>
+    <li>
+      <strong>驗證（端到端）：</strong>同一班正線，待命不佔 T3 時發車 485 分；
+      待命佔住 T3 08:00–08:20 時發車被延後到 487 分、<code>delayedCount = 1</code>
+      ——求解器確實看見並反應了。剩下的差距受既有的延後上限所限，
+      由最終驗證回報，符合「解不了就報告」。
+      真實資料各項數字不變（<code>errorsByCode</code> 空、<code>report.ok = true</code>、
+      設施重疊 0），因為目前設定還沒有待命任務。
+      新增 2 則測試（停靠站要寫 stationId／停設施格不寫）。
+      <code>tsc</code> 23、測試 342 pass／9 fail、<code>eslint</code> 無新增問題。
+    </li>
+    <li>
+      <strong>教訓：</strong>「同一件事有兩套實作」這個坑這個 session 已經踩到第三次
+      （班次代號、設施佔用表、現在是站位佔用）。<code>stationBerthConstraint.ts</code>
+      的註解甚至寫著「與 collectStationBerthOccupancies 同一套自然在站定義」——
+      <strong>寫著同一套，實際是各算各的</strong>。往後看到這種註解要當成警訊去查證，
+      而不是當成保證。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

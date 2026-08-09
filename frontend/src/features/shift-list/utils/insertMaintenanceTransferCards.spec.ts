@@ -824,6 +824,79 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     });
   });
 
+  describe('待命停在正線停靠站：真的把那一格佔住', () => {
+    function topology(): PointTopology {
+      return {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'n-t3', kind: 'docking', label: 'T3上行', stationId: 'station_t3', x: 0, y: 0, color: '#111' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#222' },
+        ],
+        edges: [edge('n-t3', 'M1', 60), edge('M1', 'n-t3', 60)],
+      };
+    }
+    // 待命可以掛「T3上行」這個停靠站
+    const BODY = {
+      mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'T3上行' }] },
+    };
+
+    it('待命掛到停靠站時，會寫上 yardFacilityStationId 供站位佔用表使用', () => {
+      const timelines = [{
+        row: 1,
+        blocks: [{
+          id: 'standby-1', timelineRow: 1, taskType: 'standby', label: '待命',
+          anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+          travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+        }],
+      }] as never as GeneratedSchedulePlan['timelines'];
+
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: [],
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      const standby = timelines[0]!.blocks.find((b) => b.id === 'standby-1')!;
+      assert.equal(standby.yardFacilityLabel, 'T3上行');
+      assert.equal(
+        standby.yardFacilityStationId, 'station_t3',
+        '停在停靠站要記下 stationId——站位佔用表靠它才知道那一格被佔走',
+      );
+    });
+
+    it('停在設施格時不寫 stationId——設施格不佔正線站位', () => {
+      const BODY_FACILITY = {
+        mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'M1' }] },
+      };
+      const timelines = [{
+        row: 1,
+        blocks: [{
+          id: 'standby-1', timelineRow: 1, taskType: 'standby', label: '待命',
+          anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+          travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+        }],
+      }] as never as GeneratedSchedulePlan['timelines'];
+
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY_FACILITY,
+        selectedRoutes: [],
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      const standby = timelines[0]!.blocks.find((b) => b.id === 'standby-1')!;
+      assert.equal(standby.yardFacilityLabel, 'M1');
+      assert.equal(standby.yardFacilityStationId, undefined);
+    });
+  });
+
   describe('三段共用一份設施佔用表：不同種卡不會撞用同一台設施', () => {
     /**
      * 單一設施 M1 同時是「保養」入廠目的地，也是另一列車出廠的起點——
