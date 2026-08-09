@@ -306,6 +306,13 @@ export function insertMaintenanceTransferCards(args: {
         midLabel: string;
         exitLegSeconds: number;
         entryLegSeconds: number;
+        /**
+         * 出廠設施的第一段邊終點，跟入廠設施的最後一段邊起點，是不是同一個
+         * 轉折點——只隔一個轉折點就代表兩座設施在同一個區域，卡面直接顯示
+         * 「設施 → 設施」（例 M1 → H1），不用把中間那個轉折點的站名也印出來。
+         * 隔更多段（要先繞去別的轉乘站）才維持顯示「設施 → 轉折點」兩段式。
+         */
+        sameArea: boolean;
       } | null = null;
 
       for (const exitFacility of exitFacilities) {
@@ -348,6 +355,8 @@ export function insertMaintenanceTransferCards(args: {
               midLabel: midNode?.label || midNodeId,
               exitLegSeconds,
               entryLegSeconds,
+              // 只有一個轉折點（設施→轉折點→設施，恰好兩段邊）才算同一區域
+              sameArea: path.edges.length === 2,
             };
           }
         }
@@ -373,11 +382,17 @@ export function insertMaintenanceTransferCards(args: {
       const exitLabel = resolveMaintenanceSectionLabelForTaskType(earlier.taskType) ?? undefined;
       const entryLabel = resolveMaintenanceSectionLabelForTaskType(later.taskType) ?? undefined;
 
+      // 同一區域（只隔一個轉折點）：卡面直接顯示「設施 → 設施」，不印中間那個
+      // 轉折點的站名——使用者不需要知道車繞了哪個轉乘站，只需要知道從哪一台
+      // 設施到哪一台設施。隔更多段才維持顯示「設施 → 轉折點」兩段式。
+      const exitOtherSideLabel = chosen.sameArea ? chosen.entryLabel : chosen.midLabel;
+      const entryOtherSideLabel = chosen.sameArea ? chosen.exitLabel : chosen.midLabel;
+
       const exitCard: GeneratedScheduleBlock = {
         id: `yardtransit-out-${earlier.id}-${Math.round(departSecond)}`,
         timelineRow: timeline.row,
         taskType: 'dispatch',
-        label: `整備出廠 · ${chosen.exitLabel} → ${chosen.midLabel}`,
+        label: `整備出廠 · ${chosen.exitLabel} → ${exitOtherSideLabel}`,
         anchorStartMinute: secondToMinute(departSecond),
         plannedStartMinute: secondToMinute(departSecond),
         plannedEndMinute: secondToMinute(midSecond),
@@ -387,7 +402,7 @@ export function insertMaintenanceTransferCards(args: {
         yardExitFacilityNodeId: chosen.exitNodeId,
         yardExitFacilityLabel: chosen.exitLabel,
         yardExitStationId: chosen.midNodeId,
-        yardExitStationLabel: chosen.midLabel,
+        yardExitStationLabel: exitOtherSideLabel,
         yardExitSectionCode: exitCode,
         yardExitSectionLabel: exitLabel,
       };
@@ -395,7 +410,7 @@ export function insertMaintenanceTransferCards(args: {
         id: `yardtransit-in-${later.id}-${Math.round(midSecond)}`,
         timelineRow: timeline.row,
         taskType: 'dispatch',
-        label: `整備入廠 · ${chosen.midLabel} → ${chosen.entryLabel}`,
+        label: `整備入廠 · ${entryOtherSideLabel} → ${chosen.entryLabel}`,
         anchorStartMinute: secondToMinute(midSecond),
         plannedStartMinute: secondToMinute(midSecond),
         plannedEndMinute: secondToMinute(arriveSecond),
@@ -405,7 +420,7 @@ export function insertMaintenanceTransferCards(args: {
         yardExitFacilityNodeId: chosen.entryNodeId,
         yardExitFacilityLabel: chosen.entryLabel,
         yardExitStationId: chosen.midNodeId,
-        yardExitStationLabel: chosen.midLabel,
+        yardExitStationLabel: entryOtherSideLabel,
         yardExitSectionCode: entryCode,
         yardExitSectionLabel: entryLabel,
       };

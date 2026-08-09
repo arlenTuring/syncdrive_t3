@@ -1145,10 +1145,12 @@ function ShiftScheduleBlockBar({
       title={
         isMoveCard
           ? [
-              `${code} · 出場移動`,
-              `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
+              `${code} · ${resolveMoveCardTitle(block)}`,
+              block.source === 'yard_entry_move' || block.source === 'park_entry_move'
+                ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '整備設施'}`
+                : `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
               `${timeLabel}（${block.travelSeconds} 秒）`,
-              '整備做完後把車從設施開到轉乘站；結束時刻貼齊下一段發車',
+              block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : '',
               block.yardExitAteYardTail ? '※ 空間不足，已佔用整備尾巴' : '',
             ]
               .filter(Boolean)

@@ -544,6 +544,37 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(mi.travelSeconds, 230, '剩下的 200+30 秒都算在入廠卡');
     });
 
+    it('兩座設施只隔一個轉折點（同一區域）時，卡面直接顯示「設施 → 設施」，不印轉折點站名', () => {
+      // E2（充電）──30s──> N2W（唯一轉折點）──30s──> M1（保養），恰好兩段邊
+      const sameAreaTopology: PointTopology = {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'E2', kind: 'facility', label: 'E2', x: 0, y: 0, color: '#111111' },
+          { id: 'N2W', kind: 'docking', label: 'N2W', x: 0, y: 0, color: '#222222' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#111111' },
+        ],
+        edges: [edge('E2', 'N2W', 30), edge('N2W', 'M1', 30)],
+      };
+      const p = plan();
+      const result = run(
+        p,
+        sameAreaTopology,
+        { charging: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'E2' }] },
+          maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r2', mapCode: 'M1' }] } },
+      );
+      assert.equal(result.inserted, 1);
+      const blocks = p.timelines[0]!.blocks;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
+      const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
+      assert.equal(mo.label, '整備出廠 · E2 → M1', '不顯示中間的轉折點 N2W');
+      assert.equal(mi.label, '整備入廠 · E2 → M1', '不顯示中間的轉折點 N2W');
+      assert.equal(mo.yardExitStationLabel, 'M1', '出廠卡的「另一端」顯示對面設施，不是轉折點站名');
+      assert.equal(mi.yardExitStationLabel, 'E2', '入廠卡的「另一端」顯示對面設施，不是轉折點站名');
+      // yardExitStationId 仍是真實的轉折點節點 id（資料仍然精確，只是顯示簡化）
+      assert.equal(mo.yardExitStationId, 'N2W');
+      assert.equal(mi.yardExitStationId, 'N2W');
+    });
+
     it('同類型銜接不需要轉場，不插卡', () => {
       const p: GeneratedSchedulePlan = {
         timelines: [
