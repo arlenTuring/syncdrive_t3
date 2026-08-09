@@ -128,6 +128,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: body as Record<string, unknown>,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
       });
     }
 
@@ -163,6 +164,53 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(card.yardExitFacilityLabel, 'M1', 'M1 60 秒比 M2 120 秒快');
       assert.equal(card.travelSeconds, 60);
+    });
+
+    it('兩條時間線同時經過同一個共用轉折點時，用 2 倍碰撞保護時間擋下——車不能瞬間分身', () => {
+      // 兩列車都是 09:30 跑完正線、都要進 M 系保養——路徑都要先經過共用的
+      // 轉折點 N2W，時刻完全相同：物理上不可能兩台車同時出現在同一個點。
+      const row1 = plan({ yardStartMinute: 10 * 60, row: 1 });
+      const row2 = plan({ yardStartMinute: 10 * 60, row: 2 });
+      const p: GeneratedSchedulePlan = {
+        timelines: [...row1.timelines, ...row2.timelines],
+      } as never as GeneratedSchedulePlan;
+
+      const result = insertMaintenanceTransferCards({
+        timelines: p.timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 30,
+      });
+
+      assert.equal(result.inserted, 1, '第一條線正常插卡，第二條線因為轉折點衝突排不進去');
+      assert.equal(result.skipped.length, 1);
+      assert.equal(result.skipped[0]!.timelineRow, 2);
+      assert.match(result.skipped[0]!.reason, /轉折點的時間太近/);
+
+      const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move');
+      assert.ok(row1Card, '先處理的時間線不受影響');
+    });
+
+    it('沒有設定碰撞保護時間（0）就不擋——維持原本可以同時經過的行為', () => {
+      const row1 = plan({ yardStartMinute: 10 * 60, row: 1 });
+      const row2 = plan({ yardStartMinute: 10 * 60, row: 2 });
+      const p: GeneratedSchedulePlan = {
+        timelines: [...row1.timelines, ...row2.timelines],
+      } as never as GeneratedSchedulePlan;
+
+      const result = insertMaintenanceTransferCards({
+        timelines: p.timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+      });
+
+      assert.equal(result.inserted, 2, '碰撞保護時間是 0 就不加這層限制');
+      assert.equal(result.skipped.length, 0);
     });
 
     it('連續整備串只在串首入廠，不會每段都插', () => {
@@ -201,6 +249,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: BODY,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
       });
       assert.equal(result.inserted, 0);
       assert.equal(result.skipped.length, 0);
@@ -293,6 +342,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: body,
         selectedRoutes: SELECTED_ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
         sectionCodes: SECTION_CODES,
       });
     }
@@ -486,6 +536,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: body as Record<string, unknown>,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
         sectionCodes: SECTION_CODES,
       });
     }
@@ -657,6 +708,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: BODY,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
         sectionCodes: SECTION_CODES,
       });
       assert.equal(result.inserted, 0);
@@ -784,6 +836,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         maintenanceBody: BODY,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
         sectionCodes: SECTION_CODES,
       });
 

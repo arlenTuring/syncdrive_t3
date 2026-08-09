@@ -1155,7 +1155,7 @@ function ShiftScheduleBlockBar({
             ]
               .filter(Boolean)
               .join('\n')
-          : `${block.label} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
+          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
       }
       role={selectable ? 'button' : undefined}
       tabIndex={selectable && showChrome ? 0 : undefined}
@@ -1342,6 +1342,7 @@ function ShiftScheduleBlockBar({
             style={{ color: colors.text }}
           >
             {block.label}
+            {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
           </div>
         )}
         <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">

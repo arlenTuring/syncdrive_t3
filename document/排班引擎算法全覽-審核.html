@@ -1103,6 +1103,24 @@
     時段，出廠卡可能在入廠卡已訂走的設施時段裡再插一張，兩台車同時佔用同一格
     設施卻沒有任何檢查抓到（見 §17 對應條目，真實資料驗證抓到 5 個這樣的撞格）。
   </p>
+  <p>
+    <strong>入廠卡跟出廠卡指的是同一段停留，設施一定要一致。</strong>執行順序
+    <strong>入廠 → 轉場 → 出廠</strong>本身就提供了傳遞順序：哪一側先解出具體
+    設施，就寫進 <code>yardBlockFacility</code>（整備區塊 id → 設施），晚執行
+    的一側只能沿用同一台，不能自己另外挑一台更快的。同一段整備任務區塊本身
+    也會拿到 <code>yardFacilityNodeId</code>／<code>yardFacilityLabel</code>（見
+    下表），讓任務卡自己也知道車停在哪。
+  </p>
+  <p>
+    <strong>共用轉折點也有佔用表，用 2 倍碰撞保護時間。</strong>多座設施常共用
+    同一個閘門（例如 M 系、H 系全部經 T3下行入廠）——不同時間線的卡各自找
+    最快路徑時互相看不到彼此會不會在同一個轉折點撞上同一刻。<code>junctionBookings</code>
+    是跟 <code>bookings</code> 平行的第二份佔用表，記每張卡「設施專屬邊之外、
+    緊鄰的那個共用轉折點」，同一轉折點兩個時間線的經過時刻若差在 2 倍
+    <code>collisionProtectionSeconds</code> 之內（跟 §8.1 站位碰撞保護同一個
+    數字），候選淘汰、換下一個或回報排不出來——不會悄悄接受一個要求兩台車
+    同時出現在同一個點的排法。
+  </p>
 
   <h4>資料模型：卡片身上帶什麼</h4>
   <table>
@@ -1116,9 +1134,11 @@
       卡面代號＝這個欄位 + 方向尾綴，由 <code>resolveMoveCardPrefix()</code> 動態組成。</td></tr>
       <tr><td><code>yardExitSectionLabel</code></td><td>來源／目的整備類型的<strong>中文名</strong>
       （充電／洗車／保養／行前／機動／調度），只給 hover 標題用，不影響卡面代號或排班邏輯。</td></tr>
-      <tr><td><code>yardExitFacilityNodeId</code>／<code>Label</code></td><td>實際去的那一台具體設施（例 M2）。</td></tr>
-      <tr><td><code>yardExitStationId</code>／<code>Label</code></td><td>另一端的站／分界點。</td></tr>
+      <tr><td><code>yardExitFacilityNodeId</code>／<code>Label</code></td><td>移動卡本身：實際去的那一台具體設施（例 M2）。</td></tr>
+      <tr><td><code>yardExitStationId</code>／<code>Label</code></td><td>移動卡本身：另一端的站／分界點。</td></tr>
       <tr><td><code>yardExitAteYardTail</code></td><td>只有出廠卡會設——空間不夠、吃了整備尾巴。</td></tr>
+      <tr><td><code>yardFacilityNodeId</code>／<code>Label</code></td><td><strong>整備任務區塊本身</strong>（不是移動卡）：
+      這一段實際停在哪一台具體設施，由入廠或出廠（或轉場對應那一側）解出來寫回。</td></tr>
     </tbody>
   </table>
   <p>
@@ -3008,6 +3028,93 @@ backend/src/dev-log/
       都重新核對一次，不能只挑跟這次改動直接相關的欄位看。使用者這次明確要求
       「重新一一檢查清楚」才補上這一步——以後每次接通一條先前是早退／關閉狀態
       的路徑，都要當成「這是它第一次真的跑」來對待，全欄位重新核對。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · 使用者截圖抓出三個真問題：入廠出廠設施不一致、卡面沒顯示設施、轉折點可以兩台車瞬間分身</h3>
+  <div class="callout warn">
+    使用者截了實際畫面回來核對，四個問題裡三個是真的程式問題，一個是設計如此
+    （見下方第 4 點的說明，不是 bug）。
+  </div>
+  <ul>
+    <li>
+      <strong>問題一（嚴重）：同一段整備任務的入廠卡跟出廠卡，設施可能對不上。</strong>
+      使用者截圖：EIB0244（入廠）hover 顯示「station_2 → E3」，同一段充電任務
+      緊接著的 EOB0430（出廠）hover 卻顯示「E2 → N2W下行出發」——車進去的是
+      E3，出來的卻是 E2，物理上不可能。根因：入廠（MI）、出廠（MO）、整備間
+      轉場是<strong>三個各自獨立的迴圈</strong>，各自對「自己這一側最快」的設施
+      做優化，完全不知道另一側已經選了哪一台——同一段停留因此可能被兩側
+      各自指派到不同的具體設施。
+      <br /><br />
+      <strong>修法：</strong>新增 <code>yardBlockFacility</code>
+      （整備區塊 id → 已確定設施），依<strong>入廠 → 轉場 → 出廠</strong>
+      這個既有的執行順序傳遞——晚執行的一側一定看得到早執行的一側已經定案的
+      設施，只能沿用同一台（用 <code>.filter(f =&gt; f.id === assigned.nodeId)</code>
+      把候選收斂成那一台，收斂後如果連不到才報 skip，不會自己另外挑一台）。
+      三段規則本來就是照「入廠先跑、轉場接著、出廠最後」的順序執行（見前面
+      §10.5 的說明），這個順序本身已經保證了「早解出來的先寫入、晚解出來的
+      一定讀得到」，不需要重新設計執行順序，只要在既有順序上加一層傳遞。
+    </li>
+    <li>
+      <strong>問題二：整備任務卡本身沒有顯示停在哪台設施。</strong>
+      之前只有入廠／出廠<strong>移動卡</strong>的 hover 會顯示設施，整備任務
+      本身（例如「充電」那張卡）完全沒有這個資訊。新增
+      <code>GeneratedScheduleBlock.yardFacilityNodeId</code>／
+      <code>yardFacilityLabel</code>，由問題一的 <code>yardBlockFacility</code>
+      機制順便寫回整備任務卡本身；UI 上任務卡的第二行從單純「充電」改成
+      「充電 · E3」，native title tooltip 同步補上。
+    </li>
+    <li>
+      <strong>問題三：轉折點可以讓兩台車「瞬間分身」。</strong>
+      使用者原話：「MIA0430跟MIB0430是完全同時間前往T3下行的……雖然我允許
+      他們可以不管間距，但他們不可能兩台車一起移動過去，再怎麼樣都有一個
+      距離移動時間差才對，因為他們是走在真實道路上，請你先用兩倍的安全
+      碰撞緩衝來做」。多座設施常共用同一個閘門轉折點（例如 M 系、H 系全部
+      經由 T3下行入廠）——不同時間線各自的入廠／出廠／轉場卡各自獨立找
+      最快路徑，完全不知道別的時間線會不會在同一個轉折點撞上同一刻。
+      <br /><br />
+      <strong>修法：</strong>新增第二份佔用表 <code>junctionBookings</code>
+      （轉折點層級，跟設施佔用表 <code>bookings</code> 是平行的兩份），
+      對每張入廠／出廠／轉場卡取它<strong>設施專屬邊之外、緊鄰的那個共用
+      轉折點</strong>（跟卡片分界點用的是同一種「設施專屬邊」概念——出廠取
+      設施自己邊的終點、入廠取設施自己邊的起點），檢查是否有別的時間線在
+      <strong>2 倍碰撞保護時間</strong>內經過同一個轉折點；有就整個候選淘汰，
+      換下一個候選或直接回報排不出來（不是自動延後——延後牽動的是正線與
+      整備任務本身的時刻，牽連太廣，這次先用「淘汰＋回報」，使用者可以自己
+      看警告決定怎麼調）。跟 §8.1 站位碰撞保護用同一個
+      <code>collisionProtectionSeconds</code> 數字、同一套「2 倍」邏輯，
+      不是另外發明一個新參數。
+    </li>
+    <li>
+      <strong>問題四（確認不是 bug）：EIB0244 為什麼 02:44:10 才發車，
+      不是 TN0240 結束的 02:43:40？</strong>差的 30 秒就是這份草稿設定的
+      <code>minimumRecoveryTimeSeconds</code>（Step 4 最低恢復時間，
+      這份測試資料剛好也是 30）——入廠卡的 <code>freeSecond</code>
+      本來就是「前一段載客結束時刻 + 最低恢復時間」，車不是一下客就能立刻
+      掉頭走，需要這段最低恢復時間。這是設計如此，不是誤會、也沒有多留
+      任何額外緩衝。
+    </li>
+    <li>
+      <strong>驗證：</strong>真實資料下 <code>errorsByCode</code> 維持空、
+      <code>report.ok = true</code>；54 個整備任務卡正確帶出
+      <code>yardFacilityNodeId</code>，交叉核對「入廠卡進哪台、出廠卡出哪台」
+      0 個不一致（合併前用同一份資料手動核對過至少一組真的對不上，例如上面
+      問題一截圖那組）；加上碰撞保護後 <code>yard_entry_move</code>／
+      <code>yard_exit_move</code> 各少插 2 張（41→39、42→40），
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 對應增加 2 則——這是預期
+      內的行為，代表有轉折點衝突的候選被正確擋下、回報，而不是悄悄接受一個
+      物理上不可能的排法。新增 4 則測試（設施一致性、碰撞緩衝擋下、
+      碰撞保護時間為 0 時不擋）。<code>tsc</code> 23、測試 342 pass／9 fail
+      （新增 4 則，9 則既有失敗與此改動無關），<code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>教訓：</strong>問題一、三是同一種根因的兩種樣貌——三段規則
+      分開優化（各自找「對自己最快」的答案）在時序上是對的分工，但共用資源
+      （設施、轉折點）如果只在「同一層級」內互相看得到（例如 <code>bookings</code>
+      原本只管設施本身），跨層級的物理約束（同一段任務只能停一個地方、
+      同一個轉折點同時只能有一台車）就會漏接。往後新增任何「各自獨立找最佳解」
+      的分頁式流程，都要先問一次：這些分頁之間有沒有共用的實體資源，共用資源
+      有沒有一份大家都看得到的佔用表。
     </li>
   </ul>
 

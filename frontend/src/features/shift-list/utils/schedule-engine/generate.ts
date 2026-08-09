@@ -287,6 +287,7 @@ export function generateShiftSchedule(
     maintenanceBody: engineInput.maintenanceBody,
     selectedRoutes: engineInput.selectedRoutes,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
   timelines = maintenanceTransfer.timelines;
