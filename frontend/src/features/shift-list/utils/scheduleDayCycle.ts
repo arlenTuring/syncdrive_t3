@@ -4,7 +4,9 @@
  *
  * 甘特顯示（跨夜卡）：
  * - 文字維持真實起迄（例 23:58:10 - 00:04:10）
- * - 條帶改畫在日頭：00:00 → 實際結束（例畫到 00:04:10），長度不必等於整趟占用
+ * - 條帶<strong>頭尾各畫一張</strong>：日尾 23:58:10 → 24:00:00、
+ *   日頭 00:00:00 → 00:04:10，兩張內容完全相同——同一張卡被日界切成兩段，
+ *   而不是把整張搬到日頭（那會讓日尾那段時間看起來空著）。
  */
 
 /** 一日長度（分鐘）＝ 24 × 60 */
@@ -63,7 +65,11 @@ export function crossesScheduleDayBoundary(
 /**
  * 甘特條帶位置（與鐘面文字可分離）：
  * - 當日內：照 [start, end) 畫
- * - 跨夜（end > 1440）：一律移到日頭，從 00:00 畫到 wrap(end)
+ * - <strong>跨夜（start &lt; 1440 &lt; end）：頭尾各畫一張</strong>——
+ *   日尾那張畫 [start, 24:00]、日頭那張畫 [00:00, wrap(end)]，
+ *   兩張的內容完全相同（同一張卡被日界切成兩段，不是兩張不同的卡）。
+ *   例：23:55:30 → 00:05:30 會得到 [23:55:30, 24:00:00] 與 [00:00:00, 00:05:30]，
+ *   文字一律維持真實起迄「23:55:30 - 00:05:30」。
  * - 整段已過日界：畫 [wrap(start), wrap(end)]（結束可為 1440）
  */
 export function splitIntoDayCycleSegments(
@@ -75,18 +81,27 @@ export function splitIntoDayCycleSegments(
 
   const day = SCHEDULE_DAY_MINUTES;
 
-  // 跨夜／日界後：條帶改放在 00:00 之後，長度只涵蓋「午夜後到結束」
   if (endMinute > day + 1e-12) {
     const visualEnd = wrapScheduleMinute(endMinute);
-    // wrap(1440)=0 → 結束剛好午夜：不畫（無午夜後長度）
-    if (visualEnd <= 1e-12) return [];
+    // 整段都在日界之後：整體平移回鐘面
     if (startMinute >= day - 1e-12) {
       const visualStart = wrapScheduleMinute(startMinute);
-      if (visualEnd <= visualStart + 1e-12) return [];
-      return [{ startMinute: visualStart, endMinute: visualEnd }];
+      // wrap(1440)=0 → 結束剛好午夜，視為畫到日界右緣
+      const clippedEnd = visualEnd <= 1e-12 ? day : visualEnd;
+      if (clippedEnd <= visualStart + 1e-12) return [];
+      return [{ startMinute: visualStart, endMinute: clippedEnd }];
     }
-    // 自日內跨出：從 00:00 畫到結束
-    return [{ startMinute: 0, endMinute: visualEnd }];
+    // 自日內跨出：日尾一張 + 日頭一張
+    const tailStart = Math.max(0, startMinute);
+    const segments: DayCycleSegment[] = [];
+    if (day > tailStart + 1e-12) {
+      segments.push({ startMinute: tailStart, endMinute: day });
+    }
+    // 結束剛好落在午夜（wrap=0）時沒有日頭段，只有日尾那張
+    if (visualEnd > 1e-12) {
+      segments.push({ startMinute: 0, endMinute: visualEnd });
+    }
+    return segments;
   }
 
   // 當日內

@@ -35,7 +35,7 @@ describe('scheduleDayCycle', () => {
     assert.equal(clear, 24 * 60 + 6 * 60);
   });
 
-  it('moves overnight bars to day-head 00:00→end, keeps full clock label elsewhere', () => {
+  it('splits overnight bars into a day-tail piece and a day-head piece, keeps full clock label', () => {
     const start = 23 * 60 + 58 + 10 / 60;
     const end = 24 * 60 + 4 + 10 / 60;
     assert.equal(
@@ -43,9 +43,20 @@ describe('scheduleDayCycle', () => {
       '23:58:10 - 00:04:10',
     );
     const segs = splitIntoDayCycleSegments(start, end);
+    assert.equal(segs.length, 2, '跨夜要頭尾各一張，不是整張搬到日頭');
+    // 日尾：23:58:10 → 24:00:00
+    assert.ok(Math.abs(segs[0]!.startMinute - start) < 1e-6);
+    assert.equal(segs[0]!.endMinute, 24 * 60);
+    // 日頭：00:00:00 → 00:04:10
+    assert.equal(segs[1]!.startMinute, 0);
+    assert.ok(Math.abs(segs[1]!.endMinute - (4 + 10 / 60)) < 1e-6);
+  });
+
+  it('ends exactly at midnight: only the day-tail piece, no zero-width head piece', () => {
+    const segs = splitIntoDayCycleSegments(23 * 60 + 50, 24 * 60);
     assert.equal(segs.length, 1);
-    assert.equal(segs[0]!.startMinute, 0);
-    assert.ok(Math.abs(segs[0]!.endMinute - (4 + 10 / 60)) < 1e-6);
+    assert.equal(segs[0]!.startMinute, 23 * 60 + 50);
+    assert.equal(segs[0]!.endMinute, 24 * 60);
   });
 
   it('maps post-midnight-only trips onto morning clock face', () => {

@@ -296,6 +296,71 @@ function MoveCardHoverCard({
   );
 }
 
+/** 會佔用整備設施的任務類型（與引擎 moveCardShared.YARD_TASK_TYPES 同一組） */
+const YARD_TASK_TYPES_FOR_UI = new Set([
+  'charging',
+  'inspection',
+  'standby',
+  'servicing',
+  'washing',
+]);
+
+/**
+ * 整備任務卡的 hover 說明：這一段停在哪一台設施、做多久。
+ * 卡面只塞得下「類型 · 設施」一行，設施沒排到的原因、精確時長這些
+ * 都放這裡——每張整備卡都要有 ⓘ，不能只有正線卡查得到細節。
+ */
+function YardTaskHoverCard({
+  code,
+  block,
+  pos,
+}: {
+  code: string;
+  block: GeneratedScheduleBlock;
+  pos: HoverCardPos;
+}) {
+  const CARD_WIDTH = 260;
+  const MARGIN = 12;
+  const viewportWidth = typeof window === 'undefined' ? 1600 : window.innerWidth;
+  const halfWidth = CARD_WIDTH / 2;
+  const clampedLeft = Math.min(
+    Math.max(pos.left, halfWidth + MARGIN),
+    Math.max(halfWidth + MARGIN, viewportWidth - halfWidth - MARGIN),
+  );
+  const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = Math.round(durationMinutes % 60);
+
+  return createPortal(
+    <div
+      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      style={{ top: pos.top, left: clampedLeft }}
+      role="tooltip"
+    >
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[11px] font-semibold text-zinc-100">{block.label}</span>
+        <span className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</span>
+      </div>
+      <div className="mt-1 text-[11px] leading-4 text-zinc-100">
+        {block.yardFacilityLabel
+          ? `設施：${block.yardFacilityLabel}`
+          : '設施：尚未指派'}
+      </div>
+      <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
+        {formatBlockTimeRange(block)}
+        （{hours > 0 ? `${hours} 小時 ` : ''}{minutes} 分）
+      </div>
+      {block.yardFacilityUnavailable ? (
+        <p className="mt-1 text-[10px] leading-[14px] text-red-400">
+          ⚠ 這段時間該類設施沒有任何一台是空的，車沒地方停。
+          需要加設施、把同時段的整備錯開，或減少該時段安排整備的車數。
+        </p>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}
+
 /** 頂部時間軸 hover 卡片（與建立時間模板相同內容格式） */
 function IntervalAxisHoverCard({
   interval,
@@ -935,6 +1000,7 @@ function ShiftScheduleBlockBar({
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
   const [issueHoverPos, setIssueHoverPos] = useState<HoverCardPos | null>(null);
   const [moveCardHoverPos, setMoveCardHoverPos] = useState<HoverCardPos | null>(null);
+  const [yardHoverPos, setYardHoverPos] = useState<HoverCardPos | null>(null);
 
   const route = useMemo(
     () => resolveRouteForBlock(block, selectedRoutes),
@@ -989,6 +1055,8 @@ function ShiftScheduleBlockBar({
   );
 
   const showStationInfo = Boolean(block.routeName) && block.taskType === 'passenger';
+  /** 整備任務卡（充電／洗車／保養／行前／機動）：每一張都要有 ⓘ 可看設施與時長 */
+  const isYardTask = YARD_TASK_TYPES_FOR_UI.has(block.taskType);
 
   const blockErrors = useMemo(
     () => matchIssuesForBlock(report?.errors, block.id, block.templateTaskId),
@@ -1022,6 +1090,14 @@ function ShiftScheduleBlockBar({
   const onIssueIconEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setIssueHoverPos({
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  };
+
+  const onYardInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setYardHoverPos({
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
     });
@@ -1122,11 +1198,14 @@ function ShiftScheduleBlockBar({
         const leftPx = (seg.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
         const widthPx =
           ((seg.endMinute - seg.startMinute) / GRID_SLOT_MINUTES) * slotWidthPx;
-        const showChrome = segIndex === 0;
+        // 跨夜卡被日界切成頭尾兩段，兩段是<strong>同一張卡</strong>，內容要一樣——
+        // 只有 DOM id 與 hover 卡這種「整份文件只能有一個」的東西掛在第一段上。
+        const showChrome = true;
+        const isPrimarySegment = segIndex === 0;
         return (
     <div
       key={`${block.id}-day-${segIndex}`}
-      id={showChrome ? `block-card-${block.id}` : undefined}
+      id={isPrimarySegment ? `block-card-${block.id}` : undefined}
       className={`absolute isolate flex flex-col justify-center overflow-hidden rounded-[4px] px-1 ${
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
@@ -1158,7 +1237,7 @@ function ShiftScheduleBlockBar({
           : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
       }
       role={selectable ? 'button' : undefined}
-      tabIndex={selectable && showChrome ? 0 : undefined}
+      tabIndex={selectable && isPrimarySegment ? 0 : undefined}
       onClick={
         selectable
           ? (event) => {
@@ -1173,7 +1252,7 @@ function ShiftScheduleBlockBar({
           : undefined
       }
       onKeyDown={
-        selectable && showChrome
+        selectable && isPrimarySegment
           ? (event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -1338,13 +1417,28 @@ function ShiftScheduleBlockBar({
           </div>
         ) : (
           <div
-            className="truncate text-[11px] leading-tight opacity-90 font-medium"
+            className="flex min-w-0 items-center gap-0.5 truncate text-[11px] leading-tight opacity-90 font-medium"
             style={{ color: block.yardFacilityUnavailable ? '#FCA5A5' : colors.text }}
           >
-            {block.label}
-            {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
-            {/* 沒地方停是產能問題，必須直接寫在卡面——只放 hover 使用者不會發現 */}
-            {block.yardFacilityUnavailable ? ' · ⚠ 無可用設施' : ''}
+            <span className="truncate">
+              {block.label}
+              {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
+              {/* 沒地方停是產能問題，必須直接寫在卡面——只放 hover 使用者不會發現 */}
+              {block.yardFacilityUnavailable ? ' · ⚠ 無可用設施' : ''}
+            </span>
+            {isYardTask ? (
+              <button
+                type="button"
+                className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-zinc-300 opacity-80 hover:bg-white/10 hover:opacity-100"
+                aria-label={`${code} ${block.label} 設施與時長`}
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerEnter={onYardInfoEnter}
+                onPointerLeave={() => setYardHoverPos(null)}
+              >
+                <Info className="size-2.5" aria-hidden />
+              </button>
+            ) : null}
           </div>
         )}
         <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
@@ -1352,7 +1446,10 @@ function ShiftScheduleBlockBar({
         </div>
       </div>
       ) : null}
-      {showChrome && stationHoverPos && showStationInfo ? (
+      {isPrimarySegment && yardHoverPos && isYardTask ? (
+        <YardTaskHoverCard code={code} block={block} pos={yardHoverPos} />
+      ) : null}
+      {isPrimarySegment && stationHoverPos && showStationInfo ? (
         <BlockAlgorithmHoverCard
           routeName={block.routeName ?? block.label}
           blockCode={code}
@@ -1366,7 +1463,7 @@ function ShiftScheduleBlockBar({
           }
         />
       ) : null}
-      {showChrome && issueHoverPos ? (
+      {isPrimarySegment && issueHoverPos ? (
         <BlockIssueHoverCard
           blockCode={code}
           errors={blockErrors}
