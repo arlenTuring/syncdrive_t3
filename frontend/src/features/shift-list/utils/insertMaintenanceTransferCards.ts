@@ -355,6 +355,103 @@ export function insertMaintenanceTransferCards(args: {
   }
 
   /**
+   * 每條時間線在<strong>插卡之前</strong>的原始排序，用來走「同一段連續停留」的鏈。
+   * 之後插入的移動卡都是 dispatch，不會混進整備鏈裡，所以這份索引一直有效。
+   */
+  const chainContext = new Map<
+    string,
+    { sorted: GeneratedScheduleBlock[]; index: number }
+  >();
+  for (const timeline of timelines) {
+    const sortedBlocks = [...timeline.blocks].sort(
+      (a, b) => a.plannedStartMinute - b.plannedStartMinute,
+    );
+    sortedBlocks.forEach((block, index) => {
+      chainContext.set(block.id, { sorted: sortedBlocks, index });
+    });
+  }
+
+  /**
+   * 把一台設施指派給<strong>整段連續停留</strong>——緊鄰的同類型整備（跨午夜也算）
+   * 是同一段停留，車不會中途換格子，所以那一整串都要一起佔住同一台設施。
+   *
+   * 只指派其中一段的話，另一段在別列車眼中就是空的：跨午夜的
+   * 「保養 20:33–24:00 ＋ 保養 00:00–07:50」如果只有前半段佔位，
+   * 別列車就會把同一格排進 00:00–07:50，變成兩台車同時佔一格。
+   */
+  /** 收集這一段所屬的整條連續停留（含自己），緊鄰的同類型整備都算，跨午夜也算 */
+  function collectStay(block: GeneratedScheduleBlock): GeneratedScheduleBlock[] {
+    const visited = new Set<string>([block.id]);
+    const stay: GeneratedScheduleBlock[] = [block];
+    const queue: GeneratedScheduleBlock[] = [block];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const ctx = chainContext.get(current.id);
+      if (!ctx) continue;
+      for (const neighbor of [
+        immediatePrevCyclic(ctx.sorted, ctx.index),
+        immediateNextCyclic(ctx.sorted, ctx.index),
+      ]) {
+        if (!neighbor) continue;
+        if (neighbor.block.taskType !== block.taskType) continue;
+        if (visited.has(neighbor.block.id)) continue;
+        visited.add(neighbor.block.id);
+        stay.push(neighbor.block);
+        queue.push(neighbor.block);
+      }
+    }
+    return stay;
+  }
+
+  function assignYardStay(
+    block: GeneratedScheduleBlock,
+    nodeId: string,
+    label: string,
+  ): void {
+    for (const member of collectStay(block)) {
+      assignYardFacility(member, nodeId, label);
+    }
+  }
+
+  /**
+   * 這台設施對<strong>整段連續停留</strong>都是空的嗎。
+   *
+   * 只檢查「正在決定的這一段」是不夠的：跨午夜的
+   * 「保養 20:33–24:00 ＋ 保養 00:00–07:50」是一次選擇、一起佔位，
+   * 若只拿前半段去問「空不空」，選到的設施可能在後半段早就被別列車訂走，
+   * 佔位時就直接壓上去變成兩台車同時佔一格。要選就要整條鏈一起問。
+   *
+   * 正在決定的那一段用傳入的預定時間窗（它的時刻還沒寫回區塊），
+   * 鏈上其他段用它們目前的時間窗。
+   */
+  function stayFacilityIsFree(
+    facilityNodeId: string,
+    block: GeneratedScheduleBlock,
+    timelineRow: number,
+    startSecond: number,
+    endSecond: number,
+  ): boolean {
+    if (!moveCardFacilityIsFree(bookings, facilityNodeId, startSecond, endSecond, timelineRow)) {
+      return false;
+    }
+    for (const member of collectStay(block)) {
+      if (member.id === block.id) continue;
+      if (
+        !moveCardFacilityIsFree(
+          bookings,
+          facilityNodeId,
+          minuteToSecond(member.plannedStartMinute),
+          minuteToSecond(member.plannedEndMinute),
+          timelineRow,
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * 候選被淘汰的原因計數，用來組出「到底卡在哪」的具體訊息。
    * 全部混寫成一句「找不到路徑／設施被佔／轉折點太近」使用者根本分不出
    * 該去補拓樸、加設施，還是這個時段本來就排不下——每一種的處置完全不同。
@@ -396,12 +493,23 @@ export function insertMaintenanceTransferCards(args: {
   type JunctionBooking = { nodeId: string; instant: number; timelineRow: number };
   const junctionBookings: JunctionBooking[] = [];
 
+  /**
+   * 兩個時刻在日循環上的最短間距——23:59:50 與 00:00:10 相差 20 秒，
+   * 不是 23 小時 59 分。跨午夜的移動卡時刻會落在 1440 分以上，
+   * 直接相減會把「其實只差 20 秒」算成「差了一整天」，碰撞就漏掉了。
+   */
+  const daySeconds = minuteToSecond(SCHEDULE_DAY_MINUTES);
+  function cyclicGapSeconds(a: number, b: number): number {
+    const raw = Math.abs(a - b) % daySeconds;
+    return Math.min(raw, daySeconds - raw);
+  }
+
   function junctionIsFree(nodeId: string, instant: number, timelineRow: number): boolean {
     if (collisionBufferSeconds <= 0) return true;
     return !junctionBookings.some((b) =>
       b.nodeId === nodeId
       && b.timelineRow !== timelineRow
-      && Math.abs(b.instant - instant) < collisionBufferSeconds - 1e-9);
+      && cyclicGapSeconds(b.instant, instant) < collisionBufferSeconds - 1e-9);
   }
 
   function bookJunction(nodeId: string, instant: number, timelineRow: number): void {
@@ -495,7 +603,7 @@ export function insertMaintenanceTransferCards(args: {
         // 佔用窗一致——只檢查頭部那一小段的話，別列車早就訂走整段的設施
         // 還是會被判定成空的。
         if (
-          !moveCardFacilityIsFree(bookings, facility.id, arriveSecond, yardEndSecond, timeline.row)
+          !stayFacilityIsFree(facility.id, yard, timeline.row, arriveSecond, yardEndSecond)
         ) {
           tally.facilityBusy += 1;
           continue;
@@ -547,7 +655,7 @@ export function insertMaintenanceTransferCards(args: {
       yard.plannedStartMinute = secondToMinute(arriveSecond);
       yardHeadExtended += 1;
       // 時刻定案後才綁設施——assignYardFacility 會用當下的 [開始, 結束] 佔位
-      assignYardFacility(yard, chosen.nodeId, chosen.label);
+      assignYardStay(yard, chosen.nodeId, chosen.label);
       inserted += 1;
     }
   }
@@ -557,9 +665,16 @@ export function insertMaintenanceTransferCards(args: {
     const sorted = [...timeline.blocks].sort(
       (a, b) => a.plannedStartMinute - b.plannedStartMinute,
     );
-    for (let i = 0; i < sorted.length - 1; i += 1) {
+    // 走完整條線（含最後一段）——最後一段的下一段照日循環繞回第一段，
+    // 「充電 22:00–24:00 接 保養 00:00–02:40」這種跨午夜的銜接才看得到。
+    for (let i = 0; i < sorted.length; i += 1) {
       const earlier = sorted[i]!;
-      const later = sorted[i + 1]!;
+      const laterNeighbor = immediateNextCyclic(sorted, i);
+      if (!laterNeighbor) continue;
+      const later = laterNeighbor.block;
+      /** 後一段繞到隔天時 = +1440；當日之內 = 0 */
+      const laterOffsetMinute = laterNeighbor.offsetMinute;
+      const laterOffsetSecond = minuteToSecond(laterOffsetMinute);
       if (!YARD_TASK_TYPES.has(earlier.taskType) || !YARD_TASK_TYPES.has(later.taskType)) {
         continue;
       }
@@ -595,8 +710,11 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
+      // 時序運算在「跟 earlier 同一條時間軸」的位移座標上做（後一段繞到隔天時
+      // 會是 1440 以上）；設施佔用檢查則必須換回各區塊自己的日內座標，
+      // 否則跨午夜那一段會拿 1440+ 的窗去比別列車 0–1440 的窗，永遠比不到。
       const departSecond = minuteToSecond(earlier.plannedEndMinute);
-      const laterEndSecond = minuteToSecond(later.plannedEndMinute);
+      const laterEndSecond = minuteToSecond(later.plannedEndMinute) + laterOffsetSecond;
 
       let chosen: {
         exitNodeId: string;
@@ -616,6 +734,8 @@ export function insertMaintenanceTransferCards(args: {
         sameArea: boolean;
         exitGateway: { nodeId: string; instant: number } | null;
         entryGateway: { nodeId: string; instant: number } | null;
+        /** 後一段實際開始時刻（位移座標）；只會等於或晚於它原訂的開始 */
+        finalLaterStartSecond: number;
       } | null = null;
 
       const tally = newTally();
@@ -661,22 +781,27 @@ export function insertMaintenanceTransferCards(args: {
 
           const totalSeconds = exitLegSeconds + entryLegSeconds;
           const arriveSecond = departSecond + totalSeconds;
-          if (arriveSecond >= laterEndSecond - 1e-9) { tally.noTime += 1; continue; }
-          // 前一段整備在它自己的全程都佔著出廠那台設施；後一段從抵達佔到做完
+          // 後一段只會被<strong>往後推</strong>，絕不會被往前拉——兩段之間本來就
+          // 有空檔時（車提早到、在那邊等），它照原訂時刻開始。少了這個 max，
+          // 空檔一大就會把後一段硬拉到抵達時刻，跨午夜那一對甚至會被拉成負時刻。
+          const laterStartSecond = minuteToSecond(later.plannedStartMinute) + laterOffsetSecond;
+          const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
+          if (finalLaterStartSecond >= laterEndSecond - 1e-9) { tally.noTime += 1; continue; }
+          // 前一段整備在它自己的全程都佔著出廠那台設施；後一段從實際開始佔到做完
           if (
-            !moveCardFacilityIsFree(
-              bookings,
+            !stayFacilityIsFree(
               exitFacility.id,
+              earlier,
+              timeline.row,
               minuteToSecond(earlier.plannedStartMinute),
               departSecond,
-              timeline.row,
             )
-            || !moveCardFacilityIsFree(
-              bookings,
+            || !stayFacilityIsFree(
               entryFacility.id,
-              arriveSecond,
-              laterEndSecond,
+              later,
               timeline.row,
+              finalLaterStartSecond - laterOffsetSecond,
+              laterEndSecond - laterOffsetSecond,
             )
           ) {
             tally.facilityBusy += 1;
@@ -702,6 +827,7 @@ export function insertMaintenanceTransferCards(args: {
               sameArea,
               exitGateway,
               entryGateway,
+              finalLaterStartSecond,
             };
           }
         }
@@ -774,11 +900,16 @@ export function insertMaintenanceTransferCards(args: {
       };
       timeline.blocks.push(exitCard, entryCard);
 
-      later.plannedStartMinute = secondToMinute(arriveSecond);
-      laterTaskCompressed += 1;
+      // 寫回時要扣掉位移，換回後一段自己的日內座標
+      // （跨午夜時是 1440+，扣掉 1440 才是它自己的 00:0x）
+      const laterStartBefore = later.plannedStartMinute;
+      later.plannedStartMinute =
+        secondToMinute(chosen.finalLaterStartSecond) - laterOffsetMinute;
+      // 只有真的被推遲才算「時長被壓縮」；車提早到、在那邊等的不算
+      if (later.plannedStartMinute > laterStartBefore + 1e-9) laterTaskCompressed += 1;
       // 時刻定案後才綁設施——兩段各自用自己的完整時長佔住各自那一台
-      assignYardFacility(earlier, chosen.exitNodeId, chosen.exitLabel);
-      assignYardFacility(later, chosen.entryNodeId, chosen.entryLabel);
+      assignYardStay(earlier, chosen.exitNodeId, chosen.exitLabel);
+      assignYardStay(later, chosen.entryNodeId, chosen.entryLabel);
       inserted += 1;
     }
   }
@@ -913,7 +1044,7 @@ export function insertMaintenanceTransferCards(args: {
       const startSecond = departSecond - seconds;
       // 出場移動不得早於整備開始（那代表整備根本沒做）
       if (startSecond < yardStartSecond - 1e-9) { tally.noTime += 1; continue; }
-      if (!moveCardFacilityIsFree(bookings, facility.id, yardStartSecond, startSecond, timeline.row)) {
+      if (!stayFacilityIsFree(facility.id, yard, timeline.row, yardStartSecond, startSecond)) {
         tally.facilityBusy += 1;
         continue;
       }
@@ -969,7 +1100,7 @@ export function insertMaintenanceTransferCards(args: {
     };
     timeline.blocks.push(card);
     // 吃過尾巴之後才綁設施——佔用窗要用縮短後的實際結束時刻
-    assignYardFacility(yard, chosen.nodeId, chosen.label);
+    assignYardStay(yard, chosen.nodeId, chosen.label);
     inserted += 1;
   }
 
@@ -1005,7 +1136,7 @@ export function insertMaintenanceTransferCards(args: {
         && neighbor.block.taskType === yard.taskType
         && neighbor.block.yardFacilityNodeId != null);
       if (sameStayNeighbor?.block.yardFacilityNodeId) {
-        assignYardFacility(
+        assignYardStay(
           yard,
           sameStayNeighbor.block.yardFacilityNodeId,
           sameStayNeighbor.block.yardFacilityLabel ?? sameStayNeighbor.block.yardFacilityNodeId,
@@ -1029,9 +1160,9 @@ export function insertMaintenanceTransferCards(args: {
       const startSecond = minuteToSecond(yard.plannedStartMinute);
       const endSecond = minuteToSecond(yard.plannedEndMinute);
       const free = facilities.find((facility) =>
-        moveCardFacilityIsFree(bookings, facility.id, startSecond, endSecond, timeline.row));
+        stayFacilityIsFree(facility.id, yard, timeline.row, startSecond, endSecond));
       if (free) {
-        assignYardFacility(yard, free.id, free.label || free.id);
+        assignYardStay(yard, free.id, free.label || free.id);
         continue;
       }
 

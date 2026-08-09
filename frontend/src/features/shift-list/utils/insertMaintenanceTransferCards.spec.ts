@@ -564,9 +564,11 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const p = plan();
       const result = run(p);
 
-      assert.equal(result.inserted, 1);
       assert.equal(result.laterTaskCompressed, 1);
-      assert.equal(result.skipped.length, 0);
+      assert.equal(
+        result.skipped.filter((x) => x.fromTaskType === 'charging').length, 0,
+        '充電→保養這個方向要排得出來（反方向繞回隔天的那一對不在這則測試範圍）',
+      );
 
       const blocks = p.timelines[0]!.blocks;
       const charging = blocks.find((b) => b.id === 'charging-1')!;
@@ -649,8 +651,10 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
           maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r2', mapCode: 'M1' }] } },
         areas,
       );
-      assert.equal(result.inserted, 1, '沒有拓樸路徑也要能成立——同區域不靠拓樸');
-      assert.equal(result.skipped.length, 0);
+      assert.equal(
+        result.skipped.filter((x) => x.fromTaskType === 'charging').length, 0,
+        '沒有拓樸路徑也要能成立——同區域不靠拓樸',
+      );
       const blocks = p.timelines[0]!.blocks;
       const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
       const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
@@ -704,9 +708,9 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       // 把後一段結束時刻改到很早，移動 260 秒（4.3 分）根本塞不下
       p.timelines[0]!.blocks[1]!.plannedEndMinute = 431;
       const result = run(p);
-      assert.equal(result.inserted, 0);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /塞不進這段空檔/);
+      const forwardSkip = result.skipped.find((x) => x.fromTaskType === 'charging');
+      assert.ok(forwardSkip, '充電→保養這個方向要被擋下並回報');
+      assert.match(forwardSkip.reason, /塞不進這段空檔/);
       // 兩段都維持原樣
       assert.equal(p.timelines[0]!.blocks[0]!.plannedEndMinute, 430);
     });
@@ -714,9 +718,9 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     it('其中一種類型沒設定設施時回報，不硬插', () => {
       const p = plan();
       const result = run(p, topology(), { charging: { stepEnabled: true, equipmentRows: [] } });
-      assert.equal(result.inserted, 0);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /沒設定設施/);
+      const forwardSkip = result.skipped.find((x) => x.fromTaskType === 'charging');
+      assert.ok(forwardSkip, '充電→保養這個方向要被擋下並回報');
+      assert.match(forwardSkip.reason, /沒設定設施/);
     });
 
     it('沒有拓樸時安靜略過，不當成錯誤', () => {
