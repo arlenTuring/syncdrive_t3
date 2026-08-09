@@ -62,7 +62,7 @@ describe('applyMainlineMaintenanceEntryYield', () => {
     assert.equal(Math.round(eb.plannedEndMinute * 60), Math.round(chEnd * 60));
   });
 
-  it('does not compress 行前 when passenger starts mid-yard (steal tail)', () => {
+  it('does not compress 行檢 when passenger starts mid-yard (steal tail)', () => {
     const inspectionStart = 9 * 60 + 30;
     const inspectionEnd = 10 * 60;
     const ntStart = 9 * 60 + 56 + 40 / 60;
@@ -77,7 +77,7 @@ describe('applyMainlineMaintenanceEntryYield', () => {
             taskType: 'inspection',
             plannedStartMinute: inspectionStart,
             plannedEndMinute: inspectionEnd,
-            label: '行前',
+            label: '行檢',
           }),
           block({
             id: 'nt',
@@ -91,7 +91,7 @@ describe('applyMainlineMaintenanceEntryYield', () => {
     ]);
 
     const pre = timelines[0]!.blocks.find((item) => item.id === 'pre')!;
-    assert.ok(pre, '行前 must remain');
+    assert.ok(pre, '行檢 must remain');
     assert.equal(Math.round(pre.plannedStartMinute * 60), inspectionStart * 60);
     assert.equal(Math.round(pre.plannedEndMinute * 60), inspectionEnd * 60);
   });
@@ -190,7 +190,7 @@ describe('applyMainlineMaintenanceEntryYield', () => {
 });
 
 describe('pushPassengerPastPrecedingYard', () => {
-  it('pushes passenger that steals 行前 tail to after 行前 end', () => {
+  it('pushes passenger that steals 行檢 tail to after 行檢 end', () => {
     const inspectionStart = 9 * 60 + 30;
     const inspectionEnd = 10 * 60;
     const ntStart = 9 * 60 + 56 + 40 / 60;
@@ -206,7 +206,7 @@ describe('pushPassengerPastPrecedingYard', () => {
             taskType: 'inspection',
             plannedStartMinute: inspectionStart,
             plannedEndMinute: inspectionEnd,
-            label: '行前',
+            label: '行檢',
           }),
           block({
             id: 'nt',
@@ -328,8 +328,8 @@ describe('pushPassengerPastPrecedingYard', () => {
     );
   });
 
-  it('pushes passenger at 保養→行前 junction past the whole yard chain', () => {
-    // 保養 02:00–09:30 + 行前 09:30–10:00；正線誤掛在 09:30 → 必須推過 10:00
+  it('pushes passenger at 保養→行檢 junction past the whole yard chain', () => {
+    // 保養 02:00–09:30 + 行檢 09:30–10:00；正線誤掛在 09:30 → 必須推過 10:00
     const servicingStart = 2 * 60;
     const servicingEnd = 9 * 60 + 30;
     const inspectionStart = 9 * 60 + 30;
@@ -354,7 +354,7 @@ describe('pushPassengerPastPrecedingYard', () => {
             taskType: 'inspection',
             plannedStartMinute: inspectionStart,
             plannedEndMinute: inspectionEnd,
-            label: '行前',
+            label: '行檢',
           }),
           block({
             id: 'tn',
@@ -374,7 +374,7 @@ describe('pushPassengerPastPrecedingYard', () => {
     assert.equal(Math.round(pre.plannedEndMinute * 60), inspectionEnd * 60);
     assert.ok(
       tn.plannedStartMinute >= inspectionEnd - 1e-9,
-      `passenger must start at or after 行前 end (${inspectionEnd}), got ${tn.plannedStartMinute}`,
+      `passenger must start at or after 行檢 end (${inspectionEnd}), got ${tn.plannedStartMinute}`,
     );
     assert.ok(
       Math.abs((tn.plannedEndMinute - tn.plannedStartMinute) - occ) < 1e-6,
@@ -413,7 +413,7 @@ describe('pushPassengerPastPrecedingYard', () => {
             taskType: 'inspection',
             plannedStartMinute: serviceEnd,
             plannedEndMinute: inspectEnd,
-            label: '行前',
+            label: '行檢',
           }),
           block({
             id: 'ghost',

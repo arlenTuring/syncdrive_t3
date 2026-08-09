@@ -655,7 +655,7 @@ export function enforceStationBerthConstraints(args: {
     // 中間夾著整備就<strong>不算</strong>有前一趟：車進去整備、出來是停在整備的出場站，
     // 跟整備前那一趟的終點站無關。忽略這件事的話，求解器會拿整備前那趟的終點
     // 去要求站點連續，把「整備後第一班」改成從別站發車的路線——車根本不在那裡。
-    // （2026-08-08 實測：行前出場站 T3上行、對齊已正確給 TN，卻被這裡改成 NT。）
+    // （2026-08-08 實測：行檢出場站 T3上行、對齊已正確給 TN，卻被這裡改成 NT。）
     const previousPassenger = resolveSameRowPreviousPassengerBeforeYard(
       rowBlocks,
       blockIndex,

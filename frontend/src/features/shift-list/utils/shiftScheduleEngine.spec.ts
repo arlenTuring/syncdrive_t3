@@ -2311,7 +2311,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
     }
   });
 
-  it('行前出場後由外掛班次送到首發站，輪仍從首發站起算（不因整備改變輪的結構）', () => {
+  it('行檢出場後由外掛班次送到首發站，輪仍從首發站起算（不因整備改變輪的結構）', () => {
     const down = {
       ...passengerRoute('r-nt', 'NT', 260, 200, 1, 40),
       stationIds: ['p1', 't3'],
@@ -2357,7 +2357,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
           taskType: 'inspection' as const,
           startMinute: 30,
           durationMinutes: 20,
-          label: '行前',
+          label: '行檢',
         },
         {
           id: 'pax-win-1',
@@ -2434,10 +2434,10 @@ describe('cycle pulse vehicle assignment regressions', () => {
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
 
     const dispatch = row1Passengers.find((block) => block.source === 'entry_service');
-    assert.ok(dispatch, '行前出場應插入外掛的調度營運班次');
+    assert.ok(dispatch, '行檢出場應插入外掛的調度營運班次');
     assert.equal(dispatch!.routeId, 'r-tn', '外掛走 t3→p1 把車送到首發站');
 
-    assert.ok(firstPassenger, 'row 1 should get passenger after 行前');
+    assert.ok(firstPassenger, 'row 1 should get passenger after 行檢');
     assert.equal(
       firstPassenger!.routeId,
       'r-nt',
@@ -2449,7 +2449,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
     );
   });
 
-  it('after 行前 with only 機動 (no 正線), does not hang passenger toward exit', () => {
+  it('after 行檢 with only 待命 (no 正線), does not hang passenger toward exit', () => {
     const down = {
       ...passengerRoute('r-nt', 'NT', 260, 200, 1, 40),
       stationIds: ['p1', 't3'],
@@ -2495,7 +2495,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
           taskType: 'inspection' as const,
           startMinute: 30,
           durationMinutes: 20,
-          label: '行前',
+          label: '行檢',
         },
         {
           id: 'sb-1',
@@ -2503,7 +2503,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
           taskType: 'standby' as const,
           startMinute: 60,
           durationMinutes: 60,
-          label: '機動',
+          label: '待命',
         },
       ],
     };
@@ -2552,13 +2552,13 @@ describe('cycle pulse vehicle assignment regressions', () => {
     assert.equal(
       passengerBars.length,
       0,
-      '純機動列不應為了行前出場對齊而掛正線（不必特地跑向 N2W／T 出場方向）',
+      '純待命列不應為了行檢出場對齊而掛正線（不必特地跑向 N2W／T 出場方向）',
     );
     const standby = result.plan!.timelines
       .find((timeline) => timeline.row === 1)!
       .blocks
       .find((block) => block.taskType === 'standby');
-    assert.ok(standby, '應保留機動視窗');
+    assert.ok(standby, '應保留待命視窗');
   });
 
   it('yields an already-placed same-direction trip so a yard-exit car can take the pulse', () => {
@@ -2580,7 +2580,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
       ],
       serviceDirectionId: 'up',
     };
-    // 車 2 跑到 01:00 進充電；車 1 行前後 01:00 開窗且相位＝TN。
+    // 車 2 跑到 01:00 進充電；車 1 行檢後 01:00 開窗且相位＝TN。
     // 車 2 最後一輪的 TN 會堵住班距；讓路後車 1 應承接 01:00 脈衝。
     const body = {
       editorVersion: 1,
@@ -2609,7 +2609,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
           taskType: 'inspection' as const,
           startMinute: 30,
           durationMinutes: 20,
-          label: '行前',
+          label: '行檢',
         },
         {
           id: 'pax-win-1',
@@ -2699,7 +2699,7 @@ describe('cycle pulse vehicle assignment regressions', () => {
     const row1Dispatch = result.plan!.timelines
       .find((timeline) => timeline.row === 1)!
       .blocks.find((block) => block.source === 'entry_service');
-    assert.ok(row1Dispatch, '行前出場應插入外掛的調度營運班次');
+    assert.ok(row1Dispatch, '行檢出場應插入外掛的調度營運班次');
     assert.ok(
       row1Passengers[0]!.plannedStartMinute > row1Dispatch!.plannedStartMinute,
       '輪的第一段必須在外掛之後',

@@ -122,7 +122,7 @@ describe('densifyRouteHeadwaysAfterBerth', () => {
     );
   });
 
-  it('does not pull a trip into same-row 行前 tail', () => {
+  it('does not pull a trip into same-row 行檢 tail', () => {
     const tn = route();
     const timelines = [
       {
@@ -147,7 +147,7 @@ describe('densifyRouteHeadwaysAfterBerth', () => {
               plannedEndMinute: 10 * 60,
             }),
             taskType: 'inspection' as const,
-            label: '行前',
+            label: '行檢',
             routeId: undefined,
             routeCode: undefined,
           },
@@ -188,7 +188,7 @@ describe('densifyRouteHeadwaysAfterBerth', () => {
     const b = densified.flatMap((t) => t.blocks).find((x) => x.id === 'b')!;
     assert.ok(
       b.plannedStartMinute >= 10 * 60 - 1e-9,
-      `must not steal 行前 tail, got ${b.plannedStartMinute}`,
+      `must not steal 行檢 tail, got ${b.plannedStartMinute}`,
     );
   });
 

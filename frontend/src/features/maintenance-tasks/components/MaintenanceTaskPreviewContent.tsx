@@ -106,7 +106,7 @@ type MaintenanceTaskPreviewContentProps = {
   onEditStep?: (step: CreateMaintenanceTaskStep) => void;
   /**
    * 班表 Step 2 用：插入各整備區塊內容頂部（例如正線優先讓渡餘裕）。
-   * key 對應充電／洗車／保養／行前／機動。
+   * key 對應充電／洗車／保養／行檢／待命。
    */
   sectionExtras?: Partial<{
     charging: ReactNode;

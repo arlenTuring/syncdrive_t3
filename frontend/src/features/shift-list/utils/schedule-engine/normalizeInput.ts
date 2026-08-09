@@ -568,12 +568,12 @@ function latestDepartureOnRoute(
  * - 正線視窗結束前開出的整輪，可在切入餘裕內占用下一整備開頭。
  * - 不得提前結束前一整備來預出車（讓渡餘裕只作用於整備開頭）。
  * - 跨入新正線視窗時，輪替對齊整輪邊界（與 assignRoutes 硬輪替一致）。
- * - 視窗前若為行前／充電／機動且拓樸有明確出場站，且該列之後仍有正線模板，
- *   輪替相位才對齊該站起點路線（例：行前出場 T3 → 首班 TN／TS）。
- *   純機動、無後續正線時不對齊、不強制跑出場方向。
+ * - 視窗前若為行檢／充電／待命且拓樸有明確出場站，且該列之後仍有正線模板，
+ *   輪替相位才對齊該站起點路線（例：行檢出場 T3 → 首班 TN／TS）。
+ *   純待命、無後續正線時不對齊、不強制跑出場方向。
  * - 班距地板只看候選發車之前的同方向班次，避免被已掛但更晚的交路中段腿卡死。
- * - 機動視窗可視為可派正線，但僅限「該機動開始後仍有正線視窗」的列
- *   （正線優先，不代表必須占滿機動；純機動列不派正線）。
+ * - 待命視窗可視為可派正線，但僅限「該待命開始後仍有正線視窗」的列
+ *   （正線優先，不代表必須占滿待命；純待命列不派正線）。
  * - 保養的最壞出場交路由展開後 insertMaintenanceEntryServiceTrips 處理。
  */
 function assignDirectionalDepartures(args: {
@@ -587,7 +587,7 @@ function assignDirectionalDepartures(args: {
   nonPassengerTasks?: ScheduleTask[];
   /** 全部模板任務（判斷整備後是否還有正線） */
   templateTasks?: ScheduleTask[];
-  /** 整備類型 → 出場站 stationId（行前／充電／機動） */
+  /** 整備類型 → 出場站 stationId（行檢／充電／待命） */
   yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
   /** Step 4 繼任策略；提供時以策略決定開輪相位與整輪估時 */
   successorPolicy?: RouteSuccessorPolicy;
@@ -643,7 +643,7 @@ function assignDirectionalDepartures(args: {
   };
 
   /**
-   * 行前／充電／機動後「調撥開輪」相對前車的插入間距：
+   * 行檢／充電／待命後「調撥開輪」相對前車的插入間距：
    * 衝突站靠站／離站＋遲到佔站＋緩衝％，**不用**營運班距／車隊物理地板。
    */
   const clearanceInsertGapSecondsForRoute = (
@@ -673,7 +673,7 @@ function assignDirectionalDepartures(args: {
 
   /**
    * 班距地板只看「候選發車之前」的同方向班次。
-   * 行前調撥開輪改用車站清除間距；一般營運仍用目標班距。
+   * 行檢調撥開輪改用車站清除間距；一般營運仍用目標班距。
    */
   const headwayFloorForRoute = (
     route: ShiftScheduleSelectedRoute,
@@ -749,7 +749,7 @@ function assignDirectionalDepartures(args: {
       }
       return resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
     }
-    // 充電／行前／機動／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
+    // 充電／行檢／待命／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;
   };
 
@@ -763,7 +763,7 @@ function assignDirectionalDepartures(args: {
 
     /**
      * 週期脈衝（routeIndex 恒為 0）代表「一台車開一整輪」。
-     * 行前／充電／機動出場後相位可能落在 TN 等非 0 起點；必須依該車相位
+     * 行檢／充電／待命出場後相位可能落在 TN 等非 0 起點；必須依該車相位
      * 起班（例如 T 出場 → TN），不可再要求對齊脈衝的 canonical 起點路線。
      * 班距地板也依「此車實際起班路線」計算，避免用 NT 班距卡住 TN 出場。
      */
@@ -800,7 +800,7 @@ function assignDirectionalDepartures(args: {
       /**
        * 開班／該方向尚無前班：最多小幅延後 120s（避免 00:00 上行拖到 00:07:50）。
        * 營運中已有同方向前班：只要延後不跨越下一脈衝即可掛上。
-       * 行前調撥：requiredHeadway 已是清除間距（通常遠小於營運班距）。
+       * 行檢調撥：requiredHeadway 已是清除間距（通常遠小於營運班距）。
        */
       return {
         startRoute,
@@ -846,7 +846,7 @@ function assignDirectionalDepartures(args: {
         winAtPulse.startSecond,
       );
       let startSecond = Math.max(provisionalEarliest, gate.headwayFloor);
-      // 整備連串（保養→行前…）內不得掛正線：起點若落在串內，硬推到串尾
+      // 整備連串（保養→行檢…）內不得掛正線：起點若落在串內，硬推到串尾
       {
         const busyUntilMinute = resolveContiguousYardBusyUntilMinute(
           nonPassengerTasks,
@@ -905,7 +905,7 @@ function assignDirectionalDepartures(args: {
         }
       }
 
-      // 整輪：開輪腿若為行前調撥用清除間距；其後各腿仍守營運班距。
+      // 整輪：開輪腿若為行檢調撥用清除間距；其後各腿仍守營運班距。
       const headwayForLeg = (
         route: ShiftScheduleSelectedRoute,
         _leg: PlannedCycleLeg,
@@ -1709,11 +1709,11 @@ function findPrecedingNonPassengerTask(
 /**
  * 整備結束到「輪的第一段可以發車」之間要留多久。
  *
- * 保養／行前的設施離首發站有一段距離，車做完之後要先跑一趟<strong>外掛的調度營運班次</strong>
+ * 保養／行檢的設施離首發站有一段距離，車做完之後要先跑一趟<strong>外掛的調度營運班次</strong>
  * 才會到首發站。這段時間必須先預留，否則輪的第一段緊貼整備結束就發車，
  * 外掛根本塞不進去——結果是車還在出場站、班次卻從首發站發車（YARD_EXIT_STATION_MISMATCH）。
  *
- * 回傳「最短的一條外掛路線占用 + 恢復時間」。充電／機動沒有外掛（車就在出場站附近），回 0。
+ * 回傳「最短的一條外掛路線占用 + 恢復時間」。充電／待命沒有外掛（車就在出場站附近），回 0。
  */
 function resolveYardDispatchLeadSeconds(args: {
   taskType: string;
@@ -1849,7 +1849,7 @@ export function normalizeEngineInput(
   );
   const emptyRanges = listEmptyAttributeMinuteRanges(template.intervals);
   const firstTripOrigins = args.firstTripOrigins ?? [];
-  // 相位對齊只認「車真的停在那裡、沒有外掛班次可送」的類型（充電／機動）
+  // 相位對齊只認「車真的停在那裡、沒有外掛班次可送」的類型（充電／待命）
   const yardRotationExitByTaskType = buildYardRotationExitByTaskType({
     origins: firstTripOrigins,
     maintenanceBody,
@@ -1911,7 +1911,7 @@ export function normalizeEngineInput(
     const dispatchWindowTasks = templateTasks.filter((task) => {
       if (task.taskType === 'passenger') return true;
       if (task.taskType !== 'standby') return false;
-      // 純機動列不派正線；僅「機動之後仍有正線」才把機動當可派視窗
+      // 純待命列不派正線；僅「待命之後仍有正線」才把待命當可派視窗
       return isStandbyDispatchableForMainline(templateTasks, task);
     });
     for (const pTask of dispatchWindowTasks) {
@@ -1929,7 +1929,7 @@ export function normalizeEngineInput(
         emptyRanges,
         emptyIntervalMainlineSlackSeconds,
       });
-      // 保養／行前之後要先跑外掛班次把車送到首發站，這段時間必須預留給它
+      // 保養／行檢之後要先跑外掛班次把車送到首發站，這段時間必須預留給它
       const precedingYard = findPrecedingNonPassengerTask(
         nonPassengerTasks,
         pTask.rowIndex,

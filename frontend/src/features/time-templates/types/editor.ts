@@ -110,7 +110,7 @@ export function intervalDurationTableLabel(startTime: string, endTime: string): 
 }
 
 /**
- * 整備任務固定五類（充電／洗車／保養／行前／機動），各自在場域設定 step 2
+ * 整備任務固定五類（充電／洗車／保養／行檢／待命），各自在場域設定 step 2
  * 有對應設施分類，加上正線共六種。
  *
  * 洗車（`washing`）與保養（`servicing`）是<strong>各自獨立</strong>的類型：

@@ -298,9 +298,9 @@ export function expandRowBlocks(
 
     const plannedStartSecond = minuteToSecond(task.startMinute);
 
-    // 非正線任務（充電、保養、機動）：正線佔用開頭時延後開始、鎖住原結束時間並壓縮時長。
+    // 非正線任務（充電、保養、待命）：正線佔用開頭時延後開始、鎖住原結束時間並壓縮時長。
     // 只縮短被佔用的這段整備，不因此平移後續其他整備視窗。
-    // 正線：不得早於同列 cursor（前一段整備／正線結束），避免偷行前／整備尾巴。
+    // 正線：不得早於同列 cursor（前一段整備／正線結束），避免偷行檢／整備尾巴。
     let startSecond = plannedStartSecond;
     if (task.taskType !== 'passenger') {
       const originalEndSecond = plannedStartSecond + resolved.occupancySeconds;

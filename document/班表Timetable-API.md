@@ -51,11 +51,11 @@ curl -s -X POST \
 | `to` | 否 | 時間上限。預設 `24:00:00` |
 
 **過濾規則**：班次**卡時間**與 `[from, to]` 有重疊即納入（非整段必須落在區間內）。  
-**任務範圍**：回傳 plan 內**全部任務類型**（`passenger` 正線、`servicing` 保養、`inspection` 行前、`charging` 充電、`standby` 機動、`dispatch` 調度等）；僅略過 `transition`。整備類通常無站序，`stations` 為 `[]`。
+**任務範圍**：回傳 plan 內**全部任務類型**（`passenger` 正線、`servicing` 保養、`inspection` 行檢、`charging` 充電、`standby` 待命、`dispatch` 調度等）；僅略過 `transition`。整備類通常無站序，`stations` 為 `[]`。
 
 ### 互動取用（建議）
 
-開 [http://localhost:4000/班表班次檢視.html](http://localhost:4000/班表班次檢視.html) → 以**車列**分頁籤；含正線、保養、行前、充電等全部任務類型。
+開 [http://localhost:4000/班表班次檢視.html](http://localhost:4000/班表班次檢視.html) → 以**車列**分頁籤；含正線、保養、行檢、充電等全部任務類型。
 
 ### 全取範例（curl／程式用）
 

@@ -349,7 +349,7 @@ describe('buildRouteSuccessorPolicy', () => {
     });
 
     expect(policy.canonicalCycleInstanceIds).toEqual(['NTB', 'TS', 'ST', 'TN']);
-    // 行前出 T3(=P1) → TN；下一跳必須是圖上 TN→NT，不得硬接 NTB
+    // 行檢出 T3(=P1) → TN；下一跳必須是圖上 TN→NT，不得硬接 NTB
     expect(resolveStartInstanceId(policy, 'P1')).toBe('TN');
     expect(resolveNextInstanceId(policy, 'TN')?.instanceId).toBe('NT');
     assert.notEqual(resolveNextInstanceId(policy, 'TN')?.instanceId, 'NTB');

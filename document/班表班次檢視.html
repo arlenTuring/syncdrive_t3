@@ -577,8 +577,8 @@
       const map = {
         passenger: '正線',
         charging: '充電',
-        inspection: '行前',
-        standby: '機動',
+        inspection: '行檢',
+        standby: '待命',
         servicing: '保養',
         dispatch: '調度',
         idle: '空檔',
@@ -694,7 +694,7 @@
           <tr class="trip-body-cell" hidden>
             <td colspan="9">
               ${stationCount === 0
-                ? '<p class="empty" style="margin:0;padding:16px">此任務無站序（整備／充電／行前等佔窗任務）。</p>'
+                ? '<p class="empty" style="margin:0;padding:16px">此任務無站序（整備／充電／行檢等佔窗任務）。</p>'
                 : `<table class="station-table">
                 <thead>
                   <tr>

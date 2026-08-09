@@ -327,7 +327,7 @@ describe('validateTimelineOverlaps', () => {
         id: 'pretrip-1',
         timelineRow: 1,
         taskType: 'inspection',
-        label: '行前',
+        label: '行檢',
         anchorStartMinute: 570,
         plannedStartMinute: 570,
         plannedEndMinute: 600,

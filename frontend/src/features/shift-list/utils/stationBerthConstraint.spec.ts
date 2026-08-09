@@ -1364,7 +1364,7 @@ describe('碰撞保護時間（生成期求解）', () => {
 });
 
 describe('整備後第一班不得被站位求解器改成別站發車的路線', () => {
-  // 2026-08-08 使用者實測：行前／保養出場站是 T3上行，輪替對齊也正確給了 TN，
+  // 2026-08-08 使用者實測：行檢／保養出場站是 T3上行，輪替對齊也正確給了 TN，
   // 但站位求解器把它改成 NT（起點 N2W下行出發）——車在 T3上行，這班開不了。
   // 成因：求解器找「前一趟正線」時無視中間夾著整備，拿整備前那趟的終點站
   // 去要求站點連續，於是把起點對的 TN 從候選刪掉、選了起點錯的 NT。
@@ -1417,11 +1417,11 @@ describe('整備後第一班不得被站位求解器改成別站發車的路線'
           }),
           {
             id: 'insp', timelineRow: 1, taskType: 'inspection' as const,
-            label: '行前', source: 'template_bar' as const,
+            label: '行檢', source: 'template_bar' as const,
             plannedStartMinute: 570, plannedEndMinute: 600,
             anchorStartMinute: 570, travelSeconds: 0, dwellSeconds: 0,
           } as GeneratedScheduleBlock,
-          // 行前出場站是 T3U，所以這一班必須是 TN（起點 T3U）
+          // 行檢出場站是 T3U，所以這一班必須是 TN（起點 T3U）
           block({
             id: 'after', timelineRow: 1,
             plannedStartMinute: 600, plannedEndMinute: 600 + 220 / 60,

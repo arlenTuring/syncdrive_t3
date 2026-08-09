@@ -264,7 +264,7 @@ export function generateShiftSchedule(
   }
 
   // 整備後首班代號：所有幾何後處理完成後再標記，避免站位／讓渡弄丟前綴。
-  // 規則：整備（保養／行前／充電／機動）後第一個正線一律掛「整備代號+路線代號」。
+  // 規則：整備（保養／行檢／充電／待命）後第一個正線一律掛「整備代號+路線代號」。
   timelines = tagYardDispatchTrips({
     timelines,
     origins: engineInput.firstTripOrigins,
@@ -376,7 +376,7 @@ export function generateShiftSchedule(
   validateYardExitContinuity({
     timelines,
     selectedRoutes: routesForBerth,
-    // 驗證問的是「車實際停在哪」，跟輪的相位無關，所以用 validate 版（含保養／行前）
+    // 驗證問的是「車實際停在哪」，跟輪的相位無關，所以用 validate 版（含保養／行檢）
     yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     errors,

@@ -27,13 +27,13 @@ import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/typ
 /**
  * 整備後的調度營運班次（文件 §10）。
  *
- * 車子做完保養或行前，人車還在場內，離要跑的正線起點站有一段距離。
+ * 車子做完保養或行檢，人車還在場內，離要跑的正線起點站有一段距離。
  * 這段「開過去上工」的路上會經過站點，所以順便載客，不要空車跑。
  *
  * 規則（2026-08-07 更正）：
  * - **不得佔用任何整備的尾巴**。整條串必須在整備串<strong>結束之後</strong>才發車。
  *   （舊版會把班次塞進保養視窗內偷尾巴，已廢除。）
- * - 適用保養（代號 M）與行前（代號 P）；充電、機動不適用——那兩種設施離起點站近。
+ * - 適用保養（代號 M）與行檢（代號 P）；充電、待命不適用——那兩種設施離起點站近。
  * - **不受同方向班距約束**：它的任務是盡快上工，不是補班距缺口。
  *   唯一要讓的是站位——抵達時該站位須已被 A 車淨空（見 resolveBerthClearMinute）。
  * - 計入運能（PPHPD），但不算輪替圈數（真正首班仍是後面那班正線）。
@@ -447,7 +447,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
   } = args;
   if (firstTripOrigins.length === 0 || selectedRoutes.length === 0) return timelines;
 
-  // 保養（M）與行前（P）都會產生調度營運班次；只要其中一種可用就往下跑。
+  // 保養（M）與行檢（P）都會產生調度營運班次；只要其中一種可用就往下跑。
   const dispatchCapableTaskTypes = ['servicing', 'inspection'] as const;
   const anyDispatchAllowed = dispatchCapableTaskTypes.some(
     (taskType) =>
@@ -481,7 +481,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
         continue;
       }
 
-      // 出場站與代號都依「這一段整備是哪一種」決定：保養→M、行前→P。
+      // 出場站與代號都依「這一段整備是哪一種」決定：保養→M、行檢→P。
       const sectionCode = resolveMaintenanceSectionCodeForTaskType(
         yard.taskType,
         sectionCodes,
@@ -489,7 +489,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
 
       // 2026-08-08 修正：這裡原本在查不到出場站時退回「全部首班起點站」，
       // 等於認為車可以從路網上任何一站冒出來——實際上車就停在該整備設施的出場站。
-      // 行前設施在 M、出來接 T3上行，卻因為這個退路排出「從 N2W 發車」的 PNT 班次，
+      // 行檢設施在 M、出來接 T3上行，卻因為這個退路排出「從 N2W 發車」的 PNT 班次，
       // 而那台車根本不在 N2W。查不到就<strong>不排</strong>，回報讓使用者去補設施拓樸。
       if (yardPolicy.entryServiceExitStationIds.length === 0) {
         pushIssue(warnings, {
@@ -517,14 +517,14 @@ export function insertMaintenanceEntryServiceTrips(args: {
 
       // 這一段整備的出場站與下一班正線的起點站——兩者不同就一定要靠外掛把車送過去。
       // 下面每一個 continue 都可能讓外掛沒被插入，所以只要「非插不可」卻跳過，
-      // 一律回報，不再靜默（2026-08-08：行前那兩列完全沒插外掛也沒任何警告，查了很久）。
+      // 一律回報，不再靜默（2026-08-08：行檢那兩列完全沒插外掛也沒任何警告，查了很久）。
 
-      // 連續整備串（例 充電→行前）只在<strong>串尾</strong>處理一次。
+      // 連續整備串（例 充電→行檢）只在<strong>串尾</strong>處理一次。
       //
       // 2026-08-08 更正：舊版處理「串首」。車其實是從串尾那一段出來的，
       // 出場站、能不能插外掛都該由串尾決定。串首是充電時
       // （allowEntryService=false）會在上面第一道檢查就被跳掉且不回報，
-      // 而串尾的行前又因為「前面是整備」被這裡跳掉——兩邊互推，
+      // 而串尾的行檢又因為「前面是整備」被這裡跳掉——兩邊互推，
       // 整列完全沒有外掛也沒有任何警告，查很久才找到。
       {
         let hasYardAfter = false;
@@ -551,7 +551,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
       // 但這只在「車已經在下一班的起點站」時成立——
       // 2026-08-08 更正：若下一班正線的起點站不是整備出場站，車根本開不了那一班，
       // 外掛就是必要的，不能因為整備前面剛好是正線就靜默跳過
-      // （行前夾在日間正線中段時就是這種情況，整整兩列完全沒插外掛也沒任何警告）。
+      // （行檢夾在日間正線中段時就是這種情況，整整兩列完全沒插外掛也沒任何警告）。
       if (isYardPrecededByMainline(sorted, i) && exitStationIds.has(originStationId)) {
         continue;
       }
@@ -626,7 +626,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
         continue;
       }
 
-      // 整備串（保養→行前…）結束之後才發車；不得佔用任何整備尾巴
+      // 整備串（保養→行檢…）結束之後才發車；不得佔用任何整備尾巴
       const fitting = pickSafeEntryPlacement({
         candidates,
         firstTripStartMinute: nextPassenger.plannedStartMinute,

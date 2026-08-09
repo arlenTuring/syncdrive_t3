@@ -424,10 +424,10 @@ describe('insertMaintenanceEntryServiceTrips', () => {
 });
 
 /**
- * 連續整備串（例 充電→行前）要在<strong>串尾</strong>處理外掛班次。
+ * 連續整備串（例 充電→行檢）要在<strong>串尾</strong>處理外掛班次。
  *
  * 2026-08-08 踩過：舊版處理「串首」。串首是充電時 allowEntryService=false，
- * 第一道檢查就靜默跳掉；串尾的行前又因為「前面是整備」被跳掉——兩邊互推，
+ * 第一道檢查就靜默跳掉；串尾的行檢又因為「前面是整備」被跳掉——兩邊互推，
  * 整列完全沒有外掛也沒有任何警告。車其實是從串尾出來的，出場站也該由串尾決定。
  */
 describe('連續整備串的外掛班次', () => {
@@ -509,31 +509,31 @@ describe('連續整備串的外掛班次', () => {
     return out[0]!.blocks.filter((block) => block.source === 'entry_service');
   }
 
-  /** 行前 09:30–10:00（出場站 T3U），10:24 起第一班正線 NT（起點 N2W） */
-  const inspection = chainBlock('insp', 570, 600, 'inspection', '行前');
+  /** 行檢 09:30–10:00（出場站 T3U），10:24 起第一班正線 NT（起點 N2W） */
+  const inspection = chainBlock('insp', 570, 600, 'inspection', '行檢');
   const afterMainline = chainBlock('after', 624, 627.5, 'passenger', '正線', 'nt');
 
-  it('行前單獨時插入外掛把車從 T3U 送到 N2W', () => {
+  it('行檢單獨時插入外掛把車從 T3U 送到 N2W', () => {
     const entries = runChain([inspection, afterMainline] as never);
     assert.equal(entries.length, 1);
     assert.equal(entries[0]!.routeId, 'tn');
   });
 
-  it('充電→行前 串：仍要插外掛（車是從串尾的行前出來的）', () => {
+  it('充電→行檢 串：仍要插外掛（車是從串尾的行檢出來的）', () => {
     const charging = chainBlock('chg', 480, 570, 'charging', '充電');
     const entries = runChain([charging, inspection, afterMainline] as never);
     assert.equal(
       entries.length,
       1,
-      '串首是充電（不產生外掛）不代表整串都不用；車從串尾的行前出來，仍需外掛',
+      '串首是充電（不產生外掛）不代表整串都不用；車從串尾的行檢出來，仍需外掛',
     );
     assert.equal(entries[0]!.routeId, 'tn');
   });
 
-  it('保養→行前 串：同樣只在串尾插一次', () => {
+  it('保養→行檢 串：同樣只在串尾插一次', () => {
     const servicing = chainBlock('mnt', 480, 570, 'servicing', '保養');
     const entries = runChain([servicing, inspection, afterMainline] as never);
-    assert.equal(entries.length, 1, '整串只插一次，不可保養與行前各插一次');
+    assert.equal(entries.length, 1, '整串只插一次，不可保養與行檢各插一次');
     assert.equal(entries[0]!.routeId, 'tn');
   });
 });

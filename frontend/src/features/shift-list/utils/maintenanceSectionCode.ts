@@ -3,7 +3,7 @@ import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
 /**
  * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
  *
- * 調度（parking）視為整備任務的第六種類型，跟充電／洗車／保養／行前／機動
+ * 調度（parking）視為整備任務的第六種類型，跟充電／洗車／保養／行檢／待命
  * 一樣只要一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
  * 自動加上 I（入廠）／O（出廠）尾綴組成，例：保養代號 M → 入廠 MI、出廠 MO；
  * 調度代號 T → 入廠 TI、出廠 TO。見 {@link resolveMoveCardPrefix}。

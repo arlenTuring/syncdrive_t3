@@ -220,9 +220,9 @@ function BlockIssueHoverCard({
 
 /**
  * 轉場小卡的說明；卡面只印使用者自訂的代號（充電 E → EI／EO，保養 M → MI／MO，
- * 行前 P → PI／PO……），沒有固定的「MO／MI／PI／PO 四種」——標題與說明依
+ * 行檢 P → PI／PO……），沒有固定的「MO／MI／PI／PO 四種」——標題與說明依
  * block.source（入廠／出廠、整備或調度）與 yardExitSectionLabel（充電／保養／
- * 行前／洗車／機動／調度）動態組出來。
+ * 行檢／洗車／待命／調度）動態組出來。
  */
 function resolveMoveCardTitle(block: GeneratedScheduleBlock): string {
   const direction = block.source === 'yard_entry_move' || block.source === 'park_entry_move'
@@ -1055,7 +1055,7 @@ function ShiftScheduleBlockBar({
   );
 
   const showStationInfo = Boolean(block.routeName) && block.taskType === 'passenger';
-  /** 整備任務卡（充電／洗車／保養／行前／機動）：每一張都要有 ⓘ 可看設施與時長 */
+  /** 整備任務卡（充電／洗車／保養／行檢／待命）：每一張都要有 ⓘ 可看設施與時長 */
   const isYardTask = YARD_TASK_TYPES_FOR_UI.has(block.taskType);
 
   const blockErrors = useMemo(

@@ -134,7 +134,7 @@ export type StationBerthCollision = {
  * 蒐集各停靠點跨車在站區間。
  *
  * 佔用＝該班在該站「到站～離站」的自然時間（還沒出發前本來就在這個空間），
- * **不是**正線結束後把充電／保養／行前／機動硬掛在末站上。
+ * **不是**正線結束後把充電／保養／行檢／待命硬掛在末站上。
  */
 export function collectStationBerthOccupancies(
   timelines: GeneratedSchedulePlan['timelines'],

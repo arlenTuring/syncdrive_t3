@@ -162,7 +162,7 @@ export function validateTimelineOverlaps(
         );
         if (!linearAdjacent && !dayCycleHit) continue;
 
-        // 調度可吃接下整備／行前開頭（不可偷尾巴）；重疊不得超過調度本身時長
+        // 調度可吃接下整備／行檢開頭（不可偷尾巴）；重疊不得超過調度本身時長
         if (isAllowedMaintenanceDispatchOverlap(current, next)) continue;
         // 進場載客可偷保養尾端：載客串起點不早於保養開始即允許重疊
         if (isAllowedEntryServiceOverlap(current, next)) continue;
@@ -202,7 +202,7 @@ function isAllowedMaintenanceDispatchOverlap(
   earlier: GeneratedScheduleBlock,
   later: GeneratedScheduleBlock,
 ): boolean {
-  // 禁止整備／行前 → 調度（偷尾巴）。只允許調度／空駛壓進「接下整備開頭」。
+  // 禁止整備／行檢 → 調度（偷尾巴）。只允許調度／空駛壓進「接下整備開頭」。
   const dispatchThenYard =
     earlier.source === 'dispatch' && isYardWindowForDispatchOverlap(later);
   if (!dispatchThenYard) return false;
@@ -696,7 +696,7 @@ export function validateRouteSuccessorContinuity(
     for (let i = 0; i < passengerBlocks.length - 1; i += 1) {
       const currentBlock = passengerBlocks[i]!;
       const nextBlock = passengerBlocks[i + 1]!;
-      // 中間隔了充電／保養／行前／機動等非正線時，交路由出場相位或進場載客重新對齊，
+      // 中間隔了充電／保養／行檢／待命等非正線時，交路由出場相位或進場載客重新對齊，
       // 不要求與進整備前最後一班無縫 successor。
       if (hasNonPassengerBetween(timeline.blocks, currentBlock, nextBlock)) {
         continue;
@@ -793,7 +793,7 @@ export function validateRouteSuccessorContinuity(
   }
 }
 
-/** 兩班正線之間是否夾了非正線任務（整備／充電／行前／機動等） */
+/** 兩班正線之間是否夾了非正線任務（整備／充電／行檢／待命等） */
 function hasNonPassengerBetween(
   blocks: GeneratedScheduleBlock[],
   earlier: GeneratedScheduleBlock,
@@ -1099,8 +1099,8 @@ export function validateStationBerthCollisions(
  * 整備做完之後，車就停在<strong>該設施的出場站</strong>。所以整備結束後的第一段班次，
  * 起點站一定要是那一站——不是的話，那台車根本不在起點，這班開不了。
  *
- * 2026-08-08 加入。實際踩到的案例：行前設施在 M、出來接 T3上行，
- * 引擎卻排出一段 <code>PNT</code>（行前後跑 NT，起點 N2W）。成因是插入調度營運班次時，
+ * 2026-08-08 加入。實際踩到的案例：行檢設施在 M、出來接 T3上行，
+ * 引擎卻排出一段 <code>PNT</code>（行檢後跑 NT，起點 N2W）。成因是插入調度營運班次時，
  * 查不到出場站就退回「全部首班起點站」，等於認為車可以從任何一站冒出來。
  * 那個退路已移除，這道驗證則是<strong>最後一關</strong>：不管是哪條路徑排出來的，
  * 只要起點站接不上出場站就擋下來，不要再讓物理上做不到的班表流到使用者手上。
@@ -1151,7 +1151,7 @@ export function validateYardExitContinuity(args: {
       const exitOptions = yardExitStationOptionsByTaskType[yard.taskType] ?? [];
       if (exitOptions.length === 0) continue;
 
-      // 連續整備串（保養→行前）只看串尾那一段的出場站
+      // 連續整備串（保養→行檢）只看串尾那一段的出場站
       let next: GeneratedScheduleBlock | null = null;
       for (let j = i + 1; j < ordered.length; j += 1) {
         const candidate = ordered[j]!;

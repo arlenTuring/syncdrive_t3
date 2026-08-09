@@ -88,18 +88,18 @@ export type GeneratedScheduleBlock = {
    * 英文字母）。卡面代號＝這個代號 + I（入廠）／O（出廠），由
    * {@link resolveMoveCardPrefix} 依 source 動態組成——沒有「MO／MI／PI／PO」
    * 這種寫死的固定四種，代號完全跟著使用者設定走：充電代號 E 就是 EI／EO，
-   * 保養代號 M 就是 MI／MO，行前代號 P 就是 PI／PO。
+   * 保養代號 M 就是 MI／MO，行檢代號 P 就是 PI／PO。
    */
   yardExitSectionCode?: string;
   /**
-   * 轉場卡：來源／目的整備類型的中文名（充電／洗車／保養／行前／機動／調度），
+   * 轉場卡：來源／目的整備類型的中文名（充電／洗車／保養／行檢／待命／調度），
    * 只給 UI 顯示用（hover 標題），不影響卡面代號或排班邏輯。
    */
   yardExitSectionLabel?: string;
   /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */
   yardExitAteYardTail?: boolean;
   /**
-   * 整備任務區塊本身（充電／洗車／保養／行前／機動）：這一段實際停在哪一台
+   * 整備任務區塊本身（充電／洗車／保養／行檢／待命）：這一段實際停在哪一台
    * 具體設施（例 M2）——由它自己的入廠卡或出廠卡（或轉場卡的對應那一側）
    * 解出來就寫回這裡，讓這張任務卡自己也知道、也能顯示車停在哪。
    * 入廠、出廠是兩個各自獨立算的流程，但兩者指的一定是同一段停留，
@@ -130,7 +130,7 @@ export type GeneratedScheduleBlock = {
   };
   /**
    * 調度班次前綴（Yard Dispatch Prefix）：
-   * 整備（行前／充電／機動）出場站 ≠ 首班路線首站時，引擎在整備後第一個正線班次
+   * 整備（行檢／充電／待命）出場站 ≠ 首班路線首站時，引擎在整備後第一個正線班次
    * 上寫入此前綴（= 整備代號 + 路線代號，如「ATN」）。
    * 班次代號顯示為 `{yardDispatchPrefix}{HHMM}`（不含列碼）。
    * 僅 taskType=passenger source=template_bar 的班次可能有此欄位。
@@ -187,7 +187,7 @@ export type FeasibilityViolationCode =
   | 'ROUTE_ROTATION_OVER_TURNAROUND'
   /** 時間線上正線未跑完路線群組一整輪（例：只跑下行未跑上行） */
   | 'ROTATION_CYCLE_INCOMPLETE'
-  /** 保養／行前後調度無法接到首班起點站 */
+  /** 保養／行檢後調度無法接到首班起點站 */
   | 'MAINTENANCE_DISPATCH_UNREACHABLE'
   /** 站位讓渡：已插入次要邊讓車先去別站等，避開共用站位碰撞（資訊性） */
   | 'STATION_BERTH_RELIEF_INSERTED'

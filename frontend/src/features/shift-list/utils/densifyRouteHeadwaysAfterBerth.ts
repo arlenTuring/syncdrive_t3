@@ -207,7 +207,7 @@ export function densifyRouteHeadwaysAfterBerth(args: {
           );
         }
       }
-      // 不得把正線往前拉進行前／充電／保養／機動尾巴
+      // 不得把正線往前拉進行檢／充電／保養／待命尾巴
       const yardEnd = sameRowPrecedingYardEndSecond(timelines, later, candidate);
       if (yardEnd != null) {
         candidate = Math.max(candidate, snapUpToClockAlignSeconds(yardEnd));

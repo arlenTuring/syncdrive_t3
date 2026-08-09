@@ -53,7 +53,7 @@ function makeBlock(overrides: Partial<GeneratedScheduleBlock> & { id: string }):
 
 describe('resolveYardDispatchPrefixForBlock', () => {
   it('always returns PTN after inspection even when exit station == TN first station (T3)', () => {
-    // 產品規則：保養／行前都在 T3 發車可走 TN，仍要掛代號（不是一般首班）
+    // 產品規則：保養／行檢都在 T3 發車可走 TN，仍要掛代號（不是一般首班）
     const result = resolveYardDispatchPrefixForBlock({
       yardBlock: makeBlock({ id: 'y1', taskType: 'inspection' }),
       passengerBlock: makeBlock({

@@ -98,7 +98,7 @@ export function applyRotationCycleCompletion(args: {
   /** 空時段正線讓渡餘裕：無接下整備時，回程可占用相鄰空時段開頭 */
   emptyIntervalMainlineSlackSeconds?: number;
   /**
-   * 整備類型 → 出場站：行前／充電／機動結束後，下一串正線輪替相位對齊該站起點。
+   * 整備類型 → 出場站：行檢／充電／待命結束後，下一串正線輪替相位對齊該站起點。
    * 與 assignDirectionalDepartures／assignRoutes 共用同一策略表。
    */
   yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
@@ -185,7 +185,7 @@ export function applyRotationCycleCompletion(args: {
         partialPassengerTasks = [];
       }
 
-      // 整備結束後：若該列之後仍有正線，輪替相位對齊出場站（行前／充電／機動）
+      // 整備結束後：若該列之後仍有正線，輪替相位對齊出場站（行檢／充電／待命）
       const exitStationId = yardRotationExitByTaskType[task.taskType];
       const yardEndMinute = task.startMinute + task.durationMinutes;
       let phase = 0;

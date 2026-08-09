@@ -169,7 +169,7 @@ export function scoreRouteCandidate(args: {
  * 發車錨點不變；不再為「可行性」改選其他路線，以保證來回約束與週期補完一致。
  * 不可行時仍寫入該順序路線，交由 validate 報錯。
  *
- * 整備（行前／充電／機動）之後的第一段正線：輪替相位對齊出場站起點路線
+ * 整備（行檢／充電／待命）之後的第一段正線：輪替相位對齊出場站起點路線
  * （與 assignDirectionalDepartures 一致）。
  */
 export function assignPassengerRoutesConstraintGreedy(args: {
@@ -269,7 +269,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
             forceStartAfterYard = true;
           }
         }
-        // 充電／行前／機動無明確出場站，或整備後無正線：延續進整備前輪替
+        // 充電／行檢／待命無明確出場站，或整備後無正線：延續進整備前輪替
       }
 
       const nextAnchorSecond = findNextPassengerAnchorSecond(

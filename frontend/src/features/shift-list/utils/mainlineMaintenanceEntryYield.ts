@@ -145,7 +145,7 @@ export function applyMainlineMaintenanceEntryYield(
         // 判斷用的是<strong>整串</strong>的起點，不是這一腿自己的起點——
         // 一輪跑到超過整備開始時刻，後面幾腿的起點本來就會晚於整備，
         // 但車從頭到尾都在路上、根本還沒進去整備，那正是讓渡要處理的情況。
-        // 與整備同時起點（例保養尾接行前 09:30）＝不得讓渡壓縮整備，改由 push 推過整串。
+        // 與整備同時起點（例保養尾接行檢 09:30）＝不得讓渡壓縮整備，改由 push 推過整串。
         const runStartMinute = resolveContinuousRunStartMinute(ordered, other, maint.id);
         if (runStartMinute >= floorStartMinute - 1e-9) continue;
         if (
@@ -187,7 +187,7 @@ export function applyMainlineMaintenanceEntryYield(
 }
 
 /**
- * 正線／進場載客不得壓在同一列整備／行前／充電／機動上（含跨夜保養拆成晚段＋晨段）。
+ * 正線／進場載客不得壓在同一列整備／行檢／充電／待命上（含跨夜保養拆成晚段＋晨段）。
  * 線性分鐘看不見「午夜後正線 vs 清晨保養」時，以日循環 ±1 日拷貝判定；
  * 若已重疊，整趟平移到整備結束（時長不變）。推到 ≥24:00 表示當日放不下 → 刪除該正線。
  */
@@ -240,7 +240,7 @@ export function pushPassengerPastPrecedingYard(
           prev.plannedEndMinute,
         );
         if (clearMinute == null) continue;
-        // 推到整備串尾（保養→行前相接時，不可停在 09:30 銜接點）
+        // 推到整備串尾（保養→行檢相接時，不可停在 09:30 銜接點）
         const yardTasks = ordered
           .filter((block) => isYieldableMaintenanceBlock(block))
           .map((block) => ({
@@ -259,7 +259,7 @@ export function pushPassengerPastPrecedingYard(
         );
         const targetMinute =
           chainEnd != null ? Math.max(clearMinute, chainEnd) : clearMinute;
-        // 若一推會跨越多段相接整備（充電→保養→行前），刪掉幽靈班，
+        // 若一推會跨越多段相接整備（充電→保養→行檢），刪掉幽靈班，
         // 不要錨點留在充電前、實際跑到整備後。單段整備（僅偷尾巴／撞保養）仍推過即可。
         const pushDeltaMinutes = targetMinute - current.plannedStartMinute;
         const yardsCrossed = ordered.filter((yard) => {

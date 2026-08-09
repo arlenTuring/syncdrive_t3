@@ -255,7 +255,7 @@
     <li><span class="tag hard">硬約束</span>必須守；守不住 → 略過脈衝／error，不可偷渡。</li>
     <li><span class="tag soft">決策偏好</span>在多候選裡用既定排序挑局部解（無全局回溯）。</li>
     <li>時間單位：引擎內部多用<strong>秒</strong>運算，區塊對外是<strong>自 00:00 起的分鐘浮點</strong>（<code>plannedStartMinute</code>）；對齊格是 <strong>10 秒</strong>。</li>
-    <li>「行前」模板任務型別 = <code>inspection</code>；UI 可能顯示「行前」。</li>
+    <li>「行檢」模板任務型別 = <code>inspection</code>；UI 可能顯示「行檢」。</li>
   </ul>
   <div class="callout warn">
     <strong>與舊敘述可能不一致的地方（以程式為準）：</strong>
@@ -268,7 +268,7 @@
   <h3>產品原則</h3>
   <ol>
     <li>時間模板的<strong>正線區段</strong>＝「這段時間必須提供正線服務」的營運承諾，不是「車輛只能在區段開始後才可準備」的硬殼。</li>
-    <li>整備／行前／充電／機動＝<strong>可用作業視窗</strong>，不保證必須占滿；可被正線壓縮<strong>開頭</strong>。</li>
+    <li>整備／行檢／充電／待命＝<strong>可用作業視窗</strong>，不保證必須占滿；可被正線壓縮<strong>開頭</strong>。</li>
     <li>硬約束互斥時，<strong>寧可留下運能缺口</strong>（<code>UNSERVED_SERVICE_PULSE</code>），也不輸出違規班次。</li>
   </ol>
   <h3>誰先誰後（衝突時的讓步順序）</h3>
@@ -354,7 +354,7 @@
       <tr>
         <td>1</td>
         <td><code>normalizeEngineInput</code></td>
-        <td>建 successor policy；產生方向班距<strong>整輪起班脈衝</strong>；掛到各車正線／可派機動窗；合併非正線；整備被正線壓開頭時 defer（保留模板原起點）</td>
+        <td>建 successor policy；產生方向班距<strong>整輪起班脈衝</strong>；掛到各車正線／可派待命窗；合併非正線；整備被正線壓開頭時 defer（保留模板原起點）</td>
         <td>policy 無效 → 整份 <code>plan: null</code>；掛不上 → <code>UNSERVED_SERVICE_PULSE</code></td>
       </tr>
       <tr>
@@ -372,7 +372,7 @@
       <tr>
         <td>5</td>
         <td><code>insertMaintenanceEntryServiceTrips</code></td>
-        <td>整備（保養／行前）做完之後，安排一趟<strong>調度營運班次</strong>把車開到正線起點站，路上順便載客。發車時刻由「正線開始時刻」往回推算（見 §10）。<strong>不佔用整備尾巴</strong></td>
+        <td>整備（保養／行檢）做完之後，安排一趟<strong>調度營運班次</strong>把車開到正線起點站，路上順便載客。發車時刻由「正線開始時刻」往回推算（見 §10）。<strong>不佔用整備尾巴</strong></td>
         <td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code>（接不上就略過，警告）</td>
       </tr>
       <tr>
@@ -521,7 +521,7 @@
     <thead><tr><th>欄位</th><th>意義</th></tr></thead>
     <tbody>
       <tr><td><code>rowIndex</code></td><td>時間線列（車輛列）1…N</td></tr>
-      <tr><td><code>taskType</code></td><td><code>passenger</code> / <code>charging</code> / <code>servicing</code> / <code>inspection</code>（行前）/ <code>standby</code>（機動）等</td></tr>
+      <tr><td><code>taskType</code></td><td><code>passenger</code> / <code>charging</code> / <code>servicing</code> / <code>inspection</code>（行檢）/ <code>standby</code>（待命）等</td></tr>
       <tr><td><code>startMinute</code> / <code>durationMinutes</code></td><td>視窗錨點與長度</td></tr>
       <tr><td><code>label</code></td><td>顯示名</td></tr>
     </tbody>
@@ -532,7 +532,7 @@
   <table>
     <thead><tr><th>欄位</th><th>意義</th></tr></thead>
     <tbody>
-      <tr><td><code>startSecond</code> / <code>endSecond</code></td><td>正線（或可派機動）模板窗</td></tr>
+      <tr><td><code>startSecond</code> / <code>endSecond</code></td><td>正線（或可派待命）模板窗</td></tr>
       <tr><td><code>dispatchStartSecond</code></td><td><strong>等於 startSecond</strong>——明確禁止為了預熱去裁<strong>前一段</strong>整備尾</td></tr>
       <tr><td><code>nextMaintenanceStartSecond</code></td><td>接下整備開始，或空時段邊界</td></tr>
       <tr><td><code>entrySlackSeconds</code></td><td>可占用接下整備／空時段<strong>開頭</strong>的秒數</td></tr>
@@ -584,15 +584,15 @@
     <li>hang recovery：放大 maxDelay／pulseSlack（尖峰班距≤240s 更積極）</li>
     <li>仍失敗且視窗可派 → <code>UNSERVED_SERVICE_PULSE</code></li>
   </ol>
-  <h3>行前／充電／機動開輪例外（S8）</h3>
+  <h3>行檢／充電／待命開輪例外（S8）</h3>
   <p>開輪<strong>第一腿</strong>插入門檻用<strong>車站清除時間</strong>（clearance），不用營運班距／車隊地板，否則永遠插不進去。</p>
   <h3>整備出場相位</h3>
   <table>
     <thead><tr><th>任務</th><th>出場對齊</th><th>整備後調度營運班次</th></tr></thead>
     <tbody>
-      <tr><td>行前 <code>inspection</code></td><td>從行前設施對齊到停靠站（該車後面還有正線才需要對齊）</td><td><strong>有</strong>，代號 <code>P</code></td></tr>
+      <tr><td>行檢 <code>inspection</code></td><td>從行檢設施對齊到停靠站（該車後面還有正線才需要對齊）</td><td><strong>有</strong>，代號 <code>P</code></td></tr>
       <tr><td>充電 <code>charging</code></td><td>只有單一出場站時才對齊</td><td>無</td></tr>
-      <tr><td>機動 <code>standby</code></td><td>只有單一出場站時才對齊；純機動的車不派正線</td><td>無</td></tr>
+      <tr><td>待命 <code>standby</code></td><td>只有單一出場站時才對齊；純待命的車不派正線</td><td>無</td></tr>
       <tr><td>保養 <code>servicing</code></td><td>由調度營運班次接手（見 §10）</td><td><strong>有</strong>，代號 <code>M</code></td></tr>
     </tbody>
   </table>
@@ -601,7 +601,7 @@
 <section id="s6">
   <h2>6. 整備讓渡：開頭 vs 尾巴（近期修過的語意）</h2>
   <div class="callout">
-    <strong>你確認過的產品規則：</strong>讓渡餘裕<strong>只能吃整備開頭</strong>；殘段仍須留給整備做事。禁止為了出車去砍<strong>前一段</strong>行前／整備的尾巴。
+    <strong>你確認過的產品規則：</strong>讓渡餘裕<strong>只能吃整備開頭</strong>；殘段仍須留給整備做事。禁止為了出車去砍<strong>前一段</strong>行檢／整備的尾巴。
   </div>
   <table>
     <thead><tr><th>情境</th><th>允許？</th><th>程式行為</th></tr></thead>
@@ -612,7 +612,7 @@
         <td><code>applyMainlineMaintenanceEntryYield</code>：整備 start ← 正線 end；end 鎖定</td>
       </tr>
       <tr>
-        <td>正線在行前／整備<strong>進行中</strong>才開始（偷尾巴）</td>
+        <td>正線在行檢／整備<strong>進行中</strong>才開始（偷尾巴）</td>
         <td><span class="tag hard">禁止</span></td>
         <td>yield <strong>不</strong>壓縮整備；<code>pushPassengerPastPrecedingYard</code> 把正線整趟推到整備結束後</td>
       </tr>
@@ -667,8 +667,8 @@
     <p>充電原 09:58:00–10:30:00；正線 TN 09:54:20–09:58:00。掛車在 slack 內結束 → 落地後充電變 <strong>09:58:00–10:30:00</strong>（開頭被吃、尾鎖定）。殘段仍是充電。</p>
   </div>
   <div class="ex">
-    <h4>範例 B · 非法偷行前尾巴（圖2類，現已修正）</h4>
-    <p>行前 09:30–10:00，補班距時把 NT 往前拉到 09:56:40。舊做法會把這個「重疊」當成讓渡，幾乎把行前砍光。現在的做法：行前維持 09:30–10:00 完整不動，NT 整趟推到 10:00 之後。</p>
+    <h4>範例 B · 非法偷行檢尾巴（圖2類，現已修正）</h4>
+    <p>行檢 09:30–10:00，補班距時把 NT 往前拉到 09:56:40。舊做法會把這個「重疊」當成讓渡，幾乎把行檢砍光。現在的做法：行檢維持 09:30–10:00 完整不動，NT 整趟推到 10:00 之後。</p>
   </div>
 </section>
 
@@ -924,7 +924,7 @@
   </p>
   <ul>
     <li>
-      <strong>整備任務（充電／保養／行前／機動）被往後擠</strong>：開始時間往後移，
+      <strong>整備任務（充電／保養／行檢／待命）被往後擠</strong>：開始時間往後移，
       但<strong>結束時間不動</strong>。等於整備的前段被吃掉一部分，作業時間變短。
     </li>
     <li>
@@ -946,7 +946,7 @@
 
   <h3>10.1 這是什麼</h3>
   <p>
-    車子做完保養或行前之後，通常人車都還在場內，離它要開始跑的正線起點站有一段距離。
+    車子做完保養或行檢之後，通常人車都還在場內，離它要開始跑的正線起點站有一段距離。
     這段「從場內開到正線起點站」的過程，中間會經過一些站點，
     所以<strong>順便載客</strong>，不要空車跑。這一趟就叫<strong>調度營運班次</strong>。
   </p>
@@ -957,14 +957,14 @@
   <table>
     <thead><tr><th>從哪種整備出來</th><th>代號開頭</th><th>範例</th></tr></thead>
     <tbody>
-      <tr><td>行前檢查</td><td><code>P</code></td><td><code>PTN1002</code>（行前完成後跑 TN，10:02 發車）</td></tr>
+      <tr><td>行檢</td><td><code>P</code></td><td><code>PTN1002</code>（行檢完成後跑 TN，10:02 發車）</td></tr>
       <tr><td>保養</td><td><code>M</code></td><td><code>MNT1730</code>（保養完成後跑 NT，17:30 發車）</td></tr>
     </tbody>
   </table>
   <div class="callout warn">
-    <strong>適用範圍只有保養與行前這兩種。</strong>
+    <strong>適用範圍只有保養與行檢這兩種。</strong>
     原因是這兩種整備的設施<strong>離正線起點站比較遠</strong>，車子做完之後得開一段路才能上工，
-    這段路才有「順便載客」的價值。充電與機動不適用，不產生調度營運班次。
+    這段路才有「順便載客」的價值。充電與待命不適用，不產生調度營運班次。
   </div>
 
   <h3>10.2 關鍵：這一趟不必遷就班距</h3>
@@ -1034,14 +1034,14 @@
   <h3>10.5 整備轉場小卡（入廠／出廠／整備間轉場）——現行架構</h3>
   <div class="callout warn">
     <strong>先講清楚一件事：沒有「MO／MI／PI／PO」這四種固定卡。</strong>
-    每一種整備任務（充電／洗車／保養／行前／機動）都用<strong>同一套轉場機制</strong>，
+    每一種整備任務（充電／洗車／保養／行檢／待命）都用<strong>同一套轉場機制</strong>，
     調度（parking）視為第六種類型（見 §11 的代號說明）。卡面代號＝
     <strong>使用者在整備任務自訂的代號 + I（入廠）／O（出廠）</strong>，完全動態組成：
     充電代號 <code>E</code> 就是 <code>EI</code>／<code>EO</code>；保養代號 <code>M</code>
-    就是 <code>MI</code>／<code>MO</code>；行前代號 <code>P</code> 就是 <code>PI</code>／<code>PO</code>；
-    今天保養做完接著進行前，就是<strong>一張 <code>MO</code> 接一張 <code>PI</code></strong>——
+    就是 <code>MI</code>／<code>MO</code>；行檢代號 <code>P</code> 就是 <code>PI</code>／<code>PO</code>；
+    今天保養做完接著進行檢，就是<strong>一張 <code>MO</code> 接一張 <code>PI</code></strong>——
     這兩張字面上「剛好」長得像舊觀念裡的「MO」「PI」，純粹是因為使用者剛好把
-    保養設成 <code>M</code>、行前設成 <code>P</code>；換一個代號，字面就完全不同了，
+    保養設成 <code>M</code>、行檢設成 <code>P</code>；換一個代號，字面就完全不同了，
     邏輯不會因此有任何分支。程式碼裡不存在一個列舉「MO／MI／PI／PO 四種」的
     型別或欄位——這件事本身在 2026-08-09 之前是真的做錯了（見 §17 對應條目），
     已經拿掉。
@@ -1068,7 +1068,7 @@
       <tr>
         <td>整備間轉場</td>
         <td>整備串<strong>內部</strong>——左右鄰居都是整備任務，且<strong>類型不同</strong>
-        （例：充電緊接著保養、保養緊接著行前）</td>
+        （例：充電緊接著保養、保養緊接著行檢）</td>
         <td>
         <strong>先判斷是不是同一個 Area：</strong>兩座設施若在地圖 JSON 的
         <code>MapAreaObject.facilities</code> 底下屬於同一個 Area 容器，直接視為
@@ -1133,7 +1133,7 @@
       插卡當下用 <code>resolveMaintenanceSectionCodeForTaskType()</code> 算好寫入——
       卡面代號＝這個欄位 + 方向尾綴，由 <code>resolveMoveCardPrefix()</code> 動態組成。</td></tr>
       <tr><td><code>yardExitSectionLabel</code></td><td>來源／目的整備類型的<strong>中文名</strong>
-      （充電／洗車／保養／行前／機動／調度），只給 hover 標題用，不影響卡面代號或排班邏輯。</td></tr>
+      （充電／洗車／保養／行檢／待命／調度），只給 hover 標題用，不影響卡面代號或排班邏輯。</td></tr>
       <tr><td><code>yardExitFacilityNodeId</code>／<code>Label</code></td><td>移動卡本身：實際去的那一台具體設施（例 M2）。</td></tr>
       <tr><td><code>yardExitStationId</code>／<code>Label</code></td><td>移動卡本身：另一端的站／分界點。</td></tr>
       <tr><td><code>yardExitAteYardTail</code></td><td>只有出廠卡會設——空間不夠、吃了整備尾巴。</td></tr>
@@ -1154,16 +1154,16 @@
   <h2>11. 整備後首班調度代號（P／M／E…）</h2>
   <div class="callout">
     <strong>產品規則（硬）：</strong>
-    整備任務（保養／行前／充電／機動）後面的<strong>第一個正線班次</strong>，班次代號必須掛上
+    整備任務（保養／行檢／充電／待命）後面的<strong>第一個正線班次</strong>，班次代號必須掛上
     <code>整備區段代號 + 路線代號</code>（再接時刻）。
-    例：行前代號 <code>P</code>、下一班 <code>TN</code> → 顯示 <code>PTN1126</code>；
+    例：行檢代號 <code>P</code>、下一班 <code>TN</code> → 顯示 <code>PTN1126</code>；
     保養代號 <code>M</code>、下一班 <code>NT</code> → <code>MNT1730</code>。
   </div>
 
   <h3>11.1 為什麼一定要掛</h3>
   <p>
     關聯圖／偏好導通決定整輪<strong>開輪相位</strong>（例 canonical 以 <code>NT</code> 開輪）與繼任邊——這不是寫死路徑。
-    但整備（保養、行前）常從設施出場站（例 T3）出來，下一班可以走 <code>TN</code>／<code>TNB</code>：
+    但整備（保養、行檢）常從設施出場站（例 T3）出來，下一班可以走 <code>TN</code>／<code>TNB</code>：
     該路線幾何上的首站可能剛好是 T3，<strong>看起來</strong>像「從首站發車」，
     卻<strong>不是</strong>交路意義上的一般開輪首班（不是 NT 開輪）。
     代號前綴用來標明：這是整備後的調度出場，不是一般正線首班。
@@ -1210,7 +1210,7 @@
     <li>取該整備之後第一個 <code>source: template_bar</code> 正線（略過 <code>entry_service</code>）。</li>
     <li>寫入 <code>yardDispatchPrefix = sectionCode + routeCode</code>（例 <code>PTN</code>、<code>MNT</code>）。</li>
     <li>顯示：<code>{yardDispatchPrefix}{HHMM}</code>（不含列碼）。</li>
-    <li>相接整備串（充電→保養→行前）：以串上各個整備各試一次標記，後寫覆蓋前寫 → <strong>串尾整備代號勝出</strong>（例串尾是行前 → <code>P…</code>）。</li>
+    <li>相接整備串（充電→保養→行檢）：以串上各個整備各試一次標記，後寫覆蓋前寫 → <strong>串尾整備代號勝出</strong>（例串尾是行檢 → <code>P…</code>）。</li>
     <li>若整備緊鄰前方已是正線（整備被擠進正線中段）→ <strong>不標記</strong>（避免 TS→ST 後冒出假 <code>MTN</code>）。</li>
     <li><code>scrubMidMainlineDispatchArtifacts</code>：正線後面若還掛著調度前綴／進場標記 → 清掉。</li>
   </ol>
@@ -1295,7 +1295,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
-      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行前／機動→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行檢／待命→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></td><td>warn</td><td>整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：整備任務沒設定該區段設施／拓樸上沒有可通的邊或路徑／設施當時被別列車佔著。三種轉場共用同一個模組、同一個代號（見 §10.4）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_FACILITY_UNAVAILABLE</code></td><td>warn</td><td>整備設施不足：這一段整備的<strong>整段時間內該類設施沒有任何一台是空的</strong>，車沒地方停。跟轉場卡排不出來（路徑問題）分開回報，處置完全不同——這是產能問題，要加設施或錯開整備時段（見 §10.5）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
       <tr><td><code>PARK_MOVE_UNRESOLVED</code></td><td>warn</td><td>調度入／出廠卡（PI／PO）排不出來：兩段正線之間空檔長到會佔死站位，但拓樸進不去或出不來調度設施、或設施當時被別列車佔著（見 §10.4）</td><td><code>insertParkMoveCards.ts</code></td></tr>
@@ -1312,25 +1312,25 @@ validateTimelineCapacity   ← 多為 warning</pre>
     <ul>
       <li>列數 2；尖峰班距 180s；恢復 30s</li>
       <li>關聯偏好開輪：NT → TS → ST → TN …</li>
-      <li>車1：行前 09:30–10:00；正線窗 10:00–12:00；行前區段代號 <code>P</code></li>
+      <li>車1：行檢 09:30–10:00；正線窗 10:00–12:00；行檢區段代號 <code>P</code></li>
       <li>車2：正線窗 09:30–12:00</li>
       <li>preTrip entrySlack = 600s</li>
     </ul>
     <h4>決策摘要</h4>
     <ol>
       <li>脈衝自 09:30 起每隔 180s（對齊 10s）產生「整輪起班」。</li>
-      <li>09:56 脈衝：車1 尚在行前 → <code>dispatchStartSecond=10:00</code>，不可 09:56 偷行前尾；優先掛車2 或延後到車1 10:00 開窗（開輪第一腿用清除時間）。</li>
+      <li>09:56 脈衝：車1 尚在行檢 → <code>dispatchStartSecond=10:00</code>，不可 09:56 偷行檢尾；優先掛車2 或延後到車1 10:00 開窗（開輪第一腿用清除時間）。</li>
       <li>若某輪回程拖到充電開始後 40s：在 slack 內且發車仍在充電開始<strong>前</strong> → 合法；落地 yield 壓縮充電開頭、鎖尾。不得在充電中段再發一腿。</li>
       <li>站位若 TN 與他車在 T3 撞窗 → 候選改延後或改選拓撲次要邊；再推同列下一班。</li>
-      <li>補班距時不可以把車1 的首班往前拉回 09:56（那會吃到行前的尾巴）；最後一道檢查會再確認一次。</li>
-      <li>行前後第一班無論是 NT 還是 TN，班次代號皆須帶 <code>P</code>（例 <code>PTN1002</code>）——即使 TN 幾何首站 = 行前出場站 T3。</li>
+      <li>補班距時不可以把車1 的首班往前拉回 09:56（那會吃到行檢的尾巴）；最後一道檢查會再確認一次。</li>
+      <li>行檢後第一班無論是 NT 還是 TN，班次代號皆須帶 <code>P</code>（例 <code>PTN1002</code>）——即使 TN 幾何首站 = 行檢出場站 T3。</li>
     </ol>
   </div>
   <div class="ex">
     <h4>車隊下限（紙上）</h4>
     <pre>理論列數 ≈ ceil( 完整交路一輪秒數 ÷ 目標班距秒數 )
 班距秒數 = 單車載客量 × 3600 ÷ PPHPD   （或時段直接給 headwaySeconds）</pre>
-    <p>「正線建議」列數≈穩態紙上值；現場若大量充電／行前占窗、或尚不成輪，可用正線列會少於理論，運能圖會露出山谷——這是<strong>可用列不足</strong>，不是假裝達標。</p>
+    <p>「正線建議」列數≈穩態紙上值；現場若大量充電／行檢占窗、或尚不成輪，可用正線列會少於理論，運能圖會露出山谷——這是<strong>可用列不足</strong>，不是假裝達標。</p>
   </div>
 </section>
 
@@ -1385,10 +1385,10 @@ backend/src/dev-log/
     <li><span class="tag pending">待議</span> 關聯圖是在說「跑完這條能接哪條」與從哪條開輪，不是「誰是誰的備用車」。同意？</li>
     <li><span class="tag pending">待議</span> 選線後可以等；不必成對瞬間換下一腳。同意？</li>
     <li><span class="tag pending">待議</span> 讓渡<strong>只能</strong>吃接下整備開頭；殘段保留；沒重疊就不讓。同意？</li>
-    <li><span class="tag confirmed">已確認</span> <strong>任何</strong>整備（保養／行前／充電／機動）的尾巴都不可佔用，<strong>沒有例外</strong>；只有開頭可以讓（2026-08-07 裁決）。</li>
-    <li><span class="tag confirmed">已確認</span> 整備後的調度營運班次一律在整備結束後才發車；<strong>不必滿足班距</strong>，只要不撞站位。適用保養（M）與行前（P），充電／機動不適用（2026-08-07 裁決）。</li>
+    <li><span class="tag confirmed">已確認</span> <strong>任何</strong>整備（保養／行檢／充電／待命）的尾巴都不可佔用，<strong>沒有例外</strong>；只有開頭可以讓（2026-08-07 裁決）。</li>
+    <li><span class="tag confirmed">已確認</span> 整備後的調度營運班次一律在整備結束後才發車；<strong>不必滿足班距</strong>，只要不撞站位。適用保養（M）與行檢（P），充電／待命不適用（2026-08-07 裁決）。</li>
     <li><span class="tag confirmed">已確認</span> 站位淨空時間算的是 <strong>A 車</strong>（原本在站上那班）的停靠＋緩衝＋換線＋恢復，乘 20% 安全餘裕；<strong>行駛時間是 P 車的，用扣的</strong>（2026-08-07 裁決）。</li>
-    <li><span class="tag pending">待議</span> 整備（保養／行前／充電／機動）後第一個正線<strong>一律</strong>掛區段代號＋路線代號（例 PTN／MNT）；不得用「出場站＝路線幾何首站」免除。同意？</li>
+    <li><span class="tag pending">待議</span> 整備（保養／行檢／充電／待命）後第一個正線<strong>一律</strong>掛區段代號＋路線代號（例 PTN／MNT）；不得用「出場站＝路線幾何首站」免除。同意？</li>
     <li><span class="tag pending">待議</span> 掛不上合法整輪 → 明示 <code>UNSERVED_SERVICE_PULSE</code>，不造假班。同意？</li>
     <li><span class="tag pending">待議</span> 生產固定 <code>template</code> 模式；<code>headway</code> 僅測試／次要。同意？</li>
     <li><span class="tag pending">待議</span> 現行路徑不跑 <code>completeRotationCycles</code>（原子掛車取代）。同意當成現況？</li>
@@ -1414,7 +1414,7 @@ backend/src/dev-log/
       改由站位淨空判定取代——調度班次本來就不該受班距約束。
     </li>
     <li>
-      <strong>適用範圍擴大：</strong>行前（inspection）原本寫死不產生調度班次，
+      <strong>適用範圍擴大：</strong>行檢（inspection）原本寫死不產生調度班次，
       現在與保養一樣會產生，代號 <code>P</code>。
     </li>
   </ul>
@@ -1708,9 +1708,9 @@ backend/src/dev-log/
   <h3>2026-08-08 · 查不到整備出場站就當「哪裡都能出場」，排出車不在的班次</h3>
   <ul>
     <li>
-      <strong>症狀：</strong>使用者看到 <code>PNT1000</code>——行前（P）後面跟著一段
-      <code>NT</code>（N2W → T3），10:00:00 發車。但行前設施在 <strong>M</strong>，
-      拓樸上出來接的是 <strong>T3上行</strong>；車做完行前停在 T3上行，
+      <strong>症狀：</strong>使用者看到 <code>PNT1000</code>——行檢（P）後面跟著一段
+      <code>NT</code>（N2W → T3），10:00:00 發車。但行檢設施在 <strong>M</strong>，
+      拓樸上出來接的是 <strong>T3上行</strong>；車做完行檢停在 T3上行，
       <strong>根本不在 N2W</strong>，這班開不了。
     </li>
     <li>
@@ -1718,7 +1718,7 @@ backend/src/dev-log/
       「車可以從哪一站出場」時寫了一條退路：
       <code>entryServiceExitStationIds.length &gt; 0 ? … : firstTripOrigins.map(o =&gt; o.stationId)</code>。
       查不到該整備區段的出場站，就退回<strong>全部首班起點站</strong>——
-      等於認為車可以從路網上任何一站冒出來。行前的設施代碼沒解析到時就走這條，
+      等於認為車可以從路網上任何一站冒出來。行檢的設施代碼沒解析到時就走這條，
       於是 N2W 也成了合法出場站。
     </li>
     <li>
@@ -1743,14 +1743,14 @@ backend/src/dev-log/
   <ul>
     <li>
       <strong>症狀：</strong>新加的 <code>YARD_EXIT_STATION_MISMATCH</code> 一次抓出 4 則——
-      行前與保養做完後車停在 T3上行，接著排的班次卻是從 N2W下行出發 發車。
+      行檢與保養做完後車停在 T3上行，接著排的班次卻是從 N2W下行出發 發車。
       hover 標明來源是「<strong>一般正線（整備後第一班）</strong>」，
       代表不是調度營運班次那條路徑。
     </li>
     <li>
       <strong>先排除的：</strong>合成案例直接打
       <code>assignPassengerRoutesConstraintGreedy</code>，輪替相位對齊<strong>是好的</strong>
-      ——行前出場站 T3上行，第一班正確給 TN。所以路線指派沒問題。
+      ——行檢出場站 T3上行，第一班正確給 TN。所以路線指派沒問題。
     </li>
     <li>
       <strong>真正根因：</strong><code>enforceStationBerthConstraints</code> 往前找
@@ -1797,7 +1797,7 @@ backend/src/dev-log/
     <li>
       <strong>改法：</strong>碰撞保護不足改成<strong>每個停靠點彙總成一則</strong>，
       直接講「同時最多有幾台車停在這裡」「停最久的是誰、停多久」「共影響幾對班次」。
-      這個數字才是可行動的：超過 1 台就代表車太多，要減列數、把多餘的車安排進整備／機動，
+      這個數字才是可行動的：超過 1 台就代表車太多，要減列數、把多餘的車安排進整備／待命，
       或讓它們改停別的站位。把兩班拉開是解不掉的。
     </li>
     <li>
@@ -1816,7 +1816,7 @@ backend/src/dev-log/
   <ul>
     <li>
       <strong>做錯的地方：</strong>引擎把「整備後第一班」當成輪替的起點，
-      用出場站去對齊相位。行前／保養的出場站是 T3上行，於是整輪被鎖成
+      用出場站去對齊相位。行檢／保養的出場站是 T3上行，於是整輪被鎖成
       <code>TN→NT→TS→ST</code>、收尾停在 T3上行。<strong>所有經過整備的車相位全被鎖在同一格</strong>，
       每輪之間都停在同一站，六列車就全部擠在 T3上行 排隊（40/40 碰撞集中在那裡）。
     </li>
@@ -1829,22 +1829,22 @@ backend/src/dev-log/
       <strong>改法：</strong><code>YardPostTaskPolicy</code> 新增
       <code>alignRotationToExitStation</code>，把「車停在哪」與「輪從哪起算」分成兩件事：
       <ul>
-        <li><strong>保養／行前 = false</strong>：有外掛可送，輪從首發站起算。</li>
-        <li><strong>充電／機動 = true</strong>：沒有外掛，車真的就停在出場站，第一段只能從那裡發。</li>
+        <li><strong>保養／行檢 = false</strong>：有外掛可送，輪從首發站起算。</li>
+        <li><strong>充電／待命 = true</strong>：沒有外掛，車真的就停在出場站，第一段只能從那裡發。</li>
       </ul>
       <code>buildYardRotationExitByTaskType</code> 加上 <code>purpose</code>：
       <code>'align'</code>（相位對齊，只含 true 的類型）與 <code>'validate'</code>
       （驗證車在不在該站，含全部）。
     </li>
     <li>
-      <strong>效果（實測）：</strong>行前出場後產出變成
+      <strong>效果（實測）：</strong>行檢出場後產出變成
       <code>entry_service r-tn @55</code>（外掛送車）→
       <code>template_bar r-nt @60</code>（輪從首發站起算）→ r-tn → r-nt …
       正是使用者描述的模型。
     </li>
     <li>
       <strong>兩則測試把錯誤觀念寫死了，已改寫並更名：</strong>
-      原本的「after 行前 at T, starts cycle from T-origin route」斷言整備後第一班是 TN
+      原本的「after 行檢 at T, starts cycle from T-origin route」斷言整備後第一班是 TN
       ——那正是要改掉的行為。改成斷言「外掛存在且在輪的第一段之前，輪的第一段是 r-nt」。
       <strong>這是產品規則改變，不是為了讓測試過而放寬。</strong>
     </li>
@@ -1864,7 +1864,7 @@ backend/src/dev-log/
     </li>
     <li>
       <strong>但冒出 26 則 <code>YARD_EXIT_STATION_MISMATCH</code>：</strong>
-      行前／保養做完車停在 T3上行，接著排的卻是從 N2W下行出發 發車的 NT。
+      行檢／保養做完車停在 T3上行，接著排的卻是從 N2W下行出發 發車的 NT。
       同時有 6 則「略過進場載客——尾巴時間不夠」。
     </li>
     <li>
@@ -1878,7 +1878,7 @@ backend/src/dev-log/
       <strong>解法：</strong>新增 <code>resolveYardDispatchLeadSeconds()</code>，
       建視窗時先算「最短的一條外掛路線占用 + 恢復時間」，
       把 <code>dispatchStartSecond</code> 往後推那麼多。
-      充電／機動沒有外掛（車就在出場站附近），回 0，行為不變。
+      充電／待命沒有外掛（車就在出場站附近），回 0，行為不變。
     </li>
     <li>
       <strong>教訓：</strong>改了「誰先誰後」的結構，就要同時檢查
@@ -1890,7 +1890,7 @@ backend/src/dev-log/
   <h3>2026-08-08 · 外掛班次被一條「靜默跳過」擋掉，整整兩列毫無線索</h3>
   <ul>
     <li>
-      <strong>症狀：</strong>行前做完車停在 T3上行，接著排的卻是 <code>PNT</code>
+      <strong>症狀：</strong>行檢做完車停在 T3上行，接著排的卻是 <code>PNT</code>
       （P + <strong>NT</strong>，從 N2W下行出發 發車）。使用者一眼認出：
       「調度營運班次要趕快到 N2W，應該是 <strong>TN 或 TNB</strong> 才對」。
     </li>
@@ -1898,11 +1898,11 @@ backend/src/dev-log/
       <strong>查法：</strong>看 <code>YARD_EXIT_STATION_MISMATCH</code> 的
       <code>blockSource</code> 是 <code>template_bar</code>，代表外掛根本沒被插入。
       再對 <code>MAINTENANCE_DISPATCH_UNREACHABLE</code>——只有保養那幾列有，
-      <strong>行前那兩列一則都沒有</strong>。連「略過」都沒回報，代表是靜默 <code>continue</code>。
+      <strong>行檢那兩列一則都沒有</strong>。連「略過」都沒回報，代表是靜默 <code>continue</code>。
     </li>
     <li>
       <strong>根因：</strong><code>isYardPrecededByMainline()</code>——
-      「整備被擠在正線中段就不准再插外掛」。行前夾在日間正線中段時這條就成立，
+      「整備被擠在正線中段就不准再插外掛」。行檢夾在日間正線中段時這條就成立，
       整列直接跳過。但這條規則<strong>只在「車已經在下一班的起點站」時才對</strong>；
       車不在那裡的話，外掛是<strong>必要</strong>的，不能因為整備前面剛好是正線就跳過。
     </li>
@@ -1914,7 +1914,7 @@ backend/src/dev-log/
     </li>
     <li>
       <strong>教訓：</strong>這一輪查了很久，全部卡在「<strong>沒有任何訊息</strong>」。
-      有警告的路徑（保養）三分鐘定位，靜默的路徑（行前）要逐行讀程式。
+      有警告的路徑（保養）三分鐘定位，靜默的路徑（行檢）要逐行讀程式。
       <strong>在「這件事非做不可」的分支上放 continue，一定要留下紀錄。</strong>
     </li>
   </ul>
@@ -1923,24 +1923,24 @@ backend/src/dev-log/
   <ul>
     <li>
       <strong>症狀：</strong>上一則修完重新生成，<code>YARD_EXIT_STATION_MISMATCH</code>
-      還是 26 則，而且行前那幾列<strong>連新加的 <code>reportSkip</code> 都沒觸發</strong>
+      還是 26 則，而且行檢那幾列<strong>連新加的 <code>reportSkip</code> 都沒觸發</strong>
       ——代表流程比想像中更早就跳掉了。
     </li>
     <li>
       <strong>查法：</strong>先確認 commit 時間（12:54）早於生成時間（12:57），排除「改動沒生效」。
       再直接打 <code>insertMaintenanceEntryServiceTrips()</code> 重現使用者那一列的形狀——
-      單獨的行前<strong>會</strong>插入外掛，所以函式本身是對的，差異一定在資料形狀。
-      逐一試整備串的組合，<code>充電 → 行前 → 正線</code> 重現成功：<strong>0 外掛、0 警告</strong>。
+      單獨的行檢<strong>會</strong>插入外掛，所以函式本身是對的，差異一定在資料形狀。
+      逐一試整備串的組合，<code>充電 → 行檢 → 正線</code> 重現成功：<strong>0 外掛、0 警告</strong>。
     </li>
     <li>
       <strong>根因：</strong>連續整備串的規則是「<strong>只在串首處理一次</strong>」。
       串首是充電（<code>allowEntryService=false</code>）→ 第一道檢查就靜默 <code>continue</code>；
-      串尾的行前又因為「前面是整備」被跳掉。<strong>兩邊互推，沒人處理，而且都不回報。</strong>
+      串尾的行檢又因為「前面是整備」被跳掉。<strong>兩邊互推，沒人處理，而且都不回報。</strong>
     </li>
     <li>
       <strong>解法：</strong>改成在<strong>串尾</strong>處理。車是從串尾那一段出來的，
       出場站、能不能插外掛，本來就該由串尾決定
-      （<code>充電→行前</code> 串，車出來時人在行前的出場站）。
+      （<code>充電→行檢</code> 串，車出來時人在行檢的出場站）。
     </li>
     <li>
       <strong>教訓：</strong>「只處理串首／串尾」這種去重規則，
@@ -1973,7 +1973,7 @@ backend/src/dev-log/
     </li>
     <li>
       <strong>使用者的更正：</strong>整備任務固定<strong>五類</strong>——
-      充電／洗車／保養／行前／機動，各自在場域設定 step 2 有對應設施分類。
+      充電／洗車／保養／行檢／待命，各自在場域設定 step 2 有對應設施分類。
       「這次模板沒排洗車，不代表洗車不用遵守規則。」
     </li>
     <li>
@@ -1994,8 +1994,8 @@ backend/src/dev-log/
         <thead><tr><th>任務類型</th><th>設施</th><th>出場站</th></tr></thead>
         <tbody>
           <tr><td>充電 charging</td><td>E1–E4</td><td><code>station_2</code>（N2W）</td></tr>
-          <tr><td>行前 inspection</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
-          <tr><td>機動 standby</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+          <tr><td>行檢 inspection</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
+          <tr><td>待命 standby</td><td>M1–M4</td><td><code>station_4</code>（T3上行）</td></tr>
           <tr><td>保養視窗 servicing</td><td>M1–M4 <strong>+ W1</strong></td><td><code>station_4</code>（T3上行）<strong>或</strong> <code>station_2</code>（N2W）</td></tr>
         </tbody>
       </table>
@@ -2068,7 +2068,7 @@ backend/src/dev-log/
     </li>
     <li>
       <strong>實測（真實資料）：</strong>13 處連續不同類型整備串，12 處成功、
-      1 處（行前→機動）因拓樸或設施限制回報略過。例：
+      1 處（行檢→待命）因拓樸或設施限制回報略過。例：
       <pre>
 07:10:00  充電結束（時刻不變）
 07:10:00–07:10:30  MO：E2 → N2W下行出發
@@ -2101,7 +2101,7 @@ backend/src/dev-log/
     <li>
       <strong>使用者的新架構：</strong>調度不再是獨立於整備任務外的第三種概念
       （PI／PO 用自己的一套命名），而是<strong>整備任務的第六種類型</strong>，
-      跟充電／洗車／保養／行前／機動共用同一套規則：一個代號，入廠加
+      跟充電／洗車／保養／行檢／待命共用同一套規則：一個代號，入廠加
       <code>I</code>、出廠加 <code>O</code>。
       <table>
         <thead><tr><th>類型</th><th>代號（範例）</th><th>入廠</th><th>出廠</th></tr></thead>
@@ -2109,8 +2109,8 @@ backend/src/dev-log/
           <tr><td>充電</td><td>E</td><td>EI</td><td>EO</td></tr>
           <tr><td>洗車</td><td>W</td><td>WI</td><td>WO</td></tr>
           <tr><td>保養</td><td>M</td><td>MI</td><td>MO</td></tr>
-          <tr><td>行前</td><td>P</td><td>PI</td><td>PO</td></tr>
-          <tr><td>機動</td><td>H</td><td>HI</td><td>HO</td></tr>
+          <tr><td>行檢</td><td>P</td><td>PI</td><td>PO</td></tr>
+          <tr><td>待命</td><td>H</td><td>HI</td><td>HO</td></tr>
           <tr><td>調度</td><td>T（使用者自訂）</td><td>TI</td><td>TO</td></tr>
         </tbody>
       </table>
@@ -2118,7 +2118,7 @@ backend/src/dev-log/
       PI／PO 原本是獨立設定的 <code>parkIn</code>／<code>parkOut</code> 兩個代號、
       不跟其他區塊的代號共用同一套邏輯。使用者原話：「有點把營運概念套到借屍還魂
       沒錯，但也大幅地將邏輯清晰化」——用一個統一規則換掉三套零散規則，
-      也連帶讓「行前」的代號 P 不會再跟舊版 PI／PO 撞名（新版調度改用使用者
+      也連帶讓「行檢」的代號 P 不會再跟舊版 PI／PO 撞名（新版調度改用使用者
       自訂的代號，而不是固定用 P）。
     </li>
     <li>
@@ -2167,7 +2167,7 @@ backend/src/dev-log/
       <ul>
         <li>MI（充電來源）→ 前綴 <code>EI</code>、班次代號 <code>EIA0254</code></li>
         <li>MO（保養來源）→ 前綴 <code>MO</code>、班次代號 <code>MOA1737</code></li>
-        <li>MO（行前來源）→ 前綴 <code>PO</code>、班次代號 <code>POA1035</code></li>
+        <li>MO（行檢來源）→ 前綴 <code>PO</code>、班次代號 <code>POA1035</code></li>
         <li>PI（調度）→ 前綴 <code>TI</code>、班次代號 <code>TIA1121</code></li>
         <li>PO（調度）→ 前綴 <code>TO</code>、班次代號 <code>TOA1136</code></li>
       </ul>
@@ -2253,7 +2253,7 @@ backend/src/dev-log/
       <strong>背景：</strong>MO／MI 是幾十秒寬的小卡，卡面塞不下完整班次代號，
       所以只印兩個字母 ＋ hover。<strong>PI／PO 常常橫跨一整段空檔</strong>
       （實測 11:21–11:36 這種量級），卡片本身就有足夠長度，
-      因此比照其他整備區塊（充電／洗車／保養／行前／機動），
+      因此比照其他整備區塊（充電／洗車／保養／行檢／待命），
       讓使用者自己設定代號，而不是沿用來源整備任務的代號。
     </li>
     <li>
@@ -2320,7 +2320,7 @@ backend/src/dev-log/
     <li>
       <strong>新增整備任務第五步「調度任務」</strong>：只載入調度設施，
       沒有觸發條件也沒有作業時長——停多久由排班決定，不是設一個固定值。
-      步驟從 7 步變 8 步，行前／機動往後移。
+      步驟從 7 步變 8 步，行檢／待命往後移。
     </li>
     <li>
       <strong>實測（真實資料）：</strong>MO 22 張、MI 16 張、<code>errors 0</code>。
@@ -2393,7 +2393,7 @@ backend/src/dev-log/
         （例「N2W下行&gt;[備用]T3下行停靠」），並把 <code>TN</code>／<code>TNB</code> 接到它——
         T3下行那 5 對才有機會化解。</li>
         <li>N 向再加一個備用停靠位；目前 2 個位子塞不下 3 台空等的車。</li>
-        <li>減少該時段的時間線列數，或把多餘的車安排進整備／機動。</li>
+        <li>減少該時段的時間線列數，或把多餘的車安排進整備／待命。</li>
       </ol>
     </li>
     <li>
@@ -2417,7 +2417,7 @@ backend/src/dev-log/
       <strong>根因：</strong>每個 step 各自硬篩設施用途——
       充電 <code>fetchMapFieldEquipment(mapId, 'charging')</code>、
       洗車 <code>fetchCarWashFieldEquipment</code>、
-      保養／行前／機動 <code>fetchMaintenanceStationEquipment</code>。
+      保養／行檢／待命 <code>fetchMaintenanceStationEquipment</code>。
       加上 <code>canAddRow = rows.length &lt; equipment.length</code>，
       可選集合被篩到剩四座、又剛好掛滿四座，<code>＋</code> 就死了。
     </li>
@@ -2432,12 +2432,12 @@ backend/src/dev-log/
       抓 <code>kind=all</code> 後只濾掉「不是停車位」的設備
       （號誌／智慧桿／月台門），其餘設施格全部可選。
       <code>preferredPurpose</code> 只影響<strong>排序</strong>（把常用那類排前面），不縮小範圍。
-      五個 step 各自傳自己的偏好：充電格／洗車格／保養格／保養格（行前）／調度格（機動）。
-      行前與機動共用 <code>StepStationDurationParams</code>，因此加了
+      五個 step 各自傳自己的偏好：充電格／洗車格／保養格／保養格（行檢）／調度格（待命）。
+      行檢與待命共用 <code>StepStationDurationParams</code>，因此加了
       <code>preferredFacilityPurpose</code> prop 讓兩者各自指定。
     </li>
     <li>
-      <strong>順帶查到的設定問題：</strong>機動（mobile）目前掛的是 M1–M4（保養格），
+      <strong>順帶查到的設定問題：</strong>待命（mobile）目前掛的是 M1–M4（保養格），
       而地圖上 H1–H3 才是調度格，且<strong>沒有任何整備任務區段掛到 H 系</strong>。
       結果 22 張出場移動卡全擠在 M1–M4，H 系整組閒置，
       4 則 <code>YARD_EXIT_MOVE_UNRESOLVED</code>「設施不夠分」就是這樣來的。
@@ -2477,13 +2477,13 @@ backend/src/dev-log/
     </li>
     <li>
       <strong>班次代號：</strong>整備代號 + <code>EX</code>（Exit）——
-      行前 <code>PEX</code>、保養 <code>MEX</code>、充電 <code>EEX</code>、洗車 <code>WEX</code>、機動 <code>HEX</code>。
+      行檢 <code>PEX</code>、保養 <code>MEX</code>、充電 <code>EEX</code>、洗車 <code>WEX</code>、待命 <code>HEX</code>。
       帶列碼，跟整備卡一致：它是某一台車的場內動作，不是路線班次。
     </li>
     <li>
       <strong>洗車升格為獨立任務類型。</strong><code>TaskTypeKey</code> 加回
       <code>washing</code>，時間模板編輯器出現「洗車」選項。
-      整備任務五類（充電／洗車／保養／行前／機動）與設施區段
+      整備任務五類（充電／洗車／保養／行檢／待命）與設施區段
       <strong>一對一，不再聯集</strong>——<code>servicing</code> 只吃 M 系、
       <code>washing</code> 只吃 W 系。舊資料的 <code>wash</code> 直譯成
       <code>washing</code>（併進保養會讓車被算成從 M 系出場，實際上它在 W 系）。
@@ -2623,7 +2623,7 @@ backend/src/dev-log/
     <li>
       <strong>沿路排除的：</strong>設施解析正確（<code>preTrip → M1–M4 → station_4</code>）、
       policy 正確（<code>allowEntryService=true</code>）、
-      插入當下時間充裕（行前 10:00 結束、下一班 10:38，空 38 分鐘）。
+      插入當下時間充裕（行檢 10:00 結束、下一班 10:38，空 38 分鐘）。
       訊息說「尾巴時間不夠」其實是誤導——真正的拒絕原因是站位。
     </li>
     <li>
@@ -2646,7 +2646,7 @@ backend/src/dev-log/
     <li>
       <strong>結果：</strong><code>YARD_EXIT_STATION_MISMATCH</code> 26 → 13、
       <code>STATION_BERTH_COLLISION</code> 2 → 0。列 1 變成
-      <code>行前 → entry_service TNB 10:35:40 → NTB 10:39:20</code>，正是預期的模型。
+      <code>行檢 → entry_service TNB 10:35:40 → NTB 10:39:20</code>，正是預期的模型。
     </li>
     <li>
       <strong>教訓：</strong>「取最大值」在時間軸上幾乎總是錯的——
@@ -2731,7 +2731,7 @@ backend/src/dev-log/
   <ul>
     <li>
       <strong>使用者的原話：</strong>「妳今天是充電入廠 那目前使用者設定的代號是E開頭
-      那就是EI/EO...今天是保養完成後進入行前 那就是 MO&gt;PI 請你搞清楚邏輯
+      那就是EI/EO...今天是保養完成後進入行檢 那就是 MO&gt;PI 請你搞清楚邏輯
       不是獨立的MOMIPOPI 你完全搞錯了 那些MIMOPIPO的觀念要完全消除」。
     </li>
     <li>
@@ -2748,7 +2748,7 @@ backend/src/dev-log/
       <code>MOVE_CARD_TITLE</code>／<code>MOVE_CARD_HINT</code> 兩張表直接用
       <code>Record&lt;'MO' | 'MI' | 'PI' | 'PO', string&gt;</code> 查 hover 標題與說明句
       （例：<code>MO: '整備出廠'</code>）。這表示不管卡片實際是充電出廠、保養出廠、
-      還是行前出廠，hover 標題全部顯示同一句「整備出廠」，完全沒有反映
+      還是行檢出廠，hover 標題全部顯示同一句「整備出廠」，完全沒有反映
       「這是哪一種整備」——固定四值不只是型別上不乾淨，是真的在使用者能看到的地方
       抹平了差異。
     </li>
@@ -2757,7 +2757,7 @@ backend/src/dev-log/
       <ul>
         <li><code>moveCardTag</code> 欄位整個拿掉。</li>
         <li>新增 <code>yardExitSectionLabel</code> 欄位——來源／目的整備類型的中文名
-        （充電／洗車／保養／行前／機動／調度），插卡當下依 <code>taskType</code> 算好寫入
+        （充電／洗車／保養／行檢／待命／調度），插卡當下依 <code>taskType</code> 算好寫入
         （新函式 <code>resolveMaintenanceSectionLabelForTaskType()</code>），跟
         <code>yardExitSectionCode</code>（使用者自訂字母代號）是同一套邏輯的兩個輸出，
         一個給機器（代號），一個給人看（中文名）。</li>
@@ -2976,7 +2976,7 @@ backend/src/dev-log/
     <li>
       <strong>驗證：</strong>真實資料下，maintenance／preTrip／mobile 目前在測試設定
       共用 M1–M4（設施本身就同 Area），轉場卡確實變成 0 秒的
-      <code>M1 → M2</code> 這類直接示意；手動建構 M1（保養）→H1（行前）案例，
+      <code>M1 → M2</code> 這類直接示意；手動建構 M1（保養）→H1（行檢）案例，
       原本 7 段 410 秒的路徑，現在是 0 秒、瞬間銜接。新增測試涵蓋「同 Area 但拓樸完全
       不連通仍要成立」與「沒有 Area 資料時維持查拓樸」兩種情況。<code>tsc</code> 23、
       測試 338 pass／9 fail（新增 2 則，9 則既有失敗與此改動無關），
@@ -3003,10 +3003,10 @@ backend/src/dev-log/
     <li>
       <strong>根因：</strong>同一區域的 0 秒示意轉移卡（開始＝結束＝前段結束
       那一刻）常常剛好落在<strong>後段本來就緊接著開始</strong>的那一刻——例如
-      保養 0–570 分、行前緊接著 570–600 分（模板零間隔銜接），轉場卡插在
+      保養 0–570 分、行檢緊接著 570–600 分（模板零間隔銜接），轉場卡插在
       570–570。<code>validateTimelineOverlaps()</code> 排序後比較相鄰兩段：
-      行前（570–600）跟 0 秒卡（570–570）在同一個起點排序打平，比較到
-      <code>行前.end(600) &gt; 0秒卡.start(570)</code> 就判定重疊——但一個
+      行檢（570–600）跟 0 秒卡（570–570）在同一個起點排序打平，比較到
+      <code>行檢.end(600) &gt; 0秒卡.start(570)</code> 就判定重疊——但一個
       不佔用任何時間長度的示意點，物理上不可能跟誰「重疊」，這是誤判。
     </li>
     <li>
@@ -3159,7 +3159,7 @@ backend/src/dev-log/
       <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 26 → 34——<strong>這是修好的
       表現，不是退步</strong>：先前那些卡是靠「同一格塞兩台車」才排得出來的，
       物理上做不到；現在正確擋下並回報。剩下的 34 則有 21 則是
-      「設施在這段時間被別列車佔著」，反映的是真實的產能限制：保養／行前／機動
+      「設施在這段時間被別列車佔著」，反映的是真實的產能限制：保養／行檢／待命
       三種任務在這份設定裡共用同一組 M1–M4 四格，尖峰時段本來就不夠分。
       <code>errorsByCode</code> 維持空、<code>report.ok = true</code>。
       新增 1 則回歸測試（明確構造「舊檢查窗看不到、新檢查窗擋得下」的案例）。
@@ -3426,6 +3426,44 @@ backend/src/dev-log/
       比完全不接更危險——接了的部分看起來會動，沒接的部分默默失效，而且因為
       那一對從未進入迴圈，連錯誤訊息都不會有。橫切改動要先列出<strong>所有</strong>
       取用鄰居的地方，逐一勾掉，不能改到哪算到哪。
+    </li>
+  </ul>
+
+  <h3>2026-08-10 · 用語更名：機動 → 待命、行前 → 行檢（含配色）</h3>
+  <ul>
+    <li>
+      <strong>使用者要求：</strong>「請幫我把機動改成待命，背景色塊改色灰白色，
+      另外行前改名為行檢。」
+    </li>
+    <li>
+      <strong>顯示名：</strong>全部經 <code>TASK_TYPE_OPTIONS</code> 解析，
+      改一處即全站生效（模板任務條、甘特卡面、手動編輯側欄、任務類型說明）。
+      另一併更新整備任務步驟名（第 6 步行檢任務、第 7 步待命任務）、兩支步驟
+      表單標題、轉場卡 hover 的中文名對照、後端 API 描述字串。
+    </li>
+    <li>
+      <strong>配色：</strong>待命由橘色 <code>#FF6900</code> 改為灰白
+      <code>#D4D4D8</code>／底色 <code>#3F3F46</code>——待命是車在場內候用、
+      沒有實際作業，用灰白跟「正在做事」的任務區隔開。
+    </li>
+    <li>
+      <strong>內部識別碼一律不動：</strong><code>taskType</code> 的
+      <code>'standby'</code>／<code>'inspection'</code>、設施區段鍵
+      <code>preTrip</code>／<code>mobile</code> 全部保持原樣，既有草稿與已存班表
+      不受影響。順帶一提 <code>standby</code> 這個鍵本來就叫 standby，
+      改成「待命」反而比原本的「機動」更貼。
+    </li>
+    <li>
+      <strong>程式碼註解與本文件同步更名</strong>（35 個檔案）。
+      本節較早的歷史條目也一併換成新用語——保留舊詞會讓讀者以為那是另一種任務。
+      唯二不動的是 <code>document/使用者對話紀錄.md</code>（對話逐字紀錄，
+      改了就不是紀錄了）與 <code>排班引擎最近問題.html</code>（每次生成自動覆寫）。
+    </li>
+    <li>
+      <strong>掃描時的注意點：</strong>先統計「行前」「機動」前一個字的分布，
+      確認沒有像「執行前」這種會被誤傷的複合詞才動手。實際只有一處需要收尾：
+      「行前檢查」被換成「行檢檢查」（疊字），已改回「行檢」。
+      <code>tsc</code> 23、測試 347 pass／9 fail，皆與更名前一致。
     </li>
   </ul>
 

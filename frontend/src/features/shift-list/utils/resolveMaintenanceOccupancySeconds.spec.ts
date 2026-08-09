@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { resolveMaintenanceOccupancySeconds } from './resolveMaintenanceOccupancySeconds';
 
 describe('resolveMaintenanceOccupancySeconds', () => {
-  it('does not let 行前 body duration override the template bar', () => {
+  it('does not let 行檢 body duration override the template bar', () => {
     assert.equal(
       resolveMaintenanceOccupancySeconds('inspection', {
         preTrip: {

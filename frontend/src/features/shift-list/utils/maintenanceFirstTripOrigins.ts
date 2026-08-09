@@ -253,8 +253,8 @@ export function resolvePreferredExitStationId(
 }
 
 /**
- * 行前出場站：依整備任務「行前」設施代號，對到拓樸設施→停靠邊。
- * 行前通常只指向單一停靠（如 T3）；多個時取命中最多者。
+ * 行檢出場站：依整備任務「行檢」設施代號，對到拓樸設施→停靠邊。
+ * 行檢通常只指向單一停靠（如 T3）；多個時取命中最多者。
  */
 export function resolveInspectionExitStationId(
   origins: MaintenanceFirstTripOrigin[],
@@ -270,7 +270,7 @@ export function resolveInspectionExitStationId(
  * 依指定設施區段解出可出場站集合。
  *
  * 整備任務五類各有自己的設施區段，一對一，<strong>不做聯集</strong>：
- * 充電 charging、洗車 carWash、保養 maintenance、行前 preTrip、機動 mobile。
+ * 充電 charging、洗車 carWash、保養 maintenance、行檢 preTrip、待命 mobile。
  * 洗車現在是獨立的 `washing` 任務類型（模板上排洗車就是洗車），
  * 因此保養不再需要涵蓋 W 系設施——把兩者聯集會讓車被算成可能停在
  * 一台它根本沒去過的設施旁，連帶讓出場移動卡挑錯設施。

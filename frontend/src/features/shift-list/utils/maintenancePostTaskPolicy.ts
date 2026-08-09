@@ -12,13 +12,13 @@ import {
  *
  * | 任務類型 | 出場 | 輪替相位 | 整備後調度營運班次 |
  * |---------|------|---------|-------------------|
- * | 行前 inspection | preTrip 設施→停靠 | 對齊出場站起點路線* | 有，代號 P |
+ * | 行檢 inspection | preTrip 設施→停靠 | 對齊出場站起點路線* | 有，代號 P |
  * | 充電 charging | charging 設施→停靠 | 僅單一出場站時對齊* | 無 |
- * | 機動 standby | mobile 設施→停靠 | 僅單一出場站時對齊* | 無 |
+ * | 待命 standby | mobile 設施→停靠 | 僅單一出場站時對齊* | 無 |
  * | 保養 servicing | maintenance 設施→停靠 | **對齊出場站**（例 M 系→T3→TN）* | 有，代號 M |
  * | 洗車 washing | carWash 設施→停靠 | 同保養 | 有，代號 W |
  *
- * 整備任務固定五類：充電／洗車／保養／行前／機動，各自在場域設定 step 2
+ * 整備任務固定五類：充電／洗車／保養／行檢／待命，各自在場域設定 step 2
  * 有對應設施分類，<strong>一對一，不做聯集</strong>。
  * 洗車有自己的 `TaskTypeKey`（`washing`）：模板上排洗車就是洗車、排保養就是保養。
  *
@@ -26,10 +26,10 @@ import {
  * 且不受同方向班距約束；只受站位淨空限制。詳見文件 §10。
  *
  * *出場／相位對齊只在「該列之後還有正線模板視窗」時套用。
- * 純機動、沒有正線時不強制為出場站去跑某方向（例如 TN→N2W）。
- * 機動可派正線同樣僅限「該機動開始後仍有正線視窗」的列。
+ * 純待命、沒有正線時不強制為出場站去跑某方向（例如 TN→N2W）。
+ * 待命可派正線同樣僅限「該待命開始後仍有正線視窗」的列。
  *
- * 泛用禁令：保養／行前／充電／機動連成一串整備時，串內不得掛任何正線卡；
+ * 泛用禁令：保養／行檢／充電／待命連成一串整備時，串內不得掛任何正線卡；
  * 只有整備完成後「下一個模板就是正線」才允許調度／進場載客／正線脈衝。
  */
 
@@ -65,7 +65,7 @@ export function rowHasPassengerTemplateAtOrAfter(
 
 /**
  * 若 atMinute 落在同列一串相接的整備內（或卡在銜接點），回傳該串結束分鐘；
- * 否則 null。例：保養 02:00–09:30 + 行前 09:30–10:00 → at 09:30 得 10:00。
+ * 否則 null。例：保養 02:00–09:30 + 行檢 09:30–10:00 → at 09:30 得 10:00。
  */
 export function resolveContiguousYardBusyUntilMinute(
   tasks: ReadonlyArray<{
@@ -122,8 +122,8 @@ export function resolveContiguousYardBusyUntilMinute(
 }
 
 /**
- * 機動可否當正線派車窗：該列在機動開始後仍須有正線模板。
- * （純機動列＝備援待命，不強制跑出場交路。）
+ * 待命可否當正線派車窗：該列在待命開始後仍須有正線模板。
+ * （純待命列＝備援待命，不強制跑出場交路。）
  */
 export function isStandbyDispatchableForMainline(
   tasks: ReadonlyArray<{
@@ -171,15 +171,15 @@ export type YardPostTaskPolicy = {
   /**
    * 輪替相位要不要對齊到出場站。
    *
-   * <strong>false（保養／行前）</strong>：出場站離首發站有一段距離，車會先跑一趟
+   * <strong>false（保養／行檢）</strong>：出場站離首發站有一段距離，車會先跑一趟
    * <strong>外掛的調度營運班次</strong>把自己送到首發站，那一趟不算輪、也不受班距約束。
    * 輪仍然<strong>從首發站（關聯圖的起點，例 N2W）起算</strong>，結構不變。
    *
-   * <strong>true（充電／機動）</strong>：設施就在首發站附近、沒有外掛班次，
+   * <strong>true（充電／待命）</strong>：設施就在首發站附近、沒有外掛班次，
    * 車真的就停在出場站，第一段只能從那裡發車。
    *
    * 2026-08-08 更正：舊版兩種都對齊，等於讓「外掛班次」改寫了輪的起點——
-   * 行前出場站是 T3上行，整輪就被鎖成 TN→NT→TS→ST、收尾停在 T3上行，
+   * 行檢出場站是 T3上行，整輪就被鎖成 TN→NT→TS→ST、收尾停在 T3上行，
    * 於是所有經過整備的車全部堆在 T3上行 排隊。外掛不該改變輪的結構。
    */
   alignRotationToExitStation: boolean;
@@ -216,7 +216,7 @@ export function resolveYardPostTaskPolicy(args: {
   if (origins.length === 0) return EMPTY_POLICY;
 
   if (taskType === 'inspection') {
-    // 行前設施同樣離正線起點站有一段距離，做完之後車要開過去才能上工，
+    // 行檢設施同樣離正線起點站有一段距離，做完之後車要開過去才能上工，
     // 因此與保養一樣產生「整備後調度營運班次」（代號 P）。
     const preTripCodes = extractFacilityMapCodes(maintenanceBody, 'preTrip');
     const entryStations = resolveExitStationIdsForFacilityCodes(origins, preTripCodes);
@@ -225,7 +225,7 @@ export function resolveYardPostTaskPolicy(args: {
         resolvePreferredExitStationId(origins, preTripCodes)
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
-      // 行前設施離首發站遠，靠外掛的調度營運班次把車送過去；輪仍從首發站起算
+      // 行檢設施離首發站遠，靠外掛的調度營運班次把車送過去；輪仍從首發站起算
       alignRotationToExitStation: false,
       allowEntryService: true,
       entryServiceExitStationIds: entryStations,
@@ -251,7 +251,7 @@ export function resolveYardPostTaskPolicy(args: {
         origins,
         extractFacilityMapCodes(maintenanceBody, 'mobile'),
       ),
-      // 機動同充電：沒有外掛班次，車就在出場站
+      // 待命同充電：沒有外掛班次，車就在出場站
       alignRotationToExitStation: true,
       allowEntryService: false,
       entryServiceExitStationIds: [],
@@ -296,7 +296,7 @@ export function resolveYardPostTaskPolicy(args: {
         )
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
-      // 保養同行前：靠外掛班次送到首發站，輪不改結構
+      // 保養同行檢：靠外掛班次送到首發站，輪不改結構
       alignRotationToExitStation: false,
       allowEntryService: true,
       entryServiceExitStationIds: entryStations,
@@ -313,7 +313,7 @@ export function resolveYardPostTaskPolicy(args: {
  *
  * - <strong>'align'</strong>（掛車／路線指派用）：只含
  *   {@link YardPostTaskPolicy.alignRotationToExitStation} 為 true 的類型
- *   （充電／機動）。保養／行前不含——它們的車會由外掛的調度營運班次送到首發站，
+ *   （充電／待命）。保養／行檢不含——它們的車會由外掛的調度營運班次送到首發站，
  *   <strong>輪仍從首發站起算，不可被出場站改寫相位</strong>。
  * - <strong>'validate'</strong>（驗證車在不在該站用）：含全部有出場站的類型。
  *   驗證要問的是「車實際停在哪」，跟輪的相位無關。

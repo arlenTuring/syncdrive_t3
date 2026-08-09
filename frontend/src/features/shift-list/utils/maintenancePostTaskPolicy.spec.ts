@@ -43,7 +43,7 @@ const BODY = {
 };
 
 describe('resolveContiguousYardBusyUntilMinute', () => {
-  it('extends through 保養→行前 chain at the junction', () => {
+  it('extends through 保養→行檢 chain at the junction', () => {
     const tasks = [
       {
         rowIndex: 1,
@@ -97,8 +97,8 @@ describe('resolveYardPostTaskPolicy servicing exit', () => {
     assert.deepEqual(policy.entryServiceExitStationIds, ['station_4']);
   });
 
-  it('lets 行前 (inspection) produce a post-maintenance dispatch trip too', () => {
-    // 行前設施（H1）同樣離正線起點站有距離，做完之後車要開過去才能上工，
+  it('lets 行檢 (inspection) produce a post-maintenance dispatch trip too', () => {
+    // 行檢設施（H1）同樣離正線起點站有距離，做完之後車要開過去才能上工，
     // 因此與保養一樣要產生調度營運班次（代號 P）。舊版把 inspection 寫死為不允許。
     const policy = resolveYardPostTaskPolicy({
       taskType: 'inspection',
@@ -109,7 +109,7 @@ describe('resolveYardPostTaskPolicy servicing exit', () => {
     assert.deepEqual(policy.entryServiceExitStationIds, ['station_4']);
   });
 
-  it('keeps 充電/機動 without dispatch trips (facilities are near the origin)', () => {
+  it('keeps 充電/待命 without dispatch trips (facilities are near the origin)', () => {
     for (const taskType of ['charging', 'standby'] as const) {
       const policy = resolveYardPostTaskPolicy({
         taskType,
@@ -130,7 +130,7 @@ describe('resolveYardPostTaskPolicy servicing exit', () => {
       maintenanceBody: BODY,
     });
     // 2026-08-08：預設 purpose='align' 只含「車真的停在出場站、沒有外掛可送」的類型。
-    // 保養／行前有外掛班次會把車送到首發站，輪不從出場站起算，所以不列入相位對齊。
+    // 保養／行檢有外掛班次會把車送到首發站，輪不從出場站起算，所以不列入相位對齊。
     assert.equal(map.servicing, undefined);
     assert.equal(map.inspection, undefined);
     assert.equal(map.charging, 'station_2');
