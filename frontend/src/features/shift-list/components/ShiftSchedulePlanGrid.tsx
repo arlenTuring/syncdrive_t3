@@ -225,17 +225,13 @@ function BlockIssueHoverCard({
  * 行檢／洗車／待命／調度）動態組出來。
  */
 function resolveMoveCardTitle(block: GeneratedScheduleBlock): string {
-  const direction = block.source === 'yard_entry_move' || block.source === 'park_entry_move'
-    ? '入廠'
-    : '出廠';
+  const direction = block.source === 'yard_entry_move' ? '入廠' : '出廠';
   return `${block.yardExitSectionLabel ?? ''}${direction}`;
 }
 
 const MOVE_CARD_HINT_BY_SOURCE: Record<string, string> = {
   yard_exit_move: '整備做完後把車從設施開到轉乘站（或下一種整備設施）；結束時刻貼齊下一段發車。',
   yard_entry_move: '車輛不能再跑正線，提前開進整備設施；到了整備就直接開始（整備開始提前、結束不動）。',
-  park_entry_move: '車輛暫時無法接正線，先開進調度設施停放；必須先跑完停靠站放下客人才會進廠。',
-  park_exit_move: '暫停結束，把車從調度設施開回首站接正線。',
 };
 
 /** 移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
@@ -276,7 +272,7 @@ function MoveCardHoverCard({
         <span className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</span>
       </div>
       <div className="mt-1 text-[11px] leading-4 text-zinc-100">
-        {block.source === 'yard_entry_move' || block.source === 'park_entry_move'
+        {block.source === 'yard_entry_move'
           ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '設施'}`
           : `${block.yardExitFacilityLabel ?? '設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`}
       </div>
@@ -1225,7 +1221,7 @@ function ShiftScheduleBlockBar({
         isMoveCard
           ? [
               `${code} · ${resolveMoveCardTitle(block)}`,
-              block.source === 'yard_entry_move' || block.source === 'park_entry_move'
+              block.source === 'yard_entry_move'
                 ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '整備設施'}`
                 : `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
               `${timeLabel}（${block.travelSeconds} 秒）`,

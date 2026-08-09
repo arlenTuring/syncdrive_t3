@@ -170,9 +170,7 @@ export type MaintenanceBodySectionKey =
   | 'charging'
   | 'carWash'
   | 'maintenance'
-  | 'mobile'
-  /** 調度：車暫時不能跑正線時先停一下的設施（調度入／出廠卡 PI／PO 用） */
-  | 'parking';
+  | 'mobile';
 
 /** 從整備任務 body 抽出指定區段的設施代號（equipment.mapCode） */
 export function extractFacilityMapCodes(

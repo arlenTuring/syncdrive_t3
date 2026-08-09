@@ -4,7 +4,27 @@ import {
   isPositiveIntegerUpTo,
 } from '../utils/numericInput';
 
-export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** 目前步驟總數（第 7 步是任務檢視） */
+export const MAINTENANCE_STEP_COUNT = 7;
+
+/**
+ * 把舊草稿存的步驟號換算成現在的步驟號。
+ *
+ * 調度任務原本是第 5 步，廢除後第 6～8 步各往前遞補一格。舊草稿裡存的
+ * 步驟號如果不換算，使用者再打開會停在錯的步驟（曾經因為同一類錯位卡住過）。
+ *
+ * 舊 1–4 不動；舊 5（調度，已廢）落到現在的第 5 步（行檢）——那一步本來就是
+ * 它的下一步；舊 6→5、7→6、8→7。
+ */
+function migrateStoredStep(raw: unknown): CreateMaintenanceTaskStep {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1;
+  const old = Math.round(raw);
+  if (old < 1) return 1;
+  const next = old <= 4 ? old : Math.max(5, old - 1);
+  return Math.min(MAINTENANCE_STEP_COUNT, next) as CreateMaintenanceTaskStep;
+}
 
 export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   step: CreateMaintenanceTaskStep;
@@ -14,10 +34,9 @@ export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   { step: 2, label: '充電任務' },
   { step: 3, label: '洗車任務' },
   { step: 4, label: '保養任務' },
-  { step: 5, label: '調度任務' },
-  { step: 6, label: '行檢任務' },
-  { step: 7, label: '待命任務' },
-  { step: 8, label: '任務檢視' },
+  { step: 5, label: '行檢任務' },
+  { step: 6, label: '待命任務' },
+  { step: 7, label: '任務檢視' },
 ];
 
 export type MaintenanceTaskBasicDraft = {
@@ -97,10 +116,6 @@ export type MaintenanceTaskMobileDraft = StationDurationTaskDraft;
  * 停多久由排班決定（看什麼時候有班次可接），不是這裡設定的固定值，
  * 所以沒有 operationDurationMinutes。
  */
-export type MaintenanceTaskParkingDraft = {
-  stepEnabled: boolean;
-  equipmentRows: MaintenanceFacilityEquipmentRow[];
-};
 
 /** 設施代號：不指定 */
 export const PRE_TRIP_STATION_UNSPECIFIED = MAINTENANCE_STATION_UNSPECIFIED;
@@ -177,7 +192,6 @@ export type MaintenanceTaskCreateDraft = {
   charging: MaintenanceTaskChargingDraft;
   carWash: MaintenanceTaskCarWashDraft;
   maintenance: MaintenanceTaskMaintenanceDraft;
-  parking: MaintenanceTaskParkingDraft;
   preTrip: MaintenanceTaskPreTripDraft;
   mobile: MaintenanceTaskMobileDraft;
   currentStep: CreateMaintenanceTaskStep;
@@ -223,9 +237,6 @@ export function emptyMaintenanceTaskMobileDraft(): MaintenanceTaskMobileDraft {
   return emptyStationDurationTaskDraft();
 }
 
-export function emptyMaintenanceTaskParkingDraft(): MaintenanceTaskParkingDraft {
-  return { stepEnabled: true, equipmentRows: [] };
-}
 
 export function emptyStationDurationTaskDraft(): StationDurationTaskDraft {
   return {
@@ -368,7 +379,6 @@ export function emptyMaintenanceTaskCreateDraft(): MaintenanceTaskCreateDraft {
     charging: emptyMaintenanceTaskChargingDraft(),
     carWash: emptyMaintenanceTaskCarWashDraft(),
     maintenance: emptyMaintenanceTaskMaintenanceDraft(),
-    parking: emptyMaintenanceTaskParkingDraft(),
     preTrip: emptyMaintenanceTaskPreTripDraft(),
     mobile: emptyMaintenanceTaskMobileDraft(),
     currentStep: 1,
@@ -604,21 +614,6 @@ function parseStationDurationDraft(
   });
 }
 
-function parseParkingDraft(body: Record<string, unknown>): MaintenanceTaskParkingDraft {
-  const section =
-    body.parking && typeof body.parking === 'object'
-      ? (body.parking as Record<string, unknown>)
-      : null;
-  if (!section) return emptyMaintenanceTaskParkingDraft();
-  return {
-    stepEnabled:
-      typeof section.stepEnabled === 'boolean' ? section.stepEnabled : true,
-    equipmentRows: parseFacilityEquipmentRows(
-      section.equipmentRows,
-      newStationDurationEquipmentRowId,
-    ),
-  };
-}
 
 function parsePreTripDraft(body: Record<string, unknown>): MaintenanceTaskPreTripDraft {
   return parseStationDurationDraft(body, 'preTrip', emptyMaintenanceTaskPreTripDraft);
@@ -679,14 +674,6 @@ export function serializeMaintenanceTaskBody(
         durationMinutes: row.durationMinutes,
       })),
     },
-    parking: {
-      stepEnabled: draft.parking.stepEnabled,
-      equipmentRows: draft.parking.equipmentRows.map((row) => ({
-        id: row.id,
-        mapCode: row.mapCode,
-        ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
-      })),
-    },
     preTrip: {
       stepEnabled: draft.preTrip.stepEnabled,
       equipmentRows: draft.preTrip.equipmentRows.map((row) => ({
@@ -712,16 +699,14 @@ export function buildMaintenanceTaskDraftFromStored(
   name: string,
   body: Record<string, unknown>,
 ): MaintenanceTaskCreateDraft {
-  const currentStep =
-    typeof body.currentStep === 'number' && body.currentStep >= 1 && body.currentStep <= 8
-      ? (body.currentStep as CreateMaintenanceTaskStep)
-      : 1;
-
+  const currentStep = migrateStoredStep(body.currentStep);
   const maxReachedStepRaw =
-    typeof body.maxReachedStep === 'number' ? body.maxReachedStep : currentStep;
+    typeof body.maxReachedStep === 'number'
+      ? migrateStoredStep(body.maxReachedStep)
+      : currentStep;
   const maxReachedStep = Math.max(
     currentStep,
-    Math.min(8, Math.max(1, maxReachedStepRaw)),
+    Math.min(MAINTENANCE_STEP_COUNT, Math.max(1, maxReachedStepRaw)),
   ) as CreateMaintenanceTaskStep;
 
   return {
@@ -733,7 +718,6 @@ export function buildMaintenanceTaskDraftFromStored(
     charging: parseChargingDraft(body),
     carWash: parseCarWashDraft(body),
     maintenance: parseMaintenanceDraft(body),
-    parking: parseParkingDraft(body),
     preTrip: parsePreTripDraft(body),
     mobile: parseMobileDraft(body),
     currentStep,
@@ -823,11 +807,6 @@ export function isMaintenanceStepComplete(
  * 調度任務只要有設施就算完成——它沒有作業時長（停多久由排班決定），
  * 所以不能沿用 isStationDurationStepComplete（那會要求 operationDurationMinutes）。
  */
-export function isParkingStepComplete(parking: MaintenanceTaskParkingDraft): boolean {
-  if (!parking.stepEnabled) return true;
-  if (parking.equipmentRows.length === 0) return false;
-  return parking.equipmentRows.every((row) => row.mapCode.trim().length > 0);
-}
 
 export function isPreTripStepComplete(preTrip: MaintenanceTaskPreTripDraft): boolean {
   return isStationDurationStepComplete(preTrip);
@@ -866,9 +845,8 @@ export function isCreateMaintenanceTaskStepComplete(
   if (step === 2) return isChargingStepComplete(draft.charging);
   if (step === 3) return isCarWashStepComplete(draft.carWash);
   if (step === 4) return isMaintenanceStepComplete(draft.maintenance);
-  if (step === 5) return isParkingStepComplete(draft.parking);
-  if (step === 6) return isPreTripStepComplete(draft.preTrip);
-  if (step === 7) return isMobileStepComplete(draft.mobile);
+  if (step === 5) return isPreTripStepComplete(draft.preTrip);
+  if (step === 6) return isMobileStepComplete(draft.mobile);
   return true;
 }
 

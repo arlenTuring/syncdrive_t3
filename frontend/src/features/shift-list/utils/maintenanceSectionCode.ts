@@ -3,10 +3,9 @@ import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
 /**
  * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
  *
- * 調度（parking）視為整備任務的第六種類型，跟充電／洗車／保養／行檢／待命
- * 一樣只要一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
- * 自動加上 I（入廠）／O（出廠）尾綴組成，例：保養代號 M → 入廠 MI、出廠 MO；
- * 調度代號 T → 入廠 TI、出廠 TO。見 {@link resolveMoveCardPrefix}。
+ * 五種整備任務各一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
+ * 自動加上 I（入廠）／O（出廠）尾綴組成，例：保養代號 M → 入廠 MI、出廠 MO。
+ * 見 {@link resolveMoveCardPrefix}。
  */
 export type MaintenanceSectionCodeBySection = {
   charging: string;
@@ -14,7 +13,6 @@ export type MaintenanceSectionCodeBySection = {
   maintenance: string;
   preTrip: string;
   mobile: string;
-  parking: string;
 };
 
 export type MaintenanceSectionCodeKey = keyof MaintenanceSectionCodeBySection;
@@ -26,7 +24,6 @@ export function emptyMaintenanceSectionCodeBySection(): MaintenanceSectionCodeBy
     maintenance: '',
     preTrip: '',
     mobile: '',
-    parking: '',
   };
 }
 
@@ -54,7 +51,6 @@ export function normalizeMaintenanceSectionCodeBySection(
     maintenance: normalizeMaintenanceSectionCodeInput(raw.maintenance ?? base.maintenance),
     preTrip: normalizeMaintenanceSectionCodeInput(raw.preTrip ?? base.preTrip),
     mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile),
-    parking: normalizeMaintenanceSectionCodeInput(raw.parking ?? base.parking),
   };
 }
 
@@ -121,15 +117,12 @@ export function buildMaintenanceSectionCodeFingerprint(
     `maintenance:${n.maintenance}`,
     `preTrip:${n.preTrip}`,
     `mobile:${n.mobile}`,
-    `parking:${n.parking}`,
   ].join('|');
 }
 
 /**
  * 依時間模板 taskType 取整備區塊代號。
  * 洗車有自己的 taskType（washing），不再與保養共用一個視窗。
- * 調度（parking）不是時間模板任務類型，不在這裡查——見
- * {@link resolveMoveCardPrefix}。
  */
 export function resolveMaintenanceSectionCodeForTaskType(
   taskType: ScheduleEngineTaskType,
@@ -162,17 +155,13 @@ export function resolveMaintenanceSectionLabelForTaskType(
 }
 
 /**
- * 移動小卡（整備出／入廠、調度出／入廠）方向 → 代號尾綴。
+ * 整備轉場小卡方向 → 代號尾綴。
  * 入廠 I、出廠 O；跟來源那個區塊自己的代號組合成卡面／班次代號前綴，
- * 例：保養（M）入廠 → MI、洗車（W）出廠 → WO、調度（T）入廠 → TI。
- * 調度視為整備任務的第六種類型，跟其餘五種共用同一套規則，
- * 不再是獨立的 PI／PO 命名。
+ * 例：保養（M）入廠 → MI、洗車（W）出廠 → WO、行檢（P）入廠 → PI。
  */
 export const MOVE_CARD_DIRECTION_BY_SOURCE: Record<string, 'I' | 'O'> = {
   yard_entry_move: 'I',
-  park_entry_move: 'I',
   yard_exit_move: 'O',
-  park_exit_move: 'O',
 };
 
 /**

@@ -37,15 +37,7 @@ export type ScheduleBlockSource =
    * 與 MO 剛好對稱：MO 吃整備尾巴，MI 長整備的頭。
    */
   | 'yard_entry_move'
-  /**
-   * 調度入廠卡（PI）：車輛無可奈何得先停一下時，開進調度設施暫停。
-   * 前提是<strong>必須先跑完停靠站把客人放下</strong>——它只是暫停，不是收班。
-   */
-  | 'park_entry_move'
-  /**
-   * 調度出廠卡（PO）：暫停結束，把車從調度設施開回<strong>首站</strong>接正線。
-   */
-  | 'park_exit_move';
+  | 'yard_entry_move';
 
 export type GeneratedScheduleBlock = {
   id: string;
@@ -158,8 +150,6 @@ export type FeasibilityViolationCode =
    * 前者要加設施／錯開整備時段，後者是補拓樸的邊（警告）。
    */
   | 'MAINTENANCE_FACILITY_UNAVAILABLE'
-  /** 調度入／出廠卡（PI／PO）排不出來：拓樸進不去或出不來／設施被佔（警告） */
-  | 'PARK_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */

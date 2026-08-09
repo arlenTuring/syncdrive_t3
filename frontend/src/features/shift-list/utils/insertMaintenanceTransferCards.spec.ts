@@ -39,7 +39,6 @@ const SECTION_CODES = {
   maintenance: 'M',
   preTrip: 'P',
   mobile: 'H',
-  parking: 'T',
 };
 
 describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉場，共用一個模組）', () => {

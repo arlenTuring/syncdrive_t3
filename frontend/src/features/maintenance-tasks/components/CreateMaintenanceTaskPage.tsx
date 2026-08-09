@@ -14,8 +14,8 @@ import {
   isCarWashStepComplete,
   isCreateMaintenanceTaskStepComplete,
   isMaintenanceStepComplete,
+  MAINTENANCE_STEP_COUNT,
   isChargingStepComplete,
-  isParkingStepComplete,
   isPreTripStepComplete,
   isMobileStepComplete,
   resolveMaintenanceTaskDraftName,
@@ -26,7 +26,6 @@ import {
 import { StepChargingParams } from './StepChargingParams';
 import { StepCarWashParams } from './StepCarWashParams';
 import { StepMaintenanceParams } from './StepMaintenanceParams';
-import { StepParkingParams } from './StepParkingParams';
 import { StepPreTripParams } from './StepPreTripParams';
 import { StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
@@ -425,12 +424,9 @@ export function CreateMaintenanceTaskPage({
       return isMaintenanceStepComplete(draft.maintenance);
     }
     if (draft.currentStep === 5) {
-      return isParkingStepComplete(draft.parking);
-    }
-    if (draft.currentStep === 6) {
       return isPreTripStepComplete(draft.preTrip);
     }
-    if (draft.currentStep === 7) {
+    if (draft.currentStep === 6) {
       return isMobileStepComplete(draft.mobile);
     }
     return true;
@@ -440,7 +436,6 @@ export function CreateMaintenanceTaskPage({
     draft.carWash,
     draft.charging,
     draft.maintenance,
-    draft.parking,
     draft.preTrip,
     draft.mobile,
     draft.currentStep,
@@ -515,7 +510,7 @@ export function CreateMaintenanceTaskPage({
       && draft.maxReachedStep > 1
       && draft.basic.name.trim().length > 0);
 
-  const isLastStep = draft.currentStep === 8;
+  const isLastStep = draft.currentStep === MAINTENANCE_STEP_COUNT;
   const primaryActionEnabled = isLastStep
     ? previewReachedBottom && !loading && !loadError && !completing
     : canGoNext;
@@ -579,30 +574,24 @@ export function CreateMaintenanceTaskPage({
                   />
                 )}
                 {draft.currentStep === 5 && (
-                  <StepParkingParams
-                    draft={draft.parking}
-                    onChange={(parking) => updateDraft((prev) => ({ ...prev, parking }))}
-                  />
-                )}
-                {draft.currentStep === 6 && (
                   <StepPreTripParams
                     draft={draft.preTrip}
                     onChange={(preTrip) => updateDraft((prev) => ({ ...prev, preTrip }))}
                   />
                 )}
-                {draft.currentStep === 7 && (
+                {draft.currentStep === 6 && (
                   <StepMobileParams
                     draft={draft.mobile}
                     onChange={(mobile) => updateDraft((prev) => ({ ...prev, mobile }))}
                   />
                 )}
-                {draft.currentStep === 8 && (
+                {draft.currentStep === MAINTENANCE_STEP_COUNT && (
                   <StepSchedulePreview
                     draft={draft}
                     scrollRootRef={previewScrollRef}
                     onReachedBottom={setPreviewReachedBottom}
                     onEditStep={(step) => {
-                      if (step >= 1 && step <= 7) goToStep(step);
+                      if (step >= 1 && step < MAINTENANCE_STEP_COUNT) goToStep(step);
                     }}
                   />
                 )}

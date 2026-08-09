@@ -57,10 +57,9 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
-  PARK_MOVE_UNRESOLVED: '調度入／出廠卡排不出來',
 };
 
-/** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
+/** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
 export const ALL_FEASIBILITY_VIOLATION_CODES: FeasibilityViolationCode[] =
   Object.keys(GROUP_TITLE) as FeasibilityViolationCode[];
 
@@ -96,7 +95,6 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
-  PARK_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -224,11 +222,6 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。',
-  },
-  PARK_MOVE_UNRESOLVED: {
-    kind: 'policy',
-    guidance:
-      '調度入／出廠卡（PI／PO）讓車在「接下來沒班次可接、空檔又長到會佔死終點站站位」時先開進調度設施暫停。排不出來多半是整備任務第 5 步沒設定調度設施，或拓樸上少了「站 → 設施」「設施 → 站」其中一個方向的邊（可到路網拓樸把該邊設為雙向）。',
   },
   MAINTENANCE_FACILITY_UNAVAILABLE: {
     kind: 'limit',

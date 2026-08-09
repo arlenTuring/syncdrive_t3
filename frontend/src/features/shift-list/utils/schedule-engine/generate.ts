@@ -4,7 +4,6 @@ import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
-import { insertParkMoveCards } from '../insertParkMoveCards';
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
@@ -328,27 +327,6 @@ export function generateShiftSchedule(
     });
   }
 
-  // 調度入／出廠卡（PI／PO）：車接下來沒班次可接、空檔又長到會佔死終點站站位時，
-  // 開進調度設施暫停，時間到再開回下一段的起點站。
-  // 排在整備入廠卡之後：中間有整備的空檔已經由 MI 處理掉，剩下的才是「純粹沒班可跑」。
-  const parkMove = insertParkMoveCards({
-    timelines,
-    topology: engineInput.pointTopology,
-    maintenanceBody: engineInput.maintenanceBody,
-    selectedRoutes: engineInput.selectedRoutes,
-    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
-  });
-  timelines = parkMove.timelines;
-  for (const skip of parkMove.skipped) {
-    pushIssue(warnings, {
-      code: 'PARK_MOVE_UNRESOLVED',
-      severity: 'warning',
-      kind: 'policy',
-      message: `時間線 ${skip.timelineRow}：排不出調度入／出廠卡——${skip.reason}`,
-      detail: { timelineRow: skip.timelineRow, reason: skip.reason },
-    });
-  }
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(

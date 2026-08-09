@@ -2,11 +2,10 @@ import type { TaskTypeKey } from '../../time-templates/types/editor';
 import type { MaintenanceBodySectionKey } from './maintenanceFirstTripOrigins';
 
 /**
- * 四張移動小卡（MO／MI／PI／PO）共用的設施比對與佔用邏輯。
+ * 整備轉場小卡共用的設施比對與佔用邏輯。
  *
- * 這些片段原本在 insertYardExitMoveCards.ts／insertYardEntryMoveCards.ts／
- * insertParkMoveCards.ts 裡各自重複了一份，一字不差。新增「整備間轉場卡」
- * （insertYardTransitionMoveCards.ts）會是第四份重複，所以這次直接抽出來。
+ * 這些片段原本散在入廠／出廠／整備間轉場三個檔案裡各自重複一份，一字不差，
+ * 所以抽出來共用；三者後來也合併成 insertMaintenanceTransferCards.ts。
  */
 
 /** 整備任務類型 → 整備中心設施區段鍵 */

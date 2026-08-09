@@ -44,7 +44,6 @@ function resolveSectionEnabled(
     maintenance: previewDraft.maintenance.stepEnabled,
     preTrip: previewDraft.preTrip.stepEnabled,
     mobile: previewDraft.mobile.stepEnabled,
-    parking: previewDraft.parking.stepEnabled,
   };
 }
 
@@ -69,8 +68,6 @@ export function StepShiftMaintenanceTask({
     draft.sectionCodeBySection,
   );
   const sectionEnabled = draft.sectionEnabled;
-  // 調度（parking）現在跟其他五個整備區塊一樣只有一個代號欄位，
-  // 不用再另外組驗證用的 enabled map——sectionEnabled 的鍵本來就對得上。
   const codeIssues = findMaintenanceSectionCodeIssues(
     sectionCodeBySection,
     sectionEnabled,
@@ -132,8 +129,7 @@ export function StepShiftMaintenanceTask({
           && current.sectionEnabled.carWash === enabled.carWash
           && current.sectionEnabled.maintenance === enabled.maintenance
           && current.sectionEnabled.preTrip === enabled.preTrip
-          && current.sectionEnabled.mobile === enabled.mobile
-          && current.sectionEnabled.parking === enabled.parking;
+          && current.sectionEnabled.mobile === enabled.mobile;
         if (!same) {
           onChange({
             ...current,
@@ -172,7 +168,6 @@ export function StepShiftMaintenanceTask({
         maintenance: false,
         preTrip: false,
         mobile: false,
-        parking: false,
       },
     });
   };
@@ -251,11 +246,6 @@ export function StepShiftMaintenanceTask({
       <div className="space-y-4">
         {sectionCodeField('maintenance')}
         {creationMode === 'parametric' ? slackField('maintenance') : null}
-      </div>
-    ),
-    parking: (
-      <div className="space-y-4">
-        {sectionCodeField('parking')}
       </div>
     ),
     preTrip: (

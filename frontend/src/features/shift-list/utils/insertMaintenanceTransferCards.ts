@@ -69,12 +69,7 @@ import {
  * 設施路徑一律走 {@link findTopologyPath}（拓樸最短路徑），不再有出廠卡
  * 獨立用「聚合後的每站最快空駛時間」這種另一套資料來源——路徑只有一種
  * 找法，多一套就是多一份要保持同步的重複。
- *
- * 調度入／出廠卡（PI／PO，見 insertParkMoveCards.ts）刻意<strong>不</strong>併進來：
- * 觸發條件是「兩段正線之間的空檔長到會佔死站位」的營運策略門檻，不是
- * 時間模板裡「這一段是不是整備任務」的結構性判斷，跟這裡的三段規則
- * 本質不同，硬併只會讓一個模組同時扛兩種互不相干的觸發邏輯。
- */
+ * */
 
 /** 這一段是否需要車「人已經在轉乘站上」才能開始 */
 function requiresVehicleAtStation(block: GeneratedScheduleBlock): boolean {
