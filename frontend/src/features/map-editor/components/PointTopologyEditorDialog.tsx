@@ -628,6 +628,31 @@ export function PointTopologyEditorDialog({
     return map
   }, [areas])
 
+  /** 節點 id → 所在 Area 別名（顯示名稱，缺就退回 Area ID），只給設施類節點用 */
+  const areaNameByNodeId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const area of areas) {
+      const areaLabel = area.customName.trim() || area.id
+      for (const facility of area.facilities) {
+        if (
+          facility.type !== 'DockingPoint'
+          && facility.type !== 'Waypoint'
+          && facility.type !== 'Facility'
+        ) {
+          continue
+        }
+        map.set(facility.id, areaLabel)
+        if (facility.type === 'Facility') {
+          const dock = getFacilityDockingPoint(facility)
+          if (dock) {
+            map.set(facilityDockingTopologyNodeId(facility.id), areaLabel)
+          }
+        }
+      }
+    }
+    return map
+  }, [areas])
+
   const loadCandidates = useMemo(
     () => listTopologyLoadCandidates(areas, draft),
     [areas, draft],
@@ -1644,6 +1669,8 @@ export function PointTopologyEditorDialog({
                 const fieldText = field
                   ? `X ${field.xM.toFixed(2)} · Y ${field.yM.toFixed(2)} m`
                   : null
+                // 只有設施類節點才顯示所在 Area 別名——停靠／途經點不屬於任何維修廠區
+                const areaName = node.kind === 'facility' ? areaNameByNodeId.get(node.id) : undefined
                 const linkBlocked =
                   (Boolean(linkDraft)
                     && node.id !== linkDraft!.fromNodeId
@@ -1678,6 +1705,7 @@ export function PointTopologyEditorDialog({
                                       : '途經點'
                             }）`,
                             fieldText ? `場域座標 ${fieldText}` : null,
+                            areaName ? `區域 ${areaName}` : null,
                           ]
                             .filter(Boolean)
                             .join(' · ')
@@ -1722,6 +1750,11 @@ export function PointTopologyEditorDialog({
                       <span className="mt-0.5 flex flex-col items-center gap-px font-mono text-[7px] font-medium leading-none tabular-nums opacity-95">
                         <span>X {field.xM.toFixed(2)}</span>
                         <span>Y {field.yM.toFixed(2)}</span>
+                      </span>
+                    ) : null}
+                    {areaName ? (
+                      <span className="mt-0.5 line-clamp-1 max-w-full break-words text-[7px] font-semibold leading-none opacity-90">
+                        {areaName}
                       </span>
                     ) : null}
                   </button>
@@ -1976,6 +2009,11 @@ export function PointTopologyEditorDialog({
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2.5">
                 <div>
                   <p className="text-[11px] font-medium text-zinc-100">{selectedNode.label}</p>
+                  {areaNameByNodeId.get(selectedNode.id) ? (
+                    <p className="mt-0.5 text-[10px] text-cyan-400">
+                      區域：{areaNameByNodeId.get(selectedNode.id)}
+                    </p>
+                  ) : null}
                   <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
                     整備任務結束後，這台車應該去哪裡發車？
                   </p>
