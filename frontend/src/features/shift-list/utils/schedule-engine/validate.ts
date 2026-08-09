@@ -139,9 +139,13 @@ export function validateTimelineOverlaps(
   errors: FeasibilityIssue[],
 ): void {
   for (const timeline of timelines) {
-    // 過渡區塊只是空檔視覺，不參與重疊判定
+    // 過渡區塊只是空檔視覺，不參與重疊判定；0 秒的示意卡（例如整備間轉場
+    // 同一區域時的 0 秒轉移）不佔用任何時間長度，物理上不可能跟誰「重疊」——
+    // 它常常就落在下一段本來就佔用的那一刻，若不排除會被誤判成撞了下一段。
     const sorted = [...timeline.blocks]
-      .filter((block) => block.source !== 'transition')
+      .filter((block) =>
+        block.source !== 'transition'
+        && block.plannedEndMinute - block.plannedStartMinute > 1e-9)
       .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
     for (let i = 0; i < sorted.length; i += 1) {
       const current = sorted[i]!;

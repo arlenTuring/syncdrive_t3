@@ -2970,6 +2970,47 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 使用者要求全面覆查時抓到：0 秒示意卡被誤判成撞了下一段，16 則 TIMELINE_OVERLAP</h3>
+  <div class="callout warn">
+    <strong>這是上一則條目（同區域改用 Area 判斷）合併後才第一次真的把
+    pointTopology 接進正式流程</strong>——上一則的真實資料驗證只看了
+    <code>bySource</code>／<code>warningsByCode</code>，沒有重新檢查
+    <code>errorsByCode</code>。使用者要求「重新一一檢查清楚」，照做時才發現
+    <code>errorsByCode</code> 多了 <code>TIMELINE_OVERLAP</code> 16 則。
+  </div>
+  <ul>
+    <li>
+      <strong>根因：</strong>同一區域的 0 秒示意轉移卡（開始＝結束＝前段結束
+      那一刻）常常剛好落在<strong>後段本來就緊接著開始</strong>的那一刻——例如
+      保養 0–570 分、行前緊接著 570–600 分（模板零間隔銜接），轉場卡插在
+      570–570。<code>validateTimelineOverlaps()</code> 排序後比較相鄰兩段：
+      行前（570–600）跟 0 秒卡（570–570）在同一個起點排序打平，比較到
+      <code>行前.end(600) &gt; 0秒卡.start(570)</code> 就判定重疊——但一個
+      不佔用任何時間長度的示意點，物理上不可能跟誰「重疊」，這是誤判。
+    </li>
+    <li>
+      <strong>修法：</strong><code>validateTimelineOverlaps()</code> 原本就有
+      「過渡區塊只是空檔視覺，不參與重疊判定」的排除規則（<code>source !== 'transition'</code>）——
+      這次比照辦理，加一條「開始＝結束（0 秒）也不參與重疊判定」，不分
+      <code>source</code>，因為零時長的區塊本質上就是這一類「純視覺標記」。
+    </li>
+    <li>
+      <strong>驗證：</strong>真實資料重跑，<code>errorsByCode</code> 回到空；
+      新增 <code>validate.spec.ts</code> 兩則測試（0 秒卡不誤判／真的重疊仍要
+      抓到），<code>tsc</code> 23、測試 340 pass／9 fail（新增 2 則），
+      <code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>教訓：</strong>真實資料驗證只看「這個功能自己的欄位有沒有變成
+      預期值」是不夠的——這次改動第一次讓一條先前從未真正執行過的路徑
+      （<code>pointTopology</code> 終於被接進正式流程）在真實資料上跑起來，
+      理當把<strong>整份 <code>report</code>（含 <code>errors</code>）</strong>
+      都重新核對一次，不能只挑跟這次改動直接相關的欄位看。使用者這次明確要求
+      「重新一一檢查清楚」才補上這一步——以後每次接通一條先前是早退／關閉狀態
+      的路徑，都要當成「這是它第一次真的跑」來對待，全欄位重新核對。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>

@@ -11,6 +11,7 @@ import {
   validateRouteSuccessorContinuity,
   validateRouteSwitchBuffers,
   validateStationTimingsWithinBlocks,
+  validateTimelineOverlaps,
 } from './validate';
 
 function expect<T>(actual: T) {
@@ -277,5 +278,80 @@ describe('validateStationTimingsWithinBlocks', () => {
     expect(errors.map((issue) => issue.code)).toContain(
       'STATION_TIMING_INFEASIBLE',
     );
+  });
+});
+
+describe('validateTimelineOverlaps', () => {
+  it('0 秒的示意卡（開始＝結束）落在下一段的起點上，不算重疊', () => {
+    // 整備間轉場同一區域時是 0 秒示意轉移，常常剛好落在下一段本來就佔用的
+    // 那一刻（例如前段整備跟後段整備原本零間隔銜接）——這不是真的撞了。
+    const errors: FeasibilityIssue[] = [];
+    const blocks: GeneratedScheduleBlock[] = [
+      {
+        id: 'maint-1',
+        timelineRow: 1,
+        taskType: 'servicing',
+        label: '保養',
+        anchorStartMinute: 0,
+        plannedStartMinute: 0,
+        plannedEndMinute: 570,
+        travelSeconds: 0,
+        dwellSeconds: 0,
+        source: 'template_bar',
+      },
+      {
+        id: 'zero-out',
+        timelineRow: 1,
+        taskType: 'dispatch',
+        label: '整備出廠 · M1 → H1',
+        anchorStartMinute: 570,
+        plannedStartMinute: 570,
+        plannedEndMinute: 570,
+        travelSeconds: 0,
+        dwellSeconds: 0,
+        source: 'yard_exit_move',
+      },
+      {
+        id: 'zero-in',
+        timelineRow: 1,
+        taskType: 'dispatch',
+        label: '整備入廠 · M1 → H1',
+        anchorStartMinute: 570,
+        plannedStartMinute: 570,
+        plannedEndMinute: 570,
+        travelSeconds: 0,
+        dwellSeconds: 0,
+        source: 'yard_entry_move',
+      },
+      {
+        id: 'pretrip-1',
+        timelineRow: 1,
+        taskType: 'inspection',
+        label: '行前',
+        anchorStartMinute: 570,
+        plannedStartMinute: 570,
+        plannedEndMinute: 600,
+        travelSeconds: 0,
+        dwellSeconds: 0,
+        source: 'template_bar',
+      },
+    ];
+
+    validateTimelineOverlaps(plan(blocks), errors);
+
+    expect(errors).toEqual([]);
+  });
+
+  it('真的有時長的兩段重疊時仍要照常回報', () => {
+    const errors: FeasibilityIssue[] = [];
+    const selected = route('overlap', 'overlap-route', 'OV', 'P1', 'P2');
+    const first = block('first', selected, 0);
+    first.plannedEndMinute = 10;
+    const second = block('second', selected, 5);
+    second.plannedEndMinute = 15;
+
+    validateTimelineOverlaps(plan([first, second]), errors);
+
+    expect(errors.map((issue) => issue.code)).toContain('TIMELINE_OVERLAP');
   });
 });
