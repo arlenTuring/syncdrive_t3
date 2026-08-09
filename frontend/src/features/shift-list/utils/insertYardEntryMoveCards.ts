@@ -11,6 +11,13 @@ import {
   type MaintenanceSectionCodeBySection,
 } from './maintenanceSectionCode';
 import {
+  FACILITY_SECTION_BY_TASK_TYPE,
+  YARD_TASK_TYPES,
+  nodeMatchesMoveCardCodes,
+  moveCardFacilityIsFree,
+  type MoveCardFacilityBooking,
+} from './moveCardShared';
+import {
   minuteToSecond,
   secondToMinute,
   type GeneratedScheduleBlock,
@@ -37,25 +44,6 @@ import {
  * 方向嚴格遵守拓樸（例如 M 系設施入廠要走 T3下行，走 T3上行就是逆行）。
  */
 
-/** 整備任務類型 → 整備中心設施區段鍵 */
-const FACILITY_SECTION_BY_TASK_TYPE: Partial<
-  Record<TaskTypeKey, MaintenanceBodySectionKey>
-> = {
-  charging: 'charging',
-  inspection: 'preTrip',
-  standby: 'mobile',
-  servicing: 'maintenance',
-  washing: 'carWash',
-};
-
-const YARD_TASK_TYPES = new Set<string>([
-  'charging',
-  'inspection',
-  'standby',
-  'servicing',
-  'washing',
-]);
-
 export type YardEntryMoveCardsResult = {
   timelines: GeneratedSchedulePlan['timelines'];
   inserted: number;
@@ -64,47 +52,7 @@ export type YardEntryMoveCardsResult = {
   skipped: Array<{ timelineRow: number; taskType: string; reason: string }>;
 };
 
-function normalizeCode(raw: string): string {
-  return raw.trim().toUpperCase();
-}
 
-/** 拓樸節點是否命中整備任務設定的設施 mapCode */
-function nodeMatchesCodes(
-  node: { id: string; label?: string },
-  codes: string[],
-): boolean {
-  if (codes.length === 0) return false;
-  const id = normalizeCode(node.id);
-  const label = normalizeCode(node.label ?? '');
-  return codes.some((raw) => {
-    const code = normalizeCode(raw);
-    if (!code || code === 'UNSPECIFIED') return false;
-    return code === id || code === label || label.startsWith(code) || id.endsWith(code);
-  });
-}
-
-type FacilityBooking = {
-  facilityNodeId: string;
-  startSecond: number;
-  endSecond: number;
-  timelineRow: number;
-};
-
-function facilityIsFree(
-  bookings: FacilityBooking[],
-  facilityNodeId: string,
-  startSecond: number,
-  endSecond: number,
-  timelineRow: number,
-): boolean {
-  return !bookings.some(
-    (b) =>
-      b.facilityNodeId === facilityNodeId
-      && b.timelineRow !== timelineRow
-      && b.startSecond < endSecond - 1e-9
-      && startSecond < b.endSecond - 1e-9,
-  );
-}
 
 export function insertYardEntryMoveCards(args: {
   timelines: GeneratedSchedulePlan['timelines'];
@@ -154,11 +102,11 @@ export function insertYardEntryMoveCards(args: {
       codesBySection.set(section, codes);
     }
     return topology.nodes.filter(
-      (node) => node.kind === 'facility' && nodeMatchesCodes(node, codes!),
+      (node) => node.kind === 'facility' && nodeMatchesMoveCardCodes(node, codes!),
     );
   };
 
-  const bookings: FacilityBooking[] = [];
+  const bookings: MoveCardFacilityBooking[] = [];
 
   for (const timeline of timelines) {
     const sorted = [...timeline.blocks].sort(
@@ -214,7 +162,7 @@ export function insertYardEntryMoveCards(args: {
         // 到得比原訂整備開始還晚就沒有「提前」可言，不插
         if (arriveSecond >= yardStartSecond - 1e-9) continue;
         if (
-          !facilityIsFree(bookings, facility.id, arriveSecond, yardStartSecond, timeline.row)
+          !moveCardFacilityIsFree(bookings, facility.id, arriveSecond, yardStartSecond, timeline.row)
         ) {
           continue;
         }

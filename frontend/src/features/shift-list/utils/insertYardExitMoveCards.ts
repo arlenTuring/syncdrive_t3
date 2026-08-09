@@ -13,6 +13,13 @@ import {
   type MaintenanceSectionCodeBySection,
 } from './maintenanceSectionCode';
 import {
+  FACILITY_SECTION_BY_TASK_TYPE,
+  YARD_TASK_TYPES,
+  normalizeMoveCardCode,
+  moveCardFacilityIsFree,
+  type MoveCardFacilityBooking,
+} from './moveCardShared';
+import {
   minuteToSecond,
   secondToMinute,
   type GeneratedScheduleBlock,
@@ -44,71 +51,30 @@ import {
  * 入場方向（正線跑完開進設施）目前<strong>不做</strong>。
  */
 
-/** 整備任務類型 → 整備中心設施區段鍵 */
-const FACILITY_SECTION_BY_TASK_TYPE: Partial<
-  Record<TaskTypeKey, MaintenanceBodySectionKey>
-> = {
-  charging: 'charging',
-  inspection: 'preTrip',
-  standby: 'mobile',
-  servicing: 'maintenance',
-  washing: 'carWash',
-};
-
-const YARD_TASK_TYPES = new Set<string>([
-  'charging',
-  'inspection',
-  'standby',
-  'servicing',
-  'washing',
-]);
-
 /** 這一段是否需要車「人已經在轉乘站上」才能開始 */
 function requiresVehicleAtStation(block: GeneratedScheduleBlock): boolean {
   return block.taskType === 'passenger';
 }
 
-function normalizeCode(raw: string): string {
-  return raw.trim().toUpperCase();
-}
-
-/** 設施節點 id／顯示名是否命中整備任務設定的 mapCode */
+/**
+ * 設施節點 id／顯示名是否命中整備任務設定的 mapCode。
+ * MO 的資料來源是 MaintenanceFirstTripOrigin.facilities（`nodeId`／`label`），
+ * 跟 MI／PI／PO 用的拓樸節點（`id`／`label`）欄位名不同，不能直接共用
+ * moveCardShared.ts 的 nodeMatchesMoveCardCodes，但字串比對規則一致，
+ * 沿用它的 normalizeMoveCardCode()。
+ */
 function facilityMatchesCodes(
   facility: MaintenanceFacilityExit,
   codes: string[],
 ): boolean {
   if (codes.length === 0) return false;
-  const id = normalizeCode(facility.nodeId);
-  const label = normalizeCode(facility.label);
+  const id = normalizeMoveCardCode(facility.nodeId);
+  const label = normalizeMoveCardCode(facility.label);
   return codes.some((raw) => {
-    const code = normalizeCode(raw);
+    const code = normalizeMoveCardCode(raw);
     if (!code || code === 'UNSPECIFIED') return false;
     return code === id || code === label || label.startsWith(code) || id.endsWith(code);
   });
-}
-
-type FacilityBooking = {
-  facilityNodeId: string;
-  startSecond: number;
-  endSecond: number;
-  timelineRow: number;
-};
-
-/** 同一台設施在該時段是否已被別列車佔著 */
-function facilityIsFree(
-  bookings: FacilityBooking[],
-  facilityNodeId: string,
-  startSecond: number,
-  endSecond: number,
-  timelineRow: number,
-): boolean {
-  return !bookings.some(
-    (b) =>
-      b.facilityNodeId === facilityNodeId
-      && b.timelineRow !== timelineRow
-      && b.startSecond < endSecond - 1e-9
-      && startSecond < b.endSecond - 1e-9,
-  );
 }
 
 export type YardExitMoveCardsResult = {
@@ -155,7 +121,7 @@ export function insertYardExitMoveCards(args: {
   };
 
   // 設施佔用跨列共用：同一台設施同一時刻只能停一台車
-  const bookings: FacilityBooking[] = [];
+  const bookings: MoveCardFacilityBooking[] = [];
 
   // 先依開始時刻掃描，讓早的整備先挑設施（晚的才需要讓）
   type Pending = {
@@ -245,7 +211,7 @@ export function insertYardExitMoveCards(args: {
       const startSecond = departSecond - facility.deadheadSeconds;
       // 出場移動不得早於整備開始（那代表整備根本沒做）
       if (startSecond < yardStartSecond - 1e-9) continue;
-      if (!facilityIsFree(bookings, facility.nodeId, yardStartSecond, startSecond, timeline.row)) {
+      if (!moveCardFacilityIsFree(bookings, facility.nodeId, yardStartSecond, startSecond, timeline.row)) {
         continue;
       }
       chosen = facility;

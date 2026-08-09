@@ -4,6 +4,11 @@ import { findTopologyPath } from './findTopologyPath';
 import { extractFacilityMapCodes } from './maintenanceFirstTripOrigins';
 import type { MaintenanceSectionCodeBySection } from './maintenanceSectionCode';
 import {
+  nodeMatchesMoveCardCodes,
+  moveCardFacilityIsFree,
+  type MoveCardFacilityBooking,
+} from './moveCardShared';
+import {
   minuteToSecond,
   secondToMinute,
   type GeneratedScheduleBlock,
@@ -51,47 +56,6 @@ export type ParkMoveCardsResult = {
   skipped: Array<{ timelineRow: number; reason: string }>;
 };
 
-function normalizeCode(raw: string): string {
-  return raw.trim().toUpperCase();
-}
-
-function nodeMatchesCodes(
-  node: { id: string; label?: string },
-  codes: string[],
-): boolean {
-  if (codes.length === 0) return false;
-  const id = normalizeCode(node.id);
-  const label = normalizeCode(node.label ?? '');
-  return codes.some((raw) => {
-    const code = normalizeCode(raw);
-    if (!code || code === 'UNSPECIFIED') return false;
-    return code === id || code === label || label.startsWith(code) || id.endsWith(code);
-  });
-}
-
-type FacilityBooking = {
-  facilityNodeId: string;
-  startSecond: number;
-  endSecond: number;
-  timelineRow: number;
-};
-
-function facilityIsFree(
-  bookings: FacilityBooking[],
-  facilityNodeId: string,
-  startSecond: number,
-  endSecond: number,
-  timelineRow: number,
-): boolean {
-  return !bookings.some(
-    (b) =>
-      b.facilityNodeId === facilityNodeId
-      && b.timelineRow !== timelineRow
-      && b.startSecond < endSecond - 1e-9
-      && startSecond < b.endSecond - 1e-9,
-  );
-}
-
 export function insertParkMoveCards(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   topology: PointTopology | null | undefined;
@@ -121,7 +85,7 @@ export function insertParkMoveCards(args: {
 
   const parkingCodes = extractFacilityMapCodes(maintenanceBody, 'parking');
   const parkingNodes = topology.nodes.filter(
-    (node) => node.kind === 'facility' && nodeMatchesCodes(node, parkingCodes),
+    (node) => node.kind === 'facility' && nodeMatchesMoveCardCodes(node, parkingCodes),
   );
   if (parkingNodes.length === 0) {
     return { timelines, inserted, skipped };
@@ -144,7 +108,7 @@ export function insertParkMoveCards(args: {
     if (stationId) nodeIdByStationId.set(stationId, node.id);
   }
 
-  const bookings: FacilityBooking[] = [];
+  const bookings: MoveCardFacilityBooking[] = [];
 
   for (const timeline of timelines) {
     const sorted = [...timeline.blocks].sort(
@@ -195,7 +159,7 @@ export function insertParkMoveCards(args: {
         if (pathIn.avgSeconds + pathOut.avgSeconds >= idleSeconds) continue;
         const parkStart = freeSecond + pathIn.avgSeconds;
         const parkEnd = nextStartSecond - pathOut.avgSeconds;
-        if (!facilityIsFree(bookings, facility.id, parkStart, parkEnd, timeline.row)) {
+        if (!moveCardFacilityIsFree(bookings, facility.id, parkStart, parkEnd, timeline.row)) {
           continue;
         }
         const total = pathIn.avgSeconds + pathOut.avgSeconds;

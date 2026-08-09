@@ -58,6 +58,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   YARD_EXIT_MOVE_UNRESOLVED: '出場移動卡排不出來',
   YARD_ENTRY_MOVE_UNRESOLVED: '整備入廠卡排不出來',
   PARK_MOVE_UNRESOLVED: '調度入／出廠卡排不出來',
+  YARD_TRANSITION_MOVE_UNRESOLVED: '整備間轉場卡排不出來',
 };
 
 /** 全部 26 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -97,6 +98,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   YARD_EXIT_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
   YARD_ENTRY_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
   PARK_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
+  YARD_TRANSITION_MOVE_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -229,6 +231,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '調度入／出廠卡（PI／PO）讓車在「接下來沒班次可接、空檔又長到會佔死終點站站位」時先開進調度設施暫停。排不出來多半是整備任務第 5 步沒設定調度設施，或拓樸上少了「站 → 設施」「設施 → 站」其中一個方向的邊（可到路網拓樸把該邊設為雙向）。',
+  },
+  YARD_TRANSITION_MOVE_UNRESOLVED: {
+    kind: 'policy',
+    guidance:
+      '兩段不同類型的整備銜接（例：充電做完接著要去保養）需要一段真實的路網移動，這則代表排不出來——通常是其中一種整備類型沒設定設施，或拓樸上兩個設施之間沒有可通的路徑，也可能是移動時間長到會把後一段推過它的結束時刻。請回整備任務補設施，或到路網拓樸檢查兩個設施群組之間的連線與方向。',
   },
   YARD_ENTRY_MOVE_UNRESOLVED: {
     kind: 'policy',

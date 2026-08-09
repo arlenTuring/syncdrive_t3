@@ -4,6 +4,7 @@ import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins'
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertYardExitMoveCards } from '../insertYardExitMoveCards';
 import { insertYardEntryMoveCards } from '../insertYardEntryMoveCards';
+import { insertYardTransitionMoveCards } from '../insertYardTransitionMoveCards';
 import { insertParkMoveCards } from '../insertParkMoveCards';
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
@@ -290,6 +291,34 @@ export function generateShiftSchedule(
       kind: 'policy',
       message: `時間線 ${skip.timelineRow}：「${skip.taskType}」排不出整備入廠卡——${skip.reason}`,
       detail: { timelineRow: skip.timelineRow, taskType: skip.taskType, reason: skip.reason },
+    });
+  }
+
+  // 整備間轉場（出廠卡＋入廠卡）：整備串內部兩段不同類型的銜接
+  // （例：充電做完接著要去保養），MI／MO 都不管這一段——MI 只補串首、
+  // MO 只補串尾。前一段跑滿全長、結束時刻不動；後一段開始時刻推遲到
+  // 入廠卡抵達那一刻、結束時刻不動，運輸成本佔用的是後一段的工作時間。
+  const yardTransitionMove = insertYardTransitionMoveCards({
+    timelines,
+    topology: engineInput.pointTopology,
+    maintenanceBody: engineInput.maintenanceBody,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+  });
+  timelines = yardTransitionMove.timelines;
+  for (const skip of yardTransitionMove.skipped) {
+    pushIssue(warnings, {
+      code: 'YARD_TRANSITION_MOVE_UNRESOLVED',
+      severity: 'warning',
+      kind: 'policy',
+      message:
+        `時間線 ${skip.timelineRow}：「${skip.fromTaskType}」轉「${skip.toTaskType}」`
+        + `排不出轉場卡——${skip.reason}`,
+      detail: {
+        timelineRow: skip.timelineRow,
+        fromTaskType: skip.fromTaskType,
+        toTaskType: skip.toTaskType,
+        reason: skip.reason,
+      },
     });
   }
 

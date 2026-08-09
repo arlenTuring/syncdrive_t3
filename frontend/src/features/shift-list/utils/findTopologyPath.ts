@@ -32,7 +32,12 @@ export type TopologyPath = {
   avgSeconds: number;
 };
 
-function edgeSeconds(
+/**
+ * 單一邊的行駛秒數（均或快，缺就退回另一個，都缺算 0）。
+ * 對外開放——需要把一條完整路徑拆成兩段分別計時時（例如整備間轉場卡
+ * 拆成「出廠卡＋入廠卡」）要用同一套 fallback 規則，不能自己另外猜。
+ */
+export function edgeSeconds(
   edge: PointTopologyEdge,
   prefer: 'avg' | 'min',
 ): number {
