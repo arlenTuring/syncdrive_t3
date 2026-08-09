@@ -308,6 +308,17 @@ function ScheduleTaskToolbar({
   estimatedTripSeconds: number;
   onEstimatedTripSecondsChange: (value: number) => void;
 }) {
+  /**
+   * 編輯中的原始字串。
+   *
+   * 直接把 `value` 綁在數字上、又只在「解析得出正數」時才往上送，等於
+   * <strong>清空這個動作永遠不會被接受</strong>——使用者刪光數字時 onChange 收到
+   * 空字串、解析成 NaN、不呼叫回調，React 隨即用舊的數字重繪，游標前的字就這樣
+   * 長回來，看起來像刪不掉。中間狀態（空字串、只打了「0」）必須先讓它存在，
+   * 只把<strong>有效值</strong>往上送；離開欄位時再把顯示拉回已接受的值。
+   */
+  const [draft, setDraft] = useState<string | null>(null);
+
   return (
     <div
       className={`flex shrink-0 items-center justify-between gap-3 ${
@@ -316,18 +327,21 @@ function ScheduleTaskToolbar({
       role="toolbar"
       aria-label="任務排班工具列"
     >
-      {/* 左側：完整交路週期（供建議列數） */}
-      <div className="flex items-center gap-1.5" title="請填完整交路一輪秒數（含各方向與折返），不是單線。建議列數＝ceil(此值÷班距)；短時段會再建議多 1 列。">
-        <label className="text-[11px] text-zinc-500 whitespace-nowrap">完整交路秒數:</label>
+      {/* 左側：來回一趟預估秒數（供建議列數） */}
+      <div className="flex items-center gap-1.5" title="請填來回一趟的預估秒數（含各方向與折返），不是單線。建議列數＝ceil(此值÷班距)；短時段會再建議多 1 列。">
+        <label className="text-[11px] text-zinc-500 whitespace-nowrap">來回預估秒數:</label>
         <input
           type="number"
           min={1}
           step={10}
-          value={estimatedTripSeconds}
+          value={draft ?? String(estimatedTripSeconds)}
           onChange={(e) => {
-            const v = Number.parseInt(e.target.value, 10);
+            const raw = e.target.value;
+            setDraft(raw);
+            const v = Number.parseInt(raw, 10);
             if (Number.isFinite(v) && v > 0) onEstimatedTripSecondsChange(v);
           }}
+          onBlur={() => setDraft(null)}
           className="h-[26px] w-[72px] rounded-md border border-zinc-700/60 bg-zinc-900/80 px-2 text-center text-[11px] tabular-nums text-zinc-200 outline-none focus:border-zinc-500"
           placeholder="600"
         />
