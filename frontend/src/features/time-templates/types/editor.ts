@@ -134,8 +134,8 @@ export const TASK_TYPE_OPTIONS: Array<{
 }> = [
   { key: 'passenger', label: '正線' },
   { key: 'charging', label: '充電' },
-  { key: 'inspection', label: '行前' },
-  { key: 'standby', label: '機動' },
+  { key: 'inspection', label: '行檢' },
+  { key: 'standby', label: '待命' },
   { key: 'servicing', label: '保養' },
   { key: 'washing', label: '洗車' },
 ];
@@ -162,18 +162,18 @@ export const TASK_TYPE_DESCRIPTIONS: Record<
     ],
   },
   inspection: {
-    title: '行前',
+    title: '行檢',
     bullets: [
       '於模板固定排出車前檢查時段',
-      '可參考整備任務「行前」的預估作業時間',
+      '可參考整備任務「行檢」的預估作業時間',
       '通常安排於當日勤務開始前',
     ],
   },
   standby: {
-    title: '機動',
+    title: '待命',
     bullets: [
-      '於模板固定排機動／調度待命時段',
-      '可參考整備任務「機動」的預估作業時間',
+      '於模板固定排待命／調度候用時段',
+      '可參考整備任務「待命」的預估作業時間',
       '占用以模板時段長度為準',
     ],
   },
@@ -638,10 +638,11 @@ export const TASK_TYPE_COLORS: Record<
     text: '#F3F4F6',
   },
   standby: {
-    bar: '#FF6900',
-    base: '#462E1F',
-    bg: taskTypeBarBackground('#462E1F', [255, 105, 0]),
-    text: '#F3F4F6',
+    // 待命＝車在場內候用、沒有實際作業，用灰白色跟「正在做事」的任務區隔開
+    bar: '#D4D4D8',
+    base: '#3F3F46',
+    bg: taskTypeBarBackground('#3F3F46', [212, 212, 216]),
+    text: '#F4F4F5',
   },
   washing: {
     bar: '#00B8DB',

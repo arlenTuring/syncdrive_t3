@@ -10,7 +10,7 @@ export function StepMobileParams({ draft, onChange }: StepMobileParamsProps) {
   return (
     <StepStationDurationParams
       preferredFacilityPurpose="調度格"
-      title="填入機動任務"
+      title="填入待命任務"
       draft={draft}
       onChange={onChange}
       showFollowTemplateCheckbox={true}

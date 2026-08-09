@@ -50,7 +50,7 @@ export function recommendFleetRowCount(args: {
       );
     }
   } else {
-    tips.push('整備／行前占窗會讓「可用載客列」少於總列數，尖峰可多排 1～2 列。');
+    tips.push('整備／行檢占窗會讓「可用載客列」少於總列數，尖峰可多排 1～2 列。');
   }
 
   return { theoreticalMin, recommended, tips };

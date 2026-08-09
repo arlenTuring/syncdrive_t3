@@ -15,8 +15,8 @@ export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   { step: 3, label: '洗車任務' },
   { step: 4, label: '保養任務' },
   { step: 5, label: '調度任務' },
-  { step: 6, label: '行前任務' },
-  { step: 7, label: '機動任務' },
+  { step: 6, label: '行檢任務' },
+  { step: 7, label: '待命任務' },
   { step: 8, label: '任務檢視' },
 ];
 

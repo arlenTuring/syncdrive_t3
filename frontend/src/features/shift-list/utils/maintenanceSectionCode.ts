@@ -154,8 +154,8 @@ export function resolveMaintenanceSectionLabelForTaskType(
   taskType: ScheduleEngineTaskType,
 ): string | null {
   if (taskType === 'charging') return '充電';
-  if (taskType === 'inspection') return '行前';
-  if (taskType === 'standby') return '機動';
+  if (taskType === 'inspection') return '行檢';
+  if (taskType === 'standby') return '待命';
   if (taskType === 'servicing') return '保養';
   if (taskType === 'washing') return '洗車';
   return null;

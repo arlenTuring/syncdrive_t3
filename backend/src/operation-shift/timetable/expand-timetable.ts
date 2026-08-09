@@ -47,7 +47,7 @@ export type TimetableTripDto = {
   block_id: string;
   timeline_row: number;
   task_type: string;
-  /** 任務顯示名（保養／行前／充電等）；正線常為空 */
+  /** 任務顯示名（保養／行檢／充電等）；正線常為空 */
   label: string | null;
   source: string;
   route_id: string | null;
@@ -305,7 +305,7 @@ export function expandTimetableTrips(args: {
   range: TimeRangeFilter;
   /**
    * true：只載客正線（含進場載客 entry_service）。
-   * false：載入全部任務（保養／行前／充電／機動／調度等）；仍略過 transition。
+   * false：載入全部任務（保養／行檢／充電／待命／調度等）；仍略過 transition。
    * 預設 false。
    */
   passengerOnly?: boolean;

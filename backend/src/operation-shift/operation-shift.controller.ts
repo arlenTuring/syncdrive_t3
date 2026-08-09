@@ -57,7 +57,7 @@ export class OperationShiftController {
     summary: '取得班表班次清單（含各站時刻）',
     description:
       '讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。'
-      + '回傳全部任務類型（正線／保養／行前／充電／機動／調度等，略過 transition）。'
+      + '回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。'
       + '可用 from/to 過濾卡時間重疊區間。',
   })
   @ApiQuery({ name: 'from', required: false, description: 'HH:MM:SS 或秒，預設 00:00:00' })
