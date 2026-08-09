@@ -1909,6 +1909,41 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · PI／PO 代號接進引擎，資料形狀本身就撐得住——不用改資料流</h3>
+  <ul>
+    <li>
+      <strong>接法：</strong>代號不必在插卡當下（<code>insertParkMoveCards</code>）
+      算好存進區塊，直接讓 <code>resolveGeneratedBlockTripCode()</code> 與
+      <code>ShiftSchedulePlanGrid.tsx</code> 的 <code>resolveBlockCode()</code>
+      在渲染／記錄當下依 <code>block.source</code> 查
+      <code>sectionCodes.parkIn</code>／<code>sectionCodes.parkOut</code>——
+      這兩個共用函式本來就收 <code>sectionCodes</code> 參數，
+      所有既有呼叫端（<code>validate.ts</code>、
+      <code>scheduleEngineLastIssues.ts</code>、班表格線）也早就把它傳進去了，
+      不需要另外接一條資料管線。
+    </li>
+    <li>
+      <strong>兩個分支排的位置跟 MO／entry_service 一樣：必須在 dispatch 分支之前。</strong>
+      PI／PO 的 <code>taskType</code> 也是 <code>'dispatch'</code>，
+      沒有專屬分支就會被通用分支吃掉、吐出「D0930」這種代號——這正是上一輪
+      記錄下來的坑，兩份平行實作（<code>maintenanceSectionCode.ts</code> 與
+      <code>ShiftSchedulePlanGrid.tsx</code>）都補了。
+    </li>
+    <li>
+      <strong>代號格式跟其他整備卡完全一致</strong>（帶列碼）：
+      <code>整備代號 ＋ 列碼(A/B/C…) ＋ 開始時刻</code>。
+      實測（注入 <code>parkIn="TI"</code>／<code>parkOut="TO"</code>）：
+      <code>PI → TIA1121</code>、<code>PO → TOA1136</code>。
+    </li>
+    <li>
+      <strong>MI（整備入廠卡）仍是「D0930」，這輪刻意不動。</strong>
+      使用者這次只設定了 <code>parkIn</code>／<code>parkOut</code> 兩個代號，
+      MI 沒有專屬輸入欄位；要嘛沿用來源整備任務的代號（例如保養→沿用「M」，
+      會跟 MO 的「MEX」同源但沒有 EX 尾綴，容易混淆），要嘛另外開一個欄位——
+      兩條路都是設計決策，不該用猜的動它。留待下一輪確認。
+    </li>
+  </ul>
+
   <h3>2026-08-09 · 調度入／出廠代號改由使用者在班表 Step「整備任務」自訂</h3>
   <ul>
     <li>

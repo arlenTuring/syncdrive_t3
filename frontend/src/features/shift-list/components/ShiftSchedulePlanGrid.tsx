@@ -648,6 +648,18 @@ function resolveBlockCode(
     });
   }
 
+  // 調度入／出廠卡：代號使用者在整備任務 Step 自訂（parkIn／parkOut），帶列碼。
+  // 必須排在 dispatch 分支之前，它的 taskType 也是 dispatch，會被誤判成 D。
+  if (block.source === 'park_entry_move' || block.source === 'park_exit_move') {
+    const code =
+      block.source === 'park_entry_move' ? sectionCodes?.parkIn : sectionCodes?.parkOut;
+    return buildScheduleBlockTripCode({
+      prefixCode: code,
+      timelineRow: block.timelineRow,
+      startMinute: block.plannedStartMinute,
+    });
+  }
+
   if (block.taskType === 'passenger') {
     // 調度班次：整備出場站 ≠ 首班首站時，代號前加整備代號前綴（如 ATN1706）
     if (block.yardDispatchPrefix) {

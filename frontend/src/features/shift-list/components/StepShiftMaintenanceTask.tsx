@@ -268,14 +268,10 @@ export function StepShiftMaintenanceTask({
           {sectionCodeField('parkIn', {
             label: '調度入廠代號',
             placeholder: '例：I',
-            description:
-              '1–2 個大寫英文字母；車暫停時開進調度設施的那張卡（PI）用這個代號',
           })}
           {sectionCodeField('parkOut', {
             label: '調度出廠代號',
             placeholder: '例：O',
-            description:
-              '1–2 個大寫英文字母；車回到正線的那張卡（PO）用這個代號',
           })}
         </div>
       </div>
