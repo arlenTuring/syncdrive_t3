@@ -8,6 +8,7 @@ import {
 } from './maintenanceFirstTripOrigins';
 import {
   resolveMaintenanceSectionCodeForTaskType,
+  resolveMaintenanceSectionLabelForTaskType,
   type MaintenanceSectionCodeBySection,
 } from './maintenanceSectionCode';
 import {
@@ -247,12 +248,12 @@ export function insertMaintenanceTransferCards(args: {
         travelSeconds: chosen.seconds,
         dwellSeconds: 0,
         source: 'yard_entry_move',
-        moveCardTag: 'MI',
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: stationId,
         yardExitSectionCode:
           resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
+        yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
       };
       timeline.blocks.push(card);
 
@@ -369,6 +370,8 @@ export function insertMaintenanceTransferCards(args: {
         resolveMaintenanceSectionCodeForTaskType(earlier.taskType, sectionCodes) ?? undefined;
       const entryCode =
         resolveMaintenanceSectionCodeForTaskType(later.taskType, sectionCodes) ?? undefined;
+      const exitLabel = resolveMaintenanceSectionLabelForTaskType(earlier.taskType) ?? undefined;
+      const entryLabel = resolveMaintenanceSectionLabelForTaskType(later.taskType) ?? undefined;
 
       const exitCard: GeneratedScheduleBlock = {
         id: `yardtransit-out-${earlier.id}-${Math.round(departSecond)}`,
@@ -381,12 +384,12 @@ export function insertMaintenanceTransferCards(args: {
         travelSeconds: chosen.exitLegSeconds,
         dwellSeconds: 0,
         source: 'yard_exit_move',
-        moveCardTag: 'MO',
         yardExitFacilityNodeId: chosen.exitNodeId,
         yardExitFacilityLabel: chosen.exitLabel,
         yardExitStationId: chosen.midNodeId,
         yardExitStationLabel: chosen.midLabel,
         yardExitSectionCode: exitCode,
+        yardExitSectionLabel: exitLabel,
       };
       const entryCard: GeneratedScheduleBlock = {
         id: `yardtransit-in-${later.id}-${Math.round(midSecond)}`,
@@ -399,12 +402,12 @@ export function insertMaintenanceTransferCards(args: {
         travelSeconds: chosen.entryLegSeconds,
         dwellSeconds: 0,
         source: 'yard_entry_move',
-        moveCardTag: 'MI',
         yardExitFacilityNodeId: chosen.entryNodeId,
         yardExitFacilityLabel: chosen.entryLabel,
         yardExitStationId: chosen.midNodeId,
         yardExitStationLabel: chosen.midLabel,
         yardExitSectionCode: entryCode,
+        yardExitSectionLabel: entryLabel,
       };
       timeline.blocks.push(exitCard, entryCard);
 
@@ -561,13 +564,13 @@ export function insertMaintenanceTransferCards(args: {
       travelSeconds: chosen.seconds,
       dwellSeconds: 0,
       source: 'yard_exit_move',
-      moveCardTag: 'MO',
       yardExitFacilityNodeId: chosen.nodeId,
       yardExitFacilityLabel: chosen.label,
       yardExitStationId: stationId,
       yardExitStationLabel: stationLabel,
       yardExitSectionCode:
         resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
+      yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
       yardExitAteYardTail: eatsTail || undefined,
     };
     timeline.blocks.push(card);

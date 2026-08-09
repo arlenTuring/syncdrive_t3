@@ -1030,6 +1030,97 @@
     <li><strong>不計入交路輪替圈數</strong>——它是調度過程，不是完整的一輪來回。</li>
     <li>接不上（時間不夠或會撞站位）就<strong>略過這一趟</strong>，車子空車移動，回報 <code>MAINTENANCE_DISPATCH_UNREACHABLE</code>（警告，不是錯誤）。</li>
   </ul>
+
+  <h3>10.5 整備轉場小卡（入廠／出廠／整備間轉場）——現行架構</h3>
+  <div class="callout warn">
+    <strong>先講清楚一件事：沒有「MO／MI／PI／PO」這四種固定卡。</strong>
+    每一種整備任務（充電／洗車／保養／行前／機動）都用<strong>同一套轉場機制</strong>，
+    調度（parking）視為第六種類型（見 §11 的代號說明）。卡面代號＝
+    <strong>使用者在整備任務自訂的代號 + I（入廠）／O（出廠）</strong>，完全動態組成：
+    充電代號 <code>E</code> 就是 <code>EI</code>／<code>EO</code>；保養代號 <code>M</code>
+    就是 <code>MI</code>／<code>MO</code>；行前代號 <code>P</code> 就是 <code>PI</code>／<code>PO</code>；
+    今天保養做完接著進行前，就是<strong>一張 <code>MO</code> 接一張 <code>PI</code></strong>——
+    這兩張字面上「剛好」長得像舊觀念裡的「MO」「PI」，純粹是因為使用者剛好把
+    保養設成 <code>M</code>、行前設成 <code>P</code>；換一個代號，字面就完全不同了，
+    邏輯不會因此有任何分支。程式碼裡不存在一個列舉「MO／MI／PI／PO 四種」的
+    型別或欄位——這件事本身在 2026-08-09 之前是真的做錯了（見 §17 對應條目），
+    已經拿掉。
+  </div>
+
+  <h4>誰負責哪一段：兩個檔案，三種規則</h4>
+  <table>
+    <thead><tr><th>機制</th><th>觸發條件（依「左右鄰居」判斷）</th><th>時序規則</th><th>來源檔</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>入廠（entry）</td>
+        <td>整備串<strong>串首</strong>——左鄰居不是整備任務，或根本沒有左鄰居</td>
+        <td>往回找最近一段載客，算出可出發時刻，挑最快能到的設施；
+        <strong>整備開始時刻提前到抵達時刻，結束時刻不動</strong>（時長變長）。
+        沒有提前空間、拓樸不通、設施被佔就跳過，不強插。</td>
+        <td rowspan="2"><code>insertMaintenanceTransferCards.ts</code></td>
+      </tr>
+      <tr>
+        <td>出廠（exit）</td>
+        <td>整備串<strong>串尾</strong>——右鄰居不是整備任務</td>
+        <td>往前貼齊下一段發車時刻，零秒緩衝；挑最快能到下一段起點站的設施。
+        <strong>空間不夠時唯一有特權</strong>把整備結束時刻往前縮（吃尾巴）。</td>
+      </tr>
+      <tr>
+        <td>整備間轉場</td>
+        <td>整備串<strong>內部</strong>——左右鄰居都是整備任務，且<strong>類型不同</strong>
+        （例：充電緊接著保養、保養緊接著行前）</td>
+        <td>前段結束時刻是起飛點、<strong>不可更動</strong>（已做滿全長）。對所有
+        （出廠設施 × 入廠設施）組合找最短路徑，取<strong>第一段邊</strong>當分界點，
+        切成「出廠卡＋入廠卡」兩張。<strong>後段開始時刻被推遲到入廠卡抵達那一刻，
+        結束時刻不動</strong>，時長被壓縮——壓縮掉的就是這段真實的運輸成本。
+        移動時間長到會把後段推過結束時刻，判定排不出來，不強插。</td>
+        <td><code>insertMaintenanceTransferCards.ts</code></td>
+      </tr>
+      <tr>
+        <td>調度入／出廠（PI／PO，字面延用舊稱只是方便溝通，卡面代號一樣動態）</td>
+        <td>兩段<strong>正線</strong>之間的空檔長到會佔死終點站站位（門檻
+        <code>PARK_IDLE_THRESHOLD_SECONDS</code>＝900 秒）——這是<strong>營運策略門檻</strong>，
+        不是「這段是不是整備任務」的結構判斷，觸發邏輯跟上面三段本質不同，
+        <strong>刻意獨立</strong>不合併。</td>
+        <td>先跑完停靠站放下客人才進廠；暫停結束後開回下一段起點站，
+        結束時刻貼齊下一段發車。</td>
+        <td><code>insertParkMoveCards.ts</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    三段觸發條件在「左右鄰居是誰」這件事上天生互斥，不會有兩段同時想處理同一個
+    邊界，所以可以各自對每條時間線的 blocks 掃一遍、不必互相協調誰先誰後。
+    但三段<strong>共用同一份設施佔用表</strong>（<code>bookings</code>）——這是
+    2026-08-09 合併時順便補上的：合併前三段各自一份佔用表，彼此看不到對方訂走的
+    時段，出廠卡可能在入廠卡已訂走的設施時段裡再插一張，兩台車同時佔用同一格
+    設施卻沒有任何檢查抓到（見 §17 對應條目，真實資料驗證抓到 5 個這樣的撞格）。
+  </p>
+
+  <h4>資料模型：卡片身上帶什麼</h4>
+  <table>
+    <thead><tr><th>欄位</th><th>內容</th></tr></thead>
+    <tbody>
+      <tr><td><code>source</code></td><td><code>yard_entry_move</code>／<code>yard_exit_move</code>／
+      <code>park_entry_move</code>／<code>park_exit_move</code>——決定方向（I／O）與
+      是不是調度類，見 <code>MOVE_CARD_DIRECTION_BY_SOURCE</code>。</td></tr>
+      <tr><td><code>yardExitSectionCode</code></td><td>來源／目的整備類型<strong>使用者自訂</strong>的代號字母，
+      插卡當下用 <code>resolveMaintenanceSectionCodeForTaskType()</code> 算好寫入——
+      卡面代號＝這個欄位 + 方向尾綴，由 <code>resolveMoveCardPrefix()</code> 動態組成。</td></tr>
+      <tr><td><code>yardExitSectionLabel</code></td><td>來源／目的整備類型的<strong>中文名</strong>
+      （充電／洗車／保養／行前／機動／調度），只給 hover 標題用，不影響卡面代號或排班邏輯。</td></tr>
+      <tr><td><code>yardExitFacilityNodeId</code>／<code>Label</code></td><td>實際去的那一台具體設施（例 M2）。</td></tr>
+      <tr><td><code>yardExitStationId</code>／<code>Label</code></td><td>另一端的站／分界點。</td></tr>
+      <tr><td><code>yardExitAteYardTail</code></td><td>只有出廠卡會設——空間不夠、吃了整備尾巴。</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>不存在</strong>任何一個「MO／MI／PI／PO」列舉欄位。UI（<code>ShiftSchedulePlanGrid.tsx</code>）
+    的 hover 標題／說明句完全由 <code>source</code>（決定「入廠」還是「出廠」文字、
+    決定套用哪段行為說明）與 <code>yardExitSectionLabel</code>（決定「充電」「保養」…
+    這個前綴）動態組出來；卡面徽章直接印 <code>resolveMoveCardPrefix(block)</code>
+    算出的代號，不讀任何固定字面。
+  </p>
 </section>
 
 <section id="s11">
@@ -2040,6 +2131,8 @@ backend/src/dev-log/
       <code>MO</code>／<code>MI</code>／<code>PI</code>／<code>PO</code> 字面文字。
       <code>moveCardTag</code> 欄位保留、語意不變——它驅動 hover 的標題與說明句
       （「整備出廠」「調度入廠」等概念分類），跟卡面顯示的具體代號是兩件事。
+      <strong>（後續更正：這個欄位本身就是問題，已於 2026-08-09 完全拿掉，
+      見本節後方「moveCardTag 這個固定四值欄位，本身就是使用者要消滅的東西」條目。）</strong>
     </li>
     <li>
       <strong>實測（真實資料，代號 E/W/M/P/H/T）：</strong>
@@ -2603,6 +2696,68 @@ backend/src/dev-log/
       設施，卻沒有任何檢查抓到。這 5 張少插的出廠卡，是合併前就存在、
       從沒被抓到的真實撞格——不是這次合併造出來的新問題，是合併後三段
       共用同一份 <code>bookings</code> 才第一次被看見。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · moveCardTag 這個固定四值欄位，本身就是使用者要消滅的東西</h3>
+  <ul>
+    <li>
+      <strong>使用者的原話：</strong>「妳今天是充電入廠 那目前使用者設定的代號是E開頭
+      那就是EI/EO...今天是保養完成後進入行前 那就是 MO&gt;PI 請你搞清楚邏輯
+      不是獨立的MOMIPOPI 你完全搞錯了 那些MIMOPIPO的觀念要完全消除」。
+    </li>
+    <li>
+      <strong>上一輪合併（見上一則條目）只解決了「函式」層級的重複——MO／MI／
+      整備間轉場三個檔案合併成一個模組。但「資料模型」層級的固定四值還留著沒動：</strong>
+      <code>GeneratedScheduleBlock.moveCardTag?: 'MO' | 'MI' | 'PI' | 'PO'</code>。
+      每張卡建立時都會被指定成這四個字面值之一，跟卡面實際顯示的動態代號
+      （<code>resolveMoveCardPrefix()</code> 算出來的 <code>EI</code>／<code>WO</code>／
+      <code>TI</code>…）是兩條並行的資料——這正是使用者說的「不是獨立的
+      MO/MI/PO/PI」的反面：程式內部確實把它們當成四種固定分類在傳遞。
+    </li>
+    <li>
+      <strong>真正的破口在 UI：</strong><code>ShiftSchedulePlanGrid.tsx</code> 的
+      <code>MOVE_CARD_TITLE</code>／<code>MOVE_CARD_HINT</code> 兩張表直接用
+      <code>Record&lt;'MO' | 'MI' | 'PI' | 'PO', string&gt;</code> 查 hover 標題與說明句
+      （例：<code>MO: '整備出廠'</code>）。這表示不管卡片實際是充電出廠、保養出廠、
+      還是行前出廠，hover 標題全部顯示同一句「整備出廠」，完全沒有反映
+      「這是哪一種整備」——固定四值不只是型別上不乾淨，是真的在使用者能看到的地方
+      抹平了差異。
+    </li>
+    <li>
+      <strong>怎麼拆：</strong>
+      <ul>
+        <li><code>moveCardTag</code> 欄位整個拿掉。</li>
+        <li>新增 <code>yardExitSectionLabel</code> 欄位——來源／目的整備類型的中文名
+        （充電／洗車／保養／行前／機動／調度），插卡當下依 <code>taskType</code> 算好寫入
+        （新函式 <code>resolveMaintenanceSectionLabelForTaskType()</code>），跟
+        <code>yardExitSectionCode</code>（使用者自訂字母代號）是同一套邏輯的兩個輸出，
+        一個給機器（代號），一個給人看（中文名）。</li>
+        <li>UI 的 hover 標題改成動態組字：<code>{yardExitSectionLabel}{入廠或出廠}</code>，
+        方向由 <code>block.source</code> 判斷（<code>*_entry_move</code> → 入廠，
+        <code>*_exit_move</code> → 出廠），不再查任何固定表。</li>
+        <li>hover 說明句表格的 key 從 <code>'MO'|'MI'|'PI'|'PO'</code> 改成
+        <code>block.source</code> 的四個字面值（<code>yard_entry_move</code> 等）——
+        這四個值本來就存在、本來就代表「入廠／出廠 × 整備／調度」，不需要另外疊一層
+        MO/MI/PI/PO 才能查表。</li>
+        <li>新增 <code>isMoveCardBlockSource()</code>（<code>maintenanceSectionCode.ts</code>），
+        取代「這張卡是不是移動小卡」原本靠 <code>moveCardTag != null</code> 判斷的寫法。</li>
+      </ul>
+    </li>
+    <li>
+      <strong>驗證：</strong>三份轉場卡測試同步改成用 <code>source</code>／
+      <code>yardExitSectionLabel</code> 斷言，不再斷言任何 <code>moveCardTag</code>；
+      <code>tsc</code>（23 基準不變）、測試（336 pass／9 fail 基準不變）、
+      <code>eslint</code> 全過。這次改動只動資料模型與 UI 顯示，沒有動任何排班
+      時序邏輯，真實資料 harness 重跑數字（<code>yard_entry_move</code> 40、
+      <code>yard_exit_move</code> 41、<code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 25）
+      與上一則條目完全一致，符合預期。
+    </li>
+    <li>
+      <strong>教訓：</strong>「函式不重複」跟「資料模型不重複」是兩件事，
+      上一輪只做了前者就交差，被使用者一眼看穿還留著固定四值——
+      往後遇到「四種東西看起來很像」的情境，要連資料模型（型別、欄位、UI 查表）
+      一起檢查是不是也偷偷編了號，不能只看函式簽章。
     </li>
   </ul>
 

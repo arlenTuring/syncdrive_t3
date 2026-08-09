@@ -141,7 +141,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
 
       const blocks = p.timelines[0]!.blocks;
       const card = blocks.find((b) => b.source === 'yard_entry_move')!;
-      assert.equal(card.moveCardTag, 'MI');
+      assert.equal(card.yardExitSectionLabel, '保養', '沒有固定的 MI 標籤，代號跟著來源 taskType 動態算');
       assert.equal(card.plannedStartMinute, 9 * 60 + 30);
       assert.equal(card.plannedEndMinute, 9 * 60 + 31);
 
@@ -507,8 +507,8 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const p = plan();
       run(p);
       const blocks = p.timelines[0]!.blocks;
-      const mo = blocks.find((b) => b.moveCardTag === 'MO')!;
-      const mi = blocks.find((b) => b.moveCardTag === 'MI')!;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
+      const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.ok(mo, '要有一張 MO 出廠卡');
       assert.ok(mi, '要有一張 MI 入廠卡');
       assert.equal(mo.source, 'yard_exit_move');
@@ -521,18 +521,21 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const p = plan();
       run(p);
       const blocks = p.timelines[0]!.blocks;
-      const mo = blocks.find((b) => b.moveCardTag === 'MO')!;
-      const mi = blocks.find((b) => b.moveCardTag === 'MI')!;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
+      const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(mo.yardExitSectionCode, 'E');
       assert.equal(mi.yardExitSectionCode, 'M');
+      // 沒有固定的 MO／MI 標籤，標題文字跟著來源 taskType 動態算
+      assert.equal(mo.yardExitSectionLabel, '充電');
+      assert.equal(mi.yardExitSectionLabel, '保養');
     });
 
     it('出廠卡從設施到路徑第一段邊的終點；入廠卡接著到目的設施', () => {
       const p = plan();
       run(p);
       const blocks = p.timelines[0]!.blocks;
-      const mo = blocks.find((b) => b.moveCardTag === 'MO')!;
-      const mi = blocks.find((b) => b.moveCardTag === 'MI')!;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
+      const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(mo.yardExitFacilityLabel, 'E1');
       assert.equal(mo.yardExitStationId, 'N2W', '分界點是第一段邊的終點');
       assert.equal(mo.travelSeconds, 30);

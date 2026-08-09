@@ -195,11 +195,11 @@ export function insertParkMoveCards(args: {
         travelSeconds: chosen.inSeconds,
         dwellSeconds: 0,
         source: 'park_entry_move',
-        moveCardTag: 'PI',
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: parkedStationId,
         yardExitSectionCode: parkingSectionCode,
+        yardExitSectionLabel: '調度',
       };
       const po: GeneratedScheduleBlock = {
         id: `parkout-${after.id}-${Math.round(parkEnd)}`,
@@ -212,11 +212,11 @@ export function insertParkMoveCards(args: {
         travelSeconds: chosen.outSeconds,
         dwellSeconds: 0,
         source: 'park_exit_move',
-        moveCardTag: 'PO',
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: resumeStationId,
         yardExitSectionCode: parkingSectionCode,
+        yardExitSectionLabel: '調度',
       };
       timeline.blocks.push(pi, po);
       bookings.push({

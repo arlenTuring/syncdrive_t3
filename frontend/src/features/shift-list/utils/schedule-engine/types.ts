@@ -83,15 +83,21 @@ export type GeneratedScheduleBlock = {
   yardExitStationId?: string;
   /** 出場移動：抵達的轉乘站顯示名（例 T3上行） */
   yardExitStationLabel?: string;
-  /** 出場移動：來源整備區段代號（班次代號 = 該代號 + EX，例 MEX／PEX／EEX／WEX） */
+  /**
+   * 轉場卡：來源／目的整備類型自己的代號（使用者在整備任務自訂，1–2 個大寫
+   * 英文字母）。卡面代號＝這個代號 + I（入廠）／O（出廠），由
+   * {@link resolveMoveCardPrefix} 依 source 動態組成——沒有「MO／MI／PI／PO」
+   * 這種寫死的固定四種，代號完全跟著使用者設定走：充電代號 E 就是 EI／EO，
+   * 保養代號 M 就是 MI／MO，行前代號 P 就是 PI／PO。
+   */
   yardExitSectionCode?: string;
+  /**
+   * 轉場卡：來源／目的整備類型的中文名（充電／洗車／保養／行前／機動／調度），
+   * 只給 UI 顯示用（hover 標題），不影響卡面代號或排班邏輯。
+   */
+  yardExitSectionLabel?: string;
   /** 出場移動：是否吃掉了整備尾巴時間（空間不足時才會發生） */
   yardExitAteYardTail?: boolean;
-  /**
-   * 卡面代號：MO／MI／PI／PO。這種卡通常只有幾十秒寬，塞不下完整班次代號，
-   * 所以卡面只印這兩個字母，完整資訊放 hover。
-   */
-  moveCardTag?: 'MO' | 'MI' | 'PI' | 'PO';
   /**
    * 調度營運班次（entry_service）落點診斷（文件 §10.3）——
    * 只在這一段抵達某個站位時實際查得到「該站淨空時刻」才會寫入；

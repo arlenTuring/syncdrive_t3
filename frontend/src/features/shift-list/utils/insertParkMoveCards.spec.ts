@@ -134,18 +134,21 @@ describe('insertParkMoveCards（調度入／出廠卡 PI／PO）', () => {
     const p = plan(30);
     const result = run(p);
     assert.equal(result.inserted, 1);
-    const pi = p.timelines[0]!.blocks.find((b) => b.moveCardTag === 'PI')!;
-    const po = p.timelines[0]!.blocks.find((b) => b.moveCardTag === 'PO')!;
+    const pi = p.timelines[0]!.blocks.find((b) => b.source === 'park_entry_move')!;
+    const po = p.timelines[0]!.blocks.find((b) => b.source === 'park_exit_move')!;
     assert.equal(pi.source, 'park_entry_move');
     assert.equal(po.source, 'park_exit_move');
     assert.equal(pi.yardExitFacilityLabel, 'H1');
+    // 沒有固定的 PI／PO 標籤，調度視為整備的第六種類型，標籤同樣是動態算的
+    assert.equal(pi.yardExitSectionLabel, '調度');
+    assert.equal(po.yardExitSectionLabel, '調度');
   });
 
   it('PI 接在完整載客段之後——先把客人放下才進廠', () => {
     const p = plan(30);
     run(p);
     const before = p.timelines[0]!.blocks.find((b) => b.id === 'before')!;
-    const pi = p.timelines[0]!.blocks.find((b) => b.moveCardTag === 'PI')!;
+    const pi = p.timelines[0]!.blocks.find((b) => b.source === 'park_entry_move')!;
     assert.equal(before.plannedEndMinute, 8 * 60 + 30, '前一段載客不得被砍短');
     assert.equal(pi.plannedStartMinute, before.plannedEndMinute);
     assert.equal(pi.plannedEndMinute, before.plannedEndMinute + 1, '進場 60 秒');
@@ -155,7 +158,7 @@ describe('insertParkMoveCards（調度入／出廠卡 PI／PO）', () => {
     const p = plan(30);
     run(p);
     const after = p.timelines[0]!.blocks.find((b) => b.id === 'after')!;
-    const po = p.timelines[0]!.blocks.find((b) => b.moveCardTag === 'PO')!;
+    const po = p.timelines[0]!.blocks.find((b) => b.source === 'park_exit_move')!;
     assert.equal(po.plannedEndMinute, after.plannedStartMinute);
     assert.equal(po.plannedStartMinute, after.plannedStartMinute - 1.5, '出場 90 秒');
     assert.equal(after.plannedStartMinute, 9 * 60, '下一段班次時刻不得被改動');

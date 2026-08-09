@@ -146,18 +146,43 @@ export function resolveMaintenanceSectionCodeForTaskType(
 }
 
 /**
+ * 依時間模板 taskType 取整備類型的中文名——只給 UI 顯示用（例如轉場卡 hover
+ * 標題），不是使用者可自訂的代號。跟 {@link resolveMaintenanceSectionCodeForTaskType}
+ * 查同一組 taskType 分支，但回傳固定中文名而不是使用者設定的字母代號。
+ */
+export function resolveMaintenanceSectionLabelForTaskType(
+  taskType: ScheduleEngineTaskType,
+): string | null {
+  if (taskType === 'charging') return '充電';
+  if (taskType === 'inspection') return '行前';
+  if (taskType === 'standby') return '機動';
+  if (taskType === 'servicing') return '保養';
+  if (taskType === 'washing') return '洗車';
+  return null;
+}
+
+/**
  * 移動小卡（整備出／入廠、調度出／入廠）方向 → 代號尾綴。
  * 入廠 I、出廠 O；跟來源那個區塊自己的代號組合成卡面／班次代號前綴，
  * 例：保養（M）入廠 → MI、洗車（W）出廠 → WO、調度（T）入廠 → TI。
  * 調度視為整備任務的第六種類型，跟其餘五種共用同一套規則，
  * 不再是獨立的 PI／PO 命名。
  */
-const MOVE_CARD_DIRECTION_BY_SOURCE: Record<string, 'I' | 'O'> = {
+export const MOVE_CARD_DIRECTION_BY_SOURCE: Record<string, 'I' | 'O'> = {
   yard_entry_move: 'I',
   park_entry_move: 'I',
   yard_exit_move: 'O',
   park_exit_move: 'O',
 };
+
+/**
+ * 這個 source 是不是轉場小卡（入廠／出廠，整備或調度皆算）——
+ * UI 判斷「這是不是那種只印兩個字母、完整資訊在 hover 的窄卡」用這個，
+ * 不是查一個叫 moveCardTag 的固定 MO／MI／PI／PO 欄位（那個概念已經拿掉）。
+ */
+export function isMoveCardBlockSource(source: string | undefined): boolean {
+  return !!source && source in MOVE_CARD_DIRECTION_BY_SOURCE;
+}
 
 /**
  * 移動小卡的代號前綴（不含列碼與時刻）。
