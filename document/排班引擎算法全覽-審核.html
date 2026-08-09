@@ -1909,6 +1909,44 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 調度代號介面收斂成一格，底層 parkIn／parkOut 不動</h3>
+  <ul>
+    <li>
+      <strong>使用者要求：</strong>不要分「調度入廠代號」「調度出廠代號」兩格，
+      調度只填一個代號就好；<strong>只改介面，不動程式邏輯</strong>。
+    </li>
+    <li>
+      <strong>做法：</strong>底層資料形狀完全不動——
+      <code>MaintenanceSectionCodeBySection</code> 仍是 <code>parkIn</code>／
+      <code>parkOut</code> 兩個欄位，PI／PO 的代號解析（<code>resolveGeneratedBlockTripCode</code>／
+      <code>resolveBlockCode</code>）也完全沒改。只在 UI 層新增
+      <code>patchParkingCode()</code>：使用者填一格，同步寫進
+      <code>parkIn</code> 與 <code>parkOut</code> 兩個欄位。
+      兩者的值永遠相等，PI／PO 因此自然顯示同一個代號——引擎端不需要知道
+      介面收斂成一格這件事。
+    </li>
+    <li>
+      <strong>順手排掉一個會冒出來的假錯誤：</strong>
+      <code>findMaintenanceSectionCodeIssues()</code> 會抓「代號跟其他區塊重複」，
+      若把 <code>parkOut</code> 也列入檢查，因為它永遠等於 <code>parkIn</code>，
+      會被判成跟自己重複、卡死「下一步」。解法是<strong>只對 <code>parkIn</code>
+      做驗證</strong>，<code>parkOut</code> 純粹跟著同步、不單獨檢查。
+      這一步只調整 <code>StepShiftMaintenanceTask.tsx</code> 組給驗證函式的
+      <code>enabled</code> 參數，<code>findMaintenanceSectionCodeIssues()</code>
+      本身沒有改。
+    </li>
+    <li>
+      <strong>查到一個既有的 gate 漏洞，這輪沒有動：</strong>班表建立流程 Step 2
+      「整備任務」的下一步按鈕（<code>types/create.ts</code> 的
+      <code>isMaintenanceSectionCodesComplete()</code> 呼叫）傳的是
+      <code>draft.maintenanceTask.sectionEnabled</code>（只有
+      <code>parking: boolean</code>），不是 <code>parkIn</code>／<code>parkOut</code>——
+      所以調度代號是否填寫<strong>從來沒有真正擋過下一步</strong>，
+      跟畫面上顯示的紅字驗證是兩件事。使用者這次要求先只改介面，
+      這個 gate 缺口留待下一輪確認要不要修。
+    </li>
+  </ul>
+
   <h3>2026-08-09 · PI／PO 代號接進引擎，資料形狀本身就撐得住——不用改資料流</h3>
   <ul>
     <li>
