@@ -3,10 +3,10 @@ import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
 /**
  * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
  *
- * parkIn／parkOut 是調度入／出廠卡（PI／PO）專用：這兩張卡不像
- * 整備出／入廠卡（MO／MI）只有幾十秒寬，常常橫跨一整段空檔，
- * 卡片本身就有足夠長度顯示完整班次代號，所以跟其他區塊一樣
- * 讓使用者自訂代號，而不是沿用來源整備任務的代號。
+ * 調度（parking）視為整備任務的第六種類型，跟充電／洗車／保養／行前／機動
+ * 一樣只要一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
+ * 自動加上 I（入廠）／O（出廠）尾綴組成，例：保養代號 M → 入廠 MI、出廠 MO；
+ * 調度代號 T → 入廠 TI、出廠 TO。見 {@link resolveMoveCardPrefix}。
  */
 export type MaintenanceSectionCodeBySection = {
   charging: string;
@@ -14,8 +14,7 @@ export type MaintenanceSectionCodeBySection = {
   maintenance: string;
   preTrip: string;
   mobile: string;
-  parkIn: string;
-  parkOut: string;
+  parking: string;
 };
 
 export type MaintenanceSectionCodeKey = keyof MaintenanceSectionCodeBySection;
@@ -27,8 +26,7 @@ export function emptyMaintenanceSectionCodeBySection(): MaintenanceSectionCodeBy
     maintenance: '',
     preTrip: '',
     mobile: '',
-    parkIn: '',
-    parkOut: '',
+    parking: '',
   };
 }
 
@@ -56,8 +54,7 @@ export function normalizeMaintenanceSectionCodeBySection(
     maintenance: normalizeMaintenanceSectionCodeInput(raw.maintenance ?? base.maintenance),
     preTrip: normalizeMaintenanceSectionCodeInput(raw.preTrip ?? base.preTrip),
     mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile),
-    parkIn: normalizeMaintenanceSectionCodeInput(raw.parkIn ?? base.parkIn),
-    parkOut: normalizeMaintenanceSectionCodeInput(raw.parkOut ?? base.parkOut),
+    parking: normalizeMaintenanceSectionCodeInput(raw.parking ?? base.parking),
   };
 }
 
@@ -124,14 +121,15 @@ export function buildMaintenanceSectionCodeFingerprint(
     `maintenance:${n.maintenance}`,
     `preTrip:${n.preTrip}`,
     `mobile:${n.mobile}`,
-    `parkIn:${n.parkIn}`,
-    `parkOut:${n.parkOut}`,
+    `parking:${n.parking}`,
   ].join('|');
 }
 
 /**
  * 依時間模板 taskType 取整備區塊代號。
  * 洗車有自己的 taskType（washing），不再與保養共用一個視窗。
+ * 調度（parking）不是時間模板任務類型，不在這裡查——見
+ * {@link resolveMoveCardPrefix}。
  */
 export function resolveMaintenanceSectionCodeForTaskType(
   taskType: ScheduleEngineTaskType,
@@ -147,8 +145,35 @@ export function resolveMaintenanceSectionCodeForTaskType(
   return null;
 }
 
-/** 出場移動卡代號後綴（Exit）：整備代號 + EX，例 MEX／PEX／EEX／WEX */
-export const YARD_EXIT_MOVE_CODE_SUFFIX = 'EX';
+/**
+ * 移動小卡（整備出／入廠、調度出／入廠）方向 → 代號尾綴。
+ * 入廠 I、出廠 O；跟來源那個區塊自己的代號組合成卡面／班次代號前綴，
+ * 例：保養（M）入廠 → MI、洗車（W）出廠 → WO、調度（T）入廠 → TI。
+ * 調度視為整備任務的第六種類型，跟其餘五種共用同一套規則，
+ * 不再是獨立的 PI／PO 命名。
+ */
+const MOVE_CARD_DIRECTION_BY_SOURCE: Record<string, 'I' | 'O'> = {
+  yard_entry_move: 'I',
+  park_entry_move: 'I',
+  yard_exit_move: 'O',
+  park_exit_move: 'O',
+};
+
+/**
+ * 移動小卡的代號前綴（不含列碼與時刻）。
+ * <code>block.yardExitSectionCode</code> 是插卡當下就算好、寫進區塊的
+ * 來源代號（哪個整備類型的代號，不含方向尾綴）——不是移動小卡回傳 null。
+ */
+export function resolveMoveCardPrefix(block: {
+  source?: string;
+  yardExitSectionCode?: string;
+}): string | null {
+  const direction = block.source ? MOVE_CARD_DIRECTION_BY_SOURCE[block.source] : undefined;
+  if (!direction) return null;
+  const base = block.yardExitSectionCode?.trim().toUpperCase();
+  if (!base) return null;
+  return `${base}${direction}`;
+}
 
 /**
  * 時間線列碼：第 1 列車 → A、第 2 → B、第 3 → C…
@@ -214,12 +239,12 @@ export function resolveGeneratedBlockTripCode(
   index = 0,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
-  if (block.source === 'yard_exit_move') {
-    // 出場移動卡：整備代號 + EX（Exit），例 MEX／PEX／EEX／WEX。
-    // 帶列碼，跟整備卡一致——它屬於某一台車的場內動作，不是路線班次。
-    const base = block.yardExitSectionCode?.trim();
+  // 四張移動小卡（MO／MI／PI／PO）共用一套規則：來源代號 + I/O 尾綴。
+  // 帶列碼，跟整備卡一致——它們屬於某一台車的場內動作，不是路線班次。
+  // 必須排在 dispatch／passenger 分支之前，它們的 taskType 也是 'dispatch'。
+  if (block.source && block.source in MOVE_CARD_DIRECTION_BY_SOURCE) {
     return buildScheduleBlockTripCode({
-      prefixCode: base ? `${base}${YARD_EXIT_MOVE_CODE_SUFFIX}` : null,
+      prefixCode: resolveMoveCardPrefix(block),
       timelineRow: block.timelineRow,
       startMinute: block.plannedStartMinute,
     });
@@ -231,19 +256,6 @@ export function resolveGeneratedBlockTripCode(
       timelineRow: block.timelineRow,
       startMinute: block.plannedStartMinute,
       includeColumnCode: false,
-    });
-  }
-
-  if (block.source === 'park_entry_move' || block.source === 'park_exit_move') {
-    // 調度入／出廠卡：代號使用者在整備任務 Step 自訂（parkIn／parkOut），
-    // 帶列碼——跟其他整備卡同一套規則，不像 MO／MI 那樣是幾十秒的短卡。
-    // 必須排在 dispatch 分支之前，它的 taskType 也是 dispatch。
-    const code =
-      block.source === 'park_entry_move' ? sectionCodes?.parkIn : sectionCodes?.parkOut;
-    return buildScheduleBlockTripCode({
-      prefixCode: code,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
     });
   }
 

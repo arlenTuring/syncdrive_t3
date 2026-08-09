@@ -69,16 +69,11 @@ export function StepShiftMaintenanceTask({
     draft.sectionCodeBySection,
   );
   const sectionEnabled = draft.sectionEnabled;
-  // 調度介面只出一格代號，同步寫進 parkIn／parkOut（底層資料形狀不動）。
-  // 驗證只對 parkIn 做——parkOut 只是跟著同步，若也拿去查重複，
-  // 會因為兩者值必然相等而永遠誤判成「代號重複」。
-  const codeEnabled = {
-    ...sectionEnabled,
-    parkIn: sectionEnabled.parking,
-  };
+  // 調度（parking）現在跟其他五個整備區塊一樣只有一個代號欄位，
+  // 不用再另外組驗證用的 enabled map——sectionEnabled 的鍵本來就對得上。
   const codeIssues = findMaintenanceSectionCodeIssues(
     sectionCodeBySection,
-    codeEnabled,
+    sectionEnabled,
   );
   const codeIssueByKey = new Map(codeIssues.map((issue) => [issue.key, issue.message]));
 
@@ -202,49 +197,20 @@ export function StepShiftMaintenanceTask({
     });
   };
 
-  /**
-   * 調度介面只出一格代號給使用者填，底層仍是 parkIn／parkOut 兩個欄位——
-   * 寫入時同步成同一個值，engine／trip code 端完全不用改
-   * （PI／PO 分別讀 parkIn／parkOut，兩者相等時效果就是共用一個代號）。
-   */
-  const patchParkingCode = (value: string) => {
-    const code = sanitizeMaintenanceSectionCodeInput(value);
-    onChange({
-      ...draft,
-      sectionCodeBySection: {
-        ...sectionCodeBySection,
-        parkIn: code,
-        parkOut: code,
-      },
-    });
-  };
-
-  const sectionCodeField = (
-    key: MaintenanceSectionCodeKey,
-    options?: {
-      label?: string;
-      placeholder?: string;
-      description?: string;
-      onValueChange?: (value: string) => void;
-    },
-  ) => {
+  const sectionCodeField = (key: MaintenanceSectionCodeKey) => {
     const issue = codeIssueByKey.get(key);
     return (
       <div className="space-y-1.5">
         <label className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            {options?.label ?? '整備代號'}
+            整備代號
           </span>
           <input
             type="text"
             value={sectionCodeBySection[key]}
-            onChange={(e) =>
-              options?.onValueChange
-                ? options.onValueChange(e.target.value)
-                : patchSectionCode(key, e.target.value)
-            }
-            placeholder={options?.placeholder ?? '例：M'}
+            onChange={(e) => patchSectionCode(key, e.target.value)}
+            placeholder="例：M"
             maxLength={2}
             className={`${CODE_INPUT_CLASS} ${issue ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/30' : ''}`}
             autoComplete="off"
@@ -252,8 +218,7 @@ export function StepShiftMaintenanceTask({
           />
         </label>
         <p className="text-xs text-zinc-500">
-          {options?.description
-            ?? '1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻'}
+          1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻
         </p>
         {issue ? <p className="text-xs text-red-400">{issue}</p> : null}
       </div>
@@ -290,7 +255,7 @@ export function StepShiftMaintenanceTask({
     ),
     parking: (
       <div className="space-y-4">
-        {sectionCodeField('parkIn', { onValueChange: patchParkingCode })}
+        {sectionCodeField('parking')}
       </div>
     ),
     preTrip: (

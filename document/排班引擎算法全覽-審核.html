@@ -1909,6 +1909,82 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 調度正式併入整備任務：六種類型共用「代號＋I/O」一套規則</h3>
+  <ul>
+    <li>
+      <strong>使用者的新架構：</strong>調度不再是獨立於整備任務外的第三種概念
+      （PI／PO 用自己的一套命名），而是<strong>整備任務的第六種類型</strong>，
+      跟充電／洗車／保養／行前／機動共用同一套規則：一個代號，入廠加
+      <code>I</code>、出廠加 <code>O</code>。
+      <table>
+        <thead><tr><th>類型</th><th>代號（範例）</th><th>入廠</th><th>出廠</th></tr></thead>
+        <tbody>
+          <tr><td>充電</td><td>E</td><td>EI</td><td>EO</td></tr>
+          <tr><td>洗車</td><td>W</td><td>WI</td><td>WO</td></tr>
+          <tr><td>保養</td><td>M</td><td>MI</td><td>MO</td></tr>
+          <tr><td>行前</td><td>P</td><td>PI</td><td>PO</td></tr>
+          <tr><td>機動</td><td>H</td><td>HI</td><td>HO</td></tr>
+          <tr><td>調度</td><td>T（使用者自訂）</td><td>TI</td><td>TO</td></tr>
+        </tbody>
+      </table>
+      這取代了兩套舊規則：MO 原本是「整備代號＋<code>EX</code>」（例 MEX），
+      PI／PO 原本是獨立設定的 <code>parkIn</code>／<code>parkOut</code> 兩個代號、
+      不跟其他區塊的代號共用同一套邏輯。使用者原話：「有點把營運概念套到借屍還魂
+      沒錯，但也大幅地將邏輯清晰化」——用一個統一規則換掉三套零散規則，
+      也連帶讓「行前」的代號 P 不會再跟舊版 PI／PO 撞名（新版調度改用使用者
+      自訂的代號，而不是固定用 P）。
+    </li>
+    <li>
+      <strong>資料形狀跟著簡化：</strong>
+      <code>MaintenanceSectionCodeBySection</code> 的 <code>parkIn</code>／
+      <code>parkOut</code> 兩個欄位合併成一個 <code>parking</code>，
+      跟其餘五個區塊（<code>charging</code>／<code>carWash</code>／
+      <code>maintenance</code>／<code>preTrip</code>／<code>mobile</code>）同構。
+      上上輪為了讓「調度只填一格」而加的
+      <code>patchParkingCode()</code>（同步寫兩個欄位）、
+      <code>sectionCodeField()</code> 的 <code>onValueChange</code> 覆寫、
+      驗證用的 <code>codeEnabled</code> 特例合併，這輪全部撤掉——
+      型別本身就只有一格了，不需要在 UI 層模擬。
+    </li>
+    <li>
+      <strong>兩份平行實作正式合併。</strong>
+      <code>ShiftSchedulePlanGrid.tsx</code> 的 <code>resolveBlockCode()</code>
+      本來是 <code>maintenanceSectionCode.ts</code> 的
+      <code>resolveGeneratedBlockTripCode()</code> 的一份手抄複製本——這個 wiki
+      已經記錄過兩次「漏改其中一份」的坑（MO 漏過一次、MI／PI／PO 漏過一次）。
+      這次直接讓 <code>resolveBlockCode()</code> 委派給
+      <code>resolveGeneratedBlockTripCode()</code>，兩者不可能再失步。
+    </li>
+    <li>
+      <strong>新增共用函式 <code>resolveMoveCardPrefix()</code>：</strong>
+      移動小卡的代號前綴（不含列碼與時刻），只吃兩個欄位——
+      <code>block.source</code>（決定入廠 I／出廠 O）與
+      <code>block.yardExitSectionCode</code>（來源類型的代號，插卡當下就算好
+      寫進區塊）。四張卡（MO／MI／PI／PO）的插卡函式現在都在建卡時
+      呼叫 <code>resolveMaintenanceSectionCodeForTaskType()</code>
+      （MO／MI）或直接讀 <code>sectionCodes.parking</code>（PI／PO），
+      把來源代號寫進 <code>yardExitSectionCode</code>；渲染與記錄端完全不用
+      知道「這張卡屬於哪個整備類型」，只要讀這個已經算好的欄位。
+    </li>
+    <li>
+      <strong>卡面／hover 徽章改顯示動態前綴</strong>（例 <code>EI</code>／
+      <code>WO</code>／<code>TI</code>），取代原本固定顯示的
+      <code>MO</code>／<code>MI</code>／<code>PI</code>／<code>PO</code> 字面文字。
+      <code>moveCardTag</code> 欄位保留、語意不變——它驅動 hover 的標題與說明句
+      （「整備出廠」「調度入廠」等概念分類），跟卡面顯示的具體代號是兩件事。
+    </li>
+    <li>
+      <strong>實測（真實資料，代號 E/W/M/P/H/T）：</strong>
+      <ul>
+        <li>MI（充電來源）→ 前綴 <code>EI</code>、班次代號 <code>EIA0254</code></li>
+        <li>MO（保養來源）→ 前綴 <code>MO</code>、班次代號 <code>MOA1737</code></li>
+        <li>MO（行前來源）→ 前綴 <code>PO</code>、班次代號 <code>POA1035</code></li>
+        <li>PI（調度）→ 前綴 <code>TI</code>、班次代號 <code>TIA1121</code></li>
+        <li>PO（調度）→ 前綴 <code>TO</code>、班次代號 <code>TOA1136</code></li>
+      </ul>
+    </li>
+  </ul>
+
   <h3>2026-08-09 · 調度代號介面收斂成一格，底層 parkIn／parkOut 不動</h3>
   <ul>
     <li>

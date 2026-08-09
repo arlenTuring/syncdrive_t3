@@ -7,6 +7,10 @@ import {
   type MaintenanceBodySectionKey,
 } from './maintenanceFirstTripOrigins';
 import {
+  resolveMaintenanceSectionCodeForTaskType,
+  type MaintenanceSectionCodeBySection,
+} from './maintenanceSectionCode';
+import {
   minuteToSecond,
   secondToMinute,
   type GeneratedScheduleBlock,
@@ -108,6 +112,8 @@ export function insertYardEntryMoveCards(args: {
   maintenanceBody: Record<string, unknown> | null | undefined;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds: number;
+  /** 整備區塊代號；用來把來源整備類型的代號算好寫進卡片（MI 卡面／班次代號用） */
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
 }): YardEntryMoveCardsResult {
   const {
     timelines,
@@ -115,6 +121,7 @@ export function insertYardEntryMoveCards(args: {
     maintenanceBody,
     selectedRoutes,
     minimumRecoveryTimeSeconds,
+    sectionCodes,
   } = args;
   const skipped: YardEntryMoveCardsResult['skipped'] = [];
   let inserted = 0;
@@ -244,6 +251,9 @@ export function insertYardEntryMoveCards(args: {
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: stationId,
+        yardExitSectionCode:
+          resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes)
+          ?? undefined,
       };
       timeline.blocks.push(card);
 

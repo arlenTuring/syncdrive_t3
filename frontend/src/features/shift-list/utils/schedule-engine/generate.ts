@@ -280,6 +280,7 @@ export function generateShiftSchedule(
     maintenanceBody: engineInput.maintenanceBody,
     selectedRoutes: engineInput.selectedRoutes,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
   timelines = yardEntryMove.timelines;
   for (const skip of yardEntryMove.skipped) {
@@ -301,6 +302,7 @@ export function generateShiftSchedule(
     maintenanceBody: engineInput.maintenanceBody,
     selectedRoutes: engineInput.selectedRoutes,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
   timelines = parkMove.timelines;
   for (const skip of parkMove.skipped) {

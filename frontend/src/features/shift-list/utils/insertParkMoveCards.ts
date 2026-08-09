@@ -2,6 +2,7 @@ import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { findTopologyPath } from './findTopologyPath';
 import { extractFacilityMapCodes } from './maintenanceFirstTripOrigins';
+import type { MaintenanceSectionCodeBySection } from './maintenanceSectionCode';
 import {
   minuteToSecond,
   secondToMinute,
@@ -99,6 +100,8 @@ export function insertParkMoveCards(args: {
   minimumRecoveryTimeSeconds: number;
   /** 空檔門檻（秒）；不給用 PARK_IDLE_THRESHOLD_SECONDS */
   idleThresholdSeconds?: number;
+  /** 整備區塊代號；調度的代號（parking）用來把 PI／PO 卡面／班次代號算好寫進卡片 */
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
 }): ParkMoveCardsResult {
   const {
     timelines,
@@ -106,6 +109,7 @@ export function insertParkMoveCards(args: {
     maintenanceBody,
     selectedRoutes,
     minimumRecoveryTimeSeconds,
+    sectionCodes,
   } = args;
   const threshold = args.idleThresholdSeconds ?? PARK_IDLE_THRESHOLD_SECONDS;
   const skipped: ParkMoveCardsResult['skipped'] = [];
@@ -214,6 +218,7 @@ export function insertParkMoveCards(args: {
 
       const parkStart = freeSecond + chosen.inSeconds;
       const parkEnd = nextStartSecond - chosen.outSeconds;
+      const parkingSectionCode = sectionCodes?.parking?.trim() || undefined;
 
       const pi: GeneratedScheduleBlock = {
         id: `parkin-${before.id}-${Math.round(freeSecond)}`,
@@ -230,6 +235,7 @@ export function insertParkMoveCards(args: {
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: parkedStationId,
+        yardExitSectionCode: parkingSectionCode,
       };
       const po: GeneratedScheduleBlock = {
         id: `parkout-${after.id}-${Math.round(parkEnd)}`,
@@ -246,6 +252,7 @@ export function insertParkMoveCards(args: {
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: resumeStationId,
+        yardExitSectionCode: parkingSectionCode,
       };
       timeline.blocks.push(pi, po);
       bookings.push({

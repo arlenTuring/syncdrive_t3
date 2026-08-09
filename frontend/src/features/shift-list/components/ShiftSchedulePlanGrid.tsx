@@ -45,8 +45,8 @@ import {
 } from '../utils/buildBlockStationDepartures';
 import { resolveEffectiveRouteTravelSeconds } from '../utils/stationLegTravel';
 import {
-  buildScheduleBlockTripCode,
-  resolveMaintenanceSectionCodeForTaskType,
+  resolveGeneratedBlockTripCode,
+  resolveMoveCardPrefix,
   type MaintenanceSectionCodeBySection,
 } from '../utils/maintenanceSectionCode';
 import { minuteFromClientX, resolveManualBlockMinDurationMinutes } from '../utils/manualScheduleEdit';
@@ -235,10 +235,13 @@ const MOVE_CARD_HINT: Record<'MO' | 'MI' | 'PI' | 'PO', string> = {
 /** 移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
 function MoveCardHoverCard({
   code,
+  prefix,
   block,
   pos,
 }: {
   code: string;
+  /** 卡面短代號（不含列碼與時刻），例 MI／WO／TI */
+  prefix: string | null;
   block: GeneratedScheduleBlock;
   pos: HoverCardPos;
 }) {
@@ -259,7 +262,7 @@ function MoveCardHoverCard({
     >
       <div className="flex items-baseline gap-1.5">
         <span className="rounded bg-zinc-800 px-1 py-0.5 text-[10px] font-bold text-zinc-100">
-          {block.moveCardTag}
+          {prefix ?? block.moveCardTag}
         </span>
         <span className="text-[11px] font-semibold text-zinc-100">
           {block.moveCardTag ? MOVE_CARD_TITLE[block.moveCardTag] : '移動'}
@@ -622,87 +625,19 @@ export function computeAutoSlotWidthPx(plan: GeneratedSchedulePlan): number {
   );
 }
 
+/**
+ * 班次卡代號。直接委派給 maintenanceSectionCode.ts 的
+ * resolveGeneratedBlockTripCode()——這裡曾經是一份平行重寫的複製本，
+ * 每次新增 source（MO/entry_service/PI/PO…）都要記得兩邊一起補，
+ * 已經漏過兩次（MO 漏過一次、MI/PI/PO 漏過一次）。改成委派後
+ * 兩邊不可能再失步。
+ */
 function resolveBlockCode(
   block: GeneratedScheduleBlock,
   index: number,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
-  // 出場移動：代號 = 整備代號 + EX（Exit），例 MEX／PEX／EEX／WEX。
-  // 必須排在 dispatch 分支之前——它的 taskType 也是 dispatch，會被誤判成 D。
-  if (block.source === 'yard_exit_move') {
-    const base = block.yardExitSectionCode?.trim();
-    return buildScheduleBlockTripCode({
-      prefixCode: base ? `${base}EX` : null,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-    });
-  }
-
-  // 進場載客：代號 = 整備代號 + 路線代號 + 開始時刻（taskType 為 passenger，須先判 source）
-  if (block.source === 'entry_service') {
-    return buildScheduleBlockTripCode({
-      prefixCode: `${block.entryServiceSectionCode ?? ''}${block.routeCode ?? ''}`,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-      includeColumnCode: false,
-    });
-  }
-
-  // 調度入／出廠卡：代號使用者在整備任務 Step 自訂（parkIn／parkOut），帶列碼。
-  // 必須排在 dispatch 分支之前，它的 taskType 也是 dispatch，會被誤判成 D。
-  if (block.source === 'park_entry_move' || block.source === 'park_exit_move') {
-    const code =
-      block.source === 'park_entry_move' ? sectionCodes?.parkIn : sectionCodes?.parkOut;
-    return buildScheduleBlockTripCode({
-      prefixCode: code,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-    });
-  }
-
-  if (block.taskType === 'passenger') {
-    // 調度班次：整備出場站 ≠ 首班首站時，代號前加整備代號前綴（如 ATN1706）
-    if (block.yardDispatchPrefix) {
-      return buildScheduleBlockTripCode({
-        prefixCode: block.yardDispatchPrefix,
-        timelineRow: block.timelineRow,
-        startMinute: block.plannedStartMinute,
-        includeColumnCode: false,
-      });
-    }
-    return buildScheduleBlockTripCode({
-      prefixCode: block.routeCode,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-      includeColumnCode: false,
-    });
-  }
-
-  if (block.taskType === 'dispatch' || block.source === 'dispatch') {
-    return buildScheduleBlockTripCode({
-      prefixCode: 'D',
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-    });
-  }
-
-  if (block.taskType !== 'idle') {
-    const sectionCode = resolveMaintenanceSectionCodeForTaskType(
-      block.taskType,
-      sectionCodes,
-    );
-    return buildScheduleBlockTripCode({
-      prefixCode: sectionCode,
-      timelineRow: block.timelineRow,
-      startMinute: block.plannedStartMinute,
-    });
-  }
-
-  if (block.routeId) {
-    const compact = block.routeId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    if (compact.length >= 4) return compact.slice(0, 5);
-  }
-  return `T${String(index + 1).padStart(4, '0')}`;
+  return resolveGeneratedBlockTripCode(block, index, sectionCodes);
 }
 
 function ScheduleIntervalBackground({
@@ -983,6 +918,9 @@ function ShiftScheduleBlockBar({
       || block.taskType === 'dispatch'
       || block.source === 'dispatch');
   const code = resolveBlockCode(block, blockIndex, sectionCodes);
+  // 卡面／hover 徽章顯示的短代號（不含列碼與時刻），例 MI／WO／TI；
+  // 調度視為整備任務的第六種類型，跟其餘五種共用同一套「代號＋I/O」規則。
+  const moveCardPrefix = isMoveCard ? resolveMoveCardPrefix(block) : null;
   const timeLabel = formatBlockTimeRange(block);
   const selectable =
     block.source === 'template_bar'
@@ -1339,7 +1277,7 @@ function ShiftScheduleBlockBar({
           onPointerLeave={() => setMoveCardHoverPos(null)}
         >
           <span className="text-[9px] font-bold leading-none tracking-tight">
-            {moveCardTag}
+            {moveCardPrefix ?? moveCardTag}
           </span>
           <Info className="ml-0.5 size-2.5 shrink-0 opacity-70" aria-hidden />
         </button>
@@ -1427,7 +1365,12 @@ function ShiftScheduleBlockBar({
         />
       ) : null}
       {isMoveCard && moveCardHoverPos ? (
-        <MoveCardHoverCard code={code} block={block} pos={moveCardHoverPos} />
+        <MoveCardHoverCard
+          code={code}
+          prefix={moveCardPrefix}
+          block={block}
+          pos={moveCardHoverPos}
+        />
       ) : null}
     </div>
         );
