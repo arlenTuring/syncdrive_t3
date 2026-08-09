@@ -17,6 +17,22 @@ function edge(from: string, to: string, seconds: number) {
   };
 }
 
+/**
+ * 數某一種移動卡的張數。
+ * 班表是日循環的（當日最後一段的下一段＝隔天第一段），所以只有「一段載客＋
+ * 一段整備」這種極簡 fixture 也會同時產生入廠卡與出廠卡——測某一段規則時
+ * 要數那一種卡，不能數總數，否則會被另一種卡的存在干擾。
+ */
+function countCards(
+  timelines: GeneratedSchedulePlan['timelines'],
+  source: 'yard_entry_move' | 'yard_exit_move',
+): number {
+  return timelines.reduce(
+    (sum, t) => sum + t.blocks.filter((b) => b.source === source).length,
+    0,
+  );
+}
+
 const SECTION_CODES = {
   charging: 'E',
   carWash: 'W',
@@ -184,10 +200,13 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         collisionProtectionSeconds: 30,
       });
 
-      assert.equal(result.inserted, 1, '第一條線正常插卡，第二條線因為轉折點衝突排不進去');
-      assert.equal(result.skipped.length, 1);
-      assert.equal(result.skipped[0]!.timelineRow, 2);
-      assert.match(result.skipped[0]!.reason, /轉折點撞上/);
+      assert.equal(
+        countCards(p.timelines, 'yard_entry_move'), 1,
+        '第一條線正常插入廠卡，第二條線因為轉折點衝突排不進去',
+      );
+      const junctionSkip = result.skipped.find((s) => /轉折點撞上/.test(s.reason));
+      assert.ok(junctionSkip, '要有一則轉折點衝突的回報');
+      assert.equal(junctionSkip.timelineRow, 2);
 
       const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move');
       assert.ok(row1Card, '先處理的時間線不受影響');
@@ -209,22 +228,24 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         collisionProtectionSeconds: 0,
       });
 
-      assert.equal(result.inserted, 2, '碰撞保護時間是 0 就不加這層限制');
-      assert.equal(result.skipped.length, 0);
+      assert.equal(
+        countCards(p.timelines, 'yard_entry_move'), 2,
+        '碰撞保護時間是 0 就不加這層限制，兩條線都插得出入廠卡',
+      );
+      assert.equal(result.skipped.filter((s) => /轉折點撞上/.test(s.reason)).length, 0);
     });
 
     it('連續整備串只在串首入廠，不會每段都插', () => {
       const p = plan({ yardStartMinute: 10 * 60, extraYardAfter: true });
-      const result = run(p);
-      assert.equal(result.inserted, 1);
+      run(p);
+      assert.equal(countCards(p.timelines, 'yard_entry_move'), 1);
     });
 
     it('整備任務沒設定該類設施時回報，不硬插', () => {
       const p = plan({ yardStartMinute: 10 * 60 });
       const result = run(p, { maintenance: { stepEnabled: true, equipmentRows: [] } });
-      assert.equal(result.inserted, 0);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /沒設定這一類的設施/);
+      assert.equal(countCards(p.timelines, 'yard_entry_move'), 0);
+      assert.ok(result.skipped.some((s) => /沒設定這一類的設施/.test(s.reason)));
     });
 
     it('拓樸到不了該設施時回報（方向不對就是逆行，不會自己反向走）', () => {
@@ -435,9 +456,8 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       }
 
       const result = run(timelines);
-      assert.equal(result.inserted, 2);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /被別列車佔著/);
+      assert.equal(countCards(timelines, 'yard_exit_move'), 2, '只有 M1、M2 兩台，第 3 列排不出出廠卡');
+      assert.ok(result.skipped.some((s) => /被別列車佔著/.test(s.reason)));
     });
 
     it('拓樸上設施沒有連到下一段起點站時，回報而不硬塞', () => {
@@ -451,9 +471,8 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         // 保養設施改成 M3：設施存在，但拓樸上沒有連到 station_4
         { maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r', mapCode: 'M3' }] } },
       );
-      assert.equal(result.inserted, 0);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /沒有連到 station_4/);
+      assert.equal(countCards(timelines, 'yard_exit_move'), 0);
+      assert.ok(result.skipped.some((s) => /沒有連到 station_4/.test(s.reason)));
     });
   });
 
@@ -766,6 +785,120 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       },
     ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
 
+    it('日循環：當日最後一段整備的「下一段」，是同一台車隔天的第一段載客', () => {
+      // 整備排在當日尾巴（22:00–24:00），當日之內後面沒有任何載客——
+      // 但班表是一天無限重複的，它要銜接的是隔天 00:10 那一段載客。
+      // 線性看待會直接放棄、整備沒有出廠卡，車等於憑空離開整備廠。
+      const timelines = [
+        {
+          row: 1,
+          blocks: [
+            {
+              id: 'pax-head',
+              timelineRow: 1,
+              taskType: 'passenger',
+              label: 'BO',
+              routeId: 'b-out',
+              anchorStartMinute: 10,
+              plannedStartMinute: 10,
+              plannedEndMinute: 40,
+              travelSeconds: 1800,
+              dwellSeconds: 0,
+              source: 'template_bar',
+            },
+            {
+              id: 'yard-tail',
+              timelineRow: 1,
+              taskType: 'servicing',
+              label: '保養',
+              anchorStartMinute: 22 * 60,
+              plannedStartMinute: 22 * 60,
+              plannedEndMinute: 24 * 60,
+              travelSeconds: 0,
+              dwellSeconds: 0,
+              source: 'template_bar',
+            },
+          ],
+        },
+      ] as never as GeneratedSchedulePlan['timelines'];
+
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      const exitCard = timelines[0]!.blocks.find((b) => b.source === 'yard_exit_move');
+      assert.ok(exitCard, '繞過午夜也要排得出出廠卡');
+      // M1→B 要 60 秒；貼齊隔天 00:10 發車 → 卡片落在 24:09 - 24:10（＝隔天 00:09–00:10）
+      assert.equal(exitCard.plannedEndMinute, 24 * 60 + 10, '結束時刻＝隔天首段發車（+1440）');
+      assert.equal(exitCard.plannedStartMinute, 24 * 60 + 9);
+      assert.equal(
+        timelines[0]!.blocks.find((b) => b.id === 'yard-tail')!.plannedEndMinute,
+        24 * 60,
+        '整備結束時刻不動——出廠卡排在它後面，沒有吃到尾巴',
+      );
+    });
+
+    it('日循環：緊鄰的同類型整備跨午夜相接時，是同一段停留，設施要沿用同一台', () => {
+      // 保養 20:00–24:00 接 00:00–06:00：日循環上這兩段是相接的同一段停留，
+      // 車不會在午夜換格子。線性看待會把後者當成獨立的一段、另外找一台設施，
+      // 只有一台 M1 時就會誤報「沒地方停」。
+      const timelines = [
+        {
+          row: 1,
+          blocks: [
+            {
+              id: 'yard-head',
+              timelineRow: 1,
+              taskType: 'servicing',
+              label: '保養',
+              anchorStartMinute: 0,
+              plannedStartMinute: 0,
+              plannedEndMinute: 6 * 60,
+              travelSeconds: 0,
+              dwellSeconds: 0,
+              source: 'template_bar',
+            },
+            {
+              id: 'yard-tail',
+              timelineRow: 1,
+              taskType: 'servicing',
+              label: '保養',
+              anchorStartMinute: 20 * 60,
+              plannedStartMinute: 20 * 60,
+              plannedEndMinute: 24 * 60,
+              travelSeconds: 0,
+              dwellSeconds: 0,
+              source: 'template_bar',
+            },
+          ],
+        },
+      ] as never as GeneratedSchedulePlan['timelines'];
+
+      const result = insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      const head = timelines[0]!.blocks.find((b) => b.id === 'yard-head')!;
+      const tail = timelines[0]!.blocks.find((b) => b.id === 'yard-tail')!;
+      assert.equal(head.yardFacilityLabel, 'M1');
+      assert.equal(tail.yardFacilityLabel, 'M1', '跨午夜的同一段停留必須是同一台設施');
+      assert.ok(!head.yardFacilityUnavailable, '不得誤報沒地方停');
+      assert.ok(!tail.yardFacilityUnavailable);
+      assert.equal(result.facilityUnavailable.length, 0);
+    });
+
     it('沒排出任何移動卡的整備任務，也要補一台設施；一台都不空才標記為無可用設施', () => {
       // 兩列車的保養完全同時段，只有一台 M1——第一列拿到，第二列沒地方停。
       // 兩列都沒有前後的載客可回溯，所以三段規則都不會插任何移動卡：
@@ -874,9 +1007,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const assigned = [row1Yard.yardFacilityLabel, row2Yard.yardFacilityLabel]
         .filter((x) => x != null);
       assert.equal(assigned.length, 1, '同一格 M1 不得同時指派給兩列車');
-      assert.equal(result.inserted, 1);
-      assert.equal(result.skipped.length, 1);
-      assert.match(result.skipped[0]!.reason, /被別列車佔著/);
+      assert.ok(result.skipped.some((s) => /被別列車佔著/.test(s.reason)));
     });
 
     it('入廠卡先佔走 M1，出廠卡在同一時段就排不進同一台設施', () => {

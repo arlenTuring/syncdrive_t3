@@ -21,6 +21,7 @@ import {
   moveCardFacilityIsFree,
   type MoveCardFacilityBooking,
 } from './moveCardShared';
+import { SCHEDULE_DAY_MINUTES } from './scheduleDayCycle';
 import {
   minuteToSecond,
   secondToMinute,
@@ -88,6 +89,76 @@ function resolveBlockOriginStationId(
     return dwells[0]?.stationId?.trim() || null;
   }
   return null;
+}
+
+/**
+ * 日循環鄰居（整份班表是一天 00:00–24:00 無限重複）
+ * ================================================
+ *
+ * 一條時間線的<strong>最後一段之後，接的是它自己的第一段</strong>——同一台車
+ * 隔天照跑同一份班表。所以「前一段」「下一段」不能只看陣列的前後：當日最前面
+ * 那一段的前一段，是當日最後面那一段（時刻要減一天）；反之亦然。
+ *
+ * <code>offsetMinute</code> 就是這個時刻換算：往前繞回去是 −1440，
+ * 往後繞過去是 +1440，當日之內則是 0。取用時一律用
+ * <code>block.plannedXxxMinute + offsetMinute</code>，才會落在跟自己同一個
+ * 時間軸上比較。
+ */
+type CyclicNeighbor = { block: GeneratedScheduleBlock; offsetMinute: number };
+
+function findPrevCyclic(
+  sorted: GeneratedScheduleBlock[],
+  index: number,
+  predicate: (block: GeneratedScheduleBlock) => boolean,
+): CyclicNeighbor | null {
+  for (let k = index - 1; k >= 0; k -= 1) {
+    if (predicate(sorted[k]!)) return { block: sorted[k]!, offsetMinute: 0 };
+  }
+  // 當日之內找不到 → 繞回當日最後面（同一台車前一天的尾巴）
+  for (let k = sorted.length - 1; k > index; k -= 1) {
+    if (predicate(sorted[k]!)) {
+      return { block: sorted[k]!, offsetMinute: -SCHEDULE_DAY_MINUTES };
+    }
+  }
+  return null;
+}
+
+function findNextCyclic(
+  sorted: GeneratedScheduleBlock[],
+  index: number,
+  predicate: (block: GeneratedScheduleBlock) => boolean,
+): CyclicNeighbor | null {
+  for (let k = index + 1; k < sorted.length; k += 1) {
+    if (predicate(sorted[k]!)) return { block: sorted[k]!, offsetMinute: 0 };
+  }
+  // 當日之內找不到 → 繞到當日最前面（同一台車隔天的開頭）
+  for (let k = 0; k < index; k += 1) {
+    if (predicate(sorted[k]!)) {
+      return { block: sorted[k]!, offsetMinute: SCHEDULE_DAY_MINUTES };
+    }
+  }
+  return null;
+}
+
+/** 緊鄰的前一段／後一段（含跨日繞回）；整條線只有自己一段時回傳 null */
+function immediatePrevCyclic(
+  sorted: GeneratedScheduleBlock[],
+  index: number,
+): CyclicNeighbor | null {
+  if (sorted.length < 2) return null;
+  return index > 0
+    ? { block: sorted[index - 1]!, offsetMinute: 0 }
+    : { block: sorted[sorted.length - 1]!, offsetMinute: -SCHEDULE_DAY_MINUTES };
+}
+
+function immediateNextCyclic(
+  sorted: GeneratedScheduleBlock[],
+  index: number,
+): CyclicNeighbor | null {
+  if (sorted.length < 2) return null;
+  return index < sorted.length - 1
+    ? { block: sorted[index + 1]!, offsetMinute: 0 }
+    : { block: sorted[0]!, offsetMinute: SCHEDULE_DAY_MINUTES };
 }
 
 export type MaintenanceTransferCardsResult = {
@@ -367,14 +438,15 @@ export function insertMaintenanceTransferCards(args: {
     for (let i = 0; i < sorted.length; i += 1) {
       const yard = sorted[i]!;
       if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
-      // 連續整備串只在串首入廠：左鄰居是別種整備由轉場處理，同種整備不需要
-      const prevYard = sorted[i - 1];
-      if (prevYard && YARD_TASK_TYPES.has(prevYard.taskType)) continue;
+      // 連續整備串只在串首入廠：左鄰居是別種整備由轉場處理，同種整備不需要。
+      // 「左鄰居」要照日循環算——當日第一段的左鄰居是當日最後一段。
+      const prevNeighbor = immediatePrevCyclic(sorted, i);
+      if (prevNeighbor && YARD_TASK_TYPES.has(prevNeighbor.block.taskType)) continue;
 
-      const previousPassenger = [...sorted.slice(0, i)]
-        .reverse()
-        .find((block) => block.taskType === 'passenger');
-      if (!previousPassenger?.routeId) continue;
+      // 往回找最近一段載客，找不到就繞回當日最後一段（同一台車前一天的尾巴）
+      const prevPax = findPrevCyclic(sorted, i, (b) => b.taskType === 'passenger');
+      const previousPassenger = prevPax?.block;
+      if (!prevPax || !previousPassenger?.routeId) continue;
       const stationId = routeEndStation.get(previousPassenger.routeId);
       const fromNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
       if (!fromNodeId) {
@@ -398,11 +470,16 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
-      const freeSecond = minuteToSecond(previousPassenger.plannedEndMinute)
+      const freeSecond = minuteToSecond(previousPassenger.plannedEndMinute + prevPax.offsetMinute)
         + Math.max(0, minimumRecoveryTimeSeconds);
       const yardStartSecond = minuteToSecond(yard.plannedStartMinute);
       const yardEndSecond = minuteToSecond(yard.plannedEndMinute);
       if (freeSecond >= yardStartSecond - 1e-9) continue;
+      // 繞回前一天尾巴時，入廠卡會落在 00:00 之前（負時刻）。要正確表達得把
+      // 這一段整備整條鏈重新基準到「跨夜」座標（開始 23:5x、結束 +1440），
+      // 牽動渲染與各種驗證，尚未做——先不插卡，設施仍由收尾補掃負責指派，
+      // 不會變成沒人管的整備。
+      if (freeSecond < 0) continue;
 
       let chosen: {
         nodeId: string; label: string; seconds: number;
@@ -711,6 +788,8 @@ export function insertMaintenanceTransferCards(args: {
     timeline: GeneratedSchedulePlan['timelines'][number];
     yard: GeneratedScheduleBlock;
     next: GeneratedScheduleBlock;
+    /** 下一段載客的發車時刻（已含日循環位移；繞到隔天時會 > 1440） */
+    nextStartMinute: number;
   };
   const pending: Pending[] = [];
 
@@ -722,29 +801,32 @@ export function insertMaintenanceTransferCards(args: {
       const yard = sorted[i]!;
       if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
 
-      // 連續整備串只在串尾出場：右鄰居是別種整備由轉場處理，同種整備不需要
-      const nextYardIndex = sorted.findIndex(
-        (b, idx) => idx > i && YARD_TASK_TYPES.has(b.taskType),
+      // 連續整備串只在串尾出場：右鄰居是別種整備由轉場處理，同種整備不需要。
+      // 「下一段」照日循環算——當日最後一段的下一段，是同一台車隔天的第一段，
+      // 所以整備排在當日尾巴時仍然找得到它要銜接的那一段載客（時刻 +1440）。
+      const nextPax = findNextCyclic(sorted, i, requiresVehicleAtStation);
+      if (!nextPax) continue;
+      const nextYard = findNextCyclic(
+        sorted,
+        i,
+        (b) => YARD_TASK_TYPES.has(b.taskType),
       );
-      const next = sorted
-        .slice(i + 1)
-        .find((b) => requiresVehicleAtStation(b));
-      if (!next) continue;
+      const nextPaxStart = nextPax.block.plannedStartMinute + nextPax.offsetMinute;
       if (
-        nextYardIndex >= 0
-        && sorted[nextYardIndex]!.plannedStartMinute < next.plannedStartMinute
+        nextYard
+        && nextYard.block.plannedStartMinute + nextYard.offsetMinute < nextPaxStart
       ) {
         // 後面還有整備排在這一段載客之前 → 這一段不是串尾，交給串尾處理
         continue;
       }
-      pending.push({ timeline, yard, next });
+      pending.push({ timeline, yard, next: nextPax.block, nextStartMinute: nextPaxStart });
     }
   }
 
   // 早的整備先挑設施，晚的才需要讓
   pending.sort((a, b) => a.yard.plannedStartMinute - b.yard.plannedStartMinute);
 
-  for (const { timeline, yard, next } of pending) {
+  for (const { timeline, yard, next, nextStartMinute } of pending) {
     // 要的是「這一段自己從哪一站發車」＝路線起點站。
     // 不能用 firstTripOriginStationId——那個欄位在調度營運班次上存的是
     // 「要把車送到的首班起點站」（終點側），拿來當起點會查到完全另一站。
@@ -817,7 +899,7 @@ export function insertMaintenanceTransferCards(args: {
       continue;
     }
 
-    const departSecond = minuteToSecond(next.plannedStartMinute);
+    const departSecond = minuteToSecond(nextStartMinute);
     const yardEndSecond = minuteToSecond(yard.plannedEndMinute);
     const yardStartSecond = minuteToSecond(yard.plannedStartMinute);
 
@@ -872,7 +954,7 @@ export function insertMaintenanceTransferCards(args: {
       label: `出場移動 · ${chosen.label} → ${stationLabel}`,
       anchorStartMinute: secondToMinute(chosenStart),
       plannedStartMinute: secondToMinute(chosenStart),
-      plannedEndMinute: next.plannedStartMinute,
+      plannedEndMinute: nextStartMinute,
       travelSeconds: chosen.seconds,
       dwellSeconds: 0,
       source: 'yard_exit_move',
@@ -903,9 +985,33 @@ export function insertMaintenanceTransferCards(args: {
   // 真的一台都不空，才是產能不足——標記在區塊上並單獨回報，
   // 讓 UI 可以把「沒地方停」直接畫在卡面，而不是靜靜地少一段資訊。
   for (const timeline of timelines) {
-    for (const yard of timeline.blocks) {
+    const sweepSorted = [...timeline.blocks].sort(
+      (a, b) => a.plannedStartMinute - b.plannedStartMinute,
+    );
+    for (let i = 0; i < sweepSorted.length; i += 1) {
+      const yard = sweepSorted[i]!;
       if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
       if (yardBlockFacility.has(yard.id)) continue;
+
+      // 緊鄰的同類型整備＝<strong>同一段連續停留</strong>（跨午夜也算，日循環上
+      // 它們本來就相接），車不會中途換格子——直接沿用同一台，不要再挑一次。
+      // 這正是「保養 20:33–24:00」接「保養 00:00–07:50」被誤判成兩段、
+      // 第二段找不到空位而誤報「沒地方停」的那個坑。
+      const sameStayNeighbor = [
+        immediatePrevCyclic(sweepSorted, i),
+        immediateNextCyclic(sweepSorted, i),
+      ].find((neighbor) =>
+        neighbor
+        && neighbor.block.taskType === yard.taskType
+        && neighbor.block.yardFacilityNodeId != null);
+      if (sameStayNeighbor?.block.yardFacilityNodeId) {
+        assignYardFacility(
+          yard,
+          sameStayNeighbor.block.yardFacilityNodeId,
+          sameStayNeighbor.block.yardFacilityLabel ?? sameStayNeighbor.block.yardFacilityNodeId,
+        );
+        continue;
+      }
 
       const facilities = facilityNodesFor(yard.taskType);
       if (facilities.length === 0) {

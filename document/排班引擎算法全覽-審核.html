@@ -3242,6 +3242,74 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-09 · 日循環：00:00 的整備可以回溯 00:00 之前的卡</h3>
+  <div class="callout warn">
+    使用者：「整個系統是一個循環的時間，所以你是 00:00 開始的班次或是整備，
+    可以追溯 00:00 之前的卡。」——先前三段規則全部用<strong>陣列前後</strong>
+    當「前一段／下一段」，等於把一天當成有頭有尾的線段，日界兩側的關係整個斷掉。
+  </div>
+  <ul>
+    <li>
+      <strong>真實資料的規模：</strong>72 段整備裡，16 段在當日之內<strong>沒有前一段載客</strong>
+      （排在日頭）、12 段<strong>沒有下一段載客</strong>（排在日尾）。這些全部都是
+      被線性視角切斷的關係，不是真的沒有前後。
+    </li>
+    <li>
+      <strong>新增日循環鄰居工具</strong>（<code>findPrevCyclic</code>／
+      <code>findNextCyclic</code>／<code>immediatePrevCyclic</code>／
+      <code>immediateNextCyclic</code>）：當日之內找不到就繞到另一端，並回傳
+      <code>offsetMinute</code>（往前繞 −1440、往後繞 +1440）。取用時一律
+      <code>block.plannedXxxMinute + offsetMinute</code>，兩邊才會落在同一條時間軸上比較。
+    </li>
+    <li>
+      <strong>已接上日循環的三處：</strong>
+      <ol>
+        <li><strong>出廠卡找「下一段載客」</strong>：整備排在當日尾巴時，
+        銜接的是同一台車隔天的第一段載客（時刻 +1440）。真實資料多排出 2 張
+        原本缺的出廠卡；卡片時刻落在 1440 以上，沿用既有的跨夜表示法
+        （<code>splitIntoDayCycleSegments</code> 會把它畫在日頭）。</li>
+        <li><strong>串首／串尾判定</strong>：當日第一段的左鄰居是當日最後一段，
+        反之亦然——避免在日界兩側各補一張其實不該有的卡。</li>
+        <li><strong>收尾補掃沿用同一台設施</strong>：緊鄰的同類型整備＝同一段連續
+        停留，跨午夜也算（例「保養 20:33–24:00」接「保養 00:00–07:50」）。
+        線性看待會把後者當成獨立一段、另外找設施，找不到就誤報「沒地方停」——
+        真實資料上這正是 1 則假警報的來源（無可用設施 15 → 14）。</li>
+      </ol>
+    </li>
+    <li>
+      <strong>刻意沒做、要先跟使用者確認表示法的一處：入廠卡往前繞過午夜。</strong>
+      當日第一段整備要回溯前一天尾巴的載客時，入廠卡會落在
+      <strong>00:00 之前（負時刻）</strong>。要正確表達得把整條整備鏈重新基準到
+      跨夜座標（開始 23:5x、結束 +1440），這會連帶影響甘特渲染、重疊驗證、
+      站位佔用等多處，不是單點改動。目前的處理是<strong>明確擋下不插卡</strong>
+      （<code>if (freeSecond &lt; 0) continue;</code> 並在程式碼寫明原因），
+      設施仍由收尾補掃指派，不會變成沒人管的整備——但那一段的「車怎麼開進去」
+      確實還沒被模型化。
+    </li>
+    <li>
+      <strong>測試 fixture 的連帶影響（值得記一筆）：</strong>日循環讓
+      「一段載客＋一段整備」這種極簡 fixture 也會同時產生入廠卡<strong>與</strong>出廠卡
+      （整備的下一段繞回那唯一一段載客）。原本斷言 <code>result.inserted</code>
+      總數的測試因此全部失準——不是行為錯了，是<strong>斷言方式</strong>假設了線性時間。
+      改成用 <code>countCards(timelines, source)</code> 只數自己關心的那一種卡，
+      測試意圖也因此更精確。
+    </li>
+    <li>
+      <strong>驗證：</strong>出廠卡 32 → 34、有設施 57 → 58、無可用設施 15 → 14、
+      靜默無標記維持 0、設施重疊維持 0、<code>errorsByCode</code> 維持空、
+      <code>report.ok = true</code>。新增 2 則日循環測試（跨午夜出廠卡／
+      跨午夜同一段停留沿用同一台設施）。<code>tsc</code> 23、
+      測試 346 pass／9 fail、<code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>教訓：</strong>「時間是線性的」這個假設藏在<strong>陣列索引</strong>裡
+      ——<code>sorted[i - 1]</code>、<code>slice(i + 1).find(...)</code> 這種寫法
+      看起來只是在取鄰居，實際上把「這一天有頭有尾」寫死進了每一處。領域模型是
+      循環的時候，鄰居查詢必須是<strong>一個具名的、共用的工具</strong>，
+      不能散在各處各寫各的索引運算。
+    </li>
+  </ul>
+
   <h3>查錯時被推翻的假設（別再走這幾條）</h3>
   <table>
     <thead><tr><th>當時的猜測</th><th>怎麼推翻的</th></tr></thead>
