@@ -473,10 +473,16 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       } as never as GeneratedSchedulePlan;
     }
 
-    function run(p: GeneratedSchedulePlan, topo: PointTopology = topology(), body: unknown = BODY) {
+    function run(
+      p: GeneratedSchedulePlan,
+      topo: PointTopology = topology(),
+      body: unknown = BODY,
+      areas: Parameters<typeof insertMaintenanceTransferCards>[0]['areas'] = [],
+    ) {
       return insertMaintenanceTransferCards({
         timelines: p.timelines,
         topology: topo,
+        areas,
         maintenanceBody: body as Record<string, unknown>,
         selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0,
@@ -530,49 +536,74 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(mi.yardExitSectionLabel, '保養');
     });
 
-    it('入廠卡是進入目的設施專屬的最後一段邊；出廠卡吸收掉中間所有正線轉乘', () => {
+    it('出廠卡是離開來源設施專屬的第一段邊；入廠卡吸收掉中間所有正線轉乘', () => {
       const p = plan();
       run(p);
       const blocks = p.timelines[0]!.blocks;
       const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
       const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(mo.yardExitFacilityLabel, 'E1');
-      assert.equal(mo.yardExitStationId, 'T3', '分界點是最後一段邊的起點');
-      assert.equal(mo.travelSeconds, 230, '前面 30+200 秒都算在出廠卡');
-      assert.equal(mi.yardExitStationId, 'T3', '入廠卡從分界點接續');
+      assert.equal(mo.yardExitStationId, 'N2W', '分界點是第一段邊的終點');
+      assert.equal(mo.travelSeconds, 30, '出廠卡只有來源設施自己專屬的第一段邊');
+      assert.equal(mi.yardExitStationId, 'N2W', '入廠卡從分界點接續');
       assert.equal(mi.yardExitFacilityLabel, 'M1');
-      assert.equal(mi.travelSeconds, 30, '入廠卡只有目的設施自己專屬的最後一段邊');
+      assert.equal(mi.travelSeconds, 230, '剩下的 200+30 秒都算在入廠卡');
     });
 
-    it('兩座設施只隔一個轉折點（同一區域）時，卡面直接顯示「設施 → 設施」，不印轉折點站名', () => {
-      // E2（充電）──30s──> N2W（唯一轉折點）──30s──> M1（保養），恰好兩段邊
-      const sameAreaTopology: PointTopology = {
+    it('兩座設施在地圖 JSON 上是同一個 Area 時，0 秒示意轉移，完全不查拓樸', () => {
+      // 刻意讓 E2、M1 在拓樸上完全不連通（沒有任何邊）——同區域判斷
+      // 只看 Area 容器結構，不靠拓樸找不找得到路徑。
+      const disconnectedTopology: PointTopology = {
         ...emptyPointTopology(),
         nodes: [
           { id: 'E2', kind: 'facility', label: 'E2', x: 0, y: 0, color: '#111111' },
-          { id: 'N2W', kind: 'docking', label: 'N2W', x: 0, y: 0, color: '#222222' },
           { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#111111' },
         ],
-        edges: [edge('E2', 'N2W', 30), edge('N2W', 'M1', 30)],
+        edges: [],
       };
+      const areas = [
+        {
+          id: 'area-193',
+          customName: '維修充電共用區',
+          facilities: [
+            { id: 'E2', type: 'Facility' },
+            { id: 'M1', type: 'Facility' },
+          ],
+        },
+      ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['areas'];
       const p = plan();
       const result = run(
         p,
-        sameAreaTopology,
+        disconnectedTopology,
         { charging: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'E2' }] },
           maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r2', mapCode: 'M1' }] } },
+        areas,
       );
-      assert.equal(result.inserted, 1);
+      assert.equal(result.inserted, 1, '沒有拓樸路徑也要能成立——同區域不靠拓樸');
+      assert.equal(result.skipped.length, 0);
       const blocks = p.timelines[0]!.blocks;
       const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
       const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
-      assert.equal(mo.label, '整備出廠 · E2 → M1', '不顯示中間的轉折點 N2W');
-      assert.equal(mi.label, '整備入廠 · E2 → M1', '不顯示中間的轉折點 N2W');
-      assert.equal(mo.yardExitStationLabel, 'M1', '出廠卡的「另一端」顯示對面設施，不是轉折點站名');
-      assert.equal(mi.yardExitStationLabel, 'E2', '入廠卡的「另一端」顯示對面設施，不是轉折點站名');
-      // yardExitStationId 仍是真實的轉折點節點 id（資料仍然精確，只是顯示簡化）
-      assert.equal(mo.yardExitStationId, 'N2W');
-      assert.equal(mi.yardExitStationId, 'N2W');
+      assert.equal(mo.label, '整備出廠 · E2 → M1');
+      assert.equal(mi.label, '整備入廠 · E2 → M1');
+      assert.equal(mo.travelSeconds, 0, '同區域是 0 秒示意轉移');
+      assert.equal(mi.travelSeconds, 0);
+      assert.equal(mo.plannedStartMinute, mo.plannedEndMinute, '出廠卡開始跟結束是同一刻');
+      assert.equal(mi.plannedStartMinute, mi.plannedEndMinute, '入廠卡開始跟結束是同一刻');
+      // 後一段（保養）緊接著前一段（充電）結束，中間完全沒有間隔
+      const servicing = blocks.find((b) => b.id === 'servicing-1')!;
+      const charging = blocks.find((b) => b.id === 'charging-1')!;
+      assert.equal(servicing.plannedStartMinute, charging.plannedEndMinute);
+    });
+
+    it('兩座設施不在同一個 Area（或沒有 Area 資料）時，照樣走拓樸找路徑', () => {
+      const p = plan();
+      // 不傳 areas（預設空陣列）——沒有 Area 資料就不算同區域，跟原本一樣查拓樸
+      const result = run(p);
+      assert.equal(result.inserted, 1);
+      const blocks = p.timelines[0]!.blocks;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
+      assert.equal(mo.travelSeconds, 30, '沒有 Area 資料就不是同區域，維持查拓樸的正常時長');
     });
 
     it('同類型銜接不需要轉場，不插卡', () => {

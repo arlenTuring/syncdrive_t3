@@ -1,4 +1,5 @@
 import type { PointTopology } from '../../../map-editor/types/pointTopology';
+import type { MapAreaObject } from '../../../map-editor/types/area';
 import {
   DEFAULT_MAINTENANCE_ENTRY_SLACK_SECONDS,
   parseEmptyIntervalMainlineSlackSeconds,
@@ -118,6 +119,12 @@ export type EngineInput = {
    * （設施之間 N×M 種組合，不可能要使用者一條條畫），只有 firstTripOrigins 不夠。
    */
   pointTopology?: PointTopology | null;
+  /**
+   * 地圖場域管理模組的 Area 容器清單（含各 Area 底下的 facilities）。
+   * 整備間轉場用來判斷兩座設施是不是「同一個場區」——同區域不必查拓樸找路徑，
+   * 直接當成 0 秒的示意轉移；使用者畫地圖時不可能把每一對設施組合的路徑都連好。
+   */
+  areas?: MapAreaObject[] | null;
 };
 
 export type NormalizeInputArgs = {
@@ -135,6 +142,8 @@ export type NormalizeInputArgs = {
   firstTripOrigins?: MaintenanceFirstTripOrigin[];
   /** 完整拓樸；入廠卡尋路用 */
   pointTopology?: PointTopology | null;
+  /** 地圖場域管理模組的 Area 容器清單；整備間轉場判斷同區域用 */
+  areas?: MapAreaObject[] | null;
 };
 
 function resolveRouteOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
@@ -2006,5 +2015,6 @@ export function normalizeEngineInput(
     firstTripOrigins,
     successorPolicy,
     pointTopology: args.pointTopology ?? null,
+    areas: args.areas ?? null,
   };
 }

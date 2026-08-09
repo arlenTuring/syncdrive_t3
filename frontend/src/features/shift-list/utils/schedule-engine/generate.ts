@@ -1,4 +1,5 @@
 import type { PointTopology } from '../../../map-editor/types/pointTopology';
+import type { MapAreaObject } from '../../../map-editor/types/area';
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
@@ -67,6 +68,8 @@ export type GenerateShiftScheduleInput = {
   firstTripOrigins?: MaintenanceFirstTripOrigin[];
   /** 完整路網拓樸；整備／調度入廠卡尋路用 */
   pointTopology?: PointTopology | null;
+  /** 地圖場域管理模組的 Area 容器清單；整備間轉場判斷「兩座設施是不是同一區域」用 */
+  areas?: MapAreaObject[] | null;
 };
 
 /**
@@ -113,6 +116,7 @@ export function generateShiftSchedule(
       passengerTimetableMode: input.passengerTimetableMode ?? 'template',
       firstTripOrigins: input.firstTripOrigins,
       pointTopology: input.pointTopology,
+      areas: input.areas,
     },
     errors,
     warnings,
@@ -279,6 +283,7 @@ export function generateShiftSchedule(
   const maintenanceTransfer = insertMaintenanceTransferCards({
     timelines,
     topology: engineInput.pointTopology,
+    areas: engineInput.areas,
     maintenanceBody: engineInput.maintenanceBody,
     selectedRoutes: engineInput.selectedRoutes,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,

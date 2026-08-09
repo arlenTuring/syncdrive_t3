@@ -1069,14 +1069,18 @@
         <td>整備間轉場</td>
         <td>整備串<strong>內部</strong>——左右鄰居都是整備任務，且<strong>類型不同</strong>
         （例：充電緊接著保養、保養緊接著行前）</td>
-        <td>前段結束時刻是起飛點、<strong>不可更動</strong>（已做滿全長）。對所有
-        （出廠設施 × 入廠設施）組合找最短路徑，取<strong>最後一段邊</strong>當分界點——
-        入廠卡永遠是「進入目的設施專屬的那一段邊」（跟出場方向對稱），出廠卡吸收掉
-        中間所有正線轉乘，切成「出廠卡＋入廠卡」兩張。<strong>後段開始時刻被推遲到入廠卡抵達那一刻，
-        結束時刻不動</strong>，時長被壓縮——壓縮掉的就是這段真實的運輸成本。
-        移動時間長到會把後段推過結束時刻，判定排不出來，不強插。
-        <strong>路徑恰好兩段邊（設施→轉折點→設施）時視為同一區域</strong>，
-        卡面直接顯示「設施 → 設施」，不印轉折點站名（只改顯示，時序不變）。</td>
+        <td>
+        <strong>先判斷是不是同一個 Area：</strong>兩座設施若在地圖 JSON 的
+        <code>MapAreaObject.facilities</code> 底下屬於同一個 Area 容器，直接視為
+        <strong>0 秒示意轉移</strong>（開始＝結束＝前段結束那一刻），完全不查拓樸——
+        使用者不可能把每一對設施組合的路徑都手動連好。<br />
+        <strong>不同 Area 才查拓樸找路徑：</strong>前段結束時刻是起飛點、
+        <strong>不可更動</strong>（已做滿全長）。對所有（出廠設施 × 入廠設施）組合找
+        最短路徑，取<strong>第一段邊</strong>當分界點——出廠卡是「離開來源設施專屬的
+        那一段邊」（短），入廠卡吸收掉中間所有正線轉乘直到目的設施（長）。
+        <strong>後段開始時刻被推遲到入廠卡抵達那一刻，結束時刻不動</strong>，
+        時長被壓縮——壓縮掉的就是這段真實的運輸成本。移動時間長到會把後段推過
+        結束時刻，判定排不出來，不強插。</td>
         <td><code>insertMaintenanceTransferCards.ts</code></td>
       </tr>
       <tr>
@@ -2765,6 +2769,12 @@ backend/src/dev-log/
   </ul>
 
   <h3>2026-08-09 · 整備間轉場：只隔一個轉折點就是同一區域，卡面直接顯示「設施 → 設施」</h3>
+  <div class="callout warn">
+    <strong>後續更正：</strong>這則條目用「拓樸路徑恰好兩段邊」判斷同一區域，
+    後來發現這個判斷本身要靠拓樸——使用者根本不可能把每一對設施組合的路徑都
+    連好。已改成直接讀地圖 JSON 的 Area 容器結構，完全不查拓樸，見本節後方
+    「同一區域改用 Area 容器判斷，不再靠拓樸路徑段數」條目。
+  </div>
   <ul>
     <li>
       <strong>使用者的提案：</strong>「如果兩個設施之間的出場位置是在同一個轉折點，
@@ -2797,6 +2807,15 @@ backend/src/dev-log/
   </ul>
 
   <h3>2026-08-09 · 分界點原本切錯邊——入廠卡該拿「進場專屬邊」，不是出廠卡拿「離場專屬邊」</h3>
+  <div class="callout warn">
+    <strong>後續更正：</strong>這則條目本身是錯的——使用者下一輪明確糾正
+    「出廠是比較短的，入廠比較長，入場去吸收移動距離」，跟這裡的結論剛好相反。
+    已改回<strong>第一段邊</strong>（出廠卡拿來源設施專屬的那一段、入廠卡吸收中間
+    所有轉乘），見本節後方「同一區域改用 Area 容器判斷，不再靠拓樸路徑段數」條目。
+    這則的教訓（先查真實資料再下結論）依然成立，只是查出來的方向反了——
+    當時只拿一個例子（充電→保養）反推規則，沒有明確問使用者「到底哪一段該長、
+    哪一段該短」，一句話帶過的例子在切分細節上還是可能理解反。
+  </div>
   <ul>
     <li>
       <strong>使用者拿實際地圖驗證：</strong>先確認 Area 關係真的來自地圖 JSON 的
@@ -2846,6 +2865,108 @@ backend/src/dev-log/
       使用者一句話帶著實際三段邊的例子，比我自己空想的類比準——涉及具體路徑切分的
       設計，該先用真實拓樸資料跑一次 <code>findTopologyPath</code> 把完整路徑印出來，
       不能只憑「形狀類比」下決定。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · 嚴重：正式產生班表的 adapter 從沒把 pointTopology 傳給引擎，整套轉場卡機制形同虛設</h3>
+  <div class="callout warn">
+    <strong>影響範圍：</strong>這是這個 session（乃至更早）所有整備轉場卡
+    （MI／MO／整備間轉場／PI／PO）工作在<strong>正式產生班表流程</strong>裡
+    第一次真的被驗到有沒有跑——答案是<strong>從來沒有跑過</strong>。
+  </div>
+  <ul>
+    <li>
+      <strong>怎麼發現的：</strong>要把 Area 容器清單（<code>areas</code>）
+      也接進 <code>generateShiftSchedule()</code>，去查真正產生班表的 adapter
+      <code>runShiftScheduleEngineForDraft.ts</code> 現在怎麼組呼叫參數，
+      才發現它<strong>從來沒有把 <code>pointTopology</code> 傳進去</strong>——
+      `mapDocument?.pointTopology` 只被拿去餵 `buildMaintenanceFirstTripOriginsFromTopology()`
+      算 `firstTripOrigins`，`generateShiftSchedule({...})` 呼叫本身完全沒有
+      `pointTopology` 這個欄位。
+    </li>
+    <li>
+      <strong>後果：</strong><code>insertMaintenanceTransferCards()</code>／
+      <code>insertParkMoveCards()</code> 開頭都是
+      <code>if (!topology || topology.nodes.length === 0) return 早退</code>——
+      沒有 <code>pointTopology</code>，<code>engineInput.pointTopology</code>
+      永遠是 <code>undefined</code>，這兩個函式在正式流程裡永遠是第一行就退出。
+      整備入廠卡、出廠卡、整備間轉場、調度入／出廠卡——這整套從很早期就開始做、
+      這個 session 花了大量篇幅合併／修正的機制，在使用者實際點「產生班表」
+      的時候<strong>從來沒有真正插過一張卡</strong>。真實資料驗證用的
+      <code>h.ts</code> harness 之所以每次都看得到卡，是因為 harness
+      自己老實把 <code>pointTopology</code> 傳進去了——等於測試環境跟正式環境
+      餵的輸入不一樣，測試一直是綠的，正式環境卻從沒真的跑過。
+    </li>
+    <li>
+      <strong>修法：</strong>在 <code>runShiftScheduleEngineForDraft.ts</code>
+      把已經抓到的 <code>mapDocument.pointTopology</code>（跟順便一起補的
+      <code>mapDocument.areas</code>）實際傳進 <code>generateShiftSchedule({...})</code>
+      呼叫裡。
+    </li>
+    <li>
+      <strong>教訓：</strong>「測試綠燈」跟「正式路徑真的有跑」是兩件事——
+      這次的測試 harness 是這個 session 最早搭的、也是文件裡稱讚過「最有價值的
+      工具」，但正因為它是<strong>獨立於 adapter 之外、自己組參數</strong>去呼叫
+      引擎，才會沒發現 adapter 本身漏傳欄位。往後每次確認一個新輸入欄位
+      （像這次的 <code>pointTopology</code>／<code>areas</code>）有沒有生效，
+      除了用 harness 驗證引擎邏輯本身，還要抽查一次<strong>正式 adapter 的呼叫參數</strong>
+      是不是真的把這個欄位傳進去——邏輯對不代表接線對。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · 同一區域改用 Area 容器判斷，不再靠拓樸路徑段數；分界點改回第一段邊</h3>
+  <ul>
+    <li>
+      <strong>使用者糾正一：分界點方向反了。</strong>「按照你的講吧，出廠是比較短的，
+      入場比較長，所以是入場去吸收移動距離」——上一則條目改成「入廠拿最後一段邊」
+      是錯的，改回<strong>第一段邊</strong>：出廠卡是離開來源設施專屬的那一段邊
+      （短），入廠卡吸收中間所有正線轉乘直到目的設施（長）。真實資料
+      <code>E2→M1</code>：出廠卡 <code>E2→N2W下行出發</code>（30s），入廠卡
+      <code>N2W下行出發→M1</code>（200s）——跟本節一開始（合併三檔案那一輪）
+      的行為一致，等於繞了一圈又繞回來，但這次是使用者親口定案，不是我自己猜的形狀類比。
+    </li>
+    <li>
+      <strong>使用者糾正二：同區域判斷不該查拓樸。</strong>「M系列→H系列這件事情，
+      我是希望你再做出入場判定的時候，先去看下一個真的是要到哪裡……他們在同區域，
+      就不需要撈路網拓撲，因為他們就在同區域……我畫不完這麼多種組合」。
+      拿真實地圖驗證過：M1（維修廠 Area 193）跟 H1（同樣是 Area 193）雖然實體上
+      放在同一間廠房，拓樸上卻要繞 7 段、410 秒（T3上行跟T3下行之間沒有直接的邊，
+      得繞整條正線迴路）——「路徑恰好兩段邊」這個舊判斷法完全抓不到這種案例，
+      因為它<strong>還是在查拓樸</strong>，只是換一種查法。使用者要的是更根本的
+      東西：兩座設施在地圖 JSON 上是不是同一個 <code>MapAreaObject</code>，
+      這件事跟拓樸怎麼畫完全無關，不需要地圖作者把每一對設施組合的最短路徑都手動連好。
+    </li>
+    <li>
+      <strong>時間怎麼算：</strong>問過使用者，回答是「開始跟結束一樣就好了，
+      這個不用計算，只是示意」——同區域轉移直接當
+      <strong>0 秒</strong>，出廠卡／入廠卡開始＝結束＝前段結束那一刻，
+      後段緊接著開始，完全不查拓樸、不算距離。
+    </li>
+    <li>
+      <strong>做法：</strong><code>insertMaintenanceTransferCards()</code>
+      新增 <code>areas</code> 參數（<code>MapAreaObject[]</code>），走訪
+      <code>areas → area.facilities</code> 建一份 <code>facilityAreaId</code>
+      （設施 id → Area id），跟拓樸編輯器 <code>areaNameByNodeId</code> 完全同一套
+      走法。轉場迴圈對每組候選（出廠設施、入廠設施）<strong>先查 Area 是否相同</strong>，
+      相同就直接給 0 秒候選（略過 <code>findTopologyPath</code>）；不同才照舊查拓樸、
+      取第一段邊分界。0 秒候選的移動秒數必然最小，會在候選比較中自然勝出，
+      不需要額外的優先權邏輯。
+    </li>
+    <li>
+      <strong>驗證：</strong>真實資料下，maintenance／preTrip／mobile 目前在測試設定
+      共用 M1–M4（設施本身就同 Area），轉場卡確實變成 0 秒的
+      <code>M1 → M2</code> 這類直接示意；手動建構 M1（保養）→H1（行前）案例，
+      原本 7 段 410 秒的路徑，現在是 0 秒、瞬間銜接。新增測試涵蓋「同 Area 但拓樸完全
+      不連通仍要成立」與「沒有 Area 資料時維持查拓樸」兩種情況。<code>tsc</code> 23、
+      測試 338 pass／9 fail（新增 2 則，9 則既有失敗與此改動無關），
+      <code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>教訓：</strong>兩次糾正都指向同一件事——我太依賴「拓樸能不能查到路徑」
+      當作唯一的事實來源，沒有想到地圖場域管理模組本身還有一層更直接、更權威的
+      結構關係（Area 容器）可以用。使用者說得很直白：「我畫不完這麼多種組合」——
+      靠拓樸邊窮舉每一對可能相鄰的設施組合，本來就是一條走不完的路，該找的是
+      系統裡已經存在、不需要窮舉就能回答「這兩個東西是不是一夥的」的資料結構。
     </li>
   </ul>
 

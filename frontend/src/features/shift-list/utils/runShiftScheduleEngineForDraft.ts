@@ -5,6 +5,7 @@ import {
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
 import { emptyPointTopology } from '../../map-editor/types/pointTopology';
+import type { MapAreaObject } from '../../map-editor/types/area';
 import type { ShiftScheduleCreateDraft } from '../types/create';
 import { buildMaintenanceFirstTripOriginsFromTopology } from './maintenanceFirstTripOrigins';
 import {
@@ -98,11 +99,13 @@ export async function runShiftScheduleEngineForDraft(
   let firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
     emptyPointTopology(),
   );
+  let pointTopology = emptyPointTopology();
+  let areas: MapAreaObject[] = [];
   try {
     const mapDocument = await resolveParsedMapForPlatform(mapId);
-    firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
-      mapDocument?.pointTopology ?? emptyPointTopology(),
-    );
+    pointTopology = mapDocument?.pointTopology ?? emptyPointTopology();
+    areas = mapDocument?.areas ?? [];
+    firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(pointTopology);
   } catch (mapError) {
     console.warn('[schedule-engine] 地圖拓樸載入失敗，改用空首班起點', mapError);
   }
@@ -115,6 +118,10 @@ export async function runShiftScheduleEngineForDraft(
     turnaroundLimitSeconds,
     passengerTimetableMode: 'template',
     firstTripOrigins,
+    // 這兩個先前漏掉——整備轉場卡（入廠/出廠/整備間轉場）全靠這兩個欄位才會
+    // 動起來，漏傳等於這整套機制在正式產生班表時從來沒有真正跑過。
+    pointTopology,
+    areas,
   });
 
   // 開發輔助：每次生成把輸入摘要與完整報錯寫成 log 檔（fire-and-forget）。

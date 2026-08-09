@@ -1,4 +1,7 @@
 import type { PointTopology } from '../../map-editor/types/pointTopology';
+import type { MapAreaObject } from '../../map-editor/types/area';
+import { getFacilityDockingPoint } from '../../map-editor/utils/facilityDockingPoint';
+import { facilityDockingTopologyNodeId } from '../../map-editor/utils/pointTopology';
 import type { TaskTypeKey } from '../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { edgeSeconds, findTopologyPath } from './findTopologyPath';
@@ -109,6 +112,12 @@ export type MaintenanceTransferCardsResult = {
 export function insertMaintenanceTransferCards(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   topology: PointTopology | null | undefined;
+  /**
+   * 地圖場域管理模組的 Area 容器清單（含各 Area 底下的 facilities）。
+   * 整備間轉場用這個判斷兩座設施是不是同一個場區——同區域直接當 0 秒示意轉移，
+   * 不查拓樸找路徑；使用者不可能把每一對設施組合的路徑都手動連好。
+   */
+  areas?: MapAreaObject[] | null;
   maintenanceBody: Record<string, unknown> | null | undefined;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds: number;
@@ -118,6 +127,7 @@ export function insertMaintenanceTransferCards(args: {
   const {
     timelines,
     topology,
+    areas,
     maintenanceBody,
     selectedRoutes,
     minimumRecoveryTimeSeconds,
@@ -131,6 +141,31 @@ export function insertMaintenanceTransferCards(args: {
 
   if (!topology || topology.nodes.length === 0) {
     return { timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed, skipped };
+  }
+
+  /**
+   * 設施節點 id → 所在 Area id。走法跟拓樸編輯器的 areaNameByNodeId 一樣
+   * （PointTopologyEditorDialog.tsx）：走訪 areas → area.facilities，
+   * 一座設施「屬於哪個 Area」是地圖 JSON 裡結構性的事實，不是靠座標算出來的。
+   */
+  const facilityAreaId = new Map<string, string>();
+  for (const area of areas ?? []) {
+    for (const facility of area.facilities) {
+      if (
+        facility.type !== 'DockingPoint'
+        && facility.type !== 'Waypoint'
+        && facility.type !== 'Facility'
+      ) {
+        continue;
+      }
+      facilityAreaId.set(facility.id, area.id);
+      if (facility.type === 'Facility') {
+        const dock = getFacilityDockingPoint(facility);
+        if (dock) {
+          facilityAreaId.set(facilityDockingTopologyNodeId(facility.id), area.id);
+        }
+      }
+    }
   }
 
   const routeStartStation = new Map<string, string>();
@@ -307,30 +342,48 @@ export function insertMaintenanceTransferCards(args: {
         exitLegSeconds: number;
         entryLegSeconds: number;
         /**
-         * 出廠設施的第一段邊終點，跟入廠設施的最後一段邊起點，是不是同一個
-         * 轉折點——只隔一個轉折點就代表兩座設施在同一個區域，卡面直接顯示
-         * 「設施 → 設施」（例 M1 → H1），不用把中間那個轉折點的站名也印出來。
-         * 隔更多段（要先繞去別的轉乘站）才維持顯示「設施 → 轉折點」兩段式。
+         * 兩座設施是不是在地圖 JSON 上同一個 Area 容器底下——同一區域就直接
+         * 當 0 秒的示意轉移，不查拓樸找路徑；卡面顯示「設施 → 設施」
+         * （例 M1 → H1），不印任何轉折點。使用者畫地圖時不可能把每一對設施
+         * 組合的路徑都連好，這個判斷完全不看拓樸，只看 Area 容器結構。
          */
         sameArea: boolean;
       } | null = null;
 
       for (const exitFacility of exitFacilities) {
         for (const entryFacility of entryFacilities) {
-          const path = findTopologyPath(topology, exitFacility.id, entryFacility.id);
-          if (!path || path.edges.length === 0) continue;
-          const totalSeconds = path.avgSeconds;
+          const exitAreaId = facilityAreaId.get(exitFacility.id);
+          const entryAreaId = facilityAreaId.get(entryFacility.id);
+          const sameArea = Boolean(exitAreaId) && exitAreaId === entryAreaId;
+
+          let midNodeId: string;
+          let midLabel: string;
+          let exitLegSeconds: number;
+          let entryLegSeconds: number;
+
+          if (sameArea) {
+            // 同一區域：不查拓樸，直接視為 0 秒的示意轉移——開始跟結束是同一刻。
+            midNodeId = entryFacility.id;
+            midLabel = entryFacility.label || entryFacility.id;
+            exitLegSeconds = 0;
+            entryLegSeconds = 0;
+          } else {
+            const path = findTopologyPath(topology, exitFacility.id, entryFacility.id);
+            if (!path || path.edges.length === 0) continue;
+            // 分界點取第一段邊的終點：出廠卡永遠是「離開這座設施專屬的那一段
+            // 邊」（例 E2 → N2W下行出發），入廠卡吸收掉中間所有正線轉乘直到
+            // 目的設施（例 N2W下行出發 → T3下行 → M1）——出廠短、入廠長，
+            // 入廠卡負責吸收這段真實的移動距離。
+            const firstEdge = path.edges[0]!;
+            midNodeId = firstEdge.toNodeId;
+            midLabel = nodeById.get(midNodeId)?.label || midNodeId;
+            exitLegSeconds = edgeSeconds(firstEdge, 'avg');
+            entryLegSeconds = Math.max(0, path.avgSeconds - exitLegSeconds);
+          }
+
+          const totalSeconds = exitLegSeconds + entryLegSeconds;
           const arriveSecond = departSecond + totalSeconds;
           if (arriveSecond >= laterEndSecond - 1e-9) continue;
-          // 分界點取最後一段邊的起點：入廠卡永遠是「進入這座設施專屬的那一段
-          // 邊」（例 T3下行 → M1，跟出場方向 M1 → T3上行 對稱），出廠卡吸收掉
-          // 中間所有正線轉乘——不是反過來，因為入廠設施同樣有自己專屬的單一
-          // 進場邊，不該被中間的轉乘路程稀釋掉。
-          const lastEdge = path.edges[path.edges.length - 1]!;
-          const midNodeId = lastEdge.fromNodeId;
-          const midNode = nodeById.get(midNodeId);
-          const entryLegSeconds = edgeSeconds(lastEdge, 'avg');
-          const exitLegSeconds = Math.max(0, totalSeconds - entryLegSeconds);
           if (
             !moveCardFacilityIsFree(
               bookings,
@@ -356,11 +409,10 @@ export function insertMaintenanceTransferCards(args: {
               entryNodeId: entryFacility.id,
               entryLabel: entryFacility.label || entryFacility.id,
               midNodeId,
-              midLabel: midNode?.label || midNodeId,
+              midLabel,
               exitLegSeconds,
               entryLegSeconds,
-              // 只有一個轉折點（設施→轉折點→設施，恰好兩段邊）才算同一區域
-              sameArea: path.edges.length === 2,
+              sameArea,
             };
           }
         }
