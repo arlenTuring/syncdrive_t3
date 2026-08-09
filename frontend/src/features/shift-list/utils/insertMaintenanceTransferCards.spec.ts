@@ -738,6 +738,92 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     });
   });
 
+  describe('待命（standby）：設施優先、選點前瞻下一個任務', () => {
+    /**
+     * 兩個區域，各自有一個轉折點：
+     *   E 區：E1 ──30s──> GATE_E ──30s──> E1（進出同一個閘門）
+     *   M 區：M1 ──30s──> GATE_M ──30s──> M1
+     * 兩個閘門之間 600 秒——所以「待在哪一區」對下一步的成本差很大。
+     */
+    function topology(): PointTopology {
+      return {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'GATE_E', kind: 'docking', label: 'GATE_E', stationId: 'st_e', x: 0, y: 0, color: '#111' },
+          { id: 'GATE_M', kind: 'docking', label: 'GATE_M', stationId: 'st_m', x: 0, y: 0, color: '#111' },
+          { id: 'E1', kind: 'facility', label: 'E1', x: 0, y: 0, color: '#222' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#222' },
+        ],
+        edges: [
+          edge('GATE_E', 'E1', 30), edge('E1', 'GATE_E', 30),
+          edge('GATE_M', 'M1', 30), edge('M1', 'GATE_M', 30),
+          edge('GATE_E', 'GATE_M', 600), edge('GATE_M', 'GATE_E', 600),
+        ],
+      };
+    }
+    // 待命可掛 E1 與 M1 兩處；保養只能用 M1
+    const BODY = {
+      mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'E1' }, { id: 'b', mapCode: 'M1' }] },
+      maintenance: { stepEnabled: true, equipmentRows: [{ id: 'c', mapCode: 'M1' }] },
+    };
+    const ROUTES: Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'] = [];
+
+    function run(timelines: GeneratedSchedulePlan['timelines']) {
+      return insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: BODY,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+    }
+
+    const yardBlock = (
+      id: string, row: number, taskType: string, start: number, end: number,
+    ) => ({
+      id, timelineRow: row, taskType, label: taskType,
+      anchorStartMinute: start, plannedStartMinute: start, plannedEndMinute: end,
+      travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+    });
+
+    it('待命選點看「下一個任務在哪」——下一段是保養（M 區）就待在 M 區', () => {
+      // 待命 08:00–10:00，接著保養 10:00–12:00（只能在 M1）
+      const timelines = [{
+        row: 1,
+        blocks: [
+          yardBlock('standby-1', 1, 'standby', 8 * 60, 10 * 60),
+          yardBlock('maint-1', 1, 'servicing', 10 * 60, 12 * 60),
+        ],
+      }] as never as GeneratedSchedulePlan['timelines'];
+
+      run(timelines);
+      const standby = timelines[0]!.blocks.find((b) => b.id === 'standby-1')!;
+      const maint = timelines[0]!.blocks.find((b) => b.id === 'maint-1')!;
+      assert.equal(maint.yardFacilityLabel, 'M1');
+      assert.equal(
+        standby.yardFacilityLabel, 'M1',
+        '待命要待在下一段保養的同一區（出去 0 秒），不是隨便挑一個進得去的',
+      );
+    });
+
+    it('設施優先：真整備先挑，待命只能拿剩下的', () => {
+      // 兩列車時段完全重疊：保養只能用 M1，待命 M1/E1 都行 → 待命必須讓出 M1
+      const timelines = [
+        { row: 1, blocks: [yardBlock('standby-1', 1, 'standby', 8 * 60, 12 * 60)] },
+        { row: 2, blocks: [yardBlock('maint-2', 2, 'servicing', 8 * 60, 12 * 60)] },
+      ] as never as GeneratedSchedulePlan['timelines'];
+
+      const result = run(timelines);
+      const standby = timelines[0]!.blocks[0]!;
+      const maint = timelines[1]!.blocks[0]!;
+      assert.equal(maint.yardFacilityLabel, 'M1', '真整備優先拿到它唯一能用的 M1');
+      assert.equal(standby.yardFacilityLabel, 'E1', '待命讓出 M1，去別的地方納涼');
+      assert.equal(result.facilityUnavailable.length, 0);
+    });
+  });
+
   describe('三段共用一份設施佔用表：不同種卡不會撞用同一台設施', () => {
     /**
      * 單一設施 M1 同時是「保養」入廠目的地，也是另一列車出廠的起點——

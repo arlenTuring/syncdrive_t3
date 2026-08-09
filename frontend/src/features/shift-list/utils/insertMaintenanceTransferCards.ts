@@ -539,6 +539,147 @@ export function insertMaintenanceTransferCards(args: {
     return { nodeId: firstEdge.toNodeId, instant: referenceInstant + edgeSeconds(firstEdge, 'avg') };
   }
 
+  // ---- 決定去哪：先真整備、後待命 ----
+  //
+  // 這一段<strong>只決定每一段整備停在哪一台設施／哪一個停靠站</strong>，
+  // 不產生任何卡片。抽出來獨立跑有兩個理由：
+  //
+  // 1. <strong>設施優先</strong>：真正需要那套設備的任務（充電要充電樁、保養要
+  //    維修坑）必須先挑；待命只是來調節位置的，拿剩下的就好。原本選設施散在
+  //    入廠／轉場／出廠三個 pass 裡，一段整備由哪個 pass 先碰到它決定，
+  //    先後順序取決於它在串裡的位置，不是任務的重要性——待命會把樁佔走。
+  // 2. <strong>待命的選點邏輯跟其他整備相反</strong>：其他整備是「設備在哪就得去
+  //    哪」，待命是「下一步要去哪，就先待在順路的地方」。待命是調節位置用的，
+  //    要看的是<strong>出去</strong>的成本，不是進來的成本。
+  //
+  // 兩者共用同一個成本函式：<strong>進來 + 出去的總移動秒數最小</strong>。
+  // 同區域轉場是 0 秒，所以「待在下一站同一區」會自然勝出；待命若原地不動，
+  // 進來那段也是 0 秒，一樣自然浮出來，不需要另外寫特例。
+
+  /** 兩點之間的移動秒數；同一個 Area 視為 0 秒示意轉移，到不了回 null */
+  function moveSeconds(fromNodeId: string | null, toNodeId: string | null): number | null {
+    if (!fromNodeId || !toNodeId) return null;
+    if (fromNodeId === toNodeId) return 0;
+    const fromArea = facilityAreaId.get(fromNodeId);
+    const toArea = facilityAreaId.get(toNodeId);
+    if (fromArea && fromArea === toArea) return 0;
+    const path = findTopologyPath(topology, fromNodeId, toNodeId);
+    return path ? path.avgSeconds : null;
+  }
+
+  /** 這一段整備的前一個／後一個「車必須在那裡」的位置；查不到回 null（該段成本不計） */
+  function resolveAnchor(
+    sorted: GeneratedScheduleBlock[],
+    index: number,
+    direction: 'prev' | 'next',
+  ): string | null {
+    const find = direction === 'prev' ? findPrevCyclic : findNextCyclic;
+    const hit = find(
+      sorted,
+      index,
+      (b) => b.taskType === 'passenger' || YARD_TASK_TYPES.has(b.taskType),
+    );
+    if (!hit) return null;
+    if (hit.block.taskType === 'passenger') {
+      // 正線：前一段看它的終點站，下一段看它的起點站
+      const routeId = hit.block.routeId;
+      if (!routeId) return null;
+      const stationId = direction === 'prev'
+        ? routeEndStation.get(routeId)
+        : routeStartStation.get(routeId);
+      return stationId ? nodeIdByStationId.get(stationId) ?? null : null;
+    }
+    // 相鄰整備：用它已經定案的設施；還沒定案就回 null，那一段成本不計
+    return yardBlockFacility.get(hit.block.id)?.nodeId ?? null;
+  }
+
+  /**
+   * 依「進來 + 出去總移動最小」挑一個位置，並確認整段時間都空得下來。
+   * 到不了的候選直接淘汰；兩邊都查不到錨點時退回「隨便一個空的」。
+   */
+  function pickLocationForStay(
+    yard: GeneratedScheduleBlock,
+    timelineRow: number,
+    candidates: ReadonlyArray<{ id: string; label?: string }>,
+    prevAnchor: string | null,
+    nextAnchor: string | null,
+    /** 車最早可以離開上一段的時刻；入廠卡會用它算提前抵達，null＝無從得知 */
+    freeSecond: number | null,
+  ): { nodeId: string; label: string } | null {
+    let best: { nodeId: string; label: string; cost: number } | null = null;
+    const startSecond = minuteToSecond(yard.plannedStartMinute);
+    const endSecond = minuteToSecond(yard.plannedEndMinute);
+    for (const candidate of candidates) {
+      const inCost = prevAnchor ? moveSeconds(prevAnchor, candidate.id) : 0;
+      const outCost = nextAnchor ? moveSeconds(candidate.id, nextAnchor) : 0;
+      // 錨點存在卻到不了 → 這個候選不能用（車開不過去／開不出來）
+      if (inCost === null || outCost === null) continue;
+      // 入廠卡會讓車<strong>提前抵達</strong>，車一到就佔著那一格——保留窗口必須
+      // 從「實際抵達」算起，不能只鎖 [整備開始, 結束]。少鎖這段頭部的話，
+      // 別列車會被排進那個空隙，等到要產生入廠卡時才發現位置被佔、整張卡作廢。
+      const arriveSecond = freeSecond === null ? startSecond : freeSecond + inCost;
+      const holdFrom = Math.min(startSecond, arriveSecond);
+      if (!stayFacilityIsFree(candidate.id, yard, timelineRow, holdFrom, endSecond)) {
+        continue;
+      }
+      const cost = inCost + outCost;
+      if (!best || cost < best.cost) {
+        best = { nodeId: candidate.id, label: candidate.label || candidate.id, cost };
+      }
+    }
+    return best ? { nodeId: best.nodeId, label: best.label } : null;
+  }
+
+  /** 依時刻排好的（時間線、區塊、該線排序、索引），供兩階段指派共用 */
+  const yardSlots: Array<{
+    timeline: GeneratedSchedulePlan['timelines'][number];
+    block: GeneratedScheduleBlock;
+    sorted: GeneratedScheduleBlock[];
+    index: number;
+  }> = [];
+  for (const timeline of timelines) {
+    const sorted = [...timeline.blocks].sort(
+      (a, b) => a.plannedStartMinute - b.plannedStartMinute,
+    );
+    sorted.forEach((block, index) => {
+      if (!YARD_TASK_TYPES.has(block.taskType)) return;
+      yardSlots.push({ timeline, block, sorted, index });
+    });
+  }
+  yardSlots.sort((a, b) => a.block.plannedStartMinute - b.block.plannedStartMinute);
+
+  for (const priorityPhase of ['facility-first', 'standby-last'] as const) {
+    for (const slot of yardSlots) {
+      const isStandby = slot.block.taskType === 'standby';
+      if ((priorityPhase === 'facility-first') === isStandby) continue;
+      if (yardBlockFacility.has(slot.block.id)) continue;
+
+      const candidates = facilityNodesFor(slot.block.taskType);
+      if (candidates.length === 0) continue;   // 沒設施的情形由收尾補掃回報
+
+      // 跟入廠卡同一套算法：前一段載客跑完 + 最低恢復時間才是車能走的時刻
+      const prevPax = findPrevCyclic(
+        slot.sorted,
+        slot.index,
+        (b) => b.taskType === 'passenger',
+      );
+      const freeSecond = prevPax
+        ? minuteToSecond(prevPax.block.plannedEndMinute + prevPax.offsetMinute)
+          + Math.max(0, minimumRecoveryTimeSeconds)
+        : null;
+
+      const picked = pickLocationForStay(
+        slot.block,
+        slot.timeline.row,
+        candidates,
+        resolveAnchor(slot.sorted, slot.index, 'prev'),
+        resolveAnchor(slot.sorted, slot.index, 'next'),
+        freeSecond,
+      );
+      if (picked) assignYardStay(slot.block, picked.nodeId, picked.label);
+    }
+  }
+
   // ---- 入廠（MI）：只在串首補，開始時刻提前、結束不動 ----
   for (const timeline of timelines) {
     const sorted = [...timeline.blocks].sort(
@@ -568,13 +709,28 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
-      const facilities = facilityNodesFor(yard.taskType);
-      if (facilities.length === 0) {
+      const allFacilities = facilityNodesFor(yard.taskType);
+      if (allFacilities.length === 0) {
         skipped.push({
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
           reason: '整備任務沒設定這一類的設施，或設施不在拓樸上',
+        });
+        continue;
+      }
+      // 地點已由「決定去哪」階段定案，這裡只負責產生卡片——不能再自己挑一台，
+      // 否則入廠卡會指向 A、出廠卡指向 B，車等於中途瞬移換格子。
+      const assigned = yardBlockFacility.get(yard.id);
+      const facilities = assigned
+        ? allFacilities.filter((f) => f.id === assigned.nodeId)
+        : allFacilities;
+      if (facilities.length === 0) {
+        skipped.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          reason: `設施已定案在 ${assigned!.label}，但入廠方向到不了`,
         });
         continue;
       }
@@ -682,8 +838,8 @@ export function insertMaintenanceTransferCards(args: {
       if (earlier.taskType === later.taskType) continue;
 
       const allExitFacilities = facilityNodesFor(earlier.taskType);
-      const entryFacilities = facilityNodesFor(later.taskType);
-      if (allExitFacilities.length === 0 || entryFacilities.length === 0) {
+      const allEntryFacilities = facilityNodesFor(later.taskType);
+      if (allExitFacilities.length === 0 || allEntryFacilities.length === 0) {
         skipped.push({
           timelineRow: timeline.row,
           blockId: later.id,
@@ -696,17 +852,25 @@ export function insertMaintenanceTransferCards(args: {
 
       // earlier 停在哪台設施如果已經被入廠卡或前一段轉場定案，這裡只能沿用
       // 同一台——不能各自獨立再挑一次，那樣車會憑空從一台設施跳到另一台。
+      // 兩側的地點都已由「決定去哪」階段定案，這裡只能沿用，不能再自己挑一台。
+      // 只收斂出廠側而放任入廠側的話，繞日那一對（後一段是當日第一段）會反過來
+      // 把前面已經定案的地點改寫掉，車就在資料上瞬移換格子。
       const earlierAssigned = yardBlockFacility.get(earlier.id);
       const exitFacilities = earlierAssigned
         ? allExitFacilities.filter((f) => f.id === earlierAssigned.nodeId)
         : allExitFacilities;
-      if (exitFacilities.length === 0) {
+      const laterAssigned = yardBlockFacility.get(later.id);
+      const entryFacilities = laterAssigned
+        ? allEntryFacilities.filter((f) => f.id === laterAssigned.nodeId)
+        : allEntryFacilities;
+      if (exitFacilities.length === 0 || entryFacilities.length === 0) {
+        const pinned = exitFacilities.length === 0 ? earlierAssigned! : laterAssigned!;
         skipped.push({
           timelineRow: timeline.row,
           blockId: later.id,
           fromTaskType: earlier.taskType,
           toTaskType: later.taskType,
-          reason: `來源設施已被固定在 ${earlierAssigned!.label}（入廠或前一段轉場定案），這裡到不了`,
+          reason: `設施已定案在 ${pinned.label}，但這個方向到不了`,
         });
         continue;
       }
