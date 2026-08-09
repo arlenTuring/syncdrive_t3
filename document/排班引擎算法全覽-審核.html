@@ -1146,7 +1146,7 @@ validateRotationCyclesComplete
 validateRouteSwitchBuffers
 validatePassengerHeadway
 validateTimelineCapacity   ← 多為 warning</pre>
-  <p>下表為 <code>FeasibilityViolationCode</code> 全部 26 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。</p>
+  <p>下表為 <code>FeasibilityViolationCode</code> 全部 31 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。</p>
   <table>
     <thead><tr><th>代號</th><th>嚴重度</th><th>語意</th><th>來源檔</th></tr></thead>
     <tbody>
@@ -1178,7 +1178,8 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_DISPATCH_UNREACHABLE</code></td><td>warn</td><td>整備後的調度營運班次接不上正線起點站，已略過。<strong>只在「非靠這班不可」（車停在別的站、首班到不了）時才回報</strong>；車已停在合法出場站時，這班外掛只是順路加分項，排不進去不回報（見 §10）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
       <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行前／機動→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
-      <tr><td><code>YARD_EXIT_MOVE_UNRESOLVED</code></td><td>warn</td><td>出場移動卡（整備代號+EX）排不出來：整備任務沒設定該區段設施／設施在拓樸上沒有連到那一站／該設施當時被別列車佔著（見 §10.4）</td><td><code>insertYardExitMoveCards.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></td><td>warn</td><td>整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：整備任務沒設定該區段設施／拓樸上沒有可通的邊或路徑／設施當時被別列車佔著。三種轉場共用同一個模組、同一個代號（見 §10.4）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>PARK_MOVE_UNRESOLVED</code></td><td>warn</td><td>調度入／出廠卡（PI／PO）排不出來：兩段正線之間空檔長到會佔死站位，但拓樸進不去或出不來調度設施、或設施當時被別列車佔著（見 §10.4）</td><td><code>insertParkMoveCards.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
     </tbody>
   </table>
@@ -1917,7 +1918,9 @@ backend/src/dev-log/
       （後面接正線）補。串<strong>內部</strong>兩段不同類型的整備銜接
       （例：充電做完接著要去保養）完全沒有卡片——車在資料上等於瞬間從充電
       設施移動到保養設施，兩者是不同的設施群組，之間有真實的路網距離。
-      這個模組（<code>insertYardTransitionMoveCards.ts</code>）補上這一段。
+      這個模組（<code>insertYardTransitionMoveCards.ts</code>，已於後續與 MO／MI
+      合併進 <code>insertMaintenanceTransferCards.ts</code>，見本節後方新條目）
+      補上這一段。
     </li>
     <li>
       <strong>是兩張卡，不是一張。</strong>先一張出廠卡開離前一段的設施，
@@ -2528,6 +2531,78 @@ backend/src/dev-log/
       <strong>教訓：</strong>「取最大值」在時間軸上幾乎總是錯的——
       時間軸的約束是<strong>區間相交</strong>，不是全域極值。
       另外：<strong>能拿到真實資料就不要用截圖推論</strong>，這輪浪費了三次往返。
+    </li>
+  </ul>
+
+  <h3>2026-08-09 · 四張轉場卡不是四種寫死邏輯，是同一套機制——MO／MI／整備間轉場合併成一個模組</h3>
+  <ul>
+    <li>
+      <strong>使用者發現的重複做工：</strong>MO（<code>insertYardExitMoveCards.ts</code>）、
+      MI（<code>insertYardEntryMoveCards.ts</code>）、整備間轉場
+      （<code>insertYardTransitionMoveCards.ts</code>）雖然都是「整備任務的轉場」，
+      卻各自獨立成三個檔案：各自重讀一次拓樸、各自比對一次設施代號、
+      各自建一份設施佔用表——同樣的機制被寫了三份。原句：「所有的整備任務都有
+      自己的轉廠了吧 不是獨立寫MO/MI/PI/PO這些耶 你不要重複做工然後是沒有通用性的」。
+    </li>
+    <li>
+      <strong>三段規則本身不重複，是三種不同情境。</strong>入廠（只在串首補，
+      開始提前、結束不動）、出廠（只在串尾補，往前貼齊、可吃整備尾巴）、
+      整備間轉場（串內部兩段不同類型銜接，出廠卡＋入廠卡成對，前段跑滿全長、
+      後段開始被推遲）——三者在「左右鄰居是誰」這件事上天生互斥，不必互相
+      協調誰先誰後。重複的不是規則，是<strong>規則以外</strong>的樣板：拓樸建置、
+      設施代號比對、路徑搜尋、佔用表管理。合併後這些只建一份，三段規則
+      仍是各自獨立的邏輯區塊，寫進同一個檔案
+      <code>insertMaintenanceTransferCards.ts</code>，對外一個函式
+      <code>insertMaintenanceTransferCards()</code>。
+    </li>
+    <li>
+      <strong>順手修掉的另一處不通用：</strong>MO 原本用
+      <code>MaintenanceFirstTripOrigin.facilities</code>（聚合過的每站最快空駛秒數）
+      找路，MI／轉場卻都是直接呼叫 <code>findTopologyPath()</code>——同一件「設施到站
+      的最短路徑」被兩套機制各自算一次。合併時把 MO 也改用
+      <code>findTopologyPath</code>：兩者在有直達邊時算出的秒數相同（單台車
+      實測前後一致），但拓樸上只有多段路徑可達時，MO 原本會直接判定無設施可用，
+      現在能像 MI／轉場一樣找到路。</li>
+    <li>
+      <strong>順手修掉的一個潛在撞車：</strong>三份原本各自的設施佔用表互相看不見——
+      理論上 MI 佔走某台設施某時段、MO 同時段又把同一台設施排給另一列車，
+      兩邊都不知道對方訂走了。合併後三段共用同一份 <code>bookings</code>，
+      入廠、出廠、轉場都會看到彼此佔用的時段。
+    </li>
+    <li>
+      <strong>刻意不併的：</strong>調度入／出廠卡（PI／PO，<code>insertParkMoveCards.ts</code>）
+      維持獨立。它的觸發條件是「兩段正線之間的空檔長到會佔死站位」這種營運策略
+      門檻，不是「這一段是不是整備任務」的結構性判斷——跟 MO／MI／轉場的觸發
+      邏輯本質不同，硬併只會讓一個模組同時扛兩種互不相干的判斷，該檔案原本的
+      文件註解也早就寫明這個分工。
+    </li>
+    <li>
+      <strong>代號跟著收斂：</strong><code>YARD_EXIT_MOVE_UNRESOLVED</code>／
+      <code>YARD_ENTRY_MOVE_UNRESOLVED</code>／<code>YARD_TRANSITION_MOVE_UNRESOLVED</code>
+      三個 <code>FeasibilityViolationCode</code> 合併成一個
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code>；<code>PARK_MOVE_UNRESOLVED</code>
+      維持不動。§13 代號表同步更新。
+    </li>
+    <li>
+      <strong>驗證：</strong>三份舊測試（MO／MI／整備間轉場）原樣搬進
+      <code>insertMaintenanceTransferCards.spec.ts</code>，新增一則「三段共用同一份
+      設施佔用表」的交叉測試；<code>tsc</code>（23 則基準不變）／既有測試套件
+      （336 pass／9 fail，9 則與此次改動無關的既有失敗）基準不變。
+    </li>
+    <li>
+      <strong>重新跑真實資料 harness，數字沒有完全一致——而且不一致是對的。</strong>
+      合併前：<code>YARD_ENTRY_MOVE_UNRESOLVED</code> 3、
+      <code>YARD_TRANSITION_MOVE_UNRESOLVED</code> 13、
+      <code>YARD_EXIT_MOVE_UNRESOLVED</code> 4，出廠卡（MO）共插出 46 張。
+      合併後：<code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 共 25
+      （入廠 3、轉場 13 不變；出廠排不出來從 4 → 9），出廠卡少插了 5 張，
+      少的都卡在「設施都被別列車佔著」。追查發現：合併前入廠、出廠、轉場
+      <strong>各自有一份獨立的設施佔用表</strong>，彼此看不到對方訂走的時段——
+      入廠卡把某台設施訂到 09:50–10:30（車在那邊做整備），出廠卡完全不知道，
+      照樣把另一台車的出場移動排進 10:00–10:05，兩台車在資料上同時佔用同一格
+      設施，卻沒有任何檢查抓到。這 5 張少插的出廠卡，是合併前就存在、
+      從沒被抓到的真實撞格——不是這次合併造出來的新問題，是合併後三段
+      共用同一份 <code>bookings</code> 才第一次被看見。
     </li>
   </ul>
 

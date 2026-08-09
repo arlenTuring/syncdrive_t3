@@ -2,9 +2,7 @@ import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
-import { insertYardExitMoveCards } from '../insertYardExitMoveCards';
-import { insertYardEntryMoveCards } from '../insertYardEntryMoveCards';
-import { insertYardTransitionMoveCards } from '../insertYardTransitionMoveCards';
+import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
 import { insertParkMoveCards } from '../insertParkMoveCards';
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
@@ -272,10 +270,13 @@ export function generateShiftSchedule(
   });
   timelines = scrubMidMainlineDispatchArtifacts(timelines);
 
-  // 整備入廠卡（MI）：車確定不能再跑正線時，提前開進接下來要進的整備區。
-  // 必須排在出場卡之前——它會把整備開始時刻往前拉，出場卡貼齊的是「下一段發車」，
-  // 兩者互不干擾，但整備段的時間要先定案。
-  const yardEntryMove = insertYardEntryMoveCards({
+  // 整備轉場卡（入廠 MI／出廠 MO／整備間轉場）：每一種整備任務共用同一套
+  // 機制，依「這一段整備的左右鄰居是什麼」自己判斷該補入廠、出廠，還是
+  // 兩者成對的轉場——不是三張各自寫死的卡。入廠：串首補，開始提前、結束
+  // 不動；出廠：串尾補，往前貼齊下一段發車、空間不夠可吃整備尾巴；轉場：
+  // 串內部兩段不同類型整備直接銜接，前一段跑滿全長，後一段開始被推遲、
+  // 結束不動。三段共用同一份設施佔用表，見 insertMaintenanceTransferCards.ts。
+  const maintenanceTransfer = insertMaintenanceTransferCards({
     timelines,
     topology: engineInput.pointTopology,
     maintenanceBody: engineInput.maintenanceBody,
@@ -283,38 +284,19 @@ export function generateShiftSchedule(
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
-  timelines = yardEntryMove.timelines;
-  for (const skip of yardEntryMove.skipped) {
+  timelines = maintenanceTransfer.timelines;
+  for (const skip of maintenanceTransfer.skipped) {
+    const label = skip.fromTaskType && skip.toTaskType
+      ? `「${skip.fromTaskType}」轉「${skip.toTaskType}」`
+      : `「${skip.taskType}」`;
     pushIssue(warnings, {
-      code: 'YARD_ENTRY_MOVE_UNRESOLVED',
+      code: 'MAINTENANCE_TRANSFER_UNRESOLVED',
       severity: 'warning',
       kind: 'policy',
-      message: `時間線 ${skip.timelineRow}：「${skip.taskType}」排不出整備入廠卡——${skip.reason}`,
-      detail: { timelineRow: skip.timelineRow, taskType: skip.taskType, reason: skip.reason },
-    });
-  }
-
-  // 整備間轉場（出廠卡＋入廠卡）：整備串內部兩段不同類型的銜接
-  // （例：充電做完接著要去保養），MI／MO 都不管這一段——MI 只補串首、
-  // MO 只補串尾。前一段跑滿全長、結束時刻不動；後一段開始時刻推遲到
-  // 入廠卡抵達那一刻、結束時刻不動，運輸成本佔用的是後一段的工作時間。
-  const yardTransitionMove = insertYardTransitionMoveCards({
-    timelines,
-    topology: engineInput.pointTopology,
-    maintenanceBody: engineInput.maintenanceBody,
-    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
-  });
-  timelines = yardTransitionMove.timelines;
-  for (const skip of yardTransitionMove.skipped) {
-    pushIssue(warnings, {
-      code: 'YARD_TRANSITION_MOVE_UNRESOLVED',
-      severity: 'warning',
-      kind: 'policy',
-      message:
-        `時間線 ${skip.timelineRow}：「${skip.fromTaskType}」轉「${skip.toTaskType}」`
-        + `排不出轉場卡——${skip.reason}`,
+      message: `時間線 ${skip.timelineRow}：${label}排不出整備轉場卡——${skip.reason}`,
       detail: {
         timelineRow: skip.timelineRow,
+        taskType: skip.taskType,
         fromTaskType: skip.fromTaskType,
         toTaskType: skip.toTaskType,
         reason: skip.reason,
@@ -341,27 +323,6 @@ export function generateShiftSchedule(
       kind: 'policy',
       message: `時間線 ${skip.timelineRow}：排不出調度入／出廠卡——${skip.reason}`,
       detail: { timelineRow: skip.timelineRow, reason: skip.reason },
-    });
-  }
-
-  // 出場移動卡（整備代號+EX）：把車從整備設施開到轉乘站的那一段。
-  // 放在所有幾何後處理「之後」是刻意的——它往前貼齊後面那一段的發車時刻，
-  // 後面那一段的時間必須已經定案，先插會被之後的班距修復推走而失去貼齊。
-  const yardExitMove = insertYardExitMoveCards({
-    timelines,
-    origins: engineInput.firstTripOrigins,
-    maintenanceBody: engineInput.maintenanceBody,
-    selectedRoutes: engineInput.selectedRoutes,
-    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
-  });
-  timelines = yardExitMove.timelines;
-  for (const skip of yardExitMove.skipped) {
-    pushIssue(warnings, {
-      code: 'YARD_EXIT_MOVE_UNRESOLVED',
-      severity: 'warning',
-      kind: 'policy',
-      message: `時間線 ${skip.timelineRow}：「${skip.taskType}」排不出出場移動卡——${skip.reason}`,
-      detail: { timelineRow: skip.timelineRow, taskType: skip.taskType, reason: skip.reason },
     });
   }
 

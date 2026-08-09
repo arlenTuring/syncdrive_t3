@@ -123,14 +123,14 @@ export type FeasibilityViolationCode =
   | 'STATION_LEG_TRAVEL_INVALID'
   | 'STATION_TIMING_INFEASIBLE'
   | 'STATION_BERTH_COLLISION'
-  /** 出場移動卡（整備代號+EX）排不出來：設施未設定／拓樸沒有邊／設施被佔（警告） */
-  | 'YARD_EXIT_MOVE_UNRESOLVED'
-  /** 整備入廠卡（MI）排不出來：拓樸到不了該設施／設施未設定／設施被佔（警告） */
-  | 'YARD_ENTRY_MOVE_UNRESOLVED'
+  /**
+   * 整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：設施未設定、
+   * 拓樸沒有可通的邊／路徑，或設施被別列車佔著（警告）。三種轉場共用
+   * 同一個模組、同一個代號——見 insertMaintenanceTransferCards.ts。
+   */
+  | 'MAINTENANCE_TRANSFER_UNRESOLVED'
   /** 調度入／出廠卡（PI／PO）排不出來：拓樸進不去或出不來／設施被佔（警告） */
   | 'PARK_MOVE_UNRESOLVED'
-  /** 整備間轉場卡排不出來：兩種類型其中之一沒設施／拓樸沒有路徑／設施被佔（警告） */
-  | 'YARD_TRANSITION_MOVE_UNRESOLVED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */
