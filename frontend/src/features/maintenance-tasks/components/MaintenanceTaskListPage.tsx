@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  Copy,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -13,7 +14,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
 import {
+  checkMaintenanceTaskNameUnique,
+  createMaintenanceTaskDraft,
   deleteMaintenanceTask,
+  fetchMaintenanceTaskDetail,
   fetchMaintenanceTaskList,
 } from '../api/maintenanceTasksApi';
 import {
@@ -53,6 +57,7 @@ export function MaintenanceTaskListPage({
   const [error, setError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -104,6 +109,45 @@ export function MaintenanceTaskListPage({
   const applySearch = () => {
     setPage(1);
     setKeyword(keywordDraft.trim());
+  };
+
+  /**
+   * 找一個還沒被用掉的複製名稱。
+   *
+   * 名稱在後端是唯一的（`check-name`），連按兩次複製就會撞名。先試
+   * 「原名的複製」，被佔走就往後接編號——不預先假設只會複製一次。
+   * 查不動（後端掛了）就直接回傳當前候選，讓後續的建立請求去回報真正的錯誤，
+   * 不要在這裡自己吞掉。
+   */
+  const resolveDuplicateName = async (baseName: string): Promise<string> => {
+    const first = `${baseName}的複製`;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const candidate = attempt === 0 ? first : `${first}${attempt + 1}`;
+      try {
+        if (await checkMaintenanceTaskNameUnique(candidate)) return candidate;
+      } catch {
+        return candidate;
+      }
+    }
+    return `${first}${Date.now()}`;
+  };
+
+  const handleDuplicate = async (row: MaintenanceTaskListItem) => {
+    setDuplicatingId(row.task_id);
+    setOpenMenuId(null);
+    try {
+      // 複製的是完整內容，不是只有名字——設施、觸發條件、各步驟參數都要跟著走
+      const detail = await fetchMaintenanceTaskDetail(row.task_id);
+      const name = await resolveDuplicateName(row.name);
+      await createMaintenanceTaskDraft({ name, body: detail.body ?? {} });
+      // 複製出來的一律是草稿，不繼承原本的發布／使用狀態
+      setPage(1);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDuplicatingId(null);
+    }
   };
 
   const handleDelete = async (row: MaintenanceTaskListItem) => {
@@ -284,6 +328,20 @@ export function MaintenanceTaskListPage({
                         >
                           <Pencil className="size-4 text-zinc-400" />
                           編輯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDuplicate(row)}
+                          disabled={duplicatingId === row.task_id}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-600"
+                          title={`複製「${row.name}」為新的草稿`}
+                        >
+                          {duplicatingId === row.task_id ? (
+                            <Loader2 className="size-4 animate-spin text-zinc-400" />
+                          ) : (
+                            <Copy className="size-4 text-zinc-400" />
+                          )}
+                          複製
                         </button>
                         <button
                           type="button"
