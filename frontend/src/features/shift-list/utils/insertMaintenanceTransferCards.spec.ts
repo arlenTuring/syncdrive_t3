@@ -530,18 +530,18 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(mi.yardExitSectionLabel, '保養');
     });
 
-    it('出廠卡從設施到路徑第一段邊的終點；入廠卡接著到目的設施', () => {
+    it('入廠卡是進入目的設施專屬的最後一段邊；出廠卡吸收掉中間所有正線轉乘', () => {
       const p = plan();
       run(p);
       const blocks = p.timelines[0]!.blocks;
       const mo = blocks.find((b) => b.source === 'yard_exit_move')!;
       const mi = blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(mo.yardExitFacilityLabel, 'E1');
-      assert.equal(mo.yardExitStationId, 'N2W', '分界點是第一段邊的終點');
-      assert.equal(mo.travelSeconds, 30);
-      assert.equal(mi.yardExitStationId, 'N2W', '入廠卡從分界點接續');
+      assert.equal(mo.yardExitStationId, 'T3', '分界點是最後一段邊的起點');
+      assert.equal(mo.travelSeconds, 230, '前面 30+200 秒都算在出廠卡');
+      assert.equal(mi.yardExitStationId, 'T3', '入廠卡從分界點接續');
       assert.equal(mi.yardExitFacilityLabel, 'M1');
-      assert.equal(mi.travelSeconds, 230, '剩下的 200+30 秒都算在入廠卡');
+      assert.equal(mi.travelSeconds, 30, '入廠卡只有目的設施自己專屬的最後一段邊');
     });
 
     it('兩座設施只隔一個轉折點（同一區域）時，卡面直接顯示「設施 → 設施」，不印轉折點站名', () => {

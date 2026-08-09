@@ -322,11 +322,15 @@ export function insertMaintenanceTransferCards(args: {
           const totalSeconds = path.avgSeconds;
           const arriveSecond = departSecond + totalSeconds;
           if (arriveSecond >= laterEndSecond - 1e-9) continue;
-          const firstEdge = path.edges[0]!;
-          const midNodeId = firstEdge.toNodeId;
+          // 分界點取最後一段邊的起點：入廠卡永遠是「進入這座設施專屬的那一段
+          // 邊」（例 T3下行 → M1，跟出場方向 M1 → T3上行 對稱），出廠卡吸收掉
+          // 中間所有正線轉乘——不是反過來，因為入廠設施同樣有自己專屬的單一
+          // 進場邊，不該被中間的轉乘路程稀釋掉。
+          const lastEdge = path.edges[path.edges.length - 1]!;
+          const midNodeId = lastEdge.fromNodeId;
           const midNode = nodeById.get(midNodeId);
-          const exitLegSeconds = edgeSeconds(firstEdge, 'avg');
-          const entryLegSeconds = Math.max(0, totalSeconds - exitLegSeconds);
+          const entryLegSeconds = edgeSeconds(lastEdge, 'avg');
+          const exitLegSeconds = Math.max(0, totalSeconds - entryLegSeconds);
           if (
             !moveCardFacilityIsFree(
               bookings,
