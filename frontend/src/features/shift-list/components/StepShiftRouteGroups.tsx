@@ -296,8 +296,13 @@ function StationDwellEditor({
           </p>
         )}
         {showTurnaroundWarning && (
-          <p className="text-[10px] text-red-400">
-            ⚠️ 此路線最快單趟加總已超過折返時限限制！
+          <p className="text-[10px] leading-4 text-red-400">
+            ⚠️ 這條路線光是最快跑一趟（{formatSecondsLabel(totalMinSum)}）就超過折返時限
+            （{formatSecondsLabel(turnaroundLimitSeconds)}）
+            {turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0
+              ? ` ${formatSecondsLabel(totalMinSum - turnaroundLimitSeconds)}`
+              : ''}
+            。要嘛縮短這條線的行駛時間／靠站秒數／恢復時間，要嘛回時間模板放寬折返時限。
           </p>
         )}
 
@@ -1425,7 +1430,11 @@ export function StepShiftRouteGroups({
     } else if (!hasExplicitPreferred || referenceCycle == null) {
       blockers.push('尚未選擇優先採用的路線組合');
     } else if (throughGateStatus === 'overLimit') {
-      blockers.push('優先採用的路線組合超過折返時限');
+      blockers.push(
+        turnaroundLimitSeconds != null && referenceCycle != null
+          ? `優先採用的路線組合超過折返時限 ${formatSecondsLabel(referenceCycle.minCycleSeconds - turnaroundLimitSeconds)}——改採用沒超過的組合、縮短占用，或放寬時限`
+          : '優先採用的路線組合超過折返時限',
+      );
     } else if (!throughVerified || throughGateStatus !== 'passed') {
       if (
         throughAnchors.listedFingerprint === currentCheckFingerprint
@@ -1878,15 +1887,68 @@ export function StepShiftRouteGroups({
                   ) : null}
 
                   {throughGateStatus === 'overLimit' && referenceCycle ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
-                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
-                      <span>
-                        優先採用（{referenceCycle.labels.join('→')}）最快{' '}
-                        {formatSecondsLabel(referenceCycle.minCycleSeconds)}
-                        、平均 {formatSecondsLabel(referenceCycle.avgCycleSeconds)}
-                        大於折返時限（{formatSecondsLabel(turnaroundLimitSeconds)}）。
-                      </span>
-                    </p>
+                    (() => {
+                      // 只講「超過了」使用者不知道要動哪裡。把三條可行的路一起列出來，
+                      // 而且第一條要具體：清單裡如果本來就有沒超過的組合，直接點名。
+                      const limit = turnaroundLimitSeconds ?? 0;
+                      const shortfall = referenceCycle.minCycleSeconds - limit;
+                      const withinLimit = listedThroughCycles
+                        .filter((item) => item.minCycleSeconds <= limit)
+                        .sort((a, b) => a.minCycleSeconds - b.minCycleSeconds);
+                      return (
+                        <div className="space-y-1.5 rounded-lg border border-red-500/30 bg-red-500/5 p-2.5">
+                          <p className="flex items-start gap-1.5 text-[11px] text-red-300">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                            <span>
+                              優先採用（{referenceCycle.labels.join('→')}）最快{' '}
+                              {formatSecondsLabel(referenceCycle.minCycleSeconds)}，
+                              比折返時限（{formatSecondsLabel(limit)}）多了{' '}
+                              <span className="font-semibold">{formatSecondsLabel(shortfall)}</span>。
+                            </span>
+                          </p>
+                          <p className="pl-5 text-[10px] leading-4 text-zinc-500">
+                            判定只看「快」那一欄——平均 {formatSecondsLabel(referenceCycle.avgCycleSeconds)}{' '}
+                            僅供參考，不影響這個閘門。
+                          </p>
+                          <div className="pl-5 text-[11px] leading-5 text-zinc-300">
+                            <p className="text-zinc-400">可以這樣解，擇一即可：</p>
+                            <ul className="list-disc space-y-0.5 pl-4">
+                              {withinLimit.length > 0 ? (
+                                <li>
+                                  <span className="text-zinc-200">改採用沒超過的組合</span>
+                                  ——上面清單點選{' '}
+                                  <span className="font-medium text-sky-300">
+                                    {withinLimit[0]!.labels.join('→')}
+                                  </span>
+                                  （快 {formatSecondsLabel(withinLimit[0]!.minCycleSeconds)}）
+                                  {withinLimit.length > 1
+                                    ? `，另外還有 ${withinLimit.length - 1} 組也沒超過`
+                                    : ''}
+                                  。
+                                </li>
+                              ) : (
+                                <li>
+                                  清單裡<span className="text-zinc-200">每一組都超過</span>，
+                                  換組合解不了，只能走下面兩條。
+                                </li>
+                              )}
+                              <li>
+                                <span className="text-zinc-200">縮短這組路線的占用</span>
+                                ——就在這一步調整：各路線的行駛時間、靠站秒數、換線緩衝，
+                                以及最低恢復時間。合計省下{' '}
+                                {formatSecondsLabel(shortfall)} 就會通過。
+                              </li>
+                              <li>
+                                <span className="text-zinc-200">放寬折返時限</span>
+                                ——回「建立時間模板」調整，目前是{' '}
+                                {formatSecondsLabel(limit)}。這是車輛能連續運轉多久的上限，
+                                放寬前請確認營運上真的可以。
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      );
+                    })()
                   ) : null}
 
                   {throughGateStatus === 'passed' && referenceCycle ? (
