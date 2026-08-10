@@ -181,7 +181,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(card.travelSeconds, 60);
     });
 
-    it('兩條時間線同時經過同一個共用轉折點時，用 2 倍碰撞保護時間擋下——車不能瞬間分身', () => {
+    it('兩條時間線會在同一個共用轉折點碰頭時，把出發時刻挪開——不是放棄整張卡', () => {
       // 兩列車都是 09:30 跑完正線、都要進 M 系保養——路徑都要先經過共用的
       // 轉折點 N2W，時刻完全相同：物理上不可能兩台車同時出現在同一個點。
       const row1 = plan({ yardStartMinute: 10 * 60, row: 1 });
@@ -200,15 +200,28 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       });
 
       assert.equal(
-        countCards(p.timelines, 'yard_entry_move'), 1,
-        '第一條線正常插入廠卡，第二條線因為轉折點衝突排不進去',
+        countCards(p.timelines, 'yard_entry_move'), 2,
+        '兩條線都要排得出入廠卡——共用閘門會碰頭是常態，該由排班挪開時刻解掉',
       );
-      const junctionSkip = result.skipped.find((s) => /轉折點撞上/.test(s.reason));
-      assert.ok(junctionSkip, '要有一則轉折點衝突的回報');
-      assert.equal(junctionSkip.timelineRow, 2);
+      assert.equal(
+        result.skipped.some((s) => /轉折點撞上/.test(s.reason)), false,
+        '挪得開就不該回報排不出來',
+      );
 
-      const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move');
-      assert.ok(row1Card, '先處理的時間線不受影響');
+      const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move')!;
+      const row2Card = p.timelines[1]!.blocks.find((b) => b.source === 'yard_entry_move')!;
+      assert.equal(row1Card.plannedStartMinute, 9 * 60 + 30, '先處理的那條照原本最早時刻走');
+      // 這條路徑只有一段邊，經過轉折點的時刻就等於出發時刻，
+      // 兩台車至少要差開 2 倍碰撞保護時間（2 × 30 秒）
+      const gapSeconds =
+        Math.abs(row2Card.plannedStartMinute - row1Card.plannedStartMinute) * 60;
+      assert.ok(
+        gapSeconds >= 60 - 1e-9,
+        `第二條要往後挪開至少 60 秒，實際只差 ${gapSeconds} 秒`,
+      );
+      // 挪開的代價是整備晚一點開始，但結束時刻不動——入廠卡的規則沒變
+      const row2Yard = p.timelines[1]!.blocks.find((b) => b.id === 'yard-2')!;
+      assert.equal(row2Yard.plannedEndMinute, 11 * 60, '整備結束時刻仍然不動');
     });
 
     it('沒有設定碰撞保護時間（0）就不擋——維持原本可以同時經過的行為', () => {

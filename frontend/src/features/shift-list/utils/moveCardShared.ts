@@ -1,5 +1,6 @@
 import type { TaskTypeKey } from '../../time-templates/types/editor';
 import type { MaintenanceBodySectionKey } from './maintenanceFirstTripOrigins';
+import { SCHEDULE_DAY_MINUTES } from './scheduleDayCycle';
 
 /**
  * 整備轉場小卡共用的設施比對與佔用邏輯。
@@ -54,7 +55,27 @@ export type MoveCardFacilityBooking = {
   timelineRow: number;
 };
 
-/** 同一台設施在該時段是否已被別列車佔著 */
+const DAY_SECONDS = SCHEDULE_DAY_MINUTES * 60;
+
+/**
+ * 一段時間窗在日循環上實際覆蓋到的區段（0 ≤ t < 一天）。
+ *
+ * 整備區塊的時刻可以落在一天之外：入廠卡把開頭往前拉過午夜時，那一段整備會
+ * 記成「開始 23:5x、結束 1440＋」；同樣的一格設施在別列車眼中可能記成
+ * 「00:00–01:30」。直接比大小的話這兩段永遠不會判定成重疊，但它們在實體上
+ * 就是同一台設施的同一段時間，會排出兩台車同時佔一格。
+ */
+function daySegmentsOf(startSecond: number, endSecond: number): Array<[number, number]> {
+  const span = endSecond - startSecond;
+  if (span <= 0) return [];
+  if (span >= DAY_SECONDS) return [[0, DAY_SECONDS]];
+  const start = ((startSecond % DAY_SECONDS) + DAY_SECONDS) % DAY_SECONDS;
+  const end = start + span;
+  if (end <= DAY_SECONDS) return [[start, end]];
+  return [[start, DAY_SECONDS], [0, end - DAY_SECONDS]];
+}
+
+/** 同一台設施在該時段是否已被別列車佔著（日循環比對） */
 export function moveCardFacilityIsFree(
   bookings: MoveCardFacilityBooking[],
   facilityNodeId: string,
@@ -62,11 +83,13 @@ export function moveCardFacilityIsFree(
   endSecond: number,
   timelineRow: number,
 ): boolean {
-  return !bookings.some(
-    (b) =>
-      b.facilityNodeId === facilityNodeId
-      && b.timelineRow !== timelineRow
-      && b.startSecond < endSecond - 1e-9
-      && startSecond < b.endSecond - 1e-9,
-  );
+  const want = daySegmentsOf(startSecond, endSecond);
+  if (want.length === 0) return true;
+  return !bookings.some((b) => {
+    if (b.facilityNodeId !== facilityNodeId) return false;
+    if (b.timelineRow === timelineRow) return false;
+    const booked = daySegmentsOf(b.startSecond, b.endSecond);
+    return booked.some(([bs, be]) =>
+      want.some(([ws, we]) => bs < we - 1e-9 && ws < be - 1e-9));
+  });
 }
