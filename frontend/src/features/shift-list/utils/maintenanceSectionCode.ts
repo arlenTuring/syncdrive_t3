@@ -253,7 +253,9 @@ export function resolveGeneratedBlockTripCode(
   index = 0,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
-  // 四張移動小卡（MO／MI／PI／PO）共用一套規則：來源代號 + I/O 尾綴。
+  // 移動小卡共用一套規則：該段整備自己的區段代號 + I/O 尾綴
+  // （充電 E → EI／EO、行檢 P → PI／PO、待命 S → SI／SO）。
+  // 沒有固定的 MI／MO 這種東西——代號跟著任務類型走。
   // 帶列碼，跟整備卡一致——它們屬於某一台車的場內動作，不是路線班次。
   // 必須排在 dispatch／passenger 分支之前，它們的 taskType 也是 'dispatch'。
   if (block.source && block.source in MOVE_CARD_DIRECTION_BY_SOURCE) {

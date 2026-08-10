@@ -31,7 +31,7 @@ import {
 } from './schedule-engine/types';
 
 /**
- * 整備轉場卡（MI／MO／整備間轉場）
+ * 整備轉場卡（入廠／出廠／整備間轉場）
  * ================================
  *
  * 每一種整備任務（充電／洗車／保養／行檢／待命）都用<strong>同一套轉場機制</strong>：
@@ -48,10 +48,10 @@ import {
  * 完全不同的情境，本來就該算法不同：
  *
  * <ol>
- *   <li><strong>入廠（entry，MI）</strong>：只在整備串「串首」（前面接正線或本來就沒有
+ *   <li><strong>入廠（entry）</strong>：只在整備串「串首」（前面接正線或本來就沒有
  *   前一段整備）補。車一跑完正線就能走，越早到、整備就從越早開始——
  *   <strong>開始時刻提前、結束時刻不動</strong>，時長變長。</li>
- *   <li><strong>出廠（exit，MO）</strong>：只在整備串「串尾」（後面接正線）補。
+ *   <li><strong>出廠（exit）</strong>：只在整備串「串尾」（後面接正線）補。
  *   往前貼齊下一段發車時刻，零秒緩衝；空間不夠時<strong>唯一有特權</strong>
  *   吃掉整備的尾巴。</li>
  *   <li><strong>整備間轉場（transition）</strong>：串「內部」兩段不同類型整備直接
@@ -949,7 +949,7 @@ export function insertMaintenanceTransferCards(args: {
     };
   }
 
-  // ---- 入廠（MI）：只在串首補，開始時刻提前、結束不動 ----
+  // ---- 入廠：只在串首補，開始時刻提前、結束不動 ----
   for (const timeline of timelines) {
     const sorted = [...timeline.blocks].sort(
       (a, b) => a.plannedStartMinute - b.plannedStartMinute,
@@ -1521,7 +1521,7 @@ export function insertMaintenanceTransferCards(args: {
     }
   }
 
-  // ---- 出廠（MO）：只在串尾補，往前貼齊、零秒緩衝，空間不夠可吃整備尾巴 ----
+  // ---- 出廠：只在串尾補，往前貼齊、零秒緩衝，空間不夠可吃整備尾巴 ----
   type Pending = {
     timeline: GeneratedSchedulePlan['timelines'][number];
     yard: GeneratedScheduleBlock;

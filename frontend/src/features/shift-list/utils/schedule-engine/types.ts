@@ -31,7 +31,7 @@ export type ScheduleBlockSource =
    */
   | 'yard_exit_move'
   /**
-   * 整備入廠卡（MI）：車輛確定不能再跑正線時，<strong>提前</strong>開進接下來
+   * 整備入廠卡：車輛確定不能再跑正線時，<strong>提前</strong>開進接下來
    * 預計進入的整備區。卡片結束＝車抵達設施，整備就從那一刻直接開始——
    * 整備<strong>開始時刻提前、結束時刻不動</strong>，所以整備時長變長。
    * 與 MO 剛好對稱：MO 吃整備尾巴，MI 長整備的頭。
