@@ -588,9 +588,40 @@ export function insertMaintenanceTransferCards(args: {
     facilityBusy: number;
     junctionBusy: number;
     noTime: number;
+    /**
+     * 第一筆轉折點衝突的細節：撞在哪個點、原本想幾點經過、可以挪多少、
+     * 是誰擋著。只寫「會跟別列車在同一個轉折點撞上」使用者無從判斷是
+     * 「真的塞不下」還是「演算法沒挪」——2026-08-10 就是卡在這裡查不下去。
+     */
+    junctionDetail: string | null;
   };
   function newTally(): RejectTally {
-    return { noPath: 0, facilityBusy: 0, junctionBusy: 0, noTime: 0 };
+    return { noPath: 0, facilityBusy: 0, junctionBusy: 0, noTime: 0, junctionDetail: null };
+  }
+  /** 組出「撞在哪、想幾點過、有多少挪動空間、誰擋著」 */
+  function describeJunctionBlock(
+    points: Array<{ nodeId: string; instant: number } | null>,
+    timelineRow: number,
+    windowSeconds: number,
+  ): string {
+    const active = points.filter((p): p is { nodeId: string; instant: number } => p != null);
+    const parts: string[] = [];
+    for (const point of active) {
+      const blockers = junctionBookings
+        .filter((b) =>
+          b.nodeId === point.nodeId
+          && b.timelineRow !== timelineRow
+          && cyclicGapSeconds(b.instant, point.instant) < collisionBufferSeconds - 1e-9)
+        .map((b) => `時間線 ${b.timelineRow} ${formatSecondOfDay(b.instant)}`);
+      const label = nodeById.get(point.nodeId)?.label || point.nodeId;
+      parts.push(
+        blockers.length > 0
+          ? `${label} 原訂 ${formatSecondOfDay(point.instant)} 經過，被 ${blockers.join('、')} 擋著`
+          : `${label} 原訂 ${formatSecondOfDay(point.instant)} 經過`,
+      );
+    }
+    return `${parts.join('；')}；可挪動範圍只有 ${Math.max(0, Math.round(windowSeconds))} 秒`
+      + `（需要差開 ${collisionBufferSeconds} 秒）`;
   }
   function describeReject(tally: RejectTally, candidateCount: number): string {
     const parts: string[] = [];
@@ -598,7 +629,10 @@ export function insertMaintenanceTransferCards(args: {
       parts.push(`${tally.facilityBusy} 台設施在這段時間被別列車佔著`);
     }
     if (tally.junctionBusy > 0) {
-      parts.push(`${tally.junctionBusy} 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）`);
+      parts.push(
+        `${tally.junctionBusy} 條路徑會跟別列車在同一個轉折點撞上`
+        + (tally.junctionDetail ? `（${tally.junctionDetail}）` : ''),
+      );
     }
     if (tally.noTime > 0) {
       parts.push(`${tally.noTime} 條路徑的移動時間塞不進這段空檔`);
@@ -1051,7 +1085,13 @@ export function insertMaintenanceTransferCards(args: {
           0,
           latestDeparture - departureSecond,
         );
-        if (shift === null) { tally.junctionBusy += 1; continue; }
+        if (shift === null) {
+          tally.junctionBusy += 1;
+          tally.junctionDetail ??= describeJunctionBlock(
+            [baseGateway], timeline.row, latestDeparture - departureSecond,
+          );
+          continue;
+        }
 
         departureSecond += shift;
         const gateway = {
@@ -1327,7 +1367,13 @@ export function insertMaintenanceTransferCards(args: {
             0,
             maxShift - facilityShift,
           );
-          if (junctionShift === null) { tally.junctionBusy += 1; continue; }
+          if (junctionShift === null) {
+            tally.junctionBusy += 1;
+            tally.junctionDetail ??= describeJunctionBlock(
+              [exitGateway, entryGateway], timeline.row, maxShift - facilityShift,
+            );
+            continue;
+          }
           const departureShift = facilityShift + junctionShift;
           if (departureShift !== 0) {
             if (exitGateway) exitGateway = { ...exitGateway, instant: exitGateway.instant + departureShift };
@@ -1585,7 +1631,10 @@ export function insertMaintenanceTransferCards(args: {
       }
       const gateway = resolveGatewayFromPath({ edges }, startSecond, 'leaving-facility', stationNodeId);
       if (!junctionIsFree(gateway.nodeId, gateway.instant, timeline.row)) {
+        // 出廠卡的結束時刻釘死在下一段發車，時刻挪不動（挪了就不是貼齊），
+        // 所以這裡只能回報，但要講清楚撞在哪、被誰擋著
         tally.junctionBusy += 1;
+        tally.junctionDetail ??= describeJunctionBlock([gateway], timeline.row, 0);
         continue;
       }
       chosen = {
