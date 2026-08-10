@@ -549,6 +549,53 @@ export function insertMaintenanceTransferCards(args: {
    * 正在決定的那一段用傳入的預定時間窗（它的時刻還沒寫回區塊），
    * 鏈上其他段用它們目前的時間窗。
    */
+  /**
+   * 這一格是不是<strong>留給真整備的</strong>——待命不准拿。
+   *
+   * 「決定去哪」與「收尾補掃」兩處是用兩階段（真整備先挑、待命只能拿剩下的）
+   * 做到設施優先。但插卡的三段（入廠、整備間轉場、出廠）<strong>沒有</strong>
+   * 這一層：它們照時間線順序邊插卡邊搶，第 2 列的待命就這樣拿走最後一格充電樁，
+   * 第 7 列真的要充電的車卻補不到（2026-08-10 埋探針實測抓到）。
+   *
+   * 那三段不能像前兩處一樣「延後處理」——它們<strong>當下就需要一台設施</strong>
+   * 才產得出卡片。所以改成在同一個入口把規則寫死：待命要拿一格之前，
+   * 先看有沒有哪一段真整備在同一時間需要它而且還沒著落。有的話就讓開。
+   *
+   * 只擋設施格，不擋正線停靠站——真整備不會停在停靠站上，沒有競爭關係。
+   * 只在待命身上做這個檢查，所以掃描成本只跟待命的數量成正比。
+   */
+  function facilityReservedForRealYardTask(
+    facilityNodeId: string,
+    standbyBlock: GeneratedScheduleBlock,
+    startSecond: number,
+    endSecond: number,
+  ): boolean {
+    if (nodeById.get(facilityNodeId)?.kind === 'docking') return false;
+    for (const timeline of timelines) {
+      for (const block of timeline.blocks) {
+        if (block.id === standbyBlock.id) continue;
+        if (block.taskType === 'standby') continue;
+        if (!YARD_TASK_TYPES.has(block.taskType)) continue;
+        // 已經有地方停的不必替它保留——它的佔用本來就在 bookings 裡擋著了
+        if (yardBlockFacility.has(block.id)) continue;
+        if (
+          !cyclicWindowsOverlap(
+            startSecond,
+            endSecond,
+            minuteToSecond(block.plannedStartMinute),
+            minuteToSecond(block.plannedEndMinute),
+          )
+        ) {
+          continue;
+        }
+        if (facilityNodesFor(block.taskType).some((node) => node.id === facilityNodeId)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function stayFacilityIsFree(
     facilityNodeId: string,
     block: GeneratedScheduleBlock,
@@ -560,6 +607,13 @@ export function insertMaintenanceTransferCards(args: {
       return false;
     }
     if (!dockingBerthIsFree(facilityNodeId, timelineRow, startSecond, endSecond)) {
+      return false;
+    }
+    // 設施優先：待命不准拿走真整備同一時間需要、而且還沒著落的格子
+    if (
+      block.taskType === 'standby'
+      && facilityReservedForRealYardTask(facilityNodeId, block, startSecond, endSecond)
+    ) {
       return false;
     }
     for (const member of collectStay(block)) {
