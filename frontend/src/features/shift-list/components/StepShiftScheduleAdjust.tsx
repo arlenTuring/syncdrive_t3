@@ -1249,13 +1249,42 @@ export function StepShiftScheduleAdjust({
       setHighlightedBlockId(null);
     }, 3000);
 
+    /**
+     * 先<strong>用時刻算出橫向位置</strong>捲過去，再靠 DOM 做垂直對齊。
+     *
+     * 只用 <code>getElementById</code> 會失敗：格線有視窗裁切，畫面外的卡片
+     * 根本不在 DOM 裡，找不到元素就什麼都不做——使用者按了「跳轉」沒反應
+     * （2026-08-11 使用者回報）。橫向先到位之後裁切才會把那張卡畫出來，
+     * 這時再拿元素做垂直置中。
+     *
+     * 橫向座標從捲動容器自己量：內容寬 ＝ 列號欄 ＋ 三份日拷貝，
+     * 所以一天的寬度是 (scrollWidth − 列號欄) ÷ 3，目標落在<strong>中間那份</strong>。
+     */
     const targetId = targetBlockId;
+    const targetBlock = plan.timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((block) => block.id === targetId);
+    const grid = document.querySelector('[data-schedule-grid-scroll]');
+    if (grid instanceof HTMLElement && targetBlock) {
+      const ROW_LABEL_WIDTH = 48;
+      const dayWidthPx = (grid.scrollWidth - ROW_LABEL_WIDTH) / 3;
+      const minuteOfDay =
+        ((targetBlock.plannedStartMinute % 1440) + 1440) % 1440;
+      const targetLeft =
+        ROW_LABEL_WIDTH
+        + dayWidthPx
+        + (minuteOfDay / 1440) * dayWidthPx
+        - grid.clientWidth / 2;
+      grid.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+    }
+
     setTimeout(() => {
       const el = document.getElementById(`block-card-${targetId}`);
+      // inline: 'nearest' —— 橫向已經到位了，不要再被拉走
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
       }
-    }, 50);
+    }, 260);
   };
 
   // 分析報表：純計算，跟著 plan／時段／路線走；plan 還沒好就不算
