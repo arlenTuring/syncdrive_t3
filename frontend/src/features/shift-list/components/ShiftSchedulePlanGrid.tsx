@@ -1,8 +1,5 @@
 import { Info, AlertTriangle, Trash2, CopyPlus } from 'lucide-react';
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,6 +8,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { ScrollPinnedCardLabel } from '../../../components/ScrollPinnedCardLabel';
+import {
+  PRIMARY_DAY_COPY_INDEX,
+  isWithinDayCycleWindow,
+  useDayCycleGridScroll,
+} from '../../../components/scheduleGridDayCycle';
 import {
   clampGridZoom,
   SCHEDULE_SLOT_WIDTH_DEFAULT,
@@ -72,35 +75,6 @@ import { MANUAL_BLOCK_MIN_DURATION_SECONDS } from '../utils/buildManualShiftSche
 const ROW_HEIGHT_PX = 82;
 const ROW_LABEL_WIDTH = 48;
 
-/**
- * 無限捲動：左右各接一份<strong>完全一樣</strong>的一天，總共三份。
- *
- * 三份內容相同，所以捲到側邊那份時把 scrollLeft 平移一天回到中間，畫面
- * 不會有任何變化，使用者只覺得可以一直往同一個方向滑。兩份不夠——原生捲動
- * 在 scrollLeft = 0 就停住，偵測不到「還想再往左」，必須左右都留一份。
- *
- * 附帶把跨午夜的卡片接回去：日尾那段畫在第 k 份的右緣、日頭那段畫在第 k+1
- * 份的左緣，兩份實體相鄰，看起來就是連續的一張，不再被日界切斷。
- */
-const DAY_COPY_COUNT = 3;
-/** 中間那一份的索引；DOM id、鍵盤焦點這種「整份文件只能有一個」的東西掛在它身上 */
-const PRIMARY_DAY_COPY_INDEX = 1;
-
-/**
- * 視窗裁切：只畫捲動視窗附近的班次卡。
- *
- * 三份拷貝等於三倍 DOM，直接畫會從一千多個卡片變成近四千個。但實際上
- * 一次只看得到一天的幾個百分比（日寬遠大於視窗寬），所以照視窗裁切之後
- * <strong>比原本只畫一份還少</strong>——原本是整天全畫。
- *
- * 兩個參數是為了「不卡頓」：
- * - BUCKET：視窗量化到整點格，捲動時只有跨過格界才重新 render，
- *   不是每一幀都重算 React 樹。
- * - OVERSCAN：多畫視窗外的一段。餘量比量化格大，所以下一格的內容
- *   在跨界之前就已經在 DOM 裡，不會捲到才長出來。
- */
-const CULL_BUCKET_MINUTES = 60;
-const CULL_OVERSCAN_MINUTES = 180;
 
 /**
  * 0 秒轉場卡的顯示寬度。
@@ -764,92 +738,6 @@ function resolveBlockCode(
   sectionCodes?: MaintenanceSectionCodeBySection | null,
 ): string {
   return resolveGeneratedBlockTripCode(block, index, sectionCodes);
-}
-
-/**
- * 卡面文字<strong>捲到哪跟到哪</strong>：卡片左緣被捲出畫面時，文字往右平移貼齊
- * 可視左緣，一路跟到卡片右緣為止，卡片捲完才跟著離開。
- *
- * 跟時間模板管理的任務卡同一套做法（<code>StepTaskScheduling.tsx</code> 的
- * <code>TaskBar</code>）。原本這裡用 <code>position: sticky</code>，
- * 但卡片本身有 <code>overflow-hidden</code>——那會建立一個不會捲動的
- * scrollport，sticky 就黏在卡片自己身上，等於沒有作用。改用 transform 就不受
- * 任何祖先的 overflow 影響。
- *
- * 效能：直接改 DOM style、rAF 節流，不觸發 React re-render；
- * 位置用「捲動位置 ＋ 已知的卡片座標」算，只有文字寬度需要量，
- * 而那個由 ResizeObserver 快取，捲動時一次版面讀取都不做。
- */
-function ScrollPinnedCardLabel({
-  /** 卡片左緣在捲動內容座標系裡的位置（含左側列號欄與第幾份日拷貝） */
-  cardLeftPx,
-  cardWidthPx,
-  /** 卡面文字原本的起點（開頭被 0 秒入廠卡壓住時會往右讓） */
-  insetPx,
-  children,
-}: {
-  cardLeftPx: number;
-  cardWidthPx: number;
-  insetPx: number;
-  children: React.ReactNode;
-}) {
-  const labelRef = useRef<HTMLDivElement>(null);
-  const labelWidthRef = useRef(0);
-
-  useEffect(() => {
-    const label = labelRef.current;
-    if (!label) return;
-    const grid = label.closest('[data-schedule-grid-scroll]');
-    if (!(grid instanceof HTMLElement)) return;
-
-    const EDGE_PAD = 4;
-    let raf = 0;
-    let lastShift = Number.NaN;
-    const apply = () => {
-      raf = 0;
-      // 可視左緣：捲動位置再加上左側常駐的列號欄，那一欄會蓋住卡片
-      const visibleLeft = grid.scrollLeft + ROW_LABEL_WIDTH + EDGE_PAD;
-      const target = Math.max(insetPx, visibleLeft - cardLeftPx);
-      // 不能推過卡片右緣——卡片捲完了字就該跟著走
-      const maxLeft = Math.max(insetPx, cardWidthPx - labelWidthRef.current - EDGE_PAD);
-      const shift = Math.min(target, maxLeft) - insetPx;
-      if (Number.isFinite(lastShift) && Math.abs(shift - lastShift) < 0.5) return;
-      lastShift = shift;
-      label.style.transform = shift <= 0.5 ? 'none' : `translate3d(${shift}px, 0, 0)`;
-    };
-    const schedule = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(apply);
-    };
-
-    // 文字寬度只在內容或字體變動時改變，量一次存起來；捲動時不再讀版面
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        labelWidthRef.current = entry.contentRect.width;
-      }
-      schedule();
-    });
-    observer.observe(label);
-    labelWidthRef.current = label.offsetWidth;
-    apply();
-
-    grid.addEventListener('scroll', schedule, { passive: true });
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      grid.removeEventListener('scroll', schedule);
-      observer.disconnect();
-    };
-  }, [cardLeftPx, cardWidthPx, insetPx]);
-
-  return (
-    <div
-      ref={labelRef}
-      className="relative z-[6] w-fit min-w-0 max-w-full self-start px-1 will-change-transform"
-      style={insetPx > 0 ? { paddingLeft: insetPx } : undefined}
-    >
-      {children}
-    </div>
-  );
 }
 
 function ScheduleIntervalBackground({
@@ -1571,6 +1459,8 @@ function ShiftScheduleBlockBar({
         cardLeftPx={trackOffsetPx + leftPx}
         cardWidthPx={widthPx}
         insetPx={leadingInsetPx}
+        rowLabelWidth={ROW_LABEL_WIDTH}
+        className="relative z-[6] w-fit min-w-0 max-w-full self-start px-1 will-change-transform"
       >
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
@@ -1838,101 +1728,12 @@ export function ShiftSchedulePlanGrid({
     return map;
   }, [blocksByRow]);
 
-  const dayWidthPx = GRID_VISIBLE_SLOTS * slotWidthPx;
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  /** 畫面正中央是幾點（鐘面分鐘）；縮放後拿它把視角放回原處 */
-  const centerMinuteRef = useRef(0);
-  const positionedRef = useRef(false);
-  /**
-   * 目前要畫的虛擬分鐘區間。虛擬分鐘＝第幾份拷貝 × 1440 ＋ 鐘面分鐘，
-   * 所以三份拷貝在同一條數線上，一個區間就描述得完。
-   */
-  const [viewWindow, setViewWindow] = useState({
-    startMinute: SCHEDULE_DAY_MINUTES - CULL_OVERSCAN_MINUTES,
-    endMinute: SCHEDULE_DAY_MINUTES + CULL_OVERSCAN_MINUTES * 2,
-  });
-
-  const syncViewWindow = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el || slotWidthPx <= 0) return;
-    const minutesPerPx = GRID_SLOT_MINUTES / slotWidthPx;
-    // 軌道從 ROW_LABEL_WIDTH 開始（左側列號欄佔掉的那一段）
-    const rawStart = (el.scrollLeft - ROW_LABEL_WIDTH) * minutesPerPx;
-    const rawEnd = rawStart + el.clientWidth * minutesPerPx;
-    centerMinuteRef.current = wrapScheduleMinute((rawStart + rawEnd) / 2);
-    const startMinute =
-      Math.floor((rawStart - CULL_OVERSCAN_MINUTES) / CULL_BUCKET_MINUTES)
-      * CULL_BUCKET_MINUTES;
-    const endMinute =
-      Math.ceil((rawEnd + CULL_OVERSCAN_MINUTES) / CULL_BUCKET_MINUTES)
-      * CULL_BUCKET_MINUTES;
-    setViewWindow((prev) =>
-      prev.startMinute === startMinute && prev.endMinute === endMinute
-        ? prev
-        : { startMinute, endMinute },
-    );
-  }, [slotWidthPx]);
-
-  /**
-   * 捲到側邊那一份就平移一天回到中間。三份內容一樣，平移的瞬間畫面沒有變化。
-   *
-   * 門檻抓在半天：進到側邊拷貝的一半才跳，離視窗邊緣還很遠，
-   * 觸控板慣性甩動時不會一直在門檻上來回觸發。
-   * 日寬小於視窗寬時不繞——那表示整天都看得完，繞了也沒意義。
-   */
-  const recentreScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el || dayWidthPx <= 0 || dayWidthPx <= el.clientWidth) return;
-    const x = el.scrollLeft;
-    if (x < dayWidthPx * 0.5) el.scrollLeft = x + dayWidthPx;
-    else if (x > dayWidthPx * 1.5) el.scrollLeft = x - dayWidthPx;
-  }, [dayWidthPx]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    let frame = 0;
-    const onScroll = () => {
-      // 一幀最多算一次：捲動事件的頻率遠高於畫面更新，逐事件重算是白費的
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        recentreScroll();
-        syncViewWindow();
-      });
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    const observer = new ResizeObserver(() => syncViewWindow());
-    observer.observe(el);
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [recentreScroll, syncViewWindow]);
-
-  // 首次進場停在中間那份的 00:00；之後格寬改變（縮放）時保留原本看的時刻，
-  // 不然按一次 ＋ 畫面就跳到別的時段去了。
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!positionedRef.current) {
-      positionedRef.current = true;
-      el.scrollLeft = dayWidthPx;
-    } else {
-      const centerPx = (centerMinuteRef.current / GRID_SLOT_MINUTES) * slotWidthPx;
-      el.scrollLeft = Math.max(
-        0,
-        dayWidthPx + centerPx + ROW_LABEL_WIDTH - el.clientWidth / 2,
-      );
-    }
-    syncViewWindow();
-  }, [dayWidthPx, slotWidthPx, syncViewWindow]);
-
-  const dayCopies = useMemo(
-    () => Array.from({ length: DAY_COPY_COUNT }, (_, index) => index),
-    [],
-  );
+  const { scrollRef, dayWidthPx, totalTrackWidthPx, dayCopies, viewWindow } =
+    useDayCycleGridScroll<HTMLDivElement>({
+      slotWidthPx,
+      slotMinutes: GRID_SLOT_MINUTES,
+      rowLabelWidth: ROW_LABEL_WIDTH,
+    });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
@@ -1943,7 +1744,7 @@ export function ShiftSchedulePlanGrid({
       >
         <div
           className="min-w-max"
-          style={{ width: dayWidthPx * DAY_COPY_COUNT + ROW_LABEL_WIDTH }}
+          style={{ width: totalTrackWidthPx + ROW_LABEL_WIDTH }}
         >
           <div className="sticky top-0 z-10 bg-[#0c0c0e]/95 backdrop-blur-sm">
             <div className="flex border-b border-zinc-800/80">
@@ -2012,13 +1813,8 @@ export function ShiftSchedulePlanGrid({
                 </div>
                 {dayCopies.map((copyIndex) => {
                   // 這一份拷貝在虛擬數線上的起點；跟 viewWindow 同一套座標
-                  const copyStartMinute = copyIndex * SCHEDULE_DAY_MINUTES;
                   const visibleEntries = rowEntries.filter((entry) =>
-                    entry.spans.some(
-                      (span) =>
-                        copyStartMinute + span.end > viewWindow.startMinute
-                        && copyStartMinute + span.start < viewWindow.endMinute,
-                    ),
+                    isWithinDayCycleWindow(viewWindow, copyIndex, entry.spans),
                   );
                   return (
                     <div
