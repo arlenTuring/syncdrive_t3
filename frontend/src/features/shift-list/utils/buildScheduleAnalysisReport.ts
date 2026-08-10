@@ -437,12 +437,12 @@ export function buildScheduleAnalysisReport(args: {
         code: 'FLEET_SURPLUS',
         subject: row.intervalName,
         message:
-          `${row.intervalName}：這個時段只需要 ${row.requiredVehicles!.toFixed(1)} 台車`
-          + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ 班距 ${row.targetHeadwaySeconds} 秒），`
-          + `實際平均同時 ${row.actualVehicles.toFixed(1)} 台在跑（尖峰 ${row.peakConcurrentVehicles} 台、`
-          + `整段動用 ${row.distinctRowCount} 條時間線輪替），多出 ${row.surplusVehicles.toFixed(1)} 台。`
-          + `多出來的車沒有班次可跑，扣掉整備與待命之後每台每小時還空等 `
-          + `${row.idleMinutesPerVehicleHour.toFixed(0)} 分鐘，只能停在終點站佔著停靠點。`,
+          `${row.intervalName} ${formatClock(row.startMinute)}–${formatClock(row.endMinute)}：`
+          + `班距 ${row.targetHeadwaySeconds} 秒只要 ${row.requiredVehicles!.toFixed(1)} 台同時在線`
+          + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ ${(row.targetHeadwaySeconds! / 60).toFixed(1)} 分）；`
+          + `實際平均 ${row.actualVehicles.toFixed(1)} 台、尖峰 ${row.peakConcurrentVehicles} 台，`
+          + `多 ${row.surplusVehicles.toFixed(1)} 台。多的車沒班次可跑，`
+          + `扣掉整備與待命後每台每小時還空等 ${row.idleMinutesPerVehicleHour.toFixed(0)} 分，佔著停靠點。`,
       });
       continue;
     }
@@ -451,9 +451,11 @@ export function buildScheduleAnalysisReport(args: {
         code: 'FLEET_SHORTAGE',
         subject: row.intervalName,
         message:
-          `${row.intervalName}：這個時段需要 ${row.requiredVehicles!.toFixed(1)} 台車才追得上班距 `
-          + `${row.targetHeadwaySeconds} 秒，實際平均同時只有 ${row.actualVehicles.toFixed(1)} 台在跑，`
-          + `少了 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`,
+          `${row.intervalName} ${formatClock(row.startMinute)}–${formatClock(row.endMinute)}：`
+          + `班距 ${row.targetHeadwaySeconds} 秒要 ${row.requiredVehicles!.toFixed(1)} 台同時在線`
+          + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ ${(row.targetHeadwaySeconds! / 60).toFixed(1)} 分）；`
+          + `實際平均 ${row.actualVehicles.toFixed(1)} 台、尖峰 ${row.peakConcurrentVehicles} 台，`
+          + `少 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`,
       });
     }
   }

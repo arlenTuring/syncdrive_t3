@@ -1,5 +1,8 @@
 import { X } from 'lucide-react';
-import type { ScheduleAnalysisReport } from '../utils/buildScheduleAnalysisReport';
+import type {
+  ScheduleAnalysisReport,
+  ScheduleAnalysisSuggestion,
+} from '../utils/buildScheduleAnalysisReport';
 
 function formatClock(minute: number): string {
   const total = Math.max(0, Math.round(minute));
@@ -19,6 +22,46 @@ function surplusClass(value: number | null): string {
   if (value <= -1) return 'text-sky-300 font-semibold';
   return 'text-zinc-300';
 }
+
+/**
+ * 建議照種類收合。
+ *
+ * 八個時段各講一句「班距會被拉開」會排出八個一模一樣的框，使用者要一行一行
+ * 讀完才知道那其實是同一個問題（2026-08-10 使用者：「可以幫我整理或是折疊
+ * 一下嗎」）。改成一個種類一個折疊區，標題直接講「幾個時段、最嚴重的是哪一個」。
+ */
+const SUGGESTION_GROUPS: Array<{
+  code: ScheduleAnalysisSuggestion['code'];
+  title: string;
+  /** 這一類到底在講什麼、數字怎麼來的——收合起來也看得到 */
+  hint: string;
+}> = [
+  {
+    code: 'FLEET_SHORTAGE',
+    title: '車不夠，追不上目標班距',
+    hint:
+      '「要幾台同時在線」＝ 一輪往返 ÷ 班距。一台車跑完一整圈要 26 分、每 3 分鐘就要'
+      + '發一班的話，同一時刻就得有 26 ÷ 3 ≈ 9 台散在路上，才能每 3 分鐘都有一台回到'
+      + '起點發車。算的是同時在路上的台數，不是要排幾條時間線——一台跑到要充電、'
+      + '換另一台接手是輪替，不會讓同時在線的台數變多。追不上就代表這個班距用現有'
+      + '車隊做不到，要嘛加車、要嘛把班距放寬、要嘛把一輪往返縮短。',
+  },
+  {
+    code: 'FLEET_SURPLUS',
+    title: '車太多，多的沒有班次可跑',
+    hint: '多出來的車沒有脈衝可接，只能停在終點站佔著停靠點，接著就會擠出站位碰撞。',
+  },
+  {
+    code: 'BERTH_OVERFLOW',
+    title: '停靠點停不下',
+    hint: '一個停靠點同時只能停一台車。超出的部分要靠改線、改班距或減車來解。',
+  },
+  {
+    code: 'NO_ALTERNATIVE_BERTH',
+    title: '沒有替代停靠點',
+    hint: '關聯圖上這一段跑完之後沒有別的終點可選，車只能擠在同一站。',
+  },
+];
 
 const TH = 'px-2 py-1.5 text-left text-[11px] font-semibold text-zinc-400';
 const TD = 'px-2 py-1.5 text-[11px] text-zinc-200 tabular-nums';
@@ -58,16 +101,38 @@ export function ScheduleAnalysisReportPanel({
             沒有發現車隊供需或停靠點容量的問題。
           </p>
         ) : (
-          <ul className="space-y-1">
-            {suggestions.map((item, index) => (
-              <li
-                key={`${item.code}-${index}`}
-                className="rounded border border-amber-700/40 bg-amber-950/25 px-2 py-1.5"
-              >
-                <p className="text-[11px] leading-[16px] text-zinc-200">{item.message}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-1.5">
+            {SUGGESTION_GROUPS.map((group) => {
+              const items = suggestions.filter((item) => item.code === group.code);
+              if (items.length === 0) return null;
+              return (
+                <details
+                  key={group.code}
+                  // 只有一則就直接攤開；多則才收起來，避免一打開就是一整面
+                  open={items.length <= 1}
+                  className="rounded border border-amber-700/40 bg-amber-950/25 px-2 py-1.5"
+                >
+                  <summary className="cursor-pointer text-[11px] font-semibold text-amber-200 marker:text-amber-500/70">
+                    {group.title}
+                    <span className="ml-1 font-normal text-zinc-400">
+                      （{items.length} 項）
+                    </span>
+                  </summary>
+                  <p className="mt-1 text-[10px] leading-4 text-zinc-400">{group.hint}</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {items.map((item, index) => (
+                      <li
+                        key={`${item.code}-${index}`}
+                        className="border-l border-amber-700/40 pl-2 text-[11px] leading-[16px] text-zinc-200"
+                      >
+                        {item.message}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              );
+            })}
+          </div>
         )}
 
         <h3 className="mb-1 mt-4 text-xs font-semibold text-zinc-300">

@@ -125,7 +125,7 @@ describe('buildScheduleAnalysisReport', () => {
     assert.equal(row.surplusVehicles, 3);
     const surplus = report.suggestions.filter((s) => s.code === 'FLEET_SURPLUS');
     assert.equal(surplus.length, 1);
-    assert.match(surplus[0]!.message, /多出 3\.0 台/);
+    assert.match(surplus[0]!.message, /多 3\.0 台/);
     assert.equal(report.hasFindings, true);
   });
 
@@ -151,7 +151,7 @@ describe('buildScheduleAnalysisReport', () => {
     assert.equal(report.fleet[0]!.surplusVehicles, -2);
     const shortage = report.suggestions.filter((s) => s.code === 'FLEET_SHORTAGE');
     assert.equal(shortage.length, 1);
-    assert.match(shortage[0]!.message, /少了 2\.0 台/);
+    assert.match(shortage[0]!.message, /少 2\.0 台/);
   });
 
   it('時段屬性沒設班距時不做供需判斷，不亂報', () => {
