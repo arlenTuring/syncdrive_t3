@@ -1,8 +1,12 @@
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck, Minus, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
   buildAttributeIntervalLegends,
+  clampGridZoom,
+  GRID_ZOOM_MAX,
+  GRID_ZOOM_MIN,
+  GRID_ZOOM_STEP,
   parseStoredTemplateBody,
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -585,6 +589,8 @@ export function StepShiftScheduleAdjust({
   const [history, setHistory] = useState<PlanAdjustHistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isMaximized, setIsMaximized] = useState(false);
+  /** 時間刻度縮放；1＝自動格寬（依最短班次算出「時間字串塞得下」的寬度） */
+  const [gridZoom, setGridZoom] = useState(1);
   const [activeTab, setActiveTab] = useState<AdjustTab>('schedule');
   const [vehicleCapacity, setVehicleCapacity] = useState(50);
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
@@ -1299,6 +1305,49 @@ export function StepShiftScheduleAdjust({
 
         <div className="h-4 w-px bg-zinc-800" />
 
+        {/*
+          時間刻度縮放。讀數固定寬度（w-10 + tabular-nums），
+          倍率從 40% 變到 300% 時字寬不變，工具列不會跟著抖。
+        */}
+        <button
+          type="button"
+          disabled={gridZoom <= GRID_ZOOM_MIN}
+          onClick={() => setGridZoom((z) => clampGridZoom(z - GRID_ZOOM_STEP))}
+          className={`rounded p-1.5 transition ${
+            gridZoom > GRID_ZOOM_MIN
+              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+              : 'cursor-not-allowed text-zinc-600 opacity-40'
+          }`}
+          title="時間刻度縮小"
+        >
+          <Minus className="size-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setGridZoom(1)}
+          className="w-10 shrink-0 rounded py-1 text-center text-[11px] tabular-nums text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-100"
+          title="時間刻度：點擊回到自動寬度"
+        >
+          {Math.round(gridZoom * 100)}%
+        </button>
+
+        <button
+          type="button"
+          disabled={gridZoom >= GRID_ZOOM_MAX}
+          onClick={() => setGridZoom((z) => clampGridZoom(z + GRID_ZOOM_STEP))}
+          className={`rounded p-1.5 transition ${
+            gridZoom < GRID_ZOOM_MAX
+              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+              : 'cursor-not-allowed text-zinc-600 opacity-40'
+          }`}
+          title="時間刻度放大"
+        >
+          <Plus className="size-4" />
+        </button>
+
+        <div className="h-4 w-px bg-zinc-800" />
+
         <button
           type="button"
           onClick={() => setIsMaximized(!isMaximized)}
@@ -1494,6 +1543,7 @@ export function StepShiftScheduleAdjust({
                   onPreviewBlockTimeRange={isManual ? handlePreviewBlockTimeRange : undefined}
                   onDeleteBlock={isManual ? handleDeleteBlock : undefined}
                   onDuplicateBlock={isManual ? handleDuplicateBlock : undefined}
+                  zoom={gridZoom}
                 />
               ) : (
                 <PanelNoData message="無法生成班表" className="min-h-[240px]" />

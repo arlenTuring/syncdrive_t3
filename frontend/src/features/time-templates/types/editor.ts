@@ -294,6 +294,23 @@ export const SCHEDULE_SLOT_WIDTH_DEFAULT = 144; // 120px × 1.2
 export const SCHEDULE_SLOT_WIDTH_ZOOM_FACTOR = 3.5;
 export const SCHEDULE_SLOT_WIDTH_MIN = SCHEDULE_SLOT_WIDTH_DEFAULT / SCHEDULE_SLOT_WIDTH_ZOOM_FACTOR;
 
+/**
+ * 班表格線的時間刻度縮放（調整步驟工具列的 −／＋）。
+ *
+ * 乘在<strong>自動格寬之上</strong>，不是取代它——自動格寬是依當次產出的最短
+ * 班次算出「時間字串塞得下」的寬度，那個判斷仍然成立，縮放只是在它上面
+ * 整體放大縮小。
+ */
+export const GRID_ZOOM_MIN = 0.4;
+export const GRID_ZOOM_MAX = 3;
+export const GRID_ZOOM_STEP = 0.2;
+export function clampGridZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 1;
+  // 先吸附到步進格，避免浮點累加飄出 1.0000000000000002 這種值
+  const snapped = Math.round(zoom / GRID_ZOOM_STEP) * GRID_ZOOM_STEP;
+  return Math.min(GRID_ZOOM_MAX, Math.max(GRID_ZOOM_MIN, Number(snapped.toFixed(2))));
+}
+
 /** 班表時軸刻度文字色（00:00、00:30…） */
 export const SCHEDULE_TIME_AXIS_TEXT_CLASS = 'text-[#F3F4F6]';
 /** 無營運時段上的時軸刻度 */

@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  clampGridZoom,
   SCHEDULE_SLOT_WIDTH_DEFAULT,
   SCHEDULE_TIME_AXIS_TEXT_CLASS,
   SCHEDULE_ENGINE_TASK_TYPE_COLORS,
@@ -1516,6 +1517,8 @@ export type ShiftSchedulePlanGridProps = {
   ) => void;
   onDeleteBlock?: (blockId: string) => void;
   onDuplicateBlock?: (blockId: string) => void;
+  /** 時間刻度縮放倍率（工具列 −／＋）；1＝自動格寬 */
+  zoom?: number;
 };
 
 export function ShiftSchedulePlanGrid({
@@ -1538,8 +1541,13 @@ export function ShiftSchedulePlanGrid({
   onPreviewBlockTimeRange,
   onDeleteBlock,
   onDuplicateBlock,
+  zoom = 1,
 }: ShiftSchedulePlanGridProps) {
-  const slotWidthPx = useMemo(() => computeAutoSlotWidthPx(plan), [plan]);
+  const slotWidthPx = useMemo(
+    // 下限 8px：縮到最小時整天仍要畫得出格線，不能塌成 0
+    () => Math.max(8, Math.round(computeAutoSlotWidthPx(plan) * clampGridZoom(zoom))),
+    [plan, zoom],
+  );
   const activeIntervalRanges = useMemo(
     () => parseIntervalMinuteRanges(intervals.filter((slot) => !slot.isDraft)),
     [intervals],
