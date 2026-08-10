@@ -540,8 +540,15 @@ export function normalizeScheduleTask(task: ScheduleTask): ScheduleTask {
   const minDurationSeconds = SCHEDULE_TASK_MIN_DURATION_MINUTES * 60;
   let durationSeconds = snapSecondsToScheduleAlign(Math.round(task.durationMinutes * 60));
   durationSeconds = Math.max(minDurationSeconds, durationSeconds);
-  const maxDurationSeconds = Math.round((SCHEDULE_DAY_MINUTES - start) * 60);
-  durationSeconds = Math.min(durationSeconds, maxDurationSeconds);
+  /**
+   * 上限是<strong>一整天</strong>，不是「從開始到午夜」。
+   *
+   * 原本是 <code>SCHEDULE_DAY_MINUTES − start</code>——那等於規定任務條不准
+   * 越過 24:00。於是拖曳那邊算得再對（21:30 起、跨到隔天 01:00），
+   * 一進到這裡時長就被砍成 150 分、結束硬切在午夜，畫面上看起來就是
+   * 「拖到 00:00 就卡住」（2026-08-10 使用者一直跨不過去，原因在這裡不在拖曳）。
+   */
+  durationSeconds = Math.min(durationSeconds, SCHEDULE_DAY_MINUTES * 60);
   durationSeconds = snapSecondsToScheduleAlign(durationSeconds);
   const duration = durationSeconds / 60;
   const option = TASK_TYPE_OPTIONS.find((t) => t.key === task.taskType);

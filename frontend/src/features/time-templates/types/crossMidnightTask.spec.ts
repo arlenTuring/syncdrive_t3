@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   clampTaskMoveStart,
+  updateScheduleTask,
   computeUncoveredRangesForRow,
   resolveTaskMinuteRanges,
   tasksOverlapOnDayCycle,
@@ -55,6 +56,24 @@ describe('跨午夜的任務條', () => {
     assert.ok(
       start + 40 <= 24 * 60,
       `撞到 00:00–01:00 那根就不該跨過去，實際 start=${start}`,
+    );
+  });
+
+  it('端到端：拖過午夜之後，時長不可以被正規化砍掉', () => {
+    // 這是使用者實際踩到的那條：clampTaskMoveStart 算得對（21:30 起、跨到隔天
+    // 01:00），但 updateScheduleTask 的正規化把時長上限訂成「從開始到午夜」，
+    // 一進去就被砍成 150 分、結束硬切在 24:00——畫面上看起來就是拖到 00:00
+    // 卡住不動，看不出問題其實不在拖曳。
+    const bar = task({ id: 't', rowIndex: 5, startMinute: 20 * 60 + 30, durationMinutes: 210 });
+    const nextStart = clampTaskMoveStart('t', 5, 210, bar.startMinute + 60, ALL_DAY, [bar]);
+    assert.equal(nextStart, 21 * 60 + 30);
+
+    const moved = updateScheduleTask([bar], 't', { startMinute: nextStart })[0]!;
+    assert.equal(moved.durationMinutes, 210, '時長不能被砍');
+    assert.equal(
+      moved.startMinute + moved.durationMinutes,
+      25 * 60,
+      '結束要落在隔天 01:00（1500 分），不是被切在 24:00',
     );
   });
 
