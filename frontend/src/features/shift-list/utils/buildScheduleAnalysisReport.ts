@@ -134,6 +134,37 @@ export type ScheduleAnalysisReport = {
   };
 };
 
+/**
+ * 車不夠時，把「要改成多少」算出來。
+ *
+ * 兩個數字都是現成的，只是先前沒寫出來——使用者看到「班距會被拉開」也不知道
+ * 該放寬到幾秒、還是該加幾台（2026-08-10 使用者：目前這些錯誤怎麼改進）。
+ *
+ * <ul>
+ *   <li><strong>撐得起的班距</strong> ＝ 一輪往返 ÷ 尖峰同時在線台數。
+ *       8 台車跑 1608 秒的一圈，最密就是每 201 秒一班。</li>
+ *   <li><strong>要加幾台</strong> ＝ ⌈需求⌉ − 尖峰同時。加到那個數字，
+ *       原本的目標班距就回得去。</li>
+ * </ul>
+ *
+ * 用<strong>尖峰</strong>同時而不是平均：那是「這個時段你真的同時派得出幾台」，
+ * 拿平均去算會低估車隊、把要加的台數講得太多。
+ */
+function describeShortageRemedy(row: FleetSupplyDemandRow): string {
+  const peak = row.peakConcurrentVehicles;
+  const target = row.targetHeadwaySeconds;
+  if (peak <= 0 || target == null || target <= 0 || row.cycleSeconds <= 0) return '';
+  const feasibleHeadwaySeconds = Math.round(row.cycleSeconds / peak);
+  const extraVehicles = Math.max(
+    1,
+    Math.ceil((row.requiredVehicles ?? 0) - 1e-9) - peak,
+  );
+  return (
+    `要嘛把班距放寬到 ${feasibleHeadwaySeconds} 秒（${peak} 台撐得起的極限），`
+    + `要嘛再加 ${extraVehicles} 台（${peak + extraVehicles} 台就回得去 ${target} 秒）。`
+  );
+}
+
 function minutesOverlap(
   aStart: number,
   aEnd: number,
@@ -536,7 +567,8 @@ export function buildScheduleAnalysisReport(args: {
           + `班距 ${row.targetHeadwaySeconds} 秒要 ${row.requiredVehicles!.toFixed(1)} 台同時在線`
           + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ ${(row.targetHeadwaySeconds! / 60).toFixed(1)} 分）；`
           + `實際平均 ${row.actualVehicles.toFixed(1)} 台、尖峰 ${row.peakConcurrentVehicles} 台，`
-          + `少 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`,
+          + `少 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`
+          + describeShortageRemedy(row),
       });
     }
   }

@@ -1802,6 +1802,39 @@ export function insertMaintenanceTransferCards(args: {
       if (berthBusy > 0) {
         parts.push(`${berthBusy} 個停靠站這段時間有載客班次要用（待命壓住站位會擋掉那條路線）`);
       }
+      /**
+       * 「沒地方停」要講<strong>要等多久</strong>才有地方停。
+       *
+       * 只說「全被別列車佔著」，使用者不知道該把這段整備往後挪 5 分鐘還是
+       * 40 分鐘、還是根本得加設施（2026-08-10 使用者：這些錯誤怎麼改進）。
+       * 擋路的就是既有的那幾筆預約，最早空出來的時刻直接從裡面取。
+       */
+      let earliestFree: { label: string; second: number } | null = null;
+      for (const facility of facilities) {
+        if (nodeById.get(facility.id)?.kind === 'docking') continue;
+        let freeAt = startSecond;
+        for (const booking of bookings) {
+          if (booking.facilityNodeId !== facility.id) continue;
+          if (booking.timelineRow === timeline.row) continue;
+          if (booking.endSecond <= startSecond + 1e-9) continue;
+          if (booking.startSecond >= endSecond - 1e-9) continue;
+          freeAt = Math.max(freeAt, booking.endSecond);
+        }
+        if (freeAt <= startSecond + 1e-9) continue;
+        if (!earliestFree || freeAt < earliestFree.second) {
+          earliestFree = { label: facility.label || facility.id, second: freeAt };
+        }
+      }
+      if (earliestFree) {
+        const waitMinutes = Math.round((earliestFree.second - startSecond) / 60);
+        // 只講「最早要等到幾點」這個事實，不要寫成「挪過去就排得進去」——
+        // 挪過去之後那一格可能又被別的車訂走，講死了會讓使用者白跑一趟
+        parts.push(
+          `最早空出來的是 ${earliestFree.label}（${formatSecondOfDay(earliestFree.second)}，`
+          + `比這段整備的開始晚 ${waitMinutes} 分鐘）`,
+        );
+      }
+
       const window = `${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}`;
       yard.yardFacilityUnavailable = true;
       facilityUnavailable.push({
