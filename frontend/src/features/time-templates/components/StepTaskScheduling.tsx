@@ -57,6 +57,11 @@ import {
   ScheduleIntervalHeaderHits,
 } from './ScheduleIntervalSelection';
 import { TaskSettingsForm, type TaskSettingsFormHandle } from './TaskSettingsForm';
+import { ScrollPinnedCardLabel } from '../../../components/ScrollPinnedCardLabel';
+import {
+  isWithinDayCycleWindow,
+  useDayCycleGridScroll,
+} from '../../../components/scheduleGridDayCycle';
 import { TurnaroundLimitGrid } from './TurnaroundLimitGrid';
 
 const TASK_SETTINGS_FORM_ID = 'schedule-task-settings-form';
@@ -622,6 +627,7 @@ function TaskBar({
   task,
   selected,
   slotWidthPx,
+  trackOffsetPx,
   activeIntervalRanges,
   resizePreview,
   movePreview,
@@ -634,6 +640,12 @@ function TaskBar({
   task: ScheduleTask;
   selected: boolean;
   slotWidthPx: number;
+  /**
+   * 這一份日拷貝的軌道左緣在捲動內容座標系裡的位置
+   * （列號欄寬度 ＋ 第幾份 × 一日寬度）。條上的文字要跟著捲動貼齊可視左緣，
+   * 得知道自己在整份內容裡的絕對位置。
+   */
+  trackOffsetPx: number;
   activeIntervalRanges: ReturnType<typeof parseIntervalMinuteRanges>;
   resizePreview?: ResizePreview | null;
   movePreview?: MovePreview | null;
@@ -644,7 +656,6 @@ function TaskBar({
   onMove: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const barRef = useRef<HTMLDivElement>(null);
-  const labelRef = useRef<HTMLSpanElement>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   const colors = TASK_TYPE_COLORS[task.taskType];
   const widthPx = (task.durationMinutes / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
@@ -656,57 +667,6 @@ function TaskBar({
     [task.startMinute, endMinute, activeIntervalRanges],
   );
 
-  /**
-   * 標籤預設置中；僅左緣快被遮住時用 transform 貼齊可視左緣。
-   * 直接改 DOM style（rAF 節流），避免捲動時整列 React re-render 造成抖動。
-   */
-  useEffect(() => {
-    const bar = barRef.current;
-    const label = labelRef.current;
-    if (!bar || !label) return;
-    const grid = bar.closest('[data-schedule-grid-scroll]');
-    if (!(grid instanceof HTMLElement)) return;
-
-    let raf = 0;
-    let lastShift = Number.NaN;
-    const edgePad = 6;
-    const apply = () => {
-      raf = 0;
-      const scrollLeft = grid.scrollLeft;
-      const visibleLeft = Math.max(0, scrollLeft - leftPx);
-      const labelWidth = Math.max(1, label.offsetWidth);
-      const idealLeft = widthPx / 2 - labelWidth / 2;
-      const targetLeft = Math.max(idealLeft, visibleLeft + edgePad);
-      const maxLeft = Math.max(edgePad, widthPx - labelWidth - edgePad);
-      const clampedLeft = Math.min(targetLeft, maxLeft);
-      const shift = clampedLeft - idealLeft;
-      if (Number.isFinite(lastShift) && Math.abs(shift - lastShift) < 0.5) return;
-      lastShift = shift;
-      label.style.transform = shift <= 0.5 ? 'none' : `translate3d(${shift}px, 0, 0)`;
-    };
-
-    const onScrollOrResize = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(apply);
-    };
-
-    apply();
-    grid.addEventListener('scroll', onScrollOrResize, { passive: true });
-    const observer = new ResizeObserver(onScrollOrResize);
-    observer.observe(grid);
-    observer.observe(label);
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      grid.removeEventListener('scroll', onScrollOrResize);
-      observer.disconnect();
-    };
-  }, [
-    leftPx,
-    widthPx,
-    timeLabel,
-    task.label,
-    slotWidthPx,
-  ]);
 
   const resolveResizeEdge = useCallback(
     (clientX: number, target: EventTarget | null): ResizeEdge | null => {
@@ -837,15 +797,19 @@ function TaskBar({
         style={{ backgroundColor: colors.bar }}
       />
       {/* 預設置中；快被遮住時以 translate3d 絲滑貼齊可視左緣 */}
-      <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center px-1.5">
-        <span
-          ref={labelRef}
-          className="max-w-full truncate text-center text-[10px] font-normal leading-[18px] tracking-[0.5px] will-change-transform"
-          style={{ color: colors.text }}
+      {/* 文字捲到哪跟到哪，貼齊可視左緣直到條子捲完；跟班表調整同一支元件 */}
+      <div className="pointer-events-none absolute inset-0 z-[6] flex items-center px-1.5">
+        <ScrollPinnedCardLabel
+          cardLeftPx={trackOffsetPx + leftPx}
+          cardWidthPx={widthPx}
+          rowLabelWidth={ROW_LABEL_WIDTH}
+          className="w-fit min-w-0 max-w-full truncate text-left text-[10px] font-normal leading-[18px] tracking-[0.5px] will-change-transform"
         >
-          {task.label}
-          <span className="opacity-70"> | {timeLabel}</span>
-        </span>
+          <span style={{ color: colors.text }}>
+            {task.label}
+            <span className="opacity-70"> | {timeLabel}</span>
+          </span>
+        </ScrollPinnedCardLabel>
       </div>
       {selected && (
         <button
@@ -892,6 +856,18 @@ export function StepTaskScheduling({
   onTasksChange,
 }: StepTaskSchedulingProps) {
   const [slotWidthPx, setSlotWidthPx] = useState(SCHEDULE_SLOT_WIDTH_DEFAULT);
+  // 日循環無限捲動：左右各接一份一模一樣的一天，跟班表調整那邊同一套機制
+  const {
+    scrollRef: gridRef,
+    dayWidthPx,
+    totalTrackWidthPx,
+    dayCopies,
+    viewWindow,
+  } = useDayCycleGridScroll<HTMLDivElement>({
+    slotWidthPx,
+    slotMinutes: SCHEDULE_SLOT_MINUTES,
+    rowLabelWidth: ROW_LABEL_WIDTH,
+  });
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedIntervalId, setSelectedIntervalId] = useState<string | null>(null);
   const [estimatedTripSeconds, setEstimatedTripSeconds] = useState(600);
@@ -913,7 +889,7 @@ export function StepTaskScheduling({
   const [historyFlash, setHistoryFlash] = useState<'undo' | 'redo' | null>(null);
   const [highlightedGap, setHighlightedGap] = useState<ScheduleTimeGap | null>(null);
   const [gapJumpIndex, setGapJumpIndex] = useState(0);
-  const gridRef = useRef<HTMLDivElement>(null);
+
   const gapHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const taskSettingsFormRef = useRef<TaskSettingsFormHandle>(null);
   const tasksRef = useRef(tasks);
@@ -1064,8 +1040,12 @@ export function StepTaskScheduling({
 
     const grid = gridRef.current;
     if (!grid) return;
+    // 缺口在中間那一份日拷貝上；少加一天會跳到左邊那份（畫面一樣，但接著會被拉回來）
     const leftPx =
-      ROW_LABEL_WIDTH + (gap.start / SCHEDULE_SLOT_MINUTES) * slotWidthPx - grid.clientWidth * 0.18;
+      ROW_LABEL_WIDTH
+      + dayWidthPx
+      + (gap.start / SCHEDULE_SLOT_MINUTES) * slotWidthPx
+      - grid.clientWidth * 0.18;
     const rowEl = grid.querySelector(
       `[data-schedule-row="${gap.rowIndex}"]`,
     ) as HTMLElement | null;
@@ -1077,7 +1057,7 @@ export function StepTaskScheduling({
       top: topPx,
       behavior: 'smooth',
     });
-  }, [gapJumpIndex, scheduleGaps, slotWidthPx]);
+  }, [dayWidthPx, gapJumpIndex, gridRef, scheduleGaps, slotWidthPx]);
 
   const highlightedAttributeId = useMemo(() => {
     if (!selectedIntervalId) return null;
@@ -1375,23 +1355,28 @@ export function StepTaskScheduling({
         >
           <div
             className="relative min-w-max"
-            style={{ width: SCHEDULE_VISIBLE_SLOTS * slotWidthPx + ROW_LABEL_WIDTH }}
+            style={{ width: totalTrackWidthPx + ROW_LABEL_WIDTH }}
           >
-            <ScheduleIntervalColumnHighlight
-              intervals={intervals}
-              attributes={attributes}
-              slotWidthPx={slotWidthPx}
-              scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
-              trackWidthPx={trackWidthPx}
-              rowLabelWidth={ROW_LABEL_WIDTH}
-              selectedIntervalId={selectedIntervalId}
-            />
+            {/* 時段直條高亮：每一份日拷貝各畫一次，往右平移一天 */}
+            {dayCopies.map((copyIndex) => (
+              <ScheduleIntervalColumnHighlight
+                key={copyIndex}
+                intervals={intervals}
+                attributes={attributes}
+                slotWidthPx={slotWidthPx}
+                scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
+                trackWidthPx={trackWidthPx}
+                rowLabelWidth={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
+                selectedIntervalId={selectedIntervalId}
+              />
+            ))}
 
             {/* Time header + 車輛折返時限（與甘特圖同步捲動） */}
             <div className="relative sticky top-0 z-10 bg-[#0c0c0e]/95 backdrop-blur-sm">
               <div className="flex border-b border-zinc-800/80">
                 <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-zinc-800/60 bg-[#0c0c0e]/95" />
-                <div className="relative flex">
+                {dayCopies.map((copyIndex) => (
+                <div key={copyIndex} className="relative flex shrink-0" style={{ width: trackWidthPx }}>
                   <div className="pointer-events-none absolute inset-0 z-0">
                     <ScheduleTimelineBackground
                       intervals={intervals}
@@ -1415,13 +1400,17 @@ export function StepTaskScheduling({
                       </div>
                     );
                   })}
-                  <span
-                    className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
-                    style={{ left: SCHEDULE_VISIBLE_SLOTS * slotWidthPx }}
-                    aria-hidden
-                  >
-                    24:00
-                  </span>
+                  {/* 只在最後一份日拷貝的右端標 24:00——每份都標的話，
+                      它會疊在下一份的 00:00 上，變成重複的雜訊 */}
+                  {copyIndex === dayCopies.length - 1 ? (
+                    <span
+                      className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                      style={{ left: SCHEDULE_VISIBLE_SLOTS * slotWidthPx }}
+                      aria-hidden
+                    >
+                      24:00
+                    </span>
+                  ) : null}
                   <ScheduleIntervalHeaderHits
                     intervals={intervals}
                     attributes={attributes}
@@ -1434,6 +1423,7 @@ export function StepTaskScheduling({
                     estimatedTripSeconds={estimatedTripSeconds}
                   />
                 </div>
+                ))}
               </div>
 
               <TurnaroundLimitGrid
@@ -1443,6 +1433,7 @@ export function StepTaskScheduling({
                 slotWidthPx={slotWidthPx}
                 rowLabelWidth={ROW_LABEL_WIDTH}
                 estimatedTripSeconds={estimatedTripSeconds}
+                dayCopyCount={dayCopies.length}
               />
               <ScheduleIntervalHeaderColumnHighlight
                 intervals={intervals}
@@ -1471,8 +1462,9 @@ export function StepTaskScheduling({
                   <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
                     {String(row).padStart(2, '0')}
                   </div>
-                  {/* Grid cells (drop zones) */}
-                  <div className="relative flex">
+                  {/* Grid cells (drop zones)：每一份日拷貝各畫一次 */}
+                  {dayCopies.map((copyIndex) => (
+                  <div key={copyIndex} className="relative flex shrink-0" style={{ width: trackWidthPx }}>
                     <div className="pointer-events-none absolute inset-0 z-0">
                       <ScheduleTimelineBackground
                         intervals={intervals}
@@ -1514,12 +1506,21 @@ export function StepTaskScheduling({
                       />
                     ) : null}
                     {/* Render task bars overlaid on top of grid cells */}
-                    {rowTasks.map((task) => (
+                    {rowTasks
+                      .filter((task) =>
+                        isWithinDayCycleWindow(viewWindow, copyIndex, [
+                          {
+                            start: task.startMinute,
+                            end: task.startMinute + task.durationMinutes,
+                          },
+                        ]))
+                      .map((task) => (
                       <TaskBar
-                        key={task.id}
+                        key={`${task.id}#${copyIndex}`}
                         task={task}
                         selected={selectedTaskId === task.id}
                         slotWidthPx={slotWidthPx}
+                        trackOffsetPx={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
                         activeIntervalRanges={activeIntervalRanges}
                         resizePreview={
                           resizePreview?.taskId === task.id ? resizePreview : null
@@ -1535,6 +1536,7 @@ export function StepTaskScheduling({
                       />
                     ))}
                   </div>
+                  ))}
                 </div>
               );
             })}

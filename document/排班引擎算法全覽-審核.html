@@ -3671,6 +3671,64 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 時間模板的任務排班也用同一套日循環無限捲動</h3>
+  <div class="callout">
+    使用者：「我在想，我們應該讓時間模板也有這樣的 GUI，這樣使用者才可以拉時間段
+    上去並且是跨午夜的，你覺得這個想法呢？」
+  </div>
+  <ul>
+    <li>
+      <strong>先把機制抽成共用模組，再套第二個地方。</strong>
+      <code>components/scheduleGridDayCycle.ts</code>（三份日拷貝常數、
+      <code>useDayCycleGridScroll</code>、<code>isWithinDayCycleWindow</code>）與
+      <code>components/ScrollPinnedCardLabel.tsx</code>。班表格線先改成使用它們、
+      三項指標與基準完全相同，確認只搬不改之後才動時間模板——
+      「同一件事寫兩份」是這個專案反覆出問題的來源，格線這種到處都是座標運算的
+      東西尤其不能再來一次。
+      （拆兩支檔案是因為 <code>react-refresh/only-export-components</code>：
+      一支不能同時匯出元件與常數／函式。）
+    </li>
+    <li>
+      <strong>時間模板比班表格線多三個橫跨整條軌道的覆蓋層</strong>，都要跟著變三份：
+      時段直條高亮 <code>ScheduleIntervalColumnHighlight</code>（用
+      <code>rowLabelWidth + copyIndex × dayWidthPx</code> 平移）、表頭時段點擊感應區
+      <code>ScheduleIntervalHeaderHits</code>（改成放進每一份拷貝裡）、
+      折返時限那一列 <code>TurnaroundLimitGrid</code>（加 <code>dayCopyCount</code>，
+      不然捲到側邊那份時它會憑空消失）。
+    </li>
+    <li>
+      <strong>格子是真的 DOM 元素、而且是 drop target。</strong>三份之後每份各自
+      <code>col</code> 0–47，<code>startMinute = col × 30</code> 自然正確，不用改判定。
+      任務條的拖曳與縮放本來就是<strong>位移式</strong>（<code>clientX</code> 差值 ÷
+      每分鐘像素），跟拷貝無關，也不用改。
+    </li>
+    <li>
+      <strong>「跳到缺口」要瞄準中間那一份</strong>——原本算的是
+      <code>ROW_LABEL_WIDTH + gap.start × …</code>，少加一天會跳到左邊那份
+      （畫面一樣，但接著會被回中邏輯拉走）。
+    </li>
+    <li>
+      <strong>任務條的文字貼齊改用共用元件</strong>，順帶從「置中、每幀讀
+      <code>offsetWidth</code>」換成「靠左、寬度由 ResizeObserver 快取、
+      捲動時零版面讀取」，跟班表那側一致。
+      <strong>24:00</strong> 只在最後一份的右端標一次，每份都標會疊在下一份的
+      00:00 上。
+    </li>
+    <li>
+      <strong>驗證：</strong>抽模組那一步與套用這一步各跑一次，
+      <code>tsc</code> 23、測試 348 pass／9 fail、<code>eslint</code>
+      （<code>StepTaskScheduling</code> 7 problems、班表格線 2 problems）
+      全部與各自的基準相同。
+    </li>
+    <li>
+      <strong>注意這一步只給了 GUI，沒有動資料模型。</strong>
+      時段與任務條仍然不能跨午夜（<code>isValidIntervalRange</code> 要求
+      <code>end &gt; start</code>）。現況是拆兩段、引擎那側會把緊鄰的同類型整備
+      串成同一段停留，所以沒有損失；要不要讓它們變成單一物件，等真的因為拆兩段
+      出事再說（見上一則的判斷）。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 分析報表支援跨午夜時段（時段本身跨過 00:00）</h3>
   <div class="callout">使用者裁決：跨午夜時段要<strong>支援</strong>，不是在 UI 擋掉。</div>
   <ul>

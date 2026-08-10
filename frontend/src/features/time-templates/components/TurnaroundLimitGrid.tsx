@@ -175,7 +175,14 @@ export function TurnaroundLimitGrid({
   slotWidthPx,
   rowLabelWidth,
   estimatedTripSeconds,
-}: TurnaroundLimitGridProps) {
+  dayCopyCount = 1,
+}: TurnaroundLimitGridProps & {
+  /**
+   * 要畫幾份日拷貝。格線是日循環無限捲動的，這一列也要跟著複製，
+   * 否則捲到側邊那份時折返時限那一條會憑空消失。
+   */
+  dayCopyCount?: number;
+}) {
   const segments = useMemo(
     () => computeTurnaroundLimitSegments(tasks, intervals, attributes),
     [tasks, intervals, attributes],
@@ -197,7 +204,8 @@ export function TurnaroundLimitGrid({
         <Lightbulb className="size-3.5" aria-hidden />
       </div>
 
-      <div className="relative shrink-0" style={{ width: trackWidthPx, height: TURNAROUND_LIMIT_ROW_HEIGHT_PX }}>
+      {Array.from({ length: Math.max(1, dayCopyCount) }, (_, copyIndex) => (
+      <div key={copyIndex} className="relative shrink-0" style={{ width: trackWidthPx, height: TURNAROUND_LIMIT_ROW_HEIGHT_PX }}>
         <div className="pointer-events-none absolute inset-0 z-0">
           <ScheduleTimelineBackground
             intervals={intervals}
@@ -241,6 +249,7 @@ export function TurnaroundLimitGrid({
           })
         )}
       </div>
+      ))}
     </div>
   );
 }
