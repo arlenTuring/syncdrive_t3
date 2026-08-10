@@ -349,6 +349,52 @@ function RootCauseSection({
   );
 }
 
+/**
+ * 生成中的骨架。
+ *
+ * 原本是置中的轉圈 ＋ 一行字：整段時間畫面是空的，跑完才「啪」一下換成整張
+ * 甘特圖，感覺很頓。改成先畫出<strong>跟結果同樣形狀</strong>的骨架——
+ * 時間軸一列、下面幾列長短不一的條子——跑完換成真的內容時版面不會跳。
+ *
+ * 動畫<strong>只用 CSS 的 transform／opacity</strong>（見 index.css）。
+ * 排班生成是主執行緒上的重運算，期間 JS 計時器不會跑，所以用 setInterval
+ * 輪播「正在做哪一步」的文字反而會整段凍住；交給合成器做的動畫則照樣流暢。
+ */
+function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
+  const rows = Math.min(10, Math.max(4, rowCount));
+  // 長短不一才像真的班表；固定序列，不用亂數（避免每次 render 都跳動）
+  const widths = [82, 54, 68, 91, 47, 73, 60, 88, 51, 76];
+  return (
+    <div
+      className="flex min-h-[320px] flex-1 flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-2 text-[12px] text-zinc-400">
+        <Loader2 className="size-4 animate-spin" />
+        正在依時間模板、整備任務與路線群組生成班表…
+      </div>
+      {/* 時間軸 */}
+      <div className="schedule-skeleton-bar h-4 w-full shrink-0" />
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <div className="schedule-skeleton-bar h-6 w-8 shrink-0" />
+            <div
+              className="schedule-skeleton-bar h-6"
+              style={{
+                width: `${widths[index % widths.length]}%`,
+                // 每一列的呼吸與掃光各自錯開，看起來才不像整齊劃一的燈條
+                animationDelay: `${(index % 5) * 0.18}s`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function IssueGroupCard({
   group,
   plan,
@@ -1264,12 +1310,8 @@ export function StepShiftScheduleAdjust({
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[320px] items-center justify-center gap-2 text-zinc-500">
-        <Loader2 className="size-6 animate-spin" />
-        正在依時間模板、整備任務與路線群組生成班表…
-      </div>
-    );
+    // 用上一次的列數畫骨架，換成真內容時列數不會跳；沒有就給 8 列
+    return <ScheduleGeneratingSkeleton rowCount={plan?.scheduleRowCount ?? 8} />;
   }
 
   if (error && !plan) {

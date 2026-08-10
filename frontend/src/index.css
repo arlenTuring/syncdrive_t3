@@ -198,3 +198,50 @@ body {
   background-color: #2a2a2d;
   box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.35);
 }
+
+/*
+ * 班表生成中的骨架動畫。
+ *
+ * <strong>只用 transform／opacity</strong>：排班生成是主執行緒上的重運算，
+ * 期間 JS 計時器不會跑（用 setInterval 輪播文字會整段凍住，看起來更糟），
+ * 而 transform／opacity 的動畫由合成器負責，主執行緒卡住時照樣流暢。
+ */
+@keyframes schedule-skeleton-sweep {
+  0% { transform: translate3d(-60%, 0, 0); }
+  100% { transform: translate3d(220%, 0, 0); }
+}
+
+@keyframes schedule-skeleton-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+
+.schedule-skeleton-bar {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  background-color: rgba(63, 63, 70, 0.55);
+  animation: schedule-skeleton-breathe 2.4s ease-in-out infinite;
+}
+
+/* 掃光：一條斜向高光橫過骨架條，暗示「還在跑」 */
+.schedule-skeleton-bar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inline-size: 45%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: schedule-skeleton-sweep 1.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-skeleton-bar,
+  .schedule-skeleton-bar::after {
+    animation: none;
+  }
+}
