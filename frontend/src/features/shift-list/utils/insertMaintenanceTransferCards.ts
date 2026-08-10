@@ -22,6 +22,7 @@ import {
   type MoveCardFacilityBooking,
 } from './moveCardShared';
 import { SCHEDULE_DAY_MINUTES } from './scheduleDayCycle';
+import { collectStationBerthOccupancies } from './stationBerthOccupancy';
 import {
   minuteToSecond,
   secondToMinute,
@@ -313,6 +314,111 @@ export function insertMaintenanceTransferCards(args: {
   // 一台車，不分是被哪一種卡佔的。
   const bookings: MoveCardFacilityBooking[] = [];
 
+  const daySeconds = minuteToSecond(SCHEDULE_DAY_MINUTES);
+
+  /**
+   * 一段時間窗在日循環上實際覆蓋到的區段（0 ≤ t < 一天）。
+   * 待命可以從 23:40 停到隔天 01:20，也可能因為入廠卡提前抵達而讓窗口起點
+   * 落到 0 以前——直接拿原始秒數去比大小會把「跨午夜」誤判成「差了一整天」。
+   */
+  function daySegmentsOf(startSecond: number, endSecond: number): Array<[number, number]> {
+    const span = endSecond - startSecond;
+    if (span <= 0) return [];
+    if (span >= daySeconds) return [[0, daySeconds]];
+    const start = ((startSecond % daySeconds) + daySeconds) % daySeconds;
+    const end = start + span;
+    if (end <= daySeconds) return [[start, end]];
+    return [[start, daySeconds], [0, end - daySeconds]];
+  }
+
+  /** 回報訊息用的時刻字串；跨午夜的秒數先繞回日循環內 */
+  function formatSecondOfDay(second: number): string {
+    const wrapped = Math.round(((second % daySeconds) + daySeconds) % daySeconds);
+    const hh = Math.floor(wrapped / 3600);
+    const mm = Math.floor((wrapped % 3600) / 60);
+    const ss = wrapped % 60;
+    return [hh, mm, ss].map((v) => String(v).padStart(2, '0')).join(':');
+  }
+
+  function cyclicWindowsOverlap(
+    aStart: number, aEnd: number,
+    bStart: number, bEnd: number,
+  ): boolean {
+    const a = daySegmentsOf(aStart, aEnd);
+    const b = daySegmentsOf(bStart, bEnd);
+    return a.some(([as, ae]) => b.some(([bs, be]) => as < be - 1e-9 && bs < ae - 1e-9));
+  }
+
+  /**
+   * 正線停靠站的<strong>載客</strong>佔用表：stationId → 各列車壓住那一格的時間窗。
+   *
+   * 待命可以停在正線停靠站上（使用者指定的），那一格被壓住的期間別台車就進不來。
+   * 挑地點時<strong>一定要看得到這張表</strong>——先前只查 {@link bookings}（整備卡
+   * 自己的設施預約），載客班次在待命眼中永遠是不存在的，於是待命一律賴在
+   * 「車剛跑完停著的那個終端站」（移動成本 0，必勝任何設施），把全天最忙的
+   * 站位壓住一兩個小時，期間每一班經過的車都變成 STATION_BERTH_COLLISION。
+   * 求解器救不了：它只會延後（上限約 2 分鐘）或改走備用線，對付兩小時的佔用無效。
+   *
+   * 定義直接沿用 {@link collectStationBerthOccupancies}——站位佔用只能有一套定義，
+   * 這裡自己再寫一套「什麼叫佔住」就是下一個對不起來的地方。
+   */
+  let mainlineBerthUsage: Map<
+    string,
+    Array<{ startSecond: number; endSecond: number; timelineRow: number }>
+  > | null = null;
+  function mainlineBerthWindows(stationId: string) {
+    if (!mainlineBerthUsage) {
+      mainlineBerthUsage = new Map();
+      // 待命自己造成的佔用要排除：那是這個模組正在決定的東西，且待命彼此
+      // 之間的互斥已經由 bookings（同一個設施節點）管住了。
+      const standbyBlockIds = new Set<string>();
+      for (const timeline of timelines) {
+        for (const block of timeline.blocks) {
+          if (block.taskType === 'standby') standbyBlockIds.add(block.id);
+        }
+      }
+      const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
+        collisionProtectionSeconds,
+      });
+      for (const occ of occupancies) {
+        if (standbyBlockIds.has(occ.blockId)) continue;
+        const list = mainlineBerthUsage.get(occ.stationId) ?? [];
+        // 前後各留一份保護時間：待命當後車時要等前車 protectedUntil 才能進來，
+        // 當前車時也要在後車到站前 2 倍保護時間就先讓出去，跟
+        // findStationBerthCollisions 的判定同一套算術。
+        const protectionSeconds = Math.max(0, collisionProtectionSeconds) * 2;
+        list.push({
+          startSecond: minuteToSecond(occ.startMinute) - protectionSeconds,
+          endSecond: minuteToSecond(occ.protectedUntilMinute),
+          timelineRow: occ.timelineRow,
+        });
+        mainlineBerthUsage.set(occ.stationId, list);
+      }
+    }
+    return mainlineBerthUsage.get(stationId) ?? [];
+  }
+
+  /**
+   * 這個節點在 [startSecond, endSecond) 這段時間可以讓這台車壓住嗎。
+   * 設施格不佔正線站位，永遠可用；停靠節點才要問載客班次。
+   */
+  function dockingBerthIsFree(
+    nodeId: string,
+    timelineRow: number,
+    startSecond: number,
+    endSecond: number,
+  ): boolean {
+    const node = nodeById.get(nodeId);
+    if (node?.kind !== 'docking') return true;
+    const stationId = node.stationId?.trim();
+    if (!stationId) return true;
+    return !mainlineBerthWindows(stationId).some(
+      (window) =>
+        window.timelineRow !== timelineRow
+        && cyclicWindowsOverlap(startSecond, endSecond, window.startSecond, window.endSecond),
+    );
+  }
+
   /**
    * 整備區塊 id → 已經確定停留的具體設施。同一段整備任務只會停在同一台
    * 設施裡——入廠、出廠（或轉場卡對應的那一側）三段各自獨立算，但指的
@@ -429,7 +535,11 @@ export function insertMaintenanceTransferCards(args: {
   }
 
   /**
-   * 這台設施對<strong>整段連續停留</strong>都是空的嗎。
+   * 這個地點對<strong>整段連續停留</strong>都是空的嗎。
+   *
+   * 兩種資源都要問：設施格問 {@link bookings}（整備卡彼此的預約），
+   * 正線停靠節點還要多問 {@link mainlineBerthWindows}（載客班次壓住那一格的時段）。
+   * 只問前者的話，待命眼中正線永遠是空的，會直接壓在最忙的終端站上。
    *
    * 只檢查「正在決定的這一段」是不夠的：跨午夜的
    * 「保養 20:33–24:00 ＋ 保養 00:00–07:50」是一次選擇、一起佔位，
@@ -449,17 +559,19 @@ export function insertMaintenanceTransferCards(args: {
     if (!moveCardFacilityIsFree(bookings, facilityNodeId, startSecond, endSecond, timelineRow)) {
       return false;
     }
+    if (!dockingBerthIsFree(facilityNodeId, timelineRow, startSecond, endSecond)) {
+      return false;
+    }
     for (const member of collectStay(block)) {
       if (member.id === block.id) continue;
+      const memberStart = minuteToSecond(member.plannedStartMinute);
+      const memberEnd = minuteToSecond(member.plannedEndMinute);
       if (
-        !moveCardFacilityIsFree(
-          bookings,
-          facilityNodeId,
-          minuteToSecond(member.plannedStartMinute),
-          minuteToSecond(member.plannedEndMinute),
-          timelineRow,
-        )
+        !moveCardFacilityIsFree(bookings, facilityNodeId, memberStart, memberEnd, timelineRow)
       ) {
+        return false;
+      }
+      if (!dockingBerthIsFree(facilityNodeId, timelineRow, memberStart, memberEnd)) {
         return false;
       }
     }
@@ -513,7 +625,6 @@ export function insertMaintenanceTransferCards(args: {
    * 不是 23 小時 59 分。跨午夜的移動卡時刻會落在 1440 分以上，
    * 直接相減會把「其實只差 20 秒」算成「差了一整天」，碰撞就漏掉了。
    */
-  const daySeconds = minuteToSecond(SCHEDULE_DAY_MINUTES);
   function cyclicGapSeconds(a: number, b: number): number {
     const raw = Math.abs(a - b) % daySeconds;
     return Math.min(raw, daySeconds - raw);
@@ -642,7 +753,7 @@ export function insertMaintenanceTransferCards(args: {
     /** 車最早可以離開上一段的時刻；入廠卡會用它算提前抵達，null＝無從得知 */
     freeSecond: number | null,
   ): { nodeId: string; label: string } | null {
-    let best: { nodeId: string; label: string; cost: number } | null = null;
+    let best: { nodeId: string; label: string; tier: number; cost: number } | null = null;
     const startSecond = minuteToSecond(yard.plannedStartMinute);
     const endSecond = minuteToSecond(yard.plannedEndMinute);
     for (const candidate of candidates) {
@@ -658,9 +769,17 @@ export function insertMaintenanceTransferCards(args: {
       if (!stayFacilityIsFree(candidate.id, yard, timelineRow, holdFrom, endSecond)) {
         continue;
       }
+      // 設施格永遠優先於正線停靠站，跟移動成本無關。
+      //
+      // 純比移動時間的話停靠站必勝：車跑完正線就停在那一格，成本 0，任何設施
+      // 都 > 0——待命於是系統性地選擇「原地不動」，而原地就是終端站最忙的站位。
+      // 壓住正線一格是要付營運代價的（那條路線那段時間排不了車），移動個幾分鐘
+      // 進設施才是便宜的選項。所以先分層、層內才比移動成本：停靠站是
+      // <strong>沒設施可去時的退路</strong>，不是預設解。
+      const tier = nodeById.get(candidate.id)?.kind === 'docking' ? 1 : 0;
       const cost = inCost + outCost;
-      if (!best || cost < best.cost) {
-        best = { nodeId: candidate.id, label: candidate.label || candidate.id, cost };
+      if (!best || tier < best.tier || (tier === best.tier && cost < best.cost)) {
+        best = { nodeId: candidate.id, label: candidate.label || candidate.id, tier, cost };
       }
     }
     return best ? { nodeId: best.nodeId, label: best.label } : null;
@@ -1374,13 +1493,30 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
+      // 解不掉就照實講「卡在哪一種資源」。設施格滿了跟停靠站被載客班次壓著
+      // 是兩種完全不同的處置：前者要加設施，後者要改待命時段或改班表。
+      // 混寫成一句「全被別列車佔著」使用者無從判斷該動哪裡。
+      let facilityBusy = 0;
+      let berthBusy = 0;
+      for (const facility of facilities) {
+        if (nodeById.get(facility.id)?.kind === 'docking') berthBusy += 1;
+        else facilityBusy += 1;
+      }
+      const parts: string[] = [];
+      if (facilityBusy > 0) {
+        parts.push(`${facilityBusy} 台設施格這段時間被別列車佔著`);
+      }
+      if (berthBusy > 0) {
+        parts.push(`${berthBusy} 個停靠站這段時間有載客班次要用（待命壓住站位會擋掉那條路線）`);
+      }
+      const window = `${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}`;
       yard.yardFacilityUnavailable = true;
       facilityUnavailable.push({
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
         facilityCount: facilities.length,
-        reason: `這段時間 ${facilities.length} 台設施全被別列車佔著，這台車沒地方停`,
+        reason: `${window} 這台車沒地方停——${parts.join('；')}`,
       });
     }
   }

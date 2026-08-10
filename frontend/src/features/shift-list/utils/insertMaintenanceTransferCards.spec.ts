@@ -897,6 +897,103 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     });
   });
 
+  describe('待命挑地點：設施優先，停靠站要真的沒有載客班次要用', () => {
+    function topology(): PointTopology {
+      return {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'n-t3', kind: 'docking', label: 'T3上行', stationId: 'station_t3', x: 0, y: 0, color: '#111' },
+          { id: 'n-a', kind: 'docking', label: 'A站', stationId: 'station_a', x: 0, y: 0, color: '#111' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#222' },
+        ],
+        edges: [edge('n-t3', 'M1', 60), edge('M1', 'n-t3', 60), edge('n-a', 'n-t3', 60)],
+      };
+    }
+
+    const ROUTES = [
+      {
+        routeId: 'at3',
+        routeCode: 'AT3',
+        routeName: 'A>T3',
+        stationIds: ['station_a', 'station_t3'],
+        // 站位佔用是從各站到離站時刻推出來的，stationDwells 空的話一個佔用都不會產生
+        stationDwells: [
+          { stationId: 'station_a', stationName: 'A站', dwellSeconds: 0 },
+          { stationId: 'station_t3', stationName: 'T3上行', dwellSeconds: 0 },
+        ],
+        minTravelTimeSeconds: 600,
+        avgTravelTimeSeconds: 600,
+        dwellSlackSeconds: 0,
+        switchBufferAfterSeconds: 0,
+      },
+    ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
+
+    /** 第 1 列一段待命 08:00–11:00；第 2 列一段載客，末站 station_t3 */
+    function planWith(paxStartMinute: number, body: unknown) {
+      const timelines = [
+        {
+          row: 1,
+          blocks: [{
+            id: 'standby-1', timelineRow: 1, taskType: 'standby', label: '待命',
+            anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+            travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+          }],
+        },
+        {
+          row: 2,
+          blocks: [{
+            id: 'pax-2', timelineRow: 2, taskType: 'passenger', label: 'AT3', routeId: 'at3',
+            anchorStartMinute: paxStartMinute, plannedStartMinute: paxStartMinute,
+            plannedEndMinute: paxStartMinute + 10,
+            travelSeconds: 600, dwellSeconds: 0, source: 'template_bar',
+          }],
+        },
+      ] as never as GeneratedSchedulePlan['timelines'];
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: body as Record<string, unknown>,
+        selectedRoutes: ROUTES,
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+      return timelines[0]!.blocks.find((b) => b.id === 'standby-1')!;
+    }
+
+    it('設施與停靠站都可用時選設施——壓住正線一格要付營運代價，移動幾分鐘進設施便宜得多', () => {
+      const standby = planWith(
+        15 * 60, // 載客在待命時段之外，兩個候選都空
+        { mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'T3上行' }, { id: 'b', mapCode: 'M1' }] } },
+      );
+      assert.equal(
+        standby.yardFacilityLabel, 'M1',
+        '停靠站移動成本 0（車就停在那）必勝任何設施，所以要先分層再比成本',
+      );
+      assert.equal(standby.yardFacilityStationId, undefined);
+    });
+
+    it('停靠站在待命時段內有別列車的載客班次要用 → 不選它', () => {
+      const standby = planWith(
+        9 * 60, // 載客 09:00 落在待命 08:00–11:00 之內，末站就是 station_t3
+        { mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'T3上行' }] } },
+      );
+      assert.equal(
+        standby.yardFacilityStationId, undefined,
+        '只查整備卡自己的設施預約表，載客班次在待命眼中永遠不存在，會直接壓上去撞車',
+      );
+      assert.equal(standby.yardFacilityUnavailable, true, '沒地方停要標示出來，不能靜靜地不掛設施');
+    });
+
+    it('同一個停靠站沒有別列車要用時照樣可以停', () => {
+      const standby = planWith(
+        15 * 60,
+        { mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'T3上行' }] } },
+      );
+      assert.equal(standby.yardFacilityStationId, 'station_t3');
+    });
+  });
+
   describe('三段共用一份設施佔用表：不同種卡不會撞用同一台設施', () => {
     /**
      * 單一設施 M1 同時是「保養」入廠目的地，也是另一列車出廠的起點——

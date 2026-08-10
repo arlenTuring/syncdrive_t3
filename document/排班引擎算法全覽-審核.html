@@ -3670,6 +3670,80 @@ backend/src/dev-log/
     完整路線幾何（站點序、各站停靠、站間 leg）不在 log 內，
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
+
+  <h3>2026-08-10 · 大量站位碰撞的成因：待命挑地點時看不見載客班次</h3>
+  <div class="callout">
+    使用者：「目前排出來有大量的碰撞錯誤，請你先查一下原因。」
+    實際生成 <code>20260810-082639-OS-DRAFT-MSEEXIN9.json</code>：
+    <code>STATION_BERTH_COLLISION</code> <strong>41 個 error</strong>、<code>ok = false</code>，
+    集中在 <code>N2W下行出發</code>（14）與 <code>[備用]S2W上行出發</code>（26）。
+  </div>
+  <ul>
+    <li>
+      <strong>碰撞的「前車」全是待命。</strong>例如 <code>SA0503</code>
+      <code>05:03:40–07:00:00</code>、<code>SC0000</code> <code>00:00:30–01:30:00</code>，
+      都是 <code>taskType === 'standby'</code>。一台車壓住一格 1.5–2 小時，
+      期間每一班經過的載客車重疊 10 秒（最小在站窗）就記一次碰撞。
+    </li>
+    <li>
+      <strong>根因一（真 bug）：選點時只查了一半的資源。</strong>
+      <code>pickLocationForStay()</code> 靠 <code>stayFacilityIsFree()</code> 判斷候選空不空，
+      而後者只查 <code>bookings</code>——<strong>整備卡自己的設施預約表</strong>。
+      正線停靠站被載客班次佔用的時段完全不在它的視野裡，
+      於是待命挑停靠站時，那一格永遠是空的，管上面跑幾十班車。
+      <br /><br />
+      修法：<code>stayFacilityIsFree()</code> 對 <code>kind === 'docking'</code> 的候選
+      多問一張表 <code>mainlineBerthWindows()</code>，資料直接來自
+      <code>collectStationBerthOccupancies()</code>——站位佔用只能有一套定義，
+      在這裡自己再寫一套「什麼叫佔住」就是下一個對不起來的地方。
+      前後各留 2 倍碰撞保護時間，跟 <code>findStationBerthCollisions()</code> 同一套算術；
+      跨午夜用日循環區段比對，不是直接相減。
+    </li>
+    <li>
+      <strong>根因二（成本函式偏差）：停靠站必勝。</strong>
+      成本原本是 <code>inCost + outCost</code>，純移動時間。車跑完正線就停在終端站那一格，
+      選它 <code>inCost = 0</code>，<strong>必勝任何設施</strong>（設施一定 &gt; 0）。
+      待命因此系統性地選「原地不動」，而原地就是全天最忙的站位。
+      <br /><br />
+      修法：先分層再比成本——設施格 tier 0、正線停靠站 tier 1。
+      壓住正線一格是要付營運代價的（那條路線那段時間排不了車），
+      移動幾分鐘進設施才是便宜的選項。停靠站是<strong>沒設施可去時的退路</strong>，不是預設解。
+    </li>
+    <li>
+      <strong>為什麼求解器救不了：</strong>它的手段是延後發車（上限約 2 分鐘）或改走備用線，
+      對付兩小時的佔用兩者都無效。<code>STATION_BERTH_BACKUP_USED</code> 85 次就是它掙扎的痕跡，
+      而備用站 <code>[備用]S2W上行出發</code> 同樣被待命壓著，於是那 26 個碰撞也閃不掉。
+    </li>
+    <li>
+      <strong>解不掉時的回報也改了。</strong>原本一句「這段時間 N 台設施全被別列車佔著」，
+      設施格滿了跟停靠站有載客班次要用是<strong>兩種完全不同的處置</strong>
+      （前者要加設施，後者要改待命時段或改班表），混寫使用者無從判斷該動哪裡。
+      現在分開數、附上時間窗：
+      「<code>08:00:00–11:00:00</code> 這台車沒地方停——4 台設施格這段時間被別列車佔著；
+      2 個停靠站這段時間有載客班次要用（待命壓住站位會擋掉那條路線）」。
+    </li>
+    <li>
+      <strong>驗證：</strong>合成情境（把停靠站加進待命候選）下，
+      修正前待命落在 <code>N2W下行出發</code>（主線最忙的一格），修正後改落到真正空的一格；
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 57 → 37、
+      <code>MAINTENANCE_FACILITY_UNAVAILABLE</code> 15 → 14。
+      新增 3 則測試（設施優先／停靠站有班次時不選／沒班次時照選）。
+      <code>tsc</code> 23（不變）、測試 345 pass／9 fail（基準 342／9，+3 為新增）、
+      <code>eslint</code> 無新增問題。
+    </li>
+    <li>
+      <strong>待議：</strong>待命退到停靠站時，目前不分「主線站」與「<code>[備用]</code> 站」。
+      備用站是求解器擠不下時的洩壓閥，被待命壓住等於把洩壓閥關掉；
+      但主線站被壓住的營運代價又更直接。要不要再分一層、哪一邊優先，
+      取決於實際營運意圖，未動。
+    </li>
+    <li>
+      <strong>教訓（第四次）：</strong>又是「同一件事有兩套實作」。
+      這次是選點階段自己憑 <code>bookings</code> 判斷空不空，
+      跟 <code>collectStationBerthOccupancies()</code>／<code>stationBerthConstraint.ts</code>
+      三套並存。凡是「這個位置能不能用」的判斷，一律要回到同一個來源去問。
+    </li>
+  </ul>
 </section>
 
 <footer>
