@@ -102,6 +102,20 @@ const PRIMARY_DAY_COPY_INDEX = 1;
 const CULL_BUCKET_MINUTES = 60;
 const CULL_OVERSCAN_MINUTES = 180;
 
+/**
+ * 0 秒轉場卡的顯示寬度。
+ *
+ * 兩座設施在同一個 Area 時是「0 秒示意轉移」（使用者裁決：開始跟結束一樣就好，
+ * 不用計算），時間長度真的是 0。但 0 長度切不出日循環區段，整張卡就這樣消失，
+ * 畫面上「同區域 0 秒轉移」跟「這段整備根本排不出入場出場卡」<strong>長得一模一樣</strong>，
+ * 使用者分不出來——這正是「SC0000 那邊都沒有整備入場出場卡，這樣看不懂」。
+ *
+ * 所以 0 秒卡照畫，用固定寬度撐出來，並且畫成虛線邊框表示<strong>它不佔時間</strong>。
+ * 出廠卡掛在時刻的左邊（前一段任務的尾巴）、入廠卡掛在右邊（後一段任務的頭），
+ * 各佔一側，誰也不蓋誰；後一段任務的卡面文字往右讓出同樣的寬度。
+ */
+const ZERO_MOVE_CARD_WIDTH_PX = 30;
+
 // 班次卡大小高度調整參數
 const TEMPLATE_TASK_BAR_HEIGHT = 26; // 頂部時間模板任務卡片高度
 const REAL_TASK_BAR_HEIGHT = 52;     // 下層真實排班班次卡卡片高度
@@ -318,6 +332,12 @@ function MoveCardHoverCard({
       <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
         {formatBlockTimeRange(block)}（{block.travelSeconds} 秒）
       </div>
+      {block.plannedEndMinute - block.plannedStartMinute <= 1e-9 ? (
+        <div className="mt-0.5 text-[10px] leading-4 text-amber-300/90">
+          兩座設施在同一個場區，0 秒示意轉移——這張卡不佔時間，
+          畫出來的寬度只是標記。
+        </div>
+      ) : null}
       <p className="mt-1 text-[10px] leading-[14px] text-zinc-500">
         {block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : ''}
       </p>
@@ -961,6 +981,7 @@ function ShiftScheduleBlockBar({
   onDeleteBlock,
   onDuplicateBlock,
   primaryCopy = true,
+  leadingInsetPx = 0,
 }: {
   block: GeneratedScheduleBlock;
   blockIndex: number;
@@ -987,6 +1008,11 @@ function ShiftScheduleBlockBar({
    * Tab 鍵要按三次才走得完一張卡。
    */
   primaryCopy?: boolean;
+  /**
+   * 卡面文字往右讓出的寬度。開頭剛好被一張 0 秒入廠卡壓住時，
+   * 不讓的話代號（SC0000 這種）會整個被蓋掉。
+   */
+  leadingInsetPx?: number;
 }) {
   // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
   // 單一顏色、卡內不放內容，說明全部交給 hover。
@@ -999,13 +1025,21 @@ function ShiftScheduleBlockBar({
     ? YARD_EXIT_MOVE_COLOR_SET
     : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
+  /** 同區域轉移＝0 秒示意，開始等於結束 */
+  const isZeroDurationMoveCard = isMoveCard && durationMinutes <= 1e-9;
   const daySegments = useMemo(
-    () =>
-      splitIntoDayCycleSegments(
+    () => {
+      const segments = splitIntoDayCycleSegments(
         block.plannedStartMinute,
         block.plannedEndMinute,
-      ),
-    [block.plannedStartMinute, block.plannedEndMinute],
+      );
+      if (segments.length > 0 || !isZeroDurationMoveCard) return segments;
+      // 0 長度切不出區段，整張卡會消失——但它是真的存在的一張卡。
+      // 給它一個點區段，寬度靠 ZERO_MOVE_CARD_WIDTH_PX 撐出來。
+      const point = wrapScheduleMinute(block.plannedStartMinute);
+      return [{ startMinute: point, endMinute: point }];
+    },
+    [block.plannedStartMinute, block.plannedEndMinute, isZeroDurationMoveCard],
   );
   // 跨午夜的卡（兩段）以前不給拖：那時日尾與日頭畫在畫面的兩端，拖哪一段
   // 都看不懂在拖什麼。無限捲動之後兩段實體相鄰、看起來就是一張，拖任一段
@@ -1240,9 +1274,20 @@ function ShiftScheduleBlockBar({
   return (
     <>
       {daySegments.map((seg, segIndex) => {
-        const leftPx = (seg.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
-        const widthPx =
+        const rawLeftPx = (seg.startMinute / GRID_SLOT_MINUTES) * slotWidthPx;
+        const rawWidthPx =
           ((seg.endMinute - seg.startMinute) / GRID_SLOT_MINUTES) * slotWidthPx;
+        // 出場移動卡只有 30 秒，日尺度上幾乎是 0 px，給一個看得到的最小寬度；
+        // 0 秒的同區域轉場卡再寬一點，因為它要塞得下代號與 ⓘ。
+        const widthPx = isZeroDurationMoveCard
+          ? ZERO_MOVE_CARD_WIDTH_PX
+          : Math.max(rawWidthPx, isMoveCard ? 22 : 4);
+        // 0 秒的出廠卡掛在時刻左邊（前一段任務的尾巴），入廠卡掛在右邊
+        // （後一段任務的頭），兩張各佔一側，不會疊在同一個點上互相蓋掉。
+        const leftPx =
+          isZeroDurationMoveCard && block.source === 'yard_exit_move'
+            ? rawLeftPx - widthPx
+            : rawLeftPx;
         // 跨夜卡被日界切成頭尾兩段，兩段是<strong>同一張卡</strong>，內容要一樣——
         // 只有 DOM id 與 hover 卡這種「整份文件只能有一個」的東西掛在第一段上。
         const showChrome = true;
@@ -1255,15 +1300,23 @@ function ShiftScheduleBlockBar({
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
         selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
-      } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${extraBorderClass}`}
+      } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${
+        // 虛線邊框＝這張卡不佔時間（同區域 0 秒示意轉移），
+        // 跟一般有長度的轉場卡一眼分得出來
+        isZeroDurationMoveCard ? 'border border-dashed border-zinc-100/60' : ''
+      } ${extraBorderClass}`}
       style={{
         left: leftPx,
-        // 出場移動卡給一個看得到的最小寬度，否則 30 秒在日尺度上幾乎是 0 px
-        width: Math.max(widthPx, isMoveCard ? 22 : 4),
+        width: widthPx,
         height: REAL_TASK_BAR_HEIGHT,
         top: REAL_TASK_BAR_TOP,
         backgroundColor: colors.bg,
-        zIndex: highlighted ? 50 : (block.source === 'template_bar' ? 2 : 1),
+        // 0 秒卡疊在整備卡的邊界上，要壓在上面才看得到
+        zIndex: highlighted
+          ? 50
+          : isZeroDurationMoveCard
+            ? 4
+            : (block.source === 'template_bar' ? 2 : 1),
         ...extraStyle,
       }}
       title={
@@ -1274,6 +1327,9 @@ function ShiftScheduleBlockBar({
                 ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '整備設施'}`
                 : `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
               `${timeLabel}（${block.travelSeconds} 秒）`,
+              isZeroDurationMoveCard
+                ? '※ 兩座設施在同一個場區，0 秒示意轉移（不佔時間，卡片寬度只是標記）'
+                : '',
               block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : '',
               block.yardExitAteYardTail ? '※ 空間不足，已佔用整備尾巴' : '',
             ]
@@ -1414,7 +1470,10 @@ function ShiftScheduleBlockBar({
         </button>
       ) : null}
       {showChrome && !isMoveCard ? (
-      <div className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}>
+      <div
+        className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}
+        style={leadingInsetPx > 0 ? { paddingLeft: leadingInsetPx } : undefined}
+      >
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
           style={{ color: hasError ? '#FCA5A5' : hasWarning ? '#FDE68A' : colors.text }}
@@ -1633,25 +1692,49 @@ export function ShiftSchedulePlanGrid({
         previousPassengerBlock: GeneratedScheduleBlock | null;
         /** 這張卡在鐘面上實際佔用的區間（跨午夜會有兩段），裁切用 */
         spans: Array<{ start: number; end: number }>;
+        /** 卡面文字要往右讓出的寬度（開頭被 0 秒入廠卡壓住時） */
+        leadingInsetPx: number;
       }>
     >();
     for (const [row, blocks] of blocksByRow) {
+      const visible = blocks.filter((block) => block.source !== 'transition');
+      // 0 秒入廠卡壓在哪些時刻上——同一時刻開始的整備卡要把卡面讓開
+      const zeroEntryMinutes = new Set<number>();
+      for (const block of visible) {
+        if (block.source !== 'yard_entry_move') continue;
+        if (block.plannedEndMinute - block.plannedStartMinute > 1e-9) continue;
+        zeroEntryMinutes.add(
+          Math.round(wrapScheduleMinute(block.plannedStartMinute) * 60),
+        );
+      }
       let previousPassengerBlock: GeneratedScheduleBlock | null = null;
-      const entries = blocks
-        .filter((block) => block.source !== 'transition')
-        .map((block, index) => {
-          const entry = {
-            block,
-            index,
-            previousPassengerBlock,
-            spans: splitIntoDayCycleSegments(
+      const entries = visible.map((block, index) => {
+        const startSecond = Math.round(
+          wrapScheduleMinute(block.plannedStartMinute) * 60,
+        );
+        const entry = {
+          block,
+          index,
+          previousPassengerBlock,
+          // 0 秒卡切不出區段，這裡要補回一個點，否則裁切階段就把它整張丟掉，
+          // 卡片再怎麼給最小寬度也畫不出來
+          spans: (() => {
+            const segments = splitIntoDayCycleSegments(
               block.plannedStartMinute,
               block.plannedEndMinute,
-            ).map((seg) => ({ start: seg.startMinute, end: seg.endMinute })),
-          };
-          if (block.taskType === 'passenger') previousPassengerBlock = block;
-          return entry;
-        });
+            ).map((seg) => ({ start: seg.startMinute, end: seg.endMinute }));
+            if (segments.length > 0) return segments;
+            const point = wrapScheduleMinute(block.plannedStartMinute);
+            return [{ start: point, end: point }];
+          })(),
+          leadingInsetPx:
+            !isMoveCardBlockSource(block.source) && zeroEntryMinutes.has(startSecond)
+              ? ZERO_MOVE_CARD_WIDTH_PX
+              : 0,
+        };
+        if (block.taskType === 'passenger') previousPassengerBlock = block;
+        return entry;
+      });
       map.set(row, entries);
     }
     return map;
@@ -1885,6 +1968,7 @@ export function ShiftSchedulePlanGrid({
                           onDeleteBlock={onDeleteBlock}
                           onDuplicateBlock={onDuplicateBlock}
                           primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
+                          leadingInsetPx={entry.leadingInsetPx}
                         />
                       ))}
                       <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
