@@ -115,14 +115,14 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-10T08:26:39.643Z
+      更新：2026-08-10T08:48:59.342Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0810」
       · ok=<code>true</code>
       · 錯誤 0／警告 187／共 187 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 191→187（-4） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
+    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 187→187（±0） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
   </header>
   
 <section class="accept">
@@ -1048,7 +1048,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 4：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）</p>
+  <p class="msg">時間線 4：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 11:59:30 經過，被 時間線 3 11:59:30 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">整備轉場卡分三種：入廠（MI，車確定不能再跑正線時提前開進整備設施）、出廠（MO，整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
@@ -1064,7 +1064,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 4：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）</p>
+  <p class="msg">時間線 4：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 21:59:30 經過，被 時間線 3 21:59:30 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">整備轉場卡分三種：入廠（MI，車確定不能再跑正線時提前開進整備設施）、出廠（MO，整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
@@ -1128,7 +1128,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 7：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）</p>
+  <p class="msg">時間線 7：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 23:59:30 經過，被 時間線 6 23:59:30 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">整備轉場卡分三種：入廠（MI，車確定不能再跑正線時提前開進整備設施）、出廠（MO，整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
@@ -1368,7 +1368,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 8：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）</p>
+  <p class="msg">時間線 8：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 14:00:00 經過，被 時間線 5 13:59:30 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">整備轉場卡分三種：入廠（MI，車確定不能再跑正線時提前開進整備設施）、出廠（MO，整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
@@ -1432,7 +1432,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 6：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（差距不到 2 倍碰撞保護時間）</p>
+  <p class="msg">時間線 6：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 22:00:00 經過，被 時間線 3 21:59:30 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">整備轉場卡分三種：入廠（MI，車確定不能再跑正線時提前開進整備設施）、出廠（MO，整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>

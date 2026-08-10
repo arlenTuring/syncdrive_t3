@@ -166,11 +166,37 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(yard.plannedEndMinute, 11 * 60, '整備結束時刻必須不動');
     });
 
-    it('沒有提前空間就不插卡（車跑到整備開始才空出來）', () => {
+    it('沒有提前空間時，整備開始跟著實際進廠時刻往後（結束時刻仍然不動）', () => {
+      // 車 09:30 跑完正線、整備也是 09:30 開始，中間一秒空檔都沒有。
+      // 原本這種情形直接不插卡——但整備開始晚個一分鐘對一段 90 分鐘的工作
+      // 根本不算什麼，車卻因此完全沒有進廠的路徑可言。
+      // （這不是 §6 的整備讓渡——那是正線來要時間；這裡只是車進不去而已。）
       const p = plan({ yardStartMinute: 9 * 60 + 30 });
       const result = run(p);
-      assert.equal(result.inserted, 0);
-      assert.equal(p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move'), undefined);
+      assert.equal(result.inserted, 1);
+      const card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move')!;
+      assert.equal(card.plannedStartMinute, 9 * 60 + 30, '車一空出來就走');
+      assert.equal(card.plannedEndMinute, 9 * 60 + 31, 'M1 走 60 秒');
+
+      const yard = p.timelines[0]!.blocks.find((b) => b.id === 'yard-1')!;
+      assert.equal(yard.plannedStartMinute, 9 * 60 + 31, '整備開始被推遲到抵達那一刻');
+      assert.equal(yard.plannedEndMinute, 11 * 60, '結束時刻仍然不動——被壓掉的是工作時間');
+      assert.equal(result.laterTaskCompressed, 1, '被推遲要計數，不能悄悄壓縮');
+    });
+
+    it('晚進廠有上限：不會為了排出卡片把整備的工作時間吃光', () => {
+      // 保養只有 5 分鐘（09:30–09:35），車也是 09:30 才空出來。
+      // 晚進廠上限（幾倍碰撞保護時間）與「至少留 60 秒工作時間」兩道限制，
+      // 讓整備開始最多推到 09:31，不會被推到接近結束。
+      const p = plan({ yardStartMinute: 9 * 60 + 30 });
+      p.timelines[0]!.blocks.find((b) => b.id === 'yard-1')!.plannedEndMinute = 9 * 60 + 35;
+      run(p);
+      const yard = p.timelines[0]!.blocks.find((b) => b.id === 'yard-1')!;
+      assert.ok(
+        yard.plannedEndMinute - yard.plannedStartMinute >= 1,
+        `晚進廠後至少要留 1 分鐘工作時間，實際 ${yard.plannedEndMinute - yard.plannedStartMinute} 分`,
+      );
+      assert.equal(yard.plannedEndMinute, 9 * 60 + 35, '結束時刻永遠不動');
     });
 
     it('挑最快到得了的設施', () => {

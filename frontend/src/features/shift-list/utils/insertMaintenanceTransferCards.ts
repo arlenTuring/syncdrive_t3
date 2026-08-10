@@ -651,6 +651,24 @@ export function insertMaintenanceTransferCards(args: {
    * 同一個道理、同一個數字。
    */
   const collisionBufferSeconds = Math.max(0, collisionProtectionSeconds) * 2;
+
+  /**
+   * 整備開始最多可以晚多久＝<strong>車最多可以晚多久才進得到設施</strong>。
+   *
+   * 這不是 §6 的「整備讓渡」——那條講的是<strong>正線要用時間、整備讓出開頭</strong>，
+   * 觸發者是正線。這裡講的是物理：整備要等車真的進到設施才做得起來，
+   * 車幾點到，工作就幾點開始。原本只做了一半——「早到就早開工」有，
+   * 「晚到就晚開工」沒有，於是「設施要到 00:00 才空出來」加上「整備 00:00
+   * 開始」兩個限制一夾，可挪動範圍就是 0 秒，跟別列車撞在同一個轉折點上就無解。
+   * 實際上只要晚 30 秒進廠就過了，對一段 90 分鐘的充電根本不算什麼。
+   *
+   * 上限抓在幾倍碰撞保護時間：夠閃開轉折點、夠等前一台車讓出設施就好。
+   * 真的要等更久，那是設施不足或時段安排的問題，該回報讓使用者去調，
+   * 不是把整備的工作時間吃光。
+   */
+  const maxYardStartPushSeconds = Math.max(60, collisionBufferSeconds * 4);
+  /** 晚進廠之後整備至少要留下的工作時間 */
+  const MIN_YARD_WORK_SECONDS = 60;
   type JunctionBooking = { nodeId: string; instant: number; timelineRow: number };
   const junctionBookings: JunctionBooking[] = [];
 
@@ -1002,16 +1020,15 @@ export function insertMaintenanceTransferCards(args: {
         + Math.max(0, minimumRecoveryTimeSeconds);
       const yardStartSecond = minuteToSecond(yard.plannedStartMinute);
       const yardEndSecond = minuteToSecond(yard.plannedEndMinute);
-      if (freeSecond >= yardStartSecond - 1e-9) {
-        // 車還在跑正線，整備就已經開始了——中間沒有任何移動空檔，插不進入廠卡。
-        // 這是模板時刻自己的問題（整備視窗壓在正線上），使用者要能看到。
+      if (freeSecond >= yardEndSecond - 1e-9) {
+        // 車跑完正線的時候整備視窗<strong>整段都過去了</strong>，怎麼讓都塞不下。
         skipped.push({
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
           reason:
-            `整備開始時車還在跑正線（前一段載客 ${formatSecondOfDay(freeSecond)} 才空出來、`
-            + `整備 ${formatSecondOfDay(yardStartSecond)} 就開始），中間沒有移動空檔`,
+            `整備視窗整段都在車跑完正線之前（前一段載客 ${formatSecondOfDay(freeSecond)} 才空出來、`
+            + `整備 ${formatSecondOfDay(yardStartSecond)}–${formatSecondOfDay(yardEndSecond)}），塞不進任何移動`,
         });
         continue;
       }
@@ -1029,8 +1046,23 @@ export function insertMaintenanceTransferCards(args: {
         // freeSecond 可能是負的（前一段載客在前一天），那就照負的算，
         // 最後整張連整備區塊一起平移一天，避免出現負時刻。
         const preferredDeparture = freeSecond;
-        // 再晚就趕不上整備開始；比這更晚等於整備遲到，不允許
-        const latestDeparture = yardStartSecond - path.avgSeconds;
+        /**
+         * 整備開始跟著<strong>實際進廠時刻</strong>走，兩個方向都是。
+         *
+         * 早到就早開工（原本就有），晚到就晚開工（原本沒有）。這跟整備間轉場的
+         * 既有規則是同一條——後一段開始被推遲、結束不動，運輸成本佔的是後一段
+         * 自己的工作時間；入廠卡先前只做了一半。
+         *
+         * 順序上仍然<strong>優先最早</strong>：偏好出發＝車一空出來就走，
+         * 設施與轉折點的搜尋都取最小位移，所以只有在真的被擋住時才會超過原訂開始。
+         */
+        const latestDeparture = Math.min(
+          // 讓渡是「讓一點」，不是把整備吃掉——最多往後推幾倍碰撞保護時間，
+          // 夠閃開轉折點、夠等前一台車讓出設施就好。真的要等更久，那是設施
+          // 不足或時段安排的問題，該回報讓使用者去調，不是把工作時間吃光。
+          yardStartSecond + maxYardStartPushSeconds,
+          yardEndSecond - MIN_YARD_WORK_SECONDS,
+        ) - path.avgSeconds;
         if (latestDeparture < preferredDeparture - 1e-9) { tally.noTime += 1; continue; }
 
         /**
@@ -1156,7 +1188,11 @@ export function insertMaintenanceTransferCards(args: {
       // 整備區塊整個往後平移一天（開始 23:5x、結束 1440＋），日循環位置不變。
       yard.plannedStartMinute = secondToMinute(arriveSecond) + dayShiftMinute;
       yard.plannedEndMinute += dayShiftMinute;
-      yardHeadExtended += 1;
+      // 被設施或轉折點擋住而晚進廠時，整備開始被推遲、結束不動＝工作時間變短，
+      // 跟整備間轉場的「後一段被壓縮」是同一件事，計進同一個數字。
+      // 注意這不是 §6 的整備讓渡（那是正線來要時間），是車進不去而已。
+      if (arriveSecond > yardStartSecond + 1e-9) laterTaskCompressed += 1;
+      else yardHeadExtended += 1;
       // 時刻定案後才綁設施——assignYardFacility 會用當下的 [開始, 結束] 佔位
       assignYardStay(yard, chosen.nodeId, chosen.label);
       inserted += 1;
