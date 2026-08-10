@@ -60,8 +60,21 @@ export type FleetSupplyDemandRow = {
   cycleSeconds: number;
   /** 需求車數 = 一輪往返 ÷ 目標班距 */
   requiredVehicles: number | null;
-  /** 這個時段實際在跑正線的時間線列數 */
+  /**
+   * 這個時段<strong>平均同時</strong>有幾台車在跑正線
+   * ＝ 正線佔用分鐘 ÷ 時段長度。
+   *
+   * 要跟「需求車數」比就必須是這個數字——需求 = 一輪往返 ÷ 班距，算的是
+   * <strong>同一時刻</strong>要幾台車在線上。先前這裡放的是「這個時段出現過的
+   * 時間線列數」，那是<strong>整段時間的聯集</strong>：一台車跑三小時要去充電、
+   * 換另一台接手，五小時的時段就數成兩台，跟同時在跑幾台是兩回事
+   * （2026-08-10 使用者：「我招呼模式明明就只有設定兩台，他寫四台是什麼意思？」）。
+   */
   actualVehicles: number;
+  /** 這個時段同時在跑正線的最大台數 */
+  peakConcurrentVehicles: number;
+  /** 這個時段動用過的時間線列數（含輪替接手的）——供人對照，不用來算供需 */
+  distinctRowCount: number;
   /** 實際 − 需求；正值＝車太多，負值＝車不夠 */
   surplusVehicles: number | null;
   /** 這個時段的正線班次數 */
@@ -306,7 +319,7 @@ export function buildScheduleAnalysisReport(args: {
         && block.plannedEndMinute > startMinute,
     );
     const rows = new Set(inWindow.map((block) => block.row));
-    const actualVehicles = rows.size;
+    const windowMinutes = endMinute - startMinute;
 
     let busyMinutes = 0;
     for (const block of inWindow) {
@@ -317,12 +330,48 @@ export function buildScheduleAnalysisReport(args: {
         endMinute,
       );
     }
-    const windowMinutes = endMinute - startMinute;
-    const availableMinutes = actualVehicles * windowMinutes;
-    const idleMinutes = Math.max(0, availableMinutes - busyMinutes);
+    // 平均同時在跑幾台——這才跟「需求車數」是同一個維度
+    const actualVehicles = windowMinutes > 0 ? busyMinutes / windowMinutes : 0;
+
+    // 尖峰同時在跑幾台：掃過每一段正線的起訖，看重疊最多幾層
+    const events: Array<{ at: number; delta: number }> = [];
+    for (const block of inWindow) {
+      events.push({ at: Math.max(block.plannedStartMinute, startMinute), delta: 1 });
+      events.push({ at: Math.min(block.plannedEndMinute, endMinute), delta: -1 });
+    }
+    events.sort((a, b) => (a.at - b.at) || (a.delta - b.delta));
+    let concurrent = 0;
+    let peakConcurrentVehicles = 0;
+    for (const event of events) {
+      concurrent += event.delta;
+      if (concurrent > peakConcurrentVehicles) peakConcurrentVehicles = concurrent;
+    }
+
+    /**
+     * 空等 = 這個時段裡「什麼都沒排」的時間，<strong>整備與待命不算</strong>。
+     *
+     * 先前是拿「列數 × 時段長度 − 正線時間」直接當空等，於是一台車進廠充電
+     * 兩小時會被算成空等兩小時，還被描述成「只能停在終點站佔著停靠點」——
+     * 車明明在充電樁裡。要扣掉的是那一列在這個時段的<strong>所有</strong>排定工作。
+     */
+    let idleMinutes = 0;
+    for (const row of rows) {
+      const timeline = plan.timelines.find((item) => item.row === row);
+      if (!timeline) continue;
+      let scheduledMinutes = 0;
+      for (const block of timeline.blocks) {
+        scheduledMinutes += minutesOverlap(
+          block.plannedStartMinute,
+          block.plannedEndMinute,
+          startMinute,
+          endMinute,
+        );
+      }
+      idleMinutes += Math.max(0, windowMinutes - scheduledMinutes);
+    }
     const idleMinutesPerVehicleHour =
-      actualVehicles > 0 && windowMinutes > 0
-        ? (idleMinutes / actualVehicles) * (60 / windowMinutes)
+      rows.size > 0 && windowMinutes > 0
+        ? (idleMinutes / rows.size) * (60 / windowMinutes)
         : 0;
 
     const requiredVehicles =
@@ -340,6 +389,8 @@ export function buildScheduleAnalysisReport(args: {
       cycleSeconds,
       requiredVehicles,
       actualVehicles,
+      peakConcurrentVehicles,
+      distinctRowCount: rows.size,
       surplusVehicles:
         requiredVehicles == null ? null : actualVehicles - requiredVehicles,
       tripCount: inWindow.length,
@@ -388,9 +439,10 @@ export function buildScheduleAnalysisReport(args: {
         message:
           `${row.intervalName}：這個時段只需要 ${row.requiredVehicles!.toFixed(1)} 台車`
           + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ 班距 ${row.targetHeadwaySeconds} 秒），`
-          + `實際排了 ${row.actualVehicles} 台，多出 ${row.surplusVehicles.toFixed(1)} 台。`
-          + `多出來的車沒有班次可跑，每台每小時要空等 ${row.idleMinutesPerVehicleHour.toFixed(0)} 分鐘，`
-          + `只能停在終點站佔著停靠點。`,
+          + `實際平均同時 ${row.actualVehicles.toFixed(1)} 台在跑（尖峰 ${row.peakConcurrentVehicles} 台、`
+          + `整段動用 ${row.distinctRowCount} 條時間線輪替），多出 ${row.surplusVehicles.toFixed(1)} 台。`
+          + `多出來的車沒有班次可跑，扣掉整備與待命之後每台每小時還空等 `
+          + `${row.idleMinutesPerVehicleHour.toFixed(0)} 分鐘，只能停在終點站佔著停靠點。`,
       });
       continue;
     }
@@ -400,7 +452,7 @@ export function buildScheduleAnalysisReport(args: {
         subject: row.intervalName,
         message:
           `${row.intervalName}：這個時段需要 ${row.requiredVehicles!.toFixed(1)} 台車才追得上班距 `
-          + `${row.targetHeadwaySeconds} 秒，實際只有 ${row.actualVehicles} 台，`
+          + `${row.targetHeadwaySeconds} 秒，實際平均同時只有 ${row.actualVehicles.toFixed(1)} 台在跑，`
           + `少了 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`,
       });
     }

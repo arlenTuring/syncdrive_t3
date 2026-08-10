@@ -75,7 +75,10 @@ export function ScheduleAnalysisReportPanel({
         </h3>
         <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
           需求車數 ＝ 一輪往返時間 ÷ 目標班距。跑完一整圈要 13 分鐘、每 6 分鐘要發一班，
-          就需要大約兩台車輪流。實際比需求多，多出來的車就沒有班次可跑，只能停在終點站。
+          就需要大約兩台車輪流。「實際」比的是<b>同一時刻</b>平均有幾台在跑正線，
+          不是這個時段出現過幾條時間線——一台跑到要充電、換另一台接手，是輪替，
+          不是同時多一台。輪替用掉幾條線另外列在「動用」欄。
+          實際比需求多，多出來的車就沒有班次可跑，只能停在終點站。
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse">
@@ -85,7 +88,9 @@ export function ScheduleAnalysisReportPanel({
                 <th className={TH}>目標班距</th>
                 <th className={TH}>一輪往返</th>
                 <th className={TH}>需要</th>
-                <th className={TH}>實際</th>
+                <th className={TH}>實際同時</th>
+                <th className={TH}>尖峰同時</th>
+                <th className={TH}>動用</th>
                 <th className={TH}>差額</th>
                 <th className={TH}>每台每小時空等</th>
                 <th className={TH}>班次</th>
@@ -107,7 +112,9 @@ export function ScheduleAnalysisReportPanel({
                   </td>
                   <td className={TD}>{(row.cycleSeconds / 60).toFixed(1)} 分</td>
                   <td className={TD}>{formatVehicles(row.requiredVehicles)} 台</td>
-                  <td className={TD}>{row.actualVehicles} 台</td>
+                  <td className={TD}>{row.actualVehicles.toFixed(1)} 台</td>
+                  <td className={TD}>{row.peakConcurrentVehicles} 台</td>
+                  <td className={TD}>{row.distinctRowCount} 條</td>
                   <td className={`${TD} ${surplusClass(row.surplusVehicles)}`}>
                     {row.surplusVehicles == null
                       ? '—'

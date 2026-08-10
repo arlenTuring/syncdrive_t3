@@ -62,27 +62,33 @@ const ATTRIBUTES = [
   },
 ] as never as Parameters<typeof buildScheduleAnalysisReport>[0]['attributes'];
 
+/**
+ * 每一列都<strong>整個時段</strong>都在跑正線（08:00–09:00 連續發車）。
+ *
+ * 「實際」比的是同一時刻平均有幾台在線上，不是這個時段出現過幾條時間線，
+ * 所以 fixture 必須讓車真的整段都在跑；只排一段 5 分鐘的班次代表的是
+ * 「平均 0.08 台」，那跟 rowCount 是兩回事。
+ */
 function planWithRows(rowCount: number): GeneratedSchedulePlan {
   const timelines = [];
   for (let row = 1; row <= rowCount; row += 1) {
-    timelines.push({
-      row,
-      blocks: [
-        {
-          id: `blk-${row}`,
-          timelineRow: row,
-          taskType: 'passenger',
-          label: 'A>B',
-          routeId: 'ab',
-          anchorStartMinute: 8 * 60,
-          plannedStartMinute: 8 * 60,
-          plannedEndMinute: 8 * 60 + 5,
-          travelSeconds: 300,
-          dwellSeconds: 0,
-          source: 'template_bar',
-        },
-      ],
-    });
+    const blocks = [];
+    for (let leg = 0; leg < 12; leg += 1) {
+      blocks.push({
+        id: `blk-${row}-${leg}`,
+        timelineRow: row,
+        taskType: 'passenger',
+        label: 'A>B',
+        routeId: 'ab',
+        anchorStartMinute: 8 * 60 + leg * 5,
+        plannedStartMinute: 8 * 60 + leg * 5,
+        plannedEndMinute: 8 * 60 + leg * 5 + 5,
+        travelSeconds: 300,
+        dwellSeconds: 0,
+        source: 'template_bar',
+      });
+    }
+    timelines.push({ row, blocks });
   }
   return { timelines } as never as GeneratedSchedulePlan;
 }

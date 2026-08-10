@@ -3671,6 +3671,51 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 班表分析報表的「實際車數」拿聯集去比同時性，結論整個反了</h3>
+  <div class="callout">
+    使用者：「奇怪，我招呼模式明明就只有設定兩台，是因為一台只能跑 3 小時就要充電，
+    他寫四台是什麼意思？」
+  </div>
+  <ul>
+    <li>
+      <strong>兩個數字不同維度。</strong>需求車數 ＝ 一輪往返 ÷ 目標班距，算的是
+      <strong>同一時刻</strong>要幾台車在線上。而「實際」放的是
+      <code>new Set(inWindow.map(b =&gt; b.row)).size</code>——這個時段
+      <strong>出現過</strong>的時間線列數，是整段時間的<strong>聯集</strong>。
+      一台車跑三小時要去充電、換另一台接手，五小時的時段就數成兩台；
+      拿聯集去跟同時性比，數字必然愈長的時段愈膨脹。
+    </li>
+    <li>
+      <strong>結論是反的，不只是難看。</strong>真實資料 00:00–05:00：
+      <table>
+        <thead><tr><th></th><th>報表原本</th><th>實際</th></tr></thead>
+        <tbody>
+          <tr><td>需求</td><td>2.3 台</td><td>2.3 台</td></tr>
+          <tr><td>實際</td><td>4 台（＝動用 4 條線）</td><td>平均同時 <strong>1.2 台</strong>、尖峰同時 <strong>2 台</strong></td></tr>
+          <tr><td>結論</td><td>多出 1.7 台，建議減車</td><td>差 −1.1 台，<strong>車其實不夠</strong></td></tr>
+        </tbody>
+      </table>
+      「尖峰同時 2 台」正好對上使用者說的「我只有設定兩台」。
+    </li>
+    <li>
+      <strong>改法：</strong>「實際」改成<strong>平均同時在跑</strong>
+      （正線佔用分鐘 ÷ 時段長度），另外獨立列出「尖峰同時」與「動用幾條時間線」。
+      供需差額用平均同時算。表頭與說明文字一併改掉，講明輪替不等於同時多一台。
+    </li>
+    <li>
+      <strong>順手修第二個錯：空等把整備算進去了。</strong>
+      原本 <code>空等 = 列數 × 時段長度 − 正線時間</code>，於是一台車進廠充電兩小時
+      被算成空等兩小時，還被描述成「只能停在終點站佔著停靠點」——車明明在充電樁裡。
+      改成扣掉那一列在這個時段的<strong>所有</strong>排定工作（整備、待命、移動卡都算），
+      剩下的才是真的沒事做。
+    </li>
+    <li>
+      <strong>測試 fixture 也是照舊語意寫的：</strong>每一列只排一段 5 分鐘的班次，
+      卻期待「實際 ＝ 列數」。改成每一列整個時段連續發車，新舊語意下都成立。
+      <code>tsc</code> 23、測試 346 pass／9 fail、<code>eslint</code> 乾淨。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 調整班表的卡面文字改成跟著捲動貼齊（同時間模板管理）</h3>
   <div class="callout">
     使用者：「把調整班表這邊的卡裡面的文字弄得跟時間模板管理的任務排班一樣，
