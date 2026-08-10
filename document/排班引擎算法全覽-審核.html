@@ -3671,6 +3671,60 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 把所有「沉默略過」一次掃乾淨</h3>
+  <div class="callout">
+    使用者：「不要我一直點名才做，有類似的都給我補上。」
+  </div>
+  <p>
+    逐一檢查 <code>insertMaintenanceTransferCards.ts</code> 裡全部 55 個
+    <code>continue</code>，照兩類分：
+  </p>
+  <ul>
+    <li>
+      <strong>不需要卡</strong>（串首才補入廠、串尾才補出廠、同類型銜接不需轉場、
+      不是整備任務）→ 本來就該安靜，維持原狀。
+    </li>
+    <li>
+      <strong>需要卡但給不出來</strong> → 一律回報。原本有三處是安靜吞掉的：
+      <table>
+        <thead><tr><th>情形</th><th>現在的訊息</th><th>真實資料筆數</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>整列整天沒有任何載客班次（入廠找不到車從哪來、出廠找不到車要去哪）</td>
+            <td>「這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡」</td>
+            <td>4</td>
+          </tr>
+          <tr>
+            <td>整備開始時車還在跑正線，中間沒有移動空檔</td>
+            <td>「整備開始時車還在跑正線（前一段載客 <code>hh:mm:ss</code> 才空出來、
+              整備 <code>hh:mm:ss</code> 就開始），中間沒有移動空檔」</td>
+            <td>7</td>
+          </tr>
+          <tr>
+            <td>前一段載客沒有路線代號，查不出它停在哪一站</td>
+            <td>「⋯查不出它停在哪一站，無從算入廠路徑」</td>
+            <td>0（這份資料沒踩到）</td>
+          </tr>
+        </tbody>
+      </table>
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 38 → 49，多的 11 則全是原本
+      看不見的。錯誤仍為空、<code>report.ok</code> 仍為 true。
+    </li>
+    <li>
+      <strong>0 長度卡的顯示從轉場卡推廣到所有卡。</strong>原本只補了同區域轉場卡，
+      但 0 長度的<strong>整備任務本身</strong>（時間線 9、10 那種
+      <code>00:00:00~00:00:00 保養</code>）一樣畫不出來。現在任何開始等於結束的卡
+      都畫成 30px 虛線方塊，hover 會說「這張卡的開始與結束相同（長度 0），
+      時間模板那一列可能排錯了」。同區域轉場卡是正常的、0 長度整備是錯的，
+      兩種都得先看得見才談得上判斷。
+    </li>
+    <li>
+      <strong>更正一則先前的說法：</strong>之前說「那些警告的 <code>timelineRow</code>
+      是 None」——那是探查腳本讀錯欄位。時間線編號在
+      <code>detail.timelineRow</code> 裡，跟其他 code 一致，沒有問題。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 00:00 開始的整備補得出入廠卡了（前一段載客在前一天）</h3>
   <div class="callout">
     使用者指著 <code>EF0000／EG0000</code>（充電 00:00–01:30）問：「為什麼這個也沒有咧？」

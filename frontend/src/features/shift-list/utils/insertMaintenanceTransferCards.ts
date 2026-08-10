@@ -858,7 +858,19 @@ export function insertMaintenanceTransferCards(args: {
       // 往回找最近一段載客，找不到就繞回當日最後一段（同一台車前一天的尾巴）
       const prevPax = findPrevCyclic(sorted, i, (b) => b.taskType === 'passenger');
       const previousPassenger = prevPax?.block;
-      if (!prevPax || !previousPassenger?.routeId) continue;
+      if (!prevPax || !previousPassenger?.routeId) {
+        // 沉默略過的話，畫面上就是「這段整備沒有入廠卡」，跟排不出來、
+        // 跟同區域 0 秒轉移長得一模一樣。要卡而給不出卡，一律講原因。
+        skipped.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          reason: prevPax
+            ? '前一段載客沒有路線代號，查不出它停在哪一站，無從算入廠路徑'
+            : '這一列整天沒有任何載客班次，找不到車是從哪裡開進來的',
+        });
+        continue;
+      }
       const stationId = routeEndStation.get(previousPassenger.routeId);
       const fromNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
       if (!fromNodeId) {
@@ -901,7 +913,19 @@ export function insertMaintenanceTransferCards(args: {
         + Math.max(0, minimumRecoveryTimeSeconds);
       const yardStartSecond = minuteToSecond(yard.plannedStartMinute);
       const yardEndSecond = minuteToSecond(yard.plannedEndMinute);
-      if (freeSecond >= yardStartSecond - 1e-9) continue;
+      if (freeSecond >= yardStartSecond - 1e-9) {
+        // 車還在跑正線，整備就已經開始了——中間沒有任何移動空檔，插不進入廠卡。
+        // 這是模板時刻自己的問題（整備視窗壓在正線上），使用者要能看到。
+        skipped.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          reason:
+            `整備開始時車還在跑正線（前一段載客 ${formatSecondOfDay(freeSecond)} 才空出來、`
+            + `整備 ${formatSecondOfDay(yardStartSecond)} 就開始），中間沒有移動空檔`,
+        });
+        continue;
+      }
       /**
        * 前一段載客落在<strong>前一天</strong>（freeSecond 是負的）。
        *
@@ -1293,7 +1317,17 @@ export function insertMaintenanceTransferCards(args: {
       // 「下一段」照日循環算——當日最後一段的下一段，是同一台車隔天的第一段，
       // 所以整備排在當日尾巴時仍然找得到它要銜接的那一段載客（時刻 +1440）。
       const nextPax = findNextCyclic(sorted, i, requiresVehicleAtStation);
-      if (!nextPax) continue;
+      if (!nextPax) {
+        // 繞一整圈都沒有載客班次＝這一列整天只有整備，車永遠不出廠。
+        // 這通常是模板那一列排錯了，不該安靜吞掉。
+        skipped.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          reason: '這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡',
+        });
+        continue;
+      }
       const nextYard = findNextCyclic(
         sorted,
         i,

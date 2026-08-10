@@ -699,7 +699,19 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       } as never as GeneratedSchedulePlan;
       const result = run(p);
       assert.equal(result.inserted, 0);
-      assert.equal(result.skipped.length, 0);
+      // 同類型銜接本身不該有任何回報——它是「不需要卡」，不是「排不出卡」
+      assert.equal(
+        result.skipped.some((s) => s.fromTaskType != null || s.toTaskType != null),
+        false,
+        '同類型銜接不需要轉場，不該回報轉場排不出來',
+      );
+      // 這個 fixture 整列只有兩段保養、沒有任何正線，入廠與出廠都給不出卡。
+      // 那是要讓使用者看到的（整天沒有載客班次），不能安靜吞掉。
+      assert.equal(
+        result.skipped.every((s) => s.reason.includes('沒有任何載客班次')),
+        true,
+        `剩下的回報應該都是「整列沒有載客班次」，實際：${result.skipped.map((s) => s.reason).join(' / ')}`,
+      );
     });
 
     it('移動時間長到會把後一段推過結束時刻時，回報而不強插', () => {

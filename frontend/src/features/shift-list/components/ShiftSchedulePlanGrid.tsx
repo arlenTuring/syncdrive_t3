@@ -114,7 +114,7 @@ const CULL_OVERSCAN_MINUTES = 180;
  * 出廠卡掛在時刻的左邊（前一段任務的尾巴）、入廠卡掛在右邊（後一段任務的頭），
  * 各佔一側，誰也不蓋誰；後一段任務的卡面文字往右讓出同樣的寬度。
  */
-const ZERO_MOVE_CARD_WIDTH_PX = 30;
+const ZERO_DURATION_CARD_WIDTH_PX = 30;
 
 // 班次卡大小高度調整參數
 const TEMPLATE_TASK_BAR_HEIGHT = 26; // 頂部時間模板任務卡片高度
@@ -1025,21 +1025,26 @@ function ShiftScheduleBlockBar({
     ? YARD_EXIT_MOVE_COLOR_SET
     : SCHEDULE_ENGINE_TASK_TYPE_COLORS[block.taskType];
   const durationMinutes = block.plannedEndMinute - block.plannedStartMinute;
-  /** 同區域轉移＝0 秒示意，開始等於結束 */
-  const isZeroDurationMoveCard = isMoveCard && durationMinutes <= 1e-9;
+  /**
+   * 開始等於結束的卡。兩種來源：
+   * 1. 同區域轉場卡——使用者裁決的「0 秒示意轉移」，是正常的。
+   * 2. 0 長度的整備任務本身——模板那一列排錯了，是要被看見的問題。
+   * 兩種都得畫出來，畫不出來的話跟「這裡什麼都沒排」分不出來。
+   */
+  const isZeroDuration = durationMinutes <= 1e-9;
   const daySegments = useMemo(
     () => {
       const segments = splitIntoDayCycleSegments(
         block.plannedStartMinute,
         block.plannedEndMinute,
       );
-      if (segments.length > 0 || !isZeroDurationMoveCard) return segments;
+      if (segments.length > 0 || !isZeroDuration) return segments;
       // 0 長度切不出區段，整張卡會消失——但它是真的存在的一張卡。
-      // 給它一個點區段，寬度靠 ZERO_MOVE_CARD_WIDTH_PX 撐出來。
+      // 給它一個點區段，寬度靠 ZERO_DURATION_CARD_WIDTH_PX 撐出來。
       const point = wrapScheduleMinute(block.plannedStartMinute);
       return [{ startMinute: point, endMinute: point }];
     },
-    [block.plannedStartMinute, block.plannedEndMinute, isZeroDurationMoveCard],
+    [block.plannedStartMinute, block.plannedEndMinute, isZeroDuration],
   );
   // 跨午夜的卡（兩段）以前不給拖：那時日尾與日頭畫在畫面的兩端，拖哪一段
   // 都看不懂在拖什麼。無限捲動之後兩段實體相鄰、看起來就是一張，拖任一段
@@ -1279,13 +1284,13 @@ function ShiftScheduleBlockBar({
           ((seg.endMinute - seg.startMinute) / GRID_SLOT_MINUTES) * slotWidthPx;
         // 出場移動卡只有 30 秒，日尺度上幾乎是 0 px，給一個看得到的最小寬度；
         // 0 秒的同區域轉場卡再寬一點，因為它要塞得下代號與 ⓘ。
-        const widthPx = isZeroDurationMoveCard
-          ? ZERO_MOVE_CARD_WIDTH_PX
+        const widthPx = isZeroDuration
+          ? ZERO_DURATION_CARD_WIDTH_PX
           : Math.max(rawWidthPx, isMoveCard ? 22 : 4);
         // 0 秒的出廠卡掛在時刻左邊（前一段任務的尾巴），入廠卡掛在右邊
         // （後一段任務的頭），兩張各佔一側，不會疊在同一個點上互相蓋掉。
         const leftPx =
-          isZeroDurationMoveCard && block.source === 'yard_exit_move'
+          isZeroDuration && block.source === 'yard_exit_move'
             ? rawLeftPx - widthPx
             : rawLeftPx;
         // 跨夜卡被日界切成頭尾兩段，兩段是<strong>同一張卡</strong>，內容要一樣——
@@ -1303,7 +1308,7 @@ function ShiftScheduleBlockBar({
       } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${
         // 虛線邊框＝這張卡不佔時間（同區域 0 秒示意轉移），
         // 跟一般有長度的轉場卡一眼分得出來
-        isZeroDurationMoveCard ? 'border border-dashed border-zinc-100/60' : ''
+        isZeroDuration ? 'border border-dashed border-zinc-100/60' : ''
       } ${extraBorderClass}`}
       style={{
         left: leftPx,
@@ -1314,7 +1319,7 @@ function ShiftScheduleBlockBar({
         // 0 秒卡疊在整備卡的邊界上，要壓在上面才看得到
         zIndex: highlighted
           ? 50
-          : isZeroDurationMoveCard
+          : isZeroDuration
             ? 4
             : (block.source === 'template_bar' ? 2 : 1),
         ...extraStyle,
@@ -1327,15 +1332,15 @@ function ShiftScheduleBlockBar({
                 ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '整備設施'}`
                 : `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
               `${timeLabel}（${block.travelSeconds} 秒）`,
-              isZeroDurationMoveCard
-                ? '※ 兩座設施在同一個場區，0 秒示意轉移（不佔時間，卡片寬度只是標記）'
+              isZeroDuration
+                ? '※ 兩座設施在同一個場區，0 秒示意轉移（不佔時間，畫出來的寬度只是標記）'
                 : '',
               block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : '',
               block.yardExitAteYardTail ? '※ 空間不足，已佔用整備尾巴' : '',
             ]
               .filter(Boolean)
               .join('\n')
-          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
+          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${isZeroDuration ? '\n⚠ 這張卡的開始與結束相同（長度 0），時間模板那一列可能排錯了' : ''}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
       }
       role={selectable ? 'button' : undefined}
       tabIndex={selectable && isPrimarySegment && primaryCopy ? 0 : undefined}
@@ -1729,7 +1734,7 @@ export function ShiftSchedulePlanGrid({
           })(),
           leadingInsetPx:
             !isMoveCardBlockSource(block.source) && zeroEntryMinutes.has(startSecond)
-              ? ZERO_MOVE_CARD_WIDTH_PX
+              ? ZERO_DURATION_CARD_WIDTH_PX
               : 0,
         };
         if (block.taskType === 'passenger') previousPassengerBlock = block;
