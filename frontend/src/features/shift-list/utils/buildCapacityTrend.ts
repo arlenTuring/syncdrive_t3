@@ -1,8 +1,7 @@
 import {
   computeCapacityPphpd,
   computeHeadwaySecondsFromPphpd,
-  parseIntervalEndMinutes,
-  parseIntervalStartMinutes,
+  resolveIntervalMinuteRanges,
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../time-templates/types/editor';
@@ -901,20 +900,20 @@ export function buildCapacityPeriodBands(
 
   for (const interval of intervals) {
     if (interval.isDraft) continue;
-    const start = parseIntervalStartMinutes(interval.startTime);
-    const end = parseIntervalEndMinutes(interval.endTime);
-    if (start == null || end == null || end <= start) continue;
     const attr = attrById.get(interval.attributeId);
     if (!attr || attr.isDraft) continue;
-    bands.push({
-      attributeId: attr.id,
-      name: attr.name,
-      color: attr.color,
-      startMinute: start,
-      endMinute: end,
-      headwaySeconds: attr.headwaySeconds,
-      capacityPphpd: attr.capacityPphpd,
-    });
+    // 跨午夜的時段在鐘面上是兩段色帶：日尾一條、日頭一條
+    for (const range of resolveIntervalMinuteRanges(interval.startTime, interval.endTime)) {
+      bands.push({
+        attributeId: attr.id,
+        name: attr.name,
+        color: attr.color,
+        startMinute: range.start,
+        endMinute: range.end,
+        headwaySeconds: attr.headwaySeconds,
+        capacityPphpd: attr.capacityPphpd,
+      });
+    }
   }
 
   return bands.sort((a, b) => a.startMinute - b.startMinute);

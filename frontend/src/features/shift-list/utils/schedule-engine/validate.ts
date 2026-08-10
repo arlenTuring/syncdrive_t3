@@ -1,6 +1,5 @@
 import {
-  parseIntervalStartMinutes,
-  parseIntervalEndMinutes,
+  resolveIntervalMinuteRanges,
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../../time-templates/types/editor';
@@ -54,10 +53,9 @@ export function resolveHeadwaySecondsAtMinute(
   attributes: TimeSlotAttribute[],
 ): number | null {
   for (const interval of intervals) {
-    const start = parseIntervalStartMinutes(interval.startTime);
-    const end = parseIntervalEndMinutes(interval.endTime);
-    if (start == null || end == null || end <= start) continue;
-    if (minute < start || minute >= end) continue;
+    // 時段可以跨午夜，那在鐘面上是兩段；問「這一分鐘屬於哪個時段」要兩段都問
+    const ranges = resolveIntervalMinuteRanges(interval.startTime, interval.endTime);
+    if (!ranges.some((range) => minute >= range.start && minute < range.end)) continue;
     const attribute = attributes.find((item) => item.id === interval.attributeId);
     if (!attribute) return null;
     const headway = attribute.headwaySeconds;
@@ -419,9 +417,10 @@ export function validateTimelineCapacity(
   if (scheduleRowCount <= 0 || passengerBlocks.length === 0) return;
 
   for (const interval of intervals) {
-    const start = parseIntervalStartMinutes(interval.startTime);
-    const end = parseIntervalEndMinutes(interval.endTime);
-    if (start == null || end == null || end <= start) continue;
+    // 跨午夜的時段在鐘面上是兩段；班次要兩段都撿，不然午夜之後那半段的班次
+    // 會整批不受這條檢查管
+    const ranges = resolveIntervalMinuteRanges(interval.startTime, interval.endTime);
+    if (ranges.length === 0) continue;
 
     const attribute = attributes.find((item) => item.id === interval.attributeId);
     const headway = attribute?.headwaySeconds;
@@ -429,7 +428,7 @@ export function validateTimelineCapacity(
 
     const blocksInInterval = passengerBlocks.filter((block) => {
       const minute = block.anchorStartMinute;
-      return minute >= start && minute < end;
+      return ranges.some((range) => minute >= range.start && minute < range.end);
     });
     if (blocksInInterval.length === 0) continue;
 

@@ -1,6 +1,5 @@
 import {
-  parseIntervalStartMinutes,
-  parseIntervalEndMinutes,
+  resolveIntervalMinuteRanges,
   type ScheduleTask,
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -22,6 +21,33 @@ import { secondToMinute } from './types';
 export const TIMETABLE_GENERATION_ALGORITHM = 'periodic-cycle-headway-v2' as const;
 
 export type TimetableGenerationAlgorithm = typeof TIMETABLE_GENERATION_ALGORITHM;
+
+/**
+ * 把時段展開成<strong>日循環區段</strong>再排。
+ *
+ * 一個時段可以跨午夜（23:00–01:00），那在鐘面上是兩段。展開之後，下面所有
+ * 「從 startMinute 走到 endMinute」的線性迴圈原封不動就正確——不必在每個迴圈
+ * 裡各自處理一次繞回去，也就不會有哪一支忘了改。
+ *
+ * 原本這些迴圈是 <code>endMinute &lt;= startMinute 就 continue</code>：
+ * 跨午夜的時段會被<strong>整段安靜跳過</strong>，班表少掉那一段班次卻不報錯。
+ */
+type IntervalSegment = {
+  interval: TimeSlotInterval;
+  startMinute: number;
+  endMinute: number;
+};
+
+function expandIntervalSegments(intervals: TimeSlotInterval[]): IntervalSegment[] {
+  return intervals
+    .flatMap((interval) =>
+      resolveIntervalMinuteRanges(interval.startTime, interval.endTime).map((range) => ({
+        interval,
+        startMinute: range.start,
+        endMinute: range.end,
+      })))
+    .sort((a, b) => a.startMinute - b.startMinute);
+}
 
 export type HeadwayDeparture = {
   startSecond: number;
@@ -52,16 +78,9 @@ export function generateDeparturesFromHeadway(args: {
   const attrById = new Map(attributes.map((attr) => [attr.id, attr] as const));
   const departures: HeadwayDeparture[] = [];
 
-  const sortedIntervals = [...intervals].sort((a, b) => {
-    const aStart = parseIntervalStartMinutes(a.startTime) ?? 0;
-    const bStart = parseIntervalStartMinutes(b.startTime) ?? 0;
-    return aStart - bStart;
-  });
+  const sortedIntervals = expandIntervalSegments(intervals);
 
-  for (const interval of sortedIntervals) {
-    const startMinute = parseIntervalStartMinutes(interval.startTime);
-    const endMinute = parseIntervalEndMinutes(interval.endTime);
-    if (startMinute == null || endMinute == null || endMinute <= startMinute) continue;
+  for (const { interval, startMinute, endMinute } of sortedIntervals) {
 
     const attribute = attrById.get(interval.attributeId);
     const headwayRaw = attribute?.headwaySeconds;
@@ -115,11 +134,7 @@ export function generateDirectionalDeparturesFromHeadway(args: {
   if (routes.length === 0) return [];
 
   const attrById = new Map(attributes.map((attr) => [attr.id, attr] as const));
-  const sortedIntervals = [...intervals].sort((a, b) => {
-    const aStart = parseIntervalStartMinutes(a.startTime) ?? 0;
-    const bStart = parseIntervalStartMinutes(b.startTime) ?? 0;
-    return aStart - bStart;
-  });
+  const sortedIntervals = expandIntervalSegments(intervals);
   const emptyRanges =
     emptyIntervalMainlineSlackSeconds > 0
       ? listEmptyAttributeMinuteRanges(intervals)
@@ -130,10 +145,7 @@ export function generateDirectionalDeparturesFromHeadway(args: {
   let lastDepartureSecond: number | null = null;
   let lastHeadwaySeconds: number | null = null;
 
-  for (const interval of sortedIntervals) {
-    const startMinute = parseIntervalStartMinutes(interval.startTime);
-    const endMinute = parseIntervalEndMinutes(interval.endTime);
-    if (startMinute == null || endMinute == null || endMinute <= startMinute) continue;
+  for (const { interval, startMinute, endMinute } of sortedIntervals) {
 
     const attribute = attrById.get(interval.attributeId);
     const headwayRaw = attribute?.headwaySeconds;
@@ -276,18 +288,25 @@ export function buildIntervalEndSecondByDepartureStart(
   departures: HeadwayDeparture[],
   intervals: TimeSlotInterval[],
 ): Map<number, number> {
-  const endByIntervalId = new Map<string, number>();
-  for (const interval of intervals) {
-    const endMinute = parseIntervalEndMinutes(interval.endTime);
-    if (endMinute == null) continue;
-    endByIntervalId.set(interval.id, Math.round(endMinute * 60));
+  // 跨午夜的時段一個 id 對到兩段，結束秒不只一個——要看這班車實際落在哪一段
+  const segmentsByIntervalId = new Map<string, IntervalSegment[]>();
+  for (const segment of expandIntervalSegments(intervals)) {
+    const list = segmentsByIntervalId.get(segment.interval.id) ?? [];
+    list.push(segment);
+    segmentsByIntervalId.set(segment.interval.id, list);
   }
 
   const map = new Map<number, number>();
   for (const departure of departures) {
+    const segments = segmentsByIntervalId.get(departure.intervalId) ?? [];
+    const owning = segments.find(
+      (segment) =>
+        departure.startSecond >= Math.round(segment.startMinute * 60)
+        && departure.startSecond < Math.round(segment.endMinute * 60),
+    );
     map.set(
       departure.startSecond,
-      endByIntervalId.get(departure.intervalId) ?? Number.POSITIVE_INFINITY,
+      owning ? Math.round(owning.endMinute * 60) : Number.POSITIVE_INFINITY,
     );
   }
   return map;

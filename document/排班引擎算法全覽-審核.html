@@ -3671,6 +3671,64 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 時段的內核改成日循環：跨午夜時段可以畫、也真的排得出來</h3>
+  <div class="callout">
+    使用者：「我是請你把內核改好。」——先前只做了 GUI（捲動看得順），
+    資料模型與引擎仍然假設一天是線性的。
+  </div>
+  <ul>
+    <li>
+      <strong>唯一入口：<code>resolveIntervalMinuteRanges(start, end)</code>。</strong>
+      <code>23:00–01:00</code> 切成 <code>[23:00,24:00]</code> ＋ <code>[00:00,01:00]</code>；
+      開始等於結束＝整整一天。<code>parseIntervalMinuteRanges</code> 改成 flatMap 它。
+      <br />
+      關鍵是<strong>它本來就回傳陣列</strong>——先前只是遇到「結束 ≤ 開始」直接回 null。
+      所以營運底色、任務可排區間、時段缺口偵測這些吃 <code>activeRanges</code> 的
+      消費端<strong>一行都不用改</strong>就吃得下兩段。
+    </li>
+    <li>
+      <strong>引擎那三支才是內核。</strong>它們原本都是
+      「<code>endMinute &lt;= startMinute</code> 就 continue」——跨午夜的時段會被
+      <strong>整段安靜跳過</strong>，班表少掉那一段班次而且不報錯。
+      <ul>
+        <li><code>generateDepartures.ts</code>：新增 <code>expandIntervalSegments()</code>，
+          在迴圈之前先把時段展開成日循環區段，兩個線性迴圈原封不動就正確——
+          不必在每個迴圈裡各自處理繞回去，也就不會有哪一支忘了改。</li>
+        <li>同一支的 <code>buildIntervalEndSecondByDepartureStart</code> 要特別處理：
+          跨午夜的時段<strong>一個 id 對到兩段</strong>，結束秒不只一個，
+          改成看這一班實際落在哪一段。</li>
+        <li><code>validate.ts</code> 兩處、<code>buildCapacityTrend.ts</code> 的色帶：
+          改成問區段陣列；運能趨勢的跨午夜時段會畫成兩條色帶。</li>
+      </ul>
+    </li>
+    <li>
+      <strong>顯示層</strong>：<code>resolveIntervalTrackLayout</code> →
+      <code>resolveIntervalTrackLayouts</code>（回傳色帶陣列），選取高亮（格線與表頭
+      各一層）與表頭點擊感應區都改成畫兩條、<strong>兩段都可點</strong>，
+      點哪一段都是選同一個時段。時長標籤、
+      <code>findOperatingIntervalAtMinute</code>、hover 卡的時段長度也一併轉。
+    </li>
+    <li>
+      <strong>最後才打開閘門</strong>：<code>isValidIntervalRange</code> 從
+      <code>end &gt; start</code> 改成 <code>resolveIntervalMinuteRanges(...).length &gt; 0</code>。
+      順序刻意如此——引擎沒轉完就放行，等於讓使用者畫得出一個會安靜少班次的時段。
+    </li>
+    <li>
+      <strong>驗證：</strong>新增端到端測試 <code>crossMidnightInterval.spec.ts</code>：
+      23:00–01:00 配 1800 秒班距要發出 <code>23:00 / 23:30 / 00:00 / 00:30</code> 四班
+      （改之前是 <strong>0 班</strong>）；每一班的「所屬時段結束秒」要看它落在哪一段
+      （23:30 → 24:00、00:30 → 01:00）；沒跨午夜的行為不變。
+      另補 <code>isValidIntervalRange</code>／<code>resolveIntervalMinuteRanges</code>
+      的單元測試與 <code>TurnaroundLimitGrid</code> 的日拷貝測試。
+      <code>tsc</code> 23、測試 355 pass／9 fail、<code>eslint</code> 與基準相同。
+    </li>
+    <li>
+      <strong>沒有動的：任務條仍然不能跨午夜</strong>（拖曳與縮放的邊界仍夾在
+      <code>[0, 1440]</code>）。使用者這一輪要的是「拉時間段上去並且是跨午夜的」，
+      任務條拆兩段在引擎那側會被 <code>collectStay</code> 串成同一段停留，沒有損失。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 時間模板的任務排班也用同一套日循環無限捲動</h3>
   <div class="callout">
     使用者：「我在想，我們應該讓時間模板也有這樣的 GUI，這樣使用者才可以拉時間段

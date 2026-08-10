@@ -917,23 +917,17 @@ export function parseIntervalEndMinutes(time: string): number | null {
 }
 
 /**
- * 時段範圍合法嗎。
+ * 時段範圍合法嗎。<strong>跨午夜是合法的</strong>（23:00–01:00）。
  *
- * <strong>資料層（{@link resolveIntervalMinuteRanges}）已經完全支援跨午夜</strong>，
- * 但排班引擎那側還沒有：<code>generateDepartures.ts</code>（發車脈衝）、
- * <code>validate.ts</code>、<code>buildCapacityTrend.ts</code> 仍然是
- * 「<code>endMinute &lt;= startMinute</code> 就跳過這個時段」。在那三支轉完之前
- * 放行跨午夜時段，使用者畫得出來、卻會排出一張<strong>安靜少掉那一段班次</strong>
- * 的班表——那比畫不出來糟得多。
+ * 唯一不合法的是「兩個時刻解析不出來」；開始等於結束視為整整一天。
  *
- * 所以這裡暫時仍然擋著。引擎轉完之後把這個函式換成
- * <code>resolveIntervalMinuteRanges(...).length &gt; 0</code> 即可，
- * 上下游都已經吃得下兩段區間。
+ * 上下游全部吃 {@link resolveIntervalMinuteRanges} 切出來的區段陣列：
+ * 營運底色、任務可排區間、時段缺口偵測、發車脈衝（<code>generateDepartures</code>）、
+ * 班距檢查（<code>validate</code>）、運能趨勢（<code>buildCapacityTrend</code>）、
+ * 分析報表。跨午夜在每一段都是「兩段」而不是特例。
  */
 export function isValidIntervalRange(startTime: string, endTime: string): boolean {
-  const start = parseIntervalStartMinutes(startTime);
-  const end = parseIntervalEndMinutes(endTime);
-  return start != null && end != null && end > start;
+  return resolveIntervalMinuteRanges(startTime, endTime).length > 0;
 }
 
 export function formatMinutesAsDuration(totalMinutes: number): string {

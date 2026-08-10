@@ -42,11 +42,12 @@ describe('interval time parsing', () => {
     assert.equal(intervalDurationTableLabel('08:00', '08:00'), '24小時');
   });
 
-  it('UI 仍然擋著跨午夜——排班引擎那側還沒轉完', () => {
-    // 放行的話使用者畫得出來、卻會排出安靜少掉那一段班次的班表。
-    // 引擎（generateDepartures／validate／buildCapacityTrend）轉完才放行。
-    assert.equal(isValidIntervalRange('22:00', '21:00'), false);
+  it('跨午夜是合法的；解析不出來的時刻才是非法', () => {
+    assert.equal(isValidIntervalRange('22:00', '21:00'), true);
+    assert.equal(isValidIntervalRange('23:00', '01:00'), true);
+    assert.equal(isValidIntervalRange('08:00', '08:00'), true);
     assert.equal(isValidIntervalRange('22:00', '00:00'), true);
     assert.equal(isValidIntervalRange('', '08:00'), false);
+    assert.equal(isValidIntervalRange('25:00', '08:00'), false);
   });
 });
