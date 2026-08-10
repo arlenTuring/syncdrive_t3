@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   formatSelectedIntervalHoverContent,
-  resolveIntervalTrackLayout,
+  resolveIntervalTrackLayouts,
   softHighlightColumnStyle,
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -184,24 +184,22 @@ function SelectedIntervalColumnBand({
   );
 }
 
-function resolveSelectedIntervalBand(
+/** 選取中的時段要畫的色帶；跨午夜會是兩條（日尾一條、日頭一條） */
+function resolveSelectedIntervalBands(
   intervals: TimeSlotInterval[],
   attributes: TimeSlotAttribute[],
   slotWidthPx: number,
   scheduleSlotMinutes: number,
   selectedIntervalId: string | null,
-): { leftPx: number; widthPx: number; accent: string } | null {
+): Array<{ leftPx: number; widthPx: number; accent: string }> {
   const selectedSlot = intervals
     .filter((slot) => !slot.isDraft)
     .find((slot) => slot.id === selectedIntervalId);
-  if (!selectedSlot) return null;
-  const layout = resolveIntervalTrackLayout(selectedSlot, slotWidthPx, scheduleSlotMinutes);
-  if (!layout) return null;
+  if (!selectedSlot) return [];
   const attribute = attributes.find((item) => item.id === selectedSlot.attributeId);
-  return {
-    ...layout,
-    accent: attribute?.color ?? '#7C86FF',
-  };
+  const accent = attribute?.color ?? '#7C86FF';
+  return resolveIntervalTrackLayouts(selectedSlot, slotWidthPx, scheduleSlotMinutes)
+    .map((layout) => ({ ...layout, accent }));
 }
 
 /** 整欄包覆高亮：貫穿折返列與甘特列（header 另繪一層） */
@@ -214,7 +212,7 @@ export function ScheduleIntervalColumnHighlight({
   rowLabelWidth,
   selectedIntervalId,
 }: Omit<SharedIntervalSelectionProps, 'onSelectIntervalId'> & { rowLabelWidth: number }) {
-  const band = resolveSelectedIntervalBand(
+  const bands = resolveSelectedIntervalBands(
     intervals,
     attributes,
     slotWidthPx,
@@ -222,7 +220,7 @@ export function ScheduleIntervalColumnHighlight({
     selectedIntervalId,
   );
 
-  if (!band) return null;
+  if (bands.length === 0) return null;
 
   return (
     <div
@@ -230,11 +228,14 @@ export function ScheduleIntervalColumnHighlight({
       style={{ left: rowLabelWidth, width: trackWidthPx }}
       aria-hidden
     >
-      <SelectedIntervalColumnBand
-        leftPx={band.leftPx}
-        widthPx={band.widthPx}
-        accent={band.accent}
-      />
+      {bands.map((band, index) => (
+        <SelectedIntervalColumnBand
+          key={index}
+          leftPx={band.leftPx}
+          widthPx={band.widthPx}
+          accent={band.accent}
+        />
+      ))}
     </div>
   );
 }
@@ -249,7 +250,7 @@ export function ScheduleIntervalHeaderColumnHighlight({
   rowLabelWidth,
   selectedIntervalId,
 }: Omit<SharedIntervalSelectionProps, 'onSelectIntervalId'> & { rowLabelWidth: number }) {
-  const band = resolveSelectedIntervalBand(
+  const bands = resolveSelectedIntervalBands(
     intervals,
     attributes,
     slotWidthPx,
@@ -257,7 +258,7 @@ export function ScheduleIntervalHeaderColumnHighlight({
     selectedIntervalId,
   );
 
-  if (!band) return null;
+  if (bands.length === 0) return null;
 
   return (
     <div
@@ -265,11 +266,14 @@ export function ScheduleIntervalHeaderColumnHighlight({
       style={{ left: rowLabelWidth, width: trackWidthPx }}
       aria-hidden
     >
-      <SelectedIntervalColumnBand
-        leftPx={band.leftPx}
-        widthPx={band.widthPx}
-        accent={band.accent}
-      />
+      {bands.map((band, index) => (
+        <SelectedIntervalColumnBand
+          key={index}
+          leftPx={band.leftPx}
+          widthPx={band.widthPx}
+          accent={band.accent}
+        />
+      ))}
     </div>
   );
 }
@@ -298,21 +302,22 @@ export function ScheduleIntervalHeaderHits({
       style={{ left: rowLabelWidth, width: trackWidthPx }}
     >
       <div className="relative h-full w-full">
-        {confirmed.map((slot) => {
-          const layout = resolveIntervalTrackLayout(slot, slotWidthPx, scheduleSlotMinutes);
-          if (!layout) return null;
+        {confirmed.flatMap((slot) => {
           const attribute = attributes.find((item) => item.id === slot.attributeId);
-          return (
-            <ScheduleIntervalHeaderHit
-              key={slot.id}
-              interval={slot}
-              attribute={attribute}
-              leftPx={layout.leftPx}
-              widthPx={layout.widthPx}
-              selected={selectedIntervalId === slot.id}
-              onSelect={handleSelect}
-              estimatedTripSeconds={estimatedTripSeconds}
-            />
+          // 跨午夜的時段在軌道上是兩段，兩段都要能點；點哪一段都是選同一個時段
+          return resolveIntervalTrackLayouts(slot, slotWidthPx, scheduleSlotMinutes).map(
+            (layout, index) => (
+              <ScheduleIntervalHeaderHit
+                key={`${slot.id}#${index}`}
+                interval={slot}
+                attribute={attribute}
+                leftPx={layout.leftPx}
+                widthPx={layout.widthPx}
+                selected={selectedIntervalId === slot.id}
+                onSelect={handleSelect}
+                estimatedTripSeconds={estimatedTripSeconds}
+              />
+            ),
           );
         })}
       </div>

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   intervalDurationTableLabel,
   isValidIntervalRange,
+  resolveIntervalMinuteRanges,
   parseIntervalEndMinutes,
   parseIntervalStartMinutes,
   SCHEDULE_DAY_MINUTES,
@@ -25,8 +26,27 @@ describe('interval time parsing', () => {
     assert.equal(intervalDurationTableLabel('22:00', '00:00'), '2小時');
   });
 
-  it('rejects end before or equal to start', () => {
+  it('資料層已經把跨午夜切成兩段', () => {
+    assert.deepEqual(resolveIntervalMinuteRanges('23:00', '01:00'), [
+      { start: 23 * 60, end: 24 * 60 },
+      { start: 0, end: 60 },
+    ]);
+    // 22:00–21:00 就是「22:00 跑到隔天 21:00」，共 23 小時
+    assert.equal(intervalDurationTableLabel('22:00', '21:00'), '23小時');
+  });
+
+  it('開始等於結束＝整整一天（零長度的時段沒有意義）', () => {
+    assert.deepEqual(resolveIntervalMinuteRanges('08:00', '08:00'), [
+      { start: 0, end: 24 * 60 },
+    ]);
+    assert.equal(intervalDurationTableLabel('08:00', '08:00'), '24小時');
+  });
+
+  it('UI 仍然擋著跨午夜——排班引擎那側還沒轉完', () => {
+    // 放行的話使用者畫得出來、卻會排出安靜少掉那一段班次的班表。
+    // 引擎（generateDepartures／validate／buildCapacityTrend）轉完才放行。
     assert.equal(isValidIntervalRange('22:00', '21:00'), false);
-    assert.equal(isValidIntervalRange('08:00', '08:00'), false);
+    assert.equal(isValidIntervalRange('22:00', '00:00'), true);
+    assert.equal(isValidIntervalRange('', '08:00'), false);
   });
 });

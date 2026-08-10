@@ -97,10 +97,8 @@ export function createDraftInterval(attributeId = ''): TimeSlotInterval {
 }
 
 export function intervalDurationTableLabel(startTime: string, endTime: string): string {
-  const start = parseIntervalStartMinutes(startTime);
-  const end = parseIntervalEndMinutes(endTime);
-  if (start == null || end == null || end <= start) return '0小時';
-  const mins = end - start;
+  const mins = resolveIntervalDurationMinutes(startTime, endTime);
+  if (mins == null || mins <= 0) return '0小時';
   const hh = Math.floor(mins / 60);
   const mm = mins % 60;
   if (hh === 0 && mm === 0) return '0小時';
@@ -358,15 +356,45 @@ export function taskTypeBarBackground(
 
 export type MinuteRange = { start: number; end: number };
 
+/**
+ * 一個時段在鐘面上覆蓋到的區段。<strong>跨午夜就是兩段。</strong>
+ *
+ * 這是整份時間模板處理「時段」的<strong>唯一入口</strong>——營運底色、
+ * 任務可排區間、時段缺口偵測、班距查詢全都吃它回傳的區段陣列，
+ * 所以只要這裡切得對，跨午夜就會一路成立，不必每個消費端各自判斷一次。
+ * （回傳陣列這件事本來就在，先前只是遇到「結束 ≤ 開始」直接回 null。）
+ *
+ * <code>23:00–01:00</code> ＝ <code>[23:00, 24:00]</code> ＋ <code>[00:00, 01:00]</code>；
+ * 開始與結束相同視為<strong>整整一天</strong>（零長度的時段沒有意義）。
+ */
+export function resolveIntervalMinuteRanges(
+  startTime: string,
+  endTime: string,
+): MinuteRange[] {
+  const start = parseIntervalStartMinutes(startTime);
+  const end = parseIntervalEndMinutes(endTime);
+  if (start == null || end == null) return [];
+  if (end > start) return [{ start, end }];
+  if (end === start) return [{ start: 0, end: SCHEDULE_DAY_MINUTES }];
+  const ranges: MinuteRange[] = [];
+  if (start < SCHEDULE_DAY_MINUTES) ranges.push({ start, end: SCHEDULE_DAY_MINUTES });
+  if (end > 0) ranges.push({ start: 0, end });
+  return ranges;
+}
+
+/** 一個時段實際有多長（分鐘）；跨午夜也算得出來。無法解析回 null */
+export function resolveIntervalDurationMinutes(
+  startTime: string,
+  endTime: string,
+): number | null {
+  const ranges = resolveIntervalMinuteRanges(startTime, endTime);
+  if (ranges.length === 0) return null;
+  return ranges.reduce((sum, range) => sum + (range.end - range.start), 0);
+}
+
 export function parseIntervalMinuteRanges(intervals: TimeSlotInterval[]): MinuteRange[] {
   return intervals
-    .map((slot) => {
-      const start = parseIntervalStartMinutes(slot.startTime);
-      const end = parseIntervalEndMinutes(slot.endTime);
-      if (start == null || end == null || end <= start) return null;
-      return { start, end };
-    })
-    .filter((range): range is MinuteRange => range != null)
+    .flatMap((slot) => resolveIntervalMinuteRanges(slot.startTime, slot.endTime))
     .sort((a, b) => a.start - b.start);
 }
 
@@ -888,6 +916,20 @@ export function parseIntervalEndMinutes(time: string): number | null {
   return minutes;
 }
 
+/**
+ * 時段範圍合法嗎。
+ *
+ * <strong>資料層（{@link resolveIntervalMinuteRanges}）已經完全支援跨午夜</strong>，
+ * 但排班引擎那側還沒有：<code>generateDepartures.ts</code>（發車脈衝）、
+ * <code>validate.ts</code>、<code>buildCapacityTrend.ts</code> 仍然是
+ * 「<code>endMinute &lt;= startMinute</code> 就跳過這個時段」。在那三支轉完之前
+ * 放行跨午夜時段，使用者畫得出來、卻會排出一張<strong>安靜少掉那一段班次</strong>
+ * 的班表——那比畫不出來糟得多。
+ *
+ * 所以這裡暫時仍然擋著。引擎轉完之後把這個函式換成
+ * <code>resolveIntervalMinuteRanges(...).length &gt; 0</code> 即可，
+ * 上下游都已經吃得下兩段區間。
+ */
 export function isValidIntervalRange(startTime: string, endTime: string): boolean {
   const start = parseIntervalStartMinutes(startTime);
   const end = parseIntervalEndMinutes(endTime);
@@ -904,10 +946,9 @@ export function formatMinutesAsDuration(totalMinutes: number): string {
 }
 
 export function intervalDurationLabel(startTime: string, endTime: string): string {
-  const start = parseIntervalStartMinutes(startTime);
-  const end = parseIntervalEndMinutes(endTime);
-  if (start == null || end == null || end <= start) return '—';
-  return formatMinutesAsDuration(end - start);
+  const mins = resolveIntervalDurationMinutes(startTime, endTime);
+  if (mins == null || mins <= 0) return '—';
+  return formatMinutesAsDuration(mins);
 }
 
 export type TimeTemplateEditorDraft = {
@@ -1207,10 +1248,10 @@ export function findOperatingIntervalAtMinute(
 ): TimeSlotInterval | null {
   for (const slot of intervals) {
     if (slot.isDraft) continue;
-    const start = parseIntervalStartMinutes(slot.startTime);
-    const end = parseIntervalEndMinutes(slot.endTime);
-    if (start == null || end == null || end <= start) continue;
-    if (minute >= start && minute < end) return slot;
+    const ranges = resolveIntervalMinuteRanges(slot.startTime, slot.endTime);
+    if (ranges.some((range) => minute >= range.start && minute < range.end)) {
+      return slot;
+    }
   }
   return null;
 }
@@ -1229,10 +1270,14 @@ export function formatSelectedIntervalHoverContent(
     `運能　${formatCapacityLabel(attribute?.capacityPphpd ?? 0)}`,
   ];
   const headway = attribute?.headwaySeconds;
-  const start = parseIntervalStartMinutes(interval.startTime);
-  const end = parseIntervalEndMinutes(interval.endTime);
+  const intervalDurationMinutes = resolveIntervalDurationMinutes(
+    interval.startTime,
+    interval.endTime,
+  );
   const intervalDurationSeconds =
-    start != null && end != null && end > start ? (end - start) * 60 : null;
+    intervalDurationMinutes != null && intervalDurationMinutes > 0
+      ? intervalDurationMinutes * 60
+      : null;
   const fleet = recommendFleetRowCount({
     cycleSeconds: estimatedTripSeconds ?? 0,
     headwaySeconds: headway ?? 0,
@@ -1266,17 +1311,20 @@ export function softHighlightColumnStyle(color: string): {
   };
 }
 
-export function resolveIntervalTrackLayout(
+/**
+ * 一個時段在軌道上要畫的色帶。<strong>跨午夜是兩條</strong>：日尾一條、日頭一條。
+ *
+ * 格線是日循環無限捲動的，兩份日拷貝實體相鄰，所以這兩條畫出來會接在一起，
+ * 看起來就是連續的一條。
+ */
+export function resolveIntervalTrackLayouts(
   slot: TimeSlotInterval,
   slotWidthPx: number,
   scheduleSlotMinutes: number,
-): { leftPx: number; widthPx: number } | null {
-  const start = parseIntervalStartMinutes(slot.startTime);
-  const end = parseIntervalEndMinutes(slot.endTime);
-  if (start == null || end == null || end <= start) return null;
-  return {
-    leftPx: (start / scheduleSlotMinutes) * slotWidthPx,
-    widthPx: ((end - start) / scheduleSlotMinutes) * slotWidthPx,
-  };
+): Array<{ leftPx: number; widthPx: number }> {
+  return resolveIntervalMinuteRanges(slot.startTime, slot.endTime).map((range) => ({
+    leftPx: (range.start / scheduleSlotMinutes) * slotWidthPx,
+    widthPx: ((range.end - range.start) / scheduleSlotMinutes) * slotWidthPx,
+  }));
 }
 

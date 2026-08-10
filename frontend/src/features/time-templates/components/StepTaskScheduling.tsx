@@ -796,7 +796,6 @@ function TaskBar({
         className="pointer-events-none absolute inset-y-0 left-0 z-[2] w-1"
         style={{ backgroundColor: colors.bar }}
       />
-      {/* 預設置中；快被遮住時以 translate3d 絲滑貼齊可視左緣 */}
       {/* 文字捲到哪跟到哪，貼齊可視左緣直到條子捲完；跟班表調整同一支元件 */}
       <div className="pointer-events-none absolute inset-0 z-[6] flex items-center px-1.5">
         <ScrollPinnedCardLabel
@@ -1435,15 +1434,19 @@ export function StepTaskScheduling({
                 estimatedTripSeconds={estimatedTripSeconds}
                 dayCopyCount={dayCopies.length}
               />
-              <ScheduleIntervalHeaderColumnHighlight
-                intervals={intervals}
-                attributes={attributes}
-                slotWidthPx={slotWidthPx}
-                scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
-                trackWidthPx={trackWidthPx}
-                rowLabelWidth={ROW_LABEL_WIDTH}
-                selectedIntervalId={selectedIntervalId}
-              />
+              {/* 表頭的時段直條高亮：跟格線那條一樣，每一份日拷貝都要畫 */}
+              {dayCopies.map((copyIndex) => (
+                <ScheduleIntervalHeaderColumnHighlight
+                  key={copyIndex}
+                  intervals={intervals}
+                  attributes={attributes}
+                  slotWidthPx={slotWidthPx}
+                  scheduleSlotMinutes={SCHEDULE_SLOT_MINUTES}
+                  trackWidthPx={trackWidthPx}
+                  rowLabelWidth={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
+                  selectedIntervalId={selectedIntervalId}
+                />
+              ))}
             </div>
 
             {/* Data rows */}
