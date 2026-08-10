@@ -184,6 +184,62 @@ describe('buildScheduleAnalysisReport', () => {
     assert.equal(row.peakConcurrentVehicles, 1);
   });
 
+  it('時段本身跨午夜（23:00–01:00）要照算，不能整段跳過', () => {
+    const plan = {
+      timelines: [
+        {
+          row: 1,
+          blocks: [
+            // 23:30–23:50 落在時段的前半段
+            {
+              id: 'a', timelineRow: 1, taskType: 'passenger', label: 'A>B', routeId: 'ab',
+              anchorStartMinute: 23 * 60 + 30,
+              plannedStartMinute: 23 * 60 + 30,
+              plannedEndMinute: 23 * 60 + 50,
+              travelSeconds: 1200, dwellSeconds: 0, source: 'template_bar',
+            },
+            // 00:10–00:30 落在時段的後半段
+            {
+              id: 'b', timelineRow: 1, taskType: 'passenger', label: 'A>B', routeId: 'ab',
+              anchorStartMinute: 10,
+              plannedStartMinute: 10,
+              plannedEndMinute: 30,
+              travelSeconds: 1200, dwellSeconds: 0, source: 'template_bar',
+            },
+          ],
+        },
+      ],
+    } as never as GeneratedSchedulePlan;
+
+    const report = buildScheduleAnalysisReport({
+      plan,
+      intervals: [
+        {
+          id: 'iv-cross', attributeId: 'attr1', name: '跨夜',
+          startTime: '23:00', endTime: '01:00', isDraft: false,
+        },
+      ] as never as Parameters<typeof buildScheduleAnalysisReport>[0]['intervals'],
+      attributes: ATTRIBUTES,
+      passengerRoutes: ROUTES,
+      selectedRoutes: ROUTES,
+      minimumRecoveryTimeSeconds: 0,
+      collisionProtectionSeconds: 30,
+    });
+
+    assert.equal(report.fleet.length, 1, '跨午夜的時段不能被安靜跳過');
+    const row = report.fleet[0]!;
+    assert.equal(row.tripCount, 2, '午夜前後兩段都要算進來');
+    // 時段長 120 分（23:00–24:00 ＋ 00:00–01:00），車跑了 20 + 20 分
+    assert.ok(
+      Math.abs(row.actualVehicles - 40 / 120) < 1e-9,
+      `平均同時應為 ${(40 / 120).toFixed(3)}，實際 ${row.actualVehicles}`,
+    );
+    assert.equal(
+      row.peakConcurrentVehicles, 1,
+      '兩段是同一台車前後跑，尖峰同時只有 1 台——不能因為午夜切開就疊成 2',
+    );
+  });
+
   it('車剛好等於需求時不產生任何建議', () => {
     const report = run(1);
     assert.equal(report.fleet[0]!.surplusVehicles, 0);

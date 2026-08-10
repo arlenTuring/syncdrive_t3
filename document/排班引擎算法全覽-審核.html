@@ -3671,6 +3671,35 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 分析報表支援跨午夜時段（時段本身跨過 00:00）</h3>
+  <div class="callout">使用者裁決：跨午夜時段要<strong>支援</strong>，不是在 UI 擋掉。</div>
+  <ul>
+    <li>
+      <strong>時段改成用「區段清單」表示。</strong>23:00–01:00 就是
+      <code>[23:00, 24:00]</code> ＋ <code>[00:00, 01:00]</code>；一般時段仍然是單一段，
+      走同一條路。時段長度改成各段加總（跨夜那個例子是 120 分），
+      不再是 <code>end − start</code>（那會算出 −1320）。
+    </li>
+    <li>
+      <strong>尖峰同時性要在同一條數線上掃。</strong>每個區段帶一個
+      <code>offsetMinute</code>：午夜之後那半段整段 +1440 接在前半段後面。
+      少了這個位移，00:10 的班次會被排到 23:00 之前，一台車前後跑的兩段
+      會被疊成「同時 2 台」。回歸測試就是盯這一點。
+    </li>
+    <li>
+      <strong>相等視為整整一天</strong>（00:00–00:00）——零長度的時段沒有意義。
+    </li>
+    <li>
+      <strong>現況說明：報表這一側好了，但時間模板還不讓你建立跨午夜時段。</strong>
+      <code>isValidIntervalRange()</code> 與 <code>parseIntervalMinuteRanges()</code> 都要求
+      <code>end &gt; start</code>，時段編輯器、班表底色、時段缺口偵測全部建立在
+      「線性區間」這個假設上。所以今天的行為是「建不出來」（也就是原本兩個選項裡的
+      「UI 擋下來」），而報表已經先備好，之後編輯器放寬時不用再改一次。
+      要真的讓使用者畫得出跨午夜時段，是時間模板那一側的獨立工程。
+    </li>
+    <li><code>tsc</code> 23、測試 348 pass／9 fail（新增 2 則）、<code>eslint</code> 乾淨。</li>
+  </ul>
+
   <h3>2026-08-10 · 分析報表複查：兩個真的漏算，一個潛在坑</h3>
   <p>使用者要求整體複查報表還有沒有 bug。逐項對過之後：</p>
   <ul>

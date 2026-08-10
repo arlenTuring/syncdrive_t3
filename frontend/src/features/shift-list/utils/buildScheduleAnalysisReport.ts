@@ -1,6 +1,7 @@
 import {
   parseIntervalEndMinutes,
   parseIntervalStartMinutes,
+  SCHEDULE_DAY_MINUTES,
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../time-templates/types/editor';
@@ -143,28 +144,60 @@ function minutesOverlap(
 }
 
 /**
- * 一個區塊落在某個時段裡的分鐘數，<strong>照日循環算</strong>。
+ * 時段在鐘面上覆蓋到的區段。
  *
- * 跨午夜的區塊記成「開始 23:55、結束 1450」，直接跟 00:00–05:00 的窗口比大小
- * 永遠不重疊——那一段車其實在跑，卻整個從早上那個時段的統計裡消失。
- * 先切成鐘面區段再比，跟班表其他地方同一套算術。
+ * <strong>時段本身可以跨午夜</strong>（例如 23:00–01:00）：那是兩段
+ * <code>[23:00, 24:00]</code> ＋ <code>[00:00, 01:00]</code>。
+ * 原本遇到「結束 ≤ 開始」直接 <code>continue</code>——整個時段連同它的統計
+ * 安靜消失，使用者不會知道自己少看了一段（2026-08-10 使用者裁決：要支援）。
+ *
+ * <code>offsetMinute</code> 是把這一段放回「以時段開始為原點」的那條數線上要加的
+ * 位移；尖峰同時性要在同一條數線上掃，午夜之後那半段得接在午夜之前那半段後面。
+ */
+type WindowSegment = { start: number; end: number; offsetMinute: number };
+
+function resolveWindowSegments(
+  startMinute: number,
+  endMinute: number,
+): WindowSegment[] {
+  if (endMinute > startMinute) {
+    return [{ start: startMinute, end: endMinute, offsetMinute: 0 }];
+  }
+  // 結束 ≤ 開始 ＝ 跨過午夜（相等視為整整一天）
+  const segments: WindowSegment[] = [];
+  if (SCHEDULE_DAY_MINUTES > startMinute) {
+    segments.push({ start: startMinute, end: SCHEDULE_DAY_MINUTES, offsetMinute: 0 });
+  }
+  if (endMinute > 0) {
+    segments.push({ start: 0, end: endMinute, offsetMinute: SCHEDULE_DAY_MINUTES });
+  }
+  return segments;
+}
+
+/**
+ * 一個區塊落在某個時段裡的分鐘數，<strong>兩邊都照日循環算</strong>。
+ *
+ * 區塊那邊：跨午夜的區塊記成「開始 23:55、結束 1450」，直接跟 00:00–05:00 的
+ * 窗口比大小永遠不重疊——那一段車其實在跑，卻整個從早上那個時段的統計裡消失。
+ * 時段那邊：見 {@link resolveWindowSegments}。
  */
 function windowOverlapMinutes(
   blockStartMinute: number,
   blockEndMinute: number,
-  windowStartMinute: number,
-  windowEndMinute: number,
+  windowSegments: WindowSegment[],
 ): number {
-  const segments = splitIntoDayCycleSegments(blockStartMinute, blockEndMinute);
-  if (segments.length === 0) return 0;
+  const blockSegments = splitIntoDayCycleSegments(blockStartMinute, blockEndMinute);
+  if (blockSegments.length === 0) return 0;
   let total = 0;
-  for (const segment of segments) {
-    total += minutesOverlap(
-      segment.startMinute,
-      segment.endMinute,
-      windowStartMinute,
-      windowEndMinute,
-    );
+  for (const blockSegment of blockSegments) {
+    for (const windowSegment of windowSegments) {
+      total += minutesOverlap(
+        blockSegment.startMinute,
+        blockSegment.endMinute,
+        windowSegment.start,
+        windowSegment.end,
+      );
+    }
   }
   return total;
 }
@@ -344,9 +377,9 @@ export function buildScheduleAnalysisReport(args: {
   for (const interval of intervals) {
     const startMinute = parseIntervalStartMinutes(interval.startTime);
     const endMinute = parseIntervalEndMinutes(interval.endTime);
-    if (startMinute == null || endMinute == null || endMinute <= startMinute) {
-      continue;
-    }
+    if (startMinute == null || endMinute == null) continue;
+    const windowSegments = resolveWindowSegments(startMinute, endMinute);
+    if (windowSegments.length === 0) continue;
     const attribute = attributeById.get(interval.attributeId);
     const targetHeadwaySeconds = attribute?.headwaySeconds ?? null;
 
@@ -356,13 +389,15 @@ export function buildScheduleAnalysisReport(args: {
         overlap: windowOverlapMinutes(
           block.plannedStartMinute,
           block.plannedEndMinute,
-          startMinute,
-          endMinute,
+          windowSegments,
         ),
       }))
       .filter((item) => item.overlap > 0);
     const rows = new Set(inWindow.map((item) => item.block.row));
-    const windowMinutes = endMinute - startMinute;
+    const windowMinutes = windowSegments.reduce(
+      (sum, segment) => sum + (segment.end - segment.start),
+      0,
+    );
 
     let busyMinutes = 0;
     for (const item of inWindow) busyMinutes += item.overlap;
@@ -376,11 +411,14 @@ export function buildScheduleAnalysisReport(args: {
         block.plannedStartMinute,
         block.plannedEndMinute,
       )) {
-        const from = Math.max(segment.startMinute, startMinute);
-        const to = Math.min(segment.endMinute, endMinute);
-        if (to <= from) continue;
-        events.push({ at: from, delta: 1 });
-        events.push({ at: to, delta: -1 });
+        for (const windowSegment of windowSegments) {
+          const from = Math.max(segment.startMinute, windowSegment.start);
+          const to = Math.min(segment.endMinute, windowSegment.end);
+          if (to <= from) continue;
+          // 跨午夜時段的後半段接在前半段之後，才不會把 00:10 誤判成 23:00 之前
+          events.push({ at: from + windowSegment.offsetMinute, delta: 1 });
+          events.push({ at: to + windowSegment.offsetMinute, delta: -1 });
+        }
       }
     }
     events.sort((a, b) => (a.at - b.at) || (a.delta - b.delta));
@@ -407,8 +445,7 @@ export function buildScheduleAnalysisReport(args: {
         scheduledMinutes += windowOverlapMinutes(
           block.plannedStartMinute,
           block.plannedEndMinute,
-          startMinute,
-          endMinute,
+          windowSegments,
         );
       }
       idleMinutes += Math.max(0, windowMinutes - scheduledMinutes);
