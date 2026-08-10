@@ -11,6 +11,7 @@ import {
 } from './schedule-engine/physics';
 import type { RouteSuccessorPolicy } from './schedule-engine/routeSuccessorPolicy';
 import type { GeneratedSchedulePlan } from './schedule-engine/types';
+import { splitIntoDayCycleSegments } from './scheduleDayCycle';
 import {
   collectStationBerthOccupancies,
   type StationBerthOccupancy,
@@ -139,6 +140,33 @@ function minutesOverlap(
   bEnd: number,
 ): number {
   return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
+}
+
+/**
+ * 一個區塊落在某個時段裡的分鐘數，<strong>照日循環算</strong>。
+ *
+ * 跨午夜的區塊記成「開始 23:55、結束 1450」，直接跟 00:00–05:00 的窗口比大小
+ * 永遠不重疊——那一段車其實在跑，卻整個從早上那個時段的統計裡消失。
+ * 先切成鐘面區段再比，跟班表其他地方同一套算術。
+ */
+function windowOverlapMinutes(
+  blockStartMinute: number,
+  blockEndMinute: number,
+  windowStartMinute: number,
+  windowEndMinute: number,
+): number {
+  const segments = splitIntoDayCycleSegments(blockStartMinute, blockEndMinute);
+  if (segments.length === 0) return 0;
+  let total = 0;
+  for (const segment of segments) {
+    total += minutesOverlap(
+      segment.startMinute,
+      segment.endMinute,
+      windowStartMinute,
+      windowEndMinute,
+    );
+  }
+  return total;
 }
 
 /**
@@ -289,10 +317,19 @@ export function buildScheduleAnalysisReport(args: {
     successorPolicy,
   } = args;
 
+  /**
+   * 供給端算的是「有幾台車在跑載客」。
+   *
+   * <code>entry_service</code>（整備後的第一段調度營運班次）一樣載客、一樣佔著車，
+   * 只是不算輪、不受班距約束——先前只收 <code>template_bar</code>，那些班次
+   * 完全不計入供給，車隊看起來會比實際少。
+   */
   const mainlineBlocks = plan.timelines.flatMap((timeline) =>
     timeline.blocks
       .filter(
-        (block) => block.taskType === 'passenger' && block.source === 'template_bar',
+        (block) =>
+          block.taskType === 'passenger'
+          && (block.source === 'template_bar' || block.source === 'entry_service'),
       )
       .map((block) => ({ ...block, row: timeline.row })),
   );
@@ -313,31 +350,38 @@ export function buildScheduleAnalysisReport(args: {
     const attribute = attributeById.get(interval.attributeId);
     const targetHeadwaySeconds = attribute?.headwaySeconds ?? null;
 
-    const inWindow = mainlineBlocks.filter(
-      (block) =>
-        block.plannedStartMinute < endMinute
-        && block.plannedEndMinute > startMinute,
-    );
-    const rows = new Set(inWindow.map((block) => block.row));
+    const inWindow = mainlineBlocks
+      .map((block) => ({
+        block,
+        overlap: windowOverlapMinutes(
+          block.plannedStartMinute,
+          block.plannedEndMinute,
+          startMinute,
+          endMinute,
+        ),
+      }))
+      .filter((item) => item.overlap > 0);
+    const rows = new Set(inWindow.map((item) => item.block.row));
     const windowMinutes = endMinute - startMinute;
 
     let busyMinutes = 0;
-    for (const block of inWindow) {
-      busyMinutes += minutesOverlap(
-        block.plannedStartMinute,
-        block.plannedEndMinute,
-        startMinute,
-        endMinute,
-      );
-    }
+    for (const item of inWindow) busyMinutes += item.overlap;
     // 平均同時在跑幾台——這才跟「需求車數」是同一個維度
     const actualVehicles = windowMinutes > 0 ? busyMinutes / windowMinutes : 0;
 
     // 尖峰同時在跑幾台：掃過每一段正線的起訖，看重疊最多幾層
     const events: Array<{ at: number; delta: number }> = [];
-    for (const block of inWindow) {
-      events.push({ at: Math.max(block.plannedStartMinute, startMinute), delta: 1 });
-      events.push({ at: Math.min(block.plannedEndMinute, endMinute), delta: -1 });
+    for (const { block } of inWindow) {
+      for (const segment of splitIntoDayCycleSegments(
+        block.plannedStartMinute,
+        block.plannedEndMinute,
+      )) {
+        const from = Math.max(segment.startMinute, startMinute);
+        const to = Math.min(segment.endMinute, endMinute);
+        if (to <= from) continue;
+        events.push({ at: from, delta: 1 });
+        events.push({ at: to, delta: -1 });
+      }
     }
     events.sort((a, b) => (a.at - b.at) || (a.delta - b.delta));
     let concurrent = 0;
@@ -360,7 +404,7 @@ export function buildScheduleAnalysisReport(args: {
       if (!timeline) continue;
       let scheduledMinutes = 0;
       for (const block of timeline.blocks) {
-        scheduledMinutes += minutesOverlap(
+        scheduledMinutes += windowOverlapMinutes(
           block.plannedStartMinute,
           block.plannedEndMinute,
           startMinute,

@@ -129,6 +129,61 @@ describe('buildScheduleAnalysisReport', () => {
     assert.equal(report.hasFindings, true);
   });
 
+  it('跨午夜的班次要算進午夜之後那個時段（不能整段消失）', () => {
+    // 23:50–00:10 記成 [1430, 1450]。直接跟 00:00–01:00 比大小永遠不重疊，
+    // 那一段車其實在跑，卻會整個從清晨時段的統計裡不見。
+    const plan = {
+      timelines: [
+        {
+          row: 1,
+          blocks: [
+            {
+              id: 'cross',
+              timelineRow: 1,
+              taskType: 'passenger',
+              label: 'A>B',
+              routeId: 'ab',
+              anchorStartMinute: 23 * 60 + 50,
+              plannedStartMinute: 23 * 60 + 50,
+              plannedEndMinute: 24 * 60 + 10,
+              travelSeconds: 1200,
+              dwellSeconds: 0,
+              source: 'template_bar',
+            },
+          ],
+        },
+      ],
+    } as never as GeneratedSchedulePlan;
+
+    const report = buildScheduleAnalysisReport({
+      plan,
+      intervals: [
+        {
+          id: 'iv-night',
+          attributeId: 'attr1',
+          name: '深夜',
+          startTime: '00:00',
+          endTime: '01:00',
+          isDraft: false,
+        },
+      ] as never as Parameters<typeof buildScheduleAnalysisReport>[0]['intervals'],
+      attributes: ATTRIBUTES,
+      passengerRoutes: ROUTES,
+      selectedRoutes: ROUTES,
+      minimumRecoveryTimeSeconds: 0,
+      collisionProtectionSeconds: 30,
+    });
+
+    const row = report.fleet[0]!;
+    assert.equal(row.tripCount, 1, '跨午夜那一段要算進來');
+    // 00:00–00:10 有車在跑，時段長 60 分 → 平均同時 10/60 ≈ 0.17 台
+    assert.ok(
+      Math.abs(row.actualVehicles - 10 / 60) < 1e-9,
+      `平均同時應為 ${(10 / 60).toFixed(3)}，實際 ${row.actualVehicles}`,
+    );
+    assert.equal(row.peakConcurrentVehicles, 1);
+  });
+
   it('車剛好等於需求時不產生任何建議', () => {
     const report = run(1);
     assert.equal(report.fleet[0]!.surplusVehicles, 0);

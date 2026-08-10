@@ -3671,6 +3671,40 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 分析報表複查：兩個真的漏算，一個潛在坑</h3>
+  <p>使用者要求整體複查報表還有沒有 bug。逐項對過之後：</p>
+  <ul>
+    <li>
+      <strong>（已修）跨午夜的班次整段從清晨時段消失。</strong>
+      時段判定是 <code>blockStart &lt; windowEnd &amp;&amp; blockEnd &gt; windowStart</code> 的線性比較，
+      而跨午夜的班次記成「開始 23:50、結束 1450」——跟 00:00–05:00 這個窗口
+      <strong>永遠不重疊</strong>。那些車其實在跑，卻不算進清晨的供給，也不算進空等。
+      改成先 <code>splitIntoDayCycleSegments</code> 再比，跟班表其他地方同一套算術。
+      目前這份資料沒有跨午夜的正線卡（8 張跨午夜的都是移動卡），所以數字沒變，
+      但這是會咬人的潛在錯。已補回歸測試。
+    </li>
+    <li>
+      <strong>（已修）<code>entry_service</code> 班次不算進供給。</strong>
+      整備後的第一段調度營運班次一樣載客、一樣佔著車，只是不算輪、不受班距約束。
+      供給端原本只收 <code>template_bar</code>，那些班次完全不計入，車隊看起來比實際少。
+      目前這份資料沒有這種班次，所以數字也沒變。
+    </li>
+    <li>
+      <strong>（未修，要產品決定）跨午夜的時段設定會被<strong>整段丟掉</strong>。</strong>
+      <code>if (endMinute &lt;= startMinute) continue;</code>——設一個 23:00–01:00 的時段，
+      報表會安靜地跳過它，一則統計都沒有。使用者目前是拆成 23:00–00:00 與
+      00:00–05:00 兩段才沒踩到。要嘛支援跨午夜時段（切兩段算），
+      要嘛在 UI 就擋下來，不能安靜跳過。
+    </li>
+    <li>
+      查過沒問題的：一輪往返<strong>沒有</strong>把備用路線算進去（呼叫端已用
+      <code>backupForInstanceId／backupForRouteId</code> 濾掉，26.8 分是 4 段的迴圈，不是 8 段）；
+      停靠點尖峰有先合併同一列自己的相接占用；待命佔住停靠站有計入站位占用；
+      「沒有替代停靠點」在沒給關聯圖時是 <code>null</code>、不會誤報成 0。
+    </li>
+    <li><code>tsc</code> 23、測試 347 pass／9 fail（新增 1 則）、<code>eslint</code> 乾淨。</li>
+  </ul>
+
   <h3>2026-08-10 · 分析報表：建議照種類收合，並把「要幾台」講成人話</h3>
   <div class="callout">
     使用者：「你這個可以幫我整理或是折疊一下嗎？然後我真的看不懂這個時段有多少車要跑，
