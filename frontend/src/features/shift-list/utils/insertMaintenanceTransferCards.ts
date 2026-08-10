@@ -999,10 +999,49 @@ export function insertMaintenanceTransferCards(args: {
         const latestDeparture = yardStartSecond - path.avgSeconds;
         if (latestDeparture < preferredDeparture - 1e-9) { tally.noTime += 1; continue; }
 
-        // 轉折點撞上就把出發時刻往後挪（挪到還趕得上整備開始為止），
-        // 不是整張卡作廢。閘門時刻與出發時刻是等量平移的關係，所以位移可以
-        // 直接在閘門上算完再回推。
-        const baseArrive = preferredDeparture + path.avgSeconds;
+        /**
+         * 這台設施在「抵達 → 整備做完」整段都是空的嗎。
+         *
+         * 要佔的是車在裡面的全程，檢查窗必須跟佔用窗一致——只檢查頭部那一小段
+         * 的話，別列車早就訂走整段的設施還是會被判定成空的。
+         */
+        const facilityFreeFor = (departure: number) =>
+          stayFacilityIsFree(
+            facility.id, yard, timeline.row, departure + path.avgSeconds, yardEndSecond,
+          );
+
+        /**
+         * 提早到不了就晚一點到，不是整張卡作廢。
+         *
+         * 前一台車還在這格裡（例如它充到 24:00 才出來），車就沒辦法 23:53 進去；
+         * 但整備本來就從 00:00 開始，晚一點出發、剛好 00:00 到，一樣成立。
+         * 原本只試「最早出發」一個時刻，一被擋就報「設施被別列車佔著」，
+         * 使用者看畫面覺得空蕩蕩卻排不進去（2026-08-10 使用者追問）。
+         *
+         * 出發時刻越晚，要佔的窗口只會越短、越不可能撞到——這個單調性讓
+         * 「最早可行的出發時刻」可以直接二分找出來，不必逐秒掃。
+         */
+        let departureSecond: number;
+        if (facilityFreeFor(preferredDeparture)) {
+          departureSecond = preferredDeparture;
+        } else if (!facilityFreeFor(latestDeparture)) {
+          // 連「剛好趕上整備開始」都塞不進去，那是真的沒位置
+          tally.facilityBusy += 1;
+          continue;
+        } else {
+          let busy = preferredDeparture;
+          let free = latestDeparture;
+          for (let step = 0; step < 32 && free - busy > 1; step += 1) {
+            const mid = (busy + free) / 2;
+            if (facilityFreeFor(mid)) free = mid; else busy = mid;
+          }
+          departureSecond = Math.ceil(free);
+        }
+
+        // 轉折點撞上就再往後挪一點（挪到還趕得上整備開始為止）。閘門時刻與
+        // 出發時刻是等量平移的關係，位移可以直接在閘門上算完再回推。
+        // 往後挪只會讓設施佔用窗更短，不會把剛解好的設施衝突變回來。
+        const baseArrive = departureSecond + path.avgSeconds;
         const baseGateway = resolveGatewayFromPath(
           path, baseArrive, 'arriving-at-facility', fromNodeId,
         );
@@ -1010,21 +1049,11 @@ export function insertMaintenanceTransferCards(args: {
           [baseGateway],
           timeline.row,
           0,
-          latestDeparture - preferredDeparture,
+          latestDeparture - departureSecond,
         );
         if (shift === null) { tally.junctionBusy += 1; continue; }
 
-        const departureSecond = preferredDeparture + shift;
-        const arriveSecond = departureSecond + path.avgSeconds;
-        // 要佔的是「抵達 → 整備做完」整段（車在裡面的全程），檢查窗必須跟
-        // 佔用窗一致——只檢查頭部那一小段的話，別列車早就訂走整段的設施
-        // 還是會被判定成空的。
-        if (
-          !stayFacilityIsFree(facility.id, yard, timeline.row, arriveSecond, yardEndSecond)
-        ) {
-          tally.facilityBusy += 1;
-          continue;
-        }
+        departureSecond += shift;
         const gateway = {
           nodeId: baseGateway.nodeId,
           instant: baseGateway.instant + shift,
@@ -1225,28 +1254,17 @@ export function insertMaintenanceTransferCards(args: {
 
           const totalSeconds = exitLegSeconds + entryLegSeconds;
           const baseArriveSecond = departSecond + totalSeconds;
-          // 轉折點撞上就晚一點出廠——車在原本那台設施裡多留一會兒，
-          // 代價是後一段整備開始得更晚（本來就是「後一段被往後推」的規則），
-          // 比整張卡作廢好。可挪範圍以「後一段還剩得下時間」為上限。
-          const junctionShift = resolveJunctionShiftSeconds(
-            [exitGateway, entryGateway],
-            timeline.row,
-            0,
-            Math.max(0, laterEndSecond - baseArriveSecond - 1),
-          );
-          if (junctionShift === null) { tally.junctionBusy += 1; continue; }
-          if (junctionShift !== 0) {
-            if (exitGateway) exitGateway = { ...exitGateway, instant: exitGateway.instant + junctionShift };
-            if (entryGateway) entryGateway = { ...entryGateway, instant: entryGateway.instant + junctionShift };
-          }
-          const arriveSecond = baseArriveSecond + junctionShift;
           // 後一段只會被<strong>往後推</strong>，絕不會被往前拉——兩段之間本來就
           // 有空檔時（車提早到、在那邊等），它照原訂時刻開始。少了這個 max，
           // 空檔一大就會把後一段硬拉到抵達時刻，跨午夜那一對甚至會被拉成負時刻。
           const laterStartSecond = minuteToSecond(later.plannedStartMinute) + laterOffsetSecond;
-          const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
-          if (finalLaterStartSecond >= laterEndSecond - 1e-9) { tally.noTime += 1; continue; }
-          // 前一段整備在它自己的全程都佔著出廠那台設施；後一段從實際開始佔到做完
+          // 一秒都不挪就已經超過後一段的結束了 = 這段路本來就塞不進空檔，
+          // 跟設施有沒有被佔無關，要分開報，否則使用者會去找根本不存在的佔用
+          if (Math.max(laterStartSecond, baseArriveSecond) >= laterEndSecond - 1e-9) {
+            tally.noTime += 1;
+            continue;
+          }
+          // 前一段整備在它自己的全程都佔著出廠那台設施，這個窗是固定的，挪不動
           if (
             !stayFacilityIsFree(
               exitFacility.id,
@@ -1255,17 +1273,69 @@ export function insertMaintenanceTransferCards(args: {
               minuteToSecond(earlier.plannedStartMinute),
               departSecond,
             )
-            || !stayFacilityIsFree(
-              entryFacility.id,
-              later,
-              timeline.row,
-              finalLaterStartSecond - laterOffsetSecond,
-              laterEndSecond - laterOffsetSecond,
-            )
           ) {
             tally.facilityBusy += 1;
             continue;
           }
+
+          /**
+           * 晚一點出廠也是解。
+           *
+           * 車在原本那台設施裡多留一會兒，後一段整備就晚一點開始——那本來就是
+           * 轉場的既有規則（後一段被往後推、結束不動）。目的設施被前一台車佔著
+           * 時，多等一下等它走就好，不必整張卡作廢。
+           *
+           * 往後挪只會讓「後一段佔用目的設施」的窗口變短，所以可行性是單調的，
+           * 最早可行的位移可以二分找出來。上限是後一段還剩得下時間。
+           */
+          const maxShift = Math.max(0, laterEndSecond - baseArriveSecond - 1);
+          const entryFacilityFreeAt = (shift: number) => {
+            const start = Math.max(laterStartSecond, baseArriveSecond + shift);
+            if (start >= laterEndSecond - 1e-9) return false;
+            return stayFacilityIsFree(
+              entryFacility.id,
+              later,
+              timeline.row,
+              start - laterOffsetSecond,
+              laterEndSecond - laterOffsetSecond,
+            );
+          };
+          let facilityShift: number;
+          if (entryFacilityFreeAt(0)) {
+            facilityShift = 0;
+          } else if (!entryFacilityFreeAt(maxShift)) {
+            tally.facilityBusy += 1;
+            continue;
+          } else {
+            let busy = 0;
+            let free = maxShift;
+            for (let step = 0; step < 32 && free - busy > 1; step += 1) {
+              const mid = (busy + free) / 2;
+              if (entryFacilityFreeAt(mid)) free = mid; else busy = mid;
+            }
+            facilityShift = Math.ceil(free);
+          }
+
+          // 轉折點撞上就再往後挪一點。往後挪只會讓目的設施的佔用窗更短，
+          // 不會把剛解好的設施衝突變回來。
+          const junctionShift = resolveJunctionShiftSeconds(
+            [
+              exitGateway && { ...exitGateway, instant: exitGateway.instant + facilityShift },
+              entryGateway && { ...entryGateway, instant: entryGateway.instant + facilityShift },
+            ],
+            timeline.row,
+            0,
+            maxShift - facilityShift,
+          );
+          if (junctionShift === null) { tally.junctionBusy += 1; continue; }
+          const departureShift = facilityShift + junctionShift;
+          if (departureShift !== 0) {
+            if (exitGateway) exitGateway = { ...exitGateway, instant: exitGateway.instant + departureShift };
+            if (entryGateway) entryGateway = { ...entryGateway, instant: entryGateway.instant + departureShift };
+          }
+          const arriveSecond = baseArriveSecond + departureShift;
+          const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
+          if (finalLaterStartSecond >= laterEndSecond - 1e-9) { tally.noTime += 1; continue; }
           if (!chosen || totalSeconds < chosen.exitLegSeconds + chosen.entryLegSeconds) {
             chosen = {
               exitNodeId: exitFacility.id,
@@ -1279,7 +1349,7 @@ export function insertMaintenanceTransferCards(args: {
               sameArea,
               exitGateway,
               entryGateway,
-              departureShiftSeconds: junctionShift,
+              departureShiftSeconds: departureShift,
               finalLaterStartSecond,
             };
           }
