@@ -448,6 +448,18 @@ export function snapSecondsToScheduleAlign(seconds: number): number {
   return Math.round(seconds / SCHEDULE_TIME_ALIGN_SECONDS) * SCHEDULE_TIME_ALIGN_SECONDS;
 }
 
+/**
+ * 只對齊到 10 秒格，<strong>不夾在 [0, 一天]</strong>。
+ *
+ * 班表格線是無限捲動的（左右各接一份同樣的一天），拖曳時游標會落在相鄰的
+ * 日拷貝上，此時「相對於本份拷貝的分鐘數」本來就會是負的或超過 1440，
+ * 夾住就永遠拖不過午夜。要夾的地方自己夾，這裡只負責對格。
+ */
+export function snapScheduleMinuteUnbounded(minute: number): number {
+  if (!Number.isFinite(minute)) return 0;
+  return snapSecondsToScheduleAlign(Math.round(minute * 60)) / 60;
+}
+
 /** 將分鐘值對齊到 10 秒格（例如 2分05秒 → 2分10秒，不會變成 3分） */
 export function clampScheduleMinute(minute: number): number {
   const clamped = Math.min(SCHEDULE_DAY_MINUTES, Math.max(0, minute));

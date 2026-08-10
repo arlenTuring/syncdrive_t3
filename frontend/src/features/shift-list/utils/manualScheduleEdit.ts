@@ -1,5 +1,6 @@
 import {
   clampScheduleMinute,
+  snapScheduleMinuteUnbounded,
   SCHEDULE_DAY_MINUTES,
   TASK_TYPE_OPTIONS,
   type TaskTypeKey,
@@ -22,6 +23,7 @@ import {
   type MaintenanceSectionCodeBySection,
 } from './maintenanceSectionCode';
 import { validateTimelineOverlaps } from './schedule-engine/validate';
+import { splitIntoDayCycleSegments, wrapScheduleMinute } from './scheduleDayCycle';
 import type {
   GeneratedScheduleBlock,
   GeneratedSchedulePlan,
@@ -91,13 +93,35 @@ export function wouldManualBlockOverlap(args: {
   return timeline.blocks.some((block) => {
     if (block.source !== 'template_bar') return false;
     if (args.excludeBlockId && block.id === args.excludeBlockId) return false;
-    return rangesOverlap(
+    return cyclicRangesOverlap(
       args.startMinute,
       args.endMinute,
       block.plannedStartMinute,
       block.plannedEndMinute,
     );
   });
+}
+
+/**
+ * 兩段時間在<strong>日循環</strong>上有沒有重疊。
+ *
+ * 跨午夜的卡結束時刻會落在 1440 之後（23:40–24:20 記成 1420–1460），
+ * 直接拿原始數字比大小，它跟 00:00–00:30 的那張永遠不會判定成重疊——
+ * 但那兩張在同一台車上就是撞在一起。先切成鐘面區段再兩兩比，才是對的。
+ */
+function cyclicRangesOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
+  const a = splitIntoDayCycleSegments(aStart, aEnd);
+  const b = splitIntoDayCycleSegments(bStart, bEnd);
+  return a.some((one) =>
+    b.some((other) =>
+      rangesOverlap(one.startMinute, one.endMinute, other.startMinute, other.endMinute),
+    ),
+  );
 }
 
 function resolveManualBlockLabel(taskType: TaskTypeKey): string {
@@ -302,10 +326,18 @@ export function applyManualBlockTimeRange(args: {
   if (!found || found.block.source !== 'template_bar') return null;
   const { block: target, timelineRow: targetRow } = found;
 
-  const startMinute = clampScheduleMinute(args.startMinute);
-  const endMinute = clampScheduleMinute(args.endMinute);
+  // 起點繞回鐘面、時長保持不變，跨午夜就讓結束落在 1440 之後——
+  // 既有的跨夜卡本來就是這個表示法，渲染端的 splitIntoDayCycleSegments
+  // 吃得下。這裡若照舊把結束夾在 1440，往午夜方向拖就會被硬生生截短。
+  const rawStart = snapScheduleMinuteUnbounded(args.startMinute);
+  const rawEnd = snapScheduleMinuteUnbounded(args.endMinute);
+  const duration = rawEnd - rawStart;
   const minDuration = resolveManualBlockMinDurationMinutes(target);
-  if (endMinute - startMinute < minDuration) return null;
+  if (duration < minDuration) return null;
+  // 一張卡不可能長過一天：繞一圈之後頭尾會自己壓到自己
+  if (duration > SCHEDULE_DAY_MINUTES) return null;
+  const startMinute = wrapScheduleMinute(rawStart);
+  const endMinute = startMinute + duration;
   if (
     wouldManualBlockOverlap({
       plan: args.plan,
@@ -555,4 +587,23 @@ export function minuteFromClientX(args: {
   const offsetPx = Math.max(0, args.clientX - args.trackLeft);
   const rawMinute = (offsetPx / args.slotWidthPx) * args.slotMinutes;
   return clampScheduleMinute(rawMinute);
+}
+
+/**
+ * 游標 X → 分鐘（對齊 10 秒格），<strong>不夾在 [0, 一天]</strong>。
+ *
+ * 格線是無限捲動的，左右各接一份同樣的一天。拖曳中游標很容易跑到相鄰的
+ * 日拷貝上，此時相對於本份拷貝的分鐘數本來就會是負的或超過 1440。
+ * {@link minuteFromClientX} 會夾住，拿它算位移就永遠拖不過午夜——
+ * 拖曳位移一律用這一支，要落回鐘面由呼叫端自己 wrap。
+ */
+export function minuteFromClientXUnbounded(args: {
+  clientX: number;
+  trackLeft: number;
+  slotWidthPx: number;
+  slotMinutes: number;
+}): number {
+  const offsetPx = args.clientX - args.trackLeft;
+  const rawMinute = (offsetPx / args.slotWidthPx) * args.slotMinutes;
+  return snapScheduleMinuteUnbounded(rawMinute);
 }

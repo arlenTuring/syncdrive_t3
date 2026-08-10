@@ -3671,6 +3671,83 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 班表格線改成日循環無限捲動（GUI，資料不動）</h3>
+  <div class="callout">
+    使用者：「我在 00:00:00 往左邊滑是往 23:00:00 的方向走，而且可以一直滑；
+    在 23:50 往右滑則會從 00:00:00 出現。這個只是 GUI，數據需要完全一樣，
+    這樣再也不會有切斷的問題了。」
+  </div>
+  <ul>
+    <li>
+      <strong>做法：左右各接一份完全一樣的一天，共三份。</strong>
+      捲到側邊那份就把 <code>scrollLeft</code> 平移一天回到中間。三份內容相同，
+      平移的瞬間畫面沒有任何變化，使用者只覺得可以一直往同一個方向滑。
+      <strong>兩份不夠</strong>——原生捲動在 <code>scrollLeft = 0</code> 就停住，
+      偵測不到「還想再往左」，左右都要留一份。
+    </li>
+    <li>
+      <strong>順便把跨午夜的卡接回去。</strong>日尾那段畫在第 k 份的右緣、日頭那段
+      畫在第 k+1 份的左緣，兩份實體相鄰，看起來就是連續的一張。
+      <code>splitIntoDayCycleSegments()</code> 原本就會切兩段、兩段內容一樣，
+      不必再改。
+    </li>
+    <li>
+      <strong>三倍 DOM 用視窗裁切抵銷，而且比原本更省。</strong>
+      這份班表 1276 張卡，三份就是近 3800 張。但日寬遠大於視窗寬（40% 縮放下
+      一天約 12000px、視窗約 1500px），一次只看得到一天的一成上下——
+      照視窗裁切之後<strong>比原本只畫一份還少</strong>，原本是整天全畫。
+      <ul>
+        <li>視窗量化到整點格（<code>CULL_BUCKET_MINUTES = 60</code>）：
+          捲動時只有跨過格界才重新 render，不是每一幀重算 React 樹。</li>
+        <li>餘量 <code>CULL_OVERSCAN_MINUTES = 180</code> 大於量化格：
+          下一格的內容在跨界之前就已經在 DOM 裡，不會捲到才長出來。</li>
+        <li>捲動事件用 <code>requestAnimationFrame</code> 收斂成一幀一次。</li>
+      </ul>
+    </li>
+    <li>
+      <strong>順序敏感的東西要先算完再裁。</strong><code>blockIndex</code> 是班次代號的
+      流水號、<code>previousPassengerBlock</code> 是關節站對齊的依據，兩者都必須從
+      <strong>整列</strong>推出來。先裁再編號的話，捲動到哪裡代號就變成什麼。
+      因此新增 <code>rowEntriesByRow</code>：整列先算好，裁切只發生在 render 前一刻。
+      順便把 <code>previousPassengerBlock</code> 從「每張卡各自往回掃」（整列 O(n²)，
+      一列 170 張卡、每次 render 都重掃）改成一次線性掃描帶著走。
+    </li>
+    <li>
+      <strong>同一張卡畫三次的副作用。</strong>DOM id 與鍵盤焦點只能有一份，
+      否則 <code>getElementById</code> 會抓到別份、Tab 要按三次才走得完一張卡。
+      加 <code>primaryCopy</code> 參數，只有中間那份掛 id 與 <code>tabIndex</code>。
+    </li>
+    <li>
+      <strong>拖曳跨午夜「接過去」。</strong>使用者指定要接。
+      <ul>
+        <li>位移改用 <code>minuteFromClientXUnbounded()</code>：游標拖到相鄰的日拷貝上時，
+          相對本份的分鐘數本來就是負的或超過 1440，原本的
+          <code>minuteFromClientX()</code> 會夾住，往左拖到 00:00 就再也動不了。</li>
+        <li><code>applyManualBlockTimeRange()</code> 改成「起點繞回鐘面、時長不變」，
+          跨午夜就讓結束落在 1440 之後——既有跨夜卡本來就是這個表示法。
+          原本把結束夾在 1440，往午夜方向拖會被硬生生截短。加上「不得長過一天」的保護。</li>
+        <li>重疊判定改成日循環：23:40–24:20 記成 1420–1460，跟 00:00–00:30 那張
+          線性比較永遠不會判定成重疊，但它們在同一台車上就是撞在一起。
+          先切成鐘面區段再兩兩比。</li>
+        <li>跨午夜的卡以前不給拖（<code>daySegments.length === 1</code> 才可拖）。
+          無限捲動之後兩段看起來就是一張，拖任一段都是搬整張；
+          而且一拖過午夜就變成不能再拖，那才是壞掉。條件拿掉。</li>
+      </ul>
+    </li>
+    <li>
+      <strong>縮放保留視角。</strong>按 ＋／− 之後格寬改變，瀏覽器保留的是
+      <code>scrollLeft</code> 像素值，畫面會跳到別的時段。改成記住「畫面中央是幾點」，
+      縮放後換算回去。
+    </li>
+    <li>
+      <strong>驗證：</strong><code>tsc</code> 23（不變）、<code>eslint</code> 與基準相同、
+      測試 345 pass／9 fail（基準相同）。跨午夜拖曳的算術用腳本逐項驗過
+      （繞回鐘面、日內拖曳不受影響、繞過去撞到日頭的卡會被擋、長過一天會被擋）。
+      <strong>捲動與畫面本身沒有在瀏覽器裡實測</strong>——預覽瀏覽器進不到那個畫面
+      （班表預覽按鈕不換路由，調整步驟在建立精靈裡，開精靈會生出新草稿）。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 大量站位碰撞的成因：待命挑地點時看不見載客班次</h3>
   <div class="callout">
     使用者：「目前排出來有大量的碰撞錯誤，請你先查一下原因。」

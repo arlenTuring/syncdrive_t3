@@ -1,5 +1,8 @@
 import { Info, AlertTriangle, Trash2, CopyPlus } from 'lucide-react';
 import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -51,18 +54,53 @@ import {
   resolveMoveCardPrefix,
   type MaintenanceSectionCodeBySection,
 } from '../utils/maintenanceSectionCode';
-import { minuteFromClientX, resolveManualBlockMinDurationMinutes } from '../utils/manualScheduleEdit';
+import {
+  minuteFromClientX,
+  minuteFromClientXUnbounded,
+  resolveManualBlockMinDurationMinutes,
+} from '../utils/manualScheduleEdit';
 import {
   SCHEDULE_DAY_MINUTES,
   formatScheduleClockHm,
   formatScheduleClockHms,
   formatScheduleClockRangeHms,
   splitIntoDayCycleSegments,
+  wrapScheduleMinute,
 } from '../utils/scheduleDayCycle';
 import { MANUAL_BLOCK_MIN_DURATION_SECONDS } from '../utils/buildManualShiftScheduleOutput';
 
 const ROW_HEIGHT_PX = 82;
 const ROW_LABEL_WIDTH = 48;
+
+/**
+ * 無限捲動：左右各接一份<strong>完全一樣</strong>的一天，總共三份。
+ *
+ * 三份內容相同，所以捲到側邊那份時把 scrollLeft 平移一天回到中間，畫面
+ * 不會有任何變化，使用者只覺得可以一直往同一個方向滑。兩份不夠——原生捲動
+ * 在 scrollLeft = 0 就停住，偵測不到「還想再往左」，必須左右都留一份。
+ *
+ * 附帶把跨午夜的卡片接回去：日尾那段畫在第 k 份的右緣、日頭那段畫在第 k+1
+ * 份的左緣，兩份實體相鄰，看起來就是連續的一張，不再被日界切斷。
+ */
+const DAY_COPY_COUNT = 3;
+/** 中間那一份的索引；DOM id、鍵盤焦點這種「整份文件只能有一個」的東西掛在它身上 */
+const PRIMARY_DAY_COPY_INDEX = 1;
+
+/**
+ * 視窗裁切：只畫捲動視窗附近的班次卡。
+ *
+ * 三份拷貝等於三倍 DOM，直接畫會從一千多個卡片變成近四千個。但實際上
+ * 一次只看得到一天的幾個百分比（日寬遠大於視窗寬），所以照視窗裁切之後
+ * <strong>比原本只畫一份還少</strong>——原本是整天全畫。
+ *
+ * 兩個參數是為了「不卡頓」：
+ * - BUCKET：視窗量化到整點格，捲動時只有跨過格界才重新 render，
+ *   不是每一幀都重算 React 樹。
+ * - OVERSCAN：多畫視窗外的一段。餘量比量化格大，所以下一格的內容
+ *   在跨界之前就已經在 DOM 裡，不會捲到才長出來。
+ */
+const CULL_BUCKET_MINUTES = 60;
+const CULL_OVERSCAN_MINUTES = 180;
 
 // 班次卡大小高度調整參數
 const TEMPLATE_TASK_BAR_HEIGHT = 26; // 頂部時間模板任務卡片高度
@@ -922,6 +960,7 @@ function ShiftScheduleBlockBar({
   onPreviewTimeRange,
   onDeleteBlock,
   onDuplicateBlock,
+  primaryCopy = true,
 }: {
   block: GeneratedScheduleBlock;
   blockIndex: number;
@@ -942,6 +981,12 @@ function ShiftScheduleBlockBar({
   onPreviewTimeRange?: (blockId: string, startMinute: number, endMinute: number) => void;
   onDeleteBlock?: (blockId: string) => void;
   onDuplicateBlock?: (blockId: string) => void;
+  /**
+   * 是不是中間那一份日拷貝。無限捲動會把同一張卡畫三次，
+   * DOM id 與鍵盤焦點只能有一份，否則 getElementById 會抓到別份、
+   * Tab 鍵要按三次才走得完一張卡。
+   */
+  primaryCopy?: boolean;
 }) {
   // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
   // 單一顏色、卡內不放內容，說明全部交給 hover。
@@ -962,13 +1007,10 @@ function ShiftScheduleBlockBar({
       ),
     [block.plannedStartMinute, block.plannedEndMinute],
   );
-  const stayInsideCalendarDay =
-    block.plannedStartMinute >= 0 - 1e-9
-    && block.plannedEndMinute <= SCHEDULE_DAY_MINUTES + 1e-9;
-  const interactiveOnSegments =
-    interactiveEdit
-    && daySegments.length === 1
-    && stayInsideCalendarDay;
+  // 跨午夜的卡（兩段）以前不給拖：那時日尾與日頭畫在畫面的兩端，拖哪一段
+  // 都看不懂在拖什麼。無限捲動之後兩段實體相鄰、看起來就是一張，拖任一段
+  // 都是搬整張卡，語意清楚了；而且一拖過午夜就變成不能再拖，那才是壞掉。
+  const interactiveOnSegments = interactiveEdit;
   const inactiveRanges = useMemo(
     () =>
       getInactiveRangesWithinBar(
@@ -1128,7 +1170,9 @@ function ShiftScheduleBlockBar({
       MANUAL_MIN_DURATION_MINUTES,
       resolveManualBlockMinDurationMinutes(block),
     );
-    const pointerOriginMinute = minuteFromClientX({
+    // 位移一律用不夾範圍的版本：格線無限捲動，游標很容易跑到相鄰的日拷貝上，
+    // 夾在 [0, 1440] 的話往左拖到 00:00 就再也動不了，接不回 23:xx。
+    const pointerOriginMinute = minuteFromClientXUnbounded({
       clientX: event.clientX,
       trackLeft: trackRect.left,
       slotWidthPx,
@@ -1146,7 +1190,7 @@ function ShiftScheduleBlockBar({
     };
 
     const onMove = (moveEvent: PointerEvent) => {
-      const pointerMinute = minuteFromClientX({
+      const pointerMinute = minuteFromClientXUnbounded({
         clientX: moveEvent.clientX,
         trackLeft: trackRect.left,
         slotWidthPx,
@@ -1154,7 +1198,11 @@ function ShiftScheduleBlockBar({
       });
       const delta = pointerMinute - pointerOriginMinute;
       if (mode === 'move') {
-        const nextStart = Math.max(0, originStart + delta);
+        // 整張卡搬移可以跨午夜接過去：起點繞回鐘面、時長不變，
+        // 結束就自然落在 1440 之後——這正是既有跨夜卡的表示法，
+        // 渲染端的 splitIntoDayCycleSegments 本來就吃得下。
+        // 縮放（resize）不繞：那會讓卡片自己跨過自己的另一端，語意不明。
+        const nextStart = wrapScheduleMinute(originStart + delta);
         applyPreview(nextStart, nextStart + originDuration);
         return;
       }
@@ -1202,7 +1250,7 @@ function ShiftScheduleBlockBar({
         return (
     <div
       key={`${block.id}-day-${segIndex}`}
-      id={isPrimarySegment ? `block-card-${block.id}` : undefined}
+      id={isPrimarySegment && primaryCopy ? `block-card-${block.id}` : undefined}
       className={`absolute isolate flex flex-col justify-center overflow-hidden rounded-[4px] px-1 ${
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
@@ -1234,7 +1282,7 @@ function ShiftScheduleBlockBar({
           : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
       }
       role={selectable ? 'button' : undefined}
-      tabIndex={selectable && isPrimarySegment ? 0 : undefined}
+      tabIndex={selectable && isPrimarySegment && primaryCopy ? 0 : undefined}
       onClick={
         selectable
           ? (event) => {
@@ -1249,7 +1297,7 @@ function ShiftScheduleBlockBar({
           : undefined
       }
       onKeyDown={
-        selectable && isPrimarySegment
+        selectable && isPrimarySegment && primaryCopy
           ? (event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -1565,40 +1613,188 @@ export function ShiftSchedulePlanGrid({
     return map;
   }, [plan.timelines]);
 
+  /**
+   * 每列先算好「畫這張卡需要知道的一切」，跟捲動位置無關的部分只算一次。
+   *
+   * <strong>順序敏感</strong>：blockIndex 是班次代號的流水號、
+   * previousPassengerBlock 是關節站時刻對齊的依據，兩者都必須從<strong>整列</strong>
+   * 推出來。裁切一定要發生在這之後——先裁再編號的話，捲動到哪裡代號就變成什麼，
+   * 那是災難。
+   *
+   * 順便把 previousPassengerBlock 從「每張卡各自往回掃一遍」（整列 O(n²)，
+   * 這份班表一列 170 張卡、每次 render 都重掃）改成一次線性掃描帶著走。
+   */
+  const rowEntriesByRow = useMemo(() => {
+    const map = new Map<
+      number,
+      Array<{
+        block: GeneratedScheduleBlock;
+        index: number;
+        previousPassengerBlock: GeneratedScheduleBlock | null;
+        /** 這張卡在鐘面上實際佔用的區間（跨午夜會有兩段），裁切用 */
+        spans: Array<{ start: number; end: number }>;
+      }>
+    >();
+    for (const [row, blocks] of blocksByRow) {
+      let previousPassengerBlock: GeneratedScheduleBlock | null = null;
+      const entries = blocks
+        .filter((block) => block.source !== 'transition')
+        .map((block, index) => {
+          const entry = {
+            block,
+            index,
+            previousPassengerBlock,
+            spans: splitIntoDayCycleSegments(
+              block.plannedStartMinute,
+              block.plannedEndMinute,
+            ).map((seg) => ({ start: seg.startMinute, end: seg.endMinute })),
+          };
+          if (block.taskType === 'passenger') previousPassengerBlock = block;
+          return entry;
+        });
+      map.set(row, entries);
+    }
+    return map;
+  }, [blocksByRow]);
+
+  const dayWidthPx = GRID_VISIBLE_SLOTS * slotWidthPx;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  /** 畫面正中央是幾點（鐘面分鐘）；縮放後拿它把視角放回原處 */
+  const centerMinuteRef = useRef(0);
+  const positionedRef = useRef(false);
+  /**
+   * 目前要畫的虛擬分鐘區間。虛擬分鐘＝第幾份拷貝 × 1440 ＋ 鐘面分鐘，
+   * 所以三份拷貝在同一條數線上，一個區間就描述得完。
+   */
+  const [viewWindow, setViewWindow] = useState({
+    startMinute: SCHEDULE_DAY_MINUTES - CULL_OVERSCAN_MINUTES,
+    endMinute: SCHEDULE_DAY_MINUTES + CULL_OVERSCAN_MINUTES * 2,
+  });
+
+  const syncViewWindow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || slotWidthPx <= 0) return;
+    const minutesPerPx = GRID_SLOT_MINUTES / slotWidthPx;
+    // 軌道從 ROW_LABEL_WIDTH 開始（左側列號欄佔掉的那一段）
+    const rawStart = (el.scrollLeft - ROW_LABEL_WIDTH) * minutesPerPx;
+    const rawEnd = rawStart + el.clientWidth * minutesPerPx;
+    centerMinuteRef.current = wrapScheduleMinute((rawStart + rawEnd) / 2);
+    const startMinute =
+      Math.floor((rawStart - CULL_OVERSCAN_MINUTES) / CULL_BUCKET_MINUTES)
+      * CULL_BUCKET_MINUTES;
+    const endMinute =
+      Math.ceil((rawEnd + CULL_OVERSCAN_MINUTES) / CULL_BUCKET_MINUTES)
+      * CULL_BUCKET_MINUTES;
+    setViewWindow((prev) =>
+      prev.startMinute === startMinute && prev.endMinute === endMinute
+        ? prev
+        : { startMinute, endMinute },
+    );
+  }, [slotWidthPx]);
+
+  /**
+   * 捲到側邊那一份就平移一天回到中間。三份內容一樣，平移的瞬間畫面沒有變化。
+   *
+   * 門檻抓在半天：進到側邊拷貝的一半才跳，離視窗邊緣還很遠，
+   * 觸控板慣性甩動時不會一直在門檻上來回觸發。
+   * 日寬小於視窗寬時不繞——那表示整天都看得完，繞了也沒意義。
+   */
+  const recentreScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || dayWidthPx <= 0 || dayWidthPx <= el.clientWidth) return;
+    const x = el.scrollLeft;
+    if (x < dayWidthPx * 0.5) el.scrollLeft = x + dayWidthPx;
+    else if (x > dayWidthPx * 1.5) el.scrollLeft = x - dayWidthPx;
+  }, [dayWidthPx]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let frame = 0;
+    const onScroll = () => {
+      // 一幀最多算一次：捲動事件的頻率遠高於畫面更新，逐事件重算是白費的
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        recentreScroll();
+        syncViewWindow();
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const observer = new ResizeObserver(() => syncViewWindow());
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [recentreScroll, syncViewWindow]);
+
+  // 首次進場停在中間那份的 00:00；之後格寬改變（縮放）時保留原本看的時刻，
+  // 不然按一次 ＋ 畫面就跳到別的時段去了。
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!positionedRef.current) {
+      positionedRef.current = true;
+      el.scrollLeft = dayWidthPx;
+    } else {
+      const centerPx = (centerMinuteRef.current / GRID_SLOT_MINUTES) * slotWidthPx;
+      el.scrollLeft = Math.max(
+        0,
+        dayWidthPx + centerPx + ROW_LABEL_WIDTH - el.clientWidth / 2,
+      );
+    }
+    syncViewWindow();
+  }, [dayWidthPx, slotWidthPx, syncViewWindow]);
+
+  const dayCopies = useMemo(
+    () => Array.from({ length: DAY_COPY_COUNT }, (_, index) => index),
+    [],
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         <div
           className="min-w-max"
-          style={{ width: GRID_VISIBLE_SLOTS * slotWidthPx + ROW_LABEL_WIDTH }}
+          style={{ width: dayWidthPx * DAY_COPY_COUNT + ROW_LABEL_WIDTH }}
         >
           <div className="sticky top-0 z-10 bg-[#0c0c0e]/95 backdrop-blur-sm">
             <div className="flex border-b border-zinc-800/80">
               <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-zinc-800/60 bg-[#0c0c0e]/95" />
-              <div className="relative flex" style={{ width: GRID_VISIBLE_SLOTS * slotWidthPx }}>
-                <ScheduleIntervalBackground
-                  intervals={intervals.filter((slot) => !slot.isDraft)}
-                  attributes={attributes}
-                  slotWidthPx={slotWidthPx}
-                  interactive
-                />
-                {/* P5: 未服務運能缺口標記 */}
-                <UnservedPulseMarkers report={report} slotWidthPx={slotWidthPx} />
-                {timeSlots.map((slot) => (
-                  <div
-                    key={slot}
-                    className={`pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
-                    style={{ width: slotWidthPx }}
-                  >
-                    {formatSlotLabel(slot)}
-                  </div>
-                ))}
-              </div>
+              {dayCopies.map((copyIndex) => (
+                <div
+                  key={copyIndex}
+                  className="relative flex shrink-0"
+                  style={{ width: dayWidthPx }}
+                >
+                  <ScheduleIntervalBackground
+                    intervals={intervals.filter((slot) => !slot.isDraft)}
+                    attributes={attributes}
+                    slotWidthPx={slotWidthPx}
+                    interactive
+                  />
+                  {/* P5: 未服務運能缺口標記 */}
+                  <UnservedPulseMarkers report={report} slotWidthPx={slotWidthPx} />
+                  {/* 時刻標籤不裁切：144 個小 div ×3 的成本遠低於班次卡，
+                      而且它們是 flex 子元素，撐出表頭的高度，抽掉會塌 */}
+                  {timeSlots.map((slot) => (
+                    <div
+                      key={slot}
+                      className={`pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                      style={{ width: slotWidthPx }}
+                    >
+                      {formatSlotLabel(slot)}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
 
           {rows.map((row) => {
-            const rowBlocks = blocksByRow.get(row) ?? [];
+            const rowEntries = rowEntriesByRow.get(row) ?? [];
             const rowTemplateTasks = showTemplateTasks
               ? templateTasks.filter((t) => t.rowIndex === row)
               : [];
@@ -1629,66 +1825,72 @@ export function ShiftSchedulePlanGrid({
                 <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
                   {String(row).padStart(2, '0')}
                 </div>
-                <div
-                  className="relative flex"
-                  style={{ width: GRID_VISIBLE_SLOTS * slotWidthPx }}
-                  data-schedule-track="true"
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onClick={() => {
-                    if (onSelectBlock && selectedBlockId) {
-                      onSelectBlock(null);
-                    }
-                  }}
-                >
-                  <div className="pointer-events-none absolute inset-0 z-0">
-                    <ScheduleIntervalBackground
-                      intervals={intervals.filter((slot) => !slot.isDraft)}
-                      attributes={attributes}
-                      slotWidthPx={slotWidthPx}
-                    />
-                  </div>
-                  {rowTemplateTasks.map((task) => (
-                    <TemplateTaskBar
-                      key={task.id}
-                      task={task}
-                      slotWidthPx={slotWidthPx}
-                    />
-                  ))}
-                  {rowBlocks
-                    .filter((block) => block.source !== 'transition')
-                    .map((block, index, visibleBlocks) => {
-                      const previousPassengerBlock =
-                        [...visibleBlocks.slice(0, index)]
-                          .reverse()
-                          .find((item) => item.taskType === 'passenger')
-                        ?? null;
-                      return (
-                      <ShiftScheduleBlockBar
-                        key={block.id}
-                        block={block}
-                        blockIndex={index}
-                        slotWidthPx={slotWidthPx}
-                        activeIntervalRanges={activeIntervalRanges}
-                        selected={selectedBlockId === block.id}
-                        onSelect={onSelectBlock}
-                        report={report}
-                        highlighted={highlightedBlockId === block.id}
-                        selectedRoutes={selectedRoutes}
-                        minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
-                        sectionCodes={sectionCodes}
-                        interactiveEdit={interactiveEdit}
-                        hideStrategyBuffers={hideStrategyBuffers}
-                        previousPassengerBlock={previousPassengerBlock}
-                        onCommitTimeRange={onCommitBlockTimeRange}
-                        onPreviewTimeRange={onPreviewBlockTimeRange}
-                        onDeleteBlock={onDeleteBlock}
-                        onDuplicateBlock={onDuplicateBlock}
-                      />
-                      );
-                    })}
-                  <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
-                </div>
+                {dayCopies.map((copyIndex) => {
+                  // 這一份拷貝在虛擬數線上的起點；跟 viewWindow 同一套座標
+                  const copyStartMinute = copyIndex * SCHEDULE_DAY_MINUTES;
+                  const visibleEntries = rowEntries.filter((entry) =>
+                    entry.spans.some(
+                      (span) =>
+                        copyStartMinute + span.end > viewWindow.startMinute
+                        && copyStartMinute + span.start < viewWindow.endMinute,
+                    ),
+                  );
+                  return (
+                    <div
+                      key={copyIndex}
+                      className="relative flex shrink-0"
+                      style={{ width: dayWidthPx }}
+                      data-schedule-track="true"
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => {
+                        if (onSelectBlock && selectedBlockId) {
+                          onSelectBlock(null);
+                        }
+                      }}
+                    >
+                      <div className="pointer-events-none absolute inset-0 z-0">
+                        <ScheduleIntervalBackground
+                          intervals={intervals.filter((slot) => !slot.isDraft)}
+                          attributes={attributes}
+                          slotWidthPx={slotWidthPx}
+                        />
+                      </div>
+                      {rowTemplateTasks.map((task) => (
+                        <TemplateTaskBar
+                          key={task.id}
+                          task={task}
+                          slotWidthPx={slotWidthPx}
+                        />
+                      ))}
+                      {visibleEntries.map((entry) => (
+                        <ShiftScheduleBlockBar
+                          key={`${entry.block.id}#${copyIndex}`}
+                          block={entry.block}
+                          blockIndex={entry.index}
+                          slotWidthPx={slotWidthPx}
+                          activeIntervalRanges={activeIntervalRanges}
+                          selected={selectedBlockId === entry.block.id}
+                          onSelect={onSelectBlock}
+                          report={report}
+                          highlighted={highlightedBlockId === entry.block.id}
+                          selectedRoutes={selectedRoutes}
+                          minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
+                          sectionCodes={sectionCodes}
+                          interactiveEdit={interactiveEdit}
+                          hideStrategyBuffers={hideStrategyBuffers}
+                          previousPassengerBlock={entry.previousPassengerBlock}
+                          onCommitTimeRange={onCommitBlockTimeRange}
+                          onPreviewTimeRange={onPreviewBlockTimeRange}
+                          onDeleteBlock={onDeleteBlock}
+                          onDuplicateBlock={onDuplicateBlock}
+                          primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
+                        />
+                      ))}
+                      <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
