@@ -3671,6 +3671,40 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 補掃漏掉「設施優先」——待命把充電樁搶走了</h3>
+  <div class="callout">
+    使用者：「我不希望因為待命有可以停在 E1 的權利，就不讓別人有需要充電的去充。
+    但如果我把待命的充電樁取消，充電之後的待命又不知道要停哪裡。」
+  </div>
+  <ul>
+    <li>
+      <strong>「決定去哪」那一關本來就是充電優先</strong>——
+      <code>facility-first</code> 先處理所有真整備（充電／保養／行檢／洗車），
+      <code>standby-last</code> 才輪到待命。待命在那一關搶不贏充電。
+      所以使用者擔心的「待命有權利就把充電擋掉」，在主要路徑上是不成立的。
+    </li>
+    <li>
+      <strong>但收尾補掃沒有照這個順序。</strong>它是一條時間線一條走、每條照時刻
+      排序，誰先掃到誰拿——第 2 列的待命就這樣搶走最後一格充電樁，第 7 列真的要
+      充電的車卻補不到。<strong>決定階段守住的優先權，在補掃這裡漏光了。</strong>
+      補掃也套上同樣的兩階段。
+    </li>
+    <li>
+      <strong>因此不需要新增「待命優先權」設定。</strong>規則本身就講得完：
+      充電樁的本職是讓車恢復運行，待命停在那裡是<strong>順便</strong>，
+      順便的事永遠不該擋住本職。使用者不必在「取消待命的充電樁」與「讓待命擋住充電」
+      之間二選一——待命仍然可以停 E1，但只在沒有任何整備任務要用的時候。
+    </li>
+    <li>
+      <strong>驗證（真實資料）：</strong>
+      <code>MAINTENANCE_FACILITY_UNAVAILABLE</code> 14 → <strong>8</strong>、
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 36 → 28。
+      剩下的 8 則全部是 <code>servicing</code>（5）與 <code>inspection</code>（3）——
+      <strong>充電 0 則、待命 0 則</strong>，正是預期的結果。
+      <code>tsc</code> 23、測試 362 pass／9 fail。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 警告改成照「根因」分組</h3>
   <div class="callout">
     11 則警告的根因只有 2 個，分組卻是照 issue code 分成 3 張並排的卡，

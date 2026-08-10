@@ -1735,11 +1735,28 @@ export function insertMaintenanceTransferCards(args: {
   // 這裡補掃一遍：還沒綁設施的，就用它自己的完整時長去找一台空的補上；
   // 真的一台都不空，才是產能不足——標記在區塊上並單獨回報，
   // 讓 UI 可以把「沒地方停」直接畫在卡面，而不是靜靜地少一段資訊。
+  /**
+   * 補掃也要<strong>設施優先、待命最後</strong>。
+   *
+   * 「決定去哪」那一關已經是這個順序（真整備先挑、待命只能拿剩下的），
+   * 但補掃原本是一條時間線一條走、誰先掃到誰拿——第 2 列的待命就這樣搶走
+   * 最後一格充電樁，第 7 列真的要充電的車卻補不到。決定階段守住的優先權，
+   * 在這裡漏光了（2026-08-10 使用者：「我不希望因為待命有可以停在 E1 的權利，
+   * 就不讓別人有需要充電的去充」）。
+   *
+   * 充電樁的本職是讓車恢復運行；待命停在那裡是<strong>順便</strong>，
+   * 順便的事永遠不該擋住本職。
+   */
+  for (const sweepPhase of ['facility-first', 'standby-last'] as const) {
   for (const timeline of timelines) {
     const sweepSorted = [...timeline.blocks].sort(
       (a, b) => a.plannedStartMinute - b.plannedStartMinute,
     );
     for (let i = 0; i < sweepSorted.length; i += 1) {
+      if (
+        (sweepPhase === 'facility-first')
+        === (sweepSorted[i]!.taskType === 'standby')
+      ) continue;
       const yard = sweepSorted[i]!;
       if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
       if (yardBlockFacility.has(yard.id)) continue;
@@ -1845,6 +1862,7 @@ export function insertMaintenanceTransferCards(args: {
         reason: `${window} 這台車沒地方停——${parts.join('；')}`,
       });
     }
+  }
   }
 
   for (const timeline of timelines) {
