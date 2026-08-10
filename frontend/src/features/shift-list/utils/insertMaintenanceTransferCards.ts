@@ -902,22 +902,42 @@ export function insertMaintenanceTransferCards(args: {
       const yardStartSecond = minuteToSecond(yard.plannedStartMinute);
       const yardEndSecond = minuteToSecond(yard.plannedEndMinute);
       if (freeSecond >= yardStartSecond - 1e-9) continue;
-      // 繞回前一天尾巴時，入廠卡會落在 00:00 之前（負時刻）。要正確表達得把
-      // 這一段整備整條鏈重新基準到「跨夜」座標（開始 23:5x、結束 +1440），
-      // 牽動渲染與各種驗證，尚未做——先不插卡，設施仍由收尾補掃負責指派，
-      // 不會變成沒人管的整備。
-      if (freeSecond < 0) continue;
+      /**
+       * 前一段載客落在<strong>前一天</strong>（freeSecond 是負的）。
+       *
+       * 這種整備幾乎都是 00:00 開始的那一批：前一段正線 23:5x 跑完，整備從
+       * 00:00 起算。原本這裡直接 <code>continue</code>——不插卡、<strong>也不回報</strong>，
+       * 所以畫面上「00:00 的充電沒有入廠卡」跟「排不出來」跟「同區域 0 秒」
+       * 三種情形全部長得一樣，使用者無從分辨（2026-08-10 使用者追問）。
+       *
+       * 差別只在一點：入廠卡本來是「越早到、整備就從越早開始」，會把整備的
+       * 開始時刻往前拉。拉過午夜的話整備區塊自己就跨日了，得把整條停留鏈
+       * 重新基準，牽動渲染與各種驗證。所以繞回前一天時<strong>不拉頭</strong>，
+       * 改成貼齊：卡片結束正好落在整備開始那一刻，出發時刻往前推一段路程。
+       * 車在前一段的終點站多等一會兒才走，整備仍然準時開始。
+       */
+      const wrapsToPreviousDay = freeSecond < 0;
 
       let chosen: {
         nodeId: string; label: string; seconds: number;
+        departureSecond: number;
         gatewayNodeId: string; gatewayInstant: number;
       } | null = null;
       const tally = newTally();
       for (const facility of facilities) {
         const path = findTopologyPath(topology, fromNodeId, facility.id);
         if (!path) { tally.noPath += 1; continue; }
-        const arriveSecond = freeSecond + path.avgSeconds;
-        if (arriveSecond >= yardStartSecond - 1e-9) { tally.noTime += 1; continue; }
+        // 繞回前一天：貼齊整備開始往回推路程；當日之內：車一空出來就走
+        const departureSecond = wrapsToPreviousDay
+          ? yardStartSecond - path.avgSeconds
+          : freeSecond;
+        // 推回去比「車真的能走的時刻」還早 = 這段路塞不進午夜前的空檔
+        if (departureSecond < freeSecond - 1e-9) { tally.noTime += 1; continue; }
+        const arriveSecond = departureSecond + path.avgSeconds;
+        if (!wrapsToPreviousDay && arriveSecond >= yardStartSecond - 1e-9) {
+          tally.noTime += 1;
+          continue;
+        }
         // 要佔的是「抵達 → 整備做完」整段（車在裡面的全程），檢查窗必須跟
         // 佔用窗一致——只檢查頭部那一小段的話，別列車早就訂走整段的設施
         // 還是會被判定成空的。
@@ -935,6 +955,7 @@ export function insertMaintenanceTransferCards(args: {
         if (!chosen || path.avgSeconds < chosen.seconds) {
           chosen = {
             nodeId: facility.id, label: facility.label || facility.id, seconds: path.avgSeconds,
+            departureSecond,
             gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
           };
         }
@@ -950,15 +971,20 @@ export function insertMaintenanceTransferCards(args: {
       }
       bookJunction(chosen.gatewayNodeId, chosen.gatewayInstant, timeline.row);
 
-      const arriveSecond = freeSecond + chosen.seconds;
+      const departureSecond = chosen.departureSecond;
+      const arriveSecond = departureSecond + chosen.seconds;
+      // 繞回前一天的卡整張往後移一天，避免負時刻——這正是既有跨夜卡的表示法
+      // （開始 23:5x、結束落在 1440 之後），渲染端切成日尾＋日頭兩段，
+      // 無限捲動下兩段實體相鄰，看起來就是接在整備開頭的一張卡。
+      const dayShiftMinute = wrapsToPreviousDay ? SCHEDULE_DAY_MINUTES : 0;
       const card: GeneratedScheduleBlock = {
-        id: `yardentry-${yard.id}-${Math.round(freeSecond)}`,
+        id: `yardentry-${yard.id}-${Math.round(departureSecond)}`,
         timelineRow: timeline.row,
         taskType: 'dispatch',
         label: `整備入廠 · → ${chosen.label}`,
-        anchorStartMinute: secondToMinute(freeSecond),
-        plannedStartMinute: secondToMinute(freeSecond),
-        plannedEndMinute: secondToMinute(arriveSecond),
+        anchorStartMinute: secondToMinute(departureSecond) + dayShiftMinute,
+        plannedStartMinute: secondToMinute(departureSecond) + dayShiftMinute,
+        plannedEndMinute: secondToMinute(arriveSecond) + dayShiftMinute,
         travelSeconds: chosen.seconds,
         dwellSeconds: 0,
         source: 'yard_entry_move',
@@ -971,8 +997,12 @@ export function insertMaintenanceTransferCards(args: {
       };
       timeline.blocks.push(card);
 
-      yard.plannedStartMinute = secondToMinute(arriveSecond);
-      yardHeadExtended += 1;
+      // 繞回前一天時不拉頭：卡片已經貼齊整備開始，抵達＝整備開始，
+      // 拉頭只會把整備區塊本身推過午夜（見上面 wrapsToPreviousDay 的說明）。
+      if (!wrapsToPreviousDay) {
+        yard.plannedStartMinute = secondToMinute(arriveSecond);
+        yardHeadExtended += 1;
+      }
       // 時刻定案後才綁設施——assignYardFacility 會用當下的 [開始, 結束] 佔位
       assignYardStay(yard, chosen.nodeId, chosen.label);
       inserted += 1;
