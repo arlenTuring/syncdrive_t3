@@ -55,6 +55,55 @@ export const PRIMARY_DAY_COPY_INDEX = 1;
  *       在跨界之前就已經在 DOM 裡，不會捲到才長出來。</li>
  * </ul>
  */
+/**
+ * 程式主動捲動之後，暫時不做回中的時間窗（毫秒）。
+ *
+ * 回中是「捲到側邊那份就平移一天回來」，它是<strong>直接寫 scrollLeft</strong>。
+ * 而任何對 scrollLeft 的寫入都會<strong>中止進行中的平滑捲動</strong>——
+ * 所以「跳轉到某張卡」一啟動就會被回中殺掉，使用者按了沒反應
+ * （2026-08-11 使用者第二次回報）。跳轉期間先讓回中閉嘴。
+ */
+const RECENTRE_SUPPRESS_MS = 400;
+let suppressRecentreUntil = 0;
+
+/**
+ * 把格線捲到某個鐘面時刻，<strong>挑最近的那一份日拷貝</strong>。
+ *
+ * 三份拷貝內容一樣，所以同一個時刻有三個等價位置。固定捲到中間那份的話，
+ * 人在右邊那份時等於要橫跨一整天，路上必然穿過回中門檻；挑最近的就幾乎不動，
+ * 也不會觸發回中。
+ *
+ * 用直接寫 <code>scrollLeft</code> 而不是平滑捲動：平滑捲動會被任何後續寫入
+ * 中止，在這個機制底下不可靠。
+ */
+export function scrollScheduleGridToMinute(
+  grid: HTMLElement,
+  minuteOfDay: number,
+  rowLabelWidth: number,
+): void {
+  const dayWidthPx = (grid.scrollWidth - rowLabelWidth) / DAY_COPY_COUNT;
+  if (!(dayWidthPx > 0)) return;
+  const wrapped = wrapScheduleMinute(minuteOfDay);
+  const withinDayPx = (wrapped / SCHEDULE_DAY_MINUTES) * dayWidthPx;
+  const maxScrollLeft = Math.max(0, grid.scrollWidth - grid.clientWidth);
+  let best: number | null = null;
+  for (let copyIndex = 0; copyIndex < DAY_COPY_COUNT; copyIndex += 1) {
+    const left = Math.max(
+      0,
+      Math.min(
+        rowLabelWidth + copyIndex * dayWidthPx + withinDayPx - grid.clientWidth / 2,
+        maxScrollLeft,
+      ),
+    );
+    if (best === null || Math.abs(left - grid.scrollLeft) < Math.abs(best - grid.scrollLeft)) {
+      best = left;
+    }
+  }
+  if (best === null) return;
+  suppressRecentreUntil = Date.now() + RECENTRE_SUPPRESS_MS;
+  grid.scrollLeft = best;
+}
+
 export const CULL_BUCKET_MINUTES = 60;
 export const CULL_OVERSCAN_MINUTES = 180;
 
@@ -148,6 +197,8 @@ export function useDayCycleGridScroll<T extends HTMLElement>(args: {
   const recentreScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el || dayWidthPx <= 0 || dayWidthPx <= el.clientWidth) return;
+    // 跳轉剛把畫面捲到某張卡，這時回中會把它拉走
+    if (Date.now() < suppressRecentreUntil) return;
     const x = el.scrollLeft;
     if (x < dayWidthPx * 0.5) el.scrollLeft = x + dayWidthPx;
     else if (x > dayWidthPx * 1.5) el.scrollLeft = x - dayWidthPx;

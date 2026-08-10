@@ -56,6 +56,7 @@ import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
 } from '../utils/maintenanceSectionCode';
+import { scrollScheduleGridToMinute } from '../../../components/scheduleGridDayCycle';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 import { ManualScheduleEditorSidebar } from './ManualScheduleEditorSidebar';
@@ -1266,25 +1267,27 @@ export function StepShiftScheduleAdjust({
       .find((block) => block.id === targetId);
     const grid = document.querySelector('[data-schedule-grid-scroll]');
     if (grid instanceof HTMLElement && targetBlock) {
-      const ROW_LABEL_WIDTH = 48;
-      const dayWidthPx = (grid.scrollWidth - ROW_LABEL_WIDTH) / 3;
-      const minuteOfDay =
-        ((targetBlock.plannedStartMinute % 1440) + 1440) % 1440;
-      const targetLeft =
-        ROW_LABEL_WIDTH
-        + dayWidthPx
-        + (minuteOfDay / 1440) * dayWidthPx
-        - grid.clientWidth / 2;
-      grid.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+      scrollScheduleGridToMinute(grid, targetBlock.plannedStartMinute, 48);
     }
 
     setTimeout(() => {
       const el = document.getElementById(`block-card-${targetId}`);
-      // inline: 'nearest' —— 橫向已經到位了，不要再被拉走
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-      }
-    }, 260);
+      if (!el || !(grid instanceof HTMLElement)) return;
+      /**
+       * 只調垂直，橫向<strong>絕對不要碰</strong>。
+       *
+       * <code>scrollIntoView</code> 就算給 <code>inline: 'nearest'</code>，
+       * 元素橫向不在畫面內時照樣會捲——而回中隨時可能把畫面移到另一份日拷貝，
+       * 那份看起來一模一樣但 DOM id 只掛在中間那份上，於是它會把畫面拉去
+       * 一個「看起來沒必要」的地方。改成自己算垂直差值。
+       */
+      const rect = el.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
+      grid.scrollBy({
+        top: rect.top - gridRect.top - grid.clientHeight / 2 + rect.height / 2,
+        behavior: 'smooth',
+      });
+    }, 120);
   };
 
   // 分析報表：純計算，跟著 plan／時段／路線走；plan 還沒好就不算
