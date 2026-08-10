@@ -766,6 +766,92 @@ function resolveBlockCode(
   return resolveGeneratedBlockTripCode(block, index, sectionCodes);
 }
 
+/**
+ * 卡面文字<strong>捲到哪跟到哪</strong>：卡片左緣被捲出畫面時，文字往右平移貼齊
+ * 可視左緣，一路跟到卡片右緣為止，卡片捲完才跟著離開。
+ *
+ * 跟時間模板管理的任務卡同一套做法（<code>StepTaskScheduling.tsx</code> 的
+ * <code>TaskBar</code>）。原本這裡用 <code>position: sticky</code>，
+ * 但卡片本身有 <code>overflow-hidden</code>——那會建立一個不會捲動的
+ * scrollport，sticky 就黏在卡片自己身上，等於沒有作用。改用 transform 就不受
+ * 任何祖先的 overflow 影響。
+ *
+ * 效能：直接改 DOM style、rAF 節流，不觸發 React re-render；
+ * 位置用「捲動位置 ＋ 已知的卡片座標」算，只有文字寬度需要量，
+ * 而那個由 ResizeObserver 快取，捲動時一次版面讀取都不做。
+ */
+function ScrollPinnedCardLabel({
+  /** 卡片左緣在捲動內容座標系裡的位置（含左側列號欄與第幾份日拷貝） */
+  cardLeftPx,
+  cardWidthPx,
+  /** 卡面文字原本的起點（開頭被 0 秒入廠卡壓住時會往右讓） */
+  insetPx,
+  children,
+}: {
+  cardLeftPx: number;
+  cardWidthPx: number;
+  insetPx: number;
+  children: React.ReactNode;
+}) {
+  const labelRef = useRef<HTMLDivElement>(null);
+  const labelWidthRef = useRef(0);
+
+  useEffect(() => {
+    const label = labelRef.current;
+    if (!label) return;
+    const grid = label.closest('[data-schedule-grid-scroll]');
+    if (!(grid instanceof HTMLElement)) return;
+
+    const EDGE_PAD = 4;
+    let raf = 0;
+    let lastShift = Number.NaN;
+    const apply = () => {
+      raf = 0;
+      // 可視左緣：捲動位置再加上左側常駐的列號欄，那一欄會蓋住卡片
+      const visibleLeft = grid.scrollLeft + ROW_LABEL_WIDTH + EDGE_PAD;
+      const target = Math.max(insetPx, visibleLeft - cardLeftPx);
+      // 不能推過卡片右緣——卡片捲完了字就該跟著走
+      const maxLeft = Math.max(insetPx, cardWidthPx - labelWidthRef.current - EDGE_PAD);
+      const shift = Math.min(target, maxLeft) - insetPx;
+      if (Number.isFinite(lastShift) && Math.abs(shift - lastShift) < 0.5) return;
+      lastShift = shift;
+      label.style.transform = shift <= 0.5 ? 'none' : `translate3d(${shift}px, 0, 0)`;
+    };
+    const schedule = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(apply);
+    };
+
+    // 文字寬度只在內容或字體變動時改變，量一次存起來；捲動時不再讀版面
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        labelWidthRef.current = entry.contentRect.width;
+      }
+      schedule();
+    });
+    observer.observe(label);
+    labelWidthRef.current = label.offsetWidth;
+    apply();
+
+    grid.addEventListener('scroll', schedule, { passive: true });
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      grid.removeEventListener('scroll', schedule);
+      observer.disconnect();
+    };
+  }, [cardLeftPx, cardWidthPx, insetPx]);
+
+  return (
+    <div
+      ref={labelRef}
+      className="relative z-[6] w-fit min-w-0 max-w-full self-start px-1 will-change-transform"
+      style={insetPx > 0 ? { paddingLeft: insetPx } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 function ScheduleIntervalBackground({
   intervals,
   attributes,
@@ -982,6 +1068,7 @@ function ShiftScheduleBlockBar({
   onDuplicateBlock,
   primaryCopy = true,
   leadingInsetPx = 0,
+  trackOffsetPx = 0,
 }: {
   block: GeneratedScheduleBlock;
   blockIndex: number;
@@ -1013,6 +1100,12 @@ function ShiftScheduleBlockBar({
    * 不讓的話代號（SC0000 這種）會整個被蓋掉。
    */
   leadingInsetPx?: number;
+  /**
+   * 這一份日拷貝的軌道左緣在捲動內容座標系裡的位置
+   * （左側列號欄寬度 ＋ 第幾份 × 一日寬度）。卡面文字要跟著捲動貼齊可視左緣，
+   * 得知道自己在整份內容裡的絕對位置。
+   */
+  trackOffsetPx?: number;
 }) {
   // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
   // 單一顏色、卡內不放內容，說明全部交給 hover。
@@ -1074,7 +1167,6 @@ function ShiftScheduleBlockBar({
     block.source === 'template_bar'
     && block.taskType !== 'dispatch'
     && onSelect != null;
-  const isStickyLabel = durationMinutes >= 20;
   const [stationHoverPos, setStationHoverPos] = useState<HoverCardPos | null>(null);
   const [issueHoverPos, setIssueHoverPos] = useState<HoverCardPos | null>(null);
   const [moveCardHoverPos, setMoveCardHoverPos] = useState<HoverCardPos | null>(null);
@@ -1475,9 +1567,10 @@ function ShiftScheduleBlockBar({
         </button>
       ) : null}
       {showChrome && !isMoveCard ? (
-      <div
-        className={isStickyLabel ? "sticky left-[56px] z-[6] min-w-0 max-w-full px-1" : "relative z-[6] min-w-0 px-1"}
-        style={leadingInsetPx > 0 ? { paddingLeft: leadingInsetPx } : undefined}
+      <ScrollPinnedCardLabel
+        cardLeftPx={trackOffsetPx + leftPx}
+        cardWidthPx={widthPx}
+        insetPx={leadingInsetPx}
       >
         <div
           className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
@@ -1553,7 +1646,7 @@ function ShiftScheduleBlockBar({
         <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
           {timeLabel}
         </div>
-      </div>
+      </ScrollPinnedCardLabel>
       ) : null}
       {isPrimarySegment && yardHoverPos && isYardTask ? (
         <YardTaskHoverCard code={code} block={block} pos={yardHoverPos} />
@@ -1843,7 +1936,11 @@ export function ShiftSchedulePlanGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-auto"
+        data-schedule-grid-scroll="true"
+      >
         <div
           className="min-w-max"
           style={{ width: dayWidthPx * DAY_COPY_COUNT + ROW_LABEL_WIDTH }}
@@ -1974,6 +2071,7 @@ export function ShiftSchedulePlanGrid({
                           onDuplicateBlock={onDuplicateBlock}
                           primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
                           leadingInsetPx={entry.leadingInsetPx}
+                          trackOffsetPx={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
                         />
                       ))}
                       <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
