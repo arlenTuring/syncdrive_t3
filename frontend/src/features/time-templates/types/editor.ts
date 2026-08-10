@@ -628,6 +628,32 @@ export function clampTaskMoveStart(
   activeRanges: MinuteRange[],
   tasks: ScheduleTask[],
 ): number {
+  /**
+   * 拖過午夜：整段繞回鐘面（開始 23:5x、結束落在 1440 之後）。
+   *
+   * 只有在<strong>繞過去之後真的可行</strong>時才採用——同列不撞別的任務、
+   * 整段都落在營運時段內。不可行就退回原本的線性夾制，行為跟以前一模一樣，
+   * 所以這是一條純粹的新分支，不會動到既有情形。
+   */
+  const wrappedStart = ((proposedStart % SCHEDULE_DAY_MINUTES) + SCHEDULE_DAY_MINUTES)
+    % SCHEDULE_DAY_MINUTES;
+  const wrapsMidnight = wrappedStart + duration > SCHEDULE_DAY_MINUTES + 1e-9;
+  if (wrapsMidnight && duration < SCHEDULE_DAY_MINUTES) {
+    const candidate = {
+      startMinute: clampScheduleMinute(wrappedStart),
+      durationMinutes: duration,
+    };
+    const clashes = tasks.some(
+      (other) =>
+        other.id !== taskId
+        && other.rowIndex === rowIndex
+        && tasksOverlapOnDayCycle(candidate, other),
+    );
+    if (!clashes && isTaskWithinActiveIntervalsOnDayCycle(candidate, activeRanges)) {
+      return candidate.startMinute;
+    }
+  }
+
   let start = clampScheduleMinute(
     Math.max(0, Math.min(SCHEDULE_DAY_MINUTES - duration, proposedStart)),
   );
@@ -778,6 +804,51 @@ export function createScheduleTask(
 }
 
 /** 單列在營運時段內、尚未被任務覆蓋的時間區間。 */
+/**
+ * 一根任務條在鐘面上覆蓋到的區段。<strong>跨午夜就是兩段。</strong>
+ *
+ * 跟時段的 {@link resolveIntervalMinuteRanges} 同一個概念：切成鐘面區段之後，
+ * 所有「排序、比重疊、找空隙」的線性算法原封不動就正確，不必每個地方各自
+ * 處理一次繞回去。
+ */
+export function resolveTaskMinuteRanges(task: {
+  startMinute: number;
+  durationMinutes: number;
+}): MinuteRange[] {
+  const duration = Math.max(0, Math.min(SCHEDULE_DAY_MINUTES, task.durationMinutes));
+  if (duration <= 0) return [];
+  const start = ((task.startMinute % SCHEDULE_DAY_MINUTES) + SCHEDULE_DAY_MINUTES)
+    % SCHEDULE_DAY_MINUTES;
+  const end = start + duration;
+  if (end <= SCHEDULE_DAY_MINUTES) return [{ start, end }];
+  return [
+    { start, end: SCHEDULE_DAY_MINUTES },
+    { start: 0, end: end - SCHEDULE_DAY_MINUTES },
+  ];
+}
+
+/** 兩根任務條在日循環上有沒有重疊（跨午夜的那根會被切成兩段來比） */
+export function tasksOverlapOnDayCycle(
+  a: { startMinute: number; durationMinutes: number },
+  b: { startMinute: number; durationMinutes: number },
+): boolean {
+  const aRanges = resolveTaskMinuteRanges(a);
+  const bRanges = resolveTaskMinuteRanges(b);
+  return aRanges.some((one) =>
+    bRanges.some((other) => one.start < other.end - 1e-9 && other.start < one.end - 1e-9));
+}
+
+/** 一根任務條是否整段都落在營運時段內（跨午夜的兩段都要落在裡面） */
+export function isTaskWithinActiveIntervalsOnDayCycle(
+  task: { startMinute: number; durationMinutes: number },
+  activeRanges: MinuteRange[],
+): boolean {
+  const ranges = resolveTaskMinuteRanges(task);
+  if (ranges.length === 0 || activeRanges.length === 0) return false;
+  return ranges.every((range) =>
+    isRangeWithinActiveIntervals(range.start, range.end, activeRanges));
+}
+
 export function computeUncoveredRangesForRow(
   rowIndex: number,
   tasks: ScheduleTask[],
@@ -785,12 +856,10 @@ export function computeUncoveredRangesForRow(
 ): MinuteRange[] {
   if (activeRanges.length === 0) return [];
 
+  // 跨午夜的任務條在鐘面上是兩段；切開之後底下的線性掃描原封不動就正確
   const rowTasks = tasks
     .filter((task) => task.rowIndex === rowIndex)
-    .map((task) => ({
-      start: task.startMinute,
-      end: task.startMinute + task.durationMinutes,
-    }))
+    .flatMap((task) => resolveTaskMinuteRanges(task))
     .sort((a, b) => a.start - b.start);
 
   const mergedActive = mergeMinuteRanges(activeRanges);

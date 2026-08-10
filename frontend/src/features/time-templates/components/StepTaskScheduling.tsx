@@ -661,7 +661,19 @@ function TaskBar({
   const widthPx = (task.durationMinutes / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
   const leftPx = (task.startMinute / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
   const endMinute = task.startMinute + task.durationMinutes;
-  const timeLabel = `${formatMinutesToTime(task.startMinute)}-${formatMinutesToTime(endMinute)}`;
+  /**
+   * 跨午夜的任務條<strong>不必切成兩段畫</strong>。
+   *
+   * 格線是日循環無限捲動的，三份日拷貝實體相鄰而且軌道沒有 overflow 裁切，
+   * 所以一根從 23:40 長 40 分鐘的條子畫成單一個 div、寬度照時長算，
+   * 自然就會越過本份的右緣、落在下一份拷貝的左緣——那裡正好是隔天的 00:00。
+   * 看起來就是連續的一根。
+   *
+   * 卡面時刻要繞回鐘面：結束落在 1440 之後時該寫 00:20，不是 24:20。
+   */
+  const timeLabel =
+    `${formatMinutesToTime(task.startMinute)}-`
+    + `${formatMinutesToTime(endMinute % SCHEDULE_DAY_MINUTES)}`;
   const inactiveRanges = useMemo(
     () => getInactiveRangesWithinBar(task.startMinute, endMinute, activeIntervalRanges),
     [task.startMinute, endMinute, activeIntervalRanges],
