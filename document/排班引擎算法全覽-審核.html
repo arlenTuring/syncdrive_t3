@@ -3671,6 +3671,37 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-10 · 警告改成照「根因」分組</h3>
+  <div class="callout">
+    11 則警告的根因只有 2 個，分組卻是照 issue code 分成 3 張並排的卡，
+    使用者得自己推「這 8 則是不是同一件事」。
+  </div>
+  <ul>
+    <li>
+      <strong>三個根因</strong>：車不夠（<code>UNSERVED_SERVICE_PULSE</code>／
+      <code>HEADWAY_BELOW_TARGET</code>）、整備設施不夠
+      （<code>MAINTENANCE_FACILITY_UNAVAILABLE</code>／
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code>）、停靠站容量不夠
+      （四個 <code>STATION_BERTH_*</code>）。每一組附一句「為什麼這些是同一件事」，
+      收合狀態也看得到。
+    </li>
+    <li>
+      <strong>只加一層，底下完全不動。</strong>原本的 code 分組卡、排序
+      （硬錯誤 → 極限 → 可調 → 策略）、展開規則、點擊跳轉全部原封不動；
+      根因區塊的順序照「它底下第一張卡在原排序中的位置」決定，
+      所以最嚴重的根因仍然排在最前面。
+    </li>
+    <li>
+      <strong>認不出的 code 落到「其他」</strong>，不會憑空消失——之後新增
+      issue code 忘了歸類時仍然看得到，這比讓它靜靜不見安全。
+    </li>
+    <li>
+      真實資料收攏後：停靠站不夠 132 則、車不夠 24 則、設施不夠 23 則，
+      「其他」0 則（現有 8 個 code 全部歸得了類）。
+      <code>tsc</code> 23、測試 362 pass／9 fail、<code>eslint</code> 與基準相同。
+    </li>
+  </ul>
+
   <h3>2026-08-10 · 警告要講「改成多少」，不是只講「不夠」</h3>
   <div class="callout">
     使用者：「目前班表那邊還有一些錯誤是比較能容許的，你有什麼想法可以怎麼改進嗎？」

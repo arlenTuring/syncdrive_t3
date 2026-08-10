@@ -263,6 +263,92 @@ function groupFeasibilityIssues(
   });
 }
 
+/**
+ * 警告照<strong>根因</strong>分組，不是照 issue code 分組。
+ *
+ * 真實資料上常見的樣子是「11 則警告、2 個根因」：8 則班距未承接全部來自尖峰
+ * 車不夠、1 則沒地方停來自充電樁不夠。照 code 分組的話畫面上是三張並排的卡，
+ * 使用者得自己推「這 8 則是不是同一件事」（2026-08-10 使用者要求）。
+ *
+ * 這一層<strong>只管顯示</strong>：底下仍然是原本那些 code 分組卡，順序、
+ * 展開規則、跳轉行為全部不變。認不出根因的 code 落到「其他」，
+ * 所以之後新增 code 也不會憑空消失。
+ */
+type RootCauseDefinition = {
+  id: string;
+  title: string;
+  /** 這個根因底下會出現哪些 issue code */
+  codes: ReadonlySet<string>;
+  /** 為什麼這些警告是同一件事——收合狀態也看得到 */
+  hint: string;
+};
+
+const ROOT_CAUSES: RootCauseDefinition[] = [
+  {
+    id: 'fleet',
+    title: '車不夠',
+    codes: new Set(['UNSERVED_SERVICE_PULSE', 'HEADWAY_BELOW_TARGET']),
+    hint:
+      '同一時刻派得出的車少於「一輪往返 ÷ 目標班距」，脈衝就沒有車可以接，'
+      + '班距跟著被拉開。要嘛加車、要嘛放寬班距——分析報表會算出各時段要改成多少。',
+  },
+  {
+    id: 'facility',
+    title: '整備設施不夠',
+    codes: new Set(['MAINTENANCE_FACILITY_UNAVAILABLE', 'MAINTENANCE_TRANSFER_UNRESOLVED']),
+    hint:
+      '同一類設施在那段時間全被別列車佔著，車沒地方停，進出廠的移動卡也就排不出來。'
+      + '要嘛多掛幾台設施、要嘛把同時段的整備任務錯開。',
+  },
+  {
+    id: 'berth',
+    title: '停靠站容量不夠',
+    codes: new Set([
+      'STATION_BERTH_COLLISION',
+      'STATION_BERTH_PROTECTION_GAP',
+      'STATION_BERTH_DELAYED',
+      'STATION_BERTH_BACKUP_USED',
+    ]),
+    hint:
+      '一個停靠點同時只能停一台車。車比需要的多、或整備排不進去，車就會擠在終點站，'
+      + '接著就是延後發車、改走備用線，最後撞在一起。',
+  },
+];
+
+const OTHER_ROOT_CAUSE: RootCauseDefinition = {
+  id: 'other',
+  title: '其他',
+  codes: new Set(),
+  hint: '尚未歸類到某個根因的項目。',
+};
+
+function resolveRootCause(code: string): RootCauseDefinition {
+  return ROOT_CAUSES.find((cause) => cause.codes.has(code)) ?? OTHER_ROOT_CAUSE;
+}
+
+function RootCauseSection({
+  cause,
+  issueCount,
+  children,
+}: {
+  cause: RootCauseDefinition;
+  issueCount: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-2">
+      <div className="mb-1 flex flex-wrap items-baseline gap-2">
+        <span className="text-[12px] font-semibold text-zinc-100">{cause.title}</span>
+        <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
+          連帶 {issueCount} 則
+        </span>
+      </div>
+      <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">{cause.hint}</p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
 function IssueGroupCard({
   group,
   plan,
@@ -486,25 +572,48 @@ function FeasibilityMessages({
           硬閘＝0 錯誤才算通過；策略延後／改線預設隱藏。品質目標另要求無未承接脈衝與班距低於目標。
         </p>
       </div>
-      {visibleGroups.map((group) => {
-        const layer = resolveIssueDisplayLayerFromIssue({
-          code: group.code,
-          severity: group.severity,
-          kind: group.issues[0]?.kind,
-        });
-        return (
-          <IssueGroupCard
-            key={group.key}
-            group={group}
-            plan={plan}
-            sectionCodes={sectionCodes}
-            defaultExpanded={
-              layer === 'hard' || (layer !== 'policy' && group.issues.length === 1)
-            }
-            onIssueClick={onIssueClick}
-          />
-        );
-      })}
+      {/*
+        先照根因收攏，再放原本的 code 分組卡。visibleGroups 已經排好序
+        （硬錯誤 → 極限 → 可調 → 策略），這裡照它第一次出現的順序決定根因順序，
+        所以最嚴重的根因仍然排在最前面。
+      */}
+      {[...ROOT_CAUSES, OTHER_ROOT_CAUSE]
+        .map((cause) => ({
+          cause,
+          groups: visibleGroups.filter((group) => resolveRootCause(group.code) === cause),
+        }))
+        .filter((entry) => entry.groups.length > 0)
+        .sort(
+          (a, b) =>
+            visibleGroups.indexOf(a.groups[0]!) - visibleGroups.indexOf(b.groups[0]!),
+        )
+        .map(({ cause, groups }) => (
+          <RootCauseSection
+            key={cause.id}
+            cause={cause}
+            issueCount={groups.reduce((sum, group) => sum + group.issues.length, 0)}
+          >
+            {groups.map((group) => {
+              const layer = resolveIssueDisplayLayerFromIssue({
+                code: group.code,
+                severity: group.severity,
+                kind: group.issues[0]?.kind,
+              });
+              return (
+                <IssueGroupCard
+                  key={group.key}
+                  group={group}
+                  plan={plan}
+                  sectionCodes={sectionCodes}
+                  defaultExpanded={
+                    layer === 'hard' || (layer !== 'policy' && group.issues.length === 1)
+                  }
+                  onIssueClick={onIssueClick}
+                />
+              );
+            })}
+          </RootCauseSection>
+        ))}
     </div>
   );
 }
