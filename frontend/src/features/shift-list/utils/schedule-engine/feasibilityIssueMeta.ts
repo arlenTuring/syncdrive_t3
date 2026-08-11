@@ -34,6 +34,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_TIMING_INFEASIBLE: '逐站時刻超出班次卡',
   STATION_BERTH_COLLISION: '停靠點站位碰撞',
   STATION_BERTH_PROTECTION_GAP: '碰撞保護時間不足',
+  STATION_BERTH_RELIEF_UNAVAILABLE: '沒有可用的讓渡路線',
   STATION_BERTH_DELAYED: '站位約束延後',
   STATION_BERTH_BACKUP_USED: '站位約束改選路線',
   ANCHOR_CONFLICT: '錨點衝突',
@@ -77,6 +78,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   ANCHOR_CONFLICT: { id: 's9', label: '§9 Expand 與物理占用' },
   STATION_BERTH_COLLISION: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_PROTECTION_GAP: { id: 's8', label: '§8 站位約束決策' },
+  STATION_BERTH_RELIEF_UNAVAILABLE: { id: 's8', label: '§8.2 站位讓渡' },
   STATION_BERTH_DELAYED: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_BACKUP_USED: { id: 's8', label: '§8 站位約束決策' },
   TIMELINE_OVERLAP: { id: 's6', label: '§6 整備讓渡：開頭 vs 尾巴' },
@@ -140,6 +142,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」——站位在「前車離站 + 1 倍」就空了，後車還要花同樣的時間才能開進來，所以是兩倍。前車若因調度滯留在站上，以真正開走的時刻起算。訊息會直接告訴你「同時最多有幾台車停在這個停靠點」：只要超過 1 台，就代表該時段的車比班距需要的多，多出來的車跑完一輪沒有下一個脈衝可接，只好停在原地等，於是全擠在同一個停靠點。這不是把兩班拉開就能解的——要減少該時段的時間線列數、把多餘的車安排進整備／待命，或讓它們改停別的站位（關聯圖上要有終點在別站的備用路線）。',
+  },
+  STATION_BERTH_RELIEF_UNAVAILABLE: {
+    kind: 'limit',
+    guidance:
+      '車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。',
   },
   STATION_BERTH_DELAYED: {
     kind: 'policy',

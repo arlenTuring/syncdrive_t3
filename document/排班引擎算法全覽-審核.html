@@ -3763,6 +3763,39 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 碰撞保護不足：講出「讓渡試過了、為什麼沒成」</h3>
+  <div class="callout">
+    使用者指著畫面上兩則「碰撞保護時間不足」說：解決這個問題。
+  </div>
+  <ul>
+    <li>
+      <strong>先查清楚：讓渡機制其實看過這兩則。</strong><code>findStationBerthCollisions</code>
+      本來就同時回傳 <code>overlap</code> 與 <code>protection_gap</code> 兩種，讓渡迴圈也都跑過。
+      救不了是卡在兩個<strong>沉默的 continue</strong>——換不到停別站的替身路線，也繞不出
+      「去別站等再回來」的鏈。
+    </li>
+    <li>
+      <strong>沉默是最糟的結果。</strong>使用者只看到「碰撞保護時間不足」，完全不知道系統
+      <strong>試過</strong>、而且為什麼沒成，會合理地以為引擎根本沒處理這件事。
+      新增 <code>STATION_BERTH_RELIEF_UNAVAILABLE</code>，講出空等幾分鐘、試過什麼、為什麼不行。
+    </li>
+    <li>
+      講的是<strong>代價與限制</strong>，不是叫使用者去補一條路線——那條路線該不該存在是實體
+      問題，不是排班程式能判斷的（沿用 2026-08-11 使用者對 ROUTE_ORIGIN_AWAY_FROM_VEHICLE 的指正）。
+    </li>
+    <li>
+      <strong>第一版報了 40 則。</strong>那 40 對正好就是原本兩則摘要裡的 14 對＋26 對——
+      把已經整理好的摘要拆散成噪音。改成<strong>每一站只講一次</strong>，落在 3 則
+      （N2W下行出發、T3上行、[備用]N2W下行出發）。
+    </li>
+    <li>
+      <strong>誠實記錄：這一則沒有讓那 2 則消失，也不可能。</strong>那兩站的車確實比班距需要的多，
+      而關聯圖上沒有可用的替代動線。這次交付的是<strong>把「無解」跟「沒處理」分開</strong>——
+      先前兩者在畫面上長得一模一樣。
+      <code>tsc -b</code> 23、eslint 乾淨、<code>ok = true</code>、errors <code>{}</code>。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 跨午夜的過夜整備是<strong>一段</strong>，不是兩段</h3>
   <div class="callout">
     使用者：「請你不要動列9列10，那樣排是有意義的，不可以自動挪」。

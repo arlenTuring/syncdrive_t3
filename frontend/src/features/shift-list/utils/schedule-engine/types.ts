@@ -166,6 +166,8 @@ export type FeasibilityViolationCode =
   | 'GEOMETRY_NOT_CONVERGED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
+  /** 空等會撞到別列車，但關聯圖上沒有可用的讓渡路線，只能留在原地（警告） */
+  | 'STATION_BERTH_RELIEF_UNAVAILABLE'
   /** 生成期為清站位而延後發車（警告） */
   | 'STATION_BERTH_DELAYED'
   /** 生成期站位約束依拓撲改選路線（警告；代號沿用） */

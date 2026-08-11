@@ -542,6 +542,8 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
   }
 
   const handledEarlierBlockIds = new Set<string>();
+  /** 讓渡救不了時每一站只講一次——同一站的每一對都講會蓋掉已經整理好的摘要 */
+  const reliefUnavailableStationIds = new Set<string>();
 
   for (const hit of collisions) {
     const earlierBlock = blockById.get(hit.earlier.blockId);
@@ -594,7 +596,48 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
       successorPolicy,
       minimumRecoveryTimeSeconds,
     });
-    if (reliefBlocks.length === 0) continue;
+    if (reliefBlocks.length === 0) {
+      /**
+       * 兩條路都走不通：換不到停別站的替身路線，也繞不出「去別站等再回來」的鏈。
+       *
+       * 原本是沉默的 <code>continue</code>，於是使用者只看到「碰撞保護時間不足」，
+       * 完全不知道<strong>系統其實試過讓渡、而且為什麼沒成</strong>——會誤以為引擎
+       * 根本沒處理這件事（2026-08-12 使用者要求解掉這兩則）。
+       *
+       * 講的是<strong>代價與限制</strong>，不是叫使用者去補一條路線：那條路線該不該
+       * 存在是實體問題，不是排班程式能判斷的。
+       */
+      /*
+        每一站只講一次。這 40 對「救不了」正好就是 STATION_BERTH_PROTECTION_GAP
+        那兩則裡的 14 對＋26 對——同一件事報 40 次，只是把已經整理好的摘要
+        拆散成噪音。
+      */
+      if (reliefUnavailableStationIds.has(hit.stationId)) {
+        handledEarlierBlockIds.add(earlierBlock.id);
+        continue;
+      }
+      reliefUnavailableStationIds.add(hit.stationId);
+      pushIssue(warnings, {
+        code: 'STATION_BERTH_RELIEF_UNAVAILABLE',
+        severity: 'warning',
+        kind: 'limit',
+        message:
+          `時間線 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等 `
+          + `${Math.round((nextStartMinute - earlierBlock.plannedEndMinute) * 10) / 10} 分鐘，`
+          + `已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，`
+          + `只能留在原地。要消掉這一則，得減少這個時段同時在線的車，`
+          + `或讓其中一台改停別的站位。`,
+        detail: {
+          timelineRow: earlierBlock.timelineRow,
+          stationId: hit.stationId,
+          stationName: hit.stationName,
+          earlierBlockId: earlierBlock.id,
+          idleMinutes: nextStartMinute - earlierBlock.plannedEndMinute,
+        },
+      });
+      handledEarlierBlockIds.add(earlierBlock.id);
+      continue;
+    }
 
     timeline.blocks.push(...reliefBlocks);
     timeline.blocks.sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
