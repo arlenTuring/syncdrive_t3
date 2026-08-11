@@ -26,6 +26,7 @@ import {
 } from './schedule-engine/physics';
 import {
   listNextInstanceCandidates,
+  resolveStartInstanceCandidates,
   type RouteSuccessorPolicy,
 } from './schedule-engine/routeSuccessorPolicy';
 import type {
@@ -286,8 +287,25 @@ export type TopologyRouteCandidate = {
   route: ShiftScheduleSelectedRoute;
   /** 越小越優先 */
   rank: number;
-  source: 'planned' | 'priority' | 'secondary' | 'ring' | 'same_origin';
+  source:
+    | 'planned'
+    | 'priority'
+    | 'secondary'
+    | 'ring'
+    | 'same_origin'
+    /** 改從車實際停的那一格發車，見 {@link resolveDayCycleParkedStationId} */
+    | 'vehicle_parked_origin'
+    /** 冷啟動放寬：連起點站都換掉的候選，見 {@link isDayCycleColdStart} */
+    | 'cold_start_origin';
 };
+
+/**
+ * 冷啟動時要不要放寬首班車起點。
+ *
+ * 留成常數是為了做前後對照——關掉時整個引擎回到 2026-08-12 之前的行為
+ * （首班一律照 Step 4 錨點發車，站位撞了只能延後）。
+ */
+export const RELAX_FIRST_TRIP_ORIGIN = true;
 
 /**
  * 站位／交路候選＝關聯圖拓撲（優→次）＋同起點可銜接路線。
@@ -298,8 +316,19 @@ export function listTopologyRouteCandidates(args: {
   currentRoute: ShiftScheduleSelectedRoute;
   previousRoute: ShiftScheduleSelectedRoute | null;
   successorPolicy?: RouteSuccessorPolicy | null;
+  /** 真正的冷啟動（前面沒有整備也沒有正線）才可以連起點站一起換 */
+  coldStart?: boolean;
+  /** 前一段整備實際佔的站位；與計畫路線的起點站不同時，該信這個 */
+  parkedStationId?: string | null;
 }): TopologyRouteCandidate[] {
-  const { selectedRoutes, currentRoute, previousRoute, successorPolicy } = args;
+  const {
+    selectedRoutes,
+    currentRoute,
+    previousRoute,
+    successorPolicy,
+    coldStart = false,
+    parkedStationId = null,
+  } = args;
   const byId = new Map<string, TopologyRouteCandidate>();
 
   const put = (
@@ -366,6 +395,63 @@ export function listTopologyRouteCandidates(args: {
         } else {
           put(route, 40, 'same_origin');
         }
+      }
+    }
+
+    /**
+     * 車實際停的那一格，跟計畫路線的起點站不同時，也把「從車那裡發」的路線列進候選。
+     *
+     * 上面那圈的 <code>origin</code> 取自<strong>計畫路線</strong>，是流水線第一步定的；
+     * 但站位求解常把前一段待命從主線擠到備用格，車就不在計畫路線的起點了。此時候選
+     * 全部夾在一個車根本不在的站，等於在錯的那一格裡找解——撞了只能延後發車。
+     *
+     * 從車所在位置發車還<strong>省掉出廠卡那段空跑</strong>，rank 仍放在同起點候選之後
+     * （45）＝原本解得開的照舊，解不開才動它，避免與 alignRouteWithVehicleLocation
+     * 的成本判斷互相打架。終點必須相同，理由同下。
+     */
+    if (
+      RELAX_FIRST_TRIP_ORIGIN
+      && parkedStationId
+      && parkedStationId !== resolveRouteOriginStationId(currentRoute)
+    ) {
+      const destination = resolveRouteTerminalStationId(currentRoute);
+      for (const [instanceId, route] of policy.routesByInstanceId) {
+        if (resolveRouteOriginStationId(route) !== parkedStationId) continue;
+        if (resolveRouteTerminalStationId(route) !== destination) continue;
+        const preferIdx = policy.canonicalCycleInstanceIds.indexOf(instanceId);
+        put(route, 45 + Math.max(0, preferIdx), 'vehicle_parked_origin');
+      }
+    }
+
+    /**
+     * 冷啟動放寬：連起點站都可以換。
+     *
+     * 上面那圈用 <code>origin</code> 把候選夾死在「跟原本同一個起點站」，等於首班車
+     * 只能在同一格的多條線之間換。撞的偏偏常常就是<strong>那一格</strong>——主線站位
+     * 整天有車經過，備用格空著沒人用，求解器卻看不到它，只好延後發車去閃。
+     *
+     * 車一天第一次出現在這一班，之前不在任何地方，換到備用格出發沒有空跑成本。
+     *
+     * 兩個護欄：
+     * <ul>
+     *   <li><strong>終點站必須相同</strong>——終點一變，下一段的起點跟著變，會沿著
+     *       交路一路歪下去（跟 alignRouteWithVehicleLocation 同一條理由）；</li>
+     *   <li>必須是<strong>合法開輪點</strong>（錨點或導通組合成員），不是隨便一條線。</li>
+     * </ul>
+     *
+     * rank 50 起跳＝<strong>排在所有既有候選後面</strong>：同起點換得掉就照舊，
+     * 換不掉才輪到這裡。是純粹的追加，不會改動原本能解的案例。
+     */
+    if (coldStart && RELAX_FIRST_TRIP_ORIGIN) {
+      const destination = resolveRouteTerminalStationId(currentRoute);
+      // 必須看<strong>全部</strong>路線，不能只看導通組合成員：備用格那幾條正是<strong>沒被
+      // 選進組合</strong>的，只掃組合等於原地打轉，放寬會變成沒放寬（2026-08-12 實測）。
+      // 偏好順序仍照錨點與組合順序給，組合外的排最後。
+      const preferred = resolveStartInstanceCandidates(policy);
+      for (const [instanceId, route] of policy.routesByInstanceId) {
+        if (resolveRouteTerminalStationId(route) !== destination) continue;
+        const preferIdx = preferred.indexOf(instanceId);
+        put(route, 50 + (preferIdx >= 0 ? preferIdx : 20), 'cold_start_origin');
       }
     }
   }
@@ -542,6 +628,61 @@ function resolveSameRowPreviousPassengerBeforeYard(
   return undefined;
 }
 
+/**
+ * 這一班是不是「真正的冷啟動」——整個日循環裡，它前面沒有任何東西把車的位置釘死。
+ *
+ * 差別在於<strong>車在哪是既成事實，還是這個選擇造成的結果</strong>：
+ * <ul>
+ *   <li>前面有整備 → 車停在整備的出場站或它實際佔的那一格，位置是<strong>事實</strong>，
+ *       起點不能亂換（換了車就得空跑過去，那是出廠卡的事，見
+ *       alignRouteWithVehicleLocation）；</li>
+ *   <li>前面有正線 → 位置＝前一趟的終點站，同樣是事實；</li>
+ *   <li>兩者皆無 → 車一天的第一次出現就是這一班，<strong>它從哪一格發車是自由的</strong>。
+ *       此時把 Step 4 的錨點當成唯一解沒有道理，那是偏好不是物理。</li>
+ * </ul>
+ *
+ * <strong>要繞一圈找。</strong>列是日循環：跨午夜的待命以 <code>start 23:5x</code> 存放，
+ * 排序後落在陣列<strong>最後面</strong>，而它接的正是陣列<strong>最前面</strong>那一班。
+ * 只往前線性掃，會把「其實前面有待命」的班誤判成冷啟動——就是先前 SB1938 那一族的錯。
+ */
+/**
+ * 依日循環往回找「車現在實際停在哪一格」。
+ *
+ * 前一段整備如果佔的是<strong>主線站位</strong>（<code>yardFacilityStationId</code>），
+ * 那就是車的位置——而它<strong>不一定等於計畫路線的起點站</strong>：站位求解常把待命
+ * 從主線擠到備用格，路線卻是流水線第一步就定案的，兩邊會脫鉤。
+ *
+ * 停<strong>設施格</strong>（充電樁、檢修坑）時沒有站位可談，回 null，位置由出場站決定。
+ */
+function resolveDayCycleParkedStationId(
+  rowBlocks: GeneratedScheduleBlock[],
+  blockIndex: number,
+): string | null {
+  if (blockIndex < 0 || rowBlocks.length === 0) return null;
+  for (let step = 1; step < rowBlocks.length; step += 1) {
+    const candidate = rowBlocks[(blockIndex - step + rowBlocks.length) % rowBlocks.length]!;
+    if (candidate.taskType === 'passenger') return null;
+    if (isYardBlockForContinuity(candidate)) {
+      return candidate.yardFacilityStationId?.trim() || null;
+    }
+  }
+  return null;
+}
+
+function isDayCycleColdStart(
+  rowBlocks: GeneratedScheduleBlock[],
+  blockIndex: number,
+): boolean {
+  if (blockIndex < 0 || rowBlocks.length === 0) return false;
+  for (let step = 1; step < rowBlocks.length; step += 1) {
+    const i = (blockIndex - step + rowBlocks.length) % rowBlocks.length;
+    const candidate = rowBlocks[i]!;
+    if (isYardBlockForContinuity(candidate)) return false;
+    if (candidate.taskType === 'passenger') return false;
+  }
+  return true;
+}
+
 function evaluateCandidate(args: {
   block: GeneratedScheduleBlock;
   route: ShiftScheduleSelectedRoute;
@@ -698,6 +839,10 @@ export function enforceStationBerthConstraints(args: {
       currentRoute: initialRoute,
       previousRoute,
       successorPolicy,
+      coldStart: isDayCycleColdStart(rowBlocks, blockIndex),
+      parkedStationId: previousPassenger
+        ? null
+        : resolveDayCycleParkedStationId(rowBlocks, blockIndex),
     });
 
     type Choice = {
@@ -787,7 +932,14 @@ export function enforceStationBerthConstraints(args: {
         severity: 'warning',
         message:
           `為避開停靠點衝突，這一趟改跑「${chosen.route.routeCode ?? chosen.route.routeName}」`
-          + `（原本是「${initialRoute.routeCode ?? initialRoute.routeName}」）`,
+          + `（原本是「${initialRoute.routeCode ?? initialRoute.routeName}」）`
+          + (chosen.source === 'vehicle_parked_origin'
+            ? `。改成從車實際停的那一格發車，順便省掉出廠卡的空跑——終點與後續交路不變`
+            : '')
+          + (chosen.source === 'cold_start_origin'
+            ? `。這是該列一天的第一班，前面沒有整備把車位置釘死，`
+              + `所以連發車起點一起換了——不需要空跑，終點與後續交路不變`
+            : ''),
         detail: {
           blockId: block.id,
           timelineRow: block.timelineRow,

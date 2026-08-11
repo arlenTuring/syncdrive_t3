@@ -3763,6 +3763,80 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 放寬首班車起點（交接 B）</h3>
+  <div class="callout">
+    使用者的疑問：「其實我有在想是不是因為我限制了你一定要從 N2W 出發才會變成這樣」。
+    先盤點 Step 4 的折返錨點到底管住了什麼，再決定放寬哪一段。
+  </div>
+  <ul>
+    <li>
+      <strong>盤點結果：<code>throughAnchors</code> 四個欄位，只有一個跟「從哪開始」有關。</strong>
+      <code>startStationIds</code>／<code>endStationIds</code> 已 deprecated，只在 instanceIds
+      全空時當回退；<code>verifiedFingerprint</code>／<code>verifiedPathCount</code> 純驗證，
+      不進排班；<code>preferredThroughCycleId</code> 決定的是「走哪一圈」
+      （<code>canonicalCycleInstanceIds</code> 的排名），不是「從哪起步」。
+      真正相關的只有 <code>startInstanceIds</code>。
+    </li>
+    <li>
+      <strong>而它其實只在一個地方硬綁。</strong><code>resolveStartInstanceId(policy, exitStationId)</code>
+      在<strong>有出場站</strong>時完全不看錨點——只要起點站對得上就收。
+      <code>stationBerthConstraint</code> 那邊也只拿它當破平手的 rank。
+      唯一硬綁的是<strong>沒有出場站</strong>的分支，直接回 <code>startInstanceIds[0]</code>，
+      list 其餘元素從來沒被用過。
+    </li>
+    <li>
+      <strong>沒有動 <code>firstTripOrigins</code>。</strong>那是整備出場站，是物理不是偏好：
+      車做完整備就是停在那個設施的出場站，由 <code>YARD_EXIT_STATION_MISMATCH</code> 守著。
+      <code>shouldApplyYardExitRotationAlign</code> 也是看位置（有沒有出場站）加時間
+      （該列在整備結束後還有沒有正線），不是「首班車」概念。
+    </li>
+    <li>
+      <strong>改動一：<code>resolveStartInstanceCandidates</code>。</strong>把開輪候選改成回傳
+      list（錨點 → 導通組合成員），<code>resolveStartInstanceId</code> 取 <code>[0]</code>，
+      因此<strong>第一名與改動前完全相同</strong>，純粹是把原本被丟掉的候選露出來給下游用。
+    </li>
+    <li>
+      <strong>改動二：站位求解的候選不再夾死在「計畫路線的起點站」。</strong>
+      <code>listTopologyRouteCandidates</code> 的 <code>!previousRoute</code> 分支原本用
+      <strong>計畫路線</strong>的起點站列候選，但那是流水線第一步定的；站位求解常把前一段
+      待命從主線擠到備用格，車就<strong>不在計畫路線的起點</strong>了。等於在一個車根本不在
+      的站裡找解，撞了只能延後發車。新增 <code>parkedStationId</code>（依日循環往回找前一段
+      整備實際佔的站位），列出「從車那裡發、同終點」的路線，rank 45。
+    </li>
+    <li>
+      <strong>改動三：真冷啟動可以連起點站一起換。</strong>整個日循環裡前面既無整備也無正線時，
+      車的位置是<strong>這個選擇造成的結果</strong>，不是既成事實，錨點在此只是偏好。rank 50 起跳。
+    </li>
+    <li>
+      <strong>兩個護欄。</strong>候選<strong>終點站必須相同</strong>——終點一變，下一段的起點跟著變，
+      會沿著交路一路歪下去（與 <code>alignRouteWithVehicleLocation</code> 同一條理由）；
+      rank 一律<strong>排在所有既有候選之後</strong>，原本解得開的案例完全不受影響。
+    </li>
+    <li>
+      <strong>兩處都要繞日循環找，不能線性往前掃。</strong>列是循環：跨午夜的待命以
+      <code>start 23:5x</code> 存放，排序後落在陣列最後面，接的卻是陣列最前面那一班。
+      線性掃會把「其實前面有待命」的班誤判成冷啟動——就是 SB1938 那一族的錯。
+    </li>
+    <li>
+      <strong>過程中修掉一個「放寬了等於沒放寬」。</strong>冷啟動分支第一版只掃導通組合成員，
+      但備用格那幾條正是<strong>沒被選進組合</strong>的，掃了等於原地打轉。合成案例實測
+      （<code>currentRoute</code> = N2W→T3、車停 N2W_B）：修正前候選只有 <code>NT:0:planned</code>，
+      修正後多出 <code>NTB:70:cold_start_origin</code>；終點不同的 <code>XX</code> 正確被濾掉。
+    </li>
+    <li>
+      <strong>誠實記錄：這兩支在目前的重現資料上都不會觸發。</strong>實測 11 列<strong>每一列的日
+      循環裡都有整備</strong>，冷啟動恆為 false；而 <code>parkedStationId</code> 與計畫路線起點
+      也處處相同（<code>alignRouteWithVehicleLocation</code> 已在前面處理掉）。開關
+      <code>RELAX_FIRST_TRIP_ORIGIN</code> 前後對照，warning 各碼數字<strong>完全一致</strong>。
+      邏輯以合成案例直接呼叫 <code>listTopologyRouteCandidates</code> 驗證。
+      <code>tsc -b</code> 23（基線不變）、eslint 無新增錯誤、真實資料 <code>ok = true</code>、errors <code>{}</code>。
+    </li>
+    <li>
+      <strong>教訓：</strong>「放寬限制」要先確認<strong>放寬後看得到的東西真的比原本多</strong>。
+      候選來源如果仍取自同一個被限制的集合，改的只是措辭。
+    </li>
+  </ul>
+
   <h3>2026-08-11 · 車停在哪，下一班就從那裡發（交接第 2 項）</h3>
   <div class="callout">
     待命停在「[備用]N2W下行出發」，下一班卻被指派從「N2W下行出發」出發的主線路線
@@ -3846,6 +3920,9 @@ backend/src/dev-log/
   </div>
   <p><strong>2026-08-11 進度：</strong>第 1 項（外部性）、第 2 項（車停在哪就從那裡發）、
   A1／A2（收斂迴圈完整性）已完成。剩下的見下方 B／C／D。</p>
+  <p><strong>2026-08-12 進度：</strong>B（放寬首班車起點）已完成，見上方同日條目——
+  但兩支放寬在目前重現資料上都不觸發，需要使用者那份出現 SNT0610／SB1938 的資料才驗得到。
+  剩下 C（決策樹第三層）與 D（報告因果方向）；C 仍應等 D 做完，讓讓步代價可以互相比較。</p>
   <ol>
     <li>
       <strong>（已完成）成本結構加入外部性。</strong>目前挑設施只比「移動時間」，比不出

@@ -318,14 +318,29 @@ export function buildRouteSuccessorPolicy(input: {
 }
 
 /**
- * 出場站／開輪時挑選起始 instance。
- * 同站多線時：優先採用路徑上越前面的越好（利於插班後續沿偏好走），仍必須是該站起點。
+ * 開輪時「合法的起始 instance」全部列出來，最偏好的排最前面。
+ *
+ * <strong>為什麼要 list，而不是只回一條。</strong>Step 4 的折返錨點
+ * （<code>throughAnchors.startInstanceIds</code>）表達的是使用者<strong>偏好</strong>
+ * 從哪一條起算，不是物理限制——真正的物理限制是整備出場站，那由
+ * <code>exitStationId</code> 這條分支管，而且它<strong>完全不看錨點</strong>：
+ * 只要起點站對得上就收。
+ *
+ * 沒有出場站時（真正的冷啟動，前面沒有任何整備把車位置釘死），車停哪裡是
+ * <strong>這個選擇造成的結果</strong>，不是既成事實。此時把錨點當成唯一解，等於
+ * 讓使用者在 Step 4 隨手點的一條，決定了整天第一班從哪一格發車——站位求解器
+ * 之後想換也換不掉，只能靠延後發車去閃，代價全落在班距上。
+ *
+ * 所以：偏好順序照舊（錨點 → 導通組合順序），但把其餘導通組合成員也列為
+ * 合法候選，讓下游有站位資訊的那一段（見 stationBerthConstraint 的冷啟動分支）
+ * 有東西可挑。<strong>只加候選、不改第一名</strong>，故 {@link resolveStartInstanceId}
+ * 的結果與此變更前完全相同。
  */
-export function resolveStartInstanceId(
+export function resolveStartInstanceCandidates(
   policy: RouteSuccessorPolicy,
   exitStationId?: string | null,
-): string | null {
-  if (!policy.valid) return null;
+): string[] {
+  if (!policy.valid) return [];
   const exit = exitStationId?.trim() || '';
   if (exit) {
     const matches: Array<{ instanceId: string; preferredIndex: number }> = [];
@@ -345,15 +360,37 @@ export function resolveStartInstanceId(
         }
         return a.instanceId.localeCompare(b.instanceId);
       });
-      return matches[0]!.instanceId;
+      return matches.map((item) => item.instanceId);
     }
   }
-  if (policy.startInstanceIds.length === 0) {
-    return policy.rotationRoutes[0]
-      ? resolveSelectedRouteInstanceId(policy.rotationRoutes[0])
-      : null;
+
+  const ordered: string[] = [];
+  const push = (instanceId: string | null | undefined) => {
+    if (!instanceId) return;
+    if (ordered.includes(instanceId)) return;
+    if (!policy.routesByInstanceId.has(instanceId)) return;
+    ordered.push(instanceId);
+  };
+  // 1. 使用者錨點（第一名不變）
+  for (const instanceId of policy.startInstanceIds) push(instanceId);
+  // 2. 沒錨點時的原兜底：輪替第一條
+  if (ordered.length === 0 && policy.rotationRoutes[0]) {
+    push(resolveSelectedRouteInstanceId(policy.rotationRoutes[0]));
   }
-  return policy.startInstanceIds[0] ?? null;
+  // 3. 其餘導通組合成員——放寬後才看得到的候選
+  for (const instanceId of policy.canonicalCycleInstanceIds) push(instanceId);
+  return ordered;
+}
+
+/**
+ * 出場站／開輪時挑選起始 instance。
+ * 同站多線時：優先採用路徑上越前面的越好（利於插班後續沿偏好走），仍必須是該站起點。
+ */
+export function resolveStartInstanceId(
+  policy: RouteSuccessorPolicy,
+  exitStationId?: string | null,
+): string | null {
+  return resolveStartInstanceCandidates(policy, exitStationId)[0] ?? null;
 }
 
 export function resolveRouteIndexInRotation(
