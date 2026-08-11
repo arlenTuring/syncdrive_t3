@@ -160,6 +160,7 @@ export type FeasibilityViolationCode =
    * 前者要加設施／錯開整備時段，後者是補拓樸的邊（警告）。
    */
   | 'MAINTENANCE_FACILITY_UNAVAILABLE'
+  | 'MAINTENANCE_FACILITY_YIELDED'
   | 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION'
   | 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE'
   | 'GEOMETRY_NOT_CONVERGED'

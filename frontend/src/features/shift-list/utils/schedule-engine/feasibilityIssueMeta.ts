@@ -57,6 +57,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
+  MAINTENANCE_FACILITY_YIELDED: '已請別列車換設施讓位',
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: '已改派路線，配合車輛實際停放位置',
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）',
   GEOMETRY_NOT_CONVERGED: '幾何後處理未收斂'
@@ -98,6 +99,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
+  MAINTENANCE_FACILITY_YIELDED: { id: 's10', label: '§10.5 整備轉場小卡' },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: { id: 's7', label: '§7 路線關聯圖' },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: 's7', label: '§7 路線關聯圖' },
   GEOMETRY_NOT_CONVERGED: { id: 's3', label: '§3 流水線' },
@@ -233,6 +235,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'limit',
     guidance:
       '那段時間該類設施一台都不空，車沒地方停。這是產能問題，不是路徑問題。加設施、把同時段的整備錯開、或減少該時段整備的車數。設施數顯示 0 代表這一類根本沒設定設施。',
+  },
+  MAINTENANCE_FACILITY_YIELDED: {
+    kind: 'policy',
+    guidance:
+      '這一段整備原本沒地方停。求解器發現擋路的那台車自己也停得下別台設施，就請它換過去、把位子讓出來——兩邊的時間都沒有動，只是換了格子，所以沒有代價。會看到某一列的整備跑到跟平常不同的設施上，那是這個機制造成的，不是排錯。',
   },
   GEOMETRY_NOT_CONVERGED: {
     kind: 'limit',

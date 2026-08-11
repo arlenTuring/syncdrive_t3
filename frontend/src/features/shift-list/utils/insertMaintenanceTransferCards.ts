@@ -188,6 +188,18 @@ export type MaintenanceTransferCardsResult = {
     facilityCount: number;
     reason: string;
   }>;
+  /**
+   * 決策樹第三層成功的案例：請已經佔著格子的別列車換一台，把位子讓出來。
+   * 只換格子、不動任何人的時間，所以是無代價的讓步。
+   */
+  facilityYields: Array<{
+    timelineRow: number;
+    blockId: string;
+    taskType: string;
+    facilityLabel: string;
+    /** 被請去換格子的那幾列 */
+    movedRows: number[];
+  }>;
 };
 
 export function insertMaintenanceTransferCards(args: {
@@ -234,6 +246,7 @@ export function insertMaintenanceTransferCards(args: {
   } = args;
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
+  const facilityYields: MaintenanceTransferCardsResult['facilityYields'] = [];
   let inserted = 0;
   let ateYardTail = 0;
   let yardHeadExtended = 0;
@@ -242,7 +255,7 @@ export function insertMaintenanceTransferCards(args: {
   if (!topology || topology.nodes.length === 0) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable,
+      skipped, facilityUnavailable, facilityYields,
     };
   }
 
@@ -1066,7 +1079,7 @@ export function insertMaintenanceTransferCards(args: {
   if (decideOnly) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable,
+      skipped, facilityUnavailable, facilityYields,
     };
   }
 
@@ -1892,18 +1905,60 @@ export function insertMaintenanceTransferCards(args: {
    * 充電樁的本職是讓車恢復運行；待命停在那裡是<strong>順便</strong>，
    * 順便的事永遠不該擋住本職。
    */
-  for (const sweepPhase of ['facility-first', 'standby-last'] as const) {
+  /**
+   * <strong>長段先挑，不要照列序。</strong>
+   *
+   * 原本是 <code>for 每一列 { for 每一段 }</code>，等於先來先得。短段先挑走一台格子、
+   * 又在中間留下一個誰都用不掉的空檔，長段就被卡死——而長段其實只有一種放法。
+   *
+   * 實測（2026-08-12）：列 6 的保養 09:40–13:00 報「沒地方停」，但那個時刻 M1、M2
+   * 明明是空的——它們稍後被列 7 短段訂走，於是沒有<strong>任何一台</strong>整段空著。
+   * 這不是設施不夠，是挑的順序不對。
+   *
+   * 長段優先是這類裝箱問題的標準解：長段的可行位置最少，先給它挑；短段彈性大，
+   * 撿剩下的通常還是塞得進去。分相（設施優先／待命最後）維持不變。
+   */
+  const sweepCandidates: Array<{
+    timeline: (typeof timelines)[number];
+    sweepSorted: GeneratedScheduleBlock[];
+    index: number;
+    block: GeneratedScheduleBlock;
+    durationMinutes: number;
+  }> = [];
   for (const timeline of timelines) {
     const sweepSorted = [...timeline.blocks].sort(
       (a, b) => a.plannedStartMinute - b.plannedStartMinute,
     );
     for (let i = 0; i < sweepSorted.length; i += 1) {
+      const block = sweepSorted[i]!;
+      if (!YARD_TASK_TYPES.has(block.taskType)) continue;
+      sweepCandidates.push({
+        timeline,
+        sweepSorted,
+        index: i,
+        block,
+        durationMinutes: block.plannedEndMinute - block.plannedStartMinute,
+      });
+    }
+  }
+  sweepCandidates.sort((a, b) => {
+    if (a.durationMinutes !== b.durationMinutes) {
+      return b.durationMinutes - a.durationMinutes;
+    }
+    if (a.block.plannedStartMinute !== b.block.plannedStartMinute) {
+      return a.block.plannedStartMinute - b.block.plannedStartMinute;
+    }
+    return a.block.id.localeCompare(b.block.id);
+  });
+
+  for (const sweepPhase of ['facility-first', 'standby-last'] as const) {
+    for (const candidate of sweepCandidates) {
+      const { timeline, sweepSorted, index: i } = candidate;
       if (
         (sweepPhase === 'facility-first')
-        === (sweepSorted[i]!.taskType === 'standby')
+        === (candidate.block.taskType === 'standby')
       ) continue;
-      const yard = sweepSorted[i]!;
-      if (!YARD_TASK_TYPES.has(yard.taskType)) continue;
+      const yard = candidate.block;
       if (yardBlockFacility.has(yard.id)) continue;
 
       // 緊鄰的同類型整備＝<strong>同一段連續停留</strong>（跨午夜也算，日循環上
@@ -1948,6 +2003,74 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
+      /**
+       * 決策樹第三層：<strong>請已經佔著格子的人換一台</strong>。
+       *
+       * 前兩層都是這台車自己讓（挑別的格子、挪自己的時間）。都走不通時，還剩
+       * 一種可能：擋路的那台車<strong>自己也能停別處</strong>，只是先搶先贏而已。
+       * 這不改任何人的時間，只換格子，所以沒有代價——真正有代價的讓步
+       * （挪整備時窗、拆待命）要等成本能互相比較才做。
+       *
+       * 只做<strong>一層</strong>：被請走的那台必須自己找得到整段都空的格子，不能再去
+       * 請第三台讓。多層連鎖的收益遞減、失敗回捲卻很容易出錯。
+       *
+       * 換不成就整組回捲——中途放棄卻留下半套搬遷，比一開始不搬更糟。
+       */
+      let yielded = false;
+      for (const facility of facilities) {
+        const occupants = sweepCandidates
+          .map((item) => item.block)
+          .filter((other) =>
+            other.id !== yard.id
+            && yardBlockFacility.get(other.id)?.nodeId === facility.id
+            && cyclicWindowsOverlap(
+              startSecond,
+              endSecond,
+              minuteToSecond(other.plannedStartMinute),
+              minuteToSecond(other.plannedEndMinute),
+            ));
+        if (occupants.length === 0) continue;
+        const undo: Array<{ block: GeneratedScheduleBlock; nodeId: string; label: string }> = [];
+        let allMoved = true;
+        for (const occupant of occupants) {
+          const original = yardBlockFacility.get(occupant.id);
+          if (!original) { allMoved = false; break; }
+          const occupantStart = minuteToSecond(occupant.plannedStartMinute);
+          const occupantEnd = minuteToSecond(occupant.plannedEndMinute);
+          const elsewhere = facilityNodesFor(occupant.taskType).find((target) =>
+            target.id !== facility.id
+            && stayFacilityIsFree(
+              target.id,
+              occupant,
+              occupant.timelineRow,
+              occupantStart,
+              occupantEnd,
+            ));
+          if (!elsewhere) { allMoved = false; break; }
+          undo.push({ block: occupant, nodeId: original.nodeId, label: original.label });
+          assignYardStay(occupant, elsewhere.id, elsewhere.label || elsewhere.id);
+        }
+        if (
+          allMoved
+          && stayFacilityIsFree(facility.id, yard, timeline.row, startSecond, endSecond)
+        ) {
+          assignYardStay(yard, facility.id, facility.label || facility.id);
+          facilityYields.push({
+            timelineRow: timeline.row,
+            blockId: yard.id,
+            taskType: yard.taskType,
+            facilityLabel: facility.label || facility.id,
+            movedRows: occupants.map((item) => item.timelineRow),
+          });
+          yielded = true;
+          break;
+        }
+        for (const item of undo) {
+          assignYardStay(item.block, item.nodeId, item.label);
+        }
+      }
+      if (yielded) continue;
+
       // 解不掉就照實講「卡在哪一種資源」。設施格滿了跟停靠站被載客班次壓著
       // 是兩種完全不同的處置：前者要加設施，後者要改待命時段或改班表。
       // 混寫成一句「全被別列車佔著」使用者無從判斷該動哪裡。
@@ -1987,6 +2110,64 @@ export function insertMaintenanceTransferCards(args: {
           earliestFree = { label: facility.label || facility.id, second: freeAt };
         }
       }
+      /**
+       * <strong>缺格子，還是擺不下？</strong>兩者的處置完全相反，講錯會叫使用者白花錢。
+       *
+       * 同一時刻真的有 6 台車要用 4 台格子＝<strong>產能不足</strong>，怎麼挪都是白挪，
+       * 只能加設施或把某一段整備整個移到別的時段；同時刻只有 3 台車搶 4 台格子卻仍
+       * 塞不進去＝<strong>擺放問題</strong>，是空檔被切碎，挪得動。
+       *
+       * 尖峰同時需求直接數：與本段重疊、且吃同一批設施的整備段有幾個（含自己）。
+       */
+      const sameFacilityPool = new Set(facilities.map((item) => item.id));
+      const competitors = sweepCandidates
+        .map((item) => item.block)
+        .filter((other) =>
+          other.id !== yard.id
+          && facilityNodesFor(other.taskType).some((node) => sameFacilityPool.has(node.id))
+          && cyclicWindowsOverlap(
+            startSecond,
+            endSecond,
+            minuteToSecond(other.plannedStartMinute),
+            minuteToSecond(other.plannedEndMinute),
+          ));
+      /**
+       * <strong>要數的是「同一瞬間」有幾台，不是「這段窗內出現過幾台」。</strong>
+       * 後者對長段完全失真——00:00–07:50 的保養窗內會經過 18 段整備，寫成
+       * 「同時有 18 台車要用 4 台設施、缺 14 台」是胡說（2026-08-12 實測）。
+       * 取窗內每個變化點取樣，數同時重疊者的最大值。
+       */
+      const selfSegments = daySegmentsOf(startSecond, endSecond);
+      const competitorSegments = competitors.map((other) =>
+        daySegmentsOf(
+          minuteToSecond(other.plannedStartMinute),
+          minuteToSecond(other.plannedEndMinute),
+        ));
+      const covers = (segments: Array<[number, number]>, at: number) =>
+        segments.some(([from, to]) => at >= from - 1e-9 && at < to - 1e-9);
+      const samplePoints = [
+        ...selfSegments.map(([from]) => from),
+        ...competitorSegments.flat().map(([from]) => from),
+      ];
+      let peakOthers = 0;
+      for (const at of samplePoints) {
+        if (!covers(selfSegments, at)) continue;
+        const concurrent = competitorSegments.filter((segments) => covers(segments, at)).length;
+        if (concurrent > peakOthers) peakOthers = concurrent;
+      }
+      const peakDemand = peakOthers + 1;
+      if (peakDemand > facilities.length) {
+        parts.push(
+          `這段時間同時有 ${peakDemand} 台車要用這 ${facilities.length} 台設施——`
+          + `是產能不足，缺 ${peakDemand - facilities.length} 台；`
+          + `挪時段或加設施才有用，換格子沒有用`,
+        );
+      } else {
+        parts.push(
+          `同時段只有 ${peakDemand} 台車要用這 ${facilities.length} 台設施——`
+          + `格子數量是夠的，卡在空檔被切得太碎，湊不出一整段`,
+        );
+      }
       if (earliestFree) {
         const waitMinutes = Math.round((earliestFree.second - startSecond) / 60);
         // 只講「最早要等到幾點」這個事實，不要寫成「挪過去就排得進去」——
@@ -2008,7 +2189,6 @@ export function insertMaintenanceTransferCards(args: {
       });
     }
   }
-  }
 
   for (const timeline of timelines) {
     timeline.blocks.sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
@@ -2016,6 +2196,6 @@ export function insertMaintenanceTransferCards(args: {
 
   return {
     timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-    skipped, facilityUnavailable,
+    skipped, facilityUnavailable, facilityYields,
   };
 }

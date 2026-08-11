@@ -375,6 +375,26 @@ export function generateShiftSchedule(
       },
     });
   }
+  // 決策樹第三層：請別列車換一台設施，把位子讓出來。只換格子不動時間，
+  // 沒有代價，但要講出來——使用者會發現某列的整備跑到別台設施上了。
+  for (const item of maintenanceTransfer.facilityYields) {
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_FACILITY_YIELDED',
+      severity: 'warning',
+      kind: 'policy',
+      message:
+        `時間線 ${item.timelineRow}：「${item.taskType}」原本沒地方停——`
+        + `已請時間線 ${item.movedRows.join('、')} 的整備改停別台設施，`
+        + `讓出 ${item.facilityLabel}。雙方時間都沒有動。`,
+      detail: {
+        timelineRow: item.timelineRow,
+        blockId: item.blockId,
+        taskType: item.taskType,
+        facilityLabel: item.facilityLabel,
+        movedRows: item.movedRows,
+      },
+    });
+  }
   // 整備設施不足：車根本沒地方停。跟上面「移動卡排不出來」分開回報——
   // 那是路徑問題（補拓樸的邊），這是產能問題（加設施／錯開整備時段）。
   for (const item of maintenanceTransfer.facilityUnavailable) {
