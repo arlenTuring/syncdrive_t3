@@ -115,14 +115,14 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-10T18:44:10.513Z
+      更新：2026-08-11T03:23:38.099Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0810」
       · ok=<code>true</code>
       · 錯誤 0／警告 177／共 177 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 179→177（-2） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
+    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 177→177（±0） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
   </header>
   
 <section class="accept">
@@ -961,7 +961,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 1：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=27）</p>
 </article>
@@ -977,7 +977,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 1：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=28）</p>
 </article>
@@ -993,7 +993,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 5：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=29）</p>
 </article>
@@ -1009,7 +1009,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 9：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，找不到車是從哪裡開進來的</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=30）</p>
 </article>
@@ -1025,7 +1025,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 10：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，找不到車是從哪裡開進來的</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
 </article>
@@ -1041,7 +1041,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 7：「inspection」轉「standby」排不出整備轉場卡——排不出整備間轉場（出廠＋入廠）：1 個候選都不行——1 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
 </article>
@@ -1057,7 +1057,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 9：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
 </article>
@@ -1073,7 +1073,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 10：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
 </article>
@@ -1089,7 +1089,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 11：「standby」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
 </article>
@@ -1105,7 +1105,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 11：「charging」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
 </article>
@@ -1121,7 +1121,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 11：「standby」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
 </article>
@@ -1136,8 +1136,8 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 5：「standby」排不出整備轉場卡——整備設定的設施拓樸上都沒有連到 station_2</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="msg">時間線 5：「standby」排不出整備轉場卡——整備設定的設施在拓樸上都沒有連到「N2W下行出發」</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
 </article>
@@ -1153,7 +1153,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 8：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 08:01:20 經過，被 時間線 5 08:00:40 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
 </article>
@@ -1169,7 +1169,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 4：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
 </article>
@@ -1185,7 +1185,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 6：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
 </article>
@@ -1201,7 +1201,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 1：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=42）</p>
 </article>
@@ -1217,7 +1217,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 8：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 14:00:00 經過，被 時間線 5 13:59:31 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=43）</p>
 </article>
@@ -1233,7 +1233,7 @@
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
   <p class="msg">時間線 7：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=44）</p>
 </article>
@@ -1248,8 +1248,8 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 2：「standby」排不出整備轉場卡——整備設定的設施拓樸上都沒有連到 station_2</p>
-  <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
+  <p class="msg">時間線 2：「standby」排不出整備轉場卡——整備設定的設施在拓樸上都沒有連到「N2W下行出發」</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
 </article>

@@ -40,6 +40,20 @@ import type {
  * 必須讓站位求解有機會反應。放在迴圈後面就變成無人收拾的改動。
  */
 
+/**
+ * 依日循環往回找上一個區塊。
+ *
+ * 班表是一個循環：19:38–24:00 的待命，接的是 00:11 的班次。但照
+ * <code>plannedStartMinute</code> 線性排序時，00:11 那張排在陣列<strong>最前面</strong>、
+ * 待命排在<strong>最後面</strong>——直接取 <code>sorted[i - 1]</code> 會拿到清晨的某張卡，
+ * 跨午夜的待命<strong>一律漏掉</strong>。而需要改派路線的，偏偏多半就是跨午夜那幾段
+ * （2026-08-11：SB1938 就是這樣沒被處理到）。
+ */
+function previousCyclic<T>(sorted: T[], index: number): T | null {
+  if (sorted.length === 0) return null;
+  return sorted[(index - 1 + sorted.length) % sorted.length] ?? null;
+}
+
 /** 車在這一段整備結束時實際停在哪一個站（停設施格的話沒有站，回 null） */
 function parkedStationIdOf(block: GeneratedScheduleBlock): string | null {
   return block.yardFacilityStationId?.trim() || null;
@@ -108,8 +122,8 @@ export function alignRouteWithVehicleLocation(args: {
       if (block.taskType !== 'passenger') continue;
 
       // 前一段是不是「車停在某個站位」的整備？停設施格就沒有站位可談
-      const previous = sorted[i - 1];
-      if (!previous) continue;
+      const previous = previousCyclic(sorted, i);
+      if (!previous || previous === block) continue;
       const parkedStationId = parkedStationIdOf(previous);
       if (!parkedStationId) continue;
 
@@ -120,10 +134,13 @@ export function alignRouteWithVehicleLocation(args: {
       if (!currentOrigin || currentOrigin === parkedStationId) continue;
 
       // 候選只能從「前一段載客的後繼」裡挑——那是這個位置本來就接得上的
-      const previousPassenger = sorted
-        .slice(0, i)
-        .reverse()
-        .find((item) => item.taskType === 'passenger');
+      // 往回找最近一段載客，也要照日循環繞回去
+      let previousPassenger: GeneratedScheduleBlock | null = null;
+      for (let step = 1; step <= sorted.length; step += 1) {
+        const candidate = sorted[(i - step + sorted.length * 2) % sorted.length]!;
+        if (candidate === block) break;
+        if (candidate.taskType === 'passenger') { previousPassenger = candidate; break; }
+      }
       if (!previousPassenger) continue;
       const previousInstanceId = instanceIdOf(previousPassenger, selectedRoutes);
       if (!previousInstanceId) continue;
