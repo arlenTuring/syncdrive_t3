@@ -510,7 +510,11 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         { maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r', mapCode: 'M3' }] } },
       );
       assert.equal(countCards(timelines, 'yard_exit_move'), 0);
-      assert.ok(result.skipped.some((s) => /沒有連到 station_4/.test(s.reason)));
+      // 訊息要印使用者看得懂的站名，不是 station_4 這種內部 id
+      assert.ok(
+        result.skipped.some((s) => /沒有連到「T3上行」/.test(s.reason)),
+        `要用站名回報，實際：${result.skipped.map((s) => s.reason).join(' / ')}`,
+      );
     });
   });
 

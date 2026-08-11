@@ -290,6 +290,28 @@ export function insertMaintenanceTransferCards(args: {
     if (stationId) nodeIdByStationId.set(stationId, node.id);
   }
 
+  /**
+   * 站點 id → 使用者看得懂的名字。
+   *
+   * 回報訊息裡直接印 <code>station_2</code> 這種內部 id，使用者根本不知道那是哪一站
+   * （2026-08-11 使用者指正）。拓樸節點上就有 label，拿它來寫。
+   */
+  function stationDisplayName(stationId: string | null | undefined): string {
+    const id = stationId?.trim();
+    if (!id) return '未知站點';
+    const nodeId = nodeIdByStationId.get(id);
+    const label = nodeId ? nodeById.get(nodeId)?.label?.trim() : undefined;
+    if (label) return label;
+    // 拓樸上根本沒有這一站時（「找不到對應節點」那一則就是這種情形），
+    // 退回路線設定裡的站名——那才是使用者在畫面上看到的名字
+    for (const route of selectedRoutes) {
+      const dwell = route.stationDwells?.find((item) => item.stationId === id);
+      const name = dwell?.stationName?.trim();
+      if (name) return name;
+    }
+    return id;
+  }
+
   const codesBySection = new Map<MaintenanceBodySectionKey, string[]>();
   const facilityNodesFor = (taskType: string) => {
     const section = FACILITY_SECTION_BY_TASK_TYPE[taskType as TaskTypeKey];
@@ -1039,7 +1061,7 @@ export function insertMaintenanceTransferCards(args: {
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
-          reason: `前一段載客的終點站在拓樸上找不到對應節點（${stationId ?? '未知'}）`,
+          reason: `前一段載客的終點站在拓樸上找不到對應節點（${stationDisplayName(stationId)}）`,
         });
         continue;
       }
@@ -1696,7 +1718,7 @@ export function insertMaintenanceTransferCards(args: {
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
-        reason: `整備設定的設施拓樸上都沒有連到 ${stationId}`,
+        reason: `整備設定的設施在拓樸上都沒有連到「${stationDisplayName(stationId)}」`,
       });
       continue;
     }
