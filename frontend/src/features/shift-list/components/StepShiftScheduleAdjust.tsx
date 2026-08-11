@@ -282,8 +282,23 @@ type RootCauseDefinition = {
   codes: ReadonlySet<string>;
   /** 為什麼這些警告是同一件事——收合狀態也看得到 */
   hint: string;
+  /** 這個根因多半是誰的後果（上游根因 id）；沒有就是獨立問題 */
+  consequenceOf?: string;
 };
 
+/**
+ * 根因之間<strong>有方向</strong>。
+ *
+ * 「停靠站容量不夠」多半不是獨立的毛病，是上游的後果：車擠在終點站，是因為
+ * 車比需要的多、或整備排不進去。把它跟上游並排成三張卡，使用者會以為要分別解
+ * 三件事。
+ *
+ * 更糟的是<strong>互相矛盾</strong>的情形：車不夠與停靠站不夠同時出現時，
+ * 加車會讓站位更糟、減車會讓班距更糟——使用者照著建議改，會在兩者之間來回，
+ * 永遠改不動（2026-08-11 使用者原話：「多車不是、少車也不是、多暫停格不是、
+ * 少也不是，這樣會進入死迴圈改不動，這個系統就會很難用」）。
+ * 遇到這種情形要<strong>明講它是拉扯</strong>，並且指出不衝突的第三個方向。
+ */
 const ROOT_CAUSES: RootCauseDefinition[] = [
   {
     id: 'fleet',
@@ -303,6 +318,7 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
   },
   {
     id: 'berth',
+    consequenceOf: 'fleet',
     title: '停靠站容量不夠',
     codes: new Set([
       'STATION_BERTH_COLLISION',
@@ -330,10 +346,16 @@ function resolveRootCause(code: string): RootCauseDefinition {
 function RootCauseSection({
   cause,
   issueCount,
+  upstreamTitle,
+  tensionNote,
   children,
 }: {
   cause: RootCauseDefinition;
   issueCount: number;
+  /** 上游根因也在畫面上時，標出「這多半是它的後果」 */
+  upstreamTitle?: string;
+  /** 這一項跟上游互相拉扯時要講的話——照建議改會來回改不動 */
+  tensionNote?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -343,8 +365,18 @@ function RootCauseSection({
         <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
           連帶 {issueCount} 則
         </span>
+        {upstreamTitle ? (
+          <span className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
+            多半是「{upstreamTitle}」的後果
+          </span>
+        ) : null}
       </div>
       <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">{cause.hint}</p>
+      {tensionNote ? (
+        <p className="mb-1.5 rounded border border-amber-600/40 bg-amber-950/30 px-2 py-1 text-[10px] leading-4 text-amber-200">
+          {tensionNote}
+        </p>
+      ) : null}
       <div className="space-y-1.5">{children}</div>
     </div>
   );
@@ -634,11 +666,29 @@ function FeasibilityMessages({
           (a, b) =>
             visibleGroups.indexOf(a.groups[0]!) - visibleGroups.indexOf(b.groups[0]!),
         )
-        .map(({ cause, groups }) => (
+        .map(({ cause, groups }, _index, entries) => {
+          const upstream = cause.consequenceOf
+            ? entries.find((entry) => entry.cause.id === cause.consequenceOf)?.cause
+            : undefined;
+          /**
+           * 「車不夠」與「停靠站不夠」同時出現＝互相拉扯：加車讓站位更糟、
+           * 減車讓班距更糟。照單項建議改會在兩者之間來回，永遠改不動。
+           * 這時必須明講，並指出<strong>不衝突</strong>的第三個方向。
+           */
+          const tensionNote =
+            upstream?.id === 'fleet'
+              ? '注意：這一項跟「車不夠」互相拉扯——加車會讓站位更擠，減車會讓班距更差，'
+                + '照單項建議改會在兩者之間來回。要同時解，只能從不衝突的方向下手：'
+                + '縮短一輪往返（減少停靠或提高路段速度）、在關聯圖補一條終點在別站的備用路線、'
+                + '或把整備任務錯開讓車不要同時堆在終點站。'
+              : undefined;
+          return (
           <RootCauseSection
             key={cause.id}
             cause={cause}
             issueCount={groups.reduce((sum, group) => sum + group.issues.length, 0)}
+            upstreamTitle={upstream?.title}
+            tensionNote={tensionNote}
           >
             {groups.map((group) => {
               const layer = resolveIssueDisplayLayerFromIssue({
@@ -660,7 +710,8 @@ function FeasibilityMessages({
               );
             })}
           </RootCauseSection>
-        ))}
+          );
+        })}
     </div>
   );
 }
