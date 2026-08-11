@@ -266,8 +266,8 @@ describe('buildScheduleAnalysisReport', () => {
     // 光說「班距會被拉開」使用者不知道要改成多少。兩個數字都是現成的：
     // 撐得起的班距 = 一輪往返 ÷ 尖峰同時（600 ÷ 1 = 600 秒）；
     // 要加幾台 = ⌈需求⌉ − 尖峰同時（3 − 1 = 2）。
-    assert.match(shortage[0]!.message, /把班距放寬到 600 秒（1 台撐得起的極限）/);
-    assert.match(shortage[0]!.message, /再加 2 台（3 台就回得去 200 秒）/);
+    assert.match(shortage[0]!.message, /班距放寬到 600 秒（1 台的極限）/);
+    assert.match(shortage[0]!.message, /加 2 台（3 台可維持 200 秒）/);
   });
 
   it('時段屬性沒設班距時不做供需判斷，不亂報', () => {

@@ -160,8 +160,8 @@ function describeShortageRemedy(row: FleetSupplyDemandRow): string {
     Math.ceil((row.requiredVehicles ?? 0) - 1e-9) - peak,
   );
   return (
-    `要嘛把班距放寬到 ${feasibleHeadwaySeconds} 秒（${peak} 台撐得起的極限），`
-    + `要嘛再加 ${extraVehicles} 台（${peak + extraVehicles} 台就回得去 ${target} 秒）。`
+    `班距放寬到 ${feasibleHeadwaySeconds} 秒（${peak} 台的極限），`
+    + `或加 ${extraVehicles} 台（${peak + extraVehicles} 台可維持 ${target} 秒）。`
   );
 }
 
@@ -553,8 +553,8 @@ export function buildScheduleAnalysisReport(args: {
           + `班距 ${row.targetHeadwaySeconds} 秒只要 ${row.requiredVehicles!.toFixed(1)} 台同時在線`
           + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ ${(row.targetHeadwaySeconds! / 60).toFixed(1)} 分）；`
           + `實際平均 ${row.actualVehicles.toFixed(1)} 台、尖峰 ${row.peakConcurrentVehicles} 台，`
-          + `多 ${row.surplusVehicles.toFixed(1)} 台。多的車沒班次可跑，`
-          + `扣掉整備與待命後每台每小時還空等 ${row.idleMinutesPerVehicleHour.toFixed(0)} 分，佔著停靠點。`,
+          + `多 ${row.surplusVehicles.toFixed(1)} 台。扣掉整備與待命後，`
+          + `每台每小時仍空等 ${row.idleMinutesPerVehicleHour.toFixed(0)} 分，佔著停靠點。`,
       });
       continue;
     }

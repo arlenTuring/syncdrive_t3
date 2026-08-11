@@ -304,17 +304,13 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
     id: 'fleet',
     title: '車不夠',
     codes: new Set(['UNSERVED_SERVICE_PULSE', 'HEADWAY_BELOW_TARGET']),
-    hint:
-      '同一時刻派得出的車少於「一輪往返 ÷ 目標班距」，脈衝就沒有車可以接，'
-      + '班距跟著被拉開。要嘛加車、要嘛放寬班距——分析報表會算出各時段要改成多少。',
+    hint: '同時在線的車少於「一輪往返 ÷ 班距」。加車或放寬班距，分析報表有算好的數字。',
   },
   {
     id: 'facility',
     title: '整備設施不夠',
     codes: new Set(['MAINTENANCE_FACILITY_UNAVAILABLE', 'MAINTENANCE_TRANSFER_UNRESOLVED']),
-    hint:
-      '同一類設施在那段時間全被別列車佔著，車沒地方停，進出廠的移動卡也就排不出來。'
-      + '要嘛多掛幾台設施、要嘛把同時段的整備任務錯開。',
+    hint: '該類設施在那段時間全滿。加設施，或把同時段的整備錯開。',
   },
   {
     id: 'berth',
@@ -326,9 +322,7 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
       'STATION_BERTH_DELAYED',
       'STATION_BERTH_BACKUP_USED',
     ]),
-    hint:
-      '一個停靠點同時只能停一台車。車比需要的多、或整備排不進去，車就會擠在終點站，'
-      + '接著就是延後發車、改走備用線，最後撞在一起。',
+    hint: '一個停靠點只能停一台車。車擠在終點站，就會延後發車、改走備用線，最後撞上。',
   },
 ];
 
@@ -336,7 +330,7 @@ const OTHER_ROOT_CAUSE: RootCauseDefinition = {
   id: 'other',
   title: '其他',
   codes: new Set(),
-  hint: '尚未歸類到某個根因的項目。',
+  hint: '尚未歸類的項目。',
 };
 
 function resolveRootCause(code: string): RootCauseDefinition {
@@ -677,10 +671,8 @@ function FeasibilityMessages({
            */
           const tensionNote =
             upstream?.id === 'fleet'
-              ? '注意：這一項跟「車不夠」互相拉扯——加車會讓站位更擠，減車會讓班距更差，'
-                + '照單項建議改會在兩者之間來回。要同時解，只能從不衝突的方向下手：'
-                + '縮短一輪往返（減少停靠或提高路段速度）、在關聯圖補一條終點在別站的備用路線、'
-                + '或把整備任務錯開讓車不要同時堆在終點站。'
+              ? '跟「車不夠」互相拉扯：加車站位更擠、減車班距更差，照單項改會來回。'
+                + '不衝突的解法：縮短一輪往返、補一條終點在別站的備用路線、把整備錯開。'
               : undefined;
           return (
           <RootCauseSection
