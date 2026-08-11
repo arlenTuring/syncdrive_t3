@@ -282,8 +282,16 @@ type RootCauseDefinition = {
   codes: ReadonlySet<string>;
   /** 為什麼這些警告是同一件事——收合狀態也看得到 */
   hint: string;
-  /** 這個根因多半是誰的後果（上游根因 id）；沒有就是獨立問題 */
-  consequenceOf?: string;
+  /**
+   * 這個根因多半是誰的後果（上游根因 id）。
+   *
+   * <strong>可能不只一個。</strong>停靠站不夠同時是「車不夠」與「整備設施不夠」的下游：
+   * 車多會擠站位，設施不夠也會——車進不了廠就只能繼續佔著停靠站。
+   * 只記一個上游會讓另一條因果線在畫面上消失。
+   */
+  consequenceOf?: readonly string[];
+  /** 上游還在畫面上時，這裡該先按兵不動的理由 */
+  deferHint?: string;
 };
 
 /**
@@ -308,26 +316,48 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
       'HEADWAY_BELOW_TARGET',
       'ROUTE_ORIGIN_AWAY_FROM_VEHICLE',
       'ROUTE_ALIGNED_TO_VEHICLE_LOCATION',
+      'INSUFFICIENT_TIMELINES',
+      'RECOVERY_INSUFFICIENT',
     ]),
     hint: '同時在線的車少於「一輪往返 ÷ 班距」。加車或放寬班距，分析報表有算好的數字。',
   },
   {
     id: 'facility',
+    consequenceOf: ['fleet'],
     title: '整備設施不夠',
-    codes: new Set(['MAINTENANCE_FACILITY_UNAVAILABLE', 'MAINTENANCE_TRANSFER_UNRESOLVED']),
-    hint: '該類設施在那段時間全滿。加設施，或把同時段的整備錯開。',
+    codes: new Set([
+      'MAINTENANCE_FACILITY_UNAVAILABLE',
+      'MAINTENANCE_TRANSFER_UNRESOLVED',
+      'MAINTENANCE_FACILITY_YIELDED',
+    ]),
+    hint:
+      '該類設施在那段時間全滿。訊息裡會直接寫「同時有幾台車要用幾台設施、缺幾台」——'
+      + '真的缺，就只能加設施或把整備錯開；沒缺卻塞不進去，是空檔被切碎，挪時段就有用。',
+    deferHint: '車越多，同時要整備的車也越多。先確定車數，再回頭看設施要加幾台。',
   },
   {
     id: 'berth',
-    consequenceOf: 'fleet',
+    consequenceOf: ['fleet', 'facility'],
     title: '停靠站容量不夠',
     codes: new Set([
       'STATION_BERTH_COLLISION',
       'STATION_BERTH_PROTECTION_GAP',
       'STATION_BERTH_DELAYED',
       'STATION_BERTH_BACKUP_USED',
+      'STATION_BERTH_RELIEF_INSERTED',
     ]),
     hint: '一個停靠點只能停一台車。車擠在終點站，就會延後發車、改走備用線，最後撞上。',
+    deferHint:
+      '車擠在站上，多半是車太多、或整備排不進去只好繼續佔著站位。'
+      + '上游沒解決之前加停靠點，是拿站位去墊別的問題。',
+  },
+  {
+    id: 'geometry',
+    consequenceOf: ['fleet', 'facility', 'berth'],
+    title: '幾何後處理沒跑完',
+    codes: new Set(['GEOMETRY_NOT_CONVERGED']),
+    hint: '站位求解、讓渡、班距修復互相影響，跑到版面不再變動為止。跑滿上限仍在變就會出現這則。',
+    deferHint: '這是上游全部塞在一起的結果。上游少一項，這裡通常就自己收斂了。',
   },
 ];
 
@@ -345,14 +375,17 @@ function resolveRootCause(code: string): RootCauseDefinition {
 function RootCauseSection({
   cause,
   issueCount,
-  upstreamTitle,
+  upstreamTitles,
+  isSource,
   tensionNote,
   children,
 }: {
   cause: RootCauseDefinition;
   issueCount: number;
-  /** 上游根因也在畫面上時，標出「這多半是它的後果」 */
-  upstreamTitle?: string;
+  /** 上游根因也在畫面上時，標出「這多半是它們的後果」 */
+  upstreamTitles?: string[];
+  /** 這一項沒有任何上游在畫面上——它就是源頭，先動它 */
+  isSource?: boolean;
   /** 這一項跟上游互相拉扯時要講的話——照建議改會來回改不動 */
   tensionNote?: string;
   children: React.ReactNode;
@@ -364,13 +397,29 @@ function RootCauseSection({
         <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
           連帶 {issueCount} 則
         </span>
-        {upstreamTitle ? (
+        {isSource ? (
+          <span className="rounded border border-emerald-600/50 bg-emerald-950/30 px-1.5 py-0.5 text-[10px] text-emerald-300">
+            從這裡改
+          </span>
+        ) : null}
+        {upstreamTitles && upstreamTitles.length > 0 ? (
           <span className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            多半是「{upstreamTitle}」的後果
+            多半是「{upstreamTitles.join('」「')}」的後果
           </span>
         ) : null}
       </div>
       <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">{cause.hint}</p>
+      {/*
+        有上游還在畫面上時，這一項的建議<strong>先不要照做</strong>。
+        下游多半會跟著上游一起消失；先動下游等於拿它去墊上游的問題，
+        改完還是會被打回來——這正是「怎麼改都改不動」的來源。
+      */}
+      {!isSource && cause.deferHint ? (
+        <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
+          <span className="text-zinc-400">先別動這裡：</span>
+          {cause.deferHint}
+        </p>
+      ) : null}
       {tensionNote ? (
         <p className="mb-1.5 rounded border border-amber-600/40 bg-amber-950/30 px-2 py-1 text-[10px] leading-4 text-amber-200">
           {tensionNote}
@@ -661,30 +710,64 @@ function FeasibilityMessages({
           groups: visibleGroups.filter((group) => resolveRootCause(group.code) === cause),
         }))
         .filter((entry) => entry.groups.length > 0)
-        .sort(
-          (a, b) =>
-            visibleGroups.indexOf(a.groups[0]!) - visibleGroups.indexOf(b.groups[0]!),
-        )
+        /*
+          上游一定要排在下游前面。
+          原本只照嚴重度排（visibleGroups 的順序），而下游的症狀往往比上游更嚴重
+          ——站位碰撞是硬錯誤、車不夠只是警告——於是「從這裡改」會出現在畫面下方，
+          使用者照順序看，第一眼看到的正好是最不該先動的那一項。
+          先照因果深度排，同深度才回頭照嚴重度。
+        */
+        .sort((a, b) => {
+          const depthOf = (
+            cause: RootCauseDefinition,
+            present: Set<string>,
+            seen: Set<string> = new Set(),
+          ): number => {
+            if (seen.has(cause.id)) return 0;
+            seen.add(cause.id);
+            const upstream = (cause.consequenceOf ?? [])
+              .filter((id) => present.has(id))
+              .map((id) => ROOT_CAUSES.find((item) => item.id === id))
+              .filter((item): item is RootCauseDefinition => Boolean(item));
+            if (upstream.length === 0) return 0;
+            return 1 + Math.max(...upstream.map((item) => depthOf(item, present, seen)));
+          };
+          const present = new Set(
+            [...ROOT_CAUSES, OTHER_ROOT_CAUSE]
+              .filter((cause) =>
+                visibleGroups.some((group) => resolveRootCause(group.code) === cause))
+              .map((cause) => cause.id),
+          );
+          const depthDiff = depthOf(a.cause, present) - depthOf(b.cause, present);
+          if (depthDiff !== 0) return depthDiff;
+          return visibleGroups.indexOf(a.groups[0]!) - visibleGroups.indexOf(b.groups[0]!);
+        })
         .map(({ cause, groups }, _index, entries) => {
-          const upstream = cause.consequenceOf
-            ? entries.find((entry) => entry.cause.id === cause.consequenceOf)?.cause
-            : undefined;
           /**
-           * 「車不夠」與「停靠站不夠」同時出現＝互相拉扯：加車讓站位更糟、
-           * 減車讓班距更糟。照單項建議改會在兩者之間來回，永遠改不動。
-           * 這時必須明講，並指出<strong>不衝突</strong>的第三個方向。
+           * 只列<strong>畫面上真的有</strong>的上游。因果圖是靜態的，但這一次生成
+           * 未必每個節點都出問題——標一個沒出現的上游只會讓人去找不存在的東西。
            */
-          const tensionNote =
-            upstream?.id === 'fleet'
-              ? '跟「車不夠」互相拉扯：加車站位更擠、減車班距更差，照單項改會來回。'
-                + '不衝突的解法：縮短一輪往返、補一條終點在別站的備用路線、把整備錯開。'
-              : undefined;
+          const upstreams = (cause.consequenceOf ?? [])
+            .map((id) => entries.find((entry) => entry.cause.id === id)?.cause)
+            .filter((item): item is RootCauseDefinition => Boolean(item));
+          /**
+           * 「車不夠」與下游同時出現＝互相拉扯：加車讓站位與設施更擠、減車讓班距更差。
+           * 照單項建議改會在兩者之間來回，永遠改不動（使用者原話：「多車不是、少車也
+           * 不是……這樣會進入死迴圈改不動」）。這時必須明講，並指出<strong>不衝突</strong>
+           * 的第三個方向。
+           */
+          const tensionNote = upstreams.some((item) => item.id === 'fleet')
+            ? '跟「車不夠」互相拉扯：加車站位與設施更擠、減車班距更差，照單項改會來回。'
+              + '不衝突的解法：縮短一輪往返、補一條終點在別站的備用路線、把整備錯開。'
+            : undefined;
           return (
           <RootCauseSection
             key={cause.id}
             cause={cause}
             issueCount={groups.reduce((sum, group) => sum + group.issues.length, 0)}
-            upstreamTitle={upstream?.title}
+            upstreamTitles={upstreams.map((item) => item.title)}
+            /** 沒有任何上游在畫面上＝它就是源頭，動這裡才有槓桿 */
+            isSource={upstreams.length === 0}
             tensionNote={tensionNote}
           >
             {groups.map((group) => {
