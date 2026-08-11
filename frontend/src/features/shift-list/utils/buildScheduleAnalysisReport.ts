@@ -150,6 +150,21 @@ export type ScheduleAnalysisReport = {
  * 用<strong>尖峰</strong>同時而不是平均：那是「這個時段你真的同時派得出幾台」，
  * 拿平均去算會低估車隊、把要加的台數講得太多。
  */
+/**
+ * 「加 N 台」這句話<strong>不是無條件成立</strong>的。
+ *
+ * 整備設施已經滿載時，加車會讓保養、行檢更排不進去——使用者照這句改，
+ * 換來的是另一批「沒地方停」，回頭又被建議減車，於是在兩邊來回改不動
+ * （使用者原話：「多車不是、少車也不是……這樣會進入死迴圈改不動」）。
+ *
+ * 判斷不需要多傳設施數：排班引擎解不出停放位置時會在區塊上留下
+ * <code>yardFacilityUnavailable</code>，有這個旗標就代表設施已經吃緊。
+ */
+function facilitiesAlreadySaturated(plan: GeneratedSchedulePlan): boolean {
+  return plan.timelines.some((timeline) =>
+    timeline.blocks.some((block) => block.yardFacilityUnavailable === true));
+}
+
 function describeShortageRemedy(row: FleetSupplyDemandRow): string {
   const peak = row.peakConcurrentVehicles;
   const target = row.targetHeadwaySeconds;
@@ -568,7 +583,11 @@ export function buildScheduleAnalysisReport(args: {
           + `（一輪往返 ${(row.cycleSeconds / 60).toFixed(1)} 分 ÷ ${(row.targetHeadwaySeconds! / 60).toFixed(1)} 分）；`
           + `實際平均 ${row.actualVehicles.toFixed(1)} 台、尖峰 ${row.peakConcurrentVehicles} 台，`
           + `少 ${Math.abs(row.surplusVehicles).toFixed(1)} 台，班距會被拉開。`
-          + describeShortageRemedy(row),
+          + describeShortageRemedy(row)
+          + (facilitiesAlreadySaturated(plan)
+            ? '注意：目前已經有車排不進整備設施，加車會讓保養、行檢更擠——'
+              + '要加車就得同時加設施，否則只是把問題換一邊。'
+            : ''),
       });
     }
   }
