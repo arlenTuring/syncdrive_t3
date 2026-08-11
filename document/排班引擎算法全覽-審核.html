@@ -3712,6 +3712,37 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-11 · 收斂指紋只看時刻——換路線的改動被整個忽略</h3>
+  <div class="callout">
+    使用者要求複查潛在問題時抓到的，而且是自己剛引入的。
+  </div>
+  <ul>
+    <li>
+      幾何收斂迴圈用指紋判斷「這輪有沒有變化」，而指紋是
+      <code>row|id|開始|結束</code>——<strong>只有時刻</strong>。
+    </li>
+    <li>
+      迴圈裡有兩道處理會<strong>只換路線、不動時刻</strong>：
+      <code>relievePlatformIdleWithSecondaryEdge</code>（改停別的站位）與
+      <code>alignRouteWithVehicleLocation</code>（配合車輛停放位置改派）。
+      換路線＝換停靠站＝站位佔用整個變了，但時刻沒動。
+    </li>
+    <li>
+      <strong>後果：迴圈判定「沒變化」直接收工，換路線造成的新站位衝突永遠不會被求解。</strong>
+      真實資料上 NT 有 2 站、NTB 有 4 站——換過去停靠站完全不同，影響是實質的。
+    </li>
+    <li>
+      指紋補上 <code>routeInstanceId</code>。這也順帶修好了
+      <code>relievePlatformIdleWithSecondaryEdge</code> 的同一個坑——那是先前就存在、
+      沒人發現的。
+    </li>
+    <li>
+      <strong>教訓：</strong>收斂判定的指紋必須涵蓋<strong>迴圈裡所有處理會改動的東西</strong>。
+      新增一道處理時，第一個要問的是「它改的東西在指紋裡嗎」。
+      <code>tsc</code> 23、測試 366 pass／9 fail、真實資料各項不變。
+    </li>
+  </ul>
+
   <h3>2026-08-11 · 車停在哪，下一班就從那裡發（交接第 2 項）</h3>
   <div class="callout">
     待命停在「[備用]N2W下行出發」，下一班卻被指派從「N2W下行出發」出發的主線路線

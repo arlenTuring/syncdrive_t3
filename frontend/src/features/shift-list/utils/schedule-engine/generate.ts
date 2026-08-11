@@ -88,8 +88,15 @@ function fingerprintTimelines(
   const parts: string[] = [];
   for (const timeline of timelines) {
     for (const block of timeline.blocks) {
+      // 指紋要含<strong>路線</strong>，不能只有時刻。
+      //
+      // 迴圈裡有兩道會「只換路線、不動時刻」的處理（改停別的站位、
+      // 配合車輛停放位置改派）。換路線＝換停靠站＝站位佔用整個變了，
+      // 但時刻沒動——指紋只看時刻的話，迴圈會判定「這輪沒變化」直接收工，
+      // 那些新產生的站位衝突<strong>永遠不會被求解</strong>。
       parts.push(
-        `${timeline.row}|${block.id}|${block.plannedStartMinute}|${block.plannedEndMinute}`,
+        `${timeline.row}|${block.id}|${block.plannedStartMinute}|${block.plannedEndMinute}`
+        + `|${block.routeInstanceId ?? block.routeId ?? ''}`,
       );
     }
   }
