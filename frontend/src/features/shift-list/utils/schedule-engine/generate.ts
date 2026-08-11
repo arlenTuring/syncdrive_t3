@@ -228,8 +228,23 @@ export function generateShiftSchedule(
   //
   // 改為跑到不動點：每輪跑完整組處理，版面沒有任何變化就結束。
   // 這樣「某一步釋放的空間，下一輪其他步驟就能用到」，不必人工推演順序。
+  let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
     const before = fingerprintTimelines(timelines);
+
+    // 車停在哪，下一班就從那裡發——待命的地點是被站位限制夾出來的、常常沒得選，
+    // 而路線在主線與備用之間本來就可選，該讓的是有選擇的那一方。
+    //
+    // 擺在站位求解<strong>之前</strong>：換路線＝換停靠站＝站位佔用整個變了，
+    // 擺在後面的話那一輪的求解已經跑完，新衝突要等下一輪才處理；
+    // 最後一輪換的更是完全沒人收拾。擺在前面，同一輪就能反應。
+    alignRouteWithVehicleLocation({
+      timelines,
+      selectedRoutes: routesForBerth,
+      successorPolicy: engineInput.successorPolicy,
+      topology: engineInput.pointTopology,
+      warnings: round === 0 ? warnings : undefined,
+    });
 
     // 站位占用：拓撲候選中選局部無衝突解（可延後／可改線／可等）
     // 第一輪保守並收集警告；之後放寬延後上限，處理連鎖擠回來的殘餘衝突。
@@ -255,16 +270,6 @@ export function generateShiftSchedule(
       warnings: round === 0 ? warnings : [],
     });
 
-    // 車停在哪，下一班就從那裡發——待命的地點是被站位限制夾出來的、常常沒得選，
-    // 而路線在主線與備用之間本來就可選，該讓的是有選擇的那一方。
-    // 放在迴圈裡：換路線＝換停靠站，可能製造新的碰撞，要讓站位求解有機會反應。
-    alignRouteWithVehicleLocation({
-      timelines,
-      selectedRoutes: routesForBerth,
-      successorPolicy: engineInput.successorPolicy,
-      topology: engineInput.pointTopology,
-      warnings: round === 0 ? warnings : undefined,
-    });
 
     // 班距太疏 → 把後車往前拉回目標
     timelines = densifyRouteHeadwaysAfterBerth({
@@ -299,7 +304,28 @@ export function generateShiftSchedule(
       routeCount: engineInput.passengerRoutes.length,
     }).timelines;
 
-    if (fingerprintTimelines(timelines) === before) break;
+    if (fingerprintTimelines(timelines) === before) {
+      converged = true;
+      break;
+    }
+  }
+  if (!converged) {
+    /**
+     * 跑完上限輪數版面還在變＝這一輪的結果<strong>不是不動點</strong>。
+     *
+     * 先前這裡是直接離開，沒有任何回報——「收斂完成」跟「跑完 8 輪還在動」
+     * 在輸出上完全一樣。差別很大：後者的站位錯誤可能只是輪數不夠，不是設定
+     * 有問題，但使用者分辨不出來，只會去改設定（2026-08-11 複查時發現）。
+     */
+    pushIssue(warnings, {
+      code: 'GEOMETRY_NOT_CONVERGED',
+      severity: 'warning',
+      kind: 'limit',
+      message:
+        `幾何後處理跑滿 ${GEOMETRY_CONVERGENCE_MAX_ROUNDS} 輪仍未收斂——`
+        + `下面的站位與班距問題有一部分可能只是還沒處理完，不一定是設定有問題。`,
+      detail: { rounds: GEOMETRY_CONVERGENCE_MAX_ROUNDS },
+    });
   }
 
   // 整備後首班代號：所有幾何後處理完成後再標記，避免站位／讓渡弄丟前綴。

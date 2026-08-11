@@ -58,7 +58,8 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: '已改派路線，配合車輛實際停放位置',
-  ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）'
+  ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）',
+  GEOMETRY_NOT_CONVERGED: '幾何後處理未收斂'
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -99,6 +100,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: { id: 's7', label: '§7 路線關聯圖' },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: 's7', label: '§7 路線關聯圖' },
+  GEOMETRY_NOT_CONVERGED: { id: 's3', label: '§3 流水線' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -231,6 +233,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'limit',
     guidance:
       '那段時間該類設施一台都不空，車沒地方停。這是產能問題，不是路徑問題。加設施、把同時段的整備錯開、或減少該時段整備的車數。設施數顯示 0 代表這一類根本沒設定設施。',
+  },
+  GEOMETRY_NOT_CONVERGED: {
+    kind: 'limit',
+    guidance:
+      '站位求解、讓渡、班距修復這幾道會互相影響，所以跑到版面不再變動為止。跑滿上限仍在變，代表還沒到不動點——下面的站位與班距問題有一部分可能只是還沒處理完，不一定是設定有問題。先看有沒有能減少互相干擾的地方（車太多、整備全擠在同一時段），再考慮改設定。',
   },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: {
     kind: 'actionable',
