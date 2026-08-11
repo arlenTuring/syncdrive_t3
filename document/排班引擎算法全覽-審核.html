@@ -3665,10 +3665,23 @@ backend/src/dev-log/
     <li><code>input.intervals</code> / <code>input.attributes</code>：真實時段與班距目標</li>
     <li><code>input.selectedRoutes[].routeId</code> / <code>.routeInstanceId</code>：路線識別</li>
     <li>各區塊的 <code>routeId</code> / <code>routeInstanceId</code>：與上者對照，可查解析失敗</li>
+    <li>
+      <strong>（2026-08-11 新增）<code>input.routeRelationGraph.links</code></strong>：
+      關聯圖的<strong>實際的邊</strong>，不只是數量。「這一段跑完接得到哪幾條」是排班
+      決策的核心輸入，車停在備用站位卻被指派主線路線、整備出不去，成因幾乎都在
+      這張圖上；先前只記 <code>nodeCount</code>／<code>linkCount</code>，遇到這類問題就
+      查不下去。每條邊同時記代號與 instanceId（一串 uuid 對不出是哪一條）。
+    </li>
+    <li>
+      <strong>（2026-08-11 新增）<code>input.selectedRoutes[].stationIds</code> 與
+      <code>.stationDwells</code></strong>：只記起訖不夠，要離線重播「這條路線經過哪些站、
+      佔用多久」就得要整串——缺它的時候 harness 一跑就炸。
+    </li>
   </ul>
   <p>
-    完整路線幾何（站點序、各站停靠、站間 leg）不在 log 內，
-    需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
+    這兩則都是同一個教訓：<strong>log 少記一個欄位，就等於那一類問題永遠只能靠
+    使用者自己去看畫面</strong>。今天連續兩次卡在這裡。判斷要不要記的標準不是
+    「會不會太大」（這些都跟路線數同級），而是「少了它，這一類問題還查得下去嗎」。
   </p>
 
   <h3>2026-08-11 · 回報的因果化：避免「多車不是、少車也不是」的死迴圈（交接第 3 項）</h3>

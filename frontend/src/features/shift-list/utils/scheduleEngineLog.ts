@@ -107,6 +107,16 @@ export function buildScheduleEngineLogPayload(args: {
         stationCount: route.stationIds.length,
         startStationId: route.stationIds[0] ?? null,
         endStationId: route.stationIds[route.stationIds.length - 1] ?? null,
+        // 只記起訖不夠：要重播「這條路線經過哪些站、佔用多久」就得要整串。
+        // 幾十條路線 × 十來個站，量級不大，但少了它就沒辦法離線重跑
+        // （2026-08-11 就是因為缺這個，harness 一跑就炸）。
+        stationIds: route.stationIds,
+        stationDwells: route.stationDwells?.map((dwell) => ({
+          stationId: dwell.stationId,
+          stationName: dwell.stationName,
+          dwellSeconds: dwell.dwellSeconds ?? null,
+          dwellMode: dwell.dwellMode ?? null,
+        })) ?? [],
         avgTravelTimeSeconds: route.avgTravelTimeSeconds,
         minTravelTimeSeconds: route.minTravelTimeSeconds,
         switchBufferAfterSeconds: route.switchBufferAfterSeconds,
@@ -138,10 +148,39 @@ export function buildScheduleEngineLogPayload(args: {
           draft.routeGroups.throughAnchors?.verifiedFingerprint,
         ),
       },
-      routeRelationGraph: {
-        nodeCount: draft.routeGroups.routeRelationGraph?.nodes.length ?? 0,
-        linkCount: draft.routeGroups.routeRelationGraph?.links.length ?? 0,
-      },
+      /**
+       * 關聯圖要記<strong>實際的邊</strong>，不能只記數量。
+       *
+       * 「這一段跑完接得到哪幾條」是排班決策的核心輸入之一——車停在備用站位
+       * 卻被指派主線路線、整備出不去，成因幾乎都在這張圖上。先前只記
+       * nodeCount／linkCount，遇到這類問題就查不下去，只能請使用者自己去看圖
+       * （2026-08-11 連續兩次卡在這裡）。
+       *
+       * 邊的數量跟路線數同級（幾十條），不是會把 log 撐爆的東西。
+       * 順便把 instanceId 換成看得懂的路線代號，不然一串 uuid 對不出是哪一條。
+       */
+      routeRelationGraph: (() => {
+        const graph = draft.routeGroups.routeRelationGraph;
+        const codeByInstanceId = new Map(
+          draft.routeGroups.selectedRoutes.map((route) => [
+            route.instanceId ?? route.routeId,
+            route.routeCode ?? route.routeName ?? route.routeId,
+          ] as const),
+        );
+        const label = (instanceId: string) =>
+          codeByInstanceId.get(instanceId) ?? instanceId;
+        return {
+          nodeCount: graph?.nodes.length ?? 0,
+          linkCount: graph?.links.length ?? 0,
+          links: (graph?.links ?? []).map((link) => ({
+            from: label(link.fromInstanceId),
+            to: label(link.toInstanceId),
+            nextKind: link.nextKind === 'secondary' ? 'secondary' : 'priority',
+            fromInstanceId: link.fromInstanceId,
+            toInstanceId: link.toInstanceId,
+          })),
+        };
+      })(),
       emptyIntervalMainlineSlackSeconds:
         draft.timeTemplate.emptyIntervalMainlineSlackSeconds ?? null,
       maintenanceEntrySlackBySection: draft.maintenanceTask.skipped
