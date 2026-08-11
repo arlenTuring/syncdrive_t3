@@ -887,6 +887,48 @@ export function insertMaintenanceTransferCards(args: {
   // 進來那段也是 0 秒，一樣自然浮出來，不需要另外寫特例。
 
   /** 兩點之間的移動秒數；同一個 Area 視為 0 秒示意轉移，到不了回 null */
+  /**
+   * 路徑的<strong>外部成本</strong>：這條路會從別的班次身上拿走多少時間。
+   *
+   * 挑設施原本只比「移動時間」，比不出「這條路徑會連累多少人」。於是兩個看起來
+   * 相鄰的點，引擎會為了走得通而繞一大圈——那幾百秒車一直在路網上，
+   * 每經過一個共用轉折點就把那個點鎖住 2 倍碰撞保護時間，別的車那段時間過不去。
+   *
+   * 曾經想用「超過 N 秒就拒絕」來擋，被使用者正確地否決：那個 N 是從當下這張
+   * 地圖反推出來的，換一張圖就會把合法路徑判成到不了（2026-08-11，已 revert）。
+   * 正解是<strong>把代價算進成本</strong>——路徑越複雜、經過的共用點越多，
+   * 成本自然越高，這條分支就在最佳化時被剪掉，不需要任何絕對門檻，
+   * 量綱也跟著地圖與使用者設定的碰撞保護時間縮放。
+   *
+   * 中途節點數 ＝ 邊數 − 1（頭尾是起訖點，不算「經過」）。
+   */
+  function pathExternalitySeconds(path: { edges: PointTopologyEdge[] }): number {
+    if (collisionBufferSeconds <= 0) return 0;
+    return Math.max(0, path.edges.length - 1) * collisionBufferSeconds;
+  }
+
+  /**
+   * 挑設施時用來<strong>比較</strong>的成本＝實際移動時間 ＋ 外部成本。
+   *
+   * 只用在比較。卡片上寫的、時刻推算用的仍然是<strong>實際移動時間</strong>
+   * （<code>path.avgSeconds</code>）——外部成本是決策用的權重，不是車真的多花的時間，
+   * 混用會讓抵達時刻算錯。
+   */
+  function pathDecisionCost(path: { edges: PointTopologyEdge[]; avgSeconds: number }): number {
+    return path.avgSeconds + pathExternalitySeconds(path);
+  }
+
+  /** 挑地點時用的比較成本（含外部性）；到不了回 null */
+  function moveDecisionCost(fromNodeId: string | null, toNodeId: string | null): number | null {
+    if (!fromNodeId || !toNodeId) return null;
+    if (fromNodeId === toNodeId) return 0;
+    const fromArea = facilityAreaId.get(fromNodeId);
+    const toArea = facilityAreaId.get(toNodeId);
+    if (fromArea && fromArea === toArea) return 0;
+    const path = findTopologyPath(topology, fromNodeId, toNodeId);
+    return path ? pathDecisionCost(path) : null;
+  }
+
   function moveSeconds(fromNodeId: string | null, toNodeId: string | null): number | null {
     if (!fromNodeId || !toNodeId) return null;
     if (fromNodeId === toNodeId) return 0;
@@ -940,14 +982,17 @@ export function insertMaintenanceTransferCards(args: {
     const startSecond = minuteToSecond(yard.plannedStartMinute);
     const endSecond = minuteToSecond(yard.plannedEndMinute);
     for (const candidate of candidates) {
-      const inCost = prevAnchor ? moveSeconds(prevAnchor, candidate.id) : 0;
-      const outCost = nextAnchor ? moveSeconds(candidate.id, nextAnchor) : 0;
+      // 抵達時刻要用<strong>實際</strong>移動時間；排名要用含外部性的比較成本。
+      // 兩者混用的話，外部成本會被當成車真的多花的時間，抵達時刻就算錯了。
+      const inSeconds = prevAnchor ? moveSeconds(prevAnchor, candidate.id) : 0;
+      const inCost = prevAnchor ? moveDecisionCost(prevAnchor, candidate.id) : 0;
+      const outCost = nextAnchor ? moveDecisionCost(candidate.id, nextAnchor) : 0;
       // 錨點存在卻到不了 → 這個候選不能用（車開不過去／開不出來）
-      if (inCost === null || outCost === null) continue;
+      if (inSeconds === null || inCost === null || outCost === null) continue;
       // 入廠卡會讓車<strong>提前抵達</strong>，車一到就佔著那一格——保留窗口必須
       // 從「實際抵達」算起，不能只鎖 [整備開始, 結束]。少鎖這段頭部的話，
       // 別列車會被排進那個空隙，等到要產生入廠卡時才發現位置被佔、整張卡作廢。
-      const arriveSecond = freeSecond === null ? startSecond : freeSecond + inCost;
+      const arriveSecond = freeSecond === null ? startSecond : freeSecond + inSeconds;
       const holdFrom = Math.min(startSecond, arriveSecond);
       if (!stayFacilityIsFree(candidate.id, yard, timelineRow, holdFrom, endSecond)) {
         continue;
@@ -1110,6 +1155,8 @@ export function insertMaintenanceTransferCards(args: {
       }
       let chosen: {
         nodeId: string; label: string; seconds: number;
+        /** 含外部性的比較成本；只用來排名，不是車真的花的時間 */
+        decisionCost: number;
         departureSecond: number;
         gatewayNodeId: string; gatewayInstant: number;
       } | null = null;
@@ -1206,9 +1253,11 @@ export function insertMaintenanceTransferCards(args: {
           nodeId: baseGateway.nodeId,
           instant: baseGateway.instant + shift,
         };
-        if (!chosen || path.avgSeconds < chosen.seconds) {
+        const decisionCost = pathDecisionCost(path);
+        if (!chosen || decisionCost < chosen.decisionCost) {
           chosen = {
             nodeId: facility.id, label: facility.label || facility.id, seconds: path.avgSeconds,
+            decisionCost,
             departureSecond,
             gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
           };
@@ -1359,6 +1408,8 @@ export function insertMaintenanceTransferCards(args: {
         entryGateway: { nodeId: string; instant: number } | null;
         /** 為了閃開轉折點碰撞，出廠時刻往後挪了幾秒（0＝沒挪） */
         departureShiftSeconds: number;
+        /** 含外部性的比較成本；只用來排名 */
+        decisionCost: number;
         /** 後一段實際開始時刻（位移座標）；只會等於或晚於它原訂的開始 */
         finalLaterStartSecond: number;
       } | null = null;
@@ -1377,6 +1428,8 @@ export function insertMaintenanceTransferCards(args: {
           // 同一區域是 0 秒示意轉移，沒有真實移動，不會有轉折點碰撞問題
           let exitGateway: { nodeId: string; instant: number } | null = null;
           let entryGateway: { nodeId: string; instant: number } | null = null;
+          /** 這一對轉場的外部成本（路徑經過的共用轉折點會鎖住別人多久） */
+          let externalitySeconds = 0;
 
           if (sameArea) {
             // 同一區域：不查拓樸，直接視為 0 秒的示意轉移——開始跟結束是同一刻。
@@ -1402,6 +1455,7 @@ export function insertMaintenanceTransferCards(args: {
               'arriving-at-facility',
               entryFacility.id,
             );
+            externalitySeconds = pathExternalitySeconds(path);
           }
 
           const totalSeconds = exitLegSeconds + entryLegSeconds;
@@ -1494,7 +1548,9 @@ export function insertMaintenanceTransferCards(args: {
           const arriveSecond = baseArriveSecond + departureShift;
           const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
           if (finalLaterStartSecond >= laterEndSecond - 1e-9) { tally.noTime += 1; continue; }
-          if (!chosen || totalSeconds < chosen.exitLegSeconds + chosen.entryLegSeconds) {
+          // 同區域是 0 秒示意轉移、沒有真實路徑，外部成本自然是 0
+          const decisionCost = totalSeconds + externalitySeconds;
+          if (!chosen || decisionCost < chosen.decisionCost) {
             chosen = {
               exitNodeId: exitFacility.id,
               exitLabel: exitFacility.label || exitFacility.id,
@@ -1508,6 +1564,7 @@ export function insertMaintenanceTransferCards(args: {
               exitGateway,
               entryGateway,
               departureShiftSeconds: departureShift,
+              decisionCost,
               finalLaterStartSecond,
             };
           }
@@ -1709,10 +1766,22 @@ export function insertMaintenanceTransferCards(args: {
     const candidates = facilities
       .map((facility) => {
         const path = findTopologyPath(topology, facility.id, stationNodeId);
-        return path ? { facility, seconds: path.avgSeconds, edges: path.edges } : null;
+        if (!path) return null;
+        // seconds 是卡片與時刻要用的實際移動時間；decisionCost 只用來排序
+        return {
+          facility,
+          seconds: path.avgSeconds,
+          decisionCost: pathDecisionCost(path),
+          edges: path.edges,
+        };
       })
-      .filter((c): c is { facility: (typeof facilities)[number]; seconds: number; edges: PointTopologyEdge[] } => c !== null)
-      .sort((a, b) => a.seconds - b.seconds);
+      .filter((c): c is {
+        facility: (typeof facilities)[number];
+        seconds: number;
+        decisionCost: number;
+        edges: PointTopologyEdge[];
+      } => c !== null)
+      .sort((a, b) => a.decisionCost - b.decisionCost);
     if (candidates.length === 0) {
       skipped.push({
         timelineRow: timeline.row,
