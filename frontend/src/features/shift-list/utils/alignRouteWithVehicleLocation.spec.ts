@@ -107,6 +107,34 @@ describe('車停在哪，下一班就從那裡發', () => {
     assert.equal(timelines[0]!.blocks.find((b) => b.id === 'pax-next')!.routeId, 'NT');
   });
 
+  it('關聯圖上接不到同終點又從車所在位置出發的路線時，要講出來', () => {
+    const timelines = planWithParkedStandby('st-backup');
+    const warnings: never[] = [];
+    // 後繼只有主線 NT，沒有備用 NTB —— 換不成
+    const policyWithoutBackup = {
+      routesByInstanceId: (POLICY as never as { routesByInstanceId: Map<string, unknown> })
+        .routesByInstanceId,
+      prioritySuccessors: new Map([['TN', ['NT']]]),
+      secondarySuccessors: new Map(),
+      rotationRoutes: [],
+    } as never as Parameters<typeof alignRouteWithVehicleLocation>[0]['successorPolicy'];
+
+    const result = alignRouteWithVehicleLocation({
+      timelines,
+      selectedRoutes: ROUTES,
+      successorPolicy: policyWithoutBackup,
+      warnings,
+    });
+    assert.equal(result.swapped, 0);
+    assert.equal(
+      (warnings as Array<{ code: string }>).some(
+        (w) => w.code === 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE',
+      ),
+      true,
+      '換不成就要回報，不能默默放棄',
+    );
+  });
+
   it('待命停在設施格（沒有站位）就沒有可談的', () => {
     const timelines = planWithParkedStandby(undefined);
     const result = alignRouteWithVehicleLocation({

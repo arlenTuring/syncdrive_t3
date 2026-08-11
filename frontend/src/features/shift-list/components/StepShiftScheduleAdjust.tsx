@@ -303,7 +303,12 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
   {
     id: 'fleet',
     title: '車不夠',
-    codes: new Set(['UNSERVED_SERVICE_PULSE', 'HEADWAY_BELOW_TARGET']),
+    codes: new Set([
+      'UNSERVED_SERVICE_PULSE',
+      'HEADWAY_BELOW_TARGET',
+      'ROUTE_ORIGIN_AWAY_FROM_VEHICLE',
+      'ROUTE_ALIGNED_TO_VEHICLE_LOCATION',
+    ]),
     hint: '同時在線的車少於「一輪往返 ÷ 班距」。加車或放寬班距，分析報表有算好的數字。',
   },
   {

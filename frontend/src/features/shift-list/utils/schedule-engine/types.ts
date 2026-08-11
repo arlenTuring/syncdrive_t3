@@ -161,6 +161,7 @@ export type FeasibilityViolationCode =
    */
   | 'MAINTENANCE_FACILITY_UNAVAILABLE'
   | 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION'
+  | 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */

@@ -156,7 +156,36 @@ export function alignRouteWithVehicleLocation(args: {
         replacement = { instanceId: candidateId, route: candidate };
         break;
       }
-      if (!replacement) continue;
+      if (!replacement) {
+        /**
+         * 想換卻換不成——車停在 A、下一班卻要從 B 發，而關聯圖上「前一段之後」
+         * 沒有任何一條同終點、從 A 出發的路線可接。
+         *
+         * 這時車一定要空跑一段。先前這裡是<strong>直接 continue</strong>：
+         * 畫面上只看得到「待命點跟出發點不一樣」，看不出原因、也不知道能改哪裡
+         * （2026-08-11 使用者連續三輪回報 SB1938）。原因其實很明確，而且是
+         * 使用者改得動的：關聯圖上補一條邊就好。
+         */
+        warnings?.push({
+          code: 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE',
+          severity: 'warning',
+          kind: 'actionable',
+          message:
+            `時間線 ${timeline.row}：車停在「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
+            + `下一班「${currentRoute.routeName ?? currentRoute.routeId}」卻從`
+            + `「${stationDisplayName(currentOrigin, selectedRoutes)}」出發，中間得空跑一段。`
+            + `關聯圖上「${previousPassenger.routeName ?? previousInstanceId}」之後，`
+            + `沒有同終點、又從車所在位置出發的路線可接——補上那條邊就能省掉這段空跑。`,
+          detail: {
+            timelineRow: timeline.row,
+            blockId: block.id,
+            parkedStationId,
+            routeId: currentRoute.routeId,
+            previousRouteId: previousPassenger.routeId,
+          },
+        });
+        continue;
+      }
 
       block.routeId = replacement.route.routeId;
       block.routeInstanceId = replacement.instanceId;
