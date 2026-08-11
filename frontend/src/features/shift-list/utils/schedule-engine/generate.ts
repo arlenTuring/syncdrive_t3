@@ -348,6 +348,30 @@ export function generateShiftSchedule(
     });
   }
 
+  // 轉場繞了遠路：卡排得出來，但那個移動時間本身就是個問題。
+  // 挑設施只比得出「候選之間誰比較近」，比不出「這個絕對值合不合理」——
+  // 所以要有一道獨立的門檻把它喊出來（2026-08-11 使用者：410 秒那張）。
+  for (const item of maintenanceTransfer.longTransfers) {
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_TRANSFER_DETOUR',
+      severity: 'warning',
+      kind: 'actionable',
+      message:
+        `時間線 ${item.timelineRow}：「${item.taskType}」的轉場走了 `
+        + `${Math.round(item.seconds / 60)} 分 ${item.seconds % 60} 秒`
+        + `（${item.fromLabel} → ${item.toLabel}）——這段時間車一直在路網上，`
+        + `會佔用轉折點並影響別班；多半是拓樸缺了對應方向的邊，最短路徑因此繞遠。`,
+      detail: {
+        timelineRow: item.timelineRow,
+        blockId: item.blockId,
+        taskType: item.taskType,
+        seconds: item.seconds,
+        fromLabel: item.fromLabel,
+        toLabel: item.toLabel,
+      },
+    });
+  }
+
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
   const routeById = new Map(

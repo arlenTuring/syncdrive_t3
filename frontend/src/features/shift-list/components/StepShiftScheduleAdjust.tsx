@@ -296,7 +296,11 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
   {
     id: 'facility',
     title: '整備設施不夠',
-    codes: new Set(['MAINTENANCE_FACILITY_UNAVAILABLE', 'MAINTENANCE_TRANSFER_UNRESOLVED']),
+    codes: new Set([
+      'MAINTENANCE_FACILITY_UNAVAILABLE',
+      'MAINTENANCE_TRANSFER_UNRESOLVED',
+      'MAINTENANCE_TRANSFER_DETOUR',
+    ]),
     hint:
       '同一類設施在那段時間全被別列車佔著，車沒地方停，進出廠的移動卡也就排不出來。'
       + '要嘛多掛幾台設施、要嘛把同時段的整備任務錯開。',

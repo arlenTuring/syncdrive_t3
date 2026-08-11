@@ -180,6 +180,25 @@ export type MaintenanceTransferCardsResult = {
    * 整段時間內找不到任何一台空設施的整備任務——車沒地方停，是產能不足，
    * 跟「移動卡排不出來」（路徑問題）分開回報，處置方式完全不同。
    */
+  /**
+   * 移動時間離譜的轉場卡。
+   *
+   * 挑設施是在候選之間取「移動成本最小」——那是<strong>相對</strong>的：
+   * 所有候選都很爛時，它照樣挑一個最不爛的走完，不會有人喊停。實際看到
+   * 「[整備]N2W下行出發 → N2W下行出發 花 410 秒」這種：兩個點在圖上幾乎相鄰，
+   * 卻因為缺反向的邊而繞了一大圈（2026-08-11 使用者指出）。
+   *
+   * 代價不只是那幾百秒——車在路上會佔轉折點、影響別班的碰撞判定。
+   * 所以要獨立回報，而不是靜靜排下去。
+   */
+  longTransfers: Array<{
+    timelineRow: number;
+    blockId: string;
+    taskType: string;
+    seconds: number;
+    fromLabel: string;
+    toLabel: string;
+  }>;
   facilityUnavailable: Array<{
     timelineRow: number;
     blockId: string;
@@ -234,6 +253,32 @@ export function insertMaintenanceTransferCards(args: {
   } = args;
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
+  const longTransfers: MaintenanceTransferCardsResult['longTransfers'] = [];
+  /**
+   * 超過這個秒數就算「繞遠路」。
+   *
+   * 整備轉場正常是幾十秒到一兩分鐘（同區域甚至 0 秒）。五分鐘代表車在路網上
+   * 繞了一段實質的距離，那在任何一張圖上都值得看一眼——不是硬性錯誤，
+   * 但一定要講出來讓使用者判斷是「本來就這麼遠」還是「圖上缺邊」。
+   */
+  const LONG_TRANSFER_WARN_SECONDS = 300;
+  function noteTransferCost(
+    block: GeneratedScheduleBlock,
+    timelineRow: number,
+    seconds: number,
+    fromLabel: string,
+    toLabel: string,
+  ): void {
+    if (!(seconds > LONG_TRANSFER_WARN_SECONDS)) return;
+    longTransfers.push({
+      timelineRow,
+      blockId: block.id,
+      taskType: block.taskType,
+      seconds: Math.round(seconds),
+      fromLabel,
+      toLabel,
+    });
+  }
   let inserted = 0;
   let ateYardTail = 0;
   let yardHeadExtended = 0;
@@ -242,7 +287,7 @@ export function insertMaintenanceTransferCards(args: {
   if (!topology || topology.nodes.length === 0) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable,
+      skipped, facilityUnavailable, longTransfers,
     };
   }
 
@@ -1021,7 +1066,7 @@ export function insertMaintenanceTransferCards(args: {
   if (decideOnly) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable,
+      skipped, facilityUnavailable, longTransfers,
     };
   }
 
@@ -1258,6 +1303,10 @@ export function insertMaintenanceTransferCards(args: {
           resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
         yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
       };
+      noteTransferCost(
+        yard, timeline.row, chosen.seconds,
+        stationDisplayName(stationId), chosen.label,
+      );
       timeline.blocks.push(card);
 
       // 車一到就開始整備——不站格子、提早進廠、提早開工。抵達落在午夜之前時
@@ -1581,6 +1630,10 @@ export function insertMaintenanceTransferCards(args: {
         yardExitSectionCode: entryCode,
         yardExitSectionLabel: entryLabel,
       };
+      noteTransferCost(
+        later, timeline.row, chosen.exitLegSeconds + chosen.entryLegSeconds,
+        chosen.exitLabel, chosen.entryLabel,
+      );
       timeline.blocks.push(exitCard, entryCard);
 
       // 寫回時要扣掉位移，換回後一段自己的日內座標
@@ -1774,6 +1827,7 @@ export function insertMaintenanceTransferCards(args: {
       ateYardTail += 1;
     }
 
+    noteTransferCost(yard, timeline.row, chosen.seconds, chosen.label, stationLabel);
     const card: GeneratedScheduleBlock = {
       id: `yardexit-${yard.id}-${Math.round(chosenStart)}`,
       timelineRow: timeline.row,
@@ -1947,6 +2001,6 @@ export function insertMaintenanceTransferCards(args: {
 
   return {
     timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-    skipped, facilityUnavailable,
+    skipped, facilityUnavailable, longTransfers,
   };
 }
