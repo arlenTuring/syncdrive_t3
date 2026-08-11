@@ -40,12 +40,20 @@ const ROUTES = [
   route('NTB', ['st-backup', 'st-t3'], '[備用]N2W>T3'),
 ] as never as Parameters<typeof alignRouteWithVehicleLocation>[0]['selectedRoutes'];
 
+/**
+ * 照使用者真實的圖：NT 與 NTB 掛在不同的前一段底下（TN → NT、TNB → NTB），
+ * 但兩者的下游同樣是 TS——所以換過去交路不會歪。
+ */
 const POLICY = {
   routesByInstanceId: new Map(
     (ROUTES as never as Array<{ instanceId: string }>).map((r) => [r.instanceId, r]),
   ),
-  prioritySuccessors: new Map([['TN', ['NT']]]),
-  secondarySuccessors: new Map([['TN', ['NTB']]]),
+  prioritySuccessors: new Map([
+    ['TN', ['NT']],
+    ['NT', ['TS']],
+    ['NTB', ['TS']],
+  ]),
+  secondarySuccessors: new Map(),
   rotationRoutes: [],
 } as never as Parameters<typeof alignRouteWithVehicleLocation>[0]['successorPolicy'];
 
@@ -83,7 +91,7 @@ function planWithParkedStandby(parkedStationId: string | undefined) {
 }
 
 describe('車停在哪，下一班就從那裡發', () => {
-  it('跨午夜的待命也要算——線性取「前一個」會拿到清晨的卡', () => {
+  it('候選不限於「前一段的後繼」——車實際停在哪才是硬事實', () => {
     const timelines = planWithParkedStandby('st-backup');
     const result = alignRouteWithVehicleLocation({
       timelines,
@@ -107,14 +115,18 @@ describe('車停在哪，下一班就從那裡發', () => {
     assert.equal(timelines[0]!.blocks.find((b) => b.id === 'pax-next')!.routeId, 'NT');
   });
 
-  it('關聯圖上接不到同終點又從車所在位置出發的路線時，要講出來', () => {
+  it('下游不同就不准換（換過去交路會歪），而且要講出來', () => {
     const timelines = planWithParkedStandby('st-backup');
     const warnings: never[] = [];
-    // 後繼只有主線 NT，沒有備用 NTB —— 換不成
+    // NTB 的下游被改成別條（TSB）——換過去交路會歪，所以不准換
     const policyWithoutBackup = {
       routesByInstanceId: (POLICY as never as { routesByInstanceId: Map<string, unknown> })
         .routesByInstanceId,
-      prioritySuccessors: new Map([['TN', ['NT']]]),
+      prioritySuccessors: new Map([
+        ['TN', ['NT']],
+        ['NT', ['TS']],
+        ['NTB', ['TSB']],
+      ]),
       secondarySuccessors: new Map(),
       rotationRoutes: [],
     } as never as Parameters<typeof alignRouteWithVehicleLocation>[0]['successorPolicy'];

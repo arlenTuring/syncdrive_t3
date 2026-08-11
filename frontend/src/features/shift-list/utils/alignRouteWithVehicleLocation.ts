@@ -27,10 +27,14 @@ import type {
  * 出發的車。兩個子系統各自都合理，合起來不合理：路線在流水線第一步就定案，
  * 那時待命還沒決定停哪；而待命決定之後，沒有任何機制回頭通知路線。
  *
- * 換線的條件很嚴：
+ * 換線的條件：
  * <ul>
- *   <li>候選必須是<strong>前一段載客在關聯圖上的後繼</strong>——不是隨便挑一條，
- *       是這個位置本來就可以接的那幾條；</li>
+ *   <li>候選的<strong>優先後繼必須跟原本那條相同</strong>——這是「換過去交路不會歪」
+ *       的充分條件。<strong>候選不限於「前一段的後繼」</strong>：先前限成那樣，對真實
+ *       案例完全無效（SB1938）——前一段是 TN、圖上只接得到 NT，但車不在 NT 的起點，
+ *       是待命為了避開站位碰撞把它挪到備用格的；真正該用的 NTB 掛在 TNB 底下，
+ *       永遠找不到。車實際停在哪是比圖上順序更硬的事實，而 NT 與 NTB 下游同樣是 TS，
+ *       換過去不違反那張圖；</li>
  *   <li>候選的<strong>終點站必須相同</strong>——終點一變，下一段的起點跟著變，
  *       會沿著交路一路歪下去。只換起點（也就是只換用哪一格站位）是安全的；</li>
  *   <li>候選的起點必須<strong>正好是車現在停的地方</strong>。</li>
@@ -91,15 +95,17 @@ function instanceIdOf(
   return route ? route.instanceId?.trim() || route.routeId : null;
 }
 
-/** 關聯圖上這個節點的全部出邊（優先在前、次要在後） */
-function listGraphSuccessorIds(
+/**
+ * 關聯圖上這一條的優先後繼（沒有就 null）。
+ *
+ * 用它當「換過去交路不會歪」的判準：候選的下游跟原本那條接同一條，
+ * 換掉起點之後整條交路的後續完全不受影響。
+ */
+function prioritySuccessorOf(
   successorPolicy: RouteSuccessorPolicy,
   instanceId: string,
-): string[] {
-  return [
-    ...(successorPolicy.prioritySuccessors.get(instanceId) ?? []),
-    ...(successorPolicy.secondarySuccessors.get(instanceId) ?? []),
-  ];
+): string | null {
+  return successorPolicy.prioritySuccessors.get(instanceId)?.[0] ?? null;
 }
 
 export function alignRouteWithVehicleLocation(args: {
@@ -133,26 +139,20 @@ export function alignRouteWithVehicleLocation(args: {
       // 已經從車停的地方出發，不用動
       if (!currentOrigin || currentOrigin === parkedStationId) continue;
 
-      // 候選只能從「前一段載客的後繼」裡挑——那是這個位置本來就接得上的
-      // 往回找最近一段載客，也要照日循環繞回去
-      let previousPassenger: GeneratedScheduleBlock | null = null;
-      for (let step = 1; step <= sorted.length; step += 1) {
-        const candidate = sorted[(i - step + sorted.length * 2) % sorted.length]!;
-        if (candidate === block) break;
-        if (candidate.taskType === 'passenger') { previousPassenger = candidate; break; }
-      }
-      if (!previousPassenger) continue;
-      const previousInstanceId = instanceIdOf(previousPassenger, selectedRoutes);
-      if (!previousInstanceId) continue;
-
+      const currentInstanceId = instanceIdOf(block, selectedRoutes);
       const currentDestination = routeDestinationStationId(currentRoute);
+      const currentNext = currentInstanceId
+        ? prioritySuccessorOf(successorPolicy, currentInstanceId)
+        : null;
+
       let replacement: { instanceId: string; route: ShiftScheduleSelectedRoute } | null = null;
-      for (const candidateId of listGraphSuccessorIds(successorPolicy, previousInstanceId)) {
-        const candidate = successorPolicy.routesByInstanceId.get(candidateId);
-        if (!candidate) continue;
+      for (const [candidateId, candidate] of successorPolicy.routesByInstanceId) {
+        if (candidateId === currentInstanceId) continue;
         if (routeOriginStationId(candidate) !== parkedStationId) continue;
         // 終點一變，下一段的起點跟著變，會沿著交路一路歪下去
         if (routeDestinationStationId(candidate) !== currentDestination) continue;
+        // 下游必須接同一條，換過去交路才不會歪
+        if (prioritySuccessorOf(successorPolicy, candidateId) !== currentNext) continue;
         replacement = { instanceId: candidateId, route: candidate };
         break;
       }
@@ -174,14 +174,13 @@ export function alignRouteWithVehicleLocation(args: {
             `時間線 ${timeline.row}：車停在「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
             + `下一班「${currentRoute.routeName ?? currentRoute.routeId}」卻從`
             + `「${stationDisplayName(currentOrigin, selectedRoutes)}」出發，中間得空跑一段。`
-            + `關聯圖上「${previousPassenger.routeName ?? previousInstanceId}」之後，`
-            + `沒有同終點、又從車所在位置出發的路線可接——補上那條邊就能省掉這段空跑。`,
+            + `沒有一條路線是「從車所在位置出發、同終點、下游也接同一條」的——`
+            + `補一條這樣的路線就能省掉這段空跑。`,
           detail: {
             timelineRow: timeline.row,
             blockId: block.id,
             parkedStationId,
             routeId: currentRoute.routeId,
-            previousRouteId: previousPassenger.routeId,
           },
         });
         continue;
