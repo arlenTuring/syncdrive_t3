@@ -2158,17 +2158,67 @@ export function insertMaintenanceTransferCards(args: {
       const peakDemand = peakOthers + 1;
       if (peakDemand > facilities.length) {
         parts.push(
-          `這段時間同時有 ${peakDemand} 台車要用這 ${facilities.length} 台設施——`
-          + `是產能不足，缺 ${peakDemand - facilities.length} 台；`
-          + `挪時段或加設施才有用，換格子沒有用`,
+          `同時有 ${peakDemand} 台車要用這 ${facilities.length} 台設施，`
+          + `缺 ${peakDemand - facilities.length} 台`,
         );
       } else {
         parts.push(
-          `同時段只有 ${peakDemand} 台車要用這 ${facilities.length} 台設施——`
-          + `格子數量是夠的，卡在空檔被切得太碎，湊不出一整段`,
+          `同時只有 ${peakDemand} 台車要用這 ${facilities.length} 台設施，`
+          + `數量是夠的，卡在空檔被切得太碎`,
         );
       }
-      if (earliestFree) {
+      /**
+       * <strong>「最早空出來的是 M4（13:00）」還不夠用。</strong>
+       *
+       * 那只回答「某一台什麼時候放手」，不回答<strong>「整段塞不塞得下」</strong>——
+       * 一台格子 13:00 空出來，但 13:20 又被訂走，對一段 200 分鐘的保養毫無意義。
+       * 使用者照這個數字把整備往後挪，挪完還是排不進去，白跑一趟。
+       *
+       * 這裡直接掃整個日循環：以 5 分鐘為步長，找<strong>最早的起點</strong>，使得存在
+       * 一台設施在「起點 → 起點＋這段長度」<strong>整段</strong>都沒有別列車的預約。
+       * 找不到就代表這個長度整天都塞不下，那要講的是<strong>另一件事</strong>——
+       * 不是「往後挪」，是「這段太長／設施太少」。
+       *
+       * 只用設施預約做純區間運算，不碰停靠站與整備鏈：這是<strong>診斷</strong>，
+       * 給使用者判斷用，不是自動挪動。寧可算得寬鬆一點，也不要因為算太嚴格
+       * 而漏講「其實挪一下就有解」。
+       */
+      const wantSeconds = endSecond - startSecond;
+      const probeStepSeconds = 300;
+      let feasibleStartSecond: number | null = null;
+      if (wantSeconds > 0 && wantSeconds < daySeconds) {
+        for (let offset = 0; offset < daySeconds; offset += probeStepSeconds) {
+          const probeStart = startSecond + offset;
+          const fits = facilities.some((facility) =>
+            nodeById.get(facility.id)?.kind !== 'docking'
+            && moveCardFacilityIsFree(
+              bookings,
+              facility.id,
+              probeStart,
+              probeStart + wantSeconds,
+              timeline.row,
+            ));
+          if (fits) {
+            feasibleStartSecond = probeStart;
+            break;
+          }
+        }
+      }
+      if (feasibleStartSecond != null && feasibleStartSecond > startSecond + 1e-9) {
+        const shiftMinutes = Math.round((feasibleStartSecond - startSecond) / 60);
+        parts.push(
+          `往後挪 ${shiftMinutes} 分鐘（改成 ${formatSecondOfDay(feasibleStartSecond)} 開始）`
+          + `就有一台設施整段空著`,
+        );
+      } else if (feasibleStartSecond == null) {
+        parts.push(
+          `這段長 ${Math.round(wantSeconds / 60)} 分鐘，整天找不到任何一台設施能整段空這麼久`
+          + `——挪時段沒有用，只能縮短這段整備或加設施`,
+        );
+      }
+      // 算得出「往後挪多少就整段塞得下」時，這句就是多餘的——它只講某一台何時
+      // 放手，不保證放手之後撐得住整段，兩句並排只會讓使用者去挪錯的那個數字
+      if (earliestFree && feasibleStartSecond == null) {
         const waitMinutes = Math.round((earliestFree.second - startSecond) / 60);
         // 只講「最早要等到幾點」這個事實，不要寫成「挪過去就排得進去」——
         // 挪過去之後那一格可能又被別的車訂走，講死了會讓使用者白跑一趟
