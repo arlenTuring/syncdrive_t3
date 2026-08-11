@@ -1178,11 +1178,11 @@ export function StepTaskScheduling({
         const deltaMinutes = Math.round(deltaPx / pxPerMinute);
 
         if (edge === 'right') {
-          const rawEnd = clampScheduleMinute(
-            Math.max(
-              initialStart + 1,
-              Math.min(SCHEDULE_DAY_MINUTES, initialEnd + deltaMinutes),
-            ),
+          // 上限是「起點 + 一整天」，不是 24:00——任務條可以跨午夜，
+          // 夾在 24:00 會讓右緣拖到午夜就再也拉不動
+          const rawEnd = Math.max(
+            initialStart + 1,
+            Math.min(initialStart + SCHEDULE_DAY_MINUTES, initialEnd + deltaMinutes),
           );
           const endInActive = clampRangeEndToActiveIntervals(
             initialStart,

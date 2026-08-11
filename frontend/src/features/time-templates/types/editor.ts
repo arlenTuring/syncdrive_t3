@@ -495,17 +495,33 @@ export function clampScheduleMinute(minute: number): number {
   return Math.min(SCHEDULE_DAY_MINUTES, Math.max(0, snappedSeconds / 60));
 }
 
+/**
+ * 拉伸右緣時把結束時刻收回到營運時段內。
+ *
+ * <strong>不夾在 24:00。</strong>任務條可以跨午夜（結束時刻存成 &gt; 1440），
+ * 資料模型、正規化、重疊判定早就都改好了，只有這裡還留著舊的
+ * <code>clampScheduleMinute</code>，於是右緣拖到 24:00 就再也拉不動——
+ * 使用者拉得出跨午夜的<strong>區間</strong>卻拉不出跨午夜的<strong>任務</strong>
+ * （2026-08-12 補上；同一批跨午夜改動裡漏掉的最後一處）。
+ * 上限改成「一整天」——一根任務條最長就是一個日循環，再長就會蓋到自己。
+ *
+ * 落在營運時段內的判定改用日循環版：跨午夜的兩段都要落在裡面。
+ */
 export function clampRangeEndToActiveIntervals(
   start: number,
   proposedEnd: number,
   activeRanges: MinuteRange[],
 ): number {
-  let end = clampScheduleMinute(
+  let end = Math.min(
+    start + SCHEDULE_DAY_MINUTES,
     Math.max(start + SCHEDULE_TASK_MIN_DURATION_MINUTES, proposedEnd),
   );
   while (
     end > start + SCHEDULE_TASK_MIN_DURATION_MINUTES
-    && !isRangeWithinActiveIntervals(start, end, activeRanges)
+    && !isTaskWithinActiveIntervalsOnDayCycle(
+      { startMinute: start, durationMinutes: end - start },
+      activeRanges,
+    )
   ) {
     end -= 1;
   }
@@ -604,6 +620,24 @@ export function clampRangeEndAwayFromOverlappingTasks(
       end = otherStart;
     }
   }
+  /**
+   * 上面那圈只看得到「時間上排在後面」的任務。右緣可以跨午夜之後，
+   * 這根條子會繞回日循環開頭去<strong>蓋住清晨那幾根</strong>——它們的
+   * <code>startMinute</code> 比 <code>start</code> 小，上面那個條件永遠不成立，
+   * 於是重疊完全沒被擋住。用日循環版重疊判定再收一次。
+   */
+  while (
+    end > start + SCHEDULE_TASK_MIN_DURATION_MINUTES
+    && tasks.some((other) =>
+      other.id !== taskId
+      && other.rowIndex === rowIndex
+      && tasksOverlapOnDayCycle(
+        { startMinute: start, durationMinutes: end - start },
+        other,
+      ))
+  ) {
+    end -= 1;
+  }
   return Math.max(start + SCHEDULE_TASK_MIN_DURATION_MINUTES, end);
 }
 
@@ -622,6 +656,23 @@ export function clampRangeStartAwayFromOverlappingTasks(
     if (otherEnd < end && start < otherEnd) {
       start = otherEnd;
     }
+  }
+  /**
+   * 右緣跨午夜之後，左緣也要用日循環判定收一次——理由與
+   * {@link clampRangeEndAwayFromOverlappingTasks} 對稱：這根條子的尾巴已經繞回
+   * 日循環開頭，上面那圈用線性的 <code>otherEnd &lt; end</code> 看不到被蓋住的那幾根。
+   */
+  while (
+    start < end - SCHEDULE_TASK_MIN_DURATION_MINUTES
+    && tasks.some((other) =>
+      other.id !== taskId
+      && other.rowIndex === rowIndex
+      && tasksOverlapOnDayCycle(
+        { startMinute: start, durationMinutes: end - start },
+        other,
+      ))
+  ) {
+    start += 1;
   }
   return Math.min(end - SCHEDULE_TASK_MIN_DURATION_MINUTES, start);
 }

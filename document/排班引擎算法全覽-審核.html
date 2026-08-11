@@ -3763,6 +3763,34 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 任務條右緣終於能跨午夜（跨午夜改動的最後一處漏網）</h3>
+  <div class="callout">
+    使用者拉得出跨午夜的<strong>區間</strong>，卻拉不出跨午夜的<strong>任務</strong>——
+    右緣拖到 24:00 就再也拉不動。
+  </div>
+  <ul>
+    <li>
+      <strong>三處各自把上限寫死在 24:00。</strong>元件端 <code>Math.min(SCHEDULE_DAY_MINUTES, ...)</code>、
+      <code>clampRangeEndToActiveIntervals</code> 裡的 <code>clampScheduleMinute</code>、
+      以及重疊判定用的線性比較。資料模型、正規化、日循環重疊判定<strong>早就都改好了</strong>，
+      只有這條互動路徑沒接上——又是同一種病：跨切面的改動只做了一半。
+    </li>
+    <li>
+      <strong>上限改成「起點 + 一整天」</strong>，不是 24:00。一根任務條最長就是一個日循環，
+      再長會蓋到自己。
+    </li>
+    <li>
+      <strong>重疊判定換成日循環版。</strong>線性版只看得到「時間上排在後面」的任務；條子繞回
+      日循環開頭之後，清晨那幾根的 <code>startMinute</code> 比起點小，條件永遠不成立，重疊
+      完全沒被擋住。左緣同一個對稱問題也一併補上。
+    </li>
+    <li>
+      直接呼叫驗證：23:00 起拖 180 分得 1560（隔日 02:00）；拖超過一天收在起點+1440；
+      同列清晨 01:00 有任務時收在 1500（隔日 01:00），擋住重疊。
+      <code>tsc -b</code> 23（基線不變）、eslint 無新增。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 根因之間的方向：先動源頭，下游先別碰（交接 D）</h3>
   <div class="callout">
     使用者原話：「多車不是、少車也不是、多暫停格不是、少也不是，這樣會進入死迴圈
