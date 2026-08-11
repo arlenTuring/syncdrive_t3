@@ -247,6 +247,8 @@ export function insertMaintenanceTransferCards(args: {
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
   const facilityYields: MaintenanceTransferCardsResult['facilityYields'] = [];
+  /** 已經報過「沒地方停」的整段停留成員——同一段被日循環切成兩塊時只報一則 */
+  const stayReported = new Set<string>();
   let inserted = 0;
   let ateYardTail = 0;
   let yardHeadExtended = 0;
@@ -1994,8 +1996,57 @@ export function insertMaintenanceTransferCards(args: {
         continue;
       }
 
-      const startSecond = minuteToSecond(yard.plannedStartMinute);
-      const endSecond = minuteToSecond(yard.plannedEndMinute);
+      /**
+       * <strong>報錯要以「整段連續停留」為單位，不是以區塊為單位。</strong>
+       *
+       * 20:30 睡到 07:50 的過夜保養，在日循環上被切成 20:30–24:00 與 00:00–07:50
+       * 兩塊。指派成功時已經有 <code>sameStayNeighbor</code> 把它們綁成同一台設施；
+       * 但<strong>兩塊都失敗</strong>時走的是下面的回報路徑，那裡沒有這層合併，於是
+       * 同一件事報兩則，而且各自拿半段的長度去算「往後挪多少就有解」——
+       * 算出「往後挪 890 分鐘」這種對使用者毫無意義的建議
+       * （2026-08-12 使用者指正：列 9／10 那樣排是有意義的，不要叫他挪）。
+       *
+       * 合併後長度是真的 680 分鐘，結論就會正確地變成「整天塞不下」——
+       * 那才是該講的話：不是挪，是縮短或加設施。
+       */
+      const stayChain: GeneratedScheduleBlock[] = [yard];
+      let chainStartBlock = yard;
+      for (const direction of [-1, 1] as const) {
+        let cursor = i;
+        for (;;) {
+          const current = sweepSorted[cursor]!;
+          const neighbor = direction < 0
+            ? immediatePrevCyclic(sweepSorted, cursor)
+            : immediateNextCyclic(sweepSorted, cursor);
+          if (!neighbor) break;
+          if (neighbor.block.taskType !== yard.taskType) break;
+          if (yardBlockFacility.has(neighbor.block.id)) break;
+          if (stayChain.includes(neighbor.block)) break;
+          // 必須真的<strong>首尾相接</strong>才算同一段停留；同型但中間有空檔的
+          // 是兩次獨立的整備，合併會誇大長度、把「挪得動」講成「挪不動」
+          const touching = direction < 0
+            ? Math.abs(
+              (neighbor.block.plannedEndMinute + neighbor.offsetMinute)
+              - current.plannedStartMinute,
+            ) < 1e-6
+            : Math.abs(
+              (neighbor.block.plannedStartMinute + neighbor.offsetMinute)
+              - current.plannedEndMinute,
+            ) < 1e-6;
+          if (!touching) break;
+          stayChain.push(neighbor.block);
+          if (direction < 0) chainStartBlock = neighbor.block;
+          const nextCursor = sweepSorted.indexOf(neighbor.block);
+          if (nextCursor < 0) break;
+          cursor = nextCursor;
+        }
+      }
+      const stayMinutes = stayChain.reduce(
+        (sum, item) => sum + (item.plannedEndMinute - item.plannedStartMinute),
+        0,
+      );
+      const startSecond = minuteToSecond(chainStartBlock.plannedStartMinute);
+      const endSecond = startSecond + stayMinutes * 60;
       const free = facilities.find((facility) =>
         stayFacilityIsFree(facility.id, yard, timeline.row, startSecond, endSecond));
       if (free) {
@@ -2215,6 +2266,9 @@ export function insertMaintenanceTransferCards(args: {
           `這段長 ${Math.round(wantSeconds / 60)} 分鐘，整天找不到任何一台設施能整段空這麼久`
           + `——挪時段沒有用，只能縮短這段整備或加設施`,
         );
+        // 已經說死「整天塞不下」，再補一句「某台 22:00 會空出來」只會讓人以為有救。
+        // 那台 22:00 空出來，也撐不到 680 分鐘。
+        earliestFree = null;
       }
       // 算得出「往後挪多少就整段塞得下」時，這句就是多餘的——它只講某一台何時
       // 放手，不保證放手之後撐得住整段，兩句並排只會讓使用者去挪錯的那個數字
@@ -2229,14 +2283,19 @@ export function insertMaintenanceTransferCards(args: {
       }
 
       const window = `${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}`;
-      yard.yardFacilityUnavailable = true;
-      facilityUnavailable.push({
-        timelineRow: timeline.row,
-        blockId: yard.id,
-        taskType: yard.taskType,
-        facilityCount: facilities.length,
-        reason: `${window} 這台車沒地方停——${parts.join('；')}`,
-      });
+      // 整段停留都標旗標（UI 每一塊卡面都要看得到出事），但<strong>只報一則</strong>：
+      // 同一段被日循環切成兩塊，報兩次只是同一件事講兩遍
+      for (const member of stayChain) member.yardFacilityUnavailable = true;
+      if (!stayReported.has(yard.id)) {
+        for (const member of stayChain) stayReported.add(member.id);
+        facilityUnavailable.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          facilityCount: facilities.length,
+          reason: `${window} 這台車沒地方停——${parts.join('；')}`,
+        });
+      }
     }
   }
 
