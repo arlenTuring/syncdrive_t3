@@ -160,7 +160,6 @@ export type FeasibilityViolationCode =
    * 前者要加設施／錯開整備時段，後者是補拓樸的邊（警告）。
    */
   | 'MAINTENANCE_FACILITY_UNAVAILABLE'
-  | 'MAINTENANCE_TRANSFER_DETOUR'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   /** 生成期為清站位而延後發車（警告） */

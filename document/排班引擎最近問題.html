@@ -115,14 +115,14 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-11T01:53:39.591Z
+      更新：2026-08-10T18:44:10.513Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0810」
       · ok=<code>true</code>
       · 錯誤 0／警告 177／共 177 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 177→177（±0） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
+    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 179→177（-2） · severe 13→13（±0） · moderate 9→9（±0） · mild 2→2（±0）</p>
   </header>
   
 <section class="accept">
@@ -1136,7 +1136,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 5：「standby」排不出整備轉場卡——整備設定的設施在拓樸上都沒有連到「N2W下行出發」</p>
+  <p class="msg">時間線 5：「standby」排不出整備轉場卡——整備設定的設施拓樸上都沒有連到 station_2</p>
   <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
@@ -1248,7 +1248,7 @@
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 2：「standby」排不出整備轉場卡——整備設定的設施在拓樸上都沒有連到「N2W下行出發」</p>
+  <p class="msg">時間線 2：「standby」排不出整備轉場卡——整備設定的設施拓樸上都沒有連到 station_2</p>
   <p class="guide">整備轉場卡分三種：入廠（車確定不能再跑正線時提前開進整備設施）、出廠（整備做完把車從設施開到轉乘站）、整備間轉場（兩段不同類型整備直接銜接，例如充電做完接著去保養）。卡面代號跟著該段整備自己的區段代號走——充電 E 就是 EI／EO，行檢 P 就是 PI／PO，沒有固定的 MI／MO。排不出來多半是整備任務沒設定該區段的設施、拓樸上少了對應方向的邊（入廠與出廠常是不同方向，例如 M 系出廠走 T3上行、入廠要走 T3下行），或該時段設施都被別列車佔著。請回整備任務補設施，或到路網拓樸檢查邊與方向。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>

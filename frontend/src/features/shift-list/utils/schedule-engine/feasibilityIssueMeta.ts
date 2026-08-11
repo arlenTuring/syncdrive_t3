@@ -57,7 +57,6 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
-  MAINTENANCE_TRANSFER_DETOUR: '轉場路徑太遠，判定為到不了',
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -96,7 +95,6 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
-  MAINTENANCE_TRANSFER_DETOUR: { id: 's10', label: '§10.5 整備轉場小卡' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -229,11 +227,6 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'limit',
     guidance:
       '這一段整備的整段時間內，該類設施沒有任何一台是空的——車實際上沒地方停，班表這一段在物理上做不到。這跟「轉場卡排不出來」是兩回事：那是路徑問題（補拓樸的邊就好），這是產能問題。可試：在整備任務為這一類多掛幾台設施、把同時段的整備任務錯開（不要全擠在同一個時段）、或減少該時段安排整備的車數。若訊息顯示設施數為 0，代表這一類整備根本沒設定設施，或設定的設施在路網拓樸上找不到。',
-  },
-  MAINTENANCE_TRANSFER_DETOUR: {
-    kind: 'actionable',
-    guidance:
-      '轉場路徑走得太遠（超過 5 分鐘），已經被判定為「到不了」而不採用。兩個看起來相鄰的點之所以要繞好幾分鐘，是因為那個方向沒有直接的邊，最短路徑只好繞一大圈。這裡刻意不假設是漏畫——沒畫那條邊本來就可能是刻意的（不希望車那樣走），引擎繞路走過去等於推翻那個設定。所以兩條路可選：若那個方向本來就不該通，請替這一類整備加一座比較近的設施；若只是漏畫，才到路網拓樸把那條邊補上。',
   },
   MAINTENANCE_TRANSFER_UNRESOLVED: {
     kind: 'policy',

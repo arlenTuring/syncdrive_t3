@@ -180,25 +180,6 @@ export type MaintenanceTransferCardsResult = {
    * 整段時間內找不到任何一台空設施的整備任務——車沒地方停，是產能不足，
    * 跟「移動卡排不出來」（路徑問題）分開回報，處置方式完全不同。
    */
-  /**
-   * 移動時間離譜的轉場卡。
-   *
-   * 挑設施是在候選之間取「移動成本最小」——那是<strong>相對</strong>的：
-   * 所有候選都很爛時，它照樣挑一個最不爛的走完，不會有人喊停。實際看到
-   * 「[整備]N2W下行出發 → N2W下行出發 花 410 秒」這種：兩個點在圖上幾乎相鄰，
-   * 卻因為缺反向的邊而繞了一大圈（2026-08-11 使用者指出）。
-   *
-   * 代價不只是那幾百秒——車在路上會佔轉折點、影響別班的碰撞判定。
-   * 所以要獨立回報，而不是靜靜排下去。
-   */
-  longTransfers: Array<{
-    timelineRow: number;
-    blockId: string;
-    taskType: string;
-    seconds: number;
-    fromLabel: string;
-    toLabel: string;
-  }>;
   facilityUnavailable: Array<{
     timelineRow: number;
     blockId: string;
@@ -253,42 +234,6 @@ export function insertMaintenanceTransferCards(args: {
   } = args;
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
-  const longTransfers: MaintenanceTransferCardsResult['longTransfers'] = [];
-  /**
-   * 轉場路徑的<strong>成本上限</strong>：超過就當成「到不了」。
-   *
-   * 這不只是告警門檻，是硬性拒絕。原因是使用者的一句話：
-   * 「我缺少反向的邊不是因為我想缺少，而是我並不希望你這麼做，所以我並沒有做
-   * 那個邊。」——圖上沒有那條邊<strong>就是一種設定</strong>，代表「不准這樣走」。
-   * 引擎卻繞一大圈找到另一條路走過去，等於推翻使用者的設定。
-   *
-   * 整備轉場正常是幾十秒到一兩分鐘（同區域甚至 0 秒）。走到五分鐘，幾乎一定是
-   * 繞了整張圖，而且那段時間車在路網上會佔轉折點、影響別班。所以寧可判定
-   * 「這座設施到不了」，讓它去挑別的、或誠實回報排不出來——也不要硬走。
-   */
-  const TRANSFER_COST_CEILING_SECONDS = 300;
-
-  /** 路徑成本超過上限就當作不存在——見 TRANSFER_COST_CEILING_SECONDS */
-  function pathWithinCostCeiling(seconds: number): boolean {
-    return seconds <= TRANSFER_COST_CEILING_SECONDS;
-  }
-  function noteTransferCost(
-    block: GeneratedScheduleBlock,
-    timelineRow: number,
-    seconds: number,
-    fromLabel: string,
-    toLabel: string,
-  ): void {
-    if (pathWithinCostCeiling(seconds)) return;
-    longTransfers.push({
-      timelineRow,
-      blockId: block.id,
-      taskType: block.taskType,
-      seconds: Math.round(seconds),
-      fromLabel,
-      toLabel,
-    });
-  }
   let inserted = 0;
   let ateYardTail = 0;
   let yardHeadExtended = 0;
@@ -297,7 +242,7 @@ export function insertMaintenanceTransferCards(args: {
   if (!topology || topology.nodes.length === 0) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable, longTransfers,
+      skipped, facilityUnavailable,
     };
   }
 
@@ -716,8 +661,6 @@ export function insertMaintenanceTransferCards(args: {
    */
   type RejectTally = {
     noPath: number;
-    /** 有路徑、但成本超過上限，判定為到不了——跟「真的沒有路」是兩回事 */
-    tooFar: number;
     facilityBusy: number;
     junctionBusy: number;
     noTime: number;
@@ -729,7 +672,7 @@ export function insertMaintenanceTransferCards(args: {
     junctionDetail: string | null;
   };
   function newTally(): RejectTally {
-    return { noPath: 0, tooFar: 0, facilityBusy: 0, junctionBusy: 0, noTime: 0, junctionDetail: null };
+    return { noPath: 0, facilityBusy: 0, junctionBusy: 0, noTime: 0, junctionDetail: null };
   }
   /** 組出「撞在哪、想幾點過、有多少挪動空間、誰擋著」 */
   function describeJunctionBlock(
@@ -772,13 +715,6 @@ export function insertMaintenanceTransferCards(args: {
     }
     if (tally.noPath > 0) {
       parts.push(`${tally.noPath} 台設施在拓樸上沒有可通的路徑`);
-    }
-    if (tally.tooFar > 0) {
-      parts.push(
-        `${tally.tooFar} 台設施雖然有路徑、但都要走超過 `
-        + `${Math.round(TRANSFER_COST_CEILING_SECONDS / 60)} 分鐘（那個方向沒有直接的邊，`
-        + `最短路徑只好繞一大圈），判定為到不了`,
-      );
     }
     if (parts.length === 0) return `${candidateCount} 個候選全數不可用`;
     return `${candidateCount} 個候選都不行——${parts.join('；')}`;
@@ -958,9 +894,7 @@ export function insertMaintenanceTransferCards(args: {
     const toArea = facilityAreaId.get(toNodeId);
     if (fromArea && fromArea === toArea) return 0;
     const path = findTopologyPath(topology, fromNodeId, toNodeId);
-    if (!path) return null;
-    // 走得到、但走得離譜 → 當成走不到（使用者沒畫那條邊就是不准這樣走）
-    return pathWithinCostCeiling(path.avgSeconds) ? path.avgSeconds : null;
+    return path ? path.avgSeconds : null;
   }
 
   /** 這一段整備的前一個／後一個「車必須在那裡」的位置；查不到回 null（該段成本不計） */
@@ -1087,7 +1021,7 @@ export function insertMaintenanceTransferCards(args: {
   if (decideOnly) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable, longTransfers,
+      skipped, facilityUnavailable,
     };
   }
 
@@ -1183,7 +1117,6 @@ export function insertMaintenanceTransferCards(args: {
       for (const facility of facilities) {
         const path = findTopologyPath(topology, fromNodeId, facility.id);
         if (!path) { tally.noPath += 1; continue; }
-        if (!pathWithinCostCeiling(path.avgSeconds)) { tally.tooFar += 1; continue; }
         // 車一空出來就走——不站在正線格子上等，能提早進整備格就提早進，
         // 整備跟著提早開始沒有關係（2026-08-10 使用者裁決）。
         // freeSecond 可能是負的（前一段載客在前一天），那就照負的算，
@@ -1325,10 +1258,6 @@ export function insertMaintenanceTransferCards(args: {
           resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
         yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
       };
-      noteTransferCost(
-        yard, timeline.row, chosen.seconds,
-        stationDisplayName(stationId), chosen.label,
-      );
       timeline.blocks.push(card);
 
       // 車一到就開始整備——不站格子、提早進廠、提早開工。抵達落在午夜之前時
@@ -1458,7 +1387,6 @@ export function insertMaintenanceTransferCards(args: {
           } else {
             const path = findTopologyPath(topology, exitFacility.id, entryFacility.id);
             if (!path || path.edges.length === 0) { tally.noPath += 1; continue; }
-            if (!pathWithinCostCeiling(path.avgSeconds)) { tally.tooFar += 1; continue; }
             // 分界點取第一段邊的終點：出廠卡永遠是「離開這座設施專屬的那一段
             // 邊」（例 E2 → N2W下行出發），入廠卡吸收掉中間所有正線轉乘直到
             // 目的設施（例 N2W下行出發 → T3下行 → M1）——出廠短、入廠長，
@@ -1653,10 +1581,6 @@ export function insertMaintenanceTransferCards(args: {
         yardExitSectionCode: entryCode,
         yardExitSectionLabel: entryLabel,
       };
-      noteTransferCost(
-        later, timeline.row, chosen.exitLegSeconds + chosen.entryLegSeconds,
-        chosen.exitLabel, chosen.entryLabel,
-      );
       timeline.blocks.push(exitCard, entryCard);
 
       // 寫回時要扣掉位移，換回後一段自己的日內座標
@@ -1785,8 +1709,7 @@ export function insertMaintenanceTransferCards(args: {
     const candidates = facilities
       .map((facility) => {
         const path = findTopologyPath(topology, facility.id, stationNodeId);
-        if (!path || !pathWithinCostCeiling(path.avgSeconds)) return null;
-        return { facility, seconds: path.avgSeconds, edges: path.edges };
+        return path ? { facility, seconds: path.avgSeconds, edges: path.edges } : null;
       })
       .filter((c): c is { facility: (typeof facilities)[number]; seconds: number; edges: PointTopologyEdge[] } => c !== null)
       .sort((a, b) => a.seconds - b.seconds);
@@ -1851,7 +1774,6 @@ export function insertMaintenanceTransferCards(args: {
       ateYardTail += 1;
     }
 
-    noteTransferCost(yard, timeline.row, chosen.seconds, chosen.label, stationLabel);
     const card: GeneratedScheduleBlock = {
       id: `yardexit-${yard.id}-${Math.round(chosenStart)}`,
       timelineRow: timeline.row,
@@ -2025,6 +1947,6 @@ export function insertMaintenanceTransferCards(args: {
 
   return {
     timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-    skipped, facilityUnavailable, longTransfers,
+    skipped, facilityUnavailable,
   };
 }
