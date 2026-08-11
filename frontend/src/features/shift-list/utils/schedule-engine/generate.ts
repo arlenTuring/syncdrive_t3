@@ -41,6 +41,7 @@ import {
 } from '../stationBerthConstraint';
 import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
 import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
+import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -245,6 +246,16 @@ export function generateShiftSchedule(
       minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       warnings: round === 0 ? warnings : [],
+    });
+
+    // 車停在哪，下一班就從那裡發——待命的地點是被站位限制夾出來的、常常沒得選，
+    // 而路線在主線與備用之間本來就可選，該讓的是有選擇的那一方。
+    // 放在迴圈裡：換路線＝換停靠站，可能製造新的碰撞，要讓站位求解有機會反應。
+    alignRouteWithVehicleLocation({
+      timelines,
+      selectedRoutes: routesForBerth,
+      successorPolicy: engineInput.successorPolicy,
+      warnings: round === 0 ? warnings : undefined,
     });
 
     // 班距太疏 → 把後車往前拉回目標

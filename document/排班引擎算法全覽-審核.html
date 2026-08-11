@@ -3671,6 +3671,45 @@ backend/src/dev-log/
     需要時從 <code>GET /syncdrive-api/operation-shift/detail/{shiftId}</code> 取草稿。
   </p>
 
+  <h3>2026-08-11 · 車停在哪，下一班就從那裡發（交接第 2 項）</h3>
+  <div class="callout">
+    待命停在「[備用]N2W下行出發」，下一班卻被指派從「N2W下行出發」出發的主線路線
+    ——車得先空跑過去，只為了跑一班本來可以就地出發的車。
+  </div>
+  <ul>
+    <li>
+      <strong>成因是流水線順序。</strong>路線在第 ① 步
+      （<code>expandRowBlocks</code> → <code>assignPassengerRoutesConstraintGreedy</code>）
+      就定案，那時待命還沒決定停哪（第 ③ 步）；待命定案之後，
+      <strong>沒有任何機制回頭通知路線</strong>。兩個子系統各自都合理，合起來不合理。
+    </li>
+    <li>
+      <strong>該讓的是有選擇的那一方。</strong>待命的停放地點是被站位限制夾出來的
+      （主線那一格整天有車經過，只好退到備用格），常常沒得選；
+      而路線在主線與備用之間<strong>本來就是可選的</strong>。
+    </li>
+    <li>
+      <strong>新增 <code>alignRouteWithVehicleLocation.ts</code></strong>，換線條件很嚴：
+      候選必須是<strong>前一段載客在關聯圖上的後繼</strong>（不是隨便挑一條）、
+      <strong>終點站必須相同</strong>（終點一變，下一段的起點跟著變，會沿著交路一路
+      歪下去；只換起點是安全的）、起點必須正好是車現在停的地方。
+    </li>
+    <li>
+      放在幾何收斂迴圈<strong>裡面</strong>——換路線＝換停靠站，可能製造新的站位碰撞，
+      必須讓站位求解有機會反應。放在迴圈後面就是無人收拾的改動。
+    </li>
+    <li>
+      <strong>誠實的量測：這份 repro 上 0 次改派</strong>，因為它的待命幾乎都停在
+      設施格（只有 2 個區塊有 <code>yardFacilityStationId</code>），而那 2 個的下一段
+      不是載客。要用使用者那份「待命停在備用站位」的設定重跑才看得到。
+      <code>tsc</code> 23、測試 362 pass／9 fail、<code>eslint</code> 乾淨。
+    </li>
+    <li>
+      <strong>還沒做的第三級：</strong>A、B 都不行時，往下找還有誰能讓
+      （整備時段？發車時刻？）。目前是兩級，真正的決策樹還要再深一層。
+    </li>
+  </ul>
+
   <h3>2026-08-11 · 挑設施的成本加入外部性（交接第 1 項）</h3>
   <div class="callout">
     使用者：「關鍵在於這條路徑不是最優解，是因為你在成本結構裡面了解到——
