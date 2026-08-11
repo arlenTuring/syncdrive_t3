@@ -57,7 +57,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
-  MAINTENANCE_TRANSFER_DETOUR: '整備轉場繞了遠路',
+  MAINTENANCE_TRANSFER_DETOUR: '轉場路徑太遠，判定為到不了',
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -233,7 +233,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   MAINTENANCE_TRANSFER_DETOUR: {
     kind: 'actionable',
     guidance:
-      '這張轉場卡的移動時間長得不合理——挑設施是在候選之間取「移動成本最小」，那是相對的：所有候選都很遠時，它照樣挑一個最不遠的排下去，不會有人喊停。兩個看起來相鄰的點卻要走好幾分鐘，幾乎都是路網拓樸缺了對應方向的邊，最短路徑因此繞了一大圈。代價不只是那幾分鐘：車在路上會佔用轉折點，連帶影響別班的碰撞判定。請到路網拓樸檢查這兩點之間有沒有該有的邊與方向；若那段距離本來就這麼遠，可考慮替這一類整備加一座比較近的設施。',
+      '轉場路徑走得太遠（超過 5 分鐘），已經被判定為「到不了」而不採用。兩個看起來相鄰的點之所以要繞好幾分鐘，是因為那個方向沒有直接的邊，最短路徑只好繞一大圈。這裡刻意不假設是漏畫——沒畫那條邊本來就可能是刻意的（不希望車那樣走），引擎繞路走過去等於推翻那個設定。所以兩條路可選：若那個方向本來就不該通，請替這一類整備加一座比較近的設施；若只是漏畫，才到路網拓樸把那條邊補上。',
   },
   MAINTENANCE_TRANSFER_UNRESOLVED: {
     kind: 'policy',

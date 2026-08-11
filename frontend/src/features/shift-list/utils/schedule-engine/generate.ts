@@ -359,8 +359,9 @@ export function generateShiftSchedule(
       message:
         `時間線 ${item.timelineRow}：「${item.taskType}」的轉場走了 `
         + `${Math.round(item.seconds / 60)} 分 ${item.seconds % 60} 秒`
-        + `（${item.fromLabel} → ${item.toLabel}）——這段時間車一直在路網上，`
-        + `會佔用轉折點並影響別班；多半是拓樸缺了對應方向的邊，最短路徑因此繞遠。`,
+        + `（${item.fromLabel} → ${item.toLabel}）——超過上限，已判定為到不了、不採用。`
+        + `那個方向沒有直接的邊，最短路徑只好繞一大圈；若那是刻意不連，`
+        + `請替這一類整備加一座比較近的設施。`,
       detail: {
         timelineRow: item.timelineRow,
         blockId: item.blockId,
