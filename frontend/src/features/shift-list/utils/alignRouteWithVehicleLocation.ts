@@ -1,4 +1,6 @@
+import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
+import { findTopologyPath } from './findTopologyPath';
 import { resolveRouteForBlock } from './buildBlockStationDepartures';
 import type { RouteSuccessorPolicy } from './schedule-engine/routeSuccessorPolicy';
 import type {
@@ -112,10 +114,31 @@ export function alignRouteWithVehicleLocation(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   selectedRoutes: ShiftScheduleSelectedRoute[];
   successorPolicy?: RouteSuccessorPolicy | null;
+  /** 拿來算「這段空跑要花多久、經過哪些點」，讓回報講代價而不是講對錯 */
+  topology?: PointTopology | null;
   /** 只在第一輪收集，避免收斂迴圈每一輪重複回報同一件事 */
   warnings?: FeasibilityIssue[];
 }): { swapped: number } {
-  const { timelines, selectedRoutes, successorPolicy, warnings } = args;
+  const { timelines, selectedRoutes, successorPolicy, topology, warnings } = args;
+  const nodeIdByStationId = new Map(
+    (topology?.nodes ?? [])
+      .filter((node) => node.stationId?.trim())
+      .map((node) => [node.stationId!.trim(), node.id] as const),
+  );
+  const nodeById = new Map((topology?.nodes ?? []).map((node) => [node.id, node] as const));
+  /** 這段空跑要花多久、經過哪些轉折點；查不到就回 null */
+  function describeEmptyRun(fromStationId: string, toStationId: string): string | null {
+    const from = nodeIdByStationId.get(fromStationId);
+    const to = nodeIdByStationId.get(toStationId);
+    if (!topology || !from || !to) return null;
+    const path = findTopologyPath(topology, from, to);
+    if (!path) return null;
+    const via = path.edges
+      .slice(0, -1)
+      .map((edge) => nodeById.get(edge.toNodeId)?.label || edge.toNodeId);
+    return `約 ${Math.round(path.avgSeconds)} 秒`
+      + (via.length > 0 ? `，途經 ${via.join('、')}` : '');
+  }
   if (!successorPolicy) return { swapped: 0 };
 
   let swapped = 0;
@@ -161,21 +184,22 @@ export function alignRouteWithVehicleLocation(args: {
          * 想換卻換不成——車停在 A、下一班卻要從 B 發，而關聯圖上「前一段之後」
          * 沒有任何一條同終點、從 A 出發的路線可接。
          *
-         * 這時車一定要空跑一段。先前這裡是<strong>直接 continue</strong>：
-         * 畫面上只看得到「待命點跟出發點不一樣」，看不出原因、也不知道能改哪裡
-         * （2026-08-11 使用者連續三輪回報 SB1938）。原因其實很明確，而且是
-         * 使用者改得動的：關聯圖上補一條邊就好。
+         * 這時出廠卡會把車開過去——那是<strong>正常機制，不是錯誤</strong>。
+         * 所以這則只講<strong>代價</strong>（空跑多久、途經哪些點），讓使用者自己判斷
+         * 值不值得，不叫他去補一條可能實體上不該存在的路線
+         * （2026-08-11 使用者指正：那個建議是壞的）。
          */
+        const cost = describeEmptyRun(parkedStationId, currentOrigin);
         warnings?.push({
           code: 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE',
           severity: 'warning',
-          kind: 'actionable',
+          kind: 'policy',
           message:
-            `時間線 ${timeline.row}：車停在「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
-            + `下一班「${currentRoute.routeName ?? currentRoute.routeId}」卻從`
-            + `「${stationDisplayName(currentOrigin, selectedRoutes)}」出發，中間得空跑一段。`
-            + `沒有一條路線是「從車所在位置出發、同終點、下游也接同一條」的——`
-            + `補一條這樣的路線就能省掉這段空跑。`,
+            `時間線 ${timeline.row}：車停在`
+            + `「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
+            + `下一班從「${stationDisplayName(currentOrigin, selectedRoutes)}」發，`
+            + `出廠卡要空跑${cost ? ` ${cost}` : '一段'}。`
+            + `沒有同起點、同終點、下游又相同的替代路線可換。`,
           detail: {
             timelineRow: timeline.row,
             blockId: block.id,

@@ -255,6 +255,7 @@ export function generateShiftSchedule(
       timelines,
       selectedRoutes: routesForBerth,
       successorPolicy: engineInput.successorPolicy,
+      topology: engineInput.pointTopology,
       warnings: round === 0 ? warnings : undefined,
     });
 

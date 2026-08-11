@@ -58,7 +58,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: '已改派路線，配合車輛實際停放位置',
-  ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '下一班的起點不是車停的地方，要空跑'
+  ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）'
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -235,7 +235,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: {
     kind: 'actionable',
     guidance:
-      '車停在 A、下一班卻從 B 發，中間得空跑一段。引擎只能從「前一段在關聯圖上的後繼」裡換路線，而那些後繼沒有一條是同終點又從 A 出發的。到 Step 4 關聯圖補那條邊即可。',
+      '出廠卡會把車從整備位置開到下一班的起點——這是正常機制，不是錯誤。這則只是把代價講出來（空跑多久、途經哪些點）讓你判斷值不值得。想省掉的話，方向是讓車一開始就停得離下一班起點更近，而不是硬補一條路線。',
   },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: {
     kind: 'policy',
