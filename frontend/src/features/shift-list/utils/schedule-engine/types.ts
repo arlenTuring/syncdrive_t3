@@ -170,6 +170,8 @@ export type FeasibilityViolationCode =
   /** 本來可以提早進廠，設施被佔只好晚進；代價是車在站位上多等（警告） */
   | 'MAINTENANCE_ENTRY_EARLY_BLOCKED'
   | 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION'
+  /** 進廠前那一趟改開到進得了廠的那一站（警告） */
+  | 'ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY'
   | 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE'
   | 'GEOMETRY_NOT_CONVERGED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */

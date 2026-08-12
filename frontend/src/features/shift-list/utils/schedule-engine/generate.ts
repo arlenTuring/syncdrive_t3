@@ -42,6 +42,7 @@ import {
 import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
 import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
 import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
+import { alignRouteWithMaintenanceEntry } from '../alignRouteWithMaintenanceEntry';
 import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
@@ -243,6 +244,15 @@ export function generateShiftSchedule(
       timelines,
       selectedRoutes: routesForBerth,
       successorPolicy: engineInput.successorPolicy,
+      topology: engineInput.pointTopology,
+      warnings: round === 0 ? warnings : undefined,
+    });
+
+    // 要進廠卻停在到不了設施的站：把進廠前那一趟改開到進得了廠的那一站。
+    // 放在站位求解之前——換終點＝換停靠站，要讓求解器有機會反應。
+    alignRouteWithMaintenanceEntry({
+      timelines,
+      selectedRoutes: routesForBerth,
       topology: engineInput.pointTopology,
       warnings: round === 0 ? warnings : undefined,
     });
