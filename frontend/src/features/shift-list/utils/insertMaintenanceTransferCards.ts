@@ -1283,7 +1283,39 @@ export function insertMaintenanceTransferCards(args: {
           nodeId: baseGateway.nodeId,
           instant: baseGateway.instant + shift,
         };
-        const decisionCost = pathDecisionCost(path);
+        /**
+         * <strong>挑設施要一起比「能多早進去」，不是只比「開過去多久」。</strong>
+         *
+         * 每一台候選設施上面已經二分找出了「最早可行的出發時刻」——那正是
+         * 「這台設施讓我多早進得去」。但成本函式只看移動時間與外部性，
+         * 完全沒用到它：於是一台讓車 18:30 就能進的遠設施，會輸給一台
+         * 要等到 19:00 的近設施，即使多繞的那點路遠比多等半小時划算
+         * （2026-08-12 使用者：「因為要選近的地方去佔才對」——近，但也要進得去）。
+         *
+         * <strong>等待的代價不用寫死係數。</strong>車在等的時候是杵在正線停靠站上，
+         * 代價就是<strong>那段時間會擋到幾班車</strong>——直接數該站在這段等待窗內
+         * 有幾個載客佔用，再乘以碰撞保護時間，跟路徑外部性用<strong>同一種計價</strong>。
+         * 忙站上多等一分鐘很貴，閒站上等再久也不花錢，比例自己會浮現，
+         * 不需要任何人去調一個魔術數字。
+         */
+        const waitSeconds = Math.max(0, departureSecond - preferredDeparture);
+        let blockedTrips = 0;
+        if (waitSeconds > 1e-9 && stationId) {
+          for (const window of mainlineBerthWindows(stationId)) {
+            if (
+              cyclicWindowsOverlap(
+                preferredDeparture,
+                departureSecond,
+                window.startSecond,
+                window.endSecond,
+              )
+            ) {
+              blockedTrips += 1;
+            }
+          }
+        }
+        const waitCost = blockedTrips * collisionBufferSeconds;
+        const decisionCost = pathDecisionCost(path) + waitCost;
         if (!chosen || decisionCost < chosen.decisionCost) {
           chosen = {
             nodeId: facility.id, label: facility.label || facility.id, seconds: path.avgSeconds,
