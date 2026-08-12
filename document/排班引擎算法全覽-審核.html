@@ -3763,6 +3763,41 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-13 · 相位均分成功（141→18），但進廠換線把待命也放行了</h3>
+  <div class="callout">
+    使用者重新生成後的實測 log。主要目標大勝，同時暴露出前一則的適用範圍錯誤。
+  </div>
+  <ul>
+    <li>
+      <strong>相位均分有效：</strong><code>HEADWAY_BELOW_TARGET</code>
+      <strong>141 → 18</strong>；<code>STATION_BERTH_BACKUP_USED</code> 77 → 61、
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 16 → 12、
+      <code>STATION_BERTH_PROTECTION_GAP</code> 3 → 2。
+      <code>HEADWAY_PHASE_EVENED</code> 出現 2 則，機制確實有動，也沒有製造時間線重疊。
+    </li>
+    <li>
+      <strong>但冒出兩個新 error：</strong><code>ROUTE_SUCCESSOR_MISMATCH</code> 4 則、
+      <code>ROUTE_STATION_DISCONTINUITY</code> 4 則。來源是「進廠換線」那一道。
+    </li>
+    <li>
+      <strong>原因是我自己寫下的前提沒有逐條檢查適用範圍。</strong>那條規則能成立，靠的是
+      「車進了廠，出來時的起點站由設施的出場站決定，跟這一趟的終點無關」——
+      這對充電／保養／行檢成立，<strong>對待命完全不成立</strong>：待命根本沒進廠，
+      車就停在原地，下一趟的起點就是它站的那一站。把前一趟的終點換掉，下一趟就接不上。
+    </li>
+    <li>
+      修法：待命一律跳過；停在<strong>正線停靠站</strong>的整備
+      （<code>yardFacilityStationId</code> 有值）也跳過——那是站位不是廠，
+      車沒有被設施接手。
+    </li>
+    <li>
+      <strong>教訓：</strong>寫下「這個約束在這裡不適用」的理由之後，要<strong>回頭把所有
+      走進這段程式的情形都套一次那個理由</strong>。理由本身沒錯，但它只涵蓋四種整備裡的三種，
+      而程式對四種一視同仁。前一則還特地讚揚了這個不對稱洞察——越是覺得自己想通了的地方，
+      越要檢查邊界。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 發車相位均分：把被站位擠歪的班距推回去</h3>
   <div class="callout">
     使用者：「其實你整個運能掉很慘，而且整個非常得空，這是策略還是什麼限制嗎」

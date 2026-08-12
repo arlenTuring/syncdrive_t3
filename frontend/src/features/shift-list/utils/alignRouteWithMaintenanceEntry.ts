@@ -87,6 +87,23 @@ export function alignRouteWithMaintenanceEntry(args: {
     for (let i = 0; i < sorted.length; i += 1) {
       const yard = sorted[i]!;
       if (!YARD_TASK_TYPES.has(yard.taskType) || yard.source !== 'template_bar') continue;
+      /**
+       * <strong>待命不算，車停在正線站位上的也不算。</strong>
+       *
+       * 這條規則能成立，靠的是「車進了廠，出來時的起點站由設施的出場站決定，
+       * 跟這一趟的終點無關」。<strong>待命根本沒進廠</strong>——車就停在原地，
+       * 下一趟的起點就是它站的那一站；把前一趟的終點換掉，下一趟就接不上了。
+       *
+       * 實測（2026-08-12 使用者的 log）：放行待命之後冒出
+       * <code>ROUTE_STATION_DISCONTINUITY</code> 4 則與
+       * <code>ROUTE_SUCCESSOR_MISMATCH</code> 4 則，兩者都是 error。
+       * 前提寫對了，卻沒有逐條檢查它的適用範圍，就是這個下場。
+       *
+       * 同理，停在<strong>正線停靠站</strong>的整備（<code>yardFacilityStationId</code>
+       * 有值）也不算：那是站位不是廠，車沒有被設施接手。
+       */
+      if (yard.taskType === 'standby') continue;
+      if (yard.yardFacilityStationId?.trim()) continue;
       const facilityNodeId = yard.yardFacilityNodeId?.trim();
       if (!facilityNodeId) continue;
 
