@@ -23,9 +23,16 @@
  * 中間這段正是唯一能改路線、又還來得及讓站位求解反應的位置。
  */
 import type { PointTopology } from '../../map-editor/types/pointTopology';
-import type { ShiftScheduleSelectedRoute } from '../types/create';
+import {
+  resolveSelectedRouteInstanceId,
+  type ShiftScheduleSelectedRoute,
+} from '../types/create';
 import { findTopologyPath } from './findTopologyPath';
 import { resolveRouteForBlock } from './buildBlockStationDepartures';
+import {
+  listNextInstanceCandidates,
+  type RouteSuccessorPolicy,
+} from './schedule-engine/routeSuccessorPolicy';
 import type {
   FeasibilityIssue,
   GeneratedSchedulePlan,
@@ -58,10 +65,12 @@ export function alignRouteWithMaintenanceEntry(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   selectedRoutes: ShiftScheduleSelectedRoute[];
   topology?: PointTopology | null;
+  /** 換過去的路線必須仍是關聯圖上的合法出邊，否則會踩到 ROUTE_SUCCESSOR_MISMATCH（error） */
+  successorPolicy?: RouteSuccessorPolicy | null;
   /** 只在第一輪收集，避免收斂迴圈每一輪重複回報同一件事 */
   warnings?: FeasibilityIssue[];
 }): { swapped: number } {
-  const { timelines, selectedRoutes, topology, warnings } = args;
+  const { timelines, selectedRoutes, topology, successorPolicy, warnings } = args;
   if (!topology) return { swapped: 0 };
 
   const nodeIdByStationId = new Map(
@@ -105,18 +114,60 @@ export function alignRouteWithMaintenanceEntry(args: {
       const origin = routeOriginStationId(currentRoute);
       if (!origin) continue;
 
+      /**
+       * <strong>換過去的那一條必須仍是關聯圖上的合法出邊。</strong>
+       *
+       * 第一版只比對起點站就換，完全沒問關聯圖——而
+       * <code>ROUTE_SUCCESSOR_MISMATCH</code> 是<strong>error 不是 warning</strong>，
+       * 換錯會把整張班表打成不可用。重現資料沒踩到只是運氣
+       * （2026-08-12 使用者要求檢查：「你現在這個算法是成立的嗎？是有開放束縛的嗎」）。
+       *
+       * 判準跟驗證用的是<strong>同一份</strong>：前一趟的合法出邊集合
+       * （含次要邊）。前面沒有正線可比時不設限——那是開輪，本來就沒有上游可違反。
+       */
+      let allowedNextIds: Set<string> | null = null;
+      if (successorPolicy?.valid) {
+        const previousIndex = sorted.indexOf(previous);
+        for (let step = 1; step < sorted.length; step += 1) {
+          const earlier = sorted[(previousIndex - step + sorted.length) % sorted.length]!;
+          if (YARD_TASK_TYPES.has(earlier.taskType)) break;
+          if (earlier.taskType !== 'passenger' || earlier.source !== 'template_bar') continue;
+          const earlierRoute = resolveRouteForBlock(earlier, selectedRoutes);
+          if (!earlierRoute) break;
+          allowedNextIds = new Set(
+            listNextInstanceCandidates(
+              successorPolicy,
+              resolveSelectedRouteInstanceId(earlierRoute),
+              { allowSecondary: true },
+            ).map((item) => item.instanceId),
+          );
+          break;
+        }
+      }
+
+      /**
+       * 挑<strong>路徑最短</strong>的那一條，不是第一個湊合的。
+       * 「進得了廠」通常不只一條，隨手抓一條會讓車繞遠路空跑。
+       */
       let replacement: ShiftScheduleSelectedRoute | null = null;
+      let replacementSeconds = Number.POSITIVE_INFINITY;
       for (const candidate of selectedRoutes) {
         if (candidate.routeId === currentRoute.routeId) continue;
-        // 車就在起點站，起點一變它根本開不了那一趟
+        // 車就在起點站，起點一變它根本開不了那一趟——這是物理，不是偏好
         if (routeOriginStationId(candidate) !== origin) continue;
         const destination = routeDestinationStationId(candidate);
         if (!destination || destination === currentDestination) continue;
+        if (allowedNextIds && !allowedNextIds.has(resolveSelectedRouteInstanceId(candidate))) {
+          continue;
+        }
         const nodeId = nodeIdByStationId.get(destination);
         if (!nodeId) continue;
-        if (!findTopologyPath(topology, nodeId, facilityNodeId)) continue;
-        replacement = candidate;
-        break;
+        const path = findTopologyPath(topology, nodeId, facilityNodeId);
+        if (!path) continue;
+        if (path.avgSeconds < replacementSeconds) {
+          replacement = candidate;
+          replacementSeconds = path.avgSeconds;
+        }
       }
       if (!replacement) continue;
 

@@ -3763,6 +3763,49 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 束縛盤點：哪一條是物理、哪一條只是偏好</h3>
+  <div class="callout">
+    使用者：「我們之前已經開放了，應該是連行前後都不一定要去 N2W 出發了。
+    你現在這個算法是成立的嗎？是有開放束縛的嗎？請妳檢查清楚。」——
+    檢查之下，前一則有一個真的 bug。
+  </div>
+  <ul>
+    <li>
+      <strong>漏掉的檢查：關聯圖出邊。</strong>前一則的換線只比對起點站就換了，
+      完全沒問關聯圖——而 <code>ROUTE_SUCCESSOR_MISMATCH</code> 是
+      <strong>error 不是 warning</strong>，換錯會把整張班表打成不可用。
+      重現資料沒踩到只是運氣。已補上，判準跟驗證用<strong>同一份</strong>：
+      前一趟的合法出邊集合（含次要邊）。加了之後數字完全不變——原本換的那幾條本來
+      就合法，但現在是<strong>保證</strong>，不是碰運氣。
+    </li>
+    <li>
+      <strong>三條束縛的盤點：</strong>
+      <ul>
+        <li><strong>同起點站 — 物理，不能放。</strong>車就停在那一站，起點一變它根本開不了那一趟。</li>
+        <li><strong>同終點站 — 偏好，這裡該放。</strong>理由是保護下游交路；下一段是整備時
+            出場站由設施決定，理由消失。</li>
+        <li><strong>關聯圖出邊 — 硬約束，必須守。</strong>它是使用者在 Step 4 定的交路結構，
+            不是引擎的內部偏好。</li>
+      </ul>
+    </li>
+    <li>
+      <strong>沒有重新綁回已經放寬的東西。</strong>B（放寬首班車起點）動的是開輪的
+      <code>startInstanceIds</code>；這一道在<strong>前面沒有正線可比</strong>時
+      <code>allowedNextIds</code> 為 null、完全不設限，正是開輪那個情形，
+      所以不會把 B 放掉的束縛偷偷綁回來。<code>firstTripOrigins</code> 也完全沒碰。
+    </li>
+    <li>
+      順帶改掉「挑第一個湊合的」：候選常常不只一條，改成挑<strong>到設施路徑最短</strong>的，
+      免得車繞遠路空跑。<code>ok = true</code>、errors <code>{}</code>、
+      <code>tsc -b</code> 23、eslint 乾淨，各碼數字不變。
+    </li>
+    <li>
+      <strong>教訓：</strong>新增一道會改動版面的處理時，要逐條問「既有的硬約束我守住了嗎」。
+      放寬某個偏好，不代表可以順手略過旁邊那條真正的規則——而且只要重現資料剛好不踩，
+      這種錯完全不會被發現。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 要去充電，就把最後一趟開到進得了廠的那一站</h3>
   <div class="callout">
     使用者：「我還是不能接受他知道要去充電，還非得要停、不能移動過去充電樁……
