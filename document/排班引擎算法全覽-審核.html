@@ -3763,6 +3763,38 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 讓步必須是一次性的——否則會跟站位求解互推到迴圈跑滿</h3>
+  <div class="callout">
+    使用者重新生成後的實測 log：新出現 <code>GEOMETRY_NOT_CONVERGED</code>，
+    <code>HEADWAY_BELOW_TARGET</code> 從 42 暴增到 141。
+  </div>
+  <ul>
+    <li>
+      <strong>原因是上一則自己造成的。</strong><code>yieldIdleBlockArrival</code> 的
+      <code>shiftedBlockIds</code> 只在<strong>單次呼叫內</strong>有效，而它跑在收斂迴圈裡：
+      挪過去之後站位求解把別的東西推回來，下一輪同一趟又符合條件、又挪一次，
+      兩邊就這樣互推到迴圈跑滿。迴圈中途收工，班距修復沒跑完，於是
+      <code>HEADWAY_BELOW_TARGET</code> 爆增。
+    </li>
+    <li>
+      <strong>修法：把「已經讓過」記在區塊自己身上</strong>（<code>berthArrivalYieldedMinutes</code>），
+      才跨得了輪。讓步本來就該是<strong>單向、一次性</strong>的：一趟讓過一次還是不通，
+      代表它不是讓步能解的問題，再讓只是製造振盪。
+    </li>
+    <li>
+      <strong>A2 那道警告證明了自己的價值。</strong><code>GEOMETRY_NOT_CONVERGED</code>
+      是幾天前補的，當時在重現資料上不觸發、看起來像白做工；這次它是<strong>唯一</strong>
+      指出「下面那堆班距問題有一部分只是還沒處理完」的線索——沒有它，
+      141 則班距警告會被當成設定問題去追。
+    </li>
+    <li>
+      <strong>教訓：</strong>任何放進收斂迴圈的新處理，第一個要問的是
+      「它會不會每一輪都重做一次」。狀態記在函式區域變數裡＝每輪重置＝振盪。
+      這跟先前「指紋要涵蓋迴圈會改動的所有東西」是同一個坑的兩面。
+      <code>tsc -b</code> 23、eslint 乾淨，重現資料各碼數字不變（該資料上本來就只讓 2 次）。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 滯留車晚一點進站，讓只是路過的先走</h3>
   <div class="callout">
     使用者：「你想想真的沒有辦法嗎」。有——而且那段餘裕一直擺在那裡沒人用。

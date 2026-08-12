@@ -81,6 +81,18 @@ export function yieldIdleBlockArrival(args: {
     const earlier = blockById.get(hit.earlier.blockId);
     if (!earlier) continue;
     if (shiftedBlockIds.has(earlier.id)) continue;
+    /**
+     * <strong>一趟一整次生成只讓一次。</strong>
+     *
+     * <code>shiftedBlockIds</code> 只在單次呼叫內有效，而這一支跑在收斂迴圈裡：
+     * 挪過去之後站位求解把別的東西推回來，下一輪同一趟又符合條件、又挪一次，
+     * 兩邊就這樣互推到迴圈跑滿——使用者實測資料上直接觸發 GEOMETRY_NOT_CONVERGED，
+     * 而且迴圈中途收工害 HEADWAY_BELOW_TARGET 從 42 暴增到 141（2026-08-12）。
+     *
+     * 記在區塊自己身上才跨得了輪。讓步本來就該是<strong>單向、一次性</strong>的：
+     * 一趟讓過一次還是不通，代表它不是讓步能解的問題。
+     */
+    if (earlier.berthArrivalYieldedMinutes != null) continue;
     if (earlier.taskType !== 'passenger' || earlier.source !== 'template_bar') continue;
 
     // 空等＝自然可以離站之後還被迫留在站上的那一段。沒有空等就沒有餘裕可用，
@@ -121,6 +133,7 @@ export function yieldIdleBlockArrival(args: {
 
     earlier.plannedStartMinute += neededMinutes;
     earlier.plannedEndMinute += neededMinutes;
+    earlier.berthArrivalYieldedMinutes = neededMinutes;
     shiftedBlockIds.add(earlier.id);
     shifted += 1;
 

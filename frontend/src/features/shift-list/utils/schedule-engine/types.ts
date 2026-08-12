@@ -138,6 +138,12 @@ export type GeneratedScheduleBlock = {
    * 僅 taskType=passenger source=template_bar 的班次可能有此欄位。
    */
   yardDispatchPrefix?: string;
+  /**
+   * 這一趟為了讓只是路過的別列車先通過，往後挪了幾分鐘（見 yieldIdleBlockArrival）。
+   * 有值就代表<strong>已經讓過</strong>——收斂迴圈的下一輪不再讓第二次，
+   * 否則會跟站位求解互推到迴圈跑滿。
+   */
+  berthArrivalYieldedMinutes?: number;
 };
 
 export type FeasibilityViolationCode =
