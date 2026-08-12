@@ -916,6 +916,8 @@ export function validateStationBerthCollisions(
     peak: number;
     atMinute: number;
     longestIdle: StationBerthOccupancy | null;
+    /** 尖峰那一刻實際佔著這個停靠點的班次（每列取一班） */
+    atPeak: StationBerthOccupancy[];
   } => {
     const spans = occupancies.filter((occ) => occ.stationId === stationId);
     let longestIdle: StationBerthOccupancy | null = null;
@@ -968,7 +970,28 @@ export function validateStationBerthCollisions(
         atMinute = event.minute;
       }
     }
-    return { peak, atMinute, longestIdle };
+    /**
+     * 尖峰那一刻<strong>到底是哪幾班</strong>。
+     *
+     * 只給「同時最多 2 台（07:03:20）」而不點名，使用者沒辦法去畫面上找是誰；
+     * 而後面接著舉的「停最久的是 TN1146（11:50）」是<strong>另一件事</strong>，
+     * 兩個時刻差了四個多小時，並排在同一句裡只會讓人以為自己看錯
+     * （2026-08-12 使用者：「這個跟 16:00 的時間也差太多，我根本看不懂問題」）。
+     *
+     * 同一列可能留下兩段占用（到站、發車），所以每一列只取一班當代表。
+     */
+    const atPeak: StationBerthOccupancy[] = [];
+    if (peak > 1) {
+      const seenRows = new Set<number>();
+      for (const occ of [...spans].sort((a, b) => a.startMinute - b.startMinute)) {
+        if (occ.startMinute > atMinute + 1e-9) continue;
+        if (occ.actualDepartMinute < atMinute - 1e-9) continue;
+        if (seenRows.has(occ.timelineRow)) continue;
+        seenRows.add(occ.timelineRow);
+        atPeak.push(occ);
+      }
+    }
+    return { peak, atMinute, longestIdle, atPeak };
   };
 
   const protectionByStation = new Map<string, {
@@ -1044,7 +1067,12 @@ export function validateStationBerthCollisions(
   }
 
   for (const bucket of protectionByStation.values()) {
-    const { peak, atMinute, longestIdle } = peakConcurrentAtStation(bucket.stationId);
+    const { peak, atMinute, longestIdle, atPeak } = peakConcurrentAtStation(bucket.stationId);
+    const peakLabel = atPeak
+      .map((occ) =>
+        `${tripCodeOf(occ)}（時間線 ${occ.timelineRow}，`
+        + `${formatMinuteHms(occ.startMinute)}–${formatMinuteHms(occ.actualDepartMinute)}）`)
+      .join('、');
     const idleMinutes = longestIdle
       ? (longestIdle.actualDepartMinute - longestIdle.startMinute)
       : 0;
@@ -1059,10 +1087,10 @@ export function validateStationBerthCollisions(
       severity: 'warning',
       kind: 'actionable',
       message:
-        `${bucket.stationName}：同時最多有 ${peak} 台車停在這裡`
-        + `（${formatMinuteHms(atMinute)}），但一個停靠點只能停 1 台。`
-        + `共 ${bucket.pairCount} 對班次不滿足碰撞保護`
-        + (longestLabel ? `。停最久的是 ${longestLabel}` : ''),
+        `${bucket.stationName}：${formatMinuteHms(atMinute)} 同時有 ${peak} 台車停在這裡`
+        + `${peakLabel ? `——${peakLabel}` : ''}，但一個停靠點只能停 1 台。`
+        + `整天共 ${bucket.pairCount} 對班次不滿足碰撞保護`
+        + (longestLabel ? `；其中停最久的是另一班 ${longestLabel}` : ''),
       detail: {
         stationId: bucket.stationId,
         stationName: bucket.stationName,
