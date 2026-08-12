@@ -2133,7 +2133,36 @@ export function insertMaintenanceTransferCards(args: {
       }
       const parts: string[] = [];
       if (facilityBusy > 0) {
-        parts.push(`${facilityBusy} 台設施格這段時間被別列車佔著`);
+        /**
+         * <strong>要指名是誰佔著。</strong>
+         *
+         * 只說「4 台設施格被別列車佔著」，使用者看畫面上 E1 明明空的，只會覺得
+         * 程式在亂講——他看到的是<strong>這一段時窗</strong>，而檢查的是<strong>整段
+         * 連續停留</strong>（跨午夜、接續的同型整備算同一段），兩者常常不一樣。
+         * 把每一台的佔用者與時段列出來，落差自己就會顯現
+         * （2026-08-12 使用者：「我看 EE1900 還有一個充電樁 E1 可以用呀」）。
+         */
+        const holders: string[] = [];
+        for (const facility of facilities) {
+          if (nodeById.get(facility.id)?.kind === 'docking') continue;
+          const clash = bookings.find((booking) =>
+            booking.facilityNodeId === facility.id
+            && booking.timelineRow !== timeline.row
+            && cyclicWindowsOverlap(
+              startSecond,
+              endSecond,
+              booking.startSecond,
+              booking.endSecond,
+            ));
+          holders.push(
+            clash
+              ? `${facility.label || facility.id} 被時間線 ${clash.timelineRow} 佔著`
+                + `（${formatSecondOfDay(clash.startSecond)}–${formatSecondOfDay(clash.endSecond)}）`
+              : `${facility.label || facility.id} 這段時間是空的，但這台車的整段停留`
+                + `（${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}）撐不完`,
+          );
+        }
+        parts.push(`${facilityBusy} 台設施格：${holders.join('；')}`);
       }
       if (berthBusy > 0) {
         parts.push(`${berthBusy} 個停靠站這段時間有載客班次要用（待命壓住站位會擋掉那條路線）`);

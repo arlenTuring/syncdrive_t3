@@ -115,45 +115,37 @@
     <p><a class="back" href="./排班引擎算法全覽-審核.html">← 回算法／策略審核</a></p>
     <h1>最近一次生成的問題（分層）</h1>
     <p class="meta">
-      更新：2026-08-12T02:19:51.037Z
+      更新：2026-08-12T02:32:31.211Z
        · 班表「模擬正線」
        · 模板「模擬時間模板_0810」
-      · ok=<code>false</code>
-      · 錯誤 2／警告 170／共 172 則
+      · ok=<code>true</code>
+      · 錯誤 0／警告 188／共 188 則
     </p>
     <p class="meta">每次重新生成整份覆寫，不累加。機器可讀：<code>frontend/.dev/schedule-engine-last-issues.json</code></p>
-    <p class="meta delta">與上次生成相比：錯誤 0→2（+2） · 警告 305→170（-135） · severe 23→12（-11） · moderate 49→11（-38） · mild 81→6（-75）</p>
+    <p class="meta delta">與上次生成相比：錯誤 0→0（±0） · 警告 188→188（±0） · severe 16→16（±0） · moderate 9→9（±0） · mild 7→7（±0）</p>
   </header>
   
 <section class="accept">
   <h2>驗收定義</h2>
-  <p class="accept-pill gate-fail">硬閘 gatePassed=<code>false</code>（report.ok=<code>false</code>）· 硬錯誤 2</p>
-  <p class="accept-pill gate-warn">品質目標 qualityPassed=<code>false</code> · 未清零：UNSERVED_SERVICE_PULSE×8、HEADWAY_BELOW_TARGET×21</p>
-  <p class="meta">策略噪音 134／極限警告 34／可調警告 2</p>
-  <p class="meta">硬錯誤代號：STATION_BERTH_COLLISION×1、YARD_EXIT_STATION_MISMATCH×1</p>
+  <p class="accept-pill gate-ok">硬閘 gatePassed=<code>true</code>（report.ok=<code>true</code>）· 硬錯誤 0</p>
+  <p class="accept-pill gate-warn">品質目標 qualityPassed=<code>false</code> · 未清零：UNSERVED_SERVICE_PULSE×8、HEADWAY_BELOW_TARGET×24</p>
+  <p class="meta">策略噪音 148／極限警告 38／可調警告 2</p>
+  
   <ul class="criteria"><li>硬閘（ok=true）：errors 必須為 0（含站位碰撞、未跑完迴圈、時間線重疊等）。</li><li>警告不阻擋硬閘：策略延後／改線、略過進場載客、班距低於目標、肩段未承接脈衝。</li><li>品質目標（qualityPassed）：另要求 0×UNSERVED_SERVICE_PULSE 與 0×HEADWAY_BELOW_TARGET；未達標仍可 ok=true。</li><li>策略說明預設摺疊，不計入「失敗體感」主列表。</li></ul>
 </section>
   
 <section class="cause-summary">
-  <h2>成因摘要（依代號 × 嚴重度分群，15 群 · 共 172 則）</h2>
+  <h2>成因摘要（依代號 × 嚴重度分群，15 群 · 共 188 則）</h2>
   <table>
     <thead><tr><th>分類</th><th>代號</th><th>嚴重度</th><th>則數</th><th>平均落差</th><th>範例</th></tr></thead>
     <tbody>
     <tr>
-      <td>停靠點站位碰撞</td>
-      <td><code>STATION_BERTH_COLLISION</code></td>
-      <td><span class="band-none">—</span></td>
-      <td>1</td>
-      <td>—</td>
-      <td><a href="#issue-1">#1</a></td>
-    </tr>
-    <tr>
-      <td>整備出場站接不上</td>
-      <td><code>YARD_EXIT_STATION_MISMATCH</code></td>
-      <td><span class="band-none">—</span></td>
-      <td>1</td>
-      <td>—</td>
-      <td><a href="#issue-2">#2</a></td>
+      <td>班距低於目標</td>
+      <td><code>HEADWAY_BELOW_TARGET</code></td>
+      <td><span class="band band-severe">severe</span></td>
+      <td>8</td>
+      <td>244s</td>
+      <td><a href="#issue-1">#1</a> <a href="#issue-2">#2</a> <a href="#issue-3">#3</a></td>
     </tr>
     <tr>
       <td>班距需求未被承接</td>
@@ -161,23 +153,15 @@
       <td><span class="band band-severe">severe</span></td>
       <td>8</td>
       <td>—</td>
-      <td><a href="#issue-7">#7</a> <a href="#issue-8">#8</a> <a href="#issue-9">#9</a></td>
-    </tr>
-    <tr>
-      <td>班距低於目標</td>
-      <td><code>HEADWAY_BELOW_TARGET</code></td>
-      <td><span class="band band-severe">severe</span></td>
-      <td>4</td>
-      <td>218s</td>
-      <td><a href="#issue-3">#3</a> <a href="#issue-4">#4</a> <a href="#issue-5">#5</a></td>
+      <td><a href="#issue-9">#9</a> <a href="#issue-10">#10</a> <a href="#issue-11">#11</a></td>
     </tr>
     <tr>
       <td>班距低於目標</td>
       <td><code>HEADWAY_BELOW_TARGET</code></td>
       <td><span class="band band-moderate">moderate</span></td>
-      <td>11</td>
-      <td>114s</td>
-      <td><a href="#issue-15">#15</a> <a href="#issue-16">#16</a> <a href="#issue-17">#17</a></td>
+      <td>9</td>
+      <td>111s</td>
+      <td><a href="#issue-17">#17</a> <a href="#issue-18">#18</a> <a href="#issue-19">#19</a></td>
     </tr>
     <tr>
       <td>沒有可用的讓渡路線</td>
@@ -185,7 +169,7 @@
       <td><span class="band-none">—</span></td>
       <td>4</td>
       <td>—</td>
-      <td><a href="#issue-27">#27</a> <a href="#issue-28">#28</a> <a href="#issue-29">#29</a></td>
+      <td><a href="#issue-28">#28</a> <a href="#issue-29">#29</a> <a href="#issue-30">#30</a></td>
     </tr>
     <tr>
       <td>幾何後處理未收斂</td>
@@ -196,12 +180,20 @@
       <td><a href="#issue-26">#26</a></td>
     </tr>
     <tr>
+      <td>整備設施不足，車沒地方停</td>
+      <td><code>MAINTENANCE_FACILITY_UNAVAILABLE</code></td>
+      <td><span class="band-none">—</span></td>
+      <td>1</td>
+      <td>—</td>
+      <td><a href="#issue-27">#27</a></td>
+    </tr>
+    <tr>
       <td>班距低於目標</td>
       <td><code>HEADWAY_BELOW_TARGET</code></td>
       <td><span class="band band-mild">mild</span></td>
-      <td>6</td>
-      <td>10s</td>
-      <td><a href="#issue-31">#31</a> <a href="#issue-32">#32</a> <a href="#issue-33">#33</a></td>
+      <td>7</td>
+      <td>13s</td>
+      <td><a href="#issue-32">#32</a> <a href="#issue-33">#33</a> <a href="#issue-34">#34</a></td>
     </tr>
     <tr>
       <td>碰撞保護時間不足</td>
@@ -209,13 +201,13 @@
       <td><span class="band-none">—</span></td>
       <td>2</td>
       <td>—</td>
-      <td><a href="#issue-37">#37</a> <a href="#issue-38">#38</a></td>
+      <td><a href="#issue-39">#39</a> <a href="#issue-40">#40</a></td>
     </tr>
     <tr>
       <td>站位約束改選路線</td>
       <td><code>STATION_BERTH_BACKUP_USED</code></td>
       <td><span class="band-none">—</span></td>
-      <td>55</td>
+      <td>71</td>
       <td>—</td>
       <td><a href="#issue-67">#67</a> <a href="#issue-68">#68</a> <a href="#issue-69">#69</a></td>
     </tr>
@@ -225,15 +217,15 @@
       <td><span class="band-none">—</span></td>
       <td>51</td>
       <td>—</td>
-      <td><a href="#issue-122">#122</a> <a href="#issue-123">#123</a> <a href="#issue-124">#124</a></td>
+      <td><a href="#issue-138">#138</a> <a href="#issue-139">#139</a> <a href="#issue-140">#140</a></td>
     </tr>
     <tr>
       <td>整備轉場卡排不出來</td>
       <td><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></td>
       <td><span class="band-none">—</span></td>
-      <td>21</td>
+      <td>18</td>
       <td>—</td>
-      <td><a href="#issue-39">#39</a> <a href="#issue-40">#40</a> <a href="#issue-41">#41</a></td>
+      <td><a href="#issue-42">#42</a> <a href="#issue-43">#43</a> <a href="#issue-44">#44</a></td>
     </tr>
     <tr>
       <td>滯留車晚一點進站讓路</td>
@@ -252,6 +244,14 @@
       <td><a href="#issue-60">#60</a> <a href="#issue-61">#61</a></td>
     </tr>
     <tr>
+      <td>已請別列車換設施讓位</td>
+      <td><code>MAINTENANCE_FACILITY_YIELDED</code></td>
+      <td><span class="band-none">—</span></td>
+      <td>1</td>
+      <td>—</td>
+      <td><a href="#issue-41">#41</a></td>
+    </tr>
+    <tr>
       <td>出廠卡要空跑一段（車不在下一班的起點）</td>
       <td><code>ROUTE_ORIGIN_AWAY_FROM_VEHICLE</code></td>
       <td><span class="band-none">—</span></td>
@@ -266,99 +266,13 @@
     <span class="toolbar-count" id="issue-search-count"></span>
   </div>
   
-<section class="layer layer-hard">
-  <details class="layer-fold" open>
-    <summary>硬錯誤（阻擋驗收） · 2 則</summary>
-    <div class="list">
-<article id="issue-1" class="row error kind-limit layer-hard">
-  <div class="row-head">
-    <span class="idx">#1</span>
-    <span class="sev">error</span>
-    <span class="kind">演算法極限</span>
-    
-    <span class="trip">TS0914</span>
-  </div>
-  <h2>停靠點站位碰撞</h2>
-  <p class="code"><code>STATION_BERTH_COLLISION</code></p>
-  <p class="msg">T3下行 站位碰撞：NTB0911（時間線 1） 09:11:00–09:14:30 與 TS0914（時間線 2） 09:14:20–09:17:40 同時佔用同一個停靠點，重疊 10 秒</p>
-  <p class="guide">生成時已嘗試「延後發車／改派備用」仍無法清開同一停靠點的到站～離站重疊。請加時間線、縮短靠站、或手動改備援點。這不是班距警告。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <details><summary>detail</summary><pre>{
-  &quot;stationId&quot;: &quot;station_3&quot;,
-  &quot;stationName&quot;: &quot;T3下行&quot;,
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294957802-route_1-86-1-32580&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294957802-route_2-83-2-32160&quot;,
-  &quot;earlierTripCode&quot;: &quot;NTB0911&quot;,
-  &quot;laterTripCode&quot;: &quot;TS0914&quot;,
-  &quot;earlierTimelineRow&quot;: 1,
-  &quot;laterTimelineRow&quot;: 2,
-  &quot;earlierBlockRange&quot;: [
-    551,
-    554.5
-  ],
-  &quot;laterBlockRange&quot;: [
-    554.3333333333334,
-    557.6666666666667
-  ],
-  &quot;earlierBerthWindow&quot;: [
-    553.8333333333334,
-    554.5
-  ],
-  &quot;laterBerthWindow&quot;: [
-    554.3333333333334,
-    554.5
-  ],
-  &quot;earlierActualDepartMinute&quot;: 554.5,
-  &quot;earlierBerthClearMinute&quot;: 555,
-  &quot;earlierEarliestNextArrivalMinute&quot;: 555.5,
-  &quot;overlapSeconds&quot;: 10,
-  &quot;clearanceGapSeconds&quot;: -10,
-  &quot;requiredClearanceSeconds&quot;: 80,
-  &quot;protectionShortfallSeconds&quot;: 70,
-  &quot;blockId&quot;: &quot;template-pax-slot-1786294957802-route_2-83-2-32160&quot;
-}</pre></details>
-</article>
-
-<article id="issue-2" class="row error kind-actionable layer-hard">
-  <div class="row-head">
-    <span class="idx">#2</span>
-    <span class="sev">error</span>
-    <span class="kind">可調整</span>
-    
-    <span class="trip">TNB1500</span>
-  </div>
-  <h2>整備出場站接不上</h2>
-  <p class="code"><code>YARD_EXIT_STATION_MISMATCH</code></p>
-  <p class="msg">時間線 1：「充電」做完後車停在「N2W下行出發」，但接著排的 TNB1500（一般正線（整備後第一班））是從「T3上行」發車，車不在那裡開不了</p>
-  <p class="guide">車做完整備之後就停在該設施的出場站，下一趟一定要從那一站發車。這則代表排出來的班次起點站不是那裡——車根本不在，開不了。多半是整備任務沒設定該區段的設施、或設施在路網拓樸上找不到對應停靠點，請回 Step 2 補齊；也可能是關聯圖上從出場站沒有可接的路線。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <details><summary>detail</summary><pre>{
-  &quot;timelineRow&quot;: 1,
-  &quot;yardBlockId&quot;: &quot;task-1786301201361-qxyr&quot;,
-  &quot;yardTaskType&quot;: &quot;charging&quot;,
-  &quot;blockId&quot;: &quot;template-pax-slot-1786294998346-route_5-153-4-48920&quot;,
-  &quot;blockSource&quot;: &quot;template_bar&quot;,
-  &quot;exitStationId&quot;: &quot;station_2&quot;,
-  &quot;exitStationOptions&quot;: [
-    &quot;station_2&quot;
-  ],
-  &quot;exitStationName&quot;: &quot;N2W下行出發&quot;,
-  &quot;originStationId&quot;: &quot;station_4&quot;,
-  &quot;originStationName&quot;: &quot;T3上行&quot;,
-  &quot;routeId&quot;: &quot;route_6&quot;,
-  &quot;routeCode&quot;: &quot;TNB&quot;
-}</pre></details>
-</article></div>
-  </details>
-</section>
-
 <section class="layer layer-limit">
   <details class="layer-fold">
-    <summary>演算法極限警告 · 34 則</summary>
+    <summary>演算法極限警告 · 38 則</summary>
     <div class="list">
-<article id="issue-3" class="row warning kind-limit layer-limit">
+<article id="issue-1" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#3</span>
+    <span class="idx">#1</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -366,14 +280,14 @@
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 22:58:30→23:05:40 間隔 430 秒，低於跨時段班距下限 690 秒（兩時段 360/690，取較嚴者；此對班多半非乾淨脈衝）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 22:58:00→23:05:10 間隔 430 秒，低於跨時段班距下限 690 秒（兩時段 360/690，取較嚴者；此對班多半非乾淨脈衝）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
   &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-293-4-82940&quot;,
   &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-292-4-82580&quot;,
-  &quot;earlierDepartureMinute&quot;: 1378.5,
-  &quot;laterDepartureMinute&quot;: 1385.6666666666667,
+  &quot;earlierDepartureMinute&quot;: 1378,
+  &quot;laterDepartureMinute&quot;: 1385.1666666666667,
   &quot;gapSeconds&quot;: 430,
   &quot;targetHeadwaySeconds&quot;: 690,
   &quot;deficitSeconds&quot;: 260,
@@ -385,32 +299,90 @@
 }</pre></details>
 </article>
 
+<article id="issue-2" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#2</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-severe">severe</span>
+    <span class="trip">TS1051</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">T3&gt;S2W 相鄰發車 10:51:50→10:53:40 間隔 110 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <details><summary>detail</summary><pre>{
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_2-110-2-37920&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_2-111-2-38280&quot;,
+  &quot;earlierDepartureMinute&quot;: 651.8333333333334,
+  &quot;laterDepartureMinute&quot;: 653.6666666666666,
+  &quot;gapSeconds&quot;: 110,
+  &quot;targetHeadwaySeconds&quot;: 360,
+  &quot;deficitSeconds&quot;: 250,
+  &quot;severityBand&quot;: &quot;severe&quot;,
+  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_2&quot;
+}</pre></details>
+</article>
+
+<article id="issue-3" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#3</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-severe">severe</span>
+    <span class="trip">ST1055</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">S2W上行&gt;T3上行 相鄰發車 10:55:20→10:57:10 間隔 110 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <details><summary>detail</summary><pre>{
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_4-110-3-38120&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_4-111-3-38480&quot;,
+  &quot;earlierDepartureMinute&quot;: 655.3333333333334,
+  &quot;laterDepartureMinute&quot;: 657.1666666666666,
+  &quot;gapSeconds&quot;: 110,
+  &quot;targetHeadwaySeconds&quot;: 360,
+  &quot;deficitSeconds&quot;: 250,
+  &quot;severityBand&quot;: &quot;severe&quot;,
+  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_4&quot;
+}</pre></details>
+</article>
+
 <article id="issue-4" class="row warning kind-limit layer-limit">
   <div class="row-head">
     <span class="idx">#4</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
-    <span class="trip">TN1158</span>
+    <span class="trip">NT1104</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 11:58:00→12:00:20 間隔 140 秒，低於跨時段班距下限 360 秒（兩時段 360/180，取較嚴者；此對班多半非乾淨脈衝）</p>
+  <p class="msg">N2W&gt;T3 相鄰發車 11:04:00→11:06:00 間隔 120 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-122-4-42620&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294957802-route_5-97-4-35060&quot;,
-  &quot;earlierDepartureMinute&quot;: 718,
-  &quot;laterDepartureMinute&quot;: 720.3333333333334,
-  &quot;gapSeconds&quot;: 140,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-114-1-39150&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-118-1-40590&quot;,
+  &quot;earlierDepartureMinute&quot;: 664,
+  &quot;laterDepartureMinute&quot;: 666,
+  &quot;gapSeconds&quot;: 120,
   &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 220,
+  &quot;deficitSeconds&quot;: 240,
   &quot;severityBand&quot;: &quot;severe&quot;,
   &quot;earlierIntervalHeadwaySeconds&quot;: 360,
-  &quot;laterIntervalHeadwaySeconds&quot;: 180,
-  &quot;straddlesInterval&quot;: true,
-  &quot;routeId&quot;: &quot;route_5&quot;
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_1&quot;
 }</pre></details>
 </article>
 
@@ -420,26 +392,26 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
-    <span class="trip">NT2203</span>
+    <span class="trip">TS1105</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 22:03:50→22:06:30 間隔 160 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3&gt;S2W 相鄰發車 11:05:30→11:07:30 間隔 120 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-285-1-79470&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-286-1-79830&quot;,
-  &quot;earlierDepartureMinute&quot;: 1323.8333333333333,
-  &quot;laterDepartureMinute&quot;: 1326.5,
-  &quot;gapSeconds&quot;: 160,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_2-113-2-39000&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_2-114-2-39360&quot;,
+  &quot;earlierDepartureMinute&quot;: 665.5,
+  &quot;laterDepartureMinute&quot;: 667.5,
+  &quot;gapSeconds&quot;: 120,
   &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 200,
+  &quot;deficitSeconds&quot;: 240,
   &quot;severityBand&quot;: &quot;severe&quot;,
   &quot;earlierIntervalHeadwaySeconds&quot;: 360,
   &quot;laterIntervalHeadwaySeconds&quot;: 360,
   &quot;straddlesInterval&quot;: false,
-  &quot;routeId&quot;: &quot;route_1&quot;
+  &quot;routeId&quot;: &quot;route_2&quot;
 }</pre></details>
 </article>
 
@@ -449,21 +421,50 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
-    <span class="trip">TN1938</span>
+    <span class="trip">ST1109</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 19:38:50→19:41:40 間隔 170 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">S2W上行&gt;T3上行 相鄰發車 11:09:00→11:11:00 間隔 120 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-259-4-70700&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-257-4-69980&quot;,
-  &quot;earlierDepartureMinute&quot;: 1178.8333333333333,
-  &quot;laterDepartureMinute&quot;: 1181.6666666666667,
-  &quot;gapSeconds&quot;: 170,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_4-113-3-39200&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_4-114-3-39560&quot;,
+  &quot;earlierDepartureMinute&quot;: 669,
+  &quot;laterDepartureMinute&quot;: 671,
+  &quot;gapSeconds&quot;: 120,
   &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 190,
+  &quot;deficitSeconds&quot;: 240,
+  &quot;severityBand&quot;: &quot;severe&quot;,
+  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_4&quot;
+}</pre></details>
+</article>
+
+<article id="issue-7" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#7</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-severe">severe</span>
+    <span class="trip">TN1112</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 11:12:00→11:14:00 間隔 120 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <details><summary>detail</summary><pre>{
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-113-4-39380&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-114-4-39740&quot;,
+  &quot;earlierDepartureMinute&quot;: 672,
+  &quot;laterDepartureMinute&quot;: 674,
+  &quot;gapSeconds&quot;: 120,
+  &quot;targetHeadwaySeconds&quot;: 360,
+  &quot;deficitSeconds&quot;: 240,
   &quot;severityBand&quot;: &quot;severe&quot;,
   &quot;earlierIntervalHeadwaySeconds&quot;: 360,
   &quot;laterIntervalHeadwaySeconds&quot;: 360,
@@ -472,9 +473,38 @@
 }</pre></details>
 </article>
 
-<article id="issue-7" class="row warning kind-limit layer-limit">
+<article id="issue-8" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#7</span>
+    <span class="idx">#8</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-severe">severe</span>
+    <span class="trip">NT1115</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">N2W&gt;T3 相鄰發車 11:15:50→11:18:00 間隔 130 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <details><summary>detail</summary><pre>{
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-115-1-39600&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-116-1-39960&quot;,
+  &quot;earlierDepartureMinute&quot;: 675.8333333333334,
+  &quot;laterDepartureMinute&quot;: 678,
+  &quot;gapSeconds&quot;: 130,
+  &quot;targetHeadwaySeconds&quot;: 360,
+  &quot;deficitSeconds&quot;: 230,
+  &quot;severityBand&quot;: &quot;severe&quot;,
+  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_1&quot;
+}</pre></details>
+</article>
+
+<article id="issue-9" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#9</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -507,9 +537,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-8" class="row warning kind-limit layer-limit">
+<article id="issue-10" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#8</span>
+    <span class="idx">#10</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -542,9 +572,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-9" class="row warning kind-limit layer-limit">
+<article id="issue-11" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#9</span>
+    <span class="idx">#11</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -577,9 +607,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-10" class="row warning kind-limit layer-limit">
+<article id="issue-12" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#10</span>
+    <span class="idx">#12</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -612,9 +642,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-11" class="row warning kind-limit layer-limit">
+<article id="issue-13" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#11</span>
+    <span class="idx">#13</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -647,9 +677,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-12" class="row warning kind-limit layer-limit">
+<article id="issue-14" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#12</span>
+    <span class="idx">#14</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -682,9 +712,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-13" class="row warning kind-limit layer-limit">
+<article id="issue-15" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#13</span>
+    <span class="idx">#15</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -717,9 +747,9 @@
 }</pre></details>
 </article>
 
-<article id="issue-14" class="row warning kind-limit layer-limit">
+<article id="issue-16" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#14</span>
+    <span class="idx">#16</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-severe">severe</span>
@@ -752,24 +782,53 @@
 }</pre></details>
 </article>
 
-<article id="issue-15" class="row warning kind-limit layer-limit">
+<article id="issue-17" class="row warning kind-limit layer-limit">
   <div class="row-head">
-    <span class="idx">#15</span>
+    <span class="idx">#17</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">NT1942</span>
+    <span class="trip">TN1042</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 19:42:40→19:46:00 間隔 200 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 10:42:40→10:45:40 間隔 180 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-262-1-71190&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-260-1-70470&quot;,
-  &quot;earlierDepartureMinute&quot;: 1182.6666666666667,
-  &quot;laterDepartureMinute&quot;: 1186,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-106-4-36860&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-108-4-37580&quot;,
+  &quot;earlierDepartureMinute&quot;: 642.6666666666666,
+  &quot;laterDepartureMinute&quot;: 645.6666666666666,
+  &quot;gapSeconds&quot;: 180,
+  &quot;targetHeadwaySeconds&quot;: 360,
+  &quot;deficitSeconds&quot;: 180,
+  &quot;severityBand&quot;: &quot;moderate&quot;,
+  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
+  &quot;laterIntervalHeadwaySeconds&quot;: 360,
+  &quot;straddlesInterval&quot;: false,
+  &quot;routeId&quot;: &quot;route_5&quot;
+}</pre></details>
+</article>
+
+<article id="issue-18" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#18</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-moderate">moderate</span>
+    <span class="trip">NT2024</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">N2W&gt;T3 相鄰發車 20:24:50→20:28:10 間隔 200 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <details><summary>detail</summary><pre>{
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-268-1-73350&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-269-1-73710&quot;,
+  &quot;earlierDepartureMinute&quot;: 1224.8333333333333,
+  &quot;laterDepartureMinute&quot;: 1228.1666666666667,
   &quot;gapSeconds&quot;: 200,
   &quot;targetHeadwaySeconds&quot;: 360,
   &quot;deficitSeconds&quot;: 160,
@@ -781,119 +840,32 @@
 }</pre></details>
 </article>
 
-<article id="issue-16" class="row warning kind-limit layer-limit">
-  <div class="row-head">
-    <span class="idx">#16</span>
-    <span class="sev">warning</span>
-    <span class="kind">演算法極限</span>
-    <span class="band band-moderate">moderate</span>
-    <span class="trip">NT1939</span>
-  </div>
-  <h2>班距低於目標</h2>
-  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 19:39:10→19:42:40 間隔 210 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
-  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-261-1-70830&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_1-262-1-71190&quot;,
-  &quot;earlierDepartureMinute&quot;: 1179.1666666666667,
-  &quot;laterDepartureMinute&quot;: 1182.6666666666667,
-  &quot;gapSeconds&quot;: 210,
-  &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 150,
-  &quot;severityBand&quot;: &quot;moderate&quot;,
-  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
-  &quot;laterIntervalHeadwaySeconds&quot;: 360,
-  &quot;straddlesInterval&quot;: false,
-  &quot;routeId&quot;: &quot;route_1&quot;
-}</pre></details>
-</article>
-
-<article id="issue-17" class="row warning kind-limit layer-limit">
-  <div class="row-head">
-    <span class="idx">#17</span>
-    <span class="sev">warning</span>
-    <span class="kind">演算法極限</span>
-    <span class="band band-moderate">moderate</span>
-    <span class="trip">TS1928</span>
-  </div>
-  <h2>班距低於目標</h2>
-  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3&gt;S2W 相鄰發車 19:28:50→19:32:20 間隔 210 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
-  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_2-258-2-69960&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_2-259-2-70320&quot;,
-  &quot;earlierDepartureMinute&quot;: 1168.8333333333333,
-  &quot;laterDepartureMinute&quot;: 1172.3333333333333,
-  &quot;gapSeconds&quot;: 210,
-  &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 150,
-  &quot;severityBand&quot;: &quot;moderate&quot;,
-  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
-  &quot;laterIntervalHeadwaySeconds&quot;: 360,
-  &quot;straddlesInterval&quot;: false,
-  &quot;routeId&quot;: &quot;route_2&quot;
-}</pre></details>
-</article>
-
-<article id="issue-18" class="row warning kind-limit layer-limit">
-  <div class="row-head">
-    <span class="idx">#18</span>
-    <span class="sev">warning</span>
-    <span class="kind">演算法極限</span>
-    <span class="band band-moderate">moderate</span>
-    <span class="trip">ST1932</span>
-  </div>
-  <h2>班距低於目標</h2>
-  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">S2W上行&gt;T3上行 相鄰發車 19:32:20→19:35:50 間隔 210 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
-  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_4-258-3-70160&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_4-259-3-70520&quot;,
-  &quot;earlierDepartureMinute&quot;: 1172.3333333333333,
-  &quot;laterDepartureMinute&quot;: 1175.8333333333333,
-  &quot;gapSeconds&quot;: 210,
-  &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 150,
-  &quot;severityBand&quot;: &quot;moderate&quot;,
-  &quot;earlierIntervalHeadwaySeconds&quot;: 360,
-  &quot;laterIntervalHeadwaySeconds&quot;: 360,
-  &quot;straddlesInterval&quot;: false,
-  &quot;routeId&quot;: &quot;route_4&quot;
-}</pre></details>
-</article>
-
 <article id="issue-19" class="row warning kind-limit layer-limit">
   <div class="row-head">
     <span class="idx">#19</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">TN1935</span>
+    <span class="trip">NT1046</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 19:35:20→19:38:50 間隔 210 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">N2W&gt;T3 相鄰發車 10:46:30→10:50:10 間隔 220 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-258-4-70340&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-259-4-70700&quot;,
-  &quot;earlierDepartureMinute&quot;: 1175.3333333333333,
-  &quot;laterDepartureMinute&quot;: 1178.8333333333333,
-  &quot;gapSeconds&quot;: 210,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-109-1-37350&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_1-111-1-38070&quot;,
+  &quot;earlierDepartureMinute&quot;: 646.5,
+  &quot;laterDepartureMinute&quot;: 650.1666666666666,
+  &quot;gapSeconds&quot;: 220,
   &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 150,
+  &quot;deficitSeconds&quot;: 140,
   &quot;severityBand&quot;: &quot;moderate&quot;,
   &quot;earlierIntervalHeadwaySeconds&quot;: 360,
   &quot;laterIntervalHeadwaySeconds&quot;: 360,
   &quot;straddlesInterval&quot;: false,
-  &quot;routeId&quot;: &quot;route_5&quot;
+  &quot;routeId&quot;: &quot;route_1&quot;
 }</pre></details>
 </article>
 
@@ -903,21 +875,21 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">TN1957</span>
+    <span class="trip">TN1056</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 19:57:30→20:01:40 間隔 250 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 10:56:30→11:00:10 間隔 220 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
   <details><summary>detail</summary><pre>{
-  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-260-4-71060&quot;,
-  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786295018678-route_5-262-4-71780&quot;,
-  &quot;earlierDepartureMinute&quot;: 1197.5,
-  &quot;laterDepartureMinute&quot;: 1201.6666666666667,
-  &quot;gapSeconds&quot;: 250,
+  &quot;earlierBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-109-4-37940&quot;,
+  &quot;laterBlockId&quot;: &quot;template-pax-slot-1786294979162-route_5-111-4-38660&quot;,
+  &quot;earlierDepartureMinute&quot;: 656.5,
+  &quot;laterDepartureMinute&quot;: 660.1666666666666,
+  &quot;gapSeconds&quot;: 220,
   &quot;targetHeadwaySeconds&quot;: 360,
-  &quot;deficitSeconds&quot;: 110,
+  &quot;deficitSeconds&quot;: 140,
   &quot;severityBand&quot;: &quot;moderate&quot;,
   &quot;earlierIntervalHeadwaySeconds&quot;: 360,
   &quot;laterIntervalHeadwaySeconds&quot;: 360,
@@ -932,14 +904,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">ST1757</span>
+    <span class="trip">TN2016</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">S2W上行&gt;T3上行 相鄰發車 17:57:50→18:02:20 間隔 270 秒，低於跨時段班距下限 360 秒（兩時段 180/360，取較嚴者；此對班多半非乾淨脈衝）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 20:16:00→20:19:50 間隔 230 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=moderate · deficitSeconds=90 · gapSeconds=270 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=21）</p>
+  <p class="detail-compact">severityBand=moderate · deficitSeconds=130 · gapSeconds=230 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=21）</p>
 </article>
 
 <article id="issue-22" class="row warning kind-limit layer-limit">
@@ -948,14 +920,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">NT1208</span>
+    <span class="trip">TN2019</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 12:08:20→12:10:00 間隔 100 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 20:19:50→20:24:20 間隔 270 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=moderate · deficitSeconds=80 · gapSeconds=100 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=22）</p>
+  <p class="detail-compact">severityBand=moderate · deficitSeconds=90 · gapSeconds=270 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=22）</p>
 </article>
 
 <article id="issue-23" class="row warning kind-limit layer-limit">
@@ -964,14 +936,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">TS0912</span>
+    <span class="trip">NT2019</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3&gt;S2W 相鄰發車 09:12:40→09:14:20 間隔 100 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">N2W&gt;T3 相鄰發車 20:19:50→20:24:50 間隔 300 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=moderate · deficitSeconds=80 · gapSeconds=100 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=23）</p>
+  <p class="detail-compact">severityBand=moderate · deficitSeconds=60 · gapSeconds=300 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=23）</p>
 </article>
 
 <article id="issue-24" class="row warning kind-limit layer-limit">
@@ -980,14 +952,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">ST0945</span>
+    <span class="trip">TNB0820</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">S2W上行&gt;T3上行 相鄰發車 09:45:20→09:47:00 間隔 100 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;[備用]N2W上行停靠 相鄰發車 08:20:50→08:22:50 間隔 120 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=moderate · deficitSeconds=80 · gapSeconds=100 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=24）</p>
+  <p class="detail-compact">severityBand=moderate · deficitSeconds=60 · gapSeconds=120 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=24）</p>
 </article>
 
 <article id="issue-25" class="row warning kind-limit layer-limit">
@@ -996,14 +968,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-moderate">moderate</span>
-    <span class="trip">ST0916</span>
+    <span class="trip">TN2031</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">S2W上行&gt;T3上行 相鄰發車 09:16:10→09:18:20 間隔 130 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 20:31:10→20:36:30 間隔 320 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=moderate · deficitSeconds=50 · gapSeconds=130 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=25）</p>
+  <p class="detail-compact">severityBand=moderate · deficitSeconds=40 · gapSeconds=320 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=25）</p>
 </article>
 
 <article id="issue-26" class="row warning kind-limit layer-limit">
@@ -1028,14 +1000,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     
-    <span class="trip">TN0302</span>
+    <span class="trip">EE1900</span>
   </div>
-  <h2>沒有可用的讓渡路線</h2>
-  <p class="code"><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></p>
-  <p class="msg">時間線 2：跑完一輪在「N2W下行出發」空等 113.8 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
-  <p class="guide">車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8.2 站位讓渡</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=27）</p>
+  <h2>整備設施不足，車沒地方停</h2>
+  <p class="code"><code>MAINTENANCE_FACILITY_UNAVAILABLE</code></p>
+  <p class="msg">時間線 5：「charging」沒有可用設施——19:00:00–20:30:00 這台車沒地方停——4 台設施格這段時間被別列車佔著；同時有 7 台車要用這 4 台設施，缺 3 台；往後挪 30 分鐘（改成 19:30:00 開始）就有一台設施整段空著</p>
+  <p class="guide">那段時間該類設施一台都不空，車沒地方停。這是產能問題，不是路徑問題。加設施、把同時段的整備錯開、或減少該時段整備的車數。設施數顯示 0 代表這一類根本沒設定設施。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10.5 整備轉場小卡</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=27）</p>
 </article>
 
 <article id="issue-28" class="row warning kind-limit layer-limit">
@@ -1044,11 +1016,11 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     
-    <span class="trip">L2</span>
+    <span class="trip">TN0302</span>
   </div>
   <h2>沒有可用的讓渡路線</h2>
   <p class="code"><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></p>
-  <p class="msg">時間線 2：跑完一輪在「T3下行」空等 1.3 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
+  <p class="msg">時間線 2：跑完一輪在「N2W下行出發」空等 113.8 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
   <p class="guide">車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8.2 站位讓渡</a></p>
   <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=28）</p>
@@ -1060,14 +1032,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     
-    <span class="trip">L1</span>
+    <span class="trip">NTB1603</span>
   </div>
   <h2>沒有可用的讓渡路線</h2>
   <p class="code"><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></p>
-  <p class="msg">時間線 1：跑完一輪在「S2W上行出發」空等 66.7 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
+  <p class="msg">時間線 6：跑完一輪在「T3下行」空等 2 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
   <p class="guide">車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8.2 站位讓渡</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=29）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=29）</p>
 </article>
 
 <article id="issue-30" class="row warning kind-limit layer-limit">
@@ -1076,14 +1048,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     
-    <span class="trip">ST0454</span>
+    <span class="trip">L1</span>
   </div>
   <h2>沒有可用的讓渡路線</h2>
   <p class="code"><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></p>
-  <p class="msg">時間線 4：跑完一輪在「T3上行」空等 14.7 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
+  <p class="msg">時間線 1：跑完一輪在「S2W上行出發」空等 66.2 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
   <p class="guide">車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8.2 站位讓渡</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=30）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=30）</p>
 </article>
 
 <article id="issue-31" class="row warning kind-limit layer-limit">
@@ -1091,15 +1063,15 @@
     <span class="idx">#31</span>
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
-    <span class="band band-mild">mild</span>
-    <span class="trip">NT1116</span>
+    
+    <span class="trip">ST0454</span>
   </div>
-  <h2>班距低於目標</h2>
-  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 11:16:30→11:22:20 間隔 350 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
-  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=350 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
+  <h2>沒有可用的讓渡路線</h2>
+  <p class="code"><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></p>
+  <p class="msg">時間線 4：跑完一輪在「T3上行」空等 14.2 分鐘，已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，只能留在原地。要消掉這一則，得減少這個時段同時在線的車，或讓其中一台改停別的站位。</p>
+  <p class="guide">車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8.2 站位讓渡</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=31）</p>
 </article>
 
 <article id="issue-32" class="row warning kind-limit layer-limit">
@@ -1108,14 +1080,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-mild">mild</span>
-    <span class="trip">NT1705</span>
+    <span class="trip">ST1037</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">N2W&gt;T3 相鄰發車 17:05:00→17:07:50 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">S2W上行&gt;T3上行 相鄰發車 10:37:00→10:42:40 間隔 340 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=20 · gapSeconds=340 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=32）</p>
 </article>
 
 <article id="issue-33" class="row warning kind-limit layer-limit">
@@ -1124,14 +1096,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-mild">mild</span>
-    <span class="trip">TS1120</span>
+    <span class="trip">TN2157</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3&gt;S2W 相鄰發車 11:20:00→11:25:50 間隔 350 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 21:57:50→22:03:30 間隔 340 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=350 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=20 · gapSeconds=340 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=33）</p>
 </article>
 
 <article id="issue-34" class="row warning kind-limit layer-limit">
@@ -1140,14 +1112,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-mild">mild</span>
-    <span class="trip">ST1123</span>
+    <span class="trip">NT0753</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">S2W上行&gt;T3上行 相鄰發車 11:23:30→11:29:20 間隔 350 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">N2W&gt;T3 相鄰發車 07:53:50→07:56:40 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=350 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=34）</p>
 </article>
 
 <article id="issue-35" class="row warning kind-limit layer-limit">
@@ -1156,14 +1128,14 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-mild">mild</span>
-    <span class="trip">TN1701</span>
+    <span class="trip">TS1113</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3上行&gt;N2W上行 相鄰發車 17:01:10→17:04:00 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">T3&gt;S2W 相鄰發車 11:13:30→11:19:20 間隔 350 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=350 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=35）</p>
 </article>
 
 <article id="issue-36" class="row warning kind-limit layer-limit">
@@ -1172,14 +1144,46 @@
     <span class="sev">warning</span>
     <span class="kind">演算法極限</span>
     <span class="band band-mild">mild</span>
-    <span class="trip">TSB1215</span>
+    <span class="trip">ST1117</span>
   </div>
   <h2>班距低於目標</h2>
   <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
-  <p class="msg">T3下行&gt;[備用]S2W下行停靠 相鄰發車 12:15:40→12:18:30 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="msg">S2W上行&gt;T3上行 相鄰發車 11:17:00→11:22:50 間隔 350 秒，低於時段班距 360 秒（多半來自補完／延後／多車擠班）</p>
   <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
-  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=350 · targetHeadwaySeconds=360 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=36）</p>
+</article>
+
+<article id="issue-37" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#37</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-mild">mild</span>
+    <span class="trip">TN0750</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">T3上行&gt;N2W上行 相鄰發車 07:50:00→07:52:50 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
+</article>
+
+<article id="issue-38" class="row warning kind-limit layer-limit">
+  <div class="row-head">
+    <span class="idx">#38</span>
+    <span class="sev">warning</span>
+    <span class="kind">演算法極限</span>
+    <span class="band band-mild">mild</span>
+    <span class="trip">TSB0757</span>
+  </div>
+  <h2>班距低於目標</h2>
+  <p class="code"><code>HEADWAY_BELOW_TARGET</code></p>
+  <p class="msg">T3下行&gt;[備用]S2W下行停靠 相鄰發車 07:57:20→08:00:10 間隔 170 秒，低於時段班距 180 秒（多半來自補完／延後／多車擠班）</p>
+  <p class="guide">跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s5">→ 詳見 §5 掛車決策（脈衝）</a></p>
+  <p class="detail-compact">severityBand=mild · deficitSeconds=10 · gapSeconds=170 · targetHeadwaySeconds=180 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
 </article></div>
   </details>
 </section>
@@ -1188,90 +1192,58 @@
   <details class="layer-fold" open>
     <summary>可調整警告 · 2 則</summary>
     <div class="list">
-<article id="issue-37" class="row warning kind-actionable layer-actionable">
+<article id="issue-39" class="row warning kind-actionable layer-actionable">
   <div class="row-head">
-    <span class="idx">#37</span>
+    <span class="idx">#39</span>
     <span class="sev">warning</span>
     <span class="kind">可調整</span>
     
-    <span class="trip">TN0841</span>
+    <span class="trip">TN1955</span>
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">N2W下行出發：08:45:30 同時有 2 台車停在這裡——TN0838（時間線 7，08:42:30–08:59:31）、TN0841（時間線 2，08:45:30–08:45:40），但一個停靠點只能停 1 台。整天共 17 對班次不滿足碰撞保護；其中停最久的是另一班 TN0838（時間線 7） 08:42:30 到站、08:59:31 才開走，停了 17.0 分鐘</p>
+  <p class="msg">N2W下行出發：20:00:00 同時有 3 台車停在這裡——TN1949（時間線 4，19:52:40–20:12:00）、TN1955（時間線 3，19:58:40–20:06:00）、SNT2000（時間線 8，20:00:00–20:00:10），但一個停靠點只能停 1 台。整天共 11 對班次不滿足碰撞保護；其中停最久的是另一班 TN1949（時間線 4） 19:52:40 到站、20:12:00 才開走，停了 19.3 分鐘</p>
   <p class="guide">規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」——站位在「前車離站 + 1 倍」就空了，後車還要花同樣的時間才能開進來，所以是兩倍。前車若因調度滯留在站上，以真正開走的時刻起算。訊息會直接告訴你「同時最多有幾台車停在這個停靠點」：只要超過 1 台，就代表該時段的車比班距需要的多，多出來的車跑完一輪沒有下一個脈衝可接，只好停在原地等，於是全擠在同一個停靠點。這不是把兩班拉開就能解的——要減少該時段的時間線列數、把多餘的車安排進整備／待命，或讓它們改停別的站位（關聯圖上要有終點在別站的備用路線）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=37）</p>
+  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
 </article>
 
-<article id="issue-38" class="row warning kind-actionable layer-actionable">
+<article id="issue-40" class="row warning kind-actionable layer-actionable">
   <div class="row-head">
-    <span class="idx">#38</span>
+    <span class="idx">#40</span>
     <span class="sev">warning</span>
     <span class="kind">可調整</span>
     
-    <span class="trip">NT0729</span>
+    <span class="trip">SNT0700</span>
   </div>
   <h2>碰撞保護時間不足</h2>
   <p class="code"><code>STATION_BERTH_PROTECTION_GAP</code></p>
-  <p class="msg">T3下行：07:02:50 同時有 3 台車停在這裡——NTB0651（時間線 6，06:54:30–07:10:10）、NTB0657（時間線 7，07:00:30–07:13:10）、SNT0700（時間線 1，07:02:50–07:03:30），但一個停靠點只能停 1 台。整天共 23 對班次不滿足碰撞保護；其中停最久的是另一班 NTB1155（時間線 5） 11:58:30 到站、12:18:30 才開走，停了 20.0 分鐘</p>
+  <p class="msg">T3下行：07:02:50 同時有 3 台車停在這裡——NTB0651（時間線 6，06:54:30–07:09:50）、NTB0657（時間線 7，07:00:30–07:12:50）、SNT0700（時間線 1，07:02:50–07:03:30），但一個停靠點只能停 1 台。整天共 29 對班次不滿足碰撞保護；其中停最久的是另一班 NTB0651（時間線 6） 06:54:30 到站、07:09:50 才開走，停了 15.3 分鐘</p>
   <p class="guide">規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」——站位在「前車離站 + 1 倍」就空了，後車還要花同樣的時間才能開進來，所以是兩倍。前車若因調度滯留在站上，以真正開走的時刻起算。訊息會直接告訴你「同時最多有幾台車停在這個停靠點」：只要超過 1 台，就代表該時段的車比班距需要的多，多出來的車跑完一輪沒有下一個脈衝可接，只好停在原地等，於是全擠在同一個停靠點。這不是把兩班拉開就能解的——要減少該時段的時間線列數、把多餘的車安排進整備／待命，或讓它們改停別的站位（關聯圖上要有終點在別站的備用路線）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=38）</p>
+  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
 </article></div>
   </details>
 </section>
 
 <section class="layer layer-policy">
   <details class="layer-fold">
-    <summary>策略說明（不阻擋驗收） · 134 則（預設摺疊）</summary>
+    <summary>策略說明（不阻擋驗收） · 148 則（預設摺疊）</summary>
     <div class="list">
-<article id="issue-39" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#39</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">EA1000</span>
-  </div>
-  <h2>整備轉場卡排不出來</h2>
-  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 1：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=39）</p>
-</article>
-
-<article id="issue-40" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#40</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">EA1800</span>
-  </div>
-  <h2>整備轉場卡排不出來</h2>
-  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 1：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑的移動時間塞不進這段空檔</p>
-  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=40）</p>
-</article>
-
 <article id="issue-41" class="row warning kind-policy layer-policy">
   <div class="row-head">
     <span class="idx">#41</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">EC1600</span>
+    <span class="trip">EG1500</span>
   </div>
-  <h2>整備轉場卡排不出來</h2>
-  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 3：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
-  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
+  <h2>已請別列車換設施讓位</h2>
+  <p class="code"><code>MAINTENANCE_FACILITY_YIELDED</code></p>
+  <p class="msg">時間線 7：「charging」原本沒地方停——已請時間線 3 的整備改停別台設施，讓出 E2。雙方時間都沒有動。</p>
+  <p class="guide">這一段整備原本沒地方停。求解器發現擋路的那台車自己也停得下別台設施，就請它換過去、把位子讓出來——兩邊的時間都沒有動，只是換了格子，所以沒有代價。會看到某一列的整備跑到跟平常不同的設施上，那是這個機制造成的，不是排錯。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10.5 整備轉場小卡</a></p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=41）</p>
 </article>
 
 <article id="issue-42" class="row warning kind-policy layer-policy">
@@ -1280,7 +1252,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ED1202</span>
+    <span class="trip">ED1200</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
@@ -1296,11 +1268,11 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">EE0800</span>
+    <span class="trip">EE1900</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 5：「charging」排不出整備轉場卡——排不出入廠卡：1 個候選都不行——1 條路徑的移動時間塞不進這段空檔</p>
+  <p class="msg">時間線 5：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
   <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=43）</p>
@@ -1328,14 +1300,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">EF1500</span>
+    <span class="trip">EG1500</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 6：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
+  <p class="msg">時間線 7：「charging」排不出整備轉場卡——排不出入廠卡：4 個候選都不行——4 台設施在拓樸上沒有可通的路徑</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=45）</p>
 </article>
 
 <article id="issue-46" class="row warning kind-policy layer-policy">
@@ -1344,7 +1316,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">EH1100</span>
+    <span class="trip">EH1700</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
@@ -1392,6 +1364,22 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
+    <span class="trip">SE2030</span>
+  </div>
+  <h2>整備轉場卡排不出來</h2>
+  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
+  <p class="msg">時間線 5：「charging」轉「standby」排不出整備轉場卡——排不出整備間轉場（出廠＋入廠）：4 個候選都不行——4 台設施在這段時間被別列車佔著</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=49）</p>
+</article>
+
+<article id="issue-50" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#50</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
     <span class="trip">SG0500</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
@@ -1399,12 +1387,28 @@
   <p class="msg">時間線 7：「inspection」轉「standby」排不出整備轉場卡——排不出整備間轉場（出廠＋入廠）：1 個候選都不行——1 台設施在拓樸上沒有可通的路徑</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=49）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=50）</p>
 </article>
 
-<article id="issue-50" class="row warning kind-policy layer-policy">
+<article id="issue-51" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#50</span>
+    <span class="idx">#51</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">SG1600</span>
+  </div>
+  <h2>整備轉場卡排不出來</h2>
+  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
+  <p class="msg">時間線 7：「charging」轉「standby」排不出整備轉場卡——排不出整備間轉場（出廠＋入廠）：4 個候選都不行——4 台設施在這段時間被別列車佔著</p>
+  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=51）</p>
+</article>
+
+<article id="issue-52" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#52</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1415,12 +1419,12 @@
   <p class="msg">時間線 9：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=50）</p>
+  <p class="detail-compact">timelineRow=9 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
 </article>
 
-<article id="issue-51" class="row warning kind-policy layer-policy">
+<article id="issue-53" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#51</span>
+    <span class="idx">#53</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -1431,39 +1435,7 @@
   <p class="msg">時間線 10：「servicing」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=51）</p>
-</article>
-
-<article id="issue-52" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#52</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">SK0000</span>
-  </div>
-  <h2>整備轉場卡排不出來</h2>
-  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 11：「standby」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=52）</p>
-</article>
-
-<article id="issue-53" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#53</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">EK0204</span>
-  </div>
-  <h2>整備轉場卡排不出來</h2>
-  <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 11：「charging」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
-  <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=53）</p>
+  <p class="detail-compact">timelineRow=10 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=53）</p>
 </article>
 
 <article id="issue-54" class="row warning kind-policy layer-policy">
@@ -1472,7 +1444,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">SK0303</span>
+    <span class="trip">SK0000</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
@@ -1488,14 +1460,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">SD0730</span>
+    <span class="trip">EK0204</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 4：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
+  <p class="msg">時間線 11：「charging」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=55）</p>
+  <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=55）</p>
 </article>
 
 <article id="issue-56" class="row warning kind-policy layer-policy">
@@ -1504,14 +1476,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">SD1336</span>
+    <span class="trip">SK0303</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 4：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（T3上行 原訂 14:00:00 經過，被 時間線 3 13:59:50 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
+  <p class="msg">時間線 11：「standby」排不出整備轉場卡——這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>
+  <p class="detail-compact">timelineRow=11 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=56）</p>
 </article>
 
 <article id="issue-57" class="row warning kind-policy layer-policy">
@@ -1520,14 +1492,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">EA1352</span>
+    <span class="trip">SD0730</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 1：「charging」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 14:56:10 經過，被 時間線 2 14:56:20 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
+  <p class="msg">時間線 4：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=57）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=57）</p>
 </article>
 
 <article id="issue-58" class="row warning kind-policy layer-policy">
@@ -1536,14 +1508,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">SA1930</span>
+    <span class="trip">SB1130</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 1：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（N2W下行出發 原訂 00:00:00 經過，被 時間線 6 23:59:31、時間線 7 00:00:31 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
+  <p class="msg">時間線 2：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=58）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=58）</p>
 </article>
 
 <article id="issue-59" class="row warning kind-policy layer-policy">
@@ -1552,14 +1524,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">SG2130</span>
+    <span class="trip">SA1133</span>
   </div>
   <h2>整備轉場卡排不出來</h2>
   <p class="code"><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></p>
-  <p class="msg">時間線 7：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 台設施在這段時間被別列車佔著</p>
+  <p class="msg">時間線 1：「standby」排不出整備轉場卡——排不出出廠卡：1 個候選都不行——1 條路徑會跟別列車在同一個轉折點撞上（T3上行 原訂 12:00:30 經過，被 時間線 6 11:59:50 擋著；可挪動範圍只有 0 秒（需要差開 60 秒））</p>
   <p class="guide">轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。排不出來的原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向）。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s10">→ 詳見 §10 整備後的調度營運班次</a></p>
-  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=59）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=59）</p>
 </article>
 
 <article id="issue-60" class="row warning kind-policy layer-policy">
@@ -1620,7 +1592,7 @@
   </div>
   <h2>滯留車晚一點進站讓路</h2>
   <p class="code"><code>STATION_BERTH_ARRIVAL_YIELDED</code></p>
-  <p class="msg">「N2W下行出發」有 34 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 604.5 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
+  <p class="msg">「N2W下行出發」有 30 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 296.8 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
   <p class="guide">一台車跑完一趟停在站上等下一趟，這段空等會擋住只是路過的別列車。既有機制只會延後後車；這裡改成讓滯留的那台晚一點進站——它反正要在站上空等，晚幾分鐘到沒有損失，下一趟的發車時刻與班距完全不變。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=63）</p>
@@ -1636,7 +1608,7 @@
   </div>
   <h2>滯留車晚一點進站讓路</h2>
   <p class="code"><code>STATION_BERTH_ARRIVAL_YIELDED</code></p>
-  <p class="msg">「T3下行」有 22 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 33.0 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
+  <p class="msg">「T3下行」有 21 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 21.0 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
   <p class="guide">一台車跑完一趟停在站上等下一趟，這段空等會擋住只是路過的別列車。既有機制只會延後後車；這裡改成讓滯留的那台晚一點進站——它反正要在站上空等，晚幾分鐘到沒有損失，下一趟的發車時刻與班距完全不變。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=64）</p>
@@ -1652,7 +1624,7 @@
   </div>
   <h2>滯留車晚一點進站讓路</h2>
   <p class="code"><code>STATION_BERTH_ARRIVAL_YIELDED</code></p>
-  <p class="msg">「S2W上行出發」有 19 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 25.3 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
+  <p class="msg">「S2W上行出發」有 19 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 15.8 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
   <p class="guide">一台車跑完一趟停在站上等下一趟，這段空等會擋住只是路過的別列車。既有機制只會延後後車；這裡改成讓滯留的那台晚一點進站——它反正要在站上空等，晚幾分鐘到沒有損失，下一趟的發車時刻與班距完全不變。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=65）</p>
@@ -1668,7 +1640,7 @@
   </div>
   <h2>滯留車晚一點進站讓路</h2>
   <p class="code"><code>STATION_BERTH_ARRIVAL_YIELDED</code></p>
-  <p class="msg">「T3上行」有 7 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 10.5 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
+  <p class="msg">「T3上行」有 7 班車跑完一趟後要在站上空等下一趟，擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 7.0 分鐘）——它們反正要空等，下一趟發車時刻與班距都不變。</p>
   <p class="guide">一台車跑完一趟停在站上等下一趟，這段空等會擋住只是路過的別列車。既有機制只會延後後車；這裡改成讓滯留的那台晚一點進站——它反正要在站上空等，晚幾分鐘到沒有損失，下一趟的發車時刻與班距完全不變。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=66）</p>
@@ -1712,7 +1684,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1000</span>
+    <span class="trip">TNB1003</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1728,7 +1700,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1004</span>
+    <span class="trip">NTB1007</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1760,7 +1732,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1029</span>
+    <span class="trip">NTB1033</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1776,7 +1748,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">STB1607</span>
+    <span class="trip">TNB1543</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1792,7 +1764,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TN1613</span>
+    <span class="trip">NTB1546</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1808,7 +1780,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST1633</span>
+    <span class="trip">TNB1605</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1824,7 +1796,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TN1636</span>
+    <span class="trip">NTB1609</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1840,7 +1812,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TN1704</span>
+    <span class="trip">TNB1615</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1856,7 +1828,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NT1707</span>
+    <span class="trip">NTB1619</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1872,7 +1844,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST1656</span>
+    <span class="trip">TNB1619</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1888,7 +1860,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1702</span>
+    <span class="trip">NTB1622</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1904,7 +1876,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1720</span>
+    <span class="trip">TNB1639</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1920,7 +1892,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NT1712</span>
+    <span class="trip">TSB1634</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1936,7 +1908,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1724</span>
+    <span class="trip">NTB1642</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1952,7 +1924,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TSB1718</span>
+    <span class="trip">STB1638</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1968,7 +1940,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">STB1722</span>
+    <span class="trip">TNB1646</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -1984,7 +1956,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TN1725</span>
+    <span class="trip">NTB1650</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2000,7 +1972,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1734</span>
+    <span class="trip">TNB1654</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2016,7 +1988,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1737</span>
+    <span class="trip">NTB1657</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2032,7 +2004,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST1737</span>
+    <span class="trip">TNB1701</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2048,7 +2020,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TN1740</span>
+    <span class="trip">NTB1704</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2064,7 +2036,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1742</span>
+    <span class="trip">TN1704</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2080,7 +2052,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1746</span>
+    <span class="trip">NT1709</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2096,7 +2068,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST1757</span>
+    <span class="trip">TNB1717</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2112,7 +2084,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L1</span>
+    <span class="trip">NTB1721</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2128,7 +2100,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1759</span>
+    <span class="trip">TN1721</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2160,7 +2132,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NTB1802</span>
+    <span class="trip">NT1728</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2176,7 +2148,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TS1725</span>
+    <span class="trip">TSB1716</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2192,7 +2164,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST1728</span>
+    <span class="trip">STB1720</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2224,7 +2196,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TSB1739</span>
+    <span class="trip">TSB1746</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2256,7 +2228,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">STB1742</span>
+    <span class="trip">STB1750</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2320,7 +2292,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L6</span>
+    <span class="trip">TNB1821</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2336,7 +2308,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L5</span>
+    <span class="trip">TNB1837</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2352,7 +2324,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L6</span>
+    <span class="trip">NTB1825</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2368,7 +2340,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L6</span>
+    <span class="trip">TS1829</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2400,7 +2372,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L6</span>
+    <span class="trip">ST1832</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2416,7 +2388,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB0925</span>
+    <span class="trip">TNB0926</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
@@ -2432,14 +2404,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L1</span>
+    <span class="trip">TN0925</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="msg">時間線 2：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=114）</p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=114）</p>
 </article>
 
 <article id="issue-115" class="row warning kind-policy layer-policy">
@@ -2448,14 +2420,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1541</span>
+    <span class="trip">TNB1503</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="msg">時間線 1：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=115）</p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=115）</p>
 </article>
 
 <article id="issue-116" class="row warning kind-policy layer-policy">
@@ -2464,14 +2436,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TNB1918</span>
+    <span class="trip">TNB1522</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
+  <p class="msg">時間線 3：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=116）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=116）</p>
 </article>
 
 <article id="issue-117" class="row warning kind-policy layer-policy">
@@ -2480,11 +2452,11 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L4</span>
+    <span class="trip">TNB1525</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 4：跑完後會停在「T3下行」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
   <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=117）</p>
@@ -2496,14 +2468,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">TSB1617</span>
+    <span class="trip">TNB1916</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 8：跑完後會停在「T3下行」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="msg">時間線 4：跑完後會停在「N2W下行出發」擋住別台車，已改跑備用路線停到別的站位（TN → NT 改為 TNB → NTB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=118）</p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=118）</p>
 </article>
 
 <article id="issue-119" class="row warning kind-policy layer-policy">
@@ -2512,14 +2484,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NT1558</span>
+    <span class="trip">TSB0947</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 1：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="msg">時間線 3：跑完後會停在「T3下行」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=119）</p>
+  <p class="detail-compact">timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=119）</p>
 </article>
 
 <article id="issue-120" class="row warning kind-policy layer-policy">
@@ -2528,14 +2500,14 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">NT1620</span>
+    <span class="trip">TSB1805</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
-  <p class="msg">時間線 2：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="msg">時間線 7：跑完後會停在「T3下行」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=120）</p>
+  <p class="detail-compact">timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=120）</p>
 </article>
 
 <article id="issue-121" class="row warning kind-policy layer-policy">
@@ -2544,19 +2516,275 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">L6</span>
+    <span class="trip">TSB1830</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「T3下行」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=121）</p>
+</article>
+
+<article id="issue-122" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#122</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">L2</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=122）</p>
+</article>
+
+<article id="issue-123" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#123</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1018</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=123）</p>
+</article>
+
+<article id="issue-124" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#124</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1532</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 4：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=124）</p>
+</article>
+
+<article id="issue-125" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#125</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TS1533</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=125）</p>
+</article>
+
+<article id="issue-126" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#126</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">L8</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 8：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=8 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=126）</p>
+</article>
+
+<article id="issue-127" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#127</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TS1558</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=127）</p>
+</article>
+
+<article id="issue-128" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#128</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1609</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=128）</p>
+</article>
+
+<article id="issue-129" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#129</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1612</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 2：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=129）</p>
+</article>
+
+<article id="issue-130" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#130</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1622</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=130）</p>
+</article>
+
+<article id="issue-131" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#131</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1646</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 5：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=131）</p>
+</article>
+
+<article id="issue-132" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#132</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1653</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=132）</p>
+</article>
+
+<article id="issue-133" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#133</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TS1658</span>
   </div>
   <h2>站位約束改選路線</h2>
   <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
   <p class="msg">時間線 6：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
   <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=121）</p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=133）</p>
 </article>
 
-<article id="issue-122" class="row warning kind-policy layer-policy">
+<article id="issue-134" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#122</span>
+    <span class="idx">#134</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1710</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=134）</p>
+</article>
+
+<article id="issue-135" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#135</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1713</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 6：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=135）</p>
+</article>
+
+<article id="issue-136" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#136</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">L1</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 1：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=136）</p>
+</article>
+
+<article id="issue-137" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#137</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">TSB1814</span>
+  </div>
+  <h2>站位約束改選路線</h2>
+  <p class="code"><code>STATION_BERTH_BACKUP_USED</code></p>
+  <p class="msg">時間線 6：跑完後會停在「S2W上行出發」擋住別台車，已改跑備用路線停到別的站位（TS → ST 改為 TSB → STB；發車時刻不變）</p>
+  <p class="guide">這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=137）</p>
+</article>
+
+<article id="issue-138" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#138</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2567,12 +2795,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=122）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=138）</p>
 </article>
 
-<article id="issue-123" class="row warning kind-policy layer-policy">
+<article id="issue-139" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#123</span>
+    <span class="idx">#139</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2583,12 +2811,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=123）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=139）</p>
 </article>
 
-<article id="issue-124" class="row warning kind-policy layer-policy">
+<article id="issue-140" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#124</span>
+    <span class="idx">#140</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2599,12 +2827,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=124）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=140）</p>
 </article>
 
-<article id="issue-125" class="row warning kind-policy layer-policy">
+<article id="issue-141" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#125</span>
+    <span class="idx">#141</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2615,12 +2843,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=125）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=141）</p>
 </article>
 
-<article id="issue-126" class="row warning kind-policy layer-policy">
+<article id="issue-142" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#126</span>
+    <span class="idx">#142</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2631,12 +2859,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=126）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=142）</p>
 </article>
 
-<article id="issue-127" class="row warning kind-policy layer-policy">
+<article id="issue-143" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#127</span>
+    <span class="idx">#143</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2647,12 +2875,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=127）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=143）</p>
 </article>
 
-<article id="issue-128" class="row warning kind-policy layer-policy">
+<article id="issue-144" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#128</span>
+    <span class="idx">#144</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2663,12 +2891,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=128）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=144）</p>
 </article>
 
-<article id="issue-129" class="row warning kind-policy layer-policy">
+<article id="issue-145" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#129</span>
+    <span class="idx">#145</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2679,12 +2907,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=129）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=145）</p>
 </article>
 
-<article id="issue-130" class="row warning kind-policy layer-policy">
+<article id="issue-146" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#130</span>
+    <span class="idx">#146</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2695,12 +2923,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=130）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=146）</p>
 </article>
 
-<article id="issue-131" class="row warning kind-policy layer-policy">
+<article id="issue-147" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#131</span>
+    <span class="idx">#147</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2711,12 +2939,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=131）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=147）</p>
 </article>
 
-<article id="issue-132" class="row warning kind-policy layer-policy">
+<article id="issue-148" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#132</span>
+    <span class="idx">#148</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2727,12 +2955,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=132）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=148）</p>
 </article>
 
-<article id="issue-133" class="row warning kind-policy layer-policy">
+<article id="issue-149" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#133</span>
+    <span class="idx">#149</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2743,12 +2971,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=133）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=149）</p>
 </article>
 
-<article id="issue-134" class="row warning kind-policy layer-policy">
+<article id="issue-150" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#134</span>
+    <span class="idx">#150</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2759,12 +2987,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=134）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=150）</p>
 </article>
 
-<article id="issue-135" class="row warning kind-policy layer-policy">
+<article id="issue-151" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#135</span>
+    <span class="idx">#151</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2775,12 +3003,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=135）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=151）</p>
 </article>
 
-<article id="issue-136" class="row warning kind-policy layer-policy">
+<article id="issue-152" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#136</span>
+    <span class="idx">#152</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2791,12 +3019,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=136）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=152）</p>
 </article>
 
-<article id="issue-137" class="row warning kind-policy layer-policy">
+<article id="issue-153" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#137</span>
+    <span class="idx">#153</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -2807,263 +3035,7 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=137）</p>
-</article>
-
-<article id="issue-138" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#138</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0311</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=138）</p>
-</article>
-
-<article id="issue-139" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#139</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0322</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=139）</p>
-</article>
-
-<article id="issue-140" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#140</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0334</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=140）</p>
-</article>
-
-<article id="issue-141" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#141</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0345</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=141）</p>
-</article>
-
-<article id="issue-142" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#142</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0357</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=142）</p>
-</article>
-
-<article id="issue-143" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#143</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0408</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=143）</p>
-</article>
-
-<article id="issue-144" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#144</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0420</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=144）</p>
-</article>
-
-<article id="issue-145" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#145</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0431</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=145）</p>
-</article>
-
-<article id="issue-146" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#146</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0443</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=146）</p>
-</article>
-
-<article id="issue-147" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#147</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0454</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=147）</p>
-</article>
-
-<article id="issue-148" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#148</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0506</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=148）</p>
-</article>
-
-<article id="issue-149" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#149</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0512</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=149）</p>
-</article>
-
-<article id="issue-150" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#150</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0518</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=150）</p>
-</article>
-
-<article id="issue-151" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#151</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0524</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=151）</p>
-</article>
-
-<article id="issue-152" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#152</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0530</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=152）</p>
-</article>
-
-<article id="issue-153" class="row warning kind-policy layer-policy">
-  <div class="row-head">
-    <span class="idx">#153</span>
-    <span class="sev">warning</span>
-    <span class="kind">策略說明</span>
-    
-    <span class="trip">ST0536</span>
-  </div>
-  <h2>站位約束延後</h2>
-  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
-  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
-  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
-  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=153）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=153）</p>
 </article>
 
 <article id="issue-154" class="row warning kind-policy layer-policy">
@@ -3072,7 +3044,7 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
-    <span class="trip">ST0542</span>
+    <span class="trip">ST0311</span>
   </div>
   <h2>站位約束延後</h2>
   <p class="code"><code>STATION_BERTH_DELAYED</code></p>
@@ -3088,6 +3060,262 @@
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
+    <span class="trip">ST0322</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=155）</p>
+</article>
+
+<article id="issue-156" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#156</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0334</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=156）</p>
+</article>
+
+<article id="issue-157" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#157</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0345</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=157）</p>
+</article>
+
+<article id="issue-158" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#158</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0357</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=158）</p>
+</article>
+
+<article id="issue-159" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#159</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0408</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=159）</p>
+</article>
+
+<article id="issue-160" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#160</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0420</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=160）</p>
+</article>
+
+<article id="issue-161" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#161</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0431</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=161）</p>
+</article>
+
+<article id="issue-162" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#162</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0443</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=162）</p>
+</article>
+
+<article id="issue-163" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#163</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0454</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=163）</p>
+</article>
+
+<article id="issue-164" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#164</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0506</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=164）</p>
+</article>
+
+<article id="issue-165" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#165</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0512</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=165）</p>
+</article>
+
+<article id="issue-166" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#166</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0518</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=166）</p>
+</article>
+
+<article id="issue-167" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#167</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0524</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=167）</p>
+</article>
+
+<article id="issue-168" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#168</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0530</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=168）</p>
+</article>
+
+<article id="issue-169" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#169</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0536</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=169）</p>
+</article>
+
+<article id="issue-170" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#170</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
+    <span class="trip">ST0542</span>
+  </div>
+  <h2>站位約束延後</h2>
+  <p class="code"><code>STATION_BERTH_DELAYED</code></p>
+  <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
+  <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
+  <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=3 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=170）</p>
+</article>
+
+<article id="issue-171" class="row warning kind-policy layer-policy">
+  <div class="row-head">
+    <span class="idx">#171</span>
+    <span class="sev">warning</span>
+    <span class="kind">策略說明</span>
+    
     <span class="trip">ST0548</span>
   </div>
   <h2>站位約束延後</h2>
@@ -3095,12 +3323,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=155）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=171）</p>
 </article>
 
-<article id="issue-156" class="row warning kind-policy layer-policy">
+<article id="issue-172" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#156</span>
+    <span class="idx">#172</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3111,12 +3339,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=156）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=4 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=172）</p>
 </article>
 
-<article id="issue-157" class="row warning kind-policy layer-policy">
+<article id="issue-173" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#157</span>
+    <span class="idx">#173</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3127,12 +3355,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（NT）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=157）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=173）</p>
 </article>
 
-<article id="issue-158" class="row warning kind-policy layer-policy">
+<article id="issue-174" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#158</span>
+    <span class="idx">#174</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3143,12 +3371,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=158）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=174）</p>
 </article>
 
-<article id="issue-159" class="row warning kind-policy layer-policy">
+<article id="issue-175" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#159</span>
+    <span class="idx">#175</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3159,12 +3387,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=159）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=175）</p>
 </article>
 
-<article id="issue-160" class="row warning kind-policy layer-policy">
+<article id="issue-176" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#160</span>
+    <span class="idx">#176</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3175,12 +3403,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=160）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=176）</p>
 </article>
 
-<article id="issue-161" class="row warning kind-policy layer-policy">
+<article id="issue-177" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#161</span>
+    <span class="idx">#177</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3191,12 +3419,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=161）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=177）</p>
 </article>
 
-<article id="issue-162" class="row warning kind-policy layer-policy">
+<article id="issue-178" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#162</span>
+    <span class="idx">#178</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3207,12 +3435,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=162）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=178）</p>
 </article>
 
-<article id="issue-163" class="row warning kind-policy layer-policy">
+<article id="issue-179" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#163</span>
+    <span class="idx">#179</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3223,12 +3451,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=163）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=179）</p>
 </article>
 
-<article id="issue-164" class="row warning kind-policy layer-policy">
+<article id="issue-180" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#164</span>
+    <span class="idx">#180</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3239,12 +3467,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=164）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=180）</p>
 </article>
 
-<article id="issue-165" class="row warning kind-policy layer-policy">
+<article id="issue-181" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#165</span>
+    <span class="idx">#181</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3255,12 +3483,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=165）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=181）</p>
 </article>
 
-<article id="issue-166" class="row warning kind-policy layer-policy">
+<article id="issue-182" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#166</span>
+    <span class="idx">#182</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3271,12 +3499,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=166）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=182）</p>
 </article>
 
-<article id="issue-167" class="row warning kind-policy layer-policy">
+<article id="issue-183" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#167</span>
+    <span class="idx">#183</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3287,12 +3515,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=167）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=5 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=183）</p>
 </article>
 
-<article id="issue-168" class="row warning kind-policy layer-policy">
+<article id="issue-184" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#168</span>
+    <span class="idx">#184</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3303,12 +3531,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=168）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=1 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=184）</p>
 </article>
 
-<article id="issue-169" class="row warning kind-policy layer-policy">
+<article id="issue-185" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#169</span>
+    <span class="idx">#185</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3319,12 +3547,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=169）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=2 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=185）</p>
 </article>
 
-<article id="issue-170" class="row warning kind-policy layer-policy">
+<article id="issue-186" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#170</span>
+    <span class="idx">#186</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3335,12 +3563,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=170）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=6 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=186）</p>
 </article>
 
-<article id="issue-171" class="row warning kind-policy layer-policy">
+<article id="issue-187" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#171</span>
+    <span class="idx">#187</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3351,12 +3579,12 @@
   <p class="msg">為避開站位碰撞，已延後 10 秒（ST）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=171）</p>
+  <p class="detail-compact">delaySeconds=10 · timelineRow=7 · 完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=187）</p>
 </article>
 
-<article id="issue-172" class="row warning kind-policy layer-policy">
+<article id="issue-188" class="row warning kind-policy layer-policy">
   <div class="row-head">
-    <span class="idx">#172</span>
+    <span class="idx">#188</span>
     <span class="sev">warning</span>
     <span class="kind">策略說明</span>
     
@@ -3367,7 +3595,7 @@
   <p class="msg">（以上已顯示 50 則；另有 361 則相同類型的站位約束 warning 未列出）</p>
   <p class="guide">站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。</p>
   <p class="doc-link"><a href="./排班引擎算法全覽-審核.html#s8">→ 詳見 §8 站位約束決策</a></p>
-  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=172）</p>
+  <p class="detail-compact">完整 detail 見 <code>frontend/.dev/schedule-engine-last-issues.json</code>（index=188）</p>
 </article></div>
   </details>
 </section>
