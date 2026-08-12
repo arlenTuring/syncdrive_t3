@@ -1354,6 +1354,56 @@ export function insertMaintenanceTransferCards(args: {
       const plannedArriveSecond = plannedDepartureSecond + chosen.seconds;
       let arriveSecond = plannedArriveSecond;
       const assignedFacilityId = yard.yardFacilityNodeId?.trim();
+      /**
+       * <strong>光看「有沒有預約」擋不住排擠。</strong>
+       *
+       * 前一版只比對既有的設施預約，但被排擠掉的那台<strong>本來就沒拿到設施</strong>，
+       * 沒有預約可比——提早的車看到格子是空的就進去了。實測：時間線 7 的充電模板是
+       * 20:00–21:30，實際 19:26:40 就進了 E1，於是 19:00–20:30 的 EE1900 沒樁可用。
+       *
+       * 更糟的是提早會<strong>讓自己也搬不走</strong>：E2、E3 要 19:30 才空，
+       * 19:26:40 卡在門檻前四分鐘，於是讓位機制回報「請不走」——提早這個動作
+       * 同時製造了問題、又消滅了解法。
+       *
+       * 所以要看的是<strong>同時段有幾台車要用這批設施</strong>（含還沒拿到格子的），
+       * 超過設施數就不准再往前佔。這跟「沒有可用設施」訊息裡算的尖峰需求是同一個數字。
+       */
+      if (assignedFacilityId && arriveSecond < yardStartSecond - 1e-9) {
+        const pool = new Set(facilities.map((item) => item.id));
+        const rivals: Array<[number, number]> = [];
+        for (const timelineItem of timelines) {
+          for (const other of timelineItem.blocks) {
+            if (other.id === yard.id) continue;
+            if (!YARD_TASK_TYPES.has(other.taskType)) continue;
+            if (other.source !== 'template_bar') continue;
+            if (!facilityNodesFor(other.taskType).some((node) => pool.has(node.id))) continue;
+            rivals.push([
+              minuteToSecond(other.plannedStartMinute),
+              minuteToSecond(other.plannedEndMinute),
+            ]);
+          }
+        }
+        /** 這一刻有幾台別的車要用這批設施 */
+        const rivalsAt = (at: number) =>
+          rivals.filter(([from, to]) =>
+            daySegmentsOf(from, to).some(([s2, e2]) => {
+              const t = ((at % daySeconds) + daySeconds) % daySeconds;
+              return t >= s2 - 1e-9 && t < e2 - 1e-9;
+            })).length;
+        // 從最想要的時刻往後退，退到「連自己算進去都還排得下」為止
+        const probes = [
+          arriveSecond,
+          ...rivals.map(([, to]) => to).filter((to) => to > arriveSecond && to < yardStartSecond),
+          yardStartSecond,
+        ].sort((a, b) => a - b);
+        for (const probe of probes) {
+          if (rivalsAt(probe) + 1 <= facilities.length) {
+            arriveSecond = probe;
+            break;
+          }
+          arriveSecond = yardStartSecond;
+        }
+      }
       if (assignedFacilityId && arriveSecond < yardStartSecond - 1e-9) {
         for (const booking of bookings) {
           if (booking.facilityNodeId !== assignedFacilityId) continue;
