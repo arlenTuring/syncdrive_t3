@@ -44,6 +44,7 @@ import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarge
 import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
 import { alignRouteWithMaintenanceEntry } from '../alignRouteWithMaintenanceEntry';
 import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
+import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -255,6 +256,20 @@ export function generateShiftSchedule(
       selectedRoutes: routesForBerth,
       topology: engineInput.pointTopology,
       successorPolicy: engineInput.successorPolicy,
+      warnings: round === 0 ? warnings : undefined,
+    });
+
+    // 站位延後把發車相位推歪了，這裡推回等間隔。
+    //
+    // 移動之前<strong>自己逐站驗證</strong>，撞得到就整筆放棄——不能移完丟給站位求解
+    // 收拾：兩者調整方向相反（這裡往前移、求解器只往後延），收拾不掉的就變成硬碰撞
+    // （2026-08-13 第一版實測 STATION_BERTH_COLLISION 0 → 4，因此撤掉重做）。
+    // 仍排在站位求解之前，讓求解器永遠是最後拍板的那一個。
+    evenOutRouteHeadwayPhase({
+      timelines,
+      selectedRoutes: routesForBerth,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       warnings: round === 0 ? warnings : undefined,
     });
 

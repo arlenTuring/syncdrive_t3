@@ -42,6 +42,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   TIMELINE_OVERLAP: '時間線任務重疊',
   HEADWAY_PHYSICAL_IMPOSSIBLE: '班距低於物理下限',
   HEADWAY_BELOW_TARGET: '班距低於目標',
+  HEADWAY_PHASE_EVENED: '已把發車相位推回等間隔',
   UNSERVED_SERVICE_PULSE: '班距需求未被承接',
   INSUFFICIENT_TIMELINES: '時間線列數不足',
   RECOVERY_INSUFFICIENT: '恢復空檔不足',
@@ -88,6 +89,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   TIMELINE_OVERLAP: { id: 's6', label: '§6 整備讓渡：開頭 vs 尾巴' },
   HEADWAY_PHYSICAL_IMPOSSIBLE: { id: 's5', label: '§5 掛車決策（脈衝）' },
   HEADWAY_BELOW_TARGET: { id: 's5', label: '§5 掛車決策（脈衝）' },
+  HEADWAY_PHASE_EVENED: { id: 's5', label: '§5 掛車決策（脈衝）' },
   UNSERVED_SERVICE_PULSE: { id: 's5', label: '§5 掛車決策（脈衝）' },
   INSUFFICIENT_TIMELINES: { id: 's14', label: '§14 端到端範例（車隊下限）' },
   RECOVERY_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
@@ -182,6 +184,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '以目前車隊列數與單車週期，物理上撐不起此時距。請增加時間線列數，或縮短該路線占用（行駛／停靠）。',
+  },
+  HEADWAY_PHASE_EVENED: {
+    kind: 'policy',
+    guidance:
+      '站位求解為了清開停靠點會把個別班次往後延，每延一次同一條路線的發車相位就歪一次，班距因此忽大忽小、運能曲線出現低谷。這一步把每一班往「與前後班等間隔」的位置靠（一次走一半，數輪收斂），只在該列自己的空檔內微調，而且移動之前已經逐站確認過不會造成碰撞——挪過去會撞的那些整筆放棄、完全不動。不新增也不刪除任何班次。屬正常求解，不是錯誤。',
   },
   HEADWAY_BELOW_TARGET: {
     kind: 'limit',

@@ -144,6 +144,11 @@ export type GeneratedScheduleBlock = {
    * 否則會跟站位求解互推到迴圈跑滿。
    */
   berthArrivalYieldedMinutes?: number;
+  /**
+   * 這一班的發車時刻已經被「相位均分」推回過一次（見 evenOutRouteHeadwayPhase）。
+   * 收斂迴圈的下一輪不再推第二次，否則會跟站位求解互推到迴圈跑滿。
+   */
+  headwayPhaseEvened?: boolean;
 };
 
 export type FeasibilityViolationCode =
@@ -188,6 +193,8 @@ export type FeasibilityViolationCode =
   | 'TIMELINE_OVERLAP'
   | 'HEADWAY_PHYSICAL_IMPOSSIBLE'
   | 'HEADWAY_BELOW_TARGET'
+  /** 已把發車相位推回等間隔，補償站位延後造成的班距歪斜（警告） */
+  | 'HEADWAY_PHASE_EVENED'
   | 'UNSERVED_SERVICE_PULSE'
   | 'INSUFFICIENT_TIMELINES'
   | 'RECOVERY_INSUFFICIENT'
