@@ -44,7 +44,6 @@ import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarge
 import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
 import { alignRouteWithMaintenanceEntry } from '../alignRouteWithMaintenanceEntry';
 import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
-import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -256,20 +255,6 @@ export function generateShiftSchedule(
       selectedRoutes: routesForBerth,
       topology: engineInput.pointTopology,
       successorPolicy: engineInput.successorPolicy,
-      warnings: round === 0 ? warnings : undefined,
-    });
-
-    // 站位延後把發車相位推歪了，這裡推回等間隔——只在自己列的空檔內微調，
-    // 不新增也不刪除班次。
-    //
-    // <strong>必須放在站位求解之前。</strong>放在後面的話，最後一輪推的那些班次
-    // 就再也沒有人檢查站位——實測直接冒出 2 則 STATION_BERTH_COLLISION（硬錯誤），
-    // 而且迴圈本來就沒收斂（GEOMETRY_NOT_CONVERGED 2 則），最後一輪一定存在。
-    // 站位求解必須永遠是最後拍板的那一個。
-    evenOutRouteHeadwayPhase({
-      timelines,
-      selectedRoutes: routesForBerth,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       warnings: round === 0 ? warnings : undefined,
     });
 

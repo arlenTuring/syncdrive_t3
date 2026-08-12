@@ -3763,6 +3763,40 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-13 · 相位均分撤回：買到運能的代價是硬錯誤，不划算</h3>
+  <div class="callout">
+    順序修對之後的實測：兩個路線 error <strong>歸零</strong>，但
+    <code>STATION_BERTH_COLLISION</code> 從 2 變 <strong>4</strong>，
+    <code>HEADWAY_BELOW_TARGET</code> 34 → 38。整支撤掉。
+  </div>
+  <ul>
+    <li>
+      <strong>根本的方向衝突：相位均分把班次往前移，站位求解只會往後延。</strong>
+      兩者方向相反——移前面就被延回去，收益被抵銷；延不動的地方就變成硬碰撞。
+      把它排在站位求解之前（讓求解器最後拍板）修掉了路線 error，
+      卻沒有、也不可能修掉這個方向衝突。
+    </li>
+    <li>
+      <strong>診斷仍然成立，而且被證明了。</strong><code>HEADWAY_BELOW_TARGET</code>
+      一度從 <strong>141 掉到 18</strong>——運能曲線的低谷確實來自相位歪斜，不是缺班。
+      錯的是解法，不是判斷。
+    </li>
+    <li>
+      <strong>為什麼撤而不是繼續修：</strong>硬錯誤會讓班表直接不通過閘門，
+      而使用者明確說在意的兩件事第一件就是碰撞。用 4 則硬錯誤換班距，方向就是錯的。
+    </li>
+    <li>
+      <strong>下次再做要滿足的條件：</strong>移動之前<strong>先驗證新位置在所有停靠站都是空的</strong>，
+      不成立就整筆放棄——而不是移完丟給站位求解收拾。
+      跟站位求解同向（只往後移）也是一個選項，但那等於放棄「往前補上空洞」，收益會小很多。
+    </li>
+    <li>
+      <strong>教訓：</strong>兩個處理若<strong>調整方向相反</strong>，排序只能決定誰先誰後，
+      解不了衝突本身。真正的判準是「新增的這一道，會不會製造出下游修不掉的東西」——
+      修不掉就得自己驗證、自己回捲。
+    </li>
+  </ul>
+
   <h3>2026-08-13 · 站位求解必須是最後拍板的那一個</h3>
   <div class="callout">
     邊界修完之後的實測：<code>HEADWAY_BELOW_TARGET</code> <strong>18 → 34</strong>（倒退）、
