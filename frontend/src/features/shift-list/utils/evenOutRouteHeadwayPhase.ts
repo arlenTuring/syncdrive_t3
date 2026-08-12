@@ -112,23 +112,57 @@ export function evenOutRouteHeadwayPhase(args: {
     return true;
   };
 
-  /** 同一條路線的發車序列＝班距序列 */
-  const byRoute = new Map<string, GeneratedScheduleBlock[]>();
-  for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      if (block.taskType !== 'passenger' || block.source !== 'template_bar') continue;
-      const key = block.routeInstanceId?.trim() || block.routeId?.trim();
-      if (!key) continue;
-      const list = byRoute.get(key) ?? [];
-      list.push(block);
-      byRoute.set(key, list);
+  /**
+   * 要均分的序列有<strong>兩種</strong>。
+   *
+   * <ol>
+   *   <li><strong>同一條路線</strong>——那是乘客感受到的班距。</li>
+   *   <li><strong>同一個發車站</strong>——那是<strong>停靠點</strong>感受到的擁擠。</li>
+   * </ol>
+   *
+   * 第一版只照路線分組，於是<strong>跑不同路線、卻共用同一個停靠點</strong>的兩台車
+   * 從來沒被放在一起比較過。實測正是這樣：TN0536（列 3）與 TN0542（列 4）在
+   * 「N2W下行出發」<strong>離站時刻完全相同</strong>（05:59:30），兩台都在那裡空等十幾分鐘，
+   * 加上一台路過的就變成 3 台擠 1 格——<code>STATION_BERTH_PROTECTION_GAP</code>
+   * 剩下的兩則就是這個（2026-08-13）。
+   *
+   * 兩種序列都跑一遍：路線的均分讓班距平順，站別的均分讓停靠點不擁擠。
+   * 站別那一輪用<strong>路線的 instance 當前綴</strong>是不行的——那又退回第一種了；
+   * 直接用起點站當鍵。
+   */
+  const buildSequences = (
+    keyOf: (block: GeneratedScheduleBlock) => string | null,
+  ): GeneratedScheduleBlock[][] => {
+    const grouped = new Map<string, GeneratedScheduleBlock[]>();
+    for (const timeline of timelines) {
+      for (const block of timeline.blocks) {
+        if (block.taskType !== 'passenger' || block.source !== 'template_bar') continue;
+        const key = keyOf(block);
+        if (!key) continue;
+        const list = grouped.get(key) ?? [];
+        list.push(block);
+        grouped.set(key, list);
+      }
     }
-  }
+    return [...grouped.values()];
+  };
+  const originStationOf = (block: GeneratedScheduleBlock): string | null => {
+    const route = selectedRoutes.find(
+      (item) =>
+        item.routeId === block.routeId
+        && (!block.routeInstanceId || (item.instanceId ?? item.routeId) === block.routeInstanceId),
+    ) ?? selectedRoutes.find((item) => item.routeId === block.routeId);
+    return route?.stationIds?.[0]?.trim() || null;
+  };
+  const sequences = [
+    ...buildSequences((block) => block.routeInstanceId?.trim() || block.routeId?.trim() || null),
+    ...buildSequences(originStationOf),
+  ];
 
   let adjusted = 0;
   let abandoned = 0;
   let totalShift = 0;
-  for (const [, list] of byRoute) {
+  for (const list of sequences) {
     const sequence = [...list].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
     for (let i = 1; i < sequence.length - 1; i += 1) {
       const block = sequence[i]!;

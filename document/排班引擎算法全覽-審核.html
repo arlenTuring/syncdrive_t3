@@ -3763,6 +3763,35 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-13 · 均分也要照「發車站」分組——停靠點的擁擠跟路線的班距是兩回事</h3>
+  <div class="callout">
+    修完「整備後第一班不准挪」之後：<code>HEADWAY_BELOW_TARGET</code>
+    <strong>141 → 17</strong>，<strong>所有硬錯誤歸零</strong>
+    （碰撞、出場站接不上、兩種路線 error 全部 0）。剩下 <code>STATION_BERTH_PROTECTION_GAP</code> 2 則。
+  </div>
+  <ul>
+    <li>
+      <strong>剩下那 2 則的兇手很明確。</strong>N2W下行出發 05:52:10 有 3 台：
+      TN0536（列 3，05:39:50–<strong>05:59:30</strong>）、TN0542（列 4，05:46:10–<strong>05:59:30</strong>）、
+      TN0548（只佔 10 秒路過）。<strong>前兩台的離站時刻完全相同</strong>，而且都在那裡空等十幾分鐘。
+    </li>
+    <li>
+      <strong>相位均分沒有把它們分開，因為它只照「路線」分組。</strong>這兩台跑不同路線，
+      從來沒被放在同一個序列裡比較過——但它們<strong>共用同一個停靠點</strong>。
+    </li>
+    <li>
+      <strong>要均分的序列有兩種：</strong>同一條<strong>路線</strong>（乘客感受到的班距）、
+      同一個<strong>發車站</strong>（停靠點感受到的擁擠）。兩種都跑一遍，
+      共用同一套驗證與保險，撞得到照樣整筆放棄。
+    </li>
+    <li>
+      <strong>教訓：</strong>「均分什麼」跟「誰在搶資源」要對得上。
+      班距的分組軸是路線，站位的分組軸是站——用錯軸，再好的平滑也碰不到問題。
+      這跟先前「訊息講的是尖峰、掛卡依據卻是最嚴重那一對」是同一種錯：
+      <strong>統計的對象跟要解決的對象不是同一個。</strong>
+    </li>
+  </ul>
+
   <h3>2026-08-13 · 相位均分成立：141 → 28，硬錯誤全歸零</h3>
   <div class="callout">
     重做版的實測。<strong>「自己驗證、自己放棄」這條鐵律是對的</strong>——
