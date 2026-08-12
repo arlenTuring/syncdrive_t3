@@ -997,7 +997,16 @@ export function validateStationBerthCollisions(
   const protectionByStation = new Map<string, {
     stationId: string;
     stationName: string;
-    pairCount: number;
+    /**
+     * 不重複的班次配對。
+     *
+     * 同一台車在同一站常常留下<strong>兩段</strong>佔用（前一趟到站、下一趟發車），
+     * 兩兩配對會把「同一對班次」重複算好幾次——併發台數那邊早就做了同列合併
+     * （不然一台車會被算成兩台），配對數這裡卻沒有，於是報出來的數字虛胖。
+     * 改成以「班次卡對」為單位去重（2026-08-12 使用者：「為什麼他是寫 40 對？
+     * 而實際上只有看到一對？」——顯示的是一則彙總，但那個 40 本身也灌水了）。
+     */
+    pairKeys: Set<string>;
     worst: (typeof collisions)[number];
   }>();
 
@@ -1043,10 +1052,12 @@ export function validateStationBerthCollisions(
       const bucket = protectionByStation.get(hit.stationId) ?? {
         stationId: hit.stationId,
         stationName: hit.stationName,
-        pairCount: 0,
+        pairKeys: new Set<string>(),
         worst: hit,
       };
-      bucket.pairCount += 1;
+      bucket.pairKeys.add(
+        [hit.earlier.blockId, hit.later.blockId].sort().join('|'),
+      );
       if (hit.protectionShortfallSeconds > bucket.worst.protectionShortfallSeconds) {
         bucket.worst = hit;
       }
@@ -1089,14 +1100,15 @@ export function validateStationBerthCollisions(
       message:
         `${bucket.stationName}：${formatMinuteHms(atMinute)} 同時有 ${peak} 台車停在這裡`
         + `${peakLabel ? `——${peakLabel}` : ''}，但一個停靠點只能停 1 台。`
-        + `整天共 ${bucket.pairCount} 對班次不滿足碰撞保護`
+        + `整天在這一站共有 ${bucket.pairKeys.size} 對班次不滿足碰撞保護`
+        + `（這裡只列出尖峰那一刻；其餘同一站的都收在這一則裡）`
         + (longestLabel ? `；其中停最久的是另一班 ${longestLabel}` : ''),
       detail: {
         stationId: bucket.stationId,
         stationName: bucket.stationName,
         peakConcurrentVehicles: peak,
         peakAtMinute: atMinute,
-        affectedPairCount: bucket.pairCount,
+        affectedPairCount: bucket.pairKeys.size,
         longestIdleBlockId: longestIdle?.blockId ?? null,
         longestIdleMinutes: idleMinutes,
         blockId: bucket.worst.later.blockId,
