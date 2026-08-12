@@ -200,6 +200,20 @@ export type MaintenanceTransferCardsResult = {
     /** 被請去換格子的那幾列 */
     movedRows: number[];
   }>;
+  /**
+   * 本來可以提早進廠，但那段時間設施被別列車佔著，只好晚點進——
+   * 代價是車得在正線站位上多等，這是「設施不足」換成「站位碰撞」的來源。
+   */
+  entryEarlyBlocked: Array<{
+    timelineRow: number;
+    blockId: string;
+    taskType: string;
+    facilityLabel: string;
+    /** 少提早了幾分鐘 */
+    blockedMinutes: number;
+    /** 車因此得多停在哪一站 */
+    waitStationName: string;
+  }>;
 };
 
 export function insertMaintenanceTransferCards(args: {
@@ -247,6 +261,7 @@ export function insertMaintenanceTransferCards(args: {
   const skipped: MaintenanceTransferCardsResult['skipped'] = [];
   const facilityUnavailable: MaintenanceTransferCardsResult['facilityUnavailable'] = [];
   const facilityYields: MaintenanceTransferCardsResult['facilityYields'] = [];
+  const entryEarlyBlocked: MaintenanceTransferCardsResult['entryEarlyBlocked'] = [];
   /** 已經報過「沒地方停」的整段停留成員——同一段被日循環切成兩塊時只報一則 */
   const stayReported = new Set<string>();
   let inserted = 0;
@@ -257,7 +272,7 @@ export function insertMaintenanceTransferCards(args: {
   if (!topology || topology.nodes.length === 0) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable, facilityYields,
+      skipped, facilityUnavailable, facilityYields, entryEarlyBlocked,
     };
   }
 
@@ -1081,7 +1096,7 @@ export function insertMaintenanceTransferCards(args: {
   if (decideOnly) {
     return {
       timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-      skipped, facilityUnavailable, facilityYields,
+      skipped, facilityUnavailable, facilityYields, entryEarlyBlocked,
     };
   }
 
@@ -1316,6 +1331,28 @@ export function insertMaintenanceTransferCards(args: {
           if (booking.endSecond > arriveSecond) arriveSecond = booking.endSecond;
         }
         if (arriveSecond > yardStartSecond) arriveSecond = yardStartSecond;
+        /**
+         * <strong>提早被擋下，代價會落到站位上。</strong>
+         *
+         * 車提早進廠是有原因的——它在正線跑完了、沒地方去。不讓它提早進廠，
+         * 它就繼續杵在前一趟的終點站佔著站位，於是「設施不足」被無聲地換成
+         * 「站位碰撞」——把使用者最頭痛的兩件事互相搬家，不是解決
+         * （2026-08-12 使用者提醒：「那 EG1926 提前進來一定有他的理由吧，
+         * 如果有機制取消，那這列車有地方去停等嗎」）。
+         *
+         * 所以要講出來：本來可以提早多久、被誰擋住、車因此會在哪一站多停多久。
+         */
+        const blockedSeconds = arriveSecond - plannedArriveSecond;
+        if (blockedSeconds > 1e-9) {
+          entryEarlyBlocked.push({
+            timelineRow: timeline.row,
+            blockId: yard.id,
+            taskType: yard.taskType,
+            facilityLabel: yard.yardFacilityLabel ?? assignedFacilityId,
+            blockedMinutes: blockedSeconds / 60,
+            waitStationName: stationDisplayName(stationId),
+          });
+        }
       }
       const departureSecond = arriveSecond - chosen.seconds;
       /**
@@ -2384,6 +2421,6 @@ export function insertMaintenanceTransferCards(args: {
 
   return {
     timelines, inserted, ateYardTail, yardHeadExtended, laterTaskCompressed,
-    skipped, facilityUnavailable, facilityYields,
+    skipped, facilityUnavailable, facilityYields, entryEarlyBlocked,
   };
 }

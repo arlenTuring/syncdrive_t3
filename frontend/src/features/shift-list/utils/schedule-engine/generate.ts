@@ -406,6 +406,28 @@ export function generateShiftSchedule(
       },
     });
   }
+  // 提早進廠被別列車擋下：代價會落到站位上，必須講出來，否則就是把
+  // 「設施不足」無聲換成「站位碰撞」——使用者最頭痛的兩件事互相搬家。
+  for (const item of maintenanceTransfer.entryEarlyBlocked) {
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_ENTRY_EARLY_BLOCKED',
+      severity: 'warning',
+      kind: 'limit',
+      message:
+        `時間線 ${item.timelineRow}：「${item.taskType}」本來可以提早`
+        + ` ${item.blockedMinutes.toFixed(1)} 分鐘進廠，但 ${item.facilityLabel}`
+        + ` 那段時間被別列車佔著——車只好在「${item.waitStationName}」多等這段時間，`
+        + `期間佔著那個站位。`,
+      detail: {
+        timelineRow: item.timelineRow,
+        blockId: item.blockId,
+        taskType: item.taskType,
+        facilityLabel: item.facilityLabel,
+        blockedMinutes: item.blockedMinutes,
+        waitStationName: item.waitStationName,
+      },
+    });
+  }
   // 整備設施不足：車根本沒地方停。跟上面「移動卡排不出來」分開回報——
   // 那是路徑問題（補拓樸的邊），這是產能問題（加設施／錯開整備時段）。
   for (const item of maintenanceTransfer.facilityUnavailable) {
