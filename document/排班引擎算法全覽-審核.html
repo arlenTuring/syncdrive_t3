@@ -3763,6 +3763,38 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 讓步的兩個邊界：整備後第一班不准挪、緩衝要留兩倍</h3>
+  <div class="callout">
+    上一則放開挪動幅度之後，使用者的實測 log 冒出兩個<strong>新的</strong>問題——都是這道
+    讓步自己造成的。
+  </div>
+  <ul>
+    <li>
+      <strong>整備後的第一班不准挪。</strong>車做完整備就停在該設施的出場站，這一趟的
+      起點站是<strong>物理事實</strong>，發車時刻還要跟出廠卡貼齊。整段往後挪會讓出場站
+      對不上，直接觸發 <code>YARD_EXIT_STATION_MISMATCH</code>——實測：充電做完停在
+      N2W下行出發，TNB1500 卻被排成從 T3上行 發車。加上「前一段是整備就跳過」。
+    </li>
+    <li>
+      <strong>緩衝要留兩倍碰撞保護，不是一倍。</strong>規則本來就是「後車到站 ≥ 前車實際
+      離站 + 2 × 碰撞保護」。只留一倍等於挪完剛好卡在規則邊緣，實測製造出 10 秒的
+      <strong>真碰撞</strong>（NTB0911 09:11:00–09:14:30 對上 TS0914 09:14:20）——
+      把警告換成硬錯誤，比不挪還糟。
+    </li>
+    <li>
+      修完之後重現資料：<code>STATION_BERTH_BACKUP_USED</code> 23 → 24、
+      <code>HEADWAY_BELOW_TARGET</code> 36 → 38、
+      <code>MAINTENANCE_TRANSFER_UNRESOLVED</code> 27 → 26。略微退讓是預期的——
+      邊界收緊本來就會少解幾則，但換掉的是一個硬錯誤與一個出場站錯位。
+      <code>ok = true</code>、errors <code>{}</code>、<code>tsc -b</code> 23、eslint 乾淨。
+    </li>
+    <li>
+      <strong>教訓：</strong>放寬讓步幅度時，要同時問「哪些東西<strong>本來就不能動</strong>」
+      跟「讓完之後有沒有守住原本的規則」。這兩者都不會由既有測試擋下來——
+      它們是<strong>新的</strong>錯誤，不是舊的迴歸。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 目標訂錯了：不是「等對方過去」，是「快發車了才進站」</h3>
   <div class="callout">
     使用者：T3下行 16:07:10 同時有 4 台車——「這是能解決的嗎」。看數字就有解。

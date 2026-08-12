@@ -105,7 +105,13 @@ export function yieldIdleBlockArrival(args: {
      * 當折返緩衝，其餘往後挪。不必再問對方是誰、佔多久——每台各自縮短滯留，
      * 全站的重疊自然就散開。
      */
-    const marginMinutes = protectionMinutes;
+    /*
+      緩衝要留<strong>兩倍</strong>碰撞保護，不是一倍。
+      規則本來就是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護」——只留一倍，
+      挪完剛好卡在規則邊緣，實測直接製造出 10 秒的真碰撞
+      （NTB0911 09:11:00–09:14:30 對上 TS0914 09:14:20，2026-08-12 使用者回報）。
+    */
+    const marginMinutes = protectionMinutes * 2;
     const neededMinutes = idleMinutes - marginMinutes;
     if (neededMinutes <= 1e-9) continue;
 
@@ -113,6 +119,18 @@ export function yieldIdleBlockArrival(args: {
     const rowBlocks = blocksByRow.get(earlier.timelineRow) ?? [];
     const index = rowBlocks.findIndex((item) => item.id === earlier.id);
     const next = index >= 0 ? rowBlocks[index + 1] : undefined;
+    /**
+     * <strong>整備後的第一班不准挪。</strong>
+     *
+     * 車做完整備就停在該設施的出場站，這一趟的起點站是<strong>物理事實</strong>，
+     * 而且它的發車時刻要跟出廠卡貼齊。整段往後挪會讓出場站對不上，直接觸發
+     * <code>YARD_EXIT_STATION_MISMATCH</code>（2026-08-12 使用者回報：充電做完停在
+     * N2W下行出發，TNB1500 卻要從 T3上行 發車）。
+     */
+    const previous = index > 0 ? rowBlocks[index - 1] : undefined;
+    if (previous && previous.source === 'template_bar' && previous.taskType !== 'passenger') {
+      continue;
+    }
     if (
       next
       && earlier.plannedEndMinute + neededMinutes > next.plannedStartMinute - 1e-9
