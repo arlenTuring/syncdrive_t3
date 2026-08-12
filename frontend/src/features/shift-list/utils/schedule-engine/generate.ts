@@ -259,6 +259,20 @@ export function generateShiftSchedule(
       warnings: round === 0 ? warnings : undefined,
     });
 
+    // 站位延後把發車相位推歪了，這裡推回等間隔——只在自己列的空檔內微調，
+    // 不新增也不刪除班次。
+    //
+    // <strong>必須放在站位求解之前。</strong>放在後面的話，最後一輪推的那些班次
+    // 就再也沒有人檢查站位——實測直接冒出 2 則 STATION_BERTH_COLLISION（硬錯誤），
+    // 而且迴圈本來就沒收斂（GEOMETRY_NOT_CONVERGED 2 則），最後一輪一定存在。
+    // 站位求解必須永遠是最後拍板的那一個。
+    evenOutRouteHeadwayPhase({
+      timelines,
+      selectedRoutes: routesForBerth,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      warnings: round === 0 ? warnings : undefined,
+    });
+
     // 站位占用：拓撲候選中選局部無衝突解（可延後／可改線／可等）
     // 第一輪保守並收集警告；之後放寬延後上限，處理連鎖擠回來的殘餘衝突。
     timelines = enforceStationBerthConstraints({
@@ -280,15 +294,6 @@ export function generateShiftSchedule(
       timelines,
       selectedRoutes: routesForBerth,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      warnings: round === 0 ? warnings : undefined,
-    });
-
-    // 站位延後把發車相位推歪了，這裡推回等間隔——只在自己列的空檔內微調，
-    // 不新增也不刪除班次。放在站位求解之後：先讓它排出合法解，再把相位撫平。
-    evenOutRouteHeadwayPhase({
-      timelines,
-      selectedRoutes: routesForBerth,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       warnings: round === 0 ? warnings : undefined,
     });
 
