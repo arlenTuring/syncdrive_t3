@@ -42,6 +42,7 @@ import {
 import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
 import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
 import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
+import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -259,6 +260,16 @@ export function generateShiftSchedule(
         ? {}
         : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
     }).timelines;
+
+    // 滯留的那台晚一點進站，讓只是路過的先走——用掉它本來就要空等的餘裕。
+    // 放在讓渡之前：這一招零代價（班距、下一趟發車都不動），能解就先解，
+    // 解不掉才輪到會多開班次的繞路讓渡。
+    yieldIdleBlockArrival({
+      timelines,
+      selectedRoutes: routesForBerth,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      warnings: round === 0 ? warnings : undefined,
+    });
 
     // 跑完一輪在共用站位空等下一個脈衝時撞到別列車 → 有次要邊就先繞去別站等
     timelines = relievePlatformIdleWithSecondaryEdge({
