@@ -2068,6 +2068,8 @@ export function insertMaintenanceTransferCards(args: {
        * 換不成就整組回捲——中途放棄卻留下半套搬遷，比一開始不搬更糟。
        */
       let yielded = false;
+      /** 讓位為什麼沒成——沒有這個，使用者只看到「沒有可用設施」，無從判斷 */
+      const yieldNotes: string[] = [];
       for (const facility of facilities) {
         const occupants = sweepCandidates
           .map((item) => item.block)
@@ -2080,7 +2082,10 @@ export function insertMaintenanceTransferCards(args: {
               minuteToSecond(other.plannedStartMinute),
               minuteToSecond(other.plannedEndMinute),
             ));
-        if (occupants.length === 0) continue;
+        if (occupants.length === 0) {
+          yieldNotes.push(`${facility.label || facility.id} 沒有可請走的佔用者`);
+          continue;
+        }
         const undo: Array<{ block: GeneratedScheduleBlock; nodeId: string; label: string }> = [];
         let allMoved = true;
         for (const occupant of occupants) {
@@ -2097,7 +2102,15 @@ export function insertMaintenanceTransferCards(args: {
               occupantStart,
               occupantEnd,
             ));
-          if (!elsewhere) { allMoved = false; break; }
+          if (!elsewhere) {
+            allMoved = false;
+            yieldNotes.push(
+              `${facility.label || facility.id} 上的時間線 ${occupant.timelineRow}`
+              + `（${formatSecondOfDay(occupantStart)}–${formatSecondOfDay(occupantEnd)}）`
+              + `找不到別台可以整段容納它的設施，請不走`,
+            );
+            break;
+          }
           undo.push({ block: occupant, nodeId: original.nodeId, label: original.label });
           assignYardStay(occupant, elsewhere.id, elsewhere.label || elsewhere.id);
         }
@@ -2115,6 +2128,12 @@ export function insertMaintenanceTransferCards(args: {
           });
           yielded = true;
           break;
+        }
+        if (allMoved) {
+          yieldNotes.push(
+            `${facility.label || facility.id} 上的佔用者都搬得走，`
+            + `但搬完之後這一台仍然容納不了這段停留`,
+          );
         }
         for (const item of undo) {
           assignYardStay(item.block, item.nodeId, item.label);
@@ -2309,6 +2328,10 @@ export function insertMaintenanceTransferCards(args: {
           `最早空出來的是 ${earliestFree.label}（${formatSecondOfDay(earliestFree.second)}，`
           + `比這段整備的開始晚 ${waitMinutes} 分鐘）`,
         );
+      }
+
+      if (yieldNotes.length > 0) {
+        parts.push(`已試過請別列車換設施讓位：${yieldNotes.join('；')}`);
       }
 
       const window = `${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}`;
