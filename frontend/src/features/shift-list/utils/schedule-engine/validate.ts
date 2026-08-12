@@ -1098,10 +1098,17 @@ export function validateStationBerthCollisions(
       severity: 'warning',
       kind: 'actionable',
       message:
-        `${bucket.stationName}：${formatMinuteHms(atMinute)} 同時有 ${peak} 台車停在這裡`
-        + `${peakLabel ? `——${peakLabel}` : ''}，但一個停靠點只能停 1 台。`
+        // 這一則掛在「違規最嚴重的那一對」的卡片上，訊息卻只講尖峰與停最久的
+        // ——兩者常常都不是這張卡本人，使用者點開會覺得整段跟自己無關
+        // （2026-08-12：點 TN1342 卻只看到 08:51 與 16:35 的事）。先講這張卡自己的那一對。
+        `這一班：${tripCodeOf(bucket.worst.later)} 到「${bucket.stationName}」時，`
+        + `前一班 ${tripCodeOf(bucket.worst.earlier)} 還沒清乾淨`
+        + `（要等到 ${formatMinuteHms(bucket.worst.earlier.protectedUntilMinute)}，`
+        + `差 ${Math.round(bucket.worst.protectionShortfallSeconds)} 秒）。`
+        + `\n這一站整體：${formatMinuteHms(atMinute)} 同時有 ${peak} 台車停在這裡`
+        + `${peakLabel ? `——${peakLabel}` : ''}，但一個停靠點只能停 1 台；`
         + `整天在這一站共有 ${bucket.pairKeys.size} 對班次不滿足碰撞保護`
-        + `（這裡只列出尖峰那一刻；其餘同一站的都收在這一則裡）`
+        + `（同一站的都收在這一則裡，不逐對列出）`
         + (longestLabel ? `；其中停最久的是另一班 ${longestLabel}` : ''),
       detail: {
         stationId: bucket.stationId,
