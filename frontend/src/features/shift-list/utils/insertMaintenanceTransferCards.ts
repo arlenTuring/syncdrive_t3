@@ -1289,8 +1289,35 @@ export function insertMaintenanceTransferCards(args: {
       }
       bookJunction(chosen.gatewayNodeId, chosen.gatewayInstant, timeline.row);
 
-      const departureSecond = chosen.departureSecond;
-      const arriveSecond = departureSecond + chosen.seconds;
+      /**
+       * <strong>「提早進廠」是選配，不是特權。</strong>
+       *
+       * 使用者當初的要求是「有機會不站格子就先去整備格，提早開始整備並沒有關係」——
+       * 關鍵在<strong>有機會</strong>。原本的實作把提早當成無條件的權利：車一有空就
+       * 往前佔，結果<strong>排擠掉準時進廠的車</strong>。
+       *
+       * 實際案例（2026-08-12 使用者查出來的）：EG1926 提早了將近半小時進充電樁，
+       * 於是 19:00 準時要充電的 EE1900 沒樁可用——而照時間模板算，充電尖峰同時需求
+       * 剛好等於 4 台樁，本來<strong>剛好夠</strong>。提早的那台把別人的位子先坐了。
+       *
+       * 所以提早只能用<strong>那一格本來就沒人要</strong>的時間：往前拉到別列車的
+       * 預約為止就停。拉不動就照原訂時刻進廠，不會比不做這件事更糟。
+       */
+      const plannedDepartureSecond = chosen.departureSecond;
+      const plannedArriveSecond = plannedDepartureSecond + chosen.seconds;
+      let arriveSecond = plannedArriveSecond;
+      const assignedFacilityId = yard.yardFacilityNodeId?.trim();
+      if (assignedFacilityId && arriveSecond < yardStartSecond - 1e-9) {
+        for (const booking of bookings) {
+          if (booking.facilityNodeId !== assignedFacilityId) continue;
+          if (booking.timelineRow === timeline.row) continue;
+          if (booking.endSecond <= arriveSecond + 1e-9) continue;
+          if (booking.startSecond >= yardStartSecond - 1e-9) continue;
+          if (booking.endSecond > arriveSecond) arriveSecond = booking.endSecond;
+        }
+        if (arriveSecond > yardStartSecond) arriveSecond = yardStartSecond;
+      }
+      const departureSecond = arriveSecond - chosen.seconds;
       /**
        * 出發落在午夜之前（前一段載客在前一天）時，把<strong>卡片與整備區塊
        * 一起</strong>往後平移一天，避免出現負時刻。
