@@ -139,6 +139,30 @@ export function evenOutRouteHeadwayPhase(args: {
       if (before.timelineRow === block.timelineRow) continue;
       if (after.timelineRow === block.timelineRow) continue;
 
+      /**
+       * <strong>整備後第一班不准挪。</strong>
+       *
+       * 它的發車時刻被<strong>出廠卡釘住</strong>——卡片的結束要貼齊發車，車才剛從
+       * 設施開出來。整段挪走，出場站就接不上，直接觸發
+       * <code>YARD_EXIT_STATION_MISMATCH</code>（error）。
+       *
+       * 同一個坑在 <code>yieldIdleBlockArrival</code> 已經修過一次，這裡沒有套上
+       * ——實測冒出 2 則（2026-08-13）。<strong>會移動時刻的處理，這條限制一律適用</strong>，
+       * 不是各自為政的特例。
+       */
+      const rowSiblingsForPin = [
+        ...(timelines.find((t) => t.row === block.timelineRow)?.blocks ?? []),
+      ].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+      const pinIndex = rowSiblingsForPin.findIndex((item) => item.id === block.id);
+      const beforeInRow = pinIndex > 0 ? rowSiblingsForPin[pinIndex - 1] : undefined;
+      if (
+        beforeInRow
+        && beforeInRow.source === 'template_bar'
+        && beforeInRow.taskType !== 'passenger'
+      ) {
+        continue;
+      }
+
       const ideal = (before.plannedStartMinute + after.plannedStartMinute) / 2;
       let shift = (ideal - block.plannedStartMinute) * DAMPING;
       if (Math.abs(shift) < MIN_SHIFT_MINUTES) continue;

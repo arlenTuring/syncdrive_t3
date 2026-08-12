@@ -3763,6 +3763,41 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-13 · 相位均分成立：141 → 28，硬錯誤全歸零</h3>
+  <div class="callout">
+    重做版的實測。<strong>「自己驗證、自己放棄」這條鐵律是對的</strong>——
+    87 班推回等間隔、29 班因為會撞站位整筆放棄（放棄率 25%），
+    而先前那三種硬錯誤全部歸零。
+  </div>
+  <ul>
+    <li>
+      <strong>結果：</strong><code>HEADWAY_BELOW_TARGET</code> <strong>141 → 28</strong>；
+      <code>STATION_BERTH_COLLISION</code> 4 → <strong>0</strong>；
+      <code>ROUTE_STATION_DISCONTINUITY</code> 3 → <strong>0</strong>；
+      <code>ROUTE_SUCCESSOR_MISMATCH</code> 3 → <strong>0</strong>；
+      <code>STATION_BERTH_BACKUP_USED</code> 77 → 71。
+    </li>
+    <li>
+      <strong>唯一的新問題：<code>YARD_EXIT_STATION_MISMATCH</code> 2 則。</strong>
+      整備後第一班的發車時刻被<strong>出廠卡釘住</strong>——卡片結束要貼齊發車，
+      車才剛從設施開出來；整段挪走出場站就接不上。
+    </li>
+    <li>
+      <strong>這個坑我已經修過一次，卻沒有套過來。</strong>
+      <code>yieldIdleBlockArrival</code> 早就加了「整備後第一班不准挪」，
+      新寫的這一支各自為政、沒有繼承。已補上。
+    </li>
+    <li>
+      <strong>教訓：</strong>「會移動時刻的處理」是一整<strong>類</strong>，
+      它們共用同一組不變量（整備後第一班釘死、站位必須自己驗證、站位求解最後拍板）。
+      每新增一支就重新踩一次同樣的坑，代表這些限制寫在各自的程式碼裡、
+      而不是寫成這一類的共同規格。下次新增這類處理，先把這張清單逐條套一遍。
+    </li>
+    <li>
+      <code>tsc -b</code> 23、eslint 乾淨；放棄率 25% 代表還有空間，但那要等站位本身鬆開才吃得到。
+    </li>
+  </ul>
+
   <h3>2026-08-13 · 相位均分重做：自己驗證站位、撞得到就整筆放棄</h3>
   <div class="callout">
     診斷已被證實（141 → 18），錯的是解法不是判斷。這一版把上一版的失敗原因當成鐵律寫進設計。
