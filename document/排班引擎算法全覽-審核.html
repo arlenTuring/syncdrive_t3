@@ -3763,6 +3763,44 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-12 · 發車相位均分：把被站位擠歪的班距推回去</h3>
+  <div class="callout">
+    使用者：「其實你整個運能掉很慘，而且整個非常得空，這是策略還是什麼限制嗎」
+    ——量出來之後：不是缺班，是相位歪了。
+  </div>
+  <ul>
+    <li>
+      <strong>診斷：不是車不夠。</strong><code>UNSERVED_SERVICE_PULSE</code> 只有 1 則
+      （時刻表要的班次幾乎都有車接），但 <code>HEADWAY_BELOW_TARGET</code> 有 33 則
+      ——<strong>車有出、間隔卻忽大忽小</strong>。運能曲線的低谷來自這個。
+      另外量到每一列在正線時段中間有 15–37 分鐘的空洞，合計約 460 分鐘≈7.7 車小時（約 5%）。
+    </li>
+    <li>
+      <strong>歪的來源是站位求解。</strong>它為了清開停靠點會把個別班次往後延
+      （<code>STATION_BERTH_DELAYED</code> 51 則），每延一次相位就歪一次，
+      <strong>而且原本沒有任何機制把它推回來</strong>。
+    </li>
+    <li>
+      <strong>做法：往鄰居的中點靠（Laplacian 平滑）。</strong>同一條路線相鄰三班
+      A→B→C，B 理想上落在 A 與 C 的正中間；把 B 往中點移，班距變異數必然下降。
+      <strong>不需要知道目標班距是多少</strong>，也就不需要任何寫死的參數——
+      目標班距那個數字只用在回報，不再進求解。
+    </li>
+    <li>
+      <strong>三道防振盪保險：</strong>阻尼（一次只走一半，單調收斂不過衝）；
+      一趟只均分一次（記在區塊身上，跨得了輪次——這正是「滯留車讓路」踩過的坑）；
+      只在自己列的空檔內移動（前後段邊界是硬的，所以這一支<strong>不可能</strong>製造時間線重疊）。
+      同一列的兩班不算班距（那是同一台車的前後趟，不是兩台車的間隔）。
+    </li>
+    <li>
+      <strong>驗證缺口，必須記下來：</strong>這一則<strong>沒有跑過數值驗證</strong>——
+      重現資料 <code>/tmp/draftbody.json</code> 被系統清掉了，探針跑不起來。
+      只有 <code>tsc -b</code> 23（基線不變）與 eslint 乾淨。真正的驗證是使用者重新生成，
+      要看 <code>HEADWAY_BELOW_TARGET</code> 有沒有從 33 降下來、
+      <code>GEOMETRY_NOT_CONVERGED</code> 有沒有冒出來。
+    </li>
+  </ul>
+
   <h3>2026-08-12 · 束縛盤點：哪一條是物理、哪一條只是偏好</h3>
   <div class="callout">
     使用者：「我們之前已經開放了，應該是連行前後都不一定要去 N2W 出發了。

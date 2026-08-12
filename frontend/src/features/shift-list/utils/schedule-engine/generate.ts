@@ -44,6 +44,7 @@ import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarge
 import { alignRouteWithVehicleLocation } from '../alignRouteWithVehicleLocation';
 import { alignRouteWithMaintenanceEntry } from '../alignRouteWithMaintenanceEntry';
 import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
+import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -279,6 +280,15 @@ export function generateShiftSchedule(
       timelines,
       selectedRoutes: routesForBerth,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      warnings: round === 0 ? warnings : undefined,
+    });
+
+    // 站位延後把發車相位推歪了，這裡推回等間隔——只在自己列的空檔內微調，
+    // 不新增也不刪除班次。放在站位求解之後：先讓它排出合法解，再把相位撫平。
+    evenOutRouteHeadwayPhase({
+      timelines,
+      selectedRoutes: routesForBerth,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       warnings: round === 0 ? warnings : undefined,
     });
 
