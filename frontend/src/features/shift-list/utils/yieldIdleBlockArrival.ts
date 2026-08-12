@@ -35,16 +35,6 @@ import {
   findStationBerthCollisions,
 } from './stationBerthOccupancy';
 
-/**
- * 一趟最多往後挪多久。
- *
- * 不設上限的話，理論上可以把一趟推到幾小時後——雖然「下一趟發車不動」在數字上
- * 成立，但車在路上跑的時段整個換掉了，等於偷偷改了班表。挪動量本來就該遠小於
- * 空等時間，取空等的一半當上限：確定是在用<strong>多餘的</strong>餘裕，不是把
- * 空等吃乾抹淨。
- */
-const MAX_SHIFT_RATIO = 0.5;
-
 export function yieldIdleBlockArrival(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   selectedRoutes: ShiftScheduleSelectedRoute[];
@@ -101,24 +91,23 @@ export function yieldIdleBlockArrival(args: {
     if (idleMinutes <= 1e-9) continue;
 
     /**
-     * <strong>只讓給真正「路過」的車。</strong>
+     * <strong>目標是「快發車了才進站」，不是「等對方過去」。</strong>
      *
-     * 第一版對所有 protection_gap 都挪，結果 N2W 從 11 對降到 8 對、
-     * T3 卻從 29 對<strong>升到 32 對</strong>——因為對方也在滯留時，把這台挪過去
-     * 只是把碰撞推給下一個時刻，兩台都在搶同一格，誰讓都沒有用。
+     * 第一版把目標訂成「挪到路過的那台通過之後」，結果只在一對一、而且對方真的
+     * 只是路過時有用；四台車擠在同一格時完全無解——每一台都在等別人，誰讓都不夠。
      *
-     * 有效的只有「一台杵著、一台路過」這種<strong>不對稱</strong>的情形：
-     * 路過的車佔用只有幾秒，讓一下就過去了。對方也長時間佔著就是產能問題，
-     * 不是讓步能解的（見 STATION_BERTH_PROTECTION_GAP 的說明）。
+     * 但看實際數字就會發現有解：T3下行 16:07:10 那四台的<strong>離站時刻是錯開的</strong>
+     * （16:08:50、16:10:00、16:11:10、16:14:00），撞在一起的是<strong>到站</strong>——
+     * 它們全都提早到，然後一起杵在月台上。只要每一台都改成「快發車了才進站」，
+     * 隊伍自己就排好了，不需要任何人特別讓誰。
+     *
+     * 所以判準改成單純的一句：<strong>把多餘的空等吃掉</strong>。留一個碰撞保護
+     * 當折返緩衝，其餘往後挪。不必再問對方是誰、佔多久——每台各自縮短滯留，
+     * 全站的重疊自然就散開。
      */
-    const laterOccupiesMinutes = hit.later.actualDepartMinute - hit.later.startMinute;
-    if (laterOccupiesMinutes > 1) continue;
-
-    // 要挪到路過的那台通過、而且連碰撞保護都清乾淨之後才進站
-    const neededMinutes =
-      hit.later.actualDepartMinute + protectionMinutes - hit.earlier.startMinute;
+    const marginMinutes = protectionMinutes;
+    const neededMinutes = idleMinutes - marginMinutes;
     if (neededMinutes <= 1e-9) continue;
-    if (neededMinutes > idleMinutes * MAX_SHIFT_RATIO + 1e-9) continue;
 
     // 往後挪不會壓到前一段（間隔只會變大），但不能壓到自己排定的下一段
     const rowBlocks = blocksByRow.get(earlier.timelineRow) ?? [];

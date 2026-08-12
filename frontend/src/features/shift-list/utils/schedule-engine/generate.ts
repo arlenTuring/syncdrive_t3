@@ -77,7 +77,7 @@ export type GenerateShiftScheduleInput = {
  * 幾何後處理收斂迴圈的輪數上限。
  * 正常 2–3 輪就不動了；上限只是防呆，避免互相破壞的處理無限來回。
  */
-const GEOMETRY_CONVERGENCE_MAX_ROUNDS = 8;
+const GEOMETRY_CONVERGENCE_MAX_ROUNDS = 14;
 
 /**
  * 版面指紋：把每個區塊的「身分＋起迄」壓成字串，用來判斷這一輪有沒有任何變化。
