@@ -22,8 +22,9 @@
  *       會單調收斂。</li>
  *   <li><strong>一趟只均分一次</strong>——記在區塊身上（跨得了收斂迴圈的輪次）。
  *       這是先前「滯留車讓路」踩過的坑：狀態記在函式區域變數＝每輪重置＝振盪。</li>
- *   <li><strong>只在自己列的空檔內移動</strong>——前後段的邊界是硬的，絕不越界，
- *       所以這一支本身不可能製造出時間線重疊。</li>
+ *   <li><strong>只在自己列的空檔內移動</strong>——前後段的邊界是硬的，絕不越界。
+ *       邊界必須<strong>當場重算</strong>：第一版用函式開頭的快照，同列有兩班都移動時
+ *       第二班拿到過期邊界，兩班互相跨過去，該列順序就變了。</li>
  * </ol>
  *
  * 移動後可能踩到站位；放在收斂迴圈裡，交給站位求解在下一輪反應。
@@ -95,8 +96,22 @@ export function evenOutRouteHeadwayPhase(args: {
       let shift = (ideal - block.plannedStartMinute) * DAMPING;
       if (Math.abs(shift) < MIN_SHIFT_MINUTES) continue;
 
-      // 只能在自己列的空檔裡動，絕不越界
-      const siblings = rowBlocks.get(block.timelineRow) ?? [];
+      /**
+       * 只能在自己列的空檔裡動，絕不越界——而且邊界要<strong>當場重算</strong>。
+       *
+       * 第一版把每一列的順序在函式開頭抓成快照，之後照著快照取前後鄰居。
+       * 同一列有兩班都被均分時，第二班拿到的是<strong>過期的邊界</strong>，
+       * 於是兩班可能互相跨過去，該列的順序就變了——實測直接冒出
+       * <code>ROUTE_STATION_DISCONTINUITY</code> 與
+       * <code>ROUTE_SUCCESSOR_MISMATCH</code> 各 4 則，兩者都是 error
+       * （2026-08-13 使用者的 log）。
+       *
+       * 「不可能製造重疊」的推論本身沒錯，錯在它建立在<strong>邊界是新鮮的</strong>
+       * 這個沒被滿足的假設上。
+       */
+      const siblings = (rowBlocks.get(block.timelineRow) ?? [])
+        .slice()
+        .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
       const index = siblings.findIndex((item) => item.id === block.id);
       const previousSibling = index > 0 ? siblings[index - 1] : undefined;
       const nextSibling = index >= 0 ? siblings[index + 1] : undefined;

@@ -3763,6 +3763,37 @@ backend/src/dev-log/
     </li>
   </ul>
 
+  <h3>2026-08-13 · 誤判修正：那 8 則 error 是相位均分的過期邊界，不是進廠換線</h3>
+  <div class="callout">
+    使用者再生成後數字<strong>一字不變</strong>——而關鍵線索一直擺在那裡：
+    <code>ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY</code> 從頭到尾<strong>一則都沒出現過</strong>。
+    那道換線根本沒觸發，所以 8 則 error 不可能是它造成的。上一則的診斷是錯的。
+  </div>
+  <ul>
+    <li>
+      <strong>真正的原因：相位均分的邊界用了過期快照。</strong>每一列的順序在函式開頭
+      抓成快照，之後照快照取前後鄰居。同一列有<strong>兩班都被均分</strong>時，第二班拿到的
+      是過期邊界，於是兩班可能互相跨過去，該列的順序就變了——
+      <code>ROUTE_STATION_DISCONTINUITY</code> 與 <code>ROUTE_SUCCESSOR_MISMATCH</code>
+      各 4 則正是這個。改成每次移動前<strong>當場重排</strong>該列。
+    </li>
+    <li>
+      <strong>「不可能製造重疊」那句推論本身沒錯</strong>，錯在它建立在「邊界是新鮮的」
+      這個<strong>沒被滿足的假設</strong>上。寫下安全性論證時，要把論證依賴的每個前提
+      也一起檢查——尤其是那種「顯然成立」的。
+    </li>
+    <li>
+      <strong>上一則的待命限制仍然保留。</strong>那條理由（待命沒進廠，下一趟起點就是它站的
+      那一站）本身是對的，只是碰巧不是這次的兇手。留著是正確的防呆。
+    </li>
+    <li>
+      <strong>教訓：</strong>歸因之前先問「這個嫌疑犯到底有沒有在場」。
+      回報碼的<strong>缺席</strong>跟它的出現一樣有資訊量——
+      <code>ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY</code> 為 0 這件事，在我第一次讀那份 log
+      時就已經印在畫面上了，我沒看。
+    </li>
+  </ul>
+
   <h3>2026-08-13 · 相位均分成功（141→18），但進廠換線把待命也放行了</h3>
   <div class="callout">
     使用者重新生成後的實測 log。主要目標大勝，同時暴露出前一則的適用範圍錯誤。
