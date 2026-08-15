@@ -46,6 +46,7 @@ interface Props {
   onDeleteChild: (canvasId: string, childId: string) => void;
   onAddCanvas: (isGroup: boolean, x: number, y: number, canvasKind?: CanvasKind, initialWidgetType?: WidgetType) => void;
   onEnterEditGroupMode?: (groupId: string) => void;
+  onEnterTabCanvasMode?: (canvasId: string, tabId: string) => void;
   /** 拖曳／縮放開始前寫入復原快照 */
   onEditSessionStart?: () => void;
   /** 子畫布：執行時範本裁切區（虛線標示，小於編輯平面） */
@@ -69,6 +70,7 @@ export function PlaneWorkspace({
   onAddChild, onUpdateChild, onBatchUpdateChildren, onDeleteChild,
   onAddCanvas,
   onEnterEditGroupMode,
+  onEnterTabCanvasMode,
   onEditSessionStart,
   subcanvasDesignBounds,
   dualCanvasEdit,
@@ -824,6 +826,7 @@ export function PlaneWorkspace({
             onBatchUpdateChildren={(updates) => onBatchUpdateChildren(el.id, updates)}
             onDeleteChild={(childId) => onDeleteChild(el.id, childId)}
             onEnterEditGroupMode={onEnterEditGroupMode}
+            onEnterTabCanvasMode={onEnterTabCanvasMode}
             onEditSessionStart={onEditSessionStart}
             onCanvasGroupDragStart={handleCanvasGroupDragStart}
             onCanvasGroupDragMove={handleCanvasGroupDragMove}

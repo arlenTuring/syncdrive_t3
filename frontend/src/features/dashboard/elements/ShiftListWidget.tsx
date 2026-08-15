@@ -304,7 +304,7 @@ function ShiftTableRow({
 export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
   const isEditMode = useIsEditMode();
   const [activeTab, setActiveTab] = useState<'mainline' | 'maintenance'>(
-    widget.defaultTab ?? 'mainline',
+    widget.defaultTab === 'maintenance' ? 'maintenance' : 'mainline',
   );
 
   const DS = widget.dataSourceId ?? 'default-internal';

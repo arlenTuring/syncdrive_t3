@@ -80,7 +80,7 @@ export function patchTabChild(
   patch: Partial<ChildWidget>,
 ): Partial<CanvasElementProps> {
   const children = getTabChildren(el, tabId);
-  const updated = children.map(c => (c.id === childId ? { ...c, ...patch } : c));
+  const updated = children.map(c => (c.id === childId ? ({ ...c, ...patch } as ChildWidget) : c));
   return buildTabChildrenPatch(el, tabId, updated);
 }
 

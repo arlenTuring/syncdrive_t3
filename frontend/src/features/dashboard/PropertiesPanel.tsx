@@ -2441,7 +2441,7 @@ function VehicleContainerSettings({
   );
 }
 
-export function inferColumnFieldKey(col: { name?: string; children?: CanvasElementProps[]; fieldKey?: string }): string {
+export function inferColumnFieldKey(col: { name?: string; children?: ChildWidget[]; fieldKey?: string }): string {
   if (col.fieldKey && col.fieldKey.trim()) return col.fieldKey.trim();
 
   // 1. 從 children 中尋找第一組 {variable_name} 或 status-badge / route-progress

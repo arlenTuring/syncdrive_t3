@@ -24,7 +24,7 @@ interface PaletteItem {
 
 interface ContainerItem {
   id: string;
-  canvasType: 'canvas' | 'canvas-group' | 'canvas-map-platform';
+  canvasType: 'canvas' | 'canvas-group' | 'canvas-map-platform' | 'canvas-tab-list';
   label: string;
   icon: React.ReactNode;
   color: string;
