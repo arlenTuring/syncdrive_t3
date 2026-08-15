@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
@@ -10,6 +10,9 @@ import type {
   VehicleContainerWidget,
   RouteActionIconRule,
   RouteActionMatchOp,
+  TabListWidget,
+  TabListTab,
+  TabListColumn,
 } from './types';
 import {
   buildVehicleBehaviorActionRules,
@@ -24,7 +27,8 @@ import * as LucideIcons from 'lucide-react';
 import { 
   Layers, Trash2, Settings, Type, Image, TrendingUp, Database, 
   Gauge, LayoutGrid, Plus, X, Palette,
-  Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, AlertTriangle, CircleOff, Monitor, Bus, Zap
+  Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, AlertTriangle, CircleOff, Monitor, Bus, Zap, List, Edit3,
+  AlignLeft, AlignCenter, AlignRight
 } from 'lucide-react';
 import { DataSourcePicker } from './elements/DataSourcePicker';
 import { DataSourceIdSelect } from './elements/DataSourceIdSelect';
@@ -620,6 +624,17 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
       
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <Field label="數值欄位名稱"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
+      <Field label="樣式">
+        <select
+          value={w.gaugeVariant ?? 'default'}
+          onChange={e => onUpdate({ gaugeVariant: e.target.value as GaugeWidget['gaugeVariant'] })}
+          className={selectCls}
+        >
+          <option value="default">半圓弧</option>
+          <option value="semi-arc">車輛狀態半圓</option>
+          <option value="ring">全圓進度環</option>
+        </select>
+      </Field>
       
       <div className="grid grid-cols-3 gap-1.5">
         <Field label="最小值"><input type="number" value={w.min} onChange={e => onUpdate({ min: +e.target.value })} className={inputCls} /></Field>
@@ -829,13 +844,201 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
   return (
     <div className="space-y-3">
       <SH icon={<Image size={13} />} label="圖片屬性" color="#10b981" />
-      <Field label="圖片 URL"><input value={w.src} onChange={e => onUpdate({ src: e.target.value })} className={inputCls} /></Field>
-      <Field label="圓角"><input type="number" value={w.borderRadius} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} /></Field>
+
+      {/* 圖片 URL */}
+      <Field label="圖片 URL">
+        <input
+          value={w.src}
+          onChange={e => onUpdate({ src: e.target.value })}
+          className={inputCls}
+          placeholder="https://example.com/photo.jpg"
+        />
+      </Field>
+      {w.src?.trim() && (
+        <div className="rounded-lg overflow-hidden border border-zinc-700 bg-zinc-900">
+          <img
+            src={w.src}
+            alt="預覽"
+            className="w-full max-h-28 object-contain"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.25'; }}
+          />
+        </div>
+      )}
+
+      {/* 圖片填充模式 */}
+      <Field label="填充模式">
+        <select
+          value={w.objectFit}
+          onChange={e => onUpdate({ objectFit: e.target.value as ImageWidget['objectFit'] })}
+          className={selectCls}
+        >
+          <option value="cover">Cover（裁切填滿）</option>
+          <option value="contain">Contain（完整顯示）</option>
+          <option value="fill">Fill（拉伸填滿）</option>
+          <option value="none">None（原始大小）</option>
+        </select>
+      </Field>
+
+      {/* 圓角與透明度 */}
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="圓角 (px)">
+          <input
+            type="number" min={0} max={999}
+            value={w.borderRadius}
+            onChange={e => onUpdate({ borderRadius: +e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="透明度 (%)">
+          <input
+            type="number" min={0} max={100}
+            value={w.opacity ?? 100}
+            onChange={e => onUpdate({ opacity: +e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      {/* 背景色 */}
+      <Field label="背景色">
+        <div className="flex gap-2 items-center">
+          <input
+            type="color"
+            value={w.backgroundColor ?? '#000000'}
+            onChange={e => onUpdate({ backgroundColor: e.target.value })}
+            className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+          />
+          <input
+            value={w.backgroundColor ?? ''}
+            onChange={e => onUpdate({ backgroundColor: e.target.value })}
+            className={inputCls}
+            placeholder="transparent"
+          />
+        </div>
+      </Field>
+
+      {/* 外框 */}
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="外框寬度 (px)">
+          <input
+            type="number" min={0} max={20}
+            value={w.borderWidth ?? 0}
+            onChange={e => onUpdate({ borderWidth: +e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="外框顏色">
+          <div className="flex gap-1 items-center">
+            <input
+              type="color"
+              value={w.borderColor ?? '#ffffff'}
+              onChange={e => onUpdate({ borderColor: e.target.value })}
+              className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+            />
+            <input
+              value={w.borderColor ?? ''}
+              onChange={e => onUpdate({ borderColor: e.target.value })}
+              className={inputCls}
+              placeholder="rgba(255,255,255,0.15)"
+            />
+          </div>
+        </Field>
+      </div>
+
+      {/* ── 疊加文字 ── */}
+      <SH icon={<Type size={13} />} label="疊加文字" color="#a78bfa" />
+
+      <Field label="疊加文字內容">
+        <textarea
+          rows={2}
+          value={w.overlayText ?? ''}
+          onChange={e => onUpdate({ overlayText: e.target.value })}
+          className={`${inputCls} resize-none`}
+          placeholder="留空則不顯示疊加文字"
+        />
+      </Field>
+
+      {(w.overlayText ?? '').trim() !== '' && (
+        <>
+          <Field label="文字位置">
+            <select
+              value={w.overlayPosition ?? 'bottom-left'}
+              onChange={e => onUpdate({ overlayPosition: e.target.value as ImageWidget['overlayPosition'] })}
+              className={selectCls}
+            >
+              <option value="top-left">左上</option>
+              <option value="top-center">上置中</option>
+              <option value="top-right">右上</option>
+              <option value="center">正中央</option>
+              <option value="bottom-left">左下</option>
+              <option value="bottom-center">下置中</option>
+              <option value="bottom-right">右下</option>
+            </select>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="字級 (px)">
+              <input
+                type="number" min={8} max={72}
+                value={w.overlayFontSize ?? 13}
+                onChange={e => onUpdate({ overlayFontSize: +e.target.value })}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="字重">
+              <select
+                value={w.overlayFontWeight ?? 'normal'}
+                onChange={e => onUpdate({ overlayFontWeight: e.target.value as 'normal' | 'bold' })}
+                className={selectCls}
+              >
+                <option value="normal">Normal</option>
+                <option value="bold">Bold</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="文字顏色">
+              <div className="flex gap-1 items-center">
+                <input
+                  type="color"
+                  value={w.overlayTextColor ?? '#ffffff'}
+                  onChange={e => onUpdate({ overlayTextColor: e.target.value })}
+                  className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+                />
+                <input
+                  value={w.overlayTextColor ?? '#ffffff'}
+                  onChange={e => onUpdate({ overlayTextColor: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+            </Field>
+            <Field label="文字背景色">
+              <div className="flex gap-1 items-center">
+                <input
+                  type="color"
+                  value={w.overlayBgColor ?? '#000000'}
+                  onChange={e => onUpdate({ overlayBgColor: e.target.value })}
+                  className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+                />
+                <input
+                  value={w.overlayBgColor ?? 'rgba(0,0,0,0.45)'}
+                  onChange={e => onUpdate({ overlayBgColor: e.target.value })}
+                  className={inputCls}
+                  placeholder="rgba(0,0,0,0.45)"
+                />
+              </div>
+            </Field>
+          </div>
+        </>
+      )}
+
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
     </div>
   );
 }
+
 
 function ChartAxisFields({
   label,
@@ -2238,6 +2441,565 @@ function VehicleContainerSettings({
   );
 }
 
+export function inferColumnFieldKey(col: { name?: string; children?: CanvasElementProps[]; fieldKey?: string }): string {
+  if (col.fieldKey && col.fieldKey.trim()) return col.fieldKey.trim();
+
+  // 1. 從 children 中尋找第一組 {variable_name} 或 status-badge / route-progress
+  if (col.children && col.children.length > 0) {
+    for (const child of col.children) {
+      if (child.type === 'text' && typeof child.content === 'string') {
+        const match = child.content.match(/\{([a-zA-Z0-9_-]+)\}/);
+        if (match && match[1]) return match[1];
+      }
+      if (child.type === 'status-badge') {
+        const badge = child as any;
+        if (badge.valueField && typeof badge.valueField === 'string') return badge.valueField;
+      }
+      if (child.type === 'route-progress') {
+        const rp = child as any;
+        if (rp.valueField && typeof rp.valueField === 'string') return rp.valueField;
+      }
+    }
+  }
+
+  // 2. 從欄位標題名稱語意推斷
+  const name = (col.name ?? '').toLowerCase();
+  if (name.includes('班次') || name.includes('代號') || name.includes('trip')) return 'trip_code';
+  if (name.includes('方向') || name.includes('direction')) return 'direction_label';
+  if (name.includes('載具') || name.includes('車輛') || name.includes('vehicle')) return 'vehicle_code';
+  if (name.includes('路線') || name.includes('進度') || name.includes('station') || name.includes('route')) return 'route_stations';
+  if (name.includes('狀態') || name.includes('status')) return 'status_label';
+  if (name.includes('發車') || name.includes('時間') || name.includes('預計') || name.includes('time') || name.includes('depart')) return 'depart_time';
+  if (name.includes('類型') || name.includes('項目') || name.includes('maint')) return 'maint_type_label';
+  if (name.includes('操作') || name.includes('詳情') || name.includes('action') || name.includes('detail') || name.includes('key')) return 'shift_key';
+
+  return 'value';
+}
+
+function extractSqlAliases(sql?: string): string[] {
+  const defaults = [
+    'trip_code',
+    'direction_label',
+    'vehicle_code',
+    'route_stations',
+    'status_label',
+    'depart_time',
+    'shift_key',
+    'maint_type_label',
+  ];
+  const fields = new Set<string>(defaults);
+  if (!sql) return Array.from(fields);
+  // Match `AS alias` or `AS "alias"`
+  const asRegex = /\bAS\s+["']?([a-zA-Z0-9_]+)["']?/gi;
+  let match;
+  while ((match = asRegex.exec(sql)) !== null) {
+    if (match[1]) fields.add(match[1]);
+  }
+  // Match table.column_name or column_name in select
+  const selectRegex = /(?:^|\s|,)([a-zA-Z0-9_]+)\s*(?:,|$)/gi;
+  while ((match = selectRegex.exec(sql)) !== null) {
+    const k = match[1];
+    if (k && !['SELECT', 'FROM', 'WHERE', 'ORDER', 'BY', 'GROUP', 'JOIN', 'LIMIT', 'OFFSET', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AS', 'AND', 'OR', 'NOT', 'NULL', 'IS', 'IN', 'WITH', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'LATERAL', 'ON', 'TRUE', 'FALSE'].includes(k.toUpperCase())) {
+      fields.add(k);
+    }
+  }
+  return Array.from(fields);
+}
+
+function TabListSettings({
+  w,
+  onUpdate,
+  onDelete,
+  onEnterEditColumn,
+}: {
+  w: TabListWidget;
+  onUpdate: (p: Partial<TabListWidget>) => void;
+  onDelete: () => void;
+  onEnterEditColumn?: (tabId: string, columnId: string) => void;
+}) {
+  const tabs = w.tabs ?? [];
+  const [selectedTabId, setSelectedTabId] = React.useState<string>(tabs[0]?.id ?? '');
+  const activeTab = tabs.find(t => t.id === selectedTabId) ?? tabs[0];
+
+  const detectedSqlFields = React.useMemo(() => {
+    return extractSqlAliases(activeTab?.sqlQuery);
+  }, [activeTab?.sqlQuery]);
+
+  const updateTab = (tabId: string, patch: Partial<TabListTab>) => {
+    const updated = tabs.map(t => (t.id === tabId ? { ...t, ...patch } : t));
+    onUpdate({ tabs: updated });
+  };
+
+  // 自動填入所有未設定 fieldKey 的欄位
+  React.useEffect(() => {
+    if (!activeTab) return;
+    let changed = false;
+    const updatedCols = activeTab.columns.map(col => {
+      if (!col.fieldKey || !col.fieldKey.trim()) {
+        const inferred = inferColumnFieldKey(col);
+        if (inferred) {
+          changed = true;
+          return { ...col, fieldKey: inferred };
+        }
+      }
+      return col;
+    });
+    if (changed) {
+      updateTab(activeTab.id, { columns: updatedCols });
+    }
+  }, [activeTab?.id]);
+
+  const addTab = () => {
+    const newId = `tab-${Date.now()}`;
+    const newTab: TabListTab = {
+      id: newId,
+      label: `新分頁 ${tabs.length + 1}`,
+      columns: [
+        {
+          id: `col-${Date.now()}-1`,
+          name: '欄位 1',
+          fieldKey: 'name',
+          width: 120,
+          align: 'left',
+          children: [],
+        },
+      ],
+    };
+    onUpdate({ tabs: [...tabs, newTab] });
+    setSelectedTabId(newId);
+  };
+
+  const deleteTab = (tabId: string) => {
+    if (tabs.length <= 1) return;
+    const remaining = tabs.filter(t => t.id !== tabId);
+    onUpdate({ tabs: remaining });
+    if (selectedTabId === tabId) {
+      setSelectedTabId(remaining[0]?.id ?? '');
+    }
+  };
+
+  const updateColumn = (colId: string, patch: Partial<TabListColumn>) => {
+    if (!activeTab) return;
+    const updatedCols = activeTab.columns.map(c => (c.id === colId ? { ...c, ...patch } : c));
+    updateTab(activeTab.id, { columns: updatedCols });
+  };
+
+  const setGlobalAlign = (align: 'left' | 'center' | 'right') => {
+    const updatedTabs = tabs.map(tab => ({
+      ...tab,
+      align,
+      columns: tab.columns.map(col => ({
+        ...col,
+        align,
+        children: (col.children ?? []).map(ch => ch.type === 'text' ? { ...ch, textAlign: align } : ch),
+      })),
+    }));
+    onUpdate({
+      align,
+      tabs: updatedTabs,
+    });
+  };
+
+  const addColumn = () => {
+    if (!activeTab) return;
+    const newColId = `col-${Date.now()}`;
+    const newCol: TabListColumn = {
+      id: newColId,
+      name: `新欄位 ${activeTab.columns.length + 1}`,
+      fieldKey: '',
+      width: 100,
+      align: w.align ?? activeTab.align ?? 'left',
+      children: [],
+    };
+    updateTab(activeTab.id, { columns: [...activeTab.columns, newCol] });
+  };
+
+  const deleteColumn = (colId: string) => {
+    if (!activeTab || activeTab.columns.length <= 1) return;
+    const remaining = activeTab.columns.filter(c => c.id !== colId);
+    updateTab(activeTab.id, { columns: remaining });
+  };
+
+  const selectTab = (tabId: string) => {
+    setSelectedTabId(tabId);
+    onUpdate({ activeTabId: tabId });
+  };
+
+  useEffect(() => {
+    if (w.activeTabId && w.activeTabId !== selectedTabId) {
+      setSelectedTabId(w.activeTabId);
+    }
+  }, [w.activeTabId]);
+
+  return (
+    <div className="space-y-4 text-xs">
+      <SH icon={<List size={14} />} label="Tab 清單表格設定" color="#38bdf8" />
+
+      {/* Tab 管理 */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-zinc-400 text-[11px] font-medium">Tab 分頁清單</label>
+          <button
+            type="button"
+            onClick={addTab}
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-600/30 text-blue-300 hover:bg-blue-600/50 text-[10px]"
+          >
+            <Plus size={11} /> 新增 Tab
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => selectTab(tab.id)}
+              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                tab.id === (activeTab?.id ?? '')
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab && (
+        <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-zinc-300">
+              設定 Tab：「{activeTab.label}」
+            </span>
+            {tabs.length > 1 && (
+              <button
+                type="button"
+                onClick={() => deleteTab(activeTab.id)}
+                className="text-red-400 hover:text-red-300 text-[10px] flex items-center gap-0.5"
+              >
+                <Trash2 size={11} /> 刪除此 Tab
+              </button>
+            )}
+          </div>
+
+          {/* Tab 顯示名稱 */}
+          <div>
+            <label className="text-zinc-400 text-[10px] block mb-1">Tab 顯示名稱</label>
+            <input
+              type="text"
+              value={activeTab.label}
+              onChange={e => updateTab(activeTab.id, { label: e.target.value })}
+              className={inputCls}
+              placeholder="例如：正線班次"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-zinc-400 text-[10px] block">此 Tab 資料來源 SQL</label>
+            <textarea
+              rows={3}
+              value={activeTab.sqlQuery ?? ''}
+              onChange={e => updateTab(activeTab.id, { sqlQuery: e.target.value })}
+              className={`${inputCls} font-mono text-[10px]`}
+              placeholder="SELECT * FROM ... 或留空使用預設"
+            />
+          </div>
+
+          {/* 欄位清單 */}
+          <div className="pt-2 border-t border-zinc-700/50 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-zinc-300 text-[11px] font-medium">欄位格清單 (Columns)</label>
+              <button
+                type="button"
+                onClick={addColumn}
+                className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/50 text-[10px] font-medium transition-colors"
+              >
+                <Plus size={12} /> 新增欄位格
+              </button>
+            </div>
+
+            <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
+              {activeTab.columns.map((col, idx) => {
+                const effectiveFieldKey = col.fieldKey || inferColumnFieldKey(col);
+                return (
+                <div
+                  key={col.id}
+                  className="p-3 rounded-lg bg-zinc-900/90 border border-zinc-700/50 space-y-2.5"
+                >
+                  {/* 第 1 行：序號 + 欄位標題 + 刪除 */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-300 text-[10px] font-bold">
+                        欄位標題 #{idx + 1}
+                      </label>
+                      {activeTab.columns.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => deleteColumn(col.id)}
+                          className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-red-950/40"
+                          title="刪除此欄位"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={col.name}
+                      onChange={e => updateColumn(col.id, { name: e.target.value })}
+                      className={`${inputCls} w-full text-xs`}
+                      placeholder="欄位標題 (如：班次代號)"
+                    />
+                  </div>
+
+                  {/* 第 2 行：綁定 SQL 欄位別名 (下拉選單) */}
+                  <div className="space-y-1">
+                    <label className="text-zinc-400 text-[10px]">
+                      綁定 SQL 欄位別名:
+                    </label>
+                    <select
+                      value={effectiveFieldKey}
+                      onChange={e => updateColumn(col.id, { fieldKey: e.target.value })}
+                      className={`${selectCls} w-full text-xs py-1.5 font-mono`}
+                    >
+                      <option value="">-- 點此選擇 SQL 欄位別名 --</option>
+                      {detectedSqlFields.map(f => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                      {effectiveFieldKey && !detectedSqlFields.includes(effectiveFieldKey) && (
+                        <option value={effectiveFieldKey}>自訂別名: {effectiveFieldKey}</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* 第 3 行：欄位寬度 */}
+                  <div className="space-y-1">
+                    <label className="text-zinc-400 text-[10px]">
+                      欄位寬度 (px):
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        value={col.width}
+                        onChange={e => updateColumn(col.id, { width: Math.max(30, Number(e.target.value)) })}
+                        className={`${inputCls} w-full text-xs font-mono`}
+                        placeholder="寬度 (例如 90)"
+                      />
+                      <span className="text-zinc-500 text-xs shrink-0">px</span>
+                    </div>
+                  </div>
+
+                  {/* 第 4 行：進入元件編輯按鈕 */}
+                  <button
+                    type="button"
+                    onClick={() => onEnterEditColumn?.(activeTab.id, col.id)}
+                    className="w-full mt-1 py-2 px-3 rounded-md bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <Edit3 size={13} /> 進入元件編輯
+                  </button>
+                </div>
+              );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 全域字體與外觀設定 ────────────────────────────────────── */}
+      <div className="space-y-3 pt-3 border-t border-zinc-800">
+        <label className="text-zinc-300 text-[11px] font-semibold flex items-center gap-1.5">
+          <Palette size={13} className="text-cyan-400" /> 全域字體與外觀樣式
+        </label>
+
+        {/* Tab 標籤樣式 */}
+        <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2">
+          <span className="text-[10px] text-zinc-400 font-bold block">Tab 分頁標籤樣式</span>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">標籤字級 (px)</label>
+              <input
+                type="number"
+                value={w.tabFontSize ?? 14}
+                onChange={e => onUpdate({ tabFontSize: Number(e.target.value) })}
+                className={`${inputCls} text-xs`}
+              />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">選中標籤顏色</label>
+              <div
+                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                style={{ backgroundColor: w.tabActiveColor ?? '#3b82f6' }}
+              >
+                <input
+                  type="color"
+                  value={w.tabActiveColor ?? '#3b82f6'}
+                  onChange={e => onUpdate({ tabActiveColor: e.target.value })}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                  title="點擊選擇選中標籤顏色"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">未選標籤顏色</label>
+              <div
+                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                style={{ backgroundColor: w.tabInactiveColor ?? '#64748b' }}
+              >
+                <input
+                  type="color"
+                  value={w.tabInactiveColor ?? '#64748b'}
+                  onChange={e => onUpdate({ tabInactiveColor: e.target.value })}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                  title="點擊選擇未選標籤顏色"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 表頭與表身字體顏色 */}
+        <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2.5">
+          <span className="text-[10px] text-zinc-400 font-bold block">表格字體與列高</span>
+
+          {/* 表格欄位對齊方式 */}
+          <div>
+            <label className="text-zinc-500 text-[9px] block mb-1">表格欄位對齊方式</label>
+            <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded p-0.5 gap-0.5">
+              <button
+                type="button"
+                onClick={() => setGlobalAlign('left')}
+                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
+                  (w.align ?? 'left') === 'left'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                }`}
+                title="全表格欄位靠左對齊"
+              >
+                <AlignLeft size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlobalAlign('center')}
+                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
+                  w.align === 'center'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                }`}
+                title="全表格欄位置中對齊"
+              >
+                <AlignCenter size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlobalAlign('right')}
+                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
+                  w.align === 'right'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                }`}
+                title="全表格欄位靠右對齊"
+              >
+                <AlignRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">表頭字級 (px)</label>
+              <input
+                type="number"
+                value={w.headerFontSize ?? 12}
+                onChange={e => onUpdate({ headerFontSize: Number(e.target.value) })}
+                className={`${inputCls} text-xs`}
+              />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">表頭文字顏色</label>
+              <div
+                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                style={{ backgroundColor: w.headerTextColor ?? '#94a3b8' }}
+              >
+                <input
+                  type="color"
+                  value={w.headerTextColor ?? '#94a3b8'}
+                  onChange={e => onUpdate({ headerTextColor: e.target.value })}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                  title="點擊選擇表頭文字顏色"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">內容字級 (px)</label>
+              <input
+                type="number"
+                value={w.fontSize ?? 13}
+                onChange={e => onUpdate({ fontSize: Number(e.target.value) })}
+                className={`${inputCls} text-xs`}
+              />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">內容文字顏色</label>
+              <div
+                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                style={{ backgroundColor: w.textColor ?? '#cbd5e1' }}
+              >
+                <input
+                  type="color"
+                  value={w.textColor ?? '#cbd5e1'}
+                  onChange={e => onUpdate({ textColor: e.target.value })}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                  title="點擊選擇內容文字顏色"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">每列高度 (px)</label>
+              <input
+                type="number"
+                value={w.rowHeight ?? 48}
+                onChange={e => onUpdate({ rowHeight: Number(e.target.value) })}
+                className={`${inputCls} text-xs`}
+              />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-[9px] block mb-1">表頭高度 (px)</label>
+              <input
+                type="number"
+                value={w.headerHeight ?? 38}
+                onChange={e => onUpdate({ headerHeight: Number(e.target.value) })}
+                className={`${inputCls} text-xs`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 輔助標籤 */}
+        <div>
+          <label className="text-zinc-400 text-[10px] block mb-1">右上角輔助標籤文字</label>
+          <input
+            type="text"
+            value={w.currentScheduleLabel ?? '目前班表'}
+            onChange={e => onUpdate({ currentScheduleLabel: e.target.value })}
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      <PositionFields widget={w as ChildWidget} onUpdate={onUpdate as (p: Partial<ChildWidget>) => void} />
+      <DeleteBtn onDelete={onDelete} />
+    </div>
+  );
+}
+
 function DeleteBtn({ onDelete }: { onDelete: () => void }) {
   return (
     <button onClick={onDelete} className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2">
@@ -2264,6 +3026,7 @@ interface Props {
   onDeleteChild: () => void;
   onEnterEditGroupMode?: (groupId: string) => void;
   onEnterEditVehicleContainer?: () => void;
+  onEnterEditTabListCell?: (tabId: string, columnId: string) => void;
   /** 雙畫板子畫布：選取中間閘道設定區 */
   dualGateSettingsActive?: boolean;
 }
@@ -2281,6 +3044,7 @@ export function PropertiesPanel({
   onUpdateChild, onDeleteChild,
   onEnterEditGroupMode,
   onEnterEditVehicleContainer,
+  onEnterEditTabListCell,
   dualGateSettingsActive,
 }: Props) {
   const { issueMap } = useBindingHealth();
@@ -2376,6 +3140,16 @@ export function PropertiesPanel({
               case 'empty-state':    return <EmptyStateSettings {...props as any} />;
               case 'map-canvas':     return <MapCanvasSettings {...props as any} />;
               case 'unit-telemetry-card': return <UnitTelemetrySettings {...props as any} />;
+              case 'tab-list':
+              case 'shift-list':
+                return (
+                  <TabListSettings
+                    w={selectedChild as TabListWidget}
+                    onUpdate={onUpdateChild as (p: Partial<TabListWidget>) => void}
+                    onDelete={onDeleteChild}
+                    onEnterEditColumn={onEnterEditTabListCell}
+                  />
+                );
               case 'vehicle-container':
                 return (
                   <VehicleContainerSettings

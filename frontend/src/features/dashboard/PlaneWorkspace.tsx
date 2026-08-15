@@ -2,13 +2,17 @@ import { useRef, useEffect, useState, useCallback, type CSSProperties } from 're
 import type { DashboardPlane, CanvasElementProps, ChildWidget, WidgetType, CanvasKind } from './types';
 import { CanvasElement } from './CanvasElement';
 import { useFormatPainter } from './context/FormatPainterContext';
-import { ZoomIn, ZoomOut, Crosshair, Paintbrush } from 'lucide-react';
+import { ZoomIn, ZoomOut, Crosshair, Paintbrush, Lock, LockOpen } from 'lucide-react';
 import { useModifierHeld } from './hooks/useModifierHeld';
 import {
   marqueeRectsIntersect,
   normalizeMarqueeRect,
   type MarqueeRect,
 } from './utils/marqueeSelect';
+import {
+  readPlaneScaleLock,
+  writePlaneScaleLock,
+} from './utils/planeViewScaleLock';
 const zoomBtnStyle: CSSProperties = {
   background: 'none',
   border: 'none',
@@ -40,7 +44,7 @@ interface Props {
   onUpdateChild: (canvasId: string, childId: string, patch: Partial<ChildWidget>) => void;
   onBatchUpdateChildren: (canvasId: string, updates: Array<{ childId: string; patch: Partial<ChildWidget> }>) => void;
   onDeleteChild: (canvasId: string, childId: string) => void;
-  onAddCanvas: (isGroup: boolean, x: number, y: number, canvasKind?: CanvasKind) => void;
+  onAddCanvas: (isGroup: boolean, x: number, y: number, canvasKind?: CanvasKind, initialWidgetType?: WidgetType) => void;
   onEnterEditGroupMode?: (groupId: string) => void;
   /** 拖曳／縮放開始前寫入復原快照 */
   onEditSessionStart?: () => void;
@@ -77,6 +81,7 @@ export function PlaneWorkspace({
   const innerRef = useRef<HTMLDivElement>(null); // 内容區域 ref
   const [fitScale, setFitScale] = useState(1);
   const [userZoom, setUserZoom] = useState(1.0);
+  const [scaleLocked, setScaleLocked] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
@@ -89,6 +94,10 @@ export function PlaneWorkspace({
   const canvasGroupDragRef = useRef(canvasGroupDrag);
   canvasGroupDragRef.current = canvasGroupDrag;
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const scaleLockedRef = useRef(scaleLocked);
+  scaleLockedRef.current = scaleLocked;
+  const horizontalPanOnlyRef = useRef(!isEditMode);
+  horizontalPanOnlyRef.current = !isEditMode;
 
   const totalScale = fitScale * userZoom;
 
@@ -143,10 +152,17 @@ export function PlaneWorkspace({
     };
   }, [plane.width, plane.height]);
 
-  /** 切換平面（含進入群組範本編輯）時重置平移／縮放 */
+  /** 切換平面：還原鎖定縮放，否則重置；平移每次歸零（鎖定仍可再拖） */
   useEffect(() => {
-    setUserZoom(1);
+    const pref = readPlaneScaleLock(plane.id);
     setPanOffset({ x: 0, y: 0 });
+    if (pref?.locked) {
+      setUserZoom(pref.userZoom);
+      setScaleLocked(true);
+    } else {
+      setUserZoom(1);
+      setScaleLocked(false);
+    }
   }, [plane.id, plane.width, plane.height]);
 
   // 滾輪與觸控板事件 (縮放與平移)
@@ -155,17 +171,21 @@ export function PlaneWorkspace({
     if (!el) return;
     const handler = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        // 縮放 (Ctrl + Scroll / Pinch)
+        // 縮放 (Ctrl + Scroll / Pinch)；鎖定時略過，仍可平移
         e.preventDefault();
-        // 降低靈敏度：從 0.1 降至 0.05
+        if (scaleLockedRef.current) return;
         const delta = e.deltaY < 0 ? 0.05 : -0.05;
         setUserZoom(prev => Math.max(0.2, Math.min(5, +(prev + delta).toFixed(2))));
       } else {
-        // 平移 (Swipe / Scroll)
-        // 這裡不需要 preventDefault 以保持自然滾動感，但因為我們是自定義平移，所以手動更新 panOffset
+        // 檢視模式：僅橫向平移（縱向滾輪改為左右移動）
+        const horizontalOnly = horizontalPanOnlyRef.current;
+        const dx = horizontalOnly
+          ? -(Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY)
+          : -e.deltaX;
+        const dy = horizontalOnly ? 0 : -e.deltaY;
         setPanOffset(prev => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY
+          x: prev.x + dx,
+          y: horizontalOnly ? 0 : prev.y + dy,
         }));
       }
     };
@@ -191,7 +211,11 @@ export function PlaneWorkspace({
     const handleMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
-      setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      const horizontalOnly = horizontalPanOnlyRef.current;
+      setPanOffset(prev => ({
+        x: prev.x + dx,
+        y: horizontalOnly ? 0 : prev.y + dy,
+      }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
@@ -207,11 +231,34 @@ export function PlaneWorkspace({
     };
   }, [isPanning]);
 
-  const zoomIn  = () => setUserZoom(p => Math.min(5, +(p + 0.25).toFixed(2)));
-  const zoomOut = () => setUserZoom(p => Math.max(0.2, +(p - 0.25).toFixed(2)));
+  // 進入檢視模式時清掉縱向偏移
+  useEffect(() => {
+    if (!isEditMode) {
+      setPanOffset((prev) => (prev.y === 0 ? prev : { ...prev, y: 0 }));
+    }
+  }, [isEditMode]);
+
+  const zoomIn = () => {
+    if (scaleLocked) return;
+    setUserZoom((p) => Math.min(5, +(p + 0.25).toFixed(2)));
+  };
+  const zoomOut = () => {
+    if (scaleLocked) return;
+    setUserZoom((p) => Math.max(0.2, +(p - 0.25).toFixed(2)));
+  };
   const zoomReset = () => {
-    setUserZoom(1.0);
     setPanOffset({ x: 0, y: 0 });
+    if (scaleLocked) return;
+    setUserZoom(1.0);
+  };
+  const toggleScaleLock = () => {
+    if (scaleLocked) {
+      writePlaneScaleLock(plane.id, { locked: false, userZoom });
+      setScaleLocked(false);
+      return;
+    }
+    writePlaneScaleLock(plane.id, { locked: true, userZoom });
+    setScaleLocked(true);
   };
 
   const handleDragActiveChange = useCallback((active: boolean) => {
@@ -319,7 +366,7 @@ export function PlaneWorkspace({
   const [isCanvasDragOver, setIsCanvasDragOver] = useState(false);
 
   const handleWorkspaceDragOver = useCallback((e: React.DragEvent) => {
-    if (!isEditMode || !e.dataTransfer.types.includes('canvastype')) return;
+    if (!isEditMode) return;
     e.preventDefault();
     setIsCanvasDragOver(true);
   }, [isEditMode]);
@@ -336,16 +383,29 @@ export function PlaneWorkspace({
     e.preventDefault();
     e.stopPropagation();
     setIsCanvasDragOver(false);
-    const canvasType = e.dataTransfer.getData('canvasType');
-    if (!canvasType || !innerRef.current) return;
-    const isGroup = canvasType === 'canvas-group';
-    const isMapPlatform = canvasType === 'canvas-map-platform';
+    const canvasType = e.dataTransfer.getData('canvasType') || e.dataTransfer.getData('canvastype');
+    const widgetType = (e.dataTransfer.getData('widgetType') || e.dataTransfer.getData('widgettype')) as WidgetType;
+    if (!innerRef.current) return;
     const rect = innerRef.current.getBoundingClientRect();
     const rawX = (e.clientX - rect.left) / totalScale;
     const rawY = (e.clientY - rect.top) / totalScale;
-    const x = Math.round(rawX / 5) * 5;
-    const y = Math.round(rawY / 5) * 5;
-    onAddCanvas(isGroup, x, y, isMapPlatform ? 'map-platform' : 'standard');
+    const x = Math.max(0, Math.round(rawX / 5) * 5);
+    const y = Math.max(0, Math.round(rawY / 5) * 5);
+
+    if (canvasType) {
+      if (canvasType === 'canvas-tab-list') {
+        onAddCanvas(false, x, y, 'standard', 'tab-list');
+        return;
+      }
+      const isGroup = canvasType === 'canvas-group';
+      const isMapPlatform = canvasType === 'canvas-map-platform';
+      onAddCanvas(isGroup, x, y, isMapPlatform ? 'map-platform' : 'standard');
+      return;
+    }
+
+    if (widgetType) {
+      onAddCanvas(false, x, y, 'standard', widgetType);
+    }
   }, [isEditMode, totalScale, onAddCanvas]);
 
   return (
@@ -364,7 +424,7 @@ export function PlaneWorkspace({
       }}
       onMouseDown={handleMouseDown}
     >
-      {/* 縮放與平移控制 */}
+      {/* 縮放與平移控制（鎖定後固定 scale，仍可平移） */}
       <div
         style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 200,
                  display: 'flex', alignItems: 'center', gap: 6,
@@ -372,23 +432,54 @@ export function PlaneWorkspace({
                  borderRadius: 10, padding: '6px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}
       >
-        <button onClick={zoomOut} style={zoomBtnStyle} title="縮小 (Ctrl + Wheel)">
+        <button
+          onClick={zoomOut}
+          disabled={scaleLocked}
+          style={{
+            ...zoomBtnStyle,
+            opacity: scaleLocked ? 0.35 : 1,
+            cursor: scaleLocked ? 'not-allowed' : 'pointer',
+          }}
+          title={scaleLocked ? '縮放已鎖定' : '縮小 (Ctrl + Wheel)'}
+        >
           <ZoomOut size={14} />
         </button>
         <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
         <button onClick={zoomReset}
           style={{ ...zoomBtnStyle, gap: 6, padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', color: '#94a3b8' }}
-          title="重置縮放與位置">
+          title={scaleLocked ? '重置位置（縮放已鎖定）' : '重置縮放與位置'}>
           <Crosshair size={14} className="text-cyan-500" />
           {Math.round(userZoom * 100)}%
         </button>
         <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
-        <button onClick={zoomIn} style={zoomBtnStyle} title="放大 (Ctrl + Wheel)">
+        <button
+          onClick={zoomIn}
+          disabled={scaleLocked}
+          style={{
+            ...zoomBtnStyle,
+            opacity: scaleLocked ? 0.35 : 1,
+            cursor: scaleLocked ? 'not-allowed' : 'pointer',
+          }}
+          title={scaleLocked ? '縮放已鎖定' : '放大 (Ctrl + Wheel)'}
+        >
           <ZoomIn size={14} />
+        </button>
+        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+        <button
+          onClick={toggleScaleLock}
+          style={{
+            ...zoomBtnStyle,
+            color: scaleLocked ? '#38bdf8' : '#94a3b8',
+          }}
+          title={scaleLocked ? '解除縮放鎖定（仍可橫向平移）' : '鎖定目前縮放（下次進入沿用，仍可橫向平移）'}
+          aria-pressed={scaleLocked}
+          aria-label={scaleLocked ? '解除縮放鎖定' : '鎖定縮放'}
+        >
+          {scaleLocked ? <Lock size={14} /> : <LockOpen size={14} />}
         </button>
       </div>
 
-      {/* 平面容器 */}
+      {/* 平面容器（刻度尺僅編輯模式） */}
       <div
         style={{
           width: plane.width,
@@ -397,65 +488,71 @@ export function PlaneWorkspace({
           transformOrigin: 'center center',
           position: 'relative',
           flexShrink: 0,
-          paddingTop: 20,
-          paddingLeft: 20,
+          paddingTop: isEditMode ? 20 : 0,
+          paddingLeft: isEditMode ? 20 : 0,
         }}
       >
-        {/* 頂部刻度 */}
-        <div style={{ position: 'absolute', top: 0, left: 30, right: 0, height: 30, overflow: 'hidden', pointerEvents: 'none' }}>
-          {Array.from({ length: Math.ceil(plane.width / 10) + 1 }).map((_, i) => {
-            const x = i * 10;
-            const is50 = x % 50 === 0;
-            const is100 = x % 100 === 0;
-            return (
-              <div key={i} style={{ 
-                position: 'absolute', left: x, bottom: 0, 
-                borderLeft: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`, 
-                height: is50 ? 12 : 5 
-              }}>
-                {is50 && (
-                  <span style={{ 
-                    position: 'absolute', left: 4, bottom: 4, 
-                    fontSize: is100 ? 12 : 10, 
-                    fontWeight: is100 ? 'bold' : 'normal', 
-                    color: is100 ? '#cbd5e1' : '#94a3b8', 
-                    fontFamily: 'monospace' 
-                  }}>{x}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {/* 左側刻度 */}
-        <div style={{ position: 'absolute', top: 30, left: 0, bottom: 0, width: 30, overflow: 'hidden', pointerEvents: 'none' }}>
-          {Array.from({ length: Math.ceil(plane.height / 10) + 1 }).map((_, i) => {
-            const y = i * 10;
-            const is50 = y % 50 === 0;
-            const is100 = y % 100 === 0;
-            return (
-              <div key={i} style={{ 
-                position: 'absolute', top: y, right: 0, 
-                borderTop: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`, 
-                width: is50 ? 12 : 5 
-              }}>
-                {is50 && (
-                  <span style={{ 
-                    position: 'absolute', right: 4, top: 2,
-                    fontSize: is100 ? 12 : 10, 
-                    fontWeight: is100 ? 'bold' : 'normal', 
-                    color: is100 ? '#cbd5e1' : '#94a3b8', 
-                    fontFamily: 'monospace',
-                    textAlign: 'right', width: 30
-                  }}>{y}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {isEditMode ? (
+          <>
+            {/* 頂部刻度 */}
+            <div style={{ position: 'absolute', top: 0, left: 30, right: 0, height: 30, overflow: 'hidden', pointerEvents: 'none' }}>
+              {Array.from({ length: Math.ceil(plane.width / 10) + 1 }).map((_, i) => {
+                const x = i * 10;
+                const is50 = x % 50 === 0;
+                const is100 = x % 100 === 0;
+                return (
+                  <div key={i} style={{
+                    position: 'absolute', left: x, bottom: 0,
+                    borderLeft: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`,
+                    height: is50 ? 12 : 5,
+                  }}>
+                    {is50 && (
+                      <span style={{
+                        position: 'absolute', left: 4, bottom: 4,
+                        fontSize: is100 ? 12 : 10,
+                        fontWeight: is100 ? 'bold' : 'normal',
+                        color: is100 ? '#cbd5e1' : '#94a3b8',
+                        fontFamily: 'monospace',
+                      }}>{x}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* 左側刻度 */}
+            <div style={{ position: 'absolute', top: 30, left: 0, bottom: 0, width: 30, overflow: 'hidden', pointerEvents: 'none' }}>
+              {Array.from({ length: Math.ceil(plane.height / 10) + 1 }).map((_, i) => {
+                const y = i * 10;
+                const is50 = y % 50 === 0;
+                const is100 = y % 100 === 0;
+                return (
+                  <div key={i} style={{
+                    position: 'absolute', top: y, right: 0,
+                    borderTop: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`,
+                    width: is50 ? 12 : 5,
+                  }}>
+                    {is50 && (
+                      <span style={{
+                        position: 'absolute', right: 4, top: 2,
+                        fontSize: is100 ? 12 : 10,
+                        fontWeight: is100 ? 'bold' : 'normal',
+                        color: is100 ? '#cbd5e1' : '#94a3b8',
+                        fontFamily: 'monospace',
+                        textAlign: 'right', width: 30,
+                      }}>{y}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
 
         {/* 內容區域 */}
         <div style={{
-          position: 'absolute', top: 30, left: 30,
+          position: 'absolute',
+          top: isEditMode ? 30 : 0,
+          left: isEditMode ? 30 : 0,
           width: plane.width, height: plane.height,
           backgroundColor: '#0c1222',
           backgroundImage: isEditMode
@@ -465,20 +562,17 @@ export function PlaneWorkspace({
                 linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
               `
-            : `
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
-              `,
-          backgroundSize: isEditMode 
-            ? '100px 100px, 100px 100px, 5px 5px, 5px 5px' 
-            : '40px 40px, 40px 40px',
+            : 'none',
+          backgroundSize: isEditMode
+            ? '100px 100px, 100px 100px, 5px 5px, 5px 5px'
+            : undefined,
           border: isCanvasDragOver
             ? '2px solid rgba(34,197,94,0.7)'
-            : isEditMode ? '1px solid rgba(6,182,212,0.35)' : '1px solid rgba(6,182,212,0.12)',
-          borderRadius: 2,
+            : isEditMode ? '1px solid rgba(6,182,212,0.35)' : 'none',
+          borderRadius: isEditMode ? 2 : 0,
           overflow: 'hidden',
           transition: isPanning ? 'none' : 'border-color 0.2s ease',
-          boxShadow: '0 0 40px rgba(0,0,0,0.4)',
+          boxShadow: isEditMode ? '0 0 40px rgba(0,0,0,0.4)' : 'none',
         }}
         ref={innerRef}
         data-dashboard-plane="workspace"

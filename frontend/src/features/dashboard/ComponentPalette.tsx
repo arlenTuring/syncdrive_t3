@@ -4,7 +4,7 @@ import {
   Type, Image, TrendingUp, Database, Gauge, LayoutGrid, Route,
   LayoutTemplate, CopyPlus,
   Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, Activity,
-  CircleOff, AlertTriangle, Bus,
+  CircleOff, AlertTriangle, Bus, List,
 } from 'lucide-react';
 import type { CanvasKind } from './types';
 
@@ -66,11 +66,13 @@ const PALETTE_ITEMS: PaletteItem[] = [
   { type: 'slot-grid', label: '格位陣列', icon: <LayoutGrid size={18} />, color: '#f43f5e', description: '場域格位狀態監控', category: 'ops' },
   { type: 'unit-telemetry-card', label: '遙測卡', icon: <Activity size={18} />, color: '#a78bfa', description: '雙儀表 + 四子系統狀態燈', category: 'ops' },
   { type: 'vehicle-container', label: '載具樣板', icon: <Bus size={18} />, color: '#f59e0b', description: '圖台載具外觀與行為樣板（執行期套用至所有即時車輛）', category: 'ops' },
+  { type: 'tab-list', label: 'Tab 清單表格', icon: <List size={18} />, color: '#3b82f6', description: '可切 Tab 與自訂欄位子畫布的動態表格', category: 'ops' },
 ];
 
 const CONTAINER_ITEMS: ContainerItem[] = [
   { id: 'canvas', canvasType: 'canvas', label: '畫布元件', icon: <LayoutTemplate size={18} />, color: '#8b5cf6', description: '單一畫布區塊，可放子元件' },
   { id: 'canvas-group', canvasType: 'canvas-group', label: '畫布群組', icon: <CopyPlus size={18} />, color: '#d946ef', description: '資料重複／輪播範本' },
+  { id: 'canvas-tab-list', canvasType: 'canvas-tab-list', label: 'Tab 清單表格', icon: <List size={18} />, color: '#3b82f6', description: '可切換 Tab 與自訂欄位子畫布的表格容器' },
   { id: 'map-platform', canvasType: 'canvas-map-platform', label: '圖台容器', icon: <Map size={18} />, color: '#0ea5e9', description: '嵌入 Map Editor 場域圖' },
 ];
 
@@ -81,12 +83,13 @@ interface Props {
   /** 目前選取的畫布種類（用於限制載具容器） */
   activeCanvasKind?: CanvasKind;
   activeCanvasIsGroup?: boolean;
-  onAddCanvas?: (isGroup: boolean) => void;
+  onAddCanvas?: (isGroup: boolean, x?: number, y?: number, canvasKind?: CanvasKind, initialWidgetType?: WidgetType) => void;
+  onAddWidget?: (widgetType: WidgetType) => void;
 }
 
 function handleCanvasDragStart(
   e: React.DragEvent,
-  canvasType: 'canvas' | 'canvas-group' | 'canvas-map-platform',
+  canvasType: 'canvas' | 'canvas-group' | 'canvas-map-platform' | 'canvas-tab-list',
 ) {
   e.dataTransfer.setData('canvasType', canvasType);
   e.dataTransfer.setData('canvastype', canvasType);
@@ -157,6 +160,7 @@ function DraggableTile({
   draggable,
   disabled,
   onDragStart,
+  onClick,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -165,11 +169,13 @@ function DraggableTile({
   draggable: boolean;
   disabled: boolean;
   onDragStart: (e: React.DragEvent) => void;
+  onClick?: () => void;
 }) {
   return (
     <div
       draggable={draggable}
       onDragStart={onDragStart}
+      onClick={onClick}
       title={title}
       style={{
         display: 'flex',
@@ -211,10 +217,12 @@ function DraggableTile({
 
 export function ComponentPalette({
   isEditMode = true,
-  hasActiveCanvas,
+  hasActiveCanvas: _hasActiveCanvas,
   hasActivePlane,
   activeCanvasKind,
   activeCanvasIsGroup,
+  onAddCanvas,
+  onAddWidget,
 }: Props) {
   const [filter, setFilter] = useState<PaletteFilter>('all');
 
@@ -256,7 +264,6 @@ export function ComponentPalette({
     e.dataTransfer.effectAllowed = 'copy';
   }
 
-  const widgetDisabled = !hasActiveCanvas;
   const containerDisabled = !hasActivePlane;
 
   return (
@@ -324,12 +331,24 @@ export function ComponentPalette({
                 label={item.label}
                 icon={item.icon}
                 color={item.color}
-                title={`${item.label}：${item.description}（拖曳至平面）`}
+                title={`${item.label}：${item.description}（點擊或拖曳至平面）`}
                 draggable={!containerDisabled}
                 disabled={containerDisabled}
                 onDragStart={e => {
                   if (containerDisabled) { e.preventDefault(); return; }
                   handleCanvasDragStart(e, item.canvasType);
+                }}
+                onClick={() => {
+                  if (containerDisabled) return;
+                  if (item.canvasType === 'canvas-tab-list') {
+                    onAddCanvas?.(false, undefined, undefined, 'standard', 'tab-list');
+                  } else if (item.canvasType === 'canvas-map-platform') {
+                    onAddCanvas?.(false, undefined, undefined, 'map-platform');
+                  } else if (item.canvasType === 'canvas-group') {
+                    onAddCanvas?.(true, undefined, undefined, 'standard');
+                  } else {
+                    onAddCanvas?.(false, undefined, undefined, 'standard');
+                  }
                 }}
               />
             ))}
@@ -354,10 +373,10 @@ export function ComponentPalette({
                 item.type === 'vehicle-container'
                 && (activeCanvasKind !== 'map-platform' || activeCanvasIsGroup),
               );
-              const tileDisabled = widgetDisabled || mapOnlyBlocked;
+              const tileDisabled = !hasActivePlane || mapOnlyBlocked;
               const tileTitle = mapOnlyBlocked
                 ? '載具樣板僅可放在圖台容器內'
-                : `${item.label}：${item.description}（拖曳至畫布）`;
+                : `${item.label}：${item.description}（點擊或拖曳至畫布／平面）`;
               return (
               <DraggableTile
                 key={item.type}
@@ -371,22 +390,14 @@ export function ComponentPalette({
                   if (tileDisabled) { e.preventDefault(); return; }
                   handleWidgetDragStart(e, item.type);
                 }}
+                onClick={() => {
+                  if (tileDisabled) return;
+                  onAddWidget?.(item.type);
+                }}
               />
             );})}
           </div>
         ))}
-
-        {filter === 'container' && (
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', paddingLeft: 4 }}>
-            容器需拖曳至平面空白處；群組可綁定 SQL 做輪播或重複排列。
-          </span>
-        )}
-
-        {filter !== 'container' && widgetDisabled && (
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginLeft: 8, flexShrink: 0 }}>
-            請先建立並選擇一個畫布
-          </span>
-        )}
       </div>
     </div>
   );

@@ -71,15 +71,21 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
   }
 
   if (!rawValue && !vehicleBadge) {
-    const interpolated = interpolateVariables(widget.valueField, variables);
-    if (interpolated !== widget.valueField) {
-      rawValue = interpolated;
+    const varKey = widget.valueField ? widget.valueField.replace(/[{}]/g, '').trim() : '';
+    if (varKey && variables[varKey] !== undefined && variables[varKey] !== null && String(variables[varKey]).trim() !== '') {
+      rawValue = String(variables[varKey]);
       hasLiveData = true;
+    } else {
+      const interpolated = interpolateVariables(widget.valueField, variables);
+      if (interpolated !== widget.valueField) {
+        rawValue = interpolated;
+        hasLiveData = true;
+      }
     }
   }
 
   const isEditPreview = shouldShowEditPreview(isEditMode, hasBinding, hasLiveData);
-  if (isEditPreview) {
+  if (isEditPreview && !rawValue) {
     rawValue = resolveWidgetEditPreview({
       valueField: widget.valueField,
       label: widget.defaultLabel,
@@ -94,9 +100,11 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
   const rule = widget.rules.find(r => r.value === rawValue);
   let bgColor = (resolvedBadgeFinal?.bg || rule?.bgColor) || widget.defaultBgColor;
   let textColor = (resolvedBadgeFinal?.color || rule?.textColor) || widget.defaultTextColor;
-  const label = vehicleBadge
+  const rawLabel = vehicleBadge
     ? rawValue
     : (rule?.label ?? (rawValue || widget.defaultLabel));
+
+  const label = interpolateVariables(rawLabel, variables);
 
   const shiftStatusStyle = isShiftStatusLabelBadge(widget) && label
     ? resolveMainlineStatusStyleFromLabel(label)

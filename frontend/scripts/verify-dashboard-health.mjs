@@ -68,7 +68,7 @@ async function runSqlChecks() {
 
 async function navigateToDashboard(page) {
   await page.goto(`${UI}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  await page.getByRole('button', { name: /儀表板編輯器/i }).click();
+  await page.getByRole('button', { name: /^儀表板管理$/ }).click();
   await page.waitForSelector('text=儀表板管理', { timeout: 30_000 });
   const planeCard = page.getByText(/SyncDrive 總控大屏|總控大屏/).first();
   await planeCard.waitFor({ state: 'visible', timeout: 15_000 });

@@ -18,6 +18,8 @@ import { MapCanvasWidgetView }   from './MapCanvasWidget';
 import { UnitTelemetryCardWidgetView } from './UnitTelemetryCardWidget';
 import { AlertBannerWidgetView } from './AlertBannerWidget';
 import { VehicleContainerWidgetView } from './VehicleContainerWidgetView';
+import { ShiftListWidgetView }   from './ShiftListWidget';
+import { TabListWidgetView }     from './TabListWidget';
 export function WidgetRenderer({
   widget,
   isSelected,
@@ -48,6 +50,8 @@ export function WidgetRenderer({
     case 'map-canvas':     return <MapCanvasWidgetView widget={widget} />;
     case 'unit-telemetry-card': return <UnitTelemetryCardWidgetView widget={widget} />;
     case 'alert-banner': return <AlertBannerWidgetView widget={widget} />;
+    case 'tab-list':       return <TabListWidgetView widget={widget} />;
+    case 'shift-list':     return widget.tabs && widget.tabs.length > 0 ? <TabListWidgetView widget={widget} /> : <ShiftListWidgetView widget={widget} />;
     case 'vehicle-container':
       return (
         <VehicleContainerWidgetView

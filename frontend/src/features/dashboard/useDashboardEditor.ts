@@ -14,6 +14,7 @@ import {
 import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import { cloneDemoPlane, DEMO_LAYOUT_SEED } from './constants/demoPlane';
+import { ensureDeploymentDataStatsPanel } from './constants/deploymentPlane';
 import {
   applyWidgetFormat,
   canApplyWidgetFormat,
@@ -720,6 +721,7 @@ function migratePlane(plane: DashboardPlane): DashboardPlane {
   if (needsDashboardRuntimePatch(next)) {
     next = patchDashboardRuntimeFixes(next);
   }
+  next = ensureDeploymentDataStatsPanel(next);
   return next;
 }
 
@@ -952,21 +954,35 @@ export function useDashboardEditor() {
     dropX?: number,
     dropY?: number,
     canvasKind: CanvasKind = 'standard',
+    initialWidgetType?: WidgetType,
   ) => {
     if (!activePlaneId) return;
     recordHistory();
     const x = dropX ?? 40;
     const y = dropY ?? 40;
     const isMap = canvasKind === 'map-platform';
+    const isTabList = initialWidgetType === 'tab-list' || initialWidgetType === 'shift-list';
+
+    const defaultW = isMap ? 1200 : isTabList ? 1000 : isGroup ? 500 : 400;
+    const defaultH = isMap ? 680 : isTabList ? 460 : isGroup ? 320 : 250;
+
+    let initialChildren: ChildWidget[] = [];
+    if (initialWidgetType) {
+      const w = createWidget(initialWidgetType, 0, 0);
+      w.width = defaultW;
+      w.height = defaultH;
+      initialChildren = [w];
+    }
+
     const el: CanvasElementProps = {
       id: `canvas-${Date.now()}`, type: 'canvas', x, y,
-      width: isMap ? 1200 : isGroup ? 500 : 400,
-      height: isMap ? 680 : isGroup ? 320 : 250,
-      label: isMap ? '圖台' : isGroup ? '新畫布群組' : '新畫布',
-      backgroundColor: isMap ? '#020617' : '#0f172a',
+      width: defaultW,
+      height: defaultH,
+      label: isMap ? '圖台' : isTabList ? 'Tab 清單表格' : isGroup ? '新畫布群組' : '新畫布',
+      backgroundColor: isMap ? '#020617' : isTabList ? 'transparent' : '#0f172a',
       backgroundImage: '',
       opacity: 100,
-      children: [],
+      children: initialChildren,
       canvasKind: isMap ? 'map-platform' : 'standard',
       mapId: isMap ? 't3-main-version' : '',
       zoomFactor: isMap ? 1.35 : undefined,
@@ -987,7 +1003,10 @@ export function useDashboardEditor() {
       savePlanes(next); return next;
     });
     selectElement(el.id);
-  }, [activePlaneId, selectElement, recordHistory]);
+    if (initialChildren.length > 0) {
+      selectChild(el.id, initialChildren[0].id);
+    }
+  }, [activePlaneId, selectElement, selectChild, recordHistory]);
 
   const updateElement = useCallback((elementId: string, patch: Partial<CanvasElementProps>) => {
     if (!activePlaneId) return;

@@ -16,7 +16,7 @@ import {
   type AlignGuideLine,
   type ResizeDirection,
 } from './utils/dragSnap';
-import { List, Paintbrush, Trash2 } from 'lucide-react';
+import { List, Paintbrush, Trash2, Edit3 } from 'lucide-react';
 import { useFormatPainter } from './context/FormatPainterContext';
 import { useModifierHeld } from './hooks/useModifierHeld';
 import {
@@ -36,6 +36,7 @@ import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import {
   resolveMapVehicleTemplate,
 } from './utils/resolveMapVehicleTemplate';
+import { isTabCanvas, makeTabCanvasId } from './utils/tabCanvas';
 
 const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
   <div style={{
@@ -83,6 +84,8 @@ interface Props {
   onBatchUpdateChildren: (updates: Array<{ childId: string; patch: Partial<ChildWidget> }>) => void;
   onDeleteChild: (childId: string) => void;
   onEnterEditGroupMode?: (groupId: string) => void;
+  /** Tab 容器：進入指定 Tab 的子畫布編輯 */
+  onEnterTabCanvasMode?: (canvasId: string, tabId: string) => void;
   onEditSessionStart?: () => void;
   onCanvasGroupDragStart?: (anchorId: string) => void;
   onCanvasGroupDragMove?: (anchorId: string, x: number, y: number) => void;
@@ -95,7 +98,7 @@ export function CanvasElement({
   onDragActiveChange,
   onSelect, onUpdate, onDelete,
   onAddChild, onSelectChild, onSelectChildren, onUpdateChild, onBatchUpdateChildren, onDeleteChild,
-  onEnterEditGroupMode, onEditSessionStart,
+  onEnterEditGroupMode, onEnterTabCanvasMode, onEditSessionStart,
   onCanvasGroupDragStart, onCanvasGroupDragMove, onCanvasGroupDragStop,
 }: Props) {
   const hasChildSelection = selectedChildIds.length > 0;
@@ -167,8 +170,9 @@ export function CanvasElement({
   const [, setCurrentChildSize] = useState({ width: 0, height: 0 });
 
   function handleDragOver(e: React.DragEvent) {
-    if (!isEditMode || !e.dataTransfer.types.includes('widgettype')) return;
-    e.preventDefault(); e.stopPropagation();
+    if (!isEditMode) return;
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(true);
   }
   function handleDragLeave(e: React.DragEvent) {
@@ -176,14 +180,15 @@ export function CanvasElement({
   }
   function handleDrop(e: React.DragEvent) {
     if (!isEditMode) return;
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
-    const widgetType = e.dataTransfer.getData('widgetType') as WidgetType;
+    const widgetType = (e.dataTransfer.getData('widgetType') || e.dataTransfer.getData('widgettype')) as WidgetType;
     if (!widgetType || !innerRef.current) return;
     if (!canAddWidgetToCanvas(element, widgetType)) return;
     const rect = innerRef.current.getBoundingClientRect();
-    const x = Math.round((e.clientX - rect.left) / scale);
-    const y = Math.round((e.clientY - rect.top) / scale);
+    const x = Math.max(0, Math.round((e.clientX - rect.left) / scale));
+    const y = Math.max(0, Math.round((e.clientY - rect.top) / scale));
     onAddChild(widgetType, x, y);
   }
 
@@ -613,6 +618,72 @@ export function CanvasElement({
         onDrop={handleDrop}
       >
         <BindingWarningIcon issue={canvasIssue} />
+
+        {/* Tab Bar Overlay（Tab Canvas 容器，編輯模式） */}
+        {isEditMode && isTabCanvas(element) && (element.tabs ?? []).length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: element.tabBarHeight ?? 40,
+              backgroundColor: element.tabBarBgColor ?? 'rgba(15,23,42,0.92)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex',
+              alignItems: 'stretch',
+              zIndex: 10,
+              borderRadius: '4px 4px 0 0',
+              overflow: 'hidden',
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {(element.tabs ?? []).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                title={`編輯「${tab.label}」子畫布`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEnterTabCanvasMode?.(element.id, tab.id);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '0 14px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: `2px solid ${element.tabActiveColor ?? '#3B82F6'}`,
+                  color: '#e2e8f0',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                }}
+              >
+                {tab.label}
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '1px 4px',
+                    borderRadius: 3,
+                    backgroundColor: 'rgba(59,130,246,0.25)',
+                    color: '#93c5fd',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    gap: 2,
+                  }}
+                >
+                  <Edit3 size={8} />
+                  子畫布
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         {/* Drag-over Highlight */}
         {isDragOver && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 999, background: 'rgba(34,211,238,0.04)', border: '2px dashed rgba(34,211,238,0.4)', borderRadius: 4, pointerEvents: 'none' }} />

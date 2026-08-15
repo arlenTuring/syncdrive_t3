@@ -119,6 +119,60 @@ WHERE created_at >= ${DAY_MS}
   AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%')
 `.trim();
 
+/** 班表部署管理 — 目前模式卡（示意；之後可改綁營運模式狀態） */
+export const DEPLOYMENT_CURRENT_MODE_SQL = `
+SELECT
+  '正常營運'::text AS mode_label,
+  'Level 1'::text AS mode_level
+`.trim();
+
+/** 班表部署管理 — 數據統計卡（示意數值；之後可改綁真實彙總表） */
+export const DEPLOYMENT_DATA_STATS_SQL = `
+SELECT
+  92.3::float AS ontime_pct,
+  ('準點率 ' || TO_CHAR(92.3::numeric, 'FM990.0') || '%') AS ontime_badge,
+  16.9::float AS achievement_pct,
+  313::int AS total_count,
+  53::int AS completed_count,
+  1::int AS delayed_count,
+  0::int AS abnormal_count,
+  0::int AS cancelled_count,
+  ('總共 ' || 313::text) AS total_pill,
+  ('完成 ' || 53::text) AS completed_pill
+`.trim();
+
+/** 班表部署管理 — 執行班表卡（示意） */
+export const DEPLOYMENT_EXECUTING_SCHEDULE_SQL = `
+SELECT
+  '當前班表 執行於 00:00'::text AS schedule_meta,
+  '進行中'::text AS status_label,
+  'RUNNING'::text AS status_code,
+  '高運量班表'::text AS schedule_name,
+  'Jack'::text AS reviewer_name,
+  '凌晨時段 班距 540 秒 運量 400 pphp'::text AS period_1,
+  '離峰時段 班距 360 秒 運量 600 pphp'::text AS period_2,
+  '尖峰時段 班距 180 秒 運量 1,200 pphp'::text AS period_3
+`.trim();
+
+/** 班表部署管理 — 重大事件卡（示意） */
+export const DEPLOYMENT_MAJOR_EVENTS_SQL = `
+SELECT
+  '降級運轉事件'::text AS event_title,
+  'Level 2'::text AS event_level,
+  '2027.05.01'::text AS event_date,
+  '10:00:00'::text AS event_time,
+  '無更多事件'::text AS empty_hint
+`.trim();
+
+/** 班表部署管理 — 載具操作群組（每列一台車，供畫布群組迭代） */
+export const DEPLOYMENT_VEHICLE_LIST_SQL = `
+SELECT
+  vehicle_code
+FROM vehicles
+WHERE vehicle_code LIKE 'PMS-%'
+ORDER BY vehicle_code
+`.trim();
+
 /** 運能趨勢區 KPI 列（即時／目標／可用／下段）— 不依固定 offset 格點，避免 tick 後 JOIN 失敗 */
 export const CAPACITY_TREND_SUMMARY_SQL = `
 SELECT

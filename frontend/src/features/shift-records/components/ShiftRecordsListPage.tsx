@@ -34,11 +34,17 @@ import {
 type ShiftRecordsListPageProps = {
   onBackToHome?: () => void;
   onOpenDetail: (orderId: string) => void;
+  /** 殼層已有外框標題時隱藏本頁頂欄 */
+  embedded?: boolean;
 };
 
 const PAGE_SIZE = 20;
 
-export function ShiftRecordsListPage({ onBackToHome, onOpenDetail }: ShiftRecordsListPageProps) {
+export function ShiftRecordsListPage({
+  onBackToHome,
+  onOpenDetail,
+  embedded = false,
+}: ShiftRecordsListPageProps) {
   const [tab, setTab] = useState<ShiftTab>('mainline');
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -159,13 +165,15 @@ export function ShiftRecordsListPage({ onBackToHome, onOpenDetail }: ShiftRecord
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <header className="border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
-        <div className="flex items-center gap-3">
-          {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <ClipboardList className="size-5 text-sky-400" aria-hidden />
-          <h1 className="text-lg font-semibold tracking-tight">班次運行紀錄</h1>
-        </div>
-      </header>
+      {!embedded ? (
+        <header className="border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
+          <div className="flex items-center gap-3">
+            {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
+            <ClipboardList className="size-5 text-sky-400" aria-hidden />
+            <h1 className="text-lg font-semibold tracking-tight">班次運行紀錄</h1>
+          </div>
+        </header>
+      ) : null}
 
       <div className="border-b border-zinc-800/80 px-6">
         <div className="flex gap-8">

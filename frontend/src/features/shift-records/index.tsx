@@ -15,6 +15,7 @@ export default function ShiftRecordsApp({ onBackToHome, embedded }: ShiftRecords
       <ShiftRecordsListPage
         onBackToHome={embedded ? undefined : onBackToHome}
         onOpenDetail={setDetailOrderId}
+        embedded={embedded}
       />
       {detailOrderId && (
         <DrivingCapabilityModal

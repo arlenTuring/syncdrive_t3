@@ -218,7 +218,7 @@ function StationDwellEditor({
             const roleLabel = formatStationDwellRoleLabel(role);
             return (
               <div key={dwell.stationId} className="block text-center">
-                <span className="mb-1 block text-[11px] text-zinc-500">{dwell.stationName}</span>
+            <span className="mb-1 block text-[11px] text-zinc-500">{dwell.stationName}</span>
                 <div
                   className={DWELL_STATIC_CLASS}
                   aria-label={`${dwell.stationName} ${roleLabel}`}
@@ -253,20 +253,20 @@ function StationDwellEditor({
                   aria-label={`${dwell.stationName} 停靠方式`}
                 />
                 {mode === 'seconds' ? (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
                     onChange={(e) =>
                       onUpdateDwellSeconds(dwell.stationId, e.target.value.replace(/\D/g, ''))
                     }
                     placeholder="必填"
-                    className={DWELL_INPUT_CLASS}
-                    aria-label={`${dwell.stationName} 停靠秒數`}
-                  />
+                className={DWELL_INPUT_CLASS}
+                aria-label={`${dwell.stationName} 停靠秒數`}
+              />
                 ) : null}
-              </div>
-            </label>
+            </div>
+          </label>
           );
         })}
 
@@ -298,7 +298,7 @@ function StationDwellEditor({
               />
             </div>
           </label>
-        ) : null}
+          ) : null}
       </div>
 
       <div className="mt-2 space-y-1">
@@ -328,7 +328,7 @@ function StationDwellEditor({
           <span className="tabular-nums text-zinc-300">{formatSecondsLabel(totalAvgSum)}</span>
           <span className="text-zinc-600">{avgBreakdownSuffix}</span>
         </div>
-      </div>
+        </div>
     </div>
   );
 }
@@ -348,24 +348,24 @@ function RouteOrderControls({
 
   return (
     <div className="flex shrink-0 flex-col">
-      <button
-        type="button"
-        title="提前順序"
-        disabled={!canMoveUp}
+          <button
+            type="button"
+            title="提前順序"
+            disabled={!canMoveUp}
         onClick={() => onMove('up')}
-        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-      >
-        <ArrowUp className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        title="延後順序"
-        disabled={!canMoveDown}
+            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+          >
+            <ArrowUp className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            title="延後順序"
+            disabled={!canMoveDown}
         onClick={() => onMove('down')}
-        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-      >
-        <ArrowDown className="size-3.5" />
-      </button>
+            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+          >
+            <ArrowDown className="size-3.5" />
+          </button>
     </div>
   );
 }
@@ -418,7 +418,7 @@ function RecoveryAndServiceDirectionBar({
           最低恢復時間（秒）
         </span>
         <div className="flex items-center gap-2">
-          <input
+        <input
             type="text"
             inputMode="numeric"
             value={minimumRecoveryTimeSeconds ?? ''}
@@ -457,7 +457,7 @@ function RecoveryAndServiceDirectionBar({
             aria-label="碰撞保護時間"
           />
           <span className="text-sm text-zinc-500">秒</span>
-        </div>
+    </div>
       </label>
 
       <div className="min-w-0 flex-1">
@@ -472,8 +472,8 @@ function RecoveryAndServiceDirectionBar({
             <p className="mt-1 text-zinc-500">例如可建「往 T3」「往南港」，再於各路線卡單選一個。</p>
           </HelpTip>
           服務方向
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
+            </span>
+                    <div className="flex flex-wrap items-center gap-2">
           {serviceDirectionTags.map((tag) => (
             <span
               key={tag.id}
@@ -489,14 +489,14 @@ function RecoveryAndServiceDirectionBar({
               >
                 <X className="size-3.5" />
               </button>
-            </span>
+                      </span>
           ))}
 
           {drafting ? (
             <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-950 px-1.5">
-              <input
+                  <input
                 ref={inputRef}
-                type="text"
+                    type="text"
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 onKeyDown={(e) => {
@@ -536,7 +536,7 @@ function RecoveryAndServiceDirectionBar({
               >
                 <X className="size-3.5" />
               </button>
-            </div>
+                </div>
           ) : (
             <button
               type="button"
@@ -594,7 +594,7 @@ function RoutePickerBar({
   const canConfirm = Boolean(selectedRouteId) && !excludedRouteIds.has(selectedRouteId);
 
   if (!expanded) {
-    return (
+  return (
       <button
         type="button"
         onClick={onExpand}
@@ -736,13 +736,13 @@ export function StepShiftRouteGroups({
           draftRef.current.mapId.trim() !== ''
           && draftRef.current.mapId.trim() !== result.mapId;
         const nextRoutes = normalizeSelectedRouteExecutionOrders(
-          draftRef.current.selectedRoutes
+            draftRef.current.selectedRoutes
             .filter(
               (selected) =>
                 isPrimarySelectedRoute(selected) && validRouteIds.has(selected.routeId),
             )
-            .map((selected) => {
-              const meta = routeMeta.get(selected.routeId);
+              .map((selected) => {
+                const meta = routeMeta.get(selected.routeId);
               if (!meta) {
                 return {
                   ...selected,
@@ -750,9 +750,9 @@ export function StepShiftRouteGroups({
                   backupForRouteId: null,
                 };
               }
-              return {
-                ...selected,
-                stationIds: [...meta.stationIds],
+                return {
+                  ...selected,
+                  stationIds: [...meta.stationIds],
                 stationDwells: buildStationDwells(
                   meta,
                   mapChanged ? undefined : selected.stationDwells,
@@ -762,8 +762,8 @@ export function StepShiftRouteGroups({
                 minTravelTimeSeconds: meta.minTravelTimeSeconds,
                 backupForInstanceId: null,
                 backupForRouteId: null,
-              };
-            }),
+                };
+              }),
         );
         onChangeRef.current({
           ...draftRef.current,
@@ -1026,8 +1026,8 @@ export function StepShiftRouteGroups({
         instanceId,
       ),
     );
-    onChange({
-      ...draft,
+      onChange({
+        ...draft,
       selectedRoutes: normalized,
       routeRelationGraph: syncRouteRelationGraphWithRoutes(
         draft.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
@@ -1713,7 +1713,7 @@ export function StepShiftRouteGroups({
                   ? ' · 時間模板尚無可計算的折返時限'
                   : ' · 請先選擇時間模板'}
           </p>
-        </div>
+              </div>
         <div className="flex flex-wrap items-end gap-3">
           <ShiftMenuSelect
             label="場域地圖"
@@ -1733,7 +1733,7 @@ export function StepShiftRouteGroups({
               已載入 mapId：{selectedMapId || '—'}
             </p>
           ) : null}
-        </div>
+          </div>
         {!loading && !error && firstTripOriginsHint ? (
           <p className="text-xs text-zinc-400">{firstTripOriginsHint}</p>
         ) : null}
@@ -1759,7 +1759,7 @@ export function StepShiftRouteGroups({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 pb-4">
           {!isManual ? (
             <RecoveryAndServiceDirectionBar
-              minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
+                  minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
               onUpdateRecoveryTime={updateRecoveryTime}
               collisionProtectionSeconds={draft.collisionProtectionSeconds ?? null}
               onUpdateCollisionProtection={updateCollisionProtection}
@@ -1909,7 +1909,7 @@ export function StepShiftRouteGroups({
                                   <span className="text-zinc-500">點選採用</span>
                                 </>
                               )}
-                            </div>
+            </div>
                             <div
                               className={[
                                 'shrink-0 space-y-0.5 text-right tabular-nums',
@@ -1919,7 +1919,7 @@ export function StepShiftRouteGroups({
                               <div className="text-sm">
                                 <span className="text-zinc-500">快 </span>
                                 {formatSecondsLabel(cycle.minCycleSeconds)}
-                              </div>
+          </div>
                               <div className="text-sm">
                                 <span className="text-zinc-500">均 </span>
                                 {formatSecondsLabel(cycle.avgCycleSeconds)}

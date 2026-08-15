@@ -105,8 +105,31 @@ export interface TextWidget extends WidgetBase, WidgetDataBinding {
 export interface ImageWidget extends WidgetBase {
   type: 'image';
   src: string;
-  objectFit: 'cover' | 'contain' | 'fill';
+  objectFit: 'cover' | 'contain' | 'fill' | 'none';
   borderRadius: number;
+
+  /** 元件整體透明度 0~100（100 = 完全不透明） */
+  opacity?: number;
+
+  /** 外框 */
+  borderWidth?: number;
+  borderColor?: string;
+
+  /** 圖片後方背景色（圖片 contain/none 模式時可見） */
+  backgroundColor?: string;
+
+  /** 疊加在圖片上的文字標籤 */
+  overlayText?: string;
+  /** 疊加文字顏色 */
+  overlayTextColor?: string;
+  /** 疊加文字字級（px） */
+  overlayFontSize?: number;
+  /** 疊加文字位置 */
+  overlayPosition?: 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right' | 'center';
+  /** 疊加文字背景色（半透明遮罩） */
+  overlayBgColor?: string;
+  /** 疊加文字字重 */
+  overlayFontWeight?: 'normal' | 'bold';
 }
 
 export interface LineChartStatusSegment {
@@ -287,8 +310,8 @@ export interface GaugeWidget extends WidgetBase, WidgetDataBinding {
   min: number;
   max: number;
   colorStops: Array<{ at: number; color: string }>; // at: 0~1
-  /** semi-arc：半圓漸層弧 + 指針 + 中央數值 */
-  gaugeVariant?: 'default' | 'semi-arc';
+  /** semi-arc：半圓漸層弧 + 指針 + 中央數值；ring：全圓達成進度環 */
+  gaugeVariant?: 'default' | 'semi-arc' | 'ring';
   /** semi-arc 時：速度弧（綠→紅）或 電量弧（紅→綠） */
   arcVariant?: 'speed' | 'load';
   /** 中央顯示數值字級（px） */
@@ -768,6 +791,77 @@ export interface UnitTelemetryCardWidget extends WidgetBase, WidgetDataBinding {
   segmentLabelField?: string;
 }
 
+/** 班次清單 Widget：含正線 / 整備兩個 Tab，每列一班次資料 */
+export interface TabCanvasTab {
+  /** Tab 唯一 ID */
+  id: string;
+  /** Tab 顯示名稱 */
+  label: string;
+  /** 此 Tab 的資料來源 */
+  dataSourceId?: string;
+  /** 此 Tab 的 SQL（首列欄位注入子畫布變數） */
+  sqlQuery?: string;
+  /** 此 Tab 的刷新策略 */
+  freshnessPolicy?: string;
+  /** 子元件樹（不用於存儲，僅作描述；實際存儲於 CanvasElementProps.children / childrenTab1... ） */
+  children: ChildWidget[];
+}
+
+/** Tab 清單單一欄位定義 */
+export interface TabListColumn {
+  id: string;
+  name: string; // 欄位標題名稱 (如 "班次代號"、"路線進度")
+  fieldKey?: string; // 綁定的 SQL 資料別名/欄位鍵 (如 "trip_code", "direction_label")
+  width: number; // 欄位寬度 px
+  align?: 'left' | 'center' | 'right';
+  fontSize?: number; // 該欄單元格字體大小 (px，可選覆寫)
+  textColor?: string; // 該欄單元格文字顏色 (可選覆寫)
+  children: ChildWidget[]; // 該欄位單元格的子畫布範本
+}
+
+/** Tab 清單單一分頁定義 */
+export interface TabListTab {
+  id: string;
+  label: string; // Tab 顯示名稱 (如 "正線班次")
+  align?: 'left' | 'center' | 'right'; // 此 Tab 預設整體對齊方式
+  dataSourceId?: string;
+  sqlQuery?: string;
+  freshnessPolicy?: FreshnessPolicy;
+  refreshInterval?: number;
+  columns: TabListColumn[];
+}
+
+/** 可切換 Tab 的動態清單／子畫布表格元件 */
+export interface TabListWidget extends WidgetBase {
+  type: 'tab-list';
+  tabs: TabListTab[];
+  activeTabId?: string;
+  align?: 'left' | 'center' | 'right'; // 全域表格欄位對齊方式
+  rowHeight?: number; // 每列高度 (px)，預設 48
+  fontSize?: number; // 內容字級 (px)，預設 13
+  textColor?: string; // 內容文字顏色，預設 #e2e8f0
+  headerHeight?: number; // 表頭高度 (px)，預設 36
+  headerFontSize?: number; // 表頭字級 (px)，預設 12
+  headerBgColor?: string;
+  headerTextColor?: string; // 表頭文字顏色，預設 #94a3b8
+  tabFontSize?: number; // Tab 標籤字級 (px)，預設 14
+  tabActiveColor?: string; // Tab 活躍文字與底線顏色，預設 #3b82f6
+  tabInactiveColor?: string; // Tab 非活躍文字顏色，預設 #64748b
+  backgroundColor?: string;
+  borderRadius?: number;
+  borderColor?: string;
+  borderWidth?: number;
+  stripeBgColor?: string;
+  defaultTab?: string; // 預設選取 Tab ID
+  dataSourceId?: string;
+  mainlineSqlQuery?: string; // 相容既有快捷設定
+  maintenanceSqlQuery?: string; // 相容既有快捷設定
+  currentScheduleSqlQuery?: string; // 目前班表 SQL（右上角輔助標籤）
+  currentScheduleLabel?: string; // 右側標籤說明，預設 "目前班表"
+}
+
+export type ShiftListWidget = TabListWidget;
+
 /** 圖台內載具樣板：定義車體樣式與作動行為，執行期套用至場域內所有即時車輛 */
 export interface VehicleContainerWidget extends WidgetBase, WidgetDataBinding {
   type: 'vehicle-container';
@@ -804,9 +898,10 @@ export type ChildWidget =
   | UnitTelemetryCardWidget
   | AlertBannerWidget
   | VehicleAlertBannerWidget
-  | VehicleContainerWidget;
+  | VehicleContainerWidget
+  | TabListWidget;
 
-export type WidgetType = ChildWidget['type'];
+export type WidgetType = ChildWidget['type'] | 'shift-list';
 
 export type CanvasKind = 'standard' | 'map-platform';
 
@@ -955,6 +1050,37 @@ export interface CanvasElementProps {
   childrenNormal?: ChildWidget[];
   /** 顯示閘道：條件成立 → 常態；否則 → 預設（若 defaultPanelEnabled） */
   displayGate?: DualCanvasDisplayGate;
+
+  // --- Tab 子畫布 ---
+  /** 啟用 Tab 畫布模式（每個 Tab 各自一組子元件） */
+  tabCanvasEnabled?: boolean;
+  /** Tab 定義清單（含每個 Tab 的名稱與資料來源設定） */
+  tabs?: TabCanvasTab[];
+  /** Tab Bar 高度（px）；預設 40 */
+  tabBarHeight?: number;
+  /** Tab Bar 背景色 */
+  tabBarBgColor?: string;
+  /** 選中 Tab 指示線顏色；預設 #3B82F6 */
+  tabActiveColor?: string;
+  /** Tab 1 (index 0) 子元件樹 → 沿用既有 children 欄位 */
+  /** Tab 2 (index 1) 子元件樹 */
+  childrenTab1?: ChildWidget[];
+  /** Tab 3 (index 2) 子元件樹 */
+  childrenTab2?: ChildWidget[];
+  /** Tab 4 (index 3) 子元件樹 */
+  childrenTab3?: ChildWidget[];
+  /** Tab 5 (index 4) 子元件樹 */
+  childrenTab4?: ChildWidget[];
+  /** Tab 6 (index 5) 子元件樹 */
+  childrenTab5?: ChildWidget[];
+  /** Tab 7 (index 6) 子元件樹 */
+  childrenTab6?: ChildWidget[];
+  /** Tab 8 (index 7) 子元件樹 */
+  childrenTab7?: ChildWidget[];
+  /** Tab 9 (index 8) 子元件樹 */
+  childrenTab8?: ChildWidget[];
+  /** Tab 10 (index 9) 子元件樹 */
+  childrenTab9?: ChildWidget[];
 }
 
 // ─── Plane 型別 ────────────────────────────────────────────────────
@@ -1180,6 +1306,476 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         actionIconRules: [],
         mqttDataSourceId: 'default-mqtt',
         mqttTopic: 'v1/vtms/PMS-01/operation/update',
+      };
+    case 'tab-list':
+    case 'shift-list':
+      return {
+        id,
+        type: 'tab-list',
+        x,
+        y,
+        width: 960,
+        height: 380,
+        rowHeight: 48,
+        fontSize: 13,
+        textColor: '#cbd5e1',
+        headerHeight: 38,
+        headerFontSize: 12,
+        headerTextColor: '#94a3b8',
+        tabFontSize: 14,
+        tabActiveColor: '#3b82f6',
+        tabInactiveColor: '#64748b',
+        tabs: [
+          {
+            id: 'tab-mainline',
+            label: '正線班次',
+            dataSourceId: 'default-internal',
+            freshnessPolicy: 'auto',
+            columns: [
+              {
+                id: 'col-trip',
+                name: '班次代號',
+                fieldKey: 'trip_code',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-trip-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 90,
+                    height: 44,
+                    content: '{trip_code}',
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'bold',
+                    color: '#e2e8f0',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-dir',
+                name: '運行方向',
+                fieldKey: 'direction_label',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-dir-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 90,
+                    height: 44,
+                    content: '{direction_label}',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'normal',
+                    color: '#94a3b8',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-veh',
+                name: '執行載具',
+                fieldKey: 'vehicle_code',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-veh-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 90,
+                    height: 44,
+                    content: '{vehicle_code}',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'normal',
+                    color: '#94a3b8',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-route',
+                name: '路線進度',
+                fieldKey: 'route_stations',
+                width: 260,
+                align: 'left',
+                children: [
+                  {
+                    id: `rp-${Date.now()}`,
+                    type: 'route-progress',
+                    x: 0,
+                    y: 2,
+                    width: 260,
+                    height: 40,
+                    valueField: 'route_progress',
+                    activeColor: '#3b82f6',
+                    inactiveColor: '#334155',
+                    vehicleIcon: 'vehicle.svg',
+                    iconColor: '#ffffff',
+                    iconBgColor: '#3b82f6',
+                    stationSource: 'json',
+                    stationsJsonVarKey: 'stations_json',
+                    segmentIndexVarKey: 'segment_index',
+                    segmentRemainPctVarKey: 'segment_remain_pct',
+                    trackStyle: 'mainline',
+                    stations: [
+                      { id: 's1', name: 'S2W', value: 0 },
+                      { id: 's2', name: 'T3', value: 50 },
+                      { id: 's3', name: 'N2W', value: 100 },
+                    ],
+                    actionIconRules: [],
+                  },
+                ],
+              },
+              {
+                id: 'col-stat',
+                name: '班次狀態',
+                fieldKey: 'status_label',
+                width: 100,
+                align: 'left',
+                children: [
+                  {
+                    id: `badge-stat-${Date.now()}`,
+                    type: 'status-badge',
+                    x: 0,
+                    y: 8,
+                    width: 80,
+                    height: 26,
+                    valueField: 'status_label',
+                    defaultLabel: '{status_label}',
+                    defaultBgColor: 'rgba(255,255,255,0.06)',
+                    defaultTextColor: '#cbd5e1',
+                    variableBgKey: 'status_bg',
+                    variableColorKey: 'status_color',
+                    showDot: false,
+                    fontSize: 11,
+                    borderRadius: 12,
+                    rules: [
+                      { value: '延誤', bgColor: 'rgba(234, 88, 12, 0.25)', textColor: '#fdba74' },
+                      { value: '準點', bgColor: 'rgba(34, 197, 94, 0.22)', textColor: '#86efac' },
+                    ],
+                  },
+                ],
+              },
+              {
+                id: 'col-time',
+                name: '發車時間(預計/實際)',
+                fieldKey: 'depart_time',
+                width: 150,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-time-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 150,
+                    height: 44,
+                    content: '{depart_time}',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'normal',
+                    color: '#94a3b8',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-detail',
+                name: '操作',
+                fieldKey: 'shift_key',
+                width: 80,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-act-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 44,
+                    content: '查看詳情',
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'bold',
+                    color: '#3b82f6',
+                    icon: 'ExternalLink',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: 'tab-maintenance',
+            label: '整備班次',
+            dataSourceId: 'default-internal',
+            freshnessPolicy: 'auto',
+            columns: [
+              {
+                id: 'col-m-trip',
+                name: '班次代號',
+                fieldKey: 'trip_code',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-mtrip-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 90,
+                    height: 44,
+                    content: '{trip_code}',
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'bold',
+                    color: '#cbd5e1',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-m-type',
+                name: '整備類型',
+                fieldKey: 'maint_type_label',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `badge-mtype-${Date.now()}`,
+                    type: 'status-badge',
+                    x: 0,
+                    y: 8,
+                    width: 70,
+                    height: 26,
+                    valueField: 'maint_type_label',
+                    defaultLabel: '{maint_type_label}',
+                    defaultBgColor: '#422006',
+                    defaultTextColor: '#fdba74',
+                    variableBgKey: 'maint_type_bg',
+                    variableColorKey: 'maint_type_color',
+                    showDot: false,
+                    fontSize: 11,
+                    borderRadius: 6,
+                    rules: [],
+                  },
+                ],
+              },
+              {
+                id: 'col-m-veh',
+                name: '執行載具',
+                fieldKey: 'vehicle_code',
+                width: 90,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-mveh-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 90,
+                    height: 44,
+                    content: '{vehicle_code}',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'normal',
+                    color: '#94a3b8',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-m-route',
+                name: '整備進度',
+                fieldKey: 'route_stations',
+                width: 260,
+                align: 'left',
+                children: [
+                  {
+                    id: `rp-m-${Date.now()}`,
+                    type: 'route-progress',
+                    x: 0,
+                    y: 2,
+                    width: 260,
+                    height: 40,
+                    valueField: 'route_progress',
+                    activeColor: '#3b82f6',
+                    inactiveColor: '#3f3f46',
+                    vehicleIcon: 'vehicle.svg',
+                    iconColor: '#ffffff',
+                    iconBgColor: '#3b82f6',
+                    stationSource: 'json',
+                    stationsJsonVarKey: 'stations_json',
+                    segmentIndexVarKey: 'segment_index',
+                    segmentRemainPctVarKey: 'segment_remain_pct',
+                    trackStyle: 'maintenance',
+                    stations: [
+                      { id: 'ms1', name: '整備站', value: 0 },
+                      { id: 'ms2', name: '充電站', value: 50 },
+                      { id: 'ms3', name: '主線口', value: 100 },
+                    ],
+                    actionIconRules: [],
+                  },
+                ],
+              },
+              {
+                id: 'col-m-stat',
+                name: '整備狀態',
+                fieldKey: 'status_label',
+                width: 100,
+                align: 'left',
+                children: [
+                  {
+                    id: `badge-mstat-${Date.now()}`,
+                    type: 'status-badge',
+                    x: 0,
+                    y: 8,
+                    width: 80,
+                    height: 26,
+                    valueField: 'status_label',
+                    defaultLabel: '{status_label}',
+                    defaultBgColor: '#27272a',
+                    defaultTextColor: '#a1a1aa',
+                    variableBgKey: 'status_bg',
+                    variableColorKey: 'status_color',
+                    showDot: true,
+                    fontSize: 11,
+                    borderRadius: 6,
+                    rules: [],
+                  },
+                ],
+              },
+              {
+                id: 'col-m-time',
+                name: '預計時間',
+                fieldKey: 'depart_time',
+                width: 150,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-mtime-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 150,
+                    height: 44,
+                    content: '{depart_time}',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'normal',
+                    color: '#94a3b8',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+              {
+                id: 'col-m-detail',
+                name: '操作',
+                fieldKey: 'shift_key',
+                width: 80,
+                align: 'left',
+                children: [
+                  {
+                    id: `txt-mact-${Date.now()}`,
+                    type: 'text',
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 44,
+                    content: '查看詳情',
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    fontFamily: 'system-ui',
+                    fontWeight: 'bold',
+                    color: '#3b82f6',
+                    icon: 'ExternalLink',
+                    textAlign: 'left',
+                    verticalAlign: 'center',
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent',
+                    colorRulesEnabled: false,
+                    textWrap: 'nowrap',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       };
   }
 }

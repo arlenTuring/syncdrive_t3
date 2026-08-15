@@ -50,8 +50,8 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   {
     id: 'monitor',
     label: '數據監控模組',
-    enabled: true,
-    navigateTo: 'dashboard',
+    /** 儀表板編輯器已移至側欄底部「儀表板管理」；此模組先留空待班表部署等工具 */
+    enabled: false,
   },
   {
     id: 'schedule',

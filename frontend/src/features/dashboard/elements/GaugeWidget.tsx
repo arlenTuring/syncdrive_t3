@@ -162,6 +162,128 @@ function VehicleStatusGaugeView({
   );
 }
 
+function pickColorFromStops(
+  colorStops: GaugeWidgetType['colorStops'],
+  percent: number,
+): string {
+  const stops = [...colorStops].sort((a, b) => a.at - b.at);
+  if (stops.length === 0) return '#3B82F6';
+  if (percent <= stops[0].at) return stops[0].color;
+  if (percent >= stops[stops.length - 1].at) return stops[stops.length - 1].color;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const s1 = stops[i];
+    const s2 = stops[i + 1];
+    if (percent >= s1.at && percent <= s2.at) {
+      const ratio = (percent - s1.at) / (s2.at - s1.at);
+      return ratio > 0.5 ? s2.color : s1.color;
+    }
+  }
+  return stops[0].color;
+}
+
+/** 全圓達成進度環（班表部署「數據統計」） */
+function RingGaugeView({
+  widget,
+  value,
+  offline,
+  color,
+}: {
+  widget: GaugeWidgetType;
+  value: number;
+  offline?: boolean;
+  color: string;
+}) {
+  const pct = offline
+    ? 0
+    : Math.min(1, Math.max(0, (value - widget.min) / (widget.max - widget.min || 1)));
+  const size = 200;
+  const cx = size / 2;
+  const cy = size / 2;
+  const strokeWidth = widget.gaugeArcStrokeWidth != null && widget.gaugeArcStrokeWidth > 0
+    ? widget.gaugeArcStrokeWidth
+    : 10;
+  const radius = (size - strokeWidth) / 2 - 4;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - pct);
+  const title = widget.title?.trim() ?? '';
+  const valueFs = widget.gaugeValueFontSize ?? 28;
+  const unitFs = widget.gaugeUnitFontSize ?? 12;
+  const titleFs = Math.max(10, Math.round(unitFs));
+  const valueStr = offline
+    ? '--'
+    : Number.isInteger(value)
+      ? String(value)
+      : value.toFixed(1);
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        background: widget.panelBackgroundColor ?? 'transparent',
+        borderRadius: widget.panelBorderRadius ?? 0,
+        boxSizing: 'border-box',
+      }}
+    >
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      >
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
+        />
+      </svg>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          gap: 2,
+          paddingBottom: widget.gaugeTextGap ?? 0,
+        }}
+      >
+        {title ? (
+          <div style={{ fontSize: titleFs, fontWeight: 500, color: 'rgba(255,255,255,0.45)', lineHeight: 1.2 }}>
+            {title}
+          </div>
+        ) : null}
+        <div style={{ fontSize: valueFs, fontWeight: 700, color: '#F8FAFC', lineHeight: 1 }}>
+          {valueStr}
+        </div>
+        {widget.unit ? (
+          <div style={{ fontSize: unitFs, fontWeight: 500, color: 'rgba(255,255,255,0.45)', lineHeight: 1.2 }}>
+            {widget.unit}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function GaugeWidget({ widget }: Props) {
   const isEditMode = useIsEditMode();
   const hasBinding = widgetHasDataBinding(widget);
@@ -230,6 +352,12 @@ export function GaugeWidget({ widget }: Props) {
     return wrap(<VehicleStatusGaugeView widget={widget} value={value} offline={showOffline} />);
   }
 
+  if (widget.gaugeVariant === 'ring') {
+    const ringPct = (value - widget.min) / (widget.max - widget.min || 1);
+    const ringColor = pickColorFromStops(widget.colorStops, ringPct);
+    return wrap(<RingGaugeView widget={widget} value={value} offline={showOffline} color={ringColor} />);
+  }
+
   const percent = (value - widget.min) / (widget.max - widget.min);
   const radius = 80;
   const strokeWidth = widget.gaugeArcStrokeWidth != null && widget.gaugeArcStrokeWidth > 0
@@ -239,23 +367,7 @@ export function GaugeWidget({ widget }: Props) {
   const circumference = Math.PI * radius;
   const strokeDashoffset = circumference * (1 - percent);
 
-  const getColor = (p: number) => {
-    const stops = [...widget.colorStops].sort((a, b) => a.at - b.at);
-    if (stops.length === 0) return '#06b6d4';
-    if (p <= stops[0].at) return stops[0].color;
-    if (p >= stops[stops.length - 1].at) return stops[stops.length - 1].color;
-    for (let i = 0; i < stops.length - 1; i++) {
-      const s1 = stops[i];
-      const s2 = stops[i + 1];
-      if (p >= s1.at && p <= s2.at) {
-        const ratio = (p - s1.at) / (s2.at - s1.at);
-        return ratio > 0.5 ? s2.color : s1.color;
-      }
-    }
-    return stops[0].color;
-  };
-
-  const currentColor = getColor(percent);
+  const currentColor = pickColorFromStops(widget.colorStops, percent);
   const showTitle = Boolean(widget.title?.trim());
   const contentPad = resolveGaugeContentPaddingCss(widget.gaugeContentPadding);
   const hasCustomPad = Boolean(widget.gaugeContentPadding);
