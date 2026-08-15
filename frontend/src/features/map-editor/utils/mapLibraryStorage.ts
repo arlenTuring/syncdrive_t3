@@ -290,6 +290,9 @@ export function createBlankMapEntry(
     areas: [area],
     routes: [],
     routeGroups: [],
+    // 缺欄＝空（不強制全開）——新建的空白地圖還沒有人設定過可視路線，
+    // 跟 routes／routeGroups 一樣給空陣列，不是留給執行期猜測。
+    visibleRouteIds: [],
     pointTopology: emptyPointTopology(),
     createdAt: now,
     updatedAt: now,

@@ -553,7 +553,11 @@ export function normalizeSelectedRouteExecutionOrders(
 
   const backups = withIds
     .filter((route) => !isPrimarySelectedRoute(route))
-    .map((route) => {
+    .map((route): ShiftScheduleSelectedRoute | null => {
+      // 明示回傳型別：resolveSelectedRouteInstanceId／parent.routeId 回傳的都是
+      // 不可為 undefined 的 string，物件字面值會被推得比 ShiftScheduleSelectedRoute
+      // 本身（backupForInstanceId?: string | null）更窄，導致下面的 type predicate
+      // 斷言方向不合法（TS2677）。給 contextual type 讓它照介面本身寬度收斂。
       const byInstance = route.backupForInstanceId?.trim();
       const parent =
         (byInstance ? primaryByInstanceId.get(byInstance) : null)

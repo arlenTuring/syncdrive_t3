@@ -78,12 +78,6 @@ type DepartureEvent = {
   startSecond: number;
 };
 
-type HeadwaySegment = {
-  startSecond: number;
-  endSecond: number;
-  headwaySeconds: number;
-};
-
 function isCapacityPassengerBlock(block: GeneratedScheduleBlock): boolean {
   return (
     block.taskType === 'passenger'
@@ -390,19 +384,6 @@ function collectDeparturesByServiceDirection(
   return { byStream, sampleBlockByStream };
 }
 
-/**
- * route 模式：路線鍵即流鍵。
- * serviceDirection 模式：有服務方向則 `sdir:<id>`（同標籤合併），否則維持單一路線鍵。
- */
-function resolveStreamKeyForRouteKey(
-  routeKey: string,
-  mode: CapacityTrendViewMode,
-  routeById: Map<string, ShiftScheduleSelectedRoute>,
-): string {
-  if (mode === 'route') return routeKey;
-  return resolveCapacityServiceDirectionStreamKey(routeKey, routeById);
-}
-
 function orderStreamKeys(
   streamKeys: string[],
   mode: CapacityTrendViewMode,
@@ -442,32 +423,6 @@ function orderStreamKeys(
 }
 
 /**
- * 同一發車秒序列的相鄰間隔 → 班距區段 [d_i, d_{i+1})。
- */
-function buildHeadwaySegmentsFromLeadSeconds(leadSeconds: number[]): HeadwaySegment[] {
-  const segments: HeadwaySegment[] = [];
-  for (let i = 0; i < leadSeconds.length - 1; i += 1) {
-    const startSecond = leadSeconds[i]!;
-    const endSecond = leadSeconds[i + 1]!;
-    const gapSeconds = endSecond - startSecond;
-    if (gapSeconds < MIN_CAPACITY_HEADWAY_SECONDS) continue;
-    segments.push({
-      startSecond,
-      endSecond,
-      headwaySeconds: gapSeconds,
-    });
-  }
-  return segments;
-}
-
-/**
- * 同一路線流內，跨所有時間線的相鄰實際發車間隔定義班距區段 [d_i, d_{i+1})。
- */
-function buildHeadwaySegments(departures: DepartureEvent[]): HeadwaySegment[] {
-  return buildHeadwaySegmentsFromLeadSeconds(uniqueDepartureLeadSeconds(departures, true));
-}
-
-/**
  * 發車秒序列（排序去重）。
  * @param platoonFilter 為 true 時，過近連發視為同班次偽影只留先頭（單路線診斷用）。
  *   服務方向應為 false：已先合併同向連續路段，此處保留各趟班次。
@@ -489,18 +444,6 @@ function uniqueDepartureLeadSeconds(
     }
   }
   return platoonLeadSeconds;
-}
-
-function findSegmentAt(
-  segments: HeadwaySegment[],
-  sampleSecond: number,
-): HeadwaySegment | null {
-  for (const segment of segments) {
-    if (sampleSecond >= segment.startSecond && sampleSecond < segment.endSecond) {
-      return segment;
-    }
-  }
-  return null;
 }
 
 /**

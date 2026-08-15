@@ -275,7 +275,7 @@ export async function postScheduleEngineLog(args: {
     }
     const data = (await res.json()) as {
       file?: string;
-      lastIssues?: { jsonFile?: string; htmlUpdated?: boolean };
+      lastIssues?: { jsonFile?: string; htmlFile?: string };
     };
     if (data.file) {
       console.info(`[schedule-engine] 生成 log 已寫入 backend/${data.file}`);

@@ -395,20 +395,27 @@ function ManualBlockSettingsForm({
                       aria-label={`${dwell.stationName} 停靠方式`}
                       onChange={(event) => {
                         const nextMode = event.target.value as ShiftStationDwellMode;
-                        const nextDwells = stationDwells.map((item) => {
-                          if (item.stationId !== dwell.stationId) return item;
-                          if (nextMode === 'no_stop' || nextMode === 'line_change') {
-                            return { ...item, dwellMode: nextMode, dwellSeconds: 0 };
-                          }
-                          return {
-                            ...item,
-                            dwellMode: 'seconds',
-                            dwellSeconds:
-                              item.dwellSeconds != null && item.dwellSeconds > 0
-                                ? item.dwellSeconds
-                                : null,
-                          };
-                        });
+                        // 明示回傳型別，讓兩個分支的 dwellMode 都對著
+                        // ShiftScheduleStationDwell 做 contextual typing——沒有這個，
+                        // 字面值 'seconds' 在物件字面值裡會被推寬成 string，
+                        // 跟 no_stop／line_change 那個分支合成聯集後就不再是
+                        // ShiftScheduleStationDwell[] 了。
+                        const nextDwells: ShiftScheduleStationDwell[] = stationDwells.map(
+                          (item): ShiftScheduleStationDwell => {
+                            if (item.stationId !== dwell.stationId) return item;
+                            if (nextMode === 'no_stop' || nextMode === 'line_change') {
+                              return { ...item, dwellMode: nextMode, dwellSeconds: 0 };
+                            }
+                            return {
+                              ...item,
+                              dwellMode: 'seconds',
+                              dwellSeconds:
+                                item.dwellSeconds != null && item.dwellSeconds > 0
+                                  ? item.dwellSeconds
+                                  : null,
+                            };
+                          },
+                        );
                         setStationDwells(nextDwells);
                         commitDwells(nextDwells, dwellSlackText);
                       }}

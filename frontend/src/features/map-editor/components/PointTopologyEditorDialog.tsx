@@ -281,7 +281,6 @@ function EdgeArrow({
   emphasized,
   dimmed,
   bending,
-  onSelect,
   onBendPointerDown,
   onBendPointerMove,
   onBendPointerUp,
@@ -303,7 +302,6 @@ function EdgeArrow({
   emphasized: boolean
   dimmed: boolean
   bending: boolean
-  onSelect: () => void
   onDoubleClickEdge: () => void
   onBendPointerDown: (event: ReactPointerEvent<SVGElement>) => void
   onBendPointerMove: (event: ReactPointerEvent<SVGElement>) => void
@@ -320,7 +318,7 @@ function EdgeArrow({
     curveOffsetX: edge.curveOffsetX,
     curveOffsetY: edge.curveOffsetY,
   })
-  const { x1, y1, x2, y2, midX, midY, nx, ny, pathD } = path
+  const { midX, midY, nx, ny, pathD } = path
 
   const stroke = selected
     ? '#22d3ee'
@@ -1583,10 +1581,6 @@ export function PointTopologyEditorDialog({
                         emphasized={emphasized}
                         dimmed={dimmed}
                         bending={bendingEdgeId === edge.id}
-                        onSelect={() => {
-                          setSelectedEdgeId(edge.id)
-                          setSelectedNodeId(null)
-                        }}
                         onDoubleClickEdge={() => {
                           setSelectedEdgeId(edge.id)
                           setSelectedNodeId(null)

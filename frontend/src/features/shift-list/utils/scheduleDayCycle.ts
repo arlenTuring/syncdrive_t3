@@ -54,14 +54,6 @@ export function formatScheduleClockRangeHms(
   return `${formatScheduleClockHms(startMinute)} - ${formatScheduleClockHms(endMinute)}`;
 }
 
-/** 結束時刻是否跨越（或落在）日界之後 */
-export function crossesScheduleDayBoundary(
-  startMinute: number,
-  endMinute: number,
-): boolean {
-  return endMinute > SCHEDULE_DAY_MINUTES + 1e-12;
-}
-
 /**
  * 甘特條帶位置（與鐘面文字可分離）：
  * - 當日內：照 [start, end) 畫

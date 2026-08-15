@@ -247,6 +247,8 @@ export function resolveGeneratedBlockTripCode(
     routeId?: string;
     entryServiceSectionCode?: string;
     yardExitSectionCode?: string;
+    /** 調度班次前綴（整備出場站 ≠ 首班首站時，代號前掛的整備代號＋路線代號） */
+    yardDispatchPrefix?: string;
     timelineRow: number;
     plannedStartMinute: number;
   },

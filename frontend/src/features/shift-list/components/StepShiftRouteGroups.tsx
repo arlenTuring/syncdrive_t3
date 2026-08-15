@@ -70,7 +70,6 @@ import {
   sortListedThroughCycles,
   type RouteThroughCycle,
 } from '../utils/routeRelationThroughCycles';
-import { resolveRouteOriginStation } from '../utils/routeRelationGraph';
 
 type StepShiftRouteGroupsProps = {
   draft: ShiftScheduleRouteGroupsDraft;

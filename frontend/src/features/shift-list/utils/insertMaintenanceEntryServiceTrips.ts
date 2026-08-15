@@ -514,6 +514,9 @@ export function insertMaintenanceEntryServiceTrips(args: {
       const afterYard = findPassengerAfterContiguousYard(sorted, i);
       if (!afterYard?.passenger.routeId) continue;
       const nextPassenger = afterYard.passenger;
+      // 上面已經確認過 afterYard.passenger.routeId 為真值，但那個窄化不會沿著
+      // 別名 nextPassenger 傳下去——這裡重新窄化同一個不變量，讓型別跟事實對齊。
+      if (!nextPassenger.routeId) continue;
 
       // 這一段整備的出場站與下一班正線的起點站——兩者不同就一定要靠外掛把車送過去。
       // 下面每一個 continue 都可能讓外掛沒被插入，所以只要「非插不可」卻跳過，

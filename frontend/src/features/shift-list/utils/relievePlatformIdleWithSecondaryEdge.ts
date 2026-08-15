@@ -37,6 +37,7 @@ import {
   findStationBerthCollisions,
   resolveSameRowIdleOccupiedUntilMinute,
   resolveSameRowNextBlockStartMinute,
+  type StationBerthOccupancy,
 } from './stationBerthOccupancy';
 
 function routeStartStation(route: ShiftScheduleSelectedRoute): string | null {
