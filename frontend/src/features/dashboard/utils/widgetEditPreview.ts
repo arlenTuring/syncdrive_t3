@@ -5,8 +5,6 @@ import type { ChildWidget, RouteStation } from '../types';
 export const FIELD_PREVIEW_SAMPLES: Record<string, string> = {
   category: '線控',
   vehicle_code: 'PMS-01',
-  status_label: '進行中',
-  event_time: '2026.06.08 09:01:27',
   message: '防鎖死煞車系統故障',
   sub_label: 'PMS-02',
   severity: 'warning',

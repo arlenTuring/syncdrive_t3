@@ -10,7 +10,6 @@ import type {
   DashboardPlane,
   GaugeWidget,
   ImageWidget,
-  ShiftListWidget,
   TabListWidget,
   StatusBadgeWidget,
   TextWidget,

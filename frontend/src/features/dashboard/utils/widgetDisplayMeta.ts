@@ -21,6 +21,8 @@ const WIDGET_TYPE_LABELS: Record<WidgetType, string> = {
   'unit-telemetry-card': '遙測卡',
   'map-canvas': '圖台',
   'vehicle-container': '載具樣板',
+  'tab-list': 'Tab 清單',
+  'shift-list': '班表清單',
 };
 
 export function getWidgetTypeLabel(type: WidgetType): string {

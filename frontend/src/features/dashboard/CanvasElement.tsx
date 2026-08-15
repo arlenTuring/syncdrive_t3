@@ -36,7 +36,7 @@ import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import {
   resolveMapVehicleTemplate,
 } from './utils/resolveMapVehicleTemplate';
-import { isTabCanvas, makeTabCanvasId } from './utils/tabCanvas';
+import { isTabCanvas } from './utils/tabCanvas';
 
 const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
   <div style={{
@@ -1041,6 +1041,8 @@ const color =  {
     'alert-banner': '#f97316',
     'vehicle-alert-banner': '#f97316',
     'vehicle-container': '#f59e0b',
+    'tab-list': '#8b5cf6',
+    'shift-list': '#8b5cf6',
   }[child.type] || '#94a3b8';
   const label = {
     text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB',
@@ -1053,6 +1055,8 @@ const color =  {
     'alert-banner': 'ALERT',
     'vehicle-alert-banner': 'ALERT',
     'vehicle-container': 'VEH',
+    'tab-list': 'TABS',
+    'shift-list': 'SHIFTS',
   }[child.type] || 'WIDGET';
 
   const rotationDeg = child.rotationDeg ?? 0;

@@ -8,7 +8,13 @@ import { SettingsModal } from './settings/SettingsModal';
 import { DashboardList } from './DashboardList';
 import { Plus, Monitor, LayoutGrid, Save, Settings, Copy, Pencil, ArrowLeft, Undo2, Redo2, Paintbrush, LogOut } from 'lucide-react';
 import { VehicleEditorEmbed } from '../vehicle-editor/VehicleEditorEmbed';
-import type { CanvasElementProps, ChildWidget, WidgetType, TabListWidget } from './types';
+import type {
+  CanvasElementProps,
+  ChildWidget,
+  WidgetType,
+  TabListWidget,
+  DashboardPlane,
+} from './types';
 import { BindingHealthProvider } from './context/BindingHealthContext';
 import { FormatPainterProvider } from './context/FormatPainterContext';
 import { canApplyWidgetFormat } from './utils/widgetFormatPainter';
@@ -39,12 +45,7 @@ import {
   type DualCanvasLane,
 } from './utils/dualCanvas';
 import {
-  isTabCanvas,
-  makeTabCanvasId,
-  parseTabCanvasId,
-  isTabCanvasId,
   getTabChildren,
-  buildTabChildrenPatch,
   patchTabChild,
   deleteTabChild,
   addTabChild,

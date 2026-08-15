@@ -833,7 +833,16 @@ export interface TabListTab {
 
 /** 可切換 Tab 的動態清單／子畫布表格元件 */
 export interface TabListWidget extends WidgetBase {
-  type: 'tab-list';
+  /**
+   * <code>'shift-list'</code> 與 <code>'tab-list'</code> <strong>結構完全相同</strong>
+   * （見下方 <code>ShiftListWidget</code> 別名），差別只在算繪：有 tabs 就當 Tab 表格，
+   * 沒有就走班表專用檢視（見 WidgetRenderer）。因此 type 收兩個字面值——
+   * 少了 <code>'shift-list'</code> 的話 ChildWidget 聯集裡沒有這個成員，
+   * WidgetRenderer 的 <code>case 'shift-list'</code> 就比對不到、narrowing 塌成 never。
+   */
+  type: 'tab-list' | 'shift-list';
+  /** 元件顯示名稱；子畫布編輯的標題會用到（與其他元件的 label 同義） */
+  label?: string;
   tabs: TabListTab[];
   activeTabId?: string;
   align?: 'left' | 'center' | 'right'; // 全域表格欄位對齊方式
@@ -1483,8 +1492,8 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
                     fontSize: 11,
                     borderRadius: 12,
                     rules: [
-                      { value: '延誤', bgColor: 'rgba(234, 88, 12, 0.25)', textColor: '#fdba74' },
-                      { value: '準點', bgColor: 'rgba(34, 197, 94, 0.22)', textColor: '#86efac' },
+                      { value: '延誤', label: '延誤', bgColor: 'rgba(234, 88, 12, 0.25)', textColor: '#fdba74' },
+                      { value: '準點', label: '準點', bgColor: 'rgba(34, 197, 94, 0.22)', textColor: '#86efac' },
                     ],
                   },
                 ],

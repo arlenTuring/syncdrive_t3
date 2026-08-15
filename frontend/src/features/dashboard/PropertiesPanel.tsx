@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
