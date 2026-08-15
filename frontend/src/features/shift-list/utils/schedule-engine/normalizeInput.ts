@@ -103,8 +103,8 @@ export type EngineInput = {
    * 站位求解、班距補疏／修復、整備後調度班次、最終驗證共用同一個值。
    */
   collisionProtectionSeconds: number;
-  /** 整備類型 → 出場站候選集合；驗證「整備後第一段班次接不接得上」要用 */
-  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string[]>>;
+  /** 整備類型 → 出場站 stationId；驗證「整備後第一段班次接不接得上」要用 */
+  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string>>;
   /** 各整備類型「車可能停在哪幾站」；驗證「車在不在那一站」用 */
   yardExitStationOptionsByTaskType: Partial<Record<TaskTypeKey, string[]>>;
   turnaroundLimitSeconds: number | null;
@@ -587,8 +587,8 @@ function assignDirectionalDepartures(args: {
   nonPassengerTasks?: ScheduleTask[];
   /** 全部模板任務（判斷整備後是否還有正線） */
   templateTasks?: ScheduleTask[];
-  /** 整備類型 → 出場站候選集合（行檢／充電／待命） */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
+  /** 整備類型 → 出場站 stationId（行檢／充電／待命） */
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
   /** Step 4 繼任策略；提供時以策略決定開輪相位與整輪估時 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 掛不上班距需求時留下可觀測 issue，不再靜默丟棄 */
@@ -742,42 +742,12 @@ function assignDirectionalDepartures(args: {
       })
     ) {
       if (successorPolicy) {
-        // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
-        const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
+        const startId = resolveStartInstanceId(successorPolicy, exitStationId);
         if (!startId) return 0;
-        /**
-         * <strong>相位是「<code>passengerRoutes</code> 的索引」，不是
-         * 「<code>rotationRoutes</code> 的索引」——兩個是不同的陣列。</strong>
-         *
-         * 這個回傳值會被寫進 <code>rotationIndex[row]</code>，而
-         * <code>resolveStartRouteIndex()</code> 用 <code>rotationIndex[row] % routeCount</code>
-         * （<code>routeCount = passengerRoutes.length</code>）去索引
-         * <code>passengerRoutes</code>；<code>buildPlannedCycleLegs()</code> 也是從
-         * <code>passengerRoutes[startRouteIndex]</code> 起算整輪。
-         *
-         * 但 <code>resolveRouteIndexInRotation()</code> 找的是
-         * <code>successorPolicy.rotationRoutes</code>——那是 Step 4 鎖定導通組合的
-         * <strong>子集且另有順序</strong>。拿子集的名次去索引全集，指到的是<strong>另一條
-         * 路線</strong>。
-         *
-         * 2026-08-15 實測後果：normalizeInput 依「錯的那條」（較短）規劃錨點間距
-         * 180 秒，assignRoutes 卻依 <code>rotationRoutes</code> 正確走繼任鏈拿到
-         * <code>ST</code>（最快也要 210 秒），展開階段兩邊對不上，34–36 則
-         * ANCHOR_CONFLICT 全部是 <code>ST</code> 被塞進 180 秒格。
-         *
-         * 這個錯配一直都在，只是行檢原本 <code>alignRotationToExitStation: false</code>
-         * 時這裡永遠回 0，剛好踩不到；放開出場站候選後開始回真實名次才引爆。
-         * 修法：直接在 <code>passengerRoutes</code> 裡找同一個 instance 的位置。
-         */
-        const index = passengerRoutes.findIndex(
-          (route) => resolveSelectedRouteInstanceId(route) === startId,
-        );
+        const index = resolveRouteIndexInRotation(successorPolicy, startId);
         return index >= 0 ? index : 0;
       }
-      const exitStationSingle = Array.isArray(exitStationId)
-        ? exitStationId[0]
-        : exitStationId;
-      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
+      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
     }
     // 充電／行檢／待命／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;

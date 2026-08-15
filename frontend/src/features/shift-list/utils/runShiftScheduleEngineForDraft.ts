@@ -110,19 +110,43 @@ export async function runShiftScheduleEngineForDraft(
     console.warn('[schedule-engine] 地圖拓樸載入失敗，改用空首班起點', mapError);
   }
 
-  const result = generateShiftSchedule({
+  const engineInput = {
     shiftId,
     draft,
     templateBody,
     maintenanceTaskBody,
     turnaroundLimitSeconds,
-    passengerTimetableMode: 'template',
+    passengerTimetableMode: 'template' as const,
     firstTripOrigins,
     // 這兩個先前漏掉——整備轉場卡（入廠/出廠/整備間轉場）全靠這兩個欄位才會
     // 動起來，漏傳等於這整套機制在正式產生班表時從來沒有真正跑過。
     pointTopology,
     areas,
+  };
+
+  /**
+   * 開發輔助：把<strong>完整引擎輸入</strong>原封不動寫成 log 檔，供本機重放。
+   *
+   * 為什麼需要：排班引擎的問題幾乎都只在真實資料上才顯形，但過去只有「輸出」
+   * （問題清單）留下來，沒有輸入。要查一個回歸就只能改一版、請使用者重新生成
+   * 一次、看截圖再猜下一版——2026-08-15 追 ANCHOR_CONFLICT 時連續猜了三版都沒中，
+   * 每一版都燒掉使用者一次手動生成。
+   *
+   * 有了這個檔就能在本機把同一份輸入重放任意次，開關功能、加 log、逐段比對，
+   * 完全不必再麻煩使用者。寫檔失敗只 console.warn，不影響生成。
+   *
+   * 檔案落點：backend/logs/schedule-engine/{timestamp}-engine-input.json
+   */
+  void postScheduleEngineLog({
+    label: 'engine-input',
+    payload: engineInput,
+    backendUrl: backendUrl ?? '',
+    // 輸入被截成摘要就失去重放的意義，這裡放寬上限。
+    // 對齊後端 main.ts 的 REQUEST_BODY_LIMIT（預設 10mb），超過會被 413 擋掉。
+    maxBytes: 9_000_000,
   });
+
+  const result = generateShiftSchedule(engineInput);
 
   // 開發輔助：每次生成把輸入摘要與完整報錯寫成 log 檔（fire-and-forget）。
   // lastIssues 另會覆寫 .dev JSON＋審核 HTML「最近一次生成」區塊。

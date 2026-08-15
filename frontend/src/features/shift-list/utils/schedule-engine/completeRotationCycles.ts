@@ -4,10 +4,7 @@ import type {
   TimeSlotAttribute,
   TimeSlotInterval,
 } from '../../../time-templates/types/editor';
-import {
-  resolveSelectedRouteInstanceId,
-  type ShiftScheduleSelectedRoute,
-} from '../../types/create';
+import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import {
   resolveFleetPhysicalHeadwayFloorSeconds,
   resolveInterTripGapSeconds,
@@ -29,6 +26,7 @@ import {
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
 import { shouldApplyYardExitRotationAlign } from '../maintenancePostTaskPolicy';
 import {
+  resolveRouteIndexInRotation,
   resolveStartInstanceId,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
@@ -103,7 +101,7 @@ export function applyRotationCycleCompletion(args: {
    * 整備類型 → 出場站：行檢／充電／待命結束後，下一串正線輪替相位對齊該站起點。
    * 與 assignDirectionalDepartures／assignRoutes 共用同一策略表。
    */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
   /** Step 4 繼任策略：開輪相位與次要備援 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 補完失敗時寫入（缺物理量等） */
@@ -200,29 +198,14 @@ export function applyRotationCycleCompletion(args: {
         })
       ) {
         if (successorPolicy) {
-          // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
-          const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
+          const startId = resolveStartInstanceId(successorPolicy, exitStationId);
           if (startId) {
-            /**
-             * 相位是 <code>passengerRoutes</code> 的索引，不是
-             * <code>rotationRoutes</code> 的索引——下面
-             * <code>rotationIndex % routeCount</code>（<code>routeCount =
-             * passengerRoutes.length</code>）索引的是 <code>passengerRoutes</code>，
-             * 而 <code>resolveRouteIndexInRotation()</code> 找的是鎖定導通組合
-             * （<code>passengerRoutes</code> 的子集且另有順序）。拿子集名次索引全集
-             * 會指到另一條路線。同一個錯配見 normalizeInput.ts 的詳細說明。
-             */
-            const index = passengerRoutes.findIndex(
-              (route) => resolveSelectedRouteInstanceId(route) === startId,
-            );
+            const index = resolveRouteIndexInRotation(successorPolicy, startId);
             phase = index >= 0 ? index : 0;
           }
         } else {
-          const exitStationSingle = Array.isArray(exitStationId)
-            ? exitStationId[0]
-            : exitStationId;
           phase =
-            resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
+            resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
         }
       }
       stretchPassengerCount = 0;

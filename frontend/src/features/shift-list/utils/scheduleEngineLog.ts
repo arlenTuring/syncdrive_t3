@@ -237,16 +237,24 @@ export async function postScheduleEngineLog(args: {
   label: string;
   payload: unknown;
   backendUrl: string;
+  /**
+   * 截斷上限（bytes）。預設 2MB：輸出快照塞了整份 timelines，過大的 body 容易讓
+   * 瀏覽器 fetch 直接 Failed to fetch，寧可截斷也不要整包丟失。
+   *
+   * <strong>引擎輸入的 dump 要把這個調大</strong>——輸入被截成摘要就完全失去
+   * 「本機重放」的用途，那正是留這個檔的唯一理由。放寬時要對齊後端
+   * <code>main.ts</code> 的 <code>REQUEST_BODY_LIMIT</code>（預設 10mb），
+   * 超過會被 413 擋掉。
+   */
+  maxBytes?: number;
 }): Promise<void> {
-  const { label, payload, backendUrl } = args;
+  const { label, payload, backendUrl, maxBytes = 2_000_000 } = args;
   try {
     // 與 Vite proxy 對齊：優先走相對路徑，避免 localhost / 127.0.0.1 交叉造成 Failed to fetch
     const endpoint = backendUrl?.trim()
       ? `${backendUrl.replace(/\/$/, '')}/syncdrive-api/dev-log/schedule-engine`
       : '/syncdrive-api/dev-log/schedule-engine';
     const body = JSON.stringify({ label, payload });
-    // 過大的 body 容易讓瀏覽器 fetch 直接 Failed to fetch；截斷 timelines 細節
-    const maxBytes = 2_000_000;
     const trimmedBody =
       body.length > maxBytes
         ? JSON.stringify({

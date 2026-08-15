@@ -334,64 +334,33 @@ export function buildRouteSuccessorPolicy(input: {
  * 所以：偏好順序照舊（錨點 → 導通組合順序），但把其餘導通組合成員也列為
  * 合法候選，讓下游有站位資訊的那一段（見 stationBerthConstraint 的冷啟動分支）
  * 有東西可挑。<strong>只加候選、不改第一名</strong>，故 {@link resolveStartInstanceId}
- * 的結果與此變更前完全相同（單一出場站、不帶 stationSeed 時）。
- *
- * <strong>出場站可以是候選集合，不是只有一個。</strong>行檢等整備類型現在允許
- * 出場站有多個拓樸候選（例如 N2W 或 T3）——但如果每一列都固定挑「候選裡排最前
- * 面的那一個」，等於把瓶頸從「鎖死單站」換成「鎖死候選集合裡的第一名」，換湯
- * 不換藥（2026-08-15 使用者：「N2W上行出發跟N2W備用上行出發容易被佔據的機率
- * 大大提高」正是這個病）。<code>stationSeed</code> 讓不同列的呼叫端能輪流從
- * 候選集合的不同起點開始找，真正把車分散到多個出場站，不是集中到同一個。
+ * 的結果與此變更前完全相同。
  */
 export function resolveStartInstanceCandidates(
   policy: RouteSuccessorPolicy,
-  exitStationId?: string | string[] | null,
-  /** 候選出場站有多個時，從第幾個開始找（供呼叫端依列號輪替，避免全部收斂到同一站） */
-  stationSeed = 0,
+  exitStationId?: string | null,
 ): string[] {
   if (!policy.valid) return [];
-  const exits = Array.isArray(exitStationId)
-    ? exitStationId.map((id) => id?.trim()).filter((id): id is string => Boolean(id))
-    : (exitStationId?.trim() ? [exitStationId.trim()] : []);
-  if (exits.length > 0) {
-    // 依 stationSeed 輪替候選站的嘗試順序——不同列從不同起點開始找，
-    // 找到的第一個「有真實路線」的候選就用，達成跨列分散。
-    const rotatedExits =
-      exits.length > 1
-        ? [...exits.slice(stationSeed % exits.length), ...exits.slice(0, stationSeed % exits.length)]
-        : exits;
-    for (const exit of rotatedExits) {
-      const matches: Array<{ instanceId: string; preferredIndex: number }> = [];
-      for (const [instanceId, route] of policy.routesByInstanceId) {
-        const origin = resolveRouteOriginStation(route)?.stationId;
-        if (origin !== exit) continue;
-        /**
-         * <strong>必須是 Step 4 鎖定的那條導通組合成員，不能是「隨便一條起點對得上的路線」。</strong>
-         *
-         * <code>routesByInstanceId</code> 是<strong>全部</strong>選定路線；但這個回傳值
-         * 接下來會餵給 <code>resolveRouteIndexInRotation</code> 去換算「輪替相位」，
-         * 那個函式只在 <code>policy.rotationRoutes</code>（鎖定組合，是
-         * <code>routesByInstanceId</code> 的<strong>子集</strong>）裡找——找不到會回傳
-         * -1，呼叫端全部靜默 fallback 成 offset 0，等於把相位錯接到組合裡第一條，
-         * 錨點、站位整條歪掉（2026-08-15 使用者實測：放開行檢出場站候選之後冒出
-         * ANCHOR_CONFLICT 35 則、STATION_BERTH_COLLISION 2 則）。
-         *
-         * 起點對得上、卻不在鎖定組合裡的路線，直接跳過——不能回傳一個下游沒辦法
-         * 換算相位的候選。
-         */
-        const preferredIndex = policy.canonicalCycleInstanceIds.indexOf(instanceId);
-        if (preferredIndex < 0) continue;
-        matches.push({ instanceId, preferredIndex });
-      }
-      if (matches.length > 0) {
-        matches.sort((a, b) => {
-          if (a.preferredIndex !== b.preferredIndex) {
-            return a.preferredIndex - b.preferredIndex;
-          }
-          return a.instanceId.localeCompare(b.instanceId);
-        });
-        return matches.map((item) => item.instanceId);
-      }
+  const exit = exitStationId?.trim() || '';
+  if (exit) {
+    const matches: Array<{ instanceId: string; preferredIndex: number }> = [];
+    for (const [instanceId, route] of policy.routesByInstanceId) {
+      const origin = resolveRouteOriginStation(route)?.stationId;
+      if (origin !== exit) continue;
+      const preferredIndex = policy.canonicalCycleInstanceIds.indexOf(instanceId);
+      matches.push({
+        instanceId,
+        preferredIndex: preferredIndex >= 0 ? preferredIndex : Number.MAX_SAFE_INTEGER,
+      });
+    }
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        if (a.preferredIndex !== b.preferredIndex) {
+          return a.preferredIndex - b.preferredIndex;
+        }
+        return a.instanceId.localeCompare(b.instanceId);
+      });
+      return matches.map((item) => item.instanceId);
     }
   }
 
@@ -419,10 +388,9 @@ export function resolveStartInstanceCandidates(
  */
 export function resolveStartInstanceId(
   policy: RouteSuccessorPolicy,
-  exitStationId?: string | string[] | null,
-  stationSeed = 0,
+  exitStationId?: string | null,
 ): string | null {
-  return resolveStartInstanceCandidates(policy, exitStationId, stationSeed)[0] ?? null;
+  return resolveStartInstanceCandidates(policy, exitStationId)[0] ?? null;
 }
 
 export function resolveRouteIndexInRotation(
