@@ -5724,6 +5724,68 @@ backend/src/dev-log/
       三套並存。凡是「這個位置能不能用」的判斷，一律要回到同一個來源去問。
     </li>
   </ul>
+
+  <h3>2026-08-15 · 行檢多出場站撤回：修兩次仍留下 34 則重複 ANCHOR_CONFLICT，先退回零硬錯誤基準</h3>
+  <ul>
+    <li>
+      <strong>撤回的兩個 commit：</strong>
+      <code>1e69bf0</code>（行檢出場站放開成候選集合）與
+      <code>9a75f32</code>（候選必須是鎖定組合成員的修正），
+      revert commit 為 <code>4983431</code> 與 <code>610dee7</code>。
+    </li>
+    <li>
+      <strong>使用者的原始訴求仍然成立：</strong>行檢對齊單一出場站（N2W）會把
+      <code>N2W下行出發</code>／<code>[備用]N2W上行出發</code> 這兩格擠爆，
+      使用者已把 H1–H3 拓樸打通成雙向，T3→S2W 本身就是能載客的真實路線，
+      要的是行檢完之後真的能在 N2W／T3／S2W 之間分散，不是收斂到單一站。
+      這個問題本身沒有解掉，只是先退回已知安全的狀態。
+    </li>
+    <li>
+      <strong>兩次修法都通過 tsc 與合成案例，但活資料重新生成後爆錯：</strong>
+      使用者連續三次重新生成（19:10、20:38、20:42），數字完全相同——
+      <code>ANCHOR_CONFLICT</code> 0 → 35（新增）、
+      <code>STATION_BERTH_COLLISION</code> 0 → 2（新增）、
+      <code>UNSERVED_SERVICE_PULSE</code> 1 → 31。
+      <code>UNSERVED_SERVICE_PULSE</code> 是真的載客服務沒排進去，代價太大，
+      不能留著繼續猜第三次修法。
+    </li>
+    <li>
+      <strong>診斷到一半、尚未定案的線索：</strong>使用者提供的錯誤截圖顯示，
+      時間線 1 的 34 則 <code>ANCHOR_CONFLICT</code> 全部指向<strong>同一筆</strong>
+      <code>NT0000</code>（00:00:00–00:03:30，N2W→T3，170 秒行駛＋36 秒停靠＋4 秒緩衝，
+      數字本身正常，不是負值或壞資料）。一筆行程不可能真的跟 34 個不同錨點各自衝突，
+      比較像是同一個模板任務被重複處理了 34 次，而不是 34 個獨立問題。
+    </li>
+    <li>
+      <strong>结構上的疑點：</strong><code>expandRowBlocks</code>（產生 <code>ANCHOR_CONFLICT</code> 的地方）
+      在 <code>expand.ts</code> 裡跑在路線指派（<code>assignRoutes.ts</code>）<strong>之前</strong>，
+      理論上不吃這次改的 <code>rotationExitStationIds</code>／<code>resolveStartInstanceId</code>。
+      但 <code>normalizeInput.ts</code> 的「範本模式」分支裡，
+      <code>assignDirectionalDepartures</code> 會用到同一份改動過的
+      <code>resolveWindowRotationPhase</code>，產出的 <code>passengerTasks</code>
+      會併入 <code>confirmedTasks</code>，是 <code>expandRowBlocks</code> 的輸入之一——
+      這條間接路徑有沒有真的造成重複，撤回前沒有查到底。
+    </li>
+    <li>
+      <strong>為什麼先撤而不是繼續修：</strong>同一個規律的錯誤數字在三次獨立重新生成中
+      完全不變，代表不是隨機噪音，是穩定可重現的迴歸；但沒有活資料重現環境
+      （<code>draftbody.json</code> 一直被系統清掉），只能靠使用者一次次重新生成、
+      截圖回報來猜，每猜一次都要使用者手動跑一次。連續兩次修法都沒抓對，
+      第三次沒有更高把握，不如先讓班表退回沒有硬錯誤的已知狀態，再另外查根因。
+    </li>
+    <li>
+      <strong>撤回後的驗證：</strong><code>tsc -b --force</code> 0 error（退回 <code>25203ca</code> 基準）；
+      <code>git status</code> 乾淨；比對 <code>b8f5f5c</code>（撤回前最後一個 commit）
+      到撤回後 HEAD 的 diff，confirmed 0 個 dashboard 檔案被動到。
+    </li>
+    <li>
+      <strong>下一步（未動）：</strong>先確認 <code>ANCHOR_CONFLICT</code>／<code>NT0000</code>
+      重複是不是撤回後依然存在——如果撤回後還在，代表這是跟這次改動無關的既有 bug；
+      如果撤回後消失，代表確實是這次改動（或它跟 <code>assignDirectionalDepartures</code>
+      的間接互動）造成的，之後要更小心地重做。
+      行檢多出場站這個需求本身沒有取消，只是要換一個更謹慎、能先在活資料上驗證的做法。
+    </li>
+  </ul>
 </section>
 
 <footer>
