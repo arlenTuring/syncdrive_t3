@@ -747,6 +747,24 @@ export type ScheduleTask = {
    * 保留此值讓後續讓渡可在幽靈正線被推走後縮回模板開頭。
    */
   templateStartMinute?: number;
+  /**
+   * 掛車階段規劃這一趟時所用的路線 instance。
+   *
+   * <strong>為什麼要記下來：時刻是依「某一條特定路線的佔用秒數」算出來的。</strong>
+   * 掛車階段（<code>assignDirectionalDepartures</code>）先決定整輪跑哪幾條、各佔多久，
+   * 據此排出發車錨點；路線指派階段（<code>assignRoutes</code>）之後又<strong>各自
+   * 重新推導</strong>一次該跑哪一條。兩邊只要有任何一點不同步，時刻就會對應到
+   * 另一條路線的佔用秒數。
+   *
+   * 2026-08-16 實測：兩階段相位差一格，掛車依
+   * <code>S2W上行&gt;T3上行</code>（佔用 180 秒）把下一個錨點放在 180 秒後，
+   * 指派卻在同一格放 <code>T3上行&gt;N2W上行</code>（最快 210 秒），
+   * 直接產生 34 則 ANCHOR_CONFLICT。
+   *
+   * 記下規劃當下的決定、讓指派照著走，這一整類「兩邊各自推導」的錯位就結構性消失。
+   * 非掛車產生的任務沒有這個欄位，指派階段維持原本的推導邏輯。
+   */
+  plannedRouteInstanceId?: string;
 };
 
 /** Figma TaskBar colors — opaque bg so bars don't shift hue over the grid. */

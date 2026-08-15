@@ -320,6 +320,27 @@ export function assignPassengerRoutesConstraintGreedy(args: {
         route = rotationRoutes[rotationIndex % rotationRoutes.length]!;
       }
 
+      /**
+       * <strong>掛車階段已經決定過的，這裡就照著走，不要再推導一次。</strong>
+       *
+       * 這一趟的發車錨點是掛車階段依「某一條特定路線的佔用秒數」算出來的。
+       * 這裡若自己重新推導出另一條，時刻就對應到別條路線的佔用——
+       * 2026-08-16 實測正是如此：掛車依 <code>S2W上行&gt;T3上行</code>（180 秒）
+       * 把下一個錨點放在 180 秒後，這裡卻推導出 <code>T3上行&gt;N2W上行</code>
+       * （最快 210 秒），一口氣產生 34 則 ANCHOR_CONFLICT。
+       *
+       * 只覆蓋「掛車真的留下決定」的任務；其餘（模板既有正線等）維持原推導。
+       */
+      if (task.plannedRouteInstanceId && successorPolicy?.valid) {
+        const planned = successorPolicy.routesByInstanceId.get(
+          task.plannedRouteInstanceId,
+        );
+        if (planned) {
+          route = planned;
+          forceStartAfterYard = false;
+        }
+      }
+
       if (!route) {
         rotationIndex += 1;
         continue;

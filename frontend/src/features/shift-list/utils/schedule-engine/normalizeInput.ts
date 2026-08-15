@@ -1606,6 +1606,9 @@ function assignDirectionalDepartures(args: {
         startMinute: secondToMinute(leg.startSecond),
         durationMinutes: Math.max(1, leg.occupancySeconds / 60),
         label: '正線',
+        // 這一趟的錨點是依「這一條路線的佔用秒數」算出來的；記下來讓指派階段
+        // 照著走，不要各自重新推導出另一條（見 ScheduleTask 的欄位說明）。
+        plannedRouteInstanceId: resolveSelectedRouteInstanceId(leg.route),
       });
       trackedLegs.push({
         taskIndex: finalTaskIndex,
