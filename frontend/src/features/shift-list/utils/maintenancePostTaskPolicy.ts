@@ -187,10 +187,26 @@ export type YardPostTaskPolicy = {
   allowEntryService: boolean;
   /** 進場載客可用的出場站集合（allowEntryService 時有意義） */
   entryServiceExitStationIds: string[];
+  /**
+   * 這一種整備做完之後，車<strong>實際可能</strong>停在哪幾個站——拓樸算得出來的全部。
+   *
+   * <strong>與 {@link rotationExitStationId} 的差別：後者是「預設走哪一個」，
+   * 這個是「physically 出得去哪些」。</strong>兩者刻意分開：預設維持原樣，
+   * 這個集合只在預設真的排不出一整輪時當備援，所以加上它不會改變任何既有行為。
+   *
+   * <strong>為什麼要留全部：先前的 <code>resolveUniqueExitStationId()</code>
+   * 是「不唯一就回 null」——把「你有好幾個選擇」翻譯成「你沒有任何資訊」。</strong>
+   * 實測（2026-08-16）：待命的 mobile 設施涵蓋 E1–E4／H1–H3／M1–M2，
+   * 出得去 N2W下行出發、T3上行、T3下行等多站，卻因為「不唯一」整組被丟掉；
+   * 於是 15 次「待命做完、預設排不出一整輪」的決策點，備援清單全是空的——
+   * 不是沒有出路，是出路在這一行被扔了。
+   */
+  exitStationCandidateIds: string[];
 };
 
 const EMPTY_POLICY: YardPostTaskPolicy = {
   rotationExitStationId: null,
+  exitStationCandidateIds: [],
   alignRotationToExitStation: false,
   allowEntryService: false,
   entryServiceExitStationIds: [],
@@ -225,6 +241,7 @@ export function resolveYardPostTaskPolicy(args: {
         resolvePreferredExitStationId(origins, preTripCodes)
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
+      exitStationCandidateIds: entryStations,
       // 行檢設施離首發站遠，靠外掛的調度營運班次把車送過去；輪仍從首發站起算
       alignRotationToExitStation: false,
       allowEntryService: true,
@@ -233,11 +250,12 @@ export function resolveYardPostTaskPolicy(args: {
   }
 
   if (taskType === 'charging') {
+    const chargingCodes = extractFacilityMapCodes(maintenanceBody, 'charging');
     return {
-      rotationExitStationId: resolveUniqueExitStationId(
-        origins,
-        extractFacilityMapCodes(maintenanceBody, 'charging'),
-      ),
+      rotationExitStationId: resolveUniqueExitStationId(origins, chargingCodes),
+      // 不唯一時 rotationExitStationId 仍然是 null（預設行為完全不變），
+      // 但拓樸算得出來的站全部留在候選集合裡供備援用。
+      exitStationCandidateIds: resolveExitStationIdsForFacilityCodes(origins, chargingCodes),
       // 充電沒有外掛班次，車真的就停在出場站，第一段只能從那裡發車
       alignRotationToExitStation: true,
       allowEntryService: false,
@@ -246,11 +264,12 @@ export function resolveYardPostTaskPolicy(args: {
   }
 
   if (taskType === 'standby') {
+    const mobileCodes = extractFacilityMapCodes(maintenanceBody, 'mobile');
     return {
-      rotationExitStationId: resolveUniqueExitStationId(
-        origins,
-        extractFacilityMapCodes(maintenanceBody, 'mobile'),
-      ),
+      rotationExitStationId: resolveUniqueExitStationId(origins, mobileCodes),
+      // 待命的 mobile 設施通常涵蓋最多格（E／H／M 都可待命），出得去的站幾乎一定
+      // 不只一個。先前「不唯一就 null」把整組資訊丟掉，備援因此永遠是空的。
+      exitStationCandidateIds: resolveExitStationIdsForFacilityCodes(origins, mobileCodes),
       // 待命同充電：沒有外掛班次，車就在出場站
       alignRotationToExitStation: true,
       allowEntryService: false,
@@ -272,6 +291,7 @@ export function resolveYardPostTaskPolicy(args: {
           extractFacilityMapCodes(maintenanceBody, 'carWash'),
         )
         ?? (entryStations[0] ?? null),
+      exitStationCandidateIds: entryStations,
       alignRotationToExitStation: false,
       allowEntryService: true,
       entryServiceExitStationIds: entryStations,
@@ -296,6 +316,7 @@ export function resolveYardPostTaskPolicy(args: {
         )
         ?? (entryStations.length === 1 ? entryStations[0]! : null)
         ?? (entryStations[0] ?? null),
+      exitStationCandidateIds: entryStations,
       // 保養同行檢：靠外掛班次送到首發站，輪不改結構
       alignRotationToExitStation: false,
       allowEntryService: true,
@@ -345,6 +366,9 @@ export function buildYardExitStationOptionsByTaskType(args: {
     });
     const options = new Set(policy.entryServiceExitStationIds);
     if (policy.rotationExitStationId) options.add(policy.rotationExitStationId);
+    // 拓樸算得出來的出場站全部納入——「車實際可能停在哪」問的是物理位置，
+    // 有幾個就是幾個，不因為「不唯一」而整組丟掉（見 exitStationCandidateIds）。
+    for (const stationId of policy.exitStationCandidateIds) options.add(stationId);
     if (options.size > 0) map[taskType] = [...options];
   }
   return map;
