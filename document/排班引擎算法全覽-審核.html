@@ -3763,59 +3763,6 @@ backend/src/dev-log/
     </li>
   </ul>
 
-  <h3>2026-08-15 · 候選必須是鎖定組合的成員，不能是「隨便一條起點對得上的路線」</h3>
-  <div class="callout">
-    使用者重新生成後：「產生蠻多error的」。實測冒出
-    <code>ANCHOR_CONFLICT</code> 35 則、<code>STATION_BERTH_COLLISION</code> 2 則、
-    <code>STATION_TIMING_INFEASIBLE</code> 2 則、<code>UNSERVED_SERVICE_PULSE</code> 1→31。
-    上一則放開候選集合的修法本身埋了一個沒先驗證的漏洞。
-  </div>
-  <ul>
-    <li>
-      <strong>漏洞：<code>routesByInstanceId</code> 跟 <code>rotationRoutes</code> 不是同一個集合。</strong>
-      前者是<strong>全部</strong>選定路線；後者只是 Step 4 鎖定的那一條導通組合，是前者的
-      <strong>子集</strong>。<code>resolveStartInstanceCandidates</code> 的出場站比對搜尋前者，
-      找到 T3→S2W 這種起點對得上的路線就回傳——但下一步
-      <code>resolveRouteIndexInRotation</code> 要換算「輪替相位」時，只在
-      <code>rotationRoutes</code> 裡找，找不到就回傳 -1，三個呼叫端全部<strong>靜默
-      fallback 成 offset 0</strong>，等於把相位錯接到鎖定組合裡的第一條——不是使用者
-      真正選的那一條，錨點、站位跟著整條歪掉。
-    </li>
-    <li>
-      <strong>修法：候選比對加一道硬性門檻——必須是鎖定組合的成員。</strong>
-      <code>preferredIndex = canonicalCycleInstanceIds.indexOf(instanceId)</code> 原本
-      只拿來排序（-1 時退到 <code>MAX_SAFE_INTEGER</code>，仍然收）；
-      改成 <code>preferredIndex &lt; 0</code> 就直接 <code>continue</code>，不列入候選。
-      起點對得上、卻不在鎖定組合裡的路線，本來就沒辦法換算出一個有意義的相位，
-      不能被回傳。
-    </li>
-    <li>
-      <strong>合成案例對照驗證：</strong>把 T3→S2W 放進鎖定組合（案例 A）跟不放進去
-      （案例 B）各跑一次：
-      <pre>案例 A（TS 在鎖定組合裡）：row 0..3 → NT、TS、NT、TS，rotationIndex 0、1、0、1（真實分散）
-案例 B（TS 不在鎖定組合裡）：row 0..3 → 一律 NT，rotationIndex 一律 0（正確退回，不再是 -1→假 0）</pre>
-      案例 B 正是修法前的破壞路徑：以前會回傳 <code>TS</code> 卻拿到假的
-      <code>rotationIndex=0</code>；現在直接在候選階段就把它濾掉，乾淨退回原本
-      「對齊到 N2W」的行為，不製造任何 ANCHOR_CONFLICT。
-    </li>
-    <li>
-      <strong>這對使用者代表什麼：</strong>要讓行檢真的分散到 T3／S2W，
-      <strong>T3→S2W 這條路線必須先被使用者在 Step 4「檢查路線組合」裡選進鎖定的
-      導通組合</strong>——不是拓樸通了就自動生效。如果重新生成後行檢仍然全部收斂到
-      N2W，第一件事是回 Step 4 確認 T3→S2W 有沒有被選進去。
-    </li>
-    <li>
-      <code>tsc -b</code> 0 error、eslint 對 <code>routeSuccessorPolicy.ts</code> 乾淨。
-      仍然沒有真實資料能端到端驗證，只能請使用者再跑一次。
-    </li>
-    <li>
-      <strong>教訓：</strong>放寬一個「候選集合」時，要連著問<strong>下游怎麼用這個候選</strong>
-      ——候選本身合法（起點對得上），不代表它在下游的每一步都能被正確處理
-      （這裡是「換算相位」這一步只認鎖定組合）。合成案例只驗證了「函式回傳什麼」，
-      沒驗證「回傳的東西下游怎麼用」，這次的坑正好卡在兩者之間。
-    </li>
-  </ul>
-
   <h3>2026-08-15 · 行檢出場站放開成候選集合，不是鎖死單站——兩次相反的錯是同一個病</h3>
   <div class="callout">
     使用者原話：「我當初設計是希望行檢完之後...大家可以按照首班車的 N2W 那邊一起開始...

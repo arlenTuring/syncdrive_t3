@@ -365,23 +365,11 @@ export function resolveStartInstanceCandidates(
       for (const [instanceId, route] of policy.routesByInstanceId) {
         const origin = resolveRouteOriginStation(route)?.stationId;
         if (origin !== exit) continue;
-        /**
-         * <strong>必須是 Step 4 鎖定的那條導通組合成員，不能是「隨便一條起點對得上的路線」。</strong>
-         *
-         * <code>routesByInstanceId</code> 是<strong>全部</strong>選定路線；但這個回傳值
-         * 接下來會餵給 <code>resolveRouteIndexInRotation</code> 去換算「輪替相位」，
-         * 那個函式只在 <code>policy.rotationRoutes</code>（鎖定組合，是
-         * <code>routesByInstanceId</code> 的<strong>子集</strong>）裡找——找不到會回傳
-         * -1，呼叫端全部靜默 fallback 成 offset 0，等於把相位錯接到組合裡第一條，
-         * 錨點、站位整條歪掉（2026-08-15 使用者實測：放開行檢出場站候選之後冒出
-         * ANCHOR_CONFLICT 35 則、STATION_BERTH_COLLISION 2 則）。
-         *
-         * 起點對得上、卻不在鎖定組合裡的路線，直接跳過——不能回傳一個下游沒辦法
-         * 換算相位的候選。
-         */
         const preferredIndex = policy.canonicalCycleInstanceIds.indexOf(instanceId);
-        if (preferredIndex < 0) continue;
-        matches.push({ instanceId, preferredIndex });
+        matches.push({
+          instanceId,
+          preferredIndex: preferredIndex >= 0 ? preferredIndex : Number.MAX_SAFE_INTEGER,
+        });
       }
       if (matches.length > 0) {
         matches.sort((a, b) => {
