@@ -103,8 +103,8 @@ export type EngineInput = {
    * 站位求解、班距補疏／修復、整備後調度班次、最終驗證共用同一個值。
    */
   collisionProtectionSeconds: number;
-  /** 整備類型 → 出場站 stationId；驗證「整備後第一段班次接不接得上」要用 */
-  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string>>;
+  /** 整備類型 → 出場站候選集合；驗證「整備後第一段班次接不接得上」要用 */
+  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string[]>>;
   /** 各整備類型「車可能停在哪幾站」；驗證「車在不在那一站」用 */
   yardExitStationOptionsByTaskType: Partial<Record<TaskTypeKey, string[]>>;
   turnaroundLimitSeconds: number | null;
@@ -587,8 +587,8 @@ function assignDirectionalDepartures(args: {
   nonPassengerTasks?: ScheduleTask[];
   /** 全部模板任務（判斷整備後是否還有正線） */
   templateTasks?: ScheduleTask[];
-  /** 整備類型 → 出場站 stationId（行檢／充電／待命） */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  /** 整備類型 → 出場站候選集合（行檢／充電／待命） */
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
   /** Step 4 繼任策略；提供時以策略決定開輪相位與整輪估時 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 掛不上班距需求時留下可觀測 issue，不再靜默丟棄 */
@@ -742,12 +742,16 @@ function assignDirectionalDepartures(args: {
       })
     ) {
       if (successorPolicy) {
-        const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+        // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
+        const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
         if (!startId) return 0;
         const index = resolveRouteIndexInRotation(successorPolicy, startId);
         return index >= 0 ? index : 0;
       }
-      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
+      const exitStationSingle = Array.isArray(exitStationId)
+        ? exitStationId[0]
+        : exitStationId;
+      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
     }
     // 充電／行檢／待命／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;

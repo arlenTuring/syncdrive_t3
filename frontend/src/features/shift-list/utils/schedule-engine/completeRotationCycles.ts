@@ -101,7 +101,7 @@ export function applyRotationCycleCompletion(args: {
    * 整備類型 → 出場站：行檢／充電／待命結束後，下一串正線輪替相位對齊該站起點。
    * 與 assignDirectionalDepartures／assignRoutes 共用同一策略表。
    */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
   /** Step 4 繼任策略：開輪相位與次要備援 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 補完失敗時寫入（缺物理量等） */
@@ -198,14 +198,18 @@ export function applyRotationCycleCompletion(args: {
         })
       ) {
         if (successorPolicy) {
-          const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+          // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
+          const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
           if (startId) {
             const index = resolveRouteIndexInRotation(successorPolicy, startId);
             phase = index >= 0 ? index : 0;
           }
         } else {
+          const exitStationSingle = Array.isArray(exitStationId)
+            ? exitStationId[0]
+            : exitStationId;
           phase =
-            resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
+            resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
         }
       }
       stretchPassengerCount = 0;

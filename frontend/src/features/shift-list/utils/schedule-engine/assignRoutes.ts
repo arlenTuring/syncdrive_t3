@@ -179,7 +179,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
   /** 同列全部任務（含整備），用來判斷正線段落前整備類型 */
   allTasksByRow?: Map<number, ScheduleTask[]>;
   /** 整備類型 → 出場站 stationId */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
   /** Step 4 繼任策略：開輪相位對齊 */
   successorPolicy?: RouteSuccessorPolicy;
 }): Map<string, RouteAssignmentDecision> {
@@ -246,7 +246,10 @@ export function assignPassengerRoutesConstraintGreedy(args: {
         ) {
           let offset = 0;
           if (successorPolicy) {
-            const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+            // stationSeed 用列號輪替候選出場站的嘗試順序——出場站有多個候選時
+            // （例如行檢），不同列從不同候選開始找，車才會真的分散到多個出場站，
+            // 不是全部收斂到候選裡排最前面的那一個。
+            const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
             if (startId) {
               const index = resolveRouteIndexInRotation(successorPolicy, startId);
               offset = index >= 0 ? index : 0;
@@ -254,8 +257,11 @@ export function assignPassengerRoutesConstraintGreedy(args: {
               forceStartAfterYard = true;
             }
           } else {
+            const exitStationSingle = Array.isArray(exitStationId)
+              ? exitStationId[0]
+              : exitStationId;
             offset =
-              resolveRotationOffsetForExitStation(rotationRoutes, exitStationId) ?? 0;
+              resolveRotationOffsetForExitStation(rotationRoutes, exitStationSingle) ?? 0;
           }
           rotationIndex =
             Math.ceil(rotationIndex / routeCount) * routeCount + offset;
@@ -292,6 +298,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
                   precedingYard
                     ? yardRotationExitByTaskType[precedingYard.taskType]
                     : null,
+                  row,
                 )
               : resolveStartInstanceId(successorPolicy);
           route = startId
