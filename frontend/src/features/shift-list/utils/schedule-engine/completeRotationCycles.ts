@@ -101,7 +101,7 @@ export function applyRotationCycleCompletion(args: {
    * 整備類型 → 出場站：行檢／充電／待命結束後，下一串正線輪替相位對齊該站起點。
    * 與 assignDirectionalDepartures／assignRoutes 共用同一策略表。
    */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
   /** Step 4 繼任策略：開輪相位與次要備援 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 補完失敗時寫入（缺物理量等） */
@@ -198,14 +198,46 @@ export function applyRotationCycleCompletion(args: {
         })
       ) {
         if (successorPolicy) {
-          const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+          /**
+           * 門檻三的錨點間距：整備結束到該列下一個正線錨點之間有多少秒。
+           * 拿不到下一個錨點（整備後這一列沒有既有正線）時不設限——此時是這個
+           * 函式自己去補完整輪，沒有既成錨點會被撞到。
+           */
+          const yardEndSecond = minuteToSecond(yardEndMinute);
+          const nextAnchorSecond = rowTasks
+            .filter(
+              (item) =>
+                item.taskType === 'passenger'
+                && minuteToSecond(item.startMinute) > yardEndSecond,
+            )
+            .reduce<number | null>(
+              (acc, item) =>
+                acc == null
+                  ? minuteToSecond(item.startMinute)
+                  : Math.min(acc, minuteToSecond(item.startMinute)),
+              null,
+            );
+          const anchorSpacingSeconds =
+            nextAnchorSecond != null ? nextAnchorSecond - yardEndSecond : null;
+          // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站；
+          // isRouteFeasible 擋掉排不進這段間距的候選（門檻三）。
+          const startId = resolveStartInstanceId(successorPolicy, exitStationId, {
+            stationSeed: row,
+            isRouteFeasible: (route) =>
+              anchorSpacingSeconds == null
+              || !(anchorSpacingSeconds > 0)
+              || resolveMinOccupancySeconds(route) <= anchorSpacingSeconds,
+          });
           if (startId) {
             const index = resolveRouteIndexInRotation(successorPolicy, startId);
             phase = index >= 0 ? index : 0;
           }
         } else {
+          const exitStationSingle = Array.isArray(exitStationId)
+            ? exitStationId[0]
+            : exitStationId;
           phase =
-            resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
+            resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
         }
       }
       stretchPassengerCount = 0;

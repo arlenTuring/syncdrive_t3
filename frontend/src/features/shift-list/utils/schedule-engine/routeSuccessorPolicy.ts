@@ -317,6 +317,20 @@ export function buildRouteSuccessorPolicy(input: {
   };
 }
 
+/** 導通組合順序越前面越偏好；同名次時用 instanceId 穩定排序 */
+function sortCandidates(
+  entries: Array<{ instanceId: string; preferredIndex: number }>,
+): string[] {
+  return [...entries]
+    .sort((a, b) => {
+      if (a.preferredIndex !== b.preferredIndex) {
+        return a.preferredIndex - b.preferredIndex;
+      }
+      return a.instanceId.localeCompare(b.instanceId);
+    })
+    .map((item) => item.instanceId);
+}
+
 /**
  * 開輪時「合法的起始 instance」全部列出來，最偏好的排最前面。
  *
@@ -334,34 +348,89 @@ export function buildRouteSuccessorPolicy(input: {
  * 所以：偏好順序照舊（錨點 → 導通組合順序），但把其餘導通組合成員也列為
  * 合法候選，讓下游有站位資訊的那一段（見 stationBerthConstraint 的冷啟動分支）
  * 有東西可挑。<strong>只加候選、不改第一名</strong>，故 {@link resolveStartInstanceId}
- * 的結果與此變更前完全相同。
+ * 的結果與此變更前完全相同（單一出場站、不帶 stationSeed 時）。
+ *
+ * <strong>出場站可以是候選集合，不是只有一個。</strong>行檢等整備類型現在允許
+ * 出場站有多個拓樸候選（例如 N2W 或 T3）——但如果每一列都固定挑「候選裡排最前
+ * 面的那一個」，等於把瓶頸從「鎖死單站」換成「鎖死候選集合裡的第一名」，換湯
+ * 不換藥（2026-08-15 使用者：「N2W上行出發跟N2W備用上行出發容易被佔據的機率
+ * 大大提高」正是這個病）。<code>stationSeed</code> 讓不同列的呼叫端能輪流從
+ * 候選集合的不同起點開始找，真正把車分散到多個出場站，不是集中到同一個。
+ *
+ * <strong>候選還要過得了物理可行性這一關（<code>isRouteFeasible</code>）。</strong>
+ * 「起點站對得上」＋「是鎖定組合成員」這兩道門檻都只看拓樸與組合，<strong>完全
+ * 不看時間</strong>。2026-08-15 第一版放開候選後實測爆出 36 則 ANCHOR_CONFLICT，
+ * 全部是同一條 <code>ST</code>（S2W上行→T3上行）：它最快也要 210 秒，卻被指派到
+ * 尖峰 180 秒錨點間距的列上，連跑最快都來不及在下一個錨點前收班。呼叫端知道
+ * 這一列這個視窗有多少時間可用，把判斷式傳進來，讓候選在被選中<strong>之前</strong>
+ * 就被淘汰，而不是選完之後在展開階段炸成硬錯誤。
+ *
+ * 淘汰是「best-effort」，不會把候選清空：若每一個出場站的路線都過不了可行性，
+ * 退回未過濾的第一組——車實際上就停在那裡，不能因為排不下就假裝它在別站。
+ * 語意上永遠不比「沒有這道門檻」更差。
  */
 export function resolveStartInstanceCandidates(
   policy: RouteSuccessorPolicy,
-  exitStationId?: string | null,
+  exitStationId?: string | string[] | null,
+  options?: {
+    /** 候選出場站有多個時，從第幾個開始找（供呼叫端依列號輪替，避免全部收斂到同一站） */
+    stationSeed?: number;
+    /** 物理可行性判斷：回 false 的候選會被跳過，改試下一個出場站 */
+    isRouteFeasible?: (route: ShiftScheduleSelectedRoute) => boolean;
+  },
 ): string[] {
   if (!policy.valid) return [];
-  const exit = exitStationId?.trim() || '';
-  if (exit) {
-    const matches: Array<{ instanceId: string; preferredIndex: number }> = [];
-    for (const [instanceId, route] of policy.routesByInstanceId) {
-      const origin = resolveRouteOriginStation(route)?.stationId;
-      if (origin !== exit) continue;
-      const preferredIndex = policy.canonicalCycleInstanceIds.indexOf(instanceId);
-      matches.push({
-        instanceId,
-        preferredIndex: preferredIndex >= 0 ? preferredIndex : Number.MAX_SAFE_INTEGER,
-      });
-    }
-    if (matches.length > 0) {
-      matches.sort((a, b) => {
-        if (a.preferredIndex !== b.preferredIndex) {
-          return a.preferredIndex - b.preferredIndex;
+  const stationSeed = options?.stationSeed ?? 0;
+  const isRouteFeasible = options?.isRouteFeasible;
+  const exits = Array.isArray(exitStationId)
+    ? exitStationId.map((id) => id?.trim()).filter((id): id is string => Boolean(id))
+    : (exitStationId?.trim() ? [exitStationId.trim()] : []);
+  if (exits.length > 0) {
+    // 依 stationSeed 輪替候選站的嘗試順序——不同列從不同起點開始找，
+    // 找到的第一個「有真實路線且排得下」的候選就用，達成跨列分散。
+    const rotatedExits =
+      exits.length > 1
+        ? [...exits.slice(stationSeed % exits.length), ...exits.slice(0, stationSeed % exits.length)]
+        : exits;
+    /** 起點對得上、也在鎖定組合裡，但排不下的候選：每一站都排不下時的退路 */
+    let infeasibleFallback: Array<{ instanceId: string; preferredIndex: number }> | null = null;
+    for (const exit of rotatedExits) {
+      const matches: Array<{ instanceId: string; preferredIndex: number }> = [];
+      const infeasible: Array<{ instanceId: string; preferredIndex: number }> = [];
+      for (const [instanceId, route] of policy.routesByInstanceId) {
+        const origin = resolveRouteOriginStation(route)?.stationId;
+        if (origin !== exit) continue;
+        /**
+         * <strong>必須是 Step 4 鎖定的那條導通組合成員，不能是「隨便一條起點對得上的路線」。</strong>
+         *
+         * <code>routesByInstanceId</code> 是<strong>全部</strong>選定路線；但這個回傳值
+         * 接下來會餵給 <code>resolveRouteIndexInRotation</code> 去換算「輪替相位」，
+         * 那個函式只在 <code>policy.rotationRoutes</code>（鎖定組合，是
+         * <code>routesByInstanceId</code> 的<strong>子集</strong>）裡找——找不到會回傳
+         * -1，呼叫端全部靜默 fallback 成 offset 0，等於把相位錯接到組合裡第一條，
+         * 錨點、站位整條歪掉（2026-08-15 使用者實測：放開行檢出場站候選之後冒出
+         * ANCHOR_CONFLICT 35 則、STATION_BERTH_COLLISION 2 則）。
+         *
+         * 起點對得上、卻不在鎖定組合裡的路線，直接跳過——不能回傳一個下游沒辦法
+         * 換算相位的候選。
+         */
+        const preferredIndex = policy.canonicalCycleInstanceIds.indexOf(instanceId);
+        if (preferredIndex < 0) continue;
+        const entry = { instanceId, preferredIndex };
+        // 門檻三：排不下的候選先擱著，優先讓下一個出場站有機會被選中
+        if (isRouteFeasible && !isRouteFeasible(route)) {
+          infeasible.push(entry);
+          continue;
         }
-        return a.instanceId.localeCompare(b.instanceId);
-      });
-      return matches.map((item) => item.instanceId);
+        matches.push(entry);
+      }
+      if (matches.length > 0) return sortCandidates(matches);
+      if (!infeasibleFallback && infeasible.length > 0) {
+        infeasibleFallback = infeasible;
+      }
     }
+    // 每一個出場站都排不下：退回第一個「有路線」的站，行為等同沒有這道門檻
+    if (infeasibleFallback) return sortCandidates(infeasibleFallback);
   }
 
   const ordered: string[] = [];
@@ -388,9 +457,13 @@ export function resolveStartInstanceCandidates(
  */
 export function resolveStartInstanceId(
   policy: RouteSuccessorPolicy,
-  exitStationId?: string | null,
+  exitStationId?: string | string[] | null,
+  options?: {
+    stationSeed?: number;
+    isRouteFeasible?: (route: ShiftScheduleSelectedRoute) => boolean;
+  },
 ): string | null {
-  return resolveStartInstanceCandidates(policy, exitStationId)[0] ?? null;
+  return resolveStartInstanceCandidates(policy, exitStationId, options)[0] ?? null;
 }
 
 export function resolveRouteIndexInRotation(

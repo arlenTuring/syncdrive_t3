@@ -103,8 +103,8 @@ export type EngineInput = {
    * 站位求解、班距補疏／修復、整備後調度班次、最終驗證共用同一個值。
    */
   collisionProtectionSeconds: number;
-  /** 整備類型 → 出場站 stationId；驗證「整備後第一段班次接不接得上」要用 */
-  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string>>;
+  /** 整備類型 → 出場站候選集合；驗證「整備後第一段班次接不接得上」要用 */
+  yardRotationExitByTaskType: Partial<Record<TaskTypeKey, string[]>>;
   /** 各整備類型「車可能停在哪幾站」；驗證「車在不在那一站」用 */
   yardExitStationOptionsByTaskType: Partial<Record<TaskTypeKey, string[]>>;
   turnaroundLimitSeconds: number | null;
@@ -587,8 +587,8 @@ function assignDirectionalDepartures(args: {
   nonPassengerTasks?: ScheduleTask[];
   /** 全部模板任務（判斷整備後是否還有正線） */
   templateTasks?: ScheduleTask[];
-  /** 整備類型 → 出場站 stationId（行檢／充電／待命） */
-  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string>>;
+  /** 整備類型 → 出場站候選集合（行檢／充電／待命） */
+  yardRotationExitByTaskType?: Partial<Record<TaskTypeKey, string[]>>;
   /** Step 4 繼任策略；提供時以策略決定開輪相位與整輪估時 */
   successorPolicy?: RouteSuccessorPolicy;
   /** 掛不上班距需求時留下可觀測 issue，不再靜默丟棄 */
@@ -724,7 +724,39 @@ function assignDirectionalDepartures(args: {
   const windowKey = (win: ActivePassengerWindow): string =>
     `${win.startSecond}-${win.endSecond}`;
 
-  const resolveWindowRotationPhase = (row: number, windowStartSecond: number): number => {
+  /**
+   * 門檻三：這條路線塞得進這一列接下來的錨點間距嗎。
+   *
+   * 出場站候選放開之後，「起點對得上」＋「是鎖定組合成員」兩道門檻都只看拓樸，
+   * 不看時間。實測（2026-08-15）就是這樣把最快也要 210 秒的 <code>ST</code>
+   * （S2W上行→T3上行）指派到尖峰 180 秒錨點間距的列上，展開階段每一班都炸成
+   * ANCHOR_CONFLICT，共 36 則。
+   *
+   * 錨點間距取「該脈衝所屬時段的目標班距」。相位決定的當下，這一列後續的正線
+   * 錨點都還沒生出來（正線模板任務就是這個函式的下游產物），拿不到真正的下一個
+   * 錨點；時段班距是錨點格的設計間距，是此刻唯一拿得到、且與展開階段
+   * <code>maxAllowedOccupancy</code> 對得上的量。
+   *
+   * 這個取法偏保守：正常輪替下同一列相鄰班次通常遠比一個班距寬，用班距當門檻會
+   * 擋掉一些其實排得下的組合。但它只會把放寬後的候選集合縮回原本的預設站，不會
+   * 比「沒有這道門檻」更差，而擋掉的都是必爆的組合。要放寬得等到相位決定時能拿
+   * 到該列真正的下一個錨點為止。
+   */
+  const isRouteFeasibleForAnchorSpacing = (
+    route: ShiftScheduleSelectedRoute,
+    anchorSpacingSeconds: number,
+  ): boolean => {
+    if (!(anchorSpacingSeconds > 0)) return true;
+    const occupancy = resolvePassengerRouteOccupancy(route);
+    if (!occupancy) return true;
+    return occupancy.minOccupancySeconds <= anchorSpacingSeconds;
+  };
+
+  const resolveWindowRotationPhase = (
+    row: number,
+    windowStartSecond: number,
+    anchorSpacingSeconds: number,
+  ): number => {
     const preceding = findPrecedingNonPassengerTask(
       nonPassengerTasks,
       row,
@@ -742,12 +774,21 @@ function assignDirectionalDepartures(args: {
       })
     ) {
       if (successorPolicy) {
-        const startId = resolveStartInstanceId(successorPolicy, exitStationId);
+        // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站；
+        // isRouteFeasible 擋掉排不進這一列錨點間距的候選（門檻三）。
+        const startId = resolveStartInstanceId(successorPolicy, exitStationId, {
+          stationSeed: row,
+          isRouteFeasible: (route) =>
+            isRouteFeasibleForAnchorSpacing(route, anchorSpacingSeconds),
+        });
         if (!startId) return 0;
         const index = resolveRouteIndexInRotation(successorPolicy, startId);
         return index >= 0 ? index : 0;
       }
-      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationId) ?? 0;
+      const exitStationSingle = Array.isArray(exitStationId)
+        ? exitStationId[0]
+        : exitStationId;
+      return resolveRotationOffsetForExitStation(passengerRoutes, exitStationSingle) ?? 0;
     }
     // 充電／行檢／待命／保養無明確出場，或整備後無正線：延續進入整備前的輪替相位
     return ((rotationIndex[row]! % routeCount) + routeCount) % routeCount;
@@ -1113,7 +1154,11 @@ function assignDirectionalDepartures(args: {
       }
       const nextWindowKey = windowKey(winAtPulse);
       if (windowKeyByRow[row] !== nextWindowKey) {
-        const phase = resolveWindowRotationPhase(row, winAtPulse.startSecond);
+        const phase = resolveWindowRotationPhase(
+          row,
+          winAtPulse.startSecond,
+          departure.headwaySeconds,
+        );
         rotationIndex[row] =
           Math.ceil(rotationIndex[row]! / routeCount) * routeCount + phase;
         rotationPhaseByRow[row] = phase;

@@ -5786,6 +5786,86 @@ backend/src/dev-log/
       行檢多出場站這個需求本身沒有取消，只是要換一個更謹慎、能先在活資料上驗證的做法。
     </li>
   </ul>
+
+  <h3>2026-08-15 · 行檢多出場站重做（第一步）：補上「門檻三 · 物理可行性」</h3>
+  <ul>
+    <li>
+      <strong>先更正上一則的判斷。</strong>上一則說「時間線 1 的 34 則
+      <code>ANCHOR_CONFLICT</code> 全部指向同一筆 <code>NT0000</code>，疑似模板任務重複處理」——
+      <strong>這個判斷是錯的</strong>。回頭解析 log 的原始 <code>detail</code> 後確認，
+      36 則是 36 個<strong>各自不同</strong>的 <code>templateTaskId</code>，各有各的錨點時刻。
+      畫面上全部顯示 <code>NT0000</code> 是 UI 那層解不出 tripCode 時退回 0 的顯示結果，
+      不是資料重複。沒有重複處理這回事。
+    </li>
+    <li>
+      <strong>真正的病灶（20 則樣本 100% 一致）：</strong>
+      全部是 <code>route_4</code> ＝ <code>ST</code>（S2W上行→T3上行），
+      佔用 <code>210s</code>，而錨點間距全部是 <code>180s</code>；
+      時間線全部落在 <strong>1、3、5</strong>——奇數列。
+      奇數列是決定性證據：撤回的程式碼用
+      <code>rotatedExits = exits.slice(row % exits.length)</code> 輪替候選出場站，
+      兩個候選時偶數列拿 N2W（短路線）、奇數列拿 T3／S2W（<code>ST</code>），完全對得上。
+    </li>
+    <li>
+      <strong>為什麼必爆：</strong><code>ST</code> 的最小佔用
+      ＝ 行駛 170s ＋ 停靠 36s ＝ 206s，經 <code>snapUpToClockAlignSeconds</code>（10 秒格）
+      進位成 <strong>210s</strong>；尖峰模板錨點間距 <strong>180s</strong>。
+      <code>expand.ts</code> 判 <code>minOccupancy(210) &gt; maxAllowedOccupancy(180)</code>——
+      連跑最快都來不及在下一個錨點前收班，於是每一班都是硬錯誤。
+      <strong>不是相位算錯，是選了一條物理上塞不進那列錨點格的路線。</strong>
+    </li>
+    <li>
+      <strong>缺的是第三道門檻。</strong>原本的候選篩選只有兩道：
+      「起點站對得上」與「是 Step 4 鎖定組合的成員」——<strong>兩道都只看拓樸與組合，
+      完全不看時間</strong>。這次補上第三道：
+      <code>minOccupancySeconds(候選路線) ≤ 該列該視窗的錨點間距</code>，
+      排不下的候選在<strong>被選中之前</strong>就淘汰，改試下一個出場站。
+    </li>
+    <li>
+      <strong>三個呼叫端各自拿得到的「錨點間距」不一樣，分別處理：</strong>
+      <code>assignRoutes.ts</code> 用 <code>findNextPassengerAnchorSecond</code> 拿到
+      <strong>真正的</strong>下一個錨點（正線模板任務已經生出來了），與
+      <code>expand.ts</code> 的 <code>maxAllowedOccupancy</code> 是同一個量，最精確；
+      <code>completeRotationCycles.ts</code> 取整備結束到該列下一個正線錨點的距離；
+      <code>normalizeInput.ts</code> 拿不到——正線模板任務正是它的下游產物——
+      退而用<strong>該時段的目標班距</strong>當代理（實測資料中錨點間距 180s
+      正好等於尖峰班距 180s）。
+    </li>
+    <li>
+      <strong>淘汰是 best-effort，不會把候選清空。</strong>若每一個出場站的路線都過不了，
+      退回未過濾的第一組——車實際上就停在那裡，不能因為排不下就假裝它在別站。
+      語意上永遠不比「沒有這道門檻」更差，跟本 session 既有的
+      「自我驗證、驗證不過就自我放棄」模式（見 <code>evenOutRouteHeadwayPhase</code> 的
+      <code>moveKeepsBerthsClear</code>）同一套。
+    </li>
+    <li>
+      <strong>誠實記錄取法偏保守：</strong><code>normalizeInput.ts</code> 用時段班距當代理，
+      正常輪替下同一列相鄰班次通常遠比一個班距寬，這會擋掉一些其實排得下的組合。
+      代價是「分散效果比理論上限小」，不是硬錯誤；要放寬得等到相位決定時能拿到
+      該列真正的下一個錨點為止。擋掉的都是必爆的組合，先求正確再求最佳。
+    </li>
+    <li>
+      <strong>合成案例驗證（4 種情境）：</strong>
+      無門檻時 row 0..3 → NT、ST、NT、ST（重現壞掉的行為）；
+      間距 180s 時 ST 被擋，row 0..3 全部退回 NT（正是這次要修的）；
+      間距 360s（離峰）時 ST 排得下，奇數列仍分散到 T3（功能沒有被門檻殺死）；
+      間距 60s（全部排不下）時退回第一組、不清空。
+      單一出場站與冷啟動的結果與加門檻前逐位元相同。
+    </li>
+    <li>
+      <strong>驗證：</strong><code>tsc -b --force</code> 0 error；
+      eslint 對這 5 個檔案維持既有的 3 則 <code>no-useless-assignment</code>，無新增。
+      <strong>仍然沒有真實資料能端到端驗證</strong>（<code>draftbody.json</code> 持續被系統清掉），
+      要使用者重新生成才看得到。
+    </li>
+    <li>
+      <strong>下一步（未動，刻意分兩步）：</strong><code>row % 候選數</code> 是固定奇偶輪班，
+      不是最佳解——使用者要的是「哪一站現在比較空就去哪」。既有的
+      <code>collectStationBerthOccupancies()</code> 已經有站位佔用表，可以拿它算每個候選
+      出場站在該時刻的剩餘容量，挑最空的、平手才照鎖定組合順序。
+      先驗證門檻三這一步不再冒 ANCHOR_CONFLICT，再換分配法，才分得清是哪一段出問題。
+    </li>
+  </ul>
 </section>
 
 <footer>
