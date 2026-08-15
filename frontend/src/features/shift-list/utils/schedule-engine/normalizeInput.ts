@@ -724,39 +724,7 @@ function assignDirectionalDepartures(args: {
   const windowKey = (win: ActivePassengerWindow): string =>
     `${win.startSecond}-${win.endSecond}`;
 
-  /**
-   * 門檻三：這條路線塞得進這一列接下來的錨點間距嗎。
-   *
-   * 出場站候選放開之後，「起點對得上」＋「是鎖定組合成員」兩道門檻都只看拓樸，
-   * 不看時間。實測（2026-08-15）就是這樣把最快也要 210 秒的 <code>ST</code>
-   * （S2W上行→T3上行）指派到尖峰 180 秒錨點間距的列上，展開階段每一班都炸成
-   * ANCHOR_CONFLICT，共 36 則。
-   *
-   * 錨點間距取「該脈衝所屬時段的目標班距」。相位決定的當下，這一列後續的正線
-   * 錨點都還沒生出來（正線模板任務就是這個函式的下游產物），拿不到真正的下一個
-   * 錨點；時段班距是錨點格的設計間距，是此刻唯一拿得到、且與展開階段
-   * <code>maxAllowedOccupancy</code> 對得上的量。
-   *
-   * 這個取法偏保守：正常輪替下同一列相鄰班次通常遠比一個班距寬，用班距當門檻會
-   * 擋掉一些其實排得下的組合。但它只會把放寬後的候選集合縮回原本的預設站，不會
-   * 比「沒有這道門檻」更差，而擋掉的都是必爆的組合。要放寬得等到相位決定時能拿
-   * 到該列真正的下一個錨點為止。
-   */
-  const isRouteFeasibleForAnchorSpacing = (
-    route: ShiftScheduleSelectedRoute,
-    anchorSpacingSeconds: number,
-  ): boolean => {
-    if (!(anchorSpacingSeconds > 0)) return true;
-    const occupancy = resolvePassengerRouteOccupancy(route);
-    if (!occupancy) return true;
-    return occupancy.minOccupancySeconds <= anchorSpacingSeconds;
-  };
-
-  const resolveWindowRotationPhase = (
-    row: number,
-    windowStartSecond: number,
-    anchorSpacingSeconds: number,
-  ): number => {
+  const resolveWindowRotationPhase = (row: number, windowStartSecond: number): number => {
     const preceding = findPrecedingNonPassengerTask(
       nonPassengerTasks,
       row,
@@ -774,15 +742,36 @@ function assignDirectionalDepartures(args: {
       })
     ) {
       if (successorPolicy) {
-        // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站；
-        // isRouteFeasible 擋掉排不進這一列錨點間距的候選（門檻三）。
-        const startId = resolveStartInstanceId(successorPolicy, exitStationId, {
-          stationSeed: row,
-          isRouteFeasible: (route) =>
-            isRouteFeasibleForAnchorSpacing(route, anchorSpacingSeconds),
-        });
+        // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
+        const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
         if (!startId) return 0;
-        const index = resolveRouteIndexInRotation(successorPolicy, startId);
+        /**
+         * <strong>相位是「<code>passengerRoutes</code> 的索引」，不是
+         * 「<code>rotationRoutes</code> 的索引」——兩個是不同的陣列。</strong>
+         *
+         * 這個回傳值會被寫進 <code>rotationIndex[row]</code>，而
+         * <code>resolveStartRouteIndex()</code> 用 <code>rotationIndex[row] % routeCount</code>
+         * （<code>routeCount = passengerRoutes.length</code>）去索引
+         * <code>passengerRoutes</code>；<code>buildPlannedCycleLegs()</code> 也是從
+         * <code>passengerRoutes[startRouteIndex]</code> 起算整輪。
+         *
+         * 但 <code>resolveRouteIndexInRotation()</code> 找的是
+         * <code>successorPolicy.rotationRoutes</code>——那是 Step 4 鎖定導通組合的
+         * <strong>子集且另有順序</strong>。拿子集的名次去索引全集，指到的是<strong>另一條
+         * 路線</strong>。
+         *
+         * 2026-08-15 實測後果：normalizeInput 依「錯的那條」（較短）規劃錨點間距
+         * 180 秒，assignRoutes 卻依 <code>rotationRoutes</code> 正確走繼任鏈拿到
+         * <code>ST</code>（最快也要 210 秒），展開階段兩邊對不上，34–36 則
+         * ANCHOR_CONFLICT 全部是 <code>ST</code> 被塞進 180 秒格。
+         *
+         * 這個錯配一直都在，只是行檢原本 <code>alignRotationToExitStation: false</code>
+         * 時這裡永遠回 0，剛好踩不到；放開出場站候選後開始回真實名次才引爆。
+         * 修法：直接在 <code>passengerRoutes</code> 裡找同一個 instance 的位置。
+         */
+        const index = passengerRoutes.findIndex(
+          (route) => resolveSelectedRouteInstanceId(route) === startId,
+        );
         return index >= 0 ? index : 0;
       }
       const exitStationSingle = Array.isArray(exitStationId)
@@ -1154,11 +1143,7 @@ function assignDirectionalDepartures(args: {
       }
       const nextWindowKey = windowKey(winAtPulse);
       if (windowKeyByRow[row] !== nextWindowKey) {
-        const phase = resolveWindowRotationPhase(
-          row,
-          winAtPulse.startSecond,
-          departure.headwaySeconds,
-        );
+        const phase = resolveWindowRotationPhase(row, winAtPulse.startSecond);
         rotationIndex[row] =
           Math.ceil(rotationIndex[row]! / routeCount) * routeCount + phase;
         rotationPhaseByRow[row] = phase;

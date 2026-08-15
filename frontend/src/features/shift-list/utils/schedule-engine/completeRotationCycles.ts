@@ -4,7 +4,10 @@ import type {
   TimeSlotAttribute,
   TimeSlotInterval,
 } from '../../../time-templates/types/editor';
-import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import {
+  resolveSelectedRouteInstanceId,
+  type ShiftScheduleSelectedRoute,
+} from '../../types/create';
 import {
   resolveFleetPhysicalHeadwayFloorSeconds,
   resolveInterTripGapSeconds,
@@ -26,7 +29,6 @@ import {
 import { resolveRotationOffsetForExitStation } from '../maintenanceFirstTripOrigins';
 import { shouldApplyYardExitRotationAlign } from '../maintenancePostTaskPolicy';
 import {
-  resolveRouteIndexInRotation,
   resolveStartInstanceId,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
@@ -198,38 +200,21 @@ export function applyRotationCycleCompletion(args: {
         })
       ) {
         if (successorPolicy) {
-          /**
-           * 門檻三的錨點間距：整備結束到該列下一個正線錨點之間有多少秒。
-           * 拿不到下一個錨點（整備後這一列沒有既有正線）時不設限——此時是這個
-           * 函式自己去補完整輪，沒有既成錨點會被撞到。
-           */
-          const yardEndSecond = minuteToSecond(yardEndMinute);
-          const nextAnchorSecond = rowTasks
-            .filter(
-              (item) =>
-                item.taskType === 'passenger'
-                && minuteToSecond(item.startMinute) > yardEndSecond,
-            )
-            .reduce<number | null>(
-              (acc, item) =>
-                acc == null
-                  ? minuteToSecond(item.startMinute)
-                  : Math.min(acc, minuteToSecond(item.startMinute)),
-              null,
-            );
-          const anchorSpacingSeconds =
-            nextAnchorSecond != null ? nextAnchorSecond - yardEndSecond : null;
-          // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站；
-          // isRouteFeasible 擋掉排不進這段間距的候選（門檻三）。
-          const startId = resolveStartInstanceId(successorPolicy, exitStationId, {
-            stationSeed: row,
-            isRouteFeasible: (route) =>
-              anchorSpacingSeconds == null
-              || !(anchorSpacingSeconds > 0)
-              || resolveMinOccupancySeconds(route) <= anchorSpacingSeconds,
-          });
+          // stationSeed 用列號輪替候選出場站，避免多個候選全部收斂到同一站。
+          const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
           if (startId) {
-            const index = resolveRouteIndexInRotation(successorPolicy, startId);
+            /**
+             * 相位是 <code>passengerRoutes</code> 的索引，不是
+             * <code>rotationRoutes</code> 的索引——下面
+             * <code>rotationIndex % routeCount</code>（<code>routeCount =
+             * passengerRoutes.length</code>）索引的是 <code>passengerRoutes</code>，
+             * 而 <code>resolveRouteIndexInRotation()</code> 找的是鎖定導通組合
+             * （<code>passengerRoutes</code> 的子集且另有順序）。拿子集名次索引全集
+             * 會指到另一條路線。同一個錯配見 normalizeInput.ts 的詳細說明。
+             */
+            const index = passengerRoutes.findIndex(
+              (route) => resolveSelectedRouteInstanceId(route) === startId,
+            );
             phase = index >= 0 ? index : 0;
           }
         } else {

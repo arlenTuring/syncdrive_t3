@@ -5866,6 +5866,89 @@ backend/src/dev-log/
       先驗證門檻三這一步不再冒 ANCHOR_CONFLICT，再換分配法，才分得清是哪一段出問題。
     </li>
   </ul>
+
+  <h3>2026-08-15 · 找到真根因：相位索引拿「鎖定組合的名次」去索引「全部路線」</h3>
+  <ul>
+    <li>
+      <strong>門檻三沒有用，先承認。</strong>加了門檻三之後重新生成，
+      <code>ANCHOR_CONFLICT</code> 36 → 34，形狀完全一樣（全部 <code>route_4</code>＝
+      <code>ST</code>、佔用 210s、錨點間距 180s）。門檻三修的不是這個病。
+    </li>
+    <li>
+      <strong>先修正一個關鍵的流程順序誤解。</strong>先前記錄「<code>expandRowBlocks</code>
+      跑在路線指派之前」是<strong>錯的</strong>。實際上
+      <code>assignPassengerRoutesConstraintGreedy()</code>（<code>assignRoutes.ts</code>）
+      是在 <code>expand.ts</code> 的 <code>resolveTemplateTasks()</code> 裡面被呼叫的
+      （<code>expand.ts:166</code>），跑在 <code>ANCHOR_CONFLICT</code> 檢查<strong>之前</strong>。
+      所以 <code>templateTaskId</code> 裡的 <code>route_4</code> 只是 normalizeInput 產生任務
+      時的命名，<strong>實際採用的路線是 assignRoutes 重新指派的</strong>，兩者可以不一樣。
+    </li>
+    <li>
+      <strong>順帶解開 id 格式的誤讀：</strong>
+      <code>template-pax-{intervalId}-{routeId}-{departureIndex+1}-{legIndex+1}-{startSecond}</code>。
+      先前把倒數第二段的 <code>-4-</code> 讀成 routeIndex，其實是<strong>整輪的第 4 腿</strong>。
+    </li>
+    <li>
+      <strong>真根因：同一個「相位」數字，兩個階段拿去索引不同的陣列。</strong>
+      <code>resolveRouteIndexInRotation()</code> 回傳的是
+      <code>successorPolicy.rotationRoutes</code>（Step 4 鎖定導通組合，是<strong>子集
+      且另有順序</strong>）裡的名次。
+      <ul>
+        <li>
+          <code>assignRoutes.ts</code> 拿它去索引 <code>rotationRoutes</code>——<strong>對的</strong>。
+        </li>
+        <li>
+          <code>normalizeInput.ts</code>／<code>completeRotationCycles.ts</code> 拿它去索引
+          <code>passengerRoutes</code>（<strong>全部</strong>選定路線，
+          <code>routeCount = passengerRoutes.length</code>）——<strong>錯的</strong>，
+          指到的是另一條路線。
+        </li>
+      </ul>
+    </li>
+    <li>
+      <strong>這如何長成 ANCHOR_CONFLICT：</strong>normalizeInput 依「指錯的那條」
+      （較短）規劃整輪佔用，於是把下一個錨點放在 180 秒後；
+      <code>assignRoutes</code> 依 <code>rotationRoutes</code> 正確走繼任鏈，拿到
+      <code>ST</code>（最快也要 210 秒）；展開階段用實際路線一算，
+      <code>minOccupancy(210) &gt; maxAllowedOccupancy(180)</code>。
+      兩個階段對不上，不是任何一邊自己算錯。
+    </li>
+    <li>
+      <strong>為什麼以前沒事：</strong>行檢原本
+      <code>alignRotationToExitStation: false</code>，這段程式永遠回 0，
+      0 索引哪個陣列都指到第一條，錯配是<strong>睡著的</strong>。
+      放開出場站候選後開始回真實名次，才引爆。錯配本身是既有問題，不是這次寫壞的。
+    </li>
+    <li>
+      <strong>修法：</strong>直接在 <code>passengerRoutes</code> 裡找同一個 instance 的位置
+      （<code>passengerRoutes.findIndex(r =&gt; resolveSelectedRouteInstanceId(r) === startId)</code>），
+      讓「算出來的名次」與「要索引的陣列」是同一個。
+      <code>normalizeInput.ts</code> 與 <code>completeRotationCycles.ts</code> 各一處。
+      門檻三整個移除——在索引錯配之上再加門檻，只會讓兩個階段用不同的可行性判斷、
+      分歧更大。
+    </li>
+    <li>
+      <strong>合成案例驗證：</strong>8 條 <code>passengerRoutes</code>、4 條鎖定組合
+      （順序 route_1、route_6、route_3、route_4）。挑中 <code>route_6</code> 時，
+      舊碼指到 <code>route_2</code>，新碼指到 <code>route_6</code>；
+      挑中 route_1／route_3／route_4 時兩者碰巧相同。
+      證實錯配真實存在，且只在「名次在兩個陣列裡不一致」時才顯形——
+      這也解釋了為什麼只有部分列、部分時段爆掉。
+    </li>
+    <li>
+      <strong>驗證：</strong><code>tsc -b --force</code> 0 error；
+      eslint 維持既有 3 則 <code>no-useless-assignment</code>，無新增。
+      <strong>仍然沒有真實資料能端到端驗證</strong>，要重新生成才看得到。
+    </li>
+    <li>
+      <strong>另一個可疑點（未動，先記著）：</strong>
+      <code>rotationIndex[row] += Math.max(cycleLegs.length, 1)</code> 之後用
+      <code>% routeCount</code> 取相位。註解寫「下一次仍從同一相位開輪」，
+      但這只在 <code>cycleLegs.length === routeCount</code> 時成立；
+      鎖定組合 4 條、全部路線 8 條時，每跑完一輪相位會位移 4，在兩個相位之間跳。
+      與本次修的錯配是不同的問題，等這次驗證完再決定要不要處理。
+    </li>
+  </ul>
 </section>
 
 <footer>

@@ -231,30 +231,6 @@ export function assignPassengerRoutesConstraintGreedy(args: {
     for (const task of rowTasks) {
       const startSecond = minuteToSecond(task.startMinute);
 
-      const nextAnchorSecond = findNextPassengerAnchorSecond(
-        rowTasks,
-        task.id,
-        startSecond,
-      );
-      /**
-       * 門檻三用的錨點間距：這一列這一班到下一個正線錨點之間有多少秒。
-       *
-       * 這裡跟 normalizeInput 不同——正線模板任務已經生出來了，拿得到<strong>真正的</strong>
-       * 下一個錨點，不必退而用時段班距當代理。挑起始路線時就用這個實際值淘汰
-       * 排不下的候選，跟展開階段 <code>expand.ts</code> 的 <code>maxAllowedOccupancy</code>
-       * 是同一個量，不會出現「這裡覺得排得下、展開時才炸 ANCHOR_CONFLICT」。
-       */
-      const anchorSpacingSeconds =
-        nextAnchorSecond != null ? nextAnchorSecond - startSecond : null;
-      const isRouteFeasibleForAnchor = (
-        route: ShiftScheduleSelectedRoute,
-      ): boolean => {
-        if (anchorSpacingSeconds == null || !(anchorSpacingSeconds > 0)) return true;
-        const occupancy = resolvePassengerOccupancy(route);
-        if (!occupancy) return true;
-        return occupancy.minOccupancySeconds <= anchorSpacingSeconds;
-      };
-
       const precedingYard = findPrecedingYardTask(task, allRowTasks);
       if (precedingYard) {
         const exitStationId = yardRotationExitByTaskType[precedingYard.taskType];
@@ -273,11 +249,7 @@ export function assignPassengerRoutesConstraintGreedy(args: {
             // stationSeed 用列號輪替候選出場站的嘗試順序——出場站有多個候選時
             // （例如行檢），不同列從不同候選開始找，車才會真的分散到多個出場站，
             // 不是全部收斂到候選裡排最前面的那一個。
-            // isRouteFeasible 擋掉排不進這一列實際錨點間距的候選（門檻三）。
-            const startId = resolveStartInstanceId(successorPolicy, exitStationId, {
-              stationSeed: row,
-              isRouteFeasible: isRouteFeasibleForAnchor,
-            });
+            const startId = resolveStartInstanceId(successorPolicy, exitStationId, row);
             if (startId) {
               const index = resolveRouteIndexInRotation(successorPolicy, startId);
               offset = index >= 0 ? index : 0;
@@ -306,6 +278,12 @@ export function assignPassengerRoutesConstraintGreedy(args: {
         // 充電／行檢／待命無明確出場站，或整備後無正線：延續進整備前輪替
       }
 
+      const nextAnchorSecond = findNextPassengerAnchorSecond(
+        rowTasks,
+        task.id,
+        startSecond,
+      );
+
       let route: ShiftScheduleSelectedRoute | null = null;
       if (
         successorPolicy
@@ -320,13 +298,8 @@ export function assignPassengerRoutesConstraintGreedy(args: {
                   precedingYard
                     ? yardRotationExitByTaskType[precedingYard.taskType]
                     : null,
-                  {
-                    stationSeed: row,
-                    isRouteFeasible: isRouteFeasibleForAnchor,
-                  },
+                  row,
                 )
-              // 冷啟動（沒有出場站）走的是錨點／導通組合排序那條分支，
-              // 門檻三只作用在「出場站比對」分支，這裡傳了也不會生效，故不傳。
               : resolveStartInstanceId(successorPolicy);
           route = startId
             ? successorPolicy.routesByInstanceId.get(startId) ?? null
