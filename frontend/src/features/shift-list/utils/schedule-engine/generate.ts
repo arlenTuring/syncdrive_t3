@@ -7,8 +7,11 @@ import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCard
 import { computeScheduleGateOk } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
+  FeasibilityViolationCode,
   GeneratedSchedulePlan,
+  GeneratedScheduleTimeline,
   GenerateShiftScheduleResult,
+  ScheduleServiceMetrics,
   SchedulingContext,
 } from './types';
 import {
@@ -547,6 +550,66 @@ export function generateShiftSchedule(
     && resolvedByTaskId.size === engineInput.confirmedTasks.length;
   return {
     plan: plan,
-    report: { ok, errors, warnings },
+    report: { ok, errors, warnings, metrics: buildServiceMetrics(timelines, warnings, engineInput.servicePulseDemand) },
+  };
+}
+
+/**
+ * 算出可跨班表比較的服務量指標。
+ *
+ * 兩份班表要比好壞，不能比問題代號的原始則數——則數會隨班次數縮放，
+ * 少跑車就自動變好看。詳見 {@link ScheduleServiceMetrics} 的說明。
+ */
+function buildServiceMetrics(
+  timelines: GeneratedScheduleTimeline[],
+  warnings: FeasibilityIssue[],
+  servicePulseDemand: number,
+): ScheduleServiceMetrics {
+  let passengerTripCount = 0;
+  let passengerOccupancySeconds = 0;
+  const tripsByRow: Record<number, number> = {};
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.taskType !== 'passenger') continue;
+      passengerTripCount += 1;
+      tripsByRow[timeline.row] = (tripsByRow[timeline.row] ?? 0) + 1;
+      passengerOccupancySeconds += Math.max(
+        0,
+        Math.round((block.plannedEndMinute - block.plannedStartMinute) * 60),
+      );
+    }
+  }
+
+  const countCode = (code: FeasibilityViolationCode): number =>
+    warnings.reduce((sum, issue) => (issue.code === code ? sum + 1 : sum), 0);
+  const servicePulseUnserved = countCode('UNSERVED_SERVICE_PULSE');
+
+  const rowCounts = Object.values(tripsByRow);
+  const rowAverage = rowCounts.length > 0
+    ? rowCounts.reduce((sum, value) => sum + value, 0) / rowCounts.length
+    : 0;
+
+  return {
+    passengerTripCount,
+    passengerOccupancySeconds,
+    servicePulseDemand,
+    servicePulseUnserved,
+    servicePulseServedRatio:
+      servicePulseDemand > 0
+        ? (servicePulseDemand - servicePulseUnserved) / servicePulseDemand
+        : null,
+    backupBerthPerTrip:
+      passengerTripCount > 0
+        ? countCode('STATION_BERTH_BACKUP_USED') / passengerTripCount
+        : null,
+    headwayBelowTargetPerTrip:
+      passengerTripCount > 0
+        ? countCode('HEADWAY_BELOW_TARGET') / passengerTripCount
+        : null,
+    tripsByRow,
+    tripsByRowSpread:
+      rowAverage > 0
+        ? (Math.max(...rowCounts) - Math.min(...rowCounts)) / rowAverage
+        : null,
   };
 }

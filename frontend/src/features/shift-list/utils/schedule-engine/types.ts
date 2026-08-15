@@ -249,10 +249,55 @@ export type GeneratedSchedulePlan = {
   timetableGenerationAlgorithm?: string;
 };
 
+/**
+ * 可跨班表比較的驗收指標。
+ *
+ * <strong>為什麼需要：問題代號的「原始則數」不能拿來比較兩份班表。</strong>
+ * 大部分代號是<strong>事件計數</strong>，會隨班表實際跑多少班次縮放——班次少，
+ * 事件自然少。2026-08-16 實測到的教訓：某次改動讓
+ * <code>STATION_BERTH_BACKUP_USED</code> 從 69 降到 62（看似改善 10%），
+ * 但同一份班表的正線班次也從 988 掉到 892（同樣 -10%）；換算成「每班次」是
+ * 6.98% 對 6.95%，<strong>根本沒有改善</strong>，只是跑得比較少。
+ * 少跑車永遠能讓事件計數變好看，所以只看則數會系統性地獎勵「砍服務」。
+ *
+ * 各代號的性質不同，要分開處理：
+ * <ul>
+ *   <li><code>UNSERVED_SERVICE_PULSE</code>：分母是時刻表訂的脈衝需求，
+ *       <strong>不隨班次縮放</strong>，可以直接比——但更好的表達是承接率。</li>
+ *   <li><code>HEADWAY_BELOW_TARGET</code>、<code>STATION_BERTH_*</code>：
+ *       每班次／每對相鄰班次一則，<strong>必須除以班次數</strong>才有意義。</li>
+ * </ul>
+ */
+export type ScheduleServiceMetrics = {
+  /** 實際排出的正線班次數 */
+  passengerTripCount: number;
+  /** 正線總營運時間（秒）＝各班次佔用加總 */
+  passengerOccupancySeconds: number;
+  /** 時刻表要求的班距脈衝總數（服務需求分母）；非範本模式為 0 */
+  servicePulseDemand: number;
+  /** 沒有任何車能承接的脈衝數（＝UNSERVED_SERVICE_PULSE 則數） */
+  servicePulseUnserved: number;
+  /** 承接率 = (demand - unserved) / demand；demand 為 0 時回 null */
+  servicePulseServedRatio: number | null;
+  /** 每班次的備用站使用率；班次為 0 時回 null */
+  backupBerthPerTrip: number | null;
+  /** 每班次的班距低於目標率；班次為 0 時回 null */
+  headwayBelowTargetPerTrip: number | null;
+  /** 各時間線的班次數（索引 = row） */
+  tripsByRow: Record<number, number>;
+  /**
+   * 班次分佈離散度 =（最多的一列 - 最少的一列）/ 平均。
+   * 對應「班次穩定運行」：同樣的總班次，攤平在各列比集中在少數列好。
+   */
+  tripsByRowSpread: number | null;
+};
+
 export type ShiftScheduleFeasibilityReport = {
   ok: boolean;
   errors: FeasibilityIssue[];
   warnings: FeasibilityIssue[];
+  /** 可跨班表比較的服務量指標；見 {@link ScheduleServiceMetrics} */
+  metrics?: ScheduleServiceMetrics;
 };
 
 /** Step 5 手動調整的還原／復原歷史（寫入草稿 scheduleOutput） */

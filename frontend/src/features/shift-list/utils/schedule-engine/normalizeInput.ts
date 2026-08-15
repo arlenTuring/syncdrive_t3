@@ -84,6 +84,8 @@ export type EngineInput = {
   shiftId?: string;
   scheduleRowCount: number;
   confirmedTasks: ScheduleTask[];
+  /** 時刻表要求的班距脈衝總數＝服務需求的分母（承接率用）。非範本模式為 0。 */
+  servicePulseDemand: number;
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
   passengerRoutes: ShiftScheduleSelectedRoute[];
@@ -1868,6 +1870,7 @@ export function normalizeEngineInput(
 
   let confirmedTasks: ScheduleTask[] = templateTasks;
   let timetableGenerationAlgorithm: string | undefined;
+  let servicePulseDemand = 0;
 
   if (mode === 'headway') {
     const generatedPassenger = buildHeadwayPassengerTasks({
@@ -1957,6 +1960,7 @@ export function normalizeEngineInput(
       rowActiveWindows.set(pTask.rowIndex, list);
     }
 
+    servicePulseDemand = departures.length;
     const passengerTasks = assignDirectionalDepartures({
       departures,
       scheduleRowCount: template.scheduleRowCount,
@@ -1994,6 +1998,7 @@ export function normalizeEngineInput(
     shiftId: args.shiftId,
     scheduleRowCount: template.scheduleRowCount,
     confirmedTasks,
+    servicePulseDemand,
     intervals: template.intervals,
     attributes: template.attributes,
     passengerRoutes,
