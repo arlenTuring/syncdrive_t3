@@ -231,7 +231,15 @@ export function assignPassengerRoutesConstraintGreedy(args: {
     for (const task of rowTasks) {
       const startSecond = minuteToSecond(task.startMinute);
 
-      const precedingYard = findPrecedingYardTask(task, allRowTasks);
+      const precedingYard = findPrecedingYardTask(
+        task,
+        allRowTasks,
+        // 「釘住位置」＝該整備類型在對齊表裡有出場站（與 normalizeInput 同一份表）
+        (yard) => {
+          const exits = yardRotationExitByTaskType[yard.taskType];
+          return Array.isArray(exits) ? exits.length > 0 : Boolean(exits);
+        },
+      );
       if (precedingYard) {
         const exitStationId = yardRotationExitByTaskType[precedingYard.taskType];
         const yardEndMinute =
@@ -397,21 +405,47 @@ export function assignPassengerRoutesConstraintGreedy(args: {
   return decisions;
 }
 
-/** 該正線是否緊接在整備之後（中間無其他正線）；回傳該整備任務 */
+/**
+ * 該正線是否緊接在整備之後（中間無其他正線）；回傳該決定輪替相位的整備任務。
+ *
+ * <strong>整備會連成一串（行檢→待命、充電→待命…），要回頭找「真正釘住車位置」
+ * 的那一個，不是最後一個。</strong>
+ *
+ * 待命這類沒有出場站的整備不釘位置——它的語意是「車留在原地等」，車實際停在哪
+ * 是<strong>前一個</strong>有出場站的整備決定的。只取最後一個整備，等於把行檢的
+ * 出場站整個看丟。
+ *
+ * 2026-08-16 用真實資料重放追出來的分歧就是這個：row 1 的
+ * 行檢 04:30–05:00 → 待命 05:00–07:00 → 正線 07:10。
+ * <code>normalizeInput</code> 依「視窗換手」在 05:00 就依<strong>行檢</strong>
+ * 對齊了相位（該視窗被待命佔滿、一班車都沒排，但相位留了下來）；
+ * 這裡卻只看到緊鄰的<strong>待命</strong>、判定不必對齊，於是兩個階段從此差一格
+ * ——規劃把 <code>S2W上行&gt;T3上行</code>（180 秒）排在某一格、下一個錨點放 180 秒後，
+ * 指派卻在同一格放 <code>T3上行&gt;N2W上行</code>（220 秒），展開時 34 則
+ * ANCHOR_CONFLICT 全部是這一組錯位。
+ *
+ * 行檢原本 <code>alignRotationToExitStation: false</code> 時兩邊都不位移，
+ * 所以這個不對稱一直睡著，直到放開行檢出場站候選才引爆。
+ */
 function findPrecedingYardTask(
   passengerTask: ScheduleTask,
   allRowTasks: ScheduleTask[],
+  pinsRotationPhase: (task: ScheduleTask) => boolean,
 ): ScheduleTask | null {
   const paxStart = passengerTask.startMinute;
   let lastYard: ScheduleTask | null = null;
+  let lastPinningYard: ScheduleTask | null = null;
   for (const task of allRowTasks) {
     if (task.id === passengerTask.id) break;
     if (task.startMinute + task.durationMinutes > paxStart + 1e-9) continue;
     if (task.taskType === 'passenger') {
       lastYard = null;
+      lastPinningYard = null;
       continue;
     }
     lastYard = task;
+    if (pinsRotationPhase(task)) lastPinningYard = task;
   }
-  return lastYard;
+  // 串中有釘位置的就用它；整串都不釘位置時維持原行為（用最後一個）
+  return lastPinningYard ?? lastYard;
 }
