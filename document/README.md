@@ -39,6 +39,13 @@ npm run docs
 - http://localhost:4000/排班引擎最近問題.html
 - http://localhost:4000/#/班表Timetable-API
 
+### 對外介面（給外部系統／SCADA）
+
+| 文件 | 說明 |
+|------|------|
+| [車輛即時 ETA API](車輛即時ETA-API.md) | **即時**：即將進站／預計到達／異常狀況，HTTP GET 輪詢（DRAFT） |
+| [班表 Timetable API](班表Timetable-API.md) | **計畫**：班次逐站時刻、站點計畫 ETA |
+
 ### MQTT 協議
 
 | 文件 | 說明 |

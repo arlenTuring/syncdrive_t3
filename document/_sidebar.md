@@ -11,6 +11,10 @@
   - [班表 ETA（HTML 欄位）](/班表ETA取用範例.html ':ignore')
   - [班次（HTML 欄位）](/班表班次檢視.html ':ignore')
 
+- **對外介面**
+  - [車輛即時 ETA API](車輛即時ETA-API.md)
+  - [班表 Timetable API](班表Timetable-API.md)
+
 - **MQTT 協議**
   - [通訊架構與 Topic 命名規範](MQTT%20通訊架構與%20Topic%20命名規範.md)
   - [車輛動態協議](車輛動態協議.md)
