@@ -21,20 +21,21 @@
 ## 目錄
 
 1. [這份文件與既有文件的分工](#一這份文件與既有文件的分工)
-2. [系統架構與資料流](#二系統架構與資料流)
-3. [命名與代碼規範](#三命名與代碼規範)
-4. [端點總覽](#四端點總覽)
-5. [端點 1：依站即時 ETA](#五端點-1依站即時-eta)
-6. [端點 2：依車即時 ETA](#六端點-2依車即時-eta)
-7. [端點 3：異常狀況](#七端點-3異常狀況)
-8. [端點 4：資料新鮮度與可用性](#八端點-4資料新鮮度與可用性)
-9. [欄位字典](#九欄位字典)
-10. [輪詢、快取與傳輸](#十輪詢快取與傳輸)
-11. [錯誤處理](#十一錯誤處理)
-12. [典型串接情境（完整走一遍）](#十二典型串接情境完整走一遍)
-13. [JSON Schema](#十三json-schema端點-1供程式驗證)
-14. [待確認事項](#十四待確認事項提供給對方一併回覆)
-15. [實作狀態](#十五實作狀態)
+2. [API 路徑分層與命名依據](#二api-路徑分層與命名依據)
+3. [系統架構與資料流](#三系統架構與資料流)
+4. [命名與代碼規範](#四命名與代碼規範)
+5. [端點總覽](#五端點總覽)
+6. [端點 1：依站即時 ETA](#六端點-1依站即時-eta)
+7. [端點 2：依車即時 ETA](#七端點-2依車即時-eta)
+8. [端點 3：異常狀況](#八端點-3異常狀況)
+9. [端點 4：資料饋送狀態](#九端點-4資料饋送狀態)
+10. [欄位字典](#十欄位字典)
+11. [輪詢、快取與傳輸](#十一輪詢快取與傳輸)
+12. [錯誤處理](#十二錯誤處理)
+13. [典型串接情境（完整走一遍）](#十三典型串接情境完整走一遍)
+14. [JSON Schema](#十四json-schema端點-1供程式驗證)
+15. [待確認事項](#十五待確認事項提供給對方一併回覆)
+16. [實作狀態](#十六實作狀態)
 
 ---
 
@@ -79,36 +80,135 @@
 
 ---
 
-## 二、系統架構與資料流
+## 二、API 路徑分層與命名依據
+
+本 API 的路徑**不是新開一組**，而是掛在既有的 `vehicles` 領域之下。以下是依據。
+
+### 2.1 既有 API 路徑盤點
+
+SyncDrive T3 後端目前的頂層領域（`@Controller` 前綴）：
+
+| 頂層 | 領域 | 代表端點 |
+|------|------|---------|
+| `syncdrive-api/map` | 地圖與拓撲 | `GET /library`、`GET /:mapId/stations/:stationId` |
+| `syncdrive-api/time-template` | 時間模板 | `GET /list`、`GET /detail/:id` |
+| `syncdrive-api/maintenance-task` | 整備任務 | `GET /list`、`GET /detail/:id` |
+| `syncdrive-api/operation-shift` | 班表 | `GET /list`、`GET /timetable/trips`、`GET /timetable/station-etas` |
+| `syncdrive-api/order` | 營運訂單 | `POST /save`、`PUT /updateOrderProgress/:id` |
+| **`syncdrive-api/vehicles`** | **車輛即時狀態** | **`GET /snapshot`** |
+| `syncdrive-api/command` | 控制指令下發 | `POST /execute` |
+| `syncdrive-api/datasource` | 資料源查詢 | `GET /tables`、`POST /query` |
+| `syncdrive-api/media-library` | 媒體庫 | `GET /list` |
+
+**觀察到的兩條命名規則**：
+
+1. **頂層一律是「業務領域名詞」**，不是形容詞、不是資料特性。沒有 `realtime`、`cache`、`v2` 這種前綴。
+2. **第二層是資源或動作**：`/list`、`/detail/:id`、`/snapshot`、`/timetable/trips`。多視圖時用第二層區分（`timetable/trips` 對 `timetable/station-etas`）。
+
+### 2.2 本 API 的歸屬判斷
+
+即時 ETA 是**由車輛回報推導出來的**，不論索引方式是依站還是依車 —— 索引是查詢方式，不是領域歸屬。因此全部掛在 `vehicles` 之下，與既有的 `GET /vehicles/snapshot` 平行：
 
 ```
-┌────────────┐   MQTT 1Hz                ┌──────────────┐   HTTP GET      ┌───────┐      ┌──────────────┐
-│  車輛      │ ─ telemetry/update ─────▶ │              │  30~60s 輪詢    │       │      │   車輛監控    │
-│  PMS-01    │ ─ operation/update ─────▶ │  SyncDrive   │ ◀────────────── │ SCADA │ ◀──▶ │   系統        │
-│  ~ PMS-11  │ ─ health/heartbeat ─────▶ │  T3 中心端   │ ──────────────▶ │       │      │              │
-└────────────┘                           └──────────────┘   JSON 快照     └───────┘      └──────────────┘
-                                                │
-                                                │ 對照
-                                                ▼
-                                        已發布班表（計畫 ETA）
-                                        → 算出誤差 delay_seconds
+syncdrive-api/vehicles/
+├── snapshot            （既有）車輛原始狀態快照：telemetry / health / operation
+├── eta/
+│   ├── by-station      （新）即時 ETA，依站索引  ← 站顯、SCADA 告警看板
+│   └── by-vehicle      （新）即時 ETA，依車索引  ← 車輛追蹤畫面
+├── alerts              （新）異常彙整
+└── feed-status         （新）資料饋送新鮮度與可用性
 ```
 
-**權責邊界**：
+`eta/by-station` 與 `eta/by-vehicle` 的雙視圖，形狀刻意對齊既有的
+`operation-shift/timetable/trips`（依班次）與 `timetable/station-etas`（依站）。
 
-- 車端是 `vehicle_phase`、`overall_health`、`current_leg` 的**唯一真值源**。
-- 中心端只做**聚合、外推、與計畫值比對**，不覆寫車端狀態。
-- 本 API 為**唯讀**，不提供任何寫入或控制端點。控制指令走既有的動態控制協議。
+### 2.3 與計畫 ETA 的對稱關係
 
-**資料如何變成 ETA — 實際走一遍**：
+同一件事有計畫與即時兩個版本，各自掛在自己的領域下：
+
+| 視角 | 計畫值（班表衍生） | 即時值（車輛衍生） |
+|------|------------------|------------------|
+| 依站 | `operation-shift/timetable/station-etas` | `vehicles/eta/by-station` |
+| 依班次／車 | `operation-shift/timetable/trips` | `vehicles/eta/by-vehicle` |
+
+**兩者不合併**：計畫值來自班表文件、即時值來自車輛回報，生命週期與可用性完全不同（班表沒發布時計畫值仍在，車輛失聯時即時值消失）。合併會讓使用方分不清拿到的是哪一種。本 API 以 `plan` 子物件內嵌計畫值，方便對照，但真值來源仍分離。
+
+### 2.4 為什麼不叫 `realtime`
+
+本文件初稿曾使用 `syncdrive-api/realtime/...`。**那是錯的**：`realtime` 描述的是資料新鮮度（形容詞），不是業務領域（名詞），與既有九個頂層領域的命名規則衝突。若照此開，之後每加一種即時資料就得決定「放 realtime 還是放它自己的領域」，界線會逐漸失守。
+
+---
+
+## 三、系統架構與資料流
+
+### 3.1 既有實作（已上線）
+
+**MQTT 接收、快取、推播三層都已存在**，本 API 是接在它們後面的讀取層：
 
 ```
-車端 MQTT（1Hz）：
+                      ┌─────────────────── SyncDrive T3 後端 ───────────────────┐
+┌──────────┐  MQTT    │                                                          │
+│ 車輛     │ ────────▶│ MqttController                                           │
+│ PMS-01   │  1Hz     │   v1/vtms/+/telemetry/update  ─┐                         │
+│ ~ PMS-11 │          │   v1/vtms/+/health/heartbeat  ─┼─▶ RedisService          │
+└──────────┘          │   v1/vtms/+/operation/update  ─┘   vtms:telemetry:{code} │
+                      │   v1/vtms/+/event/report       ─┐  vtms:health:{code}    │
+                      │   v1/vtms/+/command/ack        ─┤  vtms:operation:{code} │
+                      │   v1/vtms/+/slot/status        ─┘                        │
+                      │            │                          │                  │
+                      │            ▼                          ▼                  │
+                      │      EventsGateway            VehicleController          │
+                      │      （WebSocket 廣播）        GET /vehicles/snapshot     │
+                      │            │                                             │
+                      └────────────┼─────────────────────────────────────────────┘
+                                   │                          │
+                                   ▼                          ▼
+                            前端地圖即時渲染          ★ 本 API（新增）
+                                                     GET /vehicles/eta/by-station
+                                                     GET /vehicles/eta/by-vehicle
+                                                     GET /vehicles/alerts
+                                                     GET /vehicles/feed-status
+                                                              │
+                                                              ▼
+                                                    SCADA ──▶ 車輛監控系統
+                                                    （30~60 秒輪詢）
+```
+
+**Redis 快取鍵**（既有，本 API 的主要讀取來源）：
+
+| 鍵 | 內容 | 寫入來源 |
+|----|------|---------|
+| `vtms:telemetry:{vehicle_code}` | 位置、速度、姿態 | `v1/vtms/+/telemetry/update` |
+| `vtms:health:{vehicle_code}` | `overall_health` + 四大子系統 | `v1/vtms/+/health/heartbeat` |
+| `vtms:operation:{vehicle_code}` | `vehicle_phase`、`current_leg`、任務進度 | `v1/vtms/+/operation/update` |
+
+**既有的資料驗證**（`RedisService`，本 API 直接受益）：
+
+- `telemetry` 缺 `timestamp` / `global_pose` / `kinematics` 或經緯度為空 → **丟棄不寫入**
+- `health` 的 `overall_health` 必須是 `OK` / `WARNING` / `ERROR` / `OFFLINE`
+- `health` 四大子系統（`COMPUTING` / `SENSING` / `COMMUNICATION` / `CHASSIS`）缺一 → 丟棄
+- 交叉驗算：任一子系統為 `ERROR` 但 `overall_health` 不是 `ERROR` → **強制修正為 `ERROR`**（以子系統為準）
+- 與前一筆比較，偵測狀態劣化（`degraded`）
+
+也就是說，本 API 的 `alerts` 不需要自己重做健康資料的驗證與劣化判定，那一層已經在了。
+
+### 3.2 本 API 新增的部分
+
+只有三件事：
+
+1. **ETA 外推** — 車端 `current_leg.eta_seconds` 只給到**下一站**；往後續站點外推需要用班表的站間旅行時間。
+2. **依站索引** — 既有的 `/snapshot` 是依車的字典；站顯需要「這一站接下來有誰要來」。
+3. **告警彙整與去重** — 既有的健康劣化是逐筆事件，本 API 需要維持「同車同 code 只有一筆 `alert_id`」的生命週期。
+
+### 3.3 資料如何變成 ETA — 實際走一遍
+
+```
+車端 MQTT（1Hz）→ Redis vtms:operation:PMS-05：
   { "vehicle_code": "PMS-05",
     "current_leg": { "target_station_id": "T3", "distance_to_target_m": 120.0, "eta_seconds": 25 } }
                           │
                           ▼
-中心端：距離 120m ≤ 200m 門檻  →  arrival_state = "APPROACHING"
+本 API：距離 120m ≤ 200m 門檻  →  arrival_state = "APPROACHING"
         收到時間 09:00:00 + 25 秒  →  eta_at = 09:00:25
         班表計畫 09:00:10          →  delay_seconds = +15（晚 15 秒）→ delay_state = "ON_TIME"
                           │
@@ -116,9 +216,26 @@
 API 回應（SCADA 每 30~60 秒取一次）
 ```
 
+### 3.4 權責邊界
+
+- 車端是 `vehicle_phase`、`overall_health`、`current_leg` 的**唯一真值源**（沿用營運任務狀態協議第一章的 SSOT 聲明）。
+- 中心端只做**聚合、外推、與計畫值比對**，不覆寫車端狀態。
+- 本 API 為**唯讀**。控制指令走既有的 `POST /syncdrive-api/command/execute`。
+
+### 3.5 既有 WebSocket 與本 API 的分工
+
+系統已有 `EventsGateway`（Socket.IO），前端地圖以 WebSocket 接收 1Hz 即時推播。
+
+| 通道 | 適用對象 | 頻率 |
+|------|---------|------|
+| WebSocket（既有） | 前端地圖，需要平滑渲染 | 1Hz 推播 |
+| **本 API（新增）** | SCADA／車輛監控系統 | 30~60 秒輪詢 |
+
+若監控系統之後希望改為推播而非輪詢，**既有的 WebSocket 通道可以直接沿用**，不需另建（見待確認事項第 10 項）。
+
 ---
 
-## 三、命名與代碼規範
+## 四、命名與代碼規範
 
 沿用既有協議，不另立規則：
 
@@ -146,23 +263,23 @@ API 回應（SCADA 每 30~60 秒取一次）
 
 ---
 
-## 四、端點總覽
+## 五、端點總覽
 
 | # | 端點 | 用途 | 建議輪詢 |
 |---|------|------|---------|
-| 1 | `GET /syncdrive-api/realtime/eta/stations` | **依站**：每站接下來會到的車 | 30–60s |
-| 2 | `GET /syncdrive-api/realtime/eta/vehicles` | **依車**：每台車接下來會到的站 | 30–60s |
-| 3 | `GET /syncdrive-api/realtime/alerts` | 異常狀況清單 | 30s |
-| 4 | `GET /syncdrive-api/realtime/health` | 資料新鮮度與系統可用性 | 30s |
+| 1 | `GET /syncdrive-api/vehicles/eta/by-station` | **依站**：每站接下來會到的車 | 30–60s |
+| 2 | `GET /syncdrive-api/vehicles/eta/by-vehicle` | **依車**：每台車接下來會到的站 | 30–60s |
+| 3 | `GET /syncdrive-api/vehicles/alerts` | 異常狀況清單 | 30s |
+| 4 | `GET /syncdrive-api/vehicles/feed-status` | 資料新鮮度與系統可用性 | 30s |
 
 **給 SCADA 的建議**：端點 1 與 3 即可滿足站顯與告警看板；端點 2 供車輛追蹤畫面；端點 4 用來判斷「資料是不是還活著」，避免把過期資料當成現況顯示。
 
 ---
 
-## 五、端點 1：依站即時 ETA
+## 六、端點 1：依站即時 ETA
 
 ```
-GET /syncdrive-api/realtime/eta/stations
+GET /syncdrive-api/vehicles/eta/by-station
 ```
 
 | Query | 必填 | 預設 | 說明 |
@@ -176,21 +293,21 @@ GET /syncdrive-api/realtime/eta/stations
 全線所有站，每站 3 筆：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 只看 T3 上行一站：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations?station_id=station_4" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station?station_id=station_4" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 同時看兩站、每站只要最近 1 筆、不需要計畫值（站顯精簡模式）：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations\
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 ?station_id=station_4&station_id=station_2&limit_per_station=1&include_plan=false" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
@@ -355,10 +472,10 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations\
 
 ---
 
-## 六、端點 2：依車即時 ETA
+## 七、端點 2：依車即時 ETA
 
 ```
-GET /syncdrive-api/realtime/eta/vehicles
+GET /syncdrive-api/vehicles/eta/by-vehicle
 ```
 
 | Query | 必填 | 預設 | 說明 |
@@ -371,14 +488,14 @@ GET /syncdrive-api/realtime/eta/vehicles
 全部車：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/vehicles" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 追蹤單一車、往後看 5 站：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/vehicles?vehicle_code=PMS-05&next_stops=5" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_code=PMS-05&next_stops=5" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
@@ -465,10 +582,10 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/vehicles?vehicle_code=
 
 ---
 
-## 七、端點 3：異常狀況
+## 八、端點 3：異常狀況
 
 ```
-GET /syncdrive-api/realtime/alerts
+GET /syncdrive-api/vehicles/alerts
 ```
 
 | Query | 必填 | 預設 | 說明 |
@@ -482,21 +599,21 @@ GET /syncdrive-api/realtime/alerts
 全部未解除的異常：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/alerts" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 只看嚴重等級（告警看板紅燈區）：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/alerts?severity=CRITICAL" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?severity=CRITICAL" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 查某台車今日全部異常（含已解除）：
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/alerts?vehicle_code=PMS-05&active_only=false" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05&active_only=false" \
   -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
@@ -585,16 +702,16 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/alerts?vehicle_code=PMS-05
 
 ---
 
-## 八、端點 4：資料新鮮度與可用性
+## 九、端點 4：資料饋送狀態
 
 ```
-GET /syncdrive-api/realtime/health
+GET /syncdrive-api/vehicles/feed-status
 ```
 
 供 SCADA 判斷「這份資料還能不能用」。**建議監控系統在顯示 ETA 前先確認此端點**。
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/health" -H "X-API-Key: <YOUR_KEY>" | jq .
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" -H "X-API-Key: <YOUR_KEY>" | jq .
 ```
 
 ### 回應範例 A — 一切正常
@@ -661,9 +778,9 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/health" -H "X-API-Key: <YO
 
 ---
 
-## 九、欄位字典
+## 十、欄位字典
 
-### 9.1 到站狀態 `arrival_state`
+### 10.1 到站狀態 `arrival_state`
 
 **這就是需求裡的「即將進站／預計到達」**。以車端 `current_leg.distance_to_target_m` 與 `eta_seconds` 判定：
 
@@ -686,7 +803,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/health" -H "X-API-Key: <YO
 | `eta_seconds=415`, `distance=1840m` | `EN_ROUTE` | 兩個都不成立 |
 | 90 秒未回報 | `UNKNOWN` | 逾時，不論上次值為何 |
 
-### 9.2 誤點狀態 `delay_state`
+### 10.2 誤點狀態 `delay_state`
 
 計畫值取自已發布班表。`delay_seconds` 為**正**表示**晚於**計畫。
 
@@ -708,7 +825,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/realtime/health" -H "X-API-Key: <YO
 | 09:06:10 | 09:11:00 | `+290` | `MAJOR_DELAY` |
 | （加班車，無計畫） | 09:11:00 | `null` | `NO_PLAN` |
 
-### 9.3 可信度 `confidence`
+### 10.3 可信度 `confidence`
 
 ETA 越往後推越不準，必須讓監控端知道。
 
@@ -728,7 +845,7 @@ ETA 越往後推越不準，必須讓監控端知道。
 | `LOW` | `約 8 分鐘` + 灰階／淡化 |
 | `STALE` | `—` 或 `資料中斷` |
 
-### 9.4 異常分類 `category`
+### 10.4 異常分類 `category`
 
 | 值 | 來源 | 說明 |
 |----|------|------|
@@ -748,7 +865,7 @@ ETA 越往後推越不準，必須讓監控端知道。
 | `OPERATION` | `TASK_FAILED`、`INTERLOCK_TIMEOUT`、`DOCKING_TIMEOUT` |
 | `SAFETY` | `MRM_TRIGGERED`、`FORCED_RECALL` |
 
-### 9.5 異常對 ETA 的影響 `eta_impact`
+### 10.5 異常對 ETA 的影響 `eta_impact`
 
 **這一欄是給監控系統做顯示決策用的**，不必自行解讀各種 `code`：
 
@@ -768,7 +885,7 @@ ETA 越往後推越不準，必須讓監控端知道。
 | `VEHICLE_SIGNAL_LOST` | `ETA_UNAVAILABLE` | `資料中斷` |
 | `MRM_TRIGGERED` | `ETA_UNAVAILABLE` | `車輛異常停止` |
 
-### 9.6 共用欄位
+### 10.6 共用欄位
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
@@ -780,7 +897,7 @@ ETA 越往後推越不準，必須讓監控端知道。
 
 ---
 
-## 十、輪詢、快取與傳輸
+## 十一、輪詢、快取與傳輸
 
 需求所述頻率為 **30 秒 ~ 1 分鐘**。
 
@@ -799,7 +916,7 @@ ETA 越往後推越不準，必須讓監控端知道。
 第一次請求：
 
 ```bash
-curl -i -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations" -H "X-API-Key: <KEY>"
+curl -i -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station" -H "X-API-Key: <KEY>"
 ```
 
 ```
@@ -814,7 +931,7 @@ Content-Type: application/json
 30 秒後帶上 ETag 再請求：
 
 ```bash
-curl -i -s "http://127.0.0.1:3000/syncdrive-api/realtime/eta/stations" \
+curl -i -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station" \
   -H "X-API-Key: <KEY>" -H 'If-None-Match: "a1b2c3d4"'
 ```
 
@@ -849,7 +966,7 @@ ETag: "a1b2c3d4"
 
 ---
 
-## 十一、錯誤處理
+## 十二、錯誤處理
 
 | HTTP | 情況 | 回應 |
 |------|------|------|
@@ -908,14 +1025,14 @@ Retry-After: 7
 
 ---
 
-## 十二、典型串接情境（完整走一遍）
+## 十三、典型串接情境（完整走一遍）
 
 以下是 SCADA 端每一輪應執行的邏輯。
 
 ### 步驟 1：確認資料還活著
 
 ```bash
-curl -s ".../realtime/health" -H "X-API-Key: <KEY>"
+curl -s ".../vehicles/feed-status" -H "X-API-Key: <KEY>"
 ```
 
 ```json
@@ -929,7 +1046,7 @@ curl -s ".../realtime/health" -H "X-API-Key: <KEY>"
 ### 步驟 2：取站別 ETA
 
 ```bash
-curl -s ".../realtime/eta/stations?station_id=station_4" \
+curl -s ".../vehicles/eta/by-station?station_id=station_4" \
   -H "X-API-Key: <KEY>" -H 'If-None-Match: "<上次的 ETag>"'
 ```
 
@@ -958,7 +1075,7 @@ for each eta in stations[].etas:
 ### 步驟 4：取異常清單更新告警看板
 
 ```bash
-curl -s ".../realtime/alerts?active_only=true" -H "X-API-Key: <KEY>"
+curl -s ".../vehicles/alerts?active_only=true" -H "X-API-Key: <KEY>"
 ```
 
 以 `alert_id` 為主鍵做增量更新：新的 `alert_id` 新增一列；已存在的更新 `updated_at`；不在本次回應中的視為已解除，自看板移除。
@@ -969,7 +1086,7 @@ ETA 60 秒、告警 30 秒。**不要低於 10 秒**，否則會收到 `429`。
 
 ---
 
-## 十三、JSON Schema（端點 1，供程式驗證）
+## 十四、JSON Schema（端點 1，供程式驗證）
 
 ```json
 {
@@ -1054,7 +1171,7 @@ ETA 60 秒、告警 30 秒。**不要低於 10 秒**，否則會收到 `429`。
 
 ---
 
-## 十四、待確認事項（提供給對方一併回覆）
+## 十五、待確認事項（提供給對方一併回覆）
 
 這些是**我方無法單方面決定**、需要與監控系統／SCADA 端一起敲定的：
 
@@ -1073,22 +1190,30 @@ ETA 60 秒、告警 30 秒。**不要低於 10 秒**，否則會收到 `429`。
 
 ---
 
-## 十五、實作狀態
+## 十六、實作狀態
 
-| 端點 | 狀態 |
+### 已上線（本 API 直接沿用，不需重做）
+
+| 項目 | 位置 |
 |------|------|
-| 1 `eta/stations` | **未實作** — 本文件為規格草案 |
-| 2 `eta/vehicles` | **未實作** |
-| 3 `alerts` | **未實作** |
-| 4 `health` | **未實作** |
+| MQTT 訂閱六支 topic（telemetry／health／operation／event／command ack／slot） | `backend/src/mqtt/mqtt.controller.ts` |
+| 車輛最新狀態快取（Redis） | `backend/src/redis/redis.service.ts` |
+| 資料驗證與健康劣化偵測 | 同上（見 3.1） |
+| 車輛狀態快照 API | `GET /syncdrive-api/vehicles/snapshot` |
+| WebSocket 即時廣播 | `backend/src/events/events.gateway.ts` |
+| 計畫 ETA（`plan` 區塊資料源） | `GET /syncdrive-api/operation-shift/timetable/station-etas` |
+| 地圖站點與拓撲 | `GET /syncdrive-api/map/:mapId/stations/:stationId` |
 
-**已具備的基礎**：
+### 本文件新增（待實作）
 
-- 車端 MQTT 三支協議已定義（動態／營運／健康）
-- 已發布班表的計畫 ETA 已實作（`/timetable/station-etas`），可直接作為 `plan` 區塊的資料源
-- 地圖站點與拓撲已具備
+| 端點 | 狀態 | 主要工作 |
+|------|------|---------|
+| `GET /vehicles/eta/by-station` | **未實作** | 依站索引 + ETA 外推 + 併計畫值 |
+| `GET /vehicles/eta/by-vehicle` | **未實作** | ETA 外推 + 併計畫值 |
+| `GET /vehicles/alerts` | **未實作** | 告警彙整、去重、生命週期（`alert_id` 穩定） |
+| `GET /vehicles/feed-status` | **未實作** | 逾時判定與 `status` 彙總 |
 
-**尚缺**：MQTT 訂閱與車輛狀態聚合層、即時 ETA 外推、告警彙整與去重。
+**評估**：三層基礎（MQTT 接收、Redis 快取、資料驗證）都已就緒，本 API 屬於在既有快取之上的**讀取與換算層**，不涉及新的資料通道或儲存。
 
 ---
 
