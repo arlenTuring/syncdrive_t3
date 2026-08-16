@@ -43,7 +43,7 @@ npm run docs
 
 | 文件 | 說明 |
 |------|------|
-| [車輛即時 ETA API](車輛即時ETA-API.md) | **即時**：即將進站／預計到達／異常狀況，HTTP GET 固定頻率輪詢 |
+| [車輛即時 ETA API](車輛即時ETA-API.md) | **即時**：即將進站／預計到達，HTTP GET 固定頻率輪詢 |
 | [班表 Timetable API](班表Timetable-API.md) | **計畫**：班次逐站時刻、站點計畫 ETA |
 
 ### MQTT 協議

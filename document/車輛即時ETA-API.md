@@ -2,16 +2,18 @@
 
 | 項目 | 內容 |
 |------|------|
-| 版本 | v1.0 |
-| 發布日期 | 2026-08-16 |
+| 版本 | v1.1 |
+| 發布日期 | 2026-08-17 |
 | 提供方 | 台智駕 SyncDrive T3 車輛監控系統 |
-| 使用方 | 取用本介面之外部系統（不限特定對象） |
+| 使用方 | 取用本介面之外部系統 |
 | 通訊方式 | HTTP / JSON，GET，唯讀 |
 | 取用模式 | 固定頻率輪詢（pull-only） |
 | Base URL | `http://127.0.0.1:3000`（正式環境依部署配置） |
 | API 文件 | `http://127.0.0.1:3000/api/docs`（Swagger） |
 
-本規格定義 SyncDrive T3 車輛監控系統對外提供**即將進站**、**預計到達**與**異常狀況**的介面。本介面為單一對外契約，對所有取用方一致，不因取用方而有差異。使用方以固定頻率輪詢取得全線即時快照；本介面不主動推播，亦不在資料更新時發出通知。
+本規格定義 SyncDrive T3 車輛監控系統對外提供**即將進站**與**預計到達**的介面。本介面為單一對外契約，對所有取用方一致。使用方以固定頻率輪詢取得全線即時快照；本介面不主動推播。
+
+**所有回應欄位的意義、型別與值域，統一定義於[第七章 資料模型](#七資料模型)。** 各 API 章節僅列出請求方式與完整回應範例。
 
 本文中的「必須」表示強制要求，「應」表示強烈建議，「可」表示選用。
 
@@ -20,69 +22,35 @@
 ## 目錄
 
 1. [服務範圍](#一服務範圍)
-2. [資料性質](#二資料性質)
-3. [通訊規範](#三通訊規範)
-4. [共用約定](#四共用約定)
-5. [端點總覽](#五端點總覽)
-6. [端點 1：依站即時 ETA](#六端點-1依站即時-eta)
-7. [端點 2：依車即時 ETA](#七端點-2依車即時-eta)
-8. [端點 3：異常狀況](#八端點-3異常狀況)
-9. [端點 4：資料饋送狀態](#九端點-4資料饋送狀態)
-10. [資料模型](#十資料模型)
-11. [輪詢規範](#十一輪詢規範)
-12. [錯誤處理](#十二錯誤處理)
-13. [整合指引](#十三整合指引)
-14. [JSON Schema](#十四json-schema)
-15. [部署配置參數](#十五部署配置參數)
-16. [與 MQTT 協議之欄位對應](#十六與-mqtt-協議之欄位對應)
-17. [實作狀態與交付](#十七實作狀態與交付)
-18. [附錄：與計畫 ETA 的關係](#十八附錄與計畫-eta-的關係)
+2. [通訊規範](#二通訊規範)
+3. [共用約定](#三共用約定)
+4. [API 總覽](#四api-總覽)
+5. [GET /vehicles/eta/by-station](#五get-vehiclesetaby-station)
+6. [GET /vehicles/eta/by-vehicle](#六get-vehiclesetaby-vehicle)
+7. [資料模型](#七資料模型)
+8. [輪詢規範](#八輪詢規範)
+9. [錯誤處理](#九錯誤處理)
+10. [整合指引](#十整合指引)
+11. [JSON Schema](#十一json-schema)
+12. [部署配置參數](#十二部署配置參數)
+13. [與 MQTT 協議之欄位對應](#十三與-mqtt-協議之欄位對應)
+14. [實作狀態與交付](#十四實作狀態與交付)
+15. [附錄：與計畫 ETA 的關係](#十五附錄與計畫-eta-的關係)
 
 ---
 
 ## 一、服務範圍
 
-### 1.1 提供的資料
+| 類別 | 內容 | 提供的 API |
+|------|------|-----------|
+| 即將進站 | 車輛已進入到站門檻，站端可顯示進站提示 | `GET /syncdrive-api/vehicles/eta/by-station`<br>`GET /syncdrive-api/vehicles/eta/by-vehicle` |
+| 預計到達 | 車輛預計抵達各停靠點的時刻與剩餘秒數 | 同上 |
 
-| 類別 | 內容 | 對應端點 |
-|------|------|---------|
-| 即將進站 | 車輛已進入到站門檻，站端應顯示進站提示 | 端點 1、2 |
-| 預計到達 | 車輛預計抵達各站的時刻與剩餘秒數 | 端點 1、2 |
-| 異常狀況 | 車輛健康、營運誤點、通訊中斷、安全事件 | 端點 3 |
-| 資料可用性 | 本介面資料的新鮮度與服務狀態 | 端點 4 |
-
-### 1.2 不在範圍內
-
-- 車輛控制指令下發
-- 歷史資料查詢與軌跡回放
-- 事件推播與訂閱
+兩支 API 提供**同一份資料的兩種索引方式**：`by-station` 以停靠點為主鍵，供站端顯示；`by-vehicle` 以車輛為主鍵，供車輛追蹤畫面。
 
 ---
 
-## 二、資料性質
-
-### 2.1 底層更新頻率
-
-| 資料 | 更新頻率 |
-|------|---------|
-| 車輛位置、速度 | 1 Hz |
-| 到站推估、任務進度 | 1 Hz |
-| 子系統健康狀態 | 1 Hz 及狀態變更時 |
-| 計畫到站時刻 | 班表發布時 |
-
-底層資料為 1 Hz 更新，本介面為固定頻率輪詢，兩者頻率不同。每筆回應均附 `observed_at` 與 `data_age_seconds`，供使用方判斷資料實際新舊。
-
-### 2.2 快照語意
-
-每次回應為當下的完整快照，非增量更新。使用方無需處理訊息順序或補漏；未取得的輪次不會造成資料落後，下一輪即補齊。
-
-### 2.3 即時值與計畫值
-
-回應中的 `arrival_state`、`eta_*`、`confidence` 為即時推估值；`plan` 子物件為對應的班表計畫值。兩者資料來源不同，`plan` 於無對應計畫班次時為 `NO_PLAN`。詳見第十八章。
-
----
-
-## 三、通訊規範
+## 二、通訊規範
 
 | 項目 | 規範 |
 |------|------|
@@ -96,7 +64,7 @@
 | 請求逾時 | 使用方應設定 5 秒 |
 | 時鐘同步 | 雙方必須以 NTP 同步 |
 
-### 3.1 請求標頭
+### 2.1 請求標頭
 
 ```http
 GET /syncdrive-api/vehicles/eta/by-station HTTP/1.1
@@ -107,7 +75,7 @@ Accept-Encoding: gzip
 If-None-Match: "a1b2c3d4"
 ```
 
-### 3.2 回應標頭
+### 2.2 回應標頭
 
 ```http
 HTTP/1.1 200 OK
@@ -119,80 +87,91 @@ Cache-Control: no-cache, max-age=0
 
 ---
 
-## 四、共用約定
+## 三、共用約定
 
-### 4.1 識別碼格式
+### 3.1 識別碼格式
 
 | 欄位 | 格式 | 範例 |
 |------|------|------|
 | `vehicle_code` | `PMS-` + 兩碼數字 | `PMS-05` |
+| `station_id` | 停靠點識別碼 | `station_4` |
 | `trip_code` | 路線代號 + `HHMM` | `ST0007` |
 | `order_id` | `[YYMMDD]-[trip_code]` | `260816-ST0007` |
-| `station_id` | 地圖停靠點識別碼 | `station_4` |
-| `alert_id` | `EVT-[YYYYMMDD]-[四位序號]` | `EVT-20260816-0117` |
 
-### 4.2 時間表示
+### 3.2 時間表示
 
 | 欄位型式 | 型別 | 說明 |
 |---------|------|------|
-| `*_at` | Long | Unix Epoch 毫秒（UTC） |
-| `*_clock` | String | `HH:MM:SS`，營運日內時刻 |
-| `service_date` | String | `YYYY-MM-DD`，營運日 |
+| `*_at` | Long | Unix Epoch **毫秒**（UTC）。運算一律以此欄位為準 |
+| `*_clock` | String | `HH:MM:SS`，當地時刻，24 小時制，值域 `00:00:00`–`23:59:59`。僅供顯示 |
 
-跨午夜班次的 `*_clock` 允許超過 `24:00:00`，`service_date` 維持發車當日。
+跨午夜的班次直接以次日時刻表示。例：車輛於當地時間 8 月 17 日 01:10:30 抵達，
 
 ```json
 {
-  "service_date": "2026-08-16",
-  "eta_clock": "25:10:30",
-  "eta_at": 1716606630000
+  "eta_at": 1755364230000,
+  "eta_clock": "01:10:30"
 }
 ```
 
-上例為營運日 2026-08-16 的班次，實際到站時間為 2026-08-17 01:10:30。使用方應以 `*_at` 進行運算，`*_clock` 僅供顯示。
+`eta_clock` 為 `01:10:30`，日期由 `eta_at` 判定。本介面不使用超過 `24:00:00` 的時刻表示法。
 
-### 4.3 列舉值
+### 3.3 列舉值
 
-所有列舉值使用 `SCREAMING_SNAKE_CASE`。使用方應忽略未知列舉值並套用預設處理：`arrival_state` 未知時視為 `UNKNOWN`，`eta_impact` 未知時視為 `ETA_UNRELIABLE`。
+所有列舉值使用 `SCREAMING_SNAKE_CASE`。使用方應忽略未知列舉值並套用預設處理：`arrival_state` 未知時視為 `UNKNOWN`。
 
-### 4.4 空值語意
+各列舉值的完整值域見[第七章 資料模型](#七資料模型)。
 
-| 情形 | 表示 |
-|------|------|
-| 該站當下無車駛近 | `etas: []` |
-| 無法推估到站時刻 | `eta_seconds`、`eta_at`、`eta_clock` 皆為 `null` |
-| 無對應計畫班次 | `plan.delay_seconds` 為 `null`，`plan.delay_state` 為 `NO_PLAN` |
+### 3.4 停靠點清單
 
-回應中列出地圖上全部停靠點，包含當下無車駛近者，以利站端固定顯示版面。
+系統共 10 個停靠點。回應中一律列出全部停靠點，包含當下無車駛近者（該站 `etas` 為空陣列），以利站端固定顯示版面。
 
-### 4.5 停靠點識別
+| `station_id` | `station_name` |
+|-------------|----------------|
+| `station_1` | [備用]N2W上行停靠 |
+| `station_2` | N2W下行出發 |
+| `station_3` | T3下行 |
+| `station_4` | T3上行 |
+| `station_5` | S2W下行停靠 |
+| `station_6` | [備用]S2W上行出發 |
+| `station_7` | S2W上行出發 |
+| `station_8` | [備用]S2W下行停靠 |
+| `station_9` | N2W上行停靠 |
+| `station_10` | [備用]N2W下行出發 |
 
-本介面之 `station_id` 一律採用**地圖停靠點識別碼**（例 `station_4`），為系統內停靠點的唯一鍵。
+### 3.5 PIDS 站體側別對應
 
-車端於營運任務狀態協議回報的 `current_leg.target_station_id` 為站名代碼（例 `T3`），與地圖識別碼不同。本介面負責兩者的對應轉換，使用方無需處理。
+供旅客資訊顯示系統（PIDS）將停靠點歸併至站體側別。本介面回應**不含**側別欄位，使用方依下表自行對應。
 
-每筆停靠點同時提供三個欄位：
+| PIDS 側別 | `station_id` | `station_name` |
+|-----------|-------------|----------------|
+| **N2W 北側** | `station_9` | N2W上行停靠 |
+| **N2W 北側** | `station_2` | N2W下行出發 |
+| **N2W 南側** | `station_1` | [備用]N2W上行停靠 |
+| **N2W 南側** | `station_10` | [備用]N2W下行出發 |
+| **S2W 北側** | `station_8` | [備用]S2W下行停靠 |
+| **S2W 北側** | `station_6` | [備用]S2W上行出發 |
+| **S2W 南側** | `station_5` | S2W下行停靠 |
+| **S2W 南側** | `station_7` | S2W上行出發 |
+| **T3 西側** | `station_3` | T3下行 |
+| **T3 東側** | `station_4` | T3上行 |
 
-| 欄位 | 用途 | 範例 |
-|------|------|------|
-| `station_id` | 程式比對用唯一鍵 | `station_4` |
-| `station_name` | 完整站名，顯示用 | `T3上行` |
-| `station_alias` | 站名簡碼，版面受限時顯示用 | `T3` |
+每個 PIDS 側別對應一至二個停靠點。使用方如需以側別顯示，應將該側別下各停靠點的 `etas` 合併後依 `eta_at` 排序。
 
 ---
 
-## 五、端點總覽
+## 四、API 總覽
 
-| # | 端點 | 用途 | 建議輪詢間隔 |
-|---|------|------|------------|
-| 1 | `GET /syncdrive-api/vehicles/eta/by-station` | 依站索引的即時 ETA | 60 秒 |
-| 2 | `GET /syncdrive-api/vehicles/eta/by-vehicle` | 依車索引的即時 ETA | 60 秒 |
-| 3 | `GET /syncdrive-api/vehicles/alerts` | 異常狀況清單 | 30 秒 |
-| 4 | `GET /syncdrive-api/vehicles/feed-status` | 資料饋送狀態 | 30 秒 |
+| API | 用途 | 建議輪詢間隔 |
+|-----|------|------------|
+| `GET /syncdrive-api/vehicles/eta/by-station` | 各停靠點接下來將抵達的車輛 | 60 秒 |
+| `GET /syncdrive-api/vehicles/eta/by-vehicle` | 各車輛接下來將抵達的停靠點 | 60 秒 |
+
+輪詢間隔的上下限與依據見[第八章 輪詢規範](#八輪詢規範)。
 
 ---
 
-## 六、端點 1：依站即時 ETA
+## 五、GET /vehicles/eta/by-station
 
 ```
 GET /syncdrive-api/vehicles/eta/by-station
@@ -200,15 +179,16 @@ GET /syncdrive-api/vehicles/eta/by-station
 
 回傳各停靠點接下來將抵達的車輛預測。
 
-### 6.1 查詢參數
+**回應欄位意義見[第七章 資料模型](#七資料模型)。**
+
+### 5.1 查詢參數
 
 | 參數 | 型別 | 必填 | 預設 | 說明 |
 |------|------|------|------|------|
 | `station_id` | String | 否 | 全部 | 指定停靠點，可重複指定多個 |
 | `limit_per_station` | Int | 否 | `3` | 每站回傳筆數，值域 1–10 |
-| `include_plan` | Boolean | 否 | `true` | 是否附帶計畫值與誤差 |
 
-### 6.2 請求範例
+### 5.2 請求範例
 
 全線各站，每站 3 筆：
 
@@ -224,31 +204,31 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station?station_id=
   -H "X-API-Key: <API_KEY>"
 ```
 
-指定多站、每站 1 筆、不含計畫值：
+指定多站、每站 1 筆：
 
 ```bash
 curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
-?station_id=station_4&station_id=station_2&limit_per_station=1&include_plan=false" \
+?station_id=station_4&station_id=station_2&limit_per_station=1" \
   -H "X-API-Key: <API_KEY>"
 ```
 
-### 6.3 回應：一般情形
+### 5.3 完整回應：一般情形
+
+請求：`?station_id=station_4&limit_per_station=3`
 
 ```json
 {
   "meta": {
-    "generated_at": 1716536400000,
-    "service_date": "2026-08-16",
+    "generated_at": 1755327600000,
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "OK"
   },
-  "station_count": 2,
+  "station_count": 1,
   "stations": [
     {
       "station_id": "station_4",
       "station_name": "T3上行",
-      "station_alias": "T3",
       "etas": [
         {
           "vehicle_code": "PMS-05",
@@ -256,21 +236,21 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "trip_code": "ST0007",
           "route_code": "ST",
           "route_name": "S2W上行 > T3上行",
+          "vehicle_phase": "TRANSITING",
           "arrival_state": "APPROACHING",
           "eta_seconds": 25,
-          "eta_at": 1716536425000,
+          "eta_at": 1755327625000,
           "eta_clock": "09:00:25",
           "distance_to_station_m": 120.0,
-          "confidence": "HIGH",
-          "vehicle_phase": "TRANSITING",
           "plan": {
+            "planned_arrival_at": 1755327610000,
             "planned_arrival_clock": "09:00:10",
-            "planned_arrival_at": 1716536410000,
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
             "delay_seconds": 15,
             "delay_state": "ON_TIME"
           },
-          "has_alert": false,
-          "observed_at": 1716536398000,
+          "observed_at": 1755327598000,
           "data_age_seconds": 2
         },
         {
@@ -279,121 +259,144 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "trip_code": "ST0013",
           "route_code": "ST",
           "route_name": "S2W上行 > T3上行",
+          "vehicle_phase": "TRANSITING",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 415,
-          "eta_at": 1716536815000,
+          "eta_at": 1755328015000,
           "eta_clock": "09:06:55",
           "distance_to_station_m": 1840.0,
-          "confidence": "MEDIUM",
-          "vehicle_phase": "TRANSITING",
           "plan": {
+            "planned_arrival_at": 1755327970000,
             "planned_arrival_clock": "09:06:10",
-            "planned_arrival_at": 1716536770000,
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
             "delay_seconds": 45,
             "delay_state": "ON_TIME"
           },
-          "has_alert": false,
-          "observed_at": 1716536397000,
+          "observed_at": 1755327597000,
           "data_age_seconds": 3
+        },
+        {
+          "vehicle_code": "PMS-09",
+          "order_id": "260816-ST0019",
+          "trip_code": "ST0019",
+          "route_code": "ST",
+          "route_name": "S2W上行 > T3上行",
+          "vehicle_phase": "TRANSITING",
+          "arrival_state": "EN_ROUTE",
+          "eta_seconds": 790,
+          "eta_at": 1755328390000,
+          "eta_clock": "09:13:10",
+          "distance_to_station_m": 3520.0,
+          "plan": {
+            "planned_arrival_at": 1755328330000,
+            "planned_arrival_clock": "09:12:10",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
+            "delay_seconds": 60,
+            "delay_state": "ON_TIME"
+          },
+          "observed_at": 1755327596000,
+          "data_age_seconds": 4
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 5.4 完整回應：停靠中、資料逾時、無車駛近
+
+請求：`?station_id=station_2&station_id=station_9&station_id=station_1&limit_per_station=1`
+
+```json
+{
+  "meta": {
+    "generated_at": 1755327600000,
+    "shift_id": "OS-DRAFT-MSEEXIN9",
+    "source": "published",
+    "data_quality": "DEGRADED"
+  },
+  "station_count": 3,
+  "stations": [
+    {
+      "station_id": "station_2",
+      "station_name": "N2W下行出發",
+      "etas": [
+        {
+          "vehicle_code": "PMS-03",
+          "order_id": "260816-NT0900",
+          "trip_code": "NT0900",
+          "route_code": "NT",
+          "route_name": "N2W下行出發 > T3下行",
+          "vehicle_phase": "TRANSITING",
+          "arrival_state": "AT_STATION",
+          "eta_seconds": 0,
+          "eta_at": 1755327580000,
+          "eta_clock": "08:59:40",
+          "distance_to_station_m": 0.0,
+          "plan": {
+            "planned_arrival_at": 1755327570000,
+            "planned_arrival_clock": "08:59:30",
+            "planned_departure_at": 1755327620000,
+            "planned_departure_clock": "09:00:20",
+            "delay_seconds": 10,
+            "delay_state": "ON_TIME"
+          },
+          "observed_at": 1755327599000,
+          "data_age_seconds": 1
         }
       ]
     },
     {
-      "station_id": "station_2",
-      "station_name": "N2W下行出發",
-      "station_alias": "N2W",
+      "station_id": "station_9",
+      "station_name": "N2W上行停靠",
+      "etas": [
+        {
+          "vehicle_code": "PMS-08",
+          "order_id": "260816-TN0905",
+          "trip_code": "TN0905",
+          "route_code": "TN",
+          "route_name": "T3上行 > N2W上行",
+          "vehicle_phase": null,
+          "arrival_state": "UNKNOWN",
+          "eta_seconds": null,
+          "eta_at": null,
+          "eta_clock": null,
+          "distance_to_station_m": null,
+          "plan": {
+            "planned_arrival_at": 1755327900000,
+            "planned_arrival_clock": "09:05:00",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
+            "delay_seconds": null,
+            "delay_state": "NO_PLAN"
+          },
+          "observed_at": 1755327508000,
+          "data_age_seconds": 92
+        }
+      ]
+    },
+    {
+      "station_id": "station_1",
+      "station_name": "[備用]N2W上行停靠",
       "etas": []
     }
   ]
 }
 ```
 
-### 6.4 回應：車輛停靠中
+本例包含三種情形：
 
-```json
-{
-  "vehicle_code": "PMS-03",
-  "trip_code": "TN0902",
-  "arrival_state": "AT_STATION",
-  "eta_seconds": 0,
-  "eta_at": 1716536380000,
-  "eta_clock": "08:59:40",
-  "distance_to_station_m": 0.0,
-  "confidence": "HIGH",
-  "vehicle_phase": "TRANSITING",
-  "plan": {
-    "planned_arrival_clock": "08:59:30",
-    "planned_departure_clock": "09:00:20",
-    "delay_seconds": 10,
-    "delay_state": "ON_TIME"
-  },
-  "has_alert": false,
-  "observed_at": 1716536399000,
-  "data_age_seconds": 1
-}
-```
+- `station_2`：車輛停靠中（`arrival_state` 為 `AT_STATION`），`plan.planned_departure_*` 提供預計發車時刻。
+- `station_9`：車端資料逾時（`data_age_seconds` 為 92，超過 90 秒門檻），`arrival_state` 為 `UNKNOWN`，所有即時推估欄位為 `null`。使用方必須顯示資料中斷，不得沿用先前取得的 ETA。
+- `station_1`：當下無車駛近，`etas` 為空陣列。
 
-`arrival_state` 為 `AT_STATION` 時，`plan.planned_departure_clock` 提供預計發車時刻。
-
-`vehicle_phase` 為車端原值透傳，其值域由營運任務狀態協議定義，與本介面之 `arrival_state` 為兩組獨立欄位。
-
-### 6.5 回應：顯著誤點且伴隨異常
-
-```json
-{
-  "vehicle_code": "PMS-02",
-  "trip_code": "ST0013",
-  "arrival_state": "EN_ROUTE",
-  "eta_seconds": 660,
-  "eta_at": 1716537060000,
-  "eta_clock": "09:11:00",
-  "distance_to_station_m": 1840.0,
-  "confidence": "LOW",
-  "vehicle_phase": "TRANSITING",
-  "plan": {
-    "planned_arrival_clock": "09:06:10",
-    "planned_arrival_at": 1716536770000,
-    "delay_seconds": 290,
-    "delay_state": "MAJOR_DELAY"
-  },
-  "has_alert": true,
-  "observed_at": 1716536380000,
-  "data_age_seconds": 20
-}
-```
-
-`has_alert` 為 `true` 時，對應告警可於端點 3 以 `vehicle_code` 查得。
-
-### 6.6 回應：車輛資料逾時
-
-```json
-{
-  "vehicle_code": "PMS-08",
-  "trip_code": "TN0905",
-  "arrival_state": "UNKNOWN",
-  "eta_seconds": null,
-  "eta_at": null,
-  "eta_clock": null,
-  "distance_to_station_m": null,
-  "confidence": "STALE",
-  "vehicle_phase": null,
-  "plan": {
-    "planned_arrival_clock": "09:05:00",
-    "planned_arrival_at": 1716536700000,
-    "delay_seconds": null,
-    "delay_state": "NO_PLAN"
-  },
-  "has_alert": true,
-  "observed_at": 1716536308000,
-  "data_age_seconds": 92
-}
-```
-
-`arrival_state` 為 `UNKNOWN` 時，使用方必須顯示資料中斷，不得沿用先前取得的 ETA。
+因存在逾時車輛，`meta.data_quality` 為 `DEGRADED`。
 
 ---
 
-## 七、端點 2：依車即時 ETA
+## 六、GET /vehicles/eta/by-vehicle
 
 ```
 GET /syncdrive-api/vehicles/eta/by-vehicle
@@ -401,14 +404,16 @@ GET /syncdrive-api/vehicles/eta/by-vehicle
 
 回傳各車輛接下來將抵達的停靠點預測。
 
-### 7.1 查詢參數
+**回應欄位意義見[第七章 資料模型](#七資料模型)。**
+
+### 6.1 查詢參數
 
 | 參數 | 型別 | 必填 | 預設 | 說明 |
 |------|------|------|------|------|
 | `vehicle_code` | String | 否 | 全部 | 指定車輛，可重複指定多個 |
 | `next_stops` | Int | 否 | `3` | 每車往後推算站數，值域 1–10 |
 
-### 7.2 請求範例
+### 6.2 請求範例
 
 ```bash
 curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle" \
@@ -416,17 +421,20 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle" \
 ```
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_code=PMS-05&next_stops=5" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_code=PMS-05&next_stops=3" \
   -H "X-API-Key: <API_KEY>"
 ```
 
-### 7.3 回應
+### 6.3 完整回應：正常行駛中
+
+請求：`?vehicle_code=PMS-05&next_stops=3`
 
 ```json
 {
   "meta": {
-    "generated_at": 1716536400000,
-    "service_date": "2026-08-16",
+    "generated_at": 1755327600000,
+    "shift_id": "OS-DRAFT-MSEEXIN9",
+    "source": "published",
     "data_quality": "OK"
   },
   "vehicle_count": 1,
@@ -434,7 +442,6 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
     {
       "vehicle_code": "PMS-05",
       "vehicle_phase": "TRANSITING",
-      "overall_health": "OK",
       "order_id": "260816-ST0007",
       "trip_code": "ST0007",
       "route_code": "ST",
@@ -452,11 +459,14 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "T3上行",
           "arrival_state": "APPROACHING",
           "eta_seconds": 25,
-          "eta_at": 1716536425000,
+          "eta_at": 1755327625000,
           "eta_clock": "09:00:25",
-          "confidence": "HIGH",
+          "distance_to_station_m": 120.0,
           "plan": {
+            "planned_arrival_at": 1755327610000,
             "planned_arrival_clock": "09:00:10",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
             "delay_seconds": 15,
             "delay_state": "ON_TIME"
           }
@@ -467,11 +477,14 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "N2W上行停靠",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 268,
-          "eta_at": 1716536668000,
+          "eta_at": 1755327868000,
           "eta_clock": "09:04:28",
-          "confidence": "MEDIUM",
+          "distance_to_station_m": null,
           "plan": {
+            "planned_arrival_at": 1755327840000,
             "planned_arrival_clock": "09:04:00",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
             "delay_seconds": 28,
             "delay_state": "ON_TIME"
           }
@@ -482,329 +495,225 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "N2W下行出發",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 495,
-          "eta_at": 1716536895000,
+          "eta_at": 1755328095000,
           "eta_clock": "09:08:15",
-          "confidence": "LOW",
+          "distance_to_station_m": null,
           "plan": {
+            "planned_arrival_at": 1755328060000,
             "planned_arrival_clock": "09:07:40",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
             "delay_seconds": 35,
             "delay_state": "ON_TIME"
           }
         }
       ],
-      "observed_at": 1716536398000,
+      "observed_at": 1755327598000,
       "data_age_seconds": 2
     }
   ]
 }
 ```
 
-`confidence` 隨 `sequence` 遞減：第 1 站採用車端直接推估，第 2 站以後由中心端依班表站間旅行時間外推。
+`distance_to_station_m` 僅於 `sequence` 為 `1`（車輛當前行駛中的目標站）時有值，後續站點為 `null`。
 
----
+### 6.4 完整回應：車輛資料逾時
 
-## 八、端點 3：異常狀況
-
-```
-GET /syncdrive-api/vehicles/alerts
-```
-
-### 8.1 查詢參數
-
-| 參數 | 型別 | 必填 | 預設 | 說明 |
-|------|------|------|------|------|
-| `event_severity` | String | 否 | 全部 | `CRITICAL` / `WARNING` / `INFO`（事件嚴重度） |
-| `health_status` | String | 否 | 全部 | `WARNING` / `ERROR` / `OFFLINE`（設備健康狀態） |
-| `vehicle_code` | String | 否 | 全部 | 指定車輛 |
-| `active_only` | Boolean | 否 | `true` | `true` 僅回傳未解除者 |
-
-### 8.2 請求範例
-
-```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts" \
-  -H "X-API-Key: <API_KEY>"
-```
-
-```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?event_severity=CRITICAL" \
-  -H "X-API-Key: <API_KEY>"
-```
-
-```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05&active_only=false" \
-  -H "X-API-Key: <API_KEY>"
-```
-
-### 8.3 回應
+請求：`?vehicle_code=PMS-08&next_stops=3`
 
 ```json
 {
   "meta": {
-    "generated_at": 1716536400000,
-    "service_date": "2026-08-16",
-    "data_quality": "OK"
+    "generated_at": 1755327600000,
+    "shift_id": "OS-DRAFT-MSEEXIN9",
+    "source": "published",
+    "data_quality": "DEGRADED"
   },
-  "alert_count": 4,
-  "alerts": [
+  "vehicle_count": 1,
+  "vehicles": [
     {
-      "alert_id": "EVT-20260816-0117",
-      "category": "VEHICLE_HEALTH",
-      "code": "LIDAR_FRONT_BLIND",
-      "event_severity": null,
-      "health_status": "ERROR",
-      "vehicle_code": "PMS-05",
-      "subsystem": "SENSING",
-      "message": "前光達視野受阻",
-      "station_id": null,
-      "trip_code": "ST0007",
-      "started_at": 1716536350000,
-      "updated_at": 1716536398000,
-      "resolved_at": null,
-      "acknowledged": false,
-      "active": true,
-      "eta_impact": "ETA_UNRELIABLE"
-    },
-    {
-      "alert_id": "EVT-20260816-0118",
-      "category": "SCHEDULE_DEVIATION",
-      "code": "MAJOR_DELAY",
-      "event_severity": null,
-      "health_status": null,
-      "vehicle_code": "PMS-02",
-      "subsystem": null,
-      "message": "較計畫誤點 245 秒",
-      "station_id": "station_4",
-      "trip_code": "ST0013",
-      "started_at": 1716536200000,
-      "updated_at": 1716536398000,
-      "resolved_at": null,
-      "acknowledged": false,
-      "active": true,
-      "eta_impact": "ETA_DEGRADED"
-    },
-    {
-      "alert_id": "EVT-20260816-0119",
-      "category": "COMMUNICATION",
-      "code": "VEHICLE_SIGNAL_LOST",
-      "event_severity": null,
-      "health_status": "OFFLINE",
       "vehicle_code": "PMS-08",
-      "subsystem": "COMMUNICATION",
-      "message": "已 92 秒未收到車端回報",
-      "station_id": null,
+      "vehicle_phase": null,
+      "order_id": "260816-TN0905",
       "trip_code": "TN0905",
-      "started_at": 1716536306000,
-      "updated_at": 1716536398000,
-      "resolved_at": null,
-      "acknowledged": false,
-      "active": true,
-      "eta_impact": "ETA_UNAVAILABLE"
-    },
-    {
-      "alert_id": "EVT-20260816-0003",
-      "category": "SAFETY",
-      "code": "PATH_BLOCKED",
-      "event_severity": "CRITICAL",
-      "health_status": "OK",
-      "vehicle_code": "PMS-07",
-      "subsystem": null,
-      "message": "路徑完全受阻，車輛安全停車",
-      "station_id": null,
-      "trip_code": "TS1042",
-      "started_at": 1716536290000,
-      "updated_at": 1716536398000,
-      "resolved_at": null,
-      "acknowledged": false,
-      "active": true,
-      "eta_impact": "ETA_UNAVAILABLE"
+      "route_code": "TN",
+      "route_name": "T3上行 > N2W上行",
+      "position": null,
+      "next_stops": [
+        {
+          "sequence": 1,
+          "station_id": "station_9",
+          "station_name": "N2W上行停靠",
+          "arrival_state": "UNKNOWN",
+          "eta_seconds": null,
+          "eta_at": null,
+          "eta_clock": null,
+          "distance_to_station_m": null,
+          "plan": {
+            "planned_arrival_at": 1755327900000,
+            "planned_arrival_clock": "09:05:00",
+            "planned_departure_at": null,
+            "planned_departure_clock": null,
+            "delay_seconds": null,
+            "delay_state": "NO_PLAN"
+          }
+        }
+      ],
+      "observed_at": 1755327508000,
+      "data_age_seconds": 92
     }
   ]
 }
 ```
 
-本筆示範事件嚴重度與設備健康狀態的獨立性：`PATH_BLOCKED` 之 `event_severity` 為 `CRITICAL`，但車輛硬體無損壞，`health_status` 維持 `OK`。`alert_id` 即該事件於 `security_event_logs` 之 `event_id`。
-
-### 8.4 `message` 值域
-
-`message` 對應 `security_event_logs.display_message`。`SAFETY` 分類之事件已有固定中文訊息：
-
-| `code` | `message` |
-|--------|-----------|
-| `PATH_BLOCKED` | 路徑受阻，車輛已執行安全停車 |
-| `UNSCHEDULED_DOOR_OPEN` | 行駛中偵測到車門異常開啟 |
-| `OBSTACLE_DETECTED` | 路徑上偵測到障礙物 |
-| `DIRECTION_VIOLATION` | 行向偏離或逆向行駛 |
-| `INTERLOCK_REQ` | 請求路口路權鎖定 |
-| `SYSTEM_HEALTH_DEGRADED` | 車載系統健康度下降 |
-
-`PATH_BLOCKED` 若係由緊急停車指令觸發，`message` 為「緊急停車指令：路徑受阻，車輛已安全停車」。
-
-`VEHICLE_HEALTH`、`SCHEDULE_DEVIATION`、`COMMUNICATION` 之 `message` 依內容動態產生，不屬固定值域。使用方應以 `code` 判斷類型，`message` 僅供顯示。
-
-### 8.5 告警生命週期
-
-同一車輛的同一 `code` 在持續期間內僅對應一筆 `alert_id`，不隨輪詢重複產生。使用方應以 `alert_id` 為主鍵維護看板狀態。
-
-`acknowledged` 表示值班人員是否已於中心端確認該告警，與 `active`（是否仍在發生）為兩個獨立狀態：已確認但尚未排除者為 `acknowledged: true` 且 `active: true`。
-
-告警解除時，`resolved_at` 填入解除時刻，`active` 轉為 `false`，`eta_impact` 轉為 `NONE`。
-
-**持久化差異**：`SAFETY` 與 `VEHICLE_HEALTH` 分類之告警持久化於中心端，`alert_id` 於重啟後維持不變；`SCHEDULE_DEVIATION` 與 `COMMUNICATION` 為即時計算結果，不持久化，中心端重啟後 `alert_id` 會重新配發。使用方應以 `vehicle_code` + `code` 作為去重依據，不應假設後兩類的 `alert_id` 長期穩定。以 `active_only=false` 查詢可取得已解除者：
-
-```json
-{
-  "alert_id": "EVT-20260816-0117",
-  "category": "VEHICLE_HEALTH",
-  "code": "LIDAR_FRONT_BLIND",
-  "event_severity": null,
-  "health_status": "OK",
-  "vehicle_code": "PMS-05",
-  "subsystem": "SENSING",
-  "message": "前光達視野受阻",
-  "station_id": null,
-  "trip_code": "ST0007",
-  "started_at": 1716536350000,
-  "updated_at": 1716536520000,
-  "resolved_at": 1716536520000,
-  "acknowledged": true,
-  "active": false,
-  "eta_impact": "NONE"
-}
-```
+車端資料逾時時，`position` 與所有即時推估欄位為 `null`，且僅回傳 `sequence` 為 `1` 的站點（無法外推後續站點）。
 
 ---
 
-## 九、端點 4：資料饋送狀態
+## 七、資料模型
 
-```
-GET /syncdrive-api/vehicles/feed-status
-```
+本章定義兩支 API 回應中每一個欄位的意義、型別與值域。
 
-回報本介面資料的新鮮度與服務可用性。使用方應於顯示 ETA 前先取得本端點。
+### 7.1 `meta`（回應層級資訊）
 
-### 9.1 請求範例
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `generated_at` | Long | 中心端產生本次快照的時刻，Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
+| `shift_id` | String \| null | 本次計畫值所依據的班表識別碼。無可用班表時為 `null` |
+| `source` | String | 計畫值來源，見 7.2 |
+| `data_quality` | String | 本次快照的整體資料品質，見 7.3 |
 
-```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
-  -H "X-API-Key: <API_KEY>"
-```
+### 7.2 `source`（計畫值來源）
 
-### 9.2 回應：正常
+`plan` 子物件的資料取自哪一份班表。
 
-```json
-{
-  "generated_at": 1716536400000,
-  "status": "OK",
-  "mqtt_broker_connected": true,
-  "timetable_loaded": true,
-  "shift_id": "OS-DRAFT-MSEEXIN9",
-  "service_date": "2026-08-16",
-  "vehicles_expected": 11,
-  "vehicles_reporting": 11,
-  "vehicles_stale": [],
-  "oldest_data_age_seconds": 3,
-  "degraded_reasons": []
-}
-```
+| 值 | 意義 | 使用方處理 |
+|----|------|-----------|
+| `published` | 已發布班表 | 計畫值有效 |
+| `draft_fallback` | 尚未發布的草稿班表 | 計畫值僅供參考，不應對外顯示為正式時刻 |
+| `none` | 無可用班表 | `plan` 全部欄位為 `null`，`delay_state` 為 `NO_PLAN` |
 
-### 9.3 回應：部分降級
+### 7.3 `data_quality`（資料品質）
 
-```json
-{
-  "generated_at": 1716536400000,
-  "status": "DEGRADED",
-  "mqtt_broker_connected": true,
-  "timetable_loaded": true,
-  "shift_id": "OS-DRAFT-MSEEXIN9",
-  "service_date": "2026-08-16",
-  "vehicles_expected": 11,
-  "vehicles_reporting": 10,
-  "vehicles_stale": [
-    { "vehicle_code": "PMS-08", "data_age_seconds": 92 }
-  ],
-  "oldest_data_age_seconds": 92,
-  "degraded_reasons": ["VEHICLE_SIGNAL_LOST"]
-}
-```
+依全車隊的回報狀況彙總。
 
-### 9.4 回應：服務中斷
-
-```json
-{
-  "generated_at": 1716536400000,
-  "status": "DOWN",
-  "mqtt_broker_connected": false,
-  "timetable_loaded": true,
-  "shift_id": "OS-DRAFT-MSEEXIN9",
-  "service_date": "2026-08-16",
-  "vehicles_expected": 11,
-  "vehicles_reporting": 0,
-  "vehicles_stale": [],
-  "oldest_data_age_seconds": null,
-  "degraded_reasons": ["MQTT_BROKER_DISCONNECTED"]
-}
-```
-
-### 9.5 狀態處理
-
-| `status` | 意義 | 使用方處理 |
-|----------|------|-----------|
+| 值 | 意義 | 使用方處理 |
+|----|------|-----------|
 | `OK` | 全部車輛回報正常 | 正常顯示 |
-| `DEGRADED` | 部分車輛逾時或班表未載入 | 顯示並標示不確定範圍 |
-| `DOWN` | MQTT 中斷或無可用班表 | 必須停止顯示 ETA，改顯示資料中斷 |
+| `DEGRADED` | 部分車輛資料逾時，或班表未載入 | 顯示，並對 `arrival_state` 為 `UNKNOWN` 者標示資料中斷 |
+| `DOWN` | 無法取得任何車輛資料 | **必須**停止顯示 ETA，改顯示資料中斷 |
 
-`degraded_reasons` 值域：`VEHICLE_SIGNAL_LOST`、`MQTT_BROKER_DISCONNECTED`、`TIMETABLE_NOT_LOADED`。
+### 7.4 計數欄位
 
----
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `station_count` | Int | 本次回應包含的停靠點數量，等於 `stations` 陣列長度。未指定 `station_id` 時為 `10` |
+| `vehicle_count` | Int | 本次回應包含的車輛數量，等於 `vehicles` 陣列長度 |
 
-## 十、資料模型
+兩者用途為讓使用方在解析前即可得知資料筆數，並可與陣列長度交叉檢查傳輸是否完整。
 
-### 10.1 `arrival_state`（到站狀態）
+### 7.5 車輛與班次識別
 
-**本欄為本介面衍生欄位**，非 MQTT 協議定義之狀態。營運任務狀態協議提供的是
-`current_leg.distance_to_target_m`、`current_leg.eta_seconds` 與任務執行狀態，
-本介面依門檻值將其歸類為可直接顯示的到站狀態，以滿足「即將進站／預計到達」之需求。
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `vehicle_code` | String | 車輛代號，格式 `PMS-` + 兩碼數字 |
+| `order_id` | String \| null | 該車當前執行的營運訂單識別碼。未執行任務時為 `null` |
+| `trip_code` | String \| null | 班次代碼，格式為路線代號 + 發車時刻 `HHMM`。例 `ST0007` 表示 ST 路線 00:07 發車的班次 |
+| `route_code` | String \| null | 路線代號 |
+| `route_name` | String \| null | 路線全名，格式為「起站 > 迄站」 |
+| `station_id` | String | 停靠點識別碼，值域見 3.4 |
+| `station_name` | String | 停靠點名稱 |
 
-| 值 | 意義 | 推導來源 |
+### 7.6 `vehicle_phase`（車輛營運階段）
+
+車端於營運任務狀態協議回報之營運階段，本介面**原值透傳**，不改寫、不擴充。
+
+| 值 | 意義 |
+|----|------|
+| `TRANSITING` | 執行任務行駛中 |
+| `FAULTED` | 故障或受困，需人工介入 |
+
+值域由營運任務狀態協議定義，上表為該協議目前明列者。車端未提供或資料逾時時為 `null`。
+
+本欄位與 `arrival_state` 為兩組獨立欄位：`vehicle_phase` 描述車輛整體營運狀態，`arrival_state` 描述該車相對於**某一個**停靠點的到站進度。同一台車對不同停靠點會有不同的 `arrival_state`，但 `vehicle_phase` 只有一個。
+
+### 7.7 `arrival_state`（到站狀態）
+
+**本欄為本介面依車端回報值計算之衍生欄位**，非 MQTT 協議定義之狀態。這是「即將進站」與「預計到達」的判斷依據。
+
+| 值 | 意義 | 判定條件 |
 |----|------|---------|
-| `EN_ROUTE` | 行駛中 | `eta_seconds` 與 `distance_to_target_m` 均未達門檻 |
-| `APPROACHING` | 即將進站 | `eta_seconds ≤ 60` 或 `distance_to_target_m ≤ 200` |
-| `DOCKING` | 進站對位中 | 任務 `PLATFORM_DOCKING` 之 `status` 為 `IN_PROGRESS` |
-| `AT_STATION` | 停靠中 | 任務 `OPEN_DOORS` 之 `status` 為 `COMPLETED`，且尚未觸發 `CLOSE_DOORS` |
-| `DEPARTED` | 已離站 | 任務 `STATION_DEPARTURE` 之 `status` 為 `COMPLETED` |
-| `UNKNOWN` | 無法判定 | 車端資料逾時，或缺少 `current_leg` |
+| `EN_ROUTE` | 行駛中，尚未接近。**此即「預計到達」** | `eta_seconds` 與 `distance_to_station_m` 均未達門檻 |
+| `APPROACHING` | 即將進站。**此即「即將進站」** | `eta_seconds ≤ 60` 或 `distance_to_station_m ≤ 200` |
+| `DOCKING` | 進站對位中 | 車端 `PLATFORM_DOCKING` 任務為 `IN_PROGRESS` |
+| `AT_STATION` | 停靠中 | 車端 `OPEN_DOORS` 任務已完成，且尚未觸發 `CLOSE_DOORS` |
+| `DEPARTED` | 已離站 | 車端 `STATION_DEPARTURE` 任務已完成 |
+| `UNKNOWN` | 無法判定 | 車端資料逾時（`data_age_seconds` 超過門檻），或缺少目標站資訊 |
 
-`PLATFORM_DOCKING`、`OPEN_DOORS`、`CLOSE_DOORS`、`STATION_DEPARTURE` 均為營運任務狀態協議
-第六章定義之 `task_name`；`IN_PROGRESS` 與 `COMPLETED` 為該協議定義之任務 `status`。
-門檻值可於部署時配置，見第十五章。
+`PLATFORM_DOCKING`、`OPEN_DOORS`、`CLOSE_DOORS`、`STATION_DEPARTURE` 為營運任務狀態協議定義之任務名稱。門檻值見[第十二章 部署配置參數](#十二部署配置參數)。
 
 判定範例：
 
 | 車端回報 | 判定 | 依據 |
 |---------|------|------|
-| `eta_seconds=25`、`distance_to_target_m=120` | `APPROACHING` | 時間與距離門檻均成立 |
-| `eta_seconds=45`、`distance_to_target_m=350` | `APPROACHING` | 時間門檻成立 |
-| `eta_seconds=90`、`distance_to_target_m=180` | `APPROACHING` | 距離門檻成立 |
-| `eta_seconds=415`、`distance_to_target_m=1840` | `EN_ROUTE` | 兩項門檻均未成立 |
+| `eta_seconds=25`、`distance=120` | `APPROACHING` | 時間與距離門檻均成立 |
+| `eta_seconds=45`、`distance=350` | `APPROACHING` | 時間門檻成立 |
+| `eta_seconds=90`、`distance=180` | `APPROACHING` | 距離門檻成立 |
+| `eta_seconds=415`、`distance=1840` | `EN_ROUTE` | 兩項門檻均未成立 |
 | 逾 90 秒未回報 | `UNKNOWN` | 資料逾時 |
 
-### 10.2 `delay_state`（誤點狀態）
+### 7.8 到站時刻欄位
 
-`delay_seconds` 為正值表示晚於計畫。
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `eta_seconds` | Int \| null | 距離抵達該停靠點還有幾秒。**以 `observed_at`（車端回報時刻）為基準**，非以使用方收到回應的時刻為基準 |
+| `eta_at` | Long \| null | 預計抵達該停靠點的**絕對時刻**，Unix Epoch 毫秒。使用方計算倒數必須使用本欄位 |
+| `eta_clock` | String \| null | `eta_at` 的當地時刻表示，格式 `HH:MM:SS`，24 小時制。僅供顯示 |
+| `distance_to_station_m` | Double \| null | 車輛距該停靠點的路徑距離，單位公尺 |
 
-| 值 | 條件 |
-|----|------|
-| `EARLY` | `delay_seconds < -30` |
-| `ON_TIME` | `-30 ≤ delay_seconds ≤ 60` |
-| `MINOR_DELAY` | `60 < delay_seconds ≤ 180` |
-| `MAJOR_DELAY` | `delay_seconds > 180` |
-| `NO_PLAN` | 無對應計畫班次 |
+三個 ETA 欄位表達同一件事的三種形式：
 
-`MAJOR_DELAY` 同時於端點 3 產生 `SCHEDULE_DEVIATION` 告警。
+```json
+{
+  "observed_at": 1755327598000,
+  "eta_seconds": 25,
+  "eta_at": 1755327625000,
+  "eta_clock": "09:00:25"
+}
+```
+
+讀法為：**該車輛預計於當地時間 09:00:25 抵達此停靠點。** 車端最後回報時刻為 09:00:00（`observed_at`），自該時刻起算尚有 25 秒（`eta_seconds`），故絕對抵達時刻為 09:00:25（`eta_at`／`eta_clock`）。
+
+`arrival_state` 為 `UNKNOWN` 時，此三個欄位皆為 `null`。
+
+### 7.9 `plan`（班表計畫值）
+
+該班次依已發布班表原訂的時刻，以及即時值與其之差。
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `planned_arrival_at` | Long \| null | 計畫抵達時刻，Unix Epoch 毫秒 |
+| `planned_arrival_clock` | String \| null | 計畫抵達時刻的當地時刻表示 |
+| `planned_departure_at` | Long \| null | 計畫發車時刻。僅於該停靠點為該班次起站，或 `arrival_state` 為 `AT_STATION` 時有值，其餘為 `null` |
+| `planned_departure_clock` | String \| null | 計畫發車時刻的當地時刻表示 |
+| `delay_seconds` | Int \| null | `eta_at` 減 `planned_arrival_at`，單位秒。**正值表示晚於計畫**，負值表示早於計畫 |
+| `delay_state` | String | 誤點狀態，見 7.10 |
+
+### 7.10 `delay_state`（誤點狀態）
+
+| 值 | 條件 | 意義 |
+|----|------|------|
+| `EARLY` | `delay_seconds < -30` | 早到 |
+| `ON_TIME` | `-30 ≤ delay_seconds ≤ 60` | 準點 |
+| `MINOR_DELAY` | `60 < delay_seconds ≤ 180` | 輕微誤點 |
+| `MAJOR_DELAY` | `delay_seconds > 180` | 顯著誤點 |
+| `NO_PLAN` | 無對應計畫班次 | 不判定誤點。加班車、調度車，或班表未載入時屬此類 |
+
+門檻值見[第十二章 部署配置參數](#十二部署配置參數)。
 
 計算範例：
 
-| 計畫到站 | 預計到站 | `delay_seconds` | `delay_state` |
+| 計畫抵達 | 預計抵達 | `delay_seconds` | `delay_state` |
 |---------|---------|----------------|--------------|
 | 09:00:10 | 09:00:25 | `15` | `ON_TIME` |
 | 09:00:10 | 08:59:20 | `-50` | `EARLY` |
@@ -812,156 +721,67 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
 | 09:06:10 | 09:11:00 | `290` | `MAJOR_DELAY` |
 | 無 | 09:11:00 | `null` | `NO_PLAN` |
 
-### 10.3 `confidence`（推估可信度）
-
-| 值 | 條件 | 推估方式 |
-|----|------|---------|
-| `HIGH` | 下一站且 `data_age_seconds ≤ 5` | 採用車端推估值 |
-| `MEDIUM` | 第 2–3 站，或 `data_age_seconds ≤ 30` | 依班表站間旅行時間外推 |
-| `LOW` | 更遠站點，或 `data_age_seconds > 30` | 同上，誤差累積較大 |
-| `STALE` | `data_age_seconds > 90` | 不提供推估，`arrival_state` 轉為 `UNKNOWN` |
-
-建議顯示方式：
-
-| `confidence` | 顯示 |
-|-------------|------|
-| `HIGH` | 精確至秒，或「即將進站」 |
-| `MEDIUM` | 「約 N 分鐘」 |
-| `LOW` | 「約 N 分鐘」並降低視覺權重 |
-| `STALE` | 「資料中斷」 |
-
-### 10.4 `category` 與 `code`（異常分類）
-
-| `category` | 來源 | `code` 值域 |
-|-----------|------|------------|
-| `VEHICLE_HEALTH` | 設備健康與異常告警協議之 `subsystems[].error_codes` | 原值透傳，例：`LIDAR_FRONT_BLIND`、`RADAR_1_DISCONNECTED`、`NETWORK_5G_LATENCY_HIGH` |
-| `SAFETY` | 動態控制與特殊事件協議之 `event_code` | `UNSCHEDULED_DOOR_OPEN`、`OBSTACLE_DETECTED`、`PATH_BLOCKED`、`DIRECTION_VIOLATION`、`INTERLOCK_REQ`、`SYSTEM_HEALTH_DEGRADED` |
-| `SCHEDULE_DEVIATION` | 本介面衍生 | `MINOR_DELAY`、`MAJOR_DELAY` |
-| `COMMUNICATION` | 本介面衍生 | `VEHICLE_SIGNAL_LOST`、`MQTT_BROKER_DISCONNECTED` |
-
-`VEHICLE_HEALTH` 與 `SAFETY` 的 `code` 為協議原值透傳，本介面不改寫、不新增。
-
-#### `SCHEDULE_DEVIATION`（營運誤點）
-
-即時推估到站時刻與班表計畫值之差超過門檻時產生。門檻見第十五章。
-
-| `code` | 條件 |
-|--------|------|
-| `MINOR_DELAY` | `60 < delay_seconds ≤ 180` |
-| `MAJOR_DELAY` | `delay_seconds > 180` |
-
-無對應計畫班次（`delay_state` 為 `NO_PLAN`）時不產生此類告警。
-
-#### `COMMUNICATION`（中心端失去可視性）
-
-**本類表示中心端接收不到車輛資料，與車輛自身通訊硬體異常為兩件事。**
-
-| `code` | 意義 | 判定者 |
-|--------|------|-------|
-| `VEHICLE_SIGNAL_LOST` | 距最後一筆車端回報已逾 90 秒 | 中心端逾時判定 |
-| `MQTT_BROKER_DISCONNECTED` | 中心端與 MQTT Broker 連線中斷 | 中心端自身狀態 |
-
-與 `VEHICLE_HEALTH` 的區別：
-
-| 情形 | 分類 | `code` |
-|------|------|--------|
-| 車輛回報自身 5G 延遲過高 | `VEHICLE_HEALTH`（`subsystem` 為 `COMMUNICATION`） | `NETWORK_5G_LATENCY_HIGH` |
-| 中心端收不到該車任何回報 | `COMMUNICATION` | `VEHICLE_SIGNAL_LOST` |
-
-設備健康與異常告警協議之 `overall_health` 雖有 `OFFLINE` 值，但該欄位由車端寫入；車輛失去連線時無法自行回報離線，故此判定必須由中心端執行。此類告警之 `eta_impact` 一律為 `ETA_UNAVAILABLE`。
-
-`subsystem` 僅於 `VEHICLE_HEALTH` 分類時有值，值域為 `COMPUTING`、`SENSING`、`COMMUNICATION`、`CHASSIS`。
-
-### 10.5 `eta_impact`（異常對 ETA 的影響）
-
-供使用方直接決定顯示方式，無需解析個別 `code`。
-
-| 值 | 使用方處理 | 建議顯示 |
-|----|-----------|---------|
-| `NONE` | 正常顯示 | 「約 5 分鐘」 |
-| `ETA_DEGRADED` | 顯示並標示延誤 | 「約 5 分鐘（誤點）」 |
-| `ETA_UNRELIABLE` | 顯示並標示不確定 | 「約 5 分鐘（資訊不確定）」 |
-| `ETA_UNAVAILABLE` | 必須停止顯示 ETA | 「資料中斷」 |
-
-### 10.6 `event_severity` 與 `health_status`（嚴重度）
-
-依動態控制與特殊事件協議第五章第 5 項，**事件嚴重度與設備健康狀態為獨立兩軸，不可合併**。本介面據此提供兩個欄位，各自沿用其來源協議的值域。
-
-#### `event_severity`（事件嚴重度）
-
-來源：動態控制與特殊事件協議。僅於 `category` 為 `SAFETY` 時有值，其餘為 `null`。
-
-| 值 | 協議中之對應事件 |
-|----|----------------|
-| `CRITICAL` | `UNSCHEDULED_DOOR_OPEN`、`PATH_BLOCKED`、`DIRECTION_VIOLATION` |
-| `WARNING` | `OBSTACLE_DETECTED` |
-| `INFO` | `INTERLOCK_REQ` |
-
-#### `health_status`（設備健康狀態）
-
-來源：設備健康與異常告警協議之 `overall_health`。僅於 `category` 為 `VEHICLE_HEALTH` 或 `COMMUNICATION` 時有值，其餘為 `null`。
-
-| 值 | 意義 |
-|----|------|
-| `OK` | 硬體無異常 |
-| `WARNING` | 子系統降級 |
-| `ERROR` | 子系統故障 |
-| `OFFLINE` | 車端離線 |
-
-#### 獨立性
-
-同一筆告警可同時具備兩者且互不推導。例：`PATH_BLOCKED` 之 `event_severity` 為 `CRITICAL`，若車輛硬體無損壞，`health_status` 仍為 `OK`。
-
-使用方如需單一排序依據，應使用 `eta_impact`（見 10.5），該欄位為本介面針對顯示決策所提供，不取代上述兩個協議值。
-
-### 10.7 共用欄位
+### 7.11 資料新鮮度欄位
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `generated_at` | Long | 本次快照產生時刻 |
-| `observed_at` | Long | 推估所依據的車端回報時刻 |
-| `data_age_seconds` | Int | `generated_at - observed_at`，單位秒 |
-| `service_date` | String | 營運日 |
-| `source` | String | `published`：讀取已發布班表；`draft_fallback`：讀取未發布草稿，計畫值僅供參考；`none`：無可用班表 |
-| `data_quality` | String | 同端點 4 的 `status` |
-| `has_alert` | Boolean | 該車是否存在未解除告警 |
-| `acknowledged` | Boolean | 該告警是否已被值班人員確認 |
-| `vehicle_phase` | String | 營運任務狀態協議之 `vehicle_phase` **原值透傳**。值域由該協議定義，本介面不改寫、不擴充；車端未提供時為 `null` |
-| `overall_health` | String | 設備健康與異常告警協議之 `overall_health` 原值透傳，值域 `OK`／`WARNING`／`ERROR`／`OFFLINE` |
+| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，Unix Epoch 毫秒 |
+| `data_age_seconds` | Int | `generated_at` 減 `observed_at`，單位秒。表示這筆資料有多舊 |
+
+`data_age_seconds` 超過門檻（預設 90 秒）時，`arrival_state` 轉為 `UNKNOWN`。
+
+### 7.12 `position`（車輛位置）
+
+僅 `by-vehicle` 提供。車端資料逾時時為 `null`。
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `latitude` | Double | 緯度（WGS84） |
+| `longitude` | Double | 經度（WGS84） |
+| `heading` | Double | 車頭朝向角，單位弳度（rad） |
+| `velocity_kph` | Double | 當下行駛速度，單位公里／小時 |
+
+### 7.13 `sequence`（站序）
+
+僅 `by-vehicle` 之 `next_stops` 提供。
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `sequence` | Int | 該停靠點為此車接下來的第幾站，自 `1` 起算 |
+
+`sequence` 為 `1` 者為車輛當前行駛中的目標站，其 `eta_seconds` 直接採用車端回報值；`sequence` 為 `2` 以後者由中心端依班表站間旅行時間外推，誤差隨站序累積。
 
 ---
 
-## 十一、輪詢規範
+## 八、輪詢規範
 
-### 11.1 建議輪詢間隔
+### 8.1 建議輪詢間隔
 
-| 端點 | 建議間隔 | 可接受範圍 | 依據 |
-|------|---------|-----------|------|
+| API | 建議間隔 | 可接受範圍 | 依據 |
+|-----|---------|-----------|------|
 | `eta/by-station` | **60 秒** | 30–60 秒 | 最短班距 180 秒，60 秒可於每一班距內更新約 3 次 |
 | `eta/by-vehicle` | **60 秒** | 30–120 秒 | 車輛追蹤用途，非安全關鍵 |
-| `alerts` | **30 秒** | 15–60 秒 | 失聯判定為 90 秒，30 秒可於判定成立後兩輪內呈現 |
-| `feed-status` | **30 秒** | 15–60 秒 | 決定其他端點資料是否可顯示，不應慢於其他端點 |
 
-建議排程：以 30 秒為基本節拍，`eta/by-station` 每兩拍取一次。
-
-```
-T+0s    feed-status, alerts, eta/by-station
-T+30s   feed-status, alerts
-T+60s   feed-status, alerts, eta/by-station
-T+90s   feed-status, alerts
-```
-
-### 11.2 間隔上下限
+### 8.2 間隔上下限
 
 | 限制 | 值 | 說明 |
 |------|----|------|
 | 最小間隔 | 10 秒 | 低於此值回應 `429 Too Many Requests` |
 | `eta/by-station` 最大間隔 | **60 秒** | `APPROACHING` 門檻為 60 秒，間隔大於此值將無法觀測到即將進站狀態 |
-| `alerts` 最大間隔 | 90 秒 | 失聯判定為 90 秒，間隔大於此值將延遲逾兩個判定週期 |
 
 低於 15 秒的輪詢不提升顯示精度：ETA 的實質變化來自車輛移動，顯示精度為分鐘級。
 
-### 11.3 重試與逾時
+### 8.3 倒數計時實作要求
+
+使用方必須以 `eta_at`（絕對時刻）計算剩餘時間，不得以 `eta_seconds` 自輪詢時刻起算倒數。
+
+`eta_seconds` 是以 `observed_at` 為基準的值。使用方收到回應時，該值已經過 `data_age_seconds` 秒加上網路傳輸時間；兩次輪詢之間車輛持續移動，以該值倒數將累積誤差。
+
+```
+剩餘秒數 = (eta_at - 使用方當前時間) / 1000
+```
+
+### 8.4 重試與逾時
 
 | 情形 | 處理 |
 |------|------|
@@ -970,9 +790,9 @@ T+90s   feed-status, alerts
 | `429` 回應 | 依 `Retry-After` 標頭延後 |
 | `304` 回應 | 沿用前一份資料，視為成功 |
 
-快照式資料無累積落差，補一輪即恢復。
+每次回應均為完整快照，漏取一輪不會造成資料累積落後，下一輪即補齊，故不需要立即重試機制。
 
-### 11.4 ETag 使用
+### 8.5 ETag 使用
 
 首次請求：
 
@@ -985,7 +805,7 @@ X-API-Key: <API_KEY>
 HTTP/1.1 200 OK
 ETag: "a1b2c3d4"
 
-{ "meta": { ... }, "stations": [ ... ] }
+{ "meta": { ... }, "station_count": 10, "stations": [ ... ] }
 ```
 
 後續請求帶入 `If-None-Match`：
@@ -1003,33 +823,21 @@ HTTP/1.1 304 Not Modified
 ETag: "a1b2c3d4"
 ```
 
-### 11.5 倒數計時實作要求
-
-使用方必須以 `eta_at`（絕對時刻）計算剩餘時間，不得以 `eta_seconds` 自輪詢時刻起算倒數。
-
-`eta_seconds` 為快照產生當下的值；兩次輪詢之間車輛持續移動，以該值倒數將累積誤差。
-
-```
-剩餘秒數 = (eta_at - 使用方當前時間) / 1000
-```
-
-### 11.6 頻寬估算
+### 8.6 頻寬估算
 
 以 11 台車、10 個停靠點、每站 3 筆計算：
 
-| 端點 | 未壓縮 | gzip | 依建議間隔之日流量 |
-|------|-------|------|------------------|
+| API | 未壓縮 | gzip | 依建議間隔之日流量 |
+|-----|-------|------|------------------|
 | `eta/by-station` | 約 18 KB | 約 3 KB | 約 4.3 MB |
 | `eta/by-vehicle` | 約 14 KB | 約 2.5 KB | 約 3.6 MB |
-| `alerts` | 約 2 KB | 約 0.6 KB | 約 1.7 MB |
-| `feed-status` | 約 0.5 KB | 約 0.3 KB | 約 0.9 MB |
-| 合計 | — | — | **約 10.5 MB／日** |
+| 合計 | — | — | **約 7.9 MB／日** |
 
 啟用 `If-None-Match` 後，未變更輪次回應 `304`，實際流量低於上表。
 
 ---
 
-## 十二、錯誤處理
+## 九、錯誤處理
 
 | 狀態碼 | 情形 |
 |-------|------|
@@ -1041,7 +849,7 @@ ETag: "a1b2c3d4"
 | `429` | 超過輪詢頻率限制 |
 | `503` | 服務降級，無法提供即時資料 |
 
-### 12.1 錯誤回應格式
+### 9.1 錯誤回應格式
 
 ```json
 {
@@ -1058,7 +866,7 @@ ETag: "a1b2c3d4"
 | `RATE_LIMITED` | `429` |
 | `SERVICE_DEGRADED` | `503` |
 
-### 12.2 範例
+### 9.2 範例
 
 `404`：
 
@@ -1083,34 +891,22 @@ ETag: "a1b2c3d4"
 ```json
 {
   "error": "SERVICE_DEGRADED",
-  "detail": "MQTT broker 連線中斷",
-  "status": "DOWN"
+  "detail": "無法取得車輛即時資料",
+  "data_quality": "DOWN"
 }
 ```
 
-### 12.3 降級原則
+### 9.3 降級原則
 
-服務降級時回應 `503`，或將個別車輛標示為 `UNKNOWN`，不回傳過期資料。使用方據此顯示資料中斷。
+服務降級時回應 `503`，或將個別車輛之 `arrival_state` 標示為 `UNKNOWN`，不回傳過期資料。使用方據此顯示資料中斷。
 
 ---
 
-## 十三、整合指引
+## 十、整合指引
 
 每一輪詢週期的處理流程。
 
-### 步驟 1：確認服務狀態
-
-```
-GET /syncdrive-api/vehicles/feed-status
-```
-
-| `status` | 處理 |
-|----------|------|
-| `DOWN` | 全畫面顯示資料中斷，結束本輪 |
-| `DEGRADED` | 繼續，畫面標示部分資料異常 |
-| `OK` | 繼續 |
-
-### 步驟 2：取得 ETA
+### 步驟 1：取得 ETA
 
 ```
 GET /syncdrive-api/vehicles/eta/by-station
@@ -1119,50 +915,53 @@ If-None-Match: "<前次 ETag>"
 
 | 回應 | 處理 |
 |------|------|
-| `304` | 沿用前次資料，跳至步驟 4 |
-| `200` | 以新資料更新畫面 |
+| `304` | 沿用前次資料，結束本輪 |
+| `503` | 全畫面顯示資料中斷，結束本輪 |
+| `200` | 繼續 |
+
+### 步驟 2：檢查資料品質
+
+| `meta.data_quality` | 處理 |
+|--------------------|------|
+| `DOWN` | 全畫面顯示資料中斷，結束本輪 |
+| `DEGRADED` | 繼續，個別車輛依 `arrival_state` 判斷 |
+| `OK` | 繼續 |
 
 ### 步驟 3：決定顯示內容
 
 ```
 對每一筆 eta：
 
-  若 confidence == "STALE" 或 arrival_state == "UNKNOWN"：
+  若 arrival_state == "UNKNOWN"：
       顯示「資料中斷」
 
-  否則若 has_alert 且該車 eta_impact == "ETA_UNAVAILABLE"：
-      顯示「資料中斷」
-
-  否則若 arrival_state == "APPROACHING"：
+  否則若 arrival_state == "APPROACHING" 或 "DOCKING"：
       顯示「即將進站」
 
   否則若 arrival_state == "AT_STATION"：
       顯示「停靠中」
+      若 plan.planned_departure_clock 有值：
+          加註預計發車時刻
 
-  否則：
+  否則若 arrival_state == "DEPARTED"：
+      自清單移除
+
+  否則（EN_ROUTE）：
       剩餘秒數 = (eta_at - 當前時間) / 1000
       顯示「約 N 分鐘」
       若 delay_state 為 MINOR_DELAY 或 MAJOR_DELAY：
           加註「誤點」
 ```
 
-### 步驟 4：更新告警看板
+### 步驟 4：等待下一週期
 
-```
-GET /syncdrive-api/vehicles/alerts?active_only=true
-```
-
-以 `alert_id` 為主鍵：新增未出現過者，更新既有者，本次未出現者視為已解除並移除。
-
-### 步驟 5：等待下一週期
-
-依 11.1 建議間隔排程。
+依 8.1 建議間隔排程。
 
 ---
 
-## 十四、JSON Schema
+## 十一、JSON Schema
 
-端點 1 回應之結構定義。
+`GET /syncdrive-api/vehicles/eta/by-station` 回應之結構定義。
 
 ```json
 {
@@ -1173,10 +972,9 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["generated_at", "service_date", "data_quality"],
+      "required": ["generated_at", "source", "data_quality"],
       "properties": {
         "generated_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
-        "service_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
         "shift_id": { "type": ["string", "null"] },
         "source": { "enum": ["published", "draft_fallback", "none"] },
         "data_quality": { "enum": ["OK", "DEGRADED", "DOWN"] }
@@ -1191,7 +989,6 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
         "properties": {
           "station_id": { "type": "string" },
           "station_name": { "type": "string" },
-          "station_alias": { "type": ["string", "null"] },
           "etas": { "type": "array", "items": { "$ref": "#/$defs/EtaEntry" } }
         }
       }
@@ -1202,7 +999,7 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
       "type": "object",
       "required": [
         "vehicle_code", "arrival_state", "eta_seconds", "eta_at",
-        "confidence", "has_alert", "observed_at", "data_age_seconds"
+        "observed_at", "data_age_seconds"
       ],
       "properties": {
         "vehicle_code": { "type": "string", "pattern": "^PMS-\\d{2}$" },
@@ -1210,23 +1007,26 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
         "trip_code": { "type": ["string", "null"] },
         "route_code": { "type": ["string", "null"] },
         "route_name": { "type": ["string", "null"] },
+        "vehicle_phase": {
+          "type": ["string", "null"],
+          "description": "營運任務狀態協議之 vehicle_phase 原值透傳"
+        },
         "arrival_state": {
           "enum": ["EN_ROUTE", "APPROACHING", "DOCKING", "AT_STATION", "DEPARTED", "UNKNOWN"]
         },
         "eta_seconds": { "type": ["integer", "null"], "minimum": 0 },
         "eta_at": { "type": ["integer", "null"] },
-        "eta_clock": { "type": ["string", "null"], "pattern": "^\\d{2}:\\d{2}:\\d{2}$" },
-        "distance_to_station_m": { "type": ["number", "null"], "minimum": 0 },
-        "confidence": { "enum": ["HIGH", "MEDIUM", "LOW", "STALE"] },
-        "vehicle_phase": {
+        "eta_clock": {
           "type": ["string", "null"],
-          "description": "營運任務狀態協議之 vehicle_phase 原值透傳"
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$"
         },
+        "distance_to_station_m": { "type": ["number", "null"], "minimum": 0 },
         "plan": {
           "type": ["object", "null"],
           "properties": {
-            "planned_arrival_clock": { "type": ["string", "null"] },
             "planned_arrival_at": { "type": ["integer", "null"] },
+            "planned_arrival_clock": { "type": ["string", "null"] },
+            "planned_departure_at": { "type": ["integer", "null"] },
             "planned_departure_clock": { "type": ["string", "null"] },
             "delay_seconds": { "type": ["integer", "null"] },
             "delay_state": {
@@ -1234,7 +1034,6 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
             }
           }
         },
-        "has_alert": { "type": "boolean" },
         "observed_at": { "type": "integer" },
         "data_age_seconds": { "type": "integer", "minimum": 0 }
       }
@@ -1245,7 +1044,7 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
 
 ---
 
-## 十五、部署配置參數
+## 十二、部署配置參數
 
 下列參數於部署時設定，本規格提供預設值。
 
@@ -1256,20 +1055,20 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
 | `EARLY_THRESHOLD_SECONDS` | `-30` | `delay_state` 轉為 `EARLY` 的門檻 |
 | `MINOR_DELAY_THRESHOLD_SECONDS` | `60` | `delay_state` 轉為 `MINOR_DELAY` 的門檻 |
 | `MAJOR_DELAY_THRESHOLD_SECONDS` | `180` | `delay_state` 轉為 `MAJOR_DELAY` 的門檻 |
-| `SIGNAL_LOST_THRESHOLD_SECONDS` | `90` | 判定 `VEHICLE_SIGNAL_LOST`，且 `confidence` 轉為 `STALE` |
-| `DEFAULT_LIMIT_PER_STATION` | `3` | 端點 1 每站預設回傳筆數 |
-| `DEFAULT_NEXT_STOPS` | `3` | 端點 2 每車預設推算站數 |
+| `DATA_STALE_THRESHOLD_SECONDS` | `90` | `arrival_state` 轉為 `UNKNOWN` 的資料逾時門檻 |
+| `DEFAULT_LIMIT_PER_STATION` | `3` | `by-station` 每站預設回傳筆數 |
+| `DEFAULT_NEXT_STOPS` | `3` | `by-vehicle` 每車預設推算站數 |
 | `MIN_POLL_INTERVAL_SECONDS` | `10` | 低於此間隔回應 `429` |
 
 `APPROACHING_ETA_THRESHOLD_SECONDS` 與 `eta/by-station` 的輪詢間隔連動：輪詢間隔應小於或等於此門檻值。
 
 ---
 
-## 十六、與 MQTT 協議之欄位對應
+## 十三、與 MQTT 協議之欄位對應
 
-本介面之欄位分為三類：協議原值透傳、協議值轉換、本介面衍生。
+本介面欄位分為三類：協議原值透傳、協議值轉換、本介面衍生。
 
-### 16.1 協議原值透傳
+### 13.1 協議原值透傳
 
 值域由來源協議定義，本介面不改寫、不擴充。
 
@@ -1277,84 +1076,74 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
 |-----------|---------|---------|
 | `vehicle_code` | MQTT 通訊架構與 Topic 命名規範 | `vehicle_code` |
 | `vehicle_phase` | 營運任務狀態協議 | `vehicle_phase` |
-| `overall_health` | 設備健康與異常告警協議 | `overall_health` |
-| `health_status` | 設備健康與異常告警協議 | `overall_health` |
-| `subsystem` | 設備健康與異常告警協議 | `subsystems` 之鍵 |
-| `code`（`VEHICLE_HEALTH`） | 設備健康與異常告警協議 | `subsystems[].error_codes[]` |
-| `code`（`SAFETY`） | 動態控制與特殊事件協議 | `event_code` |
-| `event_severity` | 動態控制與特殊事件協議 | `severity` |
-| `alert_id`（`SAFETY`／`VEHICLE_HEALTH`） | 動態控制與特殊事件協議 | `event_id` |
-| `message`（`SAFETY`） | 中心端事件紀錄 | `display_message` |
-| `acknowledged` | 中心端事件紀錄 | `is_acknowledged` |
-| `position.latitude` / `longitude` / `heading` | 車輛動態協議 | `global_pose`、`local_pose.heading` |
-| `position.velocity_kph` | 車輛動態協議 | `kinematics.velocity` |
 | `order_id` | 營運任務狀態協議 | `order_id` |
+| `distance_to_station_m` | 營運任務狀態協議 | `current_leg.distance_to_target_m` |
+| `position.latitude` / `longitude` | 車輛動態協議 | `global_pose.latitude` / `longitude` |
+| `position.heading` | 車輛動態協議 | `local_pose.heading` |
+| `position.velocity_kph` | 車輛動態協議 | `kinematics.velocity` |
 
-### 16.2 協議值轉換
+### 13.2 協議值轉換
 
 | 本介面欄位 | 轉換內容 |
 |-----------|---------|
-| `station_id` | 車端 `current_leg.target_station_id`（站名代碼）轉為地圖停靠點識別碼 |
-| `*_at` | 沿用協議之 13 位 Unix Epoch 毫秒；本介面另提供 `*_clock` 供顯示 |
+| `station_id` | 由車端 `current_leg.target_station_id` 對應至停靠點識別碼 |
+| `*_at` | 沿用協議之 13 位 Unix Epoch 毫秒；`*_clock` 為顯示用字串，非時間戳 |
 
-### 16.3 本介面衍生
+### 13.3 本介面衍生
 
-不對應任何 MQTT 協議欄位，由本介面依門檻值計算產生。
+不對應任何 MQTT 協議欄位，由本介面計算產生。
 
 | 欄位 | 計算依據 |
 |------|---------|
-| `arrival_state` | `current_leg.distance_to_target_m`、`current_leg.eta_seconds`、任務 `status` |
-| `eta_seconds` / `eta_at` / `eta_clock` | 下一站採用車端 `current_leg.eta_seconds`；後續站點依班表站間旅行時間外推 |
-| `confidence` | 站序與 `data_age_seconds` |
+| `arrival_state` | `current_leg.distance_to_target_m`、`current_leg.eta_seconds`、車端任務狀態 |
+| `eta_seconds` / `eta_at` / `eta_clock` | `sequence` 為 1 者採用車端 `current_leg.eta_seconds`；後續站點依班表站間旅行時間外推 |
 | `plan.*` | 已發布班表 |
-| `delay_state` / `delay_seconds` | 即時推估值與班表計畫值之差 |
-| `eta_impact` | 依告警內容決定 ETA 是否可顯示 |
-| `code`（`SCHEDULE_DEVIATION`、`COMMUNICATION`） | 誤點門檻、資料逾時門檻 |
-| `alert_id` | 本介面產生，格式沿用協議之 `[前綴]-[YYYYMMDD]-[四位流水號]` |
-| `data_quality` / `status` | 車輛回報覆蓋率與班表載入狀態 |
+| `delay_seconds` / `delay_state` | 即時推估值與班表計畫值之差 |
+| `data_quality` | 車輛回報覆蓋率與班表載入狀態 |
+| `data_age_seconds` | `generated_at` 與 `observed_at` 之差 |
 
-### 16.4 共通格式遵循
+### 13.4 共通格式遵循
 
 | 規範 | 出處 | 本介面遵循方式 |
 |------|------|--------------|
 | 時間戳採 13 位 Unix Epoch 毫秒，屏除 ISO 8601 | MQTT 通訊架構第四章第 2 項 | 所有 `*_at` 欄位為 Epoch 毫秒；`*_clock` 為顯示用字串，非時間戳 |
-| 狀態碼、事件碼、錯誤碼採 `SCREAMING_SNAKE_CASE` | MQTT 通訊架構第四章第 3 項 | 全部列舉值遵循 |
+| 狀態碼採 `SCREAMING_SNAKE_CASE` | MQTT 通訊架構第四章第 3 項 | 全部列舉值遵循 |
 | 車輛代號格式 `PMS-` + 兩碼數字 | MQTT 通訊架構第一章第 3 項 | 一致 |
-| 事件嚴重度與設備健康狀態獨立 | 動態控制與特殊事件協議第五章第 5 項 | 拆為 `event_severity` 與 `health_status` 兩欄，互不推導 |
-| 車端為 `vehicle_phase`、`overall_health` 之唯一寫入源 | 動態控制與特殊事件協議第五章第 4 項 | 兩欄原值透傳，本介面不改寫 |
+| 車端為 `vehicle_phase` 之唯一寫入源 | 動態控制與特殊事件協議第五章第 4 項 | 原值透傳，本介面不改寫 |
 
-### 16.5 治理
+### 13.5 治理
 
-MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介面為 HTTP 讀取介面，不新增、不修改任何 MQTT Topic、頻道或動作，亦不改寫協議定義之欄位值域。16.3 所列衍生欄位僅存在於 HTTP 回應，不回寫至 MQTT。
+MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介面為 HTTP 讀取介面，不新增、不修改任何 MQTT Topic、頻道或動作，亦不改寫協議定義之欄位值域。13.3 所列衍生欄位僅存在於 HTTP 回應，不回寫至 MQTT。
 
 ---
 
-## 十七、實作狀態與交付
+## 十四、實作狀態與交付
 
-| 端點 | 狀態 |
-|------|------|
-| `GET /vehicles/eta/by-station` | 開發中 |
-| `GET /vehicles/eta/by-vehicle` | 開發中 |
-| `GET /vehicles/alerts` | 開發中 |
-| `GET /vehicles/feed-status` | 開發中 |
+| API | 狀態 |
+|-----|------|
+| `GET /syncdrive-api/vehicles/eta/by-station` | 開發中 |
+| `GET /syncdrive-api/vehicles/eta/by-vehicle` | 開發中 |
 
-本規格為介面契約，四支端點尚未開放連線測試。使用方可先依本規格進行資料模型與畫面開發，端點開放時間另行通知。
+本規格為介面契約，兩支 API 尚未開放連線測試。使用方可先依本規格進行資料模型與畫面開發，開放時間另行通知。
 
 已具備之基礎能力：
 
 | 能力 | 狀態 |
 |------|------|
-| 車端 MQTT 三類資料接收（telemetry／operation／health） | 已上線 |
+| 車端 MQTT 資料接收（telemetry／operation／health） | 已上線 |
 | 車輛最新狀態快取 | 已上線 |
-| 車端安全事件接收與持久化 | 已上線 |
-| 班表計畫 ETA 查詢 | 已上線（見第十八章） |
-| 即時 ETA 外推、依站索引、告警彙整 | 開發中 |
+| 班表計畫 ETA 查詢 | 已上線（見第十五章） |
+| 即時 ETA 外推、依站索引 | 開發中 |
+
+### 14.1 後續版本
+
+異常狀況（Event）相關介面待 SCADA 之統一 Event Code 定義完成後另行提供，不在本版範圍。
 
 ---
 
-## 十八、附錄：與計畫 ETA 的關係
+## 十五、附錄：與計畫 ETA 的關係
 
-系統另提供班表計畫 ETA 介面，兩者資料來源與生命週期不同，不互相取代。
+系統另提供班表計畫 ETA 介面，兩者資料來源不同，不互相取代。
 
 | 視角 | 計畫值 | 即時值 |
 |------|-------|-------|
@@ -1368,4 +1157,4 @@ MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介
 | 可用條件 | 班表已發布 | 車輛正在回報 |
 | 用途 | 時刻表公告、營運規劃 | 現場顯示、監控 |
 
-本 API 於 `plan` 子物件內嵌對應的計畫值，供直接比對，無需另行呼叫計畫 ETA 介面。
+本介面於 `plan` 子物件內嵌對應的計畫值，供直接比對，無需另行呼叫計畫 ETA 介面。
