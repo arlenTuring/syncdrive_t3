@@ -5,13 +5,13 @@
 | 版本 | v1.0 |
 | 發布日期 | 2026-08-16 |
 | 提供方 | 台智駕 SyncDrive T3 車輛監控系統 |
-| 使用方 | 經 SCADA 取用之外部系統 |
+| 使用方 | 取用本介面之外部系統（不限特定對象） |
 | 通訊方式 | HTTP / JSON，GET，唯讀 |
 | 取用模式 | 固定頻率輪詢（pull-only） |
 | Base URL | `http://127.0.0.1:3000`（正式環境依部署配置） |
 | API 文件 | `http://127.0.0.1:3000/api/docs`（Swagger） |
 
-本規格定義 SyncDrive T3 車輛監控系統對外提供**即將進站**、**預計到達**與**異常狀況**的介面。使用方以固定頻率輪詢取得全線即時快照；本介面不主動推播，亦不在資料更新時發出通知。
+本規格定義 SyncDrive T3 車輛監控系統對外提供**即將進站**、**預計到達**與**異常狀況**的介面。本介面為單一對外契約，對所有取用方一致，不因取用方而有差異。使用方以固定頻率輪詢取得全線即時快照；本介面不主動推播，亦不在資料更新時發出通知。
 
 本文中的「必須」表示強制要求，「應」表示強烈建議，「可」表示選用。
 
@@ -34,7 +34,8 @@
 13. [整合指引](#十三整合指引)
 14. [JSON Schema](#十四json-schema)
 15. [部署配置參數](#十五部署配置參數)
-16. [附錄：與計畫 ETA 的關係](#十六附錄與計畫-eta-的關係)
+16. [與 MQTT 協議之欄位對應](#十六與-mqtt-協議之欄位對應)
+17. [附錄：與計畫 ETA 的關係](#十七附錄與計畫-eta-的關係)
 
 ---
 
@@ -76,7 +77,7 @@
 
 ### 2.3 即時值與計畫值
 
-回應中的 `arrival_state`、`eta_*`、`confidence` 為即時推估值；`plan` 子物件為對應的班表計畫值。兩者資料來源不同，`plan` 於無對應計畫班次時為 `NO_PLAN`。詳見第十六章。
+回應中的 `arrival_state`、`eta_*`、`confidence` 為即時推估值；`plan` 子物件為對應的班表計畫值。兩者資料來源不同，`plan` 於無對應計畫班次時為 `NO_PLAN`。詳見第十七章。
 
 ---
 
@@ -127,7 +128,8 @@ Cache-Control: no-cache, max-age=0
 | `trip_code` | 路線代號 + `HHMM` | `ST0007` |
 | `order_id` | `[YYMMDD]-[trip_code]` | `260816-ST0007` |
 | `station_id` | 地圖停靠點識別碼 | `station_4` |
-| `alert_id` | `AL-[YYYYMMDD]-[六碼序號]` | `AL-20260816-000117` |
+| `source_event_id` | `EVT-[YYYYMMDD]-[四位流水號]`，車端事件原識別碼 | `EVT-20260816-0003` |
+| `alert_id` | `ALT-[YYYYMMDD]-[四位流水號]`，每日重置 | `ALT-20260816-0117` |
 
 ### 4.2 時間表示
 
@@ -162,6 +164,20 @@ Cache-Control: no-cache, max-age=0
 | 無對應計畫班次 | `plan.delay_seconds` 為 `null`，`plan.delay_state` 為 `NO_PLAN` |
 
 回應中列出地圖上全部停靠點，包含當下無車駛近者，以利站端固定顯示版面。
+
+### 4.5 停靠點識別
+
+本介面之 `station_id` 一律採用**地圖停靠點識別碼**（例 `station_4`），為系統內停靠點的唯一鍵。
+
+車端於營運任務狀態協議回報的 `current_leg.target_station_id` 為站名代碼（例 `T3`），與地圖識別碼不同。本介面負責兩者的對應轉換，使用方無需處理。
+
+每筆停靠點同時提供三個欄位：
+
+| 欄位 | 用途 | 範例 |
+|------|------|------|
+| `station_id` | 程式比對用唯一鍵 | `station_4` |
+| `station_name` | 完整站名，顯示用 | `T3上行` |
+| `station_alias` | 站名簡碼，版面受限時顯示用 | `T3` |
 
 ---
 
@@ -222,7 +238,6 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 {
   "meta": {
     "generated_at": 1716536400000,
-    "generated_at_iso": "2026-08-16T09:00:00.000Z",
     "service_date": "2026-08-16",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
@@ -305,7 +320,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
   "eta_clock": "08:59:40",
   "distance_to_station_m": 0.0,
   "confidence": "HIGH",
-  "vehicle_phase": "AT_STATION",
+  "vehicle_phase": "TRANSITING",
   "plan": {
     "planned_arrival_clock": "08:59:30",
     "planned_departure_clock": "09:00:20",
@@ -319,6 +334,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 ```
 
 `arrival_state` 為 `AT_STATION` 時，`plan.planned_departure_clock` 提供預計發車時刻。
+
+`vehicle_phase` 為車端原值透傳，其值域由營運任務狀態協議定義，與本介面之 `arrival_state` 為兩組獨立欄位。
 
 ### 6.5 回應：顯著誤點且伴隨異常
 
@@ -496,7 +513,8 @@ GET /syncdrive-api/vehicles/alerts
 
 | 參數 | 型別 | 必填 | 預設 | 說明 |
 |------|------|------|------|------|
-| `severity` | String | 否 | 全部 | `WARNING` / `ERROR` / `CRITICAL` |
+| `event_severity` | String | 否 | 全部 | `CRITICAL` / `WARNING` / `INFO`（事件嚴重度） |
+| `health_status` | String | 否 | 全部 | `WARNING` / `ERROR` / `OFFLINE`（設備健康狀態） |
 | `vehicle_code` | String | 否 | 全部 | 指定車輛 |
 | `active_only` | Boolean | 否 | `true` | `true` 僅回傳未解除者 |
 
@@ -508,7 +526,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts" \
 ```
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?severity=CRITICAL" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?event_severity=CRITICAL" \
   -H "X-API-Key: <API_KEY>"
 ```
 
@@ -526,15 +544,17 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05
     "service_date": "2026-08-16",
     "data_quality": "OK"
   },
-  "alert_count": 3,
+  "alert_count": 4,
   "alerts": [
     {
-      "alert_id": "AL-20260816-000117",
+      "alert_id": "ALT-20260816-0117",
       "category": "VEHICLE_HEALTH",
       "code": "LIDAR_FRONT_BLIND",
-      "severity": "ERROR",
+      "event_severity": null,
+      "health_status": "ERROR",
       "vehicle_code": "PMS-05",
       "subsystem": "SENSING",
+      "source_event_id": null,
       "message": "前光達視野受阻",
       "station_id": null,
       "trip_code": "ST0007",
@@ -545,12 +565,14 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05
       "eta_impact": "ETA_UNRELIABLE"
     },
     {
-      "alert_id": "AL-20260816-000118",
+      "alert_id": "ALT-20260816-0118",
       "category": "SCHEDULE_DEVIATION",
       "code": "MAJOR_DELAY",
-      "severity": "WARNING",
+      "event_severity": null,
+      "health_status": null,
       "vehicle_code": "PMS-02",
       "subsystem": null,
+      "source_event_id": null,
       "message": "較計畫誤點 245 秒",
       "station_id": "station_4",
       "trip_code": "ST0013",
@@ -561,16 +583,36 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05
       "eta_impact": "ETA_DEGRADED"
     },
     {
-      "alert_id": "AL-20260816-000119",
+      "alert_id": "ALT-20260816-0119",
       "category": "COMMUNICATION",
       "code": "VEHICLE_SIGNAL_LOST",
-      "severity": "CRITICAL",
+      "event_severity": null,
+      "health_status": "OFFLINE",
       "vehicle_code": "PMS-08",
       "subsystem": "COMMUNICATION",
+      "source_event_id": null,
       "message": "已 92 秒未收到車端回報",
       "station_id": null,
       "trip_code": "TN0905",
       "started_at": 1716536306000,
+      "updated_at": 1716536398000,
+      "resolved_at": null,
+      "active": true,
+      "eta_impact": "ETA_UNAVAILABLE"
+    },
+    {
+      "alert_id": "ALT-20260816-0120",
+      "category": "SAFETY",
+      "code": "PATH_BLOCKED",
+      "event_severity": "CRITICAL",
+      "health_status": "OK",
+      "vehicle_code": "PMS-07",
+      "subsystem": null,
+      "source_event_id": "EVT-20260816-0003",
+      "message": "路徑完全受阻，車輛安全停車",
+      "station_id": null,
+      "trip_code": "TS1042",
+      "started_at": 1716536290000,
       "updated_at": 1716536398000,
       "resolved_at": null,
       "active": true,
@@ -580,6 +622,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05
 }
 ```
 
+本筆示範事件嚴重度與設備健康狀態的獨立性：`PATH_BLOCKED` 之 `event_severity` 為 `CRITICAL`，但車輛硬體無損壞，`health_status` 維持 `OK`。`source_event_id` 對應車端原始事件識別碼。
+
 ### 8.4 告警生命週期
 
 同一車輛的同一 `code` 在持續期間內僅對應一筆 `alert_id`，不隨輪詢重複產生。使用方應以 `alert_id` 為主鍵維護看板狀態。
@@ -588,12 +632,14 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/alerts?vehicle_code=PMS-05
 
 ```json
 {
-  "alert_id": "AL-20260816-000117",
+  "alert_id": "ALT-20260816-0117",
   "category": "VEHICLE_HEALTH",
   "code": "LIDAR_FRONT_BLIND",
-  "severity": "ERROR",
+  "event_severity": null,
+  "health_status": "OK",
   "vehicle_code": "PMS-05",
   "subsystem": "SENSING",
+  "source_event_id": null,
   "message": "前光達視野受阻",
   "station_id": null,
   "trip_code": "ST0007",
@@ -694,25 +740,31 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
 
 ### 10.1 `arrival_state`（到站狀態）
 
-| 值 | 意義 | 判定條件 |
-|----|------|---------|
-| `EN_ROUTE` | 行駛中 | 未達到站門檻 |
-| `APPROACHING` | 即將進站 | `eta_seconds ≤ 60` 或 `distance_to_station_m ≤ 200` |
-| `DOCKING` | 進站對位中 | 車端 `PLATFORM_DOCKING` 任務為 `IN_PROGRESS` |
-| `AT_STATION` | 停靠中 | 車速為 0 且 `PLATFORM_DOCKING` 已完成 |
-| `DEPARTED` | 已離站 | 車端 `STATION_DEPARTURE` 已完成 |
-| `UNKNOWN` | 無法判定 | 車端資料逾時 |
+**本欄為本介面衍生欄位**，非 MQTT 協議定義之狀態。營運任務狀態協議提供的是
+`current_leg.distance_to_target_m`、`current_leg.eta_seconds` 與任務執行狀態，
+本介面依門檻值將其歸類為可直接顯示的到站狀態，以滿足「即將進站／預計到達」之需求。
 
+| 值 | 意義 | 推導來源 |
+|----|------|---------|
+| `EN_ROUTE` | 行駛中 | `eta_seconds` 與 `distance_to_target_m` 均未達門檻 |
+| `APPROACHING` | 即將進站 | `eta_seconds ≤ 60` 或 `distance_to_target_m ≤ 200` |
+| `DOCKING` | 進站對位中 | 任務 `PLATFORM_DOCKING` 之 `status` 為 `IN_PROGRESS` |
+| `AT_STATION` | 停靠中 | 任務 `OPEN_DOORS` 之 `status` 為 `COMPLETED`，且尚未觸發 `CLOSE_DOORS` |
+| `DEPARTED` | 已離站 | 任務 `STATION_DEPARTURE` 之 `status` 為 `COMPLETED` |
+| `UNKNOWN` | 無法判定 | 車端資料逾時，或缺少 `current_leg` |
+
+`PLATFORM_DOCKING`、`OPEN_DOORS`、`CLOSE_DOORS`、`STATION_DEPARTURE` 均為營運任務狀態協議
+第六章定義之 `task_name`；`IN_PROGRESS` 與 `COMPLETED` 為該協議定義之任務 `status`。
 門檻值可於部署時配置，見第十五章。
 
 判定範例：
 
 | 車端回報 | 判定 | 依據 |
 |---------|------|------|
-| `eta_seconds=25`、`distance=120m` | `APPROACHING` | 時間與距離門檻均成立 |
-| `eta_seconds=45`、`distance=350m` | `APPROACHING` | 時間門檻成立 |
-| `eta_seconds=90`、`distance=180m` | `APPROACHING` | 距離門檻成立 |
-| `eta_seconds=415`、`distance=1840m` | `EN_ROUTE` | 兩項門檻均未成立 |
+| `eta_seconds=25`、`distance_to_target_m=120` | `APPROACHING` | 時間與距離門檻均成立 |
+| `eta_seconds=45`、`distance_to_target_m=350` | `APPROACHING` | 時間門檻成立 |
+| `eta_seconds=90`、`distance_to_target_m=180` | `APPROACHING` | 距離門檻成立 |
+| `eta_seconds=415`、`distance_to_target_m=1840` | `EN_ROUTE` | 兩項門檻均未成立 |
 | 逾 90 秒未回報 | `UNKNOWN` | 資料逾時 |
 
 ### 10.2 `delay_state`（誤點狀態）
@@ -757,17 +809,20 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
 | `LOW` | 「約 N 分鐘」並降低視覺權重 |
 | `STALE` | 「資料中斷」 |
 
-### 10.4 `category`（異常分類）
+### 10.4 `category` 與 `code`（異常分類）
 
-| 值 | 說明 | `code` 範例 |
-|----|------|------------|
-| `VEHICLE_HEALTH` | 車輛子系統異常 | `LIDAR_FRONT_BLIND`、`RADAR_1_DISCONNECTED`、`NETWORK_5G_LATENCY_HIGH` |
-| `SCHEDULE_DEVIATION` | 誤點超過門檻 | `MINOR_DELAY`、`MAJOR_DELAY` |
-| `COMMUNICATION` | 通訊逾時或中斷 | `VEHICLE_SIGNAL_LOST`、`MQTT_BROKER_DISCONNECTED` |
-| `OPERATION` | 營運任務異常 | `TASK_FAILED`、`INTERLOCK_TIMEOUT`、`DOCKING_TIMEOUT` |
-| `SAFETY` | 安全事件 | `MRM_TRIGGERED`、`FORCED_RECALL` |
+| `category` | 來源 | `code` 值域 |
+|-----------|------|------------|
+| `VEHICLE_HEALTH` | 設備健康與異常告警協議之 `subsystems[].error_codes` | 原值透傳，例：`LIDAR_FRONT_BLIND`、`RADAR_1_DISCONNECTED`、`NETWORK_5G_LATENCY_HIGH` |
+| `SAFETY` | 動態控制與特殊事件協議之 `event_code` | `UNSCHEDULED_DOOR_OPEN`、`OBSTACLE_DETECTED`、`PATH_BLOCKED`、`DIRECTION_VIOLATION`、`INTERLOCK_REQ` |
+| `SCHEDULE_DEVIATION` | 本介面衍生 | `MINOR_DELAY`、`MAJOR_DELAY` |
+| `COMMUNICATION` | 本介面衍生 | `VEHICLE_SIGNAL_LOST`、`MQTT_BROKER_DISCONNECTED` |
 
-`subsystem` 僅於 `VEHICLE_HEALTH` 與 `COMMUNICATION` 分類時有值，值域為 `COMPUTING`、`SENSING`、`COMMUNICATION`、`CHASSIS`。
+`VEHICLE_HEALTH` 與 `SAFETY` 的 `code` 為協議原值透傳，本介面不改寫、不新增。`SCHEDULE_DEVIATION` 與 `COMMUNICATION` 為本介面依門檻值計算產生，不對應任何 MQTT 協議欄位。
+
+`subsystem` 僅於 `VEHICLE_HEALTH` 分類時有值，值域為 `COMPUTING`、`SENSING`、`COMMUNICATION`、`CHASSIS`。
+
+`source_event_id` 僅於 `SAFETY` 分類時有值，對應車端原始事件之 `event_id`。
 
 ### 10.5 `eta_impact`（異常對 ETA 的影響）
 
@@ -780,13 +835,36 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
 | `ETA_UNRELIABLE` | 顯示並標示不確定 | 「約 5 分鐘（資訊不確定）」 |
 | `ETA_UNAVAILABLE` | 必須停止顯示 ETA | 「資料中斷」 |
 
-### 10.6 `severity`（嚴重度）
+### 10.6 `event_severity` 與 `health_status`（嚴重度）
+
+依動態控制與特殊事件協議第五章第 5 項，**事件嚴重度與設備健康狀態為獨立兩軸，不可合併**。本介面據此提供兩個欄位，各自沿用其來源協議的值域。
+
+#### `event_severity`（事件嚴重度）
+
+來源：動態控制與特殊事件協議。僅於 `category` 為 `SAFETY` 時有值，其餘為 `null`。
+
+| 值 | 協議中之對應事件 |
+|----|----------------|
+| `CRITICAL` | `UNSCHEDULED_DOOR_OPEN`、`PATH_BLOCKED`、`DIRECTION_VIOLATION` |
+| `WARNING` | `OBSTACLE_DETECTED` |
+| `INFO` | `INTERLOCK_REQ` |
+
+#### `health_status`（設備健康狀態）
+
+來源：設備健康與異常告警協議之 `overall_health`。僅於 `category` 為 `VEHICLE_HEALTH` 或 `COMMUNICATION` 時有值，其餘為 `null`。
 
 | 值 | 意義 |
 |----|------|
-| `WARNING` | 營運品質受影響，服務持續 |
-| `ERROR` | 車輛功能受限 |
-| `CRITICAL` | 服務中斷或安全相關，需立即處置 |
+| `OK` | 硬體無異常 |
+| `WARNING` | 子系統降級 |
+| `ERROR` | 子系統故障 |
+| `OFFLINE` | 車端離線 |
+
+#### 獨立性
+
+同一筆告警可同時具備兩者且互不推導。例：`PATH_BLOCKED` 之 `event_severity` 為 `CRITICAL`，若車輛硬體無損壞，`health_status` 仍為 `OK`。
+
+使用方如需單一排序依據，應使用 `eta_impact`（見 10.5），該欄位為本介面針對顯示決策所提供，不取代上述兩個協議值。
 
 ### 10.7 共用欄位
 
@@ -799,6 +877,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/feed-status" \
 | `source` | String | `published`：讀取已發布班表；`draft_fallback`：讀取未發布草稿，計畫值僅供參考；`none`：無可用班表 |
 | `data_quality` | String | 同端點 4 的 `status` |
 | `has_alert` | Boolean | 該車是否存在未解除告警 |
+| `vehicle_phase` | String | 營運任務狀態協議之 `vehicle_phase` **原值透傳**。值域由該協議定義，本介面不改寫、不擴充；車端未提供時為 `null` |
+| `overall_health` | String | 設備健康與異常告警協議之 `overall_health` 原值透傳，值域 `OK`／`WARNING`／`ERROR`／`OFFLINE` |
 
 ---
 
@@ -1046,8 +1126,7 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
       "type": "object",
       "required": ["generated_at", "service_date", "data_quality"],
       "properties": {
-        "generated_at": { "type": "integer" },
-        "generated_at_iso": { "type": "string", "format": "date-time" },
+        "generated_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
         "service_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
         "shift_id": { "type": ["string", "null"] },
         "source": { "enum": ["published", "draft_fallback", "none"] },
@@ -1090,7 +1169,10 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
         "eta_clock": { "type": ["string", "null"], "pattern": "^\\d{2}:\\d{2}:\\d{2}$" },
         "distance_to_station_m": { "type": ["number", "null"], "minimum": 0 },
         "confidence": { "enum": ["HIGH", "MEDIUM", "LOW", "STALE"] },
-        "vehicle_phase": { "type": ["string", "null"] },
+        "vehicle_phase": {
+          "type": ["string", "null"],
+          "description": "營運任務狀態協議之 vehicle_phase 原值透傳"
+        },
         "plan": {
           "type": ["object", "null"],
           "properties": {
@@ -1134,7 +1216,69 @@ GET /syncdrive-api/vehicles/alerts?active_only=true
 
 ---
 
-## 十六、附錄：與計畫 ETA 的關係
+## 十六、與 MQTT 協議之欄位對應
+
+本介面之欄位分為三類：協議原值透傳、協議值轉換、本介面衍生。
+
+### 16.1 協議原值透傳
+
+值域由來源協議定義，本介面不改寫、不擴充。
+
+| 本介面欄位 | 來源協議 | 來源欄位 |
+|-----------|---------|---------|
+| `vehicle_code` | MQTT 通訊架構與 Topic 命名規範 | `vehicle_code` |
+| `vehicle_phase` | 營運任務狀態協議 | `vehicle_phase` |
+| `overall_health` | 設備健康與異常告警協議 | `overall_health` |
+| `health_status` | 設備健康與異常告警協議 | `overall_health` |
+| `subsystem` | 設備健康與異常告警協議 | `subsystems` 之鍵 |
+| `code`（`VEHICLE_HEALTH`） | 設備健康與異常告警協議 | `subsystems[].error_codes[]` |
+| `code`（`SAFETY`） | 動態控制與特殊事件協議 | `event_code` |
+| `event_severity` | 動態控制與特殊事件協議 | `severity` |
+| `source_event_id` | 動態控制與特殊事件協議 | `event_id` |
+| `position.latitude` / `longitude` / `heading` | 車輛動態協議 | `global_pose`、`local_pose.heading` |
+| `position.velocity_kph` | 車輛動態協議 | `kinematics.velocity` |
+| `order_id` | 營運任務狀態協議 | `order_id` |
+
+### 16.2 協議值轉換
+
+| 本介面欄位 | 轉換內容 |
+|-----------|---------|
+| `station_id` | 車端 `current_leg.target_station_id`（站名代碼）轉為地圖停靠點識別碼 |
+| `*_at` | 沿用協議之 13 位 Unix Epoch 毫秒；本介面另提供 `*_clock` 供顯示 |
+
+### 16.3 本介面衍生
+
+不對應任何 MQTT 協議欄位，由本介面依門檻值計算產生。
+
+| 欄位 | 計算依據 |
+|------|---------|
+| `arrival_state` | `current_leg.distance_to_target_m`、`current_leg.eta_seconds`、任務 `status` |
+| `eta_seconds` / `eta_at` / `eta_clock` | 下一站採用車端 `current_leg.eta_seconds`；後續站點依班表站間旅行時間外推 |
+| `confidence` | 站序與 `data_age_seconds` |
+| `plan.*` | 已發布班表 |
+| `delay_state` / `delay_seconds` | 即時推估值與班表計畫值之差 |
+| `eta_impact` | 依告警內容決定 ETA 是否可顯示 |
+| `code`（`SCHEDULE_DEVIATION`、`COMMUNICATION`） | 誤點門檻、資料逾時門檻 |
+| `alert_id` | 本介面產生，格式沿用協議之 `[前綴]-[YYYYMMDD]-[四位流水號]` |
+| `data_quality` / `status` | 車輛回報覆蓋率與班表載入狀態 |
+
+### 16.4 共通格式遵循
+
+| 規範 | 出處 | 本介面遵循方式 |
+|------|------|--------------|
+| 時間戳採 13 位 Unix Epoch 毫秒，屏除 ISO 8601 | MQTT 通訊架構第四章第 2 項 | 所有 `*_at` 欄位為 Epoch 毫秒；`*_clock` 為顯示用字串，非時間戳 |
+| 狀態碼、事件碼、錯誤碼採 `SCREAMING_SNAKE_CASE` | MQTT 通訊架構第四章第 3 項 | 全部列舉值遵循 |
+| 車輛代號格式 `PMS-` + 兩碼數字 | MQTT 通訊架構第一章第 3 項 | 一致 |
+| 事件嚴重度與設備健康狀態獨立 | 動態控制與特殊事件協議第五章第 5 項 | 拆為 `event_severity` 與 `health_status` 兩欄，互不推導 |
+| 車端為 `vehicle_phase`、`overall_health` 之唯一寫入源 | 動態控制與特殊事件協議第五章第 4 項 | 兩欄原值透傳，本介面不改寫 |
+
+### 16.5 治理
+
+MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介面為 HTTP 讀取介面，不新增、不修改任何 MQTT Topic、頻道或動作，亦不改寫協議定義之欄位值域。16.3 所列衍生欄位僅存在於 HTTP 回應，不回寫至 MQTT。
+
+---
+
+## 十七、附錄：與計畫 ETA 的關係
 
 系統另提供班表計畫 ETA 介面，兩者資料來源與生命週期不同，不互相取代。
 
