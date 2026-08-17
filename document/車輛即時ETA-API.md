@@ -99,16 +99,36 @@ Cache-Control: no-cache, max-age=0
 
 ### 3.2 時間表示
 
-| 欄位型式 | 型別 | 說明 |
-|---------|------|------|
-| `*_at` | Long | Unix Epoch **毫秒**（UTC）。運算一律以此欄位為準 |
-| `*_clock` | String | `HH:MM:SS`，當地時刻，24 小時制，值域 `00:00:00`–`23:59:59`。僅供顯示 |
+全系統統一採用 **13 位 Unix Epoch 毫秒（Long）**，不使用 ISO 8601 字串。為便於 PIDS 等顯示端直接使用，每一個時間點另附可讀式字串。
 
-跨午夜的班次直接以次日時刻表示。例：車輛於當地時間 8 月 17 日 01:10:30 抵達，
+| 欄位型式 | 型別 | 用途 | 範例 |
+|---------|------|------|------|
+| `*_at` | Long | **權威值**。13 位 Unix Epoch 毫秒。所有運算、比較、排序一律以此為準 | `1786842023000` |
+| `*_clock` | String | **顯示值**。當地時刻 `HH:MM:SS`，24 小時制，值域 `00:00:00`–`23:59:59` | `"09:00:23"` |
+
+**每一個 `*_at` 欄位都有對應的 `*_clock` 欄位**，成對出現：
+
+| `*_at` | 對應 `*_clock` |
+|--------|---------------|
+| `generated_at` | `generated_at_clock` |
+| `observed_at` | `observed_at_clock` |
+| `eta_at` | `eta_clock` |
+| `planned_arrival_at` | `planned_arrival_clock` |
+| `planned_departure_at` | `planned_departure_clock` |
+
+`*_clock` 由中心端依當地時區換算後提供，使用方可直接輸出至顯示畫面，無需自行轉換。兩者恆指向同一時刻；若不一致，以 `*_at` 為準。
+
+秒數型欄位（`eta_seconds`、`delay_seconds`、`data_age_seconds`）為**時間長度**，非時間點，不適用上述規則。
+
+#### 跨午夜
+
+`*_clock` 一律為 24 小時制當地時刻，跨午夜直接以次日時刻表示，不使用 `25:10:30` 這類超過 `24:00:00` 的寫法。日期由 `*_at` 判定。
+
+例：車輛於當地時間 8 月 17 日 01:10:30 抵達，
 
 ```json
 {
-  "eta_at": 1755364230000,
+  "eta_at": 1786900230000,
   "eta_clock": "01:10:30"
 }
 ```
@@ -218,7 +238,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 ```json
 {
   "meta": {
-    "generated_at": 1755327600000,
+    "generated_at": 1786842000000,
+    "generated_at_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "OK"
@@ -238,18 +259,19 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "vehicle_phase": "TRANSITING",
           "arrival_state": "APPROACHING",
           "eta_seconds": 25,
-          "eta_at": 1755327625000,
-          "eta_clock": "09:00:25",
+          "eta_at": 1786842023000,
+          "eta_clock": "09:00:23",
           "distance_to_station_m": 120.0,
           "plan": {
-            "planned_arrival_at": 1755327610000,
+            "planned_arrival_at": 1786842010000,
             "planned_arrival_clock": "09:00:10",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 15,
+            "delay_seconds": 13,
             "delay_state": "ON_TIME"
           },
-          "observed_at": 1755327598000,
+          "observed_at": 1786841998000,
+          "observed_at_clock": "08:59:58",
           "data_age_seconds": 2
         },
         {
@@ -261,18 +283,19 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "vehicle_phase": "TRANSITING",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 415,
-          "eta_at": 1755328015000,
-          "eta_clock": "09:06:55",
+          "eta_at": 1786842412000,
+          "eta_clock": "09:06:52",
           "distance_to_station_m": 1840.0,
           "plan": {
-            "planned_arrival_at": 1755327970000,
+            "planned_arrival_at": 1786842370000,
             "planned_arrival_clock": "09:06:10",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 45,
+            "delay_seconds": 42,
             "delay_state": "ON_TIME"
           },
-          "observed_at": 1755327597000,
+          "observed_at": 1786841997000,
+          "observed_at_clock": "08:59:57",
           "data_age_seconds": 3
         },
         {
@@ -284,18 +307,19 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "vehicle_phase": "TRANSITING",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 790,
-          "eta_at": 1755328390000,
-          "eta_clock": "09:13:10",
+          "eta_at": 1786842786000,
+          "eta_clock": "09:13:06",
           "distance_to_station_m": 3520.0,
           "plan": {
-            "planned_arrival_at": 1755328330000,
+            "planned_arrival_at": 1786842730000,
             "planned_arrival_clock": "09:12:10",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 60,
+            "delay_seconds": 56,
             "delay_state": "ON_TIME"
           },
-          "observed_at": 1755327596000,
+          "observed_at": 1786841996000,
+          "observed_at_clock": "08:59:56",
           "data_age_seconds": 4
         }
       ]
@@ -311,7 +335,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 ```json
 {
   "meta": {
-    "generated_at": 1755327600000,
+    "generated_at": 1786842000000,
+    "generated_at_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "DEGRADED"
@@ -331,18 +356,19 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "vehicle_phase": "TRANSITING",
           "arrival_state": "AT_STATION",
           "eta_seconds": 0,
-          "eta_at": 1755327580000,
-          "eta_clock": "08:59:40",
+          "eta_at": 1786841999000,
+          "eta_clock": "08:59:59",
           "distance_to_station_m": 0.0,
           "plan": {
-            "planned_arrival_at": 1755327570000,
+            "planned_arrival_at": 1786841970000,
             "planned_arrival_clock": "08:59:30",
-            "planned_departure_at": 1755327620000,
+            "planned_departure_at": 1786842020000,
             "planned_departure_clock": "09:00:20",
-            "delay_seconds": 10,
+            "delay_seconds": 29,
             "delay_state": "ON_TIME"
           },
-          "observed_at": 1755327599000,
+          "observed_at": 1786841999000,
+          "observed_at_clock": "08:59:59",
           "data_age_seconds": 1
         }
       ]
@@ -364,14 +390,15 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "eta_clock": null,
           "distance_to_station_m": null,
           "plan": {
-            "planned_arrival_at": 1755327900000,
+            "planned_arrival_at": 1786842300000,
             "planned_arrival_clock": "09:05:00",
             "planned_departure_at": null,
             "planned_departure_clock": null,
             "delay_seconds": null,
             "delay_state": "NO_PLAN"
           },
-          "observed_at": 1755327508000,
+          "observed_at": 1786841908000,
+          "observed_at_clock": "08:58:28",
           "data_age_seconds": 92
         }
       ]
@@ -431,7 +458,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 ```json
 {
   "meta": {
-    "generated_at": 1755327600000,
+    "generated_at": 1786842000000,
+    "generated_at_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "OK"
@@ -458,15 +486,15 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "T3上行",
           "arrival_state": "APPROACHING",
           "eta_seconds": 25,
-          "eta_at": 1755327625000,
-          "eta_clock": "09:00:25",
+          "eta_at": 1786842023000,
+          "eta_clock": "09:00:23",
           "distance_to_station_m": 120.0,
           "plan": {
-            "planned_arrival_at": 1755327610000,
+            "planned_arrival_at": 1786842010000,
             "planned_arrival_clock": "09:00:10",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 15,
+            "delay_seconds": 13,
             "delay_state": "ON_TIME"
           }
         },
@@ -476,15 +504,15 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "N2W上行停靠",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 268,
-          "eta_at": 1755327868000,
-          "eta_clock": "09:04:28",
+          "eta_at": 1786842266000,
+          "eta_clock": "09:04:26",
           "distance_to_station_m": null,
           "plan": {
-            "planned_arrival_at": 1755327840000,
+            "planned_arrival_at": 1786842240000,
             "planned_arrival_clock": "09:04:00",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 28,
+            "delay_seconds": 26,
             "delay_state": "ON_TIME"
           }
         },
@@ -494,20 +522,21 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "station_name": "N2W下行出發",
           "arrival_state": "EN_ROUTE",
           "eta_seconds": 495,
-          "eta_at": 1755328095000,
-          "eta_clock": "09:08:15",
+          "eta_at": 1786842493000,
+          "eta_clock": "09:08:13",
           "distance_to_station_m": null,
           "plan": {
-            "planned_arrival_at": 1755328060000,
+            "planned_arrival_at": 1786842460000,
             "planned_arrival_clock": "09:07:40",
             "planned_departure_at": null,
             "planned_departure_clock": null,
-            "delay_seconds": 35,
+            "delay_seconds": 33,
             "delay_state": "ON_TIME"
           }
         }
       ],
-      "observed_at": 1755327598000,
+      "observed_at": 1786841998000,
+      "observed_at_clock": "08:59:58",
       "data_age_seconds": 2
     }
   ]
@@ -523,7 +552,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 ```json
 {
   "meta": {
-    "generated_at": 1755327600000,
+    "generated_at": 1786842000000,
+    "generated_at_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "DEGRADED"
@@ -549,7 +579,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           "eta_clock": null,
           "distance_to_station_m": null,
           "plan": {
-            "planned_arrival_at": 1755327900000,
+            "planned_arrival_at": 1786842300000,
             "planned_arrival_clock": "09:05:00",
             "planned_departure_at": null,
             "planned_departure_clock": null,
@@ -558,7 +588,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
           }
         }
       ],
-      "observed_at": 1755327508000,
+      "observed_at": 1786841908000,
+      "observed_at_clock": "08:58:28",
       "data_age_seconds": 92
     }
   ]
@@ -577,7 +608,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `generated_at` | Long | 中心端產生本次快照的時刻，Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
+| `generated_at` | Long | 中心端產生本次快照的時刻，13 位 Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
+| `generated_at_clock` | String | `generated_at` 的當地時刻表示，`HH:MM:SS`。可直接顯示為「資料更新於」 |
 | `shift_id` | String \| null | 本次計畫值所依據的班表識別碼。無可用班表時為 `null` |
 | `source` | String | 計畫值來源，見 7.2 |
 | `data_quality` | String | 本次快照的整體資料品質，見 7.3 |
@@ -668,7 +700,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | `eta_seconds` | Int \| null | 距離抵達該停靠點還有幾秒。**以 `observed_at`（車端回報時刻）為基準**，非以使用方收到回應的時刻為基準。第 1 站直接採用車端上行之推估值；車端未提供時，該筆 `arrival_state` 為 `UNKNOWN` |
-| `eta_at` | Long \| null | 預計抵達該停靠點的**絕對時刻**，Unix Epoch 毫秒。使用方計算倒數必須使用本欄位 |
+| `eta_at` | Long \| null | 預計抵達該停靠點的**絕對時刻**，13 位 Unix Epoch 毫秒。使用方計算倒數必須使用本欄位。恆等於 `observed_at + eta_seconds × 1000` |
 | `eta_clock` | String \| null | `eta_at` 的當地時刻表示，格式 `HH:MM:SS`，24 小時制。僅供顯示 |
 | `distance_to_station_m` | Double \| null | 車輛距該停靠點的路徑距離，單位公尺 |
 
@@ -676,14 +708,17 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 ```json
 {
-  "observed_at": 1755327598000,
+  "observed_at": 1786841998000,
+  "observed_at_clock": "08:59:58",
   "eta_seconds": 25,
-  "eta_at": 1755327625000,
-  "eta_clock": "09:00:25"
+  "eta_at": 1786842023000,
+  "eta_clock": "09:00:23"
 }
 ```
 
-讀法為：**該車輛預計於當地時間 09:00:25 抵達此停靠點。** 車端最後回報時刻為 09:00:00（`observed_at`），自該時刻起算尚有 25 秒（`eta_seconds`），故絕對抵達時刻為 09:00:25（`eta_at`／`eta_clock`）。
+讀法為：**該車輛預計於當地時間 09:00:23 抵達此停靠點。** 車端最後回報時刻為 08:59:58（`observed_at`），自該時刻起算尚有 25 秒（`eta_seconds`），故絕對抵達時刻為 08:59:58 + 25 秒 = 09:00:23（`eta_at` / `eta_clock`）。
+
+三者恆滿足 `eta_at = observed_at + eta_seconds × 1000`。顯示端可直接取用 `eta_clock`。
 
 `arrival_state` 為 `UNKNOWN` 時，此三個欄位皆為 `null`。
 
@@ -733,7 +768,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以中心端收訊時刻替代 |
+| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，13 位 Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以中心端收訊時刻替代 |
+| `observed_at_clock` | String | `observed_at` 的當地時刻表示，`HH:MM:SS` |
 | `data_age_seconds` | Int | `generated_at` 減 `observed_at`，單位秒。表示這筆資料有多舊 |
 
 `data_age_seconds` 超過門檻（預設 90 秒）時，`arrival_state` 轉為 `UNKNOWN`。
@@ -991,9 +1027,10 @@ If-None-Match: "<前次 ETag>"
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["generated_at", "source", "data_quality"],
+      "required": ["generated_at", "generated_at_clock", "source", "data_quality"],
       "properties": {
         "generated_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
+        "generated_at_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
         "shift_id": { "type": ["string", "null"] },
         "source": { "enum": ["published", "draft_fallback", "none"] },
         "data_quality": { "enum": ["OK", "DEGRADED", "DOWN"] }
@@ -1053,7 +1090,8 @@ If-None-Match: "<前次 ETag>"
             }
           }
         },
-        "observed_at": { "type": "integer" },
+        "observed_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
+        "observed_at_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
         "data_age_seconds": { "type": "integer", "minimum": 0 }
       }
     }
