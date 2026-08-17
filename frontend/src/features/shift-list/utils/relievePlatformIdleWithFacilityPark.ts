@@ -1,0 +1,391 @@
+import type { PointTopology } from '../../map-editor/types/pointTopology';
+import type { ShiftScheduleSelectedRoute } from '../types/create';
+import { findTopologyPath } from './findTopologyPath';
+import {
+  collectStationBerthOccupancies,
+  findStationBerthCollisions,
+  type StationBerthOccupancy,
+} from './stationBerthOccupancy';
+import type {
+  FeasibilityIssue,
+  GeneratedScheduleBlock,
+  GeneratedScheduleTimeline,
+} from './schedule-engine/types';
+import { minuteToSecond, secondToMinute } from './schedule-engine/types';
+import { snapUpToClockAlignSeconds } from './schedule-engine/physics';
+
+/**
+ * 站位讓渡：把空等的車暫時開進設施格
+ * ==================================
+ *
+ * <strong>決策樹的第四條路。</strong>前三條分別是：待命遷就路線、路線遷就待命
+ * （見 alignRouteWithVehicleLocation）、以及沿關聯圖次要邊先開去別站等
+ * （見 relievePlatformIdleWithSecondaryEdge）。這一支處理前三條都救不了的情形。
+ *
+ * <strong>問題長相。</strong>車跑完一趟停在終端站，下一趟要等一段時間才發。
+ * 這段期間車實體停在站位上，後面每一台要用這一格的車都被擋。實測（2026-08-17，
+ * 真實資料重放）：全線 231 對站位衝突<strong>全部</strong>來自這種空等，沒有一對
+ * 是正常經過造成的；擋人者只有 73 個，其中擋最多的一個在 T3下行 空等 38 分鐘、
+ * 一口氣擋掉 22 台次。
+ *
+ * <strong>為什麼不用「空等超過 N 分鐘就處理」這種門檻。</strong>使用者
+ * （2026-08-17）：「空等是有需要的那就是讓車空等……不是用一個閥值來決定，因為
+ * 不是說他超過閥值了，那我出現錯誤或是警告就好，完全沒意義」。門檻只能生出警告，
+ * 生不出解法。真正的判準是<strong>這段空等有沒有擋到別人</strong>——而這個訊號
+ * 引擎本來就算得出來：{@link findStationBerthCollisions} 回報的每一對都指名了
+ * 擋人的那一筆佔用。有擋到才動它，沒擋到就留著，天生符合「該空等就空等」。
+ *
+ * <strong>怎麼讓。</strong>把車開進附近的設施格停放，時間到了再開回來，中間插
+ * 「入場移動 → 暫停放 → 出場移動」三張卡。下一趟的發車時刻<strong>完全不動</strong>，
+ * 只是車在這段期間不佔正線站位。使用者已確認願意付這個空跑代價：多數案例來回
+ * 只要 60 秒，換掉十幾到三十幾分鐘的站位佔用。
+ *
+ * <strong>設施格借用的紀律。</strong>使用者（2026-08-17）：「設施格你使用了當然
+ * 會影響設施，所以如果有其他車輛要使用要讓出來，但如果沒有使用當然可以暫停」。
+ * 因此只借<strong>整段空等期間都空著</strong>的格子——任何整備卡（或先前已排定的
+ * 停放）與該區間有一點重疊就不借，不做「先佔了再說、之後再讓」。
+ *
+ * <strong>自我驗證。</strong>每插一組卡就重算站位碰撞；沒有真的變少就整組撤回。
+ * 語意上永遠不比「不做這件事」更差，與本檔案群既有的
+ * <code>moveKeepsBerthsClear</code> 同一套規矩。
+ *
+ * 放在幾何收斂迴圈<strong>裡面</strong>、站位求解之前：插卡會改變站位佔用，
+ * 必須讓求解器在同一輪就看得到。
+ */
+
+/** 設施節點的標籤樣式（E1／H2／M4／W1…）。設施節點沒有 stationId，靠標籤辨識 */
+const FACILITY_LABEL_PATTERN = /^[A-Z]{1,2}\d{1,2}$/;
+
+/** 停進去至少要待這麼久才划算——比這短的話光是進出就把時間吃完了 */
+const MIN_PARK_SECONDS = 60;
+
+type ParkCandidate = {
+  /** 擋人的那一筆站位佔用（終站、且停靠完還賴著） */
+  occupancy: StationBerthOccupancy;
+  /** 這一筆擋掉幾台車 */
+  blockedCount: number;
+  facilityNodeId: string;
+  facilityLabel: string;
+  inboundSeconds: number;
+  outboundSeconds: number;
+};
+
+function facilityNodes(topology: PointTopology): { id: string; label: string }[] {
+  return topology.nodes
+    .filter((node) => !node.stationId?.trim())
+    .map((node) => ({ id: node.id, label: (node.label ?? '').trim() }))
+    .filter((node) => FACILITY_LABEL_PATTERN.test(node.label));
+}
+
+/**
+ * 每個設施節點目前被哪些區間佔著。
+ *
+ * 來源有二：整備卡停放位置（<code>yardFacilityNodeId</code>）與出場移動卡的來源
+ * 設施（<code>yardExitFacilityNodeId</code>）。本支自己插的停放卡也會寫入
+ * <code>yardFacilityNodeId</code>，所以同一輪內連續處理多筆時不會重複借同一格。
+ */
+function collectFacilityBusyWindows(
+  timelines: GeneratedScheduleTimeline[],
+): Map<string, { start: number; end: number }[]> {
+  const busy = new Map<string, { start: number; end: number }[]>();
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      const nodeId =
+        block.yardFacilityNodeId?.trim() || block.yardExitFacilityNodeId?.trim();
+      if (!nodeId) continue;
+      const list = busy.get(nodeId) ?? [];
+      list.push({ start: block.plannedStartMinute, end: block.plannedEndMinute });
+      busy.set(nodeId, list);
+    }
+  }
+  return busy;
+}
+
+function facilityIsFree(
+  busy: Map<string, { start: number; end: number }[]>,
+  nodeId: string,
+  startMinute: number,
+  endMinute: number,
+): boolean {
+  return !(busy.get(nodeId) ?? []).some(
+    (window) => window.start < endMinute - 1e-9 && window.end > startMinute + 1e-9,
+  );
+}
+
+/**
+ * 這一筆佔用「停靠完之後還賴在站上」多久。
+ *
+ * <code>endMinute</code> 是靠站結束、<code>actualDepartMinute</code> 是車真的
+ * 開走的時刻；兩者的差就是純粹佔著站位、什麼也沒做的時間。
+ */
+function lingerMinutes(occupancy: StationBerthOccupancy): number {
+  return Math.max(0, occupancy.actualDepartMinute - occupancy.endMinute);
+}
+
+function countBlockedBy(
+  timelines: GeneratedScheduleTimeline[],
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  collisionProtectionSeconds: number,
+): { total: number; byOccupancy: Map<string, { count: number; occupancy: StationBerthOccupancy }> } {
+  const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
+    collisionProtectionSeconds,
+  });
+  const collisions = findStationBerthCollisions(occupancies, selectedRoutes);
+  const byOccupancy = new Map<
+    string,
+    { count: number; occupancy: StationBerthOccupancy }
+  >();
+  for (const collision of collisions) {
+    // 一張卡在多個站各有一筆佔用，擋人的是終站那一筆——鍵要含站位，不能只用 blockId
+    const key = `${collision.earlier.blockId}@${collision.earlier.stationId}`;
+    const current = byOccupancy.get(key) ?? { count: 0, occupancy: collision.earlier };
+    current.count += 1;
+    byOccupancy.set(key, current);
+  }
+  return { total: collisions.length, byOccupancy };
+}
+
+export function relievePlatformIdleWithFacilityPark(args: {
+  timelines: GeneratedScheduleTimeline[];
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  topology?: PointTopology | null;
+  collisionProtectionSeconds: number;
+  /** 最多處理幾筆；每筆都要重算站位驗證，設上限避免病態輸入拖垮生成 */
+  maxRelief?: number;
+  /** 只在第一輪收集，避免收斂迴圈每輪重複回報同一件事 */
+  warnings?: FeasibilityIssue[];
+}): { timelines: GeneratedScheduleTimeline[]; parked: number } {
+  const {
+    selectedRoutes,
+    topology,
+    collisionProtectionSeconds,
+    maxRelief = 80,
+    warnings,
+  } = args;
+
+  if (!topology || topology.nodes.length === 0) {
+    return { timelines: args.timelines, parked: 0 };
+  }
+  if (collisionProtectionSeconds <= 0) {
+    return { timelines: args.timelines, parked: 0 };
+  }
+
+  // 可重入：先清掉自己上次插的卡，避免重複呼叫時疊加
+  const timelines = args.timelines.map((timeline) => ({
+    ...timeline,
+    blocks: timeline.blocks
+      .filter((block) => !block.id.startsWith('berthpark-'))
+      .map((block) => ({ ...block })),
+  }));
+
+  const facilities = facilityNodes(topology);
+  if (facilities.length === 0) return { timelines, parked: 0 };
+
+  const stationNodeId = new Map<string, string>();
+  for (const node of topology.nodes) {
+    const stationId = node.stationId?.trim();
+    if (stationId && !stationNodeId.has(stationId)) stationNodeId.set(stationId, node.id);
+  }
+
+  /** 已經處理過的佔用（成功或放棄都記），避免同一輪反覆挑到同一筆 */
+  const handled = new Set<string>();
+  let parked = 0;
+
+  for (let round = 0; round < maxRelief; round += 1) {
+    const { total, byOccupancy } = countBlockedBy(
+      timelines,
+      selectedRoutes,
+      collisionProtectionSeconds,
+    );
+    if (total === 0) break;
+
+    // 擋最多的先處理——收斂最快，且一次動一個才能逐筆驗證
+    const ranked = [...byOccupancy.entries()]
+      .filter(([key]) => !handled.has(key))
+      .sort((a, b) => b[1].count - a[1].count);
+    if (ranked.length === 0) break;
+
+    let applied = false;
+    for (const [key, { count, occupancy }] of ranked) {
+      const idle = lingerMinutes(occupancy);
+      if (idle <= 1 / 60) {
+        handled.add(key);
+        continue;
+      }
+      const fromNodeId = stationNodeId.get(occupancy.stationId);
+      if (!fromNodeId) {
+        handled.add(key);
+        continue;
+      }
+
+      const timelineForRow = timelines.find((item) => item.row === occupancy.timelineRow);
+      if (!timelineForRow) {
+        handled.add(key);
+        continue;
+      }
+      /**
+       * 這段空等的下一張卡必須是正線，否則不碰。
+       *
+       * 整備前的空檔<strong>屬於整備轉場卡</strong>（入廠／出場移動）。那些卡是在
+       * 幾何收斂迴圈<strong>跑完之後</strong>才真正插進去的（迴圈裡只先決定地點），
+       * 所以在這裡看起來是空的，實際上已經被預定了。硬塞進去的結果是整整 391 則
+       * TIMELINE_OVERLAP——2026-08-17 第一版就是這樣炸的。
+       *
+       * 正線→正線之間的空檔沒有這個問題，只處理那一種。
+       */
+      const nextBlock = timelineForRow.blocks
+        .filter((block) => block.plannedStartMinute + 1e-9 >= occupancy.endMinute)
+        .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0];
+      if (!nextBlock || nextBlock.taskType !== 'passenger') {
+        handled.add(key);
+        continue;
+      }
+
+      const busy = collectFacilityBusyWindows(timelines);
+      const parkStart = occupancy.endMinute;
+      const parkEnd = occupancy.actualDepartMinute;
+
+      let best: ParkCandidate | null = null;
+      for (const facility of facilities) {
+        // 整段空等期間都空著才借；有一點重疊就跳過（不做先佔後讓）
+        if (!facilityIsFree(busy, facility.id, parkStart, parkEnd)) continue;
+        const inbound = findTopologyPath(topology, fromNodeId, facility.id);
+        const outbound = findTopologyPath(topology, facility.id, fromNodeId);
+        if (!inbound || !outbound) continue;
+        const roundTripSeconds = inbound.avgSeconds + outbound.avgSeconds;
+        // 進出加上最短停留仍塞不進這段空等 → 這一格沒意義
+        if (roundTripSeconds + MIN_PARK_SECONDS >= idle * 60) continue;
+        if (best && roundTripSeconds >= best.inboundSeconds + best.outboundSeconds) continue;
+        best = {
+          occupancy,
+          blockedCount: count,
+          facilityNodeId: facility.id,
+          facilityLabel: facility.label,
+          inboundSeconds: inbound.avgSeconds,
+          outboundSeconds: outbound.avgSeconds,
+        };
+      }
+
+      if (!best) {
+        handled.add(key);
+        continue;
+      }
+
+      const timeline = timelineForRow;
+
+      const inStartSecond = minuteToSecond(parkStart);
+      const inEndSecond = snapUpToClockAlignSeconds(inStartSecond + best.inboundSeconds);
+      const outEndSecond = minuteToSecond(parkEnd);
+      const outStartSecond = outEndSecond - best.outboundSeconds;
+      if (outStartSecond <= inEndSecond + MIN_PARK_SECONDS) {
+        handled.add(key);
+        continue;
+      }
+
+      const stationLabel = occupancy.stationName ?? occupancy.stationId;
+      const idTag = `${occupancy.blockId}-${Math.round(inStartSecond)}`;
+      const cards: GeneratedScheduleBlock[] = [
+        {
+          id: `berthpark-in-${idTag}`,
+          timelineRow: timeline.row,
+          taskType: 'dispatch',
+          label: `讓站移動 · ${stationLabel} → ${best.facilityLabel}`,
+          anchorStartMinute: secondToMinute(inStartSecond),
+          plannedStartMinute: secondToMinute(inStartSecond),
+          plannedEndMinute: secondToMinute(inEndSecond),
+          travelSeconds: best.inboundSeconds,
+          dwellSeconds: 0,
+          source: 'yard_entry_move',
+          yardEntryFacilityNodeId: best.facilityNodeId,
+          yardEntryFacilityLabel: best.facilityLabel,
+        } as GeneratedScheduleBlock,
+        {
+          id: `berthpark-stay-${idTag}`,
+          timelineRow: timeline.row,
+          taskType: 'standby',
+          label: `暫停放 · ${best.facilityLabel}`,
+          anchorStartMinute: secondToMinute(inEndSecond),
+          plannedStartMinute: secondToMinute(inEndSecond),
+          plannedEndMinute: secondToMinute(outStartSecond),
+          travelSeconds: 0,
+          dwellSeconds: outStartSecond - inEndSecond,
+          source: 'transition',
+          yardFacilityNodeId: best.facilityNodeId,
+          yardFacilityLabel: best.facilityLabel,
+        } as GeneratedScheduleBlock,
+        {
+          id: `berthpark-out-${idTag}`,
+          timelineRow: timeline.row,
+          taskType: 'dispatch',
+          label: `讓站返回 · ${best.facilityLabel} → ${stationLabel}`,
+          anchorStartMinute: secondToMinute(outStartSecond),
+          plannedStartMinute: secondToMinute(outStartSecond),
+          plannedEndMinute: secondToMinute(outEndSecond),
+          travelSeconds: best.outboundSeconds,
+          dwellSeconds: 0,
+          source: 'yard_exit_move',
+          yardExitFacilityNodeId: best.facilityNodeId,
+          yardExitFacilityLabel: best.facilityLabel,
+          yardExitStationId: occupancy.stationId,
+          yardExitStationLabel: stationLabel,
+        } as GeneratedScheduleBlock,
+      ];
+
+      /**
+       * 硬檢查：三張卡都不得與同列既有卡片重疊。
+       *
+       * 空等區間理論上是空的，但整備轉場卡、進場載客等機制都可能把卡片排進來，
+       * 而它們的時刻不歸這一支管。重疊會直接變成 TIMELINE_OVERLAP 硬錯誤，
+       * 寧可放棄這一筆讓渡，也不能產生無效班表。
+       */
+      const clashes = timeline.blocks.some((block) =>
+        cards.some(
+          (card) =>
+            block.plannedStartMinute < card.plannedEndMinute - 1e-9
+            && block.plannedEndMinute > card.plannedStartMinute + 1e-9,
+        ),
+      );
+      if (clashes) {
+        handled.add(key);
+        continue;
+      }
+
+      // 先插，再驗證；沒有真的變少就整組撤回
+      timeline.blocks.push(...cards);
+      const after = countBlockedBy(timelines, selectedRoutes, collisionProtectionSeconds);
+      if (after.total >= total) {
+        const ids = new Set(cards.map((card) => card.id));
+        timeline.blocks = timeline.blocks.filter((block) => !ids.has(block.id));
+        handled.add(key);
+        continue;
+      }
+
+      handled.add(key);
+      parked += 1;
+      applied = true;
+      warnings?.push({
+        code: 'STATION_BERTH_ARRIVAL_YIELDED',
+        severity: 'warning',
+        kind: 'policy',
+        message:
+          `時間線 ${timeline.row}：跑完一趟在「${stationLabel}」空等 ${idle.toFixed(1)} 分鐘，`
+          + `擋住 ${count} 台後車——已改開進「${best.facilityLabel}」暫停放，`
+          + `來回空駛 ${Math.round(best.inboundSeconds + best.outboundSeconds)} 秒，`
+          + `下一趟發車時刻不變。`,
+        detail: {
+          timelineRow: timeline.row,
+          blockId: occupancy.blockId,
+          stationId: occupancy.stationId,
+          idleMinutes: Number(idle.toFixed(2)),
+          affectedPairCount: count,
+          parkedStationId: best.facilityNodeId,
+        },
+      });
+      break;
+    }
+
+    if (!applied) break;
+  }
+
+  return { timelines, parked };
+}

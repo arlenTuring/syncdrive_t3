@@ -49,6 +49,7 @@ import { alignRouteWithMaintenanceEntry } from '../alignRouteWithMaintenanceEntr
 import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
 import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
+import { relievePlatformIdleWithFacilityPark } from '../relievePlatformIdleWithFacilityPark';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
 import {
@@ -310,6 +311,21 @@ export function generateShiftSchedule(
       warnings: round === 0 ? warnings : [],
     });
 
+    /**
+     * 繞不去別站 → 開進附近設施格暫停放。這一支<strong>呼叫兩次</strong>：
+     * 這裡（迴圈內）讓站位求解器在同一輪看得到讓出來的站格；整備轉場卡插完之後
+     * 再呼叫一次，把跟轉場卡撞到的那幾筆丟掉。它會先清掉自己上一次插的卡再重算，
+     * 重複呼叫不會疊加。
+     *
+     * 只放後面不行——求解器的延後與改派備用線在迴圈裡就定案了，站格再讓也沒人
+     * 受益（2026-08-17 實測：只放後面，指標與不做完全相同）。
+     */
+    timelines = relievePlatformIdleWithFacilityPark({
+      timelines,
+      selectedRoutes: routesForBerth,
+      topology: engineInput.pointTopology,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    }).timelines;
 
     // 班距太疏 → 把後車往前拉回目標
     timelines = densifyRouteHeadwaysAfterBerth({
@@ -396,6 +412,26 @@ export function generateShiftSchedule(
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
   timelines = maintenanceTransfer.timelines;
+
+  /**
+   * 繞不去別站（關聯圖上沒有回得來的路線）→ 開進附近設施格暫停放，時間到再回來。
+   *
+   * 放在<strong>整備轉場卡之後</strong>，不在幾何收斂迴圈裡。原因是轉場卡是迴圈
+   * 跑完才真正插進去的（迴圈裡只先決定地點），在迴圈裡看到的空檔其實已被預定；
+   * 2026-08-17 第一版擺在迴圈內，硬塞的結果是 391 則 TIMELINE_OVERLAP。
+   *
+   * 擺在這裡的代價是站位求解器不會針對讓出來的站格再跑一次，收益因此保守；
+   * 但這一支只移動「已經確定在空等」的車、且不改任何發車時刻，本來就不需要
+   * 求解器重新介入。
+   */
+  timelines = relievePlatformIdleWithFacilityPark({
+    timelines,
+    selectedRoutes: routesForBerth,
+    topology: engineInput.pointTopology,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    warnings,
+  }).timelines;
+
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType
       ? `「${skip.fromTaskType}」轉「${skip.toTaskType}」`
