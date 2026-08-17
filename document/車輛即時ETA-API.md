@@ -33,9 +33,8 @@
 10. [整合指引](#十整合指引)
 11. [JSON Schema](#十一json-schema)
 12. [部署配置參數](#十二部署配置參數)
-13. [與 MQTT 協議之欄位對應](#十三與-mqtt-協議之欄位對應)
-14. [實作狀態與交付](#十四實作狀態與交付)
-15. [附錄：與計畫 ETA 的關係](#十五附錄與計畫-eta-的關係)
+13. [實作狀態與交付](#十三實作狀態與交付)
+14. [附錄：與計畫 ETA 的關係](#十四附錄與計畫-eta-的關係)
 
 ---
 
@@ -603,6 +602,8 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | `DEGRADED` | 部分車輛資料逾時，或班表未載入 | 顯示，並對 `arrival_state` 為 `UNKNOWN` 者標示資料中斷 |
 | `DOWN` | 無法取得任何車輛資料 | **必須**停止顯示 ETA，改顯示資料中斷 |
 
+判定基礎：中心端已知車隊應有的車輛清單（`PMS-01` 至 `PMS-11`），逐車比對其最新資料的 `data_age_seconds`。任一車超過逾時門檻即為 `DEGRADED`；全部車輛皆無資料或皆逾時則為 `DOWN`。
+
 ### 7.4 計數欄位
 
 | 欄位 | 型別 | 說明 |
@@ -666,7 +667,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `eta_seconds` | Int \| null | 距離抵達該停靠點還有幾秒。**以 `observed_at`（車端回報時刻）為基準**，非以使用方收到回應的時刻為基準 |
+| `eta_seconds` | Int \| null | 距離抵達該停靠點還有幾秒。**以 `observed_at`（車端回報時刻）為基準**，非以使用方收到回應的時刻為基準。第 1 站直接採用車端上行之推估值；車端未提供時，該筆 `arrival_state` 為 `UNKNOWN` |
 | `eta_at` | Long \| null | 預計抵達該停靠點的**絕對時刻**，Unix Epoch 毫秒。使用方計算倒數必須使用本欄位 |
 | `eta_clock` | String \| null | `eta_at` 的當地時刻表示，格式 `HH:MM:SS`，24 小時制。僅供顯示 |
 | `distance_to_station_m` | Double \| null | 車輛距該停靠點的路徑距離，單位公尺 |
@@ -697,38 +698,52 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | `planned_departure_at` | Long \| null | 計畫發車時刻。僅於該停靠點為該班次起站，或 `arrival_state` 為 `AT_STATION` 時有值，其餘為 `null` |
 | `planned_departure_clock` | String \| null | 計畫發車時刻的當地時刻表示 |
 | `delay_seconds` | Int \| null | `eta_at` 減 `planned_arrival_at`，單位秒。**正值表示晚於計畫**，負值表示早於計畫 |
-| `delay_state` | String | 誤點狀態，見 7.10 |
+| `delay_state` | String | 誤點狀態，**暫定定義**，見 7.10。現階段應以 `delay_seconds` 為準 |
 
-### 7.10 `delay_state`（誤點狀態）
+### 7.10 `delay_state`（誤點狀態）— 暫定
 
-| 值 | 條件 | 意義 |
-|----|------|------|
+> **本欄位為暫定定義。** 門檻值與狀態分級尚未經營運確認，將於試營運後依實際營運需求調整。
+> **現階段使用方應以 `delay_seconds`（數值）為準**，自行決定顯示門檻；`delay_state` 僅供參考，不應作為判斷邏輯的唯一依據。
+
+`delay_seconds` 為 `eta_at` 減 `planned_arrival_at`，單位秒，正值表示晚於計畫。此為客觀數值，不受門檻調整影響。
+
+暫定分級如下：
+
+| 值 | 暫定條件 | 意義 |
+|----|---------|------|
 | `EARLY` | `delay_seconds < -30` | 早到 |
 | `ON_TIME` | `-30 ≤ delay_seconds ≤ 60` | 準點 |
 | `MINOR_DELAY` | `60 < delay_seconds ≤ 180` | 輕微誤點 |
 | `MAJOR_DELAY` | `delay_seconds > 180` | 顯著誤點 |
 | `NO_PLAN` | 無對應計畫班次 | 不判定誤點。加班車、調度車，或班表未載入時屬此類 |
 
-門檻值見[第十二章 部署配置參數](#十二部署配置參數)。
+門檻值見[第十二章 部署配置參數](#十二部署配置參數)，可於部署時調整。
 
-計算範例：
+`delay_seconds` 計算範例：
 
-| 計畫抵達 | 預計抵達 | `delay_seconds` | `delay_state` |
-|---------|---------|----------------|--------------|
-| 09:00:10 | 09:00:25 | `15` | `ON_TIME` |
-| 09:00:10 | 08:59:20 | `-50` | `EARLY` |
-| 09:06:10 | 09:08:20 | `130` | `MINOR_DELAY` |
-| 09:06:10 | 09:11:00 | `290` | `MAJOR_DELAY` |
-| 無 | 09:11:00 | `null` | `NO_PLAN` |
+| 計畫抵達 | 預計抵達 | `delay_seconds` |
+|---------|---------|----------------|
+| 09:00:10 | 09:00:25 | `15` |
+| 09:00:10 | 08:59:20 | `-50` |
+| 09:06:10 | 09:08:20 | `130` |
+| 09:06:10 | 09:11:00 | `290` |
+| 無 | 09:11:00 | `null` |
 
 ### 7.11 資料新鮮度欄位
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，Unix Epoch 毫秒 |
+| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以中心端收訊時刻替代 |
 | `data_age_seconds` | Int | `generated_at` 減 `observed_at`，單位秒。表示這筆資料有多舊 |
 
 `data_age_seconds` 超過門檻（預設 90 秒）時，`arrival_state` 轉為 `UNKNOWN`。
+
+#### 更新基礎
+
+車端以 1 Hz 上行，中心端逐筆覆寫該車的最新狀態，**不設過期清除**。因此：
+
+- 車輛正常回報時，`data_age_seconds` 通常為 0–2 秒。
+- 車輛停止回報時，中心端仍保有其最後一筆資料，`data_age_seconds` 將持續累加。**失聯是以「資料變舊」呈現，不是以「資料消失」呈現**，使用方必須檢查 `data_age_seconds` 或 `arrival_state`，不可僅以欄位是否存在判斷。
 
 ### 7.12 `position`（車輛位置）
 
@@ -757,17 +772,21 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 ### 8.1 建議輪詢間隔
 
-| API | 建議間隔 | 可接受範圍 | 依據 |
-|-----|---------|-----------|------|
-| `eta/by-station` | **60 秒** | 30–60 秒 | 最短班距 180 秒，60 秒可於每一班距內更新約 3 次 |
-| `eta/by-vehicle` | **60 秒** | 30–120 秒 | 車輛追蹤用途，非安全關鍵 |
+**兩支 API 使用相同的輪詢間隔。**
 
-### 8.2 間隔上下限
+| 項目 | 值 |
+|------|----|
+| 建議間隔 | **60 秒** |
+| 可接受範圍 | 30–60 秒 |
+| 最小間隔 | 10 秒 |
+| 最大間隔 | 60 秒 |
 
-| 限制 | 值 | 說明 |
+### 8.2 間隔上下限的依據
+
+| 限制 | 值 | 依據 |
 |------|----|------|
 | 最小間隔 | 10 秒 | 低於此值回應 `429 Too Many Requests` |
-| `eta/by-station` 最大間隔 | **60 秒** | `APPROACHING` 門檻為 60 秒，間隔大於此值將無法觀測到即將進站狀態 |
+| 最大間隔 | 60 秒 | `APPROACHING` 門檻為 60 秒。輪詢間隔大於此值時，車輛可能在兩次輪詢之間完成整段接近過程，使用方將觀測不到即將進站狀態 |
 
 低於 15 秒的輪詢不提升顯示精度：ETA 的實質變化來自車輛移動，顯示精度為分鐘級。
 
@@ -1064,60 +1083,7 @@ If-None-Match: "<前次 ETag>"
 
 ---
 
-## 十三、與 MQTT 協議之欄位對應
-
-本介面欄位分為三類：協議原值透傳、協議值轉換、本介面衍生。
-
-### 13.1 協議原值透傳
-
-值域由來源協議定義，本介面不改寫、不擴充。
-
-| 本介面欄位 | 來源協議 | 來源欄位 |
-|-----------|---------|---------|
-| `vehicle_code` | MQTT 通訊架構與 Topic 命名規範 | `vehicle_code` |
-| `vehicle_phase` | 營運任務狀態協議 | `vehicle_phase` |
-| `order_id` | 營運任務狀態協議 | `order_id` |
-| `distance_to_station_m` | 營運任務狀態協議 | `current_leg.distance_to_target_m` |
-| `position.latitude` / `longitude` | 車輛動態協議 | `global_pose.latitude` / `longitude` |
-| `position.heading` | 車輛動態協議 | `local_pose.heading` |
-| `position.velocity_kph` | 車輛動態協議 | `kinematics.velocity` |
-
-### 13.2 協議值轉換
-
-| 本介面欄位 | 轉換內容 |
-|-----------|---------|
-| `station_id` | 由車端 `current_leg.target_station_id` 對應至停靠點識別碼 |
-| `*_at` | 沿用協議之 13 位 Unix Epoch 毫秒；`*_clock` 為顯示用字串，非時間戳 |
-
-### 13.3 本介面衍生
-
-不對應任何 MQTT 協議欄位，由本介面計算產生。
-
-| 欄位 | 計算依據 |
-|------|---------|
-| `arrival_state` | `current_leg.distance_to_target_m`、`current_leg.eta_seconds`、車端任務狀態 |
-| `eta_seconds` / `eta_at` / `eta_clock` | `sequence` 為 1 者採用車端 `current_leg.eta_seconds`；後續站點依班表站間旅行時間外推 |
-| `plan.*` | 已發布班表 |
-| `delay_seconds` / `delay_state` | 即時推估值與班表計畫值之差 |
-| `data_quality` | 車輛回報覆蓋率與班表載入狀態 |
-| `data_age_seconds` | `generated_at` 與 `observed_at` 之差 |
-
-### 13.4 共通格式遵循
-
-| 規範 | 出處 | 本介面遵循方式 |
-|------|------|--------------|
-| 時間戳採 13 位 Unix Epoch 毫秒，屏除 ISO 8601 | MQTT 通訊架構第四章第 2 項 | 所有 `*_at` 欄位為 Epoch 毫秒；`*_clock` 為顯示用字串，非時間戳 |
-| 狀態碼採 `SCREAMING_SNAKE_CASE` | MQTT 通訊架構第四章第 3 項 | 全部列舉值遵循 |
-| 車輛代號格式 `PMS-` + 兩碼數字 | MQTT 通訊架構第一章第 3 項 | 一致 |
-| 車端為 `vehicle_phase` 之唯一寫入源 | 動態控制與特殊事件協議第五章第 4 項 | 原值透傳，本介面不改寫 |
-
-### 13.5 治理
-
-MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介面為 HTTP 讀取介面，不新增、不修改任何 MQTT Topic、頻道或動作，亦不改寫協議定義之欄位值域。13.3 所列衍生欄位僅存在於 HTTP 回應，不回寫至 MQTT。
-
----
-
-## 十四、實作狀態與交付
+## 十三、實作狀態與交付
 
 | API | 狀態 |
 |-----|------|
@@ -1132,16 +1098,16 @@ MQTT 通訊架構第五章規定通訊頻道與動作採閉鎖式管理。本介
 |------|------|
 | 車端 MQTT 資料接收（telemetry／operation／health） | 已上線 |
 | 車輛最新狀態快取 | 已上線 |
-| 班表計畫 ETA 查詢 | 已上線（見第十五章） |
+| 班表計畫 ETA 查詢 | 已上線（見第十四章） |
 | 即時 ETA 外推、依站索引 | 開發中 |
 
-### 14.1 後續版本
+### 13.1 後續版本
 
 異常狀況（Event）相關介面待 SCADA 之統一 Event Code 定義完成後另行提供，不在本版範圍。
 
 ---
 
-## 十五、附錄：與計畫 ETA 的關係
+## 十四、附錄：與計畫 ETA 的關係
 
 系統另提供班表計畫 ETA 介面，兩者資料來源不同，不互相取代。
 
