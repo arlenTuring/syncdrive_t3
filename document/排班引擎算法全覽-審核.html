@@ -413,22 +413,34 @@
     就一路留到驗證階段變成 <code>HEADWAY_BELOW_TARGET</code>。
     改成迴圈之後，「某一步釋放的空間，下一輪其他步驟就能用到」，不必人工推演順序。
   </p>
-  <h4>每一輪依序做這六件事</h4>
+  <h4>每一輪依序做這些事</h4>
   <table>
     <thead><tr><th>#</th><th>做什麼</th><th>函式</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>清掉兩台車搶同一個停靠點（可延後、可改線）。第一輪保守並收集警告，之後放寬延後上限</td><td><code>enforceStationBerthConstraints</code></td></tr>
-      <tr><td>2</td><td>班距太疏 → 把後車往前拉回目標</td><td><code>densifyRouteHeadwaysAfterBerth</code></td></tr>
-      <tr><td>3</td><td>班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕</td><td><code>repairRouteHeadwaysBelowTarget</code></td></tr>
-      <tr><td>4</td><td>正線可吃接下來那段整備的開頭（有重疊才讓）</td><td><code>applyMainlineMaintenanceEntryYield</code></td></tr>
-      <tr><td>5</td><td>不准佔用整備尾巴：壓到前一段整備的正線，整趟推到整備結束之後</td><td><code>pushPassengerPastPrecedingYard</code></td></tr>
-      <tr><td>6</td><td>撤掉不成輪的尾巴。<strong>放在迴圈內是有意的</strong>——它釋放的空間，下一輪班距修復才用得到</td><td><code>trimIncompleteRotationCyclesOnTimelines</code></td></tr>
+      <tr><td>1</td><td>車停在哪，下一班就從那裡發（只換起點站、同終點同下游才換）</td><td><code>alignRouteWithVehicleLocation</code></td></tr>
+      <tr><td>2</td><td>要進廠卻停在到不了設施的站：把進廠前那一趟改開到進得了廠的那一站</td><td><code>alignRouteWithMaintenanceEntry</code></td></tr>
+      <tr><td>3</td><td>發車相位均分</td><td><code>evenOutRouteHeadwayPhase</code></td></tr>
+      <tr><td>4</td><td>清掉兩台車搶同一個停靠點（可延後、可改線）。第一輪保守並收集警告，之後放寬延後上限</td><td><code>enforceStationBerthConstraints</code></td></tr>
+      <tr><td>5</td><td>空等的車讓後車先進站（自己反正要等，發車時刻不變）</td><td><code>yieldIdleBlockArrival</code></td></tr>
+      <tr><td>6</td><td>站位讓渡做法一／二：換替身路線、或沿次要邊繞去別站等（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge</code></td></tr>
+      <tr><td>7</td><td>站位讓渡做法三：開進附近設施格暫停放（見 §8.2）</td><td><code>relievePlatformIdleWithFacilityPark</code></td></tr>
+      <tr><td>8</td><td>班距太疏 → 把後車往前拉回目標</td><td><code>densifyRouteHeadwaysAfterBerth</code></td></tr>
+      <tr><td>9</td><td>班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕</td><td><code>repairRouteHeadwaysBelowTarget</code></td></tr>
+      <tr><td>10</td><td>撤掉不成輪的尾巴。<strong>放在迴圈內是有意的</strong>——它釋放的空間，下一輪班距修復才用得到</td><td><code>trimIncompleteRotationCyclesOnTimelines</code></td></tr>
     </tbody>
   </table>
   <p>
-    每輪結束時比對「版面指紋」（所有區塊的身分與起迄時間）。完全沒變就結束。
-    輪數上限 <strong>8</strong> 只是防呆——實測多數情況<strong>第 1 輪就不動了</strong>，
-    最複雜的案例用到第 4 輪，從未逼近上限。
+    每輪結束時比對「版面指紋」（所有區塊的身分、起迄時間與<strong>路線</strong>）。完全沒變就結束。
+    指紋要含路線：迴圈裡有兩道處理只換路線、不動時刻（第 1、6 項），
+    換路線＝換停靠站＝站位佔用整個變了，指紋只看時刻的話會誤判「這輪沒變化」提早收工。
+  </p>
+  <p>
+    輪數上限 <strong>14</strong> 只是防呆——實測多數情況第 1–3 輪就不動了。
+  </p>
+  <p class="note">
+    <strong>迴圈之後還有一次站位讓渡（做法三）。</strong>整備轉場卡是迴圈跑完才真正插入的，
+    迴圈裡看起來空著的空檔其實已被預定；轉場卡插完後再呼叫一次，把撞到的那幾筆丟掉。
+    該函式可重入，重複呼叫不會疊加。
   </p>
 
   <p>算法識別碼（plan 上記錄）：掛車 <code>periodic-cycle-headway-v2</code>；路線指派圖模式 <code>route-assignment-relation-graph-v1</code>／舊環 <code>constraint-greedy-v1</code>；策略 <code>relation-graph-through-anchors-v1</code> 或 <code>execution-order-ring-v1</code>。</p>
@@ -535,7 +547,7 @@
       <tr><td><code>startSecond</code> / <code>endSecond</code></td><td>正線（或可派待命）模板窗</td></tr>
       <tr><td><code>dispatchStartSecond</code></td><td><strong>等於 startSecond</strong>——明確禁止為了預熱去裁<strong>前一段</strong>整備尾</td></tr>
       <tr><td><code>nextMaintenanceStartSecond</code></td><td>接下整備開始，或空時段邊界</td></tr>
-      <tr><td><code>entrySlackSeconds</code></td><td>可占用接下整備／空時段<strong>開頭</strong>的秒數</td></tr>
+      <tr><td><code>entrySlackSeconds</code></td><td>可占用接下整備／空時段<strong>開頭</strong>的秒數。接下來的整備 &gt; 1 小時時改取「一個完整輪迴」的時間，見 §6.0</td></tr>
     </tbody>
   </table>
 
@@ -603,6 +615,56 @@
   <div class="callout">
     <strong>你確認過的產品規則：</strong>讓渡餘裕<strong>只能吃整備開頭</strong>；殘段仍須留給整備做事。禁止為了出車去砍<strong>前一段</strong>行檢／整備的尾巴。
   </div>
+
+  <h3>6.0 讓渡額度：長整備讓一輪</h3>
+  <div class="callout">
+    <strong>產品規則：</strong>正線之後那段整備<strong>超過 1 小時</strong>，允許正線讓渡
+    <strong>一次</strong>；一次＝<strong>一個完整輪迴</strong>（一條路線的來回，即 Step 4
+    鎖定的導通組合跑完一圈）。
+  </div>
+  <p>
+    讓渡的意義是「讓這台車把手上這一輪跑完再進場」，額度自然就是一輪的時間，
+    由 <code>resolveLockedRotationMinSeconds()</code> 直接算出，<strong>不需要另外設定，
+    也不會多讓一秒</strong>。
+  </p>
+  <table>
+    <thead><tr><th>條件</th><th>讓渡額度</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>接下來的整備 &gt; 1 小時，且有鎖定的導通組合</td>
+        <td><strong>一個完整輪迴的時間</strong></td>
+      </tr>
+      <tr>
+        <td>短整備（例如 30 分鐘的行檢），或沒有鎖定組合</td>
+        <td>沿用各區段既有的 <code>entrySlackSeconds</code> 設定</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>為什麼不是固定分鐘數</h4>
+  <p>
+    固定值（原本五個區段一律 600 秒）套在長短差十倍的整備上必然兩頭不對：對 30 分鐘的
+    行檢是三分之一、太寬鬆；對 4 小時以上的待命連 4% 都不到、太吝嗇——而待命正是最不
+    在乎晚幾分鐘開始的那一種。額度改成跟「一輪要多久」連動之後，長短整備自動各得其所。
+  </p>
+
+  <h4>「一次」是怎麼保證的</h4>
+  <p>
+    額度是「整備開始 + 一輪」這條<strong>固定線</strong>（見
+    <code>cycleViolatesMaintenanceEntryPolicy</code>），不是每掛一輪就往後推一次。
+    第二輪的結束時刻一樣要落在同一條線之前，因此天然只讓得出一輪。
+  </p>
+
+  <h4>它解的是什麼問題</h4>
+  <p>
+    掛車階段拒絕一輪的常見理由是「整輪跑不完」與「最早可發已超出正線視窗」——車其實
+    跑得完，只是會多吃整備開頭幾分鐘。額度不足時整輪就掛不上，那個班距<strong>整段開洞</strong>。
+  </p>
+  <p class="note">
+    <strong>這個機制不碰任何發車時刻。</strong>它借的是整備開頭的時間，不是把班次往後挪，
+    因此班距不受損。要區分清楚：延後發車＝誤點＝違反班距，是錯的槓桿（見 §17）；
+    讓渡＝借整備的時間，班距零損傷。
+  </p>
   <table>
     <thead><tr><th>情境</th><th>允許？</th><th>程式行為</th></tr></thead>
     <tbody>
@@ -818,6 +880,13 @@
     ——「延後」在這裡是錯的槓桿（車在原地等，延後只會讓它擋更久，還會毀掉班距，見 §17）。
   </p>
 
+  <p class="note">
+    <strong>「車停在哪」包含停在設施格的情形。</strong>車可能停在正線站位，也可能停在
+    場內設施格；後者的「車在哪」由該設施在拓樸上連得到的出場站決定，可能不只一個，
+    只要下一趟的起點站是其中之一就算合法。這一點在做法一與
+    <code>alignRouteWithVehicleLocation</code> 都適用。
+  </p>
+
   <h4>做法一（優先）：整對換成停別的站位的替身路線</h4>
   <p>
     這是關聯圖上準備備用路線的<strong>真正用途</strong>。主線與備用是<strong>成對的替身</strong>，
@@ -879,8 +948,78 @@
     <code>detail.reliefHopCount</code> 記錄繞了幾跳），讓使用者知道引擎動過班次、
     可以去關聯圖確認這條路徑是不是真的可以這樣用。
   </p>
+  <h4>做法三（前兩種都不行時）：開進附近設施格暫停放</h4>
+  <p>
+    關聯圖上既沒有同終點的替身、也沒有繞得回來的次要邊時，車只能留在原地擋人——
+    這是前兩種做法的共同死角。做法三改變的不是路線，而是<strong>車停在哪</strong>：
+    把它開進附近的設施格待著，時間到了再開回來。
+  </p>
+  <table>
+    <thead><tr><th>插入的卡</th><th>內容</th></tr></thead>
+    <tbody>
+      <tr><td>讓站移動</td><td>停靠站 → 設施格，時長取拓樸上該段的空駛秒數</td></tr>
+      <tr><td>暫停放</td><td>停在設施格，佔用該設施格</td></tr>
+      <tr><td>讓站返回</td><td>設施格 → 停靠站，結束時刻貼齊下一趟發車</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>下一趟的發車時刻完全不動</strong>，只是車在這段期間不佔正線站位。
+    代價是一段來回空駛（實務上多半 60 秒），換掉十幾到三十幾分鐘的站位佔用。
+  </p>
+
+  <h4>觸發條件：不是「空等多久」，是「有沒有擋到別人」</h4>
+  <p>
+    空等本身是正常的，該等就等。用時長門檻去判定（例如「超過 10 分鐘就處理」）只生得出
+    警告，生不出解法，而且會去動根本沒礙著誰的空等。
+  </p>
+  <p>
+    真正的判準是<strong>這段空等有沒有擋到別人</strong>，而這個訊號引擎本來就算得出來：
+    <code>findStationBerthCollisions()</code> 回報的每一對衝突都指名了「擋人的那一筆佔用」。
+    直接拿它當觸發條件，有擋到才動，沒擋到就留著。<strong>擋最多台的先處理</strong>，
+    收斂最快。
+  </p>
+
+  <h4>設施格借用的紀律</h4>
+  <ul>
+    <li><strong>只借整段空等期間都空著的格子。</strong>任何整備卡（或先前已排定的停放）
+        與該區間有一點重疊就不借——不做「先佔了再說、之後再讓」。</li>
+    <li><strong>來回空駛時間加上最短停留仍塞不進這段空等，就不做。</strong>車來不及回來
+        接下一趟的話，這個讓渡沒有意義。</li>
+    <li><strong>暫停放卡掛 <code>idle</code>，不是 <code>standby</code>。</strong>
+        整備轉場機制以 <code>taskType === 'standby'</code> 認定「這是排定的待命，
+        要幫它排進出廠卡」；本機制自己已經帶了兩張移動卡，掛成 standby 會被重複服務。</li>
+  </ul>
+
+  <h4>自我驗證與撤回</h4>
+  <ul>
+    <li>插卡前檢查三張卡都不與同列既有卡片重疊，撞到就整筆放棄。</li>
+    <li>插卡後重算站位碰撞，<strong>沒有真的變少就整組撤回</strong>。
+        語意上永遠不比「不做這件事」更差。</li>
+  </ul>
+
+  <h4>執行位置：呼叫兩次，缺一不可</h4>
+  <table>
+    <thead><tr><th>時機</th><th>為什麼</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>幾何收斂迴圈<strong>內</strong></td>
+        <td>讓站位求解器在同一輪就看得到讓出來的站格。只放後面的話，求解器的延後與
+            改派備用線在迴圈裡就定案了，站格再讓也沒人受益。</td>
+      </tr>
+      <tr>
+        <td>整備轉場卡插完<strong>之後</strong></td>
+        <td>轉場卡是迴圈跑完才真正插入的（迴圈裡只先決定地點），迴圈裡看起來空著的
+            空檔其實已被預定。這一次呼叫把跟轉場卡撞到的那幾筆丟掉。</td>
+      </tr>
+    </tbody>
+  </table>
   <p class="note">
-    <strong>已知限制：</strong>兩種做法都只在「下一段是正線」時才啟動。下一段是整備
+    函式可重入：每次呼叫先清掉自己上一次插的卡再重算，重複呼叫不會疊加。
+    實作於 <code>relievePlatformIdleWithFacilityPark.ts</code>。
+  </p>
+
+  <p class="note">
+    <strong>已知限制：</strong>三種做法都只在「下一段是正線」時才啟動。下一段是整備
     （例如跑完最後一輪停在原地等充電）時沒有明確的回程目標站，這裡不處理——
     那種情況要靠 §6 的整備讓渡讓車多跑一輪把空檔填掉。
     另外，關聯圖上若既沒有可換的替身、也沒有繞得回來的次要邊，引擎不會替使用者發明路徑；
