@@ -110,8 +110,8 @@ Cache-Control: no-cache, max-age=0
 
 | `*_at` | 對應 `*_clock` |
 |--------|---------------|
-| `generated_at` | `generated_at_clock` |
-| `observed_at` | `observed_at_clock` |
+| `generated_at` | `generated_clock` |
+| `observed_at` | `observed_clock` |
 | `eta_at` | `eta_clock` |
 | `planned_arrival_at` | `planned_arrival_clock` |
 | `planned_departure_at` | `planned_departure_clock` |
@@ -239,7 +239,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 {
   "meta": {
     "generated_at": 1786842000000,
-    "generated_at_clock": "09:00:00",
+    "generated_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "OK"
@@ -271,7 +271,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
             "delay_state": "ON_TIME"
           },
           "observed_at": 1786841998000,
-          "observed_at_clock": "08:59:58",
+          "observed_clock": "08:59:58",
           "data_age_seconds": 2
         },
         {
@@ -295,7 +295,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
             "delay_state": "ON_TIME"
           },
           "observed_at": 1786841997000,
-          "observed_at_clock": "08:59:57",
+          "observed_clock": "08:59:57",
           "data_age_seconds": 3
         },
         {
@@ -319,7 +319,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
             "delay_state": "ON_TIME"
           },
           "observed_at": 1786841996000,
-          "observed_at_clock": "08:59:56",
+          "observed_clock": "08:59:56",
           "data_age_seconds": 4
         }
       ]
@@ -336,7 +336,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
 {
   "meta": {
     "generated_at": 1786842000000,
-    "generated_at_clock": "09:00:00",
+    "generated_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "DEGRADED"
@@ -368,7 +368,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
             "delay_state": "ON_TIME"
           },
           "observed_at": 1786841999000,
-          "observed_at_clock": "08:59:59",
+          "observed_clock": "08:59:59",
           "data_age_seconds": 1
         }
       ]
@@ -398,7 +398,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
             "delay_state": "NO_PLAN"
           },
           "observed_at": 1786841908000,
-          "observed_at_clock": "08:58:28",
+          "observed_clock": "08:58:28",
           "data_age_seconds": 92
         }
       ]
@@ -459,7 +459,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 {
   "meta": {
     "generated_at": 1786842000000,
-    "generated_at_clock": "09:00:00",
+    "generated_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "OK"
@@ -536,7 +536,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
         }
       ],
       "observed_at": 1786841998000,
-      "observed_at_clock": "08:59:58",
+      "observed_clock": "08:59:58",
       "data_age_seconds": 2
     }
   ]
@@ -553,7 +553,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 {
   "meta": {
     "generated_at": 1786842000000,
-    "generated_at_clock": "09:00:00",
+    "generated_clock": "09:00:00",
     "shift_id": "OS-DRAFT-MSEEXIN9",
     "source": "published",
     "data_quality": "DEGRADED"
@@ -589,7 +589,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
         }
       ],
       "observed_at": 1786841908000,
-      "observed_at_clock": "08:58:28",
+      "observed_clock": "08:58:28",
       "data_age_seconds": 92
     }
   ]
@@ -609,7 +609,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | `generated_at` | Long | 中心端產生本次快照的時刻，13 位 Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
-| `generated_at_clock` | String | `generated_at` 的當地時刻表示，`HH:MM:SS`。可直接顯示為「資料更新於」 |
+| `generated_clock` | String | `generated_at` 的當地時刻表示，`HH:MM:SS`。可直接顯示為「資料更新於」 |
 | `shift_id` | String \| null | 本次計畫值所依據的班表識別碼。無可用班表時為 `null` |
 | `source` | String | 計畫值來源，見 7.2 |
 | `data_quality` | String | 本次快照的整體資料品質，見 7.3 |
@@ -709,7 +709,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 ```json
 {
   "observed_at": 1786841998000,
-  "observed_at_clock": "08:59:58",
+  "observed_clock": "08:59:58",
   "eta_seconds": 25,
   "eta_at": 1786842023000,
   "eta_clock": "09:00:23"
@@ -769,7 +769,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，13 位 Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以中心端收訊時刻替代 |
-| `observed_at_clock` | String | `observed_at` 的當地時刻表示，`HH:MM:SS` |
+| `observed_clock` | String | `observed_at` 的當地時刻表示，`HH:MM:SS` |
 | `data_age_seconds` | Int | `generated_at` 減 `observed_at`，單位秒。表示這筆資料有多舊 |
 
 `data_age_seconds` 超過門檻（預設 90 秒）時，`arrival_state` 轉為 `UNKNOWN`。
@@ -1027,10 +1027,10 @@ If-None-Match: "<前次 ETag>"
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["generated_at", "generated_at_clock", "source", "data_quality"],
+      "required": ["generated_at", "generated_clock", "source", "data_quality"],
       "properties": {
         "generated_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
-        "generated_at_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
+        "generated_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
         "shift_id": { "type": ["string", "null"] },
         "source": { "enum": ["published", "draft_fallback", "none"] },
         "data_quality": { "enum": ["OK", "DEGRADED", "DOWN"] }
@@ -1091,7 +1091,7 @@ If-None-Match: "<前次 ETag>"
           }
         },
         "observed_at": { "type": "integer", "description": "13 位 Unix Epoch 毫秒" },
-        "observed_at_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
+        "observed_clock": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$" },
         "data_age_seconds": { "type": "integer", "minimum": 0 }
       }
     }
