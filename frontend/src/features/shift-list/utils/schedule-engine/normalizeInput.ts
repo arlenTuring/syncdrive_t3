@@ -54,6 +54,7 @@ import {
 import {
   buildRouteSuccessorPolicy,
   estimatePolicyCycleSeconds,
+  resolveLockedRotationMinSeconds,
   resolveNextInstanceId,
   resolveRouteIndexInRotation,
   resolveStartInstanceId,
@@ -377,11 +378,55 @@ function buildPlannedCycleLegs(args: {
   return legs;
 }
 
+/**
+ * 長整備的讓渡門檻：超過這個時長，才允許正線吃它的開頭。
+ *
+ * 使用者（2026-08-18）：「正線完的那個整備如果超過一小時，可以讓渡他一次」。
+ * 短整備（例如 30 分鐘的行檢）本來就沒有多少可讓的餘地，讓了反而排擠整備本身。
+ */
+const LONG_YARD_YIELD_THRESHOLD_SECONDS = 3600;
+
+/**
+ * 正線讓渡餘裕：一次 ＝ 一個完整輪迴。
+ *
+ * <strong>為什麼不是固定分鐘數。</strong>原本五個整備區段各設一個
+ * <code>entrySlackSeconds</code>（預設一律 600 秒）。同一個數字套在 30 分鐘的行檢
+ * 與 4.4 小時的待命上：對行檢是三分之一、太寬鬆；對待命連 4% 都不到、太吝嗇——
+ * 而待命正是最不在乎晚幾分鐘開始的那一種。實測（2026-08-18）有 6 則「整輪跑不完」
+ * 與 9 則「最早可發已超出正線視窗」的拒絕，車其實跑得完，只是會多吃整備開頭幾分鐘。
+ *
+ * <strong>改成以輪迴為單位。</strong>使用者（2026-08-18）：「一次就是一條路線的
+ * 來回……就是一個輪迴」。讓渡的意義是「讓這台車把手上這一輪跑完再進場」，額度
+ * 自然就是一輪的時間，不需要另外設定，也不會多讓一秒。
+ *
+ * <strong>「一次」的邊界由既有機制保證。</strong>額度是「整備開始 + 一輪」這條
+ * 固定線（見 cycleViolatesMaintenanceEntryPolicy），不是每掛一輪就往後推一次；
+ * 第二輪的結束時刻一樣要落在同一條線之前，因此天然只讓得出一輪。
+ */
+function resolveYardEntrySlackSeconds(args: {
+  taskType: ScheduleTask['taskType'];
+  yardDurationSeconds: number;
+  lockedRotationSeconds: number | null;
+  slackBySection: MaintenanceEntrySlackBySection;
+}): number {
+  const { taskType, yardDurationSeconds, lockedRotationSeconds, slackBySection } = args;
+  if (
+    lockedRotationSeconds != null
+    && lockedRotationSeconds > 0
+    && yardDurationSeconds > LONG_YARD_YIELD_THRESHOLD_SECONDS
+  ) {
+    return lockedRotationSeconds;
+  }
+  // 短整備、或沒有鎖定導通組合（算不出一輪要多久）：沿用各區段既有設定
+  return resolveMaintenanceEntrySlackSeconds(taskType, slackBySection);
+}
+
 function resolveNextMaintenanceAfterWindow(
   row: number,
   windowEndSecond: number,
   nonPassengerTasks: ScheduleTask[],
   slackBySection: MaintenanceEntrySlackBySection,
+  lockedRotationSeconds: number | null,
 ): { startSecond: number; entrySlackSeconds: number } | null {
   const next = nonPassengerTasks
     .filter(
@@ -393,10 +438,12 @@ function resolveNextMaintenanceAfterWindow(
   if (!next) return null;
   return {
     startSecond: minuteToSecondApprox(next.startMinute),
-    entrySlackSeconds: resolveMaintenanceEntrySlackSeconds(
-      next.taskType,
+    entrySlackSeconds: resolveYardEntrySlackSeconds({
+      taskType: next.taskType,
+      yardDurationSeconds: Math.round(next.durationMinutes * 60),
+      lockedRotationSeconds,
       slackBySection,
-    ),
+    }),
   };
 }
 
@@ -1920,6 +1967,8 @@ export function normalizeEngineInput(
       // 純待命列不派正線；僅「待命之後仍有正線」才把待命當可派視窗
       return isStandbyDispatchableForMainline(templateTasks, task);
     });
+    // 一個完整輪迴要多久——長整備的讓渡額度就是這個數字（見 resolveYardEntrySlackSeconds）
+    const lockedRotationSeconds = resolveLockedRotationMinSeconds(successorPolicy);
     for (const pTask of dispatchWindowTasks) {
       const startSec = pTask.startMinute * 60;
       const endSec = (pTask.startMinute + pTask.durationMinutes) * 60;
@@ -1928,6 +1977,7 @@ export function normalizeEngineInput(
         endSec,
         nonPassengerTasks,
         slackBySection,
+        lockedRotationSeconds,
       );
       const spill = resolveNextSpillBoundary({
         windowEndSecond: endSec,

@@ -1210,9 +1210,22 @@ export function validateYardExitContinuity(args: {
 
       const route = resolveRouteForBlock(next, selectedRoutes);
       const originStationId = route?.stationIds[0]?.trim() || null;
-      // 只要起點站是「任何一個可能的出場站」就合法
-      if (!originStationId || exitOptions.includes(originStationId)) continue;
-      const exitStationId = exitOptions[0]!;
+      /**
+       * 車<strong>實際</strong>停在哪，優先於「這種整備理論上可能停哪」。
+       *
+       * <code>exitOptions</code> 是依整備類型與設施分類推導出來的<strong>可能</strong>
+       * 出場站清單。但實際停放位置是整備轉場機制逐台決定的，且沒有設施格可用時會
+       * 退到正線停靠站——那一站本來就不在推導清單裡。
+       *
+       * 2026-08-18 實測：待命實際停在「[備用]N2W下行出發」，下一班也正是從那裡發車，
+       * 物理上完全一致，卻因為驗證器拿推導清單比對而報成
+       * YARD_EXIT_STATION_MISMATCH 硬錯誤。有實際停放站時就以它為準。
+       */
+      const parkedStationId = yard.yardFacilityStationId?.trim() || null;
+      const allowedOrigins = parkedStationId ? [parkedStationId] : exitOptions;
+      // 只要起點站是「車真的能開得出去的站」就合法
+      if (!originStationId || allowedOrigins.includes(originStationId)) continue;
+      const exitStationId = allowedOrigins[0]!;
 
       // 站名比 stationId 好認；來源決定是哪一條程式路徑排出來的，查錯時最關鍵
       const sourceLabel =
@@ -1227,7 +1240,7 @@ export function validateYardExitContinuity(args: {
         kind: 'actionable',
         message:
           `時間線 ${timeline.row}：「${yard.label}」做完後車停在`
-          + `「${exitOptions.map(stationLabel).join('」或「')}」，`
+          + `「${allowedOrigins.map(stationLabel).join('」或「')}」，`
           + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null)}`
           + `（${sourceLabel}）是從「${stationLabel(originStationId)}」發車，`
           + '車不在那裡開不了',

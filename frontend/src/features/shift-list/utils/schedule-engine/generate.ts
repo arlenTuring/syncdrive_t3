@@ -250,6 +250,7 @@ export function generateShiftSchedule(
       selectedRoutes: routesForBerth,
       successorPolicy: engineInput.successorPolicy,
       topology: engineInput.pointTopology,
+      firstTripOrigins: engineInput.firstTripOrigins,
       warnings: round === 0 ? warnings : undefined,
     });
 

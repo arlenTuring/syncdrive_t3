@@ -1,6 +1,7 @@
 import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { findTopologyPath } from './findTopologyPath';
+import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import { resolveRouteForBlock } from './buildBlockStationDepartures';
 import type { RouteSuccessorPolicy } from './schedule-engine/routeSuccessorPolicy';
 import type {
@@ -60,9 +61,33 @@ function previousCyclic<T>(sorted: T[], index: number): T | null {
   return sorted[(index - 1 + sorted.length) % sorted.length] ?? null;
 }
 
-/** 車在這一段整備結束時實際停在哪一個站（停設施格的話沒有站，回 null） */
-function parkedStationIdOf(block: GeneratedScheduleBlock): string | null {
-  return block.yardFacilityStationId?.trim() || null;
+/**
+ * 車在這一段整備結束時實際停在哪——回傳<strong>可能的站集合</strong>。
+ *
+ * 兩種停法：
+ * <ul>
+ *   <li><strong>停在正線站位</strong>（<code>yardFacilityStationId</code>）：
+ *       就是那一站，集合只有一個元素。</li>
+ *   <li><strong>停在設施格</strong>（<code>yardFacilityNodeId</code>）：車在場內，
+ *       出得去哪幾站由拓樸決定，可能不只一個。</li>
+ * </ul>
+ *
+ * <strong>設施格這一種原本整個看不到</strong>（舊版只讀
+ * <code>yardFacilityStationId</code>，停設施格時為 null 就直接跳過）。實測
+ * （2026-08-18）：待命停在設施格、接著排的正線卻是從車到不了的
+ * <code>[備用]N2W下行出發</code> 發車，這一支本來救得了（NTB 與 NT 同終點、
+ * 同下游，換過去完全安全），卻因為看不到車在哪而放棄，最後變成
+ * YARD_EXIT_STATION_MISMATCH 硬錯誤。
+ */
+function parkedStationIdsOf(
+  block: GeneratedScheduleBlock,
+  stationsByFacilityNodeId: Map<string, string[]>,
+): string[] {
+  const stationId = block.yardFacilityStationId?.trim();
+  if (stationId) return [stationId];
+  const nodeId = block.yardFacilityNodeId?.trim();
+  if (nodeId) return stationsByFacilityNodeId.get(nodeId) ?? [];
+  return [];
 }
 
 function routeOriginStationId(route: ShiftScheduleSelectedRoute): string | null {
@@ -116,10 +141,21 @@ export function alignRouteWithVehicleLocation(args: {
   successorPolicy?: RouteSuccessorPolicy | null;
   /** 拿來算「這段空跑要花多久、經過哪些點」，讓回報講代價而不是講對錯 */
   topology?: PointTopology | null;
+  /** 設施 → 可出場站；車停在設施格時用來判斷「車在哪」 */
+  firstTripOrigins?: MaintenanceFirstTripOrigin[];
   /** 只在第一輪收集，避免收斂迴圈每一輪重複回報同一件事 */
   warnings?: FeasibilityIssue[];
 }): { swapped: number } {
   const { timelines, selectedRoutes, successorPolicy, topology, warnings } = args;
+  const stationsByFacilityNodeId = new Map<string, string[]>();
+  for (const origin of args.firstTripOrigins ?? []) {
+    for (const nodeId of origin.facilityNodeIds) {
+      stationsByFacilityNodeId.set(nodeId, [
+        ...(stationsByFacilityNodeId.get(nodeId) ?? []),
+        origin.stationId,
+      ]);
+    }
+  }
   const nodeIdByStationId = new Map(
     (topology?.nodes ?? [])
       .filter((node) => node.stationId?.trim())
@@ -153,14 +189,16 @@ export function alignRouteWithVehicleLocation(args: {
       // 前一段是不是「車停在某個站位」的整備？停設施格就沒有站位可談
       const previous = previousCyclic(sorted, i);
       if (!previous || previous === block) continue;
-      const parkedStationId = parkedStationIdOf(previous);
-      if (!parkedStationId) continue;
+      const parkedStationIds = parkedStationIdsOf(previous, stationsByFacilityNodeId);
+      if (parkedStationIds.length === 0) continue;
+      const parkedStationId = parkedStationIds[0]!;
 
       const currentRoute = resolveRouteForBlock(block, selectedRoutes);
       if (!currentRoute) continue;
       const currentOrigin = routeOriginStationId(currentRoute);
       // 已經從車停的地方出發，不用動
-      if (!currentOrigin || currentOrigin === parkedStationId) continue;
+      // 已經從車停得到的地方出發，不用動
+      if (!currentOrigin || parkedStationIds.includes(currentOrigin)) continue;
 
       const currentInstanceId = instanceIdOf(block, selectedRoutes);
       const currentDestination = routeDestinationStationId(currentRoute);
@@ -171,7 +209,8 @@ export function alignRouteWithVehicleLocation(args: {
       let replacement: { instanceId: string; route: ShiftScheduleSelectedRoute } | null = null;
       for (const [candidateId, candidate] of successorPolicy.routesByInstanceId) {
         if (candidateId === currentInstanceId) continue;
-        if (routeOriginStationId(candidate) !== parkedStationId) continue;
+        const candidateOrigin = routeOriginStationId(candidate);
+        if (!candidateOrigin || !parkedStationIds.includes(candidateOrigin)) continue;
         // 終點一變，下一段的起點跟著變，會沿著交路一路歪下去
         if (routeDestinationStationId(candidate) !== currentDestination) continue;
         // 下游必須接同一條，換過去交路才不會歪

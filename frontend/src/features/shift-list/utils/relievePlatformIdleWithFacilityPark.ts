@@ -302,7 +302,17 @@ export function relievePlatformIdleWithFacilityPark(args: {
         {
           id: `berthpark-stay-${idTag}`,
           timelineRow: timeline.row,
-          taskType: 'standby',
+          /**
+           * <strong>不能用 standby。</strong>整備轉場機制是以
+           * <code>taskType === 'standby'</code> 認定「這是一段排定的待命，要幫它排
+           * 進出廠卡」。本支自己插的暫停放已經自帶讓站移動／讓站返回兩張卡，若也
+           * 掛成 standby，轉場機制會再幫它產生一組進出廠卡——2026-08-18 實測就是
+           * 這樣冒出「前面根本沒有整備」的孤兒出場移動卡，並與正線班次重疊；
+           * MAINTENANCE_TRANSFER_UNRESOLVED 從 13 暴增到 22 且全部是 standby，
+           * 也是同一個原因（轉場機制在服務本來不存在的待命）。
+           * 用引擎的過渡型別 idle，轉場機制不會認領。
+           */
+          taskType: 'idle',
           label: `暫停放 · ${best.facilityLabel}`,
           anchorStartMinute: secondToMinute(inEndSecond),
           plannedStartMinute: secondToMinute(inEndSecond),
