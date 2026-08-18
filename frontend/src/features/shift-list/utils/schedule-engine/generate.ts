@@ -51,6 +51,7 @@ import { yieldIdleBlockArrival } from '../yieldIdleBlockArrival';
 import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { relievePlatformIdleWithFacilityPark } from '../relievePlatformIdleWithFacilityPark';
+import { closeYardHeadGaps } from '../closeYardHeadGaps';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
 import {
@@ -549,6 +550,10 @@ export function generateShiftSchedule(
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
     warnings,
   }).timelines;
+
+  // 整備前面不留空白：車已經在格子裡了，整備就從那一刻開始（結束不動）。
+  // 放在讓渡之後——讓渡會把入廠卡往前挪，挪完才知道車實際幾點到格子。
+  timelines = closeYardHeadGaps({ timelines }).timelines;
 
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType

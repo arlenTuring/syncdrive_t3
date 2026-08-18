@@ -346,6 +346,23 @@ export function relievePlatformIdleWithFacilityPark(args: {
         const idTag = `${occupancy.blockId}-${Math.round(leaveSecond)}`;
         const waitStartSecond = snapUpToClockAlignSeconds(leaveSecond + plan.inboundSeconds);
         const waitEndSecond = minuteToSecond(arriveMinute) - plan.hopSeconds;
+        /**
+         * 整備區塊本身：甲的情形要讓它<strong>自己往前長</strong>，不要在中間插等待卡。
+         *
+         * 使用者（2026-08-18）：「你就是入廠卡一張，然後後面就是尾巴直接接著充電卡，
+         * 就是直接安排充電了……你決定要進去了，就是一張入場，後面就是接整備，不要猶豫」。
+         * 車已經開進那一格了，卻顯示成「等待 27 分鐘、10:00 才開始充電」，班表上讀到的
+         * 整備時刻就不是真的。這與 insertMaintenanceTransferCards 的「車一到就開始整備」
+         * 是同一條規則，做法四不該繞過它。
+         */
+        const yardAfterEntry = timelineForRow.blocks
+          .filter(
+            (block) =>
+              block.plannedStartMinute + 1e-9 >= arriveMinute
+              && (block.yardFacilityNodeId?.trim() ?? '') === targetNodeId,
+          )
+          .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0] ?? null;
+
         const added: GeneratedScheduleBlock[] = [];
         // 乙才需要自己的入場移動卡；甲直接沿用既有的入廠移動卡
         if (plan.hopSeconds > 0) {
@@ -364,7 +381,8 @@ export function relievePlatformIdleWithFacilityPark(args: {
             yardEntryFacilityLabel: plan.waitLabel,
           } as GeneratedScheduleBlock);
         }
-        added.push({
+        const pullYardHead = plan.hopSeconds === 0 && yardAfterEntry != null;
+        if (!pullYardHead) added.push({
           id: `berthpark-early-stay-${idTag}`,
           timelineRow: timelineForRow.row,
           // 與做法三同理，掛 idle 而非 standby，避免整備轉場機制重複服務
@@ -387,15 +405,35 @@ export function relievePlatformIdleWithFacilityPark(args: {
         const movedStartMinute = plan.hopSeconds > 0
           ? secondToMinute(waitEndSecond)
           : secondToMinute(leaveSecond);
+        // 先檢查再動：任何一條早退路徑都不能留下改到一半的版面。
+        // 被往前拉的整備區塊本人不算重疊——它的頭正是要蓋掉這段空白。
         const clashesEarly = timelineForRow.blocks.some(
           (block) =>
             block.id !== nextBlock.id
+            && block.id !== yardAfterEntry?.id
             && block.plannedStartMinute < arriveMinute - 1e-9
             && block.plannedEndMinute > secondToMinute(leaveSecond) + 1e-9,
         );
         if (clashesEarly) {
           handled.add(key);
           continue;
+        }
+
+        /**
+         * 甲：整備<strong>自己往前長</strong>到抵達時刻，不插等待卡。
+         *
+         * 使用者（2026-08-18）：「你就是入廠卡一張，然後後面就是尾巴直接接著充電卡，
+         * 就是直接安排充電了……你決定要進去了，就是一張入場，後面就是接整備，不要猶豫」。
+         * 車已經開進那一格了卻顯示「10:00 才開始充電」，班表上讀到的整備時刻就不是真的。
+         * 與 insertMaintenanceTransferCards 的「車一到就開始整備」同一條規則。
+         */
+        const keepYardStart = yardAfterEntry?.plannedStartMinute ?? null;
+        const keepYardAnchor = yardAfterEntry?.anchorStartMinute ?? null;
+        if (pullYardHead && yardAfterEntry) {
+          yardAfterEntry.plannedStartMinute = secondToMinute(waitStartSecond);
+          if (yardAfterEntry.anchorStartMinute != null) {
+            yardAfterEntry.anchorStartMinute = secondToMinute(waitStartSecond);
+          }
         }
 
         nextBlock.plannedStartMinute = movedStartMinute;
@@ -405,6 +443,10 @@ export function relievePlatformIdleWithFacilityPark(args: {
         timelineForRow.blocks.push(...added);
         const afterEarly = countBlockedBy(timelines, selectedRoutes, collisionProtectionSeconds);
         if (afterEarly.total >= total) {
+          if (yardAfterEntry && keepYardStart != null) {
+            yardAfterEntry.plannedStartMinute = keepYardStart;
+            if (keepYardAnchor != null) yardAfterEntry.anchorStartMinute = keepYardAnchor;
+          }
           nextBlock.plannedStartMinute = keepStart;
           nextBlock.plannedEndMinute = keepEnd;
           nextBlock.anchorStartMinute = keepAnchor;
@@ -424,9 +466,10 @@ export function relievePlatformIdleWithFacilityPark(args: {
           message:
             `時間線 ${timelineForRow.row}：跑完一趟在`
             + `「${stationLabel}」等著進廠 ${idle.toFixed(1)} 分鐘，`
-            + `擋住 ${count} 台後車——已改成跑完就先開進「${plan.waitLabel}」等`
-            + (plan.hopSeconds > 0 ? `，再開進「${targetLabel}」整備` : '')
-            + '，整備時刻不變。',
+            + `擋住 ${count} 台後車——已改成跑完就開進「${plan.waitLabel}」`
+            + (plan.hopSeconds > 0
+              ? `等，再開進「${targetLabel}」整備，整備時刻不變。`
+              : '，整備跟著提早開始（結束時刻不變）。'),
           detail: {
             timelineRow: timelineForRow.row,
             blockId: occupancy.blockId,
