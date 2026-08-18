@@ -259,58 +259,158 @@ export function relievePlatformIdleWithFacilityPark(args: {
        * insertMaintenanceTransferCards 對排擠案例的說明）。
        */
       if (nextBlock.source === 'yard_entry_move') {
-        const facilityNodeId = nextBlock.yardExitFacilityNodeId?.trim();
-        const travelSeconds = Math.max(0, nextBlock.travelSeconds ?? 0);
+        const targetNodeId = nextBlock.yardExitFacilityNodeId?.trim();
+        const targetLabel = nextBlock.yardExitFacilityLabel ?? targetNodeId ?? '';
         const arriveMinute = nextBlock.plannedEndMinute;
-        const newStartSecond = minuteToSecond(occupancy.endMinute);
-        const newEndSecond = snapUpToClockAlignSeconds(newStartSecond + travelSeconds);
-        const newEndMinute = secondToMinute(newEndSecond);
+        const leaveSecond = minuteToSecond(occupancy.endMinute);
         const busyForEntry = collectFacilityBusyWindows(timelines, nextBlock.id);
-        if (
-          !facilityNodeId
-          || travelSeconds <= 0
-          || newEndMinute >= arriveMinute - MIN_PARK_SECONDS / 60
-          || !facilityIsFree(busyForEntry, facilityNodeId, newEndMinute, arriveMinute)
-        ) {
+        if (!targetNodeId) {
           handled.add(key);
           continue;
         }
-        const stayCard: GeneratedScheduleBlock = {
-          id: `berthpark-early-${nextBlock.id}`,
+
+        /**
+         * 甲：整備要用的那一格，在整段等待期間本來就空著。
+         *
+         * 這時什麼都不用多插，把既有的入廠移動卡整張往前挪到「跑完就走」即可，
+         * 後面補一張停放卡把格子佔住。
+         */
+        let plan: {
+          waitNodeId: string;
+          waitLabel: string;
+          inboundSeconds: number;
+          hopSeconds: number;
+        } | null = null;
+        const ownTravelSeconds = Math.max(0, nextBlock.travelSeconds ?? 0);
+        const ownArriveSecond = snapUpToClockAlignSeconds(leaveSecond + ownTravelSeconds);
+        if (
+          ownTravelSeconds > 0
+          && secondToMinute(ownArriveSecond) < arriveMinute - MIN_PARK_SECONDS / 60
+          && facilityIsFree(
+            busyForEntry, targetNodeId, secondToMinute(ownArriveSecond), arriveMinute,
+          )
+        ) {
+          plan = {
+            waitNodeId: targetNodeId,
+            waitLabel: targetLabel,
+            inboundSeconds: ownTravelSeconds,
+            hopSeconds: 0,
+          };
+        }
+
+        /**
+         * 乙：整備要用的那一格在等待期間有人在用——借別格站著等。
+         *
+         * 使用者（2026-08-18）：「你在設施使用的時候當然不能互換，但你是待命的
+         * 當然哪裡都可以去」。等待不是使用設施，只是站在那裡，所以中途格<strong>不
+         * 限同類</strong>；真正要進去做整備的那一格仍然是原本排定的那一格，
+         * <strong>時刻與地點都不動</strong>。
+         *
+         * 路徑變成 停靠站 → 中途格（等） → 整備格，最後一段的抵達時刻剛好貼齊
+         * 原訂進廠時刻。中途格同樣要求整段等待期間都空著。
+         */
+        if (!plan) {
+          for (const facility of facilities) {
+            if (facility.id === targetNodeId) continue;
+            const inbound = findTopologyPath(topology, fromNodeId, facility.id);
+            const hop = findTopologyPath(topology, facility.id, targetNodeId);
+            if (!inbound || !hop) continue;
+            const waitStartSecond = snapUpToClockAlignSeconds(leaveSecond + inbound.avgSeconds);
+            const waitEndSecond = minuteToSecond(arriveMinute) - hop.avgSeconds;
+            if (waitEndSecond <= waitStartSecond + MIN_PARK_SECONDS) continue;
+            if (
+              !facilityIsFree(
+                busyForEntry,
+                facility.id,
+                secondToMinute(waitStartSecond),
+                secondToMinute(waitEndSecond),
+              )
+            ) continue;
+            const cost = inbound.avgSeconds + hop.avgSeconds;
+            if (plan && cost >= plan.inboundSeconds + plan.hopSeconds) continue;
+            plan = {
+              waitNodeId: facility.id,
+              waitLabel: facility.label,
+              inboundSeconds: inbound.avgSeconds,
+              hopSeconds: hop.avgSeconds,
+            };
+          }
+        }
+
+        if (!plan) {
+          handled.add(key);
+          continue;
+        }
+
+        const stationLabel = occupancy.stationName ?? occupancy.stationId;
+        const idTag = `${occupancy.blockId}-${Math.round(leaveSecond)}`;
+        const waitStartSecond = snapUpToClockAlignSeconds(leaveSecond + plan.inboundSeconds);
+        const waitEndSecond = minuteToSecond(arriveMinute) - plan.hopSeconds;
+        const added: GeneratedScheduleBlock[] = [];
+        // 乙才需要自己的入場移動卡；甲直接沿用既有的入廠移動卡
+        if (plan.hopSeconds > 0) {
+          added.push({
+            id: `berthpark-early-in-${idTag}`,
+            timelineRow: timelineForRow.row,
+            taskType: 'dispatch',
+            label: `讓站移動 · ${stationLabel} → ${plan.waitLabel}`,
+            anchorStartMinute: secondToMinute(leaveSecond),
+            plannedStartMinute: secondToMinute(leaveSecond),
+            plannedEndMinute: secondToMinute(waitStartSecond),
+            travelSeconds: plan.inboundSeconds,
+            dwellSeconds: 0,
+            source: 'yard_entry_move',
+            yardEntryFacilityNodeId: plan.waitNodeId,
+            yardEntryFacilityLabel: plan.waitLabel,
+          } as GeneratedScheduleBlock);
+        }
+        added.push({
+          id: `berthpark-early-stay-${idTag}`,
           timelineRow: timelineForRow.row,
+          // 與做法三同理，掛 idle 而非 standby，避免整備轉場機制重複服務
           taskType: 'idle',
-          label: `提早進廠等待 · ${nextBlock.yardExitFacilityLabel ?? facilityNodeId}`,
-          anchorStartMinute: newEndMinute,
-          plannedStartMinute: newEndMinute,
-          plannedEndMinute: arriveMinute,
+          label: `提早進廠等待 · ${plan.waitLabel}`,
+          anchorStartMinute: secondToMinute(waitStartSecond),
+          plannedStartMinute: secondToMinute(waitStartSecond),
+          plannedEndMinute: secondToMinute(waitEndSecond),
           travelSeconds: 0,
-          dwellSeconds: minuteToSecond(arriveMinute) - newEndSecond,
+          dwellSeconds: waitEndSecond - waitStartSecond,
           source: 'transition',
-          yardFacilityNodeId: facilityNodeId,
-          yardFacilityLabel: nextBlock.yardExitFacilityLabel,
-        } as GeneratedScheduleBlock;
+          yardFacilityNodeId: plan.waitNodeId,
+          yardFacilityLabel: plan.waitLabel,
+        } as GeneratedScheduleBlock);
+
+        const keepStart = nextBlock.plannedStartMinute;
+        const keepEnd = nextBlock.plannedEndMinute;
+        const keepAnchor = nextBlock.anchorStartMinute;
+        const keepTravel = nextBlock.travelSeconds;
+        const movedStartMinute = plan.hopSeconds > 0
+          ? secondToMinute(waitEndSecond)
+          : secondToMinute(leaveSecond);
         const clashesEarly = timelineForRow.blocks.some(
           (block) =>
             block.id !== nextBlock.id
             && block.plannedStartMinute < arriveMinute - 1e-9
-            && block.plannedEndMinute > secondToMinute(newStartSecond) + 1e-9,
+            && block.plannedEndMinute > secondToMinute(leaveSecond) + 1e-9,
         );
         if (clashesEarly) {
           handled.add(key);
           continue;
         }
-        const keepStart = nextBlock.plannedStartMinute;
-        const keepEnd = nextBlock.plannedEndMinute;
-        nextBlock.plannedStartMinute = secondToMinute(newStartSecond);
-        nextBlock.plannedEndMinute = newEndMinute;
-        nextBlock.anchorStartMinute = secondToMinute(newStartSecond);
-        timelineForRow.blocks.push(stayCard);
+
+        nextBlock.plannedStartMinute = movedStartMinute;
+        nextBlock.anchorStartMinute = movedStartMinute;
+        nextBlock.plannedEndMinute = plan.hopSeconds > 0 ? arriveMinute : secondToMinute(waitStartSecond);
+        if (plan.hopSeconds > 0) nextBlock.travelSeconds = plan.hopSeconds;
+        timelineForRow.blocks.push(...added);
         const afterEarly = countBlockedBy(timelines, selectedRoutes, collisionProtectionSeconds);
         if (afterEarly.total >= total) {
           nextBlock.plannedStartMinute = keepStart;
           nextBlock.plannedEndMinute = keepEnd;
-          nextBlock.anchorStartMinute = keepStart;
-          timelineForRow.blocks = timelineForRow.blocks.filter((b) => b.id !== stayCard.id);
+          nextBlock.anchorStartMinute = keepAnchor;
+          nextBlock.travelSeconds = keepTravel;
+          const ids = new Set(added.map((card) => card.id));
+          timelineForRow.blocks = timelineForRow.blocks.filter((block) => !ids.has(block.id));
           handled.add(key);
           continue;
         }
@@ -323,16 +423,17 @@ export function relievePlatformIdleWithFacilityPark(args: {
           kind: 'policy',
           message:
             `時間線 ${timelineForRow.row}：跑完一趟在`
-            + `「${occupancy.stationName ?? occupancy.stationId}」等著進廠 ${idle.toFixed(1)} 分鐘，`
-            + `擋住 ${count} 台後車——已改成跑完就先開進`
-            + `「${nextBlock.yardExitFacilityLabel ?? facilityNodeId}」等，整備時刻不變。`,
+            + `「${stationLabel}」等著進廠 ${idle.toFixed(1)} 分鐘，`
+            + `擋住 ${count} 台後車——已改成跑完就先開進「${plan.waitLabel}」等`
+            + (plan.hopSeconds > 0 ? `，再開進「${targetLabel}」整備` : '')
+            + '，整備時刻不變。',
           detail: {
             timelineRow: timelineForRow.row,
             blockId: occupancy.blockId,
             stationId: occupancy.stationId,
             idleMinutes: Number(idle.toFixed(2)),
             affectedPairCount: count,
-            parkedStationId: facilityNodeId,
+            parkedStationId: plan.waitNodeId,
           },
         });
         break;
