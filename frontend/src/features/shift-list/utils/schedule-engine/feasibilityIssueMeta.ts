@@ -37,6 +37,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_BERTH_RELIEF_UNAVAILABLE: '沒有可用的讓渡路線',
   STATION_BERTH_ARRIVAL_YIELDED: '滯留車晚一點進站讓路',
   STATION_BERTH_DELAYED: '站位約束延後',
+  STATION_BERTH_DELAY_SOURCE: '站位延後成因',
   STATION_BERTH_BACKUP_USED: '站位約束改選路線',
   ANCHOR_CONFLICT: '錨點衝突',
   TIMELINE_OVERLAP: '時間線任務重疊',
@@ -85,6 +86,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   STATION_BERTH_RELIEF_UNAVAILABLE: { id: 's8', label: '§8.2 站位讓渡' },
   STATION_BERTH_ARRIVAL_YIELDED: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_DELAYED: { id: 's8', label: '§8 站位約束決策' },
+  STATION_BERTH_DELAY_SOURCE: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_BACKUP_USED: { id: 's8', label: '§8 站位約束決策' },
   TIMELINE_OVERLAP: { id: 's6', label: '§6 整備讓渡：開頭 vs 尾巴' },
   HEADWAY_PHYSICAL_IMPOSSIBLE: { id: 's5', label: '§5 掛車決策（脈衝）' },
@@ -165,6 +167,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。',
+  },
+  STATION_BERTH_DELAY_SOURCE: {
+    kind: 'actionable',
+    guidance:
+      '這一則講的是「誰把別人推晚的」。站位求解在幾何收斂迴圈裡每一輪都會延後班次，但過去只有第一輪的延後會被回報，後面幾輪完全看不到——實測有單筆班次被往後推了 520 秒卻在報告上查不到任何紀錄。現在把整個迴圈的延後累計起來，依「擋路的那一張卡」歸戶：某一台車佔著某一站不走，累計害多少班次、被推遲多少秒。要消掉它：處理被指名的那一張卡（讓它離開站位、改路線、或改時刻），而不是去調延後上限。',
   },
   STATION_BERTH_BACKUP_USED: {
     kind: 'policy',

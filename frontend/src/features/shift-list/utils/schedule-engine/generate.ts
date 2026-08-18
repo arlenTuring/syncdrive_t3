@@ -41,6 +41,7 @@ import {
 import {
   enforceStationBerthConstraints,
   STATION_BERTH_WAIT_MAX_DELAY_SECONDS,
+  type BerthDelayRecord,
 } from '../stationBerthConstraint';
 import { densifyRouteHeadwaysAfterBerth } from '../densifyRouteHeadwaysAfterBerth';
 import { repairRouteHeadwaysBelowTarget } from '../repairRouteHeadwaysBelowTarget';
@@ -84,6 +85,9 @@ export type GenerateShiftScheduleInput = {
  * 正常 2–3 輪就不動了；上限只是防呆，避免互相破壞的處理無限來回。
  */
 const GEOMETRY_CONVERGENCE_MAX_ROUNDS = 14;
+
+/** 站位延後成因最多逐則列出幾個擋路點，其餘收成一則匯總 */
+const BERTH_DELAY_SOURCE_REPORT_LIMIT = 10;
 
 /**
  * 版面指紋：把每個區塊的「身分＋起迄」壓成字串，用來判斷這一輪有沒有任何變化。
@@ -235,6 +239,18 @@ export function generateShiftSchedule(
   //
   // 改為跑到不動點：每輪跑完整組處理，版面沒有任何變化就結束。
   // 這樣「某一步釋放的空間，下一輪其他步驟就能用到」，不必人工推演順序。
+  /**
+   * 站位延後的成因紀錄簿，<strong>跨輪</strong>累積。
+   *
+   * warnings 只在第 0 輪傳給各道處理（後面幾輪傳 undefined，否則同一件事會被
+   * 重複報十幾次）。副作用是<strong>第 1 輪以後的延後完全不會出現在報告上</strong>：
+   * 實測有一筆班次在第 1 輪被站位求解往後推了 520 秒，報告裡卻只查得到第 0 輪
+   * 那幾筆「延後 10 秒」，使用者只看得到班次莫名其妙晚發，無從判斷成因。
+   *
+   * 這本紀錄簿每一輪都收，迴圈跑完再依「擋路的那一張卡」歸戶匯總成
+   * STATION_BERTH_DELAY_SOURCE，指名是誰把誰推晚的。
+   */
+  const berthDelayLog: BerthDelayRecord[] = [];
   let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
     const before = fingerprintTimelines(timelines);
@@ -287,6 +303,7 @@ export function generateShiftSchedule(
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       successorPolicy: engineInput.successorPolicy,
       warnings: round === 0 ? warnings : undefined,
+      delayLog: berthDelayLog,
       ...(round === 0
         ? {}
         : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
@@ -366,6 +383,106 @@ export function generateShiftSchedule(
       break;
     }
   }
+  /**
+   * 誰把別人推晚的：把整個迴圈累積的站位延後依「擋路的那一張卡」歸戶。
+   *
+   * 逐筆列出沒有用——同一張卡會在十幾輪裡反覆把同一批班次往後推，逐筆是雜訊。
+   * 依擋路者歸戶才看得出結構：某一台車佔著某一站不走，一整天累計害了多少班次、
+   * 總共推遲多少秒。要消掉延後就是去處理那張卡，不是去調延後上限。
+   */
+  if (berthDelayLog.length > 0) {
+    type Source = {
+      stationId: string;
+      stationName: string;
+      blockerRow?: number;
+      /** 擋路的是同一列自己的前一趟（折返銜接），不是別台車 */
+      selfBlocked: boolean;
+      victims: Set<string>;
+      totalSeconds: number;
+      worstSeconds: number;
+      worstVictimRow: number;
+    };
+    const sources = new Map<string, Source>();
+    let unattributedSeconds = 0;
+    for (const record of berthDelayLog) {
+      if (!record.binding?.stationId) {
+        unattributedSeconds += record.delaySeconds;
+        continue;
+      }
+      const key = `${record.binding.blockerBlockId ?? '?'}@${record.binding.stationId}`;
+      const selfBlocked = record.binding.blockerRow === record.timelineRow;
+      const entry = sources.get(key) ?? {
+        stationId: record.binding.stationId,
+        stationName: record.binding.stationName,
+        blockerRow: record.binding.blockerRow,
+        selfBlocked,
+        victims: new Set<string>(),
+        totalSeconds: 0,
+        worstSeconds: 0,
+        worstVictimRow: record.timelineRow,
+      };
+      entry.victims.add(record.blockId);
+      entry.totalSeconds += record.delaySeconds;
+      if (record.delaySeconds > entry.worstSeconds) {
+        entry.worstSeconds = record.delaySeconds;
+        entry.worstVictimRow = record.timelineRow;
+      }
+      sources.set(key, entry);
+    }
+    const ranked = [...sources.values()].sort((a, b) => b.totalSeconds - a.totalSeconds);
+    const shown = ranked.slice(0, BERTH_DELAY_SOURCE_REPORT_LIMIT);
+    for (const source of shown) {
+      pushIssue(warnings, {
+        code: 'STATION_BERTH_DELAY_SOURCE',
+        severity: 'warning',
+        kind: 'actionable',
+        message:
+          (source.selfBlocked
+            ? `時間線 ${source.blockerRow ?? '?'} 自己的前一趟還沒離開「${source.stationName}」，`
+              + `後面那幾趟只能等——`
+            : `「${source.stationName}」被時間線 ${source.blockerRow ?? '?'} 的車佔著，`
+              + `站位求解為了讓路，`)
+          + `整個收斂過程共把 ${source.victims.size} 個班次往後推、`
+          + `累計 ${Math.round(source.totalSeconds)} 秒；`
+          + `單筆最久的一次是時間線 ${source.worstVictimRow} 被推 `
+          + `${Math.round(source.worstSeconds)} 秒。`
+          + `\n延後會沿著同一列往後傳：一趟被推遲，該列後面每一趟都跟著整體平移`
+          + `（pushSameRowNextAfterPrevious），所以這裡的累計秒數是連鎖後的總量。`,
+        detail: {
+          stationId: source.stationId,
+          stationName: source.stationName,
+          blockerTimelineRow: source.blockerRow,
+          delayedTripCount: source.victims.size,
+          totalDelaySeconds: Math.round(source.totalSeconds),
+          worstDelaySeconds: Math.round(source.worstSeconds),
+          worstTimelineRow: source.worstVictimRow,
+          selfBlocked: source.selfBlocked,
+        },
+      });
+    }
+    if (ranked.length > shown.length || unattributedSeconds > 0) {
+      const rest = ranked.slice(shown.length);
+      pushIssue(warnings, {
+        code: 'STATION_BERTH_DELAY_SOURCE',
+        severity: 'warning',
+        kind: 'actionable',
+        message:
+          `另有 ${rest.length} 個擋路點沒有逐則列出（累計 `
+          + `${Math.round(rest.reduce((sum, item) => sum + item.totalSeconds, 0))} 秒）`
+          + (unattributedSeconds > 0
+            ? `；還有 ${Math.round(unattributedSeconds)} 秒的延後找不到明確擋路者`
+            : ''),
+        detail: {
+          omittedSourceCount: rest.length,
+          omittedDelaySeconds: Math.round(
+            rest.reduce((sum, item) => sum + item.totalSeconds, 0),
+          ),
+          unattributedDelaySeconds: Math.round(unattributedSeconds),
+        },
+      });
+    }
+  }
+
   if (!converged) {
     /**
      * 跑完上限輪數版面還在變＝這一輪的結果<strong>不是不動點</strong>。

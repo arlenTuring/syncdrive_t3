@@ -52,6 +52,8 @@ export const DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT = 50;
 export type BerthWindowSec = {
   stationId: string;
   stationName: string;
+  /** 這個窗屬於哪一張卡。延後成因追溯要靠它指名擋路的是誰 */
+  blockId?: string;
   startSecond: number;
   /**
    * 佔用尾端。走 {@link projectProtectedBerthWindowsSeconds} 時已含末站滯留與
@@ -124,6 +126,7 @@ export function projectBlockBerthWindowsSeconds(
       endSecond,
       naturalEndSecond: endSecond,
       timelineRow: block.timelineRow,
+      blockId: block.id,
     });
   }
 
@@ -229,6 +232,12 @@ export function projectProtectedBerthWindowsSeconds(
 export function resolveBerthClearDelaySeconds(
   proposed: BerthWindowSec[],
   booked: BerthWindowSec[],
+  /**
+   * 選填：寫回「最後一次把延後量撐大的那一組窗」——也就是真正決定這個延後
+   * 秒數的那台車與那一站。延後成因在報告裡看不到的話，使用者只會看到班次
+   * 莫名其妙晚發，無從判斷是設定問題還是排班問題。
+   */
+  binding?: { stationId: string; stationName: string; blockerRow?: number; blockerBlockId?: string },
 ): number {
   if (proposed.length === 0 || booked.length === 0) return 0;
 
@@ -251,7 +260,16 @@ export function resolveBerthClearDelaySeconds(
         const a0 = win.startSecond + delay;
         const a1 = winEnd + delay;
         if (a0 < priorEnd - 1e-9 && a1 > prior.startSecond + 1e-9) {
-          bump = Math.max(bump, priorEnd - a0);
+          const need = priorEnd - a0;
+          if (need > bump) {
+            bump = need;
+            if (binding) {
+              binding.stationId = win.stationId;
+              binding.stationName = win.stationName;
+              binding.blockerRow = prior.timelineRow;
+              binding.blockerBlockId = prior.blockId;
+            }
+          }
         }
       }
     }
@@ -683,12 +701,38 @@ function isDayCycleColdStart(
   return true;
 }
 
+type BerthDelayBinding = {
+  stationId: string;
+  stationName: string;
+  blockerRow?: number;
+  blockerBlockId?: string;
+};
+
+/**
+ * 一次站位延後的成因紀錄。收斂迴圈每一輪都會延後，但只有第 0 輪的 warning
+ * 會被收集，後面幾輪的延後在報告上完全看不到（實測有單筆 520 秒未被回報）。
+ * 這個紀錄跨輪累積，迴圈跑完再匯總成一則可讀的成因說明。
+ */
+export type BerthDelayRecord = {
+  blockId: string;
+  timelineRow: number;
+  routeId?: string;
+  routeName?: string;
+  /** 這一輪套用的延後秒數 */
+  delaySeconds: number;
+  /** 套用後的發車秒 */
+  startSecond: number;
+  /** 是哪一站、被誰擋住而必須延後 */
+  binding: BerthDelayBinding | null;
+};
+
 function evaluateCandidate(args: {
   block: GeneratedScheduleBlock;
   route: ShiftScheduleSelectedRoute;
   preferredStartSecond: number;
   booked: BerthWindowSec[];
   protection: BerthProtectionContext;
+  binding?: BerthDelayBinding;
 }): { delaySeconds: number; occupancySeconds: number; windows: BerthWindowSec[] } {
   const occupancySeconds = occupancySecondsForBlockRoute(args.block, args.route);
   const probe = withProposedStart(
@@ -698,7 +742,8 @@ function evaluateCandidate(args: {
     args.route,
   );
   const windows = projectProtectedBerthWindowsSeconds(probe, args.route, args.protection);
-  const delaySeconds = resolveBerthClearDelaySeconds(windows, args.booked);
+  const binding = args.binding;
+  const delaySeconds = resolveBerthClearDelaySeconds(windows, args.booked, binding);
   return { delaySeconds, occupancySeconds, windows };
 }
 
@@ -716,6 +761,11 @@ export function enforceStationBerthConstraints(args: {
   successorPolicy?: RouteSuccessorPolicy | null;
   warnings?: FeasibilityIssue[];
   /**
+   * 選填：站位延後的成因紀錄簿。呼叫端跨輪傳同一個陣列，就能拿到整個收斂迴圈
+   * 的完整延後歷程（warnings 只在第 0 輪收集，後面幾輪原本無從得知）。
+   */
+  delayLog?: BerthDelayRecord[];
+  /**
    * 每種站位約束 warning code 最多寫入幾則；超出後補一則匯總 warning，而不是逐則塞入。
    * 預設 DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT。
    */
@@ -728,6 +778,7 @@ export function enforceStationBerthConstraints(args: {
     maxDelaySeconds = DEFAULT_STATION_BERTH_MAX_DELAY_SECONDS,
     successorPolicy = null,
     warnings,
+    delayLog,
     maxWarningsPerCode = DEFAULT_STATION_BERTH_WARNING_REPORT_LIMIT,
   } = args;
 
@@ -855,15 +906,21 @@ export function enforceStationBerthConstraints(args: {
       maxAllowed: number;
     };
 
+    const bindingByRouteInstance = new Map<string, BerthDelayBinding>();
     const scoreCandidate = (candidate: TopologyRouteCandidate): Choice => {
       const { route } = candidate;
+      const binding: BerthDelayBinding = { stationId: '', stationName: '' };
       const evaluated = evaluateCandidate({
         block,
         route,
         preferredStartSecond,
         booked,
         protection,
+        binding,
       });
+      if (binding.stationId) {
+        bindingByRouteInstance.set(resolveSelectedRouteInstanceId(route), binding);
+      }
       // 站位延後只受預設上限限制。不要用後面的充電／整備牆把上限夾成 0，
       // 否則 10～30 秒的站位衝突解不掉；整備開頭重疊交給後續正線讓渡處理。
       const maxAllowed = maxDelayAllowedSeconds({
@@ -953,6 +1010,16 @@ export function enforceStationBerthConstraints(args: {
     }
 
     if (appliedDelay > 0) {
+      delayLog?.push({
+        blockId: block.id,
+        timelineRow: block.timelineRow,
+        routeId: chosen.route.routeId,
+        routeName: chosen.route.routeName ?? chosen.route.routeCode,
+        delaySeconds: appliedDelay,
+        startSecond,
+        binding:
+          bindingByRouteInstance.get(resolveSelectedRouteInstanceId(chosen.route)) ?? null,
+      });
       delayedCount += 1;
       pushBerthWarning({
         code: 'STATION_BERTH_DELAYED',
