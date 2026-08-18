@@ -86,10 +86,12 @@ function facilityNodes(topology: PointTopology): { id: string; label: string }[]
  */
 function collectFacilityBusyWindows(
   timelines: GeneratedScheduleTimeline[],
+  ignoreBlockId?: string,
 ): Map<string, { start: number; end: number }[]> {
   const busy = new Map<string, { start: number; end: number }[]>();
   for (const timeline of timelines) {
     for (const block of timeline.blocks) {
+      if (ignoreBlockId && block.id === ignoreBlockId) continue;
       const nodeId =
         block.yardFacilityNodeId?.trim() || block.yardExitFacilityNodeId?.trim();
       if (!nodeId) continue;
@@ -236,7 +238,107 @@ export function relievePlatformIdleWithFacilityPark(args: {
       const nextBlock = timelineForRow.blocks
         .filter((block) => block.plannedStartMinute + 1e-9 >= occupancy.endMinute)
         .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute)[0];
-      if (!nextBlock || nextBlock.taskType !== 'passenger') {
+      if (!nextBlock) {
+        handled.add(key);
+        continue;
+      }
+
+      /**
+       * <strong>空等完接的是「進廠」時：提早進去等，不要在站上等。</strong>
+       *
+       * 車跑完最後一輪、等著進整備廠的這一段，是站位壓力最大的一類——實測
+       * （2026-08-18）N2W下行出發 剩餘衝突的擋人者幾乎全是這種，最長一台在站上
+       * 乾等 38 分鐘、擋掉 9 台後車，而同一時段還有 4 個設施格空著。
+       *
+       * 做法是把<strong>既有的入廠移動卡整張往前挪</strong>到「跑完就走」，後面補
+       * 一張暫停放卡把設施格佔到原訂進廠時刻。<strong>整備本身的時刻完全不動</strong>
+       * ——差別只在車是在站位上等，還是在自己要進的那一格裡等。
+       *
+       * 借的就是它本來要去的那一格，不會跟別人搶：仍然要求那一格在整段等待期間
+       * 都空著，有任何預約重疊就放棄（提早進廠不能是特權，見
+       * insertMaintenanceTransferCards 對排擠案例的說明）。
+       */
+      if (nextBlock.source === 'yard_entry_move') {
+        const facilityNodeId = nextBlock.yardExitFacilityNodeId?.trim();
+        const travelSeconds = Math.max(0, nextBlock.travelSeconds ?? 0);
+        const arriveMinute = nextBlock.plannedEndMinute;
+        const newStartSecond = minuteToSecond(occupancy.endMinute);
+        const newEndSecond = snapUpToClockAlignSeconds(newStartSecond + travelSeconds);
+        const newEndMinute = secondToMinute(newEndSecond);
+        const busyForEntry = collectFacilityBusyWindows(timelines, nextBlock.id);
+        if (
+          !facilityNodeId
+          || travelSeconds <= 0
+          || newEndMinute >= arriveMinute - MIN_PARK_SECONDS / 60
+          || !facilityIsFree(busyForEntry, facilityNodeId, newEndMinute, arriveMinute)
+        ) {
+          handled.add(key);
+          continue;
+        }
+        const stayCard: GeneratedScheduleBlock = {
+          id: `berthpark-early-${nextBlock.id}`,
+          timelineRow: timelineForRow.row,
+          taskType: 'idle',
+          label: `提早進廠等待 · ${nextBlock.yardExitFacilityLabel ?? facilityNodeId}`,
+          anchorStartMinute: newEndMinute,
+          plannedStartMinute: newEndMinute,
+          plannedEndMinute: arriveMinute,
+          travelSeconds: 0,
+          dwellSeconds: minuteToSecond(arriveMinute) - newEndSecond,
+          source: 'transition',
+          yardFacilityNodeId: facilityNodeId,
+          yardFacilityLabel: nextBlock.yardExitFacilityLabel,
+        } as GeneratedScheduleBlock;
+        const clashesEarly = timelineForRow.blocks.some(
+          (block) =>
+            block.id !== nextBlock.id
+            && block.plannedStartMinute < arriveMinute - 1e-9
+            && block.plannedEndMinute > secondToMinute(newStartSecond) + 1e-9,
+        );
+        if (clashesEarly) {
+          handled.add(key);
+          continue;
+        }
+        const keepStart = nextBlock.plannedStartMinute;
+        const keepEnd = nextBlock.plannedEndMinute;
+        nextBlock.plannedStartMinute = secondToMinute(newStartSecond);
+        nextBlock.plannedEndMinute = newEndMinute;
+        nextBlock.anchorStartMinute = secondToMinute(newStartSecond);
+        timelineForRow.blocks.push(stayCard);
+        const afterEarly = countBlockedBy(timelines, selectedRoutes, collisionProtectionSeconds);
+        if (afterEarly.total >= total) {
+          nextBlock.plannedStartMinute = keepStart;
+          nextBlock.plannedEndMinute = keepEnd;
+          nextBlock.anchorStartMinute = keepStart;
+          timelineForRow.blocks = timelineForRow.blocks.filter((b) => b.id !== stayCard.id);
+          handled.add(key);
+          continue;
+        }
+        handled.add(key);
+        parked += 1;
+        applied = true;
+        warnings?.push({
+          code: 'STATION_BERTH_ARRIVAL_YIELDED',
+          severity: 'warning',
+          kind: 'policy',
+          message:
+            `時間線 ${timelineForRow.row}：跑完一趟在`
+            + `「${occupancy.stationName ?? occupancy.stationId}」等著進廠 ${idle.toFixed(1)} 分鐘，`
+            + `擋住 ${count} 台後車——已改成跑完就先開進`
+            + `「${nextBlock.yardExitFacilityLabel ?? facilityNodeId}」等，整備時刻不變。`,
+          detail: {
+            timelineRow: timelineForRow.row,
+            blockId: occupancy.blockId,
+            stationId: occupancy.stationId,
+            idleMinutes: Number(idle.toFixed(2)),
+            affectedPairCount: count,
+            parkedStationId: facilityNodeId,
+          },
+        });
+        break;
+      }
+
+      if (nextBlock.taskType !== 'passenger') {
         handled.add(key);
         continue;
       }
