@@ -1151,6 +1151,118 @@ export function insertMaintenanceTransferCards(args: {
         });
         continue;
       }
+      /**
+       * <strong>進不去就換一格，不要在外面乾等。</strong>
+       *
+       * 挑設施時把「提早抵達」算進了窗口（{@link pickLocationForStay} 的 holdFrom），
+       * 但下訂位只鎖 [整備開始, 結束]，提早那一段從來沒被真的訂下來；加上指派順序是
+       * 設施類優先、待命最後，於是排得出這種版面（2026-08-19 實測）：列6 的充電挑
+       * 到 E3 時 E3 從 08:37 起是空的，之後列4 的待命看到 E3 在 07:30–09:00 沒人訂
+       * 就進去了，等到要生入廠卡，列6 已經進不去——車只好在別的格子乾等 22 分鐘，
+       * 班表上就是「一張空的入場卡、一大段等待、又一張入場卡、才開始充電」。
+       *
+       * 使用者（2026-08-19）：「你很擺明第一張是要進去充電站的，為什麼不是第一張
+       * 就進去，然後把充電卡拉到該入場卡後呢？」
+       *
+       * 所以在產生卡片之前先補一刀：本來排定的那一格若在車抵達的當下就有人，
+       * 而同一類設施裡有另一格<strong>從抵達到整備結束都空著</strong>，就換過去。
+       * 只動這一台、只在真的進不去時才動——不像「全場預留頭部」那樣讓設施憑空
+       * 變稀缺（那個版本實測 warning 162 → 219，還多一筆硬錯誤）。
+       */
+      {
+        const current = yardBlockFacility.get(yard.id);
+        const freeSec =
+          minuteToSecond(previousPassenger.plannedEndMinute + prevPax.offsetMinute)
+          + Math.max(0, minimumRecoveryTimeSeconds);
+        const yardStartSec = minuteToSecond(yard.plannedStartMinute);
+        const yardEndSec = minuteToSecond(yard.plannedEndMinute);
+        const currentPath = current
+          ? findTopologyPath(topology, fromNodeId, current.nodeId)
+          : null;
+        const idealArrive = currentPath ? freeSec + currentPath.avgSeconds : yardStartSec;
+        const blockedNow =
+          current != null
+          && idealArrive < yardStartSec - 1e-9
+          && !stayFacilityIsFree(current.nodeId, yard, timeline.row, idealArrive, yardEndSec);
+        if (blockedNow) {
+          let alternative: { id: string; label: string; seconds: number } | null = null;
+          for (const facility of allFacilities) {
+            if (facility.id === current!.nodeId) continue;
+            // 整備要進實體設施格，不能佔正線停靠站當工作區
+            if (nodeById.get(facility.id)?.kind === 'docking') continue;
+            const path = findTopologyPath(topology, fromNodeId, facility.id);
+            if (!path) continue;
+            const arrive = freeSec + path.avgSeconds;
+            // 換過去也還是不能提早的話，換了沒有意義
+            if (arrive >= yardStartSec - 1e-9) continue;
+            if (!stayFacilityIsFree(facility.id, yard, timeline.row, arrive, yardEndSec)) continue;
+            if (!alternative || path.avgSeconds < alternative.seconds) {
+              alternative = {
+                id: facility.id,
+                label: (facility.label ?? '').trim() || facility.id,
+                seconds: path.avgSeconds,
+              };
+            }
+          }
+          if (alternative) {
+            assignYardStay(yard, alternative.id, alternative.label);
+          } else {
+            /**
+             * <strong>擋在頭上的是「待命」的話，請它讓開。</strong>
+             *
+             * 使用者（2026-08-18）：「你在設施使用的時候當然不能互換，但你是待命的
+             * 當然哪裡都可以去」。待命只是站在那裡等，沒有非在某一格不可的理由；
+             * 充電／保養／行檢是一到就要開工的，被待命佔著頭就只能在外面乾等。
+             *
+             * 實測（2026-08-19）：列6 08:37 就跑完了，四支充電樁在 08:37–10:30 之間
+             * 全都有事，唯一能讓它提早進去的是 E3——而 E3 那段時間坐著列4 的待命。
+             * 待命挪走，列6 就能一到就開充，不必先借別格站 22 分鐘。
+             *
+             * 只挪到<strong>另一個實體設施格</strong>。挪去正線停靠站會改變車做完
+             * 待命之後的所在地，下一趟就發不了車（實測會直接變成
+             * YARD_EXIT_STATION_MISMATCH 硬錯誤）。
+             */
+            const squatters: GeneratedScheduleBlock[] = [];
+            for (const timelineItem of timelines) {
+              for (const other of timelineItem.blocks) {
+                if (other.taskType !== 'standby') continue;
+                if (other.yardFacilityNodeId?.trim() !== current!.nodeId) continue;
+                if (minuteToSecond(other.plannedEndMinute) <= idealArrive + 1e-9) continue;
+                if (minuteToSecond(other.plannedStartMinute) >= yardStartSec - 1e-9) continue;
+                squatters.push(other);
+              }
+            }
+            const moves: Array<{ block: GeneratedScheduleBlock; id: string; label: string }> = [];
+            for (const squatter of squatters) {
+              const row = timelines.find((item) => item.blocks.includes(squatter))?.row;
+              if (row == null) break;
+              let target: { id: string; label: string } | null = null;
+              for (const facility of facilityNodesFor('standby')) {
+                if (facility.id === current!.nodeId) continue;
+                if (nodeById.get(facility.id)?.kind !== 'facility') continue;
+                if (
+                  !stayFacilityIsFree(
+                    facility.id,
+                    squatter,
+                    row,
+                    minuteToSecond(squatter.plannedStartMinute),
+                    minuteToSecond(squatter.plannedEndMinute),
+                  )
+                ) continue;
+                target = { id: facility.id, label: (facility.label ?? '').trim() || facility.id };
+                break;
+              }
+              if (!target) { moves.length = 0; break; }
+              moves.push({ block: squatter, id: target.id, label: target.label });
+            }
+            // 全部挪得動才動——挪一半等於把問題換個地方發生
+            if (squatters.length > 0 && moves.length === squatters.length) {
+              for (const move of moves) assignYardStay(move.block, move.id, move.label);
+            }
+          }
+        }
+      }
+
       // 地點已由「決定去哪」階段定案，這裡只負責產生卡片——不能再自己挑一台，
       // 否則入廠卡會指向 A、出廠卡指向 B，車等於中途瞬移換格子。
       const assigned = yardBlockFacility.get(yard.id);
