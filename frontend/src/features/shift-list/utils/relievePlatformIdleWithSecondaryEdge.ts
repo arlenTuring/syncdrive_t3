@@ -195,7 +195,8 @@ function tryBuildReliefBlocks(args: {
       });
     const endSecond = startSecond + occupancy.occupancySeconds;
     blocks.push({
-      id: `relief-${earlierBlock.id}-${hop.route.routeId}-${startSecond}`,
+      // 識別碼不放路線，理由同 normalizeInput 的 template-pax 識別碼
+      id: `relief-${earlierBlock.id}-${startSecond}`,
       timelineRow: earlierBlock.timelineRow,
       taskType: 'passenger',
       label: `站位讓渡 · ${hop.route.routeName || hop.route.routeId}`,

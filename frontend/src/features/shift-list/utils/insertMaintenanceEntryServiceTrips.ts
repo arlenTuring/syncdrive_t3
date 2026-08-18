@@ -684,7 +684,9 @@ export function insertMaintenanceEntryServiceTrips(args: {
         }
 
         const block: GeneratedScheduleBlock = {
-          id: `entry-${yard.id}-${item.hop.route.routeId}-${Math.round(item.startMinute * 60)}`,
+          // 識別碼不放路線：站位求解之後這一趟可能被改派，識別碼卻不能跟著變
+          // （見 normalizeInput 對 template-pax 識別碼的說明）。實際路線看 routeId。
+          id: `entry-${yard.id}-${Math.round(item.startMinute * 60)}`,
           timelineRow: timeline.row,
           taskType: 'passenger',
           label: `進場載客 · ${item.hop.route.routeName || item.hop.route.routeId}`,

@@ -1645,8 +1645,20 @@ function assignDirectionalDepartures(args: {
       finalTaskIndex = tasks.length;
       if (legIndex === 0) cycleAnchorTaskIndex = finalTaskIndex;
       tasks.push({
+        /**
+         * <strong>識別碼裡不放路線。</strong>站位求解會把個別班次改派到備用線
+         * （STATION_BERTH_BACKUP_USED），但識別碼在整個產生流程中必須固定不變
+         * ——先前發出的 warning 都以它指名這張卡，改了就對不回去。結果就是識別碼
+         * 永遠停在<strong>改派前</strong>的路線，任何人拿它判讀實際跑哪一條都會判錯
+         * （2026-08-18：一張實跑 TSB 的卡識別碼寫著 route_2，被讀成 TS，
+         * 進而誤判成「TSB 接 ST」違反路線關聯圖）。
+         *
+         * 實際路線一律看卡片上的 <code>routeId</code>／<code>routeCode</code>，
+         * 原訂路線看 <code>plannedRouteInstanceId</code>。識別碼只負責識別。
+         * 班次編號＋分段編號在同一個時段內本來就唯一，不靠路線去湊。
+         */
         id:
-          `template-pax-${departure.intervalId}-${leg.route.routeId}`
+          `template-pax-${departure.intervalId}`
           + `-${index + 1}-${legIndex + 1}-${leg.startSecond}`,
         rowIndex: chosenRow,
         taskType: 'passenger',
