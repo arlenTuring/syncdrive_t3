@@ -423,7 +423,7 @@
       <tr><td>4</td><td>清掉兩台車搶同一個停靠點（可延後、可改線）。第一輪保守並收集警告，之後放寬延後上限</td><td><code>enforceStationBerthConstraints</code></td></tr>
       <tr><td>5</td><td>空等的車讓後車先進站（自己反正要等，發車時刻不變）</td><td><code>yieldIdleBlockArrival</code></td></tr>
       <tr><td>6</td><td>站位讓渡做法一／二：換替身路線、或沿次要邊繞去別站等（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge</code></td></tr>
-      <tr><td>7</td><td>站位讓渡做法三：開進附近設施格暫停放（見 §8.2）</td><td><code>relievePlatformIdleWithFacilityPark</code></td></tr>
+      <tr><td>7</td><td>站位讓渡做法三／四：開進設施格暫停放、等著進廠就提早進去等（見 §8.2）</td><td><code>relievePlatformIdleWithFacilityPark</code></td></tr>
       <tr><td>8</td><td>班距太疏 → 把後車往前拉回目標</td><td><code>densifyRouteHeadwaysAfterBerth</code></td></tr>
       <tr><td>9</td><td>班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕</td><td><code>repairRouteHeadwaysBelowTarget</code></td></tr>
       <tr><td>10</td><td>撤掉不成輪的尾巴。<strong>放在迴圈內是有意的</strong>——它釋放的空間，下一輪班距修復才用得到</td><td><code>trimIncompleteRotationCyclesOnTimelines</code></td></tr>
@@ -438,7 +438,7 @@
     輪數上限 <strong>14</strong> 只是防呆——實測多數情況第 1–3 輪就不動了。
   </p>
   <p class="note">
-    <strong>迴圈之後還有一次站位讓渡（做法三）。</strong>整備轉場卡是迴圈跑完才真正插入的，
+    <strong>迴圈之後還有一次站位讓渡（做法三／四）。</strong>整備轉場卡是迴圈跑完才真正插入的，
     迴圈裡看起來空著的空檔其實已被預定；轉場卡插完後再呼叫一次，把撞到的那幾筆丟掉。
     該函式可重入，重複呼叫不會疊加。
   </p>
@@ -965,6 +965,32 @@
   <p>
     <strong>下一趟的發車時刻完全不動</strong>，只是車在這段期間不佔正線站位。
     代價是一段來回空駛（實務上多半 60 秒），換掉十幾到三十幾分鐘的站位佔用。
+  </p>
+
+  <h4>做法四（等著進廠時）：提早進去等</h4>
+  <p>
+    跑完最後一輪、等著進整備廠的那一段，是站位壓力最大的一類——這種車不像做法一到三
+    的對象還要接下一趟載客，它<strong>接下來哪都不去</strong>，就等著進廠，卻整段時間
+    佔著正線站位。
+  </p>
+  <p>
+    做法四不插新的移動卡，而是把<strong>既有的入廠移動卡整張往前挪</strong>到「跑完就走」，
+    後面補一張暫停放卡，把設施格佔到原訂進廠時刻：
+  </p>
+  <table>
+    <thead><tr><th>卡</th><th>做什麼</th></tr></thead>
+    <tbody>
+      <tr><td>入廠移動（既有）</td><td>起訖整段前移，接在停靠結束的當下；時長不變</td></tr>
+      <tr><td>提早進廠等待（新增）</td><td>停在該設施格，直到原訂的進廠時刻</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>整備本身的時刻完全不動</strong>，差別只在車是在站位上等、還是在自己要進的
+    那一格裡等。借的就是它本來要去的那一格，不跟別人搶格子。
+  </p>
+  <p>
+    紀律與做法三相同：該格在整段等待期間都要空著（檢查時要把入廠移動卡自己排除，
+    否則它會與自己的目標格重疊而永遠借不到）、插完之後重算、沒有比原本好就整張退回。
   </p>
 
   <h4>觸發條件：不是「空等多久」，是「有沒有擋到別人」</h4>
