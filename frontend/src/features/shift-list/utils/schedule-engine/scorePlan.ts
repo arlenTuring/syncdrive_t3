@@ -9,8 +9,11 @@ import type {
   GeneratedSchedulePlan,
 } from './types';
 import {
+  collectStationBerthOccupancies,
+  findStationBerthCollisions,
+} from '../stationBerthOccupancy';
+import {
   validatePassengerHeadway,
-  validateStationBerthCollisions,
   validateTimelineOverlaps,
 } from './validate';
 
@@ -37,16 +40,22 @@ import {
  * 不是加權總和——加權會允許「多跑幾班換一次碰撞」這種交換，那是明確被否決的。
  *
  * <strong>定義直接沿用最終驗證器</strong>（{@link validateTimelineOverlaps}、
- * {@link validateStationBerthCollisions}、{@link validatePassengerHeadway}），
- * 不另外手寫一套。評分與使用者在報告上看到的東西必須是同一個定義，否則會出現
- * 「引擎說這輪比較好、報告卻顯示比較差」。
+ * {@link validatePassengerHeadway}），不另外手寫一套。評分與使用者在報告上看到的
+ * 東西必須是同一個定義，否則會出現「引擎說這輪比較好、報告卻顯示比較差」。
+ *
+ * <strong>唯一的例外是站位碰撞：直接數，不經過報告器。</strong>
+ * {@link validateStationBerthCollisions} 為了不洗版，同一個 code 最多只寫
+ * <code>MAX_BERTH_COLLISION_REPORTS</code>（40）則。拿它來評分的話，分數會在 40
+ * 飽和——超過 40 之後所有版面看起來一樣好，閘門就瞎了（2026-08-20 實測，分數向量
+ * 第二位長時間卡在 40）。所以這裡呼叫 {@link findStationBerthCollisions} 拿未截斷
+ * 的完整清單自己數。
  */
 
 /** 分數向量：<strong>逐位比較，每一位都是越小越好</strong> */
 export type PlanScore = {
   vector: number[];
   detail: {
-    /** 硬錯誤：時間線重疊、站位碰撞、班距低於物理下限——無效班表，壓倒一切 */
+    /** 硬錯誤：時間線重疊、站位碰撞對、班距低於物理下限——無效班表，壓倒一切 */
     hardErrorCount: number;
     /** 碰撞保護不足的班次對數 */
     protectionGapPairs: number;
@@ -83,10 +92,18 @@ export function scoreSchedulePlan(args: {
   const warnings: FeasibilityIssue[] = [];
 
   validateTimelineOverlaps(timelines, errors);
-  validateStationBerthCollisions(timelines, selectedRoutes, errors, {
+
+  // 站位碰撞自己數，避開報告器 40 則的截斷
+  const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
     collisionProtectionSeconds,
-    warnings,
   });
+  const collisions = findStationBerthCollisions(occupancies, selectedRoutes);
+  let berthCollisionPairs = 0;
+  let protectionGapPairs = 0;
+  for (const hit of collisions) {
+    if (hit.kind === 'protection_gap') protectionGapPairs += 1;
+    else berthCollisionPairs += 1;
+  }
 
   const allBlocks: GeneratedScheduleBlock[] = [];
   for (const timeline of timelines) allBlocks.push(...timeline.blocks);
@@ -100,17 +117,9 @@ export function scoreSchedulePlan(args: {
     scheduleRowCount,
   );
 
-  let protectionGapPairs = 0;
   let headwayBelowTargetCount = 0;
   for (const issue of warnings) {
-    if (issue.code === 'STATION_BERTH_PROTECTION_GAP') {
-      // 這一則是「同一站收成一則」的匯總，真正的量在 affectedPairCount
-      const pairs = (issue.detail as { affectedPairCount?: number } | undefined)
-        ?.affectedPairCount;
-      protectionGapPairs += typeof pairs === 'number' ? pairs : 1;
-    } else if (issue.code === 'HEADWAY_BELOW_TARGET') {
-      headwayBelowTargetCount += 1;
-    }
+    if (issue.code === 'HEADWAY_BELOW_TARGET') headwayBelowTargetCount += 1;
   }
 
   let passengerTripCount = 0;
@@ -128,7 +137,7 @@ export function scoreSchedulePlan(args: {
     : Math.max(...tripsByRow) - Math.min(...tripsByRow);
 
   const detail = {
-    hardErrorCount: errors.length,
+    hardErrorCount: errors.length + berthCollisionPairs,
     protectionGapPairs,
     headwayBelowTargetCount,
     passengerTripCount,

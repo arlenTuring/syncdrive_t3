@@ -314,6 +314,10 @@ export function generateShiftSchedule(
    * 被系統性地擋掉，留下輪替不完整的班表。
    */
   const rejectedPasses = new Map<string, number>();
+  let currentRound = -1;
+  const traceEnabled =
+    typeof globalThis !== 'undefined'
+    && (globalThis as { __TRACE_PASS__?: boolean }).__TRACE_PASS__ === true;
   const runGuarded = (
     name: string,
     apply: () => GeneratedSchedulePlan['timelines'] | void,
@@ -325,6 +329,15 @@ export function generateShiftSchedule(
     const produced = apply();
     if (produced) timelines = produced;
     const afterScore = scoreOf(timelines);
+    if (traceEnabled) {
+      const cmp = comparePlanScores(afterScore, beforeScore);
+      const same = JSON.stringify(afterScore.vector) === JSON.stringify(beforeScore.vector);
+       
+      console.error(
+        `r${currentRound} ${name.padEnd(38)} ${cmp > 0 ? '撤回' : same ? '無變化' : '採用'}`
+        + `  ${JSON.stringify(beforeScore.vector)} → ${JSON.stringify(afterScore.vector)}`,
+      );
+    }
     if (comparePlanScores(afterScore, beforeScore) > 0) {
       timelines = beforeTimelines;
       warnings.length = warningMark;
@@ -339,6 +352,7 @@ export function generateShiftSchedule(
 
   let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
+    currentRound = round;
     const before = fingerprintTimelines(timelines);
 
     // 車停在哪，下一班就從那裡發——待命的地點是被站位限制夾出來的、常常沒得選，
@@ -472,8 +486,16 @@ export function generateShiftSchedule(
     runGuarded('pushPassengerPastPrecedingYard', () =>
       pushPassengerPastPrecedingYard(timelines));
 
-    // 撤掉不成輪的尾巴。放在迴圈內是有意的——它釋放出來的站位與空檔，
-    // 下一輪的班距修復才用得到（這正是舊版固定序列漏接的地方）。
+    /**
+     * 撤掉不成輪的尾巴。<strong>留在迴圈內</strong>——它是破壞性算子（刪班次），
+     * 照理不該待在不動點迴圈裡，2026-08-20 也實測搬到迴圈外過：班次 +1，但多出
+     * 一筆 ROTATION_CYCLE_INCOMPLETE（某段 21 趟、須為 4 的整數倍），連跑到不動點
+     * 也清不掉——它清的是列尾，而驗證器是逐段檢查「每一段整備之前」。搬出去等於
+     * 讓後續處理再也沒有機會把那一段補齊。
+     *
+     * 它原本會讓班次一路流失（1096 → 972）的問題，已經由每一道的全域評分閘門
+     * 解決（其他處理不會再為了自己的指標把版面弄亂、逼出新的不成輪）。
+     */
     timelines = trimIncompleteRotationCyclesOnTimelines({
       timelines,
       routeCount: engineInput.passengerRoutes.length,
