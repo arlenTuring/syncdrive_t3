@@ -60,6 +60,12 @@ import {
 } from '../mainlineMaintenanceEntryYield';
 import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
 import { pushIssue } from './feasibilityIssueMeta';
+import {
+  comparePlanScores,
+  formatPlanScore,
+  scoreSchedulePlan,
+  type PlanScore,
+} from './scorePlan';
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -252,6 +258,50 @@ export function generateShiftSchedule(
    * STATION_BERTH_DELAY_SOURCE，指名是誰把誰推晚的。
    */
   const berthDelayLog: BerthDelayRecord[] = [];
+
+  /**
+   * <strong>迴圈回傳「最好的那一輪」，不是「最後一輪」。</strong>
+   *
+   * 這十二道處理彼此會互相推翻，實測（2026-08-20，把每一輪的變動卡數印出來）
+   * 這個迴圈<strong>從來沒有收斂過</strong>：
+   *
+   *   好的輸入   round 0 變動 1013 張 → round 13 仍在動 82 張
+   *   壞的輸入   round 0 變動 1070 張 → round 5 降到 435 → round 9 反彈 765（發散）
+   *
+   * 所以先前回傳的不是一個解，是震盪過程中第 14 輪剛好停下來的那一格快照。輸入
+   * 動一點點就落到軌跡上另一個點——使用者在地圖上多開 7 條「站→設施」的邊，班表
+   * 就從硬錯誤 0／班次 1096 變成硬錯誤 4／班次 972，而那 7 條邊本身完全合理。
+   *
+   * 真正的修法是讓這十二道不再互相推翻（見 scorePlan 的說明，那是後面幾步）。
+   * 這一步先止血：每一輪按{@link scoreSchedulePlan 全域評分}打分，留下最好的一版，
+   * 迴圈結束用它。輸出因此<strong>永遠不會比這十四輪裡最好的那一輪差</strong>——
+   * 震盪還在，但不再由「剛好停在哪」決定結果。
+   */
+  // 評分用的路線索引與最終驗證同一份，避免兩邊定義漂移
+  const routeById = new Map(
+    routesForBerth.map((route) => [route.routeId, route] as const),
+  );
+  const scoreOf = (candidate: GeneratedSchedulePlan['timelines']): PlanScore =>
+    scoreSchedulePlan({
+      timelines: candidate,
+      selectedRoutes: routesForBerth,
+      intervals: engineInput.intervals,
+      attributes: engineInput.attributes,
+      routeById,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      scheduleRowCount: engineInput.scheduleRowCount,
+    });
+  const snapshotOf = (
+    candidate: GeneratedSchedulePlan['timelines'],
+  ): GeneratedSchedulePlan['timelines'] =>
+    candidate.map((timeline) => ({
+      ...timeline,
+      blocks: timeline.blocks.map((block) => ({ ...block })),
+    }));
+  let bestScore: PlanScore | null = null;
+  let bestTimelines: GeneratedSchedulePlan['timelines'] | null = null;
+  let bestRound = -1;
+
   let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
     const before = fingerprintTimelines(timelines);
@@ -379,9 +429,38 @@ export function generateShiftSchedule(
       routeCount: engineInput.passengerRoutes.length,
     }).timelines;
 
+    const roundScore = scoreOf(timelines);
+    if (bestScore === null || comparePlanScores(roundScore, bestScore) < 0) {
+      bestScore = roundScore;
+      bestTimelines = snapshotOf(timelines);
+      bestRound = round;
+    }
+
     if (fingerprintTimelines(timelines) === before) {
       converged = true;
       break;
+    }
+  }
+
+  if (bestTimelines && bestScore) {
+    const finalScore = scoreOf(timelines);
+    if (comparePlanScores(bestScore, finalScore) < 0) {
+      timelines = bestTimelines;
+      pushIssue(warnings, {
+        code: 'GEOMETRY_BEST_ROUND_USED',
+        severity: 'warning',
+        kind: 'limit',
+        message:
+          `幾何後處理沒有收斂到不動點，改用過程中最好的第 ${bestRound + 1} 輪：`
+          + `${formatPlanScore(bestScore)}`
+          + `（最後一輪是 ${formatPlanScore(finalScore)}）。`
+          + `這代表迴圈裡的處理仍在互相推翻，班表雖然可用，但還沒有穩定解。`,
+        detail: {
+          bestRound: bestRound + 1,
+          bestScore: bestScore.detail,
+          lastScore: finalScore.detail,
+        },
+      });
     }
   }
   /**
@@ -636,10 +715,6 @@ export function generateShiftSchedule(
 
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
-  const routeById = new Map(
-    routesForBerth.map((route) => [route.routeId, route] as const),
-  );
-
   validateTimelineOverlaps(timelines, errors);
   validateStationTimingsWithinBlocks(
     timelines,
