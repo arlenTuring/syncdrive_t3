@@ -39,6 +39,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_BERTH_DELAYED: '站位約束延後',
   STATION_BERTH_DELAY_SOURCE: '站位延後成因',
   GEOMETRY_BEST_ROUND_USED: '改用最佳輪次結果',
+  GEOMETRY_PASS_REVERTED: '幾何處理被撤回',
   STATION_BERTH_BACKUP_USED: '站位約束改選路線',
   ANCHOR_CONFLICT: '錨點衝突',
   TIMELINE_OVERLAP: '時間線任務重疊',
@@ -89,6 +90,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   STATION_BERTH_DELAYED: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_DELAY_SOURCE: { id: 's8', label: '§8 站位約束決策' },
   GEOMETRY_BEST_ROUND_USED: { id: 's3', label: '§3 幾何後處理收斂迴圈' },
+  GEOMETRY_PASS_REVERTED: { id: 's3', label: '§3 幾何後處理收斂迴圈' },
   STATION_BERTH_BACKUP_USED: { id: 's8', label: '§8 站位約束決策' },
   TIMELINE_OVERLAP: { id: 's6', label: '§6 整備讓渡：開頭 vs 尾巴' },
   HEADWAY_PHYSICAL_IMPOSSIBLE: { id: 's5', label: '§5 掛車決策（脈衝）' },
@@ -169,6 +171,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'policy',
     guidance:
       '站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。',
+  },
+  GEOMETRY_PASS_REVERTED: {
+    kind: 'limit',
+    guidance:
+      '幾何後處理的每一道跑完都會用同一把全域尺打分（不碰撞 > 班距 > 班次穩定），讓整張班表變差的就整道撤回，連同它寫進報告的訊息一起收回。所以這一則不代表班表有問題——那些動作等於沒發生。它的用途是指出哪一道處理的策略與其他處理衝突：撤回次數高的那幾道應該回頭檢討它到底想解什麼問題，而不是留著讓它每一輪都做白工。',
   },
   GEOMETRY_BEST_ROUND_USED: {
     kind: 'limit',

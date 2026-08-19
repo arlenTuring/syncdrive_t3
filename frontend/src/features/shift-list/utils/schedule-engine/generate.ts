@@ -298,6 +298,41 @@ export function generateShiftSchedule(
       ...timeline,
       blocks: timeline.blocks.map((block) => ({ ...block })),
     }));
+  /**
+   * <strong>每一道處理跑完立刻用同一把尺打分，變差就整道撤回。</strong>
+   *
+   * 先前十二道各有各的自我驗證，但量的是不同東西——站位讓渡只看碰撞對數、班距
+   * 修復只看班距。於是會出現「讓渡把碰撞少掉一對、卻順手砍掉 124 個班次還自認
+   * 成功」這種事。改成統一閘門之後，任何一道只要讓<strong>整張班表</strong>依
+   * 使用者優先序（不碰撞 > 班距 > 班次穩定）變差，就當作沒發生過。
+   *
+   * 撤回時連同它寫進報告的訊息一起收回——一道被撤銷的處理不該留下「我做了什麼」
+   * 的警告，否則使用者會看到根本不存在於班表上的動作。
+   *
+   * <code>trimIncompleteRotationCycles</code> 不納入閘門：它刪的是不成輪的尾巴，
+   * 屬於正確性收尾而不是最佳化，本來就會讓班次數下降（評分第四位），套上閘門會
+   * 被系統性地擋掉，留下輪替不完整的班表。
+   */
+  const rejectedPasses = new Map<string, number>();
+  const runGuarded = (
+    name: string,
+    apply: () => GeneratedSchedulePlan['timelines'] | void,
+  ): void => {
+    const beforeTimelines = snapshotOf(timelines);
+    const beforeScore = scoreOf(timelines);
+    const warningMark = warnings.length;
+    const delayLogMark = berthDelayLog.length;
+    const produced = apply();
+    if (produced) timelines = produced;
+    const afterScore = scoreOf(timelines);
+    if (comparePlanScores(afterScore, beforeScore) > 0) {
+      timelines = beforeTimelines;
+      warnings.length = warningMark;
+      berthDelayLog.length = delayLogMark;
+      rejectedPasses.set(name, (rejectedPasses.get(name) ?? 0) + 1);
+    }
+  };
+
   let bestScore: PlanScore | null = null;
   let bestTimelines: GeneratedSchedulePlan['timelines'] | null = null;
   let bestRound = -1;
@@ -312,23 +347,27 @@ export function generateShiftSchedule(
     // 擺在站位求解<strong>之前</strong>：換路線＝換停靠站＝站位佔用整個變了，
     // 擺在後面的話那一輪的求解已經跑完，新衝突要等下一輪才處理；
     // 最後一輪換的更是完全沒人收拾。擺在前面，同一輪就能反應。
-    alignRouteWithVehicleLocation({
-      timelines,
-      selectedRoutes: routesForBerth,
-      successorPolicy: engineInput.successorPolicy,
-      topology: engineInput.pointTopology,
-      firstTripOrigins: engineInput.firstTripOrigins,
-      warnings: round === 0 ? warnings : undefined,
+    runGuarded('alignRouteWithVehicleLocation', () => {
+      alignRouteWithVehicleLocation({
+        timelines,
+        selectedRoutes: routesForBerth,
+        successorPolicy: engineInput.successorPolicy,
+        topology: engineInput.pointTopology,
+        firstTripOrigins: engineInput.firstTripOrigins,
+        warnings: round === 0 ? warnings : undefined,
+      });
     });
 
     // 要進廠卻停在到不了設施的站：把進廠前那一趟改開到進得了廠的那一站。
     // 放在站位求解之前——換終點＝換停靠站，要讓求解器有機會反應。
-    alignRouteWithMaintenanceEntry({
-      timelines,
-      selectedRoutes: routesForBerth,
-      topology: engineInput.pointTopology,
-      successorPolicy: engineInput.successorPolicy,
-      warnings: round === 0 ? warnings : undefined,
+    runGuarded('alignRouteWithMaintenanceEntry', () => {
+      alignRouteWithMaintenanceEntry({
+        timelines,
+        selectedRoutes: routesForBerth,
+        topology: engineInput.pointTopology,
+        successorPolicy: engineInput.successorPolicy,
+        warnings: round === 0 ? warnings : undefined,
+      });
     });
 
     // 站位延後把發車相位推歪了，這裡推回等間隔。
@@ -337,48 +376,54 @@ export function generateShiftSchedule(
     // 收拾：兩者調整方向相反（這裡往前移、求解器只往後延），收拾不掉的就變成硬碰撞
     // （2026-08-13 第一版實測 STATION_BERTH_COLLISION 0 → 4，因此撤掉重做）。
     // 仍排在站位求解之前，讓求解器永遠是最後拍板的那一個。
-    evenOutRouteHeadwayPhase({
-      timelines,
-      selectedRoutes: routesForBerth,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      warnings: round === 0 ? warnings : undefined,
+    runGuarded('evenOutRouteHeadwayPhase', () => {
+      evenOutRouteHeadwayPhase({
+        timelines,
+        selectedRoutes: routesForBerth,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        warnings: round === 0 ? warnings : undefined,
+      });
     });
 
     // 站位占用：拓撲候選中選局部無衝突解（可延後／可改線／可等）
     // 第一輪保守並收集警告；之後放寬延後上限，處理連鎖擠回來的殘餘衝突。
-    timelines = enforceStationBerthConstraints({
-      timelines,
-      selectedRoutes: routesForBerth,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      successorPolicy: engineInput.successorPolicy,
-      warnings: round === 0 ? warnings : undefined,
-      delayLog: berthDelayLog,
-      ...(round === 0
-        ? {}
-        : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
-    }).timelines;
+    runGuarded('enforceStationBerthConstraints', () =>
+  enforceStationBerthConstraints({
+        timelines,
+        selectedRoutes: routesForBerth,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        successorPolicy: engineInput.successorPolicy,
+        warnings: round === 0 ? warnings : undefined,
+        delayLog: berthDelayLog,
+        ...(round === 0
+          ? {}
+          : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
+      }).timelines);
 
     // 滯留的那台晚一點進站，讓只是路過的先走——用掉它本來就要空等的餘裕。
     // 放在讓渡之前：這一招零代價（班距、下一趟發車都不動），能解就先解，
     // 解不掉才輪到會多開班次的繞路讓渡。
-    yieldIdleBlockArrival({
-      timelines,
-      selectedRoutes: routesForBerth,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      warnings: round === 0 ? warnings : undefined,
+    runGuarded('yieldIdleBlockArrival', () => {
+      yieldIdleBlockArrival({
+        timelines,
+        selectedRoutes: routesForBerth,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        warnings: round === 0 ? warnings : undefined,
+      });
     });
 
     // 跑完一輪在共用站位空等下一個脈衝時撞到別列車 → 有次要邊就先繞去別站等
-    timelines = relievePlatformIdleWithSecondaryEdge({
-      timelines,
-      selectedRoutes: routesForBerth,
-      successorPolicy: engineInput.successorPolicy,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      warnings: round === 0 ? warnings : [],
-    });
+    runGuarded('relievePlatformIdleWithSecondaryEdge', () =>
+  relievePlatformIdleWithSecondaryEdge({
+        timelines,
+        selectedRoutes: routesForBerth,
+        successorPolicy: engineInput.successorPolicy,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        warnings: round === 0 ? warnings : [],
+      }));
 
     /**
      * 繞不去別站 → 開進附近設施格暫停放。這一支<strong>呼叫兩次</strong>：
@@ -389,38 +434,43 @@ export function generateShiftSchedule(
      * 只放後面不行——求解器的延後與改派備用線在迴圈裡就定案了，站格再讓也沒人
      * 受益（2026-08-17 實測：只放後面，指標與不做完全相同）。
      */
-    timelines = relievePlatformIdleWithFacilityPark({
-      timelines,
-      selectedRoutes: routesForBerth,
-      topology: engineInput.pointTopology,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-    }).timelines;
+    runGuarded('relievePlatformIdleWithFacilityPark', () =>
+  relievePlatformIdleWithFacilityPark({
+        timelines,
+        selectedRoutes: routesForBerth,
+        topology: engineInput.pointTopology,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      }).timelines);
 
     // 班距太疏 → 把後車往前拉回目標
-    timelines = densifyRouteHeadwaysAfterBerth({
-      timelines,
-      selectedRoutes: routesForBerth,
-      intervals: engineInput.intervals,
-      attributes: engineInput.attributes,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-    });
+    runGuarded('densifyRouteHeadwaysAfterBerth', () =>
+  densifyRouteHeadwaysAfterBerth({
+        timelines,
+        selectedRoutes: routesForBerth,
+        intervals: engineInput.intervals,
+        attributes: engineInput.attributes,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      }));
 
     // 班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕
-    timelines = repairRouteHeadwaysBelowTarget({
-      timelines,
-      selectedRoutes: routesForBerth,
-      intervals: engineInput.intervals,
-      attributes: engineInput.attributes,
-      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-    });
+    runGuarded('repairRouteHeadwaysBelowTarget', () =>
+  repairRouteHeadwaysBelowTarget({
+        timelines,
+        selectedRoutes: routesForBerth,
+        intervals: engineInput.intervals,
+        attributes: engineInput.attributes,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      }));
 
     // 正線可吃接下來那段整備的開頭（有重疊才讓）
-    timelines = applyMainlineMaintenanceEntryYield(timelines);
+    runGuarded('applyMainlineMaintenanceEntryYield', () =>
+      applyMainlineMaintenanceEntryYield(timelines));
 
     // 不准佔用整備尾巴：壓到前一段整備的正線，整趟推到整備結束之後
-    timelines = pushPassengerPastPrecedingYard(timelines);
+    runGuarded('pushPassengerPastPrecedingYard', () =>
+      pushPassengerPastPrecedingYard(timelines));
 
     // 撤掉不成輪的尾巴。放在迴圈內是有意的——它釋放出來的站位與空檔，
     // 下一輪的班距修復才用得到（這正是舊版固定序列漏接的地方）。
@@ -440,6 +490,21 @@ export function generateShiftSchedule(
       converged = true;
       break;
     }
+  }
+
+  if (rejectedPasses.size > 0) {
+    const ranked = [...rejectedPasses.entries()].sort((a, b) => b[1] - a[1]);
+    pushIssue(warnings, {
+      code: 'GEOMETRY_PASS_REVERTED',
+      severity: 'warning',
+      kind: 'limit',
+      message:
+        '幾何後處理有處理被整道撤回——它讓整張班表依優先序（不碰撞 > 班距 > '
+        + `班次穩定）變差了：${ranked.map(([name, count]) => `${name} ${count} 次`).join('、')}。`
+        + '班表本身不受影響（那些動作等於沒發生），但撤回次數高的處理代表它的策略'
+        + '與其他處理衝突，值得回頭檢討。',
+      detail: { rejectedPasses: Object.fromEntries(ranked) },
+    });
   }
 
   if (bestTimelines && bestScore) {

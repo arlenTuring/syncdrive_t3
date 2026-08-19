@@ -183,6 +183,7 @@ export type FeasibilityViolationCode =
   | 'STATION_BERTH_PROTECTION_GAP'
   | 'STATION_BERTH_DELAY_SOURCE'
   | 'GEOMETRY_BEST_ROUND_USED'
+  | 'GEOMETRY_PASS_REVERTED'
   /** 空等會撞到別列車，但關聯圖上沒有可用的讓渡路線，只能留在原地（警告） */
   | 'STATION_BERTH_RELIEF_UNAVAILABLE'
   /** 滯留車往後挪、讓只是路過的先通過（警告，零代價讓步） */
