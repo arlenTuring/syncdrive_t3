@@ -15,6 +15,14 @@ import { snapUpToClockAlignSeconds } from './schedule-engine/physics';
  * 走 Dijkstra，權重取「均」（沒有就退回「快」，再沒有算 0 但仍可通行——
  * 拓樸缺時間是資料問題，不該讓整條路徑變成不可達）。
  *
+ * <strong>設施節點只能當終點，不能當通道。</strong>充電樁、維修坑不是走廊——
+ * 車不會為了到對面月台而穿過充電樁。這條規則在拓樸上開了「站 → 設施」的邊之後
+ * 才顯出重要性：2026-08-19 使用者把 T3上行 → H1–H3／M1–M4 開通，本意是讓車進得了
+ * 廠，結果引擎把它當一般可通行節點，於是 <code>T3上行 → T3下行</code> 從繞一圈的
+ * 340 秒變成穿過 M4 的 60 秒——等於在廠區裡開了一條上下行捷徑。車開始穿機廠切換
+ * 方向，原本乾淨的 T3下行 被灌爆（站位碰撞 0 → 22 對），全域硬錯誤 0 → 4、
+ * 班次 1096 → 972。擋掉「穿過」之後，進廠照樣是 30 秒，捷徑則不存在。
+ *
  * <strong>方向嚴格遵守拓樸</strong>：只走 fromNodeId → toNodeId 的邊。
  * 這很重要——例如 M 系設施「出場」接的是 T3上行、「入場」卻要從 T3下行進去，
  * 反過來走就是逆行。雙向是使用者在拓樸上明確補了反向邊才成立，
@@ -72,6 +80,11 @@ export function findTopologyPath(
 
   const blocked = options?.blockedNodeIds;
   const maxHops = options?.maxHops ?? 8;
+  /** 設施節點：可以是起點（出廠）或終點（入廠），但不可以被路過 */
+  const facilityNodeIds = new Set<string>();
+  for (const node of topology.nodes) {
+    if (node.kind === 'facility') facilityNodeIds.add(node.id);
+  }
 
   const outgoing = new Map<string, PointTopologyEdge[]>();
   for (const edge of topology.edges) {
@@ -121,6 +134,8 @@ export function findTopologyPath(
       const nextId = edge.toNodeId;
       // 終點就算在 blocked 名單裡也要能到——擋的是「路過」，不是「目的地」
       if (blocked?.has(nextId) && nextId !== toNodeId) continue;
+      // 設施是目的地不是走廊：不得穿過設施節點去別的地方
+      if (nextId !== toNodeId && facilityNodeIds.has(nextId)) continue;
       if (current.nodeIds.includes(nextId)) continue;
       const nextCost = current.cost + edgeSeconds(edge, 'avg');
       if ((best.get(nextId) ?? Infinity) <= nextCost) continue;
