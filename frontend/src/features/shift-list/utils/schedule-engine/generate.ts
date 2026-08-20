@@ -436,17 +436,9 @@ export function generateShiftSchedule(
           : { maxDelaySeconds: STATION_BERTH_WAIT_MAX_DELAY_SECONDS }),
       }).timelines);
 
-    // 滯留的那台晚一點進站，讓只是路過的先走——用掉它本來就要空等的餘裕。
-    // 放在讓渡之前：這一招零代價（班距、下一趟發車都不動），能解就先解，
-    // 解不掉才輪到會多開班次的繞路讓渡。
-    runGuarded('yieldIdleBlockArrival', () => {
-      yieldIdleBlockArrival({
-        timelines,
-        selectedRoutes: routesForBerth,
-        collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-        warnings: round === 0 ? warnings : undefined,
-      });
-    });
+    // 「滯留的那台晚一點進站」已經移出迴圈，改在所有處理跑完之後才做——
+    // 它動用的空等餘裕正是下面兩道讓渡解衝突的資源，在這裡先用掉會害它們沒東西
+    // 可用（見迴圈後的說明）。
 
     // 跑完一輪在共用站位空等下一個脈衝時撞到別列車 → 有次要邊就先繞去別站等
     runGuarded('relievePlatformIdleWithSecondaryEdge', () =>
@@ -740,6 +732,34 @@ export function generateShiftSchedule(
   // 整備前面不留空白：車已經在格子裡了，整備就從那一刻開始（結束不動）。
   // 放在讓渡之後——讓渡會把入廠卡往前挪，挪完才知道車實際幾點到格子。
   timelines = closeYardHeadGaps({ timelines }).timelines;
+
+  /**
+   * 收尾微調：早到幾秒卡進別人碰撞保護窗的，往後挪剛好差的那幾秒。
+   *
+   * <strong>這一支必須放在最後面。</strong>它挪的是「到站後反正要空等」的車，
+   * 對那台車本身零代價；但那段空等同時也是站位讓渡（繞去別站等、開進設施格暫停放）
+   * 拿來解衝突的資源。放在收斂迴圈裡先把它用掉，讓渡就沒東西可用——2026-08-20
+   * 兩種寫法都實測過，結果一致：迴圈內動手，最終站位碰撞從 1 對變成 3 對。
+   * 放到所有處理跑完之後，沒有下游會被影響，省下來的就是純賺。
+   *
+   * 每挪一趟都用同一把全域尺驗證一次，沒變好就還原那一次——整趟往後挪連帶影響
+   * 起點站的發車，不能盲挪（盲挪實測第一輪就從 3 筆硬錯誤變成 27 筆）。
+   */
+  {
+    let reference = scoreOf(timelines);
+    yieldIdleBlockArrival({
+      timelines,
+      selectedRoutes: routesForBerth,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      warnings,
+      accept: () => {
+        const next = scoreOf(timelines);
+        if (comparePlanScores(next, reference) >= 0) return false;
+        reference = next;
+        return true;
+      },
+    });
+  }
 
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType

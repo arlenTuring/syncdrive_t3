@@ -33,7 +33,9 @@ import type {
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
+  type StationBerthOccupancy,
 } from './stationBerthOccupancy';
+import { snapUpToClockAlignSeconds } from './schedule-engine/physics';
 
 export function yieldIdleBlockArrival(args: {
   timelines: GeneratedSchedulePlan['timelines'];
@@ -41,8 +43,16 @@ export function yieldIdleBlockArrival(args: {
   collisionProtectionSeconds: number;
   /** 只在第一輪收集，避免收斂迴圈每一輪重複回報同一件事 */
   warnings?: FeasibilityIssue[];
+  /**
+   * 逐次驗證：每挪一趟就問一次「整張班表有沒有變好」，答否就把那一次還原。
+   *
+   * 由呼叫端提供，這一支不自己決定什麼叫「好」——判準必須跟收斂迴圈的全域評分
+   * 是同一把尺，否則又會回到「各量各的、互相推翻」的老問題。沒給就不驗證
+   * （單元測試與舊呼叫端維持原行為）。
+   */
+  accept?: () => boolean;
 }): { shifted: number } {
-  const { timelines, selectedRoutes, collisionProtectionSeconds, warnings } = args;
+  const { timelines, selectedRoutes, collisionProtectionSeconds, warnings, accept } = args;
   if (collisionProtectionSeconds <= 0) return { shifted: 0 };
 
   const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
@@ -60,95 +70,126 @@ export function yieldIdleBlockArrival(args: {
     );
   }
 
-  const protectionMinutes = collisionProtectionSeconds / 60;
   const shiftedBlockIds = new Set<string>();
   /* 每一站彙總成一則。逐筆列出會有上百則，把已經整理好的摘要淹掉。 */
   const perStation = new Map<string, { stationName: string; count: number; totalShift: number }>();
   let shifted = 0;
 
-  for (const hit of collisions) {
-    if (hit.kind !== 'protection_gap') continue;
-    const earlier = blockById.get(hit.earlier.blockId);
-    if (!earlier) continue;
-    if (shiftedBlockIds.has(earlier.id)) continue;
-    /**
-     * <strong>一趟一整次生成只讓一次。</strong>
-     *
-     * <code>shiftedBlockIds</code> 只在單次呼叫內有效，而這一支跑在收斂迴圈裡：
-     * 挪過去之後站位求解把別的東西推回來，下一輪同一趟又符合條件、又挪一次，
-     * 兩邊就這樣互推到迴圈跑滿——使用者實測資料上直接觸發 GEOMETRY_NOT_CONVERGED，
-     * 而且迴圈中途收工害 HEADWAY_BELOW_TARGET 從 42 暴增到 141（2026-08-12）。
-     *
-     * 記在區塊自己身上才跨得了輪。讓步本來就該是<strong>單向、一次性</strong>的：
-     * 一趟讓過一次還是不通，代表它不是讓步能解的問題。
-     */
-    if (earlier.berthArrivalYieldedMinutes != null) continue;
-    if (earlier.taskType !== 'passenger' || earlier.source !== 'template_bar') continue;
+  /**
+   * 這一趟到站之後，還被迫在站上留多久（分鐘）。
+   * 沒有空等就沒有餘裕可用——那是單純兩班排太近，不歸這一支管。
+   */
+  const idleMinutesOf = (occupancy: StationBerthOccupancy): number =>
+    Math.max(0, occupancy.actualDepartMinute - occupancy.endMinute);
 
-    // 空等＝自然可以離站之後還被迫留在站上的那一段。沒有空等就沒有餘裕可用，
-    // 這一則是單純的兩班排太近，不歸這裡管。
-    const idleMinutes = hit.earlier.actualDepartMinute - hit.earlier.endMinute;
-    if (idleMinutes <= 1e-9) continue;
-
-    /**
-     * <strong>目標是「快發車了才進站」，不是「等對方過去」。</strong>
-     *
-     * 第一版把目標訂成「挪到路過的那台通過之後」，結果只在一對一、而且對方真的
-     * 只是路過時有用；四台車擠在同一格時完全無解——每一台都在等別人，誰讓都不夠。
-     *
-     * 但看實際數字就會發現有解：T3下行 16:07:10 那四台的<strong>離站時刻是錯開的</strong>
-     * （16:08:50、16:10:00、16:11:10、16:14:00），撞在一起的是<strong>到站</strong>——
-     * 它們全都提早到，然後一起杵在月台上。只要每一台都改成「快發車了才進站」，
-     * 隊伍自己就排好了，不需要任何人特別讓誰。
-     *
-     * 所以判準改成單純的一句：<strong>把多餘的空等吃掉</strong>。留一個碰撞保護
-     * 當折返緩衝，其餘往後挪。不必再問對方是誰、佔多久——每台各自縮短滯留，
-     * 全站的重疊自然就散開。
-     */
-    /*
-      緩衝要留<strong>兩倍</strong>碰撞保護，不是一倍。
-      規則本來就是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護」——只留一倍，
-      挪完剛好卡在規則邊緣，實測直接製造出 10 秒的真碰撞
-      （NTB0911 09:11:00–09:14:30 對上 TS0914 09:14:20，2026-08-12 使用者回報）。
-    */
-    const marginMinutes = protectionMinutes * 2;
-    const neededMinutes = idleMinutes - marginMinutes;
-    if (neededMinutes <= 1e-9) continue;
-
-    // 往後挪不會壓到前一段（間隔只會變大），但不能壓到自己排定的下一段
-    const rowBlocks = blocksByRow.get(earlier.timelineRow) ?? [];
-    const index = rowBlocks.findIndex((item) => item.id === earlier.id);
-    const next = index >= 0 ? rowBlocks[index + 1] : undefined;
+  /** 這一趟可以整段往後挪多少分鐘（不壓到同列下一段、不動整備後首班） */
+  const shiftRoomOf = (block: GeneratedScheduleBlock): number | null => {
+    if (block.taskType !== 'passenger' || block.source !== 'template_bar') return null;
+    // 一趟一整次生成只讓一次，記在區塊自己身上才跨得了輪（見下方說明）
+    if (block.berthArrivalYieldedMinutes != null) return null;
+    const rowBlocks = blocksByRow.get(block.timelineRow) ?? [];
+    const index = rowBlocks.findIndex((item) => item.id === block.id);
+    if (index < 0) return null;
     /**
      * <strong>整備後的第一班不准挪。</strong>
      *
      * 車做完整備就停在該設施的出場站，這一趟的起點站是<strong>物理事實</strong>，
-     * 而且它的發車時刻要跟出廠卡貼齊。整段往後挪會讓出場站對不上，直接觸發
+     * 而且發車時刻要跟出廠卡貼齊。整段往後挪會讓出場站對不上，直接觸發
      * <code>YARD_EXIT_STATION_MISMATCH</code>（2026-08-12 使用者回報：充電做完停在
      * N2W下行出發，TNB1500 卻要從 T3上行 發車）。
      */
     const previous = index > 0 ? rowBlocks[index - 1] : undefined;
     if (previous && previous.source === 'template_bar' && previous.taskType !== 'passenger') {
-      continue;
+      return null;
     }
+    const next = rowBlocks[index + 1];
+    if (!next) return Number.POSITIVE_INFINITY;
+    return Math.max(0, next.plannedStartMinute - block.plannedEndMinute);
+  };
+
+  const applyShift = (
+    block: GeneratedScheduleBlock,
+    shiftMinutes: number,
+    hit: (typeof collisions)[number],
+  ): boolean => {
+    if (shiftMinutes <= 1e-9) return false;
+    const room = shiftRoomOf(block);
+    if (room == null || shiftMinutes > room - 1e-9) return false;
+    const keepStart = block.plannedStartMinute;
+    const keepEnd = block.plannedEndMinute;
+    block.plannedStartMinute += shiftMinutes;
+    block.plannedEndMinute += shiftMinutes;
+    /**
+     * <strong>挪完立刻驗證，沒變好就還原。</strong>
+     *
+     * 整趟往後挪不只影響到站那一頭——它的<strong>起點站發車也跟著晚</strong>，
+     * 可能在那裡撞上別人。2026-08-20 實測：不驗證直接挪，第一輪就從 3 筆硬錯誤
+     * 變成 27 筆。這一支能不能出手，要看整張班表，不是只看眼前這一對。
+     */
+    if (accept && !accept()) {
+      block.plannedStartMinute = keepStart;
+      block.plannedEndMinute = keepEnd;
+      return false;
+    }
+    block.berthArrivalYieldedMinutes = shiftMinutes;
+    shiftedBlockIds.add(block.id);
+    shifted += 1;
+    perStation.set(hit.stationId, {
+      stationName: hit.stationName,
+      count: (perStation.get(hit.stationId)?.count ?? 0) + 1,
+      totalShift: (perStation.get(hit.stationId)?.totalShift ?? 0) + shiftMinutes,
+    });
+    return true;
+  };
+
+  for (const hit of collisions) {
+    if (hit.kind !== 'protection_gap') continue;
+
+    /**
+     * <strong>只挪剛好差的那幾秒，而且優先挪「後車」。</strong>
+     *
+     * 舊版是把<strong>前車</strong>整趟往後挪，一口氣吃掉幾乎全部空等（只留兩倍
+     * 碰撞保護）。兩個問題：
+     *
+     * 一、<strong>吃掉的餘裕是別人要用的。</strong>那台車在站上空等的那幾分鐘，
+     * 正是後面兩道站位讓渡（繞去別站等、開進設施格暫停放）拿來解衝突的資源。
+     * 這一支先把它用光，讓渡就沒東西可用了——2026-08-20 實測：讓這一支動手，
+     * 讓渡只能把保護不足從 33 降到 15；不讓它動手，讓渡能從 34 降到 11 再降到 6。
+     * 局部賺一對、全域賠九對，於是它每一輪都被全域評分整道撤回，等於白做。
+     *
+     * 二、<strong>它只看前車。</strong>但「早到」的常常是後車：後車到站後本來就
+     * 要在原地等下一趟，它早到幾秒沒有任何好處，卻剛好卡進前車的保護窗。實測
+     * 剩下的最後一對就是這樣——TNB0905 09:08:30 到「[備用]N2W下行出發」，前車
+     * 09:08:40 才清乾淨，差 10 秒；而 TNB0905 到站後要等到 09:13:30 才發下一班。
+     *
+     * 所以改成：<strong>誰有空等就挪誰，而且只挪差額</strong>。後車優先——挪它
+     * 直接消掉這一對；前車不行的話才退而求其次縮短它的滯留。
+     */
+    const shortfallMinutes = snapUpToClockAlignSeconds(
+      Math.max(0, hit.protectionShortfallSeconds),
+    ) / 60;
+    if (shortfallMinutes <= 1e-9) continue;
+
+    // 後車：往後挪差額就滿足保護，前提是它到站後本來就要空等這麼久
+    const later = blockById.get(hit.later.blockId);
     if (
-      next
-      && earlier.plannedEndMinute + neededMinutes > next.plannedStartMinute - 1e-9
+      later
+      && !shiftedBlockIds.has(later.id)
+      && idleMinutesOf(hit.later) >= shortfallMinutes - 1e-9
+      && applyShift(later, shortfallMinutes, hit)
     ) {
       continue;
     }
 
-    earlier.plannedStartMinute += neededMinutes;
-    earlier.plannedEndMinute += neededMinutes;
-    earlier.berthArrivalYieldedMinutes = neededMinutes;
-    shiftedBlockIds.add(earlier.id);
-    shifted += 1;
-
-    perStation.set(hit.stationId, {
-      stationName: hit.stationName,
-      count: (perStation.get(hit.stationId)?.count ?? 0) + 1,
-      totalShift: (perStation.get(hit.stationId)?.totalShift ?? 0) + neededMinutes,
-    });
+    /**
+     * 前車：挪它不會直接消掉這一對（它的實際離站時刻不變，保護窗也就不變），
+     * 但會讓它<strong>晚一點才佔住站位</strong>，把前面那段空窗還給別人。同樣
+     * 只挪差額，不把空等吃光。
+     */
+    const earlier = blockById.get(hit.earlier.blockId);
+    if (!earlier || shiftedBlockIds.has(earlier.id)) continue;
+    if (idleMinutesOf(hit.earlier) < shortfallMinutes - 1e-9) continue;
+    applyShift(earlier, shortfallMinutes, hit);
   }
 
   for (const [stationId, item] of perStation) {
@@ -157,9 +198,9 @@ export function yieldIdleBlockArrival(args: {
       severity: 'warning',
       kind: 'policy',
       message:
-        `「${item.stationName}」有 ${item.count} 班車跑完一趟後要在站上空等下一趟，`
-        + `擋住只是路過的別列車。已讓這幾班晚一點進站（合計往後挪 `
-        + `${item.totalShift.toFixed(1)} 分鐘）——它們反正要空等，`
+        `「${item.stationName}」有 ${item.count} 班車到站後本來就要在站上空等，`
+        + `卻早到幾秒卡進別列車的碰撞保護窗。已讓這幾班晚一點進站（合計往後挪 `
+        + `${item.totalShift.toFixed(1)} 分鐘，只挪剛好差的那幾秒）——它們反正要空等，`
         + `下一趟發車時刻與班距都不變。`,
       detail: { stationId, stationName: item.stationName, shiftedTripCount: item.count, totalShiftMinutes: item.totalShift },
     });
