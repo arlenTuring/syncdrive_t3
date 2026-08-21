@@ -67,11 +67,24 @@ function classifyMapObject(entry) {
   return null;
 }
 
-function equipmentLabel(entry, kind) {
+function stationHintFromAreaName(areaName) {
+  const raw = String(areaName ?? '').trim();
+  if (!raw) return '';
+  return raw.replace(/^Area\s+\S+\s+·\s+/i, '').replace(/\s*站台\s*$/, '').trim() || raw;
+}
+
+function equipmentLabel(entry, kind, areaName) {
   const code = normalizeCode(entry.customName);
   const purpose = String(entry.parameters?.purpose ?? '').trim();
   if (code && purpose) return `${code}（${purpose}）`;
   if (code) return code;
+  if (kind === EQUIPMENT_KIND.PLATFORM_DOOR) {
+    const station = stationHintFromAreaName(areaName);
+    const id = String(entry.id ?? '').trim();
+    if (station && id) return `${station} · ${id}`;
+    if (station) return `${station} 月台門`;
+    return id ? `月台門 ${id}` : '月台門';
+  }
   return purpose || entry.id || '未命名';
 }
 
@@ -112,21 +125,22 @@ function loadFieldEquipmentFromMapFile(mapPath, kindFilter = 'all') {
       if (!classified) continue;
       if (!matchesKindFilter(classified, entry, kindFilter)) continue;
 
-      const mapCode = normalizeCode(entry.customName);
+      const mapCode = normalizeCode(entry.customName) || String(entry.id ?? '');
       if (!mapCode) continue;
 
+      const areaName = String(area.customName ?? area.id ?? '');
       items.push({
         equipmentId: String(entry.id ?? ''),
         mapCode,
         equipmentKind: classified.kind,
         objectCategory: classified.category,
-        label: equipmentLabel(entry, classified.kind),
+        label: equipmentLabel(entry, classified.kind, areaName),
         purpose: String(entry.parameters?.purpose ?? '').trim() || undefined,
         mqttInstanceId: entry.parameters?.mqttInstanceId
           ? String(entry.parameters.mqttInstanceId)
           : undefined,
         areaId: String(area.id ?? ''),
-        areaName: String(area.customName ?? area.id ?? ''),
+        areaName,
         facilityType: String(entry.type ?? ''),
       });
     }

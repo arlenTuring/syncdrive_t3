@@ -1018,6 +1018,10 @@ function ChildWidgetRnd({
     [child.width, child.height, peerChildren, parentBounds.width, parentBounds.height],
   );
 
+  const isColorBlock = child.type === 'color-block';
+  const childMinW = isColorBlock ? 1 : 10;
+  const childMinH = isColorBlock ? 1 : 10;
+
   const snapChildResizeAt = useCallback(
     (rect: { x: number; y: number; width: number; height: number }, dir: ResizeDirection) =>
       snapDashboardResize(
@@ -1025,9 +1029,9 @@ function ChildWidgetRnd({
         dir,
         peerChildren,
         { x: 0, y: 0, width: parentBounds.width, height: parentBounds.height },
-        { width: 10, height: 10 },
+        { width: childMinW, height: childMinH },
       ),
-    [peerChildren, parentBounds.width, parentBounds.height],
+    [childMinW, childMinH, peerChildren, parentBounds.width, parentBounds.height],
   );
 
 const color =  {
@@ -1084,6 +1088,8 @@ const color =  {
         const local = screenDeltaToLocal(dx, dy, rotationDeg);
         const result = applyElementResize(edge, local.dx, local.dy, origin, {
           anchorCenter: true,
+          minWidth: childMinW,
+          minHeight: childMinH,
         });
         last = result;
         setResizeRect(result);
@@ -1111,7 +1117,7 @@ const color =  {
       window.addEventListener('pointerup', onUp);
       window.addEventListener('pointercancel', onUp);
     },
-    [child.x, child.y, child.width, child.height, isEditMode, onResize, onResizeEnd, onResizeStart, onUpdate, rotationDeg, scale],
+    [child.x, child.y, child.width, child.height, childMinH, childMinW, isEditMode, onResize, onResizeEnd, onResizeStart, onUpdate, rotationDeg, scale],
   );
 
   return (
@@ -1127,8 +1133,8 @@ const color =  {
       }}
       scale={scale}
       bounds="parent"
-      minWidth={10}
-      minHeight={10}
+      minWidth={childMinW}
+      minHeight={childMinH}
       dragGrid={[1, 1]}
       resizeGrid={[1, 1]}
       disableDragging={!isEditMode || painterActive || disableDrag || modifierHeld}
@@ -1336,7 +1342,24 @@ const color =  {
         </div>
       )}
       {isEditMode && isSelected && !isDragging && !isResizing && (
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: 2, right: 2, zIndex: 200, background: 'rgba(239,68,68,0.9)', border: 'none', borderRadius: 3, padding: '2px 4px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'white' }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          style={{
+            position: 'absolute',
+            top: child.height < 24 ? -18 : 2,
+            right: child.height < 24 ? 0 : 2,
+            zIndex: 210,
+            background: 'rgba(239,68,68,0.9)',
+            border: 'none',
+            borderRadius: 3,
+            padding: '2px 4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            color: 'white',
+          }}
+          title="刪除元件"
+        >
           <Trash2 size={9} />
         </button>
       )}

@@ -71,7 +71,7 @@ function DispatchTrack({
   const trackH = Math.max(44, Math.round(52 * scale));
   const dot = Math.max(7, Math.round(8 * scale));
   const bus = Math.max(14, Math.round(16 * scale));
-  const labelFs = Math.max(9, Math.round(10 * scale));
+  const labelFs = widget.fontSize ?? Math.max(9, Math.round(10 * scale));
 
   return (
     <div className="relative w-full flex-1" style={{ minHeight: trackH, marginTop: Math.round(4 * scale) }}>
@@ -398,7 +398,7 @@ function MaintenanceTrack({
   const trackH = Math.max(44, Math.round(52 * scale));
   const dot = Math.max(7, Math.round(8 * scale));
   const bus = Math.max(14, Math.round(16 * scale));
-  const labelFs = Math.max(9, Math.round(10 * scale));
+  const labelFs = widget.fontSize ?? Math.max(9, Math.round(10 * scale));
 
   return (
     <div className="relative w-full flex-1" style={{ minHeight: trackH, marginTop: Math.round(4 * scale) }}>

@@ -1,12 +1,7 @@
 -- Seed test data for SyncDrive T3
 
--- 1. Vehicles
-INSERT INTO vehicles (id, vehicle_code, display_name, is_active, created_at, updated_at) VALUES 
-(gen_random_uuid(), 'AGV-001', 'Forklift 1', true, EXTRACT(EPOCH FROM NOW()) * 1000, EXTRACT(EPOCH FROM NOW()) * 1000),
-(gen_random_uuid(), 'AGV-002', 'Forklift 2', true, EXTRACT(EPOCH FROM NOW()) * 1000, EXTRACT(EPOCH FROM NOW()) * 1000),
-(gen_random_uuid(), 'AMR-101', 'Transport AMR A', true, EXTRACT(EPOCH FROM NOW()) * 1000, EXTRACT(EPOCH FROM NOW()) * 1000),
-(gen_random_uuid(), 'AMR-102', 'Transport AMR B', true, EXTRACT(EPOCH FROM NOW()) * 1000, EXTRACT(EPOCH FROM NOW()) * 1000)
-ON CONFLICT (vehicle_code) DO NOTHING;
+-- 1. Vehicles：營運車隊為 PMS-*（儀表板 seed 會補齊 PMS-01～11）；勿再插入 AGV/AMR
+DELETE FROM vehicles WHERE vehicle_code ~ '^(AGV|AMR)-';
 
 -- 2. Facility Slots (Static Layout)
 INSERT INTO facility_slots (slot_id, facility_type, zone, display_name, capacity, is_active, description, created_at, updated_at) VALUES 

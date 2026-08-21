@@ -9,9 +9,10 @@ interface Props {
   onCreate: () => void;
   onDelete: (id: string) => void;
   onImportTemplate: (result: TemplateImportResult) => void;
+  onUpdatePlane?: (id: string, patch: Partial<Pick<DashboardPlane, 'viewportMode'>>) => void;
 }
 
-export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTemplate }: Props) {
+export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTemplate, onUpdatePlane }: Props) {
   const formatDate = (ts: number) => {
     return new Intl.DateTimeFormat('zh-TW', {
       year: 'numeric', month: '2-digit', day: '2-digit',
@@ -47,7 +48,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
           {/* Create New Card */}
           <button 
             onClick={onCreate}
-            className="group relative flex flex-col items-center justify-center gap-4 h-[220px] 
+            className="group relative flex flex-col items-center justify-center gap-4 h-[260px] 
                        bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-2xl
                        hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all duration-300"
           >
@@ -71,8 +72,8 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                          hover:shadow-cyan-500/10 transition-all duration-300"
             >
               {/* Preview Placeholder */}
-              <div className="h-32 bg-zinc-950 flex items-center justify-center border-b border-zinc-800 group-hover:bg-zinc-900 transition-colors">
-                <Monitor size={48} className="text-zinc-800 group-hover:text-cyan-900 transition-colors" />
+              <div className="h-28 bg-zinc-950 flex items-center justify-center border-b border-zinc-800 group-hover:bg-zinc-900 transition-colors">
+                <Monitor size={40} className="text-zinc-800 group-hover:text-cyan-900 transition-colors" />
                 
                 {/* Overlay Actions */}
                 <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -87,10 +88,10 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
               </div>
 
               {/* Info */}
-              <div className="p-5 space-y-3">
+              <div className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="font-bold text-zinc-100 text-lg truncate group-hover:text-cyan-400 transition-colors">{p.name}</div>
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 text-[10px] font-mono">
+                  <div className="font-bold text-zinc-100 text-base truncate group-hover:text-cyan-400 transition-colors">{p.name}</div>
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 text-[10px] font-mono shrink-0">
                     <Maximize2 size={10} /> {p.width} × {p.height}
                   </div>
                 </div>
@@ -102,7 +103,43 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                   </div>
                 </div>
 
-                <div className="pt-2">
+                {/* 畫布適配模式單選按鈕組 */}
+                <div className="pt-2 border-t border-zinc-800/80 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400 font-medium">適配模式</span>
+                    <span className="text-zinc-500 font-mono text-[10px]">
+                      {(p.viewportMode ?? 'fixed-scale') === 'fit-width' ? '寬度自適應撐滿' : '固定等比大屏'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-950/80 rounded-xl border border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => onUpdatePlane?.(p.id, { viewportMode: 'fixed-scale' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1 transition-all ${
+                        (p.viewportMode ?? 'fixed-scale') === 'fixed-scale'
+                          ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                      }`}
+                      title="固定等比大屏：16:9 戰情室大屏縮放，畫面居中，保證不變形"
+                    >
+                      <span>🖥️ 固定等比</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdatePlane?.(p.id, { viewportMode: 'fit-width' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1 transition-all ${
+                        p.viewportMode === 'fit-width'
+                          ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                      }`}
+                      title="寬度自適應：100% 填滿視窗寬度，高度自然捲動，側邊欄開合自動伸縮"
+                    >
+                      <span>↔️ 寬度自適應</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-1">
                   <div className="w-full py-2 rounded-lg bg-zinc-800 text-zinc-400 text-xs font-bold uppercase 
                                 tracking-wider text-center group-hover:bg-cyan-600 group-hover:text-white transition-all">
                     進入編輯模式

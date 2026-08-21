@@ -160,6 +160,25 @@ export async function deleteOperationShift(
   }
 }
 
+export async function deployOperationShift(
+  shiftId: string,
+  payload?: { reviewer_name?: string },
+  backendUrl = resolveOperationShiftBackendUrl(),
+): Promise<OperationShiftListItem> {
+  const res = await fetch(
+    `${backendUrl}/syncdrive-api/operation-shift/detail/${encodeURIComponent(shiftId)}/deploy`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload ?? {}),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, '部署班表失敗'));
+  }
+  return res.json() as Promise<OperationShiftListItem>;
+}
+
 export async function checkOperationShiftNameUnique(
   name: string,
   excludeShiftId?: string,

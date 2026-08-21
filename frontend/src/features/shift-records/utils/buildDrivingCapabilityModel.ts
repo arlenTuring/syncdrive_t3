@@ -1,25 +1,40 @@
-import type { ShiftRecordDetail } from '../api/shiftRecordsApi';
+import type { ShiftRecordAction, ShiftRecordDetail } from '../api/shiftRecordsApi';
+import {
+  catalogVisualForActionType,
+  catalogVisualForCode,
+} from './mapProtocolActionToCatalog';
 
-export type TaskLaneFilter = 'all' | 'main' | 'secondary';
+export type TaskLaneFilter = 'all' | 'action' | 'event';
 
 export type TimelineEventKind =
-  | 'depart'
+  | 'enter'
+  | 'exit'
+  | 'music'
   | 'door_open'
   | 'door_close'
-  | 'dock'
-  | 'broadcast'
-  | 'interlock'
-  | 'alarm'
+  | 'signal'
+  | 'alert'
+  | 'dispatch'
+  | 'charging'
+  | 'wash'
+  | 'maintenance'
+  | 'repair'
+  | 'parking'
   | 'generic';
 
 export type TimelineEvent = {
   id: string;
-  lane: 'main' | 'secondary';
+  channel: 'action' | 'event';
   kind: TimelineEventKind;
   atMs: number;
   label: string;
   station?: string;
+  iconUrl?: string | null;
+  actionType?: string;
+  actionStatus?: string;
   accelerated?: boolean;
+  delayLabel?: string;
+  description?: string;
 };
 
 export type StatusSegment = {
@@ -46,23 +61,22 @@ export type DrivingCapabilityModel = {
 };
 
 const MAINLINE_TRIP = /^[DU]\d{4}$/i;
-const MAIN_TASK_NAMES = new Set([
-  'STATION_DEPARTURE',
-  'PLATFORM_DOCKING',
-  'OPEN_DOORS',
-  'CLOSE_DOORS',
-  'ACQUIRE_INTERLOCK',
+const EVENT_KINDS = new Set<TimelineEventKind>(['alert']);
+const KIND_SET = new Set<TimelineEventKind>([
+  'enter',
+  'exit',
+  'music',
+  'door_open',
+  'door_close',
+  'signal',
+  'alert',
+  'dispatch',
+  'charging',
+  'wash',
+  'maintenance',
+  'repair',
+  'parking',
 ]);
-const SECONDARY_TASK_NAMES = new Set(['PRE_DEPARTURE_BROADCAST']);
-
-const TASK_LABELS: Record<string, string> = {
-  STATION_DEPARTURE: '發車',
-  PLATFORM_DOCKING: '進站停靠',
-  OPEN_DOORS: '車門開啟',
-  CLOSE_DOORS: '車門關閉',
-  PRE_DEPARTURE_BROADCAST: '播放音樂',
-  ACQUIRE_INTERLOCK: '辨識號誌',
-};
 
 function parseTripScheduleMs(tripCode: string): number | null {
   const m = MAINLINE_TRIP.exec(tripCode.trim());
@@ -91,30 +105,93 @@ function formatDurationHms(ms: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-function resolveRangeMs(detail: ShiftRecordDetail): { startMs: number; endMs: number } {
-  const plannedStart = detail.planned_start ? Number(detail.planned_start) : NaN;
+function parseEpoch(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  // unix 秒（約 1e9）誤當毫秒會變成 1970，時軸會被拉成數十年
+  if (n < 1e11) return Math.round(n * 1000);
+  return Math.round(n);
+}
+
+function actionAtMs(action: ShiftRecordAction): number | null {
+  return parseEpoch(action.actual_start_time) ?? parseEpoch(action.actual_end_time);
+}
+
+/** 與實際動作差超過此時距的計劃／完成時間視為跨日殘值，不納入總時長 */
+const RANGE_ANCHOR_WINDOW_MS = 3 * 60 * 60_000;
+const DEFAULT_LEG_MS = 6 * 60_000;
+const RANGE_PAD_MS = 20_000;
+
+function isNearTrip(candidate: number, anchorMin: number, anchorMax: number): boolean {
+  return (
+    candidate >= anchorMin - RANGE_ANCHOR_WINDOW_MS
+    && candidate <= anchorMax + RANGE_ANCHOR_WINDOW_MS
+  );
+}
+
+function alignClockOnDay(sourceMs: number, dayAnchorMs: number): number {
+  const src = new Date(sourceMs);
+  const aligned = new Date(dayAnchorMs);
+  aligned.setHours(
+    src.getHours(),
+    src.getMinutes(),
+    src.getSeconds(),
+    src.getMilliseconds(),
+  );
+  return aligned.getTime();
+}
+
+function resolveRangeMs(
+  detail: ShiftRecordDetail,
+  actionTimes: number[],
+): { startMs: number; endMs: number; durationMs: number } {
+  const plannedStartRaw = parseEpoch(detail.planned_start);
+  const plannedEndRaw =
+    parseEpoch(detail.planned_end) ?? parseEpoch(detail.payload?.planned_end);
+  const completed = parseEpoch(detail.completed_at);
   const scheduleStart = parseTripScheduleMs(detail.trip_code);
-  const startMs = Number.isFinite(plannedStart)
-    ? plannedStart
-    : scheduleStart ?? Date.now();
 
-  const plannedEnd = detail.payload?.planned_end
-    ? Number(detail.payload.planned_end)
-    : NaN;
-  const defaultLegMs = 6 * 60_000;
-  let endMs = Number.isFinite(plannedEnd)
-    ? plannedEnd
-    : startMs + defaultLegMs;
+  let startMs: number;
+  let endMs: number;
 
-  if (detail.completed_at) {
-    const completed = Number(detail.completed_at);
-    if (Number.isFinite(completed) && completed > startMs) {
+  if (actionTimes.length > 0) {
+    const minT = Math.min(...actionTimes);
+    const maxT = Math.max(...actionTimes);
+    const plannedStart =
+      plannedStartRaw != null ? alignClockOnDay(plannedStartRaw, minT) : null;
+    const plannedEnd =
+      plannedEndRaw != null ? alignClockOnDay(plannedEndRaw, minT) : null;
+    const plannedSpanOk =
+      plannedStart != null
+      && plannedEnd != null
+      && plannedEnd > plannedStart
+      && plannedEnd - plannedStart <= 90 * 60_000;
+
+    if (plannedSpanOk) {
+      startMs = Math.min(plannedStart, minT);
+      endMs = Math.max(plannedEnd, maxT);
+    } else {
+      startMs = minT;
+      endMs = Math.max(maxT, minT + 1_000);
+    }
+    if (completed != null && isNearTrip(completed, startMs, endMs)) {
       endMs = Math.max(endMs, completed);
     }
+  } else {
+    startMs = plannedStartRaw ?? scheduleStart ?? Date.now();
+    endMs =
+      (plannedEndRaw != null && plannedEndRaw > startMs ? plannedEndRaw : null)
+      ?? startMs + DEFAULT_LEG_MS;
   }
 
-  if (endMs <= startMs) endMs = startMs + defaultLegMs;
-  return { startMs, endMs };
+  if (endMs <= startMs) endMs = startMs + DEFAULT_LEG_MS;
+  const durationMs = endMs - startMs;
+  return {
+    startMs: startMs - RANGE_PAD_MS,
+    endMs: endMs + RANGE_PAD_MS,
+    durationMs,
+  };
 }
 
 function routeEndpoints(routeLabel: string, tripCode: string): string {
@@ -135,64 +212,53 @@ function directionLabel(tripCode: string): string {
   return '路線';
 }
 
-function taskLane(taskName: string): 'main' | 'secondary' {
-  if (SECONDARY_TASK_NAMES.has(taskName)) return 'secondary';
-  return 'main';
+function asKind(code: string | null): TimelineEventKind {
+  if (code && KIND_SET.has(code as TimelineEventKind)) return code as TimelineEventKind;
+  return 'generic';
 }
 
-function taskKind(taskName: string): TimelineEventKind {
-  switch (taskName) {
-    case 'STATION_DEPARTURE':
-      return 'depart';
-    case 'OPEN_DOORS':
-      return 'door_open';
-    case 'CLOSE_DOORS':
-      return 'door_close';
-    case 'PLATFORM_DOCKING':
-      return 'dock';
-    case 'PRE_DEPARTURE_BROADCAST':
-      return 'broadcast';
-    case 'ACQUIRE_INTERLOCK':
-      return 'interlock';
-    default:
-      return 'generic';
-  }
+function actionChannel(
+  kind: TimelineEventKind,
+  status: string,
+): 'action' | 'event' {
+  if (EVENT_KINDS.has(kind)) return 'event';
+  if (status === 'FAILED' || status.includes('ALARM')) return 'event';
+  return 'action';
 }
 
-function resolveTaskAtMs(
-  task: Record<string, unknown>,
-  index: number,
-  total: number,
-  startMs: number,
-  endMs: number,
-): number {
-  const start = task.actual_start_time ?? task.actual_end_time;
-  if (start != null && start !== '') {
-    const n = Number(start);
-    if (Number.isFinite(n)) return n;
-  }
-  const span = endMs - startMs;
-  const ratio = total <= 1 ? 0.5 : index / (total - 1);
-  return Math.round(startMs + span * ratio * 0.92 + span * 0.04);
+function stationLabel(action: ShiftRecordAction): string | undefined {
+  const named = String(action.station_display_name ?? '').trim();
+  if (named) return named;
+  const id = String(action.station_id ?? '');
+  if (id.includes('N2W') || id === 'station_1' || id === 'station_2') return 'N2W';
+  if (id.includes('S2W') || id === 'station_5' || id === 'station_6') return 'S2W';
+  if (id.includes('T3') || id === 'station_3' || id === 'station_4') return 'T3';
+  return undefined;
 }
 
-function stationFromDockTask(
-  task: Record<string, unknown>,
-  routeLabel: string,
-  dockIndex: number,
+function eventLabel(
+  action: ShiftRecordAction,
+  visualLabel: string,
+  kind: TimelineEventKind,
+  _station?: string,
 ): string {
-  const params = (task.task_params ?? {}) as Record<string, unknown>;
-  const nodeId = String(params.node_id ?? '');
-  if (nodeId.includes('N2W')) return 'N2W';
-  if (nodeId.includes('S2W')) return 'S2W';
-  if (nodeId.includes('T3')) return 'T3';
-  const stops = routeLabel.split('→').map((s) => s.trim()).filter(Boolean);
-  if (stops.length >= 2) {
-    const mid = stops.slice(1, -1);
-    if (mid[dockIndex]) return mid[dockIndex];
-    return stops[Math.min(dockIndex + 1, stops.length - 1)];
-  }
-  return '站點';
+  const protocol = String(action.action_type ?? '').toUpperCase();
+  if (protocol === 'EMERGENCY_BRAKE') return '緊急剎車';
+  if (kind === 'enter') return '進站';
+  if (kind === 'exit') return '出站';
+  if (kind === 'music') return '播放音樂';
+  if (kind === 'door_open') return '車門開啟';
+  if (kind === 'door_close') return '車門關閉';
+  if (kind === 'signal') return '判斷號誌';
+  if (kind === 'alert') return visualLabel === '告警' ? '告警' : visualLabel;
+  if (kind === 'dispatch') return '發車';
+  return visualLabel || action.action_type;
+}
+
+function stationBarLabel(station: string): string {
+  const name = station.trim();
+  if (!name) return '站點';
+  return name.endsWith('站') ? name : `${name}站`;
 }
 
 function buildStatusSegments(
@@ -201,7 +267,7 @@ function buildStatusSegments(
   endMs: number,
 ): StatusSegment[] {
   const main = events
-    .filter((e) => e.lane === 'main')
+    .filter((e) => e.channel === 'action')
     .sort((a, b) => a.atMs - b.atMs);
 
   if (main.length === 0) {
@@ -223,7 +289,7 @@ function buildStatusSegments(
   for (const ev of main) {
     if (ev.atMs <= cursor) continue;
 
-    if (ev.kind === 'dock') {
+    if (ev.kind === 'enter') {
       if (ev.atMs > cursor) {
         segments.push({
           id: `travel-${segments.length}`,
@@ -233,13 +299,13 @@ function buildStatusSegments(
           tone: 'green',
         });
       }
-      const station = ev.station ?? '站點';
+      const station = stationBarLabel(ev.station ?? '站點');
       const dwellEnd = Math.min(endMs, ev.atMs + 60_000);
       segments.push({
         id: `dock-${dockCount}`,
         fromMs: ev.atMs,
         toMs: dwellEnd,
-        label: `${station}站 停靠中`,
+        label: station,
         tone: 'blue',
       });
       cursor = dwellEnd;
@@ -247,7 +313,7 @@ function buildStatusSegments(
       continue;
     }
 
-    if (ev.kind === 'depart' && ev.atMs > cursor) {
+    if (ev.kind === 'exit' && ev.atMs > cursor) {
       segments.push({
         id: `travel-${segments.length}`,
         fromMs: cursor,
@@ -283,107 +349,85 @@ function punctualityLabel(detail: ShiftRecordDetail): DrivingCapabilityModel['pu
   return '—';
 }
 
+function toTimelineEvent(
+  action: ShiftRecordAction,
+  delayLabel?: string,
+): TimelineEvent | null {
+  const atMs = actionAtMs(action);
+  if (atMs == null) return null;
+
+  const visual = catalogVisualForActionType(action.action_type);
+  const kind = asKind(visual?.code ?? null);
+  if (kind === 'generic') return null;
+  const station = stationLabel(action);
+  const status = String(action.action_status ?? '').toUpperCase();
+  const channel = actionChannel(kind, status);
+  return {
+    id: action.action_id,
+    channel,
+    kind,
+    atMs,
+    label: eventLabel(action, visual?.label ?? action.action_type, kind, station),
+    station,
+    iconUrl: visual?.iconUrl ?? null,
+    actionType: action.action_type,
+    actionStatus: action.action_status,
+    delayLabel: kind === 'signal' ? delayLabel : undefined,
+    description: String(action.note ?? ''),
+  };
+}
+
+function dedupeTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
+  const kept: TimelineEvent[] = [];
+  for (const event of events) {
+    const prev = kept[kept.length - 1];
+    if (
+      prev
+      && prev.channel === event.channel
+      && prev.kind === event.kind
+      && prev.station === event.station
+      && Math.abs(event.atMs - prev.atMs) < 2500
+    ) {
+      continue;
+    }
+    kept.push(event);
+  }
+  return kept;
+}
+
+export function iconUrlForTimelineKind(kind: TimelineEventKind): string | null {
+  return catalogVisualForCode(kind)?.iconUrl ?? null;
+}
+
 export function buildDrivingCapabilityModel(detail: ShiftRecordDetail): DrivingCapabilityModel {
-  const { startMs, endMs } = resolveRangeMs(detail);
-  const durationMs = endMs - startMs;
-  const tasks = [...detail.task_group].sort((a, b) => {
-    const seqA = String(a.task_id ?? '').split('_').pop() ?? '';
-    const seqB = String(b.task_id ?? '').split('_').pop() ?? '';
-    return seqA.localeCompare(seqB);
-  });
+  const timedActions = detail.actions
+    .map((action) => ({ action, atMs: actionAtMs(action) }))
+    .filter((row): row is { action: ShiftRecordAction; atMs: number } => row.atMs != null);
 
-  let dockIdx = 0;
-  const events: TimelineEvent[] = tasks
-    .filter((task) => {
-      const name = String(task.task_name ?? '');
-      return MAIN_TASK_NAMES.has(name) || SECONDARY_TASK_NAMES.has(name);
-    })
-    .map((task, index, arr) => {
-      const taskName = String(task.task_name ?? 'generic');
-      const atMs = resolveTaskAtMs(task, index, arr.length, startMs, endMs);
-      let label = TASK_LABELS[taskName] ?? taskName;
-      if (taskName === 'PLATFORM_DOCKING') {
-        const station = stationFromDockTask(task, detail.route_label, dockIdx);
-        label = `${station}站 停靠`;
-        dockIdx += 1;
-        return {
-          id: String(task.task_id ?? `${taskName}-${index}`),
-          lane: taskLane(taskName),
-          kind: taskKind(taskName),
-          atMs,
-          label,
-          station,
-          accelerated: detail.delay_minutes > 0 && taskLane(taskName) === 'main',
-        };
-      }
-      if (taskName === 'STATION_DEPARTURE' && index === 0) {
-        label = '發車';
-      }
-      return {
-        id: String(task.task_id ?? `${taskName}-${index}`),
-        lane: taskLane(taskName),
-        kind: taskKind(taskName),
-        atMs,
-        label,
-        accelerated: detail.delay_minutes > 0 && taskLane(taskName) === 'main',
-      };
-    });
+  const { startMs, endMs, durationMs } = resolveRangeMs(
+    detail,
+    timedActions.map((row) => row.atMs),
+  );
 
-  if (detail.execution_status === 'faulted') {
-    events.push({
-      id: 'fault-alarm',
-      lane: 'main',
-      kind: 'alarm',
-      atMs: Math.round(startMs + durationMs * 0.7),
-      label: '告警',
-      accelerated: true,
-    });
-  }
-
-  events.sort((a, b) => a.atMs - b.atMs);
-
-  if (events.length === 0) {
-    events.push(
-      {
-        id: 'fallback-depart',
-        lane: 'main',
-        kind: 'depart',
-        atMs: startMs,
-        label: '發車',
-      },
-      {
-        id: 'fallback-broadcast',
-        lane: 'secondary',
-        kind: 'broadcast',
-        atMs: startMs + 55_000,
-        label: '播放音樂',
-      },
-      {
-        id: 'fallback-door-open',
-        lane: 'main',
-        kind: 'door_open',
-        atMs: startMs + 60_000,
-        label: '車門開啟',
-      },
-      {
-        id: 'fallback-door-close',
-        lane: 'main',
-        kind: 'door_close',
-        atMs: startMs + 120_000,
-        label: '車門關閉',
-      },
-    );
-  }
+  const delayLabel =
+    detail.delay_minutes > 0 ? `延誤 +${detail.delay_minutes}分` : undefined;
+  const events = dedupeTimelineEvents(
+    timedActions
+      .map((row) => toTimelineEvent(row.action, delayLabel))
+      .filter((ev): ev is TimelineEvent => ev != null)
+      .sort((a, b) => a.atMs - b.atMs || a.id.localeCompare(b.id)),
+  );
 
   const statusSegments = buildStatusSegments(events, startMs, endMs);
   const punctuality = punctualityLabel(detail);
+  const minutes = Math.max(1, Math.round(durationMs / 60_000));
 
   return {
     tripCode: detail.trip_code,
     routeEndpoints: routeEndpoints(detail.route_label, detail.trip_code),
     directionLabel: directionLabel(detail.trip_code),
-    timeRangeLabel: `${formatHms(startMs)} - ${formatHms(endMs)} | 總時長 ${Math.max(1, Math.round(durationMs / 60_000))} 分鐘`,
-    durationMinutes: Math.max(1, Math.round(durationMs / 60_000)),
+    timeRangeLabel: `${formatHms(startMs + RANGE_PAD_MS)} - ${formatHms(endMs - RANGE_PAD_MS)}`,
+    durationMinutes: minutes,
     plannedDurationHms: formatDurationHms(durationMs),
     actualDurationHms: formatDurationHms(durationMs),
     punctuality,
@@ -399,6 +443,6 @@ export function filterEventsByLane(
   filter: TaskLaneFilter,
 ): TimelineEvent[] {
   if (filter === 'all') return events;
-  if (filter === 'main') return events.filter((e) => e.lane === 'main');
-  return events.filter((e) => e.lane === 'secondary');
+  if (filter === 'action') return events.filter((e) => e.channel === 'action');
+  return events.filter((e) => e.channel === 'event');
 }

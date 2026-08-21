@@ -288,16 +288,31 @@ export class OrderService {
       where: { orderId: id },
       order: { id: 'ASC' },
     });
+    const stations = order.routeId
+      ? await this.orderRouteService.getRouteStations(order.routeId)
+      : [];
+    const stationNameById = new Map(
+      stations.map((s) => [s.stationId, s.stationDisplayName]),
+    );
     const item = toShiftRecordListItem(order);
     const payload = (order.payload ?? {}) as Record<string, unknown>;
+    const toEpoch = (v?: string | null) => {
+      if (v == null || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
     return {
       ...item,
       actions: actions.map((a) => ({
         action_id: a.id,
         station_id: a.stationId,
+        station_display_name: stationNameById.get(a.stationId) || null,
         action_type: a.actionType,
         action_status: a.actionStatus,
         node_id: a.nodeId ?? null,
+        actual_start_time: toEpoch(a.actualStartTime ?? null),
+        actual_end_time: toEpoch(a.actualEndTime ?? null),
+        note: a.note ?? null,
       })),
       task_group: Array.isArray(payload.task_group) ? payload.task_group : [],
       vehicle_phase: payload.vehicle_phase ?? null,

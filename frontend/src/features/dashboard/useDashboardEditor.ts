@@ -14,7 +14,13 @@ import {
 import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import { cloneDemoPlane, DEMO_LAYOUT_SEED } from './constants/demoPlane';
-import { ensureDeploymentDataStatsPanel } from './constants/deploymentPlane';
+import {
+  ensureDeploymentDataStatsPanel,
+  buildVehicleOpsTitlePanel,
+  DEPLOYMENT_PLANE_NAME,
+  DEPLOY_VEHICLE_TITLE_PANEL_ID,
+  DEPLOY_VEHICLE_OPS_GROUP_ID,
+} from './constants/deploymentPlane';
 import {
   applyWidgetFormat,
   canApplyWidgetFormat,
@@ -639,10 +645,36 @@ function migrateMapPlatformVehicleContainer(plane: DashboardPlane): DashboardPla
 }
 
 function migratePlane(plane: DashboardPlane): DashboardPlane {
+  if (plane.id !== 'demo-plane') {
+    // 班表部署管理：若尚未有「載具控制」標題，自動插入一個獨立標題元件，其餘元件與設定 100% 保留
+    if (plane.name === DEPLOYMENT_PLANE_NAME) {
+      const hasTitle = (plane.elements ?? []).some(
+        (e) => e.id === DEPLOY_VEHICLE_TITLE_PANEL_ID || e.label === '載具控制',
+      );
+      if (!hasTitle) {
+        const opsGroup = (plane.elements ?? []).find(
+          (e) => e.id === DEPLOY_VEHICLE_OPS_GROUP_ID || e.label === '載具操作',
+        );
+        const titlePanel = buildVehicleOpsTitlePanel(
+          opsGroup ? opsGroup.x : 24,
+          opsGroup ? Math.max(0, opsGroup.y - 26) : 224,
+        );
+        return {
+          ...plane,
+          elements: [titlePanel, ...(plane.elements ?? []).map(migrateCanvasElement)],
+        };
+      }
+    }
+    // 其餘自訂平面：僅進行畫布元件基礎相容性處理，絕對不覆寫使用者自訂的子元件或版型
+    return {
+      ...plane,
+      elements: (plane.elements ?? []).map(migrateCanvasElement),
+    };
+  }
   const version = (plane as DashboardPlane & { demoLayoutVersion?: number }).demoLayoutVersion ?? 0;
   const legacy = isLegacyVtmsLayout(plane);
   // 僅在版面結構確實損壞或為舊版不可編輯版型時才整包還原；不因版本號或解析度變更覆寫使用者編輯
-  if (plane.id === 'demo-plane' && (legacy || isDemoPlaneBroken(plane))) {
+  if (legacy || isDemoPlaneBroken(plane)) {
     return {
       ...freshDemoPlane(),
       id: plane.id,
@@ -725,13 +757,8 @@ function migratePlane(plane: DashboardPlane): DashboardPlane {
   return next;
 }
 
-let initialPlanesCache: DashboardPlane[] | null = null;
-
 function getInitialPlanes(): DashboardPlane[] {
-  if (!initialPlanesCache) {
-    initialPlanesCache = loadPlanes();
-  }
-  return initialPlanesCache;
+  return loadPlanes();
 }
 
 function loadPlanes(): DashboardPlane[] {
@@ -747,15 +774,12 @@ function loadPlanes(): DashboardPlane[] {
   }
 }
 
-// T2-B: debounce localStorage writes to prevent blocking the main thread
-// during rapid drag/resize events (previously writing ~60x/sec)
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 function savePlanes(planes: DashboardPlane[]) {
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
+  try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(planes));
-    _saveTimer = null;
-  }, 500);
+  } catch (err) {
+    console.error('Failed to save dashboard planes to localStorage:', err);
+  }
 }
 
 export function useDashboardEditor() {
@@ -919,7 +943,7 @@ export function useDashboardEditor() {
     return newPlane;
   }, [recordHistory]);
 
-  const updatePlane = useCallback((id: string, patch: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height'>>) => {
+  const updatePlane = useCallback((id: string, patch: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode'>>) => {
     setPlanes(prev => {
       const next = prev.map(p => p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p);
       savePlanes(next); return next;

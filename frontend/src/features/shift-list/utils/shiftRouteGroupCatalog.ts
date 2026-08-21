@@ -51,6 +51,33 @@ export type ShiftRouteGroupMapOption = {
   displayName: string;
 };
 
+export type ShiftLocationOption = {
+  value: string;
+  label: string;
+};
+
+const TRACK_LOCATION_PREFIX = 'track:';
+
+export function isTrackLocationId(value: string): boolean {
+  return value.startsWith(TRACK_LOCATION_PREFIX);
+}
+
+function collectTrackLocationOptions(areas: MapAreaObject[]): ShiftLocationOption[] {
+  const byId = new Map<string, string>();
+  for (const area of areas) {
+    for (const facility of area.facilities) {
+      if (facility.type !== 'Track') continue;
+      const id = facility.id?.trim();
+      if (!id) continue;
+      const label = facility.customName?.trim() || `軌道 ${id}`;
+      byId.set(`${TRACK_LOCATION_PREFIX}${id}`, label);
+    }
+  }
+  return [...byId.entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant', { numeric: true }));
+}
+
 async function resolveActiveMapId(): Promise<string> {
   const status = await fetchMapLibraryBackendStatus();
   if (status?.activeMapId) {
@@ -159,6 +186,8 @@ export async function loadShiftRouteGroupCatalog(
   firstTripOrigins: MaintenanceFirstTripOrigin[];
   /** 完整拓樸：整備／調度入廠卡要自己尋路，只有 origins 不夠 */
   pointTopology: PointTopology;
+  /** 地圖上全部軌道（派遣站點下拉「軌道」分類） */
+  trackLocations: ShiftLocationOption[];
 }> {
   const preferred = preferredMapId?.trim()
     ? resolveMapId(preferredMapId.trim())
@@ -174,6 +203,7 @@ export async function loadShiftRouteGroupCatalog(
       availableMaps,
       firstTripOrigins: [],
       pointTopology: emptyPointTopology(),
+      trackLocations: [],
     };
   }
 
@@ -243,5 +273,6 @@ export async function loadShiftRouteGroupCatalog(
     availableMaps: mapsWithResolvedName,
     firstTripOrigins,
     pointTopology: topology,
+    trackLocations: collectTrackLocationOptions(parsed.areas),
   };
 }

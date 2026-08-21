@@ -1,6 +1,7 @@
 /**
  * VTMS 儀表板範例 — MQTT 模擬器
  * 發布 v1/vtms/PMS-01〜11/{telemetry|health|operation}/update
+ * 以及 v1/vtms/{vehicle}/door/update、v1/vtms/{psd_id}/psd/update（月台門與車門協議）
  * 需：MQTT broker (1883)、Nest 後端 (3000) 已啟動以轉發 Socket.IO
  *
  * 執行：node scripts/vtms-demo-simulator.js
@@ -11,7 +12,96 @@ const VEHICLES = Array.from({ length: 11 }, (_, i) =>
   `PMS-${String(i + 1).padStart(2, '0')}`,
 );
 
-const TRIP_SEGMENTS = ['station_6', 'station_4', 'station_1', 'D01', 'D12', 'D22', 'D33'];
+const DEMO_PSD_IDS = ['psd-demo-s2w', 'psd-demo-t3', 'psd-demo-n2w'];
+
+const DOOR_LEAF_DEFS = [
+  { door_id: 'RF', label: '右前', lag: 0 },
+  { door_id: 'RR', label: '右後', lag: 0.12 },
+  { door_id: 'LF', label: '左前', lag: 0.24 },
+  { door_id: 'LR', label: '左後', lag: 0.36 },
+];
+
+const lastDoorPct = new Map();
+const lastPsdPct = new Map();
+
+function motionFromPercent(pct, prevPct) {
+  if (pct <= 0.5) return 'CLOSED';
+  if (pct >= 99.5) return 'OPEN';
+  if (typeof prevPct === 'number' && pct + 0.5 < prevPct) return 'CLOSING';
+  return 'OPENING';
+}
+
+function displayStateFrom({ motion, connection, alignment, alarm }) {
+  if (connection === 'OFFLINE') return 'OFFLINE';
+  if (alarm || alignment === 'MISALIGNED') return 'ALIGNMENT_ALARM';
+  if (motion === 'OPENING') return 'OPENING';
+  if (motion === 'CLOSING') return 'CLOSING';
+  if (motion === 'OPEN') return 'OPEN';
+  return 'CLOSED';
+}
+
+function doorCyclePercent(t, idx, actionCode, lag) {
+  const phase = (t / 6 + idx * 0.17 + lag) % 1;
+  if (actionCode === 'door_open') {
+    return Math.round(Math.min(100, Math.max(0, phase * 140)));
+  }
+  if (actionCode === 'door_close') {
+    return Math.round(Math.min(100, Math.max(0, 100 - phase * 140)));
+  }
+  return 0;
+}
+
+function buildDoorUpdate(vehicleCode, t, idx, actionCode, speed) {
+  const prevMap = lastDoorPct.get(vehicleCode) ?? {};
+  const nextPrev = {};
+  const doors = DOOR_LEAF_DEFS.map((def) => {
+    const pct = doorCyclePercent(t, idx, actionCode, def.lag);
+    nextPrev[def.door_id] = pct;
+    const motion = motionFromPercent(pct, prevMap[def.door_id]);
+    return {
+      door_id: def.door_id,
+      label: def.label,
+      open_percent: pct,
+      motion,
+      display_state: displayStateFrom({ motion, connection: 'ONLINE', alarm: false }),
+      locked: pct <= 0.5,
+      anti_pinch: 'OK',
+      alarm: false,
+    };
+  });
+  lastDoorPct.set(vehicleCode, nextPrev);
+  return {
+    vehicle_code: vehicleCode,
+    timestamp: Date.now(),
+    connection: 'ONLINE',
+    speed_kmh: Math.round(speed * 10) / 10,
+    doors,
+  };
+}
+
+function buildPsdUpdate(psdId, openPercent) {
+  const pct = Math.max(0, Math.min(100, Math.round(openPercent)));
+  const prev = lastPsdPct.get(psdId);
+  lastPsdPct.set(psdId, pct);
+  const motion = motionFromPercent(pct, prev);
+  return {
+    psd_id: psdId,
+    timestamp: Date.now(),
+    open_percent: pct,
+    motion,
+    display_state: displayStateFrom({
+      motion,
+      connection: 'ONLINE',
+      alignment: 'ALIGNED',
+      alarm: false,
+    }),
+    alignment: 'ALIGNED',
+    connection: 'ONLINE',
+    locked: pct <= 0.5,
+    anti_pinch: 'OK',
+    alarm: false,
+  };
+}
 
 /** 作動行為輪播（對應 dashboard operation_action / 圖示庫） */
 const OPERATION_ACTIONS = [
@@ -178,6 +268,26 @@ async function main() {
               Math.round(m.segmentRemainPct),
             ),
           ),
+        );
+        client.publish(
+          `v1/vtms/${vid}/door/update`,
+          JSON.stringify(buildDoorUpdate(vid, t, idx, action, speed)),
+          { retain: true },
+        );
+      });
+
+      DEMO_PSD_IDS.forEach((psdId, psdIdx) => {
+        const lead = VEHICLES[psdIdx] ? (psdIdx % VEHICLES.length) : 0;
+        const leadAction =
+          OPERATION_ACTIONS[(lead + Math.floor(t / 6)) % OPERATION_ACTIONS.length];
+        const pct =
+          leadAction === 'door_open' || leadAction === 'door_close'
+            ? doorCyclePercent(t, lead, leadAction === 'door_close' ? 'door_close' : 'door_open', 0)
+            : 0;
+        client.publish(
+          `v1/vtms/${psdId}/psd/update`,
+          JSON.stringify(buildPsdUpdate(psdId, pct)),
+          { retain: true },
         );
       });
     }, 500);

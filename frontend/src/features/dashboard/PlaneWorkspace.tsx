@@ -111,10 +111,18 @@ export function PlaneWorkspace({
     const measure = () => {
       const { width, height } = el.getBoundingClientRect();
       if (width < 8 || height < 8) return;
-      const sx = (width - 48) / plane.width;
-      const sy = (height - 48) / plane.height;
-      if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
-      setFitScale(Math.max(0.05, Math.min(sx, sy, 1)));
+      const isFitWidth = plane.viewportMode === 'fit-width';
+      if (!isEditMode && isFitWidth) {
+        const sx = width / plane.width;
+        if (!Number.isFinite(sx)) return;
+        setFitScale(Math.max(0.05, sx));
+      } else {
+        const pad = isEditMode ? 48 : 0;
+        const sx = (width - pad) / plane.width;
+        const sy = (height - pad) / plane.height;
+        if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+        setFitScale(isEditMode ? Math.max(0.05, Math.min(sx, sy, 1)) : Math.max(0.05, Math.min(sx, sy)));
+      }
     };
 
     measure();
@@ -152,7 +160,7 @@ export function PlaneWorkspace({
       io?.disconnect();
       window.removeEventListener('resize', onWindowResize);
     };
-  }, [plane.width, plane.height]);
+  }, [plane.width, plane.height, plane.viewportMode, isEditMode]);
 
   /** 切換平面：還原鎖定縮放，否則重置；平移每次歸零（鎖定仍可再拖） */
   useEffect(() => {
@@ -410,10 +418,13 @@ export function PlaneWorkspace({
     }
   }, [isEditMode, totalScale, onAddCanvas]);
 
+  const isFitWidth = plane.viewportMode === 'fit-width';
+  const isRuntimeFitWidth = !isEditMode && isFitWidth;
+
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden flex items-center justify-center relative workspace-bg"
+      className={`flex-1 relative workspace-bg ${isRuntimeFitWidth ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden flex items-center justify-center'}`}
       style={{ 
         background: '#0a0f1a',
         cursor: painterActive
@@ -428,7 +439,7 @@ export function PlaneWorkspace({
     >
       {/* 縮放與平移控制（鎖定後固定 scale，仍可平移） */}
       <div
-        style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 200,
+        style={{ position: isRuntimeFitWidth ? 'fixed' : 'absolute', bottom: 16, right: 16, zIndex: 200,
                  display: 'flex', alignItems: 'center', gap: 6,
                  background: 'rgba(15,22,35,0.9)', border: '1px solid rgba(255,255,255,0.1)',
                  borderRadius: 10, padding: '6px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
@@ -481,19 +492,30 @@ export function PlaneWorkspace({
         </button>
       </div>
 
-      {/* 平面容器（刻度尺僅編輯模式） */}
+      {/* 平面容器（刻度尺僅編輯模式；自適應模式使用頂端對齊撐滿寬度） */}
       <div
         style={{
-          width: plane.width,
-          height: plane.height,
-          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${totalScale})`,
-          transformOrigin: 'center center',
-          position: 'relative',
+          width: isRuntimeFitWidth ? '100%' : undefined,
+          height: isRuntimeFitWidth ? Math.ceil(plane.height * totalScale) : undefined,
+          position: isRuntimeFitWidth ? 'relative' : undefined,
+          overflow: isRuntimeFitWidth ? 'hidden' : undefined,
           flexShrink: 0,
-          paddingTop: isEditMode ? 20 : 0,
-          paddingLeft: isEditMode ? 20 : 0,
         }}
       >
+        <div
+          style={{
+            width: plane.width,
+            height: plane.height,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${totalScale})`,
+            transformOrigin: isRuntimeFitWidth ? 'top left' : 'center center',
+            position: isRuntimeFitWidth ? 'absolute' : 'relative',
+            left: isRuntimeFitWidth ? 0 : undefined,
+            top: isRuntimeFitWidth ? 0 : undefined,
+            flexShrink: 0,
+            paddingTop: isEditMode ? 20 : 0,
+            paddingLeft: isEditMode ? 20 : 0,
+          }}
+        >
         {isEditMode ? (
           <>
             {/* 頂部刻度 */}
@@ -834,6 +856,7 @@ export function PlaneWorkspace({
           />
           );
         })}
+      </div>
       </div>
       </div>
     </div>

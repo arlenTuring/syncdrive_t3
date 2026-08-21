@@ -2,11 +2,30 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RedisService } from '../redis/redis.service';
 import { VTMS_VEHICLE_CODES } from '../common/vehicle-codes';
+import { VehicleService } from './vehicle.service';
 
 @ApiTags('vehicles')
 @Controller('syncdrive-api/vehicles')
 export class VehicleController {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly vehicleService: VehicleService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: '列出資料庫中啟用中的註冊車輛' })
+  async list() {
+    const items = await this.vehicleService.listActive();
+    return {
+      count: items.length,
+      items: items.map((item) => ({
+        id: item.id,
+        vehicle_code: item.vehicleCode,
+        display_name: item.displayName,
+        is_active: item.isActive,
+      })),
+    };
+  }
 
   /**
    * 規格書 §即時資料顯示介面

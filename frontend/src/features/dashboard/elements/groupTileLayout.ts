@@ -125,7 +125,10 @@ export function computeGroupTileLayout(
       element.groupTileAlign === 'center'
         ? Math.max(padX, (canvasW - tilesW) / 2)
         : padX;
-    const padYResolved = Math.max(padY, (canvasH - tilesH) / 2);
+    const padYResolved =
+      element.groupTileAlign === 'center'
+        ? Math.max(padY, (canvasH - tilesH) / 2)
+        : padY;
     return {
       fit: 'fixed',
       tileWidth: designW,

@@ -59,6 +59,12 @@ type MapAreaCanvasProps = {
    * 容器與地圖 pixelSize 相同時為 1:1。
    */
   displayMode?: MapAreaCanvasDisplayMode
+  /**
+   * 滾輪縮放（僅非 embedded）：
+   * - pinch：觸控板捏合／Ctrl+滾輪（預設）
+   * - wheel：一般滾輪／觸控板捲動皆可縮放
+   */
+  wheelZoomMode?: 'pinch' | 'wheel'
   /** 即時車輛位置補間毫秒；連續播放給 1200，暫停／逐幀請給 0（瞬間定位）。未傳則依 isEmbedded 預設。 */
   livePositionTweenMs?: number
   /** 1 = 最放大，7 = 一屏看全圖；未傳則使用內建 state（預設 7） */
@@ -190,6 +196,7 @@ export function MapAreaCanvas({
   readOnly = false,
   editMode = false,
   displayMode = 'editor',
+  wheelZoomMode = 'pinch',
   livePositionTweenMs: livePositionTweenMsProp,
   zoomLevel: zoomLevelProp,
   onZoomLevelChange: onZoomLevelChangeProp,
@@ -555,13 +562,15 @@ export function MapAreaCanvas({
     if (!vp) return
     const onWheel = (e: WheelEvent) => {
       if (inCropMode) return
-      if (!isCanvasZoomWheelEvent(e)) return
+      const allow =
+        wheelZoomMode === 'wheel' || isCanvasZoomWheelEvent(e)
+      if (!allow) return
       e.preventDefault()
       applyWheelZoom(e.clientX, e.clientY, e.deltaY)
     }
     vp.addEventListener('wheel', onWheel, { passive: false })
     return () => vp.removeEventListener('wheel', onWheel)
-  }, [viewportRef, applyWheelZoom, inCropMode, isEmbedded])
+  }, [viewportRef, applyWheelZoom, inCropMode, isEmbedded, wheelZoomMode])
 
   return (
     <div
@@ -575,6 +584,13 @@ export function MapAreaCanvas({
       onMouseDown={(e) => {
         if (inCropMode) return
         const t = e.target as HTMLElement
+        // Portal 工具列掛在 body，但需避免被當成點擊畫布空白
+        if (
+          t.closest('[data-facility-toolbar]') ||
+          t.closest('[data-geofence-toolbar]')
+        ) {
+          return
+        }
         if (
           t.closest('[data-map-crop-edge]') ||
           t.closest('[data-map-crop-corner]') ||

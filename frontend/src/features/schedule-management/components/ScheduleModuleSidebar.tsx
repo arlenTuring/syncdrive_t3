@@ -1,9 +1,11 @@
 import {
   Activity,
+  AlertTriangle,
   CalendarDays,
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  DoorOpen,
   FileText,
   Headphones,
   LayoutDashboard,
@@ -12,15 +14,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
+  Pentagon,
   Plus,
   Route,
+  Send,
   Settings,
   Trash2,
   Wrench,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ShellView } from '../types';
-import { SIDEBAR_MODULE_GROUPS } from '../types';
+import { isOperationsView, SIDEBAR_MODULE_GROUPS } from '../types';
 import type { ModuleDashboardPage } from '../utils/moduleDashboardPages';
 import {
   moduleDashboardViewId,
@@ -42,6 +46,11 @@ type ScheduleModuleSidebarProps = {
 };
 
 const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
+  'shift-deployment': Activity,
+  'degraded-operation': AlertTriangle,
+  'dispatch-scheduling': Send,
+  'psd-control': DoorOpen,
+  'virtual-fence': Pentagon,
   'shift-records': ClipboardList,
   'time-templates': FileText,
   'shift-list': List,
@@ -54,7 +63,8 @@ function groupIcon(groupId: string) {
   if (groupId === 'monitor') return Activity;
   if (groupId === 'vehicle') return Route;
   if (groupId === 'site') return Map;
-  if (groupId === 'operations' || groupId === 'service' || groupId === 'media') {
+  if (groupId === 'operations') return Activity;
+  if (groupId === 'service' || groupId === 'media') {
     return LayoutDashboard;
   }
   return LayoutDashboard;
@@ -63,6 +73,7 @@ function groupIcon(groupId: string) {
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return activeView === 'map';
   if (groupId === 'vehicle') return activeView === 'trajectory';
+  if (groupId === 'operations') return isOperationsView(activeView);
   if (groupId === 'schedule') {
     return (
       activeView === 'shift-records'
@@ -115,6 +126,7 @@ export function ScheduleModuleSidebar({
 }: ScheduleModuleSidebarProps) {
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    operations: true,
     schedule: true,
     vehicle: true,
   });
@@ -147,6 +159,9 @@ export function ScheduleModuleSidebar({
   }, [collapsed]);
 
   useEffect(() => {
+    if (isOperationsView(activeView)) {
+      setExpanded((prev) => ({ ...prev, operations: true }));
+    }
     if (
       activeView === 'shift-records'
       || activeView === 'time-templates'

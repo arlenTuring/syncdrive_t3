@@ -62,6 +62,18 @@ const TOTAL_DURATION_MS = 60 * 60 * 1000;
 const MQTT_OPTS_TELEMETRY = { retain: false };
 const MQTT_OPTS_OPERATION = { retain: true };
 const MQTT_OPTS_HEALTH = { retain: true };
+const MQTT_OPTS_DOOR = { retain: true };
+
+const DOOR_LEAF_DEFS = [
+  { motionKey: 'door_fr_open_percent', door_id: 'RF', label: '右前' },
+  { motionKey: 'door_rr_open_percent', door_id: 'RR', label: '右後' },
+  { motionKey: 'door_fl_open_percent', door_id: 'LF', label: '左前' },
+  { motionKey: 'door_rl_open_percent', door_id: 'LR', label: '左後' },
+];
+
+/** 車門／月台門開度上次值，用來判斷 OPENING vs CLOSING */
+const lastDoorPercentByVehicle = new Map();
+const lastPsdPercentById = new Map();
 
 /** 每車上次 MQTT 發布時之模擬經過毫秒（非 managed 模式） */
 const lastMqttPublishVirtualMsByVehicle = new Map();
@@ -264,6 +276,82 @@ function resolveDoorFields(motion) {
       : Math.max(...keys.map((k) => out[k]));
   out.door_open_percent = Math.max(0, Math.min(100, aggregate));
   return out;
+}
+
+function motionFromPercent(pct, prevPct) {
+  if (pct <= 0.5) return 'CLOSED';
+  if (pct >= 99.5) return 'OPEN';
+  if (typeof prevPct === 'number' && pct + 0.5 < prevPct) return 'CLOSING';
+  return 'OPENING';
+}
+
+function displayStateFrom({ motion, connection, alignment, alarm }) {
+  if (connection === 'OFFLINE') return 'OFFLINE';
+  if (alarm || alignment === 'MISALIGNED') return 'ALIGNMENT_ALARM';
+  if (motion === 'OPENING') return 'OPENING';
+  if (motion === 'CLOSING') return 'CLOSING';
+  if (motion === 'OPEN') return 'OPEN';
+  return 'CLOSED';
+}
+
+function buildDoorUpdatePayload(vehicleCode, motion, speedKmh) {
+  const fields = resolveDoorFields(motion);
+  const prevMap = lastDoorPercentByVehicle.get(vehicleCode) ?? {};
+  const nextPrev = {};
+  const doors = DOOR_LEAF_DEFS.map((def) => {
+    const pct = Math.round(fields[def.motionKey] ?? 0);
+    nextPrev[def.door_id] = pct;
+    const motion = motionFromPercent(pct, prevMap[def.door_id]);
+    return {
+      door_id: def.door_id,
+      label: def.label,
+      open_percent: pct,
+      motion,
+      display_state: displayStateFrom({ motion, connection: 'ONLINE', alarm: false }),
+      locked: pct <= 0.5,
+      anti_pinch: 'OK',
+      alarm: false,
+    };
+  });
+  lastDoorPercentByVehicle.set(vehicleCode, nextPrev);
+  return {
+    vehicle_code: vehicleCode,
+    timestamp: Date.now(),
+    connection: 'ONLINE',
+    speed_kmh: Math.round((Number.isFinite(speedKmh) ? speedKmh : 0) * 10) / 10,
+    doors,
+  };
+}
+
+function psdIdFromEntityId(entityId) {
+  const s = String(entityId ?? '');
+  if (s.startsWith('syncdrive/Gate/')) return s.slice('syncdrive/Gate/'.length);
+  if (s.startsWith('Gate/')) return s.slice('Gate/'.length);
+  return s.replace(/^syncdrive\//, '').replace(/\//g, '-');
+}
+
+function buildPsdUpdatePayload(psdId, openPercent) {
+  const pct = Math.max(0, Math.min(100, Math.round(openPercent)));
+  const prev = lastPsdPercentById.get(psdId);
+  lastPsdPercentById.set(psdId, pct);
+  const motion = motionFromPercent(pct, prev);
+  return {
+    psd_id: psdId,
+    timestamp: Date.now(),
+    open_percent: pct,
+    motion,
+    display_state: displayStateFrom({
+      motion,
+      connection: 'ONLINE',
+      alignment: 'ALIGNED',
+      alarm: false,
+    }),
+    alignment: 'ALIGNED',
+    connection: 'ONLINE',
+    locked: pct <= 0.5,
+    anti_pinch: 'OK',
+    alarm: false,
+  };
 }
 
 function demoOrderId(tripCode, departMs) {
@@ -606,6 +694,11 @@ function publishVehicleMqtt(
         JSON.stringify(telemetry(vehicleId, motion, speed, battery, virtualElapsedMs, simStartMs)),
         MQTT_OPTS_TELEMETRY,
       );
+      client.publish(
+        `v1/vtms/${vehicleId}/door/update`,
+        JSON.stringify(buildDoorUpdatePayload(vehicleId, motion, speed)),
+        MQTT_OPTS_DOOR,
+      );
     }
     if (shouldPublishManagedKind(vehicleId, 'health', virtualElapsedMs, { force })) {
       client.publish(
@@ -620,6 +713,11 @@ function publishVehicleMqtt(
       `v1/vtms/${vehicleId}/telemetry/update`,
       JSON.stringify(telemetry(vehicleId, motion, speed, battery, virtualElapsedMs, simStartMs)),
       MQTT_OPTS_TELEMETRY,
+    );
+    client.publish(
+      `v1/vtms/${vehicleId}/door/update`,
+      JSON.stringify(buildDoorUpdatePayload(vehicleId, motion, speed)),
+      MQTT_OPTS_DOOR,
     );
     client.publish(
       `v1/vtms/${vehicleId}/health/heartbeat`,
@@ -783,13 +881,21 @@ function publishFleet(client, elapsedMs, simStartMs, publishOpts = {}) {
   ]);
   for (const entityId of allPsdIds) {
     const pct = psdByEntityId.get(entityId) ?? 0;
-    const topic = entityId.startsWith('syncdrive/') ? entityId : `syncdrive/${entityId}`;
-    publishJsonIfChanged(client, topic, {
+    const legacyTopic = entityId.startsWith('syncdrive/') ? entityId : `syncdrive/${entityId}`;
+    publishJsonIfChanged(client, legacyTopic, {
       openPercent: pct,
       state: pct >= 99.5 ? 'Open' : pct <= 0.5 ? 'Closed' : 'Moving',
       alarm: false,
       timestamp: Date.now(),
     });
+    const psdId = psdIdFromEntityId(entityId);
+    if (psdId) {
+      publishJsonIfChanged(
+        client,
+        `v1/vtms/${psdId}/psd/update`,
+        buildPsdUpdatePayload(psdId, pct),
+      );
+    }
   }
 
   // 號誌：預設紅燈；車輛停等 5s 後綠燈；通過後恢復紅燈

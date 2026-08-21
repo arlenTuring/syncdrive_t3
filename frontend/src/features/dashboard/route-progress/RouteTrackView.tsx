@@ -5,6 +5,10 @@ const LINE_H = 2;
 const VEHICLE_SIZE = 10;
 const STATION_LABEL_FS = 14;
 
+function stationLabelFontSize(widget: RouteProgressWidget): number {
+  return widget.fontSize ?? STATION_LABEL_FS;
+}
+
 function currentStationIndex(
   stations: RouteStation[],
   minVal: number,
@@ -131,7 +135,7 @@ export function RouteTrackView({
               <div
                 className="absolute top-full mt-1 max-w-[80px] truncate whitespace-nowrap"
                 style={{
-                  fontSize: STATION_LABEL_FS,
+                  fontSize: stationLabelFontSize(widget),
                   fontWeight: 400,
                   letterSpacing: '0.5px',
                   color: labelColor,
@@ -160,7 +164,7 @@ export function RouteTrackView({
             vehicleSize={VEHICLE_SIZE}
             actionIconUrl={actionIconUrl}
             labelColor={isPending ? '#99A1AF' : widget.activeColor}
-            labelFontSize={STATION_LABEL_FS}
+            labelFontSize={stationLabelFontSize(widget)}
             showGlow={false}
             vehicleStyle={{ borderRadius: 4, opacity: isPending ? 0.85 : 1 }}
           />

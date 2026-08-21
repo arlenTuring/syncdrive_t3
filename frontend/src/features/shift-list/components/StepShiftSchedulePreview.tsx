@@ -52,6 +52,7 @@ import {
 } from '../utils/actionFacilityOptions';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
+import { ScheduleTimeZoomToolbar } from './ScheduleTimeZoomToolbar';
 
 type PreviewTab = 'schedule' | 'capacity';
 
@@ -62,6 +63,8 @@ type StepShiftSchedulePreviewProps = {
   onNavigateToStep?: (step: CreateShiftScheduleStep) => void;
   /** 清單唯讀結果：隱藏引導文案 */
   resultView?: boolean;
+  /** 僅顯示第七步班次／運能預覽板（供班表調整申請等嵌入） */
+  previewBoardOnly?: boolean;
 };
 
 function formatSeconds(seconds: number | null | undefined): string {
@@ -150,29 +153,39 @@ function ReviewSection({
   step,
   title,
   onNavigate,
+  unstyled = false,
   children,
 }: {
   step: CreateShiftScheduleStep;
   title: string;
   onNavigate?: (step: CreateShiftScheduleStep) => void;
+  unstyled?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-zinc-800/80 bg-[#0c0c0e] px-5 py-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
-        {onNavigate ? (
-          <button
-            type="button"
-            onClick={() => onNavigate(step)}
-            title={`前往${title}`}
-            aria-label={`前往${title}`}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-[#2B7FFF] transition hover:bg-[rgba(43,127,255,0.12)]"
-          >
-            <Pencil className="size-4" strokeWidth={2} />
-          </button>
-        ) : null}
-      </div>
+    <section
+      className={
+        unstyled
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'rounded-xl border border-zinc-800/80 bg-[#0c0c0e] px-5 py-4'
+      }
+    >
+      {title ? (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+          {onNavigate ? (
+            <button
+              type="button"
+              onClick={() => onNavigate(step)}
+              title={`前往${title}`}
+              aria-label={`前往${title}`}
+              className="inline-flex size-8 items-center justify-center rounded-lg text-[#2B7FFF] transition hover:bg-[rgba(43,127,255,0.12)]"
+            >
+              <Pencil className="size-4" strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {children}
     </section>
   );
@@ -431,9 +444,11 @@ export function StepShiftSchedulePreview({
   turnaroundLimitSeconds = null,
   onNavigateToStep,
   resultView = false,
+  previewBoardOnly = false,
 }: StepShiftSchedulePreviewProps) {
   const output = draft.scheduleOutput;
   const [activeTab, setActiveTab] = useState<PreviewTab>('schedule');
+  const [gridZoom, setGridZoom] = useState(1);
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
@@ -557,13 +572,15 @@ export function StepShiftSchedulePreview({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {!resultView ? (
+      {!previewBoardOnly && !resultView ? (
         <h2 className="mb-5 shrink-0 text-base font-medium text-zinc-100">
           確認班表細節並完成建立
         </h2>
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {!previewBoardOnly ? (
+        <>
         <ReviewSection step={1} title="基本資料" onNavigate={onNavigateToStep}>
           <MetaGrid
             items={[
@@ -733,8 +750,15 @@ export function StepShiftSchedulePreview({
               </div>
             )}
           </ReviewSection>
+        </>
+        ) : null}
 
-        <ReviewSection step={6} title="調整班表" onNavigate={onNavigateToStep}>
+        <ReviewSection
+          step={6}
+          title={previewBoardOnly ? '' : '調整班表'}
+          onNavigate={previewBoardOnly ? undefined : onNavigateToStep}
+          unstyled={previewBoardOnly}
+        >
           {!output ? (
             <PanelNoData
               message="尚無班表產出，請先回到「調整班表」重新生成"
@@ -765,8 +789,8 @@ export function StepShiftSchedulePreview({
                 </div>
               )}
 
-              <div className="mb-3 flex shrink-0 flex-wrap items-center gap-4">
-                <div className="flex items-center gap-5 border-b border-zinc-800/80">
+              <div className="mb-3 flex shrink-0 items-center gap-4">
+                <div className="flex shrink-0 items-center gap-5 border-b border-zinc-800/80">
                   <button
                     type="button"
                     onClick={() => setActiveTab('schedule')}
@@ -797,13 +821,20 @@ export function StepShiftSchedulePreview({
                   </button>
                 </div>
 
-                {periodLegends.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-2 pb-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 pb-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
                     {periodLegends.map((item) => (
                       <AttributeLegendBadgeChip key={item.attributeId} item={item} />
                     ))}
                   </div>
-                ) : null}
+                  {activeTab === 'schedule' ? (
+                    <ScheduleTimeZoomToolbar
+                      zoom={gridZoom}
+                      onChange={setGridZoom}
+                      standalone
+                    />
+                  ) : null}
+                </div>
               </div>
 
               {/* 保持掛載以免切換運能趨勢後橫移位置被重置 */}
@@ -822,6 +853,7 @@ export function StepShiftSchedulePreview({
                     selectedRoutes={draft.routeGroups.selectedRoutes}
                     minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
                     hideStrategyBuffers={draft.creationMode === 'manual'}
+                    zoom={gridZoom}
                   />
                 ) : (
                   <PanelNoData message="班表產出缺少班次資料" className="min-h-[240px]" />

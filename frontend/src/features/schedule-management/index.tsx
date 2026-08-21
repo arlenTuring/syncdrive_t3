@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ClipboardList,
+  DoorOpen,
   FileText,
   LayoutDashboard,
   List,
   Map,
+  Pentagon,
   Route,
+  Send,
   Wrench,
+  Activity,
 } from 'lucide-react';
 import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
 import DashboardEditor from '../dashboard';
@@ -15,6 +19,10 @@ import ShiftRecordsApp from '../shift-records';
 import TimeTemplatesApp from '../time-templates';
 import MaintenanceTasksApp from '../maintenance-tasks';
 import ShiftListApp from '../shift-list';
+import ShiftDeploymentApp from '../shift-deployment';
+import DispatchSchedulingApp from '../dispatch-scheduling';
+import PsdControlApp from '../psd-control';
+import VirtualFenceManagementApp from '../virtual-fence-management';
 import type { ShellView } from './types';
 import { SIDEBAR_MODULE_GROUPS } from './types';
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
@@ -25,6 +33,7 @@ import {
   readAdminModePreference,
   writeAdminModePreference,
 } from './utils/adminModePreference';
+import { useSupervisorApprovalPreference } from './utils/supervisorApprovalPreference';
 import {
   createModuleDashboardPageId,
   moduleDashboardViewId,
@@ -57,6 +66,30 @@ function resolveWorkspaceChrome(
     return {
       title: page?.label ? `${moduleLabel} · ${page.label}` : moduleLabel,
       icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
+    };
+  }
+  if (view === 'shift-deployment') {
+    return {
+      title: '班表部署管理',
+      icon: <Activity className="size-4 text-sky-400" aria-hidden />,
+    };
+  }
+  if (view === 'dispatch-scheduling') {
+    return {
+      title: '派遣調度管理',
+      icon: <Send className="size-4 text-sky-400" aria-hidden />,
+    };
+  }
+  if (view === 'psd-control') {
+    return {
+      title: '車門月台控制',
+      icon: <DoorOpen className="size-4 text-sky-400" aria-hidden />,
+    };
+  }
+  if (view === 'virtual-fence') {
+    return {
+      title: '虛擬圍籬管理',
+      icon: <Pentagon className="size-4 text-sky-400" aria-hidden />,
     };
   }
   if (view === 'dashboard') {
@@ -109,6 +142,7 @@ export default function ScheduleManagementApp({
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
   const [trajectoryMounted, setTrajectoryMounted] = useState(initialView === 'trajectory');
   const [adminMode, setAdminMode] = useState(readAdminModePreference);
+  const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
 
@@ -139,6 +173,8 @@ export default function ScheduleManagementApp({
   const frameProps = {
     adminMode,
     onAdminModeChange: setAdminMode,
+    supervisorApproval,
+    onSupervisorApprovalChange: setSupervisorApproval,
   };
 
   const scheduleContent = (
@@ -181,6 +217,38 @@ export default function ScheduleManagementApp({
           </ShellWorkspaceFrame>
         ) : null}
 
+        {view === 'shift-deployment' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="班表部署管理載入失敗">
+              <ShiftDeploymentApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'dispatch-scheduling' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="派遣調度管理載入失敗">
+              <DispatchSchedulingApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'psd-control' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="車門月台控制載入失敗">
+              <PsdControlApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'virtual-fence' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="虛擬圍籬管理載入失敗">
+              <VirtualFenceManagementApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
         {view === 'dashboard' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
             <DashboardEditor />
@@ -198,8 +266,9 @@ export default function ScheduleManagementApp({
 
         {mapMounted ? (
           <div
-            className="absolute inset-0 flex min-h-0 flex-col"
-            style={{ display: view === 'map' ? 'flex' : 'none' }}
+            className={`absolute inset-0 z-20 flex min-h-0 flex-col ${
+              view === 'map' ? '' : 'pointer-events-none hidden'
+            }`}
           >
             <ShellWorkspaceFrame
               title="場域管理模組"
@@ -216,8 +285,9 @@ export default function ScheduleManagementApp({
 
         {trajectoryMounted ? (
           <div
-            className="absolute inset-0 flex min-h-0 flex-col"
-            style={{ display: view === 'trajectory' ? 'flex' : 'none' }}
+            className={`absolute inset-0 z-20 flex min-h-0 flex-col ${
+              view === 'trajectory' ? '' : 'pointer-events-none hidden'
+            }`}
           >
             <ShellWorkspaceFrame
               title="載具管理模組"

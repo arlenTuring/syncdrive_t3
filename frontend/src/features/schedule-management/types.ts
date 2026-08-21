@@ -1,5 +1,10 @@
 export type ShellView =
   | 'dashboard'
+  | 'shift-deployment'
+  | 'degraded-operation'
+  | 'dispatch-scheduling'
+  | 'psd-control'
+  | 'virtual-fence'
   | 'shift-records'
   | 'time-templates'
   | 'shift-list'
@@ -21,6 +26,18 @@ export type ScheduleSubView =
   | 'maintenance-tasks';
 
 export type ScheduleNavItem = ShellNavItem;
+
+export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'shift-deployment', label: '班表部署管理', enabled: true },
+  { id: 'degraded-operation', label: '降級運轉管理', enabled: false },
+  { id: 'dispatch-scheduling', label: '派遣調度管理', enabled: true },
+  { id: 'psd-control', label: '車門月台控制', enabled: true },
+  { id: 'virtual-fence', label: '虛擬圍籬管理', enabled: true },
+];
+
+export function isOperationsView(view: string): boolean {
+  return OPERATIONS_NAV_ITEMS.some((item) => item.id === view);
+}
 
 export const SCHEDULE_NAV_ITEMS: ShellNavItem[] = [
   { id: 'shift-records', label: '班次運行紀錄', enabled: true },
@@ -50,7 +67,6 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   {
     id: 'monitor',
     label: '數據監控模組',
-    /** 儀表板編輯器已移至側欄底部「儀表板管理」；此模組先留空待班表部署等工具 */
     enabled: false,
   },
   {
@@ -59,7 +75,12 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
     enabled: true,
     items: SCHEDULE_NAV_ITEMS,
   },
-  { id: 'operations', label: '營運管理模組', enabled: false },
+  {
+    id: 'operations',
+    label: '營運管理模組',
+    enabled: true,
+    items: OPERATIONS_NAV_ITEMS,
+  },
   {
     id: 'vehicle',
     label: '載具管理模組',

@@ -34,6 +34,7 @@ export const DEPLOY_DATA_STATS_PANEL_ID = 'deploy-data-stats-panel';
 export const DEPLOY_EXECUTING_SCHEDULE_PANEL_ID = 'deploy-executing-schedule-panel';
 export const DEPLOY_MAJOR_EVENTS_PANEL_ID = 'deploy-major-events-panel';
 export const DEPLOY_VEHICLE_PHOTO_PANEL_ID = 'deploy-vehicle-photo-panel';
+export const DEPLOY_VEHICLE_TITLE_PANEL_ID = 'deploy-vehicle-title-panel';
 export const DEPLOY_VEHICLE_OPS_GROUP_ID   = 'deploy-vehicle-ops-group';
 export const DEPLOY_SHIFT_LIST_PANEL_ID    = 'deploy-shift-list-panel';
 
@@ -928,6 +929,33 @@ function buildVehicleCardTemplate(
 }
 
 /**
+ * 載具控制區塊標題（方式一：獨立文字標題）
+ */
+export function buildVehicleOpsTitlePanel(
+  x = OPS_X,
+  y = ROW2_Y - 26,
+): CanvasElementProps {
+  return {
+    id: DEPLOY_VEHICLE_TITLE_PANEL_ID,
+    type: 'canvas',
+    x,
+    y: Math.max(0, y),
+    width: 200,
+    height: 24,
+    label: '載具控制',
+    backgroundColor: 'transparent',
+    backgroundImage: '',
+    opacity: 100,
+    children: [
+      staticText(0, 0, 200, 24, '載具控制', 14, '#A1A1AA', 'bold', 'left', {
+        verticalAlign: 'center',
+        backgroundColor: 'transparent',
+      }),
+    ],
+  };
+}
+
+/**
  * 載具操作畫布群組：
  * - isGroup = true，每列資料 = 一台載具
  * - 子範本 = buildVehicleCardTemplate（5 個現有元件組合）
@@ -947,6 +975,8 @@ export function buildVehicleOpsGroup(
     width: OPS_W,
     height: OPS_H,
     label: '載具操作',
+    headerTitle: '載具控制',
+    headerTitleFontSize: 14,
     backgroundColor: 'transparent',
     backgroundImage: '',
     opacity: 100,
@@ -978,25 +1008,131 @@ export function buildVehicleOpsGroup(
 
 /** 班次清單全寬卡（第三列，使用全新 TabListWidget） */
 function buildShiftListPanel(): CanvasElementProps {
-  const tabListWidget = createWidget('tab-list', 0, 0) as TabListWidget;
-  tabListWidget.id = 'shift-list-main';
-  tabListWidget.width = ROW3_W;
-  tabListWidget.height = ROW3_H;
-  tabListWidget.dataSourceId = DS;
-  tabListWidget.currentScheduleSqlQuery = `SELECT schedule_name FROM (${DEPLOYMENT_EXECUTING_SCHEDULE_SQL}) AS s LIMIT 1`;
-  if (tabListWidget.tabs && tabListWidget.tabs[0]) {
-    tabListWidget.tabs[0].dataSourceId = DS;
-    tabListWidget.tabs[0].sqlQuery = MAINLINE_SHIFTS_SQL;
-  }
-  if (tabListWidget.tabs && tabListWidget.tabs[1]) {
-    tabListWidget.tabs[1].dataSourceId = DS;
-    tabListWidget.tabs[1].sqlQuery = MAINTENANCE_SHIFTS_SQL;
-  }
+  const tabListWidget: TabListWidget = {
+    id: cid('tablist'),
+    type: 'tab-list',
+    x: 0,
+    y: 0,
+    width: ROW3_W,
+    height: ROW3_H,
+    rowHeight: 44,
+    showPagination: false,
+    pageSize: 10,
+    tabBarHeight: 40,
+    tabBarBgColor: '#18181b',
+    tabActiveColor: '#3b82f6',
+    tableBgColor: '#18181b',
+    tableHeaderBgColor: '#27272a',
+    fontSize: 13,
+    tabs: [
+      {
+        id: 'tab-mainline',
+        label: '正線班次',
+        dataSourceId: DS,
+        sqlQuery: MAINLINE_SHIFTS_SQL,
+        refreshInterval: 0,
+        columns: [
+          { id: 'col-1', name: '班次代號', field: 'trip_code', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '{trip_code}', 13, '#FFFFFF', 'bold', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'col-2', name: '運行方向', field: 'direction_label', width: 130, type: 'custom', children: [
+            staticText(0, 0, 130, 44, '{direction_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'col-3', name: '執行載具', field: 'vehicle_code', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'col-4', name: '路線進度', field: 'route_stations', width: 440, type: 'custom', children: [
+            {
+              id: cid('progress'),
+              type: 'route-progress',
+              x: 0,
+              y: 8,
+              width: 440,
+              height: 28,
+              dataSourceId: DS,
+              sqlQuery: '',
+              stations: ['A1', 'A2', 'A3', 'A4', 'A5'],
+              statusField: 'status_label',
+              directionField: 'direction_label',
+              vehicleField: 'vehicle_code',
+              timeField: 'depart_time',
+              departTimeField: 'depart_time',
+            },
+          ]},
+          { id: 'col-5', name: '班次狀態', field: 'status_label', width: 160, type: 'custom', children: [
+            {
+              id: cid('badge'),
+              type: 'status-badge',
+              x: 0,
+              y: 8,
+              width: 140,
+              height: 28,
+              valueField: 'status_label',
+              defaultLabel: '準點運行',
+              defaultBgColor: 'rgba(34, 197, 94, 0.2)',
+              rules: [
+                { value: '運行中', label: '運行中', bgColor: 'rgba(34, 197, 94, 0.2)', textColor: '#22C55E' },
+                { value: '準備中', label: '準備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
+                { value: '延誤', label: '延誤', bgColor: 'rgba(239, 68, 68, 0.2)', textColor: '#EF4444' },
+              ],
+            },
+          ]},
+          { id: 'col-6', name: '發車時間(預計/實際)', field: 'depart_time', width: 220, type: 'custom', children: [
+            staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'col-7', name: '操作', field: 'shift_key', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '查看...', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+        ],
+      },
+      {
+        id: 'tab-maint',
+        label: '整備班表',
+        dataSourceId: DS,
+        sqlQuery: MAINTENANCE_SHIFTS_SQL,
+        refreshInterval: 0,
+        columns: [
+          { id: 'mcol-1', name: '任務編號', field: 'trip_code', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '{trip_code}', 13, '#FFFFFF', 'bold', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'mcol-2', name: '指派載具', field: 'vehicle_code', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'mcol-3', name: '整備項目', field: 'maint_type_label', width: 260, type: 'custom', children: [
+            staticText(0, 0, 260, 44, '{maint_type_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'mcol-4', name: '進度狀態', field: 'status_label', width: 160, type: 'custom', children: [
+            {
+              id: cid('mbadge'),
+              type: 'status-badge',
+              x: 0,
+              y: 8,
+              width: 140,
+              height: 28,
+              valueField: 'status_label',
+              defaultLabel: '整備中',
+              defaultBgColor: 'rgba(59, 130, 246, 0.2)',
+              rules: [
+                { value: '整備中', label: '整備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
+                { value: '待檢', label: '待檢', bgColor: 'rgba(234, 179, 8, 0.2)', textColor: '#EAB308' },
+                { value: '完成', label: '完成', bgColor: 'rgba(34, 197, 94, 0.2)', textColor: '#22C55E' },
+              ],
+            },
+          ]},
+          { id: 'mcol-5', name: '預計完成時間', field: 'depart_time', width: 220, type: 'custom', children: [
+            staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+          { id: 'mcol-6', name: '操作', field: 'shift_key', width: 140, type: 'custom', children: [
+            staticText(0, 0, 140, 44, '詳情', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
+          ]},
+        ],
+      },
+    ],
+  };
 
   return {
     id: DEPLOY_SHIFT_LIST_PANEL_ID,
     type: 'canvas',
-    label: '班次清單面板',
     x: PLANE_PAD,
     y: ROW3_Y,
     width: ROW3_W,
@@ -1035,41 +1171,28 @@ function upsertDeployPanel(
   return { elements: replaced, changed: true };
 }
 
-/** 補齊／更新班表部署管理已完成的頂列卡片與班次清單 */
+/** 僅在平面完全為空時補齊初始卡片；若使用者已有編輯內容，絕對不進行任何覆寫或還原 */
 export function ensureDeploymentDataStatsPanel(plane: DashboardPlane): DashboardPlane {
   if (plane.name !== DEPLOYMENT_PLANE_NAME) return plane;
 
-  let elements = [...(plane.elements ?? [])];
-  let changed = false;
+  // 使用者已建立或自訂過元件時，100% 尊重使用者的編輯，絕不覆寫
+  if (plane.elements && plane.elements.length > 0) {
+    return plane;
+  }
 
-  const mode = upsertDeployPanel(elements, buildCurrentModePanel());
-  elements = mode.elements;
-  changed = changed || mode.changed;
-
-  const stats = upsertDeployPanel(elements, buildDataStatsPanel());
-  elements = stats.elements;
-  changed = changed || stats.changed;
-
-  const exec = upsertDeployPanel(elements, buildExecutingSchedulePanel());
-  elements = exec.elements;
-  changed = changed || exec.changed;
-
-  const events = upsertDeployPanel(elements, buildMajorEventsPanel());
-  elements = events.elements;
-  changed = changed || events.changed;
-
-  const ops = upsertDeployPanel(elements, buildVehicleOpsGroup(), true);
-  elements = ops.elements;
-  changed = changed || ops.changed;
-
-  const shiftList = upsertDeployPanel(elements, buildShiftListPanel(), true);
-  elements = shiftList.elements;
-  changed = changed || shiftList.changed;
-
-  if (!changed) return plane;
   return {
     ...plane,
-    elements,
+    viewportMode: plane.viewportMode ?? 'fit-width',
+    elements: [
+      buildCurrentModePanel(),
+      buildDataStatsPanel(),
+      buildExecutingSchedulePanel(),
+      buildMajorEventsPanel(),
+      buildVehiclePhotoPanel(),
+      buildVehicleOpsTitlePanel(),
+      buildVehicleOpsGroup(),
+      buildShiftListPanel(),
+    ],
     updatedAt: Date.now(),
   };
 }
@@ -1082,6 +1205,7 @@ export function buildDeploymentManagementPlane(): DashboardPlane {
     name: DEPLOYMENT_PLANE_NAME,
     width: 1920,
     height: 1080,
+    viewportMode: 'fit-width',
     elements: [
       buildCurrentModePanel(),
       buildDataStatsPanel(),

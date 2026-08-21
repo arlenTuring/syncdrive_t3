@@ -1,6 +1,7 @@
 import { Paintbrush, Plus, RotateCw, Trash2 } from 'lucide-react'
 import type { RefObject } from 'react'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import type { GeofenceFacility } from '../types/facility'
 import { metersToWorldPx, worldPxToMeters } from '../constants/map'
 import { clientToWorldCoords } from '../utils/pointerCoords'
@@ -192,6 +193,7 @@ export const GeofenceNode = memo(function GeofenceNode({
   )
 
   const dragModeRef = useRef<DragMode | null>(null)
+  const toolbarAnchorRef = useRef<HTMLDivElement>(null)
   const editStartedRef = useRef(false)
   const draftRef = useRef<GeofenceDraft | null>(null)
 
@@ -754,39 +756,58 @@ export const GeofenceNode = memo(function GeofenceNode({
         )
       })}
 
-      {selected && !readOnly && showFacilityToolbar && (onStartFormatPaint || onDelete) && (
-        <div
-          data-geofence-toolbar
-          className="pointer-events-auto absolute -top-9 right-0 z-[5020] flex gap-1"
-        >
-          {onStartFormatPaint && (
-            <button
-              type="button"
-              className="rounded border border-violet-700/80 bg-violet-950/90 p-1 text-violet-200 hover:bg-violet-900"
-              title="複製格式（大小、角度、框線、填色、字級；僅可貼到相同圍籬）"
-              onClick={(e) => {
-                e.stopPropagation()
-                onStartFormatPaint()
-              }}
-            >
-              <Paintbrush className="size-3.5" />
-            </button>
-          )}
-          {onDelete && (
-          <button
-            type="button"
-            className="rounded border border-red-800/80 bg-red-950/90 p-1 text-red-300 hover:bg-red-900"
-            title="刪除圍籬"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
+      {selected
+        && !readOnly
+        && showFacilityToolbar
+        && !formatPaintActive
+        && (onStartFormatPaint || onDelete) ? (
+        <>
+          <div
+            ref={toolbarAnchorRef}
+            className="pointer-events-none absolute right-0 top-0 size-0"
+            aria-hidden
+          />
+          <MapFloatingAnchorPortal
+            open
+            anchorRef={toolbarAnchorRef}
+            dataAttr="data-geofence-toolbar"
+            className="pointer-events-auto flex gap-1"
+            offsetY={-36}
+            alignX="end"
           >
-            <Trash2 className="size-3.5" />
-          </button>
-          )}
-        </div>
-      )}
+            {onStartFormatPaint && (
+              <button
+                type="button"
+                className="rounded border border-violet-700/80 bg-violet-950/90 p-1 text-violet-200 hover:bg-violet-900"
+                title="複製格式（大小、角度、框線、填色、字級；僅可貼到相同圍籬）"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onStartFormatPaint()
+                }}
+              >
+                <Paintbrush className="size-3.5" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="rounded border border-red-800/80 bg-red-950/90 p-1 text-red-300 hover:bg-red-900"
+                title="刪除圍籬"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
+          </MapFloatingAnchorPortal>
+        </>
+      ) : null}
     </div>
   )
 })

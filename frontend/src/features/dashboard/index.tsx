@@ -27,6 +27,7 @@ import { notifyCloseCanvasChildList } from './utils/canvasChildList';
 import { VariableProvider } from './VariableContext';
 import { DemoSimulationProvider } from './context/DemoSimulationContext';
 import { VehicleFleetMqttProvider } from './context/VehicleFleetMqttContext';
+import { applyTabListContentFontSize } from './elements/TabListWidget';
 import {
   buildGroupIndexPreviewVariables,
   computeSubcanvasEditPlane,
@@ -241,8 +242,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     setTabListCellEditSnapshot(cloneCanvasElement(canvas));
     setEditingTabListCell({ canvasId, widgetId, tabId, columnId });
     setIsEditMode(true);
-    selectElement(canvasId);
-  }, [activePlane, selectElement]);
+    const widget = canvas.children.find(c => c.id === widgetId) as TabListWidget | undefined;
+    const column = widget?.tabs?.find(t => t.id === tabId)?.columns.find(c => c.id === columnId);
+    const firstChildId = column?.children?.[0]?.id;
+    if (firstChildId) selectChild(`tab-list-cell:${columnId}`, firstChildId);
+    else selectElement(canvasId);
+  }, [activePlane, selectElement, selectChild]);
 
   const saveAndExitTabListCellEdit = useCallback(() => {
     const keep = editingTabListCell;
@@ -300,18 +305,24 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     return lane === 'default' || lane === 'normal' ? lane : null;
   }, [editingGroup, dualEditFocusId]);
 
+  const tabListCellSelectedChild = useMemo((): ChildWidget | null => {
+    if (!editingTabListCellInfo || selectedChildIds.length !== 1 || !selectedChildId) return null;
+    return (editingTabListCellInfo.column.children ?? []).find(c => c.id === selectedChildId) ?? null;
+  }, [editingTabListCellInfo, selectedChildId, selectedChildIds.length]);
+
   const panelSelectedChild = useMemo((): ChildWidget | null => {
     if (selectedChildIds.length !== 1) return null;
     if (editingGroup) {
       return findChildInGroup(editingGroup, selectedChildId, subcanvasLane);
     }
+    if (editingTabListCell) return tabListCellSelectedChild;
     return selectedChild;
-  }, [editingGroup, selectedChild, selectedChildId, selectedChildIds.length, subcanvasLane]);
+  }, [editingGroup, editingTabListCell, selectedChild, selectedChildId, selectedChildIds.length, subcanvasLane, tabListCellSelectedChild]);
 
   const activeSelectedChildIds = useMemo(() => {
-    if (editingGroup) return selectedChildIds;
+    if (editingGroup || editingTabListCell) return selectedChildIds;
     return selectedElementIds.length === 1 ? selectedChildIds : [];
-  }, [editingGroup, selectedChildIds, selectedElementIds.length]);
+  }, [editingGroup, editingTabListCell, selectedChildIds, selectedElementIds.length]);
 
   // 鍵盤複製貼上、刪除、復原／重做 (僅在編輯器模式生效)
   useEffect(() => {
@@ -548,6 +559,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             setIsEditMode(false);
             setView('editor'); 
           }}
+          onUpdatePlane={(id, patch) => updatePlane(id, patch)}
           onCreate={() => setShowNewDialog(true)}
           onDelete={deletePlane}
           onImportTemplate={(result) => {
@@ -758,7 +770,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           });
           return { ...t, columns: updatedCols };
         });
-        updateChildWidget(editingTabListCell.canvasId, editingTabListCell.widgetId, { tabs: updatedTabs });
+        const widgetAfterChild = { ...widget, tabs: updatedTabs };
+        const fontSize = (patch as { fontSize?: number }).fontSize;
+        const nextPatch = typeof fontSize === 'number'
+          ? applyTabListContentFontSize(widgetAfterChild, fontSize)
+          : { tabs: updatedTabs };
+        updateChildWidget(editingTabListCell.canvasId, editingTabListCell.widgetId, nextPatch);
         return;
       }
     }
@@ -1314,8 +1331,16 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           editingGroup={editingGroup}
           dualGateSettingsActive={dualGatePanel}
           selectedElement={panelSelectedElement}
-          selectedChild={editingGroup ? panelSelectedChild : selectedChild}
+          selectedChild={panelSelectedChild}
           selectedChildCount={activeSelectedChildIds.length}
+          editingTabListColumn={
+            editingTabListCellInfo
+              ? {
+                  tabLabel: editingTabListCellInfo.tab.label,
+                  columnName: editingTabListCellInfo.column.name || '未命名欄位',
+                }
+              : null
+          }
           onUpdatePlane={(patch) => activePlane && updatePlane(activePlane.id, patch)}
           onDeletePlane={() => activePlane && deletePlane(activePlane.id)}
           onUpdateElement={(patch) => {
@@ -1335,7 +1360,14 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           }}
           onUpdateChild={(patch) => {
             recordPropertyHistory();
-            if (editingGroup && panelSelectedChild) {
+            if (editingTabListCell && panelSelectedChild) {
+              handleUpdateChild(
+                `tab-list-cell:${editingTabListCell.columnId}`,
+                panelSelectedChild.id,
+                patch,
+                { fromCanvas: true },
+              );
+            } else if (editingGroup && panelSelectedChild) {
               notifyCloseCanvasChildList(editingGroupId!);
               updateChildWidget(
                 editingGroupId!,
@@ -1349,7 +1381,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             }
           }}
           onDeleteChild={() => {
-            if (editingGroup && panelSelectedChild) {
+            if (editingTabListCell && panelSelectedChild) {
+              handleDeleteChild(`tab-list-cell:${editingTabListCell.columnId}`, panelSelectedChild.id);
+            } else if (editingGroup && panelSelectedChild) {
               deleteChildWidget(editingGroupId!, panelSelectedChild.id, activeDualLane());
             } else if (selectedElement && selectedChild) {
               deleteChildWidget(selectedElement.id, selectedChild.id);

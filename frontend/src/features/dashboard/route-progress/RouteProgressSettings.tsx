@@ -153,6 +153,15 @@ export function RouteProgressSettings({
           <option value="service-card">服務卡</option>
         </select>
       </Field>
+      <Field label="站點標籤字級 (px)">
+        <input
+          type="number"
+          min={8}
+          value={w.fontSize ?? 14}
+          onChange={(e) => onUpdate({ fontSize: Math.max(8, Number(e.target.value) || 14) })}
+          className={inputCls}
+        />
+      </Field>
       {(w.variant === 'detail-card' || w.variant === 'service-card') && (
         <div className="grid grid-cols-2 gap-2">
           <Field label="站點欄標籤">

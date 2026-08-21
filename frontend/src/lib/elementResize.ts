@@ -51,16 +51,18 @@ export function applyElementResize(
   dx: number,
   dy: number,
   start: { x: number; y: number; width: number; height: number },
-  options?: { anchorCenter?: boolean },
+  options?: { anchorCenter?: boolean; minWidth?: number; minHeight?: number },
 ): { x: number; y: number; width: number; height: number } {
   let { x, y, width, height } = start;
+  const minW = options?.minWidth ?? MIN_SIZE;
+  const minH = options?.minHeight ?? MIN_SIZE;
   const cx = x + width / 2;
   const cy = y + height / 2;
   const right = x + width;
   const bottom = y + height;
 
   if (edge === 'left' || edge === 'nw' || edge === 'sw') {
-    const nextW = Math.max(MIN_SIZE, width - dx);
+    const nextW = Math.max(minW, width - dx);
     if (options?.anchorCenter) width = nextW;
     else {
       x = right - nextW;
@@ -68,10 +70,10 @@ export function applyElementResize(
     }
   }
   if (edge === 'right' || edge === 'ne' || edge === 'se') {
-    width = Math.max(MIN_SIZE, width + dx);
+    width = Math.max(minW, width + dx);
   }
   if (edge === 'top' || edge === 'nw' || edge === 'ne') {
-    const nextH = Math.max(MIN_SIZE, height - dy);
+    const nextH = Math.max(minH, height - dy);
     if (options?.anchorCenter) height = nextH;
     else {
       y = bottom - nextH;
@@ -79,7 +81,7 @@ export function applyElementResize(
     }
   }
   if (edge === 'bottom' || edge === 'sw' || edge === 'se') {
-    height = Math.max(MIN_SIZE, height + dy);
+    height = Math.max(minH, height + dy);
   }
 
   if (options?.anchorCenter) {

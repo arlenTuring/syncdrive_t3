@@ -20,6 +20,7 @@ export type ShiftRecordListItem = {
   end_time: string | null;
   delay_minutes: number;
   planned_start: string | null;
+  planned_end?: string | null;
   completed_at: string | null;
   payload: Record<string, unknown> | null;
 };

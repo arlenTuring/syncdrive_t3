@@ -198,7 +198,7 @@ function TemplateInstance({
 
   const templateBody = (
     <VariableProvider variables={variables as Record<string, string | number | boolean>}>
-      <EditModeProvider value={isEditMode}>
+      <EditModeProvider value={false}>
       <div
         className={wrapInTransition ? 'relative h-full w-full overflow-hidden' : useAbsoluteSlot ? 'absolute overflow-hidden' : 'relative overflow-hidden'}
         style={{
@@ -206,6 +206,7 @@ function TemplateInstance({
           width: actualW,
           height: actualH,
           boxSizing: 'border-box',
+          pointerEvents: isEditMode ? 'none' : 'auto',
           background: hideChrome
             ? 'transparent'
             : isPreviewMode
@@ -565,38 +566,60 @@ function TileGroupView({
   const layout = computeGroupTileLayout(element, itemCount);
   const { tileWidth: tplW, tileHeight: tplH, padX, padY, gapX, gapY, layoutCols } = layout;
 
+  const titleText = (element.headerTitle
+    ?? (element.label === '載具操作' || element.label === '載具控制' ? '載具控制' : '')
+  ).trim();
+  const hasHeader = titleText.length > 0;
+  const titleFs = Math.max(10, Math.min(48, element.headerTitleFontSize ?? 14));
+  const headerH = hasHeader ? Math.round(titleFs * 1.4) + 4 : 0;
+
   return (
     <div className="absolute inset-0 overflow-visible" style={{ padding: `${padY}px ${padX}px` }}>
-      {rows.map((row, index) => {
-        let x = 0;
-        let y = 0;
-        if (layoutMode === 'grid') {
-          const col = index % layoutCols;
-          const r = Math.floor(index / layoutCols);
-          x = col * (tplW + gapX);
-          y = r * (tplH + gapY);
-        } else {
-          const rx = element.xField && row ? Number(row[element.xField]) : 0;
-          const ry = element.yField && row ? Number(row[element.yField]) : 0;
-          x = Number.isNaN(rx) ? 0 : rx;
-          y = Number.isNaN(ry) ? 0 : ry;
-        }
-        return (
-          <TemplateInstance
-            key={index}
-            element={element}
-            row={row}
-            index={index}
-            isEditMode={isEditMode}
-            style={{ left: x, top: y, width: tplW, height: tplH }}
-          />
-        );
-      })}
+      {hasHeader && (
+        <div
+          className="absolute left-0 right-0 top-0 z-10 flex items-center px-0.5 select-none"
+          style={{ height: headerH, pointerEvents: 'none' }}
+        >
+          <span
+            className="font-bold tracking-wide text-zinc-400"
+            style={{ fontSize: titleFs, lineHeight: 1.2 }}
+          >
+            {titleText}
+          </span>
+        </div>
+      )}
+      <div className="relative h-full w-full">
+        {rows.map((row, index) => {
+          let x = 0;
+          let y = headerH;
+          if (layoutMode === 'grid') {
+            const col = index % layoutCols;
+            const r = Math.floor(index / layoutCols);
+            x = col * (tplW + gapX);
+            y = headerH + r * (tplH + gapY);
+          } else {
+            const rx = element.xField && row ? Number(row[element.xField]) : 0;
+            const ry = element.yField && row ? Number(row[element.yField]) : 0;
+            x = Number.isNaN(rx) ? 0 : rx;
+            y = headerH + (Number.isNaN(ry) ? 0 : ry);
+          }
+          return (
+            <TemplateInstance
+              key={index}
+              element={element}
+              row={row}
+              index={index}
+              isEditMode={isEditMode}
+              style={{ left: x, top: y, width: tplW, height: tplH }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected: _isCanvasSelected, onEnterEditMode }: Props) {
+export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onEnterEditMode }: Props) {
   const gate = element.displayGate;
   const builtinSql = resolveBuiltinGroupSql(element);
   const gateSql = gate?.sqlQuery?.trim() ? gate.sqlQuery : builtinSql.sqlQuery;
@@ -685,9 +708,9 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected: _is
         <TileGroupView element={renderElement} rows={rows} isEditMode={isEditMode} />
       )}
 
-      {isEditMode && (
+      {isEditMode && isCanvasSelected && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center rounded opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100"
+          className="absolute inset-0 z-50 flex items-center justify-center rounded"
           style={{ pointerEvents: 'none' }}
         >
           <button

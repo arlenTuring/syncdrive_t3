@@ -431,6 +431,8 @@ export interface RouteProgressWidget extends WidgetBase, WidgetDataBinding {
   cardEndLabel?: string;
   /** 卡片版型：metric 標籤等於這些值時以警示色顯示 */
   cardMetricAlertValues?: string[];
+  /** 軌道站點標籤字級（px）；未設時軌道版用 14、卡片版依縮放 */
+  fontSize?: number;
   unitLabel?: string;
   statusLabel?: string;
   statusBgColor?: string;
@@ -978,6 +980,10 @@ export interface CanvasElementProps {
    * overlay：疊在群組下方的輔助畫布（如空狀態）；未選取時點擊穿透至下層群組
    */
   canvasLayer?: 'default' | 'overlay';
+  /** 畫布或群組頂部自訂區塊標題（如「載具控制」） */
+  headerTitle?: string;
+  /** 區塊標題字級（px）；未設時 14 */
+  headerTitleFontSize?: number;
 
   // --- 畫布群組功能 (Canvas Group) ---
   isGroup?: boolean;
@@ -1099,6 +1105,11 @@ export interface DashboardPlane {
   name: string;
   width: number;
   height: number;
+  /** 畫布適配模式：
+   * - fixed-scale：固定等比大屏模式（預設，保持比例居中，適合 1920x1080 戰情室）
+   * - fit-width：寬度自適應撐滿模式（100% 填滿寬度，高度垂直捲動，適合業務嵌入頁）
+   */
+  viewportMode?: 'fixed-scale' | 'fit-width';
   elements: CanvasElementProps[];
   createdAt: number;
   updatedAt: number;

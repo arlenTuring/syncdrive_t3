@@ -102,3 +102,5 @@
 | `v1/vtms/{vehicle_code}/status/{type}` | 通用狀態轉發（前端 widget 訂閱） | 設施/車端 ➔ 中心 |
 | `v1/vtms/dashboard/capacity/live` | 儀表板運能即時資料 | 中心內部 |
 | `syncdrive/#` | 場域設施（月台門 PSD、號誌等）原生 Topic | 設施 ➔ 中心 |
+| `v1/vtms/{vehicle_code}/door/update` | 車門開度與六態 `display_state`（見 [月台門與車門協議](月台門與車門協議.md)） | 車端 ➔ 中心 |
+| `v1/vtms/{psd_id}/psd/update` | 月台門開度與六態 `display_state`（同上） | 設施 ➔ 中心 |

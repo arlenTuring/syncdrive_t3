@@ -24,14 +24,20 @@ export type ShiftRecordListResponse = {
   page_size: number;
 };
 
+export type ShiftRecordAction = {
+  action_id: string;
+  station_id: string;
+  station_display_name?: string | null;
+  action_type: string;
+  action_status: string;
+  node_id: string | null;
+  actual_start_time?: number | null;
+  actual_end_time?: number | null;
+  note?: string | null;
+};
+
 export type ShiftRecordDetail = ShiftRecordListItem & {
-  actions: Array<{
-    action_id: string;
-    station_id: string;
-    action_type: string;
-    action_status: string;
-    node_id: string | null;
-  }>;
+  actions: ShiftRecordAction[];
   task_group: Array<Record<string, unknown>>;
   vehicle_phase: unknown;
   current_leg: unknown;

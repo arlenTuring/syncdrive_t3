@@ -14,6 +14,32 @@ import { VariableProvider } from '../VariableContext';
 import { WidgetRenderer } from './WidgetRenderer';
 import { Edit3 } from 'lucide-react';
 
+const TAB_LIST_FONT_WIDGET_TYPES = new Set(['text', 'status-badge', 'alert-banner', 'clock', 'route-progress']);
+
+function isTabListFontWidget(child: ChildWidget): boolean {
+  return TAB_LIST_FONT_WIDGET_TYPES.has(child.type);
+}
+
+/** 將內容字級寫入表格本身，以及所有 Tab、所有欄位的文字／徽章元件 */
+export function applyTabListContentFontSize(
+  widget: TabListWidget,
+  fontSize: number,
+): Pick<TabListWidget, 'fontSize' | 'tabs'> {
+  return {
+    fontSize,
+    tabs: (widget.tabs ?? []).map(t => ({
+      ...t,
+      columns: t.columns.map(c => ({
+        ...c,
+        fontSize,
+        children: (c.children ?? []).map(ch =>
+          isTabListFontWidget(ch) ? ({ ...ch, fontSize } as ChildWidget) : ch,
+        ),
+      })),
+    })),
+  };
+}
+
 // ─── 預覽模擬資料（編輯模式無資料時使用） ──────────────────────────────────
 
 const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
@@ -168,7 +194,8 @@ function TabListCell({
   const children = column.children ?? [];
   const colW = column.width > 0 ? column.width : '100%';
   const align = column.align ?? tabAlign ?? globalAlign ?? 'left';
-  const cellFs = column.fontSize ?? fontSize;
+  // 內容字級以表格為準，避免各欄元件自己的 fontSize 把統一調整拆散
+  const cellFs = fontSize;
   const cellColor = column.textColor ?? textColor ?? '#cbd5e1';
 
   const fieldKey = column.fieldKey || (
@@ -223,9 +250,17 @@ function TabListCell({
             </span>
           ) : (
             children.map((child: ChildWidget) => {
-              const effectiveChild = child.type === 'text'
-                ? { ...child, fontSize: cellFs, textAlign: align }
-                : child;
+              let effectiveChild: ChildWidget = child;
+              if (child.type === 'text') {
+                effectiveChild = {
+                  ...child,
+                  fontSize: cellFs,
+                  color: child.color || cellColor,
+                  textAlign: align,
+                };
+              } else if (isTabListFontWidget(child)) {
+                effectiveChild = { ...child, fontSize: cellFs } as ChildWidget;
+              }
               return (
                 <div
                   key={child.id}

@@ -118,6 +118,22 @@ export class MqttController {
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
+  /** 車門狀態：v1/vtms/{vehicle_code}/door/update */
+  @MessagePattern('v1/vtms/+/door/update')
+  async handleDoorUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
+    const topic = context.getTopic();
+    if (!data) return;
+    this.eventsGateway.broadcastMqttMessage(topic, data);
+  }
+
+  /** 月台門狀態：v1/vtms/{psd_id}/psd/update */
+  @MessagePattern('v1/vtms/+/psd/update')
+  async handlePsdUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
+    const topic = context.getTopic();
+    if (!data) return;
+    this.eventsGateway.broadcastMqttMessage(topic, data);
+  }
+
   /** 場域設施（月台門 PSD、號誌等）：syncdrive/Gate/141 */
   @MessagePattern('syncdrive/#')
   async handleSyncdriveFacility(@Payload() data: any, @Ctx() context: MqttContext) {

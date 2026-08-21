@@ -284,7 +284,6 @@ function EdgeArrow({
   onBendPointerDown,
   onBendPointerMove,
   onBendPointerUp,
-  onResetBend,
   onDoubleClickEdge,
 }: {
   edge: PointTopologyEdge
@@ -306,7 +305,6 @@ function EdgeArrow({
   onBendPointerDown: (event: ReactPointerEvent<SVGElement>) => void
   onBendPointerMove: (event: ReactPointerEvent<SVGElement>) => void
   onBendPointerUp: (event: ReactPointerEvent<SVGElement>) => void
-  onResetBend: () => void
 }) {
   const isDispatch = isDispatchAfterServiceEdge(from, to)
   const isServiceLink = isServiceFacilityLinkEdge(from, to)
@@ -360,7 +358,6 @@ function EdgeArrow({
       onDoubleClick={(event) => {
         event.stopPropagation()
         onDoubleClickEdge()
-        if (customBend) onResetBend()
       }}
     >
       <defs>
@@ -434,9 +431,7 @@ function EdgeArrow({
         </g>
       ) : null}
       <title>
-        {`${from.label} → ${to.label}｜中點拖曳彎折；兩端白點拖到其他節點可改接${
-          customBend ? '｜雙擊重設彎折' : ''
-        }`}
+        {`${from.label} → ${to.label}｜中點拖曳彎折；兩端白點拖到其他節點可改接`}
       </title>
     </g>
   )
@@ -1589,14 +1584,6 @@ export function PointTopologyEditorDialog({
                         onBendPointerDown={(event) => onBendPointerDownEdge(event, edge)}
                         onBendPointerMove={(event) => onBendPointerMoveEdge(event, edge)}
                         onBendPointerUp={(event) => onBendPointerUpEdge(event, edge.id)}
-                        onResetBend={() => {
-                          applyDraft((prev) =>
-                            updatePointTopologyEdge(prev, edge.id, {
-                              curveOffsetX: null,
-                              curveOffsetY: null,
-                            }),
-                          )
-                        }}
                       />
                     )
                   })}
@@ -2211,7 +2198,7 @@ function EdgePropertiesForm({
             重設線徑彎折
           </button>
           <p className="text-[10px] leading-snug text-zinc-500">
-            拖曳線兩端白點到其他節點可改接；中點拖曳可彎折（雙擊重設彎折）。
+            拖曳線兩端白點到其他節點可改接；中點拖曳可彎折。要恢復預設線徑請按上方「重設線徑彎折」。
           </p>
         </div>
       ) : null}

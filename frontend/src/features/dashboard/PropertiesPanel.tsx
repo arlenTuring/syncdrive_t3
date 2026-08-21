@@ -41,6 +41,7 @@ import {
 } from '../../lib/textAlignment';
 import { IconImageField } from './components/IconImageField';
 import { DualCanvasSettings } from './components/DualCanvasSettings';
+import { applyTabListContentFontSize } from './elements/TabListWidget';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
 const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
@@ -1511,15 +1512,16 @@ function DatabaseSettings({ w, onUpdate, onDelete }: { w: DatabaseWidget; onUpda
 
 function PlaneSettings({ plane, onUpdate, onDelete }: {
   plane: DashboardPlane;
-  onUpdate: (p: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height'>>) => void;
+  onUpdate: (p: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode'>>) => void;
   onDelete: () => void;
 }) {
   const g = gcd(plane.width, plane.height);
+  const currentMode = plane.viewportMode ?? 'fixed-scale';
   return (
     <div className="space-y-6">
       <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-2">
         <SH icon={<Settings size={14} className="text-cyan-400" />} label="目前平面設定" color="#22d3ee" />
-        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-tighter">編輯基本屬性、解析度與比例</p>
+        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-tighter">編輯基本屬性、解析度與適配縮放模式</p>
       </div>
 
       <div className="space-y-4 px-1">
@@ -1531,6 +1533,44 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
             placeholder="輸入平面名稱..."
           />
         </Field>
+
+        {/* 畫布適配模式 */}
+        <div className="space-y-1.5">
+          <label className="text-zinc-400 text-xs font-medium block">畫布適配模式 (Viewport Mode)</label>
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-800/60 rounded-lg border border-zinc-700/50">
+            <button
+              type="button"
+              onClick={() => onUpdate({ viewportMode: 'fixed-scale' })}
+              className={`py-2 px-2 rounded-md text-[11px] font-medium flex flex-col items-center gap-1 transition-all ${
+                currentMode === 'fixed-scale'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+              }`}
+              title="固定等比大屏：16:9 戰情室大屏縮放，畫面居中，保證不變形"
+            >
+              <span className="font-bold">🖥️ 固定等比大屏</span>
+              <span className="text-[9px] opacity-75">居中等比·不變形</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdate({ viewportMode: 'fit-width' })}
+              className={`py-2 px-2 rounded-md text-[11px] font-medium flex flex-col items-center gap-1 transition-all ${
+                currentMode === 'fit-width'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+              }`}
+              title="寬度自適應撐滿：100% 填滿視窗寬度，高度自然捲動，側邊欄開合自動伸縮"
+            >
+              <span className="font-bold">↔️ 寬度自適應</span>
+              <span className="text-[9px] opacity-75">填滿寬度·垂直捲動</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-zinc-500 leading-relaxed px-0.5">
+            {currentMode === 'fixed-scale'
+              ? '💡 適合總控電視牆／戰情大屏，永遠保持固定比例居中呈現。'
+              : '💡 適合班表部署管理等業務頁面，當左側選單展開/收合時自動平滑撐滿寬度。'}
+          </p>
+        </div>
         
         <div className="grid grid-cols-2 gap-3">
           <Field label="畫布寬度 (Width)">
@@ -1579,7 +1619,25 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
   return (
     <div className="space-y-4">
       <SH icon={<Layers size={13} />} label={isMap ? '圖台容器' : el.isGroup ? '畫布群組屬性' : '畫布屬性'} color={isMap ? '#0ea5e9' : el.isGroup ? '#a855f7' : '#06b6d4'} />
-      <Field label="標籤"><input value={el.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} /></Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="標籤"><input value={el.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} /></Field>
+        <Field label="區塊標題"><input value={el.headerTitle ?? ''} onChange={e => onUpdate({ headerTitle: e.target.value })} className={inputCls} placeholder="如：載具控制" /></Field>
+      </div>
+      {el.isGroup ? (
+        <Field label="區塊標題字級 (px)">
+          <input
+            type="number"
+            min={10}
+            max={48}
+            value={el.headerTitleFontSize ?? 14}
+            onChange={e => onUpdate({ headerTitleFontSize: Math.max(10, Math.min(48, +e.target.value || 14)) })}
+            className={inputCls}
+          />
+          <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+            檢視時顯示在群組內左上角。青色小標籤是編輯模式專用，不會出現在載入後的頁面。
+          </p>
+        </Field>
+      ) : null}
 
       {isMap && (
         <div className="space-y-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
@@ -1783,13 +1841,13 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
           </Field>
 
           {(el.groupTileFit || 'fill') === 'fixed' && (
-            <Field label="水平對齊（固定尺寸）">
+            <Field label="對齊（固定尺寸）">
               <select
                 value={el.groupTileAlign || 'start'}
                 onChange={e => onUpdate({ groupTileAlign: e.target.value as 'start' | 'center' })}
                 className={selectCls}
               >
-                <option value="start">靠左</option>
+                <option value="start">靠左上</option>
                 <option value="center">置中</option>
               </select>
             </Field>
@@ -1823,14 +1881,15 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
 }
 
 function PositionFields({ widget, onUpdate }: { widget: ChildWidget; onUpdate: (p: Partial<ChildWidget>) => void }) {
+  const minSize = 1;
   return (
     <div className="pt-2 border-t border-zinc-800">
       <div className="text-zinc-600 text-[10px] uppercase font-bold mb-2 tracking-wider">位置與尺寸</div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="X"><input type="number" value={widget.x} onChange={e => onUpdate({ x: +e.target.value } as any)} className={inputCls} /></Field>
         <Field label="Y"><input type="number" value={widget.y} onChange={e => onUpdate({ y: +e.target.value } as any)} className={inputCls} /></Field>
-        <Field label="寬"><input type="number" value={widget.width} onChange={e => onUpdate({ width: +e.target.value } as any)} className={inputCls} /></Field>
-        <Field label="高"><input type="number" value={widget.height} onChange={e => onUpdate({ height: +e.target.value } as any)} className={inputCls} /></Field>
+        <Field label="寬"><input type="number" min={minSize} value={widget.width} onChange={e => onUpdate({ width: Math.max(minSize, +e.target.value) } as any)} className={inputCls} /></Field>
+        <Field label="高"><input type="number" min={minSize} value={widget.height} onChange={e => onUpdate({ height: Math.max(minSize, +e.target.value) } as any)} className={inputCls} /></Field>
         <Field label="旋轉 (°)">
           <input
             type="number"
@@ -1849,6 +1908,38 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
   return (
     <div className="space-y-4">
       <SH icon={<Square size={13} />} label="色塊屬性" color="#64748b" />
+      
+      {/* 快捷線條預設 */}
+      <div className="space-y-1.5 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/40">
+        <label className="text-zinc-400 text-[10px] uppercase font-bold tracking-tight block">快捷線條 / 分隔線</label>
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            onClick={() => onUpdate({ height: 1, borderRadius: 0, borderWidth: 0 })}
+            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
+            title="設定高度為 1px 的極細分隔線"
+          >
+            1px 分隔線
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdate({ height: 2, borderRadius: 1, borderWidth: 0 })}
+            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
+            title="設定高度為 2px 的標準分隔線"
+          >
+            2px 分隔線
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdate({ width: 3, borderRadius: 1.5, borderWidth: 0 })}
+            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
+            title="設定寬度為 3px 的垂直裝飾條"
+          >
+            3px 垂直線
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <Field label="背景顏色">
           <div className="flex gap-2">
@@ -2584,6 +2675,44 @@ function TabListSettings({
     updateTab(activeTab.id, { columns: updatedCols });
   };
 
+  const patchColumnTextStyle = (
+    colId: string | null,
+    style: { fontSize?: number; color?: string },
+  ) => {
+    const apply = (columns: TabListColumn[]) =>
+      columns.map(c => {
+        if (colId && c.id !== colId) return c;
+        return {
+          ...c,
+          ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
+          ...(style.color !== undefined ? { textColor: style.color } : {}),
+          children: (c.children ?? []).map(ch => {
+            if (ch.type === 'text') {
+              return {
+                ...ch,
+                ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
+                ...(style.color !== undefined ? { color: style.color } : {}),
+              };
+            }
+            if (ch.type === 'status-badge' && style.fontSize !== undefined) {
+              return { ...ch, fontSize: style.fontSize };
+            }
+            return ch;
+          }),
+        };
+      });
+    if (colId) {
+      if (!activeTab) return;
+      updateTab(activeTab.id, { columns: apply(activeTab.columns) });
+      return;
+    }
+    onUpdate({
+      ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
+      ...(style.color !== undefined ? { textColor: style.color } : {}),
+      tabs: tabs.map(t => ({ ...t, columns: apply(t.columns) })),
+    });
+  };
+
   const setGlobalAlign = (align: 'left' | 'center' | 'right') => {
     const updatedTabs = tabs.map(tab => ({
       ...tab,
@@ -2791,7 +2920,30 @@ function TabListSettings({
                     </div>
                   </div>
 
-                  {/* 第 4 行：進入元件編輯按鈕 */}
+                  {/* 第 4 行：此欄文字顏色（字級由下方「內容字級」全表統一） */}
+                  {(() => {
+                    const firstText = (col.children ?? []).find(ch => ch.type === 'text') as TextWidget | undefined;
+                    const colTextColor = col.textColor ?? firstText?.color ?? w.textColor ?? '#cbd5e1';
+                    return (
+                      <div className="space-y-1">
+                        <label className="text-zinc-400 text-[10px]">此欄文字顏色</label>
+                        <div
+                          className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner"
+                          style={{ backgroundColor: colTextColor }}
+                        >
+                          <input
+                            type="color"
+                            value={colTextColor.startsWith('#') ? colTextColor : '#cbd5e1'}
+                            onChange={e => patchColumnTextStyle(col.id, { color: e.target.value })}
+                            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                            title="點擊選擇此欄文字顏色"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 第 5 行：進入元件編輯按鈕 */}
                   <button
                     type="button"
                     onClick={() => onEnterEditColumn?.(activeTab.id, col.id)}
@@ -2935,11 +3087,11 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">內容字級 (px)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">內容字級 (px，全表統一)</label>
               <input
                 type="number"
                 value={w.fontSize ?? 13}
-                onChange={e => onUpdate({ fontSize: Number(e.target.value) })}
+                onChange={e => onUpdate(applyTabListContentFontSize(w, Math.max(8, Number(e.target.value) || 13)))}
                 className={`${inputCls} text-xs`}
               />
             </div>
@@ -3018,7 +3170,9 @@ interface Props {
   selectedElement: CanvasElementProps | null;
   selectedChild: ChildWidget | null;
   selectedChildCount?: number;
-  onUpdatePlane: (p: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height'>>) => void;
+  /** 正在編輯 Tab 清單某一欄的單元格範本時顯示提示 */
+  editingTabListColumn?: { tabLabel: string; columnName: string } | null;
+  onUpdatePlane: (p: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode'>>) => void;
   onDeletePlane: () => void;
   onUpdateElement: (p: Partial<CanvasElementProps>) => void;
   onDeleteElement: () => void;
@@ -3039,6 +3193,7 @@ export function PropertiesPanel({
   selectedElement,
   selectedChild,
   selectedChildCount = 0,
+  editingTabListColumn = null,
   onUpdatePlane, onDeletePlane,
   onUpdateElement, onDeleteElement,
   onUpdateChild, onDeleteChild,
@@ -3102,6 +3257,13 @@ export function PropertiesPanel({
                 </>
               )}
             </p>
+          </div>
+        ) : editingTabListColumn ? (
+          <div className="mb-3 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200/90 text-[10px] leading-relaxed">
+            <p className="font-semibold text-blue-400 mb-1">
+              單元格範本 · {editingTabListColumn.tabLabel} · {editingTabListColumn.columnName}
+            </p>
+            <p>點選欄位內的文字或元件，即可在下方調整字體大小與顏色。</p>
           </div>
         ) : selectedIssue ? (
           <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-amber-950/50 border border-amber-600/40 text-amber-200 text-[10px] leading-relaxed">
@@ -3168,6 +3330,10 @@ export function PropertiesPanel({
                 );
             }
           })()
+        ) : editingTabListColumn ? (
+          <p className="text-zinc-500 text-xs leading-relaxed px-1 py-6 text-center">
+            請點選欄位內的文字或元件，即可調整字體大小與顏色。
+          </p>
         ) : selectedElement ? (
           <CanvasSettings
             el={selectedElement}

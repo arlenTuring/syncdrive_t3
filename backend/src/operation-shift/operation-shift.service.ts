@@ -262,6 +262,43 @@ export class OperationShiftService {
     return toOperationShiftListItem(saved);
   }
 
+  /** 部署為執行班表：此班表 in_use，其餘改 idle，並一併發布 */
+  async deployShift(
+    id: string,
+    options?: { reviewerName?: string },
+  ): Promise<OperationShiftListItem> {
+    const row = await this.getShiftById(id);
+    if (!this.bodyHasPlan(row.body ?? {})) {
+      throw new BadRequestException('此班表尚無排班產出（scheduleOutput.plan），無法部署');
+    }
+
+    const now = String(Date.now());
+    await this.repo
+      .createQueryBuilder()
+      .update(OperationShift)
+      .set({
+        usageStatus: OperationShiftUsageStatus.IDLE,
+        updatedAt: now,
+      })
+      .where('usage_status = :us', { us: OperationShiftUsageStatus.IN_USE })
+      .andWhere('shift_id != :id', { id })
+      .execute();
+
+    const reviewer = String(options?.reviewerName ?? '').trim();
+    row.usageStatus = OperationShiftUsageStatus.IN_USE;
+    row.publishStatus = OperationShiftPublishStatus.PUBLISHED;
+    row.body = {
+      ...(row.body ?? {}),
+      deployment: {
+        deployedAt: Number(now),
+        deployedBy: reviewer || null,
+      },
+    };
+    row.updatedAt = now;
+    const saved = await this.repo.save(row);
+    return toOperationShiftListItem(saved);
+  }
+
   async getTimetableTrips(query: {
     from?: string;
     to?: string;

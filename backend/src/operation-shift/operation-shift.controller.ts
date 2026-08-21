@@ -111,6 +111,17 @@ export class OperationShiftController {
     return this.operationShiftService.publishShift(id);
   }
 
+  @Post('detail/:id/deploy')
+  @ApiOperation({ summary: '部署班表為使用中（同時發布；其他使用中班表改為閒置）' })
+  async deployShift(
+    @Param('id') id: string,
+    @Body() body?: { reviewer_name?: string },
+  ) {
+    return this.operationShiftService.deployShift(id, {
+      reviewerName: body?.reviewer_name,
+    });
+  }
+
   @Post('detail/:id/duplicate')
   @ApiOperation({ summary: '以此複製新版班表草稿' })
   async duplicateDraft(@Param('id') id: string) {

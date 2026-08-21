@@ -88,7 +88,7 @@ export function ShiftMenuSelect({
   };
 
   return (
-    <div ref={rootRef} className={`relative ${widthClass}`}>
+    <div ref={rootRef} className={`relative ${open ? 'z-50' : 'z-0'} ${widthClass}`}>
       {hideLabel ? null : <span className={FIELD_LABEL_CLASS}>{label}</span>}
       <button
         type="button"
@@ -127,7 +127,7 @@ export function ShiftMenuSelect({
 
       {open ? (
         <div
-          className={`${menuPanelClass} left-0 top-[calc(100%+1px)] z-30`}
+          className={`${menuPanelClass} left-0 top-[calc(100%+1px)] z-50`}
           style={{ width: Math.max(panelWidth, isSm ? 112 : 140), isolation: 'isolate' }}
         >
           <div className={menuListClass}>

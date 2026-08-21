@@ -22,6 +22,7 @@ export type ShiftRecordListItem = {
   end_time: string | null;
   delay_minutes: number;
   planned_start: string | null;
+  planned_end: string | null;
   completed_at: string | null;
   payload: Record<string, unknown> | null;
 };
@@ -134,6 +135,7 @@ export function toShiftRecordListItem(order: OperationOrder): ShiftRecordListIte
     end_time: resolveEndTime(order),
     delay_minutes: Number(order.delayMinutes ?? 0),
     planned_start: order.plannedStart ?? null,
+    planned_end: order.plannedEnd ?? null,
     completed_at: order.completedAt ?? null,
     payload: (order.payload as Record<string, unknown> | null) ?? null,
   };

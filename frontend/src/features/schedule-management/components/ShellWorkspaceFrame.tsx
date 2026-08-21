@@ -9,6 +9,8 @@ type ShellWorkspaceFrameProps = {
   flush?: boolean;
   adminMode: boolean;
   onAdminModeChange: (enabled: boolean) => void;
+  supervisorApproval: boolean;
+  onSupervisorApprovalChange: (enabled: boolean) => void;
 };
 
 /**
@@ -21,6 +23,8 @@ export function ShellWorkspaceFrame({
   flush = false,
   adminMode,
   onAdminModeChange,
+  supervisorApproval,
+  onSupervisorApprovalChange,
 }: ShellWorkspaceFrameProps) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#121214] p-3">
@@ -33,6 +37,8 @@ export function ShellWorkspaceFrame({
           <ShellAccountToolbar
             adminMode={adminMode}
             onAdminModeChange={onAdminModeChange}
+            supervisorApproval={supervisorApproval}
+            onSupervisorApprovalChange={onSupervisorApprovalChange}
           />
         </header>
         <div

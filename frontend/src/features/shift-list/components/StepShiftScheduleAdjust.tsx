@@ -1,12 +1,8 @@
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck, Minus, Plus } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
   buildAttributeIntervalLegends,
-  clampGridZoom,
-  GRID_ZOOM_MAX,
-  GRID_ZOOM_MIN,
-  GRID_ZOOM_STEP,
   parseStoredTemplateBody,
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -23,6 +19,7 @@ import {
   normalizeMinimumRecoveryTimeSeconds,
 } from '../utils/schedule-engine/physics';
 import { ScheduleAnalysisReportPanel } from './ScheduleAnalysisReportPanel';
+import { ScheduleTimeZoomToolbar } from './ScheduleTimeZoomToolbar';
 import {
   PUBLISH_STATE_LABEL,
   resolveSchedulePublishState,
@@ -1619,46 +1616,7 @@ export function StepShiftScheduleAdjust({
 
         <div className="h-4 w-px bg-zinc-800" />
 
-        {/*
-          時間刻度縮放。讀數固定寬度（w-10 + tabular-nums），
-          倍率從 40% 變到 300% 時字寬不變，工具列不會跟著抖。
-        */}
-        <button
-          type="button"
-          disabled={gridZoom <= GRID_ZOOM_MIN}
-          onClick={() => setGridZoom((z) => clampGridZoom(z - GRID_ZOOM_STEP))}
-          className={`rounded p-1.5 transition ${
-            gridZoom > GRID_ZOOM_MIN
-              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-              : 'cursor-not-allowed text-zinc-600 opacity-40'
-          }`}
-          title="時間刻度縮小"
-        >
-          <Minus className="size-4" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setGridZoom(1)}
-          className="w-10 shrink-0 rounded py-1 text-center text-[11px] tabular-nums text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-100"
-          title="時間刻度：點擊回到自動寬度"
-        >
-          {Math.round(gridZoom * 100)}%
-        </button>
-
-        <button
-          type="button"
-          disabled={gridZoom >= GRID_ZOOM_MAX}
-          onClick={() => setGridZoom((z) => clampGridZoom(z + GRID_ZOOM_STEP))}
-          className={`rounded p-1.5 transition ${
-            gridZoom < GRID_ZOOM_MAX
-              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-              : 'cursor-not-allowed text-zinc-600 opacity-40'
-          }`}
-          title="時間刻度放大"
-        >
-          <Plus className="size-4" />
-        </button>
+        <ScheduleTimeZoomToolbar zoom={gridZoom} onChange={setGridZoom} />
 
         <div className="h-4 w-px bg-zinc-800" />
 

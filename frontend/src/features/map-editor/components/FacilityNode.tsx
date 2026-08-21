@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import type { RefObject } from 'react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type {
   FacilityObject,
@@ -132,26 +133,6 @@ import {
 } from '../utils/facilityFormatPainter'
 import { resolveFacilityAreaSize } from '../utils/facilityAreaCoords'
 import { facilityUsesDraggableMapLabel } from '../utils/facilityInspectorUi'
-
-/**
- * 固定工具列螢幕尺寸（與元件大小無關）。
- * 僅補償地圖 CSS scale，讓縮放地圖時仍維持可點的約 48–56px 按鈕。
- */
-function facilityToolbarScreenScale(
-  mapScale: number,
-  meterMode: boolean,
-  scaleX: number,
-  scaleY: number,
-): number {
-  const BASE = 0.82
-  if (meterMode) {
-    const uiScale = clamp(1 / Math.max(0.15, mapScale), 1, 2.75)
-    return BASE * uiScale
-  }
-  const vpScale = Math.min(scaleX > 0 ? scaleX : 1, scaleY > 0 ? scaleY : 1)
-  const uiScale = clamp(1 / Math.max(0.15, vpScale), 1, 2.5)
-  return BASE * uiScale
-}
 
 type FacilityNodeProps = {
   facility: FacilityObject
@@ -851,14 +832,6 @@ export const FacilityNode = memo(function FacilityNode({
           })()
       : facilityHitPadWorld(facility)
 
-  /** 固定可點尺寸；僅補償地圖縮放，不隨元件大小變化 */
-  const toolbarScreenScale = facilityToolbarScreenScale(
-    mapScale,
-    meterMode,
-    scaleX,
-    scaleY,
-  )
-
   const formatPaintActive = !!formatPaintSnapshot
   const formatPaintCanApply =
     formatPaintActive &&
@@ -944,6 +917,7 @@ export const FacilityNode = memo(function FacilityNode({
     }
   })()
   const draggingRef = useRef(false)
+  const toolbarAnchorRef = useRef<HTMLDivElement>(null)
   const dragHistoryPushedRef = useRef(false)
   const resizingRef = useRef(false)
   const resizeHistoryPushedRef = useRef(false)
@@ -2399,90 +2373,117 @@ export const FacilityNode = memo(function FacilityNode({
         />
       )}
 
-      {selected && !readOnly && showFacilityToolbar && (
-        <div
-          data-facility-toolbar
-          className="pointer-events-none absolute z-[5020] flex flex-col items-center gap-1 pt-1"
-          style={{
-            left: crossoverMidLocal
-              ? hitPadX + crossoverMidLocal.x
-              : aabbBottomCenterLeft,
-            top: crossoverMidLocal
-              ? hitPadY + crossoverMidLocal.y + 14
-              : aabbBottomPx +
-                (showTransformSizeOverlay ? 26 : 6) +
-                (useDraggableMapLabel ? 28 : 0),
-            transform: `translateX(-50%) scale(${toolbarScreenScale})`,
-            transformOrigin: 'top center',
-          }}
-        >
+      {selected && !readOnly && showFacilityToolbar && !formatPaintActive ? (
+        <>
+          {/* 錨點留在地圖座標；實際工具列 portal 到 body，避免 overflow:hidden 裁切 */}
           <div
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
-            role="toolbar"
-            aria-label={isTrackCrossover ? '線徑操作' : '旋轉'}
+            ref={toolbarAnchorRef}
+            className="pointer-events-none absolute size-0"
+            style={{
+              left: crossoverMidLocal
+                ? hitPadX + crossoverMidLocal.x
+                : aabbBottomCenterLeft,
+              top: crossoverMidLocal
+                ? hitPadY + crossoverMidLocal.y + 14
+                : aabbBottomPx +
+                  (showTransformSizeOverlay ? 26 : 6) +
+                  (useDraggableMapLabel ? 28 : 0),
+            }}
+            aria-hidden
+          />
+          <MapFloatingAnchorPortal
+            open
+            anchorRef={toolbarAnchorRef}
+            dataAttr="data-facility-toolbar"
+            className="pointer-events-none flex flex-col items-center gap-1"
+            offsetY={4}
           >
-            {!isTrackCrossover ? (
-              <>
+            <div
+              className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
+              role="toolbar"
+              aria-label={isTrackCrossover ? '線徑操作' : '旋轉'}
+            >
+              {!isTrackCrossover ? (
+                <>
+                  <button
+                    type="button"
+                    title="逆時針微調 1°"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => onRotateDelta(facility.id, -1)}
+                    className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                  >
+                    <RotateCcw className="size-4" aria-hidden />
+                  </button>
+                  <span className="mx-0.5 min-w-[2rem] text-center font-mono text-xs leading-none text-cyan-400/90">
+                    {angleLabel}
+                  </span>
+                  <button
+                    type="button"
+                    title="順時針微調 1°"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => onRotateDelta(facility.id, 1)}
+                    className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                  >
+                    <RotateCw className="size-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    title="順時針轉 90°"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => onRotateRight90(facility.id)}
+                    className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                  >
+                    <RotateCwSquare className="size-4" aria-hidden />
+                  </button>
+                </>
+              ) : null}
+              {!isTrackCrossover && onStartFormatPaint && (
                 <button
                   type="button"
-                  title="逆時針微調 1°"
-                  onClick={() => onRotateDelta(facility.id, -1)}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                  title="複製格式（大小、角度、填色、框線有無與線型、字級；僅可貼到相同元件）"
+                  onPointerDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onStartFormatPaint()
+                  }}
+                  className="rounded-full p-1.5 text-violet-200/90 transition hover:bg-zinc-700 hover:text-violet-100"
                 >
-                  <RotateCcw className="size-4" aria-hidden />
+                  <Paintbrush className="size-4" aria-hidden />
                 </button>
-                <span className="mx-0.5 min-w-[2rem] text-center font-mono text-xs leading-none text-cyan-400/90">
-                  {angleLabel}
-                </span>
+              )}
+              {onDelete && (
                 <button
                   type="button"
-                  title="順時針微調 1°"
-                  onClick={() => onRotateDelta(facility.id, 1)}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                  title="刪除此物件（Delete）"
+                  onPointerDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onDelete()
+                  }}
+                  className="rounded-full p-1.5 text-red-300/90 transition hover:bg-red-950/80 hover:text-red-200"
                 >
-                  <RotateCw className="size-4" aria-hidden />
+                  <Trash2 className="size-4" aria-hidden />
                 </button>
-                <button
-                  type="button"
-                  title="順時針轉 90°"
-                  onClick={() => onRotateRight90(facility.id)}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-                >
-                  <RotateCwSquare className="size-4" aria-hidden />
-                </button>
-              </>
-            ) : null}
-            {!isTrackCrossover && onStartFormatPaint && (
-              <button
-                type="button"
-                title="複製格式（大小、角度、填色、框線有無與線型、字級；僅可貼到相同元件）"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onStartFormatPaint()
-                }}
-                className="rounded-full p-1.5 text-violet-200/90 transition hover:bg-zinc-700 hover:text-violet-100"
-              >
-                <Paintbrush className="size-4" aria-hidden />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                title="刪除此物件（Delete）"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onDelete()
-                }}
-                className="rounded-full p-1.5 text-red-300/90 transition hover:bg-red-950/80 hover:text-red-200"
-              >
-                <Trash2 className="size-4" aria-hidden />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+              )}
+            </div>
+          </MapFloatingAnchorPortal>
+        </>
+      ) : null}
     </div>
   )
 })

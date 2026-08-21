@@ -1,12 +1,7 @@
 import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Info,
   Loader2,
-  Music2,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,44 +10,75 @@ import { fetchShiftRecordDetail } from '../api/shiftRecordsApi';
 import {
   buildDrivingCapabilityModel,
   filterEventsByLane,
+  iconUrlForTimelineKind,
   type DrivingCapabilityModel,
   type TaskLaneFilter,
   type TimelineEvent,
   type TimelineEventKind,
 } from '../utils/buildDrivingCapabilityModel';
 
+/** 圖例順序對齊設計稿：線型 → 常用動作 → 號誌／告警 → 整備類 */
+const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; label: string; channel?: 'action' | 'event' }> = [
+  { kind: 'music', label: '音樂' },
+  { kind: 'enter', label: '進站' },
+  { kind: 'exit', label: '出站' },
+  { kind: 'door_open', label: '開門' },
+  { kind: 'door_close', label: '關門' },
+  { kind: 'signal', label: '號誌', channel: 'event' },
+  { kind: 'alert', label: '告警', channel: 'event' },
+  { kind: 'dispatch', label: '調度' },
+  { kind: 'charging', label: '充電' },
+  { kind: 'wash', label: '洗車' },
+  { kind: 'maintenance', label: '保養' },
+  { kind: 'repair', label: '維修' },
+  { kind: 'parking', label: '臨停' },
+];
+
 type DrivingCapabilityModalProps = {
   orderId: string;
   onClose: () => void;
 };
 
-const LANE_FILTERS: Array<{ value: TaskLaneFilter; label: string }> = [
+const CHANNEL_FILTERS: Array<{ value: TaskLaneFilter; label: string }> = [
   { value: 'all', label: '全部' },
-  { value: 'main', label: '主任務' },
-  { value: 'secondary', label: '次任務' },
+  { value: 'action', label: '動作' },
+  { value: 'event', label: '事件' },
 ];
 
-const PX_PER_MINUTE = 108;
-const LANE_LABEL_W = 72;
+/** 設計稿節點約每 40s 一格且標籤不重疊 → 提高時間密度與最小間距 */
+const PX_PER_MINUTE = 160;
+const LANE_LABEL_W = 44;
+const AXIS_H = 22;
+const STATUS_H = 32;
+const NODE_SIZE = 36;
+const NODE_INNER = 22;
+const MIN_NODE_GAP = 100;
+const LINE_Y = 22;
+const LANE_H = 96;
+const AXIS_LABEL_MIN_GAP = 72;
+const LINE_Z = 5;
+const NODE_INNER_Z = 10;
 
 function msToLeft(ms: number, model: DrivingCapabilityModel): number {
   return ((ms - model.rangeStartMs) / 60_000) * PX_PER_MINUTE;
 }
 
 function timelineWidth(model: DrivingCapabilityModel): number {
-  const minutes = model.durationMinutes + 1;
-  return Math.max(minutes * PX_PER_MINUTE, 480);
+  const spanMinutes = (model.rangeEndMs - model.rangeStartMs) / 60_000;
+  return Math.max(spanMinutes * PX_PER_MINUTE + 48, 720);
 }
 
-function minuteTicks(model: DrivingCapabilityModel): number[] {
-  const count = model.durationMinutes + 1;
-  return Array.from({ length: count }, (_, i) => i);
-}
-
-function formatAxisMinute(model: DrivingCapabilityModel, offsetMin: number): string {
-  const ms = model.rangeStartMs + offsetMin * 60_000;
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function layoutLaneLefts(events: TimelineEvent[], model: DrivingCapabilityModel): Map<string, number> {
+  const sorted = [...events].sort((a, b) => a.atMs - b.atMs || a.id.localeCompare(b.id));
+  const lefts = new Map<string, number>();
+  let prev = Number.NEGATIVE_INFINITY;
+  for (const event of sorted) {
+    const natural = msToLeft(event.atMs, model);
+    const left = Math.max(natural, prev + MIN_NODE_GAP);
+    lefts.set(event.id, left);
+    prev = left;
+  }
+  return lefts;
 }
 
 function formatEventTime(ms: number): string {
@@ -63,93 +89,211 @@ function formatEventTime(ms: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-function EventIcon({ kind }: { kind: TimelineEventKind }) {
-  if (kind === 'depart') {
-    return (
-      <span className="flex size-5 items-center justify-center rounded-full bg-sky-500/20 text-sky-400 ring-1 ring-sky-500/50">
-        <Check className="size-3" strokeWidth={3} />
-      </span>
-    );
-  }
-  if (kind === 'door_open') {
-    return (
-      <span className="flex size-5 items-center justify-center rounded bg-sky-500/15 ring-1 ring-sky-500/40">
-        <span className="h-2.5 w-3 rounded-sm border border-sky-400" />
-      </span>
-    );
-  }
-  if (kind === 'door_close') {
-    return (
-      <span className="flex size-5 items-center justify-center rounded bg-sky-500/15 ring-1 ring-sky-500/40">
-        <span className="h-2.5 w-3 rounded-sm bg-sky-400/80" />
-      </span>
-    );
-  }
-  if (kind === 'alarm') {
-    return (
-      <span className="flex size-5 items-center justify-center rounded-full bg-red-500/20 text-red-400">
-        <AlertTriangle className="size-3" />
-      </span>
-    );
-  }
-  if (kind === 'broadcast') {
-    return <Music2 className="size-3 text-zinc-500" />;
-  }
-  return <span className="size-2 rounded-full bg-zinc-500" />;
+/** 整分顯示 mm:ss 省略秒；其餘完整 h:m:s（對齊設計稿刻度密度） */
+function formatAxisTick(ms: number): string {
+  const d = new Date(ms);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = d.getSeconds();
+  if (ss === 0) return `${hh}:${mm}`;
+  return `${hh}:${mm}:${String(ss).padStart(2, '0')}`;
 }
 
-function TimelineEventNode({ event, model }: { event: TimelineEvent; model: DrivingCapabilityModel }) {
-  const left = msToLeft(event.atMs, model);
-  const isMain = event.lane === 'main';
+function axisTicks(model: DrivingCapabilityModel): Array<{ ms: number; left: number }> {
+  const sorted = [...model.events].sort((a, b) => a.atMs - b.atMs);
+  if (sorted.length === 0) {
+    return [
+      { ms: model.rangeStartMs, left: msToLeft(model.rangeStartMs, model) },
+      { ms: model.rangeEndMs, left: msToLeft(model.rangeEndMs, model) },
+    ];
+  }
+  const ticks: Array<{ ms: number; left: number }> = [];
+  for (const event of sorted) {
+    const left = msToLeft(event.atMs, model);
+    const last = ticks[ticks.length - 1];
+    if (last && left - last.left < AXIS_LABEL_MIN_GAP) continue;
+    ticks.push({ ms: event.atMs, left });
+  }
+  return ticks;
+}
+
+function nodeTone(kind: TimelineEventKind, channel: 'action' | 'event') {
+  const alarm = kind === 'alert' || kind === 'signal' || channel === 'event';
+  return {
+    alarm,
+    ring: alarm ? 'ring-zinc-400/65' : 'ring-[#51A2FF]/75',
+    glow: alarm
+      ? 'shadow-[0_0_0_7px_rgba(161,161,170,0.14)]'
+      : 'shadow-[0_0_0_7px_rgba(43,127,255,0.18)]',
+    core: alarm ? 'bg-[#52525b]' : 'bg-[#2563eb]',
+  };
+}
+
+/** 圖例用完整節點（外圈光暈 + 內圓）；時軸用分層繪製讓線穿過 */
+function EventIcon({
+  kind,
+  iconUrl,
+  channel = 'action',
+  size = NODE_SIZE,
+  innerSize = NODE_INNER,
+}: {
+  kind: TimelineEventKind;
+  iconUrl?: string | null;
+  channel?: 'action' | 'event';
+  size?: number;
+  innerSize?: number;
+}) {
+  const src = iconUrl || iconUrlForTimelineKind(kind);
+  const tone = nodeTone(kind, channel);
+  return (
+    <span
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <span
+        className={`pointer-events-none absolute inset-0 rounded-full bg-transparent ring-[1.5px] ${tone.ring} ${tone.glow}`}
+      />
+      <span
+        className={`relative flex items-center justify-center rounded-full ${tone.core}`}
+        style={{ width: innerSize, height: innerSize }}
+      >
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            className="object-contain brightness-0 invert"
+            style={{ width: innerSize - 8, height: innerSize - 8 }}
+          />
+        ) : (
+          <span className="size-1.5 rounded-full bg-white" />
+        )}
+      </span>
+    </span>
+  );
+}
+
+function NodeHalo({
+  left,
+  kind,
+  channel,
+}: {
+  left: number;
+  kind: TimelineEventKind;
+  channel: 'action' | 'event';
+}) {
+  const tone = nodeTone(kind, channel);
+  return (
+    <span
+      className={`pointer-events-none absolute -translate-x-1/2 rounded-full bg-transparent ring-[1.5px] ${tone.ring} ${tone.glow}`}
+      style={{
+        left,
+        top: LINE_Y - NODE_SIZE / 2,
+        width: NODE_SIZE,
+        height: NODE_SIZE,
+        zIndex: 1,
+      }}
+      aria-hidden
+    />
+  );
+}
+
+function TimelineEventNode({
+  event,
+  left,
+  selected,
+  onSelect,
+}: {
+  event: TimelineEvent;
+  left: number;
+  selected: boolean;
+  onSelect: (event: TimelineEvent) => void;
+}) {
+  const src = event.iconUrl || iconUrlForTimelineKind(event.kind);
+  const tone = nodeTone(event.kind, event.channel);
 
   return (
-    <div
-      className="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
-      style={{ left }}
+    <button
+      type="button"
+      className={`absolute flex -translate-x-1/2 flex-col items-center ${
+        selected ? 'brightness-125' : ''
+      }`}
+      style={{
+        left,
+        top: LINE_Y - NODE_SIZE / 2,
+        zIndex: NODE_INNER_Z,
+      }}
       title={`${formatEventTime(event.atMs)} ${event.label}`}
+      onClick={() => onSelect(event)}
     >
-      <div className={`flex flex-col items-center gap-0.5 ${isMain ? 'min-w-[88px]' : 'min-w-[72px]'}`}>
-        {isMain ? <EventIcon kind={event.kind} /> : <EventIcon kind={event.kind} />}
-        <span className="whitespace-nowrap font-mono text-[10px] text-zinc-500">
+      {/* 內圓疊在軌道線之上；外圈由 NodeHalo 畫在線下 */}
+      <span
+        className="relative flex items-center justify-center"
+        style={{ width: NODE_SIZE, height: NODE_SIZE }}
+      >
+        <span
+          className={`flex items-center justify-center rounded-full ${tone.core}`}
+          style={{ width: NODE_INNER, height: NODE_INNER }}
+        >
+          {src ? (
+            <img
+              src={src}
+              alt=""
+              className="object-contain brightness-0 invert"
+              style={{ width: NODE_INNER - 8, height: NODE_INNER - 8 }}
+            />
+          ) : (
+            <span className="size-1.5 rounded-full bg-white" />
+          )}
+        </span>
+      </span>
+      <span className="mt-2 flex w-[96px] flex-col items-center gap-0.5">
+        <span className="font-mono text-[10px] leading-none text-zinc-400">
           {formatEventTime(event.atMs)}
         </span>
-        <span
-          className={`whitespace-nowrap text-center text-[10px] leading-tight ${
-            isMain ? 'text-zinc-200' : 'text-zinc-500'
-          }`}
-        >
+        <span className="line-clamp-2 text-center text-[11px] leading-tight text-zinc-100">
           {event.label}
         </span>
-      </div>
-    </div>
+        {event.delayLabel ? (
+          <span className="rounded bg-[#422006] px-1.5 py-0.5 text-[10px] font-medium text-orange-400">
+            {event.delayLabel}
+          </span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
 function StatusBarRow({
   model,
   filter,
+  width,
 }: {
   model: DrivingCapabilityModel;
   filter: TaskLaneFilter;
+  width: number;
 }) {
-  if (filter === 'secondary') return <div className="h-9" />;
+  if (filter === 'event') return null;
 
-  const width = timelineWidth(model);
   return (
-    <div className="relative h-9" style={{ width }}>
-      {model.statusSegments.map((seg) => {
+    <div className="relative" style={{ width, height: STATUS_H }}>
+      {model.statusSegments.map((seg, index) => {
         const left = msToLeft(seg.fromMs, model);
-        const w = Math.max(4, msToLeft(seg.toMs, model) - left);
+        const right = msToLeft(seg.toMs, model);
+        const w = Math.max(12, right - left);
         const bg =
           seg.tone === 'green'
-            ? 'bg-emerald-500/35 border-emerald-500/50'
+            ? 'bg-[#22C55E]'
             : seg.tone === 'blue'
-              ? 'bg-sky-500/35 border-sky-500/50'
-              : 'bg-red-500/35 border-red-500/50';
+              ? 'bg-[#38BDF8]'
+              : 'bg-red-500';
+        const isFirst = index === 0;
+        const isLast = index === model.statusSegments.length - 1;
         return (
           <div
             key={seg.id}
-            className={`absolute top-1 flex h-7 items-center justify-center rounded border px-2 text-[11px] text-zinc-100 ${bg}`}
+            className={`absolute top-1 flex h-6 items-center justify-center px-2 text-[11px] font-medium text-white ${bg} ${
+              isFirst ? 'rounded-l-md' : ''
+            } ${isLast ? 'rounded-r-md' : ''}`}
             style={{ left, width: w }}
           >
             <span className="truncate">{seg.label}</span>
@@ -162,80 +306,170 @@ function StatusBarRow({
 
 function TaskTrackRow({
   model,
-  lane,
+  channel,
   events,
+  width,
+  selectedId,
+  onSelect,
 }: {
   model: DrivingCapabilityModel;
-  lane: 'main' | 'secondary';
+  channel: 'action' | 'event';
   events: TimelineEvent[];
+  width: number;
+  selectedId: string | null;
+  onSelect: (event: TimelineEvent) => void;
 }) {
-  const width = timelineWidth(model);
-  const laneEvents = events.filter((e) => e.lane === lane);
-  const lineClass =
-    lane === 'main'
-      ? 'border-t-2 border-solid border-sky-500'
-      : 'border-t-2 border-dashed border-zinc-600';
+  const laneEvents = events.filter((e) => e.channel === channel);
+  const lefts = layoutLaneLefts(laneEvents, model);
+  const dashed = channel === 'event';
 
   return (
-    <div className="relative h-16" style={{ width }}>
-      <div className={`absolute left-0 right-0 top-1/2 ${lineClass}`} />
+    <div className="relative" style={{ width, height: LANE_H }}>
+      {/* 1) 外圈光暈（線之下，透明底不遮線） */}
       {laneEvents.map((ev) => (
-        <TimelineEventNode key={ev.id} event={ev} model={model} />
+        <NodeHalo
+          key={`halo-${ev.id}`}
+          left={lefts.get(ev.id) ?? 0}
+          kind={ev.kind}
+          channel={ev.channel}
+        />
+      ))}
+
+      {/* 2) 連續軌道線：穿過外圈中心，不被蓋住 */}
+      <div
+        className="pointer-events-none absolute left-0 right-0"
+        style={{
+          top: LINE_Y - 1,
+          height: 2,
+          zIndex: LINE_Z,
+          ...(dashed
+            ? {
+                backgroundImage:
+                  'repeating-linear-gradient(to right, #a1a1aa 0 6px, transparent 6px 11px)',
+              }
+            : { backgroundColor: '#3B82F6' }),
+        }}
+      />
+
+      {/* 3) 內圓圖示 + 標籤（線之上） */}
+      {laneEvents.map((ev) => (
+        <TimelineEventNode
+          key={ev.id}
+          event={ev}
+          left={lefts.get(ev.id) ?? 0}
+          selected={selectedId === ev.id}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );
 }
 
-function TimelinePanel({ model, filter }: { model: DrivingCapabilityModel; filter: TaskLaneFilter }) {
+function TimelinePanel({
+  model,
+  filter,
+  selectedId,
+  onSelect,
+}: {
+  model: DrivingCapabilityModel;
+  filter: TaskLaneFilter;
+  selectedId: string | null;
+  onSelect: (event: TimelineEvent) => void;
+}) {
   const events = useMemo(() => filterEventsByLane(model.events, filter), [model.events, filter]);
-  const width = timelineWidth(model);
-  const ticks = minuteTicks(model);
+  const width = useMemo(() => {
+    const base = timelineWidth(model);
+    const actionLefts = layoutLaneLefts(
+      events.filter((e) => e.channel === 'action'),
+      model,
+    );
+    const eventLefts = layoutLaneLefts(
+      events.filter((e) => e.channel === 'event'),
+      model,
+    );
+    let maxLeft = base;
+    for (const left of actionLefts.values()) maxLeft = Math.max(maxLeft, left + 56);
+    for (const left of eventLefts.values()) maxLeft = Math.max(maxLeft, left + 56);
+    return maxLeft;
+  }, [events, model]);
+  const ticks = axisTicks(model);
+  const showStatus = filter !== 'event';
+  const showAction = filter === 'all' || filter === 'action';
+  const showEvent = filter === 'all' || filter === 'event';
+
+  const labelPadTop = AXIS_H + (showStatus ? STATUS_H + 8 : 0);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/60 bg-[#0c0c0e]/80">
       <div className="flex min-h-0 flex-1">
         <div
-          className="shrink-0 border-r border-zinc-800/80 bg-zinc-950/60 pt-8 text-[11px] text-zinc-500"
-          style={{ width: LANE_LABEL_W }}
+          className="shrink-0 text-[12px]"
+          style={{ width: LANE_LABEL_W, paddingTop: labelPadTop }}
         >
-          {filter !== 'secondary' && (
-            <div className="flex h-9 items-center justify-end pr-2">狀態</div>
-          )}
-          {(filter === 'all' || filter === 'main') && (
-            <div className="flex h-16 items-center justify-end pr-2">主任務</div>
-          )}
-          {(filter === 'all' || filter === 'secondary') && (
-            <div className="flex h-16 items-center justify-end pr-2">次任務</div>
-          )}
+          {showAction ? (
+            <div
+              className="flex items-start justify-end pr-2 font-medium text-[#51A2FF]"
+              style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
+            >
+              動作
+            </div>
+          ) : null}
+          {showEvent ? (
+            <div
+              className="flex items-start justify-end pr-2 text-zinc-200"
+              style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
+            >
+              事件
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-          <div style={{ width: width + 24, minWidth: '100%' }} className="px-3 pb-2 pt-3">
-            <div className="relative mb-2 h-5 border-b border-zinc-800/60" style={{ width }}>
-              {ticks.map((i) => (
+          <div style={{ width: width + 40, minWidth: '100%' }} className="px-3 pb-2 pt-3">
+            <div className="relative" style={{ width, height: AXIS_H }}>
+              {ticks.map((tick) => (
                 <span
-                  key={i}
-                  className="absolute -translate-x-1/2 font-mono text-[10px] text-zinc-500"
-                  style={{ left: i * PX_PER_MINUTE }}
+                  key={tick.ms}
+                  className="absolute -translate-x-1/2 font-mono text-[10px] tabular-nums text-zinc-400"
+                  style={{ left: tick.left }}
                 >
-                  {formatAxisMinute(model, i)}
+                  {formatAxisTick(tick.ms)}
                 </span>
               ))}
             </div>
 
-            <StatusBarRow model={model} filter={filter} />
-            {(filter === 'all' || filter === 'main') && (
-              <TaskTrackRow model={model} lane="main" events={events} />
-            )}
-            {(filter === 'all' || filter === 'secondary') && (
-              <TaskTrackRow model={model} lane="secondary" events={events} />
-            )}
+            {showStatus ? (
+              <div className="mb-2">
+                <StatusBarRow model={model} filter={filter} width={width} />
+              </div>
+            ) : null}
+
+            {showAction ? (
+              <TaskTrackRow
+                model={model}
+                channel="action"
+                events={events}
+                width={width}
+                selectedId={selectedId}
+                onSelect={onSelect}
+              />
+            ) : null}
+            {showEvent ? (
+              <TaskTrackRow
+                model={model}
+                channel="event"
+                events={events}
+                width={width}
+                selectedId={selectedId}
+                onSelect={onSelect}
+              />
+            ) : null}
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 border-t border-zinc-800/60 px-4 py-2 text-[11px] text-zinc-500">
-        <Info className="size-3.5 shrink-0" />
+      <div className="flex items-center gap-1.5 border-t border-zinc-800/50 px-4 py-2.5 text-[11px] text-zinc-500">
+        <Info className="size-3.5 shrink-0" aria-hidden />
         時軸可以左右滑動，查看更多任務
         <span className="text-zinc-600">← →</span>
       </div>
@@ -243,83 +477,46 @@ function TimelinePanel({ model, filter }: { model: DrivingCapabilityModel; filte
   );
 }
 
-function TimelineLegend() {
+function LegendLine({
+  color,
+  dashed,
+}: {
+  color: string;
+  dashed?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4">
-      <h3 className="mb-3 text-sm font-medium text-zinc-300">任務時間軸</h3>
-      <div className="grid gap-2 text-[11px] text-zinc-400 sm:grid-cols-2">
-        <div className="flex items-center gap-2">
-          <span className="h-0.5 w-8 border-t-2 border-sky-500" />
-          主任務
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-0.5 w-8 border-t-2 border-dashed border-zinc-500" />
-          次任務
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-0.5 w-8 border-t-2 border-red-500" />
-          主任務（加速時段）
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-0.5 w-8 border-t-2 border-dashed border-red-500" />
-          次任務（加速時段）
-        </div>
-        <div className="flex items-center gap-2">
-          <EventIcon kind="door_open" />
-          開門
-        </div>
-        <div className="flex items-center gap-2">
-          <EventIcon kind="door_close" />
-          關門
-        </div>
-        <div className="flex items-center gap-2">
-          <EventIcon kind="alarm" />
-          告警
-        </div>
-      </div>
-    </div>
+    <span
+      className="inline-block w-9"
+      style={{
+        height: 2,
+        backgroundColor: dashed ? 'transparent' : color,
+        backgroundImage: dashed
+          ? `repeating-linear-gradient(to right, ${color} 0 5px, transparent 5px 9px)`
+          : undefined,
+      }}
+    />
   );
 }
 
-function TimelineSummary({ model }: { model: DrivingCapabilityModel }) {
-  const [open, setOpen] = useState(true);
-  const punctualityClass =
-    model.punctuality === '準時'
-      ? 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30'
-      : model.punctuality === '延誤'
-        ? 'bg-orange-500/15 text-orange-400 ring-orange-500/30'
-        : 'bg-zinc-700/40 text-zinc-400 ring-zinc-600/40';
-
+function TimelineLegend() {
   return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <h3 className="text-sm font-medium text-zinc-300">任務時間軸</h3>
-        {open ? <ChevronUp className="size-4 text-zinc-500" /> : <ChevronDown className="size-4 text-zinc-500" />}
-      </button>
-      {open && (
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-zinc-500">計劃時間</dt>
-            <dd className="font-mono text-zinc-200">{model.plannedDurationHms}</dd>
+    <div className="rounded-xl border border-[#2B7FFF]/35 bg-[#0c0c0e]/60 px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 text-[12px] text-zinc-300">
+        <div className="flex items-center gap-2">
+          <LegendLine color="#3b82f6" />
+          主任務
+        </div>
+        <div className="flex items-center gap-2">
+          <LegendLine color="#a1a1aa" dashed />
+          次任務
+        </div>
+        {LEGEND_ITEMS.map((item) => (
+          <div key={item.kind} className="flex items-center gap-2">
+            <EventIcon kind={item.kind} channel={item.channel} size={26} />
+            {item.label}
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-zinc-500">實際時間</dt>
-            <dd className="font-mono text-zinc-200">{model.actualDurationHms}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-zinc-500">狀態類型</dt>
-            <dd>
-              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${punctualityClass}`}>
-                {model.punctuality}
-              </span>
-            </dd>
-          </div>
-        </dl>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
@@ -329,13 +526,16 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<TaskLaneFilter>('all');
   const [model, setModel] = useState<DrivingCapabilityModel | null>(null);
+  const [selected, setSelected] = useState<TimelineEvent | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const detail = await fetchShiftRecordDetail(orderId);
-      setModel(buildDrivingCapabilityModel(detail));
+      const next = buildDrivingCapabilityModel(detail);
+      setModel(next);
+      setSelected(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setModel(null);
@@ -373,84 +573,90 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="driving-capability-title"
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#0c0c0e] shadow-2xl"
+        aria-labelledby="operation-record-title"
+        className="flex max-h-[92vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#18181b] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-zinc-800/80 px-5 py-4">
-          <div className="min-w-0 space-y-3">
-            <h2 id="driving-capability-title" className="text-base font-semibold text-zinc-100">
-              行車能力監控
-            </h2>
-            {model && (
-              <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-sky-600 px-2 py-0.5 font-mono text-sm font-semibold text-white">
-                    {model.tripCode}
-                  </span>
-                  <span className="text-sm text-zinc-300">{model.routeEndpoints}</span>
-                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-                    # {model.directionLabel}
-                  </span>
-                </div>
-                <p className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <Clock className="size-3.5 shrink-0" aria-hidden />
-                  {model.timeRangeLabel}
-                </p>
-              </>
-            )}
-          </div>
+        <header className="relative shrink-0 px-6 pt-5 pb-1">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
             aria-label="關閉"
           >
             <X className="size-5" />
           </button>
+
+          <h2 id="operation-record-title" className="pr-10 text-base font-semibold tracking-wide text-zinc-100">
+            運行紀錄
+          </h2>
+
+          {model ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-8">
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-sm text-zinc-200">
+                <span className="rounded-md bg-[#2B7FFF] px-2.5 py-0.5 font-mono text-[13px] font-semibold text-white">
+                  {model.tripCode}
+                </span>
+                <span className="truncate">{model.routeEndpoints.replace(/➔|→/g, '→')}</span>
+              </div>
+              <div className="inline-flex shrink-0 items-center gap-2 text-[12px] text-zinc-400">
+                <Clock className="size-3.5 shrink-0" aria-hidden />
+                <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
+                <span className="text-zinc-500">總時長 {model.durationMinutes} 分鐘</span>
+              </div>
+            </div>
+          ) : null}
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-5 py-4">
-          {loading && (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6 pt-3 pb-5">
+          {loading ? (
             <div className="flex flex-1 items-center justify-center gap-2 py-16 text-zinc-500">
               <Loader2 className="size-5 animate-spin" />
               載入中…
             </div>
-          )}
+          ) : null}
 
-          {error && (
+          {error ? (
             <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
-          )}
+          ) : null}
 
-          {model && !loading && (
+          {model && !loading ? (
             <>
-              <div className="inline-flex w-fit rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
-                {LANE_FILTERS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFilter(opt.value)}
-                    className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
-                      filter === opt.value
-                        ? 'bg-zinc-700 text-zinc-100'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              {/* 設計稿：連段式 segmented control */}
+              <div className="inline-flex w-fit rounded-lg bg-[#27272a] p-0.5">
+                {CHANNEL_FILTERS.map((opt) => {
+                  const active = filter === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setFilter(opt.value)}
+                      className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+                        active
+                          ? 'bg-[#3f3f46] text-zinc-100 shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              <TimelinePanel model={model} filter={filter} />
+              <TimelinePanel
+                model={model}
+                filter={filter}
+                selectedId={selected?.id ?? null}
+                onSelect={setSelected}
+              />
 
-              <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+              <div className="shrink-0">
                 <TimelineLegend />
-                <TimelineSummary model={model} />
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
