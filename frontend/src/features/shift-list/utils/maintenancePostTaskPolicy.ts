@@ -256,7 +256,32 @@ export function resolveYardPostTaskPolicy(args: {
       // 不唯一時 rotationExitStationId 仍然是 null（預設行為完全不變），
       // 但拓樸算得出來的站全部留在候選集合裡供備援用。
       exitStationCandidateIds: resolveExitStationIdsForFacilityCodes(origins, chargingCodes),
-      // 充電沒有外掛班次，車真的就停在出場站，第一段只能從那裡發車
+      /**
+       * 充電沒有外掛班次，車真的就停在出場站，第一段只能從那裡發車。
+       *
+       * <strong>2026-08-21 試過打開，實測後退回，原因記在這裡。</strong>
+       *
+       * 動機是對的：使用者指出「車停在 T3上行、下一班卻要從 N2W下行出發 發車」這種
+       * 空跑（實測一天 10 次、每次 180 秒）其實是一種調度班次，那段路正好就是 TN
+       * 路線，本來就能載客。打開之後空跑 10 → 4、班次 +9、備用站 2.45% → 2.01%、
+       * 警告 89 → 70。
+       *
+       * 但站位碰撞保護不足從 <strong>0 對變成 15 對</strong>，而且 15 對全部牽涉新插
+       * 的調度班次，模式完全一致：
+       *
+       *   T3上行（10 對）    調度 TN 12:01 從 T3上行 發車，正線 ST 12:01 到達，差 40 秒
+       *   N2W上行停靠（5 對）調度 TN 12:03 經過，正線 TN 12:05 經過，差 30 秒
+       *
+       * 根因是 {@link insertMaintenanceEntryServiceTrips} 的落點規則：調度班次被排成
+       * 「緊貼下一班正線之前」，而它跑的就是同一條 TN 路線，於是整條路上每一站都只
+       * 落後那班正線 1–4 分鐘，在<strong>發車站與中途站</strong>擠進 60 秒的保護窗。
+       * 該模組目前只檢查<strong>抵達站</strong>有沒有淨空（resolveBerthClearMinute），
+       * 發車站與中途站都沒檢查——保養／行檢的設施離正線遠、路徑與後續正線不重疊，
+       * 所以一直沒暴露。
+       *
+       * 要重新打開，得先讓落點規則<strong>逐站</strong>檢查碰撞保護，排不下就再往前
+       * 挪；只改這裡的開關會直接違反「不碰撞」這條最高原則。
+       */
       alignRotationToExitStation: true,
       allowEntryService: false,
       entryServiceExitStationIds: [],
@@ -270,7 +295,9 @@ export function resolveYardPostTaskPolicy(args: {
       // 待命的 mobile 設施通常涵蓋最多格（E／H／M 都可待命），出得去的站幾乎一定
       // 不只一個。先前「不唯一就 null」把整組資訊丟掉，備援因此永遠是空的。
       exitStationCandidateIds: resolveExitStationIdsForFacilityCodes(origins, mobileCodes),
-      // 待命同充電：沒有外掛班次，車就在出場站
+      // 待命同充電：沒有外掛班次，車就在出場站。
+      // 打開會發生什麼、為什麼還不能打開，見上方充電分支的說明——實測那 10 次空跑
+      // 全部出自待命排在 H1／H2，打開後新插的 13 班調度班次製造出 15 對保護不足。
       alignRotationToExitStation: true,
       allowEntryService: false,
       entryServiceExitStationIds: [],
