@@ -37,6 +37,8 @@ import { LoginLog } from './database/entities/login-log.entity';
 import { PermissionChangeLog } from './database/entities/permission-change-log.entity';
 import { SystemSetting } from './database/entities/system-setting.entity';
 import { Notification } from './database/entities/notification.entity';
+// 營運全景圖台版面——原僅存於瀏覽器 localStorage，改為伺服器端保存
+import { DashboardPlane } from './database/entities/dashboard-plane.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -79,6 +81,8 @@ import { DatabaseInitService } from './database/database-init.service';
           LoginLog, PermissionChangeLog,
           // 後勤管理層：系統參數與全域通知
           SystemSetting, Notification,
+          // 營運核心層：全景圖台版面
+          DashboardPlane,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
