@@ -39,6 +39,10 @@ import { SystemSetting } from './database/entities/system-setting.entity';
 import { Notification } from './database/entities/notification.entity';
 // 營運全景圖台版面——原僅存於瀏覽器 localStorage，改為伺服器端保存
 import { DashboardPlane } from './database/entities/dashboard-plane.entity';
+// 場域圖資與媒體排程——原僅存於瀏覽器 localStorage 或伺服器端 JSON 檔
+import { MapEntity } from './database/entities/map.entity';
+import { MapVersion } from './database/entities/map-version.entity';
+import { MediaSchedule } from './database/entities/media-schedule.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -83,6 +87,8 @@ import { DatabaseInitService } from './database/database-init.service';
           SystemSetting, Notification,
           // 營運核心層：全景圖台版面
           DashboardPlane,
+          // 資源配置層：場域圖資版本庫與媒體排程
+          MapEntity, MapVersion, MediaSchedule,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
