@@ -27,6 +27,16 @@ import { TimeTemplate } from './database/entities/time-template.entity';
 import { MaintenanceTask } from './database/entities/maintenance-task.entity';
 import { OperationShift } from './database/entities/operation-shift.entity';
 import { MediaLibraryItem } from './database/entities/media-library-item.entity';
+// 後勤管理層（權限、日誌、系統基礎）——依第02584K章 2.2.3 規劃建立
+import { Account } from './database/entities/account.entity';
+import { Role } from './database/entities/role.entity';
+import { Permission } from './database/entities/permission.entity';
+import { RolePermission } from './database/entities/role-permission.entity';
+import { AccountRole } from './database/entities/account-role.entity';
+import { LoginLog } from './database/entities/login-log.entity';
+import { PermissionChangeLog } from './database/entities/permission-change-log.entity';
+import { SystemSetting } from './database/entities/system-setting.entity';
+import { Notification } from './database/entities/notification.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -63,6 +73,12 @@ import { DatabaseInitService } from './database/database-init.service';
           OperationRoute, OperationRouteStation, OperationRouteStationAction,
           OrderActionState, OrderEvent, TimeTemplate, MaintenanceTask, OperationShift,
           MediaLibraryItem,
+          // 後勤管理層：帳號、角色、功能權限與其綁定關係
+          Account, Role, Permission, RolePermission, AccountRole,
+          // 後勤管理層：登入登出與權限異動稽核
+          LoginLog, PermissionChangeLog,
+          // 後勤管理層：系統參數與全域通知
+          SystemSetting, Notification,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
