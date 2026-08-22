@@ -43,6 +43,11 @@ import { DashboardPlane } from './database/entities/dashboard-plane.entity';
 import { MapEntity } from './database/entities/map.entity';
 import { MapVersion } from './database/entities/map-version.entity';
 import { MediaSchedule } from './database/entities/media-schedule.entity';
+// 原僅存於瀏覽器 localStorage 的系統資產與流程狀態
+import { DataSource_ } from './database/entities/data-source.entity';
+import { VehicleDefinition } from './database/entities/vehicle-definition.entity';
+import { ModuleDashboardPage } from './database/entities/module-dashboard-page.entity';
+import { ScheduleAdjustRequest } from './database/entities/schedule-adjust-request.entity';
 import { OrderModule } from './order/order.module';
 import { CommandModule } from './command/command.module';
 import { VehicleModule } from './vehicle/vehicle.module';
@@ -89,6 +94,8 @@ import { DatabaseInitService } from './database/database-init.service';
           DashboardPlane,
           // 資源配置層：場域圖資版本庫與媒體排程
           MapEntity, MapVersion, MediaSchedule,
+          // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
+          DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
         ],
         // SAFETY: synchronize=true auto-migrates schema on startup.
         // MUST be false in production to avoid accidental column drops.
