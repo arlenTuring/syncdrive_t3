@@ -31,6 +31,7 @@ type DashboardPlaneRow = {
 };
 
 export type ModuleDashboardPageRow = {
+  /** 送出時放前端的頁面識別碼；後端存進 pageKey，不是 uuid 主鍵 */
   id: string;
   moduleId: string;
   label: string;
@@ -99,8 +100,15 @@ export async function saveDashboardPlanes(
 export async function fetchModuleDashboardPages(): Promise<ModuleDashboardPageRow[]> {
   const res = await fetch(`${backendUrl()}/${PAGES}`);
   if (!res.ok) throw new Error(`模組頁面對應載入失敗（${res.status}）`);
-  const rows = (await res.json()) as ModuleDashboardPageRow[];
-  return Array.isArray(rows) ? rows : [];
+  const rows = (await res.json()) as (ModuleDashboardPageRow & { pageKey?: string })[];
+  if (!Array.isArray(rows)) return [];
+  /**
+   * 對外身分取 <code>pageKey</code>，不是資料庫 uuid。
+   *
+   * 側欄導覽的 view 識別是 <code>mdp:{id}</code>，那個值散在畫面狀態與使用者當下的
+   * 導覽位置裡；往返一次若被換成 uuid，正在看的頁面就會對不上。
+   */
+  return rows.map((row) => ({ ...row, id: row.pageKey ?? row.id }));
 }
 
 export async function saveModuleDashboardPages(

@@ -33,6 +33,7 @@ export type DashboardPlanePayload = {
 };
 
 export type ModuleDashboardPagePayload = {
+  /** 前端的頁面識別碼；不是 uuid，存進 pageKey 而不是主鍵 */
   id?: string;
   moduleId: string;
   label: string;
@@ -131,7 +132,7 @@ export class DashboardPlaneService {
     for (const item of items) {
       if (!item.moduleId?.trim() || !item.planeId?.trim()) continue;
       const row = this.pages.create({
-        id: item.id,
+        pageKey: item.id?.trim() || `mdp-${now.toString(36)}-${order}`,
         moduleId: item.moduleId.trim(),
         label: item.label ?? '',
         planeId: item.planeId.trim(),

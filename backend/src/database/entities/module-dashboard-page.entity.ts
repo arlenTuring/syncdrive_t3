@@ -12,9 +12,23 @@ import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 @Entity('module_dashboard_pages')
 @Index('IDX_MODULE_PAGE_MODULE', ['moduleId'])
 @Index('IDX_MODULE_PAGE_PLANE', ['planeId'])
+@Index('IDX_MODULE_PAGE_KEY', ['pageKey'], { unique: true })
 export class ModuleDashboardPage {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * 前端使用的頁面識別碼（如 <code>mdp-msrfby96-i4756</code>）。
+   *
+   * <strong>不能直接拿它當主鍵。</strong>側欄導覽的 view 識別是
+   * <code>mdp:{pageKey}</code>，那個值散在畫面狀態與使用者當下的導覽位置裡，往返
+   * 一次若被換成資料庫 uuid，正在看的頁面就會對不上。但它也不是 uuid，硬塞進
+   * uuid 主鍵會被 Postgres 直接拒絕（2026-08-23 實測：PUT 一律 500，
+   * invalid input syntax for type uuid）。所以與 vehicle_definitions、
+   * dashboard_planes 一致——前端 key 是對外身分，uuid 只是內部主鍵。
+   */
+  @Column({ name: 'page_key' })
+  pageKey: string;
 
   // 側欄模組群組識別碼
   @Column({ name: 'module_id' })
@@ -38,9 +52,19 @@ export class ModuleDashboardPage {
   @Column({ name: 'created_by', nullable: true })
   createdBy: string;
 
-  @Column({ name: 'created_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
+  @Column({
+    name: 'created_at',
+    type: 'bigint',
+    default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000',
+    transformer: { to: (v: number) => v, from: (v: string) => Number(v) },
+  })
   createdAt: number;
 
-  @Column({ name: 'updated_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
+  @Column({
+    name: 'updated_at',
+    type: 'bigint',
+    default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000',
+    transformer: { to: (v: number) => v, from: (v: string) => Number(v) },
+  })
   updatedAt: number;
 }
