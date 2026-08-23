@@ -39,7 +39,14 @@ export function VirtualFencePage() {
   const [enableFilter, setEnableFilter] = useState<FenceEnableFilter>('all');
   const [listSearch, setListSearch] = useState('');
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
-  const [listCollapsed, setListCollapsed] = useState(false);
+  /**
+   * 清單面板預設收合。
+   *
+   * 進頁面時使用者要看的是<strong>整張地圖</strong>——先看清楚場域全貌，再決定要點
+   * 哪一條圍籬。清單展開會把地圖擠掉三分之一，而它在這個時間點還沒有任何資訊價值
+   * （使用者 2026-08-23）。要用時按展開鈕即可。
+   */
+  const [listCollapsed, setListCollapsed] = useState(true);
   const [mode, setMode] = useState<FencePageMode>({ kind: 'browse' });
   const [draft, setDraft] = useState<FenceDraft>(emptyFenceDraft);
 
@@ -59,9 +66,15 @@ export function VirtualFencePage() {
         // loadVirtualFences 會自動剔除 vf-seed-* 示範假資料並升版儲存
         const loaded = loadVirtualFences(result.mapId, result.areas);
         setFences(loaded);
-        setMode(
-          loaded[0] ? { kind: 'view', fenceId: loaded[0].id } : { kind: 'browse' },
-        );
+        /**
+         * 進頁面時<strong>不預選任何圍籬</strong>。
+         *
+         * 先前是自動選第一筆，於是右側資訊面板一進來就攤開某一條圍籬的名稱、涵蓋
+         * 範圍與速限——那是使用者沒有要求的內容，卻看起來像是「目前生效的那一條」，
+         * 容易被誤讀。清單順序也不代表重要性，選第一筆沒有任何依據
+         * （使用者 2026-08-23）。維持瀏覽狀態，等使用者自己點。
+         */
+        setMode({ kind: 'browse' });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
