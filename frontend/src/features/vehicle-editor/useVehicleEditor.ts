@@ -134,7 +134,23 @@ export function useVehicleEditor() {
     let cancelled = false;
     void fetchVehicleDefinitions()
       .then((remote) => {
-        if (cancelled || remote.length === 0) return;
+        if (cancelled) return;
+        /**
+         * 伺服器是空的＝還沒遷移過，主動把本機那份推上去。
+         *
+         * 原本只寫「下一次儲存會整批送上去」，但那是被動的——使用者不去編輯載具
+         * 就永遠不會觸發，資料庫會一直是空的。只在伺服器確實是空的時候推，永遠不拿
+         * 本機舊快取覆蓋伺服器上已有的內容。
+         */
+        if (remote.length === 0) {
+          const local = vehiclesRef.current;
+          if (local.length > 0) {
+            void saveVehicleDefinitions(local).catch(() => {
+              /* 後端暫時不可用：下一次儲存仍會補上 */
+            });
+          }
+          return;
+        }
         const migrated = mergeRestoredUserVehicle(remote).map(migrateVehicleDefinition);
         setVehicles(migrated);
         try {

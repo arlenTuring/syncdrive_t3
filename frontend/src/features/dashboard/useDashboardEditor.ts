@@ -833,7 +833,27 @@ export function useDashboardEditor() {
     let cancelled = false;
     void fetchDashboardPlanes()
       .then((remote) => {
-        if (cancelled || remote.length === 0) return;
+        if (cancelled) return;
+        /**
+         * 伺服器是空的＝這台機器還沒遷移過，<strong>主動把本機那份推上去</strong>。
+         *
+         * 原本只寫「下一次儲存會整批送上去」，但那是被動的——使用者不去編輯儀表板
+         * 就永遠不會觸發。實測（2026-08-24）就卡在這裡：模組頁面對應因為使用者剛好
+         * 編輯過而存進資料庫了，版面卻還是 0 筆，於是那筆對應指向的 demo-plane 在
+         * 伺服器上根本不存在——換一台電腦開就會指到不存在的版面。
+         *
+         * 只在<strong>伺服器確實是空的</strong>時候推，永遠不拿本機的舊快取覆蓋
+         * 伺服器上已有的內容。
+         */
+        if (remote.length === 0) {
+          const local = loadPlanes();
+          if (local.length > 0) {
+            void saveDashboardPlanes(local).catch(() => {
+              /* 後端暫時不可用：下一次儲存仍會補上 */
+            });
+          }
+          return;
+        }
         const migrated = remote.map(migratePlane);
         setPlanes(migrated);
         setActivePlaneId((current) =>
