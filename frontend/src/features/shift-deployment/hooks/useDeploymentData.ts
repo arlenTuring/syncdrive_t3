@@ -13,7 +13,10 @@ import {
   fetchOperationShiftDetail,
   fetchOperationShiftList,
 } from '../../shift-list/api/operationShiftApi';
-import { readPendingScheduleAdjust } from '../pendingScheduleAdjust';
+import {
+  readPendingScheduleAdjust,
+  refreshPendingScheduleAdjust,
+} from '../pendingScheduleAdjust';
 import {
   FALLBACK_EVENT,
   FALLBACK_MAINLINE,
@@ -182,6 +185,14 @@ export function useDeploymentData() {
         // keep SQL / fallback executing card
       }
 
+      /**
+       * 待核准請求要<strong>先跟後端對過</strong>再讀。
+       *
+       * 送出申請的排班人員與核准的主管通常不是同一台電腦；只讀本機快取的話，主管
+       * 這一端永遠看不到別人送出的申請。拉不到就沿用快取，畫面不會因為後端暫時
+       * 不可用而空掉。
+       */
+      await refreshPendingScheduleAdjust();
       const pending = readPendingScheduleAdjust();
       if (pending) {
         nextSchedule = {
