@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DashboardPlane, CanvasElementProps, ChildWidget, LineChartWidget, WidgetType, CanvasKind } from './types';
 import { createWidget } from './types';
 import { validatePlane, validateGroupTemplate, type LayoutIssue } from './utils/collision';
@@ -13,6 +13,7 @@ import {
 } from '../../lib/canvasCacheReset';
 import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
+import { fetchDashboardPlanes, saveDashboardPlanes } from './api/dashboardPlanesApi';
 import { cloneDemoPlane, DEMO_LAYOUT_SEED } from './constants/demoPlane';
 import {
   ensureDeploymentDataStatsPanel,
@@ -774,12 +775,27 @@ function loadPlanes(): DashboardPlane[] {
   }
 }
 
+/**
+ * <strong>後端是真相，localStorage 只是離線快取。</strong>
+ *
+ * 版面原本只存在瀏覽器（<code>syncdrive_dashboard_planes</code>）：換一台電腦或清一次
+ * 快取就沒了，也沒有任何伺服器端版本紀錄。營運全景圖台是規範要求的核心功能，版面
+ * 屬於系統資產，TP13C §1.4 已把它列入介面資源類。
+ *
+ * 快取沒有拿掉，因為圖台編輯器是重度互動介面（拖曳、縮放每秒數十次），每一次都打
+ * 後端不切實際；後端連不上時畫面也必須能開。所以寫入是「先寫快取、再送後端」，
+ * 後端失敗<strong>不擋畫面</strong>——編輯已經在快取裡，下一次成功儲存會整批補上
+ * （整批覆寫語意，不會只補一半）。
+ */
 function savePlanes(planes: DashboardPlane[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(planes));
   } catch (err) {
     console.error('Failed to save dashboard planes to localStorage:', err);
   }
+  void saveDashboardPlanes(planes).catch(() => {
+    /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
+  });
 }
 
 export function useDashboardEditor() {
@@ -788,6 +804,39 @@ export function useDashboardEditor() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+
+  /**
+   * 開啟時用後端內容覆蓋快取。
+   *
+   * 後端空的（第一次跑、或還沒有人存過）就不覆蓋——那代表尚未遷移，直接沿用本機
+   * 既有版面，下一次存檔會把它整批送上去，等於一次自動遷移。後端不可用時同樣
+   * 沿用快取，畫面照常運作。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void fetchDashboardPlanes()
+      .then((remote) => {
+        if (cancelled || remote.length === 0) return;
+        const migrated = remote.map(migratePlane);
+        setPlanes(migrated);
+        setActivePlaneId((current) =>
+          current && migrated.some((plane) => plane.id === current)
+            ? current
+            : (migrated[0]?.id ?? null),
+        );
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        } catch {
+          /* ignore quota */
+        }
+      })
+      .catch(() => {
+        /* 後端不可用：沿用快取 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
 
   const planesRef = useRef(planes);

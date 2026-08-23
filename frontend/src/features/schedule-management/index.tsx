@@ -39,6 +39,7 @@ import {
   moduleDashboardViewId,
   parseModuleDashboardViewId,
   readModuleDashboardPages,
+  refreshModuleDashboardPages,
   writeModuleDashboardPages,
   type ModuleDashboardPage,
 } from './utils/moduleDashboardPages';
@@ -145,6 +146,23 @@ export default function ScheduleManagementApp({
   const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
+
+  /**
+   * 模組頁面對應以後端為準。
+   *
+   * 這份對應是系統配置而非個人偏好——管理者設定好之後，所有操作人員看到的模組頁面
+   * 必須一致。初始 state 先給快取讓畫面立刻有東西，掛載後再用後端覆蓋；後端是空的
+   * 或連不上就沿用快取。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void refreshModuleDashboardPages().then((pages) => {
+      if (!cancelled) setModulePages(pages);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (view === 'map') setMapMounted(true);

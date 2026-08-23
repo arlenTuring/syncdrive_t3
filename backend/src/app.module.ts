@@ -61,6 +61,7 @@ import { OperationShiftModule } from './operation-shift/operation-shift.module';
 import { MediaLibraryModule } from './media-library/media-library.module';
 import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition.module';
 import { ScheduleAdjustModule } from './schedule-adjust/schedule-adjust.module';
+import { DashboardPlaneModule } from './dashboard-plane/dashboard-plane.module';
 import { DevLogModule } from './dev-log/dev-log.module';
 import { DatabaseInitService } from './database/database-init.service';
 
@@ -124,6 +125,7 @@ import { DatabaseInitService } from './database/database-init.service';
     MediaLibraryModule,
     VehicleDefinitionModule,
     ScheduleAdjustModule,
+    DashboardPlaneModule,
     DevLogModule,
   ],
   controllers: [AppController],
