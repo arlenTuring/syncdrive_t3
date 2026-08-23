@@ -24,6 +24,7 @@ import { ScheduleAdjustDiffStep } from './ScheduleAdjustDiffStep';
 import {
   readPendingScheduleAdjust,
   writePendingScheduleAdjust,
+  resolvePendingScheduleAdjust,
 } from '../pendingScheduleAdjust';
 
 type ScheduleAdjustApplyDialogProps = {
@@ -128,10 +129,35 @@ export function ScheduleAdjustApplyDialog({
     };
   }, [shiftId]);
 
+  const inUseShiftId = useMemo(() => {
+    const deployed =
+      shifts.find((item) => item.usage_status === 'in_use')
+      ?? (currentScheduleName
+        ? shifts.find((item) => item.name === currentScheduleName)
+        : undefined);
+    return deployed?.shift_id ?? '';
+  }, [currentScheduleName, shifts]);
+
   const options = useMemo(
-    () => shifts.map((item) => ({ value: item.shift_id, label: item.name })),
-    [shifts],
+    () =>
+      shifts.map((item) => {
+        const inUse =
+          item.usage_status === 'in_use'
+          || (inUseShiftId !== '' && item.shift_id === inUseShiftId);
+        return {
+          value: item.shift_id,
+          label: item.name,
+          disabled: inUse,
+          badge: inUse ? '正在使用' : undefined,
+        };
+      }),
+    [inUseShiftId, shifts],
   );
+
+  useEffect(() => {
+    if (!shiftId || !inUseShiftId) return;
+    if (shiftId === inUseShiftId) setShiftId('');
+  }, [inUseShiftId, shiftId]);
 
   const selectedName =
     draft?.basic.name.trim()
@@ -185,7 +211,8 @@ export function ScheduleAdjustApplyDialog({
   const deploySelected = async () => {
     if (!shiftId) throw new Error('尚未選擇班表');
     await deployOperationShift(shiftId, { reviewer_name: account.name });
-    writePendingScheduleAdjust(null);
+    // 部署成功＝這筆申請已套用至營運，稽核紀錄要記 APPLIED 而不是籠統的「取消」
+    await resolvePendingScheduleAdjust('APPLIED', account.name);
   };
 
   const finishApplied = () => {
@@ -225,7 +252,8 @@ export function ScheduleAdjustApplyDialog({
 
   const handleReject = () => {
     if (!window.confirm('確定駁回此班表調整申請？班表不會部署。')) return;
-    writePendingScheduleAdjust(null);
+    // 駁回要留下是誰駁回的；記成「取消」會讓稽核看不出這筆是被否決的
+    void resolvePendingScheduleAdjust('REJECTED', account.name, '主管駁回');
     finishApplied();
   };
 
