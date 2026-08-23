@@ -59,6 +59,7 @@ import { TimeTemplateModule } from './time-template/time-template.module';
 import { MaintenanceTaskModule } from './maintenance-task/maintenance-task.module';
 import { OperationShiftModule } from './operation-shift/operation-shift.module';
 import { MediaLibraryModule } from './media-library/media-library.module';
+import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition.module';
 import { DevLogModule } from './dev-log/dev-log.module';
 import { DatabaseInitService } from './database/database-init.service';
 
@@ -120,6 +121,7 @@ import { DatabaseInitService } from './database/database-init.service';
     MaintenanceTaskModule,
     OperationShiftModule,
     MediaLibraryModule,
+    VehicleDefinitionModule,
     DevLogModule,
   ],
   controllers: [AppController],

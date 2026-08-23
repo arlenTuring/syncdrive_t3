@@ -34,9 +34,20 @@ export class VehicleDefinition {
   @Column({ type: 'int', nullable: true })
   height: number;
 
+  // 畫布背景色
+  @Column({ name: 'background_color', nullable: true })
+  backgroundColor: string;
+
   // 載具元件樹（車體、車門、座位、狀態指示等）
   @Column({ type: 'jsonb' })
   elements: any;
+
+  /**
+   * 編輯模式下沒有即時資料時，用來讓畫面有東西可看的預覽 payload。
+   * 屬於定義的一部分（跟著載具走），不是營運資料，所以存在同一列。
+   */
+  @Column({ name: 'preview_data', type: 'jsonb', nullable: true })
+  previewData: any;
 
   @Column({ type: 'int', default: 1 })
   version: number;

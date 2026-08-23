@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildExportFilename } from '../../lib/exportFilename';
 import { normalizeDegrees } from '../map-editor/utils/rotation';
 import { VEHICLE_DEFINITIONS_STORAGE_KEY } from '../../lib/canvasCacheReset';
+import {
+  fetchVehicleDefinitions,
+  saveVehicleDefinitions,
+} from './api/vehicleDefinitionsApi';
 import { MAP_TRACK_VEHICLE_HEIGHT, MAP_TRACK_VEHICLE_WIDTH } from './constants/palette';
 import {
   createUserRestoredVtmsVehicle,
@@ -80,6 +84,20 @@ function saveVehicles(vehicles: VehicleDefinition[]) {
   }, SAVE_DEBOUNCE_MS);
 }
 
+/**
+ * <strong>後端是真相，localStorage 只是離線快取。</strong>
+ *
+ * 載具定義原本只存在瀏覽器（<code>syncdrive_vehicle_definitions</code>）：一個人畫好
+ * 的車輛外觀別人看不到，換一台電腦、清一次快取就沒了。它是圖台與車輛監控畫面共用的
+ * 呈現資產，TP13C §1.4 明訂「任一帳號所見內容一致」，所以搬進 vehicle_definitions。
+ *
+ * 快取沒有拿掉，因為兩件事都要成立：後端連不上時畫面仍要能開；而編輯器是重度互動
+ * 介面，每一次拖曳都打後端不切實際。所以寫入是「先寫快取、再送後端（沿用既有的
+ * 500 毫秒 debounce）」，讀取是「先給快取讓畫面立刻有東西、再用後端覆蓋」。
+ *
+ * 後端寫入失敗<strong>不擋畫面</strong>：使用者的編輯已經在快取裡，下一次成功的
+ * 儲存會把整份清單補上去（整批覆寫語意，不會只補一半）。
+ */
 export function flushVehiclesSave(vehicles: VehicleDefinition[]) {
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -90,6 +108,9 @@ export function flushVehiclesSave(vehicles: VehicleDefinition[]) {
   } catch {
     /* ignore quota */
   }
+  void saveVehicleDefinitions(vehicles).catch(() => {
+    /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
+  });
 }
 
 export function useVehicleEditor() {
@@ -102,6 +123,33 @@ export function useVehicleEditor() {
   const selectedElementIdRef = useRef(selectedElementId);
   const selectedElementIdsRef = useRef(selectedElementIds);
   const clipboardRef = useRef<VehicleElement | null>(null);
+
+  /**
+   * 開啟時用後端內容覆蓋快取。
+   *
+   * 後端空的（第一次跑、或還沒有人存過）就不覆蓋——那代表尚未遷移，直接沿用本機
+   * 既有內容，並且下一次儲存會把它整批送上去，等於一次自動遷移。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void fetchVehicleDefinitions()
+      .then((remote) => {
+        if (cancelled || remote.length === 0) return;
+        const migrated = mergeRestoredUserVehicle(remote).map(migrateVehicleDefinition);
+        setVehicles(migrated);
+        try {
+          localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, JSON.stringify(migrated));
+        } catch {
+          /* ignore quota */
+        }
+      })
+      .catch(() => {
+        /* 後端不可用：沿用快取，畫面照常運作 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   vehiclesRef.current = vehicles;
   activeVehicleIdRef.current = activeVehicleId;
