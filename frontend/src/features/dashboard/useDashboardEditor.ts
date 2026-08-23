@@ -787,15 +787,32 @@ function loadPlanes(): DashboardPlane[] {
  * 後端失敗<strong>不擋畫面</strong>——編輯已經在快取裡，下一次成功儲存會整批補上
  * （整批覆寫語意，不會只補一半）。
  */
+/**
+ * <strong>後端寫入要節流，本機快取不節流。</strong>
+ *
+ * savePlanes 有十九個呼叫點，而且拖曳與縮放是<strong>每個事件</strong>呼叫一次——
+ * 不節流的話拖一下就會送出數十個 PUT，每個都夾帶整份版面 JSON。
+ *
+ * 本機快取維持立即寫入：它是離線保命用的，晚寫一秒就多一秒可能掉東西的視窗。
+ * 後端則延後到「停手之後」再送一次——整批覆寫語意讓最後那一次自然涵蓋前面所有
+ * 中間狀態，不必逐次上傳。
+ */
+const BACKEND_SAVE_DEBOUNCE_MS = 800;
+let backendSaveTimer: ReturnType<typeof setTimeout> | undefined;
+
 function savePlanes(planes: DashboardPlane[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(planes));
   } catch (err) {
     console.error('Failed to save dashboard planes to localStorage:', err);
   }
-  void saveDashboardPlanes(planes).catch(() => {
-    /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
-  });
+  if (backendSaveTimer) clearTimeout(backendSaveTimer);
+  backendSaveTimer = setTimeout(() => {
+    backendSaveTimer = undefined;
+    void saveDashboardPlanes(planes).catch(() => {
+      /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
+    });
+  }, BACKEND_SAVE_DEBOUNCE_MS);
 }
 
 export function useDashboardEditor() {

@@ -127,24 +127,44 @@ export class DashboardPlaneService {
     updatedBy?: string,
   ): Promise<ModuleDashboardPage[]> {
     const now = Date.now();
-    await this.pages.clear();
+    /**
+     * <strong>先存後刪，不要先 clear() 再插入。</strong>
+     *
+     * 先前是 <code>clear()</code>（TRUNCATE）之後重新插入：中途只要有一筆失敗，
+     * 整份模組頁面對應就全沒了，而且那是無法從伺服器端復原的——它本來就是這裡的
+     * 唯一真相。改成與版面、載具定義同一套順序：先依 pageKey 建立或更新，全部成功
+     * 之後才刪掉這一批沒提到的那些。
+     */
+    const existing = await this.pages.find();
+    const byKey = new Map(existing.map((row) => [row.pageKey, row]));
+
+    const saved: ModuleDashboardPage[] = [];
     let order = 0;
     for (const item of items) {
       if (!item.moduleId?.trim() || !item.planeId?.trim()) continue;
-      const row = this.pages.create({
-        pageKey: item.id?.trim() || `mdp-${now.toString(36)}-${order}`,
-        moduleId: item.moduleId.trim(),
-        label: item.label ?? '',
-        planeId: item.planeId.trim(),
-        sortOrder: item.sortOrder ?? order,
-        isActive: true,
-        createdBy: updatedBy ?? undefined!,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const key = item.id?.trim() || `mdp-${now.toString(36)}-${order}`;
+      const prior = byKey.get(key);
+      const row =
+        prior ??
+        this.pages.create({
+          pageKey: key,
+          createdAt: now,
+          createdBy: updatedBy,
+        });
+      row.moduleId = item.moduleId.trim();
+      row.label = item.label ?? '';
+      row.planeId = item.planeId.trim();
+      row.sortOrder = item.sortOrder ?? order;
+      row.isActive = true;
+      row.updatedAt = now;
       order += 1;
-      await this.pages.save(row);
+      saved.push(await this.pages.save(row));
     }
+
+    const keep = saved.map((row) => row.pageKey);
+    const removable = existing.filter((row) => !keep.includes(row.pageKey));
+    if (removable.length > 0) await this.pages.remove(removable);
+
     return this.listPages();
   }
 }
