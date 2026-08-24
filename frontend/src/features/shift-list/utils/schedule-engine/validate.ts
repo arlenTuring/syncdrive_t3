@@ -1331,3 +1331,126 @@ export function validateRotationCyclesComplete(
     flush();
   }
 }
+
+/** 車真的停在裡面的那幾種整備；暫停卡（source 'hold'）同樣代表車還在格子裡 */
+const FACILITY_STAY_TASK_TYPES = new Set([
+  'charging',
+  'servicing',
+  'inspection',
+  'standby',
+  'washing',
+]);
+
+/**
+ * 設施格佔用驗證：同一格同一時刻只能有一台車。
+ *
+ * <strong>為什麼這支是後來才有的。</strong>設施佔用先前只記
+ * <code>[整備開始, 整備結束]</code>，「整備做完、還沒開走」那段帳上是空的，於是
+ * 兩台車同格根本量不出來——2026-08-24 補上{@link 暫停卡 source 'hold'}之後才現形：
+ * 同一份班表，補卡前量到 0 次重疊，補卡後 9 次。使用者：「當你的機制有辦法補滿
+ * 所有的時間空隙的時候，就能真正的去看待任何的碰撞跟移動。」
+ *
+ * <strong>重疊記硬錯誤，交接不足記警告。</strong>兩台車同時在一格是物理上做不到
+ * 的事，不是偏好問題；而「交接該隔多久」是營運規則，使用者定為
+ * <code>2 × 碰撞保護</code>——與站位同一套（後車到站 ≥ 前車實際離站 ＋ 兩倍保護），
+ * 留給兩台車移動的差異緩衝。
+ */
+export function validateFacilityOccupancy(
+  timelines: GeneratedSchedulePlan['timelines'],
+  errors: FeasibilityIssue[],
+  options: { collisionProtectionSeconds?: number; warnings?: FeasibilityIssue[] } = {},
+): void {
+  const protectionMinutes =
+    (Math.max(0, options.collisionProtectionSeconds ?? 0) * 2) / 60;
+
+  type Stay = {
+    facilityNodeId: string;
+    facilityLabel: string;
+    timelineRow: number;
+    blockId: string;
+    label: string;
+    startMinute: number;
+    endMinute: number;
+  };
+
+  const stays: Stay[] = [];
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      const facilityNodeId = block.yardFacilityNodeId?.trim();
+      if (!facilityNodeId) continue;
+      const isStay =
+        FACILITY_STAY_TASK_TYPES.has(block.taskType) || block.source === 'hold';
+      if (!isStay) continue;
+      if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
+      stays.push({
+        facilityNodeId,
+        facilityLabel: block.yardFacilityLabel ?? facilityNodeId,
+        timelineRow: timeline.row,
+        blockId: block.id,
+        label: block.label,
+        startMinute: block.plannedStartMinute,
+        endMinute: block.plannedEndMinute,
+      });
+    }
+  }
+
+  const byFacility = new Map<string, Stay[]>();
+  for (const stay of stays) {
+    byFacility.set(stay.facilityNodeId, [
+      ...(byFacility.get(stay.facilityNodeId) ?? []),
+      stay,
+    ]);
+  }
+
+  for (const list of byFacility.values()) {
+    list.sort((a, b) => a.startMinute - b.startMinute);
+    for (let i = 0; i < list.length; i += 1) {
+      for (let j = i + 1; j < list.length; j += 1) {
+        const earlier = list[i]!;
+        const later = list[j]!;
+        // 同一列＝同一台車，它自己的連續停留不算衝突
+        if (earlier.timelineRow === later.timelineRow) continue;
+        if (later.startMinute >= earlier.endMinute + protectionMinutes - 1e-9) break;
+
+        const overlapMinutes = earlier.endMinute - later.startMinute;
+        const detail = {
+          facilityNodeId: earlier.facilityNodeId,
+          facilityLabel: earlier.facilityLabel,
+          earlierTimelineRow: earlier.timelineRow,
+          laterTimelineRow: later.timelineRow,
+          blockId: later.blockId,
+          earlierBlockId: earlier.blockId,
+          overlapSeconds: Math.round(Math.max(0, overlapMinutes) * 60),
+          gapSeconds: Math.round(-overlapMinutes * 60),
+        };
+
+        if (overlapMinutes > 1e-9) {
+          pushIssue(errors, {
+            code: 'FACILITY_SLOT_COLLISION',
+            severity: 'error',
+            kind: 'limit',
+            message:
+              `設施格「${earlier.facilityLabel}」同時被兩台車佔用：`
+              + `時間線 ${earlier.timelineRow} 待到 ${formatMinuteHms(earlier.endMinute)}，`
+              + `時間線 ${later.timelineRow} 卻在 ${formatMinuteHms(later.startMinute)} 就進來，`
+              + `重疊 ${Math.round(overlapMinutes * 60)} 秒`,
+            detail,
+          });
+        } else if (options.warnings) {
+          pushIssue(options.warnings, {
+            code: 'FACILITY_HANDOVER_GAP',
+            severity: 'warning',
+            kind: 'limit',
+            message:
+              `設施格「${earlier.facilityLabel}」交接太緊：`
+              + `時間線 ${earlier.timelineRow} ${formatMinuteHms(earlier.endMinute)} 離開、`
+              + `時間線 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} 進來，`
+              + `只隔 ${Math.round(-overlapMinutes * 60)} 秒`
+              + `（需要 ${Math.round(protectionMinutes * 60)} 秒）`,
+            detail,
+          });
+        }
+      }
+    }
+  }
+}

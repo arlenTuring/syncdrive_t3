@@ -37,6 +37,7 @@ import {
   validateStationTimingsWithinBlocks,
   validateStationBerthCollisions,
   validateYardExitContinuity,
+  validateFacilityOccupancy,
 } from './validate';
 import {
   enforceStationBerthConstraints,
@@ -859,6 +860,18 @@ export function generateShiftSchedule(
     routesForBerth,
     errors,
   );
+  /**
+   * 設施格佔用：同一格同一時刻只能有一台車。
+   *
+   * 以「車實際還在裡面」為準——整備做完到出場移動開始之間車仍佔著那一格，時間軸上
+   * 就是那張「暫停」卡（見 fillYardHoldGaps）。所以這一支必須排在補卡之後。
+   * 重疊記硬錯誤（物理上做不到），交接不足 2 × 碰撞保護記警告（營運規則）。
+   */
+  validateFacilityOccupancy(timelines, errors, {
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    warnings,
+  });
+
   validateStationBerthCollisions(
     timelines,
     routesForBerth,

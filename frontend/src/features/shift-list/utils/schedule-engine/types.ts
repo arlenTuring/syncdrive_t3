@@ -189,6 +189,8 @@ export type FeasibilityViolationCode =
   | 'STATION_LEG_TRAVEL_INVALID'
   | 'STATION_TIMING_INFEASIBLE'
   | 'STATION_BERTH_COLLISION'
+  | 'FACILITY_SLOT_COLLISION'
+  | 'FACILITY_HANDOVER_GAP'
   /**
    * 整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：設施未設定、
    * 拓樸沒有可通的邊／路徑，或設施被別列車佔著（警告）。三種轉場共用

@@ -33,6 +33,8 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_LEG_TRAVEL_INVALID: '站間 leg 無效',
   STATION_TIMING_INFEASIBLE: '逐站時刻超出班次卡',
   STATION_BERTH_COLLISION: '停靠點站位碰撞',
+  FACILITY_SLOT_COLLISION: '設施格同時被兩台車佔用',
+  FACILITY_HANDOVER_GAP: '設施格交接時間不足',
   STATION_BERTH_PROTECTION_GAP: '碰撞保護時間不足',
   STATION_BERTH_RELIEF_UNAVAILABLE: '沒有可用的讓渡路線',
   STATION_BERTH_ARRIVAL_YIELDED: '滯留車晚一點進站讓路',
@@ -84,6 +86,8 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   STATION_TIMING_INFEASIBLE: { id: 's9', label: '§9 Expand 與物理占用' },
   ANCHOR_CONFLICT: { id: 's9', label: '§9 Expand 與物理占用' },
   STATION_BERTH_COLLISION: { id: 's8', label: '§8 站位約束決策' },
+  FACILITY_SLOT_COLLISION: { id: 's6', label: '§6 整備與設施佔用' },
+  FACILITY_HANDOVER_GAP: { id: 's6', label: '§6 整備與設施佔用' },
   STATION_BERTH_PROTECTION_GAP: { id: 's8', label: '§8 站位約束決策' },
   STATION_BERTH_RELIEF_UNAVAILABLE: { id: 's8', label: '§8.2 站位讓渡' },
   STATION_BERTH_ARRIVAL_YIELDED: { id: 's8', label: '§8 站位約束決策' },
@@ -146,6 +150,16 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '班次卡秒數不足以容納完整停靠、最快站間行駛與 10 秒到站對齊。請延長該趟、修正 leg／停靠秒數，或重新生成。',
+  },
+  FACILITY_SLOT_COLLISION: {
+    kind: 'limit',
+    guidance:
+      '同一個設施格在同一時刻只能停一台車。這一則以「車實際還在裡面」為準——整備做完到出場移動開始之間，車仍佔著那一格（時間軸上就是那張「暫停」卡）。先前設施佔用只記 [整備開始, 整備結束]，那段帳上是空的，所以兩台車同格量不出來；補上暫停卡之後才現形。要消掉它：讓前一台早一點開走（出場移動可以提前），或把後一台改排到別的格子。',
+  },
+  FACILITY_HANDOVER_GAP: {
+    kind: 'limit',
+    guidance:
+      '兩台車在同一個設施格交接時，中間至少要隔「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝。前一台還沒完全開出來，後一台就不能開進去。要消掉它：讓前一台早一點開走，或把後一台的進場時刻往後挪。',
   },
   STATION_BERTH_COLLISION: {
     kind: 'limit',
