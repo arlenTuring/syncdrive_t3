@@ -1576,6 +1576,10 @@ export function insertMaintenanceTransferCards(args: {
         yardExitFacilityNodeId: chosen.nodeId,
         yardExitFacilityLabel: chosen.label,
         yardExitStationId: stationId,
+        // 站名要一起帶，畫面才不會退回顯示原始 id。UI 是
+        // 「yardExitStationLabel ?? yardExitStationId」，少了 label 使用者看到的
+        // 就是 station_2 這種內部代號（2026-08-24 使用者回報）。
+        yardExitStationLabel: stationDisplayName(stationId),
         yardExitSectionCode:
           resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
         yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
