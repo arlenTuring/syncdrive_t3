@@ -80,8 +80,11 @@ function listEntryChainCandidates(args: {
   originStationId: string;
   exitStationIds: Set<string>;
   selectedRoutes: ShiftScheduleSelectedRoute[];
+  /** 最多幾段；充電／待命限 1 段，其餘不限（見呼叫端說明） */
+  maxHops?: number;
 }): RouteHop[][] {
   const { originStationId, exitStationIds, selectedRoutes } = args;
+  const hopLimit = Math.max(1, args.maxHops ?? Number.POSITIVE_INFINITY);
 
   const routesByEnd = new Map<string, RouteHop[]>();
   for (const route of selectedRoutes) {
@@ -107,6 +110,7 @@ function listEntryChainCandidates(args: {
       const prev = routeStartStation(hop.route)!;
       if (pathTo.has(prev)) continue;
       const path = [hop, ...suffix];
+      if (path.length > hopLimit) continue;
       pathTo.set(prev, path);
       // 起點須為出場站，且不得是「原地 0 跳」（origin 自己）
       if (exitStationIds.has(prev) && path.length > 0 && prev !== originStationId) {
@@ -287,6 +291,71 @@ function resolveBerthClearMinute(args: {
  * 4. <strong>不檢查同方向班距</strong>——調度班次的任務是盡快上工，不受班距約束。
  * 5. 候選由長到短試，取第一條可行者。
  */
+/**
+ * 這一整條路徑上，<strong>每一站</strong>都滿足碰撞保護嗎。
+ *
+ * 先前只檢查終點站（{@link resolveBerthClearMinute} 一次只問一個 stationId），
+ * 對保養／行檢夠用——那些設施離正線遠，調度班次的路徑與後續正線不重疊。但充電與
+ * 待命的車就停在正線邊上，調度班次跑的往往<strong>就是後面那班正線的同一條路線</strong>，
+ * 於是整條路上每一站都只落後它 1–4 分鐘，發車站與中途站雙雙擠進 60 秒保護窗。
+ *
+ * 實測（2026-08-21）：只檢查終點站就插進去，站位碰撞保護不足 0 對 → 15 對，
+ * 全部牽涉新插的調度班次，集中在發車站 T3上行（10 對）與中途站 N2W上行停靠（5 對）。
+ */
+function pathViolatesBerthProtection(args: {
+  placed: PlacedHop[];
+  timelines: GeneratedScheduleTimeline[];
+  routeById: Map<string, ShiftScheduleSelectedRoute>;
+  collisionProtectionSeconds: number;
+  selfTimelineRow: number;
+}): boolean {
+  const protection = { collisionProtectionSeconds: args.collisionProtectionSeconds };
+
+  const others: { stationId: string; startSecond: number; endSecond: number }[] = [];
+  for (const timeline of args.timelines) {
+    if (timeline.row === args.selfTimelineRow) continue;
+    for (const block of timeline.blocks) {
+      if (block.taskType !== 'passenger') continue;
+      const route = block.routeId ? args.routeById.get(block.routeId) : undefined;
+      if (!route) continue;
+      for (const win of projectProtectedBerthWindowsSeconds(block, route, protection)) {
+        others.push({
+          stationId: win.stationId,
+          startSecond: win.startSecond,
+          endSecond: win.endSecond,
+        });
+      }
+    }
+  }
+
+  for (const item of args.placed) {
+    const probe = {
+      id: `entry-probe-${item.hop.route.routeId}`,
+      timelineRow: args.selfTimelineRow,
+      taskType: 'passenger',
+      label: '正線',
+      routeId: item.hop.route.routeId,
+      plannedStartMinute: item.startMinute,
+      plannedEndMinute: item.endMinute,
+      travelSeconds: item.hop.durationSeconds,
+      dwellSeconds: 0,
+      source: 'entry_service',
+    } as unknown as GeneratedScheduleBlock;
+    for (const win of projectProtectedBerthWindowsSeconds(probe, item.hop.route, protection)) {
+      for (const other of others) {
+        if (other.stationId !== win.stationId) continue;
+        if (
+          other.startSecond < win.endSecond - 1e-9
+          && other.endSecond > win.startSecond + 1e-9
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 function pickSafeEntryPlacement(args: {
   candidates: RouteHop[][];
   firstTripStartMinute: number;
@@ -350,6 +419,19 @@ function pickSafeEntryPlacement(args: {
         break;
       }
     }
+    if (
+      berthOk
+      && pathViolatesBerthProtection({
+        placed,
+        timelines: args.timelines,
+        routeById: args.routeById,
+        collisionProtectionSeconds: args.collisionProtectionSeconds,
+        selfTimelineRow: args.selfTimelineRow,
+      })
+    ) {
+      berthOk = false;
+    }
+
     if (!berthOk) {
       // 非插不可時先記下來，全部候選都撞站位的話仍要挑一條插進去
       if (args.mandatory && fallback == null) fallback = placed;
@@ -448,7 +530,12 @@ export function insertMaintenanceEntryServiceTrips(args: {
   if (firstTripOrigins.length === 0 || selectedRoutes.length === 0) return timelines;
 
   // 保養（M）與行檢（P）都會產生調度營運班次；只要其中一種可用就往下跑。
-  const dispatchCapableTaskTypes = ['servicing', 'inspection'] as const;
+  // 哪幾種整備做完可能要「開過去上工」由 resolveYardPostTaskPolicy 決定；這裡只問
+  // 「有沒有任何一種是開著的」。充電與待命 2026-08-24 起納入——它們的設施不一定離
+  // 首發站近（實測待命排在 H1／H2，離 180 秒），接不上時那段移動要載客而不是空跑。
+  const dispatchCapableTaskTypes = [
+    'servicing', 'inspection', 'washing', 'charging', 'standby',
+  ] as const;
   const anyDispatchAllowed = dispatchCapableTaskTypes.some(
     (taskType) =>
       resolveYardPostTaskPolicy({ taskType, origins: firstTripOrigins, maintenanceBody })
@@ -600,10 +687,27 @@ export function insertMaintenanceEntryServiceTrips(args: {
         }
       }
 
+      /**
+       * <strong>充電與待命：只准一段，而且不強制插入。</strong>
+       *
+       * 只准一段——保養／行檢的設施離首發站遠，車要開一段路才上得了工，途中經過幾站
+       * 就順便載幾站，所以那幾種不限段數且刻意「最長優先」。充電與待命不一樣：車就停
+       * 在正線邊上，缺的只有「從這一站開到下一班發車站」那一段。硬套最長優先會挑出多段
+       * 串，而串只放得下前面幾段時車就被丟在半路——實測（2026-08-20）目標是 NT
+       * （起點 N2W下行出發），卻插進終點在 S2W 的 TS，後面的正線只好從 ST 接，整輪相位
+       * 被打亂，ROTATION_CYCLE_INCOMPLETE 0 → 6。
+       *
+       * 不強制插入——mandatory 的語意是「不插這一趟，車就憑空出現在起點」，所以寧可
+       * 帶著站位衝突也要插。但充電與待命<strong>有退路</strong>：原本的出場移動空跑卡。
+       * 塞不下就維持空跑，不會產生物理上做不到的班表。實測（2026-08-21）不設這道，
+       * 13 班硬塞進去製造出 15 對碰撞保護不足。
+       */
+      const softDispatch = yard.taskType === 'charging' || yard.taskType === 'standby';
       const candidates = listEntryChainCandidates({
         originStationId,
         exitStationIds,
         selectedRoutes,
+        maxHops: softDispatch ? 1 : undefined,
       });
 
       // 若出場站集合中只有首班起點站本身（設施出場 == 路線首站），車已在起點，
@@ -636,7 +740,8 @@ export function insertMaintenanceEntryServiceTrips(args: {
         firstTripRouteId: nextPassenger.routeId,
         yardEndMinute: afterYard.chainEndMinute,
         exitStationIds,
-        mandatory: dispatchIsRequired,
+        // 充電／待命有退路（原本的出場移動空跑卡），塞不下就別硬插——見上方說明
+        mandatory: dispatchIsRequired && !softDispatch,
         minimumRecoveryTimeSeconds,
         collisionProtectionSeconds,
         rotationRoutes: selectedRoutes,
