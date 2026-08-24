@@ -5,6 +5,15 @@ export type DoorKind = 'vehicle' | 'platform';
 
 export type DoorMonitorState = {
   id: string;
+  /**
+   * MQTT 端使用的識別碼，與畫面上的 <code>id</code> 不一定相同。
+   *
+   * 目前沒有任何地方會設值，所以 DoorDetailPage 那個「先用 id 查、查不到再用
+   * mqttId 查」的 fallback 實際上恆為假。保留這個選填欄位是因為它是刻意留的
+   * 對應點——月台門在 MQTT 端本來就可能用另一組編號；欄位不存在的話那段
+   * fallback 連編都編不過（2026-08-24）。
+   */
+  mqttId?: string;
   label: string;
   mode: ControlMode;
   latency: string;

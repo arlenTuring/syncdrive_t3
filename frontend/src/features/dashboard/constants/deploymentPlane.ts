@@ -1016,13 +1016,9 @@ function buildShiftListPanel(): CanvasElementProps {
     width: ROW3_W,
     height: ROW3_H,
     rowHeight: 44,
-    showPagination: false,
-    pageSize: 10,
-    tabBarHeight: 40,
-    tabBarBgColor: '#18181b',
     tabActiveColor: '#3b82f6',
-    tableBgColor: '#18181b',
-    tableHeaderBgColor: '#27272a',
+    backgroundColor: '#18181b',
+    headerBgColor: '#27272a',
     fontSize: 13,
     tabs: [
       {
@@ -1032,16 +1028,16 @@ function buildShiftListPanel(): CanvasElementProps {
         sqlQuery: MAINLINE_SHIFTS_SQL,
         refreshInterval: 0,
         columns: [
-          { id: 'col-1', name: '班次代號', field: 'trip_code', width: 140, type: 'custom', children: [
+          { id: 'col-1', name: '班次代號', fieldKey: 'trip_code', width: 140, children: [
             staticText(0, 0, 140, 44, '{trip_code}', 13, '#FFFFFF', 'bold', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'col-2', name: '運行方向', field: 'direction_label', width: 130, type: 'custom', children: [
+          { id: 'col-2', name: '運行方向', fieldKey: 'direction_label', width: 130, children: [
             staticText(0, 0, 130, 44, '{direction_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'col-3', name: '執行載具', field: 'vehicle_code', width: 140, type: 'custom', children: [
+          { id: 'col-3', name: '執行載具', fieldKey: 'vehicle_code', width: 140, children: [
             staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'col-4', name: '路線進度', field: 'route_stations', width: 440, type: 'custom', children: [
+          { id: 'col-4', name: '路線進度', fieldKey: 'route_stations', width: 440, children: [
             {
               id: cid('progress'),
               type: 'route-progress',
@@ -1051,15 +1047,25 @@ function buildShiftListPanel(): CanvasElementProps {
               height: 28,
               dataSourceId: DS,
               sqlQuery: '',
-              stations: ['A1', 'A2', 'A3', 'A4', 'A5'],
-              statusField: 'status_label',
-              directionField: 'direction_label',
-              vehicleField: 'vehicle_code',
-              timeField: 'depart_time',
-              departTimeField: 'depart_time',
+              // RouteStation[]：value 是軌道上的錨點位置 0–100，等距站點由這裡給定
+              stations: [
+                { id: 's1', name: 'A1', value: 0 },
+                { id: 's2', name: 'A2', value: 25 },
+                { id: 's3', name: 'A3', value: 50 },
+                { id: 's4', name: 'A4', value: 75 },
+                { id: 's5', name: 'A5', value: 100 },
+              ],
+              // 進度值欄位；其餘顯示欄位由 RouteProgressWidget 的變數鍵設定，
+              // 不是這裡的自由欄位（先前那幾個 *Field 型別上不存在，等於沒生效）
+              valueField: 'route_progress',
+              activeColor: '#51A2FF',
+              inactiveColor: '#99A1AF',
+              vehicleIcon: 'vehicle.svg',
+              iconColor: '#030712',
+              iconBgColor: '#51A2FF',
             },
           ]},
-          { id: 'col-5', name: '班次狀態', field: 'status_label', width: 160, type: 'custom', children: [
+          { id: 'col-5', name: '班次狀態', fieldKey: 'status_label', width: 160, children: [
             {
               id: cid('badge'),
               type: 'status-badge',
@@ -1070,6 +1076,11 @@ function buildShiftListPanel(): CanvasElementProps {
               valueField: 'status_label',
               defaultLabel: '準點運行',
               defaultBgColor: 'rgba(34, 197, 94, 0.2)',
+              // StatusBadgeWidget 的必填項；缺任何一個整個物件就不符合 ChildWidget
+              defaultTextColor: '#E4E4E7',
+              showDot: true,
+              fontSize: 11,
+              borderRadius: 999,
               rules: [
                 { value: '運行中', label: '運行中', bgColor: 'rgba(34, 197, 94, 0.2)', textColor: '#22C55E' },
                 { value: '準備中', label: '準備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
@@ -1077,10 +1088,10 @@ function buildShiftListPanel(): CanvasElementProps {
               ],
             },
           ]},
-          { id: 'col-6', name: '發車時間(預計/實際)', field: 'depart_time', width: 220, type: 'custom', children: [
+          { id: 'col-6', name: '發車時間(預計/實際)', fieldKey: 'depart_time', width: 220, children: [
             staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'col-7', name: '操作', field: 'shift_key', width: 140, type: 'custom', children: [
+          { id: 'col-7', name: '操作', fieldKey: 'shift_key', width: 140, children: [
             staticText(0, 0, 140, 44, '查看...', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
         ],
@@ -1092,16 +1103,16 @@ function buildShiftListPanel(): CanvasElementProps {
         sqlQuery: MAINTENANCE_SHIFTS_SQL,
         refreshInterval: 0,
         columns: [
-          { id: 'mcol-1', name: '任務編號', field: 'trip_code', width: 140, type: 'custom', children: [
+          { id: 'mcol-1', name: '任務編號', fieldKey: 'trip_code', width: 140, children: [
             staticText(0, 0, 140, 44, '{trip_code}', 13, '#FFFFFF', 'bold', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'mcol-2', name: '指派載具', field: 'vehicle_code', width: 140, type: 'custom', children: [
+          { id: 'mcol-2', name: '指派載具', fieldKey: 'vehicle_code', width: 140, children: [
             staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'mcol-3', name: '整備項目', field: 'maint_type_label', width: 260, type: 'custom', children: [
+          { id: 'mcol-3', name: '整備項目', fieldKey: 'maint_type_label', width: 260, children: [
             staticText(0, 0, 260, 44, '{maint_type_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'mcol-4', name: '進度狀態', field: 'status_label', width: 160, type: 'custom', children: [
+          { id: 'mcol-4', name: '進度狀態', fieldKey: 'status_label', width: 160, children: [
             {
               id: cid('mbadge'),
               type: 'status-badge',
@@ -1112,6 +1123,11 @@ function buildShiftListPanel(): CanvasElementProps {
               valueField: 'status_label',
               defaultLabel: '整備中',
               defaultBgColor: 'rgba(59, 130, 246, 0.2)',
+              // StatusBadgeWidget 的必填項；缺任何一個整個物件就不符合 ChildWidget
+              defaultTextColor: '#E4E4E7',
+              showDot: true,
+              fontSize: 11,
+              borderRadius: 999,
               rules: [
                 { value: '整備中', label: '整備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
                 { value: '待檢', label: '待檢', bgColor: 'rgba(234, 179, 8, 0.2)', textColor: '#EAB308' },
@@ -1119,10 +1135,10 @@ function buildShiftListPanel(): CanvasElementProps {
               ],
             },
           ]},
-          { id: 'mcol-5', name: '預計完成時間', field: 'depart_time', width: 220, type: 'custom', children: [
+          { id: 'mcol-5', name: '預計完成時間', fieldKey: 'depart_time', width: 220, children: [
             staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
-          { id: 'mcol-6', name: '操作', field: 'shift_key', width: 140, type: 'custom', children: [
+          { id: 'mcol-6', name: '操作', fieldKey: 'shift_key', width: 140, children: [
             staticText(0, 0, 140, 44, '詳情', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
         ],
@@ -1133,6 +1149,7 @@ function buildShiftListPanel(): CanvasElementProps {
   return {
     id: DEPLOY_SHIFT_LIST_PANEL_ID,
     type: 'canvas',
+    label: '班表清單',
     x: PLANE_PAD,
     y: ROW3_Y,
     width: ROW3_W,
@@ -1147,30 +1164,6 @@ function buildShiftListPanel(): CanvasElementProps {
 /**
  * 以穩定 id 覆寫／插入部署卡。
  */
-function upsertDeployPanel(
-  elements: CanvasElementProps[],
-  panel: CanvasElementProps,
-  forceResetPosition = false,
-): { elements: CanvasElementProps[]; changed: boolean } {
-  const idx = elements.findIndex(
-    (el) => el.id === panel.id || el.label === panel.label,
-  );
-  if (idx < 0) {
-    return { elements: [...elements, panel], changed: true };
-  }
-  const prev = elements[idx];
-  const next: CanvasElementProps = {
-    ...panel,
-    x: forceResetPosition ? panel.x : (prev.x ?? panel.x),
-    y: forceResetPosition ? panel.y : (prev.y ?? panel.y),
-    width: forceResetPosition ? panel.width : (prev.width ?? panel.width),
-    height: forceResetPosition ? panel.height : (prev.height ?? panel.height),
-  };
-  const replaced = [...elements];
-  replaced[idx] = next;
-  return { elements: replaced, changed: true };
-}
-
 /** 僅在平面完全為空時補齊初始卡片；若使用者已有編輯內容，絕對不進行任何覆寫或還原 */
 export function ensureDeploymentDataStatsPanel(plane: DashboardPlane): DashboardPlane {
   if (plane.name !== DEPLOYMENT_PLANE_NAME) return plane;

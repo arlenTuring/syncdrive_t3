@@ -5,17 +5,13 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import * as path from 'path';
+import { backendScriptPath } from '../common/backend-script-path';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapNodes = require(
-  path.join(process.cwd(), 'scripts/map-operation-nodes.js'),
-);
+const mapNodes = require(backendScriptPath('map-operation-nodes.js'));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapPublishedStore = require(
-  path.join(process.cwd(), 'scripts/map-published-store.js'),
-);
+const mapPublishedStore = require(backendScriptPath('map-published-store.js'));
 
 export type MapStationDto = {
   stationId: string;
@@ -71,14 +67,10 @@ export type PublishedMapLibraryDocumentDto = PublishedMapLibraryEntryDto & {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapFieldEquipment = require(
-  path.join(process.cwd(), 'scripts/map-field-equipment.js'),
-);
+const mapFieldEquipment = require(backendScriptPath('map-field-equipment.js'));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapWaypoints = require(
-  path.join(process.cwd(), 'scripts/map-waypoints.js'),
-);
+const mapWaypoints = require(backendScriptPath('map-waypoints.js'));
 
 function toStationDto(entry: {
   stationId: string;
@@ -113,11 +105,9 @@ export class MapService implements OnModuleInit {
       const id = activeMapId();
       const seeded = mapPublishedStore.seedPublishedFromBuiltinIfMissing(id);
       if (seeded) {
-        // eslint-disable-next-line no-console
         console.log(`[map-library] seeded published map from builtin: ${id}`);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('[map-library] seed failed', err);
     }
   }
@@ -151,7 +141,8 @@ export class MapService implements OnModuleInit {
     activeLibraryId: string | null;
     activeDisplayName: string | null;
   } {
-    const maps = mapPublishedStore.listPublishedEntries() as PublishedMapLibraryEntryDto[];
+    const maps =
+      mapPublishedStore.listPublishedEntries() as PublishedMapLibraryEntryDto[];
     const status = this.getActiveMapLibraryStatus();
     return {
       maps,
@@ -197,16 +188,14 @@ export class MapService implements OnModuleInit {
     return written as PublishedMapLibraryDocumentDto;
   }
 
-  setActiveMapLibrary(
-    body: {
-      mapId: string;
-      libraryId?: string;
-      displayName?: string;
-      version?: string;
-      updatedAt?: string;
-      mapDocument?: Record<string, unknown>;
-    },
-  ): PublishedMapLibraryDocumentDto & {
+  setActiveMapLibrary(body: {
+    mapId: string;
+    libraryId?: string;
+    displayName?: string;
+    version?: string;
+    updatedAt?: string;
+    mapDocument?: Record<string, unknown>;
+  }): PublishedMapLibraryDocumentDto & {
     activeMapId: string;
     activeLibraryId: string;
   } {
@@ -242,9 +231,9 @@ export class MapService implements OnModuleInit {
   }
 
   listPublishedMapIds(): string[] {
-    const published = mapPublishedStore.listPublishedEntries().map(
-      (e: { mapId: string }) => e.mapId,
-    );
+    const published = mapPublishedStore
+      .listPublishedEntries()
+      .map((e: { mapId: string }) => e.mapId);
     if (published.length > 0) return published;
     return [activeMapId()];
   }

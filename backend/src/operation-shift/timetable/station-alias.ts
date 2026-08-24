@@ -1,14 +1,10 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { backendScriptPath } from '../../common/backend-script-path';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapPublishedStore = require(
-  path.join(process.cwd(), 'scripts/map-published-store.js'),
-);
+const mapPublishedStore = require(backendScriptPath('map-published-store.js'));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mapOperationNodes = require(
-  path.join(process.cwd(), 'scripts/map-operation-nodes.js'),
-);
+const mapOperationNodes = require(backendScriptPath('map-operation-nodes.js'));
 
 /** 虛擬渡線端點：不算乘客可見停靠點 */
 export function isVirtualCrossoverStationId(stationId: string): boolean {
@@ -32,9 +28,9 @@ function resolveFacilityDockingAlias(
   const customAlias = typeof dock.alias === 'string' ? dock.alias.trim() : '';
   if (customAlias) return customAlias;
   const base =
-    (typeof facility.customName === 'string' && facility.customName.trim())
-    || (typeof facility.name === 'string' && facility.name.trim())
-    || String(facility.id ?? '設施');
+    (typeof facility.customName === 'string' && facility.customName.trim()) ||
+    (typeof facility.name === 'string' && facility.name.trim()) ||
+    String(facility.id ?? '設施');
   return `${base}停靠點`;
 }
 
@@ -65,7 +61,9 @@ export function buildStationAliasIndexFromMapDocument(
   const areas = Array.isArray(mapDocument.areas) ? mapDocument.areas : [];
   for (const area of areas) {
     const areaObj = asRecord(area);
-    const facilities = Array.isArray(areaObj?.facilities) ? areaObj!.facilities : [];
+    const facilities = Array.isArray(areaObj?.facilities)
+      ? areaObj.facilities
+      : [];
     for (const facility of facilities) {
       const fac = asRecord(facility);
       if (!fac || typeof fac.id !== 'string') continue;
@@ -77,9 +75,10 @@ export function buildStationAliasIndexFromMapDocument(
           typeof params.stationId === 'string' ? params.stationId.trim() : '';
         if (stationId) {
           const name =
-            (typeof fac.customName === 'string' && fac.customName.trim())
-            || (typeof params.stationName === 'string' && params.stationName.trim())
-            || stationId;
+            (typeof fac.customName === 'string' && fac.customName.trim()) ||
+            (typeof params.stationName === 'string' &&
+              params.stationName.trim()) ||
+            stationId;
           if (!index.has(stationId)) {
             index.set(stationId, name);
           } else {
@@ -101,8 +100,13 @@ export function buildStationAliasIndexFromMapDocument(
   return index;
 }
 
-export function resolveMapIdFromShiftBody(body: Record<string, unknown>): string | null {
-  if (typeof body.routeGroupsMapId === 'string' && body.routeGroupsMapId.trim()) {
+export function resolveMapIdFromShiftBody(
+  body: Record<string, unknown>,
+): string | null {
+  if (
+    typeof body.routeGroupsMapId === 'string' &&
+    body.routeGroupsMapId.trim()
+  ) {
     return body.routeGroupsMapId.trim();
   }
   const output = asRecord(body.scheduleOutput);
@@ -142,7 +146,9 @@ export function loadMapDocumentForShift(body: Record<string, unknown>): {
       return { mapId, mapDocument: entry.mapDocument };
     }
     try {
-      const filePath = mapPublishedStore.resolveMapJsonPath(mapId) as string | null;
+      const filePath = mapPublishedStore.resolveMapJsonPath(mapId) as
+        | string
+        | null;
       if (filePath && fs.existsSync(filePath)) {
         const mapDocument = JSON.parse(
           fs.readFileSync(filePath, 'utf8'),
@@ -162,9 +168,5 @@ export function resolveStationAlias(
   aliasIndex: Map<string, string>,
   fallbackName?: string | null,
 ): string {
-  return (
-    aliasIndex.get(stationId)?.trim()
-    || fallbackName?.trim()
-    || stationId
-  );
+  return aliasIndex.get(stationId)?.trim() || fallbackName?.trim() || stationId;
 }

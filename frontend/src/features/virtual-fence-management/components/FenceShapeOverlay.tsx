@@ -47,8 +47,17 @@ export function FenceShapeOverlay({
 
   const pointsAttr = screen.map((p) => `${p.x},${p.y}`).join(' ');
 
+  /**
+   * 事件參數要標成 <code>SVGElement</code>。
+   *
+   * 未帶型別參數的 <code>React.PointerEvent</code>，其 currentTarget 是 Element，
+   * 而 <code>ElementEventMap</code> 不含 pointer 事件——<code>addEventListener('pointermove', …)</code>
+   * 只能落到吃 <code>Event</code> 的泛用多載，於是 <code>(ev: PointerEvent) =&gt; void</code>
+   * 對不上而編不過。這個覆層畫的是 SVG，標成 SVGElement 就會走到含 pointer 事件的
+   * 事件表（2026-08-24）。
+   */
   const onVertexPointerDown = (
-    e: React.PointerEvent,
+    e: React.PointerEvent<HTMLButtonElement>,
     index: number,
   ) => {
     if (!editing) return;
@@ -74,7 +83,7 @@ export function FenceShapeOverlay({
     target.addEventListener('pointercancel', onUp);
   };
 
-  const onEdgeClick = (e: React.PointerEvent, edgeIndex: number) => {
+  const onEdgeClick = (e: React.PointerEvent<SVGElement>, edgeIndex: number) => {
     if (!editing) return;
     e.stopPropagation();
     e.preventDefault();
