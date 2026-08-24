@@ -508,6 +508,34 @@ export function insertMaintenanceTransferCards(args: {
    * 呼叫時機一律在該段整備的時刻異動<strong>之後</strong>；同一段被多個
    * 流程（入廠／轉場／出廠）先後定案時就地更新同一筆佔用，不會重複累加。
    */
+  /**
+   * 車<strong>真正離開</strong>這一格的時刻。
+   *
+   * 整備結束不等於車開走：整備做完之後，車還停在格子裡，直到下一張卡把它帶走
+   * ——可能是出場移動卡，也可能直接就是下一班正線（設施的出場站正好是發車站時，
+   * 引擎不會插移動卡）。實測（2026-08-24）九筆設施格重疊全部是後者：
+   *
+   * <pre>
+   *   E2  時間線 1  充電做完 12:00:00，car 停在格子裡到 12:10:30 才跑正線
+   *       時間線 3  12:00:40 就進來了                        → 重疊 590 秒
+   * </pre>
+   *
+   * 預約只鎖到整備結束的話，那段「做完了還沒走」在帳上是空的，別台車就訂進來了。
+   * 這個函式回傳的是<strong>下一張有長度的卡開始的時刻</strong>——車在那之前都還在
+   * 這一格。
+   */
+  function vehicleLeavesFacilityAtSecond(block: GeneratedScheduleBlock): number {
+    const context = chainContext.get(block.id);
+    const endSecond = minuteToSecond(block.plannedEndMinute);
+    if (!context) return endSecond;
+    for (let i = context.index + 1; i < context.sorted.length; i += 1) {
+      const next = context.sorted[i]!;
+      if (next.plannedEndMinute - next.plannedStartMinute <= 1e-9) continue;
+      return Math.max(endSecond, minuteToSecond(next.plannedStartMinute));
+    }
+    return endSecond;
+  }
+
   function assignYardFacility(
     block: GeneratedScheduleBlock,
     nodeId: string,
@@ -522,7 +550,8 @@ export function insertMaintenanceTransferCards(args: {
       node?.kind === 'docking' ? node.stationId?.trim() || undefined : undefined;
 
     const startSecond = minuteToSecond(block.plannedStartMinute);
-    const endSecond = minuteToSecond(block.plannedEndMinute);
+    // 鎖到車真正開走，不是整備結束——中間那段車還在格子裡（見上方說明）
+    const endSecond = vehicleLeavesFacilityAtSecond(block);
     const existing = yardBookingByBlockId.get(block.id);
     if (existing) {
       existing.facilityNodeId = nodeId;
@@ -1023,7 +1052,15 @@ export function insertMaintenanceTransferCards(args: {
   ): { nodeId: string; label: string } | null {
     let best: { nodeId: string; label: string; tier: number; cost: number } | null = null;
     const startSecond = minuteToSecond(yard.plannedStartMinute);
-    const endSecond = minuteToSecond(yard.plannedEndMinute);
+    /**
+     * 檢查窗口要問到<strong>車真正開走</strong>，不是整備結束。
+     *
+     * 兩者必須用同一個定義——預約鎖到車開走（見 assignYardFacility），挑格子時卻只
+     * 問到整備結束的話，「做完了還沒走」那段就會被判定成空的。實測（2026-08-24）
+     * 剩下的四筆重疊全是這樣來的：擋人的都是待命，而待命在指派順序上排最後，它自己
+     * 的整備窗不與後車重疊，重疊的是它結束之後還沒開走的那幾分鐘。
+     */
+    const endSecond = vehicleLeavesFacilityAtSecond(yard);
     for (const candidate of candidates) {
       // 抵達時刻要用<strong>實際</strong>移動時間；排名要用含外部性的比較成本。
       // 兩者混用的話，外部成本會被當成車真的多花的時間，抵達時刻就算錯了。
@@ -1727,7 +1764,7 @@ export function insertMaintenanceTransferCards(args: {
           /** 這一對轉場的外部成本（路徑經過的共用轉折點會鎖住別人多久） */
           let externalitySeconds = 0;
 
-          let transferVia: string[] = [];
+          let transferVia: string[];
           if (sameArea) {
             // 同一區域：不查拓樸，直接視為 0 秒的示意轉移——開始跟結束是同一刻。
             midNodeId = entryFacility.id;

@@ -13,6 +13,7 @@ import {
   findStationBerthCollisions,
 } from '../stationBerthOccupancy';
 import {
+  validateFacilityOccupancy,
   validatePassengerHeadway,
   validateTimelineOverlaps,
 } from './validate';
@@ -92,6 +93,14 @@ export function scoreSchedulePlan(args: {
   const warnings: FeasibilityIssue[] = [];
 
   validateTimelineOverlaps(timelines, errors);
+  /**
+   * 設施格重疊也算硬錯誤——兩台車同時在一格是物理上做不到的事。
+   *
+   * 不放進來的話，任何「把車從格子裡早點放出來」的處理都會被閘門判定成「沒變好」
+   * 而撤回：它修的東西根本不在分數裡。交接不足（警告）不計入，那是營運規則不是
+   * 物理事實，收進第二位會讓它壓過班距。
+   */
+  validateFacilityOccupancy(timelines, errors, { collisionProtectionSeconds });
 
   // 站位碰撞自己數，避開報告器 40 則的截斷
   const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
