@@ -303,6 +303,15 @@ function MoveCardHoverCard({
           ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '設施'}`
           : `${block.yardExitFacilityLabel ?? '設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`}
       </div>
+      {/*
+        途經節點：載客卡看得到停靠序，調度移動沒有理由是黑箱。只有兩端（起訖）時
+        不重複顯示——那跟上一行一樣，沒有新資訊。
+      */}
+      {block.yardMoveViaLabels && block.yardMoveViaLabels.length > 2 ? (
+        <div className="mt-0.5 text-[10px] leading-4 text-zinc-400">
+          途經 {block.yardMoveViaLabels.join(' › ')}
+        </div>
+      ) : null}
       <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
         {formatBlockTimeRange(block)}（{block.travelSeconds} 秒）
       </div>

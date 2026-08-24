@@ -76,6 +76,15 @@ export type GeneratedScheduleBlock = {
   /** 出場移動：抵達的轉乘站顯示名（例 T3上行） */
   yardExitStationLabel?: string;
   /**
+   * 這張移動卡實際<strong>途經的節點名稱</strong>（含起訖），依行進順序。
+   *
+   * 移動卡先前只顯示「起點 → 設施」兩端，中間走哪一條看不出來——使用者
+   * （2026-08-24）：「我需要你這張卡補足這些移動的節點，他應該要跟正常卡一樣是有
+   * 分段的，這樣我才知道你是到 T3上行 還是 T3下行 過去的 H1」。載客卡本來就看得到
+   * 停靠序，調度移動沒有理由是黑箱。
+   */
+  yardMoveViaLabels?: string[];
+  /**
    * 轉場卡：來源／目的整備類型自己的代號（使用者在整備任務自訂，1–2 個大寫
    * 英文字母）。卡面代號＝這個代號 + I（入廠）／O（出廠），由
    * {@link resolveMoveCardPrefix} 依 source 動態組成——沒有「MO／MI／PI／PO」

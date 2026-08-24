@@ -326,6 +326,19 @@ export function insertMaintenanceTransferCards(args: {
    * 回報訊息裡直接印 <code>station_2</code> 這種內部 id，使用者根本不知道那是哪一站
    * （2026-08-11 使用者指正）。拓樸節點上就有 label，拿它來寫。
    */
+  /**
+   * 把拓樸路徑轉成可讀的節點名稱序列（含起訖）。
+   *
+   * 移動卡先前只顯示兩端，中間走哪一條看不出來——使用者要能分辨「經 T3上行」還是
+   * 「經 T3下行」進 H1。節點沒有標籤時退回 id，不要整段消失。
+   */
+  function pathViaLabels(path: { nodeIds: string[] } | null | undefined): string[] {
+    if (!path) return [];
+    return path.nodeIds.map(
+      (nodeId) => nodeById.get(nodeId)?.label?.trim() || nodeId,
+    );
+  }
+
   function stationDisplayName(stationId: string | null | undefined): string {
     const id = stationId?.trim();
     if (!id) return '未知站點';
@@ -1301,6 +1314,8 @@ export function insertMaintenanceTransferCards(args: {
         decisionCost: number;
         departureSecond: number;
         gatewayNodeId: string; gatewayInstant: number;
+        /** 這條路徑實際途經的節點名稱（含起訖），給卡片顯示分段用 */
+        viaLabels: string[];
       } | null = null;
       const tally = newTally();
       for (const facility of facilities) {
@@ -1434,6 +1449,7 @@ export function insertMaintenanceTransferCards(args: {
             decisionCost,
             departureSecond,
             gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
+            viaLabels: pathViaLabels(path),
           };
         }
       }
@@ -1580,6 +1596,7 @@ export function insertMaintenanceTransferCards(args: {
         // 「yardExitStationLabel ?? yardExitStationId」，少了 label 使用者看到的
         // 就是 station_2 這種內部代號（2026-08-24 使用者回報）。
         yardExitStationLabel: stationDisplayName(stationId),
+        yardMoveViaLabels: chosen.viaLabels,
         yardExitSectionCode:
           resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
         yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,
@@ -1672,6 +1689,8 @@ export function insertMaintenanceTransferCards(args: {
         entryLabel: string;
         midNodeId: string;
         midLabel: string;
+        /** 這一對轉場實際途經的節點名稱（含起訖），給卡片顯示分段用 */
+        viaLabels: string[];
         exitLegSeconds: number;
         entryLegSeconds: number;
         /**
@@ -1708,15 +1727,21 @@ export function insertMaintenanceTransferCards(args: {
           /** 這一對轉場的外部成本（路徑經過的共用轉折點會鎖住別人多久） */
           let externalitySeconds = 0;
 
+          let transferVia: string[] = [];
           if (sameArea) {
             // 同一區域：不查拓樸，直接視為 0 秒的示意轉移——開始跟結束是同一刻。
             midNodeId = entryFacility.id;
             midLabel = entryFacility.label || entryFacility.id;
             exitLegSeconds = 0;
             entryLegSeconds = 0;
+            transferVia = [
+              exitFacility.label || exitFacility.id,
+              entryFacility.label || entryFacility.id,
+            ];
           } else {
             const path = findTopologyPath(topology, exitFacility.id, entryFacility.id);
             if (!path || path.edges.length === 0) { tally.noPath += 1; continue; }
+            transferVia = pathViaLabels(path);
             // 分界點取第一段邊的終點：出廠卡永遠是「離開這座設施專屬的那一段
             // 邊」（例 E2 → N2W下行出發），入廠卡吸收掉中間所有正線轉乘直到
             // 目的設施（例 N2W下行出發 → T3下行 → M1）——出廠短、入廠長，
@@ -1835,6 +1860,7 @@ export function insertMaintenanceTransferCards(args: {
               entryLabel: entryFacility.label || entryFacility.id,
               midNodeId,
               midLabel,
+              viaLabels: transferVia,
               exitLegSeconds,
               entryLegSeconds,
               sameArea,
@@ -1894,6 +1920,7 @@ export function insertMaintenanceTransferCards(args: {
         yardExitFacilityLabel: chosen.exitLabel,
         yardExitStationId: chosen.midNodeId,
         yardExitStationLabel: exitOtherSideLabel,
+        yardMoveViaLabels: chosen.viaLabels,
         yardExitSectionCode: exitCode,
         yardExitSectionLabel: exitLabel,
       };
@@ -1912,6 +1939,7 @@ export function insertMaintenanceTransferCards(args: {
         yardExitFacilityLabel: chosen.entryLabel,
         yardExitStationId: chosen.midNodeId,
         yardExitStationLabel: entryOtherSideLabel,
+        yardMoveViaLabels: chosen.viaLabels,
         yardExitSectionCode: entryCode,
         yardExitSectionLabel: entryLabel,
       };
@@ -2050,6 +2078,7 @@ export function insertMaintenanceTransferCards(args: {
           seconds: path.avgSeconds,
           decisionCost: pathDecisionCost(path),
           edges: path.edges,
+          viaLabels: pathViaLabels(path),
         };
       })
       .filter((c): c is {
@@ -2057,6 +2086,7 @@ export function insertMaintenanceTransferCards(args: {
         seconds: number;
         decisionCost: number;
         edges: PointTopologyEdge[];
+        viaLabels: string[];
       } => c !== null)
       .sort((a, b) => a.decisionCost - b.decisionCost);
     if (candidates.length === 0) {
@@ -2076,10 +2106,12 @@ export function insertMaintenanceTransferCards(args: {
     let chosen: {
       nodeId: string; label: string; seconds: number;
       gatewayNodeId: string; gatewayInstant: number;
+      /** 這條路徑實際途經的節點名稱（含起訖），給卡片顯示分段用 */
+      viaLabels: string[];
     } | null = null;
     let chosenStart = 0;
     const tally = newTally();
-    for (const { facility, seconds, edges } of candidates) {
+    for (const { facility, seconds, edges, viaLabels } of candidates) {
       const startSecond = departSecond - seconds;
       // 出場移動不得早於整備開始（那代表整備根本沒做）
       if (startSecond < yardStartSecond - 1e-9) { tally.noTime += 1; continue; }
@@ -2098,6 +2130,7 @@ export function insertMaintenanceTransferCards(args: {
       chosen = {
         nodeId: facility.id, label: facility.label || facility.id, seconds,
         gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
+        viaLabels,
       };
       chosenStart = startSecond;
       break;
@@ -2135,6 +2168,7 @@ export function insertMaintenanceTransferCards(args: {
       yardExitFacilityLabel: chosen.label,
       yardExitStationId: stationId,
       yardExitStationLabel: stationLabel,
+      yardMoveViaLabels: chosen.viaLabels,
       yardExitSectionCode:
         resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
       yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,

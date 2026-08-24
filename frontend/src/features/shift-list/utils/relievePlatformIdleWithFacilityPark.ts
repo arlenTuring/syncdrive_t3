@@ -68,7 +68,22 @@ type ParkCandidate = {
   facilityLabel: string;
   inboundSeconds: number;
   outboundSeconds: number;
+  /** 去程／回程實際途經的節點名稱（含起訖），給卡片顯示分段用 */
+  inboundVia: string[];
+  outboundVia: string[];
 };
+
+/** 把拓樸路徑轉成可讀節點名稱（含起訖）；讓移動卡跟載客卡一樣看得到分段 */
+function pathViaLabels(
+  topology: PointTopology,
+  path: { nodeIds: string[] } | null | undefined,
+): string[] {
+  if (!path) return [];
+  const labelById = new Map(
+    topology.nodes.map((node) => [node.id, (node.label ?? '').trim()] as const),
+  );
+  return path.nodeIds.map((nodeId) => labelById.get(nodeId) || nodeId);
+}
 
 function facilityNodes(topology: PointTopology): { id: string; label: string }[] {
   return topology.nodes
@@ -280,6 +295,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
           waitLabel: string;
           inboundSeconds: number;
           hopSeconds: number;
+          viaLabels: string[];
         } | null = null;
         const ownTravelSeconds = Math.max(0, nextBlock.travelSeconds ?? 0);
         const ownArriveSecond = snapUpToClockAlignSeconds(leaveSecond + ownTravelSeconds);
@@ -295,6 +311,11 @@ export function relievePlatformIdleWithFacilityPark(args: {
             waitLabel: targetLabel,
             inboundSeconds: ownTravelSeconds,
             hopSeconds: 0,
+            // 甲沿用既有的入廠移動卡，途經節點就查同一段路
+            viaLabels: pathViaLabels(
+              topology,
+              findTopologyPath(topology, fromNodeId, targetNodeId),
+            ),
           };
         }
 
@@ -333,6 +354,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
               waitLabel: facility.label,
               inboundSeconds: inbound.avgSeconds,
               hopSeconds: hop.avgSeconds,
+              viaLabels: pathViaLabels(topology, inbound),
             };
           }
         }
@@ -377,6 +399,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
             travelSeconds: plan.inboundSeconds,
             dwellSeconds: 0,
             source: 'yard_entry_move',
+            yardMoveViaLabels: plan.viaLabels,
             yardEntryFacilityNodeId: plan.waitNodeId,
             yardEntryFacilityLabel: plan.waitLabel,
           } as GeneratedScheduleBlock);
@@ -509,6 +532,8 @@ export function relievePlatformIdleWithFacilityPark(args: {
           facilityLabel: facility.label,
           inboundSeconds: inbound.avgSeconds,
           outboundSeconds: outbound.avgSeconds,
+          inboundVia: pathViaLabels(topology, inbound),
+          outboundVia: pathViaLabels(topology, outbound),
         };
       }
 
@@ -542,6 +567,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
           travelSeconds: best.inboundSeconds,
           dwellSeconds: 0,
           source: 'yard_entry_move',
+          yardMoveViaLabels: best.inboundVia,
           yardEntryFacilityNodeId: best.facilityNodeId,
           yardEntryFacilityLabel: best.facilityLabel,
         } as GeneratedScheduleBlock,
@@ -580,6 +606,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
           travelSeconds: best.outboundSeconds,
           dwellSeconds: 0,
           source: 'yard_exit_move',
+          yardMoveViaLabels: best.outboundVia,
           yardExitFacilityNodeId: best.facilityNodeId,
           yardExitFacilityLabel: best.facilityLabel,
           yardExitStationId: occupancy.stationId,
