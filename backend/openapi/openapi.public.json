@@ -1,6 +1,124 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/syncdrive-api/vehicles/eta/by-station": {
+      "get": {
+        "description": "以停靠點為主鍵，供站端顯示。一律列出全部停靠點（當下無車駛近者 etas 為空陣列），以利站端固定顯示版面。每站依 eta_at 由近到遠排序。建議輪詢間隔 60 秒。",
+        "operationId": "VehicleEtaController_byStation",
+        "parameters": [
+          {
+            "name": "limit_per_station",
+            "required": false,
+            "in": "query",
+            "description": "每站回傳筆數，值域 1–10",
+            "schema": {
+              "type": "integer",
+              "default": 3
+            }
+          },
+          {
+            "name": "station_id",
+            "required": false,
+            "in": "query",
+            "description": "指定停靠點，可重複指定多個（如 ?station_id=station_3&station_id=station_4）",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleEtaByStationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "參數格式錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtaErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "各停靠點接下來將抵達的車輛",
+        "tags": [
+          "對外｜車輛即時 ETA"
+        ]
+      }
+    },
+    "/syncdrive-api/vehicles/eta/by-vehicle": {
+      "get": {
+        "description": "以車輛為主鍵，供車輛追蹤畫面。next_stops 中 sequence=1 為車端當前目標站，eta 直接採用車端回報值；2 以後由中心端依班表外推，誤差隨站序累積。建議輪詢間隔 60 秒。",
+        "operationId": "VehicleEtaController_byVehicle",
+        "parameters": [
+          {
+            "name": "next_stops",
+            "required": false,
+            "in": "query",
+            "description": "每車往後推算站數，值域 1–10",
+            "schema": {
+              "type": "integer",
+              "default": 3
+            }
+          },
+          {
+            "name": "vehicle_code",
+            "required": false,
+            "in": "query",
+            "description": "指定車輛，可重複指定多個（如 ?vehicle_code=PMS-01&vehicle_code=PMS-05）",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleEtaByVehicleResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "參數格式錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtaErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "各車輛接下來將抵達的停靠點",
+        "tags": [
+          "對外｜車輛即時 ETA"
+        ]
+      }
+    },
     "/syncdrive-api/operation-shift/timetable/trips": {
       "get": {
         "description": "讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。可用 from/to 過濾卡時間重疊區間。",
@@ -107,6 +225,478 @@
         "name": "x-api-key"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "EtaErrorDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "INVALID_PARAM",
+              "UNAUTHORIZED",
+              "NOT_FOUND",
+              "RATE_LIMITED",
+              "SERVICE_DEGRADED"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "example": "limit_per_station 必須為 1 至 10 的整數"
+          }
+        },
+        "required": [
+          "error",
+          "detail"
+        ]
+      },
+      "EtaMetaDto": {
+        "type": "object",
+        "properties": {
+          "generated_at": {
+            "type": "number",
+            "example": 1786842000000,
+            "description": "中心端產生本次快照的時刻"
+          },
+          "generated_clock": {
+            "type": "string",
+            "example": "09:00:00",
+            "description": "可直接顯示為「資料更新於」"
+          },
+          "shift_id": {
+            "type": "object",
+            "nullable": true,
+            "example": "OS-DRAFT-MSEEXIN9",
+            "description": "計畫值所依據的班表；無可用班表時為 null"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "published",
+              "draft_fallback",
+              "none"
+            ],
+            "description": "published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不應對外顯示為正式時刻；none＝無班表，plan 全為 null"
+          },
+          "data_quality": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "DEGRADED",
+              "DOWN"
+            ],
+            "description": "DEGRADED＝部分車輛逾時或班表未載入，須對 UNKNOWN 者標示資料中斷；DOWN＝無法取得任何車輛資料，必須停止顯示 ETA"
+          }
+        },
+        "required": [
+          "generated_at",
+          "generated_clock",
+          "shift_id",
+          "source",
+          "data_quality"
+        ]
+      },
+      "EtaPlanDto": {
+        "type": "object",
+        "properties": {
+          "planned_arrival_at": {
+            "type": "object",
+            "nullable": true,
+            "example": 1786842010000
+          },
+          "planned_arrival_clock": {
+            "type": "object",
+            "nullable": true,
+            "example": "09:00:10"
+          },
+          "planned_departure_at": {
+            "type": "object",
+            "nullable": true,
+            "description": "僅於該停靠點為此班次起站，或 arrival_state 為 AT_STATION 時有值"
+          },
+          "planned_departure_clock": {
+            "type": "object",
+            "nullable": true
+          },
+          "delay_seconds": {
+            "type": "object",
+            "nullable": true,
+            "example": 13,
+            "description": "eta_at 減 planned_arrival_at，單位秒。正值＝晚於計畫"
+          },
+          "delay_state": {
+            "type": "string",
+            "enum": [
+              "EARLY",
+              "ON_TIME",
+              "MINOR_DELAY",
+              "MAJOR_DELAY",
+              "NO_PLAN"
+            ],
+            "description": "暫定定義，門檻未經營運確認。現階段請以 delay_seconds 為準"
+          }
+        },
+        "required": [
+          "planned_arrival_at",
+          "planned_arrival_clock",
+          "planned_departure_at",
+          "planned_departure_clock",
+          "delay_seconds",
+          "delay_state"
+        ]
+      },
+      "StationEtaEntryDto": {
+        "type": "object",
+        "properties": {
+          "vehicle_code": {
+            "type": "string",
+            "example": "PMS-05"
+          },
+          "order_id": {
+            "type": "object",
+            "nullable": true,
+            "example": "260816-ST0007"
+          },
+          "trip_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST0007",
+            "description": "路線代號＋發車時刻 HHMM"
+          },
+          "route_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST"
+          },
+          "route_name": {
+            "type": "object",
+            "nullable": true,
+            "example": "S2W上行 > T3上行"
+          },
+          "vehicle_phase": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "TRANSITING",
+              "FAULTED"
+            ],
+            "description": "車端營運階段，原值透傳；資料逾時或車端未提供時為 null"
+          },
+          "arrival_state": {
+            "type": "string",
+            "enum": [
+              "EN_ROUTE",
+              "APPROACHING",
+              "DOCKING",
+              "AT_STATION",
+              "DEPARTED",
+              "UNKNOWN"
+            ],
+            "description": "APPROACHING＝即將進站（eta ≤ 60 秒或距離 ≤ 200 公尺）；EN_ROUTE＝預計到達；UNKNOWN＝車端資料逾時或缺少目標站"
+          },
+          "eta_seconds": {
+            "type": "object",
+            "nullable": true,
+            "example": 25,
+            "description": "以 observed_at 為基準的剩餘秒數，非以收到回應的時刻為基準"
+          },
+          "eta_at": {
+            "type": "object",
+            "nullable": true,
+            "example": 1786842023000,
+            "description": "恆等於 observed_at + eta_seconds × 1000。倒數計時必須用這個欄位"
+          },
+          "eta_clock": {
+            "type": "object",
+            "nullable": true,
+            "example": "09:00:23"
+          },
+          "distance_to_station_m": {
+            "type": "object",
+            "nullable": true,
+            "example": 120,
+            "description": "路徑距離，公尺"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/EtaPlanDto"
+          },
+          "observed_at": {
+            "type": "number",
+            "example": 1786841998000,
+            "description": "車端回報時刻"
+          },
+          "observed_clock": {
+            "type": "string",
+            "example": "08:59:58"
+          },
+          "data_age_seconds": {
+            "type": "number",
+            "example": 2,
+            "description": "generated_at 減 observed_at。失聯是以「資料變舊」呈現而非欄位消失，不可只用欄位是否存在判斷"
+          }
+        },
+        "required": [
+          "vehicle_code",
+          "order_id",
+          "trip_code",
+          "route_code",
+          "route_name",
+          "vehicle_phase",
+          "arrival_state",
+          "eta_seconds",
+          "eta_at",
+          "eta_clock",
+          "distance_to_station_m",
+          "plan",
+          "observed_at",
+          "observed_clock",
+          "data_age_seconds"
+        ]
+      },
+      "StationEtaGroupDto": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "example": "station_4"
+          },
+          "station_name": {
+            "type": "string",
+            "example": "T3上行"
+          },
+          "etas": {
+            "description": "依 eta_at 由近到遠排序；當下無車駛近時為空陣列",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationEtaEntryDto"
+            }
+          }
+        },
+        "required": [
+          "station_id",
+          "station_name",
+          "etas"
+        ]
+      },
+      "VehicleEtaByStationResponseDto": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/EtaMetaDto"
+          },
+          "station_count": {
+            "type": "number",
+            "example": 10,
+            "description": "等於 stations 陣列長度；未指定 station_id 時為全部停靠點"
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationEtaGroupDto"
+            }
+          }
+        },
+        "required": [
+          "meta",
+          "station_count",
+          "stations"
+        ]
+      },
+      "VehicleEtaByVehicleResponseDto": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/EtaMetaDto"
+          },
+          "vehicle_count": {
+            "type": "number",
+            "example": 11,
+            "description": "等於 vehicles 陣列長度"
+          },
+          "vehicles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleEtaEntryDto"
+            }
+          }
+        },
+        "required": [
+          "meta",
+          "vehicle_count",
+          "vehicles"
+        ]
+      },
+      "VehicleEtaEntryDto": {
+        "type": "object",
+        "properties": {
+          "vehicle_code": {
+            "type": "string",
+            "example": "PMS-05"
+          },
+          "vehicle_phase": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "TRANSITING",
+              "FAULTED"
+            ]
+          },
+          "order_id": {
+            "type": "object",
+            "nullable": true,
+            "example": "260816-ST0007"
+          },
+          "trip_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST0007"
+          },
+          "route_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST"
+          },
+          "route_name": {
+            "type": "object",
+            "nullable": true,
+            "example": "S2W上行 > T3上行"
+          },
+          "position": {
+            "nullable": true,
+            "description": "車端資料逾時時為 null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VehiclePositionDto"
+              }
+            ]
+          },
+          "next_stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleNextStopDto"
+            }
+          },
+          "observed_at": {
+            "type": "number",
+            "example": 1786841998000
+          },
+          "observed_clock": {
+            "type": "string",
+            "example": "08:59:58"
+          },
+          "data_age_seconds": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "vehicle_code",
+          "vehicle_phase",
+          "order_id",
+          "trip_code",
+          "route_code",
+          "route_name",
+          "position",
+          "next_stops",
+          "observed_at",
+          "observed_clock",
+          "data_age_seconds"
+        ]
+      },
+      "VehicleNextStopDto": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "number",
+            "example": 1,
+            "description": "自 1 起算。sequence=1 為車端當前目標站，eta 直接採用車端回報值；2 以後由中心端依班表站間旅行時間外推，誤差隨站序累積"
+          },
+          "station_id": {
+            "type": "string",
+            "example": "station_4"
+          },
+          "station_name": {
+            "type": "string",
+            "example": "T3上行"
+          },
+          "arrival_state": {
+            "type": "string",
+            "enum": [
+              "EN_ROUTE",
+              "APPROACHING",
+              "DOCKING",
+              "AT_STATION",
+              "DEPARTED",
+              "UNKNOWN"
+            ]
+          },
+          "eta_seconds": {
+            "type": "object",
+            "nullable": true,
+            "example": 25
+          },
+          "eta_at": {
+            "type": "object",
+            "nullable": true,
+            "example": 1786842023000
+          },
+          "eta_clock": {
+            "type": "object",
+            "nullable": true,
+            "example": "09:00:23"
+          },
+          "distance_to_station_m": {
+            "type": "object",
+            "nullable": true,
+            "example": 120
+          },
+          "plan": {
+            "$ref": "#/components/schemas/EtaPlanDto"
+          }
+        },
+        "required": [
+          "sequence",
+          "station_id",
+          "station_name",
+          "arrival_state",
+          "eta_seconds",
+          "eta_at",
+          "eta_clock",
+          "distance_to_station_m",
+          "plan"
+        ]
+      },
+      "VehiclePositionDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "example": 25.077612,
+            "description": "WGS84 緯度"
+          },
+          "longitude": {
+            "type": "number",
+            "example": 121.232545,
+            "description": "WGS84 經度"
+          },
+          "heading": {
+            "type": "number",
+            "example": 1.49,
+            "description": "車頭朝向角，弳度"
+          },
+          "velocity_kph": {
+            "type": "number",
+            "example": 10.5,
+            "description": "公里／小時"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "heading",
+          "velocity_kph"
+        ]
+      }
+    }
   }
 }
