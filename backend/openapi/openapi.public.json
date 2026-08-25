@@ -1,0 +1,112 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/syncdrive-api/operation-shift/timetable/trips": {
+      "get": {
+        "description": "讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。可用 from/to 過濾卡時間重疊區間。",
+        "operationId": "OperationShiftController_getTimetableTrips",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "HH:MM:SS 或秒，預設 00:00:00",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "HH:MM:SS 或秒，預設 24:00:00",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "取得班表班次清單（含各站時刻）",
+        "tags": [
+          "對外｜班表計畫"
+        ]
+      }
+    },
+    "/syncdrive-api/operation-shift/timetable/station-etas": {
+      "get": {
+        "description": "由班表推算之站點事件流；vehicle_id 暫為 null。可用 from/to、station_id 濾波。",
+        "operationId": "OperationShiftController_getStationEtas",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "HH:MM:SS 或秒，預設 00:00:00",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "HH:MM:SS 或秒，預設 24:00:00",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "station_id",
+            "required": false,
+            "in": "query",
+            "description": "只取單一站",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "取得各站計畫 ETA（抵達／離站）",
+        "tags": [
+          "對外｜班表計畫"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "SyncDrive-T3 對外介面",
+    "description": "台智駕 SyncDrive T3 車輛監控系統對外提供的介面契約。所有端點需帶 `x-api-key` 標頭。詳細語意見各端點說明與規格書。",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "x-api-key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {}
+  }
+}

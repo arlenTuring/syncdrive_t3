@@ -1,5 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ExternalApi } from '../common/external-api.decorator';
 import {
   OperationShiftPublishStatus,
   OperationShiftUsageStatus,
@@ -21,14 +31,14 @@ export class OperationShiftController {
     @Query('page_size') page_size?: string,
   ) {
     const us =
-      usage_status === OperationShiftUsageStatus.IDLE
-        || usage_status === OperationShiftUsageStatus.IN_USE
+      usage_status === OperationShiftUsageStatus.IDLE ||
+      usage_status === OperationShiftUsageStatus.IN_USE
         ? usage_status
         : 'all';
 
     const ps =
-      publish_status === OperationShiftPublishStatus.DRAFT
-        || publish_status === OperationShiftPublishStatus.PUBLISHED
+      publish_status === OperationShiftPublishStatus.DRAFT ||
+      publish_status === OperationShiftPublishStatus.PUBLISHED
         ? publish_status
         : 'all';
 
@@ -48,20 +58,32 @@ export class OperationShiftController {
     @Query('exclude_id') exclude_id?: string,
   ) {
     return {
-      unique: await this.operationShiftService.isShiftNameUnique(name ?? '', exclude_id),
+      unique: await this.operationShiftService.isShiftNameUnique(
+        name ?? '',
+        exclude_id,
+      ),
     };
   }
 
   @Get('timetable/trips')
+  @ExternalApi('班表計畫')
   @ApiOperation({
     summary: '取得班表班次清單（含各站時刻）',
     description:
-      '讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。'
-      + '回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。'
-      + '可用 from/to 過濾卡時間重疊區間。',
+      '讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。' +
+      '回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。' +
+      '可用 from/to 過濾卡時間重疊區間。',
   })
-  @ApiQuery({ name: 'from', required: false, description: 'HH:MM:SS 或秒，預設 00:00:00' })
-  @ApiQuery({ name: 'to', required: false, description: 'HH:MM:SS 或秒，預設 24:00:00' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'HH:MM:SS 或秒，預設 00:00:00',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    description: 'HH:MM:SS 或秒，預設 24:00:00',
+  })
   async getTimetableTrips(
     @Query('from') from?: string,
     @Query('to') to?: string,
@@ -70,13 +92,22 @@ export class OperationShiftController {
   }
 
   @Get('timetable/station-etas')
+  @ExternalApi('班表計畫')
   @ApiOperation({
     summary: '取得各站計畫 ETA（抵達／離站）',
     description:
       '由班表推算之站點事件流；vehicle_id 暫為 null。可用 from/to、station_id 濾波。',
   })
-  @ApiQuery({ name: 'from', required: false, description: 'HH:MM:SS 或秒，預設 00:00:00' })
-  @ApiQuery({ name: 'to', required: false, description: 'HH:MM:SS 或秒，預設 24:00:00' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'HH:MM:SS 或秒，預設 00:00:00',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    description: 'HH:MM:SS 或秒，預設 24:00:00',
+  })
   @ApiQuery({ name: 'station_id', required: false, description: '只取單一站' })
   async getStationEtas(
     @Query('from') from?: string,
@@ -98,7 +129,9 @@ export class OperationShiftController {
 
   @Post('draft')
   @ApiOperation({ summary: '建立班表草稿' })
-  async createDraft(@Body() body: { name?: string; body?: Record<string, unknown> }) {
+  async createDraft(
+    @Body() body: { name?: string; body?: Record<string, unknown> },
+  ) {
     return this.operationShiftService.createDraft({
       name: body?.name ?? '',
       body: body?.body ?? {},
@@ -112,7 +145,9 @@ export class OperationShiftController {
   }
 
   @Post('detail/:id/deploy')
-  @ApiOperation({ summary: '部署班表為使用中（同時發布；其他使用中班表改為閒置）' })
+  @ApiOperation({
+    summary: '部署班表為使用中（同時發布；其他使用中班表改為閒置）',
+  })
   async deployShift(
     @Param('id') id: string,
     @Body() body?: { reviewer_name?: string },

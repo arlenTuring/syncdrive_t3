@@ -1,15 +1,25 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, type LogLevel } from '@nestjs/common';
+import { createServer } from 'node:http';
 import { json, urlencoded } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { ExternalPortGuard } from './common/external-port.guard';
+import {
+  buildInternalDocument,
+  buildPublicDocument,
+} from './common/openapi-documents';
 
 /** 解析 CORS 允許來源；留空或 '*' 代表全部放行（僅開發用）。 */
 function resolveCorsOrigin(): string | string[] | boolean {
   const raw = (process.env.CORS_ORIGIN ?? '*').trim();
   if (raw === '' || raw === '*') return true;
-  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function resolveNestLogLevels(): LogLevel[] {
@@ -38,15 +48,34 @@ async function bootstrap() {
   // （如 command/execute）於 controller 層自行套用更嚴格的 ValidationPipe。
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
+  // 對外 port 的路由圍籬：從那個 port 進來、卻不是對外端點的請求一律 404
+  app.useGlobalGuards(new ExternalPortGuard(app.get(Reflector)));
+
+  /**
+   * 對外 port 上把內部那份文件擋掉。
+   *
+   * {@link ExternalPortGuard} 管不到這裡——Swagger UI 是 express middleware，
+   * 不是 Nest 路由處理器，守衛不會跑到。少了這一段，廠商連上對外 port 打開
+   * <code>/api/docs</code> 就會看到全部 79 支端點，等於分兩份文件白做。
+   */
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const externalPort = Number(process.env.EXTERNAL_PORT ?? 0);
+    if (!externalPort || req.socket?.localPort !== externalPort) return next();
+    const path = req.path || req.url || '';
+    if (!path.startsWith('/api/docs')) return next();
+    // 對外那份與它的靜態資源照常放行，其餘 /api/docs* 一律當作不存在
+    if (path.startsWith('/api/docs/public')) return next();
+    res.status(404).json({ statusCode: 404, message: 'Not Found' });
+  });
+
   // 1. 設定 Swagger API 文件
-  const config = new DocumentBuilder()
-    .setTitle('SyncDrive-T3 API')
-    .setDescription('The SyncDrive-T3 Backend REST API')
-    .setVersion('1.0')
-    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'x-api-key')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  //
+  // 兩份：內部（全部端點）與對外（只有掛 @ExternalApi 的）。交付給協力廠商的是
+  // 後者，而且對外 port 上只掛得到後者——見下方 listen 與 ExternalPortGuard。
+  const internalDocument = buildInternalDocument(app);
+  const publicDocument = buildPublicDocument(app);
+  SwaggerModule.setup('api/docs', app, internalDocument);
+  SwaggerModule.setup('api/docs/public', app, publicDocument);
 
   // 2. 設定 MQTT Microservice 接收端
   app.connectMicroservice<MicroserviceOptions>({
@@ -63,5 +92,33 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://127.0.0.1:${port}`);
   console.log(`Swagger docs are available at: ${await app.getUrl()}/api/docs`);
+
+  /**
+   * 對外 port：同一份路由表再聽一個 port，交給協力廠商。
+   *
+   * 用同一個 express 實例而不是另外開一個應用程式——服務、資料庫連線、MQTT
+   * 全部共用一份，不必為了分流把模組拆兩套。隔離由 {@link ExternalPortGuard}
+   * 依連線的 localPort 判定；正式部署再加上防火牆只對外開這一個 port。
+   *
+   * 未設定 EXTERNAL_PORT 就不開，行為與加這段之前完全一樣。
+   */
+  const externalPort = Number(process.env.EXTERNAL_PORT ?? 0);
+  if (Number.isInteger(externalPort) && externalPort > 0) {
+    if (externalPort === port) {
+      throw new Error(
+        `EXTERNAL_PORT (${externalPort}) 不可與 PORT 相同——那等於沒有隔離。`,
+      );
+    }
+    const externalServer = createServer(
+      app.getHttpAdapter().getInstance() as never,
+    );
+    await new Promise<void>((resolve) => {
+      externalServer.listen(externalPort, '0.0.0.0', resolve);
+    });
+    console.log(
+      `External API is running on: http://127.0.0.1:${externalPort}` +
+        ` (docs: http://127.0.0.1:${externalPort}/api/docs/public)`,
+    );
+  }
 }
 bootstrap();
