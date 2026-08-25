@@ -11,6 +11,9 @@
   - [班表 ETA（HTML 欄位）](/班表ETA取用範例.html ':ignore')
   - [班次（HTML 欄位）](/班表班次檢視.html ':ignore')
 
+- **設計草案**
+  - [即時調度引擎（架構草案）](即時調度引擎-架構草案.md)
+
 - **對外介面**
   - [車輛即時 ETA API](車輛即時ETA-API.md)
   - [班表 Timetable API](班表Timetable-API.md)
