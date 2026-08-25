@@ -50,8 +50,13 @@ log "3/5 建置並打包 $TAG"
 remote_run "cd $REMOTE_DIR && sudo ./deploy/pack-offline.sh $TAG" \
   || die "打包失敗"
 
-log "4/5 安裝並驗收"
-remote_run "cd $REMOTE_DIR && sudo ./deploy/bootstrap.sh && ./deploy/healthcheck.sh" \
+# 建置產出的是 :$TAG，但既有的 deploy/.env 可能還指著別的標籤（例如初次安裝的
+# latest）。不同步的話 bootstrap 會撈到舊映像裝上去——服務起得來、但跑的是上一版，
+# 而且看起來一切正常（2026-08-26 實測：Basic Auth 因此靜靜地失效）。
+log "4/5 對齊 IMAGE_TAG 並安裝驗收"
+remote_run "sudo sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=$TAG|' $REMOTE_DIR/deploy/.env"
+# 後端啟動要幾十秒（health start_period 40s），太早驗收會拿到 502
+remote_run "cd $REMOTE_DIR && sudo ./deploy/bootstrap.sh && sleep 45 && ./deploy/healthcheck.sh" \
   || die "驗收未通過——原始碼保留在遠端供除錯，確認後再手動清除"
 
 log "5/5 清除原始碼與建置快取"
