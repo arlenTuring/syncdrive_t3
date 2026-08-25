@@ -34,6 +34,16 @@ export function resolveSameRowNextBlockStartMinute(
   let next: number | null = null;
   for (const other of row.blocks) {
     if (other.id === block.id) continue;
+    /**
+     * 暫停卡對這個掃描是<strong>透明</strong>的。
+     *
+     * 它記載的正是「這台車還停在原地」那段空隙本身，不是下一個任務。把它當成
+     * 下一張卡的話空隙會變成 0，滯留推論整個失效——實測（2026-08-25）補上正線側
+     * 暫停卡之後站位碰撞從 0 對變 1 對，就是這樣來的。跳過它之後拿到的仍然是
+     * 空隙後面那張真正的卡，而暫停卡的結束時刻本來就等於那張卡的開始時刻，
+     * 所以結果與補卡之前完全一致。
+     */
+    if (other.source === 'hold') continue;
     if (other.plannedStartMinute + 1e-9 < block.plannedEndMinute) continue;
     if (next == null || other.plannedStartMinute < next) next = other.plannedStartMinute;
   }
@@ -62,6 +72,26 @@ export function resolveSameRowIdleOccupiedUntilMinute(
   const idleGapSeconds = (nextStart - block.plannedEndMinute) * 60;
   if (idleGapSeconds <= MEANINGFUL_IDLE_GAP_SECONDS) return null;
   return nextStart;
+}
+
+/**
+ * 這一段之後緊接著一張暫停卡嗎。
+ *
+ * 有的話「車還停在原地」這件事已經<strong>寫在時間軸上</strong>，站位佔用由那張
+ * 卡自己貢獻，末站分支就不要再推論一次，否則同一段時間會有兩筆佔用、兩套真相。
+ * 求解過程中還沒補卡，這時回 false，推論照舊——那是暫停卡還不存在的階段。
+ */
+function hasHoldCardAfter(
+  timelines: GeneratedSchedulePlan['timelines'],
+  block: { id: string; timelineRow: number; plannedEndMinute: number },
+): boolean {
+  const row = timelines.find((t) => t.row === block.timelineRow);
+  if (!row) return false;
+  return row.blocks.some(
+    (other) =>
+      other.source === 'hold'
+      && Math.abs(other.plannedStartMinute - block.plannedEndMinute) <= 1e-9,
+  );
 }
 
 export type StationBerthOccupancy = {
@@ -165,7 +195,18 @@ export function collectStationBerthOccupancies(
       // 待命停在正線停靠站：整段時間都實實在在佔著那一格。
       // 這跟「正線跑完把整備硬掛在末站」不一樣——那是沒有明確地點的推測，
       // 這是使用者指定、引擎也挑定的地點，車真的停在那裡，別台車進不來。
-      if (block.taskType === 'standby' && block.yardFacilityStationId) {
+      /**
+       * 待命或暫停停在正線停靠站：整段時間都實實在在佔著那一格。
+       *
+       * 暫停卡（<code>source: 'hold'</code>）記的是「車跑完一趟停在末站等下一趟」
+       * 那段空隙。它跟待命的差別在於有沒有指令，但對站位來說是同一件事——車就
+       * 在那裡，別台車進不來。有卡就用卡，不必再靠 {@link
+       * resolveSameRowIdleOccupiedUntilMinute} 推論一次（見下方末站分支）。
+       */
+      if (
+        (block.taskType === 'standby' || block.source === 'hold')
+        && block.yardFacilityStationId
+      ) {
         const startMinute = block.plannedStartMinute;
         const endMinute = Math.max(block.plannedEndMinute, startMinute + minPresenceMin);
         out.push({
@@ -222,7 +263,7 @@ export function collectStationBerthOccupancies(
         //    只有末站會滯留（車開過中間站不會停在那裡等）。
         // 2) 碰撞保護時間 ×2——A 車駛離衝突區要一份，B 車開進來要另一份。
         let actualDepartMinute = endMinute;
-        if (protectionOn && isTerminal) {
+        if (protectionOn && isTerminal && !hasHoldCardAfter(timelines, block)) {
           const idleUntil = resolveSameRowIdleOccupiedUntilMinute(timelines, block);
           if (idleUntil != null) {
             actualDepartMinute = Math.max(actualDepartMinute, idleUntil);

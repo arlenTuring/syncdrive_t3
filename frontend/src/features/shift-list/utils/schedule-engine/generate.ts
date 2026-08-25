@@ -735,15 +735,6 @@ export function generateShiftSchedule(
   // 放在讓渡之後——讓渡會把入廠卡往前挪，挪完才知道車實際幾點到格子。
   timelines = closeYardHeadGaps({ timelines }).timelines;
 
-  /**
-   * 補上「暫停」卡：整備做完、車還在格子裡的那段。
-   *
-   * 放在<strong>所有處理跑完之後、驗證之前</strong>：這幾張卡是事實的載體，不是新
-   * 規則——它們讓「車在哪裡」在時間軸上變成完整且明示的事實，任何偵測器都不必再自己
-   * 推論一次。放在迴圈裡會改變各道處理看到的前後相鄰關係，那是另一回事，也是先前
-   * 踩過的雷。
-   */
-  timelines = fillYardHoldGaps({ timelines }).timelines;
 
   /**
    * 收尾微調：早到幾秒卡進別人碰撞保護窗的，往後挪剛好差的那幾秒。
@@ -772,6 +763,16 @@ export function generateShiftSchedule(
       },
     });
   }
+
+  /**
+   * 補上「暫停」卡：整備做完、車還在格子裡的那段。
+   *
+   * 放在<strong>所有會動時刻的處理跑完之後、驗證之前</strong>：這幾張卡是事實的載體，不是新
+   * 規則——它們讓「車在哪裡」在時間軸上變成完整且明示的事實，任何偵測器都不必再自己
+   * 推論一次。放在迴圈裡會改變各道處理看到的前後相鄰關係，那是另一回事，也是先前
+   * 踩過的雷。
+   */
+  timelines = fillYardHoldGaps({ timelines, selectedRoutes: routesForBerth }).timelines;
 
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType
