@@ -61,7 +61,7 @@ check() {
       "$EXTERNAL"/syncdrive-api/*) ;;   # API 走 x-api-key，不帶瀏覽帳密
       "$EXTERNAL"*) auth=("${EXT_AUTH[@]+"${EXT_AUTH[@]}"}") ;;
       # 80 埠只有文件與內部 Swagger 需要帳密，圖台與內部 API 是開放的
-      "$INTERNAL"/docs/*|"$INTERNAL"/api/docs*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
+      "$INTERNAL"/docs/*|"$INTERNAL"/api/docs*|"$INTERNAL"/portal|"$INTERNAL"/external-preview) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
     esac
   else
     key=""
@@ -120,6 +120,8 @@ check "內部 API 不需帳密"   "$INTERNAL/syncdrive-api/operation-shift/list"
 if [ -n "$WEB_PASS" ]; then
   check "內部文件沒帶帳密必須被拒" "$INTERNAL/docs/"                            401 noauth
   check "內部 Swagger 沒帶帳密必須被拒" "$INTERNAL/api/docs"                     401 noauth
+  check "內部入口沒帶帳密必須被拒"     "$INTERNAL/portal"                        401 noauth
+  check "內部入口帶帳密可進入"         "$INTERNAL/portal"                        200
 fi
 
 echo "參數驗證"
