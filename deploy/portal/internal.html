@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SyncDrive T3 系統入口</title>
+<style>
+  :root { --bg:#15181c; --card:#1d2126; --line:#2b3138; --fg:#dfe4ea; --dim:#98a2ad;
+          --accent:#4a9eff; --ext:#42b983; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+         line-height:1.7; }
+  .wrap { max-width:960px; margin:0 auto; padding:56px 24px 80px; }
+  header { border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:32px; }
+  .eyebrow { color:var(--accent); font-size:.78rem; letter-spacing:.14em; text-transform:uppercase; }
+  h1 { font-size:1.9rem; margin:.3rem 0 .5rem; letter-spacing:-.02em; }
+  .lede { color:var(--dim); margin:0; }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+  a.card { display:block; background:var(--card); border:1px solid var(--line); border-radius:12px;
+           padding:18px 20px; text-decoration:none; color:inherit; transition:border-color .15s, transform .15s; }
+  a.card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  a.card.ext:hover { border-color:var(--ext); }
+  a.card h2 { margin:0 0 6px; font-size:1.05rem; color:var(--accent); }
+  a.card.ext h2 { color:var(--ext); }
+  a.card p { margin:0; color:var(--dim); font-size:.9rem; }
+  section { margin-top:38px; }
+  section h3 { font-size:1rem; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  .note { background:#1b2430; border:1px solid #2c3a4a; border-left:3px solid var(--accent);
+          border-radius:8px; padding:12px 16px; color:#c6d4e2; font-size:.9rem; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86rem; }
+  footer { margin-top:52px; color:var(--dim); font-size:.82rem; border-top:1px solid var(--line); padding-top:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">SyncDrive T3 · Internal</div>
+    <h1>系統入口</h1>
+    <p class="lede">內部人員專用。本頁與以下連結皆需內部帳號。</p>
+  </header>
+
+  <section>
+    <h3>營運系統</h3>
+    <div class="grid">
+      <a class="card" href="/">
+        <h2>營運圖台 →</h2>
+        <p>全景圖台、班表建立與調整、地圖與整備任務管理。</p>
+      </a>
+      <a class="card" href="/docs/">
+        <h2>技術文件中心 →</h2>
+        <p>排班引擎全覽、MQTT 四大協議、資料表關聯、開發進度與測試項目。</p>
+      </a>
+      <a class="card" href="/api/docs">
+        <h2>內部 Swagger →</h2>
+        <p>全部端點（含管理類）。這一份<strong>不對外發布</strong>。</p>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h3>對外介面（廠商看到的東西）</h3>
+    <div class="grid">
+      <a class="card ext" href="/external-preview">
+        <h2>對外入口預覽 →</h2>
+        <p>廠商登入後看到的頁面。與正式入口同一份，方便對照確認沒有多給東西。</p>
+      </a>
+    </div>
+    <div class="note" style="margin-top:14px">
+      對外介面跑在<strong>另一個埠</strong>，有自己的帳號與自己的文件範圍——只收錄
+      介接說明書與兩份 API 規格。內部文件（開發進度、演算法全覽、資料表關聯、
+      會議紀錄）在那個埠上<strong>不存在</strong>，不是靠權限擋。
+    </div>
+  </section>
+
+  <footer>
+    帳號、金鑰與部署資訊見 <code>deploy/README.md</code>。
+  </footer>
+
+</div>
+</body>
+</html>

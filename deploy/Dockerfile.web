@@ -17,8 +17,22 @@ FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef
 # 前端 SPA
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 技術文件站（Wiki）；與前端同一台 nginx，掛在 /docs
+# 內部技術文件站（完整）：只在 80 那一側提供
 COPY document/ /usr/share/nginx/docs/
+
+# 對外文件站：<strong>逐份列舉</strong>，不是複製整個資料夾再排除。
+#
+# document/ 裡有使用者對話紀錄、開發進度、測試項目、排班演算法全覽、資料表關聯
+# ——那些都不該給協力廠商。用「排除法」遲早會漏：新增一份內部文件時沒有人會
+# 想到要去補排除清單，而漏掉的後果是它直接出現在對外站上。列舉法的失敗方向
+# 相反：忘了加就是廠商看不到，會被問，然後補上。
+COPY document/協力廠商介接說明書.md /usr/share/nginx/public-docs/
+COPY document/車輛即時ETA-API.md    /usr/share/nginx/public-docs/
+COPY document/班表Timetable-API.md  /usr/share/nginx/public-docs/
+COPY deploy/portal/docs/ /usr/share/nginx/public-docs/
+
+# 兩個入口頁
+COPY deploy/portal/internal.html deploy/portal/external.html /usr/share/nginx/portal/
 
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 

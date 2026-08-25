@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SyncDrive T3 對外介面入口</title>
+<style>
+  :root { --bg:#15181c; --card:#1d2126; --line:#2b3138; --fg:#dfe4ea; --dim:#98a2ad; --accent:#42b983; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+         line-height:1.7; }
+  .wrap { max-width:860px; margin:0 auto; padding:56px 24px 80px; }
+  header { border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:32px; }
+  .eyebrow { color:var(--accent); font-size:.78rem; letter-spacing:.14em; text-transform:uppercase; }
+  h1 { font-size:1.9rem; margin:.3rem 0 .5rem; letter-spacing:-.02em; }
+  .lede { color:var(--dim); margin:0; }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); margin:28px 0 8px; }
+  a.card { display:block; background:var(--card); border:1px solid var(--line); border-radius:12px;
+           padding:18px 20px; text-decoration:none; color:inherit; transition:border-color .15s, transform .15s; }
+  a.card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  a.card h2 { margin:0 0 6px; font-size:1.05rem; color:var(--accent); }
+  a.card p { margin:0; color:var(--dim); font-size:.9rem; }
+  section { margin-top:38px; }
+  section h3 { font-size:1rem; margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86rem; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  td, th { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; width:34%; }
+  .note { background:#1b2a22; border:1px solid #2c4436; border-left:3px solid var(--accent);
+          border-radius:8px; padding:12px 16px; color:#c9dbd1; font-size:.9rem; margin-top:14px; }
+  footer { margin-top:52px; color:var(--dim); font-size:.82rem; border-top:1px solid var(--line); padding-top:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">SyncDrive T3 · External Interface</div>
+    <h1>對外介面入口</h1>
+    <p class="lede">台智駕 SyncDrive T3 車輛行車管理系統，提供給協力廠商的唯讀介面。</p>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="/docs/">
+      <h2>介接文件 →</h2>
+      <p>介接說明書、即時 ETA 與班表兩份規格。第一次串接請從這裡開始。</p>
+    </a>
+    <a class="card" href="/api/docs/public">
+      <h2>Swagger →</h2>
+      <p>四支介面的線上規格，可直接 Try it out。右上角 Authorize 填入金鑰。</p>
+    </a>
+  </div>
+
+  <section>
+    <h3>四支介面</h3>
+    <table>
+      <tr><th><code>GET /syncdrive-api/operation-shift/timetable/trips</code></th>
+          <td>全部班次與逐站計畫時刻</td></tr>
+      <tr><th><code>GET /syncdrive-api/operation-shift/timetable/station-etas</code></th>
+          <td>站點計畫事件流（依站索引）</td></tr>
+      <tr><th><code>GET /syncdrive-api/vehicles/eta/by-station</code></th>
+          <td>各站接下來會到的車　建議輪詢 60 秒</td></tr>
+      <tr><th><code>GET /syncdrive-api/vehicles/eta/by-vehicle</code></th>
+          <td>各車接下來會到的站　建議輪詢 60 秒</td></tr>
+    </table>
+    <div class="note">
+      這個埠<strong>只有</strong>上面四支。同一台主機上的其他系統在這個埠一律回
+      <code>404</code>——不是權限不足，是不存在。
+    </div>
+  </section>
+
+  <section>
+    <h3>認證</h3>
+    <p style="color:var(--dim);margin-top:0">
+      本入口頁與文件需要瀏覽帳號；<strong>API 本身用的是另一組金鑰</strong>，兩者不共用。
+    </p>
+    <pre>curl -H "X-API-Key: &lt;你的金鑰&gt;" \
+  "http://&lt;本站位址&gt;/syncdrive-api/vehicles/eta/by-station"</pre>
+  </section>
+
+  <footer>
+    金鑰或帳號有問題請聯絡我方窗口。介接過程若發現回應與文件不符，請以實際回應為準並通知我方。
+  </footer>
+
+</div>
+</body>
+</html>

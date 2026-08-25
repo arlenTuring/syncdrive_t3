@@ -83,25 +83,34 @@ set_env() {  # set_env KEY VALUE — 就地改寫 deploy/.env 的一行
 }
 read_env() { grep "^$1=" "$ENV_FILE" | cut -d= -f2; }
 
-# ── 2b. 網頁 Basic Auth ─────────────────────────────────────
-# 80 埠後面是內部 API 全部端點，沒有金鑰保護。缺這個檔 nginx 會拒絕啟動，
-# 那是刻意的：寧可服務起不來，也不要以為有保護但其實沒有。
-HTPASSWD="$ROOT/deploy/.htpasswd"
-if [ -f "$HTPASSWD" ]; then
-  log "Basic Auth 帳密檔已存在，保留不動"
-else
-  WEB_USER="$(read_env WEB_AUTH_USER)"; WEB_USER="${WEB_USER:-syncdrive}"
-  WEB_PASS="$(read_env WEB_AUTH_PASSWORD)"
-  if [ -z "$WEB_PASS" ]; then
-    WEB_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)"
-    set_env WEB_AUTH_USER "$WEB_USER"
-    set_env WEB_AUTH_PASSWORD "$WEB_PASS"
+# ── 2b. 兩組瀏覽帳密 ────────────────────────────────────────
+# 內部（80）與對外（3100）各自一組，刻意不共用：對外那組是要交出去的，
+# 換發時不該連我方自己的入口一起換。缺任一檔 nginx 會拒絕啟動——那是刻意的，
+# 寧可服務起不來，也不要以為有保護但其實沒有。
+make_htpasswd() {  # make_htpasswd <檔案> <使用者變數> <密碼變數> <預設使用者> <說明>
+  local file="$1" user_key="$2" pass_key="$3" default_user="$4" label="$5"
+  if [ -f "$file" ]; then
+    log "$label 帳密檔已存在，保留不動"
+    return
+  fi
+  local user pass
+  user="$(read_env "$user_key")"; user="${user:-$default_user}"
+  pass="$(read_env "$pass_key")"
+  if [ -z "$pass" ]; then
+    pass="$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)"
+    set_env "$user_key" "$user"
+    set_env "$pass_key" "$pass"
   fi
   # apr1 是 nginx 與 apache 都認得的格式，不必額外裝 apache2-utils
-  printf '%s:%s\n' "$WEB_USER" "$(openssl passwd -apr1 "$WEB_PASS")" > "$HTPASSWD"
-  chmod 644 "$HTPASSWD"
-  log "網頁帳密（80 埠）：${WEB_USER} / ${WEB_PASS}"
-fi
+  printf '%s:%s\n' "$user" "$(openssl passwd -apr1 "$pass")" > "$file"
+  chmod 644 "$file"
+  log "$label 帳密：${user} / ${pass}"
+}
+
+make_htpasswd "$ROOT/deploy/.htpasswd" \
+  WEB_AUTH_USER WEB_AUTH_PASSWORD syncdrive "內部（80 埠）"
+make_htpasswd "$ROOT/deploy/.htpasswd-external" \
+  EXTERNAL_AUTH_USER EXTERNAL_AUTH_PASSWORD partner "對外（3100 埠）"
 
 # ── 2c. MQTT 帳密與 ACL ─────────────────────────────────────
 # broker 以 mosquitto.prod.conf 啟動（關閉匿名），沒有帳密檔就沒有人連得進來。

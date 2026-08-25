@@ -34,6 +34,16 @@ fi
 WEB_AUTH=()
 [ -n "$WEB_PASS" ] && WEB_AUTH=(-u "${WEB_USER:-syncdrive}:$WEB_PASS")
 
+# 對外那一側的瀏覽帳密（入口頁、文件、Swagger 用；API 本體仍是 x-api-key）
+EXT_USER="$(grep '^EXTERNAL_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+EXT_PASS="$(grep '^EXTERNAL_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+if [ -z "$EXT_PASS" ]; then
+  EXT_USER="$(sudo grep '^EXTERNAL_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+  EXT_PASS="$(sudo grep '^EXTERNAL_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+fi
+EXT_AUTH=()
+[ -n "$EXT_PASS" ] && EXT_AUTH=(-u "${EXT_USER:-partner}:$EXT_PASS")
+
 pass=0
 fail=0
 
@@ -44,7 +54,12 @@ check() {
   # 80 埠的請求要帶 Basic Auth；3100 走的是 x-api-key，兩者不混用。
   # key 傳 "noauth" 代表這一條就是要驗「沒帶憑證會不會被擋」，一律不補。
   if [ "$key" != "noauth" ]; then
-    case "$url" in "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;; esac
+    case "$url" in
+      # API 路徑走 x-api-key，不帶瀏覽帳密；其餘（入口頁、文件、Swagger）才帶
+      *"$EXTERNAL"*/syncdrive-api/*) ;;
+      "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
+      "$EXTERNAL"*) auth=("${EXT_AUTH[@]+"${EXT_AUTH[@]}"}") ;;
+    esac
   else
     key=""
   fi
@@ -69,6 +84,8 @@ check "內部 Swagger"        "$INTERNAL/api/docs"                              
 check "文件站"              "$INTERNAL/docs/"                                   200
 
 echo "對外（$EXTERNAL）"
+check "對外入口頁"          "$EXTERNAL/"                                        200
+check "對外文件站"          "$EXTERNAL/docs/"                                   200
 check "對外 Swagger"        "$EXTERNAL/api/docs/public"                         200
 if [ -n "$API_KEY" ]; then
   check "班表班次"            "$EXTERNAL/syncdrive-api/operation-shift/timetable/trips"       200 "$API_KEY"
@@ -81,10 +98,16 @@ else
   printf '  \033[1;33m—\033[0m %s\n' "讀不到 VTMS_API_KEY，略過需要金鑰的 5 項檢查"
 fi
 
-echo "對外邊界（這幾條必須是 404）"
+echo "對外邊界"
 check "內部端點不可從對外埠打到" "$EXTERNAL/syncdrive-api/operation-shift/list"  404
 check "內部 Swagger 不可從對外埠打到" "$EXTERNAL/api/docs"                       404
 check "資料庫查詢端點不可外露"   "$EXTERNAL/syncdrive-api/datasource/tables"     404
+# 內部文件不該存在於對外那一側的檔案系統裡，不是靠權限擋
+check "內部文件不可從對外埠取得" "$EXTERNAL/docs/使用者對話紀錄.md"              404
+check "內部文件（開發進度）同上" "$EXTERNAL/docs/TP13C_2-2-4_開發進度.md"        404
+if [ -n "$EXT_PASS" ]; then
+  check "對外入口沒帶帳密必須被拒" "$EXTERNAL/docs/"                             401 noauth
+fi
 
 echo "存取控制"
 if [ -n "$WEB_PASS" ]; then

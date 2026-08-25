@@ -105,10 +105,12 @@ services:
       DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       TELEMETRY_PERSIST_ALL: ${TELEMETRY_PERSIST_ALL:-0}
-    ports:
-      # 只發布對外埠。3000 留在 docker 網路裡，主機上打不到——
-      # 文件分兩份、路由圍籬、網路可達範圍三者因此完全一致。
-      - "0.0.0.0:3100:3100"
+    # 兩個埠都不發布到主機：對外流量由 nginx 從 3100 轉進來（它要先過對外那組
+    # Basic Auth 才到得了文件與 Swagger）。後端仍然看得到自己的 localPort 是 3100，
+    # ExternalPortGuard 的判定不受影響。
+    expose:
+      - "3000"
+      - "3100"
     volumes:
       # 執行期寫入點。已發布地圖存在 /app/data/published-maps（檔案，不是資料表，
       # 見 scripts/map-published-store.js），沒有這個 volume 的話每次重新部署
@@ -145,10 +147,12 @@ services:
     restart: always
     ports:
       - "0.0.0.0:80:80"
+      - "0.0.0.0:3100:3100"
     volumes:
-      # Basic Auth 帳密檔，由 bootstrap.sh 產生。缺這個檔 nginx 會起不來——
+      # 兩組帳密檔，由 bootstrap.sh 產生。缺任何一個 nginx 都會起不來——
       # 那是刻意的：寧可服務起不來，也不要以為有保護但其實沒有。
       - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./.htpasswd-external:/etc/nginx/.htpasswd-external:ro
     depends_on:
       - backend
     healthcheck:

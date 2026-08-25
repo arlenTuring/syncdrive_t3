@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SyncDrive T3 對外文件</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple-dark.css" />
+  <style>
+    :root {
+      --base-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      --base-font-size: 15px;
+      --base-line-height: 1.7;
+      --sidebar-width: 260px;
+      --sidebar-nav-link-color--active: #42b983;
+      --sidebar-nav-link-border-color--active: #42b983;
+      --cover-heading-color: #42b983;
+      --content-max-width: 1120px;
+      --theme-color: #42b983;
+    }
+
+    .markdown-section {
+      max-width: var(--content-max-width);
+      padding: 36px 48px 72px;
+    }
+
+    .markdown-section h1 {
+      font-size: 2.25rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.25rem;
+    }
+
+    .markdown-section h2 {
+      border-bottom: 1px solid #31363b;
+      margin-top: 2.8rem;
+      padding-bottom: 0.45rem;
+    }
+
+    .markdown-section h3 {
+      color: #dce7e3;
+      margin-top: 2rem;
+    }
+
+    .markdown-section blockquote {
+      background: rgba(66, 185, 131, 0.09);
+      border-left: 4px solid #42b983;
+      border-radius: 0 8px 8px 0;
+      color: #d8e5df;
+      padding: 14px 18px;
+    }
+
+    .markdown-section code {
+      border: 1px solid #343a40;
+      border-radius: 5px;
+      padding: 0.12em 0.36em;
+    }
+
+    .doc-hero {
+      background:
+        radial-gradient(circle at 85% 15%, rgba(66, 185, 131, 0.18), transparent 32%),
+        linear-gradient(135deg, #20272a, #171b1d);
+      border: 1px solid #35413d;
+      border-radius: 16px;
+      margin: 0 0 28px;
+      overflow: hidden;
+      padding: 34px 38px;
+    }
+
+    .doc-hero h2 {
+      border: 0;
+      font-size: 2rem;
+      margin: 2px 0 8px;
+      padding: 0;
+    }
+
+    .doc-hero p {
+      color: #b8c5c0;
+      margin: 0;
+    }
+
+    .doc-hero .doc-eyebrow {
+      color: #62d5a3;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+
+    .doc-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 20px 0 30px;
+    }
+
+    .doc-card {
+      background: #202529;
+      border: 1px solid #343b3f;
+      border-radius: 10px;
+      color: inherit !important;
+      display: flex;
+      flex-direction: column;
+      min-height: 82px;
+      padding: 16px 18px;
+      text-decoration: none !important;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .doc-card:hover {
+      border-color: #42b983;
+      transform: translateY(-2px);
+    }
+
+    .doc-card strong {
+      color: #6be0ad;
+      font-size: 1rem;
+      margin-bottom: 5px;
+    }
+
+    .doc-card span {
+      color: #aeb9b5;
+      font-size: 0.88rem;
+    }
+
+    /* 側邊欄分類標題 */
+    .sidebar-nav > ul > li > p {
+      font-weight: 700;
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #999;
+      margin: 1.2em 0 0.4em;
+      padding: 0;
+    }
+
+    /* 表格美化 */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+    th, td {
+      border: 1px solid #3a3a3a;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: #2a2a2a;
+      font-weight: 600;
+    }
+
+    /* Mermaid 圖表背景 */
+    .mermaid {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 1em 0;
+      overflow-x: auto;
+    }
+
+    /* 搜尋框 */
+    .search input {
+      border-radius: 6px !important;
+    }
+
+    @media (max-width: 768px) {
+      .markdown-section {
+        padding: 24px 20px 56px;
+      }
+
+      .doc-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .doc-hero {
+        padding: 25px 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">載入中...</div>
+  <script>
+    window.$docsify = {
+      name: 'SyncDrive T3 對外介面',
+      nameLink: '/',
+            loadSidebar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      search: {
+        placeholder: '搜尋文件...',
+        noData: '沒有找到結果',
+        paths: 'auto',
+        depth: 3,
+      },
+      copyCode: {
+        buttonText: '複製',
+        errorText: '複製失敗',
+        successText: '已複製',
+      },
+      pagination: {
+        previousText: '上一篇',
+        nextText: '下一篇',
+        crossChapter: true,
+        crossChapterText: true,
+      },
+      markdown: {
+        renderer: {
+          // 讓 mermaid 區塊在渲染後觸發 mermaid.init
+          code: function (code, lang) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid">' + code + '</div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          },
+        },
+      },
+    };
+  </script>
+  <!-- Docsify 核心 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <!-- 搜尋 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <!-- 複製按鈕 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+  <!-- 分頁導覽 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
+  <!-- Mermaid 圖表渲染 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    // Docsify 每次路由切換後重新渲染 mermaid
+    window.$docsify.plugins = (window.$docsify.plugins || []).concat(function (hook) {
+      hook.doneEach(function () {
+        mermaid.run({ querySelector: '.mermaid' });
+      });
+    });
+  </script>
+</body>
+</html>

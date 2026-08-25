@@ -44,5 +44,6 @@ deploy/seed/
 deploy/images/
 deploy/dist/
 deploy/.htpasswd
+deploy/.htpasswd-external
 deploy/mqtt-credentials.txt
 mosquitto/config/passwordfile
