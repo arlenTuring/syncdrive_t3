@@ -100,9 +100,29 @@ import { DatabaseInitService } from './database/database-init.service';
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
         ],
-        // SAFETY: synchronize=true auto-migrates schema on startup.
-        // MUST be false in production to avoid accidental column drops.
-        synchronize: configService.get<string>('NODE_ENV', 'development') !== 'production',
+        /**
+         * 建表機制。
+         *
+         * <strong>這個專案目前沒有任何 migration</strong>——`synchronize` 是唯一會
+         * 建立資料表的東西。所以正式環境一律關閉的規則會讓全新安裝直接掛掉：
+         * 資料庫是空的、沒有人建表，服務啟動時第一支查詢就 relation does not exist，
+         * 然後進入重啟迴圈（2026-08-26 在 GCP 首次部署實測）。
+         *
+         * 折衷做法是把它變成明確的開關：
+         *
+         *   DB_SYNCHRONIZE=true   依實體定義建立／調整資料表
+         *   DB_SYNCHRONIZE=false  完全不動結構
+         *   未設定                沿用舊行為（開發開、正式關）
+         *
+         * <strong>這是技術債，不是解法。</strong>synchronize 會依實體定義調整結構，
+         * 欄位改名在它眼中是「刪一欄、加一欄」，升級時可能靜默刪掉資料。正解是補上
+         * migration，在那之前：全新安裝開著建表，之後由部署流程決定是否關閉。
+         */
+        synchronize: (() => {
+          const explicit = configService.get<string>('DB_SYNCHRONIZE', '').trim();
+          if (explicit) return explicit.toLowerCase() === 'true';
+          return configService.get<string>('NODE_ENV', 'development') !== 'production';
+        })(),
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
         retryAttempts: 15,
         retryDelay: 2000,

@@ -100,6 +100,7 @@ services:
       MQTT_URL: mqtt://mosquitto:1883
       VTMS_API_KEY: ${VTMS_API_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN}
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       TELEMETRY_PERSIST_ALL: ${TELEMETRY_PERSIST_ALL:-0}
     ports:
