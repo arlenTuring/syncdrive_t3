@@ -23,7 +23,16 @@ cd "$ROOT"
 log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m失敗：\033[0m %s\n' "$*" >&2; exit 1; }
 
-TAG="${1:-$(git rev-parse --short HEAD 2>/dev/null || echo manual)}"
+# 版本來源：參數 > git > deploy/.source-commit（打包機通常只有程式碼、沒有 .git，
+# 那份檔案由傳送端寫入，讓 MANIFEST 記得住這一包對應哪一個 commit）
+SOURCE_COMMIT="$(cat deploy/.source-commit 2>/dev/null || true)"
+SOURCE_COMMIT="${SOURCE_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
+TAG="${1:-}"
+if [ -z "$TAG" ]; then
+  TAG="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  [ -z "$TAG" ] && [ -n "$SOURCE_COMMIT" ] && TAG="${SOURCE_COMMIT:0:7}"
+  TAG="${TAG:-manual}"
+fi
 HOST_ARCH="$(docker version --format '{{.Server.Arch}}' 2>/dev/null || uname -m)"
 log "打包版本 $TAG（本機架構 $HOST_ARCH）"
 case "$HOST_ARCH" in
@@ -95,7 +104,7 @@ fi
 {
   echo "package    syncdrive-t3"
   echo "version    ${TAG}"
-  echo "git        $(git rev-parse HEAD 2>/dev/null || echo '（非 git 工作目錄）')"
+  echo "git        ${SOURCE_COMMIT:-（來源 commit 未知）}"
   echo "arch       ${HOST_ARCH}"
   echo "built_on   $(uname -sr)"
   echo ""
