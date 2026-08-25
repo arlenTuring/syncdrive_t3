@@ -388,6 +388,13 @@ function YardTaskHoverCard({
         {formatBlockTimeRange(block)}
         （{hours > 0 ? `${hours} 小時 ` : ''}{minutes} 分）
       </div>
+      {block.source === 'hold' ? (
+        <p className="mt-1 text-[10px] leading-[14px] text-zinc-400">
+          整備已經做完，車還沒開走——這段時間它仍然佔著這一格。
+          暫停不是待命：待命是排定的指令（為了下一趟先開到那裡等），
+          暫停是沒有指令，只是還留在原地。設施佔用與碰撞偵測都看得到這一段。
+        </p>
+      ) : null}
       {block.yardFacilityUnavailable ? (
         <p className="mt-1 text-[10px] leading-[14px] text-red-400">
           ⚠ 這段時間該類設施沒有任何一台是空的，車沒地方停。
@@ -1122,8 +1129,14 @@ function ShiftScheduleBlockBar({
   );
 
   const showStationInfo = Boolean(block.routeName) && block.taskType === 'passenger';
-  /** 整備任務卡（充電／洗車／保養／行檢／待命）：每一張都要有 ⓘ 可看設施與時長 */
-  const isYardTask = YARD_TASK_TYPES_FOR_UI.has(block.taskType);
+  /**
+   * 整備任務卡（充電／洗車／保養／行檢／待命）：每一張都要有 ⓘ 可看設施與時長。
+   *
+   * 暫停卡掛的是 <code>taskType: 'idle'</code>（不能掛 standby，會被整備轉場機制
+   * 重複服務），但它一樣是「車停在某一台設施裡」的那段時間，ⓘ 要照給。
+   */
+  const isYardTask =
+    YARD_TASK_TYPES_FOR_UI.has(block.taskType) || block.source === 'hold';
 
   const blockErrors = useMemo(
     () => matchIssuesForBlock(report?.errors, block.id, block.templateTaskId),

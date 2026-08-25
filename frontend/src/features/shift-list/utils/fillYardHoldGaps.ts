@@ -83,7 +83,8 @@ export function fillYardHoldGaps(args: {
         id: `hold-${previous.id}-${Math.round(previous.plannedEndMinute * 60)}`,
         timelineRow: timeline.row,
         taskType: 'idle',
-        label: `時間線 ${timeline.row} · 暫停 · ${facilityLabel}`,
+        // 卡面渲染會自己補上「· 設施」，這裡再寫一次會變成「M2 · M2」
+        label: `列車 ${timeline.row} · 暫停`,
         anchorStartMinute: previous.plannedEndMinute,
         plannedStartMinute: previous.plannedEndMinute,
         plannedEndMinute: next.plannedStartMinute,
