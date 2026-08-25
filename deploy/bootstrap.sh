@@ -137,6 +137,10 @@ else
     echo "PMS-$i          $VPW    # 交給該車" >> "$MQTT_CREDS"
   done
   chmod 600 "$MQTT_CREDS"
+  # mosquitto 容器內以 uid 1883 執行，而 mosquitto_passwd 產出的檔案是 600 root
+  # ——不改擁有者的話 broker 讀不到自己的密碼檔，會反覆重啟並在日誌印
+  # "Unable to open pwfile"（2026-08-26 實測）。
+  chown 1883:1883 "$MQTT_PWFILE" && chmod 600 "$MQTT_PWFILE"
   log "車輛帳密已寫入 deploy/mqtt-credentials.txt（600）"
 fi
 
