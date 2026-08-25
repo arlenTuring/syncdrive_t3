@@ -154,7 +154,7 @@ export class VehicleEtaService {
     return {
       vehicle_code: vehicle.vehicleCode,
       order_id: vehicle.operation?.order_id ?? null,
-      trip_code: context.canonicalTripCodeOf(vehicle.operation?.trip_code),
+      trip_code: vehicle.operation?.trip_code ?? null,
       route_code: route.code,
       route_name: route.name,
       vehicle_phase: vehicle.stale
@@ -222,7 +222,7 @@ export class VehicleEtaService {
         ? null
         : (vehicle.operation?.vehicle_phase ?? null),
       order_id: vehicle.operation?.order_id ?? null,
-      trip_code: context.canonicalTripCodeOf(vehicle.operation?.trip_code),
+      trip_code: vehicle.operation?.trip_code ?? null,
       route_code: route.code,
       route_name: route.name,
       position: vehicle.stale ? null : vehicle.position,
@@ -383,44 +383,30 @@ export class VehicleEtaService {
       vehicles,
       stations: timetable.stations,
       nameOf: (stationId) => timetable.nameById.get(stationId) ?? stationId,
-      planOf: (tripCode, stationId) => {
-        for (const key of tripLookupKeys(tripCode)) {
-          const hit = timetable.plan.get(`${key}|${stationId}`);
-          if (hit) return hit;
-        }
-        return null;
-      },
-      routeOf: (tripCode) => {
-        for (const key of tripLookupKeys(tripCode)) {
-          const hit = timetable.routeByTrip.get(key);
-          if (hit) return hit;
-        }
-        return { code: null, name: null };
-      },
       /**
-       * 對外的 trip_code 一律用<strong>班表上的那一個</strong>。
+       * 計畫值以 <code>trip_code</code> 直接對上班表。
        *
-       * 規格書 3.1 定義 trip_code 為「路線代號＋HHMM」，而且第十四章承諾即時值與
-       * 計畫值兩支 API 可以直接比對——比對的鍵就是 trip_code。透傳車端的方向式代號
-       * （U1149）會同時違反這兩件事：格式不符規格，而且廠商拿它去查班表 API 查不到。
-       * 對不上班表時才退回車端原值，至少不會憑空捏造。
+       * 車端與班表用的是同一套代號（路線代號＋HHMM，見營運任務狀態協議 §三與車輛
+       * 即時 ETA 規格書 3.1），所以這裡不需要任何格式轉換。對不上就是真的沒有計畫值
+       * ——例如加班車、調度車，或班表尚未載入，照規格回 NO_PLAN。
        */
-      canonicalTripCodeOf: (tripCode) => {
-        for (const key of tripLookupKeys(tripCode)) {
-          const hit = timetable.canonicalTripCode.get(key);
-          if (hit) return hit;
-        }
-        return tripCode ?? null;
-      },
+      planOf: (tripCode, stationId) =>
+        tripCode
+          ? (timetable.plan.get(`${tripCode.trim()}|${stationId}`) ?? null)
+          : null,
+      routeOf: (tripCode) =>
+        (tripCode ? timetable.routeByTrip.get(tripCode.trim()) : null) ?? {
+          code: null,
+          name: null,
+        },
       upcomingStationsOf: (tripCode, fromStationId, count) => {
-        for (const key of tripLookupKeys(tripCode)) {
-          const sequence = timetable.stopsByTrip.get(key);
-          if (!sequence?.length) continue;
-          const index = sequence.indexOf(fromStationId);
-          if (index < 0) continue;
-          return sequence.slice(index, index + count);
-        }
-        return [fromStationId];
+        const sequence = tripCode
+          ? timetable.stopsByTrip.get(tripCode.trim())
+          : null;
+        if (!sequence?.length) return [fromStationId];
+        const index = sequence.indexOf(fromStationId);
+        if (index < 0) return [fromStationId];
+        return sequence.slice(index, index + count);
       },
     };
   }
@@ -440,7 +426,6 @@ export class VehicleEtaService {
     plan: PlanIndex;
     stopsByTrip: Map<string, string[]>;
     routeByTrip: Map<string, { code: string | null; name: string | null }>;
-    canonicalTripCode: Map<string, string>;
   }> {
     const empty = {
       shiftId: null,
@@ -453,7 +438,6 @@ export class VehicleEtaService {
         string,
         { code: string | null; name: string | null }
       >(),
-      canonicalTripCode: new Map<string, string>(),
     };
 
     try {
@@ -472,29 +456,23 @@ export class VehicleEtaService {
         string,
         { code: string | null; name: string | null }
       >();
-      const canonicalTripCode = new Map<string, string>();
       // etas 已依時間排序，逐筆推進即可還原每一班的站序
       for (const eta of result.etas) {
-        for (const tripKey of tripIndexKeys(eta.trip_code)) {
-          const key = `${tripKey}|${eta.station_id}`;
-          if (!plan.has(key)) {
-            plan.set(key, {
-              arriveSecond: eta.eta_arrive_second,
-              departSecond: eta.eta_depart_second,
-            });
-          }
-          const stops = stopsByTrip.get(tripKey) ?? [];
-          if (!stops.includes(eta.station_id)) stops.push(eta.station_id);
-          stopsByTrip.set(tripKey, stops);
-          if (!routeByTrip.has(tripKey)) {
-            routeByTrip.set(tripKey, {
-              code: eta.route_code ?? null,
-              name: eta.route_name ?? null,
-            });
-          }
-          if (!canonicalTripCode.has(tripKey)) {
-            canonicalTripCode.set(tripKey, eta.trip_code);
-          }
+        const key = `${eta.trip_code}|${eta.station_id}`;
+        if (!plan.has(key)) {
+          plan.set(key, {
+            arriveSecond: eta.eta_arrive_second,
+            departSecond: eta.eta_depart_second,
+          });
+        }
+        const stops = stopsByTrip.get(eta.trip_code) ?? [];
+        if (!stops.includes(eta.station_id)) stops.push(eta.station_id);
+        stopsByTrip.set(eta.trip_code, stops);
+        if (!routeByTrip.has(eta.trip_code)) {
+          routeByTrip.set(eta.trip_code, {
+            code: eta.route_code ?? null,
+            name: eta.route_name ?? null,
+          });
         }
       }
 
@@ -510,7 +488,6 @@ export class VehicleEtaService {
         plan,
         stopsByTrip,
         routeByTrip,
-        canonicalTripCode,
       };
     } catch (error) {
       this.logger.warn(
@@ -549,7 +526,6 @@ type EtaContext = {
     code: string | null;
     name: string | null;
   };
-  canonicalTripCodeOf: (tripCode: string | undefined) => string | null;
   upcomingStationsOf: (
     tripCode: string | undefined,
     fromStationId: string,
@@ -559,32 +535,4 @@ type EtaContext = {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-/**
- * 一筆班表計畫值要用哪些鍵入索引。
- *
- * <strong>兩份協議對 trip_code 的定義不一致。</strong>營運任務狀態協議第二章定義為
- * 「<code>[方向][時間]</code>」（車端實際送 <code>U1149</code>、<code>D1152</code>），
- * 而班表與車輛即時 ETA 規格書 3.1 定義為「<code>[路線代號][HHMM]</code>」
- * （<code>TN1149</code>、<code>ST1146</code>）。直接拿車端的值去查班表永遠查不到，
- * 計畫值與路線名稱就會全部是 null——2026-08-25 實測就是這個結果。
- *
- * 兩種寫法共用同一個發車時刻 <code>HHMM</code>，所以除了原值之外，另外以 HHMM 入索引。
- * 查詢時先試原值、再試 HHMM，而 HHMM 這一層一定會再帶上 station_id 一起比對，
- * 同一分鐘發車的不同路線不會互相認錯。
- *
- * 這是<strong>相容處置，不是正解</strong>。正解是兩份協議把 trip_code 統一，
- * 統一之後這個備援鍵就可以拿掉。
- */
-function tripIndexKeys(tripCode: string | null | undefined): string[] {
-  const raw = (tripCode ?? '').trim();
-  if (!raw) return [];
-  const hhmm = raw.match(/(\d{4})$/)?.[1];
-  return hhmm && hhmm !== raw ? [raw, hhmm] : [raw];
-}
-
-/** 車端送來的 trip_code 要拿去查班表時的候選鍵，順序即優先序 */
-function tripLookupKeys(tripCode: string | undefined): string[] {
-  return tripIndexKeys(tripCode);
 }

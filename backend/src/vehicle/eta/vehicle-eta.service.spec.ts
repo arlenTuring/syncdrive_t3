@@ -224,51 +224,21 @@ describe('VehicleEtaService.getByStation', () => {
   });
 });
 
-describe('trip_code 兩份協議格式不一致時的接合', () => {
-  /**
-   * 車端依營運任務狀態協議送「[方向][時間]」（U1149），班表與 ETA 規格書用
-   * 「[路線代號][HHMM]」（TN1149）。直接比對永遠對不上，計畫值會全部是 null。
-   */
-  it('車端方向式代號要能接上班表的路線式代號', async () => {
+describe('trip_code 與班表的對應', () => {
+  it('對不上班表的班次照規格回 NO_PLAN，不猜也不改寫代號', async () => {
+    // 加班車、調度車，或班表尚未載入都屬此類
     const service = makeService({
-      snapshot: {
-        'PMS-05': movingVehicle({
-          trip_code: 'U0007',
-          current_leg: {
-            target_station_id: 'station_4',
-            distance_to_target_m: 120,
-            eta_seconds: 25,
-          },
-        }),
-      },
-      stationEtas: {
-        ...defaultStationEtas(),
-        etas: defaultStationEtas().etas.map((eta) => ({
-          ...eta,
-          trip_code: 'ST0007',
-        })),
-      },
+      snapshot: { 'PMS-05': movingVehicle({ trip_code: 'ST9999' }) },
     });
     const result = await service.getByStation({ limitPerStation: 3 });
     const entry = result.stations[0].etas[0];
 
-    expect(entry.plan.planned_arrival_clock).toBe('09:00:10');
-    expect(entry.plan.delay_seconds).toBe(13);
-    expect(entry.route_code).toBe('ST');
-    // 對外一律給班表上的代號——廠商要拿它去查計畫值 API
-    expect(entry.trip_code).toBe('ST0007');
-  });
-
-  it('對不上班表時退回車端原值，不憑空捏造', async () => {
-    const service = makeService({
-      snapshot: { 'PMS-05': movingVehicle({ trip_code: 'U9999' }) },
-    });
-    const result = await service.getByStation({ limitPerStation: 3 });
-    const entry = result.stations[0].etas[0];
-
-    expect(entry.trip_code).toBe('U9999');
+    expect(entry.trip_code).toBe('ST9999');
     expect(entry.plan.planned_arrival_at).toBeNull();
     expect(entry.plan.delay_state).toBe('NO_PLAN');
+    // 即時值本身照樣成立
+    expect(entry.eta_seconds).toBe(25);
+    expect(entry.arrival_state).toBe('APPROACHING');
   });
 });
 
