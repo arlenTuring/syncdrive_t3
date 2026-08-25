@@ -40,3 +40,6 @@ mosquitto/config/passwordfile
 deploy/.env
 deploy/.state/
 deploy/.target
+deploy/seed/
+deploy/images/
+deploy/dist/

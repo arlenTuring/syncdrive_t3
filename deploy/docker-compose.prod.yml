@@ -1,5 +1,12 @@
 # SyncDrive T3 正式／預備環境
 #
+# <strong>與機房無關。</strong>同一份設定要能跑在 GCP VM、也能跑在進場的實體伺服器上，
+# 所以這裡不使用任何雲端供應商專屬的東西——沒有受管資料庫、沒有映像倉庫、
+# 沒有負載平衡器。差異一律外部化到 deploy/.env，不做成兩份設定檔。
+#
+# 資料庫日後要獨立一台時：把 DB_HOST 指向那台，並用 --profile 省略內建的
+# postgres 服務（見下方 profiles 說明），compose 其餘部分不動。
+#
 # 與開發用的 docker-compose.yml 三處不同：
 #
 # 1. 沒有 adminer 與 redis-commander。那兩個是開發工具，直接連得到資料庫與 Redis，
@@ -15,6 +22,9 @@ services:
     image: timescale/timescaledb:2.19.3-pg15
     container_name: syncdrive_postgres
     restart: always
+    # 內建資料庫，由 deploy/.env 的 COMPOSE_PROFILES=bundled-db 啟用（預設值）。
+    # 資料庫獨立到別台時把該變數清空並設定 DB_HOST，這個服務就不會被拉起。
+    profiles: ["bundled-db"]
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -80,7 +90,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       EXTERNAL_PORT: 3100
-      DB_HOST: postgres
+      DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: 5432
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -96,9 +106,14 @@ services:
       # 只發布對外埠。3000 留在 docker 網路裡，主機上打不到——
       # 文件分兩份、路由圍籬、網路可達範圍三者因此完全一致。
       - "0.0.0.0:3100:3100"
+    volumes:
+      # 執行期寫入點。已發布地圖存在 /app/data/published-maps（檔案，不是資料表，
+      # 見 scripts/map-published-store.js），沒有這個 volume 的話每次重新部署
+      # 地圖就會消失——而地圖一消失，班表 API 查得到班次卻查不到停靠點別名。
+      - backenddata:/app/data
+    # 不對 postgres 下 depends_on：資料庫獨立部署時那個服務根本不存在，
+    # 硬相依會讓整個 compose 起不來。連線重試由 TypeORM 自己負責。
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       mosquitto:
@@ -137,5 +152,6 @@ services:
 
 volumes:
   pgdata:
+  backenddata:
   redisdata:
   mosquitto_data:
