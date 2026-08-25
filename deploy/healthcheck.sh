@@ -54,11 +54,13 @@ check() {
   # 80 埠的請求要帶 Basic Auth；3100 走的是 x-api-key，兩者不混用。
   # key 傳 "noauth" 代表這一條就是要驗「沒帶憑證會不會被擋」，一律不補。
   if [ "$key" != "noauth" ]; then
+    # 順序不能反：INTERNAL 是 http://host、EXTERNAL 是 http://host:3100，
+    # 前者的萬用比對<strong>也會吃掉後者</strong>，先比 EXTERNAL 才不會帶錯帳密
+    # （2026-08-26 實測：對外五項全部拿到 401）
     case "$url" in
-      # API 路徑走 x-api-key，不帶瀏覽帳密；其餘（入口頁、文件、Swagger）才帶
-      *"$EXTERNAL"*/syncdrive-api/*) ;;
-      "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
+      "$EXTERNAL"/syncdrive-api/*) ;;   # API 走 x-api-key，不帶瀏覽帳密
       "$EXTERNAL"*) auth=("${EXT_AUTH[@]+"${EXT_AUTH[@]}"}") ;;
+      "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
     esac
   else
     key=""
