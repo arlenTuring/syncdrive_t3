@@ -144,8 +144,21 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableTripsResponseDto"
+                }
+              }
+            }
+          },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "404": {
+            "description": "庫內沒有任何含排班結果的班表"
           }
         },
         "security": [
@@ -193,8 +206,21 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationEtasResponseDto"
+                }
+              }
+            }
+          },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "404": {
+            "description": "庫內沒有任何含排班結果的班表"
           }
         },
         "security": [
@@ -452,6 +478,160 @@
           "data_age_seconds"
         ]
       },
+      "StationEtaEventDto": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "example": "station_4"
+          },
+          "station_alias": {
+            "type": "string",
+            "example": "T3上行",
+            "description": "地圖上的停靠點別名，顯示用主標題"
+          },
+          "station_name": {
+            "type": "string",
+            "example": "T3上行",
+            "description": "路線站序上的名稱"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "origin",
+              "intermediate",
+              "terminal"
+            ]
+          },
+          "eta_arrive": {
+            "type": "object",
+            "nullable": true,
+            "example": "00:10:40",
+            "description": "計畫抵達；起站為 null"
+          },
+          "eta_depart": {
+            "type": "object",
+            "nullable": true,
+            "example": "00:11:30",
+            "description": "起站／途經＝出發；末站＝靠站完成（即該班次卡結束）"
+          },
+          "eta_arrive_second": {
+            "type": "object",
+            "nullable": true,
+            "example": 640
+          },
+          "eta_depart_second": {
+            "type": "object",
+            "nullable": true,
+            "example": 690
+          },
+          "non_stop": {
+            "type": "boolean",
+            "example": false,
+            "description": "到站與離站同一秒（不停靠／途經）"
+          },
+          "base_dwell_seconds": {
+            "type": "number",
+            "example": 36
+          },
+          "dwell_seconds": {
+            "type": "number",
+            "example": 50
+          },
+          "buffer_seconds": {
+            "type": "number",
+            "example": 14,
+            "description": "有效停靠 − 設定停靠，恆 ≥ 0"
+          },
+          "trip_code": {
+            "type": "string",
+            "example": "ST0007"
+          },
+          "block_id": {
+            "type": "string",
+            "example": "b-st"
+          },
+          "timeline_row": {
+            "type": "number",
+            "example": 1
+          },
+          "route_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST"
+          },
+          "route_name": {
+            "type": "object",
+            "nullable": true,
+            "example": "S2W上行 > T3上行"
+          },
+          "vehicle_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "<strong>固定為 null。</strong>計畫值不含車輛對應——哪一列由哪一台車擔任，是當日才決定的。要車輛識別請改用即時 ETA 介面。"
+          }
+        },
+        "required": [
+          "station_id",
+          "station_alias",
+          "station_name",
+          "role",
+          "eta_arrive",
+          "eta_depart",
+          "eta_arrive_second",
+          "eta_depart_second",
+          "non_stop",
+          "base_dwell_seconds",
+          "dwell_seconds",
+          "buffer_seconds",
+          "trip_code",
+          "block_id",
+          "timeline_row",
+          "route_code",
+          "route_name",
+          "vehicle_id"
+        ]
+      },
+      "StationEtaFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "00:00:00"
+          },
+          "to": {
+            "type": "string",
+            "example": "24:00:00"
+          },
+          "from_second": {
+            "type": "number",
+            "example": 0,
+            "description": "當日第幾秒"
+          },
+          "to_second": {
+            "type": "number",
+            "example": 86400
+          },
+          "station_id": {
+            "type": "object",
+            "nullable": true,
+            "example": "station_4"
+          },
+          "passenger_stops_only": {
+            "type": "boolean",
+            "example": true,
+            "description": "固定為 true：只回正線班次的站點事件"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "from_second",
+          "to_second",
+          "station_id",
+          "passenger_stops_only"
+        ]
+      },
       "StationEtaGroupDto": {
         "type": "object",
         "properties": {
@@ -475,6 +655,313 @@
           "station_id",
           "station_name",
           "etas"
+        ]
+      },
+      "StationEtasResponseDto": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/TimetableMetaDto"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/StationEtaFilterDto"
+          },
+          "eta_count": {
+            "type": "number",
+            "example": 4
+          },
+          "etas": {
+            "description": "依時間排序的站點事件流",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationEtaEventDto"
+            }
+          },
+          "stations": {
+            "description": "同一份事件依停靠點分組。<strong>會列出地圖上全部停靠點</strong>，包含目前沒有任何班次的（etas 為空陣列），方便站端固定顯示版面而不必自己補齊清單。",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationEtaGroupDto"
+            }
+          }
+        },
+        "required": [
+          "meta",
+          "filter",
+          "eta_count",
+          "etas",
+          "stations"
+        ]
+      },
+      "TimetableFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "00:00:00"
+          },
+          "to": {
+            "type": "string",
+            "example": "24:00:00"
+          },
+          "from_second": {
+            "type": "number",
+            "example": 0,
+            "description": "當日第幾秒"
+          },
+          "to_second": {
+            "type": "number",
+            "example": 86400
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "from_second",
+          "to_second"
+        ]
+      },
+      "TimetableMetaDto": {
+        "type": "object",
+        "properties": {
+          "shift_id": {
+            "type": "string",
+            "example": "OS-DRAFT-MSEEXIN9",
+            "description": "這份班表的識別碼"
+          },
+          "name": {
+            "type": "string",
+            "example": "模擬正線"
+          },
+          "publish_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "班表本身的發布狀態"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "published",
+              "draft_fallback"
+            ],
+            "description": "published＝讀到已發布班表；draft_fallback＝庫內沒有已發布的，退而取用最新草稿，此時時刻僅供參考，不應對外顯示為正式時刻"
+          },
+          "generated_at": {
+            "type": "object",
+            "nullable": true,
+            "example": "2026-08-19T00:53:59.220Z",
+            "description": "班表產生時刻"
+          },
+          "updated_at": {
+            "type": "string",
+            "example": "1787115236800",
+            "description": "最後更新（Epoch 毫秒字串）"
+          },
+          "map_id": {
+            "type": "object",
+            "nullable": true,
+            "description": "這份班表所依據的地圖"
+          }
+        },
+        "required": [
+          "shift_id",
+          "name",
+          "publish_status",
+          "source",
+          "generated_at",
+          "updated_at",
+          "map_id"
+        ]
+      },
+      "TimetableTripDto": {
+        "type": "object",
+        "properties": {
+          "trip_code": {
+            "type": "string",
+            "example": "ST0007",
+            "description": "路線代號＋發車時刻 HHMM"
+          },
+          "block_id": {
+            "type": "string",
+            "example": "task-1786018029893-faqq",
+            "description": "班次卡的內部識別碼"
+          },
+          "timeline_row": {
+            "type": "number",
+            "example": 1,
+            "description": "這一趟屬於班表上的第幾列"
+          },
+          "task_type": {
+            "type": "string",
+            "example": "passenger",
+            "description": "回傳全部任務類型：passenger 正線、servicing 保養、inspection 行檢、charging 充電、standby 待命、dispatch 調度等。整備類通常無站序，stations 為空陣列"
+          },
+          "label": {
+            "type": "string",
+            "example": "正線"
+          },
+          "source": {
+            "type": "string",
+            "example": "template_bar",
+            "description": "這張卡的產生來源"
+          },
+          "route_id": {
+            "type": "object",
+            "nullable": true
+          },
+          "route_code": {
+            "type": "object",
+            "nullable": true,
+            "example": "ST"
+          },
+          "route_name": {
+            "type": "object",
+            "nullable": true,
+            "example": "S2W上行 > T3上行"
+          },
+          "card_start": {
+            "type": "string",
+            "example": "00:07:40",
+            "description": "班次卡開始（＝起站 departure）"
+          },
+          "card_end": {
+            "type": "string",
+            "example": "00:11:30",
+            "description": "班次卡結束（＝末站 dwell_complete）"
+          },
+          "card_start_second": {
+            "type": "number",
+            "example": 460
+          },
+          "card_end_second": {
+            "type": "number",
+            "example": 690
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimetableTripStationDto"
+            }
+          }
+        },
+        "required": [
+          "trip_code",
+          "block_id",
+          "timeline_row",
+          "task_type",
+          "label",
+          "source",
+          "route_id",
+          "route_code",
+          "route_name",
+          "card_start",
+          "card_end",
+          "card_start_second",
+          "card_end_second",
+          "stations"
+        ]
+      },
+      "TimetableTripStationDto": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "number",
+            "example": 1,
+            "description": "站序，自 1 起算"
+          },
+          "station_id": {
+            "type": "string",
+            "example": "station_4"
+          },
+          "station_name": {
+            "type": "string",
+            "example": "T3上行"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "origin",
+              "intermediate",
+              "terminal"
+            ],
+            "description": "origin＝只看 departure（arrival 固定 null，抵達屬上一卡末站）；intermediate＝arrival ＋ departure；terminal＝arrival ＋ dwell_complete（完成靠站，不稱出發）"
+          },
+          "arrival": {
+            "type": "object",
+            "nullable": true,
+            "example": "00:10:40",
+            "description": "計畫抵達；起站為 null"
+          },
+          "departure": {
+            "type": "object",
+            "nullable": true,
+            "example": "00:07:40",
+            "description": "計畫離站；末站為 null"
+          },
+          "dwell_complete": {
+            "type": "object",
+            "nullable": true,
+            "example": "00:11:30",
+            "description": "靠站完成（＝該班次卡結束）。僅末站有值"
+          },
+          "base_dwell_seconds": {
+            "type": "number",
+            "example": 40,
+            "description": "設定的靠站秒數，不含緩衝"
+          },
+          "dwell_seconds": {
+            "type": "number",
+            "example": 50,
+            "description": "有效靠站秒數，含緩衝"
+          },
+          "travel_to_next_seconds": {
+            "type": "object",
+            "nullable": true,
+            "example": 100,
+            "description": "到下一站的行駛秒數；末站為 null"
+          }
+        },
+        "required": [
+          "order",
+          "station_id",
+          "station_name",
+          "role",
+          "arrival",
+          "departure",
+          "dwell_complete",
+          "base_dwell_seconds",
+          "dwell_seconds",
+          "travel_to_next_seconds"
+        ]
+      },
+      "TimetableTripsResponseDto": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/TimetableMetaDto"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/TimetableFilterDto"
+          },
+          "trip_count": {
+            "type": "number",
+            "example": 26
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimetableTripDto"
+            }
+          }
+        },
+        "required": [
+          "meta",
+          "filter",
+          "trip_count",
+          "trips"
         ]
       },
       "VehicleEtaByStationResponseDto": {

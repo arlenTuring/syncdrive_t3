@@ -8,8 +8,18 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ExternalApi } from '../common/external-api.decorator';
+import {
+  StationEtasResponseDto,
+  TimetableTripsResponseDto,
+} from './dto/timetable.dto';
 import {
   OperationShiftPublishStatus,
   OperationShiftUsageStatus,
@@ -84,6 +94,8 @@ export class OperationShiftController {
     required: false,
     description: 'HH:MM:SS 或秒，預設 24:00:00',
   })
+  @ApiOkResponse({ type: TimetableTripsResponseDto })
+  @ApiNotFoundResponse({ description: '庫內沒有任何含排班結果的班表' })
   async getTimetableTrips(
     @Query('from') from?: string,
     @Query('to') to?: string,
@@ -109,6 +121,8 @@ export class OperationShiftController {
     description: 'HH:MM:SS 或秒，預設 24:00:00',
   })
   @ApiQuery({ name: 'station_id', required: false, description: '只取單一站' })
+  @ApiOkResponse({ type: StationEtasResponseDto })
+  @ApiNotFoundResponse({ description: '庫內沒有任何含排班結果的班表' })
   async getStationEtas(
     @Query('from') from?: string,
     @Query('to') to?: string,
