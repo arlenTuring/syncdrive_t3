@@ -1421,11 +1421,12 @@
   <pre>validateTimelineOverlaps
 validateStationTimingsWithinBlocks
 validateStationBerthCollisions
+validateFacilityOccupancy
 validateRotationCyclesComplete
 validateRouteSwitchBuffers
 validatePassengerHeadway
 validateTimelineCapacity   ← 多為 warning</pre>
-  <p>下表為 <code>FeasibilityViolationCode</code> 全部 31 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。</p>
+  <p>下表為 <code>FeasibilityViolationCode</code> 全部 45 個代號（<code>schedule-engine/types.ts</code>），依生成流水線出現順序排列；不再是節錄。數量以 <code>feasibilityIssueMeta.ts</code> 的 <code>GROUP_TITLE</code> 為準——那是 exhaustive Record，少一個代號 TypeScript 就編譯失敗，<code>feasibilityIssueMeta.spec.ts</code> 另有一則測試核對本節是否漏列。</p>
   <table>
     <thead><tr><th>代號</th><th>嚴重度</th><th>語意</th><th>來源檔</th></tr></thead>
     <tbody>
@@ -1437,13 +1438,17 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>STATION_TIMING_INFEASIBLE</code></td><td>error</td><td>班次卡秒數容不下完整停靠＋最快行駛＋10 秒對齊</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_COLLISION</code></td><td>error</td><td>跨車同停靠時段仍撞（延後／改派後仍清不開）</td><td><code>stationBerthConstraint.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_PROTECTION_GAP</code></td><td>warn</td><td>區間沒重疊，但後車到站不滿足「前車實際離站 + 2 × 碰撞保護時間」（見 §8.1）</td><td><code>stationBerthOccupancy.ts</code></td></tr>
+      <tr><td><code>STATION_BERTH_DELAY_SOURCE</code></td><td>warn</td><td>站位求解把別人推晚了，依「擋路的那一張卡」歸戶：某一台車佔著某一站不走，累計害多少班次、共推遲多少秒。整個幾何收斂迴圈的延後都會累計，不是只記第一輪（見 §8）</td><td><code>generate.ts</code></td></tr>
+      <tr><td><code>STATION_BERTH_ARRIVAL_YIELDED</code></td><td>warn</td><td>滯留車晚一點進站讓路：跑完一趟要在站上空等的那台，往後挪幾分鐘讓只是路過的先通過。下一趟發車時刻與班距完全不變，零代價讓步（見 §8）</td><td><code>yieldIdleBlockArrival.ts</code></td></tr>
+      <tr><td><code>STATION_BERTH_RELIEF_UNAVAILABLE</code></td><td>warn</td><td>空等會撞到別列車，但關聯圖上沒有「從這裡出發、又回得來」的次要邊可用，只能留在原地（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_DELAYED</code></td><td>warn</td><td>生成期為清站位延後發車（10 秒格；正常求解）</td><td><code>stationBerthConstraint.ts</code></td></tr>
       <tr><td><code>STATION_BERTH_BACKUP_USED</code></td><td>warn</td><td>站位排不開時，依關聯圖改選這一趟要跑的路線（見 §7 G5）</td><td><code>stationBerthConstraint.ts</code></td></tr>
       <tr><td><code>ANCHOR_CONFLICT</code></td><td>error</td><td>同車無法在下一錨點前結束本趟</td><td><code>expand.ts</code></td></tr>
       <tr><td><code>TIMELINE_OVERLAP</code></td><td>error</td><td>同一台車的任務時間重疊（正線吃整備開頭是允許的，不算重疊）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>HEADWAY_PHYSICAL_IMPOSSIBLE</code></td><td>error</td><td>違反車隊物理班距地板</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>HEADWAY_BELOW_TARGET</code></td><td>warn</td><td>低於時段目標班距（見 §5；<code>detail.severityBand</code> 分 mild／moderate／severe）</td><td><code>validate.ts</code></td></tr>
-      <tr><td><code>UNSERVED_SERVICE_PULSE</code></td><td>warn</td><td>脈衝找不到合法整輪，實際 PPHPD 下降</td><td><code>schedule-engine（掛車）</code></td></tr>
+      <tr><td><code>HEADWAY_PHASE_EVENED</code></td><td>warn</td><td>站位延後把發車相位推歪之後，已把每一班往「與前後班等間隔」的位置靠回去。只在該列自己的空檔內微調，挪過去會撞的整筆放棄，不新增也不刪除班次（見 §5）</td><td><code>evenOutRouteHeadwayPhase.ts</code></td></tr>
+<tr><td><code>UNSERVED_SERVICE_PULSE</code></td><td>warn</td><td>脈衝找不到合法整輪，實際 PPHPD 下降</td><td><code>schedule-engine（掛車）</code></td></tr>
       <tr><td><code>INSUFFICIENT_TIMELINES</code></td><td>warn</td><td>列數相對理論運能偏緊</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>RECOVERY_INSUFFICIENT</code></td><td>error</td><td>同列相鄰正線空檔 &lt; 恢復時間（S1）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROUTE_SWITCH_BUFFER_INSUFFICIENT</code></td><td>error</td><td>換線空檔 &lt; 恢復＋換線緩衝（S1+S2）</td><td><code>validate.ts</code></td></tr>
@@ -1451,7 +1456,10 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>ROUTE_SUCCESSOR_MISMATCH</code></td><td>error</td><td>同列相鄰正線未依關聯圖 successor 行駛（見 §7 G2）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROUTE_INSTANCE_AMBIGUOUS</code></td><td>error</td><td>舊班次僅存 routeId，無法唯一解析 route instance</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROUTE_STATION_DISCONTINUITY</code></td><td>error</td><td>前趟終點站≠後趟起點站（見 §7 G4）</td><td><code>validate.ts</code></td></tr>
-      <tr><td><code>CLOCK_ALIGN_VIOLATION</code></td><td>error</td><td>未落在 10 秒格（S3）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>ROUTE_ALIGNED_TO_VEHICLE_LOCATION</code></td><td>warn</td><td>車停的位置不是原指派路線的起點，已改成同終點、從車所在位置出發的那一條，省掉一段空跑。終點與發車時刻都不動（見 §7）</td><td><code>alignRouteWithVehicleLocation.ts</code></td></tr>
+      <tr><td><code>ROUTE_ORIGIN_AWAY_FROM_VEHICLE</code></td><td>warn</td><td>出廠卡要空跑一段——車不在下一班的起點。這是正常機制，代號只是把代價（空跑多久、途經哪些點）講出來（見 §7）</td><td><code>alignRouteWithVehicleLocation.ts</code></td></tr>
+      <tr><td><code>ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY</code></td><td>warn</td><td>車停的那一站到不了任何設施、入廠卡排不出來，已把該趟改成終點在「進得了廠」那一站的路線。下一段是整備，出廠起點由設施的出場站決定，所以換終點是安全的（見 §10.5）</td><td><code>alignRouteWithMaintenanceEntry.ts</code></td></tr>
+<tr><td><code>CLOCK_ALIGN_VIOLATION</code></td><td>error</td><td>未落在 10 秒格（S3）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>TURNAROUND_LIMIT_EXCEEDED</code></td><td>error</td><td>單路線最快一圈已超折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROUTE_ROTATION_OVER_TURNAROUND</code></td><td>warn</td><td>鎖定全優先組合的最快一輪超過折返時限</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>ROTATION_CYCLE_INCOMPLETE</code></td><td>error</td><td>正線條數非整輪（不含 entry_service）；以整備切段檢查</td><td><code>trimIncompleteRotationCycles.ts</code></td></tr>
@@ -1459,7 +1467,14 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>YARD_EXIT_STATION_MISMATCH</code></td><td>error</td><td>整備結束後第一段班次的起點站<strong>不在該任務類型的出場站集合內</strong>——車不在那裡，開不了。集合必為多值：充電→N2W，行檢／待命→T3上行，<strong>保養視窗→T3上行 或 N2W</strong>（servicing 合併了洗車／保養／閒置，排班當下不知做哪一項，見 §10）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_TRANSFER_UNRESOLVED</code></td><td>warn</td><td>整備轉場卡（入廠 MI／出廠 MO／整備間轉場）排不出來：整備任務沒設定該區段設施／拓樸上沒有可通的邊或路徑／設施當時被別列車佔著。三種轉場共用同一個模組、同一個代號（見 §10.4）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_FACILITY_UNAVAILABLE</code></td><td>warn</td><td>整備設施不足：這一段整備的<strong>整段時間內該類設施沒有任何一台是空的</strong>，車沒地方停。跟轉場卡排不出來（路徑問題）分開回報，處置完全不同——這是產能問題，要加設施或錯開整備時段（見 §10.5）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
-      <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_FACILITY_YIELDED</code></td><td>warn</td><td>請別列車換一台設施把位子讓出來。兩邊時間都沒動，只換格子，所以沒有代價——會看到某一列的整備跑到跟平常不同的設施上（見 §10.5）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_ENTRY_EARLY_BLOCKED</code></td><td>warn</td><td>本來可以提早進廠，設施被佔只好晚進。代價是車在正線站位上多等，那段時間它佔著停靠點（見 §10.5）</td><td><code>generate.ts</code></td></tr>
+      <tr><td><code>FACILITY_SLOT_COLLISION</code></td><td>error</td><td>同一個設施格同時被兩台車佔用。以「車實際還在裡面」為準——整備做完到開走之間車仍佔著那一格，時間軸上就是那張<strong>暫停卡</strong>（<code>source: 'hold'</code>）。補暫停卡之前這段帳上是空的，兩台車同格量不出來（見 §6）</td><td><code>validate.ts</code></td></tr>
+      <tr><td><code>FACILITY_HANDOVER_GAP</code></td><td>warn</td><td>兩台車在同一個設施格交接，中間不足「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝（見 §6）</td><td><code>validate.ts</code></td></tr>
+<tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
+      <tr><td><code>GEOMETRY_NOT_CONVERGED</code></td><td>warn</td><td>站位求解、讓渡、班距修復會互相影響，跑滿輪數仍在變動，沒到不動點（見 §3）</td><td><code>generate.ts</code></td></tr>
+      <tr><td><code>GEOMETRY_BEST_ROUND_USED</code></td><td>warn</td><td>迴圈未收斂，已改用過程中全域評分最好的那一輪作為結果，所以輸出不會比過程中最好的那版差。看到這一則代表班表可用但還不是穩定解（見 §3）</td><td><code>generate.ts</code></td></tr>
+      <tr><td><code>GEOMETRY_PASS_REVERTED</code></td><td>warn</td><td>某一道幾何處理讓整張班表變差，已整道撤回，連同它寫進報告的訊息一起收回——那些動作等於沒發生。用途是指出哪一道處理與其他處理衝突（見 §3）</td><td><code>generate.ts</code></td></tr>
     </tbody>
   </table>
   <p>更細的 issue 文案／建議見 <code>feasibilityIssueMeta.ts</code>；本頁為排班調度唯一說明文件。逐則實測見 <a href="./排班引擎最近問題.html">最近一次生成的問題</a>，代號一致，可交叉核對。</p>

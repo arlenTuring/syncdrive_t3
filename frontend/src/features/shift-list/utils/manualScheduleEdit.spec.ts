@@ -85,13 +85,14 @@ describe('manualScheduleEdit', () => {
     });
     expect(withDwells).not.toBeNull();
     const block = withDwells!.plan.timelines[0]!.blocks.find((b) => b.id === inserted!.blockId)!;
-    // 120+30 + 180+30 = 360s = 6 min
-    expect(resolveManualBlockMinDurationMinutes(block)).toBe(6);
+    // 首站不計——班次卡從「起點離站」起算，A 站的靠站發生在卡開始之前
+    // （applyStationDwellWithSlack 的 index === 0 分支）。所以只有 B：180+30 = 210s = 3.5 min
+    expect(resolveManualBlockMinDurationMinutes(block)).toBe(3.5);
     const tooShort = applyManualBlockTimeRange({
       plan: withDwells!.plan,
       blockId: inserted!.blockId,
       startMinute: block.plannedStartMinute,
-      endMinute: block.plannedStartMinute + 5,
+      endMinute: block.plannedStartMinute + 3,
     });
     expect(tooShort).toBeNull();
 
@@ -162,8 +163,8 @@ describe('manualScheduleEdit', () => {
     const block = hydrated.timelines[0]!.blocks.find((item) => item.id === blockId)!;
     expect(block.stationDwells).toEqual(route.stationDwells);
     expect(block.dwellSlackSeconds).toBe(10);
-    // 40+10 + 50+10 = 110
-    expect(block.dwellSeconds).toBe(110);
+    // 首站 a 不計（同上），只有 b：50+10 = 60
+    expect(block.dwellSeconds).toBe(60);
 
     const again = hydrateManualPlanStationDwellsFromRoutes({
       plan: hydrated,
