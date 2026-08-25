@@ -62,12 +62,19 @@ export interface DataSourceConfig {
 
 const STORAGE_KEY = 'syncdrive_datasources';
 
-// 預設的內建資料來源（指向本機後端）
+/**
+ * 預設的內建資料來源。
+ *
+ * <code>backendUrl</code> 留空＝<strong>同源</strong>：開發時走 Vite 代理，部署後走
+ * nginx 代理，兩種情況都不必知道後端在哪一台。寫死 <code>http://127.0.0.1:3000</code>
+ * 會在部署到別台機器時指到<strong>看網頁的那台電腦</strong>，畫面呈現為「後端沒開」，
+ * 但後端其實好好的（見 lib/browserApiBase.ts）。要連別台後端時再由使用者自己填。
+ */
 export const DEFAULT_DATASOURCE: DataSourceConfig = {
   id: 'default-internal',
   name: 'SyncDrive 本機資料庫',
   type: 'internal',
-  backendUrl: 'http://127.0.0.1:3000',
+  backendUrl: '',
   description: 'SyncDrive-T3 後端 PostgreSQL（TimescaleDB）',
   createdAt: 0,
 };
@@ -76,7 +83,8 @@ const DEFAULT_MQTT_DATASOURCE: DataSourceConfig = {
   id: 'default-mqtt',
   name: 'VTMS MQTT (Socket.IO)',
   type: 'mqtt',
-  backendUrl: 'http://127.0.0.1:3000',
+  // 同上：留空＝同源，Socket.IO 也跟著走 nginx 代理
+  backendUrl: '',
   description: 'v1/vtms/{vehicle_code}/telemetry|operation|health',
   mqttTopic: 'v1/vtms/+/telemetry/update',
   createdAt: 0,
