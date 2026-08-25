@@ -23,16 +23,35 @@ if [ -z "$API_KEY" ] && [ -f "$ROOT/deploy/.env" ]; then
   [ -z "$API_KEY" ] && API_KEY="$(sudo grep '^VTMS_API_KEY=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
 fi
 
+# 內部（80 埠）走 nginx Basic Auth。與金鑰同樣的讀法：讀不到就不帶，
+# 讓檢查照跑並以 401 呈現，而不是靜靜跳過。
+WEB_USER="$(grep '^WEB_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+WEB_PASS="$(grep '^WEB_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+if [ -z "$WEB_PASS" ]; then
+  WEB_USER="$(sudo grep '^WEB_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+  WEB_PASS="$(sudo grep '^WEB_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+fi
+WEB_AUTH=()
+[ -n "$WEB_PASS" ] && WEB_AUTH=(-u "${WEB_USER:-syncdrive}:$WEB_PASS")
+
 pass=0
 fail=0
 
 check() {
   local label="$1" url="$2" want="$3" key="${4:-}"
   local got
-  if [ -n "$key" ]; then
-    got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H "x-api-key: $key" "$url" || echo 000)"
+  local auth=()
+  # 80 埠的請求要帶 Basic Auth；3100 走的是 x-api-key，兩者不混用。
+  # key 傳 "noauth" 代表這一條就是要驗「沒帶憑證會不會被擋」，一律不補。
+  if [ "$key" != "noauth" ]; then
+    case "$url" in "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;; esac
   else
-    got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" || echo 000)"
+    key=""
+  fi
+  if [ -n "$key" ]; then
+    got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${auth[@]+"${auth[@]}"}" -H "x-api-key: $key" "$url" || echo 000)"
+  else
+    got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${auth[@]+"${auth[@]}"}" "$url" || echo 000)"
   fi
   if [ "$got" = "$want" ]; then
     printf '  \033[1;32m✓\033[0m %-46s %s\n' "$label" "$got"
@@ -57,7 +76,7 @@ if [ -n "$API_KEY" ]; then
   check "即時 ETA：依站"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    200 "$API_KEY"
   check "即時 ETA：依車"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-vehicle"    200 "$API_KEY"
   # 金鑰要真的有在擋，不是宣告了但沒生效
-  check "沒帶金鑰必須被拒"    "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    401
+  check "沒帶金鑰必須被拒"    "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    401 noauth
 else
   printf '  \033[1;33m—\033[0m %s\n' "讀不到 VTMS_API_KEY，略過需要金鑰的 5 項檢查"
 fi
@@ -66,6 +85,11 @@ echo "對外邊界（這幾條必須是 404）"
 check "內部端點不可從對外埠打到" "$EXTERNAL/syncdrive-api/operation-shift/list"  404
 check "內部 Swagger 不可從對外埠打到" "$EXTERNAL/api/docs"                       404
 check "資料庫查詢端點不可外露"   "$EXTERNAL/syncdrive-api/datasource/tables"     404
+
+echo "存取控制"
+if [ -n "$WEB_PASS" ]; then
+  check "80 埠沒帶帳密必須被拒" "$INTERNAL/syncdrive-api/operation-shift/list" 401 noauth
+fi
 
 echo "參數驗證"
 check "值域外的參數回 400"  "$EXTERNAL/syncdrive-api/vehicles/eta/by-station?limit_per_station=99" 400 "$API_KEY"

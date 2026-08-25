@@ -43,3 +43,6 @@ deploy/.target
 deploy/seed/
 deploy/images/
 deploy/dist/
+deploy/.htpasswd
+deploy/mqtt-credentials.txt
+mosquitto/config/passwordfile

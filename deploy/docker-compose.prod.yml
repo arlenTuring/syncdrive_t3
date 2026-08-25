@@ -66,12 +66,14 @@ services:
     image: eclipse-mosquitto:2@sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797
     container_name: syncdrive_mosquitto
     restart: always
-    # 1883 給車端；正式環境請改用 mosquitto.prod.conf 啟用帳密與 ACL，
-    # 並在防火牆只放行車輛所在網段（見 deploy/README.md）
+    # 1883 給車端。正式設定關閉匿名、啟用帳密與 ACL（協議 §三 的隔離原則），
+    # 帳密檔由 bootstrap.sh 產生。MQTT_BIND 預設 127.0.0.1，要讓車端連進來
+    # 才改 0.0.0.0，並在防火牆限制來源網段。
     ports:
       - "${MQTT_BIND:-127.0.0.1}:1883:1883"
     volumes:
       - ../mosquitto/config:/mosquitto/config
+      - ../mosquitto/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
     healthcheck:
       test: ["CMD-SHELL", "pidof mosquitto || exit 1"]
@@ -97,7 +99,7 @@ services:
       DB_NAME: ${DB_NAME}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_URL: mqtt://vtms-backend:${MQTT_BACKEND_PASSWORD}@mosquitto:1883
       VTMS_API_KEY: ${VTMS_API_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN}
       DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
@@ -143,6 +145,10 @@ services:
     restart: always
     ports:
       - "0.0.0.0:80:80"
+    volumes:
+      # Basic Auth 帳密檔，由 bootstrap.sh 產生。缺這個檔 nginx 會起不來——
+      # 那是刻意的：寧可服務起不來，也不要以為有保護但其實沒有。
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - backend
     healthcheck:
@@ -150,6 +156,24 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  simulator:
+    # 示範車隊模擬器。由 COMPOSE_PROFILES 是否含 simulator 決定要不要跑。
+    #
+    # 用後端同一個映像——它已經有 node_modules 與 scripts，不必另外建一個。
+    # 以 vtms-simulator 身分連線：ACL 上它需要對全部車輛路徑發布的權限，
+    # 那不是任何一台真車該有的權限，所以獨立一個帳號，日後要停就停這一個。
+    image: syncdrive-backend:${IMAGE_TAG:-latest}
+    container_name: syncdrive_simulator
+    restart: unless-stopped
+    profiles: ["simulator"]
+    environment:
+      MQTT_URL: mqtt://vtms-simulator:${MQTT_SIMULATOR_PASSWORD}@mosquitto:1883
+      BACKEND_URL: http://backend:3000
+    command: ["node", "scripts/vtms-shift-demo-simulator.js"]
+    depends_on:
+      - mosquitto
+      - backend
 
 volumes:
   pgdata:

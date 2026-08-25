@@ -78,6 +78,68 @@ fi
 
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 
+set_env() {  # set_env KEY VALUE — 就地改寫 deploy/.env 的一行
+  sed -i.bak "s|^$1=.*|$1=$2|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
+}
+read_env() { grep "^$1=" "$ENV_FILE" | cut -d= -f2; }
+
+# ── 2b. 網頁 Basic Auth ─────────────────────────────────────
+# 80 埠後面是內部 API 全部端點，沒有金鑰保護。缺這個檔 nginx 會拒絕啟動，
+# 那是刻意的：寧可服務起不來，也不要以為有保護但其實沒有。
+HTPASSWD="$ROOT/deploy/.htpasswd"
+if [ -f "$HTPASSWD" ]; then
+  log "Basic Auth 帳密檔已存在，保留不動"
+else
+  WEB_USER="$(read_env WEB_AUTH_USER)"; WEB_USER="${WEB_USER:-syncdrive}"
+  WEB_PASS="$(read_env WEB_AUTH_PASSWORD)"
+  if [ -z "$WEB_PASS" ]; then
+    WEB_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)"
+    set_env WEB_AUTH_USER "$WEB_USER"
+    set_env WEB_AUTH_PASSWORD "$WEB_PASS"
+  fi
+  # apr1 是 nginx 與 apache 都認得的格式，不必額外裝 apache2-utils
+  printf '%s:%s\n' "$WEB_USER" "$(openssl passwd -apr1 "$WEB_PASS")" > "$HTPASSWD"
+  chmod 644 "$HTPASSWD"
+  log "網頁帳密（80 埠）：${WEB_USER} / ${WEB_PASS}"
+fi
+
+# ── 2c. MQTT 帳密與 ACL ─────────────────────────────────────
+# broker 以 mosquitto.prod.conf 啟動（關閉匿名），沒有帳密檔就沒有人連得進來。
+# 用一次性容器產生，不能等服務起來再產——服務起不來正是因為缺這個檔。
+MQTT_PWFILE="$ROOT/mosquitto/config/passwordfile"
+MQTT_CREDS="$ROOT/deploy/mqtt-credentials.txt"
+if [ -f "$MQTT_PWFILE" ]; then
+  log "MQTT 帳密檔已存在，保留不動"
+else
+  log "產生 MQTT 帳密（後端、模擬器，以及 PMS-01 至 PMS-11）"
+  MOSQ_IMAGE="$(awk '$1=="mosquitto" {print $2"@"$3}' "$ROOT/deploy/images.lock")"
+  mosq_passwd() {  # mosq_passwd <-c|""> user pass
+    docker run --rm -v "$ROOT/mosquitto/config:/mosquitto/config" "$MOSQ_IMAGE" \
+      mosquitto_passwd $1 -b /mosquitto/config/passwordfile "$2" "$3"
+  }
+  gen() { openssl rand -base64 18 | tr -d '/+=' | head -c 18; }
+
+  BACKEND_PW="$(gen)"; SIM_PW="$(gen)"
+  mosq_passwd -c vtms-backend "$BACKEND_PW"
+  mosq_passwd "" vtms-simulator "$SIM_PW"
+  set_env MQTT_BACKEND_PASSWORD "$BACKEND_PW"
+  set_env MQTT_SIMULATOR_PASSWORD "$SIM_PW"
+
+  {
+    echo "# SyncDrive T3 MQTT 帳密（產生於 $(date '+%Y-%m-%d %H:%M:%S')）"
+    echo "# ACL 規則見 mosquitto/config/aclfile：車輛帳號只能發布到自己的路徑。"
+    echo "vtms-backend    $BACKEND_PW    # 後端自用"
+    echo "vtms-simulator  $SIM_PW    # 示範模擬器自用"
+  } > "$MQTT_CREDS"
+  for i in $(seq -w 1 11); do
+    VPW="$(gen)"
+    mosq_passwd "" "PMS-$i" "$VPW"
+    echo "PMS-$i          $VPW    # 交給該車" >> "$MQTT_CREDS"
+  done
+  chmod 600 "$MQTT_CREDS"
+  log "車輛帳密已寫入 deploy/mqtt-credentials.txt（600）"
+fi
+
 # ── 3. 主機防火牆 ───────────────────────────────────────────
 # 只放行 SSH、80（我方）、3100（協力廠商）。雲端上這是第二道（第一道是 VPC
 # 規則）；進場主機上這往往是唯一一道，所以三種常見工具都要能處理。
