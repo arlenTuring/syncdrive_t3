@@ -1,0 +1,20 @@
+# 基底映像鎖定檔
+#
+# 每一行：<用途> <image:tag> <manifest-list digest>
+#
+# 為什麼要釘 digest 而不是只寫 tag：tag 是<strong>可變的</strong>。
+# `node:20-alpine` 今天拉到的與下個月拉到的不是同一份，`redis:7-alpine` 也一樣。
+# 只寫 tag 的話，同一份原始碼在不同日子建出來的映像內容不同——這正是「拿到現場
+# 才發現跟測試時不一樣」的來源，而那種問題最難查，因為程式碼完全沒動。
+#
+# 這裡記的是 <strong>manifest list</strong> 的 digest，不是單一架構的 digest，
+# 所以 amd64 與 arm64 共用同一行；docker 會自己挑對應架構的那一層。
+#
+# 更新方式（有意識地升級時才做，並且要重新完整測一輪）：
+#   ./deploy/refresh-images-lock.sh
+
+node-build      node:20-alpine                      sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+nginx-runtime   nginx:1.27-alpine                   sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+postgres        timescale/timescaledb:2.19.3-pg15   sha256:12d8f8ee714b8d20d91ea5380a40b39df4f95b41cf7f516d25de791bf2f7e1f8
+redis           redis:7-alpine                      sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+mosquitto       eclipse-mosquitto:2                 sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797

@@ -38,6 +38,16 @@ if [ ! -f deploy/.env ]; then
   exit 1
 fi
 
+# 安裝包裡沒有原始碼——那是刻意的，正式機不該保留原始碼，也不該在上面建置。
+# 所以這支只在有原始碼的機器（開發機／打包機）上有意義。
+if [ ! -d backend ] && [ "$ROLLBACK" = false ]; then
+  fail "這台機器沒有原始碼，無法建置。"
+  echo "   正式機的更新方式是安裝新的安裝包：" >&2
+  echo "     tar xzf syncdrive-t3-<版本>.tar.gz && cd syncdrive-t3 && sudo ./deploy/bootstrap.sh" >&2
+  echo "   （回滾到上一版仍可用：./deploy/deploy.sh --rollback）" >&2
+  exit 1
+fi
+
 # ── 回滾 ────────────────────────────────────────────────────
 if [ "$ROLLBACK" = true ]; then
   if [ ! -f "$LAST_GOOD" ]; then

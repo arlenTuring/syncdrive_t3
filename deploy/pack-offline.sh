@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# 產出<strong>離線安裝包</strong>：一個 tar.gz，帶著所有映像與腳本，
-# 拿到沒有外網的進場主機上解開就能裝。
+# 產出<strong>安裝成品</strong>：一個 tar.gz，帶著所有映像與腳本。
 #
 #   ./deploy/pack-offline.sh            # 用目前 commit 當版號
 #   ./deploy/pack-offline.sh v0.4.1     # 指定版號
+#
+# <strong>這是唯一的安裝來源</strong>——雲端 VM 與進場實體伺服器裝的是同一個檔案。
+# 目標機器就算有網路也不在上面建置：一旦在目標機器 npm ci、docker pull，安裝出來
+# 的東西就取決於「那一天 registry 給了什麼」，測試過的與現場跑的不再是同一份。
+# 建置只發生一次，成品拿去哪裡裝都一樣。
 #
 # <strong>必須在 CPU 架構與目標機器相同的機器上執行。</strong>開發用的 Mac 是
 # arm64，進場主機與 GCP VM 是 amd64——在 Mac 上 docker save 出來的映像放到
@@ -42,11 +46,16 @@ IMAGE_TAG="$TAG" $COMPOSE build
 
 # ── 2. 連同第三方映像一起存 ────────────────────────────────
 # 第三方映像也要帶。進場主機拉不到 Docker Hub，少一個就起不來。
-THIRD_PARTY=(
-  "timescale/timescaledb:2.19.3-pg15"
-  "redis:7-alpine"
-  "eclipse-mosquitto:2"
-)
+# 版本一律讀 deploy/images.lock 的 digest，不用 tag——tag 是可變的
+# 用 while read 而不是 readarray：macOS 內建的是 bash 3.2，沒有 readarray，
+# 而打包機不見得永遠是 Linux
+THIRD_PARTY=()
+while IFS= read -r line; do
+  [ -n "$line" ] && THIRD_PARTY+=("$line")
+done < <(awk '$1=="postgres"||$1=="redis"||$1=="mosquitto" {print $2"@"$3}' deploy/images.lock)
+[ "${#THIRD_PARTY[@]}" -eq 3 ] || die "images.lock 讀不到三個第三方映像"
+log "第三方映像（釘在 digest）："
+printf '     %s\n' "${THIRD_PARTY[@]}"
 for image in "${THIRD_PARTY[@]}"; do
   docker image inspect "$image" >/dev/null 2>&1 || {
     log "拉取 $image"
@@ -64,7 +73,7 @@ docker save -o "$PKG/deploy/images/thirdparty.tar" "${THIRD_PARTY[@]}"
 log "收集設定與腳本"
 cp deploy/docker-compose.prod.yml "$PKG/deploy/"
 cp deploy/nginx.conf "$PKG/deploy/"
-cp deploy/.env.example "$PKG/deploy/"
+cp deploy/.env.example deploy/images.lock "$PKG/deploy/"
 cp deploy/bootstrap.sh deploy/deploy.sh deploy/healthcheck.sh "$PKG/deploy/"
 cp deploy/seed-restore.sh "$PKG/deploy/" 2>/dev/null || true
 cp deploy/README.md "$PKG/deploy/"
@@ -81,6 +90,20 @@ if [ -f "$ROOT/deploy/seed/seed.dump" ]; then
   mkdir -p "$PKG/deploy/seed"
   cp -R "$ROOT/deploy/seed/." "$PKG/deploy/seed/"
 fi
+
+# 成品裡要能回答「這一包到底是什麼」——出問題時第一個要查的就是這個
+{
+  echo "package    syncdrive-t3"
+  echo "version    ${TAG}"
+  echo "git        $(git rev-parse HEAD 2>/dev/null || echo '（非 git 工作目錄）')"
+  echo "arch       ${HOST_ARCH}"
+  echo "built_on   $(uname -sr)"
+  echo ""
+  echo "images"
+  docker image inspect --format '  {{index .RepoTags 0}}  {{.Id}}' \
+    "syncdrive-backend:$TAG" "syncdrive-web:$TAG" 2>/dev/null || true
+  printf '  %s\n' "${THIRD_PARTY[@]}"
+} > "$PKG/MANIFEST.txt"
 
 cat > "$PKG/安裝說明.txt" <<EOF
 SyncDrive T3 離線安裝包

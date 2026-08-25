@@ -1,8 +1,12 @@
 # SyncDrive T3 後端映像
 #
+# 基底映像釘在 digest（見 deploy/images.lock）。tag 是可變的，只寫 node:20-alpine
+# 會讓同一份原始碼在不同日子建出不同內容的映像——那正是「到現場才發現跟測試時
+# 不一樣」的來源，而且最難查，因為程式碼完全沒動。
+#
 # 分兩段：builder 裝完整依賴並編譯，runner 只帶執行期需要的東西。
 # 這樣產出的映像不含 TypeScript 編譯器與測試框架，也不會把原始碼帶上正式機。
-FROM node:20-alpine AS builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder
 WORKDIR /app
 
 # 先只複製 manifest：只要依賴沒變，這一層就能重用，改程式碼不必重裝
@@ -15,7 +19,7 @@ RUN npm run build
 # 重裝成只有正式依賴，dev 依賴不進最終映像
 RUN npm prune --omit=dev
 
-FROM node:20-alpine AS runner
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 

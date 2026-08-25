@@ -5,18 +5,31 @@
 #
 #   sudo ./deploy/bootstrap.sh
 #
-# 兩種模式，由「有沒有離線映像包」自動判定，不必下參數：
+# <strong>安裝一律使用現成映像，不在目標機器建置。</strong>目標機器就算有網路也一樣
+# ——在上面 npm ci、docker pull，裝出來的東西就取決於「那一天 registry 給了什麼」，
+# 測試過的與現場跑的不再是同一份，而這種問題最難查，因為程式碼完全沒動。
 #
-#   線上：deploy/images/ 不存在 → 直接 docker compose build（需要外網抓
-#         base image 與 npm 套件）
-#   離線：deploy/images/*.tar 存在 → docker load 匯入，完全不碰網路。
-#         進場主機通常沒有外網，映像包由 pack-offline.sh 在有網路且
-#         <strong>CPU 架構相同</strong>的機器上事先產出。
+# 映像來源依序：
+#
+#   1. deploy/images/*.tar  → docker load（安裝包帶來的，完全不碰網路）
+#   2. 本機 docker 已有該標籤 → 直接用（打包機自己安裝時就是這條）
+#   3. 都沒有 → 停下來並說明，除非明確加 --build
+#
+#   --build   在這台機器建置。只有打包機該用，或臨時除錯。會拉 base image
+#             與 npm 套件，因此有版本漂移風險。
 #
 # 做的事：確認 Docker、產生 deploy/.env、設定主機防火牆、起服務、收緊時序資料
 # 壓縮政策。每一步都可重複執行，做過的會跳過。
 
 set -euo pipefail
+
+ALLOW_BUILD=false
+for arg in "$@"; do
+  case "$arg" in
+    --build) ALLOW_BUILD=true ;;
+    *) echo "未知參數：$arg" >&2; exit 2 ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -90,17 +103,30 @@ else
 fi
 
 # ── 4. 取得映像 ─────────────────────────────────────────────
+IMAGE_TAG_VALUE="$(grep '^IMAGE_TAG=' "$ENV_FILE" | cut -d= -f2)"
+IMAGE_TAG_VALUE="${IMAGE_TAG_VALUE:-latest}"
+have_local_images() {
+  docker image inspect "syncdrive-backend:$IMAGE_TAG_VALUE" >/dev/null 2>&1 \
+    && docker image inspect "syncdrive-web:$IMAGE_TAG_VALUE" >/dev/null 2>&1
+}
+
 if [ -d "$IMAGE_DIR" ] && compgen -G "$IMAGE_DIR/*.tar" >/dev/null; then
-  log "離線安裝：匯入映像"
+  log "由安裝包匯入映像（不碰網路）"
   for tarball in "$IMAGE_DIR"/*.tar; do
     log "  docker load < $(basename "$tarball")"
     docker load -i "$tarball"
   done
-  log "啟動（不重新建置）"
   $COMPOSE up -d --no-build
-else
-  log "線上安裝：建置並啟動"
+elif have_local_images; then
+  log "使用本機既有映像 :$IMAGE_TAG_VALUE"
+  $COMPOSE up -d --no-build
+elif [ "$ALLOW_BUILD" = true ]; then
+  warn "在這台機器建置——會拉取 base image 與 npm 套件，裝出來的內容取決於當下的 registry"
   $COMPOSE up -d --build
+else
+  die "找不到映像（deploy/images/*.tar 不存在，本機也沒有 :$IMAGE_TAG_VALUE）。
+   正常安裝請使用 pack-offline.sh 產出的安裝包。
+   若這台就是打包機、確實要在此建置，請改跑：sudo ./deploy/bootstrap.sh --build"
 fi
 
 # ── 5. 等待資料庫 ───────────────────────────────────────────

@@ -9,26 +9,54 @@
 
 ---
 
-## 一、安裝
+## 一、安裝：建置一次，到處安裝
 
-只有一支指令，線上與離線共用：
+**目標機器上不建置。**就算它有網路也不建置。
 
-```bash
-sudo ./deploy/bootstrap.sh
-./deploy/healthcheck.sh
+在目標機器上 `npm ci` 與 `docker pull`，裝出來的內容就取決於「那一天 registry 給了
+什麼」——`node:20-alpine` 這種 tag 是可變的，今天拉到的與下個月拉到的不是同一份。
+於是測試過的與現場跑的不再是同一份，而這種問題最難查，因為程式碼完全沒動。
+
+所以流程是兩段：
+
+```
+  打包機（架構＝目標機器）            任何目標機器（雲端 VM／進場主機）
+  ────────────────────────           ──────────────────────────────
+  ./deploy/pack-offline.sh v0.4.1  →  tar xzf syncdrive-t3-v0.4.1.tar.gz
+  → deploy/dist/*.tar.gz              cd syncdrive-t3
+                                      sudo ./deploy/bootstrap.sh
+                                      ./deploy/healthcheck.sh
 ```
 
-模式由「有沒有離線映像包」自動判定：
+安裝包內含**全部**執行所需之物：自家兩個映像、三個第三方映像
+（TimescaleDB／Redis／Mosquitto）、compose、腳本、mosquitto 設定，以及可選的
+種子資料。安裝過程**完全不連網**。唯一的前提是目標機器已裝好 Docker Engine 與
+compose plugin（安裝包不含 Docker 本身）。
 
-| 情況 | `bootstrap.sh` 的行為 |
-|------|----------------------|
-| `deploy/images/` 不存在 | 線上安裝：`docker compose build`（需外網抓 base image 與 npm 套件） |
-| `deploy/images/*.tar` 存在 | 離線安裝：`docker load` 匯入，**全程不碰網路** |
+實測一包約 **500 MB**。
 
-跑完會印出**對外 API 金鑰**，那把是交給協力廠商的。資料庫密碼與金鑰都由
-`openssl rand` 在機器上產生，寫進 `deploy/.env`（權限 600），不進版控。
+### 版本鎖定
+
+所有基底映像釘在 **digest**（`deploy/images.lock`），不用 tag。要升版時是有意識地
+改那個檔案並重新完整測一輪，而不是「某天重建時它自己變了」。
+
+安裝包根目錄的 `MANIFEST.txt` 記錄這一包到底是什麼：版本、git commit、架構、
+自家映像的 image ID、第三方映像的 digest。現場出問題時第一個要看的就是它。
+
+### 例外：打包機自己
+
+打包機通常也要跑一份來驗證。`bootstrap.sh` 會依序找映像來源：安裝包 →
+本機既有映像 → 都沒有就停下來說明。真的要在該機建置時明確加旗標：
+
+```bash
+sudo ./deploy/bootstrap.sh --build
+```
 
 ### 更新
+
+**正式機**：裝新的安裝包即可，同一支 `bootstrap.sh`，資料與 `.env` 都會保留。
+
+**開發機／打包機**：
 
 ```bash
 ./deploy/deploy.sh              # 用目前目錄的程式碼重新部署
@@ -38,6 +66,9 @@ sudo ./deploy/bootstrap.sh
 
 先建置、再切換、然後驗收，**不通過就自動回滾**。手動部署最常見的失敗不是建置
 錯誤，而是換上去之後才發現不通、而舊的已經停掉了。
+
+在沒有原始碼的機器上跑 `deploy.sh` 會直接停下並告訴你改用安裝包——安裝包刻意
+不含原始碼，正式機不該保留原始碼，也不該在上面建置。
 
 ### 驗收
 
@@ -113,16 +144,22 @@ gcloud compute firewall-rules create syncdrive-internal \
 **不要**開 3000、5432、6379。後端的 3000 沒發布到主機，資料庫與 Redis 只綁
 `127.0.0.1`，開發用的 Adminer 與 redis-commander 不在正式 compose 裡。
 
-記憶體的決定因素是**前端建置峰值**（`tsc -b` + `vite build`，3–4 GB），不是常駐
-服務（後端閒置時 33 MB）。若改成只匯入離線映像、不在機器上建置，8 GB 就夠。
+這台同時擔任**打包機**——它是 amd64，與進場主機相同架構，所以在這裡產出的
+安裝包可以直接帶去現場。也因為要建置，記憶體的決定因素是**前端建置峰值**
+（`tsc -b` + `vite build`，3–4 GB），不是常駐服務（後端閒置時 33 MB）。
+
+純粹當安裝目標、不建置的機器，8 GB 就夠。
 
 ---
 
-## 五、附錄 B：進場實體伺服器（離線）
+## 五、附錄 B：進場實體伺服器
 
-實體主機通常沒有外網，所以走離線包。
+流程與雲端 VM **完全一樣**——同一個安裝包、同一支 `bootstrap.sh`。
 
-**第一步：在一台有網路、且 CPU 架構與目標機器相同的機器上打包。**
+用安裝包不是因為現場沒網路（現場安裝時通常是有的），而是因為**不要讓現場去
+決定裝到什麼版本**。同一包裝到哪裡都是同一份，這件事比省一次下載重要得多。
+
+**第一步：在架構與目標機器相同的機器上打包**（雲端那台 VM 就可以）。
 
 ```bash
 ./deploy/pack-offline.sh v0.4.1
@@ -143,8 +180,10 @@ sudo ./deploy/bootstrap.sh
 ./deploy/healthcheck.sh
 ```
 
-離線包含自家兩個映像與三個第三方映像（TimescaleDB、Redis、Mosquitto），
+安裝包含自家兩個映像與三個第三方映像（TimescaleDB、Redis、Mosquitto），
 **不含 Docker 本身**——目標主機需要事先裝好 Docker Engine 與 compose plugin。
+那是唯一需要現場自行取得的東西；如果連它也要固定版本，就請系統管理員用
+離線套件安裝，安裝包不介入。
 
 防火牆會依現場情況處理：有 `ufw` 用 ufw，有 `firewalld` 用 firewalld，兩者皆無
 就印出警告要求人工確認——不會假裝設定成功。
