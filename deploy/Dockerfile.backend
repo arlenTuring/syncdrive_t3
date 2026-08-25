@@ -1,0 +1,34 @@
+# SyncDrive T3 後端映像
+#
+# 分兩段：builder 裝完整依賴並編譯，runner 只帶執行期需要的東西。
+# 這樣產出的映像不含 TypeScript 編譯器與測試框架，也不會把原始碼帶上正式機。
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# 先只複製 manifest：只要依賴沒變，這一層就能重用，改程式碼不必重裝
+COPY backend/package*.json ./
+RUN npm ci
+
+COPY backend/ ./
+RUN npm run build
+
+# 重裝成只有正式依賴，dev 依賴不進最終映像
+RUN npm prune --omit=dev
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# scripts/ 要帶上：map.service 等模組會在執行期載入其中的產圖腳本
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/package.json ./package.json
+
+# 不用 root 跑
+USER node
+
+# 3000 內部（只在 docker 網路內，由 nginx 代理）、3100 對外（發布到主機）
+EXPOSE 3000 3100
+
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,141 @@
+# SyncDrive T3 正式／預備環境
+#
+# 與開發用的 docker-compose.yml 三處不同：
+#
+# 1. 沒有 adminer 與 redis-commander。那兩個是開發工具，直接連得到資料庫與 Redis，
+#    放在對外機器上等於開後門。
+# 2. 資料庫與 Redis 只綁 127.0.0.1，不對外發布。要進資料庫請走 SSH 通道。
+# 3. 只有兩個埠對外：80（我方前端與內部 API，經 nginx）與 3100（協力廠商）。
+#    後端的 3000 完全不發布到主機，內部流量一律經由 nginx 的 docker 網路進來。
+#
+# 用法：docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.19.3-pg15
+    container_name: syncdrive_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  redis:
+    image: redis:7-alpine
+    container_name: syncdrive_redis
+    restart: always
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: syncdrive_mosquitto
+    restart: always
+    # 1883 給車端；正式環境請改用 mosquitto.prod.conf 啟用帳密與 ACL，
+    # 並在防火牆只放行車輛所在網段（見 deploy/README.md）
+    ports:
+      - "${MQTT_BIND:-127.0.0.1}:1883:1883"
+    volumes:
+      - ../mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "pidof mosquitto || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    image: syncdrive-backend:${IMAGE_TAG:-latest}
+    container_name: syncdrive_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      EXTERNAL_PORT: 3100
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MQTT_URL: mqtt://mosquitto:1883
+      VTMS_API_KEY: ${VTMS_API_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      TELEMETRY_PERSIST_ALL: ${TELEMETRY_PERSIST_ALL:-0}
+    ports:
+      # 只發布對外埠。3000 留在 docker 網路裡，主機上打不到——
+      # 文件分兩份、路由圍籬、網路可達範圍三者因此完全一致。
+      - "0.0.0.0:3100:3100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/syncdrive-api/vehicles').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    image: syncdrive-web:${IMAGE_TAG:-latest}
+    container_name: syncdrive_web
+    restart: always
+    ports:
+      - "0.0.0.0:80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
+  redisdata:
+  mosquitto_data:

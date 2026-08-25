@@ -35,3 +35,8 @@ mosquitto/config/passwordfile
 # ── 作業系統 / 編輯器 ────────────────────
 .DS_Store
 *.swp
+
+# 部署：機器上的密鑰、部署狀態與同步目標都不進版控
+deploy/.env
+deploy/.state/
+deploy/.target
