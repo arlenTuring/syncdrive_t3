@@ -1832,8 +1832,45 @@ export function insertMaintenanceTransferCards(args: {
            *
            * 往後挪只會讓「後一段佔用目的設施」的窗口變短，所以可行性是單調的，
            * 最早可行的位移可以二分找出來。上限是後一段還剩得下時間。
+           *
+           * <strong>但晚走也要有格子可待。</strong>車多留的那幾分鐘還是佔著出廠
+           * 那台設施，所以位移還有第二道上限：出廠設施保持空著到什麼時候。少了
+           * 這道上限，出廠設施的預約會在<strong>別人已經挑完之後</strong>才被撐
+           * 大，後車眼中那格當時是空的，於是直接開進來——2026-08-25 實測剩下的
+           * 兩筆重疊（E3 241 秒、M1 401 秒）全是這樣來的。挪不動就換一組設施，
+           * 這正是候選迴圈存在的意義。
            */
-          const maxShift = Math.max(0, laterEndSecond - baseArriveSecond - 1);
+          /**
+           * 位移 shift 之下，車實際離開出廠設施的時刻。
+           *
+           * 必須跟 {@link vehicleLeavesFacilityAtSecond} 用同一個定義（下一張非零
+           * 長度卡的起點），否則檢查與預約會各說各話：同區域轉場的兩張移動卡是
+           * 零長度示意卡，車其實一路待到後一段整備開始。
+           */
+          const exitStayEndAt = (shift: number) =>
+            totalSeconds > 0
+              ? departSecond + shift
+              : Math.max(laterStartSecond, baseArriveSecond + shift);
+          const exitFacilityFreeAt = (shift: number) =>
+            stayFacilityIsFree(
+              exitFacility.id,
+              earlier,
+              timeline.row,
+              minuteToSecond(earlier.plannedStartMinute),
+              exitStayEndAt(shift),
+            );
+          let maxShift = Math.max(0, laterEndSecond - baseArriveSecond - 1);
+          if (maxShift > 0 && !exitFacilityFreeAt(maxShift)) {
+            let free = 0;
+            let busy = maxShift;
+            for (let step = 0; step < 32 && busy - free > 1; step += 1) {
+              const mid = (free + busy) / 2;
+              if (exitFacilityFreeAt(mid)) free = mid; else busy = mid;
+            }
+            maxShift = Math.floor(free);
+          }
+          // 一秒都不挪就已經佔到別人的格子——這組設施不能用，換下一組
+          if (!exitFacilityFreeAt(0)) { tally.facilityBusy += 1; continue; }
           const entryFacilityFreeAt = (shift: number) => {
             const start = Math.max(laterStartSecond, baseArriveSecond + shift);
             if (start >= laterEndSecond - 1e-9) return false;
