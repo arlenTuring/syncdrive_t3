@@ -105,6 +105,10 @@ services:
       DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       TELEMETRY_PERSIST_ALL: ${TELEMETRY_PERSIST_ALL:-0}
+      # 容器預設是 UTC，但班表的時刻是<strong>營運當地時間</strong>——時間線上寫
+      # 05:05 就是現場的 05:05。不設這一項，調度引擎會把 05:05 當成 UTC，訂單
+      # 整整晚八小時才發（2026-08-26 實測）。
+      TZ: ${TZ:-Asia/Taipei}
       # 即時調度引擎。預設關閉——沒有車端在線時開啟只會產生一整天沒人執行的訂單。
       DISPATCH_ENABLED: ${DISPATCH_ENABLED:-false}
       DISPATCH_TICK_SECONDS: ${DISPATCH_TICK_SECONDS:-5}
