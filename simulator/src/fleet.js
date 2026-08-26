@@ -3,6 +3,7 @@
 const { SimulatedVehicle } = require('./vehicle');
 const { createApiClient } = require('./apiClient');
 const { MapSource } = require('./mapSource');
+const { TrackGraph } = require('./trackRouter');
 
 /**
  * 車隊管理。網頁上的每一個按鈕最後都落到這裡。
@@ -20,6 +21,7 @@ class Fleet {
     this.target = null;
     this.api = null;
     this.map = null;
+    this.track = null;
     this.vehicles = new Map();
     this.speedMultiplier = 1;
     this.startedAt = null;
@@ -56,13 +58,16 @@ class Fleet {
       mapId ? this.api.waypoints(mapId) : null,
     ]);
     this.map = new MapSource({ map: mapPayload, operationNodes, waypoints });
+    // 軌道圖：車輛靠它把 A→B 走成沿軌的折線，而不是切過空地的直線
+    this.track = new TrackGraph(mapPayload);
     if (this.map.size === 0) {
       throw new Error('圖資裡沒有任何帶座標的站點或設施，車輛無法定位');
     }
     this.log(
       'info',
       'fleet',
-      `圖資就緒：${this.map.displayName ?? this.map.mapId}（${this.map.size} 個點位）`,
+      `圖資就緒：${this.map.displayName ?? this.map.mapId}`
+        + `（${this.map.size} 個點位、${this.track.size} 個軌道節點）`,
     );
 
     const wanted = codes?.length ? codes : [...this.credentials.vehiclePasswords.keys()];
@@ -78,6 +83,7 @@ class Fleet {
         target,
         api: this.api,
         map: this.map,
+        track: this.track,
         log: this.log,
         speed: () => this.speedMultiplier,
       });
@@ -123,7 +129,13 @@ class Fleet {
       speedMultiplier: this.speedMultiplier,
       target: this.target,
       map: this.map
-        ? { id: this.map.mapId, name: this.map.displayName, version: this.map.version, points: this.map.size }
+        ? {
+          id: this.map.mapId,
+          name: this.map.displayName,
+          version: this.map.version,
+          points: this.map.size,
+          trackNodes: this.track?.size ?? 0,
+        }
         : null,
       lastError: this.lastError,
       vehicles: [...this.vehicles.values()].map((vehicle) => vehicle.snapshot()),

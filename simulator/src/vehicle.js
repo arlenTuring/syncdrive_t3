@@ -84,12 +84,13 @@ function walkPolyline(points, ratio) {
 }
 
 class SimulatedVehicle {
-  constructor({ code, password, target, api, map, log, speed }) {
+  constructor({ code, password, target, api, map, track, log, speed }) {
     this.code = code;
     this.password = password;
     this.target = target;
     this.api = api;
     this.map = map;
+    this.track = track;
     this.log = log;
     this.speedRef = speed;
 
@@ -195,7 +196,10 @@ class SimulatedVehicle {
 
     try {
       const order = await this.api.queryOrder(orderId);
-      const { points, missing } = this.map.polylineFor(order);
+      const { points: stops, missing } = this.map.polylineFor(order);
+      // 站與站之間沿軌道走。圖台只認落在軌道段內的座標，直線切過去的話整趟
+      // 沒有一幀在軌道上，車就會從畫面上消失。
+      const points = this.routeThroughStops(stops);
       if (points.length < 2) {
         this.log(
           'error',
@@ -235,6 +239,23 @@ class SimulatedVehicle {
       this.lastError = error.message;
       this.log('error', this.code, `處理 ${orderId} 失敗：${error.message}`);
     }
+  }
+
+  /**
+   * 把站序展開成沿軌折線。
+   *
+   * 每一段各自走軌道圖；某一段找不到路徑（例如兩端都在場區內）就退回直線，
+   * 不要因為一段規劃失敗就讓整趟不能跑。
+   */
+  routeThroughStops(stops) {
+    if (!this.track || stops.length < 2) return stops;
+    const out = [stops[0]];
+    for (let i = 0; i < stops.length - 1; i += 1) {
+      const leg = this.track.route(stops[i], stops[i + 1]);
+      const tail = leg ? leg.slice(1) : [stops[i + 1]];
+      for (const point of tail) out.push(point);
+    }
+    return out;
   }
 
   async finishOrder() {

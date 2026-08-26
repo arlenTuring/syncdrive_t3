@@ -4,7 +4,7 @@ import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { acquireSocket, releaseSocket } from './socketManager';
-import { useDemoSimulationLiveClearEpoch, useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
+import { useDemoSimulationLiveClearEpoch, useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import { useVehicleFleetMqttHubContext } from '../context/VehicleFleetMqttContext';
 import { isVtmsVehicleStreamTopic } from '../utils/vtmsTopic';
 import { createMapMqttIngestPipeline } from './mapMqttIngestPipeline';
@@ -28,7 +28,19 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   const [liveById, setLiveById] = useState<Record<string, MqttLiveEntry>>({});
   const [areaVehicles, setAreaVehicles] = useState<AreaVehicleLive[]>([]);
   const liveClearEpoch = useDemoSimulationLiveClearEpoch();
-  const paused = useDemoSimulationPaused();
+  /**
+   * 何時該停止吃 MQTT。
+   *
+   * <strong>不能用 paused。</strong>那個旗標是 <code>!status.running</code>——
+   * 「示範模擬器沒在跑」。真實車隊從外面推 MQTT 進來時示範模擬器本來就不會跑，
+   * 於是所有即時車輛被當成暫停整批丟掉，畫面上只剩靜態示範車（2026-08-26 實測：
+   * 本機模擬器 11 台全部在線、遙測也確實送達瀏覽器，地圖上卻一台都沒有）。
+   *
+   * 真正該停的只有一種情況：<strong>示範回放正在跑而且被使用者按了暫停</strong>。
+   * 那時畫面要凍住當下那一幀，不該繼續前進。
+   */
+  const { running, transportPaused } = useDemoSimulationPlayback();
+  const paused = running && transportPaused;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const fleetHub = useVehicleFleetMqttHubContext();
