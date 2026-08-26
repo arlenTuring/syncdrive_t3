@@ -23,6 +23,10 @@ FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb836
 WORKDIR /app
 ENV NODE_ENV=production
 
+# alpine 不含時區資料庫。少了它，設 TZ=Asia/Taipei 也不會生效——Node 會靜靜地
+# 退回 UTC，班表 05:05 的班次於是等到台北 13:05 才發訂單，而且不報任何錯。
+RUN apk add --no-cache tzdata
+
 # scripts/ 要帶上：map.service 等模組會在執行期載入其中的產圖腳本
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
