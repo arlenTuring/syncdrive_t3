@@ -9,6 +9,12 @@ const path = require('path');
 
 const { resolveMapJsonPath } = require('./map-operation-nodes');
 
+/** 現場座標優先，沒有就退回圖面座標 */
+function fieldMeter(refField, canvas) {
+  if (typeof refField === 'number' && Number.isFinite(refField)) return refField;
+  return typeof canvas === 'number' && Number.isFinite(canvas) ? canvas : undefined;
+}
+
 function normalizeCode(raw) {
   return String(raw ?? '').trim();
 }
@@ -56,8 +62,14 @@ function loadWaypointsFromMapFile(mapPath) {
           portalKey,
           topologyNodeId: `xowp:${String(entry.id ?? '')}:${portalKey}`,
           alias: normalizeCode(portal.alias) || undefined,
-          xM: typeof portal.xM === 'number' ? portal.xM : undefined,
-          yM: typeof portal.yM === 'number' ? portal.yM : undefined,
+          // 現場座標優先。端點有兩對座標：xM／yM 是圖面位置（畫給人看的），
+          // refFieldXM／refFieldYM 是現場實際位置。對外要的是後者——車輛拿它
+          // 定位，取到圖面座標會讓車開到不存在的地方。
+          //
+          // 舊圖資沒有 refField，退回 xM／yM：在兩者分家之前，那一對本來就同時
+          // 扮演兩個角色。
+          xM: fieldMeter(portal.refFieldXM, portal.xM),
+          yM: fieldMeter(portal.refFieldYM, portal.yM),
         });
       }
     }
