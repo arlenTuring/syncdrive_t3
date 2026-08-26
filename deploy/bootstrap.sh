@@ -108,9 +108,18 @@ make_htpasswd() {  # make_htpasswd <檔案> <使用者變數> <密碼變數> <�
 }
 
 make_htpasswd "$ROOT/deploy/.htpasswd" \
-  WEB_AUTH_USER WEB_AUTH_PASSWORD syncdrive "內部（80 埠）"
+  WEB_AUTH_USER WEB_AUTH_PASSWORD syncdrive "內部文件（80 埠）"
 make_htpasswd "$ROOT/deploy/.htpasswd-external" \
-  EXTERNAL_AUTH_USER EXTERNAL_AUTH_PASSWORD partner "對外（3100 埠）"
+  EXTERNAL_AUTH_USER EXTERNAL_AUTH_PASSWORD partner "對外入口（3100 埠）"
+make_htpasswd "$ROOT/deploy/.htpasswd-vendor" \
+  VENDOR_AUTH_USER VENDOR_AUTH_PASSWORD vendor "廠商看圖台（80 埠）"
+
+# 80 埠的外層（圖台與內部 API）：內部與廠商兩個帳號都放行。
+# 文件與內部 Swagger 另外用只含內部帳號的 .htpasswd——廠商拿得到圖台，
+# 拿不到演算法與系統結構。合併成一個檔而不是在 nginx 疊兩個 auth_basic，
+# 是因為 nginx 一個 location 只認一個帳密檔。
+cat "$ROOT/deploy/.htpasswd" "$ROOT/deploy/.htpasswd-vendor" > "$ROOT/deploy/.htpasswd-web"
+chmod 644 "$ROOT/deploy/.htpasswd-web"
 
 # ── 2c. MQTT 帳密與 ACL ─────────────────────────────────────
 # broker 以 mosquitto.prod.conf 啟動（關閉匿名），沒有帳密檔就沒有人連得進來。

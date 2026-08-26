@@ -152,6 +152,7 @@ services:
       # 兩組帳密檔，由 bootstrap.sh 產生。缺任何一個 nginx 都會起不來——
       # 那是刻意的：寧可服務起不來，也不要以為有保護但其實沒有。
       - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./.htpasswd-web:/etc/nginx/.htpasswd-web:ro
       - ./.htpasswd-external:/etc/nginx/.htpasswd-external:ro
     depends_on:
       - backend

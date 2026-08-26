@@ -44,6 +44,14 @@ fi
 EXT_AUTH=()
 [ -n "$EXT_PASS" ] && EXT_AUTH=(-u "${EXT_USER:-partner}:$EXT_PASS")
 
+# 廠商看圖台用的帳號：能進圖台與內部 API，不能進技術文件與內部 Swagger
+VEN_USER="$(grep '^VENDOR_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+VEN_PASS="$(grep '^VENDOR_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+if [ -z "$VEN_PASS" ]; then
+  VEN_USER="$(sudo grep '^VENDOR_AUTH_USER=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+  VEN_PASS="$(sudo grep '^VENDOR_AUTH_PASSWORD=' "$ROOT/deploy/.env" 2>/dev/null | cut -d= -f2)"
+fi
+
 pass=0
 fail=0
 
@@ -53,7 +61,10 @@ check() {
   local auth=()
   # 80 埠的請求要帶 Basic Auth；3100 走的是 x-api-key，兩者不混用。
   # key 傳 "noauth" 代表這一條就是要驗「沒帶憑證會不會被擋」，一律不補。
-  if [ "$key" != "noauth" ]; then
+  if [ "$key" = "vendor" ]; then
+    # 廠商帳號：驗證它進得了圖台、進不了技術文件
+    auth=(-u "${VEN_USER:-vendor}:$VEN_PASS"); key=""
+  elif [ "$key" != "noauth" ]; then
     # 順序不能反：INTERNAL 是 http://host、EXTERNAL 是 http://host:3100，
     # 前者的萬用比對<strong>也會吃掉後者</strong>，先比 EXTERNAL 才不會帶錯帳密
     # （2026-08-26 實測：對外五項全部拿到 401）
@@ -130,6 +141,14 @@ if [ -n "$WEB_PASS" ]; then
   check "內部 Swagger 沒帶帳密必須被拒" "$INTERNAL/api/docs"                     401 noauth
   check "內部入口沒帶帳密必須被拒"     "$INTERNAL/portal"                        401 noauth
   check "內部入口帶帳密可進入"         "$INTERNAL/portal"                        200
+fi
+if [ -n "$VEN_PASS" ]; then
+  # 廠商帳號的邊界：圖台進得去，技術文件與內部 Swagger 進不去
+  check "廠商帳號可進圖台"         "$INTERNAL/"            200 vendor
+  check "廠商帳號可打內部 API"     "$INTERNAL/syncdrive-api/operation-shift/list" 200 vendor
+  check "廠商帳號不可進技術文件"   "$INTERNAL/docs/"       401 vendor
+  check "廠商帳號不可進內部 Swagger" "$INTERNAL/api/docs"  401 vendor
+  check "廠商帳號不可進內部入口"   "$INTERNAL/portal"      401 vendor
 fi
 
 echo "參數驗證"

@@ -45,5 +45,7 @@ deploy/images/
 deploy/dist/
 deploy/.htpasswd
 deploy/.htpasswd-external
+deploy/.htpasswd-web
+deploy/.htpasswd-vendor
 deploy/mqtt-credentials.txt
 mosquitto/config/passwordfile
