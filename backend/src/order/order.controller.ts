@@ -2,6 +2,7 @@ import { Controller, Post, Get, Put, Body, Query, Param, Req } from '@nestjs/com
 import type { Request } from 'express';
 import { OrderService } from './order.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
 
@@ -72,13 +73,25 @@ export class OrderController {
   }
 
   @Get('queryById')
-  @ApiOperation({ summary: '查詢訂單內容' })
+  @ExternalApi('營運任務')
+  @ApiOperation({
+    summary: '查詢訂單內容',
+    description:
+      '車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後'
+      + '以 order_id 取回完整任務（站點序列、各站動作、時刻）。',
+  })
   async queryOrder(@Query('id') id: string) {
     return this.orderService.getOrderById(id);
   }
 
   @Put('updateOrderProgress/:id')
-  @ApiOperation({ summary: '更新訂單狀態 (SSOT)' })
+  @ExternalApi('營運任務')
+  @ApiOperation({
+    summary: '更新訂單狀態 (SSOT)',
+    description:
+      '車端回報訂單契約狀態。營運任務狀態協議把這一支定為<strong>唯一真相來源</strong>'
+      + '——中心端資料庫的狀態判定以本 API 的 HTTP 成功回傳為準，不採信 MQTT 訊息。',
+  })
   async updateOrderProgress(
     @Param('id') id: string,
     @Query('status') status: string,
@@ -98,7 +111,12 @@ export class OrderController {
   }
 
   @Put('action/:actionId')
-  @ApiOperation({ summary: '車端以 action_id 回報站點動作狀態' })
+  @ExternalApi('營運任務')
+  @ApiOperation({
+    summary: '車端以 action_id 回報站點動作狀態',
+    description:
+      '節點任務（語音、開關門、聯鎖）的執行結果回報。營運任務狀態協議 §四 階段二。',
+  })
   async updateActionStatus(
     @Param('actionId') actionId: string,
     @Body() body: { status: string; note?: string; actual_start_time?: number; actual_end_time?: number },

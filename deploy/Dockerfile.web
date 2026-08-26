@@ -29,6 +29,13 @@ COPY document/ /usr/share/nginx/docs/
 COPY document/協力廠商介接說明書.md /usr/share/nginx/public-docs/
 COPY document/車輛即時ETA-API.md    /usr/share/nginx/public-docs/
 COPY document/班表Timetable-API.md  /usr/share/nginx/public-docs/
+# 六份通訊協議：那是與車端／中心端的契約，本來就要給對方看
+COPY "document/MQTT 通訊架構與 Topic 命名規範.md" /usr/share/nginx/public-docs/
+COPY document/車輛動態協議.md              /usr/share/nginx/public-docs/
+COPY document/營運任務狀態協議.md          /usr/share/nginx/public-docs/
+COPY document/設備健康與異常告警協議.md    /usr/share/nginx/public-docs/
+COPY document/動態控制與特殊事件協議.md    /usr/share/nginx/public-docs/
+COPY document/月台門與車門協議.md          /usr/share/nginx/public-docs/
 COPY deploy/portal/docs/ /usr/share/nginx/public-docs/
 
 # 兩個入口頁

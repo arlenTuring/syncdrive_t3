@@ -136,6 +136,7 @@
     },
     "/syncdrive-api/order/queryById": {
       "get": {
+        "description": "車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後以 order_id 取回完整任務（站點序列、各站動作、時刻）。",
         "operationId": "OrderController_queryOrder",
         "parameters": [
           {
@@ -148,18 +149,25 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
           }
         },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
         "summary": "查詢訂單內容",
         "tags": [
-          "Operation Orders"
+          "Operation Orders",
+          "對外｜營運任務"
         ]
       }
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
+        "description": "車端回報訂單契約狀態。營運任務狀態協議把這一支定為<strong>唯一真相來源</strong>——中心端資料庫的狀態判定以本 API 的 HTTP 成功回傳為準，不採信 MQTT 訊息。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -180,18 +188,25 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
           }
         },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
         "summary": "更新訂單狀態 (SSOT)",
         "tags": [
-          "Operation Orders"
+          "Operation Orders",
+          "對外｜營運任務"
         ]
       }
     },
     "/syncdrive-api/order/action/{actionId}": {
       "put": {
+        "description": "節點任務（語音、開關門、聯鎖）的執行結果回報。營運任務狀態協議 §四 階段二。",
         "operationId": "OrderController_updateActionStatus",
         "parameters": [
           {
@@ -204,13 +219,19 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
           }
         },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
         "summary": "車端以 action_id 回報站點動作狀態",
         "tags": [
-          "Operation Orders"
+          "Operation Orders",
+          "對外｜營運任務"
         ]
       }
     },

@@ -83,7 +83,7 @@ log "收集設定與腳本"
 cp deploy/docker-compose.prod.yml "$PKG/deploy/"
 cp deploy/nginx.conf "$PKG/deploy/"
 cp deploy/.env.example deploy/images.lock "$PKG/deploy/"
-cp deploy/bootstrap.sh deploy/deploy.sh deploy/healthcheck.sh "$PKG/deploy/"
+cp deploy/install.sh deploy/bootstrap.sh deploy/deploy.sh deploy/healthcheck.sh "$PKG/deploy/"
 cp deploy/seed-restore.sh "$PKG/deploy/" 2>/dev/null || true
 cp deploy/README.md "$PKG/deploy/"
 mkdir -p "$PKG/mosquitto"
@@ -119,15 +119,21 @@ SyncDrive T3 離線安裝包
 版本：${TAG}
 架構：${HOST_ARCH}
 
-在目標主機上：
+在目標主機上，一行完成：
 
-  tar xzf syncdrive-t3-${TAG}.tar.gz
-  cd syncdrive-t3
-  sudo ./deploy/bootstrap.sh
-  ./deploy/healthcheck.sh
+  tar xzf syncdrive-t3-${TAG}.tar.gz && cd syncdrive-t3 && sudo ./deploy/install.sh
+
+install.sh 會依序做：檢查前置條件（Docker、磁碟、記憶體）→ 安裝並啟動 →
+匯入起始資料（班表與地圖）→ 驗收 → 印出這台機器的入口網址與帳密。
+每一步失敗都會停下來說明原因，不會留下半套狀態。
 
 需求：已安裝 Docker Engine 與 docker compose plugin（本包不含 Docker 本身）。
 安裝過程完全不需要外網。
+
+要逐步執行時，install.sh 串的就是這三支，個別跑效果相同：
+  ./deploy/bootstrap.sh     安裝
+  ./deploy/seed-restore.sh  匯入起始資料
+  ./deploy/healthcheck.sh   驗收
 EOF
 
 # ── 4. 打包 ────────────────────────────────────────────────

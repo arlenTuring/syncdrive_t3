@@ -60,9 +60,32 @@
 2.  **中心端 (VTMS Host) 訂閱與 Wildcard 應用**：
     * **全車隊聚合 (橫向)**：如 `v1/vtms/+/telemetry/update`，用於 GIS 圖台總覽。
     * **單車全頻道監控 (縱向)**：如 **`v1/vtms/{vehicle_code}/+/+`**，用於單一車輛之遠端診斷與詳細狀態同步渲染。
-3.  **存取控制 (ACL) 隔離原則**：
+3.  **連線認證（2026-08-26 起強制）**：
+    broker 已關閉匿名連線（`allow_anonymous false`）。所有 client **必須**帶帳密，
+    否則連線階段就會被拒（`Connection Refused: not authorised`），不是發布時才失敗。
+
+    | 身分 | username | 密碼 |
+    |------|----------|------|
+    | 車端 | **等於自身 `vehicle_code`**（例 `PMS-05`） | 由中心端逐台發給 |
+    | 中心端後端 | `vtms-backend` | 中心端自用 |
+    | 示範模擬器 | `vtms-simulator` | 中心端自用 |
+
+    連線字串格式：
+
+    ```
+    mqtt://PMS-05:<該車密碼>@<broker 位址>:1883
+    ```
+
+    username 同時是 ACL 的比對依據（見下一點），所以**車端必須以自己的
+    `vehicle_code` 登入**——借用別台的帳號會導致自己的 topic 發不出去。
+
+4.  **存取控制 (ACL) 隔離原則**：
     * **車端權限**：SyncDrive 僅具備發布至自身 ID Topic 的權限，並限制訂閱自身 ID 與 `all` 路徑。
+      實作上以 username 做比對：`pattern write v1/vtms/%u/#`、`pattern read v1/vtms/%u/#`
+      與 `pattern read v1/vtms/all/#`。
     * **中心端權限**：VTMS Host 具備全域 Topic 之發布與訂閱權限。
+    * **違反 ACL 的發布會被 broker 靜默丟棄**，不會回錯誤。車端若發現中心端收不到
+      訊息，第一個要確認的是登入的 username 與 topic 中的 `vehicle_code` 是否一致。
 
 ---
 

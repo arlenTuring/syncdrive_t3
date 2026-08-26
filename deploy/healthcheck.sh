@@ -95,6 +95,7 @@ if [ -n "$API_KEY" ]; then
   check "班表站點 ETA"        "$EXTERNAL/syncdrive-api/operation-shift/timetable/station-etas" 200 "$API_KEY"
   check "即時 ETA：依站"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    200 "$API_KEY"
   check "即時 ETA：依車"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-vehicle"    200 "$API_KEY"
+  check "訂單查詢（車端用）"  "$EXTERNAL/syncdrive-api/order/queryById?id=none"   200 "$API_KEY"
   # 金鑰要真的有在擋，不是宣告了但沒生效
   check "沒帶金鑰必須被拒"    "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    401 noauth
 else
@@ -107,6 +108,7 @@ check "內部 Swagger 不可從對外埠打到" "$EXTERNAL/api/docs"            
 check "資料庫查詢端點不可外露"   "$EXTERNAL/syncdrive-api/datasource/tables"     404
 # 內部文件不該存在於對外那一側的檔案系統裡，不是靠權限擋
 check "內部文件不可從對外埠取得" "$EXTERNAL/docs/使用者對話紀錄.md"              404
+check "協議文件對外可取得"       "$EXTERNAL/docs/營運任務狀態協議.md"            200
 check "內部文件（開發進度）同上" "$EXTERNAL/docs/TP13C_2-2-4_開發進度.md"        404
 if [ -n "$EXT_PASS" ]; then
   check "對外入口沒帶帳密必須被拒" "$EXTERNAL/docs/"                             401 noauth

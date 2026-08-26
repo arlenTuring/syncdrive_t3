@@ -1,6 +1,104 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/syncdrive-api/order/queryById": {
+      "get": {
+        "description": "車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後以 order_id 取回完整任務（站點序列、各站動作、時刻）。",
+        "operationId": "OrderController_queryOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "查詢訂單內容",
+        "tags": [
+          "對外｜營運任務"
+        ]
+      }
+    },
+    "/syncdrive-api/order/updateOrderProgress/{id}": {
+      "put": {
+        "description": "車端回報訂單契約狀態。營運任務狀態協議把這一支定為<strong>唯一真相來源</strong>——中心端資料庫的狀態判定以本 API 的 HTTP 成功回傳為準，不採信 MQTT 訊息。",
+        "operationId": "OrderController_updateOrderProgress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "更新訂單狀態 (SSOT)",
+        "tags": [
+          "對外｜營運任務"
+        ]
+      }
+    },
+    "/syncdrive-api/order/action/{actionId}": {
+      "put": {
+        "description": "節點任務（語音、開關門、聯鎖）的執行結果回報。營運任務狀態協議 §四 階段二。",
+        "operationId": "OrderController_updateActionStatus",
+        "parameters": [
+          {
+            "name": "actionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "車端以 action_id 回報站點動作狀態",
+        "tags": [
+          "對外｜營運任務"
+        ]
+      }
+    },
     "/syncdrive-api/vehicles/eta/by-station": {
       "get": {
         "description": "以停靠點為主鍵，供站端顯示。一律列出全部停靠點（當下無車駛近者 etas 為空陣列），以利站端固定顯示版面。每站依 eta_at 由近到遠排序。建議輪詢間隔 60 秒。",
