@@ -7,6 +7,7 @@ import {
   getCrossoverPortals,
   resolveCrossoverPortalDisplayName,
   type CrossoverPortalKey,
+  crossoverPortalFieldMeters,
   type CrossoverPortalState,
   type CrossoverPortals,
 } from './trackCrossoverFacility'
@@ -383,7 +384,12 @@ export function patchCrossoverPortalAlias(
   }
 }
 
-/** 途經點場域參照座標（公尺）；寫入 portal.xM／yM */
+/**
+ * 途經點的<strong>現場</strong>參照座標（公尺）。
+ *
+ * 只寫 refField，<strong>不動 xM／yM</strong>——那一對是圖面位置。現場座標是實際
+ * 量到的值，修正它不該把圖上的端點拉走。要移動圖上的端點請直接拖它。
+ */
 export function patchCrossoverPortalFieldMeters(
   facility: FacilityObject,
   key: CrossoverPortalKey,
@@ -393,16 +399,17 @@ export function patchCrossoverPortalFieldMeters(
   const portals = getCrossoverPortals(facility)
   if (!portals) return facility
   const current = portals[key]
+  const fallback = crossoverPortalFieldMeters(current)
   const nextPortal: CrossoverPortalState = {
     ...current,
-    xM:
+    refFieldXM:
       typeof patch.xM === 'number' && Number.isFinite(patch.xM)
         ? patch.xM
-        : current.xM,
-    yM:
+        : fallback.xM,
+    refFieldYM:
       typeof patch.yM === 'number' && Number.isFinite(patch.yM)
         ? patch.yM
-        : current.yM,
+        : fallback.yM,
   }
   return {
     ...facility,
@@ -480,8 +487,7 @@ export function collectCrossoverPortalWaypointsFromAreas(areas: MapAreaObject[])
           areaId: area.id,
           portalKey: key,
           topologyNodeId: crossoverPortalTopologyNodeId(facility.id, key),
-          xM: portal.xM,
-          yM: portal.yM,
+          ...crossoverPortalFieldMeters(portal),
           kind: 'crossover-waypoint',
         })
       }

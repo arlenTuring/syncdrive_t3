@@ -47,8 +47,23 @@ export const CROSSOVER_PORTAL_KEYS: readonly CrossoverPortalKey[] = [
 ] as const
 
 export type CrossoverPortalState = {
+  /**
+   * 端點在<strong>圖面</strong>上的位置（公尺）。渲染、AABB、路徑幾何都用這一對。
+   * 拖動端點或磁吸接合時更新。
+   */
   xM: number
   yM: number
+  /**
+   * 端點在<strong>現場</strong>的位置（公尺）。
+   *
+   * 與 xM／yM 分開，理由和設施的 refField 一樣：圖面位置是畫給人看的，現場位置
+   * 是實際量到的，兩者本來就可以不一致。共用同一對數值時，改一個現場座標就會把
+   * 圖上的端點拉走——那不是使用者的意思。
+   *
+   * 舊圖資沒有這一對，讀取時退回 xM／yM（見 {@link crossoverPortalFieldMeters}）。
+   */
+  refFieldXM?: number
+  refFieldYM?: number
   /** 已接合軌道；null＝未接合 */
   attachedTrackId: string | null
   /** 端點內建途經點代號（路線／拓樸對外 ID） */
@@ -182,11 +197,23 @@ function parsePortal(raw: unknown): CrossoverPortalState | null {
       ? o.waypointCode.trim()
       : ''
   const aliasRaw = typeof o.alias === 'string' ? o.alias.trim() : ''
+  // 現場座標是選填：舊圖資沒有，讀取端會退回圖面座標。這裡必須原樣帶出來——
+  // 這支是重建物件而不是就地修改，漏掉的欄位等於被靜靜地丟掉。
+  const refFieldXM =
+    typeof o.refFieldXM === 'number' && Number.isFinite(o.refFieldXM)
+      ? o.refFieldXM
+      : null
+  const refFieldYM =
+    typeof o.refFieldYM === 'number' && Number.isFinite(o.refFieldYM)
+      ? o.refFieldYM
+      : null
   return {
     xM,
     yM,
     attachedTrackId,
     waypointCode,
+    ...(refFieldXM != null ? { refFieldXM } : {}),
+    ...(refFieldYM != null ? { refFieldYM } : {}),
     ...(aliasRaw ? { alias: aliasRaw } : {}),
   }
 }
@@ -581,4 +608,36 @@ export function ensureCrossoverPortals(
     size.w / 3,
     size.h / 3,
   )
+}
+
+/**
+ * 端點的<strong>現場</strong>座標。舊圖資沒有 refField 時退回圖面座標，
+ * 因為在分家之前那一對本來就同時扮演兩個角色。
+ */
+export function crossoverPortalFieldMeters(portal: CrossoverPortalState): {
+  xM: number
+  yM: number
+} {
+  return {
+    xM:
+      typeof portal.refFieldXM === 'number' && Number.isFinite(portal.refFieldXM)
+        ? portal.refFieldXM
+        : portal.xM,
+    yM:
+      typeof portal.refFieldYM === 'number' && Number.isFinite(portal.refFieldYM)
+        ? portal.refFieldYM
+        : portal.yM,
+  }
+}
+
+/**
+ * 把圖面座標同步進現場座標。
+ *
+ * 拖動端點與磁吸接合時呼叫——那兩個動作是「這個端點就在這裡」，圖面與現場都該
+ * 跟著走。只有在屬性面板手打現場座標時不呼叫，那是純粹修正量測值。
+ */
+export function syncCrossoverPortalFieldMeters(
+  portal: CrossoverPortalState,
+): CrossoverPortalState {
+  return { ...portal, refFieldXM: portal.xM, refFieldYM: portal.yM }
 }

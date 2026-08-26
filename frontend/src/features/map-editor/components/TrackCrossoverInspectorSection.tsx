@@ -22,6 +22,7 @@ import {
   TRACK_CROSSOVER_COLOR_KEY,
   TRACK_CROSSOVER_COLOR_OPACITY_KEY,
   TRACK_CROSSOVER_PORTALS_KEY,
+  crossoverPortalFieldMeters,
   TRACK_CROSSOVER_STROKE_PX_KEY,
   clampTrackCrossoverBgOpacity,
   clampTrackCrossoverCenterGapPct,
@@ -101,13 +102,14 @@ export function TrackCrossoverInspectorSection({
   const [draftCoords, setDraftCoords] = useState<
     Record<CrossoverPortalKey, { xM: string; yM: string }>
   >({
+    // 欄位顯示的是<strong>現場</strong>座標，不是圖面座標
     a: {
-      xM: formatFieldMeters(portals?.a.xM),
-      yM: formatFieldMeters(portals?.a.yM),
+      xM: formatFieldMeters(portals ? crossoverPortalFieldMeters(portals.a).xM : undefined),
+      yM: formatFieldMeters(portals ? crossoverPortalFieldMeters(portals.a).yM : undefined),
     },
     b: {
-      xM: formatFieldMeters(portals?.b.xM),
-      yM: formatFieldMeters(portals?.b.yM),
+      xM: formatFieldMeters(portals ? crossoverPortalFieldMeters(portals.b).xM : undefined),
+      yM: formatFieldMeters(portals ? crossoverPortalFieldMeters(portals.b).yM : undefined),
     },
   })
   const [codeErrors, setCodeErrors] = useState<
@@ -128,11 +130,15 @@ export function TrackCrossoverInspectorSection({
           xM:
             editing?.key === key && editing.axis === 'xM'
               ? prev[key].xM
-              : formatFieldMeters(portals?.[key]?.xM),
+              : formatFieldMeters(
+                portals ? crossoverPortalFieldMeters(portals[key]).xM : undefined,
+              ),
           yM:
             editing?.key === key && editing.axis === 'yM'
               ? prev[key].yM
-              : formatFieldMeters(portals?.[key]?.yM),
+              : formatFieldMeters(
+                portals ? crossoverPortalFieldMeters(portals[key]).yM : undefined,
+              ),
         }
       }
       return next
@@ -206,7 +212,9 @@ export function TrackCrossoverInspectorSection({
         ...prev,
         [key]: {
           ...prev[key],
-          [axis]: formatFieldMeters(portals?.[key]?.[axis]),
+          [axis]: formatFieldMeters(
+            portals ? crossoverPortalFieldMeters(portals[key])[axis] : undefined,
+          ),
         },
       }))
       return
@@ -397,7 +405,8 @@ export function TrackCrossoverInspectorSection({
                 </div>
               </div>
               <p className="text-[9px] leading-relaxed text-zinc-500">
-                場域公尺（原點左下）。拖動端點或磁吸接合時會同步更新。
+                現場實際位置（場域公尺，原點左下）。拖動端點或磁吸接合時會一併
+                更新；在這裡手打只修正量測值，<strong>不會移動圖上的端點</strong>。
               </p>
             </div>
           )
