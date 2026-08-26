@@ -49,3 +49,6 @@ deploy/.htpasswd-web
 deploy/.htpasswd-vendor
 deploy/mqtt-credentials.txt
 mosquitto/config/passwordfile
+
+# 資料清理前的備份（含營運資料，不進版控）
+.purge-backup/
