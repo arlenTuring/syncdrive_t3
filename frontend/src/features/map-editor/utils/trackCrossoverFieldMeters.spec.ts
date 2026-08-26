@@ -65,24 +65,45 @@ describe('端點的現場座標與圖面座標分家', () => {
     expect(crossoverPortalFieldMeters(after.b)).toEqual({ xM: 747.392, yM: 373.972 })
   })
 
-  it('拖動端點（走 layout 同步）時，現場座標跟著圖面走', () => {
+  it('拖動端點時，被移動的那一個現場座標跟著圖面走', () => {
+    const before = portals()
     const moved: CrossoverPortals = {
-      a: { ...portals().a, xM: 710, yM: 400 },
-      b: portals().b,
+      a: { ...before.a, xM: 710, yM: 400 },
+      b: before.b,
     }
-    const sync = syncLayoutFromCrossoverPortals(moved, DOMAIN, LAYOUT)
+    const sync = syncLayoutFromCrossoverPortals(moved, DOMAIN, LAYOUT, before)
     const patched = sync.parametersPatch[TRACK_CROSSOVER_PORTALS_KEY] as CrossoverPortals
 
     expect(crossoverPortalFieldMeters(patched.a)).toEqual({ xM: 710, yM: 400 })
   })
 
-  it('拖動會覆蓋掉先前手打的現場座標——那個端點確實被移動了', () => {
-    const edited = getCrossoverPortals(
-      patchCrossoverPortalFieldMeters(facility(), 'a', { yM: 120 }),
+  it('同一次拖動裡沒被移動的端點，保留手打的現場座標', () => {
+    const before = getCrossoverPortals(
+      patchCrossoverPortalFieldMeters(facility(), 'b', { yM: 88 }),
     )!
-    const sync = syncLayoutFromCrossoverPortals(edited, DOMAIN, LAYOUT)
+    const moved: CrossoverPortals = {
+      a: { ...before.a, xM: 710, yM: 400 },
+      b: before.b,
+    }
+    const sync = syncLayoutFromCrossoverPortals(moved, DOMAIN, LAYOUT, before)
     const patched = sync.parametersPatch[TRACK_CROSSOVER_PORTALS_KEY] as CrossoverPortals
 
-    expect(crossoverPortalFieldMeters(patched.a)).toEqual({ xM: 700, yM: 394.685 })
+    expect(crossoverPortalFieldMeters(patched.b)).toEqual({ xM: 747.392, yM: 88 })
+  })
+
+  /**
+   * 這一條是使用者回報的症狀：數字打了會自己還原。
+   *
+   * 點一下渡線選取它也會走完一次位移為零的拖曳，無條件同步就會把剛手打的現場
+   * 座標蓋回幾何值。
+   */
+  it('位移為零的拖曳（點選）不能蓋掉手打的現場座標', () => {
+    const before = getCrossoverPortals(
+      patchCrossoverPortalFieldMeters(facility(), 'a', { yM: 120 }),
+    )!
+    const sync = syncLayoutFromCrossoverPortals(before, DOMAIN, LAYOUT, before)
+    const patched = sync.parametersPatch[TRACK_CROSSOVER_PORTALS_KEY] as CrossoverPortals
+
+    expect(crossoverPortalFieldMeters(patched.a)).toEqual({ xM: 700, yM: 120 })
   })
 })

@@ -7,7 +7,7 @@ import {
 } from './areaCoords'
 import {
   crossoverPortalsAabb,
-  syncCrossoverPortalFieldMeters,
+  syncMovedCrossoverPortalsFieldMeters,
   type CrossoverPortals,
   TRACK_CROSSOVER_PORTALS_KEY,
 } from './trackCrossoverFacility'
@@ -24,13 +24,18 @@ export function syncLayoutFromCrossoverPortals(
   portals: CrossoverPortals,
   domain: MapAreaDomain,
   layout: MapAreaLayout,
+  /**
+   * 這次動作之前的端點。用來判斷哪一個端點<strong>真的移動了</strong>——只有移動
+   * 過的才把圖面座標同步進現場座標。不給的話一律視為移動過（沿用舊行為）。
+   */
+  previousPortals?: CrossoverPortals | null,
 ): CrossoverLayoutSync {
-  // 走到這裡代表端點在圖上真的被移動了（拖動或磁吸接合），現場座標要跟著走。
-  // 屬性面板手打現場座標不會經過這裡——那是純粹修正量測值，不該移動圖上的端點。
-  const synced: CrossoverPortals = {
-    a: syncCrossoverPortalFieldMeters(portals.a),
-    b: syncCrossoverPortalFieldMeters(portals.b),
-  }
+  // 有動到的端點才同步現場座標。點一下渡線選取它也會走完一次位移為零的拖曳，
+  // 無條件同步會把使用者剛手打的現場座標蓋回幾何值。
+  const synced = syncMovedCrossoverPortalsFieldMeters(
+    previousPortals ?? null,
+    portals,
+  )
   const aabb = crossoverPortalsAabb(synced)
   const position = { x: aabb.xMinM, y: aabb.yMinM }
   const sizeM = {

@@ -105,6 +105,7 @@ import type { TrackNetworkSegment } from '../vehicles/trackNetwork/types'
 import {
   dragCrossoverPortal,
   ensureCrossoverPortals,
+  getCrossoverPortals,
   clampTrackCrossoverStrokePx,
   parseTrackCrossoverColor,
   parseTrackCrossoverColorOpacity,
@@ -488,6 +489,8 @@ export const FacilityNode = memo(function FacilityNode({
         nextPortals,
         areaMeterContext.domain,
         areaMeterContext.layout,
+        // 動作前的端點：沒動到的那一個要保留它的現場座標
+        getCrossoverPortals(facility),
       )
       onPatchParameters(facility.id, sync.parametersPatch)
       onResize?.(facility.id, sync.areaSizePx)
@@ -1164,7 +1167,12 @@ export const FacilityNode = memo(function FacilityNode({
           dyM,
           crossoverSegmentByIdRef.current,
         )
-        const sync = syncLayoutFromCrossoverPortals(nextPortals, domain, layout)
+        const sync = syncLayoutFromCrossoverPortals(
+          nextPortals,
+          domain,
+          layout,
+          crossoverDragStartPortalsRef.current,
+        )
         onPatchParameters(id, sync.parametersPatch)
         onResize?.(id, sync.areaSizePx)
         onDrag(id, {

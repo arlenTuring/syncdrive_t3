@@ -631,13 +631,27 @@ export function crossoverPortalFieldMeters(portal: CrossoverPortalState): {
 }
 
 /**
- * 把圖面座標同步進現場座標。
+ * 端點<strong>真的移動了</strong>才把圖面座標同步進現場座標。
  *
- * 拖動端點與磁吸接合時呼叫——那兩個動作是「這個端點就在這裡」，圖面與現場都該
- * 跟著走。只有在屬性面板手打現場座標時不呼叫，那是純粹修正量測值。
+ * 為什麼要比對前後而不是無條件同步：點一下渡線選取它，也會走完一次「拖曳」的
+ * 生命週期（位移為零）。無條件同步的話，那一下就把使用者剛在屬性面板手打的
+ * 現場座標蓋回幾何值——症狀是數字打了會自己還原。
+ *
+ * 沒動的端點原樣保留，包含它的現場座標。
  */
-export function syncCrossoverPortalFieldMeters(
-  portal: CrossoverPortalState,
-): CrossoverPortalState {
-  return { ...portal, refFieldXM: portal.xM, refFieldYM: portal.yM }
+export function syncMovedCrossoverPortalsFieldMeters(
+  previous: CrossoverPortals | null,
+  next: CrossoverPortals,
+): CrossoverPortals {
+  const syncOne = (
+    key: CrossoverPortalKey,
+  ): CrossoverPortalState => {
+    const after = next[key]
+    const before = previous?.[key]
+    const moved =
+      !before || before.xM !== after.xM || before.yM !== after.yM
+    if (!moved) return after
+    return { ...after, refFieldXM: after.xM, refFieldYM: after.yM }
+  }
+  return { a: syncOne('a'), b: syncOne('b') }
 }
