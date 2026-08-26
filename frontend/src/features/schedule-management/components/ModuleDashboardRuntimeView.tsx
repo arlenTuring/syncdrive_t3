@@ -1,12 +1,16 @@
-import { AlertCircle } from 'lucide-react';
-import { useMemo } from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { BindingHealthProvider } from '../../dashboard/context/BindingHealthContext';
 import { DemoSimulationProvider } from '../../dashboard/context/DemoSimulationContext';
 import { VehicleFleetMqttProvider } from '../../dashboard/context/VehicleFleetMqttContext';
 import { FormatPainterProvider } from '../../dashboard/context/FormatPainterContext';
 import { PlaneWorkspace } from '../../dashboard/PlaneWorkspace';
+import type { DashboardPlane } from '../../dashboard/types';
 import { VariableProvider } from '../../dashboard/VariableContext';
-import { findStoredDashboardPlane } from '../utils/moduleDashboardPages';
+import {
+  findStoredDashboardPlane,
+  refreshDashboardPlanesCache,
+} from '../utils/moduleDashboardPages';
 
 type ModuleDashboardRuntimeViewProps = {
   planeId: string;
@@ -22,7 +26,44 @@ export function ModuleDashboardRuntimeView({
   planeId,
   pageLabel,
 }: ModuleDashboardRuntimeViewProps) {
-  const plane = useMemo(() => findStoredDashboardPlane(planeId), [planeId]);
+  /**
+   * 先查本機快取，查不到再問後端。
+   *
+   * 版面是後端資產，本機只是快取——乾淨的瀏覽器（或清過快取的）第一次點進來時
+   * 快取一定是空的。少了這一段補抓，畫面會直接說「平面可能已被刪除」，但它其實
+   * 好端端地在資料庫裡，而使用者被指去做一件不該做的事：重新新增子頁。
+   */
+  const cached = findStoredDashboardPlane(planeId);
+  const [fetched, setFetched] = useState<{
+    planeId: string;
+    plane: DashboardPlane | null;
+  } | null>(null);
+
+  const plane = cached ?? (fetched?.planeId === planeId ? fetched.plane : null);
+  const resolving = !cached && fetched?.planeId !== planeId;
+
+  useEffect(() => {
+    if (cached) return undefined;
+    let cancelled = false;
+    void refreshDashboardPlanesCache().then((planes) => {
+      if (cancelled) return;
+      setFetched({ planeId, plane: planes.find((item) => item.id === planeId) ?? null });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // cached 是每次 render 新建的物件，用布林值當相依才不會讓 effect 反覆重跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planeId, Boolean(cached)]);
+
+  if (resolving) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0b] px-6 text-center">
+        <Loader2 className="size-8 animate-spin text-zinc-500" />
+        <p className="text-xs text-zinc-500">載入儀表板平面…</p>
+      </div>
+    );
+  }
 
   if (!plane) {
     return (
@@ -31,7 +72,8 @@ export function ModuleDashboardRuntimeView({
         <div>
           <p className="text-sm font-medium text-zinc-200">找不到儀表板平面</p>
           <p className="mt-1 text-xs text-zinc-500">
-            「{pageLabel}」綁定的平面可能已被刪除，請用管理員模式重新新增子頁。
+            「{pageLabel}」綁定的平面在後端與本機都找不到，可能已被刪除；
+            請用管理員模式重新新增子頁。
           </p>
         </div>
       </div>

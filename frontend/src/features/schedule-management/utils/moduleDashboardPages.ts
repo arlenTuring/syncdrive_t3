@@ -1,6 +1,7 @@
 import { DASHBOARD_PLANES_STORAGE_KEY } from '../../../lib/canvasCacheReset';
 import type { DashboardPlane } from '../../dashboard/types';
 import {
+  fetchDashboardPlanes,
   fetchModuleDashboardPages,
   saveModuleDashboardPages,
 } from '../../dashboard/api/dashboardPlanesApi';
@@ -49,6 +50,32 @@ export function listStoredDashboardPlanes(): DashboardPlane[] {
 
 export function findStoredDashboardPlane(planeId: string): DashboardPlane | null {
   return listStoredDashboardPlanes().find((plane) => plane.id === planeId) ?? null;
+}
+
+/**
+ * 把後端的版面拉回來寫進快取。
+ *
+ * <strong>沒有這一支，乾淨的瀏覽器點進模組子頁會看到「找不到儀表板平面」。</strong>
+ * 對應（module_dashboard_pages）早就搬到後端了，版面（dashboard_planes）卻只有在
+ * 使用者先打開過儀表板管理之後才會進到本機快取——對應查得到、版面查不到，畫面
+ * 因此報「平面可能已被刪除」，但其實它好端端地在資料庫裡。
+ *
+ * 兩者都是系統配置，取得方式就該一致：後端是真相，localStorage 只是離線快取。
+ *
+ * 後端連不上時<strong>保留既有快取</strong>並回傳它——這一支的目的是讓畫面有東西
+ * 可以畫，不是把畫面清空。
+ */
+export async function refreshDashboardPlanesCache(): Promise<DashboardPlane[]> {
+  try {
+    const planes = await fetchDashboardPlanes();
+    if (planes.length > 0) {
+      window.localStorage.setItem(DASHBOARD_PLANES_STORAGE_KEY, JSON.stringify(planes));
+      return planes;
+    }
+  } catch {
+    /* 後端連不上就沿用快取 */
+  }
+  return listStoredDashboardPlanes();
 }
 
 export function readModuleDashboardPages(): ModuleDashboardPage[] {

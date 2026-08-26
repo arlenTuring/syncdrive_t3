@@ -39,6 +39,7 @@ import {
   moduleDashboardViewId,
   parseModuleDashboardViewId,
   readModuleDashboardPages,
+  refreshDashboardPlanesCache,
   refreshModuleDashboardPages,
   writeModuleDashboardPages,
   type ModuleDashboardPage,
@@ -159,6 +160,9 @@ export default function ScheduleManagementApp({
     void refreshModuleDashboardPages().then((pages) => {
       if (!cancelled) setModulePages(pages);
     });
+    // 版面要一起拉。只補對應的話，乾淨的瀏覽器點進子頁會看到「找不到儀表板平面」
+    // ——對應查得到、版面還在後端沒進本機快取。
+    void refreshDashboardPlanesCache();
     return () => {
       cancelled = true;
     };
