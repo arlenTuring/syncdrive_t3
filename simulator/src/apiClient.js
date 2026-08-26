@@ -110,9 +110,24 @@ function createApiClient(target, credentials) {
 
     // ── 內部通道（80 埠，Basic Auth）────────────────────────────
 
-    /** 圖資。車輛靠這個知道每個站點與設施在哪裡。 */
+    /** 圖資本體。設施與停靠點的座標在這裡。 */
     activeMap() {
       return int('/map/library/active');
+    },
+
+    /**
+     * 站點別名 → 座標。
+     *
+     * 訂單站序用的是 <code>station_2</code> 這種別名，不是設施數字 id，
+     * 所以光有圖資本體查不到。
+     */
+    operationNodes(mapId) {
+      return int(`/map/${encodeURIComponent(mapId)}/operation-nodes`);
+    },
+
+    /** 渡線途經點（xo_1_a…）。正線班次的站序會經過。 */
+    waypoints(mapId) {
+      return int(`/map/${encodeURIComponent(mapId)}/waypoints`);
     },
 
     /** 調度引擎狀態，UI 用來顯示「伺服器那邊在等什麼」 */

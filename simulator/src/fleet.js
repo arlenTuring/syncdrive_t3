@@ -49,7 +49,13 @@ class Fleet {
 
     this.log('info', 'fleet', `取圖資中（${target.host}）…`);
     const mapPayload = await this.api.activeMap();
-    this.map = new MapSource(mapPayload);
+    const mapId = mapPayload?.mapId;
+    // 站點別名與渡線途經點是另外兩支端點；少了它們，正線班次的站序有一半查不到
+    const [operationNodes, waypoints] = await Promise.all([
+      mapId ? this.api.operationNodes(mapId) : null,
+      mapId ? this.api.waypoints(mapId) : null,
+    ]);
+    this.map = new MapSource({ map: mapPayload, operationNodes, waypoints });
     if (this.map.size === 0) {
       throw new Error('圖資裡沒有任何帶座標的站點或設施，車輛無法定位');
     }
