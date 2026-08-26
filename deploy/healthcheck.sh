@@ -61,7 +61,7 @@ check() {
       "$EXTERNAL"/syncdrive-api/*) ;;   # API 走 x-api-key，不帶瀏覽帳密
       "$EXTERNAL"*) auth=("${EXT_AUTH[@]+"${EXT_AUTH[@]}"}") ;;
       # 80 埠只有文件與內部 Swagger 需要帳密，圖台與內部 API 是開放的
-      "$INTERNAL"/docs/*|"$INTERNAL"/api/docs*|"$INTERNAL"/portal|"$INTERNAL"/external-preview) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
+      "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
     esac
   else
     key=""
@@ -121,8 +121,10 @@ fi
 echo "存取控制"
 # 圖台與內部 API 刻意開放（圖台靠內部 API 運作，鎖了就活不了）；
 # 要保護的是演算法與系統結構，那些在文件與內部 Swagger 裡。
-check "圖台不需帳密"        "$INTERNAL/"                                        200 noauth
-check "內部 API 不需帳密"   "$INTERNAL/syncdrive-api/operation-shift/list"      200 noauth
+# 80 埠整個要帳密：圖台、內部 API、文件、Swagger 都一樣。在沒有帳號權限系統
+# 之前，這是內部 API 唯一的保護。
+check "圖台沒帶帳密必須被拒"     "$INTERNAL/"                                   401 noauth
+check "內部 API 沒帶帳密必須被拒" "$INTERNAL/syncdrive-api/operation-shift/list" 401 noauth
 if [ -n "$WEB_PASS" ]; then
   check "內部文件沒帶帳密必須被拒" "$INTERNAL/docs/"                            401 noauth
   check "內部 Swagger 沒帶帳密必須被拒" "$INTERNAL/api/docs"                     401 noauth
