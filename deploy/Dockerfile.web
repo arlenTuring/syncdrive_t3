@@ -30,7 +30,8 @@ COPY document/協力廠商介接說明書.md /usr/share/nginx/public-docs/
 COPY document/車輛即時ETA-API.md    /usr/share/nginx/public-docs/
 COPY document/班表Timetable-API.md  /usr/share/nginx/public-docs/
 # 六份通訊協議：那是與車端／中心端的契約，本來就要給對方看
-COPY "document/MQTT 通訊架構與 Topic 命名規範.md" /usr/share/nginx/public-docs/
+# 路徑含空白必須用 JSON 陣列形式；shell 形式的引號 Docker 的 COPY 解析不吃
+COPY ["document/MQTT 通訊架構與 Topic 命名規範.md", "/usr/share/nginx/public-docs/"]
 COPY document/車輛動態協議.md              /usr/share/nginx/public-docs/
 COPY document/營運任務狀態協議.md          /usr/share/nginx/public-docs/
 COPY document/設備健康與異常告警協議.md    /usr/share/nginx/public-docs/
