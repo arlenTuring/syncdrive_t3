@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SyncDrive T3 本地模擬器</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>本地模擬器</h1>
+      <p class="sub">以自駕車身分連上 SyncDrive T3：收訂單、跑路線、回報狀態</p>
+    </div>
+    <div class="target-badge" id="targetBadge">—</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>一、連線目標</h2>
+      <p class="hint">切換 GCP 與本地只有位址不同，通道與認證方式完全一樣。</p>
+      <div class="row">
+        <label>預設
+          <select id="presetSelect"></select>
+        </label>
+        <label>位址
+          <input id="hostInput" type="text" placeholder="34.80.84.224" />
+        </label>
+        <label>MQTT
+          <input id="mqttPortInput" type="number" />
+        </label>
+        <label>對外 API
+          <input id="externalPortInput" type="number" />
+        </label>
+        <label>內部 API
+          <input id="internalPortInput" type="number" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="applyTargetBtn" class="btn">套用目標</button>
+        <button id="probeBtn" class="btn ghost">測試三條通道</button>
+      </div>
+      <div id="credWarn" class="warn" hidden></div>
+      <ul id="probeResults" class="probe"></ul>
+    </section>
+
+    <section class="card">
+      <h2>二、伺服器端調度引擎</h2>
+      <p class="hint">
+        引擎依部署中的班表發訂單。模擬器沒上線就開啟，只會產生沒有人執行的訂單。
+      </p>
+      <div class="row">
+        <button id="dispatchRefreshBtn" class="btn ghost">重新整理</button>
+        <button id="dispatchOnBtn" class="btn">啟用引擎</button>
+        <button id="dispatchOffBtn" class="btn danger">停用引擎</button>
+      </div>
+      <div id="dispatchBox" class="mono-box">尚未查詢</div>
+    </section>
+
+    <section class="card">
+      <h2>三、車隊</h2>
+      <div class="row">
+        <button id="startBtn" class="btn primary">車隊上線</button>
+        <button id="stopBtn" class="btn danger">車隊下線</button>
+        <label>倍速
+          <select id="speedSelect">
+            <option value="1">1×（真實時間）</option>
+            <option value="2">2×</option>
+            <option value="5">5×</option>
+            <option value="10">10×</option>
+            <option value="30">30×</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">
+        倍速壓縮的是計畫時間，不是車速——各段的相對長短仍與班表一致。
+      </p>
+      <div id="fleetInfo" class="hint"></div>
+      <table class="fleet">
+        <thead>
+          <tr>
+            <th>車輛</th><th>連線</th><th>訂單</th><th>路徑</th>
+            <th>進度</th><th>電量</th><th>異常模擬</th>
+          </tr>
+        </thead>
+        <tbody id="fleetBody">
+          <tr><td colspan="7" class="empty">車隊未上線</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>四、事件</h2>
+      <div class="row">
+        <label class="inline"><input type="checkbox" id="onlyOrders" /> 只看訂單與異常</label>
+        <button id="clearLogBtn" class="btn ghost">清畫面</button>
+      </div>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

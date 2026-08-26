@@ -89,11 +89,16 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly orderRepository: Repository<OperationOrder>,
   ) {}
 
+  /**
+   * 計時器<strong>一律建立</strong>，停用與否由每次 tick 自己判斷。
+   *
+   * 停用時直接不建計時器看起來更省，但那會讓 <code>POST /dispatch/enable</code>
+   * 變成一個沒有作用的按鈕：回應說已啟用、卻永遠不會有人去 tick。要開就得重啟
+   * 後端——那正是這支端點想避免的事。
+   *
+   * 停用時每次 tick 在第一個判斷就返回，成本是每 5 秒一次的函式呼叫。
+   */
   onModuleInit(): void {
-    if (!dispatchConfig.enabled) {
-      this.logger.log('即時調度引擎已停用（DISPATCH_ENABLED=false）');
-      return;
-    }
     const interval = Math.max(1, dispatchConfig.tickSeconds) * 1000;
     this.timer = setInterval(() => {
       void this.tick();
@@ -101,8 +106,11 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     // 讓 timer 不要擋住程序結束（測試與優雅關閉）
     this.timer.unref?.();
     this.logger.log(
-      `即時調度引擎啟動：每 ${dispatchConfig.tickSeconds} 秒檢查一次，` +
-        `提前 ${dispatchConfig.leadSeconds} 秒下訂單`,
+      dispatchConfig.enabled
+        ? `即時調度引擎啟動：每 ${dispatchConfig.tickSeconds} 秒檢查一次，` +
+            `提前 ${dispatchConfig.leadSeconds} 秒下訂單`
+        : '即時調度引擎目前停用（DISPATCH_ENABLED=false）；' +
+            'POST /syncdrive-api/dispatch/enable 可以線上開啟，不必重啟',
     );
   }
 

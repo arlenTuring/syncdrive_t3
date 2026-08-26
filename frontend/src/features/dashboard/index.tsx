@@ -20,7 +20,6 @@ import { FormatPainterProvider } from './context/FormatPainterContext';
 import { canApplyWidgetFormat } from './utils/widgetFormatPainter';
 import { BindingIssuesBar } from './components/BindingIssuesBar';
 import { BackToHomeButton } from '../../components/BackToHomeButton';
-import { SimulationTransportToolbar } from './components/SimulationTransportToolbar';
 import { ExportTemplateButton, ImportTemplateButton } from './components/TemplateFileActions';
 import { GroupTemplateExitDialog } from './components/GroupTemplateExitDialog';
 import { notifyCloseCanvasChildList } from './utils/canvasChildList';
@@ -1450,7 +1449,17 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         />
       )}
     </div>
-    <SimulationTransportToolbar />
+    {/*
+      模擬控制列已移出數據監控模組，改由本地模擬器負責（simulator/，預設
+      http://127.0.0.1:4300）。
+
+      移出的理由是這裡的控制列操作的是<strong>伺服器上的示範程序</strong>——
+      要模擬的車卻應該在外面，用對外介面跟系統互動。控制列留在圖台裡，就會
+      變成「系統自己扮演車輛」，那樣不管跑得多順都證明不了介接是通的。
+
+      這一行刻意保留成註解而不是刪掉：DemoSimulationProvider 與相關資料流仍
+      在運作（圖台的播放與外推靠它），只是不再從這一頁下指令。
+    */}
     </FormatPainterProvider>
     </BindingHealthProvider>
     </VehicleFleetMqttProvider>

@@ -1,0 +1,16 @@
+{
+  "name": "syncdrive-t3-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地自駕車模擬器：以外部廠商身分連上 SyncDrive T3（GCP 或本地），收訂單、跑路線、回報狀態",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.0"
+  }
+}

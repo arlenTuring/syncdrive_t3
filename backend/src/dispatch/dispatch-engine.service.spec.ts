@@ -477,3 +477,31 @@ describe('班次展開結果裡的 dispatch 卡不重複排入', () => {
     expect(result.skipped).toHaveLength(0);
   });
 });
+
+describe('線上開關要真的能開', () => {
+  /**
+   * 停用時若不建計時器，POST /dispatch/enable 就變成沒有作用的按鈕——回應說
+   * 已啟用，卻永遠不會有人去 tick，只能重啟後端。
+   */
+  it('DISPATCH_ENABLED=false 啟動後，setEnabled(true) 就能下單', async () => {
+    const previous = process.env.DISPATCH_ENABLED;
+    process.env.DISPATCH_ENABLED = 'false';
+    try {
+      const { engine, created } = build([trip(12 * 3600 + 60)]);
+      engine.onModuleInit();
+
+      const off = await engine.tick({ now: REFERENCE });
+      expect(off.issued).toHaveLength(0);
+
+      engine.setEnabled(true);
+      const on = await engine.tick({ now: REFERENCE });
+
+      expect(on.issued).toHaveLength(1);
+      expect(created).toHaveLength(1);
+      engine.onModuleDestroy();
+    } finally {
+      if (previous === undefined) delete process.env.DISPATCH_ENABLED;
+      else process.env.DISPATCH_ENABLED = previous;
+    }
+  });
+});

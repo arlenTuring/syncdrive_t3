@@ -20,7 +20,13 @@ function menuOptionClass(active: boolean, disabled = false) {
   ].join(' ');
 }
 
-export type ShiftMenuOption = { value: string; label: string; disabled?: boolean };
+export type ShiftMenuOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  /** 右側次要說明（例如「正在使用」） */
+  badge?: string;
+};
 export type ShiftMenuGroup = { label: string; options: ShiftMenuOption[] };
 
 /** 與行動設定同風格的自訂下拉 */
@@ -150,6 +156,11 @@ export function ShiftMenuSelect({
                         }}
                       >
                         <span className="min-w-0 flex-1 truncate px-2">{item.label}</span>
+                        {item.badge ? (
+                          <span className="shrink-0 pr-2 text-[11px] tracking-[0.3px] text-[#6A7282]">
+                            {item.badge}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -165,6 +176,11 @@ export function ShiftMenuSelect({
                     }}
                   >
                     <span className="min-w-0 flex-1 truncate px-2">{item.label}</span>
+                    {item.badge ? (
+                      <span className="shrink-0 pr-2 text-[11px] tracking-[0.3px] text-[#6A7282]">
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
             {(groups?.length ?? 0) === 0 && (options?.length ?? 0) === 0 ? (

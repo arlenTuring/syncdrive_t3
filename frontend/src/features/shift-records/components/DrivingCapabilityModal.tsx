@@ -45,17 +45,17 @@ const CHANNEL_FILTERS: Array<{ value: TaskLaneFilter; label: string }> = [
   { value: 'event', label: '事件' },
 ];
 
-/** 設計稿節點約每 40s 一格且標籤不重疊 → 提高時間密度與最小間距 */
-const PX_PER_MINUTE = 160;
-const LANE_LABEL_W = 44;
-const AXIS_H = 22;
+/** 設計稿：刻度對齊節點、可左右滑動；約 40s 視覺間距 */
+const PX_PER_MINUTE = 140;
+const LANE_LABEL_W = 48;
+const AXIS_H = 24;
 const STATUS_H = 32;
 const NODE_SIZE = 36;
 const NODE_INNER = 22;
-const MIN_NODE_GAP = 100;
+const MIN_NODE_GAP = 108;
 const LINE_Y = 22;
-const LANE_H = 96;
-const AXIS_LABEL_MIN_GAP = 72;
+const LANE_H = 100;
+const AXIS_LABEL_MIN_GAP = 56;
 const LINE_Z = 5;
 const NODE_INNER_Z = 10;
 
@@ -65,7 +65,7 @@ function msToLeft(ms: number, model: DrivingCapabilityModel): number {
 
 function timelineWidth(model: DrivingCapabilityModel): number {
   const spanMinutes = (model.rangeEndMs - model.rangeStartMs) / 60_000;
-  return Math.max(spanMinutes * PX_PER_MINUTE + 48, 720);
+  return Math.max(spanMinutes * PX_PER_MINUTE + 80, 880);
 }
 
 function layoutLaneLefts(events: TimelineEvent[], model: DrivingCapabilityModel): Map<string, number> {
@@ -89,7 +89,7 @@ function formatEventTime(ms: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-/** 整分顯示 mm:ss 省略秒；其餘完整 h:m:s（對齊設計稿刻度密度） */
+/** 整分省略秒；其餘完整（對齊設計稿 06:00 / 06:00:40） */
 function formatAxisTick(ms: number): string {
   const d = new Date(ms);
   const hh = String(d.getHours()).padStart(2, '0');
@@ -99,22 +99,75 @@ function formatAxisTick(ms: number): string {
   return `${hh}:${mm}:${String(ss).padStart(2, '0')}`;
 }
 
-function axisTicks(model: DrivingCapabilityModel): Array<{ ms: number; left: number }> {
-  const sorted = [...model.events].sort((a, b) => a.atMs - b.atMs);
-  if (sorted.length === 0) {
-    return [
-      { ms: model.rangeStartMs, left: msToLeft(model.rangeStartMs, model) },
-      { ms: model.rangeEndMs, left: msToLeft(model.rangeEndMs, model) },
-    ];
+type AxisTick = { key: string; ms: number; left: number };
+
+/**
+ * 設計稿時間軸：
+ * 1) 起迄 + 等距填補刻度（真實時間）
+ * 2) 每個動作／事件節點各一格（用碰撞佈局 left，確保看得見）
+ */
+function buildAxisTicks(
+  model: DrivingCapabilityModel,
+  eventLeftById: Map<string, number>,
+): AxisTick[] {
+  const span = Math.max(1, model.rangeEndMs - model.rangeStartMs);
+  const stepMs =
+    span > 30 * 60_000 ? 60_000 : span > 12 * 60_000 ? 40_000 : span > 5 * 60_000 ? 30_000 : 20_000;
+
+  const candidates: AxisTick[] = [
+    {
+      key: 'range-start',
+      ms: model.rangeStartMs,
+      left: msToLeft(model.rangeStartMs, model),
+    },
+  ];
+
+  const firstStep = Math.ceil(model.rangeStartMs / stepMs) * stepMs;
+  for (let t = firstStep; t < model.rangeEndMs - stepMs / 4; t += stepMs) {
+    if (t <= model.rangeStartMs + 5_000) continue;
+    candidates.push({
+      key: `interval-${t}`,
+      ms: t,
+      left: msToLeft(t, model),
+    });
   }
-  const ticks: Array<{ ms: number; left: number }> = [];
-  for (const event of sorted) {
-    const left = msToLeft(event.atMs, model);
-    const last = ticks[ticks.length - 1];
-    if (last && left - last.left < AXIS_LABEL_MIN_GAP) continue;
-    ticks.push({ ms: event.atMs, left });
+
+  for (const event of model.events) {
+    const left = eventLeftById.get(event.id);
+    if (left == null) continue;
+    candidates.push({
+      key: `event-${event.id}`,
+      ms: event.atMs,
+      left,
+    });
   }
-  return ticks;
+
+  candidates.push({
+    key: 'range-end',
+    ms: model.rangeEndMs,
+    left: msToLeft(model.rangeEndMs, model),
+  });
+
+  // 先保留節點刻度，再填區間刻度；過近則丟棄較弱者
+  const sorted = [...candidates].sort((a, b) => a.left - b.left || a.ms - b.ms);
+  const out: AxisTick[] = [];
+  for (const tick of sorted) {
+    const isEvent = tick.key.startsWith('event-');
+    const last = out[out.length - 1];
+    if (!last) {
+      out.push(tick);
+      continue;
+    }
+    if (tick.left - last.left >= AXIS_LABEL_MIN_GAP) {
+      out.push(tick);
+      continue;
+    }
+    // 過近：優先保留「事件節點」刻度
+    if (isEvent && !last.key.startsWith('event-')) {
+      out[out.length - 1] = tick;
+    }
+  }
+  return out;
 }
 
 function nodeTone(kind: TimelineEventKind, channel: 'action' | 'event') {
@@ -311,6 +364,7 @@ function TaskTrackRow({
   width,
   selectedId,
   onSelect,
+  lefts: leftsProp,
 }: {
   model: DrivingCapabilityModel;
   channel: 'action' | 'event';
@@ -318,14 +372,14 @@ function TaskTrackRow({
   width: number;
   selectedId: string | null;
   onSelect: (event: TimelineEvent) => void;
+  lefts?: Map<string, number>;
 }) {
   const laneEvents = events.filter((e) => e.channel === channel);
-  const lefts = layoutLaneLefts(laneEvents, model);
+  const lefts = leftsProp ?? layoutLaneLefts(laneEvents, model);
   const dashed = channel === 'event';
 
   return (
     <div className="relative" style={{ width, height: LANE_H }}>
-      {/* 1) 外圈光暈（線之下，透明底不遮線） */}
       {laneEvents.map((ev) => (
         <NodeHalo
           key={`halo-${ev.id}`}
@@ -335,7 +389,6 @@ function TaskTrackRow({
         />
       ))}
 
-      {/* 2) 連續軌道線：穿過外圈中心，不被蓋住 */}
       <div
         className="pointer-events-none absolute left-0 right-0"
         style={{
@@ -351,7 +404,6 @@ function TaskTrackRow({
         }}
       />
 
-      {/* 3) 內圓圖示 + 標籤（線之上） */}
       {laneEvents.map((ev) => (
         <TimelineEventNode
           key={ev.id}
@@ -377,26 +429,51 @@ function TimelinePanel({
   onSelect: (event: TimelineEvent) => void;
 }) {
   const events = useMemo(() => filterEventsByLane(model.events, filter), [model.events, filter]);
+  const actionEvents = useMemo(
+    () => events.filter((e) => e.channel === 'action'),
+    [events],
+  );
+  const eventEvents = useMemo(
+    () => events.filter((e) => e.channel === 'event'),
+    [events],
+  );
+
+  const actionLefts = useMemo(
+    () => layoutLaneLefts(actionEvents, model),
+    [actionEvents, model],
+  );
+  const eventLefts = useMemo(
+    () => layoutLaneLefts(eventEvents, model),
+    [eventEvents, model],
+  );
+
+  const eventLeftById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [id, left] of actionLefts) map.set(id, left);
+    for (const [id, left] of eventLefts) map.set(id, left);
+    return map;
+  }, [actionLefts, eventLefts]);
+
   const width = useMemo(() => {
     const base = timelineWidth(model);
-    const actionLefts = layoutLaneLefts(
-      events.filter((e) => e.channel === 'action'),
-      model,
-    );
-    const eventLefts = layoutLaneLefts(
-      events.filter((e) => e.channel === 'event'),
-      model,
-    );
     let maxLeft = base;
-    for (const left of actionLefts.values()) maxLeft = Math.max(maxLeft, left + 56);
-    for (const left of eventLefts.values()) maxLeft = Math.max(maxLeft, left + 56);
+    for (const left of eventLeftById.values()) maxLeft = Math.max(maxLeft, left + 64);
     return maxLeft;
-  }, [events, model]);
-  const ticks = axisTicks(model);
+  }, [eventLeftById, model]);
+
+  const ticks = useMemo(
+    () => buildAxisTicks(model, eventLeftById),
+    [model, eventLeftById],
+  );
+
   const showStatus = filter !== 'event';
   const showAction = filter === 'all' || filter === 'action';
   const showEvent = filter === 'all' || filter === 'event';
 
+  const bodyH =
+    (showStatus ? STATUS_H + 8 : 0)
+    + (showAction ? LANE_H : 0)
+    + (showEvent ? LANE_H : 0);
   const labelPadTop = AXIS_H + (showStatus ? STATUS_H + 8 : 0);
 
   return (
@@ -408,7 +485,7 @@ function TimelinePanel({
         >
           {showAction ? (
             <div
-              className="flex items-start justify-end pr-2 font-medium text-[#51A2FF]"
+              className="flex items-start justify-end border-b border-[#51A2FF]/40 pr-2 font-medium text-[#51A2FF]"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
               動作
@@ -416,7 +493,7 @@ function TimelinePanel({
           ) : null}
           {showEvent ? (
             <div
-              className="flex items-start justify-end pr-2 text-zinc-200"
+              className="flex items-start justify-end border-b border-dashed border-zinc-600 pr-2 text-zinc-200"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
               事件
@@ -425,45 +502,63 @@ function TimelinePanel({
         </div>
 
         <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-          <div style={{ width: width + 40, minWidth: '100%' }} className="px-3 pb-2 pt-3">
-            <div className="relative" style={{ width, height: AXIS_H }}>
+          <div style={{ width: width + 48, minWidth: '100%' }} className="relative px-3 pb-2 pt-3">
+            {/* 時間軸刻度 + 垂直格線（貫穿狀態列／動作／事件） */}
+            <div className="relative" style={{ width, height: AXIS_H + bodyH }}>
               {ticks.map((tick) => (
-                <span
-                  key={tick.ms}
-                  className="absolute -translate-x-1/2 font-mono text-[10px] tabular-nums text-zinc-400"
-                  style={{ left: tick.left }}
-                >
-                  {formatAxisTick(tick.ms)}
-                </span>
+                <div
+                  key={`grid-${tick.key}`}
+                  className="pointer-events-none absolute top-0 w-px bg-zinc-700/55"
+                  style={{ left: tick.left, height: AXIS_H + bodyH }}
+                  aria-hidden
+                />
               ))}
-            </div>
 
-            {showStatus ? (
-              <div className="mb-2">
-                <StatusBarRow model={model} filter={filter} width={width} />
+              <div className="relative z-[1]" style={{ height: AXIS_H }}>
+                {ticks.map((tick) => (
+                  <span
+                    key={tick.key}
+                    className="absolute -translate-x-1/2 font-mono text-[10px] tabular-nums text-zinc-300"
+                    style={{ left: tick.left }}
+                  >
+                    {formatAxisTick(tick.ms)}
+                  </span>
+                ))}
               </div>
-            ) : null}
 
-            {showAction ? (
-              <TaskTrackRow
-                model={model}
-                channel="action"
-                events={events}
-                width={width}
-                selectedId={selectedId}
-                onSelect={onSelect}
-              />
-            ) : null}
-            {showEvent ? (
-              <TaskTrackRow
-                model={model}
-                channel="event"
-                events={events}
-                width={width}
-                selectedId={selectedId}
-                onSelect={onSelect}
-              />
-            ) : null}
+              <div className="relative z-[1]">
+                {showStatus ? (
+                  <div className="mb-2">
+                    <StatusBarRow model={model} filter={filter} width={width} />
+                  </div>
+                ) : null}
+
+                {showAction ? (
+                  <div className="rounded-md bg-zinc-900/35">
+                    <TaskTrackRow
+                      model={model}
+                      channel="action"
+                      events={events}
+                      width={width}
+                      selectedId={selectedId}
+                      onSelect={onSelect}
+                      lefts={actionLefts}
+                    />
+                  </div>
+                ) : null}
+                {showEvent ? (
+                  <TaskTrackRow
+                    model={model}
+                    channel="event"
+                    events={events}
+                    width={width}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    lefts={eventLefts}
+                  />
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
       </div>
