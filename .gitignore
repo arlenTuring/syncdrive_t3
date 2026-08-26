@@ -52,3 +52,6 @@ mosquitto/config/passwordfile
 
 # 資料清理前的備份（含營運資料，不進版控）
 .purge-backup/
+
+# 同步到 GCP 前的地圖備份，本機留存不進版控
+.map-backup/
