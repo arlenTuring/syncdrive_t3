@@ -88,8 +88,28 @@ function straightPath(stations) {
   return stations.map((station) => ({
     x: station.x,
     y: station.y,
+    px: station.px,
+    py: station.py,
     stationId: station.id,
   }));
+}
+
+/**
+ * 補上路徑點的圖面像素座標。
+ *
+ * 路徑點存的是<strong>場域公尺</strong>——那是車輛要用的，也是唯一的真相。但編輯器
+ * 畫在圖台上，圖台是像素的；每次載入都讓瀏覽器自己換算，等於把換算邏輯抄成兩份，
+ * 遲早對不起來。所以這裡一次補齊。
+ *
+ * 換算不出來（點落在所有方塊之外）就留 null，讓編輯器據實顯示那個點有問題，
+ * 而不是編一個位置出來。
+ */
+function withPixels(waypoints, facilities) {
+  return waypoints.map((point) => {
+    if (Number.isFinite(point.px) && Number.isFinite(point.py)) return point;
+    const px = fieldToPixel(facilities, point.x, point.y);
+    return { ...point, px: px?.x ?? null, py: px?.y ?? null };
+  });
 }
 
 /** 把一條路徑算成可以交付的樣子：經過的方塊、路徑點、總長 */
@@ -149,7 +169,10 @@ function buildRoutes({ mapPayload, map, store, canvas }) {
 
     const saved = store.get(route.routeId);
     const usable = stations.length >= 2;
-    const waypoints = saved?.waypoints ?? (usable ? straightPath(stations) : []);
+    const waypoints = withPixels(
+      saved?.waypoints ?? (usable ? straightPath(stations) : []),
+      sheet.facilities,
+    );
 
     out.push({
       routeId: route.routeId,
@@ -183,6 +206,7 @@ module.exports = {
   buildRoutes,
   describePath,
   straightPath,
+  withPixels,
   matchRouteForStations,
   fieldBounds,
   collectTracks,

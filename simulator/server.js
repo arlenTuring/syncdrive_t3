@@ -14,7 +14,7 @@ const {
   straightPath,
   collectTracks,
 } = require('./src/routePaths');
-const { buildCanvas, fieldToPixel } = require('./src/mapGeometry');
+const { buildCanvas, fieldToPixel, pixelToField } = require('./src/mapGeometry');
 const { MapSource } = require('./src/mapSource');
 const { TrackGraph } = require('./src/trackRouter');
 
@@ -116,7 +116,9 @@ function readBody(req) {
 }
 
 function serveStatic(req, res) {
-  const urlPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  const requested = req.url.split('?')[0];
+  // 目錄要拿 index.html，否則 /paths/ 會讀到一個目錄然後回 404
+  const urlPath = requested.endsWith('/') ? `${requested}index.html` : requested;
   // 只從 public/ 出檔，並且解析後必須仍在 public/ 底下
   const filePath = path.join(ROOT, 'public', urlPath);
   const publicDir = path.join(ROOT, 'public');
@@ -126,6 +128,18 @@ function serveStatic(req, res) {
   }
   fs.readFile(filePath, (error, data) => {
     if (error) {
+      // 路徑編輯器要先建置。少了這一句，使用者只會看到一片空白的 404，
+      // 完全看不出是「還沒建置」而不是「壞了」。
+      if (urlPath.startsWith('/paths/')) {
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }).end(
+          '<meta charset="utf-8"><body style="font:14px system-ui;background:#0f1115;color:#e6e9ef;padding:32px">'
+          + '<h2>路徑編輯器尚未建置</h2>'
+          + '<p>它是獨立的一份網頁（重用 syncdrive_t3 前端的圖台元件），要先建置：</p>'
+          + '<pre style="background:#1e222b;padding:12px;border-radius:8px">cd simulator &amp;&amp; npm install &amp;&amp; npm run build:web</pre>'
+          + '<p>建置完重新整理即可，不必重開伺服器。</p></body>',
+        );
+        return;
+      }
       res.writeHead(404).end('not found');
       return;
     }
@@ -237,6 +251,18 @@ const routes = {
     });
   },
 
+  /**
+   * 原封不動的地圖檔。
+   *
+   * 路徑編輯器用的是 syncdrive_t3 那邊的圖台元件（MapAreaCanvas），它吃的是
+   * parseMapFileJson 解出來的東西——所以這裡不能先整理過再送，送出去的必須是
+   * 地圖檔本身。整理過的版本另外由 /api/map/geometry 提供，那是給換算用的。
+   */
+  'GET /api/map/document': async (_req, res) => {
+    const cache = await loadMapForEditor();
+    sendJson(res, 200, cache.mapPayload?.mapDocument ?? cache.mapPayload ?? {});
+  },
+
   'GET /api/routes': async (_req, res) => {
     const cache = await loadMapForEditor();
     sendJson(res, 200, { routes: routesSnapshot(cache) });
@@ -265,14 +291,32 @@ const routes = {
       );
     }
 
-    const cleaned = waypoints.map((point) => ({
-      x: Number(point.x),
-      y: Number(point.y),
-      ...(point.stationId ? { stationId: String(point.stationId) } : {}),
-    }));
-    if (cleaned.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
-      throw new Error('路徑點座標必須是數字');
-    }
+    /**
+     * 編輯器送來的是<strong>圖面像素</strong>——它畫在圖台上，量得到的只有像素。
+     * 換成場域公尺在這裡做，不在瀏覽器：換算靠的是每個方塊自己的參照場域範圍，
+     * 兩邊各寫一份遲早會對不起來，而對不起來的後果是車輛開到別的地方去。
+     */
+    const cleaned = waypoints.map((point, index) => {
+      const px = Number(point.px);
+      const py = Number(point.py);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        throw new Error(`第 ${index + 1} 個路徑點沒有座標`);
+      }
+      const field = pixelToField(cache.canvas.facilities, px, py);
+      if (!field) {
+        throw new Error(
+          `第 ${index + 1} 個路徑點不在任何方塊上，沒有對應的場域座標——`
+          + '請把它拖回軌道或站台範圍內',
+        );
+      }
+      return {
+        x: field.x,
+        y: field.y,
+        px,
+        py,
+        ...(point.stationId ? { stationId: String(point.stationId) } : {}),
+      };
+    });
 
     routePaths.set(routeId, { waypoints: cleaned, updatedAt: Date.now() });
     fleet.refreshRoutes();

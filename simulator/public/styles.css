@@ -45,6 +45,16 @@ h2 { margin: 0 0 4px; font-size: 15px; }
   white-space: nowrap;
 }
 
+/*
+ * hidden 要贏過下面的 display:grid。
+ *
+ * 瀏覽器內建的 [hidden]{display:none} 是 UA 樣式，任何作者寫的 display 都蓋得掉它，
+ * 所以只寫 hidden 屬性沒有用——兩個分頁會同時出現，看起來像切換壞掉。
+ */
+main[hidden] {
+  display: none;
+}
+
 main {
   display: grid;
   gap: 16px;
@@ -218,30 +228,22 @@ td.empty { color: var(--muted); text-align: center; padding: 18px; }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-/* ── 路徑編輯器 ───────────────────────────────────────── */
-.map-wrap {
-  position: relative;
-  /* 照原圖 3152×642 的比例撐滿寬度：固定高度會在上下留一大片空白 */
-  aspect-ratio: 3152 / 642;
-  min-height: 240px;
-  margin: 12px 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #0b0d11;
-  overflow: hidden;
-}
-#routeMap { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-#routeMap.panning { cursor: grabbing; }
-#routeMap text { pointer-events: none; user-select: none; }
+/* ── 路徑編輯器（/paths/，iframe） ─────────────────────── */
 
-.route-info {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+/*
+ * 編輯器要整片寬。main 預設有 1180px 上限與內距，那是給表單面板的；圖台是
+ * 3152×642 的長條，夾在 1180px 裡會小到看不清楚方塊代號。
+ */
+main.full-bleed {
+  max-width: none;
+  padding: 0;
+  /* 扣掉 header 與分頁列，剩下的高度全給編輯器 */
+  height: calc(100vh - 122px);
 }
-.route-info h3 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
-.route-info .mono-box { max-height: 180px; overflow-y: auto; }
 
-@media (max-width: 860px) {
-  .route-info { grid-template-columns: 1fr; }
+.route-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
 }

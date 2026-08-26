@@ -104,42 +104,16 @@
     </section>
   </main>
 
-  <main data-panel="routes" hidden>
-    <section class="card">
-      <h2>路線路徑</h2>
-      <p class="hint">
-        地圖與路線都是從伺服器讀來的，<strong>這裡不能新增或刪除任何元件</strong>。
-        能改的只有一件事：每條路線怎麼從這一站開到下一站。
-      </p>
-      <div class="row">
-        <label>路線
-          <select id="routeSelect"><option>載入中…</option></select>
-        </label>
-        <button id="routeSaveBtn" class="btn primary">儲存路徑</button>
-        <button id="routeResetBtn" class="btn danger">還原成直線</button>
-        <span id="routeStatus" class="hint" style="margin:0"></span>
-      </div>
-      <p class="hint">
-        點線段中央的 <strong>＋</strong> 會在該處長出一個折線點，線就分成兩段；
-        拖動折線點改變線徑。<strong>站點是固定的</strong>，不能拖也不能刪——那是
-        班表定的停靠順序。折線點按右鍵可刪除。
-      </p>
+  <!--
+    路徑編輯器是獨立的一頁（simulator/web，用 React 建置）。
 
-      <div class="map-wrap">
-        <svg id="routeMap" xmlns="http://www.w3.org/2000/svg"></svg>
-      </div>
-
-      <div class="route-info">
-        <div>
-          <h3>經過的方塊</h3>
-          <div id="routeTracks" class="mono-box">尚未選擇路線</div>
-        </div>
-        <div>
-          <h3>路徑點</h3>
-          <div id="routeSamples" class="mono-box">尚未選擇路線</div>
-        </div>
-      </div>
-    </section>
+    它直接重用 syncdrive_t3 前端的 MapAreaCanvas——也就是地圖編輯器的圖台本體，
+    所以方塊、站台、號誌、顏色都與地圖編輯器完全一致，不是照著描一個像的。
+    那頁需要 React 與 Tailwind，和這一頁的原生 JS 混不進同一份 bundle，
+    所以用 iframe 掛進來（同源，沒有跨網域問題）。
+  -->
+  <main data-panel="routes" class="full-bleed" hidden>
+    <iframe id="routeFrame" class="route-frame" title="路線路徑編輯器"></iframe>
   </main>
 
   <script src="/app.js"></script>

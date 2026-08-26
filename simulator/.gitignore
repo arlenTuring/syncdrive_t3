@@ -1,3 +1,6 @@
 
 # 使用者畫的路線路徑，綁定特定地圖
 data/
+
+# 路徑編輯器的建置產物（npm run build:web 產生）
+public/paths/
