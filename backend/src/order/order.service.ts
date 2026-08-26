@@ -596,13 +596,31 @@ export class OrderService {
     order.routeId = order.routeId ?? routeId ?? undefined;
     order.lineKind = lineKind;
     order.nextStation = nextStation ?? order.nextStation;
-    const times = this.tripTimesFromCode(tripCode, lineKind === 'MAINLINE' ? 6 : 30, payload.timestamp);
-    order.plannedStart = String(times.plannedStart);
-    order.plannedEnd = String(times.plannedEnd);
+    // 計畫時刻由中心端決定，車端回報不得覆蓋。
+    //
+    // tripTimesFromCode 是<strong>沒有計畫時刻時的推測</strong>：它從 D/U 班次代號
+    // 反推發車時刻，代號不符格式時直接回「現在」。無條件套用的話，1 Hz 的進度回報
+    // 會把 plannedStart 一路推成當下時刻——計畫時刻等於實際時刻，誤點永遠是零。
+    if (!order.plannedStart || !order.plannedEnd) {
+      const times = this.tripTimesFromCode(
+        tripCode,
+        lineKind === 'MAINLINE' ? 6 : 30,
+        payload.timestamp,
+      );
+      order.plannedStart ||= String(times.plannedStart);
+      order.plannedEnd ||= String(times.plannedEnd);
+    }
     order.etaRemain = etaSec != null
       ? this.formatSecondsMmSs(etaSec)
       : this.formatEtaMmSs(routeProgress, 6);
+    // 合併而不是整包取代。
+    //
+    // payload 同時裝著兩種東西：中心端下單時寫入的<strong>任務內容</strong>
+    // （起訖點、站序、班表出處）與車端回報的<strong>執行進度</strong>。整包覆蓋
+    // 會讓第一次進度回報就把任務內容清掉——車輛之後重取 GET /order/queryById
+    // 就再也拿不到自己要去哪裡，而且畫面上的路徑也會跟著消失。
     order.payload = {
+      ...(order.payload ?? {}),
       vehicle_phase: payload.vehicle_phase ?? null,
       current_leg: currentLeg ?? null,
       leg_eta_max: legEtaMax,

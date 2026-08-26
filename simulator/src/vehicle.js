@@ -367,7 +367,12 @@ class SimulatedVehicle {
           target_station_id: nextPoint?.id ?? last.id,
           distance_to_target_m: this.position ? Math.round(distance(this.position, nextPoint ?? last)) : 0,
           eta_seconds: Math.round(remainingMs / 1000),
+          // 這一段的總秒數。中心端拿它當分母算段落剩餘百分比；不給的話它只能拿
+          // 「目前看過的最大 eta」當分母，於是每一段的進度都從 0% 開始往上跳。
+          leg_eta_max: Math.max(1, Math.round(order.plannedMs / 1000 / Math.max(1, order.points.length - 1))),
         },
+        // 兩個名字都給：route_progress 是圖台元件的預設欄位名
+        route_progress: Math.round(order.progress * 100),
         progress_percent: Math.round(order.progress * 100),
       },
       { qos: 0 },

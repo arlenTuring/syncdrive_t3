@@ -319,7 +319,7 @@ SELECT DISTINCT ON (v.vehicle_code)
   CASE
     WHEN active_order.line_kind = 'MAINLINE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
-      AND active_order.trip_code ~ '^[DU][0-9]{4}$'
+      AND NULLIF(TRIM(active_order.trip_code), '') IS NOT NULL
       THEN active_order.trip_code
     WHEN active_order.line_kind = 'MAINTENANCE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
@@ -339,7 +339,7 @@ SELECT DISTINCT ON (v.vehicle_code)
   CASE
     WHEN active_order.line_kind = 'MAINLINE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
-      AND active_order.trip_code ~ '^[DU][0-9]{4}$'
+      AND NULLIF(TRIM(active_order.trip_code), '') IS NOT NULL
       THEN 'mainline'
     WHEN active_order.line_kind = 'MAINTENANCE'
       AND active_order.status IN ('PENDING', 'PROCESSING')
@@ -417,7 +417,7 @@ LEFT JOIN LATERAL (
     CASE
       WHEN o3.line_kind = 'MAINLINE'
         AND o3.status = 'PENDING'
-        AND o3.trip_code ~ '^[DU][0-9]{4}$'
+        AND NULLIF(TRIM(o3.trip_code), '') IS NOT NULL
         THEN 3
       WHEN o3.line_kind = 'MAINLINE'
         AND o3.status = 'PROCESSING'
@@ -471,6 +471,9 @@ WITH active_orders AS (
     v.display_name,
     r.direction_letter AS trip_direction,
     CASE
+      WHEN o.planned_start IS NOT NULL THEN
+        EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60
+        + EXTRACT(MINUTE FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int
       WHEN o.trip_code ~ '^[DU][0-9]{4}$'
         AND SUBSTRING(o.trip_code, 2, 2)::int BETWEEN 0 AND 23
         AND SUBSTRING(o.trip_code, 4, 2)::int BETWEEN 0 AND 59
@@ -496,7 +499,7 @@ WITH active_orders AS (
     WHERE route_id = o.route_id ORDER BY sequence_order DESC LIMIT 1
   ) last_st ON true
   WHERE o.line_kind = 'MAINLINE'
-    AND o.trip_code ~ '^[DU][0-9]{4}$'
+    AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
 ),
 route_json AS (
@@ -566,6 +569,23 @@ SELECT
   CASE WHEN o.trip_direction = 'U' THEN 'N2W上行' ELSE 'S2W下行' END AS st_c,
   COALESCE(
     NULLIF(rj.route_stations, '[]'),
+    -- 即時調度引擎下的訂單沒有 route_id（那張表只有兩筆舊的 D/U 路線），
+    -- 站序改放在 payload。這一支才是新班表的真站序，優先於下面的固定備援。
+    (
+      SELECT json_agg(
+        json_build_object(
+          'name', COALESCE(NULLIF(st->>'station_name', ''), st->>'station_id'),
+          'station_id', st->>'station_id',
+          'actions', '[]'::json
+        ) ORDER BY (st->>'order')::int
+      )::text
+      FROM jsonb_array_elements(
+        CASE
+          WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations'
+          ELSE '[]'::jsonb
+        END
+      ) st
+    ),
     CASE
       WHEN o.trip_direction = 'U' THEN
         '[{"name":"S2W上行","station_id":"station_6"},{"name":"T3上行","station_id":"station_4"},{"name":"N2W上行","station_id":"station_1"}]'
@@ -723,7 +743,7 @@ FROM (
     )::int AS roster_count
   FROM operation_orders o
   WHERE o.line_kind = 'MAINLINE'
-    AND o.trip_code ~ '^[DU][0-9]{4}$'
+    AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
 ) s
 `.trim();
 
