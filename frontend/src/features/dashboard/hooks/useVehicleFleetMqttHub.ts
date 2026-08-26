@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { acquireSocket, releaseSocket } from '../elements/socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { VTMS_VEHICLE_POOL } from '../constants/vtmsVehiclePool';
-import { useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
+import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import type { VtmsStreamKind } from '../utils/vtmsTopic';
 import { vtmsRowKeyForStream } from '../utils/vtmsMqttRowKey';
 
@@ -41,7 +41,18 @@ const FLEET_HUB_MIN_FLUSH_MS = 50;
  * 每車每 stream 僅一條 listener，供 useMqttData 與班次卡共用。
  */
 export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
-  const paused = useDemoSimulationPaused();
+  /**
+   * 何時該丟掉進來的 MQTT。
+   *
+   * <strong>不能用 paused。</strong>那個旗標是 <code>!status.running</code>——
+   * 「示範模擬器沒在跑」。真實車隊從外面推 MQTT 進來時示範模擬器本來就不會跑，
+   * 於是每一筆遙測都在這裡被丟掉：socket 明明收得到（實測 5 秒 172 筆），
+   * hub 卻永遠是空的，圖台的車輛圖層跟著一台都沒有。
+   *
+   * 真正該停的只有一種情況：示範回放正在跑而且被使用者按了暫停。
+   */
+  const { running, transportPaused } = useDemoSimulationPlayback();
+  const paused = running && transportPaused;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
