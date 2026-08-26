@@ -4,6 +4,7 @@ const { SimulatedVehicle } = require('./vehicle');
 const { createApiClient } = require('./apiClient');
 const { MapSource } = require('./mapSource');
 const { TrackGraph } = require('./trackRouter');
+const { buildRoutes, matchRouteForStations } = require('./routePaths');
 
 /**
  * 車隊管理。網頁上的每一個按鈕最後都落到這裡。
@@ -15,8 +16,12 @@ const { TrackGraph } = require('./trackRouter');
 const MAX_EVENTS = 300;
 
 class Fleet {
-  constructor({ credentials, log }) {
+  constructor({ credentials, log, routePaths }) {
     this.credentials = credentials;
+    /** 使用者畫的路線路徑；有畫的路線，車輛照畫的走 */
+    this.routePaths = routePaths;
+    this.mapPayload = null;
+    this.routes = [];
     this.log = log;
     this.target = null;
     this.api = null;
@@ -38,6 +43,19 @@ class Fleet {
    * <code>codes</code> 沒給就用「有密碼的全部車輛」——沒有密碼的車連不上 broker，
    * 列進來只會產生一排連線失敗。
    */
+  /**
+   * 掛上圖資。
+   *
+   * 路徑編輯器與車隊用<strong>同一份</strong>圖資：兩邊各抓一次的話，使用者在
+   * 編輯器上看到的方塊，和車輛實際定位用的方塊可能是不同版本。
+   */
+  attachMap({ mapPayload, map, track }) {
+    this.mapPayload = mapPayload;
+    this.map = map;
+    this.track = track;
+    this.refreshRoutes();
+  }
+
   async start(target, codes) {
     if (this.running) await this.stop();
 
@@ -49,17 +67,22 @@ class Fleet {
     this.target = target;
     this.api = createApiClient(target, this.credentials);
 
-    this.log('info', 'fleet', `取圖資中（${target.host}）…`);
-    const mapPayload = await this.api.activeMap();
-    const mapId = mapPayload?.mapId;
-    // 站點別名與渡線途經點是另外兩支端點；少了它們，正線班次的站序有一半查不到
-    const [operationNodes, waypoints] = await Promise.all([
-      mapId ? this.api.operationNodes(mapId) : null,
-      mapId ? this.api.waypoints(mapId) : null,
-    ]);
-    this.map = new MapSource({ map: mapPayload, operationNodes, waypoints });
-    // 軌道圖：車輛靠它把 A→B 走成沿軌的折線，而不是切過空地的直線
-    this.track = new TrackGraph(mapPayload);
+    if (!this.map) {
+      this.log('info', 'fleet', `取圖資中（${target.host}）…`);
+      const mapPayload = await this.api.activeMap();
+      const mapId = mapPayload?.mapId;
+      // 站點別名與渡線途經點是另外兩支端點；少了它們，正線班次的站序有一半查不到
+      const [operationNodes, waypoints] = await Promise.all([
+        mapId ? this.api.operationNodes(mapId) : null,
+        mapId ? this.api.waypoints(mapId) : null,
+      ]);
+      this.attachMap({
+        mapPayload,
+        map: new MapSource({ map: mapPayload, operationNodes, waypoints }),
+        // 軌道圖：沒有人畫路徑時的退路，車輛自己沿軌找最短路
+        track: new TrackGraph(mapPayload),
+      });
+    }
     if (this.map.size === 0) {
       throw new Error('圖資裡沒有任何帶座標的站點或設施，車輛無法定位');
     }
@@ -84,6 +107,7 @@ class Fleet {
         api: this.api,
         map: this.map,
         track: this.track,
+        routeFor: (stationIds) => this.routeForStations(stationIds),
         log: this.log,
         speed: () => this.speedMultiplier,
       });
@@ -100,7 +124,26 @@ class Fleet {
     return this.snapshot();
   }
 
+  /** 重新整理路線清單（載入圖資後、或使用者存檔後呼叫） */
+  refreshRoutes() {
+    if (!this.mapPayload || !this.map) return [];
+    this.routes = buildRoutes({
+      mapPayload: this.mapPayload,
+      map: this.map,
+      store: this.routePaths,
+    });
+    return this.routes;
+  }
+
+  /** 這組站序有沒有人畫過路徑；沒有就回 null，車輛退回自動沿軌 */
+  routeForStations(stationIds) {
+    const route = matchRouteForStations(this.routes, stationIds);
+    if (!route || !route.customised || route.samples.length < 2) return null;
+    return route;
+  }
+
   async stop() {
+    // 圖資與路線保留：路徑編輯不需要車隊在線上
     for (const vehicle of this.vehicles.values()) vehicle.disconnect();
     this.vehicles.clear();
     this.startedAt = null;
@@ -128,6 +171,8 @@ class Fleet {
       startedAt: this.startedAt,
       speedMultiplier: this.speedMultiplier,
       target: this.target,
+      routeCount: this.routes.length,
+      customisedRoutes: this.routes.filter((r) => r.customised).length,
       map: this.map
         ? {
           id: this.map.mapId,

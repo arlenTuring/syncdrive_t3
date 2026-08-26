@@ -84,13 +84,14 @@ function walkPolyline(points, ratio) {
 }
 
 class SimulatedVehicle {
-  constructor({ code, password, target, api, map, track, log, speed }) {
+  constructor({ code, password, target, api, map, track, routeFor, log, speed }) {
     this.code = code;
     this.password = password;
     this.target = target;
     this.api = api;
     this.map = map;
     this.track = track;
+    this.routeFor = routeFor;
     this.log = log;
     this.speedRef = speed;
 
@@ -197,9 +198,19 @@ class SimulatedVehicle {
     try {
       const order = await this.api.queryOrder(orderId);
       const { points: stops, missing } = this.map.polylineFor(order);
-      // 站與站之間沿軌道走。圖台只認落在軌道段內的座標，直線切過去的話整趟
-      // 沒有一幀在軌道上，車就會從畫面上消失。
-      const points = this.routeThroughStops(stops);
+
+      // 有人畫過這條路線的路徑就照畫的走；沒有才自動沿軌找最短路。
+      //
+      // 人畫的優先，是因為「實際要走哪一條」只有人知道——同樣兩站之間可能有
+      // 好幾條走法，最短的那條未必是現場真的會走的那條。
+      const stationIds = (order?.payload?.stations ?? [])
+        .map((station) => station?.station_id)
+        .filter(Boolean)
+        .map(String);
+      const drawn = this.routeFor ? this.routeFor(stationIds) : null;
+      const points = drawn
+        ? drawn.samples.map((point) => ({ ...point }))
+        : this.routeThroughStops(stops);
       if (points.length < 2) {
         this.log(
           'error',
@@ -226,6 +237,8 @@ class SimulatedVehicle {
         // 「H3 → undefined」。
         from: stops[0]?.name ?? null,
         to: stops[stops.length - 1]?.name ?? null,
+        /** 是否照使用者畫的路徑走 */
+        drawnRouteId: drawn?.routeId ?? null,
         tripCode: order.tripCode ?? order.trip_code ?? '',
         kind: order.payload?.kind ?? 'passenger',
         yardSlotId: order.payload?.yard_slot_id ?? null,
@@ -241,7 +254,8 @@ class SimulatedVehicle {
         'order',
         this.code,
         `接單 ${orderId}（${this.order.from ?? '?'} → ${this.order.to ?? '?'}，`
-          + `計畫 ${Math.round(plannedMs / 1000)} 秒）`,
+          + `計畫 ${Math.round(plannedMs / 1000)} 秒`
+          + `${drawn ? `，走 ${drawn.displayName} 的自訂路徑` : ''}）`,
       );
     } catch (error) {
       this.lastError = error.message;
@@ -461,6 +475,7 @@ class SimulatedVehicle {
           progress: Math.round(this.order.progress * 100),
           from: this.order.from,
           to: this.order.to,
+          drawnRouteId: this.order.drawnRouteId,
         }
         : null,
     };

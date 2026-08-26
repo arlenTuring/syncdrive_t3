@@ -7,6 +7,16 @@ const { Fleet, LogBus } = require('./src/fleet');
 const { load: loadCredentials } = require('./src/credentials');
 const { resolveTarget, PRESETS } = require('./src/targets');
 const { createApiClient } = require('./src/apiClient');
+const {
+  RoutePathStore,
+  buildRoutes,
+  describePath,
+  straightPath,
+  collectTracks,
+  fieldBounds,
+} = require('./src/routePaths');
+const { MapSource } = require('./src/mapSource');
+const { TrackGraph } = require('./src/trackRouter');
 
 /**
  * 本地模擬器：控制面 ＋ 網頁。
@@ -28,10 +38,45 @@ const PORT = Number(process.env.PORT ?? 4300);
 
 const logBus = new LogBus();
 const credentials = loadCredentials(ROOT);
+const routePaths = new RoutePathStore(path.join(ROOT, 'data/route-paths.json'));
 const fleet = new Fleet({
   credentials,
+  routePaths,
   log: (level, source, message) => logBus.push(level, source, message),
 });
+
+/**
+ * 路徑編輯器用的圖資快取。
+ *
+ * 編輯路徑不必先讓車隊上線——那是兩件事。所以這裡自己抓一份，抓過就留著；
+ * 車隊上線時會用同一份，不會重抓。
+ */
+let mapCache = null;
+
+async function loadMapForEditor() {
+  if (mapCache) return mapCache;
+  const api = createApiClient(currentTarget, credentials);
+  const mapPayload = await api.activeMap();
+  const mapId = mapPayload?.mapId;
+  const [operationNodes, waypoints] = await Promise.all([
+    mapId ? api.operationNodes(mapId) : null,
+    mapId ? api.waypoints(mapId) : null,
+  ]);
+  const map = new MapSource({ map: mapPayload, operationNodes, waypoints });
+  const tracks = collectTracks(mapPayload);
+  mapCache = { mapPayload, map, tracks };
+  // 車隊用同一份：編輯器上看到的方塊，就是車輛定位用的方塊
+  fleet.attachMap({ mapPayload, map, track: new TrackGraph(mapPayload) });
+  return mapCache;
+}
+
+function routesSnapshot(cache) {
+  return buildRoutes({
+    mapPayload: cache.mapPayload,
+    map: cache.map,
+    store: routePaths,
+  });
+}
 
 let currentTarget = resolveTarget({ id: process.env.SIM_TARGET ?? 'gcp' });
 
@@ -139,6 +184,8 @@ const routes = {
   'POST /api/target': async (req, res) => {
     if (fleet.running) throw new Error('車隊在線上時不能切換目標，請先停止');
     currentTarget = resolveTarget(await readBody(req));
+    // 換一台伺服器就是換一份圖資，快取必須丟掉
+    mapCache = null;
     logBus.push('info', 'target', `目標 → ${currentTarget.label}（${currentTarget.host}）`);
     sendJson(res, 200, state());
   },
@@ -170,6 +217,82 @@ const routes = {
       vehicle.raiseFault('PATH_BLOCKED', 'CRITICAL', '模擬車端緊急停止，路徑受阻');
     }
     sendJson(res, 200, vehicle.snapshot());
+  },
+
+  // ── 路線路徑編輯 ──────────────────────────────────────────
+
+  'GET /api/map/geometry': async (_req, res) => {
+    const cache = await loadMapForEditor();
+    const points = [...cache.map.points.values()];
+    sendJson(res, 200, {
+      mapId: cache.mapPayload?.mapId ?? null,
+      displayName: cache.mapPayload?.displayName ?? null,
+      bounds: fieldBounds(cache.tracks, points),
+      tracks: cache.tracks,
+    });
+  },
+
+  'GET /api/routes': async (_req, res) => {
+    const cache = await loadMapForEditor();
+    sendJson(res, 200, { routes: routesSnapshot(cache) });
+  },
+
+  'PUT /api/routes': async (req, res) => {
+    const { routeId, waypoints } = await readBody(req);
+    const cache = await loadMapForEditor();
+    const routes = routesSnapshot(cache);
+    const route = routes.find((item) => item.routeId === routeId);
+    if (!route) throw new Error(`找不到路線 ${routeId}`);
+    if (!Array.isArray(waypoints) || waypoints.length < 2) {
+      throw new Error('路徑至少要有兩個點');
+    }
+
+    // 站點是班表定義的停靠順序，路徑只能決定「怎麼從這一站開到下一站」。
+    // 用送進來的站點欄位回頭核對，順序或數量不符就整批拒絕——存進去之後才發現
+    // 對不上，車輛會照著錯的站序跑。
+    const sentStations = waypoints
+      .filter((point) => point?.stationId)
+      .map((point) => String(point.stationId));
+    if (sentStations.join('>') !== route.stationIds.join('>')) {
+      throw new Error(
+        `站點順序不符：路線是 ${route.stationIds.join(' → ')}，`
+        + `送來的是 ${sentStations.join(' → ') || '（沒有站點）'}`,
+      );
+    }
+
+    const cleaned = waypoints.map((point) => ({
+      x: Number(point.x),
+      y: Number(point.y),
+      ...(point.stationId ? { stationId: String(point.stationId) } : {}),
+    }));
+    if (cleaned.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+      throw new Error('路徑點座標必須是數字');
+    }
+
+    routePaths.set(routeId, { waypoints: cleaned, updatedAt: Date.now() });
+    fleet.refreshRoutes();
+
+    const described = describePath(cleaned, cache.tracks);
+    logBus.push(
+      'info',
+      'route',
+      `${route.displayName} 路徑已存：${cleaned.length} 個折線頂點、`
+        + `經過 ${described.tracks.length} 個方塊、${described.samples.length} 個路徑點`,
+    );
+    sendJson(res, 200, { routeId, ...described, customised: true });
+  },
+
+  'POST /api/routes/reset': async (req, res) => {
+    const { routeId } = await readBody(req);
+    const cache = await loadMapForEditor();
+    const routes = routesSnapshot(cache);
+    const route = routes.find((item) => item.routeId === routeId);
+    if (!route) throw new Error(`找不到路線 ${routeId}`);
+    routePaths.remove(routeId);
+    fleet.refreshRoutes();
+    logBus.push('info', 'route', `${route.displayName} 路徑已還原成站點直線`);
+    const described = describePath(straightPath(route.stations), cache.tracks);
+    sendJson(res, 200, { routeId, ...described, customised: false });
   },
 
   'POST /api/dispatch/enable': async (req, res) => {

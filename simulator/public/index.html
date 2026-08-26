@@ -15,7 +15,12 @@
     <div class="target-badge" id="targetBadge">—</div>
   </header>
 
-  <main>
+  <nav class="tabs">
+    <button class="tab active" data-tab="control">模擬控制</button>
+    <button class="tab" data-tab="routes">路線路徑</button>
+  </nav>
+
+  <main data-panel="control">
     <section class="card">
       <h2>一、連線目標</h2>
       <p class="hint">切換 GCP 與本地只有位址不同，通道與認證方式完全一樣。</p>
@@ -90,7 +95,7 @@
     </section>
 
     <section class="card">
-      <h2>四、事件</h2>
+      <h2>五、事件</h2>
       <div class="row">
         <label class="inline"><input type="checkbox" id="onlyOrders" /> 只看訂單與異常</label>
         <button id="clearLogBtn" class="btn ghost">清畫面</button>
@@ -99,6 +104,45 @@
     </section>
   </main>
 
+  <main data-panel="routes" hidden>
+    <section class="card">
+      <h2>路線路徑</h2>
+      <p class="hint">
+        地圖與路線都是從伺服器讀來的，<strong>這裡不能新增或刪除任何元件</strong>。
+        能改的只有一件事：每條路線怎麼從這一站開到下一站。
+      </p>
+      <div class="row">
+        <label>路線
+          <select id="routeSelect"><option>載入中…</option></select>
+        </label>
+        <button id="routeSaveBtn" class="btn primary">儲存路徑</button>
+        <button id="routeResetBtn" class="btn danger">還原成直線</button>
+        <span id="routeStatus" class="hint" style="margin:0"></span>
+      </div>
+      <p class="hint">
+        點線段中央的 <strong>＋</strong> 會在該處長出一個折線點，線就分成兩段；
+        拖動折線點改變線徑。<strong>站點是固定的</strong>，不能拖也不能刪——那是
+        班表定的停靠順序。折線點按右鍵可刪除。
+      </p>
+
+      <div class="map-wrap">
+        <svg id="routeMap" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div class="route-info">
+        <div>
+          <h3>經過的方塊</h3>
+          <div id="routeTracks" class="mono-box">尚未選擇路線</div>
+        </div>
+        <div>
+          <h3>路徑點</h3>
+          <div id="routeSamples" class="mono-box">尚未選擇路線</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <script src="/app.js"></script>
+  <script src="/routes.js"></script>
 </body>
 </html>
