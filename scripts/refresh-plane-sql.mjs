@@ -101,20 +101,43 @@ if (!apply) {
   process.exit(0);
 }
 
+// 這一支是<strong>整批覆寫</strong>：送進去的清單就是最終結果，沒送到的版面會被
+// 刪掉。所以要連同其他版面一起送，而且外層一定要是 { items: [...] }——漏掉外層
+// 時後端讀到的是空清單，會安靜地回 200 並把所有版面清空（2026-08-26 實測踩過）。
+const allPlanes = await (
+  await fetch(`${base}/syncdrive-api/dashboard/planes`, { headers })
+).json();
+const items = allPlanes.map((row) => ({
+  planeId: row.planeId,
+  name: row.name,
+  width: row.width,
+  height: row.height,
+  viewportMode: row.viewportMode ?? null,
+  elements: row.planeId === planeId ? elements : (row.elements ?? []),
+  isTemplate: row.isTemplate ?? false,
+  version: row.version ?? 1,
+}));
+if (items.length === 0) {
+  console.error('讀不到任何版面，中止——空清單會把伺服器上的版面全部刪掉');
+  process.exit(1);
+}
+
 const put = await fetch(`${base}/syncdrive-api/dashboard/planes`, {
   method: 'PUT',
   headers: { ...headers, 'Content-Type': 'application/json' },
-  body: JSON.stringify([
-    {
-      planeId,
-      name: plane.name,
-      width: plane.width,
-      height: plane.height,
-      viewportMode: plane.viewportMode,
-      elements,
-      isTemplate: plane.isTemplate,
-      version: plane.version,
-    },
-  ]),
+  body: JSON.stringify({ items }),
 });
-console.log(put.ok ? '已寫回' : `寫回失敗：${put.status} ${await put.text()}`);
+if (!put.ok) {
+  console.error(`寫回失敗：${put.status} ${await put.text()}`);
+  process.exit(1);
+}
+// 整批覆寫踩錯格式時後端一樣回 200，所以寫回之後一定要回查
+const after = await (
+  await fetch(`${base}/syncdrive-api/dashboard/planes`, { headers })
+).json();
+console.log(`已寫回，伺服器上現有 ${after.length} 份版面：`
+  + after.map((row) => `${row.planeId}(${(row.elements ?? []).length})`).join('、'));
+if (after.length !== items.length) {
+  console.error('版面數與送出的不符，請立刻檢查');
+  process.exit(1);
+}
