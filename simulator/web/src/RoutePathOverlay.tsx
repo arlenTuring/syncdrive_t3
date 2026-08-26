@@ -7,6 +7,8 @@ export type EditPoint = {
   /** 有值＝班表定的停靠站：位置固定，不能拖也不能刪 */
   stationId?: string
   name?: string
+  /** 這個點到下一點之間，自動找路找不到——畫紅虛線，等人自己畫 */
+  brokenAhead?: boolean
 }
 
 type RoutePathOverlayProps = {
@@ -69,7 +71,6 @@ export function RoutePathOverlay({ points, isOnField, onChange }: RoutePathOverl
 
   /** 控制點在螢幕上要維持的大小，換算回使用者座標 */
   const u = (screenPx: number) => screenPx / scale
-  const polyline = points.map((p) => `${p.px},${p.py}`).join(' ')
 
   const startDrag = (e: React.PointerEvent, index: number) => {
     const svg = svgRef.current
@@ -109,6 +110,8 @@ export function RoutePathOverlay({ points, isOnField, onChange }: RoutePathOverl
     const a = points[legIndex]!
     const b = points[legIndex + 1]!
     const next = [...points]
+    // 人一旦動手畫這一段，就不再是「自動找不到路」的佔位線了
+    next[legIndex] = { ...a, brokenAhead: false }
     next.splice(legIndex + 1, 0, { px: (a.px + b.px) / 2, py: (a.py + b.py) / 2 })
     onChange(next)
     setActiveLeg(null)
@@ -122,14 +125,27 @@ export function RoutePathOverlay({ points, isOnField, onChange }: RoutePathOverl
         width="100%"
         height="100%"
       >
-        <polyline
-          points={polyline}
-          fill="none"
-          stroke="#38bdf8"
-          strokeWidth={u(2.5)}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {/*
+          * 逐段畫，不是一條 polyline：連不起來的那一段要能單獨標成紅虛線。
+          * 地圖編輯器就是這樣顯示 brokenLegs 的——那條線是佔位用的，不是真的路徑。
+          */}
+        {points.slice(0, -1).map((a, i) => {
+          const b = points[i + 1]!
+          const broken = Boolean(a.brokenAhead)
+          return (
+            <line
+              key={`seg-${i}`}
+              x1={a.px}
+              y1={a.py}
+              x2={b.px}
+              y2={b.py}
+              stroke={broken ? '#f87171' : '#38bdf8'}
+              strokeWidth={u(2.5)}
+              strokeLinecap="round"
+              strokeDasharray={broken ? `${u(8)} ${u(6)}` : undefined}
+            />
+          )
+        })}
 
         {/* 點得到的線段：透明加粗，寬度照螢幕大小而不是圖面大小 */}
         {points.slice(0, -1).map((a, i) => {

@@ -48,79 +48,95 @@ function keepRelevantFacilities(areas: MapAreaObject[]): MapAreaObject[] {
 }
 
 /**
+ * 只留下真正的轉折點。
+ *
+ * <h3>為什麼一定要收</h3>
+ * <code>pathLegs</code> 是<strong>畫線用</strong>的密集折線：一條斜穿橫渡線的直線可能有
+ * 十幾個頂點。地圖編輯器把它整條畫出來，看起來就是一條直線——因為它只在站點放徽章，
+ * 中間的頂點不顯示。
+ *
+ * 這一頁不一樣：每個頂點都是可以拖的控制點。不收的話，一條直線上會排滿十幾個方塊，
+ * 既擋住底圖也沒有任何意義——沒有人要去拖一條直線中間的第七個點。
+ *
+ * <code>collapseColinearPathPx</code> 不夠用：它只收<strong>軸向</strong>的共線點，而橫渡線
+ * 是斜的，一個都收不掉。這裡改用轉向角判斷，斜的直線一樣收得掉。
+ */
+function keepCorners(
+  points: Array<{ x: number; y: number }>,
+  minTurnDeg = 4,
+): Array<{ x: number; y: number }> {
+  if (points.length <= 2) return points.map((p) => ({ ...p }))
+  const out = [{ ...points[0]! }]
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const a = out[out.length - 1]!
+    const b = points[i]!
+    const c = points[i + 1]!
+    const inAngle = Math.atan2(b.y - a.y, b.x - a.x)
+    const outAngle = Math.atan2(c.y - b.y, c.x - b.x)
+    let turn = Math.abs((outAngle - inAngle) * (180 / Math.PI)) % 360
+    if (turn > 180) turn = 360 - turn
+    if (turn >= minTurnDeg) out.push({ ...b })
+  }
+  out.push({ ...points[points.length - 1]! })
+  return out
+}
+
+/**
  * 路線的預設路徑：<strong>沿軌道走</strong>，不是站點直線。
  *
- * 用的是地圖編輯器自己那支 <code>resolveRoutePreviewGeometry</code>——它會把站點吸附
- * 到軌道中心線、在軌道網路上找最短路、走該走的橫渡線。所以一打開看到的就是編輯器
- * 上顯示的那條線，會過 cross，不會斜穿空地。
+ * 整條路徑——站點位置與線徑——都是地圖編輯器那支 <code>resolveRoutePreviewGeometry</code>
+ * 算的，跟編輯器上顯示的是同一份結果。<strong>這裡不另外算一套</strong>：站點吸附到哪、
+ * 走哪條橫渡線、在哪裡轉，全部照它的。
  *
- * <h3>為什麼一段一段算，不整條丟進去</h3>
+ * <h3>為什麼一次只問兩站</h3>
  * 整條丟進去時，回傳的 <code>pathLegs</code> 與站序<strong>不保證一一對應</strong>：
- * 只要有一段連不起來，後面全部錯位，折線點會插到別段去——存出來的路徑點順序是亂的，
- * 車輛會照著倒退的座標開。一次只問兩站，回來的就只可能是這兩站之間的東西。
- *
- * <h3>站點座標不用它算的</h3>
- * 幾何回傳的站點是<strong>吸附到軌道中心線之後</strong>的位置，與班表定義的停靠點
- * 差得可能很遠（實測有一站從 y=170 變成 y=111）。錨點一律用伺服器給的真實站點座標，
- * 幾何只拿中間的轉折。
+ * 只要有一段連不起來，後面全部錯位，折線點會插到別段去。一次只問兩站，回來的就只
+ * 可能是這兩站之間的東西。
  */
 function defaultPathPoints(
   areas: MapAreaObject[],
   pointTopology: PointTopology | null,
   route: RouteEntry,
 ): { points: EditPoint[]; followsTracks: boolean; warnings: string[] } {
-  const stations = route.stations.filter(
-    (s) => Number.isFinite(s.px) && Number.isFinite(s.py),
-  )
-  if (stations.length < 2) return { points: [], followsTracks: false, warnings: [] }
+  const ids = route.stationIds
+  if (ids.length < 2) return { points: [], followsTracks: false, warnings: [] }
+  const nameById = new Map(route.stations.map((s) => [s.id, s.name]))
 
   const points: EditPoint[] = []
   const warnings: string[] = []
   let allFollowTracks = true
 
-  for (let i = 0; i < stations.length; i += 1) {
-    const station = stations[i]!
-    points.push({
-      px: station.px as number,
-      py: station.py as number,
-      stationId: station.id,
-      name: station.name,
-    })
-
-    const nextStation = stations[i + 1]
-    if (!nextStation) break
-
-    const geometry = resolveRoutePreviewGeometry(
-      areas,
-      [station.id, nextStation.id],
-      pointTopology,
-    )
+  for (let i = 0; i < ids.length - 1; i += 1) {
+    const geometry = resolveRoutePreviewGeometry(areas, [ids[i]!, ids[i + 1]!], pointTopology)
+    const from = geometry.stations[0]
+    const to = geometry.stations[1]
+    if (!from || !to) continue
     if (!geometry.followsTracks) allFollowTracks = false
     for (const w of geometry.warnings) warnings.push(w.message)
 
-    /*
-     * 頭尾是被吸附過的兩端，這裡只收中間的轉折，而且只收<strong>真的走在兩站之間</strong>的。
-     *
-     * 吸附後的端點與真正的站點差幾個像素，於是頭尾附近會冒出幾乎重疊、甚至超過站點的
-     * 轉折點。留著的話路徑會在站點旁邊回鉤一下——畫面上看不太出來，但存下去的路徑點
-     * 順序是往回走的。
-     *
-     * 判斷方式是投影到「這一站→下一站」的向量上：投影比例落在 0～1 之外就是沒有前進，
-     * 丟掉。這比用距離門檻乾淨——門檻要調，投影不用。
-     */
+    // 站點位置用編輯器算的：它會吸附到軌道上，橫渡線端點就落在 cross 的角上
+    if (points.length === 0) {
+      points.push({
+        px: from.x,
+        py: from.y,
+        stationId: from.stationId,
+        name: nameById.get(from.stationId) ?? from.stationName,
+      })
+    }
+    // 這一段沿不了軌道：畫成紅虛線，那是佔位的直線，不是真的路徑
+    if (!geometry.followsTracks) points[points.length - 1]!.brokenAhead = true
+
     const leg = geometry.pathLegs?.[0] ?? geometry.pathPx
     if (leg && leg.length > 2) {
-      const ax = station.px as number
-      const ay = station.py as number
-      const dx = (nextStation.px as number) - ax
-      const dy = (nextStation.py as number) - ay
-      const lenSq = dx * dx + dy * dy
-      for (const p of leg.slice(1, -1)) {
-        const t = lenSq > 0 ? ((p.x - ax) * dx + (p.y - ay) * dy) / lenSq : 0.5
-        if (t <= 0.02 || t >= 0.98) continue
-        points.push({ px: p.x, py: p.y })
-      }
+      for (const p of keepCorners(leg).slice(1, -1)) points.push({ px: p.x, py: p.y })
     }
+
+    points.push({
+      px: to.x,
+      py: to.y,
+      stationId: to.stationId,
+      name: nameById.get(to.stationId) ?? to.stationName,
+    })
   }
 
   return { points, followsTracks: allFollowTracks, warnings: [...new Set(warnings)] }
