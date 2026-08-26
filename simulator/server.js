@@ -13,8 +13,8 @@ const {
   describePath,
   straightPath,
   collectTracks,
-  fieldBounds,
 } = require('./src/routePaths');
+const { buildCanvas, fieldToPixel } = require('./src/mapGeometry');
 const { MapSource } = require('./src/mapSource');
 const { TrackGraph } = require('./src/trackRouter');
 
@@ -64,7 +64,8 @@ async function loadMapForEditor() {
   ]);
   const map = new MapSource({ map: mapPayload, operationNodes, waypoints });
   const tracks = collectTracks(mapPayload);
-  mapCache = { mapPayload, map, tracks };
+  const canvas = buildCanvas(mapPayload);
+  mapCache = { mapPayload, map, tracks, canvas };
   // 車隊用同一份：編輯器上看到的方塊，就是車輛定位用的方塊
   fleet.attachMap({ mapPayload, map, track: new TrackGraph(mapPayload) });
   return mapCache;
@@ -75,6 +76,7 @@ function routesSnapshot(cache) {
     mapPayload: cache.mapPayload,
     map: cache.map,
     store: routePaths,
+    canvas: cache.canvas,
   });
 }
 
@@ -223,12 +225,10 @@ const routes = {
 
   'GET /api/map/geometry': async (_req, res) => {
     const cache = await loadMapForEditor();
-    const points = [...cache.map.points.values()];
     sendJson(res, 200, {
       mapId: cache.mapPayload?.mapId ?? null,
       displayName: cache.mapPayload?.displayName ?? null,
-      bounds: fieldBounds(cache.tracks, points),
-      tracks: cache.tracks,
+      ...cache.canvas,
     });
   },
 

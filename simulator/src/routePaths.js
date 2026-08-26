@@ -8,6 +8,8 @@ const {
   tracksAlongPath,
   samplePath,
   pathLength,
+  buildCanvas,
+  fieldToPixel,
 } = require('./mapGeometry');
 
 /**
@@ -107,10 +109,24 @@ function describePath(waypoints, tracks) {
  * 站點座標查不到的路線仍然列出來，但標成不可編輯——直接消失的話，使用者會以為
  * 地圖裡沒有那條路線，而不是「那條路線的站點在圖資裡找不到」。
  */
-function buildRoutes({ mapPayload, map, store }) {
+function buildRoutes({ mapPayload, map, store, canvas }) {
   const doc = mapPayload?.mapDocument ?? mapPayload;
   const tracks = collectTracks(mapPayload);
+  const sheet = canvas ?? buildCanvas(mapPayload);
   const out = [];
+
+  /**
+   * 站點在圖面上的位置。
+   *
+   * 先用場域座標反查落在哪個方塊裡；查不到（站點剛好在方塊縫隙）就退回該設施
+   * 自己的像素框中心——站台一定畫得出來，只是位置不會貼在軌道正中間。
+   */
+  const stationPixel = (stationId, xM, yM) => {
+    const viaField = fieldToPixel(sheet.facilities, xM, yM);
+    if (viaField) return viaField;
+    const own = sheet.facilities.find((f) => f.id === stationId);
+    return own ? { x: own.x + own.w / 2, y: own.y + own.h / 2 } : null;
+  };
 
   for (const route of doc?.routes ?? []) {
     const stationIds = Array.isArray(route.stationIds) ? route.stationIds : [];
@@ -118,8 +134,17 @@ function buildRoutes({ mapPayload, map, store }) {
     const missing = [];
     for (const id of stationIds) {
       const point = map.point(id);
-      if (point) stations.push({ id, name: point.name, x: point.x, y: point.y });
-      else missing.push(id);
+      if (point) {
+        const px = stationPixel(point.id, point.x, point.y);
+        stations.push({
+          id,
+          name: point.name,
+          x: point.x,
+          y: point.y,
+          px: px?.x ?? null,
+          py: px?.y ?? null,
+        });
+      } else missing.push(id);
     }
 
     const saved = store.get(route.routeId);

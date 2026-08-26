@@ -7,10 +7,15 @@
  * 調整每條路線<strong>怎麼從這一站開到下一站</strong>。地圖、軌道方塊、站點都是
  * 從伺服器讀來的，不能新增也不能刪除——那些是圖資，屬於場域管理，不屬於模擬器。
  *
- * <h3>座標系</h3>
- * 畫面用場域公尺（原點左下、y 向上），與車輛回報的位置同一套。SVG 的 y 是向下
- * 長的，所以只在最後轉換一次；<strong>所有計算都留在公尺</strong>，不要在像素與
- * 公尺之間來回換算——那是折角會慢慢跑掉的來源。
+ * <h3>兩套座標</h3>
+ * <pre>
+ *   圖面像素  照圖資本來的版面畫，看起來與圖台一致
+ *   場域公尺  存檔與餵給車輛用的，車輛回報的 local_pose 就是這一套
+ * </pre>
+ *
+ * 兩者<strong>不是單一線性關係</strong>：每個方塊各自對應自己那一段現場。所以
+ * 換算一律逐方塊做——找出點落在哪個方塊裡，再依比例映射。這正是圖台判讀車輛
+ * 位置的反向操作，因此這裡量到的數字，車輛拿去用會落在同一個地方。
  */
 
 (() => {
@@ -24,17 +29,31 @@
   if (!svg) return;
 
   const NS = 'http://www.w3.org/2000/svg';
-  /** ＋ 鈕半徑（像素）。使用者明確要求「不要太小」。 */
-  const PLUS_RADIUS = 13;
-  const HANDLE_RADIUS = 8;
+  /** ＋ 鈕半徑（圖面像素）。使用者明確要求「不要太小」。 */
+  const PLUS_RADIUS = 16;
+  const HANDLE_RADIUS = 10;
+
+  /** 沒有自訂填色時的型別配色，取自圖台的視覺 */
+  const TYPE_FILL = {
+    Track: '#1a2233',
+    Facility: '#3b2f63',
+    PSD: '#1e3a5f',
+    Signal: 'none',
+    DockingPoint: '#2563eb',
+    Pole: '#3f3a24',
+    TrackCrossover: 'none',
+  };
 
   let geometry = null;
   let routes = [];
   let current = null;
-  /** 目前編輯中的折線頂點（公尺）。站點那幾個帶 stationId，不可移動。 */
+  /** 折線頂點，存的是<strong>場域公尺</strong> */
   let waypoints = [];
   let dirty = false;
   let dragging = null;
+  /** 檢視框（圖面像素）。滾輪縮放、拖底圖平移都只改這個。 */
+  let viewport = null;
+  let panning = null;
 
   const api = async (path, options) => {
     const res = await fetch(path, {
@@ -53,39 +72,129 @@
       : tone === 'ok' ? 'var(--ok)' : 'var(--muted)';
   }
 
-  // ── 公尺 ↔ 畫面 ────────────────────────────────────────────
+  // ── 逐方塊換算 ─────────────────────────────────────────────
 
-  function view() {
-    const b = geometry.bounds;
-    const width = b.xMax - b.xMin;
-    const height = b.yMax - b.yMin;
-    const rect = svg.getBoundingClientRect();
-    // 等比縮放：兩軸用同一個比例，否則折線在畫面上的角度會騙人
-    const scale = Math.min(rect.width / width, rect.height / height);
-    return { b, scale, offsetX: (rect.width - width * scale) / 2, offsetY: (rect.height - height * scale) / 2, rect };
+  function pixelToField(px, py) {
+    for (const f of geometry.facilities) {
+      if (!f.field) continue;
+      if (px < f.x || px > f.x + f.w || py < f.y || py > f.y + f.h) continue;
+      const tx = f.w > 0 ? (px - f.x) / f.w : 0.5;
+      const ty = f.h > 0 ? (py - f.y) / f.h : 0.5;
+      return {
+        x: f.field.xMinM + (f.field.xMaxM - f.field.xMinM) * tx,
+        // 像素 y 向下、場域 y 向上
+        y: f.field.yMaxM - (f.field.yMaxM - f.field.yMinM) * ty,
+        code: f.code,
+      };
+    }
+    return null;
   }
 
-  function toScreen(xM, yM) {
-    const v = view();
+  function fieldToPixel(xM, yM) {
+    for (const f of geometry.facilities) {
+      if (!f.field) continue;
+      const { xMinM, xMaxM, yMinM, yMaxM } = f.field;
+      if (xM < xMinM || xM > xMaxM || yM < yMinM || yM > yMaxM) continue;
+      const tx = xMaxM > xMinM ? (xM - xMinM) / (xMaxM - xMinM) : 0.5;
+      const ty = yMaxM > yMinM ? (yMaxM - yM) / (yMaxM - yMinM) : 0.5;
+      return { x: f.x + f.w * tx, y: f.y + f.h * ty };
+    }
+    return null;
+  }
+
+  /**
+   * 指標位置吸附到最近的軌道方塊。
+   *
+   * 折線點落在方塊外時沒有場域座標可用——那裡不是軌道。與其編一個數字出來，
+   * 不如吸到最近的方塊上：路徑本來就該壓在軌道上，這也讓拖動不必拉得很準。
+   */
+  function snapToTrack(px, py) {
+    const inside = pixelToField(px, py);
+    if (inside) return inside;
+    let best = null;
+    let bestDistance = Infinity;
+    for (const f of geometry.facilities) {
+      if (!f.field || f.type !== 'Track') continue;
+      const cx = Math.max(f.x, Math.min(px, f.x + f.w));
+      const cy = Math.max(f.y, Math.min(py, f.y + f.h));
+      const d = Math.hypot(px - cx, py - cy);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = { px: cx, py: cy };
+      }
+    }
+    return best ? pixelToField(best.px, best.py) : null;
+  }
+
+  /** 螢幕座標 → 圖面像素。viewBox 是等比縮放（xMidYMid meet），只有一個比例。 */
+  function pointerPixel(event) {
+    const rect = svg.getBoundingClientRect();
+    const vb = viewport;
+    const scale = Math.min(rect.width / vb.w, rect.height / vb.h);
+    const offsetX = (rect.width - vb.w * scale) / 2;
+    const offsetY = (rect.height - vb.h * scale) / 2;
     return {
-      x: v.offsetX + (xM - v.b.xMin) * v.scale,
-      // 公尺是 y 向上、SVG 是 y 向下，只在這裡翻一次
-      y: v.offsetY + (v.b.yMax - yM) * v.scale,
+      x: vb.x + (event.clientX - rect.left - offsetX) / scale,
+      y: vb.y + (event.clientY - rect.top - offsetY) / scale,
     };
   }
 
-  function toMeters(screenX, screenY) {
-    const v = view();
-    return {
-      x: v.b.xMin + (screenX - v.offsetX) / v.scale,
-      y: v.b.yMax - (screenY - v.offsetY) / v.scale,
+  function resetViewport() {
+    viewport = {
+      x: 0, y: 0,
+      w: geometry.pixelSize.width,
+      h: geometry.pixelSize.height,
     };
   }
 
-  function pointerMeters(event) {
+  /**
+   * 滾輪縮放，以指標為中心。
+   *
+   * 以畫布中心縮放的話，使用者得先把想看的地方拖到中間才放得大——寬幅圖上那會
+   * 反覆很多次。以指標為中心就是「放大我正在看的這裡」。
+   */
+  svg.addEventListener('wheel', (event) => {
+    if (!geometry) return;
+    event.preventDefault();
+    const at = pointerPixel(event);
+    const factor = event.deltaY < 0 ? 0.85 : 1 / 0.85;
+    const full = geometry.pixelSize;
+    const w = Math.min(full.width, Math.max(full.width / 12, viewport.w * factor));
+    const h = w * (full.height / full.width);
+    viewport = {
+      w, h,
+      x: at.x - (at.x - viewport.x) * (w / viewport.w),
+      y: at.y - (at.y - viewport.y) * (h / viewport.h),
+    };
+    render();
+  }, { passive: false });
+
+  /** 在底圖上拖曳＝平移。折線點與 ＋ 會自己吃掉事件，不會誤觸。 */
+  svg.addEventListener('pointerdown', (event) => {
+    if (dragging || !geometry) return;
+    panning = { startX: event.clientX, startY: event.clientY, view: { ...viewport } };
+    svg.classList.add('panning');
+  });
+
+  svg.addEventListener('pointermove', (event) => {
+    if (!panning) return;
     const rect = svg.getBoundingClientRect();
-    return toMeters(event.clientX - rect.left, event.clientY - rect.top);
-  }
+    const scale = Math.min(rect.width / panning.view.w, rect.height / panning.view.h);
+    viewport = {
+      ...panning.view,
+      x: panning.view.x - (event.clientX - panning.startX) / scale,
+      y: panning.view.y - (event.clientY - panning.startY) / scale,
+    };
+    render();
+  });
+
+  const endPan = () => {
+    panning = null;
+    svg.classList.remove('panning');
+  };
+  svg.addEventListener('pointerup', endPan);
+  svg.addEventListener('pointerleave', endPan);
+  svg.addEventListener('pointercancel', endPan);
 
   // ── 繪製 ───────────────────────────────────────────────────
 
@@ -96,57 +205,86 @@
     return node;
   }
 
+  /** 底圖：照圖資本來的版面畫，與圖台看到的一致 */
+  function renderBase(root) {
+    for (const area of geometry.areas) {
+      el('rect', {
+        x: area.x, y: area.y, width: area.w, height: area.h,
+        fill: 'rgba(255,255,255,0.02)',
+        stroke: 'rgba(148,163,184,0.18)', 'stroke-width': 1,
+      }, root);
+    }
+
+    for (const f of geometry.facilities) {
+      const fill = f.fill ?? TYPE_FILL[f.type] ?? '#1a2233';
+      const transform = f.rotationDeg
+        ? `rotate(${f.rotationDeg} ${f.x + f.w / 2} ${f.y + f.h / 2})`
+        : null;
+      if (fill !== 'none') {
+        el('rect', {
+          x: f.x, y: f.y, width: f.w, height: f.h,
+          rx: f.type === 'Track' ? 2 : 4,
+          fill,
+          stroke: f.type === 'Track' ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.35)',
+          'stroke-width': 1,
+          ...(transform ? { transform } : {}),
+        }, root);
+      }
+      // 標籤只給看得下的方塊，太小的字疊在一起反而看不懂
+      if (f.code && f.w >= 40 && f.h >= 16) {
+        el('text', {
+          x: f.x + f.w / 2, y: f.y + f.h / 2 + 4,
+          fill: 'rgba(226,232,240,0.75)',
+          'font-size': Math.min(13, Math.max(9, f.h * 0.4)),
+          'text-anchor': 'middle',
+        }, root).textContent = f.code;
+      }
+    }
+  }
+
   function render() {
     svg.innerHTML = '';
     if (!geometry) return;
+    if (!viewport) resetViewport();
+    svg.setAttribute('viewBox', `${viewport.x} ${viewport.y} ${viewport.w} ${viewport.h}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-    // 軌道方塊：底圖，只是讓人看得出路徑有沒有壓在軌道上
-    const base = el('g', { class: 'tracks' }, svg);
-    for (const track of geometry.tracks) {
-      const a = toScreen(track.xMin, track.yMax);
-      const b = toScreen(track.xMax, track.yMin);
-      el('rect', {
-        x: a.x, y: a.y,
-        width: Math.max(1, b.x - a.x),
-        height: Math.max(1, b.y - a.y),
-        fill: 'rgba(56,189,248,0.10)',
-        stroke: 'rgba(56,189,248,0.35)',
-        'stroke-width': 0.5,
-      }, base);
-    }
+    renderBase(el('g', {}, svg));
 
     if (!current || waypoints.length < 2) return;
 
-    // 線段
+    const screen = waypoints.map((point) => {
+      const px = fieldToPixel(point.x, point.y);
+      return px ?? { x: 0, y: 0, off: true };
+    });
+
+    // 放大時線與把手要跟著變細，不然近看整片都是色塊
+    const k = viewport.w / geometry.pixelSize.width;
     const lines = el('g', {}, svg);
-    for (let i = 0; i < waypoints.length - 1; i += 1) {
-      const a = toScreen(waypoints[i].x, waypoints[i].y);
-      const b = toScreen(waypoints[i + 1].x, waypoints[i + 1].y);
+    for (let i = 0; i < screen.length - 1; i += 1) {
       el('line', {
-        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
-        stroke: '#38bdf8', 'stroke-width': 2.5, 'stroke-linecap': 'round',
+        x1: screen[i].x, y1: screen[i].y, x2: screen[i + 1].x, y2: screen[i + 1].y,
+        stroke: '#38bdf8', 'stroke-width': 5 * k, 'stroke-linecap': 'round',
+        opacity: 0.9,
       }, lines);
     }
 
-    // 每段中央的 ＋：點下去在該處長出折線點
     const plus = el('g', {}, svg);
-    for (let i = 0; i < waypoints.length - 1; i += 1) {
-      const a = toScreen(waypoints[i].x, waypoints[i].y);
-      const b = toScreen(waypoints[i + 1].x, waypoints[i + 1].y);
-      const cx = (a.x + b.x) / 2;
-      const cy = (a.y + b.y) / 2;
-      const group = el('g', { class: 'plus', style: 'cursor:pointer' }, plus);
+    for (let i = 0; i < screen.length - 1; i += 1) {
+      const cx = (screen[i].x + screen[i + 1].x) / 2;
+      const cy = (screen[i].y + screen[i + 1].y) / 2;
+      const group = el('g', { style: 'cursor:pointer', class: 'plus' }, plus);
       el('circle', {
         cx, cy, r: PLUS_RADIUS,
-        fill: '#0f1115', stroke: '#38bdf8', 'stroke-width': 2,
+        fill: '#0f1115', stroke: '#38bdf8', 'stroke-width': 3,
       }, group);
       el('line', {
-        x1: cx - 6, y1: cy, x2: cx + 6, y2: cy,
-        stroke: '#38bdf8', 'stroke-width': 2.5, 'stroke-linecap': 'round',
+        x1: cx - 8 * k, y1: cy, x2: cx + 8 * k, y2: cy,
+        stroke: '#38bdf8', 'stroke-width': 3 * k, 'stroke-linecap': 'round',
       }, group);
       el('line', {
-        x1: cx, y1: cy - 6, x2: cx, y2: cy + 6,
-        stroke: '#38bdf8', 'stroke-width': 2.5, 'stroke-linecap': 'round',
+        x1: cx, y1: cy - 8 * k, x2: cx, y2: cy + 8 * k,
+        stroke: '#38bdf8', 'stroke-width': 3 * k, 'stroke-linecap': 'round',
       }, group);
       group.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -154,31 +292,30 @@
       });
     }
 
-    // 頂點：站點是方形錨點（固定），折線點是圓形把手（可拖、可右鍵刪）
     const handles = el('g', {}, svg);
     waypoints.forEach((point, index) => {
-      const p = toScreen(point.x, point.y);
+      const p = screen[index];
       if (point.stationId) {
         el('rect', {
-          x: p.x - 7, y: p.y - 7, width: 14, height: 14, rx: 3,
-          fill: '#34d399', stroke: '#0f1115', 'stroke-width': 2,
+          x: p.x - 9 * k, y: p.y - 9 * k, width: 18 * k, height: 18 * k, rx: 4 * k,
+          fill: '#34d399', stroke: '#0f1115', 'stroke-width': 2.5 * k,
         }, handles);
-        const label = geometry.stationNames?.[point.stationId] ?? point.stationId;
+        const station = current.stations.find((s) => s.id === point.stationId);
         el('text', {
-          x: p.x + 11, y: p.y - 10,
-          fill: '#e6e9ef', 'font-size': 11,
-        }, handles).textContent = label;
+          x: p.x + 14 * k, y: p.y - 12 * k,
+          fill: '#e6e9ef', 'font-size': 15 * k, 'font-weight': 600,
+        }, handles).textContent = station?.name ?? point.stationId;
       } else {
         const handle = el('circle', {
-          cx: p.x, cy: p.y, r: HANDLE_RADIUS,
-          fill: '#fbbf24', stroke: '#0f1115', 'stroke-width': 2,
+          cx: p.x, cy: p.y, r: HANDLE_RADIUS * k,
+          fill: '#fbbf24', stroke: '#0f1115', 'stroke-width': 2.5 * k,
           style: 'cursor:grab',
         }, handles);
         handle.addEventListener('pointerdown', (event) => {
           event.stopPropagation();
           event.preventDefault();
           handle.setPointerCapture(event.pointerId);
-          dragging = { index, pointerId: event.pointerId, node: handle };
+          dragging = { index, pointerId: event.pointerId };
         });
         handle.addEventListener('contextmenu', (event) => {
           event.preventDefault();
@@ -194,17 +331,27 @@
   function insertBend(segmentIndex) {
     const a = waypoints[segmentIndex];
     const b = waypoints[segmentIndex + 1];
+    // 中點取<strong>圖面</strong>中點再換回公尺：兩個方塊的比例尺不同，
+    // 直接平均公尺座標會讓新點跑到線外
+    const pa = fieldToPixel(a.x, a.y);
+    const pb = fieldToPixel(b.x, b.y);
+    const mid = pa && pb
+      ? snapToTrack((pa.x + pb.x) / 2, (pa.y + pb.y) / 2)
+      : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    if (!mid) {
+      setStatus('這一段的中點不在任何軌道方塊上，無法加折線點', 'error');
+      return;
+    }
     waypoints.splice(segmentIndex + 1, 0, {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
+      x: Math.round(mid.x * 100) / 100,
+      y: Math.round(mid.y * 100) / 100,
     });
     dirty = true;
-    setStatus('已新增折線點，尚未儲存');
+    setStatus(`已在 ${mid.code ?? '軌道'} 上新增折線點，尚未儲存`);
     render();
   }
 
   function removeBend(index) {
-    // 站點不能刪：那是班表定的停靠順序
     if (waypoints[index]?.stationId) return;
     waypoints.splice(index, 1);
     dirty = true;
@@ -214,10 +361,12 @@
 
   svg.addEventListener('pointermove', (event) => {
     if (!dragging) return;
-    const m = pointerMeters(event);
+    const px = pointerPixel(event);
+    const field = snapToTrack(px.x, px.y);
+    if (!field) return;
     waypoints[dragging.index] = {
-      x: Math.round(m.x * 100) / 100,
-      y: Math.round(m.y * 100) / 100,
+      x: Math.round(field.x * 100) / 100,
+      y: Math.round(field.y * 100) / 100,
     };
     dirty = true;
     render();
@@ -243,8 +392,8 @@
     tracksEl.textContent = route.tracks.length === 0
       ? '（這條路徑沒有壓在任何軌道方塊上）'
       : route.tracks.map((t) =>
-        `${t.code}  x ${t.refField.xMinM}–${t.refField.xMaxM}`
-        + `  y ${t.refField.yMinM}–${t.refField.yMaxM}`).join('\n');
+        `${String(t.code).padEnd(5)} x ${t.refField.xMinM}–${t.refField.xMaxM}`
+        + `　y ${t.refField.yMinM}–${t.refField.yMaxM}`).join('\n');
     const head = route.samples.slice(0, 6)
       .map((p) => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`).join('  ');
     samplesEl.textContent =
@@ -272,10 +421,6 @@
     ]);
     geometry = geo;
     routes = list.routes;
-    geometry.stationNames = {};
-    for (const route of routes) {
-      for (const station of route.stations) geometry.stationNames[station.id] = station.name;
-    }
     select.innerHTML = routes.map((r) =>
       `<option value="${r.routeId}">${r.displayName}${r.customised ? '　✓已自訂' : ''}</option>`,
     ).join('');
@@ -294,9 +439,6 @@
         method: 'PUT',
         body: { routeId: current.routeId, waypoints },
       });
-      Object.assign(current, saved);
-      dirty = false;
-      describe(current);
       await reload(current.routeId);
       setStatus(
         `已儲存：${saved.waypoints.length} 個頂點、經過 ${saved.tracks.length} 個方塊、`
@@ -338,15 +480,9 @@
           loaded = false;
           setStatus(`載入圖資失敗：${error.message}`, 'error');
         }
-      } else if (tab.dataset.tab === 'routes') {
-        render();
       }
     });
   }
-
-  window.addEventListener('resize', () => {
-    if (!svg.closest('[data-panel]')?.hidden) render();
-  });
 
   window.addEventListener('beforeunload', (event) => {
     if (!dirty) return;

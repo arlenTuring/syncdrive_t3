@@ -162,7 +162,121 @@ function pathLength(points) {
   return total;
 }
 
+
+/**
+ * 給編輯器畫圖用的<strong>像素版面</strong>。
+ *
+ * <h3>為什麼不用場域公尺畫</h3>
+ * 場域座標與圖面座標<strong>不是單一線性關係</strong>（實測最大誤差 685 公尺）：
+ * 每個區塊各自對應自己那一段現場。照場域公尺直接畫，出來的東西和圖台上看到的
+ * 完全不像——軌道會變成細線、站台的相對位置全跑掉。
+ *
+ * 所以畫圖用圖資本來的像素版面（區塊 layout ＋ 設施 areaPosition／areaSizePx），
+ * 那正是圖台在做的事，看起來就會一樣。<strong>存檔時再逐方塊換回場域公尺</strong>。
+ */
+function buildCanvas(mapPayload) {
+  const doc = mapPayload?.mapDocument ?? mapPayload;
+  const areas = [];
+  const facilities = [];
+
+  for (const area of doc?.areas ?? []) {
+    const layout = area.layout ?? {};
+    areas.push({
+      id: area.id,
+      name: area.customName ?? area.id,
+      x: layout.xPx ?? 0,
+      y: layout.yPx ?? 0,
+      w: layout.wPx ?? 0,
+      h: layout.hPx ?? 0,
+    });
+
+    for (const facility of area.facilities ?? []) {
+      const pos = facility.areaPosition;
+      const size = facility.areaSizePx;
+      if (!pos || !size) continue;
+      const p = facility.parameters ?? {};
+      const field = [p.refFieldXMinM, p.refFieldXMaxM, p.refFieldYMinM, p.refFieldYMaxM]
+        .every((v) => Number.isFinite(v))
+        ? {
+          xMinM: p.refFieldXMinM,
+          xMaxM: p.refFieldXMaxM,
+          yMinM: p.refFieldYMinM,
+          yMaxM: p.refFieldYMaxM,
+        }
+        : null;
+      facilities.push({
+        id: facility.id,
+        type: facility.type,
+        code: facility.customName ?? facility.name ?? '',
+        areaId: area.id,
+        // 絕對像素：區塊左上角 ＋ 設施在區塊內的位置
+        x: (layout.xPx ?? 0) + pos.x,
+        y: (layout.yPx ?? 0) + pos.y,
+        w: size.w,
+        h: size.h,
+        rotationDeg: facility.rotationDeg ?? facility.rotation ?? 0,
+        fill: typeof p.defaultFillColor === 'string' ? p.defaultFillColor : null,
+        field,
+        // 點狀設施（停靠點、號誌）記的是單一座標而不是範圍
+        fieldPoint:
+          Number.isFinite(p.refFieldXM) && Number.isFinite(p.refFieldYM)
+            ? { xM: p.refFieldXM, yM: p.refFieldYM }
+            : null,
+      });
+    }
+  }
+
+  return {
+    pixelSize: doc?.pixelSize ?? { width: 3152, height: 642 },
+    areas,
+    facilities,
+  };
+}
+
+/**
+ * 圖面像素 → 場域公尺。
+ *
+ * 逐方塊換算：找出指標落在哪一個有場域範圍的方塊裡，再依比例映射進那個方塊的
+ * 場域範圍。<strong>這正是圖台判讀車輛位置的反向操作</strong>，所以編輯器上量到
+ * 的數字，車輛拿去用會落在同一個地方。
+ *
+ * 落在方塊外時回 null——那裡沒有定義的場域座標。呼叫端可以吸附到最近的方塊，
+ * 但不該自己編一個數字出來。
+ */
+function pixelToField(facilities, px, py) {
+  for (const f of facilities) {
+    if (!f.field) continue;
+    if (px < f.x || px > f.x + f.w || py < f.y || py > f.y + f.h) continue;
+    const tx = f.w > 0 ? (px - f.x) / f.w : 0.5;
+    // 像素 y 向下、場域 y 向上
+    const ty = f.h > 0 ? (py - f.y) / f.h : 0.5;
+    return {
+      x: f.field.xMinM + (f.field.xMaxM - f.field.xMinM) * tx,
+      y: f.field.yMaxM - (f.field.yMaxM - f.field.yMinM) * ty,
+      facilityId: f.id,
+      code: f.code,
+    };
+  }
+  return null;
+}
+
+/** 場域公尺 → 圖面像素。找出哪個方塊的場域範圍含這個點，再反算。 */
+function fieldToPixel(facilities, xM, yM) {
+  for (const f of facilities) {
+    if (!f.field) continue;
+    const { xMinM, xMaxM, yMinM, yMaxM } = f.field;
+    if (xM < xMinM || xM > xMaxM || yM < yMinM || yM > yMaxM) continue;
+    const tx = xMaxM > xMinM ? (xM - xMinM) / (xMaxM - xMinM) : 0.5;
+    const ty = yMaxM > yMinM ? (yMaxM - yM) / (yMaxM - yMinM) : 0.5;
+    return { x: f.x + f.w * tx, y: f.y + f.h * ty, facilityId: f.id };
+  }
+  return null;
+}
+
 module.exports = {
+  buildCanvas,
+  pixelToField,
+  fieldToPixel,
   collectTracks,
   fieldBounds,
   segmentRectRange,
