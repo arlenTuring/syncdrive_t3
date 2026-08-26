@@ -129,7 +129,12 @@ function serveStatic(req, res) {
       res.writeHead(404).end('not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream',
+      // 這是開發用的本機工具，改完就要看到。快取只會讓人拿到舊的 JS 然後
+      // 對著一個早就修好的問題除錯。
+      'Cache-Control': 'no-store',
+    });
     res.end(data);
   });
 }

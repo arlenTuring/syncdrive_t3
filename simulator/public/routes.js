@@ -461,28 +461,58 @@
     }
   });
 
-  // ── 分頁切換 ───────────────────────────────────────────────
+  // ── 分頁切換與載入 ─────────────────────────────────────────
 
   let loaded = false;
+
+  /**
+   * 載入圖資與路線。
+   *
+   * <strong>失敗要看得見、而且要能再試。</strong>之前是「第一次切到這一頁才載入，
+   * 失敗就算了」——伺服器剛好在重啟的話，選單就永遠停在「載入中…」，畫面全白，
+   * 而且再怎麼點分頁都不會重試。
+   */
+  async function ensureLoaded() {
+    if (loaded) return;
+    try {
+      setStatus('載入圖資中…');
+      await reload();
+      loaded = true;
+    } catch (error) {
+      loaded = false;
+      select.innerHTML = '<option>載入失敗</option>';
+      setStatus(`載入圖資失敗：${error.message}（點「重試」再試一次）`, 'error');
+      showRetry();
+    }
+  }
+
+  function showRetry() {
+    if (document.getElementById('routeRetryBtn')) return;
+    const button = document.createElement('button');
+    button.id = 'routeRetryBtn';
+    button.className = 'btn';
+    button.textContent = '重試';
+    button.addEventListener('click', async () => {
+      button.remove();
+      await ensureLoaded();
+    });
+    statusEl.parentElement.insertBefore(button, statusEl);
+  }
+
   for (const tab of document.querySelectorAll('.tab')) {
-    tab.addEventListener('click', async () => {
+    tab.addEventListener('click', () => {
       for (const other of document.querySelectorAll('.tab')) {
         other.classList.toggle('active', other === tab);
       }
       for (const panel of document.querySelectorAll('[data-panel]')) {
         panel.hidden = panel.dataset.panel !== tab.dataset.tab;
       }
-      if (tab.dataset.tab === 'routes' && !loaded) {
-        loaded = true;
-        try {
-          await reload();
-        } catch (error) {
-          loaded = false;
-          setStatus(`載入圖資失敗：${error.message}`, 'error');
-        }
-      }
+      if (tab.dataset.tab === 'routes') void ensureLoaded();
     });
   }
+
+  // 開頁就載入：切到這一頁時該是畫好的，不是才開始等
+  void ensureLoaded();
 
   window.addEventListener('beforeunload', (event) => {
     if (!dirty) return;
