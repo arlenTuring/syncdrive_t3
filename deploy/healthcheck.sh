@@ -95,7 +95,11 @@ if [ -n "$API_KEY" ]; then
   check "班表站點 ETA"        "$EXTERNAL/syncdrive-api/operation-shift/timetable/station-etas" 200 "$API_KEY"
   check "即時 ETA：依站"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    200 "$API_KEY"
   check "即時 ETA：依車"      "$EXTERNAL/syncdrive-api/vehicles/eta/by-vehicle"    200 "$API_KEY"
-  check "訂單查詢（車端用）"  "$EXTERNAL/syncdrive-api/order/queryById?id=none"   200 "$API_KEY"
+  # 訂單查詢：用不存在的 id，正確回應是 404。但「路由沒對外開放」也是 404，
+  # 兩者要分得開——不帶金鑰時回 401 才證明路由存在且掛著守衛；若路由根本沒
+  # 開放，ExternalPortGuard 會讓它在對外埠上直接 404，不會有 401 這一步。
+  check "訂單查詢（車端用）存在"   "$EXTERNAL/syncdrive-api/order/queryById?id=x" 401 noauth
+  check "訂單查詢（車端用）可打"   "$EXTERNAL/syncdrive-api/order/queryById?id=x" 404 "$API_KEY"
   # 金鑰要真的有在擋，不是宣告了但沒生效
   check "沒帶金鑰必須被拒"    "$EXTERNAL/syncdrive-api/vehicles/eta/by-station"    401 noauth
 else
