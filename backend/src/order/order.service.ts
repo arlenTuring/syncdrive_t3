@@ -126,6 +126,11 @@ export class OrderService {
       planned_start?: number;
       /** 計畫結束時刻（Epoch 毫秒） */
       planned_end?: number;
+      /** 整備訂單的徽章與格位。車輛卡片與整備分佈都讀這幾欄。 */
+      maint_type_label?: string;
+      maint_type_bg?: string;
+      maint_type_color?: string;
+      maint_station?: string;
     },
     options?: { skipAssign?: boolean; initialStatus?: OrderStatus },
   ): Promise<OperationOrder> {
@@ -149,6 +154,10 @@ export class OrderService {
       payload: data.payload ?? {},
       plannedStart: data.planned_start == null ? undefined : String(data.planned_start),
       plannedEnd: data.planned_end == null ? undefined : String(data.planned_end),
+      maintTypeLabel: data.maint_type_label,
+      maintTypeBg: data.maint_type_bg,
+      maintTypeColor: data.maint_type_color,
+      maintStation: data.maint_station,
       status: options?.initialStatus ?? OrderStatus.PENDING,
       createdAt: String(Date.now()),
     });

@@ -114,7 +114,7 @@ services:
       DISPATCH_TICK_SECONDS: ${DISPATCH_TICK_SECONDS:-5}
       DISPATCH_LEAD_SECONDS: ${DISPATCH_LEAD_SECONDS:-90}
       DISPATCH_CATCH_UP_SECONDS: ${DISPATCH_CATCH_UP_SECONDS:-300}
-      DISPATCH_TASK_TYPES: ${DISPATCH_TASK_TYPES:-passenger,dispatch}
+      DISPATCH_TASK_TYPES: ${DISPATCH_TASK_TYPES:-passenger,dispatch,maintenance}
     # 兩個埠都不發布到主機：對外流量由 nginx 從 3100 轉進來（它要先過對外那組
     # Basic Auth 才到得了文件與 Swagger）。後端仍然看得到自己的 localPort 是 3100，
     # ExternalPortGuard 的判定不受影響。

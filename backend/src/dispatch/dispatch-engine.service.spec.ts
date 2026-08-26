@@ -65,8 +65,10 @@ type CreatedOrder = {
   vehicle_code: string;
   line_kind: string;
   planned_start?: number;
+  maint_type_label?: string;
   payload: {
     kind: string;
+    yard_slot_id?: string;
     route_name: string | null;
     shift_name: string;
     origin: { id: string; name: string; kind: string } | null;
@@ -503,5 +505,107 @@ describe('線上開關要真的能開', () => {
       if (previous === undefined) delete process.env.DISPATCH_ENABLED;
       else process.env.DISPATCH_ENABLED = previous;
     }
+  });
+});
+
+describe('整備班次', () => {
+  /**
+   * 整備在這套系統裡是<strong>有訂單的班次</strong>：整備格位的佔用、車輛卡片的
+   * 徽章、班次運行紀錄的整備分頁，全部從 line_kind='MAINTENANCE' 的訂單長出來。
+   */
+  function yardBody(blocks: Array<Record<string, unknown>>) {
+    return { scheduleOutput: { plan: { timelines: [{ blocks }] } } };
+  }
+
+  const CHARGING = {
+    id: 'task-charge-1',
+    label: '充電',
+    source: 'template_bar',
+    taskType: 'charging',
+    timelineRow: 1,
+    plannedStartMinute: 12 * 60 + 1,
+    plannedEndMinute: 12 * 60 + 90,
+    yardFacilityLabel: 'E3',
+    yardFacilityNodeId: '131',
+  };
+
+  it('充電卡發成 MAINTENANCE 訂單，帶格位與徽章', async () => {
+    const { engine, created } = build([], [], yardBody([CHARGING]));
+
+    await engine.tick({ now: REFERENCE });
+
+    expect(created).toHaveLength(1);
+    const order = created[0];
+    expect(order.line_kind).toBe('MAINTENANCE');
+    expect(order.trip_code).toBe(`MT-E3-R1-${(12 * 60 + 1) * 60}`);
+    // 整備分佈的 SQL 讀 payload 的格位
+    expect(
+      (order.payload as unknown as { yard_slot_id?: string }).yard_slot_id,
+    ).toBe('E3');
+  });
+
+  it('徽章看格位代號，不看卡片標籤', async () => {
+    // 卡片寫「待命」，但車停在保養格 M2 上——整備分佈那一格就該算保養
+    const { engine, created } = build(
+      [],
+      [],
+      yardBody([
+        {
+          ...CHARGING,
+          label: '待命',
+          taskType: 'standby',
+          yardFacilityLabel: 'M2',
+          yardFacilityNodeId: '198',
+        },
+      ]),
+    );
+
+    await engine.tick({ now: REFERENCE });
+
+    expect(created[0].payload.route_name).toBe('待命');
+    expect(
+      (created[0] as unknown as { maint_type_label?: string }).maint_type_label,
+    ).toBe('保養');
+  });
+
+  it('停在備用月台的待命卡不算整備，不佔格位', async () => {
+    const { engine, created } = build(
+      [],
+      [],
+      yardBody([
+        {
+          ...CHARGING,
+          label: '待命',
+          taskType: 'standby',
+          yardFacilityLabel: '[備用]N2W下行出發',
+          yardFacilityNodeId: '188',
+          yardFacilityStationId: 'station_10',
+        },
+      ]),
+    );
+
+    const result = await engine.tick({ now: REFERENCE });
+
+    expect(created).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  it('正線月台上的暫停卡沒有格位，本來就不是整備', async () => {
+    const { engine, created } = build(
+      [],
+      [],
+      yardBody([
+        {
+          ...CHARGING,
+          taskType: 'idle',
+          yardFacilityLabel: undefined,
+          yardFacilityNodeId: undefined,
+        },
+      ]),
+    );
+
+    await engine.tick({ now: REFERENCE });
+
+    expect(created).toHaveLength(0);
   });
 });

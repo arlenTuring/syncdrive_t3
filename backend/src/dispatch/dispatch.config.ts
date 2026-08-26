@@ -48,17 +48,22 @@ export const dispatchConfig = {
   },
 
   /**
-   * 要下訂單的任務類型。
+   * 要下訂單的任務類型。預設三種全開：
    *
-   * 預設是<strong>載客班次與空車移動</strong>。空車移動（整備出廠、入廠、讓站）
-   * 一定要一起發：車輛沒有出廠訂單就會一直停在場區，正線班次到點也開不出來。
+   * <pre>
+   *   passenger    載客班次
+   *   dispatch     空車移動（整備出廠、入廠、讓站）
+   *   maintenance  整備班次（充電、行檢、保養、洗車、臨停、待命）
+   * </pre>
    *
-   * 沒有列進來的是充電、行檢、保養、待命、暫停——那些是<strong>停著不動</strong>
-   * 的作業，車輛已經被空車移動送到定位了，不需要營運訂單這一層。
+   * 三種都要發。空車移動不發，車就一直停在場區，正線班次到點也開不出來；
+   * 整備不發，整備格位的佔用狀況、車輛卡片的徽章、班次運行紀錄的整備分頁
+   * 全部是空的——整備在這套系統裡是<strong>有訂單的班次</strong>，不是
+   * 「停著不動就不用管」。
    */
   get taskTypes(): string[] {
     const raw = (
-      process.env.DISPATCH_TASK_TYPES ?? 'passenger,dispatch'
+      process.env.DISPATCH_TASK_TYPES ?? 'passenger,dispatch,maintenance'
     ).trim();
     return raw
       .split(',')

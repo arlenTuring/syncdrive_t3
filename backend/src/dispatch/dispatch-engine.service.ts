@@ -17,9 +17,11 @@ import {
   localMidnight,
   planDispatches,
   planYardMoves,
+  planYardTasks,
   type PlannedDispatch,
 } from './dispatch.plan';
 import { extractYardMoves } from './dispatch.yard-moves';
+import { extractYardTasks } from './dispatch.yard-tasks';
 
 /**
  * 即時調度引擎。
@@ -178,9 +180,21 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       : { moves: [], skipped: [] };
     const moves = planYardMoves({ moves: rawMoves.moves, fleet, reference });
 
+    // 整備班次同樣要下訂單：整備格位的佔用、車輛卡片的徽章、班次運行紀錄的
+    // 整備分頁，全部是從 line_kind='MAINTENANCE' 的訂單長出來的。
+    const includeTasks = taskTypes.includes('maintenance');
+    const rawTasks = includeTasks
+      ? extractYardTasks(deployed.body)
+      : { tasks: [], skipped: [] };
+    const yardTasks = planYardTasks({
+      tasks: rawTasks.tasks,
+      fleet,
+      reference,
+    });
+
     // 補齊只記了一端的移動卡，要在兩種來源合併之後做——缺的那一端通常在正線班次上
     const merged = fillMissingEndpoints(
-      [...trips.planned, ...moves.planned].sort(
+      [...trips.planned, ...moves.planned, ...yardTasks.planned].sort(
         (a, b) => a.departAt - b.departAt,
       ),
     );
@@ -188,7 +202,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const skipped = [
       ...trips.skipped,
       ...moves.skipped,
-      ...rawMoves.skipped.map((item) => ({
+      ...yardTasks.skipped,
+      ...[...rawMoves.skipped, ...rawTasks.skipped].map((item) => ({
         tripCode: item.blockId,
         reason: item.reason,
       })),
@@ -329,13 +344,30 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       order_id: item.orderId,
       vehicle_code: item.vehicleCode,
       trip_code: item.tripCode,
-      // 空車移動不是正線營運，狀態統計不該把它算進班次
-      line_kind: item.kind === 'passenger' ? 'MAINLINE' : 'MOVEMENT',
+      // 三種訂單分開標記：正線營運、空車移動、整備。狀態統計與圖台徽章都靠它分流。
+      line_kind:
+        item.kind === 'passenger'
+          ? 'MAINLINE'
+          : item.kind === 'maintenance'
+            ? 'MAINTENANCE'
+            : 'MOVEMENT',
+      ...(item.maintenance
+        ? {
+            maint_type_label: item.maintenance.typeLabel,
+            maint_type_bg: item.maintenance.typeBg,
+            maint_type_color: item.maintenance.typeColor,
+            maint_station: item.maintenance.yardSlotId,
+          }
+        : {}),
       planned_start: item.departAt,
       planned_end: item.arriveAt,
       payload: {
         source: 'dispatch_engine',
         kind: item.kind,
+        // 整備分佈的 SQL 讀 payload->>'yard_slot_id' 判斷哪一格被佔著
+        ...(item.maintenance
+          ? { yard_slot_id: item.maintenance.yardSlotId }
+          : {}),
         shift_id: shiftId,
         shift_name: shiftName,
         timeline_row: item.timelineRow,

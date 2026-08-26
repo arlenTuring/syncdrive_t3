@@ -1,5 +1,6 @@
 import type { TimetableTripDto } from '../operation-shift/timetable/expand-timetable';
 import type { YardMove } from './dispatch.yard-moves';
+import type { YardTask } from './dispatch.yard-tasks';
 
 /**
  * 把班表班次換算成「今天要下的訂單」——不碰資料庫、不碰時鐘以外的東西，
@@ -18,8 +19,18 @@ import type { YardMove } from './dispatch.yard-moves';
  * 移動沒有。
  */
 export type PlannedDispatch = {
-  /** passenger＝載客班次；movement＝空車移動（出廠、入廠、讓站） */
-  kind: 'passenger' | 'movement';
+  /**
+   * passenger＝載客班次；movement＝空車移動（出廠、入廠、讓站）；
+   * maintenance＝整備班次（充電、行檢、保養、洗車、臨停、待命）
+   */
+  kind: 'passenger' | 'movement' | 'maintenance';
+  /** 整備班次專用：格位代號與徽章。其餘種類為 null。 */
+  maintenance: {
+    yardSlotId: string;
+    typeLabel: string;
+    typeBg: string;
+    typeColor: string;
+  } | null;
   /** 協議 §三：[YYMMDD]-[trip_code] */
   orderId: string;
   tripCode: string;
@@ -170,6 +181,7 @@ export function planDispatches(args: {
 
     planned.push({
       kind: 'passenger',
+      maintenance: null,
       orderId: buildOrderId(trip.trip_code, departAt),
       tripCode: trip.trip_code,
       vehicleCode,
@@ -241,6 +253,7 @@ export function planYardMoves(args: {
 
     planned.push({
       kind: 'movement',
+      maintenance: null,
       orderId: buildOrderId(move.tripCode, departAt),
       tripCode: move.tripCode,
       vehicleCode,
@@ -254,6 +267,72 @@ export function planYardMoves(args: {
       destination: move.destination
         ? { ...move.destination, arriveAt, departAt: null }
         : null,
+      stations: [],
+    });
+  }
+
+  planned.sort((a, b) => a.departAt - b.departAt);
+  return { planned, skipped };
+}
+
+/**
+ * 整備班次換算成待下訂單。
+ *
+ * 與另外兩種的差別是<strong>沒有位移</strong>：起訖點是同一個格位。車輛在整備
+ * 期間就停在那裡，訂單的意義不是「開去哪」而是「這段時間這台車佔著這一格、
+ * 在做這件事」——整備分佈與車輛徽章都靠這一筆。
+ */
+export function planYardTasks(args: {
+  tasks: YardTask[];
+  fleet: readonly string[];
+  reference: number;
+}): {
+  planned: PlannedDispatch[];
+  skipped: Array<{ tripCode: string; reason: string }>;
+} {
+  const { tasks, fleet, reference } = args;
+  const midnight = localMidnight(reference);
+
+  const planned: PlannedDispatch[] = [];
+  const skipped: Array<{ tripCode: string; reason: string }> = [];
+
+  for (const task of tasks) {
+    const vehicleCode = vehicleForRow(task.timelineRow, fleet);
+    if (!vehicleCode) {
+      skipped.push({
+        tripCode: task.tripCode,
+        reason: `時間線第 ${task.timelineRow} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+      });
+      continue;
+    }
+
+    const departAt = midnight + Math.round(task.startMinute * 60) * 1000;
+    const arriveAt = midnight + Math.round(task.endMinute * 60) * 1000;
+    const point = {
+      id: task.facilityNodeId,
+      name: task.yardSlotId,
+      kind: 'facility' as const,
+    };
+
+    planned.push({
+      kind: 'maintenance',
+      maintenance: {
+        yardSlotId: task.yardSlotId,
+        typeLabel: task.maintTypeLabel,
+        typeBg: task.maintTypeBg,
+        typeColor: task.maintTypeColor,
+      },
+      orderId: buildOrderId(task.tripCode, departAt),
+      tripCode: task.tripCode,
+      vehicleCode,
+      timelineRow: task.timelineRow,
+      taskType: 'maintenance',
+      routeCode: null,
+      routeName: task.cardLabel,
+      departAt,
+      arriveAt,
+      origin: { ...point, arriveAt: null, departAt },
+      destination: { ...point, arriveAt, departAt: null },
       stations: [],
     });
   }
