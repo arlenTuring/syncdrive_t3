@@ -31,6 +31,13 @@ const HEALTH_INTERVAL_MS = 5000;
 /** 圖台判定「這台車在動」用的最低速度，純顯示用 */
 const CRUISE_SPEED_MPS = 8;
 
+/** 訂單種類 → 協議上的 line_kind */
+const LINE_KIND_BY_ORDER_KIND = {
+  passenger: 'MAINLINE',
+  movement: 'MOVEMENT',
+  maintenance: 'MAINTENANCE',
+};
+
 function distance(a, b) {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
@@ -207,6 +214,7 @@ class SimulatedVehicle {
         raw: order,
         tripCode: order.tripCode ?? order.trip_code ?? '',
         kind: order.payload?.kind ?? 'passenger',
+        yardSlotId: order.payload?.yard_slot_id ?? null,
         routeId: order.routeId ?? order.route_id ?? null,
         points,
         startedAt: Date.now(),
@@ -307,7 +315,11 @@ class SimulatedVehicle {
 
   publishTelemetry() {
     if (!this.position) return;
-    const moving = Boolean(this.order) && !this.faulted && this.order.progress < 1;
+    // 整備訂單起訖是同一格，車停在那裡做事——不該顯示成在跑
+    const moving = Boolean(this.order)
+      && this.order.kind !== 'maintenance'
+      && !this.faulted
+      && this.order.progress < 1;
     const velocity = moving ? CRUISE_SPEED_MPS : 0;
     this.publish(
       'telemetry/update',
@@ -359,7 +371,11 @@ class SimulatedVehicle {
         timestamp: Date.now(),
         order_id: order.id,
         ...(order.tripCode ? { trip_code: order.tripCode } : {}),
-        line_kind: order.kind === 'passenger' ? 'MAINLINE' : 'MOVEMENT',
+        // 三種訂單各自標記。中心端會拿車端回報的 line_kind 覆寫訂單上的分類，
+        // 所以這裡標錯不只是顯示問題——整備訂單被標成 MOVEMENT 之後，資料庫裡
+        // 就再也找不到任何一筆 MAINTENANCE，整備分佈與整備分頁跟著全空。
+        line_kind: LINE_KIND_BY_ORDER_KIND[order.kind] ?? 'MOVEMENT',
+        ...(order.yardSlotId ? { yard_slot_id: order.yardSlotId } : {}),
         ...(order.routeId ? { route_id: order.routeId } : {}),
         order_status: this.faulted ? 'FAULTED' : 'PROCESSING',
         vehicle_phase: this.faulted ? 'FAULTED' : 'RUNNING',
