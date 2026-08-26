@@ -25,10 +25,23 @@ const { mqttUrl } = require('./targets');
  * </pre>
  */
 
-const TELEMETRY_INTERVAL_MS = 1000;
+/**
+ * 位置更新的節拍。
+ *
+ * 圖台是靠兩筆 telemetry 之間插值把車畫順的，所以「一秒一筆」在 1 倍速下夠用
+ * （8 m/s，一次跳 8 公尺），但倍速一開就不夠了：10 倍速下車在圖面上每秒跑 80 公尺，
+ * 一秒一筆等於每次瞬移 80 公尺，看起來就是一頓一頓的。
+ *
+ * 所以回報頻率跟著倍速走——倍速多少就多發幾筆，讓<strong>每一筆之間的位移維持差不多</strong>。
+ * 上限 10 Hz：再密下去頻寬與圖台的處理都划不來，而 10 Hz 已經是每次約 8 公尺。
+ */
+const TELEMETRY_BASE_INTERVAL_MS = 1000;
+const TELEMETRY_MIN_INTERVAL_MS = 100;
+/** 動作節拍固定 100 ms：位置本來就是照時間算的，算得細一點不花什麼成本 */
+const TICK_INTERVAL_MS = 100;
 const HEALTH_INTERVAL_MS = 5000;
 
-/** 圖台判定「這台車在動」用的最低速度，純顯示用 */
+/** 沒有實測位移可用時的預設車速（起步第一筆） */
 const CRUISE_SPEED_MPS = 8;
 
 /**
@@ -155,7 +168,7 @@ class SimulatedVehicle {
       else if (topic.endsWith('/command/execute')) this.onCommand(payload);
     });
 
-    this.timers.push(setInterval(() => this.tick(), TELEMETRY_INTERVAL_MS));
+    this.timers.push(setInterval(() => this.tick(), TICK_INTERVAL_MS));
     this.timers.push(setInterval(() => this.publishHealth(), HEALTH_INTERVAL_MS));
   }
 
@@ -356,7 +369,18 @@ class SimulatedVehicle {
       }
     }
 
-    this.battery = Math.max(5, this.battery - (this.order ? 0.002 : 0.0004));
+    // 電量照真實時間掉，不照倍速——倍速壓縮的是班表，不是電池
+    this.battery = Math.max(5, this.battery - (this.order ? 0.0002 : 0.00004));
+
+    // 倍速多少就多發幾筆，讓每筆之間的位移維持差不多
+    const interval = Math.max(
+      TELEMETRY_MIN_INTERVAL_MS,
+      TELEMETRY_BASE_INTERVAL_MS / Math.max(1, this.speed),
+    );
+    const now = Date.now();
+    if (now - (this.lastTelemetryAt ?? 0) < interval) return;
+    this.lastTelemetryAt = now;
+
     this.publishTelemetry();
     if (this.order) this.publishOperation();
   }
@@ -369,7 +393,23 @@ class SimulatedVehicle {
       && this.order.kind !== 'maintenance'
       && !this.faulted
       && this.order.progress < 1;
-    const velocity = moving ? CRUISE_SPEED_MPS : 0;
+
+    /*
+     * 速度用<strong>實際位移</strong>算，不是填一個固定值。
+     *
+     * 圖台會拿速度去外推兩筆之間的位置。固定回報 8 m/s 但實際在 10 倍速下每秒跑
+     * 80 公尺的話，外推出來的位置跟下一筆實際位置對不上，畫面就會一直「衝過頭再被拉回」
+     * ——看起來比不外推還鈍。
+     */
+    let velocity = 0;
+    if (moving) {
+      const previous = this.lastPublished;
+      const dt = previous ? (Date.now() - previous.at) / 1000 : 0;
+      velocity = dt > 0
+        ? Math.hypot(this.position.x - previous.x, this.position.y - previous.y) / dt
+        : CRUISE_SPEED_MPS;
+    }
+    this.lastPublished = { x: this.position.x, y: this.position.y, at: Date.now() };
     this.publish(
       'telemetry/update',
       {
@@ -388,7 +428,7 @@ class SimulatedVehicle {
           heading: this.heading,
         },
         kinematics: {
-          velocity,
+          velocity: Math.round(velocity * 100) / 100,
           acceleration: moving ? 0.05 : 0,
           angular_velocity: 0.02,
         },
