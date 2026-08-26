@@ -390,6 +390,34 @@ class SimulatedVehicle {
 
     this.publishTelemetry();
     if (this.order) this.publishOperation();
+    else this.publishIdleAtYard();
+  }
+
+  /**
+   * 待命時回報「停在哪一格」。
+   *
+   * <h3>為什麼光有座標不夠</h3>
+   * 圖台把車放到圖面上時，會先看 payload 有沒有 <code>yard_slot_id</code>：有就直接放進
+   * 那一格；沒有就拿座標去比對軌道。<strong>場區格位不是軌道</strong>，所以停在場區的車
+   * 比對不到任何軌道，而圖台的位置快取會讓它<strong>沿用上一次的位置</strong>——結果就是
+   * 車還留在它上一趟結束的地方，像殭屍一樣停在正線上。
+   *
+   * 所以待命時要主動報格位。這一則沒有 order_id 與 trip_code，中心端的
+   * applyOperationMqttUpdate 會直接略過，不會寫進資料庫——它只是給圖台看的位置資訊。
+   */
+  publishIdleAtYard() {
+    if (!this.home?.slot) return;
+    this.publish(
+      'operation/update',
+      {
+        vehicle_code: this.code,
+        timestamp: Date.now(),
+        yard_slot_id: this.home.slot,
+        vehicle_phase: this.faulted ? 'FAULTED' : 'IDLE',
+        order_status: 'IDLE',
+      },
+      { qos: 0 },
+    );
   }
 
   publishTelemetry() {
