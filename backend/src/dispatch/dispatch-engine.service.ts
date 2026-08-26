@@ -152,15 +152,19 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const fleet = await this.loadFleet();
     const taskTypes = dispatchConfig.taskTypes;
 
+    // 空車移動要走 extractYardMoves，不能讓它再從班次展開結果進來一次。
+    //
+    // 展開結果裡也有 taskType='dispatch' 的卡，但那份<strong>沒有站序</strong>——
+    // 空車移動的起訖點是場區設施，不在 stationDwells 裡。兩邊都收的話同一趟會被
+    // 排兩次：一份有起訖點、一份兩端都空，後者還會去搶相鄰卡的補齊來源。
+    const includeMoves = taskTypes.includes('dispatch');
     const trips = planDispatches({
       trips: deployed.trips,
       fleet,
-      taskTypes,
+      taskTypes: taskTypes.filter((type) => type !== 'dispatch'),
       reference,
     });
 
-    // 空車移動的起訖點不在班次展開結果裡，要從原始計畫另外抽（見 dispatch.yard-moves）
-    const includeMoves = taskTypes.includes('dispatch');
     const rawMoves = includeMoves
       ? extractYardMoves(deployed.body)
       : { moves: [], skipped: [] };

@@ -431,3 +431,49 @@ describe('讓站移動：只記了設施端', () => {
     expect(result.skipped).toHaveLength(1);
   });
 });
+
+describe('班次展開結果裡的 dispatch 卡不重複排入', () => {
+  /**
+   * 展開結果也含 taskType='dispatch' 的卡，但那份沒有站序。兩邊都收會讓同一趟
+   * 被排兩次，其中一份兩端皆空，還會搶走相鄰卡的補齊來源。
+   */
+  it('只認 extractYardMoves 抽出來的那一份', async () => {
+    const stationless = {
+      ...trip(12 * 3600 + 60, 1, 'D0000'),
+      task_type: 'dispatch',
+      stations: [],
+    } as TimetableTripDto;
+
+    const { engine, created } = build([stationless], [], {
+      scheduleOutput: {
+        plan: {
+          timelines: [
+            {
+              blocks: [
+                {
+                  id: 'yard-out-1',
+                  label: '整備出廠 · E3 → N2W下行出發',
+                  source: 'yard_exit_move',
+                  taskType: 'dispatch',
+                  timelineRow: 1,
+                  plannedStartMinute: 12 * 60 + 1,
+                  plannedEndMinute: 12 * 60 + 2,
+                  yardExitStationId: '175',
+                  yardExitStationLabel: 'N2W下行出發',
+                  yardExitFacilityNodeId: '131',
+                  yardExitFacilityLabel: 'E3',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await engine.tick({ now: REFERENCE });
+
+    expect(created).toHaveLength(1);
+    expect(created[0].trip_code).toBe(`MVOUT-R1-${(12 * 60 + 1) * 60}`);
+    expect(result.skipped).toHaveLength(0);
+  });
+});
