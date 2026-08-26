@@ -1801,7 +1801,7 @@
         ]
       }
     },
-    "/dispatch/status": {
+    "/syncdrive-api/dispatch/status": {
       "get": {
         "description": "目前部署中的班表、今日班次數、已下訂單數、接下來十班、最近下的十張訂單。",
         "operationId": "DispatchController_status",
@@ -1817,7 +1817,7 @@
         ]
       }
     },
-    "/dispatch/plan": {
+    "/syncdrive-api/dispatch/plan": {
       "get": {
         "description": "把部署中的班表展開成今日全部待下訂單。純讀取，不會發訂單，可用來對照班表與實際指派。",
         "operationId": "DispatchController_plan",
@@ -1833,7 +1833,7 @@
         ]
       }
     },
-    "/dispatch/dry-run": {
+    "/syncdrive-api/dispatch/dry-run": {
       "get": {
         "description": "照現在時刻算出「這一刻會下哪些訂單」，但不真的下。上線前對時用。",
         "operationId": "DispatchController_dryRun",
@@ -1858,7 +1858,7 @@
         ]
       }
     },
-    "/dispatch/enable": {
+    "/syncdrive-api/dispatch/enable": {
       "post": {
         "description": "停用時保留既有訂單，只是不再發新的。重啟後回到 DISPATCH_ENABLED 的值。",
         "operationId": "DispatchController_setEnabled",

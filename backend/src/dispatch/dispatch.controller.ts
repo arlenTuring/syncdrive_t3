@@ -9,7 +9,7 @@ import { DispatchEngineService } from './dispatch-engine.service';
  * 只在 80 埠可達，3100 埠一律 404。
  */
 @ApiTags('即時調度引擎')
-@Controller('dispatch')
+@Controller('syncdrive-api/dispatch')
 export class DispatchController {
   constructor(private readonly engine: DispatchEngineService) {}
 
