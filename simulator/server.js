@@ -14,7 +14,12 @@ const {
   straightPath,
   collectTracks,
 } = require('./src/routePaths');
-const { buildCanvas, fieldToPixel, pixelToField } = require('./src/mapGeometry');
+const {
+  buildCanvas,
+  collectCrossovers,
+  fieldToPixel,
+  pixelToField,
+} = require('./src/mapGeometry');
 const { MapSource } = require('./src/mapSource');
 const { TrackGraph } = require('./src/trackRouter');
 
@@ -65,7 +70,8 @@ async function loadMapForEditor() {
   const map = new MapSource({ map: mapPayload, operationNodes, waypoints });
   const tracks = collectTracks(mapPayload);
   const canvas = buildCanvas(mapPayload);
-  mapCache = { mapPayload, map, tracks, canvas };
+  const crossovers = collectCrossovers(mapPayload);
+  mapCache = { mapPayload, map, tracks, canvas, crossovers };
   // 車隊用同一份：編輯器上看到的方塊，就是車輛定位用的方塊
   fleet.attachMap({ mapPayload, map, track: new TrackGraph(mapPayload) });
   return mapCache;
@@ -248,6 +254,7 @@ const routes = {
       mapId: cache.mapPayload?.mapId ?? null,
       displayName: cache.mapPayload?.displayName ?? null,
       ...cache.canvas,
+      crossovers: cache.crossovers,
     });
   },
 
@@ -302,11 +309,24 @@ const routes = {
       if (!Number.isFinite(px) || !Number.isFinite(py)) {
         throw new Error(`第 ${index + 1} 個路徑點沒有座標`);
       }
-      const field = pixelToField(cache.canvas.facilities, px, py);
+      /*
+       * 站點的場域座標是已知的，不要從像素反推。
+       *
+       * 像素往返會有零點幾公尺的誤差（實測 750 變成 749.02），而站點是班表定的停靠
+       * 位置——那個數字必須原封不動。折線點才需要反推，因為它只存在於使用者畫的線上。
+       */
+      if (point.stationId) {
+        const known = route.stations.find((s) => s.id === String(point.stationId));
+        if (known) {
+          return { x: known.x, y: known.y, px, py, stationId: String(point.stationId) };
+        }
+      }
+
+      const field = pixelToField(cache.canvas.facilities, px, py, cache.crossovers);
       if (!field) {
         throw new Error(
-          `第 ${index + 1} 個路徑點不在任何方塊上，沒有對應的場域座標——`
-          + '請把它拖回軌道或站台範圍內',
+          `第 ${index + 1} 個路徑點不在任何方塊或橫渡線上，沒有對應的場域座標——`
+          + '請把它拖回軌道、站台或橫渡線上',
         );
       }
       return {

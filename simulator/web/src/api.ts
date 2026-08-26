@@ -57,19 +57,35 @@ export function fetchMapDocument(): Promise<unknown> {
 /** 有場域範圍的方塊，含圖面上的絕對像素框 */
 export type FieldBox = { id: string; code: string; x: number; y: number; w: number; h: number }
 
+/** 橫渡線：兩端場域座標已知的斜向連接，路徑走 cross 時壓的就是這一段 */
+export type CrossoverSegment = {
+  id: string
+  code: string
+  a: { px: number; py: number }
+  b: { px: number; py: number }
+}
+
+export type FieldTargets = { boxes: FieldBox[]; crossovers: CrossoverSegment[] }
+
 /**
- * 方塊的像素框，只拿來做<strong>命中判斷</strong>：這個折線點有沒有落在某個方塊上。
+ * 有場域座標的地方，只拿來做<strong>命中判斷</strong>：這個折線點存不存得進去。
  *
  * 判斷而已，不做座標換算——換算留在伺服器一份就好。少了這個判斷，使用者要按下
  * 儲存才知道某個點飄到軌道外面去了。
+ *
+ * 橫渡線一定要算在內：走 cross 的路徑點不在任何方塊裡，但它有座標。
  */
-export async function fetchFieldBoxes(): Promise<FieldBox[]> {
+export async function fetchFieldTargets(): Promise<FieldTargets> {
   const body = await json<{
     facilities: Array<FieldBox & { field: unknown | null }>
+    crossovers?: CrossoverSegment[]
   }>('/api/map/geometry')
-  return body.facilities
-    .filter((f) => f.field != null)
-    .map(({ id, code, x, y, w, h }) => ({ id, code, x, y, w, h }))
+  return {
+    boxes: body.facilities
+      .filter((f) => f.field != null)
+      .map(({ id, code, x, y, w, h }) => ({ id, code, x, y, w, h })),
+    crossovers: body.crossovers ?? [],
+  }
 }
 
 export async function fetchRoutes(): Promise<RouteEntry[]> {

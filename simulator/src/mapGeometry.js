@@ -239,16 +239,115 @@ function buildCanvas(mapPayload) {
 }
 
 /**
+ * 橫渡線：兩端場域座標已知的一條斜向連接。
+ *
+ * 軌道方塊有「參照場域<strong>範圍</strong>」，橫渡線沒有——它記的是兩個 portal 的
+ * 精確場域座標（<code>refFieldXM/refFieldYM</code>），各自貼在一條軌道上。
+ * 車要從上行換到下行就是走這一段，所以路徑一定會壓過這裡；少了這一段，
+ * 走 cross 的點就換算不出場域座標。
+ *
+ * portal 的位置存的是<strong>區塊 domain 公尺</strong>（不是場域公尺，也不是像素），
+ * 所以要照該區塊的 domain↔layout 比例換成像素。
+ */
+function collectCrossovers(mapPayload) {
+  const doc = mapPayload?.mapDocument ?? mapPayload;
+  const out = [];
+
+  for (const area of doc?.areas ?? []) {
+    const layout = area.layout ?? {};
+    const domain = area.domain;
+    if (!domain) continue;
+    const spanX = domain.xMaxM - domain.xMinM;
+    const spanY = domain.yMaxM - domain.yMinM;
+    if (!(spanX > 0) || !(spanY > 0)) continue;
+
+    // domain 公尺 → 絕對像素。原點在區塊左下、y 向上，與設施的 areaPosition 同一套。
+    const toPixel = (xM, yM) => ({
+      x: (layout.xPx ?? 0) + ((xM - domain.xMinM) / spanX) * (layout.wPx ?? 0),
+      y: (layout.yPx ?? 0) + (layout.hPx ?? 0) - ((yM - domain.yMinM) / spanY) * (layout.hPx ?? 0),
+    });
+
+    for (const facility of area.facilities ?? []) {
+      if (facility.type !== 'TrackCrossover') continue;
+      const portals = facility.parameters?.trackCrossoverPortals;
+      const a = portals?.a;
+      const b = portals?.b;
+      if (!a || !b) continue;
+      if (![a.xM, a.yM, b.xM, b.yM, a.refFieldXM, a.refFieldYM, b.refFieldXM, b.refFieldYM]
+        .every((v) => Number.isFinite(v))) continue;
+
+      const pa = toPixel(a.xM, a.yM);
+      const pb = toPixel(b.xM, b.yM);
+      out.push({
+        id: facility.id,
+        code: facility.customName ?? facility.name ?? facility.id,
+        areaId: area.id,
+        a: { px: pa.x, py: pa.y, xM: a.refFieldXM, yM: a.refFieldYM, alias: a.alias ?? null },
+        b: { px: pb.x, py: pb.y, xM: b.refFieldXM, yM: b.refFieldYM, alias: b.alias ?? null },
+      });
+    }
+  }
+
+  return out;
+}
+
+/** 點到線段的投影參數 t（0～1）與距離 */
+function projectOnSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0) return { t: 0, distance: Math.hypot(px - ax, py - ay) };
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return { t, distance: Math.hypot(px - (ax + dx * t), py - (ay + dy * t)) };
+}
+
+/** 走橫渡線的點：投影到 portal 連線上，再依比例內插兩端的場域座標 */
+function crossoverFieldAt(crossovers, px, py, tolerancePx) {
+  let best = null;
+  for (const xo of crossovers) {
+    const hit = projectOnSegment(px, py, xo.a.px, xo.a.py, xo.b.px, xo.b.py);
+    if (hit.distance > tolerancePx) continue;
+    if (!best || hit.distance < best.hit.distance) best = { xo, hit };
+  }
+  if (!best) return null;
+  const { xo, hit } = best;
+  return {
+    x: xo.a.xM + (xo.b.xM - xo.a.xM) * hit.t,
+    y: xo.a.yM + (xo.b.yM - xo.a.yM) * hit.t,
+    facilityId: xo.id,
+    code: xo.code,
+    viaCrossover: true,
+  };
+}
+
+/**
  * 圖面像素 → 場域公尺。
  *
  * 逐方塊換算：找出指標落在哪一個有場域範圍的方塊裡，再依比例映射進那個方塊的
  * 場域範圍。<strong>這正是圖台判讀車輛位置的反向操作</strong>，所以編輯器上量到
  * 的數字，車輛拿去用會落在同一個地方。
  *
- * 落在方塊外時回 null——那裡沒有定義的場域座標。呼叫端可以吸附到最近的方塊，
- * 但不該自己編一個數字出來。
+ * 方塊都沒中就試橫渡線：那裡沒有「範圍」，但兩端 portal 的場域座標是精確的，
+ * 投影到兩者連線上內插即可。走 cross 的路徑點都落在這裡。
+ *
+ * 兩者都不中才回 null——那裡真的沒有定義的場域座標。呼叫端不該自己編一個數字。
  */
-function pixelToField(facilities, px, py) {
+function pixelToField(facilities, px, py, crossovers = [], tolerancePx = 24) {
+  /*
+   * 橫渡線優先，而且只在「幾乎壓在線上」時優先。
+   *
+   * 橫渡線是斜的，一定會穿過幾條水平軌道帶。同一個點兩種答案都算得出來：照軌道帶
+   * 算會得到那條帶的 y，照橫渡線算會得到轉線途中的 y。車在這裡是<strong>正在轉線</strong>，
+   * 不是待在那條帶上，所以答案是橫渡線。
+   *
+   * 先前沒有這個優先序，於是一條斜線上的點有些判給帶、有些判給橫渡線——每一段各自
+   * 平滑，接起來卻是來回跳的（實測 715→690→720→740）。存出去的路徑點會忽前忽後，
+   * 車輛就照著倒退的座標開。
+   */
+  const onCrossover = crossoverFieldAt(crossovers, px, py, 8);
+  if (onCrossover) return onCrossover;
+
   for (const f of facilities) {
     if (!f.field) continue;
     if (px < f.x || px > f.x + f.w || py < f.y || py > f.y + f.h) continue;
@@ -262,7 +361,9 @@ function pixelToField(facilities, px, py) {
       code: f.code,
     };
   }
-  return null;
+
+  // 方塊也沒中：手畫的折線點不必正中橫渡線，放寬一點
+  return crossoverFieldAt(crossovers, px, py, tolerancePx);
 }
 
 /** 場域公尺 → 圖面像素。找出哪個方塊的場域範圍含這個點，再反算。 */
@@ -280,6 +381,7 @@ function fieldToPixel(facilities, xM, yM) {
 
 module.exports = {
   buildCanvas,
+  collectCrossovers,
   pixelToField,
   fieldToPixel,
   collectTracks,
