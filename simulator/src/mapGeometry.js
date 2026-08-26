@@ -239,6 +239,37 @@ function buildCanvas(mapPayload) {
 }
 
 /**
+ * 場區格位：充電 E、洗車 W、調度 H、保養 M。
+ *
+ * 車輛沒有訂單時就停在這裡。這很重要——沒有位置就發不出 telemetry，圖台上那台車
+ * 等於不存在，要等到它第一次接單才會憑空冒出來。真實的車就算停著也一直在回報。
+ *
+ * 取格位的<strong>中心</strong>，不是角落：角落會讓車圖示壓在格線上。
+ */
+function collectYardSlots(mapPayload) {
+  const doc = mapPayload?.mapDocument ?? mapPayload;
+  const slots = [];
+  for (const area of doc?.areas ?? []) {
+    for (const facility of area.facilities ?? []) {
+      const code = facility.customName ?? facility.name ?? '';
+      if (!/^[EPWHM]\d+$/.test(code)) continue;
+      const p = facility.parameters ?? {};
+      const box = [p.refFieldXMinM, p.refFieldXMaxM, p.refFieldYMinM, p.refFieldYMaxM];
+      if (!box.every((v) => Number.isFinite(v))) continue;
+      slots.push({
+        code,
+        id: facility.id,
+        x: (p.refFieldXMinM + p.refFieldXMaxM) / 2,
+        y: (p.refFieldYMinM + p.refFieldYMaxM) / 2,
+      });
+    }
+  }
+  // 依代號排序，讓每次啟動的分配都一樣——車每次開機停在不同地方很難對照
+  slots.sort((a, b) => a.code.localeCompare(b.code));
+  return slots;
+}
+
+/**
  * 橫渡線：兩端場域座標已知的一條斜向連接。
  *
  * 軌道方塊有「參照場域<strong>範圍</strong>」，橫渡線沒有——它記的是兩個 portal 的
@@ -382,6 +413,7 @@ function fieldToPixel(facilities, xM, yM) {
 module.exports = {
   buildCanvas,
   collectCrossovers,
+  collectYardSlots,
   pixelToField,
   fieldToPixel,
   collectTracks,

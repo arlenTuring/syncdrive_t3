@@ -5,6 +5,7 @@ const { createApiClient } = require('./apiClient');
 const { MapSource } = require('./mapSource');
 const { TrackGraph } = require('./trackRouter');
 const { buildRoutes, matchRouteForStations } = require('./routePaths');
+const { collectYardSlots } = require('./mapGeometry');
 
 /**
  * 車隊管理。網頁上的每一個按鈕最後都落到這裡。
@@ -94,6 +95,28 @@ class Fleet {
     );
 
     const wanted = codes?.length ? codes : [...this.credentials.vehiclePasswords.keys()];
+
+    /*
+     * 沒有訂單時車停在哪。
+     *
+     * 沒有位置就發不出 telemetry，圖台上那台車等於不存在——要等到它第一次接單才會
+     * 憑空冒出來，跑完又消失。實測 11 台車只有 2 台在圖台上看得到，其餘 9 台從連線
+     * 到現在一個封包都沒送過。
+     *
+     * 依車號順序分配格位，讓每次啟動的位置都一樣。格位不夠就繞回去；圖資裡 H1～M4
+     * 的參照場域範圍是同一塊，停在那裡的車本來就會疊在一起。
+     */
+    const slots = this.mapPayload ? collectYardSlots(this.mapPayload) : [];
+    const order = [...wanted].sort();
+    const parking = (code) => {
+      if (slots.length === 0) return null;
+      const index = order.indexOf(code);
+      const slot = slots[(index < 0 ? 0 : index) % slots.length];
+      return { x: slot.x, y: slot.y, slot: slot.code };
+    };
+    if (slots.length > 0) {
+      this.log('info', 'fleet', `${slots.length} 個場區格位可停放，車輛待命時回報所在格位`);
+    }
     for (const code of wanted) {
       const password = this.credentials.vehiclePasswords.get(code);
       if (!password) {
@@ -104,6 +127,7 @@ class Fleet {
         code,
         password,
         target,
+        home: parking(code),
         api: this.api,
         map: this.map,
         track: this.track,

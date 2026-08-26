@@ -97,7 +97,7 @@ function walkPolyline(points, ratio) {
 }
 
 class SimulatedVehicle {
-  constructor({ code, password, target, api, map, track, routeFor, log, speed }) {
+  constructor({ code, password, target, api, map, track, routeFor, log, speed, home }) {
     this.code = code;
     this.password = password;
     this.target = target;
@@ -118,7 +118,14 @@ class SimulatedVehicle {
     this.faulted = false;
     this.battery = 80 + Math.random() * 15;
 
-    this.position = null;
+    /*
+     * 待命時停在場區格位。
+     *
+     * 一定要有初始位置：publishTelemetry 沒有位置就直接 return，那台車在圖台上
+     * 等於不存在——第一次接單才憑空出現，跑完又消失。真實的車停著也一直在回報。
+     */
+    this.home = home ?? null;
+    this.position = home ? { x: home.x, y: home.y } : null;
     this.heading = 0;
     this.timers = [];
     this.stats = { assigns: 0, completed: 0, published: 0 };
