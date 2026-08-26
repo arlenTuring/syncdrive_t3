@@ -221,6 +221,11 @@ class SimulatedVehicle {
       this.order = {
         id: orderId,
         raw: order,
+        // 站名用<strong>原始站序</strong>，不要用規劃後的折線：折線去重時，若終點
+        // 與前一個軌道節點重疊，被丟掉的會是帶著名字的那一個，畫面上就變成
+        // 「H3 → undefined」。
+        from: stops[0]?.name ?? null,
+        to: stops[stops.length - 1]?.name ?? null,
         tripCode: order.tripCode ?? order.trip_code ?? '',
         kind: order.payload?.kind ?? 'passenger',
         yardSlotId: order.payload?.yard_slot_id ?? null,
@@ -232,9 +237,12 @@ class SimulatedVehicle {
       };
       this.position = { x: points[0].x, y: points[0].y };
 
-      const from = points[0].name;
-      const to = points[points.length - 1].name;
-      this.log('order', this.code, `接單 ${orderId}（${from} → ${to}，計畫 ${Math.round(plannedMs / 1000)} 秒）`);
+      this.log(
+        'order',
+        this.code,
+        `接單 ${orderId}（${this.order.from ?? '?'} → ${this.order.to ?? '?'}，`
+          + `計畫 ${Math.round(plannedMs / 1000)} 秒）`,
+      );
     } catch (error) {
       this.lastError = error.message;
       this.log('error', this.code, `處理 ${orderId} 失敗：${error.message}`);
@@ -451,8 +459,8 @@ class SimulatedVehicle {
           tripCode: this.order.tripCode,
           kind: this.order.kind,
           progress: Math.round(this.order.progress * 100),
-          from: this.order.points[0]?.name ?? null,
-          to: this.order.points[this.order.points.length - 1]?.name ?? null,
+          from: this.order.from,
+          to: this.order.to,
         }
         : null,
     };
