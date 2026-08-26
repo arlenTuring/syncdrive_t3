@@ -58,6 +58,7 @@ import { MapModule } from './map/map.module';
 import { TimeTemplateModule } from './time-template/time-template.module';
 import { MaintenanceTaskModule } from './maintenance-task/maintenance-task.module';
 import { OperationShiftModule } from './operation-shift/operation-shift.module';
+import { DispatchModule } from './dispatch/dispatch.module';
 import { MediaLibraryModule } from './media-library/media-library.module';
 import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition.module';
 import { ScheduleAdjustModule } from './schedule-adjust/schedule-adjust.module';
@@ -142,6 +143,7 @@ import { DatabaseInitService } from './database/database-init.service';
     TimeTemplateModule,
     MaintenanceTaskModule,
     OperationShiftModule,
+    DispatchModule,
     MediaLibraryModule,
     VehicleDefinitionModule,
     ScheduleAdjustModule,

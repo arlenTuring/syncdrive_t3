@@ -122,6 +122,10 @@ export class OrderService {
       priority_level?: number;
       line_kind?: string;
       payload?: Record<string, unknown>;
+      /** 計畫發車時刻（Epoch 毫秒）。班表下來的訂單會帶，手動建立的可略。 */
+      planned_start?: number;
+      /** 計畫結束時刻（Epoch 毫秒） */
+      planned_end?: number;
     },
     options?: { skipAssign?: boolean; initialStatus?: OrderStatus },
   ): Promise<OperationOrder> {
@@ -143,6 +147,8 @@ export class OrderService {
       priorityLevel: data.priority_level ?? 50,
       lineKind,
       payload: data.payload ?? {},
+      plannedStart: data.planned_start == null ? undefined : String(data.planned_start),
+      plannedEnd: data.planned_end == null ? undefined : String(data.planned_end),
       status: options?.initialStatus ?? OrderStatus.PENDING,
       createdAt: String(Date.now()),
     });

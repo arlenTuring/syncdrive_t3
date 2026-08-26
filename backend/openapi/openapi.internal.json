@@ -1801,6 +1801,79 @@
         ]
       }
     },
+    "/dispatch/status": {
+      "get": {
+        "description": "目前部署中的班表、今日班次數、已下訂單數、接下來十班、最近下的十張訂單。",
+        "operationId": "DispatchController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "調度引擎狀態",
+        "tags": [
+          "即時調度引擎"
+        ]
+      }
+    },
+    "/dispatch/plan": {
+      "get": {
+        "description": "把部署中的班表展開成今日全部待下訂單。純讀取，不會發訂單，可用來對照班表與實際指派。",
+        "operationId": "DispatchController_plan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "今日完整調度計畫",
+        "tags": [
+          "即時調度引擎"
+        ]
+      }
+    },
+    "/dispatch/dry-run": {
+      "get": {
+        "description": "照現在時刻算出「這一刻會下哪些訂單」，但不真的下。上線前對時用。",
+        "operationId": "DispatchController_dryRun",
+        "parameters": [
+          {
+            "name": "at",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "試跑一次檢查",
+        "tags": [
+          "即時調度引擎"
+        ]
+      }
+    },
+    "/dispatch/enable": {
+      "post": {
+        "description": "停用時保留既有訂單，只是不再發新的。重啟後回到 DISPATCH_ENABLED 的值。",
+        "operationId": "DispatchController_setEnabled",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "線上開關",
+        "tags": [
+          "即時調度引擎"
+        ]
+      }
+    },
     "/syncdrive-api/media-library/options": {
       "get": {
         "operationId": "MediaLibraryController_listOptions",

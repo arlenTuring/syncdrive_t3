@@ -325,6 +325,46 @@ export class OperationShiftService {
     };
   }
 
+  /**
+   * 取<strong>目前部署中</strong>的班表並展開成班次。
+   *
+   * 與 {@link getTimetableTrips} 的差別是解析對象：那一支給對外查詢用，讀的是
+   * 「最新已發布」；這一支給即時調度用，讀的是 <code>usage_status = in_use</code>
+   * ——也就是使用者按下「部署」的那一份。兩者通常是同一份，但不保證：可以先發布
+   * 新版本供對外預覽，稍後才部署。<strong>下訂單一定要照部署中的那份</strong>，
+   * 否則車輛會去執行還沒上線的班表。
+   *
+   * 展開走的是同一支 {@link expandTimetableTrips}，所以調度下的訂單時刻與對外
+   * 介面查到的計畫時刻必然一致——不會出現「API 說 09:00 發車、車卻 09:02 動」。
+   */
+  async getDeployedTrips(): Promise<{
+    shiftId: string;
+    shiftName: string;
+    trips: TimetableTripDto[];
+    /** 原始計畫內容。空車移動卡的起訖點只存在這裡，班次展開結果不含。 */
+    body: Record<string, unknown>;
+  } | null> {
+    const rows = await this.repo.find({
+      where: { usageStatus: OperationShiftUsageStatus.IN_USE },
+      order: { updatedAt: 'DESC' },
+      take: 5,
+    });
+    const deployed = rows.find((row) => this.bodyHasPlan(row.body ?? {}));
+    if (!deployed) return null;
+
+    const range = parseTimeRangeQuery({});
+    return {
+      shiftId: deployed.id,
+      shiftName: deployed.name,
+      body: deployed.body ?? {},
+      trips: expandTimetableTrips({
+        body: deployed.body ?? {},
+        range,
+        passengerOnly: false,
+      }),
+    };
+  }
+
   async getStationEtas(query: {
     from?: string;
     to?: string;
