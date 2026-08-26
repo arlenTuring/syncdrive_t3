@@ -309,12 +309,27 @@ describe('空車移動', () => {
     });
   });
 
-  it('空車移動不算正線營運，line_kind 不是 MAINLINE', async () => {
+  it('空車移動屬於整備班次：只有載客進正線班表', async () => {
     const { engine, created } = build([], [], YARD_BODY);
 
     await engine.tick({ now: REFERENCE });
 
-    expect(created.every((order) => order.line_kind === 'MOVEMENT')).toBe(true);
+    expect(created.every((order) => order.line_kind === 'MAINTENANCE')).toBe(
+      true,
+    );
+    // 移動中的徽章是「調度」，格位取場區那一端
+    expect(created.every((order) => order.maint_type_label === '調度')).toBe(
+      true,
+    );
+    const out = created.find((order) =>
+      order.payload.route_name?.startsWith('整備出廠'),
+    )!;
+    const into = created.find((order) =>
+      order.payload.route_name?.startsWith('整備入廠'),
+    )!;
+    // 出廠：場區端是起點；入廠：場區端是終點
+    expect(out.payload.yard_slot_id).toBe('E3');
+    expect(into.payload.yard_slot_id).toBe('H1');
   });
 
   it('order_id 用列與分鐘組出來，重算班表也不會換號', async () => {

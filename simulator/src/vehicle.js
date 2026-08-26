@@ -31,10 +31,15 @@ const HEALTH_INTERVAL_MS = 5000;
 /** 圖台判定「這台車在動」用的最低速度，純顯示用 */
 const CRUISE_SPEED_MPS = 8;
 
-/** 訂單種類 → 協議上的 line_kind */
+/**
+ * 訂單種類 → 協議上的 line_kind。
+ *
+ * <strong>只有載客班次進正線班表</strong>，空車移動與整備一律歸整備班次——
+ * 出廠、入廠、讓站是把車在場區之間挪位置，車還沒開始營運。
+ */
 const LINE_KIND_BY_ORDER_KIND = {
   passenger: 'MAINLINE',
-  movement: 'MOVEMENT',
+  movement: 'MAINTENANCE',
   maintenance: 'MAINTENANCE',
 };
 
@@ -315,7 +320,8 @@ class SimulatedVehicle {
 
   publishTelemetry() {
     if (!this.position) return;
-    // 整備訂單起訖是同一格，車停在那裡做事——不該顯示成在跑
+    // 整備訂單起訖是同一格，車停在那裡做事——不該顯示成在跑。
+    // 空車移動雖然也歸整備班次，但車是真的在開，速度照常。
     const moving = Boolean(this.order)
       && this.order.kind !== 'maintenance'
       && !this.faulted

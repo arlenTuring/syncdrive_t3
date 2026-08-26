@@ -345,12 +345,11 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       vehicle_code: item.vehicleCode,
       trip_code: item.tripCode,
       // 三種訂單分開標記：正線營運、空車移動、整備。狀態統計與圖台徽章都靠它分流。
-      line_kind:
-        item.kind === 'passenger'
-          ? 'MAINLINE'
-          : item.kind === 'maintenance'
-            ? 'MAINTENANCE'
-            : 'MOVEMENT',
+      // 只有載客班次進正線班表；其餘一律是整備班次。
+      //
+      // 空車移動（出廠、入廠、讓站）雖然車真的在開，但那是把車在場區之間挪
+      // 位置，還沒開始營運——它屬於整備班次，也停在整備區。
+      line_kind: item.kind === 'passenger' ? 'MAINLINE' : 'MAINTENANCE',
       ...(item.maintenance
         ? {
             maint_type_label: item.maintenance.typeLabel,

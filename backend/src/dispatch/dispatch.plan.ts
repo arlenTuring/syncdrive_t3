@@ -251,9 +251,24 @@ export function planYardMoves(args: {
     const departAt = midnight + Math.round(move.startMinute * 60) * 1000;
     const arriveAt = midnight + Math.round(move.endMinute * 60) * 1000;
 
+    // 空車移動也算整備班次。
+    //
+    // 只有載客班次進正線班表，其餘一律歸整備——出廠、入廠、讓站移動都是把車
+    // 在場區之間挪位置，車還沒開始營運。徽章固定「調度」（移動中），格位取
+    // <strong>場區那一端</strong>：出廠時是起點、入廠時是終點。
+    const yardEnd =
+      move.origin?.kind === 'facility' ? move.origin : move.destination;
+    const yardSlotId =
+      yardEnd?.kind === 'facility' ? yardEnd.name.toUpperCase() : '';
+
     planned.push({
       kind: 'movement',
-      maintenance: null,
+      maintenance: {
+        yardSlotId,
+        typeLabel: '調度',
+        typeBg: '#422006',
+        typeColor: '#FD9A00',
+      },
       orderId: buildOrderId(move.tripCode, departAt),
       tripCode: move.tripCode,
       vehicleCode,
