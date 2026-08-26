@@ -37,6 +37,22 @@ function findMapRoot(viewport: HTMLDivElement | null): HTMLElement | null {
   return (scaledWrap?.firstElementChild as HTMLElement | null) ?? null
 }
 
+/**
+ * 這一頁畫得出來的元件。
+ *
+ * 路徑只跟「車能走到哪、停在哪」有關：軌道、交叉、停靠點，以及站台這一類設施。
+ * 號誌、月台門、智慧桿在圖台上是密密麻麻的小圖示，對畫路徑沒有幫助，只會擋住
+ * 折線點與那個 ＋。
+ */
+const VISIBLE_FACILITY_TYPES = new Set(['Track', 'TrackCrossover', 'DockingPoint', 'Facility'])
+
+function keepRelevantFacilities(areas: MapAreaObject[]): MapAreaObject[] {
+  return areas.map((area) => ({
+    ...area,
+    facilities: area.facilities.filter((f) => VISIBLE_FACILITY_TYPES.has(f.type)),
+  }))
+}
+
 /** 路線目前的折線頂點，轉成編輯器用的形狀（只有像素） */
 function toEditPoints(route: RouteEntry): EditPoint[] {
   const nameById = new Map(route.stations.map((s) => [s.id, s.name]))
@@ -81,7 +97,7 @@ export function RoutePathApp() {
       ])
       const parsed = parseMapFileJson(doc)
       setMap({
-        areas: parsed.areas,
+        areas: keepRelevantFacilities(parsed.areas),
         pixelSize: parsed.pixelSize,
         pixelOrigin: parsed.pixelOrigin,
         displayName: parsed.displayName,

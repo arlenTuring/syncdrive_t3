@@ -211,7 +211,12 @@ function buildCanvas(mapPayload) {
         areaId: area.id,
         // 絕對像素：區塊左上角 ＋ 設施在區塊內的位置
         x: (layout.xPx ?? 0) + pos.x,
-        y: (layout.yPx ?? 0) + pos.y,
+        /*
+         * areaPosition 的原點在區塊<strong>左下角、y 向上</strong>（見前端
+         * areaPositionToCssTopLeft），CSS 的 top 是由上往下。直接相加會讓每個設施
+         * 的 y 都翻過來，症狀是站點與路徑通通浮在兩排軌道中間的空白處。
+         */
+        y: (layout.yPx ?? 0) + ((layout.hPx ?? 0) - pos.y - size.h),
         w: size.w,
         h: size.h,
         rotationDeg: facility.rotationDeg ?? facility.rotation ?? 0,
