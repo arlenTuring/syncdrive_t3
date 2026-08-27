@@ -6,6 +6,30 @@ const { MapSource } = require('./mapSource');
 const { TrackGraph } = require('./trackRouter');
 const { buildRoutes, matchRouteForStations } = require('./routePaths');
 const { collectYardSlots } = require('./mapGeometry');
+const fs = require('fs');
+const path = require('path');
+
+const MAP_FILE = path.join(__dirname, '..', 'data', 'map.json');
+
+/**
+ * 本機的地圖檔。
+ *
+ * 缺檔就明講怎麼補——沒有圖資，車輛連自己在哪都不知道，靜靜地失敗只會讓人
+ * 以為是連線問題。
+ */
+function loadLocalMap() {
+  if (!fs.existsSync(MAP_FILE)) {
+    throw new Error(
+      `找不到圖資 ${MAP_FILE}。模擬器不跟伺服器要圖資——`
+      + '請先執行 npm run map:import <地圖檔路徑或網址>',
+    );
+  }
+  try {
+    return JSON.parse(fs.readFileSync(MAP_FILE, 'utf-8'));
+  } catch (error) {
+    throw new Error(`圖資 ${MAP_FILE} 不是合法 JSON：${error.message}`);
+  }
+}
 
 /**
  * 車隊管理。網頁上的每一個按鈕最後都落到這裡。
@@ -69,17 +93,20 @@ class Fleet {
     this.api = createApiClient(target, this.credentials);
 
     if (!this.map) {
-      this.log('info', 'fleet', `取圖資中（${target.host}）…`);
-      const mapPayload = await this.api.activeMap();
-      const mapId = mapPayload?.mapId;
-      // 站點別名與渡線途經點是另外兩支端點；少了它們，正線班次的站序有一半查不到
-      const [operationNodes, waypoints] = await Promise.all([
-        mapId ? this.api.operationNodes(mapId) : null,
-        mapId ? this.api.waypoints(mapId) : null,
-      ]);
+      /*
+       * 圖資讀<strong>本機的地圖檔</strong>，不跟伺服器要。
+       *
+       * 模擬器是外部單位：只有對外 API 與 MQTT，沒有內部端點可以問。真實的自駕車
+       * 廠商也是這樣——場域方把圖資交給廠商，廠商自己解讀，車上帶著那份圖跑。
+       *
+       * 站點別名與渡線途經點以前是另外兩支內部端點，現在全部從這份檔案自己推導
+       * （見 MapSource）。地圖更新時重跑 npm run map:import。
+       */
+      const mapPayload = loadLocalMap();
+      this.log('info', 'fleet', `讀本機圖資：${mapPayload.displayName ?? mapPayload.mapId}`);
       this.attachMap({
         mapPayload,
-        map: new MapSource({ map: mapPayload, operationNodes, waypoints }),
+        map: new MapSource({ map: mapPayload }),
         // 軌道圖：沒有人畫路徑時的退路，車輛自己沿軌找最短路
         track: new TrackGraph(mapPayload),
       });
@@ -245,4 +272,4 @@ class LogBus {
   }
 }
 
-module.exports = { Fleet, LogBus };
+module.exports = { Fleet, LogBus, loadLocalMap };

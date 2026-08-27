@@ -18,13 +18,19 @@
  * 圖台判讀 <code>local_pose.position</code> 用的是<strong>場域座標</strong>，
  * 取錯的話車子會整批出現在圖外，而且不會有任何錯誤訊息。
  *
- * <h3>三個來源才蓋得全</h3>
+ * <h3>三種 id 都要查得到，而且只靠地圖檔</h3>
  * <pre>
- *   圖資 facilities        設施與停靠點的數字 id（175、131…）
- *   operation-nodes        班表用的站點別名（station_2…）
- *   waypoints              渡線途經點（xo_1_a…）
+ *   設施 id      175、131…      直接來自 facilities
+ *   設施代號     E1、H1、M4…    facilities 的 customName
+ *   站點別名     station_2…     pointTopology.nodes 的 stationId → 設施 id
+ *   途經點       xo_1_a…        橫渡線的 trackCrossoverPortals[].waypointCode
  * </pre>
- * 訂單的站序三種都會出現，少一個來源就有整段路徑查不到。
+ *
+ * 訂單的站序四種都會出現，少一種就有整段路徑查不到。
+ *
+ * <strong>全部從地圖檔本身推導</strong>——模擬器是外部單位，只有對外 API 與 MQTT，
+ * 沒有 operation-nodes、waypoints 那些內部端點可以問。地圖檔是廠商拿得到的資料，
+ * 裡面本來就有這些對應關係，自己解出來就好。
  */
 
 function fieldPosition(facility) {
@@ -48,7 +54,7 @@ function fieldPosition(facility) {
 }
 
 class MapSource {
-  constructor({ map, operationNodes, waypoints }) {
+  constructor({ map }) {
     this.mapId = map?.mapId ?? null;
     this.displayName = map?.displayName ?? null;
     this.version = map?.version ?? null;
@@ -84,31 +90,47 @@ class MapSource {
       }
     }
 
-    // 站點別名。班表與訂單站序用的是這一組，不是設施數字 id。
-    for (const node of operationNodes?.nodes ?? []) {
-      if (!Number.isFinite(node.xM) || !Number.isFinite(node.yM)) continue;
-      const entry = {
-        name: node.stationName || node.stationId,
+    /*
+     * 站點別名（station_2…）。
+     *
+     * 班表與訂單的站序用的是這一組，不是設施數字 id。對應關係在地圖檔的
+     * pointTopology 裡：每個節點帶著 stationId 與它對應的設施 id，座標則到那個設施
+     * 上拿——節點自己的 x/y 是<strong>圖面像素</strong>，不是場域公尺，直接用會讓車
+     * 全部飛到圖外。
+     */
+    for (const node of doc?.pointTopology?.nodes ?? []) {
+      if (!node?.stationId) continue;
+      const facility = this.points.get(String(node.id));
+      if (!facility) continue;
+      add(node.stationId, {
+        ...facility,
+        name: node.label || facility.name,
         kind: 'station',
-        areaId: node.areaId,
-        x: node.xM,
-        y: node.yM,
-      };
-      add(node.stationId, entry);
-      add(node.nodeId, entry);
-      add(node.facilityId, entry);
+      });
     }
 
-    // 渡線途經點。正線班次的站序會經過這些，少了就整段查不到。
-    for (const item of waypoints?.items ?? []) {
-      if (!Number.isFinite(item.xM) || !Number.isFinite(item.yM)) continue;
-      add(item.waypointCode, {
-        name: item.alias || item.waypointCode,
-        kind: 'waypoint',
-        areaId: item.areaId,
-        x: item.xM,
-        y: item.yM,
-      });
+    /*
+     * 渡線途經點（xo_1_a…）。正線班次的站序會經過這些，少了就整段查不到。
+     *
+     * 兩個 portal 各自帶著精確的場域座標，就寫在橫渡線設施的參數裡。
+     */
+    for (const area of doc?.areas ?? []) {
+      for (const facility of area.facilities ?? []) {
+        const portals = facility.parameters?.trackCrossoverPortals;
+        if (!portals) continue;
+        for (const key of ['a', 'b']) {
+          const portal = portals[key];
+          if (!portal?.waypointCode) continue;
+          if (!Number.isFinite(portal.refFieldXM) || !Number.isFinite(portal.refFieldYM)) continue;
+          add(portal.waypointCode, {
+            name: portal.alias || portal.waypointCode,
+            kind: 'waypoint',
+            areaId: area.id,
+            x: portal.refFieldXM,
+            y: portal.refFieldYM,
+          });
+        }
+      }
     }
   }
 

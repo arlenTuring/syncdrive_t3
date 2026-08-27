@@ -1,6 +1,6 @@
 'use strict';
 
-const { externalApiBase, internalApiBase } = require('./targets');
+const { externalApiBase } = require('./targets');
 
 /**
  * 對伺服器的 HTTP 通道。
@@ -53,23 +53,11 @@ async function request(url, { headers = {}, method = 'GET', body, channel }) {
 
 function createApiClient(target, credentials) {
   const externalHeaders = () => ({ 'x-api-key': credentials.apiKey });
-  const internalHeaders = () => {
-    const raw = `${credentials.internalUser}:${credentials.internalPassword}`;
-    return { Authorization: `Basic ${Buffer.from(raw).toString('base64')}` };
-  };
-
   const ext = (path, init = {}) =>
     request(`${externalApiBase(target)}${path}`, {
       ...init,
       headers: { ...externalHeaders(), ...(init.headers ?? {}) },
       channel: 'external',
-    });
-
-  const int = (path, init = {}) =>
-    request(`${internalApiBase(target)}${path}`, {
-      ...init,
-      headers: { ...internalHeaders(), ...(init.headers ?? {}) },
-      channel: 'internal',
     });
 
   return {
@@ -110,35 +98,10 @@ function createApiClient(target, credentials) {
 
     // ── 內部通道（80 埠，Basic Auth）────────────────────────────
 
-    /** 圖資本體。設施與停靠點的座標在這裡。 */
-    activeMap() {
-      return int('/map/library/active');
-    },
 
-    /**
-     * 站點別名 → 座標。
-     *
-     * 訂單站序用的是 <code>station_2</code> 這種別名，不是設施數字 id，
-     * 所以光有圖資本體查不到。
-     */
-    operationNodes(mapId) {
-      return int(`/map/${encodeURIComponent(mapId)}/operation-nodes`);
-    },
 
-    /** 渡線途經點（xo_1_a…）。正線班次的站序會經過。 */
-    waypoints(mapId) {
-      return int(`/map/${encodeURIComponent(mapId)}/waypoints`);
-    },
 
-    /** 調度引擎狀態，UI 用來顯示「伺服器那邊在等什麼」 */
-    dispatchStatus() {
-      return int('/dispatch/status');
-    },
 
-    /** 調度引擎開關。模擬器上線後才需要開，所以放在這一頁最順手。 */
-    setDispatchEnabled(enabled) {
-      return int('/dispatch/enable', { method: 'POST', body: { enabled } });
-    },
   };
 }
 

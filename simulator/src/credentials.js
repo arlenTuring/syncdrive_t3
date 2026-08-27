@@ -55,15 +55,12 @@ function load(rootDir) {
 
   return {
     apiKey: get('API_KEY'),
-    internalUser: get('INTERNAL_USER'),
-    internalPassword: get('INTERNAL_PASSWORD'),
     vehiclePasswords,
 
     /** 給網頁看的摘要：只說有沒有，不說是什麼 */
     summary() {
       return {
         apiKey: Boolean(this.apiKey),
-        internalAuth: Boolean(this.internalUser && this.internalPassword),
         vehicleCount: this.vehiclePasswords.size,
         vehicles: [...this.vehiclePasswords.keys()],
       };
@@ -72,10 +69,9 @@ function load(rootDir) {
     /** 缺哪些必要憑證。有缺就不該讓使用者按下開始然後看一堆連線錯誤。 */
     missing() {
       const missing = [];
+      // 模擬器是外部單位，只需要這兩樣：一組對外金鑰、每台車一組 MQTT 密碼。
+      // 內部帳密刻意不收——收了就代表這支程式能碰它不該碰的東西。
       if (!this.apiKey) missing.push('API_KEY（對外 API 的 x-api-key）');
-      if (!this.internalUser || !this.internalPassword) {
-        missing.push('INTERNAL_USER / INTERNAL_PASSWORD（取圖資用的內部帳密）');
-      }
       if (this.vehiclePasswords.size === 0) {
         missing.push('車輛 MQTT 密碼（MQTT_PMS_01… 或 MQTT_PASSWORD_ALL）');
       }

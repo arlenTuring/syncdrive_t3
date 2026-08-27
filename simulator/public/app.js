@@ -13,15 +13,10 @@ const el = {
   host: $('hostInput'),
   mqttPort: $('mqttPortInput'),
   externalPort: $('externalPortInput'),
-  internalPort: $('internalPortInput'),
   applyTarget: $('applyTargetBtn'),
   probe: $('probeBtn'),
   probeResults: $('probeResults'),
   credWarn: $('credWarn'),
-  dispatchRefresh: $('dispatchRefreshBtn'),
-  dispatchOn: $('dispatchOnBtn'),
-  dispatchOff: $('dispatchOffBtn'),
-  dispatchBox: $('dispatchBox'),
   start: $('startBtn'),
   stop: $('stopBtn'),
   speed: $('speedSelect'),
@@ -49,7 +44,6 @@ function fillTarget(target) {
   el.host.value = target.host;
   el.mqttPort.value = target.mqttPort;
   el.externalPort.value = target.externalApiPort;
-  el.internalPort.value = target.internalApiPort;
   el.targetBadge.textContent = `${target.label} · ${target.host}`;
 }
 
@@ -156,7 +150,7 @@ function connectEvents() {
 
 el.preset.addEventListener('change', () => {
   const preset = presets.find((item) => item.id === el.preset.value);
-  if (preset) fillTarget({ ...preset, externalApiPort: preset.externalApiPort, internalApiPort: preset.internalApiPort });
+  if (preset) fillTarget(preset);
 });
 
 el.applyTarget.addEventListener('click', async () => {
@@ -167,7 +161,6 @@ el.applyTarget.addEventListener('click', async () => {
         host: el.host.value,
         mqttPort: Number(el.mqttPort.value),
         externalApiPort: Number(el.externalPort.value),
-        internalApiPort: Number(el.internalPort.value),
       },
     }));
   } catch (error) {
@@ -193,32 +186,6 @@ el.probe.addEventListener('click', async () => {
   } finally {
     el.probe.disabled = false;
   }
-});
-
-async function refreshDispatch() {
-  try {
-    const status = await api('/api/dispatch/status');
-    const upcoming = (status.upcoming ?? []).slice(0, 3)
-      .map((item) => `  ${new Date(item.depart_at).toLocaleTimeString('zh-TW', { hour12: false })} ${item.vehicle_code} ${item.origin} → ${item.destination}`)
-      .join('\n');
-    el.dispatchBox.textContent =
-      `引擎：${status.enabled ? '已啟用' : '已停用'}\n`
-      + `班表：${status.deployed_shift?.name ?? '（沒有部署中的班表）'}\n`
-      + `今日訂單：${status.today_trip_count} 張，已發 ${status.issued_today} 張\n`
-      + (upcoming ? `接下來：\n${upcoming}` : '接下來：無');
-  } catch (error) {
-    el.dispatchBox.textContent = `查詢失敗：${error.message}`;
-  }
-}
-
-el.dispatchRefresh.addEventListener('click', () => void refreshDispatch());
-el.dispatchOn.addEventListener('click', async () => {
-  await api('/api/dispatch/enable', { body: { enabled: true } }).catch((e) => alert(e.message));
-  void refreshDispatch();
-});
-el.dispatchOff.addEventListener('click', async () => {
-  await api('/api/dispatch/enable', { body: { enabled: false } }).catch((e) => alert(e.message));
-  void refreshDispatch();
 });
 
 el.start.addEventListener('click', async () => {
@@ -260,6 +227,5 @@ el.fleetBody.addEventListener('click', async (event) => {
 el.clearLog.addEventListener('click', () => { el.log.innerHTML = ''; });
 
 void refresh();
-void refreshDispatch();
 connectEvents();
 setInterval(refresh, 2000);

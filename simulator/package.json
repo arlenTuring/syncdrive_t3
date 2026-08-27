@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "build:web": "vite build --config web/vite.config.mts",
-    "dev:web": "vite build --watch --config web/vite.config.mts"
+    "dev:web": "vite build --watch --config web/vite.config.mts",
+    "map:import": "node scripts/import-map.js"
   },
   "engines": {
     "node": ">=20"

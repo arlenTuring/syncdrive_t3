@@ -3,7 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { Fleet, LogBus } = require('./src/fleet');
+const { Fleet, LogBus, loadLocalMap } = require('./src/fleet');
 const { load: loadCredentials } = require('./src/credentials');
 const { resolveTarget, PRESETS } = require('./src/targets');
 const { createApiClient } = require('./src/apiClient');
@@ -32,10 +32,16 @@ const { TrackGraph } = require('./src/trackRouter');
  * 所以憑證與所有對外連線都留在這個 Node 程序裡，網頁只下指令、看狀態。
  *
  * <pre>
- *   瀏覽器 ──HTTP──▶ 這支程序 ──MQTT 1883──▶ 伺服器（GCP 或本地）
+ *   瀏覽器 ──HTTP──▶ 這支程序 ──MQTT 1883──────▶ 伺服器（GCP 或本地）
  *                          └──HTTP 3100 x-api-key──▶
- *                          └──HTTP 80  Basic Auth──▶
  * </pre>
+ *
+ * <h3>只有這兩條，沒有第三條</h3>
+ * 模擬器是<strong>外部單位</strong>，能用的就是自駕車廠商拿得到的東西：一組 API 金鑰、
+ * 每台車一組 MQTT 帳密，以及場域方交付的地圖檔。內部端點（圖資、站點別名、渡線
+ * 途經點、調度引擎）一律不碰——那些是 syncdrive_t3 自己的東西。
+ *
+ * 所以圖資讀本機的 data/map.json，站點別名與途經點自己從那份檔案解出來。
  */
 
 const ROOT = __dirname;
@@ -60,14 +66,9 @@ let mapCache = null;
 
 async function loadMapForEditor() {
   if (mapCache) return mapCache;
-  const api = createApiClient(currentTarget, credentials);
-  const mapPayload = await api.activeMap();
-  const mapId = mapPayload?.mapId;
-  const [operationNodes, waypoints] = await Promise.all([
-    mapId ? api.operationNodes(mapId) : null,
-    mapId ? api.waypoints(mapId) : null,
-  ]);
-  const map = new MapSource({ map: mapPayload, operationNodes, waypoints });
+  // 圖資來自本機檔案，不跟伺服器要——模擬器是外部單位，沒有內部端點
+  const mapPayload = loadLocalMap();
+  const map = new MapSource({ map: mapPayload });
   const tracks = collectTracks(mapPayload);
   const canvas = buildCanvas(mapPayload);
   const crossovers = collectCrossovers(mapPayload);
@@ -169,7 +170,7 @@ function state() {
   };
 }
 
-/** 三條通道各打一次，回報通不通。連不上時這一頁要能指出是哪一條。 */
+/** 對外通道各打一次，回報通不通。連不上時這一頁要能指出是哪一條。 */
 async function probe(target) {
   const api = createApiClient(target, credentials);
   const results = [];
@@ -193,13 +194,9 @@ async function probe(target) {
     const count = Array.isArray(eta?.vehicles) ? eta.vehicles.length : 0;
     return `${count} 台車`;
   });
-  await attempt('內部 API：圖資', 'internal', async () => {
-    const map = await api.activeMap();
-    return map?.displayName ?? map?.mapId ?? '已取得';
-  });
-  await attempt('內部 API：調度引擎', 'internal', async () => {
-    const status = await api.dispatchStatus();
-    return `${status?.enabled ? '已啟用' : '已停用'}，今日 ${status?.today_trip_count ?? 0} 張`;
+  await attempt('本機圖資', 'local', async () => {
+    const map = loadLocalMap();
+    return `${map.displayName ?? map.mapId}（${map.version ?? '無版本'}）`;
   });
 
   return results;
@@ -364,18 +361,9 @@ const routes = {
     sendJson(res, 200, { routeId, ...described, customised: false });
   },
 
-  'POST /api/dispatch/enable': async (req, res) => {
-    const { enabled } = await readBody(req);
-    const api = createApiClient(currentTarget, credentials);
-    const result = await api.setDispatchEnabled(enabled !== false);
-    logBus.push('info', 'dispatch', `伺服器端調度引擎 → ${result?.enabled ? '啟用' : '停用'}`);
-    sendJson(res, 200, result);
-  },
+  
 
-  'GET /api/dispatch/status': async (_req, res) => {
-    const api = createApiClient(currentTarget, credentials);
-    sendJson(res, 200, await api.dispatchStatus());
-  },
+  
 };
 
 const server = http.createServer((req, res) => {

@@ -23,7 +23,7 @@
   <main data-panel="control">
     <section class="card">
       <h2>一、連線目標</h2>
-      <p class="hint">切換 GCP 與本地只有位址不同，通道與認證方式完全一樣。</p>
+      <p class="hint">模擬器是外部單位：只用對外 API（金鑰）與 MQTT（每台車一組帳密）。圖資讀本機的 data/map.json，不跟伺服器要。</p>
       <div class="row">
         <label>預設
           <select id="presetSelect"></select>
@@ -37,33 +37,17 @@
         <label>對外 API
           <input id="externalPortInput" type="number" />
         </label>
-        <label>內部 API
-          <input id="internalPortInput" type="number" />
-        </label>
       </div>
       <div class="row">
         <button id="applyTargetBtn" class="btn">套用目標</button>
-        <button id="probeBtn" class="btn ghost">測試三條通道</button>
+        <button id="probeBtn" class="btn ghost">測試對外通道</button>
       </div>
       <div id="credWarn" class="warn" hidden></div>
       <ul id="probeResults" class="probe"></ul>
     </section>
 
     <section class="card">
-      <h2>二、伺服器端調度引擎</h2>
-      <p class="hint">
-        引擎依部署中的班表發訂單。模擬器沒上線就開啟，只會產生沒有人執行的訂單。
-      </p>
-      <div class="row">
-        <button id="dispatchRefreshBtn" class="btn ghost">重新整理</button>
-        <button id="dispatchOnBtn" class="btn">啟用引擎</button>
-        <button id="dispatchOffBtn" class="btn danger">停用引擎</button>
-      </div>
-      <div id="dispatchBox" class="mono-box">尚未查詢</div>
-    </section>
-
-    <section class="card">
-      <h2>三、車隊</h2>
+      <h2>二、車隊</h2>
       <div class="row">
         <button id="startBtn" class="btn primary">車隊上線</button>
         <button id="stopBtn" class="btn danger">車隊下線</button>
@@ -95,7 +79,7 @@
     </section>
 
     <section class="card">
-      <h2>五、事件</h2>
+      <h2>三、事件</h2>
       <div class="row">
         <label class="inline"><input type="checkbox" id="onlyOrders" /> 只看訂單與異常</label>
         <button id="clearLogBtn" class="btn ghost">清畫面</button>
