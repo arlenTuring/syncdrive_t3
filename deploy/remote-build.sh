@@ -30,9 +30,19 @@ die() { printf '\033[1;31m失敗：\033[0m %s\n' "$*" >&2; exit 1; }
 remote_run() { gcloud compute ssh "$INSTANCE" --zone="$ZONE" --command="$1"; }
 remote_pipe() { gcloud compute ssh "$INSTANCE" --zone="$ZONE" --command="$1"; }
 
-git diff --quiet || log "注意：工作目錄有未提交的修改，這些不會被部署"
+# 未提交的修改不會被部署。這件事夾在幾百行 docker 輸出裡很容易被略過，所以要停下來問。
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  printf '\033[1;33m注意：\033[0m工作目錄有未提交的修改，這些\033[1m不會\033[0m被部署：\n'
+  git status --short | sed 's/^/    /'
+  printf '要用 HEAD（%s）繼續部署嗎？[y/N] ' "$(git rev-parse --short HEAD)"
+  read -r reply
+  case "$reply" in
+    [yY]*) ;;
+    *) die '已取消。請先提交，或用 git stash 收好再部署' ;;
+  esac
+fi
 
-log "1/5 上傳已提交的程式碼（$(git rev-parse --short HEAD)）"
+log "1/6 上傳已提交的程式碼（$(git rev-parse --short HEAD)）"
 remote_run "sudo mkdir -p $REMOTE_DIR && sudo chown \$(whoami):\$(whoami) $REMOTE_DIR"
 git archive --format=tar HEAD | gzip \
   | remote_pipe "tar xzf - -C $REMOTE_DIR && chmod +x $REMOTE_DIR/deploy/*.sh"
@@ -40,26 +50,36 @@ remote_run "echo '$(git rev-parse HEAD)' > $REMOTE_DIR/deploy/.source-commit"
 
 # 種子資料被 .gitignore 擋著，git archive 帶不走；有才送
 if [ -f deploy/seed/seed.dump ]; then
-  log "2/5 上傳種子資料"
+  log "2/6 上傳種子資料"
   tar czf - deploy/seed | remote_pipe "tar xzf - -C $REMOTE_DIR"
 else
-  log "2/5 沒有 deploy/seed，略過"
+  log "2/6 沒有 deploy/seed，略過"
 fi
 
-log "3/5 建置並打包 $TAG"
+log "3/6 建置並打包 $TAG"
 remote_run "cd $REMOTE_DIR && sudo ./deploy/pack-offline.sh $TAG" \
   || die "打包失敗"
 
 # 建置產出的是 :$TAG，但既有的 deploy/.env 可能還指著別的標籤（例如初次安裝的
 # latest）。不同步的話 bootstrap 會撈到舊映像裝上去——服務起得來、但跑的是上一版，
 # 而且看起來一切正常（2026-08-26 實測：Basic Auth 因此靜靜地失效）。
-log "4/5 對齊 IMAGE_TAG 並安裝驗收"
+log "4/6 對齊 IMAGE_TAG 並安裝驗收"
 remote_run "sudo sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=$TAG|' $REMOTE_DIR/deploy/.env"
 # 後端啟動要幾十秒（health start_period 40s），太早驗收會拿到 502
 remote_run "cd $REMOTE_DIR && sudo ./deploy/bootstrap.sh && sleep 45 && ./deploy/healthcheck.sh" \
   || die "驗收未通過——原始碼保留在遠端供除錯，確認後再手動清除"
 
-log "5/5 清除原始碼與建置快取"
+# 驗收全過不代表跑的是新版：那 34 項檢查的是端點、權限、參數，舊版一樣全過。
+# 真正要確認的是「現在服務的，是不是我剛剛送上去的那個 commit」。少了這一步，
+# 部署到舊映像會安安靜靜地成功（2026-08-26 的 Basic Auth 就是這樣失效的）。
+log "5/6 確認跑的是 $TAG"
+remote_run "cd $REMOTE_DIR && for c in syncdrive_backend syncdrive_web; do \
+    running=\$(sudo docker inspect --format '{{.Config.Image}}' \$c 2>/dev/null); \
+    echo \"  \$c → \$running\"; \
+    case \"\$running\" in *:$TAG) ;; *) echo \"    ✗ 預期 :$TAG\"; exit 1 ;; esac; \
+  done" || die "跑起來的不是 $TAG——服務可能還在舊映像上，原始碼保留在遠端供除錯"
+
+log "6/6 清除原始碼與建置快取"
 # build cache 裡有原始碼副本，只刪目錄是不夠的
 remote_run "cd $REMOTE_DIR \
   && sudo rm -rf backend frontend document scripts package.json docker-compose.yml \
