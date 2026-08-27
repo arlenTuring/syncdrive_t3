@@ -124,12 +124,20 @@ function isDemoPlaneBroken(plane: DashboardPlane): boolean {
     const panel = elements.find((e) => e.label === panelLabel);
     if (panel && (panel.children?.length ?? 0) === 0) return true;
   }
-  for (const groupLabel of DATA_GROUP_LABELS) {
-    const group = elements.find((e) => e.label === groupLabel);
-    if (!group) continue;
-    if ((group.children?.length ?? 0) === 0) return true;
-    if (!group.dataSourceId || !group.sqlQuery?.trim()) return true;
-  }
+  /*
+   * 群組缺子元件或缺資料綁定，<strong>不算版面壞掉</strong>。
+   *
+   * 這兩種情況 ensureDemoGroupChildren 已經逐一修好了：缺 dataSourceId／sqlQuery
+   * 會從內建範例補回該欄位，children 空了會補回子元件——都是針對那一個群組，
+   * 不動其他東西。
+   *
+   * 原本把它們算成「壞掉」，整張版面就會被內建快照取代。而內建快照裡的圖台
+   * 寫死 mapId: 't3-main-version'，於是使用者換好的地圖每次載入都被打回去：
+   * 存檔明明成功（後端資料是對的），重整就變回舊地圖，而且完全沒有提示。
+   * 實測使用者的版面就是「車輛分佈」與「整備分佈」少了 dataSourceId 而中招。
+   *
+   * 整包還原是最後手段，留給真正救不回來的結構損壞：元件數不足、核心面板不見。
+   */
   return false;
 }
 
