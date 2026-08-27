@@ -329,8 +329,8 @@ if $need_backend; then
 fi
 echo ""
 
-# VTMS 模擬器已移除：它是外部單位，跑在 simulator/ 底下，自己啟動
-#   cd simulator && npm start   →  http://127.0.0.1:4300
+# VTMS 模擬器已移除：它是外部單位，程式在另一個資料夾，自己啟動
+#   cd ../syncdrive_t3_simulator && npm start   →  http://127.0.0.1:4300
 
 # ── Frontend ──
 need_frontend=true

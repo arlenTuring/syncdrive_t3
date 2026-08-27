@@ -174,7 +174,7 @@ services:
 
 # 這裡曾經有一個 simulator 服務（vtms-shift-demo-simulator.js），已移除。
 #
-# 模擬器是<strong>外部單位</strong>，只有一份，跑在開發者自己的機器上（simulator/）。
+# 模擬器是<strong>外部單位</strong>，只有一份，跑在開發者自己的機器上，程式在另一個資料夾 syncdrive_t3_simulator/。
 # 產品端不該有任何東西以車輛身分發布 telemetry——那個容器與本機模擬器搶同一批
 # PMS-01～11，兩邊輪流蓋掉對方的位置，圖台上的車就散在莫名其妙的地方
 # （實測它回報 x=1025，超出圖資 x 上限 900）。
