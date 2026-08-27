@@ -65,12 +65,22 @@ class MapSource {
       for (const facility of area.facilities ?? []) {
         const position = fieldPosition(facility);
         if (!facility.id || !position) continue;
-        add(facility.id, {
+        const entry = {
           name: facility.customName || facility.name || String(facility.id),
           kind: facility.type,
           areaId: area.id,
           ...position,
-        });
+        };
+        add(facility.id, entry);
+        /*
+         * 也用<strong>代號</strong>建索引（E1、H1、M4…）。
+         *
+         * 整備與入出場訂單的端點給的是格位代號，不是設施 id。只用 id 建索引的話這些
+         * 端點一律查不到，polylineFor 會把查不到的點跳過——車於是停在剩下的那一端，
+         * 也就是正線上。症狀是圖台上的車越跑越散，最後全卡在正線各處不動。
+         */
+        add(facility.customName, entry);
+        add(facility.name, entry);
       }
     }
 

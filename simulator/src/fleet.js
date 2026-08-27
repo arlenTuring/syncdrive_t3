@@ -128,6 +128,7 @@ class Fleet {
         password,
         target,
         home: parking(code),
+        yardSlots: slots,
         api: this.api,
         map: this.map,
         track: this.track,

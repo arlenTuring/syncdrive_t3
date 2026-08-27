@@ -97,7 +97,7 @@ function walkPolyline(points, ratio) {
 }
 
 class SimulatedVehicle {
-  constructor({ code, password, target, api, map, track, routeFor, log, speed, home }) {
+  constructor({ code, password, target, api, map, track, routeFor, log, speed, home, yardSlots }) {
     this.code = code;
     this.password = password;
     this.target = target;
@@ -125,6 +125,8 @@ class SimulatedVehicle {
      * 等於不存在——第一次接單才憑空出現，跑完又消失。真實的車停著也一直在回報。
      */
     this.home = home ?? null;
+    /** 場區格位的範圍，用來判斷「我現在停在哪一格」 */
+    this.yardSlots = yardSlots ?? [];
     this.position = home ? { x: home.x, y: home.y } : null;
     this.heading = 0;
     this.timers = [];
@@ -406,18 +408,35 @@ class SimulatedVehicle {
    * applyOperationMqttUpdate 會直接略過，不會寫進資料庫——它只是給圖台看的位置資訊。
    */
   publishIdleAtYard() {
-    if (!this.home?.slot) return;
+    // 報「我人在哪一格」，不是「我的家在哪一格」。
+    //
+    // 跑完一趟的車就停在終點，那多半在正線上而不是場區。照著 home 報的話，
+    // 車實際在 (840, 305) 卻宣稱自己在 E1——圖台優先信格位，就把它畫進 E1，
+    // 於是所有車擠在場區、角度還各自歪斜。
+    const slot = this.slotAt(this.position);
+    if (!slot) return;
     this.publish(
       'operation/update',
       {
         vehicle_code: this.code,
         timestamp: Date.now(),
-        yard_slot_id: this.home.slot,
+        yard_slot_id: slot,
         vehicle_phase: this.faulted ? 'FAULTED' : 'IDLE',
         order_status: 'IDLE',
       },
       { qos: 0 },
     );
+  }
+
+  /** 這個座標落在哪一個場區格位裡；不在任何格位就回 null */
+  slotAt(position) {
+    if (!position || !this.yardSlots?.length) return null;
+    for (const slot of this.yardSlots) {
+      if (position.x < slot.xMin || position.x > slot.xMax) continue;
+      if (position.y < slot.yMin || position.y > slot.yMax) continue;
+      return slot.code;
+    }
+    return null;
   }
 
   publishTelemetry() {

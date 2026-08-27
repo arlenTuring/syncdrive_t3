@@ -261,6 +261,11 @@ function collectYardSlots(mapPayload) {
         id: facility.id,
         x: (p.refFieldXMinM + p.refFieldXMaxM) / 2,
         y: (p.refFieldYMinM + p.refFieldYMaxM) / 2,
+        // 範圍要留著：判斷「車現在停在哪一格」得看它有沒有落在格子裡
+        xMin: p.refFieldXMinM,
+        xMax: p.refFieldXMaxM,
+        yMin: p.refFieldYMinM,
+        yMax: p.refFieldYMaxM,
       });
     }
   }
