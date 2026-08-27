@@ -137,10 +137,12 @@ import {
   DEFAULT_MAP_VERSION,
   entryToParsed,
   getMapLibraryEntry,
+  hydrateMapLibraryFromBackend,
   readMapLibrary,
   refreshStaleBuiltinMapEntries,
   saveEditorStateToLibraryEntry,
   upsertMapLibraryEntry,
+  type MapLibraryEntry,
   writeMapLibrary,
 } from './utils/mapLibraryStorage'
 import { publishMapLibraryEntryToBackend } from './api/mapLibraryApi'
@@ -301,6 +303,7 @@ export default function MapEditorApp({
     ).y,
   )
 
+  const [backendSyncFailed, setBackendSyncFailed] = useState(false)
   const [mapScreen, setMapScreen] = useState<MapEditorScreen>('library')
   const [mapExtentMeters] = useState<MapExtentMeters>(defaultMapExtentMeters)
   const [loadedMapMeta, setLoadedMapMeta] = useState<LoadedMapMeta>({
@@ -904,7 +907,7 @@ export default function MapEditorApp({
       pointTopologyRef.current,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-    void publishMapLibraryEntryToBackend(updated)
+    void publishAndReport(updated)
   }, [])
 
   const routePlanningPickMode =
@@ -1201,8 +1204,29 @@ export default function MapEditorApp({
     })
   }, [])
 
+  /**
+   * 存到後端，失敗要講。
+   *
+   * 原本是 void publishMapLibraryEntryToBackend(updated)——射後不理。使用者以為存好了，
+   * 其實只進了這台瀏覽器的快取；換一台電腦打開就是舊的，而且沒有任何線索。
+   * 本機快取照樣先寫（後端掛掉時畫面仍要能編），但沒送成功一定要說。
+   */
+  const publishAndReport = useCallback(async (entry: MapLibraryEntry) => {
+    const result = await publishMapLibraryEntryToBackend(entry)
+    setBackendSyncFailed(!result.ok)
+  }, [])
+
   const openLibraryMap = useCallback(
     async (libraryId: string) => {
+      /*
+       * 開圖前先跟後端對一次。
+       *
+       * getMapLibraryEntry 讀的是 localStorage，那是快取；別台機器改過的內容不在
+       * 裡面。不對這一次的話，打開的是這台瀏覽器上次留下的舊版，而且沒有任何提示。
+       * 後端連不上就沿用快取——開得起來比開得新重要。
+       */
+      await hydrateMapLibraryFromBackend()
+
       let entry = getMapLibraryEntry(libraryId)
       if (!entry) {
         alert('找不到地圖，請重新整理清單。')
@@ -1365,7 +1389,7 @@ export default function MapEditorApp({
         pointTopologyRef.current,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-      void publishMapLibraryEntryToBackend(updated)
+      void publishAndReport(updated)
     }
     clearMapDraft(meta.libraryId)
     setMapPixelSize(pixelSize)
@@ -1454,7 +1478,7 @@ export default function MapEditorApp({
           pointTopologyRef.current,
         )
         writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-        void publishMapLibraryEntryToBackend(updated)
+        void publishAndReport(updated)
       }
       clearMapDraft(libraryId)
       const savedAt = new Date()
@@ -3017,6 +3041,12 @@ export default function MapEditorApp({
     <div className="flex h-screen min-h-0 flex-col bg-zinc-950 text-zinc-100">
       {isMapWorkspace && mapScreen === 'library' && (
         <MapLibraryPage onOpenMap={openLibraryMap} onBackToHome={onBackToHome} />
+      )}
+      {isMapWorkspace && mapScreen === 'editor' && backendSyncFailed && (
+        <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-xs text-amber-300">
+          這張地圖<strong className="text-amber-200">沒有存到伺服器</strong>，目前只在這台瀏覽器裡。
+          換一台電腦或清一次快取就會看到舊版本——請確認後端連線，再存一次。
+        </div>
       )}
       {isMapWorkspace && mapScreen === 'editor' && (
         <MapEditorToolbar

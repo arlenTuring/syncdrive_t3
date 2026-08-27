@@ -3,7 +3,11 @@ import {
   resolveBuiltinMapIdFromLibraryEntry,
   resolveMapId,
 } from '../constants/builtinMaps'
-import { fetchPublishedMapDocument } from '../api/mapLibraryApi'
+import {
+  fetchPublishedMapDocument,
+  fetchPublishedMapList,
+  publishMapLibraryEntryToBackend,
+} from '../api/mapLibraryApi'
 import {
   createBlankArea,
   type MapAreaObject,
@@ -242,15 +246,81 @@ export async function refreshStaleBuiltinMapEntries(
  * 讀取地圖庫。僅在 localStorage 完全空白時種子內建範例；
  * 刪除項目後不會自動補回（請用應用程式設定「還原圖台範例」重載內建地圖）。
  */
+/**
+ * 從後端把地圖庫補回來。
+ *
+ * <h3>後端是真相，localStorage 只是快取</h3>
+ * 地圖庫原本只活在瀏覽器裡：換一台電腦、換一個瀏覽器、換一個網域
+ * （localhost ↔ 正式站）就是另一份資料，而且快取空的時候會退回內建範例檔——
+ * 那份是 7 月的，連 pointTopology 都沒有。症狀每次換皮出現：路網拓撲不見、
+ * 儀表板選不到地圖、編輯器打開是舊版。這與儀表板版面當初的問題是同一個，
+ * 那邊已經改成「後端是真相」，這裡比照辦理。
+ *
+ * <h3>三種情況</h3>
+ * <pre>
+ *   後端有這張圖   → 用後端的覆蓋快取（本機那份可能是別台機器的舊狀態）
+ *   後端沒有       → 保留本機的，並主動推上去（等於一次自動遷移）
+ *   後端連不上     → 沿用快取，畫面照常開
+ * </pre>
+ *
+ * 不丟例外：地圖庫打不開比資料舊還糟。
+ */
+export async function hydrateMapLibraryFromBackend(): Promise<MapLibraryEntry[]> {
+  const local = readMapLibrary()
+
+  let published: Awaited<ReturnType<typeof fetchPublishedMapList>>
+  try {
+    published = await fetchPublishedMapList()
+  } catch {
+    return local
+  }
+
+  const byId = new Map(local.map((e) => [resolveMapId(e.mapDocument.mapId || e.libraryId), e]))
+
+  for (const summary of published.maps) {
+    const mapId = resolveMapId(summary.mapId || summary.libraryId)
+    if (!mapId) continue
+    const doc = await fetchPublishedMapDocument(mapId)
+    if (!doc) continue
+    try {
+      const parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(doc))
+      const existing = byId.get(mapId)
+      byId.set(mapId, {
+        ...importMapEntryFromServer(parsed, mapId),
+        // 內建標記留著：還原內建範例那條路要靠它
+        ...(existing?.builtinId ? { builtinId: existing.builtinId } : {}),
+      })
+    } catch {
+      // 後端那份解不開就別動本機的，至少畫面還有東西
+    }
+  }
+
+  const merged = [...byId.values()]
+  writeMapLibrary(merged)
+
+  /*
+   * 後端是空的＝這台機器還沒遷移過，主動把本機那份推上去。
+   *
+   * 只寫「下次儲存會送上去」是被動的：使用者不去編輯就永遠不會觸發，
+   * 資料就一直只存在這一台瀏覽器裡。
+   */
+  if (published.maps.length === 0 && merged.length > 0) {
+    await Promise.all(merged.map((entry) => publishMapLibraryEntryToBackend(entry)))
+  }
+
+  return merged
+}
+
 export async function ensureMapLibrarySeeded(): Promise<MapLibraryEntry[]> {
   let entries = readMapLibrary()
   if (entries.length === 0) {
     entries = await seedBuiltinMapLibraryEntries()
     writeMapLibrary(entries)
-    return entries
+  } else {
+    entries = (await refreshStaleBuiltinMapEntries(entries)).entries
   }
-  const { entries: synced } = await refreshStaleBuiltinMapEntries(entries)
-  return synced
+  // 內建墊底之後才問後端：後端有的一律以後端為準
+  return hydrateMapLibraryFromBackend()
 }
 
 export function getMapLibraryEntry(
