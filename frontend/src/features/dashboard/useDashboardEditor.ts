@@ -684,8 +684,25 @@ function migratePlane(plane: DashboardPlane): DashboardPlane {
   const legacy = isLegacyVtmsLayout(plane);
   // 僅在版面結構確實損壞或為舊版不可編輯版型時才整包還原；不因版本號或解析度變更覆寫使用者編輯
   if (legacy || isDemoPlaneBroken(plane)) {
+    /*
+     * 整包還原是最後手段，但<strong>使用者選的地圖要留著</strong>。
+     *
+     * 內建快照的圖台元件寫死 mapId: 't3-main-version'。直接整包套上去，等於每次
+     * 還原都把人家換好的地圖悄悄改掉——使用者只看到「存了又變回舊地圖」，
+     * 完全不知道發生過還原。版面壞掉要修是一回事，順手改掉別的設定是另一回事。
+     */
+    const chosenMapId = (plane.elements ?? []).find(
+      (e) => e.canvasKind === 'map-platform' && e.mapId,
+    )?.mapId;
+
+    const restored = freshDemoPlane();
     return {
-      ...freshDemoPlane(),
+      ...restored,
+      elements: chosenMapId
+        ? restored.elements.map((e) =>
+            e.canvasKind === 'map-platform' ? { ...e, mapId: chosenMapId } : e,
+          )
+        : restored.elements,
       id: plane.id,
       name: plane.name,
       createdAt: plane.createdAt,
