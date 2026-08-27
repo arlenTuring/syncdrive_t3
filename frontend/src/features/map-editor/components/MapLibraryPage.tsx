@@ -20,6 +20,7 @@ import {
   deleteMapLibraryEntry,
   duplicateMapEntry,
   ensureMapLibrarySeeded,
+  hydrateMapLibraryFromBackend,
   formatMapLibraryDate,
   importMapEntryFromParsed,
   importMapEntryFromServer,
@@ -58,6 +59,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   const [serverActiveId, setServerActiveId] = useState<string | null>(null)
   const [serverLoadingId, setServerLoadingId] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [offline, setOffline] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -75,16 +77,28 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     setActiveLibraryId(status.activeLibraryId)
   }, [])
 
+  /**
+   * 先畫快取，再跟後端對。
+   *
+   * 快取是快取，不是真相——但等 33 毫秒才畫第一幀也沒必要。所以先把本機那份放上去，
+   * 補水完成再換掉。<strong>後端連不上時要標出來</strong>：悄悄顯示舊資料正是先前
+   * 那一串「存了又還原」「拓撲不見了」的形狀。
+   */
   const refreshEntries = useCallback(async () => {
-    setLoading(true)
+    const cached = readMapLibrary()
+    if (cached.length > 0) setEntries(cached)
+    setLoading(cached.length === 0)
     setError(null)
     try {
-      const seeded = await ensureMapLibrarySeeded()
-      setEntries(seeded)
+      await ensureMapLibrarySeeded()
+      const { entries, online } = await hydrateMapLibraryFromBackend()
+      setEntries(entries)
+      setOffline(!online)
       await refreshActiveStatus()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setEntries(readMapLibrary())
+      setOffline(true)
     } finally {
       setLoading(false)
     }
@@ -283,7 +297,17 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               <BackToHomeButton onClick={onBackToHome} className="mt-0.5" />
             )}
             <div>
-              <h1 className="text-lg font-semibold text-zinc-100">地圖清單</h1>
+              <h1 className="flex items-center gap-2 text-lg font-semibold text-zinc-100">
+                地圖清單
+                {offline && (
+                  <span
+                    title="連不上伺服器，顯示的是這台瀏覽器的快取，可能不是最新的"
+                    className="rounded border border-amber-800 px-1.5 py-0.5 text-[11px] font-normal text-amber-300"
+                  >
+                    離線
+                  </span>
+                )}
+              </h1>
               <p className="mt-1 text-sm text-zinc-400">
                 選擇要編輯的地圖，或建立空白地圖、複製、匯入／導出地圖描述檔。
                 「設為當前使用」後，儀表板模擬與後端 API 會讀取該圖。

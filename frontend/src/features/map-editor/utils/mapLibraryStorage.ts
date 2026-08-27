@@ -263,16 +263,20 @@ export async function refreshStaleBuiltinMapEntries(
  *   後端連不上     → 沿用快取，畫面照常開
  * </pre>
  *
- * 不丟例外：地圖庫打不開比資料舊還糟。
+ * 不丟例外：地圖庫打不開比資料舊還糟。回傳的 <code>online</code> 是給畫面用的——
+ * 顯示的是後端資料還是本機快取，使用者有權知道。
  */
-export async function hydrateMapLibraryFromBackend(): Promise<MapLibraryEntry[]> {
+export async function hydrateMapLibraryFromBackend(): Promise<{
+  entries: MapLibraryEntry[]
+  online: boolean
+}> {
   const local = readMapLibrary()
 
   let published: Awaited<ReturnType<typeof fetchPublishedMapList>>
   try {
     published = await fetchPublishedMapList()
   } catch {
-    return local
+    return { entries: local, online: false }
   }
 
   const byId = new Map(local.map((e) => [resolveMapId(e.mapDocument.mapId || e.libraryId), e]))
@@ -308,7 +312,7 @@ export async function hydrateMapLibraryFromBackend(): Promise<MapLibraryEntry[]>
     await Promise.all(merged.map((entry) => publishMapLibraryEntryToBackend(entry)))
   }
 
-  return merged
+  return { entries: merged, online: true }
 }
 
 export async function ensureMapLibrarySeeded(): Promise<MapLibraryEntry[]> {
@@ -320,7 +324,7 @@ export async function ensureMapLibrarySeeded(): Promise<MapLibraryEntry[]> {
     entries = (await refreshStaleBuiltinMapEntries(entries)).entries
   }
   // 內建墊底之後才問後端：後端有的一律以後端為準
-  return hydrateMapLibraryFromBackend()
+  return (await hydrateMapLibraryFromBackend()).entries
 }
 
 export function getMapLibraryEntry(
