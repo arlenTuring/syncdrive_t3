@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DashboardPlane, CanvasElementProps, ChildWidget, LineChartWidget, WidgetType, CanvasKind } from './types';
+import type { DashboardPlane, CanvasElementProps, ChildWidget, WidgetType, CanvasKind } from './types';
 import { createWidget } from './types';
 import { validatePlane, validateGroupTemplate, type LayoutIssue } from './utils/collision';
 import {
@@ -8,20 +8,12 @@ import {
 } from './hooks/useDashboardHistory';
 
 import {
-  DASHBOARD_LAYOUT_SEED_KEY as LAYOUT_SEED_KEY,
   DASHBOARD_PLANES_STORAGE_KEY as STORAGE_KEY,
 } from '../../lib/canvasCacheReset';
 import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import { fetchDashboardPlanes, saveDashboardPlanes } from './api/dashboardPlanesApi';
-import { cloneDemoPlane, DEMO_LAYOUT_SEED } from './constants/demoPlane';
-import {
-  ensureDeploymentDataStatsPanel,
-  buildVehicleOpsTitlePanel,
-  DEPLOYMENT_PLANE_NAME,
-  DEPLOY_VEHICLE_TITLE_PANEL_ID,
-  DEPLOY_VEHICLE_OPS_GROUP_ID,
-} from './constants/deploymentPlane';
+import { cloneDemoPlane } from './constants/demoPlane';
 import {
   applyWidgetFormat,
   canApplyWidgetFormat,
@@ -34,7 +26,6 @@ import {
   type DualCanvasLane,
 } from './utils/dualCanvas';
 import { migrateChildWidgetGenerics } from './utils/migrateWidgetGenerics';
-import { needsDashboardRuntimePatch, patchDashboardRuntimeFixes } from './utils/migrateVehicleMonitorProtocol';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -101,694 +92,69 @@ function freshDemoPlane(): DashboardPlane {
   return { ...cloneDemoPlane(), demoLayoutVersion: DEMO_LAYOUT_VERSION } as DashboardPlane;
 }
 
-/** 內建範例應有的核心畫布標籤（用於偵測損壞的本機快取） */
-const DEMO_CORE_LABELS = ['事件中心', '班次中心', '運能趨勢', '即時圖台'] as const;
 
-const SHIFT_GROUP_LABELS = new Set(['正線班次', '整備班表']);
 
-/** 依 SQL 重複渲染的群組：範本子元件或資料綁定遺失時從內建範例補回 */
-const DATA_GROUP_LABELS = new Set([
-  '車輛狀態', '車輛分佈', '整備分佈', '事件輪播',
-  ...SHIFT_GROUP_LABELS,
-]);
 
-function isDemoPlaneBroken(plane: DashboardPlane): boolean {
-  if (plane.id !== 'demo-plane') return false;
-  const elements = plane.elements ?? [];
-  if (elements.length < 8) return true;
-  const labels = new Set(elements.map((e) => e.label ?? ''));
-  for (const required of DEMO_CORE_LABELS) {
-    if (!labels.has(required)) return true;
-  }
-  for (const panelLabel of ['事件中心', '班次中心', '運能趨勢'] as const) {
-    const panel = elements.find((e) => e.label === panelLabel);
-    if (panel && (panel.children?.length ?? 0) === 0) return true;
-  }
-  /*
-   * 群組缺子元件或缺資料綁定，<strong>不算版面壞掉</strong>。
-   *
-   * 這兩種情況 ensureDemoGroupChildren 已經逐一修好了：缺 dataSourceId／sqlQuery
-   * 會從內建範例補回該欄位，children 空了會補回子元件——都是針對那一個群組，
-   * 不動其他東西。
-   *
-   * 原本把它們算成「壞掉」，整張版面就會被內建快照取代。而內建快照裡的圖台
-   * 寫死 mapId: 't3-main-version'，於是使用者換好的地圖每次載入都被打回去：
-   * 存檔明明成功（後端資料是對的），重整就變回舊地圖，而且完全沒有提示。
-   * 實測使用者的版面就是「車輛分佈」與「整備分佈」少了 dataSourceId 而中招。
-   *
-   * 整包還原是最後手段，留給真正救不回來的結構損壞：元件數不足、核心面板不見。
-   */
-  return false;
-}
 
-function isLegacyVtmsLayout(plane: DashboardPlane): boolean {
-  const labels = (plane.elements ?? []).map(e => e.label ?? '');
-  if (labels.some(l => /班次格位|事件滾動|格位/.test(l))) return true;
-  // 單一複合面板鎖死子元件時，強制還原為可編輯子元件版面
-  for (const el of plane.elements ?? []) {
-    if (el.label !== '事件中心' && el.label !== '班次中心') continue;
-    const ch = el.children ?? [];
-    if (ch.some(c => ['event-center-panel', 'shift-center-panel', 'shift-progress-block'].includes(c.type))) {
-      return true;
-    }
-  }
-  return false;
-}
 
-/** 種子變更時清除舊平面，強制從內建快照重新載入 */
-function ensureLayoutSeed(): void {
-  try {
-    const stored = localStorage.getItem(LAYOUT_SEED_KEY);
-    if (!stored) {
-      localStorage.setItem(LAYOUT_SEED_KEY, DEMO_LAYOUT_SEED);
-      return;
-    }
-    if (stored !== DEMO_LAYOUT_SEED) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem(LAYOUT_SEED_KEY, DEMO_LAYOUT_SEED);
-    }
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
 
-const SHIFT_GROUP_KEYS: (keyof CanvasElementProps)[] = [
-  'groupRepeatMode', 'slotCount', 'slotKeyField', 'groupSlotAssignment', 'groupTransition',
-  'layoutMode', 'gridColumns', 'groupTileFit', 'groupTileAlign', 'groupTilePadding', 'groupTilePadX', 'groupTilePadY',
-  'templateHideChrome', 'gapX', 'templateWidth', 'templateHeight',
-  'dataSourceId', 'sqlQuery', 'refreshInterval', 'variableName', 'iteratorField',
-];
 
-function patchRouteProgressMqtt(child: ChildWidget): ChildWidget {
-  return child;
-}
 
-function ensureDemoGroupChildren(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refByLabel = new Map(ref.elements.map(el => [el.label, el]));
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (!el.isGroup) return el;
-      const seed = refByLabel.get(el.label ?? '');
-      if (!seed) return el;
 
-      let next = el;
-      if (DATA_GROUP_LABELS.has(el.label ?? '')) {
-        const merged: Partial<CanvasElementProps> = {};
-        for (const key of SHIFT_GROUP_KEYS) {
-          const current = el[key];
-          const missing = current === undefined
-            || (key === 'sqlQuery' && typeof current === 'string' && !current.trim())
-            || (key === 'dataSourceId' && typeof current === 'string' && !current.trim());
-          if (!missing) continue;
-          const val = seed[key];
-          if (val !== undefined) (merged as Record<string, unknown>)[key] = val;
-        }
-        if (Object.keys(merged).length > 0) {
-          next = { ...el, ...merged };
-        }
-      }
 
-      if ((next.children?.length ?? 0) === 0 && seed.children?.length) {
-        return { ...next, children: JSON.parse(JSON.stringify(seed.children)) as ChildWidget[] };
-      }
 
-      if (SHIFT_GROUP_LABELS.has(el.label ?? '') && next.children?.length) {
-        return {
-          ...next,
-          children: next.children!.map(patchRouteProgressMqtt),
-        };
-      }
 
-      return next;
-    }),
-  };
-}
 
-/** 事件輪播：索引變數模式 + 子元件各自 SQL */
-function migrateEventScrollLayout(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refScroll = ref.elements.find(e => e.label === '事件輪播');
-  if (!refScroll?.children?.length) return plane;
 
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '事件輪播') return el;
-      const firstChild = el.children?.[0];
-      const hasIndexSql = firstChild?.type === 'color-block'
-        && !!(firstChild as { dataSourceId?: string }).dataSourceId;
-      const needsFix =
-        el.groupVariableMode !== 'index'
-        || !hasIndexSql
-        || el.groupTileFit !== 'fixed'
-        || (el.children?.length ?? 0) !== refScroll.children!.length;
-      if (!needsFix) return el;
-      return {
-        ...el,
-        groupVariableMode: 'index',
-        groupTileFit: 'fixed',
-        groupTileAlign: 'center',
-        templateWidth: refScroll.templateWidth,
-        templateHeight: refScroll.templateHeight,
-        iteratorField: undefined,
-        children: JSON.parse(JSON.stringify(refScroll.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
 
-/** 事件中心：移除舊疊層空狀態，輪播群組改雙畫板 + 索引變數 item */
-function migrateEventCenterLayout(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refParent = ref.elements.find(e => e.label === '事件中心');
-  const refScroll = ref.elements.find(e => e.label === '事件輪播');
-  if (!refParent || !refScroll) return plane;
 
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label === '事件中心') {
-        const hasListOverlay = (el.children ?? []).some(
-          c => c.type === 'empty-state'
-            || (c.type === 'color-block' && (c.y ?? 0) >= EVENT_KPI_H - 4),
-        );
-        if (!hasListOverlay) return el;
-        return {
-          ...el,
-          children: JSON.parse(JSON.stringify(refParent.children)) as ChildWidget[],
-        };
-      }
-      if (el.label !== '事件輪播') return el;
-      const normal = refScroll.childrenNormal ?? refScroll.children ?? [];
-      return {
-        ...el,
-        dualCanvasEnabled: true,
-        defaultPanelEnabled: refScroll.defaultPanelEnabled ?? true,
-        displayGate: refScroll.displayGate ?? { signal: 'rowCount', operator: 'gte', compareValue: '1' },
-        groupVariableMode: 'index',
-        variableName: refScroll.variableName ?? 'item',
-        groupTileFit: 'fixed',
-        groupTileAlign: 'center',
-        templateWidth: refScroll.templateWidth,
-        templateHeight: refScroll.templateHeight,
-        childrenNormal: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-        childrenDefault: JSON.parse(JSON.stringify(refScroll.childrenDefault ?? [])) as ChildWidget[],
-        children: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-      };
-    }),
-  };
-}
 
-const EVENT_KPI_H = 100;
 
-/** 整備班表：對齊 Figma Card 299×196 */
-function migrateMaintenanceShiftCardFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '整備班表');
-  if (!refPanel) return plane;
 
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '整備班表') return el;
-      return {
-        ...el,
-        templateWidth: refPanel.templateWidth,
-        templateHeight: refPanel.templateHeight,
-        groupTilePadY: refPanel.groupTilePadY,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
 
-/** 正線班表：對齊 Figma Card 299×196 */
-function migrateMainlineShiftCardFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '正線班次');
-  if (!refPanel) return plane;
 
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '正線班次') return el;
-      return {
-        ...el,
-        templateWidth: refPanel.templateWidth,
-        templateHeight: refPanel.templateHeight,
-        groupTilePadY: refPanel.groupTilePadY,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
 
-/** 載具監控列：對齊 Figma Card 306×192 */
-function migrateVehicleMonitorFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '車輛狀態');
-  if (!refPanel) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '車輛狀態') return el;
-      return {
-        ...el,
-        height: refPanel.height,
-        backgroundColor: refPanel.backgroundColor,
-        templateWidth: refPanel.templateWidth,
-        templateHeight: refPanel.templateHeight,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 車輛分佈：對齊 Figma Card 652×91 + 分段色條 */
-function migrateVehicleDistributionFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '車輛分佈');
-  if (!refPanel) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '車輛分佈') return el;
-      return {
-        ...el,
-        height: refPanel.height,
-        backgroundColor: refPanel.backgroundColor,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 整備分布：對齊 Figma Card 652×227 + 2×3 格位卡 */
-function migrateMaintenanceDistributionFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '整備分佈');
-  if (!refPanel) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '整備分佈') return el;
-      return {
-        ...el,
-        height: refPanel.height,
-        backgroundColor: refPanel.backgroundColor,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 運能趨勢：對齊 Figma Card 652×298 + KPI + 折線圖 */
-function migrateCapacityTrendFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '運能趨勢');
-  if (!refPanel) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '運能趨勢') return el;
-      return {
-        ...el,
-        height: refPanel.height,
-        backgroundColor: refPanel.backgroundColor,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 班次中心：對齊 Figma Card 330×196 + 達成卡 306×84 */
-function migrateShiftCenterFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refPanel = ref.elements.find(e => e.label === '班次中心');
-  if (!refPanel) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '班次中心') return el;
-      return {
-        ...el,
-        height: refPanel.height,
-        backgroundColor: refPanel.backgroundColor,
-        children: JSON.parse(JSON.stringify(refPanel.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 事件中心／輪播：對齊 Figma Card 330×196 + Event Card 306×84 */
-function migrateEventCenterFigma(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refParent = ref.elements.find(e => e.label === '事件中心');
-  const refScroll = ref.elements.find(e => e.label === '事件輪播');
-  if (!refParent || !refScroll) return plane;
-
-  const normal = refScroll.childrenNormal ?? refScroll.children ?? [];
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label === '事件中心') {
-        return {
-          ...el,
-          height: refParent.height,
-          backgroundColor: refParent.backgroundColor,
-          children: JSON.parse(JSON.stringify(refParent.children)) as ChildWidget[],
-        };
-      }
-      if (el.label === '事件輪播') {
-        return {
-          ...el,
-          y: refScroll.y,
-          height: refScroll.height,
-          templateWidth: refScroll.templateWidth,
-          templateHeight: refScroll.templateHeight,
-          children: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-          childrenNormal: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-          childrenDefault: JSON.parse(JSON.stringify(refScroll.childrenDefault ?? [])) as ChildWidget[],
-        };
-      }
-      return el;
-    }),
-  };
-}
-
-/** 事件輪播：對齊設計稿事件卡範本 */
-function migrateEventBarDesign(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refScroll = ref.elements.find(e => e.label === '事件輪播');
-  if (!refScroll) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '事件輪播') return el;
-      const normal = refScroll.childrenNormal ?? refScroll.children ?? [];
-      return {
-        ...el,
-        templateWidth: refScroll.templateWidth,
-        templateHeight: refScroll.templateHeight,
-        childrenNormal: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-        childrenDefault: JSON.parse(JSON.stringify(refScroll.childrenDefault ?? [])) as ChildWidget[],
-        children: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 事件輪播：啟用雙畫板（預設／常態互斥） */
-function migrateDualCanvasEventScroll(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refScroll = ref.elements.find(e => e.label === '事件輪播');
-  if (!refScroll?.dualCanvasEnabled) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '事件輪播') return el;
-      if (el.dualCanvasEnabled && (el.childrenDefault?.length ?? 0) > 0) return el;
-      const normal = refScroll.childrenNormal ?? refScroll.children ?? [];
-      return {
-        ...el,
-        dualCanvasEnabled: true,
-        defaultPanelEnabled: refScroll.defaultPanelEnabled ?? true,
-        displayGate: refScroll.displayGate ?? { signal: 'rowCount', operator: 'gte', compareValue: '1' },
-        childrenNormal: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-        childrenDefault: JSON.parse(JSON.stringify(refScroll.childrenDefault ?? [])) as ChildWidget[],
-        children: JSON.parse(JSON.stringify(normal)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 運能趨勢：還原四欄 KPI + 固定視窗折線圖（對照設計稿） */
-function migrateCapacityTrendLayout(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refTrend = ref.elements.find(e => e.label === '運能趨勢');
-  if (!refTrend?.children?.length) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '運能趨勢') return el;
-      const statCount = (el.children ?? []).filter(c => c.type === 'stat-card').length;
-      const chart = (el.children ?? []).find(
-        (c): c is LineChartWidget => c.type === 'line-chart',
-      );
-      const rollingWindow = chart?.xAxis?.timeWindow?.enabled === true;
-      if (statCount >= 4 && !rollingWindow && chart?.xAxis?.highlightPivot) return el;
-      return {
-        ...el,
-        children: JSON.parse(JSON.stringify(refTrend.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-/** 運能趨勢折線圖：補上第二條預期走勢線與雙欄位 SQL */
-function migrateCapacityTrendLineChart(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refTrend = ref.elements.find(e => e.label === '運能趨勢');
-  const seedChart = refTrend?.children?.find((c): c is LineChartWidget => c.type === 'line-chart');
-  if (!seedChart) return plane;
-
-  const patchChart = (ch: ChildWidget): ChildWidget => {
-    if (ch.type !== 'line-chart') return ch;
-    const chart = ch as LineChartWidget;
-    const hasForecast =
-      chart.yFields?.includes('forecast_util')
-      || chart.series?.some(s => s.yField === 'forecast_util');
-    if (hasForecast && (chart.series?.length ?? 0) >= 2) return chart;
-    return {
-      ...chart,
-      series: seedChart.series,
-      yFields: seedChart.yFields,
-      strokeColors: seedChart.strokeColors,
-      sqlQuery: seedChart.sqlQuery,
-      xField: seedChart.xField,
-      xAxis: seedChart.xAxis ?? chart.xAxis,
-    };
-  };
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (el.label !== '運能趨勢') return el;
-      return { ...el, children: (el.children ?? []).map(patchChart) };
-    }),
-  };
-}
-
-function widgetSqlBindingMissing(c: ChildWidget): boolean {
-  if (!['stat-card', 'text', 'progress-bar', 'line-chart'].includes(c.type)) return false;
-  const w = c as { dataSourceId?: string; sqlQuery?: string; valueField?: string };
-  return !!w.valueField?.trim() && (!w.dataSourceId?.trim() || !w.sqlQuery?.trim());
-}
-
-/** 班次中心／運能趨勢：子元件 SQL 綁定遺失時從內建範例還原 */
-function migrateShiftCenterPanels(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refByLabel = new Map(ref.elements.map(el => [el.label, el]));
-  const panelLabels = new Set(['班次中心', '運能趨勢']);
-
-  return {
-    ...plane,
-    elements: plane.elements.map(el => {
-      if (!panelLabels.has(el.label ?? '')) return el;
-      const seed = refByLabel.get(el.label ?? '');
-      if (!seed?.children?.length) return el;
-      const children = el.children ?? [];
-      const needsRestore = children.length === 0 || children.some(widgetSqlBindingMissing);
-      if (!needsRestore) return el;
-      return {
-        ...el,
-        children: JSON.parse(JSON.stringify(seed.children)) as ChildWidget[],
-      };
-    }),
-  };
-}
-
-function migrateDemoMapPlatformId(plane: DashboardPlane): DashboardPlane {
-  return {
-    ...plane,
-    elements: plane.elements.map((el) => {
-      if (el.canvasKind !== 'map-platform') return el;
-      if (el.mapId === 'vtms-current' || el.mapId === 'vtms-main-loop') {
-        return { ...el, mapId: 't3-main-version' };
-      }
-      return el;
-    }),
-  };
-}
-
-function migrateMapPlatformVehicleContainer(plane: DashboardPlane): DashboardPlane {
-  const ref = cloneDemoPlane();
-  const refMap = ref.elements.find((e) => e.label === '即時圖台');
-  const refVehicle = refMap?.children?.find((c) => c.type === 'vehicle-container');
-  if (!refVehicle) return plane;
-
-  return {
-    ...plane,
-    elements: plane.elements.map((el) => {
-      if (el.label !== '即時圖台' || el.canvasKind !== 'map-platform') return el;
-      if (el.children?.some((c) => c.type === 'vehicle-container')) return el;
-      return {
-        ...el,
-        children: [
-          ...(el.children ?? []),
-          JSON.parse(JSON.stringify(refVehicle)) as ChildWidget,
-        ],
-      };
-    }),
-  };
-}
-
+/**
+ * 載入版面時的處理。
+ *
+ * <h3>這裡曾經有一整條「範本遷移鏈」，已經移除</h3>
+ * 原本會依 <code>demoLayoutVersion</code> 逐級套用十七個 migrateXxx，每一個都
+ * <code>cloneDemoPlane()</code> 拿寫死的範本改寫使用者的面板；判定「壞掉」時還會整張
+ * 換成範本。
+ *
+ * 問題是那個版本號<strong>後端根本不存</strong>（平面資料表只有 id／name／elements…），
+ * 所以每次從資料庫讀回來都是 0，十七個遷移<strong>每次都重跑</strong>，把使用者調好的
+ * 版面改寫回範本，再存回資料庫，下次又是 0——無限循環。使用者看到的就是
+ * 「明明存好了，重整又變回去」，而且完全沒有提示。
+ *
+ * 這類程式的問題是它<strong>比使用者更相信自己</strong>：把合法資料判定成髒資料，
+ * 用寫死的範本覆蓋。使用者存了什麼，就該讀回什麼；真的要升級舊格式，那是一次性的
+ * 資料轉換，不是每次載入都跑的東西。
+ *
+ * 保留的只有 <code>migrateCanvasElement</code>：它做的是純相容處理（移除已下架的
+ * widget 型別、補上舊版沒有的欄位），不會去拿範本的內容覆蓋。
+ */
 function migratePlane(plane: DashboardPlane): DashboardPlane {
-  if (plane.id !== 'demo-plane') {
-    // 班表部署管理：若尚未有「載具控制」標題，自動插入一個獨立標題元件，其餘元件與設定 100% 保留
-    if (plane.name === DEPLOYMENT_PLANE_NAME) {
-      const hasTitle = (plane.elements ?? []).some(
-        (e) => e.id === DEPLOY_VEHICLE_TITLE_PANEL_ID || e.label === '載具控制',
-      );
-      if (!hasTitle) {
-        const opsGroup = (plane.elements ?? []).find(
-          (e) => e.id === DEPLOY_VEHICLE_OPS_GROUP_ID || e.label === '載具操作',
-        );
-        const titlePanel = buildVehicleOpsTitlePanel(
-          opsGroup ? opsGroup.x : 24,
-          opsGroup ? Math.max(0, opsGroup.y - 26) : 224,
-        );
-        return {
-          ...plane,
-          elements: [titlePanel, ...(plane.elements ?? []).map(migrateCanvasElement)],
-        };
-      }
-    }
-    // 其餘自訂平面：僅進行畫布元件基礎相容性處理，絕對不覆寫使用者自訂的子元件或版型
-    return {
-      ...plane,
-      elements: (plane.elements ?? []).map(migrateCanvasElement),
-    };
-  }
-  const version = (plane as DashboardPlane & { demoLayoutVersion?: number }).demoLayoutVersion ?? 0;
-  const legacy = isLegacyVtmsLayout(plane);
-  // 僅在版面結構確實損壞或為舊版不可編輯版型時才整包還原；不因版本號或解析度變更覆寫使用者編輯
-  if (legacy || isDemoPlaneBroken(plane)) {
-    /*
-     * 整包還原是最後手段，但<strong>使用者選的地圖要留著</strong>。
-     *
-     * 內建快照的圖台元件寫死 mapId: 't3-main-version'。直接整包套上去，等於每次
-     * 還原都把人家換好的地圖悄悄改掉——使用者只看到「存了又變回舊地圖」，
-     * 完全不知道發生過還原。版面壞掉要修是一回事，順手改掉別的設定是另一回事。
-     */
-    const chosenMapId = (plane.elements ?? []).find(
-      (e) => e.canvasKind === 'map-platform' && e.mapId,
-    )?.mapId;
-
-    const restored = freshDemoPlane();
-    return {
-      ...restored,
-      elements: chosenMapId
-        ? restored.elements.map((e) =>
-            e.canvasKind === 'map-platform' ? { ...e, mapId: chosenMapId } : e,
-          )
-        : restored.elements,
-      id: plane.id,
-      name: plane.name,
-      createdAt: plane.createdAt,
-      updatedAt: Date.now(),
-    } as DashboardPlane;
-  }
-  let next = ensureDemoGroupChildren({
+  return {
     ...plane,
     elements: (plane.elements ?? []).map(migrateCanvasElement),
-  } as DashboardPlane);
-  if (version < 79) {
-    next = migrateCapacityTrendLineChart(next);
-  }
-  if (version < 81) {
-    next = migrateCapacityTrendLayout(next);
-  }
-  if (version < 84) {
-    next = migrateEventScrollLayout(next);
-  }
-  if (version < 85) {
-    next = migrateDualCanvasEventScroll(next);
-  }
-  if (version < 86) {
-    next = migrateEventCenterLayout(next);
-  }
-  if (version < 87) {
-    next = migrateEventBarDesign(next);
-  }
-  if (version < 89) {
-    next = migrateShiftCenterPanels(next);
-  }
-  if (version < 90) {
-    next = migrateEventCenterFigma(next);
-  }
-  if (version < 91) {
-    next = migrateShiftCenterFigma(next);
-  }
-  if (version < 93) {
-    next = migrateCapacityTrendFigma(next);
-  }
-  if (version < 94) {
-    next = migrateMaintenanceDistributionFigma(next);
-  }
-  if (version < 95) {
-    next = migrateVehicleDistributionFigma(next);
-  }
-  if (version < 96) {
-    next = migrateVehicleDistributionFigma(next);
-  }
-  if (version < 97) {
-    next = migrateVehicleMonitorFigma(next);
-  }
-  if (version < 98) {
-    next = migrateMainlineShiftCardFigma(next);
-  }
-  if (version < 99) {
-    next = migrateMaintenanceShiftCardFigma(next);
-  }
-  if (version < 100) {
-    next = migrateShiftCenterFigma(next);
-  }
-  if (version < 101) {
-    next = migrateCapacityTrendFigma(next);
-  }
-  if (version < 102) {
-    next = migrateCapacityTrendFigma(next);
-  }
-  if (version < DEMO_LAYOUT_VERSION) {
-    next = migrateDemoMapPlatformId(next);
-    next = migrateMapPlatformVehicleContainer(next);
-    next = patchDashboardRuntimeFixes(next);
-    next = { ...next, demoLayoutVersion: DEMO_LAYOUT_VERSION } as DashboardPlane;
-  }
-  if (needsDashboardRuntimePatch(next)) {
-    next = patchDashboardRuntimeFixes(next);
-  }
-  next = ensureDeploymentDataStatsPanel(next);
-  return next;
+  };
 }
 
 function getInitialPlanes(): DashboardPlane[] {
   return loadPlanes();
 }
 
+/**
+ * 從快取讀版面。
+ *
+ * 這裡曾經先呼叫 ensureLayoutSeed()——那支程式在「種子字串」變動時會
+ * localStorage.removeItem(STORAGE_KEY)，直接把使用者存好的版面刪掉重種。
+ * 已移除：改個常數就清掉別人的資料，不是遷移，是破壞。
+ *
+ * 快取只是第一幀用的，掛載後會立刻跟資料庫要最新的覆蓋掉。
+ */
 function loadPlanes(): DashboardPlane[] {
-  ensureLayoutSeed();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [migratePlane(freshDemoPlane())];

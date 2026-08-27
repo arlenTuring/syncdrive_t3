@@ -343,9 +343,12 @@ export async function ensureMapLibrarySeeded(): Promise<MapLibraryEntry[]> {
   if (entries.length === 0) {
     entries = await seedBuiltinMapLibraryEntries()
     writeMapLibrary(entries)
-  } else {
-    entries = (await refreshStaleBuiltinMapEntries(entries)).entries
   }
+  /*
+   * 這裡曾經呼叫 refreshStaleBuiltinMapEntries：內建檔比本機新就用內建檔覆蓋，
+   * 或把內建的 refField 併回來。已移除——內建檔是 7 月的，覆蓋等於把使用者
+   * 後來做的修改抹掉，而且悄悄地做。要還原內建範例是明確的動作，不該在載入時發生。
+   */
   // 內建墊底之後才問後端：後端有的一律以後端為準
   return (await hydrateMapLibraryFromBackend()).entries
 }

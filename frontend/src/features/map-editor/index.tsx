@@ -139,7 +139,6 @@ import {
   getMapLibraryEntry,
   hydrateMapLibraryFromBackend,
   readMapLibrary,
-  refreshStaleBuiltinMapEntries,
   saveEditorStateToLibraryEntry,
   upsertMapLibraryEntry,
   type MapLibraryEntry,
@@ -1232,10 +1231,11 @@ export default function MapEditorApp({
         alert('找不到地圖，請重新整理清單。')
         return
       }
-      if (entry.builtinId) {
-        const { entries } = await refreshStaleBuiltinMapEntries(readMapLibrary())
-        entry = entries.find((e) => e.libraryId === libraryId) ?? entry
-      }
+      /*
+       * 這裡曾經在開內建地圖時用 public/maps 的內建檔覆蓋一次。已移除：
+       * 那份檔案是 7 月的，連 pointTopology 都沒有，覆蓋等於把使用者後來
+       * 建的路網拓撲整個抹掉。真相在後端，上面已經補水過了。
+       */
       const parsed = entryToParsed(entry)
       applyLoadedMap(parsed, entry.libraryId)
       setMapScreen('editor')
