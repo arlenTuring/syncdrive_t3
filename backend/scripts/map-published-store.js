@@ -219,8 +219,33 @@ function getActiveMapId() {
   return DEFAULT_MAP_ID;
 }
 
+/**
+ * 刪掉一份已發佈的地圖。
+ *
+ * 沒有這個的話，前端刪除只是把 localStorage 那筆拿掉——下次跟後端補水就整份回來，
+ * 使用者以為刪掉了，重整又出現。刪除必須兩邊都做。
+ *
+ * 使用中的那一份不給刪：圖台與模擬器都靠它，刪掉會讓整個系統沒有地圖可用。
+ */
+function deletePublishedEntry(mapId) {
+  const id = String(mapId || '').trim();
+  if (!id) return { ok: false, reason: 'mapId is required' };
+  if (id === getActiveMapId()) {
+    return { ok: false, reason: 'active map cannot be deleted' };
+  }
+  let removed = false;
+  for (const p of [publishedDocumentPath(id), publishedMetaPath(id)]) {
+    if (fs.existsSync(p)) {
+      fs.unlinkSync(p);
+      removed = true;
+    }
+  }
+  return { ok: removed, mapId: id };
+}
+
 module.exports = {
   DEFAULT_MAP_ID,
+  deletePublishedEntry,
   resolvePublishedDir,
   publishedDocumentPath,
   readPublishedEntry,

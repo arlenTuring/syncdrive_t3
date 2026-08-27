@@ -31,7 +31,20 @@ export async function getAvailableMapsAsync(): Promise<MapOption[]> {
       const id = m.mapId || m.libraryId;
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      local.push({ mapId: id, displayName: `[伺服器] ${m.displayName}`, source: 'server' });
+      /*
+       * 同名的地圖不只一份（實測後端有兩份都叫「軌道合併加道路線」，
+       * 一份 6 條路線、一份 8 條）。只加「[伺服器]」前綴分不出來，
+       * 使用者會選到舊的那一份還以為選對了。標上路線數與日期。
+       */
+      const mark = [
+        typeof m.routeCount === 'number' ? `${m.routeCount} 條路線` : null,
+        m.updatedAt ? new Date(m.updatedAt).toLocaleDateString('zh-TW') : null,
+      ].filter(Boolean).join(' · ');
+      local.push({
+        mapId: id,
+        displayName: mark ? `${m.displayName}（${mark}）` : m.displayName,
+        source: 'server',
+      });
     }
   } catch {
     /* 連不上伺服器就只列本機的，不要讓整個選單掛掉 */

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -85,6 +86,21 @@ export class MapController {
   ) {
     this.mapService.assertInternalPublishToken(token);
     return this.mapService.publishMapLibrary(mapId, body);
+  }
+
+  @Delete('library/:mapId')
+  @ApiOperation({ summary: '地圖庫：刪除已發佈的地圖（使用中的不給刪）' })
+  @ApiHeader({
+    name: 'X-Sync-Internal-Token',
+    description: '內部發佈權杖（預設開發用 sync-dev-internal）',
+    required: true,
+  })
+  deleteMapLibrary(
+    @Param('mapId') mapId: string,
+    @Headers('x-sync-internal-token') token?: string,
+  ) {
+    this.mapService.assertInternalPublishToken(token);
+    return this.mapService.deleteMapLibrary(mapId);
   }
 
   @Get(':mapId/stations/:stationId')

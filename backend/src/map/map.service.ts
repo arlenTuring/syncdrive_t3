@@ -188,6 +188,22 @@ export class MapService implements OnModuleInit {
     return written as PublishedMapLibraryDocumentDto;
   }
 
+  /**
+   * 刪除一份已發佈的地圖。
+   *
+   * 前端只刪 localStorage 是不夠的——下次補水就整份回來，使用者以為刪掉了、
+   * 重整又出現。使用中的那一份擋下來：圖台與模擬器都靠它。
+   */
+  deleteMapLibrary(mapId: string): { ok: boolean; mapId: string } {
+    const id = String(mapId ?? '').trim();
+    if (!id) throw new BadRequestException('mapId is required');
+    const result = mapPublishedStore.deletePublishedEntry(id);
+    if (!result.ok && result.reason === 'active map cannot be deleted') {
+      throw new ForbiddenException('使用中的地圖不能刪除，請先切換到別張再刪');
+    }
+    return { ok: Boolean(result.ok), mapId: id };
+  }
+
   setActiveMapLibrary(body: {
     mapId: string;
     libraryId?: string;

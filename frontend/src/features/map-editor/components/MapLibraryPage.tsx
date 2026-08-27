@@ -35,6 +35,7 @@ import { NewMapPixelDialog } from './NewMapPixelDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
 import {
   fetchMapLibraryBackendStatus,
+  deletePublishedMap,
   fetchPublishedMapDocument,
   fetchPublishedMapList,
   isMapLibraryEntryActive,
@@ -150,7 +151,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   )
 
   const handleDelete = useCallback(
-    (entry: MapLibraryEntry) => {
+    async (entry: MapLibraryEntry) => {
       const label = entry.builtinId ? '內建範例' : '地圖'
       if (
         !window.confirm(
@@ -159,6 +160,21 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       ) {
         return
       }
+
+      /*
+       * 後端也要刪。
+       *
+       * 只刪 localStorage 的話，下次跟後端補水就整份回來——使用者以為刪掉了，
+       * 重整又出現。後端擋下來（例如使用中的地圖）時就不要刪本機那份，
+       * 否則兩邊會不一致。
+       */
+      const mapId = entry.mapDocument.mapId || entry.libraryId
+      const result = await deletePublishedMap(mapId)
+      if (!result.ok) {
+        alert(`刪不掉：${result.error ?? '後端拒絕'}`)
+        return
+      }
+
       persistEntries(deleteMapLibraryEntry(readMapLibrary(), entry.libraryId))
       void clearMapRevisionsForLibrary(entry.libraryId)
     },

@@ -173,3 +173,25 @@ export async function fetchPublishedMapList(): Promise<{
     activeMapId: body?.activeMapId ?? null,
   }
 }
+
+/**
+ * 從後端刪除一份已發佈的地圖。
+ *
+ * 只刪 localStorage 是不夠的：下次補水就整份回來，使用者以為刪掉了、重整又出現。
+ * 使用中的那一份後端會擋（回 403），訊息原樣往上帶。
+ */
+export async function deletePublishedMap(
+  mapId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(
+      `/syncdrive-api/map/library/${encodeURIComponent(resolveMapId(mapId))}`,
+      { method: 'DELETE', headers: internalHeaders() },
+    )
+    if (res.ok) return { ok: true }
+    const body = (await res.json().catch(() => null)) as { message?: string } | null
+    return { ok: false, error: body?.message ?? `HTTP ${res.status}` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}

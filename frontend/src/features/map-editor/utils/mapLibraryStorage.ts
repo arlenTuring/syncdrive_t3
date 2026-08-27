@@ -256,12 +256,17 @@ export async function refreshStaleBuiltinMapEntries(
  * 儀表板選不到地圖、編輯器打開是舊版。這與儀表板版面當初的問題是同一個，
  * 那邊已經改成「後端是真相」，這裡比照辦理。
  *
- * <h3>三種情況</h3>
+ * <h3>比對時間，新的贏</h3>
  * <pre>
- *   後端有這張圖   → 用後端的覆蓋快取（本機那份可能是別台機器的舊狀態）
- *   後端沒有       → 保留本機的，並主動推上去（等於一次自動遷移）
- *   後端連不上     → 沿用快取，畫面照常開
+ *   後端比較新   → 用後端的覆蓋快取
+ *   本機比較新   → 保留本機的，並推上去（本機有還沒發佈的修改）
+ *   後端沒有     → 保留本機的並推上去（等於一次自動遷移）
+ *   後端連不上   → 沿用快取，畫面照常開
  * </pre>
+ *
+ * <strong>不能無條件讓後端贏。</strong>本機可能有還沒發佈成功的修改——發佈是
+ * 射後不理過的，網路一抖就只留在瀏覽器裡。這時候拉後端那份下來會直接蓋掉人家
+ * 剛做完的工作，而且毫無徵兆。
  *
  * 不丟例外：地圖庫打不開比資料舊還糟。回傳的 <code>online</code> 是給畫面用的——
  * 顯示的是後端資料還是本機快取，使用者有權知道。
@@ -281,14 +286,28 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
 
   const byId = new Map(local.map((e) => [resolveMapId(e.mapDocument.mapId || e.libraryId), e]))
 
+  const stamp = (v?: string) => {
+    const t = v ? Date.parse(v) : NaN
+    return Number.isFinite(t) ? t : 0
+  }
+  /** 本機比後端新的，補水完要推上去 */
+  const toPublish: MapLibraryEntry[] = []
+
   for (const summary of published.maps) {
     const mapId = resolveMapId(summary.mapId || summary.libraryId)
     if (!mapId) continue
+
+    const existing = byId.get(mapId)
+    if (existing && stamp(existing.updatedAt) > stamp(summary.updatedAt)) {
+      // 本機這份比較新：別動它，改把它送上去
+      toPublish.push(existing)
+      continue
+    }
+
     const doc = await fetchPublishedMapDocument(mapId)
     if (!doc) continue
     try {
       const parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(doc))
-      const existing = byId.get(mapId)
       byId.set(mapId, {
         ...importMapEntryFromServer(parsed, mapId),
         // 內建標記留著：還原內建範例那條路要靠它
@@ -301,6 +320,10 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
 
   const merged = [...byId.values()]
   writeMapLibrary(merged)
+
+  if (toPublish.length > 0) {
+    await Promise.all(toPublish.map((entry) => publishMapLibraryEntryToBackend(entry)))
+  }
 
   /*
    * 後端是空的＝這台機器還沒遷移過，主動把本機那份推上去。
