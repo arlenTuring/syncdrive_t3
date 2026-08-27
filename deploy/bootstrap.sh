@@ -137,17 +137,17 @@ else
   }
   gen() { openssl rand -base64 18 | tr -d '/+=' | head -c 18; }
 
-  BACKEND_PW="$(gen)"; SIM_PW="$(gen)"
+  # vtms-simulator 帳號已移除：那是給示範模擬器用的，而模擬器現在是外部單位，
+  # 跑在開發者自己的機器上，以各車自己的帳密連線。產品端不再有任何身分
+  # 可以對「全部車輛」的路徑發布 telemetry。
+  BACKEND_PW="$(gen)"
   mosq_passwd -c vtms-backend "$BACKEND_PW"
-  mosq_passwd "" vtms-simulator "$SIM_PW"
   set_env MQTT_BACKEND_PASSWORD "$BACKEND_PW"
-  set_env MQTT_SIMULATOR_PASSWORD "$SIM_PW"
 
   {
     echo "# SyncDrive T3 MQTT 帳密（產生於 $(date '+%Y-%m-%d %H:%M:%S')）"
     echo "# ACL 規則見 mosquitto/config/aclfile：車輛帳號只能發布到自己的路徑。"
     echo "vtms-backend    $BACKEND_PW    # 後端自用"
-    echo "vtms-simulator  $SIM_PW    # 示範模擬器自用"
   } > "$MQTT_CREDS"
   for i in $(seq -w 1 11); do
     VPW="$(gen)"

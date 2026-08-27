@@ -172,23 +172,12 @@ services:
       timeout: 5s
       retries: 3
 
-  simulator:
-    # 示範車隊模擬器。由 COMPOSE_PROFILES 是否含 simulator 決定要不要跑。
-    #
-    # 用後端同一個映像——它已經有 node_modules 與 scripts，不必另外建一個。
-    # 以 vtms-simulator 身分連線：ACL 上它需要對全部車輛路徑發布的權限，
-    # 那不是任何一台真車該有的權限，所以獨立一個帳號，日後要停就停這一個。
-    image: syncdrive-backend:${IMAGE_TAG:-latest}
-    container_name: syncdrive_simulator
-    restart: unless-stopped
-    profiles: ["simulator"]
-    environment:
-      MQTT_URL: mqtt://vtms-simulator:${MQTT_SIMULATOR_PASSWORD}@mosquitto:1883
-      BACKEND_URL: http://backend:3000
-    command: ["node", "scripts/vtms-shift-demo-simulator.js"]
-    depends_on:
-      - mosquitto
-      - backend
+# 這裡曾經有一個 simulator 服務（vtms-shift-demo-simulator.js），已移除。
+#
+# 模擬器是<strong>外部單位</strong>，只有一份，跑在開發者自己的機器上（simulator/）。
+# 產品端不該有任何東西以車輛身分發布 telemetry——那個容器與本機模擬器搶同一批
+# PMS-01～11，兩邊輪流蓋掉對方的位置，圖台上的車就散在莫名其妙的地方
+# （實測它回報 x=1025，超出圖資 x 上限 900）。
 
 volumes:
   pgdata:

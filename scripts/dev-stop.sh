@@ -9,7 +9,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PID_DIR="$ROOT/.dev"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
-VTMS_SIM_PID_FILE="$PID_DIR/vtms-simulator.pid"
 
 STOP_DOCKER=false
 if [[ "${1:-}" == "--all" ]] || [[ "${1:-}" == "--docker" ]]; then
@@ -39,8 +38,6 @@ stop_pid_file() {
 echo "==> 停止 SyncDrive T3 開發程序"
 stop_pid_file "frontend" "$FRONTEND_PID_FILE"
 stop_pid_file "backend" "$BACKEND_PID_FILE"
-stop_pid_file "vtms-simulator" "$VTMS_SIM_PID_FILE"
-pkill -f "vtms-shift-demo-simulator.js" 2>/dev/null && echo "[vtms-simulator] 已清理殘留程序" || true
 
 # 清掉佔用 3000 的殘留程序（避免 EADDRINUSE 導致後端無法啟動）
 if command -v lsof >/dev/null 2>&1; then
@@ -59,7 +56,7 @@ for pid_file in "$PID_DIR"/*.log.trimmer.pid; do
   kill "$(cat "$pid_file")" 2>/dev/null || true
   rm -f "$pid_file"
 done
-for f in backend frontend vtms-simulator; do
+for f in backend frontend; do
   log="$PID_DIR/${f}.log"
   [[ -f "$log" ]] && : >"$log"
 done

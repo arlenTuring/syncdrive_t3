@@ -5,7 +5,7 @@
  * 調整此常數即可改暖機深度（例如 5 幀、10 幀）。
  *
  * 暖機時間（1x）≈ MAP_VEHICLE_PLAYOUT_FRAME_COUNT × MAP_VEHICLE_TELEMETRY_INTERVAL_MS
- * 須與後端 `TELEMETRY_SIM_INTERVAL_MS`（vtms-shift-demo-simulator.js）一致。
+ * 須與模擬器的回報間隔一致（simulator/src/vehicle.js 的 TELEMETRY_BASE_INTERVAL_MS）。
  */
 export const MAP_VEHICLE_PLAYOUT_FRAME_COUNT = 3;
 

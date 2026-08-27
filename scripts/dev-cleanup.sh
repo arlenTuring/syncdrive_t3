@@ -13,7 +13,7 @@ cyan "==> SyncDrive 開發環境清理"
 
 # 專案日誌與暫存
 mkdir -p "$ROOT/.dev"
-for f in backend frontend vtms-simulator; do
+for f in backend frontend; do
   log="$ROOT/.dev/${f}.log"
   if [[ -f "$log" ]]; then
     : >"$log"

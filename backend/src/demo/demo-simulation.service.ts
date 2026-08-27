@@ -520,76 +520,28 @@ export class DemoSimulationService {
     return { vehicleCode: String(vehicleCode).trim().toUpperCase(), action: 'SIMULATE_OBSTACLE' };
   }
 
+  /**
+   * 已停用：中心端不再自己生車輛資料。
+   *
+   * 這裡以前會 spawn vtms-shift-demo-simulator.js，那支程式代替全部 PMS-01～11
+   * 發布 telemetry。問題是模擬器<strong>只該有一份</strong>：它跑在開發者機器上
+   * （simulator/），以外部廠商身分連線。兩邊同時跑會搶同一批車號，輪流蓋掉對方
+   * 的位置，圖台上的車就散在莫名其妙的地方（實測那支回報 x=1025，超出圖資的
+   * x 上限 900）。
+   *
+   * 而且它啟動時會 TRUNCATE telemetry_logs。那對一個「示範」功能來說權限太大了。
+   *
+   * 端點保留並明確回絕，不是靜靜地成功——按下按鈕卻什麼都沒發生，比講清楚更難查。
+   */
   async start(): Promise<DemoSimulationStatus> {
-    await this.ensureMqttBroker();
-    try {
-      await this.dataSource.query('TRUNCATE telemetry_logs');
-      this.logger.log('Truncated telemetry_logs before demo start');
-    } catch (err) {
-      this.logger.warn('Failed to truncate telemetry_logs before demo start', err);
-    }
-    await this.dashboardDemoSeed.reseedAll();
-    await this.killAllSimulators();
-
-    await this.syncPublishedMapBeforeSimulator();
-    this.invalidateMotionModuleCache();
-
-    const scriptPath = this.resolveSimulatorScript();
-    if (!scriptPath) {
-      throw new Error('找不到 vtms-shift-demo-simulator.js');
-    }
-
-    const port = process.env.PORT ?? '3000';
-    const transportApi = `http://127.0.0.1:${port}/syncdrive-api/demo/simulation`;
-
-    this.startedAt = new Date();
-    this.simStartMs = this.startedAt.getTime();
-    const motionSimStartMs = this.simStartMs;
-
-    this.child = spawn(process.execPath, [scriptPath], {
-      cwd: path.dirname(path.dirname(scriptPath)),
-      env: {
-        ...process.env,
-        MANAGED: '1',
-        MQTT_URL: process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883',
-        TRANSPORT_API: transportApi,
-        SYNC_API: `http://127.0.0.1:${port}/syncdrive-api`,
-        TRANSPORT_STATE_FILE: this.transportStatePath,
-        SIM_START_MS: String(motionSimStartMs),
-      },
-      stdio: 'ignore',
-      detached: false,
-    });
-
-    this.child.on('exit', (code, signal) => {
-      this.logger.log(`VTMS shift simulator exited (code=${code}, signal=${signal})`);
-      this.child = null;
-      this.stopSqlTick();
-      this.clearTransportStateFile();
-    });
-
-    this.child.on('error', (err) => {
-      this.logger.error('VTMS shift simulator failed to start', err);
-      this.child = null;
-      this.stopSqlTick();
-      this.clearTransportStateFile();
-    });
-    this.paused = false;
-    this.resetTransportState();
-    this.resetFleetBatteryState();
-    this.lastAckWallMs = Date.now();
-    this.emitTransportState(true);
-    this.startSqlTick();
-    await this.syncVehicleTrackSql();
-
-    this.logger.log(`Demo simulation started (pid=${this.child.pid})`);
-    return this.getStatus();
+    throw new Error(
+      '中心端的示範模擬器已移除。模擬器是外部單位，只有一份，'
+      + '請在開發機執行 simulator/（cd simulator && npm start，http://127.0.0.1:4300）。',
+    );
   }
 
   async pause(): Promise<DemoSimulationStatus> {
-    await this.killAllSimulators();
     this.stopSqlTick();
-    this.child = null;
     this.startedAt = null;
     this.simStartMs = null;
     this.paused = true;
@@ -1124,121 +1076,13 @@ export class DemoSimulationService {
     });
   }
 
-  private resolveSyncPublishedMapScript(): string | null {
-    const candidates = [
-      path.join(process.cwd(), 'scripts', 'sync-published-map-from-api.js'),
-      path.join(process.cwd(), 'backend', 'scripts', 'sync-published-map-from-api.js'),
-      path.join(__dirname, '..', '..', 'scripts', 'sync-published-map-from-api.js'),
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p;
-    }
-    return null;
-  }
-
-  /** 模擬器啟動前從 Map Library API 拉取最新地圖至 published-maps */
-  private async syncPublishedMapBeforeSimulator(): Promise<void> {
-    const scriptPath = this.resolveSyncPublishedMapScript();
-    if (!scriptPath) return;
-    const port = process.env.PORT ?? '3000';
-    const cwd = fs.existsSync(path.join(process.cwd(), 'backend', 'package.json'))
-      ? process.cwd()
-      : path.dirname(path.dirname(scriptPath));
-    await new Promise<void>((resolve) => {
-      const child = spawn(process.execPath, [scriptPath], {
-        cwd,
-        env: {
-          ...process.env,
-          SYNC_API: `http://127.0.0.1:${port}/syncdrive-api`,
-        },
-        stdio: 'inherit',
-      });
-      child.on('exit', () => resolve());
-      child.on('error', (err) => {
-        this.logger.warn(`map sync before simulator failed: ${err.message}`);
-        resolve();
-      });
-    });
-  }
-
-  private resolveSimulatorScript(): string | null {
-    const candidates = [
-      path.join(process.cwd(), 'scripts', 'vtms-shift-demo-simulator.js'),
-      path.join(process.cwd(), 'backend', 'scripts', 'vtms-shift-demo-simulator.js'),
-      path.join(__dirname, '..', '..', 'scripts', 'vtms-shift-demo-simulator.js'),
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p;
-    }
-    return null;
-  }
-
-  private async killAllSimulators(): Promise<void> {
-    if (this.child && this.child.pid) {
-      try {
-        this.child.kill('SIGTERM');
-      } catch {
-        /* ignore */
-      }
-      this.child = null;
-    }
-    await this.killExternalSimulator();
-    await new Promise((r) => setTimeout(r, 300));
-    const survivors = await this.listSimulatorPids();
-    for (const pid of survivors) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        /* ignore */
-      }
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-
-  private killExternalSimulator(): Promise<void> {
-    return new Promise((resolve) => {
-      const killer = spawn('pkill', ['-f', 'vtms-shift-demo-simulator.js'], { stdio: 'ignore' });
-      killer.on('exit', () => resolve());
-      killer.on('error', () => resolve());
-      setTimeout(() => resolve(), 800);
-    });
-  }
-
-  private listSimulatorPids(): Promise<number[]> {
-    return new Promise((resolve) => {
-      const proc = spawn('pgrep', ['-f', 'vtms-shift-demo-simulator.js'], { stdio: ['ignore', 'pipe', 'ignore'] });
-      let out = '';
-      const timer = setTimeout(() => {
-        try {
-          proc.kill('SIGKILL');
-        } catch {
-          /* ignore */
-        }
-        resolve([]);
-      }, 1500);
-      proc.stdout?.on('data', (chunk) => {
-        out += String(chunk);
-      });
-      proc.on('exit', () => {
-        clearTimeout(timer);
-        const pids = out
-          .trim()
-          .split('\n')
-          .map((line) => Number.parseInt(line.trim(), 10))
-          .filter((pid) => Number.isFinite(pid));
-        resolve(pids);
-      });
-      proc.on('error', () => {
-        clearTimeout(timer);
-        resolve([]);
-      });
-    });
-  }
-
+  /**
+   * 已停用：中心端不再啟動任何模擬器程序，也就沒有「外部的那一支」要找。
+   *
+   * 留著回 null 而不是整個拿掉，是因為呼叫端用它判斷「有沒有人代替車輛在發話」，
+   * 答案現在恆為「沒有」。
+   */
   private async findExternalSimulatorPid(): Promise<number | null> {
-    const managedPid = this.resolveManagedPid();
-    const pids = await this.listSimulatorPids();
-    const external = pids.filter((pid) => pid !== managedPid);
-    return external[0] ?? null;
+    return null;
   }
 }

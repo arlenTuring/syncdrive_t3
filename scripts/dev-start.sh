@@ -16,13 +16,11 @@ cd "$ROOT"
 
 FORCE=false
 SEED=false
-AUTO_VTMS=false
 FRONTEND_DEV=false
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=true ;;
     --seed)  SEED=true ;;
-    --demo)  AUTO_VTMS=true ;;
     --dev)   FRONTEND_DEV=true ;;
   esac
 done
@@ -30,10 +28,8 @@ done
 PID_DIR="$ROOT/.dev"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
-VTMS_SIM_PID_FILE="$PID_DIR/vtms-simulator.pid"
 BACKEND_LOG="$PID_DIR/backend.log"
 FRONTEND_LOG="$PID_DIR/frontend.log"
-VTMS_SIM_LOG="$PID_DIR/vtms-simulator.log"
 
 mkdir -p "$PID_DIR"
 
@@ -333,24 +329,8 @@ if $need_backend; then
 fi
 echo ""
 
-# ── VTMS 模擬器（預設不啟動，請用儀表板「開始模擬」或 --demo）──
-if $AUTO_VTMS; then
-  need_vtms=true
-  if ! $FORCE && is_running "$VTMS_SIM_PID_FILE"; then
-    yellow "[vtms-simulator] 已在執行 (PID $(cat "$VTMS_SIM_PID_FILE"))，略過"
-    need_vtms=false
-  elif $FORCE || is_running "$VTMS_SIM_PID_FILE"; then
-    stop_pid_file "vtms-simulator" "$VTMS_SIM_PID_FILE"
-  fi
-  if $need_vtms; then
-    cyan "==> 啟動 VTMS MQTT 模擬器 (--demo)"
-    start_process "vtms-simulator" "$VTMS_SIM_PID_FILE" "$VTMS_SIM_LOG" "$ROOT/backend" "npm run demo:vtms-shift"
-  fi
-  echo ""
-else
-  yellow "[vtms-simulator] 略過（請在儀表板按「開始模擬」，或 ./scripts/dev-start.sh --demo）"
-  echo ""
-fi
+# VTMS 模擬器已移除：它是外部單位，跑在 simulator/ 底下，自己啟動
+#   cd simulator && npm start   →  http://127.0.0.1:4300
 
 # ── Frontend ──
 need_frontend=true

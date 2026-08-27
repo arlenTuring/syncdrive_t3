@@ -64,8 +64,3 @@ check_http "http://localhost:3000/syncdrive-api/datasource/ping" "後端 ping" |
 check_http "http://localhost:3000/syncdrive-api/demo/simulation/status" "模擬 API" || true
 echo ""
 
-if pgrep -f vtms-shift-demo-simulator >/dev/null 2>&1; then
-  yellow "VTMS 模擬器程序：$(pgrep -f vtms-shift-demo-simulator | tr '\n' ' ')"
-else
-  yellow "VTMS 模擬器：未執行（請在儀表板按「開始模擬」）"
-fi

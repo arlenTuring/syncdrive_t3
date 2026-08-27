@@ -23,9 +23,6 @@ user vtms-backend
 topic readwrite v1/vtms/#
 topic readwrite syncdrive/#
 
-# 示範車隊模擬器：需要代所有車輛發布，權限與中心端相同。
-# 獨立成一個帳號而不是共用 vtms-backend，是為了「要停就停這一個」——
-# 它模擬的是真車的上行，權限範圍不該混在後端自己的帳號裡。
-user vtms-simulator
-topic readwrite v1/vtms/#
-topic readwrite syncdrive/#
+# 這裡曾經有一個 vtms-simulator 帳號，可以代所有車輛發布，已移除。
+# 模擬器現在是外部單位，以各車自己的帳密連線——沒有任何一個身分該有
+# 「代替全部車輛發話」的權限。

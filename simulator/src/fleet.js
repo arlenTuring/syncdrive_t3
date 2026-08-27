@@ -24,8 +24,26 @@ function loadLocalMap() {
       + '請先執行 npm run map:import <地圖檔路徑或網址>',
     );
   }
+  /*
+   * 讀不到與解析不了是兩回事，訊息要分開。
+   *
+   * 原本兩種錯都報「不是合法 JSON」，於是 macOS 收回檔案權限時，畫面上寫的是
+   * 「圖資不是合法 JSON：EPERM: operation not permitted」——看到這句話的人會跑去
+   * 檢查檔案內容，但檔案好得很，是這支程序讀不到它。
+   */
+  let raw;
   try {
-    return JSON.parse(fs.readFileSync(MAP_FILE, 'utf-8'));
+    raw = fs.readFileSync(MAP_FILE, 'utf-8');
+  } catch (error) {
+    const hint = error.code === 'EPERM' || error.code === 'EACCES'
+      ? '——這支程序沒有讀取權限。macOS 的檔案權限在程序啟動時決定，'
+        + '剛授權過的話要重啟模擬器才會生效'
+      : '';
+    throw new Error(`讀不到圖資 ${MAP_FILE}：${error.message}${hint}`);
+  }
+
+  try {
+    return JSON.parse(raw);
   } catch (error) {
     throw new Error(`圖資 ${MAP_FILE} 不是合法 JSON：${error.message}`);
   }
