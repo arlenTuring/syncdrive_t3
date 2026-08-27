@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  CloudDownload,
 } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MapPixelSize } from '../types/area'
@@ -21,6 +22,7 @@ import {
   ensureMapLibrarySeeded,
   formatMapLibraryDate,
   importMapEntryFromParsed,
+  importMapEntryFromServer,
   readMapLibrary,
   renameMapLibraryEntry,
   upsertMapLibraryEntry,
@@ -32,8 +34,11 @@ import { NewMapPixelDialog } from './NewMapPixelDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
 import {
   fetchMapLibraryBackendStatus,
+  fetchPublishedMapDocument,
+  fetchPublishedMapList,
   isMapLibraryEntryActive,
   setActiveMapLibraryEntry,
+  type PublishedMapSummary,
 } from '../api/mapLibraryApi'
 
 type MapLibraryPageProps = {
@@ -48,6 +53,11 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMapDialogOpen, setNewMapDialogOpen] = useState(false)
+  const [serverOpen, setServerOpen] = useState(false)
+  const [serverMaps, setServerMaps] = useState<PublishedMapSummary[] | null>(null)
+  const [serverActiveId, setServerActiveId] = useState<string | null>(null)
+  const [serverLoadingId, setServerLoadingId] = useState<string | null>(null)
+  const [serverError, setServerError] = useState<string | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -176,6 +186,64 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     [importParsed],
   )
 
+  /**
+   * 從伺服器把已發佈的地圖拉回這一台瀏覽器的地圖庫。
+   *
+   * 地圖庫存在 localStorage，是<strong>每個瀏覽器各自一份</strong>。在別台電腦編好的
+   * 地圖，這裡看不到；localStorage 空的時候還會退回內建範例檔——那份沒有路網拓撲，
+   * 於是拓撲看起來像是不見了。
+   *
+   * 拉回來會<strong>覆蓋</strong>同 mapId 的既有條目，不是新增一份。載之前先問清楚：
+   * 這一步會蓋掉本機還沒發佈的修改。
+   */
+  const handleLoadFromServer = useCallback(
+    async (summary: PublishedMapSummary) => {
+      setServerLoadingId(summary.mapId)
+      try {
+        const doc = await fetchPublishedMapDocument(summary.mapId)
+        if (!doc) throw new Error('伺服器上找不到這份地圖的內容')
+        const parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(doc))
+        const existing = readMapLibrary().find(
+          (e) => e.libraryId === summary.mapId || e.mapDocument.mapId === summary.mapId,
+        )
+        if (
+          existing
+          && !window.confirm(
+            `地圖庫裡已經有「${existing.displayName}」。\n`
+            + '從伺服器載入會覆蓋它，本機還沒發佈的修改會消失。要繼續嗎？',
+          )
+        ) {
+          return
+        }
+        const entry = importMapEntryFromServer(parsed, summary.mapId)
+        persistEntries(upsertMapLibraryEntry(readMapLibrary(), entry))
+        setServerOpen(false)
+      } catch (e) {
+        alert(`從伺服器載入失敗：${e instanceof Error ? e.message : String(e)}`)
+      } finally {
+        setServerLoadingId(null)
+      }
+    },
+    [persistEntries],
+  )
+
+  const handleOpenServerList = useCallback(async () => {
+    if (serverOpen) {
+      setServerOpen(false)
+      return
+    }
+    setServerOpen(true)
+    setServerMaps(null)
+    setServerError(null)
+    try {
+      const { maps, activeMapId } = await fetchPublishedMapList()
+      setServerMaps(maps)
+      setServerActiveId(activeMapId)
+    } catch (e) {
+      setServerError(e instanceof Error ? e.message : String(e))
+    }
+  }, [serverOpen])
+
   const handlePasteImport = useCallback(() => {
     try {
       const json = JSON.parse(pasteText.replace(/^\uFEFF/, '')) as unknown
@@ -258,8 +326,73 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               <FileText className="size-4" aria-hidden />
               貼上地圖描述檔
             </button>
+            <button
+              type="button"
+              onClick={() => void handleOpenServerList()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
+            >
+              <CloudDownload className="size-4" aria-hidden />
+              從伺服器載入
+            </button>
           </div>
         </div>
+
+        {serverOpen && (
+          <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+            <p className="text-xs text-zinc-400">
+              伺服器上已發佈的地圖。載回來會覆蓋地圖庫裡同一份地圖，
+              <span className="text-zinc-300">本機還沒發佈的修改會消失</span>。
+            </p>
+
+            {serverError ? (
+              <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 px-2 py-1.5 text-xs text-red-300">
+                讀不到清單：{serverError}
+              </p>
+            ) : serverMaps === null ? (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                讀取中…
+              </p>
+            ) : serverMaps.length === 0 ? (
+              <p className="mt-2 text-xs text-zinc-500">伺服器上還沒有任何已發佈的地圖。</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-zinc-800">
+                {serverMaps.map((m) => (
+                  <li key={m.mapId} className="flex items-center gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-zinc-100">
+                        {m.displayName}
+                        {m.mapId === serverActiveId ? (
+                          <span className="ml-2 rounded border border-cyan-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
+                            使用中
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="truncate text-[11px] text-zinc-500">
+                        {m.mapId} · {m.version ?? '無版本'}
+                        {m.updatedAt ? ` · ${formatMapLibraryDate(m.updatedAt)}` : ''}
+                        {typeof m.routeCount === 'number' ? ` · ${m.routeCount} 條路線` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={serverLoadingId != null}
+                      onClick={() => void handleLoadFromServer(m)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-cyan-700/60 bg-cyan-950/50 px-2.5 py-1 text-xs text-cyan-200 hover:bg-cyan-900/50 disabled:opacity-40"
+                    >
+                      {serverLoadingId === m.mapId ? (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      ) : (
+                        <CloudDownload className="size-3.5" aria-hidden />
+                      )}
+                      載入
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {pasteOpen && (
           <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">

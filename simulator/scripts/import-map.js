@@ -19,13 +19,33 @@ const { MapSource } = require('../src/mapSource');
 
 const TARGET = path.join(__dirname, '..', 'data', 'map.json');
 
+/**
+ * 讀來源。
+ *
+ * 檔案或網址都行——<strong>怎麼拿到圖資是場域方決定的事</strong>，可能是交付一個檔案、
+ * 一個下載連結，或一支要帳密的端點。這支只負責收檔，收進來之後模擬器就再也不用
+ * 對外要圖資了。
+ *
+ * 網址可以帶帳密（<code>https://user:pass@host/…</code>），因為 fetch 不吃 URL 裡的
+ * 帳密，這裡手動轉成 Authorization 標頭。
+ */
 async function read(source) {
-  if (/^https?:\/\//.test(source)) {
-    const res = await fetch(source);
-    if (!res.ok) throw new Error(`${source} 回 ${res.status}`);
-    return res.json();
+  if (!/^https?:\/\//.test(source)) {
+    return JSON.parse(fs.readFileSync(source, 'utf-8'));
   }
-  return JSON.parse(fs.readFileSync(source, 'utf-8'));
+
+  const url = new URL(source);
+  const headers = { Accept: 'application/json' };
+  if (url.username || url.password) {
+    const raw = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+    headers.Authorization = `Basic ${Buffer.from(raw).toString('base64')}`;
+    url.username = '';
+    url.password = '';
+  }
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`${url.origin}${url.pathname} 回 ${res.status}`);
+  return res.json();
 }
 
 function check(doc) {

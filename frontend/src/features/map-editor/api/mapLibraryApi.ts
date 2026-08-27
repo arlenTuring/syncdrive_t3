@@ -141,3 +141,35 @@ export async function fetchPublishedMapDocument(mapId: string): Promise<unknown 
   }
 }
 
+
+/** 伺服器上已發佈的地圖 */
+export type PublishedMapSummary = {
+  mapId: string
+  libraryId: string
+  displayName: string
+  version?: string
+  updatedAt?: string
+  routeCount?: number
+}
+
+/**
+ * 伺服器上已發佈的地圖清單。
+ *
+ * 地圖庫平常讀的是瀏覽器 localStorage——那是<strong>這一台瀏覽器</strong>的東西。
+ * 換一台電腦、換一個瀏覽器、清一次快取，看到的就只剩內建範例檔（那份沒有路網拓撲）。
+ * 這支讓人把伺服器上真正在用的那份拉回來。
+ */
+export async function fetchPublishedMapList(): Promise<{
+  maps: PublishedMapSummary[]
+  activeMapId: string | null
+}> {
+  const res = await fetch('/syncdrive-api/map/library', {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`伺服器回 ${res.status}`)
+  const body = await res.json()
+  return {
+    maps: Array.isArray(body?.maps) ? body.maps : [],
+    activeMapId: body?.activeMapId ?? null,
+  }
+}

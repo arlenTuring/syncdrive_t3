@@ -325,6 +325,23 @@ export function duplicateMapEntry(
   }
 }
 
+/**
+ * 從伺服器載回來的地圖。
+ *
+ * 與 importMapEntryFromParsed 的差別是<strong>保留原本的 mapId</strong>：
+ * 那是伺服器上那份的身分。給新 id 的話，同一份地圖每載一次就多一個條目，
+ * 而且發佈時會被當成另一張圖。保留 id，重載就是覆蓋。
+ */
+export function importMapEntryFromServer(
+  parsed: ParsedMapFile,
+  mapId: string,
+): MapLibraryEntry {
+  return entryFromParsed(
+    { ...parsed, mapId, updatedAt: parsed.updatedAt ?? nowIso() },
+    { libraryId: mapId, createdAt: parsed.createdAt },
+  )
+}
+
 export function importMapEntryFromParsed(parsed: ParsedMapFile): MapLibraryEntry {
   const libraryId = generateLibraryId()
   const now = nowIso()
