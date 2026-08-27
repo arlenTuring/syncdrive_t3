@@ -824,6 +824,37 @@ function loadPlanes(): DashboardPlane[] {
  */
 const BACKEND_SAVE_DEBOUNCE_MS = 800;
 let backendSaveTimer: ReturnType<typeof setTimeout> | undefined;
+/** 還沒送到後端的那一份。離開頁面前要把它補送掉。 */
+let pendingPlanes: DashboardPlane[] | null = null;
+
+/**
+ * 把還沒送出的版面立刻送到後端。
+ *
+ * 節流是為了拖曳縮放（每個事件都會呼叫 savePlanes），但<strong>使用者離開頁面時
+ * 不能還在等</strong>：關分頁、重整、或 800 毫秒內跳頁，那個 PUT 就永遠不會送，
+ * 資料庫裡沒有這一次的修改。原本註解寫「下一次儲存會整批補上」——那是僥倖，
+ * 使用者不再編輯就永遠補不上，而他明明按過儲存。
+ */
+export function flushDashboardPlanes(): void {
+  if (backendSaveTimer) {
+    clearTimeout(backendSaveTimer);
+    backendSaveTimer = undefined;
+  }
+  const planes = pendingPlanes;
+  if (!planes) return;
+  pendingPlanes = null;
+  void saveDashboardPlanes(planes).catch(() => {
+    /* 送不出去就留在快取，下次進來會比對時間 */
+  });
+}
+
+if (typeof window !== 'undefined') {
+  // pagehide 比 beforeunload 可靠：手機與 bfcache 情境下 beforeunload 不一定會觸發
+  window.addEventListener('pagehide', flushDashboardPlanes);
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushDashboardPlanes();
+  });
+}
 
 function savePlanes(planes: DashboardPlane[]) {
   try {
@@ -831,11 +862,15 @@ function savePlanes(planes: DashboardPlane[]) {
   } catch (err) {
     console.error('Failed to save dashboard planes to localStorage:', err);
   }
+  pendingPlanes = planes;
   if (backendSaveTimer) clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(() => {
     backendSaveTimer = undefined;
-    void saveDashboardPlanes(planes).catch(() => {
-      /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
+    const snapshot = pendingPlanes;
+    pendingPlanes = null;
+    if (!snapshot) return;
+    void saveDashboardPlanes(snapshot).catch(() => {
+      /* 送不出去就留在快取，下次進來會比對時間 */
     });
   }, BACKEND_SAVE_DEBOUNCE_MS);
 }
@@ -846,6 +881,8 @@ export function useDashboardEditor() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  /** 加一就重新跟資料庫要一次版面 */
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   /**
    * 開啟時用後端內容覆蓋快取。
@@ -897,6 +934,30 @@ export function useDashboardEditor() {
       });
     return () => {
       cancelled = true;
+    };
+  }, [reloadNonce]);
+
+  /**
+   * 回到這一頁就重新跟資料庫要。
+   *
+   * 掛載時抓一次是不夠的：SPA 裡跳去別的模組再回來，元件不一定重新掛載，
+   * 看到的就是離開前那份。使用者在別的地方改了地圖、或用另一台電腦改過，
+   * 這裡永遠不知道。
+   *
+   * <strong>有還沒送出的修改就不重抓</strong>：那代表使用者正在編輯，
+   * 這時候拿資料庫覆蓋等於吃掉他手上的工作。等 flush 送出去之後再說。
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (pendingPlanes) return;
+      setReloadNonce((n) => n + 1);
+    };
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, []);
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
