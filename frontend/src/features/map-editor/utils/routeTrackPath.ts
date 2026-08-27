@@ -17,7 +17,6 @@ import {
   parseCrossoverPortalTopologyNodeId,
 } from './trackCrossoverFacility'
 import {
-  areaLocalPxToMeter,
   areaPositionToCssTopLeft,
   meterToAreaLocalPx,
 } from './areaCoords'
@@ -49,6 +48,9 @@ const SNAP_MAX_M = 12
 /** 點在軌道中心線延長線上、僅超出端點時允許的縱向懸伸（臨停格超出軌道端） */
 const SNAP_MAX_ALONG_OVERHANG_M = 55
 /** 懸伸吸附時離中心線的最大橫向偏差（須小於上下行走廊間距，避免吸到對向股） */
+/** 站標離軌道中心線多遠就算「不在軌道上」（圖面像素） */
+const MAP_PX_SNAP_MAX = 60
+
 const SNAP_MAX_LATERAL_M = 1.75
 /**
  * 路線站序續吸同股時可略放寬橫向（停靠點常貼邊界）；
@@ -689,6 +691,58 @@ function pathLengthPx(points: Array<{ x: number; y: number }>): number {
 }
 
 /**
+ * 圖面像素 → 參照場域公尺。
+ *
+ * 找出這個像素壓在哪一條軌道上（比對每條軌道中心線的像素投影），再依它在那條軌道上
+ * 的比例，換算進該軌道的 refField 範圍。<strong>逐軌道換算</strong>是必要的：
+ * 圖面座標與場域座標不是單一線性關係，每條軌道各自對應現場的一段。
+ *
+ * 都構不上就回 null，讓呼叫端退回 refField 原值——寧可用可能偏一股的座標，
+ * 也不要編一個不存在的位置出來。
+ */
+function mapPxToRefFieldMeters(
+  areas: MapAreaObject[],
+  px: { x: number; y: number },
+): { xM: number; yM: number } | null {
+  const { segments } = buildTrackNetwork(areas)
+  let best: { xM: number; yM: number; lateral: number } | null = null
+
+  for (const seg of segments) {
+    const b = seg.bounds
+    const startM = seg.horizontal
+      ? { xM: b.xMinM, yM: (b.yMinM + b.yMaxM) / 2 }
+      : { xM: (b.xMinM + b.xMaxM) / 2, yM: b.yMinM }
+    const endM = seg.horizontal
+      ? { xM: b.xMaxM, yM: (b.yMinM + b.yMaxM) / 2 }
+      : { xM: (b.xMinM + b.xMaxM) / 2, yM: b.yMaxM }
+
+    const a = fieldPointToMapPx(startM.xM, startM.yM, seg)
+    const c = fieldPointToMapPx(endM.xM, endM.yM, seg)
+    if (!a || !c) continue
+
+    const dx = c.x - a.x
+    const dy = c.y - a.y
+    const lenSq = dx * dx + dy * dy
+    if (lenSq <= 0) continue
+
+    const raw = ((px.x - a.x) * dx + (px.y - a.y) * dy) / lenSq
+    const t = Math.max(0, Math.min(1, raw))
+    const lateral = Math.hypot(px.x - (a.x + dx * t), px.y - (a.y + dy * t))
+    if (best && lateral >= best.lateral) continue
+
+    best = {
+      xM: startM.xM + (endM.xM - startM.xM) * t,
+      yM: startM.yM + (endM.yM - startM.yM) * t,
+      lateral,
+    }
+  }
+
+  // 站標離最近的軌道超過半個畫面區塊時，多半根本不在軌道上，別硬吸
+  if (!best || best.lateral > MAP_PX_SNAP_MAX) return null
+  return { xM: best.xM, yM: best.yM }
+}
+
+/**
  * 站序相鄰兩點是否為同一虛擬渡線的 A／B 端點；若是則回傳渡線道路折線（圖台 px）。
  * 方向依路線站序（from → to），不自動幫其他站間段走渡線。
  */
@@ -826,15 +880,22 @@ function resolveStationFieldMeters(
         docking.areaId,
         docking.facilityId,
       )
-      if (mapPx) {
-        const localX = mapPx.x - area.layout.xPx
-        const localFromTop = mapPx.y - area.layout.yPx
-        const areaY = area.layout.hPx - localFromTop
-        const m = areaLocalPxToMeter(localX, areaY, area.domain, area.layout)
-        if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
-          return { xM: m.x, yM: m.y }
-        }
-      }
+      /*
+       * 站標像素要換成<strong>參照場域</strong>公尺，不能用區塊 domain 換。
+       *
+       * 這裡以前走 areaLocalPxToMeter(…, area.domain, …)，回的是「區塊自己那把尺」
+       * 的公尺；但呼叫端拿它去和軌道的 refField 比對，而軌道量的是「現場那把尺」。
+       * 兩把尺不是同一條線性關係，實測 N2W下行出發 refField 是 (840, 101.75)，
+       * 用 domain 換出來卻是 (889, 394)——y 差了 290 公尺。
+       *
+       * 差這麼多的結果是：對圖上<strong>每一條</strong>軌道都超出吸附容許距離，
+       * 於是回報「兩端皆無法吸附至軌道」，整條路線退回站點直線。車照著那條斜線走，
+       * 圖台上就是一台歪斜的車。
+       *
+       * 正解是照站標壓在哪條軌道上，換進<strong>那條軌道自己的 refField 範圍</strong>。
+       */
+      const fromPx = mapPx ? mapPxToRefFieldMeters(areas, mapPx) : null
+      if (fromPx) return fromPx
     }
     return { xM: docking.xM, yM: docking.yM }
   }

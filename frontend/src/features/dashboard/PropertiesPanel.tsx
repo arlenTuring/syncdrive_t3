@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { DataSourcePicker } from './elements/DataSourcePicker';
 import { DataSourceIdSelect } from './elements/DataSourceIdSelect';
-import { getAvailableMaps } from './elements/mapCanvasStorage';
+import { getAvailableMaps, getAvailableMapsAsync } from './elements/mapCanvasStorage';
 import { RouteProgressSettings } from './route-progress/RouteProgressSettings';
 import { TextAlignmentControls } from '../../components/TextAlignmentControls';
 import {
@@ -1614,7 +1614,17 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
   onDelete: () => void;
   onEnterEditGroupMode?: () => void;
 }) {
-  const maps = React.useMemo(() => getAvailableMaps(), []);
+  const [maps, setMaps] = React.useState(() => getAvailableMaps());
+  React.useEffect(() => {
+    // 補上伺服器已發佈的地圖：本機地圖庫是每個瀏覽器各自一份，可能沒有這一張
+    let alive = true;
+    void getAvailableMapsAsync().then((all) => {
+      if (alive) setMaps(all);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const isMap = el.canvasKind === 'map-platform';
   return (
     <div className="space-y-4">
@@ -2293,7 +2303,17 @@ function UnitTelemetrySettings({
 }
 
 function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUpdate: (p: Partial<MapCanvasWidget>) => void; onDelete: () => void }) {
-  const maps = React.useMemo(() => getAvailableMaps(), []);
+  const [maps, setMaps] = React.useState(() => getAvailableMaps());
+  React.useEffect(() => {
+    // 補上伺服器已發佈的地圖：本機地圖庫是每個瀏覽器各自一份，可能沒有這一張
+    let alive = true;
+    void getAvailableMapsAsync().then((all) => {
+      if (alive) setMaps(all);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   return (
     <div className="space-y-3">
       <SH icon={<Map size={13} />} label="地圖畫布 (舊版子元件)" color="#0ea5e9" />
