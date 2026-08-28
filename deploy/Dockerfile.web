@@ -27,6 +27,7 @@ COPY document/ /usr/share/nginx/docs/
 # 想到要去補排除清單，而漏掉的後果是它直接出現在對外站上。列舉法的失敗方向
 # 相反：忘了加就是廠商看不到，會被問，然後補上。
 COPY document/協力廠商介接說明書.md /usr/share/nginx/public-docs/
+COPY document/車端介接說明書.md     /usr/share/nginx/public-docs/
 COPY document/車輛即時ETA-API.md    /usr/share/nginx/public-docs/
 COPY document/班表Timetable-API.md  /usr/share/nginx/public-docs/
 # 六份通訊協議：那是與車端／中心端的契約，本來就要給對方看
