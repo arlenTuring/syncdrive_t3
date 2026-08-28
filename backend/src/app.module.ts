@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { MqttModule } from './mqtt/mqtt.module';
 import { RedisModule } from './redis/redis.module';
 import { EventsModule } from './events/events.module';
+import { PartnerApiKey } from './database/entities/partner-api-key.entity';
+import { PartnerAccessModule } from './partner-access/partner-access.module';
 import { Vehicle } from './database/entities/vehicle.entity';
 import { OperationOrder } from './database/entities/operation-order.entity';
 import { CommandLog } from './database/entities/command-log.entity';
@@ -100,6 +102,8 @@ import { DatabaseInitService } from './database/database-init.service';
           MapEntity, MapVersion, MediaSchedule,
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
+          // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
+          PartnerApiKey,
         ],
         /**
          * 建表機制。
@@ -149,6 +153,7 @@ import { DatabaseInitService } from './database/database-init.service';
     ScheduleAdjustModule,
     DashboardPlaneModule,
     DevLogModule,
+    PartnerAccessModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

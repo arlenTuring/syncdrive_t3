@@ -168,7 +168,7 @@ if docker ps >/dev/null 2>&1; then DOCKER="docker"; else DOCKER="sudo docker"; f
 mqtt_denied() {
   local label="$1"; shift
   local out
-  out="$($DOCKER exec syncdrive_mosquitto mosquitto_sub -h 127.0.0.1 -p 1883 \
+  out="$($DOCKER exec syncdrive_mosquitto mosquitto_sub -h 127.0.0.1 \
         -t '$SYS/broker/version' -C 1 -W 3 "$@" 2>&1 || true)"
   if printf '%s' "$out" | grep -qi 'not authorised\|Connection Refused\|refused'; then
     printf '\033[1;32m✓\033[0m %-40s 被拒\n' "$label"; pass=$((pass + 1))
@@ -177,8 +177,11 @@ mqtt_denied() {
   fi
 }
 if $DOCKER exec syncdrive_mosquitto sh -c 'command -v mosquitto_sub' >/dev/null 2>&1; then
-  mqtt_denied "MQTT 匿名連線必須被拒"
-  mqtt_denied "MQTT 錯誤密碼必須被拒" -u PMS-01 -P definitely-not-the-password
+  # 8883 是車端唯一的入口：沒有用戶端憑證一定要連不上
+  mqtt_denied "MQTT 8883 無憑證必須被拒" -p 8883 --cafile /mosquitto/certs/ca.crt
+  # 1883 只給 docker 內部的後端，仍然要擋掉匿名
+  mqtt_denied "MQTT 1883 匿名必須被拒" -p 1883
+  mqtt_denied "MQTT 1883 錯誤密碼必須被拒" -p 1883 -u vtms-backend -P definitely-not-the-password
 else
   printf '\033[1;33m略過\033[0m 容器裡沒有 mosquitto_sub，無法檢查 MQTT 認證\n'
 fi

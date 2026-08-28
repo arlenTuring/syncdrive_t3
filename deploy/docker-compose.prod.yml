@@ -66,11 +66,15 @@ services:
     image: eclipse-mosquitto:2@sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797
     container_name: syncdrive_mosquitto
     restart: always
-    # 1883 給車端。正式設定關閉匿名、啟用帳密與 ACL（協議 §三 的隔離原則），
-    # 帳密檔由 bootstrap.sh 產生。MQTT_BIND 預設 127.0.0.1，要讓車端連進來
-    # 才改 0.0.0.0，並在防火牆限制來源網段。
+    # 只發布 8883。車端走 TLS ＋ 用戶端憑證，憑證由 deploy/mqtt-certs.sh 產生。
+    #
+    # 1883 <strong>刻意不對主機發布</strong>：那個 listener 只給同一個 compose 網路裡的
+    # 後端用。發布出去等於在 TLS 之外又留一條純文字的路，而攻擊者只要拿到任何一組
+    # 帳密就能繞過憑證這道關卡。
+    #
+    # MQTT_BIND 預設 127.0.0.1，要讓車端連進來才改 0.0.0.0，並在防火牆限制來源網段。
     ports:
-      - "${MQTT_BIND:-127.0.0.1}:1883:1883"
+      - "${MQTT_BIND:-127.0.0.1}:8883:8883"
     # 明確指定要讀哪一份設定，不要用「把 prod 蓋在 mosquitto.conf 上」的疊法。
     #
     # 疊法會留下一個地雷：容器裡 /mosquitto/config/mosquitto.conf 這個路徑同時被
@@ -85,6 +89,7 @@ services:
     command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.prod.conf"]
     volumes:
       - ../mosquitto/config:/mosquitto/config
+      - ../mosquitto/certs:/mosquitto/certs:ro
       - mosquitto_data:/mosquitto/data
     healthcheck:
       test: ["CMD-SHELL", "pidof mosquitto || exit 1"]
@@ -112,6 +117,14 @@ services:
       REDIS_PORT: 6379
       MQTT_URL: mqtt://vtms-backend:${MQTT_BACKEND_PASSWORD}@mosquitto:1883
       VTMS_API_KEY: ${VTMS_API_KEY}
+      # 對外金鑰的發放：廠商以這組帳密換金鑰，與 3100 埠的瀏覽帳密同一組。
+      # 分兩組的話等於同一個廠商要記兩份，而它們保護的是同一個邊界。
+      EXTERNAL_AUTH_USER: ${EXTERNAL_AUTH_USER}
+      EXTERNAL_AUTH_PASSWORD: ${EXTERNAL_AUTH_PASSWORD}
+      # 發金鑰時一併回傳 MQTT 用戶端憑證，所以後端要讀得到憑證目錄（唯讀）
+      MQTT_CERT_DIR: /mqtt-certs
+      MQTT_PUBLIC_HOST: ${MQTT_PUBLIC_HOST:-127.0.0.1}
+      MQTT_PUBLIC_PORT: ${MQTT_PUBLIC_PORT:-8883}
       CORS_ORIGIN: ${CORS_ORIGIN}
       DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
@@ -137,6 +150,9 @@ services:
       # 見 scripts/map-published-store.js），沒有這個 volume 的話每次重新部署
       # 地圖就會消失——而地圖一消失，班表 API 查得到班次卻查不到停靠點別名。
       - backenddata:/app/data
+      # 憑證唯讀掛進來：發金鑰時要一併把 CA 與該車的用戶端憑證回給廠商。
+      # 唯讀是重點——後端只需要讀，不該有能力改動或刪除任何一張憑證。
+      - ../mosquitto/certs:/mqtt-certs:ro
     # 不對 postgres 下 depends_on：資料庫獨立部署時那個服務根本不存在，
     # 硬相依會讓整個 compose 起不來。連線重試由 TypeORM 自己負責。
     depends_on:

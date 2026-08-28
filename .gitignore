@@ -55,3 +55,7 @@ mosquitto/config/passwordfile
 
 # 同步到 GCP 前的地圖備份，本機留存不進版控
 .map-backup/
+
+# MQTT TLS 憑證：私鑰絕對不能進版控，公開的憑證也一起排除——
+# 它們由 deploy/mqtt-certs.sh 在目標主機上產生，每個環境一套。
+mosquitto/certs/
