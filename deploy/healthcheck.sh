@@ -154,5 +154,34 @@ fi
 echo "參數驗證"
 check "值域外的參數回 400"  "$EXTERNAL/syncdrive-api/vehicles/eta/by-station?limit_per_station=99" 400 "$API_KEY"
 
+# ── MQTT broker 的認證邊界 ────────────────────────────────────────
+#
+# 這一項是事後補的：broker 的設定曾經以「把 prod 蓋在 mosquitto.conf 上」的方式
+# 掛載，而目錄裡那份是開發用的（allow_anonymous true）。發過一次 SIGHUP 之後
+# mosquitto 讀到開發那份，匿名與錯誤密碼全部連得上——1883 是對全世界開放的，
+# 而整個過程沒有任何錯誤訊息，前面 33 項也全數通過。
+#
+# 所以要真的去連一次。用 mosquitto_sub 從 broker 容器裡打，不必在主機上裝東西。
+echo "MQTT 認證邊界"
+# docker 可能需要 sudo，也可能不用——與上面讀 .env 同樣的處理方式
+if docker ps >/dev/null 2>&1; then DOCKER="docker"; else DOCKER="sudo docker"; fi
+mqtt_denied() {
+  local label="$1"; shift
+  local out
+  out="$($DOCKER exec syncdrive_mosquitto mosquitto_sub -h 127.0.0.1 -p 1883 \
+        -t '$SYS/broker/version' -C 1 -W 3 "$@" 2>&1 || true)"
+  if printf '%s' "$out" | grep -qi 'not authorised\|Connection Refused\|refused'; then
+    printf '\033[1;32m✓\033[0m %-40s 被拒\n' "$label"; pass=$((pass + 1))
+  else
+    printf '\033[1;31m✗\033[0m %-40s 竟然連得上——broker 沒有在驗證帳密\n' "$label"; fail=$((fail + 1))
+  fi
+}
+if $DOCKER exec syncdrive_mosquitto sh -c 'command -v mosquitto_sub' >/dev/null 2>&1; then
+  mqtt_denied "MQTT 匿名連線必須被拒"
+  mqtt_denied "MQTT 錯誤密碼必須被拒" -u PMS-01 -P definitely-not-the-password
+else
+  printf '\033[1;33m略過\033[0m 容器裡沒有 mosquitto_sub，無法檢查 MQTT 認證\n'
+fi
+
 printf '\n通過 %d 項，失敗 %d 項\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -71,9 +71,20 @@ services:
     # 才改 0.0.0.0，並在防火牆限制來源網段。
     ports:
       - "${MQTT_BIND:-127.0.0.1}:1883:1883"
+    # 明確指定要讀哪一份設定，不要用「把 prod 蓋在 mosquitto.conf 上」的疊法。
+    #
+    # 疊法會留下一個地雷：容器裡 /mosquitto/config/mosquitto.conf 這個路徑同時被
+    # 目錄掛載與檔案掛載覆蓋，而目錄裡那份是<strong>開發用</strong>設定
+    # （allow_anonymous true、沒有 password_file）。部署重新解開設定目錄之後，
+    # 只要 mosquitto 因為任何原因重讀設定（SIGHUP、容器重建），就可能讀到開發那份
+    # ——broker 隨即對全世界開放，而且沒有任何錯誤訊息。實測發過一次 SIGHUP 之後，
+    # 匿名與錯誤密碼全部連得上。
+    #
+    # 改成用不同檔名 ＋ 明確 -c，路徑不再有兩個來源；prod 檔掛不上時 mosquitto
+    # 直接起不來，是往安全的方向失敗。
+    command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.prod.conf"]
     volumes:
       - ../mosquitto/config:/mosquitto/config
-      - ../mosquitto/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
     healthcheck:
       test: ["CMD-SHELL", "pidof mosquitto || exit 1"]
