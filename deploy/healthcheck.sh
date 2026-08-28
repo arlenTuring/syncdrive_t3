@@ -170,7 +170,9 @@ mqtt_denied() {
   local out
   out="$($DOCKER exec syncdrive_mosquitto mosquitto_sub -h 127.0.0.1 \
         -t '$SYS/broker/version' -C 1 -W 3 "$@" 2>&1 || true)"
-  if printf '%s' "$out" | grep -qi 'not authorised\|Connection Refused\|refused'; then
+  # 拒絕的表現方式依層級不同：TLS 握手被擋（沒帶用戶端憑證）是連線被切斷，
+  # MQTT 認證被擋（帳密錯）才會回 CONNACK 的 not authorised。兩種都要算通過。
+  if printf '%s' "$out" | grep -qi 'not authorised\|Connection Refused\|refused\|connection was lost\|connection error\|TLS\|certificate'; then
     printf '\033[1;32m✓\033[0m %-40s 被拒\n' "$label"; pass=$((pass + 1))
   else
     printf '\033[1;31m✗\033[0m %-40s 竟然連得上——broker 沒有在驗證帳密\n' "$label"; fail=$((fail + 1))

@@ -99,9 +99,26 @@ EOF
   chmod 600 "$code.key"
 done
 
-# mosquitto 在容器裡以 uid 1883 執行，讀不到 root 擁有的檔案就會靜靜地不啟用 TLS
+# ── 權限 ────────────────────────────────────────────────────────
+#
+# 兩種私鑰要分開對待：
+#
+#   ca.key / server.key   只有 mosquitto 該讀得到。CA 私鑰能簽出任何一台車的身分，
+#                         伺服器私鑰能冒充 broker——兩者外流的後果都不是換一張憑證
+#                         就能收拾的。0600，屬 mosquitto。
+#
+#   PMS-xx.key            本來就是要發給對應廠商的東西，後端在核發金鑰時要讀它。
+#                         mosquitto 在容器裡是 uid 1883，後端是 uid 1000，所以設成
+#                         擁有者 1883、群組 1000、0640：兩個服務讀得到，其他人不行。
 chown -R 1883:1883 "$CERT_DIR" 2>/dev/null || true
-chmod 644 ca.crt server.crt ./*.crt 2>/dev/null || true
+chmod 644 ca.crt server.crt 2>/dev/null || true
+chmod 600 ca.key server.key 2>/dev/null || true
+for leaf in "$CERT_DIR"/PMS-*.key; do
+  [ -e "$leaf" ] || continue
+  chown 1883:1000 "$leaf" 2>/dev/null || true
+  chmod 640 "$leaf" 2>/dev/null || true
+done
+chmod 644 "$CERT_DIR"/PMS-*.crt 2>/dev/null || true
 
 log "完成：$CERT_DIR"
 printf '    CA          %s\n' "$(openssl x509 -in ca.crt -noout -enddate | cut -d= -f2)"
