@@ -77,7 +77,6 @@ red() { printf '\033[31m%s\033[0m\n' "$*"; }
 stop_log_trimmers
 rotate_dev_log "$BACKEND_LOG"
 rotate_dev_log "$FRONTEND_LOG"
-rotate_dev_log "$VTMS_SIM_LOG"
 
 docker_cmd() {
   if command -v docker >/dev/null 2>&1; then echo docker; return; fi

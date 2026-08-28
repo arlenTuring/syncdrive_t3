@@ -347,6 +347,9 @@ export class VehicleEtaService {
       const stale = ageSeconds > vehicleEtaConfig.dataStaleSeconds;
       if (!stale) freshCount += 1;
 
+      // 車端可能因缺值傳空字串／非數字，root 層以外的欄位 redis.service.ts 不做
+      // 型別檢查——這裡用 numberOrNull 擋一次，避免 "" 或 NaN 混進對外回應。
+      const latitude = numberOrNull(telemetry?.global_pose?.latitude);
       vehicles.push({
         vehicleCode,
         operation,
@@ -354,13 +357,13 @@ export class VehicleEtaService {
         ageSeconds,
         stale,
         position:
-          telemetry?.global_pose?.latitude == null
+          latitude == null
             ? null
             : {
-                latitude: telemetry.global_pose.latitude,
-                longitude: telemetry.global_pose?.longitude ?? 0,
-                heading: telemetry.local_pose?.heading ?? 0,
-                velocity_kph: telemetry.kinematics?.velocity ?? 0,
+                latitude,
+                longitude: numberOrNull(telemetry?.global_pose?.longitude) ?? 0,
+                heading: numberOrNull(telemetry?.local_pose?.heading) ?? 0,
+                velocity_kph: numberOrNull(telemetry?.kinematics?.velocity) ?? 0,
               },
       });
     }

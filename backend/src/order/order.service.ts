@@ -18,6 +18,7 @@ import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { MapService } from '../map/map.service';
 import {
   ExecutionStatusKey,
   ShiftRecordListItem,
@@ -47,6 +48,10 @@ export type OperationCurrentLeg = {
   target_station_id?: string;
   distance_to_target_m?: number;
   eta_seconds?: number;
+  /**
+   * @deprecated 車端已不需要回報：中心端會用訂單自己的站序計畫時刻推算
+   * （見 computeLegEtaMaxFromSchedule）。僅在推算失敗時當相容性 fallback。
+   */
   leg_eta_max?: number;
 };
 
@@ -83,7 +88,13 @@ export type OperationMqttPayload = {
   vehicle_phase?: string;
   order_status?: string;
   operation_action?: string;
+  /**
+   * @deprecated 車端已不需要回報：中心端派單時就把 line_kind 寫進訂單記錄
+   * 了（見 dispatch-engine.service.ts），這裡一律信任既有訂單。僅在訂單本身
+   * 缺記錄時當相容性 fallback，供舊車端／模擬器過渡使用。
+   */
   line_kind?: string;
+  /** @deprecated 同 line_kind，中心端指派時已經知道，車端不需要回報。 */
   route_id?: string;
   current_leg?: OperationCurrentLeg | string;
   task_group?: Array<Record<string, unknown>>;
@@ -95,6 +106,12 @@ export type OperationMqttPayload = {
     payload?: Record<string, unknown>;
   };
   maint_type_label?: string;
+  /**
+   * 車端一般不需要主動回報：中心端會用車輛最近一次 telemetry/update 的
+   * local_pose.position 比對場區格位範圍自動判定（見
+   * MqttService.enrichWithFacilityLocation）。仍保留此欄位供舊車端／
+   * 模擬器相容——若車端已帶值，中心端不會覆蓋。
+   */
   yard_slot_id?: string;
   timestamp?: number;
 };
@@ -111,6 +128,7 @@ export class OrderService {
     private readonly orderMqttPublisher: OrderMqttPublisher,
     private readonly orderRouteService: OrderRouteService,
     private readonly datasourceInvalidation: DatasourceInvalidationService,
+    private readonly mapService: MapService,
   ) {}
 
   async createOrder(
@@ -180,11 +198,72 @@ export class OrderService {
   }
 
   async getOrderById(id: string): Promise<OperationOrder> {
+    if (!this.nonEmpty(id)) {
+      // id 缺漏時 TypeORM 的 where:{id:undefined} 會被忽略，等於查全表第一筆——
+      // 對外查詢絕不能讓缺參數變成「隨機回一筆」，必須先擋掉。
+      throw new BadRequestException('id is required');
+    }
     const order = await this.orderRepository.findOne({ where: { id } });
     if (!order) {
       throw new NotFoundException(`Order with id '${id}' not found`);
     }
     return order;
+  }
+
+  /**
+   * 對外查詢用：回傳訂單並在 payload.origin/destination 補上場域參照座標。
+   *
+   * 座標不在派單當下寫死進 DB——地圖之後可能再校正，寫死的話進行中訂單會拿到
+   * 舊座標。改成每次查詢當下即時查表：station 用現行地圖的站點座標，facility
+   * （場區格位／範圍型設施）取範圍中心值。查不到（例如地圖已無此站點）就跳過
+   * 補值，保留原始欄位，不讓查詢失敗。
+   */
+  async getOrderByIdWithCoordinates(id: string): Promise<OperationOrder> {
+    const order = await this.getOrderById(id);
+    return this.attachEndpointCoordinates(order);
+  }
+
+  private attachEndpointCoordinates(order: OperationOrder): OperationOrder {
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    const origin = this.resolveEndpointCoordinates(payload.origin);
+    const destination = this.resolveEndpointCoordinates(payload.destination);
+    if (!origin && !destination) {
+      return order;
+    }
+    return {
+      ...order,
+      payload: {
+        ...payload,
+        ...(origin ? { origin } : {}),
+        ...(destination ? { destination } : {}),
+      },
+    } as OperationOrder;
+  }
+
+  private resolveEndpointCoordinates(point: unknown): Record<string, unknown> | null {
+    if (!point || typeof point !== 'object') return null;
+    const endpoint = point as Record<string, unknown>;
+    const endpointId = typeof endpoint.id === 'string' ? endpoint.id : undefined;
+    const kind = typeof endpoint.kind === 'string' ? endpoint.kind : undefined;
+    if (!endpointId || !kind) {
+      return { ...endpoint };
+    }
+    try {
+      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
+      if (kind === 'station') {
+        const station = this.mapService.getStation(mapId, endpointId);
+        return { ...endpoint, x: station.xM, y: station.yM };
+      }
+      if (kind === 'facility') {
+        const center = this.mapService.getFacilityCenter(mapId, endpointId);
+        if (center) {
+          return { ...endpoint, x: center.xM, y: center.yM };
+        }
+      }
+    } catch {
+      // 查不到座標（例如地圖已改版、id 對不上）就跳過補值，回傳原始欄位。
+    }
+    return { ...endpoint };
   }
 
   async listOrders(query: ListOrdersQuery): Promise<{
@@ -411,7 +490,11 @@ export class OrderService {
 
   async updateOrderStatus(id: string, statusStr: string): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
-    const targetStatus = statusStr.toUpperCase() as OrderStatus;
+    const normalizedStatus = this.nonEmpty(statusStr);
+    if (!normalizedStatus) {
+      throw new BadRequestException('status is required');
+    }
+    const targetStatus = normalizedStatus.toUpperCase() as OrderStatus;
 
     if (!Object.values(OrderStatus).includes(targetStatus)) {
       throw new BadRequestException(
@@ -484,19 +567,23 @@ export class OrderService {
     const orderId = this.nonEmpty(payload.order_id);
     if (!tripCode || !orderId) return null;
 
-    const routeId = this.nonEmpty(payload.route_id)
-      ?? this.orderRouteService.routeIdForTripCode(tripCode);
-    let lineKind = this.nonEmpty(payload.line_kind)
-      ?? (routeId ? 'MAINLINE' : null);
-    if (!lineKind && (payload.maint_type_label || payload.yard_slot_id)) {
-      lineKind = 'MAINTENANCE';
-    }
-    if (!lineKind) return null;
-
     let order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order) {
       return null;
     }
+
+    // line_kind／route_id 在派單當下已經寫進訂單記錄（見 dispatch-engine.service.ts），
+    // 一律信任既有訂單，不再依賴車端回報或用 trip_code 前綴猜——車端回報錯了會讓分類
+    // 跑掉（例如整備訂單被標成正線，資料庫裡就再也找不到那筆整備紀錄）。
+    // payload.line_kind／payload.route_id 只在舊車端／模擬器仍會送、且訂單本身缺記錄
+    // 時才退回去用，屬相容性 fallback，非必要欄位。
+    const routeId = order.routeId
+      ?? this.nonEmpty(payload.route_id)
+      ?? this.orderRouteService.routeIdForTripCode(tripCode);
+    const lineKind = order.lineKind
+      ?? this.nonEmpty(payload.line_kind)
+      ?? (routeId ? 'MAINLINE' : null);
+    if (!lineKind) return null;
 
     const vehiclePhase = String(payload.vehicle_phase ?? '').toUpperCase();
     const isAwaitingDeparture =
@@ -560,19 +647,29 @@ export class OrderService {
     if (legTarget && etaSec != null) {
       legEtaMax[legTarget] = Math.max(legEtaMax[legTarget] ?? 0, etaSec);
     }
+    // leg_eta_max 的權威來源是訂單自己的站序計畫時刻（前一站計畫發車→本站計畫抵達），
+    // 車端不需要回報這個值——資料本來就在派單時寫進 payload.stations[]。
+    // currentLeg?.leg_eta_max 只在排班資料算不出來時才當相容性 fallback 用。
+    const legEtaMaxFromSchedule = legTarget
+      ? this.computeLegEtaMaxFromSchedule(order, legTarget)
+      : null;
     const legEtaMaxFromPayload = typeof currentLeg?.leg_eta_max === 'number'
       ? Math.max(0, Math.round(currentLeg.leg_eta_max))
       : null;
-    if (legTarget && legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0) {
-      legEtaMax[legTarget] = legEtaMaxFromPayload;
+    if (legTarget) {
+      const preferred = legEtaMaxFromSchedule
+        ?? (legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0 ? legEtaMaxFromPayload : null);
+      if (preferred != null) {
+        legEtaMax[legTarget] = preferred;
+      }
     }
     const maxEta = legTarget ? (legEtaMax[legTarget] ?? etaSec ?? 0) : 0;
 
     const computedProgress = await this.orderRouteService.computeRouteProgress(
       orderId,
-      order.routeId ?? routeId,
+      routeId,
     );
-    const effectiveRouteId = order.routeId ?? routeId ?? null;
+    const effectiveRouteId = routeId ?? null;
     const routeStations = effectiveRouteId
       ? await this.orderRouteService.getRouteStations(effectiveRouteId)
       : [];
@@ -595,14 +692,14 @@ export class OrderService {
 
     const nextStation = await this.orderRouteService.computeNextStation(
       orderId,
-      order.routeId ?? routeId,
+      routeId,
     );
 
     const operationAction = deriveOperationActionFromTaskGroup(payload.task_group);
 
     order.tripCode = tripCode;
     order.vehicleCode = vehicleCode;
-    order.routeId = order.routeId ?? routeId ?? undefined;
+    order.routeId = routeId ?? undefined;
     order.lineKind = lineKind;
     order.nextStation = nextStation ?? order.nextStation;
     // 計畫時刻由中心端決定，車端回報不得覆蓋。
@@ -896,6 +993,11 @@ export class OrderService {
     const etaSec = typeof currentLeg?.eta_seconds === 'number'
       ? Math.max(0, Math.round(currentLeg.eta_seconds))
       : null;
+    // 同 applyOperationMqttUpdate：leg_eta_max 優先從訂單自己的站序計畫時刻推算，
+    // 車端回報值只在算不出來時當相容性 fallback。
+    const legEtaMaxFromSchedule = legTarget
+      ? this.computeLegEtaMaxFromSchedule(order, legTarget)
+      : null;
     const legEtaMaxFromPayload = typeof currentLeg?.leg_eta_max === 'number'
       ? Math.max(0, Math.round(currentLeg.leg_eta_max))
       : null;
@@ -904,10 +1006,14 @@ export class OrderService {
     const legEtaMax: Record<string, number> = {
       ...((prevPayload.leg_eta_max as Record<string, number> | undefined) ?? {}),
     };
-    if (legTarget && legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0) {
-      legEtaMax[legTarget] = legEtaMaxFromPayload;
-    } else if (legTarget && etaSec != null) {
-      legEtaMax[legTarget] = Math.max(legEtaMax[legTarget] ?? 0, etaSec);
+    if (legTarget) {
+      const preferred = legEtaMaxFromSchedule
+        ?? (legEtaMaxFromPayload != null && legEtaMaxFromPayload > 0 ? legEtaMaxFromPayload : null);
+      if (preferred != null) {
+        legEtaMax[legTarget] = preferred;
+      } else if (etaSec != null) {
+        legEtaMax[legTarget] = Math.max(legEtaMax[legTarget] ?? 0, etaSec);
+      }
     }
 
     order.tripCode = tripCode;
@@ -964,6 +1070,30 @@ export class OrderService {
     if (raw == null) return null;
     const v = String(raw).trim();
     return v ? v : null;
+  }
+
+  /**
+   * 從訂單自己的站序計畫時刻推算某一段（前一停靠點計畫發車 → 目標停靠點計畫
+   * 抵達）的計畫總秒數。車端不需要回報 current_leg.leg_eta_max——這個資料
+   * 派單當下就已經寫進 order.payload.stations[] 了。
+   */
+  private computeLegEtaMaxFromSchedule(
+    order: OperationOrder,
+    targetStationId: string,
+  ): number | null {
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    const stations = Array.isArray(payload.stations)
+      ? (payload.stations as Array<Record<string, unknown>>)
+      : [];
+    const index = stations.findIndex(
+      (s) => this.nonEmpty(s.station_id) === targetStationId,
+    );
+    if (index <= 0) return null;
+    const arriveAt = stations[index]?.arrive_at;
+    const departAt = stations[index - 1]?.depart_at;
+    if (typeof arriveAt !== 'number' || typeof departAt !== 'number') return null;
+    const seconds = Math.round((arriveAt - departAt) / 1000);
+    return seconds > 0 ? seconds : null;
   }
 
   private tripTimesFromCode(

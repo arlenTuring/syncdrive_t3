@@ -67,11 +67,13 @@ export class MqttController {
     const vehicleCode = parts[2];
     if (!vehicleCode || !data) return;
 
-    await this.redisService.setOperationUpdate(vehicleCode, data);
-    await this.mqttService.syncOperationOrderFromLive(vehicleCode, data);
+    const enriched = await this.mqttService.enrichWithFacilityLocation(vehicleCode, data);
 
-    this.eventsGateway.broadcastOperation(vehicleCode, data);
-    this.eventsGateway.broadcastMqttMessage(topic, data);
+    await this.redisService.setOperationUpdate(vehicleCode, enriched);
+    await this.mqttService.syncOperationOrderFromLive(vehicleCode, enriched);
+
+    this.eventsGateway.broadcastOperation(vehicleCode, enriched);
+    this.eventsGateway.broadcastMqttMessage(topic, enriched);
   }
 
   @MessagePattern('v1/vtms/+/command/ack')

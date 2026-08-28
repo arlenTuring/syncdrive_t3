@@ -6,9 +6,16 @@ import { SlotStatus_ } from '../database/entities/slot-status.entity';
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
 import { OrderService } from '../order/order.service';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { RedisService } from '../redis/redis.service';
+import { MapService } from '../map/map.service';
 import { MqttService } from './mqtt.service';
 
 const invalidationMock = { emit: jest.fn(), emitOrderLifecycle: jest.fn(), emitEventCenter: jest.fn(), emitMaintenanceSlots: jest.fn() };
+const redisServiceMock = { getTelemetry: jest.fn().mockResolvedValue(null) };
+const mapServiceMock = {
+  getActiveMapLibraryStatus: jest.fn().mockReturnValue({ activeMapId: 'map-test' }),
+  findFacilityAtPoint: jest.fn().mockReturnValue(null),
+};
 
 describe('MqttService', () => {
   let service: MqttService;
@@ -33,6 +40,8 @@ describe('MqttService', () => {
         { provide: getRepositoryToken(SlotStatus_), useValue: repositoryMock },
         { provide: OrderService, useValue: orderServiceMock },
         { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: RedisService, useValue: redisServiceMock },
+        { provide: MapService, useValue: mapServiceMock },
       ],
     }).compile();
 
@@ -65,5 +74,39 @@ describe('MqttService', () => {
         trip_code: 'D1401',
       }),
     );
+  });
+
+  describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {
+    it('車端已帶 yard_slot_id 時不覆蓋', async () => {
+      const payload = { yard_slot_id: 'H1', vehicle_phase: 'IDLE' };
+      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      expect(result).toBe(payload);
+      expect(redisServiceMock.getTelemetry).not.toHaveBeenCalled();
+    });
+
+    it('沒有 yard_slot_id 時，用最近一次 telemetry 座標比對格位', async () => {
+      redisServiceMock.getTelemetry.mockResolvedValueOnce({
+        local_pose: { position: { x: 52, y: 62 } },
+      });
+      mapServiceMock.findFacilityAtPoint.mockReturnValueOnce({
+        mapCode: 'H2',
+        equipmentId: '195',
+        equipmentKind: 'yard_slot',
+      });
+      const payload = { vehicle_phase: 'IDLE' };
+      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      expect(result).toMatchObject({ yard_slot_id: 'H2' });
+      expect(mapServiceMock.findFacilityAtPoint).toHaveBeenCalledWith('map-test', 52, 62);
+    });
+
+    it('座標沒有落在任何格位範圍內（正線軌道）時不補值', async () => {
+      redisServiceMock.getTelemetry.mockResolvedValueOnce({
+        local_pose: { position: { x: 500, y: 200 } },
+      });
+      mapServiceMock.findFacilityAtPoint.mockReturnValueOnce(null);
+      const payload = { vehicle_phase: 'TRANSITING' };
+      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      expect(result).not.toHaveProperty('yard_slot_id');
+    });
   });
 });

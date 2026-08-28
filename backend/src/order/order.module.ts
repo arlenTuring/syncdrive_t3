@@ -11,6 +11,7 @@ import { OrderActionState } from '../database/entities/order-action-state.entity
 import { OrderEvent } from '../database/entities/order-event.entity';
 import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { AuditModule } from '../audit/audit.module';
+import { MapModule } from '../map/map.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AuditModule } from '../audit/audit.module';
       OrderEvent,
     ]),
     AuditModule,
+    MapModule,
   ],
   controllers: [OrderController],
   providers: [OrderService, OrderRouteService, OrderMqttPublisher],

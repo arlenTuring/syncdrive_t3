@@ -160,6 +160,112 @@ function loadFieldEquipment(mapId, kindFilter = 'all') {
   return loadFieldEquipmentFromMapFile(mapPath, kindFilter);
 }
 
+/**
+ * 取設施（Facility 類）的場域參照範圍。與 `t3-v0-0-5-track-motion.js` 內部同名邏輯
+ * 對齊，但搬到這裡讓 backend/src 能直接匯入重用（原本只有模擬器腳本能用）。
+ */
+function getRefFieldBounds(params) {
+  const p = params ?? {};
+  const xMinM = p.refFieldXMinM;
+  const xMaxM = p.refFieldXMaxM;
+  const yMinM = p.refFieldYMinM;
+  const yMaxM = p.refFieldYMaxM;
+  if (
+    typeof xMinM === 'number' && Number.isFinite(xMinM)
+    && typeof xMaxM === 'number' && Number.isFinite(xMaxM)
+    && typeof yMinM === 'number' && Number.isFinite(yMinM)
+    && typeof yMaxM === 'number' && Number.isFinite(yMaxM)
+  ) {
+    return { xMinM, xMaxM, yMinM, yMaxM };
+  }
+  return null;
+}
+
+/** 設施中心點：有範圍取範圍中心，否則退回單點座標（若有）。 */
+function facilityCenterMeters(entry) {
+  const params = entry.parameters ?? {};
+  const bounds = getRefFieldBounds(params);
+  if (bounds) {
+    return {
+      xM: (bounds.xMinM + bounds.xMaxM) / 2,
+      yM: (bounds.yMinM + bounds.yMaxM) / 2,
+    };
+  }
+  const xM = params.refFieldXM;
+  const yM = params.refFieldYM;
+  if (typeof xM === 'number' && Number.isFinite(xM) && typeof yM === 'number' && Number.isFinite(yM)) {
+    return { xM, yM };
+  }
+  return null;
+}
+
+/** 載入所有 facility 類設施的幾何資料（中心點＋範圍），供座標查詢重用。 */
+function loadFacilityGeometryFromMapFile(mapPath) {
+  const raw = fs.readFileSync(mapPath, 'utf8');
+  const map = JSON.parse(raw);
+  const areas = Array.isArray(map.areas) ? map.areas : [];
+  const items = [];
+
+  for (const area of areas) {
+    const facilities = Array.isArray(area.facilities) ? area.facilities : [];
+    for (const entry of facilities) {
+      const classified = classifyMapObject(entry);
+      if (!classified || classified.category !== OBJECT_CATEGORY.FACILITY) continue;
+      const center = facilityCenterMeters(entry);
+      if (!center) continue;
+
+      items.push({
+        equipmentId: String(entry.id ?? ''),
+        mapCode: normalizeCode(entry.customName) || String(entry.id ?? ''),
+        equipmentKind: classified.kind,
+        centerXM: center.xM,
+        centerYM: center.yM,
+        bounds: getRefFieldBounds(entry.parameters),
+      });
+    }
+  }
+
+  return items;
+}
+
+/** facility id → 中心點座標（公尺，場域參照座標）。查不到回 null。 */
+function resolveFacilityCenterById(mapId, facilityId) {
+  const mapPath = resolveMapJsonPath(mapId);
+  if (!mapPath) return null;
+  const id = String(facilityId ?? '').trim();
+  if (!id) return null;
+  const items = loadFacilityGeometryFromMapFile(mapPath);
+  const hit = items.find((item) => item.equipmentId === id || item.mapCode === id);
+  if (!hit) return null;
+  return { xM: hit.centerXM, yM: hit.centerYM };
+}
+
+/**
+ * 座標 → 場區格位（矩形命中測試）。用來取代車端回報 yard_slot_id：
+ * 車輛回報自己的 local_pose.position，中心端自行比對目前落在哪個格位範圍內。
+ * 沒有命中（例如車輛在正線軌道上）回 null。
+ */
+function findFacilityAtPoint(mapId, xM, yM) {
+  if (typeof xM !== 'number' || !Number.isFinite(xM)) return null;
+  if (typeof yM !== 'number' || !Number.isFinite(yM)) return null;
+  const mapPath = resolveMapJsonPath(mapId);
+  if (!mapPath) return null;
+  const items = loadFacilityGeometryFromMapFile(mapPath);
+  const hit = items.find((item) => {
+    if (!item.bounds) return false;
+    return (
+      xM >= item.bounds.xMinM && xM <= item.bounds.xMaxM
+      && yM >= item.bounds.yMinM && yM <= item.bounds.yMaxM
+    );
+  });
+  if (!hit) return null;
+  return {
+    mapCode: hit.mapCode,
+    equipmentId: hit.equipmentId,
+    equipmentKind: hit.equipmentKind,
+  };
+}
+
 module.exports = {
   OBJECT_CATEGORY,
   EQUIPMENT_KIND,
@@ -170,4 +276,9 @@ module.exports = {
   },
   loadFieldEquipmentFromMapFile,
   loadFieldEquipment,
+  getRefFieldBounds,
+  facilityCenterMeters,
+  loadFacilityGeometryFromMapFile,
+  resolveFacilityCenterById,
+  findFacilityAtPoint,
 };

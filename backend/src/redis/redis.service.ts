@@ -65,8 +65,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     // 3. 交叉驗算：若任一子系統為 ERROR，overall_health 必須為 ERROR（離線狀態除外）
+    // sub 可能是 null／字串等非預期型別（車端送錯格式），用可選鏈避免拋例外中斷處理程序。
     const hasErrorSubsystem = Object.values(payload.subsystems).some(
-      (sub: any) => sub.status === 'ERROR'
+      (sub: any) => sub?.status === 'ERROR'
     );
     if (hasErrorSubsystem && payload.overall_health !== 'ERROR' && payload.overall_health !== 'OFFLINE') {
       this.logger.warn(
@@ -102,6 +103,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async setOperationUpdate(vehicleCode: string, payload: any) {
     const key = `vtms:operation:${vehicleCode}`;
     await this.client.set(key, JSON.stringify(payload));
+  }
+
+  /** 讀取車輛最新一筆 telemetry 快取，供 operation/update 處理流程比對場區位置用。 */
+  async getTelemetry(vehicleCode: string): Promise<Record<string, unknown> | null> {
+    const raw = await this.client.get(`vtms:telemetry:${vehicleCode}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
 
   /**

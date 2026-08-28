@@ -7,6 +7,8 @@ import { TelemetryLog } from '../database/entities/telemetry-log.entity';
 import { SlotStatus_ } from '../database/entities/slot-status.entity';
 import { OrderService } from '../order/order.service';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { RedisService } from '../redis/redis.service';
+import { MapService } from '../map/map.service';
 
 @Injectable()
 export class MqttService {
@@ -25,7 +27,42 @@ export class MqttService {
     private slotStatusRepository: Repository<SlotStatus_>,
     private readonly orderService: OrderService,
     private readonly datasourceInvalidation: DatasourceInvalidationService,
+    private readonly redisService: RedisService,
+    private readonly mapService: MapService,
   ) {}
+
+  /**
+   * operation/update 不再要求車端回報 yard_slot_id：改由中心端用車輛最近一次
+   * telemetry/update 回報的 local_pose.position 比對場區格位範圍。車輛停在
+   * 正線軌道（座標不落在任何格位範圍內）時，維持不補值——語意與舊版
+   * 「車輛停於正線時省略此欄位」相同。
+   *
+   * 若車端仍帶了 yard_slot_id（舊版車端／模擬器相容），保留原值不覆蓋。
+   */
+  async enrichWithFacilityLocation(
+    vehicleCode: string,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    if (this.nonEmptyString(payload?.yard_slot_id)) {
+      return payload;
+    }
+    try {
+      const telemetry = await this.redisService.getTelemetry(vehicleCode);
+      const position = (telemetry as { local_pose?: { position?: { x?: unknown; y?: unknown } } } | null)
+        ?.local_pose?.position;
+      const x = typeof position?.x === 'number' ? position.x : null;
+      const y = typeof position?.y === 'number' ? position.y : null;
+      if (x == null || y == null) return payload;
+
+      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
+      const hit = this.mapService.findFacilityAtPoint(mapId, x, y);
+      if (!hit) return payload;
+      return { ...payload, yard_slot_id: hit.mapCode };
+    } catch (err) {
+      this.logger.debug(`facility location lookup skipped for ${vehicleCode}: ${(err as Error)?.message}`);
+      return payload;
+    }
+  }
 
   async saveTelemetry(vehicleCode: string, payload: any) {
     await this.saveTelemetryBatch([{ vehicleCode, payload }]);
@@ -94,14 +131,14 @@ export class MqttService {
     this.operationSyncCache.set(vehicleCode, { at: now, key: syncKey });
 
     try {
+      // line_kind／route_id 不再由這裡猜測：訂單建立時中心端已經寫死
+      // order.lineKind／order.routeId，applyOperationMqttUpdate 會直接信任
+      // 既有訂單記錄，不需要在進來的路上先幫車端補值。
       await this.orderService.applyOperationMqttUpdate(vehicleCode, {
         ...payload,
         order_id: orderId,
         trip_code: tripCode,
         vehicle_code: vehicleCode,
-        line_kind: this.isShiftTripCode(tripCode)
-          ? 'MAINLINE'
-          : this.nonEmptyString(payload?.line_kind) ?? undefined,
       });
     } catch (err) {
       this.logger.warn(`operation/update sync failed for ${vehicleCode}: ${(err as Error)?.message ?? err}`);

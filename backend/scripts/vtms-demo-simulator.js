@@ -227,7 +227,6 @@ function operation(vehicleCode, progress, segment, actionCode, segmentIndex, seg
       target_station_id: segment,
       progress_percent: progress,
     },
-    route_progress: progress,
     segment_index: segmentIndex,
     segment_remain_pct: segmentRemainPct,
   };

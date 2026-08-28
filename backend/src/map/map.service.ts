@@ -325,4 +325,26 @@ export class MapService implements OnModuleInit {
     }
     return registry;
   }
+
+  /**
+   * facility id（或 mapCode）→ 中心點座標（公尺，場域參照座標）。
+   * 用於 origin/destination.kind === 'facility' 補座標（範圍型設施取範圍中心）。
+   * 查不到回 null，呼叫端應自行決定要不要跳過補值，不丟例外。
+   */
+  getFacilityCenter(mapId: string, facilityId: string): { xM: number; yM: number } | null {
+    return mapFieldEquipment.resolveFacilityCenterById(mapId, facilityId);
+  }
+
+  /**
+   * 座標 → 場區格位（矩形命中測試）。取代車端回報 yard_slot_id：
+   * 車輛回報 local_pose.position，中心端自行比對落在哪個格位範圍內。
+   * 沒有命中（例如車輛在正線軌道上）回 null。
+   */
+  findFacilityAtPoint(
+    mapId: string,
+    xM: number,
+    yM: number,
+  ): { mapCode: string; equipmentId: string; equipmentKind: string } | null {
+    return mapFieldEquipment.findFacilityAtPoint(mapId, xM, yM);
+  }
 }

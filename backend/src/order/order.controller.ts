@@ -1,10 +1,35 @@
-import { Controller, Post, Get, Put, Body, Query, Param, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Get, Put, Body, Query, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { OrderService } from './order.service';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
+
+class UpdateActionStatusDto {
+  @ApiProperty({
+    description: '動作狀態',
+    enum: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'],
+  })
+  @IsString()
+  status!: string;
+
+  @ApiPropertyOptional({ description: '卡關或失敗之原因' })
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @ApiPropertyOptional({ description: '實際開始時刻，Epoch 毫秒' })
+  @IsOptional()
+  @IsNumber()
+  actual_start_time?: number;
+
+  @ApiPropertyOptional({ description: '實際結束時刻，Epoch 毫秒' })
+  @IsOptional()
+  @IsNumber()
+  actual_end_time?: number;
+}
 
 @ApiTags('Operation Orders')
 @Controller('syncdrive-api/order')
@@ -80,8 +105,11 @@ export class OrderController {
       '車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後'
       + '以 order_id 取回完整任務（站點序列、各站動作、時刻）。',
   })
-  async queryOrder(@Query('id') id: string) {
-    return this.orderService.getOrderById(id);
+  async queryOrder(@Query('id') id?: string) {
+    if (!id) {
+      throw new BadRequestException('id is required');
+    }
+    return this.orderService.getOrderByIdWithCoordinates(id);
   }
 
   @Put('updateOrderProgress/:id')
@@ -119,7 +147,7 @@ export class OrderController {
   })
   async updateActionStatus(
     @Param('actionId') actionId: string,
-    @Body() body: { status: string; note?: string; actual_start_time?: number; actual_end_time?: number },
+    @Body() body: UpdateActionStatusDto,
     @Req() req: Request,
   ) {
     const result = await this.orderService.updateActionStatus(actionId, body);
