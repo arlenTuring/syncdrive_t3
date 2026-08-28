@@ -26,10 +26,9 @@ COPY document/ /usr/share/nginx/docs/
 # ——那些都不該給協力廠商。用「排除法」遲早會漏：新增一份內部文件時沒有人會
 # 想到要去補排除清單，而漏掉的後果是它直接出現在對外站上。列舉法的失敗方向
 # 相反：忘了加就是廠商看不到，會被問，然後補上。
-COPY document/協力廠商介接說明書.md /usr/share/nginx/public-docs/
-COPY document/車端介接說明書.md     /usr/share/nginx/public-docs/
-COPY document/車輛即時ETA-API.md    /usr/share/nginx/public-docs/
-COPY document/班表Timetable-API.md  /usr/share/nginx/public-docs/
+COPY document/協力廠商介接說明書.md   /usr/share/nginx/public-docs/
+COPY document/車端介接說明書.md       /usr/share/nginx/public-docs/
+COPY document/班表與到站預測介面.md   /usr/share/nginx/public-docs/
 # 六份通訊協議：那是與車端／中心端的契約，本來就要給對方看
 # 路徑含空白必須用 JSON 陣列形式；shell 形式的引號 Docker 的 COPY 解析不吃
 COPY ["document/MQTT 通訊架構與 Topic 命名規範.md", "/usr/share/nginx/public-docs/"]

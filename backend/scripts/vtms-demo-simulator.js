@@ -4,9 +4,40 @@
  * 以及 v1/vtms/{vehicle}/door/update、v1/vtms/{psd_id}/psd/update（月台門與車門協議）
  * 需：MQTT broker (1883)、Nest 後端 (3000) 已啟動以轉發 Socket.IO
  *
- * 執行：node scripts/vtms-demo-simulator.js
+ * 執行（本機開發，匿名連線 1883）：
+ *   node scripts/vtms-demo-simulator.js
+ *
+ * 執行（對正式 broker 8883，TLS 用戶端憑證，與車端介接說明書 §2.1 相同的認證方式）：
+ *   MQTT_URL=mqtts://<host>:8883 \
+ *   MQTT_TLS_CA=./ca.crt MQTT_TLS_CERT=./PMS-01.crt MQTT_TLS_KEY=./PMS-01.key \
+ *   node scripts/vtms-demo-simulator.js
+ *
+ * 憑證由 POST /syncdrive-api/auth/token 取得（見協力廠商介接說明書 §一），
+ * 將回應中的 mqtt.ca_certificate／clients[].certificate／clients[].private_key
+ * 分別存成上述三個檔案即可。
  */
+const fs = require('fs');
 const mqtt = require('mqtt');
+
+function buildConnectOptions(clientId) {
+  const caPath = process.env.MQTT_TLS_CA;
+  const certPath = process.env.MQTT_TLS_CERT;
+  const keyPath = process.env.MQTT_TLS_KEY;
+  const options = { clientId, clean: true };
+  if (!caPath && !certPath && !keyPath) return options;
+  if (!caPath || !certPath || !keyPath) {
+    throw new Error(
+      'MQTT_TLS_CA、MQTT_TLS_CERT、MQTT_TLS_KEY 三者須同時提供（憑證式連線缺一不可）',
+    );
+  }
+  return {
+    ...options,
+    ca: fs.readFileSync(caPath),
+    cert: fs.readFileSync(certPath),
+    key: fs.readFileSync(keyPath),
+    rejectUnauthorized: true,
+  };
+}
 
 const VEHICLES = Array.from({ length: 11 }, (_, i) =>
   `PMS-${String(i + 1).padStart(2, '0')}`,
@@ -210,7 +241,7 @@ function healthForIndex(idx) {
 async function main() {
   const url = process.env.MQTT_URL || 'mqtt://127.0.0.1:1883';
   const clientId = `vtms-dashboard-demo-sim-${process.pid}`;
-  const client = mqtt.connect(url, { clientId, clean: true });
+  const client = mqtt.connect(url, buildConnectOptions(clientId));
 
   /** 每台車的區段進度（獨立前進，方便觀察站間移動） */
   const motion = VEHICLES.map((_, idx) => ({

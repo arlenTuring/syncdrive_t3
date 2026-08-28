@@ -45,17 +45,25 @@
   <div class="grid">
     <a class="card" href="/docs/">
       <h2>介接文件 →</h2>
-      <p>介接說明書、即時 ETA 與班表兩份規格。第一次串接請從這裡開始。</p>
+      <p>介接說明書、車端介接與班表到站預測規格。第一次串接請從這裡開始。</p>
     </a>
     <a class="card" href="/api/docs/public">
       <h2>Swagger →</h2>
-      <p>四支介面的線上規格，可直接 Try it out。右上角 Authorize 填入金鑰。</p>
+      <p>全部對外介面的線上規格，可直接 Try it out。右上角 Authorize 填入金鑰。</p>
     </a>
   </div>
 
   <section>
-    <h3>四支介面</h3>
+    <h3>對外介面</h3>
     <table>
+      <tr><th><code>POST /syncdrive-api/auth/token</code></th>
+          <td>以帳密換取 API 金鑰與 MQTT 用戶端憑證</td></tr>
+      <tr><th><code>GET /syncdrive-api/order/queryById</code></th>
+          <td>依訂單編號取得任務內容（車端）</td></tr>
+      <tr><th><code>PUT /syncdrive-api/order/updateOrderProgress/{id}</code></th>
+          <td>回報訂單狀態（車端）</td></tr>
+      <tr><th><code>PUT /syncdrive-api/order/action/{actionId}</code></th>
+          <td>回報站點動作執行結果（車端）</td></tr>
       <tr><th><code>GET /syncdrive-api/operation-shift/timetable/trips</code></th>
           <td>全部班次與逐站計畫時刻</td></tr>
       <tr><th><code>GET /syncdrive-api/operation-shift/timetable/station-etas</code></th>
@@ -66,22 +74,24 @@
           <td>各車接下來會到的站　建議輪詢 60 秒</td></tr>
     </table>
     <div class="note">
-      這個埠<strong>只有</strong>上面四支。同一台主機上的其他系統在這個埠一律回
-      <code>404</code>——不是權限不足，是不存在。
+      這個埠<strong>只有</strong>上面八支。同一台主機上的其他系統在這個埠一律回
+      <code>404</code>。
     </div>
   </section>
 
   <section>
     <h3>認證</h3>
     <p style="color:var(--dim);margin-top:0">
-      本入口頁與文件需要瀏覽帳號；<strong>API 本身用的是另一組金鑰</strong>，兩者不共用。
+      本入口頁與文件需要瀏覽帳號；<strong>API 本身用另一組金鑰</strong>，兩者不共用，且金鑰須以帳密透過
+      <code>POST /syncdrive-api/auth/token</code> 申請，非固定值。
     </p>
-    <pre>curl -H "X-API-Key: &lt;你的金鑰&gt;" \
-  "http://&lt;本站位址&gt;/syncdrive-api/vehicles/eta/by-station"</pre>
+    <pre>curl -X POST "http://&lt;本站位址&gt;/syncdrive-api/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"&lt;帳號&gt;","password":"&lt;密碼&gt;"}'</pre>
   </section>
 
   <footer>
-    金鑰或帳號有問題請聯絡我方窗口。介接過程若發現回應與文件不符，請以實際回應為準並通知我方。
+    帳號有問題請聯絡我方窗口。介接過程若發現回應與文件不符，請以實際回應為準並通知我方。
   </footer>
 
 </div>

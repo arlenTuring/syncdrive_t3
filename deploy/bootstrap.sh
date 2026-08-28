@@ -82,6 +82,30 @@ set_env() {  # set_env KEY VALUE — 就地改寫 deploy/.env 的一行
   sed -i.bak "s|^$1=.*|$1=$2|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
 }
 read_env() { grep "^$1=" "$ENV_FILE" | cut -d= -f2; }
+append_if_missing() {  # append_if_missing KEY=VALUE — 舊 .env 沒有這個 KEY 時補一行
+  local key="${1%%=*}"
+  grep -q "^${key}=" "$ENV_FILE" || echo "$1" >> "$ENV_FILE"
+}
+
+# ── 2a. 補齊舊版 .env 缺的變數 ───────────────────────────────
+# 這幾個是後來才加的設定；由既有 .env（在這支腳本學會寫它們之前就存在）升級的
+# 機器不會自動長出來，必須在這裡補，否則對應功能會用預設值悄悄壞掉
+# （例：MQTT_PUBLIC_HOST 沒填就回 127.0.0.1，廠商連不上；EXTERNAL_AUTH_* 沒填，
+# /auth/token 直接 503）。
+append_if_missing "EXTERNAL_AUTH_USER="
+append_if_missing "EXTERNAL_AUTH_PASSWORD="
+append_if_missing "MQTT_PUBLIC_HOST="
+append_if_missing "MQTT_PUBLIC_PORT=8883"
+
+if [ -z "$(read_env MQTT_PUBLIC_HOST)" ]; then
+  DETECTED_IP="$(curl -fsS -m 3 https://ifconfig.me 2>/dev/null || true)"
+  if [ -n "$DETECTED_IP" ]; then
+    set_env MQTT_PUBLIC_HOST "$DETECTED_IP"
+    log "MQTT_PUBLIC_HOST 未設定，已自動偵測並填入：$DETECTED_IP（如非對外位址請手動修正 deploy/.env）"
+  else
+    log "警告：MQTT_PUBLIC_HOST 未設定且自動偵測失敗，回應中的 mqtt.host 將是 127.0.0.1，廠商連不上。請手動設定 deploy/.env 後重啟 backend"
+  fi
+fi
 
 # ── 2b. 兩組瀏覽帳密 ────────────────────────────────────────
 # 內部（80）與對外（3100）各自一組，刻意不共用：對外那組是要交出去的，
@@ -91,6 +115,12 @@ make_htpasswd() {  # make_htpasswd <檔案> <使用者變數> <密碼變數> <�
   local file="$1" user_key="$2" pass_key="$3" default_user="$4" label="$5"
   if [ -f "$file" ]; then
     log "$label 帳密檔已存在，保留不動"
+    if [ "$user_key" = "EXTERNAL_AUTH_USER" ] && [ -z "$(read_env "$pass_key")" ]; then
+      log "警告：$file 已存在但 deploy/.env 沒有 $pass_key——這是舊版留下的缺口"\
+"（該功能是後來才加的）。POST /syncdrive-api/auth/token 會回 503。"\
+"請把當初產生 $file 時印出的密碼手動填進 deploy/.env 的 $user_key／$pass_key，"\
+"或改兩邊密碼一起換發後重啟 backend。"
+    fi
     return
   fi
   local user pass
@@ -129,7 +159,7 @@ MQTT_CREDS="$ROOT/deploy/mqtt-credentials.txt"
 if [ -f "$MQTT_PWFILE" ]; then
   log "MQTT 帳密檔已存在，保留不動"
 else
-  log "產生 MQTT 帳密（後端、模擬器，以及 PMS-01 至 PMS-11）"
+  log "產生 MQTT 帳密（僅後端內部連線用）"
   MOSQ_IMAGE="$(awk '$1=="mosquitto" {print $2"@"$3}' "$ROOT/deploy/images.lock")"
   mosq_passwd() {  # mosq_passwd <-c|""> user pass
     docker run --rm -v "$ROOT/mosquitto/config:/mosquitto/config" "$MOSQ_IMAGE" \
@@ -137,23 +167,20 @@ else
   }
   gen() { openssl rand -base64 18 | tr -d '/+=' | head -c 18; }
 
-  # vtms-simulator 帳號已移除：那是給示範模擬器用的，而模擬器現在是外部單位，
-  # 跑在開發者自己的機器上，以各車自己的帳密連線。產品端不再有任何身分
-  # 可以對「全部車輛」的路徑發布 telemetry。
+  # vtms-simulator 帳號已移除：那是給示範模擬器用的身分，可以代所有車輛發布，
+  # 已不該存在。車輛（含模擬器）改用 TLS 用戶端憑證連線 8883（見
+  # deploy/mqtt-certs.sh），不再逐台申請密碼——密碼檔只服務 1883 那個
+  # docker 內部網路帳號，車輛從未使用也不該使用它。
   BACKEND_PW="$(gen)"
   mosq_passwd -c vtms-backend "$BACKEND_PW"
   set_env MQTT_BACKEND_PASSWORD "$BACKEND_PW"
 
   {
     echo "# SyncDrive T3 MQTT 帳密（產生於 $(date '+%Y-%m-%d %H:%M:%S')）"
-    echo "# ACL 規則見 mosquitto/config/aclfile：車輛帳號只能發布到自己的路徑。"
+    echo "# 僅後端內部連線（1883，docker 網路內）用。車端一律走 8883 的 TLS 用戶端"
+    echo "# 憑證（deploy/mqtt-certs.sh 產生），沒有帳密可用也不需要。"
     echo "vtms-backend    $BACKEND_PW    # 後端自用"
   } > "$MQTT_CREDS"
-  for i in $(seq -w 1 11); do
-    VPW="$(gen)"
-    mosq_passwd "" "PMS-$i" "$VPW"
-    echo "PMS-$i          $VPW    # 交給該車" >> "$MQTT_CREDS"
-  done
   chmod 600 "$MQTT_CREDS"
   # mosquitto 容器內以 uid 1883 執行，而 mosquitto_passwd 產出的檔案是 600 root
   # ——不改擁有者的話 broker 讀不到自己的密碼檔，會反覆重啟並在日誌印

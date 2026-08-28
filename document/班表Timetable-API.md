@@ -1,3 +1,6 @@
+> **本檔僅供內部參考。** 對外版本已併入[班表與到站預測介面](班表與到站預測介面.md)，
+> 對外文件站與 `deploy/Dockerfile.web` 均以該檔為準，本檔不再對外發佈。
+
 # 班表 Timetable API
 
 <div class="doc-hero">

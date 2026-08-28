@@ -196,22 +196,17 @@ sudo ./deploy/bootstrap.sh
 |------|-----|
 | Base URL | `http://<主機位址>:3100` |
 | Swagger | `http://<主機位址>:3100/api/docs/public` |
-| 認證 | `x-api-key: <bootstrap.sh 印出的金鑰>` |
-| 離線規格檔 | `backend/openapi/openapi.public.json` |
+| 認證 | 廠商以帳密呼叫 `POST /syncdrive-api/auth/token` 換取 `x-api-key` 與 MQTT 用戶端憑證；帳密即 `EXTERNAL_AUTH_USER` / `EXTERNAL_AUTH_PASSWORD`（`deploy/.env`，`bootstrap.sh` 產生） |
+| 對外文件 | `http://<主機位址>:3100/docs/`（介接說明書、車端介接、班表與到站預測、六份通訊協議） |
 
-對外目前四支：班表班次、班表站點 ETA、即時 ETA（依站）、即時 ETA（依車）。
-其餘 78 支是我方內部使用，廠商既看不到文件、也打不通。
+對外共 8 支（含金鑰申請）：`auth/token`、車端三支（`order/queryById`、`order/updateOrderProgress`、`order/action`）、班表兩支、即時 ETA 兩支。其餘皆為我方內部使用，廠商在對外埠（3100）既看不到文件、也打不通（一律回 `404`）。
+
+`backend/openapi/openapi.public.json` 為本機產生的規格快照（`npm run openapi:export`），不隨映像出貨、也不對外提供下載路徑——欄位會隨版本調整，唯一的準確來源是線上 Swagger（`/api/docs/public`），有需要離線 spec 時直接從該端點下載當次版本。
 
 ---
 
-## 七、還沒處理的安全問題
+## 七、MQTT 認證
 
-**MQTT 1883 目前是明文、無認證。**`mosquitto/config/mosquitto.prod.conf` 已經寫好
-帳密與 ACL，但預設沒有啟用，所以 `MQTT_BIND` 保持 `127.0.0.1`，車端連不進來
-——這是刻意的，不是漏設。真車或廠商要連進來之前必須先：
+車端與模擬器一律以 **TLS 雙向驗證＋用戶端憑證** 連線 `8883`，沒有帳密可用。憑證由 `deploy/mqtt-certs.sh` 產生（CA、server、各車用戶端憑證），廠商申請金鑰時（`POST /syncdrive-api/auth/token`）由後端一併回傳 CA 憑證與指定車輛的用戶端憑證／私鑰，不需要另外分發檔案。
 
-1. 依 `mosquitto/config/README.md` 產生 passwordfile
-2. 把 compose 的 mosquitto 設定掛載改指向 `mosquitto.prod.conf`
-3. 把 `MQTT_BIND` 改成 `0.0.0.0`，並用防火牆限制來源網段
-
-1883 開著等於誰都能對車隊下指令。
+`1883` 僅供後端在 docker 內部網路連線（帳密＋ACL，`mosquitto/config/README.md`），不對主機發布，車端與廠商都連不到、也不需要連。
