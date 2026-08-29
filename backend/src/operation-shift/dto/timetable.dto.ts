@@ -26,7 +26,7 @@ export class TimetableMetaDto {
     enum: ['published', 'draft_fallback'],
     description:
       'published＝讀到已發布班表；draft_fallback＝庫內沒有已發布的，退而取用最新草稿，'
-      + '此時時刻僅供參考，不應對外顯示為正式時刻',
+      + '此時時刻僅供參考，不得作為正式時刻使用',
   })
   source!: string;
 

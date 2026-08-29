@@ -3,7 +3,7 @@
   "paths": {
     "/syncdrive-api/order/queryById": {
       "get": {
-        "description": "車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後以 order_id 取回完整任務（站點序列、各站動作、時刻）。",
+        "description": "取得指定訂單之站序、各站計畫時刻與起訖點座標。`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。欄位定義見車端介接說明書 §3.2。",
         "operationId": "OrderController_queryOrder",
         "parameters": [
           {
@@ -16,8 +16,17 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "訂單內容"
+          },
+          "400": {
+            "description": "缺少 id 參數"
+          },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "404": {
+            "description": "訂單不存在"
           }
         },
         "security": [
@@ -25,15 +34,15 @@
             "x-api-key": []
           }
         ],
-        "summary": "查詢訂單內容",
+        "summary": "依訂單編號取得任務內容",
         "tags": [
-          "對外｜營運任務"
+          "營運任務"
         ]
       }
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
-        "description": "車端回報訂單契約狀態。營運任務狀態協議把這一支定為<strong>唯一真相來源</strong>——中心端資料庫的狀態判定以本 API 的 HTTP 成功回傳為準，不採信 MQTT 訊息。",
+        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。欄位定義見車端介接說明書 §3.3。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -54,8 +63,17 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "更新後之訂單"
+          },
+          "400": {
+            "description": "status 值不合法，或不允許之狀態轉移"
+          },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "404": {
+            "description": "訂單不存在"
           }
         },
         "security": [
@@ -63,15 +81,15 @@
             "x-api-key": []
           }
         ],
-        "summary": "更新訂單狀態 (SSOT)",
+        "summary": "回報訂單狀態",
         "tags": [
-          "對外｜營運任務"
+          "營運任務"
         ]
       }
     },
     "/syncdrive-api/order/action/{actionId}": {
       "put": {
-        "description": "節點任務（語音、開關門、聯鎖）的執行結果回報。營運任務狀態協議 §四 階段二。",
+        "description": "回報站點動作（發車前語音、開關門、路口聯鎖、精準對位停靠）之執行結果。動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §3.4。",
         "operationId": "OrderController_updateActionStatus",
         "parameters": [
           {
@@ -83,9 +101,28 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateActionStatusDto"
+              }
+            }
+          }
+        },
         "responses": {
+          "200": {
+            "description": "更新後之動作狀態"
+          },
+          "400": {
+            "description": "status 值不合法"
+          },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "404": {
+            "description": "動作識別碼不存在"
           }
         },
         "security": [
@@ -93,15 +130,15 @@
             "x-api-key": []
           }
         ],
-        "summary": "車端以 action_id 回報站點動作狀態",
+        "summary": "回報站點動作執行結果",
         "tags": [
-          "對外｜營運任務"
+          "營運任務"
         ]
       }
     },
     "/syncdrive-api/vehicles/eta/by-station": {
       "get": {
-        "description": "以停靠點為主鍵，供站端顯示。一律列出全部停靠點（當下無車駛近者 etas 為空陣列），以利站端固定顯示版面。每站依 eta_at 由近到遠排序。建議輪詢間隔 60 秒。",
+        "description": "以停靠點為主鍵，回傳各停靠點接下來將抵達之車輛。一律列出全部停靠點，當下無車輛駛近者 etas 為空陣列。每站之 etas 依 eta_at 由近至遠排序。建議輪詢間隔 60 秒。",
         "operationId": "VehicleEtaController_byStation",
         "parameters": [
           {
@@ -154,13 +191,13 @@
         ],
         "summary": "各停靠點接下來將抵達的車輛",
         "tags": [
-          "對外｜車輛即時 ETA"
+          "車輛即時 ETA"
         ]
       }
     },
     "/syncdrive-api/vehicles/eta/by-vehicle": {
       "get": {
-        "description": "以車輛為主鍵，供車輛追蹤畫面。next_stops 中 sequence=1 為車端當前目標站，eta 直接採用車端回報值；2 以後由中心端依班表外推，誤差隨站序累積。建議輪詢間隔 60 秒。",
+        "description": "以車輛為主鍵，回傳各車輛接下來將抵達之停靠點。next_stops 中 sequence 為 1 者取自車端回報之 current_leg，sequence 2 以後由中心端依班表計畫時刻外推。建議輪詢間隔 60 秒。",
         "operationId": "VehicleEtaController_byVehicle",
         "parameters": [
           {
@@ -213,13 +250,13 @@
         ],
         "summary": "各車輛接下來將抵達的停靠點",
         "tags": [
-          "對外｜車輛即時 ETA"
+          "車輛即時 ETA"
         ]
       }
     },
     "/syncdrive-api/operation-shift/timetable/trips": {
       "get": {
-        "description": "讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。可用 from/to 過濾卡時間重疊區間。",
+        "description": "回傳目前使用中班表之全部班次，含各班次的逐站計畫抵達與發車時刻。任務類型涵蓋正線、保養、行檢、充電、待命與調度。本端點為計畫值，與車輛實際位置無關；即時值見車輛即時 ETA。",
         "operationId": "OperationShiftController_getTimetableTrips",
         "parameters": [
           {
@@ -264,15 +301,15 @@
             "x-api-key": []
           }
         ],
-        "summary": "取得班表班次清單（含各站時刻）",
+        "summary": "取得班次清單與各站計畫時刻",
         "tags": [
-          "對外｜班表計畫"
+          "班表計畫"
         ]
       }
     },
     "/syncdrive-api/operation-shift/timetable/station-etas": {
       "get": {
-        "description": "由班表推算之站點事件流；vehicle_id 暫為 null。可用 from/to、station_id 濾波。",
+        "description": "以停靠點為主鍵，回傳由班表推算之抵達與離站事件序列。本端點為計畫值，事件不帶車輛識別；需要車輛識別時使用車輛即時 ETA。可用 from／to 限定時間區間，station_id 限定單一停靠點。",
         "operationId": "OperationShiftController_getStationEtas",
         "parameters": [
           {
@@ -326,20 +363,72 @@
             "x-api-key": []
           }
         ],
-        "summary": "取得各站計畫 ETA（抵達／離站）",
+        "summary": "取得各停靠點之計畫事件流",
         "tags": [
-          "對外｜班表計畫"
+          "班表計畫"
+        ]
+      }
+    },
+    "/syncdrive-api/auth/token": {
+      "post": {
+        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之用戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。欄位定義見介接說明書 §一。",
+        "operationId": "PartnerAccessController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API 金鑰與 MQTT 用戶端憑證",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedTokenDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ttl_minutes 逾值域，或 vehicle_codes 含未簽發之車輛代號"
+          },
+          "401": {
+            "description": "帳號或密碼不正確"
+          }
+        },
+        "summary": "申請 API 金鑰與 MQTT 用戶端憑證",
+        "tags": [
+          "存取憑據"
         ]
       }
     }
   },
   "info": {
-    "title": "SyncDrive-T3 對外介面",
-    "description": "台智駕 SyncDrive T3 車輛監控系統對外提供的介面契約。所有端點需帶 `x-api-key` 標頭。詳細語意見各端點說明與規格書。",
+    "title": "SyncDrive-T3 介接介面",
+    "description": "台智駕 SyncDrive T3 車輛行車管理系統之介接契約。除申請存取憑據之端點外，其餘端點均需帶 `x-api-key` 標頭；金鑰以「存取憑據」分組之端點申請取得。共通規範見介接說明書，車端介面之欄位定義見車端介接說明書。",
     "version": "1.0",
     "contact": {}
   },
-  "tags": [],
+  "tags": [
+    {
+      "name": "存取憑據"
+    },
+    {
+      "name": "營運任務"
+    },
+    {
+      "name": "班表計畫"
+    },
+    {
+      "name": "車輛即時 ETA"
+    }
+  ],
   "servers": [],
   "components": {
     "securitySchemes": {
@@ -399,7 +488,7 @@
               "draft_fallback",
               "none"
             ],
-            "description": "published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不應對外顯示為正式時刻；none＝無班表，plan 全為 null"
+            "description": "published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不得作為正式時刻使用；none＝無班表，plan 全為 null"
           },
           "data_quality": {
             "type": "string",
@@ -466,6 +555,148 @@
           "planned_departure_clock",
           "delay_seconds",
           "delay_state"
+        ]
+      },
+      "IssueTokenDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "配發之帳號",
+            "example": "partner"
+          },
+          "password": {
+            "type": "string",
+            "description": "配發之密碼"
+          },
+          "ttl_minutes": {
+            "type": "number",
+            "description": "金鑰有效時長，單位分鐘。預設 1440（24 小時），可指定 1～43200。",
+            "default": 1440,
+            "minimum": 1,
+            "maximum": 43200
+          },
+          "vehicle_codes": {
+            "description": "需取得 MQTT 用戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
+            "example": [
+              "PMS-01",
+              "PMS-02"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "IssuedTokenDto": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "description": "呼叫各介面時帶入 x-api-key 標頭之值"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "固定為 ApiKey",
+            "example": "ApiKey"
+          },
+          "issued_at": {
+            "type": "number",
+            "description": "簽發時間，Unix Epoch 毫秒",
+            "example": 1787890000000
+          },
+          "expires_at": {
+            "type": "number",
+            "description": "失效時間，Unix Epoch 毫秒",
+            "example": 1787976400000
+          },
+          "expires_in_minutes": {
+            "type": "number",
+            "description": "有效時長，分鐘",
+            "example": 1440
+          },
+          "mqtt": {
+            "description": "MQTT 連線資訊與用戶端憑證",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MqttBundleDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "api_key",
+          "token_type",
+          "issued_at",
+          "expires_at",
+          "expires_in_minutes",
+          "mqtt"
+        ]
+      },
+      "MqttBundleDto": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "MQTT broker 位址",
+            "example": "34.80.84.224"
+          },
+          "port": {
+            "type": "number",
+            "description": "MQTT broker 埠",
+            "example": 8883
+          },
+          "tls": {
+            "type": "boolean",
+            "description": "固定為 true，連線採 TLS 雙向驗證",
+            "example": true
+          },
+          "ca_certificate": {
+            "type": "string",
+            "description": "CA 憑證，PEM 格式"
+          },
+          "clients": {
+            "description": "各車之用戶端憑證與私鑰",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MqttClientCertificateDto"
+            }
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "tls",
+          "ca_certificate",
+          "clients"
+        ]
+      },
+      "MqttClientCertificateDto": {
+        "type": "object",
+        "properties": {
+          "vehicle_code": {
+            "type": "string",
+            "description": "車輛代號",
+            "example": "PMS-01"
+          },
+          "certificate": {
+            "type": "string",
+            "description": "該車用戶端憑證，PEM 格式"
+          },
+          "private_key": {
+            "type": "string",
+            "description": "該車用戶端私鑰，PEM 格式"
+          }
+        },
+        "required": [
+          "vehicle_code",
+          "certificate",
+          "private_key"
         ]
       },
       "StationEtaEntryDto": {
@@ -845,7 +1076,7 @@
               "published",
               "draft_fallback"
             ],
-            "description": "published＝讀到已發布班表；draft_fallback＝庫內沒有已發布的，退而取用最新草稿，此時時刻僅供參考，不應對外顯示為正式時刻"
+            "description": "published＝讀到已發布班表；draft_fallback＝庫內沒有已發布的，退而取用最新草稿，此時時刻僅供參考，不得作為正式時刻使用"
           },
           "generated_at": {
             "type": "object",
@@ -1060,6 +1291,36 @@
           "filter",
           "trip_count",
           "trips"
+        ]
+      },
+      "UpdateActionStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "動作狀態",
+            "enum": [
+              "PENDING",
+              "IN_PROGRESS",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "卡關或失敗之原因"
+          },
+          "actual_start_time": {
+            "type": "number",
+            "description": "實際開始時刻，Epoch 毫秒"
+          },
+          "actual_end_time": {
+            "type": "number",
+            "description": "實際結束時刻，Epoch 毫秒"
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "VehicleEtaByStationResponseDto": {

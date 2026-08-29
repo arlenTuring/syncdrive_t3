@@ -1,5 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiProperty,
   ApiPropertyOptional,
@@ -18,11 +20,11 @@ import {
 } from './partner-access.service';
 
 class IssueTokenDto {
-  @ApiProperty({ description: '我方配發的帳號', example: 'partner' })
+  @ApiProperty({ description: '配發之帳號', example: 'partner' })
   @IsString()
   username!: string;
 
-  @ApiProperty({ description: '我方配發的密碼' })
+  @ApiProperty({ description: '配發之密碼' })
   @IsString()
   password!: string;
 
@@ -40,7 +42,7 @@ class IssueTokenDto {
   ttl_minutes?: number;
 
   @ApiPropertyOptional({
-    description: '要取得 MQTT 用戶端憑證的車輛代號；未指定時回傳全部已簽發的車輛。',
+    description: '需取得 MQTT 用戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。',
     example: ['PMS-01', 'PMS-02'],
     type: [String],
   })
@@ -48,6 +50,54 @@ class IssueTokenDto {
   @IsArray()
   @IsString({ each: true })
   vehicle_codes?: string[];
+}
+
+class MqttClientCertificateDto {
+  @ApiProperty({ description: '車輛代號', example: 'PMS-01' })
+  vehicle_code!: string;
+
+  @ApiProperty({ description: '該車用戶端憑證，PEM 格式' })
+  certificate!: string;
+
+  @ApiProperty({ description: '該車用戶端私鑰，PEM 格式' })
+  private_key!: string;
+}
+
+class MqttBundleDto {
+  @ApiProperty({ description: 'MQTT broker 位址', example: '34.80.84.224' })
+  host!: string;
+
+  @ApiProperty({ description: 'MQTT broker 埠', example: 8883 })
+  port!: number;
+
+  @ApiProperty({ description: '固定為 true，連線採 TLS 雙向驗證', example: true })
+  tls!: boolean;
+
+  @ApiProperty({ description: 'CA 憑證，PEM 格式' })
+  ca_certificate!: string;
+
+  @ApiProperty({ description: '各車之用戶端憑證與私鑰', type: [MqttClientCertificateDto] })
+  clients!: MqttClientCertificateDto[];
+}
+
+class IssuedTokenDto {
+  @ApiProperty({ description: '呼叫各介面時帶入 x-api-key 標頭之值' })
+  api_key!: string;
+
+  @ApiProperty({ description: '固定為 ApiKey', example: 'ApiKey' })
+  token_type!: string;
+
+  @ApiProperty({ description: '簽發時間，Unix Epoch 毫秒', example: 1787890000000 })
+  issued_at!: number;
+
+  @ApiProperty({ description: '失效時間，Unix Epoch 毫秒', example: 1787976400000 })
+  expires_at!: number;
+
+  @ApiProperty({ description: '有效時長，分鐘', example: 1440 })
+  expires_in_minutes!: number;
+
+  @ApiProperty({ description: 'MQTT 連線資訊與用戶端憑證', type: MqttBundleDto })
+  mqtt!: MqttBundleDto;
 }
 
 /**
@@ -65,11 +115,17 @@ export class PartnerAccessController {
   @Post('token')
   @SetMetadata(EXTERNAL_API_METADATA_KEY, true)
   @ApiOperation({
-    summary: '以帳號密碼換取 API 金鑰與 MQTT 用戶端憑證',
+    summary: '申請 API 金鑰與 MQTT 用戶端憑證',
     description:
-      '回應同時包含後續呼叫對外 API 所需的 `x-api-key`，以及連線 MQTT broker 所需的 '
-      + 'CA 憑證與各車的用戶端憑證與私鑰。金鑰在 `expires_at` 之後失效，屆時重新呼叫本端點取得新的一把。'
-      + '金鑰僅在本回應中出現一次，中心端只保存其雜湊值，無法再次查詢。',
+      '以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，'
+      + '以及連線 MQTT broker 所需的 CA 憑證與各車之用戶端憑證與私鑰。'
+      + '金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。'
+      + '金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。'
+      + '欄位定義見介接說明書 §一。',
+  })
+  @ApiOkResponse({ description: 'API 金鑰與 MQTT 用戶端憑證', type: IssuedTokenDto })
+  @ApiBadRequestResponse({
+    description: 'ttl_minutes 逾值域，或 vehicle_codes 含未簽發之車輛代號',
   })
   @ApiUnauthorizedResponse({ description: '帳號或密碼不正確' })
   async issue(@Body() body: IssueTokenDto, @Req() request: Request) {

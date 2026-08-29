@@ -1,7 +1,15 @@
 import { BadRequestException, Controller, Post, Get, Put, Body, Query, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { OrderService } from './order.service';
-import { ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsString } from 'class-validator';
 import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
@@ -100,11 +108,16 @@ export class OrderController {
   @Get('queryById')
   @ExternalApi('營運任務')
   @ApiOperation({
-    summary: '查詢訂單內容',
+    summary: '依訂單編號取得任務內容',
     description:
-      '車端拉取任務內容。營運任務狀態協議 §四 階段一：收到 operation/assign 之後'
-      + '以 order_id 取回完整任務（站點序列、各站動作、時刻）。',
+      '取得指定訂單之站序、各站計畫時刻與起訖點座標。'
+      + '`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。'
+      + '中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。'
+      + '欄位定義見車端介接說明書 §3.2。',
   })
+  @ApiOkResponse({ description: '訂單內容' })
+  @ApiBadRequestResponse({ description: '缺少 id 參數' })
+  @ApiNotFoundResponse({ description: '訂單不存在' })
   async queryOrder(@Query('id') id?: string) {
     if (!id) {
       throw new BadRequestException('id is required');
@@ -115,11 +128,17 @@ export class OrderController {
   @Put('updateOrderProgress/:id')
   @ExternalApi('營運任務')
   @ApiOperation({
-    summary: '更新訂單狀態 (SSOT)',
+    summary: '回報訂單狀態',
     description:
-      '車端回報訂單契約狀態。營運任務狀態協議把這一支定為<strong>唯一真相來源</strong>'
-      + '——中心端資料庫的狀態判定以本 API 的 HTTP 成功回傳為準，不採信 MQTT 訊息。',
+      '本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，'
+      + '不採信 MQTT 訊息中的狀態欄位。'
+      + '允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；'
+      + 'FAULTED → PROCESSING 或 END。END 為終態。'
+      + '欄位定義見車端介接說明書 §3.3。',
   })
+  @ApiOkResponse({ description: '更新後之訂單' })
+  @ApiBadRequestResponse({ description: 'status 值不合法，或不允許之狀態轉移' })
+  @ApiNotFoundResponse({ description: '訂單不存在' })
   async updateOrderProgress(
     @Param('id') id: string,
     @Query('status') status: string,
@@ -141,10 +160,14 @@ export class OrderController {
   @Put('action/:actionId')
   @ExternalApi('營運任務')
   @ApiOperation({
-    summary: '車端以 action_id 回報站點動作狀態',
+    summary: '回報站點動作執行結果',
     description:
-      '節點任務（語音、開關門、聯鎖）的執行結果回報。營運任務狀態協議 §四 階段二。',
+      '回報站點動作（發車前語音、開關門、路口聯鎖、精準對位停靠）之執行結果。'
+      + '動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §3.4。',
   })
+  @ApiOkResponse({ description: '更新後之動作狀態' })
+  @ApiBadRequestResponse({ description: 'status 值不合法' })
+  @ApiNotFoundResponse({ description: '動作識別碼不存在' })
   async updateActionStatus(
     @Param('actionId') actionId: string,
     @Body() body: UpdateActionStatusDto,

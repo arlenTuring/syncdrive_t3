@@ -35,8 +35,9 @@ export class VehicleEtaController {
   @ApiOperation({
     summary: '各停靠點接下來將抵達的車輛',
     description:
-      '以停靠點為主鍵，供站端顯示。一律列出全部停靠點（當下無車駛近者 etas 為空陣列），' +
-      '以利站端固定顯示版面。每站依 eta_at 由近到遠排序。建議輪詢間隔 60 秒。',
+      '以停靠點為主鍵，回傳各停靠點接下來將抵達之車輛。' +
+      '一律列出全部停靠點，當下無車輛駛近者 etas 為空陣列。' +
+      '每站之 etas 依 eta_at 由近至遠排序。建議輪詢間隔 60 秒。',
   })
   @ApiQuery({
     name: 'station_id',
@@ -71,9 +72,9 @@ export class VehicleEtaController {
   @ApiOperation({
     summary: '各車輛接下來將抵達的停靠點',
     description:
-      '以車輛為主鍵，供車輛追蹤畫面。next_stops 中 sequence=1 為車端當前目標站，' +
-      'eta 直接採用車端回報值；2 以後由中心端依班表外推，誤差隨站序累積。' +
-      '建議輪詢間隔 60 秒。',
+      '以車輛為主鍵，回傳各車輛接下來將抵達之停靠點。' +
+      'next_stops 中 sequence 為 1 者取自車端回報之 current_leg，' +
+      'sequence 2 以後由中心端依班表計畫時刻外推。建議輪詢間隔 60 秒。',
   })
   @ApiQuery({
     name: 'vehicle_code',

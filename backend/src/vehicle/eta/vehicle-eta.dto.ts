@@ -34,7 +34,7 @@ export class EtaMetaDto {
   @ApiProperty({
     enum: ['published', 'draft_fallback', 'none'],
     description:
-      'published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不應對外顯示為正式時刻；' +
+      'published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不得作為正式時刻使用；' +
       'none＝無班表，plan 全為 null',
   })
   source!: 'published' | 'draft_fallback' | 'none';

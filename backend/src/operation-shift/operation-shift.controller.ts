@@ -78,11 +78,11 @@ export class OperationShiftController {
   @Get('timetable/trips')
   @ExternalApi('班表計畫')
   @ApiOperation({
-    summary: '取得班表班次清單（含各站時刻）',
+    summary: '取得班次清單與各站計畫時刻',
     description:
-      '讀取最新「已發布」且有 plan 的班表；若無已發布則 fallback 最新草稿。' +
-      '回傳全部任務類型（正線／保養／行檢／充電／待命／調度等，略過 transition）。' +
-      '可用 from/to 過濾卡時間重疊區間。',
+      '回傳目前使用中班表之全部班次，含各班次的逐站計畫抵達與發車時刻。' +
+      '任務類型涵蓋正線、保養、行檢、充電、待命與調度。' +
+      '本端點為計畫值，與車輛實際位置無關；即時值見車輛即時 ETA。',
   })
   @ApiQuery({
     name: 'from',
@@ -106,9 +106,11 @@ export class OperationShiftController {
   @Get('timetable/station-etas')
   @ExternalApi('班表計畫')
   @ApiOperation({
-    summary: '取得各站計畫 ETA（抵達／離站）',
+    summary: '取得各停靠點之計畫事件流',
     description:
-      '由班表推算之站點事件流；vehicle_id 暫為 null。可用 from/to、station_id 濾波。',
+      '以停靠點為主鍵，回傳由班表推算之抵達與離站事件序列。' +
+      '本端點為計畫值，事件不帶車輛識別；需要車輛識別時使用車輛即時 ETA。' +
+      '可用 from／to 限定時間區間，station_id 限定單一停靠點。',
   })
   @ApiQuery({
     name: 'from',
