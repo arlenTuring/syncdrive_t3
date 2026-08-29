@@ -113,7 +113,7 @@ export class OrderController {
       '取得指定訂單之站序、各站計畫時刻與起訖點座標。'
       + '`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。'
       + '中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。'
-      + '欄位定義見車端介接說明書 §3.2。',
+      + '欄位定義見車端介接說明書 §五.1。',
   })
   @ApiOkResponse({ description: '訂單內容' })
   @ApiBadRequestResponse({ description: '缺少 id 參數' })
@@ -134,7 +134,7 @@ export class OrderController {
       + '不採信 MQTT 訊息中的狀態欄位。'
       + '允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；'
       + 'FAULTED → PROCESSING 或 END。END 為終態。'
-      + '欄位定義見車端介接說明書 §3.3。',
+      + '欄位定義見車端介接說明書 §五.2。',
   })
   @ApiOkResponse({ description: '更新後之訂單' })
   @ApiBadRequestResponse({ description: 'status 值不合法，或不允許之狀態轉移' })
@@ -163,7 +163,7 @@ export class OrderController {
     summary: '回報站點動作執行結果',
     description:
       '回報站點動作（發車前語音、開關門、路口聯鎖、精準對位停靠）之執行結果。'
-      + '動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §3.4。',
+      + '動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §五.3。',
   })
   @ApiOkResponse({ description: '更新後之動作狀態' })
   @ApiBadRequestResponse({ description: 'status 值不合法' })

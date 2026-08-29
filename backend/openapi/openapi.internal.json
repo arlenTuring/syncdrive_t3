@@ -136,7 +136,7 @@
     },
     "/syncdrive-api/order/queryById": {
       "get": {
-        "description": "取得指定訂單之站序、各站計畫時刻與起訖點座標。`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。欄位定義見車端介接說明書 §3.2。",
+        "description": "取得指定訂單之站序、各站計畫時刻與起訖點座標。`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。欄位定義見車端介接說明書 §五.1。",
         "operationId": "OrderController_queryOrder",
         "parameters": [
           {
@@ -176,7 +176,7 @@
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
-        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。欄位定義見車端介接說明書 §3.3。",
+        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。欄位定義見車端介接說明書 §五.2。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -224,7 +224,7 @@
     },
     "/syncdrive-api/order/action/{actionId}": {
       "put": {
-        "description": "回報站點動作（發車前語音、開關門、路口聯鎖、精準對位停靠）之執行結果。動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §3.4。",
+        "description": "回報站點動作（發車前語音、開關門、路口聯鎖、精準對位停靠）之執行結果。動作代碼與觸發時機見營運任務狀態協議 §六.1，欄位定義見車端介接說明書 §五.3。",
         "operationId": "OrderController_updateActionStatus",
         "parameters": [
           {
