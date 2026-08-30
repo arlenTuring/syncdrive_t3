@@ -121,7 +121,7 @@ services:
       # 分兩組的話等於同一個廠商要記兩份，而它們保護的是同一個邊界。
       EXTERNAL_AUTH_USER: ${EXTERNAL_AUTH_USER}
       EXTERNAL_AUTH_PASSWORD: ${EXTERNAL_AUTH_PASSWORD}
-      # 發金鑰時一併回傳 MQTT 用戶端憑證，所以後端要讀得到憑證目錄（唯讀）
+      # 發金鑰時當場簽出車輛憑證，所以後端要讀得到中介 CA 的私鑰（唯讀掛載）
       MQTT_CERT_DIR: /mqtt-certs
       MQTT_PUBLIC_HOST: ${MQTT_PUBLIC_HOST:-127.0.0.1}
       MQTT_PUBLIC_PORT: ${MQTT_PUBLIC_PORT:-8883}
@@ -150,8 +150,11 @@ services:
       # 見 scripts/map-published-store.js），沒有這個 volume 的話每次重新部署
       # 地圖就會消失——而地圖一消失，班表 API 查得到班次卻查不到停靠點別名。
       - backenddata:/app/data
-      # 憑證唯讀掛進來：發金鑰時要一併把 CA 與該車的用戶端憑證回給廠商。
-      # 唯讀是重點——後端只需要讀，不該有能力改動或刪除任何一張憑證。
+      # 憑證唯讀掛進來：發金鑰時要當場簽出該車的用戶端憑證。
+      #
+      # 後端讀得到的是<strong>中介</strong> CA 的私鑰（client-ca.key，群組 1000），
+      # 不是根。根私鑰是 600 root，容器內讀不到——後端被攻破時攻擊者能冒充車輛，
+      # 但簽不出伺服器憑證，冒充不了 broker。唯讀掛載讓它連改都不能改。
       - ../mosquitto/certs:/mqtt-certs:ro
     # 不對 postgres 下 depends_on：資料庫獨立部署時那個服務根本不存在，
     # 硬相依會讓整個 compose 起不來。連線重試由 TypeORM 自己負責。

@@ -180,7 +180,7 @@ mqtt_denied() {
 }
 if $DOCKER exec syncdrive_mosquitto sh -c 'command -v mosquitto_sub' >/dev/null 2>&1; then
   # 8883 是車端唯一的入口：沒有用戶端憑證一定要連不上
-  mqtt_denied "MQTT 8883 無憑證必須被拒" -p 8883 --cafile /mosquitto/certs/ca.crt
+  mqtt_denied "MQTT 8883 無憑證必須被拒" -p 8883 --cafile /mosquitto/certs/ca-chain.crt
   # 1883 只給 docker 內部的後端，仍然要擋掉匿名
   mqtt_denied "MQTT 1883 匿名必須被拒" -p 1883
   mqtt_denied "MQTT 1883 錯誤密碼必須被拒" -p 1883 -u vtms-backend -P definitely-not-the-password

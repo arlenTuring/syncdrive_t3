@@ -1,6 +1,4 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
 import {
   BadRequestException,
   Injectable,
@@ -12,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { PartnerApiKey } from '../database/entities/partner-api-key.entity';
+import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
 
 /** 預設有效期：24 小時 */
 export const DEFAULT_TTL_MINUTES = 24 * 60;
@@ -32,11 +31,16 @@ export type MqttBundle = {
   host: string;
   port: number;
   tls: true;
+  /** 信任錨點：車端用它驗證 broker。是根 CA，不是簽車輛憑證的那一張。 */
   ca_certificate: string;
+  /** 中介 CA。車端的憑證鏈需要它才接得回根。 */
+  intermediate_certificate: string;
   clients: Array<{
     vehicle_code: string;
     certificate: string;
     private_key: string;
+    not_before: number;
+    not_after: number;
   }>;
 };
 
@@ -56,6 +60,7 @@ export class PartnerAccessService {
     private readonly config: ConfigService,
     @InjectRepository(PartnerApiKey)
     private readonly keys: Repository<PartnerApiKey>,
+    private readonly certificates: VehicleCertificateIssuer,
   ) {}
 
   private hash(key: string): string {
@@ -81,44 +86,26 @@ export class PartnerAccessService {
     return timingSafeEqual(padA, padB) && a.length === b.length;
   }
 
-  /** 讀憑證目錄。掛不進來就明講，不要發一把配不上憑證的金鑰出去。 */
-  private certDir(): string {
-    return this.config.get<string>('MQTT_CERT_DIR', '/mqtt-certs');
-  }
-
-  private readCert(name: string): string | null {
-    const path = join(this.certDir(), name);
-    if (!existsSync(path)) return null;
-    try {
-      return readFileSync(path, 'utf8');
-    } catch (error) {
-      this.logger.error(`讀不到憑證 ${path}：${(error as Error).message}`);
-      return null;
-    }
-  }
-
-  private buildMqttBundle(vehicleCodes: string[]): MqttBundle {
-    const ca = this.readCert('ca.crt');
-    if (!ca) {
+  /**
+   * 組出這次要交付的 MQTT 憑據。
+   *
+   * 車輛憑證在這裡<strong>當場簽</strong>，效期等於這次申請的 ttl_minutes——
+   * 換金鑰與換憑證是同一個動作，不會出現「金鑰還有效但憑證過期」的半殘狀態。
+   */
+  private buildMqttBundle(vehicleCodes: string[], ttlMinutes: number): MqttBundle {
+    const ca = this.certificates.rootCertificate();
+    const intermediate = this.certificates.intermediateCertificate();
+    if (!ca || !intermediate) {
       throw new ServiceUnavailableException(
-        'MQTT 憑證尚未產生或未掛載到中心端，請聯絡我方維運（deploy/mqtt-certs.sh）',
+        'MQTT 憑證體系尚未建立或未掛載到中心端，請聯絡我方維運（deploy/mqtt-certs.sh）',
       );
     }
 
-    const clients: MqttBundle['clients'] = [];
-    const missing: string[] = [];
-    for (const code of vehicleCodes) {
-      const certificate = this.readCert(`${code}.crt`);
-      const privateKey = this.readCert(`${code}.key`);
-      if (!certificate || !privateKey) {
-        missing.push(code);
-        continue;
-      }
-      clients.push({ vehicle_code: code, certificate, private_key: privateKey });
-    }
-    if (missing.length > 0) {
+    const known = new Set(this.knownVehicleCodes());
+    const unknown = vehicleCodes.filter((code) => !known.has(code));
+    if (unknown.length > 0) {
       throw new BadRequestException(
-        `下列車輛沒有憑證：${missing.join('、')}。請確認車輛代號，或聯絡我方簽發。`,
+        `下列車輛代號不存在：${unknown.join('、')}。請確認代號，或聯絡我方登錄。`,
       );
     }
 
@@ -127,7 +114,8 @@ export class PartnerAccessService {
       port: Number(this.config.get<string>('MQTT_PUBLIC_PORT', '8883')),
       tls: true,
       ca_certificate: ca,
-      clients,
+      intermediate_certificate: intermediate,
+      clients: vehicleCodes.map((code) => this.certificates.issue(code, ttlMinutes)),
     };
   }
 
@@ -164,7 +152,7 @@ export class PartnerAccessService {
     const codes = input.vehicleCodes?.length
       ? input.vehicleCodes.map((code) => String(code).trim().toUpperCase())
       : this.knownVehicleCodes();
-    const mqtt = this.buildMqttBundle(codes);
+    const mqtt = this.buildMqttBundle(codes, ttl);
 
     // 32 bytes 的隨機值。金鑰只在這一刻存在，之後資料庫裡只有它的雜湊。
     const apiKey = randomBytes(32).toString('hex');
@@ -186,7 +174,7 @@ export class PartnerAccessService {
     await this.purgeExpired();
 
     this.logger.log(
-      `發出金鑰給 ${input.username}（有效 ${ttl} 分鐘，${mqtt.clients.length} 張車輛憑證）`,
+      `發出金鑰給 ${input.username}（有效 ${ttl} 分鐘，即時簽發 ${mqtt.clients.length} 張車輛憑證）`,
     );
 
     return {

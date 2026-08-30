@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PartnerApiKey } from '../database/entities/partner-api-key.entity';
 import { PartnerAccessController } from './partner-access.controller';
 import { PartnerAccessService } from './partner-access.service';
+import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
 
 /**
  * 對外存取憑據。
@@ -17,7 +18,7 @@ import { PartnerAccessService } from './partner-access.service';
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature([PartnerApiKey])],
   controllers: [PartnerAccessController],
-  providers: [PartnerAccessService],
-  exports: [PartnerAccessService],
+  providers: [PartnerAccessService, VehicleCertificateIssuer],
+  exports: [PartnerAccessService, VehicleCertificateIssuer],
 })
 export class PartnerAccessModule {}

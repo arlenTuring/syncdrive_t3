@@ -1,56 +1,79 @@
 #!/usr/bin/env bash
 #
-# 產生 MQTT 的 TLS 憑證：一組 CA、一張伺服器憑證、每台車一張用戶端憑證。
+# 產生 MQTT 的 TLS 憑證體系：根 CA、車輛簽發用的中介 CA、broker 的伺服器憑證。
 #
-#   ./deploy/mqtt-certs.sh [主機位址] [車輛代號...]
-#   ./deploy/mqtt-certs.sh 34.80.84.224 PMS-01 PMS-02 …
+#   ./deploy/mqtt-certs.sh [主機位址]
+#   ./deploy/mqtt-certs.sh 34.80.84.224
 #
-# 車端改用憑證而不是帳密，理由是身分的強度：帳密是一串可以被轉貼、被記在筆記本、
-# 被寫進程式碼的字串，而且十一台車的密碼一旦外流，補救方式是十一台一起換。
-# 用戶端憑證由 CA 簽發，broker 以 use_identity_as_username 把憑證的 CN 當成
-# username——ACL 那條 pattern write v1/vtms/%u/# 因此原封不動繼續生效，
-# 而「這台車是誰」由簽章決定，不是由一段可複製的字串決定。
+# <h3>為什麼分成根與中介兩層</h3>
+# 車輛憑證改成「申請金鑰時即時簽發、效期跟著金鑰」之後，後端必須拿得到一把能簽車輛
+# 身分的私鑰。若那把就是根 CA，後端一旦被攻破，攻擊者不只能冒充任何一台車，還能簽出
+# 伺服器憑證冒充 broker——中間人就成立了。
 #
-# <h3>CN 必須等於車輛代號</h3>
-# broker 拿 CN 當 username，ACL 拿 username 比對路徑。CN 打錯的那台車不會連不上，
-# 它會連上、然後發布到別台的路徑被拒——症狀是「連得上但資料都沒進來」。
+# 所以簽車輛的權力交給<strong>中介 CA</strong>：
+#
+#   ca.key         根。只簽中介與伺服器憑證。簽完就沒有日常用途，應離線保存。
+#   client-ca.key  中介。後端讀得到，只用來簽車輛用戶端憑證。
+#   server.key     broker 自己的身分，由根直接簽，與中介無關。
+#
+# 後端被攻破的後果因此縮小到「能冒充車輛」，冒充不了 broker；而且撤銷中介、換一把
+# 重簽即可，不必動到根與所有車端已知的信任錨點。
+#
+# <h3>這支不再簽車輛憑證</h3>
+# 車輛憑證由 POST /syncdrive-api/auth/token 在申請當下簽發，效期等於該次的
+# ttl_minutes（預設一天）。這支只負責建立體系與 broker 身分。
 #
 # <h3>已存在就不覆蓋</h3>
-# 重跑這支不會把已經發出去的憑證作廢。要換某一台，先刪掉那一台的 .crt/.key 再跑。
+# 重跑不會作廢已發出去的東西。要重建整套，先刪掉整個 certs 目錄——注意那會讓所有
+# 已簽發的車輛憑證失效。
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CERT_DIR="${CERT_DIR:-$ROOT/mosquitto/certs}"
 HOST="${1:-127.0.0.1}"
-shift || true
-
-VEHICLES=("$@")
-if [ ${#VEHICLES[@]} -eq 0 ]; then
-  VEHICLES=(PMS-01 PMS-02 PMS-03 PMS-04 PMS-05 PMS-06 PMS-07 PMS-08 PMS-09 PMS-10 PMS-11)
-fi
 
 SUBJECT_BASE="/C=TW/O=SyncDrive T3"
-CA_DAYS=3650
-LEAF_DAYS=825   # 公開信任的上限是 398 天，自簽沒有這個限制；825 是常見的內部上限
+ROOT_DAYS=3650
+INTERMEDIATE_DAYS=1825
+SERVER_DAYS=825
 
 log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 
 mkdir -p "$CERT_DIR"
 cd "$CERT_DIR"
 
-# ── CA ──────────────────────────────────────────────────────────
+# ── 根 CA ───────────────────────────────────────────────────────
 if [ -f ca.crt ] && [ -f ca.key ]; then
-  log "CA 已存在，沿用（要重建請先刪除 $CERT_DIR/ca.*）"
+  log "根 CA 已存在，沿用"
 else
-  log "產生 CA"
+  log "產生根 CA"
   openssl genrsa -out ca.key 4096 2>/dev/null
-  openssl req -new -x509 -days "$CA_DAYS" -key ca.key -out ca.crt \
-    -subj "$SUBJECT_BASE/CN=SyncDrive T3 Vehicle CA" 2>/dev/null
-  chmod 600 ca.key
+  openssl req -new -x509 -days "$ROOT_DAYS" -key ca.key -out ca.crt \
+    -subj "$SUBJECT_BASE/CN=SyncDrive T3 Root CA" 2>/dev/null
 fi
 
-# ── 伺服器憑證 ──────────────────────────────────────────────────
+# ── 中介 CA（只簽車輛用戶端憑證）────────────────────────────────
+#
+# pathlen:0 表示它底下不能再有 CA——中介只能簽終端憑證，簽不出另一層 CA。
+# keyCertSign 是簽發能力本身；少了它 OpenSSL 會拒絕用它驗證任何鏈。
+if [ -f client-ca.crt ] && [ -f client-ca.key ]; then
+  log "中介 CA 已存在，沿用"
+else
+  log "產生中介 CA（車輛簽發用）"
+  openssl genrsa -out client-ca.key 4096 2>/dev/null
+  openssl req -new -key client-ca.key -out client-ca.csr \
+    -subj "$SUBJECT_BASE/CN=SyncDrive T3 Vehicle Issuing CA" 2>/dev/null
+  cat > client-ca.ext <<'EOF'
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage = critical, keyCertSign, cRLSign
+EOF
+  openssl x509 -req -in client-ca.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -out client-ca.crt -days "$INTERMEDIATE_DAYS" -sha256 -extfile client-ca.ext 2>/dev/null
+  rm -f client-ca.csr client-ca.ext
+fi
+
+# ── 伺服器憑證（由根直接簽）─────────────────────────────────────
 #
 # SAN 一定要帶。只寫 CN 的憑證新版 TLS 用戶端一律拒絕（CN 早已不被採信），
 # 症狀是車端連線時報 hostname mismatch 而不是憑證無效，很難查。
@@ -65,6 +88,7 @@ else
   cat > server.ext <<EOF
 subjectAltName = @alt
 extendedKeyUsage = serverAuth
+basicConstraints = CA:FALSE
 [alt]
 DNS.1 = mosquitto
 DNS.2 = localhost
@@ -76,51 +100,34 @@ EOF
     printf 'DNS.3 = %s\n' "$HOST" >> server.ext
   fi
   openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
-    -out server.crt -days "$LEAF_DAYS" -sha256 -extfile server.ext 2>/dev/null
+    -out server.crt -days "$SERVER_DAYS" -sha256 -extfile server.ext 2>/dev/null
   rm -f server.csr server.ext
-  chmod 600 server.key
 fi
 
-# ── 車輛用戶端憑證 ──────────────────────────────────────────────
-for code in "${VEHICLES[@]}"; do
-  if [ -f "$code.crt" ] && [ -f "$code.key" ]; then
-    continue
-  fi
-  log "產生 $code 的用戶端憑證"
-  openssl genrsa -out "$code.key" 2048 2>/dev/null
-  openssl req -new -key "$code.key" -out "$code.csr" \
-    -subj "$SUBJECT_BASE/CN=$code" 2>/dev/null
-  cat > "$code.ext" <<EOF
-extendedKeyUsage = clientAuth
-EOF
-  openssl x509 -req -in "$code.csr" -CA ca.crt -CAkey ca.key -CAcreateserial \
-    -out "$code.crt" -days "$LEAF_DAYS" -sha256 -extfile "$code.ext" 2>/dev/null
-  rm -f "$code.csr" "$code.ext"
-  chmod 600 "$code.key"
-done
+# ── 信任鏈 ──────────────────────────────────────────────────────
+#
+# broker 的 cafile 要同時含根與中介：根用來讓它自己的伺服器憑證成鏈，
+# 中介用來驗證後端簽出去的車輛憑證。少了中介，每一張車輛憑證都會驗不過。
+cat ca.crt client-ca.crt > ca-chain.crt
 
 # ── 權限 ────────────────────────────────────────────────────────
 #
-# 兩種私鑰要分開對待：
-#
-#   ca.key / server.key   只有 mosquitto 該讀得到。CA 私鑰能簽出任何一台車的身分，
-#                         伺服器私鑰能冒充 broker——兩者外流的後果都不是換一張憑證
-#                         就能收拾的。0600，屬 mosquitto。
-#
-#   PMS-xx.key            本來就是要發給對應廠商的東西，後端在核發金鑰時要讀它。
-#                         mosquitto 在容器裡是 uid 1883，後端是 uid 1000，所以設成
-#                         擁有者 1883、群組 1000、0640：兩個服務讀得到，其他人不行。
-chown -R 1883:1883 "$CERT_DIR" 2>/dev/null || true
-chmod 644 ca.crt server.crt 2>/dev/null || true
-chmod 600 ca.key server.key 2>/dev/null || true
-for leaf in "$CERT_DIR"/PMS-*.key; do
-  [ -e "$leaf" ] || continue
-  chown 1883:1000 "$leaf" 2>/dev/null || true
-  chmod 640 "$leaf" 2>/dev/null || true
-done
-chmod 644 "$CERT_DIR"/PMS-*.crt 2>/dev/null || true
+#   ca.key         根私鑰。能簽出中介，也能簽出伺服器憑證——外流等於整套重建。
+#                  只有 root 讀得到；正式環境應該把它搬離這台機器。
+#   client-ca.key  中介私鑰。後端要用它簽車輛憑證，所以群組給後端的 gid 1000。
+#   server.key     broker 專用，只有 mosquitto（uid 1883）讀得到。
+chown 1883:1883 ca.crt client-ca.crt server.crt server.key ca-chain.crt 2>/dev/null || true
+chmod 644 ca.crt client-ca.crt server.crt ca-chain.crt 2>/dev/null || true
+chmod 600 server.key 2>/dev/null || true
+
+chown root:root ca.key 2>/dev/null || true
+chmod 600 ca.key 2>/dev/null || true
+
+chown 1883:1000 client-ca.key 2>/dev/null || true
+chmod 640 client-ca.key 2>/dev/null || true
 
 log "完成：$CERT_DIR"
-printf '    CA          %s\n' "$(openssl x509 -in ca.crt -noout -enddate | cut -d= -f2)"
-printf '    伺服器      %s（%s）\n' "$(openssl x509 -in server.crt -noout -enddate | cut -d= -f2)" "$HOST"
-printf '    車輛憑證    %d 張\n' "${#VEHICLES[@]}"
+printf '    根 CA      %s\n' "$(openssl x509 -in ca.crt -noout -enddate | cut -d= -f2)"
+printf '    中介 CA    %s\n' "$(openssl x509 -in client-ca.crt -noout -enddate | cut -d= -f2)"
+printf '    伺服器     %s（%s）\n' "$(openssl x509 -in server.crt -noout -enddate | cut -d= -f2)" "$HOST"
+printf '    車輛憑證   由 POST /syncdrive-api/auth/token 即時簽發，效期＝該次 ttl_minutes\n'
