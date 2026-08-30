@@ -1,0 +1,13 @@
+[Unit]
+Description=每日續簽 MQTT TLS 憑證
+
+[Timer]
+# 每天凌晨執行。續簽門檻是到期前 90 天（伺服器）與 365 天（中介），所以絕大多數
+# 日子什麼都不會發生；真的要換的那一天，重建 broker 造成的斷線落在離峰時段。
+OnCalendar=*-*-* 03:20:00
+# 機器關過機的話，開機後補跑一次——錯過的那幾天可能正好是該續簽的那幾天。
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

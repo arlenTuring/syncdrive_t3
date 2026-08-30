@@ -42,7 +42,7 @@ class IssueTokenDto {
   ttl_minutes?: number;
 
   @ApiPropertyOptional({
-    description: '需取得 MQTT 用戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。',
+    description: '需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。',
     example: ['PMS-01', 'PMS-02'],
     type: [String],
   })
@@ -56,7 +56,7 @@ class MqttClientCertificateDto {
   @ApiProperty({ description: '車輛代號', example: 'PMS-01' })
   vehicle_code!: string;
 
-  @ApiProperty({ description: '該車用戶端憑證，PEM 格式' })
+  @ApiProperty({ description: '該車客戶端憑證，PEM 格式' })
   certificate!: string;
 
   @ApiProperty({ description: '憑證生效時間，Unix Epoch 毫秒', example: 1787889940000 })
@@ -68,7 +68,7 @@ class MqttClientCertificateDto {
   })
   not_after!: number;
 
-  @ApiProperty({ description: '該車用戶端私鑰，PEM 格式' })
+  @ApiProperty({ description: '該車客戶端私鑰，PEM 格式' })
   private_key!: string;
 }
 
@@ -83,18 +83,18 @@ class MqttBundleDto {
   tls!: boolean;
 
   @ApiProperty({
-    description: '根 CA 憑證，PEM 格式。設為 TLS 用戶端的信任錨點，用於驗證 broker',
+    description: '根 CA 憑證，PEM 格式。設為 TLS 客戶端的信任錨點，用於驗證 broker',
   })
   ca_certificate!: string;
 
   @ApiProperty({
     description:
       '中介 CA 憑證，PEM 格式。車輛憑證的簽發者，接於 clients[].certificate 之後'
-      + '組成送出的憑證鏈（葉子在前、中介在後）',
+      + '組成送出的憑證鏈（車輛憑證在前、中介憑證在後）',
   })
   intermediate_certificate!: string;
 
-  @ApiProperty({ description: '各車之用戶端憑證與私鑰', type: [MqttClientCertificateDto] })
+  @ApiProperty({ description: '各車之客戶端憑證與私鑰', type: [MqttClientCertificateDto] })
   clients!: MqttClientCertificateDto[];
 }
 
@@ -114,7 +114,7 @@ class IssuedTokenDto {
   @ApiProperty({ description: '有效時長，分鐘', example: 1440 })
   expires_in_minutes!: number;
 
-  @ApiProperty({ description: 'MQTT 連線資訊與用戶端憑證', type: MqttBundleDto })
+  @ApiProperty({ description: 'MQTT 連線資訊與客戶端憑證', type: MqttBundleDto })
   mqtt!: MqttBundleDto;
 }
 
@@ -133,15 +133,15 @@ export class PartnerAccessController {
   @Post('token')
   @SetMetadata(EXTERNAL_API_METADATA_KEY, true)
   @ApiOperation({
-    summary: '申請 API 金鑰與 MQTT 用戶端憑證',
+    summary: '申請 API 金鑰與 MQTT 客戶端憑證',
     description:
       '以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，'
-      + '以及連線 MQTT broker 所需的 CA 憑證與各車之用戶端憑證與私鑰。'
+      + '以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。'
       + '金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。'
       + '金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。'
       + '欄位定義見介接說明書 §一。',
   })
-  @ApiOkResponse({ description: 'API 金鑰與 MQTT 用戶端憑證', type: IssuedTokenDto })
+  @ApiOkResponse({ description: 'API 金鑰與 MQTT 客戶端憑證', type: IssuedTokenDto })
   @ApiBadRequestResponse({
     description: 'ttl_minutes 逾值域，或 vehicle_codes 含未簽發之車輛代號',
   })

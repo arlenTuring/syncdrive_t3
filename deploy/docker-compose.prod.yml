@@ -66,7 +66,7 @@ services:
     image: eclipse-mosquitto:2@sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797
     container_name: syncdrive_mosquitto
     restart: always
-    # 只發布 8883。車端走 TLS ＋ 用戶端憑證，憑證由 deploy/mqtt-certs.sh 產生。
+    # 只發布 8883。車端走 TLS ＋ 客戶端憑證，憑證由 deploy/mqtt-certs.sh 產生。
     #
     # 1883 <strong>刻意不對主機發布</strong>：那個 listener 只給同一個 compose 網路裡的
     # 後端用。發布出去等於在 TLS 之外又留一條純文字的路，而攻擊者只要拿到任何一組
@@ -150,7 +150,7 @@ services:
       # 見 scripts/map-published-store.js），沒有這個 volume 的話每次重新部署
       # 地圖就會消失——而地圖一消失，班表 API 查得到班次卻查不到停靠點別名。
       - backenddata:/app/data
-      # 憑證唯讀掛進來：發金鑰時要當場簽出該車的用戶端憑證。
+      # 憑證唯讀掛進來：發金鑰時要當場簽出該車的客戶端憑證。
       #
       # 後端讀得到的是<strong>中介</strong> CA 的私鑰（client-ca.key，群組 1000），
       # 不是根。根私鑰是 600 root，容器內讀不到——後端被攻破時攻擊者能冒充車輛，

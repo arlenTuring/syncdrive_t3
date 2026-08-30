@@ -7,7 +7,7 @@
  * 執行（本機開發，匿名連線 1883）：
  *   node scripts/vtms-demo-simulator.js
  *
- * 執行（對正式 broker 8883，TLS 用戶端憑證，與車端介接說明書 §2.1 相同的認證方式）：
+ * 執行（對正式 broker 8883，TLS 客戶端憑證，與車端介接說明書 §2.1 相同的認證方式）：
  *   MQTT_URL=mqtts://<host>:8883 \
  *   MQTT_TLS_CA=./ca.crt MQTT_TLS_CERT=./PMS-01.crt MQTT_TLS_KEY=./PMS-01.key \
  *   node scripts/vtms-demo-simulator.js

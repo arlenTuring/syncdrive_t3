@@ -170,7 +170,7 @@ mqtt_denied() {
   local out
   out="$($DOCKER exec syncdrive_mosquitto mosquitto_sub -h 127.0.0.1 \
         -t '$SYS/broker/version' -C 1 -W 3 "$@" 2>&1 || true)"
-  # 拒絕的表現方式依層級不同：TLS 握手被擋（沒帶用戶端憑證）是連線被切斷，
+  # 拒絕的表現方式依層級不同：TLS 握手被擋（沒帶客戶端憑證）是連線被切斷，
   # MQTT 認證被擋（帳密錯）才會回 CONNACK 的 not authorised。兩種都要算通過。
   if printf '%s' "$out" | grep -qi 'not authorised\|Connection Refused\|refused\|connection was lost\|connection error\|TLS\|certificate'; then
     printf '\033[1;32m✓\033[0m %-40s 被拒\n' "$label"; pass=$((pass + 1))
@@ -179,7 +179,7 @@ mqtt_denied() {
   fi
 }
 if $DOCKER exec syncdrive_mosquitto sh -c 'command -v mosquitto_sub' >/dev/null 2>&1; then
-  # 8883 是車端唯一的入口：沒有用戶端憑證一定要連不上
+  # 8883 是車端唯一的入口：沒有客戶端憑證一定要連不上
   mqtt_denied "MQTT 8883 無憑證必須被拒" -p 8883 --cafile /mosquitto/certs/ca-chain.crt
   # 1883 只給 docker 內部的後端，仍然要擋掉匿名
   mqtt_denied "MQTT 1883 匿名必須被拒" -p 1883
@@ -187,6 +187,47 @@ if $DOCKER exec syncdrive_mosquitto sh -c 'command -v mosquitto_sub' >/dev/null 
 else
   printf '\033[1;33m略過\033[0m 容器裡沒有 mosquitto_sub，無法檢查 MQTT 認證\n'
 fi
+
+# ── 憑證剩餘效期 ────────────────────────────────────────────────
+#
+# 憑證到期是最安靜的一種故障：那天之前一切正常，那天之後全部連不上，而且原因
+# 與任何一次改動都無關。deploy/mqtt-certs.timer 每天會自動續簽，但自動化本身也
+# 會壞——timer 沒啟用、腳本執行失敗、續簽了卻沒重建 broker 容器。
+#
+# 所以在這裡直接檢查<strong>正在服役的那幾張憑證</strong>還剩多久。續簽門檻是
+# 90 天（伺服器）與 365 天（中介），這裡用 30 天當紅線：低於它就代表自動續簽
+# 已經連續失敗了一段時間，而距離真正停擺還有一個月可以處理。
+echo "憑證效期"
+CERT_MIN_DAYS="${CERT_MIN_DAYS:-30}"
+cert_days() {
+  local label="$1" path="$2"
+  if ! $DOCKER exec syncdrive_mosquitto sh -c "[ -f $path ]" 2>/dev/null; then
+    printf '  \033[1;33m—\033[0m %-46s 找不到\n' "$label"
+    return
+  fi
+  # 容器裡沒有 openssl，用 mosquitto 一定有的方式拿不到日期，所以從主機讀。
+  local host_path="$ROOT/mosquitto/certs/${path##*/}"
+  local end
+  end="$(openssl x509 -in "$host_path" -noout -enddate 2>/dev/null | cut -d= -f2)" \
+    || end="$(sudo openssl x509 -in "$host_path" -noout -enddate 2>/dev/null | cut -d= -f2)"
+  if [ -z "$end" ]; then
+    printf '  \033[1;33m—\033[0m %-46s 讀不到\n' "$label"
+    return
+  fi
+  local left
+  left=$(( ( $(date -d "$end" +%s 2>/dev/null || echo 0) - $(date +%s) ) / 86400 ))
+  if [ "$left" -ge "$CERT_MIN_DAYS" ]; then
+    printf '  \033[1;32m✓\033[0m %-46s 剩 %s 天\n' "$label" "$left"
+    pass=$((pass + 1))
+  else
+    printf '  \033[1;31m✗\033[0m %-46s 剩 %s 天，低於 %s 天——自動續簽可能已失效\n' \
+      "$label" "$left" "$CERT_MIN_DAYS"
+    fail=$((fail + 1))
+  fi
+}
+cert_days "broker 伺服器憑證"  /mosquitto/certs/server.crt
+cert_days "中介 CA（簽車輛憑證用）" /mosquitto/certs/client-ca.crt
+cert_days "根 CA"              /mosquitto/certs/ca.crt
 
 printf '\n通過 %d 項，失敗 %d 項\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -1,0 +1,8 @@
+[Unit]
+Description=SyncDrive T3 續簽 MQTT TLS 憑證
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/syncdrive_t3/deploy/mqtt-certs-renew.sh

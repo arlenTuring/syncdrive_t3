@@ -196,7 +196,7 @@ sudo ./deploy/bootstrap.sh
 |------|-----|
 | Base URL | `http://<主機位址>:3100` |
 | Swagger | `http://<主機位址>:3100/api/docs/public` |
-| 認證 | 廠商以帳密呼叫 `POST /syncdrive-api/auth/token` 換取 `x-api-key` 與 MQTT 用戶端憑證；帳密即 `EXTERNAL_AUTH_USER` / `EXTERNAL_AUTH_PASSWORD`（`deploy/.env`，`bootstrap.sh` 產生） |
+| 認證 | 廠商以帳密呼叫 `POST /syncdrive-api/auth/token` 換取 `x-api-key` 與 MQTT 客戶端憑證；帳密即 `EXTERNAL_AUTH_USER` / `EXTERNAL_AUTH_PASSWORD`（`deploy/.env`，`bootstrap.sh` 產生） |
 | 對外文件 | `http://<主機位址>:3100/docs/`（介接說明書、車端介接、班表與到站預測、六份通訊協議） |
 
 對外共 8 支（含金鑰申請）：`auth/token`、車端三支（`order/queryById`、`order/updateOrderProgress`、`order/action`）、班表兩支、即時 ETA 兩支。其餘皆為我方內部使用，廠商在對外埠（3100）既看不到文件、也打不通（一律回 `404`）。
@@ -207,6 +207,6 @@ sudo ./deploy/bootstrap.sh
 
 ## 七、MQTT 認證
 
-車端與模擬器一律以 **TLS 雙向驗證＋用戶端憑證** 連線 `8883`，沒有帳密可用。憑證由 `deploy/mqtt-certs.sh` 產生（CA、server、各車用戶端憑證），廠商申請金鑰時（`POST /syncdrive-api/auth/token`）由後端一併回傳 CA 憑證與指定車輛的用戶端憑證／私鑰，不需要另外分發檔案。
+車端與模擬器一律以 **TLS 雙向驗證＋客戶端憑證** 連線 `8883`，沒有帳密可用。憑證由 `deploy/mqtt-certs.sh` 產生（CA、server、各車客戶端憑證），廠商申請金鑰時（`POST /syncdrive-api/auth/token`）由後端一併回傳 CA 憑證與指定車輛的客戶端憑證／私鑰，不需要另外分發檔案。
 
 `1883` 僅供後端在 docker 內部網路連線（帳密＋ACL，`mosquitto/config/README.md`），不對主機發布，車端與廠商都連不到、也不需要連。

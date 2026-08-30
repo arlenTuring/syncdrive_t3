@@ -14,7 +14,7 @@ export type IssuedClientCertificate = {
 };
 
 /**
- * 車輛用戶端憑證的即時簽發。
+ * 車輛客戶端憑證的即時簽發。
  *
  * <h3>為什麼不預先簽好</h3>
  * 預簽的憑證只有一個效期，而效期到期那天該台車就直接連不上 broker，沒有預警。
@@ -54,16 +54,26 @@ export class VehicleCertificateIssuer {
     }
   }
 
-  /** 給車端用來驗證 broker 的信任錨點。是<strong>根</strong>，不是中介。 */
+  /**
+   * 給車端用來驗證 broker 的信任錨點。
+   *
+   * 讀的是 ca-published.crt 而不是 ca.crt——前者是 deploy/mqtt-certs.sh 維護的
+   * <strong>集合</strong>，包含現行根、接班根，以及尚未過期的舊根。
+   *
+   * 根憑證每十年要換一次，而換的那一刻如果車端只信任舊的那一把，就會在沒有任何
+   * 改動的情況下集體斷線。所以換根分兩階段：先把新根加進這個集合公布 30 天，
+   * 讓每天換憑據的車端都拿到，之後才真正改用新根簽發。這支端點交付的是集合，
+   * 車端把整份設為信任錨點即可，不需要知道現在處於哪個階段。
+   *
+   * 舊部署可能還沒有這個檔，退回 ca.crt。
+   */
   rootCertificate(): string | null {
-    return this.read('ca.crt');
+    return this.read('ca-published.crt') ?? this.read('ca.crt');
   }
 
   /**
-   * 中介 CA。車端的憑證鏈需要它才驗得到根，所以要一併交付。
-   *
-   * broker 那側的 cafile 也含中介，但那只解決 broker 驗車端；車端驗自己這條鏈
-   * 時仍然需要它。
+   * 中介 CA。車輛憑證的簽發者，車端接在自己的憑證之後送出，broker 才能把那張
+   * 憑證追溯到根。
    */
   intermediateCertificate(): string | null {
     return this.read('client-ca.crt');

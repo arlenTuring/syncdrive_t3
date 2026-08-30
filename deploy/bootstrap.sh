@@ -168,7 +168,7 @@ else
   gen() { openssl rand -base64 18 | tr -d '/+=' | head -c 18; }
 
   # vtms-simulator 帳號已移除：那是給示範模擬器用的身分，可以代所有車輛發布，
-  # 已不該存在。車輛（含模擬器）改用 TLS 用戶端憑證連線 8883（見
+  # 已不該存在。車輛（含模擬器）改用 TLS 客戶端憑證連線 8883（見
   # deploy/mqtt-certs.sh），不再逐台申請密碼——密碼檔只服務 1883 那個
   # docker 內部網路帳號，車輛從未使用也不該使用它。
   BACKEND_PW="$(gen)"
@@ -177,7 +177,7 @@ else
 
   {
     echo "# SyncDrive T3 MQTT 帳密（產生於 $(date '+%Y-%m-%d %H:%M:%S')）"
-    echo "# 僅後端內部連線（1883，docker 網路內）用。車端一律走 8883 的 TLS 用戶端"
+    echo "# 僅後端內部連線（1883，docker 網路內）用。車端一律走 8883 的 TLS 客戶端"
     echo "# 憑證（deploy/mqtt-certs.sh 產生），沒有帳密可用也不需要。"
     echo "vtms-backend    $BACKEND_PW    # 後端自用"
   } > "$MQTT_CREDS"

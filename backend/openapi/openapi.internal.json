@@ -2262,7 +2262,7 @@
     },
     "/syncdrive-api/auth/token": {
       "post": {
-        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之用戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。欄位定義見介接說明書 §一。",
+        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。欄位定義見介接說明書 §一。",
         "operationId": "PartnerAccessController_issue",
         "parameters": [],
         "requestBody": {
@@ -2277,7 +2277,7 @@
         },
         "responses": {
           "200": {
-            "description": "API 金鑰與 MQTT 用戶端憑證",
+            "description": "API 金鑰與 MQTT 客戶端憑證",
             "content": {
               "application/json": {
                 "schema": {
@@ -2293,7 +2293,7 @@
             "description": "帳號或密碼不正確"
           }
         },
-        "summary": "申請 API 金鑰與 MQTT 用戶端憑證",
+        "summary": "申請 API 金鑰與 MQTT 客戶端憑證",
         "tags": [
           "對外｜存取憑據"
         ]
@@ -3327,7 +3327,7 @@
             "maximum": 43200
           },
           "vehicle_codes": {
-            "description": "需取得 MQTT 用戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
+            "description": "需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
             "example": [
               "PMS-01",
               "PMS-02"
@@ -3353,11 +3353,11 @@
           },
           "certificate": {
             "type": "string",
-            "description": "該車用戶端憑證，PEM 格式"
+            "description": "該車客戶端憑證，PEM 格式"
           },
           "private_key": {
             "type": "string",
-            "description": "該車用戶端私鑰，PEM 格式"
+            "description": "該車客戶端私鑰，PEM 格式"
           }
         },
         "required": [
@@ -3389,7 +3389,7 @@
             "description": "CA 憑證，PEM 格式"
           },
           "clients": {
-            "description": "各車之用戶端憑證與私鑰",
+            "description": "各車之客戶端憑證與私鑰",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MqttClientCertificateDto"
@@ -3432,7 +3432,7 @@
             "example": 1440
           },
           "mqtt": {
-            "description": "MQTT 連線資訊與用戶端憑證",
+            "description": "MQTT 連線資訊與客戶端憑證",
             "allOf": [
               {
                 "$ref": "#/components/schemas/MqttBundleDto"
