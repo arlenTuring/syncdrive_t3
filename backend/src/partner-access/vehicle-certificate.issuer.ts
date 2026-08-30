@@ -1,5 +1,5 @@
 import { generateKeyPairSync, randomBytes } from 'crypto';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -35,7 +35,12 @@ export type IssuedClientCertificate = {
 @Injectable()
 export class VehicleCertificateIssuer {
   private readonly logger = new Logger(VehicleCertificateIssuer.name);
-  private cached: { cert: forge.pki.Certificate; key: forge.pki.rsa.PrivateKey } | null = null;
+  private cached: {
+    cert: forge.pki.Certificate;
+    key: forge.pki.rsa.PrivateKey;
+    /** 快取當時中介私鑰的 mtime。檔案被續簽換掉時用它判斷要重讀。 */
+    keyMtimeMs: number;
+  } | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -79,8 +84,24 @@ export class VehicleCertificateIssuer {
     return this.read('client-ca.crt');
   }
 
+  /**
+   * 目前的中介 CA，解析後快取。
+   *
+   * 解析 PEM 每次要花幾十毫秒，一次申請要簽十一張，所以值得快取。但<strong>不能
+   * 永久快取</strong>：中介每年會被 deploy/mqtt-certs.sh 自動續簽換掉，而換掉之後
+   * 這裡若還拿著舊的那把私鑰，簽出來的車輛憑證就與同一包裡交付的
+   * intermediate_certificate（讀檔案，永遠是新的）對不起來——車端送出的鏈接不上，
+   * 而症狀要等到舊中介真的過期才會變成連不上，中間隔了好幾年。
+   *
+   * 所以比對私鑰檔的 mtime，變了就重讀。續簽是把檔案原地覆寫，mtime 一定會動。
+   */
   private issuer(): { cert: forge.pki.Certificate; key: forge.pki.rsa.PrivateKey } {
-    if (this.cached) return this.cached;
+    const keyPath = join(this.certDir(), 'client-ca.key');
+    const mtime = existsSync(keyPath) ? statSync(keyPath).mtimeMs : 0;
+    if (this.cached && this.cached.keyMtimeMs === mtime) return this.cached;
+    if (this.cached) {
+      this.logger.log('中介 CA 已更換，重新載入簽發用金鑰');
+    }
     const certPem = this.read('client-ca.crt');
     const keyPem = this.read('client-ca.key');
     if (!certPem || !keyPem) {
@@ -91,6 +112,7 @@ export class VehicleCertificateIssuer {
     this.cached = {
       cert: forge.pki.certificateFromPem(certPem),
       key: forge.pki.privateKeyFromPem(keyPem) as forge.pki.rsa.PrivateKey,
+      keyMtimeMs: mtime,
     };
     return this.cached;
   }

@@ -57,10 +57,12 @@ INTERMEDIATE_DAYS=1825
 SERVER_DAYS=825
 
 # 提前多久續簽。都遠大於車端一天一次的換發週期，留足反應時間。
-ROOT_PREPARE_AT=1095        # 根剩 3 年：產生接班根，加入信任錨點但不啟用
-ROOT_CUTOVER_AFTER_DAYS=30  # 接班根公布滿 30 天：正式改用它簽發
-INTERMEDIATE_RENEW_AT=365   # 中介剩 1 年：換新
-SERVER_RENEW_AT=90          # 伺服器憑證剩 90 天：換新
+# 可用環境變數覆寫，供 deploy/test-cert-rotation.sh 把時間快轉——輪替一次要好幾年，
+# 沒有辦法用等的方式驗證它對不對。
+ROOT_PREPARE_AT="${ROOT_PREPARE_AT:-1095}"              # 根剩 3 年：產生接班根，加入信任錨點但不啟用
+ROOT_CUTOVER_AFTER_DAYS="${ROOT_CUTOVER_AFTER_DAYS:-30}" # 接班根公布滿 30 天：正式改用它簽發
+INTERMEDIATE_RENEW_AT="${INTERMEDIATE_RENEW_AT:-365}"    # 中介剩 1 年：換新
+SERVER_RENEW_AT="${SERVER_RENEW_AT:-90}"                 # 伺服器憑證剩 90 天：換新
 
 log()  { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
