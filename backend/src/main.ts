@@ -35,6 +35,19 @@ async function bootstrap() {
     logger: resolveNestLogLevels(),
   });
 
+  /*
+   * 信任前面那一層 nginx 送來的 X-Forwarded-For。
+   *
+   * 不設的話 request.ip 拿到的是 nginx 容器在 docker 網路裡的位址（172.18.0.x），
+   * 對每一個請求都一樣。發放金鑰時記的來源 IP 因此永遠是同一個值，稽核欄位等於
+   * 沒有作用——出事時查不到是誰在什麼位置拿走了金鑰。
+   *
+   * 只信任一層：後端沒有對主機發布任何埠，唯一進得來的路徑就是 nginx，所以
+   * 鏈上只會有它。設成 true（信任全部）的話，外部就能自己偽造整條 X-Forwarded-For
+   * 把來源 IP 寫成任何值。
+   */
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   const bodyLimit = process.env.REQUEST_BODY_LIMIT ?? '10mb';
   app.use(json({ limit: bodyLimit }));
   app.use(urlencoded({ extended: true, limit: bodyLimit }));
