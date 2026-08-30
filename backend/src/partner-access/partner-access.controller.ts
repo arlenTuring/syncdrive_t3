@@ -84,16 +84,16 @@ class MqttBundleDto {
 
   @ApiProperty({
     description:
-      '根 CA 憑證，PEM 格式。設為 TLS 客戶端的信任錨點，用於驗證 broker。'
-      + '根憑證輪替的過渡期間本欄位會含有兩張憑證，信任錨點設定須接受多張，不要只取第一張。'
-      + '內容會隨輪替更換，請一律使用最近一次申請取得的值，不要寫死',
+      '信任憑證，PEM 格式。設為 TLS 的 ca，用於驗證 broker。'
+      + '本欄位有時會含有多張憑證，設定時須整份傳入，不要只取第一張。'
+      + '內容會不定期更換，請一律使用最近一次申請取得的值，不要寫死',
   })
   ca_certificate!: string;
 
   @ApiProperty({
     description:
-      '中介 CA 憑證，PEM 格式。車輛憑證的簽發者，接於 clients[].certificate 之後'
-      + '組成送出的憑證鏈（車輛憑證在前、中介憑證在後）',
+      '中介憑證，PEM 格式。接於 clients[].certificate 之後一併送出'
+      + '（該車憑證在前、中介憑證在後）。內容會不定期更換，不要寫死',
   })
   intermediate_certificate!: string;
 
