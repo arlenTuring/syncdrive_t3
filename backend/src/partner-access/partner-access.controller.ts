@@ -83,7 +83,10 @@ class MqttBundleDto {
   tls!: boolean;
 
   @ApiProperty({
-    description: '根 CA 憑證，PEM 格式。設為 TLS 客戶端的信任錨點，用於驗證 broker',
+    description:
+      '根 CA 憑證，PEM 格式。設為 TLS 客戶端的信任錨點，用於驗證 broker。'
+      + '根憑證輪替的過渡期間本欄位會含有兩張憑證，信任錨點設定須接受多張，不要只取第一張。'
+      + '內容會隨輪替更換，請一律使用最近一次申請取得的值，不要寫死',
   })
   ca_certificate!: string;
 
