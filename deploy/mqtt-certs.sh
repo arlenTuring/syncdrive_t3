@@ -261,7 +261,12 @@ fi
 note "中介 CA    $(enddate client-ca.crt)"
 note "伺服器     $(enddate server.crt)（$HOST）"
 note "車輛憑證   由 POST /syncdrive-api/auth/token 即時簽發，效期＝該次 ttl_minutes"
-retired_count=$(ls retired/*.crt 2>/dev/null | wc -l | tr -d ' ')
+# 用 glob 數，不用 ls——set -o pipefail 之下目錄是空的時 ls 會讓整條管線回非零，
+# 而 set -e 就在這裡把整支腳本結束掉，摘要印到一半、退出碼 2。
+retired_count=0
+for f in retired/*.crt; do
+  if [ -e "$f" ]; then retired_count=$((retired_count + 1)); fi
+done
 if [ "$retired_count" != 0 ]; then
   note "信任鏈另含 $retired_count 張退役但未過期的憑證"
 fi
@@ -270,3 +275,7 @@ if [ -f .changed ]; then
   note "憑證有變動，broker 需要重建容器才會讀到："
   note "  docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --force-recreate mosquitto"
 fi
+
+# 明確以 0 結束。腳本的退出碼是最後一個指令的退出碼，而上面那些條件判斷
+# 不成立時會回非零——呼叫端會誤判成續簽失敗。
+exit 0
