@@ -92,7 +92,15 @@ export class VehicleCertificateIssuer {
    * username，而 ACL 用 username 比對可發布的路徑。CN 打錯的那台車連得上，但發布
    * 全被拒——症狀是「連上了卻什麼資料都沒進來」，很難查。
    */
-  issue(vehicleCode: string, ttlMinutes: number): IssuedClientCertificate {
+  /**
+   * 簽一張車輛憑證。
+   *
+   * expiresAt 由呼叫端傳<strong>絕對時間</strong>，不是在這裡用 Date.now() 加 TTL——
+   * 一次申請要簽十一張，各自算的話每張的到期時間都差幾百毫秒，而且整批會比金鑰
+   * 本身早幾秒失效（實測 4.4 秒）。差幾秒不會出事，但「憑證與金鑰同時失效」是
+   * 對外文件寫明的保證，讓它真的成立比解釋那幾秒容易。
+   */
+  issue(vehicleCode: string, expiresAt: number): IssuedClientCertificate {
     const { cert: caCert, key: caKey } = this.issuer();
 
     const { privateKey, publicKey } = generateKeyPairSync('rsa', {
@@ -104,7 +112,7 @@ export class VehicleCertificateIssuer {
     const notBefore = new Date();
     // 往前挪一分鐘，避免車端與中心端有幾秒時鐘差時憑證「還沒生效」
     notBefore.setMinutes(notBefore.getMinutes() - 1);
-    const notAfter = new Date(Date.now() + ttlMinutes * 60_000);
+    const notAfter = new Date(expiresAt);
 
     const cert = forge.pki.createCertificate();
     cert.publicKey = forge.pki.publicKeyFromPem(publicKey);

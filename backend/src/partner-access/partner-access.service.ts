@@ -92,7 +92,7 @@ export class PartnerAccessService {
    * 車輛憑證在這裡<strong>當場簽</strong>，效期等於這次申請的 ttl_minutes——
    * 換金鑰與換憑證是同一個動作，不會出現「金鑰還有效但憑證過期」的半殘狀態。
    */
-  private buildMqttBundle(vehicleCodes: string[], ttlMinutes: number): MqttBundle {
+  private buildMqttBundle(vehicleCodes: string[], expiresAt: number): MqttBundle {
     const ca = this.certificates.rootCertificate();
     const intermediate = this.certificates.intermediateCertificate();
     if (!ca || !intermediate) {
@@ -115,7 +115,7 @@ export class PartnerAccessService {
       tls: true,
       ca_certificate: ca,
       intermediate_certificate: intermediate,
-      clients: vehicleCodes.map((code) => this.certificates.issue(code, ttlMinutes)),
+      clients: vehicleCodes.map((code) => this.certificates.issue(code, expiresAt)),
     };
   }
 
@@ -152,12 +152,13 @@ export class PartnerAccessService {
     const codes = input.vehicleCodes?.length
       ? input.vehicleCodes.map((code) => String(code).trim().toUpperCase())
       : this.knownVehicleCodes();
-    const mqtt = this.buildMqttBundle(codes, ttl);
+    // 到期時間先定下來，金鑰與憑證共用同一個值——兩者必須同時失效
+    const issuedAt = Date.now();
+    const expiresAt = issuedAt + ttl * 60_000;
+    const mqtt = this.buildMqttBundle(codes, expiresAt);
 
     // 32 bytes 的隨機值。金鑰只在這一刻存在，之後資料庫裡只有它的雜湊。
     const apiKey = randomBytes(32).toString('hex');
-    const issuedAt = Date.now();
-    const expiresAt = issuedAt + ttl * 60_000;
 
     await this.keys.save(
       this.keys.create({

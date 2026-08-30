@@ -83,14 +83,14 @@ class MqttBundleDto {
   tls!: boolean;
 
   @ApiProperty({
-    description: '根 CA 憑證，PEM 格式。信任錨點，車端用它驗證 broker',
+    description: '根 CA 憑證，PEM 格式。設為 TLS 用戶端的信任錨點，用於驗證 broker',
   })
   ca_certificate!: string;
 
   @ApiProperty({
     description:
-      '中介 CA 憑證，PEM 格式。用戶端憑證的簽發者，須與根 CA 一併納入信任鏈；'
-      + '僅提供根憑證時憑證鏈中斷，連線會被拒絕',
+      '中介 CA 憑證，PEM 格式。車輛憑證的簽發者，接於 clients[].certificate 之後'
+      + '組成送出的憑證鏈（葉子在前、中介在後）',
   })
   intermediate_certificate!: string;
 
