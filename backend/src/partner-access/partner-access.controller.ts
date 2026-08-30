@@ -59,6 +59,15 @@ class MqttClientCertificateDto {
   @ApiProperty({ description: '該車用戶端憑證，PEM 格式' })
   certificate!: string;
 
+  @ApiProperty({ description: '憑證生效時間，Unix Epoch 毫秒', example: 1787889940000 })
+  not_before!: number;
+
+  @ApiProperty({
+    description: '憑證失效時間，Unix Epoch 毫秒。等於本次申請金鑰的 expires_at',
+    example: 1787976400000,
+  })
+  not_after!: number;
+
   @ApiProperty({ description: '該車用戶端私鑰，PEM 格式' })
   private_key!: string;
 }
@@ -73,8 +82,17 @@ class MqttBundleDto {
   @ApiProperty({ description: '固定為 true，連線採 TLS 雙向驗證', example: true })
   tls!: boolean;
 
-  @ApiProperty({ description: 'CA 憑證，PEM 格式' })
+  @ApiProperty({
+    description: '根 CA 憑證，PEM 格式。信任錨點，車端用它驗證 broker',
+  })
   ca_certificate!: string;
+
+  @ApiProperty({
+    description:
+      '中介 CA 憑證，PEM 格式。用戶端憑證的簽發者，須與根 CA 一併納入信任鏈；'
+      + '僅提供根憑證時憑證鏈中斷，連線會被拒絕',
+  })
+  intermediate_certificate!: string;
 
   @ApiProperty({ description: '各車之用戶端憑證與私鑰', type: [MqttClientCertificateDto] })
   clients!: MqttClientCertificateDto[];
