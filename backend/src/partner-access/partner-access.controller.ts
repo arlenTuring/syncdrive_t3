@@ -83,17 +83,14 @@ class MqttBundleDto {
   tls!: boolean;
 
   @ApiProperty({
-    description:
-      '信任憑證，PEM 格式。設為 TLS 的 ca，用於驗證 broker。'
-      + '本欄位有時會含有多張憑證，設定時須整份傳入，不要只取第一張。'
-      + '內容會不定期更換，請一律使用最近一次申請取得的值，不要寫死',
+    description: '信任憑證，PEM 格式。設為 TLS 的 ca，整份填入，用於驗證 broker',
   })
   ca_certificate!: string;
 
   @ApiProperty({
     description:
       '中介憑證，PEM 格式。接於 clients[].certificate 之後一併送出'
-      + '（該車憑證在前、中介憑證在後）。內容會不定期更換，不要寫死',
+      + '（該車憑證在前、中介憑證在後）',
   })
   intermediate_certificate!: string;
 
