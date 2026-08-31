@@ -42,6 +42,7 @@ import {
 } from './constants/mapExtent'
 import { MapExtentProvider } from './context/MapExtentContext'
 import { AreaInspectorSection } from './components/AreaInspectorSection'
+import { BasemapInspectorSection } from './components/BasemapInspectorSection'
 import { MapCropInspectorSection } from './components/MapCropInspectorSection'
 import {
   applyMapCrop,
@@ -67,6 +68,7 @@ import {
   DEFAULT_MAP_PIXEL_ORIGIN,
   DEFAULT_MAP_PIXEL_SIZE,
 } from './types/area'
+import { createBlankBasemap, type MapBasemapLayout, type MapBasemapObject } from './types/basemap'
 import type { ParsedTrajectory } from './types/trajectoryFile'
 import type {
   FacilityObject,
@@ -124,7 +126,7 @@ import type { RouteGroupDraft } from './components/RouteGroupEditorView'
 import {
   MAP_PIXEL_ZOOM_DEFAULT_LEVEL,
 } from './utils/mapPixelZoom'
-import { isAreaPaletteItem } from './utils/paletteDrag'
+import { isAreaPaletteItem, isBasemapPaletteItem } from './utils/paletteDrag'
 import {
   flattenAreaFacilities,
   nextNumericIdFromAreas,
@@ -182,6 +184,12 @@ import {
 } from './utils/facilityFormatPainter'
 import { defaultRefFieldParametersForType } from './utils/facilityRefFieldBinding'
 import { defaultRoadLineParameters } from './utils/roadLineFacility'
+import {
+  BASEMAP_ABOVE_AREAS_KEY,
+  defaultBasemapParameters,
+  isBasemapAboveAreas,
+  partitionMapBasemaps,
+} from './utils/basemapFacility'
 import {
   defaultTrackCrossoverParameters,
 } from './utils/trackCrossoverFacility'
@@ -251,6 +259,7 @@ export default function MapEditorApp({
   const isMapWorkspace = workspace === 'map'
   const isTrajectoryWorkspace = workspace === 'trajectory'
   const [areas, setAreas] = useState<MapAreaObject[]>([])
+  const [basemaps, setBasemaps] = useState<MapBasemapObject[]>([])
   const [mapPixelSize, setMapPixelSize] = useState<MapPixelSize>(
     DEFAULT_MAP_PIXEL_SIZE,
   )
@@ -258,6 +267,7 @@ export default function MapEditorApp({
     DEFAULT_MAP_PIXEL_ORIGIN,
   )
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
+  const [selectedBasemapId, setSelectedBasemapId] = useState<string | null>(null)
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([])
   const [geofenceSelectedLabelId, setGeofenceSelectedLabelId] = useState<
     string | null
@@ -412,10 +422,12 @@ export default function MapEditorApp({
   const trajectoryScaleXRef = useRef(1)
   const trajectoryScaleYRef = useRef(1)
   const areasRef = useRef(areas)
+  const basemapsRef = useRef(basemaps)
   const mapRoutesRef = useRef(mapRoutes)
   const mapRouteGroupsRef = useRef(mapRouteGroups)
   const pointTopologyRef = useRef(pointTopology)
   const selectedAreaIdRef = useRef(selectedAreaId)
+  const selectedBasemapIdRef = useRef(selectedBasemapId)
   const selectedFacilityIdsRef = useRef(selectedFacilityIds)
   const multiDragStartRef = useRef<{
     areaId: string
@@ -447,13 +459,15 @@ export default function MapEditorApp({
 
   useEffect(() => {
     areasRef.current = areas
+    basemapsRef.current = basemaps
     mapRoutesRef.current = mapRoutes
     mapRouteGroupsRef.current = mapRouteGroups
     pointTopologyRef.current = pointTopology
     selectedAreaIdRef.current = selectedAreaId
+    selectedBasemapIdRef.current = selectedBasemapId
     selectedFacilityIdsRef.current = selectedFacilityIds
     clipboardRef.current = clipboard
-  }, [areas, mapRoutes, mapRouteGroups, pointTopology, selectedAreaId, selectedFacilityIds, clipboard])
+  }, [areas, basemaps, mapRoutes, mapRouteGroups, pointTopology, selectedAreaId, selectedBasemapId, selectedFacilityIds, clipboard])
 
   const updateSelection = useCallback(
     (areaId: string | null, facilityIds: string[] | null) => {
@@ -466,9 +480,15 @@ export default function MapEditorApp({
     [],
   )
 
-  const clearSelection = useCallback(() => {
+  const clearMapSelection = useCallback(() => {
+    selectedBasemapIdRef.current = null
+    setSelectedBasemapId(null)
     updateSelection(null, null)
   }, [updateSelection])
+
+  const clearSelection = useCallback(() => {
+    clearMapSelection()
+  }, [clearMapSelection])
 
   const connectivityScan = useTrackConnectivityScan(areas)
 
@@ -504,10 +524,14 @@ export default function MapEditorApp({
   /** 取消選取時收合屬性面板；單擊選取不自動展開（需雙擊元件） */
   useEffect(() => {
     if (!isMapWorkspace) return
-    if (selectedAreaId === null && selectedFacilityIds.length === 0) {
+    if (
+      selectedAreaId === null &&
+      selectedFacilityIds.length === 0 &&
+      selectedBasemapId === null
+    ) {
       setInspectorCollapsed(true)
     }
-  }, [selectedAreaId, selectedFacilityIds, isMapWorkspace])
+  }, [selectedAreaId, selectedFacilityIds, selectedBasemapId, isMapWorkspace])
 
   useEffect(() => {
     setSlotPreview(null)
@@ -675,28 +699,35 @@ export default function MapEditorApp({
   const getSnapshot = useCallback(
     () => ({
       areas: structuredClone(areas),
+      basemaps: structuredClone(basemaps),
       mapPixelSize: { ...mapPixelSizeRef.current },
       mapPixelOrigin: { ...mapPixelOriginRef.current },
       selectedAreaId,
       selectedFacilityIds,
+      selectedBasemapId,
       nextNumericId,
     }),
-    [areas, selectedAreaId, selectedFacilityIds, nextNumericId],
+    [areas, basemaps, selectedAreaId, selectedFacilityIds, selectedBasemapId, nextNumericId],
   )
 
   const applySnapshot = useCallback(
     (s: {
       areas: MapAreaObject[]
+      basemaps: MapBasemapObject[]
       mapPixelSize: MapPixelSize
       mapPixelOrigin: MapPixelOrigin
       selectedAreaId: string | null
       selectedFacilityIds: string[]
+      selectedBasemapId: string | null
       nextNumericId: number
     }) => {
       setAreas(s.areas)
+      setBasemaps(s.basemaps)
       setMapPixelSize(s.mapPixelSize)
       setMapPixelOrigin(s.mapPixelOrigin)
       updateSelection(s.selectedAreaId, s.selectedFacilityIds)
+      selectedBasemapIdRef.current = s.selectedBasemapId
+      setSelectedBasemapId(s.selectedBasemapId)
       setNextNumericId(s.nextNumericId)
     },
     [updateSelection],
@@ -861,7 +892,8 @@ export default function MapEditorApp({
           ),
         ),
       )
-      setNextNumericId(nextNumericIdFromAreas(loaded.areas))
+      setBasemaps(structuredClone(loaded.basemaps ?? []))
+      setNextNumericId(nextNumericIdFromAreas(loaded.areas, loaded.basemaps ?? []))
       setMapRoutes(loaded.routes ?? [])
       setMapRouteGroups(
         ensureRouteGroupsForRoutes(loaded.routes ?? [], loaded.routeGroups ?? []),
@@ -904,6 +936,8 @@ export default function MapEditorApp({
       mapRoutesRef.current,
       mapRouteGroupsRef.current,
       pointTopologyRef.current,
+      [],
+      basemapsRef.current,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
     void publishAndReport(updated)
@@ -1246,6 +1280,7 @@ export default function MapEditorApp({
   const enterEditMode = useCallback(() => {
     setEditSessionBaseline({
       areas: structuredClone(areas),
+      basemaps: structuredClone(basemaps),
       routeGroups: structuredClone(mapRouteGroups),
       routes: structuredClone(mapRoutes),
       pointTopology: structuredClone(pointTopology),
@@ -1278,6 +1313,7 @@ export default function MapEditorApp({
     }
   }, [
     areas,
+    basemaps,
     mapRouteGroups,
     mapRoutes,
     pointTopology,
@@ -1298,6 +1334,7 @@ export default function MapEditorApp({
       !isEditSessionDirty(
         editSessionBaseline,
         areas,
+        basemaps,
         mapRouteGroups,
         mapRoutes,
         pointTopology,
@@ -1319,6 +1356,7 @@ export default function MapEditorApp({
     mapEditorMode,
     editSessionBaseline,
     areas,
+    basemaps,
     mapRouteGroups,
     mapRoutes,
     pointTopology,
@@ -1334,6 +1372,7 @@ export default function MapEditorApp({
         isEditSessionDirty(
           editSessionBaseline,
           areas,
+          basemaps,
           mapRouteGroups,
           mapRoutes,
           pointTopology,
@@ -1359,6 +1398,7 @@ export default function MapEditorApp({
     mapEditorMode,
     editSessionBaseline,
     areas,
+    basemaps,
     mapRoutes,
     mapRouteGroups,
     pointTopology,
@@ -1387,6 +1427,8 @@ export default function MapEditorApp({
         mapRoutesRef.current,
         mapRouteGroupsRef.current,
         pointTopologyRef.current,
+        [],
+        basemapsRef.current,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
       void publishAndReport(updated)
@@ -1396,7 +1438,9 @@ export default function MapEditorApp({
     setAreas(
       applyExampleMapDefaultLabelStyleToAreas(currentAreas, meta.mapId),
     )
-    setNextNumericId(nextNumericIdFromAreas(currentAreas))
+    setNextNumericId(
+      nextNumericIdFromAreas(currentAreas, basemapsRef.current),
+    )
     clearSelection()
     setLeaveEditDialogOpen(false)
     setMapEditorMode('view')
@@ -1415,6 +1459,7 @@ export default function MapEditorApp({
     const b = editSessionBaseline
     if (!b) return
     setAreas(structuredClone(b.areas))
+    setBasemaps(structuredClone(b.basemaps ?? []))
     setMapRouteGroups(structuredClone(b.routeGroups))
     setMapRoutes(structuredClone(b.routes))
     setPointTopology(structuredClone(b.pointTopology))
@@ -1476,6 +1521,8 @@ export default function MapEditorApp({
           mapRoutesRef.current,
           mapRouteGroupsRef.current,
           pointTopologyRef.current,
+          [],
+          basemapsRef.current,
         )
         writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
         void publishAndReport(updated)
@@ -1500,6 +1547,7 @@ export default function MapEditorApp({
   }, [
     mapEditorMode,
     areas,
+    basemaps,
     mapRouteGroups,
     mapRoutes,
     pointTopology,
@@ -1738,6 +1786,11 @@ export default function MapEditorApp({
   const selectedArea = useMemo(
     () => areas.find((a) => a.id === selectedAreaId) ?? null,
     [areas, selectedAreaId],
+  )
+
+  const selectedBasemap = useMemo(
+    () => basemaps.find((b) => b.id === selectedBasemapId) ?? null,
+    [basemaps, selectedBasemapId],
   )
 
   const selectedFacility = useMemo(() => {
@@ -2007,6 +2060,21 @@ export default function MapEditorApp({
           },
         }
       }
+      if (item.type === 'Basemap') {
+        return {
+          id,
+          type: 'Basemap',
+          name: 'Basemap',
+          customName: '',
+          areaPosition,
+          position: positionMeters,
+          rotation: 0,
+          currentState: getDefaultStateForType('Basemap'),
+          parameters: {
+            ...defaultBasemapParameters(),
+          },
+        }
+      }
       if (item.type === 'TrackCrossover') {
         return {
           id,
@@ -2044,10 +2112,23 @@ export default function MapEditorApp({
 
   const addFromPalette = useCallback(
     (item: PaletteItem) => {
+      const ps = mapPixelSizeRef.current
+      const mapCenter = { x: ps.width / 2, y: ps.height / 2 }
+      if (isBasemapPaletteItem(item)) {
+        pushHistory()
+        const id = String(nextNumericId).padStart(3, '0')
+        const newBasemap = createBlankBasemap(id, mapCenter)
+        setBasemaps((prev) => [...prev, newBasemap])
+        selectedBasemapIdRef.current = id
+        setSelectedBasemapId(id)
+        updateSelection(null, [])
+        setAllAreasSelected(false)
+        setNextNumericId((n) => n + 1)
+        return
+      }
       if (!isAreaPaletteItem(item)) return
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
-      const ps = mapPixelSizeRef.current
       const w = Math.max(200, ps.width * 0.42)
       const h = Math.max(160, ps.height * 0.38)
       const newArea: MapAreaObject = {
@@ -2095,13 +2176,126 @@ export default function MapEditorApp({
     [pushHistory, nextNumericId, updateSelection],
   )
 
+  const onPaletteDropBasemap = useCallback(
+    (_item: PaletteItem, mapPointPx: { x: number; y: number }) => {
+      pushHistory()
+      const id = String(nextNumericId).padStart(3, '0')
+      const newBasemap = createBlankBasemap(id, mapPointPx)
+      setBasemaps((prev) => [...prev, newBasemap])
+      selectedBasemapIdRef.current = id
+      setSelectedBasemapId(id)
+      updateSelection(null, [])
+      setAllAreasSelected(false)
+      setNextNumericId((n) => n + 1)
+    },
+    [pushHistory, nextNumericId, updateSelection],
+  )
+
+  const onPatchBasemapLayout = useCallback((basemapId: string, layout: MapBasemapLayout) => {
+    setBasemaps((prev) =>
+      prev.map((b) => (b.id === basemapId ? { ...b, layout } : b)),
+    )
+  }, [])
+
+  const onPatchBasemapParameters = useCallback(
+    (basemapId: string, patch: Record<string, unknown>) => {
+      setBasemaps((prev) =>
+        prev.map((b) =>
+          b.id === basemapId
+            ? {
+                ...b,
+                parameters: { ...(b.parameters ?? {}), ...patch },
+              }
+            : b,
+        ),
+      )
+    },
+    [],
+  )
+
+  const onBasemapLayoutSessionStart = useCallback(() => {
+    pushHistory()
+  }, [pushHistory])
+
+  const onBasemapBringToFront = useCallback(
+    (basemapId: string) => {
+      pushHistory()
+      setBasemaps((prev) => {
+        const idx = prev.findIndex((b) => b.id === basemapId)
+        if (idx < 0) return prev
+        const target = prev[idx]
+        const { below, above } = partitionMapBasemaps(prev)
+        const alreadyAbove = isBasemapAboveAreas(target.parameters)
+
+        if (!alreadyAbove) {
+          return prev.map((b) =>
+            b.id === basemapId
+              ? {
+                  ...b,
+                  parameters: {
+                    ...b.parameters,
+                    [BASEMAP_ABOVE_AREAS_KEY]: true,
+                  },
+                }
+              : b,
+          )
+        }
+
+        if (above.length <= 1) return prev
+        const tierIdx = above.findIndex((b) => b.id === basemapId)
+        if (tierIdx < 0 || tierIdx >= above.length - 1) return prev
+        const nextAbove = [...above]
+        const [item] = nextAbove.splice(tierIdx, 1)
+        nextAbove.push(item)
+        return [...below, ...nextAbove]
+      })
+    },
+    [pushHistory],
+  )
+
+  const onBasemapSendToBack = useCallback(
+    (basemapId: string) => {
+      pushHistory()
+      setBasemaps((prev) => {
+        const idx = prev.findIndex((b) => b.id === basemapId)
+        if (idx < 0) return prev
+        const target = prev[idx]
+        const { below, above } = partitionMapBasemaps(prev)
+        const alreadyAbove = isBasemapAboveAreas(target.parameters)
+
+        if (alreadyAbove) {
+          return prev.map((b) =>
+            b.id === basemapId
+              ? {
+                  ...b,
+                  parameters: {
+                    ...b.parameters,
+                    [BASEMAP_ABOVE_AREAS_KEY]: false,
+                  },
+                }
+              : b,
+          )
+        }
+
+        if (below.length <= 1) return prev
+        const tierIdx = below.findIndex((b) => b.id === basemapId)
+        if (tierIdx <= 0) return prev
+        const nextBelow = [...below]
+        const [item] = nextBelow.splice(tierIdx, 1)
+        nextBelow.unshift(item)
+        return [...nextBelow, ...above]
+      })
+    },
+    [pushHistory],
+  )
+
   const onPaletteDropFacility = useCallback(
     (
       areaId: string,
       item: PaletteItem,
       areaPositionCenter: { x: number; y: number },
     ) => {
-      if (isAreaPaletteItem(item)) return
+      if (isAreaPaletteItem(item) || isBasemapPaletteItem(item)) return
       const area = areasRef.current.find((a) => a.id === areaId)
       if (!area) return
       pushHistory()
@@ -2210,6 +2404,14 @@ export default function MapEditorApp({
   }, [nextNumericId, pushHistory, mapAreaFacilities, updateSelection])
 
   const deleteSelected = useCallback(() => {
+    const basemapId = selectedBasemapIdRef.current
+    if (basemapId) {
+      pushHistory()
+      setBasemaps((prev) => prev.filter((b) => b.id !== basemapId))
+      selectedBasemapIdRef.current = null
+      setSelectedBasemapId(null)
+      return
+    }
     const areaId = selectedAreaIdRef.current
     const facilityIds = selectedFacilityIdsRef.current
     if (!areaId) return
@@ -2498,20 +2700,46 @@ export default function MapEditorApp({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [formatPaintSnapshot])
 
+  const onSelectBasemap = useCallback(
+    (basemapId: string | null) => {
+      if (basemapId === null) {
+        selectedBasemapIdRef.current = null
+        setSelectedBasemapId(null)
+        return
+      }
+      setAllAreasSelected(false)
+      selectedBasemapIdRef.current = basemapId
+      setSelectedBasemapId(basemapId)
+      updateSelection(null, [])
+      setGeofenceSelectedLabelId(null)
+    },
+    [updateSelection],
+  )
+
+  const onBasemapDoubleClick = useCallback(
+    (basemapId: string) => {
+      onSelectBasemap(basemapId)
+      setInspectorCollapsed(false)
+    },
+    [onSelectBasemap],
+  )
+
   const onSelectArea = useCallback(
     (areaId: string | null) => {
       if (areaId === null) {
-        clearSelection()
+        clearMapSelection()
         setAllAreasSelected(false)
         setListDrawerTab(null)
         setInspectorCollapsed(true)
         return
       }
+      selectedBasemapIdRef.current = null
+      setSelectedBasemapId(null)
       setAllAreasSelected(false)
       updateSelection(areaId, [])
       setGeofenceSelectedLabelId(null)
     },
-    [clearSelection, updateSelection],
+    [clearMapSelection, updateSelection],
   )
 
   /** 點畫布／Area 空白：收合左側清單與右側屬性抽屜 */
@@ -2534,6 +2762,8 @@ export default function MapEditorApp({
     ) => {
       setGeofenceSelectedLabelId(null)
       setAllAreasSelected(false)
+      selectedBasemapIdRef.current = null
+      setSelectedBasemapId(null)
       if (facilityId === null) {
         updateSelection(areaId, [])
         return
@@ -2895,6 +3125,7 @@ export default function MapEditorApp({
         if (shouldBlockFacilityDeleteShortcut(e)) return
         if (
           selectedAreaIdRef.current === null &&
+          selectedBasemapIdRef.current === null &&
           selectedFacilityIdsRef.current.length === 0
         ) {
           return
@@ -3193,7 +3424,9 @@ export default function MapEditorApp({
                 pixelSize={mapPixelSize}
                 pixelOrigin={mapPixelOrigin}
                 areas={areas}
+                basemaps={basemaps}
                 selectedAreaId={selectedAreaId}
+                selectedBasemapId={selectedBasemapId}
                 selectedFacilityIds={selectedFacilityIds}
                 geofenceSelectedLabelId={geofenceSelectedLabelId}
                 viewportRef={mapViewportRef}
@@ -3202,6 +3435,7 @@ export default function MapEditorApp({
                 liveById={liveById}
                 slotPreview={slotPreview}
                 onSelectArea={onSelectArea}
+                onSelectBasemap={onSelectBasemap}
                 onSelectFacility={onSelectFacility}
                 onSelectFacilities={onSelectFacilities}
                 onSelectGeofenceLabel={onSelectGeofenceLabel}
@@ -3239,6 +3473,9 @@ export default function MapEditorApp({
                 onPaletteDropArea={
                   mapEditorMode === 'edit' ? onPaletteDropArea : undefined
                 }
+                onPaletteDropBasemap={
+                  mapEditorMode === 'edit' ? onPaletteDropBasemap : undefined
+                }
                 onPaletteDropFacility={
                   mapEditorMode === 'edit' ? onPaletteDropFacility : undefined
                 }
@@ -3247,6 +3484,21 @@ export default function MapEditorApp({
                 }
                 onAreaLayoutSessionStart={
                   mapEditorMode === 'edit' ? onAreaLayoutSessionStart : undefined
+                }
+                onPatchBasemapLayout={
+                  mapEditorMode === 'edit' ? onPatchBasemapLayout : undefined
+                }
+                onPatchBasemapParameters={
+                  mapEditorMode === 'edit' ? onPatchBasemapParameters : undefined
+                }
+                onBasemapLayoutSessionStart={
+                  mapEditorMode === 'edit' ? onBasemapLayoutSessionStart : undefined
+                }
+                onBasemapBringToFront={
+                  mapEditorMode === 'edit' ? onBasemapBringToFront : undefined
+                }
+                onBasemapSendToBack={
+                  mapEditorMode === 'edit' ? onBasemapSendToBack : undefined
                 }
                 formatPaintSnapshot={
                   mapEditorMode === 'edit' ? formatPaintSnapshot : null
@@ -3294,6 +3546,7 @@ export default function MapEditorApp({
                 connectivityScan={showTestDock ? connectivityScan.state : null}
                 facilityFocusTarget={facilityFocusTarget}
                 onFacilityDoubleClick={onFacilityDoubleClick}
+                onBasemapDoubleClick={onBasemapDoubleClick}
                 routePlanningOverlay={
                   routeOverlayPreview || routeOverlaySaved.length > 0 ? (
                     <RoutePlanningOverlay
@@ -3501,6 +3754,24 @@ export default function MapEditorApp({
                     onSelectGeofenceLabel={(_facilityId, labelId) =>
                       setGeofenceSelectedLabelId(labelId)
                     }
+                  />
+                ) : selectedBasemap ? (
+                  <BasemapInspectorSection
+                    basemap={selectedBasemap}
+                    readOnly={readOnlyCanvas}
+                    onChangeCustomName={(customName) => {
+                      setBasemaps((prev) =>
+                        prev.map((b) =>
+                          b.id === selectedBasemap.id ? { ...b, customName } : b,
+                        ),
+                      )
+                    }}
+                    onPatchParameters={(patch) => {
+                      onPatchBasemapParameters(selectedBasemap.id, patch)
+                    }}
+                    onDelete={() => deleteSelected()}
+                    onFieldFocus={onInspectorFieldFocus}
+                    onFieldBlur={onInspectorFieldBlur}
                   />
                 ) : selectedArea && !selectedFacility ? (
                   <AreaInspectorSection

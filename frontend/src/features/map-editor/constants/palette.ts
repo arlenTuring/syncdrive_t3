@@ -13,7 +13,13 @@ export interface AreaPaletteItem {
   hint: string
 }
 
-export type PaletteItem = FacilityPaletteItem | AreaPaletteItem
+export interface BasemapPaletteItem {
+  label: string
+  type: 'Basemap'
+  hint: string
+}
+
+export type PaletteItem = FacilityPaletteItem | AreaPaletteItem | BasemapPaletteItem
 
 export const AREA_PALETTE_ITEM: AreaPaletteItem = {
   label: 'Area 容器',
@@ -21,7 +27,13 @@ export const AREA_PALETTE_ITEM: AreaPaletteItem = {
   hint: '畫布上的區塊容器，用於群組放置元件',
 }
 
-/** 資產列：僅可拖入 Area 內。分類見 facilityTaxonomy（設備 vs 設施）。 */
+export const BASEMAP_PALETTE_ITEM: BasemapPaletteItem = {
+  label: '底圖',
+  type: 'Basemap',
+  hint: '底圖 — 與 Area 同層；拖曳至地圖任意位置，可載入圖片或 .xodr',
+}
+
+/** 資產列：設施／設備僅可拖入 Area 內；底圖與 Area 同層。 */
 export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
   {
     label: '設施',

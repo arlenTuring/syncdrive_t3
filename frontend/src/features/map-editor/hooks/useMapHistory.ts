@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react'
 import type { MapAreaObject, MapPixelOrigin, MapPixelSize } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 
 export type MapEditorSnapshot = {
   areas: MapAreaObject[]
+  basemaps: MapBasemapObject[]
   mapPixelSize: MapPixelSize
   mapPixelOrigin: MapPixelOrigin
   selectedAreaId: string | null
   selectedFacilityIds: string[]
+  selectedBasemapId: string | null
   nextNumericId: number
 }
 
@@ -15,10 +18,12 @@ const MAX_HISTORY = 50
 function cloneSnapshot(s: MapEditorSnapshot): MapEditorSnapshot {
   return {
     areas: structuredClone(s.areas),
+    basemaps: structuredClone(s.basemaps),
     mapPixelSize: { ...s.mapPixelSize },
     mapPixelOrigin: { ...s.mapPixelOrigin },
     selectedAreaId: s.selectedAreaId,
     selectedFacilityIds: [...s.selectedFacilityIds],
+    selectedBasemapId: s.selectedBasemapId,
     nextNumericId: s.nextNumericId,
   }
 }

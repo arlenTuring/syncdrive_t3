@@ -14,6 +14,7 @@ import type {
   WaypointState,
   RoadLineState,
   TrackCrossoverState,
+  BasemapState,
 } from '../types/facility'
 
 export const SLOT_OCCUPANCY: readonly SlotOccupancy[] = [
@@ -67,6 +68,8 @@ export const TRACK_CROSSOVER_STATES: readonly TrackCrossoverState[] = [
   'Normal',
 ] as const
 
+export const BASEMAP_STATES: readonly BasemapState[] = ['Normal'] as const
+
 export const FACILITY_AREA_STATES: readonly FacilityAreaState[] = [
   'Normal',
   'Occupied',
@@ -91,6 +94,7 @@ export const STATES_BY_TYPE: Record<
   Waypoint: WAYPOINT_STATES,
   RoadLine: ROAD_LINE_STATES,
   TrackCrossover: TRACK_CROSSOVER_STATES,
+  Basemap: BASEMAP_STATES,
   Facility: FACILITY_AREA_STATES,
   Geofence: GEOFENCE_STATES,
 }

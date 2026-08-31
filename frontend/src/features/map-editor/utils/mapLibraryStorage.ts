@@ -14,6 +14,7 @@ import {
   type MapPixelOrigin,
   type MapPixelSize,
 } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 import type { MapFileV2, MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
 import { emptyPointTopology } from '../types/pointTopology'
@@ -388,6 +389,7 @@ export function createBlankMapEntry(
     pixelSize,
     pixelOrigin: { x: 0, y: 0 },
     areas: [area],
+    basemaps: [],
     routes: [],
     routeGroups: [],
     // 缺欄＝空（不強制全開）——新建的空白地圖還沒有人設定過可視路線，
@@ -512,6 +514,7 @@ export function saveEditorStateToLibraryEntry(
   routeGroups: MapRouteGroup[] = [],
   pointTopology?: PointTopology,
   visibleRouteIds: readonly string[] = [],
+  basemaps: MapBasemapObject[] = [],
 ): MapLibraryEntry {
   const now = nowIso()
   const mapDocument = buildMapFileV2(
@@ -529,6 +532,7 @@ export function saveEditorStateToLibraryEntry(
       routeGroups,
       visibleRouteIds: [...visibleRouteIds],
       pointTopology,
+      basemaps,
     },
   )
   return {

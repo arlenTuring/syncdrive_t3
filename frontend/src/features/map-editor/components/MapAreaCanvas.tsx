@@ -15,12 +15,15 @@ import type {
   MapPixelSize,
 } from '../types/area'
 import { DEFAULT_MAP_PIXEL_ORIGIN } from '../types/area'
+import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
 import type { PaletteItem } from '../constants/palette'
 import type {
   SlotEquipmentState,
   SlotOccupancy,
 } from '../types/facility'
-import { decodePaletteDragItem, isAreaPaletteItem, PALETTE_DRAG_MIME } from '../utils/paletteDrag'
+import { decodePaletteDragItem, isAreaPaletteItem, isBasemapPaletteItem, isMapCanvasPaletteItem, PALETTE_DRAG_MIME } from '../utils/paletteDrag'
+import { partitionMapBasemaps } from '../utils/basemapFacility'
+import { BasemapNode } from './BasemapNode'
 import {
   applyWheelToMapPixelZoomLevel,
   computeMapPixelZoomMultipliers,
@@ -48,7 +51,9 @@ type MapAreaCanvasProps = {
   pixelSize: MapPixelSize
   pixelOrigin?: MapPixelOrigin
   areas: MapAreaObject[]
+  basemaps?: MapBasemapObject[]
   selectedAreaId: string | null
+  selectedBasemapId?: string | null
   selectedFacilityIds: string[]
   geofenceSelectedLabelId?: string | null
   viewportRef: RefObject<HTMLDivElement | null>
@@ -97,6 +102,7 @@ type MapAreaCanvasProps = {
     equipment: SlotEquipmentState
   } | null
   onSelectArea: (areaId: string | null) => void
+  onSelectBasemap?: (basemapId: string | null) => void
   onSelectFacility: (
     areaId: string,
     facilityId: string | null,
@@ -149,6 +155,7 @@ type MapAreaCanvasProps = {
   ) => void
   onGeofenceEditStart?: () => void
   onPaletteDropArea?: (item: PaletteItem, mapPointPx: { x: number; y: number }) => void
+  onPaletteDropBasemap?: (item: PaletteItem, mapPointPx: { x: number; y: number }) => void
   onPaletteDropFacility?: (
     areaId: string,
     item: PaletteItem,
@@ -156,6 +163,14 @@ type MapAreaCanvasProps = {
   ) => void
   onPatchAreaLayout?: (areaId: string, layout: MapAreaLayout) => void
   onAreaLayoutSessionStart?: () => void
+  onPatchBasemapLayout?: (basemapId: string, layout: MapBasemapLayout) => void
+  onPatchBasemapParameters?: (
+    basemapId: string,
+    patch: Record<string, unknown>,
+  ) => void
+  onBasemapLayoutSessionStart?: () => void
+  onBasemapBringToFront?: (basemapId: string) => void
+  onBasemapSendToBack?: (basemapId: string) => void
   formatPaintSnapshot?: FacilityFormatSnapshot | null
   onStartFormatPaint?: (snapshot: FacilityFormatSnapshot) => void
   onFormatPaintTarget?: (areaId: string, facilityId: string) => void
@@ -181,6 +196,7 @@ type MapAreaCanvasProps = {
   /** 清單跳轉：地圖像素座標（含 origin） */
   facilityFocusTarget?: { x: number; y: number; token: number } | null
   onFacilityDoubleClick?: (areaId: string, facilityId: string) => void
+  onBasemapDoubleClick?: (basemapId: string) => void
   /** 路線製作預覽 overlay（地圖 content 像素座標） */
   routePlanningOverlay?: ReactNode
 }
@@ -189,7 +205,9 @@ export function MapAreaCanvas({
   pixelSize,
   pixelOrigin = DEFAULT_MAP_PIXEL_ORIGIN,
   areas,
+  basemaps = [],
   selectedAreaId,
+  selectedBasemapId = null,
   selectedFacilityIds,
   geofenceSelectedLabelId = null,
   viewportRef,
@@ -212,6 +230,7 @@ export function MapAreaCanvas({
   vehicleEditSizer = null,
   slotPreview = null,
   onSelectArea,
+  onSelectBasemap,
   onSelectFacility,
   onSelectFacilities,
   onSelectGeofenceLabel,
@@ -229,9 +248,15 @@ export function MapAreaCanvas({
   onUpdateGeofence,
   onGeofenceEditStart,
   onPaletteDropArea,
+  onPaletteDropBasemap,
   onPaletteDropFacility,
   onPatchAreaLayout,
   onAreaLayoutSessionStart,
+  onPatchBasemapLayout,
+  onPatchBasemapParameters,
+  onBasemapLayoutSessionStart,
+  onBasemapBringToFront,
+  onBasemapSendToBack,
   formatPaintSnapshot = null,
   onStartFormatPaint,
   onFormatPaintTarget,
@@ -248,6 +273,7 @@ export function MapAreaCanvas({
   connectivityScan = null,
   facilityFocusTarget = null,
   onFacilityDoubleClick,
+  onBasemapDoubleClick,
   routePlanningOverlay = null,
 }: MapAreaCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -339,6 +365,11 @@ export function MapAreaCanvas({
     : interpolateMapPixelZoomMultiplier(zoomMultipliers, zoomLevel)
   const mapScale = fitScale * zoomMultiplier
   mapScaleRef.current = mapScale
+
+  const { below: basemapsBelow, above: basemapsAbove } = useMemo(
+    () => partitionMapBasemaps(basemaps),
+    [basemaps],
+  )
 
   const scaledW = layoutSize.width * mapScale
   const scaledH = layoutSize.height * mapScale
@@ -449,15 +480,19 @@ export function MapAreaCanvas({
 
   const handleMapDrop = useCallback(
     (e: React.DragEvent) => {
-      if (!areaEditEnabled || !onPaletteDropArea) return
+      if (!areaEditEnabled) return
       e.preventDefault()
       const raw = e.dataTransfer.getData(PALETTE_DRAG_MIME)
       const item = decodePaletteDragItem(raw)
-      if (!item || !isAreaPaletteItem(item)) return
+      if (!item || !isMapCanvasPaletteItem(item)) return
       const pt = clientToMapPx(e.clientX, e.clientY)
-      onPaletteDropArea(item, pt)
+      if (isAreaPaletteItem(item)) {
+        onPaletteDropArea?.(item, pt)
+      } else if (isBasemapPaletteItem(item)) {
+        onPaletteDropBasemap?.(item, pt)
+      }
     },
-    [editMode, onPaletteDropArea, clientToMapPx],
+    [areaEditEnabled, onPaletteDropArea, onPaletteDropBasemap, clientToMapPx],
   )
 
   const applyWheelZoom = useCallback(
@@ -587,7 +622,8 @@ export function MapAreaCanvas({
         // Portal 工具列掛在 body，但需避免被當成點擊畫布空白
         if (
           t.closest('[data-facility-toolbar]') ||
-          t.closest('[data-geofence-toolbar]')
+          t.closest('[data-geofence-toolbar]') ||
+          t.closest('[data-basemap-toolbar]')
         ) {
           return
         }
@@ -598,9 +634,13 @@ export function MapAreaCanvas({
         ) {
           return
         }
-        if (!t.closest('[data-area-id]')) {
+        if (
+          !t.closest('[data-area-id]') &&
+          !t.closest('[data-basemap-root]')
+        ) {
           onEmptyMapPointerDown?.()
           onSelectArea(null)
+          onSelectBasemap?.(null)
         }
       }}
     >
@@ -633,7 +673,12 @@ export function MapAreaCanvas({
             background: inCropMode ? '#0a0e16' : '#060a12',
           }}
           onDragOver={(e) => {
-            if (areaEditEnabled && onPaletteDropArea) e.preventDefault()
+            if (
+              areaEditEnabled &&
+              (onPaletteDropArea || onPaletteDropBasemap)
+            ) {
+              e.preventDefault()
+            }
           }}
           onDrop={handleMapDrop}
         >
@@ -679,6 +724,36 @@ export function MapAreaCanvas({
                 onPointerDown={onBulkMoveLayerPointerDown}
               />
             ) : null}
+            {basemapsBelow.map((basemap, stackOrder) => (
+              <BasemapNode
+                key={basemap.id}
+                basemap={basemap}
+                stackOrder={stackOrder}
+                stackCount={basemapsBelow.length}
+                selected={selectedBasemapId === basemap.id}
+                readOnly={readOnly || inCropMode}
+                editMode={areaEditEnabled}
+                mapScale={mapScale}
+                showToolbar={showFacilityToolbars}
+                onSelect={(id) => onSelectBasemap?.(id)}
+                onPatchLayout={
+                  onPatchBasemapLayout ??
+                  (() => {
+                    /* noop */
+                  })
+                }
+                onPatchParameters={
+                  onPatchBasemapParameters ??
+                  (() => {
+                    /* noop */
+                  })
+                }
+                onLayoutSessionStart={onBasemapLayoutSessionStart}
+                onBringToFront={onBasemapBringToFront}
+                onSendToBack={onBasemapSendToBack}
+                onDoubleClick={onBasemapDoubleClick}
+              />
+            ))}
             {areas.map((area, areaStackOrder) => (
               <AreaNode
                 key={area.id}
@@ -741,6 +816,36 @@ export function MapAreaCanvas({
                 showFacilityToolbars={showFacilityToolbars}
                 allAreas={areas}
                 connectivityScanHighlightTrackIds={connectivityScan?.highlightTrackIds ?? null}
+              />
+            ))}
+            {basemapsAbove.map((basemap, stackOrder) => (
+              <BasemapNode
+                key={basemap.id}
+                basemap={basemap}
+                stackOrder={stackOrder}
+                stackCount={basemapsAbove.length}
+                selected={selectedBasemapId === basemap.id}
+                readOnly={readOnly || inCropMode}
+                editMode={areaEditEnabled}
+                mapScale={mapScale}
+                showToolbar={showFacilityToolbars}
+                onSelect={(id) => onSelectBasemap?.(id)}
+                onPatchLayout={
+                  onPatchBasemapLayout ??
+                  (() => {
+                    /* noop */
+                  })
+                }
+                onPatchParameters={
+                  onPatchBasemapParameters ??
+                  (() => {
+                    /* noop */
+                  })
+                }
+                onLayoutSessionStart={onBasemapLayoutSessionStart}
+                onBringToFront={onBasemapBringToFront}
+                onSendToBack={onBasemapSendToBack}
+                onDoubleClick={onBasemapDoubleClick}
               />
             ))}
             {connectivityScan &&

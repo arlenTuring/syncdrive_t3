@@ -10,6 +10,7 @@ export type FacilityType =
   | 'Waypoint'
   | 'RoadLine'
   | 'TrackCrossover'
+  | 'Basemap'
 
 export type FacilityName =
   | 'Parking'
@@ -26,6 +27,7 @@ export type FacilityName =
   | 'Waypoint'
   | 'RoadLine'
   | 'TrackCrossover'
+  | 'Basemap'
 
 /** 旋轉角度（度），可為任意數值以利微調 */
 export type RotationDeg = number
@@ -61,6 +63,9 @@ export type RoadLineState = 'Normal'
 /** 虛擬渡線／交叉連通（兩端各接合一條軌道物件） */
 export type TrackCrossoverState = 'Normal'
 
+/** 底圖（可載入本機圖片作為 Area 內背景） */
+export type BasemapState = 'Normal'
+
 /** 電子圍籬（僅供圖層／匯出；幾何以 parameters.verticesMeters 為準） */
 export type GeofenceState = 'Normal'
 
@@ -77,6 +82,7 @@ export type NonSlotFacilityState =
   | WaypointState
   | RoadLineState
   | TrackCrossoverState
+  | BasemapState
   | FacilityAreaState
   | GeofenceState
 
@@ -124,6 +130,8 @@ export type FacilityObject =
         | 'Waypoint'
         | 'RoadLine'
         | 'TrackCrossover'
+        | 'Basemap'
+  | 'Basemap'
       name: FacilityName
       customName: string
       areaPosition: { x: number; y: number }

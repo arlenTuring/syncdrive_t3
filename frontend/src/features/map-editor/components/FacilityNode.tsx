@@ -6,7 +6,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { RefObject } from 'react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type {
@@ -74,6 +74,7 @@ import { applyEdgeResizePx, resizeCursorForEdge } from '../../../lib/elementResi
 import { normalizeDegrees, resolveRotatedRectAabb } from '../utils/rotation'
 import { clientToWorldCoords } from '../utils/pointerCoords'
 import {
+  areaPxPerMeter,
   areaLocalPxToMeter,
   areaPositionToCssTopLeft,
   clampFacilityMeterPosition,
@@ -96,6 +97,22 @@ import {
   parseRoadLineWidthPx,
 } from '../utils/roadLineFacility'
 import { RoadLineGraphic } from './RoadLineGraphic'
+import { BasemapGraphic } from './BasemapGraphic'
+import { BasemapFilePickerDialog } from './BasemapFilePickerDialog'
+import {
+  BASEMAP_FILE_NAME_KEY,
+  BASEMAP_PREVIEW_URL_KEY,
+  BASEMAP_SOURCE_TYPE_KEY,
+  BASEMAP_XODR_CONTENT_KEY,
+  type BasemapFileSelection,
+  getBasemapFileName,
+  getBasemapOpacity,
+  getBasemapPreviewUrl,
+  getBasemapWorldBounds,
+  getBasemapXodrContent,
+  openDriveSpanM,
+  parseBasemapOpenDrivePlan,
+} from '../utils/basemapFacility'
 import {
   TrackCrossoverGraphic,
   portalsToAreaCssPoints,
@@ -340,8 +357,52 @@ export const FacilityNode = memo(function FacilityNode({
   const isPole = facility.type === 'Pole'
   const isTrack = facility.type === 'Track'
   const isRoadLine = facility.type === 'RoadLine'
+  const isBasemap = facility.type === 'Basemap'
   const isTrackCrossover = facility.type === 'TrackCrossover'
   const isFacilityArea = facility.type === 'Facility'
+  const [basemapPickerOpen, setBasemapPickerOpen] = useState(false)
+
+  const basemapPreviewUrl = isBasemap
+    ? getBasemapPreviewUrl(facility.parameters)
+    : null
+  const basemapFileName = isBasemap
+    ? getBasemapFileName(facility.parameters)
+    : null
+  const basemapXodrContent = isBasemap
+    ? getBasemapXodrContent(facility.parameters)
+    : null
+  const basemapXodrPlan = useMemo(
+    () => (isBasemap ? parseBasemapOpenDrivePlan(facility.parameters) : null),
+    [facility.parameters, isBasemap],
+  )
+  const basemapXodrParseFailed = !!basemapXodrContent && !basemapXodrPlan
+  const basemapWorldBounds = useMemo(
+    () =>
+      isBasemap
+        ? getBasemapWorldBounds(
+            facility.parameters,
+            { wPx: nw, hPx: nh },
+            basemapXodrPlan,
+          )
+        : { xmin: 0, ymin: 0, xmax: 1, ymax: 1 },
+    [facility.parameters, isBasemap, nw, nh, basemapXodrPlan],
+  )
+
+  const basemapUrlRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    basemapUrlRef.current = basemapPreviewUrl
+  }, [basemapPreviewUrl])
+
+  useEffect(() => {
+    return () => {
+      const url = basemapUrlRef.current
+      if (url?.startsWith('blob:')) {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [facility.id])
+
   const [crossoverPortalPreview, setCrossoverPortalPreview] =
     useState<CrossoverPortals | null>(null)
   const [crossoverStrokePreview, setCrossoverStrokePreview] = useState<
@@ -767,6 +828,7 @@ export const FacilityNode = memo(function FacilityNode({
   const useWideRow =
     isPsd ||
     isFacilityArea ||
+    isBasemap ||
     facility.type === 'Track' ||
     isRoadLine ||
     isTrackCrossover ||
@@ -902,6 +964,7 @@ export const FacilityNode = memo(function FacilityNode({
     (isDragging ||
       isResizing ||
       (selected && isRoadLine) ||
+      (selected && isBasemap) ||
       (selected && showRotNorm !== 0 && !isTrackCrossover))
   const rotAabb = resolveRotatedRectAabb(nw, nh, showRotNorm)
   const aabbBottomCenterLeft = hitPadX + rotAabb.offsetLeft + rotAabb.w / 2
@@ -1341,6 +1404,59 @@ export const FacilityNode = memo(function FacilityNode({
     [onOpenProperties, onSelect],
   )
 
+  const onBasemapPickClick = useCallback(() => {
+    if (readOnly) return
+    setBasemapPickerOpen(true)
+  }, [readOnly])
+
+  const onBasemapFileConfirm = useCallback(
+    (selection: BasemapFileSelection) => {
+      if (!onPatchParameters) return
+      const oldUrl = getBasemapPreviewUrl(facility.parameters)
+      if (oldUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(oldUrl)
+      }
+
+      if (selection.kind === 'image') {
+        onPatchParameters(facility.id, {
+          [BASEMAP_SOURCE_TYPE_KEY]: 'image',
+          [BASEMAP_PREVIEW_URL_KEY]: selection.previewUrl,
+          [BASEMAP_FILE_NAME_KEY]: selection.file.name,
+          [BASEMAP_XODR_CONTENT_KEY]: undefined,
+        })
+      } else {
+        const plan = parseBasemapOpenDrivePlan({
+          [BASEMAP_XODR_CONTENT_KEY]: selection.content,
+        })
+        onPatchParameters(facility.id, {
+          [BASEMAP_SOURCE_TYPE_KEY]: 'xodr',
+          [BASEMAP_XODR_CONTENT_KEY]: selection.content,
+          [BASEMAP_FILE_NAME_KEY]: selection.file.name,
+          [BASEMAP_PREVIEW_URL_KEY]: undefined,
+        })
+        if (plan && onResize && areaMeterContext) {
+          const { pxPerMeterX, pxPerMeterY } = areaPxPerMeter(
+            areaMeterContext.layout,
+            areaMeterContext.domain,
+          )
+          const span = openDriveSpanM(plan.bounds)
+          onResize(facility.id, {
+            w: Math.max(40, span.w * pxPerMeterX),
+            h: Math.max(40, span.h * pxPerMeterY),
+          })
+        }
+      }
+      setBasemapPickerOpen(false)
+    },
+    [
+      areaMeterContext,
+      facility.id,
+      facility.parameters,
+      onPatchParameters,
+      onResize,
+    ],
+  )
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return
@@ -1357,6 +1473,7 @@ export const FacilityNode = memo(function FacilityNode({
         return
       if ((e.target as HTMLElement).closest('[data-crossover-width-handle]'))
         return
+      if ((e.target as HTMLElement).closest('[data-basemap-pick]')) return
 
       if (formatPaintSnapshot) {
         e.stopPropagation()
@@ -1747,7 +1864,7 @@ export const FacilityNode = memo(function FacilityNode({
         className={`absolute left-0 top-0 touch-none select-none ${
           isTrackCrossover
             ? 'overflow-visible pointer-events-none'
-            : isRoadLine
+            : isRoadLine || isBasemap
               ? 'overflow-visible pointer-events-auto'
               : ''
         }`}
@@ -1845,7 +1962,7 @@ export const FacilityNode = memo(function FacilityNode({
             'min-h-0 overflow-visible transition',
             isPsd || isSignal || isDockingPoint || isWaypoint || isPole || (isFacilityArea && useDraggableMapLabel)
               ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
-              : isTrack || isRoadLine
+              : isTrack || isRoadLine || isBasemap
                 ? 'flex size-full items-center justify-center border-0 p-0 shadow-none bg-transparent'
                 : isTrackCrossover
                   ? 'relative size-full border-0 p-0 shadow-none bg-transparent'
@@ -1869,7 +1986,7 @@ export const FacilityNode = memo(function FacilityNode({
                 ? selected
                   ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                   : 'hover:ring-1 hover:ring-cyan-500/40'
-                : isTrack || isRoadLine
+                : isTrack || isRoadLine || isBasemap
                   ? selected
                     ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                     : 'hover:ring-1 hover:ring-cyan-500/35'
@@ -1908,6 +2025,20 @@ export const FacilityNode = memo(function FacilityNode({
               className="pointer-events-none size-full object-contain"
               style={{ opacity: facility.currentState === 'Error' ? 0.55 : 0.95 }}
               onError={() => setImageError(true)}
+            />
+          ) : isBasemap ? (
+            <BasemapGraphic
+              width={nw}
+              height={nh}
+              worldBounds={basemapWorldBounds}
+              contentOpacity={getBasemapOpacity(facility.parameters)}
+              imageUrl={basemapPreviewUrl}
+              xodrPlan={basemapXodrPlan}
+              xodrParseFailed={basemapXodrParseFailed}
+              fileName={basemapFileName}
+              readOnly={readOnly}
+              selected={selected}
+              onPickClick={onBasemapPickClick}
             />
           ) : isRoadLine && roadLineStyle ? (
             <div className="relative size-full" style={{ isolation: 'isolate' }}>
@@ -2099,7 +2230,7 @@ export const FacilityNode = memo(function FacilityNode({
                 <Icon className="size-full" strokeWidth={1.75} />
               </div>
             )
-          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityArea ? (
+          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityArea && !isBasemap ? (
             <div
               className="shrink-0 text-cyan-300"
               style={{ width: iconWorld, height: iconWorld }}
@@ -2491,6 +2622,14 @@ export const FacilityNode = memo(function FacilityNode({
             </div>
           </MapFloatingAnchorPortal>
         </>
+      ) : null}
+      {isBasemap ? (
+        <BasemapFilePickerDialog
+          open={basemapPickerOpen}
+          initialFileName={basemapFileName}
+          onConfirm={onBasemapFileConfirm}
+          onCancel={() => setBasemapPickerOpen(false)}
+        />
       ) : null}
     </div>
   )

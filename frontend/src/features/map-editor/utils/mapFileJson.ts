@@ -14,6 +14,7 @@ import {
   type MapAreaLayout,
   type MapAreaObject,
 } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 import { ensureRefFieldParametersForExport } from './facilityRefFieldBinding'
 import { ensureAreaContentScale, meterToAreaLocalPx, normalizeAreaView } from './areaCoords'
 import {
@@ -33,6 +34,7 @@ import {
   MAP_FILE_SCHEMA_VERSION,
   MAP_FILE_SCHEMA_VERSION_V1,
   type MapFileAreaEntry,
+  type MapFileBasemapEntry,
   type MapFileFacilityEntry,
   type MapFileV1,
   type MapFileV2,
@@ -101,6 +103,7 @@ const FACILITY_TYPES = [
   'Waypoint',
   'RoadLine',
   'TrackCrossover',
+  'Basemap',
   'Zone',
 ] as const
 
@@ -444,6 +447,7 @@ export type ParsedMapFile = {
   pixelSize: MapPixelSize
   pixelOrigin: { x: number; y: number }
   areas: MapAreaObject[]
+  basemaps: MapBasemapObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
   /** 使用者最後設定的路線可視 id；缺欄＝空（不強制全開） */
@@ -486,10 +490,42 @@ export function parseVisibleRouteIds(
   return out
 }
 
+function parseBasemapEntry(entry: MapFileBasemapEntry): MapBasemapObject {
+  return {
+    id: entry.id,
+    customName: entry.customName?.trim() || `底圖 ${entry.id}`,
+    layout: {
+      xPx: entry.layout.xPx,
+      yPx: entry.layout.yPx,
+      wPx: entry.layout.wPx,
+      hPx: entry.layout.hPx,
+    },
+    ...(entry.parameters ? { parameters: { ...entry.parameters } } : {}),
+  }
+}
+
+export function basemapToMapEntry(b: MapBasemapObject): MapFileBasemapEntry {
+  return {
+    id: b.id,
+    customName: b.customName,
+    layout: {
+      xPx: b.layout.xPx,
+      yPx: b.layout.yPx,
+      wPx: b.layout.wPx,
+      hPx: b.layout.hPx,
+      borderPx: 0,
+    },
+    ...(b.parameters && Object.keys(b.parameters).length > 0
+      ? { parameters: { ...b.parameters } }
+      : {}),
+  }
+}
+
 export function parseMapFileJson(json: unknown): ParsedMapFile {
   if (isMapFileV2(json)) {
     const pixelSize = clampMapPixelSize(json.pixelSize ?? DEFAULT_MAP_PIXEL_SIZE)
     const areas = (json.areas ?? []).map((a, i) => parseAreaEntry(a, i))
+    const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     return {
       mapId: json.mapId,
@@ -499,6 +535,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       pixelSize,
       pixelOrigin: parsePixelOrigin(json.pixelOrigin),
       areas: areas.length > 0 ? areas : [createBlankArea('1', pixelSize)],
+      basemaps,
       routes,
       routeGroups: parseMapRouteGroups(json.routeGroups),
       visibleRouteIds: parseVisibleRouteIds(json.visibleRouteIds, routes),
@@ -518,6 +555,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       pixelSize,
       pixelOrigin: { x: 0, y: 0 },
       areas: migrateV1ToAreas(json, pixelSize),
+      basemaps: [],
       routes: [],
       routeGroups: [],
       visibleRouteIds: [],
@@ -595,12 +633,14 @@ export function buildMapFileV2(
     routeGroups?: MapRouteGroup[]
     visibleRouteIds?: string[]
     pointTopology?: PointTopology
+    basemaps?: MapBasemapObject[]
   },
 ): MapFileV2 {
   const origin = parsePixelOrigin(options?.pixelOrigin)
   const routes = options?.routes ?? []
   const routeGroups = options?.routeGroups ?? []
   const pointTopology = options?.pointTopology
+  const basemaps = options?.basemaps ?? []
   const description = parseOptionalDescription(options?.description)
   const visibleRouteIds = parseVisibleRouteIds(
     options?.visibleRouteIds ?? [],
@@ -617,6 +657,7 @@ export function buildMapFileV2(
     pixelSize: clampMapPixelSize(pixelSize),
     ...(origin.x > 0 || origin.y > 0 ? { pixelOrigin: origin } : {}),
     areas: areas.map(areaToMapEntry),
+    ...(basemaps.length > 0 ? { basemaps: basemaps.map(basemapToMapEntry) } : {}),
     ...(routeGroups.length > 0 ? { routeGroups } : {}),
     ...(routes.length > 0 ? { routes } : {}),
     // 一律寫入，空陣列＝使用者關掉全部；與「缺欄」舊檔區隔
@@ -627,8 +668,15 @@ export function buildMapFileV2(
   }
 }
 
-export function nextNumericIdFromAreas(areas: MapAreaObject[]): number {
+export function nextNumericIdFromAreas(
+  areas: MapAreaObject[],
+  basemaps: MapBasemapObject[] = [],
+): number {
   let max = 0
+  for (const b of basemaps) {
+    const n = Number.parseInt(b.id, 10)
+    if (!Number.isNaN(n) && n > max) max = n
+  }
   for (const a of areas) {
     const nArea = Number.parseInt(a.id, 10)
     if (!Number.isNaN(nArea) && nArea > max) max = nArea

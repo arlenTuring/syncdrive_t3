@@ -4,6 +4,7 @@ import {
   CircleDot,
   DoorClosed,
   Droplets,
+  Image as ImageIcon,
   LayoutGrid,
   MapPin,
   Minus,
@@ -35,6 +36,7 @@ export const PALETTE_ICON_BY_NAME: Record<
   Waypoint: CircleDot,
   RoadLine: Minus,
   TrackCrossover: Waypoints,
+  Basemap: ImageIcon,
 }
 
 /** Area 容器圖示（資產列） */

@@ -111,6 +111,8 @@ export function defaultSizeMetersForType(type: FacilityType): {
       return { w: 24, h: 18 }
     case 'Geofence':
       return { ...GEOFENCE_DEFAULT_SIZE_METERS }
+    case 'Basemap':
+      return { w: 80, h: 60 }
     default:
       return { w: 12, h: 5 }
   }

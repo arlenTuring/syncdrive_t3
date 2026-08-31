@@ -12,6 +12,7 @@ function baseParsed(over: Partial<ParsedMapFile> = {}): ParsedMapFile {
     pixelSize: { width: 100, height: 100 },
     pixelOrigin: { x: 0, y: 0 },
     areas: [],
+    basemaps: [],
     routes: [],
     routeGroups: [],
     pointTopology: emptyPointTopology(),

@@ -158,6 +158,13 @@ export interface MapPlannedRoute {
   updatedAt?: string
 }
 
+export interface MapFileBasemapEntry {
+  id: string
+  customName?: string
+  layout: MapAreaLayoutEntry
+  parameters?: Record<string, unknown>
+}
+
 export interface MapFileV2 {
   schemaVersion: typeof MAP_FILE_SCHEMA_VERSION
   mapId: string
@@ -172,6 +179,8 @@ export interface MapFileV2 {
   /** 畫布可視原點對應的內容座標（自上方／左側裁切後 > 0） */
   pixelOrigin?: { x: number; y: number }
   areas: MapFileAreaEntry[]
+  /** 地圖層底圖（與 Area 同層；可載入圖片或 OpenDRIVE） */
+  basemaps?: MapFileBasemapEntry[]
   routeGroups?: MapRouteGroup[]
   routes?: MapPlannedRoute[]
   /**

@@ -1,15 +1,18 @@
 import { LayoutGrid } from 'lucide-react'
 import {
   AREA_PALETTE_ITEM,
+  BASEMAP_PALETTE_ITEM,
   FACILITY_PALETTE_ITEMS,
   type FacilityPaletteItem,
   type PaletteItem,
 } from '../constants/palette'
 import { isMapEquipmentType, isMapFacilityAreaType } from '../constants/facilityTaxonomy'
 import { AREA_PALETTE_ICON, PALETTE_ICON_BY_NAME } from '../utils/facilityIcons'
+import { Image as ImageIcon } from 'lucide-react'
 import {
   encodePaletteDragItem,
   isAreaPaletteItem,
+  isBasemapPaletteItem,
   PALETTE_DRAG_MIME,
 } from '../utils/paletteDrag'
 
@@ -34,7 +37,11 @@ function buildPaletteGroups(): PaletteGroup[] {
   }
 
   return [
-    { key: 'area', label: null, items: [AREA_PALETTE_ITEM] },
+    {
+      key: 'map-layer',
+      label: '地圖層',
+      items: [BASEMAP_PALETTE_ITEM, AREA_PALETTE_ITEM],
+    },
     { key: 'facility', label: '設施', items: facilityItems },
     { key: 'equipment', label: '設備', items: equipmentItems },
     { key: 'other', label: '其他', items: otherItems },
@@ -88,11 +95,19 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
               {group.items.map((item) => {
                 const Icon = isAreaPaletteItem(item)
                   ? AREA_PALETTE_ICON
-                  : PALETTE_ICON_BY_NAME[item.name]
-                const clickEnabled = isAreaPaletteItem(item)
+                  : isBasemapPaletteItem(item)
+                    ? ImageIcon
+                    : PALETTE_ICON_BY_NAME[item.name]
+                const clickEnabled = isAreaPaletteItem(item) || isBasemapPaletteItem(item)
                 return (
                   <div
-                    key={isAreaPaletteItem(item) ? 'area' : `${item.label}-${item.name}`}
+                    key={
+                      isAreaPaletteItem(item)
+                        ? 'area'
+                        : isBasemapPaletteItem(item)
+                          ? 'basemap'
+                          : `${item.label}-${item.name}`
+                    }
                     className="flex w-[3.75rem] shrink-0 flex-col items-center justify-center gap-1"
                   >
                     <button
@@ -110,7 +125,9 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                       }}
                       title={
                         clickEnabled
-                          ? `${item.hint}\n拖曳至地圖可指定位置`
+                          ? isBasemapPaletteItem(item)
+                            ? `${item.hint}\n點擊或拖曳至地圖任意位置`
+                            : `${item.hint}\n點擊置中或拖曳至地圖指定位置`
                           : `${item.hint}\n僅可拖曳至 Area 內`
                       }
                       aria-label={`加入：${item.label}。${item.hint}`}

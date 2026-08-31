@@ -27,6 +27,8 @@ import {
   resolveAreaFillStyle,
 } from '../utils/areaLayoutStyle'
 import {
+  BASEMAP_LAYER_Z,
+  listBasemapsForPaint,
   listRoadLinesForPaint,
   resolveFacilityStackZ,
   ROAD_LINE_LAYER_Z,
@@ -1070,7 +1072,7 @@ export const AreaNode = memo(function AreaNode({
   const renderFacility = (
     f: FacilityObject,
     orderIndex: number,
-    opts?: { roadLineLayer?: boolean },
+    opts?: { roadLineLayer?: boolean; basemapLayer?: boolean },
   ) => {
     const mqttLive = liveById?.[getMqttEntityId(f)]
     const isSelected = selectedFacilityIds.includes(f.id)
@@ -1565,6 +1567,16 @@ export const AreaNode = memo(function AreaNode({
             showMoveHint={false}
           />
         )}
+        {listBasemapsForPaint(area.facilities).length > 0 ? (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ zIndex: BASEMAP_LAYER_Z }}
+          >
+            {listBasemapsForPaint(area.facilities).map((f, orderIndex) =>
+              renderFacility(f, orderIndex, { basemapLayer: true }),
+            )}
+          </div>
+        ) : null}
         {sortFacilitiesForPaint(
           area.facilities.filter((f) => f.type !== 'Geofence'),
         ).map((f, orderIndex) => renderFacility(f, orderIndex))}

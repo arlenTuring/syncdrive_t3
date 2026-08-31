@@ -1,4 +1,5 @@
 import type { MapAreaObject, MapPixelOrigin, MapPixelSize } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
 
@@ -13,6 +14,7 @@ export type LoadedMapMetaSnapshot = {
 
 export type EditSessionSnapshot = {
   areas: MapAreaObject[]
+  basemaps: MapBasemapObject[]
   routeGroups: MapRouteGroup[]
   routes: MapPlannedRoute[]
   pointTopology: PointTopology
@@ -23,6 +25,7 @@ export type EditSessionSnapshot = {
 export function isEditSessionDirty(
   baseline: EditSessionSnapshot | null,
   areas: MapAreaObject[],
+  basemaps: MapBasemapObject[],
   routeGroups: MapRouteGroup[],
   routes: MapPlannedRoute[],
   pointTopology: PointTopology,
@@ -32,6 +35,7 @@ export function isEditSessionDirty(
   if (!baseline) return false
   return (
     JSON.stringify(baseline.areas) !== JSON.stringify(areas) ||
+    JSON.stringify(baseline.basemaps) !== JSON.stringify(basemaps) ||
     JSON.stringify(baseline.routeGroups) !== JSON.stringify(routeGroups) ||
     JSON.stringify(baseline.routes) !== JSON.stringify(routes) ||
     JSON.stringify(baseline.pointTopology) !== JSON.stringify(pointTopology) ||
