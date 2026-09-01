@@ -18,6 +18,7 @@ import {
   type TaperHandleKey,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
+  MAX_TAPER_OFFSET,
   MIN_CORNER_BULGE,
   readCornerTrack,
   type CornerHandleKey,
@@ -363,10 +364,26 @@ export const FacilityNode = memo(function FacilityNode({
     : isWaypoint
       ? ''
       : facility.customName.trim() || facility.name
+  /*
+   * 拖曳旋轉時的即時角度。
+   *
+   * 拖曳中<strong>不</strong>往上送：上層的旋轉會推一次歷史，一次拖曳就會塞進上百筆，
+   * 復原一次只退 1 度。改成本地先畫，放開手才送出總共轉了多少。
+   */
+  const [liveRotDeg, setLiveRotDeg] = useState<number | null>(null)
+  /*
+   * 同一份角度也放在 ref。
+   *
+   * 送出那一下若寫在 setState 的更新函式裡，StrictMode 會把更新函式跑兩次，
+   * 送出去的角度就變成兩倍——畫面上拖 40 度、放開變 80 度。
+   */
+  const liveRotRef = useRef<number | null>(null)
   const showRot =
-    mqttLive?.rotationDeg !== undefined
-      ? mqttLive.rotationDeg
-      : facility.rotation
+    liveRotDeg !== null
+      ? liveRotDeg
+      : mqttLive?.rotationDeg !== undefined
+        ? mqttLive.rotationDeg
+        : facility.rotation
   const showRotNorm = normalizeDegrees(showRot)
   const angleLabel = `${showRotNorm.toFixed(0)}°`
 
@@ -1064,6 +1081,8 @@ export const FacilityNode = memo(function FacilityNode({
   })()
   const draggingRef = useRef(false)
   const toolbarAnchorRef = useRef<HTMLDivElement>(null)
+  /** 旋轉把手要以元件外框中心為圓心，所以需要拿到根節點 */
+  const rootRef = useRef<HTMLDivElement>(null)
   const dragHistoryPushedRef = useRef(false)
   const resizingRef = useRef(false)
   const resizeHistoryPushedRef = useRef(false)
@@ -1563,6 +1582,7 @@ export const FacilityNode = memo(function FacilityNode({
       if ((e.target as HTMLElement).closest('[data-facility-edge-resize-handle]'))
         return
       if ((e.target as HTMLElement).closest('[data-track-corner-handle]')) return
+      if ((e.target as HTMLElement).closest('[data-facility-rotate-handle]')) return
       if ((e.target as HTMLElement).closest('[data-facility-label-drag]')) return
       if ((e.target as HTMLElement).closest('[data-facility-label-rotate-handle]'))
         return
@@ -2025,9 +2045,9 @@ export const FacilityNode = memo(function FacilityNode({
      一個在上緣、一個在下緣，就落在斜邊的起點上，各自控制那一側的斜切程度。 */
   const [taperDragKey, setTaperDragKey] = useState<TaperHandleKey | null>(null)
   const taperDragRef = useRef<{
-    pointerX: number
+    pointerY: number
     base: ReturnType<typeof readTaperTrack>
-  }>({ pointerX: 0, base: readTaperTrack(undefined) })
+  }>({ pointerY: 0, base: readTaperTrack(undefined) })
 
   const onTaperHandleDown = useCallback(
     (key: TaperHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
@@ -2036,7 +2056,7 @@ export const FacilityNode = memo(function FacilityNode({
       if (readOnly || !onPatchParameters) return
       onTrackCornerEditStart?.()
       taperDragRef.current = {
-        pointerX: e.clientX,
+        pointerY: e.clientY,
         base: readTaperTrack(facilityRef.current.parameters),
       }
       setTaperDragKey(key)
@@ -2052,21 +2072,17 @@ export const FacilityNode = memo(function FacilityNode({
   const onTaperHandleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!taperDragKey || !onPatchParameters) return
-      const { pointerX, base } = taperDragRef.current
-      const w = Math.max(1, nw * mapScale)
-      const dxR = (e.clientX - pointerX) / w
-      const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
-      const next = { ...base }
-      if (taperDragKey === 'topCut') {
-        // 控制點在上緣，往左拉＝切得更多
-        next.topCutRatio = clamp01(base.topCutRatio - dxR)
-      } else {
-        // 控制點在下緣，往右拉＝切得更多
-        next.bottomCutRatio = clamp01(base.bottomCutRatio + dxR)
+      const { pointerY, base } = taperDragRef.current
+      // 控制點在右端面上緣，往下拉＝兩端錯得更開
+      const h = Math.max(1, nh * mapScale)
+      const dyR = (e.clientY - pointerY) / h
+      const next = {
+        ...base,
+        offsetRatio: Math.max(0, Math.min(MAX_TAPER_OFFSET, base.offsetRatio + dyR)),
       }
       onPatchParameters(facilityRef.current.id, { [TAPER_TRACK_KEY]: next })
     },
-    [taperDragKey, mapScale, nw, onPatchParameters],
+    [taperDragKey, mapScale, nh, onPatchParameters],
   )
 
   const onTaperHandleEnd = useCallback(
@@ -2080,6 +2096,79 @@ export const FacilityNode = memo(function FacilityNode({
       }
     },
     [taperDragKey],
+  )
+
+  /* ── 拖曳旋轉 ────────────────────────────────────────────────
+     把手在元件外側，會跟著元件一起轉——就像簡報軟體那樣，指標與把手的相對位置
+     在整段拖曳中保持一致。角度由「元件中心 → 指標」的方位差算出來，所以從把手
+     的哪一點按下去都不影響結果。 */
+  const rotateDragRef = useRef<{
+    centreX: number
+    centreY: number
+    startPointerDeg: number
+    startRotDeg: number
+  } | null>(null)
+
+  const pointerAngleDeg = (cx: number, cy: number, x: number, y: number) =>
+    (Math.atan2(y - cy, x - cx) * 180) / Math.PI
+
+  const onRotateHandleDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation()
+      e.preventDefault()
+      if (readOnly) return
+      const root = rootRef.current
+      if (!root) return
+      const b = root.getBoundingClientRect()
+      const cx = b.left + b.width / 2
+      const cy = b.top + b.height / 2
+      rotateDragRef.current = {
+        centreX: cx,
+        centreY: cy,
+        startPointerDeg: pointerAngleDeg(cx, cy, e.clientX, e.clientY),
+        startRotDeg: facilityRef.current.rotation ?? 0,
+      }
+      liveRotRef.current = facilityRef.current.rotation ?? 0
+      setLiveRotDeg(liveRotRef.current)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [readOnly],
+  )
+
+  const onRotateHandleMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const st = rotateDragRef.current
+    if (!st) return
+    const now = pointerAngleDeg(st.centreX, st.centreY, e.clientX, e.clientY)
+    const raw = st.startRotDeg + (now - st.startPointerDeg)
+    // 按住 Shift 吸到 15 度，方便對齊；平常取整數度
+    const step = e.shiftKey ? 15 : 1
+    liveRotRef.current = Math.round(raw / step) * step
+    setLiveRotDeg(liveRotRef.current)
+  }, [])
+
+  const onRotateHandleEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const st = rotateDragRef.current
+      if (!st) return
+      rotateDragRef.current = null
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      const live = liveRotRef.current
+      liveRotRef.current = null
+      setLiveRotDeg(null)
+      if (live !== null) {
+        const delta = normalizeDegrees(live) - normalizeDegrees(st.startRotDeg)
+        if (Math.abs(delta) > 1e-6) onRotateDelta(facilityRef.current.id, delta)
+      }
+    },
+    [onRotateDelta],
   )
 
   const onTrackCornerPointerDown = useCallback(
@@ -2136,6 +2225,7 @@ export const FacilityNode = memo(function FacilityNode({
 
   return (
     <div
+      ref={rootRef}
       data-facility
       data-facility-root
         className={`absolute left-0 top-0 touch-none select-none ${
@@ -2655,6 +2745,29 @@ export const FacilityNode = memo(function FacilityNode({
             ))}
           </>
         )}
+        {/*
+          * 拖曳旋轉把手。
+          *
+          * 放在右緣外側、跟著元件一起轉——工具列的 ±1 度按鈕留在原位不動，這個是
+          * 給「大概轉到那個角度」用的。按住 Shift 吸到 15 度。
+          */}
+        {selected && !readOnly && !isTrackCrossover && (
+          <div
+            data-facility-rotate-handle
+            role="presentation"
+            className="absolute z-[82] cursor-grab touch-none active:cursor-grabbing"
+            style={{ left: nw + 10, top: nh / 2, transform: 'translate(0, -50%)' }}
+            title="拖曳旋轉（按住 Shift 吸到 15 度）"
+            onPointerDown={onRotateHandleDown}
+            onPointerMove={onRotateHandleMove}
+            onPointerUp={onRotateHandleEnd}
+            onPointerCancel={onRotateHandleEnd}
+          >
+            <div className="flex size-5 items-center justify-center rounded-full border-2 border-cyan-400 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40">
+              <RotateCw className="size-3 text-cyan-300" aria-hidden />
+            </div>
+          </div>
+        )}
         {isCornerTrack && cornerTrackGeom && selected && !readOnly && onPatchParameters && (
           <>
             {(() => {
@@ -2693,26 +2806,22 @@ export const FacilityNode = memo(function FacilityNode({
         {isTaperTrack && taperTrackGeom && selected && !readOnly && onPatchParameters && (
           <>
             {(() => {
-              const h = taperTrackHandlesPx(taperTrackGeom, nw, nh)
-              const items: Array<[TaperHandleKey, { x: number; y: number }, string]> = [
-                ['topCut', h.topCut, '拖曳調整上方斜切程度'],
-                ['bottomCut', h.bottomCut, '拖曳調整下方斜切程度'],
-              ]
-              return items.map(([key, pt, title]) => (
+              const pt = taperTrackHandlesPx(taperTrackGeom, nw, nh).offset
+              return [
                 <div
-                  key={key}
+                  key="offset"
                   data-taper-track-handle
-                  className="absolute z-[86] cursor-ew-resize touch-none"
+                  className="absolute z-[86] cursor-ns-resize touch-none"
                   style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title={title}
-                  onPointerDown={(e) => onTaperHandleDown(key, e)}
+                  title="拖曳調整兩端的錯位"
+                  onPointerDown={(e) => onTaperHandleDown('offset', e)}
                   onPointerMove={onTaperHandleMove}
                   onPointerUp={onTaperHandleEnd}
                   onPointerCancel={onTaperHandleEnd}
                 >
-                  <div className="size-3 rounded-full border-2 border-amber-400 bg-zinc-900 shadow-md" />
-                </div>
-              ))
+                  <div className="size-3 rotate-45 border-2 border-amber-400 bg-amber-500 shadow-md" />
+                </div>,
+              ]
             })()}
           </>
         )}

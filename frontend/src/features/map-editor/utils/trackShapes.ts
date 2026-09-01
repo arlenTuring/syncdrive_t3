@@ -288,18 +288,17 @@ export function cornerTrackEndsPx(
   }
 }
 
-/** 斜帶兩端的中點：a 在左邊、b 在右邊（未旋轉時） */
+/** 斜帶兩端面的中點：a 在左邊、b 在右邊（未旋轉時） */
 export function taperTrackEndsPx(
   g: TaperTrackGeometry,
   boxWPx: number,
   boxHPx: number,
 ): { a: ShapePoint; b: ShapePoint } {
   const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const tc = Math.max(0, Math.min(1, g.topCutRatio))
-  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
+  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
   return {
-    a: T(0, (0 + (h - bc * h)) / 2),
-    b: T(w, (tc * h + h) / 2),
+    a: T(0, (h - d) / 2),
+    b: T(w, (h + d) / 2),
   }
 }
 
@@ -317,10 +316,13 @@ export const CORNER_TRACK_KEY = 'cornerTrack'
  * 與圓角軌道一樣存比例而不是公尺：外框只管大小、比例只管形狀，縮放與拖點互不干擾。
  */
 export type TaperTrackGeometry = {
-  /** 上方斜切程度，佔外框的比例（0–1）。0＝不切 */
-  topCutRatio: number
-  /** 下方斜切程度，佔外框的比例（0–1） */
-  bottomCutRatio: number
+  /**
+   * 兩端的垂直錯位，佔外框高的比例（0–0.9）。0＝矩形。
+   *
+   * 只有<strong>一個</strong>數字：兩條斜邊本來就平行，用兩個比例去描述同一件事，
+   * 使用者得拉兩次才對得起來，還可能拉成不平行的怪形狀。
+   */
+  offsetRatio: number
   /** 方位（度，螢幕座標順時針為正） */
   entryDeg: number
 }
@@ -328,10 +330,12 @@ export type TaperTrackGeometry = {
 export const TAPER_TRACK_KEY = 'taperTrack'
 
 export const DEFAULT_TAPER_TRACK: TaperTrackGeometry = {
-  topCutRatio: 0.45,
-  bottomCutRatio: 0.45,
+  offsetRatio: 0.4,
   entryDeg: 0,
 }
+
+/** 錯位拉滿就退化成一條線，留一點餘裕 */
+export const MAX_TAPER_OFFSET = 0.9
 
 /** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
 export const DEFAULT_TAPER_TRACK_SIZE_M = { w: 60, h: 40 }
@@ -341,14 +345,23 @@ export function readTaperTrack(
 ): TaperTrackGeometry {
   const raw = parameters?.[TAPER_TRACK_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TAPER_TRACK }
-  const o = raw as Partial<TaperTrackGeometry>
-  const ratio = (v: unknown, fallback: number) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : fallback
+  const o = raw as Partial<TaperTrackGeometry> & {
+    topCutRatio?: number
+    bottomCutRatio?: number
+  }
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  /*
+   * 舊資料存的是上下兩個切角比例。那組值描述的是同一條斜邊，取兩者平均換算過來，
+   * 已經放在地圖上的斜接軌道才不會在改版後突然變回矩形。
+   */
+  const legacy =
+    num(o.topCutRatio) !== null || num(o.bottomCutRatio) !== null
+      ? 1 - ((num(o.topCutRatio) ?? 0) + (num(o.bottomCutRatio) ?? 0)) / 2
+      : null
+  const raw2 = num(o.offsetRatio) ?? legacy ?? DEFAULT_TAPER_TRACK.offsetRatio
   return {
-    topCutRatio: ratio(o.topCutRatio, DEFAULT_TAPER_TRACK.topCutRatio),
-    bottomCutRatio: ratio(o.bottomCutRatio, DEFAULT_TAPER_TRACK.bottomCutRatio),
-    entryDeg:
-      typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg) ? o.entryDeg : 0,
+    offsetRatio: Math.max(0, Math.min(MAX_TAPER_OFFSET, raw2)),
+    entryDeg: num(o.entryDeg) ?? 0,
   }
 }
 
@@ -375,22 +388,24 @@ function taperSpin(g: TaperTrackGeometry, boxWPx: number, boxHPx: number) {
   return { w, h, T }
 }
 
-/** 填色外框：右上與左下各切一刀，兩條斜邊平行 */
+/**
+ * 填色外框：一個平行四邊形。
+ *
+ * 左端面從上緣往下，右端面往下錯開 offset；兩條斜邊平行，兩端等寬。offset 為 0
+ * 時退回矩形。
+ */
 export function taperTrackPath(
   g: TaperTrackGeometry,
   boxWPx: number,
   boxHPx: number,
 ): string {
   const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const tc = Math.max(0, Math.min(1, g.topCutRatio))
-  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
-  const pts = [
+  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
+  const pts: Array<[number, number]> = [
     [0, 0],
-    [w - tc * w, 0],
-    [w, tc * h],
+    [w, d],
     [w, h],
-    [bc * w, h],
-    [0, h - bc * h],
+    [0, h - d],
   ]
   return `${pts
     .map(([x, y], i) => {
@@ -400,19 +415,15 @@ export function taperTrackPath(
     .join(' ')} Z`
 }
 
-export type TaperHandleKey = 'topCut' | 'bottomCut'
+export type TaperHandleKey = 'offset'
 
-/** 兩個控制點（像素）：一個在上緣、一個在下緣，就在斜邊的起點上 */
+/** 唯一的控制點：右端面的上緣，往上下拉就改變兩端的錯位 */
 export function taperTrackHandlesPx(
   g: TaperTrackGeometry,
   boxWPx: number,
   boxHPx: number,
 ): Record<TaperHandleKey, { x: number; y: number }> {
   const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const tc = Math.max(0, Math.min(1, g.topCutRatio))
-  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
-  return {
-    topCut: T(w - tc * w, 0),
-    bottomCut: T(bc * w, h),
-  }
+  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
+  return { offset: T(w, d) }
 }

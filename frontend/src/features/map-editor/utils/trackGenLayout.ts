@@ -4,6 +4,7 @@ import {
   cornerArcCentrePx,
   cornerTrackEndsPx,
   taperTrackEndsPx,
+  MAX_TAPER_OFFSET,
   type CornerTrackGeometry,
   type TaperTrackGeometry,
 } from './trackShapes'
@@ -154,24 +155,21 @@ function fitCorner(
 }
 
 /**
- * 挑一個方位與位置，讓斜帶兩端落在 p0／p1 上。
+ * 解出方位、外框與錯位，讓斜帶兩端落在 p0／p1 上、且帶寬等於 bandWM。
  *
- * <h3>切角比例怎麼來的</h3>
- * 兩條斜邊的水平間距是 2·w·(1−t)，把它換算成垂直於斜向的寬度再令其等於帶寬，
- * 就得到 t。直接用 1−帶寬/長邊會得到兩倍寬的帶子——實測渡線畫出來是一坨方塊
- * 帶著兩個缺口，不是一條斜帶。
+ * <h3>直接解，不要近似</h3>
+ * 斜帶的兩個端面是垂直線段，高 f；帶的方向是 (dx, dy)。垂直於帶的寬度是
+ * f·dx/√(dx²+dy²)，令它等於帶寬就解得 f。外框因此是 dx × (dy + f)，錯位比例是
+ * dy/(dy+f)。先前拿外接方框再回推比例，帶寬會差將近一倍。
  *
- * <h3>位置用算的，不用猜</h3>
- * 決定方位與比例之後，兩端的位置就固定了；把方框平移到讓兩端落在目標點上即可。
- * 先前拿外接方框硬套，端點自然對不上相鄰的軌道。
+ * 四種方位 × 兩種端點配對共八種擺法，只有一種能讓形狀在自己的座標系裡是
+ * 「往右下走」；八種都算一次殘差取最小，就不必自己推該轉幾度。
  */
 function fitTaper(
   p0: Vec2,
   p1: Vec2,
   bandWM: number,
 ): { geometry: TaperTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } {
-  const wM = Math.max(bandWM, Math.abs(p1.x - p0.x) + bandWM)
-  const hM = Math.max(bandWM, Math.abs(p1.y - p0.y) + bandWM)
   let best: {
     geometry: TaperTrackGeometry
     box: { xM: number; yM: number; wM: number; hM: number }
@@ -179,32 +177,45 @@ function fitTaper(
   } | null = null
 
   for (const entryDeg of QUARTERS) {
-    // 轉 90 度時形狀的寬高互換，切角比例要在互換後的座標系裡算
-    const swap = entryDeg % 180 !== 0
-    const w = swap ? hM : wM
-    const h = swap ? wM : hM
-    const diag = Math.hypot(w, h)
-    const cut = Math.max(0, Math.min(1, 1 - (bandWM * diag) / (2 * w * h)))
-    const geometry: TaperTrackGeometry = {
-      topCutRatio: cut,
-      bottomCutRatio: cut,
-      entryDeg,
-    }
-    const ends = taperTrackEndsPx(geometry, wM, hM)
-    for (const [ea, eb, ta, tb] of [
-      [ends.a, ends.b, p0, p1],
-      [ends.a, ends.b, p1, p0],
-    ] as Array<[typeof ends.a, typeof ends.b, Vec2, Vec2]>) {
+    for (const [ta, tb] of [
+      [p0, p1],
+      [p1, p0],
+    ] as Array<[Vec2, Vec2]>) {
+      // 把目標向量轉回形狀自己的座標系
+      const v = rotate({ x: tb.x - ta.x, y: tb.y - ta.y }, -entryDeg)
+      if (v.x <= 1e-6 || v.y < -1e-6) continue
+      const dx = v.x
+      const dy = Math.max(0, v.y)
+      const len = Math.hypot(dx, dy)
+      const f = Math.min((bandWM * len) / dx, 1e6)
+      const W = dx
+      const H = dy + f
+      const offsetRatio = Math.max(0, Math.min(MAX_TAPER_OFFSET, dy / Math.max(1e-6, H)))
+      const geometry: TaperTrackGeometry = { offsetRatio, entryDeg }
+      // 轉 90 度時形狀的寬高在世界座標裡互換
+      const wM = entryDeg % 180 === 0 ? W : H
+      const hM = entryDeg % 180 === 0 ? H : W
+      const ends = taperTrackEndsPx(geometry, wM, hM)
       // 平移量取兩端各自需要的位移的平均，殘差就是兩者的差
-      const dx = ((ta.x - ea.x) + (tb.x - eb.x)) / 2
-      const dy = ((ta.y - ea.y) + (tb.y - eb.y)) / 2
-      const err = Math.hypot(ta.x - ea.x - dx, ta.y - ea.y - dy) * 2
+      const ex = ((ta.x - ends.a.x) + (tb.x - ends.b.x)) / 2
+      const ey = ((ta.y - ends.a.y) + (tb.y - ends.b.y)) / 2
+      const err = Math.hypot(ta.x - ends.a.x - ex, ta.y - ends.a.y - ey) * 2
       if (!best || err < best.err) {
-        best = { geometry, box: { xM: dx, yM: dy, wM, hM }, err }
+        best = { geometry, box: { xM: ex, yM: ey, wM, hM }, err }
       }
     }
   }
-  return { geometry: best!.geometry, box: best!.box }
+  if (best) return { geometry: best.geometry, box: best.box }
+  // 兩點重合之類的退化情形：給一個等寬的方塊，至少畫得出來
+  return {
+    geometry: { offsetRatio: 0, entryDeg: 0 },
+    box: {
+      xM: Math.min(p0.x, p1.x) - bandWM / 2,
+      yM: Math.min(p0.y, p1.y) - bandWM / 2,
+      wM: Math.max(bandWM, Math.abs(p1.x - p0.x)),
+      hM: Math.max(bandWM, Math.abs(p1.y - p0.y)),
+    },
+  }
 }
 
 /**
@@ -379,13 +390,25 @@ export function layoutTrackGen(
       const sig = `${Math.round(a[0] / 10)}:${Math.round(b[0] / 10)}:${[la, lb].sort().join(',')}`
       if (seenCrossovers.has(sig)) continue
       seenCrossovers.add(sig)
-      const pa = placePoint(a[0], latOfLevel(la), placed, lt)
-      const pb = placePoint(b[0], latOfLevel(lb), placed, lt)
+      /*
+       * 沿線長度至少撐到跟橫移量一樣（最陡 45 度）。
+       *
+       * 橫向放大 9 倍之後，20 公尺內換三股道會橫移 90 公尺——照實畫是一根幾乎
+       * 垂直、穿過上下行的尖刺。簡圖上渡線該是一條看得出來的斜線，所以以里程
+       * 中點為中心把兩端撐開。
+       */
+      const latDeltaM = Math.abs(latOfLevel(la) - latOfLevel(lb)) * lt
+      const sMid = (a[0] + b[0]) / 2
+      const half = Math.max(Math.abs(b[0] - a[0]), latDeltaM) / 2
+      const sA = sMid - half
+      const sB = sMid + half
+      const pa = placePoint(sA, latOfLevel(la), placed, lt)
+      const pb = placePoint(sB, latOfLevel(lb), placed, lt)
       if (la === lb) {
-        addRect(tag, lane.role, pa, pb, a[0], b[0])
+        addRect(tag, lane.role, pa, pb, sA, sB)
       } else {
         const { geometry, box } = fitTaper(pa, pb, bandW)
-        shapes.push({ kind: 'taper', name: tag, role: lane.role, geometry, box, sFrom: a[0], sTo: b[0] })
+        shapes.push({ kind: 'taper', name: tag, role: lane.role, geometry, box, sFrom: sA, sTo: sB })
         pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
       }
       continue
