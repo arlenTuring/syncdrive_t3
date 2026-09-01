@@ -12,16 +12,44 @@ import {
 /**
  * 生成結果 → 版面形狀。
  *
- * <h3>為什麼要有這一層</h3>
- * 預覽與「套用到地圖」原本各自算一次位置，兩邊算法一有差異就對不起來——實際發生
- * 過：套用出來的軌道方向是反的、ㄩ 形也散掉了。現在兩邊都吃這一支的輸出，
- * 對不起來在結構上就不可能。
+ * <h3>只用三種軌道元件</h3>
+ * 整張圖只由這三種拼出來，沒有第四種東西：
+ *
+ *   一般軌道   矩形，畫直線段
+ *   圓角軌道   四分之一等寬弧帶，畫轉角
+ *   斜接軌道   平行四邊形，畫換股道
+ *
+ * <h3>演算法</h3>
+ * 每一條車道都走同一條路，主線、側線、渡線不分特例：
+ *
+ * <ol>
+ *   <li>把車道的橫向偏移吸到<strong>整數股道</strong>（buildLaneLevels）。真實的側線可以
+ *       岔到幾十公尺外，簡圖要表達的是「在第幾股」而不是距離。</li>
+ *   <li>依股道把車道切成一段一段——股道不變的一段就是一個區段。</li>
+ *   <li>每個區段再依<strong>脊線</strong>切開，各自落在哪一段脊線上就畫成哪一種：
+ *     <ul>
+ *       <li>直線脊線段 → 一般軌道（主線再依「每塊目標長度」細分成 D01／U01…）</li>
+ *       <li>彎道脊線段 → 圓角軌道，整段一個</li>
+ *     </ul>
+ *   </li>
+ *   <li>相鄰兩個區段的股道不同 → 中間放一段斜接軌道，兩側的一般軌道讓出位置。</li>
+ * </ol>
+ *
+ * <h3>兩條由元件本身決定的限制</h3>
+ * 圓角軌道是<strong>四分之一</strong>，畫不出半段弧，所以一條線只要走進某段彎道就佔滿
+ * 那整段；覆蓋不到兩成的視為沒有經過（否則一公尺的擦邊也會長出一個完整轉角）。
+ * 斜接軌道是<strong>一段直的</strong>平行四邊形，所以只放在直線脊線段上；換股道發生在
+ * 彎道上時就不畫那一段斜接，兩側的軌道直接相接。
  *
  * <h3>方位不用推的，用試的</h3>
  * 圓角與斜接軌道的形狀由元件自己的 path 函式決定，方位只有 90 度的倍數四種。
  * 排版<strong>不自己推</strong>該轉幾度——推錯過一次，整個轉角平移了一個外框的距離，
- * 而且畫面上看起來只是「位置怪怪的」，很難聯想到是角度慣例不一致。現在改成四種
- * 都試，挑兩端最貼合目標點的那一種，排版與繪製就不可能各說各話。
+ * 而且畫面上看起來只是「位置怪怪的」，很難聯想到是角度慣例不一致。現在四種都試，
+ * 挑兩端最貼合目標點的那一種，排版與繪製就不可能各說各話。
+ *
+ * <h3>與「套用到地圖」共用</h3>
+ * 預覽與套用原本各自算一次位置，兩邊算法一有差異就對不起來——實際發生過：套用出來
+ * 的軌道方向是反的、ㄩ 形也散掉了。兩邊都吃這一支的輸出，對不起來在結構上就不可能。
  *
  * 單位是<strong>版面公尺</strong>：沿線是真實公尺，橫向乘上放大倍率。上下行只差
  * 3.5 公尺，不放大會黏成一條線。真實座標另外由 refPoints 換算，不混在這裡。
@@ -259,12 +287,11 @@ function fitTaper(
 function buildLaneLevels(
   lanes: ProjectedLane[],
   mainLateralM: number,
-): { levelOf: (lateralM: number) => number; levelOfLane: Map<string, number> } {
+): { levelOf: (lateralM: number) => number } {
   const mean = (l: ProjectedLane) =>
     l.profile.reduce((a, p) => a + p[1], 0) / Math.max(1, l.profile.length)
 
   const sidings = lanes.filter((l) => l.role === 'siding')
-  const levelOfLane = new Map<string, number>()
   // 代表性橫向距離：主線兩條先佔 0 與 1
   const reps: Array<{ level: number; lateralM: number }> = [
     { level: 0, lateralM: 0 },
@@ -275,14 +302,8 @@ function buildLaneLevels(
   const hi = Math.max(0, mainLateralM)
   const outer = sidings.filter((l) => mean(l) > hi).sort((a, b) => mean(a) - mean(b))
   const inner = sidings.filter((l) => mean(l) < lo).sort((a, b) => mean(b) - mean(a))
-  outer.forEach((l, i) => {
-    levelOfLane.set(l.key, 2 + i)
-    reps.push({ level: 2 + i, lateralM: mean(l) })
-  })
-  inner.forEach((l, i) => {
-    levelOfLane.set(l.key, -1 - i)
-    reps.push({ level: -1 - i, lateralM: mean(l) })
-  })
+  outer.forEach((l, i) => reps.push({ level: 2 + i, lateralM: mean(l) }))
+  inner.forEach((l, i) => reps.push({ level: -1 - i, lateralM: mean(l) }))
 
   const levelOf = (lateralM: number) => {
     let best = reps[0]!
@@ -291,29 +312,98 @@ function buildLaneLevels(
     }
     return best.level
   }
-  return { levelOf, levelOfLane }
+  return { levelOf }
 }
 
 /**
- * 只保留落在直線脊線段上的里程區間。
+ * 把一條車道切成「股道不變」的一段一段。
  *
- * 側線橫跨轉角時，用頭尾兩點拉一條矩形會拉出一條弦——畫面上是一根從轉角斜刺
- * 出去的棒子。轉角的側線在簡圖上不畫，比畫歪更乾淨。
+ * <h3>短段不能一律往前併</h3>
+ * 渡線是連續漸變的：吸到整數股之後會得到一串各自只有幾公尺的小段。一律往前併的話
+ * 整條渡線會被併成單一股道，換股道那件事就消失了——實測 10 條渡線一條斜接軌道都沒
+ * 生出來。改成反覆挑<strong>最短</strong>的一段，併進股道比較接近的那個鄰居。
+ *
+ * 剖面的里程不保證遞增（車道方向與參考線相反時就是遞減），所以先排序。
  */
-function straightSpans(
+function laneRuns(
+  lane: ProjectedLane,
+  minRunM: number,
+  levelOf: (lateralM: number) => number,
+): Array<{ sFrom: number; sTo: number; level: number }> {
+  const prof = [...lane.profile].sort((a, b) => a[0] - b[0])
+  if (prof.length < 2) return []
+  let runs: Array<{ sFrom: number; sTo: number; level: number }> = []
+  for (const [s, lat] of prof) {
+    const n = levelOf(lat)
+    const last = runs[runs.length - 1]
+    if (last && last.level === n) last.sTo = s
+    else runs.push({ sFrom: last ? last.sTo : s, sTo: s, level: n })
+  }
+
+  const coalesce = () => {
+    const out: typeof runs = []
+    for (const r of runs) {
+      const last = out[out.length - 1]
+      if (last && last.level === r.level) last.sTo = r.sTo
+      else out.push({ ...r })
+    }
+    runs = out
+  }
+  coalesce()
+
+  while (runs.length > 1) {
+    let worst = -1
+    let worstLen = Infinity
+    for (let i = 0; i < runs.length; i += 1) {
+      const len = runs[i]!.sTo - runs[i]!.sFrom
+      if (len < worstLen) {
+        worstLen = len
+        worst = i
+      }
+    }
+    if (worstLen >= minRunM) break
+    const prev = runs[worst - 1]
+    const next = runs[worst + 1]
+    const r = runs[worst]!
+    // 併進股道比較接近的鄰居；一樣近就併進比較長的那一個
+    const dPrev = prev ? Math.abs(prev.level - r.level) : Infinity
+    const dNext = next ? Math.abs(next.level - r.level) : Infinity
+    const intoPrev =
+      dPrev < dNext ||
+      (dPrev === dNext && !!prev && (!next || prev.sTo - prev.sFrom >= next.sTo - next.sFrom))
+    if (intoPrev && prev) prev.sTo = r.sTo
+    else if (next) next.sFrom = r.sFrom
+    else break
+    runs.splice(worst, 1)
+    coalesce()
+  }
+  return runs.filter((r) => r.sTo - r.sFrom > 1)
+}
+
+/** 把一段里程依脊線切開，回傳每一小段落在哪一種脊線上 */
+function spinePieces(
   placed: ReturnType<typeof placeSpine>,
   sFrom: number,
   sTo: number,
-): Array<[number, number]> {
-  const out: Array<[number, number]> = []
-  for (const seg of placed) {
-    if (seg.kind !== 'straight') continue
+): Array<{ kind: 'straight' | 'arc'; sFrom: number; sTo: number; segIndex: number }> {
+  const out: Array<{ kind: 'straight' | 'arc'; sFrom: number; sTo: number; segIndex: number }> = []
+  placed.forEach((seg, segIndex) => {
     const a = Math.max(sFrom, seg.sFrom)
     const b = Math.min(sTo, seg.sTo)
-    if (b - a > 1) out.push([a, b])
-  }
-  return out
+    if (b - a <= 1e-6) return
+    out.push({ kind: seg.kind, sFrom: a, sTo: b, segIndex })
+  })
+  return out.sort((x, y) => x.sFrom - y.sFrom)
 }
+
+/**
+ * 走進彎道要佔多少比例才算「經過」。
+ *
+ * 圓角軌道是四分之一，畫不出半段弧，所以經過就得佔滿整段。門檻放太低的後果實測
+ * 過：SD-5 只走過那個轉角的四分之一，卻被畫成整整 90 度的弧，而且它在第三股、
+ * 半徑比主線大一倍多，整條甩到主線外面去，比主線還顯眼。過半才算經過。
+ */
+const ARC_COVERAGE_MIN = 0.5
 
 export function layoutTrackGen(
   result: TrackGenResult,
@@ -325,16 +415,25 @@ export function layoutTrackGen(
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
 
+  const mainLateral = result.blocks[0]?.lateralM ?? LANE_W_M
+  const { levelOf } = buildLaneLevels(result.lanes, mainLateral)
+  const latOfLevel = (level: number) => level * mainLateral
+
+  /* ── 三種元件各一支產生函式 ─────────────────────────────── */
+
   const addRect = (
     name: string,
     role: LaneRole,
-    p0: Vec2,
-    p1: Vec2,
     sFrom: number,
     sTo: number,
+    latM: number,
     realLatFromM: number,
     realLatToM = realLatFromM,
   ) => {
+    const p0 = placePoint(sFrom, latM, placed, lt)
+    const p1 = placePoint(sTo, latM, placed, lt)
+    const lengthM = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+    if (lengthM < 0.5) return
     const rect: LayoutRect = {
       kind: 'rect',
       name,
@@ -343,206 +442,252 @@ export function layoutTrackGen(
       realLatToM,
       samples: [p0, p1],
       centre: { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 },
-      lengthM: Math.hypot(p1.x - p0.x, p1.y - p0.y),
+      lengthM,
       widthM: bandW,
       rotationDeg: (Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180) / Math.PI,
       sFrom,
       sTo,
     }
-    if (rect.lengthM < 0.5) return
     shapes.push(rect)
     pts.push(...rectCorners(rect))
   }
 
-  for (const b of result.blocks) {
-    for (const [lat, name, role] of [
-      [0, b.nameDown, 'down'],
-      [b.lateralM, b.nameUp, 'up'],
-    ] as Array<[number, string, LaneRole]>) {
-      if (b.spineKind === 'straight') {
-        addRect(
-          name,
-          role,
-          placePoint(b.sFrom, lat, placed, lt),
-          placePoint(b.sTo, lat, placed, lt),
-          b.sFrom,
-          b.sTo,
-          lat,
-        )
+  const addCorner = (
+    name: string,
+    role: LaneRole,
+    segIndex: number,
+    latM: number,
+    realLatM: number,
+  ) => {
+    const seg = placed[segIndex]
+    if (!seg || seg.kind !== 'arc') return
+    const centreRadius = Math.abs(seg.radiusPx - seg.sign * latM * lt)
+    const outerR = centreRadius + bandW / 2
+    const p0 = placePoint(seg.sFrom, latM, placed, lt)
+    const p1 = placePoint(seg.sTo, latM, placed, lt)
+    const samples: Vec2[] = []
+    for (let i = 0; i <= 12; i += 1) {
+      samples.push(placePoint(seg.sFrom + ((seg.sTo - seg.sFrom) * i) / 12, latM, placed, lt))
+    }
+    const { geometry, box } = fitCorner(seg.centre, outerR, bandW, p0, p1)
+    shapes.push({
+      kind: 'corner',
+      name,
+      role,
+      realLatFromM: realLatM,
+      realLatToM: realLatM,
+      samples,
+      geometry,
+      box,
+      outerRadiusM: outerR,
+      sFrom: seg.sFrom,
+      sTo: seg.sTo,
+    })
+    pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
+  }
+
+  const addTaper = (
+    name: string,
+    role: LaneRole,
+    sA: number,
+    latA: number,
+    sB: number,
+    latB: number,
+    realLatFromM: number,
+    realLatToM: number,
+  ) => {
+    const pa = placePoint(sA, latA, placed, lt)
+    const pb = placePoint(sB, latB, placed, lt)
+    const { geometry, box } = fitTaper(pa, pb, bandW)
+    shapes.push({
+      kind: 'taper',
+      name,
+      role,
+      realLatFromM,
+      realLatToM,
+      samples: [pa, pb],
+      geometry,
+      box,
+      sFrom: sA,
+      sTo: sB,
+    })
+    pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
+  }
+
+  /**
+   * 一段「股道不變」的區段 → 依脊線拆成一般軌道與圓角軌道。
+   *
+   * subdivide 是主線用的：直線段再依「每塊目標長度」切成 D01／U01… 那些塊。
+   */
+  const emitRun = (
+    tag: string,
+    role: LaneRole,
+    level: number,
+    sFrom: number,
+    sTo: number,
+    realLatAt: (s: number) => number,
+    subdivide: number | null,
+    nameAt: ((index: number) => string) | null,
+  ) => {
+    const latM = latOfLevel(level)
+    let n = 0
+    for (const piece of spinePieces(placed, sFrom, sTo)) {
+      const seg = placed[piece.segIndex]!
+      if (piece.kind === 'arc') {
+        // 圓角軌道是四分之一：擦到一點邊不算經過，經過就佔滿整段
+        const cover = (piece.sTo - piece.sFrom) / Math.max(1e-6, seg.sTo - seg.sFrom)
+        if (cover < ARC_COVERAGE_MIN) continue
+        addCorner(nameAt ? nameAt(n++) : `${tag}.C`, role, piece.segIndex, latM, realLatAt((seg.sFrom + seg.sTo) / 2))
         continue
       }
-
-      /*
-       * 彎道：整段一段弧帶。
-       *
-       * 用區塊<strong>中點</strong>去找所屬脊線段：區塊里程存進結果時做過四捨五入，
-       * 拿端點配 1e-6 的容差會配不到，整個彎道就不見了。
-       */
-      const mid = (b.sFrom + b.sTo) / 2
-      const seg = placed.find((q) => q.kind === 'arc' && mid >= q.sFrom && mid <= q.sTo)
-      if (!seg || seg.kind !== 'arc') continue
-      const centreRadius = Math.abs(seg.radiusPx - seg.sign * lat * lt)
-      const outerR = centreRadius + bandW / 2
-      const p0 = placePoint(b.sFrom, lat, placed, lt)
-      const p1 = placePoint(b.sTo, lat, placed, lt)
-      const { geometry, box } = fitCorner(seg.centre, outerR, bandW, p0, p1)
-      const arcSamples: Vec2[] = []
-      for (let i = 0; i <= 12; i += 1) {
-        arcSamples.push(placePoint(b.sFrom + ((b.sTo - b.sFrom) * i) / 12, lat, placed, lt))
+      const span = piece.sTo - piece.sFrom
+      const count = subdivide ? Math.max(1, Math.round(span / subdivide)) : 1
+      const step = span / count
+      for (let k = 0; k < count; k += 1) {
+        const a = piece.sFrom + k * step
+        const b = a + step
+        addRect(
+          nameAt ? nameAt(n++) : count > 1 ? `${tag}.${k + 1}` : tag,
+          role,
+          a,
+          b,
+          latM,
+          realLatAt(a),
+          realLatAt(b),
+        )
       }
-      shapes.push({
-        kind: 'corner',
-        name,
-        role,
-        realLatFromM: lat,
-        realLatToM: lat,
-        samples: arcSamples,
-        geometry,
-        box,
-        outerRadiusM: outerR,
-        sFrom: b.sFrom,
-        sTo: b.sTo,
-      })
-      pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
+    }
+  }
+
+  /* ── 主線：股道固定，整條走一次 ─────────────────────────── */
+
+  const mainRealLat = (role: LaneRole) => {
+    const pts2 = result.lanes
+      .filter((l) => l.role === role)
+      .flatMap((l) => l.profile)
+      .sort((a, b) => a[0] - b[0])
+    if (!pts2.length) return () => 0
+    return (s: number) => {
+      if (s <= pts2[0]![0]) return pts2[0]![1]
+      if (s >= pts2[pts2.length - 1]![0]) return pts2[pts2.length - 1]![1]
+      let lo = 0
+      let hi = pts2.length - 1
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1
+        if (pts2[mid]![0] <= s) lo = mid
+        else hi = mid
+      }
+      const w = Math.max(1e-6, pts2[hi]![0] - pts2[lo]![0])
+      const u = (s - pts2[lo]![0]) / w
+      return pts2[lo]![1] + (pts2[hi]![1] - pts2[lo]![1]) * u
     }
   }
 
   /*
-   * 渡線與側線。
-   *
-   * 照真實的橫向偏移畫，側線會飛出畫面外——真實路網的側線本來就可以岔到很遠。
-   * 簡圖只表達「在第幾股」，所以先照橫向距離排序發股道號碼，再照號碼擺。
+   * 主線的塊名沿用生成結果裡的編號（D01／U01…）。那份編號就是「直線段依每塊長度
+   * 切開、彎道整段一塊」，與這裡的規則一致，直接照著發名字即可。
    */
-  const mainLateral = result.blocks[0]?.lateralM ?? LANE_W_M
-  const { levelOf, levelOfLane } = buildLaneLevels(result.lanes, mainLateral)
-  const latOfLevel = (level: number) => level * mainLateral
+  for (const [level, role, names] of [
+    [0, 'down', result.blocks.map((b) => b.nameDown)],
+    [1, 'up', result.blocks.map((b) => b.nameUp)],
+  ] as Array<[number, LaneRole, string[]]>) {
+    emitRun(
+      role === 'down' ? 'D' : 'U',
+      role,
+      level,
+      0,
+      result.totalM,
+      mainRealLat(role),
+      settings.blockLengthM,
+      (i) => names[i] ?? `${role === 'down' ? 'D' : 'U'}${String(i + 1).padStart(2, '0')}`,
+    )
+  }
+
+  /* ── 側線與渡線：同一條規則，只是股道會變 ───────────────── */
 
   /*
    * 同一條渡線在 OpenDRIVE 裡有正反兩個方向的車道，投影出來是同一段里程、同一組
    * 股道。兩條都畫會疊在一起，看起來像一坨有缺口的方塊——簡圖上一條就夠了。
    */
-  const seenCrossovers = new Set<string>()
+  const seen = new Set<string>()
 
-  /*
-   * 側線實際畫出來的股道與里程。
-   *
-   * 渡線是通往側線的；側線若整段落在彎道上而被裁掉，那條渡線就會指向一個不存在
-   * 的東西、孤零零地戳在圖面外面——實測 SD-5 被裁光之後，X-14 與 X-15 就變成兩片
-   * 橫在轉角旁邊的尖角。所以先把側線畫完、記下涵蓋範圍，渡線再依此決定畫不畫。
-   */
-  const sidingCoverage: Array<{ level: number; sFrom: number; sTo: number }> = []
-
-  const sideLanes = result.lanes.filter(
-    (l) => l.role === 'siding' || l.role === 'crossover',
-  )
-  for (const lane of [
-    ...sideLanes.filter((l) => l.role === 'siding'),
-    ...sideLanes.filter((l) => l.role === 'crossover'),
-  ]) {
+  for (const lane of result.lanes) {
+    if (lane.role === 'down' || lane.role === 'up') continue
     if (lane.role === 'crossover' && !settings.showCrossovers) continue
     if (lane.role === 'siding' && !settings.showSidings) continue
     const prof = [...lane.profile].sort((a, b) => a[0] - b[0])
     if (prof.length < 2) continue
     const tag = `${lane.role === 'crossover' ? 'X' : 'SD'}-${lane.key.replace(':', '_')}`
 
-    if (lane.role === 'crossover') {
-      const a = prof[0]!
-      const b = prof[prof.length - 1]!
-      const la = levelOf(a[1])
-      const lb = levelOf(b[1])
-      const sig = `${Math.round(a[0] / 10)}:${Math.round(b[0] / 10)}:${[la, lb].sort().join(',')}`
-      if (seenCrossovers.has(sig)) continue
-      seenCrossovers.add(sig)
-      /*
-       * 沿線長度至少撐到跟橫移量一樣（最陡 45 度）。
-       *
-       * 橫向放大 9 倍之後，20 公尺內換三股道會橫移 90 公尺——照實畫是一根幾乎
-       * 垂直、穿過上下行的尖刺。簡圖上渡線該是一條看得出來的斜線，所以以里程
-       * 中點為中心把兩端撐開。
-       */
-      const latDeltaM = Math.abs(latOfLevel(la) - latOfLevel(lb)) * lt
-      const sMid = (a[0] + b[0]) / 2
-      let half = Math.max(Math.abs(b[0] - a[0]), latDeltaM) / 2
-      /*
-       * 撐開之後不可以跨進彎道。
-       *
-       * 斜接軌道是一段直的平行四邊形；兩端一旦一個落在直線段、一個落在弧上，中間
-       * 那條直線就會橫切過整個轉角——實測 X-15 被撐到 1146–1209，而直線段 1193 就
-       * 結束，畫出來是一根刺穿轉角的尖角。所以先夾回中點所在的那一段直線裡。
-       */
-      const host = placed.find(
-        (q) => q.kind === 'straight' && sMid >= q.sFrom && sMid <= q.sTo,
-      )
-      if (host) {
-        half = Math.min(half, sMid - host.sFrom, host.sTo - sMid)
-      }
-      const sA = sMid - half
-      const sB = sMid + half
-      // 夾完太短就不畫：比自己的帶寬還短的斜帶只是一小塊斜方塊，看不出是渡線
-      if (sB - sA < bandW * 0.4) continue
-      // 通往側線的渡線，目的股道要真的有畫出側線才畫
-      const needsSiding = [la, lb].filter((v) => v !== 0 && v !== 1)
-      const reachable = needsSiding.every((level) =>
-        sidingCoverage.some(
-          (c) => c.level === level && c.sTo >= sA - bandW && c.sFrom <= sB + bandW,
-        ),
-      )
-      if (!reachable) continue
-
-      const pa = placePoint(sA, latOfLevel(la), placed, lt)
-      const pb = placePoint(sB, latOfLevel(lb), placed, lt)
-      if (la === lb) {
-        addRect(tag, lane.role, pa, pb, sA, sB, a[1], b[1])
-      } else {
-        const { geometry, box } = fitTaper(pa, pb, bandW)
-        shapes.push({
-          kind: 'taper',
-          name: tag,
-          role: lane.role,
-          realLatFromM: a[1],
-          realLatToM: b[1],
-          samples: [pa, pb],
-          geometry,
-          box,
-          sFrom: sA,
-          sTo: sB,
-        })
-        pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
-      }
-      continue
-    }
-
-    // 側線：整條一股，只畫在直線段上
-    const lat = latOfLevel(levelOfLane.get(lane.key) ?? levelOf(prof[0]![1]))
-    // 真實橫向偏移照剖面查，不能用吸過股道的那個值
     const realLatAt = (s: number) => {
       let best = prof[0]!
       for (const p of prof) if (Math.abs(p[0] - s) < Math.abs(best[0] - s)) best = p
       return best[1]
     }
-    const spans = straightSpans(placed, prof[0]![0], prof[prof.length - 1]![0])
+
+    const span = prof[prof.length - 1]![0] - prof[0]![0]
+    const runs = laneRuns(lane, Math.min(12, span / 3), levelOf)
+    if (!runs.length) continue
+
+    const sig = `${Math.round(prof[0]![0] / 10)}:${Math.round(prof[prof.length - 1]![0] / 10)}:${runs
+      .map((r) => r.level)
+      .join(',')}`
+    if (seen.has(sig)) continue
+    seen.add(sig)
+
     /*
-     * 太短的殘段不畫。
+     * 換股道那一段由斜接軌道佔住，兩側的區段各自讓出一半。
      *
-     * 側線只畫在直線脊線段上，落在轉角那一段會被裁掉；剩下幾公尺的殘段比自己的
-     * 帶寬還短，畫出來是一個與任何東西都不相連的小方塊——實測 SD-5 只剩 6 與 8
-     * 公尺，浮在轉角外面。寧可不畫。
+     * 長度取「實際換股用掉的里程」與「橫移量」的較大者：橫向放大 9 倍之後，20 公尺
+     * 內換三股會橫移 90 公尺，照實畫是一根幾乎垂直、穿過上下行的尖刺；撐開之後最陡
+     * 就是 45 度。撐開後不可以跨進彎道，因為斜接軌道是一段直的平行四邊形——兩端一個
+     * 落在直線、一個落在弧上，中間那條直線會橫切過整個轉角。
      */
-    const drawn = spans.filter(([a, b]) => b - a >= bandW * 0.6)
-    const level = levelOfLane.get(lane.key) ?? levelOf(prof[0]![1])
-    drawn.forEach(([a, b]) => sidingCoverage.push({ level, sFrom: a, sTo: b }))
-    drawn.forEach(([a, b], i) => {
-      addRect(
-        drawn.length > 1 ? `${tag}.${i + 1}` : tag,
+    const halves = runs.map(() => ({ before: 0, after: 0 }))
+    const tapers: Array<{ sA: number; sB: number; i: number }> = []
+    for (let i = 0; i + 1 < runs.length; i += 1) {
+      const a = runs[i]!
+      const b = runs[i + 1]!
+      const sc = (a.sTo + b.sFrom) / 2
+      const host = placed.find((q) => q.kind === 'straight' && sc >= q.sFrom && sc <= q.sTo)
+      if (!host) continue
+      const latDelta = Math.abs(latOfLevel(a.level) - latOfLevel(b.level)) * lt
+      let half = Math.max(b.sFrom - a.sTo, latDelta) / 2
+      half = Math.min(half, sc - host.sFrom, host.sTo - sc)
+      if (half * 2 < bandW * 0.4) continue
+      halves[i]!.after = Math.max(0, sc - half - a.sTo) + (a.sTo - (sc - half))
+      halves[i + 1]!.before = sc + half - b.sFrom
+      tapers.push({ sA: sc - half, sB: sc + half, i })
+    }
+
+    runs.forEach((run, i) => {
+      const from = run.sFrom + Math.max(0, halves[i]!.before)
+      const to = run.sTo - Math.max(0, halves[i]!.after)
+      if (to - from <= 1e-6) return
+      emitRun(
+        runs.length > 1 ? `${tag}.${i + 1}` : tag,
         lane.role,
-        placePoint(a, lat, placed, lt),
-        placePoint(b, lat, placed, lt),
-        a,
-        b,
-        realLatAt(a),
-        realLatAt(b),
+        run.level,
+        from,
+        to,
+        realLatAt,
+        null,
+        null,
       )
     })
+
+    for (const t of tapers) {
+      addTaper(
+        `${tag}.T${t.i + 1}`,
+        lane.role,
+        t.sA,
+        latOfLevel(runs[t.i]!.level),
+        t.sB,
+        latOfLevel(runs[t.i + 1]!.level),
+        realLatAt(t.sA),
+        realLatAt(t.sB),
+      )
+    }
   }
 
   const xs = pts.map((p) => p.x)
@@ -558,7 +703,6 @@ export function layoutTrackGen(
   }
 }
 
-/** 矩形的四角（預覽用） */
 export function rectPolygon(r: LayoutRect): Vec2[] {
   return rectCorners(r)
 }
