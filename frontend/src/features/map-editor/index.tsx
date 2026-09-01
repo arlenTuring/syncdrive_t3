@@ -2287,26 +2287,28 @@ export default function MapEditorApp({
       const areaId = String(seq++).padStart(3, '0')
       const ps = mapPixelSizeRef.current
       const blank = createBlankArea(areaId, ps)
-      // Area 的網域＝生成結果的示意座標範圍；版面沿用底下那個生成元件的框，
-      // 這樣「套用」出來的東西與畫面上看到的比例一致。
       const area: MapAreaObject = {
         ...blank,
-        customName: `${basemap.customName || '軌道生成'} 套用`,
+        customName: `${basemap.customName || '軌道生成'} 軌道`,
         /*
-         * 高度依版面的長寬比算，不要沿用生成元件的框。
+         * 生成出來的東西<strong>完全沿用軌道生成元件的框</strong>——同位置、同寬、同高。
          *
-         * Area 是把公尺網域對映到像素框，兩邊長寬比不同就會非等比縮放——套用出來
-         * 的垂直段會被壓扁，ㄩ 形整個走樣。等比才會與預覽一致。
+         * 先前高度是照示意版面的長寬比另外算的：橫向放大 9 倍會讓 ㄩ 形變得又高又
+         * 窄，算出來的高度遠超過使用者拉好的框，生成完就整片溢出畫面。
+         *
+         * 現在寬高就是使用者事先拉好的比例：他把路網拉到滿意的大小，按下生成，軌道
+         * 就落在同樣大小的矩形裡。網域對映因此是非等比的（橫向與縱向各自縮放），
+         * 與元件裡的中心線畫法一致。
+         *
+         * 位置擺在元件<strong>正下方</strong>，不是疊上去：Area 畫在底圖之上，疊上去會
+         * 整片蓋住生成元件，使用者就按不到「重新生成」與「更換路網」了。
          */
         layout: {
           ...blank.layout,
           xPx: basemap.layout.xPx,
           yPx: basemap.layout.yPx + basemap.layout.hPx + 24,
           wPx: basemap.layout.wPx,
-          hPx: Math.max(
-            80,
-            Math.round(basemap.layout.wPx * (built.extentM.hM / built.extentM.wM)),
-          ),
+          hPx: basemap.layout.hPx,
         },
         domain: {
           xMinM: 0,
