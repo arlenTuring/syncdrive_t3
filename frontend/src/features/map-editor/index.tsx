@@ -200,7 +200,7 @@ import {
 import {
   CORNER_TRACK_KEY,
   DEFAULT_CORNER_TRACK,
-  defaultTaperTrack,
+  DEFAULT_TAPER_TRACK,
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
 import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
@@ -2089,6 +2089,22 @@ export default function MapEditorApp({
           },
         }
       }
+      if (item.type === 'Track' && item.name === 'RailTaper') {
+        return {
+          id,
+          type: 'Track',
+          name: 'RailTaper',
+          customName: '',
+          areaPosition,
+          position: positionMeters,
+          rotation: 0,
+          currentState: getDefaultStateForType('Track'),
+          parameters: {
+            ...defaultRefFieldParametersForType('Track'),
+            [TAPER_TRACK_KEY]: { ...DEFAULT_TAPER_TRACK },
+          },
+        }
+      }
       if (item.type === 'Track' && item.name === 'RailCorner') {
         return {
           id,
@@ -2109,7 +2125,7 @@ export default function MapEditorApp({
         return {
           id,
           type: 'TrackCrossover',
-          name: item.name === 'RailTaper' ? 'RailTaper' : 'TrackCrossover',
+          name: 'TrackCrossover',
           customName: '',
           areaPosition,
           position: positionMeters,
@@ -2120,14 +2136,6 @@ export default function MapEditorApp({
               positionMeters.x,
               positionMeters.y,
             ),
-            ...(item.name === 'RailTaper'
-              ? {
-                  [TAPER_TRACK_KEY]: defaultTaperTrack({
-                    x: positionMeters.x,
-                    y: positionMeters.y,
-                  }),
-                }
-              : {}),
           },
         }
       }
@@ -2273,12 +2281,21 @@ export default function MapEditorApp({
       const area: MapAreaObject = {
         ...blank,
         customName: `${basemap.customName || '軌道生成'} 套用`,
+        /*
+         * 高度依版面的長寬比算，不要沿用生成元件的框。
+         *
+         * Area 是把公尺網域對映到像素框，兩邊長寬比不同就會非等比縮放——套用出來
+         * 的垂直段會被壓扁，ㄩ 形整個走樣。等比才會與預覽一致。
+         */
         layout: {
           ...blank.layout,
           xPx: basemap.layout.xPx,
           yPx: basemap.layout.yPx + basemap.layout.hPx + 24,
           wPx: basemap.layout.wPx,
-          hPx: basemap.layout.hPx,
+          hPx: Math.max(
+            80,
+            Math.round(basemap.layout.wPx * (built.extentM.hM / built.extentM.wM)),
+          ),
         },
         domain: {
           xMinM: 0,
@@ -2290,28 +2307,30 @@ export default function MapEditorApp({
       }
 
       const facilities = built.facilities.map((f) => {
-        const areaPosition = {
-          x: (f.layout.xM / built.extentM.wM) * area.layout.wPx,
-          // areaPosition 的原點在左下、y 向上；示意座標是左上、y 向下
-          y:
-            area.layout.hPx
-            - ((f.layout.yM + f.layout.hM) / built.extentM.hM) * area.layout.hPx,
-        }
+        const pxPerX = area.layout.wPx / built.extentM.wM
+        const pxPerY = area.layout.hPx / built.extentM.hM
         const areaSizePx = {
-          w: Math.max(1, (f.layout.wM / built.extentM.wM) * area.layout.wPx),
-          h: Math.max(1, (f.layout.hM / built.extentM.hM) * area.layout.hPx),
+          w: Math.max(1, f.box.wM * pxPerX),
+          h: Math.max(1, f.box.hM * pxPerY),
         }
         return {
           id: f.id,
           type: f.type,
           name: f.name,
           customName: f.customName,
-          rotation: f.rotation,
-          currentState: f.currentState,
-          parameters: f.parameters,
-          areaPosition,
+          // 版面座標的 y 向下，areaPosition 的原點在左下、y 向上
+          areaPosition: {
+            x: f.box.xM * pxPerX,
+            y: area.layout.hPx - (f.box.yM + f.box.hM) * pxPerY,
+          },
           areaSizePx,
-          position: { x: f.layout.xM, y: built.extentM.hM - f.layout.yM - f.layout.hM },
+          position: {
+            x: f.box.xM,
+            y: built.extentM.hM - f.box.yM - f.box.hM,
+          },
+          rotation: f.rotation,
+          currentState: null,
+          parameters: f.parameters,
         } as unknown as FacilityObject
       })
 

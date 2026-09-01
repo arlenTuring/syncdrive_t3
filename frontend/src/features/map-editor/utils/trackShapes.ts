@@ -9,7 +9,8 @@
  * 所以拆成三種可獨立操作的軌道：
  *
  *   一般軌道    矩形，既有的 Track
- *   圓角軌道    直腳 → 圓弧 → 直腳，等寬。兩端可拉長，圓弧半徑可調
+ *   圓角軌道    等寬弧帶：外緣一條弧、內緣一條弧。四個角分別調外緣半徑、
+ *               內緣半徑、與兩端直段長度
  *   斜接軌道    四邊形，兩端各自有寬度。端點吸附到別的軌道後寬度跟著對方走
  *
  * 斜接軌道兩端寬度可以不同是<strong>刻意</strong>的：接合的目的就是與對手齊寬，
@@ -20,113 +21,213 @@ export type ShapePoint = { x: number; y: number }
 
 /* ── 圓角軌道 ───────────────────────────────────────────────── */
 
+/**
+ * 圓角軌道：四分之一橢圓的弧帶。
+ *
+ * 未旋轉時右邊與下面是直邊，弧從右上掃到左下——與簡報軟體那個「圓弧／派」是同
+ * 一種形狀。圓角矩形做不出內側那條弧（CSS 的圓角只修外框），所以走自訂路徑。
+ *
+ * <h3>為什麼存比例而不是公尺</h3>
+ * 三個半徑若以公尺存，元件一縮放就得同步改四個數字，少改一個形狀就走樣；而且
+ * 外框大小與弧的大小會互相牽制——外弧半徑等於外框寬時就再也拉不大，看起來像
+ * 控制點壞掉。改成<strong>相對外框的比例</strong>之後，外框只管大小、比例只管形狀，
+ * 縮放與拖點互不干擾。
+ */
 export type CornerTrackGeometry = {
-  /** 軌道寬（公尺） */
-  widthM: number
-  /** 中心線圓弧半徑（公尺） */
-  radiusM: number
-  /** 進入端直線段長度（公尺） */
-  legInM: number
-  /** 離開端直線段長度（公尺） */
-  legOutM: number
-  /** 轉角，正值左轉、負值右轉。目前只用 ±90 */
-  turnDeg: number
+  /** 弧的水平半徑，佔外框寬的比例（0–1） */
+  arcXRatio: number
+  /** 弧的垂直半徑，佔外框高的比例（0–1） */
+  arcYRatio: number
+  /** 內弧深度＝帶寬，佔較短半徑的比例（0–1）。1＝實心的四分之一 */
+  depthRatio: number
+  /**
+   * 外弧彎度。0.5＝直線切角，1≈正圓，拉到上限＝直角。
+   *
+   * 兩個端點由 arcXRatio／arcYRatio 決定，不受這個值影響。
+   */
+  outerBulge: number
+  /**
+   * 內弧彎度，與外弧<strong>各自獨立</strong>。
+   *
+   * 兩條弧共用一個彎度的話，調外弧會把內弧一起帶著跑——那不是使用者的意思，
+   * 他要的是各調各的。
+   */
+  innerBulge: number
+  /** 方位（度，螢幕座標順時針為正）。0＝直邊在右與下 */
+  entryDeg: number
 }
 
 export const DEFAULT_CORNER_TRACK: CornerTrackGeometry = {
-  widthM: 3.5,
-  radiusM: 12,
-  legInM: 8,
-  legOutM: 8,
-  turnDeg: -90,
+  arcXRatio: 1,
+  arcYRatio: 1,
+  depthRatio: 0.3,
+  outerBulge: 1,
+  innerBulge: 1,
+  entryDeg: 0,
 }
 
-/** 圓角軌道的外接尺寸（公尺），用來決定設施的 areaSizePx */
-export function cornerTrackSizeM(g: CornerTrackGeometry): { w: number; h: number } {
-  const half = g.widthM / 2
-  const outer = g.radiusM + half
-  return {
-    w: Math.max(0.5, g.legInM + outer),
-    h: Math.max(0.5, g.legOutM + outer),
-  }
-}
+/** 0.5＝兩端點連成直線的切角 */
+export const MIN_CORNER_BULGE = 0.5
+/** 到達上限就直接畫成直角，不再用曲線逼近 */
+export const MAX_CORNER_BULGE = 2.4
+
+/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
+export const DEFAULT_CORNER_TRACK_SIZE_M = { w: 60, h: 60 }
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 /**
- * 圓角軌道的填色外框。
+ * 弧帶的填色外框。
  *
- * 以左上角為原點的區域座標（y 向下）產生；進入端在左、離開端在下，
- * 其餘方向靠設施本身的 rotationDeg 轉。
- *
- * 外緣與內緣各自是「直線 → 圓弧 → 直線」，兩者半徑差一個軌道寬，
- * 所以整條路徑等寬、沒有接縫。
+ * 直接以元件的像素尺寸產生，所以拖曳邊角改變大小時形狀跟著等比變化。
+ * 弧的圓心在右下角；內弧半徑各減去帶寬，帶寬達到半徑時就不畫內弧。
  */
 export function cornerTrackPath(
   g: CornerTrackGeometry,
-  pxPerMX: number,
-  pxPerMY: number,
+  boxWPx: number,
+  boxHPx: number,
 ): string {
-  const half = g.widthM / 2
-  const rOuter = g.radiusM + half
-  const rInner = Math.max(0, g.radiusM - half)
-  const size = cornerTrackSizeM(g)
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  // 轉 90 度時形狀的寬高互換，先在「未旋轉」的座標系裡算
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+
+  const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
+  const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
+  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
+  const irx = rx - d
+  const iry = ry - d
+  const solid = irx <= 0.5 || iry <= 0.5
+
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const P = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return `${(ocx + dx).toFixed(2)} ${(ocy + dy).toFixed(2)}`
+  }
 
   /*
-   * 圓心就在直腳結束的地方：水平進來走 legIn 之後開始轉彎，
-   * 所以圓心 x 等於 legIn，y 等於「半寬 ＋ 半徑」也就是 rOuter。
-   * 外緣是半徑 rOuter 的弧、內緣是 rInner，兩者同心，整段才會等寬。
+   * 弧用二次貝茲曲線畫，控制點沿著「弦中點 → 方框角」這條對角線移動。
+   *
+   * 圓弧做不到「拉到底變直角」——弧永遠是弧。貝茲可以：控制點推到方框角外側時
+   * 曲線就貼上兩條邊，這時直接改畫兩段直線，得到真正的直角。
+   *
+   *   0.5   控制點在弦中點 → 直線切角
+   *   1     ≈ 正圓的四分之一
+   *   上限  直角
    */
-  const cx = g.legInM
-  const cy = rOuter
+  const bez = (
+    px1: number, py1: number,
+    px2: number, py2: number,
+    ax: number, ay: number,
+    q: number,
+    cornerX: number, cornerY: number,
+  ): string => {
+    if (q >= MAX_CORNER_BULGE - 1e-6) {
+      return `L ${P(cornerX, cornerY)} L ${P(px2, py2)}`
+    }
+    return `Q ${P(ax - (ax - cornerX) * (q - 0.5) * 2, ay - (ay - cornerY) * (q - 0.5) * 2)} ${P(px2, py2)}`
+  }
 
-  const X = (m: number) => (m * pxPerMX).toFixed(2)
-  const Y = (m: number) => (m * pxPerMY).toFixed(2)
+  const qOuter = Math.max(MIN_CORNER_BULGE, Math.min(MAX_CORNER_BULGE, g.outerBulge || 1))
+  const qInner = Math.max(MIN_CORNER_BULGE, Math.min(MAX_CORNER_BULGE, g.innerBulge || 1))
+  // 弦中點與方框角：控制點就在這兩點的連線上
+  const oMidX = w - rx / 2
+  const oMidY = h - ry / 2
+  const oCorX = w - rx
+  const oCorY = h - ry
+  const iMidX = w - irx / 2
+  const iMidY = h - iry / 2
+  const iCorX = w - irx
+  const iCorY = h - iry
 
-  // 外緣：從左端上緣出發，往右到弧起點，繞外弧到下方，再往下到離開端
-  const outerStart = { x: 0, y: cy - rOuter }
-  const outerArcEnd = { x: cx + rOuter, y: cy }
-  // 內緣：回程
-  const innerStart = { x: cx + rInner, y: cy }
-  const innerArcEnd = { x: 0, y: cy - rInner }
-
-  const rx = (rOuter * pxPerMX).toFixed(2)
-  const ry = (rOuter * pxPerMY).toFixed(2)
-  const irx = (rInner * pxPerMX).toFixed(2)
-  const iry = (rInner * pxPerMY).toFixed(2)
-
+  if (solid) {
+    return [
+      `M ${P(w, h)}`,
+      `L ${P(w, h - ry)}`,
+      bez(w, h - ry, w - rx, h, oMidX, oMidY, qOuter, oCorX, oCorY),
+      'Z',
+    ].join(' ')
+  }
   return [
-    `M ${X(outerStart.x)} ${Y(outerStart.y)}`,
-    `L ${X(cx)} ${Y(outerStart.y)}`,
-    `A ${rx} ${ry} 0 0 0 ${X(outerArcEnd.x)} ${Y(outerArcEnd.y)}`,
-    `L ${X(outerArcEnd.x)} ${Y(size.h)}`,
-    `L ${X(innerStart.x)} ${Y(size.h)}`,
-    `L ${X(innerStart.x)} ${Y(cy)}`,
-    rInner > 0
-      ? `A ${irx} ${iry} 0 0 1 ${X(cx)} ${Y(innerArcEnd.y)}`
-      : `L ${X(cx)} ${Y(innerArcEnd.y)}`,
-    `L ${X(innerArcEnd.x)} ${Y(innerArcEnd.y)}`,
+    `M ${P(w, h - ry)}`,
+    bez(w, h - ry, w - rx, h, oMidX, oMidY, qOuter, oCorX, oCorY),
+    `L ${P(w - irx, h)}`,
+    // 內弧反向走：從下邊回到右邊
+    (() => {
+      if (qInner >= MAX_CORNER_BULGE - 1e-6) {
+        return `L ${P(iCorX, iCorY)} L ${P(w, h - iry)}`
+      }
+      const cx2 = iMidX - (iMidX - iCorX) * (qInner - 0.5) * 2
+      const cy2 = iMidY - (iMidY - iCorY) * (qInner - 0.5) * 2
+      return `Q ${P(cx2, cy2)} ${P(w, h - iry)}`
+    })(),
     'Z',
   ].join(' ')
 }
 
-/** 兩個端點與半徑控制點的位置（公尺，左上原點） */
-export function cornerTrackHandlesM(g: CornerTrackGeometry): {
-  endIn: ShapePoint
-  endOut: ShapePoint
-  radius: ShapePoint
-} {
-  const half = g.widthM / 2
-  const rOuter = g.radiusM + half
-  const cx = g.legInM
-  const cy = rOuter
-  const size = cornerTrackSizeM(g)
+export type CornerHandleKey = 'arcY' | 'arcX' | 'outer' | 'depth'
+
+/**
+ * 四個控制點（像素，相對元件左上角）。
+ *
+ * 兩個落在弧與直邊的交點上，另外兩個落在外弧與內弧的中點——位置就在它所控制
+ * 的那條線上。
+ */
+export function cornerTrackHandlesPx(
+  g: CornerTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): Record<CornerHandleKey, { x: number; y: number }> {
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const rx = clamp01(g.arcXRatio) * w
+  const ry = clamp01(g.arcYRatio) * h
+  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const T = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return { x: ocx + dx, y: ocy + dy }
+  }
+  /*
+   * 控制點放在曲線的中點上。二次貝茲在 t=0.5 的位置是 (P1 + 2Q + P2)/4，
+   * 代入控制點的定義後化簡，中點離圓心的比例正好是 (2q + 1)/4——
+   * q=0.5 時 0.5（弦中點）、q=1 時 0.75（≈正圓）、拉到上限就是方框角。
+   */
+  const qO = Math.max(MIN_CORNER_BULGE, Math.min(MAX_CORNER_BULGE, g.outerBulge || 1))
+  const qI = Math.max(MIN_CORNER_BULGE, Math.min(MAX_CORNER_BULGE, g.innerBulge || 1))
+  const frac = (q: number) => (q >= MAX_CORNER_BULGE - 1e-6 ? 1 : (2 * q + 1) / 4)
+  const fo = frac(qO)
+  const fi = frac(qI)
+  const ir = Math.max(0, rx - d)
+  const iry2 = Math.max(0, ry - d)
   return {
-    endIn: { x: 0, y: cy - g.radiusM },
-    endOut: { x: cx + g.radiusM, y: size.h },
-    // 半徑控制點在中心線圓弧的中點，往外拉＝半徑變大
-    radius: {
-      x: cx + g.radiusM * Math.SQRT1_2,
-      y: cy - g.radiusM * Math.SQRT1_2,
-    },
+    arcY: T(w, h - ry),
+    arcX: T(w - rx, h),
+    outer: T(w - rx * fo, h - ry * fo),
+    depth: T(w - ir * fi, h - iry2 * fi),
   }
 }
 
@@ -136,17 +237,20 @@ export function readCornerTrack(
   const raw = parameters?.[CORNER_TRACK_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_CORNER_TRACK }
   const o = raw as Partial<CornerTrackGeometry>
-  const num = (v: unknown, fallback: number, min = 0) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.max(min, v) : fallback
+  const ratio = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? clamp01(v) : fallback
+  const bulge = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v)
+      ? Math.max(MIN_CORNER_BULGE, Math.min(MAX_CORNER_BULGE, v))
+      : fallback
   return {
-    widthM: num(o.widthM, DEFAULT_CORNER_TRACK.widthM, 0.2),
-    radiusM: num(o.radiusM, DEFAULT_CORNER_TRACK.radiusM, 0),
-    legInM: num(o.legInM, DEFAULT_CORNER_TRACK.legInM),
-    legOutM: num(o.legOutM, DEFAULT_CORNER_TRACK.legOutM),
-    turnDeg:
-      typeof o.turnDeg === 'number' && Number.isFinite(o.turnDeg)
-        ? o.turnDeg
-        : DEFAULT_CORNER_TRACK.turnDeg,
+    arcXRatio: ratio(o.arcXRatio, DEFAULT_CORNER_TRACK.arcXRatio),
+    arcYRatio: ratio(o.arcYRatio, DEFAULT_CORNER_TRACK.arcYRatio),
+    depthRatio: ratio(o.depthRatio, DEFAULT_CORNER_TRACK.depthRatio),
+    outerBulge: bulge(o.outerBulge, DEFAULT_CORNER_TRACK.outerBulge),
+    innerBulge: bulge(o.innerBulge, DEFAULT_CORNER_TRACK.innerBulge),
+    entryDeg:
+      typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg) ? o.entryDeg : 0,
   }
 }
 
@@ -154,132 +258,112 @@ export const CORNER_TRACK_KEY = 'cornerTrack'
 
 /* ── 斜接軌道 ───────────────────────────────────────────────── */
 
-export type TaperTrackEnd = {
-  /** 端點在圖面上的位置（公尺） */
-  xM: number
-  yM: number
-  /** 該端的軌道寬（公尺）。接合後會等於對方軌道的寬度 */
-  widthM: number
-  /** 已接合的軌道 id；null＝未接合 */
-  attachedTrackId: string | null
-}
-
+/**
+ * 斜接軌道：矩形切掉兩個對角。
+ *
+ * 未旋轉時切的是<strong>右上</strong>與<strong>左下</strong>，兩條斜邊平行——這就是兩條
+ * 平行股道之間換線那一段的樣子。上下兩個切角各自一個控制點，可以切得不一樣多；
+ * 兩邊都切到 0 就退回矩形。
+ *
+ * 與圓角軌道一樣存比例而不是公尺：外框只管大小、比例只管形狀，縮放與拖點互不干擾。
+ */
 export type TaperTrackGeometry = {
-  a: TaperTrackEnd
-  b: TaperTrackEnd
+  /** 上方斜切程度，佔外框的比例（0–1）。0＝不切 */
+  topCutRatio: number
+  /** 下方斜切程度，佔外框的比例（0–1） */
+  bottomCutRatio: number
+  /** 方位（度，螢幕座標順時針為正） */
+  entryDeg: number
 }
 
 export const TAPER_TRACK_KEY = 'taperTrack'
 
-export function defaultTaperTrack(
-  centre: ShapePoint,
-  lengthM = 24,
-  widthM = 3.5,
-): TaperTrackGeometry {
-  // 預設放一個平行四邊形：兩端等寬、稍微斜著，一看就知道是用來斜接的
-  const halfLen = lengthM / 2
-  const offset = widthM * 1.6
-  return {
-    a: {
-      xM: centre.x - halfLen,
-      yM: centre.y - offset / 2,
-      widthM,
-      attachedTrackId: null,
-    },
-    b: {
-      xM: centre.x + halfLen,
-      yM: centre.y + offset / 2,
-      widthM,
-      attachedTrackId: null,
-    },
-  }
+export const DEFAULT_TAPER_TRACK: TaperTrackGeometry = {
+  topCutRatio: 0.45,
+  bottomCutRatio: 0.45,
+  entryDeg: 0,
 }
+
+/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
+export const DEFAULT_TAPER_TRACK_SIZE_M = { w: 60, h: 40 }
 
 export function readTaperTrack(
   parameters: Record<string, unknown> | undefined,
-): TaperTrackGeometry | null {
+): TaperTrackGeometry {
   const raw = parameters?.[TAPER_TRACK_KEY]
-  if (!raw || typeof raw !== 'object') return null
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_TAPER_TRACK }
   const o = raw as Partial<TaperTrackGeometry>
-  const end = (e: Partial<TaperTrackEnd> | undefined): TaperTrackEnd | null => {
-    if (!e || typeof e.xM !== 'number' || typeof e.yM !== 'number') return null
-    return {
-      xM: e.xM,
-      yM: e.yM,
-      widthM:
-        typeof e.widthM === 'number' && Number.isFinite(e.widthM)
-          ? Math.max(0.2, e.widthM)
-          : 3.5,
-      attachedTrackId:
-        typeof e.attachedTrackId === 'string' ? e.attachedTrackId : null,
-    }
-  }
-  const a = end(o.a)
-  const b = end(o.b)
-  return a && b ? { a, b } : null
-}
-
-/**
- * 斜接軌道的四個角（公尺，圖面座標）。
- *
- * 兩端各自以自己的寬度往<strong>垂直於連線方向</strong>張開。兩端寬度不同時
- * 就是一個梯形，那正是與不同寬度的軌道齊接時該有的樣子。
- */
-export function taperTrackCorners(g: TaperTrackGeometry): ShapePoint[] {
-  const dx = g.b.xM - g.a.xM
-  const dy = g.b.yM - g.a.yM
-  const len = Math.hypot(dx, dy) || 1
-  const nx = -dy / len
-  const ny = dx / len
-  const ha = g.a.widthM / 2
-  const hb = g.b.widthM / 2
-  return [
-    { x: g.a.xM + nx * ha, y: g.a.yM + ny * ha },
-    { x: g.b.xM + nx * hb, y: g.b.yM + ny * hb },
-    { x: g.b.xM - nx * hb, y: g.b.yM - ny * hb },
-    { x: g.a.xM - nx * ha, y: g.a.yM - ny * ha },
-  ]
-}
-
-export function taperTrackAabbM(g: TaperTrackGeometry): {
-  xMinM: number
-  yMinM: number
-  xMaxM: number
-  yMaxM: number
-} {
-  const pts = taperTrackCorners(g)
+  const ratio = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : fallback
   return {
-    xMinM: Math.min(...pts.map((p) => p.x)),
-    yMinM: Math.min(...pts.map((p) => p.y)),
-    xMaxM: Math.max(...pts.map((p) => p.x)),
-    yMaxM: Math.max(...pts.map((p) => p.y)),
+    topCutRatio: ratio(o.topCutRatio, DEFAULT_TAPER_TRACK.topCutRatio),
+    bottomCutRatio: ratio(o.bottomCutRatio, DEFAULT_TAPER_TRACK.bottomCutRatio),
+    entryDeg:
+      typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg) ? o.entryDeg : 0,
   }
 }
 
-/** 以 AABB 左上角為原點的填色外框 */
+function taperSpin(g: TaperTrackGeometry, boxWPx: number, boxHPx: number) {
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const T = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return { x: ocx + dx, y: ocy + dy }
+  }
+  return { w, h, T }
+}
+
+/** 填色外框：右上與左下各切一刀，兩條斜邊平行 */
 export function taperTrackPath(
   g: TaperTrackGeometry,
-  pxPerMX: number,
-  pxPerMY: number,
+  boxWPx: number,
+  boxHPx: number,
 ): string {
-  const aabb = taperTrackAabbM(g)
-  const pts = taperTrackCorners(g).map((p) => ({
-    x: (p.x - aabb.xMinM) * pxPerMX,
-    // 圖面公尺是 y 向上，畫面 y 向下
-    y: (aabb.yMaxM - p.y) * pxPerMY,
-  }))
+  const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
+  const tc = Math.max(0, Math.min(1, g.topCutRatio))
+  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
+  const pts = [
+    [0, 0],
+    [w - tc * w, 0],
+    [w, tc * h],
+    [w, h],
+    [bc * w, h],
+    [0, h - bc * h],
+  ]
   return `${pts
-    .map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+    .map(([x, y], i) => {
+      const p = T(x, y)
+      return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+    })
     .join(' ')} Z`
 }
 
-export function translateTaperTrack(
+export type TaperHandleKey = 'topCut' | 'bottomCut'
+
+/** 兩個控制點（像素）：一個在上緣、一個在下緣，就在斜邊的起點上 */
+export function taperTrackHandlesPx(
   g: TaperTrackGeometry,
-  dxM: number,
-  dyM: number,
-): TaperTrackGeometry {
+  boxWPx: number,
+  boxHPx: number,
+): Record<TaperHandleKey, { x: number; y: number }> {
+  const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
+  const tc = Math.max(0, Math.min(1, g.topCutRatio))
+  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
   return {
-    a: { ...g.a, xM: g.a.xM + dxM, yM: g.a.yM + dyM },
-    b: { ...g.b, xM: g.b.xM + dxM, yM: g.b.yM + dyM },
+    topCut: T(w - tc * w, 0),
+    bottomCut: T(bc * w, h),
   }
 }

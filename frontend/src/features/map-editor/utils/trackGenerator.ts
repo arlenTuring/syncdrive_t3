@@ -359,7 +359,13 @@ export function generateTracks(
   const blocks: TrackBlock[] = []
   for (const seg of spine) {
     const span = seg.sTo - seg.sFrom
-    const n = Math.max(1, Math.round(span / blockLengthM))
+    /*
+     * 彎道<strong>不切</strong>：整段就是一個圓角軌道。
+     *
+     * 照直線的長度去切彎道，會把一個轉角變成好幾塊小碎片——畫面上看起來破碎，
+     * 而且轉角本來就是一個物件，切開之後每一塊都要各自對齊，接縫只會更多。
+     */
+    const n = seg.kind === 'arc' ? 1 : Math.max(1, Math.round(span / blockLengthM))
     const step = span / n
     for (let k = 0; k < n; k += 1) {
       const sFrom = seg.sFrom + k * step

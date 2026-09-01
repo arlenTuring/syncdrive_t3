@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
 import { Plus, Route } from 'lucide-react'
 import type { LaneCenterlinePlan } from '../opendrive/laneCenterlines'
+import type { TrackGenSettings } from '../utils/trackGenFacility'
 import {
-  placePoint,
-  placeSpine,
-  type TrackGenSettings,
-} from '../utils/trackGenFacility'
+  bandPolygon,
+  LANE_W_M,
+  layoutTrackGen,
+  rectPolygon,
+} from '../utils/trackGenLayout'
 import type { LaneRole, TrackGenResult, Vec2 } from '../utils/trackGenerator'
 
 /**
@@ -15,8 +17,6 @@ import type { LaneRole, TrackGenResult, Vec2 } from '../utils/trackGenerator'
  * （畫出上下行軌道、渡線與側線）。中心線先畫出來，是為了讓使用者在按下生成
  * 之前就能確認載進來的是不是對的路網。
  */
-
-const LANE_W_M = 3.35
 
 const ROLE_STROKE: Record<LaneRole, string> = {
   down: '#7f9ec2',
@@ -82,88 +82,69 @@ export function TrackGenGraphic({
   /**
    * 已生成的軌道。
    *
-   * 每一塊都畫成<strong>封閉多邊形</strong>而不是一條粗線。相鄰兩塊共用同一組端點，
-   * 所以接縫處是完全貼合的；粗線的做法在橫向偏移改變的地方會撕出裂縫與尖角，
-   * 那正是先前看起來破碎的原因。
-   *
-   * 三種形狀對應三種軌道元件：直線段是矩形、彎道是環狀扇形、渡線與側線是
-   * 兩端各自有寬度的四邊形。
+   * 形狀由 layoutTrackGen 算出——與「套用到地圖」<strong>同一支</strong>。兩邊各自算
+   * 位置時對不起來過：套用出來方向是反的、ㄩ 形也散掉。共用一份就不會再發生。
    */
   const generated = useMemo(() => {
     if (!result || !result.spine.length) return null
-    // 沿線固定 1 px/m：整體尺寸交給 fitTransform，由元件大小決定。
-    const placed = placeSpine(result.spine, 1, settings.cornerRadiusM)
-    const lt = settings.lateralScale
-    const halfW = (LANE_W_M / 2) * lt
-
-    type Poly = { role: LaneRole; key: string; pts: Vec2[] }
-    const polys: Poly[] = []
+    const layout = layoutTrackGen(result, settings)
+    /*
+     * z 決定畫的先後：側線／渡線在最底，彎道依外側半徑由大到小，直線段最後。
+     * 彎道靠疊出「露出來那一圈」，用角色分組畫會把大小順序打亂。
+     */
+    const polys: Array<{ role: LaneRole; key: string; pts: Vec2[]; z: number }> = []
     const labels: Array<{ at: Vec2; text: string; angle: number }> = []
     const seams: Array<{ a: Vec2; b: Vec2 }> = []
+    let minBlockLen = Infinity
 
-    /** 沿里程取一段的左右緣，組成封閉四邊形；彎道多取幾個中間點讓弧平滑 */
-    const bandPolygon = (
-      sFrom: number,
-      sTo: number,
-      latAt: (s: number) => number,
-      steps: number,
-    ): Vec2[] => {
-      const left: Vec2[] = []
-      const right: Vec2[] = []
-      for (let i = 0; i <= steps; i += 1) {
-        const s = sFrom + ((sTo - sFrom) * i) / steps
-        const lat = latAt(s)
-        left.push(placePoint(s, lat + LANE_W_M / 2, placed, lt))
-        right.push(placePoint(s, lat - LANE_W_M / 2, placed, lt))
-      }
-      return [...left, ...right.reverse()]
-    }
-
-    for (const b of result.blocks) {
-      const onArc = b.spineKind === 'arc'
-      const steps = onArc ? 10 : 1
-      for (const [lat, name, role] of [
-        [0, b.nameDown, 'down'],
-        [b.lateralM, b.nameUp, 'up'],
-      ] as Array<[number, string, LaneRole]>) {
-        polys.push({
-          role,
-          key: `${name}`,
-          pts: bandPolygon(b.sFrom, b.sTo, () => lat, steps),
-        })
-        // 接縫線：畫在每塊的起點，讓相鄰塊看得出是兩個物件
-        const p0 = placePoint(b.sFrom, lat + LANE_W_M / 2, placed, lt)
-        const p1 = placePoint(b.sFrom, lat - LANE_W_M / 2, placed, lt)
-        seams.push({ a: p0, b: p1 })
-        if (settings.labelSizePx > 0) {
-          const mid = placePoint((b.sFrom + b.sTo) / 2, lat, placed, lt)
-          const e0 = placePoint(b.sFrom, lat, placed, lt)
-          const e1 = placePoint(b.sTo, lat, placed, lt)
-          const deg = (Math.atan2(e1.y - e0.y, e1.x - e0.x) * 180) / Math.PI
-          labels.push({ at: mid, text: name, angle: deg > 90 || deg < -90 ? deg + 180 : deg })
+    // 彎道大的先畫、小的疊上去，露出來那一圈就是軌道帶
+    const ordered = [...layout.shapes].sort((a, b) => {
+      const ra = a.kind === 'corner' ? a.outerRadiusM : 0
+      const rb = b.kind === 'corner' ? b.outerRadiusM : 0
+      return rb - ra
+    })
+    for (const s of ordered) {
+      if (s.kind === 'rect') {
+        polys.push({ role: s.role, key: s.name, pts: rectPolygon(s), z: 3000 })
+        minBlockLen = Math.min(minBlockLen, s.lengthM)
+        const half = s.widthM / 2
+        const dir = { x: Math.cos((s.rotationDeg * Math.PI) / 180), y: Math.sin((s.rotationDeg * Math.PI) / 180) }
+        const nrm = { x: -dir.y, y: dir.x }
+        const start = {
+          x: s.centre.x - dir.x * (s.lengthM / 2),
+          y: s.centre.y - dir.y * (s.lengthM / 2),
         }
+        seams.push({
+          a: { x: start.x + nrm.x * half, y: start.y + nrm.y * half },
+          b: { x: start.x - nrm.x * half, y: start.y - nrm.y * half },
+        })
+        const deg = s.rotationDeg
+        labels.push({ at: s.centre, text: s.name, angle: deg > 90 || deg < -90 ? deg + 180 : deg })
+      } else if (s.kind === 'corner') {
+        const width = s.geometry.depthRatio * s.outerRadiusM
+        polys.push({
+          role: s.role,
+          key: s.name,
+          pts: bandPolygon(s.samples, width),
+          z: 2000 - s.outerRadiusM,
+        })
+        const mid = s.samples[Math.floor(s.samples.length / 2)]!
+        labels.push({ at: mid, text: s.name, angle: 0 })
+      } else {
+        polys.push({ role: s.role, key: s.name, pts: bandPolygon(s.samples, s.a.widthM), z: 100 })
       }
     }
 
-    // 渡線與側線：橫向偏移沿里程改變，所以自然是斜的四邊形
-    for (const lane of result.lanes) {
-      if (lane.role === 'down' || lane.role === 'up') continue
-      if (lane.role === 'crossover' && !settings.showCrossovers) continue
-      if (lane.role === 'siding' && !settings.showSidings) continue
-      const prof = lane.profile
-      if (prof.length < 2) continue
-      const left: Vec2[] = []
-      const right: Vec2[] = []
-      for (const [s, lat] of prof) {
-        left.push(placePoint(s, lat + LANE_W_M / 2, placed, lt))
-        right.push(placePoint(s, lat - LANE_W_M / 2, placed, lt))
-      }
-      polys.push({ role: lane.role, key: lane.key, pts: [...left, ...right.reverse()] })
-    }
-
+    polys.sort((a, b) => a.z - b.z)
     const extent = polys.flatMap((p) => p.pts)
-    const blockSpanM = result.blocks[0]?.lengthM ?? 50
-    return { polys, labels, seams, thick: halfW * 2, extent, blockSpanPx: blockSpanM }
+    return {
+      polys,
+      labels,
+      seams,
+      thick: LANE_W_M * settings.lateralScale,
+      extent,
+      blockSpanPx: Number.isFinite(minBlockLen) ? minBlockLen : 50,
+    }
   }, [result, settings])
 
   const view = useMemo(() => {
@@ -237,20 +218,16 @@ export function TrackGenGraphic({
       <svg width={width} height={height} className="block">
         {generated ? (
           <>
-            {(['siding', 'crossover', 'down', 'up'] as LaneRole[]).map((role) =>
-              generated.polys
-                .filter((p) => p.role === role)
-                .map((p) => (
-                  <polygon
-                    key={`${role}-${p.key}`}
-                    points={p.pts.map(T).join(' ')}
-                    fill={ROLE_STROKE[role]}
-                    stroke={ROLE_STROKE[role]}
-                    strokeWidth={0.5}
-                    strokeLinejoin="round"
-                  />
-                )),
-            )}
+            {generated.polys.map((p, i) => (
+              <polygon
+                key={`${p.role}-${p.key}-${i}`}
+                points={p.pts.map(T).join(' ')}
+                fill={ROLE_STROKE[p.role]}
+                stroke={ROLE_STROKE[p.role]}
+                strokeWidth={0.5}
+                strokeLinejoin="round"
+              />
+            ))}
             {generated.seams.map((s, i) => (
               <line
                 key={`seam-${i}`}

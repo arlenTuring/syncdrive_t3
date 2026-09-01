@@ -1,8 +1,7 @@
 import type { FacilityName, FacilityType } from '../types/facility'
 import {
-  cornerTrackSizeM,
-  DEFAULT_CORNER_TRACK,
-  readCornerTrack,
+  DEFAULT_CORNER_TRACK_SIZE_M,
+  DEFAULT_TAPER_TRACK_SIZE_M,
 } from '../utils/trackShapes'
 import {
   getRefFieldBounds,
@@ -107,7 +106,10 @@ export function defaultSizeMetersForType(
   h: number
 } {
   if (type === 'Track' && name === 'RailCorner') {
-    return cornerTrackSizeM(DEFAULT_CORNER_TRACK)
+    return { ...DEFAULT_CORNER_TRACK_SIZE_M }
+  }
+  if (type === 'Track' && name === 'RailTaper') {
+    return { ...DEFAULT_TAPER_TRACK_SIZE_M }
   }
   switch (type) {
     case 'Slot':
@@ -172,11 +174,6 @@ export function getFacilitySizeMeters(
     if (verticesMeters.length >= 3) {
       return clampSizeMeters(sizeMetersFromVertices(verticesMeters), maxMeters)
     }
-  }
-  if (f.type === 'Track' && f.name === 'RailCorner') {
-    // 圓角軌道的外框<strong>就是</strong>它的幾何：直腳長度與圓弧半徑決定它多大。
-    // 所以不看 refField，改由幾何算——拉端點或改半徑時外框自動跟著變。
-    return clampSizeMeters(cornerTrackSizeM(readCornerTrack(f.parameters)), maxMeters)
   }
   const refSpan = refFieldBoundsSpanMeters(getRefFieldBounds(f.parameters))
   if (refSpan) {

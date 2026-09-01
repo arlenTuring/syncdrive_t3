@@ -113,9 +113,9 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
   },
   {
     label: '斜接軌道',
-    type: 'TrackCrossover',
+    type: 'Track',
     name: 'RailTaper',
-    hint: '斜接軌道 — 四邊形；端點可吸附到其他軌道，接合後該端寬度自動齊平',
+    hint: '斜接軌道 — 矩形切掉右上與左下兩個對角；上下各一個控制點調整切角',
   },
   {
     label: '虛擬渡線',

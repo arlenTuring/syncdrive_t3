@@ -1,39 +1,42 @@
 import type { FacilityObject } from '../types/facility'
-import {
-  placePoint,
-  placeSpine,
-  type TrackGenSettings,
-} from './trackGenFacility'
-import type { SpineSegment, TrackGenResult, Vec2 } from './trackGenerator'
+import type { TrackGenSettings } from './trackGenFacility'
+import type { TrackGenResult, Vec2 } from './trackGenerator'
+import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
 import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 
 /**
  * 把生成結果轉成真正的設施。
  *
- * <h3>三種軌道各對應生成結果的哪一部分</h3>
+ * 位置與形狀直接取自 {@link layoutTrackGen}——那也是預覽在用的同一支，所以套用
+ * 出來的東西與畫面上看到的一致。先前兩邊各自算，套用出來方向是反的、ㄩ 形也散掉。
+ *
+ * <h3>三種軌道各對應哪一部分</h3>
  * <ul>
- *   <li>直線段的每一塊 → 一般軌道（矩形）。逐塊獨立，才能個別拉伸與設定屬性。</li>
- *   <li>每一段彎道 → <strong>一個</strong>圓角軌道。彎道是一個物件，不是十幾塊碎片；
- *       切成碎片正是先前看起來破碎的原因。</li>
- *   <li>渡線與側線 → 斜接軌道。兩端各自帶寬度，端點可再吸附到別的軌道。</li>
+ *   <li>直線段的每一塊 → 一般軌道（矩形），逐塊獨立才能個別拉伸與設屬性</li>
+ *   <li>每一段彎道 → <strong>一個</strong>圓角軌道，不切碎</li>
+ *   <li>渡線與側線 → 斜接軌道，兩端各自帶寬度</li>
  * </ul>
  *
  * <h3>兩套座標</h3>
- * 圖面位置用<strong>示意座標</strong>：沿線是真實公尺，橫向乘上放大倍率——上下行只差
- * 3.5 公尺，不放大就會黏成一條線。真實座標另外寫進 refField，兩者分開存，和地圖
- * 其他設施的做法一致。
+ * 圖面位置用版面座標（沿線真實公尺、橫向放大），真實座標另外寫進 refField。
+ * 兩者分開存，與地圖其他設施的做法一致。
  */
 
-export type ApplyResult = {
-  facilities: Array<Omit<FacilityObject, 'areaPosition' | 'position'> & {
-    /** 示意座標（公尺，左上原點、y 向下） */
-    layout: { xM: number; yM: number; wM: number; hM: number }
-  }>
-  /** 全部設施的示意座標外框，用來決定 Area 大小 */
-  extentM: { wM: number; hM: number }
+export type BuiltFacility = {
+  id: string
+  type: FacilityObject['type']
+  name: FacilityObject['name']
+  customName: string
+  rotation: number
+  parameters: Record<string, unknown>
+  /** 未旋轉前的外框（版面公尺，左上原點、y 向下） */
+  box: { xM: number; yM: number; wM: number; hM: number }
 }
 
-const LANE_W_M = 3.35
+export type ApplyResult = {
+  facilities: BuiltFacility[]
+  extentM: { wM: number; hM: number }
+}
 
 function realAt(result: TrackGenResult, s: number): Vec2 {
   const xs = result.refStations
@@ -55,21 +58,122 @@ function realAt(result: TrackGenResult, s: number): Vec2 {
   }
 }
 
-function refFieldPatch(result: TrackGenResult, sFrom: number, sTo: number) {
+/**
+ * 真實座標範圍。
+ *
+ * 刻意不寫成 refFieldXMinM 那組鍵：那組鍵會參與設施尺寸的推導
+ * （見 getFacilitySizeMeters），寫進真實座標會把版面上的方框拉成另一個大小。
+ * 真實座標在這裡只是給人對照與日後投影用，不該影響畫面。
+ */
+function realBounds(result: TrackGenResult, sFrom: number, sTo: number) {
   const a = realAt(result, sFrom)
   const b = realAt(result, sTo)
   return {
-    refFieldXMinM: Number(Math.min(a.x, b.x).toFixed(2)),
-    refFieldXMaxM: Number(Math.max(a.x, b.x).toFixed(2)),
-    refFieldYMinM: Number(Math.min(a.y, b.y).toFixed(2)),
-    refFieldYMaxM: Number(Math.max(a.y, b.y).toFixed(2)),
+    trackGenRealFrom: [Number(a.x.toFixed(2)), Number(a.y.toFixed(2))],
+    trackGenRealTo: [Number(b.x.toFixed(2)), Number(b.y.toFixed(2))],
+    trackGenSFromM: Number(sFrom.toFixed(2)),
+    trackGenSToM: Number(sTo.toFixed(2)),
   }
 }
 
-/** 走向（度）→ 設施旋轉角。示意圖只有 45 度的倍數。 */
-function rotationForHeading(hdgDeg: number): number {
-  // 真實航向以東為 0、逆時針為正；圖面 y 向下，所以旋轉取負值
-  return -(((hdgDeg % 360) + 360) % 360)
+function facilityFor(
+  shape: LayoutShape,
+  result: TrackGenResult,
+  id: string,
+): BuiltFacility {
+  const meta = realBounds(result, shape.sFrom, shape.sTo)
+  if (shape.kind === 'rect') {
+    /*
+     * 軸對齊的段<strong>不要旋轉</strong>。
+     *
+     * 把長寬照行進方向寫進去、再轉一個 180 度，畫出來會上下顛倒——連標籤都是反的。
+     * 軸對齊時直接用外接方框就對了，旋轉只留給 45 度那種斜段。
+     */
+    const near = (deg: number, target: number) =>
+      Math.abs(((deg - target + 540) % 360) - 180) < 1
+    const horizontal = near(shape.rotationDeg, 0) || near(shape.rotationDeg, 180)
+    const vertical = near(shape.rotationDeg, 90) || near(shape.rotationDeg, -90)
+    const axisAligned = horizontal || vertical
+    const wM = horizontal ? shape.lengthM : shape.widthM
+    const hM = horizontal ? shape.widthM : shape.lengthM
+    return {
+      id,
+      type: 'Track',
+      name: 'Rail',
+      customName: shape.name,
+      rotation: axisAligned ? 0 : shape.rotationDeg,
+      parameters: { segmentId: shape.name, trackGenRole: shape.role, ...meta },
+      box: axisAligned
+        ? {
+            xM: shape.centre.x - wM / 2,
+            yM: shape.centre.y - hM / 2,
+            wM,
+            hM,
+          }
+        : {
+            xM: shape.centre.x - shape.lengthM / 2,
+            yM: shape.centre.y - shape.widthM / 2,
+            wM: shape.lengthM,
+            hM: shape.widthM,
+          },
+    }
+  }
+  if (shape.kind === 'corner') {
+    return {
+      id,
+      type: 'Track',
+      name: 'RailCorner',
+      customName: shape.name,
+      rotation: 0,
+      parameters: {
+        segmentId: shape.name,
+        trackGenRole: shape.role,
+        [CORNER_TRACK_KEY]: shape.geometry,
+        ...meta,
+      },
+      box: { ...shape.box },
+    }
+  }
+  /*
+   * 渡線與側線 → 斜接軌道。
+   *
+   * 外框取整條取樣線的外接方框，再往外各撐半個帶寬——只拿頭尾兩點會讓幾乎水平的
+   * 側線算出 0 公尺高的方框，畫出來是一條 1 像素的線。
+   *
+   * 斜切比例由帶寬佔外框的比例決定：切掉的那一段等於外框長度減一個帶寬，
+   * 斜邊兩側就剛好夾出一條等寬的斜帶。
+   */
+  const bandW = Math.max(0.5, shape.a.widthM)
+  const half = bandW / 2
+  const xsAll = shape.samples.map((p) => p.x)
+  const ysAll = shape.samples.map((p) => p.y)
+  const xMin = Math.min(...xsAll) - half
+  const yMin = Math.min(...ysAll) - half
+  const wM = Math.max(bandW, Math.max(...xsAll) - Math.min(...xsAll) + bandW)
+  const hM = Math.max(bandW, Math.max(...ysAll) - Math.min(...ysAll) + bandW)
+  // 由頭尾的走向決定斜帶落在哪一條對角線；往上走的要轉 90 度才會鏡射過去
+  const entryDeg = shape.b.at.y >= shape.a.at.y ? 0 : 90
+  // 轉 90 度時外框的長邊換成高，斜切比例要跟著換算
+  const spanM = entryDeg === 0 ? wM : hM
+  const cut = Math.max(0, Math.min(1, 1 - bandW / spanM))
+  return {
+    id,
+    type: 'Track',
+    name: 'RailTaper',
+    customName: shape.name,
+    rotation: 0,
+    parameters: {
+      segmentId: shape.name,
+      trackGenRole: shape.role,
+      [TAPER_TRACK_KEY]: {
+        topCutRatio: cut,
+        bottomCutRatio: cut,
+        entryDeg,
+      },
+      ...meta,
+    },
+    box: { xM: xMin, yM: yMin, wM, hM },
+  }
 }
 
 export function buildFacilitiesFromTrackGen(
@@ -77,158 +181,27 @@ export function buildFacilitiesFromTrackGen(
   settings: TrackGenSettings,
   nextId: () => string,
 ): ApplyResult {
-  const lt = settings.lateralScale
-  const placed = placeSpine(result.spine, 1, settings.cornerRadiusM)
-  const out: ApplyResult['facilities'] = []
-  const pts: Vec2[] = []
-
-  const push = (
-    type: FacilityObject['type'],
-    name: FacilityObject['name'],
-    customName: string,
-    layout: { xM: number; yM: number; wM: number; hM: number },
-    rotation: number,
-    parameters: Record<string, unknown>,
-  ) => {
-    pts.push({ x: layout.xM, y: layout.yM })
-    pts.push({ x: layout.xM + layout.wM, y: layout.yM + layout.hM })
-    out.push({
-      id: nextId(),
-      type,
-      name,
-      customName,
-      rotation,
-      currentState: null,
-      layout,
-      parameters,
-    } as ApplyResult['facilities'][number])
-  }
-
-  const arcSegments = result.spine.filter((s): s is Extract<SpineSegment, { kind: 'arc' }> => s.kind === 'arc')
-
-  // ── 直線段：逐塊一個一般軌道 ──────────────────────────────
-  for (const b of result.blocks) {
-    if (b.spineKind === 'arc') continue
-    const seg = result.spine.find((s) => b.sFrom >= s.sFrom && b.sTo <= s.sTo + 1e-6)
-    const hdg = seg && seg.kind === 'straight' ? seg.hdgDeg : 0
-    for (const [lat, name] of [
-      [0, b.nameDown],
-      [b.lateralM, b.nameUp],
-    ] as Array<[number, string]>) {
-      const p0 = placePoint(b.sFrom, lat, placed, lt)
-      const p1 = placePoint(b.sTo, lat, placed, lt)
-      const cx = (p0.x + p1.x) / 2
-      const cy = (p0.y + p1.y) / 2
-      const wM = Math.hypot(p1.x - p0.x, p1.y - p0.y)
-      const hM = LANE_W_M * lt
-      push(
-        'Track',
-        'Rail',
-        name,
-        { xM: cx - wM / 2, yM: cy - hM / 2, wM, hM },
-        rotationForHeading(hdg),
-        {
-          segmentId: name,
-          trackGenSFromM: b.sFrom,
-          trackGenSToM: b.sTo,
-          ...refFieldPatch(result, b.sFrom, b.sTo),
-        },
-      )
-    }
-  }
-
-  // ── 彎道：每一段一個圓角軌道（不切碎） ────────────────────
-  arcSegments.forEach((arc, i) => {
-    for (const [lat, prefix] of [
-      [0, 'D'],
-      [result.blocks.find((b) => b.spineKind === 'arc')?.lateralM ?? 3.5, 'U'],
-    ] as Array<[number, string]>) {
-      const radiusM = Math.max(0.5, settings.cornerRadiusM - (lat * lt) * Math.sign(arc.turnDeg || -1))
-      const legM = 0
-      const widthM = LANE_W_M * lt
-      const half = widthM / 2
-      const sizeW = legM + radiusM + half
-      const sizeH = legM + radiusM + half
-      const start = placePoint(arc.sFrom, lat, placed, lt)
-      push(
-        'Track',
-        'RailCorner',
-        `${prefix}C${i + 1}`,
-        { xM: start.x, yM: start.y - half, wM: sizeW, hM: sizeH },
-        0,
-        {
-          [CORNER_TRACK_KEY]: {
-            widthM,
-            radiusM,
-            legInM: legM,
-            legOutM: legM,
-            turnDeg: arc.turnDeg,
-          },
-          ...refFieldPatch(result, arc.sFrom, arc.sTo),
-        },
-      )
-    }
+  const layout = layoutTrackGen(result, settings)
+  /*
+   * 彎道的方塊要「大的先、小的後」：外側那塊比較大，內側疊在它上面，
+   * 露出來的那一圈就是轉彎的軌道帶。順序反了會被外側整個蓋住。
+   */
+  const ordered = [...layout.shapes].sort((a, b) => {
+    const ra = a.kind === 'corner' ? a.outerRadiusM : 0
+    const rb = b.kind === 'corner' ? b.outerRadiusM : 0
+    return rb - ra
   })
+  const facilities = ordered.map((s) => facilityFor(s, result, nextId()))
 
-  // ── 渡線與側線：斜接軌道 ──────────────────────────────────
-  for (const lane of result.lanes) {
-    if (lane.role === 'down' || lane.role === 'up') continue
-    if (lane.role === 'crossover' && !settings.showCrossovers) continue
-    if (lane.role === 'siding' && !settings.showSidings) continue
-    const prof = lane.profile
-    if (prof.length < 2) continue
-    const a = placePoint(prof[0]![0], prof[0]![1], placed, lt)
-    const b = placePoint(prof[prof.length - 1]![0], prof[prof.length - 1]![1], placed, lt)
-    const widthM = LANE_W_M * lt
-    push(
-      'TrackCrossover',
-      'RailTaper',
-      `${lane.role === 'crossover' ? 'X' : 'SD'}-${lane.key.replace(':', '_')}`,
-      {
-        xM: Math.min(a.x, b.x),
-        yM: Math.min(a.y, b.y),
-        wM: Math.max(1, Math.abs(b.x - a.x)),
-        hM: Math.max(1, Math.abs(b.y - a.y)),
-      },
-      0,
-      {
-        [TAPER_TRACK_KEY]: {
-          a: { xM: a.x, yM: a.y, widthM, attachedTrackId: null },
-          b: { xM: b.x, yM: b.y, widthM, attachedTrackId: null },
-        },
-        trackGenRole: lane.role,
-        sourceLane: lane.key,
-        ...refFieldPatch(result, prof[0]![0], prof[prof.length - 1]![0]),
-      },
-    )
-  }
-
-  const xs = pts.map((p) => p.x)
-  const ys = pts.map((p) => p.y)
-  const minX = Math.min(...xs)
-  const minY = Math.min(...ys)
   // 平移到原點，Area 才不用容納負座標
-  for (const f of out) {
-    f.layout.xM -= minX
-    f.layout.yM -= minY
-  }
-  for (const f of out) {
-    const taper = f.parameters?.[TAPER_TRACK_KEY] as
-      | { a: { xM: number; yM: number }; b: { xM: number; yM: number } }
-      | undefined
-    if (taper) {
-      taper.a.xM -= minX
-      taper.a.yM -= minY
-      taper.b.xM -= minX
-      taper.b.yM -= minY
-    }
+  const { xMin, yMin, xMax, yMax } = layout.bounds
+  for (const f of facilities) {
+    f.box.xM -= xMin
+    f.box.yM -= yMin
   }
 
   return {
-    facilities: out,
-    extentM: {
-      wM: Math.max(1, Math.max(...xs) - minX),
-      hM: Math.max(1, Math.max(...ys) - minY),
-    },
+    facilities,
+    extentM: { wM: Math.max(1, xMax - xMin), hM: Math.max(1, yMax - yMin) },
   }
 }
