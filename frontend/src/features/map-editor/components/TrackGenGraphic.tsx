@@ -155,9 +155,7 @@ export function TrackGenGraphic({
       {selected ? (
         <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
           {`中心線 ${centerlines.roadCount} 道路 · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
-          {result
-            ? ` ｜ 已生成 ${result.blocks.length * 2} 塊軌道 · ${result.lanes.filter((l) => l.role === 'crossover').length} 渡線 · ${result.lanes.filter((l) => l.role === 'siding').length} 側線到地圖上`
-            : ''}
+          {result ? ` ｜ 已生成 ${result.lines.length} 條線到地圖上` : ''}
         </div>
       ) : null}
 

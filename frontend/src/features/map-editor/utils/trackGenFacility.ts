@@ -73,7 +73,7 @@ export function getTrackGenResult(
   const raw = parameters?.[TRACKGEN_RESULT_KEY]
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Partial<TrackGenResult>
-  if (!Array.isArray(r.spine) || !Array.isArray(r.blocks) || !Array.isArray(r.lanes)) return null
+  if (!Array.isArray(r.spine) || !Array.isArray(r.lines)) return null
   return raw as TrackGenResult
 }
 

@@ -19,32 +19,33 @@ import { parseLaneCenterlines, type LaneCenterline, type LaneCenterlinePlan } fr
  */
 
 export type Vec2 = { x: number; y: number }
-export type LaneRole = 'down' | 'up' | 'crossover' | 'siding'
+
+/**
+ * 車道的角色<strong>只從檔案讀</strong>，不從長度猜。
+ *
+ * 先前把最長的兩條叫「下行／上行」、其餘叫側線——那是把某一個場域的樣子寫死進
+ * 演算法裡。換一份路網（三線、單線、環狀）那個假設就不成立，而且畫出來的東西
+ * 會莫名其妙。OpenDRIVE 唯一告訴我們的分類是「這條車道在不在 junction 裡」。
+ */
+export type LaneRole = 'road' | 'junction'
 
 /** 脊線的一段：直線或彎道 */
 export type SpineSegment =
   | { kind: 'straight'; sFrom: number; sTo: number; hdgDeg: number }
   | { kind: 'arc'; sFrom: number; sTo: number; turnDeg: number; realTurnDeg: number }
 
-export type TrackBlock = {
-  index: number
-  nameDown: string
-  nameUp: string
-  sFrom: number
-  sTo: number
-  lengthM: number
-  /** 上行線相對下行線的橫向偏移（公尺） */
-  lateralM: number
-  /** 該塊範圍內實際橫向偏移與 lateralM 的最大差，用來看生成貼不貼合 */
-  residualM: number
-  spineKind: 'straight' | 'arc'
-}
-
-export type ProjectedLane = {
+/**
+ * 一條連續的線：由數條首尾相接的 OpenDRIVE 車道串成。
+ *
+ * 每條線一視同仁，沒有「主線」這種身分。線的位置一律以「里程 ＋ 橫向偏移」表示，
+ * 里程量在參考線上——參考線就是最長的那一條，這是資料決定的，不是誰比較重要。
+ */
+export type ProjectedLine = {
   key: string
   role: LaneRole
-  mmslLaneId: string | null
   lengthM: number
+  /** 組成這條線的 OpenDRIVE 車道 */
+  laneKeys: string[]
   /** [里程, 橫向偏移] 取樣序列 */
   profile: Array<[number, number]>
 }
@@ -52,16 +53,15 @@ export type ProjectedLane = {
 export type TrackGenResult = {
   spine: SpineSegment[]
   totalM: number
-  blocks: TrackBlock[]
-  lanes: ProjectedLane[]
-  /** 下行主線的真實座標，供顯示每塊對應到哪裡 */
+  lines: ProjectedLine[]
+  /** 參考線的真實座標，供回填參照場域範圍與車輛投影 */
   refPoints: Vec2[]
   refStations: number[]
   warnings: string[]
 }
 
 export type TrackGenOptions = {
-  /** 每塊目標長度（公尺） */
+  /** 每塊目標長度（公尺）。切塊改由版面負責，這裡留著相容呼叫端 */
   blockLengthM?: number
   /** 串接時可容忍的端點距離（公尺） */
   joinToleranceM?: number
@@ -290,57 +290,77 @@ function buildSpine(
   return out
 }
 
-function median(values: number[]): number | null {
-  if (!values.length) return null
-  const s = [...values].sort((a, b) => a - b)
-  return s[s.length >> 1]!
+/**
+ * 把所有車道串成互不重疊的連續線。
+ *
+ * 先算出「從每一條車道出發能走到的最長路徑」，照長度由大到小依序取用，取過的車道
+ * 不再參與；剩下接不上任何人的就自己成一條。這樣每一條車道都會屬於某一條線，
+ * 不需要「哪兩條是主線」這種外部知識。
+ */
+function buildChains(
+  lanes: LaneCenterline[],
+  tolM: number,
+  angleDeg: number,
+): string[][] {
+  const ranked = longestPaths(lanes, tolM, angleDeg)
+  const used = new Set<string>()
+  const chains: string[][] = []
+  for (const r of ranked) {
+    if (r.path.some((k) => used.has(k))) continue
+    r.path.forEach((k) => used.add(k))
+    chains.push(r.path)
+  }
+  for (const l of lanes) {
+    if (!used.has(l.key)) {
+      used.add(l.key)
+      chains.push([l.key])
+    }
+  }
+  return chains
 }
 
 export function generateTracks(
   plan: LaneCenterlinePlan,
   options: TrackGenOptions = {},
 ): TrackGenResult {
-  const blockLengthM = options.blockLengthM ?? 50
   const tolM = options.joinToleranceM ?? 2.5
   const angleDeg = options.joinAngleDeg ?? 30
   const curvature = options.curvatureDegPerM ?? 0.35
   const warnings: string[] = []
 
   const lanes = plan.lanes.filter((l) => l.points.length >= 2)
-  if (lanes.length < 2) {
-    return { spine: [], totalM: 0, blocks: [], lanes: [], refPoints: [], refStations: [], warnings: ['車道不足，無法生成'] }
-  }
+  const empty = (msg: string): TrackGenResult => ({
+    spine: [],
+    totalM: 0,
+    lines: [],
+    refPoints: [],
+    refStations: [],
+    warnings: [msg],
+  })
+  if (lanes.length < 1) return empty('車道不足，無法生成')
+
   const byKey = new Map(lanes.map((l) => [l.key, l] as const))
-  const ranked = longestPaths(lanes, tolM, angleDeg)
-  if (!ranked.length) {
-    return { spine: [], totalM: 0, blocks: [], lanes: [], refPoints: [], refStations: [], warnings: ['車道無法串接'] }
-  }
+  const chains = buildChains(lanes, tolM, angleDeg)
+  if (!chains.length) return empty('車道無法串接')
 
-  const pathA = ranked[0]!.path
-  const setA = new Set(pathA)
-  const pathB = ranked.find((r) => !r.path.some((k) => setA.has(k)))?.path ?? []
-  if (!pathB.length) warnings.push('只找到一條主線，上下行無法區分')
+  const lengthOf = (chain: string[]) =>
+    chain.reduce((a, k) => a + byKey.get(k)!.lengthM, 0)
+  const ordered = [...chains].sort((a, b) => lengthOf(b) - lengthOf(a))
 
-  // 走向較長的當下行（參考線），另一條當上行
-  const lenA = ranked[0]!.len
-  const lenB = pathB.reduce((a, k) => a + byKey.get(k)!.lengthM, 0)
-  const downPath = lenA >= lenB ? pathA : pathB
-  const upPath = lenA >= lenB ? pathB : pathA
-
-  const ref = resample(joinPath(downPath, byKey), 1)
+  /*
+   * 參考線＝最長的那一條。
+   *
+   * 里程必須量在某一條線上，這是線性參照的前提；挑最長的純粹是為了讓其他線都投影
+   * 得到，不代表它有什麼特殊身分。
+   */
+  const ref = resample(joinPath(ordered[0]!, byKey), 1)
   const refS = stationsOf(ref)
   const totalM = refS[refS.length - 1] ?? 0
   const spine = buildSpine(ref, refS, curvature)
 
-  const roleOf = (key: string): LaneRole => {
-    if (downPath.includes(key)) return 'down'
-    if (upPath.includes(key)) return 'up'
-    return byKey.get(key)!.inJunction ? 'crossover' : 'siding'
-  }
-
-  const projected: ProjectedLane[] = []
-  for (const lane of lanes) {
-    const pts = resample(lane.points.map((p) => ({ x: p.x, y: p.y })), 2)
+  const lines: ProjectedLine[] = []
+  ordered.forEach((chain, index) => {
+    const pts = resample(joinPath(chain, byKey), 2)
     const profile: Array<[number, number]> = []
     for (const p of pts) {
       const { s, lateral } = projectOnto(p, ref, refS)
@@ -348,70 +368,25 @@ export function generateTracks(
         profile.push([Number(s.toFixed(1)), Number(lateral.toFixed(2))])
       }
     }
-    if (profile.length >= 2) {
-      projected.push({
-        key: lane.key,
-        role: roleOf(lane.key),
-        mmslLaneId: lane.mmslLaneId,
-        lengthM: Number(lane.lengthM.toFixed(1)),
-        profile,
-      })
-    }
-  }
-
-  /*
-   * 上下行的間距<strong>整條共用一個值</strong>。
-   *
-   * 每塊各自取中位數的話，上行線在路網分岔或資料稀疏的地方會跳到別的距離——畫出來
-   * 就是頭尾幾塊掉下去一格，整排參差不齊。簡圖上兩條主線本來就是平行的，
-   * 間距只該有一個。各塊實際偏離多少仍然記在 residualM，要檢查貼不貼合看那個。
-   */
-  const upProfile = projected
-    .filter((l) => l.role === 'up')
-    .flatMap((l) => l.profile)
-    .sort((a, b) => a[0] - b[0])
-  const uniformLateral = median(upProfile.map((p) => p[1])) ?? 3.5
-
-  const blocks: TrackBlock[] = []
-  for (const seg of spine) {
-    const span = seg.sTo - seg.sFrom
-    /*
-     * 彎道<strong>不切</strong>：整段就是一個圓角軌道。
-     *
-     * 照直線的長度去切彎道，會把一個轉角變成好幾塊小碎片——畫面上看起來破碎，
-     * 而且轉角本來就是一個物件，切開之後每一塊都要各自對齊，接縫只會更多。
-     */
-    const n = seg.kind === 'arc' ? 1 : Math.max(1, Math.round(span / blockLengthM))
-    const step = span / n
-    for (let k = 0; k < n; k += 1) {
-      const sFrom = seg.sFrom + k * step
-      const sTo = sFrom + step
-      const inRange = upProfile.filter((p) => p[0] >= sFrom && p[0] <= sTo).map((p) => p[1])
-      const lateral = uniformLateral
-      const residual = inRange.length ? Math.max(...inRange.map((v) => Math.abs(v - lateral))) : 0
-      const index = blocks.length
-      blocks.push({
-        index,
-        nameDown: `D${String(index + 1).padStart(2, '0')}`,
-        nameUp: `U${String(index + 1).padStart(2, '0')}`,
-        sFrom: Number(sFrom.toFixed(2)),
-        sTo: Number(sTo.toFixed(2)),
-        lengthM: Number(step.toFixed(2)),
-        lateralM: Number(lateral.toFixed(3)),
-        residualM: Number(residual.toFixed(3)),
-        spineKind: seg.kind,
-      })
-    }
-  }
-  if (blocks.length) blocks[blocks.length - 1]!.sTo = Number(totalM.toFixed(2))
+    if (profile.length < 2) return
+    lines.push({
+      key: `L${index + 1}`,
+      role: chain.some((k) => byKey.get(k)!.inJunction) ? 'junction' : 'road',
+      lengthM: Number(lengthOf(chain).toFixed(1)),
+      laneKeys: chain,
+      profile,
+    })
+  })
+  if (lines.length < 2) warnings.push('只串出一條線，無法表達股道關係')
 
   return {
     spine,
     totalM: Number(totalM.toFixed(2)),
-    blocks,
-    lanes: projected,
-    refPoints: ref.filter((_, i) => i % 5 === 0).map((p) => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) })),
-    refStations: refS.filter((_, i) => i % 5 === 0).map((s) => Number(s.toFixed(1))),
+    lines,
+    refPoints: ref
+      .filter((_, i) => i % 5 === 0)
+      .map((p) => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) })),
+    refStations: refS.filter((_, i) => i % 5 === 0).map((s2) => Number(s2.toFixed(1))),
     warnings,
   }
 }

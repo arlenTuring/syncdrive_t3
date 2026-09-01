@@ -1,6 +1,6 @@
 import type { FacilityObject } from '../types/facility'
 import type { TrackGenSettings } from './trackGenFacility'
-import type { LaneRole, TrackGenResult, Vec2 } from './trackGenerator'
+import type { TrackGenResult, Vec2 } from './trackGenerator'
 import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
 import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
@@ -151,35 +151,6 @@ function realBounds(
    實測車子在轉角處會跳 137 像素。所以每一段都存下「真實路徑」與「圖面路徑」，
    投影時先在真實路徑上求出走了幾成，再照同樣的比例落在圖面路徑上。       */
 
-/**
- * 某個角色（上行／下行）在各里程的<strong>實際</strong>橫向偏移。
- *
- * 主線區塊的偏移原本取整條的中位數，那是為了讓圖面上兩條線平行；但參照場域範圍
- * 要的是真實位置。實測上行線在 junction 會外擺到 8 公尺，名目間距只有 3.5——
- * 用名目值算出來的範圍蓋不到車子實際走的地方，那幾段就定位不到。
- */
-function lateralLookup(result: TrackGenResult, role: LaneRole): (s: number) => number {
-  const pts = result.lanes
-    .filter((l) => l.role === role)
-    .flatMap((l) => l.profile)
-    .sort((a, b) => a[0] - b[0])
-  if (!pts.length) return () => 0
-  return (s: number) => {
-    if (s <= pts[0]![0]) return pts[0]![1]
-    if (s >= pts[pts.length - 1]![0]) return pts[pts.length - 1]![1]
-    let lo = 0
-    let hi = pts.length - 1
-    while (lo < hi - 1) {
-      const mid = (lo + hi) >> 1
-      if (pts[mid]![0] <= s) lo = mid
-      else hi = mid
-    }
-    const span = Math.max(1e-6, pts[hi]![0] - pts[lo]![0])
-    const u = (s - pts[lo]![0]) / span
-    return pts[lo]![1] + (pts[hi]![1] - pts[lo]![1]) * u
-  }
-}
-
 /** 這一段的真實中心線（依里程由小到大） */
 function realPathOf(
   result: TrackGenResult,
@@ -234,21 +205,17 @@ function localPathOf(
 function facilityFor(
   shape: LayoutShape,
   result: TrackGenResult,
-  mainLateral: Record<'down' | 'up', (s: number) => number>,
   id: string,
 ): BuiltFacility {
   /*
-   * 主線照該條線自己的剖面取真實偏移；渡線與側線的兩端偏移已經是各自剖面上的
-   * 實際值，中間線性內插即可。
+   * 真實橫向偏移由形狀自己帶著：版面上的偏移被放大過、還被吸到整數股，拿它回推
+   * 真實座標會差很遠。兩端的值取自該條線的剖面，中間線性內插。
    */
-  const latAt =
-    shape.role === 'down' || shape.role === 'up'
-      ? mainLateral[shape.role]
-      : (s: number) => {
-          const span = Math.max(1e-6, shape.sTo - shape.sFrom)
-          const u = Math.max(0, Math.min(1, (s - shape.sFrom) / span))
-          return shape.realLatFromM + (shape.realLatToM - shape.realLatFromM) * u
-        }
+  const latAt = (s: number) => {
+    const span = Math.max(1e-6, shape.sTo - shape.sFrom)
+    const u = Math.max(0, Math.min(1, (s - shape.sFrom) / span))
+    return shape.realLatFromM + (shape.realLatToM - shape.realLatFromM) * u
+  }
   const meta = realBounds(result, shape.sFrom, shape.sTo, latAt)
   const realPath = realPathOf(
     result,
@@ -280,6 +247,8 @@ function facilityFor(
       parameters: {
         segmentId: shape.name,
         trackGenRole: shape.role,
+        trackGenLine: shape.lineKey,
+        trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
         [TRACKGEN_REAL_PATH_KEY]: realPath,
         [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(
           shape.samples,
@@ -320,6 +289,8 @@ function facilityFor(
       parameters: {
         segmentId: shape.name,
         trackGenRole: shape.role,
+        trackGenLine: shape.lineKey,
+        trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
         [CORNER_TRACK_KEY]: shape.geometry,
         [TRACKGEN_REAL_PATH_KEY]: realPath,
         [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
@@ -343,6 +314,8 @@ function facilityFor(
     parameters: {
       segmentId: shape.name,
       trackGenRole: shape.role,
+      trackGenLine: shape.lineKey,
+      trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
       [TAPER_TRACK_KEY]: shape.geometry,
       [TRACKGEN_REAL_PATH_KEY]: realPath,
       [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
@@ -367,11 +340,7 @@ export function buildFacilitiesFromTrackGen(
     const rb = b.kind === 'corner' ? b.outerRadiusM : 0
     return rb - ra
   })
-  const mainLateral = {
-    down: lateralLookup(result, 'down'),
-    up: lateralLookup(result, 'up'),
-  }
-  const facilities = ordered.map((s) => facilityFor(s, result, mainLateral, nextId()))
+  const facilities = ordered.map((s) => facilityFor(s, result, nextId()))
 
   // 平移到原點，Area 才不用容納負座標
   const { xMin, yMin, xMax, yMax } = layout.bounds

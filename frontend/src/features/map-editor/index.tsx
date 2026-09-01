@@ -2275,7 +2275,7 @@ export default function MapEditorApp({
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
       if (!basemap) return
       const result = freshResult ?? getTrackGenResult(basemap.parameters)
-      if (!result || !result.blocks.length) return
+      if (!result || !result.lines.length) return
       const settings = getTrackGenSettings(basemap.parameters)
 
       pushHistory()

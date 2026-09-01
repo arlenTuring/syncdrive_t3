@@ -107,11 +107,15 @@ export function pointAlongPath(path: PathXY, along: number): { x: number; y: num
 /**
  * 重疊時的取捨分數：越小越優先。
  *
- * 渡線從主線岔出去，分岔點上兩者與車輛等距——單看距離會在某一格突然跳到渡線上
- * 再跳回來（實測主線上有一格跳了 19 像素）。主線給一點優勢，只有車輛明顯離開
- * 主線時才會判給渡線。
+ * 參照場域範圍是外接方框，分岔處必然互相重疊；只比距離的話，岔出去那條與直行那條
+ * 在分岔點上等距，車子會在某一格突然跳過去再跳回來——實測跳了 19 像素。
+ *
+ * 分不出來時<strong>偏向比較長的那一條線</strong>。這是資料本身的性質（哪一條串得比較
+ * 長），不是「哪一條是主線」這種外部知識；短短一段岔線要贏，得靠車子真的明顯
+ * 靠過去。優勢上限 0.75 公尺，兩公里以上的線才拿滿。
  */
-export const SIDE_LANE_PENALTY_M = 0.75
+export const LONG_LINE_BONUS_M = 0.75
+const LONG_LINE_FULL_M = 2000
 
 export function trackGenPickScore(
   parameters: Record<string, unknown> | undefined,
@@ -121,7 +125,8 @@ export function trackGenPickScore(
   const paths = getTrackGenPaths(parameters)
   if (!paths) return null
   const { distance } = projectAlongPath(paths.real, xM, yM)
-  const role = parameters?.trackGenRole
-  const isMain = role === 'down' || role === 'up'
-  return distance + (isMain ? 0 : SIDE_LANE_PENALTY_M)
+  const raw = parameters?.trackGenLineLengthM
+  const lineLen = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
+  const bonus = Math.min(1, lineLen / LONG_LINE_FULL_M) * LONG_LINE_BONUS_M
+  return distance - bonus
 }

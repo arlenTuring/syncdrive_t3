@@ -71,16 +71,12 @@ export function TrackGenInspectorSection({
 
   const stats = useMemo(() => {
     if (!result) return null
-    const res = result.blocks.map((b) => b.residualM)
-    const sorted = [...res].sort((a, b) => a - b)
     return {
-      blocks: result.blocks.length,
-      crossovers: result.lanes.filter((l) => l.role === 'crossover').length,
-      sidings: result.lanes.filter((l) => l.role === 'siding').length,
+      lines: result.lines.length,
+      junction: result.lines.filter((l) => l.role === 'junction').length,
       straights: result.spine.filter((s) => s.kind === 'straight').length,
       arcs: result.spine.filter((s) => s.kind === 'arc').length,
-      medianRes: sorted.length ? sorted[sorted.length >> 1]! : 0,
-      overRes: res.filter((r) => r > 0.3).length,
+      longestM: result.lines.reduce((a, l) => Math.max(a, l.lengthM), 0),
     }
   }, [result])
 
@@ -124,21 +120,16 @@ export function TrackGenInspectorSection({
           <div className="flex flex-col gap-0.5">
             <span>
               路網 <b className="font-mono tabular-nums text-zinc-200">{result.totalM.toFixed(0)} m</b>
-              脊線 <b className="font-mono tabular-nums text-zinc-200">{stats?.straights} 直 · {stats?.arcs} 彎</b>
+              {' · '}脊線 <b className="font-mono tabular-nums text-zinc-200">{stats?.straights} 直 · {stats?.arcs} 彎</b>
             </span>
             <span>
-              軌道 <b className="font-mono tabular-nums text-zinc-200">{(stats?.blocks ?? 0) * 2}</b> 塊
-               渡線 <b className="font-mono tabular-nums text-zinc-200">{stats?.crossovers}</b>
-               側線 <b className="font-mono tabular-nums text-zinc-200">{stats?.sidings}</b>
+              串出 <b className="font-mono tabular-nums text-zinc-200">{stats?.lines}</b> 條線
+              {' · '}其中 <b className="font-mono tabular-nums text-zinc-200">{stats?.junction}</b> 條在 junction 內
             </span>
             <span>
-              殘差中位數 
-              <b className="font-mono tabular-nums text-zinc-200">{stats?.medianRes.toFixed(3)} m</b>
-              {stats && stats.overRes > 0 ? (
-                <span className="text-amber-400"> {stats.overRes} 塊超過 0.3 m</span>
-              ) : (
-                <span className="text-emerald-400"> 全部在 0.3 m 內</span>
-              )}
+              最長一條 
+              <b className="font-mono tabular-nums text-zinc-200">{stats?.longestM.toFixed(0)} m</b>
+              {' · '}里程量在它上面
             </span>
           </div>
         ) : (
