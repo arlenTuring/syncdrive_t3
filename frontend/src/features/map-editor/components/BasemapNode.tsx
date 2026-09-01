@@ -207,32 +207,6 @@ export const BasemapNode = memo(function BasemapNode({
     }, 0)
   }, [basemap.id, onPatchParameters, trackGenCenterlines, trackGenSettings.blockLengthM])
 
-  /*
-   * 載入路網之後直接生成。
-   *
-   * 中心線只是中繼產物，使用者要的是軌道；讓他先看一張中心線再按一次按鈕沒有
-   * 意義。改成拿到路網就生成，按鈕留著給改完參數重跑用。
-   *
-   * 判斷條件是「有路網、沒有結果」，所以拖進來、用選檔對話框、或是重新開啟一張
-   * 舊地圖，三種進來的路徑都會生成。
-   */
-  const autoGenKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!isTrackGen || !trackGenCenterlines || trackGenResult || generating) return
-    const key = `${trackGenXodr?.length ?? 0}:${trackGenSettings.blockLengthM}`
-    if (autoGenKeyRef.current === key) return
-    autoGenKeyRef.current = key
-    runTrackGeneration()
-  }, [
-    isTrackGen,
-    trackGenCenterlines,
-    trackGenResult,
-    generating,
-    trackGenXodr,
-    trackGenSettings.blockLengthM,
-    runTrackGeneration,
-  ])
-
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)
   const xodrContent = getBasemapXodrContent(basemap.parameters)
@@ -761,7 +735,11 @@ export const BasemapNode = memo(function BasemapNode({
                     <button
                       type="button"
                       title={
-                        trackGenCenterlines ? '依目前設定重新生成軌道' : '請先載入 .xodr'
+                        trackGenCenterlines
+                          ? trackGenResult
+                            ? '依目前設定重新生成軌道'
+                            : '由路網生成軌道'
+                          : '請先載入 .xodr'
                       }
                       disabled={!trackGenCenterlines || generating}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -774,7 +752,7 @@ export const BasemapNode = memo(function BasemapNode({
                       className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <Route className="size-4" aria-hidden />
-                      {generating ? '生成中…' : '重新生成'}
+                      {generating ? '生成中…' : trackGenResult ? '重新生成' : '軌道生成'}
                     </button>
                     {trackGenResult && onApplyTrackGen ? (
                       <button
