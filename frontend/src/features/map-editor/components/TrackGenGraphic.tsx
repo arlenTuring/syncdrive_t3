@@ -23,13 +23,21 @@ type Props = {
   onPickClick: () => void
 }
 
+/**
+ * 把路網<strong>填滿</strong>元件框：橫向與縱向各自縮放。
+ *
+ * 不等比。使用者拖出多寬多高，載入的路網就畫成多寬多高——這個元件的框就是他要
+ * 的版面比例，等比縮放只會在兩側留下大片空白，反而看不清楚。
+ *
+ * 留 1 像素的邊：線寬 1.4，不留的話貼著邊界的那幾條會被切掉半條。
+ */
 function fitTransform(
   points: Vec2[],
   width: number,
   height: number,
   padPx: number,
-): { scale: number; tx: number; ty: number } {
-  if (!points.length) return { scale: 1, tx: 0, ty: 0 }
+): { sx: number; sy: number; tx: number; ty: number } {
+  if (!points.length) return { sx: 1, sy: 1, tx: 0, ty: 0 }
   let xmin = Infinity
   let ymin = Infinity
   let xmax = -Infinity
@@ -42,12 +50,9 @@ function fitTransform(
   }
   const w = Math.max(1e-6, xmax - xmin)
   const h = Math.max(1e-6, ymax - ymin)
-  const scale = Math.min((width - padPx * 2) / w, (height - padPx * 2) / h)
-  return {
-    scale,
-    tx: padPx - xmin * scale + (width - padPx * 2 - w * scale) / 2,
-    ty: padPx - ymin * scale + (height - padPx * 2 - h * scale) / 2,
-  }
+  const sx = Math.max(1e-6, width - padPx * 2) / w
+  const sy = Math.max(1e-6, height - padPx * 2) / h
+  return { sx, sy, tx: padPx - xmin * sx, ty: padPx - ymin * sy }
 }
 
 export function TrackGenGraphic({
@@ -66,7 +71,7 @@ export function TrackGenGraphic({
   const view = useMemo(() => {
     if (!centerlines) return null
     const pts = centerlines.lanes.flatMap((l) => l.points.map((p) => ({ x: p.x, y: -p.y })))
-    return fitTransform(pts, width, height, 10)
+    return fitTransform(pts, width, height, 1)
   }, [centerlines, width, height])
 
   if (parseFailed) {
@@ -124,10 +129,11 @@ export function TrackGenGraphic({
     )
   }
 
-  const sc = view?.scale ?? 1
+  const sx = view?.sx ?? 1
+  const sy = view?.sy ?? 1
   const tx = view?.tx ?? 0
   const ty = view?.ty ?? 0
-  const T = (p: Vec2) => `${(p.x * sc + tx).toFixed(1)},${(p.y * sc + ty).toFixed(1)}`
+  const T = (p: Vec2) => `${(p.x * sx + tx).toFixed(1)},${(p.y * sy + ty).toFixed(1)}`
 
   return (
     <div className="relative size-full overflow-hidden rounded-sm border border-zinc-600/60 bg-zinc-950/45">
