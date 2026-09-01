@@ -38,8 +38,16 @@ export type CornerTrackGeometry = {
   arcXRatio: number
   /** 弧的垂直半徑，佔外框高的比例（0–1） */
   arcYRatio: number
-  /** 內弧深度＝帶寬，佔較短半徑的比例（0–1）。1＝實心的四分之一 */
-  depthRatio: number
+  /**
+   * 內弧的水平半徑，佔外框寬的比例（0–1）。
+   *
+   * 與縱向<strong>分開</strong>存。共用一個「深度」時，內外半徑會同時減掉同一個公尺數；
+   * 外框不是正方形的話，那條帶子就會一頭粗一頭細——實測長寬比拉開之後，轉角上緣
+   * 明顯比下緣厚。分成兩個之後，右邊與下面各一個控制點各自調。
+   */
+  innerXRatio: number
+  /** 內弧的垂直半徑，佔外框高的比例（0–1） */
+  innerYRatio: number
   /**
    * 外弧彎度。0.5＝直線切角，1≈正圓，拉到上限＝直角。
    *
@@ -60,7 +68,8 @@ export type CornerTrackGeometry = {
 export const DEFAULT_CORNER_TRACK: CornerTrackGeometry = {
   arcXRatio: 1,
   arcYRatio: 1,
-  depthRatio: 0.3,
+  innerXRatio: 0.7,
+  innerYRatio: 0.7,
   outerBulge: 1,
   innerBulge: 1,
   entryDeg: 0,
@@ -120,9 +129,9 @@ export function cornerTrackPath(
 
   const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
   const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
-  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
-  const irx = rx - d
-  const iry = ry - d
+  // 內弧的兩個半徑各自算，帶子在非正方形的外框裡才會兩端等厚
+  const irx = Math.min(rx, clamp01(g.innerXRatio) * w)
+  const iry = Math.min(ry, clamp01(g.innerYRatio) * h)
   const solid = irx <= 0.5 || iry <= 0.5
 
   const P = (x: number, y: number) => {
@@ -190,7 +199,7 @@ export function cornerTrackPath(
   ].join(' ')
 }
 
-export type CornerHandleKey = 'arcY' | 'arcX' | 'outer' | 'depth'
+export type CornerHandleKey = 'arcY' | 'arcX' | 'innerY' | 'innerX' | 'outer' | 'inner'
 
 /**
  * 四個控制點（像素，相對元件左上角）。
@@ -206,7 +215,8 @@ export function cornerTrackHandlesPx(
   const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
   const rx = clamp01(g.arcXRatio) * w
   const ry = clamp01(g.arcYRatio) * h
-  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
+  const irx = Math.min(rx, clamp01(g.innerXRatio) * w)
+  const iry = Math.min(ry, clamp01(g.innerYRatio) * h)
   /*
    * 控制點放在曲線的中點上。二次貝茲在 t=0.5 的位置是 (P1 + 2Q + P2)/4，
    * 代入控制點的定義後化簡，中點離圓心的比例正好是 (2q + 1)/4——
@@ -217,14 +227,27 @@ export function cornerTrackHandlesPx(
   const frac = (q: number) => (q >= MAX_CORNER_BULGE - 1e-6 ? 1 : (2 * q + 1) / 4)
   const fo = frac(qO)
   const fi = frac(qI)
-  const ir = Math.max(0, rx - d)
-  const iry2 = Math.max(0, ry - d)
   return {
     arcY: T(w, h - ry),
     arcX: T(w - rx, h),
+    innerY: T(w, h - iry),
+    innerX: T(w - irx, h),
     outer: T(w - rx * fo, h - ry * fo),
-    depth: T(w - ir * fi, h - iry2 * fi),
+    inner: T(w - irx * fi, h - iry * fi),
   }
+}
+
+/** 舊資料的 depthRatio → 兩個內半徑比例 */
+function legacyInner(
+  o: Partial<CornerTrackGeometry> & { depthRatio?: number },
+  axis: 'x' | 'y',
+): number | undefined {
+  const d = o.depthRatio
+  if (typeof d !== 'number' || !Number.isFinite(d)) return undefined
+  const outer =
+    (axis === 'x' ? o.arcXRatio : o.arcYRatio) ??
+    (axis === 'x' ? DEFAULT_CORNER_TRACK.arcXRatio : DEFAULT_CORNER_TRACK.arcYRatio)
+  return outer * (1 - Math.max(0, Math.min(1, d)))
 }
 
 export function readCornerTrack(
@@ -232,7 +255,7 @@ export function readCornerTrack(
 ): CornerTrackGeometry {
   const raw = parameters?.[CORNER_TRACK_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_CORNER_TRACK }
-  const o = raw as Partial<CornerTrackGeometry>
+  const o = raw as Partial<CornerTrackGeometry> & { depthRatio?: number }
   const ratio = (v: unknown, fallback: number) =>
     typeof v === 'number' && Number.isFinite(v) ? clamp01(v) : fallback
   const bulge = (v: unknown, fallback: number) =>
@@ -242,7 +265,18 @@ export function readCornerTrack(
   return {
     arcXRatio: ratio(o.arcXRatio, DEFAULT_CORNER_TRACK.arcXRatio),
     arcYRatio: ratio(o.arcYRatio, DEFAULT_CORNER_TRACK.arcYRatio),
-    depthRatio: ratio(o.depthRatio, DEFAULT_CORNER_TRACK.depthRatio),
+    /*
+     * 舊資料只存一個 depthRatio（內半徑＝外半徑減掉同一個深度）。等比換算成兩個
+     * 比例，已經放在地圖上的轉角改版後才不會突然變形。
+     */
+    innerXRatio: ratio(
+      o.innerXRatio ?? legacyInner(o, 'x'),
+      DEFAULT_CORNER_TRACK.innerXRatio,
+    ),
+    innerYRatio: ratio(
+      o.innerYRatio ?? legacyInner(o, 'y'),
+      DEFAULT_CORNER_TRACK.innerYRatio,
+    ),
     outerBulge: bulge(o.outerBulge, DEFAULT_CORNER_TRACK.outerBulge),
     innerBulge: bulge(o.innerBulge, DEFAULT_CORNER_TRACK.innerBulge),
     entryDeg:
@@ -279,9 +313,8 @@ export function cornerTrackEndsPx(
   const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
   const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
   const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
-  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
-  const irx = Math.max(0, rx - d)
-  const iry = Math.max(0, ry - d)
+  const irx = Math.min(rx, clamp01(g.innerXRatio) * w)
+  const iry = Math.min(ry, clamp01(g.innerYRatio) * h)
   return {
     a: T(w, h - (ry + iry) / 2),
     b: T(w - (rx + irx) / 2, h),

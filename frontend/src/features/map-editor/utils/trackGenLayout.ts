@@ -148,7 +148,14 @@ function fitCorner(
   p1: Vec2,
 ): { geometry: CornerTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } {
   const S = Math.max(1e-3, outerRM)
-  const depthRatio = Math.max(0.02, Math.min(1, bandWM / S))
+  /*
+   * 內弧半徑照<strong>比例</strong>縮，不是減掉固定公尺數。
+   *
+   * 外框之後會被非等比地放進 Area（橫向與縱向各自縮放）；等比例縮的內弧在縮放後
+   * 兩端的帶寬各自等於該方向的帶寬，剛好接上相鄰的直線段。減固定值的話帶子會
+   * 一頭粗一頭細。
+   */
+  const innerRatio = Math.max(0, Math.min(0.98, 1 - bandWM / S))
   let best: {
     geometry: CornerTrackGeometry
     box: { xM: number; yM: number; wM: number; hM: number }
@@ -158,7 +165,8 @@ function fitCorner(
     const geometry: CornerTrackGeometry = {
       arcXRatio: 1,
       arcYRatio: 1,
-      depthRatio,
+      innerXRatio: innerRatio,
+      innerYRatio: innerRatio,
       outerBulge: 1,
       innerBulge: 1,
       entryDeg,

@@ -2019,9 +2019,23 @@ export const FacilityNode = memo(function FacilityNode({
           MIN_CORNER_BULGE,
           Math.min(MAX_CORNER_BULGE, base.outerBulge + outward * 4),
         )
+      } else if (cornerDragKey === 'innerY') {
+        // 控制點在右邊直邊上：往上拉＝內弧的垂直半徑變大、帶子變薄
+        next.innerYRatio = clamp01(base.innerYRatio - dyR)
+      } else if (cornerDragKey === 'innerX') {
+        // 控制點在下面直邊上：往左拉＝內弧的水平半徑變大、帶子變薄
+        next.innerXRatio = clamp01(base.innerXRatio - dxR)
       } else {
-        // 內弧中點：往右下（圓心方向）拉＝帶子變厚，拉滿變成實心的四分之一
-        next.depthRatio = clamp01(base.depthRatio + (dxR + dyR) / Math.SQRT2)
+        /*
+         * 內弧中點：兩個端點<strong>不動</strong>，只改內弧的彎度。
+         *
+         * 端點由右邊與下面那兩個內弧控制點決定；彎度與外弧各調各的。
+         */
+        const outward = -(dxR + dyR) / Math.SQRT2
+        next.innerBulge = Math.max(
+          MIN_CORNER_BULGE,
+          Math.min(MAX_CORNER_BULGE, base.innerBulge + outward * 4),
+        )
       }
       onPatchParameters(facilityRef.current.id, { [CORNER_TRACK_KEY]: next })
     },
@@ -2775,8 +2789,10 @@ export const FacilityNode = memo(function FacilityNode({
               const items: Array<[CornerHandleKey, { x: number; y: number }, string, string]> = [
                 ['arcY', h.arcY, '拖曳調整上緣弧度', '#67e8f9'],
                 ['arcX', h.arcX, '拖曳調整下緣弧度', '#67e8f9'],
+                ['innerY', h.innerY, '拖曳調整內弧的縱向位置（右緣帶寬）', '#fbbf24'],
+                ['innerX', h.innerX, '拖曳調整內弧的橫向位置（下緣帶寬）', '#fbbf24'],
                 ['outer', h.outer, '拖曳調整外弧彎度：往外拉到底成直角、往內趨近切角', '#a3e635'],
-                ['depth', h.depth, '拖曳調整內弧深度；拉滿變成實心的四分之一', '#fbbf24'],
+                ['inner', h.inner, '拖曳調整內弧彎度；貼到外弧就變成實心的四分之一', '#f97316'],
               ]
               return items.map(([key, pt, title, color]) => (
                 <div
