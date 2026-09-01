@@ -20,6 +20,7 @@ import {
   getTrackNetwork,
 } from './trackNetwork/scanMap';
 import type { TrackNetwork } from './trackNetwork/types';
+import { locateOnCrossover } from './trackNetwork/crossoverLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
 export type VehicleTrackPlacement = {
@@ -354,8 +355,10 @@ export function resolveVehicleTrackPlacementInArea(
 }
 
 /**
- * 全圖定位：掃描所有 Track refField（與 Area 分區無關）。
- * 段外不吸附、不外插；未命中任何 refField 則回傳 null。
+ * 全圖定位：橫渡線優先，再掃 Track refField。
+ *
+ * 橫渡線與軌道帶在場域上重疊——若先吸到軌道中心線，轉線途中的車會在上下行之間
+ * 「飄／跳」。模擬器路徑點正確、圖台卻飄，多半就是這裡少了橫渡線這一步。
  */
 export function resolveVehiclePlacementAcrossAreas(
   areas: MapAreaObject[],
@@ -374,8 +377,16 @@ export function resolveVehiclePlacementAcrossAreas(
     return resolveYardFacilityPlacement(areas, options?.payload);
   }
 
+  // 緊貼橫渡線（2 m）：即使同時落在軌道帶 AABB 裡，也畫在渡線上
+  const onCrossover = locateOnCrossover(areas, xM, yM, 2);
+  if (onCrossover) return onCrossover;
+
   const onTrack = locateOnTrackNetwork(net, xM, yM);
   if (onTrack) return onTrack;
+
+  // 略寬：portal 外緣、尚未落入任何 refField 的點
+  const onCrossoverLoose = locateOnCrossover(areas, xM, yM, 6);
+  if (onCrossoverLoose) return onCrossoverLoose;
 
   return locateInAreaDomain(areas, xM, yM);
 }
