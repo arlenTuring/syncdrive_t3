@@ -1,4 +1,9 @@
-import type { FacilityObject, FacilityType } from '../types/facility'
+import type { FacilityName, FacilityType } from '../types/facility'
+import {
+  cornerTrackSizeM,
+  DEFAULT_CORNER_TRACK,
+  readCornerTrack,
+} from '../utils/trackShapes'
 import {
   getRefFieldBounds,
   refFieldBoundsSpanMeters,
@@ -72,11 +77,14 @@ export function resolvePoleFrameSizePx(
  * 圖台預設顯示尺寸（絕對畫素）。
  * 與 Area 外框、場域 domain 無關；僅決定元件在圖台上的視覺大小。
  */
-export function defaultCanvasSizePxForType(type: FacilityType): {
+export function defaultCanvasSizePxForType(
+  type: FacilityType,
+  name?: FacilityName,
+): {
   w: number
   h: number
 } {
-  const m = defaultSizeMetersForType(type)
+  const m = defaultSizeMetersForType(type, name)
   return {
     w: Math.max(MIN_FACILITY_CANVAS_PX, metersToWorldPx(m.w)),
     h: Math.max(MIN_FACILITY_CANVAS_PX, metersToWorldPx(m.h)),
@@ -84,10 +92,23 @@ export function defaultCanvasSizePxForType(type: FacilityType): {
 }
 
 /** 各類型參照場域／語意預設（公尺；非圖台畫素） */
-export function defaultSizeMetersForType(type: FacilityType): {
+/**
+ * 設施預設尺寸。
+ *
+ * name 是選填的：多數設施只看 type 就夠，但軌道有幾種變體，形狀不同、
+ * 合理的初始尺寸也不同——圓角軌道是接近正方的 L 形，用一般軌道那種
+ * 50×3.5 的細長比例放下去會被壓成一條線。
+ */
+export function defaultSizeMetersForType(
+  type: FacilityType,
+  name?: FacilityName,
+): {
   w: number
   h: number
 } {
+  if (type === 'Track' && name === 'RailCorner') {
+    return cornerTrackSizeM(DEFAULT_CORNER_TRACK)
+  }
   switch (type) {
     case 'Slot':
       return { w: 20, h: 5 }
@@ -152,11 +173,16 @@ export function getFacilitySizeMeters(
       return clampSizeMeters(sizeMetersFromVertices(verticesMeters), maxMeters)
     }
   }
+  if (f.type === 'Track' && f.name === 'RailCorner') {
+    // 圓角軌道的外框<strong>就是</strong>它的幾何：直腳長度與圓弧半徑決定它多大。
+    // 所以不看 refField，改由幾何算——拉端點或改半徑時外框自動跟著變。
+    return clampSizeMeters(cornerTrackSizeM(readCornerTrack(f.parameters)), maxMeters)
+  }
   const refSpan = refFieldBoundsSpanMeters(getRefFieldBounds(f.parameters))
   if (refSpan) {
     return clampSizeMeters(refSpan, maxMeters)
   }
-  return clampSizeMeters(defaultSizeMetersForType(f.type), maxMeters)
+  return clampSizeMeters(defaultSizeMetersForType(f.type, f.name), maxMeters)
 }
 
 /**

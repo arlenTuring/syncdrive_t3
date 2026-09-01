@@ -43,6 +43,7 @@ import {
 import { MapExtentProvider } from './context/MapExtentContext'
 import { AreaInspectorSection } from './components/AreaInspectorSection'
 import { BasemapInspectorSection } from './components/BasemapInspectorSection'
+import { TrackGenInspectorSection } from './components/TrackGenInspectorSection'
 import { MapCropInspectorSection } from './components/MapCropInspectorSection'
 import {
   applyMapCrop,
@@ -126,7 +127,7 @@ import type { RouteGroupDraft } from './components/RouteGroupEditorView'
 import {
   MAP_PIXEL_ZOOM_DEFAULT_LEVEL,
 } from './utils/mapPixelZoom'
-import { isAreaPaletteItem, isBasemapPaletteItem } from './utils/paletteDrag'
+import { isAreaPaletteItem, isBasemapPaletteItem, isTrackGenPaletteItem } from './utils/paletteDrag'
 import {
   flattenAreaFacilities,
   nextNumericIdFromAreas,
@@ -190,6 +191,19 @@ import {
   isBasemapAboveAreas,
   partitionMapBasemaps,
 } from './utils/basemapFacility'
+import {
+  defaultTrackGenParameters,
+  getTrackGenResult,
+  getTrackGenSettings,
+  isTrackGenComponent,
+} from './utils/trackGenFacility'
+import {
+  CORNER_TRACK_KEY,
+  DEFAULT_CORNER_TRACK,
+  defaultTaperTrack,
+  TAPER_TRACK_KEY,
+} from './utils/trackShapes'
+import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
 import {
   defaultTrackCrossoverParameters,
 } from './utils/trackCrossoverFacility'
@@ -2075,11 +2089,27 @@ export default function MapEditorApp({
           },
         }
       }
+      if (item.type === 'Track' && item.name === 'RailCorner') {
+        return {
+          id,
+          type: 'Track',
+          name: 'RailCorner',
+          customName: '',
+          areaPosition,
+          position: positionMeters,
+          rotation: 0,
+          currentState: getDefaultStateForType('Track'),
+          parameters: {
+            ...defaultRefFieldParametersForType('Track'),
+            [CORNER_TRACK_KEY]: { ...DEFAULT_CORNER_TRACK },
+          },
+        }
+      }
       if (item.type === 'TrackCrossover') {
         return {
           id,
           type: 'TrackCrossover',
-          name: 'TrackCrossover',
+          name: item.name === 'RailTaper' ? 'RailTaper' : 'TrackCrossover',
           customName: '',
           areaPosition,
           position: positionMeters,
@@ -2090,6 +2120,14 @@ export default function MapEditorApp({
               positionMeters.x,
               positionMeters.y,
             ),
+            ...(item.name === 'RailTaper'
+              ? {
+                  [TAPER_TRACK_KEY]: defaultTaperTrack({
+                    x: positionMeters.x,
+                    y: positionMeters.y,
+                  }),
+                }
+              : {}),
           },
         }
       }
@@ -2114,10 +2152,18 @@ export default function MapEditorApp({
     (item: PaletteItem) => {
       const ps = mapPixelSizeRef.current
       const mapCenter = { x: ps.width / 2, y: ps.height / 2 }
-      if (isBasemapPaletteItem(item)) {
+      if (isBasemapPaletteItem(item) || isTrackGenPaletteItem(item)) {
         pushHistory()
         const id = String(nextNumericId).padStart(3, '0')
-        const newBasemap = createBlankBasemap(id, mapCenter)
+        const trackGen = isTrackGenPaletteItem(item)
+        const blank = createBlankBasemap(id, mapCenter, trackGen ? { w: 1180, h: 300 } : undefined)
+        const newBasemap = trackGen
+          ? {
+              ...blank,
+              customName: `軌道生成 ${id}`,
+              parameters: { ...blank.parameters, ...defaultTrackGenParameters() },
+            }
+          : blank
         setBasemaps((prev) => [...prev, newBasemap])
         selectedBasemapIdRef.current = id
         setSelectedBasemapId(id)
@@ -2177,10 +2223,18 @@ export default function MapEditorApp({
   )
 
   const onPaletteDropBasemap = useCallback(
-    (_item: PaletteItem, mapPointPx: { x: number; y: number }) => {
+    (item: PaletteItem, mapPointPx: { x: number; y: number }) => {
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
-      const newBasemap = createBlankBasemap(id, mapPointPx)
+      const trackGen = isTrackGenPaletteItem(item)
+      const blank = createBlankBasemap(id, mapPointPx, trackGen ? { w: 1180, h: 300 } : undefined)
+      const newBasemap = trackGen
+        ? {
+            ...blank,
+            customName: `軌道生成 ${id}`,
+            parameters: { ...blank.parameters, ...defaultTrackGenParameters() },
+          }
+        : blank
       setBasemaps((prev) => [...prev, newBasemap])
       selectedBasemapIdRef.current = id
       setSelectedBasemapId(id)
@@ -2189,6 +2243,85 @@ export default function MapEditorApp({
       setNextNumericId((n) => n + 1)
     },
     [pushHistory, nextNumericId, updateSelection],
+  )
+
+  /**
+   * 把軌道生成的結果變成真正的設施。
+   *
+   * 產出一個新的 Area 裝它們，而不是塞進既有的 Area：生成的是一整套座標系，
+   * 混進別人的 Area 會與那裡既有的設施座標打架。使用者要合併時再自己搬。
+   */
+  const onApplyTrackGen = useCallback(
+    (basemapId: string) => {
+      const basemap = basemapsRef.current.find((b) => b.id === basemapId)
+      if (!basemap) return
+      const result = getTrackGenResult(basemap.parameters)
+      if (!result || !result.blocks.length) return
+      const settings = getTrackGenSettings(basemap.parameters)
+
+      pushHistory()
+      let seq = nextNumericId
+      const built = buildFacilitiesFromTrackGen(result, settings, () =>
+        String(seq++).padStart(3, '0'),
+      )
+
+      const areaId = String(seq++).padStart(3, '0')
+      const ps = mapPixelSizeRef.current
+      const blank = createBlankArea(areaId, ps)
+      // Area 的網域＝生成結果的示意座標範圍；版面沿用底下那個生成元件的框，
+      // 這樣「套用」出來的東西與畫面上看到的比例一致。
+      const area: MapAreaObject = {
+        ...blank,
+        customName: `${basemap.customName || '軌道生成'} 套用`,
+        layout: {
+          ...blank.layout,
+          xPx: basemap.layout.xPx,
+          yPx: basemap.layout.yPx + basemap.layout.hPx + 24,
+          wPx: basemap.layout.wPx,
+          hPx: basemap.layout.hPx,
+        },
+        domain: {
+          xMinM: 0,
+          xMaxM: built.extentM.wM,
+          yMinM: 0,
+          yMaxM: built.extentM.hM,
+        },
+        facilities: [],
+      }
+
+      const facilities = built.facilities.map((f) => {
+        const areaPosition = {
+          x: (f.layout.xM / built.extentM.wM) * area.layout.wPx,
+          // areaPosition 的原點在左下、y 向上；示意座標是左上、y 向下
+          y:
+            area.layout.hPx
+            - ((f.layout.yM + f.layout.hM) / built.extentM.hM) * area.layout.hPx,
+        }
+        const areaSizePx = {
+          w: Math.max(1, (f.layout.wM / built.extentM.wM) * area.layout.wPx),
+          h: Math.max(1, (f.layout.hM / built.extentM.hM) * area.layout.hPx),
+        }
+        return {
+          id: f.id,
+          type: f.type,
+          name: f.name,
+          customName: f.customName,
+          rotation: f.rotation,
+          currentState: f.currentState,
+          parameters: f.parameters,
+          areaPosition,
+          areaSizePx,
+          position: { x: f.layout.xM, y: built.extentM.hM - f.layout.yM - f.layout.hM },
+        } as unknown as FacilityObject
+      })
+
+      setAreas((prev) => [...prev, { ...area, facilities }])
+      setNextNumericId(seq)
+      updateSelection(areaId, [])
+      selectedBasemapIdRef.current = null
+      setSelectedBasemapId(null)
+    },
+    [nextNumericId, pushHistory, updateSelection],
   )
 
   const onPatchBasemapLayout = useCallback((basemapId: string, layout: MapBasemapLayout) => {
@@ -2300,7 +2433,7 @@ export default function MapEditorApp({
       if (!area) return
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
-      const sizePx = defaultCanvasSizePxForType(item.type)
+      const sizePx = defaultCanvasSizePxForType(item.type, item.name)
       const cssTopLeft = {
         left: areaPositionCenter.x - sizePx.w / 2,
         top: areaPositionCenter.y - sizePx.h / 2,
@@ -3500,6 +3633,9 @@ export default function MapEditorApp({
                 onBasemapSendToBack={
                   mapEditorMode === 'edit' ? onBasemapSendToBack : undefined
                 }
+                onApplyTrackGen={
+                  mapEditorMode === 'edit' ? onApplyTrackGen : undefined
+                }
                 formatPaintSnapshot={
                   mapEditorMode === 'edit' ? formatPaintSnapshot : null
                 }
@@ -3754,6 +3890,21 @@ export default function MapEditorApp({
                     onSelectGeofenceLabel={(_facilityId, labelId) =>
                       setGeofenceSelectedLabelId(labelId)
                     }
+                  />
+                ) : selectedBasemap && isTrackGenComponent(selectedBasemap.parameters) ? (
+                  <TrackGenInspectorSection
+                    basemap={selectedBasemap}
+                    readOnly={mapEditorMode !== 'edit'}
+                    onRename={(customName) => {
+                      setBasemaps((prev) =>
+                        prev.map((b) =>
+                          b.id === selectedBasemap.id ? { ...b, customName } : b,
+                        ),
+                      )
+                    }}
+                    onPatchParameters={(patch) => {
+                      onPatchBasemapParameters(selectedBasemap.id, patch)
+                    }}
                   />
                 ) : selectedBasemap ? (
                   <BasemapInspectorSection

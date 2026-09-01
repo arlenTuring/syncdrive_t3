@@ -14,6 +14,8 @@ import {
   TrainTrack,
   Waypoints,
   Wrench,
+  CornerDownRight,
+  Spline,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { FacilityName } from '../types/facility'
@@ -31,6 +33,8 @@ export const PALETTE_ICON_BY_NAME: Record<
   Gate: DoorClosed,
   Light: SignalIcon,
   Rail: TrainTrack,
+  RailCorner: CornerDownRight,
+  RailTaper: Spline,
   SmartPole: Radio,
   DockingPoint: MapPin,
   Waypoint: CircleDot,

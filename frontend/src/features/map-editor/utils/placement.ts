@@ -1,13 +1,16 @@
-import type { FacilityType } from '../types/facility'
+import type { FacilityName, FacilityType } from '../types/facility'
 import { defaultSizeMetersForType } from '../constants/facilityDimensions'
 import { metersToWorldPx } from '../constants/map'
 import { snapDragPosition } from './snapDrag'
 
-export function nodeWorldSizeForFacilityType(type: FacilityType): {
+export function nodeWorldSizeForFacilityType(
+  type: FacilityType,
+  name?: FacilityName,
+): {
   w: number
   h: number
 } {
-  const { w, h } = defaultSizeMetersForType(type)
+  const { w, h } = defaultSizeMetersForType(type, name)
   return { w: metersToWorldPx(w), h: metersToWorldPx(h) }
 }
 

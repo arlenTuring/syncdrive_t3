@@ -1,11 +1,34 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownToLine, ArrowUpToLine, CircleCheck, Columns2, PencilLine, Rows2 } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  CircleCheck,
+  Columns2,
+  Check,
+  Eraser,
+  PencilLine,
+  Rows2,
+  Route,
+} from 'lucide-react'
 import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
 import { AreaDragTrack } from './AreaDragTrack'
 import { BasemapCellOverlay } from './BasemapCellOverlay'
 import { BasemapGraphic } from './BasemapGraphic'
 import { BasemapPartitionContent } from './BasemapPartitionContent'
 import { BasemapFilePickerDialog } from './BasemapFilePickerDialog'
+import { TrackGenGraphic } from './TrackGenGraphic'
+import { parseLaneCenterlines } from '../opendrive/laneCenterlines'
+import { generateTracks } from '../utils/trackGenerator'
+import {
+  getTrackGenFileName,
+  getTrackGenResult,
+  getTrackGenSettings,
+  getTrackGenXodr,
+  isTrackGenComponent,
+  TRACKGEN_FILE_NAME_KEY,
+  TRACKGEN_RESULT_KEY,
+  TRACKGEN_XODR_KEY,
+} from '../utils/trackGenFacility'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   type BasemapFileSelection,
@@ -85,6 +108,8 @@ function layoutFromCornerResize(
 }
 
 type Props = {
+  /** 軌道生成：把結果變成真正的設施 */
+  onApplyTrackGen?: (basemapId: string) => void
   basemap: MapBasemapObject
   stackOrder: number
   stackCount: number
@@ -118,6 +143,7 @@ export const BasemapNode = memo(function BasemapNode({
   onBringToFront,
   onSendToBack,
   onDoubleClick,
+  onApplyTrackGen,
 }: Props) {
   const canEdit = editMode && !readOnly
   const layout = basemap.layout
@@ -146,6 +172,41 @@ export const BasemapNode = memo(function BasemapNode({
   )
 
   const displayLayout = liveLayout ?? layout
+
+  /* ── 軌道生成元件 ─────────────────────────────────────────────
+     沿用底圖的搬移／縮放／選取／存檔管線，只以 componentKind 區分身分，
+     內容、工具列與屬性各走各的。 */
+  const isTrackGen = isTrackGenComponent(basemap.parameters)
+  const trackGenXodr = getTrackGenXodr(basemap.parameters)
+  const trackGenCenterlines = useMemo(() => {
+    if (!isTrackGen || !trackGenXodr) return null
+    try {
+      return parseLaneCenterlines(trackGenXodr, { sampleStepM: 1 })
+    } catch {
+      return null
+    }
+  }, [isTrackGen, trackGenXodr])
+  const trackGenParseFailed = isTrackGen && !!trackGenXodr && !trackGenCenterlines
+  const trackGenResult = getTrackGenResult(basemap.parameters)
+  const trackGenSettings = getTrackGenSettings(basemap.parameters)
+  const [generating, setGenerating] = useState(false)
+
+  const runTrackGeneration = useCallback(() => {
+    if (!trackGenCenterlines) return
+    setGenerating(true)
+    // 讓「生成中」先畫出來，再做這件會佔住主執行緒約一秒的計算
+    window.setTimeout(() => {
+      try {
+        const result = generateTracks(trackGenCenterlines, {
+          blockLengthM: trackGenSettings.blockLengthM,
+        })
+        onPatchParameters(basemap.id, { [TRACKGEN_RESULT_KEY]: result })
+      } finally {
+        setGenerating(false)
+      }
+    }, 0)
+  }, [basemap.id, onPatchParameters, trackGenCenterlines, trackGenSettings.blockLengthM])
+
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)
   const xodrContent = getBasemapXodrContent(basemap.parameters)
@@ -460,6 +521,18 @@ export const BasemapNode = memo(function BasemapNode({
 
   const onConfirmFile = useCallback(
     (selection: BasemapFileSelection) => {
+      if (isTrackGen) {
+        // 軌道生成只吃路網；載入新檔就把上一次的生成結果作廢，
+        // 否則畫面上會是新的中心線配上舊的軌道。
+        if (selection.kind !== 'xodr') return
+        onPatchParameters(basemap.id, {
+          [TRACKGEN_XODR_KEY]: selection.content,
+          [TRACKGEN_FILE_NAME_KEY]: selection.file.name,
+          [TRACKGEN_RESULT_KEY]: undefined,
+        })
+        setPickerOpen(false)
+        return
+      }
       const oldUrl = getBasemapPreviewUrl(basemap.parameters)
       if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl)
 
@@ -562,22 +635,37 @@ export const BasemapNode = memo(function BasemapNode({
           onDoubleClick?.(basemap.id)
         }}
       >
-        <BasemapGraphic
-          width={displayLayout.wPx}
-          height={displayLayout.hPx}
-          worldBounds={worldBounds}
-          mapScale={mapScale}
-          contentOpacity={getBasemapOpacity(basemap.parameters)}
-          imageUrl={previewUrl}
-          xodrPlan={xodrPlan}
-          xodrParseFailed={xodrParseFailed}
-          fileName={fileName}
-          readOnly={readOnly}
-          selected={selected}
-          hideContent={showPartitionContent}
-          onPickClick={() => setPickerOpen(true)}
-        />
-        {showPartitionContent ? (
+        {isTrackGen ? (
+          <TrackGenGraphic
+            width={displayLayout.wPx}
+            height={displayLayout.hPx}
+            centerlines={trackGenCenterlines}
+            parseFailed={trackGenParseFailed}
+            result={trackGenResult}
+            settings={trackGenSettings}
+            fileName={getTrackGenFileName(basemap.parameters)}
+            readOnly={readOnly}
+            selected={selected}
+            onPickClick={() => setPickerOpen(true)}
+          />
+        ) : (
+          <BasemapGraphic
+            width={displayLayout.wPx}
+            height={displayLayout.hPx}
+            worldBounds={worldBounds}
+            mapScale={mapScale}
+            contentOpacity={getBasemapOpacity(basemap.parameters)}
+            imageUrl={previewUrl}
+            xodrPlan={xodrPlan}
+            xodrParseFailed={xodrParseFailed}
+            fileName={fileName}
+            readOnly={readOnly}
+            selected={selected}
+            hideContent={showPartitionContent}
+            onPickClick={() => setPickerOpen(true)}
+          />
+        )}
+        {!isTrackGen && showPartitionContent ? (
           <BasemapPartitionContent
             partition={partition}
             parentWorldBounds={worldBounds}
@@ -595,7 +683,7 @@ export const BasemapNode = memo(function BasemapNode({
             className="pointer-events-none absolute inset-0 z-[2] border-2 border-cyan-400/90"
           />
         ) : null}
-        {canEdit && selected ? (
+        {canEdit && selected && !isTrackGen ? (
           <BasemapCellOverlay
             partition={partition}
             widthPx={displayLayout.wPx}
@@ -640,10 +728,71 @@ export const BasemapNode = memo(function BasemapNode({
                 data-basemap-toolbar
                 className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
                 role="toolbar"
-                aria-label="底圖圖層"
+                aria-label={isTrackGen ? '軌道生成' : '底圖圖層'}
               >
+                {isTrackGen ? (
+                  <>
+                    <button
+                      type="button"
+                      title={
+                        trackGenCenterlines
+                          ? trackGenResult
+                            ? '依目前設定重新生成軌道'
+                            : '由路網生成軌道'
+                          : '請先載入 .xodr'
+                      }
+                      disabled={!trackGenCenterlines || generating}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        runTrackGeneration()
+                      }}
+                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <Route className="size-4" aria-hidden />
+                      {generating ? '生成中…' : trackGenResult ? '重新生成' : '軌道生成'}
+                    </button>
+                    {trackGenResult && onApplyTrackGen ? (
+                      <button
+                        type="button"
+                        title="把生成的軌道變成地圖上真正的設施，之後可個別拉伸與設定"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          onApplyTrackGen(basemap.id)
+                        }}
+                        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                      >
+                        <Check className="size-4" aria-hidden />
+                        套用到地圖
+                      </button>
+                    ) : null}
+                    {trackGenResult ? (
+                      <button
+                        type="button"
+                        title="清除生成結果，回到只顯示中心線"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          onPatchParameters(basemap.id, { [TRACKGEN_RESULT_KEY]: undefined })
+                        }}
+                        className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                      >
+                        <Eraser className="size-4" aria-hidden />
+                      </button>
+                    ) : null}
+                    <span className="mx-0.5 h-4 w-px bg-zinc-600" aria-hidden />
+                  </>
+                ) : null}
                 <button
                   type="button"
+                  hidden={isTrackGen}
                   title={
                     canSplit
                       ? '橫向分割（上／下）'
@@ -665,6 +814,7 @@ export const BasemapNode = memo(function BasemapNode({
                 </button>
                 <button
                   type="button"
+                  hidden={isTrackGen}
                   title={
                     canSplit
                       ? '縱向分割（左／右）'
@@ -686,6 +836,7 @@ export const BasemapNode = memo(function BasemapNode({
                 </button>
                 <button
                   type="button"
+                  hidden={isTrackGen}
                   title={
                     canConfirmCuts
                       ? '確定切割（各格完全獨立，可個別縮放）'

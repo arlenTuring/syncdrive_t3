@@ -3,16 +3,18 @@ import {
   AREA_PALETTE_ITEM,
   BASEMAP_PALETTE_ITEM,
   FACILITY_PALETTE_ITEMS,
+  TRACKGEN_PALETTE_ITEM,
   type FacilityPaletteItem,
   type PaletteItem,
 } from '../constants/palette'
 import { isMapEquipmentType, isMapFacilityAreaType } from '../constants/facilityTaxonomy'
 import { AREA_PALETTE_ICON, PALETTE_ICON_BY_NAME } from '../utils/facilityIcons'
-import { Image as ImageIcon } from 'lucide-react'
+import { Image as ImageIcon, Route } from 'lucide-react'
 import {
   encodePaletteDragItem,
   isAreaPaletteItem,
   isBasemapPaletteItem,
+  isTrackGenPaletteItem,
   PALETTE_DRAG_MIME,
 } from '../utils/paletteDrag'
 
@@ -40,7 +42,7 @@ function buildPaletteGroups(): PaletteGroup[] {
     {
       key: 'map-layer',
       label: '地圖層',
-      items: [BASEMAP_PALETTE_ITEM, AREA_PALETTE_ITEM],
+      items: [BASEMAP_PALETTE_ITEM, TRACKGEN_PALETTE_ITEM, AREA_PALETTE_ITEM],
     },
     { key: 'facility', label: '設施', items: facilityItems },
     { key: 'equipment', label: '設備', items: equipmentItems },
@@ -97,8 +99,11 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                   ? AREA_PALETTE_ICON
                   : isBasemapPaletteItem(item)
                     ? ImageIcon
-                    : PALETTE_ICON_BY_NAME[item.name]
-                const clickEnabled = isAreaPaletteItem(item) || isBasemapPaletteItem(item)
+                    : isTrackGenPaletteItem(item)
+                      ? Route
+                      : PALETTE_ICON_BY_NAME[item.name]
+                const clickEnabled =
+                  isAreaPaletteItem(item) || isBasemapPaletteItem(item) || isTrackGenPaletteItem(item)
                 return (
                   <div
                     key={
@@ -106,7 +111,9 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                         ? 'area'
                         : isBasemapPaletteItem(item)
                           ? 'basemap'
-                          : `${item.label}-${item.name}`
+                          : isTrackGenPaletteItem(item)
+                            ? 'trackgen'
+                            : `${item.label}-${item.name}`
                     }
                     className="flex w-[3.75rem] shrink-0 flex-col items-center justify-center gap-1"
                   >
@@ -125,7 +132,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                       }}
                       title={
                         clickEnabled
-                          ? isBasemapPaletteItem(item)
+                          ? isBasemapPaletteItem(item) || isTrackGenPaletteItem(item)
                             ? `${item.hint}\n點擊或拖曳至地圖任意位置`
                             : `${item.hint}\n點擊置中或拖曳至地圖指定位置`
                           : `${item.hint}\n僅可拖曳至 Area 內`

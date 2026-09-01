@@ -19,7 +19,17 @@ export interface BasemapPaletteItem {
   hint: string
 }
 
-export type PaletteItem = FacilityPaletteItem | AreaPaletteItem | BasemapPaletteItem
+export interface TrackGenPaletteItem {
+  label: string
+  type: 'TrackGen'
+  hint: string
+}
+
+export type PaletteItem =
+  | FacilityPaletteItem
+  | AreaPaletteItem
+  | BasemapPaletteItem
+  | TrackGenPaletteItem
 
 export const AREA_PALETTE_ITEM: AreaPaletteItem = {
   label: 'Area 容器',
@@ -31,6 +41,12 @@ export const BASEMAP_PALETTE_ITEM: BasemapPaletteItem = {
   label: '底圖',
   type: 'Basemap',
   hint: '底圖 — 與 Area 同層；拖曳至地圖任意位置，可載入圖片或 .xodr',
+}
+
+export const TRACKGEN_PALETTE_ITEM: TrackGenPaletteItem = {
+  label: '軌道生成',
+  type: 'TrackGen',
+  hint: '軌道生成 — 與 Area 同層；載入 .xodr 後可由路網自動生成軌道',
 }
 
 /** 資產列：設施／設備僅可拖入 Area 內；底圖與 Area 同層。 */
@@ -88,6 +104,18 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     type: 'RoadLine',
     name: 'RoadLine',
     hint: '道路線 — 純視覺標記；可調線型、線寬與長度',
+  },
+  {
+    label: '圓角軌道',
+    type: 'Track',
+    name: 'RailCorner',
+    hint: '圓角軌道 — 90 度圓角；可拉長兩端直線段，並調整圓弧半徑',
+  },
+  {
+    label: '斜接軌道',
+    type: 'TrackCrossover',
+    name: 'RailTaper',
+    hint: '斜接軌道 — 四邊形；端點可吸附到其他軌道，接合後該端寬度自動齊平',
   },
   {
     label: '虛擬渡線',

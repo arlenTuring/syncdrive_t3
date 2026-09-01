@@ -1,4 +1,5 @@
 import type { MapAreaDomain, MapAreaLayout } from '../types/area'
+import { cornerTrackSizeM, readCornerTrack } from './trackShapes'
 import type { FacilityObject } from '../types/facility'
 import {
   clampSizeMeters,
@@ -117,6 +118,12 @@ export function resolveFacilityAreaSize(
       w: base.w,
       h: resolveRoadLineAreaHeightPx(base.h, sw),
     }
+  }
+  if (f.type === 'Track' && f.name === 'RailCorner') {
+    // 圓角軌道的外框由幾何決定，不吃 areaSizePx——存下來的舊尺寸會把
+    // 正方的 L 形壓成長條，弧就不圓了。
+    const sizeM = cornerTrackSizeM(readCornerTrack(f.parameters))
+    return meterSizeToAreaLocalPx(sizeM.w, sizeM.h, domain, layout)
   }
   if (f.type === 'TrackCrossover') {
     const portals = getCrossoverPortals(f)

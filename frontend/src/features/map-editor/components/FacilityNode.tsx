@@ -8,6 +8,19 @@ import {
 import type { RefObject } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
+import {
+  readTaperTrack,
+  TAPER_TRACK_KEY,
+} from '../utils/trackShapes'
+import { TaperTrackGraphic } from './TaperTrackGraphic'
+import {
+  cornerTrackHandlesM,
+  cornerTrackPath,
+  cornerTrackSizeM,
+  CORNER_TRACK_KEY,
+  DEFAULT_CORNER_TRACK,
+  readCornerTrack,
+} from '../utils/trackShapes'
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type {
   FacilityObject,
@@ -120,6 +133,7 @@ import {
 } from './TrackCrossoverGraphic'
 import type { TrackNetworkSegment } from '../vehicles/trackNetwork/types'
 import {
+  CROSSOVER_PORTAL_KEYS,
   dragCrossoverPortal,
   ensureCrossoverPortals,
   getCrossoverPortals,
@@ -356,9 +370,20 @@ export const FacilityNode = memo(function FacilityNode({
   const isSignal = facility.type === 'Signal'
   const isPole = facility.type === 'Pole'
   const isTrack = facility.type === 'Track'
+  /*
+   * 圓角軌道是 Track 的變體：位置、縮放、選取、存檔全部沿用既有機制，
+   * 只把可見形狀從矩形換成「直腳→圓弧→直腳」。用 clip-path 而不是改成 SVG，
+   * 是因為那些機制都掛在這個 div 上，換掉容器等於整套重寫。
+   */
+  const isCornerTrack = isTrack && facility.name === 'RailCorner'
   const isRoadLine = facility.type === 'RoadLine'
   const isBasemap = facility.type === 'Basemap'
   const isTrackCrossover = facility.type === 'TrackCrossover'
+  /*
+   * 斜接軌道是虛擬渡線的變體：端點拖曳與吸附接合那一整套直接沿用，
+   * 只換外觀（填色四邊形）並讓每一端記住自己的寬度。
+   */
+  const isTaperTrack = isTrackCrossover && facility.name === 'RailTaper'
   const isFacilityArea = facility.type === 'Facility'
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false)
 
@@ -543,6 +568,35 @@ export const FacilityNode = memo(function FacilityNode({
     [facility, onPatchParameters],
   )
 
+  /**
+   * 斜接軌道每一端的寬度。
+   *
+   * 接合之後就以對手軌道的寬度為準——接縫兩側等寬才不會有段差，而這也表示
+   * 兩端可能不一樣寬。未接合的端點保留使用者原本的寬度。
+   */
+  const taperWidthsFromPortals = useCallback(
+    (portals: CrossoverPortals): Record<CrossoverPortalKey, number> | null => {
+      if (!isTaperTrack) return null
+      const stored = readTaperTrack(facilityRef.current.parameters)
+      const out = {} as Record<CrossoverPortalKey, number>
+      for (const key of CROSSOVER_PORTAL_KEYS) {
+        const fallback = (key === 'a' ? stored?.a.widthM : stored?.b.widthM) ?? 3.5
+        const attachedId = portals[key].attachedTrackId
+        const seg = attachedId ? crossoverSegmentByIdRef.current?.get(attachedId) : null
+        if (!seg) {
+          out[key] = fallback
+          continue
+        }
+        // 軌道的「寬度」是與行進方向垂直的那一邊
+        out[key] = seg.horizontal
+          ? seg.bounds.yMaxM - seg.bounds.yMinM
+          : seg.bounds.xMaxM - seg.bounds.xMinM
+      }
+      return out
+    },
+    [isTaperTrack],
+  )
+
   const applyCrossoverPortalsUpdate = useCallback(
     (nextPortals: CrossoverPortals) => {
       if (!areaMeterContext || !onPatchParameters) return
@@ -553,14 +607,42 @@ export const FacilityNode = memo(function FacilityNode({
         // 動作前的端點：沒動到的那一個要保留它的現場座標
         getCrossoverPortals(facility),
       )
-      onPatchParameters(facility.id, sync.parametersPatch)
+      const widths = taperWidthsFromPortals(nextPortals)
+      onPatchParameters(facility.id, {
+        ...sync.parametersPatch,
+        ...(widths
+          ? {
+              [TAPER_TRACK_KEY]: {
+                a: {
+                  xM: nextPortals.a.xM,
+                  yM: nextPortals.a.yM,
+                  widthM: widths.a,
+                  attachedTrackId: nextPortals.a.attachedTrackId,
+                },
+                b: {
+                  xM: nextPortals.b.xM,
+                  yM: nextPortals.b.yM,
+                  widthM: widths.b,
+                  attachedTrackId: nextPortals.b.attachedTrackId,
+                },
+              },
+            }
+          : {}),
+      })
       onResize?.(facility.id, sync.areaSizePx)
       onDrag(facility.id, {
         areaPosition: sync.areaPosition,
         position: sync.position,
       })
     },
-    [areaMeterContext, facility.id, onDrag, onPatchParameters, onResize],
+    [
+      areaMeterContext,
+      facility.id,
+      onDrag,
+      onPatchParameters,
+      onResize,
+      taperWidthsFromPortals,
+    ],
   )
 
   const onCrossoverPortalPointerDown = useCallback(
@@ -729,6 +811,19 @@ export const FacilityNode = memo(function FacilityNode({
   const crossoverPortals = isTrackCrossover
     ? (crossoverPortalPreview ?? ensureCrossoverPortals(facility))
     : null
+  /** 斜接軌道兩端寬度（px）。公尺→像素用區域的橫向比例，與軌道本身一致。 */
+  const taperEndWidthsPx = (() => {
+    if (!isTaperTrack || !areaMeterContext) return [8, 8]
+    const stored = readTaperTrack(facility.parameters)
+    const domain = areaMeterContext.domain
+    const spanM = Math.max(0.001, domain.yMaxM - domain.yMinM)
+    const pxPerM = areaMeterContext.layout.hPx / spanM
+    return [
+      Math.max(2, (stored?.a.widthM ?? 3.5) * pxPerM),
+      Math.max(2, (stored?.b.widthM ?? 3.5) * pxPerM),
+    ]
+  })()
+
   const crossoverPortalsLocal =
     crossoverPortals && areaMeterContext
       ? portalsToAreaCssPoints(
@@ -1073,6 +1168,24 @@ export const FacilityNode = memo(function FacilityNode({
       setLiveSizeM({ w: widthM, h: heightM })
     }
   }, [widthM, heightM, isResizing])
+
+  /**
+   * 圓角軌道的裁切路徑。
+   *
+   * 直接以元件的像素尺寸產生，所以拖曳邊角改變大小時形狀會跟著變——
+   * 兩個直腳等於被拉長，正是預期的操作方式。
+   */
+  const cornerTrackGeom = useMemo(
+    () => (isCornerTrack ? readCornerTrack(facility.parameters) : null),
+    [isCornerTrack, facility.parameters],
+  )
+  const cornerTrackClipPath = useMemo(() => {
+    if (!cornerTrackGeom) return ''
+    const sizeM = cornerTrackSizeM(cornerTrackGeom)
+    const w = Math.max(1, nw)
+    const h = Math.max(1, nh)
+    return cornerTrackPath(cornerTrackGeom, w / sizeM.w, h / sizeM.h)
+  }, [cornerTrackGeom, nw, nh])
 
   const trackCorners = isTrack
     ? getTrackCornerRadii(facility)
@@ -1805,6 +1918,76 @@ export const FacilityNode = memo(function FacilityNode({
     }
   }, [])
 
+  /* ── 圓角軌道的三個控制點 ─────────────────────────────────────
+     兩個端點拉長直腳、一個點調整圓弧半徑。外框由幾何算出（見
+     getFacilitySizeMeters），所以這裡只要改參數，大小會自己跟上。 */
+  const [cornerDragKey, setCornerDragKey] = useState<
+    'legIn' | 'legOut' | 'radius' | null
+  >(null)
+  const cornerDragRef = useRef({
+    pointerX: 0,
+    pointerY: 0,
+    base: DEFAULT_CORNER_TRACK,
+  })
+
+  const cornerTrackPxPerM = useMemo(() => {
+    if (!cornerTrackGeom) return { x: 1, y: 1 }
+    const sizeM = cornerTrackSizeM(cornerTrackGeom)
+    return { x: nw / Math.max(0.001, sizeM.w), y: nh / Math.max(0.001, sizeM.h) }
+  }, [cornerTrackGeom, nw, nh])
+
+  const onCornerTrackHandleDown = useCallback(
+    (key: 'legIn' | 'legOut' | 'radius', e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation()
+      e.preventDefault()
+      if (readOnly || !onPatchParameters) return
+      onTrackCornerEditStart?.()
+      cornerDragRef.current = {
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+        base: readCornerTrack(facilityRef.current.parameters),
+      }
+      setCornerDragKey(key)
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    [onPatchParameters, onTrackCornerEditStart, readOnly],
+  )
+
+  const onCornerTrackHandleMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!cornerDragKey || !onPatchParameters) return
+      const { pointerX, pointerY, base } = cornerDragRef.current
+      const dxM = (e.clientX - pointerX) / Math.max(0.001, cornerTrackPxPerM.x * mapScale)
+      const dyM = (e.clientY - pointerY) / Math.max(0.001, cornerTrackPxPerM.y * mapScale)
+      const next = { ...base }
+      if (cornerDragKey === 'legIn') {
+        // 端點在左緣，往左拉（dx 為負）＝直腳變長
+        next.legInM = Math.max(0, base.legInM - dxM)
+      } else if (cornerDragKey === 'legOut') {
+        next.legOutM = Math.max(0, base.legOutM + dyM)
+      } else {
+        // 半徑控制點在弧的中點，往外（左上）拉＝半徑變大
+        const outward = -(dxM + dyM) / Math.SQRT2
+        next.radiusM = Math.max(0, base.radiusM + outward)
+      }
+      onPatchParameters(facilityRef.current.id, { [CORNER_TRACK_KEY]: next })
+    },
+    [cornerDragKey, cornerTrackPxPerM, mapScale, onPatchParameters],
+  )
+
+  const onCornerTrackHandleEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!cornerDragKey) return
+      setCornerDragKey(null)
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [cornerDragKey],
+  )
+
   const onTrackCornerPointerDown = useCallback(
     (corner: 'tl' | 'tr' | 'br' | 'bl', e: React.PointerEvent<HTMLDivElement>) => {
       e.stopPropagation()
@@ -1953,7 +2136,16 @@ export const FacilityNode = memo(function FacilityNode({
             ...(isTrack
               ? {
                   backgroundColor: trackFillColor ?? undefined,
-                  borderRadius: `${trackCornersPx.tl}px ${trackCornersPx.tr}px ${trackCornersPx.br}px ${trackCornersPx.bl}px`,
+                  ...(isCornerTrack
+                    ? {
+                        // 圓角軌道自己是一條 L 形，外框的方角圓角不適用
+                        borderRadius: undefined,
+                        borderWidth: 0,
+                        clipPath: `path('${cornerTrackClipPath}')`,
+                      }
+                    : {
+                        borderRadius: `${trackCornersPx.tl}px ${trackCornersPx.tr}px ${trackCornersPx.br}px ${trackCornersPx.bl}px`,
+                      }),
                   overflow: 'hidden',
                 }
               : {}),
@@ -2048,6 +2240,29 @@ export const FacilityNode = memo(function FacilityNode({
                 style={roadLineStyle}
                 strokeWidthPx={roadLineWidthPx}
                 color={roadLineColor}
+              />
+            </div>
+          ) : isTaperTrack ? (
+            <div
+              className="relative size-full overflow-visible pointer-events-none"
+              style={{ isolation: 'isolate' }}
+            >
+              <TaperTrackGraphic
+                width={nw}
+                height={nh}
+                portalsLocal={crossoverPortalsLocal}
+                endWidthsPx={taperEndWidthsPx}
+                attached={CROSSOVER_PORTAL_KEYS.map(
+                  (k) => !!crossoverPortals?.[k]?.attachedTrackId,
+                )}
+                fill={trackCrossoverColor}
+                fillOpacity={trackCrossoverColorOpacity / 100}
+                stroke={trackCrossoverColor}
+                emphasized={selected}
+                readOnly={readOnly}
+                onPortalPointerDown={onCrossoverPortalPointerDown}
+                onPortalPointerMove={onCrossoverPortalPointerMove}
+                onPortalPointerUp={onCrossoverPortalPointerEnd}
               />
             </div>
           ) : isTrackCrossover ? (
@@ -2332,7 +2547,41 @@ export const FacilityNode = memo(function FacilityNode({
             ))}
           </>
         )}
-        {isTrack && selected && !readOnly && onPatchParameters && (
+        {isCornerTrack && cornerTrackGeom && selected && !readOnly && onPatchParameters && (
+          <>
+            {(() => {
+              const h = cornerTrackHandlesM(cornerTrackGeom)
+              const items = [
+                ['legIn', h.endIn, '拖曳拉長進入端直線段', 'cursor-ew-resize', '#67e8f9'],
+                ['legOut', h.endOut, '拖曳拉長離開端直線段', 'cursor-ns-resize', '#67e8f9'],
+                ['radius', h.radius, '拖曳調整圓弧半徑', 'cursor-nwse-resize', '#fbbf24'],
+              ] as const
+              return items.map(([key, pt, title, cursor, color]) => (
+                <div
+                  key={key}
+                  data-corner-track-handle
+                  className={`absolute z-[86] touch-none ${cursor}`}
+                  style={{
+                    left: pt.x * cornerTrackPxPerM.x,
+                    top: pt.y * cornerTrackPxPerM.y,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  title={title}
+                  onPointerDown={(e) => onCornerTrackHandleDown(key, e)}
+                  onPointerMove={onCornerTrackHandleMove}
+                  onPointerUp={onCornerTrackHandleEnd}
+                  onPointerCancel={onCornerTrackHandleEnd}
+                >
+                  <div
+                    className="size-3 rounded-full border-2 bg-zinc-900 shadow-md"
+                    style={{ borderColor: color }}
+                  />
+                </div>
+              ))
+            })()}
+          </>
+        )}
+        {isTrack && !isCornerTrack && selected && !readOnly && onPatchParameters && (
           <>
             {([
               [

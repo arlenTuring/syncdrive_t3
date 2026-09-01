@@ -52,6 +52,7 @@ type MapAreaCanvasProps = {
   pixelOrigin?: MapPixelOrigin
   areas: MapAreaObject[]
   basemaps?: MapBasemapObject[]
+  onApplyTrackGen?: (basemapId: string) => void
   selectedAreaId: string | null
   selectedBasemapId?: string | null
   selectedFacilityIds: string[]
@@ -206,6 +207,7 @@ export function MapAreaCanvas({
   pixelOrigin = DEFAULT_MAP_PIXEL_ORIGIN,
   areas,
   basemaps = [],
+  onApplyTrackGen,
   selectedAreaId,
   selectedBasemapId = null,
   selectedFacilityIds,
@@ -726,6 +728,7 @@ export function MapAreaCanvas({
             ) : null}
             {basemapsBelow.map((basemap, stackOrder) => (
               <BasemapNode
+                onApplyTrackGen={onApplyTrackGen}
                 key={basemap.id}
                 basemap={basemap}
                 stackOrder={stackOrder}
@@ -820,6 +823,7 @@ export function MapAreaCanvas({
             ))}
             {basemapsAbove.map((basemap, stackOrder) => (
               <BasemapNode
+                onApplyTrackGen={onApplyTrackGen}
                 key={basemap.id}
                 basemap={basemap}
                 stackOrder={stackOrder}
