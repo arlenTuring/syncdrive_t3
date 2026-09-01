@@ -2300,13 +2300,13 @@ export default function MapEditorApp({
          * 就落在同樣大小的矩形裡。網域對映因此是非等比的（橫向與縱向各自縮放），
          * 與元件裡的中心線畫法一致。
          *
-         * 位置擺在元件<strong>正下方</strong>，不是疊上去：Area 畫在底圖之上，疊上去會
-         * 整片蓋住生成元件，使用者就按不到「重新生成」與「更換路網」了。
+         * 位置也<strong>疊在元件上</strong>——同一個矩形，生成的軌道就直接蓋在原本那張
+         * 路網圖上面，兩者對得起來。擺在正下方的話等於另外開一塊，反而看不出對應。
          */
         layout: {
           ...blank.layout,
           xPx: basemap.layout.xPx,
-          yPx: basemap.layout.yPx + basemap.layout.hPx + 24,
+          yPx: basemap.layout.yPx,
           wPx: basemap.layout.wPx,
           hPx: basemap.layout.hPx,
         },
@@ -2366,11 +2366,18 @@ export default function MapEditorApp({
         ),
       )
       setNextNumericId(seq)
-      updateSelection(areaId, [])
-      selectedBasemapIdRef.current = null
-      setSelectedBasemapId(null)
+      /*
+       * 生成完<strong>維持選取生成元件</strong>，不要跳去選新的 Area。
+       *
+       * Area 完全疊在元件上，選取一跳走就再也點不到底下的元件——「重新生成」與
+       * 「更換路網」那兩顆按鈕會連同工具列一起消失。留著選取，改完參數可以直接
+       * 再按一次。
+       */
+      clearSelection()
+      selectedBasemapIdRef.current = basemapId
+      setSelectedBasemapId(basemapId)
     },
-    [nextNumericId, pushHistory, updateSelection],
+    [clearSelection, nextNumericId, pushHistory],
   )
 
   const onPatchBasemapLayout = useCallback((basemapId: string, layout: MapBasemapLayout) => {
