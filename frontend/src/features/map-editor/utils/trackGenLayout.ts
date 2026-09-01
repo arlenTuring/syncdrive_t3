@@ -423,8 +423,22 @@ export function layoutTrackGen(
    */
   const seenCrossovers = new Set<string>()
 
-  for (const lane of result.lanes) {
-    if (lane.role === 'down' || lane.role === 'up') continue
+  /*
+   * 側線實際畫出來的股道與里程。
+   *
+   * 渡線是通往側線的；側線若整段落在彎道上而被裁掉，那條渡線就會指向一個不存在
+   * 的東西、孤零零地戳在圖面外面——實測 SD-5 被裁光之後，X-14 與 X-15 就變成兩片
+   * 橫在轉角旁邊的尖角。所以先把側線畫完、記下涵蓋範圍，渡線再依此決定畫不畫。
+   */
+  const sidingCoverage: Array<{ level: number; sFrom: number; sTo: number }> = []
+
+  const sideLanes = result.lanes.filter(
+    (l) => l.role === 'siding' || l.role === 'crossover',
+  )
+  for (const lane of [
+    ...sideLanes.filter((l) => l.role === 'siding'),
+    ...sideLanes.filter((l) => l.role === 'crossover'),
+  ]) {
     if (lane.role === 'crossover' && !settings.showCrossovers) continue
     if (lane.role === 'siding' && !settings.showSidings) continue
     const prof = [...lane.profile].sort((a, b) => a[0] - b[0])
@@ -448,9 +462,33 @@ export function layoutTrackGen(
        */
       const latDeltaM = Math.abs(latOfLevel(la) - latOfLevel(lb)) * lt
       const sMid = (a[0] + b[0]) / 2
-      const half = Math.max(Math.abs(b[0] - a[0]), latDeltaM) / 2
+      let half = Math.max(Math.abs(b[0] - a[0]), latDeltaM) / 2
+      /*
+       * 撐開之後不可以跨進彎道。
+       *
+       * 斜接軌道是一段直的平行四邊形；兩端一旦一個落在直線段、一個落在弧上，中間
+       * 那條直線就會橫切過整個轉角——實測 X-15 被撐到 1146–1209，而直線段 1193 就
+       * 結束，畫出來是一根刺穿轉角的尖角。所以先夾回中點所在的那一段直線裡。
+       */
+      const host = placed.find(
+        (q) => q.kind === 'straight' && sMid >= q.sFrom && sMid <= q.sTo,
+      )
+      if (host) {
+        half = Math.min(half, sMid - host.sFrom, host.sTo - sMid)
+      }
       const sA = sMid - half
       const sB = sMid + half
+      // 夾完太短就不畫：比自己的帶寬還短的斜帶只是一小塊斜方塊，看不出是渡線
+      if (sB - sA < bandW * 0.4) continue
+      // 通往側線的渡線，目的股道要真的有畫出側線才畫
+      const needsSiding = [la, lb].filter((v) => v !== 0 && v !== 1)
+      const reachable = needsSiding.every((level) =>
+        sidingCoverage.some(
+          (c) => c.level === level && c.sTo >= sA - bandW && c.sFrom <= sB + bandW,
+        ),
+      )
+      if (!reachable) continue
+
       const pa = placePoint(sA, latOfLevel(la), placed, lt)
       const pb = placePoint(sB, latOfLevel(lb), placed, lt)
       if (la === lb) {
@@ -483,9 +521,19 @@ export function layoutTrackGen(
       return best[1]
     }
     const spans = straightSpans(placed, prof[0]![0], prof[prof.length - 1]![0])
-    spans.forEach(([a, b], i) => {
+    /*
+     * 太短的殘段不畫。
+     *
+     * 側線只畫在直線脊線段上，落在轉角那一段會被裁掉；剩下幾公尺的殘段比自己的
+     * 帶寬還短，畫出來是一個與任何東西都不相連的小方塊——實測 SD-5 只剩 6 與 8
+     * 公尺，浮在轉角外面。寧可不畫。
+     */
+    const drawn = spans.filter(([a, b]) => b - a >= bandW * 0.6)
+    const level = levelOfLane.get(lane.key) ?? levelOf(prof[0]![1])
+    drawn.forEach(([a, b]) => sidingCoverage.push({ level, sFrom: a, sTo: b }))
+    drawn.forEach(([a, b], i) => {
       addRect(
-        spans.length > 1 ? `${tag}.${i + 1}` : tag,
+        drawn.length > 1 ? `${tag}.${i + 1}` : tag,
         lane.role,
         placePoint(a, lat, placed, lt),
         placePoint(b, lat, placed, lt),
