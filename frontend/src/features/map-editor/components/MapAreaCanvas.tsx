@@ -22,7 +22,7 @@ import type {
   SlotEquipmentState,
   SlotOccupancy,
 } from '../types/facility'
-import { decodePaletteDragItem, isAreaPaletteItem, isBasemapPaletteItem, isMapCanvasPaletteItem, PALETTE_DRAG_MIME } from '../utils/paletteDrag'
+import { decodePaletteDragItem, isAreaPaletteItem, isMapCanvasPaletteItem, PALETTE_DRAG_MIME } from '../utils/paletteDrag'
 import { partitionMapBasemaps } from '../utils/basemapFacility'
 import { BasemapNode } from './BasemapNode'
 import {
@@ -491,7 +491,14 @@ export function MapAreaCanvas({
       const pt = clientToMapPx(e.clientX, e.clientY)
       if (isAreaPaletteItem(item)) {
         onPaletteDropArea?.(item, pt)
-      } else if (isBasemapPaletteItem(item)) {
+      } else {
+        /*
+         * 底圖與軌道生成走同一條路：軌道生成元件就是掛了 componentKind 的底圖。
+         *
+         * 先前這裡只列了 Basemap，軌道生成通過了 isMapCanvasPaletteItem 卻沒有分支
+         * 接它，拖進地圖等於什麼都沒發生——從元件庫「點一下新增」有另一條路徑，
+         * 所以只有拖曳會沒反應。
+         */
         onPaletteDropBasemap?.(item, pt)
       }
     },
