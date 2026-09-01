@@ -16,6 +16,7 @@ import type {
 } from '../types/area'
 import { DEFAULT_MAP_PIXEL_ORIGIN } from '../types/area'
 import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
+import type { TrackGenResult } from '../utils/trackGenerator'
 import type { PaletteItem } from '../constants/palette'
 import type {
   SlotEquipmentState,
@@ -52,7 +53,7 @@ type MapAreaCanvasProps = {
   pixelOrigin?: MapPixelOrigin
   areas: MapAreaObject[]
   basemaps?: MapBasemapObject[]
-  onApplyTrackGen?: (basemapId: string) => void
+  onApplyTrackGen?: (basemapId: string, result: TrackGenResult) => void
   selectedAreaId: string | null
   selectedBasemapId?: string | null
   selectedFacilityIds: string[]

@@ -15,6 +15,8 @@ export const TRACKGEN_XODR_KEY = 'trackGenXodrContent'
 export const TRACKGEN_FILE_NAME_KEY = 'trackGenFileName'
 export const TRACKGEN_RESULT_KEY = 'trackGenResult'
 export const TRACKGEN_SETTINGS_KEY = 'trackGenSettings'
+/** 這個元件上一次生成出來的 Area；重跑時取代它，不要越堆越多 */
+export const TRACKGEN_AREA_ID_KEY = 'trackGenAreaId'
 
 export type TrackGenSettings = {
   /**
@@ -51,6 +53,13 @@ export function isTrackGenComponent(parameters: Record<string, unknown> | undefi
 export function getTrackGenXodr(parameters: Record<string, unknown> | undefined): string | null {
   const raw = parameters?.[TRACKGEN_XODR_KEY]
   return typeof raw === 'string' && raw.trim() ? raw : null
+}
+
+export function getTrackGenAreaId(
+  parameters: Record<string, unknown> | undefined,
+): string | null {
+  const raw = parameters?.[TRACKGEN_AREA_ID_KEY]
+  return typeof raw === 'string' && raw ? raw : null
 }
 
 export function getTrackGenFileName(parameters: Record<string, unknown> | undefined): string | null {

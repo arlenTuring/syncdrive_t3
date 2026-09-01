@@ -193,8 +193,10 @@ import {
 } from './utils/basemapFacility'
 import {
   defaultTrackGenParameters,
+  getTrackGenAreaId,
   getTrackGenResult,
   getTrackGenSettings,
+  TRACKGEN_AREA_ID_KEY,
   isTrackGenComponent,
 } from './utils/trackGenFacility'
 import {
@@ -204,6 +206,7 @@ import {
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
 import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
+import type { TrackGenResult } from './utils/trackGenerator'
 import {
   defaultTrackCrossoverParameters,
 } from './utils/trackCrossoverFacility'
@@ -2259,11 +2262,19 @@ export default function MapEditorApp({
    * 產出一個新的 Area 裝它們，而不是塞進既有的 Area：生成的是一整套座標系，
    * 混進別人的 Area 會與那裡既有的設施座標打架。使用者要合併時再自己搬。
    */
+  /**
+   * 生成軌道：直接在地圖上建出真正的軌道元件。
+   *
+   * 中間不畫任何示意圖形——使用者要的就是圓角／斜接／一般軌道那些可以個別拉伸、
+   * 設屬性、被車輛投影命中的元件。多畫一層藍色示意方塊只是讓人多按一次按鈕。
+   *
+   * result 由呼叫端直接帶進來：剛算完的結果還沒寫回 state，從參數讀會拿到上一次的。
+   */
   const onApplyTrackGen = useCallback(
-    (basemapId: string) => {
+    (basemapId: string, freshResult?: TrackGenResult) => {
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
       if (!basemap) return
-      const result = getTrackGenResult(basemap.parameters)
+      const result = freshResult ?? getTrackGenResult(basemap.parameters)
       if (!result || !result.blocks.length) return
       const settings = getTrackGenSettings(basemap.parameters)
 
@@ -2334,7 +2345,24 @@ export default function MapEditorApp({
         } as unknown as FacilityObject
       })
 
-      setAreas((prev) => [...prev, { ...area, facilities }])
+      /*
+       * 重跑時取代上一次生成的那個 Area。
+       *
+       * 不取代的話每按一次「重新生成」就多一份，畫面上疊成好幾層一樣的軌道，
+       * 使用者還得自己去刪。
+       */
+      const prevAreaId = getTrackGenAreaId(basemap.parameters)
+      setAreas((prev) => {
+        const kept = prevAreaId ? prev.filter((a) => a.id !== prevAreaId) : prev
+        return [...kept, { ...area, facilities }]
+      })
+      setBasemaps((prev) =>
+        prev.map((b) =>
+          b.id === basemapId
+            ? { ...b, parameters: { ...(b.parameters ?? {}), [TRACKGEN_AREA_ID_KEY]: areaId } }
+            : b,
+        ),
+      )
       setNextNumericId(seq)
       updateSelection(areaId, [])
       selectedBasemapIdRef.current = null

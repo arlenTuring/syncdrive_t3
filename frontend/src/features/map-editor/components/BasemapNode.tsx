@@ -4,7 +4,6 @@ import {
   ArrowUpToLine,
   CircleCheck,
   Columns2,
-  Check,
   Eraser,
   PencilLine,
   Rows2,
@@ -18,6 +17,7 @@ import { BasemapPartitionContent } from './BasemapPartitionContent'
 import { BasemapFilePickerDialog } from './BasemapFilePickerDialog'
 import { TrackGenGraphic } from './TrackGenGraphic'
 import { parseLaneCenterlines } from '../opendrive/laneCenterlines'
+import type { TrackGenResult } from '../utils/trackGenerator'
 import { generateTracks } from '../utils/trackGenerator'
 import {
   getTrackGenFileName,
@@ -109,7 +109,7 @@ function layoutFromCornerResize(
 
 type Props = {
   /** 軌道生成：把結果變成真正的設施 */
-  onApplyTrackGen?: (basemapId: string) => void
+  onApplyTrackGen?: (basemapId: string, result: TrackGenResult) => void
   basemap: MapBasemapObject
   stackOrder: number
   stackCount: number
@@ -191,6 +191,13 @@ export const BasemapNode = memo(function BasemapNode({
   const trackGenSettings = getTrackGenSettings(basemap.parameters)
   const [generating, setGenerating] = useState(false)
 
+  /**
+   * 生成軌道：算完就直接在地圖上建出真正的軌道元件。
+   *
+   * 中間<strong>不畫示意圖形</strong>。使用者要的是圓角／斜接／一般軌道那些能個別
+   * 拉伸、設屬性、被車輛投影命中的元件；先畫一份藍色示意方塊再按一次「套用」，
+   * 只是多一道手續。這個元件負責的是「載入路網、看中心線、按下生成」。
+   */
   const runTrackGeneration = useCallback(() => {
     if (!trackGenCenterlines) return
     setGenerating(true)
@@ -200,12 +207,20 @@ export const BasemapNode = memo(function BasemapNode({
         const result = generateTracks(trackGenCenterlines, {
           blockLengthM: trackGenSettings.blockLengthM,
         })
+        // 結果留著給屬性匡顯示統計，也讓「重新生成」知道上一次生成過
         onPatchParameters(basemap.id, { [TRACKGEN_RESULT_KEY]: result })
+        onApplyTrackGen?.(basemap.id, result)
       } finally {
         setGenerating(false)
       }
     }, 0)
-  }, [basemap.id, onPatchParameters, trackGenCenterlines, trackGenSettings.blockLengthM])
+  }, [
+    basemap.id,
+    onApplyTrackGen,
+    onPatchParameters,
+    trackGenCenterlines,
+    trackGenSettings.blockLengthM,
+  ])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)
@@ -642,7 +657,6 @@ export const BasemapNode = memo(function BasemapNode({
             centerlines={trackGenCenterlines}
             parseFailed={trackGenParseFailed}
             result={trackGenResult}
-            settings={trackGenSettings}
             fileName={getTrackGenFileName(basemap.parameters)}
             readOnly={readOnly}
             selected={selected}
@@ -754,27 +768,10 @@ export const BasemapNode = memo(function BasemapNode({
                       <Route className="size-4" aria-hidden />
                       {generating ? '生成中…' : trackGenResult ? '重新生成' : '軌道生成'}
                     </button>
-                    {trackGenResult && onApplyTrackGen ? (
-                      <button
-                        type="button"
-                        title="把生成的軌道變成地圖上真正的設施，之後可個別拉伸與設定"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          onApplyTrackGen(basemap.id)
-                        }}
-                        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-                      >
-                        <Check className="size-4" aria-hidden />
-                        套用到地圖
-                      </button>
-                    ) : null}
                     {trackGenResult ? (
                       <button
                         type="button"
-                        title="清除生成結果，回到只顯示中心線"
+                        title="清除生成紀錄，回到只顯示中心線"
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
