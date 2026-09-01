@@ -77,6 +77,35 @@ export const DEFAULT_CORNER_TRACK_SIZE_M = { w: 60, h: 60 }
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 /**
+ * 把「未旋轉」的形狀座標搬到實際的元件座標。
+ *
+ * entryDeg 量化到 90 度的倍數：轉 90 度時形狀的寬高互換，所以先在未旋轉的
+ * 座標系裡算，最後才轉過去。圓角與斜接共用同一套慣例，排版才有辦法對位。
+ */
+function cornerSpin(g: Pick<CornerTrackGeometry, 'entryDeg'>, boxWPx: number, boxHPx: number) {
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const T = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return { x: ocx + dx, y: ocy + dy }
+  }
+  return { w, h, T }
+}
+
+/**
  * 弧帶的填色外框。
  *
  * 直接以元件的像素尺寸產生，所以拖曳邊角改變大小時形狀跟著等比變化。
@@ -87,11 +116,7 @@ export function cornerTrackPath(
   boxWPx: number,
   boxHPx: number,
 ): string {
-  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
-  const swap = quarter % 2 === 1
-  // 轉 90 度時形狀的寬高互換，先在「未旋轉」的座標系裡算
-  const w = Math.max(1, swap ? boxHPx : boxWPx)
-  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
 
   const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
   const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
@@ -100,20 +125,9 @@ export function cornerTrackPath(
   const iry = ry - d
   const solid = irx <= 0.5 || iry <= 0.5
 
-  const cx = w / 2
-  const cy = h / 2
-  const ocx = boxWPx / 2
-  const ocy = boxHPx / 2
   const P = (x: number, y: number) => {
-    let dx = x - cx
-    let dy = y - cy
-    for (let i = 0; i < quarter; i += 1) {
-      const nx = -dy
-      const ny = dx
-      dx = nx
-      dy = ny
-    }
-    return `${(ocx + dx).toFixed(2)} ${(ocy + dy).toFixed(2)}`
+    const p = T(x, y)
+    return `${p.x.toFixed(2)} ${p.y.toFixed(2)}`
   }
 
   /*
@@ -189,28 +203,10 @@ export function cornerTrackHandlesPx(
   boxWPx: number,
   boxHPx: number,
 ): Record<CornerHandleKey, { x: number; y: number }> {
-  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
-  const swap = quarter % 2 === 1
-  const w = Math.max(1, swap ? boxHPx : boxWPx)
-  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
   const rx = clamp01(g.arcXRatio) * w
   const ry = clamp01(g.arcYRatio) * h
   const d = clamp01(g.depthRatio) * Math.min(rx, ry)
-  const cx = w / 2
-  const cy = h / 2
-  const ocx = boxWPx / 2
-  const ocy = boxHPx / 2
-  const T = (x: number, y: number) => {
-    let dx = x - cx
-    let dy = y - cy
-    for (let i = 0; i < quarter; i += 1) {
-      const nx = -dy
-      const ny = dx
-      dx = nx
-      dy = ny
-    }
-    return { x: ocx + dx, y: ocy + dy }
-  }
   /*
    * 控制點放在曲線的中點上。二次貝茲在 t=0.5 的位置是 (P1 + 2Q + P2)/4，
    * 代入控制點的定義後化簡，中點離圓心的比例正好是 (2q + 1)/4——
@@ -251,6 +247,59 @@ export function readCornerTrack(
     innerBulge: bulge(o.innerBulge, DEFAULT_CORNER_TRACK.innerBulge),
     entryDeg:
       typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg) ? o.entryDeg : 0,
+  }
+}
+
+/* ── 幾何錨點：排版對位用 ─────────────────────────────────────
+   生成軌道時必須知道「畫出來的那一段，兩端到底落在哪」。以前排版自己推一次、
+   元件再畫一次，兩邊的角度慣例一不一致就會整段偏掉——實際發生過：轉角整個
+   平移了一個外框的距離。錨點統一由這裡算，排版與繪製就不可能各說各話。   */
+
+/** 弧的圓心（相對元件左上角的像素）。未旋轉時在方框右下角 */
+export function cornerArcCentrePx(
+  entryDeg: number,
+  boxWPx: number,
+  boxHPx: number,
+): ShapePoint {
+  const { w, h, T } = cornerSpin({ entryDeg }, boxWPx, boxHPx)
+  return T(w, h)
+}
+
+/**
+ * 弧帶兩端的中點。
+ *
+ * a 落在「直邊在右」的那一側，b 落在「直邊在下」的那一側；行進方向由哪一端進
+ * 由排版決定，這裡只回傳位置。
+ */
+export function cornerTrackEndsPx(
+  g: CornerTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { a: ShapePoint; b: ShapePoint } {
+  const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
+  const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
+  const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
+  const d = clamp01(g.depthRatio) * Math.min(rx, ry)
+  const irx = Math.max(0, rx - d)
+  const iry = Math.max(0, ry - d)
+  return {
+    a: T(w, h - (ry + iry) / 2),
+    b: T(w - (rx + irx) / 2, h),
+  }
+}
+
+/** 斜帶兩端的中點：a 在左邊、b 在右邊（未旋轉時） */
+export function taperTrackEndsPx(
+  g: TaperTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { a: ShapePoint; b: ShapePoint } {
+  const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
+  const tc = Math.max(0, Math.min(1, g.topCutRatio))
+  const bc = Math.max(0, Math.min(1, g.bottomCutRatio))
+  return {
+    a: T(0, (0 + (h - bc * h)) / 2),
+    b: T(w, (tc * h + h) / 2),
   }
 }
 

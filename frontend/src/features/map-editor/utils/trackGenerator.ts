@@ -248,17 +248,26 @@ function buildSpine(
     }
     return unwrapped[lo]!
   }
-  const q45 = (deg: number) => Math.round(deg / 45) * 45
+  /*
+   * 方位與轉角都量化到 <strong>90 度</strong>的倍數。
+   *
+   * 圓角軌道是一段四分之一弧——它畫不出 45 度的彎。留著 45 度的話，那一段轉角
+   * 的兩端永遠對不上相鄰的直線段（實測差 43 公尺），畫面上就是一個接不起來的
+   * 缺口。簡圖本來就是刻意變形的，全部拉成直角反而更整齊。
+   *
+   * 量化後轉角變成 0 度的那一段不是彎道，當直線處理。
+   */
+  const q90 = (deg: number) => Math.round(deg / 90) * 90
 
   const spine: SpineSegment[] = []
   for (const r of merged) {
     const turn = hdgAt(r.sTo) - hdgAt(r.sFrom)
-    if (r.kind === 'arc' && Math.abs(q45(turn)) >= 45) {
+    if (r.kind === 'arc' && Math.abs(q90(turn)) >= 90) {
       spine.push({
         kind: 'arc',
         sFrom: r.sFrom,
         sTo: r.sTo,
-        turnDeg: q45(turn),
+        turnDeg: q90(turn),
         realTurnDeg: Number(turn.toFixed(1)),
       })
     } else {
@@ -266,7 +275,7 @@ function buildSpine(
         kind: 'straight',
         sFrom: r.sFrom,
         sTo: r.sTo,
-        hdgDeg: q45(hdgAt((r.sFrom + r.sTo) / 2)),
+        hdgDeg: q90(hdgAt((r.sFrom + r.sTo) / 2)),
       })
     }
   }
@@ -350,11 +359,18 @@ export function generateTracks(
     }
   }
 
-  // 上行線的橫向剖面：用來給每塊決定兩線間距
+  /*
+   * 上下行的間距<strong>整條共用一個值</strong>。
+   *
+   * 每塊各自取中位數的話，上行線在路網分岔或資料稀疏的地方會跳到別的距離——畫出來
+   * 就是頭尾幾塊掉下去一格，整排參差不齊。簡圖上兩條主線本來就是平行的，
+   * 間距只該有一個。各塊實際偏離多少仍然記在 residualM，要檢查貼不貼合看那個。
+   */
   const upProfile = projected
     .filter((l) => l.role === 'up')
     .flatMap((l) => l.profile)
     .sort((a, b) => a[0] - b[0])
+  const uniformLateral = median(upProfile.map((p) => p[1])) ?? 3.5
 
   const blocks: TrackBlock[] = []
   for (const seg of spine) {
@@ -371,7 +387,7 @@ export function generateTracks(
       const sFrom = seg.sFrom + k * step
       const sTo = sFrom + step
       const inRange = upProfile.filter((p) => p[0] >= sFrom && p[0] <= sTo).map((p) => p[1])
-      const lateral = median(inRange) ?? 3.5
+      const lateral = uniformLateral
       const residual = inRange.length ? Math.max(...inRange.map((v) => Math.abs(v - lateral))) : 0
       const index = blocks.length
       blocks.push({

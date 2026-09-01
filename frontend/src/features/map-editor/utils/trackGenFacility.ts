@@ -151,8 +151,16 @@ export function placePoint(
   const vx = seg.v0.x * Math.cos(a) - seg.v0.y * Math.sin(a)
   const vy = seg.v0.x * Math.sin(a) + seg.v0.y * Math.cos(a)
   const m = Math.hypot(vx, vy) || 1
-  // 內側半徑變小，兩條線在彎道才會保持平行
-  const r = seg.radiusPx - seg.sign * lateralM * lateralScale
+  /*
+   * 內側半徑變小，兩條線在彎道才會保持平行。
+   *
+   * 半徑要夾在正值：離主線三股的側線橫向偏移比彎道半徑還大，不夾的話半徑變負，
+   * 點會穿過圓心鏡射到另一邊——畫面上就是一條從轉角斜刺出去的帶子。
+   */
+  const r = Math.max(
+    seg.radiusPx * 0.15,
+    seg.radiusPx - seg.sign * lateralM * lateralScale,
+  )
   return { x: seg.centre.x + (vx / m) * r, y: seg.centre.y + (vy / m) * r }
 }
 

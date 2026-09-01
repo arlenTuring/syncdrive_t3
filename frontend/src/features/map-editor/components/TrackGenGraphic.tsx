@@ -2,23 +2,28 @@ import { useMemo } from 'react'
 import { Plus, Route } from 'lucide-react'
 import type { LaneCenterlinePlan } from '../opendrive/laneCenterlines'
 import type { TrackGenSettings } from '../utils/trackGenFacility'
+import { LANE_W_M, layoutTrackGen, rectPolygon } from '../utils/trackGenLayout'
 import {
-  bandPolygon,
-  LANE_W_M,
-  layoutTrackGen,
-  rectPolygon,
-} from '../utils/trackGenLayout'
+  cornerArcCentrePx,
+  cornerTrackEndsPx,
+  cornerTrackPath,
+  taperTrackPath,
+} from '../utils/trackShapes'
 import type { LaneRole, TrackGenResult, Vec2 } from '../utils/trackGenerator'
 
 /**
  * 軌道生成元件的內容。
  *
- * 三種狀態：尚未載入（顯示 ＋）、已載入但未生成（只畫車道中心線）、已生成
- * （畫出上下行軌道、渡線與側線）。中心線先畫出來，是為了讓使用者在按下生成
- * 之前就能確認載進來的是不是對的路網。
+ * 兩種狀態：尚未載入（顯示 ＋）、已載入（直接畫出生成的軌道）。載入 .xodr 之後
+ * 立刻生成，中間不再多一步——使用者要的是軌道，中心線只是中繼產物。
+ *
+ * <h3>形狀由元件自己算</h3>
+ * 彎道與斜接段的填色外框直接呼叫 {@link cornerTrackPath} 與 {@link taperTrackPath}，
+ * 也就是「套用到地圖」之後那些真正的軌道元件在用的同一支。預覽自己描一條帶子的
+ * 話，兩邊的角度慣例一有出入，畫面上好看、套用出來卻是散的——發生過。
  */
 
-const ROLE_STROKE: Record<LaneRole, string> = {
+const ROLE_FILL: Record<LaneRole, string> = {
   down: '#7f9ec2',
   up: '#5b82ad',
   crossover: '#c08a48',
@@ -65,6 +70,19 @@ function fitTransform(
   }
 }
 
+type Drawn =
+  | { kind: 'poly'; role: LaneRole; key: string; pts: Vec2[]; z: number }
+  | {
+      kind: 'path'
+      role: LaneRole
+      key: string
+      /** 未縮放的方框（版面公尺） */
+      box: { xM: number; yM: number; wM: number; hM: number }
+      /** 給定像素尺寸後產生填色外框 */
+      d: (wPx: number, hPx: number) => string
+      z: number
+    }
+
 export function TrackGenGraphic({
   width,
   height,
@@ -79,68 +97,72 @@ export function TrackGenGraphic({
 }: Props) {
   const buttonSize = Math.max(28, Math.min(width, height) * 0.14)
 
-  /**
-   * 已生成的軌道。
-   *
-   * 形狀由 layoutTrackGen 算出——與「套用到地圖」<strong>同一支</strong>。兩邊各自算
-   * 位置時對不起來過：套用出來方向是反的、ㄩ 形也散掉。共用一份就不會再發生。
-   */
   const generated = useMemo(() => {
     if (!result || !result.spine.length) return null
     const layout = layoutTrackGen(result, settings)
-    /*
-     * z 決定畫的先後：側線／渡線在最底，彎道依外側半徑由大到小，直線段最後。
-     * 彎道靠疊出「露出來那一圈」，用角色分組畫會把大小順序打亂。
-     */
-    const polys: Array<{ role: LaneRole; key: string; pts: Vec2[]; z: number }> = []
+    const drawn: Drawn[] = []
     const labels: Array<{ at: Vec2; text: string; angle: number }> = []
-    const seams: Array<{ a: Vec2; b: Vec2 }> = []
+    const extent: Vec2[] = []
     let minBlockLen = Infinity
 
-    // 彎道大的先畫、小的疊上去，露出來那一圈就是軌道帶
-    const ordered = [...layout.shapes].sort((a, b) => {
-      const ra = a.kind === 'corner' ? a.outerRadiusM : 0
-      const rb = b.kind === 'corner' ? b.outerRadiusM : 0
-      return rb - ra
-    })
-    for (const s of ordered) {
+    for (const s of layout.shapes) {
       if (s.kind === 'rect') {
-        polys.push({ role: s.role, key: s.name, pts: rectPolygon(s), z: 3000 })
-        minBlockLen = Math.min(minBlockLen, s.lengthM)
-        const half = s.widthM / 2
-        const dir = { x: Math.cos((s.rotationDeg * Math.PI) / 180), y: Math.sin((s.rotationDeg * Math.PI) / 180) }
-        const nrm = { x: -dir.y, y: dir.x }
-        const start = {
-          x: s.centre.x - dir.x * (s.lengthM / 2),
-          y: s.centre.y - dir.y * (s.lengthM / 2),
+        const pts = rectPolygon(s)
+        drawn.push({ kind: 'poly', role: s.role, key: s.name, pts, z: 3000 })
+        extent.push(...pts)
+        // 只拿主線的區塊來決定字級門檻：轉角旁邊被裁短的側線殘段只有幾公尺，
+        // 拿它當門檻會把整張圖的標籤全部關掉
+        if (s.role === 'down' || s.role === 'up') {
+          minBlockLen = Math.min(minBlockLen, s.lengthM)
         }
-        seams.push({
-          a: { x: start.x + nrm.x * half, y: start.y + nrm.y * half },
-          b: { x: start.x - nrm.x * half, y: start.y - nrm.y * half },
-        })
         const deg = s.rotationDeg
         labels.push({ at: s.centre, text: s.name, angle: deg > 90 || deg < -90 ? deg + 180 : deg })
-      } else if (s.kind === 'corner') {
-        const width = s.geometry.depthRatio * s.outerRadiusM
-        polys.push({
+        continue
+      }
+      const box = s.box
+      extent.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
+      if (s.kind === 'corner') {
+        drawn.push({
+          kind: 'path',
           role: s.role,
           key: s.name,
-          pts: bandPolygon(s.samples, width),
-          z: 2000 - s.outerRadiusM,
+          box,
+          d: (w, h) => cornerTrackPath(s.geometry, w, h),
+          z: 2500,
         })
-        const mid = s.samples[Math.floor(s.samples.length / 2)]!
-        labels.push({ at: mid, text: s.name, angle: 0 })
+        /*
+         * 標籤放在弧帶的正中央，不是方框中央。
+         *
+         * 上下行的方框同心但大小不同，兩個中央離得很近，標籤會疊在一起；弧帶
+         * 中央本來就分得開，也才真的落在軌道上。
+         */
+        const c = cornerArcCentrePx(s.geometry.entryDeg, box.wM, box.hM)
+        const ends = cornerTrackEndsPx(s.geometry, box.wM, box.hM)
+        const mx = (ends.a.x + ends.b.x) / 2 - c.x
+        const my = (ends.a.y + ends.b.y) / 2 - c.y
+        const m = Math.hypot(mx, my) || 1
+        const midR = box.wM * (1 - s.geometry.depthRatio / 2)
+        labels.push({
+          at: { x: box.xM + c.x + (mx / m) * midR, y: box.yM + c.y + (my / m) * midR },
+          text: s.name,
+          angle: 0,
+        })
       } else {
-        polys.push({ role: s.role, key: s.name, pts: bandPolygon(s.samples, s.a.widthM), z: 100 })
+        drawn.push({
+          kind: 'path',
+          role: s.role,
+          key: s.name,
+          box,
+          d: (w, h) => taperTrackPath(s.geometry, w, h),
+          z: 1000,
+        })
       }
     }
 
-    polys.sort((a, b) => a.z - b.z)
-    const extent = polys.flatMap((p) => p.pts)
+    drawn.sort((a, b) => a.z - b.z)
     return {
-      polys,
+      drawn,
       labels,
-      seams,
       thick: LANE_W_M * settings.lateralScale,
       extent,
       blockSpanPx: Number.isFinite(minBlockLen) ? minBlockLen : 50,
@@ -211,40 +233,43 @@ export function TrackGenGraphic({
     )
   }
 
-  const T = (p: Vec2) => `${(p.x * (view?.scale ?? 1) + (view?.tx ?? 0)).toFixed(1)},${(p.y * (view?.scale ?? 1) + (view?.ty ?? 0)).toFixed(1)}`
+  const sc = view?.scale ?? 1
+  const tx = view?.tx ?? 0
+  const ty = view?.ty ?? 0
+  const T = (p: Vec2) => `${(p.x * sc + tx).toFixed(1)},${(p.y * sc + ty).toFixed(1)}`
 
   return (
     <div className="relative size-full overflow-hidden rounded-sm border border-zinc-600/60 bg-zinc-950/45">
       <svg width={width} height={height} className="block">
         {generated ? (
           <>
-            {generated.polys.map((p, i) => (
-              <polygon
-                key={`${p.role}-${p.key}-${i}`}
-                points={p.pts.map(T).join(' ')}
-                fill={ROLE_STROKE[p.role]}
-                stroke={ROLE_STROKE[p.role]}
-                strokeWidth={0.5}
-                strokeLinejoin="round"
-              />
-            ))}
-            {generated.seams.map((s, i) => (
-              <line
-                key={`seam-${i}`}
-                x1={s.a.x * (view?.scale ?? 1) + (view?.tx ?? 0)}
-                y1={s.a.y * (view?.scale ?? 1) + (view?.ty ?? 0)}
-                x2={s.b.x * (view?.scale ?? 1) + (view?.tx ?? 0)}
-                y2={s.b.y * (view?.scale ?? 1) + (view?.ty ?? 0)}
-                stroke="#0b1020"
-                strokeWidth={1}
-                opacity={0.45}
-              />
-            ))}
+            {generated.drawn.map((p, i) =>
+              p.kind === 'poly' ? (
+                <polygon
+                  key={`${p.key}-${i}`}
+                  points={p.pts.map(T).join(' ')}
+                  fill={ROLE_FILL[p.role]}
+                  stroke={ROLE_FILL[p.role]}
+                  strokeWidth={0.5}
+                  strokeLinejoin="round"
+                />
+              ) : (
+                <path
+                  key={`${p.key}-${i}`}
+                  d={p.d(p.box.wM * sc, p.box.hM * sc)}
+                  transform={`translate(${(p.box.xM * sc + tx).toFixed(1)} ${(p.box.yM * sc + ty).toFixed(1)})`}
+                  fill={ROLE_FILL[p.role]}
+                  stroke={ROLE_FILL[p.role]}
+                  strokeWidth={0.5}
+                  strokeLinejoin="round"
+                />
+              ),
+            )}
             {generated.labels.map((l, i) => {
-              const x = l.at.x * (view?.scale ?? 1) + (view?.tx ?? 0)
-              const y = l.at.y * (view?.scale ?? 1) + (view?.ty ?? 0)
+              const x = l.at.x * sc + tx
+              const y = l.at.y * sc + ty
               const size = settings.labelSizePx
-              const spanPx = generated.blockSpanPx * (view?.scale ?? 1)
+              const spanPx = generated.blockSpanPx * sc
               if (size < 5 || spanPx < size * 2.1) return null
               return (
                 <text

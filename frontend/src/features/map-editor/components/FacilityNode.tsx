@@ -184,7 +184,9 @@ type FacilityResizeEdge =
 
 const CORNER_RESIZE_EDGES = ['nw', 'ne', 'se', 'sw'] as const
 
-function isCornerResizeEdge(edge: FacilityResizeEdge): boolean {
+function isCornerResizeEdge(
+  edge: FacilityResizeEdge,
+): edge is (typeof CORNER_RESIZE_EDGES)[number] {
   return (CORNER_RESIZE_EDGES as readonly string[]).includes(edge)
 }
 
@@ -1800,7 +1802,7 @@ export const FacilityNode = memo(function FacilityNode({
           const snapThreshold = resolveFacilityAlignSnapThresholdPx(mapScaleRef.current)
           const { rect: snapped, guides } = snapResizeRectWithAlignGuides(
             { left: newX, top: newY, width: newW, height: newH },
-            edge as 'left' | 'right' | 'top' | 'bottom',
+            edge,
             peerSnapRectsRef.current,
             { left: 0, top: 0, width: layout.wPx, height: layout.hPx },
             snapThreshold,

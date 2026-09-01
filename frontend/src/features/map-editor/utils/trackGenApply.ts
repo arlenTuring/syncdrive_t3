@@ -135,27 +135,11 @@ function facilityFor(
     }
   }
   /*
-   * 渡線與側線 → 斜接軌道。
+   * 換股道 → 斜接軌道。
    *
-   * 外框取整條取樣線的外接方框，再往外各撐半個帶寬——只拿頭尾兩點會讓幾乎水平的
-   * 側線算出 0 公尺高的方框，畫出來是一條 1 像素的線。
-   *
-   * 斜切比例由帶寬佔外框的比例決定：切掉的那一段等於外框長度減一個帶寬，
-   * 斜邊兩側就剛好夾出一條等寬的斜帶。
+   * 外框與切角比例都由排版算好（見 fitTaper），這裡照抄就好——套用與預覽共用
+   * 同一份幾何，畫面上看到什麼就是套用出來的東西。
    */
-  const bandW = Math.max(0.5, shape.a.widthM)
-  const half = bandW / 2
-  const xsAll = shape.samples.map((p) => p.x)
-  const ysAll = shape.samples.map((p) => p.y)
-  const xMin = Math.min(...xsAll) - half
-  const yMin = Math.min(...ysAll) - half
-  const wM = Math.max(bandW, Math.max(...xsAll) - Math.min(...xsAll) + bandW)
-  const hM = Math.max(bandW, Math.max(...ysAll) - Math.min(...ysAll) + bandW)
-  // 由頭尾的走向決定斜帶落在哪一條對角線；往上走的要轉 90 度才會鏡射過去
-  const entryDeg = shape.b.at.y >= shape.a.at.y ? 0 : 90
-  // 轉 90 度時外框的長邊換成高，斜切比例要跟著換算
-  const spanM = entryDeg === 0 ? wM : hM
-  const cut = Math.max(0, Math.min(1, 1 - bandW / spanM))
   return {
     id,
     type: 'Track',
@@ -165,14 +149,10 @@ function facilityFor(
     parameters: {
       segmentId: shape.name,
       trackGenRole: shape.role,
-      [TAPER_TRACK_KEY]: {
-        topCutRatio: cut,
-        bottomCutRatio: cut,
-        entryDeg,
-      },
+      [TAPER_TRACK_KEY]: shape.geometry,
       ...meta,
     },
-    box: { xM: xMin, yM: yMin, wM, hM },
+    box: { ...shape.box },
   }
 }
 
