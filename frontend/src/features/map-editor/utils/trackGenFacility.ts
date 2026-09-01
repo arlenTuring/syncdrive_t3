@@ -33,6 +33,31 @@ export type TrackGenSettings = {
   labelSizePx: number
   showCrossovers: boolean
   showSidings: boolean
+  /* ── 場域座標對映 ───────────────────────────────────────────
+     .xodr 的座標原點與方向不一定等於場域座標。這幾個值只影響回填的
+     「參照場域範圍」，不影響畫面。 */
+  /** 場域 x = (翻轉後的 xodr x) + 這個偏移（公尺） */
+  fieldOriginXM: number
+  /** 場域 y = (翻轉後的 xodr y) + 這個偏移（公尺） */
+  fieldOriginYM: number
+  /** xodr 的 x 軸與場域相反 */
+  fieldFlipX: boolean
+  /** xodr 的 y 軸與場域相反 */
+  fieldFlipY: boolean
+}
+
+/** xodr 真實座標 → 場域座標 */
+export function toFieldCoords(
+  p: { x: number; y: number },
+  settings: Pick<
+    TrackGenSettings,
+    'fieldOriginXM' | 'fieldOriginYM' | 'fieldFlipX' | 'fieldFlipY'
+  >,
+): { x: number; y: number } {
+  return {
+    x: (settings.fieldFlipX ? -p.x : p.x) + settings.fieldOriginXM,
+    y: (settings.fieldFlipY ? -p.y : p.y) + settings.fieldOriginYM,
+  }
 }
 
 export const DEFAULT_TRACKGEN_SETTINGS: TrackGenSettings = {
@@ -42,6 +67,10 @@ export const DEFAULT_TRACKGEN_SETTINGS: TrackGenSettings = {
   labelSizePx: 10,
   showCrossovers: true,
   showSidings: true,
+  fieldOriginXM: 0,
+  fieldOriginYM: 0,
+  fieldFlipX: false,
+  fieldFlipY: false,
 }
 
 export function isTrackGenComponent(parameters: Record<string, unknown> | undefined): boolean {

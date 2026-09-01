@@ -238,9 +238,40 @@ export function TrackGenGraphic({
   const ty = view?.ty ?? 0
   const T = (p: Vec2) => `${(p.x * sc + tx).toFixed(1)},${(p.y * sc + ty).toFixed(1)}`
 
+  /*
+   * 中心線一律畫出來。
+   *
+   * 生成之後也留著，淡淡地墊在軌道底下：那是判斷「載進來的路網對不對」唯一的
+   * 依據，看不到就只能相信生成結果。生成前它是主角，生成後降成對照。
+   */
+  const centerlineStroke = generated ? 0.7 : 1.4
+  const centerlineOpacity = generated ? 0.32 : 0.9
+  const centerView = generated
+    ? fitTransform(
+        centerlines.lanes.flatMap((l) => l.points.map((p) => ({ x: p.x, y: -p.y }))),
+        width,
+        height,
+        10,
+      )
+    : view
+  const CT = (p: Vec2) =>
+    `${(p.x * (centerView?.scale ?? 1) + (centerView?.tx ?? 0)).toFixed(1)},${(p.y * (centerView?.scale ?? 1) + (centerView?.ty ?? 0)).toFixed(1)}`
+
   return (
     <div className="relative size-full overflow-hidden rounded-sm border border-zinc-600/60 bg-zinc-950/45">
       <svg width={width} height={height} className="block">
+        {centerlines.lanes.map((lane) => (
+          <polyline
+            key={`c-${lane.key}`}
+            points={lane.points.map((p) => CT({ x: p.x, y: -p.y })).join(' ')}
+            fill="none"
+            stroke={lane.inJunction ? '#c08a48' : '#7f9ec2'}
+            strokeWidth={centerlineStroke}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={centerlineOpacity}
+          />
+        ))}
         {generated ? (
           <>
             {generated.drawn.map((p, i) =>
@@ -287,27 +318,15 @@ export function TrackGenGraphic({
               )
             })}
           </>
-        ) : (
-          centerlines.lanes.map((lane) => (
-            <polyline
-              key={lane.key}
-              points={lane.points.map((p) => T({ x: p.x, y: -p.y })).join(' ')}
-              fill="none"
-              stroke={lane.inJunction ? '#c08a48' : '#7f9ec2'}
-              strokeWidth={1.4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.9}
-            />
-          ))
-        )}
+        ) : null}
       </svg>
 
       {selected ? (
         <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
+          {`中心線 ${centerlines.roadCount} 道路 · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
           {result
-            ? `已生成 · ${result.blocks.length * 2} 塊軌道 · ${result.lanes.filter((l) => l.role === 'crossover').length} 渡線 · ${result.lanes.filter((l) => l.role === 'siding').length} 側線`
-            : `中心線 · ${centerlines.roadCount} 道路 · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
+            ? ` ｜ 已生成 ${result.blocks.length * 2} 塊軌道 · ${result.lanes.filter((l) => l.role === 'crossover').length} 渡線 · ${result.lanes.filter((l) => l.role === 'siding').length} 側線`
+            : ''}
         </div>
       ) : null}
 

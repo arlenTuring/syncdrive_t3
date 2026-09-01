@@ -1,8 +1,14 @@
 import type { FacilityObject } from '../types/facility'
-import type { TrackGenSettings } from './trackGenFacility'
+import { toFieldCoords, type TrackGenSettings } from './trackGenFacility'
 import type { TrackGenResult, Vec2 } from './trackGenerator'
 import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
 import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
+import {
+  REF_FIELD_X_MAX_M,
+  REF_FIELD_X_MIN_M,
+  REF_FIELD_Y_MAX_M,
+  REF_FIELD_Y_MIN_M,
+} from './facilityRefFieldBounds'
 
 /**
  * 把生成結果轉成真正的設施。
@@ -38,50 +44,117 @@ export type ApplyResult = {
   extentM: { wM: number; hM: number }
 }
 
-function realAt(result: TrackGenResult, s: number): Vec2 {
+/** 參照場域範圍要往兩側撐半個車道，範圍才蓋得住整條軌道帶 */
+const LANE_HALF_W_M = 1.675
+
+/**
+ * 參考線上某里程的真實座標與左法線。
+ *
+ * refPoints 是抽稀過的下行主線；相鄰兩點的方向就是切線，左法線由它旋轉九十度
+ * 得到——與 projectOnto 算橫向偏移時用的是同一個正負號慣例，兩邊才對得起來。
+ */
+function realFrameAt(result: TrackGenResult, s: number): { at: Vec2; nx: number; ny: number } {
   const xs = result.refStations
   const ps = result.refPoints
-  if (!xs.length || !ps.length) return { x: 0, y: 0 }
-  if (s <= xs[0]!) return ps[0]!
-  if (s >= xs[xs.length - 1]!) return ps[ps.length - 1]!
+  if (xs.length < 2 || ps.length < 2) return { at: { x: 0, y: 0 }, nx: 0, ny: 0 }
   let lo = 0
   let hi = xs.length - 1
-  while (lo < hi - 1) {
-    const mid = (lo + hi) >> 1
-    if (xs[mid]! <= s) lo = mid
-    else hi = mid
+  if (s <= xs[0]!) {
+    lo = 0
+    hi = 1
+  } else if (s >= xs[hi]!) {
+    lo = hi - 1
+    hi = xs.length - 1
+  } else {
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1
+      if (xs[mid]! <= s) lo = mid
+      else hi = mid
+    }
+    hi = lo + 1
   }
-  const u = (s - xs[lo]!) / Math.max(1e-6, xs[hi]! - xs[lo]!)
+  const a = ps[lo]!
+  const b = ps[hi]!
+  const span = Math.max(1e-6, xs[hi]! - xs[lo]!)
+  const u = Math.max(0, Math.min(1, (s - xs[lo]!) / span))
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const m = Math.hypot(dx, dy) || 1
   return {
-    x: ps[lo]!.x + (ps[hi]!.x - ps[lo]!.x) * u,
-    y: ps[lo]!.y + (ps[hi]!.y - ps[lo]!.y) * u,
+    at: { x: a.x + dx * u, y: a.y + dy * u },
+    nx: -dy / m,
+    ny: dx / m,
   }
 }
 
+/** 里程＋真實橫向偏移 → 真實座標 */
+function realAtLateral(result: TrackGenResult, s: number, lateralM: number): Vec2 {
+  const f = realFrameAt(result, s)
+  return { x: f.at.x + f.nx * lateralM, y: f.at.y + f.ny * lateralM }
+}
+
 /**
- * 真實座標範圍。
+ * 這一段軌道在真實場域裡蓋到的範圍，直接寫進「參照場域範圍」。
  *
- * 刻意不寫成 refFieldXMinM 那組鍵：那組鍵會參與設施尺寸的推導
- * （見 getFacilitySizeMeters），寫進真實座標會把版面上的方框拉成另一個大小。
- * 真實座標在這裡只是給人對照與日後投影用，不該影響畫面。
+ * <h3>這就是自動生成的目的</h3>
+ * 車端回報的是真實場域座標；圖台要把車畫在簡易地圖上，靠的就是每一段軌道的
+ * 參照場域範圍。以前這四個數字得一段一段手填，四十幾段就是一百多個數字。
+ *
+ * 範圍取這一段沿線取樣點的外接方框，再往兩側各撐半個車道寬——只取頭尾兩點的話，
+ * 彎道那一段的方框會沿著弦切過去，中間整段落在範圍外。
+ *
+ * 寫進 refField 不會改變圖面大小：Area 內的顯示尺寸看的是 areaSizePx，
+ * refField 只在沒有 areaSizePx 時才參與尺寸推導（見 getFacilitySizeMeters）。
  */
-function realBounds(result: TrackGenResult, sFrom: number, sTo: number) {
-  const a = realAt(result, sFrom)
-  const b = realAt(result, sTo)
+function realBounds(
+  result: TrackGenResult,
+  settings: TrackGenSettings,
+  sFrom: number,
+  sTo: number,
+  latFromM: number,
+  latToM: number,
+) {
+  const N = 16
+  let xMin = Infinity
+  let xMax = -Infinity
+  let yMin = Infinity
+  let yMax = -Infinity
+  for (let i = 0; i <= N; i += 1) {
+    const u = i / N
+    const s = sFrom + (sTo - sFrom) * u
+    const lat = latFromM + (latToM - latFromM) * u
+    // 換到場域座標系再取範圍：.xodr 的原點與軸向不一定等於場域
+    const p = toFieldCoords(realAtLateral(result, s, lat), settings)
+    if (p.x < xMin) xMin = p.x
+    if (p.x > xMax) xMax = p.x
+    if (p.y < yMin) yMin = p.y
+    if (p.y > yMax) yMax = p.y
+  }
+  const r = (v: number) => Number(v.toFixed(2))
   return {
-    trackGenRealFrom: [Number(a.x.toFixed(2)), Number(a.y.toFixed(2))],
-    trackGenRealTo: [Number(b.x.toFixed(2)), Number(b.y.toFixed(2))],
-    trackGenSFromM: Number(sFrom.toFixed(2)),
-    trackGenSToM: Number(sTo.toFixed(2)),
+    [REF_FIELD_X_MIN_M]: r(xMin - LANE_HALF_W_M),
+    [REF_FIELD_X_MAX_M]: r(xMax + LANE_HALF_W_M),
+    [REF_FIELD_Y_MIN_M]: r(yMin - LANE_HALF_W_M),
+    [REF_FIELD_Y_MAX_M]: r(yMax + LANE_HALF_W_M),
+    trackGenSFromM: r(sFrom),
+    trackGenSToM: r(sTo),
   }
 }
 
 function facilityFor(
   shape: LayoutShape,
   result: TrackGenResult,
+  settings: TrackGenSettings,
   id: string,
 ): BuiltFacility {
-  const meta = realBounds(result, shape.sFrom, shape.sTo)
+  const meta = realBounds(
+    result,
+    settings,
+    shape.sFrom,
+    shape.sTo,
+    shape.realLatFromM,
+    shape.realLatToM,
+  )
   if (shape.kind === 'rect') {
     /*
      * 軸對齊的段<strong>不要旋轉</strong>。
@@ -171,7 +244,7 @@ export function buildFacilitiesFromTrackGen(
     const rb = b.kind === 'corner' ? b.outerRadiusM : 0
     return rb - ra
   })
-  const facilities = ordered.map((s) => facilityFor(s, result, nextId()))
+  const facilities = ordered.map((s) => facilityFor(s, result, settings, nextId()))
 
   // 平移到原點，Area 才不用容納負座標
   const { xMin, yMin, xMax, yMax } = layout.bounds

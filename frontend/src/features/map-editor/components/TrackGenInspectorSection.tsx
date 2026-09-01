@@ -6,6 +6,7 @@ import {
   getTrackGenResult,
   getTrackGenSettings,
   TRACKGEN_SETTINGS_KEY,
+  toFieldCoords,
   uniformCornerRadiusM,
   type TrackGenSettings,
 } from '../utils/trackGenFacility'
@@ -83,6 +84,28 @@ export function TrackGenInspectorSection({
       overRes: res.filter((r) => r > 0.3).length,
     }
   }, [result])
+
+  /*
+   * 回填的參照場域範圍會落在哪。
+   *
+   * .xodr 的原點與軸向不保證等於場域座標，對錯與否光看數字看不出來；把整體範圍
+   * 顯示出來，跟場域實際的尺寸一比就知道偏移與翻轉調對了沒有。
+   */
+  const fieldExtent = useMemo(() => {
+    if (!result?.refPoints.length) return null
+    let xMin = Infinity
+    let xMax = -Infinity
+    let yMin = Infinity
+    let yMax = -Infinity
+    for (const p of result.refPoints) {
+      const q = toFieldCoords(p, settings)
+      if (q.x < xMin) xMin = q.x
+      if (q.x > xMax) xMax = q.x
+      if (q.y < yMin) yMin = q.y
+      if (q.y > yMax) yMax = q.y
+    }
+    return { xMin, xMax, yMin, yMax }
+  }, [result, settings])
 
   const patch = (next: Partial<TrackGenSettings>) => {
     onPatchParameters({ [TRACKGEN_SETTINGS_KEY]: { ...settings, ...next } })
@@ -192,6 +215,68 @@ export function TrackGenInspectorSection({
           suffix={settings.labelSizePx === 0 ? '（隱藏）' : 'px'}
           onChange={(v) => patch({ labelSizePx: v })}
         />
+      </fieldset>
+
+      <fieldset disabled={readOnly} className="flex flex-col gap-2">
+        <legend className="mb-1 text-[11px] font-medium tracking-wide text-zinc-300">
+          場域座標對映
+        </legend>
+        <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
+          「套用到地圖」時每一段軌道的參照場域範圍都由這裡換算後自動填好。只影響
+          那四個數字，不影響畫面。.xodr 的原點與軸向若與場域一致，四個值留預設即可。
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-zinc-400">橫向原點偏移 (m)</span>
+            <input
+              type="number"
+              value={settings.fieldOriginXM}
+              onChange={(e) => patch({ fieldOriginXM: Number(e.target.value) || 0 })}
+              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[12px] tabular-nums text-zinc-100 focus:border-cyan-500 focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-zinc-400">縱向原點偏移 (m)</span>
+            <input
+              type="number"
+              value={settings.fieldOriginYM}
+              onChange={(e) => patch({ fieldOriginYM: Number(e.target.value) || 0 })}
+              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[12px] tabular-nums text-zinc-100 focus:border-cyan-500 focus:outline-none"
+            />
+          </label>
+        </div>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 text-[12px] text-zinc-300">
+            <input
+              type="checkbox"
+              checked={settings.fieldFlipX}
+              onChange={(e) => patch({ fieldFlipX: e.target.checked })}
+              className="accent-cyan-500"
+            />
+            橫向反向
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-zinc-300">
+            <input
+              type="checkbox"
+              checked={settings.fieldFlipY}
+              onChange={(e) => patch({ fieldFlipY: e.target.checked })}
+              className="accent-cyan-500"
+            />
+            縱向反向
+          </label>
+        </div>
+        {fieldExtent ? (
+          <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-2.5 py-1.5 text-[11px] text-zinc-400">
+            回填後範圍 
+            <b className="font-mono tabular-nums text-zinc-200">
+              x {fieldExtent.xMin.toFixed(0)}–{fieldExtent.xMax.toFixed(0)}
+            </b>
+            
+            <b className="font-mono tabular-nums text-zinc-200">
+              y {fieldExtent.yMin.toFixed(0)}–{fieldExtent.yMax.toFixed(0)}
+            </b>
+          </div>
+        ) : null}
       </fieldset>
 
       <fieldset disabled={readOnly} className="flex flex-col gap-2">

@@ -29,7 +29,20 @@ import {
 
 export const LANE_W_M = 3.35
 
-export type LayoutRect = {
+/**
+ * 每個形狀都帶著它在<strong>真實</strong>路網裡的橫向偏移。
+ *
+ * 版面上的橫向偏移被放大過、側線還被吸到整數股，拿它回推真實座標會差很遠。
+ * 參照場域範圍要的是真實座標，所以真實偏移必須另外帶著走。
+ */
+export type RealLateral = {
+  /** 起點的真實橫向偏移（公尺，行進方向左側為正） */
+  realLatFromM: number
+  /** 終點的真實橫向偏移（公尺） */
+  realLatToM: number
+}
+
+export type LayoutRect = RealLateral & {
   kind: 'rect'
   name: string
   role: LaneRole
@@ -49,7 +62,7 @@ export type LayoutRect = {
  *
  * 外緣與內緣同心，所以整段等寬、沒有接縫。
  */
-export type LayoutCorner = {
+export type LayoutCorner = RealLateral & {
   kind: 'corner'
   name: string
   role: LaneRole
@@ -63,7 +76,7 @@ export type LayoutCorner = {
 }
 
 /** 換股道：一段斜接軌道 */
-export type LayoutTaper = {
+export type LayoutTaper = RealLateral & {
   kind: 'taper'
   name: string
   role: LaneRole
@@ -303,11 +316,15 @@ export function layoutTrackGen(
     p1: Vec2,
     sFrom: number,
     sTo: number,
+    realLatFromM: number,
+    realLatToM = realLatFromM,
   ) => {
     const rect: LayoutRect = {
       kind: 'rect',
       name,
       role,
+      realLatFromM,
+      realLatToM,
       centre: { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 },
       lengthM: Math.hypot(p1.x - p0.x, p1.y - p0.y),
       widthM: bandW,
@@ -326,7 +343,15 @@ export function layoutTrackGen(
       [b.lateralM, b.nameUp, 'up'],
     ] as Array<[number, string, LaneRole]>) {
       if (b.spineKind === 'straight') {
-        addRect(name, role, placePoint(b.sFrom, lat, placed, lt), placePoint(b.sTo, lat, placed, lt), b.sFrom, b.sTo)
+        addRect(
+          name,
+          role,
+          placePoint(b.sFrom, lat, placed, lt),
+          placePoint(b.sTo, lat, placed, lt),
+          b.sFrom,
+          b.sTo,
+          lat,
+        )
         continue
       }
 
@@ -348,6 +373,8 @@ export function layoutTrackGen(
         kind: 'corner',
         name,
         role,
+        realLatFromM: lat,
+        realLatToM: lat,
         geometry,
         box,
         outerRadiusM: outerR,
@@ -405,10 +432,20 @@ export function layoutTrackGen(
       const pa = placePoint(sA, latOfLevel(la), placed, lt)
       const pb = placePoint(sB, latOfLevel(lb), placed, lt)
       if (la === lb) {
-        addRect(tag, lane.role, pa, pb, sA, sB)
+        addRect(tag, lane.role, pa, pb, sA, sB, a[1], b[1])
       } else {
         const { geometry, box } = fitTaper(pa, pb, bandW)
-        shapes.push({ kind: 'taper', name: tag, role: lane.role, geometry, box, sFrom: sA, sTo: sB })
+        shapes.push({
+          kind: 'taper',
+          name: tag,
+          role: lane.role,
+          realLatFromM: a[1],
+          realLatToM: b[1],
+          geometry,
+          box,
+          sFrom: sA,
+          sTo: sB,
+        })
         pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
       }
       continue
@@ -416,6 +453,12 @@ export function layoutTrackGen(
 
     // 側線：整條一股，只畫在直線段上
     const lat = latOfLevel(levelOfLane.get(lane.key) ?? levelOf(prof[0]![1]))
+    // 真實橫向偏移照剖面查，不能用吸過股道的那個值
+    const realLatAt = (s: number) => {
+      let best = prof[0]!
+      for (const p of prof) if (Math.abs(p[0] - s) < Math.abs(best[0] - s)) best = p
+      return best[1]
+    }
     const spans = straightSpans(placed, prof[0]![0], prof[prof.length - 1]![0])
     spans.forEach(([a, b], i) => {
       addRect(
@@ -425,6 +468,8 @@ export function layoutTrackGen(
         placePoint(b, lat, placed, lt),
         a,
         b,
+        realLatAt(a),
+        realLatAt(b),
       )
     })
   }
