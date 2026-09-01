@@ -166,6 +166,63 @@ import {
 import { resolveFacilityAreaSize } from '../utils/facilityAreaCoords'
 import { facilityUsesDraggableMapLabel } from '../utils/facilityInspectorUi'
 
+/**
+ * 可拖曳縮放的把手。
+ *
+ * 四個邊照舊只改一個方向；四個角是<strong>等比</strong>縮放——圓角軌道與斜接軌道
+ * 的形狀是用外框比例算出來的，只拉單一邊會把弧與斜切一起拉扁。
+ */
+type FacilityResizeEdge =
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'nw'
+  | 'ne'
+  | 'se'
+  | 'sw'
+
+const CORNER_RESIZE_EDGES = ['nw', 'ne', 'se', 'sw'] as const
+
+function isCornerResizeEdge(edge: FacilityResizeEdge): boolean {
+  return (CORNER_RESIZE_EDGES as readonly string[]).includes(edge)
+}
+
+/**
+ * 角把手的等比縮放。
+ *
+ * 兩個軸各自算出想要的倍率後取平均，拖曳沿對角線走時手感才連續；只取其中一軸
+ * 會在接近水平或垂直拖曳時忽然沒反應。錨點是對角的那一個角，跟一般繪圖軟體一致。
+ */
+function applyCornerScaleResize(
+  edge: FacilityResizeEdge,
+  dX: number,
+  dY: number,
+  start: { w: number; h: number; x: number; y: number },
+  limits: { minW: number; minH: number; maxW: number; maxH: number },
+): { w: number; h: number; x: number; y: number } {
+  const signX = edge === 'ne' || edge === 'se' ? 1 : -1
+  const signY = edge === 'se' || edge === 'sw' ? 1 : -1
+  const rawW = start.w + signX * dX
+  const rawH = start.h + signY * dY
+  const scale = Math.max(
+    0.01,
+    (rawW / Math.max(1e-6, start.w) + rawH / Math.max(1e-6, start.h)) / 2,
+  )
+  // 比例鎖在倍率上，不分開夾 w 與 h，否則碰到邊界時形狀就變形了
+  const lo = Math.max(limits.minW / start.w, limits.minH / start.h)
+  const hi = Math.min(limits.maxW / start.w, limits.maxH / start.h)
+  const s = Math.max(lo, Math.min(Math.max(lo, hi), scale))
+  const w = start.w * s
+  const h = start.h * s
+  return {
+    w,
+    h,
+    x: signX > 0 ? start.x : start.x + start.w - w,
+    y: signY > 0 ? start.y : start.y + start.h - h,
+  }
+}
+
 type FacilityNodeProps = {
   facility: FacilityObject
   /** 畫面上的世界座標（含 MQTT 即時位置） */
@@ -1016,7 +1073,7 @@ export const FacilityNode = memo(function FacilityNode({
     x: 0,
     y: 0,
   })
-  const resizeEdgeRef = useRef<'left' | 'right' | 'top' | 'bottom'>('right')
+  const resizeEdgeRef = useRef<FacilityResizeEdge>('right')
   const cornerStartRef = useRef({
     key: 'tl' as 'tl' | 'tr' | 'br' | 'bl',
     pointerX: 0,
@@ -1628,7 +1685,7 @@ export const FacilityNode = memo(function FacilityNode({
   )
 
   const onResizePointerDown = useCallback(
-    (edge: 'left' | 'right' | 'top' | 'bottom', e: React.PointerEvent<HTMLDivElement>) => {
+    (edge: FacilityResizeEdge, e: React.PointerEvent<HTMLDivElement>) => {
       e.stopPropagation()
       e.preventDefault()
       if (readOnly || !onResize) return
@@ -1695,7 +1752,24 @@ export const FacilityNode = memo(function FacilityNode({
         let newH = start.h
         let newX = start.x
         let newY = start.y
-        if (rot % 360 !== 0) {
+        if (isCornerResizeEdge(edge)) {
+          const scaled = applyCornerScaleResize(edge, dX, dY, start, {
+            minW: minWpx,
+            minH: minHpx,
+            maxW: maxWpx,
+            maxH: maxHpx,
+          })
+          newW = scaled.w
+          newH = scaled.h
+          if (rot % 360 !== 0) {
+            // 旋轉過的元件以中心為錨，跟既有的旋轉縮放一致
+            newX = start.x + start.w / 2 - newW / 2
+            newY = start.y + start.h / 2 - newH / 2
+          } else {
+            newX = scaled.x
+            newY = scaled.y
+          }
+        } else if (rot % 360 !== 0) {
           const resized = applyEdgeResizePx(
             edge,
             dX,
@@ -1721,11 +1795,12 @@ export const FacilityNode = memo(function FacilityNode({
           newY = start.y + (start.h - newH)
         }
 
-        if (rot % 360 === 0) {
+        // 等比縮放不吸附：對齊會改動其中一邊，比例就破了
+        if (rot % 360 === 0 && !isCornerResizeEdge(edge)) {
           const snapThreshold = resolveFacilityAlignSnapThresholdPx(mapScaleRef.current)
           const { rect: snapped, guides } = snapResizeRectWithAlignGuides(
             { left: newX, top: newY, width: newW, height: newH },
-            edge,
+            edge as 'left' | 'right' | 'top' | 'bottom',
             peerSnapRectsRef.current,
             { left: 0, top: 0, width: layout.wPx, height: layout.hPx },
             snapThreshold,
@@ -1781,7 +1856,23 @@ export const FacilityNode = memo(function FacilityNode({
       let newH = start.h
       let newX = start.x
       let newY = start.y
-      if (rot % 360 !== 0) {
+      if (isCornerResizeEdge(edge)) {
+        const scaled = applyCornerScaleResize(edge, dX, dY, start, {
+          minW: minPx,
+          minH: minPx,
+          maxW: maxWpx,
+          maxH: maxHpx,
+        })
+        newW = scaled.w
+        newH = scaled.h
+        if (rot % 360 !== 0) {
+          newX = start.x + start.w / 2 - newW / 2
+          newY = start.y + start.h / 2 - newH / 2
+        } else {
+          newX = scaled.x
+          newY = scaled.y
+        }
+      } else if (rot % 360 !== 0) {
         const resized = applyEdgeResizePx(
           edge,
           dX,
@@ -2518,6 +2609,45 @@ export const FacilityNode = memo(function FacilityNode({
                     isPole ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                   ].join(' ')}
                   title="拖曳此邊調整大小"
+                />
+              </div>
+            ))}
+          </>
+        )}
+        {/*
+         * 四個角的等比縮放把手。
+         *
+         * 圓角軌道與斜接軌道的弧度、斜切都是外框的比例，只拉單邊會把形狀拉扁；
+         * 角把手同時改長寬、鎖住比例，錨點是對角那一角。
+         */}
+        {(isCornerTrack || isTaperTrack) && selected && !readOnly && onResize && (
+          <>
+            {([
+              ['nw', { left: -7, top: -7 }],
+              ['ne', { right: -7, top: -7 }],
+              ['se', { right: -7, bottom: -7 }],
+              ['sw', { left: -7, bottom: -7 }],
+            ] as const).map(([edge, posStyle]) => (
+              <div
+                key={edge}
+                data-facility-resize-handle
+                data-facility-corner-resize-handle={edge}
+                role="presentation"
+                className="group absolute z-[80] touch-none"
+                style={{
+                  ...posStyle,
+                  width: 14,
+                  height: 14,
+                  cursor: resizeCursorForEdge(edge, showRot),
+                }}
+                onPointerDown={(e) => onResizePointerDown(edge, e)}
+                onPointerMove={onResizePointerMove}
+                onPointerUp={endResize}
+                onPointerCancel={endResize}
+              >
+                <div
+                  className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-cyan-300 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40"
+                  title="拖曳等比放大縮小"
                 />
               </div>
             ))}
