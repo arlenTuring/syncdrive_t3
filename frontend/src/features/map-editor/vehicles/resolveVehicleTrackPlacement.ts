@@ -20,6 +20,12 @@ import {
   getTrackNetwork,
 } from './trackNetwork/scanMap';
 import type { TrackNetwork } from './trackNetwork/types';
+import {
+  getTrackGenPaths,
+  pointAlongPath,
+  projectAlongPath,
+  trackGenPickScore,
+} from '../utils/trackGenPaths';
 import { locateOnCrossover } from './trackNetwork/crossoverLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
@@ -290,6 +296,33 @@ export function fieldPositionToTrackAreaLocal(
 
   const areaPos = resolveFacilityAreaPosition(track, area.domain, area.layout);
   const areaSize = resolveFacilityAreaSize(track, area.domain, area.layout);
+
+  /*
+   * 生成的軌道自己帶著真實路徑與圖面路徑，優先照那兩條走。
+   *
+   * 底下那套是把座標對到參照場域範圍、沿長邊做線性內插——直線段沒問題，圓角是
+   * 一段弧就對不上：範圍是弧的外接方框，線性內插等於把弧拉成直線，實測車子走到
+   * 轉角會跳 137 像素。有路徑時改成「真實路徑上走了幾成 → 圖面路徑上同樣幾成」，
+   * 弧與斜段都貼合。
+   */
+  const paths = getTrackGenPaths(track.parameters);
+  if (paths) {
+    const { along: t } = projectAlongPath(paths.real, xM, yM);
+    const uv = pointAlongPath(paths.local, t);
+    /*
+     * 圖面路徑的 v 是「外框上緣為 0」，areaPosition 卻是左下原點、y 向上，
+     * 所以要翻一次。少了這一次翻轉，轉角與相鄰直線段的接點差了整整一個外框高
+     * ——實測 138 像素。
+     */
+    return applyTrackRotation(
+      areaPos.x + uv.x * areaSize.w,
+      areaPos.y + (1 - uv.y) * areaSize.h,
+      areaPos,
+      areaSize,
+      readRotationDeg(track),
+    );
+  }
+
   const horizontal = span.w >= span.h;
 
   let along = horizontal
@@ -309,18 +342,27 @@ export function fieldPositionToTrackAreaLocal(
     localX = areaPos.x + areaSize.w / 2;
   }
 
-  const rotDeg = readRotationDeg(track);
-  if (Math.abs(rotDeg) > 0.001) {
-    const cx = areaPos.x + areaSize.w / 2;
-    const cy = areaPos.y + areaSize.h / 2;
-    const rad = (rotDeg * Math.PI) / 180;
-    const dx = localX - cx;
-    const dy = localY - cy;
-    localX = cx + dx * Math.cos(rad) - dy * Math.sin(rad);
-    localY = cy + dx * Math.sin(rad) + dy * Math.cos(rad);
-  }
+  return applyTrackRotation(localX, localY, areaPos, areaSize, readRotationDeg(track));
+}
 
-  return { x: localX, y: localY };
+/** 元件有旋轉時，把區域座標繞元件中心轉過去 */
+function applyTrackRotation(
+  localX: number,
+  localY: number,
+  areaPos: { x: number; y: number },
+  areaSize: { w: number; h: number },
+  rotDeg: number,
+): { x: number; y: number } {
+  if (Math.abs(rotDeg) <= 0.001) return { x: localX, y: localY };
+  const cx = areaPos.x + areaSize.w / 2;
+  const cy = areaPos.y + areaSize.h / 2;
+  const rad = (rotDeg * Math.PI) / 180;
+  const dx = localX - cx;
+  const dy = localY - cy;
+  return {
+    x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+    y: cy + dx * Math.sin(rad) + dy * Math.cos(rad),
+  };
 }
 
 function placementFromTrackInArea(
@@ -345,13 +387,25 @@ export function resolveVehicleTrackPlacementInArea(
   yM: number,
   area: MapAreaObject,
 ): VehicleTrackPlacement | null {
+  /*
+   * 命中多段時挑真實中心線最近的。參照場域範圍是外接方框，彎道與垂直段本來就會
+   * 蓋到鄰居；照順序取第一個會讓車子在重疊處左右跳。
+   */
+  let picked: FacilityObject | null = null;
+  let pickedD = Infinity;
   for (const track of area.facilities ?? []) {
     if (track.type !== 'Track') continue;
     const bounds = getValidRefFieldBounds(track.parameters);
     if (!bounds || !fieldPointInRefField(xM, yM, bounds)) continue;
-    return placementFromTrackInArea(xM, yM, area, track);
+    const score = trackGenPickScore(track.parameters, xM, yM);
+    const d = score ?? Infinity;
+    if (!picked || d < pickedD) {
+      picked = track;
+      pickedD = d;
+    }
+    if (score === null && picked === track) break;
   }
-  return null;
+  return picked ? placementFromTrackInArea(xM, yM, area, picked) : null;
 }
 
 /**

@@ -1,0 +1,127 @@
+/**
+ * 生成軌道的投影路徑。
+ *
+ * 車輛回報的是真實場域座標，圖台要把它畫在簡易地圖上。通用的做法是把座標對到
+ * 元件的參照場域範圍、沿長邊做線性內插——直線段沒問題，圓角是一段弧就對不上：
+ * 實測車子走到轉角會跳 137 像素。
+ *
+ * 所以生成時把兩條中心線一起存下來：真實路徑與對應的圖面路徑。投影時先在真實
+ * 路徑上求出「走了幾成」，再照同樣的比例落在圖面路徑上，弧與斜段都會貼合。
+ *
+ * 圖面路徑存的是<strong>未旋轉外框的 0–1 比例</strong>，所以元件之後被拉伸、Area 被
+ * 縮放都不影響。
+ */
+
+/** 真實中心線，[[x, y], …]，依里程由小到大 */
+export const TRACKGEN_REAL_PATH_KEY = 'trackGenRealPath'
+/** 圖面中心線，[[u, v], …]，與真實路徑同順序 */
+export const TRACKGEN_LOCAL_PATH_KEY = 'trackGenLocalPath'
+
+export type PathXY = Array<[number, number]>
+
+function readPath(raw: unknown): PathXY | null {
+  if (!Array.isArray(raw) || raw.length < 2) return null
+  const out: PathXY = []
+  for (const p of raw) {
+    if (!Array.isArray(p) || p.length < 2) return null
+    const x = Number(p[0])
+    const y = Number(p[1])
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    out.push([x, y])
+  }
+  return out
+}
+
+export function getTrackGenPaths(
+  parameters: Record<string, unknown> | undefined,
+): { real: PathXY; local: PathXY } | null {
+  const real = readPath(parameters?.[TRACKGEN_REAL_PATH_KEY])
+  const local = readPath(parameters?.[TRACKGEN_LOCAL_PATH_KEY])
+  if (!real || !local) return null
+  return { real, local }
+}
+
+function cumulative(path: PathXY): number[] {
+  const seg: number[] = [0]
+  for (let i = 1; i < path.length; i += 1) {
+    seg.push(
+      seg[i - 1]! +
+        Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]),
+    )
+  }
+  return seg
+}
+
+/** 點投影到折線上，回傳沿線走了幾成（0–1）與距離 */
+export function projectAlongPath(
+  path: PathXY,
+  x: number,
+  y: number,
+): { along: number; distance: number } {
+  const seg = cumulative(path)
+  const total = seg[seg.length - 1]!
+  if (!(total > 0)) {
+    return { along: 0, distance: Math.hypot(x - path[0]![0], y - path[0]![1]) }
+  }
+
+  let bestS = 0
+  let bestD = Infinity
+  for (let i = 1; i < path.length; i += 1) {
+    const ax = path[i - 1]![0]
+    const ay = path[i - 1]![1]
+    const dx = path[i]![0] - ax
+    const dy = path[i]![1] - ay
+    const l2 = dx * dx + dy * dy
+    const u = l2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2)) : 0
+    const qx = ax + dx * u
+    const qy = ay + dy * u
+    const d = Math.hypot(x - qx, y - qy)
+    if (d < bestD) {
+      bestD = d
+      bestS = seg[i - 1]! + u * Math.sqrt(l2)
+    }
+  }
+  return { along: bestS / total, distance: bestD }
+}
+
+/** 沿折線取「走了幾成」的位置 */
+export function pointAlongPath(path: PathXY, along: number): { x: number; y: number } {
+  const seg = cumulative(path)
+  const total = seg[seg.length - 1]!
+  if (!(total > 0)) return { x: path[0]![0], y: path[0]![1] }
+  const target = Math.max(0, Math.min(1, along)) * total
+  for (let i = 1; i < path.length; i += 1) {
+    if (seg[i]! >= target) {
+      const span = Math.max(1e-9, seg[i]! - seg[i - 1]!)
+      const u = (target - seg[i - 1]!) / span
+      return {
+        x: path[i - 1]![0] + (path[i]![0] - path[i - 1]![0]) * u,
+        y: path[i - 1]![1] + (path[i]![1] - path[i - 1]![1]) * u,
+      }
+    }
+  }
+  const last = path[path.length - 1]!
+  return { x: last[0], y: last[1] }
+}
+
+/**
+ * 重疊時的取捨分數：越小越優先。
+ *
+ * 渡線從主線岔出去，分岔點上兩者與車輛等距——單看距離會在某一格突然跳到渡線上
+ * 再跳回來（實測主線上有一格跳了 19 像素）。主線給一點優勢，只有車輛明顯離開
+ * 主線時才會判給渡線。
+ */
+export const SIDE_LANE_PENALTY_M = 0.75
+
+export function trackGenPickScore(
+  parameters: Record<string, unknown> | undefined,
+  xM: number,
+  yM: number,
+): number | null {
+  const paths = getTrackGenPaths(parameters)
+  if (!paths) return null
+  const { distance } = projectAlongPath(paths.real, xM, yM)
+  const role = parameters?.trackGenRole
+  const isMain = role === 'down' || role === 'up'
+  return distance + (isMain ? 0 : SIDE_LANE_PENALTY_M)
+}

@@ -1,8 +1,12 @@
 import type { FacilityObject } from '../types/facility'
-import { toFieldCoords, type TrackGenSettings } from './trackGenFacility'
-import type { TrackGenResult, Vec2 } from './trackGenerator'
+import type { TrackGenSettings } from './trackGenFacility'
+import type { LaneRole, TrackGenResult, Vec2 } from './trackGenerator'
 import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
 import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
+import {
+  TRACKGEN_LOCAL_PATH_KEY,
+  TRACKGEN_REAL_PATH_KEY,
+} from './trackGenPaths'
 import {
   REF_FIELD_X_MAX_M,
   REF_FIELD_X_MIN_M,
@@ -108,11 +112,9 @@ function realAtLateral(result: TrackGenResult, s: number, lateralM: number): Vec
  */
 function realBounds(
   result: TrackGenResult,
-  settings: TrackGenSettings,
   sFrom: number,
   sTo: number,
-  latFromM: number,
-  latToM: number,
+  latAt: (s: number) => number,
 ) {
   const N = 16
   let xMin = Infinity
@@ -120,11 +122,13 @@ function realBounds(
   let yMin = Infinity
   let yMax = -Infinity
   for (let i = 0; i <= N; i += 1) {
-    const u = i / N
-    const s = sFrom + (sTo - sFrom) * u
-    const lat = latFromM + (latToM - latFromM) * u
-    // 換到場域座標系再取範圍：.xodr 的原點與軸向不一定等於場域
-    const p = toFieldCoords(realAtLateral(result, s, lat), settings)
+    const s = sFrom + (sTo - sFrom) * (i / N)
+    const lat = latAt(s)
+    /*
+     * .xodr 就是場域的實際地圖，座標直接當場域座標用——不做偏移也不翻轉。
+     * 車端回報的位置與這裡寫進去的是同一個座標系，投影才會落在對的地方。
+     */
+    const p = realAtLateral(result, s, lat)
     if (p.x < xMin) xMin = p.x
     if (p.x > xMax) xMax = p.x
     if (p.y < yMin) yMin = p.y
@@ -141,19 +145,117 @@ function realBounds(
   }
 }
 
+
+/* ── 車輛投影用的兩條路徑 ─────────────────────────────────────
+   通用投影只會沿 refField 的長邊做線性內插：直線段沒問題，圓角是弧就對不上，
+   實測車子在轉角處會跳 137 像素。所以每一段都存下「真實路徑」與「圖面路徑」，
+   投影時先在真實路徑上求出走了幾成，再照同樣的比例落在圖面路徑上。       */
+
+/**
+ * 某個角色（上行／下行）在各里程的<strong>實際</strong>橫向偏移。
+ *
+ * 主線區塊的偏移原本取整條的中位數，那是為了讓圖面上兩條線平行；但參照場域範圍
+ * 要的是真實位置。實測上行線在 junction 會外擺到 8 公尺，名目間距只有 3.5——
+ * 用名目值算出來的範圍蓋不到車子實際走的地方，那幾段就定位不到。
+ */
+function lateralLookup(result: TrackGenResult, role: LaneRole): (s: number) => number {
+  const pts = result.lanes
+    .filter((l) => l.role === role)
+    .flatMap((l) => l.profile)
+    .sort((a, b) => a[0] - b[0])
+  if (!pts.length) return () => 0
+  return (s: number) => {
+    if (s <= pts[0]![0]) return pts[0]![1]
+    if (s >= pts[pts.length - 1]![0]) return pts[pts.length - 1]![1]
+    let lo = 0
+    let hi = pts.length - 1
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1
+      if (pts[mid]![0] <= s) lo = mid
+      else hi = mid
+    }
+    const span = Math.max(1e-6, pts[hi]![0] - pts[lo]![0])
+    const u = (s - pts[lo]![0]) / span
+    return pts[lo]![1] + (pts[hi]![1] - pts[lo]![1]) * u
+  }
+}
+
+/** 這一段的真實中心線（依里程由小到大） */
+function realPathOf(
+  result: TrackGenResult,
+  sFrom: number,
+  sTo: number,
+  latAt: (s: number) => number,
+  n: number,
+): number[][] {
+  const out: number[][] = []
+  for (let i = 0; i <= n; i += 1) {
+    const s = sFrom + (sTo - sFrom) * (i / n)
+    const p = realAtLateral(result, s, latAt(s))
+    out.push([Number(p.x.toFixed(2)), Number(p.y.toFixed(2))])
+  }
+  return out
+}
+
+/**
+ * 圖面中心線，換成「未旋轉外框」的 0–1 座標。
+ *
+ * 存成比例而不是像素：元件之後被拉伸、Area 被縮放都不影響，投影仍然落在軌道上。
+ */
+function localPathOf(
+  samples: Vec2[],
+  box: { xM: number; yM: number; wM: number; hM: number },
+  rotationDeg: number,
+): number[][] {
+  const w = Math.max(1e-6, box.wM)
+  const h = Math.max(1e-6, box.hM)
+  if (Math.abs(rotationDeg) < 1e-6) {
+    return samples.map((p) => [
+      Number(((p.x - box.xM) / w).toFixed(4)),
+      Number(((p.y - box.yM) / h).toFixed(4)),
+    ])
+  }
+  /*
+   * 有旋轉的段：外框是「長沿行進方向、寬跨軌道」，所以把取樣點轉回未旋轉的
+   * 座標系再正規化，否則比例會沿著螢幕的軸算，斜段整條歪掉。
+   */
+  const rad = (-rotationDeg * Math.PI) / 180
+  const cx = box.xM + w / 2
+  const cy = box.yM + h / 2
+  return samples.map((p) => {
+    const dx = p.x - cx
+    const dy = p.y - cy
+    const rx = dx * Math.cos(rad) - dy * Math.sin(rad)
+    const ry = dx * Math.sin(rad) + dy * Math.cos(rad)
+    return [Number((0.5 + rx / w).toFixed(4)), Number((0.5 + ry / h).toFixed(4))]
+  })
+}
+
 function facilityFor(
   shape: LayoutShape,
   result: TrackGenResult,
-  settings: TrackGenSettings,
+  mainLateral: Record<'down' | 'up', (s: number) => number>,
   id: string,
 ): BuiltFacility {
-  const meta = realBounds(
+  /*
+   * 主線照該條線自己的剖面取真實偏移；渡線與側線的兩端偏移已經是各自剖面上的
+   * 實際值，中間線性內插即可。
+   */
+  const latAt =
+    shape.role === 'down' || shape.role === 'up'
+      ? mainLateral[shape.role]
+      : (s: number) => {
+          const span = Math.max(1e-6, shape.sTo - shape.sFrom)
+          const u = Math.max(0, Math.min(1, (s - shape.sFrom) / span))
+          return shape.realLatFromM + (shape.realLatToM - shape.realLatFromM) * u
+        }
+  const meta = realBounds(result, shape.sFrom, shape.sTo, latAt)
+  const realPath = realPathOf(
     result,
-    settings,
     shape.sFrom,
     shape.sTo,
-    shape.realLatFromM,
-    shape.realLatToM,
+    latAt,
+    shape.kind === 'corner' ? 12 : 4,
   )
   if (shape.kind === 'rect') {
     /*
@@ -175,7 +277,24 @@ function facilityFor(
       name: 'Rail',
       customName: shape.name,
       rotation: axisAligned ? 0 : shape.rotationDeg,
-      parameters: { segmentId: shape.name, trackGenRole: shape.role, ...meta },
+      parameters: {
+        segmentId: shape.name,
+        trackGenRole: shape.role,
+        [TRACKGEN_REAL_PATH_KEY]: realPath,
+        [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(
+          shape.samples,
+          axisAligned
+            ? { xM: shape.centre.x - wM / 2, yM: shape.centre.y - hM / 2, wM, hM }
+            : {
+                xM: shape.centre.x - shape.lengthM / 2,
+                yM: shape.centre.y - shape.widthM / 2,
+                wM: shape.lengthM,
+                hM: shape.widthM,
+              },
+          axisAligned ? 0 : shape.rotationDeg,
+        ),
+        ...meta,
+      },
       box: axisAligned
         ? {
             xM: shape.centre.x - wM / 2,
@@ -202,6 +321,8 @@ function facilityFor(
         segmentId: shape.name,
         trackGenRole: shape.role,
         [CORNER_TRACK_KEY]: shape.geometry,
+        [TRACKGEN_REAL_PATH_KEY]: realPath,
+        [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
         ...meta,
       },
       box: { ...shape.box },
@@ -223,6 +344,8 @@ function facilityFor(
       segmentId: shape.name,
       trackGenRole: shape.role,
       [TAPER_TRACK_KEY]: shape.geometry,
+      [TRACKGEN_REAL_PATH_KEY]: realPath,
+      [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
       ...meta,
     },
     box: { ...shape.box },
@@ -244,7 +367,11 @@ export function buildFacilitiesFromTrackGen(
     const rb = b.kind === 'corner' ? b.outerRadiusM : 0
     return rb - ra
   })
-  const facilities = ordered.map((s) => facilityFor(s, result, settings, nextId()))
+  const mainLateral = {
+    down: lateralLookup(result, 'down'),
+    up: lateralLookup(result, 'up'),
+  }
+  const facilities = ordered.map((s) => facilityFor(s, result, mainLateral, nextId()))
 
   // 平移到原點，Area 才不用容納負座標
   const { xMin, yMin, xMax, yMax } = layout.bounds

@@ -40,6 +40,14 @@ export type RealLateral = {
   realLatFromM: number
   /** 終點的真實橫向偏移（公尺） */
   realLatToM: number
+  /**
+   * 這一段在圖面上的中心線（版面公尺，依里程由小到大）。
+   *
+   * 車輛投影要的就是這條線：真實座標先落在真實路徑上得到「走了幾成」，再照同樣
+   * 的比例落在這條線上。少了它，圓角只能沿 refField 的長邊做線性內插——弧被拉成
+   * 直線，實測車子在轉角處會跳 137 像素。
+   */
+  samples: Vec2[]
 }
 
 export type LayoutRect = RealLateral & {
@@ -325,6 +333,7 @@ export function layoutTrackGen(
       role,
       realLatFromM,
       realLatToM,
+      samples: [p0, p1],
       centre: { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 },
       lengthM: Math.hypot(p1.x - p0.x, p1.y - p0.y),
       widthM: bandW,
@@ -369,12 +378,17 @@ export function layoutTrackGen(
       const p0 = placePoint(b.sFrom, lat, placed, lt)
       const p1 = placePoint(b.sTo, lat, placed, lt)
       const { geometry, box } = fitCorner(seg.centre, outerR, bandW, p0, p1)
+      const arcSamples: Vec2[] = []
+      for (let i = 0; i <= 12; i += 1) {
+        arcSamples.push(placePoint(b.sFrom + ((b.sTo - b.sFrom) * i) / 12, lat, placed, lt))
+      }
       shapes.push({
         kind: 'corner',
         name,
         role,
         realLatFromM: lat,
         realLatToM: lat,
+        samples: arcSamples,
         geometry,
         box,
         outerRadiusM: outerR,
@@ -441,6 +455,7 @@ export function layoutTrackGen(
           role: lane.role,
           realLatFromM: a[1],
           realLatToM: b[1],
+          samples: [pa, pb],
           geometry,
           box,
           sFrom: sA,
