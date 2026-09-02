@@ -27,6 +27,14 @@ export type TrackGenSettings = {
    * 上下行只差 3.5 公尺，不放大就會黏成一條線。
    */
   lateralScale: number
+  /**
+   * 軌道寬度倍率，乘在<strong>真實車道寬</strong>上。
+   *
+   * 先前寬度是「車道寬 × 橫向放大」，橫向放大 9 倍時 3.35 公尺的車道被畫成 30 公尺
+   * 寬——一段只有 6 公尺長的軌道就變成一片橫躺的薄片。寬度與橫向間距是兩件事，
+   * 分開設定。
+   */
+  trackWidthScale: number
   /** 彎道半徑（公尺） */
   cornerRadiusM: number
   /** 每塊目標長度（公尺） */
@@ -38,7 +46,15 @@ export type TrackGenSettings = {
 }
 
 export const DEFAULT_TRACKGEN_SETTINGS: TrackGenSettings = {
-  lateralScale: 9,
+  /*
+   * 橫向與軌道寬都預設 1：直接照真實幾何畫，只有曲率被分段化。
+   *
+   * 先前橫向放大 9 倍是為了把上下行分開，代價是任何橫向位移都被放大九倍——
+   * 一段 16 公尺長的岔線橫移 30 公尺，畫出來是一根 183 公尺寬的尖刺。要把兩條線
+   * 分開請調這個值，但記得軌道寬也要跟著調，否則會變成一堆細線。
+   */
+  lateralScale: 1,
+  trackWidthScale: 1,
   cornerRadiusM: 57,
   blockLengthM: 50,
   labelSizePx: 10,

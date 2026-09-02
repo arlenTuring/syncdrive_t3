@@ -44,6 +44,8 @@ export type ProjectedLine = {
   key: string
   role: LaneRole
   lengthM: number
+  /** 車道寬（公尺）。軌道畫多寬直接用它，不要另外訂一個「帶寬」 */
+  widthM: number
   /** 組成這條線的 OpenDRIVE 車道 */
   laneKeys: string[]
   /** [里程, 橫向偏移] 取樣序列 */
@@ -54,6 +56,17 @@ export type TrackGenResult = {
   spine: SpineSegment[]
   totalM: number
   lines: ProjectedLine[]
+  /**
+   * 參考線相對<strong>脊線</strong>的橫向偏離，[里程, 偏離] 取樣。
+   *
+   * 脊線的直線段方位量化到 90 度，真實的參考線在那一段裡會慢慢偏開——實測 834 公尺
+   * 那段偏了 −8.7 ～ +16.5 公尺。那正是原圖上「兩條線一起緩緩爬升」的那件事，
+   * 是應該用斜接軌道畫出來的幾何，不是應該抹掉的誤差。
+   *
+   * 每段直線各自以自己的起點為錨，所以偏離從 0 開始累積；彎道段線性收回 0，
+   * 交界處才不會跳。真實座標的還原不吃這個值，只有版面吃。
+   */
+  refDeviation: Array<[number, number]>
   /** 參考線的真實座標，供回填參照場域範圍與車輛投影 */
   refPoints: Vec2[]
   refStations: number[]
@@ -333,6 +346,7 @@ export function generateTracks(
     spine: [],
     totalM: 0,
     lines: [],
+    refDeviation: [],
     refPoints: [],
     refStations: [],
     warnings: [msg],
@@ -358,6 +372,50 @@ export function generateTracks(
   const totalM = refS[refS.length - 1] ?? 0
   const spine = buildSpine(ref, refS, curvature)
 
+  /*
+   * 參考線相對脊線的橫向偏離。
+   *
+   * 每段直線以自己的起點為錨、用量化後的方位拉一條直線，量參考線離它多遠；彎道段
+   * 從前一段的末值線性收回 0。全域理想化行不通——第二個彎實際只轉 56.5 度卻被拉成
+   * 90 度，整條理想路徑會偏掉 342 公尺。分段量就只有十幾公尺。
+   */
+  const refAt = (sq: number): Vec2 => {
+    let i = 1
+    while (i < refS.length - 1 && refS[i]! < sq) i += 1
+    const a = refS[i - 1]!
+    const b = refS[i]!
+    const u = (sq - a) / Math.max(1e-6, b - a)
+    return {
+      x: ref[i - 1]!.x + (ref[i]!.x - ref[i - 1]!.x) * u,
+      y: ref[i - 1]!.y + (ref[i]!.y - ref[i - 1]!.y) * u,
+    }
+  }
+  const refDeviation: Array<[number, number]> = []
+  let carry = 0
+  for (const seg of spine) {
+    if (seg.kind === 'straight') {
+      const p0 = refAt(seg.sFrom)
+      const dir = { x: Math.cos(seg.hdgDeg * DEG), y: -Math.sin(seg.hdgDeg * DEG) }
+      const nrm = { x: -dir.y, y: dir.x }
+      const n = Math.max(1, Math.round((seg.sTo - seg.sFrom) / 5))
+      for (let k = 0; k <= n; k += 1) {
+        const sq = seg.sFrom + ((seg.sTo - seg.sFrom) * k) / n
+        const p = refAt(sq)
+        const d = (p.x - p0.x) * nrm.x + (p.y - p0.y) * nrm.y
+        refDeviation.push([Number(sq.toFixed(1)), Number(d.toFixed(2))])
+        carry = d
+      }
+    } else {
+      // 彎道：把前一段累積的偏離線性收回 0
+      const n = 6
+      for (let k = 0; k <= n; k += 1) {
+        const sq = seg.sFrom + ((seg.sTo - seg.sFrom) * k) / n
+        refDeviation.push([Number(sq.toFixed(1)), Number((carry * (1 - k / n)).toFixed(2))])
+      }
+      carry = 0
+    }
+  }
+
   const lines: ProjectedLine[] = []
   ordered.forEach((chain, index) => {
     const pts = resample(joinPath(chain, byKey), 2)
@@ -373,6 +431,12 @@ export function generateTracks(
       key: `L${index + 1}`,
       role: chain.some((k) => byKey.get(k)!.inJunction) ? 'junction' : 'road',
       lengthM: Number(lengthOf(chain).toFixed(1)),
+      widthM: Number(
+        (
+          chain.reduce((a, k) => a + (byKey.get(k)!.widthM || 0), 0) /
+          Math.max(1, chain.length)
+        ).toFixed(3),
+      ),
       laneKeys: chain,
       profile,
     })
@@ -383,6 +447,7 @@ export function generateTracks(
     spine,
     totalM: Number(totalM.toFixed(2)),
     lines,
+    refDeviation,
     refPoints: ref
       .filter((_, i) => i % 5 === 0)
       .map((p) => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) })),

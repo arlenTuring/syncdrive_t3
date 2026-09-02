@@ -142,14 +142,27 @@ export function TrackGenInspectorSection({
         <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
           整體大小由元件框決定，拖曳邊角即可縮放。
         </p>
+        <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
+          兩者都是 1 時直接照真實幾何畫，只有曲率被分段化成一般／圓角／斜接三種軌道。
+          放大橫向可以把並行的線分開，但軌道寬要跟著調，否則會變成一堆細線。
+        </p>
         <Slider
           label="橫向放大"
           value={settings.lateralScale}
-          min={2}
-          max={30}
+          min={1}
+          max={20}
           step={1}
           suffix="×"
           onChange={(v) => patch({ lateralScale: v })}
+        />
+        <Slider
+          label="軌道寬度"
+          value={settings.trackWidthScale}
+          min={1}
+          max={20}
+          step={1}
+          suffix="× 車道寬"
+          onChange={(v) => patch({ trackWidthScale: v })}
         />
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">

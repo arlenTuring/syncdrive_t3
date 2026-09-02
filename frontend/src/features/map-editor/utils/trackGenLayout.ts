@@ -1,5 +1,5 @@
 import { placePoint, placeSpine, type TrackGenSettings } from './trackGenFacility'
-import type { LaneRole, ProjectedLine, TrackGenResult, Vec2 } from './trackGenerator'
+import type { LaneRole, TrackGenResult, Vec2 } from './trackGenerator'
 import {
   cornerArcCentrePx,
   cornerTrackEndsPx,
@@ -307,143 +307,50 @@ function fitTaper(
 }
 
 /**
- * 決定每一條線畫在第幾股。
+ * 用折線逼近一條線的橫向剖面。
  *
- * <h3>分群，不是照身分指派</h3>
- * 先前的做法是「最長的兩條當第 0、第 1 股，其餘側線照平均距離往外排」——那把
- * 「有兩條主線」寫死進演算法了。換一份路網就不成立，而且渡線的端點會吸到某條側線
- * 的平均位置上，畫出來接在半空中。
+ * <h3>為什麼不是吸到整數股道</h3>
+ * 先前把橫向偏移吸到整數股，一段長長的漸變就只會變成「一次換股」——實際上那是一條
+ * 平緩的 S 形，應該由<strong>連續好幾段斜接軌道</strong>接起來才像原圖。吸到整數股還會
+ * 讓真實幾何整個消失：分隔島的寬度、兩線靠攏又拉開，全部被抹平成同一股。
  *
- * 現在改成純資料：把<strong>所有線、所有取樣點</strong>的橫向偏移排序後分群，群與群
- * 之間的間隔超過大半個車道寬就切開。每一群就是一股，照橫向位置由小到大編號；
- * 參考線所在的那一群定為第 0 股。股距取相鄰群中心距離的中位數。
+ * 改成 Douglas–Peucker：在（里程, 橫向偏移）平面上把剖面簡化成折線，容差就是可以
+ * 忽略的橫向誤差。折線的每一段要嘛幾乎水平（→ 一般軌道），要嘛有斜率（→ 斜接軌道），
+ * 段數由曲線自己的形狀決定，不是由我訂幾股。
  */
-function buildLevels(lines: ProjectedLine[]): {
-  levelOf: (lateralM: number) => number
-  spacingM: number
-  count: number
-} {
-  /*
-   * 只拿「停得住」的取樣點來分群。
-   *
-   * 換股道的那一段是連續掃過去的，它的取樣點會把股與股之間的空隙填滿；照全部的點
-   * 分群，整條路網會被併成一群，換股道那件事就消失了——實測 10 條線一段斜接軌道
-   * 都生不出來。所謂停得住，是指前後一小段裡橫向偏移幾乎沒變。
-   */
-  const dwell: number[] = []
-  for (const line of lines) {
-    const prof = [...line.profile].sort((a, b) => a[0] - b[0])
-    for (let i = 0; i < prof.length; i += 1) {
-      const lo = Math.max(0, i - 3)
-      const hi = Math.min(prof.length - 1, i + 3)
-      let min = Infinity
-      let max = -Infinity
-      for (let j = lo; j <= hi; j += 1) {
-        min = Math.min(min, prof[j]![1])
-        max = Math.max(max, prof[j]![1])
-      }
-      if (max - min <= LANE_W_M * 0.4) dwell.push(prof[i]![1])
-    }
-  }
-  const samples = (dwell.length ? dwell : lines.flatMap((l) => l.profile.map((p) => p[1]))).sort(
-    (a, b) => a - b,
-  )
-  if (!samples.length) return { levelOf: () => 0, spacingM: LANE_W_M, count: 1 }
+function simplifyProfile(
+  profile: Array<[number, number]>,
+  toleranceM: number,
+): Array<[number, number]> {
+  if (profile.length < 3) return [...profile]
+  const keep = new Array<boolean>(profile.length).fill(false)
+  keep[0] = true
+  keep[profile.length - 1] = true
 
-  const gap = LANE_W_M * 0.75
-  const groups: number[][] = [[samples[0]!]]
-  for (let i = 1; i < samples.length; i += 1) {
-    const v = samples[i]!
-    const g = groups[groups.length - 1]!
-    if (v - g[g.length - 1]! <= gap) g.push(v)
-    else groups.push([v])
-  }
-  const centres = groups.map((g) => g[g.length >> 1]!)
-
-  // 參考線的橫向偏移是 0，它所在的那一群就是第 0 股
-  let zero = 0
-  for (let i = 1; i < centres.length; i += 1) {
-    if (Math.abs(centres[i]!) < Math.abs(centres[zero]!)) zero = i
-  }
-
-  const gaps: number[] = []
-  for (let i = 1; i < centres.length; i += 1) gaps.push(centres[i]! - centres[i - 1]!)
-  gaps.sort((a, b) => a - b)
-  const spacingM = gaps.length ? gaps[gaps.length >> 1]! : LANE_W_M
-
-  const levelOf = (lateralM: number) => {
-    let best = 0
-    for (let i = 1; i < centres.length; i += 1) {
-      if (Math.abs(centres[i]! - lateralM) < Math.abs(centres[best]! - lateralM)) best = i
-    }
-    return best - zero
-  }
-  return { levelOf, spacingM: Math.max(LANE_W_M * 0.5, spacingM), count: centres.length }
-}
-
-/**
- * 把一條車道切成「股道不變」的一段一段。
- *
- * <h3>短段不能一律往前併</h3>
- * 渡線是連續漸變的：吸到整數股之後會得到一串各自只有幾公尺的小段。一律往前併的話
- * 整條渡線會被併成單一股道，換股道那件事就消失了——實測 10 條渡線一條斜接軌道都沒
- * 生出來。改成反覆挑<strong>最短</strong>的一段，併進股道比較接近的那個鄰居。
- *
- * 剖面的里程不保證遞增（車道方向與參考線相反時就是遞減），所以先排序。
- */
-function laneRuns(
-  lane: ProjectedLine,
-  minRunM: number,
-  levelOf: (lateralM: number) => number,
-): Array<{ sFrom: number; sTo: number; level: number }> {
-  const prof = [...lane.profile].sort((a, b) => a[0] - b[0])
-  if (prof.length < 2) return []
-  let runs: Array<{ sFrom: number; sTo: number; level: number }> = []
-  for (const [s, lat] of prof) {
-    const n = levelOf(lat)
-    const last = runs[runs.length - 1]
-    if (last && last.level === n) last.sTo = s
-    else runs.push({ sFrom: last ? last.sTo : s, sTo: s, level: n })
-  }
-
-  const coalesce = () => {
-    const out: typeof runs = []
-    for (const r of runs) {
-      const last = out[out.length - 1]
-      if (last && last.level === r.level) last.sTo = r.sTo
-      else out.push({ ...r })
-    }
-    runs = out
-  }
-  coalesce()
-
-  while (runs.length > 1) {
+  const stack: Array<[number, number]> = [[0, profile.length - 1]]
+  while (stack.length) {
+    const [lo, hi] = stack.pop()!
+    if (hi - lo < 2) continue
+    const [s0, l0] = profile[lo]!
+    const [s1, l1] = profile[hi]!
+    const ds = s1 - s0
     let worst = -1
-    let worstLen = Infinity
-    for (let i = 0; i < runs.length; i += 1) {
-      const len = runs[i]!.sTo - runs[i]!.sFrom
-      if (len < worstLen) {
-        worstLen = len
+    let worstD = toleranceM
+    for (let i = lo + 1; i < hi; i += 1) {
+      const [s, l] = profile[i]!
+      // 橫向誤差就好，不需要真正的垂直距離：里程軸與橫向軸的意義不同
+      const expect = Math.abs(ds) < 1e-9 ? l0 : l0 + ((l1 - l0) * (s - s0)) / ds
+      const d = Math.abs(l - expect)
+      if (d > worstD) {
+        worstD = d
         worst = i
       }
     }
-    if (worstLen >= minRunM) break
-    const prev = runs[worst - 1]
-    const next = runs[worst + 1]
-    const r = runs[worst]!
-    // 併進股道比較接近的鄰居；一樣近就併進比較長的那一個
-    const dPrev = prev ? Math.abs(prev.level - r.level) : Infinity
-    const dNext = next ? Math.abs(next.level - r.level) : Infinity
-    const intoPrev =
-      dPrev < dNext ||
-      (dPrev === dNext && !!prev && (!next || prev.sTo - prev.sFrom >= next.sTo - next.sFrom))
-    if (intoPrev && prev) prev.sTo = r.sTo
-    else if (next) next.sFrom = r.sFrom
-    else break
-    runs.splice(worst, 1)
-    coalesce()
+    if (worst < 0) continue
+    keep[worst] = true
+    stack.push([lo, worst], [worst, hi])
   }
-  return runs.filter((r) => r.sTo - r.sFrom > 1)
+  return profile.filter((_, i) => keep[i])
 }
 
 /** 把一段里程依脊線切開，回傳每一小段落在哪一種脊線上 */
@@ -477,19 +384,39 @@ export function layoutTrackGen(
 ): TrackGenLayout {
   const lt = settings.lateralScale
   const placed = placeSpine(result.spine, 1, settings.cornerRadiusM)
-  const bandW = LANE_W_M * lt
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
 
-  const { levelOf, spacingM, count } = buildLevels(result.lines)
-  const latOfLevel = (level: number) => level * spacingM
-  /** 股道編號從最外側那一股算起，1 開始——只是個名字，沒有方向含意 */
-  const trackNo = (level: number) => level + Math.ceil(count / 2)
-
-  /* ── 三種元件各一支產生函式 ─────────────────────────────── */
+  /*
+   * 版面上的橫向偏移 ＝ 剖面的偏移 ＋ 參考線相對脊線的偏離。
+   *
+   * 脊線把緩彎拉直了，那段彎的量存在 refDeviation 裡；加回去，主線自己的緩彎才會
+   * 變成幾段斜接軌道，而不是憑空消失。真實座標的還原不加這個值（那邊用的是剖面
+   * 的原始偏移），兩者刻意分開。
+   */
+  const devAt = (sq: number) => {
+    const d = result.refDeviation
+    if (!d.length) return 0
+    if (sq <= d[0]![0]) return d[0]![1]
+    if (sq >= d[d.length - 1]![0]) return d[d.length - 1]![1]
+    let lo = 0
+    let hi = d.length - 1
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1
+      if (d[mid]![0] <= sq) lo = mid
+      else hi = mid
+    }
+    const span = Math.max(1e-6, d[hi]![0] - d[lo]![0])
+    const u = (sq - d[lo]![0]) / span
+    return d[lo]![1] + (d[hi]![1] - d[lo]![1]) * u
+  }
 
   let lineKey = ''
   let lineLengthM = 0
+  /** 這條線畫多寬（版面公尺）——直接來自車道寬，不另外訂 */
+  let bandW = LANE_W_M
+
+  /* ── 三種元件各一支產生函式 ─────────────────────────────── */
 
   const addRect = (
     name: string,
@@ -567,8 +494,6 @@ export function layoutTrackGen(
     latA: number,
     sB: number,
     latB: number,
-    realLatFromM: number,
-    realLatToM: number,
     alongDeg: number,
   ) => {
     const pa = placePoint(sA, latA, placed, lt)
@@ -580,8 +505,8 @@ export function layoutTrackGen(
       role,
       lineKey,
       lineLengthM,
-      realLatFromM,
-      realLatToM,
+      realLatFromM: latA,
+      realLatToM: latB,
       samples: [pa, pb],
       geometry,
       box,
@@ -591,116 +516,101 @@ export function layoutTrackGen(
     pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
   }
 
-  /** 一段「股道不變」的區段 → 依脊線拆成一般軌道與圓角軌道 */
-  const emitRun = (
+  /** 一段「橫向偏移固定」的區間 → 依脊線拆成一般軌道與圓角軌道 */
+  const emitFlat = (
     role: LaneRole,
-    level: number,
+    latM: number,
     sFrom: number,
     sTo: number,
-    realLatAt: (s: number) => number,
     nextName: () => string,
   ) => {
-    const latM = latOfLevel(level)
     for (const piece of spinePieces(placed, sFrom, sTo)) {
       const seg = placed[piece.segIndex]!
       if (piece.kind === 'arc') {
         const cover = (piece.sTo - piece.sFrom) / Math.max(1e-6, seg.sTo - seg.sFrom)
         if (cover < ARC_COVERAGE_MIN) continue
-        addCorner(nextName(), role, piece.segIndex, latM, realLatAt((seg.sFrom + seg.sTo) / 2))
+        addCorner(nextName(), role, piece.segIndex, latM, latM)
         continue
       }
       const span = piece.sTo - piece.sFrom
       const n = Math.max(1, Math.round(span / Math.max(1, settings.blockLengthM)))
       const step = span / n
       for (let k = 0; k < n; k += 1) {
-        const a = piece.sFrom + k * step
-        const b = a + step
-        addRect(nextName(), role, a, b, latM, realLatAt(a), realLatAt(b))
+        addRect(nextName(), role, piece.sFrom + k * step, piece.sFrom + (k + 1) * step, latM, latM)
       }
     }
   }
 
+  const hdgAt = (s: number) => {
+    const seg = placed.find((q) => q.kind === 'straight' && s >= q.sFrom && s <= q.sTo)
+    if (!seg || seg.kind !== 'straight') return null
+    return Math.round((Math.atan2(seg.dir.y, seg.dir.x) * 180) / Math.PI / 90) * 90
+  }
+
   /* ── 每一條線都走同一條路 ───────────────────────────────── */
 
+  const seen = new Set<string>()
+
   for (const line of result.lines) {
-    /*
-     * 兩個顯示開關都是<strong>結構</strong>上的，不是身分上的：
-     *   側線 ＝ 參考線以外的線（參考線就是最長那條，資料決定的）
-     *   渡線 ＝ 換股道的那一段斜接軌道
-     */
     const isReference = line.key === result.lines[0]?.key
     if (!isReference && !settings.showSidings) continue
-    lineKey = line.key
-    lineLengthM = line.lengthM
     const prof = [...line.profile].sort((a, b) => a[0] - b[0])
     if (prof.length < 2) continue
 
-    const realLatAt = (s: number) => {
-      let best = prof[0]!
-      for (const p of prof) if (Math.abs(p[0] - s) < Math.abs(best[0] - s)) best = p
-      return best[1]
-    }
-
-    const span = prof[prof.length - 1]![0] - prof[0]![0]
-    const runs = laneRuns(line, Math.min(12, span / 3), levelOf)
-    if (!runs.length) continue
+    lineKey = line.key
+    lineLengthM = line.lengthM
+    bandW = Math.max(0.5, (line.widthM || LANE_W_M) * settings.trackWidthScale)
 
     /*
-     * 換股道那一段由斜接軌道佔住，兩側的區段各自讓出位置。
-     *
-     * 長度取「實際換股用掉的里程」與「橫移量」的較大者：橫向放大之後，二十公尺內
-     * 換三股會橫移近百公尺，照實畫是一根幾乎垂直、穿過其他股道的尖刺；撐開之後最陡
-     * 就是 45 度。撐開後不可以跨進彎道——斜接軌道是一段直的平行四邊形，兩端一個落在
-     * 直線、一個落在弧上，中間那條直線會橫切過整個轉角。
+     * 把剖面簡化成折線，容差取車道寬的四分之一：比這小的橫向擺動在簡圖上看不出來，
+     * 留著只會生出一堆幾公尺長的碎片。
      */
-    const trims = runs.map(() => ({ before: 0, after: 0 }))
-    const tapers: Array<{ sA: number; sB: number; i: number; alongDeg: number }> = []
-    for (let i = 0; i + 1 < runs.length; i += 1) {
-      const a = runs[i]!
-      const b = runs[i + 1]!
-      const sc = (a.sTo + b.sFrom) / 2
-      const host = placed.find((q) => q.kind === 'straight' && sc >= q.sFrom && sc <= q.sTo)
-      if (!host || host.kind !== 'straight') continue
-      const latDelta = Math.abs(latOfLevel(a.level) - latOfLevel(b.level)) * lt
-      let half = Math.max(b.sFrom - a.sTo, latDelta) / 2
-      half = Math.min(half, sc - host.sFrom, host.sTo - sc)
-      if (half * 2 < bandW * 0.4) continue
-      trims[i]!.after = a.sTo - (sc - half)
-      trims[i + 1]!.before = sc + half - b.sFrom
-      tapers.push({
-        sA: sc - half,
-        sB: sc + half,
-        i,
-        alongDeg:
-          Math.round((Math.atan2(host.dir.y, host.dir.x) * 180) / Math.PI / 90) * 90,
-      })
-    }
+    const withDev: Array<[number, number]> = prof.map(([sq, lat]) => [sq, lat + devAt(sq)])
+    const simplified = simplifyProfile(withDev, (line.widthM || LANE_W_M) * 0.25)
+    const sig = `${Math.round(prof[0]![0])}:${Math.round(prof[prof.length - 1]![0])}:${simplified
+      .map((p) => Math.round(p[1]))
+      .join(',')}`
+    if (seen.has(sig)) continue
+    seen.add(sig)
 
     let seq = 0
-    const nameAt = (level: number) => () => {
+    const nextName = () => {
       seq += 1
-      return `${line.key}T${trackNo(level)}-${String(seq).padStart(2, '0')}`
+      return `${line.key}-${String(seq).padStart(2, '0')}`
     }
 
-    runs.forEach((run, i) => {
-      const from = run.sFrom + Math.max(0, trims[i]!.before)
-      const to = run.sTo - Math.max(0, trims[i]!.after)
-      if (to - from <= 1e-6) return
-      emitRun(line.role, run.level, from, to, realLatAt, nameAt(run.level))
-    })
-
-    for (const t of settings.showCrossovers ? tapers : []) {
+    /*
+     * 折線的每一段：橫向幾乎沒變就是一般軌道／圓角軌道，有斜率就是斜接軌道。
+     *
+     * 斜接軌道是一段直的平行四邊形，只能放在直線脊線段上；落在彎道上的那一段改用
+     * 平均橫向偏移當作固定值，畫成圓角軌道。
+     */
+    const flatEps = (line.widthM || LANE_W_M) * 0.25
+    for (let i = 0; i + 1 < simplified.length; i += 1) {
+      const [sA, latA] = simplified[i]!
+      const [sB, latB] = simplified[i + 1]!
+      if (sB - sA < 0.5) continue
+      const along = hdgAt((sA + sB) / 2)
+      const sloped = Math.abs(latB - latA) > flatEps && along !== null
+      if (!sloped) {
+        emitFlat(line.role, (latA + latB) / 2, sA, sB, nextName)
+        continue
+      }
+      // 斜的那一段若跨進彎道，彎道那一截退回固定偏移
+      const host = placed.find((q) => q.kind === 'straight' && sA >= q.sFrom && sB <= q.sTo)
+      if (!host) {
+        emitFlat(line.role, (latA + latB) / 2, sA, sB, nextName)
+        continue
+      }
       seq += 1
       addTaper(
         `${line.key}X-${String(seq).padStart(2, '0')}`,
         line.role,
-        t.sA,
-        latOfLevel(runs[t.i]!.level),
-        t.sB,
-        latOfLevel(runs[t.i + 1]!.level),
-        realLatAt(t.sA),
-        realLatAt(t.sB),
-        t.alongDeg,
+        sA,
+        latA,
+        sB,
+        latB,
+        along,
       )
     }
   }

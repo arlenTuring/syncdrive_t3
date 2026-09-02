@@ -24,6 +24,8 @@ export type LaneCenterline = {
   /** 與 points 等長的累積里程 */
   stations: number[]
   lengthM: number
+  /** 車道寬（公尺，取起點處）——軌道畫多寬直接用它，不要自己訂 */
+  widthM: number
 }
 
 /**
@@ -242,6 +244,7 @@ export function parseLaneCenterlines(
           )
         }
         lanes.push({
+          widthM: evalWidthPoly(lane.widths, sectionS, sectionS),
           key: `${roadId}:${lane.id}`,
           roadId,
           laneId: lane.id,
