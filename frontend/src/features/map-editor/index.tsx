@@ -194,6 +194,7 @@ import {
 import {
   defaultTrackGenParameters,
   getTrackGenAreaId,
+  getTrackGenBlockSize,
   getTrackGenResult,
   getTrackGenSettings,
   TRACKGEN_AREA_ID_KEY,
@@ -207,6 +208,7 @@ import {
 } from './utils/trackShapes'
 import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
 import type { TrackGenResult } from './utils/trackGenerator'
+import type { TrackGenBlockSize } from './utils/trackGenFacility'
 import {
   defaultTrackCrossoverParameters,
 } from './utils/trackCrossoverFacility'
@@ -2271,17 +2273,21 @@ export default function MapEditorApp({
    * result 由呼叫端直接帶進來：剛算完的結果還沒寫回 state，從參數讀會拿到上一次的。
    */
   const onApplyTrackGen = useCallback(
-    (basemapId: string, freshResult?: TrackGenResult) => {
+    (basemapId: string, freshResult?: TrackGenResult, block?: TrackGenBlockSize) => {
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
       if (!basemap) return
       const result = freshResult ?? getTrackGenResult(basemap.parameters)
       if (!result || !result.lines.length) return
       const settings = getTrackGenSettings(basemap.parameters)
+      const blockSize = block ?? getTrackGenBlockSize(basemap.parameters)
 
       pushHistory()
       let seq = nextNumericId
-      const built = buildFacilitiesFromTrackGen(result, settings, () =>
-        String(seq++).padStart(3, '0'),
+      const built = buildFacilitiesFromTrackGen(
+        result,
+        settings,
+        () => String(seq++).padStart(3, '0'),
+        blockSize,
       )
 
       const areaId = String(seq++).padStart(3, '0')
@@ -2303,12 +2309,18 @@ export default function MapEditorApp({
          * 位置也<strong>疊在元件上</strong>——同一個矩形，生成的軌道就直接蓋在原本那張
          * 路網圖上面，兩者對得起來。擺在正下方的話等於另外開一塊，反而看不出對應。
          */
+        /*
+         * 使用者指定了一塊軌道多大時，Area 直接用<strong>版面本身的像素範圍</strong>。
+         *
+         * 沿用元件的框會把版面再壓縮一次——實測要 60×20 的軌道，出來是 49×10。
+         * 範圍與框相同時對映是 1:1，拉出來多大就是多大。沒有指定時仍沿用元件的框。
+         */
         layout: {
           ...blank.layout,
           xPx: basemap.layout.xPx,
           yPx: basemap.layout.yPx,
-          wPx: basemap.layout.wPx,
-          hPx: basemap.layout.hPx,
+          wPx: block ? Math.max(40, Math.round(built.extentM.wM)) : basemap.layout.wPx,
+          hPx: block ? Math.max(40, Math.round(built.extentM.hM)) : basemap.layout.hPx,
         },
         domain: {
           xMinM: 0,

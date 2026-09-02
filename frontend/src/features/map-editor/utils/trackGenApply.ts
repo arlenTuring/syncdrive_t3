@@ -1,5 +1,5 @@
 import type { FacilityObject } from '../types/facility'
-import type { TrackGenSettings } from './trackGenFacility'
+import type { TrackGenBlockSize, TrackGenSettings } from './trackGenFacility'
 import type { TrackGenResult, Vec2 } from './trackGenerator'
 import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
 import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
@@ -329,8 +329,9 @@ export function buildFacilitiesFromTrackGen(
   result: TrackGenResult,
   settings: TrackGenSettings,
   nextId: () => string,
+  block?: TrackGenBlockSize,
 ): ApplyResult {
-  const layout = layoutTrackGen(result, settings)
+  const layout = layoutTrackGen(result, settings, block)
   /*
    * 彎道的方塊要「大的先、小的後」：外側那塊比較大，內側疊在它上面，
    * 露出來的那一圈就是轉彎的軌道帶。順序反了會被外側整個蓋住。

@@ -16,16 +16,21 @@ import { BasemapGraphic } from './BasemapGraphic'
 import { BasemapPartitionContent } from './BasemapPartitionContent'
 import { BasemapFilePickerDialog } from './BasemapFilePickerDialog'
 import { TrackGenGraphic } from './TrackGenGraphic'
+import {
+  TrackGenSizeDialog,
+  type TrackGenSizeParams,
+} from './TrackGenSizeDialog'
 import { parseLaneCenterlines } from '../opendrive/laneCenterlines'
 import type { TrackGenResult } from '../utils/trackGenerator'
 import { generateTracks } from '../utils/trackGenerator'
 import {
   getTrackGenFileName,
   getTrackGenResult,
-  getTrackGenSettings,
   getTrackGenXodr,
   isTrackGenComponent,
   TRACKGEN_FILE_NAME_KEY,
+  TRACKGEN_BLOCK_SIZE_KEY,
+  getTrackGenBlockSize,
   TRACKGEN_RESULT_KEY,
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
@@ -109,7 +114,11 @@ function layoutFromCornerResize(
 
 type Props = {
   /** 軌道生成：把結果變成真正的設施 */
-  onApplyTrackGen?: (basemapId: string, result: TrackGenResult) => void
+  onApplyTrackGen?: (
+    basemapId: string,
+    result: TrackGenResult,
+    block: TrackGenSizeParams,
+  ) => void
   basemap: MapBasemapObject
   stackOrder: number
   stackCount: number
@@ -188,7 +197,6 @@ export const BasemapNode = memo(function BasemapNode({
   }, [isTrackGen, trackGenXodr])
   const trackGenParseFailed = isTrackGen && !!trackGenXodr && !trackGenCenterlines
   const trackGenResult = getTrackGenResult(basemap.parameters)
-  const trackGenSettings = getTrackGenSettings(basemap.parameters)
   const [generating, setGenerating] = useState(false)
 
   /**
@@ -198,29 +206,34 @@ export const BasemapNode = memo(function BasemapNode({
    * 拉伸、設屬性、被車輛投影命中的元件；先畫一份藍色示意方塊再按一次「套用」，
    * 只是多一道手續。這個元件負責的是「載入路網、看中心線、按下生成」。
    */
-  const runTrackGeneration = useCallback(() => {
+  /*
+   * 生成前先問「一塊軌道多大」。
+   *
+   * 目標是用簡單明瞭的幾何表示場域，不是模擬得很像；一塊畫多長多寬應該由使用者
+   * 決定，所以先開對話框讓他拉，拉完才生成。
+   */
+  const [sizeDialogOpen, setSizeDialogOpen] = useState(false)
+
+  const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
     if (!trackGenCenterlines) return
     setGenerating(true)
     // 讓「生成中」先畫出來，再做這件會佔住主執行緒約一秒的計算
     window.setTimeout(() => {
       try {
         const result = generateTracks(trackGenCenterlines, {
-          blockLengthM: trackGenSettings.blockLengthM,
+          blockLengthM: block.metersPerBlock,
         })
         // 結果留著給屬性匡顯示統計，也讓「重新生成」知道上一次生成過
-        onPatchParameters(basemap.id, { [TRACKGEN_RESULT_KEY]: result })
-        onApplyTrackGen?.(basemap.id, result)
+        onPatchParameters(basemap.id, {
+          [TRACKGEN_RESULT_KEY]: result,
+          [TRACKGEN_BLOCK_SIZE_KEY]: block,
+        })
+        onApplyTrackGen?.(basemap.id, result, block)
       } finally {
         setGenerating(false)
       }
     }, 0)
-  }, [
-    basemap.id,
-    onApplyTrackGen,
-    onPatchParameters,
-    trackGenCenterlines,
-    trackGenSettings.blockLengthM,
-  ])
+  }, [basemap.id, onApplyTrackGen, onPatchParameters, trackGenCenterlines])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)
@@ -534,6 +547,37 @@ export const BasemapNode = memo(function BasemapNode({
     [attachWindowListeners, canEdit, layout, onLayoutSessionStart, selected],
   )
 
+  /**
+   * 直接把 .xodr 拖到元件上。
+   *
+   * 空白狀態的提示寫著「點擊或拖曳 .xodr 至此」，但先前根本沒有接 drop——拖進去
+   * 什麼都不會發生。拖放少一次開對話框、少一次按確定，這一步本來就該省掉。
+   */
+  const [dropActive, setDropActive] = useState(false)
+
+  const onTrackGenFileDrop = useCallback(
+    (e: React.DragEvent) => {
+      setDropActive(false)
+      if (!isTrackGen || readOnly) return
+      const file = e.dataTransfer.files?.[0]
+      if (!file || !/\.xodr$/i.test(file.name)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const reader = new FileReader()
+      reader.onload = () => {
+        const content = String(reader.result ?? '')
+        if (!content.trim()) return
+        onPatchParameters(basemap.id, {
+          [TRACKGEN_XODR_KEY]: content,
+          [TRACKGEN_FILE_NAME_KEY]: file.name,
+          [TRACKGEN_RESULT_KEY]: undefined,
+        })
+      }
+      reader.readAsText(file)
+    },
+    [basemap.id, isTrackGen, onPatchParameters, readOnly],
+  )
+
   const onConfirmFile = useCallback(
     (selection: BasemapFileSelection) => {
       if (isTrackGen) {
@@ -651,6 +695,22 @@ export const BasemapNode = memo(function BasemapNode({
         }}
       >
         {isTrackGen ? (
+          <div
+            className="size-full"
+            onDragOver={(e) => {
+              if (readOnly) return
+              e.preventDefault()
+              e.stopPropagation()
+              setDropActive(true)
+            }}
+            onDragLeave={() => setDropActive(false)}
+            onDrop={onTrackGenFileDrop}
+            style={
+              dropActive
+                ? { outline: '2px dashed #34d399', outlineOffset: -2, borderRadius: 2 }
+                : undefined
+            }
+          >
           <TrackGenGraphic
             width={displayLayout.wPx}
             height={displayLayout.hPx}
@@ -662,6 +722,7 @@ export const BasemapNode = memo(function BasemapNode({
             selected={selected}
             onPickClick={() => setPickerOpen(true)}
           />
+          </div>
         ) : (
           <BasemapGraphic
             width={displayLayout.wPx}
@@ -761,7 +822,7 @@ export const BasemapNode = memo(function BasemapNode({
                       onClick={(e) => {
                         e.stopPropagation()
                         e.preventDefault()
-                        runTrackGeneration()
+                        setSizeDialogOpen(true)
                       }}
                       className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
                     >
@@ -901,6 +962,18 @@ export const BasemapNode = memo(function BasemapNode({
           </>
         ) : null}
       </div>
+      <TrackGenSizeDialog
+        key={sizeDialogOpen ? 'open' : 'closed'}
+        open={sizeDialogOpen}
+        canvasPx={{ width: displayLayout.wPx, height: displayLayout.hPx }}
+        totalM={trackGenCenterlines ? trackGenCenterlines.lanes.reduce((a, l) => Math.max(a, l.lengthM), 0) : 0}
+        initial={getTrackGenBlockSize(basemap.parameters)}
+        onCancel={() => setSizeDialogOpen(false)}
+        onConfirm={(block) => {
+          setSizeDialogOpen(false)
+          runTrackGeneration(block)
+        }}
+      />
       <BasemapFilePickerDialog
         open={pickerOpen}
         initialFileName={fileName}

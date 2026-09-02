@@ -1,4 +1,9 @@
-import { placePoint, placeSpine, type TrackGenSettings } from './trackGenFacility'
+import {
+  placePoint,
+  placeSpine,
+  type TrackGenBlockSize,
+  type TrackGenSettings,
+} from './trackGenFacility'
 import type { LaneRole, TrackGenResult, Vec2 } from './trackGenerator'
 import {
   cornerArcCentrePx,
@@ -381,9 +386,20 @@ const ARC_COVERAGE_MIN = 0.5
 export function layoutTrackGen(
   result: TrackGenResult,
   settings: TrackGenSettings,
+  block?: TrackGenBlockSize,
 ): TrackGenLayout {
-  const lt = settings.lateralScale
-  const placed = placeSpine(result.spine, 1, settings.cornerRadiusM)
+  /*
+   * 使用者指定了一塊軌道多大時，整個版面改用<strong>畫布像素</strong>當單位：
+   *
+   *   沿線  1 公尺 → blockLengthPx / metersPerBlock 像素
+   *   橫向  一股   → blockWidthPx 像素（軌道等寬且相鄰）
+   *
+   * 這樣生出來的每一塊就剛好是他拉出來的大小。沒有指定時退回原本的公尺版面。
+   */
+  const along = block ? block.blockLengthPx / Math.max(1, block.metersPerBlock) : 1
+  // 一條車道寬（LANE_W_M 公尺）對應 blockWidthPx，兩軸都是像素才加得起來
+  const lt = block ? block.blockWidthPx / LANE_W_M : settings.lateralScale
+  const placed = placeSpine(result.spine, along, settings.cornerRadiusM)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
 
@@ -533,7 +549,8 @@ export function layoutTrackGen(
         continue
       }
       const span = piece.sTo - piece.sFrom
-      const n = Math.max(1, Math.round(span / Math.max(1, settings.blockLengthM)))
+      const perBlockM = block ? block.metersPerBlock : settings.blockLengthM
+      const n = Math.max(1, Math.round(span / Math.max(1, perBlockM)))
       const step = span / n
       for (let k = 0; k < n; k += 1) {
         addRect(nextName(), role, piece.sFrom + k * step, piece.sFrom + (k + 1) * step, latM, latM)
@@ -559,7 +576,9 @@ export function layoutTrackGen(
 
     lineKey = line.key
     lineLengthM = line.lengthM
-    bandW = Math.max(0.5, (line.widthM || LANE_W_M) * settings.trackWidthScale)
+    bandW = block
+      ? block.blockWidthPx
+      : Math.max(0.5, (line.widthM || LANE_W_M) * settings.trackWidthScale)
 
     /*
      * 把剖面簡化成折線，容差取車道寬的四分之一：比這小的橫向擺動在簡圖上看不出來，

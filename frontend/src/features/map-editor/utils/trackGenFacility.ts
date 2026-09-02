@@ -18,6 +18,41 @@ export const TRACKGEN_SETTINGS_KEY = 'trackGenSettings'
 /** 這個元件上一次生成出來的 Area；重跑時取代它，不要越堆越多 */
 export const TRACKGEN_AREA_ID_KEY = 'trackGenAreaId'
 
+/**
+ * 一塊軌道多大，以及代表多少路。
+ *
+ * 目標是用簡單明瞭的幾何表示場域，不是模擬得很像。一塊軌道畫多長多寬由使用者
+ * 決定，單位是<strong>畫布像素</strong>——他在意的是「在我的畫布上這塊看起來多大」。
+ */
+export type TrackGenBlockSize = {
+  blockLengthPx: number
+  blockWidthPx: number
+  metersPerBlock: number
+}
+
+export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
+
+export const DEFAULT_TRACKGEN_BLOCK_SIZE: TrackGenBlockSize = {
+  blockLengthPx: 90,
+  blockWidthPx: 26,
+  metersPerBlock: 50,
+}
+
+export function getTrackGenBlockSize(
+  parameters: Record<string, unknown> | undefined,
+): TrackGenBlockSize {
+  const raw = parameters?.[TRACKGEN_BLOCK_SIZE_KEY]
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_TRACKGEN_BLOCK_SIZE }
+  const o = raw as Partial<TrackGenBlockSize>
+  const n = (v: unknown, d: number, lo: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, v) : d
+  return {
+    blockLengthPx: n(o.blockLengthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockLengthPx, 8),
+    blockWidthPx: n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockWidthPx, 4),
+    metersPerBlock: n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlock, 1),
+  }
+}
+
 export type TrackGenSettings = {
   /**
    * 橫向放大倍率。
