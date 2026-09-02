@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * 生成前先決定「一塊軌道多大」。
@@ -93,12 +94,30 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
   } | null>(null)
 
   /*
-   * 縮圖固定寬 520，高度照畫布長寬比。示意軌道的像素是<strong>畫布像素</strong>，
-   * 畫在縮圖上時要乘這個倍率，不然使用者看到的大小是騙人的。
+   * 縮圖要盡量大。
+   *
+   * 畫布可能有兩千多像素寬，縮圖只給 520 的話一塊 90 像素的軌道畫出來只剩 18——
+   * 螞蟻才看得到，根本沒辦法判斷大小。所以吃滿視窗：畫布放得下就 1:1，放不下才
+   * 等比縮，並把縮小倍率寫出來，使用者才知道自己在看的是幾成大小。
    */
-  const stageW = 520
-  const scale = stageW / Math.max(1, canvasPx.width)
-  const stageH = Math.max(120, Math.round(canvasPx.height * scale))
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window === 'undefined' ? 1280 : window.innerWidth,
+    h: typeof window === 'undefined' ? 800 : window.innerHeight,
+  }))
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const canvasW = Math.max(1, Math.round(canvasPx.width))
+  const canvasH = Math.max(1, Math.round(canvasPx.height))
+  // 對話框本身的留白與其他區塊大約吃掉這些
+  const availW = Math.max(320, Math.min(1600, viewport.w * 0.94) - 56)
+  const availH = Math.max(160, viewport.h * 0.94 - 320)
+  const scale = Math.min(1, availW / canvasW, availH / canvasH)
+  const stageW = Math.round(canvasW * scale)
+  const stageH = Math.round(canvasH * scale)
 
   const onPointerDown = useCallback(
     (axis: 'length' | 'width' | 'both', e: React.PointerEvent<HTMLDivElement>) => {
@@ -148,19 +167,28 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
   const blocks = Math.max(1, Math.round(totalM / Math.max(1, params.metersPerBlock)))
 
   /** 示意用：橫三塊一排、縱三塊一排，讓人看得出並排起來的樣子 */
+  const pad = Math.round(Math.min(40, stageW * 0.04))
+  const vCol = Math.round(stageW * 0.55)
   const sample = (i: number, vertical: boolean) => {
     const w = (vertical ? widPx : lenPx) * scale
     const h = (vertical ? lenPx : widPx) * scale
-    const gap = 2
+    const gap = Math.max(1, 2 * scale)
     return {
       width: w,
       height: h,
-      left: vertical ? 24 + i * (w + gap) : 24,
-      top: vertical ? 24 : 24 + i * (h + gap),
+      left: vertical ? vCol + i * (w + gap) : pad,
+      top: vertical ? pad : pad + i * (h + gap),
     }
   }
 
-  return (
+  /*
+   * 一定要 portal 到 body。
+   *
+   * 這個對話框掛在圖台節點底下，而圖台外層帶著縮放用的 transform。有 transform 的
+   * 祖先會變成 fixed 的定位基準，所以 `fixed inset-0` 不是貼齊視窗、而是貼齊那個被
+   * 縮放過的容器——量出來對話框被連帶縮成 0.898 倍，還被推到畫面下緣切掉一半。
+   */
+  return createPortal(
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4"
       onPointerDown={(e) => {
@@ -168,14 +196,18 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
       }}
     >
       <div
-        className="flex max-h-full w-[600px] max-w-full flex-col gap-3 overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-4 shadow-2xl"
+        className="flex max-h-full flex-col gap-3 overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-5 shadow-2xl"
+        style={{ width: Math.max(360, stageW + 42) }}
         data-trackgen-size-dialog
       >
         <div>
-          <div className="text-sm font-medium text-zinc-100">一塊軌道要多大</div>
-          <p className="mt-1 text-[11px] leading-snug text-zinc-500">
-            背景是畫布 {canvasPx.width} × {canvasPx.height} px 的等比縮圖。拖曳示意軌道的
-            右下角改大小，橫三塊、縱三塊會一起變——並排起來多擠，看這裡最準。
+          <div className="text-base font-medium text-zinc-100">一塊軌道要多大</div>
+          <p className="mt-1 text-[12px] leading-snug text-zinc-500">
+            背景是畫布 {canvasW} × {canvasH} px
+            {scale >= 0.999
+              ? '，以原尺寸顯示'
+              : `，縮到 ${(scale * 100).toFixed(0)}% 顯示`}
+            。拖曳示意軌道的把手改大小，橫三塊、縱三塊會一起變——並排起來多擠，看這裡最準。
           </p>
         </div>
 
@@ -200,12 +232,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
               <div
                 key={`v${i}`}
                 className="absolute rounded-[1px] border border-emerald-300/70 bg-emerald-400/30"
-                style={{
-                  left: s.left + 200,
-                  top: s.top,
-                  width: s.width,
-                  height: s.height,
-                }}
+                style={{ left: s.left, top: s.top, width: s.width, height: s.height }}
               />
             )
           })}
@@ -213,12 +240,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
           {/* 只有第一塊帶把手，其他八塊跟著動 */}
           <div
             className="absolute"
-            style={{
-              left: 24,
-              top: 24,
-              width: lenPx * scale,
-              height: widPx * scale,
-            }}
+            style={{ left: pad, top: pad, width: lenPx * scale, height: widPx * scale }}
           >
             <div
               data-trackgen-size-handle="both"
@@ -246,7 +268,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
             />
           </div>
 
-          <div className="pointer-events-none absolute bottom-1 right-2 font-mono text-[11px] tabular-nums text-cyan-300">
+          <div className="pointer-events-none absolute bottom-1.5 right-3 font-mono text-[13px] tabular-nums text-cyan-300">
             {lenPx} × {widPx} px
           </div>
         </div>
@@ -309,6 +331,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
