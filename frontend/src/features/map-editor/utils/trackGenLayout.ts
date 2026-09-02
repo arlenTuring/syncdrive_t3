@@ -228,43 +228,58 @@ function fitTaper(
   p0: Vec2,
   p1: Vec2,
   bandWM: number,
+  alongDeg: number,
 ): { geometry: TaperTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } {
+  /*
+   * 端面必須<strong>垂直於軌道方向</strong>，不是由斜線自己的走向決定。
+   *
+   * 斜接軌道兩端接的是沿著脊線走的軌道，那些軌道的端面垂直於行進方向；端面方向
+   * 一旦跟著斜線走，就會變成與軌道平行，怎麼接都對不上對手的邊——實測八段生成的
+   * 斜接軌道裡有兩段是這樣，L2X-39 的端面是水平的、鄰居的端面卻是垂直的。
+   *
+   * 形狀的 a→b 軸就是 entryDeg，端面垂直於它，所以 entryDeg 要與軌道方向同軸。
+   */
+  const allowed = QUARTERS.filter((q) => (((q - alongDeg) % 180) + 180) % 180 === 0)
+  const quarters = allowed.length ? allowed : QUARTERS
   let best: {
     geometry: TaperTrackGeometry
     box: { xM: number; yM: number; wM: number; hM: number }
     err: number
   } | null = null
 
-  for (const entryDeg of QUARTERS) {
+  for (const entryDeg of quarters) {
     for (const [ta, tb] of [
       [p0, p1],
       [p1, p0],
     ] as Array<[Vec2, Vec2]>) {
       // 把目標向量轉回形狀自己的座標系
       const v = rotate({ x: tb.x - ta.x, y: tb.y - ta.y }, -entryDeg)
-      if (v.x <= 1e-6 || v.y < -1e-6) continue
+      if (v.x <= 1e-6) continue
       const dx = v.x
-      const dy = Math.max(0, v.y)
+      const dy = Math.abs(v.y)
       /*
        * 端面高度就是<strong>帶寬本身</strong>，不是換算成垂直於斜向的寬度。
        *
        * 軌道是端對端相接的：斜接軌道的端面必須與相鄰那一塊的端面一樣高，才接得
        * 平。先前把端面撐成 bandW·len/dx（讓垂直於斜向的寬度等於帶寬），端面就比
-       * 鄰居高，接縫處看起來像折了一下——實測 L2X-39 與 L2T5-37 之間就是這樣。
-       * 斜的那一段因此比直線段略窄，鐵道示意圖本來就是這樣畫的。
+       * 鄰居高，接縫處看起來像折了一下。斜的那一段因此比直線段略窄，鐵道示意圖
+       * 本來就是這樣畫的。
        */
       const faceH = bandWM
       const W = dx
       const H = dy + faceH
-      // 兩端等寬：左端面貼上緣，右端面往下錯開 dy
       const r = Math.max(0, Math.min(1, faceH / H))
-      const geometry: TaperTrackGeometry = {
-        aFrom: 0,
-        aTo: r,
-        bFrom: 1 - r,
-        bTo: 1,
-        entryDeg,
-      }
+      /*
+       * 往上走與往下走都要能表示。
+       *
+       * 先前只接受往下（v.y ≥ 0），往上的那些一個候選都不剩，掉進退化的矩形——
+       * 端面長度就變成整個外框高（實測 39.3，帶寬只有 30.2）。往上時把兩個端面
+       * 上下對調即可，形狀一樣、只是鏡射。
+       */
+      const down = v.y >= 0
+      const geometry: TaperTrackGeometry = down
+        ? { aFrom: 0, aTo: r, bFrom: 1 - r, bTo: 1, entryDeg }
+        : { aFrom: 1 - r, aTo: 1, bFrom: 0, bTo: r, entryDeg }
       // 轉 90 度時形狀的寬高在世界座標裡互換
       const wM = entryDeg % 180 === 0 ? W : H
       const hM = entryDeg % 180 === 0 ? H : W
@@ -554,10 +569,11 @@ export function layoutTrackGen(
     latB: number,
     realLatFromM: number,
     realLatToM: number,
+    alongDeg: number,
   ) => {
     const pa = placePoint(sA, latA, placed, lt)
     const pb = placePoint(sB, latB, placed, lt)
-    const { geometry, box } = fitTaper(pa, pb, bandW)
+    const { geometry, box } = fitTaper(pa, pb, bandW, alongDeg)
     shapes.push({
       kind: 'taper',
       name,
@@ -638,20 +654,26 @@ export function layoutTrackGen(
      * 直線、一個落在弧上，中間那條直線會橫切過整個轉角。
      */
     const trims = runs.map(() => ({ before: 0, after: 0 }))
-    const tapers: Array<{ sA: number; sB: number; i: number }> = []
+    const tapers: Array<{ sA: number; sB: number; i: number; alongDeg: number }> = []
     for (let i = 0; i + 1 < runs.length; i += 1) {
       const a = runs[i]!
       const b = runs[i + 1]!
       const sc = (a.sTo + b.sFrom) / 2
       const host = placed.find((q) => q.kind === 'straight' && sc >= q.sFrom && sc <= q.sTo)
-      if (!host) continue
+      if (!host || host.kind !== 'straight') continue
       const latDelta = Math.abs(latOfLevel(a.level) - latOfLevel(b.level)) * lt
       let half = Math.max(b.sFrom - a.sTo, latDelta) / 2
       half = Math.min(half, sc - host.sFrom, host.sTo - sc)
       if (half * 2 < bandW * 0.4) continue
       trims[i]!.after = a.sTo - (sc - half)
       trims[i + 1]!.before = sc + half - b.sFrom
-      tapers.push({ sA: sc - half, sB: sc + half, i })
+      tapers.push({
+        sA: sc - half,
+        sB: sc + half,
+        i,
+        alongDeg:
+          Math.round((Math.atan2(host.dir.y, host.dir.x) * 180) / Math.PI / 90) * 90,
+      })
     }
 
     let seq = 0
@@ -678,6 +700,7 @@ export function layoutTrackGen(
         latOfLevel(runs[t.i + 1]!.level),
         realLatAt(t.sA),
         realLatAt(t.sB),
+        t.alongDeg,
       )
     }
   }
