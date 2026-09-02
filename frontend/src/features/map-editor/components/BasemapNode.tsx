@@ -119,6 +119,8 @@ type Props = {
     result: TrackGenResult,
     block: TrackGenSizeParams,
   ) => void
+  /** 目前這張地圖的畫布尺寸（像素）——生成對話框要照它畫縮圖 */
+  mapPixelSize?: { width: number; height: number }
   basemap: MapBasemapObject
   stackOrder: number
   stackCount: number
@@ -137,6 +139,7 @@ type Props = {
 }
 
 export const BasemapNode = memo(function BasemapNode({
+  mapPixelSize,
   basemap,
   stackOrder,
   stackCount,
@@ -965,7 +968,9 @@ export const BasemapNode = memo(function BasemapNode({
       <TrackGenSizeDialog
         key={sizeDialogOpen ? 'open' : 'closed'}
         open={sizeDialogOpen}
-        canvasPx={{ width: displayLayout.wPx, height: displayLayout.hPx }}
+        canvasPx={
+          mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
+        }
         totalM={trackGenCenterlines ? trackGenCenterlines.lanes.reduce((a, l) => Math.max(a, l.lengthM), 0) : 0}
         initial={getTrackGenBlockSize(basemap.parameters)}
         onCancel={() => setSizeDialogOpen(false)}

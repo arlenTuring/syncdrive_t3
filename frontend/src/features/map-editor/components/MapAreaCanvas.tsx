@@ -742,6 +742,7 @@ export function MapAreaCanvas({
             {basemapsBelow.map((basemap, stackOrder) => (
               <BasemapNode
                 onApplyTrackGen={onApplyTrackGen}
+                mapPixelSize={pixelSize}
                 key={basemap.id}
                 basemap={basemap}
                 stackOrder={stackOrder}
@@ -837,6 +838,7 @@ export function MapAreaCanvas({
             {basemapsAbove.map((basemap, stackOrder) => (
               <BasemapNode
                 onApplyTrackGen={onApplyTrackGen}
+                mapPixelSize={pixelSize}
                 key={basemap.id}
                 basemap={basemap}
                 stackOrder={stackOrder}

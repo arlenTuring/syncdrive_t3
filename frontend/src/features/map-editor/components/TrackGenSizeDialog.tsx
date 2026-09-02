@@ -82,6 +82,8 @@ export function TrackGenSizeDialog(props: Props) {
 
 function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Props) {
   const [params, setParams] = useState<TrackGenSizeParams>(initial)
+  /** 點過那一塊才長出把手：沒點之前只是示意，長一堆把手反而看不出主角是誰 */
+  const [editing, setEditing] = useState(false)
 
   const stageRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
@@ -166,20 +168,36 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
   const widPx = Math.round(params.blockWidthPx)
   const blocks = Math.max(1, Math.round(totalM / Math.max(1, params.metersPerBlock)))
 
-  /** 示意用：橫三塊一排、縱三塊一排，讓人看得出並排起來的樣子 */
-  const pad = Math.round(Math.min(40, stageW * 0.04))
-  const vCol = Math.round(stageW * 0.55)
-  const sample = (i: number, vertical: boolean) => {
-    const w = (vertical ? widPx : lenPx) * scale
-    const h = (vertical ? lenPx : widPx) * scale
-    const gap = Math.max(1, 2 * scale)
-    return {
-      width: w,
-      height: h,
-      left: vertical ? vCol + i * (w + gap) : pad,
-      top: vertical ? pad : pad + i * (h + gap),
-    }
-  }
+  /*
+   * 示意分兩層，兩層都用同一個縮放倍率，看到的就是畫布上的真實大小。
+   *
+   * 上層是五塊<strong>相連</strong>的軌道，擺在畫布正中央：一塊一塊分開放看不出並排
+   * 起來多擠，連在一起才看得出來。下層是<strong>另外一塊</strong>，那才是可以拉的；
+   * 要拉的東西如果是五塊裡的某一塊，使用者得先猜哪一塊才是能動的。
+   */
+  const STRIP_N = 5
+  const bw = lenPx * scale
+  const bh = widPx * scale
+  const stripW = bw * STRIP_N
+  const gapY = Math.max(18, bh * 0.6)
+  const stripLeft = Math.round((stageW - stripW) / 2)
+  const stripTop = Math.round((stageH - (bh * 2 + gapY)) / 2)
+  const editLeft = Math.round((stageW - bw) / 2)
+  const editTop = Math.round(stripTop + bh + gapY)
+
+  const handle = (
+    axis: 'both' | 'length' | 'width',
+    cls: string,
+  ) => (
+    <div
+      data-trackgen-size-handle={axis}
+      className={`absolute size-3 touch-none rounded-sm border-2 border-cyan-300 bg-zinc-900 ${cls}`}
+      onPointerDown={(e) => onPointerDown(axis, e)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    />
+  )
 
   /*
    * 一定要 portal 到 body。
@@ -207,7 +225,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
             {scale >= 0.999
               ? '，以原尺寸顯示'
               : `，縮到 ${(scale * 100).toFixed(0)}% 顯示`}
-            。拖曳示意軌道的把手改大小，橫三塊、縱三塊會一起變——並排起來多擠，看這裡最準。
+            。上排是五塊接起來的樣子，下面那一塊點下去就能拉大小。
           </p>
         </div>
 
@@ -216,64 +234,48 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
           className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-zinc-900"
           style={{ width: stageW, height: stageH }}
         >
-          {[0, 1, 2].map((i) => {
-            const s = sample(i, false)
-            return (
-              <div
-                key={`h${i}`}
-                className="absolute rounded-[1px] border border-sky-300/70 bg-sky-400/35"
-                style={{ left: s.left, top: s.top, width: s.width, height: s.height }}
-              />
-            )
-          })}
-          {[0, 1, 2].map((i) => {
-            const s = sample(i, true)
-            return (
-              <div
-                key={`v${i}`}
-                className="absolute rounded-[1px] border border-emerald-300/70 bg-emerald-400/30"
-                style={{ left: s.left, top: s.top, width: s.width, height: s.height }}
-              />
-            )
-          })}
+          {Array.from({ length: STRIP_N }, (_, i) => (
+            <div
+              key={`s${i}`}
+              data-trackgen-size-strip
+              className="absolute border border-sky-300/70 bg-sky-400/30"
+              style={{ left: stripLeft + i * bw, top: stripTop, width: bw, height: bh }}
+            />
+          ))}
 
-          {/* 只有第一塊帶把手，其他八塊跟著動 */}
           <div
-            className="absolute"
-            style={{ left: pad, top: pad, width: lenPx * scale, height: widPx * scale }}
+            data-trackgen-size-edit
+            className={`absolute cursor-pointer bg-cyan-400/25 ${
+              editing
+                ? 'border border-cyan-300'
+                : 'border border-dashed border-cyan-300/70 hover:bg-cyan-400/40'
+            }`}
+            style={{ left: editLeft, top: editTop, width: bw, height: bh }}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              setEditing(true)
+            }}
           >
-            <div
-              data-trackgen-size-handle="both"
-              className="absolute -bottom-1.5 -right-1.5 size-3 cursor-nwse-resize touch-none rounded-sm border-2 border-cyan-300 bg-zinc-900"
-              onPointerDown={(e) => onPointerDown('both', e)}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            />
-            <div
-              data-trackgen-size-handle="length"
-              className="absolute -right-1.5 top-1/2 size-3 -translate-y-1/2 cursor-ew-resize touch-none rounded-sm border-2 border-cyan-300 bg-zinc-900"
-              onPointerDown={(e) => onPointerDown('length', e)}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            />
-            <div
-              data-trackgen-size-handle="width"
-              className="absolute -bottom-1.5 left-1/2 size-3 -translate-x-1/2 cursor-ns-resize touch-none rounded-sm border-2 border-cyan-300 bg-zinc-900"
-              onPointerDown={(e) => onPointerDown('width', e)}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            />
+            {editing ? (
+              <>
+                {handle('both', '-bottom-1.5 -right-1.5 cursor-nwse-resize')}
+                {handle('length', '-right-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize')}
+                {handle('width', '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize')}
+              </>
+            ) : null}
           </div>
 
-          <div className="pointer-events-none absolute bottom-1.5 right-3 font-mono text-[13px] tabular-nums text-cyan-300">
-            {lenPx} × {widPx} px
+          {/* 寬度不綁那一塊：塊很窄時 `125 × 52 px` 會被折成三行 */}
+          <div
+            className="pointer-events-none absolute -translate-x-1/2 whitespace-nowrap font-mono text-[12px] tabular-nums text-cyan-300"
+            style={{ left: editLeft + bw / 2, top: editTop + bh + 8 }}
+          >
+            {editing ? `${lenPx} × ${widPx} px` : '點我拉大小'}
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* 參數就擺在那一塊的正下方，改哪一個都對得起來 */}
+        <div className="flex flex-wrap justify-center gap-4">
           <NumberField
             label="軌道長度"
             value={params.blockLengthPx}
