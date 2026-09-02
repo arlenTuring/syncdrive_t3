@@ -867,8 +867,14 @@ export const AreaNode = memo(function AreaNode({
 
   const [taperHighlightId, setTaperHighlightId] = useState<string | null>(null)
 
-  /** 一個設施在 Area 局部像素裡的四條邊（含旋轉） */
-  const facilityEdgesLocal = useCallback(
+  /**
+   * 一個軌道的<strong>兩條端面</strong>（Area 局部像素，含旋轉）。
+   *
+   * 只回傳與行進方向垂直的那一對短邊，不回傳長邊。軌道是端對端相接的，接到側面
+   * 既接不出東西、又會把長邊變成一個大得多的吸附目標，短短的端面反而永遠吸不到
+   * ——實測就是只吸得到上下邊、吸不到左右邊。
+   */
+  const facilityEndEdgesLocal = useCallback(
     (f: FacilityObject) => {
       const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
       const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
@@ -882,18 +888,35 @@ export const AreaNode = memo(function AreaNode({
         x: cx + dx * cos - dy * sin,
         y: cy + dx * sin + dy * cos,
       })
+      // 斜接軌道的端面由它自己的幾何決定，不是外框的長短邊
+      if (f.name === 'RailTaper') {
+        const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
+        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+        const a0 = L(segs.a[0])
+        const a1 = L(segs.a[1])
+        const b0 = L(segs.b[0])
+        const b1 = L(segs.b[1])
+        return [
+          { x1: a0.x, y1: a0.y, x2: a1.x, y2: a1.y },
+          { x1: b0.x, y1: b0.y, x2: b1.x, y2: b1.y },
+        ]
+      }
       const hw = size.w / 2
       const hh = size.h / 2
       const tl = corner(-hw, -hh)
       const tr = corner(hw, -hh)
       const br = corner(hw, hh)
       const bl = corner(-hw, hh)
-      return [
-        { x1: tl.x, y1: tl.y, x2: tr.x, y2: tr.y },
-        { x1: tr.x, y1: tr.y, x2: br.x, y2: br.y },
-        { x1: br.x, y1: br.y, x2: bl.x, y2: bl.y },
-        { x1: bl.x, y1: bl.y, x2: tl.x, y2: tl.y },
-      ]
+      // 長邊沿著行進方向，端面是另一對
+      return size.w >= size.h
+        ? [
+            { x1: tl.x, y1: tl.y, x2: bl.x, y2: bl.y },
+            { x1: tr.x, y1: tr.y, x2: br.x, y2: br.y },
+          ]
+        : [
+            { x1: tl.x, y1: tl.y, x2: tr.x, y2: tr.y },
+            { x1: bl.x, y1: bl.y, x2: br.x, y2: br.y },
+          ]
     },
     [displayDomain, displayLayout],
   )
@@ -919,7 +942,7 @@ export const AreaNode = memo(function AreaNode({
       let bestD = reach
       for (const other of area.facilities) {
         if (other.id === facilityId || other.type !== 'Track') continue
-        for (const e of facilityEdgesLocal(other)) {
+        for (const e of facilityEndEdgesLocal(other)) {
           const dx = e.x2 - e.x1
           const dy = e.y2 - e.y1
           const l2 = dx * dx + dy * dy
@@ -934,7 +957,7 @@ export const AreaNode = memo(function AreaNode({
       setTaperHighlightId(best?.targetId ?? null)
       return best
     },
-    [area.facilities, clientToAreaLocal, facilityEdgesLocal, mapScale],
+    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale],
   )
 
   const onTaperEndCommit = useCallback(

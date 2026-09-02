@@ -245,8 +245,15 @@ function fitTaper(
       if (v.x <= 1e-6 || v.y < -1e-6) continue
       const dx = v.x
       const dy = Math.max(0, v.y)
-      const len = Math.hypot(dx, dy)
-      const faceH = Math.min((bandWM * len) / dx, 1e6)
+      /*
+       * 端面高度就是<strong>帶寬本身</strong>，不是換算成垂直於斜向的寬度。
+       *
+       * 軌道是端對端相接的：斜接軌道的端面必須與相鄰那一塊的端面一樣高，才接得
+       * 平。先前把端面撐成 bandW·len/dx（讓垂直於斜向的寬度等於帶寬），端面就比
+       * 鄰居高，接縫處看起來像折了一下——實測 L2X-39 與 L2T5-37 之間就是這樣。
+       * 斜的那一段因此比直線段略窄，鐵道示意圖本來就是這樣畫的。
+       */
+      const faceH = bandWM
       const W = dx
       const H = dy + faceH
       // 兩端等寬：左端面貼上緣，右端面往下錯開 dy
