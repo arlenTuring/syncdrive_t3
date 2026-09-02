@@ -14,11 +14,9 @@ import {
   taperTrackHandlesPx,
   taperTrackPath,
   readTaperTrack,
-  TAPER_TRACK_KEY,
   type TaperHandleKey,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
-  MAX_TAPER_OFFSET,
   MIN_CORNER_BULGE,
   readCornerTrack,
   type CornerHandleKey,
@@ -183,6 +181,18 @@ type FacilityResizeEdge =
   | 'se'
   | 'sw'
 
+/**
+ * 斜接軌道端點拖到別的軌道上時，父層回報的吸附目標。
+ *
+ * 邊以 Area 局部像素給，因為接合要改的是這個元件在 Area 裡的外框，換算成公尺再
+ * 換回來只會多一次誤差。
+ */
+export type TaperEndProbe = {
+  targetId: string
+  /** 對手那一條邊（Area 局部像素） */
+  edge: { x1: number; y1: number; x2: number; y2: number }
+}
+
 const CORNER_RESIZE_EDGES = ['nw', 'ne', 'se', 'sw'] as const
 
 function isCornerResizeEdge(
@@ -258,6 +268,19 @@ type FacilityNodeProps = {
   onRotateDelta: (id: string, deltaDeg: number) => void
   onPatchParameters?: (id: string, patch: Record<string, unknown>) => void
   onTrackCornerEditStart?: () => void
+  /** 斜接軌道端點拖曳中：回報指標位置，取得目前碰到的軌道邊 */
+  onTaperEndProbe?: (
+    facilityId: string,
+    clientX: number,
+    clientY: number,
+  ) => TaperEndProbe | null
+  /** 放開手：把該端接到目標邊上；沒有目標就只是把端面移過去 */
+  onTaperEndCommit?: (
+    facilityId: string,
+    end: 'a' | 'b',
+    target: TaperEndProbe | null,
+    pointer: { clientX: number; clientY: number },
+  ) => void
   /** Area 模式：僅更新圖台區域像素尺寸，不影響參照場域範圍 */
   onResize?: (id: string, areaSizePx: { w: number; h: number }) => void
   onResizeSessionStart?: () => void
@@ -329,6 +352,8 @@ export const FacilityNode = memo(function FacilityNode({
   onRotateDelta,
   onPatchParameters,
   onTrackCornerEditStart,
+  onTaperEndProbe,
+  onTaperEndCommit,
   onResize,
   onResizeSessionStart,
   onDelete,
@@ -2058,21 +2083,17 @@ export const FacilityNode = memo(function FacilityNode({
   /* ── 斜接軌道的兩個控制點 ─────────────────────────────────────
      一個在上緣、一個在下緣，就落在斜邊的起點上，各自控制那一側的斜切程度。 */
   const [taperDragKey, setTaperDragKey] = useState<TaperHandleKey | null>(null)
-  const taperDragRef = useRef<{
-    pointerY: number
-    base: ReturnType<typeof readTaperTrack>
-  }>({ pointerY: 0, base: readTaperTrack(undefined) })
-
+  /** 拖曳端點時碰到的對手軌道；null 表示目前沒有碰到任何東西 */
+  const [taperProbe, setTaperProbe] = useState<TaperEndProbe | null>(null)
+  const [taperPointer, setTaperPointer] = useState<{ x: number; y: number } | null>(null)
   const onTaperHandleDown = useCallback(
     (key: TaperHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
       e.stopPropagation()
       e.preventDefault()
       if (readOnly || !onPatchParameters) return
       onTrackCornerEditStart?.()
-      taperDragRef.current = {
-        pointerY: e.clientY,
-        base: readTaperTrack(facilityRef.current.parameters),
-      }
+      setTaperProbe(null)
+      setTaperPointer({ x: e.clientX, y: e.clientY })
       setTaperDragKey(key)
       try {
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -2085,31 +2106,32 @@ export const FacilityNode = memo(function FacilityNode({
 
   const onTaperHandleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!taperDragKey || !onPatchParameters) return
-      const { pointerY, base } = taperDragRef.current
-      // 控制點在右端面上緣，往下拉＝兩端錯得更開
-      const h = Math.max(1, nh * mapScale)
-      const dyR = (e.clientY - pointerY) / h
-      const next = {
-        ...base,
-        offsetRatio: Math.max(0, Math.min(MAX_TAPER_OFFSET, base.offsetRatio + dyR)),
-      }
-      onPatchParameters(facilityRef.current.id, { [TAPER_TRACK_KEY]: next })
+      if (!taperDragKey) return
+      setTaperProbe(onTaperEndProbe?.(facilityRef.current.id, e.clientX, e.clientY) ?? null)
+      setTaperPointer({ x: e.clientX, y: e.clientY })
     },
-    [taperDragKey, mapScale, nh, onPatchParameters],
+    [taperDragKey, onTaperEndProbe],
   )
 
   const onTaperHandleEnd = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!taperDragKey) return
+      const key = taperDragKey
+      if (!key) return
       setTaperDragKey(null)
+      const probe = taperProbe
+      setTaperProbe(null)
+      setTaperPointer(null)
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
         /* ignore */
       }
+      onTaperEndCommit?.(facilityRef.current.id, key, probe, {
+        clientX: e.clientX,
+        clientY: e.clientY,
+      })
     },
-    [taperDragKey],
+    [taperDragKey, taperProbe, onTaperEndCommit],
   )
 
   /* ── 拖曳旋轉 ────────────────────────────────────────────────
@@ -2821,24 +2843,61 @@ export const FacilityNode = memo(function FacilityNode({
         )}
         {isTaperTrack && taperTrackGeom && selected && !readOnly && onPatchParameters && (
           <>
-            {(() => {
-              const pt = taperTrackHandlesPx(taperTrackGeom, nw, nh).offset
-              return [
+            {(['a', 'b'] as const).map((key) => {
+              const pt = taperTrackHandlesPx(taperTrackGeom, nw, nh)[key]
+              const dragging = taperDragKey === key
+              return (
                 <div
-                  key="offset"
-                  data-taper-track-handle
-                  className="absolute z-[86] cursor-ns-resize touch-none"
+                  key={key}
+                  data-taper-track-handle={key}
+                  className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
                   style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title="拖曳調整兩端的錯位"
-                  onPointerDown={(e) => onTaperHandleDown('offset', e)}
+                  title="拖到要接的軌道邊上，放手就接合並與對手齊寬"
+                  onPointerDown={(e) => onTaperHandleDown(key, e)}
                   onPointerMove={onTaperHandleMove}
                   onPointerUp={onTaperHandleEnd}
                   onPointerCancel={onTaperHandleEnd}
                 >
-                  <div className="size-3 rotate-45 border-2 border-amber-400 bg-amber-500 shadow-md" />
-                </div>,
-              ]
-            })()}
+                  <div
+                    className={[
+                      'size-3.5 rounded-full border-2 shadow-md',
+                      dragging && taperProbe
+                        ? 'border-emerald-300 bg-emerald-400'
+                        : 'border-white bg-blue-500',
+                    ].join(' ')}
+                  />
+                </div>
+              )
+            })}
+            {/* 拖曳中從端點拉一條線到指標，看得出正在接哪裡 */}
+            {taperDragKey && taperPointer
+              ? (() => {
+                  const from = taperTrackHandlesPx(taperTrackGeom, nw, nh)[taperDragKey]
+                  const root = rootRef.current?.getBoundingClientRect()
+                  if (!root) return null
+                  const to = {
+                    x: (taperPointer.x - root.left) / Math.max(0.01, mapScale),
+                    y: (taperPointer.y - root.top) / Math.max(0.01, mapScale),
+                  }
+                  return (
+                    <svg
+                      className="pointer-events-none absolute left-0 top-0 z-[87] overflow-visible"
+                      width={1}
+                      height={1}
+                    >
+                      <line
+                        x1={from.x}
+                        y1={from.y}
+                        x2={to.x}
+                        y2={to.y}
+                        stroke={taperProbe ? '#34d399' : '#60a5fa'}
+                        strokeWidth={2 / Math.max(0.01, mapScale)}
+                        strokeDasharray={`${6 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`}
+                      />
+                    </svg>
+                  )
+                })()
+              : null}
           </>
         )}
         {isTrack && !isCornerTrack && !isTaperTrack && selected && !readOnly && onPatchParameters && (

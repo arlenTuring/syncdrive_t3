@@ -23,6 +23,17 @@ import {
 } from '../utils/facilityAreaCoords'
 import { findFacilityAtAreaLocalPx } from '../utils/facilityHitTest'
 import {
+  readTaperTrack,
+  taperTrackEndSegmentsPx,
+  TAPER_TRACK_KEY,
+} from '../utils/trackShapes'
+import { buildTaperFromEndSegments } from '../utils/taperJoin'
+import {
+  resolveFacilityAreaPosition,
+  resolveFacilityAreaSize,
+} from '../utils/facilityAreaCoords'
+import { areaLocalPxToMeter } from '../utils/areaCoords'
+import {
   resolveAreaBorderStyle,
   resolveAreaFillStyle,
 } from '../utils/areaLayoutStyle'
@@ -848,6 +859,160 @@ export const AreaNode = memo(function AreaNode({
     [clearLayoutDragState],
   )
 
+
+  /* ── 斜接軌道端點接合 ────────────────────────────────────────
+     端點拖到別的軌道邊上 → 高亮 → 放手接合，並讓那一端與對手齊寬。
+     這是斜接軌道能接上「A 在 B 之上」與「A 在 B 之下」兩種情形的唯一辦法：
+     平行四邊形兩端一定等寬、錯位方向也固定，後者怎麼轉都接不上。           */
+
+  const [taperHighlightId, setTaperHighlightId] = useState<string | null>(null)
+
+  /** 一個設施在 Area 局部像素裡的四條邊（含旋轉） */
+  const facilityEdgesLocal = useCallback(
+    (f: FacilityObject) => {
+      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
+      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
+      const top = displayLayout.hPx - pos.y - size.h
+      const cx = pos.x + size.w / 2
+      const cy = top + size.h / 2
+      const rad = ((f.rotation ?? 0) * Math.PI) / 180
+      const cos = Math.cos(rad)
+      const sin = Math.sin(rad)
+      const corner = (dx: number, dy: number) => ({
+        x: cx + dx * cos - dy * sin,
+        y: cy + dx * sin + dy * cos,
+      })
+      const hw = size.w / 2
+      const hh = size.h / 2
+      const tl = corner(-hw, -hh)
+      const tr = corner(hw, -hh)
+      const br = corner(hw, hh)
+      const bl = corner(-hw, hh)
+      return [
+        { x1: tl.x, y1: tl.y, x2: tr.x, y2: tr.y },
+        { x1: tr.x, y1: tr.y, x2: br.x, y2: br.y },
+        { x1: br.x, y1: br.y, x2: bl.x, y2: bl.y },
+        { x1: bl.x, y1: bl.y, x2: tl.x, y2: tl.y },
+      ]
+    },
+    [displayDomain, displayLayout],
+  )
+
+  const clientToAreaLocal = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = innerRef.current?.getBoundingClientRect()
+      if (!rect) return null
+      const scale = Math.max(0.01, mapScale)
+      return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale }
+    },
+    [mapScale],
+  )
+
+  const onTaperEndProbe = useCallback(
+    (facilityId: string, clientX: number, clientY: number) => {
+      const p = clientToAreaLocal(clientX, clientY)
+      if (!p) return null
+      // 吸附範圍隨縮放走，畫面上大約就是一根手指的寬度
+      const reach = 14 / Math.max(0.01, mapScale)
+      let best: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null =
+        null
+      let bestD = reach
+      for (const other of area.facilities) {
+        if (other.id === facilityId || other.type !== 'Track') continue
+        for (const e of facilityEdgesLocal(other)) {
+          const dx = e.x2 - e.x1
+          const dy = e.y2 - e.y1
+          const l2 = dx * dx + dy * dy
+          const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
+          const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
+          if (d < bestD) {
+            bestD = d
+            best = { targetId: other.id, edge: e }
+          }
+        }
+      }
+      setTaperHighlightId(best?.targetId ?? null)
+      return best
+    },
+    [area.facilities, clientToAreaLocal, facilityEdgesLocal, mapScale],
+  )
+
+  const onTaperEndCommit = useCallback(
+    (
+      facilityId: string,
+      end: 'a' | 'b',
+      target: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null,
+      pointer: { clientX: number; clientY: number },
+    ) => {
+      setTaperHighlightId(null)
+      const f = area.facilities.find((x) => x.id === facilityId)
+      if (!f || !onPatchFacilityParameters || !onResizeFacility || !onDragFacility) return
+
+      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
+      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
+      const top = displayLayout.hPx - pos.y - size.h
+      const geom = readTaperTrack(f.parameters)
+      const segs = taperTrackEndSegmentsPx(geom, size.w, size.h)
+      const toLocal = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+
+      // 目前兩端面在 Area 局部像素裡的位置
+      const cur = {
+        a: [toLocal(segs.a[0]), toLocal(segs.a[1])] as const,
+        b: [toLocal(segs.b[0]), toLocal(segs.b[1])] as const,
+      }
+
+      let next: Record<'a' | 'b', readonly [{ x: number; y: number }, { x: number; y: number }]>
+      if (target) {
+        next = { ...cur, [end]: [
+          { x: target.edge.x1, y: target.edge.y1 },
+          { x: target.edge.x2, y: target.edge.y2 },
+        ] } as typeof cur
+      } else {
+        // 沒碰到東西：把那一端整條平移到指標處，長度不變
+        const p = clientToAreaLocal(pointer.clientX, pointer.clientY)
+        if (!p) return
+        const seg = cur[end]
+        const mid = { x: (seg[0].x + seg[1].x) / 2, y: (seg[0].y + seg[1].y) / 2 }
+        const dx = p.x - mid.x
+        const dy = p.y - mid.y
+        next = { ...cur, [end]: [
+          { x: seg[0].x + dx, y: seg[0].y + dy },
+          { x: seg[1].x + dx, y: seg[1].y + dy },
+        ] } as typeof cur
+      }
+
+      const built = buildTaperFromEndSegments(next.a, next.b)
+      if (!built) return
+
+      onDragSessionStart?.()
+      onPatchFacilityParameters(area.id, facilityId, { [TAPER_TRACK_KEY]: built.geometry })
+      onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
+      onDragFacility(area.id, facilityId, {
+        areaPosition: {
+          x: built.box.x,
+          y: displayLayout.hPx - built.box.y - built.box.h,
+        },
+        position: areaLocalPxToMeter(
+          built.box.x,
+          displayLayout.hPx - built.box.y - built.box.h,
+          displayDomain,
+          displayLayout,
+        ),
+      })
+    },
+    [
+      area.id,
+      area.facilities,
+      clientToAreaLocal,
+      displayDomain,
+      displayLayout,
+      onDragFacility,
+      onDragSessionStart,
+      onPatchFacilityParameters,
+      onResizeFacility,
+    ],
+  )
+
   const handleInnerDrop = useCallback(
     (e: React.DragEvent) => {
       if (!editMode || !onPaletteDrop || !innerRef.current) return
@@ -1425,6 +1590,8 @@ export const AreaNode = memo(function AreaNode({
           onRotateRight90={() => onRotateRight90(area.id, f.id)}
           onRotateDelta={(_id, deg) => onRotateDelta(area.id, f.id, deg)}
           onTrackCornerEditStart={onTrackCornerEditStart}
+          onTaperEndProbe={editMode ? onTaperEndProbe : undefined}
+          onTaperEndCommit={editMode ? onTaperEndCommit : undefined}
           onDelete={
             onDeleteFacility && editMode
               ? () => onDeleteFacility(area.id, f.id)
@@ -1598,6 +1765,29 @@ export const AreaNode = memo(function AreaNode({
               area.facilities.filter((x) => x.type !== 'Geofence').length + idx,
             ),
           )}
+        {/*
+          * 端點拖到某條軌道上時，把那條框起來——使用者才知道放手會接到誰。
+          */}
+        {taperHighlightId
+          ? (() => {
+              const t = area.facilities.find((x) => x.id === taperHighlightId)
+              if (!t) return null
+              const pos = resolveFacilityAreaPosition(t, displayDomain, displayLayout)
+              const size = resolveFacilityAreaSize(t, displayDomain, displayLayout)
+              return (
+                <div
+                  className="pointer-events-none absolute z-[95] rounded-[2px] border-2 border-emerald-400 bg-emerald-400/15"
+                  style={{
+                    left: pos.x,
+                    top: displayLayout.hPx - pos.y - size.h,
+                    width: size.w,
+                    height: size.h,
+                    transform: `rotate(${t.rotation ?? 0}deg)`,
+                  }}
+                />
+              )
+            })()
+          : null}
         <FacilityDragGuidesOverlay
           guides={dragAlignGuides ?? []}
           activeRect={draggingRect}

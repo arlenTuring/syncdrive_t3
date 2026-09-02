@@ -327,12 +327,7 @@ export function taperTrackEndsPx(
   boxWPx: number,
   boxHPx: number,
 ): { a: ShapePoint; b: ShapePoint } {
-  const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
-  return {
-    a: T(0, (h - d) / 2),
-    b: T(w, (h + d) / 2),
-  }
+  return taperTrackHandlesPx(g, boxWPx, boxHPx)
 }
 
 export const CORNER_TRACK_KEY = 'cornerTrack'
@@ -348,14 +343,25 @@ export const CORNER_TRACK_KEY = 'cornerTrack'
  *
  * 與圓角軌道一樣存比例而不是公尺：外框只管大小、比例只管形狀，縮放與拖點互不干擾。
  */
+/**
+ * 斜接軌道：兩個端面 ＋ 兩條連接邊。
+ *
+ * 端面各自記自己的兩個端點（佔外框高的比例），所以<strong>兩端可以不一樣寬</strong>——
+ * 那是必要的：接合的目的就是與對手齊寬，而兩端的對手本來就可能不一樣大。兩端一樣
+ * 寬時退回平行四邊形，都是 0 與 1 時退回矩形。
+ *
+ * 先前只存一個「錯位」比例、強制平行四邊形。那在 A 高 B 低時接得起來，A 低 B 高
+ * 時怎麼轉都接不上，因為平行四邊形的兩端一定等寬、而且錯位方向被寫死。
+ */
 export type TaperTrackGeometry = {
-  /**
-   * 兩端的垂直錯位，佔外框高的比例（0–0.9）。0＝矩形。
-   *
-   * 只有<strong>一個</strong>數字：兩條斜邊本來就平行，用兩個比例去描述同一件事，
-   * 使用者得拉兩次才對得起來，還可能拉成不平行的怪形狀。
-   */
-  offsetRatio: number
+  /** 左端面的起點，佔外框高的比例 */
+  aFrom: number
+  /** 左端面的終點 */
+  aTo: number
+  /** 右端面的起點 */
+  bFrom: number
+  /** 右端面的終點 */
+  bTo: number
   /** 方位（度，螢幕座標順時針為正） */
   entryDeg: number
 }
@@ -363,12 +369,12 @@ export type TaperTrackGeometry = {
 export const TAPER_TRACK_KEY = 'taperTrack'
 
 export const DEFAULT_TAPER_TRACK: TaperTrackGeometry = {
-  offsetRatio: 0.4,
+  aFrom: 0,
+  aTo: 0.6,
+  bFrom: 0.4,
+  bTo: 1,
   entryDeg: 0,
 }
-
-/** 錯位拉滿就退化成一條線，留一點餘裕 */
-export const MAX_TAPER_OFFSET = 0.9
 
 /** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
 export const DEFAULT_TAPER_TRACK_SIZE_M = { w: 60, h: 40 }
@@ -379,21 +385,37 @@ export function readTaperTrack(
   const raw = parameters?.[TAPER_TRACK_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TAPER_TRACK }
   const o = raw as Partial<TaperTrackGeometry> & {
+    offsetRatio?: number
     topCutRatio?: number
     bottomCutRatio?: number
   }
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const clamp = (v: number) => Math.max(0, Math.min(1, v))
+
+  if (num(o.aFrom) !== null && num(o.bTo) !== null) {
+    return {
+      aFrom: clamp(o.aFrom!),
+      aTo: clamp(num(o.aTo) ?? DEFAULT_TAPER_TRACK.aTo),
+      bFrom: clamp(num(o.bFrom) ?? DEFAULT_TAPER_TRACK.bFrom),
+      bTo: clamp(o.bTo!),
+      entryDeg: num(o.entryDeg) ?? 0,
+    }
+  }
+
   /*
-   * 舊資料存的是上下兩個切角比例。那組值描述的是同一條斜邊，取兩者平均換算過來，
-   * 已經放在地圖上的斜接軌道才不會在改版後突然變回矩形。
+   * 舊資料換算：一個錯位比例的平行四邊形，或再更早的上下兩個切角比例。已經放在
+   * 地圖上的斜接軌道改版後才不會突然變形。
    */
-  const legacy =
+  const legacyCut =
     num(o.topCutRatio) !== null || num(o.bottomCutRatio) !== null
       ? 1 - ((num(o.topCutRatio) ?? 0) + (num(o.bottomCutRatio) ?? 0)) / 2
       : null
-  const raw2 = num(o.offsetRatio) ?? legacy ?? DEFAULT_TAPER_TRACK.offsetRatio
+  const d = clamp(num(o.offsetRatio) ?? legacyCut ?? 0.4)
   return {
-    offsetRatio: Math.max(0, Math.min(MAX_TAPER_OFFSET, raw2)),
+    aFrom: 0,
+    aTo: clamp(1 - d),
+    bFrom: d,
+    bTo: 1,
     entryDeg: num(o.entryDeg) ?? 0,
   }
 }
@@ -422,10 +444,10 @@ function taperSpin(g: TaperTrackGeometry, boxWPx: number, boxHPx: number) {
 }
 
 /**
- * 填色外框：一個平行四邊形。
+ * 填色外框：左端面 → 右端面 → 回來，一個四邊形。
  *
- * 左端面從上緣往下，右端面往下錯開 offset；兩條斜邊平行，兩端等寬。offset 為 0
- * 時退回矩形。
+ * 兩端面都是垂直線段（未旋轉時），所以與軸對齊的軌道邊天生對得齊；長度各自獨立，
+ * 因此可以是梯形。
  */
 export function taperTrackPath(
   g: TaperTrackGeometry,
@@ -433,12 +455,12 @@ export function taperTrackPath(
   boxHPx: number,
 ): string {
   const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
   const pts: Array<[number, number]> = [
-    [0, 0],
-    [w, d],
-    [w, h],
-    [0, h - d],
+    [0, c(g.aFrom)],
+    [w, c(g.bFrom)],
+    [w, c(g.bTo)],
+    [0, c(g.aTo)],
   ]
   return `${pts
     .map(([x, y], i) => {
@@ -448,15 +470,37 @@ export function taperTrackPath(
     .join(' ')} Z`
 }
 
-export type TaperHandleKey = 'offset'
+export type TaperHandleKey = 'a' | 'b'
 
-/** 唯一的控制點：右端面的上緣，往上下拉就改變兩端的錯位 */
+/**
+ * 兩個端點小點，各在一個端面的中央。
+ *
+ * 拖它們去碰要接的軌道邊；碰到就吸附、放手就接合並與對手齊寬。不去碰任何東西時
+ * 就只是把那個端面移到指標的位置。
+ */
 export function taperTrackHandlesPx(
   g: TaperTrackGeometry,
   boxWPx: number,
   boxHPx: number,
 ): Record<TaperHandleKey, { x: number; y: number }> {
   const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
-  const d = Math.max(0, Math.min(MAX_TAPER_OFFSET, g.offsetRatio)) * h
-  return { offset: T(w, d) }
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  return {
+    a: T(0, (c(g.aFrom) + c(g.aTo)) / 2),
+    b: T(w, (c(g.bFrom) + c(g.bTo)) / 2),
+  }
+}
+
+/** 兩個端面的線段（相對元件左上角的像素） */
+export function taperTrackEndSegmentsPx(
+  g: TaperTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { a: [ShapePoint, ShapePoint]; b: [ShapePoint, ShapePoint] } {
+  const { w, h, T } = taperSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  return {
+    a: [T(0, c(g.aFrom)), T(0, c(g.aTo))],
+    b: [T(w, c(g.bFrom)), T(w, c(g.bTo))],
+  }
 }

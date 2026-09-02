@@ -4,7 +4,6 @@ import {
   cornerArcCentrePx,
   cornerTrackEndsPx,
   taperTrackEndsPx,
-  MAX_TAPER_OFFSET,
   type CornerTrackGeometry,
   type TaperTrackGeometry,
 } from './trackShapes'
@@ -247,11 +246,18 @@ function fitTaper(
       const dx = v.x
       const dy = Math.max(0, v.y)
       const len = Math.hypot(dx, dy)
-      const f = Math.min((bandWM * len) / dx, 1e6)
+      const faceH = Math.min((bandWM * len) / dx, 1e6)
       const W = dx
-      const H = dy + f
-      const offsetRatio = Math.max(0, Math.min(MAX_TAPER_OFFSET, dy / Math.max(1e-6, H)))
-      const geometry: TaperTrackGeometry = { offsetRatio, entryDeg }
+      const H = dy + faceH
+      // 兩端等寬：左端面貼上緣，右端面往下錯開 dy
+      const r = Math.max(0, Math.min(1, faceH / H))
+      const geometry: TaperTrackGeometry = {
+        aFrom: 0,
+        aTo: r,
+        bFrom: 1 - r,
+        bTo: 1,
+        entryDeg,
+      }
       // 轉 90 度時形狀的寬高在世界座標裡互換
       const wM = entryDeg % 180 === 0 ? W : H
       const hM = entryDeg % 180 === 0 ? H : W
@@ -268,7 +274,7 @@ function fitTaper(
   if (best) return { geometry: best.geometry, box: best.box }
   // 兩點重合之類的退化情形：給一個等寬的方塊，至少畫得出來
   return {
-    geometry: { offsetRatio: 0, entryDeg: 0 },
+    geometry: { aFrom: 0, aTo: 1, bFrom: 0, bTo: 1, entryDeg: 0 },
     box: {
       xM: Math.min(p0.x, p1.x) - bandWM / 2,
       yM: Math.min(p0.y, p1.y) - bandWM / 2,
