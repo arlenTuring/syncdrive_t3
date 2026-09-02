@@ -67,8 +67,16 @@ export function TrackGenGraphic({
   onPickClick,
 }: Props) {
   const buttonSize = Math.max(28, Math.min(width, height) * 0.14)
-  /** 滑過哪一條 road；載入階段用它顯示那條路的基本資訊 */
-  const [hoverRoadId, setHoverRoadId] = useState<string | null>(null)
+  /**
+   * 滑過哪一條 road，以及滑鼠在元件內的位置。
+   *
+   * 卡片跟著滑鼠走：這個元件可以被拉得很長很扁，固定貼在角落的話滑鼠在另一頭時
+   * 根本看不到。
+   */
+  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null)
+  const hoverRoadId = hover?.id ?? null
+  /** 量出來的卡片尺寸，用來決定要往左還是往右翻 */
+  const [cardSize, setCardSize] = useState({ w: 220, h: 140 })
 
   const view = useMemo(() => {
     if (!centerlines) return null
@@ -163,8 +171,24 @@ export function TrackGenGraphic({
           return (
             <g
               key={road.id}
-              onPointerEnter={() => setHoverRoadId(road.id)}
-              onPointerLeave={() => setHoverRoadId((v) => (v === road.id ? null : v))}
+              onPointerMove={(e) => {
+                const box = e.currentTarget.ownerSVGElement?.getBoundingClientRect()
+                if (!box || box.width < 1) return
+                /*
+                 * 換算回元件的本地座標。
+                 *
+                 * 卡片是這個容器的子元素，而容器被地圖縮放過；直接拿螢幕像素去設
+                 * left/top，滑鼠移了幾百像素卡片才動幾十——實測滑鼠從 96 移到 885，
+                 * 卡片只從 19 移到 59。
+                 */
+                const scale = box.width / Math.max(1, width)
+                setHover({
+                  id: road.id,
+                  x: (e.clientX - box.left) / scale,
+                  y: (e.clientY - box.top) / scale,
+                })
+              }}
+              onPointerLeave={() => setHover((v) => (v?.id === road.id ? null : v))}
               style={{ cursor: 'pointer' }}
             >
               {/* 加粗的透明線只為了好按到——中心線本身太細，滑鼠很難命中 */}
@@ -195,8 +219,33 @@ export function TrackGenGraphic({
         })}
       </svg>
 
-      {hoveredRoad ? (
-        <div className="pointer-events-none absolute right-2 top-2 z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-300 shadow-lg">
+      {hoveredRoad && hover ? (
+        <div
+          ref={(el) => {
+            if (!el) return
+            // 量到的也是螢幕像素，同樣要換回本地座標才能跟 left/top 比
+            const r = el.getBoundingClientRect()
+            const box = el.parentElement?.getBoundingClientRect()
+            const scale = box && box.width > 1 ? box.width / Math.max(1, width) : 1
+            const wLocal = r.width / scale
+            const hLocal = r.height / scale
+            if (Math.abs(wLocal - cardSize.w) > 1 || Math.abs(hLocal - cardSize.h) > 1) {
+              setCardSize({ w: wLocal, h: hLocal })
+            }
+          }}
+          className="pointer-events-none absolute z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-300 shadow-lg"
+          style={{
+            // 預設放在滑鼠右下，靠近邊界就翻到另一邊，卡片才不會被切掉
+            left: Math.max(
+              4,
+              hover.x + 14 + cardSize.w > width ? hover.x - 14 - cardSize.w : hover.x + 14,
+            ),
+            top: Math.max(
+              4,
+              hover.y + 14 + cardSize.h > height ? hover.y - 14 - cardSize.h : hover.y + 14,
+            ),
+          }}
+        >
           <div className="mb-1 font-medium text-emerald-300">
             road {hoveredRoad.id}
             {hoveredRoad.name && hoveredRoad.name !== hoveredRoad.id
