@@ -383,6 +383,41 @@ function spinePieces(
  */
 const ARC_COVERAGE_MIN = 0.5
 
+/**
+ * 把太短的一段併進隔壁。
+ *
+ * 簡化過的剖面還是會留下幾像素的段：一段 8 像素的斜接、一段 1.6 像素的直線，在圖上
+ * 只是接縫處的雜訊，不像一塊軌道。門檻以下的段就把它的端點拿掉，長度讓給隔壁那一
+ * 段——併掉會讓橫向偏移少一個轉折，但那個轉折本來也短到看不出來。
+ *
+ * 只動中間的點，兩端保留：頭尾一動，這條線就接不上鄰居了。
+ */
+function mergeShortRuns(
+  prof: Array<[number, number]>,
+  minS: number,
+): Array<[number, number]> {
+  if (prof.length < 3 || !(minS > 0)) return prof
+  const out = prof.map((p) => [p[0], p[1]] as [number, number])
+  let i = 0
+  while (out.length > 2 && i + 1 < out.length) {
+    if (out[i + 1]![0] - out[i]![0] >= minS) {
+      i += 1
+      continue
+    }
+    if (i + 2 < out.length) {
+      // 併進後面那一段
+      out.splice(i + 1, 1)
+    } else if (i > 0) {
+      // 這是最後一段：尾點得留著，改拿掉前一個轉折
+      out.splice(i, 1)
+      i -= 1
+    } else {
+      break
+    }
+  }
+  return out
+}
+
 export function layoutTrackGen(
   result: TrackGenResult,
   settings: TrackGenSettings,
@@ -411,10 +446,35 @@ export function layoutTrackGen(
    * 外側股道的弧仍然比較大：同心弧本來就是這樣，第 n 股在半徑上多出 n 個軌道寬，
    * 這是幾何，不是參數沒吃到。
    */
+  /*
+   * 一段軌道至少要有多長才畫得出來（里程公尺）。
+   *
+   * 比軌道還窄的一塊不像軌道，像接縫；實測生出過 1.6 × 24 的一般軌道與 8 × 31 的
+   * 斜接軌道。門檻取「一個軌道寬」與「四分之一塊」的大者，以下的段併進隔壁。
+   */
+  const minRunM = block
+    ? Math.max(block.blockWidthPx, block.blockLengthPx * 0.25) / Math.max(1e-6, along)
+    : LANE_W_M
+
   const cornerRPx = block ? block.blockLengthPx : settings.cornerRadiusM * along
   const placed = placeSpine(result.spine, along, cornerRPx)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
+
+  /** 把里程吸到最近的脊線段邊界（差在一個門檻內才吸） */
+  const boundaries = placed.flatMap((q) => [q.sFrom, q.sTo])
+  const snapStation = (sq: number) => {
+    let best = sq
+    let bd = minRunM
+    for (const b of boundaries) {
+      const d = Math.abs(sq - b)
+      if (d < bd) {
+        bd = d
+        best = b
+      }
+    }
+    return best
+  }
 
   /*
    * 版面上的橫向偏移 ＝ 剖面的偏移 ＋ 參考線相對脊線的偏離。
@@ -568,14 +628,16 @@ export function layoutTrackGen(
        * 使用者填的數字在畫面上根本兌現不了。寧可最後一塊短一截，也不要每一塊都不是
        * 自己填的長度。
        *
-       * 餘數不到一塊的 2% 時併進前一塊：那點長度在圖上看不出來，單獨切一塊只會留下
-       * 一條幾乎沒有寬度的碎片。
+       * 餘數短到不成一塊時併進前一塊。門檻原本是一塊的 2%，太鬆——實測留下 1.6 × 24
+       * 的一般軌道，比軌道還窄，看起來是接縫不是軌道。改用與其他地方同一個門檻
+       * minRunM：以下的餘數讓前一塊吃掉。代價是每一段直線的最後一塊最多長出一個
+       * minRun（一塊 150 × 30 時是 30 px，兩成），換掉的是一條看不出是軌道的碎片。
        */
       const span = piece.sTo - piece.sFrom
       const perBlockM = Math.max(1, block ? block.metersPerBlock : settings.blockLengthM)
       const full = Math.floor(span / perBlockM)
       const rest = span - full * perBlockM
-      const n = full > 0 && rest < perBlockM * 0.02 ? full : full + (rest > 0 ? 1 : 0)
+      const n = full > 0 && rest < minRunM ? full : full + (rest > 0 ? 1 : 0)
       for (let k = 0; k < Math.max(1, n); k += 1) {
         const from = piece.sFrom + k * perBlockM
         const to = k === n - 1 ? piece.sTo : Math.min(piece.sTo, from + perBlockM)
@@ -611,7 +673,18 @@ export function layoutTrackGen(
      * 留著只會生出一堆幾公尺長的碎片。
      */
     const withDev: Array<[number, number]> = prof.map(([sq, lat]) => [sq, lat + devAt(sq)])
-    const simplified = simplifyProfile(withDev, (line.widthM || LANE_W_M) * 0.25)
+    /*
+     * 轉折點先吸到脊線段的邊界，再併掉太短的段。
+     *
+     * 剩下的碎片幾乎都是這樣來的：一段直線跨過脊線段的交界只跨進去一點點，那一點點
+     * 就自成一塊——實測 1.7 × 24 的一般軌道。把差不到一個門檻的轉折點吸到交界上，
+     * 那一小截就歸隔壁那一段，碎片自然不存在。頭尾不吸，一動這條線就接不上鄰居。
+     */
+    const rough = simplifyProfile(withDev, (line.widthM || LANE_W_M) * 0.25)
+    const snapped: Array<[number, number]> = rough.map((p, i) =>
+      i === 0 || i === rough.length - 1 ? p : [snapStation(p[0]), p[1]],
+    )
+    const simplified = mergeShortRuns(snapped, minRunM)
     const sig = `${Math.round(prof[0]![0])}:${Math.round(prof[prof.length - 1]![0])}:${simplified
       .map((p) => Math.round(p[1]))
       .join(',')}`
