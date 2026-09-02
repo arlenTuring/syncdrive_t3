@@ -154,10 +154,15 @@ export type PlacedSpine = Array<
   | { kind: 'arc'; sFrom: number; sTo: number; centre: Vec2; v0: Vec2; radiusPx: number; sign: number; turnDeg: number }
 >
 
+/**
+ * @param cornerRadiusPx 轉角的<strong>脊線</strong>半徑，已經是版面單位。
+ *   以前吃的是公尺再乘 alongScale，於是轉角大小綁在「一塊代表幾公尺」上：使用者
+ *   只是把一塊從 50 公尺改成 25，轉角就跟著脹成兩倍，而他根本沒動到轉角。
+ */
 export function placeSpine(
   spine: SpineSegment[],
   alongScale: number,
-  cornerRadiusM: number,
+  cornerRadiusPx: number,
 ): PlacedSpine {
   const out: PlacedSpine = []
   let p: Vec2 = { x: 0, y: 0 }
@@ -172,7 +177,7 @@ export function placeSpine(
       out.push({ kind: 'straight', sFrom: seg.sFrom, sTo: seg.sTo, p0: p, dir, nrm, lenPx })
       p = { x: p.x + dir.x * lenPx, y: p.y + dir.y * lenPx }
     } else {
-      const radiusPx = cornerRadiusM * alongScale
+      const radiusPx = cornerRadiusPx
       const nrm = { x: -Math.sin(hdg * DEG), y: -Math.cos(hdg * DEG) }
       const sign = seg.turnDeg > 0 ? 1 : -1
       const centre = { x: p.x + nrm.x * sign * radiusPx, y: p.y + nrm.y * sign * radiusPx }

@@ -399,7 +399,20 @@ export function layoutTrackGen(
   const along = block ? block.blockLengthPx / Math.max(1, block.metersPerBlock) : 1
   // 一條車道寬（LANE_W_M 公尺）對應 blockWidthPx，兩軸都是像素才加得起來
   const lt = block ? block.blockWidthPx / LANE_W_M : settings.lateralScale
-  const placed = placeSpine(result.spine, along, settings.cornerRadiusM)
+  /*
+   * 轉角半徑也照使用者給的參數走：脊線半徑就是<strong>一塊軌道的長度</strong>，所以
+   * 一個轉角在圖上約等於一塊，跟旁邊的直線塊看起來是同一個量級。
+   *
+   * 以前用的是 settings.cornerRadiusM（57 公尺）再乘上 alongScale。那個數字使用者
+   * 在對話框裡看不到也改不了，而且乘上 alongScale 之後轉角大小其實綁在「一塊代表
+   * 幾公尺」上——量出來 150 × 30 的塊配上 186 × 186 的轉角，轉角的高是軌道寬的
+   * 六倍多，整體比例就歪在這裡。
+   *
+   * 外側股道的弧仍然比較大：同心弧本來就是這樣，第 n 股在半徑上多出 n 個軌道寬，
+   * 這是幾何，不是參數沒吃到。
+   */
+  const cornerRPx = block ? block.blockLengthPx : settings.cornerRadiusM * along
+  const placed = placeSpine(result.spine, along, cornerRPx)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
 
