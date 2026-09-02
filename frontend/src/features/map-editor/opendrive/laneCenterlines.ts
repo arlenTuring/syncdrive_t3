@@ -26,8 +26,38 @@ export type LaneCenterline = {
   lengthM: number
 }
 
+/**
+ * 一條 road。
+ *
+ * OpenDRIVE 本來就以 road 為單位：每條有 id、name、長度、屬於哪個 junction、
+ * 前後接誰，以及左右各有哪些 lane。方向也是明確的——s 沿參考線遞增，lane id
+ * 正號在參考線左側、負號在右側。這些都不需要猜。
+ */
+export type RoadInfo = {
+  id: string
+  name: string
+  lengthM: number
+  /** '-1' 表示不在 junction 裡 */
+  junctionId: string
+  predecessor: { type: string; id: string } | null
+  successor: { type: string; id: string } | null
+  /** 參考線取樣點（真實座標） */
+  refPoints: OpenDrivePoint[]
+  /** 起點與終點的方位（度，數學慣例、逆時針為正） */
+  headingFromDeg: number
+  headingToDeg: number
+  lanes: Array<{
+    id: number
+    type: string
+    /** 車道寬（公尺，取起點處） */
+    widthM: number
+    mmslLaneId: string | null
+  }>
+}
+
 export type LaneCenterlinePlan = {
   lanes: LaneCenterline[]
+  roads: RoadInfo[]
   bounds: OpenDriveBounds
   roadCount: number
   laneCount: number
@@ -118,12 +148,57 @@ export function parseLaneCenterlines(
   const wanted = new Set(options.laneTypes ?? ['driving'])
   const roadEls = Array.from(root.querySelectorAll(':scope > road'))
   const lanes: LaneCenterline[] = []
+  const roads: RoadInfo[] = []
 
   for (const roadEl of roadEls) {
     const roadId = roadEl.getAttribute('id') ?? '?'
     const inJunction = (roadEl.getAttribute('junction') ?? '-1') !== '-1'
     const refLine: RefSample[] = sampleReferenceLine(parsePlanView(roadEl), step)
     if (refLine.length < 2) continue
+
+    /*
+     * road 層的資訊照抄，不做任何推論。
+     *
+     * 這一層本來就在檔案裡，先前只取了車道中心線就把它丟掉，結果得靠「把車道串起來」
+     * 反推有幾條路——那是猜的，而 OpenDRIVE 已經明講了。
+     */
+    const linkEl = roadEl.querySelector(':scope > link')
+    const linkOf = (tag: string) => {
+      const el = linkEl?.querySelector(`:scope > ${tag}`)
+      if (!el) return null
+      return {
+        type: el.getAttribute('elementType') ?? '',
+        id: el.getAttribute('elementId') ?? '',
+      }
+    }
+    const firstSection = roadEl.querySelector(':scope > lanes > laneSection')
+    const roadLanes: RoadInfo['lanes'] = []
+    for (const side of ['left', 'center', 'right']) {
+      const container = firstSection?.querySelector(`:scope > ${side}`)
+      if (!container) continue
+      for (const laneEl of Array.from(container.querySelectorAll(':scope > lane'))) {
+        const parsed = parseLane(laneEl)
+        roadLanes.push({
+          id: parsed.id,
+          type: parsed.type,
+          widthM: evalWidthPoly(parsed.widths, 0, 0),
+          mmslLaneId: parsed.mmslLaneId,
+        })
+      }
+    }
+    const deg = (rad: number) => (rad * 180) / Math.PI
+    roads.push({
+      id: roadId,
+      name: roadEl.getAttribute('name') ?? roadId,
+      lengthM: num(roadEl, 'length'),
+      junctionId: roadEl.getAttribute('junction') ?? '-1',
+      predecessor: linkOf('predecessor'),
+      successor: linkOf('successor'),
+      refPoints: refLine.map((p) => ({ x: p.x, y: p.y })),
+      headingFromDeg: deg(refLine[0]!.hdg),
+      headingToDeg: deg(refLine[refLine.length - 1]!.hdg),
+      lanes: roadLanes.sort((a, b) => b.id - a.id),
+    })
 
     const sectionEls = Array.from(roadEl.querySelectorAll(':scope > lanes > laneSection'))
     for (const sectionEl of sectionEls) {
@@ -202,6 +277,7 @@ export function parseLaneCenterlines(
 
   return {
     lanes,
+    roads,
     bounds: { xmin, ymin, xmax, ymax },
     roadCount: roadEls.length,
     laneCount: lanes.length,

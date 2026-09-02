@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, Route } from 'lucide-react'
-import type { LaneCenterlinePlan } from '../opendrive/laneCenterlines'
+import type { LaneCenterlinePlan, RoadInfo } from '../opendrive/laneCenterlines'
 import type { TrackGenResult, Vec2 } from '../utils/trackGenerator'
 
 /**
@@ -67,6 +67,8 @@ export function TrackGenGraphic({
   onPickClick,
 }: Props) {
   const buttonSize = Math.max(28, Math.min(width, height) * 0.14)
+  /** 滑過哪一條 road；載入階段用它顯示那條路的基本資訊 */
+  const [hoverRoadId, setHoverRoadId] = useState<string | null>(null)
 
   const view = useMemo(() => {
     if (!centerlines) return null
@@ -135,26 +137,120 @@ export function TrackGenGraphic({
   const ty = view?.ty ?? 0
   const T = (p: Vec2) => `${(p.x * sx + tx).toFixed(1)},${(p.y * sy + ty).toFixed(1)}`
 
+  /*
+   * 逐 road 畫，不是逐車道。
+   *
+   * road 是 OpenDRIVE 本來的單位：一條 road 有自己的 id、長度、屬於哪個 junction、
+   * 前後接誰、左右各有哪些車道。以它為單位畫，使用者才點得到「一條路」而不是
+   * 「一條車道」，也才看得出這張圖是由幾段路組成的。
+   */
+  const laneByRoad = new Map<string, LaneCenterlinePlan['lanes']>()
+  for (const lane of centerlines.lanes) {
+    const list = laneByRoad.get(lane.roadId)
+    if (list) list.push(lane)
+    else laneByRoad.set(lane.roadId, [lane])
+  }
+  const hoveredRoad: RoadInfo | null =
+    centerlines.roads.find((r) => r.id === hoverRoadId) ?? null
+
   return (
     <div className="relative size-full overflow-hidden rounded-sm border border-zinc-600/60 bg-zinc-950/45">
       <svg width={width} height={height} className="block">
-        {centerlines.lanes.map((lane) => (
-          <polyline
-            key={lane.key}
-            points={lane.points.map((p) => T({ x: p.x, y: -p.y })).join(' ')}
-            fill="none"
-            stroke={lane.inJunction ? '#c08a48' : '#7f9ec2'}
-            strokeWidth={1.4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.9}
-          />
-        ))}
+        {centerlines.roads.map((road) => {
+          const lanesOfRoad = laneByRoad.get(road.id) ?? []
+          const inJunction = road.junctionId !== '-1'
+          const active = hoverRoadId === road.id
+          return (
+            <g
+              key={road.id}
+              onPointerEnter={() => setHoverRoadId(road.id)}
+              onPointerLeave={() => setHoverRoadId((v) => (v === road.id ? null : v))}
+              style={{ cursor: 'pointer' }}
+            >
+              {/* 加粗的透明線只為了好按到——中心線本身太細，滑鼠很難命中 */}
+              {lanesOfRoad.map((lane) => (
+                <polyline
+                  key={`hit-${lane.key}`}
+                  points={lane.points.map((p) => T({ x: p.x, y: -p.y })).join(' ')}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={10}
+                  strokeLinecap="round"
+                />
+              ))}
+              {lanesOfRoad.map((lane) => (
+                <polyline
+                  key={lane.key}
+                  points={lane.points.map((p) => T({ x: p.x, y: -p.y })).join(' ')}
+                  fill="none"
+                  stroke={active ? '#34d399' : inJunction ? '#c08a48' : '#7f9ec2'}
+                  strokeWidth={active ? 3 : 1.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={active ? 1 : 0.9}
+                />
+              ))}
+            </g>
+          )
+        })}
       </svg>
+
+      {hoveredRoad ? (
+        <div className="pointer-events-none absolute right-2 top-2 z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-300 shadow-lg">
+          <div className="mb-1 font-medium text-emerald-300">
+            road {hoveredRoad.id}
+            {hoveredRoad.name && hoveredRoad.name !== hoveredRoad.id
+              ? ` · ${hoveredRoad.name}`
+              : ''}
+          </div>
+          <div>
+            長度{' '}
+            <b className="font-mono tabular-nums text-zinc-100">
+              {hoveredRoad.lengthM.toFixed(1)} m
+            </b>
+            {hoveredRoad.junctionId !== '-1' ? (
+              <span className="text-amber-300">{` · junction ${hoveredRoad.junctionId}`}</span>
+            ) : null}
+          </div>
+          <div>
+            方位{' '}
+            <b className="font-mono tabular-nums text-zinc-100">
+              {hoveredRoad.headingFromDeg.toFixed(0)}° → {hoveredRoad.headingToDeg.toFixed(0)}°
+            </b>
+          </div>
+          <div>
+            前接{' '}
+            <b className="font-mono text-zinc-100">
+              {hoveredRoad.predecessor
+                ? `${hoveredRoad.predecessor.type} ${hoveredRoad.predecessor.id}`
+                : '—'}
+            </b>
+            {' · 後接 '}
+            <b className="font-mono text-zinc-100">
+              {hoveredRoad.successor
+                ? `${hoveredRoad.successor.type} ${hoveredRoad.successor.id}`
+                : '—'}
+            </b>
+          </div>
+          <div className="mt-1 border-t border-zinc-700/70 pt-1">
+            車道（左正右負）
+            {hoveredRoad.lanes.map((l) => (
+              <div key={l.id} className="font-mono tabular-nums">
+                {l.id > 0 ? `+${l.id}` : l.id}{' '}
+                <span className={l.type === 'driving' ? 'text-emerald-300' : 'text-zinc-500'}>
+                  {l.type}
+                </span>
+                {l.widthM > 0 ? ` ${l.widthM.toFixed(2)} m` : ''}
+                {l.mmslLaneId ? ` · mmsl ${l.mmslLaneId}` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {selected ? (
         <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
-          {`中心線 ${centerlines.roadCount} 道路 · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
+          {`${centerlines.roads.length} 條 road · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
           {result ? ` ｜ 已生成 ${result.lines.length} 條線到地圖上` : ''}
         </div>
       ) : null}
