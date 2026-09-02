@@ -548,12 +548,25 @@ export function layoutTrackGen(
         addCorner(nextName(), role, piece.segIndex, latM, latM)
         continue
       }
+      /*
+       * 每一塊都剛好是使用者指定的長度，除不盡的餘數留給最後一塊。
+       *
+       * 先前是把餘數平均攤給整段的每一塊，結果要 150 公尺卻生出 155–197 的塊——
+       * 使用者填的數字在畫面上根本兌現不了。寧可最後一塊短一截，也不要每一塊都不是
+       * 自己填的長度。
+       *
+       * 餘數不到一塊的 2% 時併進前一塊：那點長度在圖上看不出來，單獨切一塊只會留下
+       * 一條幾乎沒有寬度的碎片。
+       */
       const span = piece.sTo - piece.sFrom
-      const perBlockM = block ? block.metersPerBlock : settings.blockLengthM
-      const n = Math.max(1, Math.round(span / Math.max(1, perBlockM)))
-      const step = span / n
-      for (let k = 0; k < n; k += 1) {
-        addRect(nextName(), role, piece.sFrom + k * step, piece.sFrom + (k + 1) * step, latM, latM)
+      const perBlockM = Math.max(1, block ? block.metersPerBlock : settings.blockLengthM)
+      const full = Math.floor(span / perBlockM)
+      const rest = span - full * perBlockM
+      const n = full > 0 && rest < perBlockM * 0.02 ? full : full + (rest > 0 ? 1 : 0)
+      for (let k = 0; k < Math.max(1, n); k += 1) {
+        const from = piece.sFrom + k * perBlockM
+        const to = k === n - 1 ? piece.sTo : Math.min(piece.sTo, from + perBlockM)
+        addRect(nextName(), role, from, to, latM, latM)
       }
     }
   }
