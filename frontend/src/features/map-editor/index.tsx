@@ -2315,13 +2315,30 @@ export default function MapEditorApp({
          * 沿用元件的框會把版面再壓縮一次——實測要 60×20 的軌道，出來是 49×10。
          * 範圍與框相同時對映是 1:1，拉出來多大就是多大。沒有指定時仍沿用元件的框。
          */
-        layout: {
-          ...blank.layout,
-          xPx: basemap.layout.xPx,
-          yPx: basemap.layout.yPx,
-          wPx: block ? Math.max(40, Math.round(built.extentM.wM)) : basemap.layout.wPx,
-          hPx: block ? Math.max(40, Math.round(built.extentM.hM)) : basemap.layout.hPx,
-        },
+        layout: (() => {
+          const wPx = block
+            ? Math.max(40, Math.round(built.extentM.wM))
+            : basemap.layout.wPx
+          const hPx = block
+            ? Math.max(40, Math.round(built.extentM.hM))
+            : basemap.layout.hPx
+          /*
+           * 疊在元件上，但整塊要留在畫布裡。
+           *
+           * 生成出來的大小已經由對話框保證塞得進畫布，可是位置是沿用元件的；元件擺在
+           * 靠下方時，1647 × 630 的軌道從 y=170 開始就會掉出 640 高的畫布外（實測
+           * 底邊到 800）。所以位置往回夾，寬高不動。
+           */
+          const clamp = (v: number, span: number, limit: number) =>
+            Math.max(0, Math.min(v, Math.max(0, limit - span)))
+          return {
+            ...blank.layout,
+            xPx: clamp(basemap.layout.xPx, wPx, ps.width),
+            yPx: clamp(basemap.layout.yPx, hPx, ps.height),
+            wPx,
+            hPx,
+          }
+        })(),
         domain: {
           xMinM: 0,
           xMaxM: built.extentM.wM,

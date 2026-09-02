@@ -31,9 +31,11 @@ import {
   TRACKGEN_FILE_NAME_KEY,
   TRACKGEN_BLOCK_SIZE_KEY,
   getTrackGenBlockSize,
+  getTrackGenSettings,
   TRACKGEN_RESULT_KEY,
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
+import { layoutTrackGen } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   type BasemapFileSelection,
@@ -216,27 +218,56 @@ export const BasemapNode = memo(function BasemapNode({
    * 決定，所以先開對話框讓他拉，拉完才生成。
    */
   const [sizeDialogOpen, setSizeDialogOpen] = useState(false)
+  /*
+   * 路網先算好再開對話框。
+   *
+   * 對話框要能回答「這樣生出來塞不塞得進畫布」，而那個尺寸得把整份版面排完才知道；
+   * 排版吃的就是這份結果。順便省掉一次重算——這份結果與「一塊多少像素」無關，
+   * 拉大小時不必重跑。
+   */
+  const [pendingResult, setPendingResult] = useState<TrackGenResult | null>(null)
 
-  const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
+  const openSizeDialog = useCallback(() => {
     if (!trackGenCenterlines) return
     setGenerating(true)
     // 讓「生成中」先畫出來，再做這件會佔住主執行緒約一秒的計算
     window.setTimeout(() => {
       try {
-        const result = generateTracks(trackGenCenterlines, {
-          blockLengthM: block.metersPerBlock,
-        })
-        // 結果留著給屬性匡顯示統計，也讓「重新生成」知道上一次生成過
-        onPatchParameters(basemap.id, {
-          [TRACKGEN_RESULT_KEY]: result,
-          [TRACKGEN_BLOCK_SIZE_KEY]: block,
-        })
-        onApplyTrackGen?.(basemap.id, result, block)
+        setPendingResult(generateTracks(trackGenCenterlines, {}))
+        setSizeDialogOpen(true)
       } finally {
         setGenerating(false)
       }
     }, 0)
-  }, [basemap.id, onApplyTrackGen, onPatchParameters, trackGenCenterlines])
+  }, [trackGenCenterlines])
+
+  /** 這組參數排出來會佔多大（畫布像素）——對話框拿去跟畫布比 */
+  const measureTrackGen = useCallback(
+    (block: TrackGenSizeParams) => {
+      if (!pendingResult) return null
+      const { bounds } = layoutTrackGen(
+        pendingResult,
+        getTrackGenSettings(basemap.parameters),
+        block,
+      )
+      return {
+        wPx: Math.max(1, bounds.xMax - bounds.xMin),
+        hPx: Math.max(1, bounds.yMax - bounds.yMin),
+      }
+    },
+    [basemap.parameters, pendingResult],
+  )
+
+  const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
+    const result = pendingResult
+    if (!result) return
+    // 結果留著給屬性匡顯示統計，也讓「重新生成」知道上一次生成過
+    onPatchParameters(basemap.id, {
+      [TRACKGEN_RESULT_KEY]: result,
+      [TRACKGEN_BLOCK_SIZE_KEY]: block,
+    })
+    onApplyTrackGen?.(basemap.id, result, block)
+  }, [basemap.id, onApplyTrackGen, onPatchParameters, pendingResult])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)
@@ -825,7 +856,7 @@ export const BasemapNode = memo(function BasemapNode({
                       onClick={(e) => {
                         e.stopPropagation()
                         e.preventDefault()
-                        setSizeDialogOpen(true)
+                        openSizeDialog()
                       }}
                       className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
                     >
@@ -973,6 +1004,7 @@ export const BasemapNode = memo(function BasemapNode({
         }
         totalM={trackGenCenterlines ? trackGenCenterlines.lanes.reduce((a, l) => Math.max(a, l.lengthM), 0) : 0}
         initial={getTrackGenBlockSize(basemap.parameters)}
+        measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}
         onConfirm={(block) => {
           setSizeDialogOpen(false)

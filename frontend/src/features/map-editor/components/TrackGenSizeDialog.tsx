@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 /**
@@ -31,6 +31,14 @@ type Props = {
   /** 這份路網總長（公尺），用來估會生出幾塊 */
   totalM: number
   initial: TrackGenSizeParams
+  /**
+   * 這組參數排出來會佔多大（畫布像素）。回傳 null 表示還算不出來。
+   *
+   * 排版對這兩個尺度是<strong>齊次</strong>的：長度與寬度同時乘上 k，整份版面就等比
+   * 放大 k 倍（塊數只由「一塊代表幾公尺」決定，不受 k 影響）。所以「縮到塞得下」
+   * 一次除法就求得出來，不必二分搜尋。
+   */
+  measure?: (params: TrackGenSizeParams) => { wPx: number; hPx: number } | null
   onCancel: () => void
   onConfirm: (params: TrackGenSizeParams) => void
 }
@@ -74,14 +82,63 @@ function NumberField({
   )
 }
 
+/**
+ * 把「一塊多大」縮到整份版面塞得進畫布。
+ *
+ * 排版對這兩個尺度是<strong>齊次</strong>的：長度與寬度同時乘上 k，版面就等比放大
+ * k 倍（塊數只由「一塊代表幾公尺」決定，不受 k 影響），所以需要的倍率就是兩軸比值
+ * 取小的那個，一次除法就求得出來。取整會差個一像素，再量一次修掉。
+ */
+function shrinkToFit(
+  params: TrackGenSizeParams,
+  measure: ((p: TrackGenSizeParams) => { wPx: number; hPx: number } | null) | undefined,
+  canvasW: number,
+  canvasH: number,
+): TrackGenSizeParams {
+  if (!measure) return params
+  let next = params
+  for (let i = 0; i < 3; i += 1) {
+    const got = measure(next)
+    if (!got) return next
+    const k = Math.min(canvasW / got.wPx, canvasH / got.hPx)
+    if (k >= 0.999) break
+    const shrunk = {
+      ...next,
+      blockLengthPx: Math.max(MIN_LEN, Math.floor(next.blockLengthPx * k)),
+      blockWidthPx: Math.max(MIN_WID, Math.floor(next.blockWidthPx * k)),
+    }
+    if (
+      shrunk.blockLengthPx === next.blockLengthPx &&
+      shrunk.blockWidthPx === next.blockWidthPx
+    ) {
+      break
+    }
+    next = shrunk
+  }
+  return next
+}
+
 export function TrackGenSizeDialog(props: Props) {
   if (!props.open) return null
   // 每次開啟都是新的一份：用 key 重掛比在 effect 裡同步狀態乾淨
   return <SizeDialogBody {...props} />
 }
 
-function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Props) {
-  const [params, setParams] = useState<TrackGenSizeParams>(initial)
+function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfirm }: Props) {
+  /*
+   * 一開啟就先塞好。
+   *
+   * 上一次記住的大小配上這一份路網不一定塞得下，開起來就是一個已經溢出的預設值；
+   * 使用者要的是「打開就是能用的」。想再拉大是他的自由，拉大時下面那行會轉紅。
+   */
+  const [params, setParams] = useState<TrackGenSizeParams>(() =>
+    shrinkToFit(
+      initial,
+      measure,
+      Math.max(1, Math.round(canvasPx.width)),
+      Math.max(1, Math.round(canvasPx.height)),
+    ),
+  )
   /** 點過那一塊才長出把手：沒點之前只是示意，長一堆把手反而看不出主角是誰 */
   const [editing, setEditing] = useState(false)
 
@@ -167,6 +224,21 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
   const lenPx = Math.round(params.blockLengthPx)
   const widPx = Math.round(params.blockWidthPx)
   const blocks = Math.max(1, Math.round(totalM / Math.max(1, params.metersPerBlock)))
+
+  /*
+   * 生成出來塞不塞得進畫布。
+   *
+   * 「一條線攤開約 N px」不是答案：版面會轉彎、會折回來，攤開的長度跟實際佔的
+   * 矩形是兩回事。這裡直接把整份版面排一次，量它的外接矩形。
+   */
+  const extent = useMemo(() => measure?.(params) ?? null, [measure, params])
+  const overflow =
+    extent !== null && (extent.wPx > canvasW + 0.5 || extent.hPx > canvasH + 0.5)
+
+  const fitToCanvas = useCallback(
+    () => setParams((p) => shrinkToFit(p, measure, canvasW, canvasH)),
+    [canvasH, canvasW, measure],
+  )
 
   /*
    * 示意分兩層，兩層都用同一個縮放倍率，看到的就是畫布上的真實大小。
@@ -309,11 +381,37 @@ function SizeDialogBody({ canvasPx, totalM, initial, onCancel, onConfirm }: Prop
           <b className="font-mono tabular-nums text-zinc-200">{params.metersPerBlock} m</b>
           {' → 約 '}
           <b className="font-mono tabular-nums text-zinc-200">{blocks}</b> 塊
-          {'，一條線攤開約 '}
-          <b className="font-mono tabular-nums text-zinc-200">
-            {Math.round(blocks * params.blockLengthPx)}
-          </b>{' '}
-          px
+          {extent ? (
+            <>
+              {'，生成後佔 '}
+              <b
+                className={`font-mono tabular-nums ${
+                  overflow ? 'text-amber-300' : 'text-zinc-200'
+                }`}
+                data-trackgen-extent
+              >
+                {Math.round(extent.wPx)} × {Math.round(extent.hPx)} px
+              </b>
+              {overflow ? (
+                <>
+                  {'，超出畫布 '}
+                  <b className="font-mono tabular-nums text-zinc-200">
+                    {canvasW} × {canvasH} px
+                  </b>
+                  <button
+                    type="button"
+                    data-trackgen-fit
+                    onClick={fitToCanvas}
+                    className="ml-2 rounded border border-amber-400/70 px-2 py-0.5 text-[11px] text-amber-200 transition hover:bg-amber-400/15"
+                  >
+                    縮到塞得下
+                  </button>
+                </>
+              ) : (
+                '，塞得進畫布'
+              )}
+            </>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2">
