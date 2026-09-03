@@ -243,36 +243,54 @@ export const BasemapNode = memo(function BasemapNode({
   }, [trackGenCenterlines])
 
   /*
-   * 脊線上橫的路與縱的路各幾公尺。
+   * 脊線上橫的路與縱的路各有哪幾段（公尺）。
    *
-   * 對話框要分別估兩軸各生幾塊，而折起來之後兩軸的長度差很多——拿路網總長除一次
-   * 等於沒講。彎道不算進任何一軸：它由轉角半徑決定，不吃「一塊代表幾公尺」。
+   * 給的是<strong>每一段</strong>而不是總和：切塊是一段一段切的，每段各自有除不盡的
+   * 尾巴，拿總長除一次算出來的塊數跟實際生的對不上。彎道不算進任何一軸：它由轉角
+   * 半徑決定，不吃「一塊代表幾公尺」。
    */
   const trackGenTotals = useMemo(() => {
     if (!pendingResult) return undefined
-    let xM = 0
-    let yM = 0
+    const x: number[] = []
+    const y: number[] = []
     for (const seg of pendingResult.spine) {
       if (seg.kind !== 'straight') continue
       const len = seg.sTo - seg.sFrom
-      if (isAlongX(seg.hdgDeg)) xM += len
-      else yM += len
+      if (len <= 0) continue
+      if (isAlongX(seg.hdgDeg)) x.push(len)
+      else y.push(len)
     }
-    return { xM, yM }
+    return { x, y }
   }, [pendingResult])
 
-  /** 這組參數排出來會佔多大（畫布像素）——對話框拿去跟畫布比 */
+  /**
+   * 這組參數排出來會佔多大、兩軸各幾塊——對話框拿去跟畫布比。
+   *
+   * 塊數直接<strong>數排出來的形狀</strong>，不另外用公尺數推。推的版本錯過一次：拿
+   * 脊線上那段 214 公尺的縱向路除以一塊 80 公尺說會有 3 塊，實際只生 2 塊——那段路
+   * 有一截被轉角與斜接吃掉，一條線並沒有走滿整段。只數參考線，不然雙線會變兩倍。
+   */
   const measureTrackGen = useCallback(
     (block: TrackGenSizeParams) => {
       if (!pendingResult) return null
-      const { bounds } = layoutTrackGen(
+      const { bounds, shapes } = layoutTrackGen(
         pendingResult,
         getTrackGenSettings(basemap.parameters),
         block,
       )
+      const refKey = pendingResult.lines[0]?.key
+      let countX = 0
+      let countY = 0
+      for (const sh of shapes) {
+        if (sh.kind !== 'rect' || sh.lineKey !== refKey) continue
+        if (Math.abs(Math.round(sh.rotationDeg / 90)) % 2 === 0) countX += 1
+        else countY += 1
+      }
       return {
         wPx: Math.max(1, bounds.xMax - bounds.xMin),
         hPx: Math.max(1, bounds.yMax - bounds.yMin),
+        countX,
+        countY,
       }
     },
     [basemap.parameters, pendingResult],

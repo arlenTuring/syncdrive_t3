@@ -418,6 +418,22 @@ function mergeShortRuns(
   return out
 }
 
+/**
+ * 一段路切成幾塊。
+ *
+ * 對話框的估算與實際排版<strong>吃同一支</strong>：先前估算用 `round(總長/一塊)`，
+ * 排版卻是「整數塊 + 尾巴，尾巴太短就併進前一塊」。214 公尺配一塊 80 公尺時估算
+ * 說 3 塊、實際只生 2 塊，數字對不上。
+ */
+export function blocksInSpan(spanM: number, perBlockM: number, minRunM: number): number {
+  const per = Math.max(1e-6, perBlockM)
+  if (spanM <= 0) return 0
+  const full = Math.floor(spanM / per)
+  const rest = spanM - full * per
+  if (full > 0 && rest < minRunM) return full
+  return full + (rest > 0 ? 1 : 0)
+}
+
 export function layoutTrackGen(
   result: TrackGenResult,
   settings: TrackGenSettings,
@@ -659,10 +675,7 @@ export function layoutTrackGen(
             : block.metersPerBlockY
           : settings.blockLengthM,
       )
-      const tail = alongThis ? minRunXM : minRunYM
-      const full = Math.floor(span / perBlockM)
-      const rest = span - full * perBlockM
-      const n = full > 0 && rest < tail ? full : full + (rest > 0 ? 1 : 0)
+      const n = blocksInSpan(span, perBlockM, alongThis ? minRunXM : minRunYM)
       for (let k = 0; k < Math.max(1, n); k += 1) {
         const from = piece.sFrom + k * perBlockM
         const to = k === n - 1 ? piece.sTo : Math.min(piece.sTo, from + perBlockM)

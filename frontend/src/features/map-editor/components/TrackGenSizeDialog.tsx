@@ -27,8 +27,8 @@ type Props = {
   open: boolean
   /** 畫布尺寸（像素），用來畫等比縮圖 */
   canvasPx: { width: number; height: number }
-  /** 脊線上橫的路與縱的路各幾公尺，用來估兩軸各生幾塊 */
-  totals?: { xM: number; yM: number }
+  /** 脊線上橫的路與縱的路各有哪幾段（公尺），用來估兩軸各生幾塊 */
+  totals?: { x: number[]; y: number[] }
   initial: TrackGenSizeParams
   /**
    * 這組參數排出來會佔多大（畫布像素）。回傳 null 表示還算不出來。
@@ -37,7 +37,9 @@ type Props = {
    * 放大 k 倍（塊數只由「一塊代表幾公尺」決定，不受 k 影響）。所以「縮到塞得下」
    * 一次除法就求得出來，不必二分搜尋。
    */
-  measure?: (params: TrackGenSizeParams) => { wPx: number; hPx: number } | null
+  measure?: (
+    params: TrackGenSizeParams,
+  ) => { wPx: number; hPx: number; countX: number; countY: number } | null
   onCancel: () => void
   onConfirm: (params: TrackGenSizeParams) => void
 }
@@ -249,13 +251,14 @@ function SizeDialogBody({ canvasPx, totals, initial, measure, onCancel, onConfir
   const lenYPx = Math.round(params.blockLengthYPx)
   const widPx = Math.round(params.blockWidthPx)
   /*
-   * 兩軸各估幾塊。
+   * 兩軸各幾塊由排版直接數出來（extent 一起回傳），不在這裡用公尺數推。
    *
-   * 用脊線上橫的路與縱的路各自的公尺數去除，不是拿路網總長除一次——折起來之後
-   * 兩軸的塊數差很多，合在一起講等於沒講。
+   * 推的版本錯過一次：脊線上那段 214 公尺的縱向路除以一塊 80 公尺說 3 塊，實際只生
+   * 2 塊——那段路有一截被轉角與斜接吃掉，一條線並沒有走滿整段。
    */
-  const countX = Math.max(1, Math.round((totals?.xM ?? 0) / Math.max(1, params.metersPerBlockX)))
-  const countY = Math.max(0, Math.round((totals?.yM ?? 0) / Math.max(1, params.metersPerBlockY)))
+  const sum = (a: number[] | undefined) => (a ?? []).reduce((t, v) => t + v, 0)
+  const totalXM = sum(totals?.x)
+  const totalYM = sum(totals?.y)
 
   /*
    * 生成出來塞不塞得進畫布。
@@ -516,20 +519,20 @@ function SizeDialogBody({ canvasPx, totals, initial, measure, onCancel, onConfir
           */}
           軌道{' '}
           <b className="font-mono tabular-nums text-zinc-200">
-            {Math.round((totals?.xM ?? 0) + (totals?.yM ?? 0))} m
+            {Math.round(totalXM + totalYM)} m
           </b>
           {' · 橫向 '}
           <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
-            {countX}
+            {extent?.countX ?? 0}
           </b>
           {' 塊（'}
-          <span className="font-mono tabular-nums">{Math.round(totals?.xM ?? 0)} m</span>
+          <span className="font-mono tabular-nums">{Math.round(totalXM)} m</span>
           {'）· 縱向 '}
           <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
-            {countY}
+            {extent?.countY ?? 0}
           </b>
           {' 塊（'}
-          <span className="font-mono tabular-nums">{Math.round(totals?.yM ?? 0)} m</span>
+          <span className="font-mono tabular-nums">{Math.round(totalYM)} m</span>
           {'）'}
           {extent ? (
             <>
