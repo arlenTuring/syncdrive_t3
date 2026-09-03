@@ -14,6 +14,11 @@ import {
   taperTrackHandlesPx,
   taperTrackPath,
   readTaperTrack,
+  switchTrackPath,
+  readSwitchTrack,
+  switchTrackHandlesPx,
+  SWITCH_TRACK_KEY,
+  type SwitchHandleKey,
   type TaperHandleKey,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
@@ -479,6 +484,7 @@ export const FacilityNode = memo(function FacilityNode({
   const isCornerTrack = isTrack && facility.name === 'RailCorner'
   /** 斜接軌道：矩形切掉兩個對角，與圓角軌道同樣用 clip-path 換形狀 */
   const isTaperTrack = isTrack && facility.name === 'RailTaper'
+  const isSwitchTrack = isTrack && facility.name === 'RailSwitch'
   const isRoadLine = facility.type === 'RoadLine'
   const isBasemap = facility.type === 'Basemap'
   const isTrackCrossover = facility.type === 'TrackCrossover'
@@ -1214,6 +1220,14 @@ export const FacilityNode = memo(function FacilityNode({
   const taperTrackClipPath = useMemo(
     () => (taperTrackGeom ? taperTrackPath(taperTrackGeom, nw, nh) : ''),
     [taperTrackGeom, nw, nh],
+  )
+  const switchTrackGeom = useMemo(
+    () => (isSwitchTrack ? readSwitchTrack(facility.parameters) : null),
+    [isSwitchTrack, facility.parameters],
+  )
+  const switchTrackClipPath = useMemo(
+    () => (switchTrackGeom ? switchTrackPath(switchTrackGeom, nw, nh) : ''),
+    [switchTrackGeom, nw, nh],
   )
 
   const trackCorners = isTrack
@@ -2137,6 +2151,67 @@ export const FacilityNode = memo(function FacilityNode({
     [taperDragKey, taperProbe, onTaperEndCommit],
   )
 
+  /* ── 分岔軌道的三個控制點 ─────────────────────────────────────
+     進口一個、兩個出口各一個。拖著改那一面在外框上的位置，形狀跟著變；三面都是
+     與軸對齊的線段，所以與鄰居的端面天生對得齊。 */
+  const [switchDragKey, setSwitchDragKey] = useState<SwitchHandleKey | null>(null)
+  const switchDragRef = useRef<{ key: SwitchHandleKey; startY: number; from: number; to: number } | null>(
+    null,
+  )
+  const onSwitchHandleDown = useCallback(
+    (key: SwitchHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation()
+      e.preventDefault()
+      if (readOnly || !onPatchParameters) return
+      const g = readSwitchTrack(facilityRef.current.parameters)
+      onTrackCornerEditStart?.()
+      switchDragRef.current = {
+        key,
+        startY: e.clientY,
+        from: key === 'a' ? g.aFrom : key === 'm' ? g.mFrom : g.bFrom,
+        to: key === 'a' ? g.aTo : key === 'm' ? g.mTo : g.bTo,
+      }
+      setSwitchDragKey(key)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [onPatchParameters, onTrackCornerEditStart, readOnly],
+  )
+
+  const onSwitchHandleMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const st = switchDragRef.current
+      if (!st || !onPatchParameters) return
+      // 整個面一起移動，寬度不變——寬度是軌道寬，不該被把手改掉
+      const span = Math.max(1, nh)
+      const d = (e.clientY - st.startY) / Math.max(0.01, mapScale) / span
+      const width = st.to - st.from
+      const from = Math.max(0, Math.min(1 - width, st.from + d))
+      const g = readSwitchTrack(facilityRef.current.parameters)
+      const next =
+        st.key === 'a'
+          ? { ...g, aFrom: from, aTo: from + width }
+          : st.key === 'm'
+            ? { ...g, mFrom: from, mTo: from + width }
+            : { ...g, bFrom: from, bTo: from + width }
+      onPatchParameters(facilityRef.current.id, { [SWITCH_TRACK_KEY]: next })
+    },
+    [mapScale, nh, onPatchParameters],
+  )
+
+  const onSwitchHandleEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    switchDragRef.current = null
+    setSwitchDragKey(null)
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   /* ── 拖曳旋轉 ────────────────────────────────────────────────
      把手在元件外側，會跟著元件一起轉——就像簡報軟體那樣，指標與把手的相對位置
      在整段拖曳中保持一致。角度由「元件中心 → 指標」的方位差算出來，所以從把手
@@ -2359,10 +2434,16 @@ export const FacilityNode = memo(function FacilityNode({
             ...(isTrack
               ? {
                   backgroundColor: trackFillColor ?? undefined,
-                  ...(isCornerTrack || isTaperTrack
+                  ...(isCornerTrack || isTaperTrack || isSwitchTrack
                     ? {
                         borderWidth: 0,
-                        clipPath: `path('${isCornerTrack ? cornerTrackClipPath : taperTrackClipPath}')`,
+                        clipPath: `path('${
+                          isCornerTrack
+                            ? cornerTrackClipPath
+                            : isSwitchTrack
+                              ? switchTrackClipPath
+                              : taperTrackClipPath
+                        }')`,
                       }
                     : {
                         borderRadius: `${trackCornersPx.tl}px ${trackCornersPx.tr}px ${trackCornersPx.br}px ${trackCornersPx.bl}px`,
@@ -2751,7 +2832,7 @@ export const FacilityNode = memo(function FacilityNode({
          * 圓角軌道與斜接軌道的弧度、斜切都是外框的比例，只拉單邊會把形狀拉扁；
          * 角把手同時改長寬、鎖住比例，錨點是對角那一角。
          */}
-        {(isCornerTrack || isTaperTrack) && selected && !readOnly && onResize && (
+        {(isCornerTrack || isTaperTrack || isSwitchTrack) && selected && !readOnly && onResize && (
           <>
             {([
               ['nw', { left: -7, top: -7 }],
@@ -2842,6 +2923,34 @@ export const FacilityNode = memo(function FacilityNode({
                 </div>
               ))
             })()}
+          </>
+        )}
+        {isSwitchTrack && switchTrackGeom && selected && !readOnly && onPatchParameters && (
+          <>
+            {(['a', 'm', 'b'] as const).map((key) => {
+              const pt = switchTrackHandlesPx(switchTrackGeom, nw, nh)[key]
+              const dragging = switchDragKey === key
+              return (
+                <div
+                  key={key}
+                  data-switch-track-handle={key}
+                  className="absolute z-[88] cursor-ns-resize touch-none"
+                  style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
+                  title={key === 'a' ? '進口' : key === 'm' ? '直行出口' : '岔出出口'}
+                  onPointerDown={(e) => onSwitchHandleDown(key, e)}
+                  onPointerMove={onSwitchHandleMove}
+                  onPointerUp={onSwitchHandleEnd}
+                  onPointerCancel={onSwitchHandleEnd}
+                >
+                  <div
+                    className={[
+                      'size-3.5 rounded-full border-2 shadow-md',
+                      dragging ? 'border-emerald-300 bg-emerald-400' : 'border-white bg-blue-500',
+                    ].join(' ')}
+                  />
+                </div>
+              )
+            })}
           </>
         )}
         {isTaperTrack && taperTrackGeom && selected && !readOnly && onPatchParameters && (

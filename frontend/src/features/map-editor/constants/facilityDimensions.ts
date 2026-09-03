@@ -2,6 +2,7 @@ import type { FacilityName, FacilityType } from '../types/facility'
 import {
   DEFAULT_CORNER_TRACK_SIZE_M,
   DEFAULT_TAPER_TRACK_SIZE_M,
+  DEFAULT_SWITCH_TRACK_SIZE_M,
 } from '../utils/trackShapes'
 import {
   getRefFieldBounds,
@@ -110,6 +111,9 @@ export function defaultSizeMetersForType(
   }
   if (type === 'Track' && name === 'RailTaper') {
     return { ...DEFAULT_TAPER_TRACK_SIZE_M }
+  }
+  if (type === 'Track' && name === 'RailSwitch') {
+    return { ...DEFAULT_SWITCH_TRACK_SIZE_M }
   }
   switch (type) {
     case 'Slot':

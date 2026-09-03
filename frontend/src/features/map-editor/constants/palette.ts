@@ -118,6 +118,12 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: '斜接軌道 — 矩形切掉右上與左下兩個對角；上下各一個控制點調整切角',
   },
   {
+    label: '分岔軌道',
+    type: 'Track',
+    name: 'RailSwitch',
+    hint: '分岔軌道 — 一進兩出；三個控制點分別調整進口、直行出口與岔出出口',
+  },
+  {
     label: '虛擬渡線',
     type: 'TrackCrossover',
     name: 'TrackCrossover',

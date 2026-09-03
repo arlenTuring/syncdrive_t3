@@ -504,3 +504,146 @@ export function taperTrackEndSegmentsPx(
     b: [T(w, c(g.bFrom)), T(w, c(g.bTo))],
   }
 }
+
+/* ── 分岔軌道 ────────────────────────────────────────────────────
+   一進兩出：一條軌道分成直行與岔出兩條。斜接軌道只能表示「整條線平移過去」，
+   表達不了「主線繼續、同時分出一條」——生成時只好讓兩條線在路口各畫各的，結果
+   互相穿透。實測 T3 的路口區，六段斜接就製造了四萬多平方像素的跨線重疊。      */
+
+export type SwitchTrackGeometry = {
+  /** 進口面的起點，佔外框高的比例 */
+  aFrom: number
+  /** 進口面的終點 */
+  aTo: number
+  /** 直行出口面的起點 */
+  mFrom: number
+  /** 直行出口面的終點 */
+  mTo: number
+  /** 岔出出口面的起點 */
+  bFrom: number
+  /** 岔出出口面的終點 */
+  bTo: number
+  /** 方位（度，螢幕座標順時針為正） */
+  entryDeg: number
+}
+
+export const SWITCH_TRACK_KEY = 'switchTrack'
+
+export const DEFAULT_SWITCH_TRACK: SwitchTrackGeometry = {
+  aFrom: 0,
+  aTo: 0.34,
+  mFrom: 0,
+  mTo: 0.34,
+  bFrom: 0.66,
+  bTo: 1,
+  entryDeg: 0,
+}
+
+/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
+export const DEFAULT_SWITCH_TRACK_SIZE_M = { w: 80, h: 40 }
+
+export function readSwitchTrack(
+  parameters: Record<string, unknown> | undefined,
+): SwitchTrackGeometry {
+  const raw = parameters?.[SWITCH_TRACK_KEY]
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_SWITCH_TRACK }
+  const o = raw as Partial<SwitchTrackGeometry>
+  const num = (v: unknown, d: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d
+  return {
+    aFrom: num(o.aFrom, DEFAULT_SWITCH_TRACK.aFrom),
+    aTo: num(o.aTo, DEFAULT_SWITCH_TRACK.aTo),
+    mFrom: num(o.mFrom, DEFAULT_SWITCH_TRACK.mFrom),
+    mTo: num(o.mTo, DEFAULT_SWITCH_TRACK.mTo),
+    bFrom: num(o.bFrom, DEFAULT_SWITCH_TRACK.bFrom),
+    bTo: num(o.bTo, DEFAULT_SWITCH_TRACK.bTo),
+    entryDeg:
+      typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg)
+        ? o.entryDeg
+        : DEFAULT_SWITCH_TRACK.entryDeg,
+  }
+}
+
+function switchSpin(g: SwitchTrackGeometry, boxWPx: number, boxHPx: number) {
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const T = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return { x: ocx + dx, y: ocy + dy }
+  }
+  return { w, h, T }
+}
+
+/**
+ * 填色外框：兩個四邊形共用同一個進口面。
+ *
+ * 直行那一片與岔出那一片<strong>各自是一個子路徑</strong>，靠 nonzero 填色規則合成
+ * 一個 Y。硬要算出兩片的交會點再繞一圈外框，遇到兩出口貼在一起或岔到另一側時就會
+ * 自交；兩片疊起來沒有這個問題，端面也還是各自完整的線段。
+ */
+export function switchTrackPath(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): string {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const quad = (y0: number, y1: number) =>
+    [
+      [0, c(g.aFrom)],
+      [w, y0],
+      [w, y1],
+      [0, c(g.aTo)],
+    ]
+      .map(([x, y], i) => {
+        const p = T(x as number, y as number)
+        return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+      })
+      .join(' ') + ' Z'
+  return `${quad(c(g.mFrom), c(g.mTo))} ${quad(c(g.bFrom), c(g.bTo))}`
+}
+
+/** 進口 a、直行出口 m、岔出出口 b */
+export type SwitchHandleKey = 'a' | 'm' | 'b'
+
+export function switchTrackHandlesPx(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): Record<SwitchHandleKey, { x: number; y: number }> {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  return {
+    a: T(0, (c(g.aFrom) + c(g.aTo)) / 2),
+    m: T(w, (c(g.mFrom) + c(g.mTo)) / 2),
+    b: T(w, (c(g.bFrom) + c(g.bTo)) / 2),
+  }
+}
+
+/** 三個端面的線段（相對元件左上角的像素） */
+export function switchTrackEndSegmentsPx(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { a: [ShapePoint, ShapePoint]; m: [ShapePoint, ShapePoint]; b: [ShapePoint, ShapePoint] } {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  return {
+    a: [T(0, c(g.aFrom)), T(0, c(g.aTo))],
+    m: [T(w, c(g.mFrom)), T(w, c(g.mTo))],
+    b: [T(w, c(g.bFrom)), T(w, c(g.bTo))],
+  }
+}

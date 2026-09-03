@@ -16,6 +16,7 @@ import {
   Wrench,
   CornerDownRight,
   Spline,
+  GitFork,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { FacilityName } from '../types/facility'
@@ -35,6 +36,7 @@ export const PALETTE_ICON_BY_NAME: Record<
   Rail: TrainTrack,
   RailCorner: CornerDownRight,
   RailTaper: Spline,
+  RailSwitch: GitFork,
   SmartPole: Radio,
   DockingPoint: MapPin,
   Waypoint: CircleDot,

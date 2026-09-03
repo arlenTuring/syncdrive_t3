@@ -24,6 +24,7 @@ export type FacilityName =
   | 'Rail'
   | 'RailCorner'
   | 'RailTaper'
+  | 'RailSwitch'
   | 'SmartPole'
   | 'DockingPoint'
   | 'Waypoint'
