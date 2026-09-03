@@ -507,29 +507,6 @@ export function layoutTrackGen(
     return best
   }
 
-  /*
-   * 版面上的橫向偏移 ＝ 剖面的偏移 ＋ 參考線相對脊線的偏離。
-   *
-   * 脊線把緩彎拉直了，那段彎的量存在 refDeviation 裡；加回去，主線自己的緩彎才會
-   * 變成幾段斜接軌道，而不是憑空消失。真實座標的還原不加這個值（那邊用的是剖面
-   * 的原始偏移），兩者刻意分開。
-   */
-  const devAt = (sq: number) => {
-    const d = result.refDeviation
-    if (!d.length) return 0
-    if (sq <= d[0]![0]) return d[0]![1]
-    if (sq >= d[d.length - 1]![0]) return d[d.length - 1]![1]
-    let lo = 0
-    let hi = d.length - 1
-    while (lo < hi - 1) {
-      const mid = (lo + hi) >> 1
-      if (d[mid]![0] <= sq) lo = mid
-      else hi = mid
-    }
-    const span = Math.max(1e-6, d[hi]![0] - d[lo]![0])
-    const u = (sq - d[lo]![0]) / span
-    return d[lo]![1] + (d[hi]![1] - d[lo]![1]) * u
-  }
 
   let lineKey = ''
   let lineLengthM = 0
@@ -747,10 +724,21 @@ export function layoutTrackGen(
       : Math.max(0.5, (line.widthM || LANE_W_M) * settings.trackWidthScale)
 
     /*
-     * 把剖面簡化成折線，容差取車道寬的四分之一：比這小的橫向擺動在簡圖上看不出來，
-     * 留著只會生出一堆幾公尺長的碎片。
+     * 畫的是<strong>第幾股</strong>，不是真實的橫向公尺數。
+     *
+     * 橫向被放大得很兇（一股就是一個軌道寬），真實幾何裡幾公尺的緩慢漂移放大之後
+     * 變成畫面上一大段斜的——實測原始中心線幾乎是兩條平直的線、只有一處渡線，生出來
+     * 卻整片都在斜。所以吸到整數股：平的地方就真的是平的，換股才有斜接軌道，一步
+     * 剛好一個軌道寬。
+     *
+     * 脊線把緩彎拉直後的偏離（refDeviation）也不再加回來。它是真實公尺，同樣會被
+     * 橫向倍率放大好幾倍，畫出來是整條線在飄，而那個彎在圖上已經由轉角表達過了。
      */
-    const withDev: Array<[number, number]> = prof.map(([sq, lat]) => [sq, lat + devAt(sq)])
+    const levelM = LANE_W_M
+    const withDev: Array<[number, number]> = prof.map(([sq, lat]) => [
+      sq,
+      Math.round(lat / levelM) * levelM,
+    ])
     /*
      * 轉折點先吸到脊線段的邊界，再併掉太短的段。
      *
