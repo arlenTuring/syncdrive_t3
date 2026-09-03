@@ -194,9 +194,6 @@ import {
 import {
   defaultTrackGenParameters,
   getTrackGenAreaId,
-  getTrackGenBlockSize,
-  getTrackGenResult,
-  getTrackGenSettings,
   TRACKGEN_AREA_ID_KEY,
   isTrackGenComponent,
 } from './utils/trackGenFacility'
@@ -206,10 +203,8 @@ import {
   DEFAULT_TAPER_TRACK,
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
-import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
+import { buildFacilitiesFromLayout } from './utils/trackGenApply'
 import type { TrackGenLayout } from './utils/trackGenLayout'
-import type { TrackGenResult } from './utils/trackGenerator'
-import type { TrackGenBlockSize } from './utils/trackGenFacility'
 import {
   defaultTrackCrossoverParameters,
 } from './utils/trackCrossoverFacility'
@@ -2276,26 +2271,16 @@ export default function MapEditorApp({
   const onApplyTrackGen = useCallback(
     (
       basemapId: string,
-      freshResult?: TrackGenResult,
-      block?: TrackGenBlockSize,
+      /** 對話框排好的版面：預覽與套用吃同一份，不再各排一次 */
       prebuilt?: TrackGenLayout,
     ) => {
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
-      if (!basemap) return
-      const result = freshResult ?? getTrackGenResult(basemap.parameters)
-      if (!result || !result.lines.length) return
-      const settings = getTrackGenSettings(basemap.parameters)
-      const blockSize = block ?? getTrackGenBlockSize(basemap.parameters)
+      if (!basemap || !prebuilt || !prebuilt.shapes.length) return
 
       pushHistory()
       let seq = nextNumericId
-      const built = buildFacilitiesFromTrackGen(
-        result,
-        settings,
-        () => String(seq++).padStart(3, '0'),
-        blockSize,
-        { wPx: basemap.layout.wPx, hPx: basemap.layout.hPx },
-        prebuilt,
+      const built = buildFacilitiesFromLayout(prebuilt, () =>
+        String(seq++).padStart(3, '0'),
       )
 
       const areaId = String(seq++).padStart(3, '0')
@@ -2324,12 +2309,8 @@ export default function MapEditorApp({
          * 範圍與框相同時對映是 1:1，拉出來多大就是多大。沒有指定時仍沿用元件的框。
          */
         layout: (() => {
-          const wPx = block
-            ? Math.max(40, Math.round(built.extentM.wM))
-            : basemap.layout.wPx
-          const hPx = block
-            ? Math.max(40, Math.round(built.extentM.hM))
-            : basemap.layout.hPx
+          const wPx = Math.max(40, Math.round(built.extentM.wM))
+          const hPx = Math.max(40, Math.round(built.extentM.hM))
           /*
            * 疊在元件上，但整塊要留在畫布裡。
            *
@@ -3994,9 +3975,6 @@ export default function MapEditorApp({
                           b.id === selectedBasemap.id ? { ...b, customName } : b,
                         ),
                       )
-                    }}
-                    onPatchParameters={(patch) => {
-                      onPatchBasemapParameters(selectedBasemap.id, patch)
                     }}
                   />
                 ) : selectedBasemap ? (

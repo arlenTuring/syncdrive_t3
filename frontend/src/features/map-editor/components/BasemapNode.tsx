@@ -21,24 +21,20 @@ import {
   type TrackGenSizeParams,
 } from './TrackGenSizeDialog'
 import { parseLaneCenterlines } from '../opendrive/laneCenterlines'
-import type { TrackGenResult } from '../utils/trackGenerator'
-import { generateTracks } from '../utils/trackGenerator'
 import {
   getTrackGenFileName,
-  getTrackGenResult,
+  getTrackGenSummary,
   getTrackGenXodr,
   isTrackGenComponent,
   TRACKGEN_FILE_NAME_KEY,
   TRACKGEN_BLOCK_SIZE_KEY,
   getTrackGenBlockSize,
-  getTrackGenSettings,
-  isAlongX,
   TRACKGEN_RESULT_KEY,
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
-import { buildTrackGraph } from '../utils/trackGenGraph'
+import { buildTrackGraph, type TrackGraph } from '../utils/trackGenGraph'
 import { layoutTrackGraph } from '../utils/trackGenGraphLayout'
-import { layoutTrackGen, type TrackGenLayout } from '../utils/trackGenLayout'
+import type { TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   type BasemapFileSelection,
@@ -119,12 +115,7 @@ function layoutFromCornerResize(
 
 type Props = {
   /** 軌道生成：把結果變成真正的設施 */
-  onApplyTrackGen?: (
-    basemapId: string,
-    result: TrackGenResult,
-    block: TrackGenSizeParams,
-    layout?: TrackGenLayout,
-  ) => void
+  onApplyTrackGen?: (basemapId: string, layout: TrackGenLayout) => void
   /** 目前這張地圖的畫布尺寸（像素）——生成對話框要照它畫縮圖 */
   mapPixelSize?: { width: number; height: number }
   basemap: MapBasemapObject
@@ -205,7 +196,7 @@ export const BasemapNode = memo(function BasemapNode({
     }
   }, [isTrackGen, trackGenXodr])
   const trackGenParseFailed = isTrackGen && !!trackGenXodr && !trackGenCenterlines
-  const trackGenResult = getTrackGenResult(basemap.parameters)
+  const trackGenResult = getTrackGenSummary(basemap.parameters)
   const [generating, setGenerating] = useState(false)
 
   /**
@@ -223,21 +214,20 @@ export const BasemapNode = memo(function BasemapNode({
    */
   const [sizeDialogOpen, setSizeDialogOpen] = useState(false)
   /*
-   * 路網先算好再開對話框。
+   * 路網的圖先建好再開對話框。
    *
-   * 對話框要能回答「這樣生出來塞不塞得進畫布」，而那個尺寸得把整份版面排完才知道；
-   * 排版吃的就是這份結果。順便省掉一次重算——這份結果與「一塊多少像素」無關，
-   * 拉大小時不必重跑。
+   * 對話框要能回答「這樣生出來多大」，而那得把整份版面排完才知道；排版吃的就是這張
+   * 圖。圖與「一塊多少像素」無關，拉參數時不必重建。
    */
-  const [pendingResult, setPendingResult] = useState<TrackGenResult | null>(null)
+  const [pendingGraph, setPendingGraph] = useState<TrackGraph | null>(null)
 
   const openSizeDialog = useCallback(() => {
     if (!trackGenCenterlines) return
     setGenerating(true)
-    // 讓「生成中」先畫出來，再做這件會佔住主執行緒約一秒的計算
+    // 讓「生成中」先畫出來，再做這件會佔住主執行緒的計算
     window.setTimeout(() => {
       try {
-        setPendingResult(generateTracks(trackGenCenterlines, {}))
+        setPendingGraph(buildTrackGraph(trackGenCenterlines))
         setSizeDialogOpen(true)
       } finally {
         setGenerating(false)
@@ -245,54 +235,32 @@ export const BasemapNode = memo(function BasemapNode({
     }, 0)
   }, [trackGenCenterlines])
 
-  /*
-   * 脊線上橫的路與縱的路各有哪幾段（公尺）。
-   *
-   * 給的是<strong>每一段</strong>而不是總和：切塊是一段一段切的，每段各自有除不盡的
-   * 尾巴，拿總長除一次算出來的塊數跟實際生的對不上。彎道不算進任何一軸：它由轉角
-   * 半徑決定，不吃「一塊代表幾公尺」。
-   */
+  /** 圖上橫的邊與縱的邊各有哪幾段（公尺），對話框拿去顯示 */
   const trackGenTotals = useMemo(() => {
-    if (!pendingResult) return undefined
+    if (!pendingGraph) return undefined
     const x: number[] = []
     const y: number[] = []
-    for (const seg of pendingResult.spine) {
-      if (seg.kind !== 'straight') continue
-      const len = seg.sTo - seg.sFrom
-      if (len <= 0) continue
-      if (isAlongX(seg.hdgDeg)) x.push(len)
-      else y.push(len)
+    for (const e of pendingGraph.edges) {
+      if (e.orient === 'h') x.push(e.lengthM)
+      else y.push(e.lengthM)
     }
     return { x, y }
-  }, [pendingResult])
+  }, [pendingGraph])
 
   /**
    * 這組參數排出來會佔多大、兩軸各幾塊——對話框拿去跟畫布比。
    *
-   * 塊數直接<strong>數排出來的形狀</strong>，不另外用公尺數推。推的版本錯過一次：拿
-   * 脊線上那段 214 公尺的縱向路除以一塊 80 公尺說會有 3 塊，實際只生 2 塊——那段路
-   * 有一截被轉角與斜接吃掉，一條線並沒有走滿整段。只數參考線，不然雙線會變兩倍。
+   * 塊數直接<strong>數排出來的形狀</strong>，不另外用公尺數推。
    */
   const measureTrackGen = useCallback(
     (block: TrackGenSizeParams) => {
-      if (!pendingResult) return null
+      if (!pendingGraph) return null
       const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
-      /*
-       * 有中心線就走圖模型：節點擺位、邊連在節點之間，環才會閉合。舊的脊線模型留著
-       * 當退路——中心線解析失敗時仍然生得出東西。
-       */
-      const graphLayout = trackGenCenterlines
-        ? layoutTrackGraph(buildTrackGraph(trackGenCenterlines), block, {
-            wPx: displayLayout.wPx,
-            hPx: displayLayout.hPx,
-          })
-        : null
-      const { bounds, shapes } =
-        graphLayout ??
-        layoutTrackGen(pendingResult, getTrackGenSettings(basemap.parameters), block, {
-          wPx: displayLayout.wPx,
-          hPx: displayLayout.hPx,
-        })
+      const graphLayout = layoutTrackGraph(pendingGraph, block, {
+        wPx: displayLayout.wPx,
+        hPx: displayLayout.hPx,
+      })
+      const { bounds, shapes } = graphLayout
       /*
        * 塊數只數<strong>其中一條線</strong>，不然雙線會變兩倍。取塊數最多的那一條，
        * 圖模型的線是車道鍵（例如 8:-2），沒有「參考線」這個概念。
@@ -335,19 +303,27 @@ export const BasemapNode = memo(function BasemapNode({
         },
       }
     },
-    [basemap.parameters, displayLayout, mapPixelSize, pendingResult, trackGenCenterlines],
+    [displayLayout, mapPixelSize, pendingGraph],
   )
 
   const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
-    const result = pendingResult
-    if (!result) return
-    // 結果留著給屬性匡顯示統計，也讓「重新生成」知道上一次生成過
+    const graph = pendingGraph
+    if (!graph) return
+    const measured = measureTrackGen(block)
+    if (!measured?.layout) return
+    // 摘要留著給屬性匡顯示，也讓「重新生成」知道上一次生成過
     onPatchParameters(basemap.id, {
-      [TRACKGEN_RESULT_KEY]: result,
+      [TRACKGEN_RESULT_KEY]: {
+        nodes: graph.nodes.length,
+        edges: graph.edges.length,
+        components: graph.components,
+        lanes: new Set(graph.edges.flatMap((e) => e.lanes.map((l) => l.key))).size,
+        totalM: Math.round(graph.edges.reduce((t, e) => t + e.lengthM, 0)),
+      },
       [TRACKGEN_BLOCK_SIZE_KEY]: block,
     })
-    onApplyTrackGen?.(basemap.id, result, block, measureTrackGen(block)?.layout)
-  }, [basemap.id, onApplyTrackGen, onPatchParameters, pendingResult])
+    onApplyTrackGen?.(basemap.id, measured.layout as TrackGenLayout)
+  }, [basemap.id, measureTrackGen, onApplyTrackGen, onPatchParameters, pendingGraph])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
   const fileName = getBasemapFileName(basemap.parameters)

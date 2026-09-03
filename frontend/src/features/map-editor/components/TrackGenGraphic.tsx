@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Plus, Route } from 'lucide-react'
 import type { LaneCenterlinePlan, RoadInfo } from '../opendrive/laneCenterlines'
-import type { TrackGenResult, Vec2 } from '../utils/trackGenerator'
+import type { TrackGenSummary } from '../utils/trackGenFacility'
+import type { Vec2 } from '../utils/trackGenLayout'
 
 /**
  * 軌道生成元件的內容：只畫<strong>道路中心線</strong>。
@@ -16,7 +17,7 @@ type Props = {
   height: number
   centerlines: LaneCenterlinePlan | null
   parseFailed: boolean
-  result: TrackGenResult | null
+  result: TrackGenSummary | null
   fileName: string | null
   readOnly: boolean
   selected: boolean
@@ -300,7 +301,7 @@ export function TrackGenGraphic({
       {selected ? (
         <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
           {`${centerlines.roads.length} 條 road · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
-          {result ? ` ｜ 已生成 ${result.lines.length} 條線到地圖上` : ''}
+          {result ? ` ｜ 已生成 ${result.lanes} 條車道到地圖上` : ''}
         </div>
       ) : null}
 

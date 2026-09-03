@@ -1,4 +1,3 @@
-import type { SpineSegment, TrackGenResult, Vec2 } from './trackGenerator'
 
 /**
  * 軌道生成元件的參數存取與排版。
@@ -133,14 +132,29 @@ export function getTrackGenFileName(parameters: Record<string, unknown> | undefi
   return typeof raw === 'string' && raw.trim() ? raw.trim() : null
 }
 
-export function getTrackGenResult(
+/** 生成後留下的摘要，給屬性欄顯示，也讓「重新生成」知道上一次生成過 */
+export type TrackGenSummary = {
+  nodes: number
+  edges: number
+  components: number
+  lanes: number
+  totalM: number
+}
+
+export function getTrackGenSummary(
   parameters: Record<string, unknown> | undefined,
-): TrackGenResult | null {
+): TrackGenSummary | null {
   const raw = parameters?.[TRACKGEN_RESULT_KEY]
   if (!raw || typeof raw !== 'object') return null
-  const r = raw as Partial<TrackGenResult>
-  if (!Array.isArray(r.spine) || !Array.isArray(r.lines)) return null
-  return raw as TrackGenResult
+  const r = raw as Partial<TrackGenSummary>
+  if (typeof r.edges !== 'number' || typeof r.nodes !== 'number') return null
+  return {
+    nodes: r.nodes,
+    edges: r.edges,
+    components: r.components ?? 1,
+    lanes: r.lanes ?? 0,
+    totalM: r.totalM ?? 0,
+  }
 }
 
 export function getTrackGenSettings(
@@ -156,105 +170,4 @@ export function defaultTrackGenParameters(): Record<string, unknown> {
     [TRACKGEN_KIND_KEY]: TRACKGEN_KIND_VALUE,
     [TRACKGEN_SETTINGS_KEY]: { ...DEFAULT_TRACKGEN_SETTINGS },
   }
-}
-
-/* ── 排版 ────────────────────────────────────────────────────────
-   螢幕座標 y 向下：真實航向 θ 的方向向量是 (cosθ, −sinθ)，
-   行進方向左法線是 (−sinθ, −cosθ)。                              */
-
-const DEG = Math.PI / 180
-
-export type PlacedSpine = Array<
-  | { kind: 'straight'; sFrom: number; sTo: number; p0: Vec2; dir: Vec2; nrm: Vec2; lenPx: number }
-  | { kind: 'arc'; sFrom: number; sTo: number; centre: Vec2; v0: Vec2; radiusPx: number; sign: number; turnDeg: number }
->
-
-/**
- * @param alongX 橫向的路，一公尺幾像素
- * @param alongY 縱向的路，一公尺幾像素——與橫向分開，扁畫布才塞得下
- * @param cornerRadiusPx 轉角的<strong>脊線</strong>半徑，已經是版面單位。
- *   以前吃的是公尺再乘 alongScale，於是轉角大小綁在「一塊代表幾公尺」上：使用者
- *   只是把一塊從 50 公尺改成 25，轉角就跟著脹成兩倍，而他根本沒動到轉角。
- */
-/** 航向是不是橫的（脊線的航向已經吸到 90 度的倍數） */
-export function isAlongX(hdgDeg: number): boolean {
-  return Math.abs(Math.round(hdgDeg / 90)) % 2 === 0
-}
-
-export function placeSpine(
-  spine: SpineSegment[],
-  alongX: number,
-  alongY: number,
-  cornerRadiusPx: number,
-): PlacedSpine {
-  const out: PlacedSpine = []
-  let p: Vec2 = { x: 0, y: 0 }
-  let hdg = spine.find((s) => s.kind === 'straight')?.hdgDeg ?? 180
-
-  for (const seg of spine) {
-    if (seg.kind === 'straight') {
-      hdg = seg.hdgDeg
-      const dir = { x: Math.cos(hdg * DEG), y: -Math.sin(hdg * DEG) }
-      const nrm = { x: -Math.sin(hdg * DEG), y: -Math.cos(hdg * DEG) }
-      const lenPx = (seg.sTo - seg.sFrom) * (isAlongX(hdg) ? alongX : alongY)
-      out.push({ kind: 'straight', sFrom: seg.sFrom, sTo: seg.sTo, p0: p, dir, nrm, lenPx })
-      p = { x: p.x + dir.x * lenPx, y: p.y + dir.y * lenPx }
-    } else {
-      const radiusPx = cornerRadiusPx
-      const nrm = { x: -Math.sin(hdg * DEG), y: -Math.cos(hdg * DEG) }
-      const sign = seg.turnDeg > 0 ? 1 : -1
-      const centre = { x: p.x + nrm.x * sign * radiusPx, y: p.y + nrm.y * sign * radiusPx }
-      const v0 = { x: p.x - centre.x, y: p.y - centre.y }
-      out.push({ kind: 'arc', sFrom: seg.sFrom, sTo: seg.sTo, centre, v0, radiusPx, sign, turnDeg: seg.turnDeg })
-      // 真實左轉 = 螢幕順時針
-      const a = -seg.turnDeg * DEG
-      p = {
-        x: centre.x + v0.x * Math.cos(a) - v0.y * Math.sin(a),
-        y: centre.y + v0.x * Math.sin(a) + v0.y * Math.cos(a),
-      }
-      hdg += seg.turnDeg
-    }
-  }
-  return out
-}
-
-/** (里程, 橫向偏移) → 排版座標 */
-export function placePoint(
-  s: number,
-  lateralM: number,
-  placed: PlacedSpine,
-  lateralScale: number,
-): Vec2 {
-  const seg = placed.find((q) => s <= q.sTo) ?? placed[placed.length - 1]
-  if (!seg) return { x: 0, y: 0 }
-  if (seg.kind === 'straight') {
-    const u = ((s - seg.sFrom) / Math.max(1e-6, seg.sTo - seg.sFrom)) * seg.lenPx
-    return {
-      x: seg.p0.x + seg.dir.x * u + seg.nrm.x * lateralM * lateralScale,
-      y: seg.p0.y + seg.dir.y * u + seg.nrm.y * lateralM * lateralScale,
-    }
-  }
-  const u = Math.max(0, Math.min(1, (s - seg.sFrom) / Math.max(1e-6, seg.sTo - seg.sFrom)))
-  const a = -seg.turnDeg * DEG * u
-  const vx = seg.v0.x * Math.cos(a) - seg.v0.y * Math.sin(a)
-  const vy = seg.v0.x * Math.sin(a) + seg.v0.y * Math.cos(a)
-  const m = Math.hypot(vx, vy) || 1
-  /*
-   * 內側半徑變小，兩條線在彎道才會保持平行。
-   *
-   * 半徑要夾在正值：離主線三股的側線橫向偏移比彎道半徑還大，不夾的話半徑變負，
-   * 點會穿過圓心鏡射到另一邊——畫面上就是一條從轉角斜刺出去的帶子。
-   */
-  const r = Math.max(
-    seg.radiusPx * 0.15,
-    seg.radiusPx - seg.sign * lateralM * lateralScale,
-  )
-  return { x: seg.centre.x + (vx / m) * r, y: seg.centre.y + (vy / m) * r }
-}
-
-/** 讓彎道畫出來的弧長等於實際長度×沿線縮放，整條線比例才一致 */
-export function uniformCornerRadiusM(spine: SpineSegment[]): number | null {
-  const arc = spine.find((s) => s.kind === 'arc')
-  if (!arc || arc.kind !== 'arc' || !arc.turnDeg) return null
-  return Math.round((arc.sTo - arc.sFrom) / Math.abs(arc.turnDeg * DEG))
 }

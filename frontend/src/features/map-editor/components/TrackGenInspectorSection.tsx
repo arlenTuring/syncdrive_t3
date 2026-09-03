@@ -1,106 +1,26 @@
-import { useMemo } from 'react'
 import type { MapBasemapObject } from '../types/basemap'
-import {
-  DEFAULT_TRACKGEN_SETTINGS,
-  getTrackGenFileName,
-  getTrackGenResult,
-  getTrackGenSettings,
-  TRACKGEN_SETTINGS_KEY,
-  uniformCornerRadiusM,
-  type TrackGenSettings,
-} from '../utils/trackGenFacility'
+import { getTrackGenFileName, getTrackGenSummary } from '../utils/trackGenFacility'
 
 /**
  * 軌道生成元件的屬性。
  *
- * 這裡只調「整體怎麼畫」，不調個別區塊——區塊的里程與橫向偏移由 .xodr 的幾何
- * 決定，手動改那些數字就失去自動生成的意義了。
+ * 這裡只有名稱與一份摘要——「軌道怎麼畫」的三個參數在按下生成時的對話框裡，改了
+ * 就能立刻看到整份版面的預覽，比在屬性欄裡拉滑桿再回頭看畫面直觀得多。
+ *
+ * 舊版在這裡放了橫向放大、軌道寬度倍率、彎道半徑、每塊目標長度、渡線與側線開關。
+ * 那些都是「脊線 + 橫向偏移」那套模型的旋鈕，模型換成路網圖之後全部沒有意義了，
+ * 一併移除，免得畫面上留著一堆調了沒反應的東西。
  */
 
 type Props = {
   basemap: MapBasemapObject
   readOnly: boolean
   onRename: (customName: string) => void
-  onPatchParameters: (patch: Record<string, unknown>) => void
 }
 
-type SliderProps = {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  suffix?: string
-  disabled?: boolean
-  onChange: (v: number) => void
-}
-
-function Slider({ label, value, min, max, step, suffix, disabled, onChange }: SliderProps) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="flex items-baseline justify-between gap-2 text-[11px] text-zinc-400">
-        {label}
-        <b className="font-mono text-[12px] font-medium tabular-nums text-zinc-100">
-          {value}
-          {suffix ? ` ${suffix}` : ''}
-        </b>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-cyan-500 disabled:opacity-40"
-      />
-    </label>
-  )
-}
-
-export function TrackGenInspectorSection({
-  basemap,
-  readOnly,
-  onRename,
-  onPatchParameters,
-}: Props) {
-  const settings = getTrackGenSettings(basemap.parameters)
-  const result = getTrackGenResult(basemap.parameters)
+export function TrackGenInspectorSection({ basemap, readOnly, onRename }: Props) {
+  const summary = getTrackGenSummary(basemap.parameters)
   const fileName = getTrackGenFileName(basemap.parameters)
-
-  const stats = useMemo(() => {
-    if (!result) return null
-    return {
-      lines: result.lines.length,
-      junction: result.lines.filter((l) => l.role === 'junction').length,
-      straights: result.spine.filter((s) => s.kind === 'straight').length,
-      arcs: result.spine.filter((s) => s.kind === 'arc').length,
-      longestM: result.lines.reduce((a, l) => Math.max(a, l.lengthM), 0),
-    }
-  }, [result])
-
-  /*
-   * 回填的參照場域範圍會落在哪。
-   *
-   * .xodr 就是場域的實際地圖，座標直接當場域座標用；把整體範圍顯示出來，是給人
-   * 對照「這張圖蓋到場域的哪一塊」，不是拿來調整的。
-   */
-  const fieldExtent = useMemo(() => {
-    if (!result?.refPoints.length) return null
-    const xs = result.refPoints.map((p) => p.x)
-    const ys = result.refPoints.map((p) => p.y)
-    return {
-      xMin: Math.min(...xs),
-      xMax: Math.max(...xs),
-      yMin: Math.min(...ys),
-      yMax: Math.max(...ys),
-    }
-  }, [result])
-
-  const patch = (next: Partial<TrackGenSettings>) => {
-    onPatchParameters({ [TRACKGEN_SETTINGS_KEY]: { ...settings, ...next } })
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,157 +35,36 @@ export function TrackGenInspectorSection({
         />
       </label>
 
-      <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400">
-        {result ? (
+      <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] leading-snug text-zinc-400">
+        {summary ? (
           <div className="flex flex-col gap-0.5">
             <span>
-              路網 <b className="font-mono tabular-nums text-zinc-200">{result.totalM.toFixed(0)} m</b>
-              {' · '}脊線 <b className="font-mono tabular-nums text-zinc-200">{stats?.straights} 直 · {stats?.arcs} 彎</b>
+              路網{' '}
+              <b className="font-mono tabular-nums text-zinc-200">{summary.totalM} m</b>
+              {' · '}
+              <b className="font-mono tabular-nums text-zinc-200">{summary.lanes}</b> 條車道
             </span>
             <span>
-              串出 <b className="font-mono tabular-nums text-zinc-200">{stats?.lines}</b> 條線
-              {' · '}其中 <b className="font-mono tabular-nums text-zinc-200">{stats?.junction}</b> 條在 junction 內
+              圖上 <b className="font-mono tabular-nums text-zinc-200">{summary.nodes}</b> 個節點
+              {' · '}
+              <b className="font-mono tabular-nums text-zinc-200">{summary.edges}</b> 條邊
+              {' · '}
+              <b className="font-mono tabular-nums text-zinc-200">{summary.components}</b> 個連通塊
             </span>
-            <span>
-              最長一條 
-              <b className="font-mono tabular-nums text-zinc-200">{stats?.longestM.toFixed(0)} m</b>
-              {' · '}里程量在它上面
-            </span>
+            <p className="mt-1 text-[10.5px] text-zinc-500">
+              每一段軌道的參照場域範圍在生成時就填好了，座標直接沿用 .xodr——那就是場域的
+              實際地圖，車端回報的位置與這裡是同一個座標系。
+            </p>
           </div>
         ) : (
           <span>{fileName ? `已載入 ${fileName}，尚未生成軌道` : '尚未載入 .xodr'}</span>
         )}
       </div>
 
-      <fieldset disabled={readOnly} className="flex flex-col gap-3">
-        <legend className="mb-1 text-[11px] font-medium tracking-wide text-zinc-300">整體比例</legend>
-        <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
-          整體大小由元件框決定，拖曳邊角即可縮放。
-        </p>
-        <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
-          兩者都是 1 時直接照真實幾何畫，只有曲率被分段化成一般／圓角／斜接三種軌道。
-          放大橫向可以把並行的線分開，但軌道寬要跟著調，否則會變成一堆細線。
-        </p>
-        <Slider
-          label="橫向放大"
-          value={settings.lateralScale}
-          min={1}
-          max={20}
-          step={1}
-          suffix="×"
-          onChange={(v) => patch({ lateralScale: v })}
-        />
-        <Slider
-          label="軌道寬度"
-          value={settings.trackWidthScale}
-          min={1}
-          max={20}
-          step={1}
-          suffix="× 車道寬"
-          onChange={(v) => patch({ trackWidthScale: v })}
-        />
-        <div className="flex items-end gap-2">
-          <div className="min-w-0 flex-1">
-            <Slider
-              label="彎道半徑"
-              value={settings.cornerRadiusM}
-              min={10}
-              max={220}
-              step={1}
-              suffix="m"
-              onChange={(v) => patch({ cornerRadiusM: v })}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!result}
-            onClick={() => {
-              const r = result ? uniformCornerRadiusM(result.spine) : null
-              if (r) patch({ cornerRadiusM: r })
-            }}
-            title="讓彎道畫出的弧長等於實際長度×沿線縮放"
-            className="shrink-0 rounded-md border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-cyan-500/70 hover:text-cyan-200 disabled:opacity-40"
-          >
-            等比
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset disabled={readOnly} className="flex flex-col gap-3">
-        <legend className="mb-1 text-[11px] font-medium tracking-wide text-zinc-300">區塊</legend>
-        <Slider
-          label="每塊目標長度"
-          value={settings.blockLengthM}
-          min={20}
-          max={150}
-          step={5}
-          suffix="m"
-          onChange={(v) => patch({ blockLengthM: v })}
-        />
-        <p className="-mt-1 text-[10.5px] leading-snug text-zinc-500">
-          改長度需要重新生成才會套用；比例與顯示則即時生效。
-        </p>
-        <Slider
-          label="區塊字級"
-          value={settings.labelSizePx}
-          min={0}
-          max={16}
-          step={1}
-          suffix={settings.labelSizePx === 0 ? '（隱藏）' : 'px'}
-          onChange={(v) => patch({ labelSizePx: v })}
-        />
-      </fieldset>
-
-      {fieldExtent ? (
-        <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] leading-snug text-zinc-400">
-          <div>
-            參照場域範圍 
-            <b className="font-mono tabular-nums text-zinc-200">
-              x {fieldExtent.xMin.toFixed(0)}–{fieldExtent.xMax.toFixed(0)}
-            </b>
-            
-            <b className="font-mono tabular-nums text-zinc-200">
-              y {fieldExtent.yMin.toFixed(0)}–{fieldExtent.yMax.toFixed(0)}
-            </b>
-          </div>
-          <p className="mt-1 text-[10.5px] text-zinc-500">
-            「套用到地圖」時每一段軌道的參照場域範圍都會自動填好，座標直接沿用
-            .xodr——那就是場域的實際地圖，車端回報的位置與這裡是同一個座標系。
-          </p>
-        </div>
-      ) : null}
-
-      <fieldset disabled={readOnly} className="flex flex-col gap-2">
-        <legend className="mb-1 text-[11px] font-medium tracking-wide text-zinc-300">顯示</legend>
-        <label className="flex items-center gap-2 text-[12px] text-zinc-300">
-          <input
-            type="checkbox"
-            checked={settings.showCrossovers}
-            onChange={(e) => patch({ showCrossovers: e.target.checked })}
-            className="accent-cyan-500"
-          />
-          渡線
-        </label>
-        <label className="flex items-center gap-2 text-[12px] text-zinc-300">
-          <input
-            type="checkbox"
-            checked={settings.showSidings}
-            onChange={(e) => patch({ showSidings: e.target.checked })}
-            className="accent-cyan-500"
-          />
-          側線
-        </label>
-      </fieldset>
-
-      {!readOnly ? (
-        <button
-          type="button"
-          onClick={() => onPatchParameters({ [TRACKGEN_SETTINGS_KEY]: { ...DEFAULT_TRACKGEN_SETTINGS } })}
-          className="self-start rounded-md border border-zinc-600 px-2.5 py-1 text-[11px] text-zinc-300 transition hover:border-cyan-500/70 hover:text-cyan-200"
-        >
-          回到預設值
-        </button>
-      ) : null}
+      <p className="text-[10.5px] leading-snug text-zinc-500">
+        軌道寬度與「一塊代表幾公尺」在按下「軌道生成」後的對話框裡調，那裡看得到整份
+        版面的預覽。整體大小由這個元件的框決定，拖曳邊角即可縮放。
+      </p>
     </div>
   )
 }
