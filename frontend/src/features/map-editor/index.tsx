@@ -1262,6 +1262,19 @@ export default function MapEditorApp({
   const publishAndReport = useCallback(async (entry: MapLibraryEntry) => {
     const result = await publishMapLibraryEntryToBackend(entry)
     setBackendSyncFailed(!result.ok)
+    /*
+     * 送成功就記下來。
+     *
+     * 補水時要靠這個欄位分辨「後端沒有這一張」是被刪掉了還是根本還沒送上去；沒有
+     * 這一筆的話，剛建好還來不及發佈的地圖會在下一次重新整理時被當成已刪除清掉。
+     */
+    writeMapLibrary(
+      readMapLibrary().map((e) =>
+        e.libraryId === entry.libraryId
+          ? { ...e, publishState: result.ok ? ('published' as const) : ('pending' as const) }
+          : e,
+      ),
+    )
   }, [])
 
   const openLibraryMap = useCallback(

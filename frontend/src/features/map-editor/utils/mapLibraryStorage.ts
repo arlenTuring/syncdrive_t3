@@ -50,6 +50,14 @@ export type MapLibraryEntry = {
   updatedAt: string
   /** 若由 public/maps 內建檔種子而來 */
   builtinId?: string
+  /**
+   * 這一份有沒有成功送到後端過。
+   *
+   * 用來分辨「後端上沒有這一張」的兩種情況：<code>pending</code> 是還沒送成功（發佈
+   * 失敗、離線），必須留著再送；其餘（已送成功、或舊版沒有這個欄位的資料）代表它
+   * 曾經在後端上，現在不在了就是<strong>被刪掉了</strong>，本機要跟著刪。
+   */
+  publishState?: 'pending' | 'published'
   mapDocument: MapFileV2
 }
 
@@ -319,7 +327,35 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
     }
   }
 
-  const merged = [...byId.values()]
+  /*
+   * 後端沒有的就刪掉，<strong>不要留在本機</strong>。
+   *
+   * 先前這裡只做聯集：後端有的更新進來，後端沒有的原封不動留著。於是在別處刪掉的
+   * 地圖，這台瀏覽器重新整理還是看得到——實測後端只剩 2 張，畫面上照樣列出 30 張，
+   * 而且下次存檔還會把它們推回後端，等於刪不掉。使用者要的是「重新整理就是去拉
+   * 資料」，那本機就不能有自己的一套。
+   *
+   * 唯一的例外是還沒送成功的（publishState === 'pending'）：那是本機才有的新東西，
+   * 刪掉就真的沒了，留著並且再送一次。舊版資料沒有這個欄位，視同曾經發佈過。
+   */
+  const liveIds = new Set(
+    published.maps.map((m) => resolveMapId(m.mapId || m.libraryId)).filter(Boolean),
+  )
+  const kept: MapLibraryEntry[] = []
+  const dropped: string[] = []
+  for (const entry of byId.values()) {
+    const mapId = resolveMapId(entry.mapDocument.mapId || entry.libraryId)
+    // 內建範例是本機種子出來的，後端上本來就沒有，不能當成被刪掉
+    if (liveIds.has(mapId) || entry.publishState === 'pending' || entry.builtinId) {
+      kept.push(entry)
+    }
+    else dropped.push(entry.displayName)
+  }
+  if (dropped.length > 0) {
+    console.info(`[map-library] 後端已無這些地圖，本機一併清掉：${dropped.join('、')}`)
+  }
+
+  const merged = kept
   writeMapLibrary(merged)
 
   if (toPublish.length > 0) {
@@ -438,25 +474,36 @@ export function importMapEntryFromServer(
   parsed: ParsedMapFile,
   mapId: string,
 ): MapLibraryEntry {
-  return entryFromParsed(
-    { ...parsed, mapId, updatedAt: parsed.updatedAt ?? nowIso() },
-    { libraryId: mapId, createdAt: parsed.createdAt },
-  )
+  return {
+    ...entryFromParsed(
+      { ...parsed, mapId, updatedAt: parsed.updatedAt ?? nowIso() },
+      { libraryId: mapId, createdAt: parsed.createdAt },
+    ),
+    // 這一份就是從後端拿下來的
+    publishState: 'published',
+  }
 }
 
 export function importMapEntryFromParsed(parsed: ParsedMapFile): MapLibraryEntry {
   const libraryId = generateLibraryId()
   const now = nowIso()
-  return entryFromParsed(
-    {
-      ...parsed,
-      mapId: libraryId,
-      createdAt: parsed.createdAt ?? now,
-      updatedAt: now,
-      version: parsed.version || DEFAULT_MAP_VERSION,
-    },
-    { libraryId },
-  )
+  return {
+    ...entryFromParsed(
+      {
+        ...parsed,
+        mapId: libraryId,
+        createdAt: parsed.createdAt ?? now,
+        updatedAt: now,
+        version: parsed.version || DEFAULT_MAP_VERSION,
+      },
+      { libraryId },
+    ),
+    /*
+     * 還沒送上去。標成 pending，補水時才知道「後端沒有這一張」是因為它是新的，
+     * 不是因為被刪掉了——不標的話新建的地圖會在下一次重新整理時消失。
+     */
+    publishState: 'pending',
+  }
 }
 
 export function renameMapLibraryEntry(
