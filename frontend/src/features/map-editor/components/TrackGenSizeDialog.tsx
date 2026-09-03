@@ -232,8 +232,15 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
    * 矩形是兩回事。這裡直接把整份版面排一次，量它的外接矩形。
    */
   const extent = useMemo(() => measure?.(params) ?? null, [measure, params])
-  const overflow =
-    extent !== null && (extent.wPx > canvasW + 0.5 || extent.hPx > canvasH + 0.5)
+  /*
+   * 哪一軸超出要講清楚。
+   *
+   * 只說「超出畫布 3152 × 642」時，使用者看到寬 2948 比 3152 小，會以為判斷錯了；
+   * 實際上超出的是高——版面會折回來，堆疊起來的高度跟一塊有多長沒有直覺關係。
+   */
+  const overW = extent !== null && extent.wPx > canvasW + 0.5
+  const overH = extent !== null && extent.hPx > canvasH + 0.5
+  const overflow = overW || overH
 
   const fitToCanvas = useCallback(
     () => setParams((p) => shrinkToFit(p, measure, canvasW, canvasH)),
@@ -394,9 +401,11 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
               </b>
               {overflow ? (
                 <>
-                  {'，超出畫布 '}
+                  {overW && overH ? '，長寬都超出畫布 ' : overW ? '，寬度超出畫布 ' : '，高度超出畫布 '}
                   <b className="font-mono tabular-nums text-zinc-200">
-                    {canvasW} × {canvasH} px
+                    {overW && overH
+                      ? `${canvasW} × ${canvasH} px`
+                      : `${overW ? canvasW : canvasH} px`}
                   </b>
                   <button
                     type="button"
