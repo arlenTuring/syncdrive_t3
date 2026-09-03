@@ -20,13 +20,36 @@ export interface MapOption {
  *
  * 所以再加上伺服器已發佈的那些。同一個 mapId 以本機為準——本機那份可能有還沒
  * 發佈的修改。
+ *
+ * <strong>但伺服器沒有的就別列。</strong>本機快取是<strong>快取</strong>，不是另一份
+ * 真相：在別處刪掉的地圖若還留在這台瀏覽器裡，選單就會列出一個已經不存在的選項，
+ * 選下去在別台機器上是空的。只有兩種本機項目留著——內建範例（伺服器上本來就沒有）
+ * 與還沒發佈成功的（刪了就真的沒了）。伺服器連不上時整個不過濾，沿用快取。
  */
 export async function getAvailableMapsAsync(): Promise<MapOption[]> {
-  const local = getAvailableMaps();
+  const localAll = getAvailableMaps();
+
+  let published: Awaited<ReturnType<typeof fetchPublishedMapList>>;
+  try {
+    published = await fetchPublishedMapList();
+  } catch {
+    /* 連不上伺服器就只列本機的，不要讓整個選單掛掉 */
+    return localAll;
+  }
+
+  const liveIds = new Set(
+    published.maps.map((m) => m.mapId || m.libraryId).filter(Boolean),
+  );
+  const keepLocal = new Set(
+    readMapLibrary()
+      .filter((e) => e.builtinId || e.publishState === 'pending')
+      .map((e) => e.libraryId),
+  );
+  const local = localAll.filter((m) => liveIds.has(m.mapId) || keepLocal.has(m.mapId));
   const seen = new Set(local.map((m) => m.mapId));
 
-  try {
-    const { maps } = await fetchPublishedMapList();
+  {
+    const { maps } = published;
     for (const m of maps) {
       const id = m.mapId || m.libraryId;
       if (!id || seen.has(id)) continue;
@@ -46,8 +69,6 @@ export async function getAvailableMapsAsync(): Promise<MapOption[]> {
         source: 'server',
       });
     }
-  } catch {
-    /* 連不上伺服器就只列本機的，不要讓整個選單掛掉 */
   }
 
   return local;

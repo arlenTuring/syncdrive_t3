@@ -349,7 +349,21 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
     if (liveIds.has(mapId) || entry.publishState === 'pending' || entry.builtinId) {
       kept.push(entry)
     }
-    else dropped.push(entry.displayName)
+    else {
+      dropped.push(entry.displayName)
+      /*
+       * 草稿與正式版的快取也要一起清。
+       *
+       * 它們是另外幾個 key，只留著地圖不見了也沒人會去讀，但會一直佔配額；更麻煩的
+       * 是同一個 libraryId 之後又出現時會把舊草稿當成這張圖的內容。刪除單張時本來
+       * 就有清，這條路徑漏了。
+       */
+      for (const id of [entry.libraryId, entry.builtinId]) {
+        if (!id) continue
+        localStorage.removeItem(`${MAP_DRAFT_PREFIX}${id}`)
+        localStorage.removeItem(`${MAP_OFFICIAL_PREFIX}${id}`)
+      }
+    }
   }
   if (dropped.length > 0) {
     console.info(`[map-library] 後端已無這些地圖，本機一併清掉：${dropped.join('、')}`)
