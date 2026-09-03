@@ -273,10 +273,12 @@ export const BasemapNode = memo(function BasemapNode({
   const measureTrackGen = useCallback(
     (block: TrackGenSizeParams) => {
       if (!pendingResult) return null
+      const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
       const { bounds, shapes } = layoutTrackGen(
         pendingResult,
         getTrackGenSettings(basemap.parameters),
         block,
+        { wPx: displayLayout.wPx, hPx: displayLayout.hPx },
       )
       const refKey = pendingResult.lines[0]?.key
       let countX = 0
@@ -292,7 +294,6 @@ export const BasemapNode = memo(function BasemapNode({
        * 生成出來會落在畫布的哪裡：位置沿用這個元件的框，但整塊要留在畫布內，
        * 與套用時同一條規則。預覽照這個位置畫，看到的就是實際會長成的樣子。
        */
-      const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
       const clamp = (v: number, span: number, limit: number) =>
         Math.max(0, Math.min(v, Math.max(0, limit - span)))
       return {
@@ -1055,6 +1056,7 @@ export const BasemapNode = memo(function BasemapNode({
         canvasPx={
           mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
         }
+        boxPx={{ wPx: displayLayout.wPx, hPx: displayLayout.hPx }}
         totals={trackGenTotals}
         initial={getTrackGenBlockSize(basemap.parameters)}
         measure={measureTrackGen}

@@ -2288,6 +2288,7 @@ export default function MapEditorApp({
         settings,
         () => String(seq++).padStart(3, '0'),
         blockSize,
+        { wPx: basemap.layout.wPx, hPx: basemap.layout.hPx },
       )
 
       const areaId = String(seq++).padStart(3, '0')

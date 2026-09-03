@@ -25,42 +25,26 @@ export const TRACKGEN_AREA_ID_KEY = 'trackGenAreaId'
  * 決定，單位是<strong>畫布像素</strong>——他在意的是「在我的畫布上這塊看起來多大」。
  */
 export type TrackGenBlockSize = {
-  /** 橫向的一塊有多長（畫布像素） */
-  blockLengthXPx: number
-  /** 縱向的一塊有多長（畫布像素）——與橫向分開，扁畫布才塞得下 */
-  blockLengthYPx: number
-  /** 軌道有多寬（畫布像素）。兩軸共用，不然轉角接不起來 */
-  blockWidthPx: number
   /**
-   * 橫向的路，一塊代表幾公尺。
+   * 軌道有多寬（畫布像素）。
    *
-   * 橫縱分開的理由：畫布通常又寬又扁（3152 × 642），而場域是折起來的。同一個公尺
-   * 數套在兩軸上時，橫向還很寬鬆、縱向早就滿了。分開之後縱向可以壓得比橫向兇，
-   * 整張圖才塞得進扁畫布。
+   * 它決定的是<strong>車輛在圖上的解析度</strong>——軌道畫粗一點，車子在上面才不會
+   * 擠成一點。整體大小不受它影響：版面永遠鋪滿軌道生成元件的框，寬度變了只是每條
+   * 帶子連同接上去的圓角、斜接、分岔一起變粗。
    */
+  trackWidthPx: number
+  /** 橫向的路，一塊代表幾公尺——只決定切幾刀，不決定大小 */
   metersPerBlockX: number
   /** 縱向的路，一塊代表幾公尺 */
   metersPerBlockY: number
-  /**
-   * 斜接軌道的斜率，1：N。
-   *
-   * 換股道的斜度<strong>不能照 .xodr 的真實過渡長度畫</strong>。版面的橫向被放大得
-   * 很兇：一塊 83 px 代表 50 公尺時沿線是 1.66 px／公尺，而軌道寬 53 px 換算成
-   * 15.8 px／公尺，兩軸差 9.5 倍。真實 1:30 的渡線畫出來就變成 1:3，看起來像折斷。
-   * 所以斜率改成直接指定，斜接軌道要多長由它反推。
-   */
-  taperSlopeN: number
 }
 
 export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
 
 export const DEFAULT_TRACKGEN_BLOCK_SIZE: TrackGenBlockSize = {
-  blockLengthXPx: 90,
-  blockLengthYPx: 90,
-  blockWidthPx: 26,
+  trackWidthPx: 26,
   metersPerBlockX: 50,
   metersPerBlockY: 50,
-  taperSlopeN: 3,
 }
 
 export function getTrackGenBlockSize(
@@ -70,20 +54,17 @@ export function getTrackGenBlockSize(
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TRACKGEN_BLOCK_SIZE }
   const o = raw as Partial<TrackGenBlockSize> & {
     metersPerBlock?: unknown
-    blockLengthPx?: unknown
+    blockWidthPx?: unknown
   }
   const n = (v: unknown, d: number, lo: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, v) : d
-  // 舊資料兩軸共用一個長度與一個公尺數，讀進來時兩軸都沿用它
+  // 舊資料的欄位名稱與「一塊多長」都不再用，寬度與公尺數沿用得下來
   const legacyM = n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlockX, 1)
-  const legacyLen = n(o.blockLengthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockLengthXPx, 8)
+  const legacyW = n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.trackWidthPx, 4)
   return {
-    blockLengthXPx: n(o.blockLengthXPx, legacyLen, 8),
-    blockLengthYPx: n(o.blockLengthYPx, legacyLen, 8),
-    blockWidthPx: n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockWidthPx, 4),
+    trackWidthPx: n(o.trackWidthPx, legacyW, 4),
     metersPerBlockX: n(o.metersPerBlockX, legacyM, 1),
     metersPerBlockY: n(o.metersPerBlockY, legacyM, 1),
-    taperSlopeN: n(o.taperSlopeN, DEFAULT_TRACKGEN_BLOCK_SIZE.taperSlopeN, 0.5),
   }
 }
 

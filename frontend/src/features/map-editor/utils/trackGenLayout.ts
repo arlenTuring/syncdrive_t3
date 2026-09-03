@@ -63,6 +63,15 @@ import {
 export const LANE_W_M = 3.35
 
 /**
+ * 斜接軌道的斜率 1:N。
+ *
+ * 不做成參數：使用者要調的是軌道寬與切幾刀，斜率是為了讓換股道看起來像鐵道示意圖
+ * 而不是折斷，一個定值就夠。真實過渡長度不能照抄——橫向的比例尺比沿線大好幾倍，
+ * 真實 1:30 的渡線畫出來會變成 1:3。
+ */
+const TAPER_SLOPE_N = 3
+
+/**
  * 每個形狀都帶著它在<strong>真實</strong>路網裡的橫向偏移。
  *
  * 版面上的橫向偏移被放大過、側線還被吸到整數股，拿它回推真實座標會差很遠。
@@ -435,59 +444,47 @@ export function blocksInSpan(spanM: number, perBlockM: number, minRunM: number):
   return full + (rest > 0 ? 1 : 0)
 }
 
-export function layoutTrackGen(
+function layoutOnce(
   result: TrackGenResult,
   settings: TrackGenSettings,
-  block?: TrackGenBlockSize,
+  block: TrackGenBlockSize | undefined,
+  alongX: number,
+  alongY: number,
 ): TrackGenLayout {
   /*
-   * 使用者指定了一塊軌道多大時，整個版面改用<strong>畫布像素</strong>當單位：
+   * 版面<strong>鋪滿軌道生成元件的框</strong>，大小不由參數決定。
    *
-   *   橫向的路 1 公尺 → blockLengthXPx / metersPerBlockX 像素
-   *   縱向的路 1 公尺 → blockLengthYPx / metersPerBlockY 像素
-   *   橫向偏移 一股    → blockWidthPx 像素（軌道等寬且相鄰）
+   * 使用者已經把路網圖拉到滿意的大小了；按下生成之後看到的就該是同一塊區域的簡化
+   * 版，不必再去湊「一塊幾像素」。所以沿線的比例尺是解出來的：兩軸各自試算，讓脊線
+   * 的外框剛好等於框的長寬。
    *
-   * 兩軸<strong>各自</strong>有「一塊多長」與「一塊代表幾公尺」：畫布通常又寬又扁，
-   * 同一組數字套在兩軸上時，橫向還很寬鬆、縱向早就滿了。沒有指定時退回公尺版面。
+   * 三個參數各管各的，互不影響大小：
+   *
+   *   軌道寬度       帶子多粗（連同圓角、斜接、分岔一起），以及一股佔多寬
+   *   橫向一塊代表   橫的路每幾公尺切一刀
+   *   縱向一塊代表   縱的路每幾公尺切一刀
    */
-  const alongX = block ? block.blockLengthXPx / Math.max(1, block.metersPerBlockX) : 1
-  const alongY = block ? block.blockLengthYPx / Math.max(1, block.metersPerBlockY) : 1
-  // 一條車道寬（LANE_W_M 公尺）對應 blockWidthPx，兩軸都是像素才加得起來
-  const lt = block ? block.blockWidthPx / LANE_W_M : settings.lateralScale
+  const bandPx = block ? block.trackWidthPx : 0
+  const lt = block ? bandPx / LANE_W_M : settings.lateralScale
   /*
-   * 轉角半徑也照使用者給的參數走：脊線半徑就是<strong>一塊軌道的長度</strong>，所以
-   * 一個轉角在圖上約等於一塊，跟旁邊的直線塊看起來是同一個量級。
+   * 轉角半徑跟著軌道寬走。
    *
-   * 以前用的是 settings.cornerRadiusM（57 公尺）再乘上 alongScale。那個數字使用者
-   * 在對話框裡看不到也改不了，而且乘上 alongScale 之後轉角大小其實綁在「一塊代表
-   * 幾公尺」上——量出來 150 × 30 的塊配上 186 × 186 的轉角，轉角的高是軌道寬的
-   * 六倍多，整體比例就歪在這裡。
-   *
-   * 外側股道的弧仍然比較大：同心弧本來就是這樣，第 n 股在半徑上多出 n 個軌道寬，
-   * 這是幾何，不是參數沒吃到。
+   * 圓角軌道的外緣半徑還要加上該股的橫向偏移，所以基準給小了，內側的弧會被夾到
+   * 幾乎沒有；三個軌道寬是最裡面那條還畫得出來的下限。
    */
+  const cornerRPx = block ? bandPx * 3 : settings.cornerRadiusM
+
   /*
    * 一段軌道至少要有多長才畫得出來（里程公尺）。
    *
    * 比軌道還窄的一塊不像軌道，像接縫；實測生出過 1.6 × 24 的一般軌道與 8 × 31 的
-   * 斜接軌道。門檻取「一個軌道寬」與「四分之一塊」的大者，以下的段併進隔壁。
+   * 斜接軌道。門檻取一個軌道寬，以下的段併進隔壁。
    */
-  const minRunXM = block
-    ? Math.max(block.blockWidthPx, block.blockLengthXPx * 0.25) / Math.max(1e-6, alongX)
-    : LANE_W_M
-  const minRunYM = block
-    ? Math.max(block.blockWidthPx, block.blockLengthYPx * 0.25) / Math.max(1e-6, alongY)
-    : LANE_W_M
+  const minRunXM = block ? bandPx / Math.max(1e-6, alongX) : LANE_W_M
+  const minRunYM = block ? bandPx / Math.max(1e-6, alongY) : LANE_W_M
   /** 吸附與併段用同一個門檻，取兩軸較寬鬆的那個才不會把橫向的段誤併 */
   const minRunM = Math.min(minRunXM, minRunYM)
 
-  /*
-   * 轉角接的是一橫一縱，方框又是正方形，所以取兩軸<strong>較短</strong>的那一塊。
-   * 取長的那一邊會讓縱向壓縮的努力被轉角吃掉——轉角自己就佔掉一整塊的高度。
-   */
-  const cornerRPx = block
-    ? Math.min(block.blockLengthXPx, block.blockLengthYPx)
-    : settings.cornerRadiusM * alongX
   const placed = placeSpine(result.spine, alongX, alongY, cornerRPx)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
@@ -680,7 +677,7 @@ export function layoutTrackGen(
     flatEps: number,
   ): Array<[number, number]> => {
     if (!block || prof.length < 2) return prof
-    const n = Math.max(0.1, block.taperSlopeN)
+    const n = TAPER_SLOPE_N
     const out = prof.map((p) => [p[0], p[1]] as [number, number])
     for (let i = 0; i + 1 < out.length; i += 1) {
       const dLat = Math.abs(out[i + 1]![1] - out[i]![1])
@@ -720,7 +717,7 @@ export function layoutTrackGen(
     lineKey = line.key
     lineLengthM = line.lengthM
     bandW = block
-      ? block.blockWidthPx
+      ? bandPx
       : Math.max(0.5, (line.widthM || LANE_W_M) * settings.trackWidthScale)
 
     /*
@@ -825,4 +822,38 @@ export function layoutTrackGen(
 
 export function rectPolygon(r: LayoutRect): Vec2[] {
   return rectCorners(r)
+}
+
+/**
+ * 排版，並讓結果<strong>鋪滿指定的框</strong>。
+ *
+ * 沿線的比例尺是解出來的，不是使用者填的：他已經把路網圖拉到滿意的大小了，按下生成
+ * 之後看到的就該是同一塊區域的簡化版。兩軸互相牽動（轉角同時吃掉長與寬，帶寬又撐開
+ * 橫向），沒有解析解，所以直接<strong>排幾次逼近</strong>——照實際外框與目標的比值
+ * 調整倍率，收斂得很快。
+ *
+ * 拿真的排版結果去逼近，不是拿脊線估：脊線沒有算轉角的外緣、帶寬與最外側的股道，
+ * 估出來的高度差了三成。
+ */
+export function layoutTrackGen(
+  result: TrackGenResult,
+  settings: TrackGenSettings,
+  block?: TrackGenBlockSize,
+  /** 要鋪滿的框（軌道生成元件的大小，畫布像素） */
+  box?: { wPx: number; hPx: number },
+): TrackGenLayout {
+  if (!block || !box) return layoutOnce(result, settings, block, 1, 1)
+  let ax = 1
+  let ay = 1
+  let out = layoutOnce(result, settings, block, ax, ay)
+  for (let i = 0; i < 6; i += 1) {
+    const w = Math.max(1, out.bounds.xMax - out.bounds.xMin)
+    const h = Math.max(1, out.bounds.yMax - out.bounds.yMin)
+    if (Math.abs(w - box.wPx) < 1 && Math.abs(h - box.hPx) < 1) break
+    // 倍率只影響沿線的部分，帶寬與轉角是定值，所以用比值修正會過頭一點——收斂即可
+    ax = Math.max(1e-4, ax * (box.wPx / w))
+    ay = Math.max(1e-4, ay * (box.hPx / h))
+    out = layoutOnce(result, settings, block, ax, ay)
+  }
+  return out
 }

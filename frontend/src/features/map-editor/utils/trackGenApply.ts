@@ -330,8 +330,10 @@ export function buildFacilitiesFromTrackGen(
   settings: TrackGenSettings,
   nextId: () => string,
   block?: TrackGenBlockSize,
+  /** 要鋪滿的框（軌道生成元件的大小，畫布像素） */
+  box?: { wPx: number; hPx: number },
 ): ApplyResult {
-  const layout = layoutTrackGen(result, settings, block)
+  const layout = layoutTrackGen(result, settings, block, box)
   /*
    * 彎道的方塊要「大的先、小的後」：外側那塊比較大，內側疊在它上面，
    * 露出來的那一圈就是轉彎的軌道帶。順序反了會被外側整個蓋住。
