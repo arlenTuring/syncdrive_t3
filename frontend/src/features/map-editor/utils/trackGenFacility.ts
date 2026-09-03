@@ -25,7 +25,11 @@ export const TRACKGEN_AREA_ID_KEY = 'trackGenAreaId'
  * 決定，單位是<strong>畫布像素</strong>——他在意的是「在我的畫布上這塊看起來多大」。
  */
 export type TrackGenBlockSize = {
-  blockLengthPx: number
+  /** 橫向的一塊有多長（畫布像素） */
+  blockLengthXPx: number
+  /** 縱向的一塊有多長（畫布像素）——與橫向分開，扁畫布才塞得下 */
+  blockLengthYPx: number
+  /** 軌道有多寬（畫布像素）。兩軸共用，不然轉角接不起來 */
   blockWidthPx: number
   /**
    * 橫向的路，一塊代表幾公尺。
@@ -42,7 +46,8 @@ export type TrackGenBlockSize = {
 export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
 
 export const DEFAULT_TRACKGEN_BLOCK_SIZE: TrackGenBlockSize = {
-  blockLengthPx: 90,
+  blockLengthXPx: 90,
+  blockLengthYPx: 90,
   blockWidthPx: 26,
   metersPerBlockX: 50,
   metersPerBlockY: 50,
@@ -53,16 +58,21 @@ export function getTrackGenBlockSize(
 ): TrackGenBlockSize {
   const raw = parameters?.[TRACKGEN_BLOCK_SIZE_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TRACKGEN_BLOCK_SIZE }
-  const o = raw as Partial<TrackGenBlockSize> & { metersPerBlock?: unknown }
+  const o = raw as Partial<TrackGenBlockSize> & {
+    metersPerBlock?: unknown
+    blockLengthPx?: unknown
+  }
   const n = (v: unknown, d: number, lo: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, v) : d
-  // 舊資料只有一個 metersPerBlock，兩軸都沿用它
-  const legacy = n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlockX, 1)
+  // 舊資料兩軸共用一個長度與一個公尺數，讀進來時兩軸都沿用它
+  const legacyM = n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlockX, 1)
+  const legacyLen = n(o.blockLengthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockLengthXPx, 8)
   return {
-    blockLengthPx: n(o.blockLengthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockLengthPx, 8),
+    blockLengthXPx: n(o.blockLengthXPx, legacyLen, 8),
+    blockLengthYPx: n(o.blockLengthYPx, legacyLen, 8),
     blockWidthPx: n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockWidthPx, 4),
-    metersPerBlockX: n(o.metersPerBlockX, legacy, 1),
-    metersPerBlockY: n(o.metersPerBlockY, legacy, 1),
+    metersPerBlockX: n(o.metersPerBlockX, legacyM, 1),
+    metersPerBlockY: n(o.metersPerBlockY, legacyM, 1),
   }
 }
 

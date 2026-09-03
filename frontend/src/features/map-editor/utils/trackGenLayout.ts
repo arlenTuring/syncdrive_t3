@@ -426,15 +426,15 @@ export function layoutTrackGen(
   /*
    * 使用者指定了一塊軌道多大時，整個版面改用<strong>畫布像素</strong>當單位：
    *
-   *   橫向的路 1 公尺 → blockLengthPx / metersPerBlockX 像素
-   *   縱向的路 1 公尺 → blockLengthPx / metersPerBlockY 像素
+   *   橫向的路 1 公尺 → blockLengthXPx / metersPerBlockX 像素
+   *   縱向的路 1 公尺 → blockLengthYPx / metersPerBlockY 像素
    *   橫向偏移 一股    → blockWidthPx 像素（軌道等寬且相鄰）
    *
-   * 兩軸的公尺數<strong>分開</strong>：畫布通常又寬又扁，同一個公尺數套在兩軸上時，
-   * 橫向還很寬鬆、縱向早就滿了。沒有指定時退回原本的公尺版面。
+   * 兩軸<strong>各自</strong>有「一塊多長」與「一塊代表幾公尺」：畫布通常又寬又扁，
+   * 同一組數字套在兩軸上時，橫向還很寬鬆、縱向早就滿了。沒有指定時退回公尺版面。
    */
-  const alongX = block ? block.blockLengthPx / Math.max(1, block.metersPerBlockX) : 1
-  const alongY = block ? block.blockLengthPx / Math.max(1, block.metersPerBlockY) : 1
+  const alongX = block ? block.blockLengthXPx / Math.max(1, block.metersPerBlockX) : 1
+  const alongY = block ? block.blockLengthYPx / Math.max(1, block.metersPerBlockY) : 1
   // 一條車道寬（LANE_W_M 公尺）對應 blockWidthPx，兩軸都是像素才加得起來
   const lt = block ? block.blockWidthPx / LANE_W_M : settings.lateralScale
   /*
@@ -455,13 +455,22 @@ export function layoutTrackGen(
    * 比軌道還窄的一塊不像軌道，像接縫；實測生出過 1.6 × 24 的一般軌道與 8 × 31 的
    * 斜接軌道。門檻取「一個軌道寬」與「四分之一塊」的大者，以下的段併進隔壁。
    */
-  const minRunPx = block ? Math.max(block.blockWidthPx, block.blockLengthPx * 0.25) : 0
-  const minRunXM = block ? minRunPx / Math.max(1e-6, alongX) : LANE_W_M
-  const minRunYM = block ? minRunPx / Math.max(1e-6, alongY) : LANE_W_M
+  const minRunXM = block
+    ? Math.max(block.blockWidthPx, block.blockLengthXPx * 0.25) / Math.max(1e-6, alongX)
+    : LANE_W_M
+  const minRunYM = block
+    ? Math.max(block.blockWidthPx, block.blockLengthYPx * 0.25) / Math.max(1e-6, alongY)
+    : LANE_W_M
   /** 吸附與併段用同一個門檻，取兩軸較寬鬆的那個才不會把橫向的段誤併 */
   const minRunM = Math.min(minRunXM, minRunYM)
 
-  const cornerRPx = block ? block.blockLengthPx : settings.cornerRadiusM * alongX
+  /*
+   * 轉角接的是一橫一縱，方框又是正方形，所以取兩軸<strong>較短</strong>的那一塊。
+   * 取長的那一邊會讓縱向壓縮的努力被轉角吃掉——轉角自己就佔掉一整塊的高度。
+   */
+  const cornerRPx = block
+    ? Math.min(block.blockLengthXPx, block.blockLengthYPx)
+    : settings.cornerRadiusM * alongX
   const placed = placeSpine(result.spine, alongX, alongY, cornerRPx)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
