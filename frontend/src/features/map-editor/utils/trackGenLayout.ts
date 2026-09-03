@@ -348,14 +348,17 @@ function fitTaper(
  * 帶寬等於 bandWM。與斜接一樣不自己推方位——四種都算一次、拿元件自己的端面函式驗證，
  * 取誤差最小的那一種。
  */
-function fitSwitch(
+export function fitSwitchAt(
   stem: Vec2,
   main: Vec2,
   branch: Vec2,
   bandWM: number,
-  alongDeg: number,
+  alongDeg?: number,
 ): { geometry: SwitchTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } | null {
-  const allowed = QUARTERS.filter((q) => (((q - alongDeg) % 180) + 180) % 180 === 0)
+  const allowed =
+    alongDeg === undefined
+      ? QUARTERS
+      : QUARTERS.filter((q) => (((q - alongDeg) % 180) + 180) % 180 === 0)
   const quarters = allowed.length ? allowed : QUARTERS
   let best: {
     geometry: SwitchTrackGeometry
@@ -733,7 +736,7 @@ function layoutOnce(
     const stem = placePoint(sA, latA, placed, lt)
     const main = placePoint(sB, latA, placed, lt)
     const branch = placePoint(sB, latB, placed, lt)
-    const fit = fitSwitch(stem, main, branch, bandW, alongDeg)
+    const fit = fitSwitchAt(stem, main, branch, bandW, alongDeg)
     if (!fit) return false
     shapes.push({
       kind: 'switch',

@@ -1,4 +1,11 @@
-import { blocksInSpan, fitCornerAt, LANE_W_M, type LayoutShape, type TrackGenLayout } from './trackGenLayout'
+import {
+  blocksInSpan,
+  fitCornerAt,
+  fitSwitchAt,
+  LANE_W_M,
+  type LayoutShape,
+  type TrackGenLayout,
+} from './trackGenLayout'
 import type { TrackGenBlockSize } from './trackGenFacility'
 import type { GraphEdge, GraphNode, TrackGraph } from './trackGenGraph'
 
@@ -66,9 +73,77 @@ function layoutOnce(
   const pts: Vec[] = []
   const note = (p: Vec) => pts.push(p)
 
-  /** 這條邊每一條車道的橫向偏移（版面像素，正負對稱） */
-  const offsetsOf = (e: GraphEdge) =>
-    e.lanes.map((_, k) => (k - (e.lanes.length - 1) / 2) * levelPx)
+  /*
+   * 同一對節點之間的平行邊要<strong>疊起來排</strong>，不能各自置中。
+   *
+   * 上下行常常是兩條各一條車道的 road，端點完全相同。各自置中的話兩條都落在偏移
+   * 0，畫出來完全重疊，看起來只有一條——實測 T3 的 road 1 與 3 就是這樣。把同一對
+   * 節點之間的邊當成一束，車道依序排開，才會是兩條並排的軌道。
+   */
+  const bundleKey = (e: GraphEdge) => [e.from, e.to].sort().join('|')
+  const bundles = new Map<string, GraphEdge[]>()
+  for (const e of graph.edges) {
+    const arr = bundles.get(bundleKey(e)) ?? []
+    arr.push(e)
+    bundles.set(bundleKey(e), arr)
+  }
+  /** 每條邊第一條車道在束裡的序號 */
+  const baseIndex = new Map<string, number>()
+  const bundleCount = new Map<string, number>()
+  for (const [key, list] of bundles) {
+    let k = 0
+    for (const e of list) {
+      baseIndex.set(e.id, k)
+      k += e.lanes.length
+    }
+    bundleCount.set(key, k)
+  }
+
+  /*
+   * 岔出去的那一束要讓開。
+   *
+   * 一個節點上有兩束<strong>往同一個方向</strong>走時，它們的車道會落在同一排，畫
+   * 出來互相重疊。留長的那一束在原位，短的往外挪一整束的寬度，中間用分岔軌道接起
+   * 來——這正是「主線繼續、同時分出一條」。
+   */
+  const shift = new Map<string, number>()
+  const dirKey = (e: GraphEdge, nodeId: string) => {
+    const other = byId.get(e.from === nodeId ? e.to : e.from)
+    const self = byId.get(nodeId)
+    if (!other || !self) return '?'
+    const a = P(self)
+    const b = P(other)
+    return `${Math.sign(Math.round(b.x - a.x))},${Math.sign(Math.round(b.y - a.y))}`
+  }
+  for (const node of graph.nodes) {
+    const groups = new Map<string, GraphEdge[]>()
+    for (const e of incident.get(node.id) ?? []) {
+      const key = dirKey(e, node.id)
+      const arr = groups.get(key) ?? []
+      if (!arr.some((q) => bundleKey(q) === bundleKey(e))) arr.push(e)
+      groups.set(key, arr)
+    }
+    for (const list of groups.values()) {
+      if (list.length < 2) continue
+      const sorted = [...list].sort((a, b) => b.lengthM - a.lengthM)
+      let away = 0
+      for (let i = 1; i < sorted.length; i += 1) {
+        const key = bundleKey(sorted[i]!)
+        away += (bundleCount.get(bundleKey(sorted[i - 1]!)) ?? 1) * levelPx
+        for (const e of bundles.get(key) ?? []) {
+          if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away)
+        }
+      }
+    }
+  }
+
+  /** 這條邊每一條車道的橫向偏移（版面像素）：束內依序排開，再加上讓開的量 */
+  const offsetsOf = (e: GraphEdge) => {
+    const total = bundleCount.get(bundleKey(e)) ?? e.lanes.length
+    const base = baseIndex.get(e.id) ?? 0
+    const away = shift.get(e.id) ?? 0
+    return e.lanes.map((_, k) => (base + k - (total - 1) / 2) * levelPx + away)
+  }
 
   /** 邊在節點端讓出的長度：那一端要放轉角就讓一個半徑 */
   const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) =>
@@ -171,6 +246,69 @@ function layoutOnce(
             geometry: fit.geometry,
             box: fit.box,
             outerRadiusM: radius + bandW / 2,
+            sFrom: 0,
+            sTo: 0,
+          })
+          note({ x: fit.box.xM, y: fit.box.yM })
+          note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
+        }
+      }
+    }
+  }
+
+  /* ── 分岔 ───────────────────────────────────────────────── */
+
+  /*
+   * 讓開的那一束在節點處要接回主線，接法就是分岔軌道：一進兩出，梗在節點側，
+   * 直行出口留在原位、岔出出口落在讓開之後的位置。沒有這一段的話，岔出去那一束
+   * 會憑空出現在旁邊。
+   */
+  for (const node of graph.nodes) {
+    const N = P(node)
+    const groups = new Map<string, GraphEdge[]>()
+    for (const e of incident.get(node.id) ?? []) {
+      const key = dirKey(e, node.id)
+      const arr = groups.get(key) ?? []
+      if (!arr.some((q) => bundleKey(q) === bundleKey(e))) arr.push(e)
+      groups.set(key, arr)
+    }
+    for (const [key, list] of groups) {
+      if (list.length < 2) continue
+      const [sxDir, syDir] = key.split(',').map(Number) as [number, number]
+      const main = [...list].sort((a, b) => b.lengthM - a.lengthM)[0]!
+      for (const e of list) {
+        if (e === main) continue
+        const away = shift.get(e.id) ?? 0
+        if (Math.abs(away) < 1) continue
+        const mainOffs = offsetsOf(main)
+        const offs = offsetsOf(e)
+        const count = Math.min(mainOffs.length, offs.length)
+        // 岔出的長度照斜率給，太短會變尖刺
+        const runPx = Math.max(cornerR, Math.abs(away) * 3)
+        for (let k = 0; k < count; k += 1) {
+          const oMain = mainOffs[k]!
+          const oBranch = offs[k]!
+          const perp = (o: number): Vec =>
+            sxDir !== 0 ? { x: 0, y: o } : { x: o, y: 0 }
+          const along = (t: number): Vec =>
+            sxDir !== 0 ? { x: sxDir * t, y: 0 } : { x: 0, y: syDir * t }
+          const p = (t: number, o: number): Vec => ({
+            x: N.x + along(t).x + perp(o).x,
+            y: N.y + along(t).y + perp(o).y,
+          })
+          const fit = fitSwitchAt(p(0, oMain), p(runPx, oMain), p(runPx, oBranch), bandW)
+          if (!fit) continue
+          shapes.push({
+            kind: 'switch',
+            name: `${e.lanes[k]!.key}^${main.lanes[k]!.key}`,
+            role: 'road',
+            lineKey: e.lanes[k]!.key,
+            lineLengthM: e.lengthM,
+            realLatFromM: 0,
+            realLatToM: 0,
+            samples: [p(0, oMain), p(runPx, oBranch)],
+            geometry: fit.geometry,
+            box: fit.box,
             sFrom: 0,
             sTo: 0,
           })
