@@ -3,6 +3,20 @@ import { createPortal } from 'react-dom'
 
 import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
+import type { LayoutShape } from '../utils/trackGenLayout'
+import { cornerTrackPath, taperTrackPath } from '../utils/trackShapes'
+
+/** 排一次版得到的全部結果：尺寸、塊數、形狀，畫預覽與判斷塞不塞得下都吃這一份 */
+export type TrackGenPreview = {
+  wPx: number
+  hPx: number
+  countX: number
+  countY: number
+  shapes: LayoutShape[]
+  bounds: { xMin: number; yMin: number; xMax: number; yMax: number }
+  /** 生成出來會落在畫布的哪個位置（已經夾進畫布內） */
+  originPx: { x: number; y: number }
+}
 
 /**
  * 生成前先決定「一塊軌道多大」。
@@ -37,9 +51,7 @@ type Props = {
    * 放大 k 倍（塊數只由「一塊代表幾公尺」決定，不受 k 影響）。所以「縮到塞得下」
    * 一次除法就求得出來，不必二分搜尋。
    */
-  measure?: (
-    params: TrackGenSizeParams,
-  ) => { wPx: number; hPx: number; countX: number; countY: number } | null
+  measure?: (params: TrackGenSizeParams) => TrackGenPreview | null
   onCancel: () => void
   onConfirm: (params: TrackGenSizeParams) => void
 }
@@ -372,6 +384,51 @@ function SizeDialogBody({ canvasPx, totals, initial, measure, onCancel, onConfir
           className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-zinc-900"
           style={{ width: stageW, height: stageH }}
         >
+          {/*
+            整份版面直接畫出來，不必靠示意塊去猜。
+            三種元件用的是它們自己的 path 函式，所以預覽與生成出來的形狀不可能各說各話。
+          */}
+          {extent?.shapes.map((sh, i) => {
+            const ox = extent.originPx.x - extent.bounds.xMin
+            const oy = extent.originPx.y - extent.bounds.yMin
+            if (sh.kind === 'rect') {
+              return (
+                <div
+                  key={`p${i}`}
+                  data-trackgen-preview
+                  className="pointer-events-none absolute bg-zinc-400/45"
+                  style={{
+                    left: (ox + sh.centre.x - sh.lengthM / 2) * scale,
+                    top: (oy + sh.centre.y - sh.widthM / 2) * scale,
+                    width: Math.max(1, sh.lengthM * scale),
+                    height: Math.max(1, sh.widthM * scale),
+                    transform: `rotate(${sh.rotationDeg}deg)`,
+                  }}
+                />
+              )
+            }
+            const w = Math.max(1, sh.box.wM * scale)
+            const h = Math.max(1, sh.box.hM * scale)
+            return (
+              <div
+                key={`p${i}`}
+                data-trackgen-preview
+                className="pointer-events-none absolute bg-zinc-400/45"
+                style={{
+                  left: (ox + sh.box.xM) * scale,
+                  top: (oy + sh.box.yM) * scale,
+                  width: w,
+                  height: h,
+                  clipPath: `path("${
+                    sh.kind === 'corner'
+                      ? cornerTrackPath(sh.geometry, w, h)
+                      : taperTrackPath(sh.geometry, w, h)
+                  }")`,
+                }}
+              />
+            )
+          })}
+
           {Array.from({ length: STRIP_N }, (_, i) => (
             <div
               key={`s${i}`}

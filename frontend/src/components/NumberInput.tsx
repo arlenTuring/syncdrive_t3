@@ -31,8 +31,15 @@ function clamp(n: number, min: number | undefined, max: number | undefined): num
   return v
 }
 
-export function NumberInput({ value, onChange, min, max, onBlur, ...rest }: Props) {
+export function NumberInput({ value, onChange, min, max, onFocus, onBlur, ...rest }: Props) {
   const [draft, setDraft] = useState<string | null>(null)
+  /*
+   * 草稿只在<strong>游標還在這個欄位裡</strong>時算數。
+   *
+   * 不然外面把值改掉了（例如按「縮到塞得下」一次改好幾個欄位），欄位還顯示著上一次
+   * 打到一半的字，看起來像沒生效。
+   */
+  const [focused, setFocused] = useState(false)
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -49,10 +56,19 @@ export function NumberInput({ value, onChange, min, max, onBlur, ...rest }: Prop
     [max, min, onChange],
   )
 
+  const handleFocus = useCallback(
+    (e: FocusEvent<HTMLInputElement>) => {
+      setFocused(true)
+      onFocus?.(e)
+    },
+    [onFocus],
+  )
+
   const handleBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
       const raw = draft
       setDraft(null)
+      setFocused(false)
       if (raw !== null && raw.trim() !== '') {
         const n = Number(raw)
         if (Number.isFinite(n)) {
@@ -71,8 +87,9 @@ export function NumberInput({ value, onChange, min, max, onBlur, ...rest }: Prop
       type="number"
       min={min}
       max={max}
-      value={draft ?? String(value)}
+      value={focused && draft !== null ? draft : String(value)}
       onChange={handleChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
     />
   )

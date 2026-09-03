@@ -286,14 +286,29 @@ export const BasemapNode = memo(function BasemapNode({
         if (Math.abs(Math.round(sh.rotationDeg / 90)) % 2 === 0) countX += 1
         else countY += 1
       }
+      const wPx = Math.max(1, bounds.xMax - bounds.xMin)
+      const hPx = Math.max(1, bounds.yMax - bounds.yMin)
+      /*
+       * 生成出來會落在畫布的哪裡：位置沿用這個元件的框，但整塊要留在畫布內，
+       * 與套用時同一條規則。預覽照這個位置畫，看到的就是實際會長成的樣子。
+       */
+      const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
+      const clamp = (v: number, span: number, limit: number) =>
+        Math.max(0, Math.min(v, Math.max(0, limit - span)))
       return {
-        wPx: Math.max(1, bounds.xMax - bounds.xMin),
-        hPx: Math.max(1, bounds.yMax - bounds.yMin),
+        wPx,
+        hPx,
         countX,
         countY,
+        shapes,
+        bounds,
+        originPx: {
+          x: clamp(displayLayout.xPx, wPx, canvas.width),
+          y: clamp(displayLayout.yPx, hPx, canvas.height),
+        },
       }
     },
-    [basemap.parameters, pendingResult],
+    [basemap.parameters, displayLayout, mapPixelSize, pendingResult],
   )
 
   const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
