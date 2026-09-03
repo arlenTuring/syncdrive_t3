@@ -271,6 +271,7 @@ type FacilityNodeProps = {
   /** 斜接軌道端點拖曳中：回報指標位置，取得目前碰到的軌道邊 */
   onTaperEndProbe?: (
     facilityId: string,
+    end: TaperHandleKey,
     clientX: number,
     clientY: number,
   ) => TaperEndProbe | null
@@ -2107,7 +2108,9 @@ export const FacilityNode = memo(function FacilityNode({
   const onTaperHandleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!taperDragKey) return
-      setTaperProbe(onTaperEndProbe?.(facilityRef.current.id, e.clientX, e.clientY) ?? null)
+      setTaperProbe(
+        onTaperEndProbe?.(facilityRef.current.id, taperDragKey, e.clientX, e.clientY) ?? null,
+      )
       setTaperPointer({ x: e.clientX, y: e.clientY })
     },
     [taperDragKey, onTaperEndProbe],

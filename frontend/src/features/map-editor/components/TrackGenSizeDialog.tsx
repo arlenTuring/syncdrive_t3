@@ -566,6 +566,14 @@ function SizeDialogBody({ canvasPx, totals, initial, measure, onCancel, onConfir
             max={2000}
             onChange={(v) => setParams((p) => ({ ...p, metersPerBlockY: v }))}
           />
+          <NumberField
+            label="斜接斜率 1："
+            value={params.taperSlopeN}
+            suffix="越大越平"
+            min={1}
+            max={40}
+            onChange={(v) => setParams((p) => ({ ...p, taperSlopeN: v }))}
+          />
         </div>
 
         <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400">

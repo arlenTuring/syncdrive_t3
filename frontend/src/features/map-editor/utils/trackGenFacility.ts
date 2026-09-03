@@ -41,6 +41,15 @@ export type TrackGenBlockSize = {
   metersPerBlockX: number
   /** 縱向的路，一塊代表幾公尺 */
   metersPerBlockY: number
+  /**
+   * 斜接軌道的斜率，1：N。
+   *
+   * 換股道的斜度<strong>不能照 .xodr 的真實過渡長度畫</strong>。版面的橫向被放大得
+   * 很兇：一塊 83 px 代表 50 公尺時沿線是 1.66 px／公尺，而軌道寬 53 px 換算成
+   * 15.8 px／公尺，兩軸差 9.5 倍。真實 1:30 的渡線畫出來就變成 1:3，看起來像折斷。
+   * 所以斜率改成直接指定，斜接軌道要多長由它反推。
+   */
+  taperSlopeN: number
 }
 
 export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
@@ -51,6 +60,7 @@ export const DEFAULT_TRACKGEN_BLOCK_SIZE: TrackGenBlockSize = {
   blockWidthPx: 26,
   metersPerBlockX: 50,
   metersPerBlockY: 50,
+  taperSlopeN: 3,
 }
 
 export function getTrackGenBlockSize(
@@ -73,6 +83,7 @@ export function getTrackGenBlockSize(
     blockWidthPx: n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockWidthPx, 4),
     metersPerBlockX: n(o.metersPerBlockX, legacyM, 1),
     metersPerBlockY: n(o.metersPerBlockY, legacyM, 1),
+    taperSlopeN: n(o.taperSlopeN, DEFAULT_TRACKGEN_BLOCK_SIZE.taperSlopeN, 0.5),
   }
 }
 

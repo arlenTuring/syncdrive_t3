@@ -931,8 +931,32 @@ export const AreaNode = memo(function AreaNode({
     [mapScale],
   )
 
+  /** 這一端換成那條邊之後，元件表示得出來嗎——表示不出來就不該亮綠燈 */
+  const taperWouldJoin = useCallback(
+    (
+      facilityId: string,
+      end: 'a' | 'b',
+      edge: { x1: number; y1: number; x2: number; y2: number },
+    ) => {
+      const f = area.facilities.find((x) => x.id === facilityId)
+      if (!f) return false
+      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
+      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
+      const top = displayLayout.hPx - pos.y - size.h
+      const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
+      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+      const other = end === 'a' ? ([L(segs.b[0]), L(segs.b[1])] as const) : ([L(segs.a[0]), L(segs.a[1])] as const)
+      const mine = [
+        { x: edge.x1, y: edge.y1 },
+        { x: edge.x2, y: edge.y2 },
+      ] as const
+      return !!buildTaperFromEndSegments(end === 'a' ? mine : other, end === 'a' ? other : mine)
+    },
+    [area.facilities, displayDomain, displayLayout],
+  )
+
   const onTaperEndProbe = useCallback(
-    (facilityId: string, clientX: number, clientY: number) => {
+    (facilityId: string, end: 'a' | 'b', clientX: number, clientY: number) => {
       const p = clientToAreaLocal(clientX, clientY)
       if (!p) return null
       // 吸附範圍隨縮放走，畫面上大約就是一根手指的寬度
@@ -948,7 +972,14 @@ export const AreaNode = memo(function AreaNode({
           const l2 = dx * dx + dy * dy
           const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
           const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
-          if (d < bestD) {
+          /*
+           * 接不成的就不算候選。
+           *
+           * 元件的兩個端面必須同時是垂直或同時是水平；橫的那一端配上直的邊怎麼轉都
+           * 表示不出來。先前這種目標照樣亮綠燈，放手卻什麼都沒發生——使用者只會覺得
+           * 功能壞了。現在先試算一次，成得了才亮。
+           */
+          if (d < bestD && taperWouldJoin(facilityId, end, e)) {
             bestD = d
             best = { targetId: other.id, edge: e }
           }
@@ -957,7 +988,7 @@ export const AreaNode = memo(function AreaNode({
       setTaperHighlightId(best?.targetId ?? null)
       return best
     },
-    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale],
+    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, taperWouldJoin],
   )
 
   const onTaperEndCommit = useCallback(

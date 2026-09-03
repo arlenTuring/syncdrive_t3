@@ -1,4 +1,5 @@
 import {
+  isAlongX,
   placePoint,
   placeSpine,
   type TrackGenBlockSize,
@@ -690,6 +691,45 @@ export function layoutTrackGen(
     return Math.round((Math.atan2(seg.dir.y, seg.dir.x) * 180) / Math.PI / 90) * 90
   }
 
+  /**
+   * 把每一段斜的改成指定斜率：需要多長的里程由橫移量反推。
+   *
+   * 只動轉折點的<strong>里程</strong>，橫向偏移原封不動，所以線還是接得上，兩側的直線
+   * 段自動讓出或收回那一段。撐不開時就撐到隔壁那一點為止——寧可比目標斜一點，也不能
+   * 跨過去把別人的段吃掉。
+   */
+  const applySlope = (
+    prof: Array<[number, number]>,
+    flatEps: number,
+  ): Array<[number, number]> => {
+    if (!block || prof.length < 2) return prof
+    const n = Math.max(0.1, block.taperSlopeN)
+    const out = prof.map((p) => [p[0], p[1]] as [number, number])
+    for (let i = 0; i + 1 < out.length; i += 1) {
+      const dLat = Math.abs(out[i + 1]![1] - out[i]![1])
+      if (dLat <= flatEps) continue
+      const mid = (out[i]![0] + out[i + 1]![0]) / 2
+      const hdg = hdgAt(mid)
+      const alongPx = hdg === null || isAlongX(hdg) ? alongX : alongY
+      const needM = (dLat * lt * n) / Math.max(1e-6, alongPx)
+      const lo = i > 0 ? out[i - 1]![0] : out[0]![0]
+      const hi = i + 2 < out.length ? out[i + 2]![0] : out[out.length - 1]![0]
+      let a = mid - needM / 2
+      let b = mid + needM / 2
+      if (a < lo) {
+        a = lo
+        b = Math.min(hi, a + needM)
+      }
+      if (b > hi) {
+        b = hi
+        a = Math.max(lo, b - needM)
+      }
+      out[i]![0] = a
+      out[i + 1]![0] = b
+    }
+    return out
+  }
+
   /* ── 每一條線都走同一條路 ───────────────────────────────── */
 
   const seen = new Set<string>()
@@ -718,11 +758,23 @@ export function layoutTrackGen(
      * 就自成一塊——實測 1.7 × 24 的一般軌道。把差不到一個門檻的轉折點吸到交界上，
      * 那一小截就歸隔壁那一段，碎片自然不存在。頭尾不吸，一動這條線就接不上鄰居。
      */
-    const rough = simplifyProfile(withDev, (line.widthM || LANE_W_M) * 0.25)
+    const flatEps = (line.widthM || LANE_W_M) * 0.25
+    const rough = simplifyProfile(withDev, flatEps)
     const snapped: Array<[number, number]> = rough.map((p, i) =>
       i === 0 || i === rough.length - 1 ? p : [snapStation(p[0]), p[1]],
     )
-    const simplified = mergeShortRuns(snapped, minRunM)
+    const merged = mergeShortRuns(snapped, minRunM)
+    /*
+     * 換股道的斜度由參數決定，不照 .xodr 的真實過渡長度。
+     *
+     * 版面的橫向被放大得很兇：一塊 83 px 代表 50 公尺時沿線是 1.66 px／公尺，而軌道
+     * 寬 53 px 換算成 15.8 px／公尺，兩軸差 9.5 倍。真實 1:30 的渡線照抄過來就變成
+     * 1:3，看起來像折斷——使用者第一眼就說「斜接軌道太傾斜」。
+     *
+     * 所以反過來做：斜率先定死成 1:N，需要多長的里程由橫移量反推，兩側的直線段讓出
+     * （或收回）那一段。移動的是轉折點的里程，不是橫向偏移，所以線還是接得上。
+     */
+    const simplified = applySlope(merged, flatEps)
     const sig = `${Math.round(prof[0]![0])}:${Math.round(prof[prof.length - 1]![0])}:${simplified
       .map((p) => Math.round(p[1]))
       .join(',')}`
@@ -741,7 +793,6 @@ export function layoutTrackGen(
      * 斜接軌道是一段直的平行四邊形，只能放在直線脊線段上；落在彎道上的那一段改用
      * 平均橫向偏移當作固定值，畫成圓角軌道。
      */
-    const flatEps = (line.widthM || LANE_W_M) * 0.25
     for (let i = 0; i + 1 < simplified.length; i += 1) {
       const [sA, latA] = simplified[i]!
       const [sB, latB] = simplified[i + 1]!
