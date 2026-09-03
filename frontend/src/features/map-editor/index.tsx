@@ -207,6 +207,7 @@ import {
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
 import { buildFacilitiesFromTrackGen } from './utils/trackGenApply'
+import type { TrackGenLayout } from './utils/trackGenLayout'
 import type { TrackGenResult } from './utils/trackGenerator'
 import type { TrackGenBlockSize } from './utils/trackGenFacility'
 import {
@@ -2273,7 +2274,12 @@ export default function MapEditorApp({
    * result 由呼叫端直接帶進來：剛算完的結果還沒寫回 state，從參數讀會拿到上一次的。
    */
   const onApplyTrackGen = useCallback(
-    (basemapId: string, freshResult?: TrackGenResult, block?: TrackGenBlockSize) => {
+    (
+      basemapId: string,
+      freshResult?: TrackGenResult,
+      block?: TrackGenBlockSize,
+      prebuilt?: TrackGenLayout,
+    ) => {
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
       if (!basemap) return
       const result = freshResult ?? getTrackGenResult(basemap.parameters)
@@ -2289,6 +2295,7 @@ export default function MapEditorApp({
         () => String(seq++).padStart(3, '0'),
         blockSize,
         { wPx: basemap.layout.wPx, hPx: basemap.layout.hPx },
+        prebuilt,
       )
 
       const areaId = String(seq++).padStart(3, '0')

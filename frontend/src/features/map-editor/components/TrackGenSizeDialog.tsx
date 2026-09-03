@@ -34,6 +34,8 @@ export type TrackGenPreview = {
   bounds: { xMin: number; yMin: number; xMax: number; yMax: number }
   /** 生成出來會落在畫布的哪個位置（已經夾進畫布內） */
   originPx: { x: number; y: number }
+  /** 圖模型排好的版面，套用時直接沿用，預覽與生成才是同一份 */
+  layout?: unknown
 }
 
 type Props = {

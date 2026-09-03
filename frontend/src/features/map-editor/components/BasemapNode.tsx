@@ -36,7 +36,9 @@ import {
   TRACKGEN_RESULT_KEY,
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
-import { layoutTrackGen } from '../utils/trackGenLayout'
+import { buildTrackGraph } from '../utils/trackGenGraph'
+import { layoutTrackGraph } from '../utils/trackGenGraphLayout'
+import { layoutTrackGen, type TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   type BasemapFileSelection,
@@ -121,6 +123,7 @@ type Props = {
     basemapId: string,
     result: TrackGenResult,
     block: TrackGenSizeParams,
+    layout?: TrackGenLayout,
   ) => void
   /** 目前這張地圖的畫布尺寸（像素）——生成對話框要照它畫縮圖 */
   mapPixelSize?: { width: number; height: number }
@@ -274,19 +277,41 @@ export const BasemapNode = memo(function BasemapNode({
     (block: TrackGenSizeParams) => {
       if (!pendingResult) return null
       const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
-      const { bounds, shapes } = layoutTrackGen(
-        pendingResult,
-        getTrackGenSettings(basemap.parameters),
-        block,
-        { wPx: displayLayout.wPx, hPx: displayLayout.hPx },
-      )
-      const refKey = pendingResult.lines[0]?.key
+      /*
+       * 有中心線就走圖模型：節點擺位、邊連在節點之間，環才會閉合。舊的脊線模型留著
+       * 當退路——中心線解析失敗時仍然生得出東西。
+       */
+      const graphLayout = trackGenCenterlines
+        ? layoutTrackGraph(buildTrackGraph(trackGenCenterlines), block, {
+            wPx: displayLayout.wPx,
+            hPx: displayLayout.hPx,
+          })
+        : null
+      const { bounds, shapes } =
+        graphLayout ??
+        layoutTrackGen(pendingResult, getTrackGenSettings(basemap.parameters), block, {
+          wPx: displayLayout.wPx,
+          hPx: displayLayout.hPx,
+        })
+      /*
+       * 塊數只數<strong>其中一條線</strong>，不然雙線會變兩倍。取塊數最多的那一條，
+       * 圖模型的線是車道鍵（例如 8:-2），沒有「參考線」這個概念。
+       */
+      const perLine = new Map<string, { x: number; y: number }>()
+      for (const sh of shapes) {
+        if (sh.kind !== 'rect') continue
+        const cur = perLine.get(sh.lineKey) ?? { x: 0, y: 0 }
+        if (Math.abs(Math.round(sh.rotationDeg / 90)) % 2 === 0) cur.x += 1
+        else cur.y += 1
+        perLine.set(sh.lineKey, cur)
+      }
       let countX = 0
       let countY = 0
-      for (const sh of shapes) {
-        if (sh.kind !== 'rect' || sh.lineKey !== refKey) continue
-        if (Math.abs(Math.round(sh.rotationDeg / 90)) % 2 === 0) countX += 1
-        else countY += 1
+      for (const c of perLine.values()) {
+        if (c.x + c.y > countX + countY) {
+          countX = c.x
+          countY = c.y
+        }
       }
       const wPx = Math.max(1, bounds.xMax - bounds.xMin)
       const hPx = Math.max(1, bounds.yMax - bounds.yMin)
@@ -303,13 +328,14 @@ export const BasemapNode = memo(function BasemapNode({
         countY,
         shapes,
         bounds,
+        layout: graphLayout ?? undefined,
         originPx: {
           x: clamp(displayLayout.xPx, wPx, canvas.width),
           y: clamp(displayLayout.yPx, hPx, canvas.height),
         },
       }
     },
-    [basemap.parameters, displayLayout, mapPixelSize, pendingResult],
+    [basemap.parameters, displayLayout, mapPixelSize, pendingResult, trackGenCenterlines],
   )
 
   const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
@@ -320,7 +346,7 @@ export const BasemapNode = memo(function BasemapNode({
       [TRACKGEN_RESULT_KEY]: result,
       [TRACKGEN_BLOCK_SIZE_KEY]: block,
     })
-    onApplyTrackGen?.(basemap.id, result, block)
+    onApplyTrackGen?.(basemap.id, result, block, measureTrackGen(block)?.layout)
   }, [basemap.id, onApplyTrackGen, onPatchParameters, pendingResult])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)

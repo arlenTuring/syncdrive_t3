@@ -1,7 +1,7 @@
 import type { FacilityObject } from '../types/facility'
 import type { TrackGenBlockSize, TrackGenSettings } from './trackGenFacility'
 import type { TrackGenResult, Vec2 } from './trackGenerator'
-import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
+import { layoutTrackGen, type LayoutShape, type TrackGenLayout } from './trackGenLayout'
 import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
   TRACKGEN_LOCAL_PATH_KEY,
@@ -217,7 +217,9 @@ function facilityFor(
     return shape.realLatFromM + (shape.realLatToM - shape.realLatFromM) * u
   }
   const meta = realBounds(result, shape.sFrom, shape.sTo, latAt)
-  const realPath = realPathOf(
+  const realPath = shape.realPath
+    ? shape.realPath.map((p) => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))])
+    : realPathOf(
     result,
     shape.sFrom,
     shape.sTo,
@@ -357,8 +359,10 @@ export function buildFacilitiesFromTrackGen(
   block?: TrackGenBlockSize,
   /** 要鋪滿的框（軌道生成元件的大小，畫布像素） */
   box?: { wPx: number; hPx: number },
+  /** 已經排好的版面（圖模型）。給了就直接用，預覽與套用才會是同一份 */
+  prebuilt?: TrackGenLayout,
 ): ApplyResult {
-  const layout = layoutTrackGen(result, settings, block, box)
+  const layout = prebuilt ?? layoutTrackGen(result, settings, block, box)
   /*
    * 彎道的方塊要「大的先、小的後」：外側那塊比較大，內側疊在它上面，
    * 露出來的那一圈就是轉彎的軌道帶。順序反了會被外側整個蓋住。

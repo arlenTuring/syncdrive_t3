@@ -95,6 +95,13 @@ export type RealLateral = {
    * 直線，實測車子在轉角處會跳 137 像素。
    */
   samples: Vec2[]
+  /**
+   * 這一段的真實中心線（公尺）。
+   *
+   * 圖模型沒有全域里程，真實座標只能由邊自己的取樣點內插出來，所以直接帶著走；
+   * 舊的脊線模型留空，由 refPoints 加里程回推。
+   */
+  realPath?: Vec2[]
 }
 
 export type LayoutRect = RealLateral & {
@@ -198,7 +205,7 @@ function pairError(a: Vec2, b: Vec2, p: Vec2, q: Vec2): number {
  * 圓心固定在 centre（四種方位分別落在方框的四個角），所以方位一決定，外框位置
  * 也就決定了。四種都算一次兩端的誤差，取最小。
  */
-function fitCorner(
+export function fitCornerAt(
   centre: Vec2,
   outerRM: number,
   bandWM: number,
@@ -660,7 +667,7 @@ function layoutOnce(
     for (let i = 0; i <= 12; i += 1) {
       samples.push(placePoint(seg.sFrom + ((seg.sTo - seg.sFrom) * i) / 12, latM, placed, lt))
     }
-    const { geometry, box } = fitCorner(seg.centre, outerR, bandW, p0, p1)
+    const { geometry, box } = fitCornerAt(seg.centre, outerR, bandW, p0, p1)
     shapes.push({
       kind: 'corner',
       name,
