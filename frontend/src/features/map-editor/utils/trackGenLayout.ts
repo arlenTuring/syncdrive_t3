@@ -526,6 +526,7 @@ function layoutOnce(
   block: TrackGenBlockSize | undefined,
   alongX: number,
   alongY: number,
+  box: { wPx: number; hPx: number } | undefined,
 ): TrackGenLayout {
   /*
    * 版面<strong>鋪滿軌道生成元件的框</strong>，大小不由參數決定。
@@ -541,14 +542,35 @@ function layoutOnce(
    *   縱向一塊代表   縱的路每幾公尺切一刀
    */
   const bandPx = block ? block.trackWidthPx : 0
-  const lt = block ? bandPx / LANE_W_M : settings.lateralScale
   /*
-   * 轉角半徑跟著軌道寬走。
+   * 股距與軌道寬<strong>分開</strong>。
+   *
+   * 綁在一起時，軌道寬會連帶決定整張圖的高度：股數 × 軌道寬再加上轉角外緣就是下限，
+   * 壓縮沿線救不了——實測 1180 × 300 的框配軌道寬 26 只能生出 1180 × 321。可是使用者
+   * 調寬度只是要讓車子在圖上看得清楚，不該動到幾何。
+   *
+   * 所以股距改成由框的高度反推：橫向最多吃掉框高的三分之一，剩下的留給折回來的路。
+   * 框夠高時仍然等於軌道寬（軌道剛好相鄰）；框太扁時股距會小於軌道寬，平行的軌道
+   * 因此略為重疊——那是刻意的取捨，總比整張圖溢出框好。
+   */
+  let levels = 1
+  for (const line of result.lines) {
+    for (const [, lat] of line.profile) {
+      levels = Math.max(levels, Math.round(Math.abs(lat) / LANE_W_M) + 1)
+    }
+  }
+  const levelPx = block
+    ? Math.max(2, Math.min(bandPx, (box ? box.hPx : Infinity) * 0.35 / levels))
+    : 0
+  const lt = block ? levelPx / LANE_W_M : settings.lateralScale
+  /*
+   * 轉角半徑跟著<strong>股距</strong>走，不是軌道寬。
    *
    * 圓角軌道的外緣半徑還要加上該股的橫向偏移，所以基準給小了，內側的弧會被夾到
-   * 幾乎沒有；三個軌道寬是最裡面那條還畫得出來的下限。
+   * 幾乎沒有；三個股距是最裡面那條還畫得出來的下限。跟著軌道寬走的話，把軌道畫粗
+   * 一點就會連帶把兩個轉角一起脹大，高度又被吃掉。
    */
-  const cornerRPx = block ? bandPx * 3 : settings.cornerRadiusM
+  const cornerRPx = block ? levelPx * 3 : settings.cornerRadiusM
 
   /*
    * 一段軌道至少要有多長才畫得出來（里程公尺）。
@@ -556,8 +578,8 @@ function layoutOnce(
    * 比軌道還窄的一塊不像軌道，像接縫；實測生出過 1.6 × 24 的一般軌道與 8 × 31 的
    * 斜接軌道。門檻取一個軌道寬，以下的段併進隔壁。
    */
-  const minRunXM = block ? bandPx / Math.max(1e-6, alongX) : LANE_W_M
-  const minRunYM = block ? bandPx / Math.max(1e-6, alongY) : LANE_W_M
+  const minRunXM = block ? levelPx / Math.max(1e-6, alongX) : LANE_W_M
+  const minRunYM = block ? levelPx / Math.max(1e-6, alongY) : LANE_W_M
   /** 吸附與併段用同一個門檻，取兩軸較寬鬆的那個才不會把橫向的段誤併 */
   const minRunM = Math.min(minRunXM, minRunYM)
 
@@ -977,10 +999,10 @@ export function layoutTrackGen(
   /** 要鋪滿的框（軌道生成元件的大小，畫布像素） */
   box?: { wPx: number; hPx: number },
 ): TrackGenLayout {
-  if (!block || !box) return layoutOnce(result, settings, block, 1, 1)
+  if (!block || !box) return layoutOnce(result, settings, block, 1, 1, box)
   let ax = 1
   let ay = 1
-  let out = layoutOnce(result, settings, block, ax, ay)
+  let out = layoutOnce(result, settings, block, ax, ay, box)
   for (let i = 0; i < 6; i += 1) {
     const w = Math.max(1, out.bounds.xMax - out.bounds.xMin)
     const h = Math.max(1, out.bounds.yMax - out.bounds.yMin)
@@ -988,7 +1010,7 @@ export function layoutTrackGen(
     // 倍率只影響沿線的部分，帶寬與轉角是定值，所以用比值修正會過頭一點——收斂即可
     ax = Math.max(1e-4, ax * (box.wPx / w))
     ay = Math.max(1e-4, ay * (box.hPx / h))
-    out = layoutOnce(result, settings, block, ax, ay)
+    out = layoutOnce(result, settings, block, ax, ay, box)
   }
   return out
 }
