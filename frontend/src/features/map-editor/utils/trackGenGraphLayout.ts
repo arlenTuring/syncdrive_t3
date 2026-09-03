@@ -53,15 +53,17 @@ function layoutOnce(
 ): TrackGenLayout {
   const bandW = block.trackWidthPx
   /*
-   * 轉角只是<strong>把直角磨圓</strong>，不是一段路。
+   * 轉角就是<strong>直角</strong>，只是把尖角磨掉。
    *
-   * 圓角軌道存在的意義是讓兩段直線接得順，車子不會在那裡待多久；半徑給大了，一個
-   * 轉角就吃掉圖上一大截，看起來像整段路都在轉彎。所以取剛好夠用的最小值：最外側那
-   * 條弧要蓋住所有股道（levelPx × (股數 − 1)），再加一個軌道寬，這樣最裡面那條弧
-   * 也還有一個帶寬的空間，不會被夾扁。
+   * 圓角軌道不是一段路，車子不會在那裡待多久；它存在的意義只是讓兩段直線接得順。
+   * 半徑給大了，一個轉角就吃掉圖上一大截，看起來像整段路都在轉彎。
+   *
+   * 所以壓到極限：最<strong>內</strong>側那條帶子的內緣半徑收到零——它就是一個四分之
+   * 一圓盤，外觀上等於直角。外側的帶子跟著同心外推，內弧自然配合對手那條，不然兩條
+   * 弧不同心，轉彎處就會一邊寬一邊窄。
    */
   const maxLanes = Math.max(1, ...graph.edges.map((e) => e.lanes.length))
-  const cornerR = levelPx * (maxLanes - 1) + bandW
+  const cornerR = (levelPx * (maxLanes - 1) + bandW) / 2
 
   const realX0 = Math.min(...graph.nodes.map((n) => n.x))
   const realY1 = Math.max(...graph.nodes.map((n) => n.y))
@@ -239,7 +241,8 @@ function layoutOnce(
         for (let k = 0; k < count; k += 1) {
           const o = offsH[k]!
           const radius = cornerR - syDir * o
-          if (radius <= bandW * 0.6) continue
+          // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
+          if (radius < bandW * 0.45) continue
           const p0 = { x: N.x - sxDir * cornerR, y: N.y + o }
           const p1 = { x: N.x - sxDir * sxDir * syDir * o, y: N.y + syDir * cornerR }
           const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)

@@ -172,48 +172,63 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
           className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-zinc-900"
           style={{ width: stageW, height: stageH }}
         >
-          {extent?.shapes.map((sh, i) => {
-            const ox = extent.originPx.x - extent.bounds.xMin
-            const oy = extent.originPx.y - extent.bounds.yMin
-            if (sh.kind === 'rect') {
+          {/*
+            用 SVG 畫，每一塊都描邊。
+            先前是一堆同色的 div，兩條並排的軌道糊成一片，數不出來有幾條；描邊之後
+            塊與塊、線與線的界線都看得見。三種軌道用的仍是它們自己的 path 函式。
+          */}
+          <svg
+            width={stageW}
+            height={stageH}
+            className="pointer-events-none absolute inset-0"
+            aria-hidden
+          >
+            {extent?.shapes.map((sh, i) => {
+              const ox = extent.originPx.x - extent.bounds.xMin
+              const oy = extent.originPx.y - extent.bounds.yMin
+              const fill = 'rgba(161,161,170,0.38)'
+              const stroke = 'rgba(228,228,231,0.85)'
+              if (sh.kind === 'rect') {
+                const w = Math.max(1, sh.lengthM * scale)
+                const h = Math.max(1, sh.widthM * scale)
+                const cx = (ox + sh.centre.x) * scale
+                const cy = (oy + sh.centre.y) * scale
+                return (
+                  <rect
+                    key={`p${i}`}
+                    data-trackgen-preview
+                    x={cx - w / 2}
+                    y={cy - h / 2}
+                    width={w}
+                    height={h}
+                    transform={`rotate(${sh.rotationDeg} ${cx} ${cy})`}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={0.75}
+                  />
+                )
+              }
+              const w = Math.max(1, sh.box.wM * scale)
+              const h = Math.max(1, sh.box.hM * scale)
+              const d =
+                sh.kind === 'corner'
+                  ? cornerTrackPath(sh.geometry, w, h)
+                  : sh.kind === 'switch'
+                    ? switchTrackPath(sh.geometry, w, h)
+                    : taperTrackPath(sh.geometry, w, h)
               return (
-                <div
+                <path
                   key={`p${i}`}
                   data-trackgen-preview
-                  className="pointer-events-none absolute bg-zinc-400/45"
-                  style={{
-                    left: (ox + sh.centre.x - sh.lengthM / 2) * scale,
-                    top: (oy + sh.centre.y - sh.widthM / 2) * scale,
-                    width: Math.max(1, sh.lengthM * scale),
-                    height: Math.max(1, sh.widthM * scale),
-                    transform: `rotate(${sh.rotationDeg}deg)`,
-                  }}
+                  d={d}
+                  transform={`translate(${(ox + sh.box.xM) * scale} ${(oy + sh.box.yM) * scale})`}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={0.75}
                 />
               )
-            }
-            const w = Math.max(1, sh.box.wM * scale)
-            const h = Math.max(1, sh.box.hM * scale)
-            return (
-              <div
-                key={`p${i}`}
-                data-trackgen-preview
-                className="pointer-events-none absolute bg-zinc-400/45"
-                style={{
-                  left: (ox + sh.box.xM) * scale,
-                  top: (oy + sh.box.yM) * scale,
-                  width: w,
-                  height: h,
-                  clipPath: `path("${
-                    sh.kind === 'corner'
-                      ? cornerTrackPath(sh.geometry, w, h)
-                      : sh.kind === 'switch'
-                        ? switchTrackPath(sh.geometry, w, h)
-                        : taperTrackPath(sh.geometry, w, h)
-                  }")`,
-                }}
-              />
-            )
-          })}
+            })}
+          </svg>
         </div>
 
         <div className="flex flex-wrap justify-center gap-5">
