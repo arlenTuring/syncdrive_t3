@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
 import type { LayoutShape } from '../utils/trackGenLayout'
-import { cornerTrackPath, taperTrackPath } from '../utils/trackShapes'
+import { cornerTrackPath, switchTrackPath, taperTrackPath } from '../utils/trackShapes'
 
 /**
  * 生成前的三個參數。
@@ -204,7 +204,9 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   clipPath: `path("${
                     sh.kind === 'corner'
                       ? cornerTrackPath(sh.geometry, w, h)
-                      : taperTrackPath(sh.geometry, w, h)
+                      : sh.kind === 'switch'
+                        ? switchTrackPath(sh.geometry, w, h)
+                        : taperTrackPath(sh.geometry, w, h)
                   }")`,
                 }}
               />

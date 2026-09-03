@@ -2,7 +2,7 @@ import type { FacilityObject } from '../types/facility'
 import type { TrackGenBlockSize, TrackGenSettings } from './trackGenFacility'
 import type { TrackGenResult, Vec2 } from './trackGenerator'
 import { layoutTrackGen, type LayoutShape } from './trackGenLayout'
-import { CORNER_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
+import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_REAL_PATH_KEY,
@@ -292,6 +292,31 @@ function facilityFor(
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
         [CORNER_TRACK_KEY]: shape.geometry,
+        [TRACKGEN_REAL_PATH_KEY]: realPath,
+        [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
+        ...meta,
+      },
+      box: { ...shape.box },
+    }
+  }
+  if (shape.kind === 'switch') {
+    /*
+     * 路口 → 分岔軌道。
+     *
+     * 外框與三個端面的比例都由排版算好（見 fitSwitch），這裡照抄。
+     */
+    return {
+      id,
+      type: 'Track',
+      name: 'RailSwitch',
+      customName: shape.name,
+      rotation: 0,
+      parameters: {
+        segmentId: shape.name,
+        trackGenRole: shape.role,
+        trackGenLine: shape.lineKey,
+        trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
+        [SWITCH_TRACK_KEY]: shape.geometry,
         [TRACKGEN_REAL_PATH_KEY]: realPath,
         [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
         ...meta,

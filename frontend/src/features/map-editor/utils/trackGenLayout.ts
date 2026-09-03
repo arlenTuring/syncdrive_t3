@@ -9,8 +9,10 @@ import type { LaneRole, TrackGenResult, Vec2 } from './trackGenerator'
 import {
   cornerArcCentrePx,
   cornerTrackEndsPx,
+  switchTrackEndSegmentsPx,
   taperTrackEndsPx,
   type CornerTrackGeometry,
+  type SwitchTrackGeometry,
   type TaperTrackGeometry,
 } from './trackShapes'
 
@@ -139,7 +141,18 @@ export type LayoutTaper = RealLateral & {
   sTo: number
 }
 
-export type LayoutShape = LayoutRect | LayoutCorner | LayoutTaper
+/** 分岔：一進兩出，路口用它取代兩段互相穿透的斜接 */
+export type LayoutSwitch = RealLateral & {
+  kind: 'switch'
+  name: string
+  role: LaneRole
+  geometry: SwitchTrackGeometry
+  box: { xM: number; yM: number; wM: number; hM: number }
+  sFrom: number
+  sTo: number
+}
+
+export type LayoutShape = LayoutRect | LayoutCorner | LayoutTaper | LayoutSwitch
 
 export type TrackGenLayout = {
   shapes: LayoutShape[]
@@ -319,6 +332,69 @@ function fitTaper(
       hM: Math.max(bandWM, Math.abs(p1.y - p0.y)),
     },
   }
+}
+
+/**
+ * 解出分岔軌道的方位、外框與三個端面。
+ *
+ * 三個端面都是與軸對齊的線段，中心分別落在「進口」「直行出口」「岔出出口」上；
+ * 帶寬等於 bandWM。與斜接一樣不自己推方位——四種都算一次、拿元件自己的端面函式驗證，
+ * 取誤差最小的那一種。
+ */
+function fitSwitch(
+  stem: Vec2,
+  main: Vec2,
+  branch: Vec2,
+  bandWM: number,
+  alongDeg: number,
+): { geometry: SwitchTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } | null {
+  const allowed = QUARTERS.filter((q) => (((q - alongDeg) % 180) + 180) % 180 === 0)
+  const quarters = allowed.length ? allowed : QUARTERS
+  let best: {
+    geometry: SwitchTrackGeometry
+    box: { xM: number; yM: number; wM: number; hM: number }
+    err: number
+  } | null = null
+
+  for (const entryDeg of quarters) {
+    const R = (p: Vec2) => rotate(p, -entryDeg)
+    const s = R(stem)
+    const m = R(main)
+    const b = R(branch)
+    // 兩個出口都必須在進口的前方，不然這個方位擺不出來
+    if (m.x - s.x <= 1e-6 || b.x - s.x <= 1e-6) continue
+    const W = Math.max(m.x, b.x) - s.x
+    const ys = [s.y, m.y, b.y]
+    const top = Math.min(...ys) - bandWM / 2
+    const H = Math.max(...ys) + bandWM / 2 - top
+    const r = (y: number) => (y - top) / H
+    const geometry: SwitchTrackGeometry = {
+      aFrom: r(s.y - bandWM / 2),
+      aTo: r(s.y + bandWM / 2),
+      mFrom: r(m.y - bandWM / 2),
+      mTo: r(m.y + bandWM / 2),
+      bFrom: r(b.y - bandWM / 2),
+      bTo: r(b.y + bandWM / 2),
+      entryDeg,
+    }
+    const wM = entryDeg % 180 === 0 ? W : H
+    const hM = entryDeg % 180 === 0 ? H : W
+    const segs = switchTrackEndSegmentsPx(geometry, wM, hM)
+    const mid = (q: [Vec2, Vec2]) => ({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 })
+    // 平移量取三個端面各自需要的位移的平均，殘差就是彼此的差
+    const want = [stem, main, branch]
+    const got = [mid(segs.a), mid(segs.m), mid(segs.b)]
+    const ex = want.reduce((t, p, i) => t + (p.x - got[i]!.x), 0) / 3
+    const ey = want.reduce((t, p, i) => t + (p.y - got[i]!.y), 0) / 3
+    const err = Math.max(
+      ...want.map((p, i) => Math.hypot(p.x - got[i]!.x - ex, p.y - got[i]!.y - ey)),
+    )
+    if (!best || err < best.err) {
+      best = { geometry, box: { xM: ex, yM: ey, wM, hM }, err }
+    }
+  }
+  if (!best || best.err > Math.max(2, bandWM * 0.25)) return null
+  return { geometry: best.geometry, box: best.box }
 }
 
 /**
@@ -610,6 +686,47 @@ function layoutOnce(
     pts.push({ x: box.xM, y: box.yM }, { x: box.xM + box.wM, y: box.yM + box.hM })
   }
 
+  /**
+   * 路口：一進兩出。
+   *
+   * 側線岔出去時，用一個分岔軌道表示「主線繼續、同時分出一條」。先前只有斜接可用，
+   * 主線與側線在路口各畫各的，兩片就互相穿透。
+   */
+  const addSwitch = (
+    name: string,
+    role: LaneRole,
+    sA: number,
+    latA: number,
+    sB: number,
+    latB: number,
+    alongDeg: number,
+  ) => {
+    const stem = placePoint(sA, latA, placed, lt)
+    const main = placePoint(sB, latA, placed, lt)
+    const branch = placePoint(sB, latB, placed, lt)
+    const fit = fitSwitch(stem, main, branch, bandW, alongDeg)
+    if (!fit) return false
+    shapes.push({
+      kind: 'switch',
+      name,
+      role,
+      lineKey,
+      lineLengthM,
+      realLatFromM: latA,
+      realLatToM: latB,
+      samples: [stem, branch],
+      geometry: fit.geometry,
+      box: fit.box,
+      sFrom: sA,
+      sTo: sB,
+    })
+    pts.push(
+      { x: fit.box.xM, y: fit.box.yM },
+      { x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM },
+    )
+    return true
+  }
+
   /** 一段「橫向偏移固定」的區間 → 依脊線拆成一般軌道與圓角軌道 */
   const emitFlat = (
     role: LaneRole,
@@ -795,15 +912,33 @@ function layoutOnce(
         continue
       }
       seq += 1
-      addTaper(
-        `${line.key}X-${String(seq).padStart(2, '0')}`,
-        line.role,
-        sA,
-        latA,
-        sB,
-        latB,
-        along,
-      )
+      /*
+       * 線頭與線尾的那一段斜的是<strong>岔出／併回</strong>，不是換股道：一條側線在
+       * 路口離開主線，主線並沒有跟著走。用分岔軌道畫，主線那一支就留在圖上，不會
+       * 變成兩片互相穿透的斜接。中間的斜段仍然是換股道，維持斜接。
+       */
+      const name = `${line.key}X-${String(seq).padStart(2, '0')}`
+      const atEnd = i === 0 || i + 2 === simplified.length
+      /*
+       * 梗放在<strong>比較靠近主線</strong>的那一端。哪一端是路口不看順序：側線可能
+       * 從頭岔出去，也可能到尾才併回來，但靠主線的那一端一定是橫向偏移比較小的。
+       */
+      const stemFirst = Math.abs(latA) <= Math.abs(latB)
+      if (
+        atEnd &&
+        addSwitch(
+          name,
+          line.role,
+          stemFirst ? sA : sB,
+          stemFirst ? latA : latB,
+          stemFirst ? sB : sA,
+          stemFirst ? latB : latA,
+          along,
+        )
+      ) {
+        continue
+      }
+      addTaper(name, line.role, sA, latA, sB, latB, along)
     }
   }
 
