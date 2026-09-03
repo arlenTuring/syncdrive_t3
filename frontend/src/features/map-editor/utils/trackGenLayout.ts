@@ -426,12 +426,15 @@ export function layoutTrackGen(
   /*
    * 使用者指定了一塊軌道多大時，整個版面改用<strong>畫布像素</strong>當單位：
    *
-   *   沿線  1 公尺 → blockLengthPx / metersPerBlock 像素
-   *   橫向  一股   → blockWidthPx 像素（軌道等寬且相鄰）
+   *   橫向的路 1 公尺 → blockLengthPx / metersPerBlockX 像素
+   *   縱向的路 1 公尺 → blockLengthPx / metersPerBlockY 像素
+   *   橫向偏移 一股    → blockWidthPx 像素（軌道等寬且相鄰）
    *
-   * 這樣生出來的每一塊就剛好是他拉出來的大小。沒有指定時退回原本的公尺版面。
+   * 兩軸的公尺數<strong>分開</strong>：畫布通常又寬又扁，同一個公尺數套在兩軸上時，
+   * 橫向還很寬鬆、縱向早就滿了。沒有指定時退回原本的公尺版面。
    */
-  const along = block ? block.blockLengthPx / Math.max(1, block.metersPerBlock) : 1
+  const alongX = block ? block.blockLengthPx / Math.max(1, block.metersPerBlockX) : 1
+  const alongY = block ? block.blockLengthPx / Math.max(1, block.metersPerBlockY) : 1
   // 一條車道寬（LANE_W_M 公尺）對應 blockWidthPx，兩軸都是像素才加得起來
   const lt = block ? block.blockWidthPx / LANE_W_M : settings.lateralScale
   /*
@@ -452,12 +455,14 @@ export function layoutTrackGen(
    * 比軌道還窄的一塊不像軌道，像接縫；實測生出過 1.6 × 24 的一般軌道與 8 × 31 的
    * 斜接軌道。門檻取「一個軌道寬」與「四分之一塊」的大者，以下的段併進隔壁。
    */
-  const minRunM = block
-    ? Math.max(block.blockWidthPx, block.blockLengthPx * 0.25) / Math.max(1e-6, along)
-    : LANE_W_M
+  const minRunPx = block ? Math.max(block.blockWidthPx, block.blockLengthPx * 0.25) : 0
+  const minRunXM = block ? minRunPx / Math.max(1e-6, alongX) : LANE_W_M
+  const minRunYM = block ? minRunPx / Math.max(1e-6, alongY) : LANE_W_M
+  /** 吸附與併段用同一個門檻，取兩軸較寬鬆的那個才不會把橫向的段誤併 */
+  const minRunM = Math.min(minRunXM, minRunYM)
 
-  const cornerRPx = block ? block.blockLengthPx : settings.cornerRadiusM * along
-  const placed = placeSpine(result.spine, along, cornerRPx)
+  const cornerRPx = block ? block.blockLengthPx : settings.cornerRadiusM * alongX
+  const placed = placeSpine(result.spine, alongX, alongY, cornerRPx)
   const shapes: LayoutShape[] = []
   const pts: Vec2[] = []
 
@@ -634,10 +639,21 @@ export function layoutTrackGen(
        * minRun（一塊 150 × 30 時是 30 px，兩成），換掉的是一條看不出是軌道的碎片。
        */
       const span = piece.sTo - piece.sFrom
-      const perBlockM = Math.max(1, block ? block.metersPerBlock : settings.blockLengthM)
+      // 橫的路與縱的路各有自己的「一塊代表幾公尺」
+      const alongThis =
+        seg.kind === 'straight' ? Math.abs(seg.dir.x) >= Math.abs(seg.dir.y) : true
+      const perBlockM = Math.max(
+        1,
+        block
+          ? alongThis
+            ? block.metersPerBlockX
+            : block.metersPerBlockY
+          : settings.blockLengthM,
+      )
+      const tail = alongThis ? minRunXM : minRunYM
       const full = Math.floor(span / perBlockM)
       const rest = span - full * perBlockM
-      const n = full > 0 && rest < minRunM ? full : full + (rest > 0 ? 1 : 0)
+      const n = full > 0 && rest < tail ? full : full + (rest > 0 ? 1 : 0)
       for (let k = 0; k < Math.max(1, n); k += 1) {
         const from = piece.sFrom + k * perBlockM
         const to = k === n - 1 ? piece.sTo : Math.min(piece.sTo, from + perBlockM)

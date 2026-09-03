@@ -32,6 +32,7 @@ import {
   TRACKGEN_BLOCK_SIZE_KEY,
   getTrackGenBlockSize,
   getTrackGenSettings,
+  isAlongX,
   TRACKGEN_RESULT_KEY,
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
@@ -240,6 +241,25 @@ export const BasemapNode = memo(function BasemapNode({
       }
     }, 0)
   }, [trackGenCenterlines])
+
+  /*
+   * 脊線上橫的路與縱的路各幾公尺。
+   *
+   * 對話框要分別估兩軸各生幾塊，而折起來之後兩軸的長度差很多——拿路網總長除一次
+   * 等於沒講。彎道不算進任何一軸：它由轉角半徑決定，不吃「一塊代表幾公尺」。
+   */
+  const trackGenTotals = useMemo(() => {
+    if (!pendingResult) return undefined
+    let xM = 0
+    let yM = 0
+    for (const seg of pendingResult.spine) {
+      if (seg.kind !== 'straight') continue
+      const len = seg.sTo - seg.sFrom
+      if (isAlongX(seg.hdgDeg)) xM += len
+      else yM += len
+    }
+    return { xM, yM }
+  }, [pendingResult])
 
   /** 這組參數排出來會佔多大（畫布像素）——對話框拿去跟畫布比 */
   const measureTrackGen = useCallback(
@@ -1002,7 +1022,7 @@ export const BasemapNode = memo(function BasemapNode({
         canvasPx={
           mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
         }
-        totalM={trackGenCenterlines ? trackGenCenterlines.lanes.reduce((a, l) => Math.max(a, l.lengthM), 0) : 0}
+        totals={trackGenTotals}
         initial={getTrackGenBlockSize(basemap.parameters)}
         measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}

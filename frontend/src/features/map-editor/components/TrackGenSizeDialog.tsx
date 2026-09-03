@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import type { TrackGenBlockSize } from '../utils/trackGenFacility'
+
 /**
  * 生成前先決定「一塊軌道多大」。
  *
@@ -11,25 +13,21 @@ import { createPortal } from 'react-dom'
  *
  * <h3>背景是畫布的等比縮圖</h3>
  * 光給數字感覺不出大小，所以背景畫一個依畫布長寬等比縮小的框，示意軌道就放在裡面。
- * 橫三塊、縱三塊各擺一排——單看一塊看不出並排起來會多擠。改任何一塊，其他八塊
- * 跟著動。
+ * 橫的五塊相連、縱的兩塊接下來，排成 L 形——場域本來就是折的，兩軸各自看才準。
+ *
+ * <h3>橫縱的公尺數分開</h3>
+ * 畫布通常又寬又扁，而場域是折起來的。同一個公尺數套在兩軸上時，橫向還很寬鬆、
+ * 縱向早就滿了。分開之後縱向可以壓得比橫向兇，整張圖才塞得進扁畫布。
  */
 
-export type TrackGenSizeParams = {
-  /** 一塊軌道的長度（畫布像素） */
-  blockLengthPx: number
-  /** 一塊軌道的寬度（畫布像素） */
-  blockWidthPx: number
-  /** 一塊軌道代表多少公尺的路 */
-  metersPerBlock: number
-}
+export type TrackGenSizeParams = TrackGenBlockSize
 
 type Props = {
   open: boolean
   /** 畫布尺寸（像素），用來畫等比縮圖 */
   canvasPx: { width: number; height: number }
-  /** 這份路網總長（公尺），用來估會生出幾塊 */
-  totalM: number
+  /** 脊線上橫的路與縱的路各幾公尺，用來估兩軸各生幾塊 */
+  totals?: { xM: number; yM: number }
   initial: TrackGenSizeParams
   /**
    * 這組參數排出來會佔多大（畫布像素）。回傳 null 表示還算不出來。
@@ -124,7 +122,7 @@ export function TrackGenSizeDialog(props: Props) {
   return <SizeDialogBody {...props} />
 }
 
-function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfirm }: Props) {
+function SizeDialogBody({ canvasPx, totals, initial, measure, onCancel, onConfirm }: Props) {
   /*
    * 一開啟就先塞好。
    *
@@ -223,7 +221,14 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
 
   const lenPx = Math.round(params.blockLengthPx)
   const widPx = Math.round(params.blockWidthPx)
-  const blocks = Math.max(1, Math.round(totalM / Math.max(1, params.metersPerBlock)))
+  /*
+   * 兩軸各估幾塊。
+   *
+   * 用脊線上橫的路與縱的路各自的公尺數去除，不是拿路網總長除一次——折起來之後
+   * 兩軸的塊數差很多，合在一起講等於沒講。
+   */
+  const countX = Math.max(1, Math.round((totals?.xM ?? 0) / Math.max(1, params.metersPerBlockX)))
+  const countY = Math.max(0, Math.round((totals?.yM ?? 0) / Math.max(1, params.metersPerBlockY)))
 
   /*
    * 生成出來塞不塞得進畫布。
@@ -248,21 +253,27 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
   )
 
   /*
-   * 示意分兩層，兩層都用同一個縮放倍率，看到的就是畫布上的真實大小。
+   * 示意排成 L 形，全部用同一個縮放倍率，看到的就是畫布上的真實大小。
    *
-   * 上層是五塊<strong>相連</strong>的軌道，擺在畫布正中央：一塊一塊分開放看不出並排
-   * 起來多擠，連在一起才看得出來。下層是<strong>另外一塊</strong>，那才是可以拉的；
-   * 要拉的東西如果是五塊裡的某一塊，使用者得先猜哪一塊才是能動的。
+   * 橫的五塊相連、從左端往下接兩塊：場域本來就是折的，只看橫排感覺得到寬度、
+   * 感覺不到高度——而高度才是扁畫布會先滿的那一軸。每一塊上面寫它代表幾公尺，
+   * 兩軸的公尺數不同時一眼就分得出來。
+   *
+   * 右邊<strong>另外一塊</strong>才是可以拉的；要拉的東西如果是示意裡的某一塊，
+   * 使用者得先猜哪一塊才是能動的。
    */
   const STRIP_N = 5
+  const COL_N = 2
   const bw = lenPx * scale
   const bh = widPx * scale
-  const stripW = bw * STRIP_N
-  const gapY = Math.max(18, bh * 0.6)
-  const stripLeft = Math.round((stageW - stripW) / 2)
-  const stripTop = Math.round((stageH - (bh * 2 + gapY)) / 2)
-  const editLeft = Math.round((stageW - bw) / 2)
-  const editTop = Math.round(stripTop + bh + gapY)
+  const pad = Math.round(Math.max(10, Math.min(32, stageW * 0.03)))
+  const stripLeft = pad
+  const stripTop = pad
+  const colTop = stripTop + bh
+  const editLeft = Math.max(stripLeft + bh + 12, stageW - pad - bw)
+  const editTop = colTop + Math.round(bw * 0.35)
+  /** 塊夠寬才塞得下「50 m」，塞不下就只在整排上方寫一次 */
+  const labelInStrip = bw >= 34
 
   const handle = (
     axis: 'both' | 'length' | 'width',
@@ -304,7 +315,7 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
             {scale >= 0.999
               ? '，以原尺寸顯示'
               : `，縮到 ${(scale * 100).toFixed(0)}% 顯示`}
-            。上排是五塊接起來的樣子，下面那一塊點下去就能拉大小。
+            。左邊是橫五塊接上縱兩塊，每塊上面寫它代表幾公尺；右邊那一塊點下去就能拉大小。
           </p>
         </div>
 
@@ -317,9 +328,37 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
             <div
               key={`s${i}`}
               data-trackgen-size-strip
-              className="absolute border border-sky-300/70 bg-sky-400/30"
+              className="absolute flex items-center justify-center overflow-hidden border border-sky-300/70 bg-sky-400/30 text-[10px] tabular-nums text-sky-100"
               style={{ left: stripLeft + i * bw, top: stripTop, width: bw, height: bh }}
+            >
+              {labelInStrip ? `${Math.round(params.metersPerBlockX)} m` : null}
+            </div>
+          ))}
+          {labelInStrip ? null : (
+            <div
+              className="pointer-events-none absolute whitespace-nowrap text-[10px] tabular-nums text-sky-200"
+              style={{ left: stripLeft, top: Math.max(0, stripTop - 13) }}
+            >
+              一塊 {Math.round(params.metersPerBlockX)} m
+            </div>
+          )}
+
+          {Array.from({ length: COL_N }, (_, i) => (
+            <div
+              key={`v${i}`}
+              data-trackgen-size-col
+              className="absolute flex items-center justify-center overflow-hidden border border-emerald-300/70 bg-emerald-400/25"
+              style={{ left: stripLeft, top: colTop + i * bw, width: bh, height: bw }}
             />
+          ))}
+          {Array.from({ length: COL_N }, (_, i) => (
+            <div
+              key={`vl${i}`}
+              className="pointer-events-none absolute whitespace-nowrap text-[10px] tabular-nums text-emerald-200"
+              style={{ left: stripLeft + bh + 5, top: colTop + i * bw + bw / 2 - 7 }}
+            >
+              {Math.round(params.metersPerBlockY)} m
+            </div>
           ))}
 
           <div
@@ -372,22 +411,46 @@ function SizeDialogBody({ canvasPx, totalM, initial, measure, onCancel, onConfir
             onChange={(v) => setParams((p) => ({ ...p, blockWidthPx: v }))}
           />
           <NumberField
-            label="一塊代表"
-            value={params.metersPerBlock}
+            label="橫向一塊代表"
+            value={params.metersPerBlockX}
             suffix="公尺"
             min={1}
             max={2000}
-            onChange={(v) => setParams((p) => ({ ...p, metersPerBlock: v }))}
+            onChange={(v) => setParams((p) => ({ ...p, metersPerBlockX: v }))}
+          />
+          <NumberField
+            label="縱向一塊代表"
+            value={params.metersPerBlockY}
+            suffix="公尺"
+            min={1}
+            max={2000}
+            onChange={(v) => setParams((p) => ({ ...p, metersPerBlockY: v }))}
           />
         </div>
 
         <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400">
-          路網總長{' '}
-          <b className="font-mono tabular-nums text-zinc-200">{totalM.toFixed(0)} m</b>
-          {' · 一塊 '}
-          <b className="font-mono tabular-nums text-zinc-200">{params.metersPerBlock} m</b>
-          {' → 約 '}
-          <b className="font-mono tabular-nums text-zinc-200">{blocks}</b> 塊
+          {/*
+            不寫「路網總長」。那個數字是最長的<strong>單一車道</strong>（732 m），而
+            排版走的是把車道串起來的參考鏈（實測 1873 m）；兩個數字擺在一起只會讓人
+            以為算錯。兩軸各自的公尺數才是塊數的來源。
+          */}
+          軌道{' '}
+          <b className="font-mono tabular-nums text-zinc-200">
+            {Math.round((totals?.xM ?? 0) + (totals?.yM ?? 0))} m
+          </b>
+          {' · 橫向 '}
+          <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
+            {countX}
+          </b>
+          {' 塊（'}
+          <span className="font-mono tabular-nums">{Math.round(totals?.xM ?? 0)} m</span>
+          {'）· 縱向 '}
+          <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
+            {countY}
+          </b>
+          {' 塊（'}
+          <span className="font-mono tabular-nums">{Math.round(totals?.yM ?? 0)} m</span>
+          {'）'}
           {extent ? (
             <>
               {'，生成後佔 '}

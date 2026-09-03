@@ -27,7 +27,16 @@ export const TRACKGEN_AREA_ID_KEY = 'trackGenAreaId'
 export type TrackGenBlockSize = {
   blockLengthPx: number
   blockWidthPx: number
-  metersPerBlock: number
+  /**
+   * 橫向的路，一塊代表幾公尺。
+   *
+   * 橫縱分開的理由：畫布通常又寬又扁（3152 × 642），而場域是折起來的。同一個公尺
+   * 數套在兩軸上時，橫向還很寬鬆、縱向早就滿了。分開之後縱向可以壓得比橫向兇，
+   * 整張圖才塞得進扁畫布。
+   */
+  metersPerBlockX: number
+  /** 縱向的路，一塊代表幾公尺 */
+  metersPerBlockY: number
 }
 
 export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
@@ -35,7 +44,8 @@ export const TRACKGEN_BLOCK_SIZE_KEY = 'trackGenBlockSize'
 export const DEFAULT_TRACKGEN_BLOCK_SIZE: TrackGenBlockSize = {
   blockLengthPx: 90,
   blockWidthPx: 26,
-  metersPerBlock: 50,
+  metersPerBlockX: 50,
+  metersPerBlockY: 50,
 }
 
 export function getTrackGenBlockSize(
@@ -43,13 +53,16 @@ export function getTrackGenBlockSize(
 ): TrackGenBlockSize {
   const raw = parameters?.[TRACKGEN_BLOCK_SIZE_KEY]
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_TRACKGEN_BLOCK_SIZE }
-  const o = raw as Partial<TrackGenBlockSize>
+  const o = raw as Partial<TrackGenBlockSize> & { metersPerBlock?: unknown }
   const n = (v: unknown, d: number, lo: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, v) : d
+  // 舊資料只有一個 metersPerBlock，兩軸都沿用它
+  const legacy = n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlockX, 1)
   return {
     blockLengthPx: n(o.blockLengthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockLengthPx, 8),
     blockWidthPx: n(o.blockWidthPx, DEFAULT_TRACKGEN_BLOCK_SIZE.blockWidthPx, 4),
-    metersPerBlock: n(o.metersPerBlock, DEFAULT_TRACKGEN_BLOCK_SIZE.metersPerBlock, 1),
+    metersPerBlockX: n(o.metersPerBlockX, legacy, 1),
+    metersPerBlockY: n(o.metersPerBlockY, legacy, 1),
   }
 }
 
@@ -155,13 +168,21 @@ export type PlacedSpine = Array<
 >
 
 /**
+ * @param alongX 橫向的路，一公尺幾像素
+ * @param alongY 縱向的路，一公尺幾像素——與橫向分開，扁畫布才塞得下
  * @param cornerRadiusPx 轉角的<strong>脊線</strong>半徑，已經是版面單位。
  *   以前吃的是公尺再乘 alongScale，於是轉角大小綁在「一塊代表幾公尺」上：使用者
  *   只是把一塊從 50 公尺改成 25，轉角就跟著脹成兩倍，而他根本沒動到轉角。
  */
+/** 航向是不是橫的（脊線的航向已經吸到 90 度的倍數） */
+export function isAlongX(hdgDeg: number): boolean {
+  return Math.abs(Math.round(hdgDeg / 90)) % 2 === 0
+}
+
 export function placeSpine(
   spine: SpineSegment[],
-  alongScale: number,
+  alongX: number,
+  alongY: number,
   cornerRadiusPx: number,
 ): PlacedSpine {
   const out: PlacedSpine = []
@@ -173,7 +194,7 @@ export function placeSpine(
       hdg = seg.hdgDeg
       const dir = { x: Math.cos(hdg * DEG), y: -Math.sin(hdg * DEG) }
       const nrm = { x: -Math.sin(hdg * DEG), y: -Math.cos(hdg * DEG) }
-      const lenPx = (seg.sTo - seg.sFrom) * alongScale
+      const lenPx = (seg.sTo - seg.sFrom) * (isAlongX(hdg) ? alongX : alongY)
       out.push({ kind: 'straight', sFrom: seg.sFrom, sTo: seg.sTo, p0: p, dir, nrm, lenPx })
       p = { x: p.x + dir.x * lenPx, y: p.y + dir.y * lenPx }
     } else {
