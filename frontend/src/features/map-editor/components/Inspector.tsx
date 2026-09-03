@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { NumberInput } from '../../../components/NumberInput'
 import { TextAlignmentControls } from '../../../components/TextAlignmentControls'
 import { TextLayoutControls } from '../../../components/TextLayoutControls'
 import {
@@ -128,19 +129,14 @@ function FacilityLabelStyleSection({
           字體大小（px）
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <NumberInput
             id="label-font-size"
-            type="number"
             min={6}
             max={72}
             step={1}
             disabled={readOnly || labelStyle.visible === false}
             value={effectiveLabelPx}
-            onChange={(e) => {
-              const n = Number(e.target.value)
-              if (!Number.isFinite(n)) return
-              patchLabelStyle({ fontSizePx: n })
-            }}
+            onChange={(n) => patchLabelStyle({ fontSizePx: n })}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
@@ -553,15 +549,13 @@ export function Inspector({
                   >
                     像素橫向尺寸
                   </label>
-                  <input
+                  <NumberInput
                     id="facility-size-px-w"
-                    type="number"
                     min={1}
                     step={0.1}
-                    value={pixelW.toFixed(2)}
-                    onChange={(e) => {
-                      const px = Number.parseFloat(e.target.value)
-                      if (!Number.isFinite(px) || px <= 0 || pixelH === null) return
+                    value={Number(pixelW.toFixed(2))}
+                    onChange={(px) => {
+                      if (px <= 0 || pixelH === null) return
                       onChangeAreaSizePx(px, pixelH)
                     }}
                     onFocus={onFieldFocus}
@@ -577,15 +571,13 @@ export function Inspector({
                   >
                     像素縱向尺寸
                   </label>
-                  <input
+                  <NumberInput
                     id="facility-size-px-h"
-                    type="number"
                     min={1}
                     step={0.1}
-                    value={pixelH.toFixed(2)}
-                    onChange={(e) => {
-                      const px = Number.parseFloat(e.target.value)
-                      if (!Number.isFinite(px) || px <= 0 || pixelW === null) return
+                    value={Number(pixelH.toFixed(2))}
+                    onChange={(px) => {
+                      if (px <= 0 || pixelW === null) return
                       onChangeAreaSizePx(pixelW, px)
                     }}
                     onFocus={onFieldFocus}

@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import { ChevronDown } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import {
@@ -186,12 +187,11 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
       >
         <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-4">
           <span className={LABEL_CLASS}>群組編號</span>
-          <input
-            type="number"
+          <NumberInput
             min={1}
             max={rowCount}
             value={rowIndex}
-            onChange={(e) => setRowIndex(Number(e.target.value))}
+            onChange={(n) => setRowIndex(n)}
             className={`${FIELD_CLASS} tabular-nums`}
           />
 

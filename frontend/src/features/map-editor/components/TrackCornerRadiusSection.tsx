@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 import {
   getTrackCornerRadiiForFacility,
@@ -108,18 +109,13 @@ export function TrackCornerRadiusSection({
         {CORNER_LABELS.map(({ key, label }) => (
           <label key={key} className="block text-[10px] text-zinc-500">
             {label}
-            <input
-              type="number"
+            <NumberInput
               min={0}
               max={maxR}
               step={0.1}
               disabled={readOnly}
               value={corners[key]}
-              onChange={(e) => {
-                const n = Number.parseFloat(e.target.value)
-                if (!Number.isFinite(n)) return
-                applyCorners({ ...corners, [key]: n })
-              }}
+              onChange={(n) => applyCorners({ ...corners, [key]: n })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-violet-500 read-only:opacity-90"

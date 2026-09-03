@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 import {
   DEFAULT_ROAD_LINE_COLOR,
@@ -84,23 +85,19 @@ export function RoadLineInspectorSection({
         >
           線寬（px）
         </label>
-        <input
+        <NumberInput
           id="road-line-width"
-          type="number"
           min={1}
           max={48}
           step={0.5}
           readOnly={readOnly}
           value={widthPx}
-          onChange={(e) => {
-            const v = Number.parseFloat(e.target.value)
-            if (!Number.isFinite(v)) return
-            const clamped = Math.min(48, Math.max(1, v))
+          onChange={(v) =>
             onPatchParameters({
               [ROAD_LINE_WIDTH_PX_KEY]:
-                clamped === DEFAULT_ROAD_LINE_WIDTH_PX ? undefined : clamped,
+                v === DEFAULT_ROAD_LINE_WIDTH_PX ? undefined : v,
             })
-          }}
+          }
           onFocus={onFieldFocus}
           onBlur={onFieldBlur}
           className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 read-only:opacity-80"

@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput'
 import React, { useEffect } from 'react';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
@@ -195,8 +196,8 @@ function DataBindingSettings({
         </p>
         {(w.freshnessPolicy ?? 'auto') === 'interval' && (
           <>
-            <input type="number" min={1} value={w.refreshInterval || 15}
-                   onChange={e => onUpdate({ refreshInterval: +e.target.value })}
+            <NumberInput min={1} value={w.refreshInterval || 15}
+                   onChange={n => onUpdate({ refreshInterval: n })}
                    className={`${inputCls} mt-1.5`} placeholder="每隔幾秒更新" />
             <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
               ⚠ 定時輪詢會對資料庫造成重複查詢，僅建議用於無法即時推送的資料。
@@ -463,12 +464,11 @@ function TextSettings({
 
         {(w.icon || w.iconImage) && (
           <Field label="圖示與文字間距 (px)">
-            <input
-              type="number"
+            <NumberInput
               min={0}
               max={32}
               value={w.iconGap ?? (w.textWrap === 'nowrap' ? 4 : 8)}
-              onChange={e => onUpdate({ iconGap: Math.max(0, +e.target.value) })}
+              onChange={n => onUpdate({ iconGap: Math.max(0, n) })}
               className={inputCls}
             />
           </Field>
@@ -486,7 +486,7 @@ function TextSettings({
             </div>
           </Field>
           <Field label="字體大小">
-            <input type="number" value={w.fontSize} onChange={e => onUpdate({ fontSize: +e.target.value })} className={inputCls} />
+            <NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
           </Field>
         </div>
 
@@ -507,7 +507,7 @@ function TextSettings({
             </div>
           </Field>
           <Field label="圓角 (Radius)">
-            <input type="number" min={0} value={w.borderRadius || 0} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} />
+            <NumberInput min={0} value={w.borderRadius || 0} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} />
           </Field>
         </div>
 
@@ -519,7 +519,7 @@ function TextSettings({
             </div>
           </Field>
           <Field label="外框粗細">
-            <input type="number" min={0} value={w.borderWidth || 0} onChange={e => onUpdate({ borderWidth: +e.target.value })} className={inputCls} />
+            <NumberInput min={0} value={w.borderWidth || 0} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} />
           </Field>
         </div>
       </div>
@@ -589,12 +589,11 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
         </Field>
         {(w.alertPresentation ?? 'stack') === 'carousel' && (
           <Field label="輪播間隔 (ms)">
-            <input
-              type="number"
+            <NumberInput
               min={1200}
               step={100}
               value={w.carouselIntervalMs ?? 3200}
-              onChange={e => onUpdate({ carouselIntervalMs: +e.target.value })}
+              onChange={n => onUpdate({ carouselIntervalMs: n })}
               className={inputCls}
             />
           </Field>
@@ -604,7 +603,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       <div className="pt-2 border-t border-zinc-800 space-y-3">
         <SH icon={<Type size={13} />} label="共用樣式" color="#94a3b8" />
         <Field label="字級">
-          <input type="number" min={8} value={w.fontSize ?? 10} onChange={e => onUpdate({ fontSize: +e.target.value })} className={inputCls} />
+          <NumberInput min={8} value={w.fontSize ?? 10} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
         </Field>
         <Field label="圖示 (Lucide，選填)">
           <input value={w.icon ?? ''} onChange={e => onUpdate({ icon: e.target.value })} className={inputCls} placeholder="AlertCircle" />
@@ -638,28 +637,26 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
       </Field>
       
       <div className="grid grid-cols-3 gap-1.5">
-        <Field label="最小值"><input type="number" value={w.min} onChange={e => onUpdate({ min: +e.target.value })} className={inputCls} /></Field>
-        <Field label="最大值"><input type="number" value={w.max} onChange={e => onUpdate({ max: +e.target.value })} className={inputCls} /></Field>
+        <Field label="最小值"><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
+        <Field label="最大值"><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
         <Field label="單位"><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="顯示數值字級 (px)">
-          <input
-            type="number"
+          <NumberInput
             min={8}
             max={96}
             value={w.gaugeValueFontSize ?? 16}
-            onChange={e => onUpdate({ gaugeValueFontSize: +e.target.value })}
+            onChange={n => onUpdate({ gaugeValueFontSize: n })}
             className={inputCls}
           />
         </Field>
         <Field label="單位字級 (px)">
-          <input
-            type="number"
+          <NumberInput
             min={7}
             max={48}
             value={w.gaugeUnitFontSize ?? 12}
-            onChange={e => onUpdate({ gaugeUnitFontSize: +e.target.value })}
+            onChange={n => onUpdate({ gaugeUnitFontSize: n })}
             className={inputCls}
           />
         </Field>
@@ -711,12 +708,11 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
         </p>
       </div>
       <Field label="文字與弧線間距 (px)">
-        <input
-          type="number"
+        <NumberInput
           min={-24}
           max={48}
           value={w.gaugeTextGap ?? 0}
-          onChange={e => onUpdate({ gaugeTextGap: +e.target.value })}
+          onChange={n => onUpdate({ gaugeTextGap: n })}
           className={inputCls}
         />
         <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
@@ -733,11 +729,10 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           />
         </Field>
         <Field label="面板圓角">
-          <input
-            type="number"
+          <NumberInput
             min={0}
             value={w.panelBorderRadius ?? 6}
-            onChange={e => onUpdate({ panelBorderRadius: +e.target.value })}
+            onChange={n => onUpdate({ panelBorderRadius: n })}
             className={inputCls}
           />
         </Field>
@@ -827,7 +822,7 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
             <option value="horizontal">橫向排列</option><option value="grid">網格排列</option>
           </select>
         </Field>
-        <Field label="格位間距 (px)"><input type="number" min={0} value={w.slotGap ?? 4} onChange={e => onUpdate({ slotGap: +e.target.value })} className={inputCls} /></Field>
+        <Field label="格位間距 (px)"><NumberInput min={0} value={w.slotGap ?? 4} onChange={n => onUpdate({ slotGap: n })} className={inputCls} /></Field>
       </div>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
         格位數量由 SQL 回傳列數決定。請設定 statusColorRules 或沿用範例平面預設。
@@ -883,18 +878,16 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       {/* 圓角與透明度 */}
       <div className="grid grid-cols-2 gap-2">
         <Field label="圓角 (px)">
-          <input
-            type="number" min={0} max={999}
+          <NumberInput min={0} max={999}
             value={w.borderRadius}
-            onChange={e => onUpdate({ borderRadius: +e.target.value })}
+            onChange={n => onUpdate({ borderRadius: n })}
             className={inputCls}
           />
         </Field>
         <Field label="透明度 (%)">
-          <input
-            type="number" min={0} max={100}
+          <NumberInput min={0} max={100}
             value={w.opacity ?? 100}
-            onChange={e => onUpdate({ opacity: +e.target.value })}
+            onChange={n => onUpdate({ opacity: n })}
             className={inputCls}
           />
         </Field>
@@ -921,10 +914,9 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       {/* 外框 */}
       <div className="grid grid-cols-2 gap-2">
         <Field label="外框寬度 (px)">
-          <input
-            type="number" min={0} max={20}
+          <NumberInput min={0} max={20}
             value={w.borderWidth ?? 0}
-            onChange={e => onUpdate({ borderWidth: +e.target.value })}
+            onChange={n => onUpdate({ borderWidth: n })}
             className={inputCls}
           />
         </Field>
@@ -979,10 +971,9 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
 
           <div className="grid grid-cols-2 gap-2">
             <Field label="字級 (px)">
-              <input
-                type="number" min={8} max={72}
+              <NumberInput min={8} max={72}
                 value={w.overlayFontSize ?? 13}
-                onChange={e => onUpdate({ overlayFontSize: +e.target.value })}
+                onChange={n => onUpdate({ overlayFontSize: n })}
                 className={inputCls}
               />
             </Field>
@@ -1106,39 +1097,36 @@ function ChartAxisFields({
               {axis?.timeWindow?.enabled === true && (
                 <div className="grid grid-cols-3 gap-2">
                   <Field label="過去比例">
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       value={axis?.timeWindow?.pastRatio ?? 2}
-                      onChange={e =>
+                      onChange={n =>
                         patch({
-                          timeWindow: { ...axis?.timeWindow, enabled: true, pastRatio: +e.target.value },
+                          timeWindow: { ...axis?.timeWindow, enabled: true, pastRatio: n },
                         })
                       }
                       className={inputCls}
                     />
                   </Field>
                   <Field label="未來比例">
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       value={axis?.timeWindow?.futureRatio ?? 4}
-                      onChange={e =>
+                      onChange={n =>
                         patch({
-                          timeWindow: { ...axis?.timeWindow, enabled: true, futureRatio: +e.target.value },
+                          timeWindow: { ...axis?.timeWindow, enabled: true, futureRatio: n },
                         })
                       }
                       className={inputCls}
                     />
                   </Field>
                   <Field label="視窗(分)">
-                    <input
-                      type="number"
+                    <NumberInput
                       min={60}
                       value={axis?.timeWindow?.totalMinutes ?? 360}
-                      onChange={e =>
+                      onChange={n =>
                         patch({
-                          timeWindow: { ...axis?.timeWindow, enabled: true, totalMinutes: +e.target.value },
+                          timeWindow: { ...axis?.timeWindow, enabled: true, totalMinutes: n },
                         })
                       }
                       className={inputCls}
@@ -1209,12 +1197,11 @@ function LineChartSeriesFields({
           />
         </Field>
         <Field label="線寬(px)">
-          <input
-            type="number"
+          <NumberInput
             min={1}
             max={8}
             value={series.strokeWidth ?? 2}
-            onChange={e => patch({ strokeWidth: +e.target.value })}
+            onChange={n => patch({ strokeWidth: n })}
             className={inputCls}
           />
         </Field>
@@ -1346,10 +1333,10 @@ function AxisBandFields({
           <input type="color" value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
         </Field>
         <Field label="厚度(px)">
-          <input type="number" min={1} max={20} value={band.thickness ?? 4} onChange={e => patch({ thickness: +e.target.value })} className={inputCls} />
+          <NumberInput min={1} max={20} value={band.thickness ?? 4} onChange={n => patch({ thickness: n })} className={inputCls} />
         </Field>
         <Field label="透明度(0~1)">
-          <input type="number" min={0} max={1} step={0.1} value={band.opacity ?? 1} onChange={e => patch({ opacity: +e.target.value })} className={inputCls} />
+          <NumberInput min={0} max={1} step={0.1} value={band.opacity ?? 1} onChange={n => patch({ opacity: n })} className={inputCls} />
         </Field>
       </div>
       <div className="space-y-1.5 pt-1 border-t border-zinc-800">
@@ -1458,12 +1445,11 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
         </Field>
         {w.viewportMode === 'data-centered' && (
           <Field label="視窗留白 %">
-            <input
-              type="number"
+            <NumberInput
               min={0}
               max={45}
               value={Math.round((w.viewportPadding ?? 0.12) * 100)}
-              onChange={e => onUpdate({ viewportPadding: Math.min(0.45, Math.max(0, +e.target.value / 100)) })}
+              onChange={n => onUpdate({ viewportPadding: Math.min(0.45, Math.max(0, n / 100)) })}
               className={inputCls}
             />
           </Field>
@@ -1501,7 +1487,7 @@ function DatabaseSettings({ w, onUpdate, onDelete }: { w: DatabaseWidget; onUpda
       <SH icon={<Database size={13} />} label="資料庫屬性" color="#a78bfa" />
       <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
-      <Field label="最大行數"><input type="number" value={w.maxRows} onChange={e => onUpdate({ maxRows: +e.target.value })} className={inputCls} /></Field>
+      <Field label="最大行數"><NumberInput value={w.maxRows} onChange={n => onUpdate({ maxRows: n })} className={inputCls} /></Field>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
     </div>
@@ -1575,13 +1561,13 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
         <div className="grid grid-cols-2 gap-3">
           <Field label="畫布寬度 (Width)">
             <div className="relative">
-              <input type="number" min={320} value={plane.width} onChange={e => onUpdate({ width: +e.target.value })} className={inputCls} />
+              <NumberInput min={320} value={plane.width} onChange={n => onUpdate({ width: n })} className={inputCls} />
               <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
             </div>
           </Field>
           <Field label="畫布高度 (Height)">
             <div className="relative">
-              <input type="number" min={240} value={plane.height} onChange={e => onUpdate({ height: +e.target.value })} className={inputCls} />
+              <NumberInput min={240} value={plane.height} onChange={n => onUpdate({ height: n })} className={inputCls} />
               <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
             </div>
           </Field>
@@ -1635,12 +1621,11 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
       </div>
       {el.isGroup ? (
         <Field label="區塊標題字級 (px)">
-          <input
-            type="number"
+          <NumberInput
             min={10}
             max={48}
             value={el.headerTitleFontSize ?? 14}
-            onChange={e => onUpdate({ headerTitleFontSize: Math.max(10, Math.min(48, +e.target.value || 14)) })}
+            onChange={n => onUpdate({ headerTitleFontSize: Math.max(10, Math.min(48, n || 14)) })}
             className={inputCls}
           />
           <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
@@ -1668,10 +1653,10 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label="X"><input type="number" value={el.x} onChange={e => onUpdate({ x: +e.target.value })} className={inputCls} /></Field>
-        <Field label="Y"><input type="number" value={el.y} onChange={e => onUpdate({ y: +e.target.value })} className={inputCls} /></Field>
-        <Field label="寬"><input type="number" value={el.width} onChange={e => onUpdate({ width: +e.target.value })} className={inputCls} /></Field>
-        <Field label="高"><input type="number" value={el.height} onChange={e => onUpdate({ height: +e.target.value })} className={inputCls} /></Field>
+        <Field label="X"><NumberInput value={el.x} onChange={n => onUpdate({ x: n })} className={inputCls} /></Field>
+        <Field label="Y"><NumberInput value={el.y} onChange={n => onUpdate({ y: n })} className={inputCls} /></Field>
+        <Field label="寬"><NumberInput value={el.width} onChange={n => onUpdate({ width: n })} className={inputCls} /></Field>
+        <Field label="高"><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
       <Field label="背景顏色"><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       <Field label={`透明度：${el.opacity}%`}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
@@ -1720,11 +1705,10 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
           {(el.groupRepeatMode === 'scroll') && (
             <>
               <Field label="滾動間隔（秒）">
-                <input
-                  type="number"
+                <NumberInput
                   min={2}
                   value={el.groupScrollInterval ?? 5}
-                  onChange={e => onUpdate({ groupScrollInterval: +e.target.value })}
+                  onChange={n => onUpdate({ groupScrollInterval: n })}
                   className={inputCls}
                 />
               </Field>
@@ -1740,8 +1724,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
             <>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="格位數量">
-                  <input type="number" min={1} max={12} value={el.slotCount ?? 6}
-                    onChange={e => onUpdate({ slotCount: +e.target.value })} className={inputCls} />
+                  <NumberInput min={1} max={12} value={el.slotCount ?? 6}
+                    onChange={n => onUpdate({ slotCount: n })} className={inputCls} />
                 </Field>
                 <Field label="替換識別欄位">
                   <input value={el.slotKeyField || ''} onChange={e => onUpdate({ slotKeyField: e.target.value })}
@@ -1829,8 +1813,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
 
           <Field label="子範本尺寸 (W × H)">
             <div className="flex gap-2">
-              <input type="number" value={el.templateWidth || 300} onChange={e => onUpdate({ templateWidth: +e.target.value })} className={inputCls} />
-              <input type="number" value={el.templateHeight || 180} onChange={e => onUpdate({ templateHeight: +e.target.value })} className={inputCls} />
+              <NumberInput value={el.templateWidth || 300} onChange={n => onUpdate({ templateWidth: n })} className={inputCls} />
+              <NumberInput value={el.templateHeight || 180} onChange={n => onUpdate({ templateHeight: n })} className={inputCls} />
             </div>
             {(el.groupTileFit || 'fill') === 'slot' && (
               <p className="mt-1 text-[10px] text-amber-500/90">
@@ -1872,9 +1856,9 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
 
           {(el.layoutMode === 'grid' || !el.layoutMode) ? (
             <div className="grid grid-cols-3 gap-2">
-              <Field label="欄數"><input type="number" value={el.gridColumns || 1} onChange={e => onUpdate({ gridColumns: +e.target.value })} className={inputCls} /></Field>
-              <Field label="X 間距"><input type="number" value={el.gapX ?? 12} onChange={e => onUpdate({ gapX: +e.target.value })} className={inputCls} /></Field>
-              <Field label="Y 間距"><input type="number" value={el.gapY ?? 12} onChange={e => onUpdate({ gapY: +e.target.value })} className={inputCls} /></Field>
+              <Field label="欄數"><NumberInput value={el.gridColumns || 1} onChange={n => onUpdate({ gridColumns: n })} className={inputCls} /></Field>
+              <Field label="X 間距"><NumberInput value={el.gapX ?? 12} onChange={n => onUpdate({ gapX: n })} className={inputCls} /></Field>
+              <Field label="Y 間距"><NumberInput value={el.gapY ?? 12} onChange={n => onUpdate({ gapY: n })} className={inputCls} /></Field>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -1896,15 +1880,14 @@ function PositionFields({ widget, onUpdate }: { widget: ChildWidget; onUpdate: (
     <div className="pt-2 border-t border-zinc-800">
       <div className="text-zinc-600 text-[10px] uppercase font-bold mb-2 tracking-wider">位置與尺寸</div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="X"><input type="number" value={widget.x} onChange={e => onUpdate({ x: +e.target.value } as any)} className={inputCls} /></Field>
-        <Field label="Y"><input type="number" value={widget.y} onChange={e => onUpdate({ y: +e.target.value } as any)} className={inputCls} /></Field>
-        <Field label="寬"><input type="number" min={minSize} value={widget.width} onChange={e => onUpdate({ width: Math.max(minSize, +e.target.value) } as any)} className={inputCls} /></Field>
-        <Field label="高"><input type="number" min={minSize} value={widget.height} onChange={e => onUpdate({ height: Math.max(minSize, +e.target.value) } as any)} className={inputCls} /></Field>
+        <Field label="X"><NumberInput value={widget.x} onChange={n => onUpdate({ x: n } as any)} className={inputCls} /></Field>
+        <Field label="Y"><NumberInput value={widget.y} onChange={n => onUpdate({ y: n } as any)} className={inputCls} /></Field>
+        <Field label="寬"><NumberInput min={minSize} value={widget.width} onChange={n => onUpdate({ width: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
+        <Field label="高"><NumberInput min={minSize} value={widget.height} onChange={n => onUpdate({ height: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
         <Field label="旋轉 (°)">
-          <input
-            type="number"
+          <NumberInput
             value={widget.rotationDeg ?? 0}
-            onChange={(e) => onUpdate({ rotationDeg: +e.target.value } as Partial<ChildWidget>)}
+            onChange={(n) => onUpdate({ rotationDeg: n } as Partial<ChildWidget>)}
             className={inputCls}
           />
         </Field>
@@ -1963,8 +1946,8 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <Field label="圓角"><input type="number" min={0} value={w.borderRadius} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} /></Field>
-        <Field label="外框粗細"><input type="number" min={0} value={w.borderWidth} onChange={e => onUpdate({ borderWidth: +e.target.value })} className={inputCls} /></Field>
+        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
+        <Field label="外框粗細"><NumberInput min={0} value={w.borderWidth} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} /></Field>
         <Field label="外框顏色"><input type="color" value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
@@ -2016,8 +1999,8 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
         <Field label="預設標籤"><input value={w.defaultLabel} onChange={e => onUpdate({ defaultLabel: e.target.value })} className={inputCls} placeholder="UNKNOWN" /></Field>
         <Field label="預設背景色"><input type="color" value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
         <Field label="預設文字色"><input type="color" value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="字體大小"><input type="number" value={w.fontSize} onChange={e => onUpdate({ fontSize: +e.target.value })} className={inputCls} /></Field>
-        <Field label="圓角"><input type="number" min={0} value={w.borderRadius} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} /></Field>
+        <Field label="字體大小"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" checked={w.showDot} onChange={e => onUpdate({ showDot: e.target.checked })} className="accent-green-500 w-3 h-3" />
@@ -2058,9 +2041,9 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
         <Field label="資料欄位"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
         <Field label="單位"><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} placeholder="km/h" /></Field>
         <Field label="圖示 (Lucide)"><input value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={inputCls} placeholder="Gauge" /></Field>
-        <Field label="數值字體大小"><input type="number" value={w.valueFontSize} onChange={e => onUpdate({ valueFontSize: +e.target.value })} className={inputCls} /></Field>
-        <Field label="標籤字體大小"><input type="number" value={w.labelFontSize} onChange={e => onUpdate({ labelFontSize: +e.target.value })} className={inputCls} /></Field>
-        <Field label="單位字體大小"><input type="number" min={8} value={w.unitFontSize ?? Math.max(w.labelFontSize, 10)} onChange={e => onUpdate({ unitFontSize: +e.target.value })} className={inputCls} /></Field>
+        <Field label="數值字體大小"><NumberInput value={w.valueFontSize} onChange={n => onUpdate({ valueFontSize: n })} className={inputCls} /></Field>
+        <Field label="標籤字體大小"><NumberInput value={w.labelFontSize} onChange={n => onUpdate({ labelFontSize: n })} className={inputCls} /></Field>
+        <Field label="單位字體大小"><NumberInput min={8} value={w.unitFontSize ?? Math.max(w.labelFontSize, 10)} onChange={n => onUpdate({ unitFontSize: n })} className={inputCls} /></Field>
         <Field label="標籤方位（相對數值）">
           <select
             value={w.labelPosition ?? 'top'}
@@ -2087,11 +2070,11 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
             <option value="right">靠右</option>
           </select>
         </Field>
-        <Field label="標籤／數值間距"><input type="number" min={0} max={24} value={w.layoutGap ?? 4} onChange={e => onUpdate({ layoutGap: +e.target.value })} className={inputCls} /></Field>
+        <Field label="標籤／數值間距"><NumberInput min={0} max={24} value={w.layoutGap ?? 4} onChange={n => onUpdate({ layoutGap: n })} className={inputCls} /></Field>
         <Field label="數值顏色"><input type="color" value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
         <Field label="標籤顏色"><input type="color" value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
         <Field label="單位顏色"><input type="color" value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="圓角"><input type="number" min={0} value={w.borderRadius} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} /></Field>
+        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={w.labelUppercase !== false}
@@ -2113,7 +2096,7 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
           />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="容許誤差 %"><input type="number" min={0} max={50} value={w.tolerancePct ?? 5} onChange={e => onUpdate({ tolerancePct: +e.target.value })} className={inputCls} /></Field>
+          <Field label="容許誤差 %"><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
           <Field label="達標色"><input type="color" value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
           <Field label="偏離色"><input type="color" value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
           <Field label="提示欄位"><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
@@ -2139,15 +2122,15 @@ function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; 
       <div className="grid grid-cols-2 gap-2">
         <Field label="資料欄位"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="value" /></Field>
         <Field label="標籤文字"><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder="進度" /></Field>
-        <Field label="最小值"><input type="number" value={w.min} onChange={e => onUpdate({ min: +e.target.value })} className={inputCls} /></Field>
-        <Field label="最大值"><input type="number" value={w.max} onChange={e => onUpdate({ max: +e.target.value })} className={inputCls} /></Field>
+        <Field label="最小值"><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
+        <Field label="最大值"><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
         <Field label="方向">
           <select value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as any })} className={selectCls}>
             <option value="horizontal">水平</option>
             <option value="vertical">垂直</option>
           </select>
         </Field>
-        <Field label="圓角"><input type="number" min={0} value={w.borderRadius} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} /></Field>
+        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex gap-4">
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
@@ -2185,7 +2168,7 @@ function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; on
         </select>
       </Field>
       <Field label="圓角">
-        <input type="number" min={0} value={w.borderRadius ?? 8} onChange={e => onUpdate({ borderRadius: +e.target.value })} className={inputCls} />
+        <NumberInput min={0} value={w.borderRadius ?? 8} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} />
       </Field>
       <Field label="樣式">
         <select
@@ -2224,8 +2207,8 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
             <option value="DD/MM/YYYY">DD/MM/YYYY</option>
           </select>
         </Field>
-        <Field label="時間字體大小"><input type="number" value={w.fontSize} onChange={e => onUpdate({ fontSize: +e.target.value })} className={inputCls} /></Field>
-        <Field label="日期字體大小"><input type="number" value={w.dateFontSize} onChange={e => onUpdate({ dateFontSize: +e.target.value })} className={inputCls} /></Field>
+        <Field label="時間字體大小"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+        <Field label="日期字體大小"><NumberInput value={w.dateFontSize} onChange={n => onUpdate({ dateFontSize: n })} className={inputCls} /></Field>
         <Field label="時間顏色"><input type="color" value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
         <Field label="日期顏色"><input type="color" value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       </div>
@@ -2257,7 +2240,7 @@ function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpda
             <option value="horizontal">水平長條</option>
           </select>
         </Field>
-        <Field label="Bar 間距 (0~1)"><input type="number" step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={e => onUpdate({ barPadding: +e.target.value })} className={inputCls} /></Field>
+        <Field label="Bar 間距 (0~1)"><NumberInput step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={n => onUpdate({ barPadding: n })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
         <input type="checkbox" checked={w.showValues} onChange={e => onUpdate({ showValues: e.target.checked })} className="accent-orange-500 w-3 h-3" /> 顯示數值標籤
@@ -2403,18 +2386,16 @@ function VehicleContainerSettings({
       <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="grid grid-cols-3 gap-2">
         <Field label="偏移 X">
-          <input
-            type="number"
+          <NumberInput
             value={w.behaviorOffsetX ?? 0}
-            onChange={(e) => onUpdate({ behaviorOffsetX: Number(e.target.value) })}
+            onChange={(n) => onUpdate({ behaviorOffsetX: n })}
             className={inputCls}
           />
         </Field>
         <Field label="偏移 Y">
-          <input
-            type="number"
+          <NumberInput
             value={w.behaviorOffsetY ?? -28}
-            onChange={(e) => onUpdate({ behaviorOffsetY: Number(e.target.value) })}
+            onChange={(n) => onUpdate({ behaviorOffsetY: n })}
             className={inputCls}
           />
         </Field>
@@ -2429,14 +2410,13 @@ function VehicleContainerSettings({
             className="w-full accent-violet-500"
           />
           <div className="mt-1 flex items-center gap-2">
-            <input
-              type="number"
+            <NumberInput
               min={8}
               max={64}
               value={w.behaviorIconSize ?? 20}
-              onChange={(e) =>
+              onChange={(n) =>
                 onUpdate({
-                  behaviorIconSize: Math.min(64, Math.max(8, Number(e.target.value) || 20)),
+                  behaviorIconSize: Math.min(64, Math.max(8, n || 20)),
                 })
               }
               className={inputCls}
@@ -2929,10 +2909,9 @@ function TabListSettings({
                       欄位寬度 (px):
                     </label>
                     <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
+                      <NumberInput
                         value={col.width}
-                        onChange={e => updateColumn(col.id, { width: Math.max(30, Number(e.target.value)) })}
+                        onChange={n => updateColumn(col.id, { width: Math.max(30, n) })}
                         className={`${inputCls} w-full text-xs font-mono`}
                         placeholder="寬度 (例如 90)"
                       />
@@ -2991,10 +2970,9 @@ function TabListSettings({
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="text-zinc-500 text-[9px] block mb-1">標籤字級 (px)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={w.tabFontSize ?? 14}
-                onChange={e => onUpdate({ tabFontSize: Number(e.target.value) })}
+                onChange={n => onUpdate({ tabFontSize: n })}
                 className={`${inputCls} text-xs`}
               />
             </div>
@@ -3081,10 +3059,9 @@ function TabListSettings({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-zinc-500 text-[9px] block mb-1">表頭字級 (px)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={w.headerFontSize ?? 12}
-                onChange={e => onUpdate({ headerFontSize: Number(e.target.value) })}
+                onChange={n => onUpdate({ headerFontSize: n })}
                 className={`${inputCls} text-xs`}
               />
             </div>
@@ -3108,10 +3085,9 @@ function TabListSettings({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-zinc-500 text-[9px] block mb-1">內容字級 (px，全表統一)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={w.fontSize ?? 13}
-                onChange={e => onUpdate(applyTabListContentFontSize(w, Math.max(8, Number(e.target.value) || 13)))}
+                onChange={n => onUpdate(applyTabListContentFontSize(w, Math.max(8, n || 13)))}
                 className={`${inputCls} text-xs`}
               />
             </div>
@@ -3135,19 +3111,17 @@ function TabListSettings({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-zinc-500 text-[9px] block mb-1">每列高度 (px)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={w.rowHeight ?? 48}
-                onChange={e => onUpdate({ rowHeight: Number(e.target.value) })}
+                onChange={n => onUpdate({ rowHeight: n })}
                 className={`${inputCls} text-xs`}
               />
             </div>
             <div>
               <label className="text-zinc-500 text-[9px] block mb-1">表頭高度 (px)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={w.headerHeight ?? 38}
-                onChange={e => onUpdate({ headerHeight: Number(e.target.value) })}
+                onChange={n => onUpdate({ headerHeight: n })}
                 className={`${inputCls} text-xs`}
               />
             </div>

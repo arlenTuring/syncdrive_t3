@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 
 type Props = {
@@ -73,18 +74,13 @@ export function FrameInspectorSection({
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[10px] text-zinc-500">
               線條粗細（px）
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={20}
                 step={1}
                 readOnly={readOnly}
                 value={strokeWidthPx}
-                onChange={(e) => {
-                  const n = Number.parseFloat(e.target.value)
-                  if (!Number.isFinite(n)) return
-                  onPatchParameters({ strokeWidthPx: Math.max(0, Math.round(n)) })
-                }}
+                onChange={(n) => onPatchParameters({ strokeWidthPx: Math.round(n) })}
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
                 className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500"

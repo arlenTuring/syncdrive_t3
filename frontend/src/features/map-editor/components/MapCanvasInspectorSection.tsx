@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import {
   clampMapPixelSize,
   MAX_MAP_PIXEL,
@@ -41,16 +42,13 @@ export function MapCanvasInspectorSection({
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs text-zinc-500">
             寬度（px）
-            <input
-              type="number"
+            <NumberInput
               min={Math.max(MIN_MAP_PIXEL, minPixelSize.width)}
               max={MAX_MAP_PIXEL}
               step={1}
               disabled={readOnly}
               value={pixelSize.width}
-              onChange={(e) =>
-                patch({ width: Number.parseInt(e.target.value, 10) })
-              }
+              onChange={(n) => patch({ width: Math.round(n) })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-50"
@@ -58,16 +56,13 @@ export function MapCanvasInspectorSection({
           </label>
           <label className="block text-xs text-zinc-500">
             高度（px）
-            <input
-              type="number"
+            <NumberInput
               min={Math.max(MIN_MAP_PIXEL, minPixelSize.height)}
               max={MAX_MAP_PIXEL}
               step={1}
               disabled={readOnly}
               value={pixelSize.height}
-              onChange={(e) =>
-                patch({ height: Number.parseInt(e.target.value, 10) })
-              }
+              onChange={(n) => patch({ height: Math.round(n) })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-50"

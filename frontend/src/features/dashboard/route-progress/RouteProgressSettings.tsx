@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput'
 import * as LucideIcons from 'lucide-react';
 import { Plus, Trash2, Palette, MapPin, Zap, FolderOpen } from 'lucide-react';
 import type {
@@ -52,10 +53,9 @@ function PositionFields({
     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
       {(['x', 'y', 'width', 'height'] as const).map((k) => (
         <Field key={k} label={k.toUpperCase()}>
-          <input
-            type="number"
+          <NumberInput
             value={widget[k]}
-            onChange={(e) => onUpdate({ [k]: +e.target.value })}
+            onChange={(n) => onUpdate({ [k]: n })}
             className={inputCls}
           />
         </Field>
@@ -154,11 +154,10 @@ export function RouteProgressSettings({
         </select>
       </Field>
       <Field label="站點標籤字級 (px)">
-        <input
-          type="number"
+        <NumberInput
           min={8}
           value={w.fontSize ?? 14}
-          onChange={(e) => onUpdate({ fontSize: Math.max(8, Number(e.target.value) || 14) })}
+          onChange={(n) => onUpdate({ fontSize: Math.max(8, n || 14) })}
           className={inputCls}
         />
       </Field>
@@ -403,10 +402,9 @@ export function RouteProgressSettings({
                 });
               }}
             />
-            <input
-              type="number"
+            <NumberInput
               value={rule.priority ?? 0}
-              onChange={(e) => updateRule(i, { priority: +e.target.value })}
+              onChange={(n) => updateRule(i, { priority: n })}
               className={inputCls}
               placeholder="優先序"
               style={{ fontSize: 10 }}

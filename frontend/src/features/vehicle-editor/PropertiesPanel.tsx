@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput'
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { WidgetDataBindingSettings } from '../dashboard/elements/WidgetDataBindingSettings';
@@ -229,18 +230,16 @@ export function PropertiesPanel({
             />
           </Field>
           <Field label="畫布寬度 (px)">
-            <input
-              type="number"
+            <NumberInput
               value={vehicle.width}
-              onChange={(e) => onUpdateVehicle({ width: Number(e.target.value) })}
+              onChange={(n) => onUpdateVehicle({ width: n })}
               className={inputCls}
             />
           </Field>
           <Field label="畫布高度 (px)">
-            <input
-              type="number"
+            <NumberInput
               value={vehicle.height}
-              onChange={(e) => onUpdateVehicle({ height: Number(e.target.value) })}
+              onChange={(n) => onUpdateVehicle({ height: n })}
               className={inputCls}
             />
           </Field>
@@ -330,11 +329,10 @@ export function PropertiesPanel({
         <div className="grid grid-cols-2 gap-2">
           {(['x', 'y', 'width', 'height'] as const).map((key) => (
             <Field key={key} label={key.toUpperCase()}>
-              <input
-                type="number"
+              <NumberInput
                 step={key === 'x' || key === 'y' ? VEHICLE_NUDGE_STEP : 1}
                 value={el[key]}
-                onChange={(e) => patch({ [key]: Number(e.target.value) })}
+                onChange={(n) => patch({ [key]: n })}
                 className={inputCls}
               />
             </Field>
@@ -342,11 +340,10 @@ export function PropertiesPanel({
         </div>
 
         <Field label="旋轉角度">
-          <input
-            type="number"
+          <NumberInput
             value={el.rotationDeg ?? 0}
-            onChange={(e) =>
-              patch({ rotationDeg: normalizeDegrees(Number(e.target.value)) })
+            onChange={(n) =>
+              patch({ rotationDeg: normalizeDegrees(n) })
             }
             className={inputCls}
           />
@@ -409,10 +406,9 @@ export function PropertiesPanel({
               />
             </Field>
             <Field label="字級">
-              <input
-                type="number"
+              <NumberInput
                 value={el.fontSize}
-                onChange={(e) => patch({ fontSize: Number(e.target.value) })}
+                onChange={(n) => patch({ fontSize: n })}
                 className={inputCls}
               />
             </Field>

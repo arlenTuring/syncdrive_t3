@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Bus, X } from 'lucide-react';
 
@@ -68,21 +69,19 @@ export function NewVehicleDialog({
         <div className="mb-4">
           <label className="mb-1.5 block text-xs font-medium text-zinc-400">自訂像素尺寸</label>
           <div className="flex items-center gap-2">
-            <input
-              type="number"
+            <NumberInput
               min={40}
               max={512}
               value={width}
-              onChange={(e) => setWidth(Number(e.target.value))}
+              onChange={(n) => setWidth(n)}
               className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-amber-500 focus:outline-none"
             />
             <span className="text-sm text-zinc-500">×</span>
-            <input
-              type="number"
+            <NumberInput
               min={40}
               max={512}
               value={height}
-              onChange={(e) => setHeight(Number(e.target.value))}
+              onChange={(n) => setHeight(n)}
               className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-amber-500 focus:outline-none"
             />
           </div>

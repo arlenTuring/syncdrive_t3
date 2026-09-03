@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { NumberInput } from '../../../components/NumberInput'
 import { TextAlignmentControls } from '../../../components/TextAlignmentControls'
 import { TextLayoutControls } from '../../../components/TextLayoutControls'
 import {
@@ -76,17 +77,12 @@ export function GeofenceInspectorSection({
           <label className="mb-1 block text-[10px] text-zinc-500">
             線條粗細（px）
           </label>
-          <input
-            type="number"
+          <NumberInput
             min={1}
             max={24}
             disabled={readOnly}
             value={params.strokeWidthPx}
-            onChange={(e) =>
-              onPatchParameters({
-                strokeWidthPx: Math.max(1, Number(e.target.value) || 1),
-              })
-            }
+            onChange={(n) => onPatchParameters({ strokeWidthPx: n })}
             className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-70"
           />
         </div>
@@ -257,24 +253,15 @@ export function GeofenceInspectorSection({
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="mb-1 block text-[10px] text-zinc-500">字級 px</label>
-                <input
-                  type="number"
+                <NumberInput
                   min={8}
                   max={72}
                   readOnly={readOnly}
                   value={selectedLabel.fontSizePx}
-                  onChange={(e) =>
+                  onChange={(n) =>
                     patchLabels(
                       labels.map((l) =>
-                        l.id === selectedLabel.id
-                          ? {
-                              ...l,
-                              fontSizePx: Math.max(
-                                8,
-                                Number(e.target.value) || 16,
-                              ),
-                            }
-                          : l,
+                        l.id === selectedLabel.id ? { ...l, fontSizePx: n } : l,
                       ),
                     )
                   }
@@ -307,19 +294,13 @@ export function GeofenceInspectorSection({
             </div>
             <div>
               <label className="mb-1 block text-[10px] text-zinc-500">旋轉（度）</label>
-              <input
-                type="number"
+              <NumberInput
                 readOnly={readOnly}
                 value={selectedLabel.rotationDeg}
-                onChange={(e) =>
+                onChange={(n) =>
                   patchLabels(
                     labels.map((l) =>
-                      l.id === selectedLabel.id
-                        ? {
-                            ...l,
-                            rotationDeg: Number(e.target.value) || 0,
-                          }
-                        : l,
+                      l.id === selectedLabel.id ? { ...l, rotationDeg: n } : l,
                     ),
                   )
                 }

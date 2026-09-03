@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Monitor, X } from 'lucide-react';
 
@@ -77,18 +78,16 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
         <div className="mb-4">
           <label className="block text-zinc-400 text-xs mb-1.5 font-medium">自訂解析度</label>
           <div className="flex items-center gap-2">
-            <input
-              type="number" min={320} max={7680}
+            <NumberInput min={320} max={7680}
               value={width}
-              onChange={e => setWidth(Number(e.target.value))}
+              onChange={n => setWidth(n)}
               className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-zinc-100 text-sm
                          focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-colors"
             />
             <span className="text-zinc-500 text-sm">×</span>
-            <input
-              type="number" min={240} max={4320}
+            <NumberInput min={240} max={4320}
               value={height}
-              onChange={e => setHeight(Number(e.target.value))}
+              onChange={n => setHeight(n)}
               className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-zinc-100 text-sm
                          focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-colors"
             />

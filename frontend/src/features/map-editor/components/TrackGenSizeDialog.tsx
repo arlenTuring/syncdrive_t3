@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
 
 /**
@@ -63,15 +64,11 @@ function NumberField({
     <label className="flex flex-col gap-1">
       <span className="text-[11px] text-zinc-400">{label}</span>
       <div className="flex items-center gap-1.5">
-        <input
-          type="number"
+        <NumberInput
           value={Math.round(value)}
           min={min}
           max={max}
-          onChange={(e) => {
-            const n = Number(e.target.value)
-            if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)))
-          }}
+          onChange={onChange}
           className="w-24 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[12px] tabular-nums text-zinc-100 focus:border-cyan-500 focus:outline-none"
         />
         <span className="text-[11px] text-zinc-500">{suffix}</span>
