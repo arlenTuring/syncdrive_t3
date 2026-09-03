@@ -899,6 +899,27 @@ function layoutOnce(
      * （或收回）那一段。移動的是轉折點的里程，不是橫向偏移，所以線還是接得上。
      */
     const simplified = applySlope(merged, flatEps)
+
+    /*
+     * 太短的線整條不畫。
+     *
+     * 路口裡那些連接用的短車道，畫出來就是一兩塊、幾十像素——而且它與主線差好幾股，
+     * 那個岔出動作擠在幾十像素裡，畫出來是一根尖刺。實測 T3 的 L5～L10 各只有 26～
+     * 68 px，全部都是這種東西；主線 L1／L2 是 2416／1750 px，差兩個數量級。
+     *
+     * 門檻取八個股距：夠畫出一個像樣的分岔加一小段軌道。簡圖要的是看得懂的幾何，
+     * 不是把每一條連接車道都交代掉。
+     */
+    if (block) {
+      let lenPx = 0
+      for (let i = 1; i < simplified.length; i += 1) {
+        const a = placePoint(simplified[i - 1]![0], simplified[i - 1]![1], placed, lt)
+        const b = placePoint(simplified[i]![0], simplified[i]![1], placed, lt)
+        lenPx += Math.hypot(b.x - a.x, b.y - a.y)
+      }
+      if (lenPx < levelPx * 8) continue
+    }
+
     const sig = `${Math.round(prof[0]![0])}:${Math.round(prof[prof.length - 1]![0])}:${simplified
       .map((p) => Math.round(p[1]))
       .join(',')}`
