@@ -67,7 +67,15 @@ export function TrackGenGraphic({
   selected,
   onPickClick,
 }: Props) {
-  const buttonSize = Math.max(28, Math.min(width, height) * 0.14)
+  const buttonSize = Math.max(28, Math.min(width, height) * 0.18)
+  /**
+   * 空白狀態那行提示的字級。
+   *
+   * 以前寫死 11px：元件被拉大之後按鈕跟著長，字卻還是那麼小，整塊看起來像一顆
+   * 大按鈕配一行螞蟻字。改成跟著元件的短邊走，上下夾住，元件很小的時候不會擠爆，
+   * 很大的時候也讀得到。
+   */
+  const hintFontPx = Math.max(11, Math.min(28, Math.min(width, height) * 0.055))
   /**
    * 滑過哪一條 road，以及滑鼠在元件內的位置。
    *
@@ -108,7 +116,10 @@ export function TrackGenGraphic({
 
   if (!centerlines) {
     return (
-      <div className="relative flex size-full flex-col items-center justify-center gap-2 overflow-hidden rounded-sm border border-dashed border-zinc-500/70 bg-zinc-900/20">
+      <div
+        className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-sm border border-dashed border-zinc-500/70 bg-zinc-900/20"
+        style={{ gap: hintFontPx * 0.9 }}
+      >
         {!readOnly ? (
           <button
             type="button"
@@ -133,7 +144,10 @@ export function TrackGenGraphic({
             aria-hidden
           />
         )}
-        <span className="pointer-events-none select-none px-3 text-center text-[11px] text-zinc-500">
+        <span
+          className="pointer-events-none select-none px-3 text-center leading-snug text-zinc-400"
+          style={{ fontSize: hintFontPx }}
+        >
           {readOnly ? '尚未載入路網' : '點擊或拖曳 .xodr 至此'}
         </span>
       </div>
