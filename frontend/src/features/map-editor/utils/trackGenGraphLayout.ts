@@ -91,6 +91,40 @@ function layoutOnce(
    * 0，畫出來完全重疊，看起來只有一條——實測 T3 的 road 1 與 3 就是這樣。把同一對
    * 節點之間的邊當成一束，車道依序排開，才會是兩條並排的軌道。
    */
+  /*
+   * 橫向偏移一律用<strong>世界座標的軸</strong>，不用邊自己的左法線。
+   *
+   * 沿著邊的左法線放，方向會跟著行車方向翻面：同一條路的上行往上排、下行往下排，
+   * 兩條反向的平行邊疊出來順序相反；岔出去的那一束也會因為那條邊剛好朝西就跑到
+   * 主線上面去——實測 4#0 的真實位置在主線下方 11.6 公尺，畫出來卻在上面。
+   *
+   * 改成：橫的邊一律沿版面 y、縱的邊一律沿版面 x，正負由<strong>真實座標</strong>決定。
+   */
+  const perpAxis = (e: GraphEdge): Vec => (e.orient === 'h' ? { x: 0, y: 1 } : { x: 1, y: 0 })
+  /** 這條邊在版面上的垂直位置（越大越下／越右），用真實座標推 */
+  const perpOf = (e: GraphEdge): number => {
+    const pts = e.points
+    if (!pts.length) return 0
+    const mx = pts.reduce((t, p) => t + p.x, 0) / pts.length
+    const my = pts.reduce((t, p) => t + p.y, 0) / pts.length
+    // 真實 y 向上、版面 y 向下
+    return e.orient === 'h' ? -my : mx
+  }
+  /**
+   * 車道序號往哪一邊排。
+   *
+   * lane id 越大越靠參考線左側；左側在版面上是上還是下，看這條路往哪走。往東走時
+   * 左側是上（版面 y 較小），所以序號要往負的方向排。
+   */
+  const laneSign = (e: GraphEdge): number => {
+    const pts = e.points
+    if (pts.length < 2) return 1
+    const dx = pts[pts.length - 1]!.x - pts[0]!.x
+    const dy = pts[pts.length - 1]!.y - pts[0]!.y
+    const s = e.orient === 'h' ? -Math.sign(dx) : -Math.sign(dy)
+    return s === 0 ? 1 : s
+  }
+
   const bundleKey = (e: GraphEdge) => [e.from, e.to].sort().join('|')
   const bundles = new Map<string, GraphEdge[]>()
   for (const e of graph.edges) {
@@ -102,8 +136,10 @@ function layoutOnce(
   const baseIndex = new Map<string, number>()
   const bundleCount = new Map<string, number>()
   for (const [key, list] of bundles) {
+    // 束裡的邊照真實位置排，上下行才不會左右顛倒
+    const ordered = [...list].sort((a, b) => perpOf(a) - perpOf(b))
     let k = 0
-    for (const e of list) {
+    for (const e of ordered) {
       baseIndex.set(e.id, k)
       k += e.lanes.length
     }
@@ -137,12 +173,16 @@ function layoutOnce(
     for (const list of groups.values()) {
       if (list.length < 2) continue
       const sorted = [...list].sort((a, b) => b.lengthM - a.lengthM)
+      const main = sorted[0]!
       let away = 0
       for (let i = 1; i < sorted.length; i += 1) {
-        const key = bundleKey(sorted[i]!)
+        const branch = sorted[i]!
+        const key = bundleKey(branch)
         away += (bundleCount.get(bundleKey(sorted[i - 1]!)) ?? 1) * levelPx
+        // 往真實世界上它所在的那一側讓開，不是固定往下
+        const side = perpOf(branch) >= perpOf(main) ? 1 : -1
         for (const e of bundles.get(key) ?? []) {
-          if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away)
+          if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away * side)
         }
       }
     }
@@ -153,7 +193,8 @@ function layoutOnce(
     const total = bundleCount.get(bundleKey(e)) ?? e.lanes.length
     const base = baseIndex.get(e.id) ?? 0
     const away = shift.get(e.id) ?? 0
-    return e.lanes.map((_, k) => (base + k - (total - 1) / 2) * levelPx + away)
+    const sign = laneSign(e)
+    return e.lanes.map((_, k) => ((base + k - (total - 1) / 2) * levelPx) * sign + away)
   }
 
   /** 邊在節點端讓出的長度：那一端要放轉角就讓一個半徑 */
@@ -187,9 +228,10 @@ function layoutOnce(
     const offs = offsetsOf(e)
     e.lanes.forEach((lane, k) => {
       const o = offs[k]!
-      // 垂直於邊的方向
-      const nx = -uy
-      const ny = ux
+      // 垂直方向用世界的軸，不跟著行車方向翻面
+      const ax = perpAxis(e)
+      const nx = ax.x
+      const ny = ax.y
       for (let i = 0; i < n; i += 1) {
         const f0 = i / n
         const f1 = (i + 1) / n
