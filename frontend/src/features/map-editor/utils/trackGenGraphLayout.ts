@@ -502,10 +502,38 @@ function layoutOnce(
   const spreadAt = (e: GraphEdge, f: number): number =>
     innerGapAt(e, f) >= laneWidthM * 0.5 ? 1 : 0
 
+  /*
+   * 每個節點自己的轉角半徑：<strong>兩隻腳都要放得下</strong>。
+   *
+   * 半徑是照股距與帶寬算的，跟邊有多長無關。碰到短邊時，邊只讓得出自己的一半，轉角卻
+   * 照原半徑畫，兩者就對不上——實測 road 10 那個 20 公尺的轉折，軌道寬拉到 70 時接縫
+   * 差了 59 像素。所以半徑先夾在兩隻腳各自的一半以內，讓與畫用同一個值。
+   */
+  const cornerRadiusAt = new Map<string, number>()
+  for (const [nodeId, pair] of cornerPair) {
+    const r = Math.min(cornerR, spanOf(pair.h) * 0.5 - 1, spanOf(pair.v) * 0.5 - 1)
+    /*
+     * 放不下就不畫圓角，讓兩條帶子直接交成直角。
+     *
+     * 最內圈那一條的半徑是「節點半徑減去束的半寬」。腳太短時它會小過半個帶寬——那種弧
+     * 畫不出來。先前是<strong>只跳過那一條</strong>，於是同一個角有的車道有圓角、有的
+     * 沒有，缺的那條就開一個口。整組不畫、兩條帶子在角上交會，才是完整的直角。
+     */
+    const half = Math.max(
+      ...offsetsOf(pair.h).map(Math.abs),
+      ...offsetsOf(pair.v).map(Math.abs),
+      0,
+    )
+    cornerRadiusAt.set(nodeId, r - half < bandW * 0.45 ? 0 : r)
+  }
+
   /** 邊在節點端讓出的長度：那一端<strong>真的會放</strong>轉角或分岔才讓 */
   const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) => {
     const pair = cornerPair.get(nodeId)
-    const corner = pair && (pair.h.id === e.id || pair.v.id === e.id) ? cornerR : 0
+    const corner =
+      pair && (pair.h.id === e.id || pair.v.id === e.id)
+        ? (cornerRadiusAt.get(nodeId) ?? cornerR)
+        : 0
     const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
     const want = Math.max(corner, sw)
     return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
@@ -971,22 +999,39 @@ function layoutOnce(
     if (!hOther || !vOther) continue
     const sxDir = Math.sign(N.x - P(hOther).x) || 1
     const syDir = Math.sign(P(vOther).y - N.y) || 1
-    const C = { x: N.x - sxDir * cornerR, y: N.y + syDir * cornerR }
-    const count = Math.min(eh.lanes.length, ev.lanes.length)
-    const offsH = offsetsOf(eh)
+    const r = cornerRadiusAt.get(node.id) ?? cornerR
+    if (r <= 0) continue
+    const C = { x: N.x - sxDir * r, y: N.y + syDir * r }
+    /*
+     * 兩隻腳各用<strong>自己那條邊的偏移</strong>，再照「離圓心多遠」配對。
+     *
+     * 先前只取橫向那條邊的偏移，縱向那頭用一條猜出來的正負號套上去。兩條邊的車道排列
+     * 方向本來就可能相反（行車方向不同），束的寬度也可能不一樣，猜出來的位置常常落在
+     * 另一條車道上、甚至落到帶子外面——軌道寬愈大差愈多。
+     *
+     * 照離圓心的距離排序再配，等於「外圈接外圈、內圈接內圈」，弧也自然同心。
+     */
+    const rank = (offs: number[], base: number, centre: number) =>
+      offs
+        .map((o, k) => ({ k, o, d: Math.abs(base + o - centre) }))
+        .sort((a, b) => a.d - b.d)
+    const hs = rank(offsetsOf(eh), N.y, C.y)
+    const vs = rank(offsetsOf(ev), N.x, C.x)
+    const count = Math.min(hs.length, vs.length)
     for (let k = 0; k < count; k += 1) {
-      const o = offsH[k]!
-      const radius = cornerR - syDir * o
+      const h = hs[k]!
+      const v = vs[k]!
+      const radius = (h.d + v.d) / 2
       // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
       if (radius < bandW * 0.45) continue
-      const p0 = { x: N.x - sxDir * cornerR, y: N.y + o }
-      const p1 = { x: N.x - sxDir * sxDir * syDir * o, y: N.y + syDir * cornerR }
+      const p0 = { x: C.x, y: N.y + h.o }
+      const p1 = { x: N.x + v.o, y: C.y }
       const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)
       shapes.push({
         kind: 'corner',
-        name: `${eh.lanes[k]!.key}~${ev.lanes[k]!.key}`,
+        name: `${eh.lanes[h.k]!.key}~${ev.lanes[v.k]!.key}`,
         role: 'road',
-        lineKey: eh.lanes[k]!.key,
+        lineKey: eh.lanes[h.k]!.key,
         lineLengthM: eh.lengthM,
         realLatFromM: 0,
         realLatToM: 0,
