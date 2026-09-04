@@ -527,13 +527,25 @@ function layoutOnce(
     cornerRadiusAt.set(nodeId, r - half < bandW * 0.45 ? 0 : r)
   }
 
-  /** 邊在節點端讓出的長度：那一端<strong>真的會放</strong>轉角或分岔才讓 */
+  /** 一束往兩側最遠伸到哪（半個束寬，含讓開的量） */
+  const halfSpanOf = (e: GraphEdge) => Math.max(0, ...offsetsOf(e).map(Math.abs))
+
+  /**
+   * 邊在節點端讓出的長度。負值代表<strong>往外多伸一截</strong>。
+   *
+   * 那一端真的會放轉角或分岔才讓。放不下轉角時（腳太短）反過來要<strong>補</strong>：
+   * 橫的那條停在節點的 x、縱的那條停在節點的 y，各自還帶著自己的車道偏移，中間會留下一個
+   * L 形的洞，洞的大小就是另一束的半寬——實測軌道寬 70 時破了 68 像素。各自往對方的位置
+   * 多伸那麼一截，兩條帶子就在角上交會成一個實心的直角。
+   */
   const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) => {
     const pair = cornerPair.get(nodeId)
-    const corner =
-      pair && (pair.h.id === e.id || pair.v.id === e.id)
-        ? (cornerRadiusAt.get(nodeId) ?? cornerR)
-        : 0
+    const onPair = pair && (pair.h.id === e.id || pair.v.id === e.id)
+    if (onPair && (cornerRadiusAt.get(nodeId) ?? cornerR) <= 0) {
+      const other = pair!.h.id === e.id ? pair!.v : pair!.h
+      return -halfSpanOf(other)
+    }
+    const corner = onPair ? (cornerRadiusAt.get(nodeId) ?? cornerR) : 0
     const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
     const want = Math.max(corner, sw)
     return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
@@ -559,8 +571,8 @@ function layoutOnce(
     const alongShift = (n: GraphNode) => endExtra(n, e.orient === 'h' ? 'v' : 'h')
     const trim0 = trimAt(e, e.from, full)
     const trim1 = trimAt(e, e.to, full)
-    const t0 = Math.max(0, trim0 > 0 ? trim0 + alongU * alongShift(ends.a) : 0)
-    const t1 = Math.max(0, trim1 > 0 ? trim1 - alongU * alongShift(ends.b) : 0)
+    const t0 = trim0 > 0 ? Math.max(0, trim0 + alongU * alongShift(ends.a)) : trim0
+    const t1 = trim1 > 0 ? Math.max(0, trim1 - alongU * alongShift(ends.b)) : trim1
     let len = full - t0 - t1
     if (len < 2) continue
     let S = { x: A.x + ux * t0, y: A.y + uy * t0 }
