@@ -561,8 +561,11 @@ function layoutOnce(
      *
      * 用股距（軌道之間的 3.5 公尺）去切會把每一點小起伏都切成一段；圖上看得出來的
      * 差異是「挪了半條軌道寬」那個級距，換算回真實世界是幾十公尺。
+     *
+     * 這裡一律拿<strong>軌道寬</strong>當尺，不拿股距——判斷的是「線挪得看不看得出來」，
+     * 那要跟線自己的粗細比，跟兩條線之間留多少空隙無關。
      */
-    const stepM = levelPx / Math.max(1e-6, perpScale)
+    const stepM = bandW / Math.max(1e-6, perpScale)
     /*
      * 切段用的級距取<strong>四分之一股</strong>：線在圖上挪了四分之一條軌道寬就看得
      * 出來不是直的，值得切一段。整股當級距的話，road 9 那個 ±8 公尺的緩坡（圖上 15
@@ -629,7 +632,15 @@ function layoutOnce(
     for (const r of levelRuns) r.offsetPx = toPx(meanDev(r.f0, r.f1))
     const fromPx = nodeOffsetPx(ends.a, e.orient)
     const toPxEnd = nodeOffsetPx(ends.b, e.orient)
-    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > levelPx * 0.12) {
+    /*
+     * 只有一段的邊要不要為了兩端高度不同而切一刀。
+     *
+     * 長邊值得——那是路真的在挪。短邊不值得：它本來就沒有空間好好走一段坡，兩端的差
+     * 又常常只是路口附近幾像素的擺動。實測塊給 50 公尺時，59 公尺的側線為了六像素的
+     * 落差生出一段斜接，圖上就是側線上莫名其妙多一塊。
+     */
+    const splitAt = usedM < perBlockM * MIN_TAPER_BLOCKS ? bandW * 0.4 : bandW * 0.08
+    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > splitAt) {
       const only = levelRuns[0]!
       const mid = (only.f0 + only.f1) / 2
       levelRuns = [
@@ -646,11 +657,11 @@ function layoutOnce(
     /*
      * 併掉高度差看不出來的段界。
      *
-     * 改完端點之後可能有相鄰兩段高度幾乎一樣；差不到八分之一股的落差在圖上就是一條
+     * 改完端點之後可能有相鄰兩段高度幾乎一樣；差不到一成軌道寬的落差在圖上就是一條
      * 直線，畫成斜接只會多一片碎片。
      */
     for (let i = levelRuns.length - 1; i > 0; i -= 1) {
-      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < levelPx * 0.12) {
+      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < bandW * 0.08) {
         levelRuns[i - 1]!.f1 = levelRuns[i]!.f1
         levelRuns.splice(i, 1)
       }
@@ -1083,10 +1094,11 @@ export function layoutTrackGraph(
 ): TrackGenLayout {
   const maxLanes = Math.max(1, ...graph.edges.map((e) => e.lanes.length))
   /*
-   * 股距與軌道寬分開：框夠高時等於軌道寬（帶子剛好相鄰），框太扁時縮小，平行的帶子
-   * 略為重疊。整張圖的大小因此不受軌道寬影響。
+   * 股距與軌道寬分開：框夠高時給軌道寬的 1.3 倍，平行的兩條之間留得下三成軌道寬的
+   * 空隙——貼在一起的四條線看起來是一整片，分不出有幾條。框太扁時縮小，縮到比軌道寬
+   * 還小就會略為重疊。整張圖的大小因此不受軌道寬影響。
    */
-  const levelPx = Math.max(2, Math.min(block.trackWidthPx, (box.hPx * 0.35) / maxLanes))
+  const levelPx = Math.max(2, Math.min(block.trackWidthPx * 1.3, (box.hPx * 0.35) / maxLanes))
 
   let sx = 1
   let sy = 1
