@@ -52,6 +52,19 @@ type Props = {
   onConfirm: (params: TrackGenSizeParams) => void
 }
 
+/**
+ * 四種軌道在預覽裡各給一個顏色。
+ *
+ * 全部同色時，一眼分不出哪一段是轉角、哪一段是分岔——先前只能靠外框長寬去猜。顏色
+ * 只用在預覽，生成出來的元件仍照圖台原本的樣式。
+ */
+const KIND_STYLE = {
+  rect: { fill: 'rgba(161,161,170,0.38)', stroke: 'rgba(228,228,231,0.85)', label: '一般軌道' },
+  corner: { fill: 'rgba(45,212,191,0.35)', stroke: 'rgba(94,234,212,0.95)', label: '圓角軌道' },
+  taper: { fill: 'rgba(251,191,36,0.32)', stroke: 'rgba(252,211,77,0.95)', label: '斜接軌道' },
+  switch: { fill: 'rgba(167,139,250,0.35)', stroke: 'rgba(196,181,253,0.95)', label: '分岔軌道' },
+} as const
+
 const MIN_WID = 4
 
 function NumberField({
@@ -186,8 +199,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
             {extent?.shapes.map((sh, i) => {
               const ox = extent.originPx.x - extent.bounds.xMin
               const oy = extent.originPx.y - extent.bounds.yMin
-              const fill = 'rgba(161,161,170,0.38)'
-              const stroke = 'rgba(228,228,231,0.85)'
+              const { fill, stroke } = KIND_STYLE[sh.kind]
               if (sh.kind === 'rect') {
                 const w = Math.max(1, sh.lengthM * scale)
                 const h = Math.max(1, sh.widthM * scale)
@@ -289,6 +301,32 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
               ，把軌道寬度調小
             </span>
           ) : null}
+        </div>
+
+        {/*
+          四種軌道的對照。顏色只用在預覽——生成出來的元件仍照圖台原本的樣式；這裡是
+          為了讓人一眼看出哪一段是轉角、哪一段是分岔，不必去比對外框長寬。
+        */}
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400"
+          data-trackgen-legend
+        >
+          {(['rect', 'corner', 'switch', 'taper'] as const).map((kind) => {
+            const st = KIND_STYLE[kind]
+            const n = extent?.shapes.filter((sh) => sh.kind === kind).length ?? 0
+            return (
+              <span key={kind} className="flex items-center gap-1.5">
+                <span
+                  className="inline-block size-3 rounded-[2px] border"
+                  style={{ background: st.fill, borderColor: st.stroke }}
+                  aria-hidden
+                />
+                {st.label}
+                <b className="font-mono tabular-nums text-zinc-200">{n}</b>
+              </span>
+            )
+          })}
+          <span className="text-zinc-500">顏色只是預覽的標示，生成出來的軌道不受影響</span>
         </div>
 
         <div className="flex justify-end gap-2">
