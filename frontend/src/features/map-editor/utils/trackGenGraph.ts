@@ -64,6 +64,13 @@ export type GraphEdge = {
   lanes: Array<{ key: string; laneId: number; widthM: number; points: Array<{ x: number; y: number }> }>
   /** 真實座標的取樣點，車輛投影要用 */
   points: Array<{ x: number; y: number }>
+  /**
+   * 這一段沿線的<strong>內側間隔</strong>（公尺），與 points 等長。
+   *
+   * 兩條行車道之間夾了多寬的非行車道——月台、安全島、只有標線寬度的分隔。檔案自己寫著，
+   * 排版拿它決定哪一段要把兩條軌道拉開。
+   */
+  innerGapM: number[]
 }
 
 /**
@@ -387,6 +394,7 @@ export function buildTrackGraph(
         sign: run.dirDeg === 0 || run.dirDeg === 90 ? 1 : -1,
         lanes,
         points: pts.slice(run.from, run.to + 1).map((p) => ({ x: p.x, y: p.y })),
+        innerGapM: (road.innerGapM ?? []).slice(run.from, run.to + 1),
       })
     }
   }

@@ -381,73 +381,17 @@ function layoutOnce(
    * T3 只有兩處拉開，都在右端的開口，1#0+3#0 那一束從 8.0 公尺收到 5.0，7#0 從 7.9
    * 收到 3.5；其餘每一束整條都是 3.5 公尺。
    *
-   * 判準因此是相對的：比這份路網<strong>自己</strong>的常態線間距寬半股以上。常態值
-   * 由檔案統計出來，不寫死，換一份 .xodr 也適用。
+   * 而且不必量：OpenDRIVE 把兩條行車道<strong>之間</strong>那幾條非行車道的寬度寫在
+   * 檔案裡（分隔島、月台、只有標線寬度的分隔）。上下行併在一起時那個寬度只有幾公分，
+   * 中間夾進月台時會長到幾公尺。所以拉開的位置與長度是<strong>讀</strong>出來的。
    */
-  const laneAt = (pts: Array<{ x: number; y: number }>, f: number): Vec | null => {
-    if (pts.length < 2) return null
-    const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
-    const i = Math.min(pts.length - 2, Math.floor(u))
-    const t = u - i
-    return {
-      x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
-      y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
-    }
-  }
-  /** 這一束在這個位置最遠的兩條車道相距多少（公尺） */
-  const gapAt = (e: GraphEdge, f: number): number => {
-    const list = bundles.get(bundleKey(e)) ?? [e]
-    const ps: Vec[] = []
-    for (const other of list) {
-      // 同一束裡的邊可能反向存，對齊之後才是同一個位置
-      const g = other.from === e.from ? f : 1 - f
-      for (const lane of other.lanes) {
-        const p = laneAt(lane.points, g)
-        if (p) ps.push(p)
-      }
-    }
-    let mx = 0
-    for (let i = 0; i < ps.length; i += 1) {
-      for (let j = i + 1; j < ps.length; j += 1) {
-        mx = Math.max(mx, Math.hypot(ps[i]!.x - ps[j]!.x, ps[i]!.y - ps[j]!.y))
-      }
-    }
-    return mx
-  }
-  /** 這一束總共幾條車道 */
-  const bundleLanes = (e: GraphEdge) =>
-    (bundles.get(bundleKey(e)) ?? [e]).reduce((t, o) => t + o.lanes.length, 0)
-
-  /**
-   * 這份路網的<strong>股距</strong>（公尺）：相鄰兩條軌道中心線常態上相距多少。
-   *
-   * 這是整份排版的量化單位——「差幾股」「拉開了沒有」都拿它除。先前用寫死的 3.35，
-   * 那是這份 .xodr 的車道寬，換一份檔案（不同軌距、不同的線間距，甚至不同單位）就
-   * 全部量錯。改成從檔案本身統計：每一束的最外兩線距除以間隔數，取中位數。整份路網
-   * 只有一條車道時退回車道寬。
-   */
-  const pitchM = (() => {
-    const all: number[] = []
-    for (const e of graph.edges) {
-      const n = bundleLanes(e)
-      if (n < 2) continue
-      for (let i = 0; i <= 8; i += 1) {
-        const g = gapAt(e, i / 8)
-        if (g > 0.1) all.push(g / (n - 1))
-      }
-    }
-    if (all.length) {
-      all.sort((a, b) => a - b)
-      return all[Math.floor(all.length / 2)]!
-    }
-    const w = graph.edges.flatMap((e) => e.lanes.map((l) => l.widthM)).filter((x) => x > 0.1)
-    if (w.length) {
-      w.sort((a, b) => a - b)
-      return w[Math.floor(w.length / 2)]!
-    }
-    return LANE_W_M
+  /** 這份檔案的車道寬（公尺）：取中位數，不寫死 */
+  const laneWidthM = (() => {
+    const w = graph.edges.flatMap((e) => e.lanes.map((l) => l.widthM)).filter((x) => x > 0.01)
+    if (!w.length) return LANE_W_M
+    w.sort((a, b) => a - b)
+    return w[Math.floor(w.length / 2)]!
   })()
-
   /**
    * 節點在它那一排裡的<strong>股位</strong>。
    *
@@ -533,8 +477,30 @@ function layoutOnce(
    * 比常態寬<strong>半股</strong>以上就算拉開。常態寬度是這一束自己的股數乘上股距，
    * 所以三線並行的束不會因為本來就比較寬而被誤判成拉開。
    */
+  /** 這一束在這個位置的內側間隔（公尺）：束裡每條邊自己那半邊加起來 */
+  const innerGapAt = (e: GraphEdge, f: number): number => {
+    let sum = 0
+    for (const other of bundles.get(bundleKey(e)) ?? [e]) {
+      const g = other.innerGapM
+      if (!g.length) continue
+      // 同一束裡的邊可能反向存，對齊之後才是同一個位置
+      const ff = other.from === e.from ? f : 1 - f
+      const u = Math.max(0, Math.min(1, ff)) * (g.length - 1)
+      const i = Math.min(g.length - 2, Math.floor(u))
+      const t = u - i
+      sum += g.length === 1 ? g[0]! : g[i]! + (g[i + 1]! - g[i]!) * t
+    }
+    return sum
+  }
+  /*
+   * 拉開的判準：<strong>兩條行車道之間夾得下半條車道</strong>。
+   *
+   * 這不是量兩條線離多遠再跟常態比，而是直接讀檔案寫的內側間隔——那幾條非行車道的寬度。
+   * 上下行併在一起時它只有幾公分（實測 0.15），中間夾進月台時會長到幾公尺（實測 2.3 與
+   * 4.5）。門檻取這份檔案自己的車道寬的一半：夾得下半條車道，才是站得了人的空地。
+   */
   const spreadAt = (e: GraphEdge, f: number): number =>
-    gapAt(e, f) - pitchM * Math.max(1, bundleLanes(e) - 1) >= pitchM * 0.5 ? 1 : 0
+    innerGapAt(e, f) >= laneWidthM * 0.5 ? 1 : 0
 
   /** 邊在節點端讓出的長度：那一端<strong>真的會放</strong>轉角或分岔才讓 */
   const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) => {

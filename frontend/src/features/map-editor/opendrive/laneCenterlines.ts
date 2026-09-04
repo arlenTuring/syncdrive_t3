@@ -59,6 +59,14 @@ export type RoadInfo = {
   successor: RoadLink | null
   /** 參考線取樣點（真實座標） */
   refPoints: OpenDrivePoint[]
+  /**
+   * 兩條行車道<strong>之間</strong>隔了多寬（公尺），與 refPoints 等長。
+   *
+   * 也就是內側那幾條非行車道（分隔島、路肩、標線）的總寬。上下行併在一起時它只有幾公分，
+   * 中間夾進月台或安全島時它會長到幾公尺——月台在哪，檔案自己用這條寬度說了，不必從兩條
+   * 中心線的距離回推。
+   */
+  innerGapM: number[]
   /** 起點與終點的方位（度，數學慣例、逆時針為正） */
   headingFromDeg: number
   headingToDeg: number
@@ -204,6 +212,55 @@ export function parseLaneCenterlines(
         })
       }
     }
+    /*
+     * 兩條行車道之間隔多寬，沿線逐點算。
+     *
+     * 取兩側<strong>最靠內</strong>的行車道，把夾在它們中間那幾條的寬度加起來。那幾條在
+     * OpenDRIVE 裡就是分隔島、路肩或只有標線寬度的 none —— 上下行併在一起時加起來只有
+     * 幾公分，中間夾進月台時會長到幾公尺。
+     */
+    const innerGapM: number[] = (() => {
+      const secEls = Array.from(roadEl.querySelectorAll(':scope > lanes > laneSection'))
+      if (!secEls.length) return refLine.map(() => 0)
+      return refLine.map((p) => {
+        // 這個 s 落在哪一個 laneSection
+        let sec = secEls[0]!
+        let secS = num(sec, 's')
+        for (const el of secEls) {
+          const sv = num(el, 's')
+          if (sv <= p.s + 1e-6 && sv >= secS) {
+            sec = el
+            secS = sv
+          }
+        }
+        const all: ParsedLane[] = []
+        for (const side of ['left', 'right']) {
+          const container = sec.querySelector(`:scope > ${side}`)
+          if (!container) continue
+          for (const laneEl of Array.from(container.querySelectorAll(':scope > lane'))) {
+            all.push(parseLane(laneEl))
+          }
+        }
+        const driving = all.filter((l) => wanted.has(l.type))
+        if (!driving.length) return 0
+        const innerPos = driving.filter((l) => l.id > 0).sort((a, b) => a.id - b.id)[0]
+        const innerNeg = driving.filter((l) => l.id < 0).sort((a, b) => b.id - a.id)[0]
+        /*
+         * 兩側各自算：從參考線數到那一側最靠內的行車道，中間夾了幾條非行車道。
+         *
+         * 上下行有時分成兩條 road（各只有一側有行車道），這時一條 road 只看得到自己那半
+         * 邊的分隔島；把同一束的幾條加起來才是完整的間隔。
+         */
+        let gap = 0
+        for (const l of all) {
+          if (l.id === 0 || wanted.has(l.type)) continue
+          if (innerPos && l.id > 0 && l.id < innerPos.id) gap += evalWidthPoly(l.widths, secS, p.s)
+          if (innerNeg && l.id < 0 && l.id > innerNeg.id) gap += evalWidthPoly(l.widths, secS, p.s)
+        }
+        return gap
+      })
+    })()
+
     const deg = (rad: number) => (rad * 180) / Math.PI
     roads.push({
       id: roadId,
@@ -213,6 +270,7 @@ export function parseLaneCenterlines(
       predecessor: linkOf('predecessor'),
       successor: linkOf('successor'),
       refPoints: refLine.map((p) => ({ x: p.x, y: p.y })),
+      innerGapM,
       headingFromDeg: deg(refLine[0]!.hdg),
       headingToDeg: deg(refLine[refLine.length - 1]!.hdg),
       lanes: roadLanes.sort((a, b) => b.id - a.id),
