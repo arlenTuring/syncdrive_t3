@@ -321,6 +321,32 @@ export function buildTrackGraph(
   }
 
   /*
+   * 連接道沒把某個路口縫起來時，退回<strong>路口 id</strong>。
+   *
+   * road 的 link 可以直接指到一個 junction（「我這一端接的是三號路口」）。連接道齊全時
+   * 上面那一輪已經把兩側縫好了；缺了幾條連接道的檔案就靠這一輪：指到同一個路口的端點
+   * 本來就在同一個地方，併成一個節點。這仍然是讀規格，不是看座標。
+   */
+  const byJunction = new Map<string, string[]>()
+  for (const road of plan.roads) {
+    if (!lanesByRoad.has(road.id) || road.junctionId !== '-1') continue
+    for (const [link, contact] of [
+      [road.predecessor, 'start'],
+      [road.successor, 'end'],
+    ] as const) {
+      if (link?.type !== 'junction') continue
+      const k = endAt(road.id, contact)
+      if (!k) continue
+      const arr = byJunction.get(link.id) ?? []
+      arr.push(k)
+      byJunction.set(link.id, arr)
+    }
+  }
+  for (const list of byJunction.values()) {
+    for (let i = 1; i < list.length; i += 1) weld.union(list[0]!, list[i]!)
+  }
+
+  /*
    * 沒有 link 的端點才退回座標。
    *
    * 容差取路網對角線的千分之二，不是寫死的公尺數；合規的檔案根本不會走到這裡。
