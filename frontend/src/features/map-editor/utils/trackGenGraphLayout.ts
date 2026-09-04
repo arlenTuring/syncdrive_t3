@@ -454,8 +454,19 @@ function layoutOnce(
     if (full < 2) continue
     const ux = (B.x - A.x) / full
     const uy = (B.y - A.y) / full
-    const t0 = trimAt(e, e.from, full)
-    const t1 = trimAt(e, e.to, full)
+    /*
+     * 讓出去的長度還要算上節點在<strong>沿線那個軸</strong>上的偏移。
+     *
+     * 轉角與分岔是畫在兩條直帶延伸線的交點上，那個點在沿線方向也被挪過（橫的邊挪的是
+     * x，而 x 正是它自己前進的方向）。邊只讓一個半徑的話，band 的盡頭停在原本的節點
+     * 位置，跟挪過去的轉角就差了那一段——實測左端上下兩個轉角與橫向軌道之間各斷開一截。
+     */
+    const alongU = e.orient === 'h' ? ux : uy
+    const alongShift = (n: GraphNode) => endExtra(n, e.orient === 'h' ? 'v' : 'h')
+    const trim0 = trimAt(e, e.from, full)
+    const trim1 = trimAt(e, e.to, full)
+    const t0 = Math.max(0, trim0 > 0 ? trim0 + alongU * alongShift(ends.a) : 0)
+    const t1 = Math.max(0, trim1 > 0 ? trim1 - alongU * alongShift(ends.b) : 0)
     const len = full - t0 - t1
     if (len < 2) continue
     const S = { x: A.x + ux * t0, y: A.y + uy * t0 }
