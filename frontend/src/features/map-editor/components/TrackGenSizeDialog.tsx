@@ -58,11 +58,18 @@ type Props = {
  * 全部同色時，一眼分不出哪一段是轉角、哪一段是分岔——先前只能靠外框長寬去猜。顏色
  * 只用在預覽，生成出來的元件仍照圖台原本的樣式。
  */
+/*
+ * 四種軌道的顏色。
+ *
+ * 全部<strong>不透明</strong>，而且亮度接近，只有色相不同。半透明的填色疊在深色底上會
+ * 一塊亮一塊暗，看起來像有光源、像立體的斜面——這是一張平面示意圖，不該有那種暗示。
+ * 斜接原本用黃色，亮度比其他三種高一截，那個問題最明顯，改成同一個亮度的藍。
+ */
 const KIND_STYLE = {
-  rect: { fill: 'rgba(161,161,170,0.38)', stroke: 'rgba(228,228,231,0.85)', label: '一般軌道' },
-  corner: { fill: 'rgba(45,212,191,0.35)', stroke: 'rgba(94,234,212,0.95)', label: '圓角軌道' },
-  taper: { fill: 'rgba(251,191,36,0.32)', stroke: 'rgba(252,211,77,0.95)', label: '斜接軌道' },
-  switch: { fill: 'rgba(167,139,250,0.35)', stroke: 'rgba(196,181,253,0.95)', label: '分岔軌道' },
+  rect: { fill: '#3f3f46', stroke: '#a1a1aa', label: '一般軌道' },
+  corner: { fill: '#2f4f4a', stroke: '#5eead4', label: '圓角軌道' },
+  taper: { fill: '#33435c', stroke: '#93b4e0', label: '斜接軌道' },
+  switch: { fill: '#463c5e', stroke: '#c4b5fd', label: '分岔軌道' },
 } as const
 
 const MIN_WID = 4

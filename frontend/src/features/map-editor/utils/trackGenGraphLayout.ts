@@ -338,8 +338,53 @@ function layoutOnce(
    * 只有 3.5 公尺。road 1/3 兩端真實差 7 公尺，量化成股會變成兩股 120 像素，實際上照
    * 版面比例只有 13 像素。所以直接照版面比例換算，落差多少就畫多少。
    */
+  /**
+   * 這條邊某一端<strong>直的那一段</strong>在哪（真實側位，公尺）。
+   *
+   * 不能拿節點的座標當這個值。節點是好幾條路端點焊起來的位置，而那個位置正好落在
+   * 彎裡面：左側那根 287 公尺的直立柱，整段 x 都在 −880.5，只有最上面 25 公尺為了轉進
+   * 橫向那條而甩到 −869——節點記的就是 −869。照它畫，整根柱子會被往右推 33 像素，還在
+   * 中段插一段斜接，而真的柱子是直的、只有貼著轉角那一小截在彎。
+   *
+   * 所以取端點<strong>稍微往裡面</strong>那一段的平均：轉角讓出去的部分不算，量到的
+   * 才是這條邊直的地方。
+   */
+  const endLat = (e: GraphEdge, atFrom: boolean): number => {
+    const pts = e.points
+    if (!pts.length) return 0
+    const lo = atFrom ? 0.08 : 0.75
+    const hi = atFrom ? 0.25 : 0.92
+    let t = 0
+    const N = 6
+    for (let i = 0; i <= N; i += 1) {
+      const f = lo + ((hi - lo) * i) / N
+      const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
+      const j = Math.min(pts.length - 2, Math.floor(u))
+      const k = u - j
+      const px = pts[j]!.x + (pts[j + 1]!.x - pts[j]!.x) * k
+      const py = pts[j]!.y + (pts[j + 1]!.y - pts[j]!.y) * k
+      t += e.orient === 'h' ? py : px
+    }
+    return t / (N + 1)
+  }
+  /** 節點在某個軸上的代表側位：那個方向上每條邊直段位置的平均 */
+  const nodeLatCache = new Map<string, number>()
+  const nodeLat = (n: GraphNode, orient: 'h' | 'v'): number | null => {
+    const key = `${n.id}|${orient}`
+    const hit = nodeLatCache.get(key)
+    if (hit !== undefined) return hit
+    const list = (incident.get(n.id) ?? []).filter((e) => e.orient === orient)
+    if (!list.length) return null
+    let t = 0
+    for (const e of list) t += endLat(e, e.from === n.id)
+    const v = t / list.length
+    nodeLatCache.set(key, v)
+    return v
+  }
   const nodeOffsetPx = (n: GraphNode, orient: 'h' | 'v'): number => {
-    const dev = orient === 'h' ? n.realY - n.y : n.realX - n.x
+    const lat = nodeLat(n, orient)
+    if (lat === null) return 0
+    const dev = lat - (orient === 'h' ? n.y : n.x)
     const px = axisSign(orient) * dev * axisScale(orient)
     // 上限四分之三股：框壓得很扁時股距本來就快容不下軌道寬，落差再加上去就會疊在一起
     const cap = levelPx * 0.75
