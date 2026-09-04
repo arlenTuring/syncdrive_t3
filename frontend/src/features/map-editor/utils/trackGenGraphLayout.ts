@@ -32,19 +32,6 @@ function edgeEnds(e: GraphEdge, byId: Map<string, GraphNode>) {
   return a && b ? { a, b } : null
 }
 
-/** 這個節點上，與這條邊<strong>方向不同</strong>的鄰邊 */
-function perpendicularAt(
-  nodeId: string,
-  edge: GraphEdge,
-  incident: Map<string, GraphEdge[]>,
-): GraphEdge | null {
-  for (const other of incident.get(nodeId) ?? []) {
-    if (other.id === edge.id) continue
-    if (other.orient !== edge.orient) return other
-  }
-  return null
-}
-
 function layoutOnce(
   graph: TrackGraph,
   block: TrackGenBlockSize,
@@ -154,7 +141,56 @@ function layoutOnce(
    * 出來互相重疊。留長的那一束在原位，短的往外挪一整束的寬度，中間用分岔軌道接起
    * 來——這正是「主線繼續、同時分出一條」。
    */
+  /** 從某個節點出發，沿這條邊走 d 公尺之後的真實座標 */
+  const walkFrom = (e: GraphEdge, nodeId: string, d: number): Vec | null => {
+    const pts = e.from === nodeId ? e.points : [...e.points].reverse()
+    if (pts.length < 2) return null
+    let acc = 0
+    for (let i = 1; i < pts.length; i += 1) {
+      const seg = Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y)
+      if (acc + seg >= d) {
+        const t = seg > 1e-6 ? (d - acc) / seg : 1
+        return {
+          x: pts[i - 1]!.x + (pts[i]!.x - pts[i - 1]!.x) * t,
+          y: pts[i - 1]!.y + (pts[i]!.y - pts[i - 1]!.y) * t,
+        }
+      }
+      acc += seg
+    }
+    return pts[pts.length - 1]!
+  }
+
+  /**
+   * 岔出去的那一束該往哪一邊讓。
+   *
+   * 先前拿兩條邊<strong>整條的平均位置</strong>比大小。側線很短、主線很長時，主線的
+   * 平均會落在遠處某個彎的中間，跟「在這個路口誰在上面」完全無關——實測右上那條側線
+   * 真實位置在主線上方，卻被畫到下方去。
+   *
+   * 改成從共用的那個節點出發，兩條邊各走<strong>同樣的里程</strong>，比那一點的位置。
+   * 這才是分岔實際張開的方向。
+   */
+  const branchSide = (branch: GraphEdge, main: GraphEdge, nodeId: string): number => {
+    const fallback = () => (perpOf(branch) >= perpOf(main) ? 1 : -1)
+    const probe = Math.min(150, Math.max(LANE_W_M, Math.min(branch.lengthM, main.lengthM) * 0.5))
+    const pb = walkFrom(branch, nodeId, probe)
+    const pm = walkFrom(main, nodeId, probe)
+    if (!pb || !pm) return fallback()
+    // 真實 y 向上、版面 y 向下；縱向的邊改比真實 x
+    const d = main.orient === 'h' ? -(pb.y - pm.y) : pb.x - pm.x
+    if (Math.abs(d) < 1e-3) return fallback()
+    return d > 0 ? 1 : -1
+  }
+
   const shift = new Map<string, number>()
+  /*
+   * 分岔軌道自己就是一段路，兩側的直軌要讓開它。
+   *
+   * 不讓的話同一段被畫兩次：分岔軌道從節點鋪出去，主線與岔線的方塊也從節點鋪出去，
+   * 疊在一起（實測一組疊掉 13462、四組主線各 15332 平方像素）。鍵是「哪條邊、在哪個
+   * 節點」，因為同一條邊兩端可能讓不一樣多。
+   */
+  const switchTrim = new Map<string, number>()
   const dirKey = (e: GraphEdge, nodeId: string) => {
     const other = byId.get(e.from === nodeId ? e.to : e.from)
     const self = byId.get(nodeId)
@@ -181,9 +217,15 @@ function layoutOnce(
         const key = bundleKey(branch)
         away += (bundleCount.get(bundleKey(sorted[i - 1]!)) ?? 1) * levelPx
         // 往真實世界上它所在的那一側讓開，不是固定往下
-        const side = perpOf(branch) >= perpOf(main) ? 1 : -1
+        const side = branchSide(branch, main, node.id)
         for (const e of bundles.get(key) ?? []) {
           if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away * side)
+        }
+        // 分岔軌道佔掉的長度：與下面畫分岔時用的同一條式子
+        const runPx = Math.max(cornerR, away * 3)
+        for (const e of [...(bundles.get(key) ?? []), ...(bundles.get(bundleKey(main)) ?? [])]) {
+          const tk = `${e.id}|${node.id}`
+          if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
         }
       }
     }
@@ -198,9 +240,39 @@ function layoutOnce(
     return e.lanes.map((_, k) => ((base + k - (total - 1) / 2) * levelPx) * sign + away)
   }
 
-  /** 邊在節點端讓出的長度：那一端要放轉角就讓一個半徑 */
-  const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) =>
-    perpendicularAt(nodeId, e, incident) ? Math.min(cornerR, fullLen / 2 - 1) : 0
+  /*
+   * 一個節點只畫<strong>一組</strong>轉角。
+   *
+   * 先前是「這個節點上每一對 h/v 都畫一個轉角」。路口常常是三岔——例如場域左下角，
+   * 一條路從東邊過來、主線往北、另有一條 35 公尺的短支線往南。三條邊配出兩對 h/v，
+   * 於是同一個角上疊了兩組圓角，實測互相蓋掉 14400 平方像素，看起來就是一團。
+   *
+   * 真正該轉的是<strong>兩邊都走得遠</strong>的那一對，那才是主線在這裡轉彎。其餘的
+   * 邊照自己的方向畫成直的——短支線本來就只是從轉角旁邊伸出去一小截。
+   */
+  const cornerPair = new Map<string, { h: GraphEdge; v: GraphEdge }>()
+  for (const node of graph.nodes) {
+    const list = incident.get(node.id) ?? []
+    let best: { h: GraphEdge; v: GraphEdge; score: number } | null = null
+    for (const a of list) {
+      if (a.orient !== 'h') continue
+      for (const b of list) {
+        if (b.orient !== 'v') continue
+        const score = Math.min(a.lengthM, b.lengthM)
+        if (!best || score > best.score) best = { h: a, v: b, score }
+      }
+    }
+    if (best) cornerPair.set(node.id, { h: best.h, v: best.v })
+  }
+
+  /** 邊在節點端讓出的長度：那一端<strong>真的會放</strong>轉角或分岔才讓 */
+  const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) => {
+    const pair = cornerPair.get(nodeId)
+    const corner = pair && (pair.h.id === e.id || pair.v.id === e.id) ? cornerR : 0
+    const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
+    const want = Math.max(corner, sw)
+    return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
+  }
 
   for (const e of graph.edges) {
     const ends = edgeEnds(e, byId)
@@ -237,7 +309,8 @@ function layoutOnce(
      * 插一段斜接軌道，斜度照 1:3 給。不夠一股的擺動不畫——那種程度在簡圖上看不出來，
      * 畫了只會多出一堆幾像素的碎片。
      */
-    const levelAt = (f: number): number => {
+    /** 這一點離「兩端連線」多遠（公尺，真實左法線為正） */
+    const devAt = (f: number): number => {
       const pts = e.points
       if (pts.length < 3) return 0
       const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
@@ -253,20 +326,33 @@ function layoutOnce(
       const dy = b.y - a.y
       const m = Math.hypot(dx, dy) || 1
       // 真實左法線；與車道序號同一個方向慣例
-      const dev = ((p.x - a.x) * -dy + (p.y - a.y) * dx) / m
-      /*
-       * 最多差一股。
-       *
-       * 這裡量到的偏離同時混著兩件事：兩條線彼此挪開（要畫），以及整條路自己在彎
-       * （已經由把邊拉直表達過了）。不夾的話後者會被逐股還原成一座階梯——實測長邊
-       * 上一口氣生出 64 段斜接、整份版面高度多了 236 像素。簡圖只需要看得出「這裡挪
-       * 了一下」，一股就夠。
-       */
-      return Math.max(-1, Math.min(1, Math.round(dev / LANE_W_M)))
+      return ((p.x - a.x) * -dy + (p.y - a.y) * dx) / m
     }
+    /*
+     * 最多差一股。
+     *
+     * 量到的偏離同時混著兩件事：兩條線彼此挪開（要畫），以及整條路自己在彎（已經由
+     * 把邊拉直表達過了）。不夾的話後者會被逐股還原成一座階梯——實測長邊上一口氣生出
+     * 64 段斜接、整份版面高度多了 236 像素。簡圖只需要看得出「這裡挪了一下」，一股就夠。
+     *
+     * 兩端的偏離依定義是零，所以頭尾兩段一定落在第 0 股，接得回節點。
+     */
+    const levelAt = (f: number): number =>
+      Math.max(-1, Math.min(1, Math.round(devAt(f) / LANE_W_M)))
     /** 沿線切成幾段「差同樣股數」的區間 */
     const levelRuns: Array<{ f0: number; f1: number; level: number }> = []
-    {
+    /*
+     * 短邊不畫橫移。
+     *
+     * 「離兩端連線多遠」在短邊上量出來的幾乎都是那條路自己在轉彎——路口前後那幾十
+     * 公尺本來就是弧。實測 93 公尺的 road 1/3、68 公尺的 road 10、54 公尺的 11#1 各被
+     * 判出一次換股，畫成四組沒有意義的斜接；真正該有的那一次在 683 公尺的 road 8 上。
+     * 圖上看得懂的橫移至少要拉開幾塊，所以不到六塊長的邊一律畫直的。
+     */
+    const MIN_TAPER_BLOCKS = 6
+    if (usedM < perBlockM * MIN_TAPER_BLOCKS) {
+      levelRuns.push({ f0: 0, f1: 1, level: 0 })
+    } else {
       const K = Math.max(4, Math.min(48, Math.round(usedM / 15)))
       const raw: Array<{ f0: number; f1: number; level: number }> = []
       let start = 0
@@ -283,18 +369,72 @@ function layoutOnce(
        * 太短的階段併給前一段。
        *
        * 逐點量出來的股數會在邊界上來回跳，每跳一次就是一段斜接；只有夠長的那一段才
-       * 值得畫成「挪了一股」，門檻取三塊。
+       * 值得畫成「挪了一股」。
+       *
+       * 門檻本來寫死三塊。塊給得大的時候（橫向一塊 80 公尺）三塊就是 240 公尺，佔掉
+       * 732 公尺長的 road 9 三分之一——它那個 S 的兩半各只有 183 與 213 公尺，於是整條
+       * 被抹平成直線，原圖看得到的緩坡在圖上消失。
+       *
+       * 改成用<strong>斜接自己的坡</strong>來定：坡是 1:3，換一股要走三個股距，留一半
+       * 的餘裕才不會兩段斜接頭尾相接，所以是四點五個股距；再不短於一塊，免得塊很小時
+       * 門檻跟著失效。
        */
-      const minRunF = Math.min(0.4, (perBlockM * 3) / Math.max(1, usedM))
-      for (const r of raw) {
+      const minShiftM = Math.max(minRunM * 4.5, perBlockM)
+      const minRunF = Math.min(0.4, minShiftM / Math.max(1, usedM))
+      /*
+       * 最後一段不併。
+       *
+       * 它是這條邊<strong>回到節點</strong>的那一段，依定義在第 0 股。併掉的話整條邊
+       * 的尾端就停在 ±1 股上，接到節點時憑空歪一格——road 8 原本尾端那段只佔 7%，
+       * 被併進前一段，右端就與路口對不上。
+       */
+      raw.forEach((r, i) => {
         const prev = levelRuns[levelRuns.length - 1]
-        if (prev && (r.f1 - r.f0 < minRunF || r.level === prev.level)) {
+        const tooShort = r.f1 - r.f0 < minRunF && i < raw.length - 1
+        if (prev && (tooShort || r.level === prev.level)) {
           prev.f1 = r.f1
-          continue
+          return
         }
         levelRuns.push({ ...r })
-      }
+      })
       if (!levelRuns.length) levelRuns.push({ f0: 0, f1: 1, level: 0 })
+
+      /*
+       * 換股的位置移到<strong>路真的在挪</strong>的那一點。
+       *
+       * 分段是照「偏離跨過半股」切的，那個門檻很早就跨過去了：road 8 一路緩緩偏開，
+       * 走到 9% 就已經差半股，於是斜接被畫在最左邊；但眼睛看到的那個彎在 70–80%——
+       * 那裡的橫移速率是前段的五倍（每單位 −115 對 21）。原圖上的彎也在那裡。
+       *
+       * 所以段界不動段的「內容」，只往兩段的中點之間找橫移最猛的一點挪過去。方向要
+       * 對上：往上挪的段界找最陡的上坡，不然會跳到旁邊那個反向的彎。
+       */
+      const slopeAt = (f: number) => {
+        const h = 0.02
+        const lo = Math.max(0, f - h)
+        const hi = Math.min(1, f + h)
+        return (devAt(hi) - devAt(lo)) / Math.max(1e-6, hi - lo)
+      }
+      for (let i = 0; i + 1 < levelRuns.length; i += 1) {
+        const a = levelRuns[i]!
+        const b = levelRuns[i + 1]!
+        const dir = Math.sign(b.level - a.level) || 1
+        const lo = (a.f0 + a.f1) / 2
+        const hi = (b.f0 + b.f1) / 2
+        let best = a.f1
+        let bestSlope = -Infinity
+        const N = 40
+        for (let k = 0; k <= N; k += 1) {
+          const f = lo + ((hi - lo) * k) / N
+          const sl = slopeAt(f) * dir
+          if (sl > bestSlope) {
+            bestSlope = sl
+            best = f
+          }
+        }
+        a.f1 = best
+        b.f0 = best
+      }
     }
     const sign = laneSign(e)
     /** 斜接佔掉的沿線長度（版面像素），1:3 */
@@ -380,48 +520,44 @@ function layoutOnce(
   /* ── 轉角 ───────────────────────────────────────────────── */
 
   for (const node of graph.nodes) {
-    const list = incident.get(node.id) ?? []
-    for (let i = 0; i < list.length; i += 1) {
-      for (let j = i + 1; j < list.length; j += 1) {
-        const eh = list[i]!.orient === 'h' ? list[i]! : list[j]!
-        const ev = list[i]!.orient === 'h' ? list[j]! : list[i]!
-        if (eh.orient !== 'h' || ev.orient !== 'v') continue
-        const N = P(node)
-        const hOther = byId.get(eh.from === node.id ? eh.to : eh.from)
-        const vOther = byId.get(ev.from === node.id ? ev.to : ev.from)
-        if (!hOther || !vOther) continue
-        const sxDir = Math.sign(N.x - P(hOther).x) || 1
-        const syDir = Math.sign(P(vOther).y - N.y) || 1
-        const C = { x: N.x - sxDir * cornerR, y: N.y + syDir * cornerR }
-        const count = Math.min(eh.lanes.length, ev.lanes.length)
-        const offsH = offsetsOf(eh)
-        for (let k = 0; k < count; k += 1) {
-          const o = offsH[k]!
-          const radius = cornerR - syDir * o
-          // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
-          if (radius < bandW * 0.45) continue
-          const p0 = { x: N.x - sxDir * cornerR, y: N.y + o }
-          const p1 = { x: N.x - sxDir * sxDir * syDir * o, y: N.y + syDir * cornerR }
-          const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)
-          shapes.push({
-            kind: 'corner',
-            name: `${eh.lanes[k]!.key}~${ev.lanes[k]!.key}`,
-            role: 'road',
-            lineKey: eh.lanes[k]!.key,
-            lineLengthM: eh.lengthM,
-            realLatFromM: 0,
-            realLatToM: 0,
-            samples: [p0, p1],
-            geometry: fit.geometry,
-            box: fit.box,
-            outerRadiusM: radius + bandW / 2,
-            sFrom: 0,
-            sTo: 0,
-          })
-          note({ x: fit.box.xM, y: fit.box.yM })
-          note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
-        }
-      }
+    const pair = cornerPair.get(node.id)
+    if (!pair) continue
+    const eh = pair.h
+    const ev = pair.v
+    const N = P(node)
+    const hOther = byId.get(eh.from === node.id ? eh.to : eh.from)
+    const vOther = byId.get(ev.from === node.id ? ev.to : ev.from)
+    if (!hOther || !vOther) continue
+    const sxDir = Math.sign(N.x - P(hOther).x) || 1
+    const syDir = Math.sign(P(vOther).y - N.y) || 1
+    const C = { x: N.x - sxDir * cornerR, y: N.y + syDir * cornerR }
+    const count = Math.min(eh.lanes.length, ev.lanes.length)
+    const offsH = offsetsOf(eh)
+    for (let k = 0; k < count; k += 1) {
+      const o = offsH[k]!
+      const radius = cornerR - syDir * o
+      // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
+      if (radius < bandW * 0.45) continue
+      const p0 = { x: N.x - sxDir * cornerR, y: N.y + o }
+      const p1 = { x: N.x - sxDir * sxDir * syDir * o, y: N.y + syDir * cornerR }
+      const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)
+      shapes.push({
+        kind: 'corner',
+        name: `${eh.lanes[k]!.key}~${ev.lanes[k]!.key}`,
+        role: 'road',
+        lineKey: eh.lanes[k]!.key,
+        lineLengthM: eh.lengthM,
+        realLatFromM: 0,
+        realLatToM: 0,
+        samples: [p0, p1],
+        geometry: fit.geometry,
+        box: fit.box,
+        outerRadiusM: radius + bandW / 2,
+        sFrom: 0,
+        sTo: 0,
+      })
+      note({ x: fit.box.xM, y: fit.box.yM })
+      note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
     }
   }
 
@@ -449,14 +585,25 @@ function layoutOnce(
         if (e === main) continue
         const away = shift.get(e.id) ?? 0
         if (Math.abs(away) < 1) continue
-        const mainOffs = offsetsOf(main)
-        const offs = offsetsOf(e)
-        const count = Math.min(mainOffs.length, offs.length)
+        /*
+         * 主線與岔線的車道要照<strong>版面上的排序</strong>配對，不能照 lane 序號。
+         *
+         * 兩條 road 的行車方向常常相反，lane 序號的排列方向就跟著翻面；照序號配對的
+         * 話第一條接到對面那條，兩片分岔軌道會交叉成一個 X——實測右上那組就是這樣。
+         * 兩邊各自照偏移由小到大排，再依序配，扇形永遠不會交叉。
+         */
+        const rank = (list: number[]) =>
+          list.map((o, k) => ({ o, k })).sort((a, b) => a.o - b.o)
+        const mainRank = rank(offsetsOf(main))
+        const branchRank = rank(offsetsOf(e))
+        const count = Math.min(mainRank.length, branchRank.length)
         // 岔出的長度照斜率給，太短會變尖刺
         const runPx = Math.max(cornerR, Math.abs(away) * 3)
         for (let k = 0; k < count; k += 1) {
-          const oMain = mainOffs[k]!
-          const oBranch = offs[k]!
+          const oMain = mainRank[k]!.o
+          const oBranch = branchRank[k]!.o
+          const laneMain = main.lanes[mainRank[k]!.k]!
+          const laneBranch = e.lanes[branchRank[k]!.k]!
           const perp = (o: number): Vec =>
             sxDir !== 0 ? { x: 0, y: o } : { x: o, y: 0 }
           const along = (t: number): Vec =>
@@ -469,9 +616,9 @@ function layoutOnce(
           if (!fit) continue
           shapes.push({
             kind: 'switch',
-            name: `${e.lanes[k]!.key}^${main.lanes[k]!.key}`,
+            name: `${laneBranch.key}^${laneMain.key}`,
             role: 'road',
-            lineKey: e.lanes[k]!.key,
+            lineKey: laneBranch.key,
             lineLengthM: e.lengthM,
             realLatFromM: 0,
             realLatToM: 0,
