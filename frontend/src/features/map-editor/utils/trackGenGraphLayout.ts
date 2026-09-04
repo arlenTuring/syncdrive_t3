@@ -24,6 +24,37 @@ import type { GraphEdge, GraphNode, TrackGraph } from './trackGenGraph'
  * 由圓角軌道補上，兩者的弧同心。
  */
 
+/**
+ * 畫成簡圖時的<strong>製圖慣例</strong>。
+ *
+ * 這裡的每一個數字都<strong>不是</strong>從 .xodr 推得出來的——規格描述的是真實世界，
+ * 沒有講「一張示意圖該長什麼樣」。它們也都不綁任何一份圖：全部相對於使用者給的軌道寬、
+ * 每塊代表幾公尺，或是路網自己的統計值。
+ *
+ * 集中放在這裡，是為了讓「哪些是讀出來的、哪些是我訂的」一眼看得出來，要開成參數也只有
+ * 這一個地方要動。
+ */
+const DRAWING = {
+  /** 斜接的坡：換一條軌道的位置要走幾倍的距離 */
+  rampRun: 3,
+  /** 擠不下時最陡到哪：1 就是 45 度，再陡不像軌道 */
+  rampMinRun: 1,
+  /** 一段換股最少要多長：夠放一段坡再留一半餘裕 */
+  runMargin: 1.5,
+  /** 一條邊短過幾塊就不畫中途的橫移——那個尺度上的起伏在圖上讀不出來 */
+  minTaperBlocks: 6,
+  /** 切段的級距：線挪了幾分之一條軌道寬才算「看得出來不是直的」 */
+  segUnit: 1 / 4,
+  /** 兩段高度差幾分之一條軌道寬以內就當成同一段 */
+  mergeUnit: 0.08,
+  /** 短邊要為了兩端不等高而切一刀的門檻（幾分之一條軌道寬） */
+  shortSplitUnit: 0.4,
+  /** 一段斜接最多吃掉整條邊的幾成 */
+  rampMaxSpan: 0.3,
+  /** 束與束之間留幾股的空隙 */
+  bundleGapSteps: 1,
+} as const
+
 type Vec = { x: number; y: number }
 
 function edgeEnds(e: GraphEdge, byId: Map<string, GraphNode>) {
@@ -39,7 +70,13 @@ function layoutOnce(
   sy: number,
   levelPx: number,
 ): TrackGenLayout {
-  const bandW = block.trackWidthPx
+  /*
+   * 帶子畫多寬：使用者要的軌道寬，但<strong>不超過股距</strong>。
+   *
+   * 框壓得很扁時股距容不下要求的寬度，硬畫的話並行的兩條會沿全長重疊——那不是示意圖，
+   * 是一片色塊。畫細一點是誠實的：那個框就只放得下這麼寬。
+   */
+  const bandW = Math.min(block.trackWidthPx, levelPx)
   /*
    * 轉角就是<strong>直角</strong>，只是把尖角磨掉。
    *
@@ -299,7 +336,8 @@ function layoutOnce(
     // 最長的那一束直行，其餘讓開
     const sorted = [...outs].sort((a, b) => wholeRoadLen(b) - wholeRoadLen(a))
     const through = sorted[0]!
-    let steps = bundleCount.get(bundleKey(through)) ?? 1
+    // 讓開的量 = 直行那一束的寬度，再加上束與束之間的空隙
+    let steps = (bundleCount.get(bundleKey(through)) ?? 1) + DRAWING.bundleGapSteps
     for (let i = 1; i < sorted.length; i += 1) {
       const branch = sorted[i]!
       const key = bundleKey(branch)
@@ -314,14 +352,14 @@ function layoutOnce(
        */
       const runPx = Math.max(
         1,
-        Math.min(Math.max(cornerR, awayPx * 3), spanOf(stem) * 0.5 - 1),
+        Math.min(Math.max(cornerR, awayPx * DRAWING.rampRun), spanOf(stem) * 0.5 - 1),
       )
       for (const q of bundles.get(bundleKey(stem)) ?? []) {
         const tk = `${q.id}|${node.id}`
         if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
       }
       switchJobs.push({ nodeId: node.id, stem, through, branch, runPx })
-      steps += bundleCount.get(key) ?? 1
+      steps += (bundleCount.get(key) ?? 1) + DRAWING.bundleGapSteps
     }
   }
 
@@ -441,26 +479,18 @@ function layoutOnce(
    * 橫向那條而甩到 −869——節點記的就是 −869。照它畫，整根柱子會被往右推 33 像素，還在
    * 中段插一段斜接，而真的柱子是直的、只有貼著轉角那一小截在彎。
    *
-   * 所以取端點<strong>稍微往裡面</strong>那一段的平均：轉角讓出去的部分不算，量到的
-   * 才是這條邊直的地方。
+   * 所以取靠這一端<strong>那半條邊的中位數</strong>。中位數不受端點附近那一小截弧影響，
+   * 也不需要挑一個「從幾成到幾成」的取樣窗——那種窗口就是又一個要調的數字。
    */
   const endLat = (e: GraphEdge, atFrom: boolean): number => {
     const pts = e.points
     if (!pts.length) return 0
-    const lo = atFrom ? 0.08 : 0.75
-    const hi = atFrom ? 0.25 : 0.92
-    let t = 0
-    const N = 6
-    for (let i = 0; i <= N; i += 1) {
-      const f = lo + ((hi - lo) * i) / N
-      const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
-      const j = Math.min(pts.length - 2, Math.floor(u))
-      const k = u - j
-      const px = pts[j]!.x + (pts[j + 1]!.x - pts[j]!.x) * k
-      const py = pts[j]!.y + (pts[j + 1]!.y - pts[j]!.y) * k
-      t += e.orient === 'h' ? py : px
-    }
-    return t / (N + 1)
+    const half = pts.filter((_, i) =>
+      atFrom ? i <= (pts.length - 1) / 2 : i >= (pts.length - 1) / 2,
+    )
+    const vals = (half.length ? half : pts).map((p) => (e.orient === 'h' ? p.y : p.x))
+    vals.sort((a, b) => a - b)
+    return vals[Math.floor(vals.length / 2)]!
   }
   /** 節點在某個軸上的代表側位：那個方向上每條邊直段位置的平均 */
   const nodeLatCache = new Map<string, number>()
@@ -481,8 +511,8 @@ function layoutOnce(
     if (lat === null) return 0
     const dev = lat - (orient === 'h' ? n.y : n.x)
     const px = axisSign(orient) * dev * axisScale(orient)
-    // 上限四分之三股：框壓得很扁時股距本來就快容不下軌道寬，落差再加上去就會疊在一起
-    const cap = levelPx * 0.75
+    // 上限半股：一條帶子最多挪到與鄰帶的正中間，再多就侵犯隔壁那一條的位置
+    const cap = levelPx * 0.5
     return Math.max(-cap, Math.min(cap, px))
   }
   /**
@@ -600,8 +630,8 @@ function layoutOnce(
       const py = pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t
       return (e.orient === 'h' ? py : px) - rowLat
     }
-    /** 側位差換算成版面偏移（像素），上限四分之三股，免得一條偏很遠的路把整張圖撐開 */
-    const capPx = levelPx * 0.75
+    /** 側位差換算成版面偏移（像素），上限半股：最多挪到與鄰帶的正中間 */
+    const capPx = levelPx * 0.5
     const toPx = (devM: number) =>
       Math.max(-capPx, Math.min(capPx, axisSign(e.orient) * devM * perpScale))
     /**
@@ -619,7 +649,7 @@ function layoutOnce(
      * 出來不是直的，值得切一段。整股當級距的話，road 9 那個 ±8 公尺的緩坡（圖上 15
      * 像素）會被判成沒動，原圖看得到的 S 又不見了。
      */
-    const segUnitM = stepM / 4
+    const segUnitM = stepM * DRAWING.segUnit
     const levelAt = (f: number): number =>
       Math.max(-8, Math.min(8, Math.round(latDevAt(f) / segUnitM)))
     /** 沿線切成幾段「同一階」的區間 */
@@ -630,7 +660,7 @@ function layoutOnce(
      * 短邊上量到的起伏幾乎都是那條路自己在轉彎——路口前後那幾十公尺本來就是弧。但兩端
      * 的高度還是要接上，所以端點不同高時仍然換一次，只是不看中間。
      */
-    const MIN_TAPER_BLOCKS = 6
+    const MIN_TAPER_BLOCKS = DRAWING.minTaperBlocks
     if (usedM < perBlockM * MIN_TAPER_BLOCKS) {
       levelRuns.push({ f0: 0, f1: 1, level: 0, offsetPx: 0 })
     } else {
@@ -651,7 +681,7 @@ function layoutOnce(
        * 要走三個股距，留一半餘裕才不會兩段斜接頭尾相接，所以是四點五個股距；再不短於
        * 一塊，免得塊很小時門檻跟著失效。頭尾兩段不併，它們接的是節點。
        */
-      const minShiftM = Math.max(minRunM * 4.5, perBlockM)
+      const minShiftM = Math.max(minRunM * DRAWING.rampRun * (1 + DRAWING.runMargin), perBlockM)
       const minRunF = Math.min(0.4, minShiftM / Math.max(1, usedM))
       raw.forEach((r, i) => {
         const prev = levelRuns[levelRuns.length - 1]
@@ -687,7 +717,10 @@ function layoutOnce(
      * 又常常只是路口附近幾像素的擺動。實測塊給 50 公尺時，59 公尺的側線為了六像素的
      * 落差生出一段斜接，圖上就是側線上莫名其妙多一塊。
      */
-    const splitAt = usedM < perBlockM * MIN_TAPER_BLOCKS ? bandW * 0.4 : bandW * 0.08
+    const splitAt =
+      usedM < perBlockM * MIN_TAPER_BLOCKS
+        ? bandW * DRAWING.shortSplitUnit
+        : bandW * DRAWING.mergeUnit
     if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > splitAt) {
       const only = levelRuns[0]!
       const mid = (only.f0 + only.f1) / 2
@@ -709,7 +742,7 @@ function layoutOnce(
      * 直線，畫成斜接只會多一片碎片。
      */
     for (let i = levelRuns.length - 1; i > 0; i -= 1) {
-      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < bandW * 0.08) {
+      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < bandW * DRAWING.mergeUnit) {
         levelRuns[i - 1]!.f1 = levelRuns[i]!.f1
         levelRuns.splice(i, 1)
       }
@@ -750,7 +783,8 @@ function layoutOnce(
       }
     }
     /** 斜接佔掉的沿線長度（版面像素），1:3 */
-    const rampPx = (dPx: number) => Math.min(len * 0.3, Math.abs(dPx) * 3)
+    const rampPx = (dPx: number) =>
+      Math.min(len * DRAWING.rampMaxSpan, Math.abs(dPx) * DRAWING.rampRun)
 
     /*
      * 拉開的區間。整束一起判，因為拉開是「這兩條之間」的事，不是某一條自己的事。
@@ -770,7 +804,7 @@ function layoutOnce(
         cur = v
       }
       raw.push({ f0: start / K, f1: 1, spread: cur })
-      const minSpreadF = (levelPx * 1.5) / Math.max(1, len)
+      const minSpreadF = (levelPx * DRAWING.runMargin) / Math.max(1, len)
       raw.forEach((r, i) => {
         // 頭尾兩段不併：它們是這一束接回節點的地方，併掉的話整段都停在拉開的寬度上
         const terminal = i === 0 || i === raw.length - 1
@@ -796,7 +830,7 @@ function layoutOnce(
        */
       const continues = (nodeId: string) =>
         (incident.get(nodeId) ?? []).some((other) => bundleKey(other) !== bundleKey(e))
-      const tailF = Math.min(0.35, (levelPx * 1.5) / Math.max(1, len))
+      const tailF = Math.min(0.35, (levelPx * DRAWING.runMargin) / Math.max(1, len))
       const head = spreadRuns[0]!
       if (head.spread === 1 && continues(e.from) && head.f1 > tailF * 1.5) {
         head.f0 = tailF
@@ -876,7 +910,7 @@ function layoutOnce(
         const want = rampPx(b.extra - a.extra) / 2 / len
         const room = Math.min((a.f1 - a.f0) / 2, (b.f1 - b.f0) / 2)
         // 擠不下 1:3 就用剩下的空間，但再擠也不陡過 1:1——垂直的一刀不像軌道
-        const floor = Math.min(0.5, (Math.abs(b.extra - a.extra) * 0.5) / len)
+        const floor = Math.min(0.5, (Math.abs(b.extra - a.extra) * DRAWING.rampMinRun) / 2 / len)
         return Math.max(floor, Math.min(want, Math.max(room, floor)))
       }
       let seq = 0
@@ -1125,7 +1159,32 @@ export function layoutTrackGraph(
    * 框太扁時縮小，平行的帶子略為重疊。不同束之間另外留一股的空隙，那才是「兩條兩條
    * 分開」的地方。整張圖的大小因此不受軌道寬影響。
    */
-  const levelPx = Math.max(2, Math.min(block.trackWidthPx, (box.hPx * 0.35) / maxLanes))
+  /*
+   * 股距的上限由<strong>最擠的那個節點</strong>決定，不是拍一個比例。
+   *
+   * 圖上縱向要塞得下的，是某個節點上所有並排的束加起來有幾條軌道——路口那裡主線、側線、
+   * 支線會同時出現。算出那個最大值，框的高度除以它（再留一點邊），就是股距容得下的上限；
+   * 框夠高時股距就等於使用者給的軌道寬。
+   */
+  const bundleOf = (e: GraphEdge) => [e.from, e.to].sort().join('|')
+  const stackAt = new Map<string, Map<string, number>>()
+  for (const e of graph.edges) {
+    for (const nodeId of [e.from, e.to]) {
+      const m = stackAt.get(nodeId) ?? new Map<string, number>()
+      m.set(bundleOf(e), Math.max(m.get(bundleOf(e)) ?? 0, e.lanes.length))
+      stackAt.set(nodeId, m)
+    }
+  }
+  let maxStack = maxLanes
+  for (const m of stackAt.values()) {
+    let total = 0
+    for (const n of m.values()) total += n
+    if (total > maxStack) maxStack = total
+  }
+  const levelPx = Math.max(
+    2,
+    Math.min(block.trackWidthPx, box.hPx / (maxStack + 2)),
+  )
 
   let sx = 1
   let sy = 1
