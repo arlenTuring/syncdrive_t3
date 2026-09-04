@@ -221,8 +221,31 @@ function layoutOnce(
         for (const e of bundles.get(key) ?? []) {
           if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away * side)
         }
-        // 分岔軌道佔掉的長度：與下面畫分岔時用的同一條式子
-        const runPx = Math.max(cornerR, away * 3)
+        /*
+         * 分岔軌道佔掉的長度。
+         *
+         * 想要的是 1:3 的坡，但它<strong>不能比岔出去的那條路本身還長</strong>。road 4
+         * 只有 59 公尺（版面上 210 像素），照 1:3 算出來是 360 像素——分岔一路畫到那條
+         * 路的另一頭外面去，那條路自己的方塊反而被壓在分岔底下，看起來就是一段浮在
+         * 上面、沒接到任何東西的軌道。上限取兩邊長度的一半——邊自己讓出去時也是夾在
+         * 半條長度以內，兩邊用同一個上限才不會一邊讓 104、另一邊畫 126 而疊出來。
+         */
+        const spanOf = (x: GraphEdge) => {
+          const a = byId.get(x.from)
+          const b = byId.get(x.to)
+          if (!a || !b) return Infinity
+          const p = P(a)
+          const q = P(b)
+          return Math.hypot(q.x - p.x, q.y - p.y)
+        }
+        const runPx = Math.max(
+          1,
+          Math.min(
+            Math.max(cornerR, away * 3),
+            spanOf(branch) * 0.5 - 1,
+            spanOf(main) * 0.5 - 1,
+          ),
+        )
         for (const e of [...(bundles.get(key) ?? []), ...(bundles.get(bundleKey(main)) ?? [])]) {
           const tk = `${e.id}|${node.id}`
           if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
@@ -588,6 +611,9 @@ function layoutOnce(
         { f0: only.f0, f1: mid, level: only.level, offsetPx: fromPx },
         { f0: mid, f1: only.f1, level: only.level, offsetPx: toPxEnd },
       ]
+    } else if (levelRuns.length === 1) {
+      // 一段要同時接兩端：取平均，兩頭各差一半，都在看不出來的範圍內
+      levelRuns[0]!.offsetPx = (fromPx + toPxEnd) / 2
     } else {
       levelRuns[0]!.offsetPx = fromPx
       levelRuns[levelRuns.length - 1]!.offsetPx = toPxEnd
@@ -933,7 +959,8 @@ function layoutOnce(
         const branchRank = rank(offsetsOf(e))
         const count = Math.min(mainRank.length, branchRank.length)
         // 岔出的長度照斜率給，太短會變尖刺
-        const runPx = Math.max(cornerR, Math.abs(away) * 3)
+        // 與上面決定 switchTrim 時同一個值，兩者不一致的話分岔與軌道就接不上
+        const runPx = switchTrim.get(`${main.id}|${node.id}`) ?? Math.max(cornerR, Math.abs(away) * 3)
         for (let k = 0; k < count; k += 1) {
           const oMain = mainRank[k]!.o
           const oBranch = branchRank[k]!.o
