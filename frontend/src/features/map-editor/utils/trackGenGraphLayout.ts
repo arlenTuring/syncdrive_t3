@@ -241,6 +241,88 @@ function layoutOnce(
   }
 
   /*
+   * 兩條軌道<strong>拉開</strong>的那一段要畫出來。
+   *
+   * 場域在幾個地方把上下行拉開，中間那塊空地就是月台的位置——車站之後要插在那裡。
+   * road 的參考線看不出這件事（它一路都在兩線正中間），要看車道自己的中心線：實測
+   * T3 只有兩處拉開，都在右端的開口，1#0+3#0 那一束從 8.0 公尺收到 5.0，7#0 從 7.9
+   * 收到 3.5；其餘每一束整條都是 3.5 公尺。
+   *
+   * 判準因此是相對的：比這份路網<strong>自己</strong>的常態線間距寬半股以上。常態值
+   * 由檔案統計出來，不寫死，換一份 .xodr 也適用。
+   */
+  const laneAt = (pts: Array<{ x: number; y: number }>, f: number): Vec | null => {
+    if (pts.length < 2) return null
+    const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
+    const i = Math.min(pts.length - 2, Math.floor(u))
+    const t = u - i
+    return {
+      x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
+      y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
+    }
+  }
+  /** 這一束在這個位置最遠的兩條車道相距多少（公尺） */
+  const gapAt = (e: GraphEdge, f: number): number => {
+    const list = bundles.get(bundleKey(e)) ?? [e]
+    const ps: Vec[] = []
+    for (const other of list) {
+      // 同一束裡的邊可能反向存，對齊之後才是同一個位置
+      const g = other.from === e.from ? f : 1 - f
+      for (const lane of other.lanes) {
+        const p = laneAt(lane.points, g)
+        if (p) ps.push(p)
+      }
+    }
+    let mx = 0
+    for (let i = 0; i < ps.length; i += 1) {
+      for (let j = i + 1; j < ps.length; j += 1) {
+        mx = Math.max(mx, Math.hypot(ps[i]!.x - ps[j]!.x, ps[i]!.y - ps[j]!.y))
+      }
+    }
+    return mx
+  }
+  /** 這一束總共幾條車道 */
+  const bundleLanes = (e: GraphEdge) =>
+    (bundles.get(bundleKey(e)) ?? [e]).reduce((t, o) => t + o.lanes.length, 0)
+
+  /**
+   * 這份路網的<strong>股距</strong>（公尺）：相鄰兩條軌道中心線常態上相距多少。
+   *
+   * 這是整份排版的量化單位——「差幾股」「拉開了沒有」都拿它除。先前用寫死的 3.35，
+   * 那是這份 .xodr 的車道寬，換一份檔案（不同軌距、不同的線間距，甚至不同單位）就
+   * 全部量錯。改成從檔案本身統計：每一束的最外兩線距除以間隔數，取中位數。整份路網
+   * 只有一條車道時退回車道寬。
+   */
+  const pitchM = (() => {
+    const all: number[] = []
+    for (const e of graph.edges) {
+      const n = bundleLanes(e)
+      if (n < 2) continue
+      for (let i = 0; i <= 8; i += 1) {
+        const g = gapAt(e, i / 8)
+        if (g > 0.1) all.push(g / (n - 1))
+      }
+    }
+    if (all.length) {
+      all.sort((a, b) => a - b)
+      return all[Math.floor(all.length / 2)]!
+    }
+    const w = graph.edges.flatMap((e) => e.lanes.map((l) => l.widthM)).filter((x) => x > 0.1)
+    if (w.length) {
+      w.sort((a, b) => a - b)
+      return w[Math.floor(w.length / 2)]!
+    }
+    return LANE_W_M
+  })()
+
+  /*
+   * 比常態寬<strong>半股</strong>以上就算拉開。常態寬度是這一束自己的股數乘上股距，
+   * 所以三線並行的束不會因為本來就比較寬而被誤判成拉開。
+   */
+  const spreadAt = (e: GraphEdge, f: number): number =>
+    gapAt(e, f) - pitchM * Math.max(1, bundleLanes(e) - 1) >= pitchM * 0.5 ? 1 : 0
+
+  /*
    * 一個節點只畫<strong>一組</strong>轉角。
    *
    * 先前是「這個節點上每一對 h/v 都畫一個轉角」。路口常常是三岔——例如場域左下角，
@@ -338,7 +420,7 @@ function layoutOnce(
      * 兩端的偏離依定義是零，所以頭尾兩段一定落在第 0 股，接得回節點。
      */
     const levelAt = (f: number): number =>
-      Math.max(-1, Math.min(1, Math.round(devAt(f) / LANE_W_M)))
+      Math.max(-1, Math.min(1, Math.round(devAt(f) / pitchM)))
     /** 沿線切成幾段「差同樣股數」的區間 */
     const levelRuns: Array<{ f0: number; f1: number; level: number }> = []
     /*
@@ -438,21 +520,128 @@ function layoutOnce(
     }
     const sign = laneSign(e)
     /** 斜接佔掉的沿線長度（版面像素），1:3 */
-    const rampPx = (steps: number) => Math.min(len * 0.3, Math.abs(steps) * levelPx * 3)
+    const rampPx = (dPx: number) => Math.min(len * 0.3, Math.abs(dPx) * 3)
+
+    /*
+     * 拉開的區間。整束一起判，因為拉開是「這兩條之間」的事，不是某一條自己的事。
+     * 短到放不下兩段斜接的區間不畫——那種寬度在圖上看不出來，只會多兩片碎斜接。
+     */
+    const spreadRuns: Array<{ f0: number; f1: number; spread: number }> = []
+    {
+      const K = 48
+      const raw: Array<{ f0: number; f1: number; spread: number }> = []
+      let start = 0
+      let cur = spreadAt(e, 0)
+      for (let i = 1; i <= K; i += 1) {
+        const v = spreadAt(e, i / K)
+        if (v === cur) continue
+        raw.push({ f0: start / K, f1: i / K, spread: cur })
+        start = i
+        cur = v
+      }
+      raw.push({ f0: start / K, f1: 1, spread: cur })
+      const minSpreadF = (levelPx * 1.5) / Math.max(1, len)
+      raw.forEach((r, i) => {
+        // 頭尾兩段不併：它們是這一束接回節點的地方，併掉的話整段都停在拉開的寬度上
+        const terminal = i === 0 || i === raw.length - 1
+        const prev = spreadRuns[spreadRuns.length - 1]
+        if (prev && ((r.f1 - r.f0 < minSpreadF && !terminal) || r.spread === prev.spread)) {
+          prev.f1 = r.f1
+          return
+        }
+        spreadRuns.push({ ...r })
+      })
+      // 取樣點剛好落在轉折上時會生出零長度的段，先丟掉
+      for (let i = spreadRuns.length - 1; i >= 0; i -= 1) {
+        if (spreadRuns[i]!.f1 - spreadRuns[i]!.f0 <= 1e-9) spreadRuns.splice(i, 1)
+      }
+      if (!spreadRuns.length) spreadRuns.push({ f0: 0, f1: 1, spread: 0 })
+
+      /*
+       * 拉開的那一束在節點那一端<strong>還要接下去</strong>的話，得在這條邊裡面收回來，
+       * 不然接到下一束時憑空差一股——實測 1#0+3#0 那一束一路寬到節點，另一頭的 road 2
+       * 是標準間距。
+       *
+       * 開放端不收：那裡沒有別束要接，月台就在那裡，原圖上兩條線也是一路寬到底。
+       */
+      const continues = (nodeId: string) =>
+        (incident.get(nodeId) ?? []).some((other) => bundleKey(other) !== bundleKey(e))
+      const tailF = Math.min(0.35, (levelPx * 1.5) / Math.max(1, len))
+      const head = spreadRuns[0]!
+      if (head.spread === 1 && continues(e.from) && head.f1 > tailF * 1.5) {
+        head.f0 = tailF
+        spreadRuns.unshift({ f0: 0, f1: tailF, spread: 0 })
+      }
+      const tail = spreadRuns[spreadRuns.length - 1]!
+      if (tail.spread === 1 && continues(e.to) && tail.f0 < 1 - tailF * 1.5) {
+        tail.f1 = 1 - tailF
+        spreadRuns.push({ f0: 1 - tailF, f1: 1, spread: 0 })
+      }
+    }
+
+    /* 橫移與拉開各有各的段界，畫之前先合成同一組 */
+    const cuts = [
+      ...new Set([
+        ...levelRuns.flatMap((r) => [r.f0, r.f1]),
+        ...spreadRuns.flatMap((r) => [r.f0, r.f1]),
+      ]),
+    ].sort((a, b) => a - b)
+    const pick = <T extends { f0: number; f1: number }>(arr: T[], f: number): T =>
+      arr.find((r) => f >= r.f0 && f < r.f1) ?? arr[arr.length - 1]!
 
     e.lanes.forEach((lane, k) => {
       const o = offs[k]!
+      /*
+       * 拉開時往哪一邊讓：看這條車道在束裡本來排在中線的哪一側。讓開的量（away）
+       * 是整束一起挪的，不算在內。
+       */
+      const side = Math.sign(o - (shift.get(e.id) ?? 0)) || 1
       const at = (f: number, extra: number): Vec => ({
         x: S.x + ux * len * f + ax.x * (o + extra),
         y: S.y + uy * len * f + ax.y * (o + extra),
       })
+      const runs: Array<{ f0: number; f1: number; extra: number }> = []
+      for (let i = 0; i + 1 < cuts.length; i += 1) {
+        const f0 = cuts[i]!
+        const f1 = cuts[i + 1]!
+        if (f1 - f0 < 1e-6) continue
+        const mid = (f0 + f1) / 2
+        // 拉開時兩條各讓半股，中間就空出一整條軌道的寬度，剛好放得下月台
+        const extra =
+          pick(levelRuns, mid).level * levelPx * sign +
+          pick(spreadRuns, mid).spread * (levelPx / 2) * side
+        const last = runs[runs.length - 1]
+        if (last && Math.abs(last.extra - extra) < 0.01) {
+          last.f1 = f1
+          continue
+        }
+        runs.push({ f0, f1, extra })
+      }
+      if (!runs.length) runs.push({ f0: 0, f1: 1, extra: 0 })
+
+      /*
+       * 兩段之間的斜接佔掉的半寬。
+       *
+       * 坡照 1:3 給，但不能吃掉比相鄰兩段本身還長的距離——收尾那一段常常很短（實測
+       * 1#0+3#0 那一束只剩 4% 在收），照 1:3 算出來的斜接會伸出邊的兩端。放不下就讓
+       * 它陡一點，總比畫到外面去好。
+       */
+      const halfAt = (i: number): number => {
+        const a = runs[i]
+        const b = runs[i + 1]
+        if (!a || !b) return 0
+        return Math.min(
+          rampPx(b.extra - a.extra) / 2 / len,
+          (a.f1 - a.f0) / 2,
+          (b.f1 - b.f0) / 2,
+        )
+      }
       let seq = 0
-      levelRuns.forEach((run, ri) => {
-        const extra = run.level * levelPx * sign
-        const prev = levelRuns[ri - 1]
-        const next = levelRuns[ri + 1]
-        const cut0 = prev ? rampPx(run.level - prev.level) / 2 / len : 0
-        const cut1 = next ? rampPx(next.level - run.level) / 2 / len : 0
+      runs.forEach((run, ri) => {
+        const extra = run.extra
+        const next = runs[ri + 1]
+        const cut0 = halfAt(ri - 1)
+        const cut1 = halfAt(ri)
         const g0 = run.f0 + cut0
         const g1 = run.f1 - cut1
         if (g1 - g0 > 0.01) {
@@ -489,8 +678,8 @@ function layoutOnce(
         }
         // 與下一段之間的換股，用斜接軌道接
         if (!next) return
-        const nextExtra = next.level * levelPx * sign
-        const half = rampPx(next.level - run.level) / 2 / len
+        const nextExtra = next.extra
+        const half = halfAt(ri)
         const a0 = at(run.f1 - half, extra)
         const a1 = at(run.f1 + half, nextExtra)
         const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI

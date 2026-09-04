@@ -51,8 +51,14 @@ export type GraphEdge = {
   orient: 'h' | 'v'
   /** 走向：+1 表示往 x（或 y）增加的方向 */
   sign: 1 | -1
-  /** 這一段涵蓋的車道，依 lane id 排序 */
-  lanes: Array<{ key: string; laneId: number; widthM: number }>
+  /**
+   * 這一段涵蓋的車道，依 lane id 排序。
+   *
+   * `points` 是那條車道自己的中心線（真實座標），已經裁到這一段、方向對齊參考線。
+   * 排版要靠它看出<strong>兩條軌道在哪裡拉開</strong>——月台就在拉開的那一段中間，
+   * road 的參考線看不出這件事，車道線才看得出來。
+   */
+  lanes: Array<{ key: string; laneId: number; widthM: number; points: Array<{ x: number; y: number }> }>
   /** 真實座標的取樣點，車輛投影要用 */
   points: Array<{ x: number; y: number }>
 }
@@ -128,6 +134,34 @@ function splitRuns(points: Pt[], minRunM: number): Array<{ from: number; to: num
       continue
     }
     out.push({ ...r })
+  }
+  return out
+}
+
+/**
+ * 一條車道在 [f0, f1] 這一段的取樣點，方向對齊 road 的參考線。
+ *
+ * 車道中心線是<strong>依行車方向</strong>存的，左側（lane id 為正）那條因此與參考線
+ * 反向，要先翻回來再裁，不然量出來的位置會落到路的另一頭。
+ */
+function sampleLane(
+  lane: LaneCenterline,
+  f0: number,
+  f1: number,
+  n = 24,
+): Array<{ x: number; y: number }> {
+  const src = lane.laneId > 0 ? [...lane.points].reverse() : lane.points
+  if (src.length < 2) return []
+  const out: Array<{ x: number; y: number }> = []
+  for (let i = 0; i < n; i += 1) {
+    const f = f0 + ((f1 - f0) * i) / (n - 1)
+    const u = Math.max(0, Math.min(1, f)) * (src.length - 1)
+    const j = Math.min(src.length - 2, Math.floor(u))
+    const t = u - j
+    out.push({
+      x: src[j]!.x + (src[j + 1]!.x - src[j]!.x) * t,
+      y: src[j]!.y + (src[j + 1]!.y - src[j]!.y) * t,
+    })
   }
   return out
 }
@@ -248,12 +282,16 @@ export function buildTrackGraph(
     const pts = road.refPoints
     const runs = runsByRoad.get(road.id)
     if (!runs) continue
-    const lanes = (lanesByRoad.get(road.id) ?? [])
-      .slice()
-      .sort((a, b) => a.laneId - b.laneId)
-      .map((l) => ({ key: l.key, laneId: l.laneId, widthM: l.widthM }))
+    const laneList = (lanesByRoad.get(road.id) ?? []).slice().sort((a, b) => a.laneId - b.laneId)
+    const lastIdx = Math.max(1, pts.length - 1)
     for (let i = 0; i < runs.length; i += 1) {
       const run = runs[i]!
+      const lanes = laneList.map((l) => ({
+        key: l.key,
+        laneId: l.laneId,
+        widthM: l.widthM,
+        points: sampleLane(l, run.from / lastIdx, run.to / lastIdx),
+      }))
       const from = weld.find(`${road.id}#${i}a`)
       const to = weld.find(`${road.id}#${i}b`)
       if (from === to) continue
