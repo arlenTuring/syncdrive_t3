@@ -315,6 +315,50 @@ function layoutOnce(
     return LANE_W_M
   })()
 
+  /**
+   * 節點在它那一排裡的<strong>股位</strong>。
+   *
+   * 正交化把同一排的節點壓到同一條線上，那一排裡各節點原本的高低差就消失了——實測
+   * 上排四個節點真實 y 是 +4.2 / −4.0 / −11.8 / −14.3，全被壓成 −7.5，road 8 兩端
+   * 22.3 公尺的落差整個不見。
+   *
+   * 於是「離兩端連線多遠」量到的不是路在挪，而是那條連線在斜：road 8 的真實 y 前
+   * 六成一路平（4.2→6.8），六到九成掉 22 公尺，離弦卻是一路爬到 16 再收回零。照離弦
+   * 畫，平的那段被畫成往上凸，掉下去那段被畫成凸完回來——形狀正好相反。
+   *
+   * 改成讓一條邊的<strong>兩端各自落在自己的股位</strong>：節點的股位由它自己離那一排
+   * 平均多遠決定，一個節點只有一個值，所以在那裡交會的每條邊自動對得起來，不會有接縫。
+   */
+  const axisScale = (orient: 'h' | 'v') => (orient === 'h' ? sy : sx)
+  /**
+   * 節點離它那一排多遠，換算成版面像素。
+   *
+   * 不量化成股。股距是「兩條並行軌道之間」的距離，拿它量<strong>路自己的高低差</strong>
+   * 會放大十倍：這份場域縱向 350 公尺壓進 640 像素，一股 60 像素等於 33 公尺，而股距
+   * 只有 3.5 公尺。road 1/3 兩端真實差 7 公尺，量化成股會變成兩股 120 像素，實際上照
+   * 版面比例只有 13 像素。所以直接照版面比例換算，落差多少就畫多少。
+   */
+  const nodeOffsetPx = (n: GraphNode, orient: 'h' | 'v'): number => {
+    const dev = orient === 'h' ? n.realY - n.y : n.realX - n.x
+    const px = axisSign(orient) * dev * axisScale(orient)
+    // 上限四分之三股：框壓得很扁時股距本來就快容不下軌道寬，落差再加上去就會疊在一起
+    const cap = levelPx * 0.75
+    return Math.max(-cap, Math.min(cap, px))
+  }
+  /**
+   * 一股換算成版面偏移的方向。
+   *
+   * 橫的邊沿版面 y 排，而真實 y 越大越靠北、在圖上越<strong>上面</strong>，所以要反號；
+   * 縱的邊沿版面 x 排，真實 x 越大越靠東、在圖上越右邊，同號。
+   *
+   * 先前這裡用的是 laneSign（車道序號往哪邊排），它跟著行車方向翻面。當時的股數是從
+   * 「離弦」來的、也跟著方向翻，兩個翻面剛好抵銷。現在股位改用真實側位算，不再跟方向
+   * 有關，就得用固定的軸向。
+   */
+  const axisSign = (orient: 'h' | 'v') => (orient === 'h' ? -1 : 1)
+  /** 這條邊在某個節點那一端要讓出的版面偏移 */
+  const endExtra = (n: GraphNode, orient: 'h' | 'v') => nodeOffsetPx(n, orient)
+
   /*
    * 比常態寬<strong>半股</strong>以上就算拉開。常態寬度是這一束自己的股數乘上股距，
    * 所以三線並行的束不會因為本來就比較寬而被誤判成拉開。
@@ -382,125 +426,146 @@ function layoutOnce(
     const offs = offsetsOf(e)
     const ax = perpAxis(e)
     /*
-     * 一條路自己的<strong>緩慢橫移</strong>要畫出來。
+     * 一條路自己的<strong>橫移</strong>要畫出來。
      *
-     * 節點只管兩端，中間那段路實際上會慢慢挪開又挪回來——原始中心線看得到那個緩坡，
-     * 而先前整條邊被畫成一條直的，那個起伏整個消失。
+     * 量的是「這一點的真實側位離<strong>這一排的線</strong>多遠」——正交化把同一排的
+     * 節點壓到同一條線上，那條線就是這條邊在圖上的位置，所以離它多遠才是圖上該讓開
+     * 多少。
      *
-     * 做法是量每一點離「兩端連線」多遠，除以一個車道寬就是差幾股；股數變了就在那裡
-     * 插一段斜接軌道，斜度照 1:3 給。不夠一股的擺動不畫——那種程度在簡圖上看不出來，
-     * 畫了只會多出一堆幾像素的碎片。
+     * 先前量的是「離兩端連線多遠」。兩端不等高時那條連線是斜的，路是平的，於是平的
+     * 那段被算成一路偏離、畫成往上凸，真正掉下去的那段反而被畫成凸完回來，形狀相反。
      */
-    /** 這一點離「兩端連線」多遠（公尺，真實左法線為正） */
-    const devAt = (f: number): number => {
+    const perpScale = axisScale(e.orient)
+    const rowLat = e.orient === 'h' ? ends.a.y : ends.a.x
+    /** 這一點的真實側位離這一排多遠（公尺） */
+    const latDevAt = (f: number): number => {
       const pts = e.points
-      if (pts.length < 3) return 0
+      if (pts.length < 2) return 0
       const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
       const i = Math.min(pts.length - 2, Math.floor(u))
       const t = u - i
-      const p = {
-        x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
-        y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
-      }
-      const a = pts[0]!
-      const b = pts[pts.length - 1]!
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const m = Math.hypot(dx, dy) || 1
-      // 真實左法線；與車道序號同一個方向慣例
-      return ((p.x - a.x) * -dy + (p.y - a.y) * dx) / m
+      const px = pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t
+      const py = pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t
+      return (e.orient === 'h' ? py : px) - rowLat
     }
-    /*
-     * 最多差一股。
+    /** 側位差換算成版面偏移（像素），上限四分之三股，免得一條偏很遠的路把整張圖撐開 */
+    const capPx = levelPx * 0.75
+    const toPx = (devM: number) =>
+      Math.max(-capPx, Math.min(capPx, axisSign(e.orient) * devM * perpScale))
+    /**
+     * 切段時的量化單位：<strong>一股在圖上代表多少公尺</strong>。
      *
-     * 量到的偏離同時混著兩件事：兩條線彼此挪開（要畫），以及整條路自己在彎（已經由
-     * 把邊拉直表達過了）。不夾的話後者會被逐股還原成一座階梯——實測長邊上一口氣生出
-     * 64 段斜接、整份版面高度多了 236 像素。簡圖只需要看得出「這裡挪了一下」，一股就夠。
-     *
-     * 兩端的偏離依定義是零，所以頭尾兩段一定落在第 0 股，接得回節點。
+     * 用股距（軌道之間的 3.5 公尺）去切會把每一點小起伏都切成一段；圖上看得出來的
+     * 差異是「挪了半條軌道寬」那個級距，換算回真實世界是幾十公尺。
      */
-    const levelAt = (f: number): number =>
-      Math.max(-1, Math.min(1, Math.round(devAt(f) / pitchM)))
-    /** 沿線切成幾段「差同樣股數」的區間 */
-    const levelRuns: Array<{ f0: number; f1: number; level: number }> = []
+    const stepM = levelPx / Math.max(1e-6, perpScale)
     /*
-     * 短邊不畫橫移。
+     * 切段用的級距取<strong>四分之一股</strong>：線在圖上挪了四分之一條軌道寬就看得
+     * 出來不是直的，值得切一段。整股當級距的話，road 9 那個 ±8 公尺的緩坡（圖上 15
+     * 像素）會被判成沒動，原圖看得到的 S 又不見了。
+     */
+    const segUnitM = stepM / 4
+    const levelAt = (f: number): number =>
+      Math.max(-8, Math.min(8, Math.round(latDevAt(f) / segUnitM)))
+    /** 沿線切成幾段「同一階」的區間 */
+    let levelRuns: Array<{ f0: number; f1: number; level: number; offsetPx: number }> = []
+    /*
+     * 短邊不看中途的橫移。
      *
-     * 「離兩端連線多遠」在短邊上量出來的幾乎都是那條路自己在轉彎——路口前後那幾十
-     * 公尺本來就是弧。實測 93 公尺的 road 1/3、68 公尺的 road 10、54 公尺的 11#1 各被
-     * 判出一次換股，畫成四組沒有意義的斜接；真正該有的那一次在 683 公尺的 road 8 上。
-     * 圖上看得懂的橫移至少要拉開幾塊，所以不到六塊長的邊一律畫直的。
+     * 短邊上量到的起伏幾乎都是那條路自己在轉彎——路口前後那幾十公尺本來就是弧。但兩端
+     * 的高度還是要接上，所以端點不同高時仍然換一次，只是不看中間。
      */
     const MIN_TAPER_BLOCKS = 6
     if (usedM < perBlockM * MIN_TAPER_BLOCKS) {
-      levelRuns.push({ f0: 0, f1: 1, level: 0 })
+      levelRuns.push({ f0: 0, f1: 1, level: 0, offsetPx: 0 })
     } else {
       const K = Math.max(4, Math.min(48, Math.round(usedM / 15)))
-      const raw: Array<{ f0: number; f1: number; level: number }> = []
+      const raw: Array<{ f0: number; f1: number; level: number; offsetPx: number }> = []
       let start = 0
       let cur = levelAt(0)
       for (let i = 1; i <= K; i += 1) {
         const lv = levelAt(i / K)
         if (lv === cur) continue
-        raw.push({ f0: start / K, f1: i / K, level: cur })
+        raw.push({ f0: start / K, f1: i / K, level: cur, offsetPx: 0 })
         start = i
         cur = lv
       }
-      raw.push({ f0: start / K, f1: 1, level: cur })
+      raw.push({ f0: start / K, f1: 1, level: cur, offsetPx: 0 })
       /*
-       * 太短的階段併給前一段。
-       *
-       * 逐點量出來的股數會在邊界上來回跳，每跳一次就是一段斜接；只有夠長的那一段才
-       * 值得畫成「挪了一股」。
-       *
-       * 門檻本來寫死三塊。塊給得大的時候（橫向一塊 80 公尺）三塊就是 240 公尺，佔掉
-       * 732 公尺長的 road 9 三分之一——它那個 S 的兩半各只有 183 與 213 公尺，於是整條
-       * 被抹平成直線，原圖看得到的緩坡在圖上消失。
-       *
-       * 改成用<strong>斜接自己的坡</strong>來定：坡是 1:3，換一股要走三個股距，留一半
-       * 的餘裕才不會兩段斜接頭尾相接，所以是四點五個股距；再不短於一塊，免得塊很小時
-       * 門檻跟著失效。
+       * 太短的階段併給前一段。門檻用<strong>斜接自己的坡</strong>來定：坡是 1:3，換一階
+       * 要走三個股距，留一半餘裕才不會兩段斜接頭尾相接，所以是四點五個股距；再不短於
+       * 一塊，免得塊很小時門檻跟著失效。頭尾兩段不併，它們接的是節點。
        */
       const minShiftM = Math.max(minRunM * 4.5, perBlockM)
       const minRunF = Math.min(0.4, minShiftM / Math.max(1, usedM))
-      /*
-       * 最後一段不併。
-       *
-       * 它是這條邊<strong>回到節點</strong>的那一段，依定義在第 0 股。併掉的話整條邊
-       * 的尾端就停在 ±1 股上，接到節點時憑空歪一格——road 8 原本尾端那段只佔 7%，
-       * 被併進前一段，右端就與路口對不上。
-       */
       raw.forEach((r, i) => {
         const prev = levelRuns[levelRuns.length - 1]
-        const tooShort = r.f1 - r.f0 < minRunF && i < raw.length - 1
-        if (prev && (tooShort || r.level === prev.level)) {
+        const terminal = i === 0 || i === raw.length - 1
+        if (prev && ((r.f1 - r.f0 < minRunF && !terminal) || r.level === prev.level)) {
           prev.f1 = r.f1
           return
         }
         levelRuns.push({ ...r })
       })
-      if (!levelRuns.length) levelRuns.push({ f0: 0, f1: 1, level: 0 })
+      if (!levelRuns.length) levelRuns.push({ f0: 0, f1: 1, level: 0, offsetPx: 0 })
+    }
 
-      /*
-       * 換股的位置移到<strong>路真的在挪</strong>的那一點。
-       *
-       * 分段是照「偏離跨過半股」切的，那個門檻很早就跨過去了：road 8 一路緩緩偏開，
-       * 走到 9% 就已經差半股，於是斜接被畫在最左邊；但眼睛看到的那個彎在 70–80%——
-       * 那裡的橫移速率是前段的五倍（每單位 −115 對 21）。原圖上的彎也在那裡。
-       *
-       * 所以段界不動段的「內容」，只往兩段的中點之間找橫移最猛的一點挪過去。方向要
-       * 對上：往上挪的段界找最陡的上坡，不然會跳到旁邊那個反向的彎。
-       */
+    /*
+     * 每一段畫在<strong>那一段自己的平均高度</strong>上，兩端則直接用節點的高度。
+     *
+     * 節點的高度是那個節點自己的事，在它上面交會的每條邊都得用同一個值，接縫才不會
+     * 錯開；中間各段照實際位置擺，簡圖才貼近真的幾何。
+     */
+    const meanDev = (f0: number, f1: number) => {
+      let t = 0
+      const N = 8
+      for (let i = 0; i <= N; i += 1) t += latDevAt(f0 + ((f1 - f0) * i) / N)
+      return t / (N + 1)
+    }
+    for (const r of levelRuns) r.offsetPx = toPx(meanDev(r.f0, r.f1))
+    const fromPx = nodeOffsetPx(ends.a, e.orient)
+    const toPxEnd = nodeOffsetPx(ends.b, e.orient)
+    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > levelPx * 0.12) {
+      const only = levelRuns[0]!
+      const mid = (only.f0 + only.f1) / 2
+      levelRuns = [
+        { f0: only.f0, f1: mid, level: only.level, offsetPx: fromPx },
+        { f0: mid, f1: only.f1, level: only.level, offsetPx: toPxEnd },
+      ]
+    } else {
+      levelRuns[0]!.offsetPx = fromPx
+      levelRuns[levelRuns.length - 1]!.offsetPx = toPxEnd
+    }
+    /*
+     * 併掉高度差看不出來的段界。
+     *
+     * 改完端點之後可能有相鄰兩段高度幾乎一樣；差不到八分之一股的落差在圖上就是一條
+     * 直線，畫成斜接只會多一片碎片。
+     */
+    for (let i = levelRuns.length - 1; i > 0; i -= 1) {
+      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < levelPx * 0.12) {
+        levelRuns[i - 1]!.f1 = levelRuns[i]!.f1
+        levelRuns.splice(i, 1)
+      }
+    }
+
+    /*
+     * 換股的位置移到<strong>路真的在挪</strong>的那一點。
+     *
+     * 段界不動段的「內容」，只往兩段的中點之間找橫移最猛的一點挪過去。方向要對上：
+     * 往上挪的段界找最陡的上坡，不然會跳到旁邊那個反向的彎。
+     */
+    {
       const slopeAt = (f: number) => {
         const h = 0.02
         const lo = Math.max(0, f - h)
         const hi = Math.min(1, f + h)
-        return (devAt(hi) - devAt(lo)) / Math.max(1e-6, hi - lo)
+        return (latDevAt(hi) - latDevAt(lo)) / Math.max(1e-6, hi - lo)
       }
       for (let i = 0; i + 1 < levelRuns.length; i += 1) {
         const a = levelRuns[i]!
         const b = levelRuns[i + 1]!
-        const dir = Math.sign(b.level - a.level) || 1
+        const dir = Math.sign(toPx(1)) * Math.sign(b.offsetPx - a.offsetPx) || 1
         const lo = (a.f0 + a.f1) / 2
         const hi = (b.f0 + b.f1) / 2
         let best = a.f1
@@ -518,7 +583,6 @@ function layoutOnce(
         b.f0 = best
       }
     }
-    const sign = laneSign(e)
     /** 斜接佔掉的沿線長度（版面像素），1:3 */
     const rampPx = (dPx: number) => Math.min(len * 0.3, Math.abs(dPx) * 3)
 
@@ -608,7 +672,7 @@ function layoutOnce(
         const mid = (f0 + f1) / 2
         // 拉開時兩條各讓半股，中間就空出一整條軌道的寬度，剛好放得下月台
         const extra =
-          pick(levelRuns, mid).level * levelPx * sign +
+          pick(levelRuns, mid).offsetPx +
           pick(spreadRuns, mid).spread * (levelPx / 2) * side
         const last = runs[runs.length - 1]
         if (last && Math.abs(last.extra - extra) < 0.01) {
@@ -618,6 +682,19 @@ function layoutOnce(
         runs.push({ f0, f1, extra })
       }
       if (!runs.length) runs.push({ f0: 0, f1: 1, extra: 0 })
+      /*
+       * 中間夾著的短段併掉。
+       *
+       * 換股與拉開的段界有時只差一點點，中間夾出一段幾像素的平段；兩側各要一段斜接，
+       * 擠在那幾像素裡就變成兩片近乎垂直的碎片（實測 6 像素寬、90 像素高）。併掉之後
+       * 由一段斜接一次走完，坡度才正常。頭尾不動——它們接的是節點。
+       */
+      for (let i = runs.length - 2; i > 0; i -= 1) {
+        const r = runs[i]!
+        if ((r.f1 - r.f0) * len >= levelPx) continue
+        runs[i - 1]!.f1 = r.f1
+        runs.splice(i, 1)
+      }
 
       /*
        * 兩段之間的斜接佔掉的半寬。
@@ -630,11 +707,11 @@ function layoutOnce(
         const a = runs[i]
         const b = runs[i + 1]
         if (!a || !b) return 0
-        return Math.min(
-          rampPx(b.extra - a.extra) / 2 / len,
-          (a.f1 - a.f0) / 2,
-          (b.f1 - b.f0) / 2,
-        )
+        const want = rampPx(b.extra - a.extra) / 2 / len
+        const room = Math.min((a.f1 - a.f0) / 2, (b.f1 - b.f0) / 2)
+        // 擠不下 1:3 就用剩下的空間，但再擠也不陡過 1:1——垂直的一刀不像軌道
+        const floor = Math.min(0.5, (Math.abs(b.extra - a.extra) * 0.5) / len)
+        return Math.max(floor, Math.min(want, Math.max(room, floor)))
       }
       let seq = 0
       runs.forEach((run, ri) => {
@@ -713,7 +790,16 @@ function layoutOnce(
     if (!pair) continue
     const eh = pair.h
     const ev = pair.v
-    const N = P(node)
+    /*
+     * 轉角要落在<strong>那兩條邊實際到達的高度</strong>，不是節點的原點。
+     *
+     * 兩條邊在這個節點的股位由節點決定（橫的看真實 y、縱的看真實 x），邊已經照那個
+     * 股位讓開了；轉角若還畫在原點上，兩頭就各差一格。
+     */
+    const N = (() => {
+      const p = P(node)
+      return { x: p.x + endExtra(node, 'v'), y: p.y + endExtra(node, 'h') }
+    })()
     const hOther = byId.get(eh.from === node.id ? eh.to : eh.from)
     const vOther = byId.get(ev.from === node.id ? ev.to : ev.from)
     if (!hOther || !vOther) continue
@@ -758,7 +844,11 @@ function layoutOnce(
    * 會憑空出現在旁邊。
    */
   for (const node of graph.nodes) {
-    const N = P(node)
+    // 分岔同樣要落在那一束實際到達的股位上
+    const N = (() => {
+      const p = P(node)
+      return { x: p.x + endExtra(node, 'v'), y: p.y + endExtra(node, 'h') }
+    })()
     const groups = new Map<string, GraphEdge[]>()
     for (const e of incident.get(node.id) ?? []) {
       const key = dirKey(e, node.id)
