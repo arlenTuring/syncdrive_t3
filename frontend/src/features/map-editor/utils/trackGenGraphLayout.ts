@@ -490,9 +490,34 @@ function layoutOnce(
     const trim1 = trimAt(e, e.to, full)
     const t0 = Math.max(0, trim0 > 0 ? trim0 + alongU * alongShift(ends.a) : 0)
     const t1 = Math.max(0, trim1 > 0 ? trim1 - alongU * alongShift(ends.b) : 0)
-    const len = full - t0 - t1
+    let len = full - t0 - t1
     if (len < 2) continue
-    const S = { x: A.x + ux * t0, y: A.y + uy * t0 }
+    let S = { x: A.x + ux * t0, y: A.y + uy * t0 }
+
+    /*
+     * 支線不該被路口的元件吃掉。
+     *
+     * 側線 road 4 全長 59 公尺（版面 210 像素），分岔要爬過一整束的寬度、在圖上就得
+     * 走一百多像素，讓出去之後剩下的直線只剩一半——原圖上那是一條長長的平行側線，
+     * 圖上卻變成兩塊。可是它的另一頭是死路，沒有東西要接，位置本來就不帶資訊；所以
+     * 讓出去多少，就從死路那一頭補回來，整條的長度不受影響。
+     *
+     * 再給一個下限：<strong>至少要跟這一束一樣寬</strong>。短過這個就不像一段軌道，
+     * 只像一塊方形——縱向那條 35 公尺的短支線（版面上只有 64 像素高、卻有 120 像素寬）
+     * 就是這樣。
+     */
+    const degOf = (id: string) => (incident.get(id) ?? []).length
+    const deadFrom = degOf(e.from) <= 1
+    const deadTo = degOf(e.to) <= 1
+    if (deadFrom !== deadTo) {
+      const back = deadFrom
+      const minStub = (bundleCount.get(bundleKey(e)) ?? e.lanes.length) * levelPx
+      const grow = Math.max(back ? t1 : t0, minStub - len)
+      if (grow > 0) {
+        len += grow
+        if (back) S = { x: S.x - ux * grow, y: S.y - uy * grow }
+      }
+    }
 
     const perBlockM = Math.max(
       1,
