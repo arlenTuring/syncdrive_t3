@@ -1,5 +1,10 @@
 import type { CornerTrackGeometry, SwitchTrackGeometry, TaperTrackGeometry } from './trackShapes'
-import { cornerArcCentrePx, cornerTrackEndsPx, switchTrackEndSegmentsPx } from './trackShapes'
+import {
+  cornerArcCentrePx,
+  cornerTrackEndsPx,
+  switchTrackEndSegmentsPx,
+  taperTrackEndsPx,
+} from './trackShapes'
 
 export type Vec2 = { x: number; y: number }
 /** 這一段是路上的軌道還是路口裡的連接道 */
@@ -181,6 +186,99 @@ export function fitCornerAt(
   return { geometry: best!.geometry, box: best!.box }
 }
 
+
+/**
+ * 解出方位、外框與錯位，讓斜帶兩端落在 p0／p1 上、且帶寬等於 bandWM。
+ *
+ * <h3>直接解，不要近似</h3>
+ * 斜帶的兩個端面是垂直線段，高 f；帶的方向是 (dx, dy)。垂直於帶的寬度是
+ * f·dx/√(dx²+dy²)，令它等於帶寬就解得 f。外框因此是 dx × (dy + f)，錯位比例是
+ * dy/(dy+f)。先前拿外接方框再回推比例，帶寬會差將近一倍。
+ *
+ * 四種方位 × 兩種端點配對共八種擺法，只有一種能讓形狀在自己的座標系裡是
+ * 「往右下走」；八種都算一次殘差取最小，就不必自己推該轉幾度。
+ */
+export function fitTaperAt(
+  p0: Vec2,
+  p1: Vec2,
+  bandWM: number,
+  alongDeg: number,
+): { geometry: TaperTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } {
+  /*
+   * 端面必須<strong>垂直於軌道方向</strong>，不是由斜線自己的走向決定。
+   *
+   * 斜接軌道兩端接的是沿著脊線走的軌道，那些軌道的端面垂直於行進方向；端面方向
+   * 一旦跟著斜線走，就會變成與軌道平行，怎麼接都對不上對手的邊——實測八段生成的
+   * 斜接軌道裡有兩段是這樣，L2X-39 的端面是水平的、鄰居的端面卻是垂直的。
+   *
+   * 形狀的 a→b 軸就是 entryDeg，端面垂直於它，所以 entryDeg 要與軌道方向同軸。
+   */
+  const allowed = QUARTERS.filter((q) => (((q - alongDeg) % 180) + 180) % 180 === 0)
+  const quarters = allowed.length ? allowed : QUARTERS
+  let best: {
+    geometry: TaperTrackGeometry
+    box: { xM: number; yM: number; wM: number; hM: number }
+    err: number
+  } | null = null
+
+  for (const entryDeg of quarters) {
+    for (const [ta, tb] of [
+      [p0, p1],
+      [p1, p0],
+    ] as Array<[Vec2, Vec2]>) {
+      // 把目標向量轉回形狀自己的座標系
+      const v = rotate({ x: tb.x - ta.x, y: tb.y - ta.y }, -entryDeg)
+      if (v.x <= 1e-6) continue
+      const dx = v.x
+      const dy = Math.abs(v.y)
+      /*
+       * 端面高度就是<strong>帶寬本身</strong>，不是換算成垂直於斜向的寬度。
+       *
+       * 軌道是端對端相接的：斜接軌道的端面必須與相鄰那一塊的端面一樣高，才接得
+       * 平。先前把端面撐成 bandW·len/dx（讓垂直於斜向的寬度等於帶寬），端面就比
+       * 鄰居高，接縫處看起來像折了一下。斜的那一段因此比直線段略窄，鐵道示意圖
+       * 本來就是這樣畫的。
+       */
+      const faceH = bandWM
+      const W = dx
+      const H = dy + faceH
+      const r = Math.max(0, Math.min(1, faceH / H))
+      /*
+       * 往上走與往下走都要能表示。
+       *
+       * 先前只接受往下（v.y ≥ 0），往上的那些一個候選都不剩，掉進退化的矩形——
+       * 端面長度就變成整個外框高（實測 39.3，帶寬只有 30.2）。往上時把兩個端面
+       * 上下對調即可，形狀一樣、只是鏡射。
+       */
+      const down = v.y >= 0
+      const geometry: TaperTrackGeometry = down
+        ? { aFrom: 0, aTo: r, bFrom: 1 - r, bTo: 1, entryDeg }
+        : { aFrom: 1 - r, aTo: 1, bFrom: 0, bTo: r, entryDeg }
+      // 轉 90 度時形狀的寬高在世界座標裡互換
+      const wM = entryDeg % 180 === 0 ? W : H
+      const hM = entryDeg % 180 === 0 ? H : W
+      const ends = taperTrackEndsPx(geometry, wM, hM)
+      // 平移量取兩端各自需要的位移的平均，殘差就是兩者的差
+      const ex = ((ta.x - ends.a.x) + (tb.x - ends.b.x)) / 2
+      const ey = ((ta.y - ends.a.y) + (tb.y - ends.b.y)) / 2
+      const err = Math.hypot(ta.x - ends.a.x - ex, ta.y - ends.a.y - ey) * 2
+      if (!best || err < best.err) {
+        best = { geometry, box: { xM: ex, yM: ey, wM, hM }, err }
+      }
+    }
+  }
+  if (best) return { geometry: best.geometry, box: best.box }
+  // 兩點重合之類的退化情形：給一個等寬的方塊，至少畫得出來
+  return {
+    geometry: { aFrom: 0, aTo: 1, bFrom: 0, bTo: 1, entryDeg: 0 },
+    box: {
+      xM: Math.min(p0.x, p1.x) - bandWM / 2,
+      yM: Math.min(p0.y, p1.y) - bandWM / 2,
+      wM: Math.max(bandWM, Math.abs(p1.x - p0.x)),
+      hM: Math.max(bandWM, Math.abs(p1.y - p0.y)),
+    },
+  }
+}
 
 /**
  * 解出分岔軌道的方位、外框與三個端面。

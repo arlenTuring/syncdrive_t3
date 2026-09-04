@@ -2,6 +2,7 @@ import {
   blocksInSpan,
   fitCornerAt,
   fitSwitchAt,
+  fitTaperAt,
   LANE_W_M,
   type LayoutShape,
   type TrackGenLayout,
@@ -223,42 +224,156 @@ function layoutOnce(
     // 讓出轉角之後剩下的里程，才是要切塊的長度
     const usedM = e.lengthM * (len / full)
     const minRunM = (levelPx / Math.max(1e-6, len / Math.max(1e-6, usedM))) || LANE_W_M
-    const n = Math.max(1, blocksInSpan(usedM, perBlockM, minRunM))
 
     const offs = offsetsOf(e)
+    const ax = perpAxis(e)
+    /*
+     * 一條路自己的<strong>緩慢橫移</strong>要畫出來。
+     *
+     * 節點只管兩端，中間那段路實際上會慢慢挪開又挪回來——原始中心線看得到那個緩坡，
+     * 而先前整條邊被畫成一條直的，那個起伏整個消失。
+     *
+     * 做法是量每一點離「兩端連線」多遠，除以一個車道寬就是差幾股；股數變了就在那裡
+     * 插一段斜接軌道，斜度照 1:3 給。不夠一股的擺動不畫——那種程度在簡圖上看不出來，
+     * 畫了只會多出一堆幾像素的碎片。
+     */
+    const levelAt = (f: number): number => {
+      const pts = e.points
+      if (pts.length < 3) return 0
+      const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
+      const i = Math.min(pts.length - 2, Math.floor(u))
+      const t = u - i
+      const p = {
+        x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
+        y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
+      }
+      const a = pts[0]!
+      const b = pts[pts.length - 1]!
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const m = Math.hypot(dx, dy) || 1
+      // 真實左法線；與車道序號同一個方向慣例
+      const dev = ((p.x - a.x) * -dy + (p.y - a.y) * dx) / m
+      /*
+       * 最多差一股。
+       *
+       * 這裡量到的偏離同時混著兩件事：兩條線彼此挪開（要畫），以及整條路自己在彎
+       * （已經由把邊拉直表達過了）。不夾的話後者會被逐股還原成一座階梯——實測長邊
+       * 上一口氣生出 64 段斜接、整份版面高度多了 236 像素。簡圖只需要看得出「這裡挪
+       * 了一下」，一股就夠。
+       */
+      return Math.max(-1, Math.min(1, Math.round(dev / LANE_W_M)))
+    }
+    /** 沿線切成幾段「差同樣股數」的區間 */
+    const levelRuns: Array<{ f0: number; f1: number; level: number }> = []
+    {
+      const K = Math.max(4, Math.min(48, Math.round(usedM / 15)))
+      const raw: Array<{ f0: number; f1: number; level: number }> = []
+      let start = 0
+      let cur = levelAt(0)
+      for (let i = 1; i <= K; i += 1) {
+        const lv = levelAt(i / K)
+        if (lv === cur) continue
+        raw.push({ f0: start / K, f1: i / K, level: cur })
+        start = i
+        cur = lv
+      }
+      raw.push({ f0: start / K, f1: 1, level: cur })
+      /*
+       * 太短的階段併給前一段。
+       *
+       * 逐點量出來的股數會在邊界上來回跳，每跳一次就是一段斜接；只有夠長的那一段才
+       * 值得畫成「挪了一股」，門檻取三塊。
+       */
+      const minRunF = Math.min(0.4, (perBlockM * 3) / Math.max(1, usedM))
+      for (const r of raw) {
+        const prev = levelRuns[levelRuns.length - 1]
+        if (prev && (r.f1 - r.f0 < minRunF || r.level === prev.level)) {
+          prev.f1 = r.f1
+          continue
+        }
+        levelRuns.push({ ...r })
+      }
+      if (!levelRuns.length) levelRuns.push({ f0: 0, f1: 1, level: 0 })
+    }
+    const sign = laneSign(e)
+    /** 斜接佔掉的沿線長度（版面像素），1:3 */
+    const rampPx = (steps: number) => Math.min(len * 0.3, Math.abs(steps) * levelPx * 3)
+
     e.lanes.forEach((lane, k) => {
       const o = offs[k]!
-      // 垂直方向用世界的軸，不跟著行車方向翻面
-      const ax = perpAxis(e)
-      const nx = ax.x
-      const ny = ax.y
-      for (let i = 0; i < n; i += 1) {
-        const f0 = i / n
-        const f1 = (i + 1) / n
-        const p0 = { x: S.x + ux * len * f0 + nx * o, y: S.y + uy * len * f0 + ny * o }
-        const p1 = { x: S.x + ux * len * f1 + nx * o, y: S.y + uy * len * f1 + ny * o }
-        const centre = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
-        const lengthM = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+      const at = (f: number, extra: number): Vec => ({
+        x: S.x + ux * len * f + ax.x * (o + extra),
+        y: S.y + uy * len * f + ax.y * (o + extra),
+      })
+      let seq = 0
+      levelRuns.forEach((run, ri) => {
+        const extra = run.level * levelPx * sign
+        const prev = levelRuns[ri - 1]
+        const next = levelRuns[ri + 1]
+        const cut0 = prev ? rampPx(run.level - prev.level) / 2 / len : 0
+        const cut1 = next ? rampPx(next.level - run.level) / 2 / len : 0
+        const g0 = run.f0 + cut0
+        const g1 = run.f1 - cut1
+        if (g1 - g0 > 0.01) {
+          const runM = usedM * (g1 - g0)
+          const parts = Math.max(1, blocksInSpan(runM, perBlockM, minRunM))
+          for (let i = 0; i < parts; i += 1) {
+            const f0 = g0 + ((g1 - g0) * i) / parts
+            const f1 = g0 + ((g1 - g0) * (i + 1)) / parts
+            const p0 = at(f0, extra)
+            const p1 = at(f1, extra)
+            const centre = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
+            const lengthM = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+            seq += 1
+            shapes.push({
+              kind: 'rect',
+              name: `${lane.key}-${String(seq).padStart(2, '0')}`,
+              role: 'road',
+              lineKey: lane.key,
+              lineLengthM: e.lengthM,
+              realLatFromM: 0,
+              realLatToM: 0,
+              samples: [p0, p1],
+              realPath: realSlice(e, k, e.lanes.length, f0, f1, t0 / full, t1 / full),
+              centre,
+              lengthM,
+              widthM: bandW,
+              rotationDeg: (Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180) / Math.PI,
+              sFrom: 0,
+              sTo: 0,
+            })
+            note({ x: centre.x - lengthM / 2, y: centre.y - bandW / 2 })
+            note({ x: centre.x + lengthM / 2, y: centre.y + bandW / 2 })
+          }
+        }
+        // 與下一段之間的換股，用斜接軌道接
+        if (!next) return
+        const nextExtra = next.level * levelPx * sign
+        const half = rampPx(next.level - run.level) / 2 / len
+        const a0 = at(run.f1 - half, extra)
+        const a1 = at(run.f1 + half, nextExtra)
+        const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
+        const fit = fitTaperAt(a0, a1, bandW, alongDeg)
+        seq += 1
         shapes.push({
-          kind: 'rect',
-          name: `${lane.key}-${String(i + 1).padStart(2, '0')}`,
+          kind: 'taper',
+          name: `${lane.key}X-${String(seq).padStart(2, '0')}`,
           role: 'road',
           lineKey: lane.key,
           lineLengthM: e.lengthM,
           realLatFromM: 0,
           realLatToM: 0,
-          samples: [p0, p1],
-          realPath: realSlice(e, k, e.lanes.length, f0, f1, t0 / full, t1 / full),
-          centre,
-          lengthM,
-          widthM: bandW,
-          rotationDeg: (Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180) / Math.PI,
+          samples: [a0, a1],
+          realPath: realSlice(e, k, e.lanes.length, run.f1 - half, run.f1 + half, t0 / full, t1 / full),
+          geometry: fit.geometry,
+          box: fit.box,
           sFrom: 0,
           sTo: 0,
         })
-        note({ x: centre.x - lengthM / 2, y: centre.y - bandW / 2 })
-        note({ x: centre.x + lengthM / 2, y: centre.y + bandW / 2 })
-      }
+        note({ x: fit.box.xM, y: fit.box.yM })
+        note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
+      })
     })
   }
 
