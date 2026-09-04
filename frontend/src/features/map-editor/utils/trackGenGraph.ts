@@ -25,10 +25,13 @@ import type { LaneCenterline, LaneCenterlinePlan, RoadInfo } from '../opendrive/
  * 靠真實座標聚類，不靠 link 標籤——link 缺漏或 contactPoint 寫反時，幾何不會騙人。
  */
 
-/** 真實座標上多近算同一個點（公尺） */
-const WELD_M = 8
-/** 路口連接道最長多長（公尺）——比這長的不當連接道，它自己就是一段路 */
-const CONNECTOR_MAX_M = 120
+/**
+ * 端點沒有 link 時，退回用座標判斷「多近算同一個點」。
+ *
+ * 不寫死公尺數：取整個路網對角線的千分之二。合規的 .xodr 每條 road 都有
+ * <code>&lt;link&gt;</code>，這條路根本不會走到；它只是給缺欄位的檔案留的後路。
+ */
+const WELD_FRACTION = 0.002
 
 export type GraphNode = {
   id: string
@@ -63,9 +66,25 @@ export type GraphEdge = {
   points: Array<{ x: number; y: number }>
 }
 
+/**
+ * 路口的通行配對：在這個節點上，哪一條 road 走得到哪一條 road。
+ *
+ * 直接來自 .xodr —— junction 裡的每一條連接道，它的 <code>&lt;link&gt;</code> 就寫著
+ * 「我把 A 的某一端接到 B 的某一端」。分岔要畫在哪、誰是主線誰是岔線，看這份配對就夠，
+ * 不必再從幾何回推「同一個節點上有沒有兩束往同一個方向走」。
+ */
+export type NodeMovement = {
+  nodeId: string
+  /** road id */
+  a: string
+  b: string
+}
+
 export type TrackGraph = {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  /** 路口允許的通行配對，照 .xodr 的連接道列出來 */
+  movements: NodeMovement[]
   /** 診斷用：圖上有幾個環（邊數 − 節點數 + 連通塊數） */
   cycles: number
   components: number
@@ -183,8 +202,6 @@ export function buildTrackGraph(
   plan: LaneCenterlinePlan,
   options: BuildGraphOptions = {},
 ): TrackGraph {
-  const minRunM = options.minRunM ?? 25
-
   const driving = (l: LaneCenterline) => l.laneType === 'driving'
   const lanesByRoad = new Map<string, LaneCenterline[]>()
   for (const lane of plan.lanes) {
@@ -194,20 +211,50 @@ export function buildTrackGraph(
     lanesByRoad.set(lane.roadId, arr)
   }
 
+  /*
+   * 誰要畫、誰只是路口內部的連接道，<strong>檔案自己說了</strong>：road 的
+   * <code>junction</code> 屬性不是 -1 就在某個路口裡。不必用長度去猜。
+   */
   const mainRoads: RoadInfo[] = []
   const connectors: RoadInfo[] = []
   for (const road of plan.roads) {
     if (!lanesByRoad.has(road.id)) continue
-    if (road.junctionId !== '-1' && road.lengthM <= CONNECTOR_MAX_M) connectors.push(road)
+    if (road.junctionId !== '-1') connectors.push(road)
     else mainRoads.push(road)
   }
 
-  /* ── 節點：切段 + 端點焊接 ──────────────────────────────── */
+  const extentM = (() => {
+    let xmin = Infinity
+    let ymin = Infinity
+    let xmax = -Infinity
+    let ymax = -Infinity
+    for (const road of plan.roads) {
+      for (const p of road.refPoints) {
+        if (p.x < xmin) xmin = p.x
+        if (p.y < ymin) ymin = p.y
+        if (p.x > xmax) xmax = p.x
+        if (p.y > ymax) ymax = p.y
+      }
+    }
+    return Number.isFinite(xmin) ? Math.hypot(xmax - xmin, ymax - ymin) : 1
+  })()
+  /*
+   * 一段直線至少要多長才值得成為圖上的一段。
+   *
+   * 這是<strong>簡圖的解析度</strong>，不是場域的性質，所以跟著路網的大小走：取對角線的
+   * 百分之二。寫死公尺數的話，換一個大十倍的路網就會切出一堆碎段。
+   */
+  const minRunM = options.minRunM ?? extentM * 0.02
+
+  /* ── 節點：切段 + 照 link 接起來 ─────────────────────────── */
 
   type Endpoint = { key: string; at: Pt }
   const endpoints: Endpoint[] = []
   const weld = new Weld()
   const runsByRoad = new Map<string, Array<{ from: number; to: number; dirDeg: number }>>()
+  /** road 的兩個實體端點對應到哪一個段端點 */
+  const roadEndKey = new Map<string, string>()
+  const endAt = (roadId: string, contact: 'start' | 'end') => roadEndKey.get(`${roadId}|${contact}`)
 
   for (const road of mainRoads) {
     const pts = road.refPoints
@@ -223,40 +270,74 @@ export function buildTrackGraph(
       // 同一條 road 上相鄰兩段共用轉折點
       if (i > 0) weld.union(`${road.id}#${i - 1}b`, a.key)
     }
-  }
-
-  // 真實座標夠近的端點焊成同一個節點
-  for (let i = 0; i < endpoints.length; i += 1) {
-    for (let j = i + 1; j < endpoints.length; j += 1) {
-      const a = endpoints[i]!
-      const b = endpoints[j]!
-      if (Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y) <= WELD_M) weld.union(a.key, b.key)
-    }
+    roadEndKey.set(`${road.id}|start`, `${road.id}#0a`)
+    roadEndKey.set(`${road.id}|end`, `${road.id}#${runs.length - 1}b`)
   }
 
   /*
-   * 路口的連接道不畫，但要把兩側縫起來。
+   * 拓樸照 <code>&lt;link&gt;</code> 接，不用座標猜。
    *
-   * 它們就是使用者說的「不用畫的渡線」：幾十公尺的短車道，畫出來只會在路口糊成一團。
-   * 可是拓樸上少了它們，環就斷了——所以只拿它們把兩端的節點併成同一個。
+   * OpenDRIVE 每條 road 都寫著前後接誰、接在對方的哪一端；路口裡的連接道也一樣，它的
+   * link 就是「我把 A 的某一端接到 B 的某一端」。所以節點是<strong>讀</strong>出來的：
+   * 兩個端點被 link 指到一起就是同一個節點，跟它們在座標上差幾公尺無關。
+   *
+   * 先前是「相距八公尺內就焊在一起」。那在路口密集或比例尺不同的檔案上會焊錯，而且
+   * 每換一份圖就要重調那個數字。
    */
-  for (const road of connectors) {
-    const pts = road.refPoints
-    if (pts.length < 2) continue
-    const ends: Pt[] = [pts[0]!, pts[pts.length - 1]!]
-    const hit = ends.map((p) => {
-      let best: Endpoint | null = null
-      let bestD = CONNECTOR_MAX_M
-      for (const e of endpoints) {
-        const d = Math.hypot(e.at.x - p.x, e.at.y - p.y)
-        if (d < bestD) {
-          bestD = d
-          best = e
-        }
+  const movements: NodeMovement[] = []
+  /** 連接道兩端接到的 road 端點；沒有 link 的話回傳 null */
+  const linkTarget = (link: RoadInfo['predecessor']): string | null => {
+    if (!link || link.type !== 'road' || !link.contact) return null
+    return endAt(link.id, link.contact) ?? null
+  }
+  for (const road of plan.roads) {
+    if (!lanesByRoad.has(road.id)) continue
+    const isConnector = road.junctionId !== '-1'
+    const own = {
+      start: isConnector ? null : endAt(road.id, 'start'),
+      end: isConnector ? null : endAt(road.id, 'end'),
+    }
+    const pre = linkTarget(road.predecessor)
+    const suc = linkTarget(road.successor)
+    if (isConnector) {
+      // 連接道自己不畫，只把它接的兩端縫成同一個節點——那就是這個路口
+      if (pre && suc) {
+        weld.union(pre, suc)
+        const a = road.predecessor?.id
+        const b = road.successor?.id
+        if (a && b && a !== b) movements.push({ nodeId: pre, a, b })
       }
-      return best
-    })
-    if (hit[0] && hit[1]) weld.union(hit[0].key, hit[1].key)
+      continue
+    }
+    if (own.start && pre) weld.union(own.start, pre)
+    if (own.end && suc) weld.union(own.end, suc)
+  }
+
+  /*
+   * 沒有 link 的端點才退回座標。
+   *
+   * 容差取路網對角線的千分之二，不是寫死的公尺數；合規的檔案根本不會走到這裡。
+   */
+  const weldM = extentM * WELD_FRACTION
+  const linked = new Set<string>()
+  for (const road of plan.roads) {
+    if (!lanesByRoad.has(road.id) || road.junctionId !== '-1') continue
+    if (road.predecessor) {
+      const k = endAt(road.id, 'start')
+      if (k) linked.add(k)
+    }
+    if (road.successor) {
+      const k = endAt(road.id, 'end')
+      if (k) linked.add(k)
+    }
+  }
+  const loose = endpoints.filter((e) => !linked.has(e.key))
+  for (let i = 0; i < loose.length; i += 1) {
+    for (let j = i + 1; j < loose.length; j += 1) {
+      const a = loose[i]!
+      const b = loose[j]!
+      if (Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y) <= weldM) weld.union(a.key, b.key)
+    }
   }
 
   /* ── 節點座標 ───────────────────────────────────────────── */
@@ -323,6 +404,7 @@ export function buildTrackGraph(
   return {
     nodes: [...nodes.values()],
     edges,
+    movements: movements.map((m) => ({ ...m, nodeId: weld.find(m.nodeId) })),
     components: roots.size,
     cycles: edges.length - nodes.size + roots.size,
   }

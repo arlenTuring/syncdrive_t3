@@ -172,7 +172,8 @@ function layoutOnce(
    */
   const branchSide = (branch: GraphEdge, main: GraphEdge, nodeId: string): number => {
     const fallback = () => (perpOf(branch) >= perpOf(main) ? 1 : -1)
-    const probe = Math.min(150, Math.max(LANE_W_M, Math.min(branch.lengthM, main.lengthM) * 0.5))
+    // 走兩條邊裡較短那條的一半；沒有寫死的公尺數，換多大的路網都成立
+    const probe = Math.max(1, Math.min(branch.lengthM, main.lengthM) * 0.5)
     const pb = walkFrom(branch, nodeId, probe)
     const pm = walkFrom(main, nodeId, probe)
     if (!pb || !pm) return fallback()
@@ -217,118 +218,113 @@ function layoutOnce(
     return Math.hypot(q.x - p.x, q.y - p.y)
   }
   /** 轉角旁邊那種分岔：主線繼續轉彎，支線從轉彎前就岔出去 */
-  const legSwitch: Array<{ nodeId: string; main: GraphEdge; branch: GraphEdge }> = []
-  const shift = new Map<string, number>()
-  /*
-   * 分岔軌道自己就是一段路，兩側的直軌要讓開它。
-   *
-   * 不讓的話同一段被畫兩次：分岔軌道從節點鋪出去，主線與岔線的方塊也從節點鋪出去，
-   * 疊在一起（實測一組疊掉 13462、四組主線各 15332 平方像素）。鍵是「哪條邊、在哪個
-   * 節點」，因為同一條邊兩端可能讓不一樣多。
-   */
   const switchTrim = new Map<string, number>()
-  const dirKey = (e: GraphEdge, nodeId: string) => {
-    const other = byId.get(e.from === nodeId ? e.to : e.from)
-    const self = byId.get(nodeId)
-    if (!other || !self) return '?'
-    const a = P(self)
-    const b = P(other)
-    return `${Math.sign(Math.round(b.x - a.x))},${Math.sign(Math.round(b.y - a.y))}`
-  }
-  for (const node of graph.nodes) {
-    const groups = new Map<string, GraphEdge[]>()
-    for (const e of incident.get(node.id) ?? []) {
-      const key = dirKey(e, node.id)
-      const arr = groups.get(key) ?? []
-      if (!arr.some((q) => bundleKey(q) === bundleKey(e))) arr.push(e)
-      groups.set(key, arr)
-    }
-    for (const list of groups.values()) {
-      if (list.length < 2) continue
-      const sorted = [...list].sort((a, b) => b.lengthM - a.lengthM)
-      const main = sorted[0]!
-      let away = 0
-      for (let i = 1; i < sorted.length; i += 1) {
-        const branch = sorted[i]!
-        const key = bundleKey(branch)
-        /*
-         * 兩束之間再多留一股。
-         *
-         * 只讓「前一束有幾條」的話，兩束最靠近的那兩條剛好相鄰、邊貼邊，四條線看起來
-         * 是一整片。原始路網那邊本來就是兩條兩條分開的，中間空得出一條軌道的寬度。
-         */
-        away += ((bundleCount.get(bundleKey(sorted[i - 1]!)) ?? 1) + 1) * levelPx
-        // 往真實世界上它所在的那一側讓開，不是固定往下
-        const side = branchSide(branch, main, node.id)
-        for (const e of bundles.get(key) ?? []) {
-          if (Math.abs(shift.get(e.id) ?? 0) < away) shift.set(e.id, away * side)
-        }
-        /*
-         * 分岔軌道佔掉的長度。
-         *
-         * 想要的是 1:3 的坡，但它<strong>不能比岔出去的那條路本身還長</strong>。road 4
-         * 只有 59 公尺（版面上 210 像素），照 1:3 算出來是 360 像素——分岔一路畫到那條
-         * 路的另一頭外面去，那條路自己的方塊反而被壓在分岔底下，看起來就是一段浮在
-         * 上面、沒接到任何東西的軌道。上限取兩邊長度的一半——邊自己讓出去時也是夾在
-         * 半條長度以內，兩邊用同一個上限才不會一邊讓 104、另一邊畫 126 而疊出來。
-         */
-        const runPx = Math.max(
-          1,
-          Math.min(
-            Math.max(cornerR, away * 3),
-            spanOf(branch) * 0.5 - 1,
-            spanOf(main) * 0.5 - 1,
-          ),
-        )
-        for (const e of [...(bundles.get(key) ?? []), ...(bundles.get(bundleKey(main)) ?? [])]) {
-          const tk = `${e.id}|${node.id}`
-          if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
-        }
-      }
-    }
+  const shift = new Map<string, number>()
 
-    /*
-     * 轉角旁邊的支線也是一個分岔。
-     *
-     * 場域左下角是三岔：一條從東邊過來、主線往北、另有一條 35 公尺的支線往南。三條邊
-     * 從節點離開的方向兩兩不同，照「同方向的兩束」找不到分岔，於是圖上只有一個轉角加
-     * 一截直軌——可是原始路網那裡就是一個道岔，從東邊過來的車可以往北也可以往南。
-     *
-     * 畫法是把支線橫挪一束，分岔畫在<strong>轉彎之前</strong>那一段主線上：梗在主線
-     * 遠端，一個出口直行進轉角、一個出口落在支線上。轉角接的正是那個直行出口，所以
-     * 不會多出空隙。支線本身不讓，它從節點就開始。
-     */
-    const pair = cornerPair.get(node.id)
-    if (pair) {
-      for (const leg of [pair.h, pair.v]) {
-        const seen = new Set<string>([bundleKey(leg)])
-        // 支線就貼著主線旁邊一束——這裡不像同向的兩束那樣還要空一條，本來就是同一條線
-        let steps = bundleCount.get(bundleKey(leg)) ?? 1
-        for (const br of incident.get(node.id) ?? []) {
-          if (br.orient !== leg.orient) continue
-          const key = bundleKey(br)
-          if (seen.has(key)) continue
-          seen.add(key)
-          const awayPx = steps * levelPx
-          const side = branchSide(br, leg, node.id)
-          for (const q of bundles.get(key) ?? []) {
-            if (Math.abs(shift.get(q.id) ?? 0) < awayPx) shift.set(q.id, awayPx * side)
-          }
-          // 分岔佔的是主線的長度，不佔支線的——支線本來就短
-          const runPx = Math.max(
-            1,
-            Math.min(Math.max(cornerR, awayPx * 3), spanOf(leg) * 0.35),
-          )
-          for (const q of bundles.get(bundleKey(leg)) ?? []) {
-            const tk = `${q.id}|${node.id}`
-            if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
-          }
-          legSwitch.push({ nodeId: node.id, main: leg, branch: br })
-          steps += bundleCount.get(key) ?? 1
-        }
+  /*
+   * 分岔畫在哪，<strong>檔案自己說了</strong>。
+   *
+   * 每個路口的連接道在 .xodr 裡寫著「我把 A 接到 B」，圖上就照這份配對走：一條 road 在
+   * 同一個節點接得到兩束以上，那裡就是分岔——最長的那一束是直行，其餘往旁邊讓開。
+   *
+   * 先前是從幾何回推：「同一個節點上有兩束往同一個方向走」算分岔。那條規則抓不到兩腿
+   * 一南一北的道岔，我就再補一條「轉角旁邊的同向邊也算」——兩條都是在重建檔案已經明說
+   * 的事實，而且每遇到一種新的路口形狀就得再補一條。現在只有一條路徑：讀 movements。
+   */
+  type SwitchJob = {
+    nodeId: string
+    /** 梗：分岔開在這一束上 */
+    stem: GraphEdge
+    /** 直行出口 */
+    through: GraphEdge
+    /** 岔出出口 */
+    branch: GraphEdge
+    runPx: number
+  }
+  const switchJobs: SwitchJob[] = []
+  /** 這條 road 在這個節點上的那一段 */
+  const edgeOf = (nodeId: string, roadId: string) =>
+    (incident.get(nodeId) ?? []).find((e) => e.roadId === roadId) ?? null
+  /*
+   * 誰直行、誰岔出，比的是<strong>整條 road 的長度</strong>，不是它在這個節點那一段。
+   *
+   * 一條路在圖上可能被切成好幾段，靠近路口的那一段常常很短；照段長比，68 公尺的主線會
+   * 輸給 35 公尺的支線，直行與岔出就反了。
+   */
+  const roadLenM = new Map<string, number>()
+  for (const e of graph.edges) {
+    roadLenM.set(e.roadId, (roadLenM.get(e.roadId) ?? 0) + e.lengthM)
+  }
+  const wholeRoadLen = (e: GraphEdge) => roadLenM.get(e.roadId) ?? e.lengthM
+
+  for (const node of graph.nodes) {
+    // 這個節點上，每條 road 走得到哪些 road
+    const partners = new Map<string, Set<string>>()
+    for (const m of graph.movements) {
+      if (m.nodeId !== node.id) continue
+      for (const [a, b] of [
+        [m.a, m.b],
+        [m.b, m.a],
+      ]) {
+        const set = partners.get(a!) ?? new Set<string>()
+        set.add(b!)
+        partners.set(a!, set)
       }
     }
+    if (!partners.size) continue
+
+    // 束才是圖上的一條線：同一對節點之間的幾條 road 算同一束
+    const distinct = (roadIds: Iterable<string>) => {
+      const out = new Map<string, GraphEdge>()
+      for (const id of roadIds) {
+        const e = edgeOf(node.id, id)
+        if (e) out.set(bundleKey(e), e)
+      }
+      return [...out.values()]
+    }
+    let stem: GraphEdge | null = null
+    let outs: GraphEdge[] = []
+    for (const [roadId, set] of partners) {
+      const self = edgeOf(node.id, roadId)
+      if (!self) continue
+      const list = distinct(set).filter((e) => bundleKey(e) !== bundleKey(self))
+      if (list.length < 2) continue
+      if (!stem || list.length > outs.length || wholeRoadLen(self) > wholeRoadLen(stem)) {
+        stem = self
+        outs = list
+      }
+    }
+    if (!stem || outs.length < 2) continue
+
+    // 最長的那一束直行，其餘讓開
+    const sorted = [...outs].sort((a, b) => wholeRoadLen(b) - wholeRoadLen(a))
+    const through = sorted[0]!
+    let steps = bundleCount.get(bundleKey(through)) ?? 1
+    for (let i = 1; i < sorted.length; i += 1) {
+      const branch = sorted[i]!
+      const key = bundleKey(branch)
+      const awayPx = steps * levelPx
+      const side = branchSide(branch, through, node.id)
+      for (const q of bundles.get(key) ?? []) {
+        if (Math.abs(shift.get(q.id) ?? 0) < awayPx) shift.set(q.id, awayPx * side)
+      }
+      /*
+       * 分岔佔掉的長度：想要 1:3 的坡，但不能比梗那一束的一半還長——分岔是開在梗上的，
+       * 它讓出去多少，梗就短多少。
+       */
+      const runPx = Math.max(
+        1,
+        Math.min(Math.max(cornerR, awayPx * 3), spanOf(stem) * 0.5 - 1),
+      )
+      for (const q of bundles.get(bundleKey(stem)) ?? []) {
+        const tk = `${q.id}|${node.id}`
+        if ((switchTrim.get(tk) ?? 0) < runPx) switchTrim.set(tk, runPx)
+      }
+      switchJobs.push({ nodeId: node.id, stem, through, branch, runPx })
+      steps += bundleCount.get(key) ?? 1
+    }
   }
+
 
   /** 這條邊每一條車道的橫向偏移（版面像素）：束內依序排開，再加上讓開的量 */
   const offsetsOf = (e: GraphEdge) => {
@@ -1009,112 +1005,41 @@ function layoutOnce(
   /* ── 分岔 ───────────────────────────────────────────────── */
 
   /*
-   * 讓開的那一束在節點處要接回主線，接法就是分岔軌道：一進兩出，梗在節點側，
-   * 直行出口留在原位、岔出出口落在讓開之後的位置。沒有這一段的話，岔出去那一束
-   * 會憑空出現在旁邊。
+   * 一進兩出：梗擺在<strong>開分岔的那一束</strong>上，兩個出口都落在節點。
+   *
+   * 直行出口就是那一束原本的位置，轉角或下一段直接接上去；岔出出口落在讓開之後的位置，
+   * 岔線從那裡開始走。梗那一束已經讓出了同樣的長度，所以不會疊、也不會斷。
    */
-  for (const node of graph.nodes) {
-    // 分岔同樣要落在那一束實際到達的股位上
-    const N = (() => {
-      const p = P(node)
-      return { x: p.x + endExtra(node, 'v'), y: p.y + endExtra(node, 'h') }
-    })()
-    const groups = new Map<string, GraphEdge[]>()
-    for (const e of incident.get(node.id) ?? []) {
-      const key = dirKey(e, node.id)
-      const arr = groups.get(key) ?? []
-      if (!arr.some((q) => bundleKey(q) === bundleKey(e))) arr.push(e)
-      groups.set(key, arr)
-    }
-    for (const [key, list] of groups) {
-      if (list.length < 2) continue
-      const [sxDir, syDir] = key.split(',').map(Number) as [number, number]
-      const main = [...list].sort((a, b) => b.lengthM - a.lengthM)[0]!
-      for (const e of list) {
-        if (e === main) continue
-        const away = shift.get(e.id) ?? 0
-        if (Math.abs(away) < 1) continue
-        /*
-         * 主線與岔線的車道要照<strong>版面上的排序</strong>配對，不能照 lane 序號。
-         *
-         * 兩條 road 的行車方向常常相反，lane 序號的排列方向就跟著翻面；照序號配對的
-         * 話第一條接到對面那條，兩片分岔軌道會交叉成一個 X——實測右上那組就是這樣。
-         * 兩邊各自照偏移由小到大排，再依序配，扇形永遠不會交叉。
-         */
-        const rank = (list: number[]) =>
-          list.map((o, k) => ({ o, k })).sort((a, b) => a.o - b.o)
-        const mainRank = rank(offsetsOf(main))
-        const branchRank = rank(offsetsOf(e))
-        const count = Math.min(mainRank.length, branchRank.length)
-        // 岔出的長度照斜率給，太短會變尖刺
-        // 與上面決定 switchTrim 時同一個值，兩者不一致的話分岔與軌道就接不上
-        const runPx = switchTrim.get(`${main.id}|${node.id}`) ?? Math.max(cornerR, Math.abs(away) * 3)
-        for (let k = 0; k < count; k += 1) {
-          const oMain = mainRank[k]!.o
-          const oBranch = branchRank[k]!.o
-          const laneMain = main.lanes[mainRank[k]!.k]!
-          const laneBranch = e.lanes[branchRank[k]!.k]!
-          const perp = (o: number): Vec =>
-            sxDir !== 0 ? { x: 0, y: o } : { x: o, y: 0 }
-          const along = (t: number): Vec =>
-            sxDir !== 0 ? { x: sxDir * t, y: 0 } : { x: 0, y: syDir * t }
-          const p = (t: number, o: number): Vec => ({
-            x: N.x + along(t).x + perp(o).x,
-            y: N.y + along(t).y + perp(o).y,
-          })
-          const fit = fitSwitchAt(p(0, oMain), p(runPx, oMain), p(runPx, oBranch), bandW)
-          if (!fit) continue
-          shapes.push({
-            kind: 'switch',
-            name: `${laneBranch.key}^${laneMain.key}`,
-            role: 'road',
-            lineKey: laneBranch.key,
-            lineLengthM: e.lengthM,
-            realLatFromM: 0,
-            realLatToM: 0,
-            samples: [p(0, oMain), p(runPx, oBranch)],
-            geometry: fit.geometry,
-            box: fit.box,
-            sFrom: 0,
-            sTo: 0,
-          })
-          note({ x: fit.box.xM, y: fit.box.yM })
-          note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
-        }
-      }
-    }
-  }
-
-  /*
-   * 轉角旁邊的支線：梗擺在主線遠端，直行出口留在節點（轉角接的就是它），岔出出口
-   * 落在挪開之後的支線上。
-   */
-  for (const job of legSwitch) {
+  for (const job of switchJobs) {
     const node = byId.get(job.nodeId)
-    const other = byId.get(job.main.from === job.nodeId ? job.main.to : job.main.from)
-    if (!node || !other) continue
+    const stemOther = byId.get(job.stem.from === job.nodeId ? job.stem.to : job.stem.from)
+    if (!node || !stemOther) continue
     const p0 = P(node)
     const N = { x: p0.x + endExtra(node, 'v'), y: p0.y + endExtra(node, 'h') }
-    const q = P(other)
+    const q = P(stemOther)
     const d = Math.hypot(q.x - p0.x, q.y - p0.y) || 1
     const dir = { x: (q.x - p0.x) / d, y: (q.y - p0.y) / d }
-    const runPx = switchTrim.get(`${job.main.id}|${job.nodeId}`) ?? cornerR
+    /*
+     * 車道要照<strong>版面上的排序</strong>配對，不能照 lane 序號：兩條 road 的行車方向
+     * 常常相反，序號的排列方向就跟著翻面，照序號配會讓兩片分岔交叉成一個 X。
+     */
     const rank = (list: number[]) => list.map((o, k) => ({ o, k })).sort((a, b) => a.o - b.o)
-    const mainRank = rank(offsetsOf(job.main))
+    const stemRank = rank(offsetsOf(job.through))
     const branchRank = rank(offsetsOf(job.branch))
-    const count = Math.min(mainRank.length, branchRank.length)
+    const count = Math.min(stemRank.length, branchRank.length)
+    // 出口沿著梗的垂直軸排開
     const perp = (o: number): Vec =>
-      job.main.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
+      job.stem.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
     for (let k = 0; k < count; k += 1) {
-      const oMain = mainRank[k]!.o
+      const oMain = stemRank[k]!.o
       const oBranch = branchRank[k]!.o
       const at = (t: number, o: number): Vec => ({
         x: N.x + dir.x * t + perp(o).x,
         y: N.y + dir.y * t + perp(o).y,
       })
-      const fit = fitSwitchAt(at(runPx, oMain), at(0, oMain), at(0, oBranch), bandW)
+      const fit = fitSwitchAt(at(job.runPx, oMain), at(0, oMain), at(0, oBranch), bandW)
       if (!fit) continue
-      const laneMain = job.main.lanes[mainRank[k]!.k]!
+      const laneMain = job.through.lanes[stemRank[k]!.k]!
       const laneBranch = job.branch.lanes[branchRank[k]!.k]!
       shapes.push({
         kind: 'switch',
@@ -1124,7 +1049,7 @@ function layoutOnce(
         lineLengthM: job.branch.lengthM,
         realLatFromM: 0,
         realLatToM: 0,
-        samples: [at(runPx, oMain), at(0, oBranch)],
+        samples: [at(job.runPx, oMain), at(0, oBranch)],
         geometry: fit.geometry,
         box: fit.box,
         sFrom: 0,

@@ -35,14 +35,28 @@ export type LaneCenterline = {
  * 前後接誰，以及左右各有哪些 lane。方向也是明確的——s 沿參考線遞增，lane id
  * 正號在參考線左側、負號在右側。這些都不需要猜。
  */
+export type RoadLink = {
+  /** 'road' | 'junction' */
+  type: string
+  id: string
+  /** 只有 type 是 road 時才有：接在對方的起點還是終點 */
+  contact: 'start' | 'end' | null
+}
+
 export type RoadInfo = {
   id: string
   name: string
   lengthM: number
   /** '-1' 表示不在 junction 裡 */
   junctionId: string
-  predecessor: { type: string; id: string } | null
-  successor: { type: string; id: string } | null
+  /**
+   * 前後接誰。
+   *
+   * `contact` 是接在對方的哪一端（起點或終點）——OpenDRIVE 的 <code>contactPoint</code>。
+   * 少了它就只知道「這兩條路相接」，不知道接在哪一頭，拓樸還是得靠座標猜。
+   */
+  predecessor: RoadLink | null
+  successor: RoadLink | null
   /** 參考線取樣點（真實座標） */
   refPoints: OpenDrivePoint[]
   /** 起點與終點的方位（度，數學慣例、逆時針為正） */
@@ -165,12 +179,14 @@ export function parseLaneCenterlines(
      * 反推有幾條路——那是猜的，而 OpenDRIVE 已經明講了。
      */
     const linkEl = roadEl.querySelector(':scope > link')
-    const linkOf = (tag: string) => {
+    const linkOf = (tag: string): RoadLink | null => {
       const el = linkEl?.querySelector(`:scope > ${tag}`)
       if (!el) return null
+      const contact = el.getAttribute('contactPoint')
       return {
         type: el.getAttribute('elementType') ?? '',
         id: el.getAttribute('elementId') ?? '',
+        contact: contact === 'start' || contact === 'end' ? contact : null,
       }
     }
     const firstSection = roadEl.querySelector(':scope > lanes > laneSection')
