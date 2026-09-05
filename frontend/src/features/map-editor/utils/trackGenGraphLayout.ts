@@ -91,11 +91,6 @@ function layoutOnce(
   const maxLanes = Math.max(1, ...graph.edges.map((e) => e.lanes.length))
   const cornerR = (levelPx * (maxLanes - 1) + bandW) / 2
 
-  const realX0 = Math.min(...graph.nodes.map((n) => n.x))
-  const realY1 = Math.max(...graph.nodes.map((n) => n.y))
-  // 真實座標 y 向上、版面 y 向下
-  const P = (n: GraphNode): Vec => ({ x: (n.x - realX0) * sx, y: (realY1 - n.y) * sy })
-
   const byId = new Map(graph.nodes.map((n) => [n.id, n]))
   const incident = new Map<string, GraphEdge[]>()
   for (const e of graph.edges) {
@@ -105,6 +100,74 @@ function layoutOnce(
       incident.set(id, arr)
     }
   }
+
+  /*
+   * 要轉彎的那一段，版面上得<strong>放得下那個轉角</strong>。
+   *
+   * 正交化把同一排的節點壓到同一條線上之後，短的那一段常常只剩幾個像素——實測 road 10
+   * 的縱向那一截，兩個節點在圖上只差 7 像素，而那個直角光是要蓋過另一束就要 18.8 像素。
+   * 帶子只好往外多伸，伸出去又蓋不滿：圖上就是一個接不起來的直角（實測缺 11.8 像素），
+   * 車輛沿著開過去也接不上，位置一次跳 53 公尺。
+   *
+   * 所以先把版面撐開：一段的兩端只要有一端要轉彎，就讓它至少有一個轉角那麼長。撐開的量
+   * 是<strong>算出來的</strong>（束的半寬，由股距與帶寬決定），不是挑一個好看的數字；框
+   * 的大小也不受影響——外層還會照外框重算比例尺。
+   */
+  const spacedOn = (axis: 'x' | 'y'): ((n: GraphNode) => number) => {
+    const key = (n: GraphNode) => (axis === 'x' ? n.x : n.y)
+    const scale = axis === 'x' ? sx : sy
+    const wantOrient: 'h' | 'v' = axis === 'x' ? 'h' : 'v'
+    // 版面上的欄與列：同一欄的節點座標已經被正交化壓成同一個值
+    const vals = [...new Set(graph.nodes.map(key))].sort((a, b) => a - b)
+    const at = new Map(vals.map((v, i) => [v, i]))
+    const need = new Array(Math.max(0, vals.length - 1)).fill(0) as number[]
+    /** 這個節點上有沒有要轉彎（同時接著橫的與縱的） */
+    const bends = (id: string) => {
+      const list = incident.get(id) ?? []
+      return list.some((x) => x.orient === 'h') && list.some((x) => x.orient === 'v')
+    }
+    /*
+     * 要多長才夠：<strong>兩隻腳各讓出一個半徑</strong>。
+     *
+     * cornerRadiusAt 是這樣夾的——半徑不能超過任一隻腳的一半（讓與畫要用同一個值）。
+     * 所以一段要放得下完整的半徑，版面長度就得是兩倍的半徑再多一點；短過這個，圓角
+     * 會被夾到畫不出來，退回直角，接縫就開了。
+     */
+    const want = (cornerR * 2 + 2) / Math.max(1e-6, scale)
+    for (const e of graph.edges) {
+      if (e.orient !== wantOrient) continue
+      const a = byId.get(e.from)
+      const b = byId.get(e.to)
+      if (!a || !b) continue
+      if (!bends(a.id) && !bends(b.id)) continue
+      const ia = at.get(key(a))
+      const ib = at.get(key(b))
+      if (ia === undefined || ib === undefined) continue
+      // 只撐相鄰的那一格：中間隔著別的欄時，該撐的是那一格，不是這一段
+      if (Math.abs(ia - ib) !== 1) continue
+      const lo = Math.min(ia, ib)
+      const room = vals[lo + 1]! - vals[lo]!
+      if (room >= want) continue
+      need[lo] = Math.max(need[lo]!, want - room)
+    }
+    const shiftOf = new Map<number, number>()
+    let acc = 0
+    vals.forEach((v, i) => {
+      if (i > 0) acc += need[i - 1]!
+      shiftOf.set(v, acc)
+    })
+    return (n: GraphNode) => key(n) + (shiftOf.get(key(n)) ?? 0)
+  }
+  const laidX = spacedOn('x')
+  const laidY = spacedOn('y')
+
+  const realX0 = Math.min(...graph.nodes.map(laidX))
+  const realY1 = Math.max(...graph.nodes.map(laidY))
+  // 真實座標 y 向上、版面 y 向下
+  const P = (n: GraphNode): Vec => ({
+    x: (laidX(n) - realX0) * sx,
+    y: (realY1 - laidY(n)) * sy,
+  })
 
   const shapes: LayoutShape[] = []
   const pts: Vec[] = []
@@ -551,6 +614,27 @@ function layoutOnce(
     const want = Math.max(corner, sw)
     return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
   }
+  /**
+   * 真正讓出去的長度（版面像素），<strong>切塊與認領里程共用這一個</strong>。
+   *
+   * 除了 trimAt 之外還要加上節點在沿線那個軸上的偏移：轉角與分岔畫在兩條直帶延伸線的
+   * 交點上，那個點在沿線方向也被挪過。兩邊各算各的話，轉角認領的里程與直段讓出來的
+   * 就差一截——實測 road 10 差 2.2 公尺，覆蓋上就是一個洞。
+   */
+  const trimPxAt = (e: GraphEdge, nodeId: string, fullLen: number) => {
+    const ends = edgeEnds(e, byId)
+    if (!ends) return 0
+    const raw = trimAt(e, nodeId, fullLen)
+    // 負的（補直角多伸的那一截）不必再挪，它本來就不是里程
+    if (raw <= 0) return raw
+    const A = P(ends.a)
+    const B = P(ends.b)
+    const d = Math.hypot(B.x - A.x, B.y - A.y) || 1
+    const alongU = e.orient === 'h' ? (B.x - A.x) / d : (B.y - A.y) / d
+    const atFrom = e.from === nodeId
+    const shiftPx = endExtra(atFrom ? ends.a : ends.b, e.orient === 'h' ? 'v' : 'h')
+    return Math.max(0, raw + (atFrom ? alongU * shiftPx : -alongU * shiftPx))
+  }
 
   for (const e of graph.edges) {
     const ends = edgeEnds(e, byId)
@@ -561,19 +645,9 @@ function layoutOnce(
     if (full < 2) continue
     const ux = (B.x - A.x) / full
     const uy = (B.y - A.y) / full
-    /*
-     * 讓出去的長度還要算上節點在<strong>沿線那個軸</strong>上的偏移。
-     *
-     * 轉角與分岔是畫在兩條直帶延伸線的交點上，那個點在沿線方向也被挪過（橫的邊挪的是
-     * x，而 x 正是它自己前進的方向）。邊只讓一個半徑的話，band 的盡頭停在原本的節點
-     * 位置，跟挪過去的轉角就差了那一段——實測左端上下兩個轉角與橫向軌道之間各斷開一截。
-     */
-    const alongU = e.orient === 'h' ? ux : uy
-    const alongShift = (n: GraphNode) => endExtra(n, e.orient === 'h' ? 'v' : 'h')
-    const trim0 = trimAt(e, e.from, full)
-    const trim1 = trimAt(e, e.to, full)
-    const t0 = trim0 > 0 ? Math.max(0, trim0 + alongU * alongShift(ends.a)) : trim0
-    const t1 = trim1 > 0 ? Math.max(0, trim1 - alongU * alongShift(ends.b)) : trim1
+    // 讓出去多少見 trimPxAt：轉角／分岔認領里程時用的是同一個值
+    const t0 = trimPxAt(e, e.from, full)
+    const t1 = trimPxAt(e, e.to, full)
     let len = full - t0 - t1
     if (len < 2) continue
     let S = { x: A.x + ux * t0, y: A.y + uy * t0 }
@@ -1041,11 +1115,20 @@ function layoutOnce(
    * 圓角吃掉兩條腿在節點那頭讓出來的部分，分岔吃掉梗那一束讓出來的部分——那些里程如果
    * 沒有人認領，車輛開到路口就查不到任何一塊，只能掉回外框內插（實測跳 137 像素）。
    */
-  /** 這條邊在這個節點那一端讓出去的比例 */
+  /**
+   * 這條邊在這個節點那一端讓出去的比例。
+   *
+   * 直接由 trimPxAt 換算，跟切塊時用的是<strong>同一個 t</strong>。兩端加起來超過整段
+   * 時按比例收回去——不然轉角認領的里程會跟直段重疊。
+   */
   const trimFracAt = (e: GraphEdge, nodeId: string) => {
     const full = spanOf(e)
     if (!Number.isFinite(full) || full <= 0) return 0
-    return Math.max(0, Math.min(0.5, trimAt(e, nodeId, full) / full))
+    const a = Math.max(0, trimPxAt(e, e.from, full)) / full
+    const b = Math.max(0, trimPxAt(e, e.to, full)) / full
+    const sum = a + b
+    const k = sum > 1 ? 1 / sum : 1
+    return (e.from === nodeId ? a : b) * k
   }
   /** 這條邊在這個節點那一端、讓出去那一截所涵蓋的路網區間 */
   const spanAtNode = (e: GraphEdge, nodeId: string, laneIdx: number, reversed = false): TrackSpan => {
@@ -1208,6 +1291,29 @@ function layoutOnce(
       const p0 = { x: C.x, y: N.y + h.o }
       const p1 = { x: N.x + v.o, y: C.y }
       const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)
+      /*
+       * 圖面中心線要照<strong>弧</strong>取，不能只留兩個端點。
+       *
+       * 車輛的位置是「在真實路徑上走了幾成，就在圖面路徑上走幾成」。圖面只留兩個端點
+       * 的話那是一條弦，車子會從弧的一端直接切到另一端——實測在轉角裡一步跳 7.9 公尺。
+       */
+      const arc = (() => {
+        const a0 = Math.atan2(p0.y - C.y, p0.x - C.x)
+        const a1raw = Math.atan2(p1.y - C.y, p1.x - C.x)
+        let da = a1raw - a0
+        while (da > Math.PI) da -= 2 * Math.PI
+        while (da < -Math.PI) da += 2 * Math.PI
+        const n = 8
+        const out: Vec[] = []
+        for (let i = 0; i <= n; i += 1) {
+          const t = i / n
+          const ang = a0 + da * t
+          // 兩端的半徑不一定完全相同，照比例補間，端點才會落在原本的位置
+          const rr = h.d + (v.d - h.d) * t
+          out.push({ x: C.x + Math.cos(ang) * rr, y: C.y + Math.sin(ang) * rr })
+        }
+        return out
+      })()
       shapes.push({
         kind: 'corner',
         name: `${eh.lanes[h.k]!.key}~${ev.lanes[v.k]!.key}`,
@@ -1216,7 +1322,7 @@ function layoutOnce(
         lineLengthM: eh.lengthM,
         realLatFromM: 0,
         realLatToM: 0,
-        samples: [p0, p1],
+        samples: arc,
         ...(() => {
           const spans = [spanAtNode(eh, node.id, h.k, true), spanAtNode(ev, node.id, v.k)]
           const realPath = joinLegs(
