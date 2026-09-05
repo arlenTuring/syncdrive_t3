@@ -102,19 +102,32 @@ function cumulative(path: PathXY): number[] {
   return seg
 }
 
-/** 點投影到折線上，回傳沿線走了幾成（0–1）與距離 */
+/**
+ * 投影到折線上，可以只<strong>看其中一截</strong>。
+ *
+ * 路口的元件一塊要代表好幾段路網（圓角接兩條腿、分岔接梗與岔出），每一段各佔路徑的
+ * 一截。距離若照<strong>整條</strong>路徑量，同一塊的每一段都會算出一模一樣的距離，
+ * 誰先建立誰就贏——車子明明在岔出那條腿上，回報的卻是梗那條 road 的里程。
+ *
+ * 給了 range 就只在那一截上找最近點，於是「一段路網一個候選」，比較才有意義。
+ * 回傳的 along 仍然是<strong>整條路徑</strong>的比例，取位置時不必再換算。
+ */
 export function projectAlongPath(
   path: PathXY,
   x: number,
   y: number,
+  range?: { from: number; to: number },
 ): { along: number; distance: number } {
   const seg = cumulative(path)
   const total = seg[seg.length - 1]!
   if (!(total > 0)) {
     return { along: 0, distance: Math.hypot(x - path[0]![0], y - path[0]![1]) }
   }
+  const lo = range ? Math.max(0, Math.min(1, range.from)) * total : 0
+  const hi = range ? Math.max(0, Math.min(1, range.to)) * total : total
+  const [winLo, winHi] = lo <= hi ? [lo, hi] : [hi, lo]
 
-  let bestS = 0
+  let bestS = winLo
   let bestD = Infinity
   for (let i = 1; i < path.length; i += 1) {
     const ax = path[i - 1]![0]
@@ -122,13 +135,24 @@ export function projectAlongPath(
     const dx = path[i]![0] - ax
     const dy = path[i]![1] - ay
     const l2 = dx * dx + dy * dy
-    const u = l2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2)) : 0
+    const len = Math.sqrt(l2)
+    // 這一段落在視窗內的那一截（比例），完全在視窗外就跳過
+    let uLo = 0
+    let uHi = 1
+    if (range && len > 1e-9) {
+      uLo = Math.max(0, Math.min(1, (winLo - seg[i - 1]!) / len))
+      uHi = Math.max(0, Math.min(1, (winHi - seg[i - 1]!) / len))
+      if (uHi <= uLo && seg[i]! < winLo) continue
+      if (uHi <= uLo && seg[i - 1]! > winHi) continue
+    }
+    const raw = l2 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0
+    const u = Math.max(uLo, Math.min(uHi, raw))
     const qx = ax + dx * u
     const qy = ay + dy * u
     const d = Math.hypot(x - qx, y - qy)
     if (d < bestD) {
       bestD = d
-      bestS = seg[i - 1]! + u * Math.sqrt(l2)
+      bestS = seg[i - 1]! + u * len
     }
   }
   return { along: bestS / total, distance: bestD }

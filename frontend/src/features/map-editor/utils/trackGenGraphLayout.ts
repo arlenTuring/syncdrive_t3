@@ -1056,7 +1056,7 @@ function layoutOnce(
         ? [e.sFromM, e.sFromM + total * frac]
         : [e.sToM - total * frac, e.sToM]
     // 方向照那條腿自己的走向算，不要用整塊的頭尾連線
-    const tail = laneTailAt(e, nodeId, laneIdx, 2)
+    const tail = laneTailAt(e, nodeId, laneIdx)
     const laneId = e.lanes[laneIdx]?.laneId ?? 0
     let along = 0
     if (tail.length >= 2) {
@@ -1101,24 +1101,44 @@ function layoutOnce(
   const joinLegs = (first: Vec[], second: Vec[], spans: TrackSpan[]) => {
     const path = [...first, ...second]
     const lenA = polyLen(first)
-    const total = lenA + polyLen(second)
-    const cut = total > 1e-6 ? lenA / total : 0.5
+    const lenB = polyLen(second)
+    /*
+     * 兩條腿<strong>接不起來</strong>的那一段也要算長度。
+     *
+     * 路口裡兩條主線之間隔著連接道，兩條腿的端點在真實座標上差得很遠——實測分岔那裡差
+     * 19.8 公尺、另一處差 21.8 公尺。先前算「這條腿佔整條路徑的幾成」時只加兩條腿自己
+     * 的長度，那一跳完全沒算進去，於是比例算成 0.9997，實際只佔 0.875：車輛沿著這一塊
+     * 換算出來的里程就一路偏，末端差到 17 公尺。
+     *
+     * 那一跳不屬於任何一條腿（它是連接道的里程，不畫），所以只計入總長、不分給任何一段。
+     */
+    const a = first[first.length - 1]
+    const b = second[0]
+    const jump = a && b ? Math.hypot(b.x - a.x, b.y - a.y) : 0
+    const total = lenA + jump + lenB
+    if (!(total > 1e-6)) return path
     if (spans[0]) {
       spans[0].pathFrom = 0
-      spans[0].pathTo = cut
+      spans[0].pathTo = lenA / total
     }
     for (let i = 1; i < spans.length; i += 1) {
-      spans[i]!.pathFrom = cut
+      spans[i]!.pathFrom = (lenA + jump) / total
       spans[i]!.pathTo = 1
     }
     return path
   }
-  /** 這條邊某一條車道、在這個節點那一截的真實中心線 */
-  const laneTailAt = (e: GraphEdge, nodeId: string, laneIdx: number, n = 6): Vec[] => {
+  /**
+   * 這條邊某一條車道、在這個節點那一截的真實中心線。
+   *
+   * 取樣密度<strong>照車道中心線自己的</strong>，不要固定切幾段。分岔讓出去的那一截可以
+   * 長達整條邊的一半（實測 287 公尺的路讓出 140 公尺），固定七個點等於用 23 公尺一段的
+   * 折線去代表一段會彎的路，車輛投影上去的里程差到 17 公尺。中心線本來就是照檔案的取樣
+   * 步長存的，直接照它取，誤差就只剩檔案本身的解析度。
+   */
+  const laneTailAt = (e: GraphEdge, nodeId: string, laneIdx: number): Vec[] => {
     const pts = e.lanes[laneIdx]?.points ?? []
     if (pts.length < 2) return []
     const frac = Math.max(1e-3, trimFracAt(e, nodeId))
-    // 由節點往邊的內部走：節點在 from 就是 0→frac，在 to 就是 1→1-frac
     const at = (u: number) => {
       const t = Math.max(0, Math.min(1, u)) * (pts.length - 1)
       const i = Math.min(pts.length - 2, Math.floor(t))
@@ -1128,6 +1148,8 @@ function layoutOnce(
         y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * r,
       }
     }
+    // 由節點往邊的內部走：節點在 from 就是 0→frac，在 to 就是 1→1-frac
+    const n = Math.max(2, Math.round(frac * (pts.length - 1)))
     const out: Vec[] = []
     for (let i = 0; i <= n; i += 1) {
       const u = i / n
@@ -1237,14 +1259,22 @@ function layoutOnce(
      * 常常相反，序號的排列方向就跟著翻面，照序號配會讓兩片分岔交叉成一個 X。
      */
     const rank = (list: number[]) => list.map((o, k) => ({ o, k })).sort((a, b) => a.o - b.o)
-    const stemRank = rank(offsetsOf(job.through))
+    /*
+     * 三條邊<strong>各自</strong>排一次。
+     *
+     * 先前只排了直行與岔出兩條，梗那一條卻拿直行的名次去索引自己的車道陣列——那是兩條
+     * 不同的 road，車道數與排列方向都不保證一樣，取到的常常是另一條車道，元件認領的
+     * 里程就掛在錯的車道上。
+     */
+    const stemRank = rank(offsetsOf(job.stem))
+    const throughRank = rank(offsetsOf(job.through))
     const branchRank = rank(offsetsOf(job.branch))
-    const count = Math.min(stemRank.length, branchRank.length)
+    const count = Math.min(stemRank.length, throughRank.length, branchRank.length)
     // 出口沿著梗的垂直軸排開
     const perp = (o: number): Vec =>
       job.stem.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
     for (let k = 0; k < count; k += 1) {
-      const oMain = stemRank[k]!.o
+      const oMain = throughRank[k]!.o
       const oBranch = branchRank[k]!.o
       const at = (t: number, o: number): Vec => ({
         x: N.x + dir.x * t + perp(o).x,
@@ -1252,7 +1282,7 @@ function layoutOnce(
       })
       const fit = fitSwitchAt(at(job.runPx, oMain), at(0, oMain), at(0, oBranch), bandW)
       if (!fit) continue
-      const laneMain = job.through.lanes[stemRank[k]!.k]!
+      const laneMain = job.through.lanes[throughRank[k]!.k]!
       const laneBranch = job.branch.lanes[branchRank[k]!.k]!
       shapes.push({
         kind: 'switch',
@@ -1270,7 +1300,7 @@ function layoutOnce(
         ...(() => {
           const spans = [
             spanAtNode(job.stem, job.nodeId, stemRank[k]!.k, true),
-            spanAtNode(job.through, job.nodeId, stemRank[k]!.k),
+            spanAtNode(job.through, job.nodeId, throughRank[k]!.k),
             spanAtNode(job.branch, job.nodeId, branchRank[k]!.k),
           ]
           const realPath = joinLegs(
@@ -1323,9 +1353,18 @@ function realSlice(
   const pts = e.lanes[k]?.points ?? []
   const src = pts.length >= 2 ? pts : e.points
   if (src.length < 2) return []
-  const span = 1 - trim0 - trim1
+  /*
+   * 讓開量是<strong>負</strong>的時候（放不下圓角，帶子往外多伸一截補成直角），那一截
+   * 在路網上屬於隔壁那條邊，這條邊的中心線裡沒有它。當成 0，跟里程換算（sAt）用同一
+   * 套規則。
+   *
+   * 先前直接拿負數去算 span，於是 span 大於 1，取樣點跑過中心線的尾端被夾住——尾巴
+   * 那幾塊的真實路徑全縮成同一個點。實測 road 10 有 27 公尺（48.9 公尺裡的 34.9→
+   * 48.9 與 48.9→62.2）的軌道路徑退化成一點，車輛在那一段的里程差到 47 公尺。
+   */
+  const span = 1 - Math.max(0, trim0) - Math.max(0, trim1)
   const at = (f: number) => {
-    const u = Math.max(0, Math.min(1, trim0 + f * span)) * (src.length - 1)
+    const u = Math.max(0, Math.min(1, Math.max(0, trim0) + f * span)) * (src.length - 1)
     const i = Math.min(src.length - 2, Math.floor(u))
     const t = u - i
     return {

@@ -27,17 +27,21 @@ import {
  * 上下行分不出來時<strong>用車頭朝向</strong>：兩條線的走向差 180 度，朝向一比就定了。
  * 那是廠商本來就在送、而我們一直沒用的欄位——比「哪條線比較長」可靠得多。
  *
- * <h3>目前的準確度（T3、軌道寬 30／60／80 各 418 個取樣點）</h3>
+ * <h3>目前的準確度（T3、軌道寬 30／60／80／120 各 882 個取樣點）</h3>
  * <ul>
- *   <li>road 與 lane 判對 <strong>98.1%</strong>；離中心線的中位數 0.005 公尺。</li>
- *   <li>里程誤差中位數 0.02–0.03 公尺。</li>
- *   <li><strong>尚未修好</strong>：8/418（1.9%）落在左側那條長直立路的下半段時會挑錯，
- *       偏差最大 72 公尺；路口元件回報的里程最大也還差 70 公尺。兩者都出在「路口元件
- *       同時代表好幾段路網」那一段的簿記，還沒收斂。</li>
+ *   <li>road 與 lane 判對 <strong>100%</strong>；離中心線的中位數 0.004 公尺、最大 0.44。</li>
+ *   <li>里程誤差中位數 0.018 公尺、95 百分位 0.96、最大 1.93。</li>
+ *   <li>十八條車道的里程覆蓋<strong>沒有洞也沒有重疊</strong>（0 → 該 road 全長）。</li>
  * </ul>
  *
+ * <h3>已知還會跳的地方</h3>
+ * 沿著車道每兩公尺查一次圖面位置，位移中位數 1.43、95 百分位 2.26 公尺；但有兩處會跳
+ * 47.6 與 53.1 公尺，都在<strong>直角彎</strong>上（圓角放不下、兩條帶子疊成直角的那種）。
+ * 那不是這裡的簿記問題：同一個節點在橫向那條邊與縱向那條邊上被畫在不同的位置，兩條
+ * 中心線本來就沒有接上。要修得動排版，不是動這一支。
+ *
  * 所以這一支<strong>還沒有接進實際的車輛定位</strong>——現行流程仍走
- * {@link ../vehicles/resolveVehicleTrackPlacement}。等上面那一項修好再換。
+ * {@link ../vehicles/resolveVehicleTrackPlacement}。等上面那一項也收斂再換。
  */
 
 export type LocateFacility = {
@@ -213,7 +217,8 @@ export function locateByField(
   let bestScore = Infinity
   for (const i of candidates) {
     const p = index.pieces[i]!
-    const { along, distance } = projectAlongPath(p.real, xM, yM)
+    // 只在這一段自己那一截上比：一塊路口元件橫跨好幾段，整條一起量會每一段都同分
+    const { along, distance } = projectAlongPath(p.real, xM, yM, { from: p.f0, to: p.f1 })
     /*
      * 走向不合的直接放到最後。差超過 90 度就是反方向那一條，不是「比較差的候選」。
      */

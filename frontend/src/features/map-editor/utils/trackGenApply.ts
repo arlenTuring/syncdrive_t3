@@ -135,8 +135,14 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
    * 不必拿座標去跟每一塊軌道比距離，也不必靠「哪條線比較長」決定分岔口挑誰。路口的元件
    * 會有不只一筆：圓角吃掉兩條腿的尾巴，分岔吃掉梗與兩個出口的起頭。
    */
+  /*
+   * 里程是<strong>照路徑的走向</strong>記的，s0 可以大於 s1（反接的那條腿里程遞減）。
+   * 先前這裡寫 `sToM - sFromM > 1e-6`，等於把所有遞減的段當成空的丟掉——分岔元件三段
+   * 全被丟光，整塊沒有 trackGenSpans，於是進不了定位索引：實測左側那條長路有 116 公尺
+   * 完全查不到任何一塊。要看的是<strong>長度</strong>，不是正負號。
+   */
   const spans = (shape.spans ?? [])
-    .filter((sp) => sp.sToM - sp.sFromM > 1e-6)
+    .filter((sp) => Math.abs(sp.sToM - sp.sFromM) > 1e-6)
     .map((sp) => ({
       road: sp.roadId,
       lane: sp.laneId,
