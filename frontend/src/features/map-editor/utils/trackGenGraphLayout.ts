@@ -6,6 +6,7 @@ import {
   LANE_W_M,
   type LayoutShape,
   type TrackGenLayout,
+  type TrackSpan,
 } from './trackGenLayout'
 import type { TrackGenBlockSize } from './trackGenFacility'
 import type { GraphEdge, GraphNode, TrackGraph } from './trackGenGraph'
@@ -623,6 +624,28 @@ function layoutOnce(
      * 先前量的是「離兩端連線多遠」。兩端不等高時那條連線是斜的，路是平的，於是平的
      * 那段被算成一路偏離、畫成往上凸，真正掉下去的那段反而被畫成凸完回來，形狀相反。
      */
+    /*
+     * 畫面上的 f（0–1，量的是<strong>讓開之後</strong>那一段）換回這條 road 的里程。
+     *
+     * 車輛反投影回 OpenDRIVE 得到的是 road 的 s，所以每一塊都要記下自己涵蓋哪一段 s，
+     * 定位時才查得到。讓給轉角與分岔的那兩截也要算進去，不然里程會少一段。
+     */
+    /*
+     * 負的讓開量代表帶子<strong>往外多伸</strong>了一截（放不下圓角時補的直角）。那一截
+     * 在路網上屬於隔壁那條邊，不是自己的里程，所以算 s 時當成 0。
+     */
+    const sTrim0 = Math.max(0, t0) / full
+    const sTrim1 = Math.max(0, t1) / full
+    const spanFrac = Math.max(0, 1 - sTrim0 - sTrim1)
+    const sAt = (f: number) =>
+      e.sFromM + (e.sToM - e.sFromM) * (sTrim0 + Math.max(0, Math.min(1, f)) * spanFrac)
+    const spanOfLane = (lane: { laneId: number }, f0: number, f1: number): TrackSpan => ({
+      roadId: e.roadId,
+      laneId: lane.laneId,
+      sFromM: Math.min(sAt(f0), sAt(f1)),
+      sToM: Math.max(sAt(f0), sAt(f1)),
+    })
+
     const perpScale = axisScale(e.orient)
     const rowLat = e.orient === 'h' ? ends.a.y : ends.a.x
     /** 這一點的真實側位離這一排多遠（公尺） */
@@ -948,6 +971,7 @@ function layoutOnce(
               realLatToM: 0,
               samples: [p0, p1],
               realPath: realSlice(e, k, e.lanes.length, f0, f1, t0 / full, t1 / full),
+              spans: [spanOfLane(lane, f0, f1)],
               centre,
               lengthM,
               widthM: bandW,
@@ -978,6 +1002,7 @@ function layoutOnce(
           realLatToM: 0,
           samples: [a0, a1],
           realPath: realSlice(e, k, e.lanes.length, run.f1 - half, run.f1 + half, t0 / full, t1 / full),
+          spans: [spanOfLane(lane, run.f1 - half, run.f1 + half)],
           geometry: fit.geometry,
           box: fit.box,
           sFrom: 0,
@@ -987,6 +1012,51 @@ function layoutOnce(
         note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
       })
     })
+  }
+
+  /*
+   * 路口的元件也要說出自己代表哪一段路網。
+   *
+   * 圓角吃掉兩條腿在節點那頭讓出來的部分，分岔吃掉梗那一束讓出來的部分——那些里程如果
+   * 沒有人認領，車輛開到路口就查不到任何一塊，只能掉回外框內插（實測跳 137 像素）。
+   */
+  /** 這條邊在這個節點那一端讓出去的比例 */
+  const trimFracAt = (e: GraphEdge, nodeId: string) => {
+    const full = spanOf(e)
+    if (!Number.isFinite(full) || full <= 0) return 0
+    return Math.max(0, Math.min(0.5, trimAt(e, nodeId, full) / full))
+  }
+  /** 這條邊在這個節點那一端、讓出去那一截所涵蓋的路網區間 */
+  const spanAtNode = (e: GraphEdge, nodeId: string, laneId: number): TrackSpan => {
+    const frac = trimFracAt(e, nodeId)
+    const total = e.sToM - e.sFromM
+    const [a, b] =
+      e.from === nodeId
+        ? [e.sFromM, e.sFromM + total * frac]
+        : [e.sToM - total * frac, e.sToM]
+    return { roadId: e.roadId, laneId, sFromM: Math.min(a, b), sToM: Math.max(a, b) }
+  }
+  /** 這條邊某一條車道、在這個節點那一截的真實中心線 */
+  const laneTailAt = (e: GraphEdge, nodeId: string, laneIdx: number, n = 6): Vec[] => {
+    const pts = e.lanes[laneIdx]?.points ?? []
+    if (pts.length < 2) return []
+    const frac = Math.max(1e-3, trimFracAt(e, nodeId))
+    // 由節點往邊的內部走：節點在 from 就是 0→frac，在 to 就是 1→1-frac
+    const at = (u: number) => {
+      const t = Math.max(0, Math.min(1, u)) * (pts.length - 1)
+      const i = Math.min(pts.length - 2, Math.floor(t))
+      const r = t - i
+      return {
+        x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * r,
+        y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * r,
+      }
+    }
+    const out: Vec[] = []
+    for (let i = 0; i <= n; i += 1) {
+      const u = i / n
+      out.push(at(e.from === nodeId ? u * frac : 1 - u * frac))
+    }
+    return out
   }
 
   /* ── 轉角 ───────────────────────────────────────────────── */
@@ -1048,6 +1118,14 @@ function layoutOnce(
         realLatFromM: 0,
         realLatToM: 0,
         samples: [p0, p1],
+        realPath: [
+          ...laneTailAt(eh, node.id, h.k).reverse(),
+          ...laneTailAt(ev, node.id, v.k),
+        ],
+        spans: [
+          spanAtNode(eh, node.id, eh.lanes[h.k]!.laneId),
+          spanAtNode(ev, node.id, ev.lanes[v.k]!.laneId),
+        ],
         geometry: fit.geometry,
         box: fit.box,
         outerRadiusM: radius + bandW / 2,
@@ -1107,6 +1185,19 @@ function layoutOnce(
         realLatFromM: 0,
         realLatToM: 0,
         samples: [at(job.runPx, oMain), at(0, oBranch)],
+        realPath: [
+          ...laneTailAt(job.stem, job.nodeId, stemRank[k]!.k).reverse(),
+          ...laneTailAt(job.branch, job.nodeId, branchRank[k]!.k),
+        ],
+        /*
+         * 分岔認領三段：梗讓出來的那一截，以及兩個出口各自的起頭。車輛不管走直行還是
+         * 岔出，在路口那一小段都查得到這一塊。
+         */
+        spans: [
+          spanAtNode(job.stem, job.nodeId, job.stem.lanes[stemRank[k]!.k]?.laneId ?? 0),
+          spanAtNode(job.through, job.nodeId, laneMain.laneId),
+          spanAtNode(job.branch, job.nodeId, laneBranch.laneId),
+        ],
         geometry: fit.geometry,
         box: fit.box,
         sFrom: 0,

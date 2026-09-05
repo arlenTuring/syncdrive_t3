@@ -50,6 +50,15 @@ export type GraphEdge = {
   to: string
   /** 這一段的里程長度（公尺） */
   lengthM: number
+  /**
+   * 這一段在<strong>那條 road 上</strong>的里程起訖（公尺，沿參考線）。
+   *
+   * OpenDRIVE 的 s 定義在 road 的參考線上，車輛回報的位置反投影回來也是得到 road 的 s。
+   * 每一段記下自己涵蓋哪一段 s，之後才能用「road + lane + s」直接查到圖上的哪一塊，
+   * 不必拿座標去跟每一塊軌道比距離。
+   */
+  sFromM: number
+  sToM: number
   /** 橫的還是縱的 */
   orient: 'h' | 'v'
   /** 走向：+1 表示往 x（或 y）增加的方向 */
@@ -416,6 +425,8 @@ export function buildTrackGraph(
         from,
         to,
         lengthM: polyLength(pts, run.from, run.to),
+        sFromM: polyLength(pts, 0, run.from),
+        sToM: polyLength(pts, 0, run.to),
         orient: horiz ? 'h' : 'v',
         sign: run.dirDeg === 0 || run.dirDeg === 90 ? 1 : -1,
         lanes,

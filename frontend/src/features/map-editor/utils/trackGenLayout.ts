@@ -54,6 +54,25 @@ export type RealLateral = {
    * 舊的脊線模型留空，由 refPoints 加里程回推。
    */
   realPath?: Vec2[]
+  /**
+   * 這一塊<strong>代表路網的哪一段</strong>。
+   *
+   * 車輛回報的是場域座標，反投影回 OpenDRIVE 就是「哪條 road、哪條 lane、里程 s 多少」。
+   * 每一塊記下自己涵蓋的 (road, lane, s 起訖)，定位時就能直接查表：不必拿座標去跟每一
+   * 塊軌道比距離，也不必靠「哪條線比較長」這種經驗值決定分岔口該挑誰。
+   *
+   * 路口的元件會有<strong>不只一筆</strong>——圓角同時吃掉兩條腿的尾巴，分岔同時接三條。
+   */
+  spans?: TrackSpan[]
+}
+
+/** 一塊軌道代表的路網區間 */
+export type TrackSpan = {
+  roadId: string
+  laneId: number
+  /** 沿該 road 參考線的里程（公尺） */
+  sFromM: number
+  sToM: number
 }
 
 export type LayoutRect = RealLateral & {

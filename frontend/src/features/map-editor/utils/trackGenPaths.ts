@@ -16,6 +16,34 @@
 export const TRACKGEN_REAL_PATH_KEY = 'trackGenRealPath'
 /** 圖面中心線，[[u, v], …]，與真實路徑同順序 */
 export const TRACKGEN_LOCAL_PATH_KEY = 'trackGenLocalPath'
+/**
+ * 這一塊代表的路網區間：`[{ road, lane, s0, s1 }, …]`。
+ *
+ * 車輛回報場域座標，反投影回 OpenDRIVE 得到 road / lane / s，照這份清單就能直接查到
+ * 該畫在哪一塊，不必拿座標跟每一塊軌道比距離。路口的元件會有不只一筆。
+ */
+export const TRACKGEN_SPANS_KEY = 'trackGenSpans'
+
+export type TrackGenSpan = { road: string; lane: number; s0: number; s1: number }
+
+export function getTrackGenSpans(
+  parameters: Record<string, unknown> | undefined,
+): TrackGenSpan[] {
+  const raw = parameters?.[TRACKGEN_SPANS_KEY]
+  if (!Array.isArray(raw)) return []
+  const out: TrackGenSpan[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const road = typeof o.road === 'string' ? o.road : null
+    const lane = Number(o.lane)
+    const s0 = Number(o.s0)
+    const s1 = Number(o.s1)
+    if (!road || ![lane, s0, s1].every(Number.isFinite)) continue
+    out.push({ road, lane, s0: Math.min(s0, s1), s1: Math.max(s0, s1) })
+  }
+  return out
+}
 
 export type PathXY = Array<[number, number]>
 

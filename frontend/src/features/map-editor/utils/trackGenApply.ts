@@ -3,6 +3,7 @@ import type { LayoutShape, TrackGenLayout, Vec2 } from './trackGenLayout'
 import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
   TRACKGEN_LOCAL_PATH_KEY,
+  TRACKGEN_SPANS_KEY,
   TRACKGEN_REAL_PATH_KEY,
 } from './trackGenPaths'
 import {
@@ -127,6 +128,22 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
   const path = shape.realPath ?? []
   const meta = realBounds(path)
   const realPath = path.map((p) => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))])
+  /*
+   * 這一塊代表路網的哪一段：road、lane、里程起訖。
+   *
+   * 車輛回報場域座標，反投影回 OpenDRIVE 就得到這三個值，於是定位變成查表加一次內插——
+   * 不必拿座標去跟每一塊軌道比距離，也不必靠「哪條線比較長」決定分岔口挑誰。路口的元件
+   * 會有不只一筆：圓角吃掉兩條腿的尾巴，分岔吃掉梗與兩個出口的起頭。
+   */
+  const spans = (shape.spans ?? [])
+    .filter((sp) => sp.sToM - sp.sFromM > 1e-6)
+    .map((sp) => ({
+      road: sp.roadId,
+      lane: sp.laneId,
+      s0: Number(sp.sFromM.toFixed(2)),
+      s1: Number(sp.sToM.toFixed(2)),
+    }))
+  const spanMeta = spans.length ? { [TRACKGEN_SPANS_KEY]: spans } : {}
   if (shape.kind === 'rect') {
     /*
      * 軸對齊的段<strong>不要旋轉</strong>。
@@ -149,6 +166,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       rotation: axisAligned ? 0 : shape.rotationDeg,
       parameters: {
         segmentId: shape.name,
+        ...spanMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -191,6 +209,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       rotation: 0,
       parameters: {
         segmentId: shape.name,
+        ...spanMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -216,6 +235,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       rotation: 0,
       parameters: {
         segmentId: shape.name,
+        ...spanMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -241,6 +261,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
     rotation: 0,
     parameters: {
       segmentId: shape.name,
+      ...spanMeta,
       trackGenRole: shape.role,
       trackGenLine: shape.lineKey,
       trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
