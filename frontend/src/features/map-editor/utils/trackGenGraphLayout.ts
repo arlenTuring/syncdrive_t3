@@ -1027,22 +1027,64 @@ function layoutOnce(
        * 1#0+3#0 那一束只剩 4% 在收），照 1:3 算出來的斜接會伸出邊的兩端。放不下就讓
        * 它陡一點，總比畫到外面去好。
        */
-      const halfAt = (i: number): number => {
+      /*
+       * 斜接至少要<strong>從前一塊就開始</strong>。
+       *
+       * 坡照 1:3 給，所以只挪幾個像素的地方算出來的斜接就只有幾個像素寬——圖上那不像
+       * 換股，像兩塊之間裂了一條縫。挪多少是幾何決定的，但<strong>畫多長</strong>是製圖
+       * 決定的：一塊是這張圖自己的最小單位（使用者給的「一塊幾公尺」），斜接就從那個
+       * 尺度起跳，讓它看起來是一段有走勢的軌道。
+       *
+       * 一整塊仍然放不下時（相鄰的段本來就短）照舊讓給 room，那時本來也擠不出斜度。
+       */
+      /*
+       * 斜接要多寬，以及<strong>兩邊各讓出多少</strong>。
+       *
+       * 寬度：坡照 1:3 給，但至少一整塊。只挪幾個像素的地方照 1:3 算出來只有幾個像素寬，
+       * 圖上那不像換股、像兩塊之間裂了一條縫。挪多少是幾何決定的，畫多長是製圖決定的；
+       * 一塊是這張圖自己的最小單位（使用者給的「一塊幾公尺」），就從那個尺度起跳。
+       *
+       * 讓法：先前是兩邊<strong>各讓一半</strong>，短的那一邊決定全部。可是頭尾那兩段常常
+       * 很短——它們的存在只是為了把帶子接到節點自己的股位上——於是整片斜接被那一小段壓成
+       * 幾像素寬、卻有半條軌道高的碎片（實測 18.8 × 18.8 的 45 度小方塊）。
+       *
+       * 改成一邊出不起、對面就補上，斜接因此往長的那一段延伸過去。接著節點的那一端沒有
+       * 另一片斜接要讓，所以可以整段讓出去；中間的段兩側都有，仍然只讓一半。
+       */
+      const oneBlockW = perBlockM / Math.max(1e-6, usedM)
+      const shareOf = (i: number): number => {
+        const r = runs[i]
+        if (!r) return 0
+        const span = r.f1 - r.f0
+        const terminal = i === 0 || i === runs.length - 1
+        return terminal ? span : span / 2
+      }
+      const cutsAt = (i: number): { left: number; right: number } => {
         const a = runs[i]
         const b = runs[i + 1]
-        if (!a || !b) return 0
-        const want = rampPx(b.extra - a.extra) / 2 / len
-        const room = Math.min((a.f1 - a.f0) / 2, (b.f1 - b.f0) / 2)
-        // 擠不下 1:3 就用剩下的空間，但再擠也不陡過 1:1——垂直的一刀不像軌道
-        const floor = Math.min(0.5, (Math.abs(b.extra - a.extra) * DRAWING.rampMinRun) / 2 / len)
-        return Math.max(floor, Math.min(want, Math.max(room, floor)))
+        if (!a || !b) return { left: 0, right: 0 }
+        const step = Math.abs(b.extra - a.extra)
+        const wantW = Math.max(rampPx(b.extra - a.extra) / len, oneBlockW)
+        const la = shareOf(i)
+        const rb = shareOf(i + 1)
+        let left = Math.min(la, wantW / 2)
+        let right = Math.min(rb, wantW - left)
+        left = Math.min(la, wantW - right)
+        // 兩邊加起來還是擠不出 1:1 就讓它陡一點——垂直的一刀不像軌道，但畫到邊外更糟
+        const floorW = Math.min(1, (step * DRAWING.rampMinRun) / len)
+        const short = floorW - (left + right)
+        if (short > 0) {
+          left += short / 2
+          right += short / 2
+        }
+        return { left, right }
       }
       let seq = 0
       runs.forEach((run, ri) => {
         const extra = run.extra
         const next = runs[ri + 1]
-        const cut0 = halfAt(ri - 1)
-        const cut1 = halfAt(ri)
+        const cut0 = cutsAt(ri - 1).right
+        const cut1 = cutsAt(ri).left
         const g0 = run.f0 + cut0
         const g1 = run.f1 - cut1
         if (g1 - g0 > 0.01) {
@@ -1081,9 +1123,9 @@ function layoutOnce(
         // 與下一段之間的換股，用斜接軌道接
         if (!next) return
         const nextExtra = next.extra
-        const half = halfAt(ri)
-        const a0 = at(run.f1 - half, extra)
-        const a1 = at(run.f1 + half, nextExtra)
+        const cut = cutsAt(ri)
+        const a0 = at(run.f1 - cut.left, extra)
+        const a1 = at(run.f1 + cut.right, nextExtra)
         const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
         const fit = fitTaperAt(a0, a1, bandW, alongDeg)
         seq += 1
@@ -1096,8 +1138,16 @@ function layoutOnce(
           realLatFromM: 0,
           realLatToM: 0,
           samples: [a0, a1],
-          realPath: realSlice(e, k, e.lanes.length, run.f1 - half, run.f1 + half, t0 / full, t1 / full),
-          spans: [spanOfLane(k, run.f1 - half, run.f1 + half)],
+          realPath: realSlice(
+            e,
+            k,
+            e.lanes.length,
+            run.f1 - cut.left,
+            run.f1 + cut.right,
+            t0 / full,
+            t1 / full,
+          ),
+          spans: [spanOfLane(k, run.f1 - cut.left, run.f1 + cut.right)],
           geometry: fit.geometry,
           box: fit.box,
           sFrom: 0,

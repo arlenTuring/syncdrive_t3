@@ -1,5 +1,10 @@
 import type { FacilityObject } from '../types/facility'
-import type { LayoutShape, TrackGenLayout, Vec2 } from './trackGenLayout'
+import {
+  TRACK_GEN_KIND_COLOR,
+  type LayoutShape,
+  type TrackGenLayout,
+  type Vec2,
+} from './trackGenLayout'
 import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
   TRACKGEN_LOCAL_PATH_KEY,
@@ -153,6 +158,15 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       f1: Number(sp.pathTo.toFixed(4)),
     }))
   const spanMeta = spans.length ? { [TRACKGEN_SPANS_KEY]: spans } : {}
+  /*
+   * 底色照<strong>種類</strong>分：一般、圓角、斜接、分岔各一個色。
+   *
+   * 生成出來一整片同色的方塊，看不出哪一塊是道岔、哪一塊只是換股——那正是需要一眼認出來
+   * 的兩種。四個色與預覽對話框共用同一份，明度接近、差在色相。
+   *
+   * 寫的是 defaultFillColor，所以使用者之後仍可以自己改色，MQTT 的顏色規則也照樣覆蓋得掉。
+   */
+  const fillMeta = { defaultFillColor: TRACK_GEN_KIND_COLOR[shape.kind].fill }
   if (shape.kind === 'rect') {
     /*
      * 軸對齊的段<strong>不要旋轉</strong>。
@@ -176,6 +190,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       parameters: {
         segmentId: shape.name,
         ...spanMeta,
+        ...fillMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -219,6 +234,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       parameters: {
         segmentId: shape.name,
         ...spanMeta,
+        ...fillMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -245,6 +261,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       parameters: {
         segmentId: shape.name,
         ...spanMeta,
+        ...fillMeta,
         trackGenRole: shape.role,
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
@@ -271,6 +288,7 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
     parameters: {
       segmentId: shape.name,
       ...spanMeta,
+      ...fillMeta,
       trackGenRole: shape.role,
       trackGenLine: shape.lineKey,
       trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),

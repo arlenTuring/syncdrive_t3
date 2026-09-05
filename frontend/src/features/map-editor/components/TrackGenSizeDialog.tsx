@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
-import type { LayoutShape } from '../utils/trackGenLayout'
+import { TRACK_GEN_KIND_COLOR, type LayoutShape } from '../utils/trackGenLayout'
 import { cornerTrackPath, switchTrackPath, taperTrackPath } from '../utils/trackShapes'
 
 /**
@@ -66,12 +66,8 @@ type Props = {
  * 一塊亮一塊暗，看起來像有光源、像立體的斜面——這是一張平面示意圖，不該有那種暗示。
  * 斜接原本用黃色，亮度比其他三種高一截，那個問題最明顯，改成同一個亮度的藍。
  */
-const KIND_STYLE = {
-  rect: { fill: '#3f3f46', stroke: '#a1a1aa' },
-  corner: { fill: '#2f4f4a', stroke: '#5eead4' },
-  taper: { fill: '#33435c', stroke: '#93b4e0' },
-  switch: { fill: '#463c5e', stroke: '#c4b5fd' },
-} as const
+// 預覽與生成共用同一份底色（見 trackGenLayout）
+const KIND_STYLE = TRACK_GEN_KIND_COLOR
 
 const MIN_WID = 4
 

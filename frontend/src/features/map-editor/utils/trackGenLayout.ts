@@ -24,6 +24,24 @@ export type LaneRole = 'road' | 'junction'
 
 export const LANE_W_M = 3.35
 
+/**
+ * 四種元件在圖上的底色。
+ *
+ * 預覽對話框與生成出來的設施<strong>共用同一份</strong>——預覽看到什麼顏色，圖上就是
+ * 什麼顏色。四個色的明度刻意接近，差在色相：這是一張 2D 示意圖，不該有某一種看起來
+ * 比較「亮」而像是被選取或被強調。
+ *
+ * 寫進設施的 <code>defaultFillColor</code>，所以使用者之後仍可以自己改色，
+ * MQTT 的顏色規則也照樣覆蓋得掉。
+ */
+export const TRACK_GEN_KIND_COLOR = {
+  rect: { fill: '#3f3f46', stroke: '#a1a1aa' },
+  corner: { fill: '#2f4f4a', stroke: '#5eead4' },
+  taper: { fill: '#33435c', stroke: '#93b4e0' },
+  switch: { fill: '#463c5e', stroke: '#c4b5fd' },
+} as const
+
+
 
 /**
  * 每個形狀都帶著它在<strong>真實</strong>路網裡的橫向偏移。
