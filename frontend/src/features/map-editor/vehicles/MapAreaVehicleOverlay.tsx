@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
+import {
+  buildStationMileageIndex,
+  stationProgressAt,
+  type StationProgress,
+} from '../utils/trackGenStations';
 import { VehicleDefinitionMapView } from '../../vehicle-editor/elements/VehicleDefinitionMapView';
 import type { MapAreaObject } from '../types/area';
 import {
@@ -61,6 +66,7 @@ function MapVehicleMqttCoordLabel({
   steeringRad,
   containerRotateDeg,
   networkFix,
+  stationProgress,
   left,
   top,
   zIndex,
@@ -73,6 +79,7 @@ function MapVehicleMqttCoordLabel({
   steeringRad: number | null;
   containerRotateDeg: number | null;
   networkFix: VehicleNetworkFix | null;
+  stationProgress: StationProgress | null;
   left: number;
   top: number;
   zIndex: number;
@@ -104,6 +111,18 @@ function MapVehicleMqttCoordLabel({
         <div className="whitespace-nowrap text-amber-200">
           road {networkFix.roadId} · lane {networkFix.laneId} · 里程{' '}
           {networkFix.sM.toFixed(1)} m · 偏離 {networkFix.offsetM.toFixed(2)} m
+        </div>
+      ) : null}
+      {stationProgress?.next || stationProgress?.from ? (
+        /* 站也換算成里程，所以「還有多遠」就是兩個里程相減 */
+        <div className="whitespace-nowrap text-emerald-200">
+          {stationProgress.from
+            ? `離 ${stationProgress.from.stationName} ${(stationProgress.distanceFromM ?? 0).toFixed(0)} m`
+            : '起點'}
+          {' · '}
+          {stationProgress.next
+            ? `下一站 ${stationProgress.next.stationName} ${(stationProgress.distanceToNextM ?? 0).toFixed(0)} m`
+            : '本段無下一站'}
         </div>
       ) : null}
     </div>
@@ -185,6 +204,14 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  /*
+   * 停靠站的里程表。站是人放的，與軌道之間本來沒有關聯；換算成里程之後，「離下一站
+   * 多遠」就只是兩個里程相減，不受簡圖比例尺影響。
+   */
+  const stationMileage = useMemo(
+    () => buildStationMileageIndex(areas, trackNetwork.genIndex),
+    [areas, trackNetwork],
+  );
   const placementCacheRef = useRef<
     Map<string, { inputKey: string; placement: VehiclePlacementAcrossAreas | null }>
   >(new Map());
@@ -377,6 +404,11 @@ export function MapAreaVehicleOverlay({
             steeringRad={steeringRad}
             containerRotateDeg={containerRotateDeg}
             networkFix={placement.placement.network ?? null}
+            stationProgress={
+              placement.placement.network
+                ? stationProgressAt(stationMileage, placement.placement.network)
+                : null
+            }
             left={coordLeft}
             top={coordTop}
             zIndex={zIndex + 1}

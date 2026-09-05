@@ -26,6 +26,7 @@ import {
   projectAlongPath,
   trackGenPickScore,
 } from '../utils/trackGenPaths';
+import { locateByRoadLaneS } from '../utils/trackGenLocate';
 import { locateOnCrossover } from './trackNetwork/crossoverLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
@@ -300,6 +301,28 @@ export function fieldPositionToFacilityAreaLocal(
  * 將 MQTT 場域座標（公尺）換算成圖台上該軌道段的區域座標。
  * extrapolate=false 時 along 箝制在 0–1（段外不應呼叫）。
  */
+/**
+ * 圖面中心線上的一點（未旋轉外框的 0–1 比例）換成 Area 內座標。
+ *
+ * 圖面路徑的 v 是「外框上緣為 0」，areaPosition 卻是左下原點、y 向上，所以要翻一次。
+ * 少了這一次翻轉，轉角與相鄰直線段的接點差了整整一個外框高——實測 138 像素。
+ */
+export function trackLocalPathPointToAreaLocal(
+  track: FacilityObject,
+  area: MapAreaObject,
+  uv: { x: number; y: number },
+): { x: number; y: number } {
+  const areaPos = resolveFacilityAreaPosition(track, area.domain, area.layout);
+  const areaSize = resolveFacilityAreaSize(track, area.domain, area.layout);
+  return applyTrackRotation(
+    areaPos.x + uv.x * areaSize.w,
+    areaPos.y + (1 - uv.y) * areaSize.h,
+    areaPos,
+    areaSize,
+    readRotationDeg(track),
+  );
+}
+
 export function fieldPositionToTrackAreaLocal(
   xM: number,
   yM: number,
@@ -329,19 +352,7 @@ export function fieldPositionToTrackAreaLocal(
   const paths = getTrackGenPaths(track.parameters);
   if (paths) {
     const { along: t } = projectAlongPath(paths.real, xM, yM);
-    const uv = pointAlongPath(paths.local, t);
-    /*
-     * 圖面路徑的 v 是「外框上緣為 0」，areaPosition 卻是左下原點、y 向上，
-     * 所以要翻一次。少了這一次翻轉，轉角與相鄰直線段的接點差了整整一個外框高
-     * ——實測 138 像素。
-     */
-    return applyTrackRotation(
-      areaPos.x + uv.x * areaSize.w,
-      areaPos.y + (1 - uv.y) * areaSize.h,
-      areaPos,
-      areaSize,
-      readRotationDeg(track),
-    );
+    return trackLocalPathPointToAreaLocal(track, area, pointAlongPath(paths.local, t));
   }
 
   const horizontal = span.w >= span.h;
@@ -471,6 +482,43 @@ export function resolveVehiclePlacementAcrossAreas(
   if (onCrossoverLoose) return onCrossoverLoose;
 
   return locateInAreaDomain(areas, xM, yM);
+}
+
+/**
+ * road / lane / 里程 → 圖台位置：<strong>完全不碰座標</strong>的那一條路。
+ *
+ * 生成軌道每一塊都記著自己涵蓋哪一段里程（trackGenSpans），所以給定三個值就只剩查表
+ * 加一次線性內插——不必比距離、不必挑候選，也不會在重疊處猶豫。
+ *
+ * 目前車端協議沒有這三個值（只有場域座標與車頭朝向），所以正常流程走
+ * {@link resolveVehiclePlacementAcrossAreas}；這一支是給<strong>已經知道里程</strong>的
+ * 呼叫端用的：把停靠站畫到它自己的里程上、依班表把車擺到某一站、或哪天協議帶了車道
+ * 與里程時直接接上。
+ */
+export function resolvePlacementByRoadLaneS(
+  areas: MapAreaObject[],
+  roadId: string,
+  laneId: number,
+  sM: number,
+  network?: TrackNetwork,
+): VehiclePlacementAcrossAreas | null {
+  const net = network ?? getTrackNetwork(areas);
+  if (!net.genIndex) return null;
+  const hit = locateByRoadLaneS(net.genIndex, roadId, laneId, sM);
+  if (!hit) return null;
+  const segment = net.byTrackId.get(hit.facilityId);
+  if (!segment) return null;
+  const local = trackLocalPathPointToAreaLocal(segment.track, segment.renderArea, hit.local);
+  return {
+    area: segment.renderArea,
+    placement: {
+      areaLocalX: local.x,
+      areaLocalY: local.y,
+      trackId: segment.trackId,
+      score: 1,
+      network: { roadId: hit.road, laneId: hit.lane, sM: hit.sM, offsetM: hit.offsetM },
+    },
+  };
 }
 
 /** 圖台標籤：僅在 refField 段內時回傳軌道代碼 */
