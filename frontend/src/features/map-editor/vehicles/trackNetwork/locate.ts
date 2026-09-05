@@ -1,4 +1,8 @@
-import type { VehiclePlacementAcrossAreas, VehicleTrackPlacement } from '../resolveVehicleTrackPlacement';
+import type {
+  VehicleNetworkFix,
+  VehiclePlacementAcrossAreas,
+  VehicleTrackPlacement,
+} from '../resolveVehicleTrackPlacement';
 import { fieldPositionToTrackAreaLocal } from '../resolveVehicleTrackPlacement';
 import type { TrackNetwork, TrackNetworkSegment } from './types';
 import { trackGenPickScore } from '../../utils/trackGenPaths';
@@ -58,19 +62,23 @@ export function pickRefFieldSegment(
   return matches.slice().sort((a, b) => a.trackId.localeCompare(b.trackId))[0] ?? null;
 }
 
-/** 生成軌道：格網找候選、車頭朝向定上下行 */
+/** 生成軌道：格網找候選、車頭朝向定上下行；順便帶回它落在路網的哪一點 */
 function locateGeneratedSegment(
   network: TrackNetwork,
   xM: number,
   yM: number,
   headingRad?: number,
-): TrackNetworkSegment | null {
+): { segment: TrackNetworkSegment; fix: VehicleNetworkFix } | null {
   if (!network.genIndex) return null;
   const hit = locateByField(network.genIndex, xM, yM, headingRad);
   if (!hit) return null;
   const segment = network.byTrackId.get(hit.facilityId);
   if (!segment) return null;
-  return fieldPointInRefField(xM, yM, segment.bounds) ? segment : null;
+  if (!fieldPointInRefField(xM, yM, segment.bounds)) return null;
+  return {
+    segment,
+    fix: { roadId: hit.road, laneId: hit.lane, sM: hit.sM, offsetM: hit.offsetM },
+  };
 }
 
 /**
@@ -94,8 +102,9 @@ export function locateOnTrackNetwork(
   yM: number,
   headingRad?: number,
 ): VehiclePlacementAcrossAreas | null {
+  const generated = locateGeneratedSegment(network, xM, yM, headingRad);
   const segment =
-    locateGeneratedSegment(network, xM, yM, headingRad) ??
+    generated?.segment ??
     pickRefFieldSegment(findRefFieldSegmentsAtPoint(network, xM, yM), {
       xM,
       yM,
@@ -112,6 +121,7 @@ export function locateOnTrackNetwork(
     areaLocalY: local.y,
     trackId: segment.trackId,
     score: 1,
+    ...(generated ? { network: generated.fix } : {}),
   };
 
   return { area: segment.renderArea, placement };

@@ -29,12 +29,33 @@ import {
 import { locateOnCrossover } from './trackNetwork/crossoverLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
+/**
+ * 這一點在路網上的位置：road、lane、沿參考線的里程，以及離該段中心線多遠。
+ *
+ * <strong>這是本端算出來的，不是跟車端要的。</strong>廠商的 telemetry 只有場域座標與
+ * 車頭朝向（`local_pose.position` / `local_pose.heading`），協議裡沒有 road、沒有 lane、
+ * 也沒有里程。這幾個值來自生成軌道時就寫進元件的 `trackGenSpans`——那份對應表是讀
+ * .xodr 產生的，定位時只是拿座標去查它。
+ *
+ * 手工放置的軌道沒有那份資料，所以查不到時是 undefined。
+ */
+export type VehicleNetworkFix = {
+  roadId: string;
+  laneId: number;
+  /** 沿該 road 參考線的里程（公尺） */
+  sM: number;
+  /** 離該段真實中心線多遠（公尺），可用來判斷是不是根本不在軌道上 */
+  offsetM: number;
+};
+
 export type VehicleTrackPlacement = {
   areaLocalX: number;
   areaLocalY: number;
   trackId: string;
   /** @deprecated 巢狀定位不再使用分數；保留欄位相容舊型別 */
   score: number;
+  /** 反查到的路網位置；手工軌道或查不到時沒有這一欄 */
+  network?: VehicleNetworkFix;
 };
 
 export type VehiclePlacementAcrossAreas = {

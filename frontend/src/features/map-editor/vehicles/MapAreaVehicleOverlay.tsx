@@ -12,6 +12,7 @@ import {
   parseYardSlotIdFromPayload,
   resolveVehiclePlacementAcrossAreas,
   resolveTrackCodeForDisplay,
+  type VehicleNetworkFix,
   type VehiclePlacementAcrossAreas,
 } from './resolveVehicleTrackPlacement';
 import {
@@ -59,6 +60,7 @@ function MapVehicleMqttCoordLabel({
   headingRad,
   steeringRad,
   containerRotateDeg,
+  networkFix,
   left,
   top,
   zIndex,
@@ -70,6 +72,7 @@ function MapVehicleMqttCoordLabel({
   headingRad: number | null;
   steeringRad: number | null;
   containerRotateDeg: number | null;
+  networkFix: VehicleNetworkFix | null;
   left: number;
   top: number;
   zIndex: number;
@@ -96,6 +99,13 @@ function MapVehicleMqttCoordLabel({
           ? ` · 旋轉 ${containerRotateDeg.toFixed(1)}°`
           : ''}
       </div>
+      {networkFix ? (
+        /* 路網位置是本端反查出來的，車端沒有送這幾個值 */
+        <div className="whitespace-nowrap text-amber-200">
+          road {networkFix.roadId} · lane {networkFix.laneId} · 里程{' '}
+          {networkFix.sM.toFixed(1)} m · 偏離 {networkFix.offsetM.toFixed(2)} m
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -366,6 +376,7 @@ export function MapAreaVehicleOverlay({
             headingRad={headingRad}
             steeringRad={steeringRad}
             containerRotateDeg={containerRotateDeg}
+            networkFix={placement.placement.network ?? null}
             left={coordLeft}
             top={coordTop}
             zIndex={zIndex + 1}
