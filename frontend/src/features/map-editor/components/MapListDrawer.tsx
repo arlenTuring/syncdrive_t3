@@ -1,5 +1,6 @@
 import { Building2, ChevronLeft, DoorOpen, GitBranch, LayoutGrid, MapPin, Network, Radio, Zap } from 'lucide-react'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
@@ -83,6 +84,7 @@ function ListRow({
   onSelect: () => void
   onDoubleClickOpen: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
@@ -103,8 +105,8 @@ function ListRow({
         {formatListDescription(entry)}
       </p>
       <div className="mt-1 grid grid-cols-1 gap-0.5 font-mono text-[10px] text-zinc-400">
-        <span>場域：{formatRef(entry)}</span>
-        <span>像素：{formatPx(entry)}</span>
+        <span>{t('mapEditor.listDrawer.field', { value: formatRef(entry) })}</span>
+        <span>{t('mapEditor.listDrawer.pixels', { value: formatPx(entry) })}</span>
       </div>
     </button>
   )
@@ -125,10 +127,11 @@ function SectionBlock({
   onSelectEntry: (areaId: string, facilityId: string) => void
   onEntryDoubleClick: (areaId: string, facilityId: string) => void
 }) {
+  const { t } = useTranslation()
   if (entries.length === 0) {
     return (
       <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-3 text-center text-[10px] text-zinc-600">
-        此圖台尚無{title}
+        {t('mapEditor.listDrawer.emptySection', { title })}
       </p>
     )
   }
@@ -213,6 +216,7 @@ export function MapListDrawer({
   pointTopology,
   onPickPaletteItem,
 }: Props) {
+  const { t } = useTranslation()
   const dockingEntries = useMemo(
     () => collectDockingPointEntries(areas),
     [areas],
@@ -234,16 +238,16 @@ export function MapListDrawer({
 
   const panelTitle =
     openTab === 'docking'
-      ? '點位清單'
+      ? t('mapEditor.listDrawer.dockingList')
       : openTab === 'facility'
-        ? '設施清單'
+        ? t('mapEditor.listDrawer.facilityList')
         : openTab === 'routes'
           ? routePlanningDraft
             ? routePlanningDraft.routeId
-              ? '編輯路線'
-              : '製作路線'
-            : '路線清單'
-          : '設備清單'
+              ? t('mapEditor.listDrawer.editRoute')
+              : t('mapEditor.listDrawer.createRoute')
+            : t('mapEditor.listDrawer.routeList')
+          : t('mapEditor.listDrawer.equipmentList')
 
   return (
     <>
@@ -258,7 +262,7 @@ export function MapListDrawer({
         >
           <button
             type="button"
-            title="點位清單"
+            title={t('mapEditor.listDrawer.dockingList')}
             onClick={() => onOpenTab(openTab === 'docking' ? null : 'docking')}
             className={[
               'pointer-events-auto flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
@@ -266,11 +270,11 @@ export function MapListDrawer({
             ].join(' ')}
           >
             <MapPin className="size-4 shrink-0" />
-            <span style={{ writingMode: 'vertical-rl' }}>點位清單</span>
+            <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.dockingList')}</span>
           </button>
           <button
             type="button"
-            title="設施清單"
+            title={t('mapEditor.listDrawer.facilityList')}
             onClick={() => onOpenTab(openTab === 'facility' ? null : 'facility')}
             className={[
               'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
@@ -278,11 +282,11 @@ export function MapListDrawer({
             ].join(' ')}
           >
             <Building2 className="size-4 shrink-0" />
-            <span style={{ writingMode: 'vertical-rl' }}>設施清單</span>
+            <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.facilityList')}</span>
           </button>
           <button
             type="button"
-            title="設備清單"
+            title={t('mapEditor.listDrawer.equipmentList')}
             onClick={() => onOpenTab(openTab === 'equipment' ? null : 'equipment')}
             className={[
               'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
@@ -290,11 +294,11 @@ export function MapListDrawer({
             ].join(' ')}
           >
             <Radio className="size-4 shrink-0" />
-            <span style={{ writingMode: 'vertical-rl' }}>設備清單</span>
+            <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.equipmentList')}</span>
           </button>
           <button
             type="button"
-            title="路線清單"
+            title={t('mapEditor.listDrawer.routeList')}
             onClick={() => onOpenTab(openTab === 'routes' ? null : 'routes')}
             className={[
               'pointer-events-auto mt-2 flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
@@ -302,7 +306,7 @@ export function MapListDrawer({
             ].join(' ')}
           >
             <GitBranch className="size-4 shrink-0" />
-            <span style={{ writingMode: 'vertical-rl' }}>路線清單</span>
+            <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.routeList')}</span>
           </button>
 
           {onOpenPointTopology || (mapEditMode && onPickPaletteItem && !paletteOpen) ? (
@@ -310,18 +314,18 @@ export function MapListDrawer({
               {onOpenPointTopology ? (
                 <button
                   type="button"
-                  title="路網拓撲"
+                  title={t('mapEditor.listDrawer.topology')}
                   onClick={onOpenPointTopology}
                   className="flex w-11 flex-col items-center justify-center gap-1 border border-l-0 border-cyan-700/60 bg-cyan-950/80 py-3 text-[10px] font-medium text-cyan-100 shadow-lg backdrop-blur-sm transition hover:bg-cyan-900/90"
                 >
                   <Network className="size-4 shrink-0" />
-                  <span style={{ writingMode: 'vertical-rl' }}>路網拓撲</span>
+                  <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.topology')}</span>
                 </button>
               ) : null}
               {mapEditMode && onPickPaletteItem && !paletteOpen ? (
                 <button
                   type="button"
-                  title="元件庫"
+                  title={t('mapEditor.listDrawer.palette')}
                   onClick={() => onOpenTab('palette')}
                   className={[
                     'flex w-11 flex-col items-center justify-center gap-1 border border-l-0 py-3 text-[10px] font-medium shadow-lg backdrop-blur-sm transition',
@@ -330,7 +334,7 @@ export function MapListDrawer({
                   ].join(' ')}
                 >
                   <LayoutGrid className="size-4 shrink-0" />
-                  <span style={{ writingMode: 'vertical-rl' }}>元件庫</span>
+                  <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.listDrawer.palette')}</span>
                 </button>
               ) : null}
             </div>
@@ -347,7 +351,7 @@ export function MapListDrawer({
                 type="button"
                 onClick={() => onOpenTab(null)}
                 className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                title="收合清單"
+                title={t('mapEditor.listDrawer.collapse')}
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -387,15 +391,15 @@ export function MapListDrawer({
               ) : openTab === 'docking' ? (
                 <div className="space-y-4">
                   <p className="text-[10px] leading-relaxed text-zinc-500">
-                    正線停靠點來自元件庫；設施停靠點在大型設施屬性中設定，綠色圓點標示於設施內。
+                    {t('mapEditor.listDrawer.dockingHint')}
                   </p>
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400/90">
                       <MapPin className="size-3.5" />
-                      停靠點
+                      {t('mapEditor.listDrawer.docking')}
                     </h4>
                     <SectionBlock
-                      title="停靠點"
+                      title={t('mapEditor.listDrawer.docking')}
                       entries={dockingEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
@@ -406,10 +410,10 @@ export function MapListDrawer({
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
                       <MapPin className="size-3.5" />
-                      設施停靠點
+                      {t('mapEditor.listDrawer.facilityDocking')}
                     </h4>
                     <SectionBlock
-                      title="設施停靠點"
+                      title={t('mapEditor.listDrawer.facilityDocking')}
                       entries={facilityDockingEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
@@ -421,10 +425,10 @@ export function MapListDrawer({
               ) : openTab === 'facility' ? (
                 <div className="space-y-3">
                   <p className="text-[10px] leading-relaxed text-zinc-500">
-                    大型區塊：充電格、停車格、維修格等（type = Facility，用途於屬性填寫）。
+                    {t('mapEditor.listDrawer.facilityHint')}
                   </p>
                   <SectionBlock
-                    title="設施"
+                    title={t('mapEditor.listDrawer.facility')}
                     entries={facilityEntries}
                     selectedAreaId={selectedAreaId}
                     selectedFacilityId={selectedFacilityId}
@@ -435,15 +439,15 @@ export function MapListDrawer({
               ) : (
                 <div className="space-y-4">
                   <p className="text-[10px] leading-relaxed text-zinc-500">
-                    設備：紅綠燈、智慧桿、月台門（請由元件庫拖入對應類型，勿用「設施」填用途代替）。
+                    {t('mapEditor.listDrawer.equipmentHint')}
                   </p>
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400/90">
                       <Radio className="size-3.5" />
-                      紅綠燈
+                      {t('mapEditor.listDrawer.trafficLight')}
                     </h4>
                     <SectionBlock
-                      title="紅綠燈"
+                      title={t('mapEditor.listDrawer.trafficLight')}
                       entries={signalEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
@@ -454,10 +458,10 @@ export function MapListDrawer({
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
                       <Zap className="size-3.5" />
-                      智慧桿
+                      {t('mapEditor.listDrawer.smartPole')}
                     </h4>
                     <SectionBlock
-                      title="智慧桿"
+                      title={t('mapEditor.listDrawer.smartPole')}
                       entries={poleEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
@@ -468,10 +472,10 @@ export function MapListDrawer({
                   <section>
                     <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
                       <DoorOpen className="size-3.5" />
-                      月台門
+                      {t('mapEditor.listDrawer.psd')}
                     </h4>
                     <SectionBlock
-                      title="月台門"
+                      title={t('mapEditor.listDrawer.psd')}
                       entries={psdEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}

@@ -1,4 +1,5 @@
 import { Check, ChevronDown, Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   createDraftInterval,
   intervalDurationTableLabel,
@@ -94,6 +95,7 @@ function DayTimeline({
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
 }) {
+  const { t } = useTranslation();
   const confirmed = sortIntervals(intervals).filter((slot) => !slot.isDraft);
 
   return (
@@ -111,9 +113,9 @@ function DayTimeline({
             style={{ height: INTERVAL_TIMELINE_BAR_HEIGHT_PX }}
           >
             <span className="text-center text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC]">
-              時段
+              {t('timeTemplates.intervals.timelineLine1')}
               <br />
-              設定
+              {t('timeTemplates.intervals.timelineLine2')}
             </span>
           </div>
         </div>
@@ -215,6 +217,7 @@ function AttributeSelect({
   attributes: TimeSlotAttribute[];
   onChange: (attributeId: string) => void;
 }) {
+  const { t } = useTranslation();
   const selected = attributes.find((a) => a.id === value);
 
   return (
@@ -225,7 +228,7 @@ function AttributeSelect({
         className={`${FIELD_CLASS} appearance-none pr-9 ${!value ? 'text-[#99A1AF]' : 'pl-7'}`}
         style={FIELD_STYLE}
       >
-        <option value="">請選擇</option>
+        <option value="">{t('timeTemplates.intervals.selectPlaceholder')}</option>
         {attributes.map((attr) => (
           <option key={attr.id} value={attr.id} className="bg-zinc-900 text-zinc-100">
             {attr.name}
@@ -254,6 +257,7 @@ export function TimeSlotIntervalsPanel({
   intervals,
   onChange,
 }: TimeSlotIntervalsPanelProps) {
+  const { t } = useTranslation();
   const confirmedAttributes = attributes.filter((attr) => !attr.isDraft);
   const canAddInterval = confirmedAttributes.length > 0;
   const hasDraft = intervals.some((slot) => slot.isDraft);
@@ -337,7 +341,7 @@ export function TimeSlotIntervalsPanel({
             <div className={draft && overlaps ? '[&_input]:ring-1 [&_input]:ring-red-400/60' : ''}>
               <TimeOfDayPicker
                 value={slot.startTime}
-                label="開始"
+                label={t('timeTemplates.intervals.start')}
                 role="start"
                 onChange={(startTime) => updateInterval(slot.id, { startTime })}
               />
@@ -351,7 +355,7 @@ export function TimeSlotIntervalsPanel({
             <div className={draft && overlaps ? '[&_input]:ring-1 [&_input]:ring-red-400/60' : ''}>
               <TimeOfDayPicker
                 value={slot.endTime}
-                label="結束"
+                label={t('timeTemplates.intervals.end')}
                 role="end"
                 onChange={(endTime) => updateInterval(slot.id, { endTime })}
               />
@@ -372,8 +376,8 @@ export function TimeSlotIntervalsPanel({
                 onClick={() => confirmInterval(slot.id)}
                 className="inline-flex items-center justify-center rounded-lg bg-[#2B7FFF] text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
                 style={ACTION_BUTTON_STYLE}
-                aria-label="確認時段"
-                title={overlaps ? '時段與其他時段重疊，請調整時間' : undefined}
+                aria-label={t('timeTemplates.intervals.confirmAria')}
+                title={overlaps ? t('timeTemplates.intervals.overlapTitle') : undefined}
               >
                 <Check className="size-4" strokeWidth={2.5} />
               </button>
@@ -386,7 +390,7 @@ export function TimeSlotIntervalsPanel({
                 disabled={hasDraft}
                 className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
                 style={ACTION_BUTTON_STYLE}
-                aria-label="編輯時段"
+                aria-label={t('timeTemplates.intervals.editAria')}
               >
                 <Pencil className="size-4" />
               </button>
@@ -395,7 +399,7 @@ export function TimeSlotIntervalsPanel({
                 onClick={() => removeInterval(slot.id)}
                 className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
                 style={ACTION_BUTTON_STYLE}
-                aria-label="刪除時段"
+                aria-label={t('timeTemplates.intervals.deleteAria')}
               >
                 <Trash2 className="size-4" />
               </button>
@@ -410,7 +414,7 @@ export function TimeSlotIntervalsPanel({
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 shrink-0">
                 <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
-              <span>時段重疊：此時段的時間範圍與其他已建立的時段重疊，請調整開始或結束時間後再確認。</span>
+              <span>{t('timeTemplates.intervals.overlapWarning')}</span>
             </div>
           </td>
         </tr>
@@ -425,13 +429,13 @@ export function TimeSlotIntervalsPanel({
         <div className="flex min-w-0 flex-1 items-center">
           <TimeTemplatePanelTitle
             icon={<SlidersHorizontal className="size-5" strokeWidth={1.75} />}
-            title="時段區間"
+            title={t('timeTemplates.intervals.title')}
           />
         </div>
         <TimeTemplatePanelAddButton
           onClick={addInterval}
           disabled={!canAddInterval || hasDraft}
-          title={canAddInterval ? undefined : '請先新增並確認時段屬性'}
+          title={canAddInterval ? undefined : t('timeTemplates.intervals.addDisabledHint')}
         />
       </div>
       <div className="flex shrink-0 flex-col gap-2 px-3">
@@ -459,25 +463,25 @@ export function TimeSlotIntervalsPanel({
                   className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
-                  時段名稱
+                  {t('timeTemplates.intervals.colName')}
                 </th>
                 <th
                   className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
-                  開始時間
+                  {t('timeTemplates.intervals.colStart')}
                 </th>
                 <th
                   className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
-                  結束時間
+                  {t('timeTemplates.intervals.colEnd')}
                 </th>
                 <th
                   className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
-                  總共時長
+                  {t('timeTemplates.intervals.colDuration')}
                 </th>
                 <th className="px-3 py-0.5" style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }} />
               </tr>

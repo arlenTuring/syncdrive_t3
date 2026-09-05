@@ -6,6 +6,8 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../../i18n';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
   buildAttributeIntervalLegends,
@@ -69,7 +71,7 @@ type StepShiftSchedulePreviewProps = {
 
 function formatSeconds(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds)) return '—';
-  return `${Math.round(seconds)} 秒`;
+  return i18n.t('shiftList.schedulePreview.seconds', { value: Math.round(seconds) });
 }
 
 function formatActionReviewLine(
@@ -78,7 +80,7 @@ function formatActionReviewLine(
   facilityGroups: ActionFacilityTypeGroup[],
 ): string {
   const category = resolveShiftActionCategory(action.categoryId);
-  const parts: string[] = [category?.label ?? '未選類別'];
+  const parts: string[] = [category?.label ?? i18n.t('shiftList.schedulePreview.noCategory')];
 
   if (
     category
@@ -97,7 +99,7 @@ function formatActionReviewLine(
       action.targetId,
       facilityGroups,
     );
-    parts.push(targetLabel || '未選設施');
+    parts.push(targetLabel || i18n.t('shiftList.schedulePreview.noFacility'));
   }
 
   if (action.behavior) {
@@ -105,12 +107,12 @@ function formatActionReviewLine(
       const resourceId = action.resourceId?.trim() ?? '';
       const media = resourceId ? mediaById.get(resourceId) : undefined;
       if (media) {
-        const kindLabel = media.kind === 'group' ? '媒體群組' : '音樂';
-        parts.push(`播放${kindLabel}「${media.name}」`);
+        const kindLabel = media.kind === 'group' ? i18n.t('shiftList.schedulePreview.mediaGroup') : i18n.t('shiftList.schedulePreview.music');
+        parts.push(i18n.t('shiftList.schedulePreview.playNamed', { kind: kindLabel, name: media.name }));
       } else if (resourceId) {
-        parts.push(`播放音樂「${resourceId}」`);
+        parts.push(i18n.t('shiftList.schedulePreview.playMusicId', { id: resourceId }));
       } else {
-        parts.push(`${labelForActionBehavior(action.behavior)}（未選媒體）`);
+        parts.push(i18n.t('shiftList.schedulePreview.behaviorNoMedia', { behavior: labelForActionBehavior(action.behavior) }));
       }
     } else {
       parts.push(labelForActionBehavior(action.behavior));
@@ -162,6 +164,7 @@ function ReviewSection({
   unstyled?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <section
       className={
@@ -177,8 +180,8 @@ function ReviewSection({
             <button
               type="button"
               onClick={() => onNavigate(step)}
-              title={`前往${title}`}
-              aria-label={`前往${title}`}
+              title={t('shiftList.schedulePreview.goTo', { title })}
+              aria-label={t('shiftList.schedulePreview.goTo', { title })}
               className="inline-flex size-8 items-center justify-center rounded-lg text-[#2B7FFF] transition hover:bg-[rgba(43,127,255,0.12)]"
             >
               <Pencil className="size-4" strokeWidth={2} />
@@ -226,16 +229,17 @@ function RouteGroupsCycleSummaryPanel({
   summary: ReturnType<typeof summarizeRouteGroupsCycle>;
   turnaroundLimitSeconds?: number | null;
 }) {
+  const { t } = useTranslation();
   const hasLimit = turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0;
   const isOver = hasLimit && summary.totalMinCycleSeconds > (turnaroundLimitSeconds ?? 0);
 
   return (
     <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-zinc-200">通盤綜合值</h4>
+        <h4 className="text-sm font-semibold text-zinc-200">{t('shiftList.schedulePreview.overallValues')}</h4>
         {hasLimit ? (
           <span className="text-xs text-zinc-500">
-            車輛折返時限 {formatSeconds(turnaroundLimitSeconds)}
+            {t('shiftList.schedulePreview.turnaroundLimit', { value: formatSeconds(turnaroundLimitSeconds) })}
           </span>
         ) : null}
       </div>
@@ -248,7 +252,7 @@ function RouteGroupsCycleSummaryPanel({
               : 'border-emerald-500/20 bg-emerald-500/5'
           }`}
         >
-          <div className="text-xs font-medium text-zinc-400">完整循環最快時間</div>
+          <div className="text-xs font-medium text-zinc-400">{t('shiftList.schedulePreview.cycleFastest')}</div>
           <div
             className={`mt-2 text-2xl font-bold tabular-nums ${
               isOver ? 'text-red-400' : 'text-emerald-400'
@@ -257,19 +261,17 @@ function RouteGroupsCycleSummaryPanel({
             {formatSeconds(summary.totalMinCycleSeconds)}
           </div>
           <div className="mt-1.5 text-[10px] font-medium text-zinc-500">
-            ({summary.totalMinTravelSeconds}s 行駛 + {summary.totalDwellWithSlackSeconds}s 停靠
-            + {summary.totalSwitchBufferSeconds}s 切換 + {summary.recoverySeconds}s 恢復)
+            {t('shiftList.schedulePreview.cycleBreakdown', { travel: summary.totalMinTravelSeconds, dwell: summary.totalDwellWithSlackSeconds, switch: summary.totalSwitchBufferSeconds, recovery: summary.recoverySeconds })}
           </div>
         </div>
 
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-          <div className="text-xs font-medium text-zinc-400">完整循環平均時間</div>
+          <div className="text-xs font-medium text-zinc-400">{t('shiftList.schedulePreview.cycleAverage')}</div>
           <div className="mt-2 text-2xl font-bold tabular-nums text-zinc-200">
             {formatSeconds(summary.totalAvgCycleSeconds)}
           </div>
           <div className="mt-1.5 text-[10px] font-medium text-zinc-500">
-            ({summary.totalAvgTravelSeconds}s 行駛 + {summary.totalDwellWithSlackSeconds}s 停靠
-            + {summary.totalSwitchBufferSeconds}s 切換 + {summary.recoverySeconds}s 恢復)
+            {t('shiftList.schedulePreview.cycleBreakdown', { travel: summary.totalAvgTravelSeconds, dwell: summary.totalDwellWithSlackSeconds, switch: summary.totalSwitchBufferSeconds, recovery: summary.recoverySeconds })}
           </div>
         </div>
       </div>
@@ -280,13 +282,13 @@ function RouteGroupsCycleSummaryPanel({
             <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
               <span>
-                完整循環最快時間超過折返時限，請回到路線群組調整。
+                {t('shiftList.schedulePreview.overLimit')}
               </span>
             </div>
           ) : (
             <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
               <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-              <span>完整循環最快時間在折返時限內。</span>
+              <span>{t('shiftList.schedulePreview.withinLimit')}</span>
             </div>
           )}
         </div>
@@ -305,6 +307,7 @@ function RouteReviewCard({
   /** 手動製作：列出站點名稱，不顯示路線預設靠站／緩衝秒數（各班次卡可不同） */
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -321,21 +324,21 @@ function RouteReviewCard({
             ) : null}
           </div>
           <p className="mt-1 text-xs text-zinc-500">
-            群組 {route.groupName || '—'}
+            {t('shiftList.schedulePreview.group', { name: route.groupName || '—' })}
             {compact
               ? null
               : route.stationDwellsConfirmed
-                ? ' · 停靠已確認'
-                : ' · 停靠未確認'}
+                ? t('shiftList.schedulePreview.dwellConfirmed')
+                : t('shiftList.schedulePreview.dwellUnconfirmed')}
           </p>
         </div>
       </div>
 
       {compact ? (
         <div className="mt-3">
-          <p className="mb-1.5 text-xs text-zinc-500">站點</p>
+          <p className="mb-1.5 text-xs text-zinc-500">{t('shiftList.schedulePreview.stations')}</p>
           {route.stationDwells.length === 0 ? (
-            <p className="text-xs text-zinc-600">無站點資料</p>
+            <p className="text-xs text-zinc-600">{t('shiftList.schedulePreview.noStationData')}</p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
               {route.stationDwells.map((dwell, index) => (
@@ -367,6 +370,7 @@ function RouteReviewCardParametricDetails({
   route: ShiftScheduleSelectedRoute;
   recoverySeconds: number;
 }) {
+  const { t } = useTranslation();
   const dwellSlack = normalizeDwellSlackSeconds(route.dwellSlackSeconds);
   const switchBuffer = normalizeSwitchBufferAfterSeconds(route.switchBufferAfterSeconds);
   const dwellWithSlack = sumStationDwellSecondsWithSlack(route.stationDwells, dwellSlack);
@@ -375,31 +379,31 @@ function RouteReviewCardParametricDetails({
     <>
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="text-zinc-500">平均行駛</p>
+          <p className="text-zinc-500">{t('shiftList.schedulePreview.avgTravel')}</p>
           <p className="mt-0.5 tabular-nums text-zinc-200">
             {formatSeconds(route.avgTravelTimeSeconds)}
           </p>
         </div>
         <div>
-          <p className="text-zinc-500">最快行駛</p>
+          <p className="text-zinc-500">{t('shiftList.schedulePreview.minTravel')}</p>
           <p className="mt-0.5 tabular-nums text-zinc-200">
             {formatSeconds(route.minTravelTimeSeconds)}
           </p>
         </div>
         <div>
-          <p className="text-zinc-500">換線緩衝</p>
+          <p className="text-zinc-500">{t('shiftList.schedulePreview.switchBuffer')}</p>
           <p className="mt-0.5 tabular-nums text-zinc-200">{formatSeconds(switchBuffer)}</p>
         </div>
         <div>
-          <p className="text-zinc-500">靠站緩衝</p>
+          <p className="text-zinc-500">{t('shiftList.schedulePreview.dwellSlack')}</p>
           <p className="mt-0.5 tabular-nums text-zinc-200">{formatSeconds(dwellSlack)}</p>
         </div>
       </div>
 
       <div className="mt-3">
-        <p className="mb-1.5 text-xs text-zinc-500">站點停靠</p>
+        <p className="mb-1.5 text-xs text-zinc-500">{t('shiftList.schedulePreview.stationDwells')}</p>
         {route.stationDwells.length === 0 ? (
-          <p className="text-xs text-zinc-600">無站點資料</p>
+          <p className="text-xs text-zinc-600">{t('shiftList.schedulePreview.noStationData')}</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {route.stationDwells.map((dwell, index) => {
@@ -409,9 +413,9 @@ function RouteReviewCardParametricDetails({
                 role !== 'editable'
                   ? formatStationDwellRoleLabel(role)
                   : mode === 'no_stop'
-                    ? '不停靠'
+                    ? t('shiftList.schedulePreview.noStop')
                     : mode === 'line_change'
-                      ? '換線停靠'
+                      ? t('shiftList.schedulePreview.lineChange')
                       : formatSeconds(dwell.dwellSeconds);
               return (
                 <li
@@ -426,12 +430,12 @@ function RouteReviewCardParametricDetails({
           </ul>
         )}
         <p className="mt-2 text-[11px] text-zinc-500">
-          有效停靠合計（含靠站緩衝）{' '}
+          {t('shiftList.schedulePreview.effectiveDwell')}{' '}
           <span className="tabular-nums text-zinc-300">
             {formatSeconds(dwellWithSlack)}
           </span>
           <span className="mx-1.5 text-zinc-700">·</span>
-          恢復時間{' '}
+          {t('shiftList.schedulePreview.recovery')}{' '}
           <span className="tabular-nums text-zinc-300">{formatSeconds(recoverySeconds)}</span>
         </p>
       </div>
@@ -446,6 +450,7 @@ export function StepShiftSchedulePreview({
   resultView = false,
   previewBoardOnly = false,
 }: StepShiftSchedulePreviewProps) {
+  const { t } = useTranslation();
   const output = draft.scheduleOutput;
   const [activeTab, setActiveTab] = useState<PreviewTab>('schedule');
   const [gridZoom, setGridZoom] = useState(1);
@@ -558,7 +563,7 @@ export function StepShiftSchedulePreview({
   );
 
   const maintenanceDisplayName = draft.maintenanceTask.skipped
-    ? '略過整備任務'
+    ? t('shiftList.schedulePreview.skipMaintenance')
     : (draft.maintenanceTask.taskName.trim()
       || output?.maintenanceTaskBinding.taskName
       || draft.maintenanceTask.taskId
@@ -574,45 +579,45 @@ export function StepShiftSchedulePreview({
     <div className="flex min-h-0 flex-1 flex-col">
       {!previewBoardOnly && !resultView ? (
         <h2 className="mb-5 shrink-0 text-base font-medium text-zinc-100">
-          確認班表細節並完成建立
+          {t('shiftList.schedulePreview.confirmTitle')}
         </h2>
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {!previewBoardOnly ? (
         <>
-        <ReviewSection step={1} title="基本資料" onNavigate={onNavigateToStep}>
+        <ReviewSection step={1} title={t('shiftList.schedulePreview.basic')} onNavigate={onNavigateToStep}>
           <MetaGrid
             items={[
-              { label: '班表名稱', value: draft.basic.name },
-              { label: '版本編號', value: draft.basic.version },
-              { label: '備註說明', value: draft.basic.remarks },
+              { label: t('shiftList.schedulePreview.name'), value: draft.basic.name },
+              { label: t('shiftList.schedulePreview.version'), value: draft.basic.version },
+              { label: t('shiftList.schedulePreview.remarks'), value: draft.basic.remarks },
             ]}
           />
         </ReviewSection>
 
-        <ReviewSection step={2} title="整備任務" onNavigate={onNavigateToStep}>
+        <ReviewSection step={2} title={t('shiftList.schedulePreview.maintenance')} onNavigate={onNavigateToStep}>
           <SimpleNameLine value={maintenanceDisplayName} />
         </ReviewSection>
 
-        <ReviewSection step={3} title="時間模板" onNavigate={onNavigateToStep}>
+        <ReviewSection step={3} title={t('shiftList.schedulePreview.timeTemplate')} onNavigate={onNavigateToStep}>
           <SimpleNameLine value={templateDisplayName} />
         </ReviewSection>
 
-        <ReviewSection step={4} title="路線群組" onNavigate={onNavigateToStep}>
+        <ReviewSection step={4} title={t('shiftList.schedulePreview.routeGroups')} onNavigate={onNavigateToStep}>
           {orderedRoutes.length === 0 ? (
-            <p className="text-sm text-zinc-500">尚未選擇路線</p>
+            <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noRoutes')}</p>
           ) : (
             <div className="space-y-3">
               <div className="rounded-lg border border-zinc-800/60 bg-zinc-950/30 px-3 py-2 text-xs text-zinc-400">
                 {draft.creationMode !== 'manual' ? (
                   <>
-                    <span>策略參數｜最低恢復時間 </span>
+                    <span>{t('shiftList.schedulePreview.strategyMinRecovery')} </span>
                     <span className="tabular-nums text-zinc-200">
                       {formatSeconds(recoverySeconds)}
                     </span>
                     <span className="mx-2 text-zinc-700">·</span>
-                    <span>碰撞保護時間 </span>
+                    <span>{t('shiftList.schedulePreview.collisionProtect')} </span>
                     <span className="tabular-nums text-zinc-200">
                       {formatSeconds(
                         normalizeCollisionProtectionSeconds(
@@ -623,10 +628,10 @@ export function StepShiftSchedulePreview({
                     <span className="mx-2 text-zinc-700">·</span>
                   </>
                 ) : null}
-                <span>已選路線 </span>
+                <span>{t('shiftList.schedulePreview.selectedRoutes')} </span>
                 <span className="tabular-nums text-zinc-200">{orderedRoutes.length}</span>
                 <span className="mx-2 text-zinc-700">·</span>
-                <span>執行順序 </span>
+                <span>{t('shiftList.schedulePreview.execOrder')} </span>
                 <span className="text-zinc-200">
                   {orderedRoutes.map((route) => route.routeName).join(' → ')}
                 </span>
@@ -651,7 +656,7 @@ export function StepShiftSchedulePreview({
           )}
         </ReviewSection>
 
-        <ReviewSection step={5} title="行動設定" onNavigate={onNavigateToStep}>
+        <ReviewSection step={5} title={t('shiftList.schedulePreview.actionSettings')} onNavigate={onNavigateToStep}>
             {draft.actionSettings.routes.every((route) => {
               const stationCount = (route.stations ?? []).reduce(
                 (sum, station) =>
@@ -664,7 +669,7 @@ export function StepShiftSchedulePreview({
               );
               return stationCount + movingCount === 0;
             }) ? (
-              <p className="text-sm text-zinc-500">未設定站間行動</p>
+              <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noActions')}</p>
             ) : (
               <div className="space-y-4">
                 {draft.actionSettings.routes.map((route) => {
@@ -755,13 +760,13 @@ export function StepShiftSchedulePreview({
 
         <ReviewSection
           step={6}
-          title={previewBoardOnly ? '' : '調整班表'}
+          title={previewBoardOnly ? '' : t('shiftList.schedulePreview.adjustSchedule')}
           onNavigate={previewBoardOnly ? undefined : onNavigateToStep}
           unstyled={previewBoardOnly}
         >
           {!output ? (
             <PanelNoData
-              message="尚無班表產出，請先回到「調整班表」重新生成"
+              message={t('shiftList.schedulePreview.noScheduleOutput')}
               className="min-h-[160px]"
             />
           ) : (
@@ -800,7 +805,7 @@ export function StepShiftSchedulePreview({
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    班次預覽
+                    {t('shiftList.schedulePreview.tripPreview')}
                     {activeTab === 'schedule' ? (
                       <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
                     ) : null}
@@ -814,7 +819,7 @@ export function StepShiftSchedulePreview({
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    運能趨勢
+                    {t('shiftList.schedulePreview.capacityTrend')}
                     {activeTab === 'capacity' ? (
                       <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
                     ) : null}
@@ -842,7 +847,7 @@ export function StepShiftSchedulePreview({
                 {templateLoading ? (
                   <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                     <Loader2 className="size-5 animate-spin" />
-                    載入班表預覽…
+                    {t('shiftList.schedulePreview.loadingPreview')}
                   </div>
                 ) : output.plan ? (
                   <ShiftSchedulePlanGrid
@@ -856,14 +861,14 @@ export function StepShiftSchedulePreview({
                     zoom={gridZoom}
                   />
                 ) : (
-                  <PanelNoData message="班表產出缺少班次資料" className="min-h-[240px]" />
+                  <PanelNoData message={t('shiftList.schedulePreview.missingTrips')} className="min-h-[240px]" />
                 )}
               </div>
               {activeTab === 'capacity' ? (
                 templateLoading ? (
                   <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                     <Loader2 className="size-5 animate-spin" />
-                    載入運能趨勢…
+                    {t('shiftList.schedulePreview.loadingCapacity')}
                   </div>
                 ) : (
                   <CapacityTrendChart

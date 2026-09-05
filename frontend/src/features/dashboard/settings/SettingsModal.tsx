@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Database, Plus, Trash2, CheckCircle, AlertCircle, Loader, Edit2, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   useDataSourceStore,
   seedDashboardAll,
@@ -15,27 +16,11 @@ interface Props {
 
 type PingState = 'idle' | 'loading' | 'ok' | 'error';
 
-const DATA_SOURCE_SECTIONS: {
-  type: DataSourceType;
-  title: string;
-  hint: string;
-}[] = [
-  {
-    type: 'internal',
-    title: 'SQL 資料庫',
-    hint: '供元件「數據綁定 → SQL」使用：選資料表、撰寫 SELECT，經後端查 PostgreSQL。',
-  },
-  {
-    type: 'mqtt',
-    title: 'MQTT 即時',
-    hint: '供元件「數據綁定 → MQTT」使用：Socket.IO 轉發 VTMS 主題，需再設定 Topic 與 JSON 路徑。',
-  },
-];
-
 const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 text-sm
   focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
 export function SettingsModal({ onClose, onClearAll }: Props) {
+  const { t } = useTranslation();
   const { dataSources, addDataSource, updateDataSource, deleteDataSource } = useDataSourceStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -43,7 +28,23 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
   const [activeTab, setActiveTab] = useState<'datasource' | 'general'>('datasource');
   const [seedState, setSeedState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
 
-  // ─── Ping 測試 ─────────────────────────────────────────────────
+  const dataSourceSections: {
+    type: DataSourceType;
+    title: string;
+    hint: string;
+  }[] = [
+    {
+      type: 'internal',
+      title: t('dashboard.settings.sectionSqlTitle'),
+      hint: t('dashboard.settings.sectionSqlHint'),
+    },
+    {
+      type: 'mqtt',
+      title: t('dashboard.settings.sectionMqttTitle'),
+      hint: t('dashboard.settings.sectionMqttHint'),
+    },
+  ];
+
   async function pingDataSource(ds: DataSourceConfig) {
     if (ds.type !== 'internal') return;
     setPingStates(p => ({ ...p, [ds.id]: 'loading' }));
@@ -61,27 +62,24 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 backdrop-blur-sm"
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div className="flex gap-4">
-            <button onClick={() => setActiveTab('datasource')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>資料來源</button>
-            <button onClick={() => setActiveTab('general')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>一般設定</button>
+            <button onClick={() => setActiveTab('datasource')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabDatasource')}</button>
+            <button onClick={() => setActiveTab('general')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabGeneral')}</button>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors p-1">
             <X size={18} />
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
           {activeTab === 'datasource' ? (
             <>
-              {/* 說明 */}
               <div className="bg-purple-900/20 border border-purple-800/40 rounded-lg px-4 py-3 text-xs text-purple-300 leading-relaxed">
-                資料來源依類型分類管理。元件的「數據綁定」分頁只會列出對應類型：SQL 僅能選 SQL 資料庫，MQTT 僅能選 MQTT 連線。
+                {t('dashboard.settings.datasourceIntro')}
               </div>
 
-              {DATA_SOURCE_SECTIONS.map(section => {
+              {dataSourceSections.map(section => {
                 const sectionSources = dataSources.filter(ds => ds.type === section.type);
                 return (
                   <div key={section.type} className="space-y-2">
@@ -94,7 +92,7 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                     <p className="text-zinc-500 text-xs leading-relaxed -mt-1">{section.hint}</p>
                     {sectionSources.length === 0 ? (
                       <div className="text-zinc-600 text-xs px-3 py-2 border border-dashed border-zinc-700 rounded-lg">
-                        尚無此類資料來源
+                        {t('dashboard.settings.emptySection')}
                       </div>
                     ) : (
                       sectionSources.map(ds => (
@@ -114,7 +112,6 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                 );
               })}
 
-              {/* 新增表單 */}
               {showAddForm
                 ? <AddDataSourceForm
                     onAdd={(cfg) => { addDataSource(cfg); setShowAddForm(false); }}
@@ -126,7 +123,7 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                     className="w-full py-3 border-2 border-dashed border-zinc-700 rounded-xl text-zinc-500 text-sm
                                hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Plus size={16} /> 新增資料來源
+                    <Plus size={16} /> {t('dashboard.settings.addDatasource')}
                   </button>
                 )
               }
@@ -134,17 +131,17 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
           ) : (
             <div className="space-y-6">
               <div className="p-4 border border-zinc-700/60 bg-zinc-800/30 rounded-xl">
-                <div className="text-zinc-300 text-sm font-semibold">還原內建範例</div>
+                <div className="text-zinc-300 text-sm font-semibold">{t('dashboard.settings.restoreExamplesTitle')}</div>
                 <p className="text-zinc-500 text-xs mt-1 leading-relaxed">
-                  請使用畫面左上角齒輪「應用程式設定」→「還原兩個圖台範例」（儀表板與地圖編輯器一次還原）。
+                  {t('dashboard.settings.restoreExamplesBody')}
                 </p>
               </div>
               <div>
-                <h3 className="text-zinc-200 text-sm font-semibold mb-2">示範資料</h3>
+                <h3 className="text-zinc-200 text-sm font-semibold mb-2">{t('dashboard.settings.demoDataTitle')}</h3>
                 <div className="p-4 border border-cyan-900/30 bg-cyan-950/10 rounded-xl flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-cyan-300 text-sm font-bold">載入示範資料到資料庫</div>
-                    <div className="text-zinc-500 text-xs mt-1">寫入 11 台車輛、事件、正線／整備班次卡、運能與整備分佈。需後端運行中。</div>
+                    <div className="text-cyan-300 text-sm font-bold">{t('dashboard.settings.seedTitle')}</div>
+                    <div className="text-zinc-500 text-xs mt-1">{t('dashboard.settings.seedHint')}</div>
                   </div>
                   <button
                     type="button"
@@ -154,32 +151,38 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                       try {
                         await seedDashboardAll();
                         setSeedState('ok');
-                        alert('示範資料已寫入資料庫。請重新整理儀表板；若仍無資料，請用左上角齒輪「還原兩個圖台範例」。');
+                        alert(t('dashboard.settings.seedOkAlert'));
                       } catch (e: unknown) {
                         setSeedState('error');
-                        alert(e instanceof Error ? e.message : '載入失敗，請確認後端已啟動');
+                        alert(e instanceof Error ? e.message : t('dashboard.settings.seedFailAlert'));
                       }
                       setTimeout(() => setSeedState('idle'), 3000);
                     }}
                     className="px-4 py-2 rounded-lg bg-cyan-600/20 border border-cyan-600/40 text-cyan-300 text-xs font-bold uppercase hover:bg-cyan-600 hover:text-white transition-all whitespace-nowrap disabled:opacity-50"
                   >
-                    {seedState === 'loading' ? '載入中…' : seedState === 'ok' ? '已載入' : seedState === 'error' ? '失敗' : '載入資料'}
+                    {seedState === 'loading'
+                      ? t('dashboard.settings.seedLoading')
+                      : seedState === 'ok'
+                        ? t('dashboard.settings.seedDone')
+                        : seedState === 'error'
+                          ? t('dashboard.settings.seedError')
+                          : t('dashboard.settings.seedIdle')}
                   </button>
                 </div>
               </div>
               <div>
-                <h3 className="text-zinc-200 text-sm font-semibold mb-2">危險區域 (Danger Zone)</h3>
+                <h3 className="text-zinc-200 text-sm font-semibold mb-2">{t('dashboard.settings.dangerZone')}</h3>
                 <div className="p-4 border border-red-900/30 bg-red-950/10 rounded-xl space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <div className="text-red-400 text-sm font-bold">清除所有平面與元件</div>
-                      <div className="text-zinc-500 text-xs mt-1">此操作將永久刪除 localStorage 中儲存的所有儀表板配置，且無法還原。</div>
+                      <div className="text-red-400 text-sm font-bold">{t('dashboard.settings.clearAllTitle')}</div>
+                      <div className="text-zinc-500 text-xs mt-1">{t('dashboard.settings.clearAllHint')}</div>
                     </div>
                     <button 
-                      onClick={() => { if(confirm('確定要清空所有資料嗎？這將刪除所有已建立的平面。')) { onClearAll(); onClose(); } }}
+                      onClick={() => { if(confirm(t('dashboard.settings.clearAllConfirm'))) { onClearAll(); onClose(); } }}
                       className="px-4 py-2 rounded-lg bg-red-600/20 border border-red-600/40 text-red-400 text-xs font-bold uppercase hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
                     >
-                      立即清空
+                      {t('dashboard.settings.clearAllAction')}
                     </button>
                   </div>
                 </div>
@@ -188,20 +191,17 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-zinc-800 flex justify-end">
           <button onClick={onClose}
             className="px-5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm
                        hover:border-zinc-500 transition-colors">
-            關閉
+            {t('dashboard.settings.close')}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── 資料來源卡片 ───────────────────────────────────────────────────
 
 function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, onPing }: {
   ds: DataSourceConfig;
@@ -212,6 +212,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   onDelete: () => void;
   onPing: () => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: ds.name,
     backendUrl: ds.backendUrl,
@@ -228,15 +229,14 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   }[pingState];
 
   const pingLabel = {
-    idle: '測試連線',
-    loading: '測試中…',
-    ok: '連線正常',
-    error: '連線失敗',
+    idle: t('dashboard.settings.pingIdle'),
+    loading: t('dashboard.settings.pingLoading'),
+    ok: t('dashboard.settings.pingOk'),
+    error: t('dashboard.settings.pingError'),
   }[pingState];
 
   return (
     <div className="border border-zinc-700/60 rounded-xl bg-zinc-800/30 overflow-hidden">
-      {/* Card header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="w-8 h-8 rounded-lg bg-purple-900/40 border border-purple-800/40 flex items-center justify-center flex-shrink-0">
           <Database size={14} className="text-purple-400" />
@@ -244,7 +244,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-zinc-200 text-sm font-medium truncate">{ds.name}</span>
-            {isDefault && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 border border-purple-800/40">預設</span>}
+            {isDefault && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 border border-purple-800/40">{t('dashboard.settings.defaultBadge')}</span>}
             <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400">
               {ds.type === 'internal' ? 'PostgreSQL' : ds.type === 'mqtt' ? 'Socket.IO' : 'REST'}
             </span>
@@ -253,7 +253,6 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
             {ds.type === 'internal' ? ds.backendUrl : ''} {ds.description && `· ${ds.description}`}
           </div>
         </div>
-        {/* Actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {ds.type === 'internal' && (
             <button onClick={onPing}
@@ -280,22 +279,21 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
         </div>
       </div>
 
-      {/* Edit form */}
       {isEditing && (
         <div className="border-t border-zinc-700/60 px-4 py-4 space-y-3 bg-zinc-800/50">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">名稱</label>
+              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.name')}</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inputCls} />
             </div>
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">後端 URL</label>
+              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrl')}</label>
               <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder="http://localhost:3000" />
             </div>
           </div>
           {ds.type === 'mqtt' && (
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">預設訂閱主題（選填）</label>
+              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
               <input
                 value={form.mqttTopic ?? ''}
                 onChange={e => setForm(f => ({ ...f, mqttTopic: e.target.value }))}
@@ -305,17 +303,17 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
             </div>
           )}
           <div>
-            <label className="block text-zinc-500 text-xs mb-1">說明（選填）</label>
+            <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.description')}</label>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={() => onSave(form)}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-500 transition-colors">
-              <Save size={12} /> 儲存
+              <Save size={12} /> {t('dashboard.settings.save')}
             </button>
             <button onClick={onEdit}
               className="px-4 py-1.5 rounded-lg border border-zinc-600 text-zinc-400 text-xs hover:text-zinc-200 transition-colors">
-              取消
+              {t('dashboard.settings.cancel')}
             </button>
           </div>
         </div>
@@ -324,12 +322,11 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   );
 }
 
-// ─── 新增資料來源表單 ───────────────────────────────────────────────
-
 function AddDataSourceForm({ onAdd, onCancel }: {
   onAdd: (cfg: Omit<DataSourceConfig, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: '',
     type: 'internal' as DataSourceType,
@@ -340,36 +337,36 @@ function AddDataSourceForm({ onAdd, onCancel }: {
 
   return (
     <div className="border-2 border-purple-700/40 rounded-xl bg-purple-900/10 p-4 space-y-3">
-      <h3 className="text-purple-300 text-sm font-medium">新增資料來源</h3>
+      <h3 className="text-purple-300 text-sm font-medium">{t('dashboard.settings.addFormTitle')}</h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">名稱 *</label>
+          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.nameRequired')}</label>
           <input
             value={form.name}
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             className={inputCls}
-            placeholder={form.type === 'mqtt' ? '我的 MQTT' : '我的資料庫'}
+            placeholder={form.type === 'mqtt' ? t('dashboard.settings.namePlaceholderMqtt') : t('dashboard.settings.namePlaceholderSql')}
           />
         </div>
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">類型 *</label>
+          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.typeRequired')}</label>
           <select
             value={form.type}
             onChange={e => setForm(f => ({ ...f, type: e.target.value as DataSourceType }))}
             className={inputCls}
           >
-            <option value="internal">SQL — PostgreSQL（透過後端）</option>
-            <option value="mqtt">MQTT — Socket.IO 轉發</option>
+            <option value="internal">{t('dashboard.settings.typeSql')}</option>
+            <option value="mqtt">{t('dashboard.settings.typeMqtt')}</option>
           </select>
         </div>
       </div>
       <div>
-        <label className="block text-zinc-500 text-xs mb-1">後端 URL *</label>
+        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrlRequired')}</label>
         <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder="http://localhost:3000" />
       </div>
       {form.type === 'mqtt' && (
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">預設訂閱主題（選填）</label>
+          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
           <input
             value={form.mqttTopic}
             onChange={e => setForm(f => ({ ...f, mqttTopic: e.target.value }))}
@@ -379,7 +376,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         </div>
       )}
       <div>
-        <label className="block text-zinc-500 text-xs mb-1">說明（選填）</label>
+        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.description')}</label>
         <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
       </div>
       <div className="flex gap-2 pt-1">
@@ -396,10 +393,10 @@ function AddDataSourceForm({ onAdd, onCancel }: {
           disabled={!form.name || !form.backendUrl}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-500 disabled:opacity-40 transition-colors"
         >
-          <Plus size={12} /> 新增
+          <Plus size={12} /> {t('dashboard.settings.add')}
         </button>
         <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-zinc-600 text-zinc-400 text-xs hover:text-zinc-200 transition-colors">
-          取消
+          {t('dashboard.settings.cancel')}
         </button>
       </div>
     </div>

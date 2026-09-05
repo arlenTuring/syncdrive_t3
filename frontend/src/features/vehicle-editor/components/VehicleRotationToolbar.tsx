@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, RotateCcw, RotateCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { normalizeDegrees } from '../../map-editor/utils/rotation';
 
 export function VehicleRotationToolbar({
@@ -17,6 +18,7 @@ export function VehicleRotationToolbar({
   onRotateRight90: () => void;
   onRotateDelta: (delta: number) => void;
 }) {
+  const { t } = useTranslation();
   const angleLabel = `${normalizeDegrees(rotationDeg).toFixed(0)}°`;
   const inv = screenScale > 0 ? 1 / screenScale : 1;
 
@@ -24,11 +26,11 @@ export function VehicleRotationToolbar({
       <div
         className="flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
         role="toolbar"
-        aria-label="旋轉"
+        aria-label={t('vehicleEditor.rotationToolbar.aria')}
       >
         <button
           type="button"
-          title="向左轉 90°"
+          title={t('vehicleEditor.rotationToolbar.left90')}
           onClick={onRotateLeft90}
           className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
         >
@@ -36,7 +38,7 @@ export function VehicleRotationToolbar({
         </button>
         <button
           type="button"
-          title="向右轉 90°"
+          title={t('vehicleEditor.rotationToolbar.right90')}
           onClick={onRotateRight90}
           className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
         >
@@ -47,7 +49,7 @@ export function VehicleRotationToolbar({
         </span>
         <button
           type="button"
-          title="微調 -5°"
+          title={t('vehicleEditor.rotationToolbar.nudgeMinus')}
           onClick={() => onRotateDelta(-5)}
           className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
         >
@@ -55,7 +57,7 @@ export function VehicleRotationToolbar({
         </button>
         <button
           type="button"
-          title="微調 +5°"
+          title={t('vehicleEditor.rotationToolbar.nudgePlus')}
           onClick={() => onRotateDelta(5)}
           className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
         >

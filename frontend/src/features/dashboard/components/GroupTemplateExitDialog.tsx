@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   groupLabel: string;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSave }: Props) {
+  const { t } = useTranslation();
   return (
     <div
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] backdrop-blur-sm"
@@ -26,11 +28,10 @@ export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSav
             </div>
             <div>
               <h2 id="group-exit-dialog-title" className="text-zinc-100 font-semibold text-base">
-                離開子畫布編輯？
+                {t('dashboard.groupExit.title')}
               </h2>
               <p className="text-zinc-400 text-sm mt-1 leading-relaxed">
-                「{groupLabel}」的範本在編輯期間的變更已寫入本機預覽。
-                請選擇要保留變更，或還原為進入編輯前的範本。
+                {t('dashboard.groupExit.body', { label: groupLabel })}
               </p>
             </div>
           </div>
@@ -38,7 +39,7 @@ export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSav
             type="button"
             onClick={onCancel}
             className="text-zinc-500 hover:text-zinc-200 transition-colors p-1 shrink-0"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X size={18} />
           </button>
@@ -50,7 +51,7 @@ export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSav
             onClick={onCancel}
             className="px-4 py-2 rounded-lg border border-zinc-600 text-zinc-300 text-sm hover:bg-zinc-800 transition-colors"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -58,14 +59,14 @@ export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSav
             className="px-4 py-2 rounded-lg border border-red-800/60 bg-red-950/40 text-red-300 text-sm font-medium
                        hover:bg-red-900/50 transition-colors"
           >
-            不儲存並退出
+            {t('dashboard.groupExit.discard')}
           </button>
           <button
             type="button"
             onClick={onSave}
             className="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-500 transition-colors"
           >
-            儲存並退出
+            {t('dashboard.saveAndExit')}
           </button>
         </div>
       </div>

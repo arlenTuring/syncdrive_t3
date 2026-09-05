@@ -1,5 +1,6 @@
 import { SlidersHorizontal, Tag } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   TASK_TYPE_COLORS,
   TASK_TYPE_OPTIONS,
@@ -58,6 +59,7 @@ function SidebarCard({
 }
 
 function TripTypeChip({ taskKey, label }: { taskKey: TaskTypeKey; label: string }) {
+  const { t } = useTranslation();
   const colors = TASK_TYPE_COLORS[taskKey];
   return (
     <button
@@ -69,7 +71,7 @@ function TripTypeChip({ taskKey, label }: { taskKey: TaskTypeKey; label: string 
       }}
       className="isolate relative inline-flex h-[32px] cursor-grab items-center justify-center overflow-hidden whitespace-nowrap rounded px-3 text-sm font-normal leading-[18px] tracking-[0.5px] transition select-none hover:brightness-110 active:cursor-grabbing"
       style={{ backgroundColor: colors.bg, color: colors.text }}
-      title={`拖曳「${label}」到列車時間線`}
+      title={t('shiftList.manualSidebar.dragChipTitle', { label })}
     >
       <div
         className="absolute inset-y-0 left-0 w-1"
@@ -136,6 +138,7 @@ function ManualBlockSettingsForm({
   onApply: (next: ManualBlockApplyPayload) => void;
   onApplyDwells: (next: ManualBlockDwellPayload) => void;
 }) {
+  const { t } = useTranslation();
   const [startText, setStartText] = useState(formatMinuteInput(block.plannedStartMinute));
   const [endText, setEndText] = useState(formatMinuteInput(block.plannedEndMinute));
   const [routeId, setRouteId] = useState(block.routeId ?? '');
@@ -242,15 +245,15 @@ function ManualBlockSettingsForm({
     const startMinute = parseMinuteInput(nextStartText);
     const endMinute = parseMinuteInput(nextEndText);
     if (startMinute == null || endMinute == null) {
-      setError('時間格式須為 HH:MM:SS 或 HH:MM');
+      setError(t('shiftList.manualSidebar.errorTimeFormat'));
       return;
     }
     if (endMinute <= startMinute) {
-      setError('結束時間必須晚於開始時間');
+      setError(t('shiftList.manualSidebar.errorEndBeforeStart'));
       return;
     }
     if (endMinute - startMinute < minDurationMinutes) {
-      setError(`班次長度不得少於靠站合計（${Math.ceil(minDurationMinutes * 60)} 秒）`);
+      setError(t('shiftList.manualSidebar.errorMinDuration', { seconds: Math.ceil(minDurationMinutes * 60) }));
       return;
     }
     if (
@@ -271,18 +274,18 @@ function ManualBlockSettingsForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3">
-        <span className={LABEL_CLASS}>班次代號</span>
+        <span className={LABEL_CLASS}>{t('shiftList.manualSidebar.tripCode')}</span>
         <input
           type="text"
           readOnly
           value={tripCode}
           className={`${INPUT_CLASS} cursor-default text-zinc-300`}
-          aria-label="班次代號（自動產生）"
+          aria-label={t('shiftList.manualSidebar.tripCodeAria')}
         />
 
         {block.taskType === 'passenger' ? (
           <>
-            <span className={LABEL_CLASS}>選擇路線</span>
+            <span className={LABEL_CLASS}>{t('shiftList.manualSidebar.selectRoute')}</span>
             <select
               value={routeId}
               onChange={(event) => {
@@ -296,9 +299,9 @@ function ManualBlockSettingsForm({
                 });
               }}
               className={INPUT_CLASS}
-              aria-label="選擇正線路線"
+              aria-label={t('shiftList.manualSidebar.selectRouteAria')}
             >
-              <option value="">尚未選擇</option>
+              <option value="">{t('shiftList.manualSidebar.notSelected')}</option>
               {selectedRoutes.map((route) => (
                 <option key={route.routeId} value={route.routeId}>
                   {route.routeName}
@@ -309,7 +312,7 @@ function ManualBlockSettingsForm({
           </>
         ) : null}
 
-        <span className={LABEL_CLASS}>開始</span>
+        <span className={LABEL_CLASS}>{t('shiftList.manualSidebar.start')}</span>
         <input
           type="text"
           value={startText}
@@ -326,10 +329,10 @@ function ManualBlockSettingsForm({
           }}
           placeholder="HH:MM:SS"
           className={INPUT_CLASS}
-          aria-label="開始時間"
+          aria-label={t('shiftList.manualSidebar.startAria')}
         />
 
-        <span className={LABEL_CLASS}>結束</span>
+        <span className={LABEL_CLASS}>{t('shiftList.manualSidebar.end')}</span>
         <input
           type="text"
           value={endText}
@@ -346,16 +349,16 @@ function ManualBlockSettingsForm({
           }}
           placeholder="HH:MM:SS"
           className={INPUT_CLASS}
-          aria-label="結束時間"
+          aria-label={t('shiftList.manualSidebar.endAria')}
         />
       </div>
 
       {showDwellEditor ? (
         <div className="space-y-2 border-t border-zinc-800/70 pt-3">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-medium text-zinc-200">各站靠站時間</h4>
+            <h4 className="text-xs font-medium text-zinc-200">{t('shiftList.manualSidebar.stationDwells')}</h4>
             <span className="text-[10px] text-zinc-500">
-              合計 {dwellTotalSeconds}s · 最短 {Math.ceil(minDurationMinutes * 60)}s
+              {t('shiftList.manualSidebar.dwellTotalMin', { total: dwellTotalSeconds, min: Math.ceil(minDurationMinutes * 60) })}
             </span>
           </div>
           <div className="space-y-1.5">
@@ -384,15 +387,15 @@ function ManualBlockSettingsForm({
                 >
                   <span
                     className="truncate text-[11px] text-zinc-400"
-                    title={`站點:${dwell.stationName || dwell.stationId}`}
+                    title={t('shiftList.manualSidebar.stationPrefix', { name: dwell.stationName || dwell.stationId })}
                   >
-                    站點:{dwell.stationName || dwell.stationId}
+                    {t('shiftList.manualSidebar.stationPrefix', { name: dwell.stationName || dwell.stationId })}
                   </span>
                   <div className="flex items-center justify-center gap-1">
                     <select
                       value={mode}
                       className="h-8 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-1 text-center text-[11px] text-zinc-100"
-                      aria-label={`${dwell.stationName} 停靠方式`}
+                      aria-label={t('shiftList.manualSidebar.dwellModeAria', { name: dwell.stationName })}
                       onChange={(event) => {
                         const nextMode = event.target.value as ShiftStationDwellMode;
                         // 明示回傳型別，讓兩個分支的 dwellMode 都對著
@@ -420,18 +423,18 @@ function ManualBlockSettingsForm({
                         commitDwells(nextDwells, dwellSlackText);
                       }}
                     >
-                      <option value="seconds">秒數</option>
-                      <option value="no_stop">不停靠</option>
-                      <option value="line_change">換線停靠</option>
+                      <option value="seconds">{t('shiftList.manualSidebar.dwellSeconds')}</option>
+                      <option value="no_stop">{t('shiftList.manualSidebar.noStop')}</option>
+                      <option value="line_change">{t('shiftList.manualSidebar.lineChange')}</option>
                     </select>
                     {mode === 'seconds' ? (
                       <input
                         type="text"
                         inputMode="numeric"
                         value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
-                        placeholder="必填"
+                        placeholder={t('shiftList.manualSidebar.required')}
                         className={`${SMALL_INPUT_CLASS} text-center`}
-                        aria-label={`${dwell.stationName} 靠站秒數`}
+                        aria-label={t('shiftList.manualSidebar.dwellSecondsAria', { name: dwell.stationName })}
                         onChange={(event) => {
                           const digits = event.target.value.replace(/\D/g, '');
                           const nextDwells = stationDwells.map((item) =>
@@ -455,13 +458,13 @@ function ManualBlockSettingsForm({
             })}
           </div>
           <label className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2 pt-1">
-            <span className="text-[11px] text-zinc-400">停靠緩衝（秒）</span>
+            <span className="text-[11px] text-zinc-400">{t('shiftList.manualSidebar.dwellSlack')}</span>
             <input
               type="text"
               inputMode="numeric"
               value={dwellSlackText}
               className={SMALL_INPUT_CLASS}
-              aria-label="停靠緩衝秒數"
+              aria-label={t('shiftList.manualSidebar.dwellSlackAria')}
               onChange={(event) => {
                 const digits = event.target.value.replace(/\D/g, '');
                 setDwellSlackText(digits);
@@ -470,15 +473,17 @@ function ManualBlockSettingsForm({
             />
           </label>
           <p className="text-[10px] leading-4 text-zinc-500">
-            縮短班次卡時不得少於靠站＋緩衝合計。變更後若需更長會自動延長結束時間。
+            {t('shiftList.manualSidebar.dwellSlackHint')}
           </p>
           {durationShorterThanDwells ? (
             <p
               className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-4 text-amber-200"
               role="status"
             >
-              ⚠️ 目前班次長度（{blockDurationSeconds} 秒）小於靠站＋緩衝合計（{dwellTotalSeconds}{' '}
-              秒）。請拉長班次卡，或減少各站靠站／停靠緩衝。
+              {t('shiftList.manualSidebar.durationTooShort', {
+                block: blockDurationSeconds,
+                dwell: dwellTotalSeconds,
+              })}
             </p>
           ) : null}
         </div>
@@ -502,23 +507,27 @@ export function ManualScheduleEditorSidebar({
   onApplyBlock: (next: ManualBlockApplyPayload) => void;
   onApplyDwells: (next: ManualBlockDwellPayload) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <aside className="flex w-[248px] shrink-0 flex-col gap-3">
-      <SidebarCard icon={<Tag className="size-4 text-zinc-400" />} title="任務類型">
+      <SidebarCard icon={<Tag className="size-4 text-zinc-400" />} title={t('shiftList.manualSidebar.taskTypes')}>
         <div className="grid grid-cols-2 gap-2">
           {TASK_TYPE_OPTIONS.map((task) => (
-            <TripTypeChip key={task.key} taskKey={task.key} label={task.label} />
+            <TripTypeChip
+              key={task.key}
+              taskKey={task.key}
+              label={t(`timeTemplates.taskTypes.${task.key}`)}
+            />
           ))}
         </div>
         <p className="mt-3 text-[11px] leading-4 text-zinc-500">
-          拖曳班次卡到左側列車線；預設長度 10 分鐘，對齊 10 秒格，不可與其他班次重疊。
-          上方列為時間模板任務（僅供對照），下方為你放置的班次卡。
+          {t('shiftList.manualSidebar.dragHint')}
         </p>
       </SidebarCard>
 
       <SidebarCard
         icon={<SlidersHorizontal className="size-4 text-zinc-400" />}
-        title="任務設定"
+        title={t('shiftList.manualSidebar.taskSettings')}
       >
         {selectedBlock && selectedBlock.source === 'template_bar' ? (
           <ManualBlockSettingsForm
@@ -530,7 +539,7 @@ export function ManualScheduleEditorSidebar({
             onApplyDwells={onApplyDwells}
           />
         ) : (
-          <PanelNoData message="沒有選取" />
+          <PanelNoData message={t('shiftList.manualSidebar.nothingSelected')} />
         )}
       </SidebarCard>
     </aside>

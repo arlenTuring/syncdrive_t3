@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { DashboardPlane, CanvasElementProps, ChildWidget, WidgetType, CanvasKind } from './types';
 import { CanvasElement } from './CanvasElement';
 import { useFormatPainter } from './context/FormatPainterContext';
@@ -75,6 +76,7 @@ export function PlaneWorkspace({
   subcanvasDesignBounds,
   dualCanvasEdit,
 }: Props) {
+  const { t } = useTranslation();
   const fp = useFormatPainter();
   const painterActive = !!fp?.armed;
   const { modifier: modifierHeld } = useModifierHeld();
@@ -453,14 +455,14 @@ export function PlaneWorkspace({
             opacity: scaleLocked ? 0.35 : 1,
             cursor: scaleLocked ? 'not-allowed' : 'pointer',
           }}
-          title={scaleLocked ? '縮放已鎖定' : '縮小 (Ctrl + Wheel)'}
+          title={scaleLocked ? t('dashboard.planeWorkspace.zoomLocked') : t('dashboard.planeWorkspace.zoomOut')}
         >
           <ZoomOut size={14} />
         </button>
         <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
         <button onClick={zoomReset}
           style={{ ...zoomBtnStyle, gap: 6, padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', color: '#94a3b8' }}
-          title={scaleLocked ? '重置位置（縮放已鎖定）' : '重置縮放與位置'}>
+          title={scaleLocked ? t('dashboard.planeWorkspace.resetLocked') : t('dashboard.planeWorkspace.reset')}>
           <Crosshair size={14} className="text-cyan-500" />
           {Math.round(userZoom * 100)}%
         </button>
@@ -473,7 +475,7 @@ export function PlaneWorkspace({
             opacity: scaleLocked ? 0.35 : 1,
             cursor: scaleLocked ? 'not-allowed' : 'pointer',
           }}
-          title={scaleLocked ? '縮放已鎖定' : '放大 (Ctrl + Wheel)'}
+          title={scaleLocked ? t('dashboard.planeWorkspace.zoomLocked') : t('dashboard.planeWorkspace.zoomIn')}
         >
           <ZoomIn size={14} />
         </button>
@@ -484,9 +486,9 @@ export function PlaneWorkspace({
             ...zoomBtnStyle,
             color: scaleLocked ? '#38bdf8' : '#94a3b8',
           }}
-          title={scaleLocked ? '解除縮放鎖定（仍可橫向平移）' : '鎖定目前縮放（下次進入沿用，仍可橫向平移）'}
+          title={scaleLocked ? t('dashboard.planeWorkspace.unlockScale') : t('dashboard.planeWorkspace.lockScale')}
           aria-pressed={scaleLocked}
-          aria-label={scaleLocked ? '解除縮放鎖定' : '鎖定縮放'}
+          aria-label={scaleLocked ? t('dashboard.planeWorkspace.unlockScaleAria') : t('dashboard.planeWorkspace.lockScaleAria')}
         >
           {scaleLocked ? <Lock size={14} /> : <LockOpen size={14} />}
         </button>
@@ -635,7 +637,7 @@ export function PlaneWorkspace({
                     color: 'rgba(168,85,247,0.85)',
                   }}
                 >
-                  {i === 0 ? '預設範本' : '常態範本'} {dualCanvasEdit.designW}×{dualCanvasEdit.designH}
+                  {i === 0 ? t('dashboard.planeWorkspace.defaultTemplate') : t('dashboard.planeWorkspace.normalTemplate')} {dualCanvasEdit.designW}×{dualCanvasEdit.designH}
                 </div>
               </div>
             ))}
@@ -667,7 +669,7 @@ export function PlaneWorkspace({
                 gap: 4,
                 padding: 4,
               }}
-              title="雙畫板閘道設定"
+              title={t('dashboard.planeWorkspace.gateSettingsTitle')}
             >
               <span
                 style={{
@@ -679,7 +681,7 @@ export function PlaneWorkspace({
                   letterSpacing: '0.08em',
                 }}
               >
-                閘道設定
+                {t('dashboard.planeWorkspace.gateSettings')}
               </span>
             </button>
           </>
@@ -712,7 +714,7 @@ export function PlaneWorkspace({
                 letterSpacing: '0.04em',
               }}
             >
-              執行範本 {subcanvasDesignBounds.width}×{subcanvasDesignBounds.height}
+              {t('dashboard.planeWorkspace.runtimeTemplate', { w: subcanvasDesignBounds.width, h: subcanvasDesignBounds.height })}
             </div>
           </div>
         ) : null}
@@ -741,7 +743,7 @@ export function PlaneWorkspace({
               fontSize: 13, fontFamily: 'monospace', fontWeight: 'bold',
               boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
             }}>
-              ＋ 放開以新增畫布
+              {t('dashboard.planeWorkspace.releaseToAdd')}
             </div>
           </div>
         )}
@@ -767,7 +769,7 @@ export function PlaneWorkspace({
             boxShadow: '0 4px 12px rgba(217,70,239,0.2)',
           }}>
             <Paintbrush size={12} />
-            格式刷 · 點選 {fp.armed.sourceType} 元件 · Esc 取消
+            {t('dashboard.planeWorkspace.formatPainter', { type: fp.armed.sourceType })}
           </div>
         )}
         {isEditMode && !painterActive && (
@@ -779,7 +781,7 @@ export function PlaneWorkspace({
             border: '1px solid rgba(6,182,212,0.2)',
             padding: '2px 6px', borderRadius: 4, pointerEvents: 'none',
           }}>
-            ✂ EDIT · Shift+點擊加選 · Shift/Alt+拖曳框選 · 3px 對齊
+            {t('dashboard.planeWorkspace.editHint')}
           </div>
         )}
 
@@ -788,9 +790,9 @@ export function PlaneWorkspace({
             className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-center"
             style={{ top: 30, left: 30, width: plane.width, height: plane.height }}
           >
-            <p className="text-sm font-medium text-zinc-300">此平面沒有任何畫布元件</p>
+            <p className="text-sm font-medium text-zinc-300">{t('dashboard.planeWorkspace.emptyTitle')}</p>
             <p className="max-w-md text-xs leading-relaxed text-zinc-500">
-              可能是本機快取損壞。請使用左上角齒輪「應用程式設定」→「還原兩個圖台範例」，或從清單重新建立平面。
+              {t('dashboard.planeWorkspace.emptyHint')}
             </p>
           </div>
         ) : null}

@@ -1,5 +1,6 @@
 import { AlertTriangle, MapPin, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   fetchOperationShiftDetail,
   fetchOperationShiftList,
@@ -8,7 +9,11 @@ import { buildShiftScheduleDraftFromStored } from '../../shift-list/types/create
 import { resolveGeneratedBlockTripCode } from '../../shift-list/utils/maintenanceSectionCode';
 import type { GeneratedSchedulePlan } from '../../shift-list/utils/schedule-engine/types';
 import { formatMinutesToTime, parseTimeToMinutes } from '../../time-templates/types/editor';
-import { PRIORITY_LABEL, type DispatchPriorityKey, type DispatchStatusKey, DISPATCH_STATUS_TAG_STYLE, STATUS_LABEL } from '../types';
+import {
+  type DispatchPriorityKey,
+  type DispatchStatusKey,
+  DISPATCH_STATUS_TAG_STYLE,
+} from '../types';
 import { StatusTag } from '../../../components/StatusTag';
 
 export type ConfirmStationStop = {
@@ -126,16 +131,20 @@ export function CreateDispatchConfirmStep({
   confirmText,
   onConfirmTextChange,
   showConfirmField = true,
-  confirmLabel = '輸入確認並建立',
-  confirmPlaceholder = '請輸入「確認」',
+  confirmLabel,
+  confirmPlaceholder,
   variant = 'plain',
   dispatchStatus,
 }: CreateDispatchConfirmStepProps) {
+  const { t } = useTranslation();
   const [conflict, setConflict] = useState<DispatchConflict | null>(null);
   const execAt = useMemo(() => resolveExecAt(execTime), [execTime]);
   const startMinute = useMemo(() => parseTimeToMinutes(execTime) ?? 0, [execTime]);
   const endMinute = startMinute + Math.max(1, tripMinutes);
   const stationIds = useMemo(() => stations.map((s) => s.stationId), [stations]);
+  const resolvedConfirmLabel = confirmLabel ?? t('dispatchScheduling.confirm.confirmAndCreate');
+  const resolvedConfirmPlaceholder =
+    confirmPlaceholder ?? t('dispatchScheduling.confirm.confirmPlaceholder');
 
   useEffect(() => {
     let cancelled = false;
@@ -182,28 +191,32 @@ export function CreateDispatchConfirmStep({
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-2">
       <section className={sectionClass}>
         <h3 className={headingClass}>
-          {variant === 'approval' ? '基礎內容設定' : '基本資料'}
+          {variant === 'approval'
+            ? t('dispatchScheduling.confirm.basicSettings')
+            : t('dispatchScheduling.createDialog.basicInfo')}
         </h3>
         <div className={`grid gap-4 text-sm ${card ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">執行時間</p>
+            <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.createDialog.execTime')}</p>
             <p className="text-zinc-100">{execDisplay ?? formatDotDateTime(execAt)}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">優先等級</p>
+            <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.createDialog.priority')}</p>
             <p className="text-zinc-100">
-              {priority ? PRIORITY_LABEL[priority] : '—'}
+              {priority ? t(`dispatchScheduling.priority.${priority}`) : '—'}
             </p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">指派載具</p>
+            <p className="mb-1 text-xs text-zinc-500">
+              {t('dispatchScheduling.createDialog.assignVehicle')}
+            </p>
             <p className="text-zinc-100">{vehicleCode || '—'}</p>
           </div>
           {dispatchStatus ? (
             <div>
-              <p className="mb-1 text-xs text-zinc-500">派遣狀態</p>
+              <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.columns.status')}</p>
               <StatusTag
-                label={STATUS_LABEL[dispatchStatus]}
+                label={t(`dispatchScheduling.status.${dispatchStatus}`)}
                 style={DISPATCH_STATUS_TAG_STYLE[dispatchStatus]}
               />
             </div>
@@ -212,7 +225,7 @@ export function CreateDispatchConfirmStep({
       </section>
 
       <section className={sectionClass}>
-        <h3 className={headingClass}>派遣任務規劃</h3>
+        <h3 className={headingClass}>{t('dispatchScheduling.createDialog.planSection')}</h3>
         <div className="relative pl-1">
           {stations.map((stop, index) => (
             <div key={stop.id} className="relative flex gap-3 pb-5 last:pb-0">
@@ -237,19 +250,22 @@ export function CreateDispatchConfirmStep({
         <p className="mb-3 flex items-start gap-2 text-sm text-red-400">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <span>
-            警告：此停靠時間將衝突 {conflict.startLabel}-{conflict.endLabel} 的 [班次{' '}
-            {conflict.tripCode}]，該班次將被強制取消。
+            {t('dispatchScheduling.confirm.conflictWarning', {
+              start: conflict.startLabel,
+              end: conflict.endLabel,
+              tripCode: conflict.tripCode,
+            })}
           </span>
         </p>
       ) : null}
 
       {showConfirmField ? (
         <label className={card ? 'mb-1 block rounded-xl bg-zinc-900/80 px-4 py-3' : 'block'}>
-          <span className="mb-1.5 block text-xs text-zinc-400">{confirmLabel}</span>
+          <span className="mb-1.5 block text-xs text-zinc-400">{resolvedConfirmLabel}</span>
           <input
             value={confirmText}
             onChange={(e) => onConfirmTextChange(e.target.value)}
-            placeholder={confirmPlaceholder}
+            placeholder={resolvedConfirmPlaceholder}
             autoComplete="off"
             className="h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-950/40 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30"
           />
@@ -261,11 +277,12 @@ export function CreateDispatchConfirmStep({
 
 export function CreateDispatchConfirmHeader({
   onClose,
-  title = '派遣任務雙重確認',
+  title,
 }: {
   onClose: () => void;
   title?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
       <div className="flex items-center gap-2.5">
@@ -276,14 +293,14 @@ export function CreateDispatchConfirmHeader({
           !
         </span>
         <h2 id="create-dispatch-title" className="text-base font-semibold text-zinc-100">
-          {title}
+          {title ?? t('dispatchScheduling.confirm.dualVerifyTitle')}
         </h2>
       </div>
       <button
         type="button"
         onClick={onClose}
         className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        aria-label="關閉"
+        aria-label={t('common.close')}
       >
         <X className="size-4" />
       </button>

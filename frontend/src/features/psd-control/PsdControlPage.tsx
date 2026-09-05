@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DoorLinkIndicator } from './components/DoorLinkIndicator';
 import { DoorDetailPage } from './components/DoorDetailPage';
 import type { DoorIndicatorModel } from './constants';
@@ -58,6 +59,15 @@ function ControlCard({
 }
 
 export function PsdControlPage() {
+  const { t } = useTranslation();
+  const vehicleDoors = useMemo(
+    () =>
+      VEHICLE_DOORS.map((door) => ({
+        id: door.id,
+        label: t(`psdControl.doors.${door.id}`),
+      })),
+    [t],
+  );
   const [tab, setTab] = useState<TabKey>('vehicle');
   const [vehicles, setVehicles] = useState<PsdVehicleCard[]>([]);
   const [vehicleLoading, setVehicleLoading] = useState(true);
@@ -149,7 +159,7 @@ export function PsdControlPage() {
             tab === 'vehicle' ? 'text-[#51A2FF]' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          車門
+          {t('psdControl.tabVehicle')}
           {tab === 'vehicle' ? (
             <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#2B7FFF]" />
           ) : null}
@@ -161,7 +171,7 @@ export function PsdControlPage() {
             tab === 'platform' ? 'text-[#51A2FF]' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          月台門
+          {t('psdControl.tabPlatform')}
           {tab === 'platform' ? (
             <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#2B7FFF]" />
           ) : null}
@@ -171,16 +181,16 @@ export function PsdControlPage() {
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {tab === 'vehicle' ? (
           vehicleLoading ? (
-            <p className="py-16 text-center text-sm text-zinc-500">載入車輛…</p>
+            <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.loadingVehicles')}</p>
           ) : vehicles.length === 0 ? (
-            <p className="py-16 text-center text-sm text-zinc-500">尚無已註冊載具</p>
+            <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.emptyVehicles')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {vehicles.map((vehicle) => (
                 <ControlCard
                   key={vehicle.id}
                   title={vehicle.label}
-                  doors={VEHICLE_DOORS}
+                  doors={vehicleDoors}
                   doorStates={vehicleDoorStatesFromPayload(byVehicle.get(vehicle.label))}
                   onOpen={() =>
                     setDetail({ kind: 'vehicle', title: vehicle.label, vehicleCode: vehicle.label })
@@ -190,11 +200,11 @@ export function PsdControlPage() {
             </div>
           )
         ) : platformLoading ? (
-          <p className="py-16 text-center text-sm text-zinc-500">載入月台門…</p>
+          <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.loadingPlatforms')}</p>
         ) : platformError ? (
           <p className="py-16 text-center text-sm text-red-400">{platformError}</p>
         ) : platforms.length === 0 ? (
-          <p className="py-16 text-center text-sm text-zinc-500">目前啟用地圖沒有月台門元件</p>
+          <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.emptyPlatforms')}</p>
         ) : (
           <div className="flex flex-col gap-4">
             {platforms.map((platform) => (

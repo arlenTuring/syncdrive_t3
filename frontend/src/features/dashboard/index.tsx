@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'; // HMR Trigger
+import { useTranslation } from 'react-i18next';
 import { useDashboardEditor } from './useDashboardEditor';
 import { NewPlaneDialog } from './NewPlaneDialog';
 import { PlaneWorkspace } from './PlaneWorkspace';
@@ -57,6 +58,7 @@ function cloneCanvasElement(el: CanvasElementProps): CanvasElementProps {
 }
 
 export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () => void }) {
+  const { t } = useTranslation();
   const {
     planes, activePlane, setActivePlaneId,
     selectedElementId, selectedElement, selectedElementIds,
@@ -541,7 +543,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
           <div className="flex items-center gap-2.5 text-lg font-bold text-cyan-400">
             <LayoutGrid size={20} />
-            <span>儀表板管理</span>
+            <span>{t('dashboard.title')}</span>
           </div>
           <div className="flex-1" />
           <button onClick={() => setShowSettings(true)}
@@ -564,10 +566,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           onImportTemplate={(result) => {
             importPlane(result.plane);
             const msg = [
-              `已匯入平面「${result.plane.name}」`,
+              t('dashboard.importedPlane', { name: result.plane.name }),
               ...result.dataSourceWarnings,
               result.bindingIssueCount > 0
-                ? `⚠ ${result.bindingIssueCount} 處元件可能無法連線（畫布上會顯示驚嘆號）`
+                ? t('dashboard.bindingIssues', { count: result.bindingIssueCount })
                 : '',
             ].filter(Boolean).join('\n');
             alert(msg);
@@ -602,17 +604,17 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             ...editingGroup,
             width: editingGroup.templateWidth || 300,
             height: editingGroup.templateHeight || 200,
-            label: `${editingGroup.label} · 雙畫板設定`,
+            label: t('dashboard.editorChrome.labelDualSettings', { label: editingGroup.label }),
           }
         : {
             ...editingGroup,
             width: dualSubcanvas?.designW ?? (editingGroup.templateWidth || 300),
             height: dualSubcanvas?.designH ?? (editingGroup.templateHeight || 200),
             label: dualEditFocusId === TEMPLATE_CANVAS_DEFAULT
-              ? `${editingGroup.label} · 預設資料`
+              ? t('dashboard.editorChrome.labelDefaultData', { label: editingGroup.label })
               : dualEditFocusId === TEMPLATE_CANVAS_NORMAL
-                ? `${editingGroup.label} · 常態資料`
-                : `${editingGroup.label} · 範本`,
+                ? t('dashboard.editorChrome.labelNormalData', { label: editingGroup.label })
+                : t('dashboard.editorChrome.labelTemplate', { label: editingGroup.label }),
           }
     : selectedElement;
 
@@ -623,7 +625,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     const { editW, editH, laneW, laneH, gapW } = dualSubcanvas;
     displayPlane = {
       id: 'template-plane-dual',
-      name: `編輯雙畫板: ${editingGroup.label}`,
+      name: t('dashboard.editorChrome.editDualName', { label: editingGroup.label }),
       width: editW,
       height: editH,
       elements: [
@@ -636,7 +638,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           height: laneH,
           isGroup: false,
           opacity: 100,
-          label: '預設資料',
+          label: t('dashboard.dualCanvas.defaultData'),
           children: getDefaultChildren(editingGroup),
         },
         {
@@ -648,7 +650,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           height: laneH,
           isGroup: false,
           opacity: 100,
-          label: '常態資料',
+          label: t('dashboard.dualCanvas.normalData'),
           children: getNormalChildren(editingGroup),
         },
       ],
@@ -660,7 +662,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     const { editW, editH } = subcanvasEdit;
     displayPlane = {
       id: 'template-plane',
-      name: `編輯群組範本: ${editingGroup.label}`,
+      name: t('dashboard.editorChrome.editGroupTemplate', { label: editingGroup.label }),
       width: editW,
       height: editH,
       elements: [{
@@ -672,7 +674,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         height: editH,
         isGroup: false,
         opacity: 100,
-        label: `${editingGroup.label} · 範本`,
+        label: t('dashboard.editorChrome.labelTemplate', { label: editingGroup.label }),
         children: getNormalChildren(editingGroup),
       }],
       createdAt: 0,
@@ -849,7 +851,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     const editH = 540;
     tabListCellDisplayPlane = {
       id: 'tab-list-cell-edit-plane',
-      name: `編輯「${tab.label} · ${column.name || '欄位'}」單元格範本`,
+      name: t('dashboard.editorChrome.editCellTemplate', {
+        tab: tab.label,
+        column: column.name || t('dashboard.editorChrome.columnFallback'),
+      }),
       width: editW,
       height: editH,
       elements: [{
@@ -859,7 +864,13 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         y: 0,
         width: editW,
         height: editH,
-        label: `${widget.label || '清單'} · ${tab.label} · ${column.name || '欄位'}（範本範圍：${colW}×${rowH}px）`,
+        label: t('dashboard.editorChrome.cellTemplateLabel', {
+          list: widget.label || t('dashboard.editorChrome.listFallback'),
+          tab: tab.label,
+          column: column.name || t('dashboard.editorChrome.columnFallback'),
+          width: colW,
+          height: rowH,
+        }),
         backgroundColor: '#18181b',
         backgroundImage: '',
         opacity: 100,
@@ -881,7 +892,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     const editH = Math.max(editingTabCanvas.height - tabH, 400);
     tabCanvasDisplayPlane = {
       id: 'tab-canvas-edit-plane',
-      name: `編輯 Tab「${editingTabDef?.label ?? ''}」子畫布`,
+      name: t('dashboard.editorChrome.editTabSubcanvas', {
+        label: editingTabDef?.label ?? '',
+      }),
       width: editW,
       height: editH,
       elements: [{
@@ -924,7 +937,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               onClick={saveAndExitTabListCellEdit}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all"
             >
-              <ArrowLeft size={16} /> 完成並返回
+              <ArrowLeft size={16} /> {t('dashboard.doneAndReturn')}
             </button>
             <button
               type="button"
@@ -932,10 +945,17 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
                          text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
             >
-              放棄變更
+              {t('dashboard.discardChanges')}
             </button>
             <span className="text-xs text-zinc-400">
-              單元格子畫布 · <strong className="text-blue-400">{editingTabListCellInfo.tab.label}</strong> · <strong className="text-emerald-400">{editingTabListCellInfo.column.name || '未命名欄位'}</strong> ({editingTabListCellInfo.column.width}px × {editingTabListCellInfo.widget.rowHeight ?? 44}px)
+              {t('dashboard.cellSubcanvas', {
+                tab: editingTabListCellInfo.tab.label,
+                column:
+                  editingTabListCellInfo.column.name
+                  || t('dashboard.unnamedColumn'),
+                width: editingTabListCellInfo.column.width,
+                height: editingTabListCellInfo.widget.rowHeight ?? 44,
+              })}
             </span>
           </>
         ) : isEditingTabCanvas ? (
@@ -945,7 +965,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               onClick={saveAndExitTabCanvasEdit}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all"
             >
-              <ArrowLeft size={16} /> 儲存並退出
+              <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
             </button>
             <button
               type="button"
@@ -953,10 +973,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
                          text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
             >
-              不儲存退出
+              {t('dashboard.exitWithoutSave')}
             </button>
             <span className="text-xs text-zinc-500">
-              Tab 子畫布 · <strong className="text-blue-400">{editingTabDef?.label}</strong>
+              {t('dashboard.tabSubcanvas', {
+                label: editingTabDef?.label ?? '',
+              })}
             </span>
           </>
         ) : editingGroup ? (
@@ -966,7 +988,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               onClick={saveAndExitGroupEdit}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition-all"
             >
-              <ArrowLeft size={16} /> 儲存並退出
+              <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
             </button>
             <button
               type="button"
@@ -974,10 +996,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
                          text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
             >
-              不儲存退出
+              {t('dashboard.exitWithoutSave')}
             </button>
             <div className="text-sm font-bold text-cyan-400 truncate max-w-[200px]">
-              子畫布：{editingGroup.label}
+              {t('dashboard.subcanvas', { label: editingGroup.label })}
             </div>
             <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-zinc-700 bg-zinc-800/80 p-0.5">
               <button
@@ -985,7 +1007,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 disabled={!canUndo}
                 onClick={undo}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title="復原 (⌘/Ctrl+Z)"
+                title={t('dashboard.undoTitle')}
               >
                 <Undo2 size={14} />
               </button>
@@ -994,7 +1016,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 disabled={!canRedo}
                 onClick={redo}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title="重做 (⌘/Ctrl+Shift+Z 或 Ctrl+Y)"
+                title={t('dashboard.redoTitle')}
               >
                 <Redo2 size={14} />
               </button>
@@ -1005,15 +1027,15 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <button 
               onClick={() => setView('list')}
               className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-cyan-400 transition-all mr-2"
-              title="返回列表"
+              title={t('dashboard.backToList')}
             >
               <ArrowLeft size={16} />
-              <span className="text-xs font-bold uppercase">列表</span>
+              <span className="text-xs font-bold uppercase">{t('dashboard.list')}</span>
             </button>
 
             <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-sm pr-3 border-r border-zinc-700">
               <LayoutGrid size={15} />
-              <span>Editor</span>
+              <span>{t('dashboard.editor')}</span>
             </div>
 
             {/* 平面名稱編輯器 */}
@@ -1023,7 +1045,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 value={activePlane?.name ?? ''}
                 onChange={(e) => activePlane && updatePlane(activePlane.id, { name: e.target.value })}
                 className="bg-transparent border-none outline-none text-sm font-bold text-zinc-100 w-[200px] placeholder:text-zinc-600"
-                placeholder="未命名平面"
+                placeholder={t('dashboard.unnamedPlane')}
               />
             </div>
 
@@ -1036,7 +1058,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                   : 'bg-zinc-800 text-zinc-400 ring-1 ring-zinc-600'
               }`}
             >
-              {isEditMode ? '編輯' : '檢視'}
+              {isEditMode ? t('dashboard.modeEdit') : t('dashboard.modeView')}
             </span>
 
             {isEditMode ? (
@@ -1044,20 +1066,20 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 type="button"
                 onClick={toggleEditMode}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-500 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-sm transition hover:bg-zinc-700"
-                title="離開編輯模式 (E)"
+                title={t('dashboard.leaveEditTitle')}
               >
                 <LogOut size={14} />
-                <span>離開編輯</span>
+                <span>{t('dashboard.leaveEdit')}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={toggleEditMode}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-xs font-medium text-cyan-200 shadow-sm transition hover:bg-cyan-900/50"
-                title="進入編輯模式 (E)"
+                title={t('dashboard.enterEditTitle')}
               >
                 <Pencil size={14} />
-                <span>編輯</span>
+                <span>{t('dashboard.enterEdit')}</span>
               </button>
             )}
 
@@ -1068,20 +1090,20 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                   disabled={!canUndo}
                   onClick={undo}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="復原 (⌘/Ctrl+Z)"
+                  title={t('dashboard.undoTitle')}
                 >
                   <Undo2 size={14} />
-                  <span className="hidden sm:inline">復原</span>
+                  <span className="hidden sm:inline">{t('dashboard.undo')}</span>
                 </button>
                 <button
                   type="button"
                   disabled={!canRedo}
                   onClick={redo}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="重做 (⌘/Ctrl+Shift+Z 或 Ctrl+Y)"
+                  title={t('dashboard.redoTitle')}
                 >
                   <Redo2 size={14} />
-                  <span className="hidden sm:inline">重做</span>
+                  <span className="hidden sm:inline">{t('dashboard.redo')}</span>
                 </button>
               </div>
             )}
@@ -1098,7 +1120,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 importPlane(result.plane);
                 setActivePlaneId(result.plane.id);
                 const msg = [
-                  `已匯入「${result.plane.name}」`,
+                  t('dashboard.imported', { name: result.plane.name }),
                   ...result.dataSourceWarnings,
                 ].join('\n');
                 if (result.dataSourceWarnings.length) alert(msg);
@@ -1114,7 +1136,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         <button onClick={() => setShowSettings(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700
                      text-zinc-400 text-xs hover:border-purple-600 hover:text-purple-400 transition-colors">
-          <Settings size={13} /> 資料來源
+          <Settings size={13} /> {t('dashboard.dataSource')}
         </button>
 
         {/* 剪貼簿狀態提示 */}
@@ -1122,7 +1144,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-900/20 border border-amber-700/40 text-amber-400 text-xs">
             <Copy size={11} />
             <span className="font-mono text-[10px]">
-              已複製 {clipboard.kind === 'canvas' ? '畫布' : '元件'}
+              {clipboard.kind === 'canvas'
+                ? t('dashboard.copiedCanvas')
+                : t('dashboard.copiedWidget')}
             </span>
           </div>
         )}
@@ -1130,7 +1154,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-fuchsia-900/30 border border-fuchsia-600/50 text-fuchsia-200 text-xs animate-pulse">
             <Paintbrush size={11} />
             <span className="font-mono text-[10px]">
-              格式刷：點選同類型元件（{formatPainter.sourceType}）· Esc 取消
+              {t('dashboard.formatPainter', { type: formatPainter.sourceType })}
             </span>
           </div>
         )}
@@ -1145,20 +1169,36 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           }}
         >
           <Save size={13} />
-          {saveStatus === 'ok' ? '✓ 已儲存' : saveStatus === 'error' ? '❌ 儲存失敗' : '儲存'}
+          {saveStatus === 'ok'
+            ? t('dashboard.saved')
+            : saveStatus === 'error'
+              ? t('dashboard.saveFailed')
+              : t('common.save')}
         </button>
 
         {(editingGroup && dualSubcanvas ? (
           <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
-            雙畫板 {dualSubcanvas.laneW}×{dualSubcanvas.laneH}
+            {t('dashboard.editorChrome.dualBoardSize', {
+              w: dualSubcanvas.laneW,
+              h: dualSubcanvas.laneH,
+            })}
             <span className="text-zinc-700 mx-1">·</span>
-            範本 {dualSubcanvas.designW}×{dualSubcanvas.designH}
+            {t('dashboard.editorChrome.templateSize', {
+              w: dualSubcanvas.designW,
+              h: dualSubcanvas.designH,
+            })}
           </div>
         ) : editingGroup && subcanvasEdit ? (
           <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
-            編輯區 {subcanvasEdit.editW}×{subcanvasEdit.editH}
+            {t('dashboard.editorChrome.editAreaSize', {
+              w: subcanvasEdit.editW,
+              h: subcanvasEdit.editH,
+            })}
             <span className="text-zinc-700 mx-1">·</span>
-            執行範本 {subcanvasEdit.designW}×{subcanvasEdit.designH}
+            {t('dashboard.editorChrome.runtimeTemplateSize', {
+              w: subcanvasEdit.designW,
+              h: subcanvasEdit.designH,
+            })}
           </div>
         ) : activePlane ? (
           <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
@@ -1313,10 +1353,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <Monitor size={48} className="text-zinc-700" />
-            <p className="text-zinc-500 text-sm">尚無平面，請點擊「新增平面」開始設計</p>
+            <p className="text-zinc-500 text-sm">{t('dashboard.emptyPlanes')}</p>
             <button onClick={() => setShowNewDialog(true)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 text-white text-sm hover:bg-cyan-500 transition-colors">
-              <Plus size={16} /> 新增第一個平面
+              <Plus size={16} /> {t('dashboard.addFirstPlane')}
             </button>
           </div>
         )}
@@ -1336,7 +1376,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             editingTabListCellInfo
               ? {
                   tabLabel: editingTabListCellInfo.tab.label,
-                  columnName: editingTabListCellInfo.column.name || '未命名欄位',
+                  columnName: editingTabListCellInfo.column.name || t('dashboard.unnamedColumn'),
                 }
               : null
           }

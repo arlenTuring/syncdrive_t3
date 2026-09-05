@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   fetchYardFacilityEquipment,
   type FieldEquipmentItem,
@@ -23,6 +24,7 @@ type StepChargingParamsProps = {
 };
 
 export function StepChargingParams({ draft, onChange }: StepChargingParamsProps) {
+  const { t } = useTranslation();
   const charging = normalizeChargingDraft(draft);
   const patchCharging = (patch: Partial<MaintenanceTaskChargingDraft>) =>
     onChange(normalizeChargingDraft({ ...charging, ...patch }));
@@ -54,13 +56,13 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
 
   return (
     <StepSectionToggle
-      title="填入充電任務"
+      title={t('maintenanceTasks.charging.title')}
       enabled={charging.stepEnabled}
       onEnabledChange={(stepEnabled) => patchCharging({ stepEnabled })}
     >
       <div className="space-y-5">
         <TriggerFieldRow
-          label="電量觸發值"
+          label={t('maintenanceTasks.charging.triggerLabel')}
           showToggle={false}
           required
           enabled
@@ -69,21 +71,21 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
           onValueChange={(triggerPercent) =>
             patchCharging({ triggerPercent, triggerDetectionEnabled: true })
           }
-          prefixText="如電池電量已小於或等於"
-          suffixText="%時，需回廠充電"
+          prefixText={t('maintenanceTasks.charging.triggerPrefix')}
+          suffixText={t('maintenanceTasks.charging.triggerSuffix')}
           sanitizeValue={(raw) => sanitizeIntegerInput(raw, 99)}
         />
 
         <TriggerFieldRow
-          label="電量上限值"
+          label={t('maintenanceTasks.charging.upperLabel')}
           enabled={charging.upperLimitDetectionEnabled}
           value={charging.upperLimitPercent}
           onEnabledChange={(upperLimitDetectionEnabled) =>
             patchCharging({ upperLimitDetectionEnabled })
           }
           onValueChange={(upperLimitPercent) => patchCharging({ upperLimitPercent })}
-          prefixText="如電池電量已大於或等於"
-          suffixText="%時，即停止充電"
+          prefixText={t('maintenanceTasks.charging.upperPrefix')}
+          suffixText={t('maintenanceTasks.charging.upperSuffix')}
           sanitizeValue={(raw) => sanitizeIntegerInput(raw, 100)}
         />
 
@@ -94,7 +96,10 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
           equipmentError={equipmentError}
           equipmentHint={
             equipment.length > 0
-              ? `場域共 ${equipment.length} 座設施格可掛載（${equipment.map((e) => e.mapCode).join('、')}）；掛哪一座由整備任務決定，不受地圖用途限制`
+              ? t('maintenanceTasks.equipmentHint', {
+                  count: equipment.length,
+                  codes: equipment.map((e) => e.mapCode).join('、'),
+                })
               : undefined
           }
           newRow={() => ({
@@ -106,7 +111,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
           onChange={(equipmentRows) => patchCharging({ equipmentRows })}
           renderExtraFields={(row, updateRow) => (
             <div className="flex shrink-0 items-center gap-2 text-sm text-zinc-400">
-              <span className="whitespace-nowrap">每分鐘充電率</span>
+              <span className="whitespace-nowrap">{t('maintenanceTasks.charging.chargeRate')}</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -116,10 +121,12 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
                     chargeRateKwhPerMin: sanitizeIntegerInput(e.target.value),
                   })
                 }
-                placeholder="請輸入"
+                placeholder={t('maintenanceTasks.triggerField.placeholder')}
                 className={RATE_INPUT_CLASS}
               />
-              <span className="whitespace-nowrap text-zinc-500">度電/分鐘</span>
+              <span className="whitespace-nowrap text-zinc-500">
+                {t('maintenanceTasks.charging.chargeRateUnit')}
+              </span>
             </div>
           )}
         />

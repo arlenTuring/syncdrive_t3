@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { FileCode2, Image, Upload } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { BasemapFileSelection } from '../utils/basemapFacility'
 import { parseOpenDriveXodr, laneFillColor, lanePolygonToSvgPath, laneStrokeColor } from '../opendrive'
 
@@ -23,6 +24,7 @@ export function BasemapFilePickerDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useTranslation()
   const titleId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const previewUrlRef = useRef<string | null>(null)
@@ -85,14 +87,14 @@ export function BasemapFilePickerDialog({
         setXodrContent(text)
       } catch (err) {
         setSelectedFile(null)
-        setError(err instanceof Error ? err.message : 'OpenDRIVE 檔案無法解析')
+        setError(err instanceof Error ? err.message : t('mapEditor.basemap.parseFailed'))
       }
       return
     }
 
     if (!file.type.startsWith('image/')) {
       setSelectedFile(null)
-      setError('請選擇圖片或 .xodr 檔案')
+      setError(t('mapEditor.basemap.selectImageOrXodr'))
       return
     }
 
@@ -103,7 +105,7 @@ export function BasemapFilePickerDialog({
 
   const submit = () => {
     if (!selectedFile) {
-      setError('請先選擇底圖檔案')
+      setError(t('mapEditor.basemap.selectFirst'))
       return
     }
     if (xodrContent) {
@@ -113,7 +115,7 @@ export function BasemapFilePickerDialog({
       return
     }
     if (!previewUrl) {
-      setError('請先選擇底圖檔案')
+      setError(t('mapEditor.basemap.selectFirst'))
       return
     }
     const url = previewUrl
@@ -141,10 +143,10 @@ export function BasemapFilePickerDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="text-base font-semibold text-zinc-100">
-          載入底圖
+          {t('mapEditor.basemap.title')}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          支援本機圖片（PNG、JPG 等）或 OpenDRIVE（.xodr）即時繪製車道平面圖。可點擊選擇或拖曳檔案至下方區域。
+          {t('mapEditor.basemap.hint')}
         </p>
 
         <input
@@ -197,7 +199,7 @@ export function BasemapFilePickerDialog({
           {previewUrl ? (
             <img
               src={previewUrl}
-              alt={selectedFile?.name ?? '預覽'}
+              alt={selectedFile?.name ?? t('mapEditor.basemap.previewAlt')}
               className="max-h-48 max-w-full rounded-md object-contain shadow-md"
             />
           ) : xodrPreview ? (
@@ -228,14 +230,17 @@ export function BasemapFilePickerDialog({
           <span className="text-sm">
             {selectedFile?.name ??
               (initialFileName
-                ? `目前：${initialFileName}`
+                ? t('mapEditor.basemap.currentFile', { name: initialFileName })
                 : dragOver
-                  ? '放開以載入檔案'
-                  : '點擊或拖曳圖片／.xodr 至此')}
+                  ? t('mapEditor.basemap.dropToLoad')
+                  : t('mapEditor.basemap.clickOrDrag'))}
           </span>
           {xodrPreview ? (
             <span className="text-xs text-zinc-500">
-              {xodrPreview.roadCount} 條道路 · {xodrPreview.laneCount} 個車道區塊
+              {t('mapEditor.basemap.roadsLanes', {
+                roads: xodrPreview.roadCount,
+                lanes: xodrPreview.laneCount,
+              })}
             </span>
           ) : null}
         </button>
@@ -252,7 +257,7 @@ export function BasemapFilePickerDialog({
             onClick={onCancel}
             className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -260,7 +265,7 @@ export function BasemapFilePickerDialog({
             disabled={!canSubmit}
             className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            套用底圖
+            {t('mapEditor.basemap.apply')}
           </button>
         </div>
       </div>

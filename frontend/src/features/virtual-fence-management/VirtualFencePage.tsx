@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search } from 'lucide-react';
 import type { MapAreaObject, MapPixelSize } from '../map-editor/types/area';
 import { DEFAULT_MAP_PIXEL_SIZE } from '../map-editor/types/area';
@@ -27,6 +28,7 @@ const SELECT =
   'h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF]/60';
 
 export function VirtualFencePage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapId, setMapId] = useState('');
@@ -40,7 +42,7 @@ export function VirtualFencePage() {
   const [listSearch, setListSearch] = useState('');
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   /**
-   * 清單面板預設收合。
+   * 左側面板預設收合。
    *
    * 進頁面時使用者要看的是<strong>整張地圖</strong>——先看清楚場域全貌，再決定要點
    * 哪一條圍籬。清單展開會把地圖擠掉三分之一，而它在這個時間點還沒有任何資訊價值
@@ -78,7 +80,7 @@ export function VirtualFencePage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : '無法載入啟用地圖');
+        setError(err instanceof Error ? err.message : t('virtualFence.loadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -86,7 +88,7 @@ export function VirtualFencePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const fenceById = useMemo(() => {
     const map = new Map<string, VirtualFence>();
@@ -167,13 +169,13 @@ export function VirtualFencePage() {
         setMode({ kind: 'view', fenceId: result.fenceId });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '儲存失敗');
+      setError(err instanceof Error ? err.message : t('virtualFence.saveFailed'));
     }
   };
 
   const removeFence = (fenceId: string) => {
     if (!mapId) return;
-    if (!window.confirm('確定刪除此虛擬圍籬？')) return;
+    if (!window.confirm(t('virtualFence.confirmDelete'))) return;
     setFences(deleteVirtualFence(mapId, fences, fenceId));
     setMode({ kind: 'browse' });
   };
@@ -187,16 +189,16 @@ export function VirtualFencePage() {
               value={enableFilter}
               onChange={(e) => setEnableFilter(e.target.value as FenceEnableFilter)}
               className={SELECT}
-              aria-label="圍籬啟用狀態"
+              aria-label={t('virtualFence.enableFilterAria')}
             >
-              <option value="all">圍籬啟用狀態</option>
-              <option value="enabled">啟用</option>
-              <option value="disabled">未啟用</option>
+              <option value="all">{t('virtualFence.enableFilterAll')}</option>
+              <option value="enabled">{t('virtualFence.enableFilterEnabled')}</option>
+              <option value="disabled">{t('virtualFence.enableFilterDisabled')}</option>
             </select>
             <button
               type="button"
               className="inline-flex size-9 items-center justify-center rounded-lg border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 text-[#51A2FF] transition hover:bg-[#2B7FFF]/25"
-              title="搜尋"
+              title={t('common.search')}
               onClick={() => {
                 document
                   .querySelector<HTMLInputElement>('[data-fence-list-search]')
@@ -208,7 +210,7 @@ export function VirtualFencePage() {
             <div className="ml-auto flex min-w-0 items-center gap-3">
               {mapId ? (
                 <p className="hidden truncate text-xs text-zinc-500 sm:block">
-                  目前地圖 · {displayName || mapId}
+                  {t('virtualFence.currentMap', { name: displayName || mapId })}
                 </p>
               ) : null}
               <button
@@ -217,13 +219,13 @@ export function VirtualFencePage() {
                 className="inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
               >
                 <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-                建立圍籬
+                {t('virtualFence.create')}
               </button>
             </div>
           </>
         ) : (
           <p className="absolute inset-x-0 text-center text-sm tracking-[0.4px] text-zinc-300">
-            正在編輯中...
+            {t('virtualFence.editing')}
           </p>
         )}
       </div>
@@ -231,7 +233,7 @@ export function VirtualFencePage() {
       <div className="flex min-h-0 flex-1">
         {loading ? (
           <p className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-            載入啟用地圖…
+            {t('virtualFence.loading')}
           </p>
         ) : error ? (
           <p className="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-400">

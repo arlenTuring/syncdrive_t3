@@ -1,5 +1,6 @@
 import { ChevronRight, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchMediaLibraryOptions, type MediaLibraryOption } from '../../shift-list/api/mediaLibraryApi';
 import { ShiftMenuSelect } from '../../shift-list/components/ShiftMenuSelect';
 import {
@@ -49,12 +50,6 @@ const FIELD_LABEL = 'mb-1.5 block text-xs text-zinc-400';
 const INPUT =
   'h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30';
 
-const DEPARTURE_MODES = [
-  { value: 'punctual', label: '準點發車' },
-  { value: 'immediate', label: '到站即發' },
-  { value: 'hold', label: '等候發車指令' },
-];
-
 const STATION_ACTION_OPTIONS = SHIFT_ACTION_CATEGORY_CATALOG.filter(
   (item) => item.group === 'station',
 ).map((item) => ({ value: item.id, label: item.label }));
@@ -100,23 +95,6 @@ function minutesFromNow(hm: string): number | null {
   return Math.round(diff / 60000);
 }
 
-function formatStationActionLabel(
-  action: ShiftRouteSegmentAction,
-  mediaNameById: Map<string, string>,
-): string | null {
-  const category = resolveShiftActionCategory(action.categoryId);
-  if (!category) return null;
-  const parts = [category.label];
-  if (action.offsetValue != null && action.offsetUnit) {
-    const unit = labelForOffsetUnit(action.offsetUnit);
-    parts.push(`${category.offsetLabel ?? ''} ${action.offsetValue} ${unit}`.trim());
-  }
-  if (action.behavior === 'play_music') parts.push('播放音樂');
-  const resource = action.resourceId ? mediaNameById.get(action.resourceId) : null;
-  if (resource) parts.push(resource);
-  return parts.join(' · ');
-}
-
 function RequiredLabel({ children }: { children: string }) {
   return (
     <span className={FIELD_LABEL}>
@@ -133,6 +111,8 @@ export function CreateDispatchDialog({
   onClose,
   onCreate,
 }: CreateDispatchDialogProps) {
+  const { t } = useTranslation();
+  const confirmPhrase = t('dispatchScheduling.confirmPhrase');
   const [step, setStep] = useState<1 | 2>(1);
   const [execTime, setExecTime] = useState(editing?.exec_time ?? '');
   const [priority, setPriority] = useState(editing?.priority ?? '');
@@ -160,6 +140,34 @@ export function CreateDispatchDialog({
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryOption[]>([]);
   const [estimateMinutes, setEstimateMinutes] = useState(0);
   const [confirmText, setConfirmText] = useState('');
+
+  const departureModes = useMemo(
+    () => [
+      { value: 'punctual', label: t('dispatchScheduling.createDialog.departurePunctual') },
+      { value: 'immediate', label: t('dispatchScheduling.createDialog.departureImmediate') },
+      { value: 'hold', label: t('dispatchScheduling.createDialog.departureHold') },
+    ],
+    [t],
+  );
+
+  const formatStationActionLabel = (
+    action: ShiftRouteSegmentAction,
+    mediaNameById: Map<string, string>,
+  ): string | null => {
+    const category = resolveShiftActionCategory(action.categoryId);
+    if (!category) return null;
+    const parts = [category.label];
+    if (action.offsetValue != null && action.offsetUnit) {
+      const unit = labelForOffsetUnit(action.offsetUnit);
+      parts.push(`${category.offsetLabel ?? ''} ${action.offsetValue} ${unit}`.trim());
+    }
+    if (action.behavior === 'play_music') {
+      parts.push(t('dispatchScheduling.createDialog.playMusic'));
+    }
+    const resource = action.resourceId ? mediaNameById.get(action.resourceId) : null;
+    if (resource) parts.push(resource);
+    return parts.join(' · ');
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -203,13 +211,19 @@ export function CreateDispatchDialog({
   const locationSelectGroups = useMemo(() => {
     const groupsOut = [];
     if (stationOptions.length > 0) {
-      groupsOut.push({ label: '停靠點', options: stationOptions });
+      groupsOut.push({
+        label: t('dispatchScheduling.createDialog.stops'),
+        options: stationOptions,
+      });
     }
     if (trackLocations.length > 0) {
-      groupsOut.push({ label: '軌道', options: trackLocations });
+      groupsOut.push({
+        label: t('dispatchScheduling.createDialog.tracks'),
+        options: trackLocations,
+      });
     }
     return groupsOut;
-  }, [stationOptions, trackLocations]);
+  }, [stationOptions, trackLocations, t]);
 
   const stationNameById = useMemo(() => {
     const byId = new Map(stationOptions.map((item) => [item.value, item.label]));
@@ -229,7 +243,7 @@ export function CreateDispatchDialog({
       ...(mediaItems.length > 0
         ? [
             {
-              label: '媒體',
+              label: t('dispatchScheduling.createDialog.media'),
               options: mediaItems.map((item) => ({ value: item.id, label: item.name })),
             },
           ]
@@ -237,13 +251,13 @@ export function CreateDispatchDialog({
       ...(mediaGroups.length > 0
         ? [
             {
-              label: '媒體群組',
+              label: t('dispatchScheduling.createDialog.mediaGroup'),
               options: mediaGroups.map((item) => ({ value: item.id, label: item.name })),
             },
           ]
         : []),
     ];
-  }, [mediaLibrary]);
+  }, [mediaLibrary, t]);
 
   const mediaNameById = useMemo(
     () => new Map(mediaLibrary.map((item) => [item.id, item.name])),
@@ -259,8 +273,9 @@ export function CreateDispatchDialog({
           const labels = stop.actions
             .map((action) => formatStationActionLabel(action, mediaNameById))
             .filter((label): label is string => Boolean(label));
-          if (index === 0 && broadcastMedia && !labels.includes('廣播')) {
-            labels.unshift('廣播');
+          const broadcastLabel = t('dispatchScheduling.createDialog.broadcast');
+          if (index === 0 && broadcastMedia && !labels.includes(broadcastLabel)) {
+            labels.unshift(broadcastLabel);
           }
           return {
             id: stop.id,
@@ -269,9 +284,9 @@ export function CreateDispatchDialog({
             taskLabels: labels,
           };
         }),
-    [stations, stationNameById, broadcastMedia, mediaNameById],
+    [stations, stationNameById, broadcastMedia, mediaNameById, t],
   );
-  const canCreate = confirmText.trim() === CONFIRM_PHRASE;
+  const canCreate = confirmText.trim() === confirmPhrase || confirmText.trim() === CONFIRM_PHRASE;
   const timeOffset = execTime ? minutesFromNow(execTime) : null;
   const timeOk = timeOffset != null && timeOffset >= 0 && timeOffset <= 60;
   const tripOk = Number(tripMinutes) > 0;
@@ -345,7 +360,7 @@ export function CreateDispatchDialog({
   };
 
   const submit = () => {
-    if (confirmText.trim() !== CONFIRM_PHRASE) return;
+    if (confirmText.trim() !== confirmPhrase && confirmText.trim() !== CONFIRM_PHRASE) return;
     const firstStation =
       stations.find((stop) => stop.stationId)?.stationId ?? '';
     onCreate({
@@ -376,13 +391,15 @@ export function CreateDispatchDialog({
         {step === 1 ? (
           <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
             <h2 id="create-dispatch-title" className="text-base font-semibold text-zinc-100">
-              {editing ? '編輯派遣' : '建立派遣'}
+              {editing
+                ? t('dispatchScheduling.createDialog.titleEdit')
+                : t('dispatchScheduling.createDialog.titleCreate')}
             </h2>
             <button
               type="button"
               onClick={onClose}
               className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-              aria-label="關閉"
+              aria-label={t('common.close')}
             >
               <X className="size-4" />
             </button>
@@ -395,27 +412,29 @@ export function CreateDispatchDialog({
           <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] overflow-hidden">
             <aside className="space-y-4 overflow-auto border-r border-zinc-800/80 px-6 py-1">
               <div>
-                <RequiredLabel>執行時間</RequiredLabel>
+                <RequiredLabel>{t('dispatchScheduling.createDialog.execTime')}</RequiredLabel>
                 <ExecutionTimeField
                   value={execTime}
-                  placeholder="限選擇1小時內的特定時間"
+                  placeholder={t('dispatchScheduling.createDialog.execTimePlaceholder')}
                   onChange={setExecTime}
                   onNow={() => setExecTime(formatLocalHm(new Date()))}
                 />
                 {execTime && !timeOk ? (
-                  <p className="mt-1 text-[11px] text-red-400">請選擇現在起一小時內的時間</p>
+                  <p className="mt-1 text-[11px] text-red-400">
+                    {t('dispatchScheduling.createDialog.execTimeError')}
+                  </p>
                 ) : null}
               </div>
               <div>
-                <RequiredLabel>優先等級</RequiredLabel>
+                <RequiredLabel>{t('dispatchScheduling.createDialog.priority')}</RequiredLabel>
                 <ShiftMenuSelect
-                  label="優先等級"
+                  label={t('dispatchScheduling.createDialog.priority')}
                   hideLabel
                   value={priority}
-                  placeholder="請選擇"
+                  placeholder={t('dispatchScheduling.createDialog.pleaseSelect')}
                   options={(Object.keys(PRIORITY_LABEL) as DispatchPriorityKey[]).map((key) => ({
                     value: key,
-                    label: PRIORITY_LABEL[key],
+                    label: t(`dispatchScheduling.priority.${key}`),
                   }))}
                   onChange={setPriority}
                   widthClass="w-full"
@@ -423,7 +442,7 @@ export function CreateDispatchDialog({
                 />
               </div>
               <div>
-                <RequiredLabel>指派載具</RequiredLabel>
+                <RequiredLabel>{t('dispatchScheduling.createDialog.assignVehicle')}</RequiredLabel>
                 <VehicleAssignSelect
                   value={vehicleCode}
                   reservedCodes={reservedVehicleCodes}
@@ -435,20 +454,24 @@ export function CreateDispatchDialog({
             <div className="min-h-0 overflow-auto px-6 py-1 pb-4">
               <section className="mb-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-zinc-200">基本資料</h3>
+                  <h3 className="text-sm font-medium text-zinc-200">
+                    {t('dispatchScheduling.createDialog.basicInfo')}
+                  </h3>
                   <button
                     type="button"
                     onClick={() => setGroupPickerOpen((open) => !open)}
                     className="inline-flex items-center text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
                   >
-                    選擇路線群組
+                    {t('dispatchScheduling.createDialog.selectRouteGroup')}
                     <ChevronRight className="size-4" />
                   </button>
                 </div>
                 {groupPickerOpen ? (
                   <div className="mb-4 max-h-56 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950/60 p-2">
                     {groups.length === 0 ? (
-                      <p className="px-2 py-3 text-xs text-zinc-500">目前地圖沒有可用路線群組</p>
+                      <p className="px-2 py-3 text-xs text-zinc-500">
+                        {t('dispatchScheduling.createDialog.noRouteGroups')}
+                      </p>
                     ) : (
                       groups.map((group) => (
                         <div key={group.groupId} className="mb-2 last:mb-0">
@@ -473,58 +496,63 @@ export function CreateDispatchDialog({
                 ) : null}
                 {selectedGroup ? (
                   <p className="mb-3 text-[11px] text-zinc-500">
-                    已選 {selectedGroup.groupName}
-                    {routeId
-                      ? `／${selectedGroup.routes.find((r) => r.routeId === routeId)?.label ?? ''}`
-                      : ''}
+                    {t('dispatchScheduling.createDialog.selected', {
+                      name: `${selectedGroup.groupName}${
+                        routeId
+                          ? `／${selectedGroup.routes.find((r) => r.routeId === routeId)?.label ?? ''}`
+                          : ''
+                      }`,
+                    })}
                   </p>
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <RequiredLabel>派遣任務名稱</RequiredLabel>
+                    <RequiredLabel>{t('dispatchScheduling.createDialog.taskName')}</RequiredLabel>
                     <input
                       value={taskName}
                       onChange={(e) => setTaskName(e.target.value)}
-                      placeholder="請輸入"
+                      placeholder={t('dispatchScheduling.createDialog.pleaseEnter')}
                       className={INPUT}
                     />
                   </div>
                   <div>
-                    <RequiredLabel>行程時間</RequiredLabel>
+                    <RequiredLabel>{t('dispatchScheduling.createDialog.tripTime')}</RequiredLabel>
                     <div className="relative">
                       <input
                         value={tripMinutes}
                         onChange={(e) => setTripMinutes(e.target.value.replace(/[^\d]/g, ''))}
-                        placeholder="請輸入"
+                        placeholder={t('dispatchScheduling.createDialog.pleaseEnter')}
                         className={`${INPUT} pr-12`}
                         inputMode="numeric"
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                        分鐘
+                        {t('dispatchScheduling.createDialog.minutes')}
                       </span>
                     </div>
                   </div>
                   <div>
-                    <RequiredLabel>首站發車模式</RequiredLabel>
+                    <RequiredLabel>{t('dispatchScheduling.createDialog.departureMode')}</RequiredLabel>
                     <ShiftMenuSelect
-                      label="首站發車模式"
+                      label={t('dispatchScheduling.createDialog.departureMode')}
                       hideLabel
                       value={departureMode}
-                      placeholder="請選擇"
-                      options={DEPARTURE_MODES}
+                      placeholder={t('dispatchScheduling.createDialog.pleaseSelect')}
+                      options={departureModes}
                       onChange={setDepartureMode}
                       widthClass="w-full"
                       panelWidth={220}
                     />
                   </div>
                   <div className="col-span-2">
-                    <span className={FIELD_LABEL}>廣播媒體</span>
+                    <span className={FIELD_LABEL}>
+                      {t('dispatchScheduling.createDialog.broadcastMedia')}
+                    </span>
                     <ShiftMenuSelect
-                      label="廣播媒體"
+                      label={t('dispatchScheduling.createDialog.broadcastMedia')}
                       hideLabel
                       value={broadcastMedia}
-                      placeholder="請選擇"
+                      placeholder={t('dispatchScheduling.createDialog.pleaseSelect')}
                       options={mediaOptions}
                       onChange={setBroadcastMedia}
                       widthClass="w-full"
@@ -536,14 +564,16 @@ export function CreateDispatchDialog({
 
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-zinc-200">派遣任務規劃</h3>
+                  <h3 className="text-sm font-medium text-zinc-200">
+                    {t('dispatchScheduling.createDialog.planSection')}
+                  </h3>
                   <button
                     type="button"
                     onClick={() => setStations((prev) => [...prev, emptyStation()])}
                     className="inline-flex items-center gap-1 text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
                   >
                     <Plus className="size-3.5" />
-                    建立站點
+                    {t('dispatchScheduling.createDialog.createStation')}
                   </button>
                 </div>
 
@@ -558,10 +588,10 @@ export function CreateDispatchDialog({
                       </div>
                       <div className="min-w-0 flex-1 p-3">
                         <ShiftMenuSelect
-                          label="站點"
+                          label={t('dispatchScheduling.createDialog.station')}
                           hideLabel
                           value={stop.stationId}
-                          placeholder="請選擇"
+                          placeholder={t('dispatchScheduling.createDialog.pleaseSelect')}
                           groups={locationSelectGroups}
                           onChange={(value) => updateStation(stop.id, value)}
                           widthClass="w-full"
@@ -586,7 +616,7 @@ export function CreateDispatchDialog({
                           className="mt-2 inline-flex items-center gap-1 text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
                         >
                           <Plus className="size-3.5" />
-                          建立行動
+                          {t('dispatchScheduling.createDialog.createAction')}
                         </button>
                       </div>
                       <button
@@ -599,7 +629,7 @@ export function CreateDispatchDialog({
                           )
                         }
                         className="m-2 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                        aria-label="刪除站點"
+                        aria-label={t('dispatchScheduling.createDialog.deleteStation')}
                       >
                         <X className="size-4" />
                       </button>
@@ -608,9 +638,9 @@ export function CreateDispatchDialog({
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-sm text-zinc-400">
-                  <span>總行程時間</span>
+                  <span>{t('dispatchScheduling.createDialog.totalTripTime')}</span>
                   <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
-                    行程預估 {estimateMinutes} min
+                    {t('dispatchScheduling.createDialog.estimate', { minutes: estimateMinutes })}
                   </span>
                 </div>
               </section>
@@ -634,7 +664,7 @@ export function CreateDispatchDialog({
             onClick={onClose}
             className="rounded-lg px-3.5 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            取消
+            {t('common.cancel')}
           </button>
           {step === 1 ? (
             <button
@@ -646,7 +676,7 @@ export function CreateDispatchDialog({
               }}
               className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              下一步
+              {t('dispatchScheduling.createDialog.next')}
             </button>
           ) : (
             <div className="flex items-center gap-2">
@@ -655,7 +685,7 @@ export function CreateDispatchDialog({
                 onClick={() => setStep(1)}
                 className="rounded-lg px-3.5 py-2 text-sm font-medium text-[#51A2FF] hover:bg-[#2B7FFF]/10"
               >
-                上一步
+                {t('dispatchScheduling.createDialog.previous')}
               </button>
               <button
                 type="button"
@@ -663,7 +693,7 @@ export function CreateDispatchDialog({
                 onClick={submit}
                 className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
-                建立
+                {t('dispatchScheduling.createDialog.create')}
               </button>
             </div>
           )}

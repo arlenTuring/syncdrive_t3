@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
@@ -66,6 +67,7 @@ function RowActionsMenu({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   const open = openMenuKey === menuKey
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -117,7 +119,7 @@ function RowActionsMenu({
           e.stopPropagation()
           onOpenMenu(menuKey)
         }}
-        title="更多操作"
+        title={t('mapEditor.routeGroupList.moreActions')}
         className="flex items-center justify-center rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
       >
         <MoreHorizontal className="size-3.5" />
@@ -138,7 +140,7 @@ function RowActionsMenu({
                 className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
               >
                 <Pencil className="size-3 shrink-0 text-zinc-400" />
-                編輯
+                {t('mapEditor.routeGroupList.edit')}
               </button>
               <button
                 type="button"
@@ -149,7 +151,7 @@ function RowActionsMenu({
                 className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-red-300 hover:bg-red-950/40"
               >
                 <Trash2 className="size-3 shrink-0 text-red-400" />
-                刪除
+                {t('mapEditor.routeGroupList.delete')}
               </button>
             </div>,
             document.body,
@@ -186,9 +188,10 @@ function RouteRow({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   const pathLabel =
     route.stationIds.map((id) => stationDisplayLabel(areas, id)).join(' → ') ||
-    '（無有效站點）'
+    t('mapEditor.routeGroupList.noValidStations')
   const topology = useMemo(
     () =>
       route.stationIds.length >= 2
@@ -212,12 +215,12 @@ function RouteRow({
 
   const unavailableDetail = useMemo(() => {
     if (topologyAvailable) return null
-    if (route.stationIds.length < 2) return '站序不足 2 站'
+    if (route.stationIds.length < 2) return t('mapEditor.routeGroupList.stationsTooFew')
     const legHint = topology?.legs.find((leg) => leg.message)?.message
     if (legHint) return legHint
-    if (topologyPathOk) return '拓撲路徑已連通，但尚有邊未填完整行駛時間'
-    return '拓撲尚無此站序組合的有向路徑'
-  }, [topologyAvailable, topologyPathOk, topology, route.stationIds.length])
+    if (topologyPathOk) return t('mapEditor.routeGroupList.topologyTimesIncomplete')
+    return t('mapEditor.routeGroupList.topologyNoPath')
+  }, [topologyAvailable, topologyPathOk, topology, route.stationIds.length, t])
 
   return (
     <div
@@ -233,8 +236,8 @@ function RouteRow({
         topologyAvailable
           ? undefined
           : unavailableDetail
-            ? `不可用 · ${unavailableDetail}`
-            : '路線目前不可用'
+            ? t('mapEditor.routeGroupList.unavailableWithDetail', { detail: unavailableDetail })
+            : t('mapEditor.routeGroupList.unavailable')
       }
     >
       <button
@@ -243,10 +246,10 @@ function RouteRow({
         disabled={!topologyAvailable}
         title={
           !topologyAvailable
-            ? '拓撲尚未就緒，無法在地圖顯示'
+            ? t('mapEditor.routeGroupList.topologyNotReady')
             : isVisible
-              ? '隱藏地圖路線'
-              : '顯示地圖路線'
+              ? t('mapEditor.routeGroupList.hideRoute')
+              : t('mapEditor.routeGroupList.showRoute')
         }
         className={[
           'flex shrink-0 items-center justify-center rounded-l-md px-2 transition-colors',
@@ -270,7 +273,7 @@ function RouteRow({
           </p>
           {!topologyAvailable ? (
             <span className="shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-1 py-px text-[8px] font-semibold tracking-wide text-amber-200">
-              不可用
+              {t('mapEditor.routeGroupList.unavailableBadge')}
             </span>
           ) : null}
         </div>
@@ -285,7 +288,7 @@ function RouteRow({
         ) : null}
         {!topologyAvailable && unavailableDetail ? (
           <p className="mt-0.5 text-[9px] leading-snug text-amber-200/90">
-            缺少：{unavailableDetail}
+            {t('mapEditor.routeGroupList.missing', { detail: unavailableDetail })}
           </p>
         ) : null}
       </div>
@@ -319,6 +322,7 @@ export function RouteGroupListView({
   onStartNewRoute,
   onStartNewGroup,
 }: Props) {
+  const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [openMenuKey, setOpenMenuKey] = useState<MenuKey | null>(null)
 
@@ -344,13 +348,13 @@ export function RouteGroupListView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <p className="text-[10px] leading-snug text-zinc-500">
-        路線依群組管理；點眼睛可顯示或隱藏地圖路徑，群組眼睛會一次切換組內所有路線。
+        {t('mapEditor.routeGroupList.intro')}
       </p>
 
       {isEmpty ? (
         <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-6 text-center text-[10px] text-zinc-600">
-          尚無路線群組。
-          {editMode ? '請先新增群組，再製作路線。' : '請進入編輯模式以管理路線。'}
+          {t('mapEditor.routeGroupList.empty')}
+          {editMode ? t('mapEditor.routeGroupList.emptyEdit') : t('mapEditor.routeGroupList.emptyView')}
         </p>
       ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
@@ -360,10 +364,10 @@ export function RouteGroupListView({
             const groupVisibility = resolveGroupVisibility(groupRouteIds, visibleRouteIds)
             const groupEyeTitle =
               groupRouteIds.length === 0
-                ? '此群組尚無路線'
+                ? t('mapEditor.routeGroupList.groupEmpty')
                 : groupVisibility === 'all'
-                  ? '隱藏群組內所有路線'
-                  : '顯示群組內所有路線'
+                  ? t('mapEditor.routeGroupList.hideGroupRoutes')
+                  : t('mapEditor.routeGroupList.showGroupRoutes')
 
             return (
               <section
@@ -423,7 +427,7 @@ export function RouteGroupListView({
                 {open ? (
                   <div className="space-y-1.5 border-t border-zinc-800/80 px-2 pb-2.5 pt-2">
                     {groupRoutes.length === 0 ? (
-                      <p className="px-1 py-2 text-[10px] text-zinc-600">此群組尚無路線</p>
+                      <p className="px-1 py-2 text-[10px] text-zinc-600">{t('mapEditor.routeGroupList.groupEmpty')}</p>
                     ) : (
                       groupRoutes.map((route) => (
                         <RouteRow
@@ -450,7 +454,7 @@ export function RouteGroupListView({
                         className="ml-3 flex w-[calc(100%-0.75rem)] items-center justify-center gap-1 rounded-md border border-dashed border-amber-600/40 py-1.5 text-[10px] text-amber-200/90 hover:bg-amber-950/30"
                       >
                         <Plus className="size-3" />
-                        在此群組製作路線
+                        {t('mapEditor.routeGroupList.createInGroup')}
                       </button>
                     ) : null}
                   </div>
@@ -463,7 +467,7 @@ export function RouteGroupListView({
             <section className="rounded-lg border border-dashed border-zinc-700/80 bg-zinc-950/20 p-2.5">
               <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                 <GitBranch className="size-3.5" />
-                未分組路線
+                {t('mapEditor.routeGroupList.ungrouped')}
               </p>
               <div className="space-y-1.5">
                 {ungrouped.map((route) => (
@@ -497,7 +501,7 @@ export function RouteGroupListView({
             className="flex w-full items-center justify-center gap-1.5 rounded-md border border-sky-600/50 bg-sky-950/30 px-3 py-2 text-[11px] font-medium text-sky-200 hover:bg-sky-900/40"
           >
             <Plus className="size-4" />
-            新增路線群組
+            {t('mapEditor.routeGroupList.addGroup')}
           </button>
           {routeGroups.length === 0 ? (
             <button
@@ -506,13 +510,13 @@ export function RouteGroupListView({
               className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-950/40 px-3 py-2 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50"
             >
               <Plus className="size-4" />
-              製作路線（未分組）
+              {t('mapEditor.routeGroupList.createUngrouped')}
             </button>
           ) : null}
         </div>
       ) : (
         <p className="shrink-0 rounded-md border border-zinc-700/70 bg-zinc-950/50 px-2.5 py-2 text-center text-[10px] text-zinc-500">
-          請進入編輯模式以管理路線群組
+          {t('mapEditor.routeGroupList.enterEdit')}
         </p>
       )}
     </div>

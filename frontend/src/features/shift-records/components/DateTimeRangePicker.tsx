@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CustomDateTimePanel } from './CustomDateTimePanel';
 
 export type DateTimeRange = {
@@ -62,6 +63,7 @@ function FieldDateTimePopover({
   onClose: () => void;
   onConfirm: (next: Date | null) => void;
 }) {
+  const { t } = useTranslation();
   const titleId = useId();
   const popoverRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, caretLeft: 24 });
@@ -105,7 +107,8 @@ function FieldDateTimePopover({
     return () => document.removeEventListener('mousedown', onDocDown);
   }, [anchorRef, rangeRef, onClose]);
 
-  const label = field === 'start' ? '選擇開始時間' : '選擇結束時間';
+  const label =
+    field === 'start' ? t('shiftRecords.dateRange.selectStart') : t('shiftRecords.dateRange.selectEnd');
 
   return (
     <div
@@ -135,6 +138,7 @@ function FieldDateTimePopover({
 }
 
 export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProps) {
+  const { t } = useTranslation();
   const [openField, setOpenField] = useState<OpenField>(null);
   const rangeRef = useRef<HTMLDivElement>(null);
   const startBtnRef = useRef<HTMLButtonElement>(null);
@@ -169,7 +173,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
         ref={rangeRef}
         className="flex w-full min-w-[400px] max-w-[520px] shrink-0 flex-nowrap items-stretch overflow-hidden rounded-lg border border-zinc-700/90 bg-[#1c1c1e] text-sm"
         role="group"
-        aria-label="班次時間區間"
+        aria-label={t('shiftRecords.dateRange.aria')}
       >
         <div className="flex min-w-0 flex-1 items-center justify-start py-0 pl-4 pr-2">
           <button
@@ -178,7 +182,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
             onClick={() => open('start')}
             className={fieldBtnClass(!!startLabel, openField === 'start')}
           >
-            {startLabel ?? '開始'}
+            {startLabel ?? t('shiftRecords.dateRange.start')}
           </button>
           {!startLabel && (
             <span className="inline-block w-[7.5rem] shrink-0" aria-hidden />
@@ -192,7 +196,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
             onClick={() => open('end')}
             className={fieldBtnClass(!!endLabel, openField === 'end')}
           >
-            {endLabel ?? '結束'}
+            {endLabel ?? t('shiftRecords.dateRange.end')}
           </button>
           {!endLabel && startLabel && (
             <span className="inline-block w-[7.5rem] shrink-0" aria-hidden />
@@ -203,7 +207,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
           type="button"
           onClick={() => open(value.start ? 'end' : 'start')}
           className="flex w-11 shrink-0 items-center justify-center border-l border-zinc-700/80 opacity-90 transition hover:opacity-100"
-          title="選擇日期與時間"
+          title={t('shiftRecords.dateRange.selectDateTime')}
         >
           <img
             src="/shift-mgt-icons/timepick.png"

@@ -9,6 +9,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   checkOperationShiftNameUnique,
   createOperationShiftDraft,
@@ -59,8 +60,8 @@ const AUTO_SAVE_DEBOUNCE_MS = 900;
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type NameUniqueState = 'idle' | 'checking' | 'unique' | 'duplicate' | 'error';
 
-function formatAutoSaveTime(date: Date): string {
-  return date.toLocaleTimeString('zh-TW', {
+function formatAutoSaveTime(date: Date, locale: string): string {
+  return date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -75,6 +76,7 @@ function AutoSaveDraftBadge({
   status: AutoSaveStatus;
   savedAt: Date | null;
 }) {
+  const { t, i18n } = useTranslation();
   if (status === 'idle' && !savedAt) return null;
 
   return (
@@ -82,15 +84,17 @@ function AutoSaveDraftBadge({
       {status === 'saving' ? (
         <>
           <Loader2 className="size-3 animate-spin text-zinc-500" />
-          草稿儲存中…
+          {t('shiftList.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
           <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
-          草稿已自動儲存 ({formatAutoSaveTime(savedAt)})
+          {t('shiftList.createWizard.draftSaved', {
+            time: formatAutoSaveTime(savedAt, i18n.language),
+          })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">自動儲存失敗</span>
+        <span className="text-red-400">{t('shiftList.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -117,6 +121,7 @@ function CreateStepSidebar({
   onDiscard: () => void;
   onStepClick: (step: CreateShiftScheduleStep) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
       <div className="border-b border-zinc-800/80 px-4 py-4">
@@ -126,11 +131,11 @@ function CreateStepSidebar({
           className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
         >
           <ArrowLeft className="size-4" />
-          返回平台
+          {t('shiftList.createWizard.backToPlatform')}
         </button>
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
           <ClipboardList className="size-4 text-[#2B7FFF]" />
-          建立班表
+          {t('shiftList.createWizard.title')}
         </div>
       </div>
 
@@ -169,7 +174,7 @@ function CreateStepSidebar({
                   onClick={() => canClick && onStepClick(item.step)}
                   title={
                     isStepLockedByInvalidation
-                      ? '班表已失效，請先重新生成後再進入'
+                      ? t('shiftList.createWizard.scheduleLockedHint')
                       : undefined
                   }
                   className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
@@ -216,7 +221,7 @@ function CreateStepSidebar({
                         active ? 'font-medium text-zinc-100' : 'text-zinc-400'
                       }`}
                     >
-                      {item.label}
+                      {t(`shiftList.createWizard.steps.${item.step}`)}
                     </span>
                   </span>
                 </button>
@@ -234,7 +239,7 @@ function CreateStepSidebar({
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
         >
           <Trash2 className="size-4" />
-          放棄並清除本次草稿
+          {t('shiftList.createWizard.discardDraft')}
         </button>
       </div>
     </aside>
@@ -315,6 +320,7 @@ export function CreateShiftSchedulePage({
   editShiftId,
   initialCreationMode = 'parametric',
 }: CreateShiftSchedulePageProps) {
+  const { t } = useTranslation();
   const isEditing = Boolean(editShiftId);
   const [draft, setDraft] = useState<ShiftScheduleCreateDraft>(() =>
     emptyShiftScheduleCreateDraft(initialCreationMode),
@@ -594,7 +600,7 @@ export function CreateShiftSchedulePage({
   }, [flushAutoSave, hydrated, loadError, loading, onBack]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm('確定要放棄並清除本次草稿嗎？');
+    const confirmed = window.confirm(t('shiftList.createWizard.confirmDiscard'));
     if (!confirmed) return;
     const id = savedShiftIdRef.current;
     if (id) {
@@ -607,7 +613,7 @@ export function CreateShiftSchedulePage({
       }
     }
     onBack();
-  }, [onBack, onSavedDraft]);
+  }, [onBack, onSavedDraft, t]);
 
   const handlePrevious = () => {
     const prev = resolvePreviousCreateShiftStep(draft.currentStep, draft.creationMode);
@@ -645,7 +651,7 @@ export function CreateShiftSchedulePage({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="border-b border-zinc-800/60 px-8 py-3 text-center text-xs text-zinc-500">
-          提示：可以隨時點擊左側已解鎖的步驟直接修改
+          {t('shiftList.createWizard.stepHint')}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-8">
@@ -660,13 +666,13 @@ export function CreateShiftSchedulePage({
             {showInvalidationChrome && (
               <div className="mb-6 flex shrink-0 items-center justify-center gap-2 px-4 py-1 text-sm font-medium text-amber-400">
                 <AlertTriangle className="size-4 shrink-0" strokeWidth={2.25} aria-hidden />
-                <span>關鍵設定變更，班表已失效，請點擊重新生成按鈕</span>
+                <span>{t('shiftList.createWizard.scheduleInvalidated')}</span>
               </div>
             )}
             {loading ? (
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                 <Loader2 className="size-6 animate-spin" />
-                載入草稿中…
+                {t('shiftList.createWizard.loadingDraft')}
               </div>
             ) : loadError ? (
               <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
@@ -762,7 +768,7 @@ export function CreateShiftSchedulePage({
               disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}
               className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              上一步
+              {t('shiftList.createWizard.previous')}
             </button>
             {showInvalidationChrome ? (
               <button
@@ -772,7 +778,7 @@ export function CreateShiftSchedulePage({
                 className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className="size-4" aria-hidden />
-                儲存並重新生成班表
+                {t('shiftList.createWizard.rebuildSchedule')}
               </button>
             ) : (
               <button
@@ -785,7 +791,9 @@ export function CreateShiftSchedulePage({
                     : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
                 }`}
               >
-                {draft.currentStep === 7 ? '儲存建立' : '下一步'}
+                {draft.currentStep === 7
+                  ? t('shiftList.createWizard.saveCreate')
+                  : t('shiftList.createWizard.next')}
               </button>
             )}
           </div>

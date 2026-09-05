@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DrivingCapabilityModal } from '../shift-records/components/DrivingCapabilityModal';
 import { DeploymentShiftTable } from './components/DeploymentShiftTable';
 import { ScheduleAdjustApplyDialog } from './components/ScheduleAdjustApplyDialog';
@@ -7,26 +8,27 @@ import { VehicleControlSection } from './components/VehicleControlSection';
 import { useDeploymentData } from './hooks/useDeploymentData';
 import type { ShiftDeploymentAction } from './types';
 
-function describeAction(action: ShiftDeploymentAction): string {
-  switch (action.kind) {
-    case 'event-open':
-      return '「重大事件」詳情將於後續步驟接上視窗。';
-    case 'vehicle-stop':
-      return '「自駕停駛 · ' + action.vehicleCode + '」將於後續步驟接上視窗。';
-    case 'vehicle-start':
-      return '「自駕啟動 · ' + action.vehicleCode + '」將於後續步驟接上視窗。';
-    case 'vehicle-reset':
-      return '「系統重置 · ' + action.vehicleCode + '」將於後續步驟接上視窗。';
-    default:
-      return '此操作將於後續接上。';
-  }
-}
-
 export function ShiftDeploymentPage() {
+  const { t } = useTranslation();
   const data = useDeploymentData();
   const [hint, setHint] = useState<string | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+
+  const describeAction = (action: ShiftDeploymentAction): string => {
+    switch (action.kind) {
+      case 'event-open':
+        return t('shiftDeployment.actions.eventOpen');
+      case 'vehicle-stop':
+        return t('shiftDeployment.actions.vehicleStop', { vehicleCode: action.vehicleCode });
+      case 'vehicle-start':
+        return t('shiftDeployment.actions.vehicleStart', { vehicleCode: action.vehicleCode });
+      case 'vehicle-reset':
+        return t('shiftDeployment.actions.vehicleReset', { vehicleCode: action.vehicleCode });
+      default:
+        return t('shiftDeployment.actions.fallback');
+    }
+  };
 
   const onAction = (action: ShiftDeploymentAction) => {
     if (action.kind === 'schedule-adjust') {
@@ -52,7 +54,7 @@ export function ShiftDeploymentPage() {
             onClick={() => setHint(null)}
             className="ml-3 text-sky-400 hover:underline"
           >
-            關閉
+            {t('common.close')}
           </button>
         </div>
       ) : null}

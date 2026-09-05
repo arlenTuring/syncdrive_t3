@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 type WorkspaceTab = 'map' | 'trajectory'
 
 type WorkspaceTabsProps = {
@@ -6,11 +8,13 @@ type WorkspaceTabsProps = {
 }
 
 export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
+  const { t } = useTranslation()
+
   return (
     <div
       className="flex shrink-0 gap-1 border-b border-zinc-800 bg-zinc-950 px-4 pt-3"
       role="tablist"
-      aria-label="工作區：地圖編輯圖台、軌跡圖台"
+      aria-label={t('mapEditor.workspaceAria')}
     >
       <button
         type="button"
@@ -23,7 +27,7 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         }`}
         onClick={() => onChange('map')}
       >
-        地圖編輯圖台
+        {t('mapEditor.tabMap')}
       </button>
       <button
         type="button"
@@ -36,7 +40,7 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         }`}
         onClick={() => onChange('trajectory')}
       >
-        軌跡圖台
+        {t('mapEditor.tabTrajectory')}
       </button>
     </div>
   )

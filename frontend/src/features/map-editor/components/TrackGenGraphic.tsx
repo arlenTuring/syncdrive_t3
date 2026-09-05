@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Plus, Route } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { LaneCenterlinePlan, RoadInfo } from '../opendrive/laneCenterlines'
 import type { TrackGenSummary } from '../utils/trackGenFacility'
 import type { Vec2 } from '../utils/trackGenLayout'
@@ -67,6 +68,7 @@ export function TrackGenGraphic({
   selected,
   onPickClick,
 }: Props) {
+  const { t } = useTranslation()
   const buttonSize = Math.max(28, Math.min(width, height) * 0.18)
   /**
    * 空白狀態那行提示的字級。
@@ -96,7 +98,7 @@ export function TrackGenGraphic({
   if (parseFailed) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-rose-500/50 bg-rose-950/20 px-3 text-center">
-        <span className="text-xs text-rose-300">OpenDRIVE 解析失敗</span>
+        <span className="text-xs text-rose-300">{t('mapEditor.trackGen.graphic.parseFailed')}</span>
         {!readOnly ? (
           <button
             type="button"
@@ -107,7 +109,7 @@ export function TrackGenGraphic({
             }}
             className="text-[11px] text-cyan-300 underline"
           >
-            重新選擇檔案
+            {t('mapEditor.trackGen.graphic.reselectFile')}
           </button>
         ) : null}
       </div>
@@ -124,7 +126,7 @@ export function TrackGenGraphic({
           <button
             type="button"
             data-trackgen-pick
-            title="載入 OpenDRIVE"
+            title={t('mapEditor.trackGen.graphic.loadTitle')}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -135,7 +137,7 @@ export function TrackGenGraphic({
             style={{ width: buttonSize, height: buttonSize }}
           >
             <Plus className="size-[55%]" strokeWidth={2.25} aria-hidden />
-            <span className="sr-only">載入 OpenDRIVE</span>
+            <span className="sr-only">{t('mapEditor.trackGen.graphic.loadTitle')}</span>
           </button>
         ) : (
           <Route
@@ -148,7 +150,9 @@ export function TrackGenGraphic({
           className="pointer-events-none select-none px-3 text-center leading-snug text-zinc-400"
           style={{ fontSize: hintFontPx }}
         >
-          {readOnly ? '尚未載入路網' : '點擊或拖曳 .xodr 至此'}
+          {readOnly
+            ? t('mapEditor.trackGen.graphic.emptyReadOnly')
+            : t('mapEditor.trackGen.graphic.emptyDrop')}
         </span>
       </div>
     )
@@ -268,7 +272,7 @@ export function TrackGenGraphic({
               : ''}
           </div>
           <div>
-            長度{' '}
+            {t('mapEditor.trackGen.graphic.length')}{' '}
             <b className="font-mono tabular-nums text-zinc-100">
               {hoveredRoad.lengthM.toFixed(1)} m
             </b>
@@ -277,19 +281,19 @@ export function TrackGenGraphic({
             ) : null}
           </div>
           <div>
-            方位{' '}
+            {t('mapEditor.trackGen.graphic.heading')}{' '}
             <b className="font-mono tabular-nums text-zinc-100">
               {hoveredRoad.headingFromDeg.toFixed(0)}° → {hoveredRoad.headingToDeg.toFixed(0)}°
             </b>
           </div>
           <div>
-            前接{' '}
+            {t('mapEditor.trackGen.graphic.predecessor')}{' '}
             <b className="font-mono text-zinc-100">
               {hoveredRoad.predecessor
                 ? `${hoveredRoad.predecessor.type} ${hoveredRoad.predecessor.id}`
                 : '—'}
             </b>
-            {' · 後接 '}
+            {` · ${t('mapEditor.trackGen.graphic.successor')} `}
             <b className="font-mono text-zinc-100">
               {hoveredRoad.successor
                 ? `${hoveredRoad.successor.type} ${hoveredRoad.successor.id}`
@@ -297,7 +301,7 @@ export function TrackGenGraphic({
             </b>
           </div>
           <div className="mt-1 border-t border-zinc-700/70 pt-1">
-            車道（左正右負）
+            {t('mapEditor.trackGen.graphic.lanes')}
             {hoveredRoad.lanes.map((l) => (
               <div key={l.id} className="font-mono tabular-nums">
                 {l.id > 0 ? `+${l.id}` : l.id}{' '}
@@ -314,8 +318,13 @@ export function TrackGenGraphic({
 
       {selected ? (
         <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
-          {`${centerlines.roads.length} 條 road · ${centerlines.laneCount} 車道${fileName ? ` · ${fileName}` : ''}`}
-          {result ? ` ｜ 已生成 ${result.lanes} 條車道到地圖上` : ''}
+          {`${t('mapEditor.trackGen.graphic.summary', {
+            roads: centerlines.roads.length,
+            lanes: centerlines.laneCount,
+          })}${fileName ? ` · ${fileName}` : ''}`}
+          {result
+            ? t('mapEditor.trackGen.graphic.generated', { lanes: result.lanes })
+            : ''}
         </div>
       ) : null}
 
@@ -323,7 +332,7 @@ export function TrackGenGraphic({
         <button
           type="button"
           data-trackgen-pick
-          title="更換 OpenDRIVE"
+          title={t('mapEditor.trackGen.graphic.replaceTitle')}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -332,7 +341,7 @@ export function TrackGenGraphic({
           }}
           className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-zinc-900/90 px-2 py-1 text-[11px] text-zinc-200 shadow-md transition hover:border-cyan-500/70 hover:text-cyan-100"
         >
-          更換路網
+          {t('mapEditor.trackGen.graphic.replace')}
         </button>
       ) : null}
     </div>

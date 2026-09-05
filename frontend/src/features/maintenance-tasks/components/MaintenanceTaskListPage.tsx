@@ -11,6 +11,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
 import {
@@ -46,6 +47,7 @@ export function MaintenanceTaskListPage({
   onEditClick,
   onPreviewClick,
 }: MaintenanceTaskListPageProps) {
+  const { t } = useTranslation();
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [usageStatus, setUsageStatus] = useState<UsageStatusKey | 'all'>('all');
@@ -120,7 +122,7 @@ export function MaintenanceTaskListPage({
    * 不要在這裡自己吞掉。
    */
   const resolveDuplicateName = async (baseName: string): Promise<string> => {
-    const first = `${baseName}的複製`;
+    const first = `${baseName}${t('maintenanceTasks.copyNameSuffix')}`;
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const candidate = attempt === 0 ? first : `${first}${attempt + 1}`;
       try {
@@ -152,7 +154,7 @@ export function MaintenanceTaskListPage({
 
   const handleDelete = async (row: MaintenanceTaskListItem) => {
     if (row.usage_status === 'in_use') return;
-    const confirmed = window.confirm(`確定要刪除「${row.name}」嗎？此操作無法復原。`);
+    const confirmed = window.confirm(t('common.confirmDelete', { name: row.name }));
     if (!confirmed) return;
 
     setDeletingId(row.task_id);
@@ -173,7 +175,7 @@ export function MaintenanceTaskListPage({
         <div className="flex items-center gap-3">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
           <Wrench className="size-5 text-violet-400" aria-hidden />
-          <h1 className="text-lg font-semibold tracking-tight">整備任務管理</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{t('maintenanceTasks.title')}</h1>
         </div>
       </header>
 
@@ -188,7 +190,9 @@ export function MaintenanceTaskListPage({
         >
           {PUBLISH_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.value === 'all' ? '選擇發布狀態' : opt.label}
+              {opt.value === 'all'
+                ? t('common.selectPublishStatus')
+                : t(`common.publishStatus.${opt.value}`)}
             </option>
           ))}
         </select>
@@ -202,7 +206,9 @@ export function MaintenanceTaskListPage({
         >
           {USAGE_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.label}
+              {opt.value === 'all'
+                ? t('common.selectUsageStatus')
+                : t(`common.usageStatus.${opt.value}`)}
             </option>
           ))}
         </select>
@@ -210,7 +216,7 @@ export function MaintenanceTaskListPage({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           <input
             type="search"
-            placeholder="請輸入關鍵字"
+            placeholder={t('common.keywordPlaceholder')}
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
@@ -226,7 +232,7 @@ export function MaintenanceTaskListPage({
               ? 'border-violet-600 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30'
               : 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 text-zinc-600'
           }`}
-          title="搜尋"
+          title={t('common.search')}
         >
           <Search className="size-4" />
         </button>
@@ -236,7 +242,7 @@ export function MaintenanceTaskListPage({
           className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
         >
           <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          建立整備任務
+          {t('maintenanceTasks.create')}
         </button>
       </div>
 
@@ -249,12 +255,12 @@ export function MaintenanceTaskListPage({
         <table className="w-full min-w-[960px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-zinc-800 text-left text-zinc-500">
-              <th className="py-3 pr-4 font-medium">整備任務名稱</th>
-              <th className="py-3 pr-4 font-medium">任務檢視</th>
-              <th className="py-3 pr-4 font-medium">使用狀態</th>
-              <th className="py-3 pr-4 font-medium">發布狀態</th>
-              <th className="py-3 pr-4 font-medium">建立時間</th>
-              <th className="py-3 pr-4 font-medium">修改時間</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.name')}</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.preview')}</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.usageStatus')}</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.publishStatus')}</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.createdAt')}</th>
+              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.updatedAt')}</th>
               <th className="w-10 py-3" />
             </tr>
           </thead>
@@ -263,13 +269,13 @@ export function MaintenanceTaskListPage({
               <tr>
                 <td colSpan={7} className="py-16 text-center text-zinc-500">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
-                  載入中…
+                  {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-16 text-center text-zinc-500">
-                  尚無符合條件的整備任務
+                  {t('maintenanceTasks.empty')}
                 </td>
               </tr>
             ) : (
@@ -285,18 +291,18 @@ export function MaintenanceTaskListPage({
                       onClick={() => onPreviewClick?.(row.task_id)}
                       className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
                     >
-                      任務檢視
+                      {t('maintenanceTasks.preview')}
                     </button>
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.usage_status_label}
+                      label={t(`common.usageStatus.${row.usage_status}`)}
                       style={USAGE_TAG_STYLE[row.usage_status]}
                     />
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.publish_status_label}
+                      label={t(`common.publishStatus.${row.publish_status}`)}
                       style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
@@ -309,7 +315,7 @@ export function MaintenanceTaskListPage({
                         setOpenMenuId((prev) => (prev === row.task_id ? null : row.task_id))
                       }
                       className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="更多操作"
+                      title={t('common.moreActions')}
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
@@ -327,21 +333,21 @@ export function MaintenanceTaskListPage({
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
                         >
                           <Pencil className="size-4 text-zinc-400" />
-                          編輯
+                          {t('common.edit')}
                         </button>
                         <button
                           type="button"
                           onClick={() => void handleDuplicate(row)}
                           disabled={duplicatingId === row.task_id}
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-600"
-                          title={`複製「${row.name}」為新的草稿`}
+                          title={t('maintenanceTasks.copyAsDraftTitle', { name: row.name })}
                         >
                           {duplicatingId === row.task_id ? (
                             <Loader2 className="size-4 animate-spin text-zinc-400" />
                           ) : (
                             <Copy className="size-4 text-zinc-400" />
                           )}
-                          複製
+                          {t('common.duplicate')}
                         </button>
                         <button
                           type="button"
@@ -352,14 +358,18 @@ export function MaintenanceTaskListPage({
                               ? 'cursor-not-allowed text-zinc-600'
                               : 'text-red-400 hover:bg-zinc-800 hover:text-red-300'
                           }`}
-                          title={row.usage_status === 'in_use' ? '使用中的整備任務無法刪除' : undefined}
+                          title={
+                            row.usage_status === 'in_use'
+                              ? t('maintenanceTasks.cannotDeleteInUse')
+                              : undefined
+                          }
                         >
                           {deletingId === row.task_id ? (
                             <Loader2 className="size-4 animate-spin text-zinc-400" />
                           ) : (
                             <Trash2 className="size-4 text-red-400" />
                           )}
-                          刪除
+                          {t('common.delete')}
                         </button>
                       </div>
                     )}

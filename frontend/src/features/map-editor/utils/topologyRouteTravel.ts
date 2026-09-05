@@ -1,5 +1,6 @@
 import type { MapAreaObject } from '../types/area'
 import type { PointTopology, PointTopologyEdge } from '../types/pointTopology'
+import i18n from '../../../i18n'
 import { collectStationsFromAreas } from './dockingPointStationId'
 import {
   getFacilityDockingPoint,
@@ -300,7 +301,10 @@ export function buildTopologyStationLegBreakdown(
       distanceMeters: null,
       pathFound: false,
       metricsComplete: false,
-      message: `無法對應拓撲節點：${fromLabel} → ${toLabel}`,
+      message: i18n.t('mapEditor.routePlanning.legNoNode', {
+        from: fromLabel,
+        to: toLabel,
+      }),
     }
   }
 
@@ -318,7 +322,10 @@ export function buildTopologyStationLegBreakdown(
       distanceMeters: null,
       pathFound: false,
       metricsComplete: false,
-      message: `路網拓撲缺少有向路徑：${fromLabel} → ${toLabel}`,
+      message: i18n.t('mapEditor.routePlanning.legNoPath', {
+        from: fromLabel,
+        to: toLabel,
+      }),
     }
   }
 
@@ -337,7 +344,10 @@ export function buildTopologyStationLegBreakdown(
     metricsComplete: metrics.metricsComplete,
     message: metrics.metricsComplete
       ? null
-      : `路徑已連通，但尚有邊未填完整時間：${fromLabel} → ${toLabel}`,
+      : i18n.t('mapEditor.routePlanning.legIncompleteTimes', {
+          from: fromLabel,
+          to: toLabel,
+        }),
   }
 }
 
@@ -379,11 +389,11 @@ export function buildTopologyRouteTravelBreakdown(
   }
 
   if (stationIds.length >= 2 && topology.nodes.length === 0) {
-    warnings.unshift('此地圖尚未建立路網拓撲，無法由拓撲加總行駛時間')
+    warnings.unshift(i18n.t('mapEditor.routePlanning.warnNoTopology'))
   } else if (stationIds.length >= 2 && !pathsComplete) {
-    warnings.unshift('站序無法完全依拓撲連通，請至「編輯路網拓撲」補齊有向連線')
+    warnings.unshift(i18n.t('mapEditor.routePlanning.warnIncompletePath'))
   } else if (stationIds.length >= 2 && !timesComplete) {
-    warnings.unshift('拓撲路徑已連通，請為每一條邊填寫最快／平均時間')
+    warnings.unshift(i18n.t('mapEditor.routePlanning.warnIncompleteEdgeTimes'))
   }
 
   return {
@@ -398,12 +408,24 @@ export function buildTopologyRouteTravelBreakdown(
 }
 
 export function formatTopologyLegSummary(leg: TopologyStationLegBreakdown): string {
-  if (!leg.pathFound) return '無拓撲路徑'
+  if (!leg.pathFound) return i18n.t('mapEditor.routePlanning.legSummaryNoPath')
   const parts: string[] = []
-  if (leg.avgTravelTimeSeconds != null) parts.push(`均 ${leg.avgTravelTimeSeconds}s`)
-  if (leg.minTravelTimeSeconds != null) parts.push(`快 ${leg.minTravelTimeSeconds}s`)
+  if (leg.avgTravelTimeSeconds != null) {
+    parts.push(
+      i18n.t('mapEditor.routePlanning.legSummaryAvg', {
+        seconds: leg.avgTravelTimeSeconds,
+      }),
+    )
+  }
+  if (leg.minTravelTimeSeconds != null) {
+    parts.push(
+      i18n.t('mapEditor.routePlanning.legSummaryMin', {
+        seconds: leg.minTravelTimeSeconds,
+      }),
+    )
+  }
   if (leg.distanceMeters != null) parts.push(`${leg.distanceMeters} m`)
-  if (parts.length === 0) return '路徑已連 · 未填時間'
+  if (parts.length === 0) return i18n.t('mapEditor.routePlanning.legSummaryConnectedNoTimes')
   return parts.join(' · ')
 }
 

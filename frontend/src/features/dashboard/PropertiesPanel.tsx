@@ -1,5 +1,6 @@
 import { NumberInput } from '../../components/NumberInput'
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
@@ -71,44 +72,48 @@ function GroupInheritedVariablesSection({
   group: CanvasElementProps;
   onInsertToken?: (token: string) => void;
 }) {
+  const { t } = useTranslation();
   const rowVar = group.variableName || 'item';
   const indexMode = (group.groupVariableMode ?? 'row') === 'index';
   const hasListSql = !!(group.dataSourceId && group.sqlQuery?.trim());
+  const token = `{${rowVar}}`;
 
   return (
     <div className="mb-4 p-3 rounded-lg bg-purple-950/25 border border-purple-700/40 space-y-2.5">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-purple-300">群組繼承變數</div>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-purple-300">
+        {t('dashboard.properties.inheritedVars')}
+      </div>
       {indexMode ? (
         <p className="text-[10px] text-zinc-400 leading-relaxed">
-          群組僅注入<strong className="text-zinc-300 font-medium">列索引</strong>
-          <code className="mx-1 text-purple-300 font-mono">{`{${rowVar}}`}</code>
-          （0, 1, 2…）。各元件請在 SQL／MQTT 綁定中用此變數取第 N 筆，例如
+          {t('dashboard.properties.inheritedIndex', { token })}
           <code className="block mt-1 text-[9px] text-zinc-500 font-mono leading-relaxed">
             LIMIT 1 OFFSET {'{'}{rowVar}{'}'}
           </code>
         </p>
       ) : (
         <p className="text-[10px] text-zinc-400 leading-relaxed">
-          群組注入整列欄位；文字可用 <code className="text-purple-300 font-mono">{'{欄位名}'}</code> 引用。
+          {t('dashboard.properties.inheritedRow', {
+            token: t('dashboard.properties.fieldNameToken'),
+          })}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <code className="px-2 py-1 rounded bg-purple-500/20 border border-purple-500/35 text-purple-200 text-[11px] font-mono">
-          {`{${rowVar}}`}
+          {token}
         </code>
         {onInsertToken && (
           <button
             type="button"
-            onClick={() => onInsertToken(`{${rowVar}}`)}
+            onClick={() => onInsertToken(token)}
             className="text-[10px] text-cyan-400 hover:text-cyan-300"
           >
-            插入至查詢
+            {t('dashboard.properties.insertIntoQuery')}
           </button>
         )}
       </div>
       {hasListSql && indexMode && (
         <p className="text-[10px] text-zinc-500">
-          群組 SQL 僅決定列數與輪播；欄位內容請在子元件各自綁定。
+          {t('dashboard.properties.groupSqlHint')}
         </p>
       )}
     </div>
@@ -123,9 +128,11 @@ function DataBindingSettings({
   w: WidgetDataBinding; 
   onUpdate: (p: Partial<WidgetDataBinding>) => void 
 }) {
+  const { t } = useTranslation();
   const [mode, setMode] = React.useState<'sql' | 'mqtt' | 'rest'>(
     w.mqttDataSourceId ? 'mqtt' : (w.dataUrl ? 'rest' : 'sql')
   );
+  const policy = (w.freshnessPolicy ?? 'auto') as FreshnessPolicy;
 
   // T2-C 修正：當選取的 Widget 改變時（例如從 MQTT Widget 切換到 SQL Widget），
   // 同步更新 mode 狀態，防止頁籤顯示錯誤的資料綁定模式
@@ -162,11 +169,11 @@ function DataBindingSettings({
             value={w.mqttDataSourceId ?? ''}
             onChange={id => onUpdate({ mqttDataSourceId: id, dataSourceId: '', dataUrl: '' })}
           />
-          <Field label="訂閱主題 (Topic)">
+          <Field label={t('dashboard.properties.mqttTopic')}>
             <input value={w.mqttTopic} onChange={e => onUpdate({ mqttTopic: e.target.value })} 
                    className={inputCls} placeholder="v1/vtms/+/telemetry/update" />
           </Field>
-          <Field label="數值路徑 (JSON Path)">
+          <Field label={t('dashboard.properties.mqttPath')}>
             <input value={w.mqttValuePath} onChange={e => onUpdate({ mqttValuePath: e.target.value })} 
                    className={inputCls} placeholder="payload.speed" />
           </Field>
@@ -174,33 +181,42 @@ function DataBindingSettings({
       )}
 
       {mode === 'rest' && (
-        <Field label="直接 REST URL">
+        <Field label={t('dashboard.properties.restUrl')}>
           <input value={w.dataUrl} onChange={e => onUpdate({ dataUrl: e.target.value, dataSourceId: '', mqttDataSourceId: '' })} 
                  className={inputCls} placeholder="https://api.example.com/data" />
         </Field>
       )}
 
-      <Field label="更新方式">
+      <Field label={t('dashboard.properties.freshness')}>
         <select
-          value={w.freshnessPolicy ?? 'auto'}
+          value={policy}
           onChange={e => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
           className={inputCls}
         >
           {FRESHNESS_POLICY_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {t(`dashboard.properties.freshnessOpt.${o.value}`)}
+            </option>
           ))}
         </select>
         <p className="text-zinc-500 text-[10px] leading-snug mt-1">
-          {FRESHNESS_POLICY_OPTIONS.find(o => o.value === (w.freshnessPolicy ?? 'auto'))?.hint}
-          <span className="block text-zinc-600 mt-0.5">目前由平台判定：{resolveFreshness(w).reason}</span>
+          {t(`dashboard.properties.freshnessHint.${policy}`)}
+          <span className="block text-zinc-600 mt-0.5">
+            {(() => {
+              const fr = resolveFreshness(w);
+              return t('dashboard.properties.freshnessCurrent', {
+                reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams),
+              });
+            })()}
+          </span>
         </p>
-        {(w.freshnessPolicy ?? 'auto') === 'interval' && (
+        {policy === 'interval' && (
           <>
             <NumberInput min={1} value={w.refreshInterval || 15}
                    onChange={n => onUpdate({ refreshInterval: n })}
-                   className={`${inputCls} mt-1.5`} placeholder="每隔幾秒更新" />
+                   className={`${inputCls} mt-1.5`} placeholder={t('dashboard.properties.freshnessIntervalPlaceholder')} />
             <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
-              ⚠ 定時輪詢會對資料庫造成重複查詢，僅建議用於無法即時推送的資料。
+              {t('dashboard.properties.freshnessPollWarn')}
             </p>
           </>
         )}
@@ -216,6 +232,7 @@ function AlertRulesEditor({
   rules: AlertRule[];
   onChange: (next: AlertRule[]) => void;
 }) {
+  const { t } = useTranslation();
   const add = () => onChange([...rules, createEmptyAlertRule()]);
   const remove = (idx: number) => onChange(rules.filter((_, i) => i !== idx));
   const patch = (idx: number, p: Partial<AlertRule>) =>
@@ -224,71 +241,71 @@ function AlertRulesEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-zinc-500 text-[10px] uppercase font-bold tracking-tight">警示規則</label>
+        <label className="text-zinc-500 text-[10px] uppercase font-bold tracking-tight">{t('dashboard.properties.alertRules.title')}</label>
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); add(); }}
           className="p-1 hover:bg-zinc-800 rounded text-cyan-500 transition-colors"
-          title="新增規則"
+          title={t('dashboard.properties.alertRules.addTitle')}
         >
           <Plus size={14} />
         </button>
       </div>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
-        每條規則獨立設定文字、顏色、閃爍方式與起訖條件。<strong className="text-zinc-400">多條同時命中會多行顯示</strong>。
+        {t('dashboard.properties.alertRules.hint')}<strong className="text-zinc-400">{t('dashboard.properties.alertRules.hintMulti')}</strong>
       </p>
       {rules.length === 0 && (
-        <p className="text-[10px] text-amber-500/90">尚無規則，請按 + 新增。</p>
+        <p className="text-[10px] text-amber-500/90">{t('dashboard.properties.alertRules.empty')}</p>
       )}
       {rules.map((rule, i) => (
         <div key={rule.id} className="p-2.5 bg-zinc-800/40 rounded-md border border-zinc-700/50 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-zinc-400">規則 {i + 1}</span>
+            <span className="text-[10px] font-bold text-zinc-400">{t('dashboard.properties.alertRules.ruleN', { n: i + 1 })}</span>
             <button type="button" onClick={() => remove(i)} className="p-0.5 text-zinc-500 hover:text-red-400 transition-colors">
               <X size={12} />
             </button>
           </div>
 
-          <Field label="顯示文字（可含變數）">
+          <Field label={t('dashboard.properties.alertRules.content')}>
             <textarea
               value={rule.content}
               onChange={e => patch(i, { content: e.target.value })}
               className={`${inputCls} h-12 resize-none`}
-              placeholder="例如：感測器異常，請檢查 {vehicle_code}"
+              placeholder={t('dashboard.properties.alertRules.contentPlaceholder')}
             />
           </Field>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="文字顏色">
+            <Field label={t('dashboard.properties.textColor')}>
               <input type="color" value={rule.textColor} onChange={e => patch(i, { textColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
             </Field>
-            <Field label="背景顏色">
+            <Field label={t('dashboard.properties.backgroundColor')}>
               <input type="color" value={hexFromRgba(rule.backgroundColor)} onChange={e => patch(i, { backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
             </Field>
           </div>
-          <Field label="邊框顏色">
+          <Field label={t('dashboard.properties.alertRules.borderColor')}>
             <input type="color" value={hexFromRgba(rule.borderColor)} onChange={e => patch(i, { borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
           </Field>
-          <Field label="顯示方式">
+          <Field label={t('dashboard.properties.alertRules.displayMode')}>
             <select value={rule.displayMode} onChange={e => patch(i, { displayMode: e.target.value as AlertDisplayMode })} className={selectCls}>
-              <option value="blink">閃爍（預設）</option>
-              <option value="static">持續顯示</option>
+              <option value="blink">{t('dashboard.properties.alertRules.blink')}</option>
+              <option value="static">{t('dashboard.properties.alertRules.static')}</option>
             </select>
           </Field>
 
           <div className="pt-1 border-t border-zinc-700/50 space-y-2">
-            <p className="text-[10px] font-bold text-emerald-500/90">開始條件（命中才顯示）</p>
-            <Field label="監看欄位">
+            <p className="text-[10px] font-bold text-emerald-500/90">{t('dashboard.properties.alertRules.startCondition')}</p>
+            <Field label={t('dashboard.properties.alertRules.watchField')}>
               <input value={rule.startField} onChange={e => patch(i, { startField: e.target.value })} className={inputCls} placeholder="alert_message" />
             </Field>
-            <Field label="觸發模式">
+            <Field label={t('dashboard.properties.alertRules.triggerMode')}>
               <select value={rule.startMode} onChange={e => patch(i, { startMode: e.target.value as AlertTriggerMode })} className={selectCls}>
-                <option value="non-empty">有值</option>
-                <option value="equals">等於</option>
-                <option value="not-equals">不等於</option>
+                <option value="non-empty">{t('dashboard.properties.alertRules.nonEmpty')}</option>
+                <option value="equals">{t('dashboard.properties.alertRules.equals')}</option>
+                <option value="not-equals">{t('dashboard.properties.alertRules.notEquals')}</option>
               </select>
             </Field>
             {(rule.startMode === 'equals' || rule.startMode === 'not-equals') && (
-              <Field label="比對值">
+              <Field label={t('dashboard.properties.alertRules.compareValue')}>
                 <input value={rule.startValue ?? ''} onChange={e => patch(i, { startValue: e.target.value })} className={inputCls} />
               </Field>
             )}
@@ -297,22 +314,22 @@ function AlertRulesEditor({
           <div className="pt-1 border-t border-zinc-700/50 space-y-2">
             <label className="flex items-center gap-2 text-[10px] text-zinc-400">
               <input type="checkbox" checked={rule.endEnabled} onChange={e => patch(i, { endEnabled: e.target.checked })} className="accent-cyan-500" />
-              啟用結束條件（命中則隱藏此列）
+              {t('dashboard.properties.alertRules.enableEnd')}
             </label>
             {rule.endEnabled && (
               <>
-                <Field label="結束欄位">
+                <Field label={t('dashboard.properties.alertRules.endField')}>
                   <input value={rule.endField ?? ''} onChange={e => patch(i, { endField: e.target.value })} className={inputCls} placeholder="health_status" />
                 </Field>
-                <Field label="結束模式">
+                <Field label={t('dashboard.properties.alertRules.endMode')}>
                   <select value={rule.endMode ?? 'non-empty'} onChange={e => patch(i, { endMode: e.target.value as AlertTriggerMode })} className={selectCls}>
-                    <option value="non-empty">有值</option>
-                    <option value="equals">等於</option>
-                    <option value="not-equals">不等於</option>
+                    <option value="non-empty">{t('dashboard.properties.alertRules.nonEmpty')}</option>
+                    <option value="equals">{t('dashboard.properties.alertRules.equals')}</option>
+                    <option value="not-equals">{t('dashboard.properties.alertRules.notEquals')}</option>
                   </select>
                 </Field>
                 {(rule.endMode === 'equals' || rule.endMode === 'not-equals' || !rule.endMode) && (
-                  <Field label="結束比對值">
+                  <Field label={t('dashboard.properties.alertRules.endCompareValue')}>
                     <input value={rule.endValue ?? ''} onChange={e => patch(i, { endValue: e.target.value })} className={inputCls} placeholder="OK" />
                   </Field>
                 )}
@@ -344,6 +361,7 @@ function ColorRulesEditor({
   enabled: boolean;
   onToggleEnabled: (e: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const addRule = () => onUpdate([...rules, { condition: 'gt', threshold: '0', textColor: '#ffffff', bgColor: '#ef4444', borderColor: '#ef4444' }]);
   const removeRule = (idx: number) => onUpdate(rules.filter((_, i) => i !== idx));
   const updateRule = (idx: number, patch: Partial<ColorRule>) => onUpdate(rules.map((r, i) => i === idx ? { ...r, ...patch } : r));
@@ -353,7 +371,7 @@ function ColorRulesEditor({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <input type="checkbox" checked={enabled} onChange={e => onToggleEnabled(e.target.checked)} className="accent-cyan-500 w-3 h-3 cursor-pointer" />
-          <SH icon={<Palette size={12} />} label="條件著色規則" color="#ec4899" />
+          <SH icon={<Palette size={12} />} label={t('dashboard.properties.colorRules.title')} color="#ec4899" />
         </div>
         {enabled && (
           <button onClick={addRule} className="p-1 hover:bg-zinc-800 rounded text-cyan-500 transition-colors">
@@ -369,29 +387,29 @@ function ColorRulesEditor({
           </button>
           <div className="flex gap-1.5 items-center">
             <select value={rule.condition} onChange={e => updateRule(i, { condition: e.target.value as any })} className={`${selectCls} flex-1`}>
-              <option value="gt">大於 &gt;</option><option value="lt">小於 &lt;</option>
-              <option value="eq">等於 =</option><option value="contains">包含</option>
-              <option value="status_eq">狀態等於 (字串)</option>
+              <option value="gt">{t('dashboard.properties.colorRules.opGt')}</option><option value="lt">{t('dashboard.properties.colorRules.opLt')}</option>
+              <option value="eq">{t('dashboard.properties.colorRules.opEq')}</option><option value="contains">{t('dashboard.properties.colorRules.opContains')}</option>
+              <option value="status_eq">{t('dashboard.properties.colorRules.opStatusEq')}</option>
             </select>
-            <input value={rule.threshold} onChange={e => updateRule(i, { threshold: e.target.value })} className={`${inputCls} flex-1`} placeholder="門檻值" />
+            <input value={rule.threshold} onChange={e => updateRule(i, { threshold: e.target.value })} className={`${inputCls} flex-1`} placeholder={t('dashboard.properties.colorRules.thresholdPlaceholder')} />
           </div>
           <div className="grid grid-cols-3 gap-1">
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
               <input type="color" value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
-              <span className="text-[8px] text-zinc-500 uppercase">字</span>
+              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrText')}</span>
             </div>
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
               <input type="color" value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
-              <span className="text-[8px] text-zinc-500 uppercase">背</span>
+              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBg')}</span>
             </div>
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
               <input type="color" value={rule.borderColor || '#ffffff'} onChange={e => updateRule(i, { borderColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
-              <span className="text-[8px] text-zinc-500 uppercase">框</span>
+              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBorder')}</span>
             </div>
           </div>
         </div>
       ))}
-      {rules.length === 0 && <div className="text-[10px] text-zinc-600 text-center py-2 italic">尚未設定規則</div>}
+      {rules.length === 0 && <div className="text-[10px] text-zinc-600 text-center py-2 italic">{t('dashboard.properties.colorRules.empty')}</div>}
     </div>
   );
 }
@@ -409,6 +427,7 @@ function TextSettings({
   onDelete: () => void;
   editingGroup?: CanvasElementProps | null;
 }) {
+  const { t } = useTranslation();
   const commonIcons = ['Activity', 'AlertTriangle', 'Bell', 'Battery', 'Cpu', 'Database', 'Eye', 'Gauge', 'HardDrive', 'Home', 'Info', 'Layers', 'Lock', 'Power', 'Settings', 'Shield', 'Thermometer', 'Wifi'];
 
   const insertIntoSql = (token: string) => {
@@ -421,27 +440,27 @@ function TextSettings({
       {editingGroup && (
         <GroupInheritedVariablesSection group={editingGroup} onInsertToken={insertIntoSql} />
       )}
-      <SH icon={<Type size={13} />} label="文字屬性" color="#f59e0b" />
+      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.text.title')} color="#f59e0b" />
       
       <div className="space-y-3">
-        <Field label="預設內容">
+        <Field label={t('dashboard.properties.widgets.text.defaultContent')}>
           <textarea
             value={w.content}
             onChange={e => onUpdate({ content: e.target.value })}
             className={`${inputCls} h-16 resize-none`}
-            placeholder="可填占位文字，如：在這邊編輯文字"
+            placeholder={t('dashboard.properties.widgets.text.defaultPlaceholder')}
           />
           {(w.dataSourceId || w.mqttDataSourceId) && (
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              已綁定 SQL／MQTT 時，編輯模式且尚無即時資料會顯示此文字；留空則依欄位名稱自動示範。
+              {t('dashboard.properties.widgets.text.defaultHint')}
             </p>
           )}
         </Field>
         
-        <Field label="圖示 (Icon)">
+        <Field label={t('dashboard.properties.icon')}>
           <div className="space-y-2">
             <select value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={selectCls}>
-              <option value="">（內建圖示）</option>
+              <option value="">{t('dashboard.properties.iconBuiltin')}</option>
               {commonIcons.map(icon => <option key={icon} value={icon}>{icon}</option>)}
             </select>
             <div className="flex flex-wrap gap-1 mt-2">
@@ -455,7 +474,7 @@ function TextSettings({
           </div>
         </Field>
 
-        <Field label="圖片圖示">
+        <Field label={t('dashboard.properties.iconImage')}>
           <IconImageField
             value={w.iconImage}
             onChange={(url) => onUpdate({ iconImage: url, icon: url ? undefined : w.icon })}
@@ -463,7 +482,7 @@ function TextSettings({
         </Field>
 
         {(w.icon || w.iconImage) && (
-          <Field label="圖示與文字間距 (px)">
+          <Field label={t('dashboard.properties.iconGapPx')}>
             <NumberInput
               min={0}
               max={32}
@@ -476,21 +495,21 @@ function TextSettings({
       </div>
 
       <div className="space-y-4 pt-4 border-t border-zinc-800">
-        <SH icon={<Palette size={13} />} label="預設外觀樣式" color="#ec4899" />
+        <SH icon={<Palette size={13} />} label={t('dashboard.properties.appearanceDefault')} color="#ec4899" />
         
         <div className="grid grid-cols-2 gap-3">
-          <Field label="文字顏色">
+          <Field label={t('dashboard.properties.textColor')}>
             <div className="flex gap-2">
               <input type="color" value={w.color.startsWith('#') ? w.color : '#ffffff'} onChange={e => onUpdate({ color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
               <input value={w.color} onChange={e => onUpdate({ color: e.target.value })} className={`${inputCls} font-mono`} placeholder="#RRGGBB" />
             </div>
           </Field>
-          <Field label="字體大小">
+          <Field label={t('dashboard.properties.fontSize')}>
             <NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
           </Field>
         </div>
 
-        <Field label="對齊">
+        <Field label={t('dashboard.properties.align')}>
           <TextAlignmentControls
             horizontal={resolveTextHorizontalAlign(w.textAlign)}
             vertical={resolveTextVerticalAlign(w.verticalAlign)}
@@ -500,35 +519,35 @@ function TextSettings({
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="背景填滿 (Fill)">
+          <Field label={t('dashboard.properties.backgroundFill')}>
             <div className="flex gap-2">
               <input type="color" value={w.backgroundColor?.startsWith('#') ? w.backgroundColor : '#000000'} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
-              <button onClick={() => onUpdate({ backgroundColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">透明</button>
+              <button onClick={() => onUpdate({ backgroundColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
             </div>
           </Field>
-          <Field label="圓角 (Radius)">
+          <Field label={t('dashboard.properties.borderRadius')}>
             <NumberInput min={0} value={w.borderRadius || 0} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} />
           </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="外框顏色">
+          <Field label={t('dashboard.properties.borderColor')}>
             <div className="flex gap-2">
               <input type="color" value={w.borderColor?.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
-              <button onClick={() => onUpdate({ borderColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">透明</button>
+              <button onClick={() => onUpdate({ borderColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
             </div>
           </Field>
-          <Field label="外框粗細">
+          <Field label={t('dashboard.properties.borderWidth')}>
             <NumberInput min={0} value={w.borderWidth || 0} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} />
           </Field>
         </div>
       </div>
 
       <div className="pt-4 border-t border-zinc-800">
-        <SH icon={<Database size={13} />} label="數據綁定" color="#a78bfa" />
+        <SH icon={<Database size={13} />} label={t('dashboard.properties.dataBinding')} color="#a78bfa" />
         <div className="mt-3 space-y-3">
           <DataBindingSettings w={w} onUpdate={onUpdate} />
-          <Field label="對應資料欄位名稱">
+          <Field label={t('dashboard.properties.dataFieldName')}>
             <input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="battery_level" />
           </Field>
         </div>
@@ -543,7 +562,7 @@ function TextSettings({
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={!!w.severityTextColor}
           onChange={e => onUpdate({ severityTextColor: e.target.checked })} />
-        依 severity 變更文字色（群組範本內有效）
+        {t('dashboard.properties.widgets.text.severityColor')}
       </label>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -552,6 +571,7 @@ function TextSettings({
 }
 
 function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; onUpdate: (p: Partial<AlertBannerWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   const rules = w.triggerConditions != null
     ? w.triggerConditions.map((r, i) => coerceAlertRule(r, i))
     : getEditorAlertRules(w);
@@ -561,34 +581,34 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
 
   return (
     <div className="space-y-5">
-      <SH icon={<Database size={13} />} label="資料來源" color="#a78bfa" />
+      <SH icon={<Database size={13} />} label={t('dashboard.properties.dataSource')} color="#a78bfa" />
       <DataBindingSettings w={w} onUpdate={onUpdate} />
 
       <div className="pt-2 border-t border-zinc-800 space-y-3">
-        <SH icon={<AlertTriangle size={13} />} label="警示規則" color="#f97316" />
+        <SH icon={<AlertTriangle size={13} />} label={t('dashboard.properties.alertRules.title')} color="#f97316" />
         <div className="p-2.5 rounded-lg bg-amber-950/25 border border-amber-700/40 text-[10px] text-amber-200/90 leading-relaxed">
-          預覽時僅顯示命中規則；編輯模式可預覽全部規則。
+          {t('dashboard.properties.alertRules.previewHint')}
           {(w.alertPresentation ?? 'stack') === 'carousel'
-            ? <> 多條命中時<strong>輪播</strong>（一次一條）。</>
-            : <> 多條同時命中會<strong>多行並列</strong>顯示。</>}
+            ? <> {t('dashboard.properties.alertRules.multiCarousel')}</>
+            : <> {t('dashboard.properties.alertRules.multiStack')}</>}
         </div>
         <AlertRulesEditor rules={rules} onChange={setRules} />
       </div>
 
       <div className="pt-2 border-t border-zinc-800 space-y-3">
-        <SH icon={<Type size={13} />} label="呈現方式" color="#38bdf8" />
-        <Field label="多條命中時">
+        <SH icon={<Type size={13} />} label={t('dashboard.properties.displayModeSection')} color="#38bdf8" />
+        <Field label={t('dashboard.properties.alertRules.multiHit')}>
           <select
             value={w.alertPresentation ?? 'stack'}
             onChange={e => onUpdate({ alertPresentation: e.target.value as 'stack' | 'carousel' })}
             className={inputCls}
           >
-            <option value="stack">多行並列</option>
-            <option value="carousel">輪播（一次一條）</option>
+            <option value="stack">{t('dashboard.properties.alertRules.stack')}</option>
+            <option value="carousel">{t('dashboard.properties.alertRules.carousel')}</option>
           </select>
         </Field>
         {(w.alertPresentation ?? 'stack') === 'carousel' && (
-          <Field label="輪播間隔 (ms)">
+          <Field label={t('dashboard.properties.alertRules.carouselMs')}>
             <NumberInput
               min={1200}
               step={100}
@@ -601,11 +621,11 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       </div>
 
       <div className="pt-2 border-t border-zinc-800 space-y-3">
-        <SH icon={<Type size={13} />} label="共用樣式" color="#94a3b8" />
-        <Field label="字級">
+        <SH icon={<Type size={13} />} label={t('dashboard.properties.sharedStyle')} color="#94a3b8" />
+        <Field label={t('dashboard.properties.alertRules.fontSize')}>
           <NumberInput min={8} value={w.fontSize ?? 10} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
         </Field>
-        <Field label="圖示 (Lucide，選填)">
+        <Field label={t('dashboard.properties.iconLucideOptional')}>
           <input value={w.icon ?? ''} onChange={e => onUpdate({ icon: e.target.value })} className={inputCls} placeholder="AlertCircle" />
         </Field>
       </div>
@@ -617,32 +637,33 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
 }
 
 function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p: Partial<GaugeWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Gauge size={13} />} label="儀表板屬性" color="#ec4899" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <SH icon={<Gauge size={13} />} label={t('dashboard.properties.widgets.gauge.title')} color="#ec4899" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       
       <DataBindingSettings w={w} onUpdate={onUpdate} />
-      <Field label="數值欄位名稱"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
-      <Field label="樣式">
+      <Field label={t('dashboard.properties.valueField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
+      <Field label={t('dashboard.properties.style')}>
         <select
           value={w.gaugeVariant ?? 'default'}
           onChange={e => onUpdate({ gaugeVariant: e.target.value as GaugeWidget['gaugeVariant'] })}
           className={selectCls}
         >
-          <option value="default">半圓弧</option>
-          <option value="semi-arc">車輛狀態半圓</option>
-          <option value="ring">全圓進度環</option>
+          <option value="default">{t('dashboard.properties.widgets.gauge.variantDefault')}</option>
+          <option value="semi-arc">{t('dashboard.properties.widgets.gauge.variantSemiArc')}</option>
+          <option value="ring">{t('dashboard.properties.widgets.gauge.variantRing')}</option>
         </select>
       </Field>
       
       <div className="grid grid-cols-3 gap-1.5">
-        <Field label="最小值"><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
-        <Field label="最大值"><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
-        <Field label="單位"><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.min')}><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.max')}><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.unit')}><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="顯示數值字級 (px)">
+        <Field label={t('dashboard.properties.widgets.gauge.valueFontSize')}>
           <NumberInput
             min={8}
             max={96}
@@ -651,7 +672,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
             className={inputCls}
           />
         </Field>
-        <Field label="單位字級 (px)">
+        <Field label={t('dashboard.properties.widgets.gauge.unitFontSize')}>
           <NumberInput
             min={7}
             max={48}
@@ -661,13 +682,13 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           />
         </Field>
       </div>
-      <Field label="弧線寬度 (px)">
+      <Field label={t('dashboard.properties.widgets.gauge.strokeWidth')}>
         <input
           type="number"
           min={1}
           max={32}
           value={w.gaugeArcStrokeWidth ?? ''}
-          placeholder={w.gaugeVariant === 'semi-arc' ? '自動' : '12'}
+          placeholder={w.gaugeVariant === 'semi-arc' ? t('dashboard.properties.auto') : '12'}
           onChange={e => {
             const v = e.target.value.trim();
             onUpdate({ gaugeArcStrokeWidth: v === '' ? undefined : Math.max(1, +v) });
@@ -675,14 +696,14 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           className={inputCls}
         />
         <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-          半圓儀表弧線粗細；留白則依元件尺寸自動計算。
+          {t('dashboard.properties.widgets.gauge.strokeHint')}
         </p>
       </Field>
       <div className="space-y-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">內距 (px)</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{t('dashboard.properties.paddingPx')}</div>
         <div className="grid grid-cols-4 gap-1.5">
           {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
-            <Field key={side} label={side === 'top' ? '上' : side === 'right' ? '右' : side === 'bottom' ? '下' : '左'}>
+            <Field key={side} label={side === 'top' ? t('dashboard.properties.sideTop') : side === 'right' ? t('dashboard.properties.sideRight') : side === 'bottom' ? t('dashboard.properties.sideBottom') : t('dashboard.properties.sideLeft')}>
               <input
                 type="number"
                 min={0}
@@ -704,10 +725,10 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           ))}
         </div>
         <p className="text-[10px] text-zinc-500 leading-relaxed">
-          弧線／數值與面板外框的距離；四邊皆留白則為 0。
+          {t('dashboard.properties.widgets.gauge.padHint')}
         </p>
       </div>
-      <Field label="文字與弧線間距 (px)">
+      <Field label={t('dashboard.properties.widgets.gauge.textGap')}>
         <NumberInput
           min={-24}
           max={48}
@@ -716,11 +737,11 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           className={inputCls}
         />
         <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-          調整中央數值／單位與半圓弧線的垂直距離；正值下移、負值上移。
+          {t('dashboard.properties.widgets.gauge.textGapHint')}
         </p>
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="面板底色">
+        <Field label={t('dashboard.properties.widgets.gauge.panelBg')}>
           <input
             type="color"
             value={w.panelBackgroundColor?.startsWith('#') ? w.panelBackgroundColor : '#1a2332'}
@@ -728,7 +749,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
             className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
           />
         </Field>
-        <Field label="面板圓角">
+        <Field label={t('dashboard.properties.widgets.gauge.panelRadius')}>
           <NumberInput
             min={0}
             value={w.panelBorderRadius ?? 6}
@@ -742,7 +763,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
         className="text-xs text-zinc-400 hover:text-zinc-200 underline"
         onClick={() => onUpdate({ panelBackgroundColor: 'transparent', panelBorderRadius: 0 })}
       >
-        面板改為透明（改由色塊當底）
+        {t('dashboard.properties.widgets.gauge.panelTransparent')}
       </button>
 
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -752,6 +773,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
 }
 
 function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; onUpdate: (p: Partial<SegmentBarWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   const rules = w.colorRules ?? [];
   const patchRule = (idx: number, patch: Partial<SegmentBarColorRule>) => {
     const next = rules.map((r, i) => (i === idx ? { ...r, ...patch } : r));
@@ -759,9 +781,9 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
   };
   return (
     <div className="space-y-4">
-      <SH icon={<BarChart2 size={13} />} label="分段比例條" color="#22c55e" />
-      <Field label="標題"><input value={w.title ?? ''} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
-      <Field label="標題圖示">
+      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.segmentBar.title')} color="#22c55e" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title ?? ''} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <Field label={t('dashboard.properties.widgets.segmentBar.titleIcon')}>
         <IconImageField
           value={w.titleIconImage}
           onChange={(url) => onUpdate({ titleIconImage: url })}
@@ -769,22 +791,22 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
       </Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="狀態欄位"><input value={w.statusField} onChange={e => onUpdate({ statusField: e.target.value })} className={inputCls} placeholder="status_code" /></Field>
-        <Field label="比例欄位"><input value={w.pctField} onChange={e => onUpdate({ pctField: e.target.value })} className={inputCls} placeholder="pct" /></Field>
-        <Field label="數量欄位"><input value={w.countField} onChange={e => onUpdate({ countField: e.target.value })} className={inputCls} placeholder="vehicle_count" /></Field>
-        <Field label="數量單位"><input value={w.countUnit ?? '輛'} onChange={e => onUpdate({ countUnit: e.target.value })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.statusField')}><input value={w.statusField} onChange={e => onUpdate({ statusField: e.target.value })} className={inputCls} placeholder="status_code" /></Field>
+        <Field label={t('dashboard.properties.widgets.segmentBar.pctField')}><input value={w.pctField} onChange={e => onUpdate({ pctField: e.target.value })} className={inputCls} placeholder="pct" /></Field>
+        <Field label={t('dashboard.properties.widgets.segmentBar.countField')}><input value={w.countField} onChange={e => onUpdate({ countField: e.target.value })} className={inputCls} placeholder="vehicle_count" /></Field>
+        <Field label={t('dashboard.properties.widgets.segmentBar.countUnit')}><input value={w.countUnit ?? t('dashboard.properties.widgets.segmentBar.countUnitDefault')} onChange={e => onUpdate({ countUnit: e.target.value })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-2 text-[10px] text-zinc-400">
         <input type="checkbox" checked={w.showLegend !== false} onChange={e => onUpdate({ showLegend: e.target.checked })} />
-        顯示圖例
+        {t('dashboard.properties.showLegend')}
       </label>
-      <p className="text-[10px] text-zinc-500">狀態色對照表（元件內建，不寫入資料庫）</p>
+      <p className="text-[10px] text-zinc-500">{t('dashboard.properties.widgets.segmentBar.statusLegend')}</p>
       {rules.map((rule, idx) => (
         <div key={idx} className="grid grid-cols-2 gap-2 rounded border border-zinc-800 p-2">
-          <Field label="狀態碼"><input value={rule.status} onChange={e => patchRule(idx, { status: e.target.value })} className={inputCls} /></Field>
-          <Field label="標籤"><input value={rule.label} onChange={e => patchRule(idx, { label: e.target.value })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.widgets.segmentBar.statusCode')}><input value={rule.status} onChange={e => patchRule(idx, { status: e.target.value })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.label')}><input value={rule.label} onChange={e => patchRule(idx, { label: e.target.value })} className={inputCls} /></Field>
           <div className="col-span-2">
-            <Field label="顏色">
+            <Field label={t('dashboard.properties.color')}>
               <input type="color" value={rule.color} onChange={e => patchRule(idx, { color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
             </Field>
           </div>
@@ -797,35 +819,36 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
 }
 
 function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpdate: (p: Partial<SlotGridWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<LayoutGrid size={13} />} label="格位陣列屬性" color="#f43f5e" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.slotGrid.title')} color="#f43f5e" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="格內文字欄位"><input value={w.nameField} onChange={e => onUpdate({ nameField: e.target.value })} className={inputCls} placeholder="slot_label" /></Field>
-        <Field label="狀態欄位"><input value={w.statusField} onChange={e => onUpdate({ statusField: e.target.value })} className={inputCls} placeholder="status" /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.nameField')}><input value={w.nameField} onChange={e => onUpdate({ nameField: e.target.value })} className={inputCls} placeholder="slot_label" /></Field>
+        <Field label={t('dashboard.properties.statusField')}><input value={w.statusField} onChange={e => onUpdate({ statusField: e.target.value })} className={inputCls} placeholder="status" /></Field>
       </div>
-      <Field label="高亮狀態值 (逗號分隔)"><input value={w.activeValues.join(',')} onChange={e => onUpdate({ activeValues: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} placeholder="OCCUPIED,CHARGING" /></Field>
-      <Field label="版型">
+      <Field label={t('dashboard.properties.widgets.slotGrid.activeValues')}><input value={w.activeValues.join(',')} onChange={e => onUpdate({ activeValues: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} placeholder="OCCUPIED,CHARGING" /></Field>
+      <Field label={t('dashboard.properties.variant')}>
         <select value={w.variant ?? 'default'} onChange={e => onUpdate({ variant: e.target.value as SlotGridWidget['variant'] })} className={selectCls}>
-          <option value="default">一般</option>
-          <option value="compact-row">緊湊列</option>
+          <option value="default">{t('dashboard.properties.widgets.slotGrid.variantDefault')}</option>
+          <option value="compact-row">{t('dashboard.properties.widgets.slotGrid.variantCompact')}</option>
         </select>
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="高亮顏色"><input type="color" value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="空閒顏色"><input type="color" value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="佈局模式">
+        <Field label={t('dashboard.properties.widgets.slotGrid.activeColor')}><input type="color" value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.inactiveColor')}><input type="color" value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.layoutMode')}>
           <select value={w.layout} onChange={e => onUpdate({ layout: e.target.value as any })} className={selectCls}>
-            <option value="horizontal">橫向排列</option><option value="grid">網格排列</option>
+            <option value="horizontal">{t('dashboard.properties.widgets.slotGrid.layoutHorizontal')}</option><option value="grid">{t('dashboard.properties.widgets.slotGrid.layoutGrid')}</option>
           </select>
         </Field>
-        <Field label="格位間距 (px)"><NumberInput min={0} value={w.slotGap ?? 4} onChange={n => onUpdate({ slotGap: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.slotGap')}><NumberInput min={0} value={w.slotGap ?? 4} onChange={n => onUpdate({ slotGap: n })} className={inputCls} /></Field>
       </div>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
-        格位數量由 SQL 回傳列數決定。請設定 statusColorRules 或沿用範例平面預設。
+        {t('dashboard.properties.widgets.slotGrid.hint')}
       </p>
 
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -837,12 +860,13 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
 // ─── (舊有元件保持簡化) ──────────────────────────────────────────────
 
 function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p: Partial<ImageWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
-      <SH icon={<Image size={13} />} label="圖片屬性" color="#10b981" />
+      <SH icon={<Image size={13} />} label={t('dashboard.properties.widgets.image.title')} color="#10b981" />
 
       {/* 圖片 URL */}
-      <Field label="圖片 URL">
+      <Field label={t('dashboard.properties.widgets.image.url')}>
         <input
           value={w.src}
           onChange={e => onUpdate({ src: e.target.value })}
@@ -854,7 +878,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
         <div className="rounded-lg overflow-hidden border border-zinc-700 bg-zinc-900">
           <img
             src={w.src}
-            alt="預覽"
+            alt={t('dashboard.properties.preview')}
             className="w-full max-h-28 object-contain"
             onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.25'; }}
           />
@@ -862,29 +886,29 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       )}
 
       {/* 圖片填充模式 */}
-      <Field label="填充模式">
+      <Field label={t('dashboard.properties.widgets.image.objectFit')}>
         <select
           value={w.objectFit}
           onChange={e => onUpdate({ objectFit: e.target.value as ImageWidget['objectFit'] })}
           className={selectCls}
         >
-          <option value="cover">Cover（裁切填滿）</option>
-          <option value="contain">Contain（完整顯示）</option>
-          <option value="fill">Fill（拉伸填滿）</option>
-          <option value="none">None（原始大小）</option>
+          <option value="cover">{t('dashboard.properties.widgets.image.fitCover')}</option>
+          <option value="contain">{t('dashboard.properties.widgets.image.fitContain')}</option>
+          <option value="fill">{t('dashboard.properties.widgets.image.fitFill')}</option>
+          <option value="none">{t('dashboard.properties.widgets.image.fitNone')}</option>
         </select>
       </Field>
 
       {/* 圓角與透明度 */}
       <div className="grid grid-cols-2 gap-2">
-        <Field label="圓角 (px)">
+        <Field label={t('dashboard.properties.borderRadiusPx')}>
           <NumberInput min={0} max={999}
             value={w.borderRadius}
             onChange={n => onUpdate({ borderRadius: n })}
             className={inputCls}
           />
         </Field>
-        <Field label="透明度 (%)">
+        <Field label={t('dashboard.properties.opacityPct')}>
           <NumberInput min={0} max={100}
             value={w.opacity ?? 100}
             onChange={n => onUpdate({ opacity: n })}
@@ -894,7 +918,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       </div>
 
       {/* 背景色 */}
-      <Field label="背景色">
+      <Field label={t('dashboard.properties.backgroundColorShort')}>
         <div className="flex gap-2 items-center">
           <input
             type="color"
@@ -913,14 +937,14 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
 
       {/* 外框 */}
       <div className="grid grid-cols-2 gap-2">
-        <Field label="外框寬度 (px)">
+        <Field label={t('dashboard.properties.borderWidthPx')}>
           <NumberInput min={0} max={20}
             value={w.borderWidth ?? 0}
             onChange={n => onUpdate({ borderWidth: n })}
             className={inputCls}
           />
         </Field>
-        <Field label="外框顏色">
+        <Field label={t('dashboard.properties.borderColor')}>
           <div className="flex gap-1 items-center">
             <input
               type="color"
@@ -939,58 +963,58 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       </div>
 
       {/* ── 疊加文字 ── */}
-      <SH icon={<Type size={13} />} label="疊加文字" color="#a78bfa" />
+      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.image.overlay')} color="#a78bfa" />
 
-      <Field label="疊加文字內容">
+      <Field label={t('dashboard.properties.widgets.image.overlayContent')}>
         <textarea
           rows={2}
           value={w.overlayText ?? ''}
           onChange={e => onUpdate({ overlayText: e.target.value })}
           className={`${inputCls} resize-none`}
-          placeholder="留空則不顯示疊加文字"
+          placeholder={t('dashboard.properties.widgets.image.overlayPlaceholder')}
         />
       </Field>
 
       {(w.overlayText ?? '').trim() !== '' && (
         <>
-          <Field label="文字位置">
+          <Field label={t('dashboard.properties.widgets.image.textPosition')}>
             <select
               value={w.overlayPosition ?? 'bottom-left'}
               onChange={e => onUpdate({ overlayPosition: e.target.value as ImageWidget['overlayPosition'] })}
               className={selectCls}
             >
-              <option value="top-left">左上</option>
-              <option value="top-center">上置中</option>
-              <option value="top-right">右上</option>
-              <option value="center">正中央</option>
-              <option value="bottom-left">左下</option>
-              <option value="bottom-center">下置中</option>
-              <option value="bottom-right">右下</option>
+              <option value="top-left">{t('dashboard.properties.widgets.image.posTopLeft')}</option>
+              <option value="top-center">{t('dashboard.properties.widgets.image.posTopCenter')}</option>
+              <option value="top-right">{t('dashboard.properties.widgets.image.posTopRight')}</option>
+              <option value="center">{t('dashboard.properties.widgets.image.posCenter')}</option>
+              <option value="bottom-left">{t('dashboard.properties.widgets.image.posBottomLeft')}</option>
+              <option value="bottom-center">{t('dashboard.properties.widgets.image.posBottomCenter')}</option>
+              <option value="bottom-right">{t('dashboard.properties.widgets.image.posBottomRight')}</option>
             </select>
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="字級 (px)">
+            <Field label={t('dashboard.properties.fontSizePx')}>
               <NumberInput min={8} max={72}
                 value={w.overlayFontSize ?? 13}
                 onChange={n => onUpdate({ overlayFontSize: n })}
                 className={inputCls}
               />
             </Field>
-            <Field label="字重">
+            <Field label={t('dashboard.properties.fontWeight')}>
               <select
                 value={w.overlayFontWeight ?? 'normal'}
                 onChange={e => onUpdate({ overlayFontWeight: e.target.value as 'normal' | 'bold' })}
                 className={selectCls}
               >
-                <option value="normal">Normal</option>
-                <option value="bold">Bold</option>
+                <option value="normal">{t('dashboard.properties.normal')}</option>
+                <option value="bold">{t('dashboard.properties.boldWeight')}</option>
               </select>
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="文字顏色">
+            <Field label={t('dashboard.properties.textColor')}>
               <div className="flex gap-1 items-center">
                 <input
                   type="color"
@@ -1005,7 +1029,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
                 />
               </div>
             </Field>
-            <Field label="文字背景色">
+            <Field label={t('dashboard.properties.widgets.image.textBg')}>
               <div className="flex gap-1 items-center">
                 <input
                   type="color"
@@ -1041,6 +1065,7 @@ function ChartAxisFields({
   axis: ChartAxisConfig | undefined;
   onChange: (a: ChartAxisConfig) => void;
 }) {
+  const { t } = useTranslation();
   const unit = axis?.unit ?? 'number';
   const patch = (p: Partial<ChartAxisConfig>) => onChange({ unit, ...axis, ...p });
   const boundInput = (key: 'min' | 'max', placeholder: string) => (
@@ -1055,28 +1080,28 @@ function ChartAxisFields({
     <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{label}</p>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="單位">
+        <Field label={t('dashboard.properties.unit')}>
           <select value={unit} onChange={e => patch({ unit: e.target.value as ChartAxisUnit })} className={selectCls}>
-            <option value="number">數字</option>
-            <option value="time">時間</option>
+            <option value="number">{t('dashboard.properties.widgets.chart.unitNumber')}</option>
+            <option value="time">{t('dashboard.properties.widgets.chart.unitTime')}</option>
           </select>
         </Field>
-        <Field label="軸標籤">
-          <input value={axis?.label ?? ''} onChange={e => patch({ label: e.target.value })} className={inputCls} placeholder="可選" />
+        <Field label={t('dashboard.properties.widgets.chart.axisLabel')}>
+          <input value={axis?.label ?? ''} onChange={e => patch({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.optionalShort')} />
         </Field>
-        <Field label="下限">{boundInput('min', unit === 'time' ? '07:00' : '0')}</Field>
-        <Field label="上限">{boundInput('max', unit === 'time' ? '12:00' : '100')}</Field>
+        <Field label={t('dashboard.properties.widgets.chart.axisMin')}>{boundInput('min', unit === 'time' ? '07:00' : '0')}</Field>
+        <Field label={t('dashboard.properties.widgets.chart.axisMax')}>{boundInput('max', unit === 'time' ? '12:00' : '100')}</Field>
         {unit === 'time' && (
           <>
-            <Field label="時間格式">
+            <Field label={t('dashboard.properties.widgets.chart.timeFormat')}>
               <select value={axis?.timeStyle ?? 'hm'} onChange={e => patch({ timeStyle: e.target.value as 'hm' })} className={selectCls}>
-                <option value="hm">時:分</option>
+                <option value="hm">{t('dashboard.properties.widgets.chart.timeHm')}</option>
               </select>
             </Field>
-            <Field label="時制">
+            <Field label={t('dashboard.properties.widgets.chart.clockSystem')}>
               <select value={axis?.timeClock ?? '24h'} onChange={e => patch({ timeClock: e.target.value as '12h' | '24h' })} className={selectCls}>
-                <option value="24h">24 小時</option>
-                <option value="12h">12 小時</option>
+                <option value="24h">{t('dashboard.properties.widgets.chart.h24')}</option>
+                <option value="12h">{t('dashboard.properties.widgets.chart.h12')}</option>
               </select>
             </Field>
             <div className="col-span-2 space-y-2 pt-1 border-t border-zinc-800/80">
@@ -1092,11 +1117,11 @@ function ChartAxisFields({
                     });
                   }}
                 />
-                與目前時間同步（過去:未來 比例滑動視窗）
+                {t('dashboard.properties.widgets.chart.syncNow')}
               </label>
               {axis?.timeWindow?.enabled === true && (
                 <div className="grid grid-cols-3 gap-2">
-                  <Field label="過去比例">
+                  <Field label={t('dashboard.properties.widgets.chart.pastRatio')}>
                     <NumberInput
                       min={1}
                       value={axis?.timeWindow?.pastRatio ?? 2}
@@ -1108,7 +1133,7 @@ function ChartAxisFields({
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="未來比例">
+                  <Field label={t('dashboard.properties.widgets.chart.futureRatio')}>
                     <NumberInput
                       min={1}
                       value={axis?.timeWindow?.futureRatio ?? 4}
@@ -1120,7 +1145,7 @@ function ChartAxisFields({
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="視窗(分)">
+                  <Field label={t('dashboard.properties.widgets.chart.windowMin')}>
                     <NumberInput
                       min={60}
                       value={axis?.timeWindow?.totalMinutes ?? 360}
@@ -1135,7 +1160,7 @@ function ChartAxisFields({
                 </div>
               )}
               {axis?.timeWindow?.enabled !== true && (
-                <Field label="高亮時刻">
+                <Field label={t('dashboard.properties.widgets.chart.highlightTime')}>
                   <input
                     value={axis?.highlightTime ?? ''}
                     onChange={e => patch({ highlightTime: e.target.value || undefined })}
@@ -1161,6 +1186,7 @@ function LineChartSeriesFields({
   onChange: (s: LineChartSeriesConfig) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const patch = (p: Partial<LineChartSeriesConfig>) => onChange({ ...series, ...p });
   const patchLabelStyle = (p: Partial<LineChartEventLabelStyle>) =>
     patch({ eventLabelStyle: { ...series.eventLabelStyle, ...p } });
@@ -1171,16 +1197,16 @@ function LineChartSeriesFields({
         type="button"
         onClick={onRemove}
         className="absolute top-2 right-2 p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded opacity-0 group-hover:opacity-100"
-        title="移除此線"
+        title={t('dashboard.properties.widgets.chart.removeSeries')}
       >
         <X size={12} />
       </button>
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide pr-6">資料線</p>
+      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide pr-6">{t('dashboard.properties.widgets.chart.seriesTitle')}</p>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Y 欄位">
+        <Field label={t('dashboard.properties.widgets.chart.yField')}>
           <input value={series.yField} onChange={e => patch({ yField: e.target.value })} className={inputCls} placeholder="actual_util" />
         </Field>
-        <Field label="線色">
+        <Field label={t('dashboard.properties.widgets.chart.lineColor')}>
           <input
             type="color"
             value={series.color?.startsWith('#') ? series.color : '#38bdf8'}
@@ -1188,15 +1214,15 @@ function LineChartSeriesFields({
             className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
           />
         </Field>
-        <Field label="圖例名稱">
+        <Field label={t('dashboard.properties.widgets.chart.legendName')}>
           <input
             value={series.label ?? ''}
             onChange={e => patch({ label: e.target.value || undefined })}
             className={inputCls}
-            placeholder="可選"
+            placeholder={t('dashboard.properties.optionalShort')}
           />
         </Field>
-        <Field label="線寬(px)">
+        <Field label={t('dashboard.properties.widgets.chart.lineWidth')}>
           <NumberInput
             min={1}
             max={8}
@@ -1213,11 +1239,11 @@ function LineChartSeriesFields({
             checked={series.eventLabelsEnabled === true}
             onChange={e => patch({ eventLabelsEnabled: e.target.checked })}
           />
-          事件標籤
+          {t('dashboard.properties.widgets.chart.eventLabels')}
         </label>
         {series.eventLabelsEnabled === true && (
           <div className="grid grid-cols-2 gap-2">
-            <Field label="標籤欄位">
+            <Field label={t('dashboard.properties.widgets.chart.labelField')}>
               <input
                 value={series.eventLabelField ?? ''}
                 onChange={e => patch({ eventLabelField: e.target.value || undefined })}
@@ -1225,7 +1251,7 @@ function LineChartSeriesFields({
                 placeholder="anomaly_label"
               />
             </Field>
-            <Field label="旗標欄位（可選）">
+            <Field label={t('dashboard.properties.widgets.chart.flagField')}>
               <input
                 value={series.eventFlagField ?? ''}
                 onChange={e => patch({ eventFlagField: e.target.value || undefined })}
@@ -1233,7 +1259,7 @@ function LineChartSeriesFields({
                 placeholder="is_anomaly"
               />
             </Field>
-            <Field label="字級(px)">
+            <Field label={t('dashboard.properties.fontSizePx')}>
               <input
                 type="number"
                 min={8}
@@ -1246,7 +1272,7 @@ function LineChartSeriesFields({
                 className={inputCls}
               />
             </Field>
-            <Field label="字重">
+            <Field label={t('dashboard.properties.fontWeight')}>
               <select
                 value={String(series.eventLabelStyle?.fontWeight ?? 'normal')}
                 onChange={e =>
@@ -1256,11 +1282,11 @@ function LineChartSeriesFields({
                 }
                 className={selectCls}
               >
-                <option value="normal">一般</option>
-                <option value="bold">粗體</option>
+                <option value="normal">{t('dashboard.properties.normal')}</option>
+                <option value="bold">{t('dashboard.properties.boldWeight')}</option>
               </select>
             </Field>
-            <Field label="文字色">
+            <Field label={t('dashboard.properties.widgets.chart.textColorShort')}>
               <input
                 type="color"
                 value={series.eventLabelStyle?.fill?.startsWith('#') ? series.eventLabelStyle.fill : '#fca5a5'}
@@ -1268,7 +1294,7 @@ function LineChartSeriesFields({
                 className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
               />
             </Field>
-            <Field label="外框色">
+            <Field label={t('dashboard.properties.widgets.chart.borderColorShort')}>
               <input
                 type="color"
                 value={series.eventLabelStyle?.stroke?.startsWith('#') ? series.eventLabelStyle.stroke : '#ef4444'}
@@ -1276,7 +1302,7 @@ function LineChartSeriesFields({
                 className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
               />
             </Field>
-            <Field label="外框粗細">
+            <Field label={t('dashboard.properties.borderWidth')}>
               <input
                 type="number"
                 min={0}
@@ -1306,6 +1332,7 @@ function AxisBandFields({
   band: ChartAxisBandConfig;
   onChange: (band: ChartAxisBandConfig) => void;
 }) {
+  const { t } = useTranslation();
   const patch = (p: Partial<ChartAxisBandConfig>) => onChange({ ...band, ...p });
   const rules = band.colorRules ?? [];
   const addRule = () => patch({ colorRules: [...rules, { value: '', color: '#64748b' }] });
@@ -1315,33 +1342,33 @@ function AxisBandFields({
 
   return (
     <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{band.axis.toUpperCase()} 軸區段色帶</p>
+      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{t('dashboard.properties.widgets.chart.bandTitle', { axis: band.axis.toUpperCase() })}</p>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
-        資料庫提供區段識別與時間界線；顏色在此依欄位值對應（不存於 DB）。
+        {t('dashboard.properties.widgets.chart.bandHint')}
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="起點欄位">
+        <Field label={t('dashboard.properties.widgets.chart.startField')}>
           <input value={band.startField ?? ''} onChange={e => patch({ startField: e.target.value || undefined })} className={inputCls} placeholder={band.axis === 'x' ? 'time' : 'value'} />
         </Field>
-        <Field label="終點欄位">
-          <input value={band.endField ?? ''} onChange={e => patch({ endField: e.target.value || undefined })} className={inputCls} placeholder="可留空(用下一筆)" />
+        <Field label={t('dashboard.properties.widgets.chart.endField')}>
+          <input value={band.endField ?? ''} onChange={e => patch({ endField: e.target.value || undefined })} className={inputCls} placeholder={t('dashboard.properties.widgets.chart.endFieldPlaceholder')} />
         </Field>
-        <Field label="區段識別欄位">
+        <Field label={t('dashboard.properties.widgets.chart.segmentIdField')}>
           <input value={band.segmentField} onChange={e => patch({ segmentField: e.target.value })} className={inputCls} placeholder="segment_code" />
         </Field>
-        <Field label="無匹配時預設色">
+        <Field label={t('dashboard.properties.widgets.chart.defaultColor')}>
           <input type="color" value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
         </Field>
-        <Field label="厚度(px)">
+        <Field label={t('dashboard.properties.widgets.chart.thickness')}>
           <NumberInput min={1} max={20} value={band.thickness ?? 4} onChange={n => patch({ thickness: n })} className={inputCls} />
         </Field>
-        <Field label="透明度(0~1)">
+        <Field label={t('dashboard.properties.opacity01')}>
           <NumberInput min={0} max={1} step={0.1} value={band.opacity ?? 1} onChange={n => patch({ opacity: n })} className={inputCls} />
         </Field>
       </div>
       <div className="space-y-1.5 pt-1 border-t border-zinc-800">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase">區段值 → 顏色</span>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('dashboard.properties.widgets.chart.valueColorMap')}</span>
           <button type="button" onClick={addRule} className="p-1 text-cyan-500 hover:bg-zinc-800 rounded"><Plus size={12} /></button>
         </div>
         {rules.map((rule, i) => (
@@ -1351,13 +1378,14 @@ function AxisBandFields({
             <input type="color" value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer shrink-0" />
           </div>
         ))}
-        {rules.length === 0 && <p className="text-[10px] text-zinc-600 italic text-center py-1">尚未設定對應規則</p>}
+        {rules.length === 0 && <p className="text-[10px] text-zinc-600 italic text-center py-1">{t('dashboard.properties.widgets.chart.noMapping')}</p>}
       </div>
     </div>
   );
 }
 
 function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUpdate: (p: Partial<LineChartWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   const seriesList = resolveLineChartSeries(w);
   const setSeriesList = (next: LineChartSeriesConfig[]) => {
     const legacy = syncSeriesToLegacyFields(next);
@@ -1390,25 +1418,25 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
   };
   return (
     <div className="space-y-4">
-      <SH icon={<TrendingUp size={13} />} label="折線圖屬性" color="#06b6d4" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <SH icon={<TrendingUp size={13} />} label={t('dashboard.properties.widgets.chart.lineChartTitle')} color="#06b6d4" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="space-y-2 pt-2 border-t border-zinc-800">
-        <SH icon={<TrendingUp size={12} />} label="內邊距（內縮）" color="#64748b" />
+        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.paddingTitle')} color="#64748b" />
         <p className="text-[10px] text-zinc-500 leading-relaxed">
-          圖表繪製區會填滿 CHART 元件外框；僅透過內邊距在內部留白。請拖曳 CHART 右下角調整元件大小。
+          {t('dashboard.properties.widgets.chart.paddingHint')}
         </p>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="上"><input type="number" min={0} max={120} value={w.chartPadding?.top ?? ''} placeholder="16" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, top: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
-          <Field label="右"><input type="number" min={0} max={120} value={w.chartPadding?.right ?? ''} placeholder="16" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, right: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
-          <Field label="下"><input type="number" min={0} max={120} value={w.chartPadding?.bottom ?? ''} placeholder="36" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, bottom: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
-          <Field label="左"><input type="number" min={0} max={120} value={w.chartPadding?.left ?? ''} placeholder="48" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, left: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.sideTop')}><input type="number" min={0} max={120} value={w.chartPadding?.top ?? ''} placeholder="16" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, top: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.sideRight')}><input type="number" min={0} max={120} value={w.chartPadding?.right ?? ''} placeholder="16" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, right: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.sideBottom')}><input type="number" min={0} max={120} value={w.chartPadding?.bottom ?? ''} placeholder="36" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, bottom: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.sideLeft')}><input type="number" min={0} max={120} value={w.chartPadding?.left ?? ''} placeholder="48" onChange={e => onUpdate({ chartPadding: { ...w.chartPadding, left: e.target.value === '' ? undefined : +e.target.value } })} className={inputCls} /></Field>
         </div>
       </div>
-      <Field label="X 軸欄位"><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
+      <Field label={t('dashboard.properties.widgets.chart.xField')}><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
       <div className="space-y-2 pt-2 border-t border-zinc-800">
         <div className="flex items-center justify-between">
-          <SH icon={<TrendingUp size={12} />} label="折線系列" color="#06b6d4" />
+          <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.seriesSection')} color="#06b6d4" />
           <button
             type="button"
             onClick={() =>
@@ -1419,7 +1447,7 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
             }
             className="flex items-center gap-1 px-2 py-1 text-[10px] text-cyan-400 hover:bg-zinc-800 rounded border border-zinc-700"
           >
-            <Plus size={12} /> 新增
+            <Plus size={12} /> {t('dashboard.properties.add')}
           </button>
         </div>
         {seriesList.map((s, i) => (
@@ -1432,19 +1460,19 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
         ))}
       </div>
       <div className="space-y-2 pt-2 border-t border-zinc-800">
-        <SH icon={<TrendingUp size={12} />} label="座標軸" color="#22d3ee" />
-        <Field label="視窗模式">
+        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.axesSection')} color="#22d3ee" />
+        <Field label={t('dashboard.properties.widgets.chart.viewportMode')}>
           <select
             value={w.viewportMode ?? 'fixed-axis'}
             onChange={e => onUpdate({ viewportMode: e.target.value as ChartViewportMode })}
             className={selectCls}
           >
-            <option value="fixed-axis">定軸（軸固定，資料在區間內移動）</option>
-            <option value="data-centered">以資料為中心（軸在允許區間內平移）</option>
+            <option value="fixed-axis">{t('dashboard.properties.widgets.chart.viewportFixed')}</option>
+            <option value="data-centered">{t('dashboard.properties.widgets.chart.viewportData')}</option>
           </select>
         </Field>
         {w.viewportMode === 'data-centered' && (
-          <Field label="視窗留白 %">
+          <Field label={t('dashboard.properties.widgets.chart.viewportPad')}>
             <NumberInput
               min={0}
               max={45}
@@ -1454,25 +1482,25 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
             />
           </Field>
         )}
-        <ChartAxisFields label="X 軸" axis={w.xAxis} onChange={xAxis => onUpdate({ xAxis })} />
-        <ChartAxisFields label="Y 軸" axis={w.yAxis} onChange={yAxis => onUpdate({ yAxis })} />
+        <ChartAxisFields label={t('dashboard.properties.widgets.chart.xAxis')} axis={w.xAxis} onChange={xAxis => onUpdate({ xAxis })} />
+        <ChartAxisFields label={t('dashboard.properties.widgets.chart.yAxis')} axis={w.yAxis} onChange={yAxis => onUpdate({ yAxis })} />
         <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
-          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">軸區段色帶（資料驅動）</p>
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{t('dashboard.properties.widgets.chart.bandsSection')}</p>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center gap-2 text-xs text-zinc-400">
               <input type="checkbox" checked={!!xBand} onChange={e => setBand('x', e.target.checked)} />
-              啟用 X 軸色帶
+              {t('dashboard.properties.widgets.chart.enableXBand')}
             </label>
             <label className="flex items-center gap-2 text-xs text-zinc-400">
               <input type="checkbox" checked={!!yBand} onChange={e => setBand('y', e.target.checked)} />
-              啟用 Y 軸色帶
+              {t('dashboard.properties.widgets.chart.enableYBand')}
             </label>
           </div>
         </div>
         {xBand && <AxisBandFields band={xBand} onChange={b => updateBand('x', b)} />}
         {yBand && <AxisBandFields band={yBand} onChange={b => updateBand('y', b)} />}
         <p className="text-[10px] text-zinc-500 leading-relaxed">
-          時間軸請使用 HH:mm（如 09:00）；數字軸可設上下限。不論元件寬高，刻度依軸範圍等比縮放。
+          {t('dashboard.properties.widgets.chart.axisHint')}
         </p>
       </div>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -1482,12 +1510,13 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
 }
 
 function DatabaseSettings({ w, onUpdate, onDelete }: { w: DatabaseWidget; onUpdate: (p: Partial<DatabaseWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Database size={13} />} label="資料庫屬性" color="#a78bfa" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.database.title')} color="#a78bfa" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
-      <Field label="最大行數"><NumberInput value={w.maxRows} onChange={n => onUpdate({ maxRows: n })} className={inputCls} /></Field>
+      <Field label={t('dashboard.properties.widgets.database.maxRows')}><NumberInput value={w.maxRows} onChange={n => onUpdate({ maxRows: n })} className={inputCls} /></Field>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
     </div>
@@ -1501,28 +1530,28 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   onUpdate: (p: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode'>>) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const g = gcd(plane.width, plane.height);
   const currentMode = plane.viewportMode ?? 'fixed-scale';
   return (
     <div className="space-y-6">
       <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-2">
-        <SH icon={<Settings size={14} className="text-cyan-400" />} label="目前平面設定" color="#22d3ee" />
-        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-tighter">編輯基本屬性、解析度與適配縮放模式</p>
+        <SH icon={<Settings size={14} className="text-cyan-400" />} label={t('dashboard.properties.plane.title')} color="#22d3ee" />
+        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-tighter">{t('dashboard.properties.plane.subtitle')}</p>
       </div>
 
       <div className="space-y-4 px-1">
-        <Field label="平面名稱 (Name)">
+        <Field label={t('dashboard.properties.plane.name')}>
           <input 
             value={plane.name} 
             onChange={e => onUpdate({ name: e.target.value })} 
             className={`${inputCls} text-sm font-semibold`} 
-            placeholder="輸入平面名稱..."
+            placeholder={t('dashboard.properties.plane.namePlaceholder')}
           />
         </Field>
 
-        {/* 畫布適配模式 */}
         <div className="space-y-1.5">
-          <label className="text-zinc-400 text-xs font-medium block">畫布適配模式 (Viewport Mode)</label>
+          <label className="text-zinc-400 text-xs font-medium block">{t('dashboard.properties.plane.viewportMode')}</label>
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-800/60 rounded-lg border border-zinc-700/50">
             <button
               type="button"
@@ -1532,10 +1561,10 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
               }`}
-              title="固定等比大屏：16:9 戰情室大屏縮放，畫面居中，保證不變形"
+              title={t('dashboard.properties.plane.fixedScaleTitle')}
             >
-              <span className="font-bold">🖥️ 固定等比大屏</span>
-              <span className="text-[9px] opacity-75">居中等比·不變形</span>
+              <span className="font-bold">{t('dashboard.properties.plane.fixedScale')}</span>
+              <span className="text-[9px] opacity-75">{t('dashboard.properties.plane.fixedScaleSub')}</span>
             </button>
             <button
               type="button"
@@ -1545,27 +1574,27 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
               }`}
-              title="寬度自適應撐滿：100% 填滿視窗寬度，高度自然捲動，側邊欄開合自動伸縮"
+              title={t('dashboard.properties.plane.fitWidthTitle')}
             >
-              <span className="font-bold">↔️ 寬度自適應</span>
-              <span className="text-[9px] opacity-75">填滿寬度·垂直捲動</span>
+              <span className="font-bold">{t('dashboard.properties.plane.fitWidth')}</span>
+              <span className="text-[9px] opacity-75">{t('dashboard.properties.plane.fitWidthSub')}</span>
             </button>
           </div>
           <p className="text-[10px] text-zinc-500 leading-relaxed px-0.5">
             {currentMode === 'fixed-scale'
-              ? '💡 適合總控電視牆／戰情大屏，永遠保持固定比例居中呈現。'
-              : '💡 適合班表部署管理等業務頁面，當左側選單展開/收合時自動平滑撐滿寬度。'}
+              ? t('dashboard.properties.plane.fixedScaleHint')
+              : t('dashboard.properties.plane.fitWidthHint')}
           </p>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
-          <Field label="畫布寬度 (Width)">
+          <Field label={t('dashboard.properties.plane.canvasWidth')}>
             <div className="relative">
               <NumberInput min={320} value={plane.width} onChange={n => onUpdate({ width: n })} className={inputCls} />
               <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
             </div>
           </Field>
-          <Field label="畫布高度 (Height)">
+          <Field label={t('dashboard.properties.plane.canvasHeight')}>
             <div className="relative">
               <NumberInput min={240} value={plane.height} onChange={n => onUpdate({ height: n })} className={inputCls} />
               <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
@@ -1574,7 +1603,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
         </div>
 
         <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">螢幕比例</div>
+          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{t('dashboard.properties.plane.aspectRatio')}</div>
           <div className="px-3 py-1 bg-zinc-900 rounded text-cyan-400 font-mono text-xs shadow-inner">
             {plane.width / g} : {plane.height / g}
           </div>
@@ -1582,11 +1611,11 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
 
         <div className="pt-4 border-t border-zinc-800">
           <button 
-            onClick={() => { if(confirm('確定要永久刪除此平面嗎？')) onDelete(); }} 
+            onClick={() => { if(confirm(t('dashboard.properties.plane.deleteConfirm'))) onDelete(); }} 
             className="w-full py-2.5 rounded-lg bg-red-950/20 border border-red-900/30 text-red-400 text-xs 
                        flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all duration-300"
           >
-            <Trash2 size={13} /> 刪除目前平面
+            <Trash2 size={13} /> {t('dashboard.properties.plane.delete')}
           </button>
         </div>
       </div>
@@ -1600,6 +1629,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
   onDelete: () => void;
   onEnterEditGroupMode?: () => void;
 }) {
+  const { t } = useTranslation();
   const [maps, setMaps] = React.useState(() => getAvailableMaps());
   React.useEffect(() => {
     // 補上伺服器已發佈的地圖：本機地圖庫是每個瀏覽器各自一份，可能沒有這一張
@@ -1612,15 +1642,20 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
     };
   }, []);
   const isMap = el.canvasKind === 'map-platform';
+  const sectionTitle = isMap
+    ? t('dashboard.properties.canvas.mapPlatform')
+    : el.isGroup
+      ? t('dashboard.properties.canvas.groupTitle')
+      : t('dashboard.properties.canvas.canvasTitle');
   return (
     <div className="space-y-4">
-      <SH icon={<Layers size={13} />} label={isMap ? '圖台容器' : el.isGroup ? '畫布群組屬性' : '畫布屬性'} color={isMap ? '#0ea5e9' : el.isGroup ? '#a855f7' : '#06b6d4'} />
+      <SH icon={<Layers size={13} />} label={sectionTitle} color={isMap ? '#0ea5e9' : el.isGroup ? '#a855f7' : '#06b6d4'} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="標籤"><input value={el.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} /></Field>
-        <Field label="區塊標題"><input value={el.headerTitle ?? ''} onChange={e => onUpdate({ headerTitle: e.target.value })} className={inputCls} placeholder="如：載具控制" /></Field>
+        <Field label={t('dashboard.properties.label')}><input value={el.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.headerTitle')}><input value={el.headerTitle ?? ''} onChange={e => onUpdate({ headerTitle: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.headerTitlePlaceholder')} /></Field>
       </div>
       {el.isGroup ? (
-        <Field label="區塊標題字級 (px)">
+        <Field label={t('dashboard.properties.headerFontSize')}>
           <NumberInput
             min={10}
             max={48}
@@ -1629,25 +1664,24 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
             className={inputCls}
           />
           <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-            檢視時顯示在群組內左上角。青色小標籤是編輯模式專用，不會出現在載入後的頁面。
+            {t('dashboard.properties.headerFontHint')}
           </p>
         </Field>
       ) : null}
 
       {isMap && (
         <div className="space-y-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">圖台來源 (Map Editor)</div>
-          <Field label="選擇圖台">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">{t('dashboard.properties.canvas.mapSource')}</div>
+          <Field label={t('dashboard.properties.canvas.selectMap')}>
             <select value={el.mapId ?? ''} onChange={e => onUpdate({ mapId: e.target.value })} className={selectCls}>
-              <option value="">— 請選擇圖台 —</option>
+              <option value="">{t('dashboard.properties.canvas.selectMapPlaceholder')}</option>
               {maps.map(m => (
                 <option key={m.mapId} value={m.mapId}>{m.displayName}</option>
               ))}
             </select>
           </Field>
           <p className="text-[9px] leading-relaxed text-zinc-500">
-            圖台容器寬高請與地圖編輯器中的畫布解析度（pixelSize）一致，即可 1:1 顯示且不捲動。
-            若尺寸不同會等比縮放以完整放入容器。載具外觀請使用「載具容器」子元件放置於圖台上方。
+            {t('dashboard.properties.canvas.mapHint')}
           </p>
         </div>
       )}
@@ -1655,25 +1689,24 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
       <div className="grid grid-cols-2 gap-2">
         <Field label="X"><NumberInput value={el.x} onChange={n => onUpdate({ x: n })} className={inputCls} /></Field>
         <Field label="Y"><NumberInput value={el.y} onChange={n => onUpdate({ y: n })} className={inputCls} /></Field>
-        <Field label="寬"><NumberInput value={el.width} onChange={n => onUpdate({ width: n })} className={inputCls} /></Field>
-        <Field label="高"><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.width')}><NumberInput value={el.width} onChange={n => onUpdate({ width: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.height')}><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
-      <Field label="背景顏色"><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-      <Field label={`透明度：${el.opacity}%`}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
+      <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+      <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
 
       {el.label === '事件中心' && !el.isGroup && (
         <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
-          此畫布僅含標題與 KPI（SQL 彙總）。列表輪播請編輯同列的「<strong className="text-purple-300">事件輪播</strong>」群組：雙畫板左預設、右常態，資料來自群組列表 SQL。
+          {t('dashboard.properties.canvas.eventCenterHint')}
         </p>
       )}
 
       {el.canvasLayer === 'overlay' && (
         <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
-          疊層畫布：未選取時點擊會穿透至下層群組；選取後可編輯空狀態元件。
+          {t('dashboard.properties.canvas.overlayHint')}
         </p>
       )}
 
-      {/* 畫布群組設定 */}
       {el.isGroup && (
         <div className="pt-3 border-t border-purple-500/20 space-y-3">
           {onEnterEditGroupMode && (
@@ -1682,29 +1715,29 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
               onClick={onEnterEditGroupMode}
               className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
             >
-              編輯子畫布範本
+              {t('dashboard.properties.canvas.editSubcanvas')}
             </button>
           )}
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
             <Database size={12} className="text-purple-400" />
-            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">畫布群組</span>
+            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">{t('dashboard.properties.canvas.groupBadge')}</span>
           </div>
 
-          <Field label="資料呈現模式">
+          <Field label={t('dashboard.properties.canvas.presentMode')}>
             <select
               value={el.groupRepeatMode || 'tile'}
               onChange={e => onUpdate({ groupRepeatMode: e.target.value as 'tile' | 'scroll' | 'slots' })}
               className={selectCls}
             >
-              <option value="tile">重複排列（全部列出）</option>
-              <option value="scroll">單格滾動（輪播替換）</option>
-              <option value="slots">橫向格位（固定格數整塊替換）</option>
+              <option value="tile">{t('dashboard.properties.canvas.modeTile')}</option>
+              <option value="scroll">{t('dashboard.properties.canvas.modeScroll')}</option>
+              <option value="slots">{t('dashboard.properties.canvas.modeSlots')}</option>
             </select>
           </Field>
 
           {(el.groupRepeatMode === 'scroll') && (
             <>
-              <Field label="滾動間隔（秒）">
+              <Field label={t('dashboard.properties.canvas.scrollInterval')}>
                 <NumberInput
                   min={2}
                   value={el.groupScrollInterval ?? 5}
@@ -1714,8 +1747,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
               </Field>
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {el.dualCanvasEnabled
-                  ? '雙畫板已啟用：左側子畫布編輯預設畫板（閘道不成立時顯示），右側編輯常態輪播範本；中間直欄可設定閘道條件。'
-                  : '若要無資料與有資料使用不同版面，可啟用下方「雙畫板」並分別編輯預設與常態畫板。'}
+                  ? t('dashboard.properties.canvas.scrollDualHint')
+                  : t('dashboard.properties.canvas.scrollHint')}
               </p>
             </>
           )}
@@ -1723,59 +1756,59 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
           {(el.groupRepeatMode === 'slots') && (
             <>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="格位數量">
+                <Field label={t('dashboard.properties.canvas.slotCount')}>
                   <NumberInput min={1} max={12} value={el.slotCount ?? 6}
                     onChange={n => onUpdate({ slotCount: n })} className={inputCls} />
                 </Field>
-                <Field label="替換識別欄位">
+                <Field label={t('dashboard.properties.canvas.slotKeyField')}>
                   <input value={el.slotKeyField || ''} onChange={e => onUpdate({ slotKeyField: e.target.value })}
                     className={inputCls} placeholder="shift_key" />
                 </Field>
               </div>
-              <Field label="格位指派">
+              <Field label={t('dashboard.properties.canvas.slotAssign')}>
                 <select
                   value={el.groupSlotAssignment ?? 'sticky-pool'}
                   onChange={e => onUpdate({ groupSlotAssignment: e.target.value as 'index' | 'sticky-pool' })}
                   className={selectCls}
                 >
-                  <option value="sticky-pool">固定格位池（結束釋放、候補填入）</option>
-                  <option value="index">依序對應（第 i 列 → 第 i 格）</option>
+                  <option value="sticky-pool">{t('dashboard.properties.canvas.slotSticky')}</option>
+                  <option value="index">{t('dashboard.properties.canvas.slotIndex')}</option>
                 </select>
               </Field>
-              <Field label="替換動畫">
+              <Field label={t('dashboard.properties.canvas.transition')}>
                 <select
                   value={el.groupTransition ?? 'flip'}
                   onChange={e => onUpdate({ groupTransition: e.target.value as 'none' | 'fade' | 'flip' })}
                   className={selectCls}
                 >
-                  <option value="flip">翻日曆（往上翻）</option>
-                  <option value="fade">淡入位移</option>
-                  <option value="none">無動畫</option>
+                  <option value="flip">{t('dashboard.properties.canvas.transitionFlip')}</option>
+                  <option value="fade">{t('dashboard.properties.canvas.transitionFade')}</option>
+                  <option value="none">{t('dashboard.properties.canvas.transitionNone')}</option>
                 </select>
               </Field>
               <p className="text-[10px] text-zinc-500 leading-relaxed">
-                固定格位池：哪一格的班次先結束就先替換新資料；超過格數的候補班次同樣以動畫輪替進場。
+                {t('dashboard.properties.canvas.slotPoolHint')}
               </p>
             </>
           )}
 
-          <Field label="變數注入模式">
+          <Field label={t('dashboard.properties.canvas.varMode')}>
             <select
               value={el.groupVariableMode ?? 'row'}
               onChange={e => onUpdate({ groupVariableMode: e.target.value as 'index' | 'row' })}
               className={selectCls}
             >
-              <option value="index">索引（子元件自行 SQL／MQTT）</option>
-              <option value="row">整列欄位（舊版相容）</option>
+              <option value="index">{t('dashboard.properties.canvas.varModeIndex')}</option>
+              <option value="row">{t('dashboard.properties.canvas.varModeRow')}</option>
             </select>
           </Field>
 
           <div className="p-2.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50 space-y-1.5">
-            <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">變數注入</div>
+            <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">{t('dashboard.properties.canvas.varInject')}</div>
             <div className="text-[10px] text-zinc-400 leading-relaxed">
               {(el.groupVariableMode ?? 'row') === 'index'
-                ? <>僅注入列索引 <code className="text-purple-300 font-mono">{`{${el.variableName || 'item'}}`}</code>；子元件在 SQL／MQTT 中用 OFFSET 或主題變數承接。</>
-                : <>每列欄位注入為變數，文字可用 <code className="text-zinc-400 font-mono">{`{欄位名稱}`}</code>。</>}
+                ? t('dashboard.properties.canvas.varInjectIndex', { token: `{${el.variableName || 'item'}}` })
+                : t('dashboard.properties.canvas.varInjectRow', { token: t('dashboard.properties.canvas.fieldNameToken') })}
             </div>
           </div>
 
@@ -1784,42 +1817,43 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
           <DataBindingSettings w={el as any} onUpdate={onUpdate as any} />
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="資料表變數欄位">
-              <input value={el.iteratorField || ''} onChange={e => onUpdate({ iteratorField: e.target.value })} className={inputCls} placeholder="例如: id" />
+            <Field label={t('dashboard.properties.canvas.iteratorField')}>
+              <input value={el.iteratorField || ''} onChange={e => onUpdate({ iteratorField: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.canvas.iteratorPlaceholder')} />
             </Field>
-            <Field label="內部變數名稱">
-              <input value={el.variableName || ''} onChange={e => onUpdate({ variableName: e.target.value })} className={inputCls} placeholder="例如: item" />
+            <Field label={t('dashboard.properties.canvas.variableName')}>
+              <input value={el.variableName || ''} onChange={e => onUpdate({ variableName: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.canvas.variablePlaceholder')} />
             </Field>
           </div>
 
-          <Field label="範本填滿方式">
+          <Field label={t('dashboard.properties.canvas.tileFit')}>
             <select
               value={el.groupTileFit || 'fill'}
               onChange={e => onUpdate({ groupTileFit: e.target.value as 'fixed' | 'fill' | 'slot' })}
               className={selectCls}
             >
-              <option value="slot">固定槽寬（依欄數，有幾筆顯示幾格）</option>
-              <option value="fill">填滿畫布（依資料筆數分配欄寬）</option>
-              <option value="fixed">固定範本尺寸</option>
+              <option value="slot">{t('dashboard.properties.canvas.tileSlot')}</option>
+              <option value="fill">{t('dashboard.properties.canvas.tileFill')}</option>
+              <option value="fixed">{t('dashboard.properties.canvas.tileFixed')}</option>
             </select>
             <p className="mt-1 text-[10px] text-zinc-500 leading-relaxed">
               {(el.groupTileFit || 'fill') === 'slot'
-                ? '單格寬度 =（群組寬 − 邊距 − 間距）÷ 欄數；執行時子範本會依 template W×H 拉伸填滿單格（群組改大小仍貼滿）。'
+                ? t('dashboard.properties.canvas.tileSlotHint')
                 : (el.groupTileFit || 'fill') === 'fill'
-                  ? '子範本會撐滿群組畫布；下方 W×H 僅在「固定尺寸」時作為排版基準。'
-                  : '使用固定 W×H；可搭配欄數與間距排列，畫布較大時可置中。'}
+                  ? t('dashboard.properties.canvas.tileFillHint')
+                  : t('dashboard.properties.canvas.tileFixedHint')}
             </p>
           </Field>
 
-          <Field label="子範本尺寸 (W × H)">
+          <Field label={t('dashboard.properties.canvas.templateSize')}>
             <div className="flex gap-2">
               <NumberInput value={el.templateWidth || 300} onChange={n => onUpdate({ templateWidth: n })} className={inputCls} />
               <NumberInput value={el.templateHeight || 180} onChange={n => onUpdate({ templateHeight: n })} className={inputCls} />
             </div>
             {(el.groupTileFit || 'fill') === 'slot' && (
               <p className="mt-1 text-[10px] text-amber-500/90">
-                建議 W×H = 單槽尺寸（欄數 {el.gridColumns || 11} 時約{' '}
-                {(() => {
+                {t('dashboard.properties.canvas.templateSuggest', {
+                  cols: el.gridColumns || 11,
+                  size: (() => {
                   const padX = el.groupTilePadX ?? el.groupTilePadding ?? 4;
                   const padY = el.groupTilePadY ?? el.groupTilePadding ?? 4;
                   const s = Math.floor(
@@ -1828,42 +1862,42 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
                   );
                   const h = (el.height || 180) - padY * 2;
                   return `${s}×${h}`;
-                })()}
-                ）
+                })(),
+                })}
               </p>
             )}
           </Field>
 
           {(el.groupTileFit || 'fill') === 'fixed' && (
-            <Field label="對齊（固定尺寸）">
+            <Field label={t('dashboard.properties.canvas.alignFixed')}>
               <select
                 value={el.groupTileAlign || 'start'}
                 onChange={e => onUpdate({ groupTileAlign: e.target.value as 'start' | 'center' })}
                 className={selectCls}
               >
-                <option value="start">靠左上</option>
-                <option value="center">置中</option>
+                <option value="start">{t('dashboard.properties.canvas.alignStart')}</option>
+                <option value="center">{t('dashboard.properties.canvas.alignCenter')}</option>
               </select>
             </Field>
           )}
 
-          <Field label="佈局模式">
+          <Field label={t('dashboard.properties.canvas.layoutMode')}>
             <select value={el.layoutMode || 'grid'} onChange={e => onUpdate({ layoutMode: e.target.value as 'free' | 'grid' })} className={selectCls}>
-              <option value="grid">網格排列</option>
-              <option value="free">自由排列 (依資料欄位)</option>
+              <option value="grid">{t('dashboard.properties.canvas.layoutGrid')}</option>
+              <option value="free">{t('dashboard.properties.canvas.layoutFree')}</option>
             </select>
           </Field>
 
           {(el.layoutMode === 'grid' || !el.layoutMode) ? (
             <div className="grid grid-cols-3 gap-2">
-              <Field label="欄數"><NumberInput value={el.gridColumns || 1} onChange={n => onUpdate({ gridColumns: n })} className={inputCls} /></Field>
-              <Field label="X 間距"><NumberInput value={el.gapX ?? 12} onChange={n => onUpdate({ gapX: n })} className={inputCls} /></Field>
-              <Field label="Y 間距"><NumberInput value={el.gapY ?? 12} onChange={n => onUpdate({ gapY: n })} className={inputCls} /></Field>
+              <Field label={t('dashboard.properties.canvas.columns')}><NumberInput value={el.gridColumns || 1} onChange={n => onUpdate({ gridColumns: n })} className={inputCls} /></Field>
+              <Field label={t('dashboard.properties.canvas.gapX')}><NumberInput value={el.gapX ?? 12} onChange={n => onUpdate({ gapX: n })} className={inputCls} /></Field>
+              <Field label={t('dashboard.properties.canvas.gapY')}><NumberInput value={el.gapY ?? 12} onChange={n => onUpdate({ gapY: n })} className={inputCls} /></Field>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              <Field label="X 欄位"><input value={el.xField || ''} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} placeholder="例如: x" /></Field>
-              <Field label="Y 欄位"><input value={el.yField || ''} onChange={e => onUpdate({ yField: e.target.value })} className={inputCls} placeholder="例如: y" /></Field>
+              <Field label={t('dashboard.properties.canvas.xField')}><input value={el.xField || ''} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.canvas.xyPlaceholder', { axis: 'x' })} /></Field>
+              <Field label={t('dashboard.properties.canvas.yField')}><input value={el.yField || ''} onChange={e => onUpdate({ yField: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.canvas.xyPlaceholder', { axis: 'y' })} /></Field>
             </div>
           )}
         </div>
@@ -1875,16 +1909,17 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
 }
 
 function PositionFields({ widget, onUpdate }: { widget: ChildWidget; onUpdate: (p: Partial<ChildWidget>) => void }) {
+  const { t } = useTranslation();
   const minSize = 1;
   return (
     <div className="pt-2 border-t border-zinc-800">
-      <div className="text-zinc-600 text-[10px] uppercase font-bold mb-2 tracking-wider">位置與尺寸</div>
+      <div className="text-zinc-600 text-[10px] uppercase font-bold mb-2 tracking-wider">{t('dashboard.properties.positionSize')}</div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="X"><NumberInput value={widget.x} onChange={n => onUpdate({ x: n } as any)} className={inputCls} /></Field>
         <Field label="Y"><NumberInput value={widget.y} onChange={n => onUpdate({ y: n } as any)} className={inputCls} /></Field>
-        <Field label="寬"><NumberInput min={minSize} value={widget.width} onChange={n => onUpdate({ width: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
-        <Field label="高"><NumberInput min={minSize} value={widget.height} onChange={n => onUpdate({ height: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
-        <Field label="旋轉 (°)">
+        <Field label={t('dashboard.properties.width')}><NumberInput min={minSize} value={widget.width} onChange={n => onUpdate({ width: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.height')}><NumberInput min={minSize} value={widget.height} onChange={n => onUpdate({ height: Math.max(minSize, n) } as any)} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.rotation')}>
           <NumberInput
             value={widget.rotationDeg ?? 0}
             onChange={(n) => onUpdate({ rotationDeg: n } as Partial<ChildWidget>)}
@@ -1898,66 +1933,67 @@ function PositionFields({ widget, onUpdate }: { widget: ChildWidget; onUpdate: (
 // ─── 新元件設定面板 ───────────────────────────────────────────────────────────
 
 function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; onUpdate: (p: Partial<ColorBlockWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Square size={13} />} label="色塊屬性" color="#64748b" />
+      <SH icon={<Square size={13} />} label={t('dashboard.properties.widgets.colorBlock.title')} color="#64748b" />
       
       {/* 快捷線條預設 */}
       <div className="space-y-1.5 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/40">
-        <label className="text-zinc-400 text-[10px] uppercase font-bold tracking-tight block">快捷線條 / 分隔線</label>
+        <label className="text-zinc-400 text-[10px] uppercase font-bold tracking-tight block">{t('dashboard.properties.widgets.colorBlock.quickLines')}</label>
         <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() => onUpdate({ height: 1, borderRadius: 0, borderWidth: 0 })}
             className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title="設定高度為 1px 的極細分隔線"
+            title={t('dashboard.properties.widgets.colorBlock.line1pxTitle')}
           >
-            1px 分隔線
+            {t('dashboard.properties.widgets.colorBlock.line1px')}
           </button>
           <button
             type="button"
             onClick={() => onUpdate({ height: 2, borderRadius: 1, borderWidth: 0 })}
             className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title="設定高度為 2px 的標準分隔線"
+            title={t('dashboard.properties.widgets.colorBlock.line2pxTitle')}
           >
-            2px 分隔線
+            {t('dashboard.properties.widgets.colorBlock.line2px')}
           </button>
           <button
             type="button"
             onClick={() => onUpdate({ width: 3, borderRadius: 1.5, borderWidth: 0 })}
             className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title="設定寬度為 3px 的垂直裝飾條"
+            title={t('dashboard.properties.widgets.colorBlock.line3pxTitle')}
           >
-            3px 垂直線
+            {t('dashboard.properties.widgets.colorBlock.line3px')}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label="背景顏色">
+        <Field label={t('dashboard.properties.backgroundColor')}>
           <div className="flex gap-2">
             <input type="color" value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1e293b'}
               onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
             <input value={w.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className={`${inputCls} font-mono`} />
           </div>
         </Field>
-        <Field label={`透明度 ${w.opacity}%`}>
+        <Field label={t('dashboard.properties.opacityShort', { pct: w.opacity })}>
           <input type="range" min={0} max={100} value={w.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
-        <Field label="外框粗細"><NumberInput min={0} value={w.borderWidth} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} /></Field>
-        <Field label="外框顏色"><input type="color" value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.borderWidth')}><NumberInput min={0} value={w.borderWidth} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.borderColor')}><input type="color" value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={!!w.severityStripColor}
           onChange={e => onUpdate({ severityStripColor: e.target.checked })} />
-        依 severity 變色（需 SQL 回傳 severity 欄位）
+        {t('dashboard.properties.widgets.colorBlock.severityColor')}
       </label>
       {w.severityStripColor && (
         <div className="pt-2 border-t border-zinc-800">
-          <SH icon={<Database size={13} />} label="severity 資料" color="#a78bfa" />
+          <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.colorBlock.mqttData')} color="#a78bfa" />
           <div className="mt-2">
             <DataBindingSettings w={w} onUpdate={onUpdate} />
           </div>
@@ -1966,18 +2002,18 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={!!w.bindBorderFromHealthField}
           onChange={e => onUpdate({ bindBorderFromHealthField: e.target.checked })} />
-        依健康狀態欄位映射外框色（MQTT）
+        {t('dashboard.properties.widgets.colorBlock.healthBorder')}
       </label>
       {w.bindBorderFromHealthField && (
-        <Field label="健康狀態欄位鍵">
+        <Field label={t('dashboard.properties.widgets.colorBlock.healthField')}>
           <input value={w.healthFieldForBorder ?? ''} onChange={e => onUpdate({ healthFieldForBorder: e.target.value })} className={inputCls} placeholder="health_status" />
         </Field>
       )}
-      <Field label="邊框色變數鍵（可選）">
+      <Field label={t('dashboard.properties.widgets.colorBlock.borderColorVar')}>
         <input value={w.bindBorderColorVar ?? ''} onChange={e => onUpdate({ bindBorderColorVar: e.target.value })} className={inputCls} placeholder="card_border_color" />
       </Field>
       <div className="text-[9px] text-zinc-600 bg-zinc-800/50 p-2 rounded border border-zinc-700/50 italic">
-        💡 色塊會自動置於其他元件的底層（z-index 最低）
+        {t('dashboard.properties.widgets.colorBlock.zHint')}
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -1986,41 +2022,42 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
 }
 
 function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; onUpdate: (p: Partial<StatusBadgeWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   const addRule = () => onUpdate({ rules: [...w.rules, { value: 'NEW', label: 'NEW', bgColor: '#1e3a5f', textColor: '#60a5fa' }] });
   const removeRule = (i: number) => onUpdate({ rules: w.rules.filter((_, j) => j !== i) });
   const updateRule = (i: number, p: Partial<StatusBadgeRule>) => onUpdate({ rules: w.rules.map((r, j) => j === i ? { ...r, ...p } : r) });
 
   return (
     <div className="space-y-4">
-      <SH icon={<Tag size={13} />} label="狀態徽章屬性" color="#22c55e" />
+      <SH icon={<Tag size={13} />} label={t('dashboard.properties.widgets.statusBadge.title')} color="#22c55e" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="資料欄位"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="status" /></Field>
-        <Field label="預設標籤"><input value={w.defaultLabel} onChange={e => onUpdate({ defaultLabel: e.target.value })} className={inputCls} placeholder="UNKNOWN" /></Field>
-        <Field label="預設背景色"><input type="color" value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="預設文字色"><input type="color" value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="字體大小"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
-        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="status" /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultLabel')}><input value={w.defaultLabel} onChange={e => onUpdate({ defaultLabel: e.target.value })} className={inputCls} placeholder="UNKNOWN" /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultBg')}><input type="color" value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultText')}><input type="color" value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.fontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" checked={w.showDot} onChange={e => onUpdate({ showDot: e.target.checked })} className="accent-green-500 w-3 h-3" />
-        <span className="text-zinc-400 text-[10px]">顯示狀態指示點</span>
+        <span className="text-zinc-400 text-[10px]">{t('dashboard.properties.widgets.statusBadge.showDot')}</span>
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase">狀態規則映射</span>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('dashboard.properties.widgets.statusBadge.rules')}</span>
           <button onClick={addRule} className="p-1 text-cyan-500 hover:bg-zinc-800 rounded"><Plus size={12} /></button>
         </div>
         {w.rules.map((rule, i) => (
           <div key={i} className="p-2 bg-zinc-800/40 rounded border border-zinc-700/50 space-y-1.5 relative group">
             <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-700 rounded-full text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
             <div className="grid grid-cols-2 gap-1">
-              <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} font-mono`} placeholder="值（如 ONLINE）" />
-              <input value={rule.label} onChange={e => updateRule(i, { label: e.target.value })} className={inputCls} placeholder="顯示標籤" />
+              <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} font-mono`} placeholder={t('dashboard.properties.widgets.statusBadge.valuePlaceholder')} />
+              <input value={rule.label} onChange={e => updateRule(i, { label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statusBadge.labelPlaceholder')} />
             </div>
             <div className="flex gap-2">
-              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">背景</span></div>
-              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">文字</span></div>
+              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.bg')}</span></div>
+              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.text')}</span></div>
             </div>
           </div>
         ))}
@@ -2032,62 +2069,63 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
 }
 
 function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpdate: (p: Partial<StatCardWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Hash size={13} />} label="KPI 數值卡屬性" color="#e879f9" />
+      <SH icon={<Hash size={13} />} label={t('dashboard.properties.widgets.statCard.title')} color="#e879f9" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="標籤文字"><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder="速度" /></Field>
-        <Field label="資料欄位"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
-        <Field label="單位"><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} placeholder="km/h" /></Field>
-        <Field label="圖示 (Lucide)"><input value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={inputCls} placeholder="Gauge" /></Field>
-        <Field label="數值字體大小"><NumberInput value={w.valueFontSize} onChange={n => onUpdate({ valueFontSize: n })} className={inputCls} /></Field>
-        <Field label="標籤字體大小"><NumberInput value={w.labelFontSize} onChange={n => onUpdate({ labelFontSize: n })} className={inputCls} /></Field>
-        <Field label="單位字體大小"><NumberInput min={8} value={w.unitFontSize ?? Math.max(w.labelFontSize, 10)} onChange={n => onUpdate({ unitFontSize: n })} className={inputCls} /></Field>
-        <Field label="標籤方位（相對數值）">
+        <Field label={t('dashboard.properties.widgets.statCard.labelText')}><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statCard.labelPlaceholder')} /></Field>
+        <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
+        <Field label={t('dashboard.properties.unit')}><input value={w.unit} onChange={e => onUpdate({ unit: e.target.value })} className={inputCls} placeholder="km/h" /></Field>
+        <Field label={t('dashboard.properties.iconLucide')}><input value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={inputCls} placeholder="Gauge" /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.valueFontSize')}><NumberInput value={w.valueFontSize} onChange={n => onUpdate({ valueFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelFontSize')}><NumberInput value={w.labelFontSize} onChange={n => onUpdate({ labelFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.unitFontSize')}><NumberInput min={8} value={w.unitFontSize ?? Math.max(w.labelFontSize, 10)} onChange={n => onUpdate({ unitFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelPosition')}>
           <select
             value={w.labelPosition ?? 'top'}
             onChange={e => onUpdate({ labelPosition: e.target.value as StatCardWidget['labelPosition'] })}
             className={selectCls}
           >
-            <option value="top">上</option>
-            <option value="bottom">下</option>
-            <option value="left">左</option>
-            <option value="right">右</option>
+            <option value="top">{t('dashboard.properties.sideTop')}</option>
+            <option value="bottom">{t('dashboard.properties.sideBottom')}</option>
+            <option value="left">{t('dashboard.properties.sideLeft')}</option>
+            <option value="right">{t('dashboard.properties.sideRight')}</option>
           </select>
         </Field>
         <p className="text-[10px] text-zinc-500 leading-relaxed">
-          「標籤方位」是標籤在數字旁邊的位置；「整體對齊」才是整組在卡片裡靠左／中／右。
+          {t('dashboard.properties.widgets.statCard.labelPositionHint')}
         </p>
-        <Field label="整體對齊">
+        <Field label={t('dashboard.properties.widgets.statCard.contentAlign')}>
           <select
             value={w.contentAlign ?? 'center'}
             onChange={e => onUpdate({ contentAlign: e.target.value as StatCardWidget['contentAlign'] })}
             className={selectCls}
           >
-            <option value="left">靠左</option>
-            <option value="center">置中</option>
-            <option value="right">靠右</option>
+            <option value="left">{t('dashboard.properties.alignLeft')}</option>
+            <option value="center">{t('dashboard.properties.alignCenter')}</option>
+            <option value="right">{t('dashboard.properties.alignRight')}</option>
           </select>
         </Field>
-        <Field label="標籤／數值間距"><NumberInput min={0} max={24} value={w.layoutGap ?? 4} onChange={n => onUpdate({ layoutGap: n })} className={inputCls} /></Field>
-        <Field label="數值顏色"><input type="color" value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="標籤顏色"><input type="color" value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="單位顏色"><input type="color" value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.layoutGap')}><NumberInput min={0} max={24} value={w.layoutGap ?? 4} onChange={n => onUpdate({ layoutGap: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.valueColor')}><input type="color" value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelColor')}><input type="color" value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.unitColor')}><input type="color" value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={w.labelUppercase !== false}
           onChange={e => onUpdate({ labelUppercase: e.target.checked })} />
-        標籤全大寫（關閉可顯示「達成了」等中文標籤）
+        {t('dashboard.properties.widgets.statCard.labelUppercase')}
       </label>
       <ColorRulesEditor rules={w.colorRules} enabled={w.colorRulesEnabled} onToggleEnabled={e => onUpdate({ colorRulesEnabled: e })} onUpdate={rules => onUpdate({ colorRules: rules })} />
       <div className="pt-2 border-t border-zinc-800 space-y-2">
-        <SH icon={<Hash size={12} />} label="目標比較著色（可選）" color="#38bdf8" />
+        <SH icon={<Hash size={12} />} label={t('dashboard.properties.widgets.statCard.compareTitle')} color="#38bdf8" />
         <p className="text-[10px] text-zinc-500 leading-relaxed">
-          依目標欄位自動變色（達標藍／偏離紅），僅改變數字顏色，不會多顯示其他數值。
+          {t('dashboard.properties.widgets.statCard.compareHint')}
         </p>
-        <Field label="目標欄位">
+        <Field label={t('dashboard.properties.widgets.statCard.targetField')}>
           <input
             value={w.compareTargetField ?? ''}
             onChange={e => onUpdate({ compareTargetField: e.target.value || undefined })}
@@ -2096,12 +2134,12 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
           />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="容許誤差 %"><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
-          <Field label="達標色"><input type="color" value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-          <Field label="偏離色"><input type="color" value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-          <Field label="提示欄位"><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.tolerance')}><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><input type="color" value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><input type="color" value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.hintField')}><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
         </div>
-        <Field label="提示圖示">
+        <Field label={t('dashboard.properties.widgets.statCard.hintIcon')}>
           <IconImageField
             value={w.hintIconImage}
             onChange={(url) => onUpdate({ hintIconImage: url, hintIcon: url ? undefined : w.hintIcon })}
@@ -2115,29 +2153,30 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
 }
 
 function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; onUpdate: (p: Partial<ProgressBarWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<AlignJustify size={13} />} label="進度條屬性" color="#38bdf8" />
+      <SH icon={<AlignJustify size={13} />} label={t('dashboard.properties.widgets.progressBar.title')} color="#38bdf8" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="資料欄位"><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="value" /></Field>
-        <Field label="標籤文字"><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder="進度" /></Field>
-        <Field label="最小值"><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
-        <Field label="最大值"><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
-        <Field label="方向">
+        <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="value" /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelText')}><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statCard.progressPlaceholder')} /></Field>
+        <Field label={t('dashboard.properties.min')}><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.max')}><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.direction')}>
           <select value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as any })} className={selectCls}>
-            <option value="horizontal">水平</option>
-            <option value="vertical">垂直</option>
+            <option value="horizontal">{t('dashboard.properties.horizontal')}</option>
+            <option value="vertical">{t('dashboard.properties.vertical')}</option>
           </select>
         </Field>
-        <Field label="圓角"><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex gap-4">
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showValue} onChange={e => onUpdate({ showValue: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> 顯示數值
+          <input type="checkbox" checked={w.showValue} onChange={e => onUpdate({ showValue: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.progressBar.showValue')}
         </label>
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showLabel} onChange={e => onUpdate({ showLabel: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> 顯示標籤
+          <input type="checkbox" checked={w.showLabel} onChange={e => onUpdate({ showLabel: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.progressBar.showLabel')}
         </label>
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2147,41 +2186,42 @@ function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; 
 }
 
 function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; onUpdate: (p: Partial<EmptyStateWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<CircleOff size={13} />} label="空狀態屬性" color="#94a3b8" />
+      <SH icon={<CircleOff size={13} />} label={t('dashboard.properties.widgets.emptyState.title')} color="#94a3b8" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
-      <Field label="主文案">
-        <input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder="尚無資料" />
+      <Field label={t('dashboard.properties.widgets.emptyState.mainLabel')}>
+        <input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.emptyState.mainPlaceholder')} />
       </Field>
-      <Field label="副文案">
-        <input value={w.subLabel ?? ''} onChange={e => onUpdate({ subLabel: e.target.value })} className={inputCls} placeholder="查詢結果為空" />
+      <Field label={t('dashboard.properties.widgets.emptyState.subLabel')}>
+        <input value={w.subLabel ?? ''} onChange={e => onUpdate({ subLabel: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.emptyState.subPlaceholder')} />
       </Field>
-      <Field label="顯示時機">
+      <Field label={t('dashboard.properties.widgets.emptyState.when')}>
         <select
           value={w.visibilityMode ?? 'when-empty'}
           onChange={e => onUpdate({ visibilityMode: e.target.value as EmptyStateWidget['visibilityMode'] })}
           className={selectCls}
         >
-          <option value="when-empty">查詢成功且 0 筆</option>
-          <option value="when-has-data">有資料時</option>
+          <option value="when-empty">{t('dashboard.properties.widgets.emptyState.whenEmpty')}</option>
+          <option value="when-has-data">{t('dashboard.properties.widgets.emptyState.whenHasData')}</option>
         </select>
       </Field>
-      <Field label="圓角">
+      <Field label={t('dashboard.properties.borderRadius')}>
         <NumberInput min={0} value={w.borderRadius ?? 8} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} />
       </Field>
-      <Field label="樣式">
+      <Field label={t('dashboard.properties.style')}>
         <select
           value={w.emptyStateVariant ?? 'default'}
           onChange={e => onUpdate({ emptyStateVariant: e.target.value as EmptyStateWidget['emptyStateVariant'] })}
           className={selectCls}
         >
-          <option value="default">通用（虛線框）</option>
-          <option value="minimal-center">置中極簡</option>
+          <option value="default">{t('dashboard.properties.widgets.emptyState.variantDefault')}</option>
+          <option value="minimal-center">{t('dashboard.properties.widgets.emptyState.variantMinimal')}</option>
         </select>
       </Field>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
-        用於雙畫板群組的<strong className="text-zinc-400">預設畫板</strong>範本；執行時由閘道決定是否顯示（無需再疊加於外層畫布）。
+        {t('dashboard.properties.widgets.emptyState.dualHintBefore')}<strong className="text-zinc-400">{t('dashboard.properties.widgets.emptyState.dualHintStrong')}</strong>{t('dashboard.properties.widgets.emptyState.dualHintAfter')}
       </p>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -2190,34 +2230,35 @@ function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; on
 }
 
 function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p: Partial<ClockWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Clock size={13} />} label="時鐘屬性" color="#a3e635" />
+      <SH icon={<Clock size={13} />} label={t('dashboard.properties.widgets.clock.title')} color="#a3e635" />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="時間格式">
+        <Field label={t('dashboard.properties.widgets.clock.timeFormat')}>
           <select value={w.format} onChange={e => onUpdate({ format: e.target.value as any })} className={selectCls}>
-            <option value="24h">24 小時制</option>
-            <option value="12h">12 小時制 (AM/PM)</option>
+            <option value="24h">{t('dashboard.properties.widgets.clock.h24')}</option>
+            <option value="12h">{t('dashboard.properties.widgets.clock.h12')}</option>
           </select>
         </Field>
-        <Field label="日期格式">
+        <Field label={t('dashboard.properties.widgets.clock.dateFormat')}>
           <select value={w.dateFormat} onChange={e => onUpdate({ dateFormat: e.target.value as any })} className={selectCls}>
             <option value="YYYY-MM-DD">YYYY-MM-DD</option>
             <option value="MM/DD/YYYY">MM/DD/YYYY</option>
             <option value="DD/MM/YYYY">DD/MM/YYYY</option>
           </select>
         </Field>
-        <Field label="時間字體大小"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
-        <Field label="日期字體大小"><NumberInput value={w.dateFontSize} onChange={n => onUpdate({ dateFontSize: n })} className={inputCls} /></Field>
-        <Field label="時間顏色"><input type="color" value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label="日期顏色"><input type="color" value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.timeFontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.dateFontSize')}><NumberInput value={w.dateFontSize} onChange={n => onUpdate({ dateFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.timeColor')}><input type="color" value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.dateColor')}><input type="color" value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       </div>
       <div className="flex gap-4">
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showDate} onChange={e => onUpdate({ showDate: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> 顯示日期
+          <input type="checkbox" checked={w.showDate} onChange={e => onUpdate({ showDate: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.clock.showDate')}
         </label>
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showSeconds} onChange={e => onUpdate({ showSeconds: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> 顯示秒數
+          <input type="checkbox" checked={w.showSeconds} onChange={e => onUpdate({ showSeconds: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.clock.showSeconds')}
         </label>
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2226,24 +2267,25 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
   );
 }
 function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpdate: (p: Partial<BarChartWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<BarChart2 size={13} />} label="長條圖屬性" color="#f97316" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.barChart.title')} color="#f97316" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="X 軸欄位"><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
-        <Field label="Y 軸欄位 (CSV)"><input value={w.yFields.join(',')} onChange={e => onUpdate({ yFields: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} /></Field>
-        <Field label="方向">
+        <Field label={t('dashboard.properties.widgets.chart.xField')}><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.barChart.yFields')}><input value={w.yFields.join(',')} onChange={e => onUpdate({ yFields: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.direction')}>
           <select value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as BarChartWidget['orientation'] })} className={selectCls}>
-            <option value="vertical">垂直長條</option>
-            <option value="horizontal">水平長條</option>
+            <option value="vertical">{t('dashboard.properties.widgets.barChart.vertical')}</option>
+            <option value="horizontal">{t('dashboard.properties.widgets.barChart.horizontal')}</option>
           </select>
         </Field>
-        <Field label="Bar 間距 (0~1)"><NumberInput step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={n => onUpdate({ barPadding: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.barChart.barPadding')}><NumberInput step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={n => onUpdate({ barPadding: n })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-        <input type="checkbox" checked={w.showValues} onChange={e => onUpdate({ showValues: e.target.checked })} className="accent-orange-500 w-3 h-3" /> 顯示數值標籤
+        <input type="checkbox" checked={w.showValues} onChange={e => onUpdate({ showValues: e.target.checked })} className="accent-orange-500 w-3 h-3" /> {t('dashboard.properties.widgets.barChart.showValues')}
       </label>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -2260,10 +2302,11 @@ function UnitTelemetrySettings({
   onUpdate: (p: Partial<UnitTelemetryCardWidget>) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Monitor size={13} />} label="遙測卡屬性" color="#2dd4bf" />
-      <Field label="載具標籤">
+      <SH icon={<Monitor size={13} />} label={t('dashboard.properties.widgets.unitTelemetry.title')} color="#2dd4bf" />
+      <Field label={t('dashboard.properties.widgets.unitTelemetry.vehicleLabel')}>
         <input value={w.unitLabel} onChange={e => onUpdate({ unitLabel: e.target.value })} className={inputCls} placeholder="UNIT-03" />
       </Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
@@ -2273,10 +2316,10 @@ function UnitTelemetrySettings({
       <Field label="Health Topic">
         <input value={w.mqttHealthTopic ?? ''} onChange={e => onUpdate({ mqttHealthTopic: e.target.value })} className={inputCls} />
       </Field>
-      <Field label="版型">
+      <Field label={t('dashboard.properties.variant')}>
         <select value={w.cardVariant ?? 'default'} onChange={e => onUpdate({ cardVariant: e.target.value as UnitTelemetryCardWidget['cardVariant'] })} className={selectCls}>
-          <option value="default">一般遙測卡</option>
-          <option value="instrument-row">儀表列</option>
+          <option value="default">{t('dashboard.properties.widgets.unitTelemetry.variantDefault')}</option>
+          <option value="instrument-row">{t('dashboard.properties.widgets.unitTelemetry.variantInstrument')}</option>
         </select>
       </Field>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -2286,6 +2329,7 @@ function UnitTelemetrySettings({
 }
 
 function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUpdate: (p: Partial<MapCanvasWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   const [maps, setMaps] = React.useState(() => getAvailableMaps());
   React.useEffect(() => {
     // 補上伺服器已發佈的地圖：本機地圖庫是每個瀏覽器各自一份，可能沒有這一張
@@ -2299,25 +2343,25 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
   }, []);
   return (
     <div className="space-y-3">
-      <SH icon={<Map size={13} />} label="地圖畫布 (舊版子元件)" color="#0ea5e9" />
-      <Field label="地圖來源">
+      <SH icon={<Map size={13} />} label={t('dashboard.properties.widgets.mapCanvas.title')} color="#0ea5e9" />
+      <Field label={t('dashboard.properties.widgets.mapCanvas.mapSource')}>
         <select
           value={w.mapId}
           onChange={e => onUpdate({ mapId: e.target.value })}
           className={selectCls}
         >
-          <option value="">— 請選擇地圖 —</option>
+          <option value="">{t('dashboard.properties.widgets.mapCanvas.selectMap')}</option>
           {maps.map(m => (
             <option key={m.mapId} value={m.mapId}>{m.displayName}</option>
           ))}
         </select>
         {maps.length === 0 && (
           <p className="text-[9px] text-zinc-500 mt-1">
-            目前沒有可用地圖。請先在地圖編輯器中儲存正式版本。
+            {t('dashboard.properties.widgets.mapCanvas.noMaps')}
           </p>
         )}
       </Field>
-      <Field label={`縮放倍率 (${w.zoomFactor?.toFixed(1) ?? '2.0'}×)`}>
+      <Field label={t('dashboard.properties.widgets.mapCanvas.zoom', { factor: w.zoomFactor?.toFixed(1) ?? '2.0' })}>
         <input
           type="range" min={0.2} max={5} step={0.1}
           value={w.zoomFactor ?? 2.0}
@@ -2325,7 +2369,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
           className="w-full accent-sky-400"
         />
         <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
-          <span>放大</span><span>縮小</span>
+          <span>{t('dashboard.properties.widgets.mapCanvas.zoomIn')}</span><span>{t('dashboard.properties.widgets.mapCanvas.zoomOut')}</span>
         </div>
       </Field>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2345,6 +2389,7 @@ function VehicleContainerSettings({
   onDelete: () => void;
   onEnterEdit?: () => void;
 }) {
+  const { t } = useTranslation();
   const rules = w.actionIconRules ?? [];
 
   const updateRule = (idx: number, patch: Partial<RouteActionIconRule>) => {
@@ -2354,23 +2399,23 @@ function VehicleContainerSettings({
   };
 
   const ACTION_MATCH_OPS: { value: RouteActionMatchOp; label: string }[] = [
-    { value: 'eq', label: '等於' },
+    { value: 'eq', label: t('dashboard.properties.widgets.vehicleContainer.matchEq') },
     { value: 'gte', label: '≥' },
     { value: 'gt', label: '>' },
-    { value: 'present', label: '有值' },
+    { value: 'present', label: t('dashboard.properties.widgets.vehicleContainer.matchPresent') },
   ];
 
   return (
     <div className="space-y-3">
       <p className="text-[10px] leading-relaxed text-zinc-500">
-        編輯時地圖上只會顯示這一個樣板（黃框）。執行後圖台才依 MQTT 在各地點複製樣板、顯示多輛即時車輛。
+        {t('dashboard.properties.widgets.vehicleContainer.editHint')}
       </p>
-      <Field label="顯示標籤">
+      <Field label={t('dashboard.properties.widgets.vehicleContainer.showLabel')}>
         <input
           value={w.label ?? ''}
           onChange={(e) => onUpdate({ label: e.target.value })}
           className={inputCls}
-          placeholder="載具"
+          placeholder={t('dashboard.properties.widgets.vehicleContainer.labelPlaceholder')}
         />
       </Field>
       <button
@@ -2379,27 +2424,27 @@ function VehicleContainerSettings({
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 py-2.5 text-xs font-semibold text-white hover:bg-amber-500"
       >
         <Bus size={14} />
-        編輯載具樣式
+        {t('dashboard.properties.widgets.vehicleContainer.editStyle')}
       </button>
 
-      <SH icon={<Zap size={14} className="text-violet-400" />} label="作動行為" color="#a78bfa" />
+      <SH icon={<Zap size={14} className="text-violet-400" />} label={t('dashboard.properties.widgets.vehicleContainer.actions')} color="#a78bfa" />
       <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="grid grid-cols-3 gap-2">
-        <Field label="偏移 X">
+        <Field label={t('dashboard.properties.widgets.vehicleContainer.offsetX')}>
           <NumberInput
             value={w.behaviorOffsetX ?? 0}
             onChange={(n) => onUpdate({ behaviorOffsetX: n })}
             className={inputCls}
           />
         </Field>
-        <Field label="偏移 Y">
+        <Field label={t('dashboard.properties.widgets.vehicleContainer.offsetY')}>
           <NumberInput
             value={w.behaviorOffsetY ?? -28}
             onChange={(n) => onUpdate({ behaviorOffsetY: n })}
             className={inputCls}
           />
         </Field>
-        <Field label="圖示尺寸">
+        <Field label={t('dashboard.properties.widgets.vehicleContainer.iconSize')}>
           <input
             type="range"
             min={8}
@@ -2421,20 +2466,20 @@ function VehicleContainerSettings({
               }
               className={inputCls}
             />
-            <span className="shrink-0 text-[9px] text-zinc-500">px · 畫布右下角可拖曳</span>
+            <span className="shrink-0 text-[9px] text-zinc-500">{t('dashboard.properties.widgets.vehicleContainer.iconSizeHint')}</span>
           </div>
         </Field>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-zinc-400">作動行為規則</span>
+          <span className="text-[10px] font-semibold text-zinc-400">{t('dashboard.properties.widgets.vehicleContainer.actionRules')}</span>
           <div className="flex gap-1">
             <button
               type="button"
               onClick={() => onUpdate({ actionIconRules: buildVehicleBehaviorActionRules('operation_action') })}
               className="rounded bg-zinc-800 px-2 py-0.5 text-[9px] text-zinc-400 hover:text-amber-400"
             >
-              11 種
+              {t('dashboard.properties.widgets.vehicleContainer.catalog11')}
             </button>
             <button
               type="button"
@@ -2460,7 +2505,7 @@ function VehicleContainerSettings({
         </div>
         {rules.length === 0 && (
           <p className="text-[9px] text-zinc-600">
-            點「＋」逐條新增狀態規則並選擇圖示；單一圖示置中，多個由左至右排列。
+            {t('dashboard.properties.widgets.vehicleContainer.rulesHint')}
           </p>
         )}
         {rules.map((rule, i) => (
@@ -2497,7 +2542,7 @@ function VehicleContainerSettings({
               value={rule.sourceVarKey}
               onChange={(e) => updateRule(i, { sourceVarKey: e.target.value })}
               className={inputCls}
-              placeholder="變數鍵"
+              placeholder={t('dashboard.properties.widgets.vehicleContainer.varKeyPlaceholder')}
               style={{ fontSize: 10 }}
             />
             <div className="grid grid-cols-2 gap-1">
@@ -2517,7 +2562,7 @@ function VehicleContainerSettings({
                 value={rule.threshold ?? ''}
                 onChange={(e) => updateRule(i, { threshold: e.target.value })}
                 className={inputCls}
-                placeholder="門檻"
+                placeholder={t('dashboard.properties.widgets.vehicleContainer.thresholdPlaceholder')}
                 style={{ fontSize: 10 }}
                 disabled={rule.matchOp === 'present'}
               />
@@ -2608,6 +2653,7 @@ function TabListSettings({
   onDelete: () => void;
   onEnterEditColumn?: (tabId: string, columnId: string) => void;
 }) {
+  const { t } = useTranslation();
   const tabs = w.tabs ?? [];
   const [selectedTabId, setSelectedTabId] = React.useState<string>(tabs[0]?.id ?? '');
   const activeTab = tabs.find(t => t.id === selectedTabId) ?? tabs[0];
@@ -2644,11 +2690,11 @@ function TabListSettings({
     const newId = `tab-${Date.now()}`;
     const newTab: TabListTab = {
       id: newId,
-      label: `新分頁 ${tabs.length + 1}`,
+      label: t('dashboard.properties.widgets.tabList.newTab', { n: tabs.length + 1 }),
       columns: [
         {
           id: `col-${Date.now()}-1`,
-          name: '欄位 1',
+          name: t('dashboard.properties.widgets.tabList.columnDefault'),
           fieldKey: 'name',
           width: 120,
           align: 'left',
@@ -2734,7 +2780,7 @@ function TabListSettings({
     const newColId = `col-${Date.now()}`;
     const newCol: TabListColumn = {
       id: newColId,
-      name: `新欄位 ${activeTab.columns.length + 1}`,
+      name: t('dashboard.properties.widgets.tabList.newColumn', { n: activeTab.columns.length + 1 }),
       fieldKey: '',
       width: 100,
       align: w.align ?? activeTab.align ?? 'left',
@@ -2762,18 +2808,18 @@ function TabListSettings({
 
   return (
     <div className="space-y-4 text-xs">
-      <SH icon={<List size={14} />} label="Tab 清單表格設定" color="#38bdf8" />
+      <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#38bdf8" />
 
       {/* Tab 管理 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-zinc-400 text-[11px] font-medium">Tab 分頁清單</label>
+          <label className="text-zinc-400 text-[11px] font-medium">{t('dashboard.properties.widgets.tabList.tabList')}</label>
           <button
             type="button"
             onClick={addTab}
             className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-600/30 text-blue-300 hover:bg-blue-600/50 text-[10px]"
           >
-            <Plus size={11} /> 新增 Tab
+            <Plus size={11} /> {t('dashboard.properties.widgets.tabList.addTab')}
           </button>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -2798,7 +2844,7 @@ function TabListSettings({
         <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/40 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-zinc-300">
-              設定 Tab：「{activeTab.label}」
+              {t('dashboard.properties.widgets.tabList.configureTab', { label: activeTab.label })}
             </span>
             {tabs.length > 1 && (
               <button
@@ -2806,44 +2852,44 @@ function TabListSettings({
                 onClick={() => deleteTab(activeTab.id)}
                 className="text-red-400 hover:text-red-300 text-[10px] flex items-center gap-0.5"
               >
-                <Trash2 size={11} /> 刪除此 Tab
+                <Trash2 size={11} /> {t('dashboard.properties.widgets.tabList.deleteTab')}
               </button>
             )}
           </div>
 
-          {/* Tab 顯示名稱 */}
+          {/* {t('dashboard.properties.widgets.tabList.tabName')} */}
           <div>
-            <label className="text-zinc-400 text-[10px] block mb-1">Tab 顯示名稱</label>
+            <label className="text-zinc-400 text-[10px] block mb-1">{t('dashboard.properties.widgets.tabList.tabName')}</label>
             <input
               type="text"
               value={activeTab.label}
               onChange={e => updateTab(activeTab.id, { label: e.target.value })}
               className={inputCls}
-              placeholder="例如：正線班次"
+              placeholder={t('dashboard.properties.widgets.tabList.tabNamePlaceholder')}
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-zinc-400 text-[10px] block">此 Tab 資料來源 SQL</label>
+            <label className="text-zinc-400 text-[10px] block">{t('dashboard.properties.widgets.tabList.tabSql')}</label>
             <textarea
               rows={3}
               value={activeTab.sqlQuery ?? ''}
               onChange={e => updateTab(activeTab.id, { sqlQuery: e.target.value })}
               className={`${inputCls} font-mono text-[10px]`}
-              placeholder="SELECT * FROM ... 或留空使用預設"
+              placeholder={t('dashboard.properties.widgets.tabList.tabSqlPlaceholder')}
             />
           </div>
 
           {/* 欄位清單 */}
           <div className="pt-2 border-t border-zinc-700/50 space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-zinc-300 text-[11px] font-medium">欄位格清單 (Columns)</label>
+              <label className="text-zinc-300 text-[11px] font-medium">{t('dashboard.properties.widgets.tabList.columns')}</label>
               <button
                 type="button"
                 onClick={addColumn}
                 className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/50 text-[10px] font-medium transition-colors"
               >
-                <Plus size={12} /> 新增欄位格
+                <Plus size={12} /> {t('dashboard.properties.widgets.tabList.addColumn')}
               </button>
             </div>
 
@@ -2859,14 +2905,14 @@ function TabListSettings({
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <label className="text-zinc-300 text-[10px] font-bold">
-                        欄位標題 #{idx + 1}
+                        {t('dashboard.properties.widgets.tabList.columnTitle', { n: idx + 1 })}
                       </label>
                       {activeTab.columns.length > 1 && (
                         <button
                           type="button"
                           onClick={() => deleteColumn(col.id)}
                           className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-red-950/40"
-                          title="刪除此欄位"
+                          title={t('dashboard.properties.widgets.tabList.deleteColumn')}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -2877,28 +2923,28 @@ function TabListSettings({
                       value={col.name}
                       onChange={e => updateColumn(col.id, { name: e.target.value })}
                       className={`${inputCls} w-full text-xs`}
-                      placeholder="欄位標題 (如：班次代號)"
+                      placeholder={t('dashboard.properties.widgets.tabList.columnNamePlaceholder')}
                     />
                   </div>
 
                   {/* 第 2 行：綁定 SQL 欄位別名 (下拉選單) */}
                   <div className="space-y-1">
                     <label className="text-zinc-400 text-[10px]">
-                      綁定 SQL 欄位別名:
+                      {t('dashboard.properties.widgets.tabList.bindAlias')}
                     </label>
                     <select
                       value={effectiveFieldKey}
                       onChange={e => updateColumn(col.id, { fieldKey: e.target.value })}
                       className={`${selectCls} w-full text-xs py-1.5 font-mono`}
                     >
-                      <option value="">-- 點此選擇 SQL 欄位別名 --</option>
+                      <option value="">{t('dashboard.properties.widgets.tabList.selectAlias')}</option>
                       {detectedSqlFields.map(f => (
                         <option key={f} value={f}>
                           {f}
                         </option>
                       ))}
                       {effectiveFieldKey && !detectedSqlFields.includes(effectiveFieldKey) && (
-                        <option value={effectiveFieldKey}>自訂別名: {effectiveFieldKey}</option>
+                        <option value={effectiveFieldKey}>{t('dashboard.properties.widgets.tabList.customAlias', { key: effectiveFieldKey })}</option>
                       )}
                     </select>
                   </div>
@@ -2906,26 +2952,26 @@ function TabListSettings({
                   {/* 第 3 行：欄位寬度 */}
                   <div className="space-y-1">
                     <label className="text-zinc-400 text-[10px]">
-                      欄位寬度 (px):
+                      {t('dashboard.properties.widgets.tabList.columnWidth')}
                     </label>
                     <div className="flex items-center gap-1.5">
                       <NumberInput
                         value={col.width}
                         onChange={n => updateColumn(col.id, { width: Math.max(30, n) })}
                         className={`${inputCls} w-full text-xs font-mono`}
-                        placeholder="寬度 (例如 90)"
+                        placeholder={t('dashboard.properties.widgets.tabList.widthPlaceholder')}
                       />
                       <span className="text-zinc-500 text-xs shrink-0">px</span>
                     </div>
                   </div>
 
-                  {/* 第 4 行：此欄文字顏色（字級由下方「內容字級」全表統一） */}
+                  {/* Column text color (content font size is table-wide below) */}
                   {(() => {
                     const firstText = (col.children ?? []).find(ch => ch.type === 'text') as TextWidget | undefined;
                     const colTextColor = col.textColor ?? firstText?.color ?? w.textColor ?? '#cbd5e1';
                     return (
                       <div className="space-y-1">
-                        <label className="text-zinc-400 text-[10px]">此欄文字顏色</label>
+                        <label className="text-zinc-400 text-[10px]">{t('dashboard.properties.widgets.tabList.columnTextColor')}</label>
                         <div
                           className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner"
                           style={{ backgroundColor: colTextColor }}
@@ -2935,7 +2981,7 @@ function TabListSettings({
                             value={colTextColor.startsWith('#') ? colTextColor : '#cbd5e1'}
                             onChange={e => patchColumnTextStyle(col.id, { color: e.target.value })}
                             className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                            title="點擊選擇此欄文字顏色"
+                            title={t('dashboard.properties.widgets.tabList.pickColumnColor')}
                           />
                         </div>
                       </div>
@@ -2948,7 +2994,7 @@ function TabListSettings({
                     onClick={() => onEnterEditColumn?.(activeTab.id, col.id)}
                     className="w-full mt-1 py-2 px-3 rounded-md bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-all shadow-sm"
                   >
-                    <Edit3 size={13} /> 進入元件編輯
+                    <Edit3 size={13} /> {t('dashboard.properties.widgets.tabList.editCell')}
                   </button>
                 </div>
               );
@@ -2961,15 +3007,15 @@ function TabListSettings({
       {/* ── 全域字體與外觀設定 ────────────────────────────────────── */}
       <div className="space-y-3 pt-3 border-t border-zinc-800">
         <label className="text-zinc-300 text-[11px] font-semibold flex items-center gap-1.5">
-          <Palette size={13} className="text-cyan-400" /> 全域字體與外觀樣式
+          <Palette size={13} className="text-cyan-400" /> {t('dashboard.properties.widgets.tabList.globalStyle')}
         </label>
 
         {/* Tab 標籤樣式 */}
         <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2">
-          <span className="text-[10px] text-zinc-400 font-bold block">Tab 分頁標籤樣式</span>
+          <span className="text-[10px] text-zinc-400 font-bold block">{t('dashboard.properties.widgets.tabList.tabStyle')}</span>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">標籤字級 (px)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabFontSize')}</label>
               <NumberInput
                 value={w.tabFontSize ?? 14}
                 onChange={n => onUpdate({ tabFontSize: n })}
@@ -2977,7 +3023,7 @@ function TabListSettings({
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">選中標籤顏色</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabActiveColor')}</label>
               <div
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabActiveColor ?? '#3b82f6' }}
@@ -2987,12 +3033,12 @@ function TabListSettings({
                   value={w.tabActiveColor ?? '#3b82f6'}
                   onChange={e => onUpdate({ tabActiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                  title="點擊選擇選中標籤顏色"
+                  title={t('dashboard.properties.widgets.tabList.pickActive')}
                 />
               </div>
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">未選標籤顏色</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabInactiveColor')}</label>
               <div
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabInactiveColor ?? '#64748b' }}
@@ -3002,7 +3048,7 @@ function TabListSettings({
                   value={w.tabInactiveColor ?? '#64748b'}
                   onChange={e => onUpdate({ tabInactiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                  title="點擊選擇未選標籤顏色"
+                  title={t('dashboard.properties.widgets.tabList.pickInactive')}
                 />
               </div>
             </div>
@@ -3011,11 +3057,11 @@ function TabListSettings({
 
         {/* 表頭與表身字體顏色 */}
         <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2.5">
-          <span className="text-[10px] text-zinc-400 font-bold block">表格字體與列高</span>
+          <span className="text-[10px] text-zinc-400 font-bold block">{t('dashboard.properties.widgets.tabList.tableStyle')}</span>
 
-          {/* 表格欄位對齊方式 */}
+          {/* {t('dashboard.properties.widgets.tabList.tableAlign')} */}
           <div>
-            <label className="text-zinc-500 text-[9px] block mb-1">表格欄位對齊方式</label>
+            <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tableAlign')}</label>
             <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded p-0.5 gap-0.5">
               <button
                 type="button"
@@ -3025,7 +3071,7 @@ function TabListSettings({
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
                 }`}
-                title="全表格欄位靠左對齊"
+                title={t('dashboard.properties.widgets.tabList.alignLeftTitle')}
               >
                 <AlignLeft size={13} />
               </button>
@@ -3037,7 +3083,7 @@ function TabListSettings({
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
                 }`}
-                title="全表格欄位置中對齊"
+                title={t('dashboard.properties.widgets.tabList.alignCenterTitle')}
               >
                 <AlignCenter size={13} />
               </button>
@@ -3049,7 +3095,7 @@ function TabListSettings({
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
                 }`}
-                title="全表格欄位靠右對齊"
+                title={t('dashboard.properties.widgets.tabList.alignRightTitle')}
               >
                 <AlignRight size={13} />
               </button>
@@ -3058,7 +3104,7 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">表頭字級 (px)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerFontSize')}</label>
               <NumberInput
                 value={w.headerFontSize ?? 12}
                 onChange={n => onUpdate({ headerFontSize: n })}
@@ -3066,7 +3112,7 @@ function TabListSettings({
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">表頭文字顏色</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerTextColor')}</label>
               <div
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.headerTextColor ?? '#94a3b8' }}
@@ -3076,7 +3122,7 @@ function TabListSettings({
                   value={w.headerTextColor ?? '#94a3b8'}
                   onChange={e => onUpdate({ headerTextColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                  title="點擊選擇表頭文字顏色"
+                  title={t('dashboard.properties.widgets.tabList.pickHeaderColor')}
                 />
               </div>
             </div>
@@ -3084,7 +3130,7 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">內容字級 (px，全表統一)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.contentFontSize')}</label>
               <NumberInput
                 value={w.fontSize ?? 13}
                 onChange={n => onUpdate(applyTabListContentFontSize(w, Math.max(8, n || 13)))}
@@ -3092,7 +3138,7 @@ function TabListSettings({
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">內容文字顏色</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.contentTextColor')}</label>
               <div
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.textColor ?? '#cbd5e1' }}
@@ -3102,7 +3148,7 @@ function TabListSettings({
                   value={w.textColor ?? '#cbd5e1'}
                   onChange={e => onUpdate({ textColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                  title="點擊選擇內容文字顏色"
+                  title={t('dashboard.properties.widgets.tabList.pickContentColor')}
                 />
               </div>
             </div>
@@ -3110,7 +3156,7 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">每列高度 (px)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.rowHeight')}</label>
               <NumberInput
                 value={w.rowHeight ?? 48}
                 onChange={n => onUpdate({ rowHeight: n })}
@@ -3118,7 +3164,7 @@ function TabListSettings({
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">表頭高度 (px)</label>
+              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerHeight')}</label>
               <NumberInput
                 value={w.headerHeight ?? 38}
                 onChange={n => onUpdate({ headerHeight: n })}
@@ -3130,10 +3176,10 @@ function TabListSettings({
 
         {/* 輔助標籤 */}
         <div>
-          <label className="text-zinc-400 text-[10px] block mb-1">右上角輔助標籤文字</label>
+          <label className="text-zinc-400 text-[10px] block mb-1">{t('dashboard.properties.widgets.tabList.auxLabel')}</label>
           <input
             type="text"
-            value={w.currentScheduleLabel ?? '目前班表'}
+            value={w.currentScheduleLabel ?? t('dashboard.properties.widgets.tabList.auxLabelDefault')}
             onChange={e => onUpdate({ currentScheduleLabel: e.target.value })}
             className={inputCls}
           />
@@ -3147,9 +3193,10 @@ function TabListSettings({
 }
 
 function DeleteBtn({ onDelete }: { onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <button onClick={onDelete} className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2">
-      <Trash2 size={12} /> 移除元件
+      <Trash2 size={12} /> {t('dashboard.properties.removeWidget')}
     </button>
   );
 }
@@ -3196,6 +3243,7 @@ export function PropertiesPanel({
   onEnterEditTabListCell,
   dualGateSettingsActive,
 }: Props) {
+  const { t } = useTranslation();
   const { issueMap } = useBindingHealth();
   const selectedIssue = selectedChild
     ? issueMap.get(selectedChild.id)
@@ -3206,7 +3254,7 @@ export function PropertiesPanel({
   if (!activePlane) {
     return (
       <aside className="w-64 bg-zinc-900 border-l border-zinc-800 flex items-center justify-center">
-        <p className="text-zinc-600 text-xs text-center px-4">請先建立或選擇一個平面</p>
+        <p className="text-zinc-600 text-xs text-center px-4">{t('dashboard.properties.selectPlane')}</p>
       </aside>
     );
   }
@@ -3215,9 +3263,11 @@ export function PropertiesPanel({
     return (
       <aside className="w-64 bg-zinc-900 border-l border-zinc-800 flex flex-col items-center justify-center p-6 text-center gap-3">
         <Monitor size={28} className="text-zinc-600" />
-        <p className="text-zinc-400 text-sm font-medium">檢視模式</p>
+        <p className="text-zinc-400 text-sm font-medium">{t('dashboard.properties.viewModeTitle')}</p>
         <p className="text-zinc-500 text-xs leading-relaxed">
-          點擊元件不會變更設定。請按上方「切換編輯模式」或鍵盤 <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-400">E</kbd> 進入編輯。
+          {t('dashboard.properties.viewModeHintBefore')}{' '}
+          <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-400">E</kbd>{' '}
+          {t('dashboard.properties.viewModeHintAfter')}
         </p>
         <p className="text-zinc-600 text-[10px] font-mono">{activePlane.name}</p>
       </aside>
@@ -3229,25 +3279,24 @@ export function PropertiesPanel({
       <div className="p-4">
         {dualGateSettingsActive && editingGroup ? (
           <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-[10px] leading-relaxed">
-            <p className="font-semibold text-cyan-400 mb-1">雙畫板閘道 · {editingGroupLabel}</p>
-            <p>設定何時顯示常態畫板；條件不成立且已啟用預設畫板時，改顯示左側預設範本。</p>
+            <p className="font-semibold text-cyan-400 mb-1">{t('dashboard.properties.dualGateTitle', { label: editingGroupLabel })}</p>
+            <p>{t('dashboard.properties.dualGateHint')}</p>
           </div>
         ) : editingGroupLabel && editingGroup && !selectedChild ? (
           <GroupInheritedVariablesSection group={editingGroup} />
         ) : editingGroupLabel ? (
           <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-[10px] leading-relaxed">
-            <p className="font-semibold text-cyan-400 mb-1">子畫布範本 · {editingGroupLabel}</p>
+            <p className="font-semibold text-cyan-400 mb-1">{t('dashboard.properties.subcanvasTitle', { label: editingGroupLabel })}</p>
             <p>
               {editingGroup?.dualCanvasEnabled
-                ? '左右兩側分別編輯預設與常態範本；紫色虛線為執行裁切區，中間直欄為閘道設定。'
-                : '編輯區可放置元件；紫色虛線為執行範本裁切區。'}
+                ? t('dashboard.properties.subcanvasDual')
+                : t('dashboard.properties.subcanvasSingle')}
               {editingGroup && (editingGroup.groupVariableMode ?? 'row') === 'index' && (
                 <>
-                  {' '}預覽索引{' '}
-                  <span className="font-mono text-cyan-300">
-                    {`{${editingGroup.variableName || 'item'}}=0`}
-                  </span>
-                  。
+                  {' '}
+                  {t('dashboard.properties.previewIndex', {
+                    token: `{${editingGroup.variableName || 'item'}}=0`,
+                  })}
                 </>
               )}
             </p>
@@ -3255,9 +3304,12 @@ export function PropertiesPanel({
         ) : editingTabListColumn ? (
           <div className="mb-3 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200/90 text-[10px] leading-relaxed">
             <p className="font-semibold text-blue-400 mb-1">
-              單元格範本 · {editingTabListColumn.tabLabel} · {editingTabListColumn.columnName}
+              {t('dashboard.properties.cellTemplateTitle', {
+                tab: editingTabListColumn.tabLabel,
+                column: editingTabListColumn.columnName,
+              })}
             </p>
-            <p>點選欄位內的文字或元件，即可在下方調整字體大小與顏色。</p>
+            <p>{t('dashboard.properties.cellTemplateHint')}</p>
           </div>
         ) : selectedIssue ? (
           <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-amber-950/50 border border-amber-600/40 text-amber-200 text-[10px] leading-relaxed">
@@ -3269,9 +3321,9 @@ export function PropertiesPanel({
           <DualCanvasSettings el={editingGroup} onUpdate={onUpdateElement} />
         ) : selectedChildCount > 1 ? (
           <div className="space-y-3 text-center py-8">
-            <p className="text-zinc-300 text-sm font-medium">已選取 {selectedChildCount} 個元件</p>
+            <p className="text-zinc-300 text-sm font-medium">{t('dashboard.properties.multiSelectTitle', { count: selectedChildCount })}</p>
             <p className="text-zinc-500 text-xs leading-relaxed px-2">
-              可一起拖曳或方向鍵微調；按 Delete 一次刪除全部。Shift+點擊加選，Shift+拖曳框選。
+              {t('dashboard.properties.multiSelectHint')}
             </p>
           </div>
         ) : selectedChild ? (
@@ -3318,15 +3370,15 @@ export function PropertiesPanel({
               default:
                 return (
                   <div className="space-y-3 p-2 text-xs text-zinc-500">
-                    <p>此元件類型已不支援，請刪除後改用元件列中的通用元件。</p>
-                    <button type="button" onClick={props.onDelete} className="w-full rounded bg-red-900/40 py-2 text-red-400">刪除元件</button>
+                    <p>{t('dashboard.properties.unsupportedType')}</p>
+                    <button type="button" onClick={props.onDelete} className="w-full rounded bg-red-900/40 py-2 text-red-400">{t('dashboard.properties.deleteWidget')}</button>
                   </div>
                 );
             }
           })()
         ) : editingTabListColumn ? (
           <p className="text-zinc-500 text-xs leading-relaxed px-1 py-6 text-center">
-            請點選欄位內的文字或元件，即可調整字體大小與顏色。
+            {t('dashboard.properties.cellTemplateEmpty')}
           </p>
         ) : selectedElement ? (
           <CanvasSettings

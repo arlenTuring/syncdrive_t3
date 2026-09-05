@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   SCHEDULE_ROW_COUNT_INITIAL,
   SCHEDULE_SLOT_MINUTES,
@@ -150,9 +151,11 @@ export function StepOverallPreview({
   attributes,
   tasks,
   rowCount,
-  emptyHint = '請於「任務排班」步驟放置任務後再預覽',
+  emptyHint,
   readOnly = false,
 }: StepOverallPreviewProps) {
+  const { t } = useTranslation();
+  const resolvedEmptyHint = emptyHint ?? t('timeTemplates.overallPreview.emptyHint');
   const slotWidthPx = SCHEDULE_SLOT_WIDTH_DEFAULT;
   const timeSlots = Array.from({ length: SCHEDULE_VISIBLE_SLOTS }, (_, i) => i);
   const rows = Array.from(
@@ -173,7 +176,9 @@ export function StepOverallPreview({
       {/* 模板名稱 + 營運時段圖例 */}
       <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-sm text-zinc-500">模板名稱</span>
+          <span className="shrink-0 text-sm text-zinc-500">
+            {t('timeTemplates.overallPreview.templateName')}
+          </span>
           <span className="truncate text-sm font-medium text-zinc-100">
             {resolveTimeTemplateDraftName(name)}
           </span>
@@ -196,7 +201,7 @@ export function StepOverallPreview({
         {tasks.length === 0 ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6">
             <PanelNoData />
-            <p className="text-xs text-zinc-600">{emptyHint}</p>
+            <p className="text-xs text-zinc-600">{resolvedEmptyHint}</p>
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto">
@@ -236,7 +241,7 @@ export function StepOverallPreview({
 
               {/* Data rows */}
               {rows.map((row) => {
-                const rowTasks = tasks.filter((t) => t.rowIndex === row);
+                const rowTasks = tasks.filter((task) => task.rowIndex === row);
                 return (
                   <div key={row} className="relative flex border-b border-zinc-800/50">
                     <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
@@ -284,7 +289,11 @@ export function StepOverallPreview({
 
         <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
           <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
-          <span>{readOnly ? '僅供預覽，可左右滑動查看班表' : '時軸可以左右滑動，查看更多任務'}</span>
+          <span>
+            {readOnly
+              ? t('timeTemplates.overallPreview.readOnlyHint')
+              : t('timeTemplates.scheduling.hintScroll')}
+          </span>
           <span className="text-zinc-600">← →</span>
         </div>
       </div>

@@ -9,4 +9,4 @@ cd "$ROOT"
 
 echo "==> 完整重啟 SyncDrive T3"
 "$ROOT/scripts/dev-stop.sh"
-exec "$ROOT/scripts/dev-start.sh" --force --seed
+exec "$ROOT/scripts/dev-start.sh" --force --seed --dev

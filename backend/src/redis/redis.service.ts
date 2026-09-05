@@ -26,6 +26,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client.disconnect();
   }
 
+  /** 健康檢查：回傳 Redis PING 結果 */
+  async ping(): Promise<string> {
+    return this.client.ping();
+  }
+
   async setTelemetry(vehicleCode: string, payload: any) {
     // 規格書 §四 Anti-drift 硬性約束：驗證根層必填欄位
     if (!payload.timestamp || !payload.global_pose || !payload.kinematics) {

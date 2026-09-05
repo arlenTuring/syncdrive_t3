@@ -1,4 +1,5 @@
 import { NumberInput } from '../../../components/NumberInput'
+import { useTranslation } from 'react-i18next'
 import * as LucideIcons from 'lucide-react';
 import { Plus, Trash2, Palette, MapPin, Zap, FolderOpen } from 'lucide-react';
 import type {
@@ -64,24 +65,7 @@ function PositionFields({
   );
 }
 
-function DeleteBtn({ onDelete }: { onDelete: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onDelete}
-      className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2"
-    >
-      <Trash2 size={12} /> 移除元件
-    </button>
-  );
-}
-
-const MATCH_OPS: { value: RouteActionMatchOp; label: string }[] = [
-  { value: 'present', label: '有值／為真' },
-  { value: 'eq', label: '等於' },
-  { value: 'gte', label: '大於等於' },
-  { value: 'gt', label: '大於' },
-];
+const MATCH_OPS: RouteActionMatchOp[] = ['present', 'eq', 'gte', 'gt'];
 
 export function RouteProgressSettings({
   w,
@@ -92,9 +76,20 @@ export function RouteProgressSettings({
   onUpdate: (patch: Partial<RouteProgressWidget>) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const stationSource: RouteStationSource =
     w.stationSource ?? (w.dynamicStationFields ? 'legacy-columns' : 'manual');
   const rules = w.actionIconRules ?? [];
+
+  const matchLabel = (op: RouteActionMatchOp) => {
+    switch (op) {
+      case 'present': return t('dashboard.routeProgress.matchPresent');
+      case 'eq': return t('dashboard.routeProgress.matchEq');
+      case 'gte': return t('dashboard.routeProgress.matchGte');
+      case 'gt': return t('dashboard.routeProgress.matchGt');
+      default: return op;
+    }
+  };
 
   const updateStation = (idx: number, patch: Partial<RouteStation>) => {
     const newStations = [...w.stations];
@@ -106,7 +101,7 @@ export function RouteProgressSettings({
     onUpdate({
       stations: [
         ...w.stations,
-        { id: `s_${Date.now()}`, name: '新站點', value: anchors > 0 ? 100 : 0 },
+        { id: `s_${Date.now()}`, name: t('dashboard.routeProgress.newStation'), value: anchors > 0 ? 100 : 0 },
       ],
     });
   };
@@ -125,7 +120,7 @@ export function RouteProgressSettings({
         ...rules,
         {
           id: `act_${Date.now()}`,
-          label: '新動作',
+          label: t('dashboard.routeProgress.newAction'),
           sourceVarKey: 'action_code',
           matchOp: 'present',
           iconFile: 'action.png',
@@ -140,20 +135,20 @@ export function RouteProgressSettings({
 
   return (
     <div className="space-y-4">
-      <SH icon={<LucideIcons.Route size={14} className="text-blue-400" />} label="路線進度設定" color="#3b82f6" />
+      <SH icon={<LucideIcons.Route size={14} className="text-blue-400" />} label={t('dashboard.routeProgress.title')} color="#3b82f6" />
 
-      <Field label="版型">
+      <Field label={t('dashboard.routeProgress.variant')}>
         <select
           value={w.variant ?? 'track'}
           onChange={(e) => onUpdate({ variant: e.target.value as RouteProgressWidget['variant'] })}
           className={selectCls}
         >
-          <option value="track">軌道</option>
-          <option value="detail-card">詳情卡</option>
-          <option value="service-card">服務卡</option>
+          <option value="track">{t('dashboard.routeProgress.track')}</option>
+          <option value="detail-card">{t('dashboard.routeProgress.detailCard')}</option>
+          <option value="service-card">{t('dashboard.routeProgress.serviceCard')}</option>
         </select>
       </Field>
-      <Field label="站點標籤字級 (px)">
+      <Field label={t('dashboard.routeProgress.stationFontSize')}>
         <NumberInput
           min={8}
           value={w.fontSize ?? 14}
@@ -163,17 +158,17 @@ export function RouteProgressSettings({
       </Field>
       {(w.variant === 'detail-card' || w.variant === 'service-card') && (
         <div className="grid grid-cols-2 gap-2">
-          <Field label="站點欄標籤">
-            <input value={w.cardStationLabel ?? ''} onChange={(e) => onUpdate({ cardStationLabel: e.target.value })} className={inputCls} placeholder="站點" />
+          <Field label={t('dashboard.routeProgress.cardStationLabel')}>
+            <input value={w.cardStationLabel ?? ''} onChange={(e) => onUpdate({ cardStationLabel: e.target.value })} className={inputCls} placeholder={t('dashboard.routeProgress.placeholderStation')} />
           </Field>
-          <Field label="指標欄標籤">
+          <Field label={t('dashboard.routeProgress.cardMetricLabel')}>
             <input value={w.cardMetricLabel ?? ''} onChange={(e) => onUpdate({ cardMetricLabel: e.target.value })} className={inputCls} placeholder="ETA" />
           </Field>
-          <Field label="開始時間標籤">
-            <input value={w.cardDepartLabel ?? ''} onChange={(e) => onUpdate({ cardDepartLabel: e.target.value })} className={inputCls} placeholder="開始" />
+          <Field label={t('dashboard.routeProgress.cardDepartLabel')}>
+            <input value={w.cardDepartLabel ?? ''} onChange={(e) => onUpdate({ cardDepartLabel: e.target.value })} className={inputCls} placeholder={t('dashboard.routeProgress.placeholderStart')} />
           </Field>
-          <Field label="結束時間標籤">
-            <input value={w.cardEndLabel ?? ''} onChange={(e) => onUpdate({ cardEndLabel: e.target.value })} className={inputCls} placeholder="結束" />
+          <Field label={t('dashboard.routeProgress.cardEndLabel')}>
+            <input value={w.cardEndLabel ?? ''} onChange={(e) => onUpdate({ cardEndLabel: e.target.value })} className={inputCls} placeholder={t('dashboard.routeProgress.placeholderEnd')} />
           </Field>
         </div>
       )}
@@ -181,15 +176,13 @@ export function RouteProgressSettings({
       <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/50 text-[10px] text-zinc-400 leading-relaxed flex gap-2">
         <FolderOpen size={14} className="shrink-0 text-cyan-500 mt-0.5" />
         <span>
-          作動行為圖示請放到{' '}
-          <code className="text-cyan-400 font-mono">{VEHICLE_OPERATION_ACTION_ICONS_BASE}/</code>
-          （專案內 <code className="font-mono">public/vehicle-operation-actions/icons/</code>）
+          {t('dashboard.routeProgress.iconHint', { base: VEHICLE_OPERATION_ACTION_ICONS_BASE })}
         </span>
       </div>
 
       <div className="space-y-2">
         <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />
-        <Field label="總進度 fallback 欄位（0–100）">
+        <Field label={t('dashboard.routeProgress.progressFallback')}>
           <input
             value={w.valueField}
             onChange={(e) => onUpdate({ valueField: e.target.value })}
@@ -197,7 +190,7 @@ export function RouteProgressSettings({
             placeholder="route_progress"
           />
         </Field>
-        <Field label="MQTT 進度路徑（選填）">
+        <Field label={t('dashboard.routeProgress.mqttPath')}>
           <input
             value={w.mqttProgressPath ?? ''}
             onChange={(e) => onUpdate({ mqttProgressPath: e.target.value || undefined })}
@@ -208,20 +201,20 @@ export function RouteProgressSettings({
       </div>
 
       <div className="space-y-2 pt-2 border-t border-zinc-800">
-        <SH icon={<MapPin size={12} />} label="站點來源" color="#10b981" />
-        <Field label="模式">
+        <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.stationSource')} color="#10b981" />
+        <Field label={t('dashboard.routeProgress.mode')}>
           <select
             value={stationSource}
             onChange={(e) => onUpdate({ stationSource: e.target.value as RouteStationSource })}
             className={selectCls}
           >
-            <option value="json">JSON 陣列（站數浮動、等距）</option>
-            <option value="legacy-columns">舊版三欄位站名（st_a…）</option>
-            <option value="manual">手動站點（預覽／備援）</option>
+            <option value="json">{t('dashboard.routeProgress.modeJson')}</option>
+            <option value="legacy-columns">{t('dashboard.routeProgress.modeLegacy')}</option>
+            <option value="manual">{t('dashboard.routeProgress.modeManual')}</option>
           </select>
         </Field>
         {stationSource === 'json' && (
-          <Field label="站點 JSON 變數鍵">
+          <Field label={t('dashboard.routeProgress.stationsJsonKey')}>
             <input
               value={w.stationsJsonVarKey ?? 'route_stations'}
               onChange={(e) => onUpdate({ stationsJsonVarKey: e.target.value })}
@@ -233,7 +226,7 @@ export function RouteProgressSettings({
           </Field>
         )}
         {stationSource === 'legacy-columns' && (
-          <Field label="站名欄位（逗號分隔三鍵）">
+          <Field label={t('dashboard.routeProgress.legacyFields')}>
             <input
               value={(w.dynamicStationFields ?? []).join(',')}
               onChange={(e) => {
@@ -251,14 +244,14 @@ export function RouteProgressSettings({
           </Field>
         )}
         <div className="grid grid-cols-2 gap-2">
-          <Field label="區段索引變數">
+          <Field label={t('dashboard.routeProgress.segmentIndex')}>
             <input
               value={w.segmentIndexVarKey ?? 'segment_index'}
               onChange={(e) => onUpdate({ segmentIndexVarKey: e.target.value })}
               className={inputCls}
             />
           </Field>
-          <Field label="區段剩餘 % 變數">
+          <Field label={t('dashboard.routeProgress.segmentRemain')}>
             <input
               value={w.segmentRemainPctVarKey ?? 'segment_remain_pct'}
               onChange={(e) => onUpdate({ segmentRemainPctVarKey: e.target.value })}
@@ -267,14 +260,14 @@ export function RouteProgressSettings({
           </Field>
         </div>
         <p className="text-[9px] text-zinc-500 leading-relaxed">
-          車輛在兩站之間的位置：優先使用區段索引 + 剩餘 %；否則依 JSON 的 remain_pct；再 fallback 總進度欄位。
+          {t('dashboard.routeProgress.positionHint')}
         </p>
       </div>
 
       {stationSource === 'manual' && (
         <div className="space-y-2 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
-            <SH icon={<MapPin size={12} />} label="手動站點（備援）" color="#10b981" />
+            <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.manualStations')} color="#10b981" />
             <button
               type="button"
               onClick={addStation}
@@ -292,7 +285,7 @@ export function RouteProgressSettings({
                 value={s.name}
                 onChange={(e) => updateStation(i, { name: e.target.value })}
                 className={`${inputCls} flex-1`}
-                placeholder="站名"
+                placeholder={t('dashboard.routeProgress.stationName')}
                 style={{ fontSize: 10 }}
               />
               <button
@@ -309,23 +302,23 @@ export function RouteProgressSettings({
 
       <div className="space-y-2 pt-2 border-t border-zinc-800">
         <div className="flex items-center justify-between gap-2">
-          <SH icon={<Zap size={12} />} label="作動行為對應" color="#f59e0b" />
+          <SH icon={<Zap size={12} />} label={t('dashboard.routeProgress.actionMapping')} color="#f59e0b" />
           <div className="flex gap-1">
             <button
               type="button"
-              title="載入設計稿 11 種作動行為"
+              title={t('dashboard.routeProgress.loadCatalog')}
               onClick={() => onUpdate({ actionIconRules: buildCatalogActionRules() })}
               className="px-2 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
             >
-              11 種
+              {t('dashboard.routeProgress.catalogBtn')}
             </button>
             <button
               type="button"
-              title="載入範例規則（含告警、延誤）"
+              title={t('dashboard.routeProgress.loadSample')}
               onClick={() => onUpdate({ actionIconRules: [...DEFAULT_ROUTE_ACTION_ICON_RULES] })}
               className="px-2 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
             >
-              範例
+              {t('dashboard.routeProgress.sampleBtn')}
             </button>
             <button
               type="button"
@@ -337,7 +330,7 @@ export function RouteProgressSettings({
           </div>
         </div>
         {rules.length === 0 && (
-          <p className="text-[10px] text-zinc-500">尚無規則；命中時在巴士上方顯示圖示。</p>
+          <p className="text-[10px] text-zinc-500">{t('dashboard.routeProgress.noRules')}</p>
         )}
         {rules.map((rule, i) => (
           <div key={rule.id} className="space-y-1.5 p-2 rounded border border-zinc-700/50 bg-zinc-800/30">
@@ -346,7 +339,7 @@ export function RouteProgressSettings({
                 value={rule.label ?? ''}
                 onChange={(e) => updateRule(i, { label: e.target.value })}
                 className={`${inputCls} flex-1`}
-                placeholder="說明"
+                placeholder={t('dashboard.routeProgress.ruleLabel')}
                 style={{ fontSize: 10 }}
               />
               <button type="button" onClick={() => removeRule(i)} className="p-1 text-zinc-500 hover:text-red-400">
@@ -357,7 +350,7 @@ export function RouteProgressSettings({
               value={rule.sourceVarKey}
               onChange={(e) => updateRule(i, { sourceVarKey: e.target.value })}
               className={inputCls}
-              placeholder="變數鍵"
+              placeholder={t('dashboard.routeProgress.varKey')}
               style={{ fontSize: 10 }}
             />
             <div className="grid grid-cols-2 gap-1">
@@ -368,8 +361,8 @@ export function RouteProgressSettings({
                 style={{ fontSize: 10 }}
               >
                 {MATCH_OPS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                  <option key={o} value={o}>
+                    {matchLabel(o)}
                   </option>
                 ))}
               </select>
@@ -377,7 +370,7 @@ export function RouteProgressSettings({
                 value={rule.threshold ?? ''}
                 onChange={(e) => updateRule(i, { threshold: e.target.value })}
                 className={inputCls}
-                placeholder="門檻值"
+                placeholder={t('dashboard.routeProgress.threshold')}
                 style={{ fontSize: 10 }}
                 disabled={rule.matchOp === 'present'}
               />
@@ -406,7 +399,7 @@ export function RouteProgressSettings({
               value={rule.priority ?? 0}
               onChange={(n) => updateRule(i, { priority: n })}
               className={inputCls}
-              placeholder="優先序"
+              placeholder={t('dashboard.routeProgress.priority')}
               style={{ fontSize: 10 }}
             />
           </div>
@@ -414,9 +407,9 @@ export function RouteProgressSettings({
       </div>
 
       <div className="space-y-2 pt-2 border-t border-zinc-800">
-        <SH icon={<Palette size={12} />} label="外觀樣式" color="#ec4899" />
+        <SH icon={<Palette size={12} />} label={t('dashboard.routeProgress.appearance')} color="#ec4899" />
         <div className="grid grid-cols-2 gap-2">
-          <Field label="走過路線顏色">
+          <Field label={t('dashboard.routeProgress.activeColor')}>
             <input
               type="color"
               value={w.activeColor}
@@ -425,7 +418,7 @@ export function RouteProgressSettings({
               style={{ height: 28 }}
             />
           </Field>
-          <Field label="未走路線顏色">
+          <Field label={t('dashboard.routeProgress.inactiveColor')}>
             <input
               type="color"
               value={w.inactiveColor}
@@ -434,7 +427,7 @@ export function RouteProgressSettings({
               style={{ height: 28 }}
             />
           </Field>
-          <Field label="車輛背景色（fallback）">
+          <Field label={t('dashboard.routeProgress.iconBg')}>
             <input
               type="color"
               value={w.iconBgColor}
@@ -443,7 +436,7 @@ export function RouteProgressSettings({
               style={{ height: 28 }}
             />
           </Field>
-          <Field label="車輛圖示顏色">
+          <Field label={t('dashboard.routeProgress.iconColor')}>
             <input
               type="color"
               value={w.iconColor}
@@ -453,29 +446,29 @@ export function RouteProgressSettings({
             />
           </Field>
         </div>
-        <Field label="車輛圖示">
+        <Field label={t('dashboard.routeProgress.vehicleIcon')}>
           <div className="flex gap-1">
             <input
               value={w.vehicleIcon}
               onChange={(e) => onUpdate({ vehicleIcon: e.target.value })}
               className={`${inputCls} flex-1`}
-              placeholder={`${DEFAULT_VEHICLE_ICON_FILE} 或 Bus`}
+              placeholder={t('dashboard.routeProgress.vehicleIconPlaceholder', { file: DEFAULT_VEHICLE_ICON_FILE })}
             />
             <button
               type="button"
-              title="使用預設車體圖 vehicle.svg"
+              title={t('dashboard.routeProgress.useDefaultIcon')}
               onClick={() => onUpdate({ vehicleIcon: DEFAULT_VEHICLE_ICON_FILE })}
               className="shrink-0 px-2 py-1 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
             >
-              預設
+              {t('dashboard.routeProgress.defaultBtn')}
             </button>
           </div>
           <p className="text-[9px] text-zinc-500 mt-1">
-            建議 vehicle.svg（依載具狀態染色）；亦可填 Lucide 名稱 Bus
+            {t('dashboard.routeProgress.vehicleIconHint')}
           </p>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="車體底色變數">
+          <Field label={t('dashboard.routeProgress.iconBgVar')}>
             <input
               value={w.vehicleIconBgVarKey ?? 'icon_bg_color'}
               onChange={(e) => onUpdate({ vehicleIconBgVarKey: e.target.value })}
@@ -483,7 +476,7 @@ export function RouteProgressSettings({
               placeholder="icon_bg_color"
             />
           </Field>
-          <Field label="健康 fallback">
+          <Field label={t('dashboard.routeProgress.healthFallback')}>
             <input
               value={w.vehicleHealthVarKey ?? ''}
               onChange={(e) => onUpdate({ vehicleHealthVarKey: e.target.value })}
@@ -493,12 +486,18 @@ export function RouteProgressSettings({
           </Field>
         </div>
         <p className="text-[9px] text-zinc-500 leading-relaxed">
-          底色優先讀 SQL／變數；若無則依健康狀態欄位：OK 藍、WARNING 橘、ERROR 紅
+          {t('dashboard.routeProgress.healthHint')}
         </p>
       </div>
 
       <PositionFields widget={w} onUpdate={onUpdate} />
-      <DeleteBtn onDelete={onDelete} />
+      <button
+        type="button"
+        onClick={onDelete}
+        className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2"
+      >
+        <Trash2 size={12} /> {t('dashboard.routeProgress.removeWidget')}
+      </button>
     </div>
   );
 }

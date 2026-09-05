@@ -13,6 +13,7 @@ import {
   type MapCropRect,
   type MapCropResizeEdge,
 } from '../utils/mapCropMode'
+import { useTranslation } from 'react-i18next'
 
 /** 螢幕上希望至少多寬（px），會依 mapScale 放大命中區 */
 const EDGE_HIT_SCREEN_PX = 14
@@ -35,6 +36,7 @@ export function MapCropModeOverlay({
   mapScale,
   onCropRectChange,
 }: Props) {
+  const { t } = useTranslation()
   const mapScaleRef = useRef(mapScale)
   mapScaleRef.current = mapScale
 
@@ -180,7 +182,7 @@ export function MapCropModeOverlay({
   }[] = [
     {
       edge: 'top',
-      title: '裁切／拉伸上邊',
+      title: t('mapEditor.cropMode.edgeTop'),
       style: {
         left: x,
         top: y - edgeHit,
@@ -191,7 +193,7 @@ export function MapCropModeOverlay({
     },
     {
       edge: 'bottom',
-      title: '裁切／拉伸下邊',
+      title: t('mapEditor.cropMode.edgeBottom'),
       style: {
         left: x,
         top: y + ch,
@@ -202,7 +204,7 @@ export function MapCropModeOverlay({
     },
     {
       edge: 'left',
-      title: '裁切／拉伸左邊',
+      title: t('mapEditor.cropMode.edgeLeft'),
       style: {
         left: x - edgeHit,
         top: y,
@@ -213,7 +215,7 @@ export function MapCropModeOverlay({
     },
     {
       edge: 'right',
-      title: '裁切／拉伸右邊',
+      title: t('mapEditor.cropMode.edgeRight'),
       style: {
         left: x + cw,
         top: y,
@@ -254,7 +256,7 @@ export function MapCropModeOverlay({
           height: contentExtent.height,
           pointerEvents: 'none',
         }}
-        title="地圖內容完整範圍（虛線）"
+        title={t('mapEditor.cropMode.contentExtent')}
       />
 
       <div
@@ -274,19 +276,19 @@ export function MapCropModeOverlay({
             transformOrigin: 'top left',
           }}
         >
-          <span className="text-xs font-medium text-amber-200/90">輸出解析度</span>
+          <span className="text-xs font-medium text-amber-200/90">{t('mapEditor.cropMode.outputResolution')}</span>
           <div className="mt-0.5 text-lg font-semibold leading-none tracking-tight tabular-nums">
             {Math.round(cw)}×{Math.round(ch)}
             <span className="ml-1 text-sm font-medium text-amber-200/80">px</span>
           </div>
           {isStretched || isShrunk ? (
             <span className="mt-1 block text-xs text-amber-300/80">
-              {isStretched ? '已拉伸' : '已裁切'}
+              {isStretched ? t('mapEditor.cropMode.stretched') : t('mapEditor.cropMode.cropped')}
             </span>
           ) : null}
         </div>
         <p className="absolute bottom-2 left-2 max-w-[90%] text-[9px] leading-snug text-amber-200/70">
-          拖曳邊或角裁切／拉伸；Area 座標不變
+          {t('mapEditor.cropMode.dragHint')}
         </p>
       </div>
 
@@ -316,7 +318,7 @@ export function MapCropModeOverlay({
             zIndex: 20001,
           }}
           onPointerDown={onPointerDown(edge)}
-          title="拖曳裁切／拉伸"
+          title={t('mapEditor.cropMode.cornerTitle')}
         />
       ))}
 
@@ -324,7 +326,7 @@ export function MapCropModeOverlay({
         className="absolute bottom-2 right-2 rounded bg-zinc-950/85 px-2 py-1 font-mono text-[10px] text-zinc-400"
         style={{ pointerEvents: 'none' }}
       >
-        工作區 {wsW}×{wsH} · 內容 {contentExtent.width}×{contentExtent.height}
+        {t('mapEditor.cropMode.workspaceStats', { wsW, wsH, cW: contentExtent.width, cH: contentExtent.height })}
       </div>
     </div>
   )

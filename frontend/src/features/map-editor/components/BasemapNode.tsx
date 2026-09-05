@@ -9,6 +9,7 @@ import {
   Rows2,
   Route,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
 import { AreaDragTrack } from './AreaDragTrack'
 import { BasemapCellOverlay } from './BasemapCellOverlay'
@@ -154,6 +155,7 @@ export const BasemapNode = memo(function BasemapNode({
   onDoubleClick,
   onApplyTrackGen,
 }: Props) {
+  const { t } = useTranslation()
   const canEdit = editMode && !readOnly
   const layout = basemap.layout
   const rootRef = useRef<HTMLDivElement>(null)
@@ -893,7 +895,11 @@ export const BasemapNode = memo(function BasemapNode({
                 data-basemap-toolbar
                 className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
                 role="toolbar"
-                aria-label={isTrackGen ? '軌道生成' : '底圖圖層'}
+                aria-label={
+                  isTrackGen
+                    ? t('mapEditor.basemap.toolbar.trackGenAria')
+                    : t('mapEditor.basemap.toolbar.basemapAria')
+                }
               >
                 {isTrackGen ? (
                   <>
@@ -902,9 +908,9 @@ export const BasemapNode = memo(function BasemapNode({
                       title={
                         trackGenCenterlines
                           ? trackGenResult
-                            ? '依目前設定重新生成軌道'
-                            : '由路網生成軌道'
-                          : '請先載入 .xodr'
+                            ? t('mapEditor.basemap.toolbar.regenerateTitle')
+                            : t('mapEditor.basemap.toolbar.generateTitle')
+                          : t('mapEditor.basemap.toolbar.needXodr')
                       }
                       disabled={!trackGenCenterlines || generating}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -917,12 +923,16 @@ export const BasemapNode = memo(function BasemapNode({
                       className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <Route className="size-4" aria-hidden />
-                      {generating ? '生成中…' : trackGenResult ? '重新生成' : '軌道生成'}
+                      {generating
+                        ? t('mapEditor.basemap.toolbar.generating')
+                        : trackGenResult
+                          ? t('mapEditor.basemap.toolbar.regenerate')
+                          : t('mapEditor.basemap.toolbar.generate')}
                     </button>
                     {trackGenResult ? (
                       <button
                         type="button"
-                        title="清除生成紀錄，回到只顯示中心線"
+                        title={t('mapEditor.basemap.toolbar.clearResultTitle')}
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
@@ -943,10 +953,10 @@ export const BasemapNode = memo(function BasemapNode({
                   hidden={isTrackGen}
                   title={
                     canSplit
-                      ? '橫向分割（上／下）'
+                      ? t('mapEditor.basemap.toolbar.splitRow')
                       : cutsConfirmed
-                        ? '已確定切割，請點選各格後拖曳邊緣調整'
-                        : '請先點選要分割的區域'
+                        ? t('mapEditor.basemap.toolbar.cutsConfirmed')
+                        : t('mapEditor.basemap.toolbar.selectRegionFirst')
                   }
                   disabled={!canSplit}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -965,10 +975,10 @@ export const BasemapNode = memo(function BasemapNode({
                   hidden={isTrackGen}
                   title={
                     canSplit
-                      ? '縱向分割（左／右）'
+                      ? t('mapEditor.basemap.toolbar.splitCol')
                       : cutsConfirmed
-                        ? '已確定切割，請點選各格後拖曳邊緣調整'
-                        : '請先點選要分割的區域'
+                        ? t('mapEditor.basemap.toolbar.cutsConfirmed')
+                        : t('mapEditor.basemap.toolbar.selectRegionFirst')
                   }
                   disabled={!canSplit}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -987,10 +997,10 @@ export const BasemapNode = memo(function BasemapNode({
                   hidden={isTrackGen}
                   title={
                     canConfirmCuts
-                      ? '確定切割（各格完全獨立，可個別縮放）'
+                      ? t('mapEditor.basemap.toolbar.confirmCutsTitle')
                       : canReopenCuts
-                        ? '重新編輯切割（回到分割草稿）'
-                        : '請先分割成至少兩格'
+                        ? t('mapEditor.basemap.toolbar.reopenCutsTitle')
+                        : t('mapEditor.basemap.toolbar.needTwoCells')
                   }
                   disabled={!canConfirmCuts && !canReopenCuts}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -1013,13 +1023,15 @@ export const BasemapNode = memo(function BasemapNode({
                     <CircleCheck className="size-4" aria-hidden />
                   )}
                   <span className="sr-only">
-                    {canReopenCuts ? '重新編輯切割' : '確定切割'}
+                    {canReopenCuts
+                      ? t('mapEditor.basemap.toolbar.reopenCuts')
+                      : t('mapEditor.basemap.toolbar.confirmCuts')}
                   </span>
                 </button>
                 <div className="mx-0.5 h-5 w-px bg-zinc-600/80" aria-hidden />
                 <button
                   type="button"
-                  title="置底（移到 Area 與地圖元件下方）"
+                  title={t('mapEditor.basemap.toolbar.sendToBack')}
                   disabled={!canSendBackward}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
@@ -1034,7 +1046,7 @@ export const BasemapNode = memo(function BasemapNode({
                 </button>
                 <button
                   type="button"
-                  title="置頂（蓋過 Area 與地圖元件）"
+                  title={t('mapEditor.basemap.toolbar.bringToFront')}
                   disabled={!canBringForward}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}

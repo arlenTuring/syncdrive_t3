@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const FIELD_LABEL_CLASS = 'mb-1.5 block text-xs leading-none text-zinc-400';
 
@@ -33,7 +34,7 @@ export type ShiftMenuGroup = { label: string; options: ShiftMenuOption[] };
 export function ShiftMenuSelect({
   label,
   value,
-  placeholder = '請選擇',
+  placeholder,
   options,
   groups,
   onChange,
@@ -61,6 +62,8 @@ export function ShiftMenuSelect({
   triggerClassName?: string;
   'aria-label'?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('shiftList.menuSelect.placeholder');
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const isSm = size === 'sm';
@@ -74,7 +77,7 @@ export function ShiftMenuSelect({
 
   const displayLabel =
     flatOptions.find((item) => item.value === value)?.label
-    || (value ? value : placeholder);
+    || (value ? value : resolvedPlaceholder);
   const hasValue = Boolean(value);
 
   useEffect(() => {
@@ -109,7 +112,7 @@ export function ShiftMenuSelect({
             : 'border-zinc-700/80 text-zinc-100 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30',
           triggerClassName,
         ].join(' ')}
-        aria-label={ariaLabel || label || '選單'}
+        aria-label={ariaLabel || label || t('shiftList.menuSelect.menuAria')}
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
@@ -184,7 +187,9 @@ export function ShiftMenuSelect({
                   </button>
                 ))}
             {(groups?.length ?? 0) === 0 && (options?.length ?? 0) === 0 ? (
-              <div className="px-5 py-3 text-[13px] text-[#6A7282]">尚無可選項目</div>
+              <div className="px-5 py-3 text-[13px] text-[#6A7282]">
+                {t('shiftList.menuSelect.empty')}
+              </div>
             ) : null}
           </div>
         </div>

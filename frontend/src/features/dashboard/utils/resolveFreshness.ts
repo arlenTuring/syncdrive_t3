@@ -3,11 +3,24 @@ import { inferInvalidateTagsFromSql } from './inferInvalidateTagsFromSql';
 
 export type EffectiveRefreshMode = 'stream' | 'once' | 'event' | 'poll';
 
+export type FreshnessReasonKey =
+  | 'live'
+  | 'on_change'
+  | 'interval'
+  | 'once'
+  | 'legacy_poll'
+  | 'legacy_mode'
+  | 'auto_mqtt'
+  | 'auto_tags'
+  | 'auto_poll'
+  | 'auto_once';
+
 export interface EffectiveRefresh {
   refreshMode: EffectiveRefreshMode;
   refreshInterval?: number;
-  /** 推導出此結果的依據（供進階面板/除錯用人話顯示） */
-  reason: string;
+  /** i18n key under dashboard.properties.freshnessReason.* */
+  reasonKey: FreshnessReasonKey;
+  reasonParams?: Record<string, string | number>;
 }
 
 const DEFAULT_INTERVAL_SEC = 15;
@@ -29,17 +42,17 @@ export function resolveFreshness(binding: WidgetDataBinding): EffectiveRefresh {
   if (policy && policy !== 'auto') {
     switch (policy) {
       case 'live':
-        return { refreshMode: 'stream', reason: '即時串流（MQTT）' };
+        return { refreshMode: 'stream', reasonKey: 'live' };
       case 'on_change':
-        return { refreshMode: 'event', reason: '有變更就更新（寫庫後推送重查）' };
+        return { refreshMode: 'event', reasonKey: 'on_change' };
       case 'interval': {
         const sec = binding.refreshInterval && binding.refreshInterval > 0
           ? binding.refreshInterval
           : DEFAULT_INTERVAL_SEC;
-        return { refreshMode: 'poll', refreshInterval: sec, reason: `定時輪詢（每 ${sec} 秒）` };
+        return { refreshMode: 'poll', refreshInterval: sec, reasonKey: 'interval', reasonParams: { sec } };
       }
       case 'once':
-        return { refreshMode: 'once', reason: '僅載入一次' };
+        return { refreshMode: 'once', reasonKey: 'once' };
     }
   }
 
@@ -49,38 +62,41 @@ export function resolveFreshness(binding: WidgetDataBinding): EffectiveRefresh {
       return {
         refreshMode: 'poll',
         refreshInterval: binding.refreshInterval,
-        reason: '定時輪詢（legacy 設定）',
+        reasonKey: 'legacy_poll',
       };
     }
-    return { refreshMode: binding.refreshMode, reason: `沿用既有設定（${binding.refreshMode}）` };
+    return {
+      refreshMode: binding.refreshMode,
+      reasonKey: 'legacy_mode',
+      reasonParams: { mode: binding.refreshMode },
+    };
   }
 
   // 3) auto（或完全未設定）：平台依資料來源型別推斷
   if (isMqtt) {
-    return { refreshMode: 'stream', reason: '自動：MQTT 來源 → 即時串流' };
+    return { refreshMode: 'stream', reasonKey: 'auto_mqtt' };
   }
   if (hasTags) {
-    return { refreshMode: 'event', reason: '自動：可推斷資料表 → 有變更就更新' };
+    return { refreshMode: 'event', reasonKey: 'auto_tags' };
   }
   if (binding.refreshInterval && binding.refreshInterval > 0) {
     return {
       refreshMode: 'poll',
       refreshInterval: binding.refreshInterval,
-      reason: `自動：沿用既有輪詢（每 ${binding.refreshInterval} 秒）`,
+      reasonKey: 'auto_poll',
+      reasonParams: { sec: binding.refreshInterval },
     };
   }
-  return { refreshMode: 'once', reason: '自動：無推送來源 → 僅載入一次' };
+  return { refreshMode: 'once', reasonKey: 'auto_once' };
 }
 
-/** 使用者面向選項的人話標籤（供下拉選單） */
+/** 使用者面向選項（標籤／說明改由 i18n：freshnessOpt / freshnessHint） */
 export const FRESHNESS_POLICY_OPTIONS: ReadonlyArray<{
   value: FreshnessPolicy;
-  label: string;
-  hint: string;
 }> = [
-  { value: 'auto', label: '自動（建議）', hint: '由平台依資料來源決定更新方式' },
-  { value: 'live', label: '即時', hint: '位置、速度、ETA、燈號等高頻資料（MQTT 串流）' },
-  { value: 'on_change', label: '有變更就更新', hint: '訂單、事件、名冊、KPI：寫庫後約 1 秒內更新' },
-  { value: 'interval', label: '定時更新', hint: '僅建議用於無法即時推送的資料；會重複查詢資料庫' },
-  { value: 'once', label: '僅載入一次', hint: '靜態設定、路線結構等不會變動的資料' },
+  { value: 'auto' },
+  { value: 'live' },
+  { value: 'on_change' },
+  { value: 'interval' },
+  { value: 'once' },
 ];

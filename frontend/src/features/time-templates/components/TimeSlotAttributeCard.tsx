@@ -1,12 +1,12 @@
 import { Check, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ATTRIBUTE_CARD_FIELD_HEIGHT_PX,
   ATTRIBUTE_CARD_HEADER_ROW_PX,
   ATTRIBUTE_CARD_HEIGHT_PX,
   ATTRIBUTE_CARD_WIDTH_PX,
-  ATTRIBUTE_NAME_LIMIT_HINT,
   clampAttributeNameInput,
   isAttributeNameWithinLimit,
   type TimeSlotAttribute,
@@ -51,10 +51,12 @@ function ColorSwatch({
   color,
   onClick,
   buttonRef,
+  ariaLabel,
 }: {
   color: string;
   onClick: () => void;
   buttonRef: React.RefObject<HTMLButtonElement | null>;
+  ariaLabel: string;
 }) {
   return (
     <button
@@ -62,7 +64,7 @@ function ColorSwatch({
       type="button"
       onClick={onClick}
       className="flex size-4 shrink-0 items-center justify-center rounded bg-[rgba(212,212,216,0.1)] p-0.5"
-      aria-label="選擇顏色"
+      aria-label={ariaLabel}
     >
       <span
         className="size-3 rounded-[2px]"
@@ -97,6 +99,7 @@ function EditModeCard({
   onOpenPalette: () => void;
   onClosePalette: (color: string) => void;
 }) {
+  const { t } = useTranslation();
   const palettePos = paletteOpen && colorRef.current
     ? (() => {
         const rect = colorRef.current.getBoundingClientRect();
@@ -112,6 +115,7 @@ function EditModeCard({
             color={attribute.color}
             onClick={onOpenPalette}
             buttonRef={colorRef}
+            ariaLabel={t('timeTemplates.attributes.selectColor')}
           />
           {paletteOpen && palettePos && createPortal(
             <div
@@ -132,10 +136,10 @@ function EditModeCard({
           ref={nameInputRef}
           value={attribute.name}
           onChange={(e) => onChange({ name: clampAttributeNameInput(e.target.value) })}
-          placeholder="請輸入"
+          placeholder={t('timeTemplates.attributes.placeholder')}
           className={`min-w-0 flex-1 ${EDIT_FIELD_CLASS}`}
           style={EDIT_FIELD_STYLE}
-          title={ATTRIBUTE_NAME_LIMIT_HINT}
+          title={t('timeTemplates.attributes.nameLimitHint')}
         />
 
         <button
@@ -144,7 +148,7 @@ function EditModeCard({
           onClick={onConfirm}
           className="inline-flex shrink-0 items-center justify-center rounded-md bg-[#2B7FFF] text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
           style={ACTION_BUTTON_STYLE}
-          aria-label="確認"
+          aria-label={t('timeTemplates.attributes.confirm')}
         >
           <Check className="size-3.5" strokeWidth={2.5} />
         </button>
@@ -153,7 +157,7 @@ function EditModeCard({
       <div className="flex w-full items-center gap-3">
         <div className="w-[72px] shrink-0">
           <div className="text-[10px] font-medium leading-none text-[#99A1AF] pb-0.5">
-            班距
+            {t('timeTemplates.attributes.headway')}
           </div>
           <input
             value={headwayInput}
@@ -163,7 +167,7 @@ function EditModeCard({
                 headwaySeconds: raw === '' ? null : Number(raw),
               });
             }}
-            placeholder="請輸入"
+            placeholder={t('timeTemplates.attributes.placeholder')}
             inputMode="numeric"
             className={EDIT_FIELD_CLASS}
             style={EDIT_FIELD_STYLE}
@@ -171,7 +175,9 @@ function EditModeCard({
         </div>
 
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">運能</div>
+          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">
+            {t('timeTemplates.attributes.capacity')}
+          </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
             <span className="text-xs font-medium leading-none text-[#D1D5DC]">
               {attribute.capacityPphpd}
@@ -201,6 +207,7 @@ function ViewModeCard({
   onStartEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const headwaySeconds =
     attribute.headwaySeconds != null && attribute.headwaySeconds > 0
       ? attribute.headwaySeconds
@@ -209,7 +216,12 @@ function ViewModeCard({
   return (
     <article className={CARD_CLASS} style={CARD_STYLE}>
       <div className={CARD_HEADER_ROW_CLASS} style={CARD_HEADER_ROW_STYLE}>
-        <ColorSwatch color={attribute.color} onClick={() => {}} buttonRef={colorRef} />
+        <ColorSwatch
+          color={attribute.color}
+          onClick={() => {}}
+          buttonRef={colorRef}
+          ariaLabel={t('timeTemplates.attributes.selectColor')}
+        />
         <span className="min-w-0 flex-1 truncate text-xs font-medium leading-none text-[#F3F4F6]">
           {attribute.name}
         </span>
@@ -219,7 +231,7 @@ function ViewModeCard({
             onClick={onToggleMenu}
             className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300"
             style={ACTION_BUTTON_STYLE}
-            aria-label="更多操作"
+            aria-label={t('common.moreActions')}
           >
             <MoreHorizontal className="size-3.5" />
           </button>
@@ -231,7 +243,7 @@ function ViewModeCard({
                 className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs text-zinc-200 hover:bg-zinc-800"
               >
                 <Pencil className="size-3 text-zinc-400" />
-                編輯
+                {t('common.edit')}
               </button>
               <button
                 type="button"
@@ -239,7 +251,7 @@ function ViewModeCard({
                 className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs text-zinc-200 hover:bg-zinc-800"
               >
                 <Trash2 className="size-3 text-zinc-400" />
-                刪除
+                {t('common.delete')}
               </button>
             </div>
           )}
@@ -249,7 +261,7 @@ function ViewModeCard({
       <div className="flex w-full items-center gap-3">
         <div className="w-[72px] shrink-0">
           <div className="text-[10px] font-medium leading-none text-[#99A1AF] pb-0.5">
-            班距
+            {t('timeTemplates.attributes.headway')}
           </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
             {headwaySeconds != null ? (
@@ -257,7 +269,9 @@ function ViewModeCard({
                 <span className="text-xs font-medium leading-none text-[#D1D5DC]">
                   {headwaySeconds}
                 </span>
-                <span className="text-[9px] leading-none text-[#D1D5DC] pb-[1px]">秒</span>
+                <span className="text-[9px] leading-none text-[#D1D5DC] pb-[1px]">
+                  {t('timeTemplates.attributes.seconds')}
+                </span>
               </>
             ) : (
               <span className="text-xs font-medium leading-none text-[#D1D5DC]">—</span>
@@ -265,7 +279,9 @@ function ViewModeCard({
           </div>
         </div>
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">運能</div>
+          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">
+            {t('timeTemplates.attributes.capacity')}
+          </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
             <span className="text-xs font-medium leading-none text-[#D1D5DC]">
               {attribute.capacityPphpd.toLocaleString('en-US')}

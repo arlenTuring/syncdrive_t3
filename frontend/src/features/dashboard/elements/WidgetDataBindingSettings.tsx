@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { FreshnessPolicy, WidgetDataBinding } from '../types';
 import { resolveFreshness, FRESHNESS_POLICY_OPTIONS } from '../utils/resolveFreshness';
 import { DataSourcePicker } from './DataSourcePicker';
@@ -23,14 +24,18 @@ export function WidgetDataBindingSettings({
   w: WidgetDataBinding;
   onUpdate: (p: Partial<WidgetDataBinding>) => void;
 }) {
+  const { t } = useTranslation();
   const [mode, setMode] = React.useState<'sql' | 'mqtt' | 'rest'>(
     w.mqttDataSourceId ? 'mqtt' : w.dataUrl ? 'rest' : 'sql',
   );
 
   React.useEffect(() => {
     setMode(w.mqttDataSourceId ? 'mqtt' : w.dataUrl ? 'rest' : 'sql');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [w.dataSourceId, w.mqttDataSourceId, w.dataUrl]);
+
+  const policy = (w.freshnessPolicy ?? 'auto') as FreshnessPolicy;
+  const fr = resolveFreshness(w);
 
   return (
     <div className="border border-zinc-800 rounded-lg p-3 space-y-3 bg-zinc-900/50">
@@ -38,7 +43,6 @@ export function WidgetDataBindingSettings({
         {(['sql', 'mqtt', 'rest'] as const).map((m) => (
           <button
             key={m}
-            type="button"
             onClick={() => setMode(m)}
             className={`flex-1 py-1 text-[10px] font-bold rounded uppercase transition-all
               ${mode === m ? 'bg-cyan-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -64,29 +68,29 @@ export function WidgetDataBindingSettings({
             value={w.mqttDataSourceId ?? ''}
             onChange={(id) => onUpdate({ mqttDataSourceId: id, dataSourceId: '', dataUrl: '' })}
           />
-          <Field label="訂閱主題 (Topic)">
+          <Field label={t('dashboard.properties.mqttTopic')}>
             <input
-              value={w.mqttTopic ?? ''}
+              value={w.mqttTopic}
               onChange={(e) => onUpdate({ mqttTopic: e.target.value })}
               className={inputCls}
-              placeholder="v1/vtms/+/operation/update"
+              placeholder="v1/vtms/+/telemetry/update"
             />
           </Field>
-          <Field label="數值路徑 (JSON Path)">
+          <Field label={t('dashboard.properties.mqttPath')}>
             <input
-              value={w.mqttValuePath ?? ''}
+              value={w.mqttValuePath}
               onChange={(e) => onUpdate({ mqttValuePath: e.target.value })}
               className={inputCls}
-              placeholder="route_progress"
+              placeholder="payload.speed"
             />
           </Field>
         </div>
       )}
 
       {mode === 'rest' && (
-        <Field label="直接 REST URL">
+        <Field label={t('dashboard.properties.restUrl')}>
           <input
-            value={w.dataUrl ?? ''}
+            value={w.dataUrl}
             onChange={(e) => onUpdate({ dataUrl: e.target.value, dataSourceId: '', mqttDataSourceId: '' })}
             className={inputCls}
             placeholder="https://api.example.com/data"
@@ -94,34 +98,40 @@ export function WidgetDataBindingSettings({
         </Field>
       )}
 
-      <Field label="更新方式">
+      <Field label={t('dashboard.properties.freshness')}>
         <select
-          value={w.freshnessPolicy ?? 'auto'}
+          value={policy}
           onChange={(e) => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
           className={inputCls}
         >
           {FRESHNESS_POLICY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {t(`dashboard.properties.freshnessOpt.${o.value}`)}
+            </option>
           ))}
         </select>
         <p className="text-zinc-500 text-[10px] leading-snug mt-1">
-          {FRESHNESS_POLICY_OPTIONS.find((o) => o.value === (w.freshnessPolicy ?? 'auto'))?.hint}
-          <span className="block text-zinc-600 mt-0.5">目前由平台判定：{resolveFreshness(w).reason}</span>
+          {t(`dashboard.properties.freshnessHint.${policy}`)}
+          <span className="block text-zinc-600 mt-0.5">
+            {t('dashboard.properties.freshnessCurrent', {
+              reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams),
+            })}
+          </span>
         </p>
-        {(w.freshnessPolicy ?? 'auto') === 'interval' && (
-          <input
-            type="number"
-            min={1}
-            value={w.refreshInterval || 15}
-            onChange={(e) => onUpdate({ refreshInterval: +e.target.value })}
-            className={`${inputCls} mt-1.5`}
-            placeholder="每隔幾秒更新"
-          />
-        )}
-        {(w.freshnessPolicy ?? 'auto') === 'interval' && (
-          <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
-            ⚠ 定時輪詢會對資料庫造成重複查詢，僅建議用於無法即時推送的資料。
-          </p>
+        {policy === 'interval' && (
+          <>
+            <input
+              type="number"
+              min={1}
+              value={w.refreshInterval || 15}
+              onChange={(e) => onUpdate({ refreshInterval: +e.target.value })}
+              className={`${inputCls} mt-1.5`}
+              placeholder={t('dashboard.properties.freshnessIntervalPlaceholder')}
+            />
+            <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
+              {t('dashboard.properties.freshnessPollWarn')}
+            </p>
+          </>
         )}
       </Field>
     </div>

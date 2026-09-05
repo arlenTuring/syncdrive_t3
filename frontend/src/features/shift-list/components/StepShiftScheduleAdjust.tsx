@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../../i18n';
 import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
@@ -307,7 +309,7 @@ type RootCauseDefinition = {
 const ROOT_CAUSES: RootCauseDefinition[] = [
   {
     id: 'fleet',
-    title: '車不夠',
+    title: i18n.t('shiftList.scheduleAdjust.rootFleet'),
     codes: new Set([
       'UNSERVED_SERVICE_PULSE',
       'HEADWAY_BELOW_TARGET',
@@ -316,26 +318,25 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
       'INSUFFICIENT_TIMELINES',
       'RECOVERY_INSUFFICIENT',
     ]),
-    hint: '同時在線的車少於「一輪往返 ÷ 班距」。加車或放寬班距，分析報表有算好的數字。',
+    hint: i18n.t('shiftList.scheduleAdjust.rootFleetHint'),
   },
   {
     id: 'facility',
     consequenceOf: ['fleet'],
-    title: '整備設施不夠',
+    title: i18n.t('shiftList.scheduleAdjust.rootYard'),
     codes: new Set([
       'MAINTENANCE_FACILITY_UNAVAILABLE',
       'MAINTENANCE_TRANSFER_UNRESOLVED',
       'MAINTENANCE_FACILITY_YIELDED',
     ]),
     hint:
-      '該類設施在那段時間全滿。訊息裡會直接寫「同時有幾台車要用幾台設施、缺幾台」——'
-      + '真的缺，就只能加設施或把整備錯開；沒缺卻塞不進去，是空檔被切碎，挪時段就有用。',
-    deferHint: '車越多，同時要整備的車也越多。先確定車數，再回頭看設施要加幾台。',
+      i18n.t('shiftList.scheduleAdjust.rootYardHint'),
+    deferHint: i18n.t('shiftList.scheduleAdjust.rootYardDefer'),
   },
   {
     id: 'berth',
     consequenceOf: ['fleet', 'facility'],
-    title: '停靠站容量不夠',
+    title: i18n.t('shiftList.scheduleAdjust.rootBerth'),
     codes: new Set([
       'STATION_BERTH_COLLISION',
       'STATION_BERTH_PROTECTION_GAP',
@@ -343,26 +344,25 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
       'STATION_BERTH_BACKUP_USED',
       'STATION_BERTH_RELIEF_INSERTED',
     ]),
-    hint: '一個停靠點只能停一台車。車擠在終點站，就會延後發車、改走備用線，最後撞上。',
+    hint: i18n.t('shiftList.scheduleAdjust.rootBerthHint'),
     deferHint:
-      '車擠在站上，多半是車太多、或整備排不進去只好繼續佔著站位。'
-      + '上游沒解決之前加停靠點，是拿站位去墊別的問題。',
+      i18n.t('shiftList.scheduleAdjust.rootBerthDefer'),
   },
   {
     id: 'geometry',
     consequenceOf: ['fleet', 'facility', 'berth'],
-    title: '幾何後處理沒跑完',
+    title: i18n.t('shiftList.scheduleAdjust.rootGeometry'),
     codes: new Set(['GEOMETRY_NOT_CONVERGED']),
-    hint: '站位求解、讓渡、班距修復互相影響，跑到版面不再變動為止。跑滿上限仍在變就會出現這則。',
-    deferHint: '這是上游全部塞在一起的結果。上游少一項，這裡通常就自己收斂了。',
+    hint: i18n.t('shiftList.scheduleAdjust.rootGeometryHint'),
+    deferHint: i18n.t('shiftList.scheduleAdjust.rootGeometryDefer'),
   },
 ];
 
 const OTHER_ROOT_CAUSE: RootCauseDefinition = {
   id: 'other',
-  title: '其他',
+  title: i18n.t('shiftList.scheduleAdjust.rootOther'),
   codes: new Set(),
-  hint: '尚未歸類的項目。',
+  hint: i18n.t('shiftList.scheduleAdjust.rootOtherHint'),
 };
 
 function resolveRootCause(code: string): RootCauseDefinition {
@@ -387,33 +387,32 @@ function RootCauseSection({
   tensionNote?: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-2">
       <div className="mb-1 flex flex-wrap items-baseline gap-2">
         <span className="text-[12px] font-semibold text-zinc-100">{cause.title}</span>
         <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
-          連帶 {issueCount} 則
+          {t('shiftList.scheduleAdjust.linkedIssues', { count: issueCount })}
         </span>
         {isSource ? (
           <span className="rounded border border-emerald-600/50 bg-emerald-950/30 px-1.5 py-0.5 text-[10px] text-emerald-300">
-            從這裡改
+            {t('shiftList.scheduleAdjust.fixFromHere')}
           </span>
         ) : null}
         {upstreamTitles && upstreamTitles.length > 0 ? (
           <span className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            多半是「{upstreamTitles.join('」「')}」的後果
+            {t('shiftList.scheduleAdjust.mostlyConsequence', { titles: upstreamTitles.join('」「') })}
           </span>
         ) : null}
       </div>
       <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">{cause.hint}</p>
       {/*
-        有上游還在畫面上時，這一項的建議<strong>先不要照做</strong>。
-        下游多半會跟著上游一起消失；先動下游等於拿它去墊上游的問題，
-        改完還是會被打回來——這正是「怎麼改都改不動」的來源。
+        {t('shiftList.scheduleAdjust.deferBody')}
       */}
       {!isSource && cause.deferHint ? (
         <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
-          <span className="text-zinc-400">先別動這裡：</span>
+          <span className="text-zinc-400">{t('shiftList.scheduleAdjust.deferDontTouch')}</span>
           {cause.deferHint}
         </p>
       ) : null}
@@ -439,6 +438,7 @@ function RootCauseSection({
  * 輪播「正在做哪一步」的文字反而會整段凍住；交給合成器做的動畫則照樣流暢。
  */
 function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
+  const { t } = useTranslation();
   const rows = Math.min(10, Math.max(4, rowCount));
   // 長短不一才像真的班表；固定序列，不用亂數（避免每次 render 都跳動）
   const widths = [82, 54, 68, 91, 47, 73, 60, 88, 51, 76];
@@ -450,7 +450,7 @@ function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
     >
       <div className="flex items-center gap-2 text-[12px] text-zinc-400">
         <Loader2 className="size-4 animate-spin" />
-        正在依時間模板、整備任務與路線群組生成班表…
+        {t('shiftList.scheduleAdjust.generating')}
       </div>
       {/* 時間軸 */}
       <div className="schedule-skeleton-bar h-4 w-full shrink-0" />
@@ -486,6 +486,7 @@ function IssueGroupCard({
   defaultExpanded: boolean;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const sample = group.issues[0]!;
   const meta = resolveFeasibilityIssueMeta(sample);
@@ -530,7 +531,7 @@ function IssueGroupCard({
             </span>
             <span className="text-sm font-medium text-zinc-100">{meta.groupTitle}</span>
             <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
-              {group.issues.length} 則
+              {t('shiftList.scheduleAdjust.issueCount', { count: group.issues.length })}
             </span>
           </div>
           {!expanded ? (
@@ -539,7 +540,7 @@ function IssueGroupCard({
                 .slice(0, 3)
                 .map((issue) => resolveFeasibilityIssueTripCode(issue, plan, sectionCodes))
                 .join(' · ')}
-              {group.issues.length > 3 ? ` · 另 ${group.issues.length - 3} 則` : ''}
+              {group.issues.length > 3 ? t('shiftList.scheduleAdjust.moreIssues', { count: group.issues.length - 3 }) : ''}
             </div>
           ) : null}
         </div>
@@ -573,7 +574,7 @@ function IssueGroupCard({
                       <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
                         {issue.message}
                       </span>
-                      <span className={`shrink-0 text-[10px] ${jumpHint}`}>跳轉 ⚡</span>
+                      <span className={`shrink-0 text-[10px] ${jumpHint}`}>{t('shiftList.scheduleAdjust.jump')}</span>
                     </button>
                   </li>
                 );
@@ -610,6 +611,7 @@ function FeasibilityMessages({
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'all' | 'hard' | 'hidePolicy'>('hidePolicy');
 
   const acceptance = useMemo(() => evaluateScheduleAcceptance(report), [report]);
@@ -643,27 +645,27 @@ function FeasibilityMessages({
           {errorCount > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-400 ring-1 ring-red-500/30">
               <AlertCircle className="size-3 shrink-0" />
-              {errorCount} 硬錯誤
+              {t('shiftList.scheduleAdjust.hardErrors', { count: errorCount })}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-500/25">
-              ✓ 硬閘通過
+              {t('shiftList.scheduleAdjust.hardPass')}
             </span>
           )}
           {acceptance.qualityPassed ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300/90 ring-1 ring-emerald-500/20">
-              品質目標通過
+              {t('shiftList.scheduleAdjust.qualityPass')}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300 ring-1 ring-amber-500/25">
-              品質未達標
+              {t('shiftList.scheduleAdjust.qualityFail')}
             </span>
           )}
           {warningCount > 0 && (
             <span className="text-[11px] text-zinc-500">
-              警告 {warningCount}
+              {t('shiftList.scheduleAdjust.warnings', { count: warningCount })}
               {acceptance.policyNoiseCount > 0
-                ? `（策略 ${acceptance.policyNoiseCount}）`
+                ? t('shiftList.scheduleAdjust.policyNoise', { count: acceptance.policyNoiseCount })
                 : ''}
             </span>
           )}
@@ -671,9 +673,9 @@ function FeasibilityMessages({
           <div className="inline-flex rounded-full bg-zinc-900/80 p-0.5 ring-1 ring-zinc-700/80">
             {(
               [
-                ['hidePolicy', '隱藏策略'],
-                ['hard', '僅硬錯誤'],
-                ['all', '全部'],
+                ['hidePolicy', t('shiftList.scheduleAdjust.filterHidePolicy')],
+                ['hard', t('shiftList.scheduleAdjust.filterHard')],
+                ['all', t('shiftList.scheduleAdjust.filterAll')],
               ] as const
             ).map(([mode, label]) => (
               <button
@@ -693,7 +695,7 @@ function FeasibilityMessages({
           </div>
         </div>
         <p className="text-[10px] leading-4 text-zinc-500">
-          硬閘＝0 錯誤才算通過；策略延後／改線預設隱藏。品質目標另要求無未承接脈衝與班距低於目標。
+          {t('shiftList.scheduleAdjust.gateHint')}
         </p>
       </div>
       {/*
@@ -754,8 +756,7 @@ function FeasibilityMessages({
            * 的第三個方向。
            */
           const tensionNote = upstreams.some((item) => item.id === 'fleet')
-            ? '跟「車不夠」互相拉扯：加車站位與設施更擠、減車班距更差，照單項改會來回。'
-              + '不衝突的解法：縮短一輪往返、補一條終點在別站的備用路線、把整備錯開。'
+            ? t('shiftList.scheduleAdjust.tugOfWar')
             : undefined;
           return (
           <RootCauseSection
@@ -852,6 +853,7 @@ export function StepShiftScheduleAdjust({
   shiftId,
   onScheduleOutputReady,
 }: StepShiftScheduleAdjustProps) {
+  const { t } = useTranslation();
   const isManual = draft.creationMode === 'manual';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -966,7 +968,7 @@ export function StepShiftScheduleAdjust({
         }
 
         if (!storedOutput) {
-          throw new Error('無法生成班表產出');
+          throw new Error(i18n.t('shiftList.scheduleAdjust.genFailed'));
         }
 
         let templateDetail: Awaited<ReturnType<typeof fetchTimeTemplateDetail>>;
@@ -975,7 +977,7 @@ export function StepShiftScheduleAdjust({
         } catch (templateError) {
           // 班表已生成時，模板重載失敗不應蓋掉可行性報告（常見：Failed to fetch）
           if (cancelled) return;
-          console.warn('[shift-schedule] 時間模板重載失敗', templateError);
+          console.warn('[shift-schedule] time template reload failed', templateError);
           const { history: restoredHistory, historyIndex: restoredIndex } =
             resolveHistoryFromOutput(storedOutput);
           if (restoredHistory.length > 0 && restoredIndex >= 0) {
@@ -987,8 +989,8 @@ export function StepShiftScheduleAdjust({
           }
           setError(
             templateError instanceof Error
-              ? `時間模板重載失敗：${templateError.message}`
-              : '時間模板重載失敗',
+              ? i18n.t('shiftList.scheduleAdjust.templateReloadFailedDetail', { message: templateError.message })
+              : i18n.t('shiftList.scheduleAdjust.templateReloadFailed'),
           );
           setLoading(false);
           return;
@@ -1116,7 +1118,7 @@ export function StepShiftScheduleAdjust({
       });
 
       if (!storedOutput.plan) {
-        throw new Error('無法重新生成班表產出');
+        throw new Error(i18n.t('shiftList.scheduleAdjust.regenFailed'));
       }
 
       const newEntry: PlanAdjustHistoryEntry = {
@@ -1494,7 +1496,7 @@ export function StepShiftScheduleAdjust({
               ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-red-400'
               : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
-          title="刪除已選班次"
+          title={t('shiftList.scheduleAdjust.deleteSelected')}
         >
           <Trash2 className="size-4" />
         </button>
@@ -1509,7 +1511,7 @@ export function StepShiftScheduleAdjust({
                 ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-sky-300'
                 : 'cursor-not-allowed text-zinc-600 opacity-40'
             }`}
-            title="增生已選班次"
+            title={t('shiftList.scheduleAdjust.duplicateSelected')}
           >
             <CopyPlus className="size-4" />
           </button>
@@ -1526,7 +1528,7 @@ export function StepShiftScheduleAdjust({
               ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
               : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
-          title={isManual ? `還原 (${undoShortcutLabel})` : '還原 (Undo)'}
+          title={isManual ? t('shiftList.scheduleAdjust.undoManual', { shortcut: undoShortcutLabel }) : t('shiftList.scheduleAdjust.undo')}
         >
           <Undo className="size-4" />
         </button>
@@ -1540,7 +1542,7 @@ export function StepShiftScheduleAdjust({
               ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
               : 'cursor-not-allowed text-zinc-600 opacity-40'
           }`}
-          title={isManual ? `重做 (${redoShortcutLabel})` : '重複 (Redo)'}
+          title={isManual ? t('shiftList.scheduleAdjust.redoManual', { shortcut: redoShortcutLabel }) : t('shiftList.scheduleAdjust.redo')}
         >
           <Redo className="size-4" />
         </button>
@@ -1559,7 +1561,7 @@ export function StepShiftScheduleAdjust({
                   ? 'cursor-not-allowed text-zinc-600 opacity-40'
                   : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
               }`}
-              title="重新生成班表"
+              title={t('shiftList.scheduleAdjust.regenerate')}
             >
               <RefreshCw className="size-4" />
             </button>
@@ -1583,10 +1585,10 @@ export function StepShiftScheduleAdjust({
           }`}
           title={
             publishState === 'blocked'
-              ? `發布前檢查：${PUBLISH_STATE_LABEL.blocked}（${publishCheck?.publishBlockingCount ?? 0} 項擋發布）— 點擊重新檢查`
+              ? t('shiftList.scheduleAdjust.publishBlocked', { label: PUBLISH_STATE_LABEL.blocked, count: publishCheck?.publishBlockingCount ?? 0 })
               : publishState === 'ready'
-                ? `發布前檢查：${PUBLISH_STATE_LABEL.ready} — 點擊重新檢查`
-                : '發布前檢查（尚未檢查或班表已變動）'
+                ? t('shiftList.scheduleAdjust.publishReady', { label: PUBLISH_STATE_LABEL.ready })
+                : t('shiftList.scheduleAdjust.publishUnchecked')
           }
         >
           <ShieldCheck className="size-4" />
@@ -1607,8 +1609,8 @@ export function StepShiftScheduleAdjust({
           }`}
           title={
             analysisReport?.hasFindings
-              ? `班表分析報表（${analysisReport.suggestions.length} 項待處理）`
-              : '班表分析報表'
+              ? t('shiftList.scheduleAdjust.analysisWithIssues', { count: analysisReport.suggestions.length })
+              : t('shiftList.scheduleAdjust.analysisReport')
           }
         >
           <ClipboardList className="size-4" />
@@ -1624,7 +1626,7 @@ export function StepShiftScheduleAdjust({
           type="button"
           onClick={() => setIsMaximized(!isMaximized)}
           className="rounded p-1.5 text-zinc-300 transition hover:bg-zinc-800/60 hover:text-zinc-100"
-          title={isMaximized ? '還原視窗' : '放大至全螢幕'}
+          title={isMaximized ? t('shiftList.scheduleAdjust.restoreWindow') : t('shiftList.scheduleAdjust.maximize')}
         >
           {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
         </button>
@@ -1657,21 +1659,20 @@ export function StepShiftScheduleAdjust({
                 id="rebuild-schedule-title"
                 className="text-lg font-semibold leading-7 text-[#F3F4F6]"
               >
-                確認重新生成班表
+                {t('shiftList.scheduleAdjust.confirmRegenTitle')}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowRebuildConfirm(false)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-                aria-label="關閉"
+                aria-label={t('shiftList.scheduleAdjust.close')}
               >
                 <X className="size-5" />
               </button>
             </div>
 
             <p className="mt-4 text-sm leading-6 text-zinc-400">
-              重新生成班表將會用目前的設定重新計算所有班次。
-              你可以在此步驟中使用「還原 (Undo)」回到重生成前的版本。
+              {t('shiftList.scheduleAdjust.confirmRegenBody')}
             </p>
 
             <div className="mt-8 flex justify-end gap-3">
@@ -1681,7 +1682,7 @@ export function StepShiftScheduleAdjust({
                 autoFocus
                 className="inline-flex h-[38px] items-center justify-center rounded-lg px-5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
               >
-                取消
+                {t('shiftList.scheduleAdjust.cancel')}
               </button>
               <button
                 type="button"
@@ -1692,7 +1693,7 @@ export function StepShiftScheduleAdjust({
                 }}
                 className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:opacity-50"
               >
-                確認重新生成
+                {t('shiftList.scheduleAdjust.confirmRegen')}
               </button>
             </div>
           </div>
@@ -1717,21 +1718,21 @@ export function StepShiftScheduleAdjust({
                 id="duplicate-warning-title"
                 className="text-lg font-semibold leading-7 text-[#F3F4F6]"
               >
-                無法增生班次
+                {t('shiftList.scheduleAdjust.cannotDuplicate')}
               </h2>
               <button
                 type="button"
                 onClick={() => setDuplicateWarning(null)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-                aria-label="關閉"
+                aria-label={t('shiftList.scheduleAdjust.close')}
               >
                 <X className="size-5" />
               </button>
             </div>
 
             <p className="mt-4 text-sm leading-6 text-zinc-400">
-              {duplicateWarning === '沒有足夠的空間可以增生'
-                ? '目前空間不足，無法在原班次右側增生一模一樣的班次。請先調整鄰近班次或縮短原班次後再試。'
+              {duplicateWarning === i18n.t('shiftList.scheduleAdjust.noSpaceDuplicate')
+                ? t('shiftList.scheduleAdjust.noSpaceDuplicateBody')
                 : duplicateWarning}
             </p>
           </div>
@@ -1748,7 +1749,7 @@ export function StepShiftScheduleAdjust({
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            班次預覽
+            {t('shiftList.scheduleAdjust.tripPreview')}
             {activeTab === 'schedule' ? (
               <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
             ) : null}
@@ -1762,7 +1763,7 @@ export function StepShiftScheduleAdjust({
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            運能趨勢
+            {t('shiftList.scheduleAdjust.capacityTrend')}
             {activeTab === 'capacity' ? (
               <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
             ) : null}
@@ -1818,7 +1819,7 @@ export function StepShiftScheduleAdjust({
                   zoom={gridZoom}
                 />
               ) : (
-                <PanelNoData message="無法生成班表" className="min-h-[240px]" />
+                <PanelNoData message={t('shiftList.scheduleAdjust.cannotGenerate')} className="min-h-[240px]" />
               )}
             </div>
             {isManual ? (
@@ -1835,7 +1836,7 @@ export function StepShiftScheduleAdjust({
           {report && !isManual ? (
             <div className="max-h-[300px] shrink-0 overflow-y-auto rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-2">
               <div className="mb-2 px-1 text-xs font-semibold text-zinc-400">
-                系統可行性檢驗報告與錯誤原因對照清單
+                {t('shiftList.scheduleAdjust.feasibilityReport')}
               </div>
               <FeasibilityMessages
                 report={report}
@@ -1859,7 +1860,7 @@ export function StepShiftScheduleAdjust({
               className="min-h-[280px]"
             />
           ) : (
-            <PanelNoData message="無法生成運能趨勢" className="min-h-[240px]" />
+            <PanelNoData message={t('shiftList.scheduleAdjust.cannotCapacity')} className="min-h-[240px]" />
           )
         ) : null}
       </div>

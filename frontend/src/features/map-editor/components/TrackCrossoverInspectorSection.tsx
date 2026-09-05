@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
 import type { MapAreaObject } from '../types/area'
 import { useEffect, useRef, useState } from 'react'
@@ -57,11 +58,6 @@ type Props = {
 
 const FALLBACK_BG_PICKER = '#64748b'
 
-const PORTAL_END_LABEL: Record<CrossoverPortalKey, string> = {
-  a: '端點 A',
-  b: '端點 B',
-}
-
 function findTrackById(
   mapAreas: MapAreaObject[] | undefined,
   trackId: string,
@@ -95,6 +91,7 @@ export function TrackCrossoverInspectorSection({
   onFieldBlur,
   mapAreas = [],
 }: Props) {
+  const { t } = useTranslation()
   const params = facility.parameters ?? {}
   const portals =
     facility.type === 'TrackCrossover' ? getCrossoverPortals(facility) : null
@@ -229,15 +226,14 @@ export function TrackCrossoverInspectorSection({
   return (
     <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/12 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-300">
-        虛擬渡線
+        {t('mapEditor.inspector.trackCrossover.title')}
       </h3>
       <p className="text-[10px] leading-relaxed text-zinc-300">
-        雙邊緣實線。線徑寬度＝兩邊緣間距；中間消失＝從中心向兩端對稱張開缺口。
-        端點 A／B 為內建途經點，可載入路網拓樸與加入路線。
+        {t('mapEditor.inspector.trackCrossover.hint')}
       </p>
 
       <div className="space-y-1.5 rounded-md border border-zinc-700/80 bg-zinc-950/50 p-2">
-        <div className="text-[10px] font-medium text-zinc-200">端點途經點</div>
+        <div className="text-[10px] font-medium text-zinc-200">{t('mapEditor.inspector.trackCrossover.portalWaypoints')}</div>
         {CROSSOVER_PORTAL_KEYS.map((key) => {
           const trackId = portals?.[key]?.attachedTrackId ?? null
           const track = trackId ? findTrackById(mapAreas, trackId) : null
@@ -253,19 +249,21 @@ export function TrackCrossoverInspectorSection({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-[9px] uppercase tracking-wide text-zinc-300">
-                    {PORTAL_END_LABEL[key]}
+                    {key === 'a'
+                      ? t('mapEditor.inspector.trackCrossover.endA')
+                      : t('mapEditor.inspector.trackCrossover.endB')}
                   </div>
                   {trackId && displayName ? (
                     <>
                       <div className="truncate text-[12px] font-semibold text-cyan-100">
-                        軌道：{displayName}
+                        {t('mapEditor.inspector.trackCrossover.trackNamed', { name: displayName })}
                       </div>
                       <div className="truncate font-mono text-[10px] text-zinc-400">
-                        ID：{trackId}
+                        {t('mapEditor.inspector.trackCrossover.trackId', { id: trackId })}
                       </div>
                     </>
                   ) : (
-                    <div className="text-[12px] text-zinc-400">軌道未接合</div>
+                    <div className="text-[12px] text-zinc-400">{t('mapEditor.inspector.trackCrossover.trackUnattached')}</div>
                   )}
                 </div>
                 <span
@@ -275,7 +273,9 @@ export function TrackCrossoverInspectorSection({
                       : 'bg-zinc-800 text-zinc-500'
                   }`}
                 >
-                  {trackId ? '已接合' : '空'}
+                  {trackId
+                    ? t('mapEditor.inspector.trackCrossover.attached')
+                    : t('mapEditor.inspector.trackCrossover.empty')}
                 </span>
               </div>
 
@@ -284,7 +284,7 @@ export function TrackCrossoverInspectorSection({
                   htmlFor={`xo-portal-code-${key}`}
                   className="mb-0.5 block text-[9px] text-zinc-400"
                 >
-                  途經點代號
+                  {t('mapEditor.inspector.trackCrossover.waypointCode')}
                 </label>
                 <input
                   id={`xo-portal-code-${key}`}
@@ -299,7 +299,7 @@ export function TrackCrossoverInspectorSection({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                   }}
-                  placeholder={`例：xo_1_${key}`}
+                  placeholder={t('mapEditor.inspector.trackCrossover.codePlaceholder', { key })}
                   className={`w-full rounded border bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60 ${
                     codeError ? 'border-red-600' : 'border-zinc-600'
                   }`}
@@ -314,7 +314,7 @@ export function TrackCrossoverInspectorSection({
                   htmlFor={`xo-portal-alias-${key}`}
                   className="mb-0.5 block text-[9px] text-zinc-400"
                 >
-                  別名（顯示名稱）
+                  {t('mapEditor.inspector.trackCrossover.alias')}
                 </label>
                 <input
                   id={`xo-portal-alias-${key}`}
@@ -329,7 +329,7 @@ export function TrackCrossoverInspectorSection({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                   }}
-                  placeholder="空則顯示代號"
+                  placeholder={t('mapEditor.inspector.trackCrossover.aliasPlaceholder')}
                   className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60"
                 />
               </div>
@@ -340,7 +340,7 @@ export function TrackCrossoverInspectorSection({
                     htmlFor={`xo-portal-xm-${key}`}
                     className="mb-0.5 block text-[9px] text-zinc-400"
                   >
-                    參照場域橫向位置 (m)
+                    {t('mapEditor.inspector.trackCrossover.fieldX')}
                   </label>
                   <input
                     id={`xo-portal-xm-${key}`}
@@ -374,7 +374,7 @@ export function TrackCrossoverInspectorSection({
                     htmlFor={`xo-portal-ym-${key}`}
                     className="mb-0.5 block text-[9px] text-zinc-400"
                   >
-                    參照場域縱向位置 (m)
+                    {t('mapEditor.inspector.trackCrossover.fieldY')}
                   </label>
                   <input
                     id={`xo-portal-ym-${key}`}
@@ -405,8 +405,7 @@ export function TrackCrossoverInspectorSection({
                 </div>
               </div>
               <p className="text-[9px] leading-relaxed text-zinc-500">
-                現場實際位置（場域公尺，原點左下）。拖動端點或磁吸接合時會一併
-                更新；在這裡手打只修正量測值，<strong>不會移動圖上的端點</strong>。
+                {t('mapEditor.inspector.trackCrossover.fieldHint')}
               </p>
             </div>
           )
@@ -418,7 +417,7 @@ export function TrackCrossoverInspectorSection({
           htmlFor="track-crossover-width"
           className="mb-1 flex items-center justify-between text-[10px] font-medium text-zinc-200"
         >
-          <span>兩邊線徑寬度（間距）</span>
+          <span>{t('mapEditor.inspector.trackCrossover.strokeWidth')}</span>
           <span className="font-mono text-zinc-200">{strokePx}px</span>
         </label>
         <input
@@ -445,7 +444,7 @@ export function TrackCrossoverInspectorSection({
           className="w-full accent-sky-500 disabled:opacity-60"
         />
         <p className="mt-1 text-[9px] leading-relaxed text-zinc-400">
-          選取後也可拖畫布上兩邊邊緣旁的方塊把手。
+          {t('mapEditor.inspector.trackCrossover.strokeWidthHint')}
         </p>
       </div>
       <div>
@@ -453,7 +452,7 @@ export function TrackCrossoverInspectorSection({
           htmlFor="track-crossover-center-gap"
           className="mb-1 flex items-center justify-between text-[10px] font-medium text-zinc-200"
         >
-          <span>中間消失程度</span>
+          <span>{t('mapEditor.inspector.trackCrossover.centerGap')}</span>
           <span className="font-mono text-zinc-200">{centerGapPct}%</span>
         </label>
         <input
@@ -480,7 +479,7 @@ export function TrackCrossoverInspectorSection({
           className="w-full accent-sky-500 disabled:opacity-60"
         />
         <p className="mt-1 text-[9px] leading-relaxed text-zinc-400">
-          0%＝完整實線；愈大愈從中間向兩端對稱消失。
+          {t('mapEditor.inspector.trackCrossover.centerGapHint')}
         </p>
       </div>
       <div>
@@ -488,7 +487,7 @@ export function TrackCrossoverInspectorSection({
           htmlFor="track-crossover-color"
           className="mb-1 block text-[10px] font-medium text-zinc-200"
         >
-          線色
+          {t('mapEditor.inspector.trackCrossover.lineColor')}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -529,7 +528,7 @@ export function TrackCrossoverInspectorSection({
           htmlFor="track-crossover-color-opacity"
           className="mb-1 flex items-center justify-between text-[10px] font-medium text-zinc-200"
         >
-          <span>線色透明度</span>
+          <span>{t('mapEditor.inspector.trackCrossover.lineOpacity')}</span>
           <span className="font-mono text-zinc-200">{colorOpacity}%</span>
         </label>
         <input
@@ -562,7 +561,7 @@ export function TrackCrossoverInspectorSection({
             htmlFor="track-crossover-bg-color"
             className="text-[10px] font-medium text-zinc-200"
           >
-            背景顏色
+            {t('mapEditor.inspector.trackCrossover.bgColor')}
           </label>
           {hasBg && !readOnly ? (
             <button
@@ -574,11 +573,11 @@ export function TrackCrossoverInspectorSection({
                 })
               }
             >
-              清除（無背景）
+              {t('mapEditor.inspector.trackCrossover.clearBg')}
             </button>
           ) : (
             <span className="text-[10px] text-zinc-400">
-              {hasBg ? '' : '預設無背景'}
+              {hasBg ? '' : t('mapEditor.inspector.trackCrossover.defaultNoBg')}
             </span>
           )}
         </div>
@@ -608,7 +607,7 @@ export function TrackCrossoverInspectorSection({
           <input
             type="text"
             readOnly={readOnly}
-            placeholder="無（留空）"
+            placeholder={t('mapEditor.inspector.trackCrossover.bgPlaceholder')}
             value={bgColor ?? ''}
             onChange={(e) => {
               const t = e.target.value.trim()
@@ -627,7 +626,7 @@ export function TrackCrossoverInspectorSection({
           htmlFor="track-crossover-bg-opacity"
           className="mb-1 flex items-center justify-between text-[10px] font-medium text-zinc-200"
         >
-          <span>背景透明度</span>
+          <span>{t('mapEditor.inspector.trackCrossover.bgOpacity')}</span>
           <span className="font-mono text-zinc-200">
             {hasBg ? `${bgOpacity}%` : '—'}
           </span>
@@ -656,7 +655,7 @@ export function TrackCrossoverInspectorSection({
           className="w-full accent-sky-500 disabled:opacity-40"
         />
         <p className="mt-1 text-[9px] leading-relaxed text-zinc-400">
-          需先設定背景色；0%＝全透明，100%＝不透明。
+          {t('mapEditor.inspector.trackCrossover.bgOpacityHint')}
         </p>
       </div>
     </section>

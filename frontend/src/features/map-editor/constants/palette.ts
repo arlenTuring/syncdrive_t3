@@ -1,6 +1,7 @@
 import type { FacilityName, FacilityType } from '../types/facility'
 
 export interface FacilityPaletteItem {
+  /** i18n key under mapEditor.palette.items.* */
   label: string
   type: FacilityType
   name: FacilityName
@@ -32,102 +33,102 @@ export type PaletteItem =
   | TrackGenPaletteItem
 
 export const AREA_PALETTE_ITEM: AreaPaletteItem = {
-  label: 'Area 容器',
+  label: 'mapEditor.palette.items.area.label',
   type: 'Area',
-  hint: '畫布上的區塊容器，用於群組放置元件',
+  hint: 'mapEditor.palette.items.area.hint',
 }
 
 export const BASEMAP_PALETTE_ITEM: BasemapPaletteItem = {
-  label: '底圖',
+  label: 'mapEditor.palette.items.basemap.label',
   type: 'Basemap',
-  hint: '底圖 — 與 Area 同層；拖曳至地圖任意位置，可載入圖片或 .xodr',
+  hint: 'mapEditor.palette.items.basemap.hint',
 }
 
 export const TRACKGEN_PALETTE_ITEM: TrackGenPaletteItem = {
-  label: '軌道生成',
+  label: 'mapEditor.palette.items.trackGen.label',
   type: 'TrackGen',
-  hint: '軌道生成 — 與 Area 同層；載入 .xodr 後可由路網自動生成軌道',
+  hint: 'mapEditor.palette.items.trackGen.hint',
 }
 
 /** 資產列：設施／設備僅可拖入 Area 內；底圖與 Area 同層。 */
 export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
   {
-    label: '設施',
+    label: 'mapEditor.palette.items.facility.label',
     type: 'Facility',
     name: 'FacilityArea',
-    hint: '設施（大型區塊）— 充電格／停車格／維修格等；用途請在屬性填寫',
+    hint: 'mapEditor.palette.items.facility.hint',
   },
   {
-    label: '紅綠燈',
+    label: 'mapEditor.palette.items.light.label',
     type: 'Signal',
     name: 'Light',
-    hint: '設備 — 紅綠燈（Signal / Light）',
+    hint: 'mapEditor.palette.items.light.hint',
   },
   {
-    label: '智慧桿',
+    label: 'mapEditor.palette.items.smartPole.label',
     type: 'Pole',
     name: 'SmartPole',
-    hint: '設備 — 智慧桿（Pole / SmartPole）',
+    hint: 'mapEditor.palette.items.smartPole.hint',
   },
   {
-    label: '月台門',
+    label: 'mapEditor.palette.items.gate.label',
     type: 'PSD',
     name: 'Gate',
-    hint: '設備 — 月台門（PSD / Gate）',
+    hint: 'mapEditor.palette.items.gate.hint',
   },
   {
-    label: '電子圍籬',
+    label: 'mapEditor.palette.items.geofence.label',
     type: 'Geofence',
     name: 'Geofence',
-    hint: '電子圍籬 — 多邊形範圍（僅在所屬 Area 顯示）',
+    hint: 'mapEditor.palette.items.geofence.hint',
   },
   {
-    label: '軌道',
+    label: 'mapEditor.palette.items.rail.label',
     type: 'Track',
     name: 'Rail',
-    hint: '軌道 Track / Rail',
+    hint: 'mapEditor.palette.items.rail.hint',
   },
   {
-    label: '停靠點',
+    label: 'mapEditor.palette.items.dockingPoint.label',
     type: 'DockingPoint',
     name: 'DockingPoint',
-    hint: '停靠點 — 站點標記；參照場域座標與站點名稱',
+    hint: 'mapEditor.palette.items.dockingPoint.hint',
   },
   {
-    label: '途經點',
+    label: 'mapEditor.palette.items.waypoint.label',
     type: 'Waypoint',
     name: 'Waypoint',
-    hint: '途經點 — 自駕車必經點位；預設綠色標記，代號全圖唯一',
+    hint: 'mapEditor.palette.items.waypoint.hint',
   },
   {
-    label: '道路線',
+    label: 'mapEditor.palette.items.roadLine.label',
     type: 'RoadLine',
     name: 'RoadLine',
-    hint: '道路線 — 純視覺標記；可調線型、線寬與長度',
+    hint: 'mapEditor.palette.items.roadLine.hint',
   },
   {
-    label: '圓角軌道',
+    label: 'mapEditor.palette.items.railCorner.label',
     type: 'Track',
     name: 'RailCorner',
-    hint: '圓角軌道 — 90 度圓角；可拉長兩端直線段，並調整圓弧半徑',
+    hint: 'mapEditor.palette.items.railCorner.hint',
   },
   {
-    label: '斜接軌道',
+    label: 'mapEditor.palette.items.railTaper.label',
     type: 'Track',
     name: 'RailTaper',
-    hint: '斜接軌道 — 矩形切掉右上與左下兩個對角；上下各一個控制點調整切角',
+    hint: 'mapEditor.palette.items.railTaper.hint',
   },
   {
-    label: '分岔軌道',
+    label: 'mapEditor.palette.items.railSwitch.label',
     type: 'Track',
     name: 'RailSwitch',
-    hint: '分岔軌道 — 一進兩出；三個控制點分別調整進口、直行出口與岔出出口',
+    hint: 'mapEditor.palette.items.railSwitch.hint',
   },
   {
-    label: '虛擬渡線',
+    label: 'mapEditor.palette.items.trackCrossover.label',
     type: 'TrackCrossover',
     name: 'TrackCrossover',
-    hint: '虛擬渡線 — PPT 式自由線徑（兩端任意拖）；X 形請放兩條',
+    hint: 'mapEditor.palette.items.trackCrossover.hint',
   },
 ] as const
 

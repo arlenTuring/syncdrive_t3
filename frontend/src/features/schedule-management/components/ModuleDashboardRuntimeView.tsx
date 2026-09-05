@@ -1,5 +1,6 @@
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BindingHealthProvider } from '../../dashboard/context/BindingHealthContext';
 import { DemoSimulationProvider } from '../../dashboard/context/DemoSimulationContext';
 import { VehicleFleetMqttProvider } from '../../dashboard/context/VehicleFleetMqttContext';
@@ -26,6 +27,8 @@ export function ModuleDashboardRuntimeView({
   planeId,
   pageLabel,
 }: ModuleDashboardRuntimeViewProps) {
+  const { t } = useTranslation();
+
   /**
    * 先查本機快取，查不到再問後端。
    *
@@ -60,7 +63,7 @@ export function ModuleDashboardRuntimeView({
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0b] px-6 text-center">
         <Loader2 className="size-8 animate-spin text-zinc-500" />
-        <p className="text-xs text-zinc-500">載入儀表板平面…</p>
+        <p className="text-xs text-zinc-500">{t('shell.moduleDashboard.loading')}</p>
       </div>
     );
   }
@@ -70,10 +73,11 @@ export function ModuleDashboardRuntimeView({
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0b] px-6 text-center">
         <AlertCircle className="size-10 text-amber-500/80" />
         <div>
-          <p className="text-sm font-medium text-zinc-200">找不到儀表板平面</p>
+          <p className="text-sm font-medium text-zinc-200">
+            {t('shell.moduleDashboard.notFoundTitle')}
+          </p>
           <p className="mt-1 text-xs text-zinc-500">
-            「{pageLabel}」綁定的平面在後端與本機都找不到，可能已被刪除；
-            請用管理員模式重新新增子頁。
+            {t('shell.moduleDashboard.notFoundHint', { name: pageLabel })}
           </p>
         </div>
       </div>

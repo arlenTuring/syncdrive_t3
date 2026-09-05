@@ -1,5 +1,6 @@
 import { Calendar, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ExecutionTimeField,
   formatLocalHm,
@@ -40,13 +41,13 @@ const INPUT =
 const EMPTY_PICKER =
   '[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0';
 
-const APPROVAL_PHRASE = '核准';
-
 export function ScheduleAdjustApplyDialog({
   onClose,
   currentScheduleName = '',
   onApplied,
 }: ScheduleAdjustApplyDialogProps) {
+  const { t } = useTranslation();
+  const approvalPhrase = t('shiftDeployment.adjust.approvalPhrase');
   const [account] = useDemoAccount();
   const [supervisorApproval] = useSupervisorApprovalPreference();
   const showSupervisorApproval = supervisorApproval && account.id === 'supervisor';
@@ -148,10 +149,10 @@ export function ScheduleAdjustApplyDialog({
           value: item.shift_id,
           label: item.name,
           disabled: inUse,
-          badge: inUse ? '正在使用' : undefined,
+          badge: inUse ? t('shiftDeployment.adjust.inUse') : undefined,
         };
       }),
-    [inUseShiftId, shifts],
+    [inUseShiftId, shifts, t],
   );
 
   useEffect(() => {
@@ -209,7 +210,7 @@ export function ScheduleAdjustApplyDialog({
   }, [currentScheduleName, draft, shiftId, shifts, step]);
 
   const deploySelected = async () => {
-    if (!shiftId) throw new Error('尚未選擇班表');
+    if (!shiftId) throw new Error(t('shiftDeployment.adjust.noScheduleSelected'));
     await deployOperationShift(shiftId, { reviewer_name: account.name });
     // 部署成功＝這筆申請已套用至營運，稽核紀錄要記 APPLIED 而不是籠統的「取消」
     await resolvePendingScheduleAdjust('APPLIED', account.name);
@@ -251,7 +252,7 @@ export function ScheduleAdjustApplyDialog({
   };
 
   const handleReject = () => {
-    if (!window.confirm('確定駁回此班表調整申請？班表不會部署。')) return;
+    if (!window.confirm(t('shiftDeployment.adjust.confirmReject'))) return;
     // 駁回要留下是誰駁回的；記成「取消」會讓稽核看不出這筆是被否決的
     void resolvePendingScheduleAdjust('REJECTED', account.name, '主管駁回');
     finishApplied();
@@ -266,13 +267,13 @@ export function ScheduleAdjustApplyDialog({
       >
         <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
           <h2 id="schedule-adjust-title" className="text-base font-semibold text-zinc-100">
-            班表調整申請
+            {t('shiftDeployment.adjust.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/5 hover:text-white"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X className="size-4" />
           </button>
@@ -283,7 +284,8 @@ export function ScheduleAdjustApplyDialog({
             <div className="relative z-20 grid shrink-0 grid-cols-3 gap-4 px-6 pb-4">
               <label className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>預計執行日期
+                  <span className="mr-0.5 text-red-500">*</span>
+                  {t('shiftDeployment.adjust.execDate')}
                 </span>
                 <div className="relative">
                   <input
@@ -297,7 +299,8 @@ export function ScheduleAdjustApplyDialog({
               </label>
               <div className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>預計執行時間
+                  <span className="mr-0.5 text-red-500">*</span>
+                  {t('shiftDeployment.adjust.execTime')}
                 </span>
                 <ExecutionTimeField
                   value={execTime}
@@ -311,13 +314,14 @@ export function ScheduleAdjustApplyDialog({
               </div>
               <div className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>選擇班表
+                  <span className="mr-0.5 text-red-500">*</span>
+                  {t('shiftDeployment.adjust.selectSchedule')}
                 </span>
                 <ShiftMenuSelect
-                  label="選擇班表"
+                  label={t('shiftDeployment.adjust.selectSchedule')}
                   hideLabel
                   value={shiftId}
-                  placeholder="請選擇班表"
+                  placeholder={t('shiftDeployment.adjust.selectSchedulePlaceholder')}
                   options={options}
                   onChange={setShiftId}
                   widthClass="w-full"
@@ -330,12 +334,14 @@ export function ScheduleAdjustApplyDialog({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col px-6 pb-3">
-              <p className="mb-2 shrink-0 text-sm text-zinc-300">班表瀏覽</p>
+              <p className="mb-2 shrink-0 text-sm text-zinc-300">
+                {t('shiftDeployment.adjust.browse')}
+              </p>
               <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-zinc-800/80 bg-[#0c0c0e] p-4">
                 {previewLoading ? (
                   <div className="flex min-h-[280px] items-center justify-center gap-2 text-zinc-500">
                     <Loader2 className="size-5 animate-spin" />
-                    載入班表預覽…
+                    {t('shiftDeployment.adjust.loadingPreview')}
                   </div>
                 ) : previewError ? (
                   <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
@@ -364,11 +370,15 @@ export function ScheduleAdjustApplyDialog({
             {showSupervisorApproval ? (
               <section className="px-6 pb-4">
                 <div className="rounded-xl border border-zinc-800 bg-[#141416] p-4">
-                  <h3 className="mb-3 text-sm font-medium text-zinc-200">輸入核准並送出生效</h3>
+                  <h3 className="mb-3 text-sm font-medium text-zinc-200">
+                    {t('shiftDeployment.adjust.approvalSection')}
+                  </h3>
                   <input
                     value={approvalText}
                     onChange={(e) => setApprovalText(e.target.value)}
-                    placeholder={`請輸入「${APPROVAL_PHRASE}」`}
+                    placeholder={t('shiftDeployment.adjust.approvalPlaceholder', {
+                      phrase: approvalPhrase,
+                    })}
                     className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]"
                   />
                 </div>
@@ -389,7 +399,7 @@ export function ScheduleAdjustApplyDialog({
                 onClick={onClose}
                 className="text-sm text-zinc-300 transition hover:text-white"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -397,7 +407,7 @@ export function ScheduleAdjustApplyDialog({
                 onClick={() => setStep(2)}
                 className="rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
-                選擇該模板，下一步
+                {t('shiftDeployment.adjust.nextWithTemplate')}
               </button>
             </>
           ) : showSupervisorApproval ? (
@@ -408,7 +418,7 @@ export function ScheduleAdjustApplyDialog({
                 onClick={handleReject}
                 className="rounded-lg border border-red-500/70 px-4 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
               >
-                駁回
+                {t('shiftDeployment.adjust.reject')}
               </button>
               <div className="flex items-center gap-4">
                 <button
@@ -417,16 +427,16 @@ export function ScheduleAdjustApplyDialog({
                   onClick={() => setStep(1)}
                   className="text-sm text-zinc-300 transition hover:text-white"
                 >
-                  上一步
+                  {t('shiftDeployment.adjust.previous')}
                 </button>
                 <button
                   type="button"
-                  disabled={busy || approvalText.trim() !== APPROVAL_PHRASE}
+                  disabled={busy || approvalText.trim() !== approvalPhrase}
                   onClick={() => void handleDeployNow()}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
                 >
                   {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  核准並生效
+                  {t('shiftDeployment.adjust.approveAndApply')}
                 </button>
               </div>
             </>
@@ -437,7 +447,7 @@ export function ScheduleAdjustApplyDialog({
                 onClick={onClose}
                 className="text-sm text-zinc-300 transition hover:text-white"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <div className="flex items-center gap-4">
                 <button
@@ -446,7 +456,7 @@ export function ScheduleAdjustApplyDialog({
                   onClick={() => setStep(1)}
                   className="text-sm text-zinc-300 transition hover:text-white"
                 >
-                  上一步
+                  {t('shiftDeployment.adjust.previous')}
                 </button>
                 <button
                   type="button"
@@ -455,7 +465,9 @@ export function ScheduleAdjustApplyDialog({
                   className="inline-flex items-center gap-2 rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
                 >
                   {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {supervisorApproval ? '送出申請' : '部署班表'}
+                  {supervisorApproval
+                    ? t('shiftDeployment.adjust.submitApplication')
+                    : t('shiftDeployment.adjust.deploySchedule')}
                 </button>
               </div>
             </>

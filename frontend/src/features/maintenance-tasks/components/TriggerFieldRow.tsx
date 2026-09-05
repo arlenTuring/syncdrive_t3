@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { sanitizeIntegerInput } from '../utils/numericInput';
 
 const INLINE_INPUT_ENABLED =
@@ -28,12 +29,15 @@ export function TriggerFieldRow({
   onValueChange,
   prefixText,
   suffixText,
-  disabledMessage = '不偵測此項目',
+  disabledMessage,
   inputClassName = INLINE_INPUT_ENABLED,
   sanitizeValue = sanitizeIntegerInput,
   showToggle = true,
   required = false,
 }: TriggerFieldRowProps) {
+  const { t } = useTranslation();
+  const resolvedDisabledMessage =
+    disabledMessage ?? t('maintenanceTasks.triggerField.disabledDefault');
   const fieldActive = showToggle ? enabled : true;
 
   return (
@@ -63,13 +67,13 @@ export function TriggerFieldRow({
             inputMode="numeric"
             value={value}
             onChange={(e) => onValueChange(sanitizeValue(e.target.value))}
-            placeholder="請輸入"
+            placeholder={t('maintenanceTasks.triggerField.placeholder')}
             className={inputClassName}
           />
           <span>{suffixText}</span>
         </div>
       ) : (
-        <p className="text-sm text-zinc-600">{disabledMessage}</p>
+        <p className="text-sm text-zinc-600">{resolvedDisabledMessage}</p>
       )}
     </div>
   );

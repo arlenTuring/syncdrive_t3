@@ -1,4 +1,5 @@
 import { Hourglass } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ControlMode } from '../constants';
 
 export type DoorKind = 'vehicle' | 'platform';
@@ -34,6 +35,7 @@ function ModeToggle({
   value: ControlMode;
   onChange: (next: ControlMode) => void;
 }) {
+  const { t } = useTranslation();
   const btn = (active: boolean) =>
     `rounded px-3 py-1.5 text-[12px] leading-none ${
       active
@@ -43,13 +45,13 @@ function ModeToggle({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[12px] text-zinc-300">控制模式</span>
+      <span className="text-[12px] text-zinc-300">{t('psdControl.controlMode')}</span>
       <div className="flex items-center gap-1">
         <button type="button" onClick={() => onChange('auto')} className={btn(value === 'auto')}>
-          自動控制
+          {t('psdControl.autoControl')}
         </button>
         <button type="button" onClick={() => onChange('manual')} className={btn(value === 'manual')}>
-          手動控制
+          {t('psdControl.manualControl')}
         </button>
       </div>
     </div>
@@ -69,25 +71,19 @@ function StatusCard({ label, value, dot }: { label: string; value: string; dot?:
 }
 
 function CameraWell({ src }: { src?: string | null }) {
+  const { t } = useTranslation();
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-[#0c0c0e]">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full min-h-[120px] w-full items-center justify-center">
-          <p className="text-[14px] tracking-[0.4px] text-zinc-400">尚未連接</p>
+          <p className="text-[14px] tracking-[0.4px] text-zinc-400">{t('psdControl.notConnected')}</p>
         </div>
       )}
     </div>
   );
 }
-
-const ACTIONS = [
-  { id: 'open', label: '開門' },
-  { id: 'close', label: '關門' },
-  { id: 'stop', label: '停止' },
-  { id: 'lock', label: '鎖定' },
-] as const;
 
 function formatHms(totalSeconds: number | null): string | null {
   if (totalSeconds == null || !Number.isFinite(totalSeconds)) return null;
@@ -110,8 +106,20 @@ export function DoorMonitorCard({
   dwellSeconds?: number | null;
   onModeChange: (mode: ControlMode) => void;
 }) {
-  const controlTitle = kind === 'platform' ? '手動控制' : door.mode === 'manual' ? '手動控制' : '自動控制';
+  const { t } = useTranslation();
+  const controlTitle =
+    kind === 'platform'
+      ? t('psdControl.manualControl')
+      : door.mode === 'manual'
+        ? t('psdControl.manualControl')
+        : t('psdControl.autoControl');
   const timer = formatHms(dwellSeconds ?? null);
+  const actions = [
+    { id: 'open', label: t('psdControl.actions.open') },
+    { id: 'close', label: t('psdControl.actions.close') },
+    { id: 'stop', label: t('psdControl.actions.stop') },
+    { id: 'lock', label: t('psdControl.actions.lock') },
+  ] as const;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3">
@@ -127,11 +135,11 @@ export function DoorMonitorCard({
           <div className="mb-2.5 flex items-center gap-2">
             <p className="text-[13px] text-white">{controlTitle}</p>
             <span className="rounded-full border border-white/25 bg-[#1c1c1f] px-2 py-0.5 text-[10px] leading-none text-zinc-300">
-              延遲 {door.latency}
+              {t('psdControl.latency', { value: door.latency })}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {ACTIONS.map((action) => (
+            {actions.map((action) => (
               <button
                 key={action.id}
                 type="button"
@@ -145,29 +153,37 @@ export function DoorMonitorCard({
 
         <div className="min-w-0 border-l border-white/10 pl-4">
           <div className="mb-2.5 flex items-center justify-between gap-2">
-            <p className="text-[13px] text-white">車門狀態</p>
+            <p className="text-[13px] text-white">{t('psdControl.doorStatus')}</p>
             <p className="flex items-center gap-1.5 text-[12px] text-zinc-300">
               <Hourglass className="size-3.5 stroke-[1.5]" aria-hidden />
-              {timer ?? '尚未停靠'}
+              {timer ?? t('psdControl.notDocked')}
             </p>
           </div>
           {kind === 'vehicle' ? (
             <div className="grid grid-cols-3 gap-2">
-              <StatusCard label="門體狀態" value={door.bodyStatus} />
-              <StatusCard label="行車速度" value={door.speed ?? '0 km/h'} dot />
-              <StatusCard label="門體開度" value={door.opening} dot />
-              <StatusCard label="連線狀態" value={door.connection} />
-              <StatusCard label="自動鎖定" value={door.autoLock} dot />
-              <StatusCard label="防夾裝置" value={door.antiPinch} dot />
+              <StatusCard label={t('psdControl.fields.bodyStatus')} value={door.bodyStatus} />
+              <StatusCard
+                label={t('psdControl.fields.speed')}
+                value={door.speed ?? t('psdControl.status.defaultSpeed')}
+                dot
+              />
+              <StatusCard label={t('psdControl.fields.opening')} value={door.opening} dot />
+              <StatusCard label={t('psdControl.fields.connection')} value={door.connection} />
+              <StatusCard label={t('psdControl.fields.autoLock')} value={door.autoLock} dot />
+              <StatusCard label={t('psdControl.fields.antiPinch')} value={door.antiPinch} dot />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <StatusCard label="門體狀態" value={door.bodyStatus} />
-              <StatusCard label="連線狀態" value={door.connection} />
-              <StatusCard label="對準連鎖" value={door.alignment ?? '停準'} dot />
-              <StatusCard label="自動鎖定" value={door.autoLock} dot />
-              <StatusCard label="門體開度" value={door.opening} dot />
-              <StatusCard label="防夾裝置" value={door.antiPinch} dot />
+              <StatusCard label={t('psdControl.fields.bodyStatus')} value={door.bodyStatus} />
+              <StatusCard label={t('psdControl.fields.connection')} value={door.connection} />
+              <StatusCard
+                label={t('psdControl.fields.alignment')}
+                value={door.alignment ?? t('psdControl.status.aligned')}
+                dot
+              />
+              <StatusCard label={t('psdControl.fields.autoLock')} value={door.autoLock} dot />
+              <StatusCard label={t('psdControl.fields.opening')} value={door.opening} dot />
+              <StatusCard label={t('psdControl.fields.antiPinch')} value={door.antiPinch} dot />
             </div>
           )}
         </div>

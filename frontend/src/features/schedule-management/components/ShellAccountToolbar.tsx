@@ -1,5 +1,13 @@
 import { Bell, ChevronDown, Settings, User, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  isAppLocale,
+  localeToolbarCode,
+  nextAppLocale,
+  writeUserLocaleOverride,
+  type AppLocale,
+} from '../../../i18n/localePreference';
 import {
   DEMO_ACCOUNTS,
   useDemoAccount,
@@ -21,10 +29,16 @@ export function ShellAccountToolbar({
   supervisorApproval,
   onSupervisorApprovalChange,
 }: ShellAccountToolbarProps) {
+  const { t, i18n } = useTranslation();
   const [account, setAccountId] = useDemoAccount();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const currentLocale: AppLocale = isAppLocale(i18n.language)
+    ? i18n.language
+    : 'zh-TW';
+
   useEffect(() => {
     if (!settingsOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -43,15 +57,22 @@ export function ShellAccountToolbar({
     };
   }, [settingsOpen]);
 
+  const cycleLocale = () => {
+    const next = nextAppLocale(currentLocale);
+    writeUserLocaleOverride(next);
+    void i18n.changeLanguage(next);
+  };
+
   return (
     <div ref={rootRef} className="relative flex items-center gap-2">
       <button
         type="button"
+        onClick={cycleLocale}
         className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#1f1f22] px-2.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
-        title="語言"
-        aria-label="Language EN"
+        title={t('shell.language')}
+        aria-label={t('shell.language')}
       >
-        EN
+        {localeToolbarCode(currentLocale)}
       </button>
 
       <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
@@ -59,8 +80,8 @@ export function ShellAccountToolbar({
       <button
         type="button"
         className="relative inline-flex size-8 items-center justify-center rounded-full bg-[#1f1f22] text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-        title="通知"
-        aria-label={`通知 ${notificationCount} 則`}
+        title={t('shell.notifications')}
+        aria-label={t('shell.notificationsCount', { count: notificationCount })}
       >
         <Bell className="size-4" />
         {notificationCount > 0 ? (
@@ -75,8 +96,11 @@ export function ShellAccountToolbar({
       <button
         type="button"
         className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#1f1f22] pl-2 pr-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 hover:text-white"
-        title="帳戶"
-        aria-label={`帳戶 ${account.name}（${account.title}）`}
+        title={t('shell.account')}
+        aria-label={t('shell.accountWithTitle', {
+          name: account.name,
+          title: account.title,
+        })}
       >
         <span className="inline-flex size-6 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
           <User className="size-3.5" />
@@ -95,8 +119,8 @@ export function ShellAccountToolbar({
             ? 'bg-sky-600/25 text-sky-300'
             : 'bg-[#1f1f22] text-zinc-300 hover:bg-zinc-800 hover:text-white'
         }`}
-        title="設定"
-        aria-label="設定"
+        title={t('shell.settings')}
+        aria-label={t('shell.settings')}
         aria-expanded={settingsOpen}
         aria-controls={panelId}
       >
@@ -107,25 +131,29 @@ export function ShellAccountToolbar({
         <div
           id={panelId}
           role="dialog"
-          aria-label="設定"
+          aria-label={t('shell.settings')}
           className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50"
         >
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-            <h2 className="text-sm font-semibold text-zinc-100">設定</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">
+              {t('shell.settings')}
+            </h2>
             <button
               type="button"
               onClick={() => setSettingsOpen(false)}
               className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
-              aria-label="關閉"
+              aria-label={t('common.close')}
             >
               <X className="size-4" />
             </button>
           </div>
           <div className="space-y-4 px-4 py-4">
             <div>
-              <div className="text-sm font-medium text-zinc-100">登入帳號</div>
+              <div className="text-sm font-medium text-zinc-100">
+                {t('shell.loginAccount')}
+              </div>
               <p className="mt-0.5 text-xs text-zinc-500">
-                切換主管／一般員工，預覽不同操作畫面
+                {t('shell.loginAccountHint')}
               </p>
               <div className="mt-2 space-y-1.5">
                 {DEMO_ACCOUNTS.map((item) => {
@@ -145,8 +173,12 @@ export function ShellAccountToolbar({
                         <User className="size-3.5" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-zinc-100">{item.name}</span>
-                        <span className="block text-xs text-zinc-500">{item.title}</span>
+                        <span className="block text-sm font-medium text-zinc-100">
+                          {item.name}
+                        </span>
+                        <span className="block text-xs text-zinc-500">
+                          {item.title}
+                        </span>
                       </span>
                       <span
                         className={`size-2.5 rounded-full ${
@@ -159,14 +191,14 @@ export function ShellAccountToolbar({
               </div>
             </div>
             <SettingsSwitch
-              title="切換成管理員"
-              description="開啟後可使用管理相關操作"
+              title={t('shell.switchAdmin')}
+              description={t('shell.switchAdminHint')}
               checked={adminMode}
               onChange={onAdminModeChange}
             />
             <SettingsSwitch
-              title="是否主管簽核"
-              description="開啟後，班表調整與派遣需經主管核准"
+              title={t('shell.supervisorApproval')}
+              description={t('shell.supervisorApprovalHint')}
               checked={supervisorApproval}
               onChange={onSupervisorApprovalChange}
             />

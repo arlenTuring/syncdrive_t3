@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   clampMapPixelSize,
   DEFAULT_MAP_PIXEL_HEIGHT,
@@ -21,6 +22,7 @@ export function NewMapPixelDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [widthStr, setWidthStr] = useState(
     String(initialPixelSize?.width ?? DEFAULT_MAP_PIXEL_WIDTH),
@@ -41,7 +43,7 @@ export function NewMapPixelDialog({
     const width = Number.parseInt(widthStr, 10)
     const height = Number.parseInt(heightStr, 10)
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      alert('請輸入有效的畫布寬度與高度（像素）')
+      alert(t('mapEditor.newMapPixel.invalidSize'))
       return
     }
     onConfirm(clampMapPixelSize({ width, height }))
@@ -63,15 +65,14 @@ export function NewMapPixelDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="text-base font-semibold text-zinc-100">
-          設定監控畫布大小
+          {t('mapEditor.newMapPixel.title')}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          決定 Map 圖台的顯示像素尺寸。Area 容器與設施將擺在此畫布上；各 Area
-          的實際場域公尺範圍在 Area 屬性中另行設定。
+          {t('mapEditor.newMapPixel.hint')}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <label className="block text-xs text-zinc-500">
-            寬度（px）
+            {t('mapEditor.newMapPixel.width')}
             <input
               type="number"
               min={MIN_MAP_PIXEL}
@@ -83,7 +84,7 @@ export function NewMapPixelDialog({
             />
           </label>
           <label className="block text-xs text-zinc-500">
-            高度（px）
+            {t('mapEditor.newMapPixel.height')}
             <input
               type="number"
               min={MIN_MAP_PIXEL}
@@ -96,8 +97,12 @@ export function NewMapPixelDialog({
           </label>
         </div>
         <p className="mt-2 text-[10px] text-zinc-600">
-          允許範圍 {MIN_MAP_PIXEL}–{MAX_MAP_PIXEL} px。預設 {DEFAULT_MAP_PIXEL_WIDTH}×
-          {DEFAULT_MAP_PIXEL_HEIGHT} px。
+          {t('mapEditor.newMapPixel.range', {
+            min: MIN_MAP_PIXEL,
+            max: MAX_MAP_PIXEL,
+            defaultW: DEFAULT_MAP_PIXEL_WIDTH,
+            defaultH: DEFAULT_MAP_PIXEL_HEIGHT,
+          })}
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -105,14 +110,14 @@ export function NewMapPixelDialog({
             onClick={onCancel}
             className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={submit}
             className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-900/50"
           >
-            建立空白圖台
+            {t('mapEditor.newMapPixel.create')}
           </button>
         </div>
       </div>

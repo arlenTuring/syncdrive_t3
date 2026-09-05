@@ -1,3 +1,4 @@
+import i18n from '../../../../i18n';
 import type {
   ShiftScheduleSelectedRoute,
   ShiftScheduleStationDwell,
@@ -246,9 +247,9 @@ export function resolveStationDwellListRole(
 export function formatStationDwellRoleLabel(
   role: ReturnType<typeof resolveStationDwellListRole>,
 ): string {
-  if (role === 'origin') return '首站';
-  if (role === 'pass_through') return '途經';
-  return '停靠';
+  if (role === 'origin') return i18n.t('shiftList.manualSidebar.roleOrigin');
+  if (role === 'pass_through') return i18n.t('shiftList.manualSidebar.rolePassThrough');
+  return i18n.t('shiftList.manualSidebar.roleStop');
 }
 
 export function isStationDwellEntryComplete(dwell: ShiftScheduleStationDwell): boolean {

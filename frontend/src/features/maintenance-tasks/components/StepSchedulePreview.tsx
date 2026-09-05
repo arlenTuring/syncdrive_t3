@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { CreateMaintenanceTaskStep, MaintenanceTaskCreateDraft } from '../types/create';
 import { MaintenanceTaskPreviewContent } from './MaintenanceTaskPreviewContent';
 
@@ -16,6 +17,7 @@ export function StepSchedulePreview({
   onReachedBottom,
   onEditStep,
 }: StepSchedulePreviewProps) {
+  const { t } = useTranslation();
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,9 +35,11 @@ export function StepSchedulePreview({
 
   return (
     <div className="w-full">
-      <h2 className="mb-2 text-base font-medium text-zinc-100">任務檢視</h2>
+      <h2 className="mb-2 text-base font-medium text-zinc-100">
+        {t('maintenanceTasks.schedulePreview.title')}
+      </h2>
       <p className="mb-6 text-sm text-zinc-500">
-        以下為步驟 1 至 6 的完整設定摘要，僅供檢視確認。請捲動至底部後按「完成」儲存。
+        {t('maintenanceTasks.schedulePreview.hint')}
       </p>
 
       <MaintenanceTaskPreviewContent draft={draft} onEditStep={onEditStep} />

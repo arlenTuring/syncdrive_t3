@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const TIME_TEMPLATE_PANEL_HEADER_ROW_CLASS =
   'flex h-[34px] shrink-0 items-center gap-2 px-3 py-1.5';
@@ -37,6 +38,7 @@ export function TimeTemplatePanelAddButton({
   disabled = false,
   title,
 }: TimeTemplatePanelAddButtonProps) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -46,7 +48,7 @@ export function TimeTemplatePanelAddButton({
       title={title}
     >
       <Plus className="size-[18px] shrink-0" strokeWidth={2} />
-      新增
+      {t('timeTemplates.panelAdd')}
     </button>
   );
 }

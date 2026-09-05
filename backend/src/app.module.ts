@@ -66,6 +66,7 @@ import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition
 import { ScheduleAdjustModule } from './schedule-adjust/schedule-adjust.module';
 import { DashboardPlaneModule } from './dashboard-plane/dashboard-plane.module';
 import { DevLogModule } from './dev-log/dev-log.module';
+import { SystemHealthModule } from './system-health/system-health.module';
 import { DatabaseInitService } from './database/database-init.service';
 
 @Module({
@@ -154,6 +155,7 @@ import { DatabaseInitService } from './database/database-init.service';
     DashboardPlaneModule,
     DevLogModule,
     PartnerAccessModule,
+    SystemHealthModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

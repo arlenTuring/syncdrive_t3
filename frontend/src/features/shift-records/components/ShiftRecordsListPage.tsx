@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
 import { VTMS_VEHICLE_POOL } from '../../dashboard/constants/vtmsVehiclePool';
@@ -45,6 +46,7 @@ export function ShiftRecordsListPage({
   onOpenDetail,
   embedded = false,
 }: ShiftRecordsListPageProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<ShiftTab>('mainline');
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -170,7 +172,7 @@ export function ShiftRecordsListPage({
           <div className="flex items-center gap-3">
             {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
             <ClipboardList className="size-5 text-sky-400" aria-hidden />
-            <h1 className="text-lg font-semibold tracking-tight">班次運行紀錄</h1>
+            <h1 className="text-lg font-semibold tracking-tight">{t('shiftRecords.title')}</h1>
           </div>
         </header>
       ) : null}
@@ -178,7 +180,8 @@ export function ShiftRecordsListPage({
       <div className="border-b border-zinc-800/80 px-6">
         <div className="flex gap-8">
           {(['mainline', 'maintenance'] as const).map((key) => {
-            const label = key === 'mainline' ? '正線班次' : '整備班次';
+            const label =
+              key === 'mainline' ? t('shiftRecords.tabMainline') : t('shiftRecords.tabMaintenance');
             const active = tab === key;
             return (
               <button
@@ -206,16 +209,16 @@ export function ShiftRecordsListPage({
           type="button"
           onClick={resetFilters}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700"
-          title="重置篩選條件"
+          title={t('common.resetFiltersTitle')}
         >
           <RotateCcw className="size-3.5" aria-hidden />
-          重置篩選
+          {t('common.resetFilters')}
         </button>
         <div className="relative min-w-[180px] flex-1 basis-[200px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           <input
             type="search"
-            placeholder="請輸入班次代號或是站點名稱"
+            placeholder={t('shiftRecords.keywordPlaceholder')}
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
@@ -232,7 +235,9 @@ export function ShiftRecordsListPage({
         >
           {EXECUTION_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.label === '全部狀態' ? '選擇執行狀態' : opt.label}
+              {opt.value === 'all'
+                ? t('shiftRecords.selectExecutionStatus')
+                : t(`shiftRecords.executionStatus.${opt.value}`)}
             </option>
           ))}
         </select>
@@ -244,7 +249,7 @@ export function ShiftRecordsListPage({
           }}
           className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
         >
-          <option value="">選擇執行載具</option>
+          <option value="">{t('shiftRecords.selectVehicle')}</option>
           {VTMS_VEHICLE_POOL.map((v) => (
             <option key={v} value={v}>
               {v}
@@ -263,7 +268,7 @@ export function ShiftRecordsListPage({
               ? 'border-sky-600 bg-sky-600/20 text-sky-300 hover:bg-sky-600/30'
               : 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 text-zinc-600'
           }`}
-          title="搜尋"
+          title={t('common.search')}
         >
           <Search className="size-4" />
         </button>
@@ -274,7 +279,7 @@ export function ShiftRecordsListPage({
           className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
         >
           {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          下載
+          {t('common.download')}
         </button>
       </div>
 
@@ -295,12 +300,12 @@ export function ShiftRecordsListPage({
                   className="rounded border-zinc-600 bg-zinc-900"
                 />
               </th>
-              <th className="py-3 pr-4 font-medium">班次代號</th>
-              <th className="py-3 pr-4 font-medium">執行狀態</th>
-              <th className="py-3 pr-4 font-medium">執行路線</th>
-              <th className="py-3 pr-4 font-medium">執行載具</th>
-              <th className="py-3 pr-4 font-medium">發車時間</th>
-              <th className="py-3 pr-4 font-medium">結束時間</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.tripCode')}</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.executionStatus')}</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.route')}</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.vehicle')}</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.departTime')}</th>
+              <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.endTime')}</th>
               <th className="w-10 py-3" />
             </tr>
           </thead>
@@ -309,13 +314,13 @@ export function ShiftRecordsListPage({
               <tr>
                 <td colSpan={8} className="py-16 text-center text-zinc-500">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
-                  載入中…
+                  {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-16 text-center text-zinc-500">
-                  尚無符合條件的班次紀錄
+                  {t('shiftRecords.empty')}
                 </td>
               </tr>
             ) : (
@@ -335,7 +340,7 @@ export function ShiftRecordsListPage({
                   <td className="py-3 pr-4 font-medium text-zinc-100">{row.trip_code}</td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.execution_status_label}
+                      label={t(`shiftRecords.executionStatus.${row.execution_status}`)}
                       style={EXECUTION_TAG_STYLE[row.execution_status]}
                     />
                   </td>
@@ -348,7 +353,7 @@ export function ShiftRecordsListPage({
                       type="button"
                       onClick={() => onOpenDetail(row.order_id)}
                       className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="行車能力監控"
+                      title={t('shiftRecords.drivingCapability')}
                     >
                       <MoreHorizontal className="size-4" />
                     </button>

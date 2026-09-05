@@ -123,6 +123,8 @@ services:
       EXTERNAL_AUTH_PASSWORD: ${EXTERNAL_AUTH_PASSWORD}
       # 發金鑰時當場簽出車輛憑證，所以後端要讀得到中介 CA 的私鑰（唯讀掛載）
       MQTT_CERT_DIR: /mqtt-certs
+      # 系統基礎模組上傳的 HTTPS 傳輸憑證（私鑰可寫；勿與 MQTT_CERT_DIR 混用）
+      HTTPS_CERT_DIR: /https-certs
       MQTT_PUBLIC_HOST: ${MQTT_PUBLIC_HOST:-127.0.0.1}
       MQTT_PUBLIC_PORT: ${MQTT_PUBLIC_PORT:-8883}
       CORS_ORIGIN: ${CORS_ORIGIN}
@@ -156,6 +158,9 @@ services:
       # 不是根。根私鑰是 600 root，容器內讀不到——後端被攻破時攻擊者能冒充車輛，
       # 但簽不出伺服器憑證，冒充不了 broker。唯讀掛載讓它連改都不能改。
       - ../mosquitto/certs:/mqtt-certs:ro
+      # HTTPS 傳輸憑證：管理員經系統基礎模組上傳，後端寫入此 volume。
+      # nginx／LB 之後可掛同一份（唯讀）做 443；私鑰不進 DB、不進 git。
+      - httpscerts:/https-certs
     # 不對 postgres 下 depends_on：資料庫獨立部署時那個服務根本不存在，
     # 硬相依會讓整個 compose 起不來。連線重試由 TypeORM 自己負責。
     depends_on:
@@ -212,5 +217,6 @@ services:
 volumes:
   pgdata:
   backenddata:
+  httpscerts:
   redisdata:
   mosquitto_data:

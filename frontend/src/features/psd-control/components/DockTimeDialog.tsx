@@ -1,5 +1,6 @@
 import { Lightbulb, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { resolveDwellConflict, type DwellConflict } from '../resolveDwellConflict';
 import { fetchVehicleStopDwellSeconds } from '../fetchVehicleStopDwell';
 
@@ -12,30 +13,37 @@ function ConfirmVerifyDialog({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation();
+  const phrase = t('psdControl.dock.confirmPhrase');
   const [text, setText] = useState('');
-  const ok = text.trim() === '確認';
+  const ok = text.trim() === phrase;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-[480px] rounded-xl bg-[#27272a] px-6 pb-5 pt-5 text-zinc-100 shadow-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-[15px] font-medium">雙重驗證</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-0.5 text-zinc-300 hover:text-white" aria-label="關閉">
+          <h3 className="text-[15px] font-medium">{t('psdControl.dock.dualVerify')}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-0.5 text-zinc-300 hover:text-white"
+            aria-label={t('common.close')}
+          >
             <X className="size-5 stroke-[1.75]" />
           </button>
         </div>
         <div className="mb-8 rounded-lg bg-[#3f3f46]/50 px-4 py-4">
-          <p className="mb-3 text-[14px] text-zinc-100">輸入確認並儲存</p>
+          <p className="mb-3 text-[14px] text-zinc-100">{t('psdControl.dock.confirmAndSave')}</p>
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="請輸入「確認」"
+            placeholder={t('psdControl.dock.confirmPlaceholder', { phrase })}
             className="h-11 w-full rounded-md border border-zinc-600 bg-[#18181b] px-3 text-[14px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]"
           />
         </div>
         <div className="flex items-center justify-between">
           <button type="button" onClick={onClose} className="text-[14px] text-zinc-100 hover:text-white">
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -45,7 +53,7 @@ function ConfirmVerifyDialog({
               ok ? 'bg-[#2B7FFF] text-white hover:bg-[#1d6feb]' : 'cursor-not-allowed bg-zinc-700 text-zinc-400'
             }`}
           >
-            儲存
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -62,6 +70,7 @@ export function DockTimeDialog({
   onClose: () => void;
   onApply: (next: number) => void;
 }) {
+  const { t } = useTranslation();
   const [initial, setInitial] = useState<number | null>(null);
   const [value, setValue] = useState(32);
   const [maxSeconds, setMaxSeconds] = useState(90);
@@ -77,7 +86,7 @@ export function DockTimeDialog({
         if (cancelled) return;
         const seconds = result.seconds;
         if (seconds == null) {
-          setLoadError('找不到當前站或即將到站的停靠秒數');
+          setLoadError(t('psdControl.dock.notFound'));
           setLoaded(true);
           return;
         }
@@ -90,13 +99,13 @@ export function DockTimeDialog({
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadError('載入停靠秒數失敗');
+        setLoadError(t('psdControl.dock.loadFailed'));
         setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [vehicleCode]);
+  }, [vehicleCode, t]);
 
   const dirty = initial != null && value !== initial;
   const showWarning = dirty && loaded && conflict != null;
@@ -104,28 +113,36 @@ export function DockTimeDialog({
 
   const warningText = useMemo(() => {
     if (!conflict) return '';
-    return `警告：此停靠時間將衝突 ${conflict.windowLabel} 的 [班次 ${conflict.tripCode}]，該班次將被強制取消。`;
-  }, [conflict]);
+    return t('psdControl.dock.warning', {
+      window: conflict.windowLabel,
+      tripCode: conflict.tripCode,
+    });
+  }, [conflict, t]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-[560px] rounded-xl bg-[#27272a] px-6 pb-5 pt-5 text-zinc-100 shadow-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-[15px] font-medium">單次修改停靠時間</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-0.5 text-zinc-300 hover:text-white" aria-label="關閉">
+          <h3 className="text-[15px] font-medium">{t('psdControl.dock.title')}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-0.5 text-zinc-300 hover:text-white"
+            aria-label={t('common.close')}
+          >
             <X className="size-5 stroke-[1.75]" />
           </button>
         </div>
 
         <p className="mb-8 flex items-start gap-2 text-[13px] leading-relaxed text-zinc-400">
           <Lightbulb className="mt-0.5 size-4 shrink-0 stroke-[1.75] text-zinc-400" aria-hidden />
-          提示：已限制安全上下限，以保障發車順暢與系統安全。
+          {t('psdControl.dock.hint')}
         </p>
 
         {!loaded ? (
-          <p className="mb-8 text-[13px] text-zinc-400">載入當前站停靠秒數…</p>
+          <p className="mb-8 text-[13px] text-zinc-400">{t('psdControl.dock.loading')}</p>
         ) : loadError || initial == null ? (
-          <p className="mb-8 text-[13px] text-red-400">{loadError ?? '尚無停靠秒數'}</p>
+          <p className="mb-8 text-[13px] text-red-400">{loadError ?? t('psdControl.dock.noData')}</p>
         ) : (
           <div className="mb-6 flex items-center gap-4">
             <input
@@ -139,7 +156,9 @@ export function DockTimeDialog({
                 background: `linear-gradient(to right, #2B7FFF 0%, #2B7FFF ${pct}%, #3f3f46 ${pct}%, #3f3f46 100%)`,
               }}
             />
-            <span className="w-14 shrink-0 text-right text-[14px] text-zinc-100">{value} 秒</span>
+            <span className="w-14 shrink-0 text-right text-[14px] text-zinc-100">
+              {t('psdControl.dock.seconds', { value })}
+            </span>
           </div>
         )}
 
@@ -154,7 +173,7 @@ export function DockTimeDialog({
 
         <div className="flex items-center justify-between">
           <button type="button" onClick={onClose} className="text-[14px] text-zinc-100 hover:text-white">
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -164,7 +183,7 @@ export function DockTimeDialog({
               dirty ? 'bg-[#2B7FFF] text-white hover:bg-[#1d6feb]' : 'cursor-not-allowed bg-zinc-700 text-zinc-400'
             }`}
           >
-            下一步
+            {t('psdControl.dock.next')}
           </button>
         </div>
       </div>

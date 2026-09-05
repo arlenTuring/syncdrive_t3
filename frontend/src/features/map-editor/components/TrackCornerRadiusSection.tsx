@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 import {
@@ -17,12 +18,7 @@ type Props = {
   onFieldBlur: () => void
 }
 
-const CORNER_LABELS: { key: TrackCornerKey; label: string }[] = [
-  { key: 'tl', label: '左上 (m)' },
-  { key: 'tr', label: '右上 (m)' },
-  { key: 'br', label: '右下 (m)' },
-  { key: 'bl', label: '左下 (m)' },
-]
+const CORNER_KEYS: TrackCornerKey[] = ['tl', 'tr', 'br', 'bl']
 
 export function TrackCornerRadiusSection({
   facility,
@@ -32,6 +28,7 @@ export function TrackCornerRadiusSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   if (facility.type !== 'Track') return null
 
   const corners = getTrackCornerRadiiForFacility(facility, sizeMeters)
@@ -52,10 +49,10 @@ export function TrackCornerRadiusSection({
   return (
     <section className="space-y-2.5 rounded-lg border border-violet-900/40 bg-violet-950/15 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-violet-400/90">
-        圓角（公尺）
+        {t('mapEditor.inspector.cornerRadius.title')}
       </h3>
       <p className="text-[10px] leading-relaxed text-zinc-500">
-        編輯模式下選取軌道後，可拖曳上／下邊的紫色圓點調整各角圓角；亦可在此輸入數值或一鍵設為圓角矩形。
+        {t('mapEditor.inspector.cornerRadius.hint')}
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -65,7 +62,7 @@ export function TrackCornerRadiusSection({
           onClick={() => applyCorners(roundedRectTrackCornerRadii(sizeMeters))}
           className="rounded-md border border-violet-600/60 bg-violet-950/50 px-2.5 py-1 text-[10px] text-violet-100 hover:bg-violet-900/40 disabled:opacity-50"
         >
-          設為圓角矩形
+          {t('mapEditor.inspector.cornerRadius.setRoundedRect')}
         </button>
         <button
           type="button"
@@ -75,12 +72,12 @@ export function TrackCornerRadiusSection({
           }
           className="rounded-md border border-zinc-600 bg-zinc-900/80 px-2.5 py-1 text-[10px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
         >
-          清除圓角
+          {t('mapEditor.inspector.cornerRadius.clear')}
         </button>
       </div>
 
       <label className="block text-[10px] text-zinc-500">
-        四角統一圓角 (m)
+        {t('mapEditor.inspector.cornerRadius.uniform')}
         <input
           type="number"
           min={0}
@@ -88,7 +85,11 @@ export function TrackCornerRadiusSection({
           step={0.1}
           disabled={readOnly}
           value={uniform ?? ''}
-          placeholder={uniform === null ? '四角不同' : '0'}
+          placeholder={
+            uniform === null
+              ? t('mapEditor.inspector.cornerRadius.cornersDiffer')
+              : '0'
+          }
           onChange={(e) => {
             const v = e.target.value.trim()
             if (v === '') return
@@ -102,13 +103,15 @@ export function TrackCornerRadiusSection({
         />
       </label>
       <p className="text-[9px] text-zinc-600">
-        單角上限：{maxR.toFixed(2)} m（min(寬, 高)）
+        {t('mapEditor.inspector.cornerRadius.maxHint', {
+          max: maxR.toFixed(2),
+        })}
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        {CORNER_LABELS.map(({ key, label }) => (
+        {CORNER_KEYS.map((key) => (
           <label key={key} className="block text-[10px] text-zinc-500">
-            {label}
+            {t(`mapEditor.inspector.cornerRadius.${key}`)}
             <NumberInput
               min={0}
               max={maxR}

@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   FENCE_BEHAVIOR_OPTIONS,
   type FenceBehaviorKind,
@@ -39,6 +40,7 @@ function BehaviorGroup({
   selected: FenceBehaviorKind[];
   onToggle: (kind: FenceBehaviorKind) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2 rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 py-2.5">
       <p className="text-xs font-medium text-zinc-300">{title}</p>
@@ -56,7 +58,7 @@ function BehaviorGroup({
                 onChange={() => onToggle(opt.id)}
                 className="size-3.5 rounded border-zinc-600 bg-zinc-900 text-[#2B7FFF] focus:ring-[#2B7FFF]/40"
               />
-              {opt.label}
+              {t(`virtualFence.behavior.${opt.id}`)}
             </label>
           );
         })}
@@ -73,6 +75,7 @@ export function FenceFormPanel({
   onCancel,
   onSubmit,
 }: FenceFormPanelProps) {
+  const { t } = useTranslation();
   const canSubmit =
     draft.name.trim().length > 0
     && draft.vertices.length >= 3;
@@ -92,13 +95,15 @@ export function FenceFormPanel({
     <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-zinc-800/80 bg-[#1c1c1f]">
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-4 py-3">
         <p className="text-sm font-medium text-zinc-100">
-          {mode === 'create' ? '建立圍籬' : '編輯圍籬'}
+          {mode === 'create'
+            ? t('virtualFence.form.createTitle')
+            : t('virtualFence.form.editTitle')}
         </p>
         <button
           type="button"
           onClick={onClose}
           className="inline-flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          title="關閉"
+          title={t('common.close')}
         >
           <X className="size-4" aria-hidden />
         </button>
@@ -106,24 +111,24 @@ export function FenceFormPanel({
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         <div>
-          <RequiredLabel>圍籬名稱</RequiredLabel>
+          <RequiredLabel>{t('virtualFence.form.name')}</RequiredLabel>
           <input
             type="text"
             value={draft.name}
             onChange={(e) => onChange({ ...draft, name: e.target.value })}
-            placeholder="請輸入"
+            placeholder={t('virtualFence.form.inputPlaceholder')}
             className="h-9 w-full rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]/60"
           />
         </div>
 
         <div>
-          <RequiredLabel>涵蓋範圍</RequiredLabel>
+          <RequiredLabel>{t('virtualFence.form.coverage')}</RequiredLabel>
           <div className="min-h-9 rounded-lg border border-zinc-700/60 bg-[#27272a] px-2 py-1.5">
             {draft.coverage.length === 0 ? (
               <p className="px-1 py-1 text-sm text-zinc-500">
                 {draft.vertices.length >= 3
-                  ? '圍籬已繪製，尚未覆蓋到路段'
-                  : '於地圖拉框或放置多邊形後自動帶入'}
+                  ? t('virtualFence.form.coverageEmptyDrawn')
+                  : t('virtualFence.form.coverageEmptyHint')}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -137,7 +142,9 @@ export function FenceFormPanel({
                       type="button"
                       onClick={() => removeCoverage(seg.trackId)}
                       className="text-zinc-400 hover:text-white"
-                      aria-label={`移除 ${seg.label}`}
+                      aria-label={t('virtualFence.form.removeCoverage', {
+                        label: seg.label,
+                      })}
                     >
                       ×
                     </button>
@@ -149,7 +156,7 @@ export function FenceFormPanel({
         </div>
 
         <div>
-          <RequiredLabel>啟用圍籬</RequiredLabel>
+          <RequiredLabel>{t('virtualFence.form.enable')}</RequiredLabel>
           <button
             type="button"
             role="switch"
@@ -168,12 +175,12 @@ export function FenceFormPanel({
         </div>
 
         <div className="space-y-2">
-          <RequiredLabel>作動行為</RequiredLabel>
+          <RequiredLabel>{t('virtualFence.form.behaviors')}</RequiredLabel>
           <p className="text-[11px] leading-relaxed text-zinc-500">
-            進入與離開可同時設定，各自可複選行為。
+            {t('virtualFence.form.behaviorsHint')}
           </p>
           <BehaviorGroup
-            title="進入"
+            title={t('virtualFence.form.enter')}
             selected={draft.enterBehaviors}
             onToggle={(kind) =>
               onChange({
@@ -183,7 +190,7 @@ export function FenceFormPanel({
             }
           />
           <BehaviorGroup
-            title="離開"
+            title={t('virtualFence.form.leave')}
             selected={draft.leaveBehaviors}
             onToggle={(kind) =>
               onChange({
@@ -196,7 +203,7 @@ export function FenceFormPanel({
 
         {needsSpeed ? (
           <div>
-            <RequiredLabel>載具速度限制</RequiredLabel>
+            <RequiredLabel>{t('virtualFence.form.speedLimit')}</RequiredLabel>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -212,7 +219,9 @@ export function FenceFormPanel({
                 }}
                 className="h-9 w-24 rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF]/60"
               />
-              <span className="text-sm text-zinc-400">km/hr</span>
+              <span className="text-sm text-zinc-400">
+                {t('virtualFence.form.speedUnit')}
+              </span>
             </div>
           </div>
         ) : null}
@@ -224,7 +233,9 @@ export function FenceFormPanel({
           onClick={onCancel}
           className="h-9 px-2 text-sm text-zinc-300 transition hover:text-white"
         >
-          {mode === 'create' ? '放棄' : '取消'}
+          {mode === 'create'
+            ? t('virtualFence.form.discard')
+            : t('common.cancel')}
         </button>
         <button
           type="button"
@@ -232,7 +243,9 @@ export function FenceFormPanel({
           onClick={onSubmit}
           className="inline-flex h-9 items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
         >
-          {mode === 'create' ? '建立' : '儲存'}
+          {mode === 'create'
+            ? t('virtualFence.form.createAction')
+            : t('common.save')}
         </button>
       </div>
     </aside>

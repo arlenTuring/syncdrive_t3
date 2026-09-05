@@ -11,6 +11,7 @@ import {
   Square,
   TriangleAlert,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useDemoSimulation } from '../context/DemoSimulationContext';
 import { VTMS_DEMO_VEHICLE_CODES } from '../api/demoSimulation';
 import type { DemoSimulationTransport } from '../api/demoSimulation';
@@ -164,6 +165,7 @@ function nearestSpeedIndex(speed: number): number {
  * 漂浮於視窗底部的模擬控制列（fixed，不受地圖 scale 影響）。
  */
 export function SimulationTransportToolbar() {
+  const { t } = useTranslation();
   const {
     status,
     transport,
@@ -199,11 +201,11 @@ export function SimulationTransportToolbar() {
         type="button"
         onClick={() => setToolbarVisible(true)}
         className="fixed bottom-3 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-zinc-600 bg-zinc-900/95 px-4 py-2 text-xs font-medium text-zinc-200 shadow-lg backdrop-blur-sm hover:border-cyan-600 hover:text-cyan-300"
-        title="顯示模擬控制"
+        title={t('dashboard.simulation.show')}
         style={{ transform: 'translateX(-50%)' }}
       >
         <SlidersHorizontal size={14} />
-        模擬控制
+        {t('dashboard.simulation.title')}
       </button>
     );
   }
@@ -213,15 +215,15 @@ export function SimulationTransportToolbar() {
       className="fixed bottom-4 left-1/2 z-[10000] w-[min(720px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-zinc-600/80 bg-zinc-900/95 px-4 py-3 shadow-2xl backdrop-blur-md"
       style={{ transform: 'translateX(-50%)' }}
       role="toolbar"
-      aria-label="模擬控制"
+      aria-label={t('dashboard.simulation.title')}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
           <Gauge size={14} className="text-cyan-400" />
-          模擬控制
+          {t('dashboard.simulation.title')}
           {running && (
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">
-              {managed ? '運行中' : '外部程序'}
+              {managed ? t('dashboard.simulation.running') : t('dashboard.simulation.external')}
             </span>
           )}
         </div>
@@ -229,9 +231,9 @@ export function SimulationTransportToolbar() {
           type="button"
           onClick={() => setToolbarVisible(false)}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          title="隱藏控制列"
+          title={t('dashboard.simulation.hideTitle')}
         >
-          隱藏
+          {t('dashboard.simulation.hide')}
           <ChevronUp size={12} />
         </button>
       </div>
@@ -243,12 +245,12 @@ export function SimulationTransportToolbar() {
             disabled={loading}
             onClick={() => void toggle()}
             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-xs font-medium text-emerald-200 transition hover:bg-emerald-900/40 disabled:opacity-50"
-            title="開始 MQTT 班次模擬與 SQL 示範更新"
+            title={t('dashboard.simulation.startTitle')}
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-            開始模擬
+            {t('dashboard.simulation.start')}
           </button>
-          <p className="text-[11px] text-zinc-500">啟動後可調整發送速度、暫停與逐幀播放</p>
+          <p className="text-[11px] text-zinc-500">{t('dashboard.simulation.startHint')}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -258,10 +260,10 @@ export function SimulationTransportToolbar() {
               disabled={loading}
               onClick={() => void toggle()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-800/60 bg-red-950/30 px-3 py-2 text-xs font-medium text-red-200 transition hover:bg-red-900/30 disabled:opacity-50"
-              title="停止模擬（結束 MQTT 發送）"
+              title={t('dashboard.simulation.stopTitle')}
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
-              停止模擬
+              {t('dashboard.simulation.stop')}
             </button>
 
             {managed && (
@@ -275,10 +277,16 @@ export function SimulationTransportToolbar() {
                       ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-200 hover:bg-emerald-900/40'
                       : 'border-amber-700/60 bg-amber-950/40 text-amber-200 hover:bg-amber-900/40'
                   }`}
-                  title={transportPaused ? '繼續自動發送' : '暫停自動發送（可逐幀）'}
+                  title={
+                    transportPaused
+                      ? t('dashboard.simulation.resumeTitle')
+                      : t('dashboard.simulation.pauseTitle')
+                  }
                 >
                   {transportPaused ? <Play size={14} /> : <Pause size={14} />}
-                  {transportPaused ? '繼續發送' : '暫停發送'}
+                  {transportPaused
+                    ? t('dashboard.simulation.resume')
+                    : t('dashboard.simulation.pause')}
                 </button>
 
                 <button
@@ -286,10 +294,10 @@ export function SimulationTransportToolbar() {
                   disabled={loading}
                   {...holdPrev}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-200 transition enabled:hover:border-cyan-600 enabled:hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
-                  title="回退一幀（按住可連續回退，-100ms/幀，會自動暫停發送）"
+                  title={t('dashboard.simulation.prevFrameTitle')}
                 >
                   <SkipBack size={14} />
-                  上一幀
+                  {t('dashboard.simulation.prevFrame')}
                 </button>
 
                 <button
@@ -297,10 +305,10 @@ export function SimulationTransportToolbar() {
                   disabled={loading}
                   {...holdNext}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-200 transition enabled:hover:border-cyan-600 enabled:hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
-                  title="前進一幀（按住可連續前進，+100ms/幀，會自動暫停發送）"
+                  title={t('dashboard.simulation.nextFrameTitle')}
                 >
                   <SkipForward size={14} />
-                  下一幀
+                  {t('dashboard.simulation.nextFrame')}
                 </button>
               </>
             )}
@@ -308,7 +316,7 @@ export function SimulationTransportToolbar() {
 
           {managed && transportPaused && (
             <p className="text-[11px] text-amber-300/90">
-              已暫停 MQTT 發送：圖台不會更新。按「繼續發送」或「下一幀」才會收到新座標。
+              {t('dashboard.simulation.pausedHint')}
             </p>
           )}
 
@@ -316,7 +324,7 @@ export function SimulationTransportToolbar() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-center justify-between text-[10px] text-zinc-500">
-                  <span>發送速度</span>
+                  <span>{t('dashboard.simulation.sendSpeed')}</span>
                   <span className="font-mono text-zinc-300">{speed.toFixed(2)}×</span>
                 </div>
                 <input
@@ -330,7 +338,7 @@ export function SimulationTransportToolbar() {
                     void setSpeedMultiplier(SPEED_STOPS[idx] ?? 1);
                   }}
                   className="h-2 w-full cursor-pointer accent-cyan-500"
-                  aria-label="模擬資料發送速度"
+                  aria-label={t('dashboard.simulation.sendSpeedAria')}
                 />
                 <div className="flex justify-between font-mono text-[9px] text-zinc-600">
                   {SPEED_STOPS.map((v) => (
@@ -340,7 +348,7 @@ export function SimulationTransportToolbar() {
               </div>
 
               <div className="shrink-0 text-right text-[10px] text-zinc-500">
-                <div>虛擬時間</div>
+                <div>{t('dashboard.simulation.virtualTime')}</div>
                 <div className="font-mono text-sm text-cyan-300">
                   {formatElapsed(liveVirtualMs)}
                 </div>
@@ -348,7 +356,7 @@ export function SimulationTransportToolbar() {
             </div>
           ) : (
             <p className="text-[11px] text-zinc-500">
-              外部模擬程序運行中。按「停止模擬」結束，再按「開始模擬」以使用速度與逐幀控制。
+              {t('dashboard.simulation.externalHint')}
             </p>
           )}
 
@@ -356,16 +364,16 @@ export function SimulationTransportToolbar() {
             <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-3">
               <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-red-200">
                 <TriangleAlert size={13} />
-                故障模擬驗收（command/execute → command/ack → event/report → FAULTED）
+                {t('dashboard.simulation.faultTitle')}
               </div>
               <div className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
-                  <span>① 選擇車輛</span>
+                  <span>{t('dashboard.simulation.pickVehicle')}</span>
                   <select
                     value={faultVehicleCode}
                     onChange={(e) => setFaultVehicleCode(e.target.value)}
                     className="rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100"
-                    aria-label="選擇要觸發故障的車輛"
+                    aria-label={t('dashboard.simulation.pickVehicleAria')}
                   >
                     {VTMS_DEMO_VEHICLE_CODES.map((code) => (
                       <option key={code} value={code}>
@@ -379,28 +387,28 @@ export function SimulationTransportToolbar() {
                   disabled={loading}
                   onClick={() => void triggerVehicleFault(faultVehicleCode)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-xs font-medium text-red-100 transition hover:bg-red-900/40 disabled:opacity-50"
-                  title="下發 EMERGENCY_STOP，車端應回 command/ack 並上報 PATH_BLOCKED"
+                  title={t('dashboard.simulation.emergencyStopTitle')}
                 >
                   {loading ? <Loader2 size={14} className="animate-spin" /> : <TriangleAlert size={14} />}
-                  ② 模擬緊急停車
+                  {t('dashboard.simulation.emergencyStop')}
                 </button>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => void clearVehicleFault(faultVehicleCode)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-200 transition hover:bg-emerald-900/30 disabled:opacity-50"
-                  title="清除 FAULTED 並復歸訂單為 PROCESSING"
+                  title={t('dashboard.simulation.clearFaultTitle')}
                 >
-                  ③ 清除故障
+                  {t('dashboard.simulation.clearFault')}
                 </button>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => void simulateVehicleObstacle(faultVehicleCode)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-900/30 disabled:opacity-50"
-                  title="上報 OBSTACLE_DETECTED（WARNING，不轉 FAULTED）"
+                  title={t('dashboard.simulation.obstacleTitle')}
                 >
-                  障礙物事件
+                  {t('dashboard.simulation.obstacle')}
                 </button>
               </div>
               {lastSimulatedEvent && (
@@ -410,7 +418,7 @@ export function SimulationTransportToolbar() {
                   </div>
                   <div className="mt-0.5 text-red-200">{lastSimulatedEvent.message}</div>
                   <div className="mt-1 text-[10px] text-zinc-500">
-                    圖台應顯示 vehicle_phase=FAULTED；事件列表亦會出現此描述
+                    {t('dashboard.simulation.faultHint')}
                   </div>
                 </div>
               )}

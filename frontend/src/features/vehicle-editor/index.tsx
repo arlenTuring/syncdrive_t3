@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Bus, Copy, Download, Pencil, Redo2, Save, Undo2, Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { VariableProvider } from '../dashboard/VariableContext';
 import { ComponentPalette } from './ComponentPalette';
 import { VehiclePreviewTestPanel } from './components/VehiclePreviewTestPanel';
@@ -18,6 +19,7 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
 }
 
 export default function VehicleEditor() {
+  const { t } = useTranslation();
   const {
     vehicles,
     activeVehicle,
@@ -240,122 +242,122 @@ export default function VehicleEditor() {
   if (!activeVehicle) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
-        找不到載具
+        {t('vehicleEditor.editor.notFound')}
       </div>
     );
   }
 
   return (
-      <VariableProvider variables={{}}>
-        <div className="flex h-full min-h-0 w-full flex-col bg-[#0a0f1a]">
-          <header className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-2.5">
+    <VariableProvider variables={{}}>
+      <div className="flex h-full min-h-0 w-full flex-col bg-[#0a0f1a]">
+        <header className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              flushSave();
+              setView('list');
+              setIsEditMode(false);
+              selectElement(null);
+            }}
+            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          >
+            <ArrowLeft size={14} />
+            {t('vehicleEditor.editor.backToList')}
+          </button>
+          <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
+            <Bus size={16} className="text-amber-400" />
+            <span className="text-sm font-semibold text-zinc-200">{activeVehicle.name}</span>
+            <span className="font-mono text-[10px] text-zinc-600">
+              {activeVehicle.width}×{activeVehicle.height}
+            </span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
+              title={t('vehicleEditor.editor.duplicateTitle')}
               onClick={() => {
-                flushSave();
-                setView('list');
-                setIsEditMode(false);
-                selectElement(null);
+                if (activeVehicleId) duplicateVehicle(activeVehicleId);
               }}
-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
             >
-              <ArrowLeft size={14} />
-              載具清單
+              <Copy size={14} />
+              {t('common.duplicate')}
             </button>
-            <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
-              <Bus size={16} className="text-amber-400" />
-              <span className="text-sm font-semibold text-zinc-200">{activeVehicle.name}</span>
-              <span className="font-mono text-[10px] text-zinc-600">
-                {activeVehicle.width}×{activeVehicle.height}
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                title="複製此載具"
-                onClick={() => {
-                  if (activeVehicleId) duplicateVehicle(activeVehicleId);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-              >
-                <Copy size={14} />
-                複製
-              </button>
-              <button
-                type="button"
-                title="匯出 JSON 備份"
-                onClick={() => {
-                  if (activeVehicleId) exportVehiclesJson([activeVehicleId]);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-              >
-                <Download size={14} />
-                匯出
-              </button>
-              <button
-                type="button"
-                title="匯入 JSON 備份"
-                onClick={() => importFileInputRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-              >
-                <Upload size={14} />
-                {importStatus === 'ok'
-                  ? '已匯入'
-                  : importStatus === 'error'
-                    ? '匯入失敗'
-                    : '匯入'}
-              </button>
-              <input
-                ref={importFileInputRef}
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={(e) => void handleImportFile(e.target.files?.[0])}
-              />
-              {isEditMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={undo}
-                    disabled={!canUndo}
-                    title="復原 (Ctrl+Z)"
-                    className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
-                  >
-                    <Undo2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={redo}
-                    disabled={!canRedo}
-                    title="重做 (Ctrl+Shift+Z)"
-                    className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
-                  >
-                    <Redo2 size={14} />
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                onClick={toggleEditMode}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isEditMode
-                    ? 'bg-amber-600 text-white'
-                    : 'border border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                }`}
-              >
-                <Pencil size={14} />
-                {isEditMode ? '編輯中' : '編輯'}
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveFeedback}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-              >
-                <Save size={14} />
-                {saveStatus === 'ok' ? '已自動儲存' : '儲存'}
-              </button>
-            </div>
-          </header>
+            <button
+              type="button"
+              title={t('vehicleEditor.editor.exportTitle')}
+              onClick={() => {
+                if (activeVehicleId) exportVehiclesJson([activeVehicleId]);
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
+            >
+              <Download size={14} />
+              {t('vehicleEditor.editor.export')}
+            </button>
+            <button
+              type="button"
+              title={t('vehicleEditor.editor.importTitle')}
+              onClick={() => importFileInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
+            >
+              <Upload size={14} />
+              {importStatus === 'ok'
+                ? t('vehicleEditor.editor.importOk')
+                : importStatus === 'error'
+                  ? t('vehicleEditor.editor.importFail')
+                  : t('vehicleEditor.editor.import')}
+            </button>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => void handleImportFile(e.target.files?.[0])}
+            />
+            {isEditMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={!canUndo}
+                  title={t('vehicleEditor.editor.undoTitle')}
+                  className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
+                >
+                  <Undo2 size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={!canRedo}
+                  title={t('vehicleEditor.editor.redoTitle')}
+                  className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
+                >
+                  <Redo2 size={14} />
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={toggleEditMode}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                isEditMode
+                  ? 'bg-amber-600 text-white'
+                  : 'border border-zinc-700 text-zinc-300 hover:border-zinc-500'
+              }`}
+            >
+              <Pencil size={14} />
+              {isEditMode ? t('vehicleEditor.editor.editing') : t('vehicleEditor.editor.edit')}
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveFeedback}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
+            >
+              <Save size={14} />
+              {saveStatus === 'ok' ? t('vehicleEditor.editor.autoSaved') : t('vehicleEditor.editor.save')}
+            </button>
+          </div>
+        </header>
 
           <div className="flex min-h-0 flex-1">
             <VehicleWorkspace

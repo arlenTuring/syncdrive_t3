@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-
-export const MAINTENANCE_STEP_SKIPPED_MESSAGE = '不進行此整備任務安排';
+import { useTranslation } from 'react-i18next';
 
 type StepSectionToggleProps = {
   title: string;
@@ -15,6 +14,7 @@ export function StepSectionToggle({
   onEnabledChange,
   children,
 }: StepSectionToggleProps) {
+  const { t } = useTranslation();
   return (
     <div className="w-full">
       <label className="mb-6 flex cursor-pointer items-center gap-2">
@@ -32,7 +32,7 @@ export function StepSectionToggle({
       {enabled ? (
         children
       ) : (
-        <p className="text-sm text-zinc-600">{MAINTENANCE_STEP_SKIPPED_MESSAGE}</p>
+        <p className="text-sm text-zinc-600">{t('maintenanceTasks.stepSkipped')}</p>
       )}
     </div>
   );

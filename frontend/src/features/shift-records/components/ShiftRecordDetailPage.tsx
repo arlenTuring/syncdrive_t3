@@ -1,5 +1,6 @@
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StatusTag } from '../../../components/StatusTag';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail, type ShiftRecordDetail } from '../api/shiftRecordsApi';
@@ -22,6 +23,7 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPageProps) {
+  const { t } = useTranslation();
   const [detail, setDetail] = useState<ShiftRecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
 
   useEffect(() => {
     return subscribeDatasourceInvalidation((payload) => {
-      if (payload.tags.some((t) => t === 'table:operation_orders' || t.includes('operation'))) {
+      if (payload.tags.some((tag) => tag === 'table:operation_orders' || tag.includes('operation'))) {
         void load();
       }
     });
@@ -62,9 +64,9 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
           >
             <ArrowLeft className="size-4" />
-            返回列表
+            {t('shiftRecords.detail.backToList')}
           </button>
-          <h1 className="text-lg font-semibold">班次詳細監控</h1>
+          <h1 className="text-lg font-semibold">{t('shiftRecords.detail.title')}</h1>
           {detail && (
             <span className="font-mono text-sm text-zinc-500">{detail.trip_code}</span>
           )}
@@ -75,7 +77,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
         >
           <RefreshCw className="size-4" />
-          重新整理
+          {t('common.refresh')}
         </button>
       </header>
 
@@ -83,7 +85,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
         {loading && (
           <div className="flex items-center justify-center gap-2 py-20 text-zinc-500">
             <Loader2 className="size-5 animate-spin" />
-            載入中…
+            {t('common.loading')}
           </div>
         )}
         {error && (
@@ -94,11 +96,11 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
         {detail && !loading && (
           <div className="mx-auto max-w-5xl space-y-6">
             <section className="grid gap-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-5 sm:grid-cols-2 lg:grid-cols-3">
-              <InfoCell label="班次代號" value={detail.trip_code} />
-              <InfoCell label="訂單編號" value={detail.order_id} mono />
-              <InfoCell label="執行載具" value={detail.vehicle_code} />
+              <InfoCell label={t('shiftRecords.columns.tripCode')} value={detail.trip_code} />
+              <InfoCell label={t('shiftRecords.detail.orderId')} value={detail.order_id} mono />
+              <InfoCell label={t('shiftRecords.columns.vehicle')} value={detail.vehicle_code} />
               <InfoCell
-                label="執行狀態"
+                label={t('shiftRecords.columns.executionStatus')}
                 value={
                   <StatusTag
                     label={detail.execution_status_label}
@@ -106,25 +108,40 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                   />
                 }
               />
-              <InfoCell label="執行路線" value={detail.route_label} />
-              <InfoCell label="車端階段" value={String(detail.vehicle_phase ?? '—')} />
-              <InfoCell label="發車時間" value={detail.depart_time ?? '—'} mono />
-              <InfoCell label="結束時間" value={detail.end_time ?? ''} mono />
+              <InfoCell label={t('shiftRecords.columns.route')} value={detail.route_label} />
               <InfoCell
-                label="延誤（分）"
+                label={t('shiftRecords.detail.vehiclePhase')}
+                value={String(detail.vehicle_phase ?? '—')}
+              />
+              <InfoCell
+                label={t('shiftRecords.columns.departTime')}
+                value={detail.depart_time ?? '—'}
+                mono
+              />
+              <InfoCell
+                label={t('shiftRecords.columns.endTime')}
+                value={detail.end_time ?? ''}
+                mono
+              />
+              <InfoCell
+                label={t('shiftRecords.detail.delayMinutes')}
                 value={detail.delay_minutes > 0 ? String(detail.delay_minutes) : '0'}
               />
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">當前路段 current_leg</h2>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                {t('shiftRecords.detail.currentLeg')}
+              </h2>
               <JsonBlock value={detail.current_leg} />
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">微觀任務 task_group</h2>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                {t('shiftRecords.detail.taskGroup')}
+              </h2>
               {detail.task_group.length === 0 ? (
-                <p className="text-sm text-zinc-500">尚無 task_group 資料</p>
+                <p className="text-sm text-zinc-500">{t('shiftRecords.detail.noTaskGroup')}</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-zinc-800">
                   <table className="w-full min-w-[640px] text-left text-sm">
@@ -154,17 +171,19 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">站點動作 order_action_states</h2>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                {t('shiftRecords.detail.stationActions')}
+              </h2>
               {detail.actions.length === 0 ? (
-                <p className="text-sm text-zinc-500">尚無站點動作實例</p>
+                <p className="text-sm text-zinc-500">{t('shiftRecords.detail.noStationActions')}</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-zinc-800">
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="bg-zinc-900/80 text-zinc-500">
                       <tr>
-                        <th className="px-3 py-2 font-medium">站點</th>
-                        <th className="px-3 py-2 font-medium">動作</th>
-                        <th className="px-3 py-2 font-medium">狀態</th>
+                        <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colStation')}</th>
+                        <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colAction')}</th>
+                        <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colStatus')}</th>
                         <th className="px-3 py-2 font-medium">node_id</th>
                       </tr>
                     </thead>
@@ -186,7 +205,9 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">訂單 payload（原始）</h2>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                {t('shiftRecords.detail.rawPayload')}
+              </h2>
               <JsonBlock value={detail.payload} />
             </section>
           </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { History, Loader2, BookmarkPlus, Trash2, RotateCcw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   clearMapRevisionsForLibrary,
   deleteMapRevision,
@@ -7,9 +8,9 @@ import {
   listMapRevisionMetas,
   MAX_REVISIONS_PER_MAP,
   recordMapRevision,
-  revisionReasonLabel,
   type MapRevisionEditorState,
   type MapRevisionMeta,
+  type MapRevisionReason,
 } from '../utils/mapRevisionHistory'
 
 type MapRevisionHistoryDialogProps = {
@@ -28,11 +29,17 @@ export function MapRevisionHistoryDialog({
   getEditorState,
   onRestore,
 }: MapRevisionHistoryDialogProps) {
+  const { t } = useTranslation()
   const [items, setItems] = useState<MapRevisionMeta[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [bookmarking, setBookmarking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const reasonLabel = useCallback(
+    (reason: MapRevisionReason) => t(`mapEditor.revision.reasons.${reason}`),
+    [t],
+  )
 
   const refresh = useCallback(async () => {
     if (!libraryId) {
@@ -45,12 +52,12 @@ export function MapRevisionHistoryDialog({
       const rows = await listMapRevisionMetas(libraryId)
       setItems(rows)
     } catch {
-      setError('無法讀取編修紀錄')
+      setError(t('mapEditor.revision.loadFailed'))
       setItems([])
     } finally {
       setLoading(false)
     }
-  }, [libraryId])
+  }, [libraryId, t])
 
   useEffect(() => {
     if (!open) return
@@ -66,23 +73,19 @@ export function MapRevisionHistoryDialog({
         force: true,
       })
       if (!meta) {
-        setError('內容與最新紀錄相同，未新增書籤')
+        setError(t('mapEditor.revision.bookmarkDuplicate'))
       }
       await refresh()
     } catch {
-      setError('無法寫入書籤')
+      setError(t('mapEditor.revision.bookmarkFailed'))
     } finally {
       setBookmarking(false)
     }
-  }, [getEditorState, refresh])
+  }, [getEditorState, refresh, t])
 
   const handleRestore = useCallback(
     async (id: string) => {
-      if (
-        !window.confirm(
-          '確定還原至此版本？目前圖台上未另外書籤的變更會被覆蓋。',
-        )
-      ) {
+      if (!window.confirm(t('mapEditor.revision.restoreConfirm'))) {
         return
       }
       setBusyId(id)
@@ -91,17 +94,17 @@ export function MapRevisionHistoryDialog({
         await onRestore(id)
         onClose()
       } catch {
-        setError('還原失敗')
+        setError(t('mapEditor.revision.restoreFailed'))
       } finally {
         setBusyId(null)
       }
     },
-    [onRestore, onClose],
+    [onRestore, onClose, t],
   )
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm('刪除此筆編修紀錄？')) return
+      if (!window.confirm(t('mapEditor.revision.deleteConfirm'))) return
       setBusyId(id)
       try {
         await deleteMapRevision(id)
@@ -110,13 +113,13 @@ export function MapRevisionHistoryDialog({
         setBusyId(null)
       }
     },
-    [refresh],
+    [refresh, t],
   )
 
   const handleClearAll = useCallback(async () => {
     if (
       !window.confirm(
-        `清除此地圖全部編修紀錄（最多 ${MAX_REVISIONS_PER_MAP} 筆）？此操作無法復原。`,
+        t('mapEditor.revision.clearConfirm', { max: MAX_REVISIONS_PER_MAP }),
       )
     ) {
       return
@@ -128,7 +131,7 @@ export function MapRevisionHistoryDialog({
     } finally {
       setLoading(false)
     }
-  }, [libraryId, refresh])
+  }, [libraryId, refresh, t])
 
   if (!open) return null
 
@@ -147,12 +150,10 @@ export function MapRevisionHistoryDialog({
               className="flex items-center gap-2 text-lg font-semibold text-zinc-100"
             >
               <History className="size-5 text-cyan-400" aria-hidden />
-              編修紀錄
+              {t('mapEditor.revision.title')}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-              自動儲存會寫入地圖庫；此清單另以 IndexedDB
-              保存可還原快照（節流＋上限 {MAX_REVISIONS_PER_MAP}{' '}
-              筆，優先保留正式儲存／書籤）。
+              {t('mapEditor.revision.hint', { max: MAX_REVISIONS_PER_MAP })}
             </p>
           </div>
           <button
@@ -160,7 +161,7 @@ export function MapRevisionHistoryDialog({
             onClick={onClose}
             className="rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
           >
-            關閉
+            {t('common.close')}
           </button>
         </div>
 
@@ -176,7 +177,7 @@ export function MapRevisionHistoryDialog({
             ) : (
               <BookmarkPlus className="size-3.5" aria-hidden />
             )}
-            標記目前狀態
+            {t('mapEditor.revision.bookmark')}
           </button>
           <button
             type="button"
@@ -184,7 +185,7 @@ export function MapRevisionHistoryDialog({
             disabled={items.length === 0 || loading}
             className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
           >
-            清除全部
+            {t('mapEditor.revision.clearAll')}
           </button>
           <span className="ml-auto text-[11px] text-zinc-500">
             {items.length} / {MAX_REVISIONS_PER_MAP}
@@ -201,11 +202,11 @@ export function MapRevisionHistoryDialog({
           {loading && items.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-zinc-400">
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              載入中…
+              {t('common.loading')}
             </div>
           ) : items.length === 0 ? (
             <p className="px-2 py-10 text-center text-sm text-zinc-500">
-              尚無編修紀錄。進入編輯或自動儲存後會開始累積。
+              {t('mapEditor.revision.empty')}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -220,12 +221,14 @@ export function MapRevisionHistoryDialog({
                         {item.label}
                       </p>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
-                        {revisionReasonLabel(item.reason)} ·{' '}
-                        {formatRevisionByteSize(item.byteSize)} · Area{' '}
-                        {item.summary.areaCount} · 設施{' '}
-                        {item.summary.facilityCount} · 路線{' '}
-                        {item.summary.routeCount} · 拓撲節點{' '}
-                        {item.summary.topologyNodeCount}
+                        {reasonLabel(item.reason)} ·{' '}
+                        {formatRevisionByteSize(item.byteSize)} ·{' '}
+                        {t('mapEditor.revision.summary', {
+                          areas: item.summary.areaCount,
+                          facilities: item.summary.facilityCount,
+                          routes: item.summary.routeCount,
+                          nodes: item.summary.topologyNodeCount,
+                        })}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
@@ -234,7 +237,7 @@ export function MapRevisionHistoryDialog({
                         disabled={busyId === item.id}
                         onClick={() => void handleRestore(item.id)}
                         className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
-                        title="還原至此版本"
+                        title={t('mapEditor.revision.restoreTitle')}
                       >
                         {busyId === item.id ? (
                           <Loader2
@@ -244,14 +247,14 @@ export function MapRevisionHistoryDialog({
                         ) : (
                           <RotateCcw className="size-3" aria-hidden />
                         )}
-                        還原
+                        {t('mapEditor.revision.restore')}
                       </button>
                       <button
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void handleDelete(item.id)}
                         className="inline-flex items-center rounded-md border border-zinc-600 bg-zinc-800 p-1.5 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 disabled:opacity-50"
-                        title="刪除此筆"
+                        title={t('mapEditor.revision.deleteTitle')}
                       >
                         <Trash2 className="size-3.5" aria-hidden />
                       </button>

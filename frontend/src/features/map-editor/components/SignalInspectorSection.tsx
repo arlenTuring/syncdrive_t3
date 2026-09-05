@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
 import {
   parseSignalIconRules,
@@ -12,19 +13,6 @@ import {
   type SignalLamp,
   type SignalMountDirection,
 } from '../utils/signalFacility'
-
-const LAMP_LABEL: Record<SignalLamp, string> = {
-  green: '綠燈',
-  red: '紅燈',
-  offline: '離線',
-}
-
-const MOUNT_LABEL: Record<SignalMountDirection, string> = {
-  up: '上（up）',
-  down: '下（down）',
-  left: '左（left）',
-  right: '右（right）',
-}
 
 type Props = {
   facility: FacilityObject
@@ -41,7 +29,13 @@ export function SignalInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
+
   if (facility.type !== 'Signal') return null
+
+  const lampLabel = (lamp: SignalLamp) => t(`mapEditor.signal.lamp.${lamp}`)
+  const mountLabel = (dir: SignalMountDirection) =>
+    t(`mapEditor.signal.mountDir.${dir}`)
 
   const params = facility.parameters ?? {}
   const mountDirection = parseSignalMountDirection(params.mountDirection)
@@ -58,7 +52,7 @@ export function SignalInspectorSection({
   return (
     <section className="space-y-2.5 rounded-lg border border-amber-900/40 bg-amber-950/12 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-amber-500/90">
-        號誌圖示與 MQTT 規則
+        {t('mapEditor.signal.title')}
       </h3>
 
       <div className="flex items-center gap-3 rounded border border-zinc-700/80 bg-zinc-950/60 p-2">
@@ -68,7 +62,10 @@ export function SignalInspectorSection({
           className="h-12 w-12 shrink-0 object-contain"
         />
         <span className="text-[10px] text-zinc-500">
-          預覽：{LAMP_LABEL[display.lamp]} · {MOUNT_LABEL[mountDirection]}
+          {t('mapEditor.signal.preview', {
+            lamp: lampLabel(display.lamp),
+            mount: mountLabel(mountDirection),
+          })}
         </span>
       </div>
 
@@ -77,7 +74,7 @@ export function SignalInspectorSection({
           htmlFor="signal-mount"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          安裝方向
+          {t('mapEditor.signal.mount')}
         </label>
         <select
           id="signal-mount"
@@ -94,12 +91,12 @@ export function SignalInspectorSection({
         >
           {SIGNAL_MOUNT_DIRECTIONS.map((d) => (
             <option key={d} value={d}>
-              {MOUNT_LABEL[d]}
+              {mountLabel(d)}
             </option>
           ))}
         </select>
         <p className="mt-1 text-[10px] text-zinc-600">
-          圖示來自 map-editor-icons/traffic-signals（綠／紅／離線 × 上下左右）。
+          {t('mapEditor.signal.mountHint')}
         </p>
       </div>
 
@@ -108,7 +105,7 @@ export function SignalInspectorSection({
           htmlFor="signal-default-lamp"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          預設圖示（無規則命中時）
+          {t('mapEditor.signal.defaultLamp')}
         </label>
         <select
           id="signal-default-lamp"
@@ -125,7 +122,7 @@ export function SignalInspectorSection({
         >
           {SIGNAL_LAMPS.map((lamp) => (
             <option key={lamp} value={lamp}>
-              {LAMP_LABEL[lamp]}
+              {lampLabel(lamp)}
             </option>
           ))}
         </select>
@@ -134,7 +131,7 @@ export function SignalInspectorSection({
       <div>
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-[10px] text-zinc-500">
-            規則（欄位 + 條件 + 值 → 圖示）
+            {t('mapEditor.signal.rules')}
           </span>
           {!readOnly && (
             <button
@@ -152,12 +149,12 @@ export function SignalInspectorSection({
               }
               className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
             >
-              <Plus className="size-3" /> 新增
+              <Plus className="size-3" /> {t('mapEditor.signal.add')}
             </button>
           )}
         </div>
         {rules.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">尚無規則；會使用預設圖示。</p>
+          <p className="text-[10px] text-zinc-600">{t('mapEditor.signal.noRules')}</p>
         ) : (
           <ul className="space-y-2">
             {rules.map((rule, idx) => (
@@ -176,7 +173,7 @@ export function SignalInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="min-w-[7rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
-                  placeholder="欄位名稱"
+                  placeholder={t('mapEditor.signal.fieldPlaceholder')}
                 />
                 <select
                   disabled={readOnly}
@@ -208,7 +205,7 @@ export function SignalInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="min-w-[3.5rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
-                  placeholder="比對值"
+                  placeholder={t('mapEditor.signal.valuePlaceholder')}
                 />
                 <select
                   disabled={readOnly}
@@ -227,7 +224,7 @@ export function SignalInspectorSection({
                 >
                   {SIGNAL_LAMPS.map((lamp) => (
                     <option key={lamp} value={lamp}>
-                      {LAMP_LABEL[lamp]}
+                      {lampLabel(lamp)}
                     </option>
                   ))}
                 </select>
@@ -241,7 +238,7 @@ export function SignalInspectorSection({
                     type="button"
                     onClick={() => setRules(rules.filter((_, i) => i !== idx))}
                     className="rounded p-1 text-zinc-500 hover:bg-red-950/50 hover:text-red-400"
-                    aria-label="刪除此規則"
+                    aria-label={t('mapEditor.signal.deleteRule')}
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -253,7 +250,7 @@ export function SignalInspectorSection({
       </div>
 
       <pre className="overflow-x-auto rounded border border-zinc-700/80 bg-zinc-950/80 p-2 font-mono text-[9px] leading-relaxed text-zinc-500">
-        {`MQTT 範例：{ "entityId": "${facility.id}", "signal": "green" }\n規則例：欄位 signal、條件 =、值 green → 綠燈圖`}
+        {t('mapEditor.signal.mqttExample', { id: facility.id })}
       </pre>
     </section>
   )

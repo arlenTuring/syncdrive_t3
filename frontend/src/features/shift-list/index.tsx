@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavigateToSetupModal } from '../maintenance-tasks/components/NavigateToSetupModal';
 import { CreateShiftSchedulePage } from './components/CreateShiftSchedulePage';
 import { ShiftListPage } from './components/ShiftListPage';
@@ -19,6 +20,7 @@ type ShiftListAppProps = {
 };
 
 export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppProps) {
+  const { t } = useTranslation();
   // VTMS 側欄切入時一律從清單開始，不還原上次未關閉的編輯／預覽 hash
   const [location, setLocation] = useState<ShiftListLocation>(() =>
     embedded ? { screen: 'list' } : readShiftListLocation(),
@@ -115,8 +117,8 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
           onClose={closeSetupModal}
           onConfirm={() => startCreate('parametric')}
           onSecondary={() => startCreate('manual')}
-          primaryLabel="參數生成"
-          secondaryLabel="手動製作"
+          primaryLabel={t('shiftList.navigateSetup.parametric')}
+          secondaryLabel={t('shiftList.navigateSetup.manual')}
         />
       )}
     </>

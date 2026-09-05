@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 
 import { NumberInput } from '../../../components/NumberInput'
@@ -66,10 +67,10 @@ type Props = {
  * 斜接原本用黃色，亮度比其他三種高一截，那個問題最明顯，改成同一個亮度的藍。
  */
 const KIND_STYLE = {
-  rect: { fill: '#3f3f46', stroke: '#a1a1aa', label: '一般軌道' },
-  corner: { fill: '#2f4f4a', stroke: '#5eead4', label: '圓角軌道' },
-  taper: { fill: '#33435c', stroke: '#93b4e0', label: '斜接軌道' },
-  switch: { fill: '#463c5e', stroke: '#c4b5fd', label: '分岔軌道' },
+  rect: { fill: '#3f3f46', stroke: '#a1a1aa' },
+  corner: { fill: '#2f4f4a', stroke: '#5eead4' },
+  taper: { fill: '#33435c', stroke: '#93b4e0' },
+  switch: { fill: '#463c5e', stroke: '#c4b5fd' },
 } as const
 
 const MIN_WID = 4
@@ -113,6 +114,7 @@ export function TrackGenSizeDialog(props: Props) {
 }
 
 function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, onConfirm }: Props) {
+  const { t } = useTranslation()
   const [params, setParams] = useState<TrackGenSizeParams>(initial)
 
   /*
@@ -180,11 +182,15 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
         data-trackgen-size-dialog
       >
         <div>
-          <div className="text-base font-medium text-zinc-100">軌道要怎麼畫</div>
+          <div className="text-base font-medium text-zinc-100">{t('mapEditor.trackGen.title')}</div>
           <p className="mt-1 text-[12px] leading-snug text-zinc-500">
-            版面鋪滿你拉好的那個框，大小不必填。背景是畫布 {canvasW} × {canvasH} px
-            {scale >= 0.999 ? '，以原尺寸顯示' : `，縮到 ${(scale * 100).toFixed(0)}% 顯示`}
-            。改參數就重排一次，看到什麼就會生成什麼。
+            {scale >= 0.999
+              ? t('mapEditor.trackGen.hintFull', { w: canvasW, h: canvasH })
+              : t('mapEditor.trackGen.hintScaled', {
+                  w: canvasW,
+                  h: canvasH,
+                  pct: (scale * 100).toFixed(0),
+                })}
           </p>
         </div>
 
@@ -252,7 +258,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
 
         <div className="flex flex-wrap justify-center gap-5">
           <NumberField
-            label="軌道寬度"
+            label={t('mapEditor.trackGen.trackWidth')}
             value={params.trackWidthPx}
             suffix="px"
             min={MIN_WID}
@@ -260,17 +266,17 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
             onChange={(v) => setParams((p) => ({ ...p, trackWidthPx: v }))}
           />
           <NumberField
-            label="橫向一塊代表"
+            label={t('mapEditor.trackGen.metersPerBlockX')}
             value={params.metersPerBlockX}
-            suffix="公尺"
+            suffix={t('mapEditor.trackGen.meters')}
             min={1}
             max={2000}
             onChange={(v) => setParams((p) => ({ ...p, metersPerBlockX: v }))}
           />
           <NumberField
-            label="縱向一塊代表"
+            label={t('mapEditor.trackGen.metersPerBlockY')}
             value={params.metersPerBlockY}
-            suffix="公尺"
+            suffix={t('mapEditor.trackGen.meters')}
             min={1}
             max={2000}
             onChange={(v) => setParams((p) => ({ ...p, metersPerBlockY: v }))}
@@ -278,19 +284,19 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
         </div>
 
         <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400">
-          橫向{' '}
+          {t('mapEditor.trackGen.axisX')}{' '}
           <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
             {extent?.countX ?? 0}
           </b>
-          {' 塊（'}
+          {' '}{t('mapEditor.trackGen.blockUnit')}（
           <span className="font-mono tabular-nums">{Math.round(totalXM)} m</span>
-          {'）· 縱向 '}
+          ）· {t('mapEditor.trackGen.axisY')}{' '}
           <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
             {extent?.countY ?? 0}
           </b>
-          {' 塊（'}
+          {' '}{t('mapEditor.trackGen.blockUnit')}（
           <span className="font-mono tabular-nums">{Math.round(totalYM)} m</span>
-          {'）· 佔 '}
+          ）· {t('mapEditor.trackGen.occupies')}{' '}
           <b
             className={`font-mono tabular-nums ${
               over && (over.w > 1 || over.h > 1) ? 'text-amber-300' : 'text-zinc-200'
@@ -301,11 +307,11 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
           </b>
           {over && (over.w > 1 || over.h > 1) ? (
             <span className="text-amber-300" data-trackgen-over>
-              {'　軌道太粗，超出框 '}
+              {t('mapEditor.trackGen.overflowBefore')}
               <b className="font-mono tabular-nums">
                 {over.w > 1 ? `${over.w}` : '0'} × {over.h > 1 ? `${over.h}` : '0'} px
               </b>
-              ，把軌道寬度調小
+              {t('mapEditor.trackGen.overflowAfter')}
             </span>
           ) : null}
         </div>
@@ -328,12 +334,12 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   style={{ background: st.fill, borderColor: st.stroke }}
                   aria-hidden
                 />
-                {st.label}
+                {t(`mapEditor.trackGen.kinds.${kind}`)}
                 <b className="font-mono tabular-nums text-zinc-200">{n}</b>
               </span>
             )
           })}
-          <span className="text-zinc-500">顏色只是預覽的標示，生成出來的軌道不受影響</span>
+          <span className="text-zinc-500">{t('mapEditor.trackGen.legendNote')}</span>
         </div>
 
         <div className="flex justify-end gap-2">
@@ -342,14 +348,14 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
             onClick={onCancel}
             className="rounded-md border border-zinc-600 px-3 py-1.5 text-[12px] text-zinc-300 transition hover:border-zinc-400 hover:text-zinc-100"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={confirm}
             className="rounded-md border border-cyan-500/70 bg-cyan-500/15 px-3 py-1.5 text-[12px] text-cyan-200 transition hover:bg-cyan-500/25"
           >
-            開始生成
+            {t('mapEditor.trackGen.generate')}
           </button>
         </div>
       </div>

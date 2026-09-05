@@ -10,7 +10,8 @@ export type ShellView =
   | 'shift-list'
   | 'maintenance-tasks'
   | 'map'
-  | 'trajectory';
+  | 'trajectory'
+  | 'system-foundation';
 
 export type ShellNavItem = {
   id: ShellView;
@@ -28,30 +29,40 @@ export type ScheduleSubView =
 export type ScheduleNavItem = ShellNavItem;
 
 export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'shift-deployment', label: '班表部署管理', enabled: true },
-  { id: 'degraded-operation', label: '降級運轉管理', enabled: false },
-  { id: 'dispatch-scheduling', label: '派遣調度管理', enabled: true },
-  { id: 'psd-control', label: '車門月台控制', enabled: true },
-  { id: 'virtual-fence', label: '虛擬圍籬管理', enabled: true },
+  { id: 'shift-deployment', label: 'nav.items.shift-deployment', enabled: true },
+  { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: false },
+  { id: 'dispatch-scheduling', label: 'nav.items.dispatch-scheduling', enabled: true },
+  { id: 'psd-control', label: 'nav.items.psd-control', enabled: true },
 ];
 
 export function isOperationsView(view: string): boolean {
   return OPERATIONS_NAV_ITEMS.some((item) => item.id === view);
 }
 
+/** 場域管理模組子選單（對齊 TP13C 場域管理） */
+export const SITE_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'map', label: 'nav.items.map', enabled: true },
+  { id: 'virtual-fence', label: 'nav.items.virtual-fence', enabled: true },
+];
+
+export function isSiteView(view: string): boolean {
+  return SITE_NAV_ITEMS.some((item) => item.id === view);
+}
+
 export const SCHEDULE_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'shift-records', label: '班次運行紀錄', enabled: true },
-  { id: 'time-templates', label: '時間模板管理', enabled: true },
-  { id: 'shift-list', label: '班表清單管理', enabled: true },
-  { id: 'maintenance-tasks', label: '整備任務管理', enabled: true },
+  { id: 'shift-records', label: 'nav.items.shift-records', enabled: true },
+  { id: 'time-templates', label: 'nav.items.time-templates', enabled: true },
+  { id: 'shift-list', label: 'nav.items.shift-list', enabled: true },
+  { id: 'maintenance-tasks', label: 'nav.items.maintenance-tasks', enabled: true },
 ];
 
 export const VEHICLE_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'trajectory', label: '載具軌跡圖台', enabled: true },
+  { id: 'trajectory', label: 'nav.items.trajectory', enabled: true },
 ];
 
 export type ShellModuleGroup = {
   id: string;
+  /** i18n key；使用者自訂別名不經由此欄 */
   label: string;
   enabled: boolean;
   /** 無子選單時，點擊頂層直接導向此畫面 */
@@ -66,35 +77,42 @@ export type ScheduleModuleGroup = ShellModuleGroup;
 export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   {
     id: 'monitor',
-    label: '數據監控模組',
+    label: 'nav.modules.monitor',
     enabled: false,
   },
   {
     id: 'schedule',
-    label: '班表管理模組',
+    label: 'nav.modules.schedule',
     enabled: true,
     items: SCHEDULE_NAV_ITEMS,
   },
   {
     id: 'operations',
-    label: '營運管理模組',
+    label: 'nav.modules.operations',
     enabled: true,
     items: OPERATIONS_NAV_ITEMS,
   },
   {
     id: 'vehicle',
-    label: '載具管理模組',
+    label: 'nav.modules.vehicle',
     enabled: true,
     items: VEHICLE_NAV_ITEMS,
   },
   {
     id: 'site',
-    label: '場域管理模組',
+    label: 'nav.modules.site',
     enabled: true,
-    navigateTo: 'map',
+    items: SITE_NAV_ITEMS,
   },
-  { id: 'service', label: '服務管理模組', enabled: false },
-  { id: 'media', label: '媒體管理模組', enabled: false },
+  { id: 'service', label: 'nav.modules.service', enabled: false },
+  { id: 'media', label: 'nav.modules.media', enabled: false },
+  {
+    id: 'system',
+    label: 'nav.modules.system',
+    enabled: true,
+    navigateTo: 'system-foundation',
+  },
+  { id: 'permission', label: 'nav.modules.permission', enabled: false },
 ];
 
 export function isScheduleSubView(view: ShellView): view is ScheduleSubView {

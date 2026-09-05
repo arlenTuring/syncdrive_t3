@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Palette, Radio, Trash2, X, Zap } from 'lucide-react'
 import type { FacilityObject } from '../types/facility'
 import type { MqttLiveEntry, MqttLogLine } from '../live/mqttLiveTypes'
@@ -39,6 +40,7 @@ export function MqttSimulatorPanel({
   embedded = false,
   onClose,
 }: MqttSimulatorPanelProps) {
+  const { t } = useTranslation()
   const [customTopic, setCustomTopic] = useState(() =>
     buildMqttTopic('Light/custom-1'),
   )
@@ -89,12 +91,12 @@ export function MqttSimulatorPanel({
 
   const runColorSimOnce = useCallback(() => {
     if (colorSimTargets.length === 0) {
-      alert('目前地圖沒有可改色的 Track／Facility／Signal 元件。')
+      alert(t('mapEditor.mqttSim.noColorTargetsAlert'))
       return
     }
     publishColorSimStep(colorSimStepRef.current)
     colorSimStepRef.current += 1
-  }, [colorSimTargets, publishColorSimStep])
+  }, [colorSimTargets, publishColorSimStep, t])
 
   const toggleColorSimLoop = useCallback(() => {
     if (colorSimTimerRef.current) {
@@ -102,7 +104,7 @@ export function MqttSimulatorPanel({
       return
     }
     if (colorSimTargets.length === 0) {
-      alert('目前地圖沒有可改色的 Track／Facility／Signal 元件。')
+      alert(t('mapEditor.mqttSim.noColorTargetsAlert'))
       return
     }
     setColorSimLoop(true)
@@ -112,7 +114,7 @@ export function MqttSimulatorPanel({
       publishColorSimStep(colorSimStepRef.current)
       colorSimStepRef.current += 1
     }, 1200)
-  }, [colorSimTargets, publishColorSimStep, stopColorSimLoop])
+  }, [colorSimTargets, publishColorSimStep, stopColorSimLoop, t])
 
   const stopVehicleLoop = useCallback(() => {
     if (vehicleTimerRef.current) {
@@ -165,15 +167,15 @@ export function MqttSimulatorPanel({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-600 px-3 py-2">
         <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-zinc-100">
           <Radio className="size-4 shrink-0 text-amber-400" aria-hidden />
-          <span className="truncate">MQTT 模擬</span>
+          <span className="truncate">{t('mapEditor.mqttSim.title')}</span>
         </span>
         {onClose ? (
         <button
           type="button"
           onClick={onClose}
           className="rounded p-1 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-          title="關閉"
-          aria-label="關閉測試模式"
+          title={t('mapEditor.mqttSim.closeTitle')}
+          aria-label={t('mapEditor.mqttSim.closeAria')}
         >
           <X className="size-5" aria-hidden />
         </button>
@@ -196,7 +198,7 @@ export function MqttSimulatorPanel({
               disabled={hasDemoNodes}
               className="rounded border border-amber-700/60 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100 enabled:hover:bg-amber-900/50 disabled:opacity-40"
             >
-              {hasDemoNodes ? '已有示範節點' : '示範節點'}
+              {hasDemoNodes ? t('mapEditor.mqttSim.demoNodesReady') : t('mapEditor.mqttSim.demoNodesShort')}
             </button>
             <button
               type="button"
@@ -208,7 +210,7 @@ export function MqttSimulatorPanel({
               }
               className="rounded border border-zinc-600/60 bg-zinc-900/50 px-2 py-1 text-[11px] hover:bg-zinc-800/60"
             >
-              閃爍
+              {t('mapEditor.mqttSim.blink')}
             </button>
             <button
               type="button"
@@ -216,7 +218,7 @@ export function MqttSimulatorPanel({
               disabled={colorSimTargets.length === 0}
               className="rounded border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-[11px] text-cyan-100 enabled:hover:bg-cyan-900/50 disabled:opacity-40"
             >
-              改色
+              {t('mapEditor.mqttSim.recolor')}
             </button>
             <button
               type="button"
@@ -228,7 +230,7 @@ export function MqttSimulatorPanel({
                   : 'border-zinc-600/60 bg-zinc-900/50 hover:bg-zinc-800/60'
               }`}
             >
-              {colorSimLoop ? '停改色' : '改色循環'}
+              {colorSimLoop ? t('mapEditor.mqttSim.stopRecolor') : t('mapEditor.mqttSim.recolorLoop')}
             </button>
             <button
               type="button"
@@ -240,7 +242,7 @@ export function MqttSimulatorPanel({
               }`}
             >
               <Zap className="size-3" aria-hidden />
-              {vehicleLoop ? '停繞圈' : '車繞圈'}
+              {vehicleLoop ? t('mapEditor.mqttSim.stopVehicleLoop') : t('mapEditor.mqttSim.vehicleLoop')}
             </button>
             <button
               type="button"
@@ -248,23 +250,24 @@ export function MqttSimulatorPanel({
               className="inline-flex items-center gap-1 rounded border border-zinc-600/50 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800/50"
             >
               <Trash2 className="size-3" aria-hidden />
-              清除紀錄
+              {t('mapEditor.mqttSim.clearLog')}
             </button>
             <span className="font-mono text-[10px] text-zinc-500">
-              紀錄 {mqttLog.length} · 物件 {mqttRows.length}
+              {t('mapEditor.mqttSim.logStats', { logs: mqttLog.length, objects: mqttRows.length })}
             </span>
           </>
         ) : (
           <>
         <p className="leading-relaxed text-zinc-500">
-          訊號由{' '}
+          {t('mapEditor.mqttSim.signalBroadcastBefore')}{' '}
           <code className="rounded bg-zinc-800 px-1 text-[10px] text-cyan-300">
             mockMqttSingleton
           </code>{' '}
-          廣播；payload 需含{' '}
+          {t('mapEditor.mqttSim.signalBroadcastMid')}{' '}
           <code className="text-cyan-300">entityId</code>
-          （格式為「元件名稱/尾端ID」，與屬性面板一致）。訂閱萬用字{' '}
-          <code className="text-cyan-300">#</code> 全收。
+          {t('mapEditor.mqttSim.signalBroadcastAfter')}{' '}
+          <code className="text-cyan-300">#</code>{' '}
+          {t('mapEditor.mqttSim.signalBroadcastEnd')}
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -274,19 +277,21 @@ export function MqttSimulatorPanel({
             disabled={hasDemoNodes}
             className="rounded-md border border-amber-700/80 bg-amber-950/50 px-2 py-1.5 text-amber-100 transition enabled:hover:bg-amber-900/60 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {hasDemoNodes ? '已有示範節點' : '建立示範節點（閃爍＋車）'}
+            {hasDemoNodes ? t('mapEditor.mqttSim.demoNodesReady') : t('mapEditor.mqttSim.demoNodesCreate')}
           </button>
         </div>
 
         <div className="rounded-md border border-zinc-700 bg-zinc-950/80 p-2">
           <div className="mb-1.5 flex items-center gap-1.5 font-medium text-zinc-400">
             <Palette className="size-3.5 text-cyan-400" aria-hidden />
-            地圖元件改色（即時 MQTT，不寫入地圖檔）
+            {t('mapEditor.mqttSim.colorSection')}
           </div>
           <p className="mb-2 leading-relaxed text-[10px] text-zinc-500">
-            從目前地圖挑選最多 6 個 Track／Facility／Signal，發佈{' '}
-            <code className="text-cyan-300">fillColor</code> 或對應{' '}
-            <code className="text-cyan-300">colorRules</code> 欄位。僅影響畫面即時顯示。
+            {t('mapEditor.mqttSim.colorTargetsHintBefore')}{' '}
+            <code className="text-cyan-300">fillColor</code>{' '}
+            {t('mapEditor.mqttSim.colorTargetsHintMid')}{' '}
+            <code className="text-cyan-300">colorRules</code>{' '}
+            {t('mapEditor.mqttSim.colorTargetsHintAfter')}
           </p>
           {colorSimTargets.length > 0 ? (
             <ul className="mb-2 space-y-0.5 font-mono text-[10px] text-zinc-500">
@@ -298,7 +303,7 @@ export function MqttSimulatorPanel({
             </ul>
           ) : (
             <p className="mb-2 text-[10px] text-amber-400/90">
-              尚無可改色元件（需 Track、Facility 或 Signal）。
+              {t('mapEditor.mqttSim.noColorTargets')}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -308,7 +313,7 @@ export function MqttSimulatorPanel({
               disabled={colorSimTargets.length === 0}
               className="rounded border border-cyan-700/70 bg-cyan-950/40 px-2 py-1 text-[11px] text-cyan-100 enabled:hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              下一組顏色
+              {t('mapEditor.mqttSim.nextColors')}
             </button>
             <button
               type="button"
@@ -320,7 +325,7 @@ export function MqttSimulatorPanel({
                   : 'border-zinc-600 bg-zinc-800 hover:bg-zinc-700'
               }`}
             >
-              {colorSimLoop ? '停止改色循環' : '開始改色循環'}
+              {colorSimLoop ? t('mapEditor.mqttSim.stopRecolorLoop') : t('mapEditor.mqttSim.startRecolorLoop')}
             </button>
           </div>
           <div className="mt-2 flex flex-wrap gap-1">
@@ -336,7 +341,7 @@ export function MqttSimulatorPanel({
         </div>
 
         <div className="rounded-md border border-zinc-700 bg-zinc-950/80 p-2">
-          <div className="mb-1.5 font-medium text-zinc-400">示範節點</div>
+          <div className="mb-1.5 font-medium text-zinc-400">{t('mapEditor.mqttSim.demoSection')}</div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -348,7 +353,7 @@ export function MqttSimulatorPanel({
               }
               className="rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-[11px] hover:bg-zinc-700"
             >
-              閃爍（blink）
+              {t('mapEditor.mqttSim.blinkAction')}
             </button>
             <button
               type="button"
@@ -360,7 +365,7 @@ export function MqttSimulatorPanel({
               }
               className="rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-[11px] hover:bg-zinc-700"
             >
-              邊框強調
+              {t('mapEditor.mqttSim.highlight')}
             </button>
             <button
               type="button"
@@ -375,7 +380,7 @@ export function MqttSimulatorPanel({
               }
               className="rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-[11px] hover:bg-zinc-700"
             >
-              車移到畫面中心
+              {t('mapEditor.mqttSim.moveToCenter')}
             </button>
             <button
               type="button"
@@ -387,13 +392,13 @@ export function MqttSimulatorPanel({
               }`}
             >
               <Zap className="size-3" aria-hidden />
-              {vehicleLoop ? '停止繞圈' : '車輛繞圈（週期位置）'}
+              {vehicleLoop ? t('mapEditor.mqttSim.stopVehicleLoopFull') : t('mapEditor.mqttSim.vehicleLoopFull')}
             </button>
           </div>
         </div>
 
         <div>
-          <div className="mb-1 font-medium text-zinc-400">自訂發佈</div>
+          <div className="mb-1 font-medium text-zinc-400">{t('mapEditor.mqttSim.customPublish')}</div>
           <label className="sr-only" htmlFor="mqtt-custom-topic">
             topic
           </label>
@@ -417,24 +422,24 @@ export function MqttSimulatorPanel({
                 const o = JSON.parse(customJson) as object
                 publish(customTopic, o)
               } catch {
-                alert('JSON 格式錯誤')
+                alert(t('mapEditor.mqttSim.jsonError'))
               }
             }}
             className="mt-1 rounded border border-cyan-700 bg-cyan-950/50 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-900/50"
           >
-            發佈到 {customTopic || '(空 topic)'}
+            {t('mapEditor.mqttSim.publishTo', { topic: customTopic || t('mapEditor.mqttSim.emptyTopic') })}
           </button>
         </div>
 
         <div>
           <div className="mb-1 flex items-center justify-between">
             <span className="font-medium text-zinc-400">
-              物件與 topic（{mqttRows.length}）
+              {t('mapEditor.mqttSim.objectsAndTopics', { count: mqttRows.length })}
             </span>
           </div>
           <ul className="max-h-28 space-y-1 overflow-y-auto rounded border border-zinc-700/80 bg-zinc-950/50 p-1.5 font-mono text-[10px] text-zinc-400">
             {mqttRows.length === 0 ? (
-              <li>尚無物件</li>
+              <li>{t('mapEditor.mqttSim.noObjects')}</li>
             ) : (
               mqttRows.map((f) => {
                 const eid = getMqttEntityId(f)
@@ -452,7 +457,7 @@ export function MqttSimulatorPanel({
                       <>
                         <br />
                         <span className="text-amber-400/90">
-                          最後: {lr.topic}
+                          {t('mapEditor.mqttSim.lastReceived', { topic: lr.topic })}
                         </span>
                       </>
                     )}
@@ -465,19 +470,19 @@ export function MqttSimulatorPanel({
 
         <div className="min-h-0 flex-1">
           <div className="mb-1 flex items-center justify-between">
-            <span className="font-medium text-zinc-400">訊息紀錄</span>
+            <span className="font-medium text-zinc-400">{t('mapEditor.mqttSim.messageLog')}</span>
             <button
               type="button"
               onClick={onClearLog}
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
             >
               <Trash2 className="size-3" aria-hidden />
-              清除
+              {t('mapEditor.mqttSim.clear')}
             </button>
           </div>
           <ul className="max-h-36 space-y-1 overflow-y-auto rounded border border-zinc-700/80 bg-black/40 p-1.5 font-mono text-[10px] leading-snug text-zinc-500">
             {mqttLog.length === 0 ? (
-              <li className="text-zinc-600">尚無訊息</li>
+              <li className="text-zinc-600">{t('mapEditor.mqttSim.noMessages')}</li>
             ) : (
               mqttLog.map((line, i) => (
                 <li

@@ -59,3 +59,7 @@ mosquitto/config/passwordfile
 # MQTT TLS 憑證：私鑰絕對不能進版控，公開的憑證也一起排除——
 # 它們由 deploy/mqtt-certs.sh 在目標主機上產生，每個環境一套。
 mosquitto/certs/
+
+# HTTPS／反向代理傳輸憑證（由系統基礎模組上傳，含私鑰）
+https-certs/
+backend/https-certs/

@@ -1,6 +1,7 @@
 import { NumberInput } from '../../../components/NumberInput'
 import { ChevronDown } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   TASK_TYPE_OPTIONS,
   findScheduleTaskOverlap,
@@ -34,6 +35,7 @@ type TaskSettingsFormProps = {
 };
 
 function InactiveZoneWarning() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-start gap-2 rounded-lg bg-red-500/5 px-3 py-2 text-xs text-red-400">
       <svg
@@ -49,14 +51,13 @@ function InactiveZoneWarning() {
           clipRule="evenodd"
         />
       </svg>
-      <span>
-        時間超出營運時段：任務僅能排定在 Step 1 已設定的營運時段內，請調整開始或結束時間。
-      </span>
+      <span>{t('timeTemplates.taskSettings.inactiveWarning')}</span>
     </div>
   );
 }
 
 function OverlapWarning() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-start gap-2 rounded-lg bg-red-500/5 px-3 py-2 text-xs text-red-400">
       <svg
@@ -72,9 +73,7 @@ function OverlapWarning() {
           clipRule="evenodd"
         />
       </svg>
-      <span>
-        任務重疊：此任務的時間範圍與同列其他任務重疊，請調整開始或結束時間後再確認。
-      </span>
+      <span>{t('timeTemplates.taskSettings.overlapWarning')}</span>
     </div>
   );
 }
@@ -84,6 +83,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
     { formId, task, tasks, activeIntervalRanges, rowCount, onConfirm, onDirtyChange, onCanConfirmChange },
     ref,
   ) {
+    const { t } = useTranslation();
     const [taskType, setTaskType] = useState<TaskTypeKey>(task.taskType);
     const [rowIndex, setRowIndex] = useState(task.rowIndex);
     const [startTime, setStartTime] = useState(formatMinutesToTime(task.startMinute));
@@ -164,7 +164,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
       if (!canConfirm) return;
       const start = startMinute!;
       const end = endMinute!;
-      const option = TASK_TYPE_OPTIONS.find((t) => t.key === taskType);
+      const option = TASK_TYPE_OPTIONS.find((item) => item.key === taskType);
       onConfirm({
         ...task,
         taskType,
@@ -186,7 +186,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
         }}
       >
         <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-4">
-          <span className={LABEL_CLASS}>群組編號</span>
+          <span className={LABEL_CLASS}>{t('timeTemplates.taskSettings.groupNumber')}</span>
           <NumberInput
             min={1}
             max={rowCount}
@@ -195,7 +195,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
             className={`${FIELD_CLASS} tabular-nums`}
           />
 
-          <span className={LABEL_CLASS}>任務類型</span>
+          <span className={LABEL_CLASS}>{t('timeTemplates.taskSettings.taskType')}</span>
           <div className="relative min-w-0">
             <select
               value={taskType}
@@ -204,14 +204,14 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
             >
               {TASK_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.key} value={opt.key} className="bg-zinc-900">
-                  {opt.label}
+                  {t(`timeTemplates.taskTypes.${opt.key}`)}
                 </option>
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           </div>
 
-          <span className={`${LABEL_CLASS} self-center`}>時間區段</span>
+          <span className={`${LABEL_CLASS} self-center`}>{t('timeTemplates.taskSettings.timeRange')}</span>
           <div
             className={
               isDirty && (overlaps || outsideActive)

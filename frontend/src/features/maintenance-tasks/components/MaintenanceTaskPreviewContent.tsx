@@ -12,7 +12,7 @@ import {
   type CreateMaintenanceTaskStep,
   type MaintenanceTaskCreateDraft,
 } from '../types/create';
-import { MAINTENANCE_STEP_SKIPPED_MESSAGE } from './StepSectionToggle';
+import { useTranslation } from 'react-i18next';
 
 export function PreviewSection({
   step,
@@ -27,6 +27,7 @@ export function PreviewSection({
   onEdit?: (step: CreateMaintenanceTaskStep) => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const showSkipped = enabled === false;
 
   return (
@@ -43,7 +44,7 @@ export function PreviewSection({
             className="inline-flex items-center gap-1 rounded-md border border-zinc-700/80 px-2.5 py-1 text-xs text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-800 hover:text-zinc-200"
           >
             <Pencil className="size-3" />
-            編輯
+            {t('maintenanceTasks.previewChrome.edit')}
           </button>
         )}
         {enabled !== undefined && (
@@ -54,14 +55,16 @@ export function PreviewSection({
                 : 'bg-zinc-800 text-zinc-500'
             }`}
           >
-            {enabled ? '已啟用' : '未啟用'}
+            {enabled
+              ? t('maintenanceTasks.previewChrome.enabled')
+              : t('maintenanceTasks.previewChrome.disabled')}
           </span>
         )}
       </header>
 
       <div className="px-5 py-4">
         {showSkipped ? (
-          <p className="text-sm text-zinc-600">{MAINTENANCE_STEP_SKIPPED_MESSAGE}</p>
+          <p className="text-sm text-zinc-600">{t('maintenanceTasks.stepSkipped')}</p>
         ) : (
           children
         )}
@@ -122,6 +125,7 @@ export function MaintenanceTaskPreviewContent({
   onEditStep,
   sectionExtras,
 }: MaintenanceTaskPreviewContentProps) {
+  const { t } = useTranslation();
   const charging = normalizeChargingDraft(draft.charging);
   const carWash = normalizeCarWashDraft(draft.carWash);
   const maintenance = normalizeMaintenanceDraft(draft.maintenance);
@@ -131,12 +135,12 @@ export function MaintenanceTaskPreviewContent({
   const chargingLines: string[] = [];
   if (charging.stepEnabled && charging.triggerPercent) {
     chargingLines.push(
-      `如電池電量已小於或等於 ${charging.triggerPercent}% 時，需回廠充電`,
+      t('maintenanceTasks.charging.triggerPreview', { percent: charging.triggerPercent }),
     );
   }
   if (charging.stepEnabled && charging.upperLimitDetectionEnabled && charging.upperLimitPercent) {
     chargingLines.push(
-      `如電池電量已大於或等於 ${charging.upperLimitPercent}% 時，即停止充電`,
+      t('maintenanceTasks.charging.upperPreview', { percent: charging.upperLimitPercent }),
     );
   }
   for (const row of charging.equipmentRows) {
@@ -144,7 +148,9 @@ export function MaintenanceTaskPreviewContent({
       chargingLines.push(
         formatEquipmentRowPreviewLine(
           row,
-          `每分鐘充電率 ${row.chargeRateKwhPerMin || '—'} 度電/分鐘`,
+          t('maintenanceTasks.charging.chargeRatePreview', {
+            rate: row.chargeRateKwhPerMin || '—',
+          }),
         ),
       );
     }
@@ -153,16 +159,20 @@ export function MaintenanceTaskPreviewContent({
   const carWashLines: string[] = [];
   if (carWash.mileageDetectionEnabled && carWash.mileageTriggerKm) {
     carWashLines.push(
-      `每經過 ${carWash.mileageTriggerKm} 公里的行駛里程，需進行洗車作業`,
+      t('maintenanceTasks.carWash.mileagePreview', { km: carWash.mileageTriggerKm }),
     );
   }
   if (carWash.timeDetectionEnabled && carWash.timeTriggerHours) {
     carWashLines.push(
-      `每經過 ${carWash.timeTriggerHours} 小時的行駛時數，需進行洗車作業`,
+      t('maintenanceTasks.carWash.timePreview', { hours: carWash.timeTriggerHours }),
     );
   }
   if (carWash.operationDurationMinutes) {
-    carWashLines.push(`每次需 ${carWash.operationDurationMinutes} 分鐘，進行洗車作業`);
+    carWashLines.push(
+      t('maintenanceTasks.carWash.durationPreview', {
+        minutes: carWash.operationDurationMinutes,
+      }),
+    );
   }
   for (const row of carWash.equipmentRows) {
     if (row.mapCode) {
@@ -178,7 +188,10 @@ export function MaintenanceTaskPreviewContent({
   ];
 
   const stepLabels = Object.fromEntries(
-    CREATE_MAINTENANCE_TASK_STEPS.map((s) => [s.step, s.label]),
+    CREATE_MAINTENANCE_TASK_STEPS.map((s) => [
+      s.step,
+      t(`maintenanceTasks.createWizard.steps.${s.step}`),
+    ]),
   ) as Record<number, string>;
 
   const wrapSection = (extra: ReactNode | undefined, body: ReactNode) => {
@@ -195,9 +208,18 @@ export function MaintenanceTaskPreviewContent({
     <div className="space-y-4">
       <PreviewSection step={1} title={stepLabels[1]} onEdit={onEditStep}>
         <dl className="space-y-3">
-          <PreviewRow label="班表名稱" value={draft.basic.name.trim() || '—'} />
-          <PreviewRow label="版本編號" value={draft.basic.version.trim() || '—'} />
-          <PreviewRow label="備註說明" value={draft.basic.remarks.trim() || '—'} />
+          <PreviewRow
+            label={t('maintenanceTasks.previewChrome.basicName')}
+            value={draft.basic.name.trim() || '—'}
+          />
+          <PreviewRow
+            label={t('maintenanceTasks.previewChrome.version')}
+            value={draft.basic.version.trim() || '—'}
+          />
+          <PreviewRow
+            label={t('maintenanceTasks.previewChrome.remarks')}
+            value={draft.basic.remarks.trim() || '—'}
+          />
         </dl>
       </PreviewSection>
 
@@ -232,7 +254,11 @@ export function MaintenanceTaskPreviewContent({
                 .filter((row) => row.mapCode)
                 .map((row) => formatEquipmentRowPreviewLine(row)),
               ...(preTrip.operationDurationMinutes
-                ? [`單次作業時長 ${preTrip.operationDurationMinutes} 分鐘`]
+                ? [
+                    t('maintenanceTasks.preTrip.durationLine', {
+                      minutes: preTrip.operationDurationMinutes,
+                    }),
+                  ]
                 : []),
             ]}
           />,
@@ -248,9 +274,13 @@ export function MaintenanceTaskPreviewContent({
                 .filter((row) => row.mapCode)
                 .map((row) => formatEquipmentRowPreviewLine(row)),
               ...(mobile.durationFollowTemplate !== false
-                ? ['作業時長：依排班調度決定時長']
+                ? [t('maintenanceTasks.mobile.durationFollowSchedule')]
                 : mobile.operationDurationMinutes
-                ? [`單次作業時長 ${mobile.operationDurationMinutes} 分鐘`]
+                ? [
+                    t('maintenanceTasks.mobile.durationLine', {
+                      minutes: mobile.operationDurationMinutes,
+                    }),
+                  ]
                 : []),
             ]}
           />,

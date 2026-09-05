@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../../i18n'
 import { MapEditorToolbar } from './components/MapEditorToolbar'
 import { MapLibraryPage } from './components/MapLibraryPage'
 import { Inspector } from './components/Inspector'
@@ -271,6 +273,7 @@ export default function MapEditorApp({
   workspace = 'map',
   onBackToHome,
 }: MapEditorAppProps) {
+  const { t } = useTranslation()
   const isMapWorkspace = workspace === 'map'
   const isTrajectoryWorkspace = workspace === 'trajectory'
   const [areas, setAreas] = useState<MapAreaObject[]>([])
@@ -968,7 +971,7 @@ export default function MapEditorApp({
       return {
         stationIds: routePlanningDraft.stationIds,
         color: 'rgba(251, 191, 36, 0.95)',
-        label: routePlanningDraft.displayName.trim() || '編輯中路線',
+        label: routePlanningDraft.displayName.trim() || t('mapEditor.chrome.editingRoute'),
         emphasized: true,
         avgTravelTimeSeconds: routePlanningDraft.avgTravelTimeSeconds,
         minTravelTimeSeconds: routePlanningDraft.minTravelTimeSeconds,
@@ -1083,7 +1086,7 @@ export default function MapEditorApp({
     (routeId: string) => {
       const route = mapRoutes.find((r) => r.routeId === routeId)
       const label = route?.displayName ?? routeId
-      if (!window.confirm(`確定刪除路線「${label}」？此動作無法復原。`)) return
+      if (!window.confirm(t('mapEditor.chrome.confirmDeleteRoute', { label }))) return
       pushHistory()
       setMapRoutes((prev) => prev.filter((r) => r.routeId !== routeId))
       setMapRouteGroups((prev) => removeRouteFromAllGroups(prev, routeId))
@@ -1175,10 +1178,10 @@ export default function MapEditorApp({
   const onDeleteGroup = useCallback(
     (groupId: string) => {
       const group = mapRouteGroups.find((g) => g.groupId === groupId)
-      const label = group?.displayName ?? '此路線群組'
+      const label = group?.displayName ?? t('mapEditor.chrome.thisRouteGroup')
       if (
         !window.confirm(
-          `確定刪除「${label}」？群組內的路線將移至「未分組」，路線本身不會被刪除。`,
+          t('mapEditor.chrome.confirmDeleteGroup', { label }),
         )
       ) {
         return
@@ -1290,7 +1293,7 @@ export default function MapEditorApp({
 
       let entry = getMapLibraryEntry(libraryId)
       if (!entry) {
-        alert('找不到地圖，請重新整理清單。')
+        alert(t('mapEditor.chrome.mapNotFound'))
         return
       }
       /*
@@ -1320,7 +1323,7 @@ export default function MapEditorApp({
     exitCropMode()
     resetHistory()
     setAutosaveStatus('idle')
-    setAutosaveTimeLabel('編輯中：變更將自動儲存至地圖庫')
+    setAutosaveTimeLabel(t('mapEditor.chrome.editingAutosaveLabel'))
     if (selectedAreaId !== null) {
       const area = areas.find((a) => a.id === selectedAreaId)
       if (
@@ -1476,7 +1479,7 @@ export default function MapEditorApp({
     setListDrawerTab((tab) => (tab === 'palette' ? null : tab))
     resetHistory()
     setAutosaveStatus('saved')
-    setAutosaveTimeLabel(`已儲存 ${new Date().toLocaleTimeString()}`)
+    setAutosaveTimeLabel(t('mapEditor.chrome.savedAt', { time: new Date().toLocaleTimeString() }))
     if (leaveEditNavigateToLibrary) {
       setLeaveEditNavigateToLibrary(false)
       setMapScreen('library')
@@ -1559,13 +1562,15 @@ export default function MapEditorApp({
       const savedAt = new Date()
       setAutosaveStatus('saved')
       setAutosaveTimeLabel(
-        `已自動儲存 ${savedAt.toLocaleString('zh-TW', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })}`,
+        t('mapEditor.chrome.autosavedAt', {
+          time: savedAt.toLocaleString(i18n.language === 'en-US' ? 'en-US' : 'zh-TW', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        }),
       )
     }, 900)
     autosaveTimerRef.current = t
@@ -1607,7 +1612,7 @@ export default function MapEditorApp({
       } catch (e) {
         if (seq !== trajectoryLoadSeqRef.current) return
         console.error(e)
-        alert(`載入軌跡失敗：${e instanceof Error ? e.message : String(e)}`)
+        alert(t('mapEditor.chrome.trajectoryLoadFailed', { error: e instanceof Error ? e.message : String(e) }))
         setLoadedTrajectory(null)
       }
     },
@@ -1656,7 +1661,7 @@ export default function MapEditorApp({
   const onImportTrajectoryFile = useCallback(
     async (file: File) => {
       if (!selectedVehicleId) {
-        alert('請先選擇車輛')
+        alert(t('mapEditor.chrome.selectVehicleFirst'))
         return
       }
       try {
@@ -1671,7 +1676,7 @@ export default function MapEditorApp({
         setReplayHeadIndex(null)
       } catch (e) {
         console.error(e)
-        alert(`匯入軌跡失敗：${e instanceof Error ? e.message : String(e)}`)
+        alert(t('mapEditor.chrome.trajectoryImportFailed', { error: e instanceof Error ? e.message : String(e) }))
       }
     },
     [selectedVehicleId],
@@ -1685,7 +1690,7 @@ export default function MapEditorApp({
         {
           id: '__import__',
           path: '',
-          label: '匯入的檔案',
+          label: t('mapEditor.chrome.importedFile'),
           updatedAt: new Date().toISOString(),
         },
         ...base,
@@ -2182,7 +2187,7 @@ export default function MapEditorApp({
         const newBasemap = trackGen
           ? {
               ...blank,
-              customName: `軌道生成 ${id}`,
+              customName: t('mapEditor.chrome.trackGenName', { id }),
               parameters: { ...blank.parameters, ...defaultTrackGenParameters() },
             }
           : blank
@@ -2253,7 +2258,7 @@ export default function MapEditorApp({
       const newBasemap = trackGen
         ? {
             ...blank,
-            customName: `軌道生成 ${id}`,
+            customName: t('mapEditor.chrome.trackGenName', { id }),
             parameters: { ...blank.parameters, ...defaultTrackGenParameters() },
           }
         : blank
@@ -2301,7 +2306,7 @@ export default function MapEditorApp({
       const blank = createBlankArea(areaId, ps)
       const area: MapAreaObject = {
         ...blank,
-        customName: `${basemap.customName || '軌道生成'} 軌道`,
+        customName: t('mapEditor.chrome.trackGenArea', { name: basemap.customName || t('mapEditor.chrome.trackGenDefault') }),
         /*
          * 生成出來的東西<strong>完全沿用軌道生成元件的框</strong>——同位置、同寬、同高。
          *
@@ -3108,7 +3113,7 @@ export default function MapEditorApp({
       id: MQTT_DEMO_BLINK_FACILITY_ID,
       type: 'Signal',
       name: 'Light',
-      customName: 'MQTT 示範·閃爍',
+      customName: t('mapEditor.chrome.mqttDemoBlink'),
       areaPosition: meterToAreaLocalPx(blinkPos.x, blinkPos.y, domain, layout),
       position: blinkPos,
       rotation: 0,
@@ -3119,7 +3124,7 @@ export default function MapEditorApp({
       id: MQTT_DEMO_VEHICLE_FACILITY_ID,
       type: 'Slot',
       name: 'Parking',
-      customName: 'MQTT 示範·車輛',
+      customName: t('mapEditor.chrome.mqttDemoVehicle'),
       areaPosition: meterToAreaLocalPx(vehiclePos.x, vehiclePos.y, domain, layout),
       position: vehiclePos,
       rotation: 0,
@@ -3465,8 +3470,8 @@ export default function MapEditorApp({
   }, [pushHistory, updateArea])
 
   const mapRulersToggleHint = selectedArea
-    ? `切換「${selectedArea.customName.trim() || selectedArea.id}」公尺刻度`
-    : '切換全部 Area 公尺刻度'
+    ? t('mapEditor.chrome.rulersToggleOne', { name: selectedArea.customName.trim() || selectedArea.id })
+    : t('mapEditor.chrome.rulersToggleAll')
 
   const onToggleAreaCenterLabels = useCallback(() => {
     setShowAreaCenterLabels((v) => !v)
@@ -3495,8 +3500,9 @@ export default function MapEditorApp({
       )}
       {isMapWorkspace && mapScreen === 'editor' && backendSyncFailed && (
         <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-xs text-amber-300">
-          這張地圖<strong className="text-amber-200">沒有存到伺服器</strong>，目前只在這台瀏覽器裡。
-          換一台電腦或清一次快取就會看到舊版本——請確認後端連線，再存一次。
+          {t('mapEditor.unsavedBannerBefore')}
+          <strong className="text-amber-200">{t('mapEditor.unsavedBannerStrong')}</strong>
+          {t('mapEditor.unsavedBannerAfter')}
         </div>
       )}
       {isMapWorkspace && mapScreen === 'editor' && (
@@ -3519,18 +3525,18 @@ export default function MapEditorApp({
           rulersToggleHint={mapRulersToggleHint}
           showAreaCenterLabels={showAreaCenterLabels}
           onToggleAreaCenterLabels={onToggleAreaCenterLabels}
-          areaCenterLabelsToggleHint="顯示／隱藏全部 Area 中央標示（名稱、場域範圍、像素尺寸）"
+          areaCenterLabelsToggleHint={t('mapEditor.chrome.areaLabelsHint')}
           showZoomLevelBar={showZoomLevelBar}
           onToggleZoomLevelBar={onToggleZoomLevelBar}
-          zoomLevelBarToggleHint="顯示／隱藏底部圖台縮放列（1 近～7 遠）"
+          zoomLevelBarToggleHint={t('mapEditor.chrome.zoomBarHint')}
           showTestDock={showTestDock}
           onToggleTestDock={onToggleTestDock}
-          testDockToggleHint="顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）"
+          testDockToggleHint={t('mapEditor.chrome.testerHint')}
           mapCanvasResizeActive={mapCropModeActive}
           onToggleMapCanvasResize={
             mapEditorMode === 'edit' ? onToggleCropMode : undefined
           }
-          mapCanvasResizeToggleHint="裁減模式：在較大工作區拖曳裁切框調整輸出解析度"
+          mapCanvasResizeToggleHint={t('mapEditor.chrome.cropHint')}
           onApplyMapCrop={
             mapEditorMode === 'edit' && mapCropModeActive
               ? applyCropMode
@@ -3545,7 +3551,7 @@ export default function MapEditorApp({
           onToggleFacilityToolbars={
             mapEditorMode === 'edit' ? onToggleFacilityToolbars : undefined
           }
-          facilityToolbarsToggleHint="顯示／隱藏選取元件的圓形工具列（旋轉、格式複製、刪除）"
+          facilityToolbarsToggleHint={t('mapEditor.chrome.facilityBarsHint')}
         />
       )}
       {isMapWorkspace && mapScreen === 'editor' && (
@@ -3554,7 +3560,7 @@ export default function MapEditorApp({
         aria-live="polite"
       >
         <span className="truncate text-zinc-300">
-          {loadedMapMeta.displayName || '未命名地圖'}
+          {loadedMapMeta.displayName || t('mapEditor.chrome.unnamedMap')}
           <span className="text-zinc-600"> · </span>
           {loadedMapMeta.version}
         </span>
@@ -3564,25 +3570,24 @@ export default function MapEditorApp({
         <span>
           {activeViewportCenterMeters ? (
             <>
-              座標（m）：{activeViewportCenterMeters.x.toFixed(2)},{' '}
-              {activeViewportCenterMeters.y.toFixed(2)}
+              {t('mapEditor.chrome.coords', { x: activeViewportCenterMeters.x.toFixed(2), y: activeViewportCenterMeters.y.toFixed(2) })}
               {selectedFacility
                 ? selectedFacilityIds.length > 1
-                  ? ` · 已選 ${selectedFacilityIds.length} 個元件（${selectedFacility.customName.trim() || selectedFacility.id}）`
+                  ? t('mapEditor.chrome.selectedMany', { count: selectedFacilityIds.length, name: selectedFacility.customName.trim() || selectedFacility.id })
                   : ` · ${selectedFacility.customName.trim() || selectedFacility.id}`
                 : selectedArea
                   ? ` · ${selectedArea.customName.trim() || selectedArea.id}`
                   : ''}
             </>
           ) : (
-            '選取 Area 或設施以顯示座標（m）'
+            t('mapEditor.chrome.selectHint')
           )}
         </span>
         <span className="text-zinc-600" aria-hidden>
           |
         </span>
         <span>
-          畫布（px）：{mapPixelSize.width}×{mapPixelSize.height}
+          {t('mapEditor.chrome.canvasPx', { w: mapPixelSize.width, h: mapPixelSize.height })}
         </span>
       </div>
       )}
@@ -3590,9 +3595,9 @@ export default function MapEditorApp({
       <div
         className="flex shrink-0 items-center gap-3 border-b border-zinc-700/80 bg-zinc-950 px-4 py-2"
         role="toolbar"
-        aria-label="軌跡圖台"
+        aria-label={t('mapEditor.trajectoryTitle')}
       >
-        <span className="text-sm font-semibold text-zinc-100">軌跡圖台</span>
+        <span className="text-sm font-semibold text-zinc-100">{t('mapEditor.trajectoryTitle')}</span>
       </div>
       )}
       {isTrajectoryWorkspace && (
@@ -3601,8 +3606,7 @@ export default function MapEditorApp({
         aria-live="polite"
       >
         <span>
-          畫面中心（m）：{trajectoryViewportCenterMeters.x.toFixed(2)},{' '}
-          {trajectoryViewportCenterMeters.y.toFixed(2)}
+          {t('mapEditor.chrome.viewCenter', { x: trajectoryViewportCenterMeters.x.toFixed(2), y: trajectoryViewportCenterMeters.y.toFixed(2) })}
         </span>
       </div>
       )}
@@ -3620,8 +3624,8 @@ export default function MapEditorApp({
           )}
           <span>
             {autosaveStatus === 'saving'
-              ? '正在自動儲存…'
-              : autosaveTimeLabel || '編輯中：變更將自動儲存至地圖庫'}
+              ? t('mapEditor.chrome.autosaving')
+              : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')}
           </span>
         </div>
       )}
@@ -3629,7 +3633,7 @@ export default function MapEditorApp({
       <div className="relative flex min-h-0 flex-1">
         <div
           className="relative flex min-h-0 min-w-0 flex-1 flex-col"
-          aria-label={isMapWorkspace ? '地圖編輯' : '軌跡回放'}
+          aria-label={isMapWorkspace ? t('mapEditor.chrome.mapEditAria') : t('mapEditor.chrome.trajectoryAria')}
         >
           <div className="relative min-h-0 w-full flex-1">
             <div
@@ -3912,8 +3916,8 @@ export default function MapEditorApp({
                 type="button"
                 onClick={() => setInspectorCollapsed(true)}
                 className="pointer-events-auto absolute left-0 top-3 z-20 flex h-10 w-6 -translate-x-full items-center justify-center rounded-l-md border border-r-0 border-zinc-600 bg-zinc-800 text-zinc-300 shadow-sm hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                title="收合屬性面板"
-                aria-label="收合屬性面板"
+                title={t('mapEditor.chrome.collapseInspector')}
+                aria-label={t('mapEditor.chrome.collapseInspector')}
               >
                 <ChevronRight className="size-4" aria-hidden />
               </button>
@@ -4029,18 +4033,18 @@ export default function MapEditorApp({
                     className="flex h-full min-h-0 flex-col bg-zinc-900/50"
                   >
                     <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-cyan-400/90">
-                      全選 Area（{areas.length}）
+                      {t('mapEditor.chrome.selectAllAreas', { count: areas.length })}
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm text-zinc-400">
                       <p className="leading-relaxed">
-                        已選取此圖台上全部 Area。拖曳任意外框的
-                        <strong className="text-zinc-200">移動軌道</strong>
-                        ，或拖曳 Area 之間的
-                        <strong className="text-zinc-200">畫布空白</strong>
-                        ，可一次平移所有區域。
+                        {t('mapEditor.chrome.allAreasSelectedBefore')}
+                        <strong className="text-zinc-200">{t('mapEditor.chrome.moveTrack')}</strong>
+                        {t('mapEditor.chrome.allAreasSelectedMid')}
+                        <strong className="text-zinc-200">{t('mapEditor.chrome.canvasBlank')}</strong>
+                        {t('mapEditor.chrome.allAreasSelectedAfter')}
                       </p>
                       <p className="mt-3 text-xs text-zinc-600">
-                        點選單一 Area 可改為個別編輯；Esc 取消全選；⌘/Ctrl+Z 可復原整體移動。
+                        {t('mapEditor.chrome.allAreasSelectedHint')}
                       </p>
                     </div>
                   </aside>
@@ -4050,19 +4054,19 @@ export default function MapEditorApp({
                     className="flex h-full min-h-0 flex-col bg-zinc-900/50"
                   >
                     <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                      屬性
+                      {t('mapEditor.chrome.properties')}
                     </div>
                     <div className="p-4 text-sm text-zinc-500">
                       <p>
                         {readOnlyCanvas
-                          ? '請點選畫布上的物件以檢視屬性（檢視模式無法編輯）。'
-                          : '請點選畫布上的物件以編輯屬性；⌘/Ctrl+A 全選 Area；工具列「裁減」進入裁切模式。'}
+                          ? t('mapEditor.chrome.propertiesViewHint')
+                          : t('mapEditor.chrome.propertiesEditHint')}
                       </p>
                       <p className="mt-3 text-xs text-zinc-600">
-                        元件可設定參照場域位置；Area 僅作為畫布上的群組容器。
+                        {t('mapEditor.chrome.propertiesAreaNote')}
                         {readOnlyCanvas
-                          ? ' 按「編輯」後可拖曳、旋轉與修改。'
-                          : ' 快捷鍵：⌘/Ctrl+A 全選 Area；工具列「裁減」在較大工作區拖切框。⌘/Ctrl+C／V、Delete、⌘/Ctrl+Z。'}
+                          ? t('mapEditor.chrome.propertiesEditExtra')
+                          : t('mapEditor.chrome.propertiesShortcuts')}
                       </p>
                     </div>
                   </aside>
@@ -4074,15 +4078,15 @@ export default function MapEditorApp({
               type="button"
               onClick={() => setInspectorCollapsed(false)}
               className="pointer-events-auto absolute right-0 top-1/2 z-40 flex min-h-0 w-11 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-l-md border border-r-0 border-zinc-700/80 bg-zinc-900/95 py-4 text-[11px] font-medium text-zinc-400 shadow-lg backdrop-blur-sm transition hover:bg-zinc-800 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              title="展開屬性面板"
-              aria-label="展開屬性面板"
+              title={t('mapEditor.chrome.expandInspector')}
+              aria-label={t('mapEditor.chrome.expandInspector')}
             >
               <ChevronLeft className="size-4 shrink-0" aria-hidden />
               <span
                 className="text-center leading-tight tracking-wide"
                 style={{ writingMode: 'vertical-rl' }}
               >
-                屬性
+                {t('mapEditor.chrome.properties')}
               </span>
             </button>
           ))}

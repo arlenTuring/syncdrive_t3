@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,6 +42,7 @@ export function FenceListPanel({
   onEdit,
   onDelete,
 }: FenceListPanelProps) {
+  const { t } = useTranslation();
   const [menuId, setMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -59,8 +61,8 @@ export function FenceListPanel({
         <button
           type="button"
           onClick={() => onCollapsedChange(false)}
-          title="展開清單"
-          aria-label="展開清單"
+          title={t('virtualFence.list.expand')}
+          aria-label={t('virtualFence.list.expand')}
           className="inline-flex size-8 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
         >
           <PanelLeftOpen className="size-4" aria-hidden />
@@ -69,8 +71,8 @@ export function FenceListPanel({
           type="button"
           onClick={() => onCollapsedChange(false)}
           className="mt-auto mb-6 inline-flex h-16 w-5 items-center justify-center rounded-r-md border border-l-0 border-zinc-700 bg-[#18181b] text-zinc-400 hover:text-[#51A2FF]"
-          title="展開清單"
-          aria-label="展開清單"
+          title={t('virtualFence.list.expand')}
+          aria-label={t('virtualFence.list.expand')}
         >
           <ChevronRight className="size-3.5" aria-hidden />
         </button>
@@ -91,15 +93,15 @@ export function FenceListPanel({
             type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="搜尋"
+            placeholder={t('common.search')}
             className="h-9 w-full rounded-lg border border-zinc-700 bg-zinc-900/80 py-2 pl-8 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-[#2B7FFF]/60"
           />
         </label>
         <button
           type="button"
           onClick={() => onCollapsedChange(true)}
-          title="縮合清單"
-          aria-label="縮合清單"
+          title={t('virtualFence.list.collapse')}
+          aria-label={t('virtualFence.list.collapse')}
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
         >
           <PanelLeftClose className="size-4" aria-hidden />
@@ -109,17 +111,20 @@ export function FenceListPanel({
       <ul className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
         {fences.length === 0 ? (
           <li className="px-3 py-10 text-center text-sm text-zinc-500">
-            尚無虛擬圍籬
+            {t('virtualFence.list.empty')}
             <br />
-            <span className="text-xs text-zinc-600">請按「建立圍籬」新增</span>
+            <span className="text-xs text-zinc-600">{t('virtualFence.list.emptyHint')}</span>
           </li>
         ) : (
           fences.map((fence) => {
             const selected = fence.id === selectedId;
             const visible = !hiddenIds.has(fence.id);
-            const status = fence.enabled
-              ? FENCE_ENABLE_STATUS.enabled
-              : FENCE_ENABLE_STATUS.disabled;
+            const statusStyle = fence.enabled
+              ? FENCE_ENABLE_STATUS.enabled.style
+              : FENCE_ENABLE_STATUS.disabled.style;
+            const statusLabel = fence.enabled
+              ? t('virtualFence.statusEnabled')
+              : t('virtualFence.statusDisabled');
             const menuOpen = menuId === fence.id;
             return (
               <li key={fence.id} className="relative">
@@ -145,13 +150,17 @@ export function FenceListPanel({
                       {fence.name}
                     </p>
                     <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                      事件警示
+                      {t('virtualFence.list.eventAlert')}
                     </p>
                   </div>
-                  <StatusTag label={status.label} style={status.style} />
+                  <StatusTag label={statusLabel} style={statusStyle} />
                   <button
                     type="button"
-                    title={visible ? '隱藏於圖台' : '顯示於圖台'}
+                    title={
+                      visible
+                        ? t('virtualFence.list.hideOnMap')
+                        : t('virtualFence.list.showOnMap')
+                    }
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleVisible(fence.id);
@@ -166,7 +175,7 @@ export function FenceListPanel({
                   </button>
                   <button
                     type="button"
-                    title="更多"
+                    title={t('common.moreActions')}
                     aria-expanded={menuOpen}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -193,7 +202,7 @@ export function FenceListPanel({
                       }}
                     >
                       <Pencil className="size-3.5 text-zinc-400" aria-hidden />
-                      編輯
+                      {t('common.edit')}
                     </button>
                     <button
                       type="button"
@@ -204,7 +213,7 @@ export function FenceListPanel({
                       }}
                     >
                       <Trash2 className="size-3.5" aria-hidden />
-                      刪除
+                      {t('common.delete')}
                     </button>
                   </div>
                 ) : null}
@@ -217,8 +226,8 @@ export function FenceListPanel({
       <button
         type="button"
         onClick={() => onCollapsedChange(true)}
-        title="縮合清單"
-        aria-label="縮合清單"
+        title={t('virtualFence.list.collapse')}
+        aria-label={t('virtualFence.list.collapse')}
         className="absolute top-1/2 right-0 z-30 flex h-12 w-5 translate-x-full -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-zinc-700 bg-[#18181b] text-zinc-400 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
       >
         <ChevronLeft className="size-3.5" aria-hidden />

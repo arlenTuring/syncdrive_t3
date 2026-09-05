@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Table, Play, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
 import {
   fetchTables,
@@ -22,6 +23,7 @@ const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-md px-2.5
   focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
 export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, onChangeSqlQuery, onColumnsDetected }: Props) {
+  const { t } = useTranslation();
   const dataSources = getDataSourcesForBinding('sql');
   const variables = useVariables();
 
@@ -70,7 +72,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
     try {
       const resolvedSql = interpolateVariables(sqlQuery, variables);
       if (/\{[^{}]+\}/.test(resolvedSql)) {
-        throw new Error('SQL 仍含未解析變數；子畫布編輯時請確認群組已注入索引變數');
+        throw new Error(t('dashboard.dataSourcePicker.unresolvedVars'));
       }
       const rows = await executeDatasourceQuery(dataSourceId, resolvedSql);
       setPreviewRows(rows.slice(0, 10));
@@ -106,7 +108,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-zinc-500 text-xs flex items-center gap-1">
-              <Table size={10} /> 選取資料表（可選）
+              <Table size={10} /> {t('dashboard.dataSourcePicker.selectTable')}
             </label>
             <button onClick={() => loadTables(dataSourceId)}
               className="text-zinc-600 hover:text-zinc-400 transition-colors">
@@ -121,7 +123,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
               className="w-full flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/80 border border-zinc-700
                          rounded-md text-xs text-zinc-400 hover:border-zinc-600 transition-colors"
             >
-              <span>{selectedTable || (loadingTables ? '載入中…' : '— 選擇資料表以產生查詢範本 —')}</span>
+              <span>{selectedTable || (loadingTables ? t('dashboard.dataSourcePicker.loading') : t('dashboard.dataSourcePicker.chooseTable'))}</span>
               <ChevronDown size={10} />
             </button>
             {showTableMenu && tables.length > 0 && (
@@ -156,7 +158,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
                 </button>
               ))}
               {tableSchema.length > 8 && (
-                <span className="text-zinc-600 text-xs self-center">+{tableSchema.length - 8} 欄…</span>
+                <span className="text-zinc-600 text-xs self-center">{t('dashboard.dataSourcePicker.moreColumns', { count: tableSchema.length - 8 })}</span>
               )}
             </div>
           )}
@@ -166,7 +168,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
       {/* SQL 輸入框 */}
       {dataSourceId && (
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">SQL 查詢語法</label>
+          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.dataSourcePicker.sqlLabel')}</label>
           <textarea
             id="sql-query-textarea"
             value={sqlQuery}
@@ -177,9 +179,9 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
             spellCheck={false}
           />
           <p className="text-zinc-600 text-xs mt-0.5 leading-relaxed">
-            僅允許 SELECT。依列索引取單筆時可在結尾加上
-            <code className="mx-0.5 text-cyan-600/90">LIMIT 1 OFFSET {'{索引變數}'}</code>
-            （變數名稱見群組「內部變數名稱」）；預覽時會代入目前索引（子畫布為 0）。
+            {t('dashboard.dataSourcePicker.sqlHintBefore')}
+            <code className="mx-0.5 text-cyan-600/90">{t('dashboard.dataSourcePicker.sqlHintCode')}</code>
+            {t('dashboard.dataSourcePicker.sqlHintAfter')}
           </p>
         </div>
       )}
@@ -194,8 +196,8 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
                      hover:bg-cyan-700/40 disabled:opacity-50 transition-colors"
         >
           {previewLoading
-            ? <><RefreshCw size={12} className="animate-spin" /> 查詢中…</>
-            : <><Play size={12} /> 預覽結果</>
+            ? <><RefreshCw size={12} className="animate-spin" /> {t('dashboard.dataSourcePicker.querying')}</>
+            : <><Play size={12} /> {t('dashboard.dataSourcePicker.preview')}</>
           }
         </button>
       )}
@@ -236,7 +238,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
                   </table>
                 </div>
               )
-              : <div className="px-3 py-2 text-zinc-500 text-xs">無資料</div>
+              : <div className="px-3 py-2 text-zinc-500 text-xs">{t('dashboard.dataSourcePicker.noData')}</div>
           }
         </div>
       )}

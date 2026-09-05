@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { MapBasemapObject } from '../types/basemap'
 import {
   BASEMAP_OPACITY_KEY,
@@ -25,6 +26,7 @@ export function BasemapInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   const opacity = getBasemapOpacity(basemap.parameters)
   const opacityPct = Math.round(opacity * 100)
   const sourceType = getBasemapSourceType(basemap.parameters)
@@ -36,21 +38,21 @@ export function BasemapInspectorSection({
       className="flex h-full min-h-0 w-72 flex-col border-l border-zinc-700/80 bg-zinc-900"
     >
       <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-        底圖屬性
+        {t('mapEditor.inspector.basemap.title')}
         {readOnly && (
           <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal normal-case text-zinc-400">
-            檢視
+            {t('common.view')}
           </span>
         )}
       </div>
       <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm text-zinc-200">
         <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            識別
+            {t('mapEditor.inspector.basemap.identity')}
           </h3>
           <div>
             <label htmlFor="basemap-id" className="mb-1 block text-[10px] text-zinc-500">
-              底圖 ID
+              {t('mapEditor.inspector.basemap.id')}
             </label>
             <input
               id="basemap-id"
@@ -61,7 +63,7 @@ export function BasemapInspectorSection({
           </div>
           <div>
             <label htmlFor="basemap-name" className="mb-1 block text-[10px] text-zinc-500">
-              顯示名稱
+              {t('mapEditor.inspector.basemap.displayName')}
             </label>
             <input
               id="basemap-name"
@@ -75,22 +77,24 @@ export function BasemapInspectorSection({
           </div>
           {fileName ? (
             <p className="text-[10px] text-zinc-600">
-              檔案：{fileName}
-              {sourceType ? `（${sourceType === 'xodr' ? 'OpenDRIVE' : '圖片'}）` : ''}
+              {t('mapEditor.inspector.basemap.file', { name: fileName })}
+              {sourceType
+                ? `（${sourceType === 'xodr' ? 'OpenDRIVE' : t('mapEditor.inspector.basemap.sourceImage')}）`
+                : ''}
             </p>
           ) : null}
         </section>
 
         <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            顯示
+            {t('mapEditor.inspector.basemap.display')}
           </h3>
           <div>
             <label
               htmlFor="basemap-opacity"
               className="mb-1 flex items-center justify-between text-[10px] text-zinc-500"
             >
-              <span>底圖透明度</span>
+              <span>{t('mapEditor.inspector.basemap.opacity')}</span>
               <span className="font-mono text-cyan-400/90">{opacityPct}%</span>
             </label>
             <input
@@ -112,11 +116,11 @@ export function BasemapInspectorSection({
               className="h-2 w-full cursor-pointer accent-cyan-500 disabled:opacity-40"
             />
             <div className="mt-1 flex justify-between text-[9px] text-zinc-600">
-              <span>全透明</span>
-              <span>不透明</span>
+              <span>{t('mapEditor.inspector.fullyTransparent')}</span>
+              <span>{t('mapEditor.inspector.opaque')}</span>
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-              僅影響圖片或 OpenDRIVE 圖層；格線與距離刻度維持不透明，方便對齊。
+              {t('mapEditor.inspector.basemap.opacityHint')}
             </p>
           </div>
         </section>
@@ -127,7 +131,7 @@ export function BasemapInspectorSection({
             onClick={onDelete}
             className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-200 transition hover:bg-red-950/70"
           >
-            刪除底圖
+            {t('mapEditor.inspector.basemap.delete')}
           </button>
         ) : null}
       </div>

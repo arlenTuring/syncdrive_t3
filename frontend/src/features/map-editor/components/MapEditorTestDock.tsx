@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Radio, ScanLine } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
 import type { MqttLiveEntry, MqttLogLine } from '../live/mqttLiveTypes'
 import type { ConnectivityScanState } from '../hooks/useTrackConnectivityScan'
@@ -41,6 +42,7 @@ export function MapEditorTestDock({
   onResetScan,
   onSelectIssue,
 }: MapEditorTestDockProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<MapEditorTestDockTab>('mqtt')
 
@@ -50,14 +52,14 @@ export function MapEditorTestDock({
     <div
       className={`pointer-events-none absolute left-3 right-3 z-[48] sm:left-4 sm:right-4 ${bottomClass}`}
       role="region"
-      aria-label="測試器"
+      aria-label={t('mapEditor.testDock.aria')}
     >
       <div className="pointer-events-auto mx-auto flex max-w-5xl flex-col overflow-hidden rounded-xl border border-zinc-600/40 bg-zinc-950/45 shadow-lg backdrop-blur-md">
         <div className="flex shrink-0 items-center gap-2 border-b border-zinc-700/40 px-2 py-1.5 sm:px-3">
           <div
             className="flex rounded-lg border border-zinc-700/50 bg-zinc-900/40 p-0.5"
             role="tablist"
-            aria-label="測試器模式"
+            aria-label={t('mapEditor.testDock.modeAria')}
           >
             <button
               type="button"
@@ -74,7 +76,7 @@ export function MapEditorTestDock({
               }`}
             >
               <ScanLine className="size-3.5 shrink-0" aria-hidden />
-              斷路掃描
+              {t('mapEditor.testDock.connectivity')}
             </button>
             <button
               type="button"
@@ -99,16 +101,23 @@ export function MapEditorTestDock({
             {tab === 'connectivity' ? (
               <>
                 {scanState.phase === 'scanning' &&
-                  `${scanState.progressPercent.toFixed(0)}% · ${scanState.activeProbeCount}/${scanState.maxConcurrentProbes} 探針`}
-                {scanState.phase === 'flashing' && '斷路 · 雷射停在此處'}
+                  t('mapEditor.testDock.scanningProbes', {
+                    percent: scanState.progressPercent.toFixed(0),
+                    active: scanState.activeProbeCount,
+                    max: scanState.maxConcurrentProbes,
+                  })}
+                {scanState.phase === 'flashing' && t('mapEditor.testDock.flashing')}
                 {scanState.phase === 'complete' &&
                   (scanState.totalIssues === 0
-                    ? `完成 · ${scanState.totalProbeCount} 段 · 無斷路`
-                    : `完成 · ${scanState.totalProbeCount} 段 · ${scanState.totalIssues} 斷路`)}
-                {scanState.phase === 'idle' && '鄰接圖斷路掃描（偵測池）'}
+                    ? t('mapEditor.testDock.completeOk', { probes: scanState.totalProbeCount })
+                    : t('mapEditor.testDock.completeIssues', {
+                        probes: scanState.totalProbeCount,
+                        issues: scanState.totalIssues,
+                      }))}
+                {scanState.phase === 'idle' && t('mapEditor.testDock.idle')}
               </>
             ) : (
-              'MQTT 模擬 · 不寫入地圖檔'
+              t('mapEditor.testDock.mqttHint')
             )}
           </div>
 
@@ -116,7 +125,7 @@ export function MapEditorTestDock({
             type="button"
             onClick={() => setExpanded((v) => !v)}
             className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
-            title={expanded ? '收合面板' : '展開面板'}
+            title={expanded ? t('mapEditor.testDock.collapse') : t('mapEditor.testDock.expand')}
             aria-expanded={expanded}
           >
             {expanded ? (

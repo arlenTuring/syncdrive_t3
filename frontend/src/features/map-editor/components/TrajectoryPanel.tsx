@@ -1,5 +1,6 @@
 import { FolderOpen, LocateFixed, Pause, Play, RotateCcw } from 'lucide-react'
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { VEHICLE_IDS } from '../constants/vehicles'
 import type { VehicleTrajectoryEntry } from '../constants/vehicleTrajectoryCatalog'
 import type { ParsedTrajectory } from '../types/trajectoryFile'
@@ -45,6 +46,7 @@ export function TrajectoryPanel({
   onLocateVehicle,
   onSeekToIndex,
 }: TrajectoryPanelProps) {
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const showRawList =
@@ -58,7 +60,7 @@ export function TrajectoryPanel({
       className="flex h-full min-h-0 w-[22rem] shrink-0 flex-col border-l border-zinc-700/80 bg-zinc-900"
     >
       <div className="shrink-0 border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-        軌跡回放
+        {t('mapEditor.trajectory.title')}
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 flex flex-col gap-4 p-4 text-sm">
@@ -67,7 +69,7 @@ export function TrajectoryPanel({
               htmlFor="vehicle-select"
               className="mb-1.5 block text-xs font-medium text-zinc-400"
             >
-              車輛
+              {t('mapEditor.trajectory.vehicle')}
             </label>
             <div className="flex gap-2">
               <select
@@ -79,7 +81,7 @@ export function TrajectoryPanel({
                 }}
                 className="min-w-0 flex-1 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-2 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
               >
-                <option value="">請選擇車輛</option>
+                <option value="">{t('mapEditor.trajectory.selectVehicle')}</option>
                 {VEHICLE_IDS.map((id) => (
                   <option key={id} value={id}>
                     {id}
@@ -91,14 +93,14 @@ export function TrajectoryPanel({
                 disabled={!hasTrajectory}
                 onClick={onLocateVehicle}
                 className="inline-flex shrink-0 items-center justify-center rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-2 text-zinc-100 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title="捲動圖台對準目前車輛；未播放時對準路徑起點"
-                aria-label="對準車輛位置"
+                title={t('mapEditor.trajectory.locateTitle')}
+                aria-label={t('mapEditor.trajectory.locateAria')}
               >
                 <LocateFixed className="size-4 text-cyan-300" aria-hidden />
               </button>
             </div>
             <p className="mt-1.5 text-xs text-zinc-600">
-              選取後會載入該車輛預設的<strong>最新</strong>軌跡檔；可改選下方清單更換。
+              {t('mapEditor.trajectory.loadHint')}
             </p>
           </div>
 
@@ -107,7 +109,7 @@ export function TrajectoryPanel({
               htmlFor="traj-file-select"
               className="mb-1.5 block text-xs font-medium text-zinc-400"
             >
-              軌跡清單檔
+              {t('mapEditor.trajectory.fileList')}
             </label>
             <select
               id="traj-file-select"
@@ -143,7 +145,7 @@ export function TrajectoryPanel({
               ) : (
                 <Play className="size-4 shrink-0" aria-hidden />
               )}
-              {replayPlaying ? '暫停' : '播放'}
+              {replayPlaying ? t('mapEditor.trajectory.pause') : t('mapEditor.trajectory.play')}
             </button>
             <button
               type="button"
@@ -152,7 +154,7 @@ export function TrajectoryPanel({
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <RotateCcw className="size-4 shrink-0" aria-hidden />
-              重播
+              {t('mapEditor.trajectory.rewind')}
             </button>
           </div>
 
@@ -174,13 +176,13 @@ export function TrajectoryPanel({
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 transition hover:bg-zinc-700"
             >
               <FolderOpen className="size-4 shrink-0" aria-hidden />
-              匯入軌跡 JSON
+              {t('mapEditor.trajectory.importJson')}
             </button>
           </div>
 
           {mapMismatch && (
             <p className="text-xs text-amber-400/95">
-              此軌跡建議搭配的地圖與目前載入的地圖不一致，畫面僅供示意。
+              {t('mapEditor.trajectory.mapMismatch')}
             </p>
           )}
         </div>
@@ -188,7 +190,7 @@ export function TrajectoryPanel({
         {showRawList && (
           <div className="flex min-h-0 flex-1 flex-col border-t border-zinc-700/80">
             <div className="shrink-0 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-              原始數據（新→舊）
+              {t('mapEditor.trajectory.rawData')}
             </div>
             <TrajectoryRawDataList
               trajectoryId={loadedTrajectory.trajectoryId}

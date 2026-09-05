@@ -5,6 +5,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail } from '../api/shiftRecordsApi';
 import {
@@ -18,20 +19,20 @@ import {
 } from '../utils/buildDrivingCapabilityModel';
 
 /** 圖例順序對齊設計稿：線型 → 常用動作 → 號誌／告警 → 整備類 */
-const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; label: string; channel?: 'action' | 'event' }> = [
-  { kind: 'music', label: '音樂' },
-  { kind: 'enter', label: '進站' },
-  { kind: 'exit', label: '出站' },
-  { kind: 'door_open', label: '開門' },
-  { kind: 'door_close', label: '關門' },
-  { kind: 'signal', label: '號誌', channel: 'event' },
-  { kind: 'alert', label: '告警', channel: 'event' },
-  { kind: 'dispatch', label: '調度' },
-  { kind: 'charging', label: '充電' },
-  { kind: 'wash', label: '洗車' },
-  { kind: 'maintenance', label: '保養' },
-  { kind: 'repair', label: '維修' },
-  { kind: 'parking', label: '臨停' },
+const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; channel?: 'action' | 'event' }> = [
+  { kind: 'music' },
+  { kind: 'enter' },
+  { kind: 'exit' },
+  { kind: 'door_open' },
+  { kind: 'door_close' },
+  { kind: 'signal', channel: 'event' },
+  { kind: 'alert', channel: 'event' },
+  { kind: 'dispatch' },
+  { kind: 'charging' },
+  { kind: 'wash' },
+  { kind: 'maintenance' },
+  { kind: 'repair' },
+  { kind: 'parking' },
 ];
 
 type DrivingCapabilityModalProps = {
@@ -39,11 +40,7 @@ type DrivingCapabilityModalProps = {
   onClose: () => void;
 };
 
-const CHANNEL_FILTERS: Array<{ value: TaskLaneFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'action', label: '動作' },
-  { value: 'event', label: '事件' },
-];
+const CHANNEL_FILTERS: TaskLaneFilter[] = ['all', 'action', 'event'];
 
 /** 設計稿：刻度對齊節點、可左右滑動；約 40s 視覺間距 */
 const PX_PER_MINUTE = 140;
@@ -475,6 +472,7 @@ function TimelinePanel({
     + (showAction ? LANE_H : 0)
     + (showEvent ? LANE_H : 0);
   const labelPadTop = AXIS_H + (showStatus ? STATUS_H + 8 : 0);
+  const { t } = useTranslation();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/60 bg-[#0c0c0e]/80">
@@ -488,7 +486,7 @@ function TimelinePanel({
               className="flex items-start justify-end border-b border-[#51A2FF]/40 pr-2 font-medium text-[#51A2FF]"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
-              動作
+              {t('shiftRecords.capabilityModal.laneAction')}
             </div>
           ) : null}
           {showEvent ? (
@@ -496,7 +494,7 @@ function TimelinePanel({
               className="flex items-start justify-end border-b border-dashed border-zinc-600 pr-2 text-zinc-200"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
-              事件
+              {t('shiftRecords.capabilityModal.laneEvent')}
             </div>
           ) : null}
         </div>
@@ -565,7 +563,7 @@ function TimelinePanel({
 
       <div className="flex items-center gap-1.5 border-t border-zinc-800/50 px-4 py-2.5 text-[11px] text-zinc-500">
         <Info className="size-3.5 shrink-0" aria-hidden />
-        時軸可以左右滑動，查看更多任務
+        {t('shiftRecords.capabilityModal.scrollHint')}
         <span className="text-zinc-600">← →</span>
       </div>
     </div>
@@ -594,21 +592,22 @@ function LegendLine({
 }
 
 function TimelineLegend() {
+  const { t } = useTranslation();
   return (
     <div className="rounded-xl border border-[#2B7FFF]/35 bg-[#0c0c0e]/60 px-4 py-3.5">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 text-[12px] text-zinc-300">
         <div className="flex items-center gap-2">
           <LegendLine color="#3b82f6" />
-          主任務
+          {t('shiftRecords.capabilityModal.primaryTask')}
         </div>
         <div className="flex items-center gap-2">
           <LegendLine color="#a1a1aa" dashed />
-          次任務
+          {t('shiftRecords.capabilityModal.secondaryTask')}
         </div>
         {LEGEND_ITEMS.map((item) => (
           <div key={item.kind} className="flex items-center gap-2">
             <EventIcon kind={item.kind} channel={item.channel} size={26} />
-            {item.label}
+            {t(`shiftRecords.capabilityModal.legend.${item.kind}`)}
           </div>
         ))}
       </div>
@@ -617,11 +616,18 @@ function TimelineLegend() {
 }
 
 export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityModalProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<TaskLaneFilter>('all');
   const [model, setModel] = useState<DrivingCapabilityModel | null>(null);
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
+
+  const filterLabels: Record<TaskLaneFilter, string> = {
+    all: t('shiftRecords.capabilityModal.filterAll'),
+    action: t('shiftRecords.capabilityModal.filterAction'),
+    event: t('shiftRecords.capabilityModal.filterEvent'),
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -677,13 +683,13 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
             type="button"
             onClick={onClose}
             className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X className="size-5" />
           </button>
 
           <h2 id="operation-record-title" className="pr-10 text-base font-semibold tracking-wide text-zinc-100">
-            運行紀錄
+            {t('shiftRecords.capabilityModal.title')}
           </h2>
 
           {model ? (
@@ -697,7 +703,11 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
               <div className="inline-flex shrink-0 items-center gap-2 text-[12px] text-zinc-400">
                 <Clock className="size-3.5 shrink-0" aria-hidden />
                 <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
-                <span className="text-zinc-500">總時長 {model.durationMinutes} 分鐘</span>
+                <span className="text-zinc-500">
+                  {t('shiftRecords.capabilityModal.durationMinutes', {
+                    minutes: model.durationMinutes,
+                  })}
+                </span>
               </div>
             </div>
           ) : null}
@@ -707,7 +717,7 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
           {loading ? (
             <div className="flex flex-1 items-center justify-center gap-2 py-16 text-zinc-500">
               <Loader2 className="size-5 animate-spin" />
-              載入中…
+              {t('common.loading')}
             </div>
           ) : null}
 
@@ -721,20 +731,20 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
             <>
               {/* 設計稿：連段式 segmented control */}
               <div className="inline-flex w-fit rounded-lg bg-[#27272a] p-0.5">
-                {CHANNEL_FILTERS.map((opt) => {
-                  const active = filter === opt.value;
+                {CHANNEL_FILTERS.map((value) => {
+                  const active = filter === value;
                   return (
                     <button
-                      key={opt.value}
+                      key={value}
                       type="button"
-                      onClick={() => setFilter(opt.value)}
+                      onClick={() => setFilter(value)}
                       className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
                         active
                           ? 'bg-[#3f3f46] text-zinc-100 shadow-sm'
                           : 'text-zinc-500 hover:text-zinc-300'
                       }`}
                     >
-                      {opt.label}
+                      {filterLabels[value]}
                     </button>
                   );
                 })}

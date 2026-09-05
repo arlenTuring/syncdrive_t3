@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../../i18n';
 import {
   AlertTriangle,
   ArrowDown,
@@ -90,7 +92,7 @@ const DWELL_STATIC_CLASS =
 
 function formatSecondsLabel(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '—';
-  return `${seconds}秒`;
+  return i18n.t('shiftList.routeGroups.seconds', { value: seconds });
 }
 
 /** 折返時限是哪一段時段算出來的——訊息要指名那一段，使用者才知道回模板改哪裡 */
@@ -177,6 +179,7 @@ function StationDwellEditor({
   onUpdateDwellSlack: (value: string) => void;
   onUpdateSwitchBuffer?: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const dwellsComplete = areStationDwellsComplete(route.stationDwells);
   const recoveryForBudget = hideRecoveryInSummary
     ? 0
@@ -196,17 +199,17 @@ function StationDwellEditor({
   const showIncompleteWarning = !dwellsComplete;
   const showTurnaroundWarning = dwellsComplete && !withinLimit;
   const cycleLabel = hideRecoveryInSummary
-    ? '最快一趟 + 靠站總和(含緩衝)'
-    : '最快一趟 + 恢復 + 靠站總和(含緩衝)';
+    ? i18n.t('shiftList.routeGroups.cycleMinNoRecovery')
+    : i18n.t('shiftList.routeGroups.cycleMinWithRecovery');
   const avgCycleLabel = hideRecoveryInSummary
-    ? '平均一趟 + 靠站總和(含緩衝)'
-    : '平均一趟 + 恢復 + 靠站總和(含緩衝)';
+    ? i18n.t('shiftList.routeGroups.cycleAvgNoRecovery')
+    : i18n.t('shiftList.routeGroups.cycleAvgWithRecovery');
   const breakdownSuffix = hideRecoveryInSummary
-    ? `(${route.minTravelTimeSeconds ?? 0}s 行駛 + ${totalDwellWithSlack}s 靠站)`
-    : `(${route.minTravelTimeSeconds ?? 0}s 行駛 + ${recoverySeconds}s 恢復 + ${totalDwellWithSlack}s 靠站)`;
+    ? i18n.t('shiftList.routeGroups.breakdownNoRecovery', { travel: route.minTravelTimeSeconds ?? 0, dwell: totalDwellWithSlack })
+    : i18n.t('shiftList.routeGroups.breakdownWithRecovery', { travel: route.minTravelTimeSeconds ?? 0, recovery: recoverySeconds, dwell: totalDwellWithSlack });
   const avgBreakdownSuffix = hideRecoveryInSummary
-    ? `(${route.avgTravelTimeSeconds ?? 0}s 行駛 + ${totalDwellWithSlack}s 靠站)`
-    : `(${route.avgTravelTimeSeconds ?? 0}s 行駛 + ${recoverySeconds}s 恢復 + ${totalDwellWithSlack}s 靠站)`;
+    ? i18n.t('shiftList.routeGroups.breakdownNoRecovery', { travel: route.avgTravelTimeSeconds ?? 0, dwell: totalDwellWithSlack })
+    : i18n.t('shiftList.routeGroups.breakdownWithRecovery', { travel: route.avgTravelTimeSeconds ?? 0, recovery: recoverySeconds, dwell: totalDwellWithSlack });
 
   return (
     <div className="mt-2 space-y-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-3 py-3">
@@ -231,25 +234,25 @@ function StationDwellEditor({
           return (
             <label key={dwell.stationId} className="block text-center">
               <span className="mb-1 block text-[11px] text-zinc-500">
-                站點:{dwell.stationName}
+                {t('shiftList.routeGroups.station', { name: dwell.stationName })}
               </span>
               <div className="flex h-8 items-center justify-center gap-1.5">
                 <ShiftMenuSelect
-                  label={`${dwell.stationName} 停靠方式`}
+                  label={t('shiftList.routeGroups.dwellMode', { name: dwell.stationName })}
                   hideLabel
                   size="sm"
                   value={mode}
                   options={[
-                    { value: 'seconds', label: '秒數' },
-                    { value: 'no_stop', label: '不停靠' },
-                    { value: 'line_change', label: '換線停靠' },
+                    { value: 'seconds', label: t('shiftList.routeGroups.dwellSeconds') },
+                    { value: 'no_stop', label: t('shiftList.routeGroups.noStop') },
+                    { value: 'line_change', label: t('shiftList.routeGroups.lineChange') },
                   ]}
                   onChange={(next) =>
                     onUpdateDwellMode(dwell.stationId, next as ShiftStationDwellMode)
                   }
                   widthClass="w-[100px] shrink-0"
                   panelWidth={112}
-                  aria-label={`${dwell.stationName} 停靠方式`}
+                  aria-label={t('shiftList.routeGroups.dwellMode', { name: dwell.stationName })}
                 />
                 {mode === 'seconds' ? (
               <input
@@ -259,9 +262,9 @@ function StationDwellEditor({
                     onChange={(e) =>
                       onUpdateDwellSeconds(dwell.stationId, e.target.value.replace(/\D/g, ''))
                     }
-                    placeholder="必填"
+                    placeholder={t('shiftList.routeGroups.required')}
                 className={DWELL_INPUT_CLASS}
-                aria-label={`${dwell.stationName} 停靠秒數`}
+                aria-label={t('shiftList.routeGroups.dwellSecondsAria', { name: dwell.stationName })}
               />
                 ) : null}
             </div>
@@ -270,7 +273,7 @@ function StationDwellEditor({
         })}
 
         <label className="block text-center">
-          <span className="mb-1 block text-[11px] text-zinc-500">靠站緩衝</span>
+          <span className="mb-1 block text-[11px] text-zinc-500">{t('shiftList.routeGroups.dwellSlack')}</span>
           <div className="flex h-8 items-center justify-center gap-1.5">
             <input
               type="text"
@@ -278,14 +281,14 @@ function StationDwellEditor({
               value={String(route.dwellSlackSeconds)}
               onChange={(e) => onUpdateDwellSlack(e.target.value)}
               className={DWELL_INPUT_CLASS}
-              aria-label={`${route.routeName} 靠站緩衝秒數`}
+              aria-label={t('shiftList.routeGroups.dwellSlackAria', { name: route.routeName })}
             />
           </div>
         </label>
 
         {showSwitchBuffer && onUpdateSwitchBuffer ? (
           <label className="block text-center">
-            <span className="mb-1 block text-[11px] text-zinc-500">換線緩衝</span>
+            <span className="mb-1 block text-[11px] text-zinc-500">{t('shiftList.routeGroups.switchBuffer')}</span>
             <div className="flex h-8 items-center justify-center gap-1.5">
               <input
                 type="text"
@@ -293,7 +296,7 @@ function StationDwellEditor({
                 value={String(route.switchBufferAfterSeconds)}
                 onChange={(e) => onUpdateSwitchBuffer(e.target.value)}
                 className={DWELL_INPUT_CLASS}
-                aria-label={`${route.routeName} 換線緩衝秒數`}
+                aria-label={t('shiftList.routeGroups.switchBufferAria', { name: route.routeName })}
               />
             </div>
           </label>
@@ -303,18 +306,17 @@ function StationDwellEditor({
       <div className="mt-2 space-y-1">
         {showIncompleteWarning && (
           <p className="text-[10px] text-zinc-500">
-            ⚠️ 停靠設定尚未填寫完整（選秒數時不可留空）。
+            {t('shiftList.routeGroups.dwellIncomplete')}
           </p>
         )}
         {showTurnaroundWarning && (
           <p className="text-[10px] leading-4 text-red-400">
-            ⚠️ 這條路線光是最快跑一趟（{formatSecondsLabel(totalMinSum)}）就超過折返時限
+            {t('shiftList.routeGroups.overTurnaroundBefore', { min: formatSecondsLabel(totalMinSum) })}
             （{formatSecondsLabel(turnaroundLimitSeconds)}）
             {turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0
               ? ` ${formatSecondsLabel(totalMinSum - turnaroundLimitSeconds)}`
               : ''}
-            。要嘛縮短這條線的行駛時間／靠站秒數／恢復時間，
-            要嘛回時間模板把時限撐大（時限＝該時段正線列數 × 班距，不是直接填的欄位）。
+            {t('shiftList.routeGroups.overTurnaroundAfter')}
           </p>
         )}
 
@@ -343,13 +345,14 @@ function RouteOrderControls({
   canMoveDown: boolean;
   onMove: (direction: 'up' | 'down') => void;
 }) {
+  const { t } = useTranslation();
   if (!showArrows) return null;
 
   return (
     <div className="flex shrink-0 flex-col">
           <button
             type="button"
-            title="提前順序"
+            title={t('shiftList.routeGroups.moveEarlier')}
             disabled={!canMoveUp}
         onClick={() => onMove('up')}
             className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
@@ -358,7 +361,7 @@ function RouteOrderControls({
           </button>
           <button
             type="button"
-            title="延後順序"
+            title={t('shiftList.routeGroups.moveLater')}
             disabled={!canMoveDown}
         onClick={() => onMove('down')}
             className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
@@ -386,6 +389,7 @@ function RecoveryAndServiceDirectionBar({
   onAddTag: (name: string) => void;
   onRemoveTag: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -410,11 +414,11 @@ function RecoveryAndServiceDirectionBar({
     <div className="flex flex-wrap items-start gap-6 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
       <label className="block">
         <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-          <HelpTip label="最低恢復時間說明">
-            <p>每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。</p>
-            <p className="mt-1 text-zinc-500">輸入「30」代表最少保留 30 秒恢復空檔。</p>
+          <HelpTip label={t('shiftList.routeGroups.minRecoveryHelp')}>
+            <p>{t('shiftList.routeGroups.minRecoveryHelp1')}</p>
+            <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.minRecoveryHelp2')}</p>
           </HelpTip>
-          最低恢復時間（秒）
+          {t('shiftList.routeGroups.minRecoveryLabel')}
         </span>
         <div className="flex items-center gap-2">
         <input
@@ -422,28 +426,28 @@ function RecoveryAndServiceDirectionBar({
             inputMode="numeric"
             value={minimumRecoveryTimeSeconds ?? ''}
             onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
-            placeholder="必填，如 30"
+            placeholder={t('shiftList.routeGroups.minRecoveryPlaceholder')}
             className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
-            aria-label="最低恢復時間"
+            aria-label={t('shiftList.routeGroups.minRecoveryAria')}
           />
-          <span className="text-sm text-zinc-500">秒</span>
+          <span className="text-sm text-zinc-500">{t('shiftList.routeGroups.secondsUnit')}</span>
         </div>
       </label>
 
       <label className="block">
         <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-          <HelpTip label="碰撞保護時間說明" widthClass="w-72">
+          <HelpTip label={t('shiftList.routeGroups.collisionHelp')} widthClass="w-72">
             <p>
-              前車從某個停靠點發車後，要多久才確定已經駛離會互相碰撞的那段空間。後車也要花同樣的時間才能從那段空間外緣開進來，所以兩台車在同一個停靠點的最小間隔是<strong>兩倍</strong>這個值。
+              {t('shiftList.routeGroups.collisionHelp1')}
             </p>
             <p className="mt-1 text-zinc-500">
-              規則：後車到站時刻 ≥ 前車實際離站時刻 + 2 × 碰撞保護時間。前車如果因為調度要滯留在站上，以它真正開走的時刻起算。
+              {t('shiftList.routeGroups.collisionHelp2')}
             </p>
             <p className="mt-1 text-zinc-500">
-              這是防碰撞下限，不是把班次擠近的目標；班距約束照舊，兩者取較嚴的。輸入「30」代表兩台車至少隔 60 秒。
+              {t('shiftList.routeGroups.collisionHelp3')}
             </p>
           </HelpTip>
-          碰撞保護時間（秒）
+          {t('shiftList.routeGroups.collisionLabel')}
         </span>
         <div className="flex items-center gap-2">
           <input
@@ -451,26 +455,26 @@ function RecoveryAndServiceDirectionBar({
             inputMode="numeric"
             value={collisionProtectionSeconds ?? ''}
             onChange={(e) => onUpdateCollisionProtection(e.target.value.replace(/\D/g, ''))}
-            placeholder="預設 30"
+            placeholder={t('shiftList.routeGroups.collisionPlaceholder')}
             className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
-            aria-label="碰撞保護時間"
+            aria-label={t('shiftList.routeGroups.collisionAria')}
           />
-          <span className="text-sm text-zinc-500">秒</span>
+          <span className="text-sm text-zinc-500">{t('shiftList.routeGroups.secondsUnit')}</span>
     </div>
       </label>
 
       <div className="min-w-0 flex-1">
         <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-          <HelpTip label="服務方向說明" widthClass="w-64">
+          <HelpTip label={t('shiftList.routeGroups.serviceDirHelp')} widthClass="w-64">
             <p>
-              服務方向標示哪些路線的班次算同一向。同一趟車連續跑的同向路段只算一班；運能用相鄰班次班距換算，再分桶均化顯示。
+              {t('shiftList.routeGroups.serviceDirHelp1')}
             </p>
             <p className="mt-1 text-zinc-500">
-              與下方關聯圖的輪替接續不同；關聯圖是車怎麼換線，服務方向是乘客看到的同向服務。
+              {t('shiftList.routeGroups.serviceDirHelp2')}
             </p>
-            <p className="mt-1 text-zinc-500">例如可建「往 T3」「往南港」，再於各路線卡單選一個。</p>
+            <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.serviceDirHelp3')}</p>
           </HelpTip>
-          服務方向
+          {t('shiftList.routeGroups.serviceDir')}
             </span>
                     <div className="flex flex-wrap items-center gap-2">
           {serviceDirectionTags.map((tag) => (
@@ -481,8 +485,8 @@ function RecoveryAndServiceDirectionBar({
               {tag.name}
               <button
                 type="button"
-                title={`刪除「${tag.name}」`}
-                aria-label={`刪除服務方向 ${tag.name}`}
+                title={t('shiftList.routeGroups.deleteTag', { name: tag.name })}
+                aria-label={t('shiftList.routeGroups.deleteTagAria', { name: tag.name })}
                 onClick={() => onRemoveTag(tag.id)}
                 className="rounded-md p-1 text-sky-200/70 hover:bg-sky-500/20 hover:text-sky-50"
               >
@@ -508,15 +512,15 @@ function RecoveryAndServiceDirectionBar({
                     setDraftName('');
                   }
                 }}
-                placeholder="方向名稱"
+                placeholder={t('shiftList.routeGroups.directionName')}
                 maxLength={24}
                 className="w-28 bg-transparent px-1.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
-                aria-label="新服務方向名稱"
+                aria-label={t('shiftList.routeGroups.newDirAria')}
               />
               <button
                 type="button"
-                title="確認新增"
-                aria-label="確認新增服務方向"
+                title={t('shiftList.routeGroups.confirmAdd')}
+                aria-label={t('shiftList.routeGroups.confirmAddDirAria')}
                 onClick={commitDraft}
                 disabled={!draftName.trim()}
                 className="rounded-md p-1 text-emerald-400 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
@@ -525,8 +529,8 @@ function RecoveryAndServiceDirectionBar({
               </button>
               <button
                 type="button"
-                title="取消"
-                aria-label="取消新增服務方向"
+                title={t('common.cancel')}
+                aria-label={t('shiftList.routeGroups.cancelAddDirAria')}
                 onClick={() => {
                   setDrafting(false);
                   setDraftName('');
@@ -539,8 +543,8 @@ function RecoveryAndServiceDirectionBar({
           ) : (
             <button
               type="button"
-              title="新增服務方向"
-              aria-label="新增服務方向"
+              title={t('shiftList.routeGroups.addServiceDir')}
+              aria-label={t('shiftList.routeGroups.addServiceDir')}
               onClick={() => setDrafting(true)}
               className="inline-flex size-9 items-center justify-center rounded-lg border border-dashed border-zinc-600 text-zinc-400 hover:border-sky-500/50 hover:text-sky-200"
             >
@@ -559,9 +563,9 @@ function RoutePickerBar({
   selectedRouteId,
   onSelectRouteId,
   onConfirm,
-  confirmLabel = '確認新增',
-  emptyHint = '請先選擇一條路線',
-  title = '新增路線',
+  confirmLabel = i18n.t('shiftList.routeGroups.confirmAdd'),
+  emptyHint = i18n.t('shiftList.routeGroups.emptyHint'),
+  title = i18n.t('shiftList.routeGroups.addRouteTitle'),
   expanded = true,
   onExpand,
   onCancel,
@@ -579,6 +583,7 @@ function RoutePickerBar({
   onExpand?: () => void;
   onCancel?: () => void;
 }) {
+  const { t } = useTranslation();
   const availableGroups = useMemo(
     () =>
       catalog
@@ -618,7 +623,7 @@ function RoutePickerBar({
             label={title}
             hideLabel
             value={selectedRouteId}
-            placeholder={availableGroups.length === 0 ? '沒有可選路線' : emptyHint}
+            placeholder={availableGroups.length === 0 ? t('shiftList.routeGroups.noRoutesAvailable') : emptyHint}
             groups={availableGroups.map((group) => ({
               label: group.groupName,
               options: group.routes.map((route) => ({
@@ -653,7 +658,7 @@ function RoutePickerBar({
           onClick={onCancel}
           className="px-1 text-xs text-zinc-500 hover:text-zinc-300"
         >
-          取消
+          {t('common.cancel')}
         </button>
       ) : null}
     </div>
@@ -668,11 +673,11 @@ function formatFirstTripOriginsHint(
     const facilities =
       origin.facilityLabels.length > 0
         ? origin.facilityLabels.join('、')
-        : '整備設施';
+        : i18n.t('shiftList.routeGroups.yardOrigins');
     return `${facilities} → ${origin.label}`;
   });
-  const more = origins.length > 4 ? ` 等 ${origins.length} 處` : '';
-  return `整備出場（路網拓樸）：${parts.join('；')}${more}`;
+  const more = origins.length > 4 ? i18n.t('shiftList.routeGroups.yardExitMore', { count: origins.length }) : '';
+  return i18n.t('shiftList.routeGroups.yardExitLabel', { parts: parts.join('；'), more });
 }
 
 export function StepShiftRouteGroups({
@@ -681,6 +686,7 @@ export function StepShiftRouteGroups({
   timeTemplateId,
   creationMode = 'parametric',
 }: StepShiftRouteGroupsProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapDisplayName, setMapDisplayName] = useState('');
@@ -1463,32 +1469,32 @@ export function StepShiftRouteGroups({
     if (isManual) return [] as string[];
     const blockers: string[] = [];
     if (draft.minimumRecoveryTimeSeconds == null) {
-      blockers.push('尚未填寫最低恢復時間');
+      blockers.push(i18n.t('shiftList.routeGroups.needMinRecovery'));
     }
     if (!graphHasLinks) {
-      blockers.push('關聯圖尚無連線');
+      blockers.push(i18n.t('shiftList.routeGroups.needEdges'));
     } else if (!cycleMarksReady) {
-      blockers.push('尚未設好「由此起算」與「到此結算」');
+      blockers.push(i18n.t('shiftList.routeGroups.needStartEnd'));
     } else if (!headInStarts) {
-      blockers.push('首班車必須也是起算路線');
+      blockers.push(i18n.t('shiftList.routeGroups.firstMustStart'));
     } else if (!hasExplicitPreferred || referenceCycle == null) {
-      blockers.push('尚未選擇優先採用的路線組合');
+      blockers.push(i18n.t('shiftList.routeGroups.needPreferred'));
     } else if (throughGateStatus === 'overLimit') {
       blockers.push(
         turnaroundLimitSeconds != null && referenceCycle != null
-          ? `優先採用的路線組合超過折返時限 ${formatSecondsLabel(referenceCycle.minCycleSeconds - turnaroundLimitSeconds)}——改採用沒超過的組合、縮短占用，或放寬時限`
-          : '優先採用的路線組合超過折返時限',
+          ? i18n.t('shiftList.routeGroups.preferredOverLimitDetail', { over: formatSecondsLabel(referenceCycle.minCycleSeconds - turnaroundLimitSeconds) })
+          : i18n.t('shiftList.routeGroups.preferredOverLimit'),
       );
     } else if (!throughVerified || throughGateStatus !== 'passed') {
       if (
         throughAnchors.listedFingerprint === currentCheckFingerprint
         && listedThroughCycles.length === 0
       ) {
-        blockers.push('找不到從起算到結算的路徑');
+        blockers.push(i18n.t('shiftList.routeGroups.noPath'));
       } else if (listedIsStale || listedThroughCycles.length === 0) {
-        blockers.push('請按右下角「重新檢查路線組合」確認後才能下一步');
+        blockers.push(i18n.t('shiftList.routeGroups.needRecheck'));
       } else {
-        blockers.push('請按右下角「產生路線組合」確認後才能下一步');
+        blockers.push(i18n.t('shiftList.routeGroups.needGenerate'));
       }
     }
     const recovery = draft.minimumRecoveryTimeSeconds;
@@ -1497,7 +1503,7 @@ export function StepShiftRouteGroups({
         (route) => !isSelectedRouteDwellReady(route, turnaroundLimitSeconds, recovery),
       );
       if (notReady.length > 0) {
-        blockers.push(`尚有 ${notReady.length} 條路線靠站時間未填完，或單線超過折返時限`);
+        blockers.push(i18n.t('shiftList.routeGroups.routesNotReady', { count: notReady.length }));
       }
     }
     return blockers;
@@ -1558,8 +1564,8 @@ export function StepShiftRouteGroups({
                     setEditingRouteId(null);
                     setPendingEditRouteId('');
                   }}
-                  confirmLabel="確認更換路線"
-                  emptyHint="重新選擇路線"
+                  confirmLabel={t('shiftList.routeGroups.confirmReplace')}
+                  emptyHint={t('shiftList.routeGroups.reselectRoute')}
                 />
                 <button
                   type="button"
@@ -1569,20 +1575,20 @@ export function StepShiftRouteGroups({
                   }}
                   className="text-xs text-zinc-500 hover:text-zinc-300"
                 >
-                  取消編輯
+                  {t('shiftList.routeGroups.cancelEdit')}
                 </button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {orderPosition.executionOrder === 1 ? (
                   <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                    起始
+                    {t('shiftList.routeGroups.startBadge')}
                   </span>
                 ) : null}
                 <span className="text-sm font-medium text-zinc-100">{route.routeName}</span>
                 <label className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900/80 px-1.5 py-0.5">
                   <span className="text-[10px] font-medium text-zinc-400">
-                    代號
+                    {t('shiftList.routeGroups.code')}
                     <span className="text-rose-400" aria-hidden>
                       *
                     </span>
@@ -1599,28 +1605,28 @@ export function StepShiftRouteGroups({
                       )
                     }
                     className="w-8 bg-transparent text-center text-xs font-bold text-[#2B7FFF] focus:outline-none"
-                    title="路線代號（必填，班次卡顯示用）"
-                    aria-label={`${route.routeName} 路線代號（必填）`}
+                    title={t('shiftList.routeGroups.codeTitle')}
+                    aria-label={t('shiftList.routeGroups.codeAria', { name: route.routeName })}
                     aria-required
                   />
                 </label>
                 <span className="text-xs text-zinc-500">{route.groupName}</span>
                 {!isManual ? (
                   <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
-                    <span className="shrink-0">服務方向</span>
+                    <span className="shrink-0">{t('shiftList.routeGroups.serviceDir')}</span>
                     <select
                       value={route.serviceDirectionId ?? ''}
                       onChange={(e) => updateServiceDirectionId(instanceId, e.target.value)}
                       disabled={serviceDirectionTags.length === 0}
                       className="h-7 max-w-[140px] rounded-md border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200 focus:border-[#2B7FFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`${route.routeName} 服務方向`}
+                      aria-label={`${route.routeName} ${t('shiftList.routeGroups.serviceDir')}`}
                       title={
                         serviceDirectionTags.length === 0
-                          ? '請先在上方新增服務方向'
-                          : '選擇此路線所屬服務方向（單選）'
+                          ? t('shiftList.routeGroups.serviceDirNeedTags')
+                          : t('shiftList.routeGroups.serviceDirPick')
                       }
                     >
-                      <option value="">未設定</option>
+                      <option value="">{t('shiftList.routeGroups.serviceDirUnset')}</option>
                       {serviceDirectionTags.map((tag) => (
                         <option key={tag.id} value={tag.id}>
                           {tag.name}
@@ -1635,8 +1641,8 @@ export function StepShiftRouteGroups({
             {!isEditing && !route.routeCode?.trim() ? (
               <p className="text-[11px] text-amber-400/90">
                 {isManual
-                  ? '請填寫路線代號，供手動製作班次代號使用。'
-                  : '請填寫路線代號；變更後需重新產生班表。'}
+                  ? t('shiftList.routeGroups.codeRequiredManual')
+                  : t('shiftList.routeGroups.codeRequired')}
               </p>
             ) : null}
 
@@ -1663,7 +1669,7 @@ export function StepShiftRouteGroups({
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
-                title="編輯路線"
+                title={t('shiftList.routeGroups.editRoute')}
                 onClick={() => {
                   setEditingRouteId(instanceId);
                   setPendingEditRouteId(route.routeId);
@@ -1674,7 +1680,7 @@ export function StepShiftRouteGroups({
               </button>
               <button
                 type="button"
-                title="刪除"
+                title={t('shiftList.routeGroups.delete')}
                 onClick={() => deletePrimary(instanceId)}
                 className="rounded-lg p-2 text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
               >
@@ -1701,23 +1707,23 @@ export function StepShiftRouteGroups({
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="mb-6 shrink-0 space-y-3">
         <div>
-          <h2 className="text-base font-medium text-zinc-100">配置路線群組</h2>
+          <h2 className="text-base font-medium text-zinc-100">{t('shiftList.routeGroups.configureTitle')}</h2>
           <p className="mt-1 text-xs text-zinc-500">
-            選擇場域管理地圖後，以此 mapId 的 JSON（含路網拓樸）載入路線與整備出場站
+            {t('shiftList.routeGroups.configureHint')}
             {turnaroundLoading
-              ? ' · 載入折返時限…'
+              ? t('shiftList.routeGroups.loadingTurnaround')
               : turnaroundLimitSeconds != null
-                ? ` · 車輛折返時限 ${formatSecondsLabel(turnaroundLimitSeconds)}`
+                ? t('shiftList.routeGroups.turnaroundValue', { value: formatSecondsLabel(turnaroundLimitSeconds) })
                 : timeTemplateId
-                  ? ' · 時間模板尚無可計算的折返時限'
-                  : ' · 請先選擇時間模板'}
+                  ? t('shiftList.routeGroups.noTurnaround')
+                  : t('shiftList.routeGroups.needTimeTemplate')}
           </p>
               </div>
         <div className="flex flex-wrap items-end gap-3">
           <ShiftMenuSelect
-            label="場域地圖"
+            label={t('shiftList.routeGroups.siteMap')}
             value={selectedMapId}
-            placeholder="選擇地圖"
+            placeholder={t('shiftList.routeGroups.selectMap')}
             options={mapSelectOptions}
             widthClass="w-[280px] shrink-0"
             panelWidth={280}
@@ -1729,7 +1735,7 @@ export function StepShiftRouteGroups({
           />
           {!loading && !error && mapDisplayName ? (
             <p className="pb-2 text-xs text-zinc-500">
-              已載入 mapId：{selectedMapId || '—'}
+              {t('shiftList.routeGroups.loadedMapId', { id: selectedMapId || '—' })}
             </p>
           ) : null}
           </div>
@@ -1741,7 +1747,7 @@ export function StepShiftRouteGroups({
       {loading ? (
         <div className="flex min-h-[280px] flex-1 items-center justify-center gap-2 text-sm text-zinc-500">
           <Loader2 className="size-4 animate-spin" />
-          載入路線群組中…
+          {t('shiftList.routeGroups.loadingGroups')}
         </div>
       ) : error ? (
         <div className="flex min-h-[280px] flex-1 items-center justify-center px-6 text-sm text-red-400">
@@ -1751,7 +1757,7 @@ export function StepShiftRouteGroups({
         <div className="flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
           <ShiftSelectionEmptyState />
           <p className="pb-8 text-center text-xs text-zinc-500">
-            請至地圖編輯器建立路線群組與路線，並在上方選擇該場域地圖
+            {t('shiftList.routeGroups.emptyGroups')}
           </p>
         </div>
       ) : (
@@ -1777,9 +1783,9 @@ export function StepShiftRouteGroups({
               selectedRouteId={pendingAddRouteId}
               onSelectRouteId={setPendingAddRouteId}
               onConfirm={confirmAddPrimary}
-              confirmLabel="確認新增路線"
-              emptyHint="依群組選擇路線"
-              title="新增路線"
+              confirmLabel={t('shiftList.routeGroups.confirmAddRoutes')}
+              emptyHint={t('shiftList.routeGroups.pickByGroup')}
+              title={t('shiftList.routeGroups.addRouteTitle')}
               expanded={addPrimaryOpen}
               onExpand={() => setAddPrimaryOpen(true)}
               onCancel={() => {
@@ -1818,35 +1824,35 @@ export function StepShiftRouteGroups({
               {!isManual ? (
                 <div className="space-y-3 border-t border-zinc-800/70 px-4 py-3">
                   {throughGateStatus === 'missingGraph' ? (
-                    <p className="text-[11px] text-zinc-500">請先在關聯圖拉好路線接續（至少一條連線）。</p>
+                    <p className="text-[11px] text-zinc-500">{t('shiftList.routeGroups.needEdgesHint')}</p>
                   ) : throughGateStatus === 'missingMarks' ? (
                     <p className="text-[11px] text-zinc-400">
-                      請至少各設一條「由此起算」與「到此結算」，並設好首班車。
+                      {t('shiftList.routeGroups.needStartEndHint')}
                     </p>
                   ) : throughGateStatus === 'headNotInStarts' ? (
                     <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
                       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
-                      <span>首班車必須也是「由此起算」的其中一條。</span>
+                      <span>{t('shiftList.routeGroups.firstMustStartHint')}</span>
                     </p>
                   ) : throughGateStatus === 'failed' ? (
                     <p className="flex items-start gap-1.5 text-[11px] text-red-300">
                       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
-                      <span>找不到從起算走到結算的路徑，請檢查優先連線。</span>
+                      <span>{t('shiftList.routeGroups.noPathHint')}</span>
                     </p>
                   ) : throughGateStatus === 'missingPreferred' ? (
                     <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
                       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
-                      <span>請在下方清單點選一列設為「優先採用」後才能下一步。</span>
+                      <span>{t('shiftList.routeGroups.pickPreferredHint')}</span>
                     </p>
                   ) : null}
 
                   {listedThroughCycles.length > 0 ? (
                     <div className="space-y-1">
                       <p className="pb-1 text-[11px] text-zinc-500">
-                        點選一列設為「優先採用」（全優先在上、次要在下）。
+                        {t('shiftList.routeGroups.pickPreferredList')}
                         {listedIsStale
-                          ? ' 清單可能已過時，變更關聯後請再按檢查更新。'
-                          : ' 排班會盡量走這組，約束衝突時才改派其他組合。'}
+                          ? t('shiftList.routeGroups.listStale')
+                          : t('shiftList.routeGroups.preferHint')}
                       </p>
                       {listedThroughCycles.map((cycle) => {
                         const rowOver =
@@ -1880,8 +1886,8 @@ export function StepShiftRouteGroups({
                                       ].join(' ')}
                                     >
                                       {cycle.linkKinds[labelIndex - 1] === 'secondary'
-                                        ? '次'
-                                        : '優'}
+                                        ? t('shiftList.routeGroups.secondaryShort')
+                                        : t('shiftList.routeGroups.primaryShort')}
                                     </span>
                                   ) : null}
                                   <span className="font-medium text-zinc-100">{label}</span>
@@ -1894,18 +1900,18 @@ export function StepShiftRouteGroups({
                                 }
                               >
                                 {cycle.secondaryCount === 0
-                                  ? '全優先'
-                                  : `次要×${cycle.secondaryCount}`}
+                                  ? t('shiftList.routeGroups.allPrimary')
+                                  : t('shiftList.routeGroups.secondaryCount', { count: cycle.secondaryCount })}
                               </span>
                               {isReference ? (
                                 <>
                                   <span className="text-zinc-600">·</span>
-                                  <span className="text-emerald-300">優先採用</span>
+                                  <span className="text-emerald-300">{t('shiftList.routeGroups.preferred')}</span>
                                 </>
                               ) : (
                                 <>
                                   <span className="text-zinc-600">·</span>
-                                  <span className="text-zinc-500">點選採用</span>
+                                  <span className="text-zinc-500">{t('shiftList.routeGroups.clickAdopt')}</span>
                                 </>
                               )}
             </div>
@@ -1916,11 +1922,11 @@ export function StepShiftRouteGroups({
                               ].join(' ')}
                             >
                               <div className="text-sm">
-                                <span className="text-zinc-500">快 </span>
+                                <span className="text-zinc-500">{t('shiftList.routeGroups.fastShort')} </span>
                                 {formatSecondsLabel(cycle.minCycleSeconds)}
           </div>
                               <div className="text-sm">
-                                <span className="text-zinc-500">均 </span>
+                                <span className="text-zinc-500">{t('shiftList.routeGroups.avgShort')} </span>
                                 {formatSecondsLabel(cycle.avgCycleSeconds)}
                               </div>
                             </div>
@@ -1944,70 +1950,68 @@ export function StepShiftRouteGroups({
                           <p className="flex items-start gap-1.5 text-[11px] text-red-300">
                             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
                             <span>
-                              優先採用（{referenceCycle.labels.join('→')}）最快{' '}
-                              {formatSecondsLabel(referenceCycle.minCycleSeconds)}，
-                              比折返時限（{formatSecondsLabel(limit)}）多了{' '}
-                              <span className="font-semibold">{formatSecondsLabel(shortfall)}</span>。
+                              {t('shiftList.routeGroups.preferredOver', {
+                                path: referenceCycle.labels.join('→'),
+                                min: formatSecondsLabel(referenceCycle.minCycleSeconds),
+                                limit: formatSecondsLabel(limit),
+                                over: formatSecondsLabel(shortfall),
+                              })}
                             </span>
                           </p>
                           <p className="pl-5 text-[10px] leading-4 text-zinc-500">
-                            判定只看「快」那一欄——平均 {formatSecondsLabel(referenceCycle.avgCycleSeconds)}{' '}
-                            僅供參考，不影響這個閘門。
+                            {t('shiftList.routeGroups.gateUsesFast', {
+                              avg: formatSecondsLabel(referenceCycle.avgCycleSeconds),
+                            })}
                           </p>
                           <div className="pl-5 text-[11px] leading-5 text-zinc-300">
-                            <p className="text-zinc-400">可以這樣解，擇一即可：</p>
+                            <p className="text-zinc-400">{t('shiftList.routeGroups.solutionsTitle')}</p>
                             <ul className="list-disc space-y-0.5 pl-4">
                               {withinLimit.length > 0 ? (
                                 <li>
-                                  <span className="text-zinc-200">改採用沒超過的組合</span>
-                                  ——上面清單點選{' '}
-                                  <span className="font-medium text-sky-300">
-                                    {withinLimit[0]!.labels.join('→')}
-                                  </span>
-                                  （快 {formatSecondsLabel(withinLimit[0]!.minCycleSeconds)}）
+                                  <span className="text-zinc-200">{t('shiftList.routeGroups.adoptWithin')}</span>
+                                  {t('shiftList.routeGroups.adoptWithinDetail', {
+                                    path: withinLimit[0]!.labels.join('→'),
+                                    min: formatSecondsLabel(withinLimit[0]!.minCycleSeconds),
+                                  })}
                                   {withinLimit.length > 1
-                                    ? `，另外還有 ${withinLimit.length - 1} 組也沒超過`
+                                    ? t('shiftList.routeGroups.adoptWithinMore', {
+                                        count: withinLimit.length - 1,
+                                      })
                                     : ''}
-                                  。
                                 </li>
                               ) : (
-                                <li>
-                                  清單裡<span className="text-zinc-200">每一組都超過</span>，
-                                  換組合解不了，只能走下面兩條。
-                                </li>
+                                <li>{t('shiftList.routeGroups.allOver')}</li>
                               )}
                               <li>
-                                <span className="text-zinc-200">縮短這組路線的占用</span>
-                                ——就在這一步調整：各路線的行駛時間、靠站秒數、換線緩衝，
-                                以及最低恢復時間。合計省下{' '}
-                                {formatSecondsLabel(shortfall)} 就會通過。
+                                <span className="text-zinc-200">{t('shiftList.routeGroups.shortenOccupy')}</span>
+                                {t('shiftList.routeGroups.shortenOccupyDetail', {
+                                  value: formatSecondsLabel(shortfall),
+                                })}
                               </li>
                               <li>
-                                <span className="text-zinc-200">把折返時限撐大</span>
-                                ——它<strong>不是一個可以直接填的欄位</strong>，是算出來的：
+                                <span className="text-zinc-200">{t('shiftList.routeGroups.raiseLimit')}</span>
+                                {t('shiftList.routeGroups.raiseLimitNotField')}
                                 <span className="text-zinc-200">
-                                  該時段同時在跑的正線列數 × 該時段班距
+                                  {t('shiftList.routeGroups.raiseLimitFormula')}
                                 </span>
-                                ，再取全天最小的那一段。
+                                {t('shiftList.routeGroups.raiseLimitMinDay')}
                                 {turnaroundBinding ? (
                                   <>
-                                    {' '}目前卡住的是{' '}
+                                    {t('shiftList.routeGroups.stuckInterval')}
                                     <span className="font-medium text-amber-300">
                                       {formatClockRange(
                                         turnaroundBinding.startMinute,
                                         turnaroundBinding.endMinute,
                                       )}
                                     </span>
-                                    {' '}這一段：{turnaroundBinding.activePassengerCount} 列正線 ×{' '}
-                                    {formatSecondsLabel(turnaroundBinding.headwaySeconds)} 班距 ={' '}
-                                    {formatSecondsLabel(limit)}。
-                                    要撐大就<strong>回時間模板</strong>對這一段做其中一件事：
-                                    多排一列正線，或把該時段屬性的班距拉長。
+                                    {t('shiftList.routeGroups.stuckDetail', {
+                                      trains: turnaroundBinding.activePassengerCount,
+                                      headway: formatSecondsLabel(turnaroundBinding.headwaySeconds),
+                                      limit: formatSecondsLabel(limit),
+                                    })}
                                   </>
                                 ) : (
-                                  <>
-                                    {' '}要撐大就回時間模板：多排一列正線，或把該時段的班距拉長。
-                                  </>
+                                  <>{t('shiftList.routeGroups.raiseLimitGeneric')}</>
                                 )}
                               </li>
                             </ul>
@@ -2021,15 +2025,13 @@ export function StepShiftRouteGroups({
                     <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
                       <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
                       <span>
-                        已確認：{referenceCycle.labels.join('→')}
-                        {hasLimit ? '，符合折返時限' : ''}
-                        。可以下一步。
+                        {t('shiftList.routeGroups.confirmedOk', { path: referenceCycle.labels.join('→'), limitOk: hasLimit ? t('shiftList.routeGroups.withinTurnaround') : '' })}
                       </span>
                     </p>
                   ) : throughGateStatus === 'passed' ? (
                     <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
                       <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
-                      <span>路線組合仍有效。可以下一步。</span>
+                      <span>{t('shiftList.routeGroups.stillValid')}</span>
                     </p>
                   ) : null}
 
@@ -2041,12 +2043,12 @@ export function StepShiftRouteGroups({
                       className="rounded-md border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 px-3 py-1.5 text-xs font-medium text-[#9ec5ff] hover:bg-[#2B7FFF]/25 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {listedThroughCycles.length > 0
-                        ? '重新檢查路線組合'
-                        : '產生路線組合'}
+                        ? t('shiftList.routeGroups.recheckCycles')
+                        : t('shiftList.routeGroups.generateCycles')}
                     </button>
                     {nextStepBlockers.length > 0 ? (
                       <div className="w-full rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-left text-[11px] text-amber-100/90">
-                        <p className="font-medium text-amber-200">下一步尚無法使用：</p>
+                        <p className="font-medium text-amber-200">{t('shiftList.routeGroups.nextBlocked')}</p>
                         <ul className="mt-1 list-disc space-y-0.5 pl-4 text-amber-100/80">
                           {nextStepBlockers.map((item) => (
                             <li key={item}>{item}</li>

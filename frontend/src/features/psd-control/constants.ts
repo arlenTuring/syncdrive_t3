@@ -1,9 +1,9 @@
-/** 列表卡門位順序：右前 → 右後 → 左前 → 左後（對齊設計稿） */
+/** 列表卡門位順序：右前 → 右後 → 左前 → 左後（對齊設計稿）；顯示文案用 psdControl.doors.* */
 export const VEHICLE_DOORS = [
-  { id: 'rf', label: '右前' },
-  { id: 'rr', label: '右後' },
-  { id: 'lf', label: '左前' },
-  { id: 'lr', label: '左後' },
+  { id: 'rf' },
+  { id: 'rr' },
+  { id: 'lf' },
+  { id: 'lr' },
 ] as const;
 
 export type VehicleDoorId = (typeof VEHICLE_DOORS)[number]['id'];

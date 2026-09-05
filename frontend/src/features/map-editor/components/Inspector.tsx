@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { NumberInput } from '../../../components/NumberInput'
 import { TextAlignmentControls } from '../../../components/TextAlignmentControls'
@@ -76,6 +77,7 @@ function FacilityLabelStyleSection({
   onFieldFocus,
   onFieldBlur,
 }: FacilityLabelStyleSectionProps) {
+  const { t } = useTranslation()
   const labelStyle = getFacilityLabelStyle(facility)
   const { w: sizeWm, h: sizeHm } = getFacilitySizeMeters(facility)
   const labelPreviewMinDim = Math.min(sizeWm, sizeHm) * 10
@@ -94,7 +96,7 @@ function FacilityLabelStyleSection({
 
   return (
     <div className="space-y-2 rounded-md border border-zinc-700/80 bg-zinc-950/50 p-2.5">
-      <p className="text-[10px] font-medium text-zinc-500">名稱顯示樣式</p>
+      <p className="text-[10px] font-medium text-zinc-500">{t('mapEditor.inspector.labelStyle.title')}</p>
       <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
         <input
           type="checkbox"
@@ -109,16 +111,11 @@ function FacilityLabelStyleSection({
           onBlur={onFieldBlur}
           className="rounded border-zinc-600 accent-cyan-500"
         />
-        顯示名稱
+        {t('mapEditor.inspector.labelStyle.showName')}
       </label>
       {showLabelDragHint && labelStyle.visible !== false ? (
         <p className="text-[10px] leading-relaxed text-zinc-600">
-          請先按上方<strong className="font-medium text-zinc-400">「編輯」</strong>
-          進入編輯模式。在圖台上將滑鼠移到名稱上（會出現淡青框與抓取游標），
-          <strong className="font-medium text-zinc-400">拖曳名稱</strong>
-          調整位置，選取後拖曳名稱右側圓點可
-          <strong className="font-medium text-zinc-400">旋轉名稱</strong>
-          （適用軌道、設施、號誌、智慧桿等）。
+          {t('mapEditor.inspector.labelStyle.dragHint')}
         </p>
       ) : null}
       <div>
@@ -126,7 +123,7 @@ function FacilityLabelStyleSection({
           htmlFor="label-font-size"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          字體大小（px）
+          {t('mapEditor.inspector.labelStyle.fontSize')}
         </label>
         <div className="flex items-center gap-2">
           <NumberInput
@@ -146,13 +143,17 @@ function FacilityLabelStyleSection({
             disabled={readOnly || labelStyle.visible === false}
             onClick={() => patchLabelStyle({ fontSizePx: undefined })}
             className="shrink-0 rounded border border-zinc-600 px-2 py-1.5 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
-            title={`還原自動（約 ${DEFAULT_AUTO_LABEL_FONT_PX}px）`}
+            title={t('mapEditor.inspector.labelStyle.autoTitle', {
+              px: DEFAULT_AUTO_LABEL_FONT_PX,
+            })}
           >
-            自動
+            {t('common.auto')}
           </button>
         </div>
         <p className="mt-1 text-[10px] text-zinc-600">
-          圖台座標字級；所有設施預設 {EXAMPLE_MAP_DEFAULT_LABEL_FONT_PX}px。
+          {t('mapEditor.inspector.labelStyle.fontHint', {
+            px: EXAMPLE_MAP_DEFAULT_LABEL_FONT_PX,
+          })}
         </p>
       </div>
       <div>
@@ -160,7 +161,7 @@ function FacilityLabelStyleSection({
           htmlFor="label-color"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          文字顏色
+          {t('mapEditor.inspector.labelStyle.textColor')}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -179,7 +180,7 @@ function FacilityLabelStyleSection({
             onClick={() => patchLabelStyle({ color: '' })}
             className="rounded border border-zinc-600 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
           >
-            預設色
+            {t('mapEditor.inspector.labelStyle.defaultColor')}
           </button>
         </div>
       </div>
@@ -196,7 +197,7 @@ function FacilityLabelStyleSection({
             }
             className="rounded border-zinc-600 accent-cyan-500"
           />
-          粗體
+          {t('common.bold')}
         </label>
         <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-300">
           <input
@@ -210,7 +211,7 @@ function FacilityLabelStyleSection({
             }
             className="rounded border-zinc-600 accent-cyan-500"
           />
-          斜體
+          {t('common.italic')}
         </label>
       </div>
       <TextAlignmentControls
@@ -257,7 +258,7 @@ function FacilityLabelStyleSection({
           textAlign: resolveTextHorizontalAlign(labelStyle.textAlign),
         }}
       >
-        {facility.customName.trim() || facility.name || '預覽'}
+        {facility.customName.trim() || facility.name || t('common.preview')}
       </p>
     </div>
   )
@@ -352,6 +353,7 @@ export function Inspector({
   onApplyDockingPoint,
   onApplyWaypoint,
 }: InspectorProps) {
+  const { t } = useTranslation()
   void _domainMaxM
   void _areaLayout
   const nonSlotStates =
@@ -399,18 +401,18 @@ export function Inspector({
       className="flex h-full min-h-0 w-72 flex-col border-l border-zinc-700/80 bg-zinc-900"
     >
       <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-        屬性
+        {t('mapEditor.inspector.properties')}
         {readOnly && (
           <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal normal-case text-zinc-400">
-            檢視
+            {t('common.view')}
           </span>
         )}
       </div>
       <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm text-zinc-200">
-        <InspectorSection title="識別與命名">
+        <InspectorSection title={t('mapEditor.inspector.identityNaming')}>
           <div>
             <label className="mb-1 block text-[10px] text-zinc-500">
-              標準圖層命名
+              {t('mapEditor.inspector.standardLayerName')}
             </label>
             <p className="break-all rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5 font-mono text-[11px] leading-snug text-cyan-300/90">
               {layerName}
@@ -418,7 +420,7 @@ export function Inspector({
           </div>
           <div>
             <label htmlFor="facility-id" className="mb-1 block text-[10px] text-zinc-500">
-              設施 ID
+              {t('mapEditor.inspector.facilityId')}
             </label>
             <input
               id="facility-id"
@@ -433,7 +435,7 @@ export function Inspector({
           </div>
           <div>
             <label htmlFor="facility-custom" className="mb-1 block text-[10px] text-zinc-500">
-              自訂顯示名稱
+              {t('mapEditor.inspector.customDisplayName')}
             </label>
             <input
               id="facility-custom"
@@ -443,14 +445,14 @@ export function Inspector({
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
-              placeholder="選填"
+              placeholder={t('common.optional')}
             />
           </div>
           {onPatchParameters &&
           facility.type === 'Facility' ? (
             <div>
               <label htmlFor="facility-purpose" className="mb-1 block text-[10px] text-zinc-500">
-                用途
+                {t('mapEditor.inspector.purpose')}
               </label>
               <input
                 id="facility-purpose"
@@ -466,10 +468,10 @@ export function Inspector({
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
                 className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
-                placeholder="例：充電格、停車格、維修格"
+                placeholder={t('mapEditor.inspector.purposePlaceholder')}
               />
               <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
-                選填；僅用於大型設施區塊分類說明（清單顯示）。紅綠燈／智慧桿／月台門請用元件庫「設備」類型，勿在此填寫代替。
+                {t('mapEditor.inspector.purposeHint')}
               </p>
             </div>
           ) : null}
@@ -499,42 +501,42 @@ export function Inspector({
           )}
         </InspectorSection>
 
-        <InspectorSection title="位置與尺寸">
+        <InspectorSection title={t('mapEditor.inspector.positionSize')}>
           <div>
             <p className="mb-1.5 text-[10px] text-zinc-500">
-              區域座標（Area 內；原點左下，橫軸向右、縱軸向上，見規則 9）
+              {t('mapEditor.inspector.areaCoordsHint')}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                <div className="text-[10px] text-zinc-500">橫向位置</div>
+                <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.positionX')}</div>
                 <div className="font-mono text-[11px] text-zinc-200">
                   {areaXp.toFixed(2)}
                 </div>
               </div>
               <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                <div className="text-[10px] text-zinc-500">縱向位置</div>
+                <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.positionY')}</div>
                 <div className="font-mono text-[11px] text-zinc-200">
                   {areaYp.toFixed(2)}
                 </div>
               </div>
             </div>
             <p className="mt-1.5 text-[10px] text-zinc-600">
-              在圖台上拖曳調整位置；拉伸 Area 外框時區域座標不變。實際場域語意請用下方「參照場域範圍」。
+              {t('mapEditor.inspector.areaDragHint')}
             </p>
           </div>
 
           <div>
-            <p className="mb-1.5 text-[10px] text-zinc-500">像素尺寸（Area 內顯示）</p>
+            <p className="mb-1.5 text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelSizeInArea')}</p>
             {readOnly || !onChangeAreaSizePx ? (
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                  <div className="text-[10px] text-zinc-500">像素橫向尺寸</div>
+                  <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelWidth')}</div>
                   <div className="font-mono text-[11px] text-zinc-200">
                     {pixelW !== null ? pixelW.toFixed(2) : '—'}
                   </div>
                 </div>
                 <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                  <div className="text-[10px] text-zinc-500">像素縱向尺寸</div>
+                  <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelHeight')}</div>
                   <div className="font-mono text-[11px] text-zinc-200">
                     {pixelH !== null ? pixelH.toFixed(2) : '—'}
                   </div>
@@ -547,7 +549,7 @@ export function Inspector({
                     htmlFor="facility-size-px-w"
                     className="w-16 shrink-0 text-[10px] text-zinc-500"
                   >
-                    像素橫向尺寸
+                    {t('mapEditor.inspector.pixelWidth')}
                   </label>
                   <NumberInput
                     id="facility-size-px-w"
@@ -569,7 +571,7 @@ export function Inspector({
                     htmlFor="facility-size-px-h"
                     className="w-16 shrink-0 text-[10px] text-zinc-500"
                   >
-                    像素縱向尺寸
+                    {t('mapEditor.inspector.pixelHeight')}
                   </label>
                   <NumberInput
                     id="facility-size-px-h"
@@ -589,11 +591,11 @@ export function Inspector({
               </div>
             ) : (
               <p className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5 text-[10px] text-zinc-500">
-                尚無像素尺寸；請在圖台上拖曳邊線調整大小，或載入含 areaSizePx 的地圖。
+                {t('mapEditor.inspector.noPixelSize')}
               </p>
             )}
             <p className="mt-1.5 text-[10px] text-zinc-600">
-              圖台絕對畫素，與 Area 外框、場域尺寸無關；實際場域語意請用「參照場域範圍」。
+              {t('mapEditor.inspector.pixelSizeHint')}
             </p>
           </div>
         </InspectorSection>
@@ -628,16 +630,16 @@ export function Inspector({
 
         {onPatchParameters && facility.type !== 'RoadLine' && facility.type !== 'TrackCrossover' && (
           <InspectorSection
-            title="MQTT 對接"
+            title={t('mapEditor.inspector.mqtt.title')}
             className="border-amber-900/35 bg-amber-950/12"
           >
             <p className="text-[10px] leading-relaxed text-zinc-500">
-              對接路徑為 <strong>元件名稱／尾端 ID</strong>（名稱來自 palette，ID 在路徑最後）。
-              Topic 為 <code className="text-cyan-600">syncdrive/名稱/ID</code>。
-              payload 的 <code className="text-cyan-500">entityId</code> 須與下方一致。
+              {t('mapEditor.inspector.mqtt.hintBefore')}{' '}
+              <strong>{t('mapEditor.inspector.mqtt.hintNameId')}</strong>
+              {t('mapEditor.inspector.mqtt.hintAfter')}
             </p>
             <label className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500">
-              元件名稱（對接用）
+              {t('mapEditor.inspector.mqtt.componentName')}
             </label>
             <div className="mb-2 rounded border border-zinc-700/80 bg-zinc-950/50 px-2 py-1.5 font-mono text-[11px] text-zinc-200">
               {facility.name}
@@ -646,7 +648,7 @@ export function Inspector({
               htmlFor="mqtt-instance"
               className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
             >
-              尾端 ID（選填，預設為設施 ID）
+              {t('mapEditor.inspector.mqtt.tailId')}
             </label>
             <input
               id="mqtt-instance"
@@ -666,19 +668,18 @@ export function Inspector({
             />
             <div className="rounded border border-zinc-700/80 bg-zinc-950/80 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-zinc-400">
               <div>
-                <span className="text-zinc-500">entityId（名稱/尾端ID）：</span>
+                <span className="text-zinc-500">{t('mapEditor.inspector.mqtt.entityIdLabel')}</span>
                 <span className="text-cyan-300/90">{resolvedEntityId}</span>
               </div>
               <div className="mt-0.5">
-                <span className="text-zinc-500">Topic：</span>
+                <span className="text-zinc-500">{t('mapEditor.inspector.mqtt.topicLabel')}</span>
                 <span className="text-amber-200/80">{resolvedTopic}</span>
               </div>
             </div>
             {legacyEntityId.length > 0 && (
               <div className="mt-2 rounded border border-amber-800/40 bg-amber-950/40 px-2 py-1.5 text-[10px] text-amber-100/90">
                 <p className="mb-1">
-                  已設定舊版 <code className="text-cyan-400">mqttEntityId</code>
-                  ，會優先於「名稱／尾端 ID」。
+                  {t('mapEditor.inspector.mqtt.legacyNote')}
                 </p>
                 {!readOnly && (
                   <button
@@ -686,7 +687,7 @@ export function Inspector({
                     onClick={() => onPatchParameters({ mqttEntityId: undefined })}
                     className="rounded border border-amber-700/60 bg-amber-950/60 px-2 py-0.5 text-[10px] hover:bg-amber-900/50"
                   >
-                    清除舊版，改用名稱／ID
+                    {t('mapEditor.inspector.mqtt.clearLegacy')}
                   </button>
                 )}
               </div>
@@ -696,13 +697,13 @@ export function Inspector({
 
         {facility.type === 'Slot' && sf && occEn && eqEn ? (
           readOnly ? (
-            <InspectorSection title="整備格">
+            <InspectorSection title={t('mapEditor.inspector.slot.title')}>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
                 <div className="mb-2 text-xs font-medium text-emerald-200/90">
-                  空間狀態設定（啟用設置）
+                  {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
                 <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-                  檢視模式僅供瀏覽；按「編輯」後可調整勾選。
+                  {t('mapEditor.inspector.slot.viewOnlyHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_OCCUPANCY.map((k) => (
@@ -716,17 +717,17 @@ export function Inspector({
                         disabled
                         className="rounded border-zinc-600 opacity-70"
                       />
-                      {k === 'Vacant' ? 'Vacant（空閒）' : 'Occupied（已佔用）'}
+                      {k === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
                 <div className="mb-2 text-xs font-medium text-emerald-200/90">
-                  設備狀態設定（啟用設置）
+                  {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
                 <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-                  檢視模式僅供瀏覽；按「編輯」後可調整勾選。
+                  {t('mapEditor.inspector.slot.viewOnlyHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_EQUIPMENT_STATES.map((k) => (
@@ -747,25 +748,25 @@ export function Inspector({
               </div>
               <div className="rounded-md border border-zinc-700 bg-zinc-950/80 px-2 py-2 text-xs text-zinc-300">
                 <div className="mb-2 font-medium text-zinc-400">
-                  地圖預設顯示（儲存值）
+                  {t('mapEditor.inspector.slot.mapDefaultSaved')}
                 </div>
                 <p>
-                  空間：
+                  {t('mapEditor.inspector.slot.space')}
                   {sf.slotOccupancy === 'Vacant'
-                    ? '空閒（Vacant）'
-                    : '已佔用（Occupied）'}
+                    ? t('mapEditor.inspector.slot.vacantFull')
+                    : t('mapEditor.inspector.slot.occupiedFull')}
                 </p>
-                <p className="mt-1">設備狀態：{sf.slotEquipmentState}</p>
+                <p className="mt-1">{t('mapEditor.inspector.slot.equipmentState')}{sf.slotEquipmentState}</p>
               </div>
             </InspectorSection>
           ) : (
-            <InspectorSection title="整備格">
+            <InspectorSection title={t('mapEditor.inspector.slot.title')}>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
                 <div className="mb-2 text-xs font-medium text-emerald-200/90">
-                  空間狀態設定（啟用設置）
+                  {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
                 <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-                  勾選要啟用的狀態；未勾表示不需要此狀態。預設全部啟用。與下方「地圖預設顯示」互不連動。
+                  {t('mapEditor.inspector.slot.occupancyEnableHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_OCCUPANCY.map((k) => {
@@ -789,7 +790,7 @@ export function Inspector({
                           }}
                           className="rounded border-zinc-600"
                         />
-                        {k === 'Vacant' ? 'Vacant（空閒）' : 'Occupied（已佔用）'}
+                        {k === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                       </label>
                     )
                   })}
@@ -797,10 +798,10 @@ export function Inspector({
               </div>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
                 <div className="mb-2 text-xs font-medium text-emerald-200/90">
-                  設備狀態設定（啟用設置）
+                  {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
                 <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-                  勾選要啟用的設備／作業狀態；未勾表示不需要。與下方「地圖預設顯示」互不連動。
+                  {t('mapEditor.inspector.slot.equipmentEnableHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_EQUIPMENT_STATES.map((k) => {
@@ -832,10 +833,10 @@ export function Inspector({
               </div>
               <div>
                 <label className="mb-1 block text-xs text-zinc-500">
-                  地圖預設顯示（儲存值）
+                  {t('mapEditor.inspector.slot.mapDefaultSaved')}
                 </label>
                 <p className="mb-2 text-[10px] text-zinc-500">
-                  檢視模式與未預覽時，圖台依此組合顯示。
+                  {t('mapEditor.inspector.slot.mapDefaultHint')}
                 </p>
                 <div className="flex flex-col gap-2">
                   <select
@@ -851,7 +852,7 @@ export function Inspector({
                   >
                     {SLOT_OCCUPANCY.map((s) => (
                       <option key={s} value={s}>
-                        {s === 'Vacant' ? 'Vacant（空閒）' : 'Occupied（已佔用）'}
+                        {s === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                       </option>
                     ))}
                   </select>
@@ -877,14 +878,14 @@ export function Inspector({
               <div className="rounded-md border border-cyan-900/40 bg-cyan-950/20 p-2">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs font-medium text-cyan-200/90">
-                    預覽測試（圖台）
+                    {t('mapEditor.inspector.slot.previewTest')}
                   </span>
                   {slotPreview && (
-                    <span className="text-[10px] text-amber-400">預覽中</span>
+                    <span className="text-[10px] text-amber-400">{t('mapEditor.inspector.slot.previewing')}</span>
                   )}
                 </div>
                 <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-                  一對一查看各組合的邊框／光影效果，不會自動寫入預設值。
+                  {t('mapEditor.inspector.slot.previewHint')}
                 </p>
                 <div className="flex flex-col gap-2">
                   <select
@@ -906,7 +907,7 @@ export function Inspector({
                   >
                     {SLOT_OCCUPANCY.map((s) => (
                       <option key={s} value={s}>
-                        {s === 'Vacant' ? '空閒' : '已佔用'}
+                        {s === 'Vacant' ? t('mapEditor.inspector.slot.vacantShort') : t('mapEditor.inspector.slot.occupiedShort')}
                       </option>
                     ))}
                   </select>
@@ -939,7 +940,7 @@ export function Inspector({
                       onClick={() => onSlotPreviewChange(null)}
                       className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
                     >
-                      清除預覽
+                      {t('mapEditor.inspector.slot.clearPreview')}
                     </button>
                     {slotPreview && (
                       <button
@@ -953,7 +954,7 @@ export function Inspector({
                         }}
                         className="rounded border border-cyan-700 bg-cyan-950/50 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-900/40"
                       >
-                        將預覽設為地圖預設
+                        {t('mapEditor.inspector.slot.applyPreviewAsDefault')}
                       </button>
                     )}
                   </div>
@@ -964,16 +965,16 @@ export function Inspector({
         ) : null}
         {facility.type === 'PSD' && onPatchParameters ? (
           <InspectorSection
-            title="月台門開度"
+            title={t('mapEditor.inspector.psd.title')}
             className="border-sky-900/35 bg-sky-950/12"
           >
             <p className="text-[10px] leading-relaxed text-zinc-500">
-              圖台以<strong className="text-zinc-400">開度百分比</strong>線性控制門片（0 全關 → 100 全開）。
-              MQTT／SQL 請提供 0–100（或 0–1）數值；亦支援離散狀態
-              Open／Closed／Moving／Alarm。
+              {t('mapEditor.inspector.psd.hint')}
             </p>
             <label className="mb-1 block text-[10px] text-zinc-500">
-              地圖預設開度（{resolvePsdDisplay(facility).openPercent.toFixed(0)}%）
+              {t('mapEditor.inspector.psd.mapDefaultOpen', {
+                pct: resolvePsdDisplay(facility).openPercent.toFixed(0),
+              })}
             </label>
             <input
               type="range"
@@ -1000,7 +1001,7 @@ export function Inspector({
               htmlFor="psd-mqtt-key"
               className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
             >
-              MQTT 開度欄位名
+              {t('mapEditor.inspector.psd.mqttKey')}
             </label>
             <input
               id="psd-mqtt-key"
@@ -1023,7 +1024,7 @@ export function Inspector({
               htmlFor="psd-sql-field"
               className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
             >
-              SQL 開度欄位（預留）
+              {t('mapEditor.inspector.psd.sqlField')}
             </label>
             <input
               id="psd-sql-field"
@@ -1133,7 +1134,7 @@ export function Inspector({
         facility.type !== 'RoadLine' &&
         facility.type !== 'TrackCrossover' &&
         facility.type !== 'Waypoint' ? (
-          <InspectorSection title={`顯示狀態（${facility.type}）`}>
+          <InspectorSection title={t('mapEditor.inspector.displayState', { type: facility.type })}>
             <select
               id="facility-state"
               value={facility.currentState}
@@ -1153,7 +1154,7 @@ export function Inspector({
             </select>
             {facility.type === 'PSD' && (
               <p className="text-[10px] text-zinc-600">
-                Alarm 時門片改紅色；Open／Closed 僅在無即時開度時作為預設。
+                {t('mapEditor.inspector.psd.alarmHint')}
               </p>
             )}
           </InspectorSection>
@@ -1167,15 +1168,15 @@ export function Inspector({
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/80 bg-red-950/50 py-2 text-sm font-medium text-red-300 transition hover:bg-red-950/80 focus:outline-none focus:ring-2 focus:ring-red-500/40"
             >
               <Trash2 className="size-4 shrink-0" aria-hidden />
-              刪除此物件
+              {t('mapEditor.inspector.deleteObject')}
             </button>
           </div>
         )}
 
         <p className="rounded-md border border-zinc-800/60 bg-zinc-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-zinc-500">
           {readOnly
-            ? '檢視模式僅能瀏覽屬性；按「編輯」後可修改。'
-            : '旋轉請用元件下方圓形工具列。未聚焦輸入欄時：⌘/Ctrl+C／V 複製貼上；Delete 刪除；⌘/Ctrl+Z 復原、⌘/Ctrl+Shift+Z 重做。'}
+            ? t('mapEditor.inspector.footerViewOnly')
+            : t('mapEditor.inspector.footerEditHints')}
         </p>
       </div>
     </aside>

@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StatusTag } from '../../components/StatusTag';
 import { VTMS_VEHICLE_POOL } from '../dashboard/constants/vtmsVehiclePool';
 import { useDemoAccount } from '../schedule-management/utils/demoAccountPreference';
@@ -20,10 +21,8 @@ import { FALLBACK_DISPATCH_ITEMS } from './fallback';
 import {
   DISPATCH_STATUS_TAG_STYLE,
   PRIORITY_LABEL,
-  PRIORITY_OPTIONS,
   PRIORITY_SORT_ORDER,
   STATUS_LABEL,
-  STATUS_OPTIONS,
   STATUS_SORT_ORDER,
   type DispatchCreateInput,
   type DispatchListItem,
@@ -60,6 +59,7 @@ function compareRows(a: DispatchListItem, b: DispatchListItem, key: SortKey, dir
 }
 
 export function DispatchSchedulingPage() {
+  const { t } = useTranslation();
   const [account] = useDemoAccount();
   const isSupervisor = account.id === 'supervisor';
   const [rows, setRows] = useState<DispatchListItem[]>(FALLBACK_DISPATCH_ITEMS);
@@ -84,6 +84,30 @@ export function DispatchSchedulingPage() {
     mode: 'view' | 'approve';
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const priorityOptions = useMemo(
+    () =>
+      [
+        { value: 'all' as const, label: t('dispatchScheduling.selectPriority') },
+        ...(Object.keys(PRIORITY_LABEL) as DispatchPriorityKey[]).map((key) => ({
+          value: key,
+          label: t(`dispatchScheduling.priority.${key}`),
+        })),
+      ],
+    [t],
+  );
+
+  const statusOptions = useMemo(
+    () =>
+      [
+        { value: 'all' as const, label: t('dispatchScheduling.selectStatus') },
+        ...(Object.keys(STATUS_LABEL) as DispatchStatusKey[]).map((key) => ({
+          value: key,
+          label: t(`dispatchScheduling.status.${key}`),
+        })),
+      ],
+    [t],
+  );
 
   const locations = useMemo(
     () => Array.from(new Set(rows.map((r) => r.location))).sort(),
@@ -214,7 +238,7 @@ export function DispatchSchedulingPage() {
           }}
           className={SELECT}
         >
-          {PRIORITY_OPTIONS.map((opt) => (
+          {priorityOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -230,7 +254,7 @@ export function DispatchSchedulingPage() {
           }}
           className={SELECT}
         >
-          {STATUS_OPTIONS.map((opt) => (
+          {statusOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -246,7 +270,7 @@ export function DispatchSchedulingPage() {
           }}
           className={SELECT}
         >
-          <option value="all">選擇執行載具</option>
+          <option value="all">{t('dispatchScheduling.selectVehicle')}</option>
           {VTMS_VEHICLE_POOL.map((code) => (
             <option key={code} value={code}>
               {code}
@@ -263,7 +287,7 @@ export function DispatchSchedulingPage() {
           }}
           className={SELECT}
         >
-          <option value="all">選擇執行位置</option>
+          <option value="all">{t('dispatchScheduling.selectLocation')}</option>
           {locations.map((loc) => (
             <option key={loc} value={loc}>
               {loc}
@@ -274,7 +298,7 @@ export function DispatchSchedulingPage() {
           type="button"
           onClick={applyFilters}
           className="inline-flex size-9 items-center justify-center rounded-lg border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 text-[#51A2FF] transition hover:bg-[#2B7FFF]/25"
-          title="搜尋"
+          title={t('common.search')}
         >
           <Search className="size-4" />
         </button>
@@ -284,7 +308,7 @@ export function DispatchSchedulingPage() {
           className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
         >
           <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          建立派遣
+          {t('dispatchScheduling.create')}
         </button>
       </div>
 
@@ -292,25 +316,25 @@ export function DispatchSchedulingPage() {
         <table className="w-full min-w-[960px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-zinc-800 text-left text-zinc-500">
-              <th className="py-3 pr-4 font-medium">派遣代號</th>
+              <th className="py-3 pr-4 font-medium">{t('dispatchScheduling.columns.dispatchCode')}</th>
               <SortHeader
-                label="優先等級"
+                label={t('dispatchScheduling.columns.priority')}
                 active={sortKey === 'priority'}
                 onClick={() => toggleSort('priority')}
               />
-              <th className="py-3 pr-4 font-medium">執行位置</th>
+              <th className="py-3 pr-4 font-medium">{t('dispatchScheduling.columns.location')}</th>
               <SortHeader
-                label="執行載具"
+                label={t('dispatchScheduling.columns.vehicle')}
                 active={sortKey === 'vehicle_code'}
                 onClick={() => toggleSort('vehicle_code')}
               />
               <SortHeader
-                label="派遣狀態"
+                label={t('dispatchScheduling.columns.status')}
                 active={sortKey === 'status'}
                 onClick={() => toggleSort('status')}
               />
               <SortHeader
-                label="建立日期"
+                label={t('dispatchScheduling.columns.createdAt')}
                 active={sortKey === 'created_at'}
                 onClick={() => toggleSort('created_at')}
               />
@@ -321,7 +345,7 @@ export function DispatchSchedulingPage() {
             {pageItems.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-16 text-center text-zinc-500">
-                  尚無符合條件的派遣
+                  {t('dispatchScheduling.empty')}
                 </td>
               </tr>
             ) : (
@@ -331,12 +355,14 @@ export function DispatchSchedulingPage() {
                   className="border-b border-zinc-800/60 hover:bg-zinc-900/50"
                 >
                   <td className="py-3 pr-4 font-medium text-zinc-100">{row.dispatch_code}</td>
-                  <td className="py-3 pr-4 text-zinc-200">{row.priority_label}</td>
+                  <td className="py-3 pr-4 text-zinc-200">
+                    {t(`dispatchScheduling.priority.${row.priority}`)}
+                  </td>
                   <td className="py-3 pr-4 text-zinc-300">{row.location}</td>
                   <td className="py-3 pr-4 text-zinc-200">{row.vehicle_code}</td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.status_label}
+                      label={t(`dispatchScheduling.status.${row.status}`)}
                       style={DISPATCH_STATUS_TAG_STYLE[row.status]}
                     />
                   </td>
@@ -348,7 +374,7 @@ export function DispatchSchedulingPage() {
                         setOpenMenuId((prev) => (prev === row.dispatch_id ? null : row.dispatch_id))
                       }
                       className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="更多操作"
+                      title={t('common.moreActions')}
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
@@ -367,7 +393,7 @@ export function DispatchSchedulingPage() {
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800"
                         >
                           <Pencil className="size-4 text-zinc-400" />
-                          編輯
+                          {t('common.edit')}
                         </button>
                         <div className="my-1 h-px bg-zinc-700/80" />
                         <button
@@ -385,7 +411,9 @@ export function DispatchSchedulingPage() {
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800"
                         >
                           <Eye className="size-4 text-zinc-400" />
-                          {isSupervisor ? '檢視並核准' : '檢視'}
+                          {isSupervisor
+                            ? t('dispatchScheduling.viewAndApprove')
+                            : t('dispatchScheduling.view')}
                         </button>
                       </div>
                     )}

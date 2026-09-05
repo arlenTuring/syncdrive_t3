@@ -1,10 +1,8 @@
 import { Loader2, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchTimeTemplateDetail } from '../api/timeTemplatesApi';
-import {
-  TIME_TEMPLATE_TITLE_LABEL,
-  parseStoredTemplateBody,
-} from '../types/editor';
+import { parseStoredTemplateBody } from '../types/editor';
 import { StepOverallPreview } from './StepOverallPreview';
 
 type TimeTemplatePreviewModalProps = {
@@ -18,6 +16,7 @@ export function TimeTemplatePreviewModal({
   fallbackName,
   onClose,
 }: TimeTemplatePreviewModalProps) {
+  const { t } = useTranslation();
   const titleId = useId();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,14 +72,16 @@ export function TimeTemplatePreviewModal({
       >
         <header className="flex h-[34px] shrink-0 items-center gap-2 px-5">
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-base font-medium leading-5 text-[#F3F4F6]">
-            <span className="font-normal text-[#99A1AF]">{TIME_TEMPLATE_TITLE_LABEL}</span>{' '}
+            <span className="font-normal text-[#99A1AF]">
+              {t('timeTemplates.previewModal.titleLabel')}
+            </span>{' '}
             {name.trim() || fallbackName}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 text-[#D1D5DC] hover:bg-zinc-800"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X className="size-6 shrink-0" />
           </button>
@@ -90,7 +91,7 @@ export function TimeTemplatePreviewModal({
           {loading ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-zinc-500">
               <Loader2 className="size-6 animate-spin" />
-              載入預覽中…
+              {t('timeTemplates.previewModal.loading')}
             </div>
           ) : error ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6">
@@ -103,7 +104,7 @@ export function TimeTemplatePreviewModal({
               attributes={previewData.attributes}
               tasks={previewData.tasks}
               rowCount={previewData.scheduleRowCount}
-              emptyHint="此模板尚無班表資料"
+              emptyHint={t('timeTemplates.previewModal.empty')}
               readOnly
             />
           )}

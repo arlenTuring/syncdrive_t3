@@ -1,4 +1,5 @@
 import { LayoutGrid } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   AREA_PALETTE_ITEM,
   BASEMAP_PALETTE_ITEM,
@@ -23,7 +24,7 @@ export const PALETTE_DRAWER_HEIGHT_CLASS = 'h-24'
 
 type PaletteGroup = {
   key: string
-  label: string | null
+  labelKey: string | null
   items: PaletteItem[]
 }
 
@@ -41,12 +42,12 @@ function buildPaletteGroups(): PaletteGroup[] {
   return [
     {
       key: 'map-layer',
-      label: '地圖層',
+      labelKey: 'mapEditor.palette.groups.mapLayer',
       items: [BASEMAP_PALETTE_ITEM, TRACKGEN_PALETTE_ITEM, AREA_PALETTE_ITEM],
     },
-    { key: 'facility', label: '設施', items: facilityItems },
-    { key: 'equipment', label: '設備', items: equipmentItems },
-    { key: 'other', label: '其他', items: otherItems },
+    { key: 'facility', labelKey: 'mapEditor.palette.groups.facility', items: facilityItems },
+    { key: 'equipment', labelKey: 'mapEditor.palette.groups.equipment', items: equipmentItems },
+    { key: 'other', labelKey: 'mapEditor.palette.groups.other', items: otherItems },
   ].filter((group) => group.items.length > 0)
 }
 
@@ -63,20 +64,22 @@ type AssetPaletteBarProps = {
  * 再開合只靠左側把手。
  */
 export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
+  const { t } = useTranslation()
+
   return (
     <div
       className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex ${PALETTE_DRAWER_HEIGHT_CLASS} border-t border-cyan-500/55 bg-zinc-900/95 shadow-[0_-10px_32px_rgba(0,0,0,0.35)] backdrop-blur-md`}
       role="toolbar"
-      aria-label="元件庫"
+      aria-label={t('mapEditor.palette.library')}
     >
       <button
         type="button"
-        title="收合元件庫"
+        title={t('mapEditor.palette.collapse')}
         onClick={onToggle}
         className="flex w-11 shrink-0 flex-col items-center justify-center gap-1 border-r border-cyan-500/35 text-[10px] font-medium text-cyan-200 transition hover:bg-cyan-950/40"
       >
         <LayoutGrid className="size-4 shrink-0" />
-        <span style={{ writingMode: 'vertical-rl' }}>元件庫</span>
+        <span style={{ writingMode: 'vertical-rl' }}>{t('mapEditor.palette.library')}</span>
       </button>
 
       <div className="flex min-w-0 flex-1 items-center px-3">
@@ -89,9 +92,9 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                 groupIndex > 0 ? 'border-l border-zinc-700/80 pl-5' : '',
               ].join(' ')}
             >
-              {group.label ? (
+              {group.labelKey ? (
                 <span className="shrink-0 text-[10px] font-medium tracking-wide text-zinc-500">
-                  {group.label}
+                  {t(group.labelKey)}
                 </span>
               ) : null}
               {group.items.map((item) => {
@@ -104,6 +107,8 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                       : PALETTE_ICON_BY_NAME[item.name]
                 const clickEnabled =
                   isAreaPaletteItem(item) || isBasemapPaletteItem(item) || isTrackGenPaletteItem(item)
+                const itemLabel = t(item.label)
+                const itemHint = t(item.hint)
                 return (
                   <div
                     key={
@@ -133,11 +138,14 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                       title={
                         clickEnabled
                           ? isBasemapPaletteItem(item) || isTrackGenPaletteItem(item)
-                            ? `${item.hint}\n點擊或拖曳至地圖任意位置`
-                            : `${item.hint}\n點擊置中或拖曳至地圖指定位置`
-                          : `${item.hint}\n僅可拖曳至 Area 內`
+                            ? `${itemHint}\n${t('mapEditor.palette.clickOrDragAnywhere')}`
+                            : `${itemHint}\n${t('mapEditor.palette.clickCenterOrDrag')}`
+                          : `${itemHint}\n${t('mapEditor.palette.dragIntoAreaOnly')}`
                       }
-                      aria-label={`加入：${item.label}。${item.hint}`}
+                      aria-label={t('mapEditor.palette.addAria', {
+                        label: itemLabel,
+                        hint: itemHint,
+                      })}
                       className="group flex size-11 cursor-grab items-center justify-center rounded-full border border-zinc-600 bg-zinc-800/90 text-cyan-300 shadow-md transition hover:border-cyan-500/70 hover:bg-zinc-700 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 active:cursor-grabbing sm:size-12"
                     >
                       <Icon
@@ -147,7 +155,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                       />
                     </button>
                     <span className="w-full select-none text-center text-[10px] leading-tight text-zinc-300">
-                      {item.label}
+                      {itemLabel}
                     </span>
                   </div>
                 )

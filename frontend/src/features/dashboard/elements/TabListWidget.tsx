@@ -7,6 +7,7 @@
  * - 依據資料庫查詢筆數，每一列（Row）自動注入變數並重複渲染各欄位單元格。
  */
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TabListWidget, TabListColumn, ChildWidget } from '../types';
 import { useWidgetData } from './useWidgetData';
 import { useIsEditMode } from '../utils/widgetEditPreview';
@@ -42,18 +43,22 @@ export function applyTabListContentFontSize(
 
 // ─── 預覽模擬資料（編輯模式無資料時使用） ──────────────────────────────────
 
-const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
+function buildMockPreviewRowsMainline(t: (key: string) => string): Record<string, unknown>[] {
+  const down = t('dashboard.tabListChrome.mockDown');
+  const up = t('dashboard.tabListChrome.mockUp');
+  const onTime = t('dashboard.tabListChrome.mockOnTime');
+  return [
   {
     shift_key: 'D0954',
     trip_code: 'D0954',
-    direction_label: '下行',
+    direction_label: down,
     direction_pill_bg: '#1e3a8a',
     direction_pill_color: '#93c5fd',
     vehicle_code: 'PMS-01',
     route_progress: 35,
     segment_index: 0,
     segment_remain_pct: 30,
-    status_label: '延誤+5分',
+    status_label: t('dashboard.tabListChrome.mockDelayed'),
     status_bg: '#451a03',
     status_color: '#fb923c',
     depart_time: '09:54 → 09:59 (+5)',
@@ -64,14 +69,14 @@ const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
   {
     shift_key: 'U1000',
     trip_code: 'U1000',
-    direction_label: '上行',
+    direction_label: up,
     direction_pill_bg: '#1e3a8a',
     direction_pill_color: '#93c5fd',
     vehicle_code: 'PMS-02',
     route_progress: 85,
     segment_index: 1,
     segment_remain_pct: 30,
-    status_label: '準點',
+    status_label: onTime,
     status_bg: '#052e16',
     status_color: '#4ade80',
     depart_time: '10:00 → 10:00',
@@ -82,14 +87,14 @@ const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
   {
     shift_key: 'D1006',
     trip_code: 'D1006',
-    direction_label: '下行',
+    direction_label: down,
     direction_pill_bg: '#1e3a8a',
     direction_pill_color: '#93c5fd',
     vehicle_code: 'PMS-03',
     route_progress: 25,
     segment_index: 0,
     segment_remain_pct: 50,
-    status_label: '準點',
+    status_label: onTime,
     status_bg: '#052e16',
     status_color: '#4ade80',
     depart_time: '10:06',
@@ -100,14 +105,14 @@ const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
   {
     shift_key: 'U1012',
     trip_code: 'U1012',
-    direction_label: '上行',
+    direction_label: up,
     direction_pill_bg: '#1e3a8a',
     direction_pill_color: '#93c5fd',
     vehicle_code: 'PMS-04',
     route_progress: 75,
     segment_index: 1,
     segment_remain_pct: 50,
-    status_label: '準點',
+    status_label: onTime,
     status_bg: '#052e16',
     status_color: '#4ade80',
     depart_time: '10:12',
@@ -118,14 +123,14 @@ const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
   {
     shift_key: 'D1018',
     trip_code: 'D1018',
-    direction_label: '下行',
+    direction_label: down,
     direction_pill_bg: '#1e3a8a',
     direction_pill_color: '#93c5fd',
     vehicle_code: 'PMS-05',
     route_progress: 30,
     segment_index: 0,
     segment_remain_pct: 40,
-    status_label: '準點',
+    status_label: onTime,
     status_bg: '#052e16',
     status_color: '#4ade80',
     depart_time: '10:18',
@@ -134,43 +139,47 @@ const MOCK_PREVIEW_ROWS_MAINLINE: Record<string, unknown>[] = [
     st_c: 'N2W',
   },
 ];
+}
 
-const MOCK_PREVIEW_ROWS_MAINTENANCE: Record<string, unknown>[] = [
+function buildMockPreviewRowsMaintenance(t: (key: string) => string): Record<string, unknown>[] {
+  const prepStation = t('dashboard.tabListChrome.mockPrepStation');
+  return [
   {
     shift_key: 'M0900',
     trip_code: 'M0900',
-    maint_type_label: '定期保養',
+    maint_type_label: t('dashboard.tabListChrome.mockPeriodicMaint'),
     maint_type_bg: '#422006',
     maint_type_color: '#fdba74',
     vehicle_code: 'PMS-06',
     route_progress: 40,
     segment_index: 0,
     segment_remain_pct: 60,
-    status_label: '整備中',
+    status_label: t('dashboard.tabListChrome.mockPreparing'),
     status_bg: '#3f2c06',
     status_color: '#facc15',
     depart_time: '09:00 ~ 11:30',
     st_a: 'S2W',
-    st_c: '整備站',
+    st_c: prepStation,
   },
   {
     shift_key: 'M1030',
     trip_code: 'M1030',
-    maint_type_label: '日常檢修',
+    maint_type_label: t('dashboard.tabListChrome.mockDailyInspect'),
     maint_type_bg: '#1e293b',
     maint_type_color: '#94a3b8',
     vehicle_code: 'PMS-07',
     route_progress: 90,
     segment_index: 0,
     segment_remain_pct: 10,
-    status_label: '即將完成',
+    status_label: t('dashboard.tabListChrome.mockAlmostDone'),
     status_bg: '#052e16',
     status_color: '#4ade80',
     depart_time: '10:30 ~ 11:15',
     st_a: 'S2W',
-    st_c: '整備站',
+    st_c: prepStation,
   },
 ];
+}
 
 // ─── 單一單元格渲染器 ─────────────────────────────────────────────────────────
 
@@ -295,6 +304,7 @@ export function TabListWidgetView({
   widget: TabListWidget;
   onEnterEditColumn?: (tabId: string, columnId: string) => void;
 }) {
+  const { t } = useTranslation();
   const isEditMode = useIsEditMode();
   const tabs = widget.tabs ?? [];
   const defaultTabId = widget.activeTabId ?? widget.defaultTab ?? tabs[0]?.id ?? 'tab-mainline';
@@ -346,11 +356,11 @@ export function TabListWidgetView({
     }
     if (isEditMode) {
       return effectiveTabId.includes('maint')
-        ? MOCK_PREVIEW_ROWS_MAINTENANCE
-        : MOCK_PREVIEW_ROWS_MAINLINE;
+        ? buildMockPreviewRowsMaintenance(t)
+        : buildMockPreviewRowsMainline(t);
     }
     return [];
-  }, [queryState.data, isEditMode, effectiveTabId]);
+  }, [queryState.data, isEditMode, effectiveTabId, t]);
 
   const fs = widget.fontSize ?? 13;
   const bodyTextColor = widget.textColor ?? '#cbd5e1';
@@ -426,7 +436,7 @@ export function TabListWidgetView({
         {/* 右側：目前班表 / 輔助資訊 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 4 }}>
           <span style={{ fontSize: fs - 1, color: '#64748b', whiteSpace: 'nowrap' }}>
-            {widget.currentScheduleLabel ?? '目前班表'}
+            {widget.currentScheduleLabel ?? t('dashboard.tabListChrome.currentSchedule')}
           </span>
           {currentScheduleName ? (
             <span
@@ -454,7 +464,7 @@ export function TabListWidgetView({
                 whiteSpace: 'nowrap',
               }}
             >
-              高運量班表 (進行中)
+              {t('dashboard.tabListChrome.scheduleFallback')}
             </span>
           )}
         </div>
@@ -473,7 +483,7 @@ export function TabListWidgetView({
               fontSize: fs,
             }}
           >
-            載入中…
+            {t('common.loading')}
           </div>
         ) : rows.length === 0 && !isEditMode ? (
           <div
@@ -486,7 +496,7 @@ export function TabListWidgetView({
               fontSize: fs,
             }}
           >
-            暫無資料
+            {t('dashboard.tabListChrome.noData')}
           </div>
         ) : (
           <table
@@ -535,7 +545,9 @@ export function TabListWidgetView({
                         {isEditMode && onEnterEditColumn && (
                           <button
                             type="button"
-                            title={`編輯「${col.name || '此欄位'}」單元格子畫布`}
+                            title={t('dashboard.tabListChrome.editColumnTitle', {
+                              name: col.name || t('dashboard.tabListChrome.thisColumn'),
+                            })}
                             onClick={(e) => {
                               e.stopPropagation();
                               onEnterEditColumn(effectiveTabId, col.id);

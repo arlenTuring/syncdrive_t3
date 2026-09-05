@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type FillColorRule = {
   fieldPath: string
@@ -30,6 +31,7 @@ export function FillColorRulesSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   const setRules = (next: FillColorRule[]) => {
     onRulesChange(next)
   }
@@ -43,16 +45,16 @@ export function FillColorRulesSection({
         <span
           className="inline-block size-4 rounded border border-zinc-600"
           style={{ backgroundColor: defaultFill }}
-          title="預設填色"
+          title={t('mapEditor.fillColorRules.defaultTitle')}
         />
-        <span>規則 {rules.length} 條</span>
+        <span>{t('mapEditor.fillColorRules.ruleCount', { count: rules.length })}</span>
       </div>
       <div>
         <label
           htmlFor={`${title}-default-fill`}
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          預設填色（無規則命中時）
+          {t('mapEditor.fillColorRules.defaultLabel')}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -78,7 +80,7 @@ export function FillColorRulesSection({
       </div>
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500">規則（欄位 + 條件 + 值 + 顏色）</span>
+          <span className="text-[10px] text-zinc-500">{t('mapEditor.fillColorRules.rulesLabel')}</span>
           {!readOnly && (
             <button
               type="button"
@@ -90,12 +92,12 @@ export function FillColorRulesSection({
               }
               className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
             >
-              <Plus className="size-3" /> 新增
+              <Plus className="size-3" /> {t('mapEditor.fillColorRules.add')}
             </button>
           )}
         </div>
         {rules.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">尚無規則；會使用預設填色。</p>
+          <p className="text-[10px] text-zinc-600">{t('mapEditor.fillColorRules.empty')}</p>
         ) : (
           <ul className="space-y-2">
             {rules.map((rule, idx) => (
@@ -114,7 +116,7 @@ export function FillColorRulesSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="min-w-[8rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
-                  placeholder="欄位名稱"
+                  placeholder={t('mapEditor.fillColorRules.fieldPlaceholder')}
                 />
                 <select
                   disabled={readOnly}
@@ -146,7 +148,7 @@ export function FillColorRulesSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="min-w-[4rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
-                  placeholder="比對值"
+                  placeholder={t('mapEditor.fillColorRules.valuePlaceholder')}
                 />
                 <input
                   type="color"
@@ -166,7 +168,7 @@ export function FillColorRulesSection({
                     type="button"
                     onClick={() => setRules(rules.filter((_, i) => i !== idx))}
                     className="rounded p-1 text-zinc-500 hover:bg-red-950/50 hover:text-red-400"
-                    aria-label="刪除此規則"
+                    aria-label={t('mapEditor.fillColorRules.deleteAria')}
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -177,7 +179,7 @@ export function FillColorRulesSection({
         )}
       </div>
       <pre className="overflow-x-auto rounded border border-zinc-700/80 bg-zinc-950/80 p-2 font-mono text-[9px] leading-relaxed text-zinc-500">
-        {`MQTT 範例：{ "entityId": "${entityId}", "status": "value" }`}
+        {t('mapEditor.fillColorRules.mqttExample', { entityId })}
       </pre>
     </section>
   )

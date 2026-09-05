@@ -10,6 +10,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { VehicleDefinition } from './types';
 
 export function VehicleList({
@@ -31,11 +32,12 @@ export function VehicleList({
   onExportAll: () => void;
   onImportFile: (file: File) => Promise<number>;
 }) {
+  const { t, i18n } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   const formatDate = (ts: number) =>
-    new Intl.DateTimeFormat('zh-TW', {
+    new Intl.DateTimeFormat(i18n.language, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -63,15 +65,15 @@ export function VehicleList({
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-bold text-white">
               <Bus className="text-amber-400" size={28} />
-              載具管理
+              {t('vehicleEditor.list.title')}
             </h1>
             <p className="mt-1.5 text-sm text-zinc-500">
-              清單管理載具定義；可複製備份或匯出 JSON，避免資料遺失。
+              {t('vehicleEditor.list.subtitle')}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-zinc-600">
-              {vehicles.length} 份已儲存
+              {t('vehicleEditor.list.savedCount', { count: vehicles.length })}
             </span>
             <button
               type="button"
@@ -79,7 +81,11 @@ export function VehicleList({
               className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
             >
               <Upload size={14} />
-              {importStatus === 'ok' ? '已匯入' : importStatus === 'error' ? '匯入失敗' : '匯入 JSON'}
+              {importStatus === 'ok'
+                ? t('vehicleEditor.list.importOk')
+                : importStatus === 'error'
+                  ? t('vehicleEditor.list.importFail')
+                  : t('vehicleEditor.list.importJson')}
             </button>
             <button
               type="button"
@@ -87,7 +93,7 @@ export function VehicleList({
               className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
             >
               <Download size={14} />
-              匯出全部
+              {t('vehicleEditor.list.exportAll')}
             </button>
             <button
               type="button"
@@ -95,7 +101,7 @@ export function VehicleList({
               className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
             >
               <Plus size={14} />
-              新增載具
+              {t('vehicleEditor.list.create')}
             </button>
             <input
               ref={fileInputRef}
@@ -111,18 +117,18 @@ export function VehicleList({
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-950/80 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                <th className="px-4 py-3">名稱</th>
-                <th className="hidden px-4 py-3 sm:table-cell">畫布</th>
-                <th className="hidden px-4 py-3 md:table-cell">元件</th>
-                <th className="hidden px-4 py-3 lg:table-cell">更新時間</th>
-                <th className="px-4 py-3 text-right">操作</th>
+                <th className="px-4 py-3">{t('vehicleEditor.list.colName')}</th>
+                <th className="hidden px-4 py-3 sm:table-cell">{t('vehicleEditor.list.colCanvas')}</th>
+                <th className="hidden px-4 py-3 md:table-cell">{t('vehicleEditor.list.colElements')}</th>
+                <th className="hidden px-4 py-3 lg:table-cell">{t('vehicleEditor.list.colUpdated')}</th>
+                <th className="px-4 py-3 text-right">{t('vehicleEditor.list.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {vehicles.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-zinc-500">
-                    尚無載具，請點「新增載具」建立。
+                    {t('vehicleEditor.list.empty')}
                   </td>
                 </tr>
               ) : (
@@ -144,7 +150,7 @@ export function VehicleList({
                         <span>
                           {v.width}×{v.height}
                         </span>
-                        <span>{v.elements.length} 元件</span>
+                        <span>{t('vehicleEditor.list.elementCount', { count: v.elements.length })}</span>
                       </div>
                     </td>
                     <td className="hidden px-4 py-3 font-mono text-xs text-zinc-500 sm:table-cell">
@@ -166,7 +172,7 @@ export function VehicleList({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          title="開啟編輯"
+                          title={t('vehicleEditor.list.openEdit')}
                           onClick={() => onSelect(v.id)}
                           className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-700 hover:text-white"
                         >
@@ -174,7 +180,7 @@ export function VehicleList({
                         </button>
                         <button
                           type="button"
-                          title="複製載具"
+                          title={t('vehicleEditor.list.duplicate')}
                           onClick={() => onDuplicate(v.id)}
                           className="rounded-lg p-2 text-zinc-400 hover:bg-cyan-500/15 hover:text-cyan-300"
                         >
@@ -182,7 +188,7 @@ export function VehicleList({
                         </button>
                         <button
                           type="button"
-                          title="匯出 JSON 備份"
+                          title={t('vehicleEditor.list.exportOne')}
                           onClick={() => onExportOne(v.id)}
                           className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-700 hover:text-white"
                         >
@@ -190,9 +196,9 @@ export function VehicleList({
                         </button>
                         <button
                           type="button"
-                          title="刪除"
+                          title={t('vehicleEditor.list.delete')}
                           onClick={() => {
-                            if (confirm(`確定要刪除「${v.name}」嗎？`)) onDelete(v.id);
+                            if (confirm(t('common.confirmDelete', { name: v.name }))) onDelete(v.id);
                           }}
                           className="rounded-lg p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-400"
                         >
@@ -208,7 +214,7 @@ export function VehicleList({
         </div>
 
         <p className="text-center text-[10px] text-zinc-600">
-          編輯時會自動儲存至瀏覽器；建議定期「匯出全部」備份，或複製載具作為第二份。
+          {t('vehicleEditor.list.footerHint')}
         </p>
       </div>
     </div>

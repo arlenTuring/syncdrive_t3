@@ -5,6 +5,7 @@ import {
   GRID_ZOOM_MIN,
   GRID_ZOOM_STEP,
 } from '../../time-templates/types/editor';
+import { useTranslation } from 'react-i18next';
 
 type ScheduleTimeZoomToolbarProps = {
   zoom: number;
@@ -22,6 +23,7 @@ export function ScheduleTimeZoomToolbar({
   onChange,
   standalone = false,
 }: ScheduleTimeZoomToolbarProps) {
+  const { t } = useTranslation();
   const inner = (
     <>
       <button
@@ -33,7 +35,7 @@ export function ScheduleTimeZoomToolbar({
             ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
             : 'cursor-not-allowed text-zinc-600 opacity-40'
         }`}
-        title="時間刻度縮小"
+        title={t('shiftList.timeZoom.zoomOut')}
       >
         <Minus className="size-4" />
       </button>
@@ -42,7 +44,7 @@ export function ScheduleTimeZoomToolbar({
         type="button"
         onClick={() => onChange(1)}
         className="w-10 shrink-0 rounded py-1 text-center text-[11px] tabular-nums text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-100"
-        title="時間刻度：點擊回到自動寬度"
+        title={t('shiftList.timeZoom.reset')}
       >
         {Math.round(zoom * 100)}%
       </button>
@@ -56,7 +58,7 @@ export function ScheduleTimeZoomToolbar({
             ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
             : 'cursor-not-allowed text-zinc-600 opacity-40'
         }`}
-        title="時間刻度放大"
+        title={t('shiftList.timeZoom.zoomIn')}
       >
         <Plus className="size-4" />
       </button>

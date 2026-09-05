@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type NavigateToSetupModalProps = {
   onClose: () => void;
@@ -17,9 +18,12 @@ export function NavigateToSetupModal({
   onClose,
   onConfirm,
   onSecondary,
-  primaryLabel = '前往設定',
+  primaryLabel,
   secondaryLabel,
 }: NavigateToSetupModalProps) {
+  const { t } = useTranslation();
+  const resolvedPrimary = primaryLabel ?? t('shiftList.navigateSetup.goSetup');
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -46,20 +50,20 @@ export function NavigateToSetupModal({
             id="navigate-setup-title"
             className="text-lg font-semibold leading-7 text-[#F3F4F6]"
           >
-            引導您至獨立頁面設定
+            {t('shiftList.navigateSetup.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X className="size-5" />
           </button>
         </div>
 
         <p className="mt-4 text-sm leading-6 text-zinc-400">
-          接下來將引導您完成設定，系統已為您開啟獨立頁面，確保您的資料安全並不會丟失。
+          {t('shiftList.navigateSetup.body')}
         </p>
 
         <div className="mt-8 flex justify-end">
@@ -78,7 +82,7 @@ export function NavigateToSetupModal({
               onClick={onConfirm}
               className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6]"
             >
-              {primaryLabel}
+              {resolvedPrimary}
             </button>
           </div>
         </div>

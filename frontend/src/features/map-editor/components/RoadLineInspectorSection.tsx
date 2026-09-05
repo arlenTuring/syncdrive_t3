@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 import {
@@ -28,6 +29,7 @@ export function RoadLineInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   if (facility.type !== 'RoadLine') return null
 
   const params = facility.parameters ?? {}
@@ -43,17 +45,17 @@ export function RoadLineInspectorSection({
   return (
     <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/12 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
-        道路線
+        {t('mapEditor.inspector.roadLine.title')}
       </h3>
       <p className="text-[10px] leading-relaxed text-zinc-500">
-        純視覺標記，無 MQTT／API 對接。橫向像素尺寸控制線段長度；可於圖台拖曳邊線調整。
+        {t('mapEditor.inspector.roadLine.hint')}
       </p>
       <div>
         <label
           htmlFor="road-line-style"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          線型
+          {t('mapEditor.inspector.roadLine.style')}
         </label>
         <select
           id="road-line-style"
@@ -73,7 +75,7 @@ export function RoadLineInspectorSection({
         >
           {ROAD_LINE_STYLES.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.label}
+              {t(`mapEditor.inspector.roadLine.styles.${opt.value}`)}
             </option>
           ))}
         </select>
@@ -83,7 +85,7 @@ export function RoadLineInspectorSection({
           htmlFor="road-line-width"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          線寬（px）
+          {t('mapEditor.inspector.roadLine.width')}
         </label>
         <NumberInput
           id="road-line-width"
@@ -108,7 +110,7 @@ export function RoadLineInspectorSection({
           htmlFor="road-line-color"
           className="mb-1 block text-[10px] text-zinc-500"
         >
-          線色
+          {t('mapEditor.inspector.roadLine.color')}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -145,8 +147,9 @@ export function RoadLineInspectorSection({
       </div>
       {pixelW !== null && (
         <p className="text-[10px] text-zinc-600">
-          目前線段長度約 <span className="font-mono text-zinc-400">{pixelW.toFixed(1)}</span> px
-          （請於上方「像素尺寸」調整橫向長度）。
+          {t('mapEditor.inspector.roadLine.lengthHint', {
+            px: pixelW.toFixed(1),
+          })}
         </p>
       )}
     </section>

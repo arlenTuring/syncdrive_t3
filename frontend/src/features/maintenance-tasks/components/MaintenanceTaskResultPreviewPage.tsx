@@ -1,5 +1,6 @@
 import { ArrowLeft, Loader2, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchMaintenanceTaskDetail } from '../api/maintenanceTasksApi';
 import {
   buildMaintenanceTaskDraftFromStored,
@@ -16,6 +17,7 @@ export function MaintenanceTaskResultPreviewPage({
   taskId,
   onBack,
 }: MaintenanceTaskResultPreviewPageProps) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<MaintenanceTaskCreateDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +51,15 @@ export function MaintenanceTaskResultPreviewPage({
           type="button"
           onClick={onBack}
           className="inline-flex size-9 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
-          title="返回清單"
+          title={t('maintenanceTasks.resultPreview.backToList')}
         >
           <ArrowLeft className="size-4" />
         </button>
         <Wrench className="size-5 text-[#2B7FFF]" aria-hidden />
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight">任務檢視</h1>
+          <h1 className="truncate text-lg font-semibold tracking-tight">
+            {t('maintenanceTasks.preview')}
+          </h1>
           {draft?.basic.name ? (
             <p className="truncate text-xs text-zinc-500">{draft.basic.name}</p>
           ) : null}
@@ -66,7 +70,7 @@ export function MaintenanceTaskResultPreviewPage({
         {loading ? (
           <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
             <Loader2 className="size-5 animate-spin" />
-            載入中…
+            {t('maintenanceTasks.resultPreview.loading')}
           </div>
         ) : error ? (
           <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">

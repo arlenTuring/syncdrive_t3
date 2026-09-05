@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
 
@@ -24,6 +25,7 @@ export function FrameInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   const params = facility.parameters ?? {}
   const strokeWidthPx =
     typeof params.strokeWidthPx === 'number' ? Math.max(0, params.strokeWidthPx) : 0
@@ -36,7 +38,7 @@ export function FrameInspectorSection({
   return (
     <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        框線樣式
+        {t('mapEditor.inspector.frame.title')}
       </h3>
 
       <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
@@ -66,14 +68,14 @@ export function FrameInspectorSection({
           onBlur={onFieldBlur}
           className="rounded border-zinc-600 accent-cyan-500"
         />
-        顯示框線（預設透明不顯示）
+        {t('mapEditor.inspector.frame.showFrame')}
       </label>
 
       {enabled && (
         <>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[10px] text-zinc-500">
-              線條粗細（px）
+              {t('mapEditor.inspector.frame.strokeWidth')}
               <NumberInput
                 min={0}
                 max={20}
@@ -88,7 +90,7 @@ export function FrameInspectorSection({
             </label>
 
             <label className="block text-[10px] text-zinc-500">
-              線條顏色
+              {t('mapEditor.inspector.frame.strokeColor')}
               <input
                 type="color"
                 disabled={readOnly}
@@ -104,7 +106,7 @@ export function FrameInspectorSection({
           </div>
 
           <label className="block text-[10px] text-zinc-500">
-            虛線/點線樣式
+            {t('mapEditor.inspector.frame.dashStyle')}
             <select
               disabled={readOnly}
               value={strokeStyle}
@@ -119,7 +121,7 @@ export function FrameInspectorSection({
             >
               {STROKE_STYLES.map((s) => (
                 <option key={s} value={s}>
-                  {s === 'solid' ? '實線' : s === 'dashed' ? '虛線' : '點線'}
+                  {t(`mapEditor.inspector.stroke.${s}`)}
                 </option>
               ))}
             </select>
@@ -129,4 +131,3 @@ export function FrameInspectorSection({
     </section>
   )
 }
-

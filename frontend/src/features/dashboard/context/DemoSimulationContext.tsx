@@ -28,6 +28,7 @@ import {
 } from './DemoSimulationPlaybackContext';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
+import i18n from '../../../i18n';
 
 const TOOLBAR_VISIBLE_KEY = 'syncdrive-sim-transport-toolbar-visible';
 
@@ -169,7 +170,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(
         msg.includes('fetch') || msg.includes('Failed')
-          ? '無法連線後端（請確認 Docker 與 npm run dev 已啟動）'
+          ? i18n.t('dashboard.demoSim.backendUnreachable')
           : msg,
       );
     } finally {
@@ -189,7 +190,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(
         msg.includes('fetch') || msg.includes('Failed')
-          ? '無法連線後端（請確認 Docker 與 npm run dev 已啟動）'
+          ? i18n.t('dashboard.demoSim.backendUnreachable')
           : msg,
       );
     } finally {
@@ -206,7 +207,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
     async (transportPaused: boolean) => {
       if (!status.running) return;
       if (status.source !== 'managed') {
-        setError('請用底部「開始模擬」啟動（非 dev-start 外部模擬器）');
+        setError(i18n.t('dashboard.demoSim.useManagedStart'));
         return;
       }
       setError(null);
@@ -240,7 +241,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
     async (speedMultiplier: number) => {
       if (!status.running) return;
       if (status.source !== 'managed') {
-        setError('請用底部「開始模擬」啟動（非 dev-start 外部模擬器）');
+        setError(i18n.t('dashboard.demoSim.useManagedStart'));
         return;
       }
       transportPatchAt.current = Date.now();
@@ -300,7 +301,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
   const triggerVehicleFault = useCallback(
     async (vehicleCode: string) => {
       if (!status.running || status.source !== 'managed') {
-        setError('請先按「開始模擬」啟動受管模擬器');
+        setError(i18n.t('dashboard.demoSim.startManagedFirst'));
         return;
       }
       setLoading(true);
@@ -333,7 +334,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
       eventPreview: SimulatedFaultEvent,
     ) => {
       if (!status.running || status.source !== 'managed') {
-        setError('請先按「開始模擬」啟動受管模擬器');
+        setError(i18n.t('dashboard.demoSim.startManagedFirst'));
         return;
       }
       setLoading(true);
@@ -358,7 +359,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
         vehicleCode,
         eventCode: 'SYSTEM_HEALTH_DEGRADED',
         severity: 'INFO',
-        message: `${vehicleCode} 故障已人工復歸，vehicle_phase 恢復正常`,
+        message: i18n.t('dashboard.demoSim.faultCleared', { vehicleCode }),
         timestamp: Date.now(),
       });
     },
@@ -371,7 +372,7 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
         vehicleCode,
         eventCode: 'OBSTACLE_DETECTED',
         severity: 'WARNING',
-        message: `${vehicleCode} 路徑障礙物偵測（OBSTACLE_DETECTED / WARNING）`,
+        message: i18n.t('dashboard.demoSim.obstacleDetected', { vehicleCode }),
         timestamp: Date.now(),
       });
     },

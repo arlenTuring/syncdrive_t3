@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import {
   downloadTimeTemplatesJson,
@@ -39,6 +40,7 @@ type TimeTemplateListPageProps = {
 const PAGE_SIZE = 20;
 
 export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps) {
+  const { t } = useTranslation();
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [publishStatus, setPublishStatus] = useState<PublishStatusKey | 'all'>('all');
@@ -159,7 +161,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
 
   const handleDelete = async (row: TimeTemplateListItem) => {
     if (row.usage_status === 'in_use') return;
-    const confirmed = window.confirm(`確定要刪除「${row.name}」嗎？此操作無法復原。`);
+    const confirmed = window.confirm(t('common.confirmDelete', { name: row.name }));
     if (!confirmed) return;
 
     setDeletingId(row.template_id);
@@ -198,7 +200,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         <div className="flex items-center gap-3">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
           <FileText className="size-5 text-violet-400" aria-hidden />
-          <h1 className="text-lg font-semibold tracking-tight">時間模板管理</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{t('timeTemplates.title')}</h1>
         </div>
       </header>
 
@@ -207,16 +209,16 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           type="button"
           onClick={resetFilters}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700"
-          title="重置篩選條件"
+          title={t('common.resetFiltersTitle')}
         >
           <RotateCcw className="size-3.5" aria-hidden />
-          重置篩選
+          {t('common.resetFilters')}
         </button>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           <input
             type="search"
-            placeholder="請輸入關鍵字"
+            placeholder={t('common.keywordPlaceholder')}
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
@@ -233,7 +235,9 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         >
           {PUBLISH_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.value === 'all' ? '選擇發布狀態' : opt.label}
+              {opt.value === 'all'
+                ? t('common.selectPublishStatus')
+                : t(`common.publishStatus.${opt.value}`)}
             </option>
           ))}
         </select>
@@ -246,7 +250,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
               ? 'border-violet-600 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30'
               : 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 text-zinc-600'
           }`}
-          title="搜尋"
+          title={t('common.search')}
         >
           <Search className="size-4" />
         </button>
@@ -257,7 +261,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          下載
+          {t('common.download')}
         </button>
         <button
           type="button"
@@ -265,7 +269,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
         >
           <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          建立時間模板
+          {t('timeTemplates.create')}
         </button>
       </div>
 
@@ -286,12 +290,12 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                   className="rounded border-zinc-600 bg-zinc-900"
                 />
               </th>
-              <th className="py-3 pr-4 font-medium">模板名稱</th>
-              <th className="py-3 pr-4 font-medium">模板預覽</th>
-              <th className="py-3 pr-4 font-medium">使用狀態</th>
-              <th className="py-3 pr-4 font-medium">發布狀態</th>
-              <th className="py-3 pr-4 font-medium">建立時間</th>
-              <th className="py-3 pr-4 font-medium">修改時間</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.name')}</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.preview')}</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.usageStatus')}</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.publishStatus')}</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.createdAt')}</th>
+              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.updatedAt')}</th>
               <th className="w-10 py-3" />
             </tr>
           </thead>
@@ -300,13 +304,13 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
               <tr>
                 <td colSpan={8} className="py-16 text-center text-zinc-500">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
-                  載入中…
+                  {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-16 text-center text-zinc-500">
-                  尚無符合條件的時間模板
+                  {t('timeTemplates.empty')}
                 </td>
               </tr>
             ) : (
@@ -330,18 +334,18 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                       onClick={() => setPreviewTarget({ id: row.template_id, name: row.name })}
                       className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
                     >
-                      模板預覽
+                      {t('timeTemplates.preview')}
                     </button>
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.usage_status_label}
+                      label={t(`common.usageStatus.${row.usage_status}`)}
                       style={USAGE_TAG_STYLE[row.usage_status]}
                     />
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={row.publish_status_label}
+                      label={t(`common.publishStatus.${row.publish_status}`)}
                       style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
@@ -354,7 +358,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                         setOpenMenuId((prev) => (prev === row.template_id ? null : row.template_id))
                       }
                       className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title="更多操作"
+                      title={t('common.moreActions')}
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
@@ -369,7 +373,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
                         >
                           <Download className="size-4 text-zinc-400" />
-                          下載
+                          {t('common.download')}
                         </button>
                         <button
                           type="button"
@@ -377,7 +381,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
                         >
                           <Pencil className="size-4 text-zinc-400" />
-                          編輯
+                          {t('common.edit')}
                         </button>
                         <button
                           type="button"
@@ -390,7 +394,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                           ) : (
                             <Copy className="size-4 text-zinc-400" />
                           )}
-                          複製
+                          {t('common.duplicate')}
                         </button>
                         <button
                           type="button"
@@ -401,14 +405,18 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                               ? 'cursor-not-allowed text-zinc-600'
                               : 'text-zinc-200 hover:bg-zinc-800 hover:text-red-300'
                           }`}
-                          title={row.usage_status === 'in_use' ? '使用中的模板無法刪除' : undefined}
+                          title={
+                            row.usage_status === 'in_use'
+                              ? t('timeTemplates.cannotDeleteInUse')
+                              : undefined
+                          }
                         >
                           {deletingId === row.template_id ? (
                             <Loader2 className="size-4 animate-spin text-zinc-400" />
                           ) : (
                             <Trash2 className="size-4 text-zinc-400" />
                           )}
-                          刪除
+                          {t('common.delete')}
                         </button>
                       </div>
                     )}

@@ -6,6 +6,8 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../../../i18n'
 import type { MapAreaObject } from '../types/area'
 import type {
   PointTopology,
@@ -227,7 +229,8 @@ function snapNodeCenterToPeers(
   y: number,
   nodeId: string,
   nodes: PointTopologyNode[],
-): { x: number; y: number; alignedX: boolean; alignedY: boolean } {
+): {
+  x: number; y: number; alignedX: boolean; alignedY: boolean } {
   let nextX = x
   let nextY = y
   let alignedX = false
@@ -257,8 +260,8 @@ function snapNodeCenterToPeers(
 /** 線旁簡要標籤：橫式一列「快／均／距」；沒填就不顯示標籤 */
 function formatEdgeBrief(edge: PointTopologyEdge): string {
   const parts: string[] = []
-  if (edge.minTravelTimeSeconds != null) parts.push(`快${edge.minTravelTimeSeconds}s`)
-  if (edge.avgTravelTimeSeconds != null) parts.push(`均${edge.avgTravelTimeSeconds}s`)
+  if (edge.minTravelTimeSeconds != null) parts.push(i18n.t('mapEditor.pointTopology.fastLabel', { value: edge.minTravelTimeSeconds }))
+  if (edge.avgTravelTimeSeconds != null) parts.push(i18n.t('mapEditor.pointTopology.avgLabel', { value: edge.avgTravelTimeSeconds }))
   if (edge.distanceMeters != null) {
     const meters =
       Number.isInteger(edge.distanceMeters)
@@ -431,7 +434,7 @@ function EdgeArrow({
         </g>
       ) : null}
       <title>
-        {`${from.label} → ${to.label}｜中點拖曳彎折；兩端白點拖到其他節點可改接`}
+        {i18n.t('mapEditor.pointTopology.edgeBendHint', { from: from.label, to: to.label })}
       </title>
     </g>
   )
@@ -1259,16 +1262,18 @@ export function PointTopologyEditorDialog({
       ]
     : []
 
+  const { t } = useTranslation()
+
   const kindLabel = (kind: PointTopologyNodeKind) =>
     kind === 'docking'
-      ? '停靠'
+      ? t('mapEditor.pointTopology.kind.docking')
       : kind === 'waypoint'
-        ? '途經'
+        ? t('mapEditor.pointTopology.kind.waypoint')
         : kind === 'crossover-waypoint'
-          ? '渡線途經'
+          ? t('mapEditor.pointTopology.kind.crossoverWaypoint')
           : kind === 'facility-docking'
-            ? '設施停靠'
-            : '設施'
+            ? t('mapEditor.pointTopology.kind.facilityDocking')
+            : t('mapEditor.pointTopology.kind.facility')
 
   const selectedFacilityDispatchId =
     selectedNode?.kind === 'facility'
@@ -1289,21 +1294,31 @@ export function PointTopologyEditorDialog({
               <h2
                 id="point-topology-title"
                 className="shrink-0 text-sm font-semibold text-zinc-50"
-                title="綠→紫＝整備後發車；紫↔紫＝站間行駛。點選線段可填時間與距離。"
+                title={t('mapEditor.pointTopology.titleHint')}
               >
-                編輯路網拓撲
+                {t('mapEditor.pointTopology.title')}
               </h2>
               <p className="truncate text-[12px] font-medium text-zinc-300">
-                停靠 {dockingCount} · 途經 {waypointCount} · 設施 {facilityCount}
-                {facilityDockingCount > 0
-                  ? ` · 設施停靠 ${facilityDockingCount}`
-                  : ''}{' '}
-                · 邊 {draft.edges.length}
-                {draft.nodes.length === 0 ? ' — 請從左側清單加入點位' : ''}
+                {t('mapEditor.pointTopology.summary', {
+                  docking: dockingCount,
+                  waypoint: waypointCount,
+                  facility: facilityCount,
+                  facilityDocking:
+                    facilityDockingCount > 0
+                      ? t('mapEditor.pointTopology.facilityDockingPart', {
+                          count: facilityDockingCount,
+                        })
+                      : '',
+                  edges: draft.edges.length,
+                  emptyHint:
+                    draft.nodes.length === 0
+                      ? t('mapEditor.pointTopology.emptyHint')
+                      : '',
+                })}
               </p>
             </div>
             <p className="truncate text-[11px] text-zinc-400">
-              ⌘/Ctrl+Z 還原 · ⌘/Ctrl+Shift+Z 復原｜選線後拖兩端改接；中點彎折｜設施↔停靠類＝虛線，停靠↔停靠＝實線
+              {t('mapEditor.pointTopology.shortcutHint')}
             </p>
           </div>
           <button
@@ -1311,7 +1326,7 @@ export function PointTopologyEditorDialog({
             onClick={onClose}
             className="shrink-0 rounded-md border border-zinc-500 bg-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-100 hover:bg-zinc-700"
           >
-            關閉
+            {t('mapEditor.pointTopology.close')}
           </button>
         </div>
 
@@ -1327,10 +1342,10 @@ export function PointTopologyEditorDialog({
                 : 'left-0 rounded-r-xl border-l-0',
             ].join(' ')}
             style={{ writingMode: 'vertical-rl' }}
-            title={listOpen ? '關閉點位清單' : '開啟點位清單'}
+            title={listOpen ? t('mapEditor.pointTopology.listToggleClose') : t('mapEditor.pointTopology.listToggleOpen')}
           >
             <span className="text-[11px] font-semibold tracking-wider">
-              {listOpen ? '收合' : '點位清單'}
+              {listOpen ? t('mapEditor.pointTopology.listCollapse') : t('mapEditor.pointTopology.listTitle')}
             </span>
           </button>
 
@@ -1343,13 +1358,13 @@ export function PointTopologyEditorDialog({
             aria-hidden={!listOpen}
           >
             <div className="flex items-center justify-between border-b border-zinc-700/80 px-2.5 py-2">
-              <span className="text-[11px] font-semibold text-zinc-200">點位清單</span>
+              <span className="text-[11px] font-semibold text-zinc-200">{t('mapEditor.pointTopology.listTitle')}</span>
               <button
                 type="button"
                 onClick={() => setListOpen(false)}
                 className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
               >
-                關閉
+                {t('mapEditor.pointTopology.close')}
               </button>
             </div>
             <div className="border-b border-zinc-800 px-2 py-1.5">
@@ -1357,22 +1372,22 @@ export function PointTopologyEditorDialog({
                 type="search"
                 value={listQuery}
                 onChange={(event) => setListQuery(event.target.value)}
-                placeholder="搜尋名稱…"
+                placeholder={t('mapEditor.pointTopology.searchPlaceholder')}
                 className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-cyan-500"
               />
               <p className="mt-1 text-[9px] leading-snug text-zinc-500">
-                雙擊已載入 → 置中；「移除」退回路網外可再加入；Delete 亦可刪選取點／線
+                {t('mapEditor.pointTopology.listHint')}
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="sticky top-0 z-10 flex items-center justify-between bg-zinc-950/95 px-2.5 py-1.5 backdrop-blur-sm">
                 <span className="text-[10px] font-semibold tracking-wide text-zinc-400">
-                  已在路網 · {sortedNodes.length}
+                  {t('mapEditor.pointTopology.inNetwork', { count: sortedNodes.length })}
                 </span>
               </div>
               <ul className="space-y-0.5 px-1 pb-2">
                 {sortedNodes.length === 0 ? (
-                  <li className="px-2 py-2 text-[11px] text-zinc-500">尚未加入任何點位</li>
+                  <li className="px-2 py-2 text-[11px] text-zinc-500">{t('mapEditor.pointTopology.noneAdded')}</li>
                 ) : (
                   sortedNodes.map((node) => {
                     const field = fieldMetersByNodeId.get(node.id)
@@ -1395,7 +1410,7 @@ export function PointTopologyEditorDialog({
                             }}
                             onDoubleClick={() => scrollNodeIntoView(node.id)}
                             className="min-w-0 flex-1 px-0.5 text-left"
-                            title="雙擊：移到畫面正中心"
+                            title={t('mapEditor.pointTopology.centerOnDoubleClick')}
                           >
                             <span className="flex w-full items-center gap-1.5">
                               <span
@@ -1417,9 +1432,9 @@ export function PointTopologyEditorDialog({
                             type="button"
                             onClick={() => removeNodesFromDraft([node.id])}
                             className="shrink-0 rounded border border-zinc-600/80 px-1.5 py-0.5 text-[9px] font-medium text-zinc-300 hover:border-red-700/60 hover:bg-red-950/50 hover:text-red-200"
-                            title="從路網移除（可再加入）"
+                            title={t('mapEditor.pointTopology.removeFromNetwork')}
                           >
-                            移除
+                            {t('mapEditor.pointTopology.remove')}
                           </button>
                         </div>
                       </li>
@@ -1430,7 +1445,7 @@ export function PointTopologyEditorDialog({
 
               <div className="sticky top-0 z-10 flex items-center justify-between gap-1 border-t border-zinc-800/80 bg-zinc-950/95 px-2.5 py-1.5 backdrop-blur-sm">
                 <span className="text-[10px] font-semibold tracking-wide text-zinc-400">
-                  可加入 · {availableToAdd.length}
+                  {t('mapEditor.pointTopology.available', { count: availableToAdd.length })}
                 </span>
                 {availableToAdd.length > 0 ? (
                   <button
@@ -1440,7 +1455,7 @@ export function PointTopologyEditorDialog({
                     }
                     className="rounded border border-cyan-700/60 px-1.5 py-0.5 text-[9px] font-medium text-cyan-200 hover:bg-cyan-950/80"
                   >
-                    全部加入
+                    {t('mapEditor.pointTopology.addAll')}
                   </button>
                 ) : null}
               </div>
@@ -1448,8 +1463,8 @@ export function PointTopologyEditorDialog({
                 {availableToAdd.length === 0 ? (
                   <li className="px-2 py-2 text-[11px] text-zinc-500">
                     {loadCandidates.every((item) => item.alreadyInTopology)
-                      ? '地圖上可載入的點位都已加入'
-                      : '無符合搜尋的可加入項目'}
+                      ? t('mapEditor.pointTopology.allLoaded')
+                      : t('mapEditor.pointTopology.noSearchMatch')}
                   </li>
                 ) : (
                   availableToAdd.map((item) => (
@@ -1468,7 +1483,7 @@ export function PointTopologyEditorDialog({
                           onClick={() => addFacilitiesToDraft([item.nodeId])}
                           className="shrink-0 rounded border border-cyan-700/50 px-1.5 py-0.5 text-[9px] font-medium text-cyan-200 hover:bg-cyan-950/70"
                         >
-                          加入
+                          {t('mapEditor.pointTopology.add')}
                         </button>
                       </div>
                     </li>
@@ -1482,7 +1497,7 @@ export function PointTopologyEditorDialog({
             ref={canvasRef}
             className="absolute inset-0 overflow-auto overscroll-contain bg-[radial-gradient(circle_at_1px_1px,#3f3f46_1px,transparent_0)] [background-size:24px_24px] bg-zinc-950 [scrollbar-gutter:stable]"
             onPointerDown={onCanvasBackgroundPointerDown}
-            title="觸控板雙指滑動可平移整張拓撲圖"
+            title={t('mapEditor.pointTopology.panHint')}
           >
             <div
               ref={linkCaptureRef}
@@ -1672,21 +1687,21 @@ export function PointTopologyEditorDialog({
                     type="button"
                     title={
                       linkReady
-                        ? `放開以${reconnectDraft ? '改接至' : '連接到'}「${node.label}」`
+                        ? (reconnectDraft ? t('mapEditor.pointTopology.dropReconnect', { label: node.label }) : t('mapEditor.pointTopology.dropConnect', { label: node.label }))
                         : [
                             `${node.label}（${
                               node.kind === 'docking'
-                                ? '停靠點'
+                                ? t('mapEditor.pointTopology.kindDockingPoint')
                                 : node.kind === 'crossover-waypoint'
-                                  ? '渡線途經點'
+                                  ? t('mapEditor.pointTopology.kindCrossoverWaypoint')
                                   : node.kind === 'facility-docking'
-                                    ? '設施停靠點'
+                                    ? t('mapEditor.pointTopology.kindFacilityDocking')
                                     : node.kind === 'facility'
-                                      ? '設施'
-                                      : '途經點'
+                                      ? t('mapEditor.pointTopology.kindFacility')
+                                      : t('mapEditor.pointTopology.kindWaypoint')
                             }）`,
-                            fieldText ? `場域座標 ${fieldText}` : null,
-                            areaName ? `區域 ${areaName}` : null,
+                            fieldText ? t('mapEditor.pointTopology.fieldCoords', { value: fieldText }) : null,
+                            areaName ? t('mapEditor.pointTopology.areaLabel', { name: areaName }) : null,
                           ]
                             .filter(Boolean)
                             .join(' · ')
@@ -1748,8 +1763,8 @@ export function PointTopologyEditorDialog({
                     type="button"
                     title={
                       selectedNode?.kind === 'facility'
-                        ? '拖曳到停靠點：指定整備後發車點'
-                        : '拖曳到另一個圓以建立有向連線'
+                        ? t('mapEditor.pointTopology.dragDispatch')
+                        : t('mapEditor.pointTopology.dragConnect')
                     }
                     className="absolute z-30 rounded-full border border-cyan-300 bg-cyan-950 shadow-md hover:bg-cyan-800"
                     style={{
@@ -1773,7 +1788,7 @@ export function PointTopologyEditorDialog({
                     <>
                       <button
                         type="button"
-                        title="拖曳起點：改接到其他節點"
+                        title={t('mapEditor.pointTopology.dragSource')}
                         className="absolute z-40 rounded-full border-2 border-white bg-cyan-500 shadow-lg hover:scale-110 hover:bg-cyan-400"
                         style={{
                           left: selectedEdgePath.x1 - RECONNECT_HANDLE_SIZE / 2,
@@ -1794,7 +1809,7 @@ export function PointTopologyEditorDialog({
                       />
                       <button
                         type="button"
-                        title="拖曳終點：改接到其他節點"
+                        title={t('mapEditor.pointTopology.dragTarget')}
                         className="absolute z-40 rounded-full border-2 border-white bg-cyan-500 shadow-lg hover:scale-110 hover:bg-cyan-400"
                         style={{
                           left: selectedEdgePath.x2 - RECONNECT_HANDLE_SIZE / 2,
@@ -1830,13 +1845,13 @@ export function PointTopologyEditorDialog({
             {legendOpen ? (
               <div className="max-w-[240px] rounded-lg border border-zinc-600/80 bg-zinc-950/90 px-2.5 py-2 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold text-zinc-200">怎麼看這張圖</p>
+                  <p className="text-[10px] font-semibold text-zinc-200">{t('mapEditor.pointTopology.legendTitle')}</p>
                   <button
                     type="button"
                     className="rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
                     onClick={() => setLegendOpen(false)}
                   >
-                    收合
+                    {t('mapEditor.pointTopology.collapse')}
                   </button>
                 </div>
                 <ul className="mt-1.5 space-y-1 text-[10px] leading-snug text-zinc-400">
@@ -1845,29 +1860,29 @@ export function PointTopologyEditorDialog({
                       className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: TOPOLOGY_KIND_COLORS.facility }}
                     />
-                    <span>綠點＝整備設施</span>
+                    <span>{t('mapEditor.pointTopology.legendGreen')}</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span
                       className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: TOPOLOGY_KIND_COLORS['facility-docking'] }}
                     />
-                    <span>琥珀點＝設施停靠點</span>
+                    <span>{t('mapEditor.pointTopology.legendAmber')}</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span
                       className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: TOPOLOGY_KIND_COLORS.docking }}
                     />
-                    <span>紫點＝可發車停靠點</span>
+                    <span>{t('mapEditor.pointTopology.legendPurple')}</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="mt-1 h-0.5 w-3 shrink-0 border-t border-dashed border-[#7cb87f]" />
-                    <span>綠虛線＝設施 ↔ 停靠類（整備）</span>
+                    <span>{t('mapEditor.pointTopology.legendDashed')}</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="mt-1 h-0.5 w-3 shrink-0 bg-zinc-400" />
-                    <span>實線＝停靠 ↔ 停靠（含設施停靠點）</span>
+                    <span>{t('mapEditor.pointTopology.legendSolid')}</span>
                   </li>
                 </ul>
               </div>
@@ -1876,9 +1891,9 @@ export function PointTopologyEditorDialog({
                 type="button"
                 onClick={() => setLegendOpen(true)}
                 className="rounded-md border border-zinc-600/80 bg-zinc-950/85 px-2 py-1 text-[10px] font-medium text-zinc-300 shadow-lg backdrop-blur-sm hover:border-zinc-500 hover:text-zinc-100"
-                title="顯示圖例"
+                title={t('mapEditor.pointTopology.showLegend')}
               >
-                說明
+                {t('mapEditor.pointTopology.legend')}
               </button>
             )}
           </div>
@@ -1891,16 +1906,16 @@ export function PointTopologyEditorDialog({
                     nodeById.get(selectedEdge.fromNodeId),
                     nodeById.get(selectedEdge.toNodeId),
                   )
-                    ? '整備後發車'
-                    : '站間行駛'}
+                    ? t('mapEditor.pointTopology.afterYardDispatch')
+                    : t('mapEditor.pointTopology.interStation')}
                 </span>
                 <button
                   type="button"
                   className="text-[10px] text-zinc-500 hover:text-zinc-300"
                   onClick={() => { setSelectedEdgeId(null); setInspectorTarget(null) }}
-                  title="收合側欄"
+                  title={t('mapEditor.pointTopology.collapseSidebar')}
                 >
-                  收合
+                  {t('mapEditor.pointTopology.collapse')}
                 </button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
@@ -1913,13 +1928,13 @@ export function PointTopologyEditorDialog({
                       nodeById.get(selectedEdge.fromNodeId),
                       nodeById.get(selectedEdge.toNodeId),
                     )
-                      ? '這條線表示：整備結束後，車輛去此停靠點發車。'
+                      ? t('mapEditor.pointTopology.edgeHintDispatch')
                       : isServiceFacilityLinkEdge(
                             nodeById.get(selectedEdge.fromNodeId),
                             nodeById.get(selectedEdge.toNodeId),
                           )
-                        ? '這條線表示：設施本體與設施停靠點之間的整備連線。'
-                        : '這條線表示：停靠點之間的行駛連線（含正線停靠與設施停靠）。'
+                        ? t('mapEditor.pointTopology.edgeHintFacilityLink')
+                        : t('mapEditor.pointTopology.edgeHintTravel')
                   }
                   readOnly={false}
                   canReverse={canReversePointTopologyEdge(draft, selectedEdge.id)}
@@ -1977,14 +1992,14 @@ export function PointTopologyEditorDialog({
             <aside className="absolute right-0 top-0 z-30 flex h-full w-56 flex-col border-l border-zinc-700/80 bg-zinc-950/95 shadow-2xl">
               <div className="flex items-center justify-between border-b border-zinc-700/80 px-2.5 py-1.5">
                 <span className="text-[10px] font-semibold tracking-wider text-zinc-400">
-                  整備後發車
+                  {t('mapEditor.pointTopology.afterYardDispatch')}
                 </span>
                 <button
                   type="button"
                   className="text-[10px] text-zinc-500 hover:text-zinc-300"
                   onClick={() => { setSelectedNodeId(null); setInspectorTarget(null) }}
                 >
-                  收合
+                  {t('mapEditor.pointTopology.collapse')}
                 </button>
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2.5">
@@ -1992,15 +2007,15 @@ export function PointTopologyEditorDialog({
                   <p className="text-[11px] font-medium text-zinc-100">{selectedNode.label}</p>
                   {areaNameByNodeId.get(selectedNode.id) ? (
                     <p className="mt-0.5 text-[10px] text-cyan-400">
-                      區域：{areaNameByNodeId.get(selectedNode.id)}
+                      {t('mapEditor.pointTopology.areaPrefix', { name: areaNameByNodeId.get(selectedNode.id) })}
                     </p>
                   ) : null}
                   <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
-                    整備任務結束後，這台車應該去哪裡發車？
+                    {t('mapEditor.pointTopology.dispatchWhere')}
                   </p>
                 </div>
                 <label className="block space-y-1">
-                  <span className="text-[10px] text-zinc-500">發車停靠點</span>
+                  <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.dispatchDocking')}</span>
                   <select
                     value={selectedFacilityDispatchId ?? ''}
                     onChange={(event) => {
@@ -2011,7 +2026,7 @@ export function PointTopologyEditorDialog({
                     }}
                     className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500"
                   >
-                    <option value="">尚未指定</option>
+                    <option value="">{t('mapEditor.pointTopology.notAssigned')}</option>
                     {dockingNodes.map((node) => (
                       <option key={node.id} value={node.id}>
                         {node.label}
@@ -2021,15 +2036,15 @@ export function PointTopologyEditorDialog({
                 </label>
                 {dockingNodes.length === 0 ? (
                   <p className="text-[10px] leading-snug text-amber-300/90">
-                    請先從左側清單加入至少一個停靠點。
+                    {t('mapEditor.pointTopology.needDockingFirst')}
                   </p>
                 ) : selectedFacilityDispatchId ? (
                   <p className="text-[10px] leading-snug text-lime-200/80">
-                    已指定：整備完成 → {labelForTopologyNode(draft, selectedFacilityDispatchId)}
+                    {t('mapEditor.pointTopology.assignedDispatch', { label: labelForTopologyNode(draft, selectedFacilityDispatchId) })}
                   </p>
                 ) : (
                   <p className="text-[10px] leading-snug text-zinc-500">
-                    也可從綠點周圍小圓點拖到紫色停靠點。
+                    {t('mapEditor.pointTopology.dragFromGreen')}
                   </p>
                 )}
               </div>
@@ -2043,23 +2058,23 @@ export function PointTopologyEditorDialog({
               type="button"
               disabled={!canUndo}
               onClick={undoDraft}
-              title="還原（⌘/Ctrl+Z）"
+              title={t('mapEditor.pointTopology.undoTitle')}
               className="rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
             >
-              還原
+              {t('mapEditor.pointTopology.undo')}
             </button>
             <button
               type="button"
               disabled={!canRedo}
               onClick={redoDraft}
-              title="復原（⌘/Ctrl+Shift+Z）"
+              title={t('mapEditor.pointTopology.redoTitle')}
               className="rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
             >
-              復原
+              {t('mapEditor.pointTopology.redo')}
             </button>
             {hasInvalidTravelTimes ? (
               <p className="min-w-0 text-[10px] leading-snug text-red-300/95">
-                有 {invalidTravelEdges.length} 條連線的最快時間大於平均時間，請修正後再套用。
+                {t('mapEditor.pointTopology.invalidTravel', { count: invalidTravelEdges.length })}
               </p>
             ) : null}
           </div>
@@ -2069,7 +2084,7 @@ export function PointTopologyEditorDialog({
               onClick={onClose}
               className="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700"
             >
-              取消
+              {t('mapEditor.pointTopology.cancel')}
             </button>
             <button
               type="button"
@@ -2080,7 +2095,7 @@ export function PointTopologyEditorDialog({
               }}
               className="rounded-md border border-cyan-600 bg-cyan-950/80 px-3 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-900/80 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-500"
             >
-              套用路網拓撲
+              {t('mapEditor.pointTopology.apply')}
             </button>
           </div>
         </div>
@@ -2130,6 +2145,7 @@ function EdgePropertiesForm({
   onResetBend: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   const customBend = hasCustomEdgeBend(edge)
   return (
     <div className="space-y-3">
@@ -2149,25 +2165,25 @@ function EdgePropertiesForm({
           {isBidirectional ? (
             <>
               <div className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-center text-xs font-medium text-emerald-200">
-                已設為雙向
+                {t('mapEditor.pointTopology.bidirectional')}
               </div>
               <button
                 type="button"
                 onClick={onRemoveOpposite}
-                title="刪除對向那一條，恢復成單向"
+                title={t('mapEditor.pointTopology.makeUnidirectionalTitle')}
                 className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
               >
-                改回單向（刪除對向邊）
+                {t('mapEditor.pointTopology.makeUnidirectional')}
               </button>
             </>
           ) : (
             <button
               type="button"
               onClick={onMakeBidirectional}
-              title="自動補一條反向連線，時間與距離沿用這一條"
+              title={t('mapEditor.pointTopology.makeBidirectionalTitle')}
               className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-900/50"
             >
-              設為雙向（自動補 {toLabel} → {fromLabel}）
+              {t('mapEditor.pointTopology.makeBidirectional', { to: toLabel, from: fromLabel })}
             </button>
           )}
           <button
@@ -2176,34 +2192,34 @@ function EdgePropertiesForm({
             onClick={onReverse}
             title={
               canReverse
-                ? '將箭頭方向對調（保留時間與距離）'
-                : '對向連線已存在，無法直接反轉；請刪除對向邊後再試，或改編輯對向邊'
+                ? t('mapEditor.pointTopology.reverseTitle')
+                : t('mapEditor.pointTopology.reverseBlocked')
             }
             className="w-full rounded-lg border border-cyan-700/60 bg-cyan-950/40 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/40 disabled:text-zinc-500"
           >
-            反轉方向（{fromLabel} ← {toLabel}）
+            {t('mapEditor.pointTopology.reverseDirection', { from: fromLabel, to: toLabel })}
           </button>
           {!canReverse ? (
             <p className="text-[10px] leading-snug text-amber-300/80">
-              對向連線已存在。若要改成單向反方向，請先刪除對向邊再反轉。
+              {t('mapEditor.pointTopology.reverseBlockedHint')}
             </p>
           ) : null}
           <button
             type="button"
             disabled={!customBend}
             onClick={onResetBend}
-            title={customBend ? '清除手動彎折，恢復預設線徑' : '尚未彎折線徑'}
+            title={customBend ? t('mapEditor.pointTopology.clearBendTitle') : t('mapEditor.pointTopology.noBendTitle')}
             className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
           >
-            重設線徑彎折
+            {t('mapEditor.pointTopology.resetBend')}
           </button>
           <p className="text-[10px] leading-snug text-zinc-500">
-            拖曳線兩端白點到其他節點可改接；中點拖曳可彎折。要恢復預設線徑請按上方「重設線徑彎折」。
+            {t('mapEditor.pointTopology.bendHint')}
           </p>
         </div>
       ) : null}
       <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">最快時間（秒）</span>
+        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.minTime')}</span>
         <input
           type="number"
           min={0}
@@ -2217,7 +2233,7 @@ function EdgePropertiesForm({
         />
       </label>
       <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">平均時間（秒）</span>
+        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.avgTime')}</span>
         <input
           type="number"
           min={0}
@@ -2234,11 +2250,11 @@ function EdgePropertiesForm({
         && edge.avgTravelTimeSeconds != null
         && edge.minTravelTimeSeconds > edge.avgTravelTimeSeconds ? (
         <p className="text-[10px] leading-snug text-red-300/95">
-          最快時間不可大於平均時間，請修正後才能套用路網拓撲。
+          {t('mapEditor.pointTopology.minGtAvg')}
         </p>
       ) : null}
       <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">實際距離（公尺）</span>
+        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.distance')}</span>
         <input
           type="number"
           min={0}
@@ -2257,7 +2273,7 @@ function EdgePropertiesForm({
           onClick={onDelete}
           className="w-full rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-xs font-medium text-red-200 hover:bg-red-900/60"
         >
-          刪除此連線
+          {t('mapEditor.pointTopology.deleteEdge')}
         </button>
       ) : null}
     </div>

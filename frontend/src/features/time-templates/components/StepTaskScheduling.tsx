@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Check,
   ChevronDown,
@@ -94,6 +95,7 @@ function ScheduleTimeZoomSlider({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <input
       type="range"
@@ -103,7 +105,7 @@ function ScheduleTimeZoomSlider({
       onChange={(e) => onChange(Number(e.target.value))}
       className="schedule-time-zoom-slider w-28 shrink-0"
       style={{ ['--fill' as string]: `${value}%` }}
-      aria-label="時軸縮放"
+      aria-label={t('timeTemplates.scheduling.zoomAria')}
     />
   );
 }
@@ -313,6 +315,7 @@ function ScheduleTaskToolbar({
   estimatedTripSeconds: number;
   onEstimatedTripSecondsChange: (value: number) => void;
 }) {
+  const { t } = useTranslation();
   /**
    * 編輯中的原始字串。
    *
@@ -330,11 +333,11 @@ function ScheduleTaskToolbar({
         inline ? '' : 'border-b border-zinc-800/60 px-3 py-2'
       }`}
       role="toolbar"
-      aria-label="任務排班工具列"
+      aria-label={t('timeTemplates.scheduling.toolbarAria')}
     >
       {/* 左側：來回一趟預估秒數（供建議列數） */}
-      <div className="flex items-center gap-1.5" title="請填來回一趟的預估秒數（含各方向與折返），不是單線。建議列數＝ceil(此值÷班距)；短時段會再建議多 1 列。">
-        <label className="text-[11px] text-zinc-500 whitespace-nowrap">來回預估秒數:</label>
+      <div className="flex items-center gap-1.5" title={t('timeTemplates.scheduling.tripSecondsHint')}>
+        <label className="text-[11px] text-zinc-500 whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsLabel')}</label>
         <input
           type="number"
           min={1}
@@ -350,14 +353,14 @@ function ScheduleTaskToolbar({
           className="h-[26px] w-[72px] rounded-md border border-zinc-700/60 bg-zinc-900/80 px-2 text-center text-[11px] tabular-nums text-zinc-200 outline-none focus:border-zinc-500"
           placeholder="600"
         />
-        <span className="text-[10px] text-zinc-600 whitespace-nowrap">秒（建議列數用）</span>
+        <span className="text-[10px] text-zinc-600 whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsUnit')}</span>
       </div>
 
       {/* 右側：操作按鈕群組 */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-0.5">
           <ScheduleToolbarIconButton
-            label="刪除選取任務"
+            label={t('timeTemplates.scheduling.deleteSelected')}
             onClick={onDeleteSelected}
             disabled={!canDeleteSelected}
             active={canDeleteSelected}
@@ -365,7 +368,7 @@ function ScheduleTaskToolbar({
             <Trash2 className="size-4" strokeWidth={1.75} />
           </ScheduleToolbarIconButton>
           <ScheduleToolbarIconButton
-            label="復原 (⌘Z)"
+            label={t('timeTemplates.scheduling.undo')}
             onClick={onUndo}
             disabled={!canUndo}
             flash={undoFlash}
@@ -373,7 +376,7 @@ function ScheduleTaskToolbar({
             <Undo2 className="size-4" strokeWidth={1.75} />
           </ScheduleToolbarIconButton>
           <ScheduleToolbarIconButton
-            label="重做 (⌘⇧Z)"
+            label={t('timeTemplates.scheduling.redo')}
             onClick={onRedo}
             disabled={!canRedo}
             flash={redoFlash}
@@ -383,14 +386,14 @@ function ScheduleTaskToolbar({
         </div>
         <ScheduleTimeZoomSlider value={zoomValue} onChange={onZoomChange} />
         <ScheduleViewModeButton
-          label={viewMode === 'split' ? '關閉右側面板' : '開啟右側面板'}
+          label={viewMode === 'split' ? t('timeTemplates.scheduling.closePanel') : t('timeTemplates.scheduling.openPanel')}
           active={viewMode === 'split'}
           onClick={() => onViewModeChange(viewMode === 'split' ? 'expand' : 'split')}
         >
           <SidebarPanelToggleIcon filled={viewMode === 'split'} />
         </ScheduleViewModeButton>
         <ScheduleToolbarIconButton
-          label={fullscreen ? '離開全螢幕' : '全螢幕'}
+          label={fullscreen ? t('timeTemplates.scheduling.exitFullscreen') : t('timeTemplates.scheduling.fullscreen')}
           onClick={() => onFullscreenChange(!fullscreen)}
         >
           {fullscreen ? <ScheduleShrinkIcon /> : <ScheduleExpandIcon />}
@@ -418,6 +421,7 @@ function PeriodLegend({
   attributes: TimeSlotAttribute[];
   highlightedAttributeId?: string | null;
 }) {
+  const { t } = useTranslation();
   const legends = useMemo(
     () =>
       buildAttributeIntervalLegends(
@@ -430,14 +434,18 @@ function PeriodLegend({
   if (legends.length === 0) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        {PERIOD_LEGEND_FALLBACK.map((tag) => (
+        {PERIOD_LEGEND_FALLBACK.map((tag, index) => {
+          const fallbackKeys = ['lateNight', 'offPeak', 'peak'] as const;
+          const key = fallbackKeys[index] ?? 'peak';
+          return (
           <span
-            key={tag.label}
+            key={key}
             className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-lg border px-3 text-xs font-medium ${tag.chipClass}`}
           >
-            {tag.label}
+            {t(`timeTemplates.periodFallback.${key}`)}
           </span>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -504,9 +512,10 @@ function FillEmptySlotsControl({
   disabled: boolean;
   onConfirmFill: (taskType: TaskTypeKey) => void;
 }) {
+  const { t } = useTranslation();
   const [taskType, setTaskType] = useState<TaskTypeKey>('servicing');
   const [showConfirm, setShowConfirm] = useState(false);
-  const taskLabel = TASK_TYPE_OPTIONS.find((t) => t.key === taskType)?.label ?? taskType;
+  const taskLabel = t(`timeTemplates.taskTypes.${taskType}`);
 
   return (
     <>
@@ -517,11 +526,11 @@ function FillEmptySlotsControl({
             disabled={disabled}
             onChange={(e) => setTaskType(e.target.value as TaskTypeKey)}
             className={`${FILL_TASK_SELECT_CLASS} appearance-none pr-7 disabled:cursor-not-allowed disabled:opacity-40`}
-            aria-label="補滿剩餘任務格類型"
+            aria-label={t('timeTemplates.scheduling.fillTypeAria')}
           >
             {TASK_TYPE_OPTIONS.map((opt) => (
               <option key={opt.key} value={opt.key} className="bg-zinc-900">
-                {opt.label}
+                {t(`timeTemplates.taskTypes.${opt.key}`)}
               </option>
             ))}
           </select>
@@ -533,7 +542,7 @@ function FillEmptySlotsControl({
           onClick={() => setShowConfirm(true)}
           className="h-8 shrink-0 rounded-lg bg-[#2B7FFF] px-2.5 text-xs font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
         >
-          補滿剩餘任務格
+          {t('timeTemplates.scheduling.fillEmpty')}
         </button>
       </div>
       {showConfirm && (
@@ -557,6 +566,7 @@ function ScheduleGapCheckButton({
   gaps: ScheduleTimeGap[];
   onJump: () => void;
 }) {
+  const { t } = useTranslation();
   const hasGaps = gaps.length > 0;
   return (
     <button
@@ -570,12 +580,12 @@ function ScheduleGapCheckButton({
       }`}
       title={
         hasGaps
-          ? `發現 ${gaps.length} 處時間缺漏，點擊跳至下一處`
-          : '營運時段內任務已填滿，無需檢查'
+          ? t('timeTemplates.scheduling.gapCheckFound', { count: gaps.length })
+          : t('timeTemplates.scheduling.gapCheckOk')
       }
     >
       <ScanSearch className="size-3.5 shrink-0" aria-hidden />
-      時間缺漏檢查
+      {t('timeTemplates.scheduling.gapCheck')}
       {hasGaps ? (
         <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-100">
           {gaps.length}
@@ -655,6 +665,7 @@ function TaskBar({
   onResize: (edge: ResizeEdge, event: React.PointerEvent<HTMLDivElement>) => void;
   onMove: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
+  const { t } = useTranslation();
   const barRef = useRef<HTMLDivElement>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   const colors = TASK_TYPE_COLORS[task.taskType];
@@ -832,7 +843,7 @@ function TaskBar({
             onDelete();
           }}
           className="absolute right-3 top-1/2 z-[11] flex size-5 -translate-y-1/2 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
-          aria-label="刪除任務"
+          aria-label={t('timeTemplates.scheduling.deleteTask')}
         >
           <Trash2 className="size-3" />
         </button>
@@ -866,6 +877,7 @@ export function StepTaskScheduling({
   onRowCountChange,
   onTasksChange,
 }: StepTaskSchedulingProps) {
+  const { t } = useTranslation();
   const [slotWidthPx, setSlotWidthPx] = useState(SCHEDULE_SLOT_WIDTH_DEFAULT);
   // 日循環無限捲動：左右各接一份一模一樣的一天，跟班表調整那邊同一套機制
   const {
@@ -1563,7 +1575,7 @@ export function StepTaskScheduling({
                   type="button"
                   onClick={addRow}
                   className="inline-flex size-6 items-center justify-center rounded-md bg-zinc-800 text-zinc-400 transition hover:bg-zinc-700 hover:text-zinc-200"
-                  aria-label="新增列"
+                  aria-label={t('timeTemplates.scheduling.addRow')}
                 >
                   <Plus className="size-3.5" />
                 </button>
@@ -1578,8 +1590,8 @@ export function StepTaskScheduling({
           <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
           <span>
             {activeIntervalRanges.length === 0
-              ? '請先在「營運時段」設定並確認時段後，才能於彩色區域放置任務'
-              : '時軸可以左右滑動，查看更多任務'}
+              ? t('timeTemplates.scheduling.hintNoIntervals')
+              : t('timeTemplates.scheduling.hintScroll')}
           </span>
           <span className="text-zinc-600">← →</span>
         </div>
@@ -1590,14 +1602,14 @@ export function StepTaskScheduling({
       <aside className="flex w-[248px] shrink-0 flex-col gap-3">
         <SidebarCard
           icon={<Tag className="size-4 text-zinc-400" />}
-          title="任務類型"
+          title={t('timeTemplates.scheduling.taskTypesTitle')}
         >
           <div className="grid grid-cols-2 gap-2">
             {TASK_TYPE_OPTIONS.map((task) => (
               <TaskTypeChip
                 key={task.key}
                 taskKey={task.key}
-                label={task.label}
+                label={t(`timeTemplates.taskTypes.${task.key}`)}
               />
             ))}
           </div>
@@ -1613,7 +1625,7 @@ export function StepTaskScheduling({
 
         <SidebarCard
           icon={<SlidersHorizontal className="size-4 text-zinc-400" />}
-          title="任務設定"
+          title={t('timeTemplates.scheduling.taskSettingsTitle')}
           headerAction={
             selectedTask ? (
               <div className="flex items-center gap-0.5">
@@ -1622,8 +1634,8 @@ export function StepTaskScheduling({
                   disabled={!taskFormDirty}
                   onClick={() => taskSettingsFormRef.current?.reset()}
                   className="inline-flex size-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="取消任務設定變更"
-                  title="取消變更"
+                  aria-label={t('timeTemplates.scheduling.cancelChangesAria')}
+                  title={t('timeTemplates.scheduling.cancelChanges')}
                 >
                   <X className="size-4" strokeWidth={2.5} />
                 </button>
@@ -1632,8 +1644,8 @@ export function StepTaskScheduling({
                   form={TASK_SETTINGS_FORM_ID}
                   disabled={!taskFormCanConfirm}
                   className="inline-flex size-7 items-center justify-center rounded-md text-[#51A2FF] transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-40"
-                  aria-label="確認任務設定"
-                  title="確認變更"
+                  aria-label={t('timeTemplates.scheduling.confirmChangesAria')}
+                  title={t('timeTemplates.scheduling.confirmChanges')}
                 >
                   <Check className="size-4" strokeWidth={2.5} />
                 </button>
@@ -1658,7 +1670,7 @@ export function StepTaskScheduling({
               }}
             />
           ) : (
-            <PanelNoData message="沒有選取" />
+            <PanelNoData message={t('timeTemplates.scheduling.nothingSelected')} />
           )}
         </SidebarCard>
       </aside>

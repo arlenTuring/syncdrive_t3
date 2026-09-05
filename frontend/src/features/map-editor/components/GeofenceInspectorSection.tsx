@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import { TextAlignmentControls } from '../../../components/TextAlignmentControls'
 import { TextLayoutControls } from '../../../components/TextLayoutControls'
@@ -35,6 +36,7 @@ export function GeofenceInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
+  const { t } = useTranslation()
   if (facility.type !== 'Geofence') return null
   const gf = facility as GeofenceFacility
   const params = getGeofenceParams(gf)
@@ -50,14 +52,15 @@ export function GeofenceInspectorSection({
     <>
       <section className="space-y-2.5 rounded-lg border border-violet-900/40 bg-violet-950/15 p-3">
         <h3 className="text-[10px] font-semibold uppercase tracking-wider text-violet-400/90">
-          電子圍籬 · 邊界樣式
+          {t('mapEditor.inspector.geofence.borderStyle')}
         </h3>
         <p className="text-[10px] leading-relaxed text-zinc-500">
-          拖曳頂點調整形狀；點擊邊上「＋」可新增頂點。頂點數：{' '}
-          {params.verticesMeters.length}
+          {t('mapEditor.inspector.geofence.vertexHint', {
+            count: params.verticesMeters.length,
+          })}
         </p>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">線型</label>
+          <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.lineStyle')}</label>
           <select
             disabled={readOnly}
             value={params.strokeStyle}
@@ -68,14 +71,14 @@ export function GeofenceInspectorSection({
             }
             className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-70"
           >
-            <option value="solid">實線</option>
-            <option value="dashed">虛線</option>
-            <option value="dotted">點線</option>
+            <option value="solid">{t('mapEditor.inspector.stroke.solid')}</option>
+            <option value="dashed">{t('mapEditor.inspector.stroke.dashed')}</option>
+            <option value="dotted">{t('mapEditor.inspector.stroke.dotted')}</option>
           </select>
         </div>
         <div>
           <label className="mb-1 block text-[10px] text-zinc-500">
-            線條粗細（px）
+            {t('mapEditor.inspector.geofence.strokeWidth')}
           </label>
           <NumberInput
             min={1}
@@ -87,7 +90,7 @@ export function GeofenceInspectorSection({
           />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">線條顏色</label>
+          <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.strokeColor')}</label>
           <input
             type="color"
             disabled={readOnly}
@@ -106,12 +109,12 @@ export function GeofenceInspectorSection({
             }
             className="rounded border-zinc-600 accent-cyan-500"
           />
-          填滿圍籬內部
+          {t('mapEditor.inspector.geofence.fillInside')}
         </label>
         {params.fillEnabled && (
           <>
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">填色</label>
+              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.fillColor')}</label>
               <input
                 type="color"
                 disabled={readOnly}
@@ -130,7 +133,7 @@ export function GeofenceInspectorSection({
                 htmlFor="geofence-fill-opacity"
                 className="mb-1 flex items-center justify-between text-[10px] text-zinc-500"
               >
-                <span>透明度</span>
+                <span>{t('mapEditor.inspector.geofence.opacity')}</span>
                 <span className="font-mono text-cyan-400/90">
                   {Math.round(params.fillOpacity * 100)}%
                 </span>
@@ -152,8 +155,8 @@ export function GeofenceInspectorSection({
                 className="h-2 w-full cursor-pointer accent-cyan-500 disabled:opacity-40"
               />
               <div className="mt-1 flex justify-between text-[9px] text-zinc-600">
-                <span>全透明</span>
-                <span>不透明</span>
+                <span>{t('mapEditor.inspector.fullyTransparent')}</span>
+                <span>{t('mapEditor.inspector.opaque')}</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-zinc-500">
@@ -171,7 +174,7 @@ export function GeofenceInspectorSection({
       <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
         <div className="flex items-center justify-between">
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            文字子元件
+            {t('mapEditor.inspector.geofence.textChildren')}
           </h3>
           {!readOnly && (
             <button
@@ -187,7 +190,7 @@ export function GeofenceInspectorSection({
                   ...labels,
                   {
                     id,
-                    text: '標題',
+                    text: t('mapEditor.inspector.geofence.defaultTitle'),
                     x: cx,
                     y: cy,
                     rotationDeg: 0,
@@ -199,13 +202,13 @@ export function GeofenceInspectorSection({
               }}
               className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
             >
-              <Plus className="size-3" /> 新增文字
+              <Plus className="size-3" /> {t('mapEditor.inspector.geofence.addText')}
             </button>
           )}
         </div>
         {labels.length === 0 ? (
           <p className="text-[10px] text-zinc-600">
-            尚無文字；新增後可在圖台上拖曳與旋轉（超出圍籬會顯示紅框）。
+            {t('mapEditor.inspector.geofence.noText')}
           </p>
         ) : (
           <ul className="space-y-1">
@@ -220,9 +223,9 @@ export function GeofenceInspectorSection({
                       : 'border-zinc-700/80 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600'
                   }`}
                 >
-                  {lb.text || '（空白）'}
+                  {lb.text || t('mapEditor.inspector.geofence.emptyText')}
                   {!isLabelInsideGeofence(gf, lb) && (
-                    <span className="ml-1 text-red-400">· 超出</span>
+                    <span className="ml-1 text-red-400">{t('mapEditor.inspector.geofence.outOfBounds')}</span>
                   )}
                 </button>
               </li>
@@ -232,7 +235,7 @@ export function GeofenceInspectorSection({
         {selectedLabel && (
           <div className="mt-2 space-y-2 border-t border-zinc-800 pt-2">
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">文字內容</label>
+              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.textContent')}</label>
               <input
                 readOnly={readOnly}
                 value={selectedLabel.text}
@@ -252,7 +255,7 @@ export function GeofenceInspectorSection({
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="mb-1 block text-[10px] text-zinc-500">字級 px</label>
+                <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.fontPx')}</label>
                 <NumberInput
                   min={8}
                   max={72}
@@ -288,12 +291,12 @@ export function GeofenceInspectorSection({
                     }
                     className="rounded border-zinc-600 accent-cyan-500"
                   />
-                  粗體
+                  {t('common.bold')}
                 </label>
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">旋轉（度）</label>
+              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.rotationDeg')}</label>
               <NumberInput
                 readOnly={readOnly}
                 value={selectedLabel.rotationDeg}
@@ -362,7 +365,7 @@ export function GeofenceInspectorSection({
                 }}
                 className="inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300"
               >
-                <Trash2 className="size-3" /> 刪除此文字
+                <Trash2 className="size-3" /> {t('mapEditor.inspector.geofence.deleteText')}
               </button>
             )}
           </div>

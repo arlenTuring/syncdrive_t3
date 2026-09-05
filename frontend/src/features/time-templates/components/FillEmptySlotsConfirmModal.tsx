@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type FillEmptySlotsConfirmModalProps = {
   taskLabel: string;
@@ -12,6 +13,8 @@ export function FillEmptySlotsConfirmModal({
   onClose,
   onConfirm,
 }: FillEmptySlotsConfirmModalProps) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -38,20 +41,20 @@ export function FillEmptySlotsConfirmModal({
             id="fill-empty-slots-title"
             className="text-lg font-semibold leading-7 text-[#F3F4F6]"
           >
-            補滿剩餘任務格
+            {t('timeTemplates.fillEmpty.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="關閉"
+            aria-label={t('common.close')}
           >
             <X className="size-5" />
           </button>
         </div>
 
         <p className="mt-4 text-sm leading-6 text-zinc-400">
-          是否將剩餘未安排時間全部填充{taskLabel}任務？
+          {t('timeTemplates.fillEmpty.body', { taskLabel })}
         </p>
 
         <div className="mt-8 flex justify-end gap-3">
@@ -60,14 +63,14 @@ export function FillEmptySlotsConfirmModal({
             onClick={onClose}
             className="inline-flex h-[38px] items-center justify-center rounded-lg px-5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6]"
           >
-            確認
+            {t('timeTemplates.fillEmpty.confirm')}
           </button>
         </div>
       </div>

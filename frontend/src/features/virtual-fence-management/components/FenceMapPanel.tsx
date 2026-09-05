@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Map as MapIcon,
   Pentagon,
@@ -70,6 +71,7 @@ export function FenceMapPanel({
   vertices,
   onShapeChange,
 }: FenceMapPanelProps) {
+  const { t } = useTranslation();
   const viewportRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [drawTool, setDrawTool] = useState<DrawTool>('rect');
@@ -281,7 +283,7 @@ export function FenceMapPanel({
           <button
             type="button"
             className={toolBtn(drawTool === 'rect')}
-            title="矩形圍籬：拖曳拉框"
+            title={t('virtualFence.map.toolRect')}
             onClick={() => setDrawTool('rect')}
           >
             <Square className="size-4" strokeWidth={1.75} aria-hidden />
@@ -289,7 +291,7 @@ export function FenceMapPanel({
           <button
             type="button"
             className={toolBtn(drawTool === 'polygon')}
-            title="任意邊形：點一下產生三角形，可拉頂點、邊上＋加節點"
+            title={t('virtualFence.map.toolPolygon')}
             onClick={() => setDrawTool('polygon')}
           >
             <Pentagon className="size-4" strokeWidth={1.75} aria-hidden />
@@ -299,12 +301,12 @@ export function FenceMapPanel({
 
       <div
         className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-lg border border-zinc-700/80 bg-[#18181b]/95 p-1 shadow-lg backdrop-blur-sm"
-        title="雙指捲動平移 · 捏合或 Ctrl+滾輪縮放"
+        title={t('virtualFence.map.panZoomHint')}
       >
         <button
           type="button"
           className={toolBtn(false)}
-          title="放大"
+          title={t('virtualFence.map.zoomIn')}
           disabled={displayZoom <= 1}
           onClick={() => zoomBy(-1)}
         >
@@ -316,7 +318,7 @@ export function FenceMapPanel({
         <button
           type="button"
           className={toolBtn(false)}
-          title="縮小"
+          title={t('virtualFence.map.zoomOut')}
           disabled={displayZoom >= MAP_PIXEL_ZOOM_LEVEL_COUNT}
           onClick={() => zoomBy(1)}
         >
@@ -329,7 +331,7 @@ export function FenceMapPanel({
           <button
             type="button"
             className={toolBtn(false)}
-            title="復原"
+            title={t('virtualFence.map.undo')}
             disabled={historyIndex <= 0}
             onClick={undo}
           >
@@ -338,7 +340,7 @@ export function FenceMapPanel({
           <button
             type="button"
             className={toolBtn(false)}
-            title="重做"
+            title={t('virtualFence.map.redo')}
             disabled={historyIndex >= history.length - 1}
             onClick={redo}
           >
@@ -348,7 +350,7 @@ export function FenceMapPanel({
           <button
             type="button"
             className="inline-flex size-8 items-center justify-center rounded-md text-red-400 transition hover:bg-red-500/10 disabled:opacity-40"
-            title="清除圍籬形狀"
+            title={t('virtualFence.map.clearShape')}
             disabled={vertices.length === 0 && coverage.length === 0}
             onClick={() => pushShape({ coverage: [], vertices: [] })}
           >
@@ -360,7 +362,7 @@ export function FenceMapPanel({
       {mapAreas.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500">
           <MapIcon className="size-6 opacity-40" aria-hidden />
-          <p className="text-sm">地圖尚無 Area 資料</p>
+          <p className="text-sm">{t('virtualFence.map.emptyAreas')}</p>
         </div>
       ) : (
         <MapAreaCanvas

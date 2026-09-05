@@ -1,6 +1,7 @@
 import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Monitor, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const PRESETS = [
   { label: '32:9 — 3840×1080', width: 3840, height: 1080 },
@@ -15,7 +16,8 @@ interface Props {
 }
 
 export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
-  const [name, setName] = useState('新平面');
+  const { t } = useTranslation();
+  const [name, setName] = useState(() => t('dashboard.newPlane.nameDefault'));
   const [width, setWidth] = useState(3840);
   const [height, setHeight] = useState(1080);
 
@@ -36,16 +38,20 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Monitor className="text-cyan-400" size={20} />
-            <h2 className="text-zinc-100 font-semibold text-base">新增平面</h2>
+            <h2 className="text-zinc-100 font-semibold text-base">{t('dashboard.newPlane.title')}</h2>
           </div>
-          <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-200 transition-colors">
+          <button
+            onClick={onCancel}
+            className="text-zinc-500 hover:text-zinc-200 transition-colors"
+            aria-label={t('common.close')}
+          >
             <X size={18} />
           </button>
         </div>
 
         {/* Name */}
         <div className="mb-4">
-          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">平面名稱</label>
+          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">{t('dashboard.newPlane.name')}</label>
           <input
             value={name}
             onChange={e => setName(e.target.value)}
@@ -56,7 +62,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
 
         {/* Presets */}
         <div className="mb-4">
-          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">解析度預設</label>
+          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">{t('dashboard.newPlane.presets')}</label>
           <div className="grid grid-cols-2 gap-2">
             {PRESETS.map(p => (
               <button
@@ -76,7 +82,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
 
         {/* Custom resolution */}
         <div className="mb-4">
-          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">自訂解析度</label>
+          <label className="block text-zinc-400 text-xs mb-1.5 font-medium">{t('dashboard.newPlane.customResolution')}</label>
           <div className="flex items-center gap-2">
             <NumberInput min={320} max={7680}
               value={width}
@@ -92,7 +98,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
                          focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-colors"
             />
           </div>
-          <p className="text-zinc-500 text-xs mt-1.5">長寬比：<span className="text-cyan-400 font-mono">{ratio}</span></p>
+          <p className="text-zinc-500 text-xs mt-1.5">{t('dashboard.newPlane.aspectRatio')}<span className="text-cyan-400 font-mono">{ratio}</span></p>
         </div>
 
         {/* Actions */}
@@ -102,15 +108,15 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
             className="flex-1 py-2 rounded-lg border border-zinc-600 text-zinc-400 text-sm
                        hover:border-zinc-500 hover:text-zinc-200 transition-colors"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
-            onClick={() => onConfirm(name || '未命名平面', width, height)}
+            onClick={() => onConfirm(name || t('dashboard.unnamedPlane'), width, height)}
             disabled={!name.trim() || width < 320 || height < 240}
             className="flex-1 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium
                        hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            建立平面
+            {t('dashboard.newPlane.create')}
           </button>
         </div>
       </div>

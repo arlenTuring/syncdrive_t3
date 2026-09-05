@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   sortSelectedRoutesByExecutionOrder,
   type ShiftScheduleSelectedRoute,
@@ -75,7 +76,7 @@ function menuOptionClass(active: boolean, disabled = false) {
 function ActionMenuSelect({
   label,
   value,
-  placeholder = '請選擇',
+  placeholder,
   options,
   groups,
   onChange,
@@ -142,6 +143,7 @@ function FacilityTargetPicker({
     targetId: string | null;
   }) => void;
 }) {
+  const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const level1Ref = useRef<HTMLDivElement>(null);
   const level2Ref = useRef<HTMLDivElement>(null);
@@ -158,7 +160,8 @@ function FacilityTargetPicker({
 
   const selectedValue = encodeFacilityTargetValue(targetKind, targetId);
   const displayLabel =
-    resolveFacilityTargetLabel(targetKind, targetId, facilityGroups) || '請選擇';
+    resolveFacilityTargetLabel(targetKind, targetId, facilityGroups)
+    || t('shiftList.actionSettings.selectPlaceholder');
   const activeGroup =
     facilityGroups.find((group) => group.type === activeType) ?? null;
   const canPickSpecific = (activeGroup?.facilities.length ?? 0) > 0;
@@ -231,7 +234,7 @@ function FacilityTargetPicker({
 
   return (
     <div ref={rootRef} className="relative block w-[200px] shrink-0">
-      <span className={FIELD_LABEL_CLASS}>設施</span>
+      <span className={FIELD_LABEL_CLASS}>{t('shiftList.actionSettings.facility')}</span>
       <button
         type="button"
         className={[
@@ -240,7 +243,7 @@ function FacilityTargetPicker({
             ? 'border-[#7CB8FF] text-zinc-100'
             : 'border-zinc-700/80 text-zinc-100 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30',
         ].join(' ')}
-        aria-label="設施目標"
+        aria-label={t('shiftList.actionSettings.facilityTargetAria')}
         aria-expanded={open}
         onClick={() => (open ? closePicker() : openPicker())}
       >
@@ -283,7 +286,9 @@ function FacilityTargetPicker({
                   <div key={category} className="flex w-full flex-col items-stretch">
                     <div className="flex h-8 items-center px-3">
                       <span className="px-2 text-[11px] font-medium tracking-[0.5px] text-[#99A1AF]">
-                        {category === 'equipment' ? '設備' : '設施'}
+                        {category === 'equipment'
+                          ? t('shiftList.actionSettings.equipment')
+                          : t('shiftList.actionSettings.facility')}
                       </span>
                     </div>
                     {categoryGroups.map((group) => {
@@ -361,7 +366,9 @@ function FacilityTargetPicker({
                   }}
                 >
                   <span className="min-w-0 flex-1 truncate px-2">
-                    {activeGroup.category === 'facility_area' ? '指定設施' : '指定設備'}
+                    {activeGroup.category === 'facility_area'
+                      ? t('shiftList.actionSettings.specifyFacility')
+                      : t('shiftList.actionSettings.specifyEquipment')}
                   </span>
                   <span className="mr-1 shrink-0 text-[12px] leading-4 tracking-[0.5px] text-[#99A1AF]">
                     ({activeGroup.facilities.length})
@@ -437,6 +444,7 @@ function ActionCard({
   onRemove: () => void;
   onMove: (direction: 'up' | 'down') => void;
 }) {
+  const { t } = useTranslation();
   const category = resolveShiftActionCategory(action.categoryId);
   const visibleStages = resolveVisibleActionStages(action);
   const showResource = shouldShowResourceStage(action);
@@ -453,14 +461,16 @@ function ActionCard({
           disabled={index <= 0}
           onClick={() => onMove('up')}
           className="inline-flex size-7 items-center justify-center rounded-md border border-zinc-700 text-zinc-400 transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-          title="上移"
-          aria-label="上移"
+          title={t('shiftList.actionSettings.moveUp')}
+          aria-label={t('shiftList.actionSettings.moveUp')}
         >
           <ArrowUp className="size-3.5" />
         </button>
         <span
           className="flex size-7 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-xs font-semibold uppercase text-[#7CB8FF]"
-          aria-label={`第 ${String.fromCharCode(97 + index)} 項`}
+          aria-label={t('shiftList.actionSettings.itemAria', {
+            letter: String.fromCharCode(97 + index),
+          })}
         >
           {String.fromCharCode(97 + index)}
         </span>
@@ -469,8 +479,8 @@ function ActionCard({
           disabled={index >= total - 1}
           onClick={() => onMove('down')}
           className="inline-flex size-7 items-center justify-center rounded-md border border-zinc-700 text-zinc-400 transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-          title="下移"
-          aria-label="下移"
+          title={t('shiftList.actionSettings.moveDown')}
+          aria-label={t('shiftList.actionSettings.moveDown')}
         >
           <ArrowDown className="size-3.5" />
         </button>
@@ -478,7 +488,7 @@ function ActionCard({
 
       <div className="flex min-w-0 flex-1 flex-nowrap items-end gap-5">
         <ActionMenuSelect
-          label="行動類別"
+          label={t('shiftList.actionSettings.category')}
           value={action.categoryId ?? ''}
           widthClass="w-[176px]"
           panelWidth={176}
@@ -506,7 +516,9 @@ function ActionCard({
 
         {visibleStages.includes('offset') && category ? (
           <div className="block shrink-0">
-            <span className={FIELD_LABEL_CLASS}>{category.offsetLabel ?? '偏移'}</span>
+            <span className={FIELD_LABEL_CLASS}>
+              {category.offsetLabel ?? t('shiftList.actionSettings.offset')}
+            </span>
             <div className="flex h-10 items-center gap-1.5">
               <input
                 type="text"
@@ -514,7 +526,7 @@ function ActionCard({
                 value={action.offsetValue == null ? '' : String(action.offsetValue)}
                 placeholder="0"
                 className={INPUT_CLASS}
-                aria-label="偏移數值"
+                aria-label={t('shiftList.actionSettings.offsetValueAria')}
                 onChange={(event) => {
                   const digits = event.target.value.replace(/\D/g, '');
                   onChange({
@@ -525,7 +537,7 @@ function ActionCard({
                 }}
               />
               <ActionMenuSelect
-                label="偏移單位"
+                label={t('shiftList.actionSettings.offsetUnit')}
                 hideLabel
                 value={offsetUnit ?? ''}
                 widthClass="w-[88px]"
@@ -567,7 +579,7 @@ function ActionCard({
 
         {visibleStages.includes('behavior') && category ? (
           <ActionMenuSelect
-            label="行為"
+            label={t('shiftList.actionSettings.behavior')}
             value={action.behavior ?? ''}
             widthClass="w-[148px]"
             panelWidth={148}
@@ -590,7 +602,7 @@ function ActionCard({
 
         {visibleStages.includes('resource') && showResource && isMediaBehavior(action.behavior) ? (
           <ActionMenuSelect
-            label="媒體／媒體群組"
+            label={t('shiftList.actionSettings.mediaOrGroup')}
             value={action.resourceId ?? ''}
             widthClass={MEDIA_FIELD_WIDTH_CLASS}
             panelWidth={200}
@@ -598,7 +610,7 @@ function ActionCard({
               ...(mediaItems.length > 0
                 ? [
                     {
-                      label: '媒體',
+                      label: t('shiftList.actionSettings.media'),
                       options: mediaItems.map((item) => ({
                         value: item.id,
                         label: item.name,
@@ -609,7 +621,7 @@ function ActionCard({
               ...(mediaGroups.length > 0
                 ? [
                     {
-                      label: '媒體群組',
+                      label: t('shiftList.actionSettings.mediaGroup'),
                       options: mediaGroups.map((item) => ({
                         value: item.id,
                         label: item.name,
@@ -632,8 +644,8 @@ function ActionCard({
         type="button"
         onClick={onRemove}
         className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-400 transition hover:border-rose-500/50 hover:text-rose-300"
-        title="移除此行動"
-        aria-label="移除此行動"
+        title={t('shiftList.actionSettings.removeAction')}
+        aria-label={t('shiftList.actionSettings.removeAction')}
       >
         <Trash2 className="size-4" />
       </button>
@@ -668,20 +680,28 @@ function ActionZonePanel({
   onRemoveAction: (actionId: string) => void;
   onReorder: (actionId: string, direction: 'up' | 'down') => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-xl border border-dashed border-zinc-700/70 bg-zinc-950/40 px-5 py-4">
       <div className="mb-4 flex min-w-0 flex-wrap items-end gap-3">
         <p className="pb-2 text-sm font-medium text-zinc-200">{title}</p>
         <ActionMenuSelect
-          label="套用模塊"
+          label={t('shiftList.actionSettings.applyModule')}
           value=""
-          placeholder={moduleSources.length > 0 ? '選擇要套用的模塊' : '尚無同類型模塊可套用'}
+          placeholder={
+            moduleSources.length > 0
+              ? t('shiftList.actionSettings.selectModule')
+              : t('shiftList.actionSettings.noModules')
+          }
           widthClass="w-[260px]"
           panelWidth={280}
           disabled={moduleSources.length === 0}
           options={moduleSources.map((source) => ({
             value: source.key,
-            label: `${source.label}（${source.actions.length}）`,
+            label: t('shiftList.actionSettings.moduleOption', {
+              label: source.label,
+              count: source.actions.length,
+            }),
           }))}
           onChange={(sourceKey) => {
             if (sourceKey) onApplyModule(sourceKey);
@@ -711,8 +731,8 @@ function ActionZonePanel({
             type="button"
             onClick={onAdd}
             className="inline-flex size-8 items-center justify-center rounded-full border border-zinc-700 text-zinc-400 transition hover:border-[#2B7FFF]/60 hover:text-[#7CB8FF]"
-            title="新增行動"
-            aria-label="新增行動"
+            title={t('shiftList.actionSettings.addAction')}
+            aria-label={t('shiftList.actionSettings.addAction')}
           >
             <Plus className="size-4" />
           </button>
@@ -728,6 +748,7 @@ export function StepShiftActionSettings({
   mapId,
   onChange,
 }: StepShiftActionSettingsProps) {
+  const { t } = useTranslation();
   const [mediaOptions, setMediaOptions] = useState<MediaLibraryOption[]>([]);
   const [facilityGroups, setFacilityGroups] = useState<ActionFacilityTypeGroup[]>([]);
 
@@ -827,15 +848,19 @@ export function StepShiftActionSettings({
   if (orderedRoutes.length === 0) {
     return (
       <div className="flex min-h-[240px] flex-col">
-        <h2 className="mb-2 text-lg font-medium text-zinc-100">行動設定</h2>
-        <p className="text-sm text-zinc-500">請先於第四步選擇路線群組。</p>
+        <h2 className="mb-2 text-lg font-medium text-zinc-100">
+          {t('shiftList.actionSettings.title')}
+        </h2>
+        <p className="text-sm text-zinc-500">{t('shiftList.actionSettings.needRouteGroups')}</p>
       </div>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">行動設定</h2>
+      <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
+        {t('shiftList.actionSettings.title')}
+      </h2>
 
       <div className="space-y-0">
         {displayDraft.routes.map((route, routeIndex) => (
@@ -844,7 +869,7 @@ export function StepShiftActionSettings({
               <div className="my-8 flex items-center gap-4" aria-hidden>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-600 to-zinc-600" />
                 <span className="shrink-0 rounded-full border border-zinc-600 bg-zinc-900 px-3 py-1 text-[11px] font-medium tracking-[0.2em] text-zinc-400">
-                  下一條路線
+                  {t('shiftList.actionSettings.nextRoute')}
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-l from-transparent via-zinc-600 to-zinc-600" />
               </div>

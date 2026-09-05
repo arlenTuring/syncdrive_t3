@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchTimeTemplateDetail, fetchTimeTemplateList } from '../../time-templates/api/timeTemplatesApi';
 import { StepOverallPreview } from '../../time-templates/components/StepOverallPreview';
 import { parseStoredTemplateBody } from '../../time-templates/types/editor';
@@ -30,6 +31,7 @@ export function StepShiftTimeTemplate({
   creationMode = 'parametric',
   onChange,
 }: StepShiftTimeTemplateProps) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<TimeTemplateListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,18 +135,18 @@ export function StepShiftTimeTemplate({
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
-      <h2 className="mb-6 shrink-0 text-base font-medium text-zinc-100">選擇要套用的時間模板</h2>
+      <h2 className="mb-6 shrink-0 text-base font-medium text-zinc-100">{t('shiftList.stepTimeTemplate.title')}</h2>
 
       <div className="max-w-4xl shrink-0">
         <label className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            時間模板
+            {t('shiftList.stepTimeTemplate.label')}
           </span>
           {loading ? (
             <div className="flex h-[42px] items-center gap-2 text-sm text-zinc-500">
               <Loader2 className="size-4 animate-spin" />
-              載入時間模板中…
+              {t('shiftList.stepTimeTemplate.loading')}
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -154,7 +156,7 @@ export function StepShiftTimeTemplate({
                 className={SELECT_CLASS}
                 disabled={Boolean(error) || items.length === 0}
               >
-                <option value="">請選擇</option>
+                <option value="">{t('shiftList.stepTimeTemplate.pleaseSelect')}</option>
                 {items.map((item) => (
                   <option key={item.template_id} value={item.template_id}>
                     {item.name}
@@ -168,17 +170,15 @@ export function StepShiftTimeTemplate({
                 && highDensityAttrs.length > 0 ? (
                 <p className="flex max-w-[min(100%,22rem)] shrink-0 items-center gap-1.5 text-sm font-medium text-amber-200">
                   <span className="min-w-0 leading-snug">
-                    此模板含有高密度時段，建議增加時間線列數
+                    {t('shiftList.stepTimeTemplate.highDensityWarn')}
                   </span>
                   <HelpTip
-                    label="高密度時段說明"
+                    label={t('shiftList.stepTimeTemplate.highDensityHelpLabel')}
                     widthClass="w-72"
                     side="bottom"
                   >
                     <p>
-                      以下時段屬性班距較短，一輛車的完整交路週期可能超過班距，
-                      導致單車跑不完一整輪而出現「未承接班距」警告。
-                      請在 Step 2 確認時間線列數是否足夠（通常需要 ≥ 週期÷班距 輛車）。
+                      {t('shiftList.stepTimeTemplate.highDensityHelp')}
                     </p>
                     <ul className="mt-2 space-y-1">
                       {highDensityAttrs.map((attr) => (
@@ -188,7 +188,7 @@ export function StepShiftTimeTemplate({
                             style={{ backgroundColor: attr.color }}
                           />
                           <span className="font-medium text-zinc-100">{attr.name}</span>
-                          <span className="text-zinc-400">班距 {attr.headwaySeconds} 秒</span>
+                          <span className="text-zinc-400">{t('shiftList.stepTimeTemplate.headwaySeconds', { seconds: attr.headwaySeconds })}</span>
                         </li>
                       ))}
                     </ul>
@@ -199,7 +199,7 @@ export function StepShiftTimeTemplate({
           )}
           {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           {!loading && !error && items.length === 0 && (
-            <p className="mt-2 text-sm text-zinc-500">尚無時間模板可選，請先至「時間模板管理」建立</p>
+            <p className="mt-2 text-sm text-zinc-500">{t('shiftList.stepTimeTemplate.emptyList')}</p>
           )}
         </label>
       </div>
@@ -211,13 +211,13 @@ export function StepShiftTimeTemplate({
         && hasEmptyIntervals && (
         <div className="mt-6 max-w-3xl shrink-0 space-y-3 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-5">
           <div>
-            <h3 className="text-sm font-medium text-zinc-100">空時段正線讓渡餘裕</h3>
+            <h3 className="text-sm font-medium text-zinc-100">{t('shiftList.stepTimeTemplate.emptySlackTitle')}</h3>
             <p className="mt-1 text-xs text-zinc-500">
-              此模板在 00:00–24:00 內有未排定時間屬性的空時段；正線結束後可占用空時段開頭，不可提前占用空時段尾端。改動後需重新生成班表。
+              {t('shiftList.stepTimeTemplate.emptySlackHint')}
             </p>
           </div>
           <MainlineSlackSecondsField
-            label="空時段正線讓渡餘裕"
+            label={t('shiftList.stepTimeTemplate.emptySlackTitle')}
             value={normalizeEmptyIntervalMainlineSlackSecondsInput(
               draft.emptyIntervalMainlineSlackSeconds,
             )}
@@ -227,7 +227,7 @@ export function StepShiftTimeTemplate({
                 emptyIntervalMainlineSlackSeconds,
               })
             }
-            prefixText="正線結束後可占用空時段開頭，最多"
+            prefixText={t('shiftList.stepTimeTemplate.emptySlackPrefix')}
           />
         </div>
       )}
@@ -238,7 +238,7 @@ export function StepShiftTimeTemplate({
         ) : previewLoading ? (
           <div className="flex min-h-[280px] flex-1 items-center justify-center gap-2 text-sm text-zinc-500">
             <Loader2 className="size-4 animate-spin" />
-            載入時間模板預覽中…
+            {t('shiftList.stepTimeTemplate.loadingPreview')}
           </div>
         ) : previewError ? (
           <div className="flex min-h-[280px] flex-1 items-center justify-center px-6 text-sm text-red-400">
@@ -252,7 +252,7 @@ export function StepShiftTimeTemplate({
               attributes={previewData.attributes}
               tasks={previewData.tasks}
               rowCount={previewData.scheduleRowCount}
-              emptyHint="此模板尚無班表資料"
+              emptyHint={t('shiftList.stepTimeTemplate.emptyPreview')}
               readOnly
             />
           </div>

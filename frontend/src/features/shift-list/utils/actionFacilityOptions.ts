@@ -1,3 +1,4 @@
+import i18n from '../../../i18n';
 import { FACILITY_PALETTE_ITEMS } from '../../map-editor/constants/palette';
 import {
   MAP_EQUIPMENT_TYPES,
@@ -52,11 +53,12 @@ function resolveFacilityDisplayName(facility: FacilityObject): string {
 }
 
 export function labelForActionFacilityType(type: ActionFacilityType): string {
-  return TYPE_LABEL_BY_TYPE.get(type) ?? type;
+  const key = TYPE_LABEL_BY_TYPE.get(type);
+  return key ? i18n.t(key) : type;
 }
 
 export function generalLabelForActionFacilityType(type: ActionFacilityType): string {
-  if (type === 'Facility') return '全設施';
+  if (type === 'Facility') return `全${labelForActionFacilityType('Facility')}`;
   return `全${labelForActionFacilityType(type)}`;
 }
 

@@ -11,6 +11,7 @@ import {
   CloudDownload,
 } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { MapPixelSize } from '../types/area'
 import { sanitizeMapExportFilename } from '../utils/mapExportFilename'
 import { parseMapFileJson } from '../utils/mapFileJson'
@@ -49,6 +50,7 @@ type MapLibraryPageProps = {
 }
 
 export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps) {
+  const { t } = useTranslation()
   const pasteAreaId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [entries, setEntries] = useState<MapLibraryEntry[]>([])
@@ -152,10 +154,15 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
   const handleDelete = useCallback(
     async (entry: MapLibraryEntry) => {
-      const label = entry.builtinId ? '內建範例' : '地圖'
+      const label = entry.builtinId
+        ? t('mapLibrary.builtinExample')
+        : t('mapLibrary.mapLabel')
       if (
         !window.confirm(
-          `確定要刪除${label}「${entry.displayName}」？\n\n此操作無法復原。`,
+          t('mapLibrary.confirmDelete', {
+            label,
+            name: entry.displayName,
+          }),
         )
       ) {
         return
@@ -171,14 +178,18 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       const mapId = entry.mapDocument.mapId || entry.libraryId
       const result = await deletePublishedMap(mapId)
       if (!result.ok) {
-        alert(`刪不掉：${result.error ?? '後端拒絕'}`)
+        alert(
+          t('mapLibrary.deleteFailed', {
+            error: result.error ?? t('mapLibrary.backendRejected'),
+          }),
+        )
         return
       }
 
       persistEntries(deleteMapLibraryEntry(readMapLibrary(), entry.libraryId))
       void clearMapRevisionsForLibrary(entry.libraryId)
     },
-    [persistEntries],
+    [persistEntries, t],
   )
 
   const handleExport = useCallback((entry: MapLibraryEntry) => {
@@ -210,10 +221,14 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         const json = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
         importParsed(applyRefFieldZeroPolicyToParsed(parseMapFileJson(json)))
       } catch (e) {
-        alert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`)
+        alert(
+          t('mapLibrary.importFailed', {
+            error: e instanceof Error ? e.message : String(e),
+          }),
+        )
       }
     },
-    [importParsed],
+    [importParsed, t],
   )
 
   /**
@@ -231,7 +246,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       setServerLoadingId(summary.mapId)
       try {
         const doc = await fetchPublishedMapDocument(summary.mapId)
-        if (!doc) throw new Error('伺服器上找不到這份地圖的內容')
+        if (!doc) throw new Error(t('mapLibrary.serverDocMissing'))
         const parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(doc))
         const existing = readMapLibrary().find(
           (e) => e.libraryId === summary.mapId || e.mapDocument.mapId === summary.mapId,
@@ -239,8 +254,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         if (
           existing
           && !window.confirm(
-            `地圖庫裡已經有「${existing.displayName}」。\n`
-            + '從伺服器載入會覆蓋它，本機還沒發佈的修改會消失。要繼續嗎？',
+            t('mapLibrary.confirmOverwrite', { name: existing.displayName }),
           )
         ) {
           return
@@ -249,12 +263,16 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         persistEntries(upsertMapLibraryEntry(readMapLibrary(), entry))
         setServerOpen(false)
       } catch (e) {
-        alert(`從伺服器載入失敗：${e instanceof Error ? e.message : String(e)}`)
+        alert(
+          t('mapLibrary.loadFromServerFailed', {
+            error: e instanceof Error ? e.message : String(e),
+          }),
+        )
       } finally {
         setServerLoadingId(null)
       }
     },
-    [persistEntries],
+    [persistEntries, t],
   )
 
   const handleOpenServerList = useCallback(async () => {
@@ -279,9 +297,13 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       const json = JSON.parse(pasteText.replace(/^\uFEFF/, '')) as unknown
       importParsed(applyRefFieldZeroPolicyToParsed(parseMapFileJson(json)))
     } catch (e) {
-      alert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`)
+      alert(
+        t('mapLibrary.importFailed', {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      )
     }
-  }, [importParsed, pasteText])
+  }, [importParsed, pasteText, t])
 
   const handleSetActive = useCallback(
     async (entry: MapLibraryEntry) => {
@@ -291,7 +313,9 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         const result = await setActiveMapLibraryEntry(entry)
         if (!result.ok) {
           alert(
-            `設為當前使用地圖失敗：${result.error ?? '請確認後端已啟動'}`,
+            t('mapLibrary.setActiveFailed', {
+              error: result.error ?? t('mapLibrary.backendRequired'),
+            }),
           )
           return
         }
@@ -301,7 +325,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         setActivatingLibraryId(null)
       }
     },
-    [activeLibraryId, activeMapId],
+    [activeLibraryId, activeMapId, t],
   )
 
   return (
@@ -314,19 +338,18 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             )}
             <div>
               <h1 className="flex items-center gap-2 text-lg font-semibold text-zinc-100">
-                地圖清單
+                {t('mapLibrary.title')}
                 {offline && (
                   <span
-                    title="連不上伺服器，顯示的是這台瀏覽器的快取，可能不是最新的"
+                    title={t('mapLibrary.offlineTitle')}
                     className="rounded border border-amber-800 px-1.5 py-0.5 text-[11px] font-normal text-amber-300"
                   >
-                    離線
+                    {t('mapLibrary.offline')}
                   </span>
                 )}
               </h1>
               <p className="mt-1 text-sm text-zinc-400">
-                選擇要編輯的地圖，或建立空白地圖、複製、匯入／導出地圖描述檔。
-                「設為當前使用」後，儀表板模擬與後端 API 會讀取該圖。
+                {t('mapLibrary.subtitle')}
               </p>
             </div>
           </div>
@@ -337,7 +360,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-sm font-medium text-cyan-200 hover:bg-cyan-900/50"
             >
               <Plus className="size-4" aria-hidden />
-              新建空白地圖
+              {t('mapLibrary.newBlank')}
             </button>
             <input
               ref={fileInputRef}
@@ -356,7 +379,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
             >
               <FolderOpen className="size-4" aria-hidden />
-              匯入地圖描述檔
+              {t('mapLibrary.importFile')}
             </button>
             <button
               type="button"
@@ -364,7 +387,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
             >
               <FileText className="size-4" aria-hidden />
-              貼上地圖描述檔
+              {t('mapLibrary.pasteFile')}
             </button>
             <button
               type="button"
@@ -372,7 +395,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
             >
               <CloudDownload className="size-4" aria-hidden />
-              從伺服器載入
+              {t('mapLibrary.loadFromServer')}
             </button>
           </div>
         </div>
@@ -380,21 +403,22 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         {serverOpen && (
           <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
             <p className="text-xs text-zinc-400">
-              伺服器上已發佈的地圖。載回來會覆蓋地圖庫裡同一份地圖，
-              <span className="text-zinc-300">本機還沒發佈的修改會消失</span>。
+              {t('mapLibrary.serverHintBefore')}
+              <span className="text-zinc-300">{t('mapLibrary.serverHintEmphasis')}</span>
+              {t('mapLibrary.serverHintAfter')}
             </p>
 
             {serverError ? (
               <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 px-2 py-1.5 text-xs text-red-300">
-                讀不到清單：{serverError}
+                {t('mapLibrary.serverListFailed', { error: serverError })}
               </p>
             ) : serverMaps === null ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                讀取中…
+                {t('mapLibrary.serverLoading')}
               </p>
             ) : serverMaps.length === 0 ? (
-              <p className="mt-2 text-xs text-zinc-500">伺服器上還沒有任何已發佈的地圖。</p>
+              <p className="mt-2 text-xs text-zinc-500">{t('mapLibrary.serverEmpty')}</p>
             ) : (
               <ul className="mt-2 divide-y divide-zinc-800">
                 {serverMaps.map((m) => (
@@ -404,14 +428,16 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                         {m.displayName}
                         {m.mapId === serverActiveId ? (
                           <span className="ml-2 rounded border border-cyan-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
-                            使用中
+                            {t('mapLibrary.inUse')}
                           </span>
                         ) : null}
                       </p>
                       <p className="truncate text-[11px] text-zinc-500">
-                        {m.mapId} · {m.version ?? '無版本'}
+                        {m.mapId} · {m.version ?? t('mapLibrary.noVersion')}
                         {m.updatedAt ? ` · ${formatMapLibraryDate(m.updatedAt)}` : ''}
-                        {typeof m.routeCount === 'number' ? ` · ${m.routeCount} 條路線` : ''}
+                        {typeof m.routeCount === 'number'
+                          ? ` · ${t('mapLibrary.routeCount', { count: m.routeCount })}`
+                          : ''}
                       </p>
                     </div>
                     <button
@@ -425,7 +451,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                       ) : (
                         <CloudDownload className="size-3.5" aria-hidden />
                       )}
-                      載入
+                      {t('mapLibrary.load')}
                     </button>
                   </li>
                 ))}
@@ -437,7 +463,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         {pasteOpen && (
           <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
             <label htmlFor={pasteAreaId} className="text-xs text-zinc-400">
-              貼上地圖描述檔內容（schemaVersion 2）
+              {t('mapLibrary.pasteLabel')}
             </label>
             <textarea
               id={pasteAreaId}
@@ -456,14 +482,14 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 }}
                 className="rounded-md border border-zinc-600 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handlePasteImport}
                 className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1 text-sm text-cyan-100 hover:bg-cyan-900/50"
               >
-                匯入
+                {t('mapLibrary.import')}
               </button>
             </div>
           </div>
@@ -474,24 +500,24 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
             <Loader2 className="size-5 animate-spin" aria-hidden />
-            載入地圖清單…
+            {t('mapLibrary.loading')}
           </div>
         ) : error ? (
           <p className="text-sm text-red-400">{error}</p>
         ) : entries.length === 0 ? (
-          <p className="text-sm text-zinc-500">尚無地圖，請建立或匯入。</p>
+          <p className="text-sm text-zinc-500">{t('mapLibrary.empty')}</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-zinc-800">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">名稱</th>
-                  <th className="px-4 py-3 font-medium">狀態</th>
-                  <th className="px-4 py-3 font-medium">版本</th>
-                  <th className="px-4 py-3 font-medium">目標解析度</th>
-                  <th className="px-4 py-3 font-medium">建立日期</th>
-                  <th className="px-4 py-3 font-medium">修改日期</th>
-                  <th className="px-4 py-3 font-medium text-right">操作</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.name')}</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.status')}</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.version')}</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.resolution')}</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.createdAt')}</th>
+                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.updatedAt')}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t('mapLibrary.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
@@ -530,7 +556,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           </span>
                           {entry.builtinId && (
                             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                              內建
+                              {t('mapLibrary.builtin')}
                             </span>
                           )}
                         </div>
@@ -540,7 +566,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                       {isActive ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/50 bg-cyan-950/50 px-2 py-0.5 text-[10px] font-medium text-cyan-200">
                           <MapPin className="size-3 shrink-0" aria-hidden />
-                          使用中
+                          {t('mapLibrary.inUse')}
                         </span>
                       ) : (
                         <span className="text-[10px] text-zinc-600">—</span>
@@ -566,29 +592,29 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                             onClick={() => void handleSetActive(entry)}
                             disabled={isActivating}
                             className="inline-flex items-center gap-1 rounded-md border border-amber-600/50 bg-amber-950/40 px-2 py-1 text-xs text-amber-100 hover:bg-amber-900/50 disabled:opacity-50"
-                            title="設為當前使用地圖（同步至後端，供模擬器與 API 讀取）"
+                            title={t('mapLibrary.setActiveTitle')}
                           >
                             {isActivating ? (
                               <Loader2 className="size-3 animate-spin" aria-hidden />
                             ) : (
                               <MapPin className="size-3" aria-hidden />
                             )}
-                            設為當前使用
+                            {t('mapLibrary.setActive')}
                           </button>
                         ) : null}
                         <button
                           type="button"
                           onClick={() => onOpenMap(entry.libraryId)}
                           className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-900/50"
-                          title="開啟編輯"
+                          title={t('mapLibrary.openTitle')}
                         >
-                          開啟
+                          {t('mapLibrary.open')}
                         </button>
                         <button
                           type="button"
                           onClick={() => startRename(entry)}
                           className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title="重新命名"
+                          title={t('mapLibrary.renameTitle')}
                         >
                           <Pencil className="size-3.5" aria-hidden />
                         </button>
@@ -596,7 +622,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           type="button"
                           onClick={() => handleDuplicate(entry.libraryId)}
                           className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title="複製地圖"
+                          title={t('mapLibrary.duplicateTitle')}
                         >
                           <Copy className="size-3.5" aria-hidden />
                         </button>
@@ -604,7 +630,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           type="button"
                           onClick={() => handleExport(entry)}
                           className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title="導出地圖描述檔"
+                          title={t('mapLibrary.exportTitle')}
                         >
                           <Download className="size-3.5" aria-hidden />
                         </button>
@@ -612,7 +638,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           type="button"
                           onClick={() => handleDelete(entry)}
                           className="rounded-md p-1.5 text-zinc-400 hover:bg-red-950/60 hover:text-red-300"
-                          title="刪除"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="size-3.5" aria-hidden />
                         </button>

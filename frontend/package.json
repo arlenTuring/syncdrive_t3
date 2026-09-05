@@ -18,9 +18,11 @@
     "audit:demo-plane": "tsx scripts/audit-dashboard-template.ts"
   },
   "dependencies": {
+    "i18next": "^26.4.2",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.13",
     "react-rnd": "^10.5.3",
     "socket.io-client": "^4.8.3"
   },

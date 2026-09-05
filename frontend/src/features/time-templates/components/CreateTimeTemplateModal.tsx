@@ -1,9 +1,8 @@
 import { ArrowLeft, Check, FileText, Info, Loader2, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CREATE_TEMPLATE_STEPS,
-  TIME_TEMPLATE_PREVIEW_TITLE,
-  TIME_TEMPLATE_TITLE_PLACEHOLDER,
   buildEditorDraftFromStored,
   computeCapacityPphpd,
   emptyEditorDraft,
@@ -43,8 +42,8 @@ const AUTO_SAVE_DEBOUNCE_MS = 900;
 
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-function formatAutoSaveTime(date: Date): string {
-  return date.toLocaleTimeString('zh-TW', {
+function formatAutoSaveTime(date: Date, locale: string): string {
+  return date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -59,6 +58,7 @@ function AutoSaveDraftBadge({
   status: AutoSaveStatus;
   savedAt: Date | null;
 }) {
+  const { t, i18n } = useTranslation();
   if (status === 'idle' && !savedAt) return null;
 
   return (
@@ -66,15 +66,17 @@ function AutoSaveDraftBadge({
       {status === 'saving' ? (
         <>
           <Loader2 className="size-3 animate-spin text-zinc-500" />
-          草稿儲存中…
+          {t('timeTemplates.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
           <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
-          草稿已自動儲存 ({formatAutoSaveTime(savedAt)})
+          {t('timeTemplates.createWizard.draftSaved', {
+            time: formatAutoSaveTime(savedAt, i18n.language),
+          })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">自動儲存失敗</span>
+        <span className="text-red-400">{t('timeTemplates.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -97,6 +99,9 @@ function CreateStepSidebar({
   onDiscard: () => void;
   onStepClick: (step: CreateTemplateStep) => void;
 }) {
+  const { t } = useTranslation();
+  const stepLabel = (step: CreateTemplateStep) => t(`timeTemplates.createWizard.steps.${step}`);
+
   if (collapsed) {
     return (
       <aside className="flex w-14 shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
@@ -113,7 +118,7 @@ function CreateStepSidebar({
                 key={item.step}
                 type="button"
                 disabled={!unlocked}
-                title={item.label}
+                title={stepLabel(item.step)}
                 onClick={() => unlocked && onStepClick(item.step)}
                 className={`relative flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-medium transition ${
                   active
@@ -143,11 +148,11 @@ function CreateStepSidebar({
           className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
         >
           <ArrowLeft className="size-4" />
-          返回平台
+          {t('timeTemplates.createWizard.backToPlatform')}
         </button>
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
           <FileText className="size-4 text-[#2B7FFF]" />
-          建立時間模板
+          {t('timeTemplates.createWizard.title')}
         </div>
       </div>
 
@@ -200,7 +205,7 @@ function CreateStepSidebar({
                         active ? 'font-medium text-zinc-100' : 'text-zinc-400'
                       }`}
                     >
-                      {item.label}
+                      {stepLabel(item.step)}
                     </span>
                   </span>
                 </button>
@@ -217,7 +222,7 @@ function CreateStepSidebar({
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
         >
           <Trash2 className="size-4" />
-          放棄並清除本次草稿
+          {t('timeTemplates.createWizard.discardDraft')}
         </button>
       </div>
     </aside>
@@ -235,28 +240,29 @@ function StepBasicInfoCard({
   onNameChange: (name: string) => void;
   onVehicleCapacityChange: (value: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-[rgba(142,197,255,0.08)]">
       <div className="flex items-center gap-2 border-b border-[rgba(212,212,212,0.1)] px-4 py-2">
         <Info className="size-5 text-[#99A1AF]" strokeWidth={1.75} />
-        <h3 className="text-base font-medium text-[#F3F4F6]">基本資料</h3>
+        <h3 className="text-base font-medium text-[#F3F4F6]">{t('timeTemplates.createWizard.basicInfo')}</h3>
       </div>
       <div className="grid grid-cols-2 gap-4 px-4 py-3">
         <label className="block min-w-0">
           <span className="mb-1.5 flex items-center gap-1 text-sm text-[#D1D5DC]">
             <span className="text-red-500">*</span>
-            時間模板名稱
+            {t('timeTemplates.createWizard.templateName')}
           </span>
           <input
             type="text"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
-            placeholder={TIME_TEMPLATE_TITLE_PLACEHOLDER}
+            placeholder={t('timeTemplates.createWizard.namePlaceholder')}
             className={BASIC_INFO_FIELD_CLASS}
           />
         </label>
         <div className="block min-w-0">
-          <span className="mb-1.5 block text-sm text-[#D1D5DC]">車體載運量</span>
+          <span className="mb-1.5 block text-sm text-[#D1D5DC]">{t('timeTemplates.createWizard.vehicleCapacity')}</span>
           <VehicleCapacitySlider
             value={vehicleCapacity}
             onChange={onVehicleCapacityChange}
@@ -275,6 +281,7 @@ function StepOperatingSlots({
   draft: TimeTemplateEditorDraft;
   onChange: (next: TimeTemplateEditorDraft) => void;
 }) {
+  const { t } = useTranslation();
   const syncAttributes = (attributes: TimeSlotAttribute[]) => {
     const withCapacity = attributes.map((attr) => ({
       ...attr,
@@ -301,7 +308,7 @@ function StepOperatingSlots({
 
   return (
     <div className="flex w-full flex-col gap-2">
-      <h2 className="text-base font-medium text-zinc-100">設定時間模板名稱與時段設定</h2>
+      <h2 className="text-base font-medium text-zinc-100">{t('timeTemplates.createWizard.stepTitle1')}</h2>
       <StepBasicInfoCard
         name={draft.name}
         vehicleCapacity={draft.vehicleCapacity}
@@ -328,10 +335,10 @@ function StepOperatingSlots({
   );
 }
 
-function stepContentTitle(step: CreateTemplateStep): string {
-  if (step === 1) return '設定時間模板名稱與時段設定';
-  if (step === 2) return '設定各時段的任務排班';
-  return TIME_TEMPLATE_PREVIEW_TITLE;
+function stepContentTitle(step: CreateTemplateStep, t: (key: string) => string): string {
+  if (step === 1) return t('timeTemplates.createWizard.stepTitle1');
+  if (step === 2) return t('timeTemplates.createWizard.stepTitle2');
+  return t('timeTemplates.createWizard.stepTitle3');
 }
 
 export function CreateTimeTemplateModal({
@@ -339,6 +346,7 @@ export function CreateTimeTemplateModal({
   onSavedDraft,
   editTemplateId,
 }: CreateTimeTemplateModalProps) {
+  const { t } = useTranslation();
   const isEditing = Boolean(editTemplateId);
   const [step, setStep] = useState<CreateTemplateStep>(1);
   const [maxReachedStep, setMaxReachedStep] = useState<CreateTemplateStep>(1);
@@ -476,7 +484,7 @@ export function CreateTimeTemplateModal({
   }, [flushAutoSave, hydrated, loadError, loading, onClose]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm('確定要放棄並清除本次草稿嗎？');
+    const confirmed = window.confirm(t('timeTemplates.createWizard.confirmDiscard'));
     if (!confirmed) return;
     const id = savedTemplateIdRef.current;
     if (id) {
@@ -489,7 +497,7 @@ export function CreateTimeTemplateModal({
       }
     }
     onClose();
-  }, [onClose, onSavedDraft]);
+  }, [onClose, onSavedDraft, t]);
 
   const canGoNext = useMemo(() => {
     if (loading || loadError) return false;
@@ -575,7 +583,7 @@ export function CreateTimeTemplateModal({
             {loading ? (
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                 <Loader2 className="size-6 animate-spin" />
-                載入模板中…
+                {t('timeTemplates.createWizard.loadingTemplate')}
               </div>
             ) : loadError ? (
               <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
@@ -586,11 +594,11 @@ export function CreateTimeTemplateModal({
                 {!(step === 2 && scheduleFullscreen) && (
                   <div className="mb-3 shrink-0 pr-28">
                     <p className="text-xs text-zinc-500">
-                      提示：可以隨時點擊左側已解鎖的步驟直接修改
+                      {t('timeTemplates.createWizard.stepHint')}
                     </p>
                     {step !== 1 && (
                       <h2 className="mt-2 text-base font-medium text-zinc-100">
-                        {stepContentTitle(step)}
+                        {stepContentTitle(step, t)}
                         {step === 2 && draft.name.trim() && (
                           <span className="ml-2 font-normal text-zinc-500">
                             · {resolveTimeTemplateDraftName(draft.name)}
@@ -613,7 +621,7 @@ export function CreateTimeTemplateModal({
                       tasks={draft.tasks}
                       rowCount={draft.scheduleRowCount}
                       fullscreen={scheduleFullscreen}
-                      panelTitle={stepContentTitle(2)}
+                      panelTitle={stepContentTitle(2, t)}
                       onFullscreenChange={setScheduleFullscreen}
                       onRowCountChange={(scheduleRowCount) =>
                         updateDraft((d) => ({ ...d, scheduleRowCount }))
@@ -639,7 +647,7 @@ export function CreateTimeTemplateModal({
         {!(step === 2 && scheduleFullscreen) && (
         <footer className="flex shrink-0 flex-col gap-1 border-t border-zinc-800/80 px-8 py-4">
           {(saveError || autoSaveStatus === 'error') && (
-            <p className="text-xs text-red-400">{saveError ?? '自動儲存失敗'}</p>
+            <p className="text-xs text-red-400">{saveError ?? t('timeTemplates.createWizard.autoSaveFailed')}</p>
           )}
           <div className="flex items-center justify-end gap-4">
             <button
@@ -648,7 +656,7 @@ export function CreateTimeTemplateModal({
               disabled={step <= 1 || loading || Boolean(loadError)}
               className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              上一步
+              {t('timeTemplates.createWizard.previous')}
             </button>
             <button
               type="button"
@@ -660,7 +668,11 @@ export function CreateTimeTemplateModal({
                   : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
               }`}
             >
-              {saving ? '儲存中…' : step < 3 ? '下一步' : '確認儲存'}
+              {saving
+                ? t('common.saving')
+                : step < 3
+                  ? t('timeTemplates.createWizard.next')
+                  : t('timeTemplates.createWizard.confirmSave')}
             </button>
           </div>
         </footer>

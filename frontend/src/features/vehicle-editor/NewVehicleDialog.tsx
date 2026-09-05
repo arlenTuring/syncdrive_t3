@@ -1,13 +1,14 @@
 import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Bus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
-const PRESETS = [
-  { label: '圖台橫向 — 500×100', width: 500, height: 100 },
-  { label: '設計稿 — 100×150', width: 100, height: 150 },
-  { label: '小型 — 80×120', width: 80, height: 120 },
-  { label: '中型 — 120×180', width: 120, height: 180 },
-  { label: '大型 — 160×240', width: 160, height: 240 },
+const PRESET_KEYS = [
+  { key: 'presetLandscape' as const, width: 500, height: 100 },
+  { key: 'presetDesign' as const, width: 100, height: 150 },
+  { key: 'presetSmall' as const, width: 80, height: 120 },
+  { key: 'presetMedium' as const, width: 120, height: 180 },
+  { key: 'presetLarge' as const, width: 160, height: 240 },
 ];
 
 export function NewVehicleDialog({
@@ -17,7 +18,8 @@ export function NewVehicleDialog({
   onConfirm: (name: string, width: number, height: number) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState('新載具');
+  const { t } = useTranslation();
+  const [name, setName] = useState(() => t('vehicleEditor.newVehicle.nameDefault'));
   const [width, setWidth] = useState(100);
   const [height, setHeight] = useState(150);
 
@@ -27,15 +29,20 @@ export function NewVehicleDialog({
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bus className="text-amber-400" size={20} />
-            <h2 className="text-base font-semibold text-zinc-100">新增載具</h2>
+            <h2 className="text-base font-semibold text-zinc-100">{t('vehicleEditor.newVehicle.title')}</h2>
           </div>
-          <button type="button" onClick={onCancel} className="text-zinc-500 transition-colors hover:text-zinc-200">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-zinc-500 transition-colors hover:text-zinc-200"
+            aria-label={t('common.close')}
+          >
             <X size={18} />
           </button>
         </div>
 
         <div className="mb-4">
-          <label className="mb-1.5 block text-xs font-medium text-zinc-400">載具名稱</label>
+          <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('vehicleEditor.newVehicle.name')}</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -44,11 +51,11 @@ export function NewVehicleDialog({
         </div>
 
         <div className="mb-4">
-          <label className="mb-1.5 block text-xs font-medium text-zinc-400">畫布尺寸預設</label>
+          <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('vehicleEditor.newVehicle.presets')}</label>
           <div className="grid grid-cols-2 gap-2">
-            {PRESETS.map((p) => (
+            {PRESET_KEYS.map((p) => (
               <button
-                key={p.label}
+                key={p.key}
                 type="button"
                 onClick={() => {
                   setWidth(p.width);
@@ -60,14 +67,14 @@ export function NewVehicleDialog({
                     : 'border-zinc-600 bg-zinc-800 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
                 }`}
               >
-                {p.label}
+                {t(`vehicleEditor.newVehicle.${p.key}`)}
               </button>
             ))}
           </div>
         </div>
 
         <div className="mb-4">
-          <label className="mb-1.5 block text-xs font-medium text-zinc-400">自訂像素尺寸</label>
+          <label className="mb-1.5 block text-xs font-medium text-zinc-400">{t('vehicleEditor.newVehicle.customSize')}</label>
           <div className="flex items-center gap-2">
             <NumberInput
               min={40}
@@ -93,15 +100,15 @@ export function NewVehicleDialog({
             onClick={onCancel}
             className="flex-1 rounded-lg border border-zinc-600 py-2 text-sm text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
-            onClick={() => onConfirm(name || '未命名載具', width, height)}
+            onClick={() => onConfirm(name || t('vehicleEditor.newVehicle.unnamed'), width, height)}
             disabled={!name.trim() || width < 40 || height < 40}
             className="flex-1 rounded-lg bg-amber-600 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            建立載具
+            {t('vehicleEditor.newVehicle.create')}
           </button>
         </div>
       </div>

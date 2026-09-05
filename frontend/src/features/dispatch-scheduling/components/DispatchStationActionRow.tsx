@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ShiftMenuSelect, type ShiftMenuGroup } from '../../shift-list/components/ShiftMenuSelect';
 import {
   SHIFT_ACTION_BEHAVIOR_OPTIONS,
@@ -37,6 +38,7 @@ export function DispatchStationActionRow({
   onChange,
   onRemove,
 }: DispatchStationActionRowProps) {
+  const { t } = useTranslation();
   const category = resolveShiftActionCategory(action.categoryId);
   const visibleStages = resolveVisibleActionStages(action);
   const showResource = shouldShowResourceStage(action);
@@ -46,11 +48,11 @@ export function DispatchStationActionRow({
     <div className="flex items-start gap-1">
       <div className="flex min-w-0 flex-1 flex-wrap items-end gap-1.5">
         <ShiftMenuSelect
-          label="行動類別"
+          label={t('dispatchScheduling.actionRow.category')}
           hideLabel
           size="sm"
           value={action.categoryId ?? ''}
-          placeholder="請選擇行動"
+          placeholder={t('dispatchScheduling.actionRow.selectAction')}
           options={categoryOptions}
           onChange={(nextValue) => {
             const categoryId = (nextValue || null) as ShiftActionCategoryId | null;
@@ -73,7 +75,9 @@ export function DispatchStationActionRow({
 
         {visibleStages.includes('offset') && category ? (
           <div className="shrink-0">
-            <span className={FIELD_LABEL}>{category.offsetLabel ?? '偏移'}</span>
+            <span className={FIELD_LABEL}>
+              {category.offsetLabel ?? t('dispatchScheduling.actionRow.offset')}
+            </span>
             <div className="flex h-8 items-center gap-1">
               <input
                 type="text"
@@ -81,7 +85,7 @@ export function DispatchStationActionRow({
                 value={action.offsetValue == null ? '' : String(action.offsetValue)}
                 placeholder="0"
                 className={OFFSET_INPUT}
-                aria-label="偏移數值"
+                aria-label={t('dispatchScheduling.actionRow.offsetValue')}
                 onChange={(event) => {
                   const digits = event.target.value.replace(/\D/g, '');
                   onChange({
@@ -92,7 +96,7 @@ export function DispatchStationActionRow({
                 }}
               />
               <ShiftMenuSelect
-                label="偏移單位"
+                label={t('dispatchScheduling.actionRow.offsetUnit')}
                 hideLabel
                 size="sm"
                 value={offsetUnit ?? ''}
@@ -117,11 +121,11 @@ export function DispatchStationActionRow({
 
         {visibleStages.includes('behavior') && category ? (
           <ShiftMenuSelect
-            label="行為"
+            label={t('dispatchScheduling.actionRow.behavior')}
             hideLabel
             size="sm"
             value={action.behavior ?? ''}
-            placeholder="行為"
+            placeholder={t('dispatchScheduling.actionRow.behavior')}
             widthClass="w-[108px] shrink-0"
             panelWidth={128}
             options={SHIFT_ACTION_BEHAVIOR_OPTIONS.filter((behavior) =>
@@ -142,11 +146,11 @@ export function DispatchStationActionRow({
 
         {visibleStages.includes('resource') && showResource && isMediaBehavior(action.behavior) ? (
           <ShiftMenuSelect
-            label="媒體／媒體群組"
+            label={t('dispatchScheduling.actionRow.media')}
             hideLabel
             size="sm"
             value={action.resourceId ?? ''}
-            placeholder="語音／媒體"
+            placeholder={t('dispatchScheduling.actionRow.mediaPlaceholder')}
             groups={mediaGroups}
             onChange={(nextValue) => {
               onChange({
@@ -163,7 +167,7 @@ export function DispatchStationActionRow({
         type="button"
         onClick={onRemove}
         className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        aria-label="刪除行動"
+        aria-label={t('dispatchScheduling.actionRow.deleteAction')}
       >
         <X className="size-3.5" />
       </button>

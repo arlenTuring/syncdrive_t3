@@ -1,5 +1,6 @@
 import { AlertCircle, ArrowLeft, Check, ClipboardList, Loader2, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   checkMaintenanceTaskNameUnique,
   createMaintenanceTaskDraft,
@@ -44,8 +45,8 @@ const AUTO_SAVE_DEBOUNCE_MS = 900;
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type NameUniqueState = 'idle' | 'checking' | 'unique' | 'duplicate' | 'error';
 
-function formatAutoSaveTime(date: Date): string {
-  return date.toLocaleTimeString('zh-TW', {
+function formatAutoSaveTime(date: Date, locale: string): string {
+  return date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -60,6 +61,7 @@ function AutoSaveDraftBadge({
   status: AutoSaveStatus;
   savedAt: Date | null;
 }) {
+  const { t, i18n } = useTranslation();
   if (status === 'idle' && !savedAt) return null;
 
   return (
@@ -67,15 +69,17 @@ function AutoSaveDraftBadge({
       {status === 'saving' ? (
         <>
           <Loader2 className="size-3 animate-spin text-zinc-500" />
-          草稿儲存中…
+          {t('maintenanceTasks.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
           <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
-          草稿已自動儲存 ({formatAutoSaveTime(savedAt)})
+          {t('maintenanceTasks.createWizard.draftSaved', {
+            time: formatAutoSaveTime(savedAt, i18n.language),
+          })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">自動儲存失敗</span>
+        <span className="text-red-400">{t('maintenanceTasks.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -98,6 +102,7 @@ function CreateStepSidebar({
   onDiscard: () => void;
   onStepClick: (step: CreateMaintenanceTaskStep) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
       <div className="border-b border-zinc-800/80 px-4 py-4">
@@ -107,11 +112,11 @@ function CreateStepSidebar({
           className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
         >
           <ArrowLeft className="size-4" />
-          返回平台
+          {t('maintenanceTasks.createWizard.backToPlatform')}
         </button>
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
           <ClipboardList className="size-4 text-violet-400" />
-          建立整備任務
+          {t('maintenanceTasks.createWizard.title')}
         </div>
       </div>
 
@@ -164,7 +169,7 @@ function CreateStepSidebar({
                         active ? 'font-medium text-zinc-100' : 'text-zinc-400'
                       }`}
                     >
-                      {item.label}
+                      {t(`maintenanceTasks.createWizard.steps.${item.step}`)}
                     </span>
                   </span>
                 </button>
@@ -181,7 +186,7 @@ function CreateStepSidebar({
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
         >
           <Trash2 className="size-4" />
-          放棄並清除本次草稿
+          {t('maintenanceTasks.createWizard.discardDraft')}
         </button>
       </div>
     </aside>
@@ -197,24 +202,25 @@ function StepBasicInfo({
   nameUniqueState: NameUniqueState;
   onChange: (next: MaintenanceTaskCreateDraft['basic']) => void;
 }) {
+  const { t } = useTranslation();
   const nameHasValue = draft.name.trim().length > 0;
   const nameInvalid = nameHasValue && (nameUniqueState === 'duplicate' || nameUniqueState === 'error');
 
   return (
     <div className="w-full">
-      <h2 className="mb-6 text-base font-medium text-zinc-100">設定整備任務名稱</h2>
+      <h2 className="mb-6 text-base font-medium text-zinc-100">{t('maintenanceTasks.createWizard.setNameTitle')}</h2>
       <div className="space-y-5">
         <label className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            班表名稱
+            {t('maintenanceTasks.createWizard.scheduleName')}
           </span>
           <div className="relative">
             <input
               type="text"
               value={draft.name}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
-              placeholder="請輸入"
+              placeholder={t('maintenanceTasks.createWizard.placeholder')}
               className={`${INPUT_CLASS} ${nameInvalid ? 'border-red-500/80 pr-9 focus:border-red-500 focus:ring-red-500/30' : ''}`}
             />
             {nameInvalid && (
@@ -225,32 +231,32 @@ function StepBasicInfo({
             )}
           </div>
           {nameUniqueState === 'duplicate' && (
-            <p className="mt-1 text-xs text-red-500">此班表名稱已存在，請重新輸入</p>
+            <p className="mt-1 text-xs text-red-500">{t('maintenanceTasks.createWizard.nameDuplicate')}</p>
           )}
           {nameUniqueState === 'error' && (
-            <p className="mt-1 text-xs text-red-500">名稱檢查失敗，請稍後再試</p>
+            <p className="mt-1 text-xs text-red-500">{t('maintenanceTasks.createWizard.nameCheckFailed')}</p>
           )}
         </label>
         <label className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            版本編號
+            {t('maintenanceTasks.createWizard.version')}
           </span>
           <input
             type="text"
             value={draft.version}
             onChange={(e) => onChange({ ...draft, version: e.target.value })}
-            placeholder="請輸入"
+            placeholder={t('maintenanceTasks.createWizard.placeholder')}
             className={INPUT_CLASS}
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm text-zinc-300">備註說明</span>
+          <span className="mb-2 block text-sm text-zinc-300">{t('maintenanceTasks.createWizard.remarks')}</span>
           <input
             type="text"
             value={draft.remarks}
             onChange={(e) => onChange({ ...draft, remarks: e.target.value })}
-            placeholder="請輸入"
+            placeholder={t('maintenanceTasks.createWizard.placeholder')}
             className={INPUT_CLASS}
           />
         </label>
@@ -264,6 +270,7 @@ export function CreateMaintenanceTaskPage({
   onSavedDraft,
   editTaskId,
 }: CreateMaintenanceTaskPageProps) {
+  const { t } = useTranslation();
   const isEditing = Boolean(editTaskId);
   const [draft, setDraft] = useState<MaintenanceTaskCreateDraft>(() => emptyMaintenanceTaskCreateDraft());
   const [savedTaskId, setSavedTaskId] = useState<string | undefined>(editTaskId);
@@ -463,7 +470,7 @@ export function CreateMaintenanceTaskPage({
   }, [flushAutoSave, hydrated, loadError, loading, onBack]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm('確定要放棄並清除本次草稿嗎？');
+    const confirmed = window.confirm(t('maintenanceTasks.createWizard.confirmDiscard'));
     if (!confirmed) return;
     const id = savedTaskIdRef.current;
     if (id) {
@@ -476,7 +483,7 @@ export function CreateMaintenanceTaskPage({
       }
     }
     onBack();
-  }, [onBack, onSavedDraft]);
+  }, [onBack, onSavedDraft, t]);
 
   const handlePrevious = () => {
     if (draft.currentStep <= 1) return;
@@ -531,7 +538,7 @@ export function CreateMaintenanceTaskPage({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="border-b border-zinc-800/60 px-8 py-3 text-center text-xs text-zinc-500">
-          提示：可以隨時點擊左側已解鎖的步驟直接修改
+          {t('maintenanceTasks.createWizard.stepHint')}
         </div>
 
         <div ref={previewScrollRef} className="min-h-0 flex-1 overflow-auto p-8">
@@ -540,7 +547,7 @@ export function CreateMaintenanceTaskPage({
             {loading ? (
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
                 <Loader2 className="size-6 animate-spin" />
-                載入草稿中…
+                {t('maintenanceTasks.createWizard.loadingDraft')}
               </div>
             ) : loadError ? (
               <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
@@ -609,7 +616,7 @@ export function CreateMaintenanceTaskPage({
               disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}
               className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              上一步
+              {t('maintenanceTasks.createWizard.previous')}
             </button>
             <button
               type="button"
@@ -624,12 +631,12 @@ export function CreateMaintenanceTaskPage({
               {completing ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="size-4 animate-spin" />
-                  儲存中…
+                  {t('common.saving')}
                 </span>
               ) : isLastStep ? (
-                '完成'
+                t('maintenanceTasks.createWizard.finish')
               ) : (
-                '下一步'
+                t('maintenanceTasks.createWizard.next')
               )}
             </button>
           </div>

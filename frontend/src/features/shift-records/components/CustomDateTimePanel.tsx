@@ -1,11 +1,8 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
-const MONTH_NAMES = [
-  '一月', '二月', '三月', '四月', '五月', '六月',
-  '七月', '八月', '九月', '十月', '十一月', '十二月',
-] as const;
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
 type CalendarCell = {
   year: number;
@@ -101,6 +98,7 @@ export type CustomDateTimePanelProps = {
 };
 
 export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelProps) {
+  const { t } = useTranslation();
   const today = new Date();
   const initial = value ?? today;
 
@@ -147,7 +145,7 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
             type="button"
             onClick={() => shiftYear(-1)}
             className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="上一年"
+            aria-label={t('shiftRecords.datePicker.prevYear')}
           >
             <ChevronsLeft className="size-4" />
           </button>
@@ -155,20 +153,20 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
             type="button"
             onClick={() => shiftMonth(-1)}
             className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="上個月"
+            aria-label={t('shiftRecords.datePicker.prevMonth')}
           >
             <ChevronLeft className="size-4" />
           </button>
         </div>
         <span className="text-sm font-medium text-zinc-100">
-          {MONTH_NAMES[viewMonth]} {viewYear}
+          {t(`shiftRecords.datePicker.months.m${viewMonth}`)} {viewYear}
         </span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => shiftMonth(1)}
             className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="下個月"
+            aria-label={t('shiftRecords.datePicker.nextMonth')}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -176,7 +174,7 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
             type="button"
             onClick={() => shiftYear(1)}
             className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="下一年"
+            aria-label={t('shiftRecords.datePicker.nextYear')}
           >
             <ChevronsRight className="size-4" />
           </button>
@@ -186,9 +184,9 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
       <div className="flex">
         <div className="min-w-0 flex-1 p-3 pr-2">
           <div className="mb-2 grid grid-cols-7 text-center text-xs text-zinc-500">
-            {WEEKDAYS.map((w) => (
+            {WEEKDAY_KEYS.map((w) => (
               <div key={w} className="py-1">
-                {w}
+                {t(`shiftRecords.datePicker.weekdays.${w}`)}
               </div>
             ))}
           </div>
@@ -230,7 +228,7 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
           onClick={handleConfirm}
           className="rounded-lg bg-sky-600 px-5 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
         >
-          確定
+          {t('shiftRecords.datePicker.confirm')}
         </button>
       </div>
     </div>

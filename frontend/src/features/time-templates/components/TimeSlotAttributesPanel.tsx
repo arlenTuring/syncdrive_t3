@@ -1,4 +1,5 @@
 import { Tag } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   ATTRIBUTES_PANEL_HEADER_PADDING_TOP_PX,
   ATTRIBUTES_PANEL_PADDING_TOP_PX,
@@ -30,6 +31,7 @@ export function TimeSlotAttributesPanel({
   onChange,
   showVehicleCapacity = true,
 }: TimeSlotAttributesPanelProps) {
+  const { t } = useTranslation();
   const hasDraft = attributes.some((attr) => attr.isDraft);
 
   const addAttribute = () => {
@@ -74,7 +76,7 @@ export function TimeSlotAttributesPanel({
         <div className="flex h-9 items-center">
           <TimeTemplatePanelTitle
             icon={<Tag className="size-5" strokeWidth={1.75} />}
-            title="時段屬性"
+            title={t('timeTemplates.attributes.title')}
           />
         </div>
 

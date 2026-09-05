@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { DispatchListItem } from '../types';
 import { isDispatchRevocable } from '../types';
 import {
@@ -38,8 +39,12 @@ export function DispatchReviewDialog({
   onReject,
   onWithdraw,
 }: DispatchReviewDialogProps) {
+  const { t } = useTranslation();
   const [phrase, setPhrase] = useState('');
-  const canApprove = mode === 'approve' && phrase.trim() === APPROVE_PHRASE;
+  const approvePhrase = t('dispatchScheduling.confirm.approvePhrase');
+  const canApprove =
+    mode === 'approve'
+    && (phrase.trim() === approvePhrase || phrase.trim() === APPROVE_PHRASE);
   const canWithdraw = isDispatchRevocable(row.status);
   const isApprove = mode === 'approve';
   const showFooter = isApprove || canWithdraw;
@@ -64,7 +69,11 @@ export function DispatchReviewDialog({
       >
         <CreateDispatchConfirmHeader
           onClose={onClose}
-          title={isApprove ? '派遣任務雙重確認' : '派遣任務'}
+          title={
+            isApprove
+              ? t('dispatchScheduling.confirm.dualVerifyTitle')
+              : t('dispatchScheduling.confirm.taskTitle')
+          }
         />
         <CreateDispatchConfirmStep
           execTime={execTimeFromRow(row)}
@@ -76,8 +85,8 @@ export function DispatchReviewDialog({
           confirmText={phrase}
           onConfirmTextChange={setPhrase}
           showConfirmField={isApprove}
-          confirmLabel="輸入核准並建立"
-          confirmPlaceholder="核准"
+          confirmLabel={t('dispatchScheduling.confirm.approveAndCreate')}
+          confirmPlaceholder={t('dispatchScheduling.confirm.approvePlaceholder')}
           variant={isApprove ? 'approval' : 'pending'}
           dispatchStatus={row.status}
         />
@@ -94,7 +103,7 @@ export function DispatchReviewDialog({
                   onClick={() => onReject?.(row)}
                   className="rounded-lg border border-red-500 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10"
                 >
-                  駁回
+                  {t('dispatchScheduling.confirm.reject')}
                 </button>
                 <button
                   type="button"
@@ -102,7 +111,7 @@ export function DispatchReviewDialog({
                   onClick={() => onApprove?.(row)}
                   className="rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
                 >
-                  核准
+                  {t('dispatchScheduling.confirm.approve')}
                 </button>
               </>
             ) : (
@@ -111,7 +120,7 @@ export function DispatchReviewDialog({
                 onClick={() => onWithdraw?.(row)}
                 className="rounded-lg border border-red-500 bg-transparent px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10"
               >
-                撤銷申請
+                {t('dispatchScheduling.confirm.withdraw')}
               </button>
             )}
           </footer>

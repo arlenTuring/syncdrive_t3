@@ -13,6 +13,8 @@ import {
   Component,
   FlaskConical,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
 type MapEditorToolbarProps = {
   mapEditorMode: 'view' | 'edit'
   onEnterEdit: () => void
@@ -24,40 +26,40 @@ type MapEditorToolbarProps = {
   onMapDisplayNameChange: (value: string) => void
   onMapVersionChange: (value: string) => void
   onCenterMap: () => void
-  /** 僅編輯模式顯示：復原／重做 */
+  /** Edit mode only: undo / redo */
   canUndo: boolean
   canRedo: boolean
   onUndo: () => void
   onRedo: () => void
-  /** 編輯模式：Area 公尺刻度顯示 */
+  /** Edit mode: Area meter rulers */
   showRulers?: boolean
   onToggleRulers?: () => void
   rulersToggleHint?: string
-  /** 編輯模式：Area 中央總覽標示（名稱 / 場域範圍 / 像素尺寸） */
+  /** Edit mode: Area center overview labels */
   showAreaCenterLabels?: boolean
   onToggleAreaCenterLabels?: () => void
   areaCenterLabelsToggleHint?: string
-  /** 底部圖台縮放列（1 近～7 遠） */
+  /** Bottom zoom bar (1 near – 7 far) */
   showZoomLevelBar?: boolean
   onToggleZoomLevelBar?: () => void
   zoomLevelBarToggleHint?: string
-  /** 底部測試器（斷路掃描 + MQTT 模擬） */
+  /** Bottom tester (gap scan + MQTT sim) */
   showTestDock?: boolean
   onToggleTestDock?: () => void
   testDockToggleHint?: string
-  /** 編輯模式：裁減模式 */
+  /** Edit mode: crop mode */
   mapCanvasResizeActive?: boolean
   onToggleMapCanvasResize?: () => void
   mapCanvasResizeToggleHint?: string
   onApplyMapCrop?: () => void
   onCancelMapCrop?: () => void
-  /** 編輯模式：選取元件時顯示圓形工具列（旋轉、格式複製、刪除等） */
+  /** Edit mode: circular toolbars on selection */
   showFacilityToolbars?: boolean
   onToggleFacilityToolbars?: () => void
   facilityToolbarsToggleHint?: string
 }
 
-/** 地圖編輯器工具列 */
+/** Map editor toolbar */
 export function MapEditorToolbar({
   mapEditorMode,
   onEnterEdit,
@@ -94,21 +96,23 @@ export function MapEditorToolbar({
   onToggleFacilityToolbars,
   facilityToolbarsToggleHint,
 }: MapEditorToolbarProps) {
+  const { t } = useTranslation()
+
   return (
     <div
       className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-zinc-700/80 bg-zinc-950 px-4 py-2 sm:flex-nowrap"
       role="toolbar"
-      aria-label="地圖編輯"
+      aria-label={t('mapEditor.toolbar.aria')}
     >
       <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={onBackToLibrary}
           className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-900/90 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 sm:text-sm"
-          title="返回地圖清單"
+          title={t('mapEditor.toolbar.backToList')}
         >
           <ArrowLeft className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-          <span className="hidden sm:inline">清單</span>
+          <span className="hidden sm:inline">{t('mapEditor.toolbar.list')}</span>
         </button>
 
         <span
@@ -118,29 +122,31 @@ export function MapEditorToolbar({
               : 'bg-cyan-950/80 text-cyan-300 ring-1 ring-cyan-700/60'
           }`}
         >
-          {mapEditorMode === 'view' ? '檢視' : '編輯'}
+          {mapEditorMode === 'view'
+            ? t('mapEditor.toolbar.view')
+            : t('mapEditor.toolbar.edit')}
         </span>
 
         <div className="flex min-w-0 items-center gap-2">
           <label className="sr-only" htmlFor="map-editor-display-name">
-            地圖名稱
+            {t('mapEditor.toolbar.mapName')}
           </label>
           <input
             id="map-editor-display-name"
             value={mapDisplayName}
             onChange={(e) => onMapDisplayNameChange(e.target.value)}
             className="max-w-[min(100%,14rem)] shrink rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-100 outline-none focus:border-cyan-500 sm:max-w-[18rem] sm:text-sm"
-            title="地圖名稱"
+            title={t('mapEditor.toolbar.mapName')}
           />
           <label className="sr-only" htmlFor="map-editor-version">
-            版本號
+            {t('mapEditor.toolbar.version')}
           </label>
           <input
             id="map-editor-version"
             value={mapVersion}
             onChange={(e) => onMapVersionChange(e.target.value)}
             className="w-[5.5rem] shrink-0 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-300 outline-none focus:border-cyan-500 sm:w-24 sm:text-sm"
-            title="版本號"
+            title={t('mapEditor.toolbar.version')}
           />
         </div>
 
@@ -148,27 +154,27 @@ export function MapEditorToolbar({
           <div
             className="flex shrink-0 items-center gap-0.5 rounded-lg border border-zinc-600 bg-zinc-900/90 p-0.5 shadow-sm"
             role="toolbar"
-            aria-label="復原與重做"
+            aria-label={t('mapEditor.toolbar.undoRedoAria')}
           >
             <button
               type="button"
               disabled={!canUndo}
               onClick={onUndo}
               className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-100 transition enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 sm:px-2.5 sm:text-xs"
-              title="復原 (⌘/Ctrl+Z)"
+              title={t('mapEditor.toolbar.undoTitle')}
             >
               <Undo2 className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-              <span className="hidden sm:inline">復原</span>
+              <span className="hidden sm:inline">{t('mapEditor.toolbar.undo')}</span>
             </button>
             <button
               type="button"
               disabled={!canRedo}
               onClick={onRedo}
               className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-100 transition enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 sm:px-2.5 sm:text-xs"
-              title="重做 (⌘/Ctrl+Shift+Z 或 Ctrl+Y)"
+              title={t('mapEditor.toolbar.redoTitle')}
             >
               <Redo2 className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-              <span className="hidden sm:inline">重做</span>
+              <span className="hidden sm:inline">{t('mapEditor.toolbar.redo')}</span>
             </button>
           </div>
         )}
@@ -178,10 +184,10 @@ export function MapEditorToolbar({
             type="button"
             onClick={onOpenRevisionHistory}
             className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-900/90 px-2 py-1 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-2.5 sm:text-xs"
-            title="編修紀錄：還原先前自動／正式儲存的圖台快照"
+            title={t('mapEditor.toolbar.revisionHistoryTitle')}
           >
             <History className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-            <span className="hidden sm:inline">編修紀錄</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.revisionHistory')}</span>
           </button>
         )}
 
@@ -195,17 +201,17 @@ export function MapEditorToolbar({
                 ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
                 : 'border-zinc-600 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800'
             }`}
-            title={rulersToggleHint ?? '顯示／隱藏 Area 公尺刻度'}
+            title={rulersToggleHint ?? t('mapEditor.toolbar.rulersTitle')}
           >
             <Ruler className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-            <span className="hidden sm:inline">刻度</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.rulers')}</span>
           </button>
         )}
         {mapEditorMode === 'edit' && onToggleMapCanvasResize && (
           <div
             className="flex shrink-0 items-center gap-0.5 rounded-lg border border-zinc-600 bg-zinc-900/90 p-0.5 shadow-sm"
             role="group"
-            aria-label="裁減畫布"
+            aria-label={t('mapEditor.toolbar.cropGroupAria')}
           >
             <button
               type="button"
@@ -216,22 +222,19 @@ export function MapEditorToolbar({
                   ? 'bg-amber-950/60 text-amber-200'
                   : 'text-zinc-300 hover:bg-zinc-800'
               }`}
-              title={
-                mapCanvasResizeToggleHint ??
-                '進入／結束裁減模式（拖曳琥珀色外框）'
-              }
+              title={mapCanvasResizeToggleHint ?? t('mapEditor.toolbar.cropTitle')}
             >
               <Frame className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-              <span className="hidden sm:inline">裁減</span>
+              <span className="hidden sm:inline">{t('mapEditor.toolbar.crop')}</span>
             </button>
             {mapCanvasResizeActive && onApplyMapCrop ? (
               <button
                 type="button"
                 onClick={onApplyMapCrop}
                 className="inline-flex shrink-0 items-center rounded-md border border-amber-600/70 bg-amber-950/70 px-2.5 py-1 text-[11px] font-medium text-amber-100 transition hover:bg-amber-900/60 focus:outline-none focus:ring-2 focus:ring-amber-500/60 sm:text-xs"
-                title="套用裁切並寫入地圖"
+                title={t('mapEditor.toolbar.applyCropTitle')}
               >
-                套用裁切
+                {t('mapEditor.toolbar.applyCrop')}
               </button>
             ) : null}
             {mapCanvasResizeActive && onCancelMapCrop ? (
@@ -239,9 +242,9 @@ export function MapEditorToolbar({
                 type="button"
                 onClick={onCancelMapCrop}
                 className="inline-flex shrink-0 items-center rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200 sm:px-2.5 sm:text-xs"
-                title="取消裁減（不變更畫布）"
+                title={t('mapEditor.toolbar.cancelCropTitle')}
               >
-                取消
+                {t('mapEditor.toolbar.cancel')}
               </button>
             ) : null}
           </div>
@@ -257,12 +260,11 @@ export function MapEditorToolbar({
                 : 'border-zinc-600 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800'
             }`}
             title={
-              areaCenterLabelsToggleHint ??
-              '顯示／隱藏所有 Area 中央總覽標示（名稱 / 場域範圍 / 像素尺寸）'
+              areaCenterLabelsToggleHint ?? t('mapEditor.toolbar.areaLabelsTitle')
             }
           >
             <Highlighter className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-            <span className="hidden sm:inline">區域標示</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.areaLabels')}</span>
           </button>
         )}
         {mapEditorMode === 'edit' && onToggleFacilityToolbars && (
@@ -276,12 +278,11 @@ export function MapEditorToolbar({
                 : 'border-zinc-600 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800'
             }`}
             title={
-              facilityToolbarsToggleHint ??
-              '顯示／隱藏所有選取元件的圓形工具列（旋轉、格式複製、刪除等）'
+              facilityToolbarsToggleHint ?? t('mapEditor.toolbar.facilityBarsTitle')
             }
           >
             <Component className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-            <span className="hidden sm:inline">元件列</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.facilityBars')}</span>
           </button>
         )}
       </div>
@@ -297,11 +298,13 @@ export function MapEditorToolbar({
                 ? 'border-violet-600/70 bg-violet-950/60 text-violet-200'
                 : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
             }`}
-            title={testDockToggleHint ?? '顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）'}
+            title={testDockToggleHint ?? t('mapEditor.toolbar.testerTitle')}
           >
             <FlaskConical className="size-4 shrink-0" aria-hidden />
             <span className="hidden sm:inline">
-              {showTestDock ? '隱藏測試器' : '測試器'}
+              {showTestDock
+                ? t('mapEditor.toolbar.hideTester')
+                : t('mapEditor.toolbar.tester')}
             </span>
           </button>
         )}
@@ -316,10 +319,14 @@ export function MapEditorToolbar({
                 ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
                 : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
             }`}
-            title={zoomLevelBarToggleHint ?? '顯示／隱藏底部圖台縮放列'}
+            title={zoomLevelBarToggleHint ?? t('mapEditor.toolbar.zoomBarTitle')}
           >
             <ZoomIn className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">{showZoomLevelBar ? '隱藏縮放' : '縮放列'}</span>
+            <span className="hidden sm:inline">
+              {showZoomLevelBar
+                ? t('mapEditor.toolbar.hideZoom')
+                : t('mapEditor.toolbar.zoomBar')}
+            </span>
           </button>
         )}
 
@@ -328,20 +335,20 @@ export function MapEditorToolbar({
             type="button"
             onClick={onEnterEdit}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-2 py-1.5 text-xs font-medium text-cyan-200 shadow-sm transition hover:bg-cyan-900/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm"
-            title="進入編輯模式後可拖曳、新增設施與修改屬性"
+            title={t('mapEditor.toolbar.enterEditTitle')}
           >
             <Pencil className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">編輯</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.enterEdit')}</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={onLeaveEdit}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-500 bg-zinc-800 px-2 py-1.5 text-xs font-medium text-zinc-100 shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm"
-            title="離開編輯模式（若有變更將詢問是否儲存）"
+            title={t('mapEditor.toolbar.leaveEditTitle')}
           >
             <LogOut className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">離開編輯</span>
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.leaveEdit')}</span>
           </button>
         )}
 
@@ -349,10 +356,10 @@ export function MapEditorToolbar({
           type="button"
           onClick={onCenterMap}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-2 py-1.5 text-xs font-medium text-zinc-100 shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm"
-          title="捲至目前地圖檔的 mapCenterMeters（無則對準設施群；無設施則對準原點 0,0）"
+          title={t('mapEditor.toolbar.centerTitle')}
         >
           <Crosshair className="size-4 shrink-0" aria-hidden />
-          <span className="hidden sm:inline">置中</span>
+          <span className="hidden sm:inline">{t('mapEditor.toolbar.center')}</span>
         </button>
       </div>
     </div>

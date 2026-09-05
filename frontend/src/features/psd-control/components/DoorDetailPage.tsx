@@ -1,11 +1,10 @@
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { VEHICLE_DOORS, type ControlMode } from '../constants';
 import { fetchVehicleStopDwellSeconds } from '../fetchVehicleStopDwell';
 import type { PsdDoorTile } from '../loadPsdSources';
 import {
-  bodyStatusLabel,
-  connectionLabel,
   leafByUiId,
   visualFromDoorMqtt,
   type PsdDoorMqttPayload,
@@ -14,36 +13,15 @@ import {
 import { DockTimeDialog } from './DockTimeDialog';
 import { DoorMonitorCard, type DoorKind, type DoorMonitorState } from './DoorMonitorCard';
 
-function seedVehicleDoors(): DoorMonitorState[] {
-  return VEHICLE_DOORS.map((door) => ({
-    id: door.id,
-    label: door.label,
-    mode: 'auto',
-    latency: '0.12s',
-    bodyStatus: '常態關',
-    connection: '已連線',
-    opening: '0 %',
-    autoLock: '正常',
-    antiPinch: '正常',
-    speed: '0 km/h',
-    videoUrl: null,
-  }));
-}
-
-function seedPlatformDoors(doors: PsdDoorTile[]): DoorMonitorState[] {
-  return doors.map((door) => ({
-    id: door.id,
-    label: door.label,
-    mode: 'auto',
-    latency: '0.12s',
-    bodyStatus: '常態關',
-    connection: '已連線',
-    opening: '0 mm',
-    autoLock: '正常',
-    antiPinch: '正常',
-    alignment: '停準',
-    videoUrl: null,
-  }));
+function bodyVisualKey(
+  visual: ReturnType<typeof visualFromDoorMqtt>['visual'],
+): 'open' | 'closing' | 'opening' | 'alarm' | 'offline' | 'closed' {
+  if (visual === 'open') return 'open';
+  if (visual === 'closing') return 'closing';
+  if (visual === 'opening') return 'opening';
+  if (visual === 'alarm') return 'alarm';
+  if (visual === 'offline') return 'offline';
+  return 'closed';
 }
 
 export function DoorDetailPage({
@@ -63,6 +41,38 @@ export function DoorDetailPage({
   livePsd?: Map<string, PsdDoorMqttPayload>;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
+
+  const seedVehicleDoors = (): DoorMonitorState[] =>
+    VEHICLE_DOORS.map((door) => ({
+      id: door.id,
+      label: t(`psdControl.doors.${door.id}`),
+      mode: 'auto',
+      latency: '0.12s',
+      bodyStatus: t('psdControl.bodyVisual.closed'),
+      connection: t('psdControl.status.connected'),
+      opening: t('psdControl.status.defaultOpeningPct'),
+      autoLock: t('psdControl.status.normal'),
+      antiPinch: t('psdControl.status.normal'),
+      speed: t('psdControl.status.defaultSpeed'),
+      videoUrl: null,
+    }));
+
+  const seedPlatformDoors = (tiles: PsdDoorTile[]): DoorMonitorState[] =>
+    tiles.map((door) => ({
+      id: door.id,
+      label: door.label,
+      mode: 'auto',
+      latency: '0.12s',
+      bodyStatus: t('psdControl.bodyVisual.closed'),
+      connection: t('psdControl.status.connected'),
+      opening: t('psdControl.status.defaultOpeningMm'),
+      autoLock: t('psdControl.status.normal'),
+      antiPinch: t('psdControl.status.normal'),
+      alignment: t('psdControl.status.aligned'),
+      videoUrl: null,
+    }));
+
   const [items, setItems] = useState<DoorMonitorState[]>(() =>
     kind === 'vehicle' ? seedVehicleDoors() : seedPlatformDoors(doors ?? []),
   );
@@ -101,11 +111,17 @@ export function DoorDetailPage({
           const pct = Number(leaf?.open_percent);
           return {
             ...door,
-            bodyStatus: bodyStatusLabel(visual.visual),
-            connection: connectionLabel(liveVehicle.connection),
+            bodyStatus: t(`psdControl.bodyVisual.${bodyVisualKey(visual.visual)}`),
+            connection:
+              String(liveVehicle.connection ?? '').toUpperCase() === 'OFFLINE'
+                ? t('psdControl.status.disconnected')
+                : t('psdControl.status.connected'),
             opening: Number.isFinite(pct) ? `${Math.round(pct)} %` : door.opening,
-            autoLock: leaf?.locked ? '鎖定' : '正常',
-            antiPinch: leaf?.anti_pinch === 'FAULT' ? '異常' : '正常',
+            autoLock: leaf?.locked ? t('psdControl.status.locked') : t('psdControl.status.normal'),
+            antiPinch:
+              leaf?.anti_pinch === 'FAULT'
+                ? t('psdControl.status.abnormal')
+                : t('psdControl.status.normal'),
             speed: `${Number(liveVehicle.speed_kmh ?? 0).toFixed(0)} km/h`,
           };
         }),
@@ -125,17 +141,26 @@ export function DoorDetailPage({
           const pct = Number(live.open_percent);
           return {
             ...door,
-            bodyStatus: bodyStatusLabel(visual.visual),
-            connection: connectionLabel(live.connection),
+            bodyStatus: t(`psdControl.bodyVisual.${bodyVisualKey(visual.visual)}`),
+            connection:
+              String(live.connection ?? '').toUpperCase() === 'OFFLINE'
+                ? t('psdControl.status.disconnected')
+                : t('psdControl.status.connected'),
             opening: Number.isFinite(pct) ? `${Math.round(pct)} %` : door.opening,
-            autoLock: live.locked ? '鎖定' : '正常',
-            antiPinch: live.anti_pinch === 'FAULT' ? '異常' : '正常',
-            alignment: live.alignment === 'MISALIGNED' ? '未對準' : '停準',
+            autoLock: live.locked ? t('psdControl.status.locked') : t('psdControl.status.normal'),
+            antiPinch:
+              live.anti_pinch === 'FAULT'
+                ? t('psdControl.status.abnormal')
+                : t('psdControl.status.normal'),
+            alignment:
+              live.alignment === 'MISALIGNED'
+                ? t('psdControl.status.misaligned')
+                : t('psdControl.status.aligned'),
           };
         }),
       );
     }
-  }, [kind, liveVehicle, livePsd]);
+  }, [kind, liveVehicle, livePsd, t]);
 
   const setMode = (id: string, mode: ControlMode) => {
     setItems((prev) => prev.map((door) => (door.id === id ? { ...door, mode } : door)));
@@ -149,7 +174,7 @@ export function DoorDetailPage({
             type="button"
             onClick={onBack}
             className="rounded-md p-1 text-zinc-200 hover:bg-zinc-800 hover:text-white"
-            aria-label="返回"
+            aria-label={t('psdControl.back')}
           >
             <ArrowLeft className="size-5 stroke-[1.75]" />
           </button>
@@ -159,10 +184,10 @@ export function DoorDetailPage({
           <div className="flex shrink-0 items-center gap-3">
             <p className="hidden text-[13px] text-zinc-100 sm:block">
               {dwellLoading
-                ? '即將到站的停靠時間：載入中…'
+                ? t('psdControl.dwellLoading')
                 : arrivalSeconds == null
-                  ? '即將到站的停靠時間：尚無資料'
-                  : `即將到站的停靠時間：${arrivalSeconds}秒`}
+                  ? t('psdControl.dwellNone')
+                  : t('psdControl.dwellSeconds', { seconds: arrivalSeconds })}
             </p>
             <button
               type="button"
@@ -170,7 +195,7 @@ export function DoorDetailPage({
               className="inline-flex items-center gap-1.5 rounded-md bg-[#2563eb] px-3 py-1.5 text-[13px] text-white hover:bg-[#1d4ed8]"
             >
               <SlidersHorizontal className="size-3.5 stroke-[1.75]" aria-hidden />
-              單次修改停靠時間
+              {t('psdControl.editDockTime')}
             </button>
           </div>
         ) : null}

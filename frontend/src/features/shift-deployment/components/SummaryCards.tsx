@@ -5,6 +5,7 @@ import {
   Clock,
   User,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type {
   CurrentModeData,
   DataStatsData,
@@ -31,10 +32,14 @@ export function SummaryCards({
   event: MajorEventData;
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
       <section className={CARD}>
-        <h2 className="text-[15px] font-semibold text-zinc-100">目前模式</h2>
+        <h2 className="text-[15px] font-semibold text-zinc-100">
+          {t('shiftDeployment.summary.currentMode')}
+        </h2>
         <div className="mt-3 flex flex-1 items-center justify-center rounded-xl bg-[#1B4332] px-4 py-8 text-center">
           <div>
             <div className="text-[28px] font-bold leading-tight text-white">{mode.modeLabel}</div>
@@ -45,41 +50,60 @@ export function SummaryCards({
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-zinc-100">數據統計</h2>
+          <h2 className="text-[15px] font-semibold text-zinc-100">
+            {t('shiftDeployment.summary.dataStats')}
+          </h2>
           <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[11px] text-zinc-200">
-            準點率 {stats.ontimePct}%
+            {t('shiftDeployment.summary.ontimeRate', { pct: stats.ontimePct })}
           </span>
         </div>
         <div className="mt-3 flex min-h-0 flex-1 gap-3">
           <div className="flex w-[46%] shrink-0 flex-col items-center">
-            <RingProgress value={stats.achievementPct} caption="達成進度" />
+            <RingProgress
+              value={stats.achievementPct}
+              caption={t('shiftDeployment.summary.achievement')}
+            />
             <div className="mt-2 flex w-full gap-1.5">
               <span className="flex-1 rounded-full bg-zinc-800 py-1 text-center text-[11px] text-zinc-200">
-                總共 {stats.totalCount}
+                {t('shiftDeployment.summary.total', { count: stats.totalCount })}
               </span>
               <span className="flex-1 rounded-full bg-zinc-800 py-1 text-center text-[11px] text-zinc-200">
-                完成 {stats.completedCount}
+                {t('shiftDeployment.summary.completed', { count: stats.completedCount })}
               </span>
             </div>
           </div>
           <div className="w-px bg-white/10" />
           <div className="flex flex-1 flex-col justify-center gap-3 text-sm">
-            <StatRow icon={<Clock className="size-4 text-zinc-400" />} label="延遲" value={stats.delayedCount} />
-            <StatRow icon={<AlertTriangle className="size-4 text-zinc-400" />} label="異常" value={stats.abnormalCount} />
-            <StatRow icon={<CircleX className="size-4 text-zinc-400" />} label="取消" value={stats.cancelledCount} />
+            <StatRow
+              icon={<Clock className="size-4 text-zinc-400" />}
+              label={t('shiftDeployment.summary.delayed')}
+              value={stats.delayedCount}
+            />
+            <StatRow
+              icon={<AlertTriangle className="size-4 text-zinc-400" />}
+              label={t('shiftDeployment.summary.abnormal')}
+              value={stats.abnormalCount}
+            />
+            <StatRow
+              icon={<CircleX className="size-4 text-zinc-400" />}
+              label={t('shiftDeployment.summary.cancelled')}
+              value={stats.cancelledCount}
+            />
           </div>
         </div>
       </section>
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-zinc-100">執行班表</h2>
+          <h2 className="text-[15px] font-semibold text-zinc-100">
+            {t('shiftDeployment.summary.executingSchedule')}
+          </h2>
           <button
             type="button"
             onClick={() => onAction({ kind: 'schedule-adjust' })}
             className="rounded-lg border border-sky-500 px-2.5 py-1 text-[11px] text-sky-400 transition hover:bg-sky-500/10"
           >
-            班表調整申請
+            {t('shiftDeployment.summary.scheduleAdjust')}
           </button>
         </div>
         <div className="mt-3 flex flex-1 flex-col rounded-xl bg-[#212124] p-3">
@@ -109,7 +133,7 @@ export function SummaryCards({
             <span className="text-lg font-semibold text-zinc-50">{schedule.scheduleName}</span>
           </div>
           <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-zinc-300">
-            <span className="text-zinc-500">審核人</span>
+            <span className="text-zinc-500">{t('shiftDeployment.summary.reviewer')}</span>
             <User className="size-3.5 text-zinc-500" />
             {schedule.reviewerName}
           </div>
@@ -128,7 +152,9 @@ export function SummaryCards({
       </section>
 
       <section className={CARD}>
-        <h2 className="text-[15px] font-semibold text-zinc-100">重大事件</h2>
+        <h2 className="text-[15px] font-semibold text-zinc-100">
+          {t('shiftDeployment.summary.majorEvent')}
+        </h2>
         <button
           type="button"
           onClick={() => onAction({ kind: 'event-open' })}
@@ -147,7 +173,7 @@ export function SummaryCards({
           </div>
         </button>
         <div className="mt-2 flex flex-1 items-center justify-center rounded-xl bg-[#212124] text-[13px] text-zinc-500">
-          無更多事件
+          {t('shiftDeployment.summary.noMoreEvents')}
         </div>
       </section>
     </div>

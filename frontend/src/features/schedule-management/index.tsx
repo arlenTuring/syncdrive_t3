@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ClipboardList,
   DoorOpen,
@@ -9,6 +10,7 @@ import {
   Pentagon,
   Route,
   Send,
+  Settings2,
   Wrench,
   Activity,
 } from 'lucide-react';
@@ -23,6 +25,7 @@ import ShiftDeploymentApp from '../shift-deployment';
 import DispatchSchedulingApp from '../dispatch-scheduling';
 import PsdControlApp from '../psd-control';
 import VirtualFenceManagementApp from '../virtual-fence-management';
+import SystemFoundationApp from '../system-foundation';
 import type { ShellView } from './types';
 import { SIDEBAR_MODULE_GROUPS } from './types';
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
@@ -52,88 +55,100 @@ type ScheduleManagementAppProps = {
   onOpenSettings?: () => void;
 };
 
-function resolveWorkspaceChrome(
+function useWorkspaceChrome(
   view: string,
   modulePages: ModuleDashboardPage[],
 ): {
   title: string;
   icon: ReactNode;
 } {
-  const mdpId = parseModuleDashboardViewId(view);
-  if (mdpId) {
-    const page = modulePages.find((item) => item.id === mdpId);
-    const moduleLabel =
-      SIDEBAR_MODULE_GROUPS.find((group) => group.id === page?.moduleId)?.label
-      ?? '模組';
+  const { t } = useTranslation();
+
+  return useMemo(() => {
+    const mdpId = parseModuleDashboardViewId(view);
+    if (mdpId) {
+      const page = modulePages.find((item) => item.id === mdpId);
+      const moduleKey =
+        SIDEBAR_MODULE_GROUPS.find((group) => group.id === page?.moduleId)
+          ?.label ?? null;
+      const moduleLabel = moduleKey ? t(moduleKey) : t('common.module');
+      return {
+        // 使用者自訂別名 page.label 不翻譯
+        title: page?.label ? `${moduleLabel} · ${page.label}` : moduleLabel,
+        icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'shift-deployment') {
+      return {
+        title: t('nav.items.shift-deployment'),
+        icon: <Activity className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'dispatch-scheduling') {
+      return {
+        title: t('nav.items.dispatch-scheduling'),
+        icon: <Send className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'psd-control') {
+      return {
+        title: t('nav.items.psd-control'),
+        icon: <DoorOpen className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'virtual-fence') {
+      return {
+        title: t('nav.items.virtual-fence'),
+        icon: <Pentagon className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'dashboard') {
+      return {
+        title: t('nav.items.dashboard'),
+        icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'map') {
+      return {
+        title: t('nav.items.map'),
+        icon: <Map className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'trajectory') {
+      return {
+        title: t('nav.modules.vehicle'),
+        icon: <Route className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'system-foundation') {
+      return {
+        title: t('nav.modules.system'),
+        icon: <Settings2 className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'time-templates') {
+      return {
+        title: t('nav.modules.schedule'),
+        icon: <FileText className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'shift-list') {
+      return {
+        title: t('nav.modules.schedule'),
+        icon: <List className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'maintenance-tasks') {
+      return {
+        title: t('nav.modules.schedule'),
+        icon: <Wrench className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
     return {
-      title: page?.label ? `${moduleLabel} · ${page.label}` : moduleLabel,
-      icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
+      title: t('nav.modules.schedule'),
+      icon: <ClipboardList className="size-4 text-sky-400" aria-hidden />,
     };
-  }
-  if (view === 'shift-deployment') {
-    return {
-      title: '班表部署管理',
-      icon: <Activity className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'dispatch-scheduling') {
-    return {
-      title: '派遣調度管理',
-      icon: <Send className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'psd-control') {
-    return {
-      title: '車門月台控制',
-      icon: <DoorOpen className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'virtual-fence') {
-    return {
-      title: '虛擬圍籬管理',
-      icon: <Pentagon className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'dashboard') {
-    return {
-      title: '儀表板管理',
-      icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'map') {
-    return {
-      title: '場域管理模組',
-      icon: <Map className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'trajectory') {
-    return {
-      title: '載具管理模組',
-      icon: <Route className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'time-templates') {
-    return {
-      title: '班表管理模組',
-      icon: <FileText className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'shift-list') {
-    return {
-      title: '班表管理模組',
-      icon: <List className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  if (view === 'maintenance-tasks') {
-    return {
-      title: '班表管理模組',
-      icon: <Wrench className="size-4 text-sky-400" aria-hidden />,
-    };
-  }
-  return {
-    title: '班表管理模組',
-    icon: <ClipboardList className="size-4 text-sky-400" aria-hidden />,
-  };
+  }, [view, modulePages, t]);
 }
 
 export default function ScheduleManagementApp({
@@ -181,16 +196,20 @@ export default function ScheduleManagementApp({
     writeModuleDashboardPages(modulePages);
   }, [modulePages]);
 
-  const chrome = resolveWorkspaceChrome(view, modulePages);
+  const chrome = useWorkspaceChrome(view, modulePages);
+  const { t } = useTranslation();
   const activeModulePage = useMemo(() => {
     const id = parseModuleDashboardViewId(view);
     if (!id) return null;
     return modulePages.find((page) => page.id === id) ?? null;
   }, [view, modulePages]);
 
-  const attachModuleLabel =
-    SIDEBAR_MODULE_GROUPS.find((group) => group.id === attachModuleId)?.label
-    ?? '模組';
+  const attachModuleLabel = (() => {
+    const key = SIDEBAR_MODULE_GROUPS.find(
+      (group) => group.id === attachModuleId,
+    )?.label;
+    return key ? t(key) : t('common.module');
+  })();
 
   const frameProps = {
     adminMode,
@@ -241,7 +260,7 @@ export default function ScheduleManagementApp({
 
         {view === 'shift-deployment' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="班表部署管理載入失敗">
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.shift-deployment') })}>
               <ShiftDeploymentApp />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
@@ -249,7 +268,7 @@ export default function ScheduleManagementApp({
 
         {view === 'dispatch-scheduling' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="派遣調度管理載入失敗">
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.dispatch-scheduling') })}>
               <DispatchSchedulingApp />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
@@ -257,7 +276,7 @@ export default function ScheduleManagementApp({
 
         {view === 'psd-control' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="車門月台控制載入失敗">
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.psd-control') })}>
               <PsdControlApp />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
@@ -265,8 +284,16 @@ export default function ScheduleManagementApp({
 
         {view === 'virtual-fence' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="虛擬圍籬管理載入失敗">
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.virtual-fence') })}>
               <VirtualFenceManagementApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'system-foundation' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.modules.system') })}>
+              <SystemFoundationApp />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
@@ -293,12 +320,12 @@ export default function ScheduleManagementApp({
             }`}
           >
             <ShellWorkspaceFrame
-              title="場域管理模組"
+              title="圖資資料管理"
               titleIcon={<Map className="size-4 text-sky-400" aria-hidden />}
               flush
               {...frameProps}
             >
-              <ViewErrorBoundary title="場域管理載入失敗">
+              <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.map') })}>
                 <MapEditorApp workspace="map" />
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>
@@ -317,7 +344,7 @@ export default function ScheduleManagementApp({
               flush
               {...frameProps}
             >
-              <ViewErrorBoundary title="載具軌跡圖台載入失敗">
+              <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.trajectory') })}>
                 <MapEditorApp workspace="trajectory" />
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>

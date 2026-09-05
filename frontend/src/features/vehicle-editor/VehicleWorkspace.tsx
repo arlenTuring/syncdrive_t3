@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ZoomIn, ZoomOut, Crosshair } from 'lucide-react';
 import { SnapGuideLines } from '../dashboard/components/SnapGuideLines';
 import {
@@ -70,6 +71,7 @@ export function VehicleWorkspace({
   onRotateRight90,
   onRotateDelta,
 }: Props) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasStageRef = useRef<HTMLDivElement>(null);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
@@ -444,7 +446,7 @@ export function VehicleWorkspace({
           type="button"
           className="rounded p-1 text-zinc-400 hover:text-white"
           onClick={() => setUserZoom((z) => Math.max(0.25, z / 1.25))}
-          title="縮小"
+          title={t('vehicleEditor.workspace.zoomOut')}
         >
           <ZoomOut size={16} />
         </button>
@@ -452,8 +454,8 @@ export function VehicleWorkspace({
           className="min-w-[56px] text-center font-mono text-[10px] text-zinc-500"
           title={
             compactCanvas
-              ? `邏輯畫布 ${vehicle.width}×${vehicle.height} px，編輯時放大顯示`
-              : `畫布 ${vehicle.width}×${vehicle.height} px`
+              ? t('vehicleEditor.workspace.logicalCanvasTitle', { w: vehicle.width, h: vehicle.height })
+              : t('vehicleEditor.workspace.canvasTitle', { w: vehicle.width, h: vehicle.height })
           }
         >
           {Math.round(totalScale * 100)}%
@@ -462,7 +464,7 @@ export function VehicleWorkspace({
           type="button"
           className="rounded p-1 text-zinc-400 hover:text-white"
           onClick={() => setUserZoom((z) => Math.min(4, z * 1.25))}
-          title="放大"
+          title={t('vehicleEditor.workspace.zoomIn')}
         >
           <ZoomIn size={16} />
         </button>
@@ -470,7 +472,7 @@ export function VehicleWorkspace({
           type="button"
           className="rounded p-1 text-zinc-400 hover:text-white"
           onClick={resetWorkspaceView}
-          title="重設視圖（縮放與位置）"
+          title={t('vehicleEditor.workspace.resetView')}
         >
           <Crosshair size={16} />
         </button>
@@ -563,7 +565,7 @@ export function VehicleWorkspace({
                         width: bounds.width,
                         height: bounds.height,
                       }}
-                      title="拖曳以移動所有已選元件"
+                      title={t('vehicleEditor.workspace.moveSelectionTitle')}
                       onPointerDown={handleBulkMovePointerDown}
                     />
                   );
@@ -619,11 +621,11 @@ export function VehicleWorkspace({
         </div>
         {isEditMode && (
           <p className="mt-3 font-mono text-[10px] text-zinc-500">
-            邏輯畫布 {vehicle.width} × {vehicle.height} px
-            {compactCanvas ? ' · 編輯自動放大，地圖仍依實際尺寸顯示' : null}
+            {t('vehicleEditor.workspace.logicalCanvas', { w: vehicle.width, h: vehicle.height })}
+            {compactCanvas ? t('vehicleEditor.workspace.compactHint') : null}
             {selectedElementIds.length > 0
-              ? ` · 已選 ${selectedElementIds.length} 個元件（Shift 加選 · 方向鍵微調）`
-              : ' · 空白處雙指滑動可游移 · ⌘A 全選 · 拖畫布四邊／四角調整尺寸'}
+              ? t('vehicleEditor.workspace.selectedHint', { count: selectedElementIds.length })
+              : t('vehicleEditor.workspace.emptyHint')}
           </p>
         )}
       </div>

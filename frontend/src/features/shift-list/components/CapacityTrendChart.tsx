@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
@@ -101,6 +102,7 @@ export function CapacityTrendChart({
   serviceDirectionTags,
   className = '',
 }: CapacityTrendChartProps) {
+  const { t } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverMinute, setHoverMinute] = useState<number | null>(null);
   const [hiddenStreamKeys, setHiddenStreamKeys] = useState<ReadonlySet<string>>(
@@ -223,7 +225,7 @@ export function CapacityTrendChart({
                   type="button"
                   onClick={() => toggleStreamVisibility(stream.streamKey)}
                   aria-pressed={!hidden}
-                  title={hidden ? `顯示 ${stream.label}` : `隱藏 ${stream.label}`}
+                  title={hidden ? t('shiftList.capacityTrend.showStream', { label: stream.label }) : t('shiftList.capacityTrend.hideStream', { label: stream.label })}
                   className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
                     hidden
                       ? 'border-zinc-800 bg-transparent text-zinc-600 hover:text-zinc-400'
@@ -258,7 +260,7 @@ export function CapacityTrendChart({
           onPointerMove={onPointerMove}
           onPointerLeave={() => setHoverMinute(null)}
           role="img"
-          aria-label="運能趨勢折線圖（依服務方向）"
+          aria-label={t('shiftList.capacityTrend.chartAria')}
         >
           {yTicks.map((tick) => {
             const y = yForPphpd(tick, axisMax);
@@ -464,25 +466,25 @@ export function CapacityTrendChart({
                 className="inline-block h-3 w-1 rounded-sm"
                 style={{ backgroundColor: hoverBand?.color ?? '#7CB8FF' }}
               />
-              <span className="truncate">{hoverBand?.name ?? '無時段屬性'}</span>
+              <span className="truncate">{hoverBand?.name ?? t('shiftList.capacityTrend.noBand')}</span>
               <span className="ml-auto tabular-nums text-zinc-400">
                 {formatMinuteAsHm(hoverSample.minute)}
               </span>
             </div>
             <p className="text-xs text-zinc-300">
-              班距{' '}
+              {t('shiftList.capacityTrend.headway')}{' '}
               <span className="tabular-nums text-zinc-100">
                 {formatRouteStreamHeadwayTooltip(
                   hoverSample.headwayByStream,
                   visibleStreams,
                 )
                   ?? (hoverSample.headwaySeconds != null
-                    ? `${hoverSample.headwaySeconds.toLocaleString('en-US')} 秒`
+                    ? t('shiftList.capacityTrend.seconds', { value: hoverSample.headwaySeconds.toLocaleString('en-US') })
                     : '—')}
               </span>
               {hoverBand?.headwaySeconds != null ? (
                 <span className="ml-1 text-zinc-500">
-                  （目標 {hoverBand.headwaySeconds.toLocaleString('en-US')} 秒）
+                  {t('shiftList.capacityTrend.targetSeconds', { value: hoverBand.headwaySeconds.toLocaleString('en-US') })}
                 </span>
               ) : null}
             </p>
@@ -506,7 +508,7 @@ export function CapacityTrendChart({
               })}
               {hoverBand != null && hoverBand.capacityPphpd > 0 ? (
                 <p className="text-zinc-500">
-                  要求{' '}
+                  {t('shiftList.capacityTrend.required')}{' '}
                   <span className="tabular-nums" style={{ color: hoverBand.color }}>
                     {hoverBand.capacityPphpd.toLocaleString('en-US')}
                   </span>
@@ -514,11 +516,11 @@ export function CapacityTrendChart({
               ) : null}
             </div>
             <p className="mt-0.5 text-xs text-zinc-500">
-              在跑正線{' '}
+              {t('shiftList.capacityTrend.activeMainline')}{' '}
               <span className="tabular-nums text-zinc-400">
-                {hoverSample.activeVehicleCount.toLocaleString('en-US')} 台
+                {t('shiftList.capacityTrend.vehicles', { count: hoverSample.activeVehicleCount.toLocaleString('en-US') })}
               </span>
-              <span className="ml-1">（參考）</span>
+              <span className="ml-1">{t('shiftList.capacityTrend.reference')}</span>
             </p>
             {capacityGapHint ? (
               <p className="mt-1.5 max-w-[240px] text-[11px] leading-snug text-amber-200/90">
@@ -531,8 +533,8 @@ export function CapacityTrendChart({
         {!canDraw ? (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0b0d12]/70 px-6 text-center text-sm text-zinc-500">
             {series.passengerBlockCount >= 2
-              ? '班表有正線班次，但同一服務方向尚不足兩趟發車，無法計算班距／運能。請確認路線已指派並重新生成班表。'
-              : '需要同一服務方向至少兩趟正線發車才能繪製運能趨勢'}
+              ? t('shiftList.capacityTrend.needMoreSameDirection')
+              : t('shiftList.capacityTrend.needTwoTrips')}
           </div>
         ) : null}
         </div>

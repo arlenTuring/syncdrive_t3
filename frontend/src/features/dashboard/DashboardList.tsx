@@ -1,4 +1,5 @@
 import { Plus, Monitor, Trash2, Calendar, Maximize2, LayoutGrid } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { DashboardPlane } from './types';
 import { ImportTemplateButton } from './components/TemplateFileActions';
 import type { TemplateImportResult } from './template/types';
@@ -13,8 +14,9 @@ interface Props {
 }
 
 export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTemplate, onUpdatePlane }: Props) {
+  const { t, i18n } = useTranslation();
   const formatDate = (ts: number) => {
-    return new Intl.DateTimeFormat('zh-TW', {
+    return new Intl.DateTimeFormat(i18n.language, {
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
     }).format(new Date(ts));
@@ -29,14 +31,14 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <LayoutGrid className="text-cyan-500" size={32} />
-              儀表板管理
+              {t('dashboard.title')}
             </h1>
             <p className="text-zinc-500 mt-2 text-sm">
-              選擇現有的平面開始編輯，或建立一個新的監控視窗。
+              {t('dashboard.listPage.subtitle')}
             </p>
           </div>
           <div className="text-zinc-600 text-xs font-mono uppercase tracking-widest">
-            {planes.length} 份平面已儲存
+            {t('dashboard.listPage.planesSaved', { count: planes.length })}
           </div>
         </div>
 
@@ -57,8 +59,8 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
               <Plus size={24} />
             </div>
             <div className="text-center">
-              <div className="text-zinc-300 font-semibold group-hover:text-cyan-400">建立新平面</div>
-              <div className="text-zinc-600 text-xs mt-1">自定義解析度與比例</div>
+              <div className="text-zinc-300 font-semibold group-hover:text-cyan-400">{t('dashboard.listPage.createNew')}</div>
+              <div className="text-zinc-600 text-xs mt-1">{t('dashboard.listPage.createNewHint')}</div>
             </div>
           </button>
 
@@ -78,9 +80,9 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                 {/* Overlay Actions */}
                 <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); if(confirm('確定要刪除此平面嗎？')) onDelete(p.id); }}
+                    onClick={(e) => { e.stopPropagation(); if(confirm(t('dashboard.listPage.confirmDelete'))) onDelete(p.id); }}
                     className="p-2 rounded-lg bg-red-950/50 text-red-400 border border-red-900/50 hover:bg-red-600 hover:text-white transition-all"
-                    title="刪除平面"
+                    title={t('dashboard.listPage.deletePlane')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -106,9 +108,11 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                 {/* 畫布適配模式單選按鈕組 */}
                 <div className="pt-2 border-t border-zinc-800/80 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-400 font-medium">適配模式</span>
+                    <span className="text-zinc-400 font-medium">{t('dashboard.listPage.viewportMode')}</span>
                     <span className="text-zinc-500 font-mono text-[10px]">
-                      {(p.viewportMode ?? 'fixed-scale') === 'fit-width' ? '寬度自適應撐滿' : '固定等比大屏'}
+                      {(p.viewportMode ?? 'fixed-scale') === 'fit-width'
+                        ? t('dashboard.listPage.fitWidthStatus')
+                        : t('dashboard.listPage.fixedScaleStatus')}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-950/80 rounded-xl border border-zinc-800">
@@ -120,9 +124,9 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                           ? 'bg-blue-600 text-white shadow-sm font-semibold'
                           : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                       }`}
-                      title="固定等比大屏：16:9 戰情室大屏縮放，畫面居中，保證不變形"
+                      title={t('dashboard.listPage.fixedScaleTitle')}
                     >
-                      <span>🖥️ 固定等比</span>
+                      <span>{t('dashboard.listPage.fixedScale')}</span>
                     </button>
                     <button
                       type="button"
@@ -132,9 +136,9 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                           ? 'bg-blue-600 text-white shadow-sm font-semibold'
                           : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                       }`}
-                      title="寬度自適應：100% 填滿視窗寬度，高度自然捲動，側邊欄開合自動伸縮"
+                      title={t('dashboard.listPage.fitWidthTitle')}
                     >
-                      <span>↔️ 寬度自適應</span>
+                      <span>{t('dashboard.listPage.fitWidth')}</span>
                     </button>
                   </div>
                 </div>
@@ -142,7 +146,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                 <div className="pt-1">
                   <div className="w-full py-2 rounded-lg bg-zinc-800 text-zinc-400 text-xs font-bold uppercase 
                                 tracking-wider text-center group-hover:bg-cyan-600 group-hover:text-white transition-all">
-                    進入編輯模式
+                    {t('dashboard.listPage.enterEdit')}
                   </div>
                 </div>
               </div>
@@ -153,7 +157,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
         {/* Footer info if empty */}
         {planes.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-zinc-600 italic">目前沒有任何平面，點擊上方按鈕開始您的第一個設計。</p>
+            <p className="text-zinc-600 italic">{t('dashboard.listPage.emptyHint')}</p>
           </div>
         )}
       </div>

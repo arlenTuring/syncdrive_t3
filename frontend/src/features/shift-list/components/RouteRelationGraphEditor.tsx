@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { resolveSelectedRouteInstanceId } from '../types/create';
 import { HelpTip } from './HelpTip';
@@ -264,6 +265,7 @@ export function RouteRelationGraphEditor({
   onToggleEndInstance,
   framed = true,
 }: RouteRelationGraphEditorProps) {
+  const { t } = useTranslation();
   const startSet = useMemo(() => new Set(startInstanceIds), [startInstanceIds]);
   const endSet = useMemo(() => new Set(endInstanceIds), [endInstanceIds]);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -626,7 +628,7 @@ export function RouteRelationGraphEditor({
           className="cursor-pointer"
           onClick={selectLink}
         >
-          <title>{isSecondary ? '次要路線' : '優先路線'}</title>
+          <title>{isSecondary ? t('shiftList.routeRelation.secondaryTitle') : t('shiftList.routeRelation.primaryTitle')}</title>
         </circle>
         <text
           x={midX}
@@ -638,7 +640,7 @@ export function RouteRelationGraphEditor({
           fontWeight={700}
           className="pointer-events-none select-none"
         >
-          {isSecondary ? '次' : '優'}
+          {isSecondary ? t('shiftList.routeRelation.secondaryShort') : t('shiftList.routeRelation.primaryShort')}
         </text>
         <circle
           cx={start.x}
@@ -739,9 +741,9 @@ export function RouteRelationGraphEditor({
     >
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-800/70 px-4 py-3">
         <div>
-          <h3 className="text-sm font-medium text-zinc-100">路線關聯設定</h3>
+          <h3 className="text-sm font-medium text-zinc-100">{t('shiftList.routeRelation.title')}</h3>
           <p className="mt-0.5 text-[11px] text-zinc-500">
-            拖動方格排列；從菱形拉線並點線設優先／次要。點選路線卡後可設首班車、起算、結算。
+            {t('shiftList.routeRelation.hint')}
           </p>
         </div>
         {selectedLinkId ? (
@@ -761,7 +763,7 @@ export function RouteRelationGraphEditor({
                     : 'text-zinc-400 hover:bg-sky-950/60 hover:text-sky-200',
                 ].join(' ')}
               >
-                優先路線
+                {t('shiftList.routeRelation.primaryRoute')}
               </button>
               <button
                 type="button"
@@ -777,7 +779,7 @@ export function RouteRelationGraphEditor({
                     : 'text-zinc-400 hover:bg-violet-950/60 hover:text-violet-200',
                 ].join(' ')}
               >
-                次要路線
+                {t('shiftList.routeRelation.secondaryRoute')}
               </button>
             </div>
             <button
@@ -788,7 +790,7 @@ export function RouteRelationGraphEditor({
               }}
               className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500"
             >
-              反轉方向
+              {t('shiftList.routeRelation.reverseDirection')}
             </button>
             <button
               type="button"
@@ -798,26 +800,26 @@ export function RouteRelationGraphEditor({
               }}
               className="rounded-md border border-rose-500/40 px-2.5 py-1 text-[11px] text-rose-300 hover:bg-rose-500/10"
             >
-              刪除連線
+              {t('shiftList.routeRelation.deleteEdge')}
             </button>
           </div>
         ) : routes.length > 0 &&
           (onSetHead || onToggleStartInstance || onToggleEndInstance) ? (
           <div className="flex flex-wrap items-center gap-2">
-            <HelpTip label="路線標記說明" widthClass="w-64">
+            <HelpTip label={t('shiftList.routeRelation.markHelp')} widthClass="w-64">
               <div className="space-y-1.5">
-                <p>先點選一張路線卡，再按按鈕標記。</p>
+                <p>{t('shiftList.routeRelation.markHelpSelect')}</p>
                 <p>
-                  <span className="text-amber-200">首班車</span>
-                  ：排班預設從這條線開出去（背景會變色）。
+                  <span className="text-amber-200">{t('shiftList.routeRelation.firstTrip')}</span>
+                  {t('shiftList.routeRelation.firstTripHint')}
                 </p>
                 <p>
-                  <span className="text-sky-200">由此起算</span>
-                  ：這一輪允許從這些線開出，可多選；與結算不能同卡。
+                  <span className="text-sky-200">{t('shiftList.routeRelation.startFrom')}</span>
+                  {t('shiftList.routeRelation.startFromHint')}
                 </p>
                 <p>
-                  <span className="text-violet-200">到此結算</span>
-                  ：跑到這些線就算這一輪跑完，可多選；與起算不能同卡。
+                  <span className="text-violet-200">{t('shiftList.routeRelation.endAt')}</span>
+                  {t('shiftList.routeRelation.endAtHint')}
                 </p>
               </div>
             </HelpTip>
@@ -827,7 +829,7 @@ export function RouteRelationGraphEditor({
                   headInstanceId === selectedNodeId ? (
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-300">
                       <Check className="size-3.5" strokeWidth={2.5} />
-                      已是首班車
+                      {t('shiftList.routeRelation.alreadyFirst')}
                     </span>
                   ) : (
                     <button
@@ -835,7 +837,7 @@ export function RouteRelationGraphEditor({
                       onClick={() => onSetHead(selectedNodeId)}
                       className="rounded-md border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-100 hover:bg-amber-500/20"
                     >
-                      設為首班車
+                      {t('shiftList.routeRelation.setFirst')}
                     </button>
                   )
                 ) : null}
@@ -854,14 +856,14 @@ export function RouteRelationGraphEditor({
                     ].join(' ')}
                     title={
                       endSet.has(selectedNodeId) && !startSet.has(selectedNodeId)
-                        ? '已是結算路線，請先取消結算'
+                        ? t('shiftList.routeRelation.clearStartBlocked')
                         : undefined
                     }
                   >
                     <span className="inline-flex size-4 items-center justify-center rounded-full bg-sky-500/30 text-[9px] font-semibold text-sky-100">
-                      起
+                      {t('shiftList.routeRelation.startShort')}
                     </span>
-                    {startSet.has(selectedNodeId) ? '取消起算' : '由此起算'}
+                    {startSet.has(selectedNodeId) ? t('shiftList.routeRelation.cancelStart') : t('shiftList.routeRelation.startFrom')}
                   </button>
                 ) : null}
                 {onToggleEndInstance ? (
@@ -879,14 +881,14 @@ export function RouteRelationGraphEditor({
                     ].join(' ')}
                     title={
                       startSet.has(selectedNodeId) && !endSet.has(selectedNodeId)
-                        ? '已是起算路線，請先取消起算'
+                        ? t('shiftList.routeRelation.clearEndBlocked')
                         : undefined
                     }
                   >
                     <span className="inline-flex size-4 items-center justify-center rounded-full bg-violet-500/30 text-[9px] font-semibold text-violet-100">
-                      結
+                      {t('shiftList.routeRelation.endShort')}
                     </span>
-                    {endSet.has(selectedNodeId) ? '取消結算' : '到此結算'}
+                    {endSet.has(selectedNodeId) ? t('shiftList.routeRelation.cancelEnd') : t('shiftList.routeRelation.endAt')}
                   </button>
                 ) : null}
               </>
@@ -904,7 +906,7 @@ export function RouteRelationGraphEditor({
                     ) : (
                       <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
                     )}
-                    首班車
+                    {t('shiftList.routeRelation.firstTrip')}
                   </span>
                 ) : null}
                 {onToggleStartInstance ? (
@@ -919,7 +921,7 @@ export function RouteRelationGraphEditor({
                     ) : (
                       <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
                     )}
-                    起算
+                    {t('shiftList.routeRelation.startLabel')}
                     {startSet.size > 0 ? (
                       <span className="tabular-nums text-zinc-500">{startSet.size}</span>
                     ) : null}
@@ -937,7 +939,7 @@ export function RouteRelationGraphEditor({
                     ) : (
                       <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
                     )}
-                    結算
+                    {t('shiftList.routeRelation.endLabel')}
                     {endSet.size > 0 ? (
                       <span className="tabular-nums text-zinc-500">{endSet.size}</span>
                     ) : null}
@@ -1015,25 +1017,25 @@ export function RouteRelationGraphEditor({
               >
                 {isHead ? (
                   <div className="pointer-events-none absolute left-1.5 top-1 z-30 rounded bg-amber-500/90 px-1 py-px text-[8px] font-semibold tracking-wide text-zinc-950">
-                    首班車
+                    {t('shiftList.routeRelation.firstTrip')}
                   </div>
                 ) : null}
                 {isStart ? (
                   <span
                     className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-sky-500/35 text-[9px] font-semibold text-sky-50"
-                    title="由此起算"
-                    aria-label="由此起算"
+                    title={t('shiftList.routeRelation.startFrom')}
+                    aria-label={t('shiftList.routeRelation.startFrom')}
                   >
-                    起
+                    {t('shiftList.routeRelation.startShort')}
                   </span>
                 ) : null}
                 {isEnd ? (
                   <span
                     className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-violet-500/35 text-[9px] font-semibold text-violet-50"
-                    title="到此結算"
-                    aria-label="到此結算"
+                    title={t('shiftList.routeRelation.endAt')}
+                    aria-label={t('shiftList.routeRelation.endAt')}
                   >
-                    結
+                    {t('shiftList.routeRelation.endShort')}
                   </span>
                 ) : null}
                 <div className="flex h-full flex-col items-center justify-center gap-0.5 px-2.5 py-1.5 text-center">
@@ -1055,11 +1057,11 @@ export function RouteRelationGraphEditor({
                     className="mt-0.5 max-w-full overflow-x-auto whitespace-nowrap border-t border-zinc-800/90 pt-1 text-[10px] leading-tight text-zinc-300 [scrollbar-width:thin]"
                     title={`${origin?.stationName ?? '—'} → ${terminal?.stationName ?? '—'}`}
                   >
-                    <span className="text-zinc-500">起</span>
+                    <span className="text-zinc-500">{t('shiftList.routeRelation.origin')}</span>
                     {' '}
                     {origin?.stationName ?? '—'}
                     <span className="mx-1 text-zinc-600">→</span>
-                    <span className="text-zinc-500">終</span>
+                    <span className="text-zinc-500">{t('shiftList.routeRelation.terminus')}</span>
                     {' '}
                     {terminal?.stationName ?? '—'}
                   </div>
@@ -1180,8 +1182,8 @@ export function RouteRelationGraphEditor({
                 <button
                   key={`${node.instanceId}-${anchor}`}
                   type="button"
-                  aria-label={`${code} ${anchor} 拉線點`}
-                  title="拖曳拉線"
+                  aria-label={t('shiftList.routeRelation.dragHandleAria', { code, anchor })}
+                  title={t('shiftList.routeRelation.dragHandle')}
                   className="absolute z-20 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-zinc-400 bg-zinc-700 hover:border-[#2B7FFF] hover:bg-[#2B7FFF]"
                   style={{ left: pt.x, top: pt.y }}
                   onPointerDown={(event) =>

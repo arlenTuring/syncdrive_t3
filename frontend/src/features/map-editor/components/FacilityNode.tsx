@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import type { RefObject } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   cornerTrackHandlesPx,
@@ -386,6 +387,7 @@ export const FacilityNode = memo(function FacilityNode({
   crossoverSnapPrimary = false,
   onCrossoverSnapUiChange,
 }: FacilityNodeProps) {
+  const { t } = useTranslation()
   const mapExtent = useMapExtent()
   const Icon = PALETTE_ICON_BY_NAME[facility.name]
   const isDockingPoint = facility.type === 'DockingPoint'
@@ -2353,7 +2355,9 @@ export const FacilityNode = memo(function FacilityNode({
         isFacilityArea && facilityRemarks
           ? facilityRemarks
           : mqttLive?.lastReceived
-            ? `MQTT 最後：${mqttLive.lastReceived.topic}`
+            ? t('mapEditor.inspector.node.mqttLast', {
+                topic: mqttLive.lastReceived.topic,
+              })
             : isFacilityArea
               ? label
               : undefined
@@ -2762,7 +2766,10 @@ export const FacilityNode = memo(function FacilityNode({
               className="max-w-full truncate text-center leading-tight text-zinc-500"
               style={{ fontSize: slotSubFontWorld }}
             >
-              {slotOcc === 'Vacant' ? '空' : '佔'} · {slotEq}
+              {slotOcc === 'Vacant'
+                ? t('mapEditor.inspector.node.slotVacant')
+                : t('mapEditor.inspector.node.slotOccupied')}{' '}
+              · {slotEq}
             </span>
           )}
         </div>
@@ -2820,7 +2827,7 @@ export const FacilityNode = memo(function FacilityNode({
                     'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40 transition-opacity',
                     isPole ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                   ].join(' ')}
-                  title="拖曳此邊調整大小"
+                  title={t('mapEditor.inspector.node.resizeEdge')}
                 />
               </div>
             ))}
@@ -2859,7 +2866,7 @@ export const FacilityNode = memo(function FacilityNode({
               >
                 <div
                   className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-cyan-300 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40"
-                  title="拖曳等比放大縮小"
+                  title={t('mapEditor.inspector.node.resizeProportional')}
                 />
               </div>
             ))}
@@ -2877,7 +2884,7 @@ export const FacilityNode = memo(function FacilityNode({
             role="presentation"
             className="absolute z-[82] cursor-grab touch-none active:cursor-grabbing"
             style={{ left: nw + 10, top: nh / 2, transform: 'translate(0, -50%)' }}
-            title="拖曳旋轉（按住 Shift 吸到 15 度）"
+            title={t('mapEditor.inspector.node.rotateDrag')}
             onPointerDown={onRotateHandleDown}
             onPointerMove={onRotateHandleMove}
             onPointerUp={onRotateHandleEnd}
@@ -2893,12 +2900,12 @@ export const FacilityNode = memo(function FacilityNode({
             {(() => {
               const h = cornerTrackHandlesPx(cornerTrackGeom, nw, nh)
               const items: Array<[CornerHandleKey, { x: number; y: number }, string, string]> = [
-                ['arcY', h.arcY, '拖曳調整上緣弧度', '#67e8f9'],
-                ['arcX', h.arcX, '拖曳調整下緣弧度', '#67e8f9'],
-                ['innerY', h.innerY, '拖曳調整內弧的縱向位置（右緣帶寬）', '#fbbf24'],
-                ['innerX', h.innerX, '拖曳調整內弧的橫向位置（下緣帶寬）', '#fbbf24'],
-                ['outer', h.outer, '拖曳調整外弧彎度：往外拉到底成直角、往內趨近切角', '#a3e635'],
-                ['inner', h.inner, '拖曳調整內弧彎度；貼到外弧就變成實心的四分之一', '#f97316'],
+                ['arcY', h.arcY, t('mapEditor.inspector.node.cornerArcY'), '#67e8f9'],
+                ['arcX', h.arcX, t('mapEditor.inspector.node.cornerArcX'), '#67e8f9'],
+                ['innerY', h.innerY, t('mapEditor.inspector.node.cornerInnerY'), '#fbbf24'],
+                ['innerX', h.innerX, t('mapEditor.inspector.node.cornerInnerX'), '#fbbf24'],
+                ['outer', h.outer, t('mapEditor.inspector.node.cornerOuter'), '#a3e635'],
+                ['inner', h.inner, t('mapEditor.inspector.node.cornerInner'), '#f97316'],
               ]
               return items.map(([key, pt, title, color]) => (
                 <div
@@ -2936,7 +2943,13 @@ export const FacilityNode = memo(function FacilityNode({
                   data-switch-track-handle={key}
                   className="absolute z-[88] cursor-ns-resize touch-none"
                   style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title={key === 'a' ? '進口' : key === 'm' ? '直行出口' : '岔出出口'}
+                  title={
+                    key === 'a'
+                      ? t('mapEditor.inspector.node.switchIn')
+                      : key === 'm'
+                        ? t('mapEditor.inspector.node.switchStraight')
+                        : t('mapEditor.inspector.node.switchBranch')
+                  }
                   onPointerDown={(e) => onSwitchHandleDown(key, e)}
                   onPointerMove={onSwitchHandleMove}
                   onPointerUp={onSwitchHandleEnd}
@@ -2964,7 +2977,7 @@ export const FacilityNode = memo(function FacilityNode({
                   data-taper-track-handle={key}
                   className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
                   style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title="拖到要接的軌道邊上，放手就接合並與對手齊寬"
+                  title={t('mapEditor.inspector.node.taperJoin')}
                   onPointerDown={(e) => onTaperHandleDown(key, e)}
                   onPointerMove={onTaperHandleMove}
                   onPointerUp={onTaperHandleEnd}
@@ -3063,7 +3076,7 @@ export const FacilityNode = memo(function FacilityNode({
                 onPointerMove={onTrackCornerPointerMove}
                 onPointerUp={onTrackCornerPointerEnd}
                 onPointerCancel={onTrackCornerPointerEnd}
-                title="拖曳調整此角圓角"
+                title={t('mapEditor.inspector.node.cornerHandle')}
               >
                 <div className="size-3 rounded-full border border-violet-300 bg-violet-950/95 shadow-md ring-1 ring-violet-500/40" />
               </div>
@@ -3220,13 +3233,17 @@ export const FacilityNode = memo(function FacilityNode({
             <div
               className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
               role="toolbar"
-              aria-label={isTrackCrossover ? '線徑操作' : '旋轉'}
+              aria-label={
+                isTrackCrossover
+                  ? t('mapEditor.inspector.node.toolbarPath')
+                  : t('mapEditor.inspector.node.toolbarRotate')
+              }
             >
               {!isTrackCrossover ? (
                 <>
                   <button
                     type="button"
-                    title="逆時針微調 1°"
+                    title={t('mapEditor.inspector.node.rotateCcw1')}
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => onRotateDelta(facility.id, -1)}
@@ -3239,7 +3256,7 @@ export const FacilityNode = memo(function FacilityNode({
                   </span>
                   <button
                     type="button"
-                    title="順時針微調 1°"
+                    title={t('mapEditor.inspector.node.rotateCw1')}
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => onRotateDelta(facility.id, 1)}
@@ -3249,7 +3266,7 @@ export const FacilityNode = memo(function FacilityNode({
                   </button>
                   <button
                     type="button"
-                    title="順時針轉 90°"
+                    title={t('mapEditor.inspector.node.rotateCw90')}
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => onRotateRight90(facility.id)}
@@ -3262,7 +3279,7 @@ export const FacilityNode = memo(function FacilityNode({
               {!isTrackCrossover && onStartFormatPaint && (
                 <button
                   type="button"
-                  title="複製格式（大小、角度、填色、框線有無與線型、字級；僅可貼到相同元件）"
+                  title={t('mapEditor.inspector.node.formatPaint')}
                   onPointerDown={(e) => {
                     e.stopPropagation()
                   }}
@@ -3282,7 +3299,7 @@ export const FacilityNode = memo(function FacilityNode({
               {onDelete && (
                 <button
                   type="button"
-                  title="刪除此物件（Delete）"
+                  title={t('mapEditor.inspector.node.deleteObject')}
                   onPointerDown={(e) => {
                     e.stopPropagation()
                   }}

@@ -23,8 +23,9 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ShellView } from '../types';
-import { isOperationsView, SIDEBAR_MODULE_GROUPS } from '../types';
+import { isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS } from '../types';
 import type { ModuleDashboardPage } from '../utils/moduleDashboardPages';
 import {
   moduleDashboardViewId,
@@ -51,6 +52,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'dispatch-scheduling': Send,
   'psd-control': DoorOpen,
   'virtual-fence': Pentagon,
+  map: Map,
   'shift-records': ClipboardList,
   'time-templates': FileText,
   'shift-list': List,
@@ -64,6 +66,7 @@ function groupIcon(groupId: string) {
   if (groupId === 'vehicle') return Route;
   if (groupId === 'site') return Map;
   if (groupId === 'operations') return Activity;
+  if (groupId === 'system' || groupId === 'permission') return Settings;
   if (groupId === 'service' || groupId === 'media') {
     return LayoutDashboard;
   }
@@ -71,9 +74,10 @@ function groupIcon(groupId: string) {
 }
 
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
-  if (groupId === 'site') return activeView === 'map';
+  if (groupId === 'site') return isSiteView(activeView);
   if (groupId === 'vehicle') return activeView === 'trajectory';
   if (groupId === 'operations') return isOperationsView(activeView);
+  if (groupId === 'system') return activeView === 'system-foundation';
   if (groupId === 'schedule') {
     return (
       activeView === 'shift-records'
@@ -124,11 +128,13 @@ export function ScheduleModuleSidebar({
   onRenameModuleDashboard,
   onRemoveModuleDashboard,
 }: ScheduleModuleSidebarProps) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     operations: true,
     schedule: true,
     vehicle: true,
+    site: true,
   });
   const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
@@ -161,6 +167,9 @@ export function ScheduleModuleSidebar({
   useEffect(() => {
     if (isOperationsView(activeView)) {
       setExpanded((prev) => ({ ...prev, operations: true }));
+    }
+    if (isSiteView(activeView)) {
+      setExpanded((prev) => ({ ...prev, site: true }));
     }
     if (
       activeView === 'shift-records'
@@ -203,8 +212,8 @@ export function ScheduleModuleSidebar({
               type="button"
               onClick={toggleCollapsed}
               className="inline-flex size-9 items-center justify-center rounded-md text-zinc-300 transition hover:bg-white/5 hover:text-white"
-              title="展開側欄"
-              aria-label="展開側欄"
+              title={t('shell.expandSidebar')}
+              aria-label={t('shell.expandSidebar')}
               aria-expanded={false}
             >
               <PanelLeftOpen className="size-5" />
@@ -235,8 +244,8 @@ export function ScheduleModuleSidebar({
               type="button"
               onClick={toggleCollapsed}
               className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/5 hover:text-white"
-              title="折疊側欄"
-              aria-label="折疊側欄"
+              title={t('shell.collapseSidebar')}
+              aria-label={t('shell.collapseSidebar')}
               aria-expanded
             >
               <PanelLeftClose className="size-5" />
@@ -251,6 +260,7 @@ export function ScheduleModuleSidebar({
         }`}
       >
         {SIDEBAR_MODULE_GROUPS.map((group) => {
+          const groupLabel = t(group.label);
           const isOpen = expanded[group.id] ?? false;
           const GroupIcon = groupIcon(group.id);
           const dashPages = moduleDashboardPages.filter((page) => page.moduleId === group.id);
@@ -319,7 +329,7 @@ export function ScheduleModuleSidebar({
                       ? 'cursor-not-allowed'
                       : 'hover:bg-white/5'
                   }`}
-                  title={group.label}
+                  title={groupLabel}
                 >
                   <GroupIcon
                     className={`size-[18px] shrink-0 ${
@@ -328,7 +338,7 @@ export function ScheduleModuleSidebar({
                   />
                   {!collapsed ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                      <span className="min-w-0 flex-1 truncate">{groupLabel}</span>
                       {canExpand ? (
                         isOpen ? (
                           <ChevronDown className="size-3.5 shrink-0 text-zinc-500" />
@@ -349,8 +359,8 @@ export function ScheduleModuleSidebar({
                       setExpanded((prev) => ({ ...prev, [group.id]: true }));
                     }}
                     className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-sky-600/20 hover:text-sky-300"
-                    title={`在「${group.label}」新增儀表板子頁`}
-                    aria-label={`新增 ${group.label} 子頁`}
+                    title={t('shell.addModulePage', { module: groupLabel })}
+                    aria-label={t('shell.addModulePageAria', { module: groupLabel })}
                   >
                     <Plus className="size-4" />
                   </button>
@@ -363,6 +373,7 @@ export function ScheduleModuleSidebar({
                     ? group.items.map((item) => {
                         const Icon = SUB_ICONS[item.id] ?? ClipboardList;
                         const active = activeView === item.id;
+                        const itemLabel = t(item.label);
                         return (
                           <button
                             key={item.id}
@@ -376,10 +387,10 @@ export function ScheduleModuleSidebar({
                                   ? 'bg-[#1a3a5c] font-medium text-white'
                                   : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
                             }`}
-                            title={!item.enabled ? '功能開發中' : item.label}
+                            title={!item.enabled ? t('shell.comingSoon') : itemLabel}
                           >
                             <Icon className="size-3.5 shrink-0 opacity-80" />
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate">{itemLabel}</span>
                           </button>
                         );
                       })
@@ -414,7 +425,7 @@ export function ScheduleModuleSidebar({
                                 }
                               }}
                               className="min-w-0 flex-1 rounded border border-sky-500/60 bg-zinc-950 px-1.5 py-0.5 text-[13px] text-white outline-none"
-                              aria-label="重新命名子頁"
+                              aria-label={t('shell.renamePageInput')}
                             />
                           </div>
                         ) : (
@@ -431,7 +442,11 @@ export function ScheduleModuleSidebar({
                                 ? 'bg-[#1a3a5c] font-medium text-white'
                                 : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
                             }`}
-                            title={adminMode ? `${page.label}（雙擊重新命名）` : page.label}
+                            title={
+                              adminMode
+                                ? t('shell.renamePageHint', { name: page.label })
+                                : page.label
+                            }
                           >
                             <LayoutDashboard className="size-3.5 shrink-0 opacity-80" />
                             <span className="truncate">{page.label}</span>
@@ -443,8 +458,10 @@ export function ScheduleModuleSidebar({
                               type="button"
                               onClick={() => startRename(page)}
                               className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-sky-600/15 hover:text-sky-300 group-hover/item:opacity-100"
-                              title="重新命名"
-                              aria-label={`重新命名 ${page.label}`}
+                              title={t('shell.renamePage')}
+                              aria-label={t('shell.renamePageAria', {
+                                name: page.label,
+                              })}
                             >
                               <Pencil className="size-3.5" />
                             </button>
@@ -452,8 +469,10 @@ export function ScheduleModuleSidebar({
                               type="button"
                               onClick={() => onRemoveModuleDashboard?.(page.id)}
                               className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover/item:opacity-100"
-                              title="移除子頁"
-                              aria-label={`移除 ${page.label}`}
+                              title={t('shell.removePage')}
+                              aria-label={t('shell.removePageAria', {
+                                name: page.label,
+                              })}
                             >
                               <Trash2 className="size-3.5" />
                             </button>
@@ -481,10 +500,10 @@ export function ScheduleModuleSidebar({
             className={`flex w-full items-center rounded-lg text-[14px] text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 ${
               collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2.5'
             }`}
-            title="應用程式設定"
+            title={t('shell.appSettings')}
           >
             <Settings className="size-[18px] shrink-0" />
-            {!collapsed ? <span>應用程式設定</span> : null}
+            {!collapsed ? <span>{t('shell.appSettings')}</span> : null}
           </button>
         ) : null}
         <button
@@ -497,10 +516,10 @@ export function ScheduleModuleSidebar({
               ? 'bg-[#1a3a5c] font-medium text-white'
               : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
           }`}
-          title="儀表板管理"
+          title={t('nav.items.dashboard')}
         >
           <LayoutDashboard className="size-[18px] shrink-0" />
-          {!collapsed ? <span>儀表板管理</span> : null}
+          {!collapsed ? <span>{t('nav.items.dashboard')}</span> : null}
         </button>
         <button
           type="button"
@@ -508,10 +527,10 @@ export function ScheduleModuleSidebar({
           className={`flex w-full cursor-not-allowed items-center text-[14px] text-zinc-600 ${
             collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2.5'
           }`}
-          title="幫助中心開發中"
+          title={t('shell.comingSoon')}
         >
           <Headphones className="size-[18px] shrink-0" />
-          {!collapsed ? <span>幫助中心</span> : null}
+          {!collapsed ? <span>{t('shell.comingSoon')}</span> : null}
         </button>
       </div>
     </aside>

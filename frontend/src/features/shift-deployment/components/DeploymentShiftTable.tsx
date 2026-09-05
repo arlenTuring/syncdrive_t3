@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ShiftDeploymentAction, ShiftListTab, ShiftRow } from '../types';
 import { ShiftRouteTrack } from './ShiftRouteTrack';
 
@@ -14,6 +15,7 @@ export function DeploymentShiftTable({
   maintenance: ShiftRow[];
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<ShiftListTab>('mainline');
   const rows = tab === 'mainline' ? mainline : maintenance;
 
@@ -22,14 +24,15 @@ export function DeploymentShiftTable({
       <div className="flex shrink-0 items-end justify-between gap-3 border-b border-zinc-800 px-4 pt-3">
         <div className="flex gap-5">
           <TabButton active={tab === 'mainline'} onClick={() => setTab('mainline')}>
-            正線班次
+            {t('shiftDeployment.table.tabMainline')}
           </TabButton>
           <TabButton active={tab === 'maintenance'} onClick={() => setTab('maintenance')}>
-            整備班次
+            {t('shiftDeployment.table.tabMaintenance')}
           </TabButton>
         </div>
         <div className="pb-2 text-[12px] text-zinc-400">
-          目前班表 <span className="text-zinc-200">{scheduleName}</span>
+          {t('shiftDeployment.table.currentSchedule')}{' '}
+          <span className="text-zinc-200">{scheduleName}</span>
         </div>
       </div>
 
@@ -39,22 +42,22 @@ export function DeploymentShiftTable({
             <tr>
               {tab === 'mainline' ? (
                 <>
-                  <Th>班次代號</Th>
-                  <Th>運行方向</Th>
-                  <Th>執行載具</Th>
-                  <Th className="min-w-[280px]">路線進度</Th>
-                  <Th>班次狀態</Th>
-                  <Th>發車時間(預計/實際)</Th>
-                  <Th>操作</Th>
+                  <Th>{t('shiftDeployment.table.tripCode')}</Th>
+                  <Th>{t('shiftDeployment.table.direction')}</Th>
+                  <Th>{t('shiftDeployment.table.vehicle')}</Th>
+                  <Th className="min-w-[280px]">{t('shiftDeployment.table.routeProgress')}</Th>
+                  <Th>{t('shiftDeployment.table.shiftStatus')}</Th>
+                  <Th>{t('shiftDeployment.table.departTime')}</Th>
+                  <Th>{t('shiftDeployment.table.actions')}</Th>
                 </>
               ) : (
                 <>
-                  <Th>任務編號</Th>
-                  <Th>指派載具</Th>
-                  <Th>整備項目</Th>
-                  <Th>進度狀態</Th>
-                  <Th>預計完成時間</Th>
-                  <Th>操作</Th>
+                  <Th>{t('shiftDeployment.table.taskCode')}</Th>
+                  <Th>{t('shiftDeployment.table.assignedVehicle')}</Th>
+                  <Th>{t('shiftDeployment.table.maintItem')}</Th>
+                  <Th>{t('shiftDeployment.table.progressStatus')}</Th>
+                  <Th>{t('shiftDeployment.table.expectedComplete')}</Th>
+                  <Th>{t('shiftDeployment.table.actions')}</Th>
                 </>
               )}
             </tr>
@@ -63,7 +66,7 @@ export function DeploymentShiftTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-zinc-500">
-                  目前沒有班次
+                  {t('shiftDeployment.table.empty')}
                 </td>
               </tr>
             ) : tab === 'mainline' ? (
@@ -89,7 +92,7 @@ export function DeploymentShiftTable({
                       onClick={() => onAction({ kind: 'shift-detail', tab, row })}
                       className="text-sky-400 hover:underline"
                     >
-                      查看詳情
+                      {t('shiftDeployment.table.viewDetail')}
                     </button>
                   </Td>
                 </tr>
@@ -114,7 +117,7 @@ export function DeploymentShiftTable({
                       onClick={() => onAction({ kind: 'shift-detail', tab, row })}
                       className="text-sky-400 hover:underline"
                     >
-                      查看詳情
+                      {t('shiftDeployment.table.viewDetail')}
                     </button>
                   </Td>
                 </tr>

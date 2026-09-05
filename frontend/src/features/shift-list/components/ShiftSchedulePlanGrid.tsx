@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../../i18n';
 import { Info, AlertTriangle, Trash2, CopyPlus } from 'lucide-react';
 import {
   useMemo,
@@ -195,8 +197,8 @@ function BlockIssueHoverCard({
           </span>
         ) : null}
         <span className="font-semibold text-zinc-100">
-          {errors.length > 0 ? '錯誤與警告' : '警告'}
-          <span className="ml-1 text-zinc-500">（{rows.length} 則）</span>
+          {errors.length > 0 ? i18n.t('shiftList.planGrid.errorsAndWarnings') : i18n.t('shiftList.planGrid.warnings')}
+          <span className="ml-1 text-zinc-500">{i18n.t('shiftList.planGrid.countItems', { count: rows.length })}</span>
         </span>
       </div>
       <ul className="mt-1 space-y-1">
@@ -252,13 +254,13 @@ function BlockIssueHoverCard({
  * 行檢／洗車／待命／調度）動態組出來。
  */
 function resolveMoveCardTitle(block: GeneratedScheduleBlock): string {
-  const direction = block.source === 'yard_entry_move' ? '入廠' : '出廠';
+  const direction = block.source === 'yard_entry_move' ? i18n.t('shiftList.planGrid.enterYard') : i18n.t('shiftList.planGrid.exitYard');
   return `${block.yardExitSectionLabel ?? ''}${direction}`;
 }
 
 const MOVE_CARD_HINT_BY_SOURCE: Record<string, string> = {
-  yard_exit_move: '整備做完後把車從設施開到轉乘站（或下一種整備設施）；結束時刻貼齊下一段發車。',
-  yard_entry_move: '車輛不能再跑正線，提前開進整備設施；到了整備就直接開始（整備開始提前、結束不動）。',
+  yard_exit_move: i18n.t('shiftList.planGrid.yardExitHint'),
+  yard_entry_move: i18n.t('shiftList.planGrid.yardEntryHint'),
 };
 
 /** 移動小卡的 hover 說明：卡片本身太小塞不下任何文字，內容全在這裡 */
@@ -274,6 +276,7 @@ function MoveCardHoverCard({
   block: GeneratedScheduleBlock;
   pos: HoverCardPos;
 }) {
+  const { t } = useTranslation();
   const CARD_WIDTH = 260;
   const MARGIN = 12;
   const viewportWidth = typeof window === 'undefined' ? 1600 : window.innerWidth;
@@ -300,8 +303,8 @@ function MoveCardHoverCard({
       </div>
       <div className="mt-1 text-[11px] leading-4 text-zinc-100">
         {block.source === 'yard_entry_move'
-          ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '設施'}`
-          : `${block.yardExitFacilityLabel ?? '設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`}
+          ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.currentStation')} → ${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.facility')}`
+          : `${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.facility')} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.transferStation')}`}
       </div>
       {/*
         途經節點：載客卡看得到停靠序，調度移動沒有理由是黑箱。只有兩端（起訖）時
@@ -309,16 +312,16 @@ function MoveCardHoverCard({
       */}
       {block.yardMoveViaLabels && block.yardMoveViaLabels.length > 2 ? (
         <div className="mt-0.5 text-[10px] leading-4 text-zinc-400">
-          途經 {block.yardMoveViaLabels.join(' › ')}
+          {t('shiftList.planGrid.viaNodes')} {block.yardMoveViaLabels.join(' › ')}
         </div>
       ) : null}
       <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
-        {formatBlockTimeRange(block)}（{block.travelSeconds} 秒）
+        {formatBlockTimeRange(block)}
+        {i18n.t('shiftList.planGrid.secondsParen', { seconds: block.travelSeconds })}
       </div>
       {block.plannedEndMinute - block.plannedStartMinute <= 1e-9 ? (
         <div className="mt-0.5 text-[10px] leading-4 text-amber-300/90">
-          兩座設施在同一個場區，0 秒示意轉移——這張卡不佔時間，
-          畫出來的寬度只是標記。
+          {t('shiftList.planGrid.zeroTransferNote')}
         </div>
       ) : null}
       <p className="mt-1 text-[10px] leading-[14px] text-zinc-500">
@@ -326,7 +329,7 @@ function MoveCardHoverCard({
       </p>
       {block.yardExitAteYardTail ? (
         <p className="mt-0.5 text-[10px] leading-[14px] text-amber-400">
-          ※ 空間不足，已佔用整備尾巴時間
+          {t('shiftList.planGrid.ateYardTail')}
         </p>
       ) : null}
     </div>,
@@ -357,6 +360,7 @@ function YardTaskHoverCard({
   block: GeneratedScheduleBlock;
   pos: HoverCardPos;
 }) {
+  const { t } = useTranslation();
   const CARD_WIDTH = 260;
   const MARGIN = 12;
   const viewportWidth = typeof window === 'undefined' ? 1600 : window.innerWidth;
@@ -381,24 +385,22 @@ function YardTaskHoverCard({
       </div>
       <div className="mt-1 text-[11px] leading-4 text-zinc-100">
         {block.yardFacilityLabel
-          ? `設施：${block.yardFacilityLabel}`
-          : '設施：尚未指派'}
+          ? i18n.t('shiftList.planGrid.facilityAssigned', { label: block.yardFacilityLabel })
+          : i18n.t('shiftList.planGrid.facilityUnassigned')}
       </div>
       <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
         {formatBlockTimeRange(block)}
-        （{hours > 0 ? `${hours} 小時 ` : ''}{minutes} 分）
+        （{hours > 0 ? i18n.t('shiftList.planGrid.hoursPart', { hours }) : ''}
+        {minutes} {i18n.t('shiftList.planGrid.minutesUnit')}）
       </div>
       {block.source === 'hold' ? (
         <p className="mt-1 text-[10px] leading-[14px] text-zinc-400">
-          整備已經做完，車還沒開走——這段時間它仍然佔著這一格。
-          暫停不是待命：待命是排定的指令（為了下一趟先開到那裡等），
-          暫停是沒有指令，只是還留在原地。設施佔用與碰撞偵測都看得到這一段。
+          {t('shiftList.planGrid.yardHoldHint')}
         </p>
       ) : null}
       {block.yardFacilityUnavailable ? (
         <p className="mt-1 text-[10px] leading-[14px] text-red-400">
-          ⚠ 這段時間該類設施沒有任何一台是空的，車沒地方停。
-          需要加設施、把同時段的整備錯開，或減少該時段安排整備的車數。
+          {t('shiftList.planGrid.noFacilitySlot')}
         </p>
       ) : null}
     </div>,
@@ -481,6 +483,7 @@ function BlockAlgorithmHoverCard({
   /** 調度營運班次（entry_service）落點診斷；見文件 §10.3 */
   entryServiceBerthCheck?: GeneratedScheduleBlock['entryServiceBerthCheck'];
 }) {
+  const { t } = useTranslation();
   const sec = (value: number | null | undefined) =>
     value == null || !Number.isFinite(value) ? '—' : `${Math.round(value)}s`;
 
@@ -501,31 +504,31 @@ function BlockAlgorithmHoverCard({
         </span>
       </div>
       <p className="mt-1 text-[10px] leading-[14px] tabular-nums text-zinc-400">
-        行駛 {sec(summary.actualTravelSeconds)}
-        <span className="text-zinc-600">（均 {sec(summary.topologyAvgSeconds)} · 快 {sec(summary.topologyMinSeconds)}）</span>
+        {t('shiftList.planGrid.travel')} {sec(summary.actualTravelSeconds)}
+        <span className="text-zinc-600">（{t('shiftList.planGrid.avgShort')} {sec(summary.topologyAvgSeconds)} · {t('shiftList.planGrid.minShort')} {sec(summary.topologyMinSeconds)}）</span>
         <span className="text-zinc-600"> · </span>
-        靠站 {sec(summary.dwellBaseSeconds)}
+        {t('shiftList.planGrid.dwell')} {sec(summary.dwellBaseSeconds)}
         <span className="text-zinc-600"> · </span>
-        緩衝 {sec(summary.dwellSlackSeconds)}
+        {t('shiftList.planGrid.slack')} {sec(summary.dwellSlackSeconds)}
         {!hideStrategyBuffers ? (
           <>
             <span className="text-zinc-600"> · </span>
-            換線 {sec(summary.switchBufferSeconds)}
+            {t('shiftList.planGrid.switchBuf')} {sec(summary.switchBufferSeconds)}
             <span className="text-zinc-600"> · </span>
-            恢復 {sec(summary.recoverySeconds)}
+            {t('shiftList.planGrid.recovery')} {sec(summary.recoverySeconds)}
           </>
         ) : null}
       </p>
       {entryServiceBerthCheck ? (
         <p className="mt-1 rounded border border-amber-700/40 bg-amber-950/30 px-1.5 py-1 text-[10px] leading-[14px] tabular-nums text-amber-200">
-          <span className="font-semibold">調度營運班次插入餘裕</span>
+          <span className="font-semibold">{t('shiftList.planGrid.insertSlack')}</span>
           <span className="text-amber-400/80"> · </span>
-          抵達 {stops.find((s) => s.stationId === entryServiceBerthCheck.arriveStationId)?.stationName
+          {t('shiftList.planGrid.arrive')} {stops.find((s) => s.stationId === entryServiceBerthCheck.arriveStationId)?.stationName
             ?? entryServiceBerthCheck.arriveStationId}
           <span className="text-amber-400/80"> · </span>
-          站位淨空 {formatMinuteToHms(entryServiceBerthCheck.berthClearMinute)}
+          {t('shiftList.planGrid.berthClear')} {formatMinuteToHms(entryServiceBerthCheck.berthClearMinute)}
           <span className="text-amber-400/80"> · </span>
-          餘裕{' '}
+          {t('shiftList.planGrid.slackLabel')}{' '}
           <span
             className={
               entryServiceBerthCheck.slackSeconds < 0 ? 'font-semibold text-red-400' : 'font-semibold'
@@ -537,7 +540,7 @@ function BlockAlgorithmHoverCard({
       ) : null}
 
       {stops.length === 0 ? (
-        <p className="mt-2 text-[10px] text-zinc-500">尚無站點資料</p>
+        <p className="mt-2 text-[10px] text-zinc-500">{t('shiftList.planGrid.noStationData')}</p>
       ) : (
         <ol className="mt-2 max-h-[260px] space-y-0 overflow-y-auto text-[10px] leading-[14px]">
           {stops.map((stop, index) => {
@@ -559,7 +562,7 @@ function BlockAlgorithmHoverCard({
                       if (isFirst && !isLast) {
                         return (
                           <>
-                            <span className="text-zinc-600">出發 </span>
+                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -568,9 +571,9 @@ function BlockAlgorithmHoverCard({
                       if (isLast && !isFirst) {
                         return (
                           <>
-                            <span className="text-zinc-600">抵達 </span>
+                            <span className="text-zinc-600">{t('shiftList.planGrid.arrive')} </span>
                             {formatMinuteToHms(stop.arrivalMinute)}
-                            <span className="mx-1 text-zinc-600">靠站完成 </span>
+                            <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.dwellDone')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -582,7 +585,7 @@ function BlockAlgorithmHoverCard({
                       ) {
                         return (
                           <>
-                            <span className="text-zinc-600">出發 </span>
+                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -590,9 +593,9 @@ function BlockAlgorithmHoverCard({
                       if (isFirst && isLast) {
                         return (
                           <>
-                            <span className="text-zinc-600">出發 </span>
+                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.arrivalMinute)}
-                            <span className="mx-1 text-zinc-600">靠站完成 </span>
+                            <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.dwellDone')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -600,18 +603,18 @@ function BlockAlgorithmHoverCard({
                       // 中途站
                       return (
                         <>
-                          <span className="text-zinc-600">抵達 </span>
+                          <span className="text-zinc-600">{t('shiftList.planGrid.arrive')} </span>
                           {formatMinuteToHms(stop.arrivalMinute)}
-                          <span className="mx-1 text-zinc-600">出發 </span>
+                          <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.depart')} </span>
                           {formatMinuteToHms(stop.departureMinute)}
                         </>
                       );
                     })()}
                   </span>
                   <span className="shrink-0 text-right tabular-nums text-zinc-500">
-                    靠站 {sec(stop.baseDwellSeconds)}
+                    {t('shiftList.planGrid.dwell')} {sec(stop.baseDwellSeconds)}
                     <span className="text-zinc-600"> · </span>
-                    緩衝 {sec(summary.dwellSlackSeconds > 0 && stop.baseDwellSeconds > 0
+                    {t('shiftList.planGrid.slack')} {sec(summary.dwellSlackSeconds > 0 && stop.baseDwellSeconds > 0
                       ? summary.dwellSlackSeconds
                       : 0)}
                   </span>
@@ -620,13 +623,13 @@ function BlockAlgorithmHoverCard({
                   <div className="ml-3 flex items-center gap-1.5 border-l border-zinc-800 py-1 pl-2.5 text-[10px] tabular-nums text-zinc-500">
                     <span className="text-zinc-600">↓</span>
                     <span>
-                      快 {sec(leg?.minTravelTimeSeconds)}
+                      {t('shiftList.planGrid.minShort')} {sec(leg?.minTravelTimeSeconds)}
                       <span className="text-zinc-600"> · </span>
-                      均 {sec(leg?.avgTravelTimeSeconds)}
+                      {t('shiftList.planGrid.avgShort')} {sec(leg?.avgTravelTimeSeconds)}
                       {actualLeg != null ? (
                         <>
                           <span className="text-zinc-600"> · </span>
-                          本班 {sec(actualLeg)}
+                          {t('shiftList.planGrid.thisTrip')} {sec(actualLeg)}
                         </>
                       ) : null}
                     </span>
@@ -904,6 +907,7 @@ function UnservedPulseMarkers({
   report: ShiftScheduleFeasibilityReport | null;
   slotWidthPx: number;
 }) {
+  const { t } = useTranslation();
   const markers = useMemo(() => {
     if (!report) return [];
     const out: { departureSecond: number; message: string }[] = [];
@@ -940,7 +944,7 @@ function UnservedPulseMarkers({
               className="pointer-events-none absolute left-1/2 top-full z-[10060] mt-1 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-red-500/40 bg-zinc-950 px-2.5 py-2 text-[10px] leading-snug text-red-300 shadow-xl shadow-black/50 group-hover:block"
               role="tooltip"
             >
-              <span className="mb-0.5 block font-semibold">&#9888; 未承接跨距</span>
+              <span className="mb-0.5 block font-semibold">{t('shiftList.planGrid.unservedSpan')}</span>
               {message}
             </div>
           </div>
@@ -1331,18 +1335,18 @@ function ShiftScheduleBlockBar({
           ? [
               `${code} · ${resolveMoveCardTitle(block)}`,
               block.source === 'yard_entry_move'
-                ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? '所在站'} → ${block.yardExitFacilityLabel ?? '整備設施'}`
-                : `${block.yardExitFacilityLabel ?? '整備設施'} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? '轉乘站'}`,
-              `${timeLabel}（${block.travelSeconds} 秒）`,
+                ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.currentStation')} → ${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.yardFacility')}`
+                : `${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.yardFacility')} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.transferStation')}`,
+              `${timeLabel}${i18n.t('shiftList.planGrid.secondsParen', { seconds: block.travelSeconds })}`,
               isZeroDuration
-                ? '※ 兩座設施在同一個場區，0 秒示意轉移（不佔時間，畫出來的寬度只是標記）'
+                ? i18n.t('shiftList.planGrid.zeroTransferTitle')
                 : '',
               block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : '',
-              block.yardExitAteYardTail ? '※ 空間不足，已佔用整備尾巴' : '',
+              block.yardExitAteYardTail ? i18n.t('shiftList.planGrid.ateYardTailShort') : '',
             ]
               .filter(Boolean)
               .join('\n')
-          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? '\n⚠ 這段時間沒有任何一台該類設施是空的——車沒地方停' : ''} ${timeLabel}${isZeroDuration ? '\n⚠ 這張卡的開始與結束相同（長度 0），時間模板那一列可能排錯了' : ''}${hasError ? ' (有嚴重錯誤)' : ''}${hasWarning ? ' (有警告)' : ''}`
+          : `${block.label}${block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}${block.yardFacilityUnavailable ? `\n${i18n.t('shiftList.planGrid.noFacilityHover')}` : ''} ${timeLabel}${isZeroDuration ? `\n${i18n.t('shiftList.planGrid.zeroDurationWarn')}` : ''}${hasError ? i18n.t('shiftList.planGrid.hasSevereError') : ''}${hasWarning ? i18n.t('shiftList.planGrid.hasWarning') : ''}`
       }
       role={selectable ? 'button' : undefined}
       tabIndex={selectable && isPrimarySegment && primaryCopy ? 0 : undefined}
@@ -1393,8 +1397,8 @@ function ShiftScheduleBlockBar({
                 <button
                   type="button"
                   className="inline-flex size-5 items-center justify-center rounded text-zinc-300/80 transition hover:bg-black/25 hover:text-red-300"
-                  title="刪除班次卡"
-                  aria-label="刪除班次卡"
+                  title={t('shiftList.planGrid.deleteTrip')}
+                  aria-label={t('shiftList.planGrid.deleteTrip')}
                   onPointerDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1412,8 +1416,8 @@ function ShiftScheduleBlockBar({
                 <button
                   type="button"
                   className="inline-flex size-5 items-center justify-center rounded text-zinc-300/80 transition hover:bg-black/25 hover:text-sky-300"
-                  title="增生班次卡"
-                  aria-label="增生班次卡"
+                  title={t('shiftList.planGrid.duplicateTrip')}
+                  aria-label={t('shiftList.planGrid.duplicateTrip')}
                   onPointerDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1464,7 +1468,7 @@ function ShiftScheduleBlockBar({
         <button
           type="button"
           className="pointer-events-auto absolute inset-0 z-[6] flex items-center justify-center text-zinc-100/80 hover:text-zinc-50"
-          aria-label={`${code} ${resolveMoveCardTitle(block)}內容`}
+          aria-label={t('shiftList.planGrid.cardContentAria', { code, title: resolveMoveCardTitle(block) })}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerEnter={onMoveCardInfoEnter}
@@ -1492,7 +1496,7 @@ function ShiftScheduleBlockBar({
             <button
               type="button"
               className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 hover:bg-white/10"
-              aria-label={`${code} ${hasError ? '錯誤' : '警告'}內容`}
+              aria-label={t('shiftList.planGrid.issueContentAria', { code, kind: hasError ? t('shiftList.planGrid.error') : t('shiftList.planGrid.warning') })}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
               onPointerEnter={onIssueIconEnter}
@@ -1517,7 +1521,7 @@ function ShiftScheduleBlockBar({
               <button
                 type="button"
                 className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-zinc-300 opacity-80 hover:bg-white/10 hover:opacity-100"
-                aria-label={`${block.routeName} 算法參數與站點時刻`}
+                aria-label={t('shiftList.planGrid.algoParamsAria', { route: block.routeName })}
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerEnter={onStationInfoEnter}
@@ -1538,13 +1542,13 @@ function ShiftScheduleBlockBar({
               {block.label}
               {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
               {/* 沒地方停是產能問題，必須直接寫在卡面——只放 hover 使用者不會發現 */}
-              {block.yardFacilityUnavailable ? ' · ⚠ 無可用設施' : ''}
+              {block.yardFacilityUnavailable ? t('shiftList.planGrid.noFacilityAvail') : ''}
             </span>
             {isYardTask ? (
               <button
                 type="button"
                 className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-zinc-300 opacity-80 hover:bg-white/10 hover:opacity-100"
-                aria-label={`${code} ${block.label} 設施與時長`}
+                aria-label={t('shiftList.planGrid.facilityDurationAria', { code, label: block.label })}
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerEnter={onYardInfoEnter}
@@ -1660,6 +1664,7 @@ export function ShiftSchedulePlanGrid({
   onDuplicateBlock,
   zoom = 1,
 }: ShiftSchedulePlanGridProps) {
+  const { t } = useTranslation();
   const slotWidthPx = useMemo(
     // 下限 8px：縮到最小時整天仍要畫得出格線，不能塌成 0
     () => Math.max(8, Math.round(computeAutoSlotWidthPx(plan) * clampGridZoom(zoom))),
@@ -1906,10 +1911,10 @@ export function ShiftSchedulePlanGrid({
         <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
         <span>
           {interactiveEdit
-            ? '上方為時間模板任務（對照用）；下方班次卡可拖曳／左右縮放（10 秒格），不可重疊。點空白處可取消選取。'
+            ? t('shiftList.planGrid.hintManual')
             : onSelectBlock
-              ? '滑鼠移到上方時間軸可看時段屬性；移到班次卡 i 可對照站間拓撲與靠站／緩衝；點選任務區塊可調整計畫發車時刻（10 秒刻度）；點空白處可取消選取'
-              : '滑鼠移到上方時間軸可看時段屬性；移到班次卡 i 可對照站間拓撲與靠站／緩衝；時軸可以左右滑動'}
+              ? t('shiftList.planGrid.hintEditable')
+              : t('shiftList.planGrid.hintReadonly')}
         </span>
         <span className="text-zinc-600">← →</span>
       </div>

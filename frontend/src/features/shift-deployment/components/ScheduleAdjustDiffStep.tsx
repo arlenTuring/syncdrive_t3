@@ -1,5 +1,6 @@
 import { ListFilter, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StatusTag } from '../../../components/StatusTag';
 import { PanelNoData } from '../../time-templates/components/PanelNoData';
 import {
@@ -22,12 +23,6 @@ type ScheduleAdjustDiffStepProps = {
   missingCurrent?: boolean;
 };
 
-function formatExecutionDisplay(date: string, time: string): string {
-  const hour = Number(time.slice(0, 2));
-  const period = Number.isFinite(hour) && hour >= 12 ? '下午' : '上午';
-  return `${date} ${period} ${time}`;
-}
-
 function ColumnFilter({
   label,
   value,
@@ -39,6 +34,7 @@ function ColumnFilter({
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const active = value !== 'all';
@@ -64,8 +60,8 @@ function ColumnFilter({
               ? 'text-[#2B7FFF]'
               : 'text-zinc-600 hover:bg-white/5 hover:text-zinc-300'
           }`}
-          aria-label={`篩選${label}`}
-          title={`篩選${label}`}
+          aria-label={t('shiftDeployment.diff.filterAria', { label })}
+          title={t('shiftDeployment.diff.filterAria', { label })}
         >
           <ListFilter className="size-3.5" />
         </button>
@@ -105,10 +101,20 @@ export function ScheduleAdjustDiffStep({
   error = null,
   missingCurrent = false,
 }: ScheduleAdjustDiffStepProps) {
+  const { t } = useTranslation();
   const [kindFilter, setKindFilter] = useState<'all' | ScheduleDiffKind>('all');
   const [taskFilter, setTaskFilter] = useState<'all' | ScheduleEngineTaskType>('all');
   const [newTimeFilter, setNewTimeFilter] = useState('all');
   const [originalTimeFilter, setOriginalTimeFilter] = useState('all');
+
+  const formatExecutionDisplay = (date: string, time: string): string => {
+    const hour = Number(time.slice(0, 2));
+    const period =
+      Number.isFinite(hour) && hour >= 12
+        ? t('shiftDeployment.diff.pm')
+        : t('shiftDeployment.diff.am');
+    return `${date} ${period} ${time}`;
+  };
 
   const rows = useMemo(
     () => diffSchedulePlans(currentPlan, nextPlan),
@@ -121,28 +127,28 @@ export function ScheduleAdjustDiffStep({
       if (!seen.has(row.taskType)) seen.set(row.taskType, row.taskLabel);
     }
     return [
-      { value: 'all', label: '全部' },
+      { value: 'all', label: t('shiftDeployment.diff.all') },
       ...[...seen.entries()].map(([value, label]) => ({ value, label })),
     ];
-  }, [rows]);
+  }, [rows, t]);
 
   const newTimeOptions = useMemo(() => {
     const times = [...new Set(rows.map((row) => row.newDepartLabel).filter(Boolean))].sort();
     return [
-      { value: 'all', label: '全部' },
-      { value: '__empty', label: '空白' },
+      { value: 'all', label: t('shiftDeployment.diff.all') },
+      { value: '__empty', label: t('shiftDeployment.diff.blank') },
       ...times.map((time) => ({ value: time, label: time })),
     ];
-  }, [rows]);
+  }, [rows, t]);
 
   const originalTimeOptions = useMemo(() => {
     const times = [...new Set(rows.map((row) => row.originalDepartLabel).filter(Boolean))].sort();
     return [
-      { value: 'all', label: '全部' },
-      { value: '__empty', label: '空白' },
+      { value: 'all', label: t('shiftDeployment.diff.all') },
+      { value: '__empty', label: t('shiftDeployment.diff.blank') },
       ...times.map((time) => ({ value: time, label: time })),
     ];
-  }, [rows]);
+  }, [rows, t]);
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -167,31 +173,35 @@ export function ScheduleAdjustDiffStep({
   return (
     <div className="flex flex-col px-6 pb-3">
       <section className="pb-5">
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">申請內容</h3>
+        <h3 className="mb-3 text-sm font-medium text-zinc-200">
+          {t('shiftDeployment.diff.applicationContent')}
+        </h3>
         <div className="grid grid-cols-2 gap-8 text-sm">
           <div>
-            <p className="mb-1 text-xs text-zinc-500">執行時間</p>
+            <p className="mb-1 text-xs text-zinc-500">{t('shiftDeployment.diff.executionTime')}</p>
             <p className="text-zinc-100">{formatExecutionDisplay(execDate, execTime)}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">班表</p>
+            <p className="mb-1 text-xs text-zinc-500">{t('shiftDeployment.diff.schedule')}</p>
             <p className="text-zinc-100">{scheduleName || '—'}</p>
           </div>
         </div>
       </section>
 
       <section className="flex flex-col">
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">影響摘要</h3>
+        <h3 className="mb-3 text-sm font-medium text-zinc-200">
+          {t('shiftDeployment.diff.impactSummary')}
+        </h3>
         {missingCurrent ? (
           <p className="mb-2 text-xs text-zinc-500">
-            目前沒有「使用中」的部署班表，以下差異視為相對空白班表。
+            {t('shiftDeployment.diff.missingCurrent')}
           </p>
         ) : null}
         <div className="overflow-visible rounded-xl border border-zinc-800/80 bg-[#0c0c0e]">
           {loading ? (
             <div className="flex min-h-[280px] items-center justify-center gap-2 text-zinc-500">
               <Loader2 className="size-5 animate-spin" />
-              比對班表中…
+              {t('shiftDeployment.diff.comparing')}
             </div>
           ) : error ? (
             <div className="m-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
@@ -202,34 +212,34 @@ export function ScheduleAdjustDiffStep({
               <thead>
                 <tr className="border-b border-zinc-800 bg-[#141416] text-left text-zinc-400">
                   <ColumnFilter
-                    label="新預計發車"
+                    label={t('shiftDeployment.diff.newDepart')}
                     value={newTimeFilter}
                     options={newTimeOptions}
                     onChange={setNewTimeFilter}
                   />
                   <ColumnFilter
-                    label="變動類別"
+                    label={t('shiftDeployment.diff.changeKind')}
                     value={kindFilter}
                     options={[
-                      { value: 'all', label: '全部' },
-                      { value: 'delete', label: '刪除任務' },
-                      { value: 'create', label: '建立任務' },
+                      { value: 'all', label: t('shiftDeployment.diff.all') },
+                      { value: 'delete', label: t('shiftDeployment.diff.deleteTask') },
+                      { value: 'create', label: t('shiftDeployment.diff.createTask') },
                     ]}
                     onChange={(value) => setKindFilter(value as 'all' | ScheduleDiffKind)}
                   />
                   <ColumnFilter
-                    label="原預計發車"
+                    label={t('shiftDeployment.diff.originalDepart')}
                     value={originalTimeFilter}
                     options={originalTimeOptions}
                     onChange={setOriginalTimeFilter}
                   />
                   <ColumnFilter
-                    label="任務項目"
+                    label={t('shiftDeployment.diff.taskItem')}
                     value={taskFilter}
                     options={taskOptions}
                     onChange={(value) => setTaskFilter(value as 'all' | ScheduleEngineTaskType)}
                   />
-                  <th className="px-4 py-3 font-medium">原因</th>
+                  <th className="px-4 py-3 font-medium">{t('shiftDeployment.diff.reason')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,7 +248,11 @@ export function ScheduleAdjustDiffStep({
                     <td colSpan={5} className="py-10">
                       <PanelNoData
                         className="min-h-[200px]"
-                        message={rows.length === 0 ? '與目前部署班表相同，沒有差異' : '沒有符合篩選的差異'}
+                        message={
+                          rows.length === 0
+                            ? t('shiftDeployment.diff.noDiff')
+                            : t('shiftDeployment.diff.noFilterMatch')
+                        }
                       />
                     </td>
                   </tr>
@@ -257,6 +271,7 @@ export function ScheduleAdjustDiffStep({
 }
 
 function DiffRow({ row }: { row: ScheduleDiffRow }) {
+  const { t } = useTranslation();
   const isDelete = row.kind === 'delete';
   return (
     <tr className="border-b border-zinc-800/50 hover:bg-white/[0.02]">
@@ -268,7 +283,9 @@ function DiffRow({ row }: { row: ScheduleDiffRow }) {
           }`}
         >
           {isDelete ? <Trash2 className="size-4" /> : <Plus className="size-4" />}
-          {isDelete ? '刪除任務' : '建立任務'}
+          {isDelete
+            ? t('shiftDeployment.diff.deleteTask')
+            : t('shiftDeployment.diff.createTask')}
         </span>
       </td>
       <td className="px-4 py-3 tabular-nums text-zinc-200">{row.originalDepartLabel || ''}</td>

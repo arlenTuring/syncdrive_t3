@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Lightbulb } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   SCHEDULE_SLOT_MINUTES,
   SCHEDULE_VISIBLE_SLOTS,
@@ -18,10 +19,6 @@ import { recommendFleetRowCount } from '../utils/recommendFleetRowCount';
 import { ScheduleTimelineBackground } from './scheduleTimelineBackground';
 
 export const TURNAROUND_LIMIT_ROW_HEIGHT_PX = 30;
-
-const TURNAROUND_LIMIT_ROW_TITLE = '正線建議';
-const TURNAROUND_LIMIT_ROW_HINT =
-  '建議車輛＝ceil(完整交路週期÷班距)。週期請填一整輪（非單線）；短時段常需再加列。';
 
 type TurnaroundLimitGridProps = {
   tasks: ScheduleTask[];
@@ -60,6 +57,7 @@ function TurnaroundLimitHoverCard({
   pos: HoverCardPos;
   estimatedTripSeconds?: number | null;
 }) {
+  const { t } = useTranslation();
   const tipRef = useRef<HTMLDivElement>(null);
   const [placed, setPlaced] = useState<PlacedHoverCard | null>(null);
   const existingVehicles = segment.activePassengerCount;
@@ -109,19 +107,21 @@ function TurnaroundLimitHoverCard({
       role="tooltip"
     >
       <div className="text-[11px] font-medium leading-4 text-zinc-100">
-        已排正線：{existingVehicles} 列
+        {t('timeTemplates.turnaround.existing', { count: existingVehicles })}
       </div>
       <div className="text-[11px] font-medium leading-4 text-zinc-100">
-        建議列數：{recommendedVehicles != null ? `${recommendedVehicles} 列` : '—'}
+        {recommendedVehicles != null
+          ? t('timeTemplates.turnaround.recommended', { count: recommendedVehicles })
+          : t('timeTemplates.turnaround.recommendedEmpty')}
         {theoreticalMin != null && theoreticalMin !== recommendedVehicles
-          ? `（理論下限 ${theoreticalMin}）`
+          ? t('timeTemplates.turnaround.theoreticalMin', { count: theoreticalMin })
           : null}
       </div>
       <div className="mt-1 space-y-0.5 text-[10px] leading-[14px] tabular-nums text-zinc-300">
-        <div>開始：{formatMinuteAsHms(segment.startMinute)}</div>
-        <div>結束：{formatMinuteAsHms(segment.endMinute)}</div>
+        <div>{t('timeTemplates.turnaround.start', { time: formatMinuteAsHms(segment.startMinute) })}</div>
+        <div>{t('timeTemplates.turnaround.end', { time: formatMinuteAsHms(segment.endMinute) })}</div>
         {segment.headwaySeconds ? (
-          <div>班距：{segment.headwaySeconds} 秒</div>
+          <div>{t('timeTemplates.turnaround.headway', { seconds: segment.headwaySeconds })}</div>
         ) : null}
       </div>
       <div
@@ -183,12 +183,15 @@ export function TurnaroundLimitGrid({
    */
   dayCopyCount?: number;
 }) {
+  const { t } = useTranslation();
   const segments = useMemo(
     () => computeTurnaroundLimitSegments(tasks, intervals, attributes),
     [tasks, intervals, attributes],
   );
 
   const trackWidthPx = SCHEDULE_VISIBLE_SLOTS * slotWidthPx;
+  const rowTitle = t('timeTemplates.turnaround.rowTitle');
+  const rowHint = t('timeTemplates.turnaround.rowHint');
 
   return (
     <div
@@ -198,8 +201,8 @@ export function TurnaroundLimitGrid({
       <div
         className={`sticky left-0 z-20 flex shrink-0 items-center justify-center border-r border-zinc-800/60 bg-[#0a0a0c]/95 ${SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS}`}
         style={{ width: rowLabelWidth }}
-        title={`${TURNAROUND_LIMIT_ROW_TITLE}：${TURNAROUND_LIMIT_ROW_HINT}`}
-        aria-label={TURNAROUND_LIMIT_ROW_TITLE}
+        title={`${rowTitle}：${rowHint}`}
+        aria-label={rowTitle}
       >
         <Lightbulb className="size-3.5" aria-hidden />
       </div>
@@ -216,7 +219,7 @@ export function TurnaroundLimitGrid({
 
         {segments.length === 0 ? (
           <div className="relative z-[1] flex h-full items-center px-2 text-[10px] text-zinc-600">
-            尚無載客任務
+            {t('timeTemplates.turnaround.empty')}
           </div>
         ) : (
           segments.map((segment) => {
@@ -232,9 +235,15 @@ export function TurnaroundLimitGrid({
             });
             const recommendedVehicles = fleet?.recommended ?? null;
 
-            const label = `已排: ${existingVehicles}列, 建議: ${
-              recommendedVehicles != null ? `${recommendedVehicles}列` : '—列'
-            }`;
+            const label = t('timeTemplates.turnaround.cellLabel', {
+              existing: existingVehicles,
+              recommended:
+                recommendedVehicles != null
+                  ? t('timeTemplates.turnaround.cellRecommendedValue', {
+                      count: recommendedVehicles,
+                    })
+                  : t('timeTemplates.turnaround.cellRecommendedEmpty'),
+            });
 
             return (
               <TurnaroundLimitCell

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   fetchYardFacilityEquipment,
   type FieldEquipmentItem,
@@ -23,6 +24,7 @@ type StepCarWashParamsProps = {
 };
 
 export function StepCarWashParams({ draft, onChange }: StepCarWashParamsProps) {
+  const { t } = useTranslation();
   const carWash = normalizeCarWashDraft(draft);
   const patchCarWash = (patch: Partial<MaintenanceTaskCarWashDraft>) =>
     onChange(normalizeCarWashDraft({ ...carWash, ...patch }));
@@ -54,42 +56,42 @@ export function StepCarWashParams({ draft, onChange }: StepCarWashParamsProps) {
 
   return (
     <StepSectionToggle
-      title="填入洗車任務"
+      title={t('maintenanceTasks.carWash.title')}
       enabled={carWash.stepEnabled}
       onEnabledChange={(stepEnabled) => patchCarWash({ stepEnabled })}
     >
       <div className="space-y-5">
         <TriggerFieldRow
-          label="累積里程觸發值"
+          label={t('maintenanceTasks.carWash.mileageLabel')}
           enabled={carWash.mileageDetectionEnabled}
           value={carWash.mileageTriggerKm}
           onEnabledChange={(mileageDetectionEnabled) =>
             patchCarWash({ mileageDetectionEnabled })
           }
           onValueChange={(mileageTriggerKm) => patchCarWash({ mileageTriggerKm })}
-          prefixText="每經過"
-          suffixText="公里的行駛里程，需進行洗車作業"
+          prefixText={t('maintenanceTasks.carWash.mileagePrefix')}
+          suffixText={t('maintenanceTasks.carWash.mileageSuffix')}
           sanitizeValue={sanitizeIntegerInput}
         />
 
         <TriggerFieldRow
-          label="累積時間觸發值"
+          label={t('maintenanceTasks.carWash.timeLabel')}
           enabled={carWash.timeDetectionEnabled}
           value={carWash.timeTriggerHours}
           onEnabledChange={(timeDetectionEnabled) => patchCarWash({ timeDetectionEnabled })}
           onValueChange={(timeTriggerHours) => patchCarWash({ timeTriggerHours })}
-          prefixText="每經過"
-          suffixText="小時的行駛時數，需進行洗車作業"
+          prefixText={t('maintenanceTasks.carWash.timePrefix')}
+          suffixText={t('maintenanceTasks.carWash.timeSuffix')}
           sanitizeValue={sanitizeIntegerInput}
         />
 
         <div className="block">
           <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
-            單次作業時長
+            {t('maintenanceTasks.carWash.durationLabel')}
           </span>
           <div className="flex w-full flex-wrap items-center gap-2 text-sm text-zinc-300">
-            <span>每次需</span>
+            <span>{t('maintenanceTasks.carWash.durationPrefix')}</span>
             <input
               type="text"
               inputMode="numeric"
@@ -99,10 +101,10 @@ export function StepCarWashParams({ draft, onChange }: StepCarWashParamsProps) {
                   operationDurationMinutes: sanitizeIntegerInput(e.target.value),
                 })
               }
-              placeholder="請輸入"
+              placeholder={t('maintenanceTasks.triggerField.placeholder')}
               className={INLINE_INPUT_ENABLED}
             />
-            <span>分鐘，進行洗車作業</span>
+            <span>{t('maintenanceTasks.carWash.durationSuffix')}</span>
           </div>
         </div>
 
@@ -113,7 +115,10 @@ export function StepCarWashParams({ draft, onChange }: StepCarWashParamsProps) {
           equipmentError={equipmentError}
           equipmentHint={
             equipment.length > 0
-              ? `場域共 ${equipment.length} 座設施格可掛載（${equipment.map((e) => e.mapCode).join('、')}）；掛哪一座由整備任務決定，不受地圖用途限制`
+              ? t('maintenanceTasks.equipmentHint', {
+                  count: equipment.length,
+                  codes: equipment.map((e) => e.mapCode).join('、'),
+                })
               : undefined
           }
           newRow={() => ({
