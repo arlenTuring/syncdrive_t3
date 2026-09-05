@@ -636,6 +636,9 @@ function layoutOnce(
     return Math.max(0, raw + (atFrom ? alongU * shiftPx : -alongU * shiftPx))
   }
 
+  /** 每條邊、每個節點、每條車道：帶子在那一端實際畫到的位置 */
+  const bandEnd = new Map<string, Vec>()
+
   for (const e of graph.edges) {
     const ends = edgeEnds(e, byId)
     if (!ends) continue
@@ -1079,6 +1082,15 @@ function layoutOnce(
         }
         return { left, right }
       }
+      /*
+       * 記下這條帶子<strong>實際畫到哪</strong>，轉角要照這個位置接。
+       *
+       * 帶子的側位不一定等於節點的股位：短邊的兩端想要的股位不同時，整條會畫在兩者的
+       * 平均上（見上面 levelRuns 只有一段的處理），每一端因此各差一半。轉角若照節點的
+       * 股位畫，接縫就會錯開那一半——實測 road 10 的兩個圓角與縱向帶子各差 3.7 像素。
+       */
+      bandEnd.set(`${e.id}|${e.from}|${k}`, at(0, runs[0]!.extra))
+      bandEnd.set(`${e.id}|${e.to}|${k}`, at(1, runs[runs.length - 1]!.extra))
       let seq = 0
       runs.forEach((run, ri) => {
         const extra = run.extra
@@ -1335,12 +1347,27 @@ function layoutOnce(
     for (let k = 0; k < count; k += 1) {
       const h = hs[k]!
       const v = vs[k]!
-      const radius = (h.d + v.d) / 2
+      /*
+       * 兩隻腳接在帶子<strong>實際畫到的地方</strong>，不是節點的名目股位。
+       *
+       * 短邊兩端想要的股位不同時，整條帶子畫在兩者的平均上，每一端各差一半；轉角照
+       * 名目股位畫就會錯開那一半。改成讀帶子自己回報的端點，接縫必然為零。
+       * 沒有回報的（邊太短被跳過、或另一側不是生成的帶子）才退回名目位置。
+       */
+      const hEnd = bandEnd.get(`${eh.id}|${node.id}|${h.k}`)
+      const vEnd = bandEnd.get(`${ev.id}|${node.id}|${v.k}`)
+      // 橫的那條給的是「這一排的高度」，縱的那條給的是「這一欄的位置」；圓心由兩者交會
+      const rowY = hEnd ? hEnd.y : N.y + h.o
+      const colX = vEnd ? vEnd.x : N.x + v.o
+      const armX = hEnd ? hEnd.x : C.x
+      const armY = vEnd ? vEnd.y : C.y
+      const CC = { x: armX, y: armY }
+      const radius = (Math.abs(rowY - CC.y) + Math.abs(colX - CC.x)) / 2
       // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
       if (radius < bandW * 0.45) continue
-      const p0 = { x: C.x, y: N.y + h.o }
-      const p1 = { x: N.x + v.o, y: C.y }
-      const fit = fitCornerAt(C, radius + bandW / 2, bandW, p0, p1)
+      const p0 = { x: CC.x, y: rowY }
+      const p1 = { x: colX, y: CC.y }
+      const fit = fitCornerAt(CC, radius + bandW / 2, bandW, p0, p1)
       /*
        * 圖面中心線要照<strong>弧</strong>取，不能只留兩個端點。
        *
@@ -1348,8 +1375,8 @@ function layoutOnce(
        * 的話那是一條弦，車子會從弧的一端直接切到另一端——實測在轉角裡一步跳 7.9 公尺。
        */
       const arc = (() => {
-        const a0 = Math.atan2(p0.y - C.y, p0.x - C.x)
-        const a1raw = Math.atan2(p1.y - C.y, p1.x - C.x)
+        const a0 = Math.atan2(p0.y - CC.y, p0.x - CC.x)
+        const a1raw = Math.atan2(p1.y - CC.y, p1.x - CC.x)
         let da = a1raw - a0
         while (da > Math.PI) da -= 2 * Math.PI
         while (da < -Math.PI) da += 2 * Math.PI
@@ -1359,8 +1386,10 @@ function layoutOnce(
           const t = i / n
           const ang = a0 + da * t
           // 兩端的半徑不一定完全相同，照比例補間，端點才會落在原本的位置
-          const rr = h.d + (v.d - h.d) * t
-          out.push({ x: C.x + Math.cos(ang) * rr, y: C.y + Math.sin(ang) * rr })
+          const rA = Math.abs(rowY - CC.y)
+          const rB = Math.abs(colX - CC.x)
+          const rr = rA + (rB - rA) * t
+          out.push({ x: CC.x + Math.cos(ang) * rr, y: CC.y + Math.sin(ang) * rr })
         }
         return out
       })()
