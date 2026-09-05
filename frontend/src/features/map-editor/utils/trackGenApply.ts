@@ -142,6 +142,9 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
       lane: sp.laneId,
       s0: Number(sp.sFromM.toFixed(2)),
       s1: Number(sp.sToM.toFixed(2)),
+      h: Number(sp.headingRad.toFixed(4)),
+      f0: Number(sp.pathFrom.toFixed(4)),
+      f1: Number(sp.pathTo.toFixed(4)),
     }))
   const spanMeta = spans.length ? { [TRACKGEN_SPANS_KEY]: spans } : {}
   if (shape.kind === 'rect') {

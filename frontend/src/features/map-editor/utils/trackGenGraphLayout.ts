@@ -639,11 +639,32 @@ function layoutOnce(
     const spanFrac = Math.max(0, 1 - sTrim0 - sTrim1)
     const sAt = (f: number) =>
       e.sFromM + (e.sToM - e.sFromM) * (sTrim0 + Math.max(0, Math.min(1, f)) * spanFrac)
-    const spanOfLane = (lane: { laneId: number }, f0: number, f1: number): TrackSpan => ({
+    /** 這條車道在這一段的行車方向（真實座標）：中心線的走向，正號車道與 s 相反 */
+    const laneHeading = (laneIdx: number, f0: number, f1: number) => {
+      const pts = e.lanes[laneIdx]?.points ?? e.points
+      if (pts.length < 2) return 0
+      const grab = (f: number) => {
+        const u = Math.max(0, Math.min(1, sTrim0 + f * spanFrac)) * (pts.length - 1)
+        const i = Math.min(pts.length - 2, Math.floor(u))
+        const t = u - i
+        return {
+          x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
+          y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
+        }
+      }
+      const a = grab(f0)
+      const b = grab(f1)
+      const along = Math.atan2(b.y - a.y, b.x - a.x)
+      return (e.lanes[laneIdx]?.laneId ?? 0) > 0 ? along + Math.PI : along
+    }
+    const spanOfLane = (laneIdx: number, f0: number, f1: number): TrackSpan => ({
       roadId: e.roadId,
-      laneId: lane.laneId,
-      sFromM: Math.min(sAt(f0), sAt(f1)),
-      sToM: Math.max(sAt(f0), sAt(f1)),
+      laneId: e.lanes[laneIdx]?.laneId ?? 0,
+      sFromM: sAt(f0),
+      sToM: sAt(f1),
+      headingRad: laneHeading(laneIdx, f0, f1),
+      pathFrom: 0,
+      pathTo: 1,
     })
 
     const perpScale = axisScale(e.orient)
@@ -971,7 +992,7 @@ function layoutOnce(
               realLatToM: 0,
               samples: [p0, p1],
               realPath: realSlice(e, k, e.lanes.length, f0, f1, t0 / full, t1 / full),
-              spans: [spanOfLane(lane, f0, f1)],
+              spans: [spanOfLane(k, f0, f1)],
               centre,
               lengthM,
               widthM: bandW,
@@ -1002,7 +1023,7 @@ function layoutOnce(
           realLatToM: 0,
           samples: [a0, a1],
           realPath: realSlice(e, k, e.lanes.length, run.f1 - half, run.f1 + half, t0 / full, t1 / full),
-          spans: [spanOfLane(lane, run.f1 - half, run.f1 + half)],
+          spans: [spanOfLane(k, run.f1 - half, run.f1 + half)],
           geometry: fit.geometry,
           box: fit.box,
           sFrom: 0,
@@ -1027,14 +1048,70 @@ function layoutOnce(
     return Math.max(0, Math.min(0.5, trimAt(e, nodeId, full) / full))
   }
   /** 這條邊在這個節點那一端、讓出去那一截所涵蓋的路網區間 */
-  const spanAtNode = (e: GraphEdge, nodeId: string, laneId: number): TrackSpan => {
+  const spanAtNode = (e: GraphEdge, nodeId: string, laneIdx: number, reversed = false): TrackSpan => {
     const frac = trimFracAt(e, nodeId)
     const total = e.sToM - e.sFromM
     const [a, b] =
       e.from === nodeId
         ? [e.sFromM, e.sFromM + total * frac]
         : [e.sToM - total * frac, e.sToM]
-    return { roadId: e.roadId, laneId, sFromM: Math.min(a, b), sToM: Math.max(a, b) }
+    // 方向照那條腿自己的走向算，不要用整塊的頭尾連線
+    const tail = laneTailAt(e, nodeId, laneIdx, 2)
+    const laneId = e.lanes[laneIdx]?.laneId ?? 0
+    let along = 0
+    if (tail.length >= 2) {
+      const p0 = tail[0]!
+      const p1 = tail[tail.length - 1]!
+      // laneTailAt 是由節點往邊內走，行車方向要看這一端是 from 還是 to
+      const fwd = e.from === nodeId
+      along = fwd
+        ? Math.atan2(p1.y - p0.y, p1.x - p0.x)
+        : Math.atan2(p0.y - p1.y, p0.x - p1.x)
+    }
+    /*
+     * 里程照<strong>路徑的走向</strong>記。被反過來接的那條腿（畫面上要從邊的內部連回
+     * 節點）里程是遞減的；記成遞增的話，換算出來的里程會落在區間的另一頭——實測車輛在
+     * 路口的里程差到 117 公尺。
+     */
+    const lo = Math.min(a, b)
+    const hi = Math.max(a, b)
+    const nodeAtStart = e.from === nodeId
+    // 由節點往邊內走時里程遞增（節點在 from）或遞減（節點在 to）；反接的那條再翻一次
+    const outward = nodeAtStart ? [lo, hi] : [hi, lo]
+    const [sFrom, sTo] = reversed ? [outward[1]!, outward[0]!] : [outward[0]!, outward[1]!]
+    return {
+      roadId: e.roadId,
+      laneId,
+      sFromM: sFrom,
+      sToM: sTo,
+      headingRad: laneId > 0 ? along + Math.PI : along,
+      pathFrom: 0,
+      pathTo: 1,
+    }
+  }
+  /** 折線長度，用來算路口元件兩條腿各佔整條路徑的幾成 */
+  const polyLen = (pts: Vec[]) => {
+    let t = 0
+    for (let i = 1; i < pts.length; i += 1) t += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y)
+    return t
+  }
+  /**
+   * 路口元件：把兩條腿接成一條路徑，並把兩段各自的路徑範圍標好。
+   */
+  const joinLegs = (first: Vec[], second: Vec[], spans: TrackSpan[]) => {
+    const path = [...first, ...second]
+    const lenA = polyLen(first)
+    const total = lenA + polyLen(second)
+    const cut = total > 1e-6 ? lenA / total : 0.5
+    if (spans[0]) {
+      spans[0].pathFrom = 0
+      spans[0].pathTo = cut
+    }
+    for (let i = 1; i < spans.length; i += 1) {
+      spans[i]!.pathFrom = cut
+      spans[i]!.pathTo = 1
+    }
+    return path
   }
   /** 這條邊某一條車道、在這個節點那一截的真實中心線 */
   const laneTailAt = (e: GraphEdge, nodeId: string, laneIdx: number, n = 6): Vec[] => {
@@ -1118,14 +1195,15 @@ function layoutOnce(
         realLatFromM: 0,
         realLatToM: 0,
         samples: [p0, p1],
-        realPath: [
-          ...laneTailAt(eh, node.id, h.k).reverse(),
-          ...laneTailAt(ev, node.id, v.k),
-        ],
-        spans: [
-          spanAtNode(eh, node.id, eh.lanes[h.k]!.laneId),
-          spanAtNode(ev, node.id, ev.lanes[v.k]!.laneId),
-        ],
+        ...(() => {
+          const spans = [spanAtNode(eh, node.id, h.k, true), spanAtNode(ev, node.id, v.k)]
+          const realPath = joinLegs(
+            laneTailAt(eh, node.id, h.k).reverse(),
+            laneTailAt(ev, node.id, v.k),
+            spans,
+          )
+          return { realPath, spans }
+        })(),
         geometry: fit.geometry,
         box: fit.box,
         outerRadiusM: radius + bandW / 2,
@@ -1185,19 +1263,23 @@ function layoutOnce(
         realLatFromM: 0,
         realLatToM: 0,
         samples: [at(job.runPx, oMain), at(0, oBranch)],
-        realPath: [
-          ...laneTailAt(job.stem, job.nodeId, stemRank[k]!.k).reverse(),
-          ...laneTailAt(job.branch, job.nodeId, branchRank[k]!.k),
-        ],
         /*
          * 分岔認領三段：梗讓出來的那一截，以及兩個出口各自的起頭。車輛不管走直行還是
          * 岔出，在路口那一小段都查得到這一塊。
          */
-        spans: [
-          spanAtNode(job.stem, job.nodeId, job.stem.lanes[stemRank[k]!.k]?.laneId ?? 0),
-          spanAtNode(job.through, job.nodeId, laneMain.laneId),
-          spanAtNode(job.branch, job.nodeId, laneBranch.laneId),
-        ],
+        ...(() => {
+          const spans = [
+            spanAtNode(job.stem, job.nodeId, stemRank[k]!.k, true),
+            spanAtNode(job.through, job.nodeId, stemRank[k]!.k),
+            spanAtNode(job.branch, job.nodeId, branchRank[k]!.k),
+          ]
+          const realPath = joinLegs(
+            laneTailAt(job.stem, job.nodeId, stemRank[k]!.k).reverse(),
+            laneTailAt(job.branch, job.nodeId, branchRank[k]!.k),
+            spans,
+          )
+          return { realPath, spans }
+        })(),
         geometry: fit.geometry,
         box: fit.box,
         sFrom: 0,
@@ -1225,36 +1307,39 @@ function layoutOnce(
 function realSlice(
   e: GraphEdge,
   k: number,
-  count: number,
+  _count: number,
   f0: number,
   f1: number,
   trim0: number,
   trim1: number,
 ): Vec[] {
-  const pts = e.points
-  if (pts.length < 2) return []
+  /*
+   * 直接用<strong>那條車道自己的中心線</strong>，不要拿參考線加一個算出來的橫向偏移。
+   *
+   * 算出來的偏移假設車道等寬、對稱排在參考線兩側；月台那一段兩條軌道被拉開到 4.5 公尺，
+   * 算出來的位置就差了一兩公尺——車輛定位時反而被判到對面那條車道去。車道中心線本來就
+   * 在檔案裡（建圖時已經裁好帶下來），照它取就是準的。
+   */
+  const pts = e.lanes[k]?.points ?? []
+  const src = pts.length >= 2 ? pts : e.points
+  if (src.length < 2) return []
   const span = 1 - trim0 - trim1
   const at = (f: number) => {
-    const u = Math.max(0, Math.min(1, trim0 + f * span)) * (pts.length - 1)
-    const i = Math.min(pts.length - 2, Math.floor(u))
+    const u = Math.max(0, Math.min(1, trim0 + f * span)) * (src.length - 1)
+    const i = Math.min(src.length - 2, Math.floor(u))
     const t = u - i
     return {
-      x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t,
-      y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t,
+      x: src[i]!.x + (src[i + 1]!.x - src[i]!.x) * t,
+      y: src[i]!.y + (src[i + 1]!.y - src[i]!.y) * t,
     }
   }
-  const a = at(f0)
-  const b = at(f1)
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const m = Math.hypot(dx, dy) || 1
-  const lat = (k - (count - 1) / 2) * (e.lanes[k]?.widthM || LANE_W_M)
-  // 真實座標 y 向上：右法線是 (dy, -dx)
-  const off = { x: (dy / m) * lat, y: (-dx / m) * lat }
-  return [
-    { x: a.x + off.x, y: a.y + off.y },
-    { x: b.x + off.x, y: b.y + off.y },
-  ]
+  /*
+   * 取幾個中間點，不要只留頭尾。彎的地方兩點連線會切過弧，車輛投影上去就會偏。
+   */
+  const out: Vec[] = []
+  const n = 4
+  for (let i = 0; i <= n; i += 1) out.push(at(f0 + ((f1 - f0) * i) / n))
+  return out
 }
 
 /**

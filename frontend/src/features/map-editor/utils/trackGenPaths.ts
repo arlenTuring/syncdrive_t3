@@ -24,7 +24,18 @@ export const TRACKGEN_LOCAL_PATH_KEY = 'trackGenLocalPath'
  */
 export const TRACKGEN_SPANS_KEY = 'trackGenSpans'
 
-export type TrackGenSpan = { road: string; lane: number; s0: number; s1: number }
+export type TrackGenSpan = {
+  road: string
+  lane: number
+  s0: number
+  s1: number
+  /** 這一段的行車方向（弳度，真實座標）；舊資料沒有時為 null */
+  h: number | null
+  /** 里程照路徑順序記，s0 可能大於 s1 */
+  /** 這一段對應到這塊路徑的哪一截（0–1）；舊資料沒有時視為整條 */
+  f0: number
+  f1: number
+}
 
 export function getTrackGenSpans(
   parameters: Record<string, unknown> | undefined,
@@ -40,7 +51,18 @@ export function getTrackGenSpans(
     const s0 = Number(o.s0)
     const s1 = Number(o.s1)
     if (!road || ![lane, s0, s1].every(Number.isFinite)) continue
-    out.push({ road, lane, s0: Math.min(s0, s1), s1: Math.max(s0, s1) })
+    const h = Number(o.h)
+    const f0 = Number(o.f0)
+    const f1 = Number(o.f1)
+    out.push({
+      road,
+      lane,
+      s0,
+      s1,
+      h: Number.isFinite(h) ? h : null,
+      f0: Number.isFinite(f0) ? f0 : 0,
+      f1: Number.isFinite(f1) ? f1 : 1,
+    })
   }
   return out
 }

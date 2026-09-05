@@ -70,9 +70,33 @@ export type RealLateral = {
 export type TrackSpan = {
   roadId: string
   laneId: number
-  /** 沿該 road 參考線的里程（公尺） */
+  /**
+   * 沿該 road 參考線的里程（公尺），<strong>照路徑的順序</strong>記，不是由小到大。
+   *
+   * 路口的元件會把其中一條腿反過來接（畫面上要從這頭連到那頭），那條腿的里程就是遞減的。
+   * 硬排成由小到大，里程換算會整個顛倒——實測車輛在路口的里程差到 117 公尺。
+   */
   sFromM: number
   sToM: number
+  /**
+   * 這一段的<strong>行車方向</strong>（弳度，真實座標）。
+   *
+   * 定位時拿它跟車頭朝向比，就能把走向相反的那條車道篩掉——上下行在場上只差 3.5 公尺，
+   * 位置分不出來，走向差 180 度卻一目了然。
+   *
+   * 必須逐段記：路口的元件同時代表好幾段，那幾段的方向並不相同，拿整塊的頭尾連線去
+   * 算會得到一個誰都不像的方向。
+   */
+  headingRad: number
+  /**
+   * 這一段對應到<strong>這塊軌道路徑的哪一截</strong>（0–1）。
+   *
+   * 直軌與斜接整條就是一段，所以是 0–1。路口的元件橫跨兩條腿：前半屬於一條、後半屬於
+   * 另一條，里程要照各自那一截換算。少了這個，車輛在路口的里程會被整塊的比例拉開——
+   * 實測差到 117 公尺。
+   */
+  pathFrom: number
+  pathTo: number
 }
 
 export type LayoutRect = RealLateral & {
