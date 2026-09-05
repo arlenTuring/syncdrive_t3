@@ -2,6 +2,7 @@ import type { VehiclePlacementAcrossAreas, VehicleTrackPlacement } from '../reso
 import { fieldPositionToTrackAreaLocal } from '../resolveVehicleTrackPlacement';
 import type { TrackNetwork, TrackNetworkSegment } from './types';
 import { trackGenPickScore } from '../../utils/trackGenPaths';
+import { locateByField } from '../../utils/trackGenLocate';
 
 function fieldPointInRefField(
   xM: number,
@@ -57,19 +58,48 @@ export function pickRefFieldSegment(
   return matches.slice().sort((a, b) => a.trackId.localeCompare(b.trackId))[0] ?? null;
 }
 
+/** 生成軌道：格網找候選、車頭朝向定上下行 */
+function locateGeneratedSegment(
+  network: TrackNetwork,
+  xM: number,
+  yM: number,
+  headingRad?: number,
+): TrackNetworkSegment | null {
+  if (!network.genIndex) return null;
+  const hit = locateByField(network.genIndex, xM, yM, headingRad);
+  if (!hit) return null;
+  const segment = network.byTrackId.get(hit.facilityId);
+  if (!segment) return null;
+  return fieldPointInRefField(xM, yM, segment.bounds) ? segment : null;
+}
+
 /**
  * 場域 (x,y) 定位：僅 refField 段內命中才回傳圖台座標。
  * 段外不吸附、不外插；Area 不作空間查詢。
+ *
+ * <h3>兩條路</h3>
+ * 生成的軌道走<strong>索引</strong>：座標算出格號就拿到那一格的兩三個候選，再用車頭
+ * 朝向排掉走向相反的那一條。上下行在圖上只差三公尺多，位置分不出來，走向差 180 度
+ * 卻一目了然——先前只能比距離，分不出來時靠「偏向比較長的那條線」補償 0.75 公尺，
+ * 那是個經驗值。
+ *
+ * 手工放的軌道沒有這些欄位，仍然走原本的 refField 掃描。
+ *
+ * 兩條路最後都要求命中點<strong>落在該塊的 refField 內</strong>，「段外不吸附」的
+ * 規則不變：索引的格網為了不漏掉邊界會往外放一格，比 refField 鬆。
  */
 export function locateOnTrackNetwork(
   network: TrackNetwork,
   xM: number,
   yM: number,
+  headingRad?: number,
 ): VehiclePlacementAcrossAreas | null {
-  const segment = pickRefFieldSegment(findRefFieldSegmentsAtPoint(network, xM, yM), {
-    xM,
-    yM,
-  });
+  const segment =
+    locateGeneratedSegment(network, xM, yM, headingRad) ??
+    pickRefFieldSegment(findRefFieldSegmentsAtPoint(network, xM, yM), {
+      xM,
+      yM,
+    });
   if (!segment) return null;
 
   const local = fieldPositionToTrackAreaLocal(xM, yM, segment.track, segment.renderArea, {

@@ -39,9 +39,16 @@ import {
  *       畫成一段長斜線，是<strong>示意圖的比例</strong>，不是跳位。</li>
  * </ul>
  *
- * 這一支<strong>還沒有接進實際的車輛定位</strong>——現行流程仍走
- * {@link ../vehicles/resolveVehicleTrackPlacement}。要換的時候把 buildTrackGenIndex 建好的
- * 索引接上去即可。
+ * <h3>接在哪</h3>
+ * {@link ../vehicles/trackNetwork/scanMap} 掃圖時順手建好索引掛在 TrackNetwork 上，
+ * {@link ../vehicles/trackNetwork/locate} 的 locateOnTrackNetwork 先走這裡；沒有生成資料的
+ * 手工軌道才退回原本的 refField 掃描。車頭朝向由 MQTT 的 `local_pose.heading` 一路傳下來
+ * （見 mapMqttIngestPipeline 與 MapAreaVehicleOverlay）。
+ *
+ * 朝向幫不幫得上，看車回報的位置有多準：正好落在中心線上時，最近的本來就是對的那一條，
+ * 有沒有朝向都一樣（99.6%）。把取樣點往<strong>對向那條</strong>橫移，兩條就開始分不出來——
+ * 橫移 1.4 公尺時有朝向 99.6%、沒有 98.7%；橫移 1.7 公尺（3.5 公尺股距的正中間）有朝向
+ * 仍是 99.8%、沒有掉到 81%。
  */
 
 export type LocateFacility = {

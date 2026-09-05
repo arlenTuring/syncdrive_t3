@@ -191,10 +191,13 @@ export function MapAreaVehicleOverlay({
     network: ReturnType<typeof buildTrackNetwork>,
   ): VehiclePlacementAcrossAreas | null {
     const preferYard = isYardVehiclePayload(vehicle.payload);
+    // 朝向會決定挑到上行還是下行，所以要進快取的鍵，不然轉頭之後還會拿到舊的那一條
+    const headingRad = readVehicleHeadingRad(vehicle.payload);
     const inputKey = [
       vehicle.xM.toFixed(2),
       vehicle.yM.toFixed(2),
       preferYard ? 'y' : 't',
+      headingRad == null ? '-' : headingRad.toFixed(3),
       readLegSnapKey(vehicle.payload ?? {}),
     ].join('|');
     const cached = placementCacheRef.current.get(vehicle.vehicleId);
@@ -204,7 +207,11 @@ export function MapAreaVehicleOverlay({
       vehicle.xM,
       vehicle.yM,
       network,
-      { preferYardPlacement: preferYard, payload: vehicle.payload },
+      {
+        preferYardPlacement: preferYard,
+        payload: vehicle.payload,
+        headingRad: headingRad ?? undefined,
+      },
     );
     placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement });
     return placement;

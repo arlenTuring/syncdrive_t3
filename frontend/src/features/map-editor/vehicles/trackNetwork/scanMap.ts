@@ -5,6 +5,7 @@ import {
   isZeroRefFieldBoundsSpan,
   refFieldBoundsSpanMeters,
 } from '../../utils/facilityRefFieldBounds';
+import { buildTrackGenIndex } from '../../utils/trackGenLocate';
 import type { TrackNetwork, TrackNetworkSegment } from './types';
 
 function trackCodeFromFacility(track: FacilityObject): string | null {
@@ -65,8 +66,28 @@ export function buildTrackNetwork(areas: MapAreaObject[]): TrackNetwork {
     }
   }
 
-  return { segments };
+  /*
+   * 生成的軌道自己帶著「代表哪一段路網」與真實中心線，可以直接建定位索引：座標進來
+   * 算格號就拿到兩三個候選，不必掃過每一塊的外框。手工放的軌道沒有這些欄位，
+   * buildTrackGenIndex 會自動略過，那些仍然走舊的 refField 掃描。
+   */
+  const byTrackId = new Map<string, TrackNetworkSegment>();
+  for (const seg of segments) {
+    if (!byTrackId.has(seg.trackId)) byTrackId.set(seg.trackId, seg);
+  }
+  const index = buildTrackGenIndex(
+    [...byTrackId.values()].map((seg) => ({ id: seg.trackId, parameters: seg.track.parameters })),
+  );
+
+  return { segments, genIndex: index.pieces.length ? index : null, byTrackId };
 }
+
+/** 還沒載入地圖時的空網路 */
+export const EMPTY_TRACK_NETWORK: TrackNetwork = {
+  segments: [],
+  genIndex: null,
+  byTrackId: new Map(),
+};
 
 const networkByAreas = new WeakMap<MapAreaObject[], TrackNetwork>();
 

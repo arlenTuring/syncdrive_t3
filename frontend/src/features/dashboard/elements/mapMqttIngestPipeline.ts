@@ -4,6 +4,8 @@ import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import { mergePayloadIntoLive } from '../../map-editor/live/mqttPayload';
 import { getMqttEntityId } from '../../map-editor/live/mqttEntityId';
 import { readVehicleMetersFromPayload } from '../../map-editor/utils/areaVehicleMqtt';
+import { readVehicleHeadingRad } from '../../map-editor/vehicles/readVehicleHeading';
+import { EMPTY_TRACK_NETWORK } from '../../map-editor/vehicles/trackNetwork/scanMap';
 import {
   buildTrackNetwork,
   isYardVehiclePayload,
@@ -229,7 +231,7 @@ export function createMapMqttIngestPipeline(
   onFlush: (snapshot: MapMqttFlushSnapshot) => void,
 ) {
   let areas: MapAreaObject[] = [];
-  let trackNetwork: TrackNetwork = { segments: [] };
+  let trackNetwork: TrackNetwork = EMPTY_TRACK_NETWORK;
   let facilityIndex: FacilityIndex = { byEntityKey: new Map(), areaPatterns: [] };
   let rafId = 0;
   let liveBase: Record<string, MqttLiveEntry> = {};
@@ -284,7 +286,7 @@ export function createMapMqttIngestPipeline(
     emittedVehicles.clear();
     lastAreaVehicles = [];
     pendingIngest.length = 0;
-    trackNetwork = areas.length > 0 ? buildTrackNetwork(areas) : { segments: [] };
+    trackNetwork = areas.length > 0 ? buildTrackNetwork(areas) : EMPTY_TRACK_NETWORK;
     facilityIndex =
       areas.length > 0 ? buildFacilityIndex(areas) : { byEntityKey: new Map(), areaPatterns: [] };
   }
@@ -344,6 +346,7 @@ export function createMapMqttIngestPipeline(
     xM: number,
     yM: number,
     payload?: Record<string, unknown>,
+    headingRad?: number,
   ): string | null {
     const preferYard = isYardVehiclePayload(payload);
 
@@ -357,13 +360,16 @@ export function createMapMqttIngestPipeline(
     }
 
     const key = posKey(xM, yM);
-    const cacheKey = preferYard ? `${key}|yard` : key;
+    // 朝向會決定挑到上行還是下行，所以要進快取的鍵
+    const headKey = headingRad === undefined ? '-' : headingRad.toFixed(3);
+    const cacheKey = preferYard ? `${key}|yard` : `${key}|${headKey}`;
     const cached = placementCache.get(vehicleId);
     if (cached?.posKey === cacheKey) return cached.areaId;
 
     const resolved = resolveVehiclePlacementAcrossAreas(areas, xM, yM, trackNetwork, {
       preferYardPlacement: preferYard,
       payload,
+      headingRad,
     });
     if (resolved) {
       placementCache.set(vehicleId, { posKey: cacheKey, areaId: resolved.area.id });
@@ -590,6 +596,7 @@ export function createMapMqttIngestPipeline(
         xM,
         yM,
         pending.payload,
+        readVehicleHeadingRad(pending.payload) ?? undefined,
       );
       if (!areaId) {
         // 定位失敗時保留上一帧，勿因整備 MQTT 標記而刪除載具

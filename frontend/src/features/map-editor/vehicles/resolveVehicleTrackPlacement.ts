@@ -422,6 +422,13 @@ export function resolveVehiclePlacementAcrossAreas(
   options?: {
     preferYardPlacement?: boolean;
     payload?: Record<string, unknown>;
+    /**
+     * 車頭朝向（弧度，場域座標，東為 0、逆時針為正）。
+     *
+     * 廠商本來就在送（`local_pose.heading`），用來分上下行：兩條線在圖上只差三公尺多，
+     * 位置分不出來，走向差 180 度卻一目了然。沒給就退回純距離。
+     */
+    headingRad?: number;
   },
 ): VehiclePlacementAcrossAreas | null {
   const net = network ?? getTrackNetwork(areas);
@@ -435,7 +442,7 @@ export function resolveVehiclePlacementAcrossAreas(
   const onCrossover = locateOnCrossover(areas, xM, yM, 2);
   if (onCrossover) return onCrossover;
 
-  const onTrack = locateOnTrackNetwork(net, xM, yM);
+  const onTrack = locateOnTrackNetwork(net, xM, yM, options?.headingRad);
   if (onTrack) return onTrack;
 
   // 略寬：portal 外緣、尚未落入任何 refField 的點

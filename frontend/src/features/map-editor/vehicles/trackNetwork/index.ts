@@ -3,6 +3,7 @@ export {
   buildTrackNetwork,
   getTrackNetwork,
   invalidateTrackNetworkCache,
+  EMPTY_TRACK_NETWORK,
 } from './scanMap';
 export {
   locateOnTrackNetwork,
