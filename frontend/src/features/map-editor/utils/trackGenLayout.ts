@@ -407,16 +407,22 @@ export function fitSwitchAt(
       mTo: r(m.y + bandWM / 2),
       bFrom: r(b.y - bandWM / 2),
       bTo: r(b.y + bandWM / 2),
-      // 生成出來的道岔兩條腿一樣長：兩個出口都貼著外框的另一端
-      mAt: 1,
-      bAt: 1,
+      /*
+       * 兩條腿<strong>各伸各的</strong>：出口離進口多遠，就照那個比例擺。
+       *
+       * 先前兩個出口都寫死貼著外框的另一端，兩個出口不等距時就只能靠下面那個「三個
+       * 端面各自需要的位移取平均」去攤，殘差就是彼此的差。現在每一面都放得到自己該
+       * 在的位置，殘差是<strong>結構上</strong>的零，不是碰巧的零。
+       */
+      mAt: (m.x - s.x) / W,
+      bAt: (b.x - s.x) / W,
       entryDeg,
     }
     const wM = entryDeg % 180 === 0 ? W : H
     const hM = entryDeg % 180 === 0 ? H : W
     const segs = switchTrackEndSegmentsPx(geometry, wM, hM)
     const mid = (q: [Vec2, Vec2]) => ({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 })
-    // 平移量取三個端面各自需要的位移的平均，殘差就是彼此的差
+    // 三個端面各自都放對了，所以三個位移相同；取平均只是把它算出來，殘差用來驗證
     const want = [stem, main, branch]
     const got = [mid(segs.a), mid(segs.m), mid(segs.b)]
     const ex = want.reduce((t, p, i) => t + (p.x - got[i]!.x), 0) / 3
