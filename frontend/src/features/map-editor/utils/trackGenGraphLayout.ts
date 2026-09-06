@@ -59,6 +59,8 @@ const DRAWING = {
   mergeUnit: 0.5,
   /** 切塊剩下的尾巴短過一塊的幾成就併進前一塊——比例是塊自己的事，與軌道寬無關 */
   minTailBlock: 1 / 4,
+  /** 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半 */
+  crossAspect: 3,
   /** 一段斜接最多吃掉整條邊的幾成 */
   rampMaxSpan: 0.3,
   /** 束與束之間留幾股的空隙 */
@@ -1538,13 +1540,27 @@ function layoutOnce(
     const dB = dirTo(sideB)
     if (!dA || !dB) continue
     /*
-     * 畫多長：照路口在現場的實際長度換算，但至少一條軌道寬的三倍——交會角要淺，
-     * 太短的話兩條斜線幾乎是垂直的，看起來不像交叉。
+     * 畫多長：照路口在現場的實際長度，但<strong>不能吃到鄰居身上</strong>。
+     *
+     * 先前給了「至少一條軌道寬的三倍」當下限，想讓交會角淺一點好看。可是 T3 那個
+     * 路口左邊只有 15 公尺的一段路，下限一撐就整個蓋到隔壁的分岔上——圖上看起來
+     * 就是交叉軌道沒接好、直接壓在別人身上。
+     *
+     * 所以上限由兩側較短的那一段決定（各讓出四成），下限只留半條軌道寬，免得極短的
+     * 路口縮成一條線。短就短，那是現場本來的長度。
      */
-    const half = Math.max(
-      (cross.spanM * axisScale(sideA.orient)) / 2,
-      bandW * DRAWING.rampRun * 0.5,
-    )
+    /*
+     * 想要的長度是<strong>長為高的三倍</strong>——與元件庫拉出來的交叉軌道同一個比例。
+     * 交會角要淺才看得出是兩條路交叉；照現場的 12 公尺畫只有九像素，兩條斜線會陡到
+     * 像一個叉。這與示意圖把橫向放大是同一種取捨，而且交叉不認領里程，畫長一點不會
+     * 讓定位偏掉。
+     *
+     * 上限由<strong>兩側較短的那一段</strong>決定（各讓出四成）：先前沒有這個上限，
+     * T3 那個路口的交叉整個蓋到隔壁的分岔上，圖上看起來就是沒接好。
+     */
+    const room = Math.min(spanOf(sideA), spanOf(sideB)) * 0.4
+    const want = bandW * DRAWING.crossAspect
+    const half = Math.max(bandW * 0.5, Math.min(want, room))
     const perp = (e: GraphEdge, o: number): Vec =>
       e.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
     const face = (e: GraphEdge, d: Vec, o: number): [Vec, Vec] => {
