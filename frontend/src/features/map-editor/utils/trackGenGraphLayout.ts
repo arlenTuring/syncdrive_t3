@@ -477,63 +477,22 @@ function layoutOnce(
    * 只有 3.5 公尺。road 1/3 兩端真實差 7 公尺，量化成股會變成兩股 120 像素，實際上照
    * 版面比例只有 13 像素。所以直接照版面比例換算，落差多少就畫多少。
    */
-  /**
-   * 這條邊某一端<strong>直的那一段</strong>在哪（真實側位，公尺）。
+  /*
+   * <strong>節點不再各自帶一個股位。</strong>
    *
-   * 不能拿節點的座標當這個值。節點是好幾條路端點焊起來的位置，而那個位置正好落在
-   * 彎裡面：左側那根 287 公尺的直立柱，整段 x 都在 −880.5，只有最上面 25 公尺為了轉進
-   * 橫向那條而甩到 −869——節點記的就是 −869。照它畫，整根柱子會被往右推 33 像素，還在
-   * 中段插一段斜接，而真的柱子是直的、只有貼著轉角那一小截在彎。
+   * 先前每個節點會照「靠那一端半條邊的中位數」算一個自己的側位，用來補回正交化壓平
+   * 掉的落差。立意是好的，代價卻是：同一段的兩端常常算出不同的股位，而帶子兩端不同高
+   * 就得切一刀補一段斜接（那條規則本身是對的，台階就是這樣消掉的）。結果是圖上一堆
+   * 本來該直的軌道變成斜的——實測軌道寬 34 時有 16 段斜接，其中 8 段是這樣來的；而且
+   * 那個股位還會被「上限半股」夾住，寬度動一格就換一種元件。
    *
-   * 所以取靠這一端<strong>那半條邊的中位數</strong>。中位數不受端點附近那一小截弧影響，
-   * 也不需要挑一個「從幾成到幾成」的取樣窗——那種窗口就是又一個要調的數字。
+   * 示意圖的價值在於<strong>橫平豎直</strong>。半條軌道以內的落差本來就讀不出來，用
+   * 一整段斜接去表達它並不划算。所以節點不帶股位：每條帶子就畫在自己那一排／那一欄上，
+   * 兩條邊在同一個節點交會時位置天生相同，不必補、也不會有台階。
+   *
+   * 路自己沿線的橫移仍然畫得出來——那是 levelRuns 在做的事，看的是每一點的真實側位，
+   * 與節點無關。
    */
-  const endLat = (e: GraphEdge, atFrom: boolean): number => {
-    const pts = e.points
-    if (!pts.length) return 0
-    const half = pts.filter((_, i) =>
-      atFrom ? i <= (pts.length - 1) / 2 : i >= (pts.length - 1) / 2,
-    )
-    const vals = (half.length ? half : pts).map((p) => (e.orient === 'h' ? p.y : p.x))
-    vals.sort((a, b) => a - b)
-    return vals[Math.floor(vals.length / 2)]!
-  }
-  /** 節點在某個軸上的代表側位：那個方向上每條邊直段位置的平均 */
-  const nodeLatCache = new Map<string, number>()
-  const nodeLat = (n: GraphNode, orient: 'h' | 'v'): number | null => {
-    const key = `${n.id}|${orient}`
-    const hit = nodeLatCache.get(key)
-    if (hit !== undefined) return hit
-    const list = (incident.get(n.id) ?? []).filter((e) => e.orient === orient)
-    if (!list.length) return null
-    let t = 0
-    for (const e of list) t += endLat(e, e.from === n.id)
-    const v = t / list.length
-    nodeLatCache.set(key, v)
-    return v
-  }
-  const nodeOffsetPx = (n: GraphNode, orient: 'h' | 'v'): number => {
-    const lat = nodeLat(n, orient)
-    if (lat === null) return 0
-    const dev = lat - (orient === 'h' ? n.y : n.x)
-    const px = axisSign(orient) * dev * axisScale(orient)
-    // 上限半股：一條帶子最多挪到與鄰帶的正中間，再多就侵犯隔壁那一條的位置
-    const cap = levelPx * 0.5
-    const capped = Math.max(-cap, Math.min(cap, px))
-    /*
-     * 股位<strong>吸到格</strong>上，格距就是「挪多少才看得出來」的那個量（四分之一條
-     * 軌道寬，與切段用的是同一把尺）。
-     *
-     * 不吸的話兩個節點常常差<strong>零點幾個像素</strong>——而且那個差往往不是幾何造成
-     * 的，是上面那個上限夾出來的：軌道寬 33 時兩端都被夾到 −16.5、差 0，寬 34 時一端
-     * −17、另一端 −16.752，差 0.248。帶子兩端不同高就得切一刀補一段斜接，於是使用者
-     * 只把寬度加一，一整段直的軌道就變成斜接（實測斜接由 22 段變 26 段）。
-     *
-     * 吸到格之後，看不出來的差就真的是零，圖形也不會因為寬度動一格而換一種元件。
-     */
-    const step = Math.max(1e-6, bandW * DRAWING.segUnit)
-    return Math.round(capped / step) * step
-  }
   /**
    * 一股換算成版面偏移的方向。
    *
@@ -545,8 +504,6 @@ function layoutOnce(
    * 有關，就得用固定的軸向。
    */
   const axisSign = (orient: 'h' | 'v') => (orient === 'h' ? -1 : 1)
-  /** 這條邊在某個節點那一端要讓出的版面偏移 */
-  const endExtra = (n: GraphNode, orient: 'h' | 'v') => nodeOffsetPx(n, orient)
 
   /*
    * 比常態寬<strong>半股</strong>以上就算拉開。常態寬度是這一束自己的股數乘上股距，
@@ -638,13 +595,7 @@ function layoutOnce(
     const raw = trimAt(e, nodeId, fullLen)
     // 負的（補直角多伸的那一截）不必再挪，它本來就不是里程
     if (raw <= 0) return raw
-    const A = P(ends.a)
-    const B = P(ends.b)
-    const d = Math.hypot(B.x - A.x, B.y - A.y) || 1
-    const alongU = e.orient === 'h' ? (B.x - A.x) / d : (B.y - A.y) / d
-    const atFrom = e.from === nodeId
-    const shiftPx = endExtra(atFrom ? ends.a : ends.b, e.orient === 'h' ? 'v' : 'h')
-    return Math.max(0, raw + (atFrom ? alongU * shiftPx : -alongU * shiftPx))
+    return Math.max(0, raw)
   }
 
   /** 每條邊、每個節點、每條車道：帶子在那一端實際畫到的位置 */
@@ -846,8 +797,9 @@ function layoutOnce(
       return t / (N + 1)
     }
     for (const r of levelRuns) r.offsetPx = toPx(meanDev(r.f0, r.f1))
-    const fromPx = nodeOffsetPx(ends.a, e.orient)
-    const toPxEnd = nodeOffsetPx(ends.b, e.orient)
+    // 兩端都落在自己那一排上（見上面「節點不再各自帶一個股位」）：只有路自己在挪時才切一刀
+    const fromPx = 0
+    const toPxEnd = 0
     /*
      * 只有一段的邊要不要為了兩端高度不同而切一刀。
      *
@@ -1337,7 +1289,7 @@ function layoutOnce(
      */
     const N = (() => {
       const p = P(node)
-      return { x: p.x + endExtra(node, 'v'), y: p.y + endExtra(node, 'h') }
+      return { x: p.x, y: p.y }
     })()
     const hOther = byId.get(eh.from === node.id ? eh.to : eh.from)
     const vOther = byId.get(ev.from === node.id ? ev.to : ev.from)
@@ -1459,7 +1411,7 @@ function layoutOnce(
     const stemOther = byId.get(job.stem.from === job.nodeId ? job.stem.to : job.stem.from)
     if (!node || !stemOther) continue
     const p0 = P(node)
-    const N = { x: p0.x + endExtra(node, 'v'), y: p0.y + endExtra(node, 'h') }
+    const N = { x: p0.x, y: p0.y }
     const q = P(stemOther)
     const d = Math.hypot(q.x - p0.x, q.y - p0.y) || 1
     const dir = { x: (q.x - p0.x) / d, y: (q.y - p0.y) / d }
