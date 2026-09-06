@@ -519,7 +519,20 @@ function layoutOnce(
     const px = axisSign(orient) * dev * axisScale(orient)
     // 上限半股：一條帶子最多挪到與鄰帶的正中間，再多就侵犯隔壁那一條的位置
     const cap = levelPx * 0.5
-    return Math.max(-cap, Math.min(cap, px))
+    const capped = Math.max(-cap, Math.min(cap, px))
+    /*
+     * 股位<strong>吸到格</strong>上，格距就是「挪多少才看得出來」的那個量（四分之一條
+     * 軌道寬，與切段用的是同一把尺）。
+     *
+     * 不吸的話兩個節點常常差<strong>零點幾個像素</strong>——而且那個差往往不是幾何造成
+     * 的，是上面那個上限夾出來的：軌道寬 33 時兩端都被夾到 −16.5、差 0，寬 34 時一端
+     * −17、另一端 −16.752，差 0.248。帶子兩端不同高就得切一刀補一段斜接，於是使用者
+     * 只把寬度加一，一整段直的軌道就變成斜接（實測斜接由 22 段變 26 段）。
+     *
+     * 吸到格之後，看不出來的差就真的是零，圖形也不會因為寬度動一格而換一種元件。
+     */
+    const step = Math.max(1e-6, bandW * DRAWING.segUnit)
+    return Math.round(capped / step) * step
   }
   /**
    * 一股換算成版面偏移的方向。
