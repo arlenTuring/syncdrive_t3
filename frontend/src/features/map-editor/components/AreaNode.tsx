@@ -23,11 +23,16 @@ import {
 } from '../utils/facilityAreaCoords'
 import { findFacilityAtAreaLocalPx } from '../utils/facilityHitTest'
 import {
+  readSwitchTrack,
   readTaperTrack,
+  switchTrackEndSegmentsPx,
   taperTrackEndSegmentsPx,
+  SWITCH_TRACK_KEY,
   TAPER_TRACK_KEY,
+  type SwitchHandleKey,
 } from '../utils/trackShapes'
 import { buildTaperFromEndSegments } from '../utils/taperJoin'
+import { alignSwitchFaces, buildSwitchFromEndSegments } from '../utils/switchJoin'
 import {
   resolveFacilityAreaPosition,
   resolveFacilityAreaSize,
@@ -865,7 +870,16 @@ export const AreaNode = memo(function AreaNode({
      這是斜接軌道能接上「A 在 B 之上」與「A 在 B 之下」兩種情形的唯一辦法：
      平行四邊形兩端一定等寬、錯位方向也固定，後者怎麼轉都接不上。           */
 
-  const [taperHighlightId, setTaperHighlightId] = useState<string | null>(null)
+  /**
+   * 拖曳中會接上的目標：<strong>哪一條軌道的哪一條邊</strong>。
+   *
+   * 先前只記 id、畫面上把整塊框起來。使用者要的是「那一邊」——一塊軌道有兩個端面，
+   * 框住整塊看不出來會接到哪一頭。現在把邊也記下來，直接把那條邊描粗。
+   */
+  const [taperHighlight, setTaperHighlight] = useState<{
+    targetId: string
+    edge: { x1: number; y1: number; x2: number; y2: number }
+  } | null>(null)
 
   /**
    * 一個軌道的<strong>兩條端面</strong>（Area 局部像素，含旋轉）。
@@ -888,6 +902,16 @@ export const AreaNode = memo(function AreaNode({
         x: cx + dx * cos - dy * sin,
         y: cy + dx * sin + dy * cos,
       })
+      // 分岔軌道有三個面，也由自己的幾何決定
+      if (f.name === 'RailSwitch') {
+        const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
+        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+        return (['a', 'm', 'b'] as const).map((k) => {
+          const p0 = L(segs[k][0])
+          const p1 = L(segs[k][1])
+          return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
+        })
+      }
       // 斜接軌道的端面由它自己的幾何決定，不是外框的長短邊
       if (f.name === 'RailTaper') {
         const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
@@ -985,7 +1009,7 @@ export const AreaNode = memo(function AreaNode({
           }
         }
       }
-      setTaperHighlightId(best?.targetId ?? null)
+      setTaperHighlight(best)
       return best
     },
     [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, taperWouldJoin],
@@ -998,7 +1022,7 @@ export const AreaNode = memo(function AreaNode({
       target: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null,
       pointer: { clientX: number; clientY: number },
     ) => {
-      setTaperHighlightId(null)
+      setTaperHighlight(null)
       const f = area.facilities.find((x) => x.id === facilityId)
       if (!f || !onPatchFacilityParameters || !onResizeFacility || !onDragFacility) return
 
@@ -1040,6 +1064,141 @@ export const AreaNode = memo(function AreaNode({
 
       onDragSessionStart?.()
       onPatchFacilityParameters(area.id, facilityId, { [TAPER_TRACK_KEY]: built.geometry })
+      onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
+      onDragFacility(area.id, facilityId, {
+        areaPosition: {
+          x: built.box.x,
+          y: displayLayout.hPx - built.box.y - built.box.h,
+        },
+        position: areaLocalPxToMeter(
+          built.box.x,
+          displayLayout.hPx - built.box.y - built.box.h,
+          displayDomain,
+          displayLayout,
+        ),
+      })
+    },
+    [
+      area.id,
+      area.facilities,
+      clientToAreaLocal,
+      displayDomain,
+      displayLayout,
+      onDragFacility,
+      onDragSessionStart,
+      onPatchFacilityParameters,
+      onResizeFacility,
+    ],
+  )
+
+  /* ── 分岔軌道端面接合 ────────────────────────────────────────
+     與斜接同一套，只是面有三個：進口 a、直行出口 m、岔出出口 b。 */
+
+  /** 這一面換成那條邊之後，元件表示得出來嗎——表示不出來就不該亮綠燈 */
+  const switchWouldJoin = useCallback(
+    (
+      facilityId: string,
+      end: SwitchHandleKey,
+      edge: { x1: number; y1: number; x2: number; y2: number },
+    ) => {
+      const f = area.facilities.find((x) => x.id === facilityId)
+      if (!f) return false
+      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
+      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
+      const top = displayLayout.hPx - pos.y - size.h
+      const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
+      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+      const cur = {
+        a: [L(segs.a[0]), L(segs.a[1])] as const,
+        m: [L(segs.m[0]), L(segs.m[1])] as const,
+        b: [L(segs.b[0]), L(segs.b[1])] as const,
+      }
+      const mine = [
+        { x: edge.x1, y: edge.y1 },
+        { x: edge.x2, y: edge.y2 },
+      ] as const
+      const next = alignSwitchFaces(cur, end, mine)
+      return !!next && !!buildSwitchFromEndSegments(next.a, next.m, next.b)
+    },
+    [area.facilities, displayDomain, displayLayout],
+  )
+
+  const onSwitchEndProbe = useCallback(
+    (facilityId: string, end: SwitchHandleKey, clientX: number, clientY: number) => {
+      const p = clientToAreaLocal(clientX, clientY)
+      if (!p) return null
+      const reach = 14 / Math.max(0.01, mapScale)
+      let best: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null =
+        null
+      let bestD = reach
+      for (const other of area.facilities) {
+        if (other.id === facilityId || other.type !== 'Track') continue
+        for (const e of facilityEndEdgesLocal(other)) {
+          const dx = e.x2 - e.x1
+          const dy = e.y2 - e.y1
+          const l2 = dx * dx + dy * dy
+          const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
+          const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
+          if (d < bestD && switchWouldJoin(facilityId, end, e)) {
+            bestD = d
+            best = { targetId: other.id, edge: e }
+          }
+        }
+      }
+      setTaperHighlight(best)
+      return best
+    },
+    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, switchWouldJoin],
+  )
+
+  const onSwitchEndCommit = useCallback(
+    (
+      facilityId: string,
+      end: SwitchHandleKey,
+      target: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null,
+      pointer: { clientX: number; clientY: number },
+    ) => {
+      setTaperHighlight(null)
+      const f = area.facilities.find((x) => x.id === facilityId)
+      if (!f || !onPatchFacilityParameters || !onResizeFacility || !onDragFacility) return
+
+      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
+      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
+      const top = displayLayout.hPx - pos.y - size.h
+      const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
+      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+      const cur = {
+        a: [L(segs.a[0]), L(segs.a[1])] as const,
+        m: [L(segs.m[0]), L(segs.m[1])] as const,
+        b: [L(segs.b[0]), L(segs.b[1])] as const,
+      }
+
+      let next: typeof cur | null
+      if (target) {
+        next = alignSwitchFaces(cur, end, [
+          { x: target.edge.x1, y: target.edge.y1 },
+          { x: target.edge.x2, y: target.edge.y2 },
+        ]) as typeof cur | null
+      } else {
+        // 沒碰到東西：把那一面整條平移到指標處，寬度不變
+        const p = clientToAreaLocal(pointer.clientX, pointer.clientY)
+        if (!p) return
+        const seg = cur[end]
+        const mid = { x: (seg[0].x + seg[1].x) / 2, y: (seg[0].y + seg[1].y) / 2 }
+        const dx = p.x - mid.x
+        const dy = p.y - mid.y
+        next = alignSwitchFaces(cur, end, [
+          { x: seg[0].x + dx, y: seg[0].y + dy },
+          { x: seg[1].x + dx, y: seg[1].y + dy },
+        ]) as typeof cur | null
+      }
+      if (!next) return
+
+      const built = buildSwitchFromEndSegments(next.a, next.m, next.b)
+      if (!built) return
+
+      onDragSessionStart?.()
+      onPatchFacilityParameters(area.id, facilityId, { [SWITCH_TRACK_KEY]: built.geometry })
       onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
       onDragFacility(area.id, facilityId, {
         areaPosition: {
@@ -1645,6 +1804,8 @@ export const AreaNode = memo(function AreaNode({
           onRotateDelta={(_id, deg) => onRotateDelta(area.id, f.id, deg)}
           onTrackCornerEditStart={onTrackCornerEditStart}
           onTaperEndProbe={editMode ? onTaperEndProbe : undefined}
+          onSwitchEndProbe={editMode ? onSwitchEndProbe : undefined}
+          onSwitchEndCommit={editMode ? onSwitchEndCommit : undefined}
           onTaperEndCommit={editMode ? onTaperEndCommit : undefined}
           onDelete={
             onDeleteFacility && editMode
@@ -1822,23 +1983,58 @@ export const AreaNode = memo(function AreaNode({
         {/*
           * 端點拖到某條軌道上時，把那條框起來——使用者才知道放手會接到誰。
           */}
-        {taperHighlightId
+        {taperHighlight
           ? (() => {
-              const t = area.facilities.find((x) => x.id === taperHighlightId)
+              const t = area.facilities.find((x) => x.id === taperHighlight.targetId)
               if (!t) return null
               const pos = resolveFacilityAreaPosition(t, displayDomain, displayLayout)
               const size = resolveFacilityAreaSize(t, displayDomain, displayLayout)
+              const e = taperHighlight.edge
               return (
-                <div
-                  className="pointer-events-none absolute z-[95] rounded-[2px] border-2 border-emerald-400 bg-emerald-400/15"
-                  style={{
-                    left: pos.x,
-                    top: displayLayout.hPx - pos.y - size.h,
-                    width: size.w,
-                    height: size.h,
-                    transform: `rotate(${t.rotation ?? 0}deg)`,
-                  }}
-                />
+                <>
+                  {/* 先淡淡地標出是哪一塊 */}
+                  <div
+                    className="pointer-events-none absolute z-[94] rounded-[2px] border border-emerald-400/50 bg-emerald-400/10"
+                    style={{
+                      left: pos.x,
+                      top: displayLayout.hPx - pos.y - size.h,
+                      width: size.w,
+                      height: size.h,
+                      transform: `rotate(${t.rotation ?? 0}deg)`,
+                    }}
+                  />
+                  {/* 真正會接上的是<strong>這一條邊</strong>，描粗才看得出來接哪一頭 */}
+                  <svg
+                    className="pointer-events-none absolute left-0 top-0 z-[96] overflow-visible"
+                    width={1}
+                    height={1}
+                  >
+                    <line
+                      x1={e.x1}
+                      y1={e.y1}
+                      x2={e.x2}
+                      y2={e.y2}
+                      stroke="#34d399"
+                      strokeWidth={5 / Math.max(0.01, mapScale)}
+                      strokeLinecap="round"
+                      opacity={0.95}
+                    />
+                    {[
+                      [e.x1, e.y1],
+                      [e.x2, e.y2],
+                    ].map(([cx, cy], i) => (
+                      <circle
+                        key={i}
+                        cx={cx}
+                        cy={cy}
+                        r={3.5 / Math.max(0.01, mapScale)}
+                        fill="#ecfdf5"
+                        stroke="#34d399"
+                        strokeWidth={1.5 / Math.max(0.01, mapScale)}
+                      />
+                    ))}
+                  </svg>
+                </>
               )
             })()
           : null}

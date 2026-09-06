@@ -18,7 +18,6 @@ import {
   switchTrackPath,
   readSwitchTrack,
   switchTrackHandlesPx,
-  SWITCH_TRACK_KEY,
   type SwitchHandleKey,
   type TaperHandleKey,
   CORNER_TRACK_KEY,
@@ -288,6 +287,19 @@ type FacilityNodeProps = {
     target: TaperEndProbe | null,
     pointer: { clientX: number; clientY: number },
   ) => void
+  /** 分岔軌道端面拖曳中：與斜接同一套，只是面有三個 */
+  onSwitchEndProbe?: (
+    facilityId: string,
+    end: SwitchHandleKey,
+    clientX: number,
+    clientY: number,
+  ) => TaperEndProbe | null
+  onSwitchEndCommit?: (
+    facilityId: string,
+    end: SwitchHandleKey,
+    target: TaperEndProbe | null,
+    pointer: { clientX: number; clientY: number },
+  ) => void
   /** Area 模式：僅更新圖台區域像素尺寸，不影響參照場域範圍 */
   onResize?: (id: string, areaSizePx: { w: number; h: number }) => void
   onResizeSessionStart?: () => void
@@ -361,6 +373,8 @@ export const FacilityNode = memo(function FacilityNode({
   onTrackCornerEditStart,
   onTaperEndProbe,
   onTaperEndCommit,
+  onSwitchEndProbe,
+  onSwitchEndCommit,
   onResize,
   onResizeSessionStart,
   onDelete,
@@ -2154,25 +2168,19 @@ export const FacilityNode = memo(function FacilityNode({
   )
 
   /* ── 分岔軌道的三個控制點 ─────────────────────────────────────
-     進口一個、兩個出口各一個。拖著改那一面在外框上的位置，形狀跟著變；三面都是
-     與軸對齊的線段，所以與鄰居的端面天生對得齊。 */
+     進口一個、兩個出口各一個。與斜接軌道同一套：把面拖到別條軌道的邊上，
+     那條邊會亮起來，放手就把這一面換成那條邊——位置與寬度一起吃過來，形狀自己重算。 */
   const [switchDragKey, setSwitchDragKey] = useState<SwitchHandleKey | null>(null)
-  const switchDragRef = useRef<{ key: SwitchHandleKey; startY: number; from: number; to: number } | null>(
-    null,
-  )
+  const [switchProbe, setSwitchProbe] = useState<TaperEndProbe | null>(null)
+  const [switchPointer, setSwitchPointer] = useState<{ x: number; y: number } | null>(null)
   const onSwitchHandleDown = useCallback(
     (key: SwitchHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
       e.stopPropagation()
       e.preventDefault()
       if (readOnly || !onPatchParameters) return
-      const g = readSwitchTrack(facilityRef.current.parameters)
       onTrackCornerEditStart?.()
-      switchDragRef.current = {
-        key,
-        startY: e.clientY,
-        from: key === 'a' ? g.aFrom : key === 'm' ? g.mFrom : g.bFrom,
-        to: key === 'a' ? g.aTo : key === 'm' ? g.mTo : g.bTo,
-      }
+      setSwitchProbe(null)
+      setSwitchPointer({ x: e.clientX, y: e.clientY })
       setSwitchDragKey(key)
       try {
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -2185,34 +2193,33 @@ export const FacilityNode = memo(function FacilityNode({
 
   const onSwitchHandleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      const st = switchDragRef.current
-      if (!st || !onPatchParameters) return
-      // 整個面一起移動，寬度不變——寬度是軌道寬，不該被把手改掉
-      const span = Math.max(1, nh)
-      const d = (e.clientY - st.startY) / Math.max(0.01, mapScale) / span
-      const width = st.to - st.from
-      const from = Math.max(0, Math.min(1 - width, st.from + d))
-      const g = readSwitchTrack(facilityRef.current.parameters)
-      const next =
-        st.key === 'a'
-          ? { ...g, aFrom: from, aTo: from + width }
-          : st.key === 'm'
-            ? { ...g, mFrom: from, mTo: from + width }
-            : { ...g, bFrom: from, bTo: from + width }
-      onPatchParameters(facilityRef.current.id, { [SWITCH_TRACK_KEY]: next })
+      if (!switchDragKey) return
+      setSwitchProbe(
+        onSwitchEndProbe?.(facilityRef.current.id, switchDragKey, e.clientX, e.clientY) ?? null,
+      )
+      setSwitchPointer({ x: e.clientX, y: e.clientY })
     },
-    [mapScale, nh, onPatchParameters],
+    [switchDragKey, onSwitchEndProbe],
   )
 
   const onSwitchHandleEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    switchDragRef.current = null
+    const key = switchDragKey
     setSwitchDragKey(null)
+    const probe = switchProbe
+    setSwitchProbe(null)
+    setSwitchPointer(null)
+    if (key) {
+      onSwitchEndCommit?.(facilityRef.current.id, key, probe, {
+        clientX: e.clientX,
+        clientY: e.clientY,
+      })
+    }
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [switchDragKey, switchProbe, onSwitchEndCommit])
 
   /* ── 拖曳旋轉 ────────────────────────────────────────────────
      把手在元件外側，會跟著元件一起轉——就像簡報軟體那樣，指標與把手的相對位置
@@ -2941,7 +2948,7 @@ export const FacilityNode = memo(function FacilityNode({
                 <div
                   key={key}
                   data-switch-track-handle={key}
-                  className="absolute z-[88] cursor-ns-resize touch-none"
+                  className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
                   style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
                   title={
                     key === 'a'
@@ -2958,12 +2965,43 @@ export const FacilityNode = memo(function FacilityNode({
                   <div
                     className={[
                       'size-3.5 rounded-full border-2 shadow-md',
-                      dragging ? 'border-emerald-300 bg-emerald-400' : 'border-white bg-blue-500',
+                      dragging && switchProbe
+                        ? 'border-emerald-300 bg-emerald-400'
+                        : 'border-white bg-blue-500',
                     ].join(' ')}
                   />
                 </div>
               )
             })}
+            {/* 拖曳中從端面拉一條線到指標，看得出正在接哪裡 */}
+            {switchDragKey && switchPointer
+              ? (() => {
+                  const from = switchTrackHandlesPx(switchTrackGeom, nw, nh)[switchDragKey]
+                  const root = rootRef.current?.getBoundingClientRect()
+                  if (!root) return null
+                  const to = {
+                    x: (switchPointer.x - root.left) / Math.max(0.01, mapScale),
+                    y: (switchPointer.y - root.top) / Math.max(0.01, mapScale),
+                  }
+                  return (
+                    <svg
+                      className="pointer-events-none absolute left-0 top-0 z-[87] overflow-visible"
+                      width={1}
+                      height={1}
+                    >
+                      <line
+                        x1={from.x}
+                        y1={from.y}
+                        x2={to.x}
+                        y2={to.y}
+                        stroke={switchProbe ? '#34d399' : '#60a5fa'}
+                        strokeWidth={2 / Math.max(0.01, mapScale)}
+                        strokeDasharray={`${6 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`}
+                      />
+                    </svg>
+                  )
+                })()
+              : null}
           </>
         )}
         {isTaperTrack && taperTrackGeom && selected && !readOnly && onPatchParameters && (
