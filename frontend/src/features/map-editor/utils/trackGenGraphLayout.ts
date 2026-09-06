@@ -9,6 +9,7 @@ import {
   type TrackSpan,
 } from './trackGenLayout'
 import type { TrackGenBlockSize } from './trackGenFacility'
+import { buildCrossFromEndSegments } from './crossJoin'
 import type { GraphEdge, GraphNode, TrackGraph } from './trackGenGraph'
 
 /**
@@ -1486,6 +1487,124 @@ function layoutOnce(
    * 直行出口就是那一束原本的位置，轉角或下一段直接接上去；岔出出口落在讓開之後的位置，
    * 岔線從那裡開始走。梗那一束已經讓出了同樣的長度，所以不會疊、也不會斷。
    */
+  /*
+   * 交叉路口 → 交叉軌道。
+   *
+   * <h3>什麼樣的路口算</h3>
+   * 兩個條件都要：連接道在中途互相交叉（建圖時量出來的，見 NodeCrossing），而且這個
+   * 節點上<strong>剛好兩束、每束兩條</strong>——交叉軌道只有四個口。三束以上的路口
+   * 那裡還有分岔，不是單純的交叉，仍然照原本的分岔畫。
+   *
+   * <h3>為什麼不切掉兩邊</h3>
+   * 交叉的兩條直行路徑<strong>就是</strong>兩側那兩條軌道，位置完全重疊。切掉兩端再
+   * 接回來只是把同一段路換個元件畫，還會在里程覆蓋上開兩個洞。直接疊上去：兩側的
+   * 里程照舊，交叉軌道補的是「這裡可以斜著過去」這件圖上看不出來的事。
+   */
+  for (const cross of graph.crossings ?? []) {
+    const node = byId.get(cross.nodeId)
+    if (!node) continue
+    /*
+     * 一側可能是<strong>好幾條 road 併成的一束</strong>：交叉的另一頭常常是兩條各自
+     * 獨立的單線（T3 那個路口右邊就是 road 1 與 road 3），它們在圖上是同一束的兩條
+     * 軌道。所以要照束分組再把各條 road 的車道併起來數，不能只看其中一條。
+     */
+    const around = incident.get(cross.nodeId) ?? []
+    const sides = new Map<string, GraphEdge[]>()
+    for (const e of around) {
+      const k = bundleKey(e)
+      const arr = sides.get(k) ?? []
+      arr.push(e)
+      sides.set(k, arr)
+    }
+    if (sides.size !== 2) continue
+    const [groupA, groupB] = [...sides.values()]
+    if (!groupA?.length || !groupB?.length) continue
+    const sideA = groupA[0]!
+    const sideB = groupB[0]!
+    const lanesA = groupA.flatMap((e) => offsetsOf(e))
+    const lanesB = groupB.flatMap((e) => offsetsOf(e))
+    if (lanesA.length !== 2 || lanesB.length !== 2) continue
+
+    const N = P(node)
+    /** 從節點往那一束走的方向 */
+    const dirTo = (e: GraphEdge) => {
+      const other = byId.get(e.from === cross.nodeId ? e.to : e.from)
+      if (!other) return null
+      const q = P(other)
+      const d = Math.hypot(q.x - N.x, q.y - N.y) || 1
+      return { x: (q.x - N.x) / d, y: (q.y - N.y) / d }
+    }
+    const dA = dirTo(sideA)
+    const dB = dirTo(sideB)
+    if (!dA || !dB) continue
+    /*
+     * 畫多長：照路口在現場的實際長度換算，但至少一條軌道寬的三倍——交會角要淺，
+     * 太短的話兩條斜線幾乎是垂直的，看起來不像交叉。
+     */
+    const half = Math.max(
+      (cross.spanM * axisScale(sideA.orient)) / 2,
+      bandW * DRAWING.rampRun * 0.5,
+    )
+    const perp = (e: GraphEdge, o: number): Vec =>
+      e.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
+    const face = (e: GraphEdge, d: Vec, o: number): [Vec, Vec] => {
+      const c = {
+        x: N.x + d.x * half + perp(e, o).x,
+        y: N.y + d.y * half + perp(e, o).y,
+      }
+      // 端面跨過軌道，所以沿著垂直於行進方向的那一軸展開
+      const w = e.orient === 'h' ? { x: 0, y: bandW / 2 } : { x: bandW / 2, y: 0 }
+      return [
+        { x: c.x - w.x, y: c.y - w.y },
+        { x: c.x + w.x, y: c.y + w.y },
+      ]
+    }
+    const sortLow = (list: number[]) => [...list].sort((a, b) => a - b)
+    const [aLow, aHigh] = sortLow(lanesA)
+    const [bLow, bHigh] = sortLow(lanesB)
+    /*
+     * 「左」「右」只是四個角的名字，但<strong>順序不能反</strong>：交叉軌道要求左邊
+     * 那兩個口在右邊兩個的同一側，反了就變成自交，接合器會直接回絕。所以照兩側在
+     * 行進軸上的位置決定誰是左。
+     */
+    const alongOf = (v: Vec) => (sideA.orient === 'h' ? v.x : v.y)
+    const fA = [face(sideA, dA, aLow!), face(sideA, dA, aHigh!)] as const
+    const fB = [face(sideB, dB, bLow!), face(sideB, dB, bHigh!)] as const
+    const aFirst = alongOf(fA[0][0]) <= alongOf(fB[0][0])
+    const left = aFirst ? fA : fB
+    const right = aFirst ? fB : fA
+    const built = buildCrossFromEndSegments({
+      lt: left[0],
+      lb: left[1],
+      rt: right[0],
+      rb: right[1],
+    })
+    if (!built) continue
+    const centre = {
+      x: built.box.x + built.box.w / 2,
+      y: built.box.y + built.box.h / 2,
+    }
+    shapes.push({
+      kind: 'cross',
+      name: `${sideA.lanes[0]?.key ?? sideA.roadId}x${sideB.lanes[0]?.key ?? sideB.roadId}`,
+      role: 'road',
+      lineKey: sideA.lanes[0]?.key ?? sideA.roadId,
+      lineLengthM: cross.spanM,
+      realLatFromM: 0,
+      realLatToM: 0,
+      samples: [
+        { x: built.box.x, y: centre.y },
+        { x: built.box.x + built.box.w, y: centre.y },
+      ],
+      geometry: built.geometry,
+      box: { xM: built.box.x, yM: built.box.y, wM: built.box.w, hM: built.box.h },
+      sFrom: 0,
+      sTo: 0,
+    })
+    note({ x: built.box.x, y: built.box.y })
+    note({ x: built.box.x + built.box.w, y: built.box.y + built.box.h })
+  }
+
   for (const job of switchJobs) {
     const node = byId.get(job.nodeId)
     const stemOther = byId.get(job.stem.from === job.nodeId ? job.stem.to : job.stem.from)

@@ -5,7 +5,12 @@ import {
   type TrackGenLayout,
   type Vec2,
 } from './trackGenLayout'
-import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
+import {
+  CORNER_TRACK_KEY,
+  CROSS_TRACK_KEY,
+  SWITCH_TRACK_KEY,
+  TAPER_TRACK_KEY,
+} from './trackShapes'
 import {
   TRACKGEN_LAT_MODE_KEY,
   TRACKGEN_LAT_PER_BOX_KEY,
@@ -241,6 +246,33 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
         trackGenLine: shape.lineKey,
         trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
         [CORNER_TRACK_KEY]: shape.geometry,
+        [TRACKGEN_REAL_PATH_KEY]: realPath,
+        [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
+        ...meta,
+      },
+      box: { ...shape.box },
+    }
+  }
+  if (shape.kind === 'cross') {
+    /*
+     * 交叉路口 → 交叉軌道。
+     *
+     * 外框與四個端面的比例都由排版算好（見 fitCrossAt），這裡照抄。
+     */
+    return {
+      id,
+      type: 'Track',
+      name: 'RailCross',
+      customName: shape.name,
+      rotation: 0,
+      parameters: {
+        segmentId: shape.name,
+        ...spanMeta,
+        ...fillMeta,
+        trackGenRole: shape.role,
+        trackGenLine: shape.lineKey,
+        trackGenLineLengthM: Number(shape.lineLengthM.toFixed(1)),
+        [CROSS_TRACK_KEY]: shape.geometry,
         [TRACKGEN_REAL_PATH_KEY]: realPath,
         [TRACKGEN_LOCAL_PATH_KEY]: localPathOf(shape.samples, shape.box, 0),
         ...meta,

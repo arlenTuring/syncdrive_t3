@@ -1,4 +1,9 @@
-import type { CornerTrackGeometry, SwitchTrackGeometry, TaperTrackGeometry } from './trackShapes'
+import type {
+  CornerTrackGeometry,
+  CrossTrackGeometry,
+  SwitchTrackGeometry,
+  TaperTrackGeometry,
+} from './trackShapes'
 import {
   cornerArcCentrePx,
   cornerTrackEndsPx,
@@ -39,6 +44,7 @@ export const TRACK_GEN_KIND_COLOR = {
   corner: { fill: '#2f4f4a', stroke: '#5eead4' },
   taper: { fill: '#33435c', stroke: '#93b4e0' },
   switch: { fill: '#463c5e', stroke: '#c4b5fd' },
+  cross: { fill: '#5c3a3a', stroke: '#fca5a5' },
 } as const
 
 
@@ -180,7 +186,23 @@ export type LayoutSwitch = RealLateral & {
   sTo: number
 }
 
-export type LayoutShape = LayoutRect | LayoutCorner | LayoutTaper | LayoutSwitch
+/** 交叉：兩條軌道在這裡交會，四個口互相都通 */
+export type LayoutCross = RealLateral & {
+  kind: 'cross'
+  name: string
+  role: LaneRole
+  geometry: CrossTrackGeometry
+  box: { xM: number; yM: number; wM: number; hM: number }
+  sFrom: number
+  sTo: number
+}
+
+export type LayoutShape =
+  | LayoutRect
+  | LayoutCorner
+  | LayoutTaper
+  | LayoutSwitch
+  | LayoutCross
 
 export type TrackGenLayout = {
   shapes: LayoutShape[]

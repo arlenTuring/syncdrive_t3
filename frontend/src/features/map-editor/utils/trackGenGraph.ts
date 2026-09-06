@@ -96,17 +96,98 @@ export type NodeMovement = {
   b: string
 }
 
+/**
+ * 一個<strong>交叉</strong>路口：兩條軌道在這裡交會，四個口互相都通。
+ *
+ * 判斷的依據是<strong>連接道自己交叉</strong>——同一個路口裡有兩條連接道在中途相交，
+ * 那就不是分岔（分岔的幾條腿只在端點碰頭），是交叉。這是檔案裡量得出來的事實，
+ * 不必從「有幾條腿」之類的形狀去猜。
+ */
+export type NodeCrossing = {
+  nodeId: string
+  /** 交會點的真實座標（公尺） */
+  atX: number
+  atY: number
+  /** 這個路口的連接道整體佔了多長（公尺）——畫出來的交叉軌道就這麼長 */
+  spanM: number
+}
+
 export type TrackGraph = {
   nodes: GraphNode[]
   edges: GraphEdge[]
   /** 路口允許的通行配對，照 .xodr 的連接道列出來 */
   movements: NodeMovement[]
+  /** 連接道互相交叉的路口，畫成交叉軌道 */
+  crossings: NodeCrossing[]
   /** 診斷用：圖上有幾個環（邊數 − 節點數 + 連通塊數） */
   cycles: number
   components: number
 }
 
 type Pt = { x: number; y: number }
+
+/** 兩條線段相交的位置；不相交或只在端點碰頭時回 null */
+function segmentCross(
+  p1: Pt,
+  p2: Pt,
+  p3: Pt,
+  p4: Pt,
+): { x: number; y: number; t: number; u: number } | null {
+  const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x)
+  if (Math.abs(d) < 1e-12) return null
+  const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d
+  const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null
+  return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t, t, u }
+}
+
+/**
+ * 這個路口裡有沒有兩條連接道<strong>在中途</strong>相交。
+ *
+ * 只在端點碰頭的不算——那是分岔，幾條腿共用一個起點。要離兩端都有一段距離，才是
+ * 一條路疊過另一條。門檻取整條的一成：短的連接道十幾公尺，一成就是一公尺多，足以
+ * 排掉端點的浮點誤差，又不會把真的交叉排掉（實測 T3 的交叉落在 0.31 與 0.68）。
+ */
+const CROSSING_END_MARGIN = 0.1
+
+function crossingInJunction(
+  lanes: LaneCenterline[],
+): { atX: number; atY: number; spanM: number } | null {
+  for (let a = 0; a < lanes.length; a += 1) {
+    for (let b = a + 1; b < lanes.length; b += 1) {
+      const A = lanes[a]!.points
+      const B = lanes[b]!.points
+      for (let i = 1; i < A.length; i += 1) {
+        for (let j = 1; j < B.length; j += 1) {
+          const hit = segmentCross(A[i - 1]!, A[i]!, B[j - 1]!, B[j]!)
+          if (!hit) continue
+          const fa = (i - 1 + hit.t) / (A.length - 1)
+          const fb = (j - 1 + hit.u) / (B.length - 1)
+          if (fa < CROSSING_END_MARGIN || fa > 1 - CROSSING_END_MARGIN) continue
+          if (fb < CROSSING_END_MARGIN || fb > 1 - CROSSING_END_MARGIN) continue
+          let xMin = Infinity
+          let xMax = -Infinity
+          let yMin = Infinity
+          let yMax = -Infinity
+          for (const lane of lanes) {
+            for (const p of lane.points) {
+              if (p.x < xMin) xMin = p.x
+              if (p.x > xMax) xMax = p.x
+              if (p.y < yMin) yMin = p.y
+              if (p.y > yMax) yMax = p.y
+            }
+          }
+          return {
+            atX: hit.x,
+            atY: hit.y,
+            spanM: Math.max(xMax - xMin, yMax - yMin),
+          }
+        }
+      }
+    }
+  }
+  return null
+}
 
 /** 併查集：端點靠真實座標焊在一起 */
 class Weld {
@@ -301,6 +382,23 @@ export function buildTrackGraph(
    * 每換一份圖就要重調那個數字。
    */
   const movements: NodeMovement[] = []
+  const crossings: NodeCrossing[] = []
+  const seenCrossingJunctions = new Set<string>()
+  /*
+   * 連接道<strong>在中途</strong>互相交叉的路口。
+   *
+   * 分岔的幾條腿只在端點碰頭；交叉是兩條路真的疊過去。所以「有沒有一對連接道在
+   * 兩端以外的地方相交」就是這兩者的分界，量得出來，不必猜形狀。
+   */
+  const junctionLanes = new Map<string, LaneCenterline[]>()
+  for (const lane of plan.lanes) {
+    if (!driving(lane)) continue
+    const road = plan.roads.find((r) => r.id === lane.roadId)
+    if (!road || road.junctionId === '-1') continue
+    const arr = junctionLanes.get(road.junctionId) ?? []
+    arr.push(lane)
+    junctionLanes.set(road.junctionId, arr)
+  }
   /** 連接道兩端接到的 road 端點；沒有 link 的話回傳 null */
   const linkTarget = (link: RoadInfo['predecessor']): string | null => {
     if (!link || link.type !== 'road' || !link.contact) return null
@@ -322,6 +420,12 @@ export function buildTrackGraph(
         const a = road.predecessor?.id
         const b = road.successor?.id
         if (a && b && a !== b) movements.push({ nodeId: pre, a, b })
+        // 同一個路口的每一條連接道都會走到這裡，記一次就好
+        if (!seenCrossingJunctions.has(road.junctionId)) {
+          seenCrossingJunctions.add(road.junctionId)
+          const hit = crossingInJunction(junctionLanes.get(road.junctionId) ?? [])
+          if (hit) crossings.push({ nodeId: pre, ...hit })
+        }
       }
       continue
     }
@@ -450,6 +554,7 @@ export function buildTrackGraph(
     nodes: [...nodes.values()],
     edges,
     movements: movements.map((m) => ({ ...m, nodeId: weld.find(m.nodeId) })),
+    crossings: crossings.map((c) => ({ ...c, nodeId: weld.find(c.nodeId) })),
     components: roots.size,
     cycles: edges.length - nodes.size + roots.size,
   }
