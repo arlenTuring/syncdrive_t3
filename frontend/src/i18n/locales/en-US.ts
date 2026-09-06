@@ -1613,6 +1613,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         mapLayer: 'Map layer',
         facility: 'Facilities',
         equipment: 'Equipment',
+        track: 'Tracks',
         other: 'Other',
       },
       addAria: 'Add: {{label}}. {{hint}}',

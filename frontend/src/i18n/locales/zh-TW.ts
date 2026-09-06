@@ -1599,6 +1599,7 @@ const zhTW = {
         mapLayer: '地圖層',
         facility: '設施',
         equipment: '設備',
+        track: '軌道',
         other: '其他',
       },
       addAria: '加入：{{label}}。{{hint}}',

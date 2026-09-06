@@ -8,7 +8,11 @@ import {
   type FacilityPaletteItem,
   type PaletteItem,
 } from '../constants/palette'
-import { isMapEquipmentType, isMapFacilityAreaType } from '../constants/facilityTaxonomy'
+import {
+  isMapEquipmentType,
+  isMapFacilityAreaType,
+  isMapTrackType,
+} from '../constants/facilityTaxonomy'
 import { AREA_PALETTE_ICON, PALETTE_ICON_BY_NAME } from '../utils/facilityIcons'
 import { Image as ImageIcon, Route } from 'lucide-react'
 import {
@@ -31,11 +35,13 @@ type PaletteGroup = {
 function buildPaletteGroups(): PaletteGroup[] {
   const facilityItems: FacilityPaletteItem[] = []
   const equipmentItems: FacilityPaletteItem[] = []
+  const trackItems: FacilityPaletteItem[] = []
   const otherItems: FacilityPaletteItem[] = []
 
   for (const item of FACILITY_PALETTE_ITEMS) {
     if (isMapFacilityAreaType(item.type)) facilityItems.push(item)
     else if (isMapEquipmentType(item.type)) equipmentItems.push(item)
+    else if (isMapTrackType(item.type)) trackItems.push(item)
     else otherItems.push(item)
   }
 
@@ -47,6 +53,7 @@ function buildPaletteGroups(): PaletteGroup[] {
     },
     { key: 'facility', labelKey: 'mapEditor.palette.groups.facility', items: facilityItems },
     { key: 'equipment', labelKey: 'mapEditor.palette.groups.equipment', items: equipmentItems },
+    { key: 'track', labelKey: 'mapEditor.palette.groups.track', items: trackItems },
     { key: 'other', labelKey: 'mapEditor.palette.groups.other', items: otherItems },
   ].filter((group) => group.items.length > 0)
 }
