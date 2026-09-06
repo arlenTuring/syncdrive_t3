@@ -80,9 +80,6 @@ export const MIN_CORNER_BULGE = 0.5
 /** 到達上限就直接畫成直角，不再用曲線逼近 */
 export const MAX_CORNER_BULGE = 2.4
 
-/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
-export const DEFAULT_CORNER_TRACK_SIZE_M = { w: 60, h: 60 }
-
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 /**
@@ -399,9 +396,6 @@ export const DEFAULT_TAPER_TRACK: TaperTrackGeometry = {
   entryDeg: 0,
 }
 
-/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
-export const DEFAULT_TAPER_TRACK_SIZE_M = { w: 60, h: 40 }
-
 export function readTaperTrack(
   parameters: Record<string, unknown> | undefined,
 ): TaperTrackGeometry {
@@ -573,9 +567,6 @@ export const DEFAULT_SWITCH_TRACK: SwitchTrackGeometry = {
   bAt: 1,
   entryDeg: 0,
 }
-
-/** 未旋轉時的預設外框（公尺）。夠大才拖得動控制點 */
-export const DEFAULT_SWITCH_TRACK_SIZE_M = { w: 80, h: 40 }
 
 export function readSwitchTrack(
   parameters: Record<string, unknown> | undefined,

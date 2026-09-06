@@ -1,8 +1,10 @@
 import type { FacilityName, FacilityType } from '../types/facility'
+import type { MapAreaDomain, MapAreaLayout } from '../types/area'
+import { domainHeightM, domainWidthM, meterSizeToAreaLocalPx } from '../utils/areaCoords'
 import {
-  DEFAULT_CORNER_TRACK_SIZE_M,
-  DEFAULT_TAPER_TRACK_SIZE_M,
-  DEFAULT_SWITCH_TRACK_SIZE_M,
+  DEFAULT_CORNER_TRACK,
+  DEFAULT_TAPER_TRACK,
+  DEFAULT_SWITCH_TRACK,
 } from '../utils/trackShapes'
 import {
   getRefFieldBounds,
@@ -77,6 +79,83 @@ export function resolvePoleFrameSizePx(
  * 圖台預設顯示尺寸（絕對畫素）。
  * 與 Area 外框、場域 domain 無關；僅決定元件在圖台上的視覺大小。
  */
+/**
+ * 三種軌道變體放下去時的預設外框（公尺），由<strong>帶寬</strong>反推。
+ *
+ * 帶寬要跟一般軌道一樣（TRACK_RAIL_WIDTH_M），不然放下去接不起來，看起來也不成比例
+ * ——先前圓角寫死 60×60，帶寬因此是 18 公尺，是一般軌道的五倍多，放進小一點的容器
+ * 就整個爆出去。
+ *
+ * 每一種的帶寬各由自己的幾何比例決定，所以只要把那個比例倒推回去就得到外框：
+ *
+ * <ul>
+ *   <li>圓角：帶寬 = (1 − innerRatio) × 邊長</li>
+ *   <li>斜接：帶寬 = (aTo − aFrom) × 高；長度照它自己的坡，換一條軌道的位置走三倍距離</li>
+ *   <li>分岔：帶寬同上；長度照兩個出口分開多遠再乘上同一個坡</li>
+ * </ul>
+ */
+const TAPER_RAMP_RUN = 3
+
+export const TRACK_VARIANT_SIZE_M = (() => {
+  const cornerSide = TRACK_RAIL_WIDTH_M / (1 - DEFAULT_CORNER_TRACK.innerXRatio)
+  const taperH = TRACK_RAIL_WIDTH_M / (DEFAULT_TAPER_TRACK.aTo - DEFAULT_TAPER_TRACK.aFrom)
+  const taperShift = (DEFAULT_TAPER_TRACK.bFrom - DEFAULT_TAPER_TRACK.aFrom) * taperH
+  const switchH = TRACK_RAIL_WIDTH_M / (DEFAULT_SWITCH_TRACK.aTo - DEFAULT_SWITCH_TRACK.aFrom)
+  const outletGap =
+    Math.abs(
+      (DEFAULT_SWITCH_TRACK.bFrom + DEFAULT_SWITCH_TRACK.bTo) / 2 -
+        (DEFAULT_SWITCH_TRACK.mFrom + DEFAULT_SWITCH_TRACK.mTo) / 2,
+    ) * switchH
+  return {
+    RailCorner: { w: cornerSide, h: cornerSide },
+    RailTaper: { w: taperShift * TAPER_RAMP_RUN, h: taperH },
+    RailSwitch: { w: outletGap * TAPER_RAMP_RUN, h: switchH },
+  }
+})()
+
+/**
+ * 放進 Area 時最多佔容器每一邊的幾成。
+ *
+ * 放下去之後還要挪位置、拉把手，佔滿整個容器就什麼都做不了；留三分之二的空間才轉得動。
+ */
+const DROP_MAX_SPAN = 1 / 3
+/**
+ * 放下去之後短邊至少幾個像素。
+ *
+ * 四個角的把手各約 14 像素；短邊要放得下兩個把手還分得開，才抓得住上下（或左右）不同的
+ * 那一個。抓不住就談不上縮放與旋轉。
+ *
+ * 這一條與上面那一條會打架：細長的元件（一般軌道 14:1）為了把短邊撐到這個高度，長邊會
+ * 跟著超過三分之一。那時以「抓得住」為準，最後再一起夾進容器裡。
+ */
+const DROP_MIN_SIDE_PX = 24
+
+/**
+ * 一個設施剛放進 Area 時的大小（Area 局部像素）。
+ *
+ * 先前直接把預設公尺數換成<strong>世界</strong>像素，跟容器自己的比例尺無關——所以同一個
+ * 元件放進大容器剛好、放進小容器就整個爆出去（實測圓角遠遠超出容器）。
+ *
+ * 現在照容器換算：等比縮到每一邊都不超過容器的三分之一，再確保短邊抓得住。只會縮不會放，
+ * 元件本來的長寬比也不變。
+ */
+export function defaultAreaSizePxForDrop(
+  type: FacilityType,
+  name: FacilityName | undefined,
+  domain: MapAreaDomain,
+  layout: MapAreaLayout,
+): { w: number; h: number } {
+  const m = defaultSizeMetersForType(type, name)
+  const spanW = Math.max(1e-6, domainWidthM(domain))
+  const spanH = Math.max(1e-6, domainHeightM(domain))
+  const fit = Math.min(1, (spanW * DROP_MAX_SPAN) / m.w, (spanH * DROP_MAX_SPAN) / m.h)
+  const px = meterSizeToAreaLocalPx(m.w * fit, m.h * fit, domain, layout)
+  const grow = Math.max(1, DROP_MIN_SIDE_PX / Math.max(1e-6, Math.min(px.w, px.h)))
+  // 撐大之後仍然不准超出容器——「不能比容器大」是硬規則，其餘都是取捨
+  const inside = Math.min(1, layout.wPx / (px.w * grow), layout.hPx / (px.h * grow))
+  return { w: px.w * grow * inside, h: px.h * grow * inside }
+}
+
 export function defaultCanvasSizePxForType(
   type: FacilityType,
   name?: FacilityName,
@@ -107,13 +186,13 @@ export function defaultSizeMetersForType(
   h: number
 } {
   if (type === 'Track' && name === 'RailCorner') {
-    return { ...DEFAULT_CORNER_TRACK_SIZE_M }
+    return { ...TRACK_VARIANT_SIZE_M.RailCorner }
   }
   if (type === 'Track' && name === 'RailTaper') {
-    return { ...DEFAULT_TAPER_TRACK_SIZE_M }
+    return { ...TRACK_VARIANT_SIZE_M.RailTaper }
   }
   if (type === 'Track' && name === 'RailSwitch') {
-    return { ...DEFAULT_SWITCH_TRACK_SIZE_M }
+    return { ...TRACK_VARIANT_SIZE_M.RailSwitch }
   }
   switch (type) {
     case 'Slot':

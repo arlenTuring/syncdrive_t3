@@ -29,8 +29,8 @@ import {
   type VehicleTrajectoryEntry,
 } from './constants/vehicleTrajectoryCatalog'
 import {
-  defaultCanvasSizePxForType,
   defaultSizeMetersForType,
+  defaultAreaSizePxForDrop,
   MIN_FACILITY_CANVAS_PX,
 } from './constants/facilityDimensions'
 import {
@@ -2525,7 +2525,8 @@ export default function MapEditorApp({
       if (!area) return
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
-      const sizePx = defaultCanvasSizePxForType(item.type, item.name)
+      // 大小照容器換算，不是固定的世界像素——見 defaultAreaSizePxForDrop
+      const sizePx = defaultAreaSizePxForDrop(item.type, item.name, area.domain, area.layout)
       const cssTopLeft = {
         left: areaPositionCenter.x - sizePx.w / 2,
         top: areaPositionCenter.y - sizePx.h / 2,
