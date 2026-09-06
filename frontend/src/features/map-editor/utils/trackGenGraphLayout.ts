@@ -44,10 +44,20 @@ const DRAWING = {
   runMargin: 1.5,
   /** 一條邊短過幾塊就不畫中途的橫移——那個尺度上的起伏在圖上讀不出來 */
   minTaperBlocks: 6,
-  /** 切段的級距：線挪了幾分之一條軌道寬才算「看得出來不是直的」 */
-  segUnit: 1 / 4,
-  /** 兩段高度差幾分之一條軌道寬以內就當成同一段 */
-  mergeUnit: 0.08,
+  /**
+   * 切段的級距：路<strong>真實</strong>橫移幾條軌道的寬度才算換了一階。
+   *
+   * 量的是真實世界的公尺，不是圖上的像素——圖上的尺寸會跟著使用者給的軌道寬變，
+   * 拿它當尺的話同一份路網換個寬度就會生出不同的形狀（實測寬 26 有斜接、寬 50
+   * 整段被判成直的，原圖明明是彎的）。路彎了多少是路自己的事，與畫多粗無關。
+   */
+  latStepLanes: 2,
+  /** 一階在圖上挪幾分之一股：夠看得出來，兩階就頂到與鄰帶的正中間 */
+  latStepPitch: 1 / 4,
+  /** 兩段的高度差不到一階的幾成就當成同一段 */
+  mergeUnit: 0.5,
+  /** 切塊剩下的尾巴短過一塊的幾成就併進前一塊——比例是塊自己的事，與軌道寬無關 */
+  minTailBlock: 1 / 4,
   /** 一段斜接最多吃掉整條邊的幾成 */
   rampMaxSpan: 0.3,
   /** 束與束之間留幾股的空隙 */
@@ -649,7 +659,6 @@ function layoutOnce(
     )
     // 讓出轉角之後剩下的里程，才是要切塊的長度
     const usedM = e.lengthM * (len / full)
-    const minRunM = (levelPx / Math.max(1e-6, len / Math.max(1e-6, usedM))) || LANE_W_M
 
     const offs = offsetsOf(e)
     const ax = perpAxis(e)
@@ -724,25 +733,33 @@ function layoutOnce(
     const toPx = (devM: number) =>
       Math.max(-capPx, Math.min(capPx, axisSign(e.orient) * devM * perpScale))
     /**
-     * 切段時的量化單位：<strong>一股在圖上代表多少公尺</strong>。
+     * 切段的級距：<strong>真實世界的公尺</strong>。
      *
-     * 用股距（軌道之間的 3.5 公尺）去切會把每一點小起伏都切成一段；圖上看得出來的
-     * 差異是「挪了半條軌道寬」那個級距，換算回真實世界是幾十公尺。
-     *
-     * 這裡一律拿<strong>軌道寬</strong>當尺，不拿股距——判斷的是「線挪得看不看得出來」，
-     * 那要跟線自己的粗細比，跟兩條線之間留多少空隙無關。
+     * 路橫移超過兩條軌道的寬度就算換了一階，值得切一段畫成斜接。這是路自己的性質，
+     * 換算成圖的哪一種尺寸都不看——尤其不看軌道寬：軌道寬只是畫多粗，拿它當尺的話
+     * 同一份路網寬 26 生得出 S、寬 50 就被判成直的，兩張圖的幾何互相矛盾。
      */
-    const stepM = bandW / Math.max(1e-6, perpScale)
-    /*
-     * 切段用的級距取<strong>四分之一股</strong>：線在圖上挪了四分之一條軌道寬就看得
-     * 出來不是直的，值得切一段。整股當級距的話，road 9 那個 ±8 公尺的緩坡（圖上 15
-     * 像素）會被判成沒動，原圖看得到的 S 又不見了。
-     */
-    const segUnitM = stepM * DRAWING.segUnit
+    const segUnitM = LANE_W_M * DRAWING.latStepLanes
+    /** 一階在圖上挪多少（版面像素），最多挪到與鄰帶的正中間 */
+    const latStepPx = levelPx * DRAWING.latStepPitch
     const levelAt = (f: number): number =>
       Math.max(-8, Math.min(8, Math.round(latDevAt(f) / segUnitM)))
-    /** 沿線切成幾段「同一階」的區間 */
-    let levelRuns: Array<{ f0: number; f1: number; level: number; offsetPx: number }> = []
+    /**
+     * 一段換階至少要多長：<strong>一整塊</strong>。
+     *
+     * 拿「一段坡要走多長」當門檻很直覺，但坡的長度跟著軌道寬走，門檻也就跟著走——寬 60
+     * 併掉的那一段，寬 50 又留著，同一份路網的形狀跟著粗細變。塊是使用者自己定的尺，
+     * 與粗細無關；坡放不放得下另外有 rampMaxSpan 與 rampMinRun 在管。
+     */
+    const minShiftM = perBlockM
+    /** 沿線切成幾段「同一階」的區間；<code>pinned</code> 是為了接上節點才補的端頭 */
+    const levelRuns: Array<{
+      f0: number
+      f1: number
+      level: number
+      offsetPx: number
+      pinned?: boolean
+    }> = []
     /*
      * 短邊不看中途的橫移。
      *
@@ -770,7 +787,6 @@ function layoutOnce(
        * 要走三個股距，留一半餘裕才不會兩段斜接頭尾相接，所以是四點五個股距；再不短於
        * 一塊，免得塊很小時門檻跟著失效。頭尾兩段不併，它們接的是節點。
        */
-      const minShiftM = Math.max(minRunM * DRAWING.rampRun * (1 + DRAWING.runMargin), perBlockM)
       const minRunF = Math.min(0.4, minShiftM / Math.max(1, usedM))
       raw.forEach((r, i) => {
         const prev = levelRuns[levelRuns.length - 1]
@@ -785,62 +801,55 @@ function layoutOnce(
     }
 
     /*
-     * 每一段畫在<strong>那一段自己的平均高度</strong>上，兩端則直接用節點的高度。
+     * 每一段畫在<strong>它那一階</strong>上，兩端則直接用節點的高度。
      *
-     * 節點的高度是那個節點自己的事，在它上面交會的每條邊都得用同一個值，接縫才不會
-     * 錯開；中間各段照實際位置擺，簡圖才貼近真的幾何。
+     * 擺的位置照階數乘一階的高度，不照那一段的平均側位。平均是連續的量，會跟著版面
+     * 的比例尺走，比例尺又跟著軌道寬走——同一份路網換個寬度，同一段路就畫在不同高度，
+     * 併不併得掉也跟著變。照階數擺就沒有這回事：階是路自己的性質，圖只是把它畫出來。
      */
-    const meanDev = (f0: number, f1: number) => {
-      let t = 0
-      const N = 8
-      for (let i = 0; i <= N; i += 1) t += latDevAt(f0 + ((f1 - f0) * i) / N)
-      return t / (N + 1)
+    for (const r of levelRuns) {
+      r.offsetPx = Math.max(
+        -capPx,
+        Math.min(capPx, axisSign(e.orient) * r.level * latStepPx),
+      )
     }
-    for (const r of levelRuns) r.offsetPx = toPx(meanDev(r.f0, r.f1))
-    // 兩端都落在自己那一排上（見上面「節點不再各自帶一個股位」）：只有路自己在挪時才切一刀
-    const fromPx = 0
-    const toPxEnd = 0
     /*
-     * 只有一段的邊要不要為了兩端高度不同而切一刀。
+     * 兩端一定要停在<strong>節點的股位</strong>上，但<strong>不是把整條壓下去</strong>。
      *
-     * 長邊值得——那是路真的在挪。短邊不值得：它本來就沒有空間好好走一段坡，兩端的差
-     * 又常常只是路口附近幾像素的擺動。實測塊給 50 公尺時，59 公尺的側線為了六像素的
-     * 落差生出一段斜接，圖上就是側線上莫名其妙多一塊。
+     * 節點的股位是那個節點的事，在它上面交會的每一條邊都得用同一個值，不然同一個節點
+     * 兩側的兩條帶子會差一截，中間又沒有斜接過渡，圖上就是一個硬生生的台階。
+     *
+     * 先前的作法是直接把頭尾兩段的高度改成節點的高度。段數多的時候還好，只有一兩段時
+     * 那「頭尾兩段」就是整條路——road 8 有 683 公尺、中段整段偏出 14 公尺，卻因為
+     * 第一段就是最後一段而被壓成一條直線，原圖看得到的橫移全部不見。
+     *
+     * 改成在端點<strong>補一小截</strong>停在節點的股位上，路自己的階原封不動：那一截
+     * 只要放得下一段坡，剩下的交給斜接。端頭補出來的界線不再往路中間找最陡點——那裡的
+     * 落差是正交化造成的，不是路真的在那裡挪，界線要盡量貼著節點。
      */
-    /*
-     * 帶子<strong>一定要停在節點自己的股位上</strong>，兩端都是。
-     *
-     * 節點的股位是那個節點的事，在它上面交會的每一條邊都得用同一個值——不然同一個
-     * 節點兩側的兩條帶子就會差一截，中間又沒有斜接可以過渡，圖上就是一個硬生生的
-     * 台階。實測就是使用者放大看到的那一個。
-     *
-     * 先前這裡有兩條「差一點點沒關係」的捷徑，兩條都會製造那種台階：
-     *
-     * 一、只有一段的邊取兩端的<strong>平均</strong>，兩頭各差一半。短邊的門檻還放到
-     *    四成軌道寬，那就是最多七分之一條軌道寬的台階。
-     * 二、併段時把最後一段併掉，尾端的股位跟著不見。
-     *
-     * 現在一律讓它接上：兩端不同高就切一刀，中間交給斜接（斜接自己會撐到至少一整塊，
-     * 所以不會變成碎片）。落差再小也是斜的，斜得看不出來就等於直的，但不會有台階。
-     */
-    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > 1e-6) {
-      const only = levelRuns[0]!
-      const mid = (only.f0 + only.f1) / 2
-      levelRuns = [
-        { f0: only.f0, f1: mid, level: only.level, offsetPx: fromPx },
-        { f0: mid, f1: only.f1, level: only.level, offsetPx: toPxEnd },
-      ]
-    } else {
-      levelRuns[0]!.offsetPx = fromPx
-      levelRuns[levelRuns.length - 1]!.offsetPx = toPxEnd
+    const endStubF = Math.min(0.25, minShiftM / Math.max(1, usedM))
+    const pinEnd = (head: boolean) => {
+      const r = levelRuns[head ? 0 : levelRuns.length - 1]!
+      if (r.level === 0) return
+      const cut = Math.min((r.f1 - r.f0) * 0.5, endStubF)
+      if (cut <= 1e-6) return
+      if (head) {
+        r.f0 += cut
+        levelRuns.unshift({ f0: r.f0 - cut, f1: r.f0, level: 0, offsetPx: 0, pinned: true })
+      } else {
+        r.f1 -= cut
+        levelRuns.push({ f0: r.f1, f1: r.f1 + cut, level: 0, offsetPx: 0, pinned: true })
+      }
     }
+    pinEnd(false)
+    pinEnd(true)
     /*
      * 併掉高度差看不出來的段界——但<strong>最後一段不能併</strong>：它帶著尾端節點的
      * 股位，併掉就等於把那個股位丟了。頭那一段併進來時保留的是它自己的股位，沒問題。
      */
     for (let i = levelRuns.length - 1; i > 0; i -= 1) {
       if (i === levelRuns.length - 1) continue
-      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < bandW * DRAWING.mergeUnit) {
+      if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < latStepPx * DRAWING.mergeUnit) {
         levelRuns[i - 1]!.f1 = levelRuns[i]!.f1
         levelRuns.splice(i, 1)
       }
@@ -862,6 +871,8 @@ function layoutOnce(
       for (let i = 0; i + 1 < levelRuns.length; i += 1) {
         const a = levelRuns[i]!
         const b = levelRuns[i + 1]!
+        // 端頭那一截是為了接節點才補的，界線要貼著節點，不往路中間找
+        if (a.pinned || b.pinned) continue
         const dir = Math.sign(toPx(1)) * Math.sign(b.offsetPx - a.offsetPx) || 1
         const lo = (a.f0 + a.f1) / 2
         const hi = (b.f0 + b.f1) / 2
@@ -902,7 +913,8 @@ function layoutOnce(
         cur = v
       }
       raw.push({ f0: start / K, f1: 1, spread: cur })
-      const minSpreadF = (levelPx * DRAWING.runMargin) / Math.max(1, len)
+      // 門檻用塊，不用股距：股距跟著軌道寬走，形狀就會跟著粗細變（同 minShiftM）
+      const minSpreadF = Math.min(0.4, minShiftM / Math.max(1, usedM))
       raw.forEach((r, i) => {
         // 頭尾兩段不併：它們是這一束接回節點的地方，併掉的話整段都停在拉開的寬度上
         const terminal = i === 0 || i === raw.length - 1
@@ -928,7 +940,7 @@ function layoutOnce(
        */
       const continues = (nodeId: string) =>
         (incident.get(nodeId) ?? []).some((other) => bundleKey(other) !== bundleKey(e))
-      const tailF = Math.min(0.35, (levelPx * DRAWING.runMargin) / Math.max(1, len))
+      const tailF = Math.min(0.35, minShiftM / Math.max(1, usedM))
       const head = spreadRuns[0]!
       if (head.spread === 1 && continues(e.from) && head.f1 > tailF * 1.5) {
         head.f0 = tailF
@@ -989,7 +1001,8 @@ function layoutOnce(
        */
       for (let i = runs.length - 2; i > 0; i -= 1) {
         const r = runs[i]!
-        if ((r.f1 - r.f0) * len >= levelPx) continue
+        // 門檻拿塊來量，不拿股距：股距跟著軌道寬走，併不併得掉就會跟著粗細變
+        if ((r.f1 - r.f0) * usedM >= perBlockM * DRAWING.minTailBlock) continue
         runs[i - 1]!.f1 = r.f1
         runs.splice(i, 1)
       }
@@ -1072,7 +1085,7 @@ function layoutOnce(
         const g1 = run.f1 - cut1
         if (g1 - g0 > 0.01) {
           const runM = usedM * (g1 - g0)
-          const parts = Math.max(1, blocksInSpan(runM, perBlockM, minRunM))
+          const parts = Math.max(1, blocksInSpan(runM, perBlockM, perBlockM * DRAWING.minTailBlock))
           for (let i = 0; i < parts; i += 1) {
             const f0 = g0 + ((g1 - g0) * i) / parts
             const f1 = g0 + ((g1 - g0) * (i + 1)) / parts
