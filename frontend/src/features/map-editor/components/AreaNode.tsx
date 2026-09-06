@@ -947,16 +947,21 @@ export const AreaNode = memo(function AreaNode({
       const tr = corner(hw, -hh)
       const br = corner(hw, hh)
       const bl = corner(-hw, hh)
-      // 長邊沿著行進方向，端面是另一對
-      return size.w >= size.h
-        ? [
-            { x1: tl.x, y1: tl.y, x2: bl.x, y2: bl.y },
-            { x1: tr.x, y1: tr.y, x2: br.x, y2: br.y },
-          ]
-        : [
-            { x1: tl.x, y1: tl.y, x2: tr.x, y2: tr.y },
-            { x1: bl.x, y1: bl.y, x2: br.x, y2: br.y },
-          ]
+      /*
+       * 一般軌道是矩形，<strong>四個邊都能接</strong>。
+       *
+       * 先前只回傳兩條短邊，理由是「長邊是個大得多的吸附目標，短邊會永遠吸不到」。可是
+       * 那等於規定軌道只能左右相接——實際上要從側面接上來的情形一樣存在，接哪一邊該由
+       * 使用者決定。吸附偏心的問題改在挑候選那裡處理：距離差不多時看哪一條邊的中點比較近。
+       *
+       * 順序固定成左、右、上、下，與把手的代號 a／b／c／d 一一對應；對邊是 a↔b、c↔d。
+       */
+      return [
+        { x1: tl.x, y1: tl.y, x2: bl.x, y2: bl.y },
+        { x1: tr.x, y1: tr.y, x2: br.x, y2: br.y },
+        { x1: tl.x, y1: tl.y, x2: tr.x, y2: tr.y },
+        { x1: bl.x, y1: bl.y, x2: br.x, y2: br.y },
+      ]
     },
     [displayDomain, displayLayout],
   )
@@ -979,10 +984,19 @@ export const AreaNode = memo(function AreaNode({
         return { a: seg(edges[0]!), m: seg(edges[1]!), b: seg(edges[2]!) }
       }
       if (edges.length < 2) return null
-      return { a: seg(edges[0]!), b: seg(edges[1]!) }
+      const faces: Record<string, EndSegment> = { a: seg(edges[0]!), b: seg(edges[1]!) }
+      // 一般軌道四個邊都能接
+      if (edges[2] && edges[3]) {
+        faces.c = seg(edges[2])
+        faces.d = seg(edges[3])
+      }
+      return faces
     },
     [facilityEndEdgesLocal],
   )
+
+  /** 這一面的對面是哪一面：兩面的元件是 a↔b，一般軌道多了上下的 c↔d */
+  const OPPOSITE_FACE: Record<string, string> = { a: 'b', b: 'a', c: 'd', d: 'c' }
 
   /** 這一面換成那條邊之後，這個元件表示得出來嗎——表示不出來就不該亮綠燈 */
   const trackWouldJoin = useCallback(
@@ -997,7 +1011,8 @@ export const AreaNode = memo(function AreaNode({
         )
         return !!next && !!buildSwitchFromEndSegments(next.a, next.m, next.b)
       }
-      const other = end === 'a' ? cur.b! : cur.a!
+      const other = cur[OPPOSITE_FACE[end] ?? 'a']
+      if (!other) return false
       const [x, y] = end === 'a' ? [edge, other] : [other, edge]
       if (f.name === 'RailTaper') return !!buildTaperFromEndSegments(x, y)
       if (f.name === 'RailCorner') return !!buildCornerFromEndSegments(x, y)
@@ -1026,6 +1041,7 @@ export const AreaNode = memo(function AreaNode({
       type Hit = { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } }
       let best: Hit | null = null
       let bestD = reach
+      let bestMid = Infinity
       /*
        * 碰得到、卻接不起來的也記下來。
        *
@@ -1035,6 +1051,7 @@ export const AreaNode = memo(function AreaNode({
        */
       let near: Hit | null = null
       let nearD = reach
+      let nearMid = Infinity
       for (const other of area.facilities) {
         if (other.id === facilityId || other.type !== 'Track') continue
         for (const e of facilityEndEdgesLocal(other)) {
@@ -1044,15 +1061,24 @@ export const AreaNode = memo(function AreaNode({
           const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
           const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
           if (d >= reach) continue
+          /*
+           * 兩條邊在角上會等距（短邊與長邊共用那個角），純比距離時長的那條常常先贏。
+           * 距離差不多時改看<strong>中點</strong>誰近——指標停在短邊附近時，短邊的中點
+           * 一定比長邊的中點近。
+           */
+          const midD = Math.hypot(p.x - (e.x1 + dx / 2), p.y - (e.y1 + dy / 2))
           const joinable = trackWouldJoin(f, end, [
             { x: e.x1, y: e.y1 },
             { x: e.x2, y: e.y2 },
           ])
-          if (joinable && d < bestD) {
-            bestD = d
+          const TIE = 0.5
+          if (joinable && (d < bestD - TIE || (d < bestD + TIE && midD < bestMid))) {
+            bestD = Math.min(bestD, d)
+            bestMid = midD
             best = { targetId: other.id, edge: e }
-          } else if (!joinable && d < nearD) {
-            nearD = d
+          } else if (!joinable && (d < nearD - TIE || (d < nearD + TIE && midD < nearMid))) {
+            nearD = Math.min(nearD, d)
+            nearMid = midD
             near = { targetId: other.id, edge: e }
           }
         }
@@ -1114,7 +1140,8 @@ export const AreaNode = memo(function AreaNode({
         const r = next && buildSwitchFromEndSegments(next.a, next.m, next.b)
         if (r) built = { box: r.box, patch: { [SWITCH_TRACK_KEY]: r.geometry } }
       } else {
-        const other = end === 'a' ? cur.b! : cur.a!
+        const other = cur[OPPOSITE_FACE[end] ?? 'a']
+        if (!other) return
         const [x, y] = end === 'a' ? [want, other] : [other, want]
         if (f.name === 'RailTaper') {
           const r = buildTaperFromEndSegments(x, y)
