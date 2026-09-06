@@ -407,6 +407,9 @@ export function fitSwitchAt(
       mTo: r(m.y + bandWM / 2),
       bFrom: r(b.y - bandWM / 2),
       bTo: r(b.y + bandWM / 2),
+      // 生成出來的道岔兩條腿一樣長：兩個出口都貼著外框的另一端
+      mAt: 1,
+      bAt: 1,
       entryDeg,
     }
     const wM = entryDeg % 180 === 0 ? W : H

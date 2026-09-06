@@ -523,6 +523,16 @@ export type SwitchTrackGeometry = {
   bFrom: number
   /** 岔出出口面的終點 */
   bTo: number
+  /**
+   * 直行出口<strong>伸多遠</strong>，佔外框長邊的比例（0–1）。
+   *
+   * 兩個出口各有自己的長度。先前兩個都固定在外框的另一端，於是把其中一個接上對面的
+   * 軌道時，另一個只能跟著挪到同一條線上——對面那條軌道就斷開了。實際的道岔本來就是
+   * 兩條腿各伸各的，外框只是把它們框起來，不該反過來限制它們。
+   */
+  mAt: number
+  /** 岔出出口伸多遠，佔外框長邊的比例（0–1） */
+  bAt: number
   /** 方位（度，螢幕座標順時針為正） */
   entryDeg: number
 }
@@ -536,6 +546,8 @@ export const DEFAULT_SWITCH_TRACK: SwitchTrackGeometry = {
   mTo: 0.34,
   bFrom: 0.66,
   bTo: 1,
+  mAt: 1,
+  bAt: 1,
   entryDeg: 0,
 }
 
@@ -557,6 +569,9 @@ export function readSwitchTrack(
     mTo: num(o.mTo, DEFAULT_SWITCH_TRACK.mTo),
     bFrom: num(o.bFrom, DEFAULT_SWITCH_TRACK.bFrom),
     bTo: num(o.bTo, DEFAULT_SWITCH_TRACK.bTo),
+    // 舊資料沒有這兩個欄位，當成兩個出口都伸到底——那正是先前的行為
+    mAt: num(o.mAt, DEFAULT_SWITCH_TRACK.mAt),
+    bAt: num(o.bAt, DEFAULT_SWITCH_TRACK.bAt),
     entryDeg:
       typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg)
         ? o.entryDeg
@@ -601,19 +616,21 @@ export function switchTrackPath(
 ): string {
   const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
   const c = (v: number) => Math.max(0, Math.min(1, v)) * h
-  const quad = (y0: number, y1: number) =>
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
+  // 兩條腿各伸各的：出口那一面的位置由自己的 mAt／bAt 決定，不是一律貼著外框邊
+  const quad = (x: number, y0: number, y1: number) =>
     [
       [0, c(g.aFrom)],
-      [w, y0],
-      [w, y1],
+      [x, y0],
+      [x, y1],
       [0, c(g.aTo)],
     ]
-      .map(([x, y], i) => {
-        const p = T(x as number, y as number)
+      .map(([px, py], i) => {
+        const p = T(px as number, py as number)
         return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
       })
       .join(' ') + ' Z'
-  return `${quad(c(g.mFrom), c(g.mTo))} ${quad(c(g.bFrom), c(g.bTo))}`
+  return `${quad(at(g.mAt), c(g.mFrom), c(g.mTo))} ${quad(at(g.bAt), c(g.bFrom), c(g.bTo))}`
 }
 
 /** 進口 a、直行出口 m、岔出出口 b */
@@ -626,10 +643,11 @@ export function switchTrackHandlesPx(
 ): Record<SwitchHandleKey, { x: number; y: number }> {
   const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
   const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
   return {
     a: T(0, (c(g.aFrom) + c(g.aTo)) / 2),
-    m: T(w, (c(g.mFrom) + c(g.mTo)) / 2),
-    b: T(w, (c(g.bFrom) + c(g.bTo)) / 2),
+    m: T(at(g.mAt), (c(g.mFrom) + c(g.mTo)) / 2),
+    b: T(at(g.bAt), (c(g.bFrom) + c(g.bTo)) / 2),
   }
 }
 
@@ -641,9 +659,10 @@ export function switchTrackEndSegmentsPx(
 ): { a: [ShapePoint, ShapePoint]; m: [ShapePoint, ShapePoint]; b: [ShapePoint, ShapePoint] } {
   const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
   const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
   return {
     a: [T(0, c(g.aFrom)), T(0, c(g.aTo))],
-    m: [T(w, c(g.mFrom)), T(w, c(g.mTo))],
-    b: [T(w, c(g.bFrom)), T(w, c(g.bTo))],
+    m: [T(at(g.mAt), c(g.mFrom)), T(at(g.mAt), c(g.mTo))],
+    b: [T(at(g.bAt), c(g.bFrom)), T(at(g.bAt), c(g.bTo))],
   }
 }

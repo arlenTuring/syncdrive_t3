@@ -50,14 +50,15 @@ export function buildSwitchFromEndSegments(
   if (!vertical && !horizontal) return null
 
   /*
-   * 進口要在出口的對側。同側的話那不是一個分岔，是三條並排的面——這個元件畫不出來。
+   * 兩個出口要在進口的<strong>同一邊</strong>，但不必在同一條線上——兩條腿各伸各的。
+   * 有一條跑到進口的另一側就不是分岔了，這個元件畫不出來。
    */
   const side = (s: EndSegment) => (vertical ? (s[0].x + s[1].x) / 2 : (s[0].y + s[1].y) / 2)
   const sideA = side(a)
-  const sideM = side(m)
-  const sideB = side(b)
-  if (Math.abs(sideM - sideB) > AXIS_EPS) return null
-  if (Math.abs(sideA - sideM) <= AXIS_EPS) return null
+  const dM = side(m) - sideA
+  const dB = side(b) - sideA
+  if (Math.abs(dM) <= AXIS_EPS || Math.abs(dB) <= AXIS_EPS) return null
+  if (Math.sign(dM) !== Math.sign(dB)) return null
 
   const pts = [...a, ...m, ...b]
   const xs = pts.map((p) => p.x)
@@ -75,6 +76,19 @@ export function buildSwitchFromEndSegments(
   const span = vertical ? box.h : box.w
   const base = vertical ? box.y : box.x
   const r = (p: { x: number; y: number }) => (along(p) - base) / span
+  /*
+   * 沿著<strong>行進方向</strong>的比例，用來算兩條腿各伸多遠。量的是「離進口多遠」，
+   * 所以不管方位怎麼轉、進口在左還在右，算出來都是 0–1。
+   */
+  const runSpan = vertical ? box.w : box.h
+  const runAt = (p: { x: number; y: number }) => (vertical ? p.x : p.y)
+  const runBase = vertical ? box.x : box.y
+  const runR = (p: { x: number; y: number }) => (runAt(p) - runBase) / Math.max(1e-6, runSpan)
+  const aRun = (runR(a[0]) + runR(a[1])) / 2
+  const reach = (s: EndSegment) =>
+    Math.max(0, Math.min(1, Math.abs((runR(s[0]) + runR(s[1])) / 2 - aRun)))
+  const mAt = reach(m)
+  const bAt = reach(b)
 
   let best: { built: Built; err: number } | null = null
   for (const entryDeg of QUARTERS) {
@@ -87,6 +101,8 @@ export function buildSwitchFromEndSegments(
         mTo: rr(m[1]),
         bFrom: rr(b[0]),
         bTo: rr(b[1]),
+        mAt,
+        bAt,
         entryDeg,
       }
       const segs = switchTrackEndSegmentsPx(geometry, box.w, box.h)
@@ -114,9 +130,8 @@ export function buildSwitchFromEndSegments(
 /**
  * 把一個面換成目標邊之後，三個面該長什麼樣。
  *
- * 兩個出口<strong>共用同一側</strong>——這是形狀本來就有的限制，不是這裡多加的規則。
- * 所以把其中一個出口接到別條軌道上時，另一個出口得跟著挪到同一條線上：它在那條線上
- * 的位置不變，只是離進口的遠近跟著改。拖的是進口就沒有這個問題，它自己一側。
+ * 兩條腿各伸各的（見 SwitchTrackGeometry 的 mAt／bAt），所以拖哪一面就只動哪一面，
+ * 另一個出口<strong>原地不動</strong>——它接著的那條軌道不會因此斷掉。
  *
  * 目標邊必須與現在的三個面同向（都垂直或都水平）；不同向時這個元件表示不出來，
  * 回傳 null，呼叫端就不該亮綠燈。
@@ -130,19 +145,5 @@ export function alignSwitchFaces(
   const axis: 'x' | 'y' | null = flat(target, 'x') ? 'x' : flat(target, 'y') ? 'y' : null
   if (!axis) return null
   if (!flat(cur.a, axis) || !flat(cur.m, axis) || !flat(cur.b, axis)) return null
-
-  const side = (target[0][axis] + target[1][axis]) / 2
-  const moveTo = (s: EndSegment): EndSegment =>
-    [
-      { ...s[0], [axis]: side },
-      { ...s[1], [axis]: side },
-    ] as unknown as EndSegment
-
-  if (end === 'a') return { ...cur, a: target }
-  const sibling = end === 'm' ? 'b' : 'm'
-  return { ...cur, [end]: target, [sibling]: moveTo(cur[sibling]) } as {
-    a: EndSegment
-    m: EndSegment
-    b: EndSegment
-  }
+  return { ...cur, [end]: target }
 }
