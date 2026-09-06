@@ -1447,7 +1447,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       selectFirst: 'Please select a basemap file first',
       apply: 'Apply basemap',
       toolbar: {
-        trackGenAria: 'Track generate',
+        trackGenAria: 'HD map',
         basemapAria: 'Basemap layer',
         regenerateTitle: 'Regenerate tracks with current settings',
         generateTitle: 'Generate tracks from road network',
@@ -1630,8 +1630,8 @@ const enUS: DeepStringify<typeof zhTW> = {
           hint: 'Basemap — same layer as Area; drag anywhere; load image or .xodr',
         },
         trackGen: {
-          label: 'Track generate',
-          hint: 'Track generate — same layer as Area; load .xodr to auto-generate tracks from the road network',
+          label: 'HD map',
+          hint: 'HD map — same layer as Area; load .xodr to auto-generate tracks from the road network',
         },
         facility: {
           label: 'Facility',
@@ -2352,9 +2352,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       confirmDeleteGroup:
         'Delete “{{label}}”? Routes in the group move to Ungrouped; routes themselves are kept.',
       editingRoute: 'Route being edited',
-      trackGenName: 'Track gen {{id}}',
+      trackGenName: 'HD map {{id}}',
       trackGenArea: '{{name}} tracks',
-      trackGenDefault: 'Track gen',
+      trackGenDefault: 'HD map',
       mqttDemoBlink: 'MQTT demo · blink',
       mqttDemoVehicle: 'MQTT demo · vehicle',
     },

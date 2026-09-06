@@ -1437,7 +1437,7 @@ const zhTW = {
       selectFirst: '請先選擇底圖檔案',
       apply: '套用底圖',
       toolbar: {
-        trackGenAria: '軌道生成',
+        trackGenAria: '高精地圖',
         basemapAria: '底圖圖層',
         regenerateTitle: '依目前設定重新生成軌道',
         generateTitle: '由路網生成軌道',
@@ -1616,8 +1616,8 @@ const zhTW = {
           hint: '底圖 — 與 Area 同層；拖曳至地圖任意位置，可載入圖片或 .xodr',
         },
         trackGen: {
-          label: '軌道生成',
-          hint: '軌道生成 — 與 Area 同層；載入 .xodr 後可由路網自動生成軌道',
+          label: '高精地圖',
+          hint: '高精地圖 — 與 Area 同層；載入 .xodr 後可由路網自動生成軌道',
         },
         facility: {
           label: '設施',
@@ -2325,9 +2325,9 @@ const zhTW = {
       confirmDeleteGroup:
         '確定刪除「{{label}}」？群組內的路線將移至「未分組」，路線本身不會被刪除。',
       editingRoute: '編輯中路線',
-      trackGenName: '軌道生成 {{id}}',
+      trackGenName: '高精地圖 {{id}}',
       trackGenArea: '{{name}} 軌道',
-      trackGenDefault: '軌道生成',
+      trackGenDefault: '高精地圖',
       mqttDemoBlink: 'MQTT 示範·閃爍',
       mqttDemoVehicle: 'MQTT 示範·車輛',
     },

@@ -2,7 +2,6 @@ import { LayoutGrid } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AREA_PALETTE_ITEM,
-  BASEMAP_PALETTE_ITEM,
   FACILITY_PALETTE_ITEMS,
   TRACKGEN_PALETTE_ITEM,
   type FacilityPaletteItem,
@@ -49,7 +48,8 @@ function buildPaletteGroups(): PaletteGroup[] {
     {
       key: 'map-layer',
       labelKey: 'mapEditor.palette.groups.mapLayer',
-      items: [BASEMAP_PALETTE_ITEM, TRACKGEN_PALETTE_ITEM, AREA_PALETTE_ITEM],
+      // 底圖不再放進元件庫：載入 .xodr 這件事由高精地圖元件做，兩個並存只會讓人選錯
+      items: [TRACKGEN_PALETTE_ITEM, AREA_PALETTE_ITEM],
     },
     { key: 'facility', labelKey: 'mapEditor.palette.groups.facility', items: facilityItems },
     { key: 'equipment', labelKey: 'mapEditor.palette.groups.equipment', items: equipmentItems },
