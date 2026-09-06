@@ -114,6 +114,58 @@ export const TRACK_VARIANT_SIZE_M = (() => {
 })()
 
 /**
+ * 軌道家族放進 Area 時的大小，<strong>由容器決定</strong>。
+ *
+ * 先前是固定的公尺數，所以同一組元件放進大容器全都變成小點點、放進小容器又頂到邊。
+ * 現在先從容器訂出一個<strong>帶寬</strong>，四種軌道全部由它推出來——彼此的比例因此
+ * 一定對得上，接起來也不會一粗一細。
+ *
+ * <ul>
+ *   <li>帶寬 = 容器短邊 ÷ 14</li>
+ *   <li>一般軌道：長度取容器長邊的四分之一。它是四種裡唯一沒有「自然長度」的——
+ *       圓角有半徑、斜接與分岔有坡度，矩形沒有，所以只能照容器給一個好放的長度。
+ *       先前寫死 50 公尺，在 85 公尺寬的容器裡就佔掉六成，看起來像一條橫貫線。</li>
+ *   <li>圓角、斜接、分岔：由帶寬反推自己的外框（見下面各自的算式），長度照斜接的坡
+ *       1:3——與生成器同一個慣例。</li>
+ *   <li>虛擬渡線：跨過兩條軌道，所以高是四個帶寬、長是八個。</li>
+ * </ul>
+ */
+const DROP_BAND_DIVISOR = 14
+const DROP_RAIL_SPAN = 1 / 4
+const TAPER_RAMP_RUN_DROP = 3
+
+function trackDropSizeMeters(
+  type: FacilityType,
+  name: FacilityName | undefined,
+  spanW: number,
+  spanH: number,
+): { w: number; h: number } | null {
+  const band = Math.min(spanW, spanH) / DROP_BAND_DIVISOR
+  if (!(band > 0)) return null
+  if (type === 'TrackCrossover') return { w: band * 8, h: band * 4 }
+  if (type !== 'Track') return null
+  if (name === 'RailCorner') {
+    const side = band / (1 - DEFAULT_CORNER_TRACK.innerXRatio)
+    return { w: side, h: side }
+  }
+  if (name === 'RailTaper') {
+    const h = band / (DEFAULT_TAPER_TRACK.aTo - DEFAULT_TAPER_TRACK.aFrom)
+    const shift = (DEFAULT_TAPER_TRACK.bFrom - DEFAULT_TAPER_TRACK.aFrom) * h
+    return { w: shift * TAPER_RAMP_RUN_DROP, h }
+  }
+  if (name === 'RailSwitch') {
+    const h = band / (DEFAULT_SWITCH_TRACK.aTo - DEFAULT_SWITCH_TRACK.aFrom)
+    const gap =
+      Math.abs(
+        (DEFAULT_SWITCH_TRACK.bFrom + DEFAULT_SWITCH_TRACK.bTo) / 2 -
+          (DEFAULT_SWITCH_TRACK.mFrom + DEFAULT_SWITCH_TRACK.mTo) / 2,
+      ) * h
+    return { w: gap * TAPER_RAMP_RUN_DROP, h }
+  }
+  return { w: Math.max(spanW, spanH) * DROP_RAIL_SPAN, h: band }
+}
+
+/**
  * 放進 Area 時最多佔容器每一邊的幾成。
  *
  * 放下去之後還要挪位置、拉把手，佔滿整個容器就什麼都做不了；留三分之二的空間才轉得動。
@@ -145,9 +197,10 @@ export function defaultAreaSizePxForDrop(
   domain: MapAreaDomain,
   layout: MapAreaLayout,
 ): { w: number; h: number } {
-  const m = defaultSizeMetersForType(type, name)
   const spanW = Math.max(1e-6, domainWidthM(domain))
   const spanH = Math.max(1e-6, domainHeightM(domain))
+  // 軌道家族的大小由容器決定；其餘設施仍用自己的預設公尺數
+  const m = trackDropSizeMeters(type, name, spanW, spanH) ?? defaultSizeMetersForType(type, name)
   const fit = Math.min(1, (spanW * DROP_MAX_SPAN) / m.w, (spanH * DROP_MAX_SPAN) / m.h)
   const px = meterSizeToAreaLocalPx(m.w * fit, m.h * fit, domain, layout)
   const grow = Math.max(1, DROP_MIN_SIDE_PX / Math.max(1e-6, Math.min(px.w, px.h)))
