@@ -13,13 +13,12 @@ import {
   cornerTrackHandlesPx,
   cornerTrackPath,
   taperTrackHandlesPx,
+  cornerTrackEndSegmentsPx,
   taperTrackPath,
   readTaperTrack,
   switchTrackPath,
   readSwitchTrack,
   switchTrackHandlesPx,
-  type SwitchHandleKey,
-  type TaperHandleKey,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
   MIN_CORNER_BULGE,
@@ -273,30 +272,22 @@ type FacilityNodeProps = {
   onRotateDelta: (id: string, deltaDeg: number) => void
   onPatchParameters?: (id: string, patch: Record<string, unknown>) => void
   onTrackCornerEditStart?: () => void
-  /** 斜接軌道端點拖曳中：回報指標位置，取得目前碰到的軌道邊 */
-  onTaperEndProbe?: (
+  /**
+   * 軌道端面拖曳中：回報指標位置，取得目前碰到的軌道邊。
+   *
+   * 一般、圓角、斜接、分岔共用同一套；面的代號各自不同（分岔是 a／m／b，其餘是 a／b），
+   * 所以這裡只當字串傳。虛擬渡線不走這條——它是靠兩個 portal 貼上軌道的。
+   */
+  onTrackEndProbe?: (
     facilityId: string,
-    end: TaperHandleKey,
+    end: string,
     clientX: number,
     clientY: number,
   ) => TaperEndProbe | null
-  /** 放開手：把該端接到目標邊上；沒有目標就只是把端面移過去 */
-  onTaperEndCommit?: (
+  /** 放開手：把該面接到目標邊上；沒有目標就只是把該面移過去 */
+  onTrackEndCommit?: (
     facilityId: string,
-    end: 'a' | 'b',
-    target: TaperEndProbe | null,
-    pointer: { clientX: number; clientY: number },
-  ) => void
-  /** 分岔軌道端面拖曳中：與斜接同一套，只是面有三個 */
-  onSwitchEndProbe?: (
-    facilityId: string,
-    end: SwitchHandleKey,
-    clientX: number,
-    clientY: number,
-  ) => TaperEndProbe | null
-  onSwitchEndCommit?: (
-    facilityId: string,
-    end: SwitchHandleKey,
+    end: string,
     target: TaperEndProbe | null,
     pointer: { clientX: number; clientY: number },
   ) => void
@@ -371,10 +362,8 @@ export const FacilityNode = memo(function FacilityNode({
   onRotateDelta,
   onPatchParameters,
   onTrackCornerEditStart,
-  onTaperEndProbe,
-  onTaperEndCommit,
-  onSwitchEndProbe,
-  onSwitchEndCommit,
+  onTrackEndProbe,
+  onTrackEndCommit,
   onResize,
   onResizeSessionStart,
   onDelete,
@@ -2111,115 +2100,63 @@ export const FacilityNode = memo(function FacilityNode({
     [cornerDragKey],
   )
 
-  /* ── 斜接軌道的兩個控制點 ─────────────────────────────────────
-     一個在上緣、一個在下緣，就落在斜邊的起點上，各自控制那一側的斜切程度。 */
-  const [taperDragKey, setTaperDragKey] = useState<TaperHandleKey | null>(null)
-  /** 拖曳端點時碰到的對手軌道；null 表示目前沒有碰到任何東西 */
-  const [taperProbe, setTaperProbe] = useState<TaperEndProbe | null>(null)
-  const [taperPointer, setTaperPointer] = useState<{ x: number; y: number } | null>(null)
-  const onTaperHandleDown = useCallback(
-    (key: TaperHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
+  /* ── 軌道端面接合 ────────────────────────────────────────────
+     一般、圓角、斜接、分岔共用同一套：把面拖到別條軌道的邊上，那條邊會亮起來，
+     放手就把這一面換成那條邊——位置與寬度一起吃過來，形狀自己重算。 */
+  const [joinDragKey, setJoinDragKey] = useState<string | null>(null)
+  /** 拖曳端面時碰到的對手軌道；null 表示目前沒有碰到任何東西 */
+  const [joinProbe, setJoinProbe] = useState<TaperEndProbe | null>(null)
+  const [joinPointer, setJoinPointer] = useState<{ x: number; y: number } | null>(null)
+
+  const onJoinHandleDown = useCallback(
+    (key: string, e: React.PointerEvent<HTMLDivElement>) => {
       e.stopPropagation()
       e.preventDefault()
-      if (readOnly || !onPatchParameters) return
+      if (readOnly || !onTrackEndCommit) return
       onTrackCornerEditStart?.()
-      setTaperProbe(null)
-      setTaperPointer({ x: e.clientX, y: e.clientY })
-      setTaperDragKey(key)
+      setJoinProbe(null)
+      setJoinPointer({ x: e.clientX, y: e.clientY })
+      setJoinDragKey(key)
       try {
         e.currentTarget.setPointerCapture(e.pointerId)
       } catch {
         /* ignore */
       }
     },
-    [onPatchParameters, onTrackCornerEditStart, readOnly],
+    [onTrackCornerEditStart, onTrackEndCommit, readOnly],
   )
 
-  const onTaperHandleMove = useCallback(
+  const onJoinHandleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!taperDragKey) return
-      setTaperProbe(
-        onTaperEndProbe?.(facilityRef.current.id, taperDragKey, e.clientX, e.clientY) ?? null,
+      if (!joinDragKey) return
+      setJoinProbe(
+        onTrackEndProbe?.(facilityRef.current.id, joinDragKey, e.clientX, e.clientY) ?? null,
       )
-      setTaperPointer({ x: e.clientX, y: e.clientY })
+      setJoinPointer({ x: e.clientX, y: e.clientY })
     },
-    [taperDragKey, onTaperEndProbe],
+    [joinDragKey, onTrackEndProbe],
   )
 
-  const onTaperHandleEnd = useCallback(
+  const onJoinHandleEnd = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      const key = taperDragKey
+      const key = joinDragKey
       if (!key) return
-      setTaperDragKey(null)
-      const probe = taperProbe
-      setTaperProbe(null)
-      setTaperPointer(null)
+      setJoinDragKey(null)
+      const probe = joinProbe
+      setJoinProbe(null)
+      setJoinPointer(null)
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
         /* ignore */
       }
-      onTaperEndCommit?.(facilityRef.current.id, key, probe, {
+      onTrackEndCommit?.(facilityRef.current.id, key, probe, {
         clientX: e.clientX,
         clientY: e.clientY,
       })
     },
-    [taperDragKey, taperProbe, onTaperEndCommit],
+    [joinDragKey, joinProbe, onTrackEndCommit],
   )
-
-  /* ── 分岔軌道的三個控制點 ─────────────────────────────────────
-     進口一個、兩個出口各一個。與斜接軌道同一套：把面拖到別條軌道的邊上，
-     那條邊會亮起來，放手就把這一面換成那條邊——位置與寬度一起吃過來，形狀自己重算。 */
-  const [switchDragKey, setSwitchDragKey] = useState<SwitchHandleKey | null>(null)
-  const [switchProbe, setSwitchProbe] = useState<TaperEndProbe | null>(null)
-  const [switchPointer, setSwitchPointer] = useState<{ x: number; y: number } | null>(null)
-  const onSwitchHandleDown = useCallback(
-    (key: SwitchHandleKey, e: React.PointerEvent<HTMLDivElement>) => {
-      e.stopPropagation()
-      e.preventDefault()
-      if (readOnly || !onPatchParameters) return
-      onTrackCornerEditStart?.()
-      setSwitchProbe(null)
-      setSwitchPointer({ x: e.clientX, y: e.clientY })
-      setSwitchDragKey(key)
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-    },
-    [onPatchParameters, onTrackCornerEditStart, readOnly],
-  )
-
-  const onSwitchHandleMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!switchDragKey) return
-      setSwitchProbe(
-        onSwitchEndProbe?.(facilityRef.current.id, switchDragKey, e.clientX, e.clientY) ?? null,
-      )
-      setSwitchPointer({ x: e.clientX, y: e.clientY })
-    },
-    [switchDragKey, onSwitchEndProbe],
-  )
-
-  const onSwitchHandleEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const key = switchDragKey
-    setSwitchDragKey(null)
-    const probe = switchProbe
-    setSwitchProbe(null)
-    setSwitchPointer(null)
-    if (key) {
-      onSwitchEndCommit?.(facilityRef.current.id, key, probe, {
-        clientX: e.clientX,
-        clientY: e.clientY,
-      })
-    }
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
-    }
-  }, [switchDragKey, switchProbe, onSwitchEndCommit])
 
   /* ── 拖曳旋轉 ────────────────────────────────────────────────
      把手在元件外側，會跟著元件一起轉——就像簡報軟體那樣，指標與把手的相對位置
@@ -2939,130 +2876,118 @@ export const FacilityNode = memo(function FacilityNode({
             })()}
           </>
         )}
-        {isSwitchTrack && switchTrackGeom && selected && !readOnly && onPatchParameters && (
-          <>
-            {(['a', 'm', 'b'] as const).map((key) => {
-              const pt = switchTrackHandlesPx(switchTrackGeom, nw, nh)[key]
-              const dragging = switchDragKey === key
+        {/*
+          * 接合把手：一般、圓角、斜接、分岔都有，把手就落在自己的端面中點上。
+          * 拖到別條軌道的邊上放手，那一面就換成那條邊。
+          */}
+        {isTrack && !isTrackCrossover && selected && !readOnly && onTrackEndCommit
+          ? (() => {
+              const faces: Array<[string, { x: number; y: number }, string]> = isSwitchTrack
+                ? switchTrackGeom
+                  ? (['a', 'm', 'b'] as const).map((k) => [
+                      k,
+                      switchTrackHandlesPx(switchTrackGeom, nw, nh)[k],
+                      k === 'a'
+                        ? t('mapEditor.inspector.node.switchIn')
+                        : k === 'm'
+                          ? t('mapEditor.inspector.node.switchStraight')
+                          : t('mapEditor.inspector.node.switchBranch'),
+                    ])
+                  : []
+                : isTaperTrack
+                  ? taperTrackGeom
+                    ? (['a', 'b'] as const).map((k) => [
+                        k,
+                        taperTrackHandlesPx(taperTrackGeom, nw, nh)[k],
+                        t('mapEditor.inspector.node.taperJoin'),
+                      ])
+                    : []
+                  : isCornerTrack
+                    ? cornerTrackGeom
+                      ? (() => {
+                          const seg = cornerTrackEndSegmentsPx(cornerTrackGeom, nw, nh)
+                          return (['a', 'b'] as const).map((k) => [
+                            k,
+                            {
+                              x: (seg[k][0].x + seg[k][1].x) / 2,
+                              y: (seg[k][0].y + seg[k][1].y) / 2,
+                            },
+                            t('mapEditor.inspector.node.taperJoin'),
+                          ]) as Array<[string, { x: number; y: number }, string]>
+                        })()
+                      : []
+                    : // 一般軌道：兩條短邊的中點
+                      (nw >= nh
+                        ? [
+                            ['a', { x: nw, y: nh / 2 }],
+                            ['b', { x: 0, y: nh / 2 }],
+                          ]
+                        : [
+                            ['a', { x: nw / 2, y: 0 }],
+                            ['b', { x: nw / 2, y: nh }],
+                          ]
+                      ).map(([k, pt]) => [
+                        k as string,
+                        pt as { x: number; y: number },
+                        t('mapEditor.inspector.node.taperJoin'),
+                      ]) as Array<[string, { x: number; y: number }, string]>
               return (
-                <div
-                  key={key}
-                  data-switch-track-handle={key}
-                  className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
-                  style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title={
-                    key === 'a'
-                      ? t('mapEditor.inspector.node.switchIn')
-                      : key === 'm'
-                        ? t('mapEditor.inspector.node.switchStraight')
-                        : t('mapEditor.inspector.node.switchBranch')
-                  }
-                  onPointerDown={(e) => onSwitchHandleDown(key, e)}
-                  onPointerMove={onSwitchHandleMove}
-                  onPointerUp={onSwitchHandleEnd}
-                  onPointerCancel={onSwitchHandleEnd}
-                >
-                  <div
-                    className={[
-                      'size-3.5 rounded-full border-2 shadow-md',
-                      dragging && switchProbe
-                        ? 'border-emerald-300 bg-emerald-400'
-                        : 'border-white bg-blue-500',
-                    ].join(' ')}
-                  />
-                </div>
-              )
-            })}
-            {/* 拖曳中從端面拉一條線到指標，看得出正在接哪裡 */}
-            {switchDragKey && switchPointer
-              ? (() => {
-                  const from = switchTrackHandlesPx(switchTrackGeom, nw, nh)[switchDragKey]
-                  const root = rootRef.current?.getBoundingClientRect()
-                  if (!root) return null
-                  const to = {
-                    x: (switchPointer.x - root.left) / Math.max(0.01, mapScale),
-                    y: (switchPointer.y - root.top) / Math.max(0.01, mapScale),
-                  }
-                  return (
-                    <svg
-                      className="pointer-events-none absolute left-0 top-0 z-[87] overflow-visible"
-                      width={1}
-                      height={1}
+                <>
+                  {faces.map(([key, pt, title]) => (
+                    <div
+                      key={`join-${key}`}
+                      data-track-join-handle={key}
+                      className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
+                      style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
+                      title={title}
+                      onPointerDown={(e) => onJoinHandleDown(key, e)}
+                      onPointerMove={onJoinHandleMove}
+                      onPointerUp={onJoinHandleEnd}
+                      onPointerCancel={onJoinHandleEnd}
                     >
-                      <line
-                        x1={from.x}
-                        y1={from.y}
-                        x2={to.x}
-                        y2={to.y}
-                        stroke={switchProbe ? '#34d399' : '#60a5fa'}
-                        strokeWidth={2 / Math.max(0.01, mapScale)}
-                        strokeDasharray={`${6 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`}
+                      <div
+                        className={[
+                          'size-3.5 rounded-full border-2 shadow-md',
+                          joinDragKey === key && joinProbe
+                            ? 'border-emerald-300 bg-emerald-400'
+                            : 'border-white bg-blue-500',
+                        ].join(' ')}
                       />
-                    </svg>
-                  )
-                })()
-              : null}
-          </>
-        )}
-        {isTaperTrack && taperTrackGeom && selected && !readOnly && onPatchParameters && (
-          <>
-            {(['a', 'b'] as const).map((key) => {
-              const pt = taperTrackHandlesPx(taperTrackGeom, nw, nh)[key]
-              const dragging = taperDragKey === key
-              return (
-                <div
-                  key={key}
-                  data-taper-track-handle={key}
-                  className="absolute z-[88] cursor-grab touch-none active:cursor-grabbing"
-                  style={{ left: pt.x, top: pt.y, transform: 'translate(-50%, -50%)' }}
-                  title={t('mapEditor.inspector.node.taperJoin')}
-                  onPointerDown={(e) => onTaperHandleDown(key, e)}
-                  onPointerMove={onTaperHandleMove}
-                  onPointerUp={onTaperHandleEnd}
-                  onPointerCancel={onTaperHandleEnd}
-                >
-                  <div
-                    className={[
-                      'size-3.5 rounded-full border-2 shadow-md',
-                      dragging && taperProbe
-                        ? 'border-emerald-300 bg-emerald-400'
-                        : 'border-white bg-blue-500',
-                    ].join(' ')}
-                  />
-                </div>
+                    </div>
+                  ))}
+                  {/* 拖曳中從端面拉一條線到指標，看得出正在接哪裡 */}
+                  {joinDragKey && joinPointer
+                    ? (() => {
+                        const from = faces.find(([k]) => k === joinDragKey)?.[1]
+                        const root = rootRef.current?.getBoundingClientRect()
+                        if (!from || !root) return null
+                        const to = {
+                          x: (joinPointer.x - root.left) / Math.max(0.01, mapScale),
+                          y: (joinPointer.y - root.top) / Math.max(0.01, mapScale),
+                        }
+                        return (
+                          <svg
+                            className="pointer-events-none absolute left-0 top-0 z-[87] overflow-visible"
+                            width={1}
+                            height={1}
+                          >
+                            <line
+                              x1={from.x}
+                              y1={from.y}
+                              x2={to.x}
+                              y2={to.y}
+                              stroke={joinProbe ? '#34d399' : '#60a5fa'}
+                              strokeWidth={2 / Math.max(0.01, mapScale)}
+                              strokeDasharray={`${6 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`}
+                            />
+                          </svg>
+                        )
+                      })()
+                    : null}
+                </>
               )
-            })}
-            {/* 拖曳中從端點拉一條線到指標，看得出正在接哪裡 */}
-            {taperDragKey && taperPointer
-              ? (() => {
-                  const from = taperTrackHandlesPx(taperTrackGeom, nw, nh)[taperDragKey]
-                  const root = rootRef.current?.getBoundingClientRect()
-                  if (!root) return null
-                  const to = {
-                    x: (taperPointer.x - root.left) / Math.max(0.01, mapScale),
-                    y: (taperPointer.y - root.top) / Math.max(0.01, mapScale),
-                  }
-                  return (
-                    <svg
-                      className="pointer-events-none absolute left-0 top-0 z-[87] overflow-visible"
-                      width={1}
-                      height={1}
-                    >
-                      <line
-                        x1={from.x}
-                        y1={from.y}
-                        x2={to.x}
-                        y2={to.y}
-                        stroke={taperProbe ? '#34d399' : '#60a5fa'}
-                        strokeWidth={2 / Math.max(0.01, mapScale)}
-                        strokeDasharray={`${6 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`}
-                      />
-                    </svg>
-                  )
-                })()
-              : null}
-          </>
-        )}
+            })()
+          : null}
         {isTrack && !isCornerTrack && !isTaperTrack && selected && !readOnly && onPatchParameters && (
           <>
             {([

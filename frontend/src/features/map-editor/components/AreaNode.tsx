@@ -23,15 +23,19 @@ import {
 } from '../utils/facilityAreaCoords'
 import { findFacilityAtAreaLocalPx } from '../utils/facilityHitTest'
 import {
+  cornerTrackEndSegmentsPx,
+  readCornerTrack,
   readSwitchTrack,
   readTaperTrack,
   switchTrackEndSegmentsPx,
   taperTrackEndSegmentsPx,
+  CORNER_TRACK_KEY,
   SWITCH_TRACK_KEY,
   TAPER_TRACK_KEY,
-  type SwitchHandleKey,
 } from '../utils/trackShapes'
-import { buildTaperFromEndSegments } from '../utils/taperJoin'
+import { buildTaperFromEndSegments, type EndSegment } from '../utils/taperJoin'
+import { buildCornerFromEndSegments } from '../utils/cornerJoin'
+import { buildRectFromEndSegments } from '../utils/railJoin'
 import { alignSwitchFaces, buildSwitchFromEndSegments } from '../utils/switchJoin'
 import {
   resolveFacilityAreaPosition,
@@ -902,6 +906,16 @@ export const AreaNode = memo(function AreaNode({
         x: cx + dx * cos - dy * sin,
         y: cy + dx * sin + dy * cos,
       })
+      // 圓角軌道的端面是外弧與內弧之間那一小段直邊，不是外框的短邊
+      if (f.name === 'RailCorner') {
+        const segs = cornerTrackEndSegmentsPx(readCornerTrack(f.parameters), size.w, size.h)
+        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+        return (['a', 'b'] as const).map((k) => {
+          const p0 = L(segs[k][0])
+          const p1 = L(segs[k][1])
+          return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
+        })
+      }
       // 分岔軌道有三個面，也由自己的幾何決定
       if (f.name === 'RailSwitch') {
         const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
@@ -945,6 +959,51 @@ export const AreaNode = memo(function AreaNode({
     [displayDomain, displayLayout],
   )
 
+  /**
+   * 一個元件<strong>自己</strong>的接合面，依面的代號取用。
+   *
+   * 四種軌道都有：一般兩個（兩條短邊）、圓角兩個、斜接兩個、分岔三個。虛擬渡線不在
+   * 這個機制裡——它本來就是靠兩個 portal 貼上軌道，不是靠端面。
+   */
+  const trackFacesLocal = useCallback(
+    (f: FacilityObject): Record<string, EndSegment> | null => {
+      const edges = facilityEndEdgesLocal(f)
+      const seg = (e: { x1: number; y1: number; x2: number; y2: number }): EndSegment => [
+        { x: e.x1, y: e.y1 },
+        { x: e.x2, y: e.y2 },
+      ]
+      if (f.name === 'RailSwitch') {
+        if (edges.length < 3) return null
+        return { a: seg(edges[0]!), m: seg(edges[1]!), b: seg(edges[2]!) }
+      }
+      if (edges.length < 2) return null
+      return { a: seg(edges[0]!), b: seg(edges[1]!) }
+    },
+    [facilityEndEdgesLocal],
+  )
+
+  /** 這一面換成那條邊之後，這個元件表示得出來嗎——表示不出來就不該亮綠燈 */
+  const trackWouldJoin = useCallback(
+    (f: FacilityObject, end: string, edge: EndSegment): boolean => {
+      const cur = trackFacesLocal(f)
+      if (!cur || !cur[end]) return false
+      if (f.name === 'RailSwitch') {
+        const next = alignSwitchFaces(
+          { a: cur.a!, m: cur.m!, b: cur.b! },
+          end as 'a' | 'm' | 'b',
+          edge,
+        )
+        return !!next && !!buildSwitchFromEndSegments(next.a, next.m, next.b)
+      }
+      const other = end === 'a' ? cur.b! : cur.a!
+      const [x, y] = end === 'a' ? [edge, other] : [other, edge]
+      if (f.name === 'RailTaper') return !!buildTaperFromEndSegments(x, y)
+      if (f.name === 'RailCorner') return !!buildCornerFromEndSegments(x, y)
+      return !!buildRectFromEndSegments(edge, other)
+    },
+    [trackFacesLocal],
+  )
+
   const clientToAreaLocal = useCallback(
     (clientX: number, clientY: number) => {
       const rect = innerRef.current?.getBoundingClientRect()
@@ -955,34 +1014,11 @@ export const AreaNode = memo(function AreaNode({
     [mapScale],
   )
 
-  /** 這一端換成那條邊之後，元件表示得出來嗎——表示不出來就不該亮綠燈 */
-  const taperWouldJoin = useCallback(
-    (
-      facilityId: string,
-      end: 'a' | 'b',
-      edge: { x1: number; y1: number; x2: number; y2: number },
-    ) => {
+  const onTrackEndProbe = useCallback(
+    (facilityId: string, end: string, clientX: number, clientY: number) => {
       const f = area.facilities.find((x) => x.id === facilityId)
-      if (!f) return false
-      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
-      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
-      const top = displayLayout.hPx - pos.y - size.h
-      const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
-      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
-      const other = end === 'a' ? ([L(segs.b[0]), L(segs.b[1])] as const) : ([L(segs.a[0]), L(segs.a[1])] as const)
-      const mine = [
-        { x: edge.x1, y: edge.y1 },
-        { x: edge.x2, y: edge.y2 },
-      ] as const
-      return !!buildTaperFromEndSegments(end === 'a' ? mine : other, end === 'a' ? other : mine)
-    },
-    [area.facilities, displayDomain, displayLayout],
-  )
-
-  const onTaperEndProbe = useCallback(
-    (facilityId: string, end: 'a' | 'b', clientX: number, clientY: number) => {
       const p = clientToAreaLocal(clientX, clientY)
-      if (!p) return null
+      if (!f || !p) return null
       // 吸附範圍隨縮放走，畫面上大約就是一根手指的寬度
       const reach = 14 / Math.max(0.01, mapScale)
       let best: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null =
@@ -999,11 +1035,16 @@ export const AreaNode = memo(function AreaNode({
           /*
            * 接不成的就不算候選。
            *
-           * 元件的兩個端面必須同時是垂直或同時是水平；橫的那一端配上直的邊怎麼轉都
-           * 表示不出來。先前這種目標照樣亮綠燈，放手卻什麼都沒發生——使用者只會覺得
-           * 功能壞了。現在先試算一次，成得了才亮。
+           * 先前這種目標照樣亮綠燈，放手卻什麼都沒發生——使用者只會覺得功能壞了。
+           * 現在先試算一次，成得了才亮。
            */
-          if (d < bestD && taperWouldJoin(facilityId, end, e)) {
+          if (
+            d < bestD &&
+            trackWouldJoin(f, end, [
+              { x: e.x1, y: e.y1 },
+              { x: e.x2, y: e.y2 },
+            ])
+          ) {
             bestD = d
             best = { targetId: other.id, edge: e }
           }
@@ -1012,193 +1053,83 @@ export const AreaNode = memo(function AreaNode({
       setTaperHighlight(best)
       return best
     },
-    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, taperWouldJoin],
+    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, trackWouldJoin],
   )
 
-  const onTaperEndCommit = useCallback(
+  const onTrackEndCommit = useCallback(
     (
       facilityId: string,
-      end: 'a' | 'b',
+      end: string,
       target: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null,
       pointer: { clientX: number; clientY: number },
     ) => {
       setTaperHighlight(null)
       const f = area.facilities.find((x) => x.id === facilityId)
       if (!f || !onPatchFacilityParameters || !onResizeFacility || !onDragFacility) return
+      const cur = trackFacesLocal(f)
+      if (!cur || !cur[end]) return
 
-      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
-      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
-      const top = displayLayout.hPx - pos.y - size.h
-      const geom = readTaperTrack(f.parameters)
-      const segs = taperTrackEndSegmentsPx(geom, size.w, size.h)
-      const toLocal = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
-
-      // 目前兩端面在 Area 局部像素裡的位置
-      const cur = {
-        a: [toLocal(segs.a[0]), toLocal(segs.a[1])] as const,
-        b: [toLocal(segs.b[0]), toLocal(segs.b[1])] as const,
-      }
-
-      let next: Record<'a' | 'b', readonly [{ x: number; y: number }, { x: number; y: number }]>
+      let want: EndSegment
       if (target) {
-        next = { ...cur, [end]: [
+        want = [
           { x: target.edge.x1, y: target.edge.y1 },
           { x: target.edge.x2, y: target.edge.y2 },
-        ] } as typeof cur
-      } else {
-        // 沒碰到東西：把那一端整條平移到指標處，長度不變
-        const p = clientToAreaLocal(pointer.clientX, pointer.clientY)
-        if (!p) return
-        const seg = cur[end]
-        const mid = { x: (seg[0].x + seg[1].x) / 2, y: (seg[0].y + seg[1].y) / 2 }
-        const dx = p.x - mid.x
-        const dy = p.y - mid.y
-        next = { ...cur, [end]: [
-          { x: seg[0].x + dx, y: seg[0].y + dy },
-          { x: seg[1].x + dx, y: seg[1].y + dy },
-        ] } as typeof cur
-      }
-
-      const built = buildTaperFromEndSegments(next.a, next.b)
-      if (!built) return
-
-      onDragSessionStart?.()
-      onPatchFacilityParameters(area.id, facilityId, { [TAPER_TRACK_KEY]: built.geometry })
-      onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
-      onDragFacility(area.id, facilityId, {
-        areaPosition: {
-          x: built.box.x,
-          y: displayLayout.hPx - built.box.y - built.box.h,
-        },
-        position: areaLocalPxToMeter(
-          built.box.x,
-          displayLayout.hPx - built.box.y - built.box.h,
-          displayDomain,
-          displayLayout,
-        ),
-      })
-    },
-    [
-      area.id,
-      area.facilities,
-      clientToAreaLocal,
-      displayDomain,
-      displayLayout,
-      onDragFacility,
-      onDragSessionStart,
-      onPatchFacilityParameters,
-      onResizeFacility,
-    ],
-  )
-
-  /* ── 分岔軌道端面接合 ────────────────────────────────────────
-     與斜接同一套，只是面有三個：進口 a、直行出口 m、岔出出口 b。 */
-
-  /** 這一面換成那條邊之後，元件表示得出來嗎——表示不出來就不該亮綠燈 */
-  const switchWouldJoin = useCallback(
-    (
-      facilityId: string,
-      end: SwitchHandleKey,
-      edge: { x1: number; y1: number; x2: number; y2: number },
-    ) => {
-      const f = area.facilities.find((x) => x.id === facilityId)
-      if (!f) return false
-      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
-      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
-      const top = displayLayout.hPx - pos.y - size.h
-      const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
-      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
-      const cur = {
-        a: [L(segs.a[0]), L(segs.a[1])] as const,
-        m: [L(segs.m[0]), L(segs.m[1])] as const,
-        b: [L(segs.b[0]), L(segs.b[1])] as const,
-      }
-      const mine = [
-        { x: edge.x1, y: edge.y1 },
-        { x: edge.x2, y: edge.y2 },
-      ] as const
-      const next = alignSwitchFaces(cur, end, mine)
-      return !!next && !!buildSwitchFromEndSegments(next.a, next.m, next.b)
-    },
-    [area.facilities, displayDomain, displayLayout],
-  )
-
-  const onSwitchEndProbe = useCallback(
-    (facilityId: string, end: SwitchHandleKey, clientX: number, clientY: number) => {
-      const p = clientToAreaLocal(clientX, clientY)
-      if (!p) return null
-      const reach = 14 / Math.max(0.01, mapScale)
-      let best: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null =
-        null
-      let bestD = reach
-      for (const other of area.facilities) {
-        if (other.id === facilityId || other.type !== 'Track') continue
-        for (const e of facilityEndEdgesLocal(other)) {
-          const dx = e.x2 - e.x1
-          const dy = e.y2 - e.y1
-          const l2 = dx * dx + dy * dy
-          const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
-          const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
-          if (d < bestD && switchWouldJoin(facilityId, end, e)) {
-            bestD = d
-            best = { targetId: other.id, edge: e }
-          }
-        }
-      }
-      setTaperHighlight(best)
-      return best
-    },
-    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, switchWouldJoin],
-  )
-
-  const onSwitchEndCommit = useCallback(
-    (
-      facilityId: string,
-      end: SwitchHandleKey,
-      target: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null,
-      pointer: { clientX: number; clientY: number },
-    ) => {
-      setTaperHighlight(null)
-      const f = area.facilities.find((x) => x.id === facilityId)
-      if (!f || !onPatchFacilityParameters || !onResizeFacility || !onDragFacility) return
-
-      const pos = resolveFacilityAreaPosition(f, displayDomain, displayLayout)
-      const size = resolveFacilityAreaSize(f, displayDomain, displayLayout)
-      const top = displayLayout.hPx - pos.y - size.h
-      const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
-      const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
-      const cur = {
-        a: [L(segs.a[0]), L(segs.a[1])] as const,
-        m: [L(segs.m[0]), L(segs.m[1])] as const,
-        b: [L(segs.b[0]), L(segs.b[1])] as const,
-      }
-
-      let next: typeof cur | null
-      if (target) {
-        next = alignSwitchFaces(cur, end, [
-          { x: target.edge.x1, y: target.edge.y1 },
-          { x: target.edge.x2, y: target.edge.y2 },
-        ]) as typeof cur | null
+        ]
       } else {
         // 沒碰到東西：把那一面整條平移到指標處，寬度不變
         const p = clientToAreaLocal(pointer.clientX, pointer.clientY)
         if (!p) return
-        const seg = cur[end]
+        const seg = cur[end]!
         const mid = { x: (seg[0].x + seg[1].x) / 2, y: (seg[0].y + seg[1].y) / 2 }
         const dx = p.x - mid.x
         const dy = p.y - mid.y
-        next = alignSwitchFaces(cur, end, [
+        want = [
           { x: seg[0].x + dx, y: seg[0].y + dy },
           { x: seg[1].x + dx, y: seg[1].y + dy },
-        ]) as typeof cur | null
+        ]
       }
-      if (!next) return
 
-      const built = buildSwitchFromEndSegments(next.a, next.m, next.b)
+      /** 算出來的新外框與新幾何；幾何為 null 表示這一種元件沒有幾何參數（一般軌道） */
+      let built:
+        | {
+            box: { x: number; y: number; w: number; h: number }
+            patch: Record<string, unknown> | null
+            rotationDeg?: number
+          }
+        | null = null
+
+      if (f.name === 'RailSwitch') {
+        const next = alignSwitchFaces(
+          { a: cur.a!, m: cur.m!, b: cur.b! },
+          end as 'a' | 'm' | 'b',
+          want,
+        )
+        const r = next && buildSwitchFromEndSegments(next.a, next.m, next.b)
+        if (r) built = { box: r.box, patch: { [SWITCH_TRACK_KEY]: r.geometry } }
+      } else {
+        const other = end === 'a' ? cur.b! : cur.a!
+        const [x, y] = end === 'a' ? [want, other] : [other, want]
+        if (f.name === 'RailTaper') {
+          const r = buildTaperFromEndSegments(x, y)
+          if (r) built = { box: r.box, patch: { [TAPER_TRACK_KEY]: r.geometry } }
+        } else if (f.name === 'RailCorner') {
+          const r = buildCornerFromEndSegments(x, y)
+          if (r) built = { box: r.box, patch: { [CORNER_TRACK_KEY]: r.geometry } }
+        } else {
+          // 一般軌道：寬度由被拖的那一面決定，所以它一定放第一個
+          const r = buildRectFromEndSegments(want, other)
+          if (r) built = { box: r.box, patch: null, rotationDeg: r.rotationDeg }
+        }
+      }
       if (!built) return
 
       onDragSessionStart?.()
-      onPatchFacilityParameters(area.id, facilityId, { [SWITCH_TRACK_KEY]: built.geometry })
+      if (built.patch) onPatchFacilityParameters(area.id, facilityId, built.patch)
+      if (built.rotationDeg !== undefined) {
+        // 只有相對旋轉的介面，所以自己算差值
+        const delta = built.rotationDeg - (f.rotation ?? 0)
+        if (Math.abs(delta) > 0.01) onRotateDelta(area.id, facilityId, delta)
+      }
       onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
       onDragFacility(area.id, facilityId, {
         areaPosition: {
@@ -1223,6 +1154,8 @@ export const AreaNode = memo(function AreaNode({
       onDragSessionStart,
       onPatchFacilityParameters,
       onResizeFacility,
+      onRotateDelta,
+      trackFacesLocal,
     ],
   )
 
@@ -1803,10 +1736,8 @@ export const AreaNode = memo(function AreaNode({
           onRotateRight90={() => onRotateRight90(area.id, f.id)}
           onRotateDelta={(_id, deg) => onRotateDelta(area.id, f.id, deg)}
           onTrackCornerEditStart={onTrackCornerEditStart}
-          onTaperEndProbe={editMode ? onTaperEndProbe : undefined}
-          onSwitchEndProbe={editMode ? onSwitchEndProbe : undefined}
-          onSwitchEndCommit={editMode ? onSwitchEndCommit : undefined}
-          onTaperEndCommit={editMode ? onTaperEndCommit : undefined}
+          onTrackEndProbe={editMode ? onTrackEndProbe : undefined}
+          onTrackEndCommit={editMode ? onTrackEndCommit : undefined}
           onDelete={
             onDeleteFacility && editMode
               ? () => onDeleteFacility(area.id, f.id)

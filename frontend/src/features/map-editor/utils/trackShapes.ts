@@ -321,6 +321,29 @@ export function cornerTrackEndsPx(
   }
 }
 
+/**
+ * 弧帶兩端<strong>整條端面</strong>的線段（相對元件左上角的像素）。
+ *
+ * 端面就是外弧與內弧之間那一小段直邊：a 在圓心的正上方那一側（與縱向的帶子相接）、
+ * b 在正左方那一側（與橫向的相接）。接合時要的是整條線段，不只中點——帶子多寬是由
+ * 對手那條邊決定的。
+ */
+export function cornerTrackEndSegmentsPx(
+  g: CornerTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { a: [ShapePoint, ShapePoint]; b: [ShapePoint, ShapePoint] } {
+  const { w, h, T } = cornerSpin(g, boxWPx, boxHPx)
+  const rx = Math.max(0.5, clamp01(g.arcXRatio) * w)
+  const ry = Math.max(0.5, clamp01(g.arcYRatio) * h)
+  const irx = Math.min(rx, clamp01(g.innerXRatio) * w)
+  const iry = Math.min(ry, clamp01(g.innerYRatio) * h)
+  return {
+    a: [T(w, h - ry), T(w, h - iry)],
+    b: [T(w - rx, h), T(w - irx, h)],
+  }
+}
+
 /** 斜帶兩端面的中點：a 在左邊、b 在右邊（未旋轉時） */
 export function taperTrackEndsPx(
   g: TaperTrackGeometry,
