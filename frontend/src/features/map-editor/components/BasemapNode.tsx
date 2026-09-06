@@ -34,6 +34,7 @@ import {
   TRACKGEN_XODR_KEY,
 } from '../utils/trackGenFacility'
 import { buildTrackGraph, type TrackGraph } from '../utils/trackGenGraph'
+import type { TrackGenGroup } from '../utils/trackGenGroups'
 import { layoutTrackGraph } from '../utils/trackGenGraphLayout'
 import type { TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
@@ -116,7 +117,11 @@ function layoutFromCornerResize(
 
 type Props = {
   /** 軌道生成：把結果變成真正的設施 */
-  onApplyTrackGen?: (basemapId: string, layout: TrackGenLayout) => void
+  onApplyTrackGen?: (
+    basemapId: string,
+    layout: TrackGenLayout,
+    groups: TrackGenGroup[],
+  ) => void
   /** 目前這張地圖的畫布尺寸（像素）——生成對話框要照它畫縮圖 */
   mapPixelSize?: { width: number; height: number }
   basemap: MapBasemapObject
@@ -308,7 +313,7 @@ export const BasemapNode = memo(function BasemapNode({
     [displayLayout, mapPixelSize, pendingGraph],
   )
 
-  const runTrackGeneration = useCallback((block: TrackGenSizeParams) => {
+  const runTrackGeneration = useCallback((block: TrackGenSizeParams, groups: TrackGenGroup[]) => {
     const graph = pendingGraph
     if (!graph) return
     const measured = measureTrackGen(block)
@@ -324,7 +329,7 @@ export const BasemapNode = memo(function BasemapNode({
       },
       [TRACKGEN_BLOCK_SIZE_KEY]: block,
     })
-    onApplyTrackGen?.(basemap.id, measured.layout as TrackGenLayout)
+    onApplyTrackGen?.(basemap.id, measured.layout as TrackGenLayout, groups)
   }, [basemap.id, measureTrackGen, onApplyTrackGen, onPatchParameters, pendingGraph])
 
   const previewUrl = getBasemapPreviewUrl(basemap.parameters)
@@ -1075,9 +1080,9 @@ export const BasemapNode = memo(function BasemapNode({
         initial={getTrackGenBlockSize(basemap.parameters)}
         measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}
-        onConfirm={(block) => {
+        onConfirm={(block, groups) => {
           setSizeDialogOpen(false)
-          runTrackGeneration(block)
+          runTrackGeneration(block, groups)
         }}
       />
       <BasemapFilePickerDialog

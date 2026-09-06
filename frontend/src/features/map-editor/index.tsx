@@ -206,6 +206,7 @@ import {
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
 import { buildFacilitiesFromLayout } from './utils/trackGenApply'
+import type { TrackGenGroup } from './utils/trackGenGroups'
 import type { TrackGenLayout } from './utils/trackGenLayout'
 import {
   defaultTrackCrossoverParameters,
@@ -2291,14 +2292,18 @@ export default function MapEditorApp({
       basemapId: string,
       /** 對話框排好的版面：預覽與套用吃同一份，不再各排一次 */
       prebuilt?: TrackGenLayout,
+      /** 預覽上分好的組：軌道照組的頭字加順序命名、照組的底色上色 */
+      groups: TrackGenGroup[] = [],
     ) => {
       const basemap = basemapsRef.current.find((b) => b.id === basemapId)
       if (!basemap || !prebuilt || !prebuilt.shapes.length) return
 
       pushHistory()
       let seq = nextNumericId
-      const built = buildFacilitiesFromLayout(prebuilt, () =>
-        String(seq++).padStart(3, '0'),
+      const built = buildFacilitiesFromLayout(
+        prebuilt,
+        () => String(seq++).padStart(3, '0'),
+        groups,
       )
 
       const areaId = String(seq++).padStart(3, '0')

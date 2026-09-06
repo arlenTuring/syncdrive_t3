@@ -1502,6 +1502,18 @@ const zhTW = {
       overflowBefore: '　軌道太粗，超出框 ',
       overflowAfter: '，把軌道寬度調小',
       legendNote: '顏色只是預覽的標示，生成出來的軌道不受影響',
+      groups: {
+        title: '分組命名',
+        add: '新增一組',
+        code: '軌道頭字',
+        color: '底色',
+        done: '確認',
+        remove: '刪除這組',
+        picked: '已選 {{n}} 塊',
+        previewName: '生成後會叫 {{first}} … {{last}}',
+        needCode: '填了頭字才會改名',
+        hint: '按 ＋ 開一組，然後在預覽上照順序點選軌道；點過的會換成這組的底色並標上編號。',
+      },
       generate: '開始生成',
       kinds: {
         rect: '一般軌道',

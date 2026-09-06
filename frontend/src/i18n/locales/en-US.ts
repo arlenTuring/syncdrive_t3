@@ -1513,6 +1513,18 @@ const enUS: DeepStringify<typeof zhTW> = {
       overflowBefore: '　Tracks too thick; overflow ',
       overflowAfter: ' — reduce track width',
       legendNote: 'Colors are preview labels only; generated tracks are unaffected',
+      groups: {
+        title: 'Naming groups',
+        add: 'New group',
+        code: 'Prefix',
+        color: 'Fill',
+        done: 'Done',
+        remove: 'Delete group',
+        picked: '{{n}} selected',
+        previewName: 'Will be named {{first}} … {{last}}',
+        needCode: 'Enter a prefix to rename',
+        hint: 'Press ＋ to start a group, then click tracks in the preview in order; each takes the group fill and shows its number.',
+      },
       generate: 'Generate',
       kinds: {
         rect: 'Straight track',

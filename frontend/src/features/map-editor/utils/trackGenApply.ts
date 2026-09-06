@@ -6,6 +6,11 @@ import {
   type Vec2,
 } from './trackGenLayout'
 import {
+  trackGenGroupIndex,
+  trackGenGroupLabel,
+  type TrackGenGroup,
+} from './trackGenGroups'
+import {
   CORNER_TRACK_KEY,
   CROSS_TRACK_KEY,
   SWITCH_TRACK_KEY,
@@ -338,6 +343,8 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
 export function buildFacilitiesFromLayout(
   layout: TrackGenLayout,
   nextId: () => string,
+  /** 生成前在預覽上分好的組：這一組的軌道照頭字加順序命名，底色也照組設定 */
+  groups: TrackGenGroup[] = [],
 ): ApplyResult {
   /*
    * 彎道的方塊要「大的先、小的後」：外側那塊比較大，內側疊在它上面，
@@ -349,6 +356,23 @@ export function buildFacilitiesFromLayout(
     return rb - ra
   })
   const facilities = ordered.map((s) => facilityFor(s, nextId()))
+
+  /*
+   * 分好組的軌道<strong>改名改色</strong>。
+   *
+   * 機器取的名字（車道鍵加流水號）現場沒有人這樣叫；使用者在預覽上照順序點過去，
+   * 那個順序就是編號。名字與 segmentId 一起改——圖台的清單、路徑規劃、虛擬渡線的
+   * 端點都是靠 segmentId 找軌道的，只改顯示名字等於兩套名字並存。
+   */
+  const groupOf = trackGenGroupIndex(groups)
+  for (const f of facilities) {
+    const hit = groupOf.get(f.customName)
+    if (!hit) continue
+    const label = trackGenGroupLabel(hit.code, hit.order)
+    f.customName = label
+    f.parameters.segmentId = label
+    f.parameters.defaultFillColor = hit.color
+  }
 
   /*
    * 每一塊都記下橫向比例尺：<strong>車子不一定走在軌道上</strong>。
