@@ -204,45 +204,67 @@ function pairError(a: Vec2, b: Vec2, p: Vec2, q: Vec2): number {
  * 圓心固定在 centre（四種方位分別落在方框的四個角），所以方位一決定，外框位置
  * 也就決定了。四種都算一次兩端的誤差，取最小。
  */
+/**
+ * 轉角的弧帶：兩隻腳<strong>各給一個半徑</strong>。
+ *
+ * 正圓要求兩隻腳一樣長。實際上不一定：節點在沿線方向上有自己的偏移，兩條邊讓出來的
+ * 長度因此會差一點（實測 19.3 對 22.4 像素）。硬畫成正圓就得取平均，兩個端面各差一半
+ * ——那正是圖上看到的錯位。
+ *
+ * 改成橢圓：橫的那隻腳用自己的半徑、縱的那隻腳用自己的，兩端就都落在帶子上。使用者
+ * 看到的仍然是一個把尖角磨掉的直角，只是磨的弧稍微不對稱——比錯開一截好得多。
+ */
 export function fitCornerAt(
   centre: Vec2,
-  outerRM: number,
+  outerAM: number,
+  outerBM: number,
   bandWM: number,
   p0: Vec2,
   p1: Vec2,
 ): { geometry: CornerTrackGeometry; box: { xM: number; yM: number; wM: number; hM: number } } {
-  const S = Math.max(1e-3, outerRM)
-  /*
-   * 內弧半徑照<strong>比例</strong>縮，不是減掉固定公尺數。
-   *
-   * 外框之後會被非等比地放進 Area（橫向與縱向各自縮放）；等比例縮的內弧在縮放後
-   * 兩端的帶寬各自等於該方向的帶寬，剛好接上相鄰的直線段。減固定值的話帶子會
-   * 一頭粗一頭細。
-   */
-  const innerRatio = Math.max(0, Math.min(0.98, 1 - bandWM / S))
+  const A = Math.max(1e-3, outerAM)
+  const B = Math.max(1e-3, outerBM)
   let best: {
     geometry: CornerTrackGeometry
     box: { xM: number; yM: number; wM: number; hM: number }
     err: number
   } | null = null
   for (const entryDeg of QUARTERS) {
-    const geometry: CornerTrackGeometry = {
-      arcXRatio: 1,
-      arcYRatio: 1,
-      innerXRatio: innerRatio,
-      innerYRatio: innerRatio,
-      outerBulge: 1,
-      innerBulge: 1,
-      entryDeg,
+    // 兩隻腳誰對到外框的寬、誰對到高，由方位決定；兩種都試，取接得最準的
+    for (const [wM, hM] of [
+      [A, B],
+      [B, A],
+    ]) {
+      /*
+       * 內弧半徑照<strong>比例</strong>縮，不是減掉固定公尺數。
+       *
+       * 外框之後會被非等比地放進 Area（橫向與縱向各自縮放）；等比例縮的內弧在縮放後
+       * 兩端的帶寬各自等於該方向的帶寬，剛好接上相鄰的直線段。減固定值的話帶子會
+       * 一頭粗一頭細。
+       *
+       * 旋轉會把長寬對調，所以比例要照<strong>旋轉後</strong>的邊長算。
+       */
+      const swap = (Math.round((((entryDeg % 360) + 360) % 360) / 90) & 3) % 2 === 1
+      const w = Math.max(1e-3, swap ? hM! : wM!)
+      const h = Math.max(1e-3, swap ? wM! : hM!)
+      const geometry: CornerTrackGeometry = {
+        arcXRatio: 1,
+        arcYRatio: 1,
+        innerXRatio: Math.max(0, Math.min(0.98, 1 - bandWM / w)),
+        innerYRatio: Math.max(0, Math.min(0.98, 1 - bandWM / h)),
+        outerBulge: 1,
+        innerBulge: 1,
+        entryDeg,
+      }
+      // 圓心在方框內的位置固定，外框左上角＝圓心座標減掉這個位移
+      const off = cornerArcCentrePx(entryDeg, wM!, hM!)
+      const box = { xM: centre.x - off.x, yM: centre.y - off.y, wM: wM!, hM: hM! }
+      const ends = cornerTrackEndsPx(geometry, wM!, hM!)
+      const a = { x: box.xM + ends.a.x, y: box.yM + ends.a.y }
+      const b = { x: box.xM + ends.b.x, y: box.yM + ends.b.y }
+      const err = pairError(a, b, p0, p1)
+      if (!best || err < best.err) best = { geometry, box, err }
     }
-    // 圓心在方框內的位置固定，外框左上角＝圓心座標減掉這個位移
-    const off = cornerArcCentrePx(entryDeg, S, S)
-    const box = { xM: centre.x - off.x, yM: centre.y - off.y, wM: S, hM: S }
-    const ends = cornerTrackEndsPx(geometry, S, S)
-    const a = { x: box.xM + ends.a.x, y: box.yM + ends.a.y }
-    const b = { x: box.xM + ends.b.x, y: box.yM + ends.b.y }
-    const err = pairError(a, b, p0, p1)
-    if (!best || err < best.err) best = { geometry, box, err }
   }
   return { geometry: best!.geometry, box: best!.box }
 }

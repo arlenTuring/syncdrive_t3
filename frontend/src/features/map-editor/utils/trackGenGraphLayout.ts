@@ -1362,12 +1362,19 @@ function layoutOnce(
       const armX = hEnd ? hEnd.x : C.x
       const armY = vEnd ? vEnd.y : C.y
       const CC = { x: armX, y: armY }
-      const radius = (Math.abs(rowY - CC.y) + Math.abs(colX - CC.x)) / 2
+      /*
+       * 兩隻腳各自的半徑：縱的那隻量到橫向帶子的那一排，橫的那隻量到縱向帶子的那一欄。
+       * 兩者不一定相等——節點在沿線方向上有自己的偏移——所以轉角畫成橢圓，端面才落在
+       * 帶子上（見 fitCornerAt）。
+       */
+      const rA = Math.abs(rowY - CC.y)
+      const rB = Math.abs(colX - CC.x)
+      const radius = Math.min(rA, rB)
       // 半徑到帶寬的一半就是內緣貼著圓心，再小才是真的畫不出來
       if (radius < bandW * 0.45) continue
       const p0 = { x: CC.x, y: rowY }
       const p1 = { x: colX, y: CC.y }
-      const fit = fitCornerAt(CC, radius + bandW / 2, bandW, p0, p1)
+      const fit = fitCornerAt(CC, rB + bandW / 2, rA + bandW / 2, bandW, p0, p1)
       /*
        * 圖面中心線要照<strong>弧</strong>取，不能只留兩個端點。
        *
@@ -1386,8 +1393,6 @@ function layoutOnce(
           const t = i / n
           const ang = a0 + da * t
           // 兩端的半徑不一定完全相同，照比例補間，端點才會落在原本的位置
-          const rA = Math.abs(rowY - CC.y)
-          const rB = Math.abs(colX - CC.x)
           const rr = rA + (rB - rA) * t
           out.push({ x: CC.x + Math.cos(ang) * rr, y: CC.y + Math.sin(ang) * rr })
         }
