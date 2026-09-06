@@ -883,6 +883,8 @@ export const AreaNode = memo(function AreaNode({
   const [taperHighlight, setTaperHighlight] = useState<{
     targetId: string
     edge: { x1: number; y1: number; x2: number; y2: number }
+    /** 接得成才是綠的；碰得到卻接不起來畫成橘色虛線，使用者才知道是形狀表示不出來 */
+    ok: boolean
   } | null>(null)
 
   /**
@@ -1021,9 +1023,18 @@ export const AreaNode = memo(function AreaNode({
       if (!f || !p) return null
       // 吸附範圍隨縮放走，畫面上大約就是一根手指的寬度
       const reach = 14 / Math.max(0.01, mapScale)
-      let best: { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } } | null =
-        null
+      type Hit = { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } }
+      let best: Hit | null = null
       let bestD = reach
+      /*
+       * 碰得到、卻接不起來的也記下來。
+       *
+       * 那種目標若完全不顯示，使用者只會覺得「拉過去沒反應、功能壞了」；畫成橘色虛線
+       * 才看得出來是<strong>這個形狀表示不出那個接法</strong>（例如一般軌道接斜的邊、
+       * 圓角接一條平行的邊）。
+       */
+      let near: Hit | null = null
+      let nearD = reach
       for (const other of area.facilities) {
         if (other.id === facilityId || other.type !== 'Track') continue
         for (const e of facilityEndEdgesLocal(other)) {
@@ -1032,25 +1043,21 @@ export const AreaNode = memo(function AreaNode({
           const l2 = dx * dx + dy * dy
           const u = l2 ? Math.max(0, Math.min(1, ((p.x - e.x1) * dx + (p.y - e.y1) * dy) / l2)) : 0
           const d = Math.hypot(p.x - (e.x1 + dx * u), p.y - (e.y1 + dy * u))
-          /*
-           * 接不成的就不算候選。
-           *
-           * 先前這種目標照樣亮綠燈，放手卻什麼都沒發生——使用者只會覺得功能壞了。
-           * 現在先試算一次，成得了才亮。
-           */
-          if (
-            d < bestD &&
-            trackWouldJoin(f, end, [
-              { x: e.x1, y: e.y1 },
-              { x: e.x2, y: e.y2 },
-            ])
-          ) {
+          if (d >= reach) continue
+          const joinable = trackWouldJoin(f, end, [
+            { x: e.x1, y: e.y1 },
+            { x: e.x2, y: e.y2 },
+          ])
+          if (joinable && d < bestD) {
             bestD = d
             best = { targetId: other.id, edge: e }
+          } else if (!joinable && d < nearD) {
+            nearD = d
+            near = { targetId: other.id, edge: e }
           }
         }
       }
-      setTaperHighlight(best)
+      setTaperHighlight(best ? { ...best, ok: true } : near ? { ...near, ok: false } : null)
       return best
     },
     [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, trackWouldJoin],
@@ -1925,7 +1932,12 @@ export const AreaNode = memo(function AreaNode({
                 <>
                   {/* 先淡淡地標出是哪一塊 */}
                   <div
-                    className="pointer-events-none absolute z-[94] rounded-[2px] border border-emerald-400/50 bg-emerald-400/10"
+                    className={[
+                      'pointer-events-none absolute z-[94] rounded-[2px] border',
+                      taperHighlight.ok
+                        ? 'border-emerald-400/50 bg-emerald-400/10'
+                        : 'border-amber-400/40 bg-amber-400/5',
+                    ].join(' ')}
                     style={{
                       left: pos.x,
                       top: displayLayout.hPx - pos.y - size.h,
@@ -1945,9 +1957,14 @@ export const AreaNode = memo(function AreaNode({
                       y1={e.y1}
                       x2={e.x2}
                       y2={e.y2}
-                      stroke="#34d399"
+                      stroke={taperHighlight.ok ? '#34d399' : '#f59e0b'}
                       strokeWidth={5 / Math.max(0.01, mapScale)}
                       strokeLinecap="round"
+                      strokeDasharray={
+                        taperHighlight.ok
+                          ? undefined
+                          : `${5 / Math.max(0.01, mapScale)} ${4 / Math.max(0.01, mapScale)}`
+                      }
                       opacity={0.95}
                     />
                     {[
@@ -1959,8 +1976,8 @@ export const AreaNode = memo(function AreaNode({
                         cx={cx}
                         cy={cy}
                         r={3.5 / Math.max(0.01, mapScale)}
-                        fill="#ecfdf5"
-                        stroke="#34d399"
+                        fill={taperHighlight.ok ? '#ecfdf5' : '#fffbeb'}
+                        stroke={taperHighlight.ok ? '#34d399' : '#f59e0b'}
                         strokeWidth={1.5 / Math.max(0.01, mapScale)}
                       />
                     ))}

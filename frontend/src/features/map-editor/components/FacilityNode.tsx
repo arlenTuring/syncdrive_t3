@@ -2916,11 +2916,18 @@ export const FacilityNode = memo(function FacilityNode({
                           ]) as Array<[string, { x: number; y: number }, string]>
                         })()
                       : []
-                    : // 一般軌道：兩條短邊的中點
+                    : /*
+                       * 一般軌道：兩條短邊的中點。
+                       *
+                       * 順序必須與 AreaNode 算端面的順序<strong>一模一樣</strong>——
+                       * 橫的是先左後右、直的是先上後下。先前這裡反了，使用者拖右邊的
+                       * 把手、程式卻在動左邊那一面，於是目標永遠算不出來：不亮綠燈，
+                       * 放手也沒有反應。
+                       */
                       (nw >= nh
                         ? [
-                            ['a', { x: nw, y: nh / 2 }],
-                            ['b', { x: 0, y: nh / 2 }],
+                            ['a', { x: 0, y: nh / 2 }],
+                            ['b', { x: nw, y: nh / 2 }],
                           ]
                         : [
                             ['a', { x: nw / 2, y: 0 }],
