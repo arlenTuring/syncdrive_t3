@@ -1133,8 +1133,16 @@ export const AreaNode = memo(function AreaNode({
       onDragSessionStart?.()
       if (built.patch) onPatchFacilityParameters(area.id, facilityId, built.patch)
       if (built.rotationDeg !== undefined) {
-        // 只有相對旋轉的介面，所以自己算差值
-        const delta = built.rotationDeg - (f.rotation ?? 0)
+        /*
+         * 只有相對旋轉的介面，所以自己算差值；而且要<strong>收進 ±90 度</strong>。
+         *
+         * 矩形轉 180 度長得一模一樣，但角度不是——接的是左邊那一面時，行進方向指向左，
+         * 算出來就是 180 度。形狀沒變，元件上的文字與圖示卻整個顛倒過來。取與原角度
+         * 最接近的那一個表示法，外觀就不會無故翻面。
+         */
+        let delta = built.rotationDeg - (f.rotation ?? 0)
+        while (delta > 90) delta -= 180
+        while (delta <= -90) delta += 180
         if (Math.abs(delta) > 0.01) onRotateDelta(area.id, facilityId, delta)
       }
       onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
