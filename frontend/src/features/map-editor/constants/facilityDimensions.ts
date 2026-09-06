@@ -96,6 +96,27 @@ export function resolvePoleFrameSizePx(
  */
 const TAPER_RAMP_RUN = 3
 
+/**
+ * 交叉軌道的外框：長是高的幾倍。
+ *
+ * 交會角要淺，車子才過得去——也才看得出是兩條路交叉，不是一個叉叉。三比一是圖上
+ * 讀得出來又不至於長到佔滿容器的角度。
+ */
+const CROSS_ASPECT = 3
+
+/**
+ * 帶寬反推交叉軌道的外框。
+ *
+ * 端面各佔高的一半，但帶子是斜的，所以<strong>垂直於帶子</strong>的寬度比端面短，
+ * 差的就是傾角的餘弦。少了這一次修正，交叉軌道的帶子會比一般軌道細一截，接起來
+ * 一粗一細。
+ */
+function crossSizeFor(bandM: number): { w: number; h: number } {
+  const cos = Math.cos(Math.atan(0.5 / CROSS_ASPECT))
+  const h = (bandM * 2) / cos
+  return { w: h * CROSS_ASPECT, h }
+}
+
 export const TRACK_VARIANT_SIZE_M = (() => {
   const cornerSide = TRACK_RAIL_WIDTH_M / (1 - DEFAULT_CORNER_TRACK.innerXRatio)
   const taperH = TRACK_RAIL_WIDTH_M / (DEFAULT_TAPER_TRACK.aTo - DEFAULT_TAPER_TRACK.aFrom)
@@ -110,6 +131,7 @@ export const TRACK_VARIANT_SIZE_M = (() => {
     RailCorner: { w: cornerSide, h: cornerSide },
     RailTaper: { w: taperShift * TAPER_RAMP_RUN, h: taperH },
     RailSwitch: { w: outletGap * TAPER_RAMP_RUN, h: switchH },
+    RailCross: crossSizeFor(TRACK_RAIL_WIDTH_M),
   }
 })()
 
@@ -153,6 +175,7 @@ function trackDropSizeMeters(
     const shift = (DEFAULT_TAPER_TRACK.bFrom - DEFAULT_TAPER_TRACK.aFrom) * h
     return { w: shift * TAPER_RAMP_RUN_DROP, h }
   }
+  if (name === 'RailCross') return crossSizeFor(band)
   if (name === 'RailSwitch') {
     const h = band / (DEFAULT_SWITCH_TRACK.aTo - DEFAULT_SWITCH_TRACK.aFrom)
     const gap =
@@ -243,6 +266,9 @@ export function defaultSizeMetersForType(
   }
   if (type === 'Track' && name === 'RailTaper') {
     return { ...TRACK_VARIANT_SIZE_M.RailTaper }
+  }
+  if (type === 'Track' && name === 'RailCross') {
+    return { ...TRACK_VARIANT_SIZE_M.RailCross }
   }
   if (type === 'Track' && name === 'RailSwitch') {
     return { ...TRACK_VARIANT_SIZE_M.RailSwitch }

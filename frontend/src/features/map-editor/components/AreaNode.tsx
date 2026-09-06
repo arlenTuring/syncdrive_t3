@@ -23,8 +23,12 @@ import {
 } from '../utils/facilityAreaCoords'
 import { findFacilityAtAreaLocalPx } from '../utils/facilityHitTest'
 import {
+  CROSS_HANDLE_KEYS,
+  CROSS_TRACK_KEY,
   cornerTrackEndSegmentsPx,
+  crossTrackEndSegmentsPx,
   readCornerTrack,
+  readCrossTrack,
   readSwitchTrack,
   readTaperTrack,
   switchTrackEndSegmentsPx,
@@ -34,9 +38,11 @@ import {
   TAPER_TRACK_KEY,
 } from '../utils/trackShapes'
 import { buildTaperFromEndSegments, type EndSegment } from '../utils/taperJoin'
+import type { CrossHandleKey } from '../utils/trackShapes'
 import { buildCornerFromEndSegments } from '../utils/cornerJoin'
 import { buildRectFromEndSegments } from '../utils/railJoin'
 import { alignSwitchFaces, buildSwitchFromEndSegments } from '../utils/switchJoin'
+import { alignCrossFaces, buildCrossFromEndSegments } from '../utils/crossJoin'
 import {
   resolveFacilityAreaPosition,
   resolveFacilityAreaSize,
@@ -928,6 +934,16 @@ export const AreaNode = memo(function AreaNode({
           return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
         })
       }
+      // 交叉軌道有四個面，兩兩對接
+      if (f.name === 'RailCross') {
+        const segs = crossTrackEndSegmentsPx(readCrossTrack(f.parameters), size.w, size.h)
+        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
+        return CROSS_HANDLE_KEYS.map((k) => {
+          const p0 = L(segs[k][0])
+          const p1 = L(segs[k][1])
+          return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
+        })
+      }
       // 斜接軌道的端面由它自己的幾何決定，不是外框的長短邊
       if (f.name === 'RailTaper') {
         const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
@@ -983,6 +999,12 @@ export const AreaNode = memo(function AreaNode({
         if (edges.length < 3) return null
         return { a: seg(edges[0]!), m: seg(edges[1]!), b: seg(edges[2]!) }
       }
+      if (f.name === 'RailCross') {
+        if (edges.length < 4) return null
+        return Object.fromEntries(
+          CROSS_HANDLE_KEYS.map((k, i) => [k, seg(edges[i]!)]),
+        ) as Record<string, EndSegment>
+      }
       if (edges.length < 2) return null
       const faces: Record<string, EndSegment> = { a: seg(edges[0]!), b: seg(edges[1]!) }
       // 一般軌道四個邊都能接
@@ -1010,6 +1032,14 @@ export const AreaNode = memo(function AreaNode({
           edge,
         )
         return !!next && !!buildSwitchFromEndSegments(next.a, next.m, next.b)
+      }
+      if (f.name === 'RailCross') {
+        const next = alignCrossFaces(
+          cur as Record<CrossHandleKey, EndSegment>,
+          end as CrossHandleKey,
+          edge,
+        )
+        return !!next && !!buildCrossFromEndSegments(next)
       }
       const other = cur[OPPOSITE_FACE[end] ?? 'a']
       if (!other) return false
@@ -1139,6 +1169,14 @@ export const AreaNode = memo(function AreaNode({
         )
         const r = next && buildSwitchFromEndSegments(next.a, next.m, next.b)
         if (r) built = { box: r.box, patch: { [SWITCH_TRACK_KEY]: r.geometry } }
+      } else if (f.name === 'RailCross') {
+        const next = alignCrossFaces(
+          cur as Record<CrossHandleKey, EndSegment>,
+          end as CrossHandleKey,
+          want,
+        )
+        const r = next && buildCrossFromEndSegments(next)
+        if (r) built = { box: r.box, patch: { [CROSS_TRACK_KEY]: r.geometry } }
       } else {
         const other = cur[OPPOSITE_FACE[end] ?? 'a']
         if (!other) return

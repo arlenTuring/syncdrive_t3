@@ -680,3 +680,148 @@ export function switchTrackEndSegmentsPx(
     b: [T(at(g.bAt), c(g.bFrom)), T(at(g.bAt), c(g.bTo))],
   }
 }
+
+/* ── 交叉軌道 ────────────────────────────────────────────────────
+   兩條軌道交會：左上接右下、左下接右上。渡線做的是同一件事，但它是在還沒有分岔
+   軌道的年代做的，只能表達「兩條平行線之間換過去」，接口也不是可以拉去接別人的
+   連接點。交叉軌道與其他軌道一樣有四個連接點，拉去接誰就照對方的端面變形。      */
+
+/** 一個端面：在長邊的哪個位置（at），跨過短邊的哪一段（from–to） */
+export type CrossFace = { at: number; from: number; to: number }
+
+export type CrossTrackGeometry = {
+  /** 左上端面 */
+  lt: CrossFace
+  /** 左下端面 */
+  lb: CrossFace
+  /** 右上端面 */
+  rt: CrossFace
+  /** 右下端面 */
+  rb: CrossFace
+  /** 方位（度，螢幕座標順時針為正） */
+  entryDeg: number
+}
+
+export const CROSS_TRACK_KEY = 'crossTrack'
+
+/**
+ * 預設就是兩條各佔一半、交叉滿整個外框。
+ *
+ * 四個端面各佔短邊的一半，兩條帶子因此鋪滿外框——這是交叉軌道最好認的樣子。
+ * 要細一點的帶子，把端面拉窄就是了。
+ */
+export const DEFAULT_CROSS_TRACK: CrossTrackGeometry = {
+  lt: { at: 0, from: 0, to: 0.5 },
+  lb: { at: 0, from: 0.5, to: 1 },
+  rt: { at: 1, from: 0, to: 0.5 },
+  rb: { at: 1, from: 0.5, to: 1 },
+  entryDeg: 0,
+}
+
+export function readCrossTrack(
+  parameters: Record<string, unknown> | undefined,
+): CrossTrackGeometry {
+  const raw = parameters?.[CROSS_TRACK_KEY]
+  if (!raw || typeof raw !== 'object') return structuredCloneCross(DEFAULT_CROSS_TRACK)
+  const o = raw as Partial<Record<keyof CrossTrackGeometry, unknown>>
+  const num = (v: unknown, d: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d
+  const face = (v: unknown, d: CrossFace): CrossFace => {
+    if (!v || typeof v !== 'object') return { ...d }
+    const f = v as Partial<CrossFace>
+    return { at: num(f.at, d.at), from: num(f.from, d.from), to: num(f.to, d.to) }
+  }
+  return {
+    lt: face(o.lt, DEFAULT_CROSS_TRACK.lt),
+    lb: face(o.lb, DEFAULT_CROSS_TRACK.lb),
+    rt: face(o.rt, DEFAULT_CROSS_TRACK.rt),
+    rb: face(o.rb, DEFAULT_CROSS_TRACK.rb),
+    entryDeg:
+      typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg)
+        ? o.entryDeg
+        : DEFAULT_CROSS_TRACK.entryDeg,
+  }
+}
+
+function structuredCloneCross(g: CrossTrackGeometry): CrossTrackGeometry {
+  return { lt: { ...g.lt }, lb: { ...g.lb }, rt: { ...g.rt }, rb: { ...g.rb }, entryDeg: g.entryDeg }
+}
+
+function crossSpin(g: CrossTrackGeometry, boxWPx: number, boxHPx: number) {
+  const quarter = Math.round((((g.entryDeg % 360) + 360) % 360) / 90) & 3
+  const swap = quarter % 2 === 1
+  const w = Math.max(1, swap ? boxHPx : boxWPx)
+  const h = Math.max(1, swap ? boxWPx : boxHPx)
+  const cx = w / 2
+  const cy = h / 2
+  const ocx = boxWPx / 2
+  const ocy = boxHPx / 2
+  const T = (x: number, y: number) => {
+    let dx = x - cx
+    let dy = y - cy
+    for (let i = 0; i < quarter; i += 1) {
+      const nx = -dy
+      const ny = dx
+      dx = nx
+      dy = ny
+    }
+    return { x: ocx + dx, y: ocy + dy }
+  }
+  return { w, h, T }
+}
+
+/**
+ * 填色外框：兩條帶子<strong>各自是一個子路徑</strong>。
+ *
+ * 與分岔軌道同一招——兩片疊起來靠 nonzero 填色合成一個交叉，不去算交會點再繞外框；
+ * 那樣在兩條幾乎重疊時會自交。端面也因此各自完整。
+ */
+export function crossTrackPath(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): string {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  const band = (p: CrossFace, q: CrossFace) =>
+    [
+      [p.at * w, p.from * h],
+      [q.at * w, q.from * h],
+      [q.at * w, q.to * h],
+      [p.at * w, p.to * h],
+    ]
+      .map(([px, py], i) => {
+        const t = T(px as number, py as number)
+        return `${i ? 'L' : 'M'} ${t.x.toFixed(2)} ${t.y.toFixed(2)}`
+      })
+      .join(' ') + ' Z'
+  // 左上接右下、左下接右上：交叉就是這兩條帶子的疊合
+  return `${band(g.lt, g.rb)} ${band(g.lb, g.rt)}`
+}
+
+export type CrossHandleKey = 'lt' | 'lb' | 'rt' | 'rb'
+
+export const CROSS_HANDLE_KEYS: CrossHandleKey[] = ['lt', 'lb', 'rt', 'rb']
+
+export function crossTrackHandlesPx(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): Record<CrossHandleKey, { x: number; y: number }> {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  const mid = (f: CrossFace) => T(f.at * w, ((f.from + f.to) / 2) * h)
+  return { lt: mid(g.lt), lb: mid(g.lb), rt: mid(g.rt), rb: mid(g.rb) }
+}
+
+/** 四個端面的線段（相對元件左上角的像素） */
+export function crossTrackEndSegmentsPx(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): Record<CrossHandleKey, [ShapePoint, ShapePoint]> {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  const seg = (f: CrossFace): [ShapePoint, ShapePoint] => [
+    T(f.at * w, f.from * h),
+    T(f.at * w, f.to * h),
+  ]
+  return { lt: seg(g.lt), lb: seg(g.lb), rt: seg(g.rt), rb: seg(g.rb) }
+}

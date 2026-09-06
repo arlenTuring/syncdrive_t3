@@ -1681,9 +1681,13 @@ const enUS: DeepStringify<typeof zhTW> = {
           label: 'Switch track',
           hint: 'Switch track — one in, two out; handles for entry, through, and branch exits',
         },
+        railCross: {
+          label: 'Crossing track',
+          hint: 'Crossing track — two tracks meeting; a joint at each corner that adapts to whatever track you drag it onto',
+        },
         trackCrossover: {
           label: 'Virtual crossover',
-          hint: 'Virtual crossover — free path (drag both ends); place two for an X',
+          hint: 'Virtual crossover — superseded by the crossing track; kept for existing maps',
         },
       },
     },

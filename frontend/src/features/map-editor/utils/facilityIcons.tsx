@@ -17,6 +17,7 @@ import {
   CornerDownRight,
   Spline,
   GitFork,
+  X,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { FacilityName } from '../types/facility'
@@ -37,6 +38,7 @@ export const PALETTE_ICON_BY_NAME: Record<
   RailCorner: CornerDownRight,
   RailTaper: Spline,
   RailSwitch: GitFork,
+  RailCross: X,
   SmartPole: Radio,
   DockingPoint: MapPin,
   Waypoint: CircleDot,

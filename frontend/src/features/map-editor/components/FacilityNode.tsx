@@ -17,8 +17,12 @@ import {
   taperTrackPath,
   readTaperTrack,
   switchTrackPath,
+  crossTrackPath,
+  readCrossTrack,
   readSwitchTrack,
   switchTrackHandlesPx,
+  CROSS_HANDLE_KEYS,
+  crossTrackHandlesPx,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
   MIN_CORNER_BULGE,
@@ -490,6 +494,8 @@ export const FacilityNode = memo(function FacilityNode({
   /** 斜接軌道：矩形切掉兩個對角，與圓角軌道同樣用 clip-path 換形狀 */
   const isTaperTrack = isTrack && facility.name === 'RailTaper'
   const isSwitchTrack = isTrack && facility.name === 'RailSwitch'
+  /** 交叉軌道：兩條帶子交會，四個角各一個連接點 */
+  const isCrossTrack = isTrack && facility.name === 'RailCross'
   const isRoadLine = facility.type === 'RoadLine'
   const isBasemap = facility.type === 'Basemap'
   const isTrackCrossover = facility.type === 'TrackCrossover'
@@ -1233,6 +1239,14 @@ export const FacilityNode = memo(function FacilityNode({
   const switchTrackClipPath = useMemo(
     () => (switchTrackGeom ? switchTrackPath(switchTrackGeom, nw, nh) : ''),
     [switchTrackGeom, nw, nh],
+  )
+  const crossTrackGeom = useMemo(
+    () => (isCrossTrack ? readCrossTrack(facility.parameters) : null),
+    [isCrossTrack, facility.parameters],
+  )
+  const crossTrackClipPath = useMemo(
+    () => (crossTrackGeom ? crossTrackPath(crossTrackGeom, nw, nh) : ''),
+    [crossTrackGeom, nw, nh],
   )
 
   const trackCorners = isTrack
@@ -2382,7 +2396,7 @@ export const FacilityNode = memo(function FacilityNode({
             ...(isTrack
               ? {
                   backgroundColor: trackFillColor ?? undefined,
-                  ...(isCornerTrack || isTaperTrack || isSwitchTrack
+                  ...(isCornerTrack || isTaperTrack || isSwitchTrack || isCrossTrack
                     ? {
                         borderWidth: 0,
                         clipPath: `path('${
@@ -2390,7 +2404,9 @@ export const FacilityNode = memo(function FacilityNode({
                             ? cornerTrackClipPath
                             : isSwitchTrack
                               ? switchTrackClipPath
-                              : taperTrackClipPath
+                              : isCrossTrack
+                                ? crossTrackClipPath
+                                : taperTrackClipPath
                         }')`,
                       }
                     : {
@@ -2899,6 +2915,14 @@ export const FacilityNode = memo(function FacilityNode({
                     ? (['a', 'b'] as const).map((k) => [
                         k,
                         taperTrackHandlesPx(taperTrackGeom, nw, nh)[k],
+                        t('mapEditor.inspector.node.taperJoin'),
+                      ])
+                    : []
+                  : isCrossTrack
+                  ? crossTrackGeom
+                    ? CROSS_HANDLE_KEYS.map((k) => [
+                        k,
+                        crossTrackHandlesPx(crossTrackGeom, nw, nh)[k],
                         t('mapEditor.inspector.node.taperJoin'),
                       ])
                     : []

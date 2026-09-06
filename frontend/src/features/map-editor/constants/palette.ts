@@ -125,10 +125,10 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: 'mapEditor.palette.items.railSwitch.hint',
   },
   {
-    label: 'mapEditor.palette.items.trackCrossover.label',
-    type: 'TrackCrossover',
-    name: 'TrackCrossover',
-    hint: 'mapEditor.palette.items.trackCrossover.hint',
+    label: 'mapEditor.palette.items.railCross.label',
+    type: 'Track',
+    name: 'RailCross',
+    hint: 'mapEditor.palette.items.railCross.hint',
   },
 ] as const
 
