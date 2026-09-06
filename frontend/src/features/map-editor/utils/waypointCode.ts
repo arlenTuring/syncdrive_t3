@@ -1,4 +1,5 @@
 import type { MapAreaObject } from '../types/area'
+import { CROSS_PORTAL_KEYS, getCrossPortals } from './crossTrackPortals'
 import type { FacilityObject } from '../types/facility'
 import {
   CROSSOVER_PORTAL_KEYS,
@@ -45,6 +46,15 @@ export function collectWaypointCodes(areas: MapAreaObject[]): Set<string> {
       if (facility.type === 'Waypoint') {
         const code = getWaypointCode(facility)
         if (code) codes.add(code)
+        continue
+      }
+      // 交叉軌道的四個口也各是一個途經點，代號不能跟別人撞
+      if (facility.name === 'RailCross') {
+        const cross = getCrossPortals(facility)
+        for (const key of CROSS_PORTAL_KEYS) {
+          const code = cross[key].waypointCode?.trim()
+          if (code) codes.add(code)
+        }
         continue
       }
       if (facility.type !== 'TrackCrossover') continue

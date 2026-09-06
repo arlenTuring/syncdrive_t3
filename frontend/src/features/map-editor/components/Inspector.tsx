@@ -51,6 +51,7 @@ import { DockingPointInspectorSection } from './DockingPointInspectorSection'
 import { WaypointInspectorSection } from './WaypointInspectorSection'
 import { RoadLineInspectorSection } from './RoadLineInspectorSection'
 import { TrackCrossoverInspectorSection } from './TrackCrossoverInspectorSection'
+import { CrossTrackInspectorSection } from './CrossTrackInspectorSection'
 import { GeofenceInspectorSection } from './GeofenceInspectorSection'
 import { FacilityInspectorSection } from './FacilityInspectorSection'
 import { FacilityDockingPointInspectorSection } from './FacilityDockingPointInspectorSection'
@@ -1109,6 +1110,15 @@ export function Inspector({
         ) : null}
         {facility.type === 'RoadLine' && onPatchParameters ? (
           <RoadLineInspectorSection
+            facility={facility}
+            readOnly={readOnly}
+            onPatchParameters={onPatchParameters}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+          />
+        ) : null}
+        {facility.name === 'RailCross' && onPatchParameters ? (
+          <CrossTrackInspectorSection
             facility={facility}
             readOnly={readOnly}
             onPatchParameters={onPatchParameters}

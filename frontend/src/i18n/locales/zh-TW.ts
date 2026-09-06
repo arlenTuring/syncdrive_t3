@@ -1805,6 +1805,24 @@ const zhTW = {
         rotationDeg: '旋轉（度）',
         deleteText: '刪除此文字',
       },
+      crossTrack: {
+        title: '途經點與方向',
+        portal: { lt: '左上口', lb: '左下口', rt: '右上口', rb: '右下口' },
+        waypointCode: '途經點代號',
+        alias: '別名（顯示名稱）',
+        fieldX: '參照場域橫向位置 (m)',
+        fieldY: '參照場域縱向位置 (m)',
+        fieldHint:
+          '現場實際位置（場域公尺，原點左下）。目前需自行填寫；接合軌道時尚不會自動帶入。',
+        routes: '路徑方向',
+        route: {
+          straightTop: '直行（上）',
+          straightBottom: '直行（下）',
+          diagDown: '斜行（左上↘右下）',
+          diagUp: '斜行（左下↗右上）',
+        },
+        direction: { both: '雙向', forward: '正向', reverse: '反向', off: '不通' },
+      },
       trackCrossover: {
         title: '虛擬渡線',
         hint:

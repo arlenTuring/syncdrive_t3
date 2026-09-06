@@ -10,6 +10,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
+  CROSS_PORTAL_KEYS,
+  CROSS_ROUTE_ENDS,
+  CROSS_ROUTE_KEYS,
+  getCrossPortals,
+  getCrossRoutes,
+} from '../utils/crossTrackPortals'
+import {
   cornerTrackHandlesPx,
   cornerTrackPath,
   taperTrackHandlesPx,
@@ -18,12 +25,12 @@ import {
   readTaperTrack,
   switchTrackPath,
   crossTrackGuidesPx,
+  crossTrackHandlesPx,
   crossTrackPath,
   readCrossTrack,
   readSwitchTrack,
   switchTrackHandlesPx,
   CROSS_HANDLE_KEYS,
-  crossTrackHandlesPx,
   CORNER_TRACK_KEY,
   MAX_CORNER_BULGE,
   MIN_CORNER_BULGE,
@@ -1254,6 +1261,42 @@ export const FacilityNode = memo(function FacilityNode({
     () => (crossTrackGeom ? crossTrackGuidesPx(crossTrackGeom, nw, nh) : null),
     [crossTrackGeom, nw, nh],
   )
+  /**
+   * 四個口的標籤與四條路徑的方向箭頭。
+   *
+   * 標籤取別名，沒有就取途經點代號——與虛擬渡線同一個規則：填了看得懂的名字就顯示
+   * 名字，沒填才顯示代號。箭頭擺在路徑的四分之一與四分之三處，雙向兩枚各指一頭，
+   * 單向一枚，關掉的路徑不畫——哪幾條走得通，圖上看得出來。
+   */
+  const crossTrackOverlay = useMemo(() => {
+    if (!isCrossTrack || !crossTrackGeom) return null
+    const pts = crossTrackHandlesPx(crossTrackGeom, nw, nh)
+    const portals = getCrossPortals(facility)
+    const routes = getCrossRoutes(facility)
+    const labels = CROSS_PORTAL_KEYS.map((k) => ({
+      key: k,
+      at: pts[k],
+      text: (portals[k].alias ?? '').trim() || portals[k].waypointCode,
+    }))
+    const arrows: Array<{ x: number; y: number; ux: number; uy: number; key: string }> = []
+    for (const rk of CROSS_ROUTE_KEYS) {
+      const dir = routes[rk]
+      if (dir === 'off') continue
+      const [fromKey, toKey] = CROSS_ROUTE_ENDS[rk]
+      const a = pts[fromKey]
+      const b = pts[toKey]
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      if (len < 1) continue
+      const ux = (b.x - a.x) / len
+      const uy = (b.y - a.y) / len
+      const at = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt })
+      if (dir === 'both' || dir === 'forward') arrows.push({ ...at(0.72), ux, uy, key: `${rk}-f` })
+      if (dir === 'both' || dir === 'reverse') {
+        arrows.push({ ...at(0.28), ux: -ux, uy: -uy, key: `${rk}-r` })
+      }
+    }
+    return { labels, arrows }
+  }, [isCrossTrack, crossTrackGeom, facility, nw, nh])
 
   const trackCorners = isTrack
     ? getTrackCornerRadii(facility)
@@ -2877,6 +2920,43 @@ export const FacilityNode = memo(function FacilityNode({
               strokeWidth={1}
               opacity={0.7}
             />
+            {crossTrackOverlay?.arrows.map((a) => {
+              const head = 7
+              const half = 4
+              const bx = a.x - a.ux * head
+              const by = a.y - a.uy * head
+              return (
+                <polygon
+                  key={`cross-arrow-${a.key}`}
+                  points={`${a.x},${a.y} ${bx - a.uy * half},${by + a.ux * half} ${bx + a.uy * half},${by - a.ux * half}`}
+                  fill="#7dd3fc"
+                  opacity={0.95}
+                />
+              )
+            })}
+            {crossTrackOverlay?.labels.map((l) => {
+              /*
+               * 標籤往框內收。連接點就在四個角上，字置中放在點的正上方會有一半跑到
+               * 框外被裁掉——把 x 夾在框內、太靠上的改放在點的下方。
+               */
+              const lx = Math.max(16, Math.min(nw - 16, l.at.x))
+              const above = l.at.y > 16
+              return (
+                <text
+                  key={`cross-label-${l.key}`}
+                  x={lx}
+                  y={above ? l.at.y - 9 : l.at.y + 16}
+                  textAnchor="middle"
+                  dominantBaseline="auto"
+                  fill="#e0f2fe"
+                  fontSize={10}
+                  fontWeight={600}
+                  style={{ paintOrder: 'stroke', stroke: '#0f172a', strokeWidth: 3 }}
+                >
+                  {l.text}
+                </text>
+              )
+            })}
           </svg>
         )}
         {/*

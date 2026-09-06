@@ -1823,6 +1823,34 @@ const enUS: DeepStringify<typeof zhTW> = {
         rotationDeg: 'Rotation (deg)',
         deleteText: 'Delete this text',
       },
+      crossTrack: {
+        title: 'Waypoints & directions',
+        portal: {
+          lt: 'Top-left',
+          lb: 'Bottom-left',
+          rt: 'Top-right',
+          rb: 'Bottom-right',
+        },
+        waypointCode: 'Waypoint code',
+        alias: 'Alias (display name)',
+        fieldX: 'Reference field X (m)',
+        fieldY: 'Reference field Y (m)',
+        fieldHint:
+          'Real-world position (field metres, origin bottom-left). Enter manually for now; joining a track does not fill it in yet.',
+        routes: 'Route directions',
+        route: {
+          straightTop: 'Straight (top)',
+          straightBottom: 'Straight (bottom)',
+          diagDown: 'Diagonal (top-left to bottom-right)',
+          diagUp: 'Diagonal (bottom-left to top-right)',
+        },
+        direction: {
+          both: 'Both ways',
+          forward: 'Forward',
+          reverse: 'Reverse',
+          off: 'Closed',
+        },
+      },
       trackCrossover: {
         title: 'Virtual crossover',
         hint:
