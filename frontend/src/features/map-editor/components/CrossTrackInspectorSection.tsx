@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
+import type { MapAreaObject } from '../types/area'
 import {
   CROSS_PORTAL_KEYS,
   CROSS_ROUTE_DIRECTIONS,
@@ -9,6 +10,7 @@ import {
   getCrossRoutes,
   patchCrossPortal,
   patchCrossRoute,
+  resolveCrossPortalFields,
   type CrossPortalKey,
   type CrossRouteDirection,
   type CrossRouteKey,
@@ -21,6 +23,8 @@ type Props = {
   onPatchParameters: (patch: Record<string, unknown>) => void
   onFieldFocus?: () => void
   onFieldBlur?: () => void
+  /** 反推現場座標要用到這個元件所在的容器 */
+  mapAreas?: MapAreaObject[]
 }
 
 function fmt(n: number | null): string {
@@ -40,10 +44,13 @@ export function CrossTrackInspectorSection({
   onPatchParameters,
   onFieldFocus,
   onFieldBlur,
+  mapAreas = [],
 }: Props) {
   const { t } = useTranslation()
   const portals = getCrossPortals(facility)
   const routes = getCrossRoutes(facility)
+  const area = mapAreas.find((a) => a.facilities?.some((f) => f.id === facility.id)) ?? null
+  const resolved = resolveCrossPortalFields(facility, area)
 
   const commitCode = (key: CrossPortalKey, raw: string) => {
     const code = normalizeWaypointCodeInput(raw)
@@ -55,6 +62,10 @@ export function CrossTrackInspectorSection({
     if (alias === (portals[key].alias ?? '')) return
     onPatchParameters(patchCrossPortal(facility, key, { alias }))
   }
+  /*
+   * 空白 = 回到自動。兩軸只填一個沒有意義（座標是一對），所以另一軸也一起清掉時
+   * 才算回到自動——這裡只管自己那一軸，兩軸都空就自動。
+   */
   const commitCoord = (key: CrossPortalKey, axis: 'xM' | 'yM', raw: string) => {
     const trimmed = raw.trim()
     const next = trimmed === '' ? null : Number(trimmed)
@@ -145,11 +156,16 @@ export function CrossTrackInspectorSection({
                     </label>
                     <input
                       id={`xc-${axis}-${facility.id}-${key}`}
-                      key={`xc-${axis}-${facility.id}-${key}-${fmt(p[axis])}`}
+                      key={`xc-${axis}-${facility.id}-${key}-${fmt(resolved[key][axis])}`}
                       type="number"
                       step="any"
                       readOnly={readOnly}
-                      defaultValue={fmt(p[axis])}
+                      defaultValue={fmt(resolved[key][axis])}
+                      title={
+                        resolved[key].auto
+                          ? t('mapEditor.inspector.crossTrack.autoValue')
+                          : undefined
+                      }
                       onFocus={onFieldFocus}
                       onBlur={(e) => {
                         onFieldBlur?.()
@@ -163,6 +179,15 @@ export function CrossTrackInspectorSection({
                   </div>
                 ))}
               </div>
+              {resolved[key].auto ? (
+                <p className="text-[9px] text-emerald-400/80">
+                  {t('mapEditor.inspector.crossTrack.autoValue')}
+                </p>
+              ) : (
+                <p className="text-[9px] text-amber-400/80">
+                  {t('mapEditor.inspector.crossTrack.manualValue')}
+                </p>
+              )}
             </div>
           )
         })}

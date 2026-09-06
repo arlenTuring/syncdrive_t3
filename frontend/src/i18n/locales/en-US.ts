@@ -1836,7 +1836,9 @@ const enUS: DeepStringify<typeof zhTW> = {
         fieldX: 'Reference field X (m)',
         fieldY: 'Reference field Y (m)',
         fieldHint:
-          'Real-world position (field metres, origin bottom-left). Enter manually for now; joining a track does not fill it in yet.',
+          'Real-world position (field metres, origin bottom-left). Derived automatically on HD-map generated track; otherwise from the container domain (1:1 when the domain matches its pixel size).',
+        autoValue: 'Automatic — derived from where it sits on the map; follows moves and resizes.',
+        manualValue: 'Manual override — clear both fields to go back to automatic.',
         routes: 'Route directions',
         route: {
           straightTop: 'Straight (top)',

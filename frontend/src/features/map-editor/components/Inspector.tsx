@@ -1124,6 +1124,7 @@ export function Inspector({
             onPatchParameters={onPatchParameters}
             onFieldFocus={onFieldFocus}
             onFieldBlur={onFieldBlur}
+            mapAreas={mapAreas}
           />
         ) : null}
         {facility.type === 'TrackCrossover' && onPatchParameters ? (

@@ -1,5 +1,14 @@
+import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
-import { CROSS_HANDLE_KEYS, type CrossHandleKey } from './trackShapes'
+import { resolveFacilityAreaSize } from './facilityAreaCoords'
+import { fieldMetersAtAreaLocal } from './fieldFromArea'
+import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import {
+  CROSS_HANDLE_KEYS,
+  crossTrackHandlesPx,
+  readCrossTrack,
+  type CrossHandleKey,
+} from './trackShapes'
 
 /**
  * 交叉軌道的四個連接點與四條路徑。
@@ -127,4 +136,47 @@ export function patchCrossRoute(
   direction: CrossRouteDirection,
 ): Record<string, unknown> {
   return { [CROSS_ROUTES_KEY]: { ...getCrossRoutes(facility), [key]: direction } }
+}
+
+/**
+ * 四個口<strong>現在</strong>在現場的哪裡。
+ *
+ * 連接點就固定在那一面的中點上——與 .xodr 的交會點對齊，是接合時就決定好的，不該
+ * 讓使用者去填。所以座標由圖上的位置反推：接好、移動、縮放、旋轉之後都自己跟上。
+ *
+ * 手填的值只當<strong>覆寫</strong>：填了就用填的，清空就回到自動。
+ */
+export function resolveCrossPortalFields(
+  facility: FacilityObject,
+  area: MapAreaObject | null | undefined,
+): Record<CrossPortalKey, { xM: number | null; yM: number | null; auto: boolean }> {
+  const portals = getCrossPortals(facility)
+  const out = {} as Record<
+    CrossPortalKey,
+    { xM: number | null; yM: number | null; auto: boolean }
+  >
+  const geom = readCrossTrack(facility.parameters)
+  const size = area
+    ? resolveFacilityAreaSize(facility, area.domain, area.layout)
+    : { w: 1, h: 1 }
+  const handles = crossTrackHandlesPx(geom, size.w, size.h)
+  for (const key of CROSS_PORTAL_KEYS) {
+    const manual = portals[key]
+    if (manual.xM !== null && manual.yM !== null) {
+      out[key] = { xM: manual.xM, yM: manual.yM, auto: false }
+      continue
+    }
+    if (!area) {
+      out[key] = { xM: null, yM: null, auto: true }
+      continue
+    }
+    const h = handles[key]
+    const local = trackLocalPathPointToAreaLocal(facility, area, {
+      x: h.x / Math.max(1e-6, size.w),
+      y: h.y / Math.max(1e-6, size.h),
+    })
+    const field = fieldMetersAtAreaLocal(area, local.x, local.y)
+    out[key] = { xM: field.xM, yM: field.yM, auto: true }
+  }
+  return out
 }
