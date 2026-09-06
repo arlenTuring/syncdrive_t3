@@ -989,6 +989,45 @@ function layoutOnce(
     const pick = <T extends { f0: number; f1: number }>(arr: T[], f: number): T =>
       arr.find((r) => f >= r.f0 && f < r.f1) ?? arr[arr.length - 1]!
 
+    /**
+     * 這一段的橫向比例尺：圖上與<strong>隔壁那條軌道</strong>差多遠，除以真實世界差多遠。
+     *
+     * 整張圖給一個定值不夠。月台那一段兩條軌道在真實世界拉開到 8 公尺，圖上卻只讓開
+     * 固定的半條軌道——那是製圖上的取捨（拉開多少要看得出來，但不能照實際比例，不然
+     * 月台會佔掉整張圖）。用全圖的定值去換算，車子在那一段會偏掉三分之一條軌道寬。
+     *
+     * 改成逐段量：這一塊自己畫在哪、隔壁那塊畫在哪、兩條真實中心線隔多遠，三個都知道，
+     * 比例就是量出來的，不是假設出來的。只有一條車道的邊沒有隔壁可比，退回全圖的定值。
+     */
+    const latScaleAt = (k: number, f: number): number => {
+      const kk = k === 0 ? 1 : k - 1
+      const near = e.lanes[kk]
+      if (!near) return levelPx / laneGapM
+      const extraOf = (i: number) => {
+        const oi = offs[i]!
+        const sideI = Math.sign(oi - (shift.get(e.id) ?? 0)) || 1
+        return oi + pick(levelRuns, f).offsetPx + pick(spreadRuns, f).spread * (levelPx / 2) * sideI
+      }
+      const drawn = Math.abs(extraOf(k) - extraOf(kk))
+      const ptOf = (i: number) => {
+        const pts = e.lanes[i]?.points ?? []
+        if (pts.length < 2) return null
+        const u = Math.max(0, Math.min(1, f)) * (pts.length - 1)
+        const j = Math.min(pts.length - 2, Math.floor(u))
+        const t = u - j
+        return {
+          x: pts[j]!.x + (pts[j + 1]!.x - pts[j]!.x) * t,
+          y: pts[j]!.y + (pts[j + 1]!.y - pts[j]!.y) * t,
+        }
+      }
+      const a = ptOf(k)
+      const b = ptOf(kk)
+      if (!a || !b) return levelPx / laneGapM
+      const real = Math.hypot(a.x - b.x, a.y - b.y)
+      if (!(real > 0.05) || !(drawn > 0.05)) return levelPx / laneGapM
+      return drawn / real
+    }
+
     e.lanes.forEach((lane, k) => {
       const o = offs[k]!
       /*
@@ -1126,6 +1165,7 @@ function layoutOnce(
               role: 'road',
               lineKey: lane.key,
               lineLengthM: e.lengthM,
+              latScalePerM: latScaleAt(k, (f0 + f1) / 2),
               realLatFromM: 0,
               realLatToM: 0,
               samples: [p0, p1],
@@ -1157,6 +1197,7 @@ function layoutOnce(
           role: 'road',
           lineKey: lane.key,
           lineLengthM: e.lengthM,
+          latScalePerM: latScaleAt(k, run.f1),
           realLatFromM: 0,
           realLatToM: 0,
           samples: [a0, a1],

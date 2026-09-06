@@ -24,6 +24,17 @@ export const TRACKGEN_LOCAL_PATH_KEY = 'trackGenLocalPath'
  */
 export const TRACKGEN_LAT_PER_BOX_KEY = 'trackGenLatPerBox'
 /**
+ * 偏移量<strong>往哪個方向</strong>移出去。
+ *
+ * <code>axis</code>：沿外框的橫軸。並排的軌道是照這個方向疊起來的，所以往這裡移才會
+ * 落在隔壁那條上。斜接的中心線是斜的，若改用「垂直於中心線」，偏移量會同時把點沿著
+ * 斜線推走——實測 3.5 公尺的偏移偏掉 8.2 像素，正好是 26 × sin(18.4°)。
+ *
+ * <code>arc</code>：垂直於中心線。圓角的並排軌道是同心弧，同心的方向就是法線方向。
+ */
+export const TRACKGEN_LAT_MODE_KEY = 'trackGenLatMode'
+export type TrackGenLatMode = 'axis' | 'arc'
+/**
  * 這一塊代表的路網區間：`[{ road, lane, s0, s1 }, …]`。
  *
  * 車輛回報場域座標，反投影回 OpenDRIVE 得到 road / lane / s，照這份清單就能直接查到
@@ -96,6 +107,12 @@ export function getTrackGenPaths(
   const local = readPath(parameters?.[TRACKGEN_LOCAL_PATH_KEY])
   if (!real || !local) return null
   return { real, local }
+}
+
+export function getTrackGenLatMode(
+  parameters: Record<string, unknown> | undefined,
+): TrackGenLatMode {
+  return parameters?.[TRACKGEN_LAT_MODE_KEY] === 'arc' ? 'arc' : 'axis'
 }
 
 /** 每公尺的橫向偏移佔外框的幾分之幾（沿寬、沿高） */

@@ -53,6 +53,14 @@ export type RealLateral = {
   /** 這個形狀屬於哪一條線，以及那條線多長——重疊時用來決定優先權 */
   lineKey: string
   lineLengthM: number
+  /**
+   * 這一段的橫向比例尺：真實世界橫移一公尺，圖上橫移多少（版面單位）。
+   *
+   * 逐段量出來的——圖上與隔壁那條軌道差多遠，除以真實世界差多遠。整張圖給一個定值
+   * 在拉開的區間會偏掉，那裡的讓開量是製圖上的取捨，不照實際比例。沒有這個值時
+   * 退回 {@link TrackGenLayout.latScalePerM}。
+   */
+  latScalePerM?: number
   /** 起點的真實橫向偏移（公尺，行進方向左側為正） */
   realLatFromM: number
   /** 終點的真實橫向偏移（公尺） */

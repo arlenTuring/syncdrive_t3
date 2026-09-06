@@ -7,6 +7,7 @@ import {
 } from './trackGenLayout'
 import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
+  TRACKGEN_LAT_MODE_KEY,
   TRACKGEN_LAT_PER_BOX_KEY,
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_SPANS_KEY,
@@ -326,13 +327,17 @@ export function buildFacilitiesFromLayout(
    *
    * 存成「佔外框的幾分之幾」，所以元件被移動或拉伸時偏移量跟著等比例變，不必重算。
    */
-  for (const f of facilities) {
-    if (!f.parameters?.[TRACKGEN_LOCAL_PATH_KEY]) continue
+  facilities.forEach((f, i) => {
+    if (!f.parameters?.[TRACKGEN_LOCAL_PATH_KEY]) return
+    // 逐段量出來的比例優先；沒有的（圓角、分岔）退回全圖的定值
+    const scale = ordered[i]?.latScalePerM ?? layout.latScalePerM
+    // 圓角的並排軌道是同心弧，偏移量要沿法線；其餘都是照外框的橫軸疊起來的
+    if (ordered[i]?.kind === 'corner') f.parameters[TRACKGEN_LAT_MODE_KEY] = 'arc'
     f.parameters[TRACKGEN_LAT_PER_BOX_KEY] = [
-      Number((layout.latScalePerM / Math.max(1e-6, f.box.wM)).toFixed(6)),
-      Number((layout.latScalePerM / Math.max(1e-6, f.box.hM)).toFixed(6)),
+      Number((scale / Math.max(1e-6, f.box.wM)).toFixed(6)),
+      Number((scale / Math.max(1e-6, f.box.hM)).toFixed(6)),
     ]
-  }
+  })
 
   // 平移到原點，Area 才不用容納負座標
   const { xMin, yMin, xMax, yMax } = layout.bounds

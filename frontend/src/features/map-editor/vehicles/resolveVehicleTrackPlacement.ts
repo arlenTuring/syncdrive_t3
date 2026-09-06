@@ -21,7 +21,9 @@ import {
 } from './trackNetwork/scanMap';
 import type { TrackNetwork } from './trackNetwork/types';
 import type { PathXY } from '../utils/trackGenPaths';
+import type { TrackGenLatMode } from '../utils/trackGenPaths';
 import {
+  getTrackGenLatMode,
   getTrackGenLatPerBox,
   getTrackGenPaths,
   pointAlongPath,
@@ -342,14 +344,28 @@ function offsetLocalPoint(
   along: number,
   sideM: number,
   latPerBox: [number, number] | null,
+  mode: TrackGenLatMode,
 ): { x: number; y: number } {
   const uv = pointAlongPath(local, along);
   if (!latPerBox || Math.abs(sideM) < 1e-9) return uv;
   const d = tangentAlongPath(local, along);
-  return {
-    x: uv.x + sideM * d.y * latPerBox[0],
-    y: uv.y + sideM * -d.x * latPerBox[1],
-  };
+  // 真實世界的左手邊，換到圖面座標系就是 (dy, −dx)
+  const n = { x: d.y, y: -d.x };
+  if (mode === 'arc') {
+    return { x: uv.x + sideM * n.x * latPerBox[0], y: uv.y + sideM * n.y * latPerBox[1] };
+  }
+  /*
+   * 並排的軌道是照外框的橫軸疊起來的，所以偏移量也要沿那一軸。
+   *
+   * 哪一軸是「橫」的，看這條圖面路徑整體往哪走——沿著外框長的那一軸走，橫的就是另一軸。
+   */
+  const a = local[0]!;
+  const b = local[local.length - 1]!;
+  const alongU = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]);
+  if (alongU) {
+    return { x: uv.x, y: uv.y + Math.sign(n.y || 1) * sideM * latPerBox[1] };
+  }
+  return { x: uv.x + Math.sign(n.x || 1) * sideM * latPerBox[0], y: uv.y };
 }
 
 export function fieldPositionToTrackAreaLocal(
@@ -377,7 +393,13 @@ export function fieldPositionToTrackAreaLocal(
     return trackLocalPathPointToAreaLocal(
       track,
       area,
-      offsetLocalPoint(paths.local, t, side, getTrackGenLatPerBox(track.parameters)),
+      offsetLocalPoint(
+        paths.local,
+        t,
+        side,
+        getTrackGenLatPerBox(track.parameters),
+        getTrackGenLatMode(track.parameters),
+      ),
     );
   }
 
