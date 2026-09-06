@@ -17,6 +17,13 @@ export const TRACKGEN_REAL_PATH_KEY = 'trackGenRealPath'
 /** 圖面中心線，[[u, v], …]，與真實路徑同順序 */
 export const TRACKGEN_LOCAL_PATH_KEY = 'trackGenLocalPath'
 /**
+ * 橫向比例尺，換算成「佔外框的幾分之幾」。
+ *
+ * 存兩個數字（沿外框的寬、沿外框的高各一），因為外框不見得是正方形；圖面路徑的法線
+ * 有兩個分量，各乘各的才不會把偏移量拉歪。存比例而不是像素，元件被移動、拉伸都不影響。
+ */
+export const TRACKGEN_LAT_PER_BOX_KEY = 'trackGenLatPerBox'
+/**
  * 這一塊代表的路網區間：`[{ road, lane, s0, s1 }, …]`。
  *
  * 車輛回報場域座標，反投影回 OpenDRIVE 得到 road / lane / s，照這份清單就能直接查到
@@ -91,6 +98,18 @@ export function getTrackGenPaths(
   return { real, local }
 }
 
+/** 每公尺的橫向偏移佔外框的幾分之幾（沿寬、沿高） */
+export function getTrackGenLatPerBox(
+  parameters: Record<string, unknown> | undefined,
+): [number, number] | null {
+  const raw = parameters?.[TRACKGEN_LAT_PER_BOX_KEY]
+  if (!Array.isArray(raw) || raw.length < 2) return null
+  const u = Number(raw[0])
+  const v = Number(raw[1])
+  if (!Number.isFinite(u) || !Number.isFinite(v)) return null
+  return [u, v]
+}
+
 function cumulative(path: PathXY): number[] {
   const seg: number[] = [0]
   for (let i = 1; i < path.length; i += 1) {
@@ -111,17 +130,24 @@ function cumulative(path: PathXY): number[] {
  *
  * 給了 range 就只在那一截上找最近點，於是「一段路網一個候選」，比較才有意義。
  * 回傳的 along 仍然是<strong>整條路徑</strong>的比例，取位置時不必再換算。
+ *
+ * <h3>偏移量帶正負號</h3>
+ * <code>side</code> 是「離這條線多遠、偏哪一邊」（正號在前進方向的左手邊）。
+ * 這個數字<strong>必須留著</strong>：車子不一定走在軌道上，它可能偏出去、跑到對向、
+ * 撞上牆。只回傳距離、把車壓到線上，等於把「它偏掉了」這件事丟掉，圖上永遠是一台
+ * 乖乖走在軌道上的車。
  */
 export function projectAlongPath(
   path: PathXY,
   x: number,
   y: number,
   range?: { from: number; to: number },
-): { along: number; distance: number } {
+): { along: number; distance: number; side: number } {
   const seg = cumulative(path)
   const total = seg[seg.length - 1]!
   if (!(total > 0)) {
-    return { along: 0, distance: Math.hypot(x - path[0]![0], y - path[0]![1]) }
+    const d = Math.hypot(x - path[0]![0], y - path[0]![1])
+    return { along: 0, distance: d, side: d }
   }
   const lo = range ? Math.max(0, Math.min(1, range.from)) * total : 0
   const hi = range ? Math.max(0, Math.min(1, range.to)) * total : total
@@ -129,6 +155,7 @@ export function projectAlongPath(
 
   let bestS = winLo
   let bestD = Infinity
+  let bestSide = 0
   for (let i = 1; i < path.length; i += 1) {
     const ax = path[i - 1]![0]
     const ay = path[i - 1]![1]
@@ -153,9 +180,30 @@ export function projectAlongPath(
     if (d < bestD) {
       bestD = d
       bestS = seg[i - 1]! + u * len
+      // 左手邊為正：把點放進「這一段自己的座標系」看它在線的哪一側
+      bestSide = len > 1e-9 ? (-(x - ax) * dy + (y - ay) * dx) / len : 0
     }
   }
-  return { along: bestS / total, distance: bestD }
+  return { along: bestS / total, distance: bestD, side: bestSide }
+}
+
+/** 沿折線取「走了幾成」處的行進方向（單位向量） */
+export function tangentAlongPath(path: PathXY, along: number): { x: number; y: number } {
+  const seg = cumulative(path)
+  const total = seg[seg.length - 1]!
+  if (!(total > 0) || path.length < 2) return { x: 1, y: 0 }
+  const target = Math.max(0, Math.min(1, along)) * total
+  let i = path.length - 1
+  for (let k = 1; k < path.length; k += 1) {
+    if (seg[k]! >= target) {
+      i = k
+      break
+    }
+  }
+  const dx = path[i]![0] - path[i - 1]![0]
+  const dy = path[i]![1] - path[i - 1]![1]
+  const len = Math.hypot(dx, dy)
+  return len > 1e-9 ? { x: dx / len, y: dy / len } : { x: 1, y: 0 }
 }
 
 /** 沿折線取「走了幾成」的位置 */

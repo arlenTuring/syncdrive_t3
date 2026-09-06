@@ -465,6 +465,32 @@ function layoutOnce(
     return w[Math.floor(w.length / 2)]!
   })()
   /**
+   * 兩條並排軌道的中心線<strong>實際</strong>隔多遠（公尺）：取中位數。
+   *
+   * 不能拿車道寬代替。車道寬是路面畫多寬，中心距還要加上中間那條分隔（標線、分隔島、
+   * 月台）。實測這份檔案車道寬 3.35、中心距 3.5，差的 0.15 公尺換算到圖上就是相鄰兩條
+   * 軌道各差 1.2 像素——橫向比例尺用錯的那個，同一台車拿隔壁那條軌道當參考就會偏掉。
+   */
+  const laneGapM = (() => {
+    const gaps: number[] = []
+    for (const e of graph.edges) {
+      for (let k = 0; k + 1 < e.lanes.length; k += 1) {
+        const a = e.lanes[k]?.points ?? []
+        const b = e.lanes[k + 1]?.points ?? []
+        if (a.length < 2 || b.length < 2) continue
+        for (const f of [0.25, 0.5, 0.75]) {
+          const pa = a[Math.round(f * (a.length - 1))]!
+          const pb = b[Math.round(f * (b.length - 1))]!
+          const d = Math.hypot(pa.x - pb.x, pa.y - pb.y)
+          if (d > 0.01) gaps.push(d)
+        }
+      }
+    }
+    if (!gaps.length) return laneWidthM
+    gaps.sort((a, b) => a - b)
+    return gaps[Math.floor(gaps.length / 2)]!
+  })()
+  /**
    * 節點在它那一排裡的<strong>股位</strong>。
    *
    * 正交化把同一排的節點壓到同一條線上，那一排裡各節點原本的高低差就消失了——實測
@@ -1498,6 +1524,18 @@ function layoutOnce(
   const ys = pts.map((p) => p.y)
   return {
     shapes,
+    /*
+     * 橫向的比例尺：真實世界橫移一公尺，圖上橫移多少。
+     *
+     * 圖上兩條並排軌道之間畫成 levelPx，真實世界隔的是這份檔案自己的中心距。兩者一除
+     * 就是這個數字，
+     * 而且<strong>是個定值</strong>——所以車子離中心線多遠，圖上就照同一個倍率畫多遠，
+     * 不必也不該把它壓回線上。
+     *
+     * 這也是「挑哪一條軌道當參考」不再要緊的原因：隔壁那條的中心線差一個車道寬，
+     * 偏移量跟著差一個車道寬，兩者乘上同一個倍率之後畫出來是同一個點。
+     */
+    latScalePerM: levelPx / laneGapM,
     bounds: {
       xMin: xs.length ? Math.min(...xs) : 0,
       yMin: ys.length ? Math.min(...ys) : 0,

@@ -62,7 +62,19 @@ export function pickRefFieldSegment(
   return matches.slice().sort((a, b) => a.trackId.localeCompare(b.trackId))[0] ?? null;
 }
 
-/** 生成軌道：格網找候選、車頭朝向定上下行；順便帶回它落在路網的哪一點 */
+/**
+ * 車子離軌道多遠<strong>還算得出位置</strong>（公尺）。
+ *
+ * 生成的軌道不再要求車子落在那一塊的參照場域範圍裡——那個範圍只有中心線兩側各 1.675
+ * 公尺，車子一偏出軌道就整台消失，而「它偏出去了」正是要看見的事。改成看偏移量：偏多少
+ * 就往旁邊畫多少。
+ *
+ * 但不能無限外推。離得太遠時「它屬於哪條路」本身就沒有答案了（可能在停車場中央、可能
+ * 在另一個廠區），那時交給其他定位方式，不要硬畫在某條軌道旁邊。
+ */
+const MAX_OFF_TRACK_M = 25;
+
+/** 生成軌道：格網找候選；順便帶回它落在路網的哪一點與偏移量 */
 function locateGeneratedSegment(
   network: TrackNetwork,
   xM: number,
@@ -74,7 +86,7 @@ function locateGeneratedSegment(
   if (!hit) return null;
   const segment = network.byTrackId.get(hit.facilityId);
   if (!segment) return null;
-  if (!fieldPointInRefField(xM, yM, segment.bounds)) return null;
+  if (Math.abs(hit.offsetM) > MAX_OFF_TRACK_M) return null;
   return {
     segment,
     fix: { roadId: hit.road, laneId: hit.lane, sM: hit.sM, offsetM: hit.offsetM },

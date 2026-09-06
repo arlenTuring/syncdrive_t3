@@ -20,10 +20,13 @@ import {
   getTrackNetwork,
 } from './trackNetwork/scanMap';
 import type { TrackNetwork } from './trackNetwork/types';
+import type { PathXY } from '../utils/trackGenPaths';
 import {
+  getTrackGenLatPerBox,
   getTrackGenPaths,
   pointAlongPath,
   projectAlongPath,
+  tangentAlongPath,
   trackGenPickScore,
 } from '../utils/trackGenPaths';
 import { locateByRoadLaneS } from '../utils/trackGenLocate';
@@ -323,6 +326,32 @@ export function trackLocalPathPointToAreaLocal(
   );
 }
 
+/**
+ * 圖面路徑上的一點，<strong>再照偏移量往旁邊移出去</strong>。
+ *
+ * 車子不一定走在軌道上——可能偏出去、跑到對向、撞上牆。只取「走了幾成」等於把車壓回
+ * 軌道中央，那些情況在圖上全部看不出來。偏移量乘上這一塊記下的橫向比例尺，車就畫在
+ * 它真正的位置。
+ *
+ * 法線要在圖面座標系裡取。圖面的縱軸朝下（見 trackLocalPathPointToAreaLocal 的翻轉），
+ * 與真實世界的朝上相反，所以真實世界的左手邊在這裡是 (dy, -dx)——少了這一次翻轉，
+ * 上下行會整個對調。
+ */
+function offsetLocalPoint(
+  local: PathXY,
+  along: number,
+  sideM: number,
+  latPerBox: [number, number] | null,
+): { x: number; y: number } {
+  const uv = pointAlongPath(local, along);
+  if (!latPerBox || Math.abs(sideM) < 1e-9) return uv;
+  const d = tangentAlongPath(local, along);
+  return {
+    x: uv.x + sideM * d.y * latPerBox[0],
+    y: uv.y + sideM * -d.x * latPerBox[1],
+  };
+}
+
 export function fieldPositionToTrackAreaLocal(
   xM: number,
   yM: number,
@@ -330,19 +359,12 @@ export function fieldPositionToTrackAreaLocal(
   area: MapAreaObject,
   options?: { extrapolate?: boolean },
 ): { x: number; y: number } | null {
-  if (!hasValidRefFieldBounds(track.parameters)) return null;
-
-  const bounds = getValidRefFieldBounds(track.parameters);
-  if (!bounds) return null;
-
-  const span = refFieldBoundsSpanMeters(bounds);
-  if (!span) return null;
-
-  const areaPos = resolveFacilityAreaPosition(track, area.domain, area.layout);
-  const areaSize = resolveFacilityAreaSize(track, area.domain, area.layout);
-
   /*
-   * 生成的軌道自己帶著真實路徑與圖面路徑，優先照那兩條走。
+   * 生成的軌道自己帶著真實路徑與圖面路徑，<strong>不必先看參照場域範圍</strong>。
+   *
+   * 那四個數字是給手工放的軌道用的：沒有路徑可循時，只能拿一個方框做線性內插。生成的
+   * 軌道兩條路徑都在身上，範圍再檢查一次只是多一道會擋掉東西的門——而且那個方框只有
+   * 中心線兩側各 1.675 公尺，車子一偏出軌道就整台不見。
    *
    * 底下那套是把座標對到參照場域範圍、沿長邊做線性內插——直線段沒問題，圓角是
    * 一段弧就對不上：範圍是弧的外接方框，線性內插等於把弧拉成直線，實測車子走到
@@ -351,9 +373,22 @@ export function fieldPositionToTrackAreaLocal(
    */
   const paths = getTrackGenPaths(track.parameters);
   if (paths) {
-    const { along: t } = projectAlongPath(paths.real, xM, yM);
-    return trackLocalPathPointToAreaLocal(track, area, pointAlongPath(paths.local, t));
+    const { along: t, side } = projectAlongPath(paths.real, xM, yM);
+    return trackLocalPathPointToAreaLocal(
+      track,
+      area,
+      offsetLocalPoint(paths.local, t, side, getTrackGenLatPerBox(track.parameters)),
+    );
   }
+
+  // 手工放的軌道沒有路徑，只能靠參照場域範圍做線性內插
+  if (!hasValidRefFieldBounds(track.parameters)) return null;
+  const bounds = getValidRefFieldBounds(track.parameters);
+  if (!bounds) return null;
+  const span = refFieldBoundsSpanMeters(bounds);
+  if (!span) return null;
+  const areaPos = resolveFacilityAreaPosition(track, area.domain, area.layout);
+  const areaSize = resolveFacilityAreaSize(track, area.domain, area.layout);
 
   const horizontal = span.w >= span.h;
 

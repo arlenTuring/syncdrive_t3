@@ -7,6 +7,7 @@ import {
 } from './trackGenLayout'
 import { CORNER_TRACK_KEY, SWITCH_TRACK_KEY, TAPER_TRACK_KEY } from './trackShapes'
 import {
+  TRACKGEN_LAT_PER_BOX_KEY,
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_SPANS_KEY,
   TRACKGEN_REAL_PATH_KEY,
@@ -315,6 +316,23 @@ export function buildFacilitiesFromLayout(
     return rb - ra
   })
   const facilities = ordered.map((s) => facilityFor(s, nextId()))
+
+  /*
+   * 每一塊都記下橫向比例尺：<strong>車子不一定走在軌道上</strong>。
+   *
+   * 定位時先在真實中心線上求出「走了幾成」，同時求出「離線多遠、偏哪一邊」。前者決定
+   * 沿線的位置，後者乘上這個比例尺往旁邊移出去——車子偏出軌道、跑到對向、撞上牆，圖上
+   * 就畫在偏出去的位置，不會被壓回軌道中央。
+   *
+   * 存成「佔外框的幾分之幾」，所以元件被移動或拉伸時偏移量跟著等比例變，不必重算。
+   */
+  for (const f of facilities) {
+    if (!f.parameters?.[TRACKGEN_LOCAL_PATH_KEY]) continue
+    f.parameters[TRACKGEN_LAT_PER_BOX_KEY] = [
+      Number((layout.latScalePerM / Math.max(1e-6, f.box.wM)).toFixed(6)),
+      Number((layout.latScalePerM / Math.max(1e-6, f.box.hM)).toFixed(6)),
+    ]
+  }
 
   // 平移到原點，Area 才不用容納負座標
   const { xMin, yMin, xMax, yMax } = layout.bounds

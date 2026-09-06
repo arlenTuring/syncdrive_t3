@@ -176,6 +176,8 @@ export type LayoutShape = LayoutRect | LayoutCorner | LayoutTaper | LayoutSwitch
 
 export type TrackGenLayout = {
   shapes: LayoutShape[]
+  /** 橫向比例尺：真實世界橫移一公尺，圖上橫移多少（版面單位） */
+  latScalePerM: number
   /** 全部形狀的外框（版面公尺） */
   bounds: { xMin: number; yMin: number; xMax: number; yMax: number }
 }

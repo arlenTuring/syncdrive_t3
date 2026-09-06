@@ -179,7 +179,16 @@ export type Located = {
   along: number
   /** 圖面中心線上的位置（未旋轉外框的 0–1 比例） */
   local: { x: number; y: number }
-  /** 離該段真實中心線多遠（公尺），可用來判斷是不是根本不在軌道上 */
+  /**
+   * 離該段真實中心線多遠（公尺），<strong>帶正負號</strong>：正號在行進方向的左手邊。
+   *
+   * 這個數字不是拿來丟掉的。車子不一定走在軌道上——它可能偏出去、跑到對向、撞上牆，
+   * 而那正是要在圖上看見的事。畫的時候照這個值往旁邊移出去（見 trackGenLatPerBox），
+   * 車就落在它真正的位置，不會被壓回軌道中央。
+   *
+   * 順帶的好處：隔壁那條軌道的中心線差一個中心距，量到的偏移量跟著差一個中心距，
+   * 乘上同一個橫向比例尺之後畫出來是同一個點——所以「挑到哪一條軌道」不再改變位置。
+   */
   offsetM: number
 }
 
@@ -225,7 +234,7 @@ export function locateByField(
   for (const i of candidates) {
     const p = index.pieces[i]!
     // 只在這一段自己那一截上比：一塊路口元件橫跨好幾段，整條一起量會每一段都同分
-    const { along, distance } = projectAlongPath(p.real, xM, yM, { from: p.f0, to: p.f1 })
+    const { along, distance, side } = projectAlongPath(p.real, xM, yM, { from: p.f0, to: p.f1 })
     /*
      * 走向不合的直接放到最後。差超過 90 度就是反方向那一條，不是「比較差的候選」。
      */
@@ -242,7 +251,7 @@ export function locateByField(
         sM: p.s0 + (p.s1 - p.s0) * spanFrac(p, along),
         along,
         local: pointAlongPath(p.local, along),
-        offsetM: distance,
+        offsetM: side,
       }
     }
   }
