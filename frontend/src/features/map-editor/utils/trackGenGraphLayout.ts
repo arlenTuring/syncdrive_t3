@@ -48,8 +48,6 @@ const DRAWING = {
   segUnit: 1 / 4,
   /** 兩段高度差幾分之一條軌道寬以內就當成同一段 */
   mergeUnit: 0.08,
-  /** 短邊要為了兩端不等高而切一刀的門檻（幾分之一條軌道寬） */
-  shortSplitUnit: 0.4,
   /** 一段斜接最多吃掉整條邊的幾成 */
   rampMaxSpan: 0.3,
   /** 束與束之間留幾股的空隙 */
@@ -844,31 +842,39 @@ function layoutOnce(
      * 又常常只是路口附近幾像素的擺動。實測塊給 50 公尺時，59 公尺的側線為了六像素的
      * 落差生出一段斜接，圖上就是側線上莫名其妙多一塊。
      */
-    const splitAt =
-      usedM < perBlockM * MIN_TAPER_BLOCKS
-        ? bandW * DRAWING.shortSplitUnit
-        : bandW * DRAWING.mergeUnit
-    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > splitAt) {
+    /*
+     * 帶子<strong>一定要停在節點自己的股位上</strong>，兩端都是。
+     *
+     * 節點的股位是那個節點的事，在它上面交會的每一條邊都得用同一個值——不然同一個
+     * 節點兩側的兩條帶子就會差一截，中間又沒有斜接可以過渡，圖上就是一個硬生生的
+     * 台階。實測就是使用者放大看到的那一個。
+     *
+     * 先前這裡有兩條「差一點點沒關係」的捷徑，兩條都會製造那種台階：
+     *
+     * 一、只有一段的邊取兩端的<strong>平均</strong>，兩頭各差一半。短邊的門檻還放到
+     *    四成軌道寬，那就是最多七分之一條軌道寬的台階。
+     * 二、併段時把最後一段併掉，尾端的股位跟著不見。
+     *
+     * 現在一律讓它接上：兩端不同高就切一刀，中間交給斜接（斜接自己會撐到至少一整塊，
+     * 所以不會變成碎片）。落差再小也是斜的，斜得看不出來就等於直的，但不會有台階。
+     */
+    if (levelRuns.length === 1 && Math.abs(fromPx - toPxEnd) > 1e-6) {
       const only = levelRuns[0]!
       const mid = (only.f0 + only.f1) / 2
       levelRuns = [
         { f0: only.f0, f1: mid, level: only.level, offsetPx: fromPx },
         { f0: mid, f1: only.f1, level: only.level, offsetPx: toPxEnd },
       ]
-    } else if (levelRuns.length === 1) {
-      // 一段要同時接兩端：取平均，兩頭各差一半，都在看不出來的範圍內
-      levelRuns[0]!.offsetPx = (fromPx + toPxEnd) / 2
     } else {
       levelRuns[0]!.offsetPx = fromPx
       levelRuns[levelRuns.length - 1]!.offsetPx = toPxEnd
     }
     /*
-     * 併掉高度差看不出來的段界。
-     *
-     * 改完端點之後可能有相鄰兩段高度幾乎一樣；差不到一成軌道寬的落差在圖上就是一條
-     * 直線，畫成斜接只會多一片碎片。
+     * 併掉高度差看不出來的段界——但<strong>最後一段不能併</strong>：它帶著尾端節點的
+     * 股位，併掉就等於把那個股位丟了。頭那一段併進來時保留的是它自己的股位，沒問題。
      */
     for (let i = levelRuns.length - 1; i > 0; i -= 1) {
+      if (i === levelRuns.length - 1) continue
       if (Math.abs(levelRuns[i]!.offsetPx - levelRuns[i - 1]!.offsetPx) < bandW * DRAWING.mergeUnit) {
         levelRuns[i - 1]!.f1 = levelRuns[i]!.f1
         levelRuns.splice(i, 1)
