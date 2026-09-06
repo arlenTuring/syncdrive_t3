@@ -682,9 +682,12 @@ export function switchTrackEndSegmentsPx(
 }
 
 /* ── 交叉軌道 ────────────────────────────────────────────────────
-   兩條軌道交會：左上接右下、左下接右上。渡線做的是同一件事，但它是在還沒有分岔
-   軌道的年代做的，只能表達「兩條平行線之間換過去」，接口也不是可以拉去接別人的
-   連接點。交叉軌道與其他軌道一樣有四個連接點，拉去接誰就照對方的端面變形。      */
+   兩條軌道在這裡交會，四個口<strong>互相都通</strong>：左上可以直行去右上，也可以
+   斜過去右下；左下同理。所以路徑有四條，不是兩條——本體畫的是兩條直行的軌道，兩條
+   斜的用虛線疊在上面，交錯的關係才看得出來。
+
+   渡線做的是類似的事，但它是在還沒有分岔軌道的年代做的：只能表達「兩條平行線之間
+   換過去」，接口也不是可以拉去接別人的連接點。                              */
 
 /** 一個端面：在長邊的哪個位置（at），跨過短邊的哪一段（from–to） */
 export type CrossFace = { at: number; from: number; to: number }
@@ -770,19 +773,14 @@ function crossSpin(g: CrossTrackGeometry, boxWPx: number, boxHPx: number) {
   return { w, h, T }
 }
 
-/**
- * 填色外框：兩條帶子<strong>各自是一個子路徑</strong>。
- *
- * 與分岔軌道同一招——兩片疊起來靠 nonzero 填色合成一個交叉，不去算交會點再繞外框；
- * 那樣在兩條幾乎重疊時會自交。端面也因此各自完整。
- */
-export function crossTrackPath(
-  g: CrossTrackGeometry,
-  boxWPx: number,
-  boxHPx: number,
+function bandPath(
+  p: CrossFace,
+  q: CrossFace,
+  w: number,
+  h: number,
+  T: (x: number, y: number) => ShapePoint,
 ): string {
-  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
-  const band = (p: CrossFace, q: CrossFace) =>
+  return (
     [
       [p.at * w, p.from * h],
       [q.at * w, q.from * h],
@@ -794,8 +792,60 @@ export function crossTrackPath(
         return `${i ? 'L' : 'M'} ${t.x.toFixed(2)} ${t.y.toFixed(2)}`
       })
       .join(' ') + ' Z'
-  // 左上接右下、左下接右上：交叉就是這兩條帶子的疊合
-  return `${band(g.lt, g.rb)} ${band(g.lb, g.rt)}`
+  )
+}
+
+/**
+ * 本體是<strong>兩條直行的軌道</strong>：左上到右上、左下到右下。
+ *
+ * 交叉軌道不是只能斜著過。四個口互相都通，直行是其中兩條路徑，而且是佔面積的那兩條
+ * ——本體照它們畫，兩條斜的用虛線疊上去（見 {@link crossTrackGuidesPx}）。本體若畫成
+ * 兩條斜的，元件看起來就只剩一個叉，直行反而不見了。
+ *
+ * 兩條帶子各自是一個子路徑，靠 nonzero 填色合成，與分岔軌道同一招。
+ */
+export function crossTrackPath(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): string {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  return `${bandPath(g.lt, g.rt, w, h, T)} ${bandPath(g.lb, g.rb, w, h, T)}`
+}
+
+/**
+ * 疊在本體上的線：兩條斜行路徑的邊，加上兩條直行之間的分隔。
+ *
+ * 四條虛線就是兩條斜的帶子各自的兩條邊——交錯的關係得畫出來，不然使用者看到的只是
+ * 一個灰色方塊，看不出這裡可以斜著過去。
+ */
+export function crossTrackGuidesPx(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): {
+  /** 斜行路徑的邊，每條斜的兩條，共四條 */
+  diagonals: Array<[ShapePoint, ShapePoint]>
+  /** 兩條直行之間的分隔線 */
+  divider: [ShapePoint, ShapePoint]
+} {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  const P = (f: CrossFace, v: number) => T(f.at * w, v * h)
+  const edge = (p: CrossFace, q: CrossFace): Array<[ShapePoint, ShapePoint]> => [
+    [P(p, p.from), P(q, q.from)],
+    [P(p, p.to), P(q, q.to)],
+  ]
+  const mid = (a: ShapePoint, b: ShapePoint): ShapePoint => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  })
+  return {
+    diagonals: [...edge(g.lt, g.rb), ...edge(g.lb, g.rt)],
+    divider: [
+      mid(P(g.lt, g.lt.to), P(g.lb, g.lb.from)),
+      mid(P(g.rt, g.rt.to), P(g.rb, g.rb.from)),
+    ],
+  }
 }
 
 export type CrossHandleKey = 'lt' | 'lb' | 'rt' | 'rb'

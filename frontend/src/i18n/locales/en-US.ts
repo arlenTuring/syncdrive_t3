@@ -1683,7 +1683,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         },
         railCross: {
           label: 'Crossing track',
-          hint: 'Crossing track — two tracks meeting; a joint at each corner that adapts to whatever track you drag it onto',
+          hint: 'Crossing track — two tracks meeting, all four mouths connected (two straight, two diagonal shown dashed); each joint adapts to whatever track you drag it onto',
         },
         trackCrossover: {
           label: 'Virtual crossover',

@@ -17,6 +17,7 @@ import {
   taperTrackPath,
   readTaperTrack,
   switchTrackPath,
+  crossTrackGuidesPx,
   crossTrackPath,
   readCrossTrack,
   readSwitchTrack,
@@ -1246,6 +1247,11 @@ export const FacilityNode = memo(function FacilityNode({
   )
   const crossTrackClipPath = useMemo(
     () => (crossTrackGeom ? crossTrackPath(crossTrackGeom, nw, nh) : ''),
+    [crossTrackGeom, nw, nh],
+  )
+  /** 疊在交叉軌道上的線：兩條斜行的邊（虛線）與兩條直行之間的分隔 */
+  const crossTrackGuides = useMemo(
+    () => (crossTrackGeom ? crossTrackGuidesPx(crossTrackGeom, nw, nh) : null),
     [crossTrackGeom, nw, nh],
   )
 
@@ -2831,6 +2837,47 @@ export const FacilityNode = memo(function FacilityNode({
               </div>
             ))}
           </>
+        )}
+        {/*
+          * 交叉軌道疊上去的線。
+          *
+          * 本體只畫得出兩條直行的軌道；斜著過去的那兩條路徑沒有自己的面積，得用線
+          * 標出來，不然元件看起來就是一個灰方塊，看不出這裡可以斜著走。四條虛線是
+          * 兩條斜行各自的兩條邊，中間那條實線是兩條直行的分隔。
+          *
+          * 不吃滑鼠事件：把手就疊在同一個位置上，攔下來的話就拉不動了。
+          */}
+        {isCrossTrack && crossTrackGuides && (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[70]"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            {crossTrackGuides.diagonals.map((seg, i) => (
+              <line
+                key={`cross-diag-${i}`}
+                x1={seg[0].x}
+                y1={seg[0].y}
+                x2={seg[1].x}
+                y2={seg[1].y}
+                stroke={i < 2 ? '#86efac' : '#fbbf24'}
+                strokeWidth={1.5}
+                strokeDasharray="6 4"
+                opacity={0.9}
+              />
+            ))}
+            <line
+              x1={crossTrackGuides.divider[0].x}
+              y1={crossTrackGuides.divider[0].y}
+              x2={crossTrackGuides.divider[1].x}
+              y2={crossTrackGuides.divider[1].y}
+              stroke="#d4d4d8"
+              strokeWidth={1}
+              opacity={0.7}
+            />
+          </svg>
         )}
         {/*
           * 拖曳旋轉把手。

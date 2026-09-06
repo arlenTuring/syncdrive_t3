@@ -75,12 +75,22 @@ export function buildCrossFromEndSegments(faces: Faces): Built | null {
     ((vertical ? (s[0].x + s[1].x) / 2 : (s[0].y + s[1].y) / 2) - alongBase) / alongSpan
 
   /*
-   * 左邊那兩個面要在右邊那兩個的<strong>同一側</strong>。跨過去的話兩條帶子會翻面
-   * 自交，畫出來是兩個三角形，不是交叉。
+   * 左邊那兩個面要在右邊那兩個的<strong>同一側</strong>。跨過去的話帶子會翻面自交，
+   * 畫出來是兩個三角形，不是交叉。
    */
   const leftAt = Math.max(at(faces.lt), at(faces.lb))
   const rightAt = Math.min(at(faces.rt), at(faces.rb))
   if (leftAt >= rightAt) return null
+
+  /*
+   * 兩條<strong>直行</strong>的帶子不能互相穿過：上面那條在左邊排在上面，到了右邊
+   * 也要排在上面。反過來的話本體會自己打結，四條路徑就不成立了。
+   */
+  const acrossMid = (s: EndSegment) => (across(s[0]) + across(s[1])) / 2
+  const dLeft = acrossMid(faces.lt) - acrossMid(faces.lb)
+  const dRight = acrossMid(faces.rt) - acrossMid(faces.rb)
+  if (Math.abs(dLeft) < AXIS_EPS || Math.abs(dRight) < AXIS_EPS) return null
+  if (Math.sign(dLeft) !== Math.sign(dRight)) return null
 
   let best: { built: Built; err: number } | null = null
   for (const entryDeg of QUARTERS) {
