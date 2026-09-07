@@ -31,7 +31,6 @@ import {
   tangentAlongPath,
   trackGenPickScore,
 } from '../utils/trackGenPaths';
-import { locateByRoadLaneS } from '../utils/trackGenLocate';
 import { locateOnCrossover } from './trackNetwork/crossoverLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
@@ -539,43 +538,6 @@ export function resolveVehiclePlacementAcrossAreas(
   if (onCrossoverLoose) return onCrossoverLoose;
 
   return locateInAreaDomain(areas, xM, yM);
-}
-
-/**
- * road / lane / 里程 → 圖台位置：<strong>完全不碰座標</strong>的那一條路。
- *
- * 生成軌道每一塊都記著自己涵蓋哪一段里程（trackGenSpans），所以給定三個值就只剩查表
- * 加一次線性內插——不必比距離、不必挑候選，也不會在重疊處猶豫。
- *
- * 目前車端協議沒有這三個值（只有場域座標與車頭朝向），所以正常流程走
- * {@link resolveVehiclePlacementAcrossAreas}；這一支是給<strong>已經知道里程</strong>的
- * 呼叫端用的：把停靠站畫到它自己的里程上、依班表把車擺到某一站、或哪天協議帶了車道
- * 與里程時直接接上。
- */
-export function resolvePlacementByRoadLaneS(
-  areas: MapAreaObject[],
-  roadId: string,
-  laneId: number,
-  sM: number,
-  network?: TrackNetwork,
-): VehiclePlacementAcrossAreas | null {
-  const net = network ?? getTrackNetwork(areas);
-  if (!net.genIndex) return null;
-  const hit = locateByRoadLaneS(net.genIndex, roadId, laneId, sM);
-  if (!hit) return null;
-  const segment = net.byTrackId.get(hit.facilityId);
-  if (!segment) return null;
-  const local = trackLocalPathPointToAreaLocal(segment.track, segment.renderArea, hit.local);
-  return {
-    area: segment.renderArea,
-    placement: {
-      areaLocalX: local.x,
-      areaLocalY: local.y,
-      trackId: segment.trackId,
-      score: 1,
-      network: { roadId: hit.road, laneId: hit.lane, sM: hit.sM, offsetM: hit.offsetM },
-    },
-  };
 }
 
 /** 圖台標籤：僅在 refField 段內時回傳軌道代碼 */

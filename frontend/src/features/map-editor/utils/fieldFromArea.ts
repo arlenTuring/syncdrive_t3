@@ -6,6 +6,9 @@ import {
   resolveFacilityAreaSize,
 } from './facilityAreaCoords'
 import {
+  getTrackGenSpans,
+} from './trackGenPaths'
+import {
   getTrackGenLatMode,
   getTrackGenLatPerBox,
   getTrackGenPaths,
@@ -138,6 +141,29 @@ function fieldFromTrack(
     sideM = per > 1e-12 ? delta / (sign * per) : 0
   }
 
+  /*
+   * 路口的元件（分岔、交叉）一塊代表<strong>好幾段路</strong>，真實路徑是把幾條腿接
+   * 起來的，腿與腿之間隔著連接道——那一段在真實世界是跳過去的，不是一條路。落在
+   * 跳空處的點不屬於這一塊，硬換算會得到一個離題幾十公尺的座標（實測往返誤差最大
+   * 63.7 公尺）。不屬於就說不屬於，讓別的塊去解釋。
+   */
+  const spans = getTrackGenSpans(f.parameters)
+  if (spans.length > 1) {
+    let best: number | null = null
+    let bestGap = Infinity
+    for (const sp of spans) {
+      const lo = Math.min(sp.f0, sp.f1)
+      const hi = Math.max(sp.f0, sp.f1)
+      const clamped = Math.max(lo, Math.min(hi, along))
+      const gap = Math.abs(clamped - along)
+      if (gap < bestGap) {
+        bestGap = gap
+        best = clamped
+      }
+    }
+    if (best !== null) along = best
+  }
+
   const base = pointAlongPath(paths.real, along)
   const d = tangentAlongPath(paths.real, along)
   // 真實世界 y 向上：方向 (dx, dy) 的左手邊是 (−dy, dx)
@@ -183,15 +209,26 @@ export function fieldMetersAtAreaLocal(
     if (got) return got
   }
   let best: FieldPoint | null = null
+  /** 全都超出上限時的退路：離得最近的那一塊 */
+  let fallback: FieldPoint | null = null
   for (const f of area.facilities) {
     if (f.type !== 'Track') continue
     const got = fieldFromTrack(f, area, xPx, yPx)
     if (!got) continue
     const off = Math.abs(got.offsetM ?? 0)
+    if (!fallback || off < Math.abs(fallback.offsetM ?? Infinity)) fallback = got
     if (off > MAX_OFF_TRACK_M) continue
     if (!best || off < Math.abs(best.offsetM ?? Infinity)) best = got
   }
   if (best) return best
+  /*
+   * 這個容器裡有生成的軌道時，<strong>不能退回容器的網域</strong>。
+   *
+   * 網域是容器自己的格線（0 到寬、0 到高），生成的軌道用的卻是 .xodr 的場域座標
+   * （T3 那份在 −100 到 −900 之間）。兩者是不同的座標系，混用會回一個看起來像數字、
+   * 實際上差了幾百公尺的答案。所以退而求其次：拿最近的那一塊硬算，離多遠就是多遠。
+   */
+  if (fallback) return fallback
   const m = areaLocalPxToMeter(xPx, yPx, area.domain, area.layout)
   return { xM: m.x, yM: m.y, source: 'area' }
 }

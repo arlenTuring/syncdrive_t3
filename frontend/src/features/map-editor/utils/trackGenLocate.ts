@@ -82,8 +82,6 @@ export type TrackGenIndex = {
   /** 格號 → 這一格裡有哪幾塊（pieces 的索引） */
   grid: Map<string, number[]>
   pieces: Piece[]
-  /** `road:lane` → 依里程排好的 pieces 索引 */
-  lanes: Map<string, number[]>
 }
 
 const cellKey = (cx: number, cy: number) => `${cx}|${cy}`
@@ -132,7 +130,6 @@ export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex 
 
   const cellM = cellSizeFor(pieces)
   const grid = new Map<string, number[]>()
-  const lanes = new Map<string, number[]>()
   pieces.forEach((p, i) => {
     let xMin = Infinity
     let yMin = Infinity
@@ -154,19 +151,9 @@ export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex 
         else grid.set(k, [i])
       }
     }
-    const lk = `${p.road}:${p.lane}`
-    const list = lanes.get(lk)
-    if (list) list.push(i)
-    else lanes.set(lk, [i])
   })
-  for (const list of lanes.values()) {
-    list.sort(
-      (a, b) =>
-        Math.min(pieces[a]!.s0, pieces[a]!.s1) - Math.min(pieces[b]!.s0, pieces[b]!.s1),
-    )
-  }
 
-  return { cellM, grid, pieces, lanes }
+  return { cellM, grid, pieces }
 }
 
 export type Located = {
@@ -256,42 +243,4 @@ export function locateByField(
     }
   }
   return best
-}
-
-/**
- * road / lane / 里程 → 圖面位置。
- *
- * 這是<strong>完全不碰座標</strong>的那條路：協議哪天帶了車道與里程，定位就只剩查表與
- * 一次線性內插。現在先擺著，也給上面那條路當最後一步。
- */
-export function locateByRoadLaneS(
-  index: TrackGenIndex,
-  road: string,
-  lane: number,
-  sM: number,
-): Located | null {
-  const list = index.lanes.get(`${road}:${lane}`)
-  if (!list?.length) return null
-  let picked = list[0]!
-  for (const i of list) {
-    const p = index.pieces[i]!
-    if (sM >= Math.min(p.s0, p.s1) - 1e-6 && sM <= Math.max(p.s0, p.s1) + 1e-6) {
-      picked = i
-      break
-    }
-    if (Math.max(p.s0, p.s1) <= sM) picked = i
-  }
-  const p = index.pieces[picked]!
-  const span = p.s1 - p.s0
-  const inSpan = span > 1e-6 ? Math.max(0, Math.min(1, (sM - p.s0) / span)) : 0
-  const along = p.f0 + (p.f1 - p.f0) * inSpan
-  return {
-    facilityId: p.facilityId,
-    road: p.road,
-    lane: p.lane,
-    sM,
-    along,
-    local: pointAlongPath(p.local, along),
-    offsetM: 0,
-  }
 }
