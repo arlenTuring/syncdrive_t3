@@ -1522,6 +1522,7 @@ const zhTW = {
         corner: '圓角軌道',
         taper: '斜接軌道',
         switch: '分岔軌道',
+        cross: '交叉軌道',
       },
       graphic: {
         parseFailed: 'OpenDRIVE 解析失敗',

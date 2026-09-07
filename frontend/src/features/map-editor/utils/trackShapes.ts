@@ -697,6 +697,23 @@ export function switchTrackHandlesPx(
   }
 }
 
+/** 直行與岔出各自的中心（相對元件左上角的像素）——名字標在自己那條上 */
+export function switchTrackPartCentresPx(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { straight: ShapePoint; branch: ShapePoint } {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
+  const mid = (x: number, y0: number, y1: number) =>
+    T((0 + x) / 2, (c(g.aFrom) + c(g.aTo) + y0 + y1) / 4)
+  return {
+    straight: mid(at(g.mAt), c(g.mFrom), c(g.mTo)),
+    branch: mid(at(g.bAt), c(g.bFrom), c(g.bTo)),
+  }
+}
+
 /** 三個端面的線段（相對元件左上角的像素） */
 export function switchTrackEndSegmentsPx(
   g: SwitchTrackGeometry,
@@ -896,6 +913,18 @@ export function crossTrackGuidesPx(
       mid(P(g.rt, g.rt.to), P(g.rb, g.rb.from)),
     ],
   }
+}
+
+/** 兩條直行各自的中心（相對元件左上角的像素）——名字標在自己那條上 */
+export function crossTrackPartCentresPx(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { up: ShapePoint; down: ShapePoint } {
+  const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
+  const mid = (p: CrossFace, q: CrossFace) =>
+    T(((p.at + q.at) / 2) * w, ((p.from + p.to + q.from + q.to) / 4) * h)
+  return { up: mid(g.lt, g.rt), down: mid(g.lb, g.rb) }
 }
 
 export type CrossHandleKey = 'lt' | 'lb' | 'rt' | 'rb'

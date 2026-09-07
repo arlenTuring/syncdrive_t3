@@ -663,7 +663,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
           className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400"
           data-trackgen-legend
         >
-          {(['rect', 'corner', 'switch', 'taper'] as const).map((kind) => {
+          {(['rect', 'corner', 'switch', 'cross', 'taper'] as const).map((kind) => {
             const st = KIND_STYLE[kind]
             const n = extent?.shapes.filter((sh) => sh.kind === kind).length ?? 0
             return (

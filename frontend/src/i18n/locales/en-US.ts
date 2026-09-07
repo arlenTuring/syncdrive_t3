@@ -1533,6 +1533,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         corner: 'Corner track',
         taper: 'Taper track',
         switch: 'Switch track',
+        cross: 'Crossing track',
       },
       graphic: {
         parseFailed: 'OpenDRIVE parse failed',

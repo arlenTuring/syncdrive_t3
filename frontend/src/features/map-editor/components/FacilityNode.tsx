@@ -31,8 +31,10 @@ import {
   switchTrackPath,
   crossTrackGuidesPx,
   crossTrackHandlesPx,
+  crossTrackPartCentresPx,
   crossTrackPartPaths,
   crossTrackPath,
+  switchTrackPartCentresPx,
   switchTrackPartPaths,
   readCrossTrack,
   readSwitchTrack,
@@ -414,9 +416,18 @@ export const FacilityNode = memo(function FacilityNode({
   const Icon = PALETTE_ICON_BY_NAME[facility.name]
   const isDockingPoint = facility.type === 'DockingPoint'
   const isWaypoint = facility.type === 'Waypoint'
+  /*
+   * 交叉與分岔分開命名之後<strong>不要再標一個合起來的名字</strong>。
+   *
+   * 元件自己的名字是兩半併起來的（像 D02/D01），標在正中間看起來像第三條軌道的名字。
+   * 兩個名字各自標在自己那一條上（見底下的 trackPartOverlay），中間就不要再標了。
+   */
+  const partNamed =
+    (facility.name === 'RailCross' || facility.name === 'RailSwitch') &&
+    Object.keys(getTrackGenPartNames(facility)).length > 0
   const label = isDockingPoint
     ? resolveDockingPointMapLabel(facility)
-    : isWaypoint
+    : isWaypoint || partNamed
       ? ''
       : facility.customName.trim() || facility.name
   /*
@@ -1287,10 +1298,16 @@ export const FacilityNode = memo(function FacilityNode({
         : isSwitchTrack && switchTrackGeom
           ? (switchTrackPartPaths(switchTrackGeom, nw, nh) as Record<string, string>)
           : null
-    if (!d) return null
+    const c =
+      isCrossTrack && crossTrackGeom
+        ? (crossTrackPartCentresPx(crossTrackGeom, nw, nh) as Record<string, { x: number; y: number }>)
+        : isSwitchTrack && switchTrackGeom
+          ? (switchTrackPartCentresPx(switchTrackGeom, nw, nh) as Record<string, { x: number; y: number }>)
+          : null
+    if (!d || !c) return null
     return parts
       .filter((part) => names[part])
-      .map((part) => ({ part, d: d[part]!, fill: colors[part], name: names[part]! }))
+      .map((part) => ({ part, d: d[part]!, at: c[part]!, fill: colors[part], name: names[part]! }))
   }, [isCrossTrack, isSwitchTrack, facility, crossTrackGeom, switchTrackGeom, nw, nh])
 
   /**
@@ -2933,6 +2950,22 @@ export const FacilityNode = memo(function FacilityNode({
             {trackPartOverlay.map((p) =>
               p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} /> : null,
             )}
+            {/* 名字標在自己那一條上，不併成一個放中間 */}
+            {trackPartOverlay.map((p) => (
+              <text
+                key={`name-${p.part}`}
+                x={p.at.x}
+                y={p.at.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={11}
+                fontWeight={600}
+                fill="#fafafa"
+                style={{ paintOrder: 'stroke', stroke: '#09090b', strokeWidth: 3 }}
+              >
+                {p.name}
+              </text>
+            ))}
           </svg>
         ) : null}
         {isCrossTrack && crossTrackGuides && (
