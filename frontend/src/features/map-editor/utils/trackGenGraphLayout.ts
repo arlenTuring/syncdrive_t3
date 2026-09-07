@@ -55,16 +55,6 @@ const DRAWING = {
    * 讓給旁邊的斜接，也不要單獨畫出來。
    */
   minBlockBands: 1,
-  /** 端頭補的那一截要幾塊長：一塊給坡吃、一塊留給方塊，才不會比別人短 */
-  endStubBlocks: 2,
-  /**
-   * 兩頭都被路口佔住、中間剩不到幾條軌道寬的邊，整條讓給那兩個路口。
-   *
-   * 比 minBlockBands 鬆：那是「一塊至少多長」，這是「短到不值得單獨存在」。吃掉的
-   * 部分由路口元件認領里程，但路口畫出來的大小不變，所以不能吃太多，否則圖上會在
-   * 路口與下一塊之間開一條縫。
-   */
-  absorbBands: 2,
   /** 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半 */
   crossAspect: 3,
   /** 一段斜接最多吃掉整條邊的幾成 */
@@ -587,28 +577,10 @@ function layoutOnce(
       const other = pair!.h.id === e.id ? pair!.v : pair!.h
       return -halfSpanOf(other)
     }
-    // 整條被兩頭的路口吃掉：一人一半，不留那一小截
-    if (absorbed.has(e.id)) return fullLen / 2
     const corner = onPair ? (cornerRadiusAt.get(nodeId) ?? cornerR) : 0
     const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
     const want = Math.max(corner, sw)
     return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
-  }
-
-  /**
-   * 兩頭都被路口佔住、中間剩不到一條軌道寬的邊，整條讓給那兩個路口。
-   *
-   * 那一小截畫出來是一塊比自己還窄的碎塊，夾在道岔與轉角之間。路口元件本來就認領
-   * 它讓出去的那一段里程，所以一人一半吃掉整條，覆蓋不會開洞。
-   */
-  const absorbed = new Set<string>()
-  for (const e of graph.edges) {
-    const full = spanOf(e)
-    if (!Number.isFinite(full)) continue
-    const a = trimAt(e, e.from, full)
-    const b = trimAt(e, e.to, full)
-    if (a <= 0 || b <= 0) continue
-    if (full - a - b < bandW * DRAWING.absorbBands) absorbed.add(e.id)
   }
   /**
    * 真正讓出去的長度（版面像素），切塊與認領里程共用這一個。
@@ -822,11 +794,10 @@ function layoutOnce(
      * 兩端要停在節點的股位上，作法是在端點補一小截，不是把整條壓下去。
      *
      * 壓整條的話，段數少時「頭尾兩段」就是整條路——road 8 中段偏出 14 公尺會被壓成直線。
-     * 那一截要<strong>一段坡加一整塊</strong>：坡會從它身上吃掉一塊的長度，只給一塊的話
-     * 剩下的方塊比別人短一截，圖上就是道岔旁邊那片碎屑。界線貼著節點，不往路中間找最
-     * 陡點（那裡的落差是正交化造成的，不是路真的在那裡挪）。
+     * 端頭那一截只要放得下一段坡；它的界線貼著節點，不往路中間找最陡點（那裡的落差是
+     * 正交化造成的）。
      */
-    const endStubF = Math.min(0.35, (minShiftM * DRAWING.endStubBlocks) / Math.max(1, usedM))
+    const endStubF = Math.min(0.25, minShiftM / Math.max(1, usedM))
     const pinEnd = (head: boolean) => {
       const r = levelRuns[head ? 0 : levelRuns.length - 1]!
       if (r.level === 0) return
@@ -1047,20 +1018,12 @@ function layoutOnce(
        * 壓成 18.8 × 18.8 的 45 度小方塊。接節點那一端沒有別片要讓，可以整段讓出去。
        */
       const oneBlockW = perBlockM / Math.max(1e-6, usedM)
-      /*
-       * 一段最多能讓給斜接多少。
-       *
-       * 中間的段兩側都有斜接要讓，各讓一半。端頭那一段只有一側，可以多讓，但要
-       * <strong>留下一整塊</strong>——全讓出去的話剩下的方塊比別人短一半，圖上就是
-       * 道岔旁邊那片碎屑。讓不夠的部分由對面那一段補上（見下面的 cutsAt）。
-       */
       const shareOf = (i: number): number => {
         const r = runs[i]
         if (!r) return 0
         const span = r.f1 - r.f0
         const terminal = i === 0 || i === runs.length - 1
-        if (!terminal) return span / 2
-        return Math.max(0, span - oneBlockW)
+        return terminal ? span : span / 2
       }
       const cutsAt = (i: number): { left: number; right: number } => {
         const a = runs[i]
