@@ -208,17 +208,24 @@ export function fieldMetersAtAreaLocal(
     const got = f ? fieldFromTrack(f, area, xPx, yPx) : null
     if (got) return got
   }
+  /*
+   * 挑<strong>離中心線最近</strong>的那一塊。
+   *
+   * 試過再加一項「跑出框外多遠」把遠處的候選推開，量出來一個數字都沒變——贏的本來
+   * 就是那一塊，錯不在挑塊。所以維持只比偏移量。
+   */
   let best: FieldPoint | null = null
   /** 全都超出上限時的退路：離得最近的那一塊 */
   let fallback: FieldPoint | null = null
+  const better = (a: FieldPoint, b: FieldPoint | null) =>
+    !b || Math.abs(a.offsetM ?? Infinity) < Math.abs(b.offsetM ?? Infinity)
   for (const f of area.facilities) {
     if (f.type !== 'Track') continue
     const got = fieldFromTrack(f, area, xPx, yPx)
     if (!got) continue
-    const off = Math.abs(got.offsetM ?? 0)
-    if (!fallback || off < Math.abs(fallback.offsetM ?? Infinity)) fallback = got
-    if (off > MAX_OFF_TRACK_M) continue
-    if (!best || off < Math.abs(best.offsetM ?? Infinity)) best = got
+    if (better(got, fallback)) fallback = got
+    if (Math.abs(got.offsetM ?? 0) > MAX_OFF_TRACK_M) continue
+    if (better(got, best)) best = got
   }
   if (best) return best
   /*
