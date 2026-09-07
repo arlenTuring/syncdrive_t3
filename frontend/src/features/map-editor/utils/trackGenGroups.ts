@@ -28,6 +28,36 @@ export type TrackGenGroup = {
   members: string[]
 }
 
+/**
+ * 交叉與分岔在圖上是一個元件，在現場卻是<strong>兩條軌道</strong>。
+ *
+ * 交叉是上行一條、下行一條；分岔是橫的一條（主線繼續走）與斜的一條（岔出去）。
+ * 要分上下行就得分開選、分開命名，所以這兩種的成員鍵多帶一個「哪一半」。
+ * 其餘軌道整塊就是一條，鍵就是形狀自己的名字。
+ */
+export const CROSS_PARTS = ['up', 'down'] as const
+export const SWITCH_PARTS = ['straight', 'branch'] as const
+export type TrackGenPart = (typeof CROSS_PARTS)[number] | (typeof SWITCH_PARTS)[number]
+
+/** 這一種形狀分不分成兩半，分的話有哪兩半 */
+export function partsOfKind(kind: string): readonly TrackGenPart[] | null {
+  if (kind === 'cross') return CROSS_PARTS
+  if (kind === 'switch') return SWITCH_PARTS
+  return null
+}
+
+/** 成員鍵：整塊是形狀名，分半的是「形狀名#哪一半」 */
+export function memberKey(shapeName: string, part?: TrackGenPart | null): string {
+  return part ? `${shapeName}#${part}` : shapeName
+}
+
+/** 把成員鍵拆回形狀名與哪一半 */
+export function splitMemberKey(key: string): { name: string; part: TrackGenPart | null } {
+  const i = key.lastIndexOf('#')
+  if (i < 0) return { name: key, part: null }
+  return { name: key.slice(0, i), part: key.slice(i + 1) as TrackGenPart }
+}
+
 /** 一組最多幾塊：超過的話編號就不是人記得住的東西了 */
 export const MAX_GROUP_MEMBERS = 99
 

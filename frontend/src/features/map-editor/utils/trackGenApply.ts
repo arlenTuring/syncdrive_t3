@@ -6,10 +6,13 @@ import {
   type Vec2,
 } from './trackGenLayout'
 import {
+  memberKey,
+  partsOfKind,
   trackGenGroupIndex,
   trackGenGroupLabel,
   type TrackGenGroup,
 } from './trackGenGroups'
+import { TRACKGEN_PART_COLORS_KEY, TRACKGEN_PART_NAMES_KEY } from './trackGenParts'
 import {
   CORNER_TRACK_KEY,
   CROSS_TRACK_KEY,
@@ -369,15 +372,44 @@ export function buildFacilitiesFromLayout(
    * 端點都是靠 segmentId 找軌道的，只改顯示名字等於兩套名字並存。
    */
   const groupOf = trackGenGroupIndex(groups)
-  for (const f of facilities) {
+  facilities.forEach((f, i) => {
+    const shape = ordered[i]
+    const parts = shape ? partsOfKind(shape.kind) : null
+    /*
+     * 交叉與分岔一個元件、兩條軌道，所以名字也是兩個。
+     *
+     * 交叉是上行與下行，分岔是主線繼續走的那條與岔出去的那條。兩個名字各自記著，
+     * 元件自己的名字取兩個併起來（其中一半沒命名時就只有一半），這樣清單、路徑
+     * 規劃、渡線端點看到的仍然是<strong>一個</strong>可以指名的東西。
+     */
+    if (parts) {
+      const names: Record<string, string> = {}
+      const colors: Record<string, string> = {}
+      for (const part of parts) {
+        const hit = groupOf.get(memberKey(f.customName, part))
+        if (!hit?.code) continue
+        names[part] = trackGenGroupLabel(hit.code, hit.order)
+        colors[part] = hit.color
+      }
+      const picked = parts.map((p) => names[p]).filter(Boolean)
+      if (!picked.length) return
+      f.parameters[TRACKGEN_PART_NAMES_KEY] = names
+      f.parameters[TRACKGEN_PART_COLORS_KEY] = colors
+      const label = picked.join('/')
+      f.customName = label
+      f.parameters.segmentId = label
+      // 元件只有一個底色：兩半不同色時用先命名的那一半，另一半靠自己的疊色畫
+      f.parameters.defaultFillColor = colors[parts.find((p) => names[p])!]
+      return
+    }
     const hit = groupOf.get(f.customName)
     // 沒填頭字的組只是「選起來了」，還不知道要叫什麼——不改名
-    if (!hit?.code) continue
+    if (!hit?.code) return
     const label = trackGenGroupLabel(hit.code, hit.order)
     f.customName = label
     f.parameters.segmentId = label
     f.parameters.defaultFillColor = hit.color
-  }
+  })
 
   /*
    * 每一塊都記下橫向比例尺：<strong>車子不一定走在軌道上</strong>。

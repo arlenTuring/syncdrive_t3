@@ -1819,6 +1819,15 @@ const zhTW = {
         rotationDeg: '旋轉（度）',
         deleteText: '刪除此文字',
       },
+      trackParts: {
+        title: '兩條軌道各自命名',
+        up: '上行（上面那條）',
+        down: '下行（下面那條）',
+        straight: '主線（橫的那條）',
+        branch: '岔線（斜的那條）',
+        placeholder: '例：D04',
+        hint: '這個路口在圖上是一個元件，現場是兩條軌道。生成時可以在預覽上分開選、分開命名；這裡是事後要改的地方。',
+      },
       crossTrack: {
         title: '途經點與方向',
         portal: { lt: '左上口', lb: '左下口', rt: '右上口', rb: '右下口' },

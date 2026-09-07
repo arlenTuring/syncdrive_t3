@@ -647,6 +647,38 @@ export function switchTrackPath(
   return `${quad(at(g.mAt), c(g.mFrom), c(g.mTo))} ${quad(at(g.bAt), c(g.bFrom), c(g.bTo))}`
 }
 
+/**
+ * 直行那一片與岔出那一片<strong>各自的</strong>外框。
+ *
+ * 分岔在圖上是一個元件，現場卻是兩條路：橫的那條是主線繼續走、斜的那條岔出去。
+ * 要分開選、分開命名就得分開拿得到。
+ */
+export function switchTrackPartPaths(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { straight: string; branch: string } {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
+  const quad = (x: number, y0: number, y1: number) =>
+    [
+      [0, c(g.aFrom)],
+      [x, y0],
+      [x, y1],
+      [0, c(g.aTo)],
+    ]
+      .map(([px, py], i) => {
+        const p = T(px as number, py as number)
+        return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+      })
+      .join(' ') + ' Z'
+  return {
+    straight: quad(at(g.mAt), c(g.mFrom), c(g.mTo)),
+    branch: quad(at(g.bAt), c(g.bFrom), c(g.bTo)),
+  }
+}
+
 /** 進口 a、直行出口 m、岔出出口 b */
 export type SwitchHandleKey = 'a' | 'm' | 'b'
 
@@ -809,8 +841,26 @@ export function crossTrackPath(
   boxWPx: number,
   boxHPx: number,
 ): string {
+  const p = crossTrackPartPaths(g, boxWPx, boxHPx)
+  return `${p.up} ${p.down}`
+}
+
+/**
+ * 兩條直行<strong>各自的</strong>外框。
+ *
+ * 交叉在圖上是一個元件，但現場是兩條軌道——上行一條、下行一條。要分開選、分開命名、
+ * 分開上色就得分開拿得到，所以兩片各給一個。
+ */
+export function crossTrackPartPaths(
+  g: CrossTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { up: string; down: string } {
   const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
-  return `${bandPath(g.lt, g.rt, w, h, T)} ${bandPath(g.lb, g.rb, w, h, T)}`
+  return {
+    up: bandPath(g.lt, g.rt, w, h, T),
+    down: bandPath(g.lb, g.rb, w, h, T),
+  }
 }
 
 /**

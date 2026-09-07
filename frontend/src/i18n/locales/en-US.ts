@@ -1837,6 +1837,15 @@ const enUS: DeepStringify<typeof zhTW> = {
         rotationDeg: 'Rotation (deg)',
         deleteText: 'Delete this text',
       },
+      trackParts: {
+        title: 'Name each of the two tracks',
+        up: 'Up line (upper)',
+        down: 'Down line (lower)',
+        straight: 'Through (straight)',
+        branch: 'Branch (diagonal)',
+        placeholder: 'e.g. D04',
+        hint: 'One component on the map, two tracks in the field. Pick and name them separately in the generation preview; change them here afterwards.',
+      },
       crossTrack: {
         title: 'Waypoints & directions',
         portal: {

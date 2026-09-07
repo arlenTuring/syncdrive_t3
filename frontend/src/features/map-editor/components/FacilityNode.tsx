@@ -10,6 +10,11 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
+  facilityParts,
+  getTrackGenPartColors,
+  getTrackGenPartNames,
+} from '../utils/trackGenParts'
+import {
   CROSS_PORTAL_KEYS,
   CROSS_ROUTE_ENDS,
   CROSS_ROUTE_KEYS,
@@ -26,7 +31,9 @@ import {
   switchTrackPath,
   crossTrackGuidesPx,
   crossTrackHandlesPx,
+  crossTrackPartPaths,
   crossTrackPath,
+  switchTrackPartPaths,
   readCrossTrack,
   readSwitchTrack,
   switchTrackHandlesPx,
@@ -1261,6 +1268,31 @@ export const FacilityNode = memo(function FacilityNode({
     () => (crossTrackGeom ? crossTrackGuidesPx(crossTrackGeom, nw, nh) : null),
     [crossTrackGeom, nw, nh],
   )
+  /**
+   * 交叉與分岔的<strong>兩半</strong>：各自的底色與名字。
+   *
+   * 元件只有一個底色，可是它在現場是兩條軌道；兩半分屬不同的線時，就把另一半的
+   * 顏色疊上去，名字也各標各的。沒分開命名的元件不會進到這裡。
+   */
+  const trackPartOverlay = useMemo(() => {
+    if (!isCrossTrack && !isSwitchTrack) return null
+    const parts = facilityParts(facility)
+    if (!parts) return null
+    const names = getTrackGenPartNames(facility)
+    const colors = getTrackGenPartColors(facility)
+    if (!Object.keys(names).length) return null
+    const d =
+      isCrossTrack && crossTrackGeom
+        ? (crossTrackPartPaths(crossTrackGeom, nw, nh) as Record<string, string>)
+        : isSwitchTrack && switchTrackGeom
+          ? (switchTrackPartPaths(switchTrackGeom, nw, nh) as Record<string, string>)
+          : null
+    if (!d) return null
+    return parts
+      .filter((part) => names[part])
+      .map((part) => ({ part, d: d[part]!, fill: colors[part], name: names[part]! }))
+  }, [isCrossTrack, isSwitchTrack, facility, crossTrackGeom, switchTrackGeom, nw, nh])
+
   /**
    * 四個口的標籤與四條路徑的方向箭頭。
    *
@@ -2890,6 +2922,19 @@ export const FacilityNode = memo(function FacilityNode({
           *
           * 不吃滑鼠事件：把手就疊在同一個位置上，攔下來的話就拉不動了。
           */}
+        {trackPartOverlay ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[71]"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            {trackPartOverlay.map((p) =>
+              p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} /> : null,
+            )}
+          </svg>
+        ) : null}
         {isCrossTrack && crossTrackGuides && (
           <svg
             className="pointer-events-none absolute left-0 top-0 z-[70]"

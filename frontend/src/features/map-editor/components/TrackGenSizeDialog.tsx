@@ -4,8 +4,12 @@ import { createPortal } from 'react-dom'
 
 import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
+import type { TaperTrackGeometry } from '../utils/trackShapes'
 import {
   MAX_GROUP_MEMBERS,
+  memberKey,
+  partsOfKind,
+  splitMemberKey,
   TRACK_GEN_GROUP_COLORS,
   normalizeGroupCode,
   trackGenGroupIndex,
@@ -15,8 +19,8 @@ import {
 import { TRACK_GEN_KIND_COLOR, type LayoutShape } from '../utils/trackGenLayout'
 import {
   cornerTrackPath,
-  crossTrackPath,
-  switchTrackPath,
+  crossTrackPartPaths,
+  switchTrackPartPaths,
   taperTrackPath,
 } from '../utils/trackShapes'
 
@@ -194,7 +198,12 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
    * 所以原始清單留著，只在用到的時候濾掉現在不存在的。
    */
   const liveGroups = useMemo(
-    () => groups.map((g) => ({ ...g, members: g.members.filter((m) => shapeNames.has(m)) })),
+    () =>
+      groups.map((g) => ({
+        // 成員鍵可能帶著「哪一半」，比對時要拆掉再看那個形狀還在不在
+        ...g,
+        members: g.members.filter((m) => shapeNames.has(splitMemberKey(m).name)),
+      })),
     [groups, shapeNames],
   )
   const editing = liveGroups.find((g) => g.id === editingId) ?? null
@@ -361,20 +370,59 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
               }
               const w = Math.max(1, sh.box.wM * scale)
               const h = Math.max(1, sh.box.hM * scale)
+              const shift = `translate(${(ox + sh.box.xM) * scale} ${(oy + sh.box.yM) * scale})`
+              /*
+               * 交叉與分岔<strong>兩半各畫各的</strong>。
+               *
+               * 它們在現場是兩條軌道（交叉是上下行，分岔是主線與岔線），要分開選、
+               * 分開命名，所以圖上就得分開畫——一整片的話點下去只能選到整塊。
+               */
+              if (sh.kind === 'cross' || sh.kind === 'switch') {
+                const parts = partsOfKind(sh.kind)!
+                const dd =
+                  sh.kind === 'cross'
+                    ? crossTrackPartPaths(sh.geometry, w, h)
+                    : switchTrackPartPaths(sh.geometry, w, h)
+                return (
+                  <g key={`p${i}`} transform={shift}>
+                    {parts.map((part) => {
+                      const own = memberOf.get(memberKey(sh.name, part))
+                      const st = own
+                        ? { fill: own.color, stroke: '#fafafa' }
+                        : KIND_STYLE[sh.kind]
+                      return (
+                        <path
+                          key={part}
+                          data-trackgen-preview
+                          d={(dd as Record<string, string>)[part]!}
+                          fill={st.fill}
+                          stroke={st.stroke}
+                          strokeWidth={own ? 1.25 : 0.75}
+                          {...(editingId
+                            ? {
+                                onPointerDown: (e: React.PointerEvent) => {
+                                  e.stopPropagation()
+                                  toggleMember(memberKey(sh.name, part))
+                                },
+                                style: { cursor: 'pointer' },
+                              }
+                            : {})}
+                        />
+                      )
+                    })}
+                  </g>
+                )
+              }
               const d =
                 sh.kind === 'corner'
                   ? cornerTrackPath(sh.geometry, w, h)
-                  : sh.kind === 'switch'
-                    ? switchTrackPath(sh.geometry, w, h)
-                    : sh.kind === 'cross'
-                      ? crossTrackPath(sh.geometry, w, h)
-                      : taperTrackPath(sh.geometry, w, h)
+                  : taperTrackPath(sh.geometry as TaperTrackGeometry, w, h)
               return (
                 <path
                   key={`p${i}`}
                   data-trackgen-preview
                   d={d}
-                  transform={`translate(${(ox + sh.box.xM) * scale} ${(oy + sh.box.yM) * scale})`}
+                  transform={shift}
                   fill={fill}
                   stroke={stroke}
                   strokeWidth={mine ? 1.25 : 0.75}
@@ -386,23 +434,24 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
               選取順序<strong>直接標在塊上</strong>。編號就是它生成出來的名字尾巴，
               先看到才知道自己點的順序對不對——事後改名要一塊一塊找回來，代價差很多。
             */}
-            {extent?.shapes.map((sh, i) => {
-              const mine = memberOf.get(sh.name)
-              if (!mine) return null
+            {extent?.shapes.flatMap((sh, i) => {
               const ox = extent.originPx.x - extent.bounds.xMin
               const oy = extent.originPx.y - extent.bounds.yMin
-              const c =
+              const parts = partsOfKind(sh.kind)
+              const at = (dy: number) =>
                 sh.kind === 'rect'
-                  ? { x: (ox + sh.centre.x) * scale, y: (oy + sh.centre.y) * scale }
+                  ? { x: (ox + sh.centre.x) * scale, y: (oy + sh.centre.y) * scale + dy }
                   : {
                       x: (ox + sh.box.xM + sh.box.wM / 2) * scale,
-                      y: (oy + sh.box.yM + sh.box.hM / 2) * scale,
+                      y: (oy + sh.box.yM + sh.box.hM / 2) * scale + dy,
                     }
-              return (
+              const label = (m: { code: string; order: number }) =>
+                m.code ? trackGenGroupLabel(m.code, m.order) : String(m.order + 1)
+              const draw = (key: string, m: { code: string; order: number }, dy: number) => (
                 <text
-                  key={`n${i}`}
-                  x={c.x}
-                  y={c.y}
+                  key={key}
+                  x={at(dy).x}
+                  y={at(dy).y}
                   textAnchor="middle"
                   dominantBaseline="central"
                   fontSize={11}
@@ -411,9 +460,21 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   className="pointer-events-none"
                   style={{ paintOrder: 'stroke', stroke: '#09090b', strokeWidth: 3 }}
                 >
-                  {mine.code ? trackGenGroupLabel(mine.code, mine.order) : mine.order + 1}
+                  {label(m)}
                 </text>
               )
+              if (parts && sh.kind !== 'rect') {
+                // 兩半各標各的：上（橫）在上、下（斜）在下，位置錯開才看得清楚
+                const gap = Math.max(7, (sh.box.hM * scale) / 4)
+                return parts
+                  .map((part, k) => {
+                    const own = memberOf.get(memberKey(sh.name, part))
+                    return own ? draw(`n${i}-${part}`, own, k === 0 ? -gap : gap) : null
+                  })
+                  .filter(Boolean)
+              }
+              const mine = memberOf.get(sh.name)
+              return mine ? [draw(`n${i}`, mine, 0)] : []
             })}
           </svg>
         </div>
