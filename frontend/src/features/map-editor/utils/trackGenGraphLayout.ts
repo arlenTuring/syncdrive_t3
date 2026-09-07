@@ -446,6 +446,56 @@ function layoutOnce(
   }
 
 
+  /*
+   * 交叉路口也要<strong>讓位</strong>，跟分岔一樣。
+   *
+   * 先前交叉只是疊在兩束的接縫上，不切兩邊。結果一邊的斜接就從節點開始，交叉軌道
+   * 只能壓在它上面；另一邊是一段 15 公尺的短路，圖上 23 像素，切完剩一條縫。兩個
+   * 症狀同一個原因：交叉沒有自己的地盤。
+   *
+   * 改成兩側各讓出交叉的一半長度。兩側各算各的——短的那一側讓得出多少就是多少
+   * （扣掉另一頭已經讓給分岔的部分），長的那一側照想要的長度讓。讓出去的里程由
+   * 交叉認領，覆蓋不會因此開洞。
+   */
+  type CrossPlan = {
+    nodeId: string
+    groups: [GraphEdge[], GraphEdge[]]
+    halves: [number, number]
+  }
+  const crossPlans: CrossPlan[] = []
+  for (const cross of graph.crossings ?? []) {
+    const around = incident.get(cross.nodeId) ?? []
+    const sides = new Map<string, GraphEdge[]>()
+    for (const e of around) {
+      const arr = sides.get(bundleKey(e)) ?? []
+      arr.push(e)
+      sides.set(bundleKey(e), arr)
+    }
+    if (sides.size !== 2) continue
+    const [gA, gB] = [...sides.values()] as [GraphEdge[], GraphEdge[]]
+    if (gA.flatMap((e) => e.lanes).length !== 2) continue
+    if (gB.flatMap((e) => e.lanes).length !== 2) continue
+    const want = bandW * DRAWING.crossAspect
+    const halfOf = (group: GraphEdge[]) => {
+      const e = group[0]!
+      const full = spanOf(e)
+      if (!Number.isFinite(full)) return want
+      const far = e.from === cross.nodeId ? e.to : e.from
+      const taken = Math.max(0, switchTrim.get(`${e.id}|${far}`) ?? 0)
+      return Math.max(bandW * 0.5, Math.min(want, Math.max(1, full - taken - 1)))
+    }
+    const halves: [number, number] = [halfOf(gA), halfOf(gB)]
+    for (const e of gA) {
+      const key = `${e.id}|${cross.nodeId}`
+      if ((switchTrim.get(key) ?? 0) < halves[0]) switchTrim.set(key, halves[0])
+    }
+    for (const e of gB) {
+      const key = `${e.id}|${cross.nodeId}`
+      if ((switchTrim.get(key) ?? 0) < halves[1]) switchTrim.set(key, halves[1])
+    }
+    crossPlans.push({ nodeId: cross.nodeId, groups: [gA, gB], halves })
+  }
+
   /** 這條邊每一條車道的橫向偏移（版面像素）：束內依序排開，再加上讓開的量 */
   const offsetsOf = (e: GraphEdge) => {
     const total = bundleCount.get(bundleKey(e)) ?? e.lanes.length
@@ -1532,35 +1582,27 @@ function layoutOnce(
    * 接回來只是把同一段路換個元件畫，還會在里程覆蓋上開兩個洞。直接疊上去：兩側的
    * 里程照舊，交叉軌道補的是「這裡可以斜著過去」這件圖上看不出來的事。
    */
-  for (const cross of graph.crossings ?? []) {
-    const node = byId.get(cross.nodeId)
+  for (const plan of crossPlans) {
+    const node = byId.get(plan.nodeId)
     if (!node) continue
-    /*
-     * 一側可能是<strong>好幾條 road 併成的一束</strong>：交叉的另一頭常常是兩條各自
-     * 獨立的單線（T3 那個路口右邊就是 road 1 與 road 3），它們在圖上是同一束的兩條
-     * 軌道。所以要照束分組再把各條 road 的車道併起來數，不能只看其中一條。
-     */
-    const around = incident.get(cross.nodeId) ?? []
-    const sides = new Map<string, GraphEdge[]>()
-    for (const e of around) {
-      const k = bundleKey(e)
-      const arr = sides.get(k) ?? []
-      arr.push(e)
-      sides.set(k, arr)
-    }
-    if (sides.size !== 2) continue
-    const [groupA, groupB] = [...sides.values()]
-    if (!groupA?.length || !groupB?.length) continue
+    const [groupA, groupB] = plan.groups
     const sideA = groupA[0]!
     const sideB = groupB[0]!
-    const lanesA = groupA.flatMap((e) => offsetsOf(e))
-    const lanesB = groupB.flatMap((e) => offsetsOf(e))
+    /*
+     * 四個口的側位：一側的兩條軌道可能分屬兩條 road（T3 那個路口右邊就是 road 1 與
+     * road 3 兩條單線併成一束），所以要把整束的車道攤平再照側位排序。
+     */
+    const lanesOf = (group: GraphEdge[]) =>
+      group
+        .flatMap((e) => offsetsOf(e).map((o, k) => ({ o, e, k })))
+        .sort((x, y) => x.o - y.o)
+    const lanesA = lanesOf(groupA)
+    const lanesB = lanesOf(groupB)
     if (lanesA.length !== 2 || lanesB.length !== 2) continue
 
     const N = P(node)
-    /** 從節點往那一束走的方向 */
     const dirTo = (e: GraphEdge) => {
-      const other = byId.get(e.from === cross.nodeId ? e.to : e.from)
+      const other = byId.get(e.from === plan.nodeId ? e.to : e.from)
       if (!other) return null
       const q = P(other)
       const d = Math.hypot(q.x - N.x, q.y - N.y) || 1
@@ -1569,31 +1611,10 @@ function layoutOnce(
     const dA = dirTo(sideA)
     const dB = dirTo(sideB)
     if (!dA || !dB) continue
-    /*
-     * 畫多長：照路口在現場的實際長度，但<strong>不能吃到鄰居身上</strong>。
-     *
-     * 先前給了「至少一條軌道寬的三倍」當下限，想讓交會角淺一點好看。可是 T3 那個
-     * 路口左邊只有 15 公尺的一段路，下限一撐就整個蓋到隔壁的分岔上——圖上看起來
-     * 就是交叉軌道沒接好、直接壓在別人身上。
-     *
-     * 所以上限由兩側較短的那一段決定（各讓出四成），下限只留半條軌道寬，免得極短的
-     * 路口縮成一條線。短就短，那是現場本來的長度。
-     */
-    /*
-     * 想要的長度是<strong>長為高的三倍</strong>——與元件庫拉出來的交叉軌道同一個比例。
-     * 交會角要淺才看得出是兩條路交叉；照現場的 12 公尺畫只有九像素，兩條斜線會陡到
-     * 像一個叉。這與示意圖把橫向放大是同一種取捨，而且交叉不認領里程，畫長一點不會
-     * 讓定位偏掉。
-     *
-     * 上限由<strong>兩側較短的那一段</strong>決定（各讓出四成）：先前沒有這個上限，
-     * T3 那個路口的交叉整個蓋到隔壁的分岔上，圖上看起來就是沒接好。
-     */
-    const room = Math.min(spanOf(sideA), spanOf(sideB)) * 0.4
-    const want = bandW * DRAWING.crossAspect
-    const half = Math.max(bandW * 0.5, Math.min(want, room))
+
     const perp = (e: GraphEdge, o: number): Vec =>
       e.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
-    const face = (e: GraphEdge, d: Vec, o: number): [Vec, Vec] => {
+    const face = (e: GraphEdge, d: Vec, o: number, half: number): [Vec, Vec] => {
       const c = {
         x: N.x + d.x * half + perp(e, o).x,
         y: N.y + d.y * half + perp(e, o).y,
@@ -1605,43 +1626,73 @@ function layoutOnce(
         { x: c.x + w.x, y: c.y + w.y },
       ]
     }
-    const sortLow = (list: number[]) => [...list].sort((a, b) => a - b)
-    const [aLow, aHigh] = sortLow(lanesA)
-    const [bLow, bHigh] = sortLow(lanesB)
     /*
      * 「左」「右」只是四個角的名字，但<strong>順序不能反</strong>：交叉軌道要求左邊
      * 那兩個口在右邊兩個的同一側，反了就變成自交，接合器會直接回絕。所以照兩側在
      * 行進軸上的位置決定誰是左。
      */
     const alongOf = (v: Vec) => (sideA.orient === 'h' ? v.x : v.y)
-    const fA = [face(sideA, dA, aLow!), face(sideA, dA, aHigh!)] as const
-    const fB = [face(sideB, dB, bLow!), face(sideB, dB, bHigh!)] as const
-    const aFirst = alongOf(fA[0][0]) <= alongOf(fB[0][0])
+    const fA = lanesA.map((l) => face(l.e, dA, l.o, plan.halves[0]))
+    const fB = lanesB.map((l) => face(l.e, dB, l.o, plan.halves[1]))
+    const aFirst = alongOf(fA[0]![0]) <= alongOf(fB[0]![0])
     const left = aFirst ? fA : fB
     const right = aFirst ? fB : fA
     const built = buildCrossFromEndSegments({
-      lt: left[0],
-      lb: left[1],
-      rt: right[0],
-      rb: right[1],
+      lt: left[0]!,
+      lb: left[1]!,
+      rt: right[0]!,
+      rb: right[1]!,
     })
     if (!built) continue
     const centre = {
       x: built.box.x + built.box.w / 2,
       y: built.box.y + built.box.h / 2,
     }
+    /*
+     * 認領四個口讓出來的里程。
+     *
+     * 圖面路徑取<strong>其中一條直行</strong>（一側一條腿接起來）；另一條軌道的里程
+     * 對到同一段比例上——兩條軌道平行，離中心線多遠由偏移量另外帶（見
+     * trackGenLatPerBox），所以畫出來仍然落在它自己那條帶子上。
+     */
+    const a0 = lanesA[0]!
+    const a1 = lanesA[1]!
+    const b0 = lanesB[0]!
+    const b1 = lanesB[1]!
+    const spans = [
+      spanAtNode(a0.e, plan.nodeId, a0.k, true),
+      spanAtNode(a1.e, plan.nodeId, a1.k, true),
+      spanAtNode(b0.e, plan.nodeId, b0.k),
+      spanAtNode(b1.e, plan.nodeId, b1.k),
+    ]
+    const realPath = joinLegs(
+      laneTailAt(a0.e, plan.nodeId, a0.k).reverse(),
+      laneTailAt(b0.e, plan.nodeId, b0.k),
+      spans,
+    )
+    // joinLegs 只認得「第一段在第一條腿、其餘在第二條腿」，這裡是兩條腿各兩段
+    if (spans[0] && spans[1]) {
+      spans[1].pathFrom = spans[0].pathFrom
+      spans[1].pathTo = spans[0].pathTo
+    }
+    if (spans[2] && spans[3]) {
+      spans[3].pathFrom = spans[2].pathFrom
+      spans[3].pathTo = spans[2].pathTo
+    }
     shapes.push({
       kind: 'cross',
-      name: `${sideA.lanes[0]?.key ?? sideA.roadId}x${sideB.lanes[0]?.key ?? sideB.roadId}`,
+      name: `${a0.e.lanes[a0.k]?.key ?? sideA.roadId}x${b0.e.lanes[b0.k]?.key ?? sideB.roadId}`,
       role: 'road',
-      lineKey: sideA.lanes[0]?.key ?? sideA.roadId,
-      lineLengthM: cross.spanM,
+      lineKey: a0.e.lanes[a0.k]?.key ?? sideA.roadId,
+      lineLengthM: a0.e.lengthM,
       realLatFromM: 0,
       realLatToM: 0,
       samples: [
         { x: built.box.x, y: centre.y },
         { x: built.box.x + built.box.w, y: centre.y },
       ],
+      realPath,
+      spans,
       geometry: built.geometry,
       box: { xM: built.box.x, yM: built.box.y, wM: built.box.w, hM: built.box.h },
       sFrom: 0,
