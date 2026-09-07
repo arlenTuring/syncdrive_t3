@@ -1845,6 +1845,8 @@ const enUS: DeepStringify<typeof zhTW> = {
         straight: 'Through (straight)',
         branch: 'Branch (diagonal)',
         placeholder: 'e.g. D04',
+        color: 'Fill',
+        fontSize: 'Font size (px)',
         hint: 'One component represents two tracks; names are set separately. Also selectable per track in the generation preview.',
       },
       crossTrack: {

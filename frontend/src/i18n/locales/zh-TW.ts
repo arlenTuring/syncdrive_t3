@@ -1827,6 +1827,8 @@ const zhTW = {
         straight: '主線（直行）',
         branch: '岔線（斜向）',
         placeholder: '例：D04',
+        color: '底色',
+        fontSize: '字級 (px)',
         hint: '單一元件代表兩條軌道，名稱分別設定。生成預覽中亦可逐段選取命名。',
       },
       crossTrack: {

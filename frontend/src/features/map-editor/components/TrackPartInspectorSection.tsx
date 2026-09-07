@@ -1,9 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
 import {
+  DEFAULT_PART_FONT_PX,
+  MAX_PART_FONT_PX,
+  MIN_PART_FONT_PX,
   facilityParts,
   getTrackGenPartColors,
+  getTrackGenPartFontPx,
   getTrackGenPartNames,
+  patchTrackGenPartColor,
+  patchTrackGenPartFont,
   patchTrackGenPartName,
 } from '../utils/trackGenParts'
 
@@ -34,6 +40,12 @@ export function TrackPartInspectorSection({
   if (!parts) return null
   const names = getTrackGenPartNames(facility)
   const colors = getTrackGenPartColors(facility)
+  const fonts = getTrackGenPartFontPx(facility)
+  /* 沒設過色的那一半，色票先顯示元件本身的底色，不要顯示成透明的空格 */
+  const fallbackFill =
+    typeof facility.parameters?.defaultFillColor === 'string'
+      ? (facility.parameters.defaultFillColor as string)
+      : '#3f3f46'
 
   return (
     <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
@@ -41,17 +53,11 @@ export function TrackPartInspectorSection({
         {t('mapEditor.inspector.trackParts.title')}
       </div>
       {parts.map((part) => (
-        <div key={part} className="flex items-end gap-2">
-          <span
-            className="mb-1.5 inline-block size-3 shrink-0 rounded-[2px] border border-zinc-600"
-            style={{ background: colors[part] ?? 'transparent' }}
-            aria-hidden
-          />
-          <label
-            htmlFor={`tp-${facility.id}-${part}`}
-            className="min-w-0 flex-1 text-[10px] text-zinc-400"
-          >
+        <div key={part} className="space-y-1">
+          <div className="text-[10px] text-zinc-400">
             {t(`mapEditor.inspector.trackParts.${part}`)}
+          </div>
+          <div className="flex items-center gap-1.5">
             <input
               id={`tp-${facility.id}-${part}`}
               key={`tp-${facility.id}-${part}-${names[part] ?? ''}`}
@@ -68,9 +74,44 @@ export function TrackPartInspectorSection({
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
               placeholder={t('mapEditor.inspector.trackParts.placeholder')}
-              className="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
+              className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
             />
-          </label>
+            <input
+              type="color"
+              aria-label={t('mapEditor.inspector.trackParts.color')}
+              title={t('mapEditor.inspector.trackParts.color')}
+              disabled={readOnly}
+              value={colors[part] ?? fallbackFill}
+              onChange={(e) =>
+                onPatchParameters(patchTrackGenPartColor(facility, part, e.target.value))
+              }
+              className="h-[26px] w-9 shrink-0 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <input
+              type="number"
+              aria-label={t('mapEditor.inspector.trackParts.fontSize')}
+              title={t('mapEditor.inspector.trackParts.fontSize')}
+              min={MIN_PART_FONT_PX}
+              max={MAX_PART_FONT_PX}
+              step={1}
+              readOnly={readOnly}
+              key={`tf-${facility.id}-${part}-${fonts[part] ?? ''}`}
+              defaultValue={fonts[part] ?? DEFAULT_PART_FONT_PX}
+              onFocus={onFieldFocus}
+              onBlur={(e) => {
+                onFieldBlur?.()
+                if (readOnly) return
+                const raw = e.target.value.trim()
+                const next = raw === '' ? null : Number(raw)
+                if (next === (fonts[part] ?? null)) return
+                onPatchParameters(patchTrackGenPartFont(facility, part, next))
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+              }}
+              className="w-12 shrink-0 rounded border border-zinc-600 bg-zinc-950 px-1.5 py-1 text-center font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500"
+            />
+          </div>
         </div>
       ))}
       <p className="text-[9px] leading-relaxed text-zinc-500">

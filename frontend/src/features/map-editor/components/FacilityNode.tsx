@@ -11,7 +11,9 @@ import { useTranslation } from 'react-i18next'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
   facilityParts,
+  DEFAULT_PART_FONT_PX,
   getTrackGenPartColors,
+  getTrackGenPartFontPx,
   getTrackGenPartNames,
 } from '../utils/trackGenParts'
 import {
@@ -1291,7 +1293,9 @@ export const FacilityNode = memo(function FacilityNode({
     if (!parts) return null
     const names = getTrackGenPartNames(facility)
     const colors = getTrackGenPartColors(facility)
-    if (!Object.keys(names).length) return null
+    const fonts = getTrackGenPartFontPx(facility)
+    // 只設了色、還沒命名的那一半也要上色
+    if (!Object.keys(names).length && !Object.keys(colors).length) return null
     const d =
       isCrossTrack && crossTrackGeom
         ? (crossTrackPartPaths(crossTrackGeom, nw, nh) as Record<string, string>)
@@ -1306,8 +1310,15 @@ export const FacilityNode = memo(function FacilityNode({
           : null
     if (!d || !c) return null
     return parts
-      .filter((part) => names[part])
-      .map((part) => ({ part, d: d[part]!, at: c[part]!, fill: colors[part], name: names[part]! }))
+      .filter((part) => names[part] || colors[part])
+      .map((part) => ({
+        part,
+        d: d[part]!,
+        at: c[part]!,
+        fill: colors[part],
+        name: names[part] ?? '',
+        fontPx: fonts[part] ?? DEFAULT_PART_FONT_PX,
+      }))
   }, [isCrossTrack, isSwitchTrack, facility, crossTrackGeom, switchTrackGeom, nw, nh])
 
   /**
@@ -2951,21 +2962,27 @@ export const FacilityNode = memo(function FacilityNode({
               p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} /> : null,
             )}
             {/* 名字標在自己那一條上，不併成一個放中間 */}
-            {trackPartOverlay.map((p) => (
-              <text
-                key={`name-${p.part}`}
-                x={p.at.x}
-                y={p.at.y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={11}
-                fontWeight={600}
-                fill="#fafafa"
-                style={{ paintOrder: 'stroke', stroke: '#09090b', strokeWidth: 3 }}
-              >
-                {p.name}
-              </text>
-            ))}
+            {trackPartOverlay.map((p) =>
+              p.name ? (
+                <text
+                  key={`name-${p.part}`}
+                  x={p.at.x}
+                  y={p.at.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={p.fontPx}
+                  fontWeight={600}
+                  fill="#fafafa"
+                  style={{
+                    paintOrder: 'stroke',
+                    stroke: '#09090b',
+                    strokeWidth: Math.max(2, p.fontPx * 0.27),
+                  }}
+                >
+                  {p.name}
+                </text>
+              ) : null,
+            )}
           </svg>
         ) : null}
         {isCrossTrack && crossTrackGuides && (
