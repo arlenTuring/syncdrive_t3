@@ -51,13 +51,19 @@ export const TRACK_GEN_GROUP_COLORS = [
   '#831843',
 ] as const
 
-/** 名字 → 它在哪一組、第幾塊 */
+/**
+ * 名字 → 它在哪一組、第幾塊。
+ *
+ * <strong>還沒填頭字的組也要算進來。</strong>使用者的順序是「先框再命名」，這裡若把
+ * 沒頭字的組跳過，他點了半天預覽上什麼都不會變，看起來就像沒選到。頭字只影響<strong>
+ * 叫什麼名字</strong>，不影響<strong>選了誰</strong>——所以改名那一端自己去判斷有沒有
+ * 頭字（見 buildFacilitiesFromLayout）。
+ */
 export function trackGenGroupIndex(
   groups: TrackGenGroup[],
 ): Map<string, { code: string; color: string; order: number; groupId: string }> {
   const out = new Map<string, { code: string; color: string; order: number; groupId: string }>()
   for (const g of groups) {
-    if (!g.code) continue
     g.members.forEach((name, i) => {
       out.set(name, { code: g.code, color: g.color, order: i, groupId: g.id })
     })

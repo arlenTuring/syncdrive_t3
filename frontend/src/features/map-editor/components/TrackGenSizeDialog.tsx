@@ -498,9 +498,10 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                 <input
                   value={editing.code}
                   onChange={(e) => patchEditing({ code: normalizeGroupCode(e.target.value) })}
-                  placeholder="D"
+                  // 提示字要暗得夠明顯：先前跟真的填了一樣，使用者以為頭字已經有了
+                  placeholder="AB"
                   maxLength={2}
-                  className="w-16 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-center font-mono text-[13px] uppercase text-zinc-100 outline-none focus:border-sky-500"
+                  className="w-16 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-center font-mono text-[13px] uppercase text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
                 />
               </label>
               <label className="flex flex-col gap-1 text-[10px] text-zinc-400">

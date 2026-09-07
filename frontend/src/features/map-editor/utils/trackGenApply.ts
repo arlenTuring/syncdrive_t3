@@ -367,7 +367,8 @@ export function buildFacilitiesFromLayout(
   const groupOf = trackGenGroupIndex(groups)
   for (const f of facilities) {
     const hit = groupOf.get(f.customName)
-    if (!hit) continue
+    // 沒填頭字的組只是「選起來了」，還不知道要叫什麼——不改名
+    if (!hit?.code) continue
     const label = trackGenGroupLabel(hit.code, hit.order)
     f.customName = label
     f.parameters.segmentId = label
