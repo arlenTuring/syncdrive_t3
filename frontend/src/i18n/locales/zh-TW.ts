@@ -1446,6 +1446,8 @@ const zhTW = {
         regenerate: '重新生成',
         generate: '軌道生成',
         clearResultTitle: '清除生成紀錄，回到只顯示中心線',
+        expandTitle: '擴展至當前空間：把元件撐成整張畫布的大小',
+        expandDone: '已經鋪滿整張畫布',
         splitRow: '橫向分割（上／下）',
         splitCol: '縱向分割（左／右）',
         cutsConfirmed: '已確定切割，請點選各格後拖曳邊緣調整',

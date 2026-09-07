@@ -1456,6 +1456,8 @@ const enUS: DeepStringify<typeof zhTW> = {
         regenerate: 'Regenerate',
         generate: 'Generate tracks',
         clearResultTitle: 'Clear generation; show centerlines only',
+        expandTitle: 'Fit to canvas: stretch this component to the whole map',
+        expandDone: 'Already fills the canvas',
         splitRow: 'Split horizontally (top / bottom)',
         splitCol: 'Split vertically (left / right)',
         cutsConfirmed: 'Cuts confirmed — select a cell, then drag edges',

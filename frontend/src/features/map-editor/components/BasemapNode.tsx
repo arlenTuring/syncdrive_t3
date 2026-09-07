@@ -8,6 +8,7 @@ import {
   PencilLine,
   Rows2,
   Route,
+  Maximize,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
@@ -312,6 +313,31 @@ export const BasemapNode = memo(function BasemapNode({
     },
     [displayLayout, mapPixelSize, pendingGraph],
   )
+
+  /**
+   * 擴展至當前空間：把元件撐成整張畫布。
+   *
+   * 生成出來的軌道<strong>鋪滿這個元件的框</strong>，所以框有多大、圖就有多大。要
+   * 「照地圖的解析度生成」時，先把框拉到跟畫布一樣大是必要的一步——手拉四個角很難
+   * 剛好對齊，差幾個像素比例尺就不是整數，一按就好比較實在。
+   */
+  const expandToCanvas = useCallback(() => {
+    const ps = mapPixelSize
+    if (!ps) return
+    onLayoutSessionStart?.()
+    onPatchLayout(
+      basemap.id,
+      normalizeBasemapLayout({ xPx: 0, yPx: 0, wPx: ps.width, hPx: ps.height }),
+    )
+  }, [basemap.id, mapPixelSize, onLayoutSessionStart, onPatchLayout])
+
+  /** 已經剛好鋪滿了就沒事可做 */
+  const filledCanvas =
+    !!mapPixelSize &&
+    Math.abs(layout.xPx) < 0.5 &&
+    Math.abs(layout.yPx) < 0.5 &&
+    Math.abs(layout.wPx - mapPixelSize.width) < 0.5 &&
+    Math.abs(layout.hPx - mapPixelSize.height) < 0.5
 
   const runTrackGeneration = useCallback((block: TrackGenSizeParams, groups: TrackGenGroup[]) => {
     const graph = pendingGraph
@@ -933,6 +959,27 @@ export const BasemapNode = memo(function BasemapNode({
                         : trackGenResult
                           ? t('mapEditor.basemap.toolbar.regenerate')
                           : t('mapEditor.basemap.toolbar.generate')}
+                    </button>
+                    <button
+                      type="button"
+                      title={
+                        filledCanvas
+                          ? t('mapEditor.basemap.toolbar.expandDone')
+                          : t('mapEditor.basemap.toolbar.expandTitle')
+                      }
+                      aria-label={t('mapEditor.basemap.toolbar.expandTitle')}
+                      data-basemap-expand
+                      disabled={!canEdit || !mapPixelSize || filledCanvas}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        expandToCanvas()
+                      }}
+                      className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <Maximize className="size-4" aria-hidden />
                     </button>
                     {trackGenResult ? (
                       <button
