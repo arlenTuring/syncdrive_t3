@@ -55,6 +55,14 @@ const DRAWING = {
    * 讓給旁邊的斜接，也不要單獨畫出來。
    */
   minBlockBands: 1,
+  /**
+   * 兩頭都被路口佔住、中間剩不到幾條軌道寬的邊，整條讓給那兩個路口。
+   *
+   * 比 minBlockBands 鬆：那是「一塊至少多長」，這是「短到不值得單獨存在」。吃掉的
+   * 部分由路口元件認領里程，但路口畫出來的大小不變，所以不能吃太多，否則圖上會在
+   * 路口與下一塊之間開一條縫。
+   */
+  absorbBands: 2,
   /** 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半 */
   crossAspect: 3,
   /** 一段斜接最多吃掉整條邊的幾成 */
@@ -577,10 +585,28 @@ function layoutOnce(
       const other = pair!.h.id === e.id ? pair!.v : pair!.h
       return -halfSpanOf(other)
     }
+    // 整條被兩頭的路口吃掉：一人一半，不留那一小截
+    if (absorbed.has(e.id)) return fullLen / 2
     const corner = onPair ? (cornerRadiusAt.get(nodeId) ?? cornerR) : 0
     const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
     const want = Math.max(corner, sw)
     return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
+  }
+
+  /**
+   * 兩頭都被路口佔住、中間剩不到一條軌道寬的邊，整條讓給那兩個路口。
+   *
+   * 那一小截畫出來是一塊比自己還窄的碎塊，夾在道岔與轉角之間。路口元件本來就認領
+   * 它讓出去的那一段里程，所以一人一半吃掉整條，覆蓋不會開洞。
+   */
+  const absorbed = new Set<string>()
+  for (const e of graph.edges) {
+    const full = spanOf(e)
+    if (!Number.isFinite(full)) continue
+    const a = trimAt(e, e.from, full)
+    const b = trimAt(e, e.to, full)
+    if (a <= 0 || b <= 0) continue
+    if (full - a - b < bandW * DRAWING.absorbBands) absorbed.add(e.id)
   }
   /**
    * 真正讓出去的長度（版面像素），切塊與認領里程共用這一個。
