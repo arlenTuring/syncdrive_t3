@@ -694,6 +694,20 @@ function layoutOnce(
     return Math.max(0, raw)
   }
 
+  /**
+   * 名字裡的流水號<strong>跨邊連號</strong>。
+   *
+   * 先前每條邊各自從 1 開始，於是被轉角切成兩段的同一條軌道會生出兩塊
+   * <code>11:-2-01</code>。名字一樣，分組命名時點一個就選到兩個、標的編號也一樣
+   * ——使用者看到的就是「怎麼會有兩個 19」。名字是這些塊唯一的身分，必須唯一。
+   */
+  const seqOf = new Map<string, number>()
+  const nextSeq = (key: string) => {
+    const n = (seqOf.get(key) ?? 0) + 1
+    seqOf.set(key, n)
+    return n
+  }
+
   /** 每條邊、每個節點、每條車道：帶子在那一端實際畫到的位置 */
   const bandEnd = new Map<string, Vec>()
 
@@ -1223,7 +1237,7 @@ function layoutOnce(
         else if (i > 0) cuts2[i - 1]!.right = left + piece
       })
 
-      let seq = 0
+
       runs.forEach((run, ri) => {
         const extra = run.extra
         const next = runs[ri + 1]
@@ -1241,10 +1255,9 @@ function layoutOnce(
             const p1 = at(f1, extra)
             const centre = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
             const lengthM = Math.hypot(p1.x - p0.x, p1.y - p0.y)
-            seq += 1
             shapes.push({
               kind: 'rect',
-              name: `${lane.key}-${String(seq).padStart(2, '0')}`,
+              name: `${lane.key}-${String(nextSeq(lane.key)).padStart(2, '0')}`,
               role: 'road',
               lineKey: lane.key,
               lineLengthM: e.lengthM,
@@ -1273,10 +1286,9 @@ function layoutOnce(
         const a1 = at(run.f1 + cut.right, nextExtra)
         const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
         const fit = fitTaperAt(a0, a1, bandW, alongDeg)
-        seq += 1
         shapes.push({
           kind: 'taper',
-          name: `${lane.key}X-${String(seq).padStart(2, '0')}`,
+          name: `${lane.key}X-${String(nextSeq(`${lane.key}X`)).padStart(2, '0')}`,
           role: 'road',
           lineKey: lane.key,
           lineLengthM: e.lengthM,
