@@ -2,27 +2,6 @@ import type { LaneCenterline, LaneCenterlinePlan, RoadInfo } from '../opendrive/
 
 /**
  * 路網 → 圖（節點與邊）。
- *
- * <h3>為什麼不再用「脊線 + 橫向偏移」</h3>
- * 先前的做法是把車道串成一條最長的鏈當脊線，其他東西一律表示成「相對脊線的橫向
- * 偏移」。那是<strong>走廊</strong>模型，不是路網模型，而場域是路網：
- *
- * <ul>
- *   <li>環會被切開——鏈是開放路徑，路口把環斷成好幾條，只有最長的那條被畫出來。
- *       實測 T3 的參考鏈頭尾在真實世界相距 338 公尺，脊線只有三段直線，右側整段
- *       不在圖上。</li>
- *   <li>岔出去的線只能表示成「橫向偏移暴增」，於是在幾十像素內爬好幾股，畫出來是
- *       一根尖刺（實測斜率 1:0.19）。</li>
- *   <li>路口的兩條線在模型裡毫無關係，各畫各的，兩片就互相穿透。</li>
- * </ul>
- *
- * 改成圖之後這些都不必補：環是圖上的<strong>環</strong>，佈局擺的是節點而不是走過的
- * 路徑；岔出是節點上的一條邊，不需要橫向偏移；路口是一個節點，邊在那裡相接。
- *
- * <h3>節點從哪來</h3>
- * 兩種：<strong>路口</strong>（junction 裡的連接道把兩側縫成同一個節點）與
- * <strong>轉折</strong>（一條 road 自己轉了 90 度，那個彎就是一個節點）。road 的端點
- * 靠真實座標聚類，不靠 link 標籤——link 缺漏或 contactPoint 寫反時，幾何不會騙人。
  */
 
 /**
@@ -52,10 +31,6 @@ export type GraphEdge = {
   lengthM: number
   /**
    * 這一段在<strong>那條 road 上</strong>的里程起訖（公尺，沿參考線）。
-   *
-   * OpenDRIVE 的 s 定義在 road 的參考線上，車輛回報的位置反投影回來也是得到 road 的 s。
-   * 每一段記下自己涵蓋哪一段 s，之後才能用「road + lane + s」直接查到圖上的哪一塊，
-   * 不必拿座標去跟每一塊軌道比距離。
    */
   sFromM: number
   sToM: number
@@ -65,10 +40,6 @@ export type GraphEdge = {
   sign: 1 | -1
   /**
    * 這一段涵蓋的車道，依 lane id 排序。
-   *
-   * `points` 是那條車道自己的中心線（真實座標），已經裁到這一段、方向對齊參考線。
-   * 排版要靠它看出<strong>兩條軌道在哪裡拉開</strong>——月台就在拉開的那一段中間，
-   * road 的參考線看不出這件事，車道線才看得出來。
    */
   lanes: Array<{ key: string; laneId: number; widthM: number; points: Array<{ x: number; y: number }> }>
   /** 真實座標的取樣點，車輛投影要用 */
@@ -84,10 +55,6 @@ export type GraphEdge = {
 
 /**
  * 路口的通行配對：在這個節點上，哪一條 road 走得到哪一條 road。
- *
- * 直接來自 .xodr —— junction 裡的每一條連接道，它的 <code>&lt;link&gt;</code> 就寫著
- * 「我把 A 的某一端接到 B 的某一端」。分岔要畫在哪、誰是主線誰是岔線，看這份配對就夠，
- * 不必再從幾何回推「同一個節點上有沒有兩束往同一個方向走」。
  */
 export type NodeMovement = {
   nodeId: string
@@ -98,10 +65,6 @@ export type NodeMovement = {
 
 /**
  * 一個<strong>交叉</strong>路口：兩條軌道在這裡交會，四個口互相都通。
- *
- * 判斷的依據是<strong>連接道自己交叉</strong>——同一個路口裡有兩條連接道在中途相交，
- * 那就不是分岔（分岔的幾條腿只在端點碰頭），是交叉。這是檔案裡量得出來的事實，
- * 不必從「有幾條腿」之類的形狀去猜。
  */
 export type NodeCrossing = {
   nodeId: string
@@ -373,13 +336,6 @@ export function buildTrackGraph(
 
   /*
    * 拓樸照 <code>&lt;link&gt;</code> 接，不用座標猜。
-   *
-   * OpenDRIVE 每條 road 都寫著前後接誰、接在對方的哪一端；路口裡的連接道也一樣，它的
-   * link 就是「我把 A 的某一端接到 B 的某一端」。所以節點是<strong>讀</strong>出來的：
-   * 兩個端點被 link 指到一起就是同一個節點，跟它們在座標上差幾公尺無關。
-   *
-   * 先前是「相距八公尺內就焊在一起」。那在路口密集或比例尺不同的檔案上會焊錯，而且
-   * 每換一份圖就要重調那個數字。
    */
   const movements: NodeMovement[] = []
   const crossings: NodeCrossing[] = []
@@ -435,10 +391,6 @@ export function buildTrackGraph(
 
   /*
    * 連接道沒把某個路口縫起來時，退回<strong>路口 id</strong>。
-   *
-   * road 的 link 可以直接指到一個 junction（「我這一端接的是三號路口」）。連接道齊全時
-   * 上面那一輪已經把兩側縫好了；缺了幾條連接道的檔案就靠這一輪：指到同一個路口的端點
-   * 本來就在同一個地方，併成一個節點。這仍然是讀規格，不是看座標。
    */
   const byJunction = new Map<string, string[]>()
   for (const road of plan.roads) {
@@ -562,10 +514,6 @@ export function buildTrackGraph(
 
 /**
  * 把節點的座標對齊，讓每一條邊真的是水平或垂直的。
- *
- * 水平邊要求兩端<strong>同一個 y</strong>，垂直邊要求同一個 x。把有這種要求的節點併成
- * 一組，整組取真實座標的平均——這樣圖還是照著真實位置擺，只是被拉直了。環不會因此
- * 散掉：座標是給節點的，不是沿著某條路徑累加出來的。
  */
 function orthogonalise(nodes: Map<string, GraphNode>, edges: GraphEdge[]) {
   const yGroup = new Weld()

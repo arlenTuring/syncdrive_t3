@@ -8,25 +8,6 @@ import { locateByField, type TrackGenIndex } from './trackGenLocate'
 
 /**
  * 停靠站落在路網的哪一點——把<strong>人放的站</strong>換算成里程。
- *
- * <h3>為什麼要這一層</h3>
- * 站點不是生成出來的：是人在圖上放 DockingPoint，填站號與站名。所以站與軌道之間本來
- * 沒有任何關聯，只有各自的場域座標。要回答「這台車在哪一站、離下一站多遠」，兩邊得
- * 換到<strong>同一把尺</strong>上——那把尺就是 OpenDRIVE 的里程。
- *
- * 做法是把站點的場域座標丟進與車輛同一支反查（{@link locateByField}），得到它的
- * road / lane / 里程。之後比距離就只是兩個里程相減，不必再碰座標，也不受簡圖的比例
- * 尺影響（圖上被壓扁的那一段，里程仍然是真的）。
- *
- * <h3>刻意不做的事</h3>
- * <ul>
- *   <li><strong>不篩掉離軌道遠的站。</strong>月台本來就放在軌道旁邊，離中心線幾公尺是
- *       正常的；要多遠才算「沒放在軌道上」是現場的事，不是這裡該拍板的數字。離多遠
- *       照實回報（offsetM），要不要採用由呼叫端決定。</li>
- *   <li><strong>不跨 road 找下一站。</strong>「下一站」只在同一條 road 的同一條車道上
- *       找。跨到下一條 road 要走路線與路口的通行配對，那是 topologyRouteTravel 的事；
- *       這裡只回答里程問題，不假裝知道車要往哪一條岔路走。</li>
- * </ul>
  */
 
 export type StationFix = {
@@ -119,10 +100,6 @@ const EMPTY_PROGRESS: StationProgress = {
 
 /**
  * 這一點的前後站。
- *
- * 行車方向由<strong>車道編號的正負</strong>決定，不必另外傳：OpenDRIVE 裡負號車道在
- * 參考線右側、與里程同向，正號車道在左側、與里程反向。所以正號車道的「下一站」是
- * 里程<strong>更小</strong>的那一個。
  */
 export function stationProgressAt(
   index: StationMileageIndex,

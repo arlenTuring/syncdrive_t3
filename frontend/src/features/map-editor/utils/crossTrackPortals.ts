@@ -12,15 +12,6 @@ import {
 
 /**
  * 交叉軌道的四個連接點與四條路徑。
- *
- * <h3>為什麼要記這些</h3>
- * 交叉軌道是路網上的一個節點：車子從哪個口進、往哪個口出，排班與路徑規劃都要知道。
- * 虛擬渡線靠兩個端點記這件事，交叉軌道有四個口、四條路徑，所以兩邊都要記——口記
- * 途經點代號，路徑記方向。
- *
- * <h3>方向為什麼要用填的</h3>
- * 虛擬渡線的方向是<strong>畫出來的</strong>：先點哪一端就往哪邊走。交叉軌道四個口
- * 是接合出來的，沒有先後可言，所以方向只能另外指定。
  */
 
 export const CROSS_PORTAL_KEYS = CROSS_HANDLE_KEYS
@@ -140,11 +131,6 @@ export function patchCrossRoute(
 
 /**
  * 四個口<strong>現在</strong>在現場的哪裡。
- *
- * 連接點就固定在那一面的中點上——與 .xodr 的交會點對齊，是接合時就決定好的，不該
- * 讓使用者去填。所以座標由圖上的位置反推：接好、移動、縮放、旋轉之後都自己跟上。
- *
- * 手填的值只當<strong>覆寫</strong>：填了就用填的，清空就回到自動。
  */
 export function resolveCrossPortalFields(
   facility: FacilityObject,

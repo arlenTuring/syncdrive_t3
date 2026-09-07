@@ -577,7 +577,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       taskTypes: 'Task types',
       taskSettings: 'Task settings',
       dragHint:
-        'Drag trip cards onto the left timeline; default length 10 minutes, snap to 10-second slots, no overlap. Top rows are time-template tasks (reference only); bottom rows are cards you place.',
+        'Drag trip cards onto the left timeline; default 10 minutes, snapped to 10-second slots, no overlap. Top rows are time-template tasks (reference only); bottom rows are placed cards.',
       nothingSelected: 'Nothing selected',
       dragChipTitle: 'Drag “{{label}}” onto a train timeline',
       tripCode: 'Trip code',
@@ -619,7 +619,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       highDensityWarn: 'This template has high-density slots; consider more timeline rows',
       highDensityHelpLabel: 'High-density slot help',
       highDensityHelp:
-        'These slot attributes have short headways. A vehicle’s full cycle may exceed the headway, causing “unserved headway” warnings. In Step 2, confirm timeline row count is enough (usually ≥ cycle ÷ headway vehicles).',
+        'Short headway on these slots: a full cycle may exceed the headway and raise “unserved headway”. Confirm timeline rows in Step 2 (usually ≥ cycle ÷ headway).',
       headwaySeconds: 'Headway {{seconds}} s',
       emptyList: 'No time templates yet — create one under Time Templates first',
       emptySlackTitle: 'Empty-slot mainline slack',
@@ -650,7 +650,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       itemCount: '({{count}})',
       fleetTitle: 'Vehicles needed by interval',
       fleetHint:
-        'Demand = round-trip ÷ target headway. “Actual” is average vehicles running at the same time—not distinct timelines. Rotation handoffs do not count as extra vehicles; those appear under “Used”.',
+        'Demand = round-trip ÷ target headway. “Actual” is the average concurrent vehicles, not distinct timelines. Rotation handoffs are not extra vehicles; they appear under “Used”.',
       berthTitle: 'Berth capacity',
       berthHint:
         'One berth holds one vehicle at a time. “Alt. berths” is whether the association graph offers another terminal after this segment; 0 means vehicles must crowd this stop.',
@@ -870,7 +870,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       hoursPart: '{{hours}} h ',
       minutesUnit: 'min',
       yardHoldHint:
-        'Maintenance is complete but the vehicle has not left; it still occupies this berth. Hold differs from standby: standby is a scheduled move, hold is idle occupancy. Facility occupancy and collision checks include this span.',
+        'Maintenance complete, vehicle not yet departed; the berth stays occupied. Standby is a scheduled move; hold is idle occupancy. Both facility occupancy and collision checks include this span.',
       noFacilitySlot:
         '⚠ No free facility of this type in this window. Add facilities, stagger maintenance, or reduce concurrent yard work.',
       travel: 'Travel',
@@ -919,7 +919,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         'Concurrent vehicles below round-trip ÷ headway. Add vehicles or relax headway; the analysis report lists the required figures.',
       rootYard: 'Not enough yard facilities',
       rootYardHint:
-        'That facility type is full for the window. The message lists concurrent demand against capacity. If capacity is short, add facilities or stagger maintenance; if capacity exists but does not fit, slots are fragmented and shifting times resolves it.',
+        'Facility type full for the window. The message lists concurrent demand against capacity. Short capacity: add facilities or stagger maintenance. Capacity available but not fitting: slots are fragmented; shift times.',
       rootYardDefer:
         'A larger fleet raises concurrent yard demand. Determine fleet size first, then facility count.',
       rootBerth: 'Not enough berth capacity',
@@ -956,7 +956,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       gateHint:
         'Hard gate needs 0 errors; policy defer/reroute hidden by default. Quality also requires no unserved pulses and headway at target.',
       tugOfWar:
-        'Conflicts with “not enough vehicles”: add vehicles and berths/facilities tighten; remove vehicles and headway worsens. Non-conflicting fixes: shorten round-trip, add an alternate terminal route, stagger maintenance.',
+        'Conflicts with “not enough vehicles”: adding vehicles tightens berths and facilities; removing them worsens headway. Non-conflicting fixes: shorten round-trip, add an alternate terminal route, stagger maintenance.',
       genFailed: 'Could not generate schedule output',
       templateReloadFailed: 'Failed to reload time template',
       templateReloadFailedDetail: 'Failed to reload time template: {{message}}',
@@ -1039,7 +1039,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       collisionAria: 'Collision protect',
       serviceDirHelp: 'Service direction help',
       serviceDirHelp1:
-        'Service direction marks which route trips count as the same way. Continuous same-direction segments on one vehicle count as one trip; capacity uses adjacent headways, then bucket-averaged.',
+        'Service direction marks which route trips count as the same way. Continuous same-direction segments on one vehicle count as one trip; capacity uses adjacent headways, bucket-averaged.',
       serviceDirHelp2:
         'Different from the association graph below (how vehicles rotate). Service direction is what passengers see as the same way.',
       serviceDirHelp3: 'E.g. create “to T3” / “to Nangang”, then pick one per route card.',
@@ -1720,7 +1720,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         title: 'Name display style',
         showName: 'Show name',
         dragHint:
-          'Enter Edit mode first. On the map, hover the name (cyan outline + grab cursor), drag to move; when selected, drag the handle to the right of the name to rotate (tracks, facilities, signals, poles, etc.).',
+          'Enter Edit mode first. Hover a name (cyan outline, grab cursor) and drag to move; when selected, drag the handle right of the name to rotate. Applies to tracks, facilities, signals and poles.',
         fontSize: 'Font size (px)',
         autoTitle: 'Restore auto (~{{px}}px)',
         fontHint: 'Map-coordinate font size; all facilities default to {{px}}px.',
@@ -1953,7 +1953,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       mapCanvas: {
         title: 'Monitor canvas',
         hint:
-          'Canvas pixel size is the dashboard map resolution. Select empty canvas or the Canvas toolbar, then drag the amber frame edges/corners to grow or crop; shrinking cannot go below existing Areas.',
+          'Canvas pixel size is the dashboard map resolution. Select the empty canvas or the Canvas toolbar, then drag the amber frame to grow or crop. Cannot shrink below existing Areas.',
         width: 'Width (px)',
         height: 'Height (px)',
         limits:
@@ -2210,7 +2210,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     connectivityScan: {
       title: 'Gap scan',
       hint:
-        'Checks whether refField continues across the adjacency graph (physical neighbors + continuous endpoints). Issues are pre-located and revealed as the scan reaches them. At most {{max}} probes run at once; others queue.',
+        'Checks refField continuity across the adjacency graph (physical neighbours + continuous endpoints). Issues are pre-located and revealed as the scan reaches them. Up to {{max}} probes at once; the rest queue.',
       complete: 'Scan complete',
       issueStopped: 'Gap detected · laser paused',
       scanning: 'Probe pool scanning',
@@ -2706,9 +2706,9 @@ const enUS: DeepStringify<typeof zhTW> = {
         selectMap: 'Select map',
         selectMapPlaceholder: '— Select a map —',
         mapHint:
-          'Match map-platform size to the map editor canvas pixelSize for 1:1 display without scrolling. Different sizes scale to fit. Place vehicle appearance with a vehicle container above the map.',
+          'Match map-platform size to the editor canvas pixelSize for 1:1 display without scrolling; other sizes scale to fit. Place vehicle appearance in a vehicle container above the map.',
         eventCenterHint:
-          'This canvas has title + KPI (SQL aggregates) only. Edit the “Event carousel” group in the same row for list carousel: dual canvas left=default, right=normal; data from group list SQL.',
+          'This canvas has title and KPI (SQL aggregates) only. For the list carousel, edit the “Event carousel” group in the same row: dual canvas, left default, right normal; data from the group list SQL.',
         overlayHint:
           'Overlay canvas: clicks pass through to lower groups when unselected; select to edit empty-state widgets.',
         editSubcanvas: 'Edit subcanvas template',

@@ -3,13 +3,6 @@ import { CROSS_PARTS, SWITCH_PARTS, type TrackGenPart } from './trackGenGroups'
 
 /**
  * 交叉與分岔<strong>一個元件、兩條軌道</strong>。
- *
- * 交叉是上行一條、下行一條；分岔是橫的那條（主線繼續走）與斜的那條（岔出去）。
- * 圖上它們是一個物件——形狀本來就是連在一起的——但現場的人要分上下行，所以名字與
- * 底色各記各的。
- *
- * 沒有把它們拆成兩個設施，是因為那會讓一個路口變成好幾個疊在一起的物件：移動、
- * 刪除、接合都要同時處理，而交叉的兩條斜線又不屬於其中任何一條。
  */
 
 export const TRACKGEN_PART_NAMES_KEY = 'trackGenPartNames'

@@ -36,13 +36,6 @@ import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/loca
 
 /**
  * 這一點在路網上的位置：road、lane、沿參考線的里程，以及離該段中心線多遠。
- *
- * <strong>這是本端算出來的，不是跟車端要的。</strong>廠商的 telemetry 只有場域座標與
- * 車頭朝向（`local_pose.position` / `local_pose.heading`），協議裡沒有 road、沒有 lane、
- * 也沒有里程。這幾個值來自生成軌道時就寫進元件的 `trackGenSpans`——那份對應表是讀
- * .xodr 產生的，定位時只是拿座標去查它。
- *
- * 手工放置的軌道沒有那份資料，所以查不到時是 undefined。
  */
 export type VehicleNetworkFix = {
   roadId: string;
@@ -329,14 +322,6 @@ export function trackLocalPathPointToAreaLocal(
 
 /**
  * 圖面路徑上的一點，<strong>再照偏移量往旁邊移出去</strong>。
- *
- * 車子不一定走在軌道上——可能偏出去、跑到對向、撞上牆。只取「走了幾成」等於把車壓回
- * 軌道中央，那些情況在圖上全部看不出來。偏移量乘上這一塊記下的橫向比例尺，車就畫在
- * 它真正的位置。
- *
- * 法線要在圖面座標系裡取。圖面的縱軸朝下（見 trackLocalPathPointToAreaLocal 的翻轉），
- * 與真實世界的朝上相反，所以真實世界的左手邊在這裡是 (dy, -dx)——少了這一次翻轉，
- * 上下行會整個對調。
  */
 function offsetLocalPoint(
   local: PathXY,
@@ -380,11 +365,6 @@ export function fieldPositionToTrackAreaLocal(
    * 那四個數字是給手工放的軌道用的：沒有路徑可循時，只能拿一個方框做線性內插。生成的
    * 軌道兩條路徑都在身上，範圍再檢查一次只是多一道會擋掉東西的門——而且那個方框只有
    * 中心線兩側各 1.675 公尺，車子一偏出軌道就整台不見。
-   *
-   * 底下那套是把座標對到參照場域範圍、沿長邊做線性內插——直線段沒問題，圓角是
-   * 一段弧就對不上：範圍是弧的外接方框，線性內插等於把弧拉成直線，實測車子走到
-   * 轉角會跳 137 像素。有路徑時改成「真實路徑上走了幾成 → 圖面路徑上同樣幾成」，
-   * 弧與斜段都貼合。
    */
   const paths = getTrackGenPaths(track.parameters);
   if (paths) {

@@ -1,16 +1,5 @@
 /**
  * 生成前先分組、先命名。
- *
- * <h3>為什麼要有這個</h3>
- * 生成出來的軌道名字是機器取的（車道鍵加流水號，像 <code>8:-2-07</code>），現場的人
- * 不是這樣叫它們的——他們講的是「下行 D04」「上行 U03」。以前只能生成完再一塊一塊改名，
- * 幾十塊改到手軟。
- *
- * 所以在預覽上直接框：按 + 進入選取，照順序點過去，那個順序就是編號的順序，再給這一組
- * 一個<strong>頭字</strong>與底色。生成時名字就是「頭字 + 兩位順序」。
- *
- * <h3>頭字為什麼限制兩個大寫字母</h3>
- * 它要接在兩位數字前面，變成 D04、UA12 這種現場叫得出口的代號。太長就不是代號了。
  */
 
 export type TrackGenGroup = {
@@ -30,10 +19,6 @@ export type TrackGenGroup = {
 
 /**
  * 交叉與分岔在圖上是一個元件，在現場卻是<strong>兩條軌道</strong>。
- *
- * 交叉是上行一條、下行一條；分岔是橫的一條（主線繼續走）與斜的一條（岔出去）。
- * 要分上下行就得分開選、分開命名，所以這兩種的成員鍵多帶一個「哪一半」。
- * 其餘軌道整塊就是一條，鍵就是形狀自己的名字。
  */
 export const CROSS_PARTS = ['up', 'down'] as const
 export const SWITCH_PARTS = ['straight', 'branch'] as const
@@ -83,11 +68,6 @@ export const TRACK_GEN_GROUP_COLORS = [
 
 /**
  * 名字 → 它在哪一組、第幾塊。
- *
- * <strong>還沒填頭字的組也要算進來。</strong>使用者的順序是「先框再命名」，這裡若把
- * 沒頭字的組跳過，他點了半天預覽上什麼都不會變，看起來就像沒選到。頭字只影響<strong>
- * 叫什麼名字</strong>，不影響<strong>選了誰</strong>——所以改名那一端自己去判斷有沒有
- * 頭字（見 buildFacilitiesFromLayout）。
  */
 export function trackGenGroupIndex(
   groups: TrackGenGroup[],

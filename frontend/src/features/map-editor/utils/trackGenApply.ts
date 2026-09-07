@@ -36,16 +36,6 @@ import {
 /**
  * 把生成結果轉成真正的設施。
  *
- * 位置與形狀直接取自 {@link layoutTrackGen}——那也是預覽在用的同一支，所以套用
- * 出來的東西與畫面上看到的一致。先前兩邊各自算，套用出來方向是反的、ㄩ 形也散掉。
- *
- * <h3>三種軌道各對應哪一部分</h3>
- * <ul>
- *   <li>直線段的每一塊 → 一般軌道（矩形），逐塊獨立才能個別拉伸與設屬性</li>
- *   <li>每一段彎道 → <strong>一個</strong>圓角軌道，不切碎</li>
- *   <li>渡線與側線 → 斜接軌道，兩端各自帶寬度</li>
- * </ul>
- *
  * <h3>兩套座標</h3>
  * 圖面位置用版面座標（沿線真實公尺、橫向放大），真實座標另外寫進 refField。
  * 兩者分開存，與地圖其他設施的做法一致。
@@ -72,21 +62,6 @@ const LANE_HALF_W_M = 1.675
 
 /**
  * 這一段軌道在真實場域裡蓋到的範圍，直接寫進「參照場域範圍」。
- *
- * <h3>這就是自動生成的目的</h3>
- * 車端回報的是真實場域座標；圖台要把車畫在簡易地圖上，靠的就是每一段軌道的
- * 參照場域範圍。以前這四個數字得一段一段手填，四十幾段就是一百多個數字。
- *
- * 範圍取這一段真實中心線的外接方框，再往兩側各撐半個車道寬。
- *
- * <h3>座標系</h3>
- * .xodr 的 x／y 與車端回報的位置<strong>是同一個東西</strong>：TWD97，單位公尺的平面
- * 座標。所以這裡不做偏移、不翻轉、不投影，讀進來是什麼就是什麼。整套定位的正確性
- * 建立在這個前提上；哪天拿到的是經緯度，要在最前面補一道投影換成同一個平面，後面
- * 完全不必動。
- *
- * 寫進 refField 不會改變圖面大小：Area 內的顯示尺寸看的是 areaSizePx，
- * refField 只在沒有 areaSizePx 時才參與尺寸推導（見 getFacilitySizeMeters）。
  */
 function realBounds(path: Vec2[]) {
   let xMin = Infinity
@@ -154,10 +129,6 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
   const realPath = path.map((p) => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))])
   /*
    * 這一塊代表路網的哪一段：road、lane、里程起訖。
-   *
-   * 車輛回報場域座標，反投影回 OpenDRIVE 就得到這三個值，於是定位變成查表加一次內插——
-   * 不必拿座標去跟每一塊軌道比距離，也不必靠「哪條線比較長」決定分岔口挑誰。路口的元件
-   * 會有不只一筆：圓角吃掉兩條腿的尾巴，分岔吃掉梗與兩個出口的起頭。
    */
   /*
    * 里程是<strong>照路徑的走向</strong>記的，s0 可以大於 s1（反接的那條腿里程遞減）。
@@ -179,11 +150,6 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
   const spanMeta = spans.length ? { [TRACKGEN_SPANS_KEY]: spans } : {}
   /*
    * 底色照<strong>種類</strong>分：一般、圓角、斜接、分岔各一個色。
-   *
-   * 生成出來一整片同色的方塊，看不出哪一塊是道岔、哪一塊只是換股——那正是需要一眼認出來
-   * 的兩種。四個色與預覽對話框共用同一份，明度接近、差在色相。
-   *
-   * 寫的是 defaultFillColor，所以使用者之後仍可以自己改色，MQTT 的顏色規則也照樣覆蓋得掉。
    */
   const fillMeta = { defaultFillColor: TRACK_GEN_KIND_COLOR[shape.kind].fill }
   if (shape.kind === 'rect') {
@@ -366,10 +332,6 @@ export function buildFacilitiesFromLayout(
 
   /*
    * 分好組的軌道<strong>改名改色</strong>。
-   *
-   * 機器取的名字（車道鍵加流水號）現場沒有人這樣叫；使用者在預覽上照順序點過去，
-   * 那個順序就是編號。名字與 segmentId 一起改——圖台的清單、路徑規劃、虛擬渡線的
-   * 端點都是靠 segmentId 找軌道的，只改顯示名字等於兩套名字並存。
    */
   const groupOf = trackGenGroupIndex(groups)
   facilities.forEach((f, i) => {
@@ -377,10 +339,6 @@ export function buildFacilitiesFromLayout(
     const parts = shape ? partsOfKind(shape.kind) : null
     /*
      * 交叉與分岔一個元件、兩條軌道，所以名字也是兩個。
-     *
-     * 交叉是上行與下行，分岔是主線繼續走的那條與岔出去的那條。兩個名字各自記著，
-     * 元件自己的名字取兩個併起來（其中一半沒命名時就只有一半），這樣清單、路徑
-     * 規劃、渡線端點看到的仍然是<strong>一個</strong>可以指名的東西。
      */
     if (parts) {
       const names: Record<string, string> = {}
@@ -413,12 +371,6 @@ export function buildFacilitiesFromLayout(
 
   /*
    * 每一塊都記下橫向比例尺：<strong>車子不一定走在軌道上</strong>。
-   *
-   * 定位時先在真實中心線上求出「走了幾成」，同時求出「離線多遠、偏哪一邊」。前者決定
-   * 沿線的位置，後者乘上這個比例尺往旁邊移出去——車子偏出軌道、跑到對向、撞上牆，圖上
-   * 就畫在偏出去的位置，不會被壓回軌道中央。
-   *
-   * 存成「佔外框的幾分之幾」，所以元件被移動或拉伸時偏移量跟著等比例變，不必重算。
    */
   facilities.forEach((f, i) => {
     if (!f.parameters?.[TRACKGEN_LOCAL_PATH_KEY]) return
