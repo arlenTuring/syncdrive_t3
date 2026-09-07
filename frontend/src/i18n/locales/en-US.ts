@@ -862,7 +862,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       viaNodes: 'Via',
       secondsParen: '({{seconds}} s)',
       zeroTransferNote:
-        'Both facilities share a yard — 0 s symbolic transfer; this card takes no time; width is a marker only.',
+        'Both facilities share a yard; 0 s symbolic transfer. This card takes no time; its width is a marker only.',
       ateYardTail: '※ Not enough space; used yard-tail time',
       facilityAssigned: 'Facility: {{label}}',
       facilityUnassigned: 'Facility: unassigned',
@@ -870,7 +870,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       hoursPart: '{{hours}} h ',
       minutesUnit: 'min',
       yardHoldHint:
-        'Maintenance finished but the vehicle has not left — it still occupies this berth. Hold is not standby: standby is scheduled; hold is idle occupancy. Facility occupancy and collision checks include this span.',
+        'Maintenance is complete but the vehicle has not left; it still occupies this berth. Hold differs from standby: standby is a scheduled move, hold is idle occupancy. Facility occupancy and collision checks include this span.',
       noFacilitySlot:
         '⚠ No free facility of this type in this window. Add facilities, stagger maintenance, or reduce concurrent yard work.',
       travel: 'Travel',
@@ -901,7 +901,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       zeroTransferTitle:
         '※ Both facilities share a yard — 0 s symbolic transfer (no time; width is a marker)',
       ateYardTailShort: '※ Not enough space; used yard-tail time',
-      noFacilityHover: '⚠ No free facility of this type — nowhere to park',
+      noFacilityHover: '⚠ All facilities of this type occupied; no berth available',
       zeroDurationWarn:
         '⚠ Card start equals end (length 0); time-template row may be wrong',
       hasSevereError: ' (severe error)',
@@ -916,12 +916,12 @@ const enUS: DeepStringify<typeof zhTW> = {
     scheduleAdjust: {
       rootFleet: 'Not enough vehicles',
       rootFleetHint:
-        'Concurrent vehicles below round-trip ÷ headway. Add vehicles or relax headway — see analysis report.',
+        'Concurrent vehicles below round-trip ÷ headway. Add vehicles or relax headway; the analysis report lists the required figures.',
       rootYard: 'Not enough yard facilities',
       rootYardHint:
-        'That facility type is full in the window. The message states concurrent demand vs capacity. If truly short, add facilities or stagger; if capacity exists but won’t fit, slots are fragmented — shifting times helps.',
+        'That facility type is full for the window. The message lists concurrent demand against capacity. If capacity is short, add facilities or stagger maintenance; if capacity exists but does not fit, slots are fragmented and shifting times resolves it.',
       rootYardDefer:
-        'More vehicles mean more concurrent yard work. Fix fleet size first, then facility count.',
+        'A larger fleet raises concurrent yard demand. Determine fleet size first, then facility count.',
       rootBerth: 'Not enough berth capacity',
       rootBerthHint:
         'One berth holds one vehicle. Crowding at terminals delays departures, forces alternates, then collisions.',
@@ -931,14 +931,14 @@ const enUS: DeepStringify<typeof zhTW> = {
       rootGeometryHint:
         'Berth solve, yield, and headway repair interact until the layout stops changing. Hitting the iteration cap while still changing triggers this.',
       rootGeometryDefer:
-        'This is the combined upstream result. Fix one upstream item and this often converges.',
+        'Combined result of upstream issues; usually converges once upstream is reduced.',
       rootOther: 'Other',
       rootOtherHint: 'Uncategorized items.',
       linkedIssues: '{{count}} linked',
       fixFromHere: 'Fix from here',
       mostlyConsequence: 'Mostly a consequence of “{{titles}}”',
       deferBody:
-        'While upstream issues remain, do not follow this suggestion yet. Downstream often clears with upstream; fixing downstream first pads the wrong problem and gets overwritten.',
+        'Do not apply while upstream issues remain. Downstream issues usually clear with upstream; downstream edits are typically overwritten by later passes.',
       deferDontTouch: 'Leave this for now:',
       generating: 'Generating schedule from time template, maintenance, and route groups…',
       issueCount: '{{count}}',
@@ -979,7 +979,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       confirmRegenTitle: 'Confirm regenerate',
       close: 'Close',
       confirmRegenBody:
-        'Regenerating recomputes all trips with current settings. You can Undo back to the pre-regeneration version on this step.',
+        'Recomputes all trips with the current settings. Undo returns to the pre-regeneration version.',
       cancel: 'Cancel',
       confirmRegen: 'Confirm regenerate',
       cannotDuplicate: 'Cannot duplicate trip',
@@ -1413,7 +1413,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     unsavedBannerBefore: 'This map ',
     unsavedBannerStrong: 'was not saved to the server',
     unsavedBannerAfter:
-      ' and exists only in this browser. Another computer or clearing cache will show an older version — check the backend connection and save again.',
+      ' and exists only in this browser. Another device or a cleared cache will show an older version. Check the backend connection and save again.',
     trajectoryTitle: 'Trajectory map',
     tabMap: 'Map editor',
     tabTrajectory: 'Trajectory map',
@@ -1456,7 +1456,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         regenerate: 'Regenerate',
         generate: 'Generate tracks',
         clearResultTitle: 'Clear generation; show centerlines only',
-        expandTitle: 'Fit to canvas: stretch this component to the whole map',
+        expandTitle: 'Fit to canvas (fill the whole map)',
         expandDone: 'Already fills the canvas',
         splitRow: 'Split horizontally (top / bottom)',
         splitCol: 'Split vertically (left / right)',
@@ -1499,11 +1499,11 @@ const enUS: DeepStringify<typeof zhTW> = {
       },
     },
     trackGen: {
-      title: 'How to draw tracks',
+      title: 'Track generation',
       hintFull:
-        'Layout fills the box you sized; no size to enter. Canvas background {{w}} × {{h}} px at full scale. Changing a parameter re-layouts — what you see is what will be generated.',
+        'Layout fills the component box; no size to enter. Canvas {{w}} × {{h}} px at full scale. Parameter changes re-run the layout; the preview is the generated result.',
       hintScaled:
-        'Layout fills the box you sized; no size to enter. Canvas background {{w}} × {{h}} px, scaled to {{pct}}%. Changing a parameter re-layouts — what you see is what will be generated.',
+        'Layout fills the component box; no size to enter. Canvas {{w}} × {{h}} px, scaled to {{pct}}%. Parameter changes re-run the layout; the preview is the generated result.',
       trackWidth: 'Track width',
       metersPerBlockX: 'Horizontal block equals',
       metersPerBlockY: 'Vertical block equals',
@@ -1512,7 +1512,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       axisY: 'Vertical',
       blockUnit: 'blocks',
       occupies: 'Size',
-      overflowBefore: '　Tracks too thick; overflow ',
+      overflowBefore: '　Track width too large; overflow ',
       overflowAfter: ' — reduce track width',
       legendNote: 'Colors are preview labels only; generated tracks are unaffected',
       groups: {
@@ -1523,9 +1523,9 @@ const enUS: DeepStringify<typeof zhTW> = {
         done: 'Done',
         remove: 'Delete group',
         picked: '{{n}} selected',
-        previewName: 'Will be named {{first}} … {{last}}',
-        needCode: 'Enter a prefix to rename',
-        hint: 'Press ＋ to start a group, then click tracks in the preview in order; each takes the group fill and shows its number.',
+        previewName: 'Generated names: {{first}} … {{last}}',
+        needCode: 'No prefix — tracks keep their generated names',
+        hint: 'Press ＋ to create a group, then select tracks in the preview in order. Selected tracks take the group fill and show their number.',
       },
       generate: 'Generate',
       kinds: {
@@ -1698,7 +1698,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         },
         railCross: {
           label: 'Crossing track',
-          hint: 'Crossing track — two tracks meeting, all four mouths connected (two straight, two diagonal shown dashed); each joint adapts to whatever track you drag it onto',
+          hint: 'Crossing track — two tracks meeting, all four mouths connected (two straight, two diagonal); each joint adapts to the track it is attached to',
         },
         trackCrossover: {
           label: 'Virtual crossover',
@@ -1839,13 +1839,13 @@ const enUS: DeepStringify<typeof zhTW> = {
         deleteText: 'Delete this text',
       },
       trackParts: {
-        title: 'Name each of the two tracks',
+        title: 'Per-track naming',
         up: 'Up line (upper)',
         down: 'Down line (lower)',
         straight: 'Through (straight)',
         branch: 'Branch (diagonal)',
         placeholder: 'e.g. D04',
-        hint: 'One component on the map, two tracks in the field. Pick and name them separately in the generation preview; change them here afterwards.',
+        hint: 'One component represents two tracks; names are set separately. Also selectable per track in the generation preview.',
       },
       crossTrack: {
         title: 'Waypoints & directions',
@@ -1860,9 +1860,9 @@ const enUS: DeepStringify<typeof zhTW> = {
         fieldX: 'Reference field X (m)',
         fieldY: 'Reference field Y (m)',
         fieldHint:
-          'Real-world position (field metres, origin bottom-left). Derived automatically on HD-map generated track; otherwise from the container domain (1:1 when the domain matches its pixel size).',
-        autoValue: 'Automatic — derived from where it sits on the map; follows moves and resizes.',
-        manualValue: 'Manual override — clear both fields to go back to automatic.',
+          'Field coordinates (metres, origin bottom-left). Computed automatically on HD-map generated track; otherwise from the container domain.',
+        autoValue: 'Computed automatically; follows component position and size',
+        manualValue: 'Manual override; clear both fields to restore automatic',
         routes: 'Route directions',
         route: {
           straightTop: 'Straight (top)',
@@ -1919,7 +1919,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         graphSummary:
           'On map {{nodes}} nodes · {{edges}} edges · {{components}} components',
         coordsHint:
-          'Each track’s reference field bounds are filled at generate time; coordinates follow .xodr — the same field map vehicles report against.',
+          'Reference field bounds are filled at generate time; coordinates follow .xodr (TWD97, metres), the same frame vehicles report in.',
         loadedNotGenerated: 'Loaded {{fileName}}; tracks not generated yet',
         noXodr: 'No .xodr loaded yet',
         dialogHint:
@@ -2496,7 +2496,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       nextFrameTitle:
         'Step forward one frame (hold to repeat, +100ms/frame; auto-pauses send)',
       pausedHint:
-        'MQTT send paused: map will not update. Press “Resume send” or “Next frame” for new coordinates.',
+        'MQTT send paused; the map will not update. Press “Resume send” or “Next frame” to resume coordinates.',
       sendSpeed: 'Send speed',
       sendSpeedAria: 'Simulation data send speed',
       virtualTime: 'Virtual time',
