@@ -1,5 +1,4 @@
 import {
-  blocksInSpan,
   fitCornerAt,
   fitSwitchAt,
   fitTaperAt,
@@ -570,6 +569,8 @@ function layoutOnce(
    * 放不下轉角時兩條帶子之間會留一個 L 形的洞，大小是另一束的半寬（寬 70 時破 68 像素）。
    * 各自往對方多伸那一截就補實了。
    */
+  /** 整條被兩頭路口包進去的邊；由下面那一輪填 */
+  const swallowed = new Set<string>()
   const trimAt = (e: GraphEdge, nodeId: string, fullLen: number) => {
     const pair = cornerPair.get(nodeId)
     const onPair = pair && (pair.h.id === e.id || pair.v.id === e.id)
@@ -580,7 +581,9 @@ function layoutOnce(
     const corner = onPair ? (cornerRadiusAt.get(nodeId) ?? cornerR) : 0
     const sw = switchTrim.get(`${e.id}|${nodeId}`) ?? 0
     const want = Math.max(corner, sw)
-    return want > 0 ? Math.min(want, fullLen / 2 - 1) : 0
+    // 被路口包進去的短邊不留那一像素：留了就是圖上一條縫
+    const cap = swallowed.has(e.id) ? fullLen : fullLen / 2 - 1
+    return want > 0 ? Math.min(want, cap) : 0
   }
   /**
    * 真正讓出去的長度（版面像素），切塊與認領里程共用這一個。
@@ -604,6 +607,95 @@ function layoutOnce(
     const n = (seqOf.get(key) ?? 0) + 1
     seqOf.set(key, n)
     return n
+  }
+
+  /** 這條邊切出來的一塊有多長（版面像素） */
+  const blockPxOf = (e: GraphEdge) => {
+    const perBlock = e.orient === 'h' ? block.metersPerBlockX : block.metersPerBlockY
+    return spanOf(e) * (Math.max(1, perBlock) / Math.max(1e-6, e.lengthM))
+  }
+
+  /**
+   * 剩不到半塊的邊，讓兩頭的路口把它包進去。
+   *
+   * 塊數是四捨五入來的，剩半塊以上就自成一塊，跟旁邊的塊差不多長；剩不到半塊才會切
+   * 出跟旁邊差一截的碎塊。路口讓出去多少就畫多長（轉角照半徑、分岔照 runPx、交叉照
+   * 半邊長），所以拉長不會開縫，也不會有洞。
+   */
+  {
+    /** 這一端是哪一種路口，長它一截；交叉那一側的每條邊都要跟著多讓 */
+    const growAt = (nodeId: string, e: GraphEdge, by: number): boolean => {
+      if ((cornerRadiusAt.get(nodeId) ?? 0) > 0) {
+        const pair = cornerPair.get(nodeId)
+        if (!pair) return false
+        /*
+         * 半徑兩隻腳共用，長它等於兩隻腳都多讓一截。要被包進去的那一隻可以整隻讓掉；
+         * 另一隻至少要留半塊，不然換那條切出碎塊。
+         */
+        const room = Math.min(
+          ...[pair.h, pair.v].map((leg) => {
+            if (leg.id === e.id) return spanOf(leg)
+            const far = leg.from === nodeId ? leg.to : leg.from
+            const rest = spanOf(leg) - Math.max(0, trimAt(leg, far, spanOf(leg)))
+            return Math.max(0, rest - blockPxOf(leg) * 0.5)
+          }),
+        )
+        const next = (cornerRadiusAt.get(nodeId) ?? 0) + by
+        if (next > room) return false
+        cornerRadiusAt.set(nodeId, next)
+        return true
+      }
+      const job = switchJobs.find((j) => j.nodeId === nodeId && j.stem.id === e.id)
+      if (job) {
+        job.runPx += by
+        const key = `${e.id}|${nodeId}`
+        switchTrim.set(key, (switchTrim.get(key) ?? 0) + by)
+        return true
+      }
+      const plan = crossPlans.find((c) => c.nodeId === nodeId)
+      const side = plan ? plan.groups.findIndex((g) => g.some((x) => x.id === e.id)) : -1
+      if (plan && side >= 0) {
+        plan.halves[side] += by
+        for (const x of plan.groups[side]) {
+          const key = `${x.id}|${nodeId}`
+          switchTrim.set(key, (switchTrim.get(key) ?? 0) + by)
+        }
+        return true
+      }
+      return false
+    }
+
+    /* 先把所有邊量完再長，免得先長的把後面那條也算成短邊 */
+    const cands: { e: GraphEdge; ends: string[]; rest: number }[] = []
+    for (const e of graph.edges) {
+      const full = spanOf(e)
+      if (!Number.isFinite(full)) continue
+      const blockPx = blockPxOf(e)
+      const rest =
+        full -
+        Math.max(0, trimAt(e, e.from, full)) -
+        Math.max(0, trimAt(e, e.to, full))
+      if (rest >= blockPx * 0.5) continue
+      const ends = [e.from, e.to].filter(
+        (n) =>
+          (cornerRadiusAt.get(n) ?? 0) > 0 ||
+          switchJobs.some((j) => j.nodeId === n && j.stem.id === e.id) ||
+          crossPlans.some((c) => c.nodeId === n && c.groups.some((g) => g.some((x) => x.id === e.id))),
+      )
+      if (!ends.length) continue
+      cands.push({ e, ends, rest: rest / ends.length })
+    }
+    /* 同一個路口接了好幾條短邊時只長一次，長最長的那條要的量 */
+    const want = new Map<string, { e: GraphEdge; by: number }>()
+    for (const c of cands) {
+      for (const n of c.ends) {
+        const cur = want.get(n)
+        if (!cur || c.rest > cur.by) want.set(n, { e: c.e, by: c.rest })
+      }
+    }
+    const grown = new Set<string>()
+    for (const [n, w] of want) if (growAt(n, w.e, w.by)) grown.add(n)
+    for (const c of cands) if (c.ends.every((n) => grown.has(n))) swallowed.add(c.e.id)
   }
 
   /** 每條邊、每個節點、每條車道：帶子在那一端實際畫到的位置 */
@@ -920,12 +1012,27 @@ function layoutOnce(
       }
     }
 
-    /* 橫移與拉開各有各的段界，畫之前先合成同一組 */
+    /**
+     * 塊的網格：<strong>整條均分</strong>。
+     *
+     * 先前是每一段各自除以「一塊幾公尺」再取整，段長不是塊長的整數倍就生出不等長的塊；
+     * 斜接再從段的兩端咬掉一口，剩下的更短。碎塊是這兩步的餘數，不是幾何本身。
+     *
+     * 改成整條先切成等長的塊，換股的位置再吸附到塊邊界上。每一格不是一塊軌道就是一片
+     * 斜接，長度一律相同，結構上不會有餘數。代價是換股最多偏半塊。
+     */
+    const nBlocks = Math.max(1, Math.round(usedM / perBlockM))
+    const snapF = (f: number) =>
+      Math.max(0, Math.min(nBlocks, Math.round(f * nBlocks))) / nBlocks
+
+    /* 橫移與拉開各有各的段界，畫之前先合成同一組，並吸附到塊邊界 */
     const cuts = [
-      ...new Set([
-        ...levelRuns.flatMap((r) => [r.f0, r.f1]),
-        ...spreadRuns.flatMap((r) => [r.f0, r.f1]),
-      ]),
+      ...new Set(
+        [
+          ...levelRuns.flatMap((r) => [r.f0, r.f1]),
+          ...spreadRuns.flatMap((r) => [r.f0, r.f1]),
+        ].map(snapF),
+      ),
     ].sort((a, b) => a - b)
     const pick = <T extends { f0: number; f1: number }>(arr: T[], f: number): T =>
       arr.find((r) => f >= r.f0 && f < r.f1) ?? arr[arr.length - 1]!
@@ -1007,83 +1114,68 @@ function layoutOnce(
       }
 
       /*
-       * 兩段之間的斜接佔掉的半寬。坡照 1:3，但不能吃掉比相鄰兩段還長的距離
-       * （收尾那段可能只剩 4%）。放不下就讓它陡一點，總比畫到邊外去好。
-       */
-      /*
-       * 斜接要多寬，以及兩邊各讓出多少。
-       *
-       * 寬度：坡照 1:3，但至少一整塊——只挪幾像素的地方照 1:3 算出來像一條縫，不像換股。
-       * 讓法：一邊出不起、對面就補上。各讓一半的話，頭尾那兩段常常很短，整片斜接會被
-       * 壓成 18.8 × 18.8 的 45 度小方塊。接節點那一端沒有別片要讓，可以整段讓出去。
-       */
-      const oneBlockW = perBlockM / Math.max(1e-6, usedM)
-      const shareOf = (i: number): number => {
-        const r = runs[i]
-        if (!r) return 0
-        const span = r.f1 - r.f0
-        const terminal = i === 0 || i === runs.length - 1
-        return terminal ? span : span / 2
-      }
-      const cutsAt = (i: number): { left: number; right: number } => {
-        const a = runs[i]
-        const b = runs[i + 1]
-        if (!a || !b) return { left: 0, right: 0 }
-        const step = Math.abs(b.extra - a.extra)
-        const wantW = Math.max(rampPx(b.extra - a.extra) / len, oneBlockW)
-        const la = shareOf(i)
-        const rb = shareOf(i + 1)
-        let left = Math.min(la, wantW / 2)
-        let right = Math.min(rb, wantW - left)
-        left = Math.min(la, wantW - right)
-        // 兩邊加起來還是擠不出 1:1 就讓它陡一點——垂直的一刀不像軌道，但畫到邊外更糟
-        const floorW = Math.min(1, (step * DRAWING.rampMinRun) / len)
-        const short = floorW - (left + right)
-        if (short > 0) {
-          left += short / 2
-          right += short / 2
-        }
-        return { left, right }
-      }
-      /*
        * 記下帶子實際畫到哪，轉角照這個位置接。
        * 照節點的名目股位畫會錯開（road 10 的兩個圓角與縱向帶子各差 3.7 像素）。
        */
       bandEnd.set(`${e.id}|${e.from}|${k}`, at(0, runs[0]!.extra))
       bandEnd.set(`${e.id}|${e.to}|${k}`, at(1, runs[runs.length - 1]!.extra))
 
-      /*
-       * 斜接切完剩不到一條軌道寬的殘塊，整截讓給旁邊的斜接。
+      /**
+       * 一段的開頭要讓幾格給斜接。
        *
-       * 不讓的話圖上是幾條縫（1200 像素寬的容器裡有八塊比自己還窄，最短 9.7 像素）。
-       * 斜接本來就認領那一截的里程，讓過去覆蓋照樣連續。兩側都沒有斜接的不動。
+       * 斜接畫在塊與塊之間，佔的是整數格：坡照 1:3 算出來要多寬，換算成幾格無條件進位，
+       * 至少一格。前一段沒有就是 0——第一段前面沒有東西要接。
        */
-      const cuts2 = runs.map((_, i) => cutsAt(i))
-      const minPieceF = (bandW * DRAWING.minBlockBands) / Math.max(1, len)
-      runs.forEach((run, i) => {
-        const left = i > 0 ? cuts2[i - 1]!.right : 0
-        const right = cuts2[i]?.left ?? 0
-        const piece = run.f1 - right - (run.f0 + left)
-        if (piece <= 0 || piece >= minPieceF) return
-        // 有右邊的斜接就讓給它，否則讓給左邊那一片
-        if (cuts2[i] && i + 1 < runs.length) cuts2[i]!.left = right + piece
-        else if (i > 0) cuts2[i - 1]!.right = left + piece
-      })
-
+      const blockPx = len / nBlocks
+      const taperBlocks = (from: number, to: number, avail: number) => {
+        const want = rampPx(to - from) / Math.max(1e-6, blockPx)
+        return Math.max(1, Math.min(avail, Math.ceil(want)))
+      }
 
       runs.forEach((run, ri) => {
         const extra = run.extra
-        const next = runs[ri + 1]
-        const cut0 = ri > 0 ? cuts2[ri - 1]!.right : 0
-        const cut1 = cuts2[ri]?.left ?? 0
-        const g0 = run.f0 + cut0
-        const g1 = run.f1 - cut1
-        if (g1 - g0 > 0.01) {
-          const runM = usedM * (g1 - g0)
-          const parts = Math.max(1, blocksInSpan(runM, perBlockM, perBlockM * DRAWING.minTailBlock))
-          for (let i = 0; i < parts; i += 1) {
-            const f0 = g0 + ((g1 - g0) * i) / parts
-            const f1 = g0 + ((g1 - g0) * (i + 1)) / parts
+        const prev = runs[ri - 1]
+        const a = Math.round(run.f0 * nBlocks)
+        const b = Math.round(run.f1 * nBlocks)
+        const t = prev ? taperBlocks(prev.extra, extra, b - a) : 0
+        // 斜接佔開頭那幾格，其餘一格一塊
+        if (prev && t > 0) {
+          const a0 = at(a / nBlocks, prev.extra)
+          const a1 = at((a + t) / nBlocks, extra)
+          const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
+          const fit = fitTaperAt(a0, a1, bandW, alongDeg)
+          shapes.push({
+            kind: 'taper',
+            name: `${lane.key}X-${String(nextSeq(`${lane.key}X`)).padStart(2, '0')}`,
+            role: 'road',
+            lineKey: lane.key,
+            lineLengthM: e.lengthM,
+            latScalePerM: latScaleAt(k, run.f0),
+            realLatFromM: 0,
+            realLatToM: 0,
+            samples: [a0, a1],
+            realPath: realSlice(
+              e,
+              k,
+              e.lanes.length,
+              a / nBlocks,
+              (a + t) / nBlocks,
+              t0 / full,
+              t1 / full,
+            ),
+            spans: [spanOfLane(k, a / nBlocks, (a + t) / nBlocks)],
+            geometry: fit.geometry,
+            box: fit.box,
+            sFrom: 0,
+            sTo: 0,
+          })
+          note({ x: fit.box.xM, y: fit.box.yM })
+          note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
+        }
+        {
+          for (let i = a + t; i < b; i += 1) {
+            const f0 = i / nBlocks
+            const f1 = (i + 1) / nBlocks
             const p0 = at(f0, extra)
             const p1 = at(f1, extra)
             const centre = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
@@ -1111,41 +1203,6 @@ function layoutOnce(
             note({ x: centre.x + lengthM / 2, y: centre.y + bandW / 2 })
           }
         }
-        // 與下一段之間的換股，用斜接軌道接
-        if (!next) return
-        const nextExtra = next.extra
-        const cut = cuts2[ri]!
-        const a0 = at(run.f1 - cut.left, extra)
-        const a1 = at(run.f1 + cut.right, nextExtra)
-        const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
-        const fit = fitTaperAt(a0, a1, bandW, alongDeg)
-        shapes.push({
-          kind: 'taper',
-          name: `${lane.key}X-${String(nextSeq(`${lane.key}X`)).padStart(2, '0')}`,
-          role: 'road',
-          lineKey: lane.key,
-          lineLengthM: e.lengthM,
-          latScalePerM: latScaleAt(k, run.f1),
-          realLatFromM: 0,
-          realLatToM: 0,
-          samples: [a0, a1],
-          realPath: realSlice(
-            e,
-            k,
-            e.lanes.length,
-            run.f1 - cut.left,
-            run.f1 + cut.right,
-            t0 / full,
-            t1 / full,
-          ),
-          spans: [spanOfLane(k, run.f1 - cut.left, run.f1 + cut.right)],
-          geometry: fit.geometry,
-          box: fit.box,
-          sFrom: 0,
-          sTo: 0,
-        })
-        note({ x: fit.box.xM, y: fit.box.yM })
-        note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
       })
     })
   }
