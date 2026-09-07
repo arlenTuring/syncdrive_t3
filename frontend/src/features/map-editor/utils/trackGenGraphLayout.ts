@@ -59,6 +59,13 @@ const DRAWING = {
   mergeUnit: 0.5,
   /** 切塊剩下的尾巴短過一塊的幾成就併進前一塊——比例是塊自己的事，與軌道寬無關 */
   minTailBlock: 1 / 4,
+  /**
+   * 一塊至少要有幾條軌道寬那麼長。
+   *
+   * 比這還短的方塊在圖上不像一段軌道，像兩塊之間裂了一條縫。切剩的殘塊寧可整截
+   * 讓給旁邊的斜接，也不要單獨畫出來。
+   */
+  minBlockBands: 1,
   /** 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半 */
   crossAspect: 3,
   /** 一段斜接最多吃掉整條邊的幾成 */
@@ -1143,12 +1150,35 @@ function layoutOnce(
        */
       bandEnd.set(`${e.id}|${e.from}|${k}`, at(0, runs[0]!.extra))
       bandEnd.set(`${e.id}|${e.to}|${k}`, at(1, runs[runs.length - 1]!.extra))
+
+      /*
+       * 斜接切完之後<strong>剩下的那一小截</strong>要處理掉。
+       *
+       * 斜接的坡至少一整塊長，可是它兩側的段不見得有那麼長；切完剩下的方塊有時只剩
+       * 幾個像素——圖上就是幾條縫，塞在道岔跟斜接之間。實測 1200 像素寬的容器裡有
+       * 八塊比自己的寬度還窄，最短的只有 9.7 像素長、26 像素寬。
+       *
+       * 剩太短就整截讓給旁邊的斜接：斜接本來就認領那一截的里程，讓過去里程照樣連續，
+       * 圖上少一條縫。兩側都沒有斜接的（整條邊只有一段），那是路本來就短，不動它。
+       */
+      const cuts2 = runs.map((_, i) => cutsAt(i))
+      const minPieceF = (bandW * DRAWING.minBlockBands) / Math.max(1, len)
+      runs.forEach((run, i) => {
+        const left = i > 0 ? cuts2[i - 1]!.right : 0
+        const right = cuts2[i]?.left ?? 0
+        const piece = run.f1 - right - (run.f0 + left)
+        if (piece <= 0 || piece >= minPieceF) return
+        // 有右邊的斜接就讓給它，否則讓給左邊那一片
+        if (cuts2[i] && i + 1 < runs.length) cuts2[i]!.left = right + piece
+        else if (i > 0) cuts2[i - 1]!.right = left + piece
+      })
+
       let seq = 0
       runs.forEach((run, ri) => {
         const extra = run.extra
         const next = runs[ri + 1]
-        const cut0 = cutsAt(ri - 1).right
-        const cut1 = cutsAt(ri).left
+        const cut0 = ri > 0 ? cuts2[ri - 1]!.right : 0
+        const cut1 = cuts2[ri]?.left ?? 0
         const g0 = run.f0 + cut0
         const g1 = run.f1 - cut1
         if (g1 - g0 > 0.01) {
@@ -1188,7 +1218,7 @@ function layoutOnce(
         // 與下一段之間的換股，用斜接軌道接
         if (!next) return
         const nextExtra = next.extra
-        const cut = cutsAt(ri)
+        const cut = cuts2[ri]!
         const a0 = at(run.f1 - cut.left, extra)
         const a1 = at(run.f1 + cut.right, nextExtra)
         const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
