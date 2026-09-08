@@ -54,8 +54,14 @@ const DRAWING = {
    * 讓給旁邊的斜接，也不要單獨畫出來。
    */
   minBlockBands: 1,
-  /** 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半 */
-  crossAspect: 3,
+  /**
+   * 交叉畫多長：兩條軌道疊起來是高，長取它的幾倍的一半。
+   *
+   * 3 的時候整個交叉是六個帶寬長。帶子畫粗一點它就更長，而它佔的長度是從兩側那條路
+   * 借的——帶寬 50 時它吃掉 road 1 的 43 公尺（全長 93），那條路在圖上剩一半，看起來
+   * 比對面那條短，跟現場相反。收到 1.6 之後 X 仍然看得出來，佔的長度少一半。
+   */
+  crossAspect: 1.6,
   /** 一段斜接最多吃掉整條邊的幾成 */
   rampMaxSpan: 0.3,
   /** 束與束之間留幾股的空隙 */
@@ -599,6 +605,41 @@ function layoutOnce(
   }
 
   /**
+   * 這一端讓給路口的那一截<strong>代表多少里程</strong>。
+   *
+   * 與它畫多長脫鉤。路口的長度是照帶寬算的——交叉要把兩條帶子交錯畫得出來，分岔要走
+   * 完那道坡——跟現場那個路口佔幾公尺無關。兩者綁在一起時，帶子畫粗一點路口就吃掉更多
+   * 現實里程：帶寬 50 時交叉吃掉 road 1 的 43 公尺（全長 93）、分岔吃掉 road 11 的
+   * 141 公尺（全長 341），那兩條路在圖上都只剩一半，看起來比對面短，跟現場相反。
+   *
+   * 上限取<strong>一塊</strong>：路口再大，也不該比一塊軌道代表更長的距離。另外夾在
+   * 半條之內，兩端加起來才不會把整條邊吃光。
+   */
+  const claimsOf = (e: GraphEdge): [number, number] => {
+    const full = spanOf(e)
+    if (!Number.isFinite(full) || full <= 0) return [0, 0]
+    const p0 = Math.max(0, trimPxAt(e, e.from, full))
+    const p1 = Math.max(0, trimPxAt(e, e.to, full))
+    const perBlock = Math.max(
+      1,
+      e.orient === 'h' ? block.metersPerBlockX : block.metersPerBlockY,
+    )
+    const cap = Math.min(0.5, perBlock / Math.max(1e-6, e.lengthM))
+    const a = Math.min(p0 / full, cap)
+    const b = Math.min(p1 / full, cap)
+    const sum = a + b
+    if (sum <= 1e-6) return [0, 0]
+    /*
+     * 兩端讓出去的長度把整條吃光時，中間沒有塊可以蓋那一段里程，兩端就得補滿——不然
+     * 短到只剩路口的那條路會留一小段沒人認領（road 2 全長 15 公尺，實測漏 0.6 公尺）。
+     */
+    if (sum > 1 || p0 + p1 >= full - 0.5) return [a / sum, b / sum]
+    return [a, b]
+  }
+  const claimFracAt = (e: GraphEdge, nodeId: string) =>
+    claimsOf(e)[e.from === nodeId ? 0 : 1]
+
+  /**
    * 流水號跨邊連號。名字是這些塊唯一的身分。
    * 每條邊各自從 1 開始的話，被轉角切成兩段的同一條軌道會生出兩塊 11:-2-01。
    */
@@ -760,8 +801,8 @@ function layoutOnce(
      * 負的讓開量代表帶子<strong>往外多伸</strong>了一截（放不下圓角時補的直角）。那一截
      * 在路網上屬於隔壁那條邊，不是自己的里程，所以算 s 時當成 0。
      */
-    const sTrim0 = Math.max(0, t0) / full
-    const sTrim1 = Math.max(0, t1) / full
+    const sTrim0 = claimFracAt(e, e.from)
+    const sTrim1 = claimFracAt(e, e.to)
     const spanFrac = Math.max(0, 1 - sTrim0 - sTrim1)
     const sAt = (f: number) =>
       e.sFromM + (e.sToM - e.sFromM) * (sTrim0 + Math.max(0, Math.min(1, f)) * spanFrac)
@@ -1144,8 +1185,8 @@ function layoutOnce(
               e.lanes.length,
               run.f0,
               fT,
-              t0 / full,
-              t1 / full,
+              sTrim0,
+              sTrim1,
             ),
             spans: [spanOfLane(k, run.f0, fT)],
             geometry: fit.geometry,
@@ -1174,7 +1215,7 @@ function layoutOnce(
               realLatFromM: 0,
               realLatToM: 0,
               samples: [p0, p1],
-              realPath: realSlice(e, k, e.lanes.length, f0, f1, t0 / full, t1 / full),
+              realPath: realSlice(e, k, e.lanes.length, f0, f1, sTrim0, sTrim1),
               spans: [spanOfLane(k, f0, f1)],
               centre,
               lengthM,
@@ -1203,15 +1244,7 @@ function layoutOnce(
    * 直接由 trimPxAt 換算，跟切塊時用的是<strong>同一個 t</strong>。兩端加起來超過整段
    * 時按比例收回去——不然轉角認領的里程會跟直段重疊。
    */
-  const trimFracAt = (e: GraphEdge, nodeId: string) => {
-    const full = spanOf(e)
-    if (!Number.isFinite(full) || full <= 0) return 0
-    const a = Math.max(0, trimPxAt(e, e.from, full)) / full
-    const b = Math.max(0, trimPxAt(e, e.to, full)) / full
-    const sum = a + b
-    const k = sum > 1 ? 1 / sum : 1
-    return (e.from === nodeId ? a : b) * k
-  }
+  const trimFracAt = (e: GraphEdge, nodeId: string) => claimFracAt(e, nodeId)
   /** 這條邊在這個節點那一端、讓出去那一截所涵蓋的路網區間 */
   const spanAtNode = (e: GraphEdge, nodeId: string, laneIdx: number, reversed = false): TrackSpan => {
     const frac = trimFracAt(e, nodeId)
@@ -1733,16 +1766,38 @@ export function layoutTrackGraph(
     Math.min(block.trackWidthPx, box.hPx / (maxStack + 2)),
   )
 
+  /**
+   * 比例尺用逼近的，並且<strong>留下最合身的那一次</strong>。
+   *
+   * 版面裡有一部分尺寸是固定像素（帶寬、轉角半徑、路口讓出去的那一截），不隨比例尺
+   * 縮放，所以「量出來多大就照比例調」不保證收斂，有時會在框的兩側來回跳。只取最後
+   * 一次的話可能剛好停在跳過頭的那一次——實測寬 70 時高度衝到 805（框只有 642）。
+   * 每一次都評分，超出框的重罰，最後回最合身的那一份。
+   */
+  const scoreOf = (l: TrackGenLayout) => {
+    const w = Math.max(1, l.bounds.xMax - l.bounds.xMin)
+    const h = Math.max(1, l.bounds.yMax - l.bounds.yMin)
+    const ratio = Math.max(w / box.wPx, h / box.hPx)
+    return ratio > 1 ? (ratio - 1) * 10 : 1 - ratio
+  }
+
   let sx = 1
   let sy = 1
   let out = layoutOnce(graph, block, sx, sy, levelPx)
-  for (let i = 0; i < 6; i += 1) {
+  let best = out
+  let bestScore = scoreOf(out)
+  for (let i = 0; i < 24; i += 1) {
     const w = Math.max(1, out.bounds.xMax - out.bounds.xMin)
     const h = Math.max(1, out.bounds.yMax - out.bounds.yMin)
-    if (Math.abs(w - box.wPx) < 1 && Math.abs(h - box.hPx) < 1) break
+    if (Math.abs(w - box.wPx) < 1 && Math.abs(h - box.hPx) < 1) return out
     sx = Math.max(1e-4, sx * (box.wPx / w))
     sy = Math.max(1e-4, sy * (box.hPx / h))
     out = layoutOnce(graph, block, sx, sy, levelPx)
+    const sc = scoreOf(out)
+    if (sc < bestScore) {
+      bestScore = sc
+      best = out
+    }
   }
-  return out
+  return best
 }
