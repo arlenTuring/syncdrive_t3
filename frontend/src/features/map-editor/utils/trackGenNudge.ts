@@ -12,11 +12,12 @@ import {
  * 拖——拖的是<strong>一端</strong>，不是整塊縮放。
  *
  * <h3>拖了之後別人怎麼辦</h3>
- * 拖的其實是<strong>兩塊之間的那一條界線</strong>：A 的右邊往左拉，A 就短一截，右邊
- * 那一塊的左邊跟著往左長回來。其餘的塊一個都不動，整條線的頭尾位置也不變。
+ * 拖的是<strong>兩塊之間的那一條界線</strong>：A 的右邊往左拉，A 就短一截，右邊那一塊
+ * <strong>一起被拖走</strong>，兩塊永遠黏著。受影響的就這一塊，其餘一個都不動。
  *
- * 相鄰的那一塊是路口時不做——路口連著別條線，長度不能改。被拖的那一端是盡頭時沒有
- * 鄰居，就只有自己伸縮。
+ * 兩邊都得是一般軌道才給拖。斜接與路口的長度就是它們的幾何——斜接拉長等於換一個坡度、
+ * 轉角拉長等於換一個半徑——改了就不是原來那個東西；而不改長度又只能整塊平移，平移
+ * 之後它的另一頭就跟後面斷開。兩條路都不行，所以貼著它們的那一端<strong>不長把手</strong>。
  *
  * <h3>里程不用重新對</h3>
  * 每一塊代表的里程沒有變，變的只有它畫多長。定位是「在真實路徑上走了幾成，就在圖面
@@ -169,17 +170,14 @@ function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | nul
   const joint = jointOf(s, n.end, axis)
 
   /*
-   * 相鄰的也是一般軌道時，它在對著界線的那一端反向伸縮，界線因此落在同一個位置。
+   * 鄰居跟著改長度，界線兩邊永遠黏著：被拖那一塊短多少，鄰居就長多少，另一端留在
+   * 原地。受影響的就這兩塊，其餘一個都不動。
    *
-   * 相鄰的是斜接或路口就<strong>完全不動它</strong>：那些形狀的長度就是它們的幾何，
-   * 改了等於換成另一個東西。這時界線兩邊會疊起來或空出一小段，那是使用者自己拉的，
-   * 比把幾何改掉好。
+   * 盡頭沒有鄰居時只有自己伸縮。
    */
   const at = neighbourAt(shapes, s, joint)
   const nb = at.kind === 'shape' ? at.shape : null
-  if (!nb || !canNudge(nb) || axisOf(nb) !== axis) {
-    return shapes.map((x) => (x.name === s.name ? grown : x))
-  }
+  if (!nb) return shapes.map((x) => (x.name === s.name ? grown : x))
   const ex = extentOf(nb, axis)
   const nbEnd: NudgeEnd =
     Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
@@ -358,7 +356,11 @@ function neighbourAt(
   const touch = shapes.find(
     (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
   )
-  if (touch) return { kind: 'shape', shape: touch }
+  if (touch) {
+    // 鄰居不是一般軌道就整個不給拖：它得跟著改長度才不會斷開，而改長度就是改幾何
+    if (touch.kind !== 'rect' || axisOf(touch) !== axisOf(s)) return { kind: 'blocked' }
+    return { kind: 'shape', shape: touch }
+  }
   const pad = TOUCH_PX
   const covered = shapes.some((x) => {
     if (x.name === s.name) return false
@@ -401,9 +403,8 @@ export function nudgeRangeFor(
   const { lo, hi } = extentOf(s, axis)
   const joint = jointOf(s, end, axis)
   const at = neighbourAt(shapes, s, joint)
-  const nb = at.kind === 'shape' && canNudge(at.shape) && axisOf(at.shape) === axis
-    ? at.shape
-    : null
+  if (at.kind === 'blocked') return null
+  const nb = at.kind === 'shape' ? at.shape : null
   let min = end === 'hi' ? lo + MIN_LEN_PX : -Infinity
   let max = end === 'lo' ? hi - MIN_LEN_PX : Infinity
   if (nb) {
