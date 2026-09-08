@@ -226,6 +226,8 @@ function SizeDialogBody({
     fromClient: number
     /** 按下去的那一刻，游標在畫面上的位置 */
     grabClient: number
+    /** 一個版面單位等於畫面上幾像素（量出來的） */
+    per: number
     /** 這一端拖得到的範圍：兩塊都要留一點長度 */
     min: number
     max: number
@@ -514,8 +516,15 @@ function SizeDialogBody({
        * 不再每次把游標換回版面座標：換算要用座標框，而座標框會隨著外框變動，一動就
        * 對不準——手停著圖卻自己走，吸附到的位置跟放開後的落點也就不一樣。
        */
+      /*
+       * 一個版面單位在螢幕上是幾像素，<strong>量出來</strong>，不用算的。
+       *
+       * 縮圖的 svg 有自己的 width，而它在畫面上實際多寬還會被外層的縮放影響。拿 scale
+       * 直接當換算率的話，只要外層有縮放，游標移一像素就換出錯的距離——愈拖愈偏。
+       */
       const r = svg.getBoundingClientRect()
-      const base = ax === 'x' ? r.left + gx * scale : r.top + gy * scale
+      const per = (r.width / Math.max(1, stageW)) * scale
+      const base = ax === 'x' ? r.left + gx * per : r.top + gy * per
       setDrag({
         name: sh.name,
         end,
@@ -530,15 +539,16 @@ function SizeDialogBody({
          * 看不出是被範圍擋住。留著、畫出來，拖到範圍邊界自然停住，至少看得見。
          */
         targets: snapTargetsFor(shapes, sh, ax),
-        targetsClient: snapTargetsFor(shapes, sh, ax).map((t) => base + t * scale),
-        fromClient: base + from * scale,
+        targetsClient: snapTargetsFor(shapes, sh, ax).map((t) => base + t * per),
+        fromClient: base + from * per,
+        per,
         // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
         grabClient: ax === 'x' ? e.clientX : e.clientY,
         min: range.min,
         max: range.max,
       })
     },
-    [extent, gx, gy, scale],
+    [extent, gx, gy, scale, stageW],
   )
 
   /*
@@ -564,7 +574,7 @@ function SizeDialogBody({
           hit = true
         }
       }
-      const raw = drag.from + (at - drag.fromClient) / Math.max(1e-6, scale)
+      const raw = drag.from + (at - drag.fromClient) / Math.max(1e-6, drag.per)
       const to = Math.max(drag.min, Math.min(drag.max, raw))
       setDrag((cur) => (cur ? { ...cur, to, snapped: hit && to === raw ? to : null } : cur))
     }
@@ -589,7 +599,7 @@ function SizeDialogBody({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [drag, scale])
+  }, [drag])
 
   /*
    * 一定要 portal 到 body。

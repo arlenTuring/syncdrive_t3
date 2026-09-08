@@ -1,10 +1,8 @@
 import {
-  fitTaperAt,
   type LayoutShape,
   type TrackGenLayout,
   type Vec2,
 } from './trackGenLayout'
-import type { TaperTrackGeometry } from './trackShapes'
 
 /**
  * 一塊一塊微調長度。
@@ -94,7 +92,6 @@ function resized(
   end: NudgeEnd,
   d: number,
   axis: Axis,
-  bandW: number,
 ): LayoutShape | null {
   const { lo, hi } = extentOf(s, axis)
   const nextLo = end === 'lo' ? lo + d : lo
@@ -120,18 +117,23 @@ function resized(
     }
   }
   if (s.kind === 'taper') {
-    const g = s.geometry as TaperTrackGeometry
-    const fit = fitTaperAt(samples[0]!, samples[samples.length - 1]!, bandW, g.entryDeg)
-    if (!fit) return null
-    return { ...s, samples, geometry: fit.geometry, box: fit.box }
+    /*
+     * 斜接<strong>直接把外框沿軸拉開</strong>，不重新解一次形狀。
+     *
+     * 重解會回一個「最接近」的方框，兩端不保證落在要求的位置——把手畫的是取樣點、帶子
+     * 畫的是方框，兩者於是對不上：手拖到哪，帶子卻停在別的地方。
+     *
+     * 斜接的幾何本來就是外框的比例（端面高度、坡的起訖都是比例），所以拉外框等於等比
+     * 拉整條帶子，端面仍然垂直、帶寬也不變，而且完全精確。
+     */
+    const b = s.box
+    const box =
+      axis === 'x'
+        ? { ...b, xM: nextLo, wM: nextHi - nextLo }
+        : { ...b, yM: nextLo, hM: nextHi - nextLo }
+    return { ...s, samples, box }
   }
   return null
-}
-
-/** 帶子有多粗：版面上任何一塊直軌的寬度就是軌道寬度 */
-function bandWidthOf(shapes: LayoutShape[]): number {
-  for (const s of shapes) if (s.kind === 'rect') return s.widthM
-  return 8
 }
 
 /** 這一塊的兩個端點（圖面座標） */
@@ -155,15 +157,23 @@ function near(a: Vec2, b: Vec2): boolean {
  * 相鄰的是路口就不做：路口的長度是它自己的幾何，改不得。找不到鄰居（盡頭）時只有
  * 被拖的那一塊伸縮。
  */
-function nudgeOnce(
-  shapes: LayoutShape[],
-  n: TrackGenNudge,
-  bandW: number,
-): LayoutShape[] | null {
+function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | null {
   const s = shapes.find((x) => x.name === n.name)
   if (!s || !canNudge(s)) return null
   const axis = axisOf(s)
-  const grown = resized(s, n.end, n.dPx, axis, bandW)
+  /*
+   * 超出做得到的範圍時<strong>停在極限</strong>，不要整筆不做。
+   *
+   * 整筆不做的話畫面上是：輔助線跟著游標走，塊卻一動也不動，使用者只看得到「拖了沒
+   * 反應」。停在極限至少看得出來已經到底了。
+   */
+  const range = nudgeRangeFor(shapes, s, n.end)
+  if (!range) return null
+  const { lo, hi } = extentOf(s, axis)
+  const from = n.end === 'lo' ? lo : hi
+  const d = Math.max(range.min, Math.min(range.max, from + n.dPx)) - from
+  if (Math.abs(d) < 1e-6) return null
+  const grown = resized(s, n.end, d, axis)
   if (!grown) return null
 
   const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
@@ -183,7 +193,7 @@ function nudgeOnce(
   const ex = extentOf(nb, nbAxis)
   const nbEnd: NudgeEnd =
     Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
-  const moved = resized(nb, nbEnd, n.dPx, nbAxis, bandW)
+  const moved = resized(nb, nbEnd, d, nbAxis)
   if (!moved) return null
 
   return shapes.map((x) => {
@@ -287,7 +297,6 @@ export function applyTrackGenNudges<T extends TrackGenLayout>(
   layout: T,
   nudges: TrackGenNudge[],
 ): T & NudgeReport {
-  const bandW = bandWidthOf(layout.shapes)
   /* 原本每一塊的比例尺，事後比對用 */
   const scaleOf = new Map<string, number>()
   for (const s of layout.shapes) {
@@ -299,7 +308,7 @@ export function applyTrackGenNudges<T extends TrackGenLayout>(
   let shapes = layout.shapes
   let applied = 0
   for (const n of nudges) {
-    const next = nudgeOnce(shapes, n, bandW)
+    const next = nudgeOnce(shapes, n)
     if (!next) continue
     shapes = next
     applied += 1
