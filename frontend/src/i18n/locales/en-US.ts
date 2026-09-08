@@ -1527,6 +1527,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         needCode: 'No prefix — tracks keep their generated names',
         hint: 'Press ＋ to create a group, then select tracks in the preview in order. Selected tracks take the group fill and show their number.',
       },
+      undoHint: 'Undo the last action (⌘Z / Ctrl+Z)',
       nudge: {
         title: 'Adjust',
         enter: 'Start adjusting',

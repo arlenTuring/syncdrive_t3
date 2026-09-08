@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 
@@ -219,11 +219,48 @@ function SizeDialogBody({
     to: number
     /** 吸附到的那條線，沒吸到就是 null */
     snapped: number | null
-    targets: number[]
+    /** 對齊候選，換算成畫面座標——拖動途中座標框再怎麼變都不影響 */
+    targetsClient: number[]
+    /** 按下去的那一刻，這一端在畫面上的位置 */
+    fromClient: number
+    /** 按下去的那一刻，游標在畫面上的位置 */
+    grabClient: number
     /** 這一端拖得到的範圍：兩塊都要留一點長度 */
     min: number
     max: number
   } | null>(null)
+
+  /*
+   * 一步一步復原：合併與微調共用一條時間軸。
+   *
+   * 兩種操作都是一筆一筆疊上去的，使用者記得的是「剛才做的那一件」，不是「剛才那一件
+   * 合併」。所以記下先後順序，Cmd/Ctrl+Z 就退掉最後做的那一件，不管它是哪一種。
+   */
+  const [, setHistory] = useState<('merge' | 'nudge')[]>([])
+  const undoLast = useCallback(() => {
+    setHistory((prev) => {
+      const last = prev[prev.length - 1]
+      if (!last) return prev
+      if (last === 'merge') setMerges((m) => m.slice(0, -1))
+      else setNudges((n) => n.slice(0, -1))
+      return prev.slice(0, -1)
+    })
+    setDrag(null)
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'z' && e.key !== 'Z') return
+      if (!e.metaKey && !e.ctrlKey) return
+      // 在輸入格裡打字時交給輸入格自己處理
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
+      e.preventDefault()
+      undoLast()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undoLast])
 
   /*
    * 縮圖要盡量大。
@@ -268,8 +305,8 @@ function SizeDialogBody({
    * 的界線要看得見，才有東西可以對回去。
    */
   const baseExtent = useMemo(
-    () => (nudgeMode ? (measure?.(params, merges, []) ?? null) : null),
-    [measure, params, merges, nudgeMode],
+    () => measure?.(params, merges, []) ?? null,
+    [measure, params, merges],
   )
 
   const sum = (a: number[] | undefined) => (a ?? []).reduce((t, v) => t + v, 0)
@@ -341,6 +378,7 @@ function SizeDialogBody({
   const commitMerge = useCallback(
     (from: string, to: string) => {
       setMerges((prev) => [...prev, { from, to }])
+      setHistory((prev) => [...prev, 'merge'])
       setPicks([])
     },
     [],
@@ -461,13 +499,22 @@ function SizeDialogBody({
   }
 
   const startDrag = useCallback(
-    (sh: LayoutShape, end: NudgeEnd) => {
+    (sh: LayoutShape, end: NudgeEnd, e: React.PointerEvent<SVGRectElement>) => {
       const shapes = extent?.shapes ?? []
       const range = nudgeRangeFor(shapes, sh, end)
-      if (!range) return
+      const svg = e.currentTarget.ownerSVGElement
+      if (!range || !svg) return
       const ax = axisOf(sh)
       const { lo, hi } = extentOf(sh, ax)
       const from = end === 'lo' ? lo : hi
+      /*
+       * 候選與起點都<strong>先換算成畫面座標</strong>，之後只看游標移了幾像素。
+       *
+       * 不再每次把游標換回版面座標：換算要用座標框，而座標框會隨著外框變動，一動就
+       * 對不準——手停著圖卻自己走，吸附到的位置跟放開後的落點也就不一樣。
+       */
+      const r = svg.getBoundingClientRect()
+      const base = ax === 'x' ? r.left + gx * scale : r.top + gy * scale
       setDrag({
         name: sh.name,
         end,
@@ -475,15 +522,17 @@ function SizeDialogBody({
         from,
         to: from,
         snapped: null,
-        // 對齊的候選：別條線在同一軸上的每一個塊界，拖不到的先濾掉
-        targets: snapTargetsFor(shapes, sh, ax).filter(
-          (t) => t >= range.min && t <= range.max,
-        ),
+        targetsClient: snapTargetsFor(shapes, sh, ax)
+          .filter((t) => t >= range.min && t <= range.max)
+          .map((t) => base + t * scale),
+        fromClient: base + from * scale,
+        // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
+        grabClient: ax === 'x' ? e.clientX : e.clientY,
         min: range.min,
         max: range.max,
       })
     },
-    [extent],
+    [extent, gx, gy, scale],
   )
 
   /*
@@ -492,40 +541,36 @@ function SizeDialogBody({
    * 拖到一半手常常會滑出縮圖的範圍——掛在圖上的話那一刻就收不到 move 與 up，放開了
    * 卻沒人收下，這一次調整就白做。
    */
-  const svgRef = useRef<SVGSVGElement | null>(null)
   useEffect(() => {
     if (!drag) return
     const move = (e: PointerEvent) => {
-      const el = svgRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      const raw =
-        drag.axis === 'x'
-          ? (e.clientX - r.left) / scale - gx
-          : (e.clientY - r.top) / scale - gy
-      // 夾在拖得到的範圍內：越界的話兩塊之中會有一塊短到畫不出來
-      const v = Math.max(drag.min, Math.min(drag.max, raw))
-      // 吸附：離候選夠近就貼上去，並記下是哪一條，畫面上要標出來
-      const tol = 7 / Math.max(1e-6, scale)
-      let snapped: number | null = null
-      let to = v
-      let bestD = tol
-      for (const t of drag.targets) {
-        const d = Math.abs(t - v)
+      const now = drag.axis === 'x' ? e.clientX : e.clientY
+      // 這一端現在被拖到畫面上的哪裡
+      let at = drag.fromClient + (now - drag.grabClient)
+      // 吸附：離候選夠近就貼上去（畫面上量，所以縮圖縮多少手感都一樣）
+      let hit = false
+      let bestD = 7
+      for (const t of drag.targetsClient) {
+        const d = Math.abs(t - at)
         if (d <= bestD) {
           bestD = d
-          snapped = t
-          to = t
+          at = t
+          hit = true
         }
       }
-      setDrag((cur) => (cur ? { ...cur, to, snapped } : cur))
+      const raw = drag.from + (at - drag.fromClient) / Math.max(1e-6, scale)
+      const to = Math.max(drag.min, Math.min(drag.max, raw))
+      setDrag((cur) => (cur ? { ...cur, to, snapped: hit && to === raw ? to : null } : cur))
     }
     const up = () => {
       setDrag((cur) => {
         // 手抖的那幾像素不算數
         if (cur && Math.abs(cur.to - cur.from) > 0.5) {
           const one = { name: cur.name, end: cur.end, dPx: cur.to - cur.from }
-          queueMicrotask(() => setNudges((prev) => [...prev, one]))
+          queueMicrotask(() => {
+            setNudges((prev) => [...prev, one])
+            setHistory((prev) => [...prev, 'nudge'])
+          })
         }
         return null
       })
@@ -538,7 +583,7 @@ function SizeDialogBody({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [drag, gx, gy, scale])
+  }, [drag, scale])
 
   /*
    * 一定要 portal 到 body。
@@ -587,7 +632,6 @@ function SizeDialogBody({
             className={`absolute inset-0 ${
               editingId || mergeMode || nudgeMode ? '' : 'pointer-events-none'
             }`}
-            ref={svgRef}
             aria-hidden
           >
             {/*
@@ -595,7 +639,7 @@ function SizeDialogBody({
               微調的目標是整體長度盡量不變，所以每一塊原本的界線要看得見，才有東西可以
               對回去。畫在底下，只留虛線外框。
             */}
-            {baseExtent?.shapes.map((sh, i) => {
+            {(nudgeMode ? baseExtent?.shapes : null)?.map((sh, i) => {
               const st = { fill: 'none', stroke: '#52525b', strokeDasharray: '3 3' }
               if (sh.kind === 'rect') {
                 const w = Math.max(1, sh.lengthM * scale)
@@ -866,7 +910,7 @@ function SizeDialogBody({
                         style={{ cursor: ax === 'x' ? 'ew-resize' : 'ns-resize' }}
                         onPointerDown={(e) => {
                           e.stopPropagation()
-                          startDrag(sh, end)
+                          startDrag(sh, end, e)
                         }}
                       />
                     )
@@ -1143,10 +1187,8 @@ function SizeDialogBody({
                 <button
                   type="button"
                   data-trackgen-nudge-undo
-                  onClick={() => {
-                    setNudges((prev) => prev.slice(0, -1))
-                    setDrag(null)
-                  }}
+                  title={t('mapEditor.trackGen.undoHint')}
+                  onClick={undoLast}
                   className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
                 >
                   {t('mapEditor.trackGen.nudge.undo')}

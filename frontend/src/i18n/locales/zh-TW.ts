@@ -1516,6 +1516,7 @@ const zhTW = {
         needCode: '未填頭字則不重新命名',
         hint: '按 ＋ 建立群組後，於預覽依序點選軌道。已選軌道套用群組底色並標示編號。',
       },
+      undoHint: '復原上一次操作（⌘Z / Ctrl+Z）',
       nudge: {
         title: '微調',
         enter: '開始微調',
