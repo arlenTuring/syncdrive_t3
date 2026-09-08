@@ -438,9 +438,16 @@ function SizeDialogBody({
     [onConfirm, params, liveGroups, merges, nudges],
   )
 
-  /* 版面座標 → 縮圖座標的共用位移；拖曳與輔助線都要用 */
-  const gx = extent ? extent.originPx.x - extent.bounds.xMin : 0
-  const gy = extent ? extent.originPx.y - extent.bounds.yMin : 0
+  /*
+   * 版面座標 → 縮圖座標的共用位移。
+   *
+   * 微調時<strong>用沒調過的那一份</strong>當座標框。拖動會改變外框（塊往外長時
+   * bounds 跟著變），而位移是拿外框算的——用當下這一份的話，每動一格座標框就跟著移，
+   * 游標沒動圖也會自己走，吸附也就永遠對不準。座標框固定住，拖到哪就是哪。
+   */
+  const frame = baseExtent ?? extent
+  const gx = frame ? frame.originPx.x - frame.bounds.xMin : 0
+  const gy = frame ? frame.originPx.y - frame.bounds.yMin : 0
 
   /** 這一塊兩端的把手位置（版面座標） */
   const handlesOf = (sh: LayoutShape) => {
@@ -629,8 +636,8 @@ function SizeDialogBody({
               )
             })}
             {extent?.shapes.map((sh, i) => {
-              const ox = extent.originPx.x - extent.bounds.xMin
-              const oy = extent.originPx.y - extent.bounds.yMin
+              const ox = gx
+              const oy = gy
               const mine = memberOf.get(sh.name)
               const picked = pickIndex.get(sh.name)
               /*
@@ -761,8 +768,8 @@ function SizeDialogBody({
               先看到才知道自己點的順序對不對——事後改名要一塊一塊找回來，代價差很多。
             */}
             {extent?.shapes.flatMap((sh, i) => {
-              const ox = extent.originPx.x - extent.bounds.xMin
-              const oy = extent.originPx.y - extent.bounds.yMin
+              const ox = gx
+              const oy = gy
               const parts = partsOfKind(sh.kind)
               const at = (dy: number) =>
                 sh.kind === 'rect'

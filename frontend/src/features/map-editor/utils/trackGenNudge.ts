@@ -169,13 +169,13 @@ function nudgeOnce(
   const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
   const joint = jointOf(s, n.end, axis)
 
-  const nb = shapes.find(
-    (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
-  )
-  if (!nb) {
+  const at = neighbourAt(shapes, s, joint)
+  if (at.kind === 'blocked') return null
+  if (at.kind === 'edge') {
     // 盡頭：沒有鄰居要配合，這一端就直接往外長或往內縮
     return shapes.map((x) => (x.name === s.name ? grown : x))
   }
+  const nb = at.shape
   if (!canNudge(nb)) return null
   const nbAxis = axisOf(nb)
   if (nbAxis !== axis) return null
@@ -211,7 +211,15 @@ export type NudgeReport = {
   nudgeMaxM: number
 }
 
-/** 重新量外框：拖過的塊會超出原本的範圍 */
+/**
+ * 外框只<strong>往外長，不往內縮</strong>。
+ *
+ * 這裡量到的外框跟排版當初記的不會完全一樣（排版沿路記了一些額外的點），所以重量一次
+ * 就算什麼都沒動也會差幾十像素。而畫面上版面座標換算成螢幕座標靠的就是外框——差這幾十
+ * 像素，等於拖一下整張圖自己跳一次，游標沒動圖也在走，吸附因此永遠對不準。
+ *
+ * 所以拿原本的外框跟量到的取聯集：沒有跑出去就完全不變，真的往外長了才跟著長。
+ */
 function boundsOf(shapes: LayoutShape[]): TrackGenLayout['bounds'] {
   let xMin = Infinity
   let yMin = Infinity
@@ -238,6 +246,18 @@ function boundsOf(shapes: LayoutShape[]): TrackGenLayout['bounds'] {
   }
   if (!Number.isFinite(xMin)) return { xMin: 0, yMin: 0, xMax: 1, yMax: 1 }
   return { xMin, yMin, xMax, yMax }
+}
+
+function unionBounds(
+  a: TrackGenLayout['bounds'],
+  b: TrackGenLayout['bounds'],
+): TrackGenLayout['bounds'] {
+  return {
+    xMin: Math.min(a.xMin, b.xMin),
+    yMin: Math.min(a.yMin, b.yMin),
+    xMax: Math.max(a.xMax, b.xMax),
+    yMax: Math.max(a.yMax, b.yMax),
+  }
 }
 
 /** 這一塊代表多少里程 */
@@ -303,12 +323,55 @@ export function applyTrackGenNudges<T extends TrackGenLayout>(
   return {
     ...layout,
     shapes,
-    bounds: applied ? boundsOf(shapes) : layout.bounds,
+    bounds: applied ? unionBounds(layout.bounds, boundsOf(shapes)) : layout.bounds,
     nudgesApplied: applied,
     nudgeErrors: errors,
     nudgeTotalM: Number(total.toFixed(1)),
     nudgeMaxM: Number(max.toFixed(1)),
   }
+}
+
+/** 這一塊在圖上佔的方框 */
+function boxOf(s: LayoutShape) {
+  if (s.kind !== 'rect') {
+    return { x0: s.box.xM, y0: s.box.yM, x1: s.box.xM + s.box.wM, y1: s.box.yM + s.box.hM }
+  }
+  const c = Math.abs(Math.cos((s.rotationDeg * Math.PI) / 180))
+  const d = Math.abs(Math.sin((s.rotationDeg * Math.PI) / 180))
+  const w = (s.lengthM * c + s.widthM * d) / 2
+  const h = (s.lengthM * d + s.widthM * c) / 2
+  return { x0: s.centre.x - w, y0: s.centre.y - h, x1: s.centre.x + w, y1: s.centre.y + h }
+}
+
+/**
+ * 這一端接的是什麼。
+ *
+ * 端點碰在一起的那一塊才是能一起伸縮的鄰居。路口不算：交叉與分岔的圖面中心線是它整
+ * 個外框的對角，不是四個口的位置，所以端點永遠對不上——只看端點的話會把路口當成盡頭，
+ * 一拖就疊到路口上（實測斜接整片壓過旁邊兩塊）。所以再看一次方框：有東西罩著這個
+ * 點就是路口，那一端不給拖。
+ */
+function neighbourAt(
+  shapes: LayoutShape[],
+  s: LayoutShape,
+  joint: Vec2,
+): { kind: 'edge' } | { kind: 'blocked' } | { kind: 'shape'; shape: LayoutShape } {
+  const touch = shapes.find(
+    (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
+  )
+  if (touch) return { kind: 'shape', shape: touch }
+  const pad = TOUCH_PX
+  const covered = shapes.some((x) => {
+    if (x.name === s.name) return false
+    const b = boxOf(x)
+    return (
+      joint.x >= b.x0 - pad &&
+      joint.x <= b.x1 + pad &&
+      joint.y >= b.y0 - pad &&
+      joint.y <= b.y1 + pad
+    )
+  })
+  return covered ? { kind: 'blocked' } : { kind: 'edge' }
 }
 
 /** 一塊至少要留這麼長，不然它在圖上就不是一段軌道了 */
@@ -338,9 +401,9 @@ export function nudgeRangeFor(
   const axis = axisOf(s)
   const { lo, hi } = extentOf(s, axis)
   const joint = jointOf(s, end, axis)
-  const nb = shapes.find(
-    (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
-  )
+  const at = neighbourAt(shapes, s, joint)
+  if (at.kind === 'blocked') return null
+  const nb = at.kind === 'shape' ? at.shape : null
   if (nb && (!canNudge(nb) || axisOf(nb) !== axis)) return null
   let min = end === 'hi' ? lo + MIN_LEN_PX : -Infinity
   let max = end === 'lo' ? hi - MIN_LEN_PX : Infinity
