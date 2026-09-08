@@ -37,6 +37,7 @@ import {
 import { buildTrackGraph, type TrackGraph } from '../utils/trackGenGraph'
 import type { TrackGenGroup } from '../utils/trackGenGroups'
 import { layoutTrackGraph } from '../utils/trackGenGraphLayout'
+import { applyTrackGenMerges, type TrackGenMerge } from '../utils/trackGenMerge'
 import type { TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
@@ -261,13 +262,20 @@ export const BasemapNode = memo(function BasemapNode({
    * 塊數直接<strong>數排出來的形狀</strong>，不另外用公尺數推。
    */
   const measureTrackGen = useCallback(
-    (block: TrackGenSizeParams) => {
+    (block: TrackGenSizeParams, merges: TrackGenMerge[] = []) => {
       if (!pendingGraph) return null
       const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
-      const graphLayout = layoutTrackGraph(pendingGraph, block, {
-        wPx: displayLayout.wPx,
-        hPx: displayLayout.hPx,
-      })
+      /*
+       * 使用者在預覽上合併過的，這裡就要照著併。量出來的尺寸、預覽畫的、生成出去的
+       * 是同一份版面——分開算的話按下生成會跑出跟畫面不一樣的東西。
+       */
+      const graphLayout = applyTrackGenMerges(
+        layoutTrackGraph(pendingGraph, block, {
+          wPx: displayLayout.wPx,
+          hPx: displayLayout.hPx,
+        }),
+        merges,
+      )
       const { bounds, shapes } = graphLayout
       /*
        * 塊數只數<strong>其中一條線</strong>，不然雙線會變兩倍。取塊數最多的那一條，
@@ -304,6 +312,7 @@ export const BasemapNode = memo(function BasemapNode({
         countY,
         shapes,
         bounds,
+        mergesApplied: graphLayout.mergesApplied,
         layout: graphLayout ?? undefined,
         originPx: {
           x: clamp(displayLayout.xPx, wPx, canvas.width),
@@ -339,10 +348,14 @@ export const BasemapNode = memo(function BasemapNode({
     Math.abs(layout.wPx - mapPixelSize.width) < 0.5 &&
     Math.abs(layout.hPx - mapPixelSize.height) < 0.5
 
-  const runTrackGeneration = useCallback((block: TrackGenSizeParams, groups: TrackGenGroup[]) => {
+  const runTrackGeneration = useCallback((
+    block: TrackGenSizeParams,
+    groups: TrackGenGroup[],
+    merges: TrackGenMerge[],
+  ) => {
     const graph = pendingGraph
     if (!graph) return
-    const measured = measureTrackGen(block)
+    const measured = measureTrackGen(block, merges)
     if (!measured?.layout) return
     // 摘要留著給屬性匡顯示，也讓「重新生成」知道上一次生成過
     onPatchParameters(basemap.id, {
@@ -1127,9 +1140,9 @@ export const BasemapNode = memo(function BasemapNode({
         initial={getTrackGenBlockSize(basemap.parameters)}
         measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}
-        onConfirm={(block, groups) => {
+        onConfirm={(block, groups, merges) => {
           setSizeDialogOpen(false)
-          runTrackGeneration(block, groups)
+          runTrackGeneration(block, groups, merges)
         }}
       />
       <BasemapFilePickerDialog

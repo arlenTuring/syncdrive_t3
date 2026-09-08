@@ -18,6 +18,11 @@ import {
 } from '../utils/trackGenGroups'
 import { TRACK_GEN_KIND_COLOR, type LayoutShape } from '../utils/trackGenLayout'
 import {
+  canMergeTrackGen,
+  type TrackGenMerge,
+  type TrackGenMergeRefusal,
+} from '../utils/trackGenMerge'
+import {
   cornerTrackPath,
   crossTrackPartPaths,
   switchTrackPartPaths,
@@ -52,6 +57,13 @@ export type TrackGenPreview = {
   bounds: { xMin: number; yMin: number; xMax: number; yMax: number }
   /** 生成出來會落在畫布的哪個位置（已經夾進畫布內） */
   originPx: { x: number; y: number }
+  /**
+   * 使用者的合併<strong>真的做成了幾筆</strong>。
+   *
+   * 合併是照形狀的名字記的，而參數一改就重排、名字跟著變，對不上的那幾筆會被跳過。
+   * 數字寫出來，使用者才知道自己那幾筆還在不在。
+   */
+  mergesApplied?: number
   /** 圖模型排好的版面，套用時直接沿用，預覽與生成才是同一份 */
   layout?: unknown
 }
@@ -65,9 +77,13 @@ type Props = {
   /** 脊線上橫的路與縱的路各有哪幾段（公尺） */
   totals?: { x: number[]; y: number[] }
   initial: TrackGenSizeParams
-  measure?: (params: TrackGenSizeParams) => TrackGenPreview | null
+  measure?: (params: TrackGenSizeParams, merges: TrackGenMerge[]) => TrackGenPreview | null
   onCancel: () => void
-  onConfirm: (params: TrackGenSizeParams, groups: TrackGenGroup[]) => void
+  onConfirm: (
+    params: TrackGenSizeParams,
+    groups: TrackGenGroup[],
+    merges: TrackGenMerge[],
+  ) => void
 }
 
 /**
@@ -139,6 +155,16 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
   const [editingId, setEditingId] = useState<string | null>(null)
   /** 進入編輯時先存一份，取消就整組還原 */
   const [draftBackup, setDraftBackup] = useState<TrackGenGroup | null>(null)
+  /*
+   * 合併：使用者自己決定哪兩塊要變成一塊。
+   *
+   * <code>picks</code> 是這一次點的兩塊，順序就是畫面上的 1 與 2；<code>merges</code>
+   * 是已經成立的每一次合併，<strong>依序</strong>套在版面上。順序不能亂：併過一次
+   * 之後名字與相鄰關係都變了，後面那一次是使用者在已經併過的預覽上點的。
+   */
+  const [mergeMode, setMergeMode] = useState(false)
+  const [picks, setPicks] = useState<string[]>([])
+  const [merges, setMerges] = useState<TrackGenMerge[]>([])
 
   /*
    * 縮圖要盡量大。
@@ -164,7 +190,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
   const stageW = Math.round(canvasW * scale)
   const stageH = Math.round(canvasH * scale)
 
-  const extent = useMemo(() => measure?.(params) ?? null, [measure, params])
+  const extent = useMemo(() => measure?.(params, merges) ?? null, [measure, params, merges])
 
   const sum = (a: number[] | undefined) => (a ?? []).reduce((t, v) => t + v, 0)
   const totalXM = sum(totals?.x)
@@ -208,6 +234,49 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
   )
   const editing = liveGroups.find((g) => g.id === editingId) ?? null
   const memberOf = useMemo(() => trackGenGroupIndex(liveGroups), [liveGroups])
+
+  /** 點一塊當合併對象：再點一次取消，最多兩塊 */
+  const togglePick = useCallback((name: string) => {
+    setPicks((prev) =>
+      prev.includes(name)
+        ? prev.filter((n) => n !== name)
+        : prev.length >= 2
+          ? prev
+          : [...prev, name],
+    )
+  }, [])
+
+  const pickIndex = useMemo(() => new Map(picks.map((n, i) => [n, i + 1])), [picks])
+  /* 兩個方向各驗一次：不能併的那個方向按鈕就是灰的，理由寫在旁邊 */
+  const mergeChecks = useMemo(() => {
+    const shapes = extent?.shapes ?? []
+    if (picks.length < 2) return null
+    const [a, b] = picks as [string, string]
+    return {
+      aToB: canMergeTrackGen(shapes, a, b),
+      bToA: canMergeTrackGen(shapes, b, a),
+    }
+  }, [extent, picks])
+
+  const commitMerge = useCallback(
+    (from: string, to: string) => {
+      setMerges((prev) => [...prev, { from, to }])
+      setPicks([])
+    },
+    [],
+  )
+
+  const enterMerge = useCallback(() => {
+    setEditingId(null)
+    setDraftBackup(null)
+    setMergeMode(true)
+    setPicks([])
+  }, [])
+
+  const exitMerge = useCallback(() => {
+    setMergeMode(false)
+    setPicks([])
+  }, [])
 
   const patchEditing = useCallback(
     (patch: Partial<TrackGenGroup>) => {
@@ -279,8 +348,8 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
   )
 
   const confirm = useCallback(
-    () => onConfirm(params, liveGroups.filter((g) => g.code && g.members.length)),
-    [onConfirm, params, liveGroups],
+    () => onConfirm(params, liveGroups.filter((g) => g.code && g.members.length), merges),
+    [onConfirm, params, liveGroups, merges],
   )
 
   /*
@@ -327,26 +396,40 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
           <svg
             width={stageW}
             height={stageH}
-            className={`absolute inset-0 ${editingId ? '' : 'pointer-events-none'}`}
+            className={`absolute inset-0 ${editingId || mergeMode ? '' : 'pointer-events-none'}`}
             aria-hidden
           >
             {extent?.shapes.map((sh, i) => {
               const ox = extent.originPx.x - extent.bounds.xMin
               const oy = extent.originPx.y - extent.bounds.yMin
               const mine = memberOf.get(sh.name)
-              // 選進組裡的塊換成那一組的底色，其餘照種類的顏色
-              const { fill, stroke } = mine
-                ? { fill: mine.color, stroke: '#fafafa' }
-                : KIND_STYLE[sh.kind]
-              const pick = editingId
+              const picked = pickIndex.get(sh.name)
+              /*
+               * 合併模式下只看有沒有被點到，不看分組的底色——這兩件事同時上色的話，
+               * 使用者分不出「這塊在某一組」和「這塊正要被併掉」。
+               */
+              const { fill, stroke } = picked
+                ? { fill: KIND_STYLE[sh.kind].fill, stroke: '#fbbf24' }
+                : mine
+                  ? { fill: mine.color, stroke: '#fafafa' }
+                  : KIND_STYLE[sh.kind]
+              const hit = mergeMode
                 ? {
                     onPointerDown: (e: React.PointerEvent) => {
                       e.stopPropagation()
-                      toggleMember(sh.name)
+                      togglePick(sh.name)
                     },
                     style: { cursor: 'pointer' },
                   }
-                : {}
+                : editingId
+                  ? {
+                      onPointerDown: (e: React.PointerEvent) => {
+                        e.stopPropagation()
+                        toggleMember(sh.name)
+                      },
+                      style: { cursor: 'pointer' },
+                    }
+                  : {}
               if (sh.kind === 'rect') {
                 const w = Math.max(1, sh.lengthM * scale)
                 const h = Math.max(1, sh.widthM * scale)
@@ -363,8 +446,8 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                     transform={`rotate(${sh.rotationDeg} ${cx} ${cy})`}
                     fill={fill}
                     stroke={stroke}
-                    strokeWidth={mine ? 1.25 : 0.75}
-                    {...pick}
+                    strokeWidth={picked ? 2 : mine ? 1.25 : 0.75}
+                    {...hit}
                   />
                 )
               }
@@ -387,9 +470,12 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   <g key={`p${i}`} transform={shift}>
                     {parts.map((part) => {
                       const own = memberOf.get(memberKey(sh.name, part))
-                      const st = own
-                        ? { fill: own.color, stroke: '#fafafa' }
-                        : KIND_STYLE[sh.kind]
+                      // 合併是整個元件的事：分岔長出一隻腳，兩半都跟著長
+                      const st = picked
+                        ? { fill: KIND_STYLE[sh.kind].fill, stroke: '#fbbf24' }
+                        : own
+                          ? { fill: own.color, stroke: '#fafafa' }
+                          : KIND_STYLE[sh.kind]
                       return (
                         <path
                           key={part}
@@ -397,16 +483,24 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                           d={(dd as Record<string, string>)[part]!}
                           fill={st.fill}
                           stroke={st.stroke}
-                          strokeWidth={own ? 1.25 : 0.75}
-                          {...(editingId
+                          strokeWidth={picked ? 2 : own ? 1.25 : 0.75}
+                          {...(mergeMode
                             ? {
                                 onPointerDown: (e: React.PointerEvent) => {
                                   e.stopPropagation()
-                                  toggleMember(memberKey(sh.name, part))
+                                  togglePick(sh.name)
                                 },
                                 style: { cursor: 'pointer' },
                               }
-                            : {})}
+                            : editingId
+                              ? {
+                                  onPointerDown: (e: React.PointerEvent) => {
+                                    e.stopPropagation()
+                                    toggleMember(memberKey(sh.name, part))
+                                  },
+                                  style: { cursor: 'pointer' },
+                                }
+                              : {})}
                         />
                       )
                     })}
@@ -425,8 +519,8 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   transform={shift}
                   fill={fill}
                   stroke={stroke}
-                  strokeWidth={mine ? 1.25 : 0.75}
-                  {...pick}
+                  strokeWidth={picked ? 2 : mine ? 1.25 : 0.75}
+                  {...hit}
                 />
               )
             })}
@@ -463,6 +557,28 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   {label(m)}
                 </text>
               )
+              /* 合併模式：標的是這一次點的順序，1 併到 2 還是 2 併到 1 靠它分辨 */
+              const picked = pickIndex.get(sh.name)
+              if (mergeMode) {
+                return picked
+                  ? [
+                      <text
+                        key={`m${i}`}
+                        x={at(0).x}
+                        y={at(0).y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={14}
+                        fontWeight={800}
+                        fill="#fbbf24"
+                        className="pointer-events-none"
+                        style={{ paintOrder: 'stroke', stroke: '#09090b', strokeWidth: 3.5 }}
+                      >
+                        {picked}
+                      </text>,
+                    ]
+                  : []
+              }
               if (parts && sh.kind !== 'rect') {
                 // 兩半各標各的：上（橫）在上、下（斜）在下，位置錯開才看得清楚
                 const gap = Math.max(7, (sh.box.hM * scale) / 4)
@@ -507,6 +623,118 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
         </div>
 
         {/*
+          合併。
+          演算法怎麼切都會有人不滿意，最後一步交給使用者：點兩塊，說哪一塊併進哪一塊。
+          留下來的那一塊會長到把另一塊蓋掉，並接收它代表的里程，所以生成出來就是畫面
+          上看到的樣子。
+        */}
+        <div
+          className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2"
+          data-trackgen-merge
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-zinc-300">
+              {t('mapEditor.trackGen.merge.title')}
+            </span>
+            <span
+              className={`font-mono text-[11px] tabular-nums ${
+                (extent?.mergesApplied ?? merges.length) < merges.length
+                  ? 'text-amber-300'
+                  : 'text-zinc-500'
+              }`}
+              data-trackgen-merge-count
+            >
+              {extent?.mergesApplied ?? merges.length} / {merges.length}
+            </span>
+            {mergeMode ? (
+              <button
+                type="button"
+                data-trackgen-merge-exit
+                onClick={exitMerge}
+                className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+              >
+                {t('mapEditor.trackGen.merge.exit')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-trackgen-merge-enter
+                disabled={!!editingId}
+                onClick={enterMerge}
+                className="rounded border border-amber-500/70 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-40"
+              >
+                {t('mapEditor.trackGen.merge.enter')}
+              </button>
+            )}
+            {merges.length ? (
+              <button
+                type="button"
+                data-trackgen-merge-undo
+                onClick={() => {
+                  setMerges((prev) => prev.slice(0, -1))
+                  setPicks([])
+                }}
+                className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+              >
+                {t('mapEditor.trackGen.merge.undo')}
+              </button>
+            ) : null}
+          </div>
+
+          {mergeMode ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-2">
+              {picks.map((n, i) => (
+                <span
+                  key={n}
+                  className="rounded border border-amber-500/50 px-1.5 py-0.5 font-mono text-[11px] text-amber-200"
+                >
+                  {i + 1}. {n}
+                </span>
+              ))}
+              {mergeChecks ? (
+                <>
+                  <button
+                    type="button"
+                    data-trackgen-merge-1to2
+                    disabled={!mergeChecks.aToB.ok}
+                    onClick={() => commitMerge(picks[0]!, picks[1]!)}
+                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
+                  >
+                    {t('mapEditor.trackGen.merge.oneIntoTwo')}
+                  </button>
+                  <button
+                    type="button"
+                    data-trackgen-merge-2to1
+                    disabled={!mergeChecks.bToA.ok}
+                    onClick={() => commitMerge(picks[1]!, picks[0]!)}
+                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
+                  >
+                    {t('mapEditor.trackGen.merge.twoIntoOne')}
+                  </button>
+                  {!mergeChecks.aToB.ok && !mergeChecks.bToA.ok ? (
+                    <span className="text-[10px] text-amber-300/80" data-trackgen-merge-reason>
+                      {t(
+                        `mapEditor.trackGen.merge.reason.${
+                          (mergeChecks.aToB as { reason: TrackGenMergeRefusal }).reason
+                        }`,
+                      )}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="text-[10px] text-zinc-500">
+                  {t('mapEditor.trackGen.merge.pickTwo')}
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+              {t('mapEditor.trackGen.merge.hint')}
+            </p>
+          )}
+        </div>
+
+        {/*
           分組命名。
           按 + 進入選取，照順序點過去；編號直接標在塊上。頭字只收兩個大寫字母，因為
           它要接在兩位順序前面變成 D04 那種現場叫得出口的代號。
@@ -543,8 +771,9 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
               <button
                 type="button"
                 onClick={startGroup}
+                disabled={mergeMode}
                 data-trackgen-group-add
-                className="rounded border border-cyan-500/70 bg-cyan-500/10 px-2 py-1 text-[12px] leading-none text-cyan-200 transition hover:bg-cyan-500/25"
+                className="rounded border border-cyan-500/70 bg-cyan-500/10 px-2 py-1 text-[12px] leading-none text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
                 title={t('mapEditor.trackGen.groups.add')}
               >
                 ＋
