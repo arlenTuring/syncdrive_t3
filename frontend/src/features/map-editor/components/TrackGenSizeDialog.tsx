@@ -217,10 +217,7 @@ function SizeDialogBody({
     from: number
     /** 現在拖到哪（已經吸附過） */
     to: number
-    /** 吸附到的那條線，沒吸到就是 null */
-    snapped: number | null
-    /** 對齊候選：畫面座標用來吸附，版面座標用來畫出來給人看 */
-    targetsClient: number[]
+    /** 鄰近線的塊界（版面座標），畫成參考線 */
     targets: number[]
     /** 按下去的那一刻，這一端在畫面上的位置 */
     fromClient: number
@@ -531,15 +528,10 @@ function SizeDialogBody({
         axis: ax,
         from,
         to: from,
-        snapped: null,
         /*
-         * 候選不先照範圍濾掉。
-         *
-         * 濾掉的話，拖不到的那幾條就整條消失，使用者只會覺得「怎麼樣都對不齊」，卻
-         * 看不出是被範圍擋住。留著、畫出來，拖到範圍邊界自然停住，至少看得見。
+         * 鄰近那幾條線的塊界，畫成參考線用。不吸附，只是讓人對得出來。
          */
         targets: snapTargetsFor(shapes, sh, ax),
-        targetsClient: snapTargetsFor(shapes, sh, ax).map((t) => base + t * per),
         fromClient: base + from * per,
         per,
         // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
@@ -561,28 +553,16 @@ function SizeDialogBody({
     if (!drag) return
     const move = (e: PointerEvent) => {
       const now = drag.axis === 'x' ? e.clientX : e.clientY
-      // 這一端現在被拖到畫面上的哪裡
-      const free = drag.fromClient + (now - drag.grabClient)
       /*
-       * 吸附一律拿<strong>游標的位置</strong>去比，比完才貼上去。
+       * <strong>不吸附</strong>，拖到哪就是哪。
        *
-       * 先前是邊比邊把位置改掉，於是下一個候選是拿「已經吸過去的位置」在比——只要兩
-       * 個候選靠得近，就會一路接力跳到下一段去。
+       * 吸附會自己決定落點，而候選一多就分不清它跳去哪一條；對齊用看的就夠——塊界都
+       * 畫成參考線了，對準線走到哪一條上面自己看得出來。
        */
-      let at = free
-      let hit = false
-      let bestD = 10
-      for (const t of drag.targetsClient) {
-        const d = Math.abs(t - free)
-        if (d < bestD) {
-          bestD = d
-          at = t
-          hit = true
-        }
-      }
+      const at = drag.fromClient + (now - drag.grabClient)
       const raw = drag.from + (at - drag.fromClient) / Math.max(1e-6, drag.per)
       const to = Math.max(drag.min, Math.min(drag.max, raw))
-      setDrag((cur) => (cur ? { ...cur, to, snapped: hit && to === raw ? to : null } : cur))
+      setDrag((cur) => (cur ? { ...cur, to } : cur))
     }
     const up = () => {
       setDrag((cur) => {
@@ -995,8 +975,8 @@ function SizeDialogBody({
                       y1={0}
                       x2={(gx + drag.to) * scale}
                       y2={stageH}
-                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
-                      strokeWidth={drag.snapped === null ? 1 : 1.5}
+                      stroke="#22d3ee"
+                      strokeWidth={1.25}
                     />
                   </>
                 ) : (
@@ -1016,8 +996,8 @@ function SizeDialogBody({
                       y1={(gy + drag.to) * scale}
                       x2={stageW}
                       y2={(gy + drag.to) * scale}
-                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
-                      strokeWidth={drag.snapped === null ? 1 : 1.5}
+                      stroke="#22d3ee"
+                      strokeWidth={1.25}
                     />
                   </>
                 )}

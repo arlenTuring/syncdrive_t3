@@ -77,9 +77,15 @@ export function isPinned(s: LayoutShape): boolean {
   return s.kind === 'corner' || s.kind === 'switch' || s.kind === 'cross'
 }
 
-/** 可以拖的只有一般軌道與斜接：它們是一段直的帶子，改長度不改別的 */
+/**
+ * 只有一般軌道能改長度。
+ *
+ * 斜接、轉角、分岔、交叉的長度就是它們的幾何：斜接拉長坡就變緩、轉角拉長弧就變形。
+ * 那不是「同一條軌道畫長一點」，是換成另一個東西。所以它們一律不動——調長度會疊到
+ * 它們身上時就疊上去，寧可壓線也不要把幾何改掉。
+ */
 export function canNudge(s: LayoutShape): boolean {
-  return s.kind === 'rect' || s.kind === 'taper'
+  return s.kind === 'rect'
 }
 
 /**
@@ -115,23 +121,6 @@ function resized(
       lengthM: Math.hypot(b.x - a.x, b.y - a.y),
       rotationDeg: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
     }
-  }
-  if (s.kind === 'taper') {
-    /*
-     * 斜接<strong>直接把外框沿軸拉開</strong>，不重新解一次形狀。
-     *
-     * 重解會回一個「最接近」的方框，兩端不保證落在要求的位置——把手畫的是取樣點、帶子
-     * 畫的是方框，兩者於是對不上：手拖到哪，帶子卻停在別的地方。
-     *
-     * 斜接的幾何本來就是外框的比例（端面高度、坡的起訖都是比例），所以拉外框等於等比
-     * 拉整條帶子，端面仍然垂直、帶寬也不變，而且完全精確。
-     */
-    const b = s.box
-    const box =
-      axis === 'x'
-        ? { ...b, xM: nextLo, wM: nextHi - nextLo }
-        : { ...b, yM: nextLo, hM: nextHi - nextLo }
-    return { ...s, samples, box }
   }
   return null
 }
@@ -179,21 +168,22 @@ function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | nul
   const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
   const joint = jointOf(s, n.end, axis)
 
+  /*
+   * 相鄰的也是一般軌道時，它在對著界線的那一端反向伸縮，界線因此落在同一個位置。
+   *
+   * 相鄰的是斜接或路口就<strong>完全不動它</strong>：那些形狀的長度就是它們的幾何，
+   * 改了等於換成另一個東西。這時界線兩邊會疊起來或空出一小段，那是使用者自己拉的，
+   * 比把幾何改掉好。
+   */
   const at = neighbourAt(shapes, s, joint)
-  if (at.kind === 'blocked') return null
-  if (at.kind === 'edge') {
-    // 盡頭：沒有鄰居要配合，這一端就直接往外長或往內縮
+  const nb = at.kind === 'shape' ? at.shape : null
+  if (!nb || !canNudge(nb) || axisOf(nb) !== axis) {
     return shapes.map((x) => (x.name === s.name ? grown : x))
   }
-  const nb = at.shape
-  if (!canNudge(nb)) return null
-  const nbAxis = axisOf(nb)
-  if (nbAxis !== axis) return null
-  // 鄰居要縮的是<strong>對著界線</strong>的那一端
-  const ex = extentOf(nb, nbAxis)
+  const ex = extentOf(nb, axis)
   const nbEnd: NudgeEnd =
     Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
-  const moved = resized(nb, nbEnd, d, nbAxis)
+  const moved = resized(nb, nbEnd, d, axis)
   if (!moved) return null
 
   return shapes.map((x) => {
@@ -411,9 +401,9 @@ export function nudgeRangeFor(
   const { lo, hi } = extentOf(s, axis)
   const joint = jointOf(s, end, axis)
   const at = neighbourAt(shapes, s, joint)
-  if (at.kind === 'blocked') return null
-  const nb = at.kind === 'shape' ? at.shape : null
-  if (nb && (!canNudge(nb) || axisOf(nb) !== axis)) return null
+  const nb = at.kind === 'shape' && canNudge(at.shape) && axisOf(at.shape) === axis
+    ? at.shape
+    : null
   let min = end === 'hi' ? lo + MIN_LEN_PX : -Infinity
   let max = end === 'lo' ? hi - MIN_LEN_PX : Infinity
   if (nb) {
