@@ -28,12 +28,23 @@ if [ "${1:-}" = "--gcloud" ]; then
   log "透過 gcloud compute 同步到 $INSTANCE"
   gcloud compute ssh "$INSTANCE" "${GCLOUD_ARGS[@]}" --command "sudo mkdir -p $REMOTE_DIR && sudo chown \$(whoami) $REMOTE_DIR"
   # gcloud compute scp 不支援 rsync 語意，改用 tar 串流：只送需要的東西
-  tar --exclude-vcs \
+  #
+  # mosquitto/certs 一定要排除：正式機的 CA 與各車憑證是在 VM 上簽出來的，
+  # 開發機這份是另一套。送上去不只會蓋掉正式憑證，遠端 tar 也會因為那些檔案
+  # 屬 root 而解壓失敗，整支腳本就停在這裡（deploy.sh 根本沒跑到）。
+  #
+  # COPYFILE_DISABLE 讓 macOS 的 tar 不要產生 ._* AppleDouble 檔——它們在遠端
+  # 一樣會解壓失敗。
+  COPYFILE_DISABLE=1 tar --exclude-vcs \
       --exclude='node_modules' --exclude='dist' --exclude='.dev' \
       --exclude='deploy/.env' --exclude='deploy/.state' \
+      --exclude='mosquitto/certs' --exclude='._*' \
       -czf - . \
     | gcloud compute ssh "$INSTANCE" "${GCLOUD_ARGS[@]}" --command "tar -xzf - -C $REMOTE_DIR"
-  gcloud compute ssh "$INSTANCE" "${GCLOUD_ARGS[@]}" --command "cd $REMOTE_DIR && ./deploy/deploy.sh"
+  # deploy/.env 是 root:root 600（裡面有資料庫與 broker 的密碼），docker compose
+  # --env-file 讀不到就會停在「建置映像」這一步報 permission denied，所以遠端這一
+  # 步要用 sudo 跑。
+  gcloud compute ssh "$INSTANCE" "${GCLOUD_ARGS[@]}" --command "cd $REMOTE_DIR && sudo ./deploy/deploy.sh"
   exit 0
 fi
 
@@ -55,7 +66,9 @@ rsync -az --delete \
   --exclude='.dev' \
   --exclude='deploy/.env' \
   --exclude='deploy/.state' \
+  --exclude='mosquitto/certs' \
+  --exclude='._*' \
   ./ "$TARGET:$REMOTE_DIR/"
 
 log "在遠端執行部署"
-ssh "$TARGET" "cd $REMOTE_DIR && ./deploy/deploy.sh"
+ssh "$TARGET" "cd $REMOTE_DIR && sudo ./deploy/deploy.sh"
