@@ -169,19 +169,15 @@ function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | nul
   if (!s || !canNudge(s)) return null
   const axis = axisOf(s)
   /*
-   * 超出做得到的範圍時<strong>停在極限</strong>，不要整筆不做。
+   * <strong>照著 dPx 做，不再自己夾一次。</strong>
    *
-   * 整筆不做的話畫面上是：輔助線跟著游標走，塊卻一動也不動，使用者只看得到「拖了沒
-   * 反應」。停在極限至少看得出來已經到底了。
+   * 先前這裡也夾一次範圍，而拖曳中的輔助線是用按下去那一刻算出來的範圍夾的。兩個範圍
+   * 只要差一點點，畫面上就是「放開之後跳到旁邊一點」——使用者指到哪，落點偏偏不在那。
+   * 範圍交給拖曳那一端夾就好，這裡只擋住會讓塊短到畫不出來的極端值。
    */
-  const range = nudgeRangeFor(shapes, s, n.end)
-  if (!range) return null
-  const { lo, hi } = extentOf(s, axis)
-  const from = n.end === 'lo' ? lo : hi
-  const d = Math.max(range.min, Math.min(range.max, from + n.dPx)) - from
-  if (Math.abs(d) < 1e-6) return null
-  const grown = resized(s, n.end, d, axis)
+  const grown = resized(s, n.end, n.dPx, axis)
   if (!grown) return null
+  const d = n.dPx
 
   const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
   const joint = jointOf(s, n.end, axis)

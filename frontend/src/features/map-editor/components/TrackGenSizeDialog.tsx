@@ -487,14 +487,23 @@ function SizeDialogBody({
   const gx = frame ? frame.originPx.x - frame.bounds.xMin : 0
   const gy = frame ? frame.originPx.y - frame.bounds.yMin : 0
 
-  /** 這一塊兩端的把手位置（版面座標） */
+  /**
+   * 這一塊兩端的把手位置（版面座標）。
+   *
+   * 把手擺在<strong>那一端自己的位置</strong>，不是整塊的平均。斜接兩端不等高，用平均
+   * 的話把手浮在帶子中間，看起來就跟真正會動的那條邊差一截。
+   */
   const handlesOf = (sh: LayoutShape) => {
     const ax = axisOf(sh)
     const { lo, hi } = extentOf(sh, ax)
-    const perp =
-      sh.samples.reduce((t, p) => t + (ax === 'x' ? p.y : p.x), 0) /
-      Math.max(1, sh.samples.length)
-    const at = (v: number) => (ax === 'x' ? { x: v, y: perp } : { x: perp, y: v })
+    const co = (p: { x: number; y: number }) => (ax === 'x' ? p.x : p.y)
+    const cross = (p: { x: number; y: number }) => (ax === 'x' ? p.y : p.x)
+    const head = sh.samples[0]!
+    const tail = sh.samples[sh.samples.length - 1]!
+    const at = (v: number) => {
+      const near = Math.abs(co(head) - v) <= Math.abs(co(tail) - v) ? head : tail
+      return ax === 'x' ? { x: v, y: cross(near) } : { x: cross(near), y: v }
+    }
     return { ax, lo, hi, at }
   }
 
@@ -1352,7 +1361,20 @@ function SizeDialogBody({
               className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800 px-3 py-2 text-[10px] text-zinc-400"
               data-trackgen-nudge-panel
             >
-              <span>{t('mapEditor.trackGen.nudge.pickHandle')}</span>
+              {drag ? (
+                /*
+                 * 拖曳中把數字寫出來：這一端從哪移到哪、移了多少。
+                 * 落點對不對不必用眼睛猜，放開前後對一下這個數字就知道。
+                 */
+                <span className="font-mono text-amber-200" data-trackgen-nudge-live>
+                  {drag.axis === 'x' ? '↔' : '↕'} {drag.from.toFixed(1)} → {drag.to.toFixed(1)}
+                  {'  '}
+                  {drag.to - drag.from >= 0 ? '+' : ''}
+                  {(drag.to - drag.from).toFixed(1)}
+                </span>
+              ) : (
+                <span>{t('mapEditor.trackGen.nudge.pickHandle')}</span>
+              )}
               {extent?.nudgeErrors?.length ? (
                 <>
                   <span className="text-zinc-600">·</span>
