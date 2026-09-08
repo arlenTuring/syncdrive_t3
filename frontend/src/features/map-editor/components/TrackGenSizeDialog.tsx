@@ -439,6 +439,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                   <rect
                     key={`p${i}`}
                     data-trackgen-preview
+                    data-trackgen-name={sh.name}
                     x={cx - w / 2}
                     y={cy - h / 2}
                     width={w}
@@ -480,6 +481,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                         <path
                           key={part}
                           data-trackgen-preview
+                          data-trackgen-name={sh.name}
                           d={(dd as Record<string, string>)[part]!}
                           fill={st.fill}
                           stroke={st.stroke}
@@ -515,6 +517,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                 <path
                   key={`p${i}`}
                   data-trackgen-preview
+                  data-trackgen-name={sh.name}
                   d={d}
                   transform={shift}
                   fill={fill}
@@ -595,194 +598,227 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
           </svg>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-5">
-          <NumberField
-            label={t('mapEditor.trackGen.trackWidth')}
-            value={params.trackWidthPx}
-            suffix="px"
-            min={MIN_WID}
-            max={400}
-            onChange={(v) => setParams((p) => ({ ...p, trackWidthPx: v }))}
-          />
-          <NumberField
-            label={t('mapEditor.trackGen.metersPerBlockX')}
-            value={params.metersPerBlockX}
-            suffix={t('mapEditor.trackGen.meters')}
-            min={1}
-            max={2000}
-            onChange={(v) => setParams((p) => ({ ...p, metersPerBlockX: v }))}
-          />
-          <NumberField
-            label={t('mapEditor.trackGen.metersPerBlockY')}
-            value={params.metersPerBlockY}
-            suffix={t('mapEditor.trackGen.meters')}
-            min={1}
-            max={2000}
-            onChange={(v) => setParams((p) => ({ ...p, metersPerBlockY: v }))}
-          />
-        </div>
-
         {/*
-          合併。
-          演算法怎麼切都會有人不滿意，最後一步交給使用者：點兩塊，說哪一塊併進哪一塊。
-          留下來的那一塊會長到把另一塊蓋掉，並接收它代表的里程，所以生成出來就是畫面
-          上看到的樣子。
+          參數在左，量出來的結果在右，同一列。
+
+          先前參數、合併、分組、塊數、圖例各自佔一條橫槓，五條疊起來比預覽本身還高。
+          真正要一直看著的只有「改了之後變多大」；其餘不是動作就是提示——動作收進下面
+          那條工具列，提示收進按鈕的 title 與展開區，不佔常駐空間。
         */}
-        <div
-          className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2"
-          data-trackgen-merge
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-zinc-300">
-              {t('mapEditor.trackGen.merge.title')}
-            </span>
-            <span
-              className={`font-mono text-[11px] tabular-nums ${
-                (extent?.mergesApplied ?? merges.length) < merges.length
-                  ? 'text-amber-300'
-                  : 'text-zinc-500'
-              }`}
-              data-trackgen-merge-count
-            >
-              {extent?.mergesApplied ?? merges.length} / {merges.length}
-            </span>
-            {mergeMode ? (
-              <button
-                type="button"
-                data-trackgen-merge-exit
-                onClick={exitMerge}
-                className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-              >
-                {t('mapEditor.trackGen.merge.exit')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                data-trackgen-merge-enter
-                disabled={!!editingId}
-                onClick={enterMerge}
-                className="rounded border border-amber-500/70 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-40"
-              >
-                {t('mapEditor.trackGen.merge.enter')}
-              </button>
-            )}
-            {merges.length ? (
-              <button
-                type="button"
-                data-trackgen-merge-undo
-                onClick={() => {
-                  setMerges((prev) => prev.slice(0, -1))
-                  setPicks([])
-                }}
-                className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-              >
-                {t('mapEditor.trackGen.merge.undo')}
-              </button>
-            ) : null}
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="flex flex-wrap items-end gap-4">
+            <NumberField
+              label={t('mapEditor.trackGen.trackWidth')}
+              value={params.trackWidthPx}
+              suffix="px"
+              min={MIN_WID}
+              max={400}
+              onChange={(v) => setParams((p) => ({ ...p, trackWidthPx: v }))}
+            />
+            <NumberField
+              label={t('mapEditor.trackGen.metersPerBlockX')}
+              value={params.metersPerBlockX}
+              suffix={t('mapEditor.trackGen.meters')}
+              min={1}
+              max={2000}
+              onChange={(v) => setParams((p) => ({ ...p, metersPerBlockX: v }))}
+            />
+            <NumberField
+              label={t('mapEditor.trackGen.metersPerBlockY')}
+              value={params.metersPerBlockY}
+              suffix={t('mapEditor.trackGen.meters')}
+              min={1}
+              max={2000}
+              onChange={(v) => setParams((p) => ({ ...p, metersPerBlockY: v }))}
+            />
           </div>
 
-          {mergeMode ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-2">
-              {picks.map((n, i) => (
-                <span
-                  key={n}
-                  className="rounded border border-amber-500/50 px-1.5 py-0.5 font-mono text-[11px] text-amber-200"
+          <div className="flex min-w-[15rem] flex-1 flex-col items-start gap-1 sm:items-end">
+            <div
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-zinc-400"
+              data-trackgen-stats
+            >
+              <span>
+                {t('mapEditor.trackGen.axisX')}{' '}
+                <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
+                  {extent?.countX ?? 0}
+                </b>{' '}
+                {t('mapEditor.trackGen.blockUnit')}
+                <span className="ml-1 font-mono tabular-nums text-zinc-600">
+                  {Math.round(totalXM)} m
+                </span>
+              </span>
+              <span aria-hidden className="text-zinc-700">
+                ·
+              </span>
+              <span>
+                {t('mapEditor.trackGen.axisY')}{' '}
+                <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
+                  {extent?.countY ?? 0}
+                </b>{' '}
+                {t('mapEditor.trackGen.blockUnit')}
+                <span className="ml-1 font-mono tabular-nums text-zinc-600">
+                  {Math.round(totalYM)} m
+                </span>
+              </span>
+              <span aria-hidden className="text-zinc-700">
+                ·
+              </span>
+              <span>
+                {t('mapEditor.trackGen.occupies')}{' '}
+                <b
+                  className={`font-mono tabular-nums ${
+                    over && (over.w > 1 || over.h > 1) ? 'text-amber-300' : 'text-zinc-200'
+                  }`}
+                  data-trackgen-extent
                 >
-                  {i + 1}. {n}
+                  {Math.round(extent?.wPx ?? 0)} × {Math.round(extent?.hPx ?? 0)} px
+                </b>
+              </span>
+              {over && (over.w > 1 || over.h > 1) ? (
+                <span className="text-amber-300" data-trackgen-over>
+                  {t('mapEditor.trackGen.overflowBefore')}
+                  <b className="font-mono tabular-nums">
+                    {over.w > 1 ? `${over.w}` : '0'} × {over.h > 1 ? `${over.h}` : '0'} px
+                  </b>
+                  {t('mapEditor.trackGen.overflowAfter')}
                 </span>
-              ))}
-              {mergeChecks ? (
-                <>
-                  <button
-                    type="button"
-                    data-trackgen-merge-1to2
-                    disabled={!mergeChecks.aToB.ok}
-                    onClick={() => commitMerge(picks[0]!, picks[1]!)}
-                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
-                  >
-                    {t('mapEditor.trackGen.merge.oneIntoTwo')}
-                  </button>
-                  <button
-                    type="button"
-                    data-trackgen-merge-2to1
-                    disabled={!mergeChecks.bToA.ok}
-                    onClick={() => commitMerge(picks[1]!, picks[0]!)}
-                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
-                  >
-                    {t('mapEditor.trackGen.merge.twoIntoOne')}
-                  </button>
-                  {!mergeChecks.aToB.ok && !mergeChecks.bToA.ok ? (
-                    <span className="text-[10px] text-amber-300/80" data-trackgen-merge-reason>
-                      {t(
-                        `mapEditor.trackGen.merge.reason.${
-                          (mergeChecks.aToB as { reason: TrackGenMergeRefusal }).reason
-                        }`,
-                      )}
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                <span className="text-[10px] text-zinc-500">
-                  {t('mapEditor.trackGen.merge.pickTwo')}
-                </span>
-              )}
+              ) : null}
             </div>
-          ) : (
-            <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-              {t('mapEditor.trackGen.merge.hint')}
-            </p>
-          )}
+
+            {/*
+              圖例跟著統計走：兩者都是「這組參數排出來長什麼樣」，放一起才讀得成一件事。
+              顏色只用在預覽，生成出來的元件仍照圖台原本的樣式——這句話進 title，不必
+              每次都佔一行。
+            */}
+            <div
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-zinc-500"
+              title={t('mapEditor.trackGen.legendNote')}
+              data-trackgen-legend
+            >
+              {(['rect', 'corner', 'switch', 'cross', 'taper'] as const).map((kind) => {
+                const st = KIND_STYLE[kind]
+                const n = extent?.shapes.filter((sh) => sh.kind === kind).length ?? 0
+                return (
+                  <span key={kind} className="flex items-center gap-1">
+                    <span
+                      className="inline-block size-2.5 rounded-[2px] border"
+                      style={{ background: st.fill, borderColor: st.stroke }}
+                      aria-hidden
+                    />
+                    {t(`mapEditor.trackGen.kinds.${kind}`)}
+                    <b className="font-mono tabular-nums text-zinc-300">{n}</b>
+                  </span>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/*
-          分組命名。
-          按 + 進入選取，照順序點過去；編號直接標在塊上。頭字只收兩個大寫字母，因為
-          它要接在兩位順序前面變成 D04 那種現場叫得出口的代號。
+          分組與合併同一條工具列。
+
+          兩者都是「在預覽上點軌道」的工具，一次只會用一個，所以只留一個展開區：誰在
+          用就展開誰。收起來時整條只有一列高。
         */}
-        <div
-          className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2"
-          data-trackgen-groups
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-zinc-300">
-              {t('mapEditor.trackGen.groups.title')}
-            </span>
-            {liveGroups.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => (editingId === g.id ? undefined : editGroup(g))}
-                className={`flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition ${
-                  editingId === g.id
-                    ? 'border-cyan-400 text-cyan-100'
-                    : 'border-zinc-600 text-zinc-300 hover:border-zinc-400'
-                }`}
-              >
+        <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-3 py-1.5">
+            <div className="flex flex-wrap items-center gap-1.5" data-trackgen-groups>
+              <span className="text-[11px] font-medium text-zinc-300">
+                {t('mapEditor.trackGen.groups.title')}
+              </span>
+              {liveGroups.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  disabled={mergeMode}
+                  onClick={() => (editingId === g.id ? undefined : editGroup(g))}
+                  className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[11px] transition disabled:opacity-40 ${
+                    editingId === g.id
+                      ? 'border-cyan-400 text-cyan-100'
+                      : 'border-zinc-600 text-zinc-300 hover:border-zinc-400'
+                  }`}
+                >
+                  <span
+                    className="inline-block size-2.5 rounded-[2px] border border-zinc-500"
+                    style={{ background: g.color }}
+                    aria-hidden
+                  />
+                  <span className="font-mono">{g.code || '—'}</span>
+                  <span className="tabular-nums text-zinc-500">{g.members.length}</span>
+                </button>
+              ))}
+              {editingId ? null : (
+                <button
+                  type="button"
+                  onClick={startGroup}
+                  disabled={mergeMode}
+                  data-trackgen-group-add
+                  className="rounded border border-cyan-500/70 bg-cyan-500/10 px-1.5 py-0.5 text-[12px] leading-none text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
+                  title={t('mapEditor.trackGen.groups.hint')}
+                >
+                  ＋
+                </button>
+              )}
+            </div>
+
+            <span className="mx-1 h-4 w-px shrink-0 bg-zinc-700" aria-hidden />
+
+            <div className="flex flex-wrap items-center gap-1.5" data-trackgen-merge>
+              <span className="text-[11px] font-medium text-zinc-300">
+                {t('mapEditor.trackGen.merge.title')}
+              </span>
+              {merges.length ? (
                 <span
-                  className="inline-block size-3 rounded-[2px] border border-zinc-500"
-                  style={{ background: g.color }}
-                  aria-hidden
-                />
-                <span className="font-mono">{g.code || '—'}</span>
-                <span className="tabular-nums text-zinc-500">{g.members.length}</span>
-              </button>
-            ))}
-            {editingId ? null : (
-              <button
-                type="button"
-                onClick={startGroup}
-                disabled={mergeMode}
-                data-trackgen-group-add
-                className="rounded border border-cyan-500/70 bg-cyan-500/10 px-2 py-1 text-[12px] leading-none text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
-                title={t('mapEditor.trackGen.groups.add')}
-              >
-                ＋
-              </button>
-            )}
+                  className={`font-mono text-[11px] tabular-nums ${
+                    (extent?.mergesApplied ?? merges.length) < merges.length
+                      ? 'text-amber-300'
+                      : 'text-zinc-500'
+                  }`}
+                  data-trackgen-merge-count
+                >
+                  {extent?.mergesApplied ?? merges.length}/{merges.length}
+                </span>
+              ) : null}
+              {mergeMode ? (
+                <button
+                  type="button"
+                  data-trackgen-merge-exit
+                  onClick={exitMerge}
+                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+                >
+                  {t('mapEditor.trackGen.merge.exit')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-trackgen-merge-enter
+                  disabled={!!editingId}
+                  onClick={enterMerge}
+                  title={t('mapEditor.trackGen.merge.hint')}
+                  className="rounded border border-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-40"
+                >
+                  {t('mapEditor.trackGen.merge.enter')}
+                </button>
+              )}
+              {merges.length ? (
+                <button
+                  type="button"
+                  data-trackgen-merge-undo
+                  onClick={() => {
+                    setMerges((prev) => prev.slice(0, -1))
+                    setPicks([])
+                  }}
+                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+                >
+                  {t('mapEditor.trackGen.merge.undo')}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {editing ? (
-            <div className="mt-2 flex flex-wrap items-end gap-3 border-t border-zinc-800 pt-2">
+            <div className="flex flex-wrap items-end gap-3 border-t border-zinc-800 px-3 py-2">
               <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
                 {t('mapEditor.trackGen.groups.code')}
                 <input
@@ -844,70 +880,53 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
                 {t('mapEditor.trackGen.groups.done')}
               </button>
             </div>
-          ) : (
-            <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-              {t('mapEditor.trackGen.groups.hint')}
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400">
-          {t('mapEditor.trackGen.axisX')}{' '}
-          <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
-            {extent?.countX ?? 0}
-          </b>
-          {' '}{t('mapEditor.trackGen.blockUnit')}（
-          <span className="font-mono tabular-nums">{Math.round(totalXM)} m</span>
-          ）· {t('mapEditor.trackGen.axisY')}{' '}
-          <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
-            {extent?.countY ?? 0}
-          </b>
-          {' '}{t('mapEditor.trackGen.blockUnit')}（
-          <span className="font-mono tabular-nums">{Math.round(totalYM)} m</span>
-          ）· {t('mapEditor.trackGen.occupies')}{' '}
-          <b
-            className={`font-mono tabular-nums ${
-              over && (over.w > 1 || over.h > 1) ? 'text-amber-300' : 'text-zinc-200'
-            }`}
-            data-trackgen-extent
-          >
-            {Math.round(extent?.wPx ?? 0)} × {Math.round(extent?.hPx ?? 0)} px
-          </b>
-          {over && (over.w > 1 || over.h > 1) ? (
-            <span className="text-amber-300" data-trackgen-over>
-              {t('mapEditor.trackGen.overflowBefore')}
-              <b className="font-mono tabular-nums">
-                {over.w > 1 ? `${over.w}` : '0'} × {over.h > 1 ? `${over.h}` : '0'} px
-              </b>
-              {t('mapEditor.trackGen.overflowAfter')}
-            </span>
-          ) : null}
-        </div>
-
-        {/*
-          四種軌道的對照。顏色只用在預覽——生成出來的元件仍照圖台原本的樣式；這裡是
-          為了讓人一眼看出哪一段是轉角、哪一段是分岔，不必去比對外框長寬。
-        */}
-        <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400"
-          data-trackgen-legend
-        >
-          {(['rect', 'corner', 'switch', 'cross', 'taper'] as const).map((kind) => {
-            const st = KIND_STYLE[kind]
-            const n = extent?.shapes.filter((sh) => sh.kind === kind).length ?? 0
-            return (
-              <span key={kind} className="flex items-center gap-1.5">
+          ) : mergeMode ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 px-3 py-2">
+              {picks.map((n, i) => (
                 <span
-                  className="inline-block size-3 rounded-[2px] border"
-                  style={{ background: st.fill, borderColor: st.stroke }}
-                  aria-hidden
-                />
-                {t(`mapEditor.trackGen.kinds.${kind}`)}
-                <b className="font-mono tabular-nums text-zinc-200">{n}</b>
-              </span>
-            )
-          })}
-          <span className="text-zinc-500">{t('mapEditor.trackGen.legendNote')}</span>
+                  key={n}
+                  className="rounded border border-amber-500/50 px-1.5 py-0.5 font-mono text-[11px] text-amber-200"
+                >
+                  {i + 1}. {n}
+                </span>
+              ))}
+              {mergeChecks ? (
+                <>
+                  <button
+                    type="button"
+                    data-trackgen-merge-1to2
+                    disabled={!mergeChecks.aToB.ok}
+                    onClick={() => commitMerge(picks[0]!, picks[1]!)}
+                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
+                  >
+                    {t('mapEditor.trackGen.merge.oneIntoTwo')}
+                  </button>
+                  <button
+                    type="button"
+                    data-trackgen-merge-2to1
+                    disabled={!mergeChecks.bToA.ok}
+                    onClick={() => commitMerge(picks[1]!, picks[0]!)}
+                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
+                  >
+                    {t('mapEditor.trackGen.merge.twoIntoOne')}
+                  </button>
+                  {!mergeChecks.aToB.ok && !mergeChecks.bToA.ok ? (
+                    <span className="text-[10px] text-amber-300/80" data-trackgen-merge-reason>
+                      {t(
+                        `mapEditor.trackGen.merge.reason.${
+                          (mergeChecks.aToB as { reason: TrackGenMergeRefusal }).reason
+                        }`,
+                      )}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="text-[10px] text-zinc-500">
+                  {t('mapEditor.trackGen.merge.pickTwo')}
+                </span>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2">
