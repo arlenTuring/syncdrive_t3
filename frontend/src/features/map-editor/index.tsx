@@ -1536,7 +1536,7 @@ export default function MapEditorApp({
     const libraryId = loadedMapMeta.libraryId
     if (!libraryId) return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-    const t = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       setAutosaveStatus('saving')
       const meta = loadedMapMetaRef.current
       const entry = getMapLibraryEntry(meta.libraryId)
@@ -1574,9 +1574,9 @@ export default function MapEditorApp({
         }),
       )
     }, 900)
-    autosaveTimerRef.current = t
+    autosaveTimerRef.current = timer
     return () => {
-      clearTimeout(t)
+      clearTimeout(timer)
     }
   }, [
     mapEditorMode,
@@ -1959,7 +1959,8 @@ export default function MapEditorApp({
 
   const facilityFromPaletteItem = useCallback(
     (
-      item: Exclude<PaletteItem, { type: 'Area' }>,
+      // 場域與軌道生成是跟 Area 同層的東西，不會變成設施
+      item: Exclude<PaletteItem, { type: 'Area' } | { type: 'TrackGen' }>,
       id: string,
       areaPosition: { x: number; y: number },
       positionMeters: { x: number; y: number },
@@ -2525,7 +2526,13 @@ export default function MapEditorApp({
       item: PaletteItem,
       areaPositionCenter: { x: number; y: number },
     ) => {
-      if (isAreaPaletteItem(item) || isBasemapPaletteItem(item)) return
+      if (
+        isAreaPaletteItem(item) ||
+        isBasemapPaletteItem(item) ||
+        isTrackGenPaletteItem(item)
+      ) {
+        return
+      }
       const area = areasRef.current.find((a) => a.id === areaId)
       if (!area) return
       pushHistory()

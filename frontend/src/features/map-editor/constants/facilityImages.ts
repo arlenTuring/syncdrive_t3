@@ -11,6 +11,11 @@ export const FACILITY_BACKGROUND_BY_NAME: Record<FacilityName, string | null> = 
   Gate: '/assets/facilities/gate.png',
   Light: '/assets/facilities/light.png',
   Rail: '/assets/facilities/rail.png',
+  // 圓角、斜接、分岔、交叉都是自己畫出來的形狀，沒有底圖
+  RailCorner: null,
+  RailTaper: null,
+  RailSwitch: null,
+  RailCross: null,
   SmartPole: SMART_POLE_ENABLE_ICON,
   DockingPoint: null,
   Waypoint: null,

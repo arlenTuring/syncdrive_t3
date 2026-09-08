@@ -23,7 +23,8 @@ function fieldPointInRefField(
 
 /** 命中 refField 的段；重疊視為地圖資料錯誤，以 trackId 決定性取一 */
 export function findRefFieldSegmentsAtPoint(
-  network: TrackNetwork,
+  // 只讀 segments，所以不要求整份索引——呼叫端常常只手上有一組段
+  network: Pick<TrackNetwork, 'segments'>,
   xM: number,
   yM: number,
 ): TrackNetworkSegment[] {

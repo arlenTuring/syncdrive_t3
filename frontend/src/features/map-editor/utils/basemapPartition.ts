@@ -1,6 +1,5 @@
 import {
   collectBasemapLeafRects,
-  createDefaultBasemapCellTree,
   parseBasemapCellTree,
   BASEMAP_CELL_TREE_KEY,
 } from './basemapCellTree'
@@ -86,10 +85,6 @@ function nextCellId(): string {
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0
   return Math.min(1, Math.max(0, n))
-}
-
-function clampFrac(n: number): number {
-  return Math.min(1 - MIN_FRAC, Math.max(MIN_FRAC, n))
 }
 
 function isPartitionCell(v: unknown): v is BasemapPartitionCell {
@@ -501,7 +496,6 @@ export function adjustSharedPartitionDivider(
   if (divider.axis === 'col') {
     const edgePx = localX
     const edgeNorm = clamp01(edgePx / w)
-    const aRight = a.x + a.w
     const bRight = b.x + b.w
     const minEdge = a.x + MIN_FRAC
     const maxEdge = bRight - MIN_FRAC
@@ -513,7 +507,6 @@ export function adjustSharedPartitionDivider(
   } else {
     const edgePx = localY
     const edgeNorm = clamp01(edgePx / h)
-    const aBottom = a.y + a.h
     const bBottom = b.y + b.h
     const minEdge = a.y + MIN_FRAC
     const maxEdge = bBottom - MIN_FRAC

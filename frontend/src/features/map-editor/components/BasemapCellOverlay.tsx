@@ -244,7 +244,6 @@ export function BasemapCellOverlay({
     cell: (typeof leafRects)[number],
     layer: 'structural' | 'independent',
   ) => {
-    const meta = partition.cells.find((c) => c.id === cell.id)
     const isSelected = selectedCellId === cell.id
     const isIndependent = layer === 'independent'
     const canResize = isIndependent && isSelected && !readOnly

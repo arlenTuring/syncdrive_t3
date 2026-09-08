@@ -1,4 +1,4 @@
-import type { FacilityName, FacilityType } from '../types/facility'
+import type { FacilityName, FacilityObject, FacilityType } from '../types/facility'
 import type { MapAreaDomain, MapAreaLayout } from '../types/area'
 import { domainHeightM, domainWidthM, meterSizeToAreaLocalPx } from '../utils/areaCoords'
 import {

@@ -112,7 +112,8 @@ export function cornerTrackPath(
    * 弧用二次貝茲曲線畫，控制點沿著「弦中點 → 方框角」這條對角線移動。
    */
   const bez = (
-    px1: number, py1: number,
+    // 起點只是為了讓呼叫端寫起來成對，路徑本身接續前一段，用不到
+    _px1: number, _py1: number,
     px2: number, py2: number,
     ax: number, ay: number,
     q: number,
