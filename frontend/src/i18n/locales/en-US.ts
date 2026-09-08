@@ -1534,7 +1534,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         exit: 'Stop adjusting',
         undo: 'Undo last',
         hint: 'Drag a track end to change its length. The adjacent track gives or takes the same amount; nothing else moves. Junctions cannot be adjusted.',
-        pickHandle: 'Drag the handle at a track end — horizontal left/right, vertical up/down. The adjacent track resizes to match and nothing else moves; a taper\u2019s ramp changes with its length and may overlap a neighbouring line. Dashed outlines are the original edges; dotted lines mark nearby block edges.',
+        pickHandle: 'Drag the handle at a track end — horizontal left/right, vertical up/down. The adjacent track resizes to match and nothing else moves; a taper\u2019s ramp changes with its length and may overlap a neighbouring line. Dashed outlines are the original edges; dotted lines mark nearby parallel tracks\u2019 block edges — approach within ~10 px to snap (guide turns amber when snapped).',
         error: 'Length error {{total}} m total, {{max}} m worst block. Vehicle mapping already follows; no re-sync needed.',
       },
       merge: {

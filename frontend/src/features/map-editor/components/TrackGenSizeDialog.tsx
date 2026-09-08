@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 
@@ -57,6 +57,26 @@ import {
  * 改任何一個參數就重排一次並重畫，看到什麼就會生成什麼——三種軌道用的是它們自己的
  * path 函式，預覽與生成不可能各說各話。
  */
+
+/**
+ * 微調的現場記錄。
+ *
+ * 拖曳偏掉這件事在開發機重現不出來，只能把每一步的數字留在使用者的瀏覽器裡：按下去
+ * 在哪、放開時要求移到哪、實際落在哪。放開之後那一行的 <code>diff</code> 不是 0，
+ * 就是套用那一段出了問題；是 0 而畫面看起來還是偏，就是畫的那一段。
+ *
+ * 存在 <code>window.__nudgeLog</code>，複製那個陣列出來就能對。
+ */
+type NudgeLogEntry = Record<string, unknown> & { at: string; step: string }
+
+function nudgeLog(step: string, data: Record<string, unknown>) {
+  const w = window as unknown as { __nudgeLog?: NudgeLogEntry[] }
+  const arr = (w.__nudgeLog ??= [])
+  arr.push({ at: new Date().toISOString().slice(11, 23), step, ...data })
+  if (arr.length > 200) arr.shift()
+  // eslint-disable-next-line no-console
+  console.info('[nudge]', step, data)
+}
 
 export type TrackGenSizeParams = TrackGenBlockSize
 
@@ -209,7 +229,9 @@ function SizeDialogBody({
    */
   const [nudgeMode, setNudgeMode] = useState(false)
   const [nudges, setNudges] = useState<TrackGenNudge[]>(initialNudges ?? [])
-  const [drag, setDrag] = useState<{
+  type NudgeDrag = {
+    /** 這一次拖曳的編號：提交只認編號，重複的一律不收 */
+    id: number
     name: string
     end: NudgeEnd
     axis: Axis
@@ -228,7 +250,27 @@ function SizeDialogBody({
     /** 這一端拖得到的範圍：兩塊都要留一點長度 */
     min: number
     max: number
-  } | null>(null)
+  }
+  const [drag, setDrag] = useState<NudgeDrag | null>(null)
+  /*
+   * 同一份拖曳狀態也放在 ref。
+   *
+   * 放開時若把「收下這一筆」寫在 setDrag 的更新函式裡（再 queueMicrotask），
+   * StrictMode 會把更新函式跑兩次 → 同一筆 dPx 被 append 兩次，落點變成約兩倍位移。
+   * move / up 都讀這個 ref，提交也在事件裡直接做，不經過 updater 的 side effect。
+   */
+  const dragRef = useRef<NudgeDrag | null>(null)
+  dragRef.current = drag
+  /*
+   * 每一次拖曳一個編號，收下之後把編號記起來。
+   *
+   * StrictMode 會把 render 與部分回呼跑兩次，事件監聽也可能在重掛的空窗裡收到同一個
+   * pointerup。只靠「把 ref 清成 null」擋不住——render 會再把 ref 補回去。認編號最直接：
+   * 同一個編號只收一次，不管 up 被叫幾次。實測沒有這道鎖時，一次拖曳會記成兩筆，
+   * 落點因此變成兩倍位移。
+   */
+  const dragSeqRef = useRef(0)
+  const committedRef = useRef(-1)
 
   /*
    * 一步一步復原：合併與微調共用一條時間軸。
@@ -236,16 +278,25 @@ function SizeDialogBody({
    * 兩種操作都是一筆一筆疊上去的，使用者記得的是「剛才做的那一件」，不是「剛才那一件
    * 合併」。所以記下先後順序，Cmd/Ctrl+Z 就退掉最後做的那一件，不管它是哪一種。
    */
-  const [, setHistory] = useState<('merge' | 'nudge')[]>([])
+  const [history, setHistory] = useState<('merge' | 'nudge')[]>([])
+  /*
+   * 時間軸也放一份 ref。
+   *
+   * 跟拖曳同一個理由：把「退掉哪一種」寫在 setHistory 的更新函式裡，StrictMode 會把
+   * 更新函式跑兩次，⌘Z 一次就退掉兩筆。判斷改成讀 ref，setState 只做單純的替換。
+   */
+  const historyRef = useRef<('merge' | 'nudge')[]>([])
+  historyRef.current = history
   const undoLast = useCallback(() => {
-    setHistory((prev) => {
-      const last = prev[prev.length - 1]
-      if (!last) return prev
-      if (last === 'merge') setMerges((m) => m.slice(0, -1))
-      else setNudges((n) => n.slice(0, -1))
-      return prev.slice(0, -1)
-    })
+    const prev = historyRef.current
+    const last = prev[prev.length - 1]
+    dragRef.current = null
     setDrag(null)
+    if (!last) return
+    historyRef.current = prev.slice(0, -1)
+    setHistory(historyRef.current)
+    if (last === 'merge') setMerges((m) => m.slice(0, -1))
+    else setNudges((n) => n.slice(0, -1))
   }, [])
 
   useEffect(() => {
@@ -477,6 +528,34 @@ function SizeDialogBody({
   )
 
   /*
+   * 放開之後量一次實際落點，跟要求的位置對一下。
+   *
+   * diff 不是 0 就是套用那一段把位置改掉了；是 0 表示形狀真的在要求的位置，那畫面上
+   * 還看得到偏移就只可能是畫的那一段。
+   */
+  const pendingRef = useRef<{ name: string; end: NudgeEnd; wantTo: number } | null>(null)
+  useEffect(() => {
+    const want = pendingRef.current
+    if (!want || !extent) return
+    pendingRef.current = null
+    const sh = extent.shapes.find((x) => x.name === want.name)
+    if (!sh) {
+      nudgeLog('applied', { name: want.name, missing: true })
+      return
+    }
+    const ax = axisOf(sh)
+    const { lo, hi } = extentOf(sh, ax)
+    const got = want.end === 'lo' ? lo : hi
+    nudgeLog('applied', {
+      name: want.name, end: want.end,
+      wantTo: +want.wantTo.toFixed(3),
+      gotTo: +got.toFixed(3),
+      diff: +(got - want.wantTo).toFixed(3),
+      applied: extent.nudgesApplied, total: nudges.length,
+    })
+  }, [extent, nudges.length])
+
+  /*
    * 版面座標 → 縮圖座標的共用位移。
    *
    * 微調時<strong>用沒調過的那一份</strong>當座標框。拖動會改變外框（塊往外長時
@@ -531,22 +610,39 @@ function SizeDialogBody({
       const r = svg.getBoundingClientRect()
       const per = (r.width / Math.max(1, stageW)) * scale
       const base = ax === 'x' ? r.left + gx * per : r.top + gy * per
-      setDrag({
+      /*
+       * 候選不先照範圍濾掉。
+       *
+       * 濾掉的話，拖不到的那幾條就整條消失，使用者只會覺得「怎麼樣都對不齊」，卻
+       * 看不出是被範圍擋住。留著、畫出來，拖到範圍邊界自然停住，至少看得見。
+       */
+      const targets = snapTargetsFor(shapes, sh, ax)
+      dragSeqRef.current += 1
+      const next: NudgeDrag = {
+        id: dragSeqRef.current,
         name: sh.name,
         end,
         axis: ax,
         from,
         to: from,
-        /*
-         * 鄰近那幾條線的塊界，畫成參考線用。不吸附，只是讓人對得出來。
-         */
-        targets: snapTargetsFor(shapes, sh, ax),
+        targets,
         fromClient: base + from * per,
         per,
         // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
         grabClient: ax === 'x' ? e.clientX : e.clientY,
         min: range.min,
         max: range.max,
+      }
+      dragRef.current = next
+      setDrag(next)
+      nudgeLog('down', {
+        name: sh.name, end, axis: ax,
+        from: +from.toFixed(3),
+        fromClient: +next.fromClient.toFixed(3),
+        grabClient: +next.grabClient.toFixed(3),
+        per: +per.toFixed(6), scale: +scale.toFixed(6),
+        svgW: +r.width.toFixed(2), stageW, gx: +gx.toFixed(3),
+        range: [+range.min.toFixed(3), +range.max.toFixed(3)],
       })
     },
     [extent, gx, gy, scale, stageW],
@@ -557,34 +653,51 @@ function SizeDialogBody({
    *
    * 拖到一半手常常會滑出縮圖的範圍——掛在圖上的話那一刻就收不到 move 與 up，放開了
    * 卻沒人收下，這一次調整就白做。
+   *
+   * 只在「有沒有在拖」變動時掛／拆監聽；move 讀 dragRef，不因 to 更新而重綁，
+   * 避免拆裝空窗期丟掉 pointerup。
    */
+  const dragging = drag !== null
   useEffect(() => {
-    if (!drag) return
+    if (!dragging) return
     const move = (e: PointerEvent) => {
-      const now = drag.axis === 'x' ? e.clientX : e.clientY
+      const cur = dragRef.current
+      if (!cur) return
+      const now = cur.axis === 'x' ? e.clientX : e.clientY
+      // 這一端現在被拖到畫面上的哪裡（還沒吸附）
+      const free = cur.fromClient + (now - cur.grabClient)
       /*
        * <strong>不吸附</strong>，拖到哪就是哪。
        *
-       * 吸附會自己決定落點，而候選一多就分不清它跳去哪一條；對齊用看的就夠——塊界都
-       * 畫成參考線了，對準線走到哪一條上面自己看得出來。
+       * 吸附會自己決定落點，候選一多就分不清它跳去哪一條。對齊用看的就夠——鄰近軌道
+       * 的塊界都畫成參考線了，對準線走到哪一條上面自己看得出來。
        */
-      const at = drag.fromClient + (now - drag.grabClient)
-      const raw = drag.from + (at - drag.fromClient) / Math.max(1e-6, drag.per)
-      const to = Math.max(drag.min, Math.min(drag.max, raw))
-      setDrag((cur) => (cur ? { ...cur, to } : cur))
+      const raw = cur.from + (free - cur.fromClient) / Math.max(1e-6, cur.per)
+      const to = Math.max(cur.min, Math.min(cur.max, raw))
+      const next = { ...cur, to }
+      dragRef.current = next
+      setDrag(next)
     }
     const up = () => {
-      setDrag((cur) => {
-        // 手抖的那幾像素不算數
-        if (cur && Math.abs(cur.to - cur.from) > 0.5) {
-          const one = { name: cur.name, end: cur.end, dPx: cur.to - cur.from }
-          queueMicrotask(() => {
-            setNudges((prev) => [...prev, one])
-            setHistory((prev) => [...prev, 'nudge'])
-          })
-        }
-        return null
-      })
+      const cur = dragRef.current
+      dragRef.current = null
+      setDrag(null)
+      // 同一次拖曳只收一次；手抖的那幾像素不算數
+      if (cur && committedRef.current === cur.id) return
+      if (cur) committedRef.current = cur.id
+      if (cur && Math.abs(cur.to - cur.from) > 0.5) {
+        const one = { name: cur.name, end: cur.end, dPx: cur.to - cur.from }
+        nudgeLog('up', {
+          id: cur.id,
+          name: one.name, end: one.end,
+          from: +cur.from.toFixed(3),
+          wantTo: +cur.to.toFixed(3),
+          dPx: +one.dPx.toFixed(3),
+        })
+        pendingRef.current = { name: one.name, end: one.end, wantTo: cur.to }
+        setNudges((prev) => [...prev, one])
+        setHistory((prev) => [...prev, 'nudge'])
+      }
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
@@ -594,7 +707,7 @@ function SizeDialogBody({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [drag])
+  }, [dragging])
 
   /*
    * 一定要 portal 到 body。
@@ -937,11 +1050,14 @@ function SizeDialogBody({
             {drag ? (
               <g className="pointer-events-none">
                 {/*
-                  對齊的候選全部畫出來。
-                  看不見的話，對不齊時分不清是「沒有可以對的線」還是「拖不過去」。
+                  鄰近軌道的塊界全部畫出來當對準線。
+                  沒有吸附，純粹是給眼睛對的參考；拖得到的畫亮一點，拖不到的暗一點。
                 */}
-                {drag.targets.map((t) =>
-                  drag.axis === 'x' ? (
+                {drag.targets.map((t) => {
+                  const inRange = t >= drag.min && t <= drag.max
+                  const stroke = inRange ? '#71717a' : '#3f3f46'
+                  const strokeWidth = inRange ? 1 : 0.6
+                  return drag.axis === 'x' ? (
                     <line
                       key={`t${t}`}
                       data-trackgen-snap-tick
@@ -949,8 +1065,8 @@ function SizeDialogBody({
                       y1={0}
                       x2={(gx + t) * scale}
                       y2={stageH}
-                      stroke={t >= drag.min && t <= drag.max ? '#71717a' : '#3f3f46'}
-                      strokeWidth={t >= drag.min && t <= drag.max ? 1 : 0.6}
+                      stroke={stroke}
+                      strokeWidth={strokeWidth}
                       strokeDasharray="2 5"
                     />
                   ) : (
@@ -961,12 +1077,12 @@ function SizeDialogBody({
                       y1={(gy + t) * scale}
                       x2={stageW}
                       y2={(gy + t) * scale}
-                      stroke={t >= drag.min && t <= drag.max ? '#71717a' : '#3f3f46'}
-                      strokeWidth={t >= drag.min && t <= drag.max ? 1 : 0.6}
+                      stroke={stroke}
+                      strokeWidth={strokeWidth}
                       strokeDasharray="2 5"
                     />
-                  ),
-                )}
+                  )
+                })}
                 {drag.axis === 'x' ? (
                   <>
                     <line
