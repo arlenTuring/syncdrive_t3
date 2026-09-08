@@ -562,13 +562,19 @@ function SizeDialogBody({
     const move = (e: PointerEvent) => {
       const now = drag.axis === 'x' ? e.clientX : e.clientY
       // 這一端現在被拖到畫面上的哪裡
-      let at = drag.fromClient + (now - drag.grabClient)
-      // 吸附：離候選夠近就貼上去（畫面上量，所以縮圖縮多少手感都一樣）
+      const free = drag.fromClient + (now - drag.grabClient)
+      /*
+       * 吸附一律拿<strong>游標的位置</strong>去比，比完才貼上去。
+       *
+       * 先前是邊比邊把位置改掉，於是下一個候選是拿「已經吸過去的位置」在比——只要兩
+       * 個候選靠得近，就會一路接力跳到下一段去。
+       */
+      let at = free
       let hit = false
       let bestD = 10
       for (const t of drag.targetsClient) {
-        const d = Math.abs(t - at)
-        if (d <= bestD) {
+        const d = Math.abs(t - free)
+        if (d < bestD) {
           bestD = d
           at = t
           hit = true

@@ -430,19 +430,35 @@ export function nudgeRangeFor(
 /**
  * 拖的時候可以吸附到哪些位置。
  *
- * 用意是讓上行的某一塊跟下行的某一塊對齊：先調下面再調上面，或是反過來，都要對得上。
- * 候選是<strong>圖上同一軸的每一個塊界</strong>，不分哪一條線——同一條線上的其他塊界
- * 也算，那是「跟自己這條線上的某一刀對齊」；被拖的那一塊自己不算，不然會黏在原地。
+ * 只收<strong>鄰近的線</strong>：對齊要對的是上下並排的那幾條，不是圖另一頭的對向。
+ * 全圖都收的話候選會多到密密麻麻，手一抖就黏到不相干的那一條。垂直距離超過幾個帶寬
+ * 的直接不算。
+ *
+ * 被拖的那一塊自己不算，不然會黏在原地；同一條線上的其他塊界算，那是「跟自己這條線
+ * 上的某一刀對齊」。
  */
+const SNAP_ROWS = 3
+
 export function snapTargetsFor(
   shapes: LayoutShape[],
   target: LayoutShape,
   axis: Axis,
 ): number[] {
+  const bandW = (() => {
+    for (const s of shapes) if (s.kind === 'rect') return s.widthM
+    return 8
+  })()
+  const perpOf = (s: LayoutShape) => {
+    const v = s.samples.map((p) => (axis === 'x' ? p.y : p.x))
+    return v.reduce((t, x) => t + x, 0) / Math.max(1, v.length)
+  }
+  const home = perpOf(target)
+  const reach = Math.max(1, bandW) * SNAP_ROWS
   const out = new Set<number>()
   for (const s of shapes) {
     if (s.name === target.name) continue
     if (axisOf(s) !== axis) continue
+    if (Math.abs(perpOf(s) - home) > reach) continue
     const { lo, hi } = extentOf(s, axis)
     out.add(Number(lo.toFixed(2)))
     out.add(Number(hi.toFixed(2)))
