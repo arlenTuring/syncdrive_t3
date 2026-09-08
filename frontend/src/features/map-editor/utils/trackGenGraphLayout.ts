@@ -1012,27 +1012,12 @@ function layoutOnce(
       }
     }
 
-    /**
-     * 塊的網格：<strong>整條均分</strong>。
-     *
-     * 先前是每一段各自除以「一塊幾公尺」再取整，段長不是塊長的整數倍就生出不等長的塊；
-     * 斜接再從段的兩端咬掉一口，剩下的更短。碎塊是這兩步的餘數，不是幾何本身。
-     *
-     * 改成整條先切成等長的塊，換股的位置再吸附到塊邊界上。每一格不是一塊軌道就是一片
-     * 斜接，長度一律相同，結構上不會有餘數。代價是換股最多偏半塊。
-     */
-    const nBlocks = Math.max(1, Math.round(usedM / perBlockM))
-    const snapF = (f: number) =>
-      Math.max(0, Math.min(nBlocks, Math.round(f * nBlocks))) / nBlocks
-
-    /* 橫移與拉開各有各的段界，畫之前先合成同一組，並吸附到塊邊界 */
+    /* 橫移與拉開各有各的段界，畫之前先合成同一組 */
     const cuts = [
-      ...new Set(
-        [
-          ...levelRuns.flatMap((r) => [r.f0, r.f1]),
-          ...spreadRuns.flatMap((r) => [r.f0, r.f1]),
-        ].map(snapF),
-      ),
+      ...new Set([
+        ...levelRuns.flatMap((r) => [r.f0, r.f1]),
+        ...spreadRuns.flatMap((r) => [r.f0, r.f1]),
+      ]),
     ].sort((a, b) => a - b)
     const pick = <T extends { f0: number; f1: number }>(arr: T[], f: number): T =>
       arr.find((r) => f >= r.f0 && f < r.f1) ?? arr[arr.length - 1]!
@@ -1121,27 +1106,26 @@ function layoutOnce(
       bandEnd.set(`${e.id}|${e.to}|${k}`, at(1, runs[runs.length - 1]!.extra))
 
       /**
-       * 一段的開頭要讓幾格給斜接。
+       * 一段之內怎麼切。
        *
-       * 斜接畫在塊與塊之間，佔的是整數格：坡照 1:3 算出來要多寬，換算成幾格無條件進位，
-       * 至少一格。前一段沒有就是 0——第一段前面沒有東西要接。
+       * 換股的位置照實際里程，不動——動了車子換到隔壁軌道的地方就跟現場對不上。
+       * 一段先<strong>自己均分</strong>成整數塊，段頭的斜接佔其中整數塊（坡照 1:3
+       * 算出來要幾塊，無條件進位，至少一塊），其餘一塊一塊排。除不盡的餘數不會留下，
+       * 所以同一段裡每一塊等長，也不會冒出比隔壁短一截的碎塊。
        */
-      const blockPx = len / nBlocks
-      const taperBlocks = (from: number, to: number, avail: number) => {
-        const want = rampPx(to - from) / Math.max(1e-6, blockPx)
-        return Math.max(1, Math.min(avail, Math.ceil(want)))
-      }
+      const blockPx = len * (perBlockM / Math.max(1e-6, usedM))
 
       runs.forEach((run, ri) => {
         const extra = run.extra
         const prev = runs[ri - 1]
-        const a = Math.round(run.f0 * nBlocks)
-        const b = Math.round(run.f1 * nBlocks)
-        const t = prev ? taperBlocks(prev.extra, extra, b - a) : 0
-        // 斜接佔開頭那幾格，其餘一格一塊
+        const runPx = (run.f1 - run.f0) * len
+        const n = Math.max(1, Math.round(runPx / Math.max(1e-6, blockPx)))
+        const unit = runPx / n
+        const t = prev ? Math.min(n, Math.ceil(rampPx(extra - prev.extra) / Math.max(1e-6, unit))) : 0
+        const fT = run.f0 + ((run.f1 - run.f0) * t) / n
         if (prev && t > 0) {
-          const a0 = at(a / nBlocks, prev.extra)
-          const a1 = at((a + t) / nBlocks, extra)
+          const a0 = at(run.f0, prev.extra)
+          const a1 = at(fT, extra)
           const alongDeg = (Math.atan2(uy, ux) * 180) / Math.PI
           const fit = fitTaperAt(a0, a1, bandW, alongDeg)
           shapes.push({
@@ -1158,12 +1142,12 @@ function layoutOnce(
               e,
               k,
               e.lanes.length,
-              a / nBlocks,
-              (a + t) / nBlocks,
+              run.f0,
+              fT,
               t0 / full,
               t1 / full,
             ),
-            spans: [spanOfLane(k, a / nBlocks, (a + t) / nBlocks)],
+            spans: [spanOfLane(k, run.f0, fT)],
             geometry: fit.geometry,
             box: fit.box,
             sFrom: 0,
@@ -1173,9 +1157,9 @@ function layoutOnce(
           note({ x: fit.box.xM + fit.box.wM, y: fit.box.yM + fit.box.hM })
         }
         {
-          for (let i = a + t; i < b; i += 1) {
-            const f0 = i / nBlocks
-            const f1 = (i + 1) / nBlocks
+          for (let i = t; i < n; i += 1) {
+            const f0 = run.f0 + ((run.f1 - run.f0) * i) / n
+            const f1 = run.f0 + ((run.f1 - run.f0) * (i + 1)) / n
             const p0 = at(f0, extra)
             const p1 = at(f1, extra)
             const centre = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }
