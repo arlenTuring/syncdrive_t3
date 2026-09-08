@@ -283,24 +283,31 @@ export const BasemapNode = memo(function BasemapNode({
       )
       const { bounds, shapes } = graphLayout
       /*
-       * 塊數只數<strong>其中一條線</strong>，不然雙線會變兩倍。取塊數最多的那一條，
-       * 圖模型的線是車道鍵（例如 8:-2），沒有「參考線」這個概念。
+       * 塊數<strong>每一種軌道都算</strong>。
+       *
+       * 「一塊代表幾公尺」講的是整條線的比例尺，轉角、斜接、分岔、交叉都照那個比例
+       * 尺畫，當然也各算一塊。先前只數一般軌道，路口多的那條線就少報好幾塊。
+       *
+       * 只數<strong>其中一條線</strong>，不然雙線會變兩倍；橫的與縱的各取最多的那一
+       * 條，不是同一條——先前兩個數字都取自同一條線，而整條都是橫的那條線縱向是 0，
+       * 縱向就永遠顯示 0 塊。
        */
       const perLine = new Map<string, { x: number; y: number }>()
       for (const sh of shapes) {
-        if (sh.kind !== 'rect') continue
+        const a = sh.samples[0]
+        const b = sh.samples[sh.samples.length - 1]
+        if (!a || !b) continue
         const cur = perLine.get(sh.lineKey) ?? { x: 0, y: 0 }
-        if (Math.abs(Math.round(sh.rotationDeg / 90)) % 2 === 0) cur.x += 1
+        // 轉角兩個方向都走，算在跨得比較長的那一邊
+        if (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)) cur.x += 1
         else cur.y += 1
         perLine.set(sh.lineKey, cur)
       }
       let countX = 0
       let countY = 0
       for (const c of perLine.values()) {
-        if (c.x + c.y > countX + countY) {
-          countX = c.x
-          countY = c.y
-        }
+        countX = Math.max(countX, c.x)
+        countY = Math.max(countY, c.y)
       }
       const wPx = Math.max(1, bounds.xMax - bounds.xMin)
       const hPx = Math.max(1, bounds.yMax - bounds.yMin)
