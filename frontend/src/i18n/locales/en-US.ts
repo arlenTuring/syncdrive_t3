@@ -1527,6 +1527,15 @@ const enUS: DeepStringify<typeof zhTW> = {
         needCode: 'No prefix — tracks keep their generated names',
         hint: 'Press ＋ to create a group, then select tracks in the preview in order. Selected tracks take the group fill and show their number.',
       },
+      nudge: {
+        title: 'Adjust',
+        enter: 'Start adjusting',
+        exit: 'Stop adjusting',
+        undo: 'Undo last',
+        hint: 'Drag a block end to change its length. Blocks after it shift along, up to the next junction.',
+        pickHandle: 'Drag the handle at a block end — horizontal blocks left/right, vertical blocks up/down. Dashed outlines are the original edges; ends snap to other lines\u2019 block edges.',
+        error: 'Length error {{total}} m total, {{max}} m worst block. Vehicle mapping already follows; no re-sync needed.',
+      },
       merge: {
         title: 'Merge',
         enter: 'Start merging',

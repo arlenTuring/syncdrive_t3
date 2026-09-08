@@ -23,9 +23,21 @@ import {
   type TrackGenMergeRefusal,
 } from '../utils/trackGenMerge'
 import {
+  axisOf,
+  canNudge,
+  extentOf,
+  snapTargetsFor,
+  type Axis,
+  type NudgeEnd,
+  type NudgeError,
+  type TrackGenNudge,
+} from '../utils/trackGenNudge'
+import {
   cornerTrackPath,
   crossTrackPartPaths,
+  crossTrackPath,
   switchTrackPartPaths,
+  switchTrackPath,
   taperTrackPath,
 } from '../utils/trackShapes'
 
@@ -64,6 +76,11 @@ export type TrackGenPreview = {
    * 數字寫出來，使用者才知道自己那幾筆還在不在。
    */
   mergesApplied?: number
+  /** 微調真的做成了幾筆，以及逐塊的長度誤差 */
+  nudgesApplied?: number
+  nudgeErrors?: NudgeError[]
+  nudgeTotalM?: number
+  nudgeMaxM?: number
   /** 圖模型排好的版面，套用時直接沿用，預覽與生成才是同一份 */
   layout?: unknown
 }
@@ -77,14 +94,20 @@ type Props = {
   /** 脊線上橫的路與縱的路各有哪幾段（公尺） */
   totals?: { x: number[]; y: number[] }
   initial: TrackGenSizeParams
-  /** 上一次生成用的合併，重新開啟時沿用 */
+  /** 上一次生成用的合併與微調，重新開啟時沿用 */
   initialMerges?: TrackGenMerge[]
-  measure?: (params: TrackGenSizeParams, merges: TrackGenMerge[]) => TrackGenPreview | null
+  initialNudges?: TrackGenNudge[]
+  measure?: (
+    params: TrackGenSizeParams,
+    merges: TrackGenMerge[],
+    nudges: TrackGenNudge[],
+  ) => TrackGenPreview | null
   onCancel: () => void
   onConfirm: (
     params: TrackGenSizeParams,
     groups: TrackGenGroup[],
     merges: TrackGenMerge[],
+    nudges: TrackGenNudge[],
   ) => void
 }
 
@@ -150,6 +173,7 @@ function SizeDialogBody({
   totals,
   initial,
   initialMerges,
+  initialNudges,
   measure,
   onCancel,
   onConfirm,
@@ -176,6 +200,26 @@ function SizeDialogBody({
   const [mergeMode, setMergeMode] = useState(false)
   const [picks, setPicks] = useState<string[]>([])
   const [merges, setMerges] = useState<TrackGenMerge[]>(initialMerges ?? [])
+  /*
+   * 微調：一塊一塊拖長度。
+   *
+   * <code>drag</code> 是拖到一半的那一筆，還沒進 <code>nudges</code>；放開才收下。
+   * 拖的時候預覽已經照著畫，所以看到的就是放開之後的樣子。
+   */
+  const [nudgeMode, setNudgeMode] = useState(false)
+  const [nudges, setNudges] = useState<TrackGenNudge[]>(initialNudges ?? [])
+  const [drag, setDrag] = useState<{
+    name: string
+    end: NudgeEnd
+    axis: Axis
+    /** 這一端原本在哪（版面單位） */
+    from: number
+    /** 現在拖到哪（已經吸附過） */
+    to: number
+    /** 吸附到的那條線，沒吸到就是 null */
+    snapped: number | null
+    targets: number[]
+  } | null>(null)
 
   /*
    * 縮圖要盡量大。
@@ -201,7 +245,28 @@ function SizeDialogBody({
   const stageW = Math.round(canvasW * scale)
   const stageH = Math.round(canvasH * scale)
 
-  const extent = useMemo(() => measure?.(params, merges) ?? null, [measure, params, merges])
+  /* 拖到一半的那一筆也要算進去，畫面才會跟著手走 */
+  const liveNudges = useMemo(
+    () =>
+      drag && Math.abs(drag.to - drag.from) > 0.01
+        ? [...nudges, { name: drag.name, end: drag.end, dPx: drag.to - drag.from }]
+        : nudges,
+    [nudges, drag],
+  )
+  const extent = useMemo(
+    () => measure?.(params, merges, liveNudges) ?? null,
+    [measure, params, merges, liveNudges],
+  )
+  /*
+   * 原始邊界：沒有微調過的版面。
+   *
+   * 使用者調的時候要知道自己離原本多遠——他的目標是整體長度盡量不變，所以每一塊原本
+   * 的界線要看得見，才有東西可以對回去。
+   */
+  const baseExtent = useMemo(
+    () => (nudgeMode ? (measure?.(params, merges, []) ?? null) : null),
+    [measure, params, merges, nudgeMode],
+  )
 
   const sum = (a: number[] | undefined) => (a ?? []).reduce((t, v) => t + v, 0)
   const totalXM = sum(totals?.x)
@@ -359,9 +424,85 @@ function SizeDialogBody({
   )
 
   const confirm = useCallback(
-    () => onConfirm(params, liveGroups.filter((g) => g.code && g.members.length), merges),
-    [onConfirm, params, liveGroups, merges],
+    () =>
+      onConfirm(
+        params,
+        liveGroups.filter((g) => g.code && g.members.length),
+        merges,
+        nudges,
+      ),
+    [onConfirm, params, liveGroups, merges, nudges],
   )
+
+  /* 版面座標 → 縮圖座標的共用位移；拖曳與輔助線都要用 */
+  const gx = extent ? extent.originPx.x - extent.bounds.xMin : 0
+  const gy = extent ? extent.originPx.y - extent.bounds.yMin : 0
+
+  /** 這一塊兩端的把手位置（版面座標） */
+  const handlesOf = (sh: LayoutShape) => {
+    const ax = axisOf(sh)
+    const { lo, hi } = extentOf(sh, ax)
+    const perp =
+      sh.samples.reduce((t, p) => t + (ax === 'x' ? p.y : p.x), 0) /
+      Math.max(1, sh.samples.length)
+    const at = (v: number) => (ax === 'x' ? { x: v, y: perp } : { x: perp, y: v })
+    return { ax, lo, hi, at }
+  }
+
+  const startDrag = useCallback(
+    (sh: LayoutShape, end: NudgeEnd) => {
+      const ax = axisOf(sh)
+      const { lo, hi } = extentOf(sh, ax)
+      const from = end === 'lo' ? lo : hi
+      setDrag({
+        name: sh.name,
+        end,
+        axis: ax,
+        from,
+        to: from,
+        snapped: null,
+        // 對齊的候選：別條線在同一軸上的每一個塊界
+        targets: snapTargetsFor(extent?.shapes ?? [], sh, ax),
+      })
+    },
+    [extent],
+  )
+
+  const moveDrag = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!drag) return
+      const r = e.currentTarget.getBoundingClientRect()
+      const v =
+        drag.axis === 'x'
+          ? (e.clientX - r.left) / scale - gx
+          : (e.clientY - r.top) / scale - gy
+      // 吸附：離候選夠近就貼上去，並記下是哪一條，畫面上要標出來
+      const tol = 7 / Math.max(1e-6, scale)
+      let snapped: number | null = null
+      let to = v
+      let bestD = tol
+      for (const t of drag.targets) {
+        const d = Math.abs(t - v)
+        if (d <= bestD) {
+          bestD = d
+          snapped = t
+          to = t
+        }
+      }
+      setDrag((cur) => (cur ? { ...cur, to, snapped } : cur))
+    },
+    [drag, gx, gy, scale],
+  )
+
+  const endDrag = useCallback(() => {
+    if (!drag) return
+    const d = drag.to - drag.from
+    // 手抖的那幾像素不算數
+    if (Math.abs(d) > 0.5) {
+      setNudges((prev) => [...prev, { name: drag.name, end: drag.end, dPx: d }])
+    }
+    setDrag(null)
+  }, [drag])
 
   /*
    * 一定要 portal 到 body。
@@ -407,9 +548,59 @@ function SizeDialogBody({
           <svg
             width={stageW}
             height={stageH}
-            className={`absolute inset-0 ${editingId || mergeMode ? '' : 'pointer-events-none'}`}
+            className={`absolute inset-0 ${
+              editingId || mergeMode || nudgeMode ? '' : 'pointer-events-none'
+            }`}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerLeave={endDrag}
             aria-hidden
           >
+            {/*
+              原始邊界。
+              微調的目標是整體長度盡量不變，所以每一塊原本的界線要看得見，才有東西可以
+              對回去。畫在底下，只留虛線外框。
+            */}
+            {baseExtent?.shapes.map((sh, i) => {
+              const st = { fill: 'none', stroke: '#52525b', strokeDasharray: '3 3' }
+              if (sh.kind === 'rect') {
+                const w = Math.max(1, sh.lengthM * scale)
+                const h = Math.max(1, sh.widthM * scale)
+                const cx = (gx + sh.centre.x) * scale
+                const cy = (gy + sh.centre.y) * scale
+                return (
+                  <rect
+                    key={`g${i}`}
+                    x={cx - w / 2}
+                    y={cy - h / 2}
+                    width={w}
+                    height={h}
+                    transform={`rotate(${sh.rotationDeg} ${cx} ${cy})`}
+                    strokeWidth={0.75}
+                    {...st}
+                  />
+                )
+              }
+              const w = Math.max(1, sh.box.wM * scale)
+              const h = Math.max(1, sh.box.hM * scale)
+              const d =
+                sh.kind === 'corner'
+                  ? cornerTrackPath(sh.geometry, w, h)
+                  : sh.kind === 'switch'
+                    ? switchTrackPath(sh.geometry, w, h)
+                    : sh.kind === 'cross'
+                      ? crossTrackPath(sh.geometry, w, h)
+                      : taperTrackPath(sh.geometry as TaperTrackGeometry, w, h)
+              return (
+                <path
+                  key={`g${i}`}
+                  d={d}
+                  transform={`translate(${(gx + sh.box.xM) * scale} ${(gy + sh.box.yM) * scale})`}
+                  strokeWidth={0.75}
+                  {...st}
+                />
+              )
+            })}
             {extent?.shapes.map((sh, i) => {
               const ox = extent.originPx.x - extent.bounds.xMin
               const oy = extent.originPx.y - extent.bounds.yMin
@@ -606,6 +797,99 @@ function SizeDialogBody({
               const mine = memberOf.get(sh.name)
               return mine ? [draw(`n${i}`, mine, 0)] : []
             })}
+
+            {/*
+              微調的把手：一塊兩個，各管一端。
+              橫的塊拖左右、縱的塊拖上下——拖的是那一端的位置，不是整塊縮放，所以另一端
+              留在原地。
+            */}
+            {nudgeMode
+              ? extent?.shapes.flatMap((sh, i) => {
+                  if (!canNudge(sh)) return []
+                  const { ax, lo, hi, at } = handlesOf(sh)
+                  const bar = 9
+                  return ([['lo', lo], ['hi', hi]] as [NudgeEnd, number][]).map(([end, v]) => {
+                    const p = at(v)
+                    const cx = (gx + p.x) * scale
+                    const cy = (gy + p.y) * scale
+                    const w = ax === 'x' ? 3 : bar
+                    const h = ax === 'x' ? bar : 3
+                    const on = drag?.name === sh.name && drag.end === end
+                    return (
+                      <rect
+                        key={`h${i}-${end}`}
+                        data-trackgen-handle={`${sh.name}|${end}`}
+                        x={cx - w / 2}
+                        y={cy - h / 2}
+                        width={w}
+                        height={h}
+                        rx={1}
+                        fill={on ? '#fbbf24' : '#22d3ee'}
+                        stroke="#09090b"
+                        strokeWidth={0.5}
+                        style={{ cursor: ax === 'x' ? 'ew-resize' : 'ns-resize' }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          startDrag(sh, end)
+                        }}
+                      />
+                    )
+                  })
+                })
+              : null}
+
+            {/*
+              對準線。
+              拖到哪畫到哪，橫跨整張圖，這樣才看得出跟上下那條線對不對得上；吸附到別條
+              線的塊界時換成琥珀色，並把原本的位置留一條暗線當參考。
+            */}
+            {drag ? (
+              <g className="pointer-events-none">
+                {drag.axis === 'x' ? (
+                  <>
+                    <line
+                      x1={(gx + drag.from) * scale}
+                      y1={0}
+                      x2={(gx + drag.from) * scale}
+                      y2={stageH}
+                      stroke="#52525b"
+                      strokeWidth={1}
+                      strokeDasharray="2 4"
+                    />
+                    <line
+                      data-trackgen-guide
+                      x1={(gx + drag.to) * scale}
+                      y1={0}
+                      x2={(gx + drag.to) * scale}
+                      y2={stageH}
+                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
+                      strokeWidth={drag.snapped === null ? 1 : 1.5}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <line
+                      x1={0}
+                      y1={(gy + drag.from) * scale}
+                      x2={stageW}
+                      y2={(gy + drag.from) * scale}
+                      stroke="#52525b"
+                      strokeWidth={1}
+                      strokeDasharray="2 4"
+                    />
+                    <line
+                      data-trackgen-guide
+                      x1={0}
+                      y1={(gy + drag.to) * scale}
+                      x2={stageW}
+                      y2={(gy + drag.to) * scale}
+                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
+                      strokeWidth={drag.snapped === null ? 1 : 1.5}
+                    />
+                  </>
+                )}
+              </g>
+            ) : null}
           </svg>
         </div>
 
@@ -742,7 +1026,7 @@ function SizeDialogBody({
                 <button
                   key={g.id}
                   type="button"
-                  disabled={mergeMode}
+                  disabled={mergeMode || nudgeMode}
                   onClick={() => (editingId === g.id ? undefined : editGroup(g))}
                   className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[11px] transition disabled:opacity-40 ${
                     editingId === g.id
@@ -771,6 +1055,67 @@ function SizeDialogBody({
                   ＋
                 </button>
               )}
+            </div>
+
+            <span className="mx-1 h-4 w-px shrink-0 bg-zinc-700" aria-hidden />
+
+            <div className="flex flex-wrap items-center gap-1.5" data-trackgen-nudge>
+              <span className="text-[11px] font-medium text-zinc-300">
+                {t('mapEditor.trackGen.nudge.title')}
+              </span>
+              {nudges.length ? (
+                <span
+                  className={`font-mono text-[11px] tabular-nums ${
+                    (extent?.nudgesApplied ?? nudges.length) < nudges.length
+                      ? 'text-amber-300'
+                      : 'text-zinc-500'
+                  }`}
+                  data-trackgen-nudge-count
+                >
+                  {extent?.nudgesApplied ?? nudges.length}/{nudges.length}
+                </span>
+              ) : null}
+              {nudgeMode ? (
+                <button
+                  type="button"
+                  data-trackgen-nudge-exit
+                  onClick={() => {
+                    setNudgeMode(false)
+                    setDrag(null)
+                  }}
+                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+                >
+                  {t('mapEditor.trackGen.nudge.exit')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-trackgen-nudge-enter
+                  disabled={!!editingId || mergeMode}
+                  title={t('mapEditor.trackGen.nudge.hint')}
+                  onClick={() => {
+                    setEditingId(null)
+                    setDraftBackup(null)
+                    setNudgeMode(true)
+                  }}
+                  className="rounded border border-cyan-500/70 bg-cyan-500/10 px-1.5 py-0.5 text-[11px] text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
+                >
+                  {t('mapEditor.trackGen.nudge.enter')}
+                </button>
+              )}
+              {nudges.length ? (
+                <button
+                  type="button"
+                  data-trackgen-nudge-undo
+                  onClick={() => {
+                    setNudges((prev) => prev.slice(0, -1))
+                    setDrag(null)
+                  }}
+                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
+                >
+                  {t('mapEditor.trackGen.nudge.undo')}
+                </button>
+              ) : null}
             </div>
 
             <span className="mx-1 h-4 w-px shrink-0 bg-zinc-700" aria-hidden />
@@ -804,7 +1149,7 @@ function SizeDialogBody({
                 <button
                   type="button"
                   data-trackgen-merge-enter
-                  disabled={!!editingId}
+                  disabled={!!editingId || nudgeMode}
                   onClick={enterMerge}
                   title={t('mapEditor.trackGen.merge.hint')}
                   className="rounded border border-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-40"
@@ -890,6 +1235,39 @@ function SizeDialogBody({
               >
                 {t('mapEditor.trackGen.groups.done')}
               </button>
+            </div>
+          ) : nudgeMode ? (
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800 px-3 py-2 text-[10px] text-zinc-400"
+              data-trackgen-nudge-panel
+            >
+              <span>{t('mapEditor.trackGen.nudge.pickHandle')}</span>
+              {extent?.nudgeErrors?.length ? (
+                <>
+                  <span className="text-zinc-600">·</span>
+                  <span data-trackgen-nudge-error>
+                    {t('mapEditor.trackGen.nudge.error', {
+                      total: extent.nudgeTotalM ?? 0,
+                      max: extent.nudgeMaxM ?? 0,
+                    })}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {extent.nudgeErrors.slice(0, 6).map((x) => (
+                      <span
+                        key={x.name}
+                        className={`rounded border px-1 py-0.5 font-mono ${
+                          x.deltaM > 0
+                            ? 'border-emerald-600/50 text-emerald-300'
+                            : 'border-rose-600/50 text-rose-300'
+                        }`}
+                      >
+                        {x.name} {x.deltaM > 0 ? '+' : ''}
+                        {x.deltaM.toFixed(1)} m
+                      </span>
+                    ))}
+                  </span>
+                </>
+              ) : null}
             </div>
           ) : mergeMode ? (
             <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 px-3 py-2">

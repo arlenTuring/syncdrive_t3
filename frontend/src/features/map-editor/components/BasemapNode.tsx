@@ -43,6 +43,12 @@ import {
   TRACKGEN_MERGES_KEY,
   type TrackGenMerge,
 } from '../utils/trackGenMerge'
+import {
+  applyTrackGenNudges,
+  getTrackGenNudges,
+  TRACKGEN_NUDGES_KEY,
+  type TrackGenNudge,
+} from '../utils/trackGenNudge'
 import type { TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
@@ -267,19 +273,22 @@ export const BasemapNode = memo(function BasemapNode({
    * 塊數直接<strong>數排出來的形狀</strong>，不另外用公尺數推。
    */
   const measureTrackGen = useCallback(
-    (block: TrackGenSizeParams, merges: TrackGenMerge[] = []) => {
+    (block: TrackGenSizeParams, merges: TrackGenMerge[] = [], nudges: TrackGenNudge[] = []) => {
       if (!pendingGraph) return null
       const canvas = mapPixelSize ?? { width: displayLayout.wPx, height: displayLayout.hPx }
       /*
        * 使用者在預覽上合併過的，這裡就要照著併。量出來的尺寸、預覽畫的、生成出去的
        * 是同一份版面——分開算的話按下生成會跑出跟畫面不一樣的東西。
        */
-      const graphLayout = applyTrackGenMerges(
-        layoutTrackGraph(pendingGraph, block, {
-          wPx: displayLayout.wPx,
-          hPx: displayLayout.hPx,
-        }),
-        merges,
+      const graphLayout = applyTrackGenNudges(
+        applyTrackGenMerges(
+          layoutTrackGraph(pendingGraph, block, {
+            wPx: displayLayout.wPx,
+            hPx: displayLayout.hPx,
+          }),
+          merges,
+        ),
+        nudges,
       )
       const { bounds, shapes } = graphLayout
       /*
@@ -325,6 +334,10 @@ export const BasemapNode = memo(function BasemapNode({
         shapes,
         bounds,
         mergesApplied: graphLayout.mergesApplied,
+        nudgesApplied: graphLayout.nudgesApplied,
+        nudgeErrors: graphLayout.nudgeErrors,
+        nudgeTotalM: graphLayout.nudgeTotalM,
+        nudgeMaxM: graphLayout.nudgeMaxM,
         layout: graphLayout ?? undefined,
         originPx: {
           x: clamp(displayLayout.xPx, wPx, canvas.width),
@@ -364,10 +377,11 @@ export const BasemapNode = memo(function BasemapNode({
     block: TrackGenSizeParams,
     groups: TrackGenGroup[],
     merges: TrackGenMerge[],
+    nudges: TrackGenNudge[],
   ) => {
     const graph = pendingGraph
     if (!graph) return
-    const measured = measureTrackGen(block, merges)
+    const measured = measureTrackGen(block, merges, nudges)
     if (!measured?.layout) return
     // 摘要留著給屬性匡顯示，也讓「重新生成」知道上一次生成過
     onPatchParameters(basemap.id, {
@@ -379,8 +393,9 @@ export const BasemapNode = memo(function BasemapNode({
         totalM: Math.round(graph.edges.reduce((t, e) => t + e.lengthM, 0)),
       },
       [TRACKGEN_BLOCK_SIZE_KEY]: block,
-      // 合併是使用者一塊一塊點出來的，重新生成要照他上次的樣子做
+      // 合併與微調都是使用者一塊一塊點出來的，重新生成要照他上次的樣子做
       [TRACKGEN_MERGES_KEY]: merges,
+      [TRACKGEN_NUDGES_KEY]: nudges,
     })
     onApplyTrackGen?.(basemap.id, measured.layout as TrackGenLayout, groups)
   }, [basemap.id, measureTrackGen, onApplyTrackGen, onPatchParameters, pendingGraph])
@@ -1153,11 +1168,12 @@ export const BasemapNode = memo(function BasemapNode({
         totals={trackGenTotals}
         initial={getTrackGenBlockSize(basemap.parameters)}
         initialMerges={getTrackGenMerges(basemap.parameters)}
+        initialNudges={getTrackGenNudges(basemap.parameters)}
         measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}
-        onConfirm={(block, groups, merges) => {
+        onConfirm={(block, groups, merges, nudges) => {
           setSizeDialogOpen(false)
-          runTrackGeneration(block, groups, merges)
+          runTrackGeneration(block, groups, merges, nudges)
         }}
       />
       <BasemapFilePickerDialog
