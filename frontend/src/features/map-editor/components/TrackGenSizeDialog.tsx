@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 
@@ -26,6 +26,7 @@ import {
   axisOf,
   canNudge,
   extentOf,
+  nudgeRangeFor,
   snapTargetsFor,
   type Axis,
   type NudgeEnd,
@@ -219,6 +220,9 @@ function SizeDialogBody({
     /** 吸附到的那條線，沒吸到就是 null */
     snapped: number | null
     targets: number[]
+    /** 這一端拖得到的範圍：兩塊都要留一點長度 */
+    min: number
+    max: number
   } | null>(null)
 
   /*
@@ -451,6 +455,9 @@ function SizeDialogBody({
 
   const startDrag = useCallback(
     (sh: LayoutShape, end: NudgeEnd) => {
+      const shapes = extent?.shapes ?? []
+      const range = nudgeRangeFor(shapes, sh, end)
+      if (!range) return
       const ax = axisOf(sh)
       const { lo, hi } = extentOf(sh, ax)
       const from = end === 'lo' ? lo : hi
@@ -461,21 +468,36 @@ function SizeDialogBody({
         from,
         to: from,
         snapped: null,
-        // 對齊的候選：別條線在同一軸上的每一個塊界
-        targets: snapTargetsFor(extent?.shapes ?? [], sh, ax),
+        // 對齊的候選：別條線在同一軸上的每一個塊界，拖不到的先濾掉
+        targets: snapTargetsFor(shapes, sh, ax).filter(
+          (t) => t >= range.min && t <= range.max,
+        ),
+        min: range.min,
+        max: range.max,
       })
     },
     [extent],
   )
 
-  const moveDrag = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
-      if (!drag) return
-      const r = e.currentTarget.getBoundingClientRect()
-      const v =
+  /*
+   * 拖曳的滑鼠事件掛在 window 上，不掛在圖上。
+   *
+   * 拖到一半手常常會滑出縮圖的範圍——掛在圖上的話那一刻就收不到 move 與 up，放開了
+   * 卻沒人收下，這一次調整就白做。
+   */
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  useEffect(() => {
+    if (!drag) return
+    const move = (e: PointerEvent) => {
+      const el = svgRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const raw =
         drag.axis === 'x'
           ? (e.clientX - r.left) / scale - gx
           : (e.clientY - r.top) / scale - gy
+      // 夾在拖得到的範圍內：越界的話兩塊之中會有一塊短到畫不出來
+      const v = Math.max(drag.min, Math.min(drag.max, raw))
       // 吸附：離候選夠近就貼上去，並記下是哪一條，畫面上要標出來
       const tol = 7 / Math.max(1e-6, scale)
       let snapped: number | null = null
@@ -490,19 +512,26 @@ function SizeDialogBody({
         }
       }
       setDrag((cur) => (cur ? { ...cur, to, snapped } : cur))
-    },
-    [drag, gx, gy, scale],
-  )
-
-  const endDrag = useCallback(() => {
-    if (!drag) return
-    const d = drag.to - drag.from
-    // 手抖的那幾像素不算數
-    if (Math.abs(d) > 0.5) {
-      setNudges((prev) => [...prev, { name: drag.name, end: drag.end, dPx: d }])
     }
-    setDrag(null)
-  }, [drag])
+    const up = () => {
+      setDrag((cur) => {
+        // 手抖的那幾像素不算數
+        if (cur && Math.abs(cur.to - cur.from) > 0.5) {
+          const one = { name: cur.name, end: cur.end, dPx: cur.to - cur.from }
+          queueMicrotask(() => setNudges((prev) => [...prev, one]))
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [drag, gx, gy, scale])
 
   /*
    * 一定要 portal 到 body。
@@ -551,9 +580,7 @@ function SizeDialogBody({
             className={`absolute inset-0 ${
               editingId || mergeMode || nudgeMode ? '' : 'pointer-events-none'
             }`}
-            onPointerMove={moveDrag}
-            onPointerUp={endDrag}
-            onPointerLeave={endDrag}
+            ref={svgRef}
             aria-hidden
           >
             {/*
@@ -808,7 +835,9 @@ function SizeDialogBody({
                   if (!canNudge(sh)) return []
                   const { ax, lo, hi, at } = handlesOf(sh)
                   const bar = 9
-                  return ([['lo', lo], ['hi', hi]] as [NudgeEnd, number][]).map(([end, v]) => {
+                  return ([['lo', lo], ['hi', hi]] as [NudgeEnd, number][])
+                    .filter(([end]) => nudgeRangeFor(extent?.shapes ?? [], sh, end))
+                    .map(([end, v]) => {
                     const p = at(v)
                     const cx = (gx + p.x) * scale
                     const cy = (gy + p.y) * scale

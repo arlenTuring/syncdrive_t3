@@ -14,9 +14,11 @@ import type { TaperTrackGeometry } from './trackShapes'
  * 拖——拖的是<strong>一端</strong>，不是整塊縮放。
  *
  * <h3>拖了之後別人怎麼辦</h3>
- * 同一條線上、被拖的那一端後面的每一塊<strong>整塊平移</strong>，所以不會斷開；平移
- * 到路口就停下來，由路口前面那一塊把差額吸收掉。路口本身不動——它連著別條線，動了就
- * 把整張圖拖歪。這樣整條線的頭尾位置不變，只有內部的分配改變。
+ * 拖的其實是<strong>兩塊之間的那一條界線</strong>：A 的右邊往左拉，A 就短一截，右邊
+ * 那一塊的左邊跟著往左長回來。其餘的塊一個都不動，整條線的頭尾位置也不變。
+ *
+ * 相鄰的那一塊是路口時不做——路口連著別條線，長度不能改。被拖的那一端是盡頭時沒有
+ * 鄰居，就只有自己伸縮。
  *
  * <h3>里程不用重新對</h3>
  * 每一塊代表的里程沒有變，變的只有它畫多長。定位是「在真實路徑上走了幾成，就在圖面
@@ -82,17 +84,6 @@ export function canNudge(s: LayoutShape): boolean {
   return s.kind === 'rect' || s.kind === 'taper'
 }
 
-function shifted(s: LayoutShape, d: number, axis: Axis): LayoutShape {
-  const dx = axis === 'x' ? d : 0
-  const dy = axis === 'x' ? 0 : d
-  const samples = s.samples.map((p) => ({ x: p.x + dx, y: p.y + dy }))
-  // 真實路徑是現場座標，不跟著版面走
-  if (s.kind === 'rect') {
-    return { ...s, samples, centre: { x: s.centre.x + dx, y: s.centre.y + dy } }
-  }
-  return { ...s, samples, box: { ...s.box, xM: s.box.xM + dx, yM: s.box.yM + dy } }
-}
-
 /**
  * 改一端的位置，另一端不動。
  *
@@ -156,14 +147,13 @@ function near(a: Vec2, b: Vec2): boolean {
 }
 
 /**
- * 一次微調：被拖的那一塊改長度，接在後面的<strong>一塊接一塊</strong>整塊平移。
+ * 一次微調：拖的是<strong>兩塊之間的界線</strong>。
  *
- * 往外走是照端點碰在一起找下一塊，不是照 road 或車道編號——一條 road 走完接下一條，
- * 編號不同但畫面上就是連著的，照編號找會在交界處留一個洞。
+ * 被拖的那一塊在那一端伸縮多少，相鄰的那一塊就在對著的那一端反向伸縮多少，界線因此
+ * 剛好落在同一個位置，不會開縫也不會疊到。其餘的塊完全不動。
  *
- * 走到路口就停：路口連著別條線，動了整張圖會歪。停下來時由最後那一塊把差額縮回去，
- * 整條線的頭尾位置因此不變，只有內部的分配改變。走到底都沒有路口（盡頭那種）就整段
- * 往外長，那是使用者要的。
+ * 相鄰的是路口就不做：路口的長度是它自己的幾何，改不得。找不到鄰居（盡頭）時只有
+ * 被拖的那一塊伸縮。
  */
 function nudgeOnce(
   shapes: LayoutShape[],
@@ -176,49 +166,31 @@ function nudgeOnce(
   const grown = resized(s, n.end, n.dPx, axis, bandW)
   if (!grown) return null
 
-  const { lo, hi } = extentOf(s, axis)
-  const [p0, p1] = endPointsOf(s)
   const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
-  // 被拖的那一端在圖面上是哪一個點
-  const target = n.end === 'lo' ? lo : hi
-  let cursor = Math.abs(coordOf(p0) - target) <= Math.abs(coordOf(p1) - target) ? p0 : p1
+  const joint = jointOf(s, n.end, axis)
 
-  const next = new Map<string, LayoutShape>([[s.name, grown]])
-  const seen = new Set<string>([s.name])
-  let last: LayoutShape | null = null
-  let hitPin = false
-  for (let guard = 0; guard < shapes.length; guard += 1) {
-    const cur = cursor
-    const x = shapes.find((y) => !seen.has(y.name) && endPointsOf(y).some((q) => near(q, cur)))
-    if (!x) break
-    seen.add(x.name)
-    if (isPinned(x)) {
-      hitPin = true
-      break
-    }
-    last = x
-    next.set(x.name, shifted(x, n.dPx, axis))
-    const [q0, q1] = endPointsOf(x)
-    cursor = near(q0, cur) ? q1 : q0
+  const nb = shapes.find(
+    (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
+  )
+  if (!nb) {
+    // 盡頭：沒有鄰居要配合，這一端就直接往外長或往內縮
+    return shapes.map((x) => (x.name === s.name ? grown : x))
   }
-  if (hitPin) {
-    /*
-     * 後面接著路口：最後那一塊把差額縮回去，整條線的頭尾位置就不變，路口也不必動。
-     * 被拖的那一塊自己就貼著路口時沒有人能吸收，這一筆就不做——動了會疊到路口上。
-     */
-    if (!last) return null
-    const moved = next.get(last.name)!
-    const la = axisOf(moved)
-    if (la !== axis) return null
-    // 縮的是它朝著路口那一端：平移之後那一端落在原來的位置加上位移
-    const want = (axis === 'x' ? cursor.x : cursor.y) + n.dPx
-    const ex = extentOf(moved, la)
-    const end: NudgeEnd = Math.abs(ex.lo - want) <= Math.abs(ex.hi - want) ? 'lo' : 'hi'
-    const back = resized(moved, end, -n.dPx, la, bandW)
-    if (!back) return null
-    next.set(last.name, back)
-  }
-  return shapes.map((x) => next.get(x.name) ?? x)
+  if (!canNudge(nb)) return null
+  const nbAxis = axisOf(nb)
+  if (nbAxis !== axis) return null
+  // 鄰居要縮的是<strong>對著界線</strong>的那一端
+  const ex = extentOf(nb, nbAxis)
+  const nbEnd: NudgeEnd =
+    Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
+  const moved = resized(nb, nbEnd, n.dPx, nbAxis, bandW)
+  if (!moved) return null
+
+  return shapes.map((x) => {
+    if (x.name === s.name) return grown
+    if (x.name === nb.name) return moved
+    return x
+  })
 }
 
 /** 逐塊的長度誤差（公尺）：這一塊畫得比它該有的長度多或少多少 */
@@ -337,6 +309,50 @@ export function applyTrackGenNudges<T extends TrackGenLayout>(
     nudgeTotalM: Number(total.toFixed(1)),
     nudgeMaxM: Number(max.toFixed(1)),
   }
+}
+
+/** 一塊至少要留這麼長，不然它在圖上就不是一段軌道了 */
+const MIN_LEN_PX = 6
+
+/** 被拖的那一端在圖面上是哪一個點 */
+function jointOf(s: LayoutShape, end: NudgeEnd, axis: Axis): Vec2 {
+  const { lo, hi } = extentOf(s, axis)
+  const [p0, p1] = endPointsOf(s)
+  const co = (p: Vec2) => (axis === 'x' ? p.x : p.y)
+  const target = end === 'lo' ? lo : hi
+  return Math.abs(co(p0) - target) <= Math.abs(co(p1) - target) ? p0 : p1
+}
+
+/**
+ * 這一端可以拖到哪個範圍（版面座標）。
+ *
+ * 兩塊都至少要留一點長度，所以上下限由自己的另一端與鄰居的另一端夾出來。鄰居是路口
+ * 時整個不給拖——路口的長度改不得，回 null，畫面上那一端就不長把手。
+ */
+export function nudgeRangeFor(
+  shapes: LayoutShape[],
+  s: LayoutShape,
+  end: NudgeEnd,
+): { min: number; max: number } | null {
+  if (!canNudge(s)) return null
+  const axis = axisOf(s)
+  const { lo, hi } = extentOf(s, axis)
+  const joint = jointOf(s, end, axis)
+  const nb = shapes.find(
+    (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
+  )
+  if (nb && (!canNudge(nb) || axisOf(nb) !== axis)) return null
+  let min = end === 'hi' ? lo + MIN_LEN_PX : -Infinity
+  let max = end === 'lo' ? hi - MIN_LEN_PX : Infinity
+  if (nb) {
+    const ex = extentOf(nb, axis)
+    // 鄰居的另一端：界線不能越過它，還要幫它留一點長度
+    const far = Math.abs(ex.lo - (axis === 'x' ? joint.x : joint.y)) <= Math.abs(ex.hi - (axis === 'x' ? joint.x : joint.y)) ? ex.hi : ex.lo
+    if (end === 'hi') max = Math.min(max, far - MIN_LEN_PX)
+    else min = Math.max(min, far + MIN_LEN_PX)
+  }
+  if (!(max > min)) return null
+  return { min, max }
 }
 
 /**
