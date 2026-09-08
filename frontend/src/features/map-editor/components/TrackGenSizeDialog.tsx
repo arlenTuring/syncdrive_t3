@@ -77,6 +77,8 @@ type Props = {
   /** 脊線上橫的路與縱的路各有哪幾段（公尺） */
   totals?: { x: number[]; y: number[] }
   initial: TrackGenSizeParams
+  /** 上一次生成用的合併，重新開啟時沿用 */
+  initialMerges?: TrackGenMerge[]
   measure?: (params: TrackGenSizeParams, merges: TrackGenMerge[]) => TrackGenPreview | null
   onCancel: () => void
   onConfirm: (
@@ -142,7 +144,16 @@ export function TrackGenSizeDialog(props: Props) {
   return <SizeDialogBody {...props} />
 }
 
-function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, onConfirm }: Props) {
+function SizeDialogBody({
+  canvasPx,
+  boxPx,
+  totals,
+  initial,
+  initialMerges,
+  measure,
+  onCancel,
+  onConfirm,
+}: Props) {
   const { t } = useTranslation()
   const [params, setParams] = useState<TrackGenSizeParams>(initial)
   /*
@@ -164,7 +175,7 @@ function SizeDialogBody({ canvasPx, boxPx, totals, initial, measure, onCancel, o
    */
   const [mergeMode, setMergeMode] = useState(false)
   const [picks, setPicks] = useState<string[]>([])
-  const [merges, setMerges] = useState<TrackGenMerge[]>([])
+  const [merges, setMerges] = useState<TrackGenMerge[]>(initialMerges ?? [])
 
   /*
    * 縮圖要盡量大。

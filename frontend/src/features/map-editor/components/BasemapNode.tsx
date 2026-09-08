@@ -37,7 +37,12 @@ import {
 import { buildTrackGraph, type TrackGraph } from '../utils/trackGenGraph'
 import type { TrackGenGroup } from '../utils/trackGenGroups'
 import { layoutTrackGraph } from '../utils/trackGenGraphLayout'
-import { applyTrackGenMerges, type TrackGenMerge } from '../utils/trackGenMerge'
+import {
+  applyTrackGenMerges,
+  getTrackGenMerges,
+  TRACKGEN_MERGES_KEY,
+  type TrackGenMerge,
+} from '../utils/trackGenMerge'
 import type { TrackGenLayout } from '../utils/trackGenLayout'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
@@ -367,6 +372,8 @@ export const BasemapNode = memo(function BasemapNode({
         totalM: Math.round(graph.edges.reduce((t, e) => t + e.lengthM, 0)),
       },
       [TRACKGEN_BLOCK_SIZE_KEY]: block,
+      // 合併是使用者一塊一塊點出來的，重新生成要照他上次的樣子做
+      [TRACKGEN_MERGES_KEY]: merges,
     })
     onApplyTrackGen?.(basemap.id, measured.layout as TrackGenLayout, groups)
   }, [basemap.id, measureTrackGen, onApplyTrackGen, onPatchParameters, pendingGraph])
@@ -1138,6 +1145,7 @@ export const BasemapNode = memo(function BasemapNode({
         boxPx={{ wPx: displayLayout.wPx, hPx: displayLayout.hPx }}
         totals={trackGenTotals}
         initial={getTrackGenBlockSize(basemap.parameters)}
+        initialMerges={getTrackGenMerges(basemap.parameters)}
         measure={measureTrackGen}
         onCancel={() => setSizeDialogOpen(false)}
         onConfirm={(block, groups, merges) => {

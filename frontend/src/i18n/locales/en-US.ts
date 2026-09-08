@@ -1539,7 +1539,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         reason: {
           missing: 'A selected track no longer exists. Select again.',
           self: 'Both picks are the same track.',
-          source: 'Only a plain track can be merged into another track.',
+          switchIntoPlain: 'A switch cannot be merged into a plain track.',
           corner: 'A corner is an arc; absorbing a track would also shorten its other leg.',
           apart: 'The two tracks are not adjacent on the same lane.',
           shape: 'No valid geometry for the merged track.',

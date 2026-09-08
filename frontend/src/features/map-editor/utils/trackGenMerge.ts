@@ -36,11 +36,35 @@ export type TrackGenMerge = {
   to: string
 }
 
+/**
+ * 合併存在高精地圖元件的參數裡，<strong>重新生成時沿用</strong>。
+ *
+ * 使用者可能點了幾十次才把整張圖併成他要的樣子；關掉對話框就忘掉的話，下次只是要調
+ * 一下軌道寬度就得整批重來。
+ */
+export const TRACKGEN_MERGES_KEY = 'trackGenMerges'
+
+export function getTrackGenMerges(
+  parameters: Record<string, unknown> | undefined,
+): TrackGenMerge[] {
+  const raw = parameters?.[TRACKGEN_MERGES_KEY]
+  if (!Array.isArray(raw)) return []
+  const out: TrackGenMerge[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Partial<TrackGenMerge>
+    if (typeof o.from !== 'string' || typeof o.to !== 'string') continue
+    if (!o.from || !o.to || o.from === o.to) continue
+    out.push({ from: o.from, to: o.to })
+  }
+  return out
+}
+
 /** 併不成的理由，講給使用者聽 */
 export type TrackGenMergeRefusal =
   | 'missing'
   | 'self'
-  | 'source'
+  | 'switchIntoPlain'
   | 'corner'
   | 'apart'
   | 'shape'
@@ -97,11 +121,14 @@ function adjacent(a: LayoutShape, b: LayoutShape): boolean {
  * 這兩塊能不能併。
  *
  * <ul>
- *   <li>只有一般軌道可以被併掉：路口與斜接被併掉就沒有東西畫出那個路口了。
- *   <li>轉角不能當被併進去的那一方：它是一段圓弧，把直軌吃進來只能加大半徑，而半徑
- *       兩隻腳共用，另一隻腳會跟著被縮短——那一塊不是使用者選的。
+ *   <li>分岔不能併進一般軌道：併掉之後圖上就沒有東西畫出那個岔口了。
+ *   <li>轉角不能當被併進去的那一方：它是一段圓弧，把別的軌道吃進來只能加大半徑，而
+ *       半徑兩隻腳共用，另一隻腳會跟著被縮短——那一塊不是使用者選的。
  *   <li>兩塊要在同一條車道上前後相接。
  * </ul>
+ *
+ * 其餘的組合都放行。留下來的那一塊保留自己的種類，把端點伸到對方的外端，並接收對方
+ * 代表的里程；併出來長什麼樣預覽上就看得到，不合意按「復原上一次」。
  */
 export function canMergeTrackGen(
   shapes: LayoutShape[],
@@ -112,29 +139,54 @@ export function canMergeTrackGen(
   const from = shapes.find((s) => s.name === fromName)
   const to = shapes.find((s) => s.name === toName)
   if (!from || !to) return { ok: false, reason: 'missing' }
-  if (from.kind !== 'rect') return { ok: false, reason: 'source' }
+  if (from.kind === 'switch' && to.kind === 'rect') {
+    return { ok: false, reason: 'switchIntoPlain' }
+  }
   if (to.kind === 'corner') return { ok: false, reason: 'corner' }
   if (!adjacent(from, to)) return { ok: false, reason: 'apart' }
   return { ok: true }
 }
 
-/** 反過來走：里程、路徑、方向全部跟著翻面 */
-function reversedRect(r: LayoutRect): LayoutRect {
+/**
+ * 反過來走：里程、路徑、方向全部跟著翻面。
+ *
+ * 被併掉的那一塊只有<strong>路徑與里程</strong>會留下來，它自己的幾何整塊丟掉，所以
+ * 這裡不必管它是哪一種軌道。
+ */
+function reversed<T extends LayoutShape>(r: T): T {
   return {
     ...r,
     samples: [...r.samples].reverse(),
     realPath: r.realPath ? [...r.realPath].reverse() : undefined,
     realLatFromM: r.realLatToM,
     realLatToM: r.realLatFromM,
+    /*
+     * 里程與路徑比例跟著翻，<strong>行車方向不翻</strong>。
+     *
+     * headingRad 記的是那條車道在現場的走向，用來把走向相反的對向道篩掉；翻面的是我
+     * 們畫圖的路徑順序，車子在現場往哪邊開不會因此改變。翻了的話定位會把對的那一段
+     * 判成反方向而丟掉，改判到隔壁那一段——實測里程差 50 公尺。
+     */
     spans: (r.spans ?? []).map((sp) => ({
       ...sp,
       sFromM: sp.sToM,
       sToM: sp.sFromM,
       pathFrom: 1 - sp.pathTo,
       pathTo: 1 - sp.pathFrom,
-      headingRad: sp.headingRad + Math.PI,
     })),
   }
+}
+
+/**
+ * 帶子有多粗。
+ *
+ * 版面上每一塊直軌的寬度就是軌道寬度；被併掉的那一塊不一定是直軌，所以從整份版面取，
+ * 不從當事的兩塊取。整份都沒有直軌時退回目標自己的外框短邊。
+ */
+function bandWidthOf(shapes: LayoutShape[], target: LayoutShape): number {
+  for (const s of shapes) if (s.kind === 'rect') return s.widthM
+  if (target.kind === 'rect') return target.widthM
+  return Math.min(target.box.wM, target.box.hM)
 }
 
 /** 把一段里程從自己的 0–1 挪到合併後的 lo–hi */
@@ -155,7 +207,7 @@ type Joined = {
   realLatToM: number
   /** 併進來的那一塊接在頭還是尾 */
   atStart: boolean
-  src: LayoutRect
+  src: LayoutShape
 }
 
 /**
@@ -168,7 +220,7 @@ type Joined = {
  * 兩段真實路徑不一定接得上——分岔的路徑走的是梗到岔線，直行那一隻腿根本不在上面。
  * 所以接縫的長度也算進總長，兩邊的 f 窗各自只蓋住自己那一段，誰都不會投影到接縫上。
  */
-function join(target: LayoutShape, rect: LayoutRect): Joined {
+function join(target: LayoutShape, rect: LayoutShape): Joined {
   const tr = target.realPath ?? []
   const rr = rect.realPath ?? []
   const real = tr.length >= 2 && rr.length >= 2
@@ -179,7 +231,7 @@ function join(target: LayoutShape, rect: LayoutRect): Joined {
   const atStart = Math.min(len(t0, r0), len(t0, r1)) <= Math.min(len(t1, r0), len(t1, r1))
   // 被併的那一塊要走進 target 的那一端，方向不對就整塊翻面
   const flip = atStart ? len(r1, t0) > len(r0, t0) : len(r0, t1) > len(r1, t1)
-  const src = flip ? reversedRect(rect) : rect
+  const src = flip ? reversed(rect) : rect
 
   const sr = src.realPath ?? []
   const lenT = real ? polyLen(tr) : polyLen(target.samples)
@@ -235,11 +287,15 @@ function mergeRect(target: LayoutRect, j: Joined): LayoutRect {
 }
 
 /** 斜接吃掉一塊直軌：坡拉長，兩端重新解一次 */
-function mergeTaper(target: LayoutShape & { kind: 'taper' }, j: Joined): LayoutShape | null {
+function mergeTaper(
+  target: LayoutShape & { kind: 'taper' },
+  j: Joined,
+  bandW: number,
+): LayoutShape | null {
   const g = target.geometry as TaperTrackGeometry
   const a = j.samples[0]!
   const b = j.samples[j.samples.length - 1]!
-  const fit = fitTaperAt(a, b, j.src.widthM, g.entryDeg)
+  const fit = fitTaperAt(a, b, bandW, g.entryDeg)
   if (!fit) return null
   return {
     ...target,
@@ -288,7 +344,11 @@ function nearestKey<K extends string>(
  * 分岔的形狀由三個口的位置決定，把那一口挪到被吃那一塊的外端再解一次就好；圖上是
  * 那一隻腳變長，路口本身沒有變形。
  */
-function mergeSwitch(target: LayoutShape & { kind: 'switch' }, j: Joined): LayoutShape | null {
+function mergeSwitch(
+  target: LayoutShape & { kind: 'switch' },
+  j: Joined,
+  bandW: number,
+): LayoutShape | null {
   const g = target.geometry as SwitchTrackGeometry
   const segs = switchTrackEndSegmentsPx(g, target.box.wM, target.box.hM)
   const off = (p: Vec2): Vec2 => ({ x: target.box.xM + p.x, y: target.box.yM + p.y })
@@ -302,7 +362,7 @@ function mergeSwitch(target: LayoutShape & { kind: 'switch' }, j: Joined): Layou
   const mid = (s: [Vec2, Vec2]): Vec2 => ({ x: (s[0].x + s[1].x) / 2, y: (s[0].y + s[1].y) / 2 })
   const mouths = { a: mid(world.a), m: mid(world.m), b: mid(world.b) }
   const next = { ...mouths, [key]: far }
-  const fit = fitSwitchAt(next.a, next.m, next.b, j.src.widthM)
+  const fit = fitSwitchAt(next.a, next.m, next.b, bandW)
   if (!fit) return null
   return {
     ...target,
@@ -358,17 +418,18 @@ function mergeCross(target: LayoutShape & { kind: 'cross' }, j: Joined): LayoutS
 /** 併一次：回傳新的形狀清單，併不成就回 null */
 function mergeOnce(shapes: LayoutShape[], m: TrackGenMerge): LayoutShape[] | null {
   if (!canMergeTrackGen(shapes, m.from, m.to).ok) return null
-  const from = shapes.find((s) => s.name === m.from) as LayoutRect | undefined
+  const from = shapes.find((s) => s.name === m.from)
   const to = shapes.find((s) => s.name === m.to)
   if (!from || !to) return null
   const j = join(to, from)
+  const bandW = bandWidthOf(shapes, to)
   const next =
     to.kind === 'rect'
       ? mergeRect(to, j)
       : to.kind === 'taper'
-        ? mergeTaper(to, j)
+        ? mergeTaper(to, j, bandW)
         : to.kind === 'switch'
-          ? mergeSwitch(to, j)
+          ? mergeSwitch(to, j, bandW)
           : to.kind === 'cross'
             ? mergeCross(to, j)
             : null
