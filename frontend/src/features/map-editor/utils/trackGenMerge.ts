@@ -99,13 +99,8 @@ function spanRanges(s: LayoutShape) {
   }))
 }
 
-/**
- * 兩塊在<strong>同一條車道上前後相接</strong>才能併。
- *
- * 用里程判斷，不用圖上的距離：並排的上下行在圖上只差一個軌道寬，位置分不開，里程
- * 卻分屬不同車道。
- */
-function adjacent(a: LayoutShape, b: LayoutShape): boolean {
+/** 同一條車道上，里程前後接得上 */
+function sameLaneNext(a: LayoutShape, b: LayoutShape): boolean {
   const ra = spanRanges(a)
   const rb = spanRanges(b)
   return ra.some((x) =>
@@ -115,6 +110,33 @@ function adjacent(a: LayoutShape, b: LayoutShape): boolean {
         (Math.abs(x.hi - y.lo) <= JOIN_TOL_M || Math.abs(y.hi - x.lo) <= JOIN_TOL_M),
     ),
   )
+}
+
+/**
+ * 真實路徑的端點碰在一起。
+ *
+ * 這一條是給<strong>跨路的相接</strong>用的：一條 road 走完接下一條 road，里程各算
+ * 各的，車道鍵也不同，只看里程會判成不相鄰——畫面上明明就接在一起。
+ *
+ * 距離用真實座標量，不用圖上的：圖上的軌道寬度是可調的，而現場相接的兩塊端點是同一
+ * 個點（誤差在公分內），並排的上下行差一個車道寬（3.35 公尺），用 0.75 公尺就分得開。
+ */
+const TOUCH_TOL_M = 0.75
+
+function touching(a: LayoutShape, b: LayoutShape): boolean {
+  const pa = a.realPath ?? []
+  const pb = b.realPath ?? []
+  if (pa.length < 2 || pb.length < 2) return false
+  const ea = [pa[0]!, pa[pa.length - 1]!]
+  const eb = [pb[0]!, pb[pb.length - 1]!]
+  return ea.some((p) => eb.some((q) => len(p, q) <= TOUCH_TOL_M))
+}
+
+/**
+ * 兩塊接得上才能併：同一條車道上前後相接，或是真實路徑的端點碰在一起。
+ */
+function adjacent(a: LayoutShape, b: LayoutShape): boolean {
+  return sameLaneNext(a, b) || touching(a, b)
 }
 
 /**
