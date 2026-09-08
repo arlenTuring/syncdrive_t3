@@ -1015,6 +1015,7 @@ function ShiftScheduleBlockBar({
    */
   trackOffsetPx?: number;
 }) {
+  const { t } = useTranslation();
   // 出場移動卡只有 30 秒，寬度幾個 px，塞不下任何文字：
   // 單一顏色、卡內不放內容，說明全部交給 hover。
   // 轉場小卡（入廠／出廠，整備或調度皆算）通常只有幾十秒寬，塞不下完整班次
