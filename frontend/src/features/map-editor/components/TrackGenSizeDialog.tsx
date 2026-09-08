@@ -219,8 +219,9 @@ function SizeDialogBody({
     to: number
     /** 吸附到的那條線，沒吸到就是 null */
     snapped: number | null
-    /** 對齊候選，換算成畫面座標——拖動途中座標框再怎麼變都不影響 */
+    /** 對齊候選：畫面座標用來吸附，版面座標用來畫出來給人看 */
     targetsClient: number[]
+    targets: number[]
     /** 按下去的那一刻，這一端在畫面上的位置 */
     fromClient: number
     /** 按下去的那一刻，游標在畫面上的位置 */
@@ -522,9 +523,14 @@ function SizeDialogBody({
         from,
         to: from,
         snapped: null,
-        targetsClient: snapTargetsFor(shapes, sh, ax)
-          .filter((t) => t >= range.min && t <= range.max)
-          .map((t) => base + t * scale),
+        /*
+         * 候選不先照範圍濾掉。
+         *
+         * 濾掉的話，拖不到的那幾條就整條消失，使用者只會覺得「怎麼樣都對不齊」，卻
+         * 看不出是被範圍擋住。留著、畫出來，拖到範圍邊界自然停住，至少看得見。
+         */
+        targets: snapTargetsFor(shapes, sh, ax),
+        targetsClient: snapTargetsFor(shapes, sh, ax).map((t) => base + t * scale),
         fromClient: base + from * scale,
         // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
         grabClient: ax === 'x' ? e.clientX : e.clientY,
@@ -549,7 +555,7 @@ function SizeDialogBody({
       let at = drag.fromClient + (now - drag.grabClient)
       // 吸附：離候選夠近就貼上去（畫面上量，所以縮圖縮多少手感都一樣）
       let hit = false
-      let bestD = 7
+      let bestD = 10
       for (const t of drag.targetsClient) {
         const d = Math.abs(t - at)
         if (d <= bestD) {
@@ -925,6 +931,37 @@ function SizeDialogBody({
             */}
             {drag ? (
               <g className="pointer-events-none">
+                {/*
+                  對齊的候選全部畫出來。
+                  看不見的話，對不齊時分不清是「沒有可以對的線」還是「拖不過去」。
+                */}
+                {drag.targets.map((t) =>
+                  drag.axis === 'x' ? (
+                    <line
+                      key={`t${t}`}
+                      data-trackgen-snap-tick
+                      x1={(gx + t) * scale}
+                      y1={0}
+                      x2={(gx + t) * scale}
+                      y2={stageH}
+                      stroke={t >= drag.min && t <= drag.max ? '#71717a' : '#3f3f46'}
+                      strokeWidth={t >= drag.min && t <= drag.max ? 1 : 0.6}
+                      strokeDasharray="2 5"
+                    />
+                  ) : (
+                    <line
+                      key={`t${t}`}
+                      data-trackgen-snap-tick
+                      x1={0}
+                      y1={(gy + t) * scale}
+                      x2={stageW}
+                      y2={(gy + t) * scale}
+                      stroke={t >= drag.min && t <= drag.max ? '#71717a' : '#3f3f46'}
+                      strokeWidth={t >= drag.min && t <= drag.max ? 1 : 0.6}
+                      strokeDasharray="2 5"
+                    />
+                  ),
+                )}
                 {drag.axis === 'x' ? (
                   <>
                     <line

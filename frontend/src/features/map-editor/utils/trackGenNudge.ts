@@ -422,8 +422,8 @@ export function nudgeRangeFor(
  * 拖的時候可以吸附到哪些位置。
  *
  * 用意是讓上行的某一塊跟下行的某一塊對齊：先調下面再調上面，或是反過來，都要對得上。
- * 所以候選是<strong>其他線</strong>在同一軸上的每一個塊界，加上這一塊自己原本的位置
- * ——那是「調回去」的那條線。
+ * 候選是<strong>圖上同一軸的每一個塊界</strong>，不分哪一條線——同一條線上的其他塊界
+ * 也算，那是「跟自己這條線上的某一刀對齊」；被拖的那一塊自己不算，不然會黏在原地。
  */
 export function snapTargetsFor(
   shapes: LayoutShape[],
@@ -432,8 +432,8 @@ export function snapTargetsFor(
 ): number[] {
   const out = new Set<number>()
   for (const s of shapes) {
+    if (s.name === target.name) continue
     if (axisOf(s) !== axis) continue
-    if (s.lineKey === target.lineKey) continue
     const { lo, hi } = extentOf(s, axis)
     out.add(Number(lo.toFixed(2)))
     out.add(Number(hi.toFixed(2)))
