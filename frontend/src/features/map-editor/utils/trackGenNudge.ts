@@ -15,9 +15,11 @@ import {
  * 拖的是<strong>兩塊之間的那一條界線</strong>：A 的右邊往左拉，A 就短一截，右邊那一塊
  * <strong>一起被拖走</strong>，兩塊永遠黏著。受影響的就這一塊，其餘一個都不動。
  *
- * 兩邊都得是一般軌道才給拖。斜接與路口的長度就是它們的幾何——斜接拉長等於換一個坡度、
- * 轉角拉長等於換一個半徑——改了就不是原來那個東西；而不改長度又只能整塊平移，平移
- * 之後它的另一頭就跟後面斷開。兩條路都不行，所以貼著它們的那一端<strong>不長把手</strong>。
+ * 斜接也可以拖，也可以當鄰居跟著伸縮。<strong>坡度會跟著變</strong>：斜接的長度本來
+ * 就是它的坡，拉長就是把坡放緩。變緩之後端面仍然垂直、帶寬也不變，但帶子可能壓到旁邊
+ * 那條軌道上——這是使用者選的取捨，不另外處理。
+ *
+ * 路口（轉角、分岔、交叉）那一端仍然不長把手：它們連著別條線，動了就不只影響這一塊。
  *
  * <h3>里程不用重新對</h3>
  * 每一塊代表的里程沒有變，變的只有它畫多長。定位是「在真實路徑上走了幾成，就在圖面
@@ -79,14 +81,13 @@ export function isPinned(s: LayoutShape): boolean {
 }
 
 /**
- * 只有一般軌道能改長度。
+ * 一般軌道與斜接可以改長度。
  *
- * 斜接、轉角、分岔、交叉的長度就是它們的幾何：斜接拉長坡就變緩、轉角拉長弧就變形。
- * 那不是「同一條軌道畫長一點」，是換成另一個東西。所以它們一律不動——調長度會疊到
- * 它們身上時就疊上去，寧可壓線也不要把幾何改掉。
+ * 斜接拉長就是把坡放緩，端面仍然垂直、帶寬也不變，只是可能壓到旁邊那條軌道。路口
+ * 不行：它們連著別條線，動了就不只影響這一塊。
  */
 export function canNudge(s: LayoutShape): boolean {
-  return s.kind === 'rect'
+  return s.kind === 'rect' || s.kind === 'taper'
 }
 
 /**
@@ -122,6 +123,22 @@ function resized(
       lengthM: Math.hypot(b.x - a.x, b.y - a.y),
       rotationDeg: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
     }
+  }
+  if (s.kind === 'taper') {
+    /*
+     * 斜接<strong>直接把外框沿軸拉開</strong>，不重新解一次形狀。
+     *
+     * 重解回的是「最接近」的方框，兩端不保證落在要求的位置——把手畫的是取樣點、帶子
+     * 畫的是方框，兩者於是對不上。斜接的幾何本來就是外框的比例（端面高度、坡的起訖
+     * 都是比例），拉外框等於等比拉整條帶子，端面仍垂直、帶寬不變，而且完全精確。
+     * 坡會跟著變緩，那正是「調整斜接長度」的意思。
+     */
+    const b = s.box
+    const box =
+      axis === 'x'
+        ? { ...b, xM: nextLo, wM: nextHi - nextLo }
+        : { ...b, yM: nextLo, hM: nextHi - nextLo }
+    return { ...s, samples, box }
   }
   return null
 }
@@ -357,8 +374,8 @@ function neighbourAt(
     (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
   )
   if (touch) {
-    // 鄰居不是一般軌道就整個不給拖：它得跟著改長度才不會斷開，而改長度就是改幾何
-    if (touch.kind !== 'rect' || axisOf(touch) !== axisOf(s)) return { kind: 'blocked' }
+    // 路口的長度是它自己的幾何，改不得；斜接可以，坡跟著變是使用者接受的
+    if (!canNudge(touch) || axisOf(touch) !== axisOf(s)) return { kind: 'blocked' }
     return { kind: 'shape', shape: touch }
   }
   const pad = TOUCH_PX
