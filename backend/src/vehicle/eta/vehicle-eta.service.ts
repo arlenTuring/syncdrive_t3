@@ -363,7 +363,9 @@ export class VehicleEtaService {
                 latitude,
                 longitude: numberOrNull(telemetry?.global_pose?.longitude) ?? 0,
                 heading: numberOrNull(telemetry?.local_pose?.heading) ?? 0,
-                velocity_kph: numberOrNull(telemetry?.kinematics?.velocity) ?? 0,
+                // 車端 kinematics.velocity 單位是 m/s（車端介接說明書 §四.2）；
+                // 本 API 對外欄位名已標明 kph，故在此換算一次，使用方不再換算。
+                velocity_kph: round1((numberOrNull(telemetry?.kinematics?.velocity) ?? 0) * 3.6),
               },
       });
     }
@@ -538,4 +540,9 @@ type EtaContext = {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** m/s 換算 km/h 會拖出一長串小數，對外欄位只到小數一位就夠 */
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }

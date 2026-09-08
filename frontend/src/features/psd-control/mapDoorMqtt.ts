@@ -22,7 +22,7 @@ export type VehicleDoorMqttPayload = {
   vehicle_code?: string;
   timestamp?: number;
   connection?: string;
-  speed_kmh?: number;
+  speed_mps?: number;
   doors?: DoorLeafMqtt[];
 };
 

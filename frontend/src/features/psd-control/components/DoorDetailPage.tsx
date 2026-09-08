@@ -122,7 +122,7 @@ export function DoorDetailPage({
               leaf?.anti_pinch === 'FAULT'
                 ? t('psdControl.status.abnormal')
                 : t('psdControl.status.normal'),
-            speed: `${Number(liveVehicle.speed_kmh ?? 0).toFixed(0)} km/h`,
+            speed: `${(Number(liveVehicle.speed_mps ?? 0) * 3.6).toFixed(0)} km/h`,
           };
         }),
       );

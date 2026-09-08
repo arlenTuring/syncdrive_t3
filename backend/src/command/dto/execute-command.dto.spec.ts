@@ -15,7 +15,7 @@ describe('ExecuteCommandDto 驗證', () => {
   });
 
   it('接受 all 廣播指令', () => {
-    expect(validate({ vehicle_code: 'all', action: 'SET_SPEED_LIMIT', params: { limit_kmh: 10 } })).toHaveLength(0);
+    expect(validate({ vehicle_code: 'all', action: 'SET_SPEED_LIMIT', params: { limit_mps: 2.78 } })).toHaveLength(0);
   });
 
   it('拒絕非法 vehicle_code', () => {

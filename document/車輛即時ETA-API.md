@@ -95,7 +95,7 @@ Cache-Control: no-cache, max-age=0
 
 | 欄位 | 格式 | 範例 |
 |------|------|------|
-| `vehicle_code` | `PMS-` + 兩碼數字 | `PMS-05` |
+| `vehicle_code` | `PMS` + 兩碼數字 | `PMS05` |
 | `station_id` | 停靠點識別碼 | `station_4` |
 | `trip_code` | 路線代號 + `HHMM` | `ST0007` |
 | `order_id` | `[YYMMDD]-[trip_code]` | `260816-ST0007` |
@@ -254,7 +254,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
       "station_name": "T3上行",
       "etas": [
         {
-          "vehicle_code": "PMS-05",
+          "vehicle_code": "PMS05",
           "order_id": "260816-ST0007",
           "trip_code": "ST0007",
           "route_code": "ST",
@@ -278,7 +278,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "data_age_seconds": 2
         },
         {
-          "vehicle_code": "PMS-02",
+          "vehicle_code": "PMS02",
           "order_id": "260816-ST0013",
           "trip_code": "ST0013",
           "route_code": "ST",
@@ -302,7 +302,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
           "data_age_seconds": 3
         },
         {
-          "vehicle_code": "PMS-09",
+          "vehicle_code": "PMS09",
           "order_id": "260816-ST0019",
           "trip_code": "ST0019",
           "route_code": "ST",
@@ -351,7 +351,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
       "station_name": "N2W下行出發",
       "etas": [
         {
-          "vehicle_code": "PMS-03",
+          "vehicle_code": "PMS03",
           "order_id": "260816-NT0900",
           "trip_code": "NT0900",
           "route_code": "NT",
@@ -381,7 +381,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-station\
       "station_name": "N2W上行停靠",
       "etas": [
         {
-          "vehicle_code": "PMS-08",
+          "vehicle_code": "PMS08",
           "order_id": "260816-TN0905",
           "trip_code": "TN0905",
           "route_code": "TN",
@@ -450,13 +450,13 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle" \
 ```
 
 ```bash
-curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_code=PMS-05&next_stops=3" \
+curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_code=PMS05&next_stops=3" \
   -H "X-API-Key: <API_KEY>"
 ```
 
 ### 6.3 完整回應：正常行駛中
 
-請求：`?vehicle_code=PMS-05&next_stops=3`
+請求：`?vehicle_code=PMS05&next_stops=3`
 
 ```json
 {
@@ -470,7 +470,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
   "vehicle_count": 1,
   "vehicles": [
     {
-      "vehicle_code": "PMS-05",
+      "vehicle_code": "PMS05",
       "vehicle_phase": "TRANSITING",
       "order_id": "260816-ST0007",
       "trip_code": "ST0007",
@@ -550,7 +550,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 ### 6.4 完整回應：車輛資料逾時
 
-請求：`?vehicle_code=PMS-08&next_stops=3`
+請求：`?vehicle_code=PMS08&next_stops=3`
 
 ```json
 {
@@ -564,7 +564,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
   "vehicle_count": 1,
   "vehicles": [
     {
-      "vehicle_code": "PMS-08",
+      "vehicle_code": "PMS08",
       "vehicle_phase": null,
       "order_id": "260816-TN0905",
       "trip_code": "TN0905",
@@ -637,7 +637,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | `DEGRADED` | 部分車輛資料逾時，或班表未載入 | 顯示，並對 `arrival_state` 為 `UNKNOWN` 者標示資料中斷 |
 | `DOWN` | 無法取得任何車輛資料 | **必須**停止顯示 ETA，改顯示資料中斷 |
 
-判定基礎：中心端已知車隊應有的車輛清單（`PMS-01` 至 `PMS-11`），逐車比對其最新資料的 `data_age_seconds`。任一車超過逾時門檻即為 `DEGRADED`；全部車輛皆無資料或皆逾時則為 `DOWN`。
+判定基礎：中心端已知車隊應有的車輛清單（`PMS01` 至 `PMS11`），逐車比對其最新資料的 `data_age_seconds`。任一車超過逾時門檻即為 `DEGRADED`；全部車輛皆無資料或皆逾時則為 `DOWN`。
 
 ### 7.4 計數欄位
 
@@ -652,7 +652,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `vehicle_code` | String | 車輛代號，格式 `PMS-` + 兩碼數字 |
+| `vehicle_code` | String | 車輛代號，格式 `PMS` + 兩碼數字 |
 | `order_id` | String \| null | 該車當前執行的營運訂單識別碼。未執行任務時為 `null` |
 | `trip_code` | String \| null | 班次代碼，格式為路線代號 + 發車時刻 `HHMM`。例 `ST0007` 表示 ST 路線 00:07 發車的班次 |
 | `route_code` | String \| null | 路線代號 |
@@ -931,7 +931,7 @@ ETag: "a1b2c3d4"
 ```json
 {
   "error": "NOT_FOUND",
-  "detail": "vehicle_code \"PMS-99\" 不存在"
+  "detail": "vehicle_code \"PMS99\" 不存在"
 }
 ```
 
@@ -1061,7 +1061,7 @@ If-None-Match: "<前次 ETag>"
         "observed_at", "data_age_seconds"
       ],
       "properties": {
-        "vehicle_code": { "type": "string", "pattern": "^PMS-\\d{2}$" },
+        "vehicle_code": { "type": "string", "pattern": "^PMS\\d{2}$" },
         "order_id": { "type": ["string", "null"] },
         "trip_code": { "type": ["string", "null"] },
         "route_code": { "type": ["string", "null"] },

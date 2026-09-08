@@ -134,6 +134,9 @@ export class OrderController {
       + '不採信 MQTT 訊息中的狀態欄位。'
       + '允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；'
       + 'FAULTED → PROCESSING 或 END。END 為終態。'
+      + '值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束'
+      + '（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，'
+      + '走 event/report 上報，不往本端點加狀態值。'
       + '欄位定義見車端介接說明書 §五.2。',
   })
   @ApiOkResponse({ description: '更新後之訂單' })

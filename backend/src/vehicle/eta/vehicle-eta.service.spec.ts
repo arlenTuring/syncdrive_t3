@@ -98,7 +98,7 @@ function movingVehicle(overrides: Record<string, unknown> = {}) {
       timestamp: NOW - 2000,
       global_pose: { latitude: 25.077612, longitude: 121.232545 },
       local_pose: { heading: 1.49 },
-      kinematics: { velocity: 10.5 },
+      kinematics: { velocity: 2.92 }, // m/s
     },
   };
 }
@@ -287,7 +287,7 @@ describe('VehicleEtaService.getByVehicle', () => {
       latitude: 25.077612,
       longitude: 121.232545,
       heading: 1.49,
-      velocity_kph: 10.5,
+      velocity_kph: 10.5, // 2.92 m/s × 3.6
     });
 
     const stale = movingVehicle();
