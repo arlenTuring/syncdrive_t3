@@ -145,11 +145,27 @@ export interface MapRouteGroup {
   updatedAt?: string
 }
 
+/**
+ * 模擬／圖台渲染用折點。站點帶 stationId（鎖定）；其餘為虛擬折點，協助無站點折角處走線。
+ * px/py 為圖台像素；x/y 為場域公尺（可選，供同步與他端還原）。
+ */
+export interface MapRoutePathWaypoint {
+  px: number
+  py: number
+  x?: number
+  y?: number
+  stationId?: string
+}
+
 /** 地圖內營運路線：名稱由使用者定義，站序為 DockingPoint stationId */
 export interface MapPlannedRoute {
   routeId: string
   displayName: string
   stationIds: string[]
+  /**
+   * 模擬路線繪製折點（含站點與虛擬折點）。有值且 ≥2 點時，圖台優先依此折線繪製。
+   */
+  pathWaypoints?: MapRoutePathWaypoint[]
   /** 走完路線平均時間（秒）；不含月台門停靠 */
   avgTravelTimeSeconds?: number | null
   /** 走完路線最快時間（秒）；不含月台門停靠 */

@@ -20,8 +20,13 @@ import {
   CROSS_PORTAL_KEYS,
   CROSS_ROUTE_ENDS,
   CROSS_ROUTE_KEYS,
+  getCrossDiagStrokeColors,
+  getCrossPortalPing,
   getCrossPortals,
   getCrossRoutes,
+  getCrossShowPortalLabels,
+  subscribeCrossPortalPing,
+  type CrossPortalKey,
 } from '../utils/crossTrackPortals'
 import {
   cornerTrackHandlesPx,
@@ -59,6 +64,7 @@ import {
   facilityNodeWorldSize,
   getFacilitySizeMeters,
   MIN_FACILITY_SIZE_M,
+  poleIconFillBoxStyle,
 } from '../constants/facilityDimensions'
 import {
   metersToWorldPx,
@@ -1011,9 +1017,8 @@ export const FacilityNode = memo(function FacilityNode({
           : Math.max(18, Math.min(minDim * 0.76))
   const signalScale = Math.min(nw / 32, nh / 38) * 0.92
   const dockingDotSize = Math.max(10, Math.min(iconWorld * 0.5, 22))
-  const waypointDotSize = Math.round(
-    Math.max(4, Math.min(iconWorld * 0.2, 9)) * 1.1,
-  )
+  // 途經點綠點撐滿選取框，拉框時圖示同步縮放（與智慧桿同邏輯）
+  const waypointDotSize = Math.max(8, Math.min(nw, nh) * 0.88)
   const labelStyle = getFacilityLabelStyle(facility)
   const labelCss = resolveLabelCss(labelStyle, minDim, facility.type)
   const showLabel = shouldShowFacilityLabel(labelStyle)
@@ -1276,10 +1281,31 @@ export const FacilityNode = memo(function FacilityNode({
     () => (crossTrackGeom ? crossTrackPath(crossTrackGeom, nw, nh) : ''),
     [crossTrackGeom, nw, nh],
   )
+  /** 異形軌道（clip-path）的框線 path；CSS border 會被裁掉，改用 SVG stroke */
+  const shapedTrackOutlinePath = useMemo(() => {
+    if (isCornerTrack) return cornerTrackClipPath
+    if (isTaperTrack) return taperTrackClipPath
+    if (isSwitchTrack) return switchTrackClipPath
+    if (isCrossTrack) return crossTrackClipPath
+    return ''
+  }, [
+    isCornerTrack,
+    isTaperTrack,
+    isSwitchTrack,
+    isCrossTrack,
+    cornerTrackClipPath,
+    taperTrackClipPath,
+    switchTrackClipPath,
+    crossTrackClipPath,
+  ])
   /** 疊在交叉軌道上的線：兩條斜行的邊（虛線）與兩條直行之間的分隔 */
   const crossTrackGuides = useMemo(
     () => (crossTrackGeom ? crossTrackGuidesPx(crossTrackGeom, nw, nh) : null),
     [crossTrackGeom, nw, nh],
+  )
+  const crossDiagStrokeColors = useMemo(
+    () => (isCrossTrack ? getCrossDiagStrokeColors(facility) : null),
+    [isCrossTrack, facility],
   )
   /**
    * 交叉與分岔的<strong>兩半</strong>：各自的底色與名字。
@@ -1322,23 +1348,31 @@ export const FacilityNode = memo(function FacilityNode({
   }, [isCrossTrack, isSwitchTrack, facility, crossTrackGeom, switchTrackGeom, nw, nh])
 
   /**
-   * 四個口的標籤與四條路徑的方向箭頭。
+   * 四個口的標籤與路徑方向印記。
    *
-   * 標籤取別名，沒有就取途經點代號——與虛擬渡線同一個規則：填了看得懂的名字就顯示
-   * 名字，沒填才顯示代號。箭頭擺在路徑的四分之一與四分之三處，雙向兩枚各指一頭，
-   * 單向一枚，關掉的路徑不畫——哪幾條走得通，圖上看得出來。
+   * 標籤預設不畫（屬性框可開）。方向印記<strong>完全跟「路徑方向」設定走</strong>：
+   * 不通的不畫；正向靠起點、反向靠終點、雙向兩頭各一；斜行就沿斜線頭尾標，
+   * 直行就沿直行頭尾標——你開斜上／斜下，圖上就是斜的 ›››。
    */
   const crossTrackOverlay = useMemo(() => {
     if (!isCrossTrack || !crossTrackGeom) return null
     const pts = crossTrackHandlesPx(crossTrackGeom, nw, nh)
     const portals = getCrossPortals(facility)
     const routes = getCrossRoutes(facility)
-    const labels = CROSS_PORTAL_KEYS.map((k) => ({
-      key: k,
-      at: pts[k],
-      text: (portals[k].alias ?? '').trim() || portals[k].waypointCode,
-    }))
-    const arrows: Array<{ x: number; y: number; ux: number; uy: number; key: string }> = []
+    const showPortalLabels = getCrossShowPortalLabels(facility)
+    const labels = showPortalLabels
+      ? CROSS_PORTAL_KEYS.map((k) => ({
+          key: k,
+          at: pts[k],
+          text: (portals[k].alias ?? '').trim() || portals[k].waypointCode,
+        }))
+      : []
+    const arrows: Array<{
+      x: number
+      y: number
+      angleDeg: number
+      key: string
+    }> = []
     for (const rk of CROSS_ROUTE_KEYS) {
       const dir = routes[rk]
       if (dir === 'off') continue
@@ -1346,13 +1380,20 @@ export const FacilityNode = memo(function FacilityNode({
       const a = pts[fromKey]
       const b = pts[toKey]
       const len = Math.hypot(b.x - a.x, b.y - a.y)
-      if (len < 1) continue
+      if (!(len > 1)) continue
       const ux = (b.x - a.x) / len
       const uy = (b.y - a.y) / len
-      const at = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt })
-      if (dir === 'both' || dir === 'forward') arrows.push({ ...at(0.72), ux, uy, key: `${rk}-f` })
+      const angleFwd = (Math.atan2(uy, ux) * 180) / Math.PI
+      const at = (t: number) => ({
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+      })
+      // 靠路徑頭／尾，中間交叉區不擠
+      if (dir === 'both' || dir === 'forward') {
+        arrows.push({ ...at(0.12), angleDeg: angleFwd, key: `${rk}-f` })
+      }
       if (dir === 'both' || dir === 'reverse') {
-        arrows.push({ ...at(0.28), ux: -ux, uy: -uy, key: `${rk}-r` })
+        arrows.push({ ...at(0.88), angleDeg: angleFwd + 180, key: `${rk}-r` })
       }
     }
     return { labels, arrows }
@@ -1410,6 +1451,27 @@ export const FacilityNode = memo(function FacilityNode({
     const t = window.setTimeout(() => setHighlightFlash(false), 850)
     return () => clearTimeout(t)
   }, [mqttLive?.highlightSeq])
+
+  /** 屬性框「標示此口」：短暫高亮交叉軌道某一個端面把手 */
+  const [crossPortalPingKey, setCrossPortalPingKey] = useState<CrossPortalKey | null>(null)
+  useEffect(() => {
+    if (!isCrossTrack) return
+    let clearTimer: number | null = null
+    const unsub = subscribeCrossPortalPing(() => {
+      const ping = getCrossPortalPing()
+      if (!ping || ping.facilityId !== facility.id) return
+      setCrossPortalPingKey(ping.key)
+      if (clearTimer != null) window.clearTimeout(clearTimer)
+      clearTimer = window.setTimeout(() => {
+        setCrossPortalPingKey((prev) => (prev === ping.key ? null : prev))
+        clearTimer = null
+      }, 1400)
+    })
+    return () => {
+      unsub()
+      if (clearTimer != null) window.clearTimeout(clearTimer)
+    }
+  }, [isCrossTrack, facility.id])
 
   const clearDragWindowListeners = useCallback(() => {
     dragWindowCleanupRef.current?.()
@@ -2586,13 +2648,18 @@ export const FacilityNode = memo(function FacilityNode({
             .join(' ')}
         >
           {!isTrack && isPole && bgUrl && !imageError ? (
-            <img
-              src={bgUrl}
-              alt={label}
-              className="pointer-events-none size-full object-contain"
-              style={{ opacity: facility.currentState === 'Error' ? 0.55 : 0.95 }}
-              onError={() => setImageError(true)}
-            />
+            <div className="relative size-full overflow-hidden">
+              <img
+                src={bgUrl}
+                alt={label}
+                className="pointer-events-none absolute max-w-none"
+                style={{
+                  ...poleIconFillBoxStyle(nw, nh),
+                  opacity: facility.currentState === 'Error' ? 0.55 : 0.95,
+                }}
+                onError={() => setImageError(true)}
+              />
+            </div>
           ) : isBasemap ? (
             <BasemapGraphic
               width={nw}
@@ -2720,7 +2787,7 @@ export const FacilityNode = memo(function FacilityNode({
             />
           ) : isPole && Icon ? (
             <div className="flex size-full items-center justify-center text-cyan-300">
-              <Icon className="size-[85%] max-h-full max-w-full" strokeWidth={1.75} />
+              <Icon className="size-full max-h-full max-w-full" strokeWidth={1.75} />
             </div>
           ) : !isTrack && !isPole && !isSignal && !isDockingPoint && bgUrl && !imageError ? (
             <div
@@ -2950,6 +3017,27 @@ export const FacilityNode = memo(function FacilityNode({
           *
           * 不吃滑鼠事件：把手就疊在同一個位置上，攔下來的話就拉不動了。
           */}
+        {/*
+          * 異形軌道框線：clip-path 會裁掉 CSS border，所以另外用同一條 path 描深色描邊。
+          */}
+        {shapedTrackOutlinePath && effectiveFrameWidthPx > 0 && (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[69]"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            <path
+              d={shapedTrackOutlinePath}
+              fill="none"
+              stroke={strokeColor || '#05070a'}
+              strokeWidth={effectiveFrameWidthPx}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
         {trackPartOverlay ? (
           <svg
             className="pointer-events-none absolute left-0 top-0 z-[71]"
@@ -2961,36 +3049,18 @@ export const FacilityNode = memo(function FacilityNode({
             {trackPartOverlay.map((p) =>
               p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} /> : null,
             )}
-            {/* 名字標在自己那一條上，不併成一個放中間 */}
-            {trackPartOverlay.map((p) =>
-              p.name ? (
-                <text
-                  key={`name-${p.part}`}
-                  x={p.at.x}
-                  y={p.at.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={p.fontPx}
-                  fontWeight={600}
-                  fill="#fafafa"
-                  style={{
-                    paintOrder: 'stroke',
-                    stroke: '#09090b',
-                    strokeWidth: Math.max(2, p.fontPx * 0.27),
-                  }}
-                >
-                  {p.name}
-                </text>
-              ) : null,
-            )}
           </svg>
         ) : null}
+        {/*
+          * 斜行虛線必須疊在路段填色之上，否則改色幾乎看不出來。
+          */}
         {isCrossTrack && crossTrackGuides && (
           <svg
-            className="pointer-events-none absolute left-0 top-0 z-[70]"
+            className="pointer-events-none absolute left-0 top-0 z-[72] overflow-visible"
             width={nw}
             height={nh}
             viewBox={`0 0 ${nw} ${nh}`}
+            overflow="visible"
             aria-hidden
           >
             {crossTrackGuides.diagonals.map((seg, i) => (
@@ -3000,10 +3070,14 @@ export const FacilityNode = memo(function FacilityNode({
                 y1={seg[0].y}
                 x2={seg[1].x}
                 y2={seg[1].y}
-                stroke={i < 2 ? '#86efac' : '#fbbf24'}
-                strokeWidth={1.5}
-                strokeDasharray="6 4"
-                opacity={0.9}
+                stroke={
+                  i < 2
+                    ? (crossDiagStrokeColors?.down ?? '#86efac')
+                    : (crossDiagStrokeColors?.up ?? '#fbbf24')
+                }
+                strokeWidth={2.75}
+                strokeDasharray="7 4"
+                opacity={0.95}
               />
             ))}
             <line
@@ -3011,24 +3085,19 @@ export const FacilityNode = memo(function FacilityNode({
               y1={crossTrackGuides.divider[0].y}
               x2={crossTrackGuides.divider[1].x}
               y2={crossTrackGuides.divider[1].y}
-              stroke="#d4d4d8"
-              strokeWidth={1}
-              opacity={0.7}
+              // 與「顯示框線」的 strokeColor 同步；未開框線時維持淡灰分隔
+              stroke={
+                strokeColor && strokeColor !== 'transparent'
+                  ? strokeColor
+                  : '#d4d4d8'
+              }
+              strokeWidth={
+                effectiveFrameWidthPx > 0
+                  ? Math.max(1, Math.min(2, effectiveFrameWidthPx))
+                  : 1
+              }
+              opacity={strokeColor && strokeColor !== 'transparent' ? 0.9 : 0.7}
             />
-            {crossTrackOverlay?.arrows.map((a) => {
-              const head = 7
-              const half = 4
-              const bx = a.x - a.ux * head
-              const by = a.y - a.uy * head
-              return (
-                <polygon
-                  key={`cross-arrow-${a.key}`}
-                  points={`${a.x},${a.y} ${bx - a.uy * half},${by + a.ux * half} ${bx + a.uy * half},${by - a.ux * half}`}
-                  fill="#7dd3fc"
-                  opacity={0.95}
-                />
-              )
-            })}
             {crossTrackOverlay?.labels.map((l) => {
               /*
                * 標籤往框內收。連接點就在四個角上，字置中放在點的正上方會有一半跑到
@@ -3054,6 +3123,123 @@ export const FacilityNode = memo(function FacilityNode({
             })}
           </svg>
         )}
+        {/*
+          * 方向印記獨立一層、壓在填色／虛線／路名之上。
+          * 用大號 ››› 文字，縮放後仍清楚；頭尾各一串，中間交叉區不畫。
+          */}
+        {isCrossTrack && crossTrackOverlay && crossTrackOverlay.arrows.length > 0 && (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[76] overflow-visible"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            overflow="visible"
+            aria-hidden
+          >
+            {crossTrackOverlay.arrows.map((a) => {
+              const fontPx = Math.max(13, Math.min(20, Math.min(nw, nh) * 0.38))
+              return (
+                <text
+                  key={`cross-dir-${a.key}`}
+                  x={a.x}
+                  y={a.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#f8fafc"
+                  fontSize={fontPx}
+                  fontWeight={800}
+                  letterSpacing={-1}
+                  transform={`rotate(${a.angleDeg} ${a.x} ${a.y})`}
+                  style={{ paintOrder: 'stroke', stroke: '#0f172a', strokeWidth: 3.5 }}
+                >
+                  ›››
+                </text>
+              )
+            })}
+          </svg>
+        )}
+        {isCrossTrack && crossTrackGeom && crossPortalPingKey ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[89] overflow-visible"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            overflow="visible"
+            aria-hidden
+          >
+            {(() => {
+              const pt = crossTrackHandlesPx(crossTrackGeom, nw, nh)[crossPortalPingKey]
+              const r = Math.max(10, Math.min(nw, nh) * 0.18)
+              return (
+                <g>
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={r * 1.65}
+                    fill="none"
+                    stroke="#22d3ee"
+                    strokeWidth={2.5}
+                    opacity={0.45}
+                  >
+                    <animate
+                      attributeName="r"
+                      values={`${r * 1.1};${r * 1.9};${r * 1.1}`}
+                      dur="0.9s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.55;0.15;0.55"
+                      dur="0.9s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={r * 0.55}
+                    fill="#22d3ee"
+                    stroke="#082f49"
+                    strokeWidth={2}
+                    opacity={0.95}
+                  />
+                </g>
+              )
+            })()}
+          </svg>
+        ) : null}
+        {trackPartOverlay ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[73]"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            {/* 名字壓在虛線之上，避免被斜線切開 */}
+            {trackPartOverlay.map((p) =>
+              p.name ? (
+                <text
+                  key={`name-${p.part}`}
+                  x={p.at.x}
+                  y={p.at.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={p.fontPx}
+                  fontWeight={600}
+                  fill="#fafafa"
+                  style={{
+                    paintOrder: 'stroke',
+                    stroke: '#09090b',
+                    strokeWidth: Math.max(2, p.fontPx * 0.27),
+                  }}
+                >
+                  {p.name}
+                </text>
+              ) : null,
+            )}
+          </svg>
+        ) : null}
         {/*
           * 拖曳旋轉把手。
           *

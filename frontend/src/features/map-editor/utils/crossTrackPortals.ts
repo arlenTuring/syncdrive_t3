@@ -17,6 +17,47 @@ import {
 export const CROSS_PORTAL_KEYS = CROSS_HANDLE_KEYS
 export type CrossPortalKey = CrossHandleKey
 
+/**
+ * 屬性框／清單顯示順序：左上 → 右下 → 左下 → 右上
+ * （對應兩條斜行路徑的兩端：↘ 的頭尾、↗ 的頭尾）
+ */
+export const CROSS_PORTAL_UI_ORDER: readonly CrossPortalKey[] = [
+  'lt',
+  'rb',
+  'lb',
+  'rt',
+]
+
+/** 在圖台上短暫標示某一個口（屬性框提示鈕） */
+type CrossPortalPing = {
+  facilityId: string
+  key: CrossPortalKey
+  seq: number
+}
+
+let crossPortalPing: CrossPortalPing | null = null
+const crossPortalPingListeners = new Set<() => void>()
+
+export function pingCrossPortal(facilityId: string, key: CrossPortalKey): void {
+  crossPortalPing = {
+    facilityId,
+    key,
+    seq: (crossPortalPing?.seq ?? 0) + 1,
+  }
+  for (const listener of crossPortalPingListeners) listener()
+}
+
+export function getCrossPortalPing(): CrossPortalPing | null {
+  return crossPortalPing
+}
+
+export function subscribeCrossPortalPing(listener: () => void): () => void {
+  crossPortalPingListeners.add(listener)
+  return () => {
+    crossPortalPingListeners.delete(listener)
+  }
+}
+
 export type CrossPortalState = {
   /** 途經點代號 */
   waypointCode: string
@@ -31,6 +72,13 @@ export type CrossPortals = Record<CrossPortalKey, CrossPortalState>
 
 export const CROSS_PORTALS_KEY = 'crossTrackPortals'
 export const CROSS_ROUTES_KEY = 'crossTrackRoutes'
+/** 圖台上是否顯示四個口的途經點代號／別名；預設不顯示 */
+export const CROSS_SHOW_PORTAL_LABELS_KEY = 'crossShowPortalLabels'
+
+/** 圖台上要不要畫四個口的標籤（代號或別名） */
+export function getCrossShowPortalLabels(facility: FacilityObject): boolean {
+  return facility.parameters?.[CROSS_SHOW_PORTAL_LABELS_KEY] === true
+}
 
 /**
  * 四條路徑。前兩條是直行，後兩條是斜行——與 {@link crossTrackPath} 畫的一致：
@@ -90,6 +138,36 @@ function readPortal(raw: unknown, fallbackCode: string): CrossPortalState {
 /** 沒填代號時的預設值：元件 id 加口的代號，同一張圖不會撞 */
 export function defaultCrossPortalCode(facilityId: string, key: CrossPortalKey): string {
   return `xc_${facilityId}_${key}`
+}
+
+/** 拓樸節點 id 前綴：xcwp:<facilityId>:lt|lb|rt|rb */
+export const CROSS_PORTAL_TOPOLOGY_ID_PREFIX = 'xcwp:'
+
+export function crossPortalTopologyNodeId(
+  facilityId: string,
+  key: CrossPortalKey,
+): string {
+  return `${CROSS_PORTAL_TOPOLOGY_ID_PREFIX}${facilityId}:${key}`
+}
+
+export function parseCrossPortalTopologyNodeId(
+  nodeId: string,
+): { facilityId: string; key: CrossPortalKey } | null {
+  if (!nodeId.startsWith(CROSS_PORTAL_TOPOLOGY_ID_PREFIX)) return null
+  const rest = nodeId.slice(CROSS_PORTAL_TOPOLOGY_ID_PREFIX.length)
+  const lastColon = rest.lastIndexOf(':')
+  if (lastColon <= 0) return null
+  const facilityId = rest.slice(0, lastColon).trim()
+  const key = rest.slice(lastColon + 1).trim()
+  if (!facilityId || !(CROSS_PORTAL_KEYS as readonly string[]).includes(key)) return null
+  return { facilityId, key: key as CrossPortalKey }
+}
+
+export function resolveCrossPortalDisplayName(portal: CrossPortalState): string {
+  const alias = typeof portal.alias === 'string' ? portal.alias.trim() : ''
+  if (alias) return alias
+  const code = portal.waypointCode?.trim() ?? ''
+  return code || '途經點'
 }
 
 export function getCrossPortals(facility: FacilityObject): CrossPortals {
@@ -165,4 +243,31 @@ export function resolveCrossPortalFields(
     out[key] = { xM: field.xM, yM: field.yM, auto: true }
   }
   return out
+}
+
+/** 斜行虛線顏色（左上↘右下；對應 diagDown） */
+export const CROSS_DIAG_STROKE_DOWN_KEY = 'crossDiagStrokeColorDown'
+/** 斜行虛線顏色（左下↗右上；對應 diagUp） */
+export const CROSS_DIAG_STROKE_UP_KEY = 'crossDiagStrokeColorUp'
+
+export const DEFAULT_CROSS_DIAG_STROKE_DOWN = '#86efac'
+export const DEFAULT_CROSS_DIAG_STROKE_UP = '#fbbf24'
+
+function readCssColor(raw: unknown, fallback: string): string {
+  if (typeof raw !== 'string') return fallback
+  const s = raw.trim()
+  if (!s || s === 'transparent') return fallback
+  return s
+}
+
+/** 交叉軌道兩組斜行虛線顏色（未設則用預設綠／琥珀） */
+export function getCrossDiagStrokeColors(f: FacilityObject): {
+  down: string
+  up: string
+} {
+  const p = f.parameters ?? {}
+  return {
+    down: readCssColor(p[CROSS_DIAG_STROKE_DOWN_KEY], DEFAULT_CROSS_DIAG_STROKE_DOWN),
+    up: readCssColor(p[CROSS_DIAG_STROKE_UP_KEY], DEFAULT_CROSS_DIAG_STROKE_UP),
+  }
 }

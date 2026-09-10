@@ -1534,7 +1534,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         exit: 'Stop adjusting',
         undo: 'Undo last',
         hint: 'Drag a track end to change its length. The adjacent track gives or takes the same amount; nothing else moves. Junctions cannot be adjusted.',
-        pickHandle: 'Drag the handle at a track end — horizontal left/right, vertical up/down. The adjacent track resizes to match and nothing else moves; a taper\u2019s ramp changes with its length and may overlap a neighbouring line. Dashed outlines are the original edges; dotted lines mark nearby parallel tracks\u2019 block edges — approach within ~10 px to snap (guide turns amber when snapped).',
+        pickHandle: 'Drag end handles to change length. Plain/taper: both ends. Switches: stem/through/branch (purple). Crossings: four mouths (purple). Corners: two mouths (teal; bulge shape kept). Light snap within ~1 px of a parallel edge.',
         error: 'Length error {{total}} m total, {{max}} m worst block. Vehicle mapping already follows; no re-sync needed.',
       },
       merge: {
@@ -1611,6 +1611,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       facilityDocking: 'Facility stops',
       waypoint: 'Waypoints',
       crossoverWaypoint: 'Crossover waypoints',
+      crossWaypoint: 'Cross-track waypoints',
       cannotConnect: 'Cannot connect (unavailable)',
       add: 'Add',
       moveUp: 'Move up',
@@ -1879,12 +1880,14 @@ const enUS: DeepStringify<typeof zhTW> = {
       },
       crossTrack: {
         title: 'Waypoints & directions',
+        showPortalLabels: 'Show waypoint codes on map',
         portal: {
           lt: 'Top-left',
           lb: 'Bottom-left',
           rt: 'Top-right',
           rb: 'Bottom-right',
         },
+        pingPortal: 'Highlight this portal on the map',
         waypointCode: 'Waypoint code',
         alias: 'Alias (display name)',
         fieldX: 'Reference field X (m)',
@@ -1893,6 +1896,8 @@ const enUS: DeepStringify<typeof zhTW> = {
           'Field coordinates (metres, origin bottom-left). Computed automatically on HD-map generated track; otherwise from the container domain.',
         autoValue: 'Computed automatically; follows component position and size',
         manualValue: 'Manual override; clear both fields to restore automatic',
+        diagStrokeDown: 'Diagonal dashes (top-left → bottom-right)',
+        diagStrokeUp: 'Diagonal dashes (bottom-left → top-right)',
         routes: 'Route directions',
         route: {
           straightTop: 'Straight (top)',
@@ -2060,6 +2065,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         docking: 'Stop',
         waypoint: 'Waypoint',
         crossoverWaypoint: 'Crossover waypoint',
+        crossWaypoint: 'Cross-track waypoint',
         facilityDocking: 'Facility stop',
         facility: 'Facility',
       },
@@ -2080,6 +2086,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       dropConnect: 'Release to connect to “{{label}}”',
       kindDockingPoint: 'Berth',
       kindCrossoverWaypoint: 'Crossover waypoint',
+      kindCrossWaypoint: 'Cross-track waypoint',
       kindFacilityDocking: 'Facility berth',
       kindFacility: 'Facility',
       kindWaypoint: 'Waypoint',
@@ -2336,6 +2343,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     routeGroupList: {
       moreActions: 'More actions',
       edit: 'Edit',
+      editSimRoutePath: 'Edit simulation path',
       delete: 'Delete',
       noValidStations: '(no valid stations)',
       stationsTooFew: 'Fewer than 2 stations',
@@ -2423,6 +2431,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       rulersToggleOne: 'Toggle “{{name}}” meter rulers',
       rulersToggleAll: 'Toggle all Area meter rulers',
       areaLabelsHint: 'Show / hide all Area center labels (name, field range, pixel size)',
+      displayFrameLabel: 'Display area',
+      displayFrameTitle:
+        'Deep blue = final display / deploy region; black outside is edit staging only',
       zoomBarHint: 'Show / hide bottom zoom bar (1 near – 7 far)',
       testerHint: 'Show / hide bottom tester (gap scan, MQTT sim)',
       cropHint: 'Crop mode: drag crop frame in a larger workspace to set output resolution',
@@ -2440,6 +2451,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       confirmDeleteGroup:
         'Delete “{{label}}”? Routes in the group move to Ungrouped; routes themselves are kept.',
       editingRoute: 'Route being edited',
+      simRoutePathEditing:
+        'Editing simulation path: click between points to add bends; drag to adjust. Changes autosave and sync.',
+      simRoutePathDone: 'Done',
       trackGenName: 'HD map {{id}}',
       trackGenArea: '{{name}} tracks',
       trackGenDefault: 'HD map',

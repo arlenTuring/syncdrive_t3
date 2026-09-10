@@ -562,30 +562,19 @@ function switchSpin(g: SwitchTrackGeometry, boxWPx: number, boxHPx: number) {
 }
 
 /**
- * 填色外框：兩個四邊形共用同一個進口面。
+ * 填色外框：平面示意的兩條等寬帶子。
+ *
+ * 主線：進口 → 主線出口。
+ * 岔線：同樣從進口以<strong>岔線帶寬</strong>沿中心線接到岔出口（平行四邊形，左右同寬），
+ * 貼著進口不會懸空；也不再用「整段進口高度 → 單口」的扇形，避免兩腿疊成折紙感。
  */
 export function switchTrackPath(
   g: SwitchTrackGeometry,
   boxWPx: number,
   boxHPx: number,
 ): string {
-  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
-  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
-  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
-  // 兩條腿各伸各的：出口那一面的位置由自己的 mAt／bAt 決定，不是一律貼著外框邊
-  const quad = (x: number, y0: number, y1: number) =>
-    [
-      [0, c(g.aFrom)],
-      [x, y0],
-      [x, y1],
-      [0, c(g.aTo)],
-    ]
-      .map(([px, py], i) => {
-        const p = T(px as number, py as number)
-        return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
-      })
-      .join(' ') + ' Z'
-  return `${quad(at(g.mAt), c(g.mFrom), c(g.mTo))} ${quad(at(g.bAt), c(g.bFrom), c(g.bTo))}`
+  const { straight, branch } = switchTrackPartPaths(g, boxWPx, boxHPx)
+  return `${straight} ${branch}`
 }
 
 /**
@@ -602,22 +591,44 @@ export function switchTrackPartPaths(
   const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
   const c = (v: number) => Math.max(0, Math.min(1, v)) * h
   const at = (v: number) => Math.max(0, Math.min(1, v)) * w
-  const quad = (x: number, y0: number, y1: number) =>
-    [
-      [0, c(g.aFrom)],
-      [x, y0],
-      [x, y1],
-      [0, c(g.aTo)],
-    ]
+  const poly = (pts: Array<[number, number]>) =>
+    pts
       .map(([px, py], i) => {
-        const p = T(px as number, py as number)
+        const p = T(px, py)
         return `${i ? 'L' : 'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
       })
       .join(' ') + ' Z'
-  return {
-    straight: quad(at(g.mAt), c(g.mFrom), c(g.mTo)),
-    branch: quad(at(g.bAt), c(g.bFrom), c(g.bTo)),
-  }
+
+  const a0 = c(g.aFrom)
+  const a1 = c(g.aTo)
+  const m0 = c(g.mFrom)
+  const m1 = c(g.mTo)
+  const b0 = c(g.bFrom)
+  const b1 = c(g.bTo)
+  const eMid = (a0 + a1) / 2
+  const bHalf = Math.abs(b1 - b0) / 2
+
+  // 主線：進口 → 主線出口
+  const straight = poly([
+    [0, a0],
+    [at(g.mAt), m0],
+    [at(g.mAt), m1],
+    [0, a1],
+  ])
+
+  /*
+   * 岔線：從進口就接上（不懸空），左右同寬的平行四邊形沿中心線接到岔口。
+   * 左緣以進口中心為準、高度＝岔線帶寬——與主線在進口重疊的是道岔共用段，不是兩片
+   * 各扇一整面進口。
+   */
+  const branch = poly([
+    [0, eMid - bHalf],
+    [at(g.bAt), Math.min(b0, b1)],
+    [at(g.bAt), Math.max(b0, b1)],
+    [0, eMid + bHalf],
+  ])
+
+  return { straight, branch }
 }
 
 /** 進口 a、直行出口 m、岔出出口 b */
@@ -647,11 +658,9 @@ export function switchTrackPartCentresPx(
   const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
   const c = (v: number) => Math.max(0, Math.min(1, v)) * h
   const at = (v: number) => Math.max(0, Math.min(1, v)) * w
-  const mid = (x: number, y0: number, y1: number) =>
-    T((0 + x) / 2, (c(g.aFrom) + c(g.aTo) + y0 + y1) / 4)
   return {
-    straight: mid(at(g.mAt), c(g.mFrom), c(g.mTo)),
-    branch: mid(at(g.bAt), c(g.bFrom), c(g.bTo)),
+    straight: T(at(g.mAt) / 2, (c(g.aFrom) + c(g.aTo) + c(g.mFrom) + c(g.mTo)) / 4),
+    branch: T(at(g.bAt) / 2, (c(g.aFrom) + c(g.aTo) + c(g.bFrom) + c(g.bTo)) / 4),
   }
 }
 
@@ -820,6 +829,9 @@ export function crossTrackPartPaths(
  *
  * 四條虛線就是兩條斜的帶子各自的兩條邊——交錯的關係得畫出來，不然使用者看到的只是
  * 一個灰色方塊，看不出這裡可以斜著過去。
+ *
+ * <strong>只畫在兩條直行重疊的路段上。</strong>交叉可上下口各伸各的長度；若斜線仍
+ * 從凸出去的口一路拉到對角，畫面上就像整塊被拉開分離。重疊區間才是真正交會處。
  */
 export function crossTrackGuidesPx(
   g: CrossTrackGeometry,
@@ -832,21 +844,38 @@ export function crossTrackGuidesPx(
   divider: [ShapePoint, ShapePoint]
 } {
   const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
-  const P = (f: CrossFace, v: number) => T(f.at * w, v * h)
-  const edge = (p: CrossFace, q: CrossFace): Array<[ShapePoint, ShapePoint]> => [
-    [P(p, p.from), P(q, q.from)],
-    [P(p, p.to), P(q, q.to)],
+  const along0 = Math.max(g.lt.at, g.lb.at)
+  const along1 = Math.min(g.rt.at, g.rb.at)
+  const divY =
+    (Math.min(g.lt.to, g.rt.to) + Math.max(g.lb.from, g.rb.from)) / 2
+  const divider: [ShapePoint, ShapePoint] = [
+    T(along0 * w, divY * h),
+    T(along1 * w, divY * h),
   ]
-  const mid = (a: ShapePoint, b: ShapePoint): ShapePoint => ({
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2,
-  })
+  if (!(along1 > along0 + 1e-6)) {
+    return { diagonals: [], divider }
+  }
+  /** 斜邊：在重疊區間內，跨向由兩端面接 from/to 線性插值 */
+  const edge = (
+    p: CrossFace,
+    q: CrossFace,
+    which: 'from' | 'to',
+  ): [ShapePoint, ShapePoint] => {
+    const span = Math.max(1e-9, q.at - p.at)
+    const vAt = (along: number) => {
+      const t = (along - p.at) / span
+      return p[which] + (q[which] - p[which]) * t
+    }
+    return [T(along0 * w, vAt(along0) * h), T(along1 * w, vAt(along1) * h)]
+  }
   return {
-    diagonals: [...edge(g.lt, g.rb), ...edge(g.lb, g.rt)],
-    divider: [
-      mid(P(g.lt, g.lt.to), P(g.lb, g.lb.from)),
-      mid(P(g.rt, g.rt.to), P(g.rb, g.rb.from)),
+    diagonals: [
+      edge(g.lt, g.rb, 'from'),
+      edge(g.lt, g.rb, 'to'),
+      edge(g.lb, g.rt, 'from'),
+      edge(g.lb, g.rt, 'to'),
     ],
+    divider,
   }
 }
 

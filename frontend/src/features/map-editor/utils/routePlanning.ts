@@ -16,6 +16,7 @@ import { parseFacilityIdFromFacilityDockingTopologyNodeId } from './pointTopolog
 import { fieldPositionToFacilityAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
 import {
   collectCrossoverPortalWaypointsFromAreas,
+  collectCrossPortalWaypointsFromAreas,
   collectWaypointsFromAreas,
 } from './waypointCode'
 import { resolveWaypointDisplayName } from './waypointFacility'
@@ -24,6 +25,12 @@ import {
   getCrossoverPortals,
   resolveCrossoverPortalDisplayName,
 } from './trackCrossoverFacility'
+import {
+  getCrossPortals,
+  parseCrossPortalTopologyNodeId,
+  resolveCrossPortalDisplayName,
+  resolveCrossPortalFields,
+} from './crossTrackPortals'
 
 export type RoutePlanningDraft = {
   routeId: string | null
@@ -117,6 +124,32 @@ export function generateNextRouteId(routes: MapPlannedRoute[]): string {
   return candidate
 }
 
+function parseMapRoutePathWaypoints(raw: unknown): MapPlannedRoute['pathWaypoints'] {
+  if (!Array.isArray(raw)) return undefined
+  const out: NonNullable<MapPlannedRoute['pathWaypoints']> = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const px = typeof o.px === 'number' && Number.isFinite(o.px) ? o.px : null
+    const py = typeof o.py === 'number' && Number.isFinite(o.py) ? o.py : null
+    if (px == null || py == null) continue
+    const x = typeof o.x === 'number' && Number.isFinite(o.x) ? o.x : undefined
+    const y = typeof o.y === 'number' && Number.isFinite(o.y) ? o.y : undefined
+    const stationId =
+      typeof o.stationId === 'string' && o.stationId.trim().length > 0
+        ? o.stationId.trim()
+        : undefined
+    out.push({
+      px,
+      py,
+      ...(x != null ? { x } : {}),
+      ...(y != null ? { y } : {}),
+      ...(stationId ? { stationId } : {}),
+    })
+  }
+  return out.length >= 2 ? out : undefined
+}
+
 export function parseMapRoutes(raw: unknown): MapPlannedRoute[] {
   if (!Array.isArray(raw)) return []
   const out: MapPlannedRoute[] = []
@@ -132,10 +165,12 @@ export function parseMapRoutes(raw: unknown): MapPlannedRoute[] {
           .map((id) => id.trim())
       : []
     const { avgTravelTimeSeconds, minTravelTimeSeconds } = resolveRouteTravelTimesFromBody(o)
+    const pathWaypoints = parseMapRoutePathWaypoints(o.pathWaypoints)
     out.push({
       routeId,
       displayName,
       stationIds,
+      ...(pathWaypoints ? { pathWaypoints } : {}),
       ...(avgTravelTimeSeconds != null ? { avgTravelTimeSeconds } : {}),
       ...(minTravelTimeSeconds != null ? { minTravelTimeSeconds } : {}),
       ...(typeof o.createdAt === 'string' ? { createdAt: o.createdAt } : {}),
@@ -246,6 +281,49 @@ export function resolveCrossoverPortalRouteStopMapPx(
   return null
 }
 
+/** 交叉軌道四口途經點（waypointCode 或 xcwp:…）→ 圖台 px */
+export function resolveCrossPortalRouteStopMapPx(
+  areas: MapAreaObject[],
+  stationId: string,
+): { x: number; y: number; stationName: string; xM: number; yM: number } | null {
+  const trimmed = stationId.trim()
+  if (!trimmed) return null
+
+  const byCode = collectCrossPortalWaypointsFromAreas(areas).find(
+    (s) => s.stationId === trimmed || s.topologyNodeId === trimmed,
+  )
+  const ref = byCode
+    ? { facilityId: byCode.facilityId, key: byCode.portalKey }
+    : parseCrossPortalTopologyNodeId(trimmed)
+  if (!ref) return null
+
+  for (const area of areas) {
+    const facility = area.facilities.find((f) => f.id === ref.facilityId)
+    if (facility?.type !== 'Track' || facility.name !== 'RailCross') continue
+    const portals = getCrossPortals(facility)
+    const portal = portals[ref.key]
+    if (!portal) continue
+    const fields = resolveCrossPortalFields(facility, area)
+    const field = fields[ref.key]
+    if (field.xM == null || field.yM == null) continue
+    const areaLocal = meterToAreaLocalPx(
+      field.xM,
+      field.yM,
+      area.domain,
+      area.layout,
+    )
+    const css = areaPositionToCssTopLeft(areaLocal, { w: 0, h: 0 }, area.layout.hPx)
+    return {
+      x: area.layout.xPx + css.left,
+      y: area.layout.yPx + css.top,
+      stationName: byCode?.stationName ?? resolveCrossPortalDisplayName(portal),
+      xM: field.xM,
+      yM: field.yM,
+    }
+  }
+  return null
+}
+
 export function resolveRouteStationPoints(
   areas: MapAreaObject[],
   stationIds: string[],
@@ -274,6 +352,17 @@ export function resolveRouteStationPoints(
         stationName: crossover.stationName,
         x: crossover.x,
         y: crossover.y,
+      })
+      continue
+    }
+
+    const cross = resolveCrossPortalRouteStopMapPx(areas, stationId)
+    if (cross) {
+      out.push({
+        stationId,
+        stationName: cross.stationName,
+        x: cross.x,
+        y: cross.y,
       })
       continue
     }
@@ -363,6 +452,14 @@ export function stationDisplayLabel(
 
   const crossoverPx = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
   if (crossoverPx) return crossoverPx.stationName
+
+  const cross = collectCrossPortalWaypointsFromAreas(areas).find(
+    (s) => s.stationId === stationId || s.topologyNodeId === stationId,
+  )
+  if (cross) return cross.stationName
+
+  const crossPx = resolveCrossPortalRouteStopMapPx(areas, stationId)
+  if (crossPx) return crossPx.stationName
 
   const waypoint = collectWaypointsFromAreas(areas).find(
     (s) => s.stationId === stationId || s.facilityId === stationId,

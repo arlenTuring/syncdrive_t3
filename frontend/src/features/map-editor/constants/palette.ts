@@ -77,12 +77,6 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: 'mapEditor.palette.items.gate.hint',
   },
   {
-    label: 'mapEditor.palette.items.geofence.label',
-    type: 'Geofence',
-    name: 'Geofence',
-    hint: 'mapEditor.palette.items.geofence.hint',
-  },
-  {
     label: 'mapEditor.palette.items.rail.label',
     type: 'Track',
     name: 'Rail',

@@ -5,6 +5,12 @@ import {
 import { metersToWorldPx } from '../constants/map'
 import { PALETTE_ITEMS } from '../constants/palette'
 import {
+  CORNER_TRACK_KEY,
+  CROSS_TRACK_KEY,
+  SWITCH_TRACK_KEY,
+  TAPER_TRACK_KEY,
+} from './trackShapes'
+import {
   clampMapPixelSize,
   DEFAULT_MAP_PIXEL_SIZE,
   type MapPixelSize,
@@ -167,8 +173,40 @@ export function migrateFacilityName(
       ? (name as FacilityName)
       : 'Parking'
   }
+  /*
+   * 必須先對 type+name 精確匹配。
+   * 先前寫成 `PALETTE_ITEMS.find(p => p.type === type)?.name`，會把所有 Track
+   * （RailCorner／RailTaper／RailSwitch／RailCross）一律改成第一個 Track 項
+   * 「Rail」（一般軌道）——每次載入地圖特殊形狀就消失。
+   */
+  const exact = PALETTE_ITEMS.find((p) => p.type === type && p.name === name)
+  if (exact) return exact.name
+  if (name.trim()) return name as FacilityName
   const fallback = PALETTE_ITEMS.find((p) => p.type === type)
   return (fallback?.name ?? name) as FacilityName
+}
+
+/**
+ * 若 name 已被誤存成一般軌道 Rail，但 parameters 仍留有特殊形狀幾何，還原正確 name。
+ */
+export function recoverTrackNameFromParameters(
+  name: FacilityName,
+  parameters: Record<string, unknown> | undefined,
+): FacilityName {
+  if (name !== 'Rail' || !parameters) return name
+  if (parameters[CORNER_TRACK_KEY] && typeof parameters[CORNER_TRACK_KEY] === 'object') {
+    return 'RailCorner'
+  }
+  if (parameters[TAPER_TRACK_KEY] && typeof parameters[TAPER_TRACK_KEY] === 'object') {
+    return 'RailTaper'
+  }
+  if (parameters[SWITCH_TRACK_KEY] && typeof parameters[SWITCH_TRACK_KEY] === 'object') {
+    return 'RailSwitch'
+  }
+  if (parameters[CROSS_TRACK_KEY] && typeof parameters[CROSS_TRACK_KEY] === 'object') {
+    return 'RailCross'
+  }
+  return name
 }
 
 export function isMapFileV2(v: unknown): v is MapFileV2 {
@@ -244,7 +282,12 @@ function parseFacilityEntryMeters(
   }
   const sizeFromFile = sizeMetersFromMapEntry(migratedEntry, domain)
   const rotation = typeof migratedEntry.rotationDeg === 'number' ? migratedEntry.rotationDeg : 0
-  const name = migrateFacilityName(type, String(migratedEntry.name ?? ''))
+  const name = recoverTrackNameFromParameters(
+    migrateFacilityName(type, String(migratedEntry.name ?? '')),
+    migratedEntry.parameters && typeof migratedEntry.parameters === 'object'
+      ? (migratedEntry.parameters as Record<string, unknown>)
+      : undefined,
+  )
   const parameters =
     migratedEntry.parameters && typeof migratedEntry.parameters === 'object'
       ? { ...migratedEntry.parameters }
@@ -574,6 +617,21 @@ function parametersForMapExport(f: FacilityObject): Record<string, unknown> | un
 
 export function facilityToMapEntry(f: FacilityObject): MapFileFacilityEntry {
   const exportedParameters = parametersForMapExport(f)
+  /*
+   * areaLayoutAnchor 是可選欄位。軌道生成（TrackGen）套用時曾漏寫，
+   * 這裡若強制讀 .wPx 會讓 autosave 整段炸掉，UI 卡在「正在自動儲存…」。
+   */
+  const rawAnchor = f.areaLayoutAnchor
+  const areaLayoutAnchor =
+    rawAnchor &&
+    typeof rawAnchor.wPx === 'number' &&
+    typeof rawAnchor.hPx === 'number' &&
+    Number.isFinite(rawAnchor.wPx) &&
+    Number.isFinite(rawAnchor.hPx) &&
+    rawAnchor.wPx > 0 &&
+    rawAnchor.hPx > 0
+      ? { wPx: rawAnchor.wPx, hPx: rawAnchor.hPx }
+      : undefined
   const common = {
     id: f.id,
     type: f.type,
@@ -581,10 +639,7 @@ export function facilityToMapEntry(f: FacilityObject): MapFileFacilityEntry {
     customName: f.customName,
     positionMeters: { x: f.position.x, y: f.position.y },
     areaPosition: { x: f.areaPosition.x, y: f.areaPosition.y },
-    areaLayoutAnchor: {
-      wPx: f.areaLayoutAnchor!.wPx,
-      hPx: f.areaLayoutAnchor!.hPx,
-    },
+    ...(areaLayoutAnchor ? { areaLayoutAnchor } : {}),
     ...(f.areaSizePx ? { areaSizePx: { w: f.areaSizePx.w, h: f.areaSizePx.h } } : {}),
     rotationDeg: f.rotation,
     ...(exportedParameters ? { parameters: exportedParameters } : {}),

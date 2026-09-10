@@ -35,6 +35,7 @@ function groupRouteAppendOptionsByKind(options: TopologyRouteAppendOption[]) {
     facilityDocking: options.filter((option) => option.kind === 'facility-docking'),
     waypoint: options.filter((option) => option.kind === 'waypoint'),
     crossoverWaypoint: options.filter((option) => option.kind === 'crossover-waypoint'),
+    crossWaypoint: options.filter((option) => option.kind === 'cross-waypoint'),
   }
 }
 
@@ -108,6 +109,7 @@ type Props = {
   onStartNewRoute: (groupId: string | null) => void
   onStartNewGroup: () => void
   onEditRoute: (routeId: string) => void
+  onEditSimRoutePath: (routeId: string) => void
   onEditGroup: (groupId: string) => void
   onDeleteGroup: (groupId: string) => void
   onToggleRouteVisibility: (routeId: string) => void
@@ -139,6 +141,7 @@ export function RoutePlanningPanel({
   onStartNewRoute,
   onStartNewGroup,
   onEditRoute,
+  onEditSimRoutePath,
   onEditGroup,
   onDeleteGroup,
   onToggleRouteVisibility,
@@ -292,6 +295,7 @@ export function RoutePlanningPanel({
           onToggleRouteVisibility={onToggleRouteVisibility}
           onToggleGroupRouteVisibility={onToggleGroupRouteVisibility}
           onEditRoute={onEditRoute}
+          onEditSimRoutePath={onEditSimRoutePath}
           onDeleteRoute={onDeleteRoute}
           onEditGroup={onEditGroup}
           onDeleteGroup={onDeleteGroup}
@@ -387,6 +391,13 @@ export function RoutePlanningPanel({
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}
                           />
+                          <RouteAppendOptionGroup
+                            title={t('mapEditor.routePlanning.crossWaypoint')}
+                            titleClassName="text-teal-400/80"
+                            options={selectableGroups.crossWaypoint}
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
                         </>
                       ) : null}
                       {disabledStations.length > 0 ? (
@@ -422,6 +433,14 @@ export function RoutePlanningPanel({
                             title={t('mapEditor.routePlanning.crossoverWaypoint')}
                             titleClassName="text-zinc-600"
                             options={disabledGroups.crossoverWaypoint}
+                            disabled
+                            dropdownStationId={dropdownStationId}
+                            onPick={pickStation}
+                          />
+                          <RouteAppendOptionGroup
+                            title={t('mapEditor.routePlanning.crossWaypoint')}
+                            titleClassName="text-zinc-600"
+                            options={disabledGroups.crossWaypoint}
                             disabled
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}

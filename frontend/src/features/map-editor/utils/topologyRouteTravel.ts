@@ -13,6 +13,7 @@ import {
 import { stationDisplayLabel } from './routePlanning'
 import {
   collectCrossoverPortalWaypointsFromAreas,
+  collectCrossPortalWaypointsFromAreas,
   collectWaypointsFromAreas,
 } from './waypointCode'
 import { getWaypointCode } from './waypointFacility'
@@ -20,6 +21,10 @@ import {
   crossoverPortalTopologyNodeId,
   parseCrossoverPortalTopologyNodeId,
 } from './trackCrossoverFacility'
+import {
+  crossPortalTopologyNodeId,
+  parseCrossPortalTopologyNodeId,
+} from './crossTrackPortals'
 
 export type TopologyStationLegBreakdown = {
   fromStationId: string
@@ -132,6 +137,13 @@ export function resolveTopologyDockingNodeId(
   )
   if (fromCrossoverTopo) return fromCrossoverTopo.id
 
+  const fromCrossTopo = topology.nodes.find(
+    (node) =>
+      node.kind === 'cross-waypoint'
+      && (node.stationId === trimmed || node.id === trimmed),
+  )
+  if (fromCrossTopo) return fromCrossTopo.id
+
   const crossoverRef = parseCrossoverPortalTopologyNodeId(trimmed)
   if (crossoverRef) {
     const nodeId = crossoverPortalTopologyNodeId(
@@ -144,6 +156,15 @@ export function resolveTopologyDockingNodeId(
     if (exists) return nodeId
   }
 
+  const crossRef = parseCrossPortalTopologyNodeId(trimmed)
+  if (crossRef) {
+    const nodeId = crossPortalTopologyNodeId(crossRef.facilityId, crossRef.key)
+    const exists = topology.nodes.some(
+      (node) => node.kind === 'cross-waypoint' && node.id === nodeId,
+    )
+    if (exists) return nodeId
+  }
+
   const fromCrossoverAreas = collectCrossoverPortalWaypointsFromAreas(areas).find(
     (stop) => stop.stationId === trimmed || stop.topologyNodeId === trimmed,
   )
@@ -152,6 +173,16 @@ export function resolveTopologyDockingNodeId(
       (n) => n.kind === 'crossover-waypoint' && n.id === fromCrossoverAreas.topologyNodeId,
     )
     return node?.id ?? fromCrossoverAreas.topologyNodeId
+  }
+
+  const fromCrossAreas = collectCrossPortalWaypointsFromAreas(areas).find(
+    (stop) => stop.stationId === trimmed || stop.topologyNodeId === trimmed,
+  )
+  if (fromCrossAreas) {
+    const node = topology.nodes.find(
+      (n) => n.kind === 'cross-waypoint' && n.id === fromCrossAreas.topologyNodeId,
+    )
+    return node?.id ?? fromCrossAreas.topologyNodeId
   }
 
   const fromAreas = collectStationsFromAreas(areas).find(
@@ -456,7 +487,7 @@ export function isTopologyRoutePathConnected(
 export type TopologyRouteAppendOption = {
   stationId: string
   stationName: string
-  kind: 'docking' | 'facility-docking' | 'waypoint' | 'crossover-waypoint'
+  kind: 'docking' | 'facility-docking' | 'waypoint' | 'crossover-waypoint' | 'cross-waypoint'
   reason?: string
 }
 
@@ -491,6 +522,11 @@ export function partitionStationsForTopologyRouteAppend(
       stationId: stop.stationId,
       stationName: stop.stationName,
       kind: 'crossover-waypoint' as const,
+    })),
+    ...collectCrossPortalWaypointsFromAreas(areas).map((stop) => ({
+      stationId: stop.stationId,
+      stationName: stop.stationName,
+      kind: 'cross-waypoint' as const,
     })),
   ]
     .filter((candidate) => !inRoute.has(candidate.stationId))

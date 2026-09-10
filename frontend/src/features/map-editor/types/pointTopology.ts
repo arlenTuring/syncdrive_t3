@@ -14,6 +14,11 @@ export type PointTopologyNodeKind =
    * 穩定 id＝`xowp:<facilityId>:a|b`；對外站序 id＝portal.waypointCode。
    */
   | 'crossover-waypoint'
+  /**
+   * 交叉軌道途經點（RailCross 四口 lt／lb／rt／rb）。
+   * 穩定 id＝`xcwp:<facilityId>:lt|lb|rt|rb`；對外站序 id＝portal.waypointCode。
+   */
+  | 'cross-waypoint'
 
 /**
  * 拓撲編輯器內的節點佈局座標（畫布像素，原點左上）。
@@ -24,7 +29,7 @@ export type PointTopologyNode = {
   kind: PointTopologyNodeKind
   /** 顯示名稱（開啟編輯器時會自設施同步） */
   label: string
-  /** DockingPoint／虛擬渡線途經點的對外代號（waypointCode）；一般 Waypoint 可省略（用 facility id） */
+  /** DockingPoint／虛擬渡線／交叉軌道途經點的對外代號（waypointCode）；一般 Waypoint 可省略（用 facility id） */
   stationId?: string
   x: number
   y: number

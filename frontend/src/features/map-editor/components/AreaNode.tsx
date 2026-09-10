@@ -1889,7 +1889,12 @@ export const AreaNode = memo(function AreaNode({
     <div
       ref={outerRef}
       className={`absolute ${
-        liveLayout || transformFacilityId ? 'overflow-hidden' : 'overflow-visible'
+        /*
+         * Area 拉伸中仍裁切，避免整區變形預覽外溢。
+         * 其餘編輯狀態（含拖曳／選取元件）overflow-visible，讓超出 Area 或深藍色畫布的選取框
+         * 仍能在外圍黑色工作區看得到。
+         */
+        liveLayout ? 'overflow-hidden' : 'overflow-visible'
       }${viewModePointerPassthrough ? ' pointer-events-none' : ''}`}
       style={{
         left: displayLayout.xPx,

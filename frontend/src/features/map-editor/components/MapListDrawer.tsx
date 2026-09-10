@@ -36,6 +36,7 @@ type Props = {
   onStartNewRoute: (groupId: string | null) => void
   onStartNewGroup: () => void
   onEditRoute: (routeId: string) => void
+  onEditSimRoutePath: (routeId: string) => void
   onEditGroup: (groupId: string) => void
   onDeleteGroup: (groupId: string) => void
   onToggleRouteVisibility: (routeId: string) => void
@@ -196,6 +197,7 @@ export function MapListDrawer({
   onStartNewRoute,
   onStartNewGroup,
   onEditRoute,
+  onEditSimRoutePath,
   onEditGroup,
   onDeleteGroup,
   onToggleRouteVisibility,
@@ -371,6 +373,7 @@ export function MapListDrawer({
                   onStartNewRoute={onStartNewRoute}
                   onStartNewGroup={onStartNewGroup}
                   onEditRoute={onEditRoute}
+                  onEditSimRoutePath={onEditSimRoutePath}
                   onEditGroup={onEditGroup}
                   onDeleteGroup={onDeleteGroup}
                   onToggleRouteVisibility={onToggleRouteVisibility}

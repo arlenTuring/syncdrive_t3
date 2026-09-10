@@ -758,4 +758,52 @@ describe('pointTopology', () => {
       ),
     )
   })
+
+  it('keeps RailCross portal waypoints when syncing topology with areas', () => {
+    const areas = areaWith(
+      facility({
+        id: 'dock-1',
+        type: 'DockingPoint',
+        parameters: { stationId: 'S1', stationName: '站1' },
+      }),
+      facility({
+        id: 'xc1',
+        type: 'Track',
+        name: 'RailCross',
+        parameters: {
+          crossTrackPortals: {
+            lt: { waypointCode: 'xc_1_lt', alias: '左上口' },
+            lb: { waypointCode: 'xc_1_lb', alias: '左下口' },
+            rt: { waypointCode: 'xc_1_rt', alias: '右上口' },
+            rb: { waypointCode: 'xc_1_rb', alias: '右下口' },
+          },
+        },
+      }),
+    )
+
+    const loaded = addFacilitiesToPointTopology(emptyPointTopology(), areas, [
+      'dock-1',
+      'xcwp:xc1:lt',
+      'xcwp:xc1:lb',
+      'xcwp:xc1:rt',
+      'xcwp:xc1:rb',
+    ])
+    assert.equal(loaded.nodes.length, 5)
+    assert.ok(loaded.nodes.some((n) => n.id === 'xcwp:xc1:lt' && n.kind === 'cross-waypoint'))
+    assert.ok(loaded.nodes.some((n) => n.id === 'xcwp:xc1:rb' && n.kind === 'cross-waypoint'))
+
+    const synced = syncPointTopologyWithAreas(loaded, areas)
+    assert.equal(synced.nodes.length, 5)
+    const portalLt = synced.nodes.find((n) => n.id === 'xcwp:xc1:lt')
+    assert.equal(portalLt?.kind, 'cross-waypoint')
+    assert.equal(portalLt?.stationId, 'xc_1_lt')
+    assert.equal(portalLt?.label, '左上口')
+
+    const candidates = listTopologyLoadCandidates(areas, synced)
+    assert.ok(
+      candidates.some(
+        (c) => c.nodeId === 'xcwp:xc1:lt' && c.kind === 'cross-waypoint' && c.alreadyInTopology,
+      ),
+    )
+  })
 })

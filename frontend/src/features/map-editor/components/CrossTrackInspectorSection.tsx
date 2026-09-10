@@ -1,15 +1,22 @@
+import { Crosshair } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
 import type { MapAreaObject } from '../types/area'
 import {
-  CROSS_PORTAL_KEYS,
+  CROSS_DIAG_STROKE_DOWN_KEY,
+  CROSS_DIAG_STROKE_UP_KEY,
+  CROSS_PORTAL_UI_ORDER,
   CROSS_ROUTE_DIRECTIONS,
   CROSS_ROUTE_ENDS,
   CROSS_ROUTE_KEYS,
+  CROSS_SHOW_PORTAL_LABELS_KEY,
+  getCrossDiagStrokeColors,
   getCrossPortals,
   getCrossRoutes,
+  getCrossShowPortalLabels,
   patchCrossPortal,
   patchCrossRoute,
+  pingCrossPortal,
   resolveCrossPortalFields,
   type CrossPortalKey,
   type CrossRouteDirection,
@@ -49,6 +56,8 @@ export function CrossTrackInspectorSection({
   const { t } = useTranslation()
   const portals = getCrossPortals(facility)
   const routes = getCrossRoutes(facility)
+  const diagColors = getCrossDiagStrokeColors(facility)
+  const showPortalLabels = getCrossShowPortalLabels(facility)
   const area = mapAreas.find((a) => a.facilities?.some((f) => f.id === facility.id)) ?? null
   const resolved = resolveCrossPortalFields(facility, area)
 
@@ -83,16 +92,73 @@ export function CrossTrackInspectorSection({
         {t('mapEditor.inspector.crossTrack.title')}
       </div>
 
+      <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5 text-[10px] text-zinc-300">
+        <input
+          type="checkbox"
+          disabled={readOnly}
+          checked={showPortalLabels}
+          onChange={(e) =>
+            onPatchParameters({ [CROSS_SHOW_PORTAL_LABELS_KEY]: e.target.checked })
+          }
+          onFocus={onFieldFocus}
+          onBlur={onFieldBlur}
+          className="rounded border-zinc-600 bg-zinc-950 text-sky-500 focus:ring-sky-500 disabled:opacity-50"
+        />
+        {t('mapEditor.inspector.crossTrack.showPortalLabels')}
+      </label>
+
+      <div className="grid grid-cols-2 gap-2 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5">
+        <label className="block text-[9px] text-zinc-400">
+          {t('mapEditor.inspector.crossTrack.diagStrokeDown')}
+          <input
+            type="color"
+            disabled={readOnly}
+            value={diagColors.down}
+            onChange={(e) =>
+              onPatchParameters({ [CROSS_DIAG_STROKE_DOWN_KEY]: e.target.value })
+            }
+            onFocus={onFieldFocus}
+            onBlur={onFieldBlur}
+            className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </label>
+        <label className="block text-[9px] text-zinc-400">
+          {t('mapEditor.inspector.crossTrack.diagStrokeUp')}
+          <input
+            type="color"
+            disabled={readOnly}
+            value={diagColors.up}
+            onChange={(e) =>
+              onPatchParameters({ [CROSS_DIAG_STROKE_UP_KEY]: e.target.value })
+            }
+            onFocus={onFieldFocus}
+            onBlur={onFieldBlur}
+            className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </label>
+      </div>
+
       <div className="space-y-1.5">
-        {CROSS_PORTAL_KEYS.map((key) => {
+        {CROSS_PORTAL_UI_ORDER.map((key) => {
           const p = portals[key]
           return (
             <div
               key={key}
               className="space-y-1.5 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5"
             >
-              <div className="text-[9px] uppercase tracking-wide text-zinc-300">
-                {portalLabel(key)}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[9px] uppercase tracking-wide text-zinc-300">
+                  {portalLabel(key)}
+                </div>
+                <button
+                  type="button"
+                  title={t('mapEditor.inspector.crossTrack.pingPortal')}
+                  aria-label={t('mapEditor.inspector.crossTrack.pingPortal')}
+                  onClick={() => pingCrossPortal(facility.id, key)}
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-cyan-500/40 bg-cyan-950/50 text-cyan-200 hover:border-cyan-400/70 hover:bg-cyan-900/50"
+                >
+                  <Crosshair className="size-3.5" aria-hidden />
+                </button>
               </div>
 
               <div>

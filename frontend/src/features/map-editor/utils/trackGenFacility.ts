@@ -106,7 +106,7 @@ export const DEFAULT_TRACKGEN_SETTINGS: TrackGenSettings = {
   trackWidthScale: 1,
   cornerRadiusM: 57,
   blockLengthM: 50,
-  labelSizePx: 10,
+  labelSizePx: 16,
   showCrossovers: true,
   showSidings: true,
 }

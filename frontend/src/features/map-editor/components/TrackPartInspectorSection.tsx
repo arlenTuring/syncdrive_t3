@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next'
+import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
+import { DEFAULT_ORDINARY_TRACK_FILL_COLOR } from '../utils/trackFacility'
 import {
   DEFAULT_PART_FONT_PX,
   MAX_PART_FONT_PX,
@@ -45,7 +47,7 @@ export function TrackPartInspectorSection({
   const fallbackFill =
     typeof facility.parameters?.defaultFillColor === 'string'
       ? (facility.parameters.defaultFillColor as string)
-      : '#3f3f46'
+      : DEFAULT_ORDINARY_TRACK_FILL_COLOR
 
   return (
     <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
@@ -87,29 +89,20 @@ export function TrackPartInspectorSection({
               }
               className="h-[26px] w-9 shrink-0 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <input
-              type="number"
+            <NumberInput
               aria-label={t('mapEditor.inspector.trackParts.fontSize')}
               title={t('mapEditor.inspector.trackParts.fontSize')}
               min={MIN_PART_FONT_PX}
               max={MAX_PART_FONT_PX}
               step={1}
-              readOnly={readOnly}
-              key={`tf-${facility.id}-${part}-${fonts[part] ?? ''}`}
-              defaultValue={fonts[part] ?? DEFAULT_PART_FONT_PX}
+              disabled={readOnly}
+              value={fonts[part] ?? DEFAULT_PART_FONT_PX}
               onFocus={onFieldFocus}
-              onBlur={(e) => {
-                onFieldBlur?.()
-                if (readOnly) return
-                const raw = e.target.value.trim()
-                const next = raw === '' ? null : Number(raw)
-                if (next === (fonts[part] ?? null)) return
-                onPatchParameters(patchTrackGenPartFont(facility, part, next))
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-              }}
-              className="w-12 shrink-0 rounded border border-zinc-600 bg-zinc-950 px-1.5 py-1 text-center font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500"
+              onBlur={onFieldBlur}
+              onChange={(n) =>
+                onPatchParameters(patchTrackGenPartFont(facility, part, n))
+              }
+              className="w-12 shrink-0 rounded border border-zinc-600 bg-zinc-950 px-1.5 py-1 text-center font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         </div>

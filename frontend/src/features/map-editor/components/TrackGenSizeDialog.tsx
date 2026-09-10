@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { NumberInput } from '../../../components/NumberInput'
 import type { TrackGenBlockSize } from '../utils/trackGenFacility'
+import { TRACK_DEFAULT_LABEL_FONT_PX } from '../utils/facilityLabelStyle'
 import type { TaperTrackGeometry } from '../utils/trackShapes'
 import {
   MAX_GROUP_MEMBERS,
@@ -26,9 +27,12 @@ import {
   axisOf,
   canNudge,
   extentOf,
+  junctionMouthsOf,
+  mouthNudgeRangeFor,
   nudgeRangeFor,
   snapTargetsFor,
   type Axis,
+  type JunctionMouth,
   type NudgeEnd,
   type NudgeError,
   type TrackGenNudge,
@@ -234,13 +238,21 @@ function SizeDialogBody({
     id: number
     name: string
     end: NudgeEnd
+    /** 分岔／交叉的口；直軌／斜接沒有 */
+    mouth?: JunctionMouth
     axis: Axis
     /** 這一端原本在哪（版面單位） */
     from: number
     /** 現在拖到哪（已經吸附過） */
     to: number
-    /** 鄰近線的塊界（版面座標），畫成參考線 */
+    /** 吸附到的那條線（版面座標），沒吸到就是 null */
+    snapped: number | null
+    /** 鄰近線的塊界（版面座標），畫成參考線（含同線） */
     targets: number[]
+    /** 會磁吸的候選（只含上下別條線），版面座標 */
+    snapTargets: number[]
+    /** 磁吸候選的畫面座標 */
+    snapTargetsClient: number[]
     /** 按下去的那一刻，這一端在畫面上的位置 */
     fromClient: number
     /** 按下去的那一刻，游標在畫面上的位置 */
@@ -306,11 +318,14 @@ function SizeDialogBody({
       // 在輸入格裡打字時交給輸入格自己處理
       const el = e.target as HTMLElement | null
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
+      // 攔截掉，否則圖台也會 Cmd+Z，元件框被還原，預覽看起來整張變小
       e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       undoLast()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [undoLast])
 
   /*
@@ -341,7 +356,15 @@ function SizeDialogBody({
   const liveNudges = useMemo(
     () =>
       drag && Math.abs(drag.to - drag.from) > 0.01
-        ? [...nudges, { name: drag.name, end: drag.end, dPx: drag.to - drag.from }]
+        ? [
+            ...nudges,
+            {
+              name: drag.name,
+              end: drag.end,
+              dPx: drag.to - drag.from,
+              ...(drag.mouth ? { mouth: drag.mouth } : {}),
+            },
+          ]
         : nudges,
     [nudges, drag],
   )
@@ -611,12 +634,13 @@ function SizeDialogBody({
       const per = (r.width / Math.max(1, stageW)) * scale
       const base = ax === 'x' ? r.left + gx * per : r.top + gy * per
       /*
-       * 候選不先照範圍濾掉。
+       * 參考線收鄰近所有塊界；磁吸只收<strong>別條線</strong>。
        *
-       * 濾掉的話，拖不到的那幾條就整條消失，使用者只會覺得「怎麼樣都對不齊」，卻
-       * 看不出是被範圍擋住。留著、畫出來，拖到範圍邊界自然停住，至少看得見。
+       * 同線刀口又密又多，拿來吸會一路黏住拖不動。上下軌道對齊才是吸附要做的事。
+       * 候選不先照範圍濾掉：濾掉的話拖不到的線整條消失，看不出是被範圍擋住。
        */
       const targets = snapTargetsFor(shapes, sh, ax)
+      const snapTargets = snapTargetsFor(shapes, sh, ax, { foreignLinesOnly: true })
       dragSeqRef.current += 1
       const next: NudgeDrag = {
         id: dragSeqRef.current,
@@ -625,7 +649,10 @@ function SizeDialogBody({
         axis: ax,
         from,
         to: from,
+        snapped: null,
         targets,
+        snapTargets,
+        snapTargetsClient: snapTargets.map((t) => base + t * per),
         fromClient: base + from * per,
         per,
         // 抓在把手的哪一點：位移從這裡算，才不會一按下去就跳一段
@@ -642,7 +669,52 @@ function SizeDialogBody({
         grabClient: +next.grabClient.toFixed(3),
         per: +per.toFixed(6), scale: +scale.toFixed(6),
         svgW: +r.width.toFixed(2), stageW, gx: +gx.toFixed(3),
+        targets: targets.length,
+        snapTargets: snapTargets.length,
         range: [+range.min.toFixed(3), +range.max.toFixed(3)],
+      })
+    },
+    [extent, gx, gy, scale, stageW],
+  )
+
+  /** 分岔／交叉：拖某一個口 */
+  const startMouthDrag = useCallback(
+    (sh: LayoutShape, mouth: JunctionMouth, e: React.PointerEvent<SVGRectElement>) => {
+      const shapes = extent?.shapes ?? []
+      const range = mouthNudgeRangeFor(shapes, sh, mouth)
+      const svg = e.currentTarget.ownerSVGElement
+      if (!range || !svg) return
+      const { axis: ax, from, min, max } = range
+      const r = svg.getBoundingClientRect()
+      const per = (r.width / Math.max(1, stageW)) * scale
+      const base = ax === 'x' ? r.left + gx * per : r.top + gy * per
+      const targets = snapTargetsFor(shapes, sh, ax)
+      const snapTargets = snapTargetsFor(shapes, sh, ax, { foreignLinesOnly: true })
+      dragSeqRef.current += 1
+      const next: NudgeDrag = {
+        id: dragSeqRef.current,
+        name: sh.name,
+        end: 'hi',
+        mouth,
+        axis: ax,
+        from,
+        to: from,
+        snapped: null,
+        targets,
+        snapTargets,
+        snapTargetsClient: snapTargets.map((t) => base + t * per),
+        fromClient: base + from * per,
+        per,
+        grabClient: ax === 'x' ? e.clientX : e.clientY,
+        min,
+        max,
+      }
+      dragRef.current = next
+      setDrag(next)
+      nudgeLog('down', {
+        name: sh.name, mouth, axis: ax,
+        from: +from.toFixed(3),
+        range: [+min.toFixed(3), +max.toFixed(3)],
       })
     },
     [extent, gx, gy, scale, stageW],
@@ -657,6 +729,10 @@ function SizeDialogBody({
    * 只在「有沒有在拖」變動時掛／拆監聽；move 讀 dragRef，不因 to 更新而重綁，
    * 避免拆裝空窗期丟掉 pointerup。
    */
+  /** 極近才吸（畫面像素） */
+  const SNAP_ENTER_PX = 1
+  /** 脫離略寬一點點 */
+  const SNAP_HOLD_PX = 2
   const dragging = drag !== null
   useEffect(() => {
     if (!dragging) return
@@ -667,14 +743,30 @@ function SizeDialogBody({
       // 這一端現在被拖到畫面上的哪裡（還沒吸附）
       const free = cur.fromClient + (now - cur.grabClient)
       /*
-       * <strong>不吸附</strong>，拖到哪就是哪。
+       * 吸附一律拿<strong>游標的位置</strong>去比，比完才貼上去。
        *
-       * 吸附會自己決定落點，候選一多就分不清它跳去哪一條。對齊用看的就夠——鄰近軌道
-       * 的塊界都畫成參考線了，對準線走到哪一條上面自己看得出來。
+       * 不要邊比邊改座標，否則會一路接力跳到下一個候選。只吸上下別條線的塊界。
        */
-      const raw = cur.from + (free - cur.fromClient) / Math.max(1e-6, cur.per)
+      let at = free
+      let hit = false
+      let bestD = Infinity
+      for (let i = 0; i < cur.snapTargetsClient.length; i += 1) {
+        const tClient = cur.snapTargetsClient[i]!
+        const tLayout = cur.snapTargets[i]!
+        const d = Math.abs(tClient - free)
+        const holding = cur.snapped !== null && Math.abs(tLayout - cur.snapped) < 1e-6
+        const limit = holding ? SNAP_HOLD_PX : SNAP_ENTER_PX
+        if (d <= limit && d < bestD) {
+          bestD = d
+          at = tClient
+          hit = true
+        }
+      }
+      const raw = cur.from + (at - cur.fromClient) / Math.max(1e-6, cur.per)
       const to = Math.max(cur.min, Math.min(cur.max, raw))
-      const next = { ...cur, to }
+      // 超出可拖範圍時夾住就不算吸到
+      const snapped = hit && Math.abs(to - raw) < 1e-6 ? to : null
+      const next = { ...cur, to, snapped }
       dragRef.current = next
       setDrag(next)
     }
@@ -686,13 +778,19 @@ function SizeDialogBody({
       if (cur && committedRef.current === cur.id) return
       if (cur) committedRef.current = cur.id
       if (cur && Math.abs(cur.to - cur.from) > 0.5) {
-        const one = { name: cur.name, end: cur.end, dPx: cur.to - cur.from }
+        const one: TrackGenNudge = {
+          name: cur.name,
+          end: cur.end,
+          dPx: cur.to - cur.from,
+          ...(cur.mouth ? { mouth: cur.mouth } : {}),
+        }
         nudgeLog('up', {
           id: cur.id,
           name: one.name, end: one.end,
           from: +cur.from.toFixed(3),
           wantTo: +cur.to.toFixed(3),
           dPx: +one.dPx.toFixed(3),
+          snapped: cur.snapped,
         })
         pendingRef.current = { name: one.name, end: one.end, wantTo: cur.to }
         setNudges((prev) => [...prev, one])
@@ -955,7 +1053,7 @@ function SizeDialogBody({
                   y={at(dy).y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontSize={11}
+                  fontSize={TRACK_DEFAULT_LABEL_FONT_PX}
                   fontWeight={700}
                   fill="#fafafa"
                   className="pointer-events-none"
@@ -975,7 +1073,7 @@ function SizeDialogBody({
                         y={at(0).y}
                         textAnchor="middle"
                         dominantBaseline="central"
-                        fontSize={14}
+                        fontSize={TRACK_DEFAULT_LABEL_FONT_PX}
                         fontWeight={800}
                         fill="#fbbf24"
                         className="pointer-events-none"
@@ -1001,15 +1099,54 @@ function SizeDialogBody({
             })}
 
             {/*
-              微調的把手：一塊兩個，各管一端。
-              橫的塊拖左右、縱的塊拖上下——拖的是那一端的位置，不是整塊縮放，所以另一端
-              留在原地。
+              微調的把手。
+              直軌／斜接：兩端各一個。分岔：進口 a、主線 m、岔線 b。交叉：四個口
+              lt/lb/rt/rb（上＝lt/rt、下＝lb/rb）。圓角曲率不動，調旁邊的直線即可。
             */}
             {nudgeMode
               ? extent?.shapes.flatMap((sh, i) => {
                   if (!canNudge(sh)) return []
-                  const { ax, lo, hi, at } = handlesOf(sh)
                   const bar = 9
+                  if (sh.kind === 'switch' || sh.kind === 'cross' || sh.kind === 'corner') {
+                    return junctionMouthsOf(sh)
+                      .filter((m) => mouthNudgeRangeFor(extent?.shapes ?? [], sh, m.mouth))
+                      .map((m) => {
+                        const mid = {
+                          x: (m.seg[0].x + m.seg[1].x) / 2,
+                          y: (m.seg[0].y + m.seg[1].y) / 2,
+                        }
+                        const cx = (gx + mid.x) * scale
+                        const cy = (gy + mid.y) * scale
+                        const w = m.axis === 'x' ? 3 : bar
+                        const h = m.axis === 'x' ? bar : 3
+                        const on = drag?.name === sh.name && drag.mouth === m.mouth
+                        const fill = on
+                          ? '#fbbf24'
+                          : sh.kind === 'corner'
+                            ? '#5eead4'
+                            : '#c4b5fd'
+                        return (
+                          <rect
+                            key={`h${i}-${m.mouth}`}
+                            data-trackgen-handle={`${sh.name}|${m.mouth}`}
+                            x={cx - w / 2}
+                            y={cy - h / 2}
+                            width={w}
+                            height={h}
+                            rx={1}
+                            fill={fill}
+                            stroke="#09090b"
+                            strokeWidth={0.5}
+                            style={{ cursor: m.axis === 'x' ? 'ew-resize' : 'ns-resize' }}
+                            onPointerDown={(e) => {
+                              e.stopPropagation()
+                              startMouthDrag(sh, m.mouth, e)
+                            }}
+                          />
+                        )
+                      })
+                  }
+                  const { ax, lo, hi, at } = handlesOf(sh)
                   return ([['lo', lo], ['hi', hi]] as [NudgeEnd, number][])
                     .filter(([end]) => nudgeRangeFor(extent?.shapes ?? [], sh, end))
                     .map(([end, v]) => {
@@ -1018,7 +1155,7 @@ function SizeDialogBody({
                     const cy = (gy + p.y) * scale
                     const w = ax === 'x' ? 3 : bar
                     const h = ax === 'x' ? bar : 3
-                    const on = drag?.name === sh.name && drag.end === end
+                    const on = drag?.name === sh.name && !drag.mouth && drag.end === end
                     return (
                       <rect
                         key={`h${i}-${end}`}
@@ -1050,36 +1187,39 @@ function SizeDialogBody({
             {drag ? (
               <g className="pointer-events-none">
                 {/*
-                  鄰近軌道的塊界全部畫出來當對準線。
-                  沒有吸附，純粹是給眼睛對的參考；拖得到的畫亮一點，拖不到的暗一點。
+                  鄰近軌道的塊界全部畫出來當對準線；靠近會吸附，吸到的那一條與輔助線
+                  換成琥珀色。拖不到的候選仍畫出來，才看得出是被範圍擋住。
                 */}
                 {drag.targets.map((t) => {
+                  const active = drag.snapped !== null && Math.abs(t - drag.snapped) < 1e-6
                   const inRange = t >= drag.min && t <= drag.max
-                  const stroke = inRange ? '#71717a' : '#3f3f46'
-                  const strokeWidth = inRange ? 1 : 0.6
+                  const stroke = active ? '#fbbf24' : inRange ? '#71717a' : '#3f3f46'
+                  const strokeWidth = active ? 1.5 : inRange ? 1 : 0.6
                   return drag.axis === 'x' ? (
                     <line
                       key={`t${t}`}
                       data-trackgen-snap-tick
+                      data-trackgen-snap-active={active ? '1' : undefined}
                       x1={(gx + t) * scale}
                       y1={0}
                       x2={(gx + t) * scale}
                       y2={stageH}
                       stroke={stroke}
                       strokeWidth={strokeWidth}
-                      strokeDasharray="2 5"
+                      strokeDasharray={active ? undefined : '2 5'}
                     />
                   ) : (
                     <line
                       key={`t${t}`}
                       data-trackgen-snap-tick
+                      data-trackgen-snap-active={active ? '1' : undefined}
                       x1={0}
                       y1={(gy + t) * scale}
                       x2={stageW}
                       y2={(gy + t) * scale}
                       stroke={stroke}
                       strokeWidth={strokeWidth}
-                      strokeDasharray="2 5"
+                      strokeDasharray={active ? undefined : '2 5'}
                     />
                   )
                 })}
@@ -1096,12 +1236,13 @@ function SizeDialogBody({
                     />
                     <line
                       data-trackgen-guide
+                      data-trackgen-snapped={drag.snapped === null ? undefined : '1'}
                       x1={(gx + drag.to) * scale}
                       y1={0}
                       x2={(gx + drag.to) * scale}
                       y2={stageH}
-                      stroke="#22d3ee"
-                      strokeWidth={1.25}
+                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
+                      strokeWidth={drag.snapped === null ? 1.25 : 1.5}
                     />
                   </>
                 ) : (
@@ -1117,12 +1258,13 @@ function SizeDialogBody({
                     />
                     <line
                       data-trackgen-guide
+                      data-trackgen-snapped={drag.snapped === null ? undefined : '1'}
                       x1={0}
                       y1={(gy + drag.to) * scale}
                       x2={stageW}
                       y2={(gy + drag.to) * scale}
-                      stroke="#22d3ee"
-                      strokeWidth={1.25}
+                      stroke={drag.snapped === null ? '#22d3ee' : '#fbbf24'}
+                      strokeWidth={drag.snapped === null ? 1.25 : 1.5}
                     />
                   </>
                 )}

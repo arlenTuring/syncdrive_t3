@@ -1,0 +1,15 @@
+---
+description: 地圖編輯器拖放預設尺寸以 AREA_DROP_DEFAULTS 為唯一來源
+globs: frontend/src/features/map-editor/**/*
+alwaysApply: false
+---
+
+# 地圖編輯器 — Area 拖放預設尺寸
+
+拖進 Area 的預設大小**只改** `frontend/src/features/map-editor/constants/facilityDimensions.ts` 的 `AREA_DROP_DEFAULTS`。
+
+- 設備／設施：相對 layout `shortPx`／`longPx` 比例（＋ clamp）
+- 軌道：相對 domain span 帶寬／長度比例
+- 入口：`defaultAreaSizePxForDrop`（`index.tsx` 拖放已走此路）
+
+**禁止**在元件、palette、placement 另寫死拖放像素或再疊一層「小一半」係數。要調視覺預設 → 改 `AREA_DROP_DEFAULTS` 對應欄位即可套用全部 layout。

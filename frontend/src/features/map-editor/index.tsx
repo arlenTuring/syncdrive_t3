@@ -18,6 +18,10 @@ import { PointTopologyEditorDialog } from './components/PointTopologyEditorDialo
 import { MapAreaCanvas } from './components/MapAreaCanvas'
 import { MapListDrawer, type MapListDrawerTab } from './components/MapListDrawer'
 import { RoutePlanningOverlay, routeColorForIndex } from './components/RoutePlanningOverlay'
+import {
+  SimRoutePathOverlay,
+  type EditPoint,
+} from './components/SimRoutePathOverlay'
 import { MapCanvas } from './components/MapCanvas'
 import { MapEditorTestDock } from './components/MapEditorTestDock'
 import { useTrackConnectivityScan } from './hooks/useTrackConnectivityScan'
@@ -29,8 +33,8 @@ import {
   type VehicleTrajectoryEntry,
 } from './constants/vehicleTrajectoryCatalog'
 import {
-  defaultSizeMetersForType,
   defaultAreaSizePxForDrop,
+  defaultMapChromeSizePxForDrop,
   MIN_FACILITY_CANVAS_PX,
 } from './constants/facilityDimensions'
 import {
@@ -104,6 +108,11 @@ import {
   resolveFacilityFocusPx,
 } from './utils/facilityListEntries'
 import { ensureDockingPointStationIdsInAreas, generateNextStationId } from './utils/dockingPointStationId'
+import {
+  applyAutoRefFieldPositionIfUnset,
+  ensureAutoRefFieldPositionsInAreas,
+  syncAutoRefFieldPositionFromPlacement,
+} from './utils/facilityRefFieldAuto'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
 import { canAppendStationToTopologyRoute, isTopologyRouteCombinationValid } from './utils/topologyRouteTravel'
@@ -118,6 +127,13 @@ import {
   isRoutePlanningDraftSavable,
   type RoutePlanningDraft,
 } from './utils/routePlanning'
+import {
+  buildSimRouteSnapTargets,
+  editPointsToPathWaypoints,
+  isLegacyAutoPathWaypoints,
+  isSimRoutePointOnField,
+  startSimRouteEditPoints,
+} from './utils/simRoutePathEdit'
 import {
   assignRouteToGroup,
   ensureRouteGroupsForRoutes,
@@ -173,10 +189,7 @@ import { mergePayloadIntoLive } from './live/mqttPayload'
 import type { MqttLiveEntry, MqttLogLine } from './live/mqttLiveTypes'
 import { mockMqttSingleton } from './sim/mockMqtt'
 import type { PaletteItem } from './constants/palette'
-import {
-  defaultRectVerticesMeters,
-  syncGeofenceFacility,
-} from './utils/geofence'
+import { syncGeofenceFacility } from './utils/geofence'
 import { sanitizeFacilitiesForEditor } from './utils/sanitizeFacility'
 import { normalizeDegrees } from './utils/rotation'
 import { applyExampleMapDefaultLabelStyleToAreas } from './utils/facilityLabelStyle'
@@ -411,6 +424,11 @@ export default function MapEditorApp({
   const [routeGroupDraft, setRouteGroupDraft] = useState<RouteGroupDraft | null>(
     null,
   )
+  /** 模擬路線折點編輯中的路線 id；與站序草稿互斥 */
+  const [simRouteEditRouteId, setSimRouteEditRouteId] = useState<string | null>(
+    null,
+  )
+  const [simRouteEditPoints, setSimRouteEditPoints] = useState<EditPoint[]>([])
   const [visibleRouteIds, setVisibleRouteIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -905,9 +923,11 @@ export default function MapEditorApp({
       setMapPixelSize(loaded.pixelSize)
       setMapPixelOrigin(loaded.pixelOrigin)
       setAreas(
-        ensureWaypointCodesInAreas(
-          ensureDockingPointStationIdsInAreas(
-            applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+        ensureAutoRefFieldPositionsInAreas(
+          ensureWaypointCodesInAreas(
+            ensureDockingPointStationIdsInAreas(
+              applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+            ),
           ),
         ),
       )
@@ -986,6 +1006,7 @@ export default function MapEditorApp({
     return mapRoutes
       .map((route, index) => ({ route, index }))
       .filter(({ route }) => visibleRouteIds.has(route.routeId))
+      .filter(({ route }) => route.routeId !== simRouteEditRouteId)
       .filter(({ route }) =>
         isTopologyRouteCombinationValid(pointTopology, areas, route.stationIds),
       )
@@ -994,11 +1015,102 @@ export default function MapEditorApp({
         color: routeColorForIndex(index),
         emphasized: true,
       }))
-  }, [mapRoutes, visibleRouteIds, routePlanningDraft, pointTopology, areas])
+  }, [
+    mapRoutes,
+    visibleRouteIds,
+    routePlanningDraft,
+    pointTopology,
+    areas,
+    simRouteEditRouteId,
+  ])
+
+  const simRouteSnapTargets = useMemo(
+    () => buildSimRouteSnapTargets(areas),
+    [areas],
+  )
+
+  const simRouteGuideBounds = useMemo(
+    () => ({
+      left: mapPixelOrigin.x,
+      top: mapPixelOrigin.y,
+      right: mapPixelOrigin.x + mapPixelSize.width,
+      bottom: mapPixelOrigin.y + mapPixelSize.height,
+    }),
+    [mapPixelOrigin.x, mapPixelOrigin.y, mapPixelSize.width, mapPixelSize.height],
+  )
+
+  const persistSimRoutePathPoints = useCallback(
+    (routeId: string, points: EditPoint[]) => {
+      const pathWaypoints = editPointsToPathWaypoints(areas, points)
+      const hasManualBend = pathWaypoints.some((w) => !w.stationId)
+      const now = new Date().toISOString()
+      setMapRoutes((prev) =>
+        prev.map((r) => {
+          if (r.routeId !== routeId) return r
+          if (!hasManualBend) {
+            const { pathWaypoints: _cleared, ...rest } = r
+            return { ...rest, updatedAt: now }
+          }
+          return { ...r, pathWaypoints, updatedAt: now }
+        }),
+      )
+    },
+    [areas],
+  )
+
+  const onFinishSimRoutePathEdit = useCallback(() => {
+    // 折點變更已在 onChange 時寫入 mapRoutes（會觸發自動儲存／同步）
+    setSimRouteEditRouteId(null)
+    setSimRouteEditPoints([])
+  }, [])
+
+  const onEditSimRoutePath = useCallback(
+    (routeId: string) => {
+      if (mapEditorMode !== 'edit') return
+      const route = mapRoutes.find((r) => r.routeId === routeId)
+      if (!route || route.stationIds.length < 2) return
+      setRoutePlanningDraft(null)
+      setRouteGroupDraft(null)
+      // 清掉舊版誤種的自動折點，避免一進編輯又長出一堆藍方塊
+      if (isLegacyAutoPathWaypoints(areas, pointTopology, route)) {
+        const now = new Date().toISOString()
+        setMapRoutes((prev) =>
+          prev.map((r) => {
+            if (r.routeId !== routeId) return r
+            const { pathWaypoints: _cleared, ...rest } = r
+            return { ...rest, updatedAt: now }
+          }),
+        )
+      }
+      const points = startSimRouteEditPoints(areas, pointTopology, route)
+      setSimRouteEditRouteId(routeId)
+      setSimRouteEditPoints(points)
+      setVisibleRouteIds((prev) => {
+        if (prev.has(routeId)) return prev
+        const next = new Set(prev)
+        next.add(routeId)
+        return next
+      })
+      setListDrawerTab('routes')
+    },
+    [mapEditorMode, mapRoutes, areas, pointTopology],
+  )
+
+  const onSimRoutePathPointsChange = useCallback(
+    (next: EditPoint[]) => {
+      setSimRouteEditPoints(next)
+      if (simRouteEditRouteId) {
+        persistSimRoutePathPoints(simRouteEditRouteId, next)
+      }
+    },
+    [simRouteEditRouteId, persistSimRoutePathPoints],
+  )
 
   const onStartNewRoute = useCallback(
     (groupId: string | null) => {
       if (mapEditorMode !== 'edit') return
+      setSimRouteEditRouteId(null)
+      setSimRouteEditPoints([])
       setRouteGroupDraft(null)
       setRoutePlanningDraft({
         routeId: null,
@@ -1017,6 +1129,8 @@ export default function MapEditorApp({
     (routeId: string) => {
       const route = mapRoutes.find((r) => r.routeId === routeId)
       if (!route) return
+      setSimRouteEditRouteId(null)
+      setSimRouteEditPoints([])
       const group = findRouteGroupForRoute(mapRouteGroups, routeId)
       setRouteGroupDraft(null)
       setRoutePlanningDraft({
@@ -1054,6 +1168,19 @@ export default function MapEditorApp({
         prev.map((r) => {
           if (r.routeId !== routeId) return r
           const { taskType: _legacy, ...routeRest } = r as typeof r & { taskType?: unknown }
+          const stationsChanged =
+            r.stationIds.length !== draft.stationIds.length ||
+            r.stationIds.some((id, i) => id !== draft.stationIds[i])
+          if (stationsChanged) {
+            const { pathWaypoints: _cleared, ...withoutPath } = routeRest
+            return {
+              ...withoutPath,
+              displayName,
+              stationIds: [...draft.stationIds],
+              ...travelTimes,
+              updatedAt: now,
+            }
+          }
           return {
             ...routeRest,
             displayName,
@@ -1538,41 +1665,48 @@ export default function MapEditorApp({
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     const timer = window.setTimeout(() => {
       setAutosaveStatus('saving')
-      const meta = loadedMapMetaRef.current
-      const entry = getMapLibraryEntry(meta.libraryId)
-      if (entry) {
-        const updated = saveEditorStateToLibraryEntry(
-          entry,
-          {
-            displayName: meta.displayName,
-            version: meta.version,
-            pixelSize: mapPixelSizeRef.current,
-            pixelOrigin: mapPixelOriginRef.current,
-          },
-          areasRef.current,
-          mapRoutesRef.current,
-          mapRouteGroupsRef.current,
-          pointTopologyRef.current,
-          [],
-          basemapsRef.current,
-        )
-        writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-        void publishAndReport(updated)
-      }
-      clearMapDraft(libraryId)
-      const savedAt = new Date()
-      setAutosaveStatus('saved')
-      setAutosaveTimeLabel(
-        t('mapEditor.chrome.autosavedAt', {
-          time: savedAt.toLocaleString(i18n.language === 'en-US' ? 'en-US' : 'zh-TW', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
+      try {
+        const meta = loadedMapMetaRef.current
+        const entry = getMapLibraryEntry(meta.libraryId)
+        if (entry) {
+          const updated = saveEditorStateToLibraryEntry(
+            entry,
+            {
+              displayName: meta.displayName,
+              version: meta.version,
+              pixelSize: mapPixelSizeRef.current,
+              pixelOrigin: mapPixelOriginRef.current,
+            },
+            areasRef.current,
+            mapRoutesRef.current,
+            mapRouteGroupsRef.current,
+            pointTopologyRef.current,
+            [],
+            basemapsRef.current,
+          )
+          writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
+          void publishAndReport(updated)
+        }
+        clearMapDraft(libraryId)
+        const savedAt = new Date()
+        setAutosaveStatus('saved')
+        setAutosaveTimeLabel(
+          t('mapEditor.chrome.autosavedAt', {
+            time: savedAt.toLocaleString(i18n.language === 'en-US' ? 'en-US' : 'zh-TW', {
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            }),
           }),
-        }),
-      )
+        )
+      } catch (err) {
+        // 缺 areaLayoutAnchor 等匯出錯誤曾讓狀態永遠停在 saving
+        console.error('[map-editor autosave]', err)
+        setAutosaveStatus('idle')
+        setAutosaveTimeLabel(t('mapEditor.chrome.editingAutosave'))
+      }
     }, 900)
     autosaveTimerRef.current = timer
     return () => {
@@ -1833,6 +1967,17 @@ export default function MapEditorApp({
     return area?.facilities.find((f) => f.id === primarySelectedFacilityId) ?? null
   }, [areas, selectedAreaId, primarySelectedFacilityId])
 
+  /** 選取停靠點／途經點且尚未有參照場域時，用圖台映射靜默補齊（不寫 undo） */
+  useEffect(() => {
+    if (mapEditorMode !== 'edit') return
+    if (!selectedFacility || !selectedArea) return
+    const seeded = applyAutoRefFieldPositionIfUnset(selectedFacility, selectedArea)
+    if (seeded === selectedFacility) return
+    mapAreaFacilities(selectedArea.id, (facilities) =>
+      facilities.map((f) => (f.id === seeded.id ? seeded : f)),
+    )
+  }, [mapEditorMode, selectedFacility, selectedArea, mapAreaFacilities])
+
   const selectedAreaDomainMaxM = useMemo(() => {
     if (!selectedArea) return undefined
     return {
@@ -1998,32 +2143,8 @@ export default function MapEditorApp({
         }
       }
       if (item.type === 'Geofence') {
-        const { w, h } = defaultSizeMetersForType('Geofence')
-        const centerM = {
-          x: positionMeters.x + w / 2,
-          y: positionMeters.y + h / 2,
-        }
-        return syncGeofenceFacility({
-          id,
-          type: 'Geofence',
-          name: 'Geofence',
-          customName: '',
-          areaPosition,
-          position: positionMeters,
-          rotation: 0,
-          currentState: 'Normal',
-          parameters: {
-            verticesMeters: defaultRectVerticesMeters(centerM, w, h),
-            strokeStyle: 'solid',
-            strokeWidthPx: 3,
-            strokeColor: '#22d3ee',
-            fillEnabled: false,
-            fillColor: '#22d3ee',
-            fillOpacity: 0.12,
-            labels: [],
-            ...defaultRefFieldParametersForType('Geofence'),
-          },
-        })
+        // 地圖編輯器不再建立電子圍籬（請至虛擬圍籬管理）
+        throw new Error('Geofence is not creatable in map editor')
       }
       if (item.type === 'Signal') {
         return {
@@ -2185,7 +2306,11 @@ export default function MapEditorApp({
         pushHistory()
         const id = String(nextNumericId).padStart(3, '0')
         const trackGen = isTrackGenPaletteItem(item)
-        const blank = createBlankBasemap(id, mapCenter, trackGen ? { w: 1180, h: 300 } : undefined)
+        const sizePx = defaultMapChromeSizePxForDrop(
+          trackGen ? 'trackGen' : 'basemap',
+          ps,
+        )
+        const blank = createBlankBasemap(id, mapCenter, sizePx)
         const newBasemap = trackGen
           ? {
               ...blank,
@@ -2204,8 +2329,7 @@ export default function MapEditorApp({
       if (!isAreaPaletteItem(item)) return
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
-      const w = Math.max(200, ps.width * 0.42)
-      const h = Math.max(160, ps.height * 0.38)
+      const { w, h } = defaultMapChromeSizePxForDrop('area', ps)
       const newArea: MapAreaObject = {
         ...createBlankArea(id, ps),
         customName: `Area ${id}`,
@@ -2230,8 +2354,7 @@ export default function MapEditorApp({
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
       const ps = mapPixelSizeRef.current
-      const w = 320
-      const h = 240
+      const { w, h } = defaultMapChromeSizePxForDrop('area', ps)
       const newArea: MapAreaObject = {
         ...createBlankArea(id, ps),
         customName: `Area ${id}`,
@@ -2256,7 +2379,12 @@ export default function MapEditorApp({
       pushHistory()
       const id = String(nextNumericId).padStart(3, '0')
       const trackGen = isTrackGenPaletteItem(item)
-      const blank = createBlankBasemap(id, mapPointPx, trackGen ? { w: 1180, h: 300 } : undefined)
+      const ps = mapPixelSizeRef.current
+      const sizePx = defaultMapChromeSizePxForDrop(
+        trackGen ? 'trackGen' : 'basemap',
+        ps,
+      )
+      const blank = createBlankBasemap(id, mapPointPx, sizePx)
       const newBasemap = trackGen
         ? {
             ...blank,
@@ -2368,25 +2496,30 @@ export default function MapEditorApp({
           w: Math.max(1, f.box.wM * pxPerX),
           h: Math.max(1, f.box.hM * pxPerY),
         }
-        return {
-          id: f.id,
-          type: f.type,
-          name: f.name,
-          customName: f.customName,
-          // 版面座標的 y 向下，areaPosition 的原點在左下、y 向上
-          areaPosition: {
-            x: f.box.xM * pxPerX,
-            y: area.layout.hPx - (f.box.yM + f.box.hM) * pxPerY,
-          },
-          areaSizePx,
-          position: {
-            x: f.box.xM,
-            y: built.extentM.hM - f.box.yM - f.box.hM,
-          },
-          rotation: f.rotation,
-          currentState: null,
-          parameters: f.parameters,
-        } as unknown as FacilityObject
+        // ensureFacilityDualCoords 會補上 areaLayoutAnchor；缺了 autosave 匯出會炸掉
+        return ensureFacilityDualCoords(
+          {
+            id: f.id,
+            type: f.type,
+            name: f.name,
+            customName: f.customName,
+            // 版面座標的 y 向下，areaPosition 的原點在左下、y 向上
+            areaPosition: {
+              x: f.box.xM * pxPerX,
+              y: area.layout.hPx - (f.box.yM + f.box.hM) * pxPerY,
+            },
+            areaSizePx,
+            position: {
+              x: f.box.xM,
+              y: built.extentM.hM - f.box.yM - f.box.hM,
+            },
+            rotation: f.rotation,
+            currentState: null,
+            parameters: f.parameters,
+          } as unknown as FacilityObject,
+          area.domain,
+          area.layout,
+        )
       })
 
       /*
@@ -2533,6 +2666,8 @@ export default function MapEditorApp({
       ) {
         return
       }
+      // 電子圍籬僅在「虛擬圍籬管理」；地圖編輯器不可新增
+      if (item.type === 'Geofence') return
       const area = areasRef.current.find((a) => a.id === areaId)
       if (!area) return
       pushHistory()
@@ -2553,13 +2688,16 @@ export default function MapEditorApp({
         area.domain,
         area.layout,
       )
-      const newFacility = ensureFacilityDualCoords(
-        {
-          ...facilityFromPaletteItem(item, id, areaPosition, positionMeters),
-          areaSizePx: sizePx,
-        } as FacilityObject,
-        area.domain,
-        area.layout,
+      const newFacility = applyAutoRefFieldPositionIfUnset(
+        ensureFacilityDualCoords(
+          {
+            ...facilityFromPaletteItem(item, id, areaPosition, positionMeters),
+            areaSizePx: sizePx,
+          } as FacilityObject,
+          area.domain,
+          area.layout,
+        ),
+        area,
       )
       mapAreaFacilities(areaId, (facilities) => [...facilities, newFacility])
       updateSelection(areaId, [id])
@@ -2615,7 +2753,7 @@ export default function MapEditorApp({
             return { ...p, mqttInstanceId: id }
           })(),
         }
-    const pastedFacility =
+    const typedFacility =
       newFacility.type === 'Waypoint'
         ? ensureWaypointCode(
             {
@@ -2636,6 +2774,9 @@ export default function MapEditorApp({
               },
             }
           : newFacility
+    const pastedFacility = area
+      ? applyAutoRefFieldPositionIfUnset(typedFacility, area)
+      : typedFacility
     mapAreaFacilities(areaId, (facilities) => [...facilities, pastedFacility])
     updateSelection(areaId, [id])
     setNextNumericId((n) => n + 1)
@@ -2730,12 +2871,13 @@ export default function MapEditorApp({
             const origin = session.areaPositions[fac.id]
             if (!origin || fac.type === 'Geofence') return fac
             const nextAreaPos = { x: origin.x + dx, y: origin.y + dy }
-            return facilityWithAreaPosition(
+            const moved = facilityWithAreaPosition(
               fac,
               nextAreaPos,
               area.domain,
               area.layout,
             )
+            return syncAutoRefFieldPositionFromPlacement(moved, area)
           }),
         )
         return
@@ -2760,11 +2902,14 @@ export default function MapEditorApp({
           if (fac.type === 'Geofence') return fac
           const area = areasRef.current.find((a) => a.id === areaId)
           if (!area) return fac
-          return facilityWithAreaPosition(
-            fac,
-            update.areaPosition,
-            area.domain,
-            area.layout,
+          return syncAutoRefFieldPositionFromPlacement(
+            facilityWithAreaPosition(
+              fac,
+              update.areaPosition,
+              area.domain,
+              area.layout,
+            ),
+            area,
           )
         }),
       )
@@ -2796,11 +2941,13 @@ export default function MapEditorApp({
         if (!area) return
         const selSet = new Set(selIds)
         mapAreaFacilities(selAreaId, (facilities) =>
-          facilities.map((f) =>
-            selSet.has(f.id) && f.type !== 'Geofence'
-              ? nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout)
-              : f,
-          ),
+          facilities.map((f) => {
+            if (!selSet.has(f.id) || f.type === 'Geofence') return f
+            return syncAutoRefFieldPositionFromPlacement(
+              nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout),
+              area,
+            )
+          }),
         )
         return
       }
@@ -2814,7 +2961,10 @@ export default function MapEditorApp({
       mapAreaFacilities(h.areaId, (facilities) =>
         facilities.map((f) =>
           f.id === h.facilityId
-            ? nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout)
+            ? syncAutoRefFieldPositionFromPlacement(
+                nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout),
+                area,
+              )
             : f,
         ),
       )
@@ -2926,8 +3076,26 @@ export default function MapEditorApp({
   useEffect(() => {
     if (mapEditorMode !== 'edit') {
       setFormatPaintSnapshot(null)
+      setSimRouteEditRouteId(null)
+      setSimRouteEditPoints([])
     }
   }, [mapEditorMode])
+
+  useEffect(() => {
+    if (!simRouteEditRouteId) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) {
+        return
+      }
+      e.preventDefault()
+      onFinishSimRoutePathEdit()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [simRouteEditRouteId, onFinishSimRoutePathEdit])
 
   useEffect(() => {
     if (!formatPaintSnapshot) return
@@ -3325,8 +3493,9 @@ export default function MapEditorApp({
         return
       }
 
-      // 路網拓撲對話框開啟時，快捷鍵由對話框自行處理（避免 Cmd+Z 一次還原整張地圖）
+      // 路網拓撲／軌道生成對話框開啟時，快捷鍵由對話框自行處理（避免 Cmd+Z 一次還原整張地圖）
       if (pointTopologyEditorOpenRef.current) return
+      if (document.querySelector('[data-trackgen-size-dialog]')) return
 
       const mod = e.metaKey || e.ctrlKey
       if (mod && e.key.toLowerCase() === 'a') {
@@ -3788,14 +3957,25 @@ export default function MapEditorApp({
                 onFacilityDoubleClick={onFacilityDoubleClick}
                 onBasemapDoubleClick={onBasemapDoubleClick}
                 routePlanningOverlay={
-                  routeOverlayPreview || routeOverlaySaved.length > 0 ? (
-                    <RoutePlanningOverlay
-                      areas={areas}
-                      pointTopology={pointTopology}
-                      activePreview={routeOverlayPreview}
-                      savedRoutes={routeOverlaySaved}
-                    />
-                  ) : null
+                  <>
+                    {routeOverlayPreview || routeOverlaySaved.length > 0 ? (
+                      <RoutePlanningOverlay
+                        areas={areas}
+                        pointTopology={pointTopology}
+                        activePreview={routeOverlayPreview}
+                        savedRoutes={routeOverlaySaved}
+                      />
+                    ) : null}
+                    {simRouteEditRouteId && simRouteEditPoints.length >= 2 ? (
+                      <SimRoutePathOverlay
+                        points={simRouteEditPoints}
+                        isOnField={(p) => isSimRoutePointOnField(areas, p)}
+                        snapTargets={simRouteSnapTargets}
+                        bounds={simRouteGuideBounds}
+                        onChange={onSimRoutePathPointsChange}
+                      />
+                    ) : null}
+                  </>
                 }
               />
             </div>
@@ -3827,6 +4007,21 @@ export default function MapEditorApp({
               />
             </div>
           </div>
+
+          {isMapWorkspace && mapScreen === 'editor' && simRouteEditRouteId ? (
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-[9500] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-sky-500/50 bg-zinc-950/95 px-3 py-2 shadow-xl">
+              <p className="max-w-[min(36rem,70vw)] text-[11px] leading-snug text-sky-100">
+                {t('mapEditor.chrome.simRoutePathEditing')}
+              </p>
+              <button
+                type="button"
+                className="pointer-events-auto shrink-0 rounded-md border border-sky-400/60 bg-sky-600/90 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-500"
+                onClick={onFinishSimRoutePathEdit}
+              >
+                {t('mapEditor.chrome.simRoutePathDone')}
+              </button>
+            </div>
+          ) : null}
 
           {isMapWorkspace && mapScreen === 'editor' && showZoomLevelBar && (
             <ZoomLevelBar
@@ -3885,6 +4080,7 @@ export default function MapEditorApp({
             onStartNewRoute={onStartNewRoute}
             onStartNewGroup={onStartNewGroup}
             onEditRoute={onEditRoute}
+            onEditSimRoutePath={onEditSimRoutePath}
             onEditGroup={onEditGroup}
             onDeleteGroup={onDeleteGroup}
             onToggleRouteVisibility={onToggleRouteVisibility}

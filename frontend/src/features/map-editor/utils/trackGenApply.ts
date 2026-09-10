@@ -6,13 +6,23 @@ import {
   type Vec2,
 } from './trackGenLayout'
 import {
+  DEFAULT_TRACK_FRAME_STROKE_COLOR,
+  DEFAULT_TRACK_FRAME_STROKE_WIDTH_PX,
+} from './trackFacility'
+import {
   memberKey,
   partsOfKind,
   trackGenGroupIndex,
   trackGenGroupLabel,
   type TrackGenGroup,
 } from './trackGenGroups'
-import { TRACKGEN_PART_COLORS_KEY, TRACKGEN_PART_NAMES_KEY } from './trackGenParts'
+import {
+  TRACKGEN_PART_COLORS_KEY,
+  TRACKGEN_PART_FONT_KEY,
+  TRACKGEN_PART_NAMES_KEY,
+  DEFAULT_PART_FONT_PX,
+} from './trackGenParts'
+import { LABEL_STYLE_PARAM_KEY, TRACK_DEFAULT_LABEL_FONT_PX } from './facilityLabelStyle'
 import {
   CORNER_TRACK_KEY,
   CROSS_TRACK_KEY,
@@ -150,8 +160,14 @@ function facilityFor(shape: LayoutShape, id: string): BuiltFacility {
   const spanMeta = spans.length ? { [TRACKGEN_SPANS_KEY]: spans } : {}
   /*
    * 底色照<strong>種類</strong>分：一般、圓角、斜接、分岔各一個色。
+   * 框線一律深色，相鄰同色塊才分得出界線（深底＋深填時淺色框反而搶戲）。
    */
-  const fillMeta = { defaultFillColor: TRACK_GEN_KIND_COLOR[shape.kind].fill }
+  const fillMeta = {
+    defaultFillColor: TRACK_GEN_KIND_COLOR[shape.kind].fill,
+    strokeColor: DEFAULT_TRACK_FRAME_STROKE_COLOR,
+    strokeWidthPx: DEFAULT_TRACK_FRAME_STROKE_WIDTH_PX,
+    strokeStyle: 'solid' as const,
+  }
   if (shape.kind === 'rect') {
     /*
      * 軸對齊的段<strong>不要旋轉</strong>。
@@ -343,16 +359,19 @@ export function buildFacilitiesFromLayout(
     if (parts) {
       const names: Record<string, string> = {}
       const colors: Record<string, string> = {}
+      const fonts: Record<string, number> = {}
       for (const part of parts) {
         const hit = groupOf.get(memberKey(f.customName, part))
         if (!hit?.code) continue
         names[part] = trackGenGroupLabel(hit.code, hit.order)
         colors[part] = hit.color
+        fonts[part] = DEFAULT_PART_FONT_PX
       }
       const picked = parts.map((p) => names[p]).filter(Boolean)
       if (!picked.length) return
       f.parameters[TRACKGEN_PART_NAMES_KEY] = names
       f.parameters[TRACKGEN_PART_COLORS_KEY] = colors
+      f.parameters[TRACKGEN_PART_FONT_KEY] = fonts
       const label = picked.join('/')
       f.customName = label
       f.parameters.segmentId = label
@@ -367,6 +386,16 @@ export function buildFacilitiesFromLayout(
     f.customName = label
     f.parameters.segmentId = label
     f.parameters.defaultFillColor = hit.color
+    // 與分岔／交叉路段字級一致（一般軌道走 labelStyle）
+    const prevStyle =
+      f.parameters[LABEL_STYLE_PARAM_KEY] &&
+      typeof f.parameters[LABEL_STYLE_PARAM_KEY] === 'object'
+        ? (f.parameters[LABEL_STYLE_PARAM_KEY] as Record<string, unknown>)
+        : {}
+    f.parameters[LABEL_STYLE_PARAM_KEY] = {
+      ...prevStyle,
+      fontSizePx: TRACK_DEFAULT_LABEL_FONT_PX,
+    }
   })
 
   /*

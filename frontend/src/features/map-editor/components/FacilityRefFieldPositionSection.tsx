@@ -1,4 +1,5 @@
 import type { FacilityObject } from '../types/facility'
+import { shouldAutoSeedRefFieldPoint } from '../utils/facilityRefFieldAuto'
 import {
   getRefFieldPosition,
   hasValidRefFieldPosition,
@@ -37,6 +38,7 @@ export function FacilityRefFieldPositionSection({
   const position = getRefFieldPosition(facility.parameters)
   const params = facility.parameters
   const hasPosition = hasValidRefFieldPosition(facility.parameters)
+  const autoMapped = shouldAutoSeedRefFieldPoint(facility.type)
 
   const fields: {
     key: keyof RefFieldPositionMeters
@@ -55,14 +57,20 @@ export function FacilityRefFieldPositionSection({
       <p className="text-[10px] leading-relaxed text-zinc-500">
         {readOnly
           ? '此元件在實際場域中的代表點（唯讀）。座標為場域公尺（原點左下，橫向／縱向）。'
-          : '此元件在實際場域中的代表點；僅能在此手動設定。圖台拖曳或調整像素尺寸不會改變此位置。座標為場域公尺（原點左下，橫向／縱向）。'}
+          : autoMapped
+            ? '此元件在實際場域中的代表點。放置、載入與圖台拖曳／微調時會依映射自動更新；亦可在此手動修改。調整像素尺寸不會改變此位置。座標為場域公尺（原點左下，橫向／縱向）。'
+            : '此元件在實際場域中的代表點；僅能在此手動設定。圖台拖曳或調整像素尺寸不會改變此位置。座標為場域公尺（原點左下，橫向／縱向）。'}
       </p>
       {hasPosition ? (
         <p className="rounded-md border border-sky-900/30 bg-sky-950/25 px-2 py-1.5 font-mono text-[11px] text-sky-100/90">
           代表點：({position.xM!.toFixed(2)}, {position.yM!.toFixed(2)}) m
         </p>
       ) : (
-        <p className="text-[10px] text-amber-500/90">尚未設定參照場域位置。</p>
+        <p className="text-[10px] text-amber-500/90">
+          {autoMapped
+            ? '尚未設定參照場域位置（目前無法由圖台映射帶入）。'
+            : '尚未設定參照場域位置。'}
+        </p>
       )}
       <div className="grid grid-cols-1 gap-2">
         {fields.map(({ key, label, id }) => (

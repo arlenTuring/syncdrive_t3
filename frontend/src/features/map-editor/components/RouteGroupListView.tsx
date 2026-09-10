@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Route,
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -30,6 +31,7 @@ type Props = {
   onToggleRouteVisibility: (routeId: string) => void
   onToggleGroupRouteVisibility: (routeIds: string[]) => void
   onEditRoute: (routeId: string) => void
+  onEditSimRoutePath: (routeId: string) => void
   onDeleteRoute: (routeId: string) => void
   onEditGroup: (groupId: string) => void
   onDeleteGroup: (groupId: string) => void
@@ -59,6 +61,7 @@ function RowActionsMenu({
   onCloseMenu,
   onEdit,
   onDelete,
+  onEditSimRoutePath,
 }: {
   menuKey: MenuKey
   openMenuKey: MenuKey | null
@@ -66,6 +69,8 @@ function RowActionsMenu({
   onCloseMenu: () => void
   onEdit: () => void
   onDelete: () => void
+  /** 僅路線列提供；群組選單不顯示 */
+  onEditSimRoutePath?: () => void
 }) {
   const { t } = useTranslation()
   const open = openMenuKey === menuKey
@@ -142,6 +147,19 @@ function RowActionsMenu({
                 <Pencil className="size-3 shrink-0 text-zinc-400" />
                 {t('mapEditor.routeGroupList.edit')}
               </button>
+              {onEditSimRoutePath ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCloseMenu()
+                    onEditSimRoutePath()
+                  }}
+                  className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  <Route className="size-3 shrink-0 text-sky-400" />
+                  {t('mapEditor.routeGroupList.editSimRoutePath')}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -173,6 +191,7 @@ function RouteRow({
   onCloseMenu,
   onToggleVisibility,
   onEdit,
+  onEditSimRoutePath,
   onDelete,
 }: {
   areas: MapAreaObject[]
@@ -186,6 +205,7 @@ function RouteRow({
   onCloseMenu: () => void
   onToggleVisibility: () => void
   onEdit: () => void
+  onEditSimRoutePath: () => void
   onDelete: () => void
 }) {
   const { t } = useTranslation()
@@ -299,6 +319,7 @@ function RouteRow({
           onOpenMenu={onOpenMenu}
           onCloseMenu={onCloseMenu}
           onEdit={onEdit}
+          onEditSimRoutePath={onEditSimRoutePath}
           onDelete={onDelete}
         />
       ) : null}
@@ -316,6 +337,7 @@ export function RouteGroupListView({
   onToggleRouteVisibility,
   onToggleGroupRouteVisibility,
   onEditRoute,
+  onEditSimRoutePath,
   onDeleteRoute,
   onEditGroup,
   onDeleteGroup,
@@ -443,6 +465,7 @@ export function RouteGroupListView({
                           onCloseMenu={handleCloseMenu}
                           onToggleVisibility={() => onToggleRouteVisibility(route.routeId)}
                           onEdit={() => onEditRoute(route.routeId)}
+                          onEditSimRoutePath={() => onEditSimRoutePath(route.routeId)}
                           onDelete={() => onDeleteRoute(route.routeId)}
                         />
                       ))
@@ -484,6 +507,7 @@ export function RouteGroupListView({
                     onCloseMenu={handleCloseMenu}
                     onToggleVisibility={() => onToggleRouteVisibility(route.routeId)}
                     onEdit={() => onEditRoute(route.routeId)}
+                    onEditSimRoutePath={() => onEditSimRoutePath(route.routeId)}
                     onDelete={() => onDeleteRoute(route.routeId)}
                   />
                 ))}

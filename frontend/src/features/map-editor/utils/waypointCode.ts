@@ -1,5 +1,12 @@
 import type { MapAreaObject } from '../types/area'
-import { CROSS_PORTAL_KEYS, getCrossPortals } from './crossTrackPortals'
+import {
+  CROSS_PORTAL_KEYS,
+  crossPortalTopologyNodeId,
+  getCrossPortals,
+  resolveCrossPortalDisplayName,
+  resolveCrossPortalFields,
+  type CrossPortalKey,
+} from './crossTrackPortals'
 import type { FacilityObject } from '../types/facility'
 import {
   CROSSOVER_PORTAL_KEYS,
@@ -110,6 +117,8 @@ export type WaypointCodeExclude = {
   facilityId?: string
   /** 排除虛擬渡線某一端點自身（編輯該端代號時） */
   crossoverPortal?: { facilityId: string; key: CrossoverPortalKey }
+  /** 排除交叉軌道某一口自身（編輯該口代號時） */
+  crossPortal?: { facilityId: string; key: CrossPortalKey }
 }
 
 export function isWaypointCodeTaken(
@@ -132,6 +141,23 @@ export function isWaypointCodeTaken(
           getWaypointCode(facility),
         ).toLowerCase()
         if (other && other === norm) return true
+        continue
+      }
+      if (facility.name === 'RailCross') {
+        const portals = getCrossPortals(facility)
+        for (const key of CROSS_PORTAL_KEYS) {
+          if (
+            exclude.crossPortal &&
+            exclude.crossPortal.facilityId === facility.id &&
+            exclude.crossPortal.key === key
+          ) {
+            continue
+          }
+          const other = normalizeWaypointCodeInput(
+            portals[key].waypointCode ?? '',
+          ).toLowerCase()
+          if (other && other === norm) return true
+        }
         continue
       }
       if (facility.type !== 'TrackCrossover') continue
@@ -499,6 +525,50 @@ export function collectCrossoverPortalWaypointsFromAreas(areas: MapAreaObject[])
           topologyNodeId: crossoverPortalTopologyNodeId(facility.id, key),
           ...crossoverPortalFieldMeters(portal),
           kind: 'crossover-waypoint',
+        })
+      }
+    }
+  }
+  return out
+}
+
+/** 交叉軌道四口途經點（stationId = waypointCode） */
+export function collectCrossPortalWaypointsFromAreas(areas: MapAreaObject[]) {
+  const out: Array<{
+    stationId: string
+    stationName: string
+    facilityId: string
+    areaId: string
+    portalKey: CrossPortalKey
+    topologyNodeId: string
+    xM: number
+    yM: number
+    kind: 'cross-waypoint'
+  }> = []
+
+  for (const area of areas) {
+    for (const facility of area.facilities) {
+      if (facility.type !== 'Track' || facility.name !== 'RailCross') continue
+      const portals = getCrossPortals(facility)
+      const fields = resolveCrossPortalFields(facility, area)
+      for (const key of CROSS_PORTAL_KEYS) {
+        const portal = portals[key]
+        const code = portal.waypointCode?.trim()
+        if (!code) continue
+        const field = fields[key]
+        const xM = field.xM
+        const yM = field.yM
+        if (xM == null || yM == null || !Number.isFinite(xM) || !Number.isFinite(yM)) continue
+        out.push({
+          stationId: code,
+          stationName: resolveCrossPortalDisplayName(portal),
+          facilityId: facility.id,
+          areaId: area.id,
+          portalKey: key,
+          topologyNodeId: crossPortalTopologyNodeId(facility.id, key),
+          xM,
+          yM,
+          kind: 'cross-waypoint',
         })
       }
     }

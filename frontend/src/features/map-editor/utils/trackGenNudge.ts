@@ -3,6 +3,21 @@ import {
   type TrackGenLayout,
   type Vec2,
 } from './trackGenLayout'
+import {
+  junctionMouthJoint,
+  junctionMouthsOf,
+  resizeJunctionMouth,
+  type JunctionMouth,
+} from './trackGenNudgeJunction'
+
+export type { JunctionMouth } from './trackGenNudgeJunction'
+export {
+  junctionMouthsOf,
+  junctionMouthSeg,
+  mouthAxis,
+  SWITCH_MOUTHS,
+  CROSS_MOUTHS,
+} from './trackGenNudgeJunction'
 
 /**
  * 一塊一塊微調長度。
@@ -19,7 +34,9 @@ import {
  * 就是它的坡，拉長就是把坡放緩。變緩之後端面仍然垂直、帶寬也不變，但帶子可能壓到旁邊
  * 那條軌道上——這是使用者選的取捨，不另外處理。
  *
- * 路口（轉角、分岔、交叉）那一端仍然不長把手：它們連著別條線，動了就不只影響這一塊。
+ * 分岔與交叉可以<strong>逐口分開</strong>拉（主線／岔線、交叉上下行互不綁死）。
+ * 口縮短時，旁邊接上的軌道（直軌／斜接／另一個路口口）要<strong>跟著變長補上</strong>，
+ * 跟直軌對直軌的微調同一套「界線兩邊黏著」；口拉長則旁邊變短。圓角也可以當鄰居跟著補。
  *
  * <h3>里程不用重新對</h3>
  * 每一塊代表的里程沒有變，變的只有它畫多長。定位是「在真實路徑上走了幾成，就在圖面
@@ -33,11 +50,28 @@ export type NudgeEnd = 'lo' | 'hi'
 export type TrackGenNudge = {
   /** 被拖的那一塊 */
   name: string
-  /** 拖的是座標小的那一端還是大的那一端 */
+  /** 拖的是座標小的那一端還是大的那一端（直軌／斜接）；路口有 mouth 時仍填，僅作相容 */
   end: NudgeEnd
-  /** 沿著那一塊自己的軸移動多少（版面像素，正值往座標大的方向） */
+  /** 沿著行進軸移動多少（版面像素，正值往座標大的方向） */
   dPx: number
+  /**
+   * 分岔／交叉的哪一個口。
+   * a/m/b＝進口／主線／岔線；lt/lb/rt/rb＝交叉四口（上＝lt/rt、下＝lb/rb）。
+   */
+  mouth?: JunctionMouth
 }
+
+const JUNCTION_MOUTHS = new Set<string>([
+  'a',
+  'm',
+  'b',
+  'lt',
+  'lb',
+  'rt',
+  'rb',
+  'cornerA',
+  'cornerB',
+])
 
 /** 微調存在高精地圖元件的參數裡，重新生成時沿用 */
 export const TRACKGEN_NUDGES_KEY = 'trackGenNudges'
@@ -52,9 +86,14 @@ export function getTrackGenNudges(
     if (!item || typeof item !== 'object') continue
     const o = item as Partial<TrackGenNudge>
     if (typeof o.name !== 'string' || !o.name) continue
-    if (o.end !== 'lo' && o.end !== 'hi') continue
     if (typeof o.dPx !== 'number' || !Number.isFinite(o.dPx) || o.dPx === 0) continue
-    out.push({ name: o.name, end: o.end, dPx: o.dPx })
+    const mouth =
+      typeof o.mouth === 'string' && JUNCTION_MOUTHS.has(o.mouth)
+        ? (o.mouth as JunctionMouth)
+        : undefined
+    const end = o.end === 'lo' || o.end === 'hi' ? o.end : mouth ? 'hi' : null
+    if (!end) continue
+    out.push(mouth ? { name: o.name, end, dPx: o.dPx, mouth } : { name: o.name, end, dPx: o.dPx })
   }
   return out
 }
@@ -75,19 +114,24 @@ export function extentOf(s: LayoutShape, axis: Axis): { lo: number; hi: number }
   return { lo: Math.min(...vals), hi: Math.max(...vals) }
 }
 
-/** 路口不給拖也不平移：它連著別條線，動了整張圖就歪了 */
-export function isPinned(s: LayoutShape): boolean {
-  return s.kind === 'corner' || s.kind === 'switch' || s.kind === 'cross'
+/** 已無「整塊鎖死」的路口；保留函式以免舊呼叫端報錯 */
+export function isPinned(_s: LayoutShape): boolean {
+  return false
 }
 
 /**
- * 一般軌道與斜接可以改長度。
+ * 一般軌道、斜接、分岔、交叉、圓角都可以改長度。
  *
- * 斜接拉長就是把坡放緩，端面仍然垂直、帶寬也不變，只是可能壓到旁邊那條軌道。路口
- * 不行：它們連著別條線，動了就不只影響這一塊。
+ * 分岔／交叉／圓角是逐口拉；圓角的 bulge（曲率形狀）保持不變。
  */
 export function canNudge(s: LayoutShape): boolean {
-  return s.kind === 'rect' || s.kind === 'taper'
+  return (
+    s.kind === 'rect' ||
+    s.kind === 'taper' ||
+    s.kind === 'switch' ||
+    s.kind === 'cross' ||
+    s.kind === 'corner'
+  )
 }
 
 /**
@@ -143,30 +187,171 @@ function resized(
   return null
 }
 
-/** 這一塊的兩個端點（圖面座標） */
-function endPointsOf(s: LayoutShape): [Vec2, Vec2] {
+/** 這一塊用來「碰得到鄰居」的端點（圖面座標） */
+function endPointsOf(s: LayoutShape): Vec2[] {
+  if (s.kind === 'switch' || s.kind === 'cross' || s.kind === 'corner') {
+    return junctionMouthsOf(s).map((m) => ({
+      x: (m.seg[0].x + m.seg[1].x) / 2,
+      y: (m.seg[0].y + m.seg[1].y) / 2,
+    }))
+  }
   return [s.samples[0]!, s.samples[s.samples.length - 1]!]
 }
 
-/** 兩點碰在一起（圖面像素）：相接的兩塊端點是同一個點 */
-const TOUCH_PX = 1.5
+/**
+ * 兩點算「還黏著」：緊貼用較嚴；找分岔／交叉鄰居時用 {@link ATTACH_ALONG_PX}
+ * 把已經拉開的縫再接回來。
+ */
+const TOUCH_PX = 4
+
+/** 沿行進軸：口與直軌端點相隔不超過此距離就仍視為同一條界線（可補縫） */
+const ATTACH_ALONG_PX = 120
+
+/** 垂直於行進軸：必須同一股，否則會誤黏到隔壁車道 */
+const ATTACH_PERP_PX = 16
 
 function near(a: Vec2, b: Vec2): boolean {
   return Math.hypot(a.x - b.x, a.y - b.y) <= TOUCH_PX
 }
 
+function midOf(seg: readonly [Vec2, Vec2]): Vec2 {
+  return { x: (seg[0].x + seg[1].x) / 2, y: (seg[0].y + seg[1].y) / 2 }
+}
+
+/** 一塊至少要留這麼長，不然它在圖上就不是一段軌道了 */
+const MIN_LEN_PX = 6
+
 /**
- * 一次微調：拖的是<strong>兩塊之間的界線</strong>。
+ * 這個界線點對應哪一個路口的哪一口。
  *
- * 被拖的那一塊在那一端伸縮多少，相鄰的那一塊就在對著的那一端反向伸縮多少，界線因此
- * 剛好落在同一個位置，不會開縫也不會疊到。其餘的塊完全不動。
+ * 不只看「幾乎重合」：同股、沿軸還在 {@link ATTACH_ALONG_PX} 內就認——先前若已拉開一截，
+ * 下一次拖要把縫補上，不能當成沒鄰居。
+ */
+function junctionMouthAtJoint(
+  shapes: LayoutShape[],
+  selfName: string,
+  joint: Vec2,
+  axis: Axis,
+): { shape: LayoutShape; mouth: JunctionMouth; mouthMid: Vec2 } | null {
+  let best: { shape: LayoutShape; mouth: JunctionMouth; mouthMid: Vec2; along: number } | null =
+    null
+  for (const x of shapes) {
+    if (x.name === selfName) continue
+    if (x.kind !== 'switch' && x.kind !== 'cross' && x.kind !== 'corner') continue
+    for (const m of junctionMouthsOf(x)) {
+      // 口的行進軸要跟被拖那一塊一致，否則是橫貼的另一側
+      if (m.axis !== axis) continue
+      const mouthMid = midOf(m.seg)
+      const along =
+        axis === 'x' ? Math.abs(mouthMid.x - joint.x) : Math.abs(mouthMid.y - joint.y)
+      const perp =
+        axis === 'x' ? Math.abs(mouthMid.y - joint.y) : Math.abs(mouthMid.x - joint.x)
+      if (perp > ATTACH_PERP_PX || along > ATTACH_ALONG_PX) continue
+      if (!best || along < best.along) {
+        best = { shape: x, mouth: m.mouth, mouthMid, along }
+      }
+    }
+  }
+  return best ? { shape: best.shape, mouth: best.mouth, mouthMid: best.mouthMid } : null
+}
+
+/** 黏在這個口上的直軌／斜接（可跨一小段縫） */
+function ribbonAtMouth(
+  shapes: LayoutShape[],
+  selfName: string,
+  joint: Vec2,
+  axis: Axis,
+): { shape: LayoutShape; end: NudgeEnd; endPt: Vec2 } | null {
+  let best: { shape: LayoutShape; end: NudgeEnd; endPt: Vec2; along: number } | null = null
+  const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
+  for (const x of shapes) {
+    if (x.name === selfName) continue
+    if (x.kind !== 'rect' && x.kind !== 'taper') continue
+    if (axisOf(x) !== axis) continue
+    const ex = extentOf(x, axis)
+    for (const end of ['lo', 'hi'] as const) {
+      const target = end === 'lo' ? ex.lo : ex.hi
+      const pts = endPointsOf(x)
+      const endPt =
+        Math.abs(coordOf(pts[0]!) - target) <= Math.abs(coordOf(pts[pts.length - 1]!) - target)
+          ? pts[0]!
+          : pts[pts.length - 1]!
+      const along = Math.abs(coordOf(endPt) - coordOf(joint))
+      const perp =
+        axis === 'x' ? Math.abs(endPt.y - joint.y) : Math.abs(endPt.x - joint.x)
+      if (perp > ATTACH_PERP_PX || along > ATTACH_ALONG_PX) continue
+      if (!best || along < best.along) best = { shape: x, end, endPt, along }
+    }
+  }
+  return best ? { shape: best.shape, end: best.end, endPt: best.endPt } : null
+}
+
+/** 黏在這個口／端上、用來補長度的鄰居（直軌／斜接，或另一個路口的口） */
+type FillNeighbor =
+  | { kind: 'ribbon'; shape: LayoutShape; end: NudgeEnd; endPt: Vec2 }
+  | { kind: 'mouth'; shape: LayoutShape; mouth: JunctionMouth; mouthMid: Vec2 }
+
+function fillNeighborAt(
+  shapes: LayoutShape[],
+  selfName: string,
+  joint: Vec2,
+  axis: Axis,
+): FillNeighbor | null {
+  const ribbon = ribbonAtMouth(shapes, selfName, joint, axis)
+  if (ribbon) return { kind: 'ribbon', ...ribbon }
+  const junc = junctionMouthAtJoint(shapes, selfName, joint, axis)
+  if (junc) return { kind: 'mouth', shape: junc.shape, mouth: junc.mouth, mouthMid: junc.mouthMid }
+  return null
+}
+
+/** 把鄰居的接觸端／口移到目標行進座標（補縫＋跟界線） */
+function moveFillNeighborTo(
+  nb: FillNeighbor,
+  targetAlong: number,
+  axis: Axis,
+): LayoutShape | null {
+  const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
+  if (nb.kind === 'ribbon') {
+    return resized(nb.shape, nb.end, targetAlong - coordOf(nb.endPt), axis)
+  }
+  return resizeJunctionMouth(nb.shape, nb.mouth, targetAlong - coordOf(nb.mouthMid))
+}
+
+/**
+ * 一次微調：拖的是<strong>兩塊之間的界線</strong>，或路口的<strong>某一個口</strong>。
  *
- * 相鄰的是路口就不做：路口的長度是它自己的幾何，改不得。找不到鄰居（盡頭）時只有
- * 被拖的那一塊伸縮。
+ * 直軌／斜接：被拖那一塊伸縮多少，相鄰可調的那一塊就一起伸縮多少。
+ * 分岔／交叉／圓角：只挪那一個口；旁邊不論是直軌、斜接還是別的路口口，都跟著補長度
+ * （口往內縮 → 旁邊變長；口往外伸 → 旁邊變短）。主線與岔線、交叉上下行互不綁死。
+ * 若中間已經有縫：先對齊再套位移，縫會在這一次拖曳補上。
  */
 function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | null {
   const s = shapes.find((x) => x.name === n.name)
   if (!s || !canNudge(s)) return null
+
+  if (n.mouth) {
+    const joint = junctionMouthJoint(s, n.mouth)
+    const grown = resizeJunctionMouth(s, n.mouth, n.dPx)
+    if (!grown) return null
+    if (!joint) return shapes.map((x) => (x.name === s.name ? grown : x))
+
+    const hit = junctionMouthsOf(s).find((m) => m.mouth === n.mouth)
+    const axis = hit?.axis ?? axisOf(s)
+    const coordOf = (p: Vec2) => (axis === 'x' ? p.x : p.y)
+    const target = coordOf(joint) + n.dPx
+    const nb = fillNeighborAt(shapes, s.name, joint, axis)
+    if (!nb) return shapes.map((x) => (x.name === s.name ? grown : x))
+    const moved = moveFillNeighborTo(nb, target, axis)
+    if (!moved) return null
+    return shapes.map((x) => {
+      if (x.name === s.name) return grown
+      if (x.name === nb.shape.name) return moved
+      return x
+    })
+  }
+
+  if (s.kind === 'switch' || s.kind === 'cross') return null
+
   const axis = axisOf(s)
   /*
    * <strong>照著 dPx 做，不再自己夾一次。</strong>
@@ -186,22 +371,41 @@ function nudgeOnce(shapes: LayoutShape[], n: TrackGenNudge): LayoutShape[] | nul
    * 鄰居跟著改長度，界線兩邊永遠黏著：被拖那一塊短多少，鄰居就長多少，另一端留在
    * 原地。受影響的就這兩塊，其餘一個都不動。
    *
-   * 盡頭沒有鄰居時只有自己伸縮。
+   * 盡頭沒有鄰居時只有自己伸縮。貼著分岔／交叉／圓角的口時：只動那一個口跟著移。
+   * 若已分開：先把口推回界線再位移，縫一次補平。
    */
   const at = neighbourAt(shapes, s, joint)
-  const nb = at.kind === 'shape' ? at.shape : null
-  if (!nb) return shapes.map((x) => (x.name === s.name ? grown : x))
-  const ex = extentOf(nb, axis)
-  const nbEnd: NudgeEnd =
-    Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
-  const moved = resized(nb, nbEnd, d, axis)
-  if (!moved) return null
+  if (at.kind === 'shape') {
+    const nb = at.shape
+    const ex = extentOf(nb, axis)
+    const nbEnd: NudgeEnd =
+      Math.abs(ex.lo - coordOf(joint)) <= Math.abs(ex.hi - coordOf(joint)) ? 'lo' : 'hi'
+    const moved = resized(nb, nbEnd, d, axis)
+    if (!moved) return null
+    return shapes.map((x) => {
+      if (x.name === s.name) return grown
+      if (x.name === nb.name) return moved
+      return x
+    })
+  }
 
-  return shapes.map((x) => {
-    if (x.name === s.name) return grown
-    if (x.name === nb.name) return moved
-    return x
-  })
+  const junc = junctionMouthAtJoint(shapes, s.name, joint, axis)
+  if (junc) {
+    const target = coordOf(joint) + d
+    const movedJ =
+      resizeJunctionMouth(junc.shape, junc.mouth, target - coordOf(junc.mouthMid)) ??
+      (Math.abs(target - coordOf(junc.mouthMid) - d) < 1e-9
+        ? null
+        : resizeJunctionMouth(junc.shape, junc.mouth, d))
+    if (!movedJ) return null
+    return shapes.map((x) => {
+      if (x.name === s.name) return grown
+      if (x.name === junc.shape.name) return movedJ
+      return x
+    })
+  }
+
+  return shapes.map((x) => (x.name === s.name ? grown : x))
 }
 
 /** 逐塊的長度誤差（公尺）：這一塊畫得比它該有的長度多或少多少 */
@@ -341,25 +545,12 @@ export function applyTrackGenNudges<T extends TrackGenLayout>(
   }
 }
 
-/** 這一塊在圖上佔的方框 */
-function boxOf(s: LayoutShape) {
-  if (s.kind !== 'rect') {
-    return { x0: s.box.xM, y0: s.box.yM, x1: s.box.xM + s.box.wM, y1: s.box.yM + s.box.hM }
-  }
-  const c = Math.abs(Math.cos((s.rotationDeg * Math.PI) / 180))
-  const d = Math.abs(Math.sin((s.rotationDeg * Math.PI) / 180))
-  const w = (s.lengthM * c + s.widthM * d) / 2
-  const h = (s.lengthM * d + s.widthM * c) / 2
-  return { x0: s.centre.x - w, y0: s.centre.y - h, x1: s.centre.x + w, y1: s.centre.y + h }
-}
-
 /**
  * 這一端接的是什麼。
  *
- * 端點碰在一起的那一塊才是能一起伸縮的鄰居。路口不算：交叉與分岔的圖面中心線是它整
- * 個外框的對角，不是四個口的位置，所以端點永遠對不上——只看端點的話會把路口當成盡頭，
- * 一拖就疊到路口上（實測斜接整片壓過旁邊兩塊）。所以再看一次方框：有東西罩著這個
- * 點就是路口，那一端不給拖。
+ * 端點碰在一起的那一塊才是能一起伸縮的鄰居。分岔／交叉／圓角在這裡回 edge，改由
+ * {@link junctionMouthAtJoint} + {@link resizeJunctionMouth} 連動那一個口（避免把路口
+ * 當直軌整段 resize）。
  */
 function neighbourAt(
   shapes: LayoutShape[],
@@ -370,31 +561,28 @@ function neighbourAt(
     (x) => x.name !== s.name && endPointsOf(x).some((q) => near(q, joint)),
   )
   if (touch) {
-    // 路口的長度是它自己的幾何，改不得；斜接可以，坡跟著變是使用者接受的
-    if (!canNudge(touch) || axisOf(touch) !== axisOf(s)) return { kind: 'blocked' }
+    if (axisOf(touch) !== axisOf(s) && touch.kind !== 'switch' && touch.kind !== 'cross') {
+      return { kind: 'blocked' }
+    }
+    if (
+      !canNudge(touch) ||
+      touch.kind === 'switch' ||
+      touch.kind === 'cross' ||
+      touch.kind === 'corner'
+    ) {
+      return { kind: 'edge' }
+    }
     return { kind: 'shape', shape: touch }
   }
-  const pad = TOUCH_PX
-  const covered = shapes.some((x) => {
-    if (x.name === s.name) return false
-    const b = boxOf(x)
-    return (
-      joint.x >= b.x0 - pad &&
-      joint.x <= b.x1 + pad &&
-      joint.y >= b.y0 - pad &&
-      joint.y <= b.y1 + pad
-    )
-  })
-  return covered ? { kind: 'blocked' } : { kind: 'edge' }
+  return { kind: 'edge' }
 }
-
-/** 一塊至少要留這麼長，不然它在圖上就不是一段軌道了 */
-const MIN_LEN_PX = 6
 
 /** 被拖的那一端在圖面上是哪一個點 */
 function jointOf(s: LayoutShape, end: NudgeEnd, axis: Axis): Vec2 {
   const { lo, hi } = extentOf(s, axis)
-  const [p0, p1] = endPointsOf(s)
+  const pts = endPointsOf(s)
+  const p0 = pts[0]!
+  const p1 = pts[pts.length - 1]!
   const co = (p: Vec2) => (axis === 'x' ? p.x : p.y)
   const target = end === 'lo' ? lo : hi
   return Math.abs(co(p0) - target) <= Math.abs(co(p1) - target) ? p0 : p1
@@ -403,8 +591,8 @@ function jointOf(s: LayoutShape, end: NudgeEnd, axis: Axis): Vec2 {
 /**
  * 這一端可以拖到哪個範圍（版面座標）。
  *
- * 兩塊都至少要留一點長度，所以上下限由自己的另一端與鄰居的另一端夾出來。鄰居是路口
- * 時整個不給拖——路口的長度改不得，回 null，畫面上那一端就不長把手。
+ * 兩塊都至少要留一點長度，所以上下限由自己的另一端與鄰居的另一端夾出來。
+ * 分岔／交叉請用 {@link mouthNudgeRangeFor}。
  */
 export function nudgeRangeFor(
   shapes: LayoutShape[],
@@ -412,6 +600,8 @@ export function nudgeRangeFor(
   end: NudgeEnd,
 ): { min: number; max: number } | null {
   if (!canNudge(s)) return null
+  if (s.kind === 'switch' || s.kind === 'cross') return null
+  if (s.kind === 'corner') return null
   const axis = axisOf(s)
   const { lo, hi } = extentOf(s, axis)
   const joint = jointOf(s, end, axis)
@@ -423,7 +613,11 @@ export function nudgeRangeFor(
   if (nb) {
     const ex = extentOf(nb, axis)
     // 鄰居的另一端：界線不能越過它，還要幫它留一點長度
-    const far = Math.abs(ex.lo - (axis === 'x' ? joint.x : joint.y)) <= Math.abs(ex.hi - (axis === 'x' ? joint.x : joint.y)) ? ex.hi : ex.lo
+    const far =
+      Math.abs(ex.lo - (axis === 'x' ? joint.x : joint.y)) <=
+      Math.abs(ex.hi - (axis === 'x' ? joint.x : joint.y))
+        ? ex.hi
+        : ex.lo
     if (end === 'hi') max = Math.min(max, far - MIN_LEN_PX)
     else min = Math.max(min, far + MIN_LEN_PX)
   }
@@ -432,24 +626,58 @@ export function nudgeRangeFor(
 }
 
 /**
- * 拖的時候可以吸附到哪些位置。
+ * 分岔／交叉某一個口可以拖到哪個範圍。
+ *
+ * 細的最短長度由套用時的解幾何擋住；這裡給一個寬一點的可拖區間，並若旁邊是直軌
+ * 就夾在鄰居另一端之內。
+ */
+export function mouthNudgeRangeFor(
+  shapes: LayoutShape[],
+  s: LayoutShape,
+  mouth: JunctionMouth,
+): { min: number; max: number; axis: Axis; from: number } | null {
+  if (s.kind !== 'switch' && s.kind !== 'cross' && s.kind !== 'corner') return null
+  const hit = junctionMouthsOf(s).find((m) => m.mouth === mouth)
+  if (!hit) return null
+  const { axis, at: from, seg } = hit
+  const joint = midOf(seg)
+  let min = from - 8000
+  let max = from + 8000
+  // 找黏在這個口上的直軌／斜接（含尚可補回的縫）
+  const touch = ribbonAtMouth(shapes, s.name, joint, axis)
+  if (touch) {
+    const ex = extentOf(touch.shape, axis)
+    const far = touch.end === 'lo' ? ex.hi : ex.lo
+    // 口往鄰居另一端的方向不能越過
+    if (far >= from) max = Math.min(max, far - MIN_LEN_PX)
+    else min = Math.max(min, far + MIN_LEN_PX)
+  }
+  if (!(max > min)) return null
+  return { min, max, axis, from }
+}
+
+/**
+ * 拖的時候可以吸附／對準到哪些位置。
  *
  * 只收<strong>鄰近的線</strong>：對齊要對的是上下並排的那幾條，不是圖另一頭的對向。
- * 全圖都收的話候選會多到密密麻麻，手一抖就黏到不相干的那一條。垂直距離超過幾個帶寬
- * 的直接不算。
+ * 垂直距離超過幾個帶寬的直接不算。
  *
- * 被拖的那一塊自己不算，不然會黏在原地；同一條線上的其他塊界算，那是「跟自己這條線
- * 上的某一刀對齊」。
+ * <code>foreignLinesOnly</code>：只收<strong>別條線</strong>的塊界。同一條線上的刀口又密又
+ * 多，拿來吸附會一路黏住拖不動；畫參考線時仍可收同線，磁吸只對上下軌道。
  */
-const SNAP_ROWS = 3
+const SNAP_ROWS = 4
 
 export function snapTargetsFor(
   shapes: LayoutShape[],
   target: LayoutShape,
   axis: Axis,
+  opts?: { foreignLinesOnly?: boolean },
 ): number[] {
   const bandW = (() => {
     for (const s of shapes) if (s.kind === 'rect') return s.widthM
+    for (const s of shapes) {
+      if (s.kind === 'taper') return Math.min(s.box.wM, s.box.hM)
+    }
     return 8
   })()
   const perpOf = (s: LayoutShape) => {
@@ -458,10 +686,12 @@ export function snapTargetsFor(
   }
   const home = perpOf(target)
   const reach = Math.max(1, bandW) * SNAP_ROWS
+  const foreignOnly = opts?.foreignLinesOnly === true
   const out = new Set<number>()
   for (const s of shapes) {
     if (s.name === target.name) continue
     if (axisOf(s) !== axis) continue
+    if (foreignOnly && s.lineKey === target.lineKey) continue
     if (Math.abs(perpOf(s) - home) > reach) continue
     const { lo, hi } = extentOf(s, axis)
     out.add(Number(lo.toFixed(2)))

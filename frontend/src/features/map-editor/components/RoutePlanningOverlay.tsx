@@ -8,6 +8,7 @@ import {
   resolveRoutePathMidpointPx,
   type RouteStationPoint,
 } from '../utils/routePlanning'
+import { geometryFromPathWaypoints } from '../utils/simRoutePathEdit'
 
 type RoutePreview = {
   stationIds: string[]
@@ -347,18 +348,24 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
         route,
         color,
         emphasized,
-        geometry: resolveRoutePreviewGeometry(
-          areas,
-          route.stationIds,
-          pointTopology,
-        ),
+        geometry:
+          geometryFromPathWaypoints(areas, route, pointTopology) ??
+          resolveRoutePreviewGeometry(
+            areas,
+            route.stationIds,
+            pointTopology,
+          ),
       })),
     [areas, pointTopology, savedRoutes],
   )
 
   const hasContent =
-    (activeGeometry && activeGeometry.stations.length > 0) ||
-    savedLayers.some((l) => l.geometry.stations.length > 0)
+    (activeGeometry &&
+      (activeGeometry.stations.length > 0 || activeGeometry.pathPx.length >= 2)) ||
+    savedLayers.some(
+      (l) =>
+        l.geometry.stations.length > 0 || l.geometry.pathPx.length >= 2,
+    )
   if (!hasContent) return null
 
   return (
@@ -368,7 +375,7 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
     >
       <svg className="absolute left-0 top-0 overflow-visible" width="100%" height="100%">
         {savedLayers.map(({ route, color, geometry, emphasized }) =>
-          geometry.stations.length > 0 ? (
+          geometry.stations.length > 0 || geometry.pathPx.length >= 2 ? (
             <RoutePathLayer
               key={route.routeId}
               layerKey={`${uid}-saved-${route.routeId}`}

@@ -2,6 +2,7 @@ import type { MapAreaObject } from '../types/area'
 import { collectStationsFromAreas } from './dockingPointStationId'
 import {
   resolveCrossoverPortalRouteStopMapPx,
+  resolveCrossPortalRouteStopMapPx,
   resolveDockingPointNodeMapPx,
   resolveFacilityDockingRouteStopMapPx,
   resolveRouteStationPoints,
@@ -10,6 +11,7 @@ import {
 } from './routePlanning'
 import {
   collectCrossoverPortalWaypointsFromAreas,
+  collectCrossPortalWaypointsFromAreas,
   collectWaypointsFromAreas,
 } from './waypointCode'
 import {
@@ -912,6 +914,14 @@ function resolveStationFieldMeters(
 
   const crossoverPx = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
   if (crossoverPx) return { xM: crossoverPx.xM, yM: crossoverPx.yM }
+
+  const cross = collectCrossPortalWaypointsFromAreas(areas).find(
+    (s) => s.stationId === stationId || s.topologyNodeId === stationId,
+  )
+  if (cross) return { xM: cross.xM, yM: cross.yM }
+
+  const crossPx = resolveCrossPortalRouteStopMapPx(areas, stationId)
+  if (crossPx) return { xM: crossPx.xM, yM: crossPx.yM }
 
   const fdock = resolveFacilityDockingRouteStopMapPx(areas, stationId)
   if (fdock) return { xM: fdock.xM, yM: fdock.yM }

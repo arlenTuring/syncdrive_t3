@@ -449,7 +449,14 @@ export function createBlankMapEntry(
     createdAt: now,
     updatedAt: now,
   }
-  return entryFromParsed(parsed, { libraryId })
+  return {
+    ...entryFromParsed(parsed, { libraryId }),
+    /*
+     * 還沒送上後端。必須標 pending，否則 openLibraryMap 會先 hydrate，
+     * 後端沒有這一張就把本機新建的清掉 →「找不到地圖」。
+     */
+    publishState: 'pending',
+  }
 }
 
 export function duplicateMapEntry(
@@ -474,6 +481,8 @@ export function duplicateMapEntry(
     createdAt: now,
     updatedAt: now,
     mapDocument: doc,
+    // 複製出來的是本機新條目，後端尚無；與新建空白同一規則
+    publishState: 'pending',
   }
 }
 

@@ -10,6 +10,7 @@ import {
   switchTrackEndSegmentsPx,
   taperTrackEndsPx,
 } from './trackShapes'
+import { DEFAULT_ORDINARY_TRACK_FILL_COLOR } from './trackFacility'
 
 export type Vec2 = { x: number; y: number }
 /** 這一段是路上的軌道還是路口裡的連接道 */
@@ -23,13 +24,15 @@ export const LANE_W_M = 3.35
 
 /**
  * 四種元件在圖上的底色。
+ * 一般軌道（rect）預設與 DEFAULT_ORDINARY_TRACK_FILL_COLOR 一致。
+ * stroke 用深色，預覽與生成後框線一致。
  */
 export const TRACK_GEN_KIND_COLOR = {
-  rect: { fill: '#3f3f46', stroke: '#a1a1aa' },
-  corner: { fill: '#2f4f4a', stroke: '#5eead4' },
-  taper: { fill: '#33435c', stroke: '#93b4e0' },
-  switch: { fill: '#463c5e', stroke: '#c4b5fd' },
-  cross: { fill: '#5c3a3a', stroke: '#fca5a5' },
+  rect: { fill: DEFAULT_ORDINARY_TRACK_FILL_COLOR, stroke: '#05070a' },
+  corner: { fill: '#2f4f4a', stroke: '#05070a' },
+  taper: { fill: '#33435c', stroke: '#05070a' },
+  switch: { fill: '#463c5e', stroke: '#05070a' },
+  cross: { fill: '#5c3a3a', stroke: '#05070a' },
 } as const
 
 

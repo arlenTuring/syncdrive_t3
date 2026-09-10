@@ -1,5 +1,8 @@
 import type { FacilityObject } from '../types/facility'
-import { parseTrackColorRules } from '../utils/trackFacility'
+import {
+  DEFAULT_ORDINARY_TRACK_FILL_COLOR,
+  parseTrackColorRules,
+} from '../utils/trackFacility'
 import { FillColorRulesSection } from './FillColorRulesSection'
 import { FrameInspectorSection } from './FrameInspectorSection'
 import { TrackCornerRadiusSection } from './TrackCornerRadiusSection'
@@ -25,7 +28,9 @@ export function TrackInspectorSection({
   const params = facility.parameters ?? {}
   const rules = parseTrackColorRules(params.colorRules)
   const defaultFill =
-    typeof params.defaultFillColor === 'string' ? params.defaultFillColor : '#52525b'
+    typeof params.defaultFillColor === 'string'
+      ? params.defaultFillColor
+      : DEFAULT_ORDINARY_TRACK_FILL_COLOR
 
   return (
     <>

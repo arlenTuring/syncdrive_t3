@@ -7,8 +7,10 @@ import { emptyPointTopology } from '../types/pointTopology'
 import {
   buildMapFileV2,
   facilityToMapEntry,
+  migrateFacilityName,
   migrateMisclassifiedSmartPoleEntry,
   parseMapFileJson,
+  recoverTrackNameFromParameters,
 } from './mapFileJson'
 
 function baseFacility(
@@ -285,6 +287,24 @@ describe('mapFileJson', () => {
     assert.equal(trackEntry.parameters?.segmentId, 'R01')
   })
 
+  it('facilityToMapEntry tolerates missing areaLayoutAnchor (TrackGen apply)', () => {
+    const f = baseFacility({
+      id: 'trk-no-anchor',
+      type: 'Track',
+      name: 'StraightTrack',
+      areaLayoutAnchor: undefined,
+    })
+    delete (f as { areaLayoutAnchor?: unknown }).areaLayoutAnchor
+    const entry = facilityToMapEntry(f)
+    assert.equal(entry.id, 'trk-no-anchor')
+    assert.equal(entry.areaLayoutAnchor, undefined)
+    // Must not throw when building a full map document either
+    const area = createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE)
+    area.facilities = [f]
+    const doc = buildMapFileV2('map-1', 'test', DEFAULT_MAP_PIXEL_SIZE, [area])
+    assert.equal(doc.areas[0]?.facilities[0]?.id, 'trk-no-anchor')
+  })
+
   it('round-trips TrackCrossover portals, facilityDockingPoint, and topology kinds', () => {
     const facilities = [
       baseFacility({
@@ -490,6 +510,30 @@ describe('mapFileJson', () => {
     assert.deepEqual(parsedLegacy.visibleRouteIds, [])
   })
 
+  it('round-trips route pathWaypoints for simulation path edit', () => {
+    const area = createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE)
+    const routes = [
+      {
+        routeId: 'route-path',
+        displayName: '折點路線',
+        stationIds: ['s1', 's2'],
+        pathWaypoints: [
+          { px: 10, py: 20, x: 1, y: 2, stationId: 's1' },
+          { px: 50, py: 20 },
+          { px: 50, py: 80, x: 5, y: 8, stationId: 's2' },
+        ],
+      },
+    ]
+    const doc = buildMapFileV2('map-pw', '折點', DEFAULT_MAP_PIXEL_SIZE, [area], {
+      routes,
+    })
+    const parsed = parseMapFileJson(JSON.parse(JSON.stringify(doc)))
+    assert.equal(parsed.routes[0]?.pathWaypoints?.length, 3)
+    assert.equal(parsed.routes[0]?.pathWaypoints?.[1]?.px, 50)
+    assert.equal(parsed.routes[0]?.pathWaypoints?.[0]?.stationId, 's1')
+    assert.equal(parsed.routes[0]?.pathWaypoints?.[1]?.stationId, undefined)
+  })
+
   it('migrates Facility+purpose 智慧桿 to Pole equipment', () => {
     const migrated = migrateMisclassifiedSmartPoleEntry({
       id: '052',
@@ -514,5 +558,79 @@ describe('mapFileJson', () => {
     assert.equal(migrated.parameters?.defaultFillColor, 'transparent')
     assert.equal(migrated.parameters?.customIconUrl, 'facility/smart_pole_enable.png')
     assert.deepEqual(migrated.areaSizePx, { w: 30, h: 105 })
+  })
+
+  it('preserves special Track names on migrate (not forced to Rail)', () => {
+    assert.equal(migrateFacilityName('Track', 'Rail'), 'Rail')
+    assert.equal(migrateFacilityName('Track', 'RailCorner'), 'RailCorner')
+    assert.equal(migrateFacilityName('Track', 'RailTaper'), 'RailTaper')
+    assert.equal(migrateFacilityName('Track', 'RailSwitch'), 'RailSwitch')
+    assert.equal(migrateFacilityName('Track', 'RailCross'), 'RailCross')
+  })
+
+  it('recovers Track name from shape parameters when wrongly stored as Rail', () => {
+    assert.equal(
+      recoverTrackNameFromParameters('Rail', { cornerTrack: { kind: 'se' } }),
+      'RailCorner',
+    )
+    assert.equal(
+      recoverTrackNameFromParameters('Rail', { taperTrack: { leftCut: 0.2 } }),
+      'RailTaper',
+    )
+    assert.equal(
+      recoverTrackNameFromParameters('Rail', { switchTrack: { arm: 1 } }),
+      'RailSwitch',
+    )
+    assert.equal(
+      recoverTrackNameFromParameters('Rail', { crossTrack: { arms: 4 } }),
+      'RailCross',
+    )
+    assert.equal(
+      recoverTrackNameFromParameters('Rail', { defaultFillColor: '#191F2F' }),
+      'Rail',
+    )
+  })
+
+  it('round-trips RailCorner / RailTaper names through map JSON', () => {
+    const area = {
+      ...createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE),
+      facilities: [
+        baseFacility({
+          id: 'c1',
+          type: 'Track',
+          name: 'RailCorner',
+          customName: '8:2X-01',
+          parameters: {
+            cornerTrack: { kind: 'se', radiusM: 12 },
+            defaultFillColor: '#2f4f4a',
+          },
+        }),
+        baseFacility({
+          id: 't1',
+          type: 'Track',
+          name: 'RailTaper',
+          customName: '9:2X-04',
+          parameters: {
+            taperTrack: { leftCutRatio: 0.3, rightCutRatio: 0.3 },
+            defaultFillColor: '#33435c',
+          },
+        }),
+      ],
+    }
+    const doc = buildMapFileV2('map-shapes', '形狀', DEFAULT_MAP_PIXEL_SIZE, [area])
+    const parsed = parseMapFileJson(JSON.parse(JSON.stringify(doc)))
+    assert.equal(parsed.areas[0]?.facilities.find((f) => f.id === 'c1')?.name, 'RailCorner')
+    assert.equal(parsed.areas[0]?.facilities.find((f) => f.id === 't1')?.name, 'RailTaper')
+
+    // 模擬已被 bug 寫成 Rail、但幾何參數還在的舊檔
+    const corrupted = JSON.parse(JSON.stringify(doc)) as {
+      areas: Array<{ facilities: Array<{ id: string; name: string; parameters?: unknown }> }>
+    }
+    for (const f of corrupted.areas[0]!.facilities) {
+      f.name = 'Rail'
+    }
+    const recovered = parseMapFileJson(corrupted)
+    assert.equal(recovered.areas[0]?.facilities.find((f) => f.id === 'c1')?.name, 'RailCorner')
+    assert.equal(recovered.areas[0]?.facilities.find((f) => f.id === 't1')?.name, 'RailTaper')
   })
 })

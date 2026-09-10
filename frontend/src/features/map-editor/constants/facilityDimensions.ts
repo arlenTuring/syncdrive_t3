@@ -33,12 +33,15 @@ export const TRACK_RAIL_WIDTH_M = 3.5
 /** 智慧電桿圖台預設尺寸（公尺）：寬為舊預設 2 倍、高為 3 倍 */
 export const POLE_DEFAULT_SIZE_M = { w: 3, h: 10.5 } as const
 
-/** smart_pole_enable.png 內燈頭＋燈桿大致範圍（方圖內比例，不含透明邊） */
-const POLE_ASSET_CONTENT = {
-  left: 0.31,
-  top: 0.08,
-  width: 0.38,
-  height: 0.52,
+/**
+ * smart_pole_enable.png 內燈頭＋燈桿大致範圍（相對整張方圖 0–1，不含大片黑邊／透明邊）。
+ * 圖台選取框應對齊這塊內容，拉框時圖示才會跟著變大變小。
+ */
+export const POLE_ASSET_CONTENT = {
+  left: 0.33,
+  top: 0.05,
+  width: 0.34,
+  height: 0.58,
 } as const
 
 export type PoleVisualLayout = {
@@ -50,8 +53,31 @@ export type PoleVisualLayout = {
 }
 
 /**
+ * 將智慧桿 PNG 的實質內容撐滿選取框（可非等比拉伸）。
+ * 回傳的是 <img> 的絕對定位尺寸與偏移（相對外框左上）。
+ */
+export function poleIconFillBoxStyle(boxW: number, boxH: number): {
+  width: number
+  height: number
+  left: number
+  top: number
+} {
+  const w = Math.max(1e-6, boxW)
+  const h = Math.max(1e-6, boxH)
+  const c = POLE_ASSET_CONTENT
+  const imgW = w / Math.max(1e-6, c.width)
+  const imgH = h / Math.max(1e-6, c.height)
+  return {
+    width: imgW,
+    height: imgH,
+    left: -c.left * imgW,
+    top: -c.top * imgH,
+  }
+}
+
+/**
  * 智慧電桿選取框與圖示排版（Area 內 px）。
- * @deprecated 圖台改為 object-contain 撐滿 areaSizePx；保留供舊程式參考。
+ * @deprecated 請用 poleIconFillBoxStyle；保留供舊程式參考。
  */
 export function resolvePoleVisualLayout(
   areaW: number,
@@ -124,11 +150,69 @@ export const TRACK_VARIANT_SIZE_M = (() => {
 })()
 
 /**
- * 軌道家族放進 Area 時的大小，<strong>由容器決定</strong>。
+ * 地圖編輯器：拖進 Area 的<strong>唯一預設尺寸參數</strong>。
+ *
+ * - 設備類：相對 Area 正式佈局 `shortPx`／`longPx` 的比例（＋ clamp）
+ * - 軌道類：相對場域 domain span 的帶寬／長度比例
+ *
+ * 改這裡＝之後所有新拖放、所有 layout 一併套用。勿在呼叫端另寫死像素。
  */
-const DROP_BAND_DIVISOR = 14
-const DROP_RAIL_SPAN = 1 / 4
-const TAPER_RAMP_RUN_DROP = 3
+export const AREA_DROP_DEFAULTS = {
+  /** 放進 Area 時最多佔容器每一邊的幾成（留空間拖／轉） */
+  maxSpanFrac: 1 / 3,
+  /** 短邊像素下限（略大於把手寬，過大會把小圖示撐回去） */
+  minSidePx: 16,
+
+  signal: { shortFrac: 0.08, minPx: 28, maxPx: 72 },
+  /** 智慧桿：短邊 8%（已含「小 4 倍」），外框比例跟 PNG 內容 */
+  pole: { shortFrac: 0.08, hMinPx: 22, hMaxPx: 60, wMinPx: 10, wMaxPx: 30 },
+  /** 設施：短邊約 12%×9.3%（已含「小 1/3」） */
+  facility: {
+    wShortFrac: 0.12,
+    hShortFrac: 0.14 * (2 / 3),
+    wMinPx: 42,
+    wMaxPx: 150,
+    hMinPx: 32,
+    hMaxPx: 115,
+  },
+  docking: { shortFrac: 0.04875, minPx: 18, maxPx: 42 },
+  /** 途經點：短邊 2.75%（已含「小 4 倍」） */
+  waypoint: { shortFrac: 0.0275, minPx: 10, maxPx: 20 },
+  /** 月台門：長邊 4.125%、短邊 1.5%（長度已再小一倍） */
+  psd: {
+    longFrac: 0.04125,
+    shortFrac: 0.015,
+    wMinPx: 24,
+    wMaxPx: 90,
+    hMinPx: 10,
+    hMaxPx: 18,
+  },
+  slot: {
+    longFrac: 0.18,
+    shortFrac: 0.055,
+    wMinPx: 72,
+    wMaxPx: 280,
+    hMinPx: 22,
+    hMaxPx: 56,
+  },
+  roadLine: {
+    longFrac: 0.28,
+    shortFrac: 0.016,
+    wMinPx: 100,
+    wMaxPx: 420,
+    hMinPx: 8,
+    hMaxPx: 22,
+  },
+
+  /** 軌道帶寬 = min(spanW,spanH) / bandDivisor */
+  trackBandDivisor: 14,
+  /** 一般軌道長度 = max(span) × lengthSpanFrac；帶寬 = band × bandScale */
+  rail: { lengthSpanFrac: 0.046875, bandScale: 0.375 },
+  /** 分岔軌道整體縮放（相對帶寬反推外框） */
+  railSwitchScale: 0.8,
+  taperRampRun: 3,
+  trackCrossover: { wBandMul: 8, hBandMul: 4 },
+} as const
 
 function trackDropSizeMeters(
   type: FacilityType,
@@ -136,9 +220,12 @@ function trackDropSizeMeters(
   spanW: number,
   spanH: number,
 ): { w: number; h: number } | null {
-  const band = Math.min(spanW, spanH) / DROP_BAND_DIVISOR
+  const d = AREA_DROP_DEFAULTS
+  const band = Math.min(spanW, spanH) / d.trackBandDivisor
   if (!(band > 0)) return null
-  if (type === 'TrackCrossover') return { w: band * 8, h: band * 4 }
+  if (type === 'TrackCrossover') {
+    return { w: band * d.trackCrossover.wBandMul, h: band * d.trackCrossover.hBandMul }
+  }
   if (type !== 'Track') return null
   if (name === 'RailCorner') {
     const side = band / (1 - DEFAULT_CORNER_TRACK.innerXRatio)
@@ -147,37 +234,145 @@ function trackDropSizeMeters(
   if (name === 'RailTaper') {
     const h = band / (DEFAULT_TAPER_TRACK.aTo - DEFAULT_TAPER_TRACK.aFrom)
     const shift = (DEFAULT_TAPER_TRACK.bFrom - DEFAULT_TAPER_TRACK.aFrom) * h
-    return { w: shift * TAPER_RAMP_RUN_DROP, h }
+    return { w: shift * d.taperRampRun, h }
   }
   if (name === 'RailCross') return crossSizeFor(band)
   if (name === 'RailSwitch') {
-    const h = band / (DEFAULT_SWITCH_TRACK.aTo - DEFAULT_SWITCH_TRACK.aFrom)
+    const h =
+      (band / (DEFAULT_SWITCH_TRACK.aTo - DEFAULT_SWITCH_TRACK.aFrom)) *
+      d.railSwitchScale
     const gap =
       Math.abs(
         (DEFAULT_SWITCH_TRACK.bFrom + DEFAULT_SWITCH_TRACK.bTo) / 2 -
           (DEFAULT_SWITCH_TRACK.mFrom + DEFAULT_SWITCH_TRACK.mTo) / 2,
       ) * h
-    return { w: gap * TAPER_RAMP_RUN_DROP, h }
+    return { w: gap * d.taperRampRun, h }
   }
-  return { w: Math.max(spanW, spanH) * DROP_RAIL_SPAN, h: band }
+  return {
+    w: Math.max(spanW, spanH) * d.rail.lengthSpanFrac,
+    h: band * d.rail.bandScale,
+  }
 }
 
 /**
- * 放進 Area 時最多佔容器每一邊的幾成。
+ * 設備／設施類：依 Area<strong>正式佈局像素</strong>（落在地圖 pixelSize 內）推算示意尺寸。
  *
- * 放下去之後還要挪位置、拉把手，佔滿整個容器就什麼都做不了；留三分之二的空間才轉得動。
+ * 參數一律讀 {@link AREA_DROP_DEFAULTS}，不同 layout 用同一套比例。
  */
-const DROP_MAX_SPAN = 1 / 3
-/**
- * 放下去之後短邊至少幾個像素。
- *
- * 四個角的把手各約 14 像素；短邊要放得下兩個把手還分得開，才抓得住上下（或左右）不同的
- * 那一個。抓不住就談不上縮放與旋轉。
- */
-const DROP_MIN_SIDE_PX = 24
+function equipmentDropSizeAreaPx(
+  type: FacilityType,
+  layout: MapAreaLayout,
+): { w: number; h: number } | null {
+  const shortPx = Math.max(1, Math.min(layout.wPx, layout.hPx))
+  const longPx = Math.max(1, Math.max(layout.wPx, layout.hPx))
+  const clamp = (n: number, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, n))
+  const d = AREA_DROP_DEFAULTS
+
+  switch (type) {
+    case 'Signal': {
+      const s = clamp(shortPx * d.signal.shortFrac, d.signal.minPx, d.signal.maxPx)
+      return { w: s, h: s }
+    }
+    case 'Pole': {
+      const aspect =
+        POLE_ASSET_CONTENT.width / Math.max(1e-6, POLE_ASSET_CONTENT.height)
+      const h = clamp(shortPx * d.pole.shortFrac, d.pole.hMinPx, d.pole.hMaxPx)
+      const w = clamp(h * aspect, d.pole.wMinPx, d.pole.wMaxPx)
+      return { w, h }
+    }
+    case 'Facility': {
+      return {
+        w: clamp(
+          shortPx * d.facility.wShortFrac,
+          d.facility.wMinPx,
+          d.facility.wMaxPx,
+        ),
+        h: clamp(
+          shortPx * d.facility.hShortFrac,
+          d.facility.hMinPx,
+          d.facility.hMaxPx,
+        ),
+      }
+    }
+    case 'DockingPoint': {
+      const s = clamp(
+        shortPx * d.docking.shortFrac,
+        d.docking.minPx,
+        d.docking.maxPx,
+      )
+      return { w: s, h: s }
+    }
+    case 'Waypoint': {
+      const s = clamp(
+        shortPx * d.waypoint.shortFrac,
+        d.waypoint.minPx,
+        d.waypoint.maxPx,
+      )
+      return { w: s, h: s }
+    }
+    case 'PSD': {
+      return {
+        w: clamp(longPx * d.psd.longFrac, d.psd.wMinPx, d.psd.wMaxPx),
+        h: clamp(shortPx * d.psd.shortFrac, d.psd.hMinPx, d.psd.hMaxPx),
+      }
+    }
+    case 'Slot': {
+      return {
+        w: clamp(longPx * d.slot.longFrac, d.slot.wMinPx, d.slot.wMaxPx),
+        h: clamp(shortPx * d.slot.shortFrac, d.slot.hMinPx, d.slot.hMaxPx),
+      }
+    }
+    case 'RoadLine': {
+      return {
+        w: clamp(
+          longPx * d.roadLine.longFrac,
+          d.roadLine.wMinPx,
+          d.roadLine.wMaxPx,
+        ),
+        h: clamp(
+          shortPx * d.roadLine.shortFrac,
+          d.roadLine.hMinPx,
+          d.roadLine.hMaxPx,
+        ),
+      }
+    }
+    case 'Geofence':
+      // 地圖編輯器不再提供電子圍籬拖放；保留分支僅供舊碼路徑防呆
+      return null
+    default:
+      return null
+  }
+}
+
+function fitDropSizeIntoLayout(
+  size: { w: number; h: number },
+  layout: MapAreaLayout,
+): { w: number; h: number } {
+  const maxSpan = AREA_DROP_DEFAULTS.maxSpanFrac
+  const minSide = AREA_DROP_DEFAULTS.minSidePx
+  const maxW = Math.max(minSide, layout.wPx * maxSpan)
+  const maxH = Math.max(minSide, layout.hPx * maxSpan)
+  const fit = Math.min(1, maxW / Math.max(1e-6, size.w), maxH / Math.max(1e-6, size.h))
+  let w = size.w * fit
+  let h = size.h * fit
+  // 短邊低於把手可用尺寸時等比放大，避免只撐一邊把瘦高圖示拉胖
+  const side = Math.min(w, h)
+  if (side > 0 && side < minSide) {
+    const grow = minSide / side
+    w *= grow
+    h *= grow
+  }
+  // 撐大後仍不得超出容器
+  const inside = Math.min(1, layout.wPx / w, layout.hPx / h)
+  return { w: w * inside, h: h * inside }
+}
 
 /**
  * 一個設施剛放進 Area 時的大小（Area 局部像素）。
+ *
+ * - 軌道／渡線：依場域公尺 span 推帶寬再換成 layout px（接得上、比例對）
+ * - 其餘設備：依 Area 正式佈局像素比例（跟當前顯示畫布成比例）
  */
 export function defaultAreaSizePxForDrop(
   type: FacilityType,
@@ -187,14 +382,54 @@ export function defaultAreaSizePxForDrop(
 ): { w: number; h: number } {
   const spanW = Math.max(1e-6, domainWidthM(domain))
   const spanH = Math.max(1e-6, domainHeightM(domain))
-  // 軌道家族的大小由容器決定；其餘設施仍用自己的預設公尺數
-  const m = trackDropSizeMeters(type, name, spanW, spanH) ?? defaultSizeMetersForType(type, name)
-  const fit = Math.min(1, (spanW * DROP_MAX_SPAN) / m.w, (spanH * DROP_MAX_SPAN) / m.h)
-  const px = meterSizeToAreaLocalPx(m.w * fit, m.h * fit, domain, layout)
-  const grow = Math.max(1, DROP_MIN_SIDE_PX / Math.max(1e-6, Math.min(px.w, px.h)))
-  // 撐大之後仍然不准超出容器——「不能比容器大」是硬規則，其餘都是取捨
-  const inside = Math.min(1, layout.wPx / (px.w * grow), layout.hPx / (px.h * grow))
-  return { w: px.w * grow * inside, h: px.h * grow * inside }
+
+  const trackM = trackDropSizeMeters(type, name, spanW, spanH)
+  if (trackM) {
+    const px = meterSizeToAreaLocalPx(trackM.w, trackM.h, domain, layout)
+    const grow = Math.max(
+      1,
+      AREA_DROP_DEFAULTS.minSidePx / Math.max(1e-6, Math.min(px.w, px.h)),
+    )
+    return fitDropSizeIntoLayout({ w: px.w * grow, h: px.h * grow }, layout)
+  }
+
+  const byLayout = equipmentDropSizeAreaPx(type, layout)
+  if (byLayout) return fitDropSizeIntoLayout(byLayout, layout)
+
+  // 後備：語意公尺 → layout px
+  const m = defaultSizeMetersForType(type, name)
+  const px = meterSizeToAreaLocalPx(m.w, m.h, domain, layout)
+  return fitDropSizeIntoLayout(px, layout)
+}
+
+/**
+ * 地圖層（Area／底圖／軌道群體）拖放預設尺寸——依正式顯示 pixelSize 比例。
+ */
+export function defaultMapChromeSizePxForDrop(
+  kind: 'area' | 'basemap' | 'trackGen',
+  mapPixelSize: { width: number; height: number },
+): { w: number; h: number } {
+  const W = Math.max(320, mapPixelSize.width)
+  const H = Math.max(240, mapPixelSize.height)
+  switch (kind) {
+    case 'trackGen':
+      // 軌道群體：橫向長條，約畫布寬 45%、高 52%（短畫布也保底可操作）
+      return {
+        w: Math.round(Math.min(W * 0.92, Math.max(520, W * 0.45))),
+        h: Math.round(Math.min(H * 0.85, Math.max(180, H * 0.52))),
+      }
+    case 'basemap':
+      return {
+        w: Math.round(Math.min(W * 0.7, Math.max(280, W * 0.28))),
+        h: Math.round(Math.min(H * 0.7, Math.max(200, H * 0.36))),
+      }
+    case 'area':
+    default:
+      return {
+        w: Math.round(Math.min(W * 0.7, Math.max(260, W * 0.24))),
+        h: Math.round(Math.min(H * 0.7, Math.max(180, H * 0.34))),
+      }
+  }
 }
 
 export function defaultCanvasSizePxForType(
@@ -240,21 +475,22 @@ export function defaultSizeMetersForType(
     case 'Track':
       return { w: 50, h: TRACK_RAIL_WIDTH_M }
     case 'Signal':
-      return { w: 16, h: 16 }
+      // 示意圖示語意尺寸（公尺）；圖台拖放改走 layout 像素比例
+      return { w: 5, h: 5 }
     case 'PSD':
-      return { w: 40, h: 4 }
+      return { w: 18, h: 3.5 }
     case 'Pole':
       return { ...POLE_DEFAULT_SIZE_M }
     case 'DockingPoint':
     case 'Waypoint':
-      return { w: 4, h: 4 }
+      return { w: 3.5, h: 3.5 }
     case 'RoadLine':
       return { w: 40, h: 1.2 }
     case 'TrackCrossover':
       // 預設約覆蓋一節平行股交叉區（寬沿軌道、高跨 U/D 間距）
       return { w: 28, h: 14 }
     case 'Facility':
-      return { w: 24, h: 18 }
+      return { w: 16, h: 12 }
     case 'Geofence':
       return { ...GEOFENCE_DEFAULT_SIZE_METERS }
     case 'Basemap':

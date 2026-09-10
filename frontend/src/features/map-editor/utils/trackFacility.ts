@@ -1,6 +1,15 @@
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type { FacilityObject } from '../types/facility'
 
+/** 一般軌道（矩形／StraightTrack）預設填色 */
+export const DEFAULT_ORDINARY_TRACK_FILL_COLOR = '#191F2F'
+
+/**
+ * 生成軌道的預設框線：比底色更深，用來分出相鄰塊的界線（深底上才看得出）。
+ */
+export const DEFAULT_TRACK_FRAME_STROKE_COLOR = '#05070a'
+export const DEFAULT_TRACK_FRAME_STROKE_WIDTH_PX = 1
+
 export type TrackColorRule = {
   fieldPath: string
   operator: 'eq' | 'gt' | 'lt'
@@ -68,7 +77,7 @@ export function resolveTrackFillColor(
   f: FacilityObject,
   mqttLive?: MqttLiveEntry,
 ): string {
-  if (f.type !== 'Track') return '#52525b'
+  if (f.type !== 'Track') return DEFAULT_ORDINARY_TRACK_FILL_COLOR
   const p = getTrackParameters(f)
   const rules = parseTrackColorRules(p.colorRules)
   for (const rule of rules) {
@@ -85,6 +94,6 @@ export function resolveTrackFillColor(
   if (typeof p.defaultFillColor === 'string' && p.defaultFillColor.trim()) {
     return p.defaultFillColor.trim()
   }
-  return '#52525b'
+  return DEFAULT_ORDINARY_TRACK_FILL_COLOR
 }
 

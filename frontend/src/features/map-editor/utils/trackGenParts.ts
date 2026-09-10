@@ -1,5 +1,6 @@
 import type { FacilityObject } from '../types/facility'
 import { CROSS_PARTS, SWITCH_PARTS, type TrackGenPart } from './trackGenGroups'
+import { TRACK_DEFAULT_LABEL_FONT_PX } from './facilityLabelStyle'
 
 /**
  * 交叉與分岔<strong>一個元件、兩條軌道</strong>。
@@ -9,8 +10,11 @@ export const TRACKGEN_PART_NAMES_KEY = 'trackGenPartNames'
 export const TRACKGEN_PART_COLORS_KEY = 'trackGenPartColors'
 export const TRACKGEN_PART_FONT_KEY = 'trackGenPartFontPx'
 
-/** 兩半的名字沒有設字級時用這個 */
-export const DEFAULT_PART_FONT_PX = 11
+/**
+ * 兩半名字的預設字級——與一般軌道 {@link TRACK_DEFAULT_LABEL_FONT_PX} 一致。
+ * 軌道生成套用時也寫入同一值，避免主線／岔線看起來比直軌小一截。
+ */
+export const DEFAULT_PART_FONT_PX = TRACK_DEFAULT_LABEL_FONT_PX
 export const MIN_PART_FONT_PX = 6
 export const MAX_PART_FONT_PX = 48
 
