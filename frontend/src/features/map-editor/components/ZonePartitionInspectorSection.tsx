@@ -263,7 +263,8 @@ export function ParentZoneInspectorSection({
           <option value="">{t('mapEditor.inspector.parentZone.none')}</option>
           {zones.map((z) => (
             <option key={z.id} value={z.id}>
-              {(z.customName || z.name || z.id).trim() || z.id}
+              {/* name 是字面量聯集、永遠非空，再 || z.id 這一段到不了，型別會被窄成 never */}
+              {(z.customName || z.name).trim() || z.id}
             </option>
           ))}
         </select>

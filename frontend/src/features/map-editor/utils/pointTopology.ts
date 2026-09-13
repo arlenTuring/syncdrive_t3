@@ -25,7 +25,6 @@ import {
   CROSSOVER_PORTAL_KEYS,
 } from './trackCrossoverFacility'
 import {
-  CROSS_PORTAL_KEYS,
   CROSS_PORTAL_UI_ORDER,
   crossPortalTopologyNodeId,
   getCrossPortals,

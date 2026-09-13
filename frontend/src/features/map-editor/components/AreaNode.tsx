@@ -1227,7 +1227,6 @@ export const AreaNode = memo(function AreaNode({
       }
       const other = cur[OPPOSITE_FACE[end] ?? 'a']
       if (!other) return false
-      const [x, y] = end === 'a' ? [edge, other] : [other, edge]
       if (f.name === 'RailTaper') {
         const next = alignTaperFaces(
           { a: cur.a!, b: cur.b! },
@@ -1483,7 +1482,6 @@ export const AreaNode = memo(function AreaNode({
       } else {
         const other = cur[OPPOSITE_FACE[end] ?? 'a']
         if (!other) return
-        const [x, y] = end === 'a' ? [want, other] : [other, want]
         if (f.name === 'RailTaper') {
           const next = alignTaperFaces(
             { a: cur.a!, b: cur.b! },

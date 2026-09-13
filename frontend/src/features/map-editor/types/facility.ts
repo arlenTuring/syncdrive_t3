@@ -138,7 +138,6 @@ export type FacilityObject =
         | 'RoadLine'
         | 'TrackCrossover'
         | 'Basemap'
-  | 'Basemap'
       name: FacilityName
       customName: string
       areaPosition: { x: number; y: number }

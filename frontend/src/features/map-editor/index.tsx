@@ -220,6 +220,7 @@ import {
   sanitizeZoneParameters,
   syncZoneChildFieldFromPlacement,
   ZONE_ENTRANCE_LINKS_KEY,
+  ZONE_LOCAL_FIELD_KEY,
   ZONE_PARTITION_ENTRANCE_ID_KEY,
   ZONE_PARTITION_LINK_ID_KEY,
   type ZoneEntranceLink,

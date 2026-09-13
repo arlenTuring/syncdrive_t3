@@ -3495,7 +3495,7 @@ export const FacilityNode = memo(function FacilityNode({
                     fontWeight: 600,
                     fontStyle: 'normal',
                     textAlign: 'center',
-                    verticalAlign: 'middle',
+                    verticalAlign: 'center',
                     textWrap: 'single',
                   }}
                   anchorX={p.at.x}
