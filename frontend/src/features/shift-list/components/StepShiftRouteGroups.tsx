@@ -49,6 +49,7 @@ import {
   formatStationDwellRoleLabel,
   resolveStationDwellMode,
   sortSelectedRoutesByExecutionOrder,
+  pruneRouteRelationLinksByJunction,
   syncRouteRelationGraphWithRoutes,
   normalizeSwitchBufferAfterSeconds,
   normalizeDwellSlackSeconds,
@@ -68,6 +69,7 @@ import {
   buildThroughVerificationFingerprint,
   computeRouteThroughPaths,
   emptyShiftRouteThroughAnchorsDraft,
+  invalidateThroughAnchorsForRouteChange,
   isThroughVerificationCurrent,
   sortListedThroughCycles,
   type RouteThroughCycle,
@@ -692,6 +694,17 @@ export function StepShiftRouteGroups({
   const [mapDisplayName, setMapDisplayName] = useState('');
   const [availableMaps, setAvailableMaps] = useState<ShiftRouteGroupMapOption[]>([]);
   const [firstTripOriginsHint, setFirstTripOriginsHint] = useState<string | null>(null);
+  /**
+   * 換圖／改起迄之後，哪些東西被自動清掉了。
+   *
+   * 換圖是允許的動作，但關聯與起算／結算都綁在 instanceId 上，路線換了它們就不能算數。
+   * 靜靜清掉一樣難查，所以把「幾條路線換了、剪掉幾條關聯、起算結算有沒有重置」寫出來。
+   */
+  const [routeSyncNotice, setRouteSyncNotice] = useState<{
+    routes: number;
+    links: number;
+    anchors: boolean;
+  } | null>(null);
   /** 使用者／草稿選定的地圖；空字串＝初次載入時跟場域管理目前使用地圖 */
   const [preferredMapId, setPreferredMapId] = useState(() => draft.mapId.trim());
   const [catalog, setCatalog] = useState<ShiftRouteGroupCatalogItem[]>([]);
@@ -744,6 +757,8 @@ export function StepShiftRouteGroups({
         const mapChanged =
           draftRef.current.mapId.trim() !== ''
           && draftRef.current.mapId.trim() !== result.mapId;
+        /** 這一輪同步後「instanceId 指到別條路線」的那些；關聯與起算結算要跟著失效 */
+        const changedInstanceIds = new Set<string>();
         const nextRoutes = normalizeSelectedRouteExecutionOrders(
             draftRef.current.selectedRoutes
             .filter(
@@ -751,6 +766,7 @@ export function StepShiftRouteGroups({
                 isPrimarySelectedRoute(selected) && validRouteIds.has(selected.routeId),
             )
               .map((selected) => {
+                const selectedInstanceId = selected.instanceId?.trim() || selected.routeId;
                 const hit = routeMeta.get(selected.routeId);
               if (!hit) {
                 return {
@@ -766,11 +782,18 @@ export function StepShiftRouteGroups({
                 const nextFirst = meta.stationIds[0] ?? '';
                 const nextLast =
                   meta.stationIds[meta.stationIds.length - 1] ?? '';
-                // 換地圖或起迄站變了＝這條 routeId 已不是當初編代號時那條；舊代號必須清掉
+                /*
+                 * 換地圖或起迄站變了＝這條 routeId 已不是當初編代號時那條。
+                 *
+                 * routeId 是流水號，換一張圖就可能對到另一條路線（實測 route_4～route_7
+                 * 整組挪了一位）。代號要清掉，關聯與起算／結算也一起失效——它們存的都是
+                 * instanceId，指向的路線換了就不能再算數。
+                 */
                 const routeIdentityChanged =
                   mapChanged
                   || prevFirst !== nextFirst
                   || prevLast !== nextLast;
+                if (routeIdentityChanged) changedInstanceIds.add(selectedInstanceId);
                 return {
                   ...selected,
                   // routeId 在不同地圖可能對到不同路線；名稱／群組／站序必須一起同步
@@ -793,18 +816,39 @@ export function StepShiftRouteGroups({
                 };
               }),
         );
+        /*
+         * 關聯與起算／結算都存 instanceId，指到的路線換了就不能再算數。
+         *
+         * 先跟著路線對帳，再把「終站 ≠ 下一條起站」的連線剪掉——留著的話導通驗算會
+         * 默默丟掉它們：箭頭照畫在圖上，組合卻算不出來，看不出是哪裡壞的。剪掉幾條、
+         * 起算結算有沒有被清，一律寫出來給使用者看。
+         */
+        const syncedGraph = syncRouteRelationGraphWithRoutes(
+          draftRef.current.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
+          nextRoutes,
+        );
+        const pruned = pruneRouteRelationLinksByJunction(syncedGraph, nextRoutes);
+        const anchorsResult = invalidateThroughAnchorsForRouteChange(
+          draftRef.current.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
+          changedInstanceIds,
+        );
+        setRouteSyncNotice(
+          changedInstanceIds.size > 0 || pruned.removed > 0
+            ? {
+                routes: changedInstanceIds.size,
+                links: pruned.removed,
+                anchors: anchorsResult.changed,
+              }
+            : null,
+        );
         onChangeRef.current({
           ...draftRef.current,
           mapId: result.mapId,
           minimumRecoveryTimeSeconds: draftRef.current.minimumRecoveryTimeSeconds,
           selectedRoutes: nextRoutes,
           serviceDirectionTags: draftRef.current.serviceDirectionTags ?? [],
-          routeRelationGraph: syncRouteRelationGraphWithRoutes(
-            draftRef.current.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
-            nextRoutes,
-          ),
-          throughAnchors:
-            draftRef.current.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
+          routeRelationGraph: pruned.graph,
+          throughAnchors: anchorsResult.anchors,
         });
       })
       .catch((e) => {
@@ -1762,6 +1806,19 @@ export function StepShiftRouteGroups({
             </p>
           ) : null}
           </div>
+        {!loading && !error && routeSyncNotice ? (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+            地圖或路線已變動，下列項目已自動重置，請重新指定後再檢查路線組合：
+            <span className="ml-1 font-medium">
+              {routeSyncNotice.routes > 0 ? `${routeSyncNotice.routes} 條路線改對到不同路徑（代號已清空）` : null}
+              {routeSyncNotice.routes > 0 && routeSyncNotice.links > 0 ? '、' : null}
+              {routeSyncNotice.links > 0 ? `${routeSyncNotice.links} 條關聯已接不起來並移除` : null}
+              {routeSyncNotice.anchors
+                ? `${routeSyncNotice.routes > 0 || routeSyncNotice.links > 0 ? '、' : ''}起算／結算與上次驗算結果已清除`
+                : null}
+            </span>
+          </div>
+        ) : null}
         {!loading && !error && firstTripOriginsHint ? (
           <p className="text-xs text-zinc-400">{firstTripOriginsHint}</p>
         ) : null}

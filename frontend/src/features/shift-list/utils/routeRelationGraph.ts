@@ -176,6 +176,30 @@ export function syncRouteRelationGraphWithRoutes(
   return { nodes: nextNodes, links };
 }
 
+/**
+ * 只留「前線終站＝後線起站」接得起來的連線。
+ *
+ * 關聯是照 instanceId 存的，而同一個 instanceId 在換圖之後可能對到<strong>另一條路線</strong>
+ * （routeId 是流水號，跨圖台不穩定）。這時連線還在、指到的卻是別條路，導通驗算會把它們
+ * 默默丟掉：畫面上箭頭照畫，組合卻算不出來，使用者完全看不出原因。
+ *
+ * 所以每次跟著路線重新同步時就一起清掉，並把清掉幾條回報出去，由上層告訴使用者。
+ */
+export function pruneRouteRelationLinksByJunction(
+  graph: ShiftRouteRelationGraph,
+  routes: RouteLike[],
+): { graph: ShiftRouteRelationGraph; removed: number } {
+  const byId = new Map(routes.map((route) => [resolveInstanceId(route), route] as const));
+  const kept = graph.links.filter((link) => {
+    const from = byId.get(link.fromInstanceId);
+    const to = byId.get(link.toInstanceId);
+    if (!from || !to) return false;
+    return isRouteRelationJunctionMatched(from, to);
+  });
+  const removed = graph.links.length - kept.length;
+  return { graph: removed > 0 ? { ...graph, links: kept } : graph, removed };
+}
+
 export function updateRouteRelationNodePosition(
   graph: ShiftRouteRelationGraph,
   instanceId: string,

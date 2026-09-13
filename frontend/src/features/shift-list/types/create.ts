@@ -81,6 +81,7 @@ export type { ShiftRouteThroughAnchorsDraft } from '../utils/routeRelationThroug
 export {
   emptyShiftRouteRelationGraph,
   parseShiftRouteRelationGraph,
+  pruneRouteRelationLinksByJunction,
   syncRouteRelationGraphWithRoutes,
 } from '../utils/routeRelationGraph';
 export {

@@ -429,6 +429,44 @@ export type ShiftRouteThroughAnchorsDraft = {
   listedFingerprint: string | null;
 };
 
+/**
+ * 路線換掉之後，起算／結算與上一次的驗算結果一律失效。
+ *
+ * 起算／結算存的是 instanceId，而換圖之後同一個 instanceId 可能是另一條路線；
+ * 驗算結果更是照舊的關聯算出來的。留著只會讓 Step 4 以「已通過」的狀態帶著錯的組合
+ * 往下走，所以只要有路線變動就整份清掉，讓使用者重新指定。
+ */
+export function invalidateThroughAnchorsForRouteChange(
+  anchors: ShiftRouteThroughAnchorsDraft,
+  changedInstanceIds: ReadonlySet<string>,
+): { anchors: ShiftRouteThroughAnchorsDraft; changed: boolean } {
+  const keep = (ids: string[]) => ids.filter((id) => !changedInstanceIds.has(id));
+  const nextStart = keep(anchors.startInstanceIds);
+  const nextEnd = keep(anchors.endInstanceIds);
+  const anchorsDropped =
+    nextStart.length !== anchors.startInstanceIds.length
+    || nextEnd.length !== anchors.endInstanceIds.length;
+  const hadVerification =
+    anchors.verifiedFingerprint !== null
+    || anchors.preferredThroughCycleId !== null
+    || anchors.listedThroughCycles.length > 0;
+  if (changedInstanceIds.size === 0) return { anchors, changed: false };
+  if (!anchorsDropped && !hadVerification) return { anchors, changed: false };
+  return {
+    anchors: {
+      ...anchors,
+      startInstanceIds: nextStart,
+      endInstanceIds: nextEnd,
+      verifiedFingerprint: null,
+      verifiedPathCount: 0,
+      preferredThroughCycleId: null,
+      listedThroughCycles: [],
+      listedFingerprint: null,
+    },
+    changed: true,
+  };
+}
+
 export function emptyShiftRouteThroughAnchorsDraft(): ShiftRouteThroughAnchorsDraft {
   return {
     startStationIds: [],
