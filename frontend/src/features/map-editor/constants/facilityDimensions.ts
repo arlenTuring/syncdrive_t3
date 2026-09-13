@@ -446,7 +446,7 @@ export function defaultCanvasSizePxForType(
   }
 }
 
-/** 各類型參照場域／語意預設（公尺；非圖台畫素） */
+/** 各類型 refField／語意預設（公尺；非圖台畫素） */
 /**
  * 設施預設尺寸。
  */
@@ -521,7 +521,7 @@ export function clampSizeMeters(
 }
 
 /**
- * 設施在場域中的語意寬高（公尺）：參照場域範圍 → 電子圍籬頂點包絡 → 類型預設。
+ * 設施在場域中的語意寬高（公尺）：場域範圍 → 電子圍籬頂點包絡 → 類型預設。
  * 圖台顯示尺寸請用 areaSizePx，勿與此混用。
  */
 export function getFacilitySizeMeters(

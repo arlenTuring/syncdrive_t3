@@ -195,7 +195,7 @@ describe('generateShiftSchedule', () => {
       taskType: 'passenger',
       startMinute: 600,
       durationMinutes: 21,
-      label: '正線 1',
+        label: '正線 1',
     };
     const t2: ScheduleTask = {
       id: 't2',
@@ -366,22 +366,22 @@ describe('generateShiftSchedule', () => {
       [
         1,
         [
-          {
-            id: 't1',
-            rowIndex: 1,
-            taskType: 'passenger',
-            startMinute: 600,
+      {
+        id: 't1',
+        rowIndex: 1,
+        taskType: 'passenger',
+        startMinute: 600,
             durationMinutes: 3,
-            label: '正線 1',
-          },
-          {
-            id: 't2',
-            rowIndex: 1,
-            taskType: 'passenger',
+        label: '正線 1',
+      },
+      {
+        id: 't2',
+        rowIndex: 1,
+        taskType: 'passenger',
             startMinute: 604,
             durationMinutes: 3,
-            label: '正線 2',
-          },
+        label: '正線 2',
+      },
         ],
       ],
     ]);

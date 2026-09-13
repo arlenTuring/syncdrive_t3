@@ -31,6 +31,9 @@ import {
   resolveCrossPortalDisplayName,
   resolveCrossPortalFields,
 } from './crossTrackPortals'
+import { resolveFacilityAreaSize } from './facilityAreaCoords'
+import { crossTrackHandlesPx, readCrossTrack } from './trackShapes'
+import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
 
 export type RoutePlanningDraft = {
   routeId: string | null
@@ -262,7 +265,7 @@ export function resolveCrossoverPortalRouteStopMapPx(
     const portal = portals?.[ref.key]
     if (!portal) continue
     // portal.xM/yM 已是場域公尺；用 Area 座標系換算。
-    // 不可走 fieldPositionToFacilityAreaLocal：虛擬渡線通常沒有參照場域範圍，會整段找不到畫面站位。
+    // 不可走 fieldPositionToFacilityAreaLocal：虛擬渡線通常沒有場域範圍，會整段找不到畫面站位。
     const areaLocal = meterToAreaLocalPx(
       portal.xM,
       portal.yM,
@@ -306,13 +309,30 @@ export function resolveCrossPortalRouteStopMapPx(
     const fields = resolveCrossPortalFields(facility, area)
     const field = fields[ref.key]
     if (field.xM == null || field.yM == null) continue
-    const areaLocal = meterToAreaLocalPx(
-      field.xM,
-      field.yM,
-      area.domain,
-      area.layout,
+
+    /**
+     * 圖台位置必須用交叉口<strong>幾何把手</strong>，不可把場域座標再經 Area domain 反推。
+     *
+     * 高精地圖的場域常在負座標（如 −180／−333），而 Area domain 刻度可能從 0 起；
+     * 混用會把途經點畫到框外左下，路線紅虛線也跟著飛出去。畫面上的綠點本來就是
+     * 依把手畫的，站位應與之一致。
+     */
+    const size = resolveFacilityAreaSize(facility, area.domain, area.layout)
+    const handles = crossTrackHandlesPx(
+      readCrossTrack(facility.parameters),
+      size.w,
+      size.h,
     )
-    const css = areaPositionToCssTopLeft(areaLocal, { w: 0, h: 0 }, area.layout.hPx)
+    const h = handles[ref.key]
+    const areaLocal = trackLocalPathPointToAreaLocal(facility, area, {
+      x: h.x / Math.max(1e-6, size.w),
+      y: h.y / Math.max(1e-6, size.h),
+    })
+    const css = areaPositionToCssTopLeft(
+      areaLocal,
+      { w: 0, h: 0 },
+      area.layout.hPx,
+    )
     return {
       x: area.layout.xPx + css.left,
       y: area.layout.yPx + css.top,

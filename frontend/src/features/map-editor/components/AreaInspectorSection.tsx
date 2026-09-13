@@ -350,8 +350,11 @@ export function AreaInspectorSection({
               onBlur={onFieldBlur}
               className="rounded border-zinc-600 accent-cyan-500"
             />
-            在畫布顯示公尺刻度
+            在畫布顯示刻度／座標尺
           </label>
+          <p className="text-[10px] leading-relaxed text-zinc-500">
+            刻度／座標數字畫在 Area（正式顯示範圍）外側，不遮擋軌道與設施。工具列可循環：關閉 → 刻度 → 座標。
+          </p>
         </section>
 
         {!readOnly && (

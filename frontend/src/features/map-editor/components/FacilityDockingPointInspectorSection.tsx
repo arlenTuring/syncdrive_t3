@@ -71,7 +71,7 @@ export function FacilityDockingPointInspectorSection({
             設施停靠點
           </h3>
           <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-            設於本設施參照場域範圍內；圖上為綠色圓點，可拖曳但不可離開設施外框。設定後會出現在點位清單「設施停靠點」。
+            設於本設施場域範圍內；圖上為綠色圓點，可拖曳但不可離開設施外框。設定後會出現在點位清單「設施停靠點」。
           </p>
         </div>
         {point ? (
@@ -84,7 +84,7 @@ export function FacilityDockingPointInspectorSection({
 
       {!bounds ? (
         <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-2 text-[10px] text-zinc-500">
-          請先填寫有效的「參照場域範圍」，才能設定設施停靠點。
+          請先填寫有效的「場域範圍」，才能設定設施停靠點。
         </p>
       ) : !point ? (
         <button

@@ -10,8 +10,9 @@ import {
 } from '../types/pointTopology'
 import {
   getDockingPointStationId,
-  getDockingPointStationName,
+  resolveDockingPointMapLabel,
 } from './dockingPointFacility'
+import { getComponentPurpose } from './facilityArea'
 import {
   getFacilityDockingPoint,
   resolveFacilityDockingPointTopologyLabel,
@@ -31,11 +32,15 @@ import {
   parseCrossPortalTopologyNodeId,
   resolveCrossPortalDisplayName,
 } from './crossTrackPortals'
-import { resolveWaypointDisplayName } from './waypointFacility'
+import {
+  getWaypointCode,
+  getWaypointName,
+} from './waypointFacility'
 import {
   collectCrossoverPortalWaypointsFromAreas,
   collectCrossPortalWaypointsFromAreas,
 } from './waypointCode'
+import { isZoneEntrance, isZonePartition } from './zonePartition'
 
 const NODE_RADIUS_PX = 36
 const LAYOUT_PADDING = 72
@@ -73,13 +78,12 @@ export function colorForTopologyNodeKind(kind: PointTopologyNodeKind): string {
   return TOPOLOGY_KIND_COLORS[kind]
 }
 
-/** 可載入路網拓撲的地圖物件：停靠點、途經點、大型設施（虛擬渡線端點另以 xowp 節點載入） */
+/** 可載入路網拓撲：停靠點、途經點、大型設施（不含分區／分區入口；虛擬渡線端點另以 xowp 載入） */
 export function isTopologyLoadableFacility(facility: FacilityObject): boolean {
-  return (
-    facility.type === 'DockingPoint'
-    || facility.type === 'Waypoint'
-    || facility.type === 'Facility'
-  )
+  if (facility.type === 'DockingPoint' || facility.type === 'Waypoint') return true
+  if (facility.type !== 'Facility') return false
+  if (isZonePartition(facility) || isZoneEntrance(facility)) return false
+  return true
 }
 
 function findFacilityInAreasById(
@@ -107,18 +111,66 @@ function collectTopologyFacilities(areas: MapAreaObject[]): FacilityObject[] {
 
 export function labelForTopologyFacility(facility: FacilityObject): string {
   if (facility.type === 'DockingPoint') {
-    const custom = facility.customName.trim()
-    if (custom) return custom
-    const legacy = getDockingPointStationName(facility)
-    if (legacy) return legacy
-    const stationId = getDockingPointStationId(facility)
-    if (stationId) return stationId
-    return facility.name
+    return resolveDockingPointMapLabel(facility) || facility.id
   }
   if (facility.type === 'Waypoint') {
-    return resolveWaypointDisplayName(facility) || facility.name
+    const custom = facility.customName.trim()
+    if (custom && custom !== facility.id) return custom
+    const legacy = getWaypointName(facility)
+    if (legacy) return legacy
+    const code = getWaypointCode(facility)
+    return code || facility.id
   }
-  return facility.customName || facility.name
+  const custom = facility.customName.trim()
+  if (custom && custom !== facility.id) return custom
+  const purpose = getComponentPurpose(facility)
+  if (purpose) return purpose
+  return facility.id
+}
+
+/**
+ * 依 nodeId 從目前地圖設施解析顯示標籤（別名優先，無別名才退回 id／代號）。
+ */
+export function resolveTopologyNodeLabelFromAreas(
+  nodeId: string,
+  areas: readonly MapAreaObject[],
+): string | null {
+  const areaList = areas as MapAreaObject[]
+  const parentFacilityId = parseFacilityIdFromFacilityDockingTopologyNodeId(nodeId)
+  if (parentFacilityId) {
+    const facility = findFacilityInAreasById(areaList, parentFacilityId)
+    if (facility?.type === 'Facility') {
+      return resolveFacilityDockingPointTopologyLabel(facility)
+    }
+    return null
+  }
+
+  const crossoverRef = parseCrossoverPortalTopologyNodeId(nodeId)
+  if (crossoverRef) {
+    const facility = findFacilityInAreasById(areaList, crossoverRef.facilityId)
+    if (facility?.type === 'TrackCrossover') {
+      const portals = getCrossoverPortals(facility)
+      const portal = portals?.[crossoverRef.key]
+      if (portal) return resolveCrossoverPortalDisplayName(portal)
+    }
+    return null
+  }
+
+  const crossRef = parseCrossPortalTopologyNodeId(nodeId)
+  if (crossRef) {
+    const facility = findFacilityInAreasById(areaList, crossRef.facilityId)
+    if (facility?.type === 'Track' && facility.name === 'RailCross') {
+      const portal = getCrossPortals(facility)[crossRef.key]
+      if (portal) return resolveCrossPortalDisplayName(portal)
+    }
+    return null
+  }
+
+  const facility = findFacilityInAreasById(areaList, nodeId)
+  if (facility && isTopologyLoadableFacility(facility)) {
+    return labelForTopologyFacility(facility)
+  }
+  return null
 }
 
 export function kindForTopologyFacility(facility: FacilityObject): PointTopologyNodeKind {
@@ -1124,7 +1176,12 @@ export function findPointTopologyEdge(
 export function labelForTopologyNode(
   topology: PointTopology,
   nodeId: string,
+  areas?: readonly MapAreaObject[],
 ): string {
+  if (areas) {
+    const live = resolveTopologyNodeLabelFromAreas(nodeId, areas)
+    if (live) return live
+  }
   return topology.nodes.find((node) => node.id === nodeId)?.label ?? nodeId
 }
 

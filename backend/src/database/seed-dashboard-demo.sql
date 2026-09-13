@@ -1,4 +1,4 @@
--- SyncDrive 總控大屏範例：11 台 PMS 車輛 + 調度訂單（v0.0.5 參照場域軌道）
+-- SyncDrive 總控大屏範例：11 台 PMS 車輛 + 調度訂單（v0.0.5 場域範圍軌道）
 -- 供儀表板畫布群組 SQL Repeater 使用
 
 INSERT INTO vehicles (vehicle_code, display_name, is_active, created_at, updated_at)

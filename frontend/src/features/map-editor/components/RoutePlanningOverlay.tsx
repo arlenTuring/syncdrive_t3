@@ -17,6 +17,8 @@ type RoutePreview = {
   emphasized?: boolean
   avgTravelTimeSeconds?: number | null
   minTravelTimeSeconds?: number | null
+  /** false＝站序編輯時只標站點編號，不畫軌道路徑／斷線（避免誤以為模擬路線錯誤） */
+  showConnections?: boolean
 }
 
 type RoutePlanningOverlayProps = {
@@ -395,14 +397,36 @@ export const RoutePlanningOverlay = memo(function RoutePlanningOverlay({
           <RoutePathLayer
             layerKey={`${uid}-active`}
             stations={activeGeometry.stations}
-            pathPx={activeGeometry.pathPx}
-            pathLegs={activeGeometry.pathLegs}
-            brokenLegs={activeGeometry.brokenLegs}
+            pathPx={
+              activePreview.showConnections === false ? [] : activeGeometry.pathPx
+            }
+            pathLegs={
+              activePreview.showConnections === false
+                ? []
+                : activeGeometry.pathLegs
+            }
+            brokenLegs={
+              activePreview.showConnections === false
+                ? []
+                : activeGeometry.brokenLegs
+            }
             color={activePreview.color}
             emphasized={activePreview.emphasized ?? true}
-            routeName={activePreview.label}
-            avgTravelTimeSeconds={activePreview.avgTravelTimeSeconds}
-            minTravelTimeSeconds={activePreview.minTravelTimeSeconds}
+            routeName={
+              activePreview.showConnections === false
+                ? undefined
+                : activePreview.label
+            }
+            avgTravelTimeSeconds={
+              activePreview.showConnections === false
+                ? null
+                : activePreview.avgTravelTimeSeconds
+            }
+            minTravelTimeSeconds={
+              activePreview.showConnections === false
+                ? null
+                : activePreview.minTravelTimeSeconds
+            }
           />
         ) : null}
       </svg>

@@ -1,4 +1,5 @@
 import type { MapAreaObject } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 import type { FacilityObject, FacilityType } from '../types/facility'
 import {
   resolveFacilityAreaPosition,
@@ -12,15 +13,43 @@ import {
   REF_FIELD_X_M,
   REF_FIELD_Y_M,
 } from './facilityRefFieldPosition'
+import { getTrackGenAreaId } from './trackGenFacility'
+import { getTrackGenPaths } from './trackGenPaths'
 
-/** 放置在圖台上時應由映射自動帶入參照場域單點的元件 */
+/** 放置在圖台上時應由映射自動帶入／拖曳同步場域座標（單點）的元件 */
 export const AUTO_REF_FIELD_POINT_TYPES: FacilityType[] = [
   'DockingPoint',
   'Waypoint',
+  'Signal',
+  'Pole',
+  'PSD',
 ]
 
 export function shouldAutoSeedRefFieldPoint(type: FacilityType): boolean {
   return AUTO_REF_FIELD_POINT_TYPES.includes(type)
+}
+
+/**
+ * 僅高精連結／已生成軌道的 Area 才自動寫場域座標。
+ * 一般空白 Area：手動填寫，拖曳不覆寫。
+ */
+export function areaSupportsAutoFieldCoords(
+  area: MapAreaObject,
+  basemaps?: readonly MapBasemapObject[],
+): boolean {
+  if (
+    area.facilities.some(
+      (f) => f.type === 'Track' && getTrackGenPaths(f.parameters) != null,
+    )
+  ) {
+    return true
+  }
+  if (
+    basemaps?.some((b) => getTrackGenAreaId(b.parameters) === area.id)
+  ) {
+    return true
+  }
+  return false
 }
 
 function roundFieldMeters(n: number): number {
@@ -41,14 +70,16 @@ export function facilityCenterAreaLocal(
 }
 
 /**
- * 依圖台位置反推參照場域單點（公尺）。
- * 有軌道生成時走軌道映射；否則退回 Area domain。
+ * 依圖台位置反推場域座標（單點，公尺）。
+ * 僅在高精 Area 內生效；有軌道生成時走軌道映射。
  */
 export function suggestRefFieldPositionFromPlacement(
   facility: FacilityObject,
   area: MapAreaObject,
+  basemaps?: readonly MapBasemapObject[],
 ): { xM: number; yM: number } | null {
   if (!shouldAutoSeedRefFieldPoint(facility.type)) return null
+  if (!areaSupportsAutoFieldCoords(area, basemaps)) return null
   const center = facilityCenterAreaLocal(facility, area)
   const field = fieldMetersAtAreaLocal(area, center.x, center.y)
   if (!Number.isFinite(field.xM) || !Number.isFinite(field.yM)) return null
@@ -59,15 +90,17 @@ export function suggestRefFieldPositionFromPlacement(
 }
 
 /**
- * 依目前圖台位置覆寫參照場域單點（停靠點／途經點）。
+ * 依目前圖台位置覆寫場域座標（停靠點／途經點）。
  * 拖曳、微調後呼叫，讓映射結果跟著走。
  */
 export function syncAutoRefFieldPositionFromPlacement(
   facility: FacilityObject,
   area: MapAreaObject,
+  basemaps?: readonly MapBasemapObject[],
 ): FacilityObject {
   if (!shouldAutoSeedRefFieldPoint(facility.type)) return facility
-  const suggested = suggestRefFieldPositionFromPlacement(facility, area)
+  if (!areaSupportsAutoFieldCoords(area, basemaps)) return facility
+  const suggested = suggestRefFieldPositionFromPlacement(facility, area, basemaps)
   if (!suggested) return facility
   const current = getRefFieldPosition(facility.parameters)
   if (current.xM === suggested.xM && current.yM === suggested.yM) return facility
@@ -81,27 +114,31 @@ export function syncAutoRefFieldPositionFromPlacement(
 }
 
 /**
- * 尚未設定參照場域位置時，寫入圖台映射建議值。
+ * 尚未設定場域座標時，寫入圖台映射建議值。
  * 已有手動／既有數值則不覆寫。
  */
 export function applyAutoRefFieldPositionIfUnset(
   facility: FacilityObject,
   area: MapAreaObject,
+  basemaps?: readonly MapBasemapObject[],
 ): FacilityObject {
   if (!shouldAutoSeedRefFieldPoint(facility.type)) return facility
+  if (!areaSupportsAutoFieldCoords(area, basemaps)) return facility
   if (hasValidRefFieldPosition(facility.parameters)) return facility
-  return syncAutoRefFieldPositionFromPlacement(facility, area)
+  return syncAutoRefFieldPositionFromPlacement(facility, area, basemaps)
 }
 
-/** 對 Area 內所有可自動帶入的點位補齊未設定的參照場域位置 */
+/** 對 Area 內所有可自動帶入的點位補齊未設定的場域座標 */
 export function ensureAutoRefFieldPositionsInAreas(
   areas: MapAreaObject[],
+  basemaps?: readonly MapBasemapObject[],
 ): MapAreaObject[] {
   let changed = false
   const next = areas.map((area) => {
+    if (!areaSupportsAutoFieldCoords(area, basemaps)) return area
     let areaChanged = false
     const facilities = area.facilities.map((f) => {
-      const seeded = applyAutoRefFieldPositionIfUnset(f, area)
+      const seeded = applyAutoRefFieldPositionIfUnset(f, area, basemaps)
       if (seeded !== f) areaChanged = true
       return seeded
     })
@@ -112,5 +149,5 @@ export function ensureAutoRefFieldPositionsInAreas(
   return changed ? next : areas
 }
 
-/** 測試／除錯：讀取寫入的參照場域欄位鍵名 */
+/** 測試／除錯：讀取寫入的場域座標欄位鍵名 */
 export const AUTO_REF_FIELD_PARAM_KEYS = [REF_FIELD_X_M, REF_FIELD_Y_M] as const

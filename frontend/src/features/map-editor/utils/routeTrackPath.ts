@@ -693,7 +693,7 @@ function pathLengthPx(points: Array<{ x: number; y: number }>): number {
 }
 
 /**
- * 圖面像素 → 參照場域公尺。
+ * 圖面像素 → 場域公尺座標。
  *
  * 找出這個像素壓在哪一條軌道上（比對每條軌道中心線的像素投影），再依它在那條軌道上
  * 的比例，換算進該軌道的 refField 範圍。<strong>逐軌道換算</strong>是必要的：
@@ -883,7 +883,7 @@ function resolveStationFieldMeters(
         docking.facilityId,
       )
       /*
-       * 站標像素要換成<strong>參照場域</strong>公尺，不能用區塊 domain 換。
+       * 站標像素要換成<strong>場域</strong>公尺座標，不能用區塊 domain 換。
        *
        * 這裡以前走 areaLocalPxToMeter(…, area.domain, …)，回的是「區塊自己那把尺」
        * 的公尺；但呼叫端拿它去和軌道的 refField 比對，而軌道量的是「現場那把尺」。

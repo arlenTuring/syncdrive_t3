@@ -1,5 +1,5 @@
 /**
- * 為 t3-main-version 內所有 Track 填入／校正參照場域範圍（refField*M）。
+ * 為 t3-main-version 內所有 Track 填入／校正場域範圍（refField*M）。
  *
  * 座標系：場域公尺、原點左下、X 向右、Y 向上。
  *

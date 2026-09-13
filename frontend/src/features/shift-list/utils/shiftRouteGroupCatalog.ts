@@ -16,7 +16,7 @@ import {
   resolveFacilityDockingPointListTitle,
 } from '../../map-editor/utils/facilityDockingPoint';
 import { parsePositiveRouteSeconds } from '../../map-editor/utils/routePlanning';
-import { collectCrossoverPortalWaypointsFromAreas } from '../../map-editor/utils/waypointCode';
+import { collectCrossoverPortalWaypointsFromAreas, collectCrossPortalWaypointsFromAreas } from '../../map-editor/utils/waypointCode';
 import {
   buildMaintenanceFirstTripOriginsFromTopology,
   type MaintenanceFirstTripOrigin,
@@ -90,6 +90,7 @@ async function listAvailableMaps(
   activeMapId: string,
   activeDisplayName?: string | null,
 ): Promise<ShiftRouteGroupMapOption[]> {
+  /** 僅後端已發佈地圖；顯示名稱以伺服器為準（改名必須先 sync）。 */
   const byId = new Map<string, ShiftRouteGroupMapOption>();
   try {
     const status = await fetchMapLibraryBackendStatus();
@@ -118,7 +119,7 @@ async function listAvailableMaps(
     });
   }
   return [...byId.values()].sort((a, b) =>
-    a.displayName.localeCompare(b.displayName, 'zh-Hant'),
+    a.displayName.localeCompare(b.displayName, 'zh-Hant', { numeric: true }),
   );
 }
 
@@ -220,6 +221,9 @@ export async function loadShiftRouteGroupCatalog(
   for (const waypoint of collectCrossoverPortalWaypointsFromAreas(parsed.areas)) {
     stationNameById.set(waypoint.stationId, waypoint.stationName);
   }
+  for (const waypoint of collectCrossPortalWaypointsFromAreas(parsed.areas)) {
+    stationNameById.set(waypoint.stationId, waypoint.stationName);
+  }
   // 拓撲標籤先填；設施參數別名為準，覆寫 fdock 顯示名
   for (const node of topology.nodes) {
     if (node.kind !== 'facility-docking') continue;
@@ -230,9 +234,10 @@ export async function loadShiftRouteGroupCatalog(
   for (const dock of collectFacilityDockingStationNames(parsed.areas)) {
     stationNameById.set(dock.stationId, dock.stationName);
   }
-  const crossoverStationIds = new Set(
-    collectCrossoverPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
-  );
+  const crossoverStationIds = new Set([
+    ...collectCrossoverPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
+    ...collectCrossPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
+  ]);
 
   const groups: ShiftRouteGroupCatalogItem[] = sections.map(({ group, routes: groupRoutes }) => ({
     groupId: group.groupId,

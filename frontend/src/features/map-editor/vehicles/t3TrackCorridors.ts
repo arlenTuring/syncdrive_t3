@@ -1,5 +1,5 @@
 /**
- * T3 相鄰軌道通道：以參照場域 refField + 圖元 areaPosition 建立分段線性中心線。
+ * T3 相鄰軌道通道：以 refField（場域範圍）+ 圖元 areaPosition 建立分段線性中心線。
  *
  * 算法（軸向通道 / piecewise-linear centerline，常見於軌道幾何與地圖匹配）：
  * 1. 相鄰軌道段依場域座標串成同一通道

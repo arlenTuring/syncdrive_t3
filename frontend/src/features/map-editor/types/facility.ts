@@ -18,6 +18,8 @@ export type FacilityName =
   | 'Wash'
   | 'Repair'
   | 'FacilityArea'
+  | 'ZoneEntrance'
+  | 'ZonePartition'
   | 'Geofence'
   | 'Gate'
   | 'Light'
@@ -102,8 +104,9 @@ export type SlotEquipmentEnabledMap = Partial<Record<SlotEquipmentState, boolean
  * - position：場域座標（domain 物理公尺，隨 layout/domain 映射更新）
  * - areaSizePx：圖台顯示尺寸（絕對畫素；與 Area 外框、場域 domain 無關；拉伸 Area 外框時不變）
  * - areaLayoutAnchor：定位時 Area 的 wPx/hPx（渲染換算用，拉伸外框時不變）
- * - parameters.refFieldXM / refFieldYM：參照場域位置（公尺，單點；號誌／智慧桿／月台門）
- * - parameters.refFieldXMinM…YMaxM：參照場域範圍（公尺；軌道／設施／圍籬）
+ * - parameters.refFieldXM / refFieldYM：場域座標（公尺，單點；號誌／智慧桿／月台門／停靠點／途經點；可依圖台映射自動帶入）
+ * - parameters.refFieldXMinM…YMaxM：場域範圍（公尺；軌道／設施／圍籬）
+ * - parameters.refFieldCornersM：斜接四角點（各 xM/yM；RailTaper）
  */
 export type FacilityObject =
   | {

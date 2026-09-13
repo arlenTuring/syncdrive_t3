@@ -113,6 +113,11 @@ import {
   ensureAutoRefFieldPositionsInAreas,
   syncAutoRefFieldPositionFromPlacement,
 } from './utils/facilityRefFieldAuto'
+import {
+  applyAutoRefFieldBoundsIfUnset,
+  ensureAutoRefFieldBoundsInAreas,
+} from './utils/facilityRefFieldBoundsAuto'
+import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
 import { canAppendStationToTopologyRoute, isTopologyRouteCombinationValid } from './utils/topologyRouteTravel'
@@ -192,6 +197,7 @@ import type { PaletteItem } from './constants/palette'
 import { syncGeofenceFacility } from './utils/geofence'
 import { sanitizeFacilitiesForEditor } from './utils/sanitizeFacility'
 import { normalizeDegrees } from './utils/rotation'
+import { bakeShapedTrackRotation, isShapedTrackFacility } from './utils/shapedTrackRotation'
 import { applyExampleMapDefaultLabelStyleToAreas } from './utils/facilityLabelStyle'
 import {
   applyFacilityFormat,
@@ -199,6 +205,25 @@ import {
   type FacilityFormatSnapshot,
 } from './utils/facilityFormatPainter'
 import { defaultRefFieldParametersForType } from './utils/facilityRefFieldBinding'
+import {
+  applyEntranceLinksToAreaFacilities,
+  canBelongToParentZone,
+  clampFacilityInsideParentZone,
+  createFacilityAreaInsideZone,
+  ensureZoneChildrenLocalFields,
+  isZoneEntrance,
+  isZonePartition,
+  PARENT_ZONE_ID_KEY,
+  readParentZoneId,
+  readZoneEntranceLinks,
+  rematerializeZoneChildrenOntoZoneCanvas,
+  sanitizeZoneParameters,
+  syncZoneChildFieldFromPlacement,
+  ZONE_ENTRANCE_LINKS_KEY,
+  ZONE_PARTITION_ENTRANCE_ID_KEY,
+  ZONE_PARTITION_LINK_ID_KEY,
+  type ZoneEntranceLink,
+} from './utils/zonePartition'
 import { defaultRoadLineParameters } from './utils/roadLineFacility'
 import {
   BASEMAP_ABOVE_AREAS_KEY,
@@ -315,6 +340,10 @@ export default function MapEditorApp({
     readStoredFacilityToolbarsVisible,
   )
   const [showAreaCenterLabels, setShowAreaCenterLabels] = useState(false)
+  /** 刻度帶：off → scale（Area domain）→ field（場域實際座標） */
+  const [rulerDisplayMode, setRulerDisplayMode] = useState<
+    'off' | 'scale' | 'field'
+  >('off')
   /** 裁減模式：較大工作區 + 裁切框 */
   const [mapCropModeActive, setMapCropModeActive] = useState(false)
   const [cropWorkspace, setCropWorkspace] = useState<MapCropWorkspace | null>(null)
@@ -920,19 +949,25 @@ export default function MapEditorApp({
   /** 由地圖清單載入 */
   const applyLoadedMap = useCallback(
     (loaded: ParsedMapFile, libraryId: string) => {
+      const creationMode = loaded.creationMode ?? 'blank'
       setMapPixelSize(loaded.pixelSize)
       setMapPixelOrigin(loaded.pixelOrigin)
       setAreas(
-        ensureAutoRefFieldPositionsInAreas(
-          ensureWaypointCodesInAreas(
-            ensureDockingPointStationIdsInAreas(
-              applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+        ensureAutoRefFieldBoundsInAreas(
+          ensureAutoRefFieldPositionsInAreas(
+            ensureWaypointCodesInAreas(
+              ensureDockingPointStationIdsInAreas(
+                applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+              ),
             ),
+            loaded.basemaps ?? [],
           ),
+          loaded.basemaps ?? [],
         ),
       )
-      setBasemaps(structuredClone(loaded.basemaps ?? []))
-      setNextNumericId(nextNumericIdFromAreas(loaded.areas, loaded.basemaps ?? []))
+      const nextBasemaps = structuredClone(loaded.basemaps ?? [])
+      setBasemaps(nextBasemaps)
+      setNextNumericId(nextNumericIdFromAreas(loaded.areas, nextBasemaps))
       setMapRoutes(loaded.routes ?? [])
       setMapRouteGroups(
         ensureRouteGroupsForRoutes(loaded.routes ?? [], loaded.routeGroups ?? []),
@@ -944,6 +979,17 @@ export default function MapEditorApp({
       setRouteGroupDraft(null)
       setVisibleRouteIds(new Set())
       clearSelection()
+      const trackGenBasemap =
+        creationMode === 'trackGen'
+          ? nextBasemaps.find((b) => isTrackGenComponent(b.parameters))
+          : undefined
+      if (trackGenBasemap) {
+        selectedBasemapIdRef.current = trackGenBasemap.id
+        setSelectedBasemapId(trackGenBasemap.id)
+        setRulerDisplayMode('field')
+      } else {
+        setRulerDisplayMode('off')
+      }
       setLoadedMapMeta({
         libraryId,
         mapId: loaded.mapId,
@@ -951,6 +997,7 @@ export default function MapEditorApp({
         version: loaded.version || DEFAULT_MAP_VERSION,
         pixelSize: loaded.pixelSize,
         pixelOrigin: loaded.pixelOrigin,
+        creationMode,
       })
       resetHistory()
       exitMapEditorChromeAfterLoad()
@@ -996,6 +1043,8 @@ export default function MapEditorApp({
         emphasized: true,
         avgTravelTimeSeconds: routePlanningDraft.avgTravelTimeSeconds,
         minTravelTimeSeconds: routePlanningDraft.minTravelTimeSeconds,
+        // 站序編輯只標停靠點；連線留給「模擬路線」編輯，避免紅虛線誤導
+        showConnections: false,
       }
     }
     return null
@@ -1967,16 +2016,25 @@ export default function MapEditorApp({
     return area?.facilities.find((f) => f.id === primarySelectedFacilityId) ?? null
   }, [areas, selectedAreaId, primarySelectedFacilityId])
 
-  /** 選取停靠點／途經點且尚未有參照場域時，用圖台映射靜默補齊（不寫 undo） */
+  /** 選取停靠點／途經點／軌道且尚未有場域語意時，用圖台映射靜默補齊（不寫 undo） */
   useEffect(() => {
     if (mapEditorMode !== 'edit') return
     if (!selectedFacility || !selectedArea) return
-    const seeded = applyAutoRefFieldPositionIfUnset(selectedFacility, selectedArea)
+    const seededPos = applyAutoRefFieldPositionIfUnset(
+      selectedFacility,
+      selectedArea,
+      basemaps,
+    )
+    const seeded = applyAutoRefFieldBoundsIfUnset(
+      seededPos,
+      selectedArea,
+      basemaps,
+    )
     if (seeded === selectedFacility) return
     mapAreaFacilities(selectedArea.id, (facilities) =>
       facilities.map((f) => (f.id === seeded.id ? seeded : f)),
     )
-  }, [mapEditorMode, selectedFacility, selectedArea, mapAreaFacilities])
+  }, [mapEditorMode, selectedFacility, selectedArea, basemaps, mapAreaFacilities])
 
   const selectedAreaDomainMaxM = useMemo(() => {
     if (!selectedArea) return undefined
@@ -2124,6 +2182,45 @@ export default function MapEditorApp({
         }
       }
       if (item.type === 'Facility') {
+        if (item.name === 'ZoneEntrance') {
+          return {
+            id,
+            type: 'Facility',
+            name: 'ZoneEntrance',
+            customName: '',
+            areaPosition,
+            position: positionMeters,
+            rotation: 0,
+            currentState: 'Normal',
+            parameters: {
+              defaultFillColor: 'transparent',
+              strokeWidthPx: 2,
+              strokeColor: '#22d3ee',
+              strokeStyle: 'dashed',
+              [ZONE_ENTRANCE_LINKS_KEY]: [],
+              ...defaultRefFieldParametersForType('Facility'),
+            },
+          }
+        }
+        if (item.name === 'ZonePartition') {
+          return {
+            id,
+            type: 'Facility',
+            name: 'ZonePartition',
+            customName: '',
+            areaPosition,
+            position: positionMeters,
+            rotation: 0,
+            currentState: 'Normal',
+            parameters: {
+              defaultFillColor: 'rgba(34, 211, 238, 0.06)',
+              strokeWidthPx: 1,
+              strokeColor: '#22d3ee',
+              strokeStyle: 'solid',
+              ...defaultRefFieldParametersForType('Facility'),
+            },
+          }
+        }
         return {
           id,
           type: 'Facility',
@@ -2688,16 +2785,21 @@ export default function MapEditorApp({
         area.domain,
         area.layout,
       )
-      const newFacility = applyAutoRefFieldPositionIfUnset(
-        ensureFacilityDualCoords(
-          {
-            ...facilityFromPaletteItem(item, id, areaPosition, positionMeters),
-            areaSizePx: sizePx,
-          } as FacilityObject,
-          area.domain,
-          area.layout,
+      const newFacility = applyAutoRefFieldBoundsIfUnset(
+        applyAutoRefFieldPositionIfUnset(
+          ensureFacilityDualCoords(
+            {
+              ...facilityFromPaletteItem(item, id, areaPosition, positionMeters),
+              areaSizePx: sizePx,
+            } as FacilityObject,
+            area.domain,
+            area.layout,
+          ),
+          area,
+          basemapsRef.current,
         ),
         area,
+        basemapsRef.current,
       )
       mapAreaFacilities(areaId, (facilities) => [...facilities, newFacility])
       updateSelection(areaId, [id])
@@ -2775,7 +2877,11 @@ export default function MapEditorApp({
             }
           : newFacility
     const pastedFacility = area
-      ? applyAutoRefFieldPositionIfUnset(typedFacility, area)
+      ? applyAutoRefFieldBoundsIfUnset(
+          applyAutoRefFieldPositionIfUnset(typedFacility, area, basemapsRef.current),
+          area,
+          basemapsRef.current,
+        )
       : typedFacility
     mapAreaFacilities(areaId, (facilities) => [...facilities, pastedFacility])
     updateSelection(areaId, [id])
@@ -2811,12 +2917,34 @@ export default function MapEditorApp({
     pushHistory()
     const areaId = selectedAreaIdRef.current
     const ids = selectedFacilityIdsRef.current
-    if (!areaId || ids.length <= 1) {
+    if (!areaId) {
       multiDragStartRef.current = null
       return
     }
     const area = areasRef.current.find((a) => a.id === areaId)
     if (!area) {
+      multiDragStartRef.current = null
+      return
+    }
+    /** 分區拖曳／縮放前先鎖定子設施相對位置 */
+    const zoneIds = ids.filter((id) => {
+      const f = area.facilities.find((x) => x.id === id)
+      return f != null && isZonePartition(f)
+    })
+    if (zoneIds.length > 0) {
+      mapAreaFacilities(areaId, (facilities) => {
+        let next = facilities
+        for (const zid of zoneIds) {
+          next = ensureZoneChildrenLocalFields(next, zid, {
+            ...area,
+            facilities: next,
+          })
+        }
+        return next
+      })
+    }
+
+    if (ids.length <= 1) {
       multiDragStartRef.current = null
       return
     }
@@ -2829,7 +2957,7 @@ export default function MapEditorApp({
     }
     multiDragStartRef.current =
       Object.keys(areaPositions).length > 1 ? { areaId, areaPositions } : null
-  }, [pushHistory])
+  }, [mapAreaFacilities, pushHistory])
 
   const onDragFacility = useCallback(
     (
@@ -2866,8 +2994,8 @@ export default function MapEditorApp({
             return next
           })
         }
-        mapAreaFacilities(areaId, (facilities) =>
-          facilities.map((fac) => {
+        mapAreaFacilities(areaId, (facilities) => {
+          let next = facilities.map((fac) => {
             const origin = session.areaPositions[fac.id]
             if (!origin || fac.type === 'Geofence') return fac
             const nextAreaPos = { x: origin.x + dx, y: origin.y + dy }
@@ -2877,9 +3005,26 @@ export default function MapEditorApp({
               area.domain,
               area.layout,
             )
-            return syncAutoRefFieldPositionFromPlacement(moved, area)
-          }),
-        )
+            return syncZoneChildFieldFromPlacement(
+              syncAutoRefFieldPositionFromPlacement(
+                clampFacilityInsideParentZone(moved, area),
+                area,
+                basemapsRef.current,
+              ),
+              area,
+            )
+          })
+          for (const id of Object.keys(session.areaPositions)) {
+            const fac = next.find((x) => x.id === id)
+            if (fac && isZonePartition(fac)) {
+              next = rematerializeZoneChildrenOntoZoneCanvas(next, id, {
+                ...area,
+                facilities: next,
+              })
+            }
+          }
+          return next
+        })
         return
       }
 
@@ -2896,23 +3041,38 @@ export default function MapEditorApp({
           return next
         })
       }
-      mapAreaFacilities(areaId, (facilities) =>
-        facilities.map((fac) => {
+      mapAreaFacilities(areaId, (facilities) => {
+        const areaNow = areasRef.current.find((a) => a.id === areaId)
+        if (!areaNow) return facilities
+        let next = facilities.map((fac) => {
           if (fac.id !== facilityId) return fac
           if (fac.type === 'Geofence') return fac
-          const area = areasRef.current.find((a) => a.id === areaId)
-          if (!area) return fac
-          return syncAutoRefFieldPositionFromPlacement(
-            facilityWithAreaPosition(
-              fac,
-              update.areaPosition,
-              area.domain,
-              area.layout,
+          return syncZoneChildFieldFromPlacement(
+            syncAutoRefFieldPositionFromPlacement(
+              clampFacilityInsideParentZone(
+                facilityWithAreaPosition(
+                  fac,
+                  update.areaPosition,
+                  areaNow.domain,
+                  areaNow.layout,
+                ),
+                areaNow,
+              ),
+              areaNow,
+              basemapsRef.current,
             ),
-            area,
+            areaNow,
           )
-        }),
-      )
+        })
+        const moved = next.find((x) => x.id === facilityId)
+        if (moved && isZonePartition(moved)) {
+          next = rematerializeZoneChildrenOntoZoneCanvas(next, facilityId, {
+            ...areaNow,
+            facilities: next,
+          })
+        }
+        return next
+      })
     },
     [mapAreaFacilities],
   )
@@ -2946,6 +3106,7 @@ export default function MapEditorApp({
             return syncAutoRefFieldPositionFromPlacement(
               nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout),
               area,
+              basemapsRef.current,
             )
           }),
         )
@@ -2964,6 +3125,7 @@ export default function MapEditorApp({
             ? syncAutoRefFieldPositionFromPlacement(
                 nudgeFacilityInArea(f, deltaAreaPx, area.domain, area.layout),
                 area,
+                basemapsRef.current,
               )
             : f,
         ),
@@ -2972,27 +3134,134 @@ export default function MapEditorApp({
     [mapAreaFacilities],
   )
 
-  const onPatchSelectedParameters = useCallback(
-    (patch: Record<string, unknown>) => {
-      pushHistory()
-      mapSelectedFacility((f) => {
-        const merged = { ...(f.parameters ?? {}), ...patch } as Record<
-          string,
-          unknown
-        >
-        for (const k of Object.keys(merged)) {
-          if (merged[k] === undefined) delete merged[k]
+  const onPatchFacilityParameters = useCallback(
+    (areaId: string, facilityId: string, patch: Record<string, unknown>) => {
+      mapAreaFacilities(areaId, (facilities) => {
+        const target = facilities.find((f) => f.id === facilityId)
+        if (
+          target &&
+          isZoneEntrance(target) &&
+          Object.prototype.hasOwnProperty.call(patch, ZONE_ENTRANCE_LINKS_KEY)
+        ) {
+          const links = readZoneEntranceLinks({
+            ...(target.parameters ?? {}),
+            ...patch,
+          })
+          return applyEntranceLinksToAreaFacilities(
+            facilities,
+            facilityId,
+            links,
+          )
         }
-        const next = {
-          ...f,
-          parameters: Object.keys(merged).length > 0 ? merged : undefined,
+
+        let next = facilities.map((f) => {
+          if (f.id !== facilityId) return f
+          let effectivePatch = patch
+          if (
+            Object.prototype.hasOwnProperty.call(patch, PARENT_ZONE_ID_KEY) ||
+            Object.prototype.hasOwnProperty.call(patch, ZONE_LOCAL_FIELD_KEY)
+          ) {
+            if (!canBelongToParentZone(f)) {
+              const {
+                [PARENT_ZONE_ID_KEY]: _pz,
+                [ZONE_LOCAL_FIELD_KEY]: _zl,
+                ...rest
+              } = patch
+              effectivePatch = rest
+            }
+          }
+          if (
+            Object.prototype.hasOwnProperty.call(
+              effectivePatch,
+              ZONE_ENTRANCE_LINKS_KEY,
+            ) &&
+            !isZoneEntrance(f)
+          ) {
+            const { [ZONE_ENTRANCE_LINKS_KEY]: _links, ...rest } = effectivePatch
+            effectivePatch = rest
+          }
+          if (
+            (Object.prototype.hasOwnProperty.call(
+              effectivePatch,
+              ZONE_PARTITION_ENTRANCE_ID_KEY,
+            ) ||
+              Object.prototype.hasOwnProperty.call(
+                effectivePatch,
+                ZONE_PARTITION_LINK_ID_KEY,
+              )) &&
+            !isZonePartition(f)
+          ) {
+            const {
+              [ZONE_PARTITION_ENTRANCE_ID_KEY]: _e,
+              [ZONE_PARTITION_LINK_ID_KEY]: _l,
+              ...rest
+            } = effectivePatch
+            effectivePatch = rest
+          }
+          const merged = { ...(f.parameters ?? {}), ...effectivePatch } as Record<
+            string,
+            unknown
+          >
+          for (const k of Object.keys(merged)) {
+            if (merged[k] === undefined) delete merged[k]
+          }
+          const updated = {
+            ...f,
+            parameters: Object.keys(merged).length > 0 ? merged : undefined,
+          }
+          const sanitized = sanitizeZoneParameters(
+            f.type === 'Geofence'
+              ? syncGeofenceFacility(updated as GeofenceFacility)
+              : (updated as FacilityObject),
+          )
+          return sanitized
+        })
+
+        if (Object.prototype.hasOwnProperty.call(patch, PARENT_ZONE_ID_KEY)) {
+          const area = areasRef.current.find((a) => a.id === areaId)
+          if (area) {
+            next = next.map((f) => {
+              if (f.id !== facilityId) return f
+              if (!canBelongToParentZone(f)) return f
+              if (!readParentZoneId(f.parameters)) return f
+              return syncZoneChildFieldFromPlacement(f, {
+                ...area,
+                facilities: next,
+              })
+            })
+          }
         }
-        return f.type === 'Geofence'
-          ? syncGeofenceFacility(next as GeofenceFacility)
-          : (next as FacilityObject)
+
+        return next
       })
     },
-    [pushHistory, mapSelectedFacility],
+    [mapAreaFacilities],
+  )
+
+  const onPatchSelectedParameters = useCallback(
+    (patch: Record<string, unknown>) => {
+      const areaId = selectedAreaIdRef.current
+      const ids = selectedFacilityIdsRef.current
+      const facilityId = ids[ids.length - 1] ?? null
+      if (!areaId || !facilityId) return
+      pushHistory()
+      onPatchFacilityParameters(areaId, facilityId, patch)
+    },
+    [pushHistory, onPatchFacilityParameters],
+  )
+
+  const onCommitZoneEntranceLinks = useCallback(
+    (links: ZoneEntranceLink[]) => {
+      const areaId = selectedAreaIdRef.current
+      const ids = selectedFacilityIdsRef.current
+      const facilityId = ids[ids.length - 1] ?? null
+      if (!areaId || !facilityId) return
+      pushHistory()
+      mapAreaFacilities(areaId, (facilities) =>
+        applyEntranceLinksToAreaFacilities(facilities, facilityId, links),
+      )
+    },
+    [pushHistory, mapAreaFacilities],
   )
 
   const onApplyDockingPoint = useCallback(
@@ -3009,28 +3278,6 @@ export default function MapEditorApp({
       mapSelectedFacility(() => facility)
     },
     [pushHistory, mapSelectedFacility],
-  )
-
-  const onPatchFacilityParameters = useCallback(
-    (areaId: string, facilityId: string, patch: Record<string, unknown>) => {
-      mapAreaFacilities(areaId, (facilities) =>
-        facilities.map((f) => {
-          if (f.id !== facilityId) return f
-          const merged = { ...(f.parameters ?? {}), ...patch } as Record<
-            string,
-            unknown
-          >
-          for (const k of Object.keys(merged)) {
-            if (merged[k] === undefined) delete merged[k]
-          }
-          return {
-            ...f,
-            parameters: Object.keys(merged).length > 0 ? merged : undefined,
-          }
-        }),
-      )
-    },
-    [mapAreaFacilities],
   )
 
   const onStartFormatPaint = useCallback((snapshot: FacilityFormatSnapshot) => {
@@ -3338,17 +3585,59 @@ export default function MapEditorApp({
         MIN_FACILITY_CANVAS_PX,
         Math.min(areaSizePx.h, area.layout.hPx),
       )
-      mapAreaFacilities(areaId, (facilities) =>
-        facilities.map((f) => {
+      mapAreaFacilities(areaId, (facilities) => {
+        const target = facilities.find((f) => f.id === facilityId)
+        const resizingZone = target != null && isZonePartition(target)
+        let next = resizingZone
+          ? ensureZoneChildrenLocalFields(facilities, facilityId, {
+              ...area,
+              facilities,
+            })
+          : facilities
+        next = next.map((f) => {
           if (f.id !== facilityId) return f
-          return {
+          const sized = {
             ...f,
             areaSizePx: { w, h },
           } as FacilityObject
-        }),
-      )
+          const clamped = clampFacilityInsideParentZone(sized, {
+            ...area,
+            facilities: next,
+          })
+          return syncZoneChildFieldFromPlacement(clamped, {
+            ...area,
+            facilities: next.map((x) =>
+              x.id === facilityId ? clamped : x,
+            ),
+          })
+        })
+        if (resizingZone) {
+          next = rematerializeZoneChildrenOntoZoneCanvas(next, facilityId, {
+            ...area,
+            facilities: next,
+          })
+        }
+        return next
+      })
     },
     [mapAreaFacilities],
+  )
+
+  const onAddFacilityInsideZone = useCallback(
+    (areaId: string, zoneFacilityId: string) => {
+      const area = areasRef.current.find((a) => a.id === areaId)
+      if (!area) return
+      const zone = area.facilities.find((f) => f.id === zoneFacilityId)
+      if (!zone) return
+      pushHistory()
+      const id = String(nextNumericId).padStart(3, '0')
+      const created = createFacilityAreaInsideZone(zone, area, id)
+      if (!created) return
+      mapAreaFacilities(areaId, (facilities) => [...facilities, created])
+      setNextNumericId((n) => n + 1)
+      updateSelection(areaId, [id])
+    },
+    [mapAreaFacilities, nextNumericId, pushHistory, updateSelection],
   )
 
   const onResizeFacility = useCallback(
@@ -3380,6 +3669,9 @@ export default function MapEditorApp({
       mapAreaFacilities(areaId, (facilities) =>
         facilities.map((f) => {
           if (f.id !== facilityId) return f
+          if (isShapedTrackFacility(f)) {
+            return bakeShapedTrackRotation(f, deltaDeg)
+          }
           return {
             ...f,
             rotation: normalizeDegrees((f.rotation ?? 0) + deltaDeg),
@@ -3633,27 +3925,42 @@ export default function MapEditorApp({
     selectedArea,
   ])
 
-  const mapRulersEnabled = useMemo(() => {
-    if (selectedArea) return selectedArea.showRuler
-    return areas.some((a) => a.showRuler)
-  }, [areas, selectedArea])
+  /** 外框地圖尺：僅「刻度」模式顯示；座標模式只留 Area 場域尺，避免兩套數字並陳 */
+  const mapRulersEnabled = rulerDisplayMode === 'scale'
 
-  const onToggleMapRulers = useCallback(() => {
+  const onCycleRulerDisplayMode = useCallback(() => {
     pushHistory()
-    const areaId = selectedAreaIdRef.current
-    if (areaId) {
-      const area = areasRef.current.find((a) => a.id === areaId)
-      if (!area) return
-      updateArea(areaId, { showRuler: !area.showRuler })
-      return
-    }
-    const next = !areasRef.current.some((a) => a.showRuler)
-    setAreas((prev) => prev.map((a) => ({ ...a, showRuler: next })))
-  }, [pushHistory, updateArea])
+    setRulerDisplayMode((prev) => {
+      const next = cycleMapRulerDisplayMode(prev)
+      const show = next !== 'off'
+      setAreas((areasPrev) => {
+        const areaId = selectedAreaIdRef.current
+        if (areaId) {
+          return areasPrev.map((a) =>
+            a.id === areaId ? { ...a, showRuler: show } : a,
+          )
+        }
+        return areasPrev.map((a) => ({ ...a, showRuler: show }))
+      })
+      return next
+    })
+  }, [pushHistory])
 
   const mapRulersToggleHint = selectedArea
     ? t('mapEditor.chrome.rulersToggleOne', { name: selectedArea.customName.trim() || selectedArea.id })
     : t('mapEditor.chrome.rulersToggleAll')
+
+  // 載入地圖時若 Area 已開刻度，預設進入刻度模式
+  useEffect(() => {
+    if (mapScreen !== 'editor') return
+    const anyOn = areas.some((a) => a.showRuler)
+    setRulerDisplayMode((prev) => {
+      if (prev !== 'off') return prev
+      return anyOn ? 'scale' : 'off'
+    })
+    // 只在載入切換時對齊一次；避免與使用者循環打架
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sync on library→editor entry
+  }, [mapScreen, loadedMapMeta.libraryId])
 
   const onToggleAreaCenterLabels = useCallback(() => {
     setShowAreaCenterLabels((v) => !v)
@@ -3703,7 +4010,8 @@ export default function MapEditorApp({
           onUndo={undo}
           onRedo={redo}
           showRulers={mapRulersEnabled}
-          onToggleRulers={onToggleMapRulers}
+          rulerDisplayMode={rulerDisplayMode}
+          onCycleRulerDisplayMode={onCycleRulerDisplayMode}
           rulersToggleHint={mapRulersToggleHint}
           showAreaCenterLabels={showAreaCenterLabels}
           onToggleAreaCenterLabels={onToggleAreaCenterLabels}
@@ -3745,6 +4053,17 @@ export default function MapEditorApp({
           {loadedMapMeta.displayName || t('mapEditor.chrome.unnamedMap')}
           <span className="text-zinc-600"> · </span>
           {loadedMapMeta.version}
+        </span>
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+            loadedMapMeta.creationMode === 'trackGen'
+              ? 'bg-emerald-950/70 text-emerald-300/90'
+              : 'bg-zinc-800 text-zinc-500'
+          }`}
+        >
+          {loadedMapMeta.creationMode === 'trackGen'
+            ? t('mapEditor.chrome.creationModeTrackGen')
+            : t('mapEditor.chrome.creationModeBlank')}
         </span>
         <span className="text-zinc-600" aria-hidden>
           |
@@ -3870,6 +4189,9 @@ export default function MapEditorApp({
                 onDeleteFacility={
                   mapEditorMode === 'edit' ? onDeleteFacility : undefined
                 }
+                onAddFacilityInsideZone={
+                  mapEditorMode === 'edit' ? onAddFacilityInsideZone : undefined
+                }
                 onUpdateGeofence={
                   mapEditorMode === 'edit' ? onUpdateGeofence : undefined
                 }
@@ -3925,6 +4247,9 @@ export default function MapEditorApp({
                   mapEditorMode === 'edit' ? onFacilityHover : undefined
                 }
                 showAreaCenterLabels={showAreaCenterLabels}
+                rulerDisplayMode={
+                  rulerDisplayMode === 'field' ? 'field' : 'scale'
+                }
                 showFacilityToolbars={showFacilityToolbars}
                 zoomLevel={mapZoomLevel}
                 onZoomLevelChange={setMapZoomLevel}
@@ -4107,6 +4432,7 @@ export default function MapEditorApp({
           <PointTopologyEditorDialog
             open={pointTopologyEditorOpen}
             areas={areas}
+            routes={mapRoutes}
             topology={pointTopology}
             onClose={() => setPointTopologyEditorOpen(false)}
             onApply={(next) => {
@@ -4172,11 +4498,16 @@ export default function MapEditorApp({
                       readOnlyCanvas ? undefined : onPatchSelectedParameters
                     }
                     mapAreas={areas}
+                    mapBasemaps={basemaps}
+                    parentArea={selectedArea}
                     onApplyDockingPoint={
                       readOnlyCanvas ? undefined : onApplyDockingPoint
                     }
                     onApplyWaypoint={
                       readOnlyCanvas ? undefined : onApplyWaypoint
+                    }
+                    onCommitZoneEntranceLinks={
+                      readOnlyCanvas ? undefined : onCommitZoneEntranceLinks
                     }
                     onDelete={() => {
                       deleteSelected()

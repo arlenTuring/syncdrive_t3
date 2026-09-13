@@ -1359,7 +1359,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       'Cannot reach the server; showing this browser’s cache, which may be outdated',
     subtitle:
       'Open a map to edit, or create a blank map, duplicate, import, or export a map document. After “Set as active”, dashboard simulation and backend APIs use that map.',
-    newBlank: 'New blank map',
+    newBlank: 'New map',
+    modeBlank: 'Blank',
+    modeTrackGen: 'HD',
     importFile: 'Import map file',
     pasteFile: 'Paste map file',
     loadFromServer: 'Load from server',
@@ -1396,6 +1398,8 @@ const enUS: DeepStringify<typeof zhTW> = {
     open: 'Open',
     openTitle: 'Open editor',
     renameTitle: 'Rename',
+    renameSyncFailed: 'Rename was not synced to the backend; name unchanged: {{error}}',
+    publishFailed: 'Map was not published to the backend: {{error}}',
     duplicateTitle: 'Duplicate map',
     exportTitle: 'Export map file',
     confirmDelete: 'Delete {{label}} “{{name}}”?\n\nThis cannot be undone.',
@@ -1425,13 +1429,19 @@ const enUS: DeepStringify<typeof zhTW> = {
       save: 'Yes, save this version',
     },
     newMapPixel: {
-      title: 'Set monitor canvas size',
-      hint: 'Sets the Map display size in pixels. Area containers and facilities are placed on this canvas; each Area’s real-world meter bounds are configured separately in Area properties.',
+      title: 'New map',
+      hint: 'Choose a workflow, then set the Map display size in pixels. Areas / HD map components are placed on this canvas.',
+      modeLabel: 'Map mode',
+      modeBlank: 'Blank map',
+      modeBlankHint: 'Starts with an empty Area. Field coordinates are entered manually—no auto mapping from placement.',
+      modeTrackGen: 'HD map mode',
+      modeTrackGenHint: 'Opens with a full-canvas HD map component waiting for a .xodr drop. After generate, facilities in that container auto-sync field coordinates.',
       width: 'Width (px)',
       height: 'Height (px)',
       range:
         'Allowed range {{min}}–{{max}} px. Default {{defaultW}}×{{defaultH}} px.',
       create: 'Create blank map',
+      createTrackGen: 'Create HD map',
       invalidSize: 'Enter a valid canvas width and height (pixels)',
     },
     basemap: {
@@ -1681,6 +1691,14 @@ const enUS: DeepStringify<typeof zhTW> = {
           label: 'Facility',
           hint: 'Facility (large block) — charging / parking / maintenance bay; set purpose in properties',
         },
+        zoneEntrance: {
+          label: 'Zone entrance',
+          hint: 'Dashed box; track end faces can join to it; vehicles entering teleport to linked zones; configure zone names and field ranges',
+        },
+        zonePartition: {
+          label: 'Zone',
+          hint: 'Field range bound to a zone entrance; can hold facilities with positions relative to this zone',
+        },
         light: {
           label: 'Traffic light',
           hint: 'Equipment — traffic light (Signal / Light)',
@@ -1745,6 +1763,56 @@ const enUS: DeepStringify<typeof zhTW> = {
       purposePlaceholder: 'e.g. charging, parking, maintenance bay',
       purposeHint:
         'Optional; for classifying large facility blocks (list display). Use Equipment types from the library for lights / poles / PSDs — do not substitute here.',
+      zoneEntrance: {
+        title: 'Zone links',
+        hint:
+          'Pick existing zones on the map; already-linked zones are hidden. Name / field range edits sync to the bound zone. Track end faces can join this entrance. Vehicles teleport to linked zones (simulation wiring later).',
+        empty: 'No linked zones yet',
+        add: 'Add zone',
+        linkLabel: 'Zone {{index}}',
+        zoneName: 'Zone name',
+        fieldXMin: 'Field horizontal range min (m)',
+        fieldXMax: 'Field horizontal range max (m)',
+        fieldYMin: 'Field vertical range min (m)',
+        fieldYMax: 'Field vertical range max (m)',
+        bound: 'Bound to {{id}}',
+        boundLabel: 'Linked: {{label}} ({{id}})',
+        boundMissing: 'Linked graphic missing ({{id}})',
+        unbound: 'No zone graphic linked',
+        createZone: 'Create zone graphic',
+        linkExisting: 'Link zone on map',
+        pickZone: 'Select a zone to link…',
+        noAvailable:
+          'No zones available (place a Zone from the palette, or all are already linked)',
+      },
+      zonePartition: {
+        title: 'Zone',
+        hint:
+          'Field range is bound by the zone entrance, independent of map placement. Other facilities can belong to this zone.',
+        hintShort: 'Field range bound by entrance; independent of map placement',
+        synced: 'Synced',
+        unbound: 'Unbound',
+        entrance: 'Entrance',
+        linkId: 'Link',
+        linkAlias: 'Alias',
+        fieldBounds: 'Field range',
+        fieldBoundsEmpty: 'No field range synced from entrance yet',
+        fieldBoundsValue:
+          'Horizontal {{xMin}} … {{xMax}} m / Vertical {{yMin}} … {{yMax}} m',
+        axisX: 'X',
+        axisY: 'Y',
+        min: 'Min',
+        max: 'Max',
+        childCount: 'Child facilities {{count}}',
+      },
+      parentZone: {
+        title: 'Parent zone',
+        hint:
+          'Only the Facility component can belong to a zone. When assigned, dragging remaps absolute field coords from position relative to the zone graphic.',
+        select: 'Zone',
+        none: '(none)',
+        local: 'Local u={{u}} v={{v}}',
+      },
       labelStyle: {
         title: 'Name display style',
         showName: 'Show name',
@@ -1762,14 +1830,14 @@ const enUS: DeepStringify<typeof zhTW> = {
       positionX: 'Horizontal position',
       positionY: 'Vertical position',
       areaDragHint:
-        'Drag on the map to move; Area frame resize does not change area coordinates. Use “Reference field bounds” below for real-world meaning.',
+        'Drag on the map to move; Area frame resize does not change area coordinates. Use “Field bounds” below for real-world meaning.',
       pixelSizeInArea: 'Pixel size (display inside Area)',
       pixelWidth: 'Pixel width',
       pixelHeight: 'Pixel height',
       noPixelSize:
         'No pixel size yet; drag edges on the map, or load a map that includes areaSizePx.',
       pixelSizeHint:
-        'Absolute map pixels; independent of Area frame and field size. Use “Reference field bounds” for real-world meaning.',
+        'Absolute map pixels; independent of Area frame and field size. Use “Field bounds” for real-world meaning.',
       mqtt: {
         title: 'MQTT binding',
         hintBefore: 'Binding path is',
@@ -1875,8 +1943,14 @@ const enUS: DeepStringify<typeof zhTW> = {
         branch: 'Branch (diagonal)',
         placeholder: 'e.g. D04',
         color: 'Fill',
+        dashColor: 'Dash color',
         fontSize: 'Font size (px)',
+        style: 'Display',
+        styleFill: 'Solid fill',
+        styleDashed: 'Dashed track (outline, no fill)',
         hint: 'One component represents two tracks; names are set separately. Also selectable per track in the generation preview.',
+        hintSwitch:
+          'One component is through + branch. Name/color each; either can be a dashed track (same band shape, dashed outline, no fill).',
       },
       crossTrack: {
         title: 'Waypoints & directions',
@@ -1890,8 +1964,8 @@ const enUS: DeepStringify<typeof zhTW> = {
         pingPortal: 'Highlight this portal on the map',
         waypointCode: 'Waypoint code',
         alias: 'Alias (display name)',
-        fieldX: 'Reference field X (m)',
-        fieldY: 'Reference field Y (m)',
+        fieldX: 'Field X (m)',
+        fieldY: 'Field Y (m)',
         fieldHint:
           'Field coordinates (metres, origin bottom-left). Computed automatically on HD-map generated track; otherwise from the container domain.',
         autoValue: 'Computed automatically; follows component position and size',
@@ -1928,8 +2002,8 @@ const enUS: DeepStringify<typeof zhTW> = {
         codePlaceholder: 'e.g. xo_1_{{key}}',
         alias: 'Alias (display name)',
         aliasPlaceholder: 'Empty shows the code',
-        fieldX: 'Reference field X (m)',
-        fieldY: 'Reference field Y (m)',
+        fieldX: 'Field X (m)',
+        fieldY: 'Field Y (m)',
         fieldHint:
           'Real-world field meters (origin bottom-left). Updated when dragging ends or snapping; typing here only corrects the measured value and does not move the on-map end.',
         strokeWidth: 'Path width (edge gap)',
@@ -1954,7 +2028,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         graphSummary:
           'On map {{nodes}} nodes · {{edges}} edges · {{components}} components',
         coordsHint:
-          'Reference field bounds are filled at generate time; coordinates follow .xodr (TWD97, metres), the same frame vehicles report in.',
+          'Field bounds are filled at generate time; coordinates follow .xodr (TWD97, metres), the same frame vehicles report in.',
         loadedNotGenerated: 'Loaded {{fileName}}; tracks not generated yet',
         noXodr: 'No .xodr loaded yet',
         dialogHint:
@@ -2013,7 +2087,9 @@ const enUS: DeepStringify<typeof zhTW> = {
         slotVacant: 'Vac',
         slotOccupied: 'Occ',
         resizeEdge: 'Drag edge to resize',
+        resizeCorner: 'Drag corner to resize',
         resizeProportional: 'Drag for proportional resize',
+        addFacilityInZone: 'Add facility inside zone',
         rotateDrag: 'Drag to rotate (hold Shift to snap 15°)',
         cornerArcY: 'Drag to adjust top-edge arc',
         cornerArcX: 'Drag to adjust bottom-edge arc',
@@ -2033,6 +2109,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         toolbarRotate: 'Rotate',
         rotateCcw1: 'Nudge 1° counterclockwise',
         rotateCw1: 'Nudge 1° clockwise',
+        rotateCcw90: 'Rotate 90° counterclockwise',
         rotateCw90: 'Rotate 90° clockwise',
         formatPaint:
           'Copy format (size, angle, fill, frame on/off & style, font; paste onto same type only)',
@@ -2048,7 +2125,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       facilityDockingPart: ' · Facility stops {{count}}',
       emptyHint: ' — add points from the list on the left',
       shortcutHint:
-        '⌘/Ctrl+Z undo · ⌘/Ctrl+Shift+Z redo｜Drag edge ends to reconnect; bend at midpoint｜Facility↔stop = dashed, stop↔stop = solid',
+        '⌘/Ctrl+Z undo · ⌘/Ctrl+Shift+Z redo｜Drag empty canvas to marquee-select; Shift adds｜Drag edge ends to reconnect; bend at midpoint｜Facility↔stop = dashed, stop↔stop = solid',
       close: 'Close',
       listToggleOpen: 'Open point list',
       listToggleClose: 'Close point list',
@@ -2070,7 +2147,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         facility: 'Facility',
       },
       listHint:
-        'Double-click loaded → center; “Remove” returns it outside the network; Delete also removes selection',
+        'Drag empty canvas to marquee-select; Shift/⌘ click to add｜Double-click loaded → center; “Remove” returns it outside the network; Delete removes selection',
       inNetwork: 'In network · {{count}}',
       noneAdded: 'No points added yet',
       centerOnDoubleClick: 'Double-click: center in view',
@@ -2081,7 +2158,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       allLoaded: 'All loadable map points are already added',
       noSearchMatch: 'No available items match the search',
       add: 'Add',
-      panHint: 'Two-finger trackpad swipe pans the topology',
+      panHint: 'Drag empty canvas to marquee-select; two-finger trackpad swipe pans',
       dropReconnect: 'Release to reconnect to “{{label}}”',
       dropConnect: 'Release to connect to “{{label}}”',
       kindDockingPoint: 'Berth',
@@ -2139,6 +2216,12 @@ const enUS: DeepStringify<typeof zhTW> = {
       avgTime: 'Avg time (s)',
       minGtAvg: 'Min time cannot exceed avg time — fix before applying topology.',
       distance: 'Distance (m)',
+      simEstimate: 'Estimate from sim path',
+      simEstimateTitle:
+        'Estimate distance from the most relevant segment on drawn simulated routes',
+      simEstimateOk: 'Filled {{meters}} m (from {{route}})',
+      simEstimateMiss:
+        'No simulated path covers this link. Check route station order or pathWaypoints.',
       deleteEdge: 'Delete this edge',
       edgeBendHint: '{{from}} → {{to}}｜Drag midpoint to bend; drag white ends to reconnect',
       fastLabel: 'min{{value}}s',
@@ -2286,7 +2369,11 @@ const enUS: DeepStringify<typeof zhTW> = {
       revisionHistory: 'History',
       revisionHistoryTitle: 'Revision history: restore prior autosave / formal snapshots',
       rulers: 'Rulers',
-      rulersTitle: 'Show / hide Area meter rulers',
+      rulersScale: 'Scale',
+      rulersField: 'Coords',
+      rulersTitle: 'Cycle: off → scale (even ticks) → field (even field coords; never mixed on one ruler)',
+      rulersTitleScale: 'Scale mode (even domain ticks). Click again for field coordinates',
+      rulersTitleField: 'Field coordinate mode (even field ticks only). Click again to hide',
       cropGroupAria: 'Crop canvas',
       crop: 'Crop',
       cropTitle: 'Enter / exit crop mode (drag amber frame)',
@@ -2297,9 +2384,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       areaLabels: 'Area labels',
       areaLabelsTitle:
         'Show / hide all Area center overview labels (name / field range / pixel size)',
-      facilityBars: 'Object bars',
+      facilityBars: 'Toolbar',
       facilityBarsTitle:
-        'Show / hide circular toolbars on selected objects (rotate, format copy, delete)',
+        'Show / hide circular toolbars on selection (rotate, format copy, delete); when on, selection links to rulers',
       tester: 'Tester',
       hideTester: 'Hide tester',
       testerTitle: 'Show / hide bottom tester (gap scan, MQTT sim)',
@@ -2400,6 +2487,8 @@ const enUS: DeepStringify<typeof zhTW> = {
     },
     chrome: {
       unnamedMap: 'Untitled map',
+      creationModeBlank: 'Blank map',
+      creationModeTrackGen: 'HD map',
       coords: 'Coords (m): {{x}}, {{y}}',
       selectedMany: ' · {{count}} selected ({{name}})',
       selectHint: 'Select an Area or facility to show coords (m)',
@@ -2424,20 +2513,18 @@ const enUS: DeepStringify<typeof zhTW> = {
       propertiesEditHint:
         'Click an object to edit properties; ⌘/Ctrl+A selects all Areas; toolbar “Crop” enters crop mode.',
       propertiesAreaNote:
-        'Objects can set field reference positions; Areas are group containers on the canvas only.',
+        'Objects can set field coordinates; Areas are group containers on the canvas only.',
       propertiesEditExtra: ' Press “Edit” to drag, rotate, and modify.',
       propertiesShortcuts:
         ' Shortcuts: ⌘/Ctrl+A select all Areas; toolbar “Crop” for crop frame. ⌘/Ctrl+C/V, Delete, ⌘/Ctrl+Z.',
-      rulersToggleOne: 'Toggle “{{name}}” meter rulers',
-      rulersToggleAll: 'Toggle all Area meter rulers',
+      rulersToggleOne: 'Cycle “{{name}}” scale / field rulers',
+      rulersToggleAll: 'Cycle all Area rulers: off → scale → field coords',
       areaLabelsHint: 'Show / hide all Area center labels (name, field range, pixel size)',
-      displayFrameLabel: 'Display area',
-      displayFrameTitle:
-        'Deep blue = final display / deploy region; black outside is edit staging only',
       zoomBarHint: 'Show / hide bottom zoom bar (1 near – 7 far)',
       testerHint: 'Show / hide bottom tester (gap scan, MQTT sim)',
       cropHint: 'Crop mode: drag crop frame in a larger workspace to set output resolution',
-      facilityBarsHint: 'Show / hide circular toolbars on selection (rotate, format copy, delete)',
+      facilityBarsHint:
+        'Show / hide circular toolbars on selection (rotate, format copy, delete); when on, selection links to rulers',
       mapNotFound: 'Map not found. Refresh the library.',
       editingAutosaveLabel: 'Editing: changes autosave to the map library',
       savedAt: 'Saved {{time}}',

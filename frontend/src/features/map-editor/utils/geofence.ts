@@ -5,7 +5,7 @@ import type { FacilityObject, GeofenceFacility } from '../types/facility'
 
 export type GeofenceVertexMeters = { x: number; y: number }
 
-/** 自元件列放上台時的預設矩形外框（公尺） */
+/** 自工具列放上台時的預設矩形外框（公尺） */
 export const GEOFENCE_DEFAULT_SIZE_METERS = { w: 36, h: 15 } as const
 
 export type GeofenceStrokeStyle = 'solid' | 'dashed' | 'dotted'

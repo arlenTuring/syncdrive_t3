@@ -1,4 +1,4 @@
-/** 元件 parameters 內「參照場域範圍」欄位（公尺，場域座標系） */
+/** 元件 parameters 內「場域範圍」欄位（公尺，場域座標系） */
 export const REF_FIELD_X_MIN_M = 'refFieldXMinM'
 export const REF_FIELD_X_MAX_M = 'refFieldXMaxM'
 export const REF_FIELD_Y_MIN_M = 'refFieldYMinM'
@@ -77,7 +77,7 @@ export function patchRefFieldBounds(
   return base
 }
 
-/** 參照場域範圍所代表的實際場域寬高（公尺）；無有效區間時為 null */
+/** 場域範圍所代表的實際場域寬高（公尺）；無有效區間時為 null */
 export function refFieldBoundsSpanMeters(
   bounds: RefFieldBoundsMeters,
 ): { w: number; h: number } | null {
@@ -113,7 +113,7 @@ export function describeRefFieldBoundsIssue(
   if (yMaxM! <= yMinM!) {
     return `縱向最小值 (${yMinM}) 必須小於最大值 (${yMaxM})；若填反了請對調。`
   }
-  return '尚未設定有效參照場域範圍。'
+  return '尚未設定有效場域範圍。'
 }
 
 /** 最小／最大值填反時自動對調（僅在四邊皆有數字且可修正時） */
@@ -161,7 +161,7 @@ export function getValidRefFieldBounds(
   }
 }
 
-/** 將參照場域範圍均分為 capacity 格，回傳第 subIndex 格中心（0-based） */
+/** 將場域範圍均分為 capacity 格，回傳第 subIndex 格中心（0-based） */
 export function refFieldSubslotCenterMeters(
   bounds: { xMinM: number; xMaxM: number; yMinM: number; yMaxM: number },
   subIndex: number,

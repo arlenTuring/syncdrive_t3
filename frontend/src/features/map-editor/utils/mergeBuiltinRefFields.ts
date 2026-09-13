@@ -117,7 +117,7 @@ function mergeFacilitiesInArea(
   })
 }
 
-/** 內建檔已有參照場域，但本機副本仍缺值時需合併 */
+/** 內建檔已有 refField，但本機副本仍缺值時需合併 */
 export function builtinRefFieldsNeedMerge(
   local: ParsedMapFile,
   remote: ParsedMapFile,
@@ -137,7 +137,7 @@ export function builtinRefFieldsNeedMerge(
   return false
 }
 
-/** 將內建檔的參照場域欄位併入本機副本（保留像素／版面編輯） */
+/** 將內建檔的 refField 欄位併入本機副本（保留像素／版面編輯） */
 export function mergeBuiltinRefFieldsIntoParsed(
   local: ParsedMapFile,
   remote: ParsedMapFile,

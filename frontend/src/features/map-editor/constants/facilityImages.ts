@@ -7,6 +7,8 @@ export const FACILITY_BACKGROUND_BY_NAME: Record<FacilityName, string | null> = 
   Wash: '/assets/facilities/wash.png',
   Repair: '/assets/facilities/repair.png',
   FacilityArea: null,
+  ZoneEntrance: null,
+  ZonePartition: null,
   Geofence: null,
   Gate: '/assets/facilities/gate.png',
   Light: '/assets/facilities/light.png',

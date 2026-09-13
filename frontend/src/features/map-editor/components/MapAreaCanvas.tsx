@@ -7,7 +7,6 @@ import {
   useState,
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { useTranslation } from 'react-i18next'
 import type { MqttLiveEntry } from '../live/mqttLiveTypes'
 import type {
   MapAreaLayout,
@@ -151,6 +150,8 @@ type MapAreaCanvasProps = {
   onRotateDelta?: (areaId: string, facilityId: string, deltaDeg: number) => void
   onTrackCornerEditStart?: () => void
   onDeleteFacility?: (areaId: string, facilityId: string) => void
+  /** 分區工具列：在分區內新增一般設施 */
+  onAddFacilityInsideZone?: (areaId: string, zoneFacilityId: string) => void
   onUpdateGeofence?: (
     areaId: string,
     facilityId: string,
@@ -187,6 +188,8 @@ type MapAreaCanvasProps = {
     hovered: boolean,
   ) => void
   showAreaCenterLabels?: boolean
+  /** 刻度帶數字：scale＝Area domain；field＝場域實際座標 */
+  rulerDisplayMode?: 'scale' | 'field'
   /** 編輯模式：選取元件時顯示圓形工具列 */
   showFacilityToolbars?: boolean
   /** 裁減模式：較大工作區承載現有地圖，拖曳裁切框決定輸出解析度 */
@@ -252,6 +255,7 @@ export function MapAreaCanvas({
   onRotateDelta,
   onTrackCornerEditStart,
   onDeleteFacility,
+  onAddFacilityInsideZone,
   onUpdateGeofence,
   onGeofenceEditStart,
   onPaletteDropArea,
@@ -270,6 +274,7 @@ export function MapAreaCanvas({
   onCancelFormatPaint,
   onFacilityHover,
   showAreaCenterLabels = false,
+  rulerDisplayMode = 'scale',
   showFacilityToolbars = true,
   cropMode = null,
   onCropRectChange,
@@ -283,7 +288,6 @@ export function MapAreaCanvas({
   onBasemapDoubleClick,
   routePlanningOverlay = null,
 }: MapAreaCanvasProps) {
-  const { t } = useTranslation()
   const mapRef = useRef<HTMLDivElement>(null)
   const mapScaleRef = useRef(1)
   const BULK_MAP_DRAG_START_PX = 4
@@ -711,14 +715,15 @@ export function MapAreaCanvas({
           ) : null}
           {/*
             深藍色 pixelSize 仍是正式可顯示／部署範圍。
-            編輯模式改 overflow-visible：物件先丟到外圍黑色工作區時，選取框與把手仍看得到（類 PPT）。
-            檢視／嵌入／裁切模式維持 overflow-hidden，避免正式畫面露出暫放區。
+            編輯模式 overflow-visible：物件可暫放外圍黑色工作區。
+            有 Area 刻度／座標尺時也 overflow-visible，讓尺帶畫在正式範圍外而不被裁切。
+            其餘檢視／嵌入／裁切維持 overflow-hidden。
           */}
           <div
             className={
               inCropMode
                 ? 'absolute overflow-hidden pointer-events-none [&_*]:!pointer-events-none'
-                : areaEditEnabled
+                : areaEditEnabled || areas.some((a) => a.showRuler)
                   ? 'absolute overflow-visible'
                   : 'absolute overflow-hidden'
             }
@@ -818,10 +823,12 @@ export function MapAreaCanvas({
                 onRotateDelta={onRotateDelta ?? (() => {})}
                 onTrackCornerEditStart={onTrackCornerEditStart}
                 onDeleteFacility={onDeleteFacility}
+                onAddFacilityInsideZone={onAddFacilityInsideZone}
                 onUpdateGeofence={onUpdateGeofence}
                 onGeofenceEditStart={onGeofenceEditStart}
                 onPaletteDrop={onPaletteDropFacility}
                 mapScale={mapScale}
+                rulerDisplayMode={rulerDisplayMode}
                 mapViewportRef={viewportRef}
                 mapPixelSize={pixelSize}
                 onPatchAreaLayout={onPatchAreaLayout}
@@ -899,54 +906,6 @@ export function MapAreaCanvas({
             ) : null}
             </div>
           </div>
-          {areaEditEnabled && !inCropMode ? (
-            <div
-              aria-hidden
-              data-map-display-frame
-              className="pointer-events-none absolute z-[12000]"
-              style={{
-                left: clipLeft,
-                top: clipTop,
-                width: viewportSizePx.width,
-                height: viewportSizePx.height,
-                // 淡、細：不搶正式畫布內容；外圈深色僅略分層
-                boxShadow:
-                  '0 0 0 1px rgba(56, 189, 248, 0.38), 0 0 0 3px rgba(6, 10, 18, 0.55), inset 0 0 0 1px rgba(125, 211, 252, 0.14)',
-              }}
-              title={t('mapEditor.chrome.displayFrameTitle')}
-            >
-              {/* 四角括弧，強化「這是正式畫布」的標示感 */}
-              {(
-                [
-                  { left: -1, top: -1, borderWidth: '2px 0 0 2px' },
-                  { right: -1, top: -1, borderWidth: '2px 2px 0 0' },
-                  { left: -1, bottom: -1, borderWidth: '0 0 2px 2px' },
-                  { right: -1, bottom: -1, borderWidth: '0 2px 2px 0' },
-                ] as const
-              ).map((pos, i) => (
-                <div
-                  key={i}
-                  className="absolute size-6 border-cyan-300/45"
-                  style={{
-                    ...pos,
-                    borderStyle: 'solid',
-                  }}
-                />
-              ))}
-              {/* 標籤在框外上方，不遮正式顯示範圍 */}
-              <div
-                className="absolute left-0 rounded border border-cyan-400/40 bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-cyan-200/90 shadow-sm"
-                style={{
-                  bottom: '100%',
-                  marginBottom: 4,
-                  transform: `scale(${1 / Math.max(0.15, mapScale)})`,
-                  transformOrigin: 'bottom left',
-                }}
-              >
-                {t('mapEditor.chrome.displayFrameLabel')}
-              </div>
-            </div>
-          ) : null}
           {inCropMode && cropMode && onCropRectChange ? (
             <MapCropModeOverlay
               workspace={cropMode.workspace}

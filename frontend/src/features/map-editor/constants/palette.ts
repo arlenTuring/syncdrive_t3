@@ -59,6 +59,18 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: 'mapEditor.palette.items.facility.hint',
   },
   {
+    label: 'mapEditor.palette.items.zoneEntrance.label',
+    type: 'Facility',
+    name: 'ZoneEntrance',
+    hint: 'mapEditor.palette.items.zoneEntrance.hint',
+  },
+  {
+    label: 'mapEditor.palette.items.zonePartition.label',
+    type: 'Facility',
+    name: 'ZonePartition',
+    hint: 'mapEditor.palette.items.zonePartition.hint',
+  },
+  {
     label: 'mapEditor.palette.items.light.label',
     type: 'Signal',
     name: 'Light',

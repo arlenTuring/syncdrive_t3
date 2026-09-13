@@ -37,9 +37,10 @@ import {
   SWITCH_TRACK_KEY,
   TAPER_TRACK_KEY,
 } from '../utils/trackShapes'
-import { buildTaperFromEndSegments, type EndSegment } from '../utils/taperJoin'
+import { alignTaperFaces, buildTaperFromEndSegments, type EndSegment } from '../utils/taperJoin'
+import { refFieldBoundsPatchAfterTrackJoin } from '../utils/facilityRefFieldBoundsAuto'
 import type { CrossHandleKey } from '../utils/trackShapes'
-import { buildCornerFromEndSegments } from '../utils/cornerJoin'
+import { alignCornerFaces, buildCornerFromEndSegments, cornerGeometryWithPreservedBulge } from '../utils/cornerJoin'
 import { buildRectFromEndSegments } from '../utils/railJoin'
 import { alignSwitchFaces, buildSwitchFromEndSegments } from '../utils/switchJoin'
 import { alignCrossFaces, buildCrossFromEndSegments } from '../utils/crossJoin'
@@ -47,7 +48,16 @@ import {
   resolveFacilityAreaPosition,
   resolveFacilityAreaSize,
 } from '../utils/facilityAreaCoords'
+import {
+  isZoneEntrance,
+  isZonePartition,
+  listChildFacilityIdsInZone,
+} from '../utils/zonePartition'
 import { areaLocalPxToMeter } from '../utils/areaCoords'
+import {
+  getRefFieldBounds,
+  hasValidRefFieldBounds,
+} from '../utils/facilityRefFieldBounds'
 import {
   resolveAreaBorderStyle,
   resolveAreaFillStyle,
@@ -77,7 +87,7 @@ import type { CrossoverSnapUi } from '../utils/crossoverSnapUi'
 import { GeofenceNode } from './GeofenceNode'
 import type { AlignGuideLine, SnapRect } from '../utils/facilityDragAlign'
 import { buildCrossAreaPeerSnapRects } from '../utils/facilityDragAlign'
-import { AreaRulerOverlay } from './AreaRulerOverlay'
+import { AreaRulerOverlay, type AreaRulerSelectionGuide } from './AreaRulerOverlay'
 import { AreaDragTrack } from './AreaDragTrack'
 import {
   facilityIdsInMarqueeRect,
@@ -244,6 +254,7 @@ type AreaNodeProps = {
   onRotateDelta: (areaId: string, facilityId: string, deltaDeg: number) => void
   onTrackCornerEditStart?: () => void
   onDeleteFacility?: (areaId: string, facilityId: string) => void
+  onAddFacilityInsideZone?: (areaId: string, zoneFacilityId: string) => void
   onUpdateGeofence?: (
     areaId: string,
     facilityId: string,
@@ -260,6 +271,8 @@ type AreaNodeProps = {
   ) => void
   /** 畫布 fit 視窗縮放比，供 Area 刻度 UI 補償 */
   mapScale?: number
+  /** 刻度帶數字：scale＝Area domain；field＝場域實際座標 */
+  rulerDisplayMode?: 'scale' | 'field'
   mapViewportRef?: RefObject<HTMLDivElement | null>
   mapPixelSize?: MapPixelSize
   onPatchAreaLayout?: (areaId: string, layout: MapAreaLayout) => void
@@ -280,7 +293,7 @@ type AreaNodeProps = {
     hovered: boolean,
   ) => void
   showCenterLabel?: boolean
-  /** 選取元件時顯示圓形工具列（旋轉、格式複製、刪除等） */
+  /** 選取元件時顯示圓形工具列（旋轉、格式複製、刪除等）；開啟時並連線至刻度軸 */
   showFacilityToolbars?: boolean
   /** 與其他 Area 的繪製順序（用於選取時浮起） */
   areaStackOrder?: number
@@ -320,10 +333,12 @@ export const AreaNode = memo(function AreaNode({
   onRotateDelta,
   onTrackCornerEditStart,
   onDeleteFacility,
+  onAddFacilityInsideZone,
   onUpdateGeofence,
   onGeofenceEditStart,
   onPaletteDrop,
   mapScale = 1,
+  rulerDisplayMode = 'scale',
   mapViewportRef,
   mapPixelSize,
   onPatchAreaLayout,
@@ -492,6 +507,167 @@ export const AreaNode = memo(function AreaNode({
     domain: displayDomain,
     layout: committedLayout,
   }
+
+  /** 工具列開啟 + 有選取：連線至 Area 刻度軸並標讀數 */
+  const selectionRulerGuides = useMemo((): AreaRulerSelectionGuide[] => {
+    if (
+      !showFacilityToolbars ||
+      !area.showRuler ||
+      selectedFacilityIds.length === 0
+    ) {
+      return []
+    }
+    const guides: AreaRulerSelectionGuide[] = []
+    /** 只標主要選取（最後一個），避免多選時刻度數字疊成一團 */
+    const primaryId = selectedFacilityIds[selectedFacilityIds.length - 1]
+    if (!primaryId) return []
+    for (const id of [primaryId]) {
+      const f = area.facilities.find((x) => x.id === id)
+      if (!f || f.type === 'Geofence') continue
+
+      let liveFac: FacilityObject = f
+      if (dragStartPositions && dragLiveAreaPos && draggingFacilityId) {
+        const startDragPos = dragStartPositions[draggingFacilityId]
+        const startFacPos = dragStartPositions[f.id]
+        if (startDragPos && startFacPos) {
+          liveFac = {
+            ...f,
+            areaPosition: {
+              x: startFacPos.x + (dragLiveAreaPos.x - startDragPos.x),
+              y: startFacPos.y + (dragLiveAreaPos.y - startDragPos.y),
+            },
+          }
+        }
+      } else {
+        const mqttLive = liveById?.[getMqttEntityId(f)]
+        const pm = mqttLive?.positionMeters
+        if (
+          pm &&
+          isMeterInDomain(pm.x, pm.y, displayDomain)
+        ) {
+          liveFac = {
+            ...f,
+            areaPosition: meterToAreaLocalPx(
+              pm.x,
+              pm.y,
+              displayDomain,
+              committedLayout,
+            ),
+          }
+        }
+      }
+
+      const placement = resolveFacilityRenderPlacement(
+        liveFac,
+        displayDomain,
+        committedLayout,
+        domainSpan,
+      )
+      const areaPos = resolveFacilityAreaPosition(
+        liveFac,
+        displayDomain,
+        committedLayout,
+      )
+      const areaSize = resolveFacilityAreaSize(
+        liveFac,
+        displayDomain,
+        committedLayout,
+        domainSpan,
+      )
+      const domainMin = areaLocalPxToMeter(
+        areaPos.x,
+        areaPos.y,
+        displayDomain,
+        committedLayout,
+      )
+      const domainMax = areaLocalPxToMeter(
+        areaPos.x + areaSize.w,
+        areaPos.y + areaSize.h,
+        displayDomain,
+        committedLayout,
+      )
+      const domainCenter = areaLocalPxToMeter(
+        areaPos.x + areaSize.w / 2,
+        areaPos.y + areaSize.h / 2,
+        displayDomain,
+        committedLayout,
+      )
+      const placeCssXMin = placement.css.left
+      const placeCssYMin = placement.css.top
+      const placeCssXMax = placement.css.left + placement.areaSize.w
+      const placeCssYMax = placement.css.top + placement.areaSize.h
+
+      /**
+       * 座標模式＋有效 refField：標籤用場域數值，但刻度帶框線對齊圖上元件外框。
+       */
+      if (
+        rulerDisplayMode === 'field' &&
+        hasValidRefFieldBounds(liveFac.parameters)
+      ) {
+        const b = getRefFieldBounds(liveFac.parameters)
+        const xMinM = b.xMinM!
+        const xMaxM = b.xMaxM!
+        const yMinM = b.yMinM!
+        const yMaxM = b.yMaxM!
+        guides.push({
+          cssX: (placeCssXMin + placeCssXMax) / 2,
+          cssY: (placeCssYMin + placeCssYMax) / 2,
+          crosshairCssX: (placeCssXMin + placeCssXMax) / 2,
+          crosshairCssY: (placeCssYMin + placeCssYMax) / 2,
+          domainXM: domainCenter.x,
+          domainYM: domainCenter.y,
+          cssXMin: placeCssXMin,
+          cssXMax: placeCssXMax,
+          cssYMin: placeCssYMin,
+          cssYMax: placeCssYMax,
+          domainXMin: Math.min(domainMin.x, domainMax.x),
+          domainXMax: Math.max(domainMin.x, domainMax.x),
+          domainYMin: Math.min(domainMin.y, domainMax.y),
+          domainYMax: Math.max(domainMin.y, domainMax.y),
+          fieldLabels: {
+            xMinM,
+            xMaxM,
+            yMinM,
+            yMaxM,
+            xM: (xMinM + xMaxM) / 2,
+            yM: (yMinM + yMaxM) / 2,
+          },
+        })
+        continue
+      }
+
+      guides.push({
+        cssX: (placeCssXMin + placeCssXMax) / 2,
+        cssY: (placeCssYMin + placeCssYMax) / 2,
+        domainXM: domainCenter.x,
+        domainYM: domainCenter.y,
+        cssXMin: placeCssXMin,
+        cssXMax: placeCssXMax,
+        cssYMin: placeCssYMin,
+        cssYMax: placeCssYMax,
+        domainXMin: Math.min(domainMin.x, domainMax.x),
+        domainXMax: Math.max(domainMin.x, domainMax.x),
+        domainYMin: Math.min(domainMin.y, domainMax.y),
+        domainYMax: Math.max(domainMin.y, domainMax.y),
+      })
+    }
+    return guides
+  }, [
+    area,
+    area.facilities,
+    area.showRuler,
+    committedLayout,
+    displayDomain,
+    domainSpan.h,
+    domainSpan.w,
+    dragLiveAreaPos,
+    dragStartPositions,
+    draggingFacilityId,
+    liveById,
+    rulerDisplayMode,
+    selectedFacilityIds,
+    showFacilityToolbars,
+  ])
 
   const crossoverSegmentById = useMemo(
     () => buildEditorTrackSnapSegments(area),
@@ -914,44 +1090,52 @@ export const AreaNode = memo(function AreaNode({
         x: cx + dx * cos - dy * sin,
         y: cy + dx * sin + dy * cos,
       })
+      /**
+       * 異形軌道端面在元件未旋轉座標系；圖上還會再套 facility.rotation，
+       * 接合探測必須轉到 Area 座標，否則旋轉後吸附點與畫面錯位。
+       */
+      const fromBoxLocal = (q: { x: number; y: number }) => {
+        const dx = q.x - size.w / 2
+        const dy = q.y - size.h / 2
+        return {
+          x: cx + dx * cos - dy * sin,
+          y: cy + dx * sin + dy * cos,
+        }
+      }
       // 圓角軌道的端面是外弧與內弧之間那一小段直邊，不是外框的短邊
       if (f.name === 'RailCorner') {
         const segs = cornerTrackEndSegmentsPx(readCornerTrack(f.parameters), size.w, size.h)
-        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
         return (['a', 'b'] as const).map((k) => {
-          const p0 = L(segs[k][0])
-          const p1 = L(segs[k][1])
+          const p0 = fromBoxLocal(segs[k][0])
+          const p1 = fromBoxLocal(segs[k][1])
           return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
         })
       }
       // 分岔軌道有三個面，也由自己的幾何決定
       if (f.name === 'RailSwitch') {
         const segs = switchTrackEndSegmentsPx(readSwitchTrack(f.parameters), size.w, size.h)
-        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
         return (['a', 'm', 'b'] as const).map((k) => {
-          const p0 = L(segs[k][0])
-          const p1 = L(segs[k][1])
+          const p0 = fromBoxLocal(segs[k][0])
+          const p1 = fromBoxLocal(segs[k][1])
           return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
         })
       }
       // 交叉軌道有四個面，兩兩對接
       if (f.name === 'RailCross') {
         const segs = crossTrackEndSegmentsPx(readCrossTrack(f.parameters), size.w, size.h)
-        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
         return CROSS_HANDLE_KEYS.map((k) => {
-          const p0 = L(segs[k][0])
-          const p1 = L(segs[k][1])
+          const p0 = fromBoxLocal(segs[k][0])
+          const p1 = fromBoxLocal(segs[k][1])
           return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y }
         })
       }
       // 斜接軌道的端面由它自己的幾何決定，不是外框的長短邊
       if (f.name === 'RailTaper') {
         const segs = taperTrackEndSegmentsPx(readTaperTrack(f.parameters), size.w, size.h)
-        const L = (q: { x: number; y: number }) => ({ x: pos.x + q.x, y: top + q.y })
-        const a0 = L(segs.a[0])
-        const a1 = L(segs.a[1])
-        const b0 = L(segs.b[0])
-        const b1 = L(segs.b[1])
+        const a0 = fromBoxLocal(segs.a[0])
+        const a1 = fromBoxLocal(segs.a[1])
+        const b0 = fromBoxLocal(segs.b[0])
+        const b1 = fromBoxLocal(segs.b[1])
         return [
           { x1: a0.x, y1: a0.y, x2: a1.x, y2: a1.y },
           { x1: b0.x, y1: b0.y, x2: b1.x, y2: b1.y },
@@ -1044,8 +1228,22 @@ export const AreaNode = memo(function AreaNode({
       const other = cur[OPPOSITE_FACE[end] ?? 'a']
       if (!other) return false
       const [x, y] = end === 'a' ? [edge, other] : [other, edge]
-      if (f.name === 'RailTaper') return !!buildTaperFromEndSegments(x, y)
-      if (f.name === 'RailCorner') return !!buildCornerFromEndSegments(x, y)
+      if (f.name === 'RailTaper') {
+        const next = alignTaperFaces(
+          { a: cur.a!, b: cur.b! },
+          end as 'a' | 'b',
+          edge,
+        )
+        return !!next && !!buildTaperFromEndSegments(next.a, next.b)
+      }
+      if (f.name === 'RailCorner') {
+        const next = alignCornerFaces(
+          { a: cur.a!, b: cur.b! },
+          end as 'a' | 'b',
+          edge,
+        )
+        return !!next && !!buildCornerFromEndSegments(next.a, next.b)
+      }
       return !!buildRectFromEndSegments(edge, other)
     },
     [trackFacesLocal],
@@ -1066,12 +1264,15 @@ export const AreaNode = memo(function AreaNode({
       const f = area.facilities.find((x) => x.id === facilityId)
       const p = clientToAreaLocal(clientX, clientY)
       if (!f || !p) return null
+      const curFaces = trackFacesLocal(f)
+      const dragFace = curFaces?.[end] ?? null
       // 吸附範圍隨縮放走，畫面上大約就是一根手指的寬度
       const reach = 14 / Math.max(0.01, mapScale)
       type Hit = { targetId: string; edge: { x1: number; y1: number; x2: number; y2: number } }
       let best: Hit | null = null
       let bestD = reach
       let bestMid = Infinity
+      let bestOverlap = -1
       /*
        * 碰得到、卻接不起來的也記下來。
        *
@@ -1082,9 +1283,70 @@ export const AreaNode = memo(function AreaNode({
       let near: Hit | null = null
       let nearD = reach
       let nearMid = Infinity
+      /** 雙車道出口並排、貼在同一條線上的隔壁口 → 略過；正對面的對手口（沿線重疊）要留著 */
+      const sideBySideSiblingEdge = (e: {
+        x1: number
+        y1: number
+        x2: number
+        y2: number
+      }) => {
+        if (!dragFace) return false
+        const AXIS = 1.5
+        const segFlat = (
+          ax: number,
+          ay: number,
+          bx: number,
+          by: number,
+          axis: 'x' | 'y',
+        ) => Math.abs((axis === 'x' ? ax : ay) - (axis === 'x' ? bx : by)) <= AXIS
+        const faceFlatX = segFlat(
+          dragFace[0].x,
+          dragFace[0].y,
+          dragFace[1].x,
+          dragFace[1].y,
+          'x',
+        )
+        const faceFlatY = segFlat(
+          dragFace[0].x,
+          dragFace[0].y,
+          dragFace[1].x,
+          dragFace[1].y,
+          'y',
+        )
+        const edgeFlatX = segFlat(e.x1, e.y1, e.x2, e.y2, 'x')
+        const edgeFlatY = segFlat(e.x1, e.y1, e.x2, e.y2, 'y')
+
+        let along0: number
+        let along1: number
+        let e0: number
+        let e1: number
+        if (faceFlatY && edgeFlatY && Math.abs(dragFace[0].y - e.y1) <= AXIS) {
+          along0 = Math.min(dragFace[0].x, dragFace[1].x)
+          along1 = Math.max(dragFace[0].x, dragFace[1].x)
+          e0 = Math.min(e.x1, e.x2)
+          e1 = Math.max(e.x1, e.x2)
+        } else if (faceFlatX && edgeFlatX && Math.abs(dragFace[0].x - e.x1) <= AXIS) {
+          along0 = Math.min(dragFace[0].y, dragFace[1].y)
+          along1 = Math.max(dragFace[0].y, dragFace[1].y)
+          e0 = Math.min(e.y1, e.y2)
+          e1 = Math.max(e.y1, e.y2)
+        } else {
+          return false
+        }
+        const overlap = Math.min(along1, e1) - Math.max(along0, e0)
+        // 幾乎不重疊＝並排隔壁口（D17|U17 貼齊）；有重疊＝正對要接的口（即使斜接目前比較寬）
+        return overlap < 1
+      }
       for (const other of area.facilities) {
-        if (other.id === facilityId || other.type !== 'Track') continue
+        // 可接目標：其他軌道端面，或分區入口外框四邊
+        if (
+          other.id === facilityId ||
+          (other.type !== 'Track' && !isZoneEntrance(other))
+        ) {
+          continue
+        }
         for (const e of facilityEndEdgesLocal(other)) {
+          if (sideBySideSiblingEdge(e)) continue
           const dx = e.x2 - e.x1
           const dy = e.y2 - e.y1
           const l2 = dx * dx + dy * dy
@@ -1101,10 +1363,40 @@ export const AreaNode = memo(function AreaNode({
             { x: e.x1, y: e.y1 },
             { x: e.x2, y: e.y2 },
           ])
+          /** 與拖曳面沿線重疊量：寬斜接同時蓋到兩車道時，優先重疊多的那一口 */
+          let faceOverlap = 0
+          if (dragFace) {
+            const AXIS = 1.5
+            const flatY =
+              Math.abs(dragFace[0].y - dragFace[1].y) <= AXIS &&
+              Math.abs(e.y1 - e.y2) <= AXIS
+            const flatX =
+              Math.abs(dragFace[0].x - dragFace[1].x) <= AXIS &&
+              Math.abs(e.x1 - e.x2) <= AXIS
+            if (flatY) {
+              const a0 = Math.min(dragFace[0].x, dragFace[1].x)
+              const a1 = Math.max(dragFace[0].x, dragFace[1].x)
+              const b0 = Math.min(e.x1, e.x2)
+              const b1 = Math.max(e.x1, e.x2)
+              faceOverlap = Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
+            } else if (flatX) {
+              const a0 = Math.min(dragFace[0].y, dragFace[1].y)
+              const a1 = Math.max(dragFace[0].y, dragFace[1].y)
+              const b0 = Math.min(e.y1, e.y2)
+              const b1 = Math.max(e.y1, e.y2)
+              faceOverlap = Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
+            }
+          }
           const TIE = 0.5
-          if (joinable && (d < bestD - TIE || (d < bestD + TIE && midD < bestMid))) {
+          const betterJoin =
+            d < bestD - TIE ||
+            (d < bestD + TIE &&
+              (faceOverlap > (bestOverlap ?? -1) + 0.5 ||
+                (Math.abs(faceOverlap - (bestOverlap ?? 0)) <= 0.5 && midD < bestMid)))
+          if (joinable && betterJoin) {
             bestD = Math.min(bestD, d)
             bestMid = midD
+            bestOverlap = faceOverlap
             best = { targetId: other.id, edge: e }
           } else if (!joinable && (d < nearD - TIE || (d < nearD + TIE && midD < nearMid))) {
             nearD = Math.min(nearD, d)
@@ -1116,7 +1408,14 @@ export const AreaNode = memo(function AreaNode({
       setTaperHighlight(best ? { ...best, ok: true } : near ? { ...near, ok: false } : null)
       return best
     },
-    [area.facilities, clientToAreaLocal, facilityEndEdgesLocal, mapScale, trackWouldJoin],
+    [
+      area.facilities,
+      clientToAreaLocal,
+      facilityEndEdgesLocal,
+      mapScale,
+      trackFacesLocal,
+      trackWouldJoin,
+    ],
   )
 
   const onTrackEndCommit = useCallback(
@@ -1168,7 +1467,11 @@ export const AreaNode = memo(function AreaNode({
           want,
         )
         const r = next && buildSwitchFromEndSegments(next.a, next.m, next.b)
-        if (r) built = { box: r.box, patch: { [SWITCH_TRACK_KEY]: r.geometry } }
+        /*
+         * 重建後方位寫進 entryDeg、外框是世界座標 AABB；必須把 facility.rotation
+         * 歸零，否則 CSS 再轉一次會整塊歪掉。
+         */
+        if (r) built = { box: r.box, patch: { [SWITCH_TRACK_KEY]: r.geometry }, rotationDeg: 0 }
       } else if (f.name === 'RailCross') {
         const next = alignCrossFaces(
           cur as Record<CrossHandleKey, EndSegment>,
@@ -1176,17 +1479,38 @@ export const AreaNode = memo(function AreaNode({
           want,
         )
         const r = next && buildCrossFromEndSegments(next)
-        if (r) built = { box: r.box, patch: { [CROSS_TRACK_KEY]: r.geometry } }
+        if (r) built = { box: r.box, patch: { [CROSS_TRACK_KEY]: r.geometry }, rotationDeg: 0 }
       } else {
         const other = cur[OPPOSITE_FACE[end] ?? 'a']
         if (!other) return
         const [x, y] = end === 'a' ? [want, other] : [other, want]
         if (f.name === 'RailTaper') {
-          const r = buildTaperFromEndSegments(x, y)
-          if (r) built = { box: r.box, patch: { [TAPER_TRACK_KEY]: r.geometry } }
+          const next = alignTaperFaces(
+            { a: cur.a!, b: cur.b! },
+            end as 'a' | 'b',
+            want,
+          )
+          const r = next && buildTaperFromEndSegments(next.a, next.b)
+          if (r) built = { box: r.box, patch: { [TAPER_TRACK_KEY]: r.geometry }, rotationDeg: 0 }
         } else if (f.name === 'RailCorner') {
-          const r = buildCornerFromEndSegments(x, y)
-          if (r) built = { box: r.box, patch: { [CORNER_TRACK_KEY]: r.geometry } }
+          const next = alignCornerFaces(
+            { a: cur.a!, b: cur.b! },
+            end as 'a' | 'b',
+            want,
+          )
+          const r = next && buildCornerFromEndSegments(next.a, next.b)
+          if (r) {
+            built = {
+              box: r.box,
+              patch: {
+                [CORNER_TRACK_KEY]: cornerGeometryWithPreservedBulge(
+                  r.geometry,
+                  f.parameters,
+                ),
+              },
+              rotationDeg: 0,
+            }
+          }
         } else {
           // 一般軌道：寬度由被拖的那一面決定，所以它一定放第一個
           const r = buildRectFromEndSegments(want, other)
@@ -1195,19 +1519,39 @@ export const AreaNode = memo(function AreaNode({
       }
       if (!built) return
 
+      const boundsPatch = refFieldBoundsPatchAfterTrackJoin(
+        f,
+        area,
+        {
+          box: built.box,
+          patch: built.patch,
+          layoutHPx: displayLayout.hPx,
+        },
+      )
+      const paramPatch = {
+        ...(built.patch ?? {}),
+        ...boundsPatch,
+      }
+
       onDragSessionStart?.()
-      if (built.patch) onPatchFacilityParameters(area.id, facilityId, built.patch)
+      if (Object.keys(paramPatch).length > 0) {
+        onPatchFacilityParameters(area.id, facilityId, paramPatch)
+      }
       if (built.rotationDeg !== undefined) {
         /*
-         * 只有相對旋轉的介面，所以自己算差值；而且要<strong>收進 ±90 度</strong>。
+         * 只有相對旋轉的介面，所以自己算差值。
          *
-         * 矩形轉 180 度長得一模一樣，但角度不是——接的是左邊那一面時，行進方向指向左，
-         * 算出來就是 180 度。形狀沒變，元件上的文字與圖示卻整個顛倒過來。取與原角度
-         * 最接近的那一個表示法，外觀就不會無故翻面。
+         * 一般軌道（patch === null）：矩形轉 180 度長得一模一樣，但角度不是——接左邊時
+         * 算出來就是 180 度。形狀沒變，文字與圖示卻整個顛倒；取與原角度最接近的表示法。
+         *
+         * 異形軌道：方位已寫進 entryDeg／幾何，接合後必須<strong>真的歸零</strong>
+         * facility.rotation，不可再做 ±90 折疊，否則 90°→0 會被收成再轉 90° 變成 180°。
          */
         let delta = built.rotationDeg - (f.rotation ?? 0)
-        while (delta > 90) delta -= 180
-        while (delta <= -90) delta += 180
+        if (built.patch === null) {
+          while (delta > 90) delta -= 180
+          while (delta <= -90) delta += 180
+        }
         if (Math.abs(delta) > 0.01) onRotateDelta(area.id, facilityId, delta)
       }
       onResizeFacility(area.id, facilityId, { w: built.box.w, h: built.box.h })
@@ -1787,8 +2131,30 @@ export const AreaNode = memo(function AreaNode({
           onFacilityDragActiveChange={(active) => {
             setDraggingFacilityId(active ? f.id : null)
             if (active) {
-              const starts: Record<string, { x: number; y: number }> = {}
+              const expanded = new Set(selectedFacilityIds)
               for (const id of selectedFacilityIds) {
+                const fac = area.facilities.find((x) => x.id === id)
+                if (fac && isZonePartition(fac)) {
+                  for (const childId of listChildFacilityIdsInZone(
+                    area.facilities,
+                    id,
+                  )) {
+                    expanded.add(childId)
+                  }
+                }
+              }
+              /** 若拖的是分區但未在選取列，仍帶上其子設施 */
+              if (isZonePartition(f)) {
+                expanded.add(f.id)
+                for (const childId of listChildFacilityIdsInZone(
+                  area.facilities,
+                  f.id,
+                )) {
+                  expanded.add(childId)
+                }
+              }
+              const starts: Record<string, { x: number; y: number }> = {}
+              for (const id of expanded) {
                 const fac = area.facilities.find((x) => x.id === id)
                 if (fac) {
                   starts[id] = { x: fac.areaPosition.x, y: fac.areaPosition.y }
@@ -1821,6 +2187,11 @@ export const AreaNode = memo(function AreaNode({
           onDelete={
             onDeleteFacility && editMode
               ? () => onDeleteFacility(area.id, f.id)
+              : undefined
+          }
+          onAddFacilityInsideZone={
+            onAddFacilityInsideZone && editMode
+              ? () => onAddFacilityInsideZone(area.id, f.id)
               : undefined
           }
           formatPaintSnapshot={formatPaintSnapshot}
@@ -1961,8 +2332,11 @@ export const AreaNode = memo(function AreaNode({
           <AreaRulerOverlay
             domain={displayDomain}
             layout={displayLayout}
+            area={area}
+            displayMode={rulerDisplayMode === 'field' ? 'field' : 'scale'}
             mapScale={mapScale}
             showMoveHint={false}
+            selectionGuides={selectionRulerGuides}
           />
         )}
         {listBasemapsForPaint(area.facilities).length > 0 ? (

@@ -31,10 +31,13 @@ type MapEditorToolbarProps = {
   canRedo: boolean
   onUndo: () => void
   onRedo: () => void
-  /** Edit mode: Area meter rulers */
+  /** Edit mode: Area meter rulers — off / scale (domain) / field (real coords) */
+  rulerDisplayMode?: 'off' | 'scale' | 'field'
+  onCycleRulerDisplayMode?: () => void
+  rulersToggleHint?: string
+  /** @deprecated use rulerDisplayMode */
   showRulers?: boolean
   onToggleRulers?: () => void
-  rulersToggleHint?: string
   /** Edit mode: Area center overview labels */
   showAreaCenterLabels?: boolean
   onToggleAreaCenterLabels?: () => void
@@ -75,6 +78,8 @@ export function MapEditorToolbar({
   canRedo,
   onUndo,
   onRedo,
+  rulerDisplayMode = 'off',
+  onCycleRulerDisplayMode,
   showRulers = false,
   onToggleRulers,
   rulersToggleHint,
@@ -191,20 +196,35 @@ export function MapEditorToolbar({
           </button>
         )}
 
-        {mapEditorMode === 'edit' && onToggleRulers && (
+        {mapEditorMode === 'edit' && (onCycleRulerDisplayMode || onToggleRulers) && (
           <button
             type="button"
-            onClick={onToggleRulers}
-            aria-pressed={showRulers}
+            onClick={onCycleRulerDisplayMode ?? onToggleRulers}
+            aria-pressed={rulerDisplayMode !== 'off' || showRulers}
             className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-2.5 sm:text-xs ${
-              showRulers
-                ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
-                : 'border-zinc-600 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800'
+              rulerDisplayMode === 'field'
+                ? 'border-emerald-600/70 bg-emerald-950/60 text-emerald-200'
+                : rulerDisplayMode === 'scale' || showRulers
+                  ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
+                  : 'border-zinc-600 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800'
             }`}
-            title={rulersToggleHint ?? t('mapEditor.toolbar.rulersTitle')}
+            title={
+              rulersToggleHint ??
+              (rulerDisplayMode === 'field'
+                ? t('mapEditor.toolbar.rulersTitleField')
+                : rulerDisplayMode === 'scale'
+                  ? t('mapEditor.toolbar.rulersTitleScale')
+                  : t('mapEditor.toolbar.rulersTitle'))
+            }
           >
             <Ruler className="size-3.5 shrink-0 sm:size-4" aria-hidden />
-            <span className="hidden sm:inline">{t('mapEditor.toolbar.rulers')}</span>
+            <span className="hidden sm:inline">
+              {rulerDisplayMode === 'field'
+                ? t('mapEditor.toolbar.rulersField')
+                : rulerDisplayMode === 'scale'
+                  ? t('mapEditor.toolbar.rulersScale')
+                  : t('mapEditor.toolbar.rulers')}
+            </span>
           </button>
         )}
         {mapEditorMode === 'edit' && onToggleMapCanvasResize && (

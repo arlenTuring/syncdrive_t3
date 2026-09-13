@@ -735,7 +735,11 @@ export function StepShiftRouteGroups({
           result.groups.flatMap((g) => g.routes.map((r) => r.routeId)),
         );
         const routeMeta = new Map(
-          result.groups.flatMap((g) => g.routes.map((r) => [r.routeId, r] as const)),
+          result.groups.flatMap((g) =>
+            g.routes.map(
+              (r) => [r.routeId, { route: r, group: g }] as const,
+            ),
+          ),
         );
         const mapChanged =
           draftRef.current.mapId.trim() !== ''
@@ -747,20 +751,39 @@ export function StepShiftRouteGroups({
                 isPrimarySelectedRoute(selected) && validRouteIds.has(selected.routeId),
             )
               .map((selected) => {
-                const meta = routeMeta.get(selected.routeId);
-              if (!meta) {
+                const hit = routeMeta.get(selected.routeId);
+              if (!hit) {
                 return {
                   ...selected,
                   backupForInstanceId: null,
                   backupForRouteId: null,
                 };
               }
+                const { route: meta, group } = hit;
+                const prevFirst = selected.stationIds[0] ?? '';
+                const prevLast =
+                  selected.stationIds[selected.stationIds.length - 1] ?? '';
+                const nextFirst = meta.stationIds[0] ?? '';
+                const nextLast =
+                  meta.stationIds[meta.stationIds.length - 1] ?? '';
+                // 換地圖或起迄站變了＝這條 routeId 已不是當初編代號時那條；舊代號必須清掉
+                const routeIdentityChanged =
+                  mapChanged
+                  || prevFirst !== nextFirst
+                  || prevLast !== nextLast;
                 return {
                   ...selected,
+                  // routeId 在不同地圖可能對到不同路線；名稱／群組／站序必須一起同步
+                  routeName: meta.label,
+                  groupId: group.groupId,
+                  groupName: group.groupName,
+                  routeCode: routeIdentityChanged ? null : selected.routeCode,
                   stationIds: [...meta.stationIds],
                 stationDwells: buildStationDwells(
                   meta,
-                  mapChanged ? undefined : selected.stationDwells,
+                  mapChanged || routeIdentityChanged
+                    ? undefined
+                    : selected.stationDwells,
                 ),
                 stationLegTravels: meta.stationLegTravels.map((leg) => ({ ...leg })),
                 avgTravelTimeSeconds: meta.avgTravelTimeSeconds,

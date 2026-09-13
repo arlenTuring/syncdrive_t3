@@ -2,7 +2,8 @@ import type { MapLibraryEntry } from '../utils/mapLibraryStorage'
 import { resolveMapId } from '../constants/builtinMaps'
 
 const PUBLISH_TOKEN =
-  import.meta.env.VITE_SYNC_INTERNAL_TOKEN ?? 'sync-dev-internal'
+  (import.meta as ImportMeta & { env?: { VITE_SYNC_INTERNAL_TOKEN?: string } }).env
+    ?.VITE_SYNC_INTERNAL_TOKEN ?? 'sync-dev-internal'
 
 export type MapLibraryBackendStatus = {
   activeMapId: string

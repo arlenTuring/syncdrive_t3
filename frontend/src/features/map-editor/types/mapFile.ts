@@ -78,20 +78,20 @@ export interface MapGeofenceParameters {
   /** 填色不透明度 0–1 */
   fillOpacity?: number
   labels?: MapGeofenceLabel[]
-  /** 參照場域範圍（公尺，min/max；未設定可為 null） */
+  /** 場域範圍（公尺，min/max；未設定可為 null） */
   refFieldXMinM?: number | null
   refFieldXMaxM?: number | null
   refFieldYMinM?: number | null
   refFieldYMaxM?: number | null
 }
 
-/** 參照場域單點（號誌／智慧桿／月台門） */
+/** 場域座標（單點；號誌／智慧桿／月台門） */
 export interface MapRefFieldPositionParameters {
   refFieldXM?: number | null
   refFieldYM?: number | null
 }
 
-/** 參照場域範圍（軌道／設施／圍籬） */
+/** 場域範圍（軌道／設施／圍籬） */
 export interface MapRefFieldBoundsParameters {
   refFieldXMinM?: number | null
   refFieldXMaxM?: number | null
@@ -206,7 +206,15 @@ export interface MapFileV2 {
   visibleRouteIds?: string[]
   /** 點位拓撲／路網拓撲（停靠點／途經點／設施有向時間距離網路） */
   pointTopology?: PointTopology
+  /**
+   * 建立模式：blank＝空白圖台；trackGen＝進場即鋪滿高精地圖元件。
+   * 省略視為 blank（舊檔相容）。
+   */
+  creationMode?: MapCreationMode
 }
+
+/** 新建地圖工作流 */
+export type MapCreationMode = 'blank' | 'trackGen'
 
 /** @deprecated v1 格式；匯入時自動升級為 v2 */
 export interface MapFileCoordinateSystem {

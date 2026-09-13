@@ -1304,7 +1304,7 @@ function ShiftScheduleBlockBar({
         // 只有 DOM id 與 hover 卡這種「整份文件只能有一個」的東西掛在第一段上。
         const showChrome = true;
         const isPrimarySegment = segIndex === 0;
-        return (
+  return (
     <div
       key={`${block.id}-day-${segIndex}`}
       id={isPrimarySegment && primaryCopy ? `block-card-${block.id}` : undefined}
@@ -1531,7 +1531,7 @@ function ShiftScheduleBlockBar({
                 <Info className="size-2.5" aria-hidden />
               </button>
             ) : (
-              <Info className="size-2.5 shrink-0 opacity-70" aria-hidden />
+            <Info className="size-2.5 shrink-0 opacity-70" aria-hidden />
             )}
           </div>
         ) : (
@@ -1540,7 +1540,7 @@ function ShiftScheduleBlockBar({
             style={{ color: block.yardFacilityUnavailable ? '#FCA5A5' : colors.text }}
           >
             <span className="truncate">
-              {block.label}
+            {block.label}
               {block.yardFacilityLabel ? ` · ${block.yardFacilityLabel}` : ''}
               {/* 沒地方停是產能問題，必須直接寫在卡面——只放 hover 使用者不會發現 */}
               {block.yardFacilityUnavailable ? t('shiftList.planGrid.noFacilityAvail') : ''}
@@ -1783,26 +1783,26 @@ export function ShiftSchedulePlanGrid({
                   className="relative flex shrink-0"
                   style={{ width: dayWidthPx }}
                 >
-                  <ScheduleIntervalBackground
-                    intervals={intervals.filter((slot) => !slot.isDraft)}
-                    attributes={attributes}
-                    slotWidthPx={slotWidthPx}
+                <ScheduleIntervalBackground
+                  intervals={intervals.filter((slot) => !slot.isDraft)}
+                  attributes={attributes}
+                  slotWidthPx={slotWidthPx}
                     interactive
-                  />
+                />
                   {/* P5: 未服務運能缺口標記 */}
                   <UnservedPulseMarkers report={report} slotWidthPx={slotWidthPx} />
                   {/* 時刻標籤不裁切：144 個小 div ×3 的成本遠低於班次卡，
                       而且它們是 flex 子元素，撐出表頭的高度，抽掉會塌 */}
-                  {timeSlots.map((slot) => (
-                    <div
-                      key={slot}
+                {timeSlots.map((slot) => (
+                  <div
+                    key={slot}
                       className={`pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
-                      style={{ width: slotWidthPx }}
-                    >
-                      {formatSlotLabel(slot)}
-                    </div>
-                  ))}
-                </div>
+                    style={{ width: slotWidthPx }}
+                  >
+                    {formatSlotLabel(slot)}
+                  </div>
+                ))}
+              </div>
               ))}
             </div>
           </div>
@@ -1858,13 +1858,13 @@ export function ShiftSchedulePlanGrid({
                         }
                       }}
                     >
-                      <div className="pointer-events-none absolute inset-0 z-0">
-                        <ScheduleIntervalBackground
-                          intervals={intervals.filter((slot) => !slot.isDraft)}
-                          attributes={attributes}
-                          slotWidthPx={slotWidthPx}
-                        />
-                      </div>
+                  <div className="pointer-events-none absolute inset-0 z-0">
+                    <ScheduleIntervalBackground
+                      intervals={intervals.filter((slot) => !slot.isDraft)}
+                      attributes={attributes}
+                      slotWidthPx={slotWidthPx}
+                    />
+                  </div>
                       {rowTemplateTasks.map((task) => (
                         <TemplateTaskBar
                           key={task.id}
@@ -1873,12 +1873,12 @@ export function ShiftSchedulePlanGrid({
                         />
                       ))}
                       {visibleEntries.map((entry) => (
-                        <ShiftScheduleBlockBar
+                    <ShiftScheduleBlockBar
                           key={`${entry.block.id}#${copyIndex}`}
                           block={entry.block}
                           blockIndex={entry.index}
-                          slotWidthPx={slotWidthPx}
-                          activeIntervalRanges={activeIntervalRanges}
+                      slotWidthPx={slotWidthPx}
+                      activeIntervalRanges={activeIntervalRanges}
                           selected={selectedBlockId === entry.block.id}
                           onSelect={onSelectBlock}
                           report={report}
@@ -1896,10 +1896,10 @@ export function ShiftSchedulePlanGrid({
                           primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
                           leadingInsetPx={entry.leadingInsetPx}
                           trackOffsetPx={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
-                        />
-                      ))}
-                      <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
-                    </div>
+                    />
+                  ))}
+                  <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
+                </div>
                   );
                 })}
               </div>

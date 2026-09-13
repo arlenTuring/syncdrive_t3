@@ -89,18 +89,20 @@ export function HorizontalRuler({
         ))}
         {selXPx != null && selXPx >= -6 && selXPx <= w + 6 && (
           <div
-            className="absolute top-0 flex flex-col items-center"
+            className="absolute top-0"
             style={{ left: selXPx, transform: 'translateX(-50%)' }}
+            title={
+              selectionMeterX != null
+                ? formatMeterRulerLabel(selectionMeterX, 2)
+                : undefined
+            }
           >
             <div className="h-2.5 w-px bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
-            <span className="mt-0.5 whitespace-nowrap font-mono text-[8px] text-cyan-300 sm:text-[9px]">
-              {formatMeterRulerLabel(selectionMeterX!, 2)}
-            </span>
           </div>
         )}
       </div>
       <div className="pointer-events-none absolute bottom-0 left-2 text-[9px] text-zinc-600">
-        x (m)
+        x 刻度 (m)
       </div>
     </div>
   )
@@ -154,18 +156,20 @@ export function VerticalRuler({
         ))}
         {selYPx != null && selYPx >= -6 && selYPx <= h + 6 && (
           <div
-            className="absolute left-0 flex items-center gap-0.5"
+            className="absolute left-0"
             style={{ top: selYPx, transform: 'translateY(-50%)' }}
+            title={
+              selectionMeterY != null
+                ? formatMeterRulerLabel(selectionMeterY, 2)
+                : undefined
+            }
           >
             <div className="h-px w-2.5 shrink-0 bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
-            <span className="font-mono text-[8px] leading-none text-cyan-300 sm:text-[9px]">
-              {formatMeterRulerLabel(selectionMeterY!, 2)}
-            </span>
           </div>
         )}
       </div>
       <div className="pointer-events-none absolute bottom-1 right-0.5 origin-bottom-right rotate-[-90deg] translate-y-[-100%] text-[9px] text-zinc-600">
-        y (m)
+        y 刻度 (m)
       </div>
     </div>
   )

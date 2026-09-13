@@ -15,7 +15,12 @@ import {
   type MapPixelSize,
 } from '../types/area'
 import type { MapBasemapObject } from '../types/basemap'
-import type { MapFileV2, MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import { createBlankBasemap } from '../types/basemap'
+import type {
+  MapFileV2,
+  MapPlannedRoute,
+  MapRouteGroup,
+} from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
 import { emptyPointTopology } from '../types/pointTopology'
 import {
@@ -23,6 +28,9 @@ import {
   parseMapFileJson,
   type ParsedMapFile,
 } from './mapFileJson'
+import {
+  defaultTrackGenParameters,
+} from './trackGenFacility'
 import {
   getMapOfficialVersion,
   MAP_DRAFT_PREFIX,
@@ -122,6 +130,8 @@ function entryFromParsed(
       routeGroups: parsed.routeGroups,
       visibleRouteIds: parsed.visibleRouteIds,
       pointTopology: parsed.pointTopology,
+      basemaps: parsed.basemaps,
+      creationMode: parsed.creationMode,
     },
   )
   return {
@@ -446,6 +456,7 @@ export function createBlankMapEntry(
     // 跟 routes／routeGroups 一樣給空陣列，不是留給執行期猜測。
     visibleRouteIds: [],
     pointTopology: emptyPointTopology(),
+    creationMode: 'blank',
     createdAt: now,
     updatedAt: now,
   }
@@ -455,6 +466,52 @@ export function createBlankMapEntry(
      * 還沒送上後端。必須標 pending，否則 openLibraryMap 會先 hydrate，
      * 後端沒有這一張就把本機新建的清掉 →「找不到地圖」。
      */
+    publishState: 'pending',
+  }
+}
+
+/** 高精模式：整張畫布鋪滿 TrackGen，不預建 Area；等丟 .xodr 後再生成 */
+export function createTrackGenMapEntry(
+  pixelSize: MapPixelSize,
+  displayName = '未命名地圖',
+): MapLibraryEntry {
+  const libraryId = generateLibraryId()
+  const now = nowIso()
+  const basemapId = '1'
+  const blank = createBlankBasemap(
+    basemapId,
+    { x: pixelSize.width / 2, y: pixelSize.height / 2 },
+    { w: pixelSize.width, h: pixelSize.height },
+  )
+  const trackGenBasemap: MapBasemapObject = {
+    ...blank,
+    customName: '高精地圖',
+    layout: {
+      xPx: 0,
+      yPx: 0,
+      wPx: pixelSize.width,
+      hPx: pixelSize.height,
+    },
+    parameters: { ...blank.parameters, ...defaultTrackGenParameters() },
+  }
+  const parsed: ParsedMapFile = {
+    mapId: libraryId,
+    displayName,
+    version: DEFAULT_MAP_VERSION,
+    pixelSize,
+    pixelOrigin: { x: 0, y: 0 },
+    areas: [],
+    basemaps: [trackGenBasemap],
+    routes: [],
+    routeGroups: [],
+    visibleRouteIds: [],
+    pointTopology: emptyPointTopology(),
+    creationMode: 'trackGen',
+    createdAt: now,
+    updatedAt: now,
+  }
+  return {
+    ...entryFromParsed(parsed, { libraryId }),
     publishState: 'pending',
   }
 }
@@ -603,6 +660,7 @@ export function saveEditorStateToLibraryEntry(
       visibleRouteIds: [...visibleRouteIds],
       pointTopology,
       basemaps,
+      creationMode: entry.mapDocument.creationMode,
     },
   )
   return {

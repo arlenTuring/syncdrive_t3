@@ -39,6 +39,7 @@ import type {
 import {
   MAP_FILE_SCHEMA_VERSION,
   MAP_FILE_SCHEMA_VERSION_V1,
+  type MapCreationMode,
   type MapFileAreaEntry,
   type MapFileBasemapEntry,
   type MapFileFacilityEntry,
@@ -142,7 +143,7 @@ export function migrateMisclassifiedSmartPoleEntry(entry: MapFileFacilityEntry):
 
   const nextParams: Record<string, unknown> = { ...parameters }
   delete nextParams.purpose
-  // Pole 使用單點參照場域，清掉設施區塊的 bounds 占位
+  // Pole 使用單點場域座標，清掉設施區塊的 bounds 占位
   delete nextParams.refFieldXMinM
   delete nextParams.refFieldXMaxM
   delete nextParams.refFieldYMinM
@@ -496,6 +497,8 @@ export type ParsedMapFile = {
   /** 使用者最後設定的路線可視 id；缺欄＝空（不強制全開） */
   visibleRouteIds: string[]
   pointTopology: PointTopology
+  /** 建立模式；缺省 blank（舊檔） */
+  creationMode: MapCreationMode
   createdAt?: string
   updatedAt?: string
 }
@@ -564,12 +567,17 @@ export function basemapToMapEntry(b: MapBasemapObject): MapFileBasemapEntry {
   }
 }
 
+function parseCreationMode(raw: unknown): MapCreationMode {
+  return raw === 'trackGen' ? 'trackGen' : 'blank'
+}
+
 export function parseMapFileJson(json: unknown): ParsedMapFile {
   if (isMapFileV2(json)) {
     const pixelSize = clampMapPixelSize(json.pixelSize ?? DEFAULT_MAP_PIXEL_SIZE)
     const areas = (json.areas ?? []).map((a, i) => parseAreaEntry(a, i))
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
+    const creationMode = parseCreationMode(json.creationMode)
     return {
       mapId: json.mapId,
       displayName: json.displayName,
@@ -577,12 +585,19 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       version: json.version?.trim() || 'v0.0.1',
       pixelSize,
       pixelOrigin: parsePixelOrigin(json.pixelOrigin),
-      areas: areas.length > 0 ? areas : [createBlankArea('1', pixelSize)],
+      // 高精新建可無 Area（等軌道生成再建）；空白／舊檔仍補一個空 Area
+      areas:
+        areas.length > 0
+          ? areas
+          : creationMode === 'trackGen'
+            ? []
+            : [createBlankArea('1', pixelSize)],
       basemaps,
       routes,
       routeGroups: parseMapRouteGroups(json.routeGroups),
       visibleRouteIds: parseVisibleRouteIds(json.visibleRouteIds, routes),
       pointTopology: parsePointTopology(json.pointTopology),
+      creationMode,
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
     }
@@ -603,6 +618,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       routeGroups: [],
       visibleRouteIds: [],
       pointTopology: parsePointTopology(undefined),
+      creationMode: 'blank',
     }
   }
 
@@ -611,7 +627,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
 
 function parametersForMapExport(f: FacilityObject): Record<string, unknown> | undefined {
   const raw = f.parameters ?? {}
-  const merged = ensureRefFieldParametersForExport(f.type, raw)
+  const merged = ensureRefFieldParametersForExport(f.type, raw, f.name)
   return Object.keys(merged).length > 0 ? merged : undefined
 }
 
@@ -689,6 +705,7 @@ export function buildMapFileV2(
     visibleRouteIds?: string[]
     pointTopology?: PointTopology
     basemaps?: MapBasemapObject[]
+    creationMode?: MapCreationMode
   },
 ): MapFileV2 {
   const origin = parsePixelOrigin(options?.pixelOrigin)
@@ -701,6 +718,7 @@ export function buildMapFileV2(
     options?.visibleRouteIds ?? [],
     routes,
   )
+  const creationMode = parseCreationMode(options?.creationMode)
   return {
     schemaVersion: MAP_FILE_SCHEMA_VERSION,
     mapId,
@@ -711,6 +729,7 @@ export function buildMapFileV2(
     ...(options?.updatedAt ? { updatedAt: options.updatedAt } : {}),
     pixelSize: clampMapPixelSize(pixelSize),
     ...(origin.x > 0 || origin.y > 0 ? { pixelOrigin: origin } : {}),
+    ...(creationMode !== 'blank' ? { creationMode } : {}),
     areas: areas.map(areaToMapEntry),
     ...(basemaps.length > 0 ? { basemaps: basemaps.map(basemapToMapEntry) } : {}),
     ...(routeGroups.length > 0 ? { routeGroups } : {}),

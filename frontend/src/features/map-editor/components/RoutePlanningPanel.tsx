@@ -1,7 +1,6 @@
 import {
   ArrowDown,
   ArrowUp,
-  AlertTriangle,
   ChevronDown,
   ChevronLeft,
   Info,
@@ -20,7 +19,6 @@ import {
   isRoutePlanningDraftSavable,
   type RoutePlanningDraft,
 } from '../utils/routePlanning'
-import { resolveRoutePreviewGeometry } from '../utils/routeTrackPath'
 import type { PointTopology } from '../types/pointTopology'
 import {
   buildTopologyRouteTravelBreakdown,
@@ -201,14 +199,6 @@ export function RoutePlanningPanel({
     draft != null
     && !isRouteTravelTimePairValid(draft.avgTravelTimeSeconds, draft.minTravelTimeSeconds)
     && (draft.avgTravelTimeSeconds != null || draft.minTravelTimeSeconds != null)
-
-  const routePreview = useMemo(() => {
-    if (!draft || draft.stationIds.length < 2) return null
-    return resolveRoutePreviewGeometry(areas, draft.stationIds)
-  }, [areas, draft])
-
-  // 軌道預覽警告僅供參考；路線是否成立改由拓撲決定
-  const routeWarnings = routePreview?.warnings ?? []
 
   const stationPartition = useMemo(() => {
     if (!draft) return { selectable: [], disabled: [] }
@@ -459,25 +449,6 @@ export function RoutePlanningPanel({
                   {t('mapEditor.routePlanning.add')}
                 </button>
               </div>
-            </div>
-          ) : null}
-
-          {routeWarnings.length > 0 ? (
-            <div className="space-y-1.5 rounded-md border border-zinc-700/50 bg-zinc-950/40 px-2.5 py-2">
-              <p className="flex items-center gap-1.5 text-[9px] font-medium text-zinc-500">
-                <AlertTriangle className="size-3 shrink-0" />
-                {t('mapEditor.routePlanning.trackPreviewHint')}
-              </p>
-              <ul className="space-y-1">
-                {routeWarnings.map((w) => (
-                  <li
-                    key={`${w.fromStationId}-${w.toStationId}`}
-                    className="text-[9px] leading-snug text-zinc-600"
-                  >
-                    {w.message}
-                  </li>
-                ))}
-              </ul>
             </div>
           ) : null}
 

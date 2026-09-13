@@ -5,7 +5,7 @@ import {
 } from './facilityRefFieldBounds'
 import { getComponentPurpose } from './facilityArea'
 
-/** Facility.parameters 內的設施停靠點（場域絕對公尺，須落在參照場域範圍內） */
+/** Facility.parameters 內的設施停靠點（場域絕對公尺，須落在場域範圍內） */
 export const FACILITY_DOCKING_POINT_KEY = 'facilityDockingPoint'
 
 export type FacilityDockingPoint = {
@@ -43,7 +43,7 @@ export function parseFacilityDockingPoint(
   return alias ? { xM, yM, alias } : { xM, yM }
 }
 
-/** 將點箝制在參照場域範圍內（含邊界）；保留別名 */
+/** 將點箝制在場域範圍內（含邊界）；保留別名 */
 export function clampPointToRefFieldBounds(
   point: FacilityDockingPoint,
   bounds: { xMinM: number; xMaxM: number; yMinM: number; yMaxM: number },
@@ -72,7 +72,7 @@ export function defaultFacilityDockingPointAtCenter(
 
 /**
  * 讀取並（若超出範圍）箝制設施停靠點。
- * 無有效參照場域或未設定時回 null。
+ * 無有效場域範圍或未設定時回 null。
  */
 export function getFacilityDockingPoint(
   facility: Pick<FacilityObject, 'type' | 'parameters'>,
@@ -109,7 +109,7 @@ export function patchFacilityDockingPoint(
 
 /**
  * 將設施停靠點的場域座標換成設施本體上的相對位置（0–1）。
- * alongX：左→右；alongY：下→上（與參照場域／Area 縱軸同向）。
+ * alongX：左→右；alongY：下→上（與場域範圍／Area 縱軸同向）。
  */
 export function facilityDockingPointToAlong(
   point: FacilityDockingPoint,

@@ -59,11 +59,32 @@ export function defaultDockingStationDisplayName(
   return `${routeStation}${leg === 'down' ? '下行' : '上行'}`
 }
 
-export function resolveDockingPointMapLabel(facility: FacilityObject): string {
+/** 停靠點顯示別名（自訂名稱／舊 stationName／用途）；不含站點 ID */
+export function resolveDockingPointDisplayAlias(facility: FacilityObject): string {
+  if (facility.type !== 'DockingPoint') return ''
+  const stationId = getDockingPointStationId(facility)
   const custom = facility.customName.trim()
-  if (custom) return custom
+  /** 自訂名稱若只是元件 id 或站點 ID，不算有效別名 */
+  if (
+    custom &&
+    custom !== facility.id &&
+    (!stationId || custom !== stationId)
+  ) {
+    return custom
+  }
   const legacy = getDockingPointStationName(facility)
-  if (legacy) return legacy
+  if (legacy && (!stationId || legacy !== stationId)) return legacy
+  const purpose =
+    typeof facility.parameters?.purpose === 'string'
+      ? facility.parameters.purpose.trim()
+      : ''
+  if (purpose) return purpose
+  return ''
+}
+
+export function resolveDockingPointMapLabel(facility: FacilityObject): string {
+  const alias = resolveDockingPointDisplayAlias(facility)
+  if (alias) return alias
   const stationId = getDockingPointStationId(facility)
   if (stationId) return stationId
   return ''

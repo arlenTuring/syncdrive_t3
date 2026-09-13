@@ -1349,7 +1349,9 @@ const zhTW = {
     offlineTitle: '連不上伺服器，顯示的是這台瀏覽器的快取，可能不是最新的',
     subtitle:
       '選擇要編輯的地圖，或建立空白地圖、複製、匯入／導出地圖描述檔。「設為當前使用」後，儀表板模擬與後端 API 會讀取該圖。',
-    newBlank: '新建空白地圖',
+    newBlank: '新建地圖',
+    modeBlank: '空白',
+    modeTrackGen: '高精',
     importFile: '匯入地圖描述檔',
     pasteFile: '貼上地圖描述檔',
     loadFromServer: '從伺服器載入',
@@ -1385,6 +1387,8 @@ const zhTW = {
     open: '開啟',
     openTitle: '開啟編輯',
     renameTitle: '重新命名',
+    renameSyncFailed: '改名未同步到後端，名稱未變更：{{error}}',
+    publishFailed: '地圖未發佈到後端：{{error}}',
     duplicateTitle: '複製地圖',
     exportTitle: '導出地圖描述檔',
     confirmDelete:
@@ -1415,13 +1419,19 @@ const zhTW = {
       save: '是，儲存此版本',
     },
     newMapPixel: {
-      title: '設定監控畫布大小',
-      hint: '決定 Map 圖台的顯示像素尺寸。Area 容器與設施將擺在此畫布上；各 Area 的實際場域公尺範圍在 Area 屬性中另行設定。',
+      title: '新建地圖',
+      hint: '先選擇工作模式，再設定 Map 圖台顯示像素尺寸。Area／高精地圖元件將擺在此畫布上。',
+      modeLabel: '地圖模式',
+      modeBlank: '新建空白地圖',
+      modeBlankHint: '預建空 Area；場域座標由使用者手動填寫，不會依圖台自動映射。',
+      modeTrackGen: '導入高精地圖模式',
+      modeTrackGenHint: '進場即鋪滿高精地圖元件，等待丟入 .xodr；生成後該容器內元件自動對齊場域座標。',
       width: '寬度（px）',
       height: '高度（px）',
       range:
         '允許範圍 {{min}}–{{max}} px。預設 {{defaultW}}×{{defaultH}} px。',
       create: '建立空白圖台',
+      createTrackGen: '建立高精圖台',
       invalidSize: '請輸入有效的畫布寬度與高度（像素）',
     },
     basemap: {
@@ -1667,6 +1677,14 @@ const zhTW = {
           label: '設施',
           hint: '設施（大型區塊）— 充電格／停車格／維修格等；用途請在屬性填寫',
         },
+        zoneEntrance: {
+          label: '分區入口',
+          hint: '虛線方塊；可與各式軌道端面接合；車輛進入後傳送到連結分區；可設定多個分區名稱與場域範圍',
+        },
+        zonePartition: {
+          label: '分區',
+          hint: '場域範圍由分區入口綁定；可容納設施，設施場域座標相對此分區範圍換算',
+        },
         light: {
           label: '紅綠燈',
           hint: '設備 — 紅綠燈（Signal / Light）',
@@ -1689,7 +1707,7 @@ const zhTW = {
         },
         dockingPoint: {
           label: '停靠點',
-          hint: '停靠點 — 站點標記；參照場域座標與站點名稱',
+          hint: '停靠點 — 站點標記；場域座標與站點名稱',
         },
         waypoint: {
           label: '途經點',
@@ -1731,6 +1749,55 @@ const zhTW = {
       purposePlaceholder: '例：充電格、停車格、維修格',
       purposeHint:
         '選填；僅用於大型設施區塊分類說明（清單顯示）。紅綠燈／智慧桿／月台門請用元件庫「設備」類型，勿在此填寫代替。',
+      zoneEntrance: {
+        title: '分區連結',
+        hint:
+          '從場上既有分區選擇連結；已連結的分區不會再出現在選單。變更名稱／場域範圍會同步到該分區。軌道端面可接合至此入口外框。車輛進入後可傳送到連結分區（模擬層之後接）。',
+        empty: '尚未連結分區',
+        add: '加入分區',
+        linkLabel: '分區 {{index}}',
+        zoneName: '分區名稱',
+        fieldXMin: '場域橫向範圍最小值 (m)',
+        fieldXMax: '場域橫向範圍最大值 (m)',
+        fieldYMin: '場域縱向範圍最小值 (m)',
+        fieldYMax: '場域縱向範圍最大值 (m)',
+        bound: '已綁定圖元 {{id}}',
+        boundLabel: '已連結：{{label}}（{{id}}）',
+        boundMissing: '已連結圖元遺失（{{id}}）',
+        unbound: '尚未連結分區圖元',
+        createZone: '建立分區圖元',
+        linkExisting: '連結場上分區',
+        pickZone: '選擇要連結的分區…',
+        noAvailable: '沒有可連結的分區（請先從元件庫放置分區，或已全部連結）',
+      },
+      zonePartition: {
+        title: '分區',
+        hint:
+          '場域範圍由分區入口綁定，與本圖元在地圖上的位置無關。可將其他設施設為隸屬此分區。',
+        hintShort: '場域範圍由入口綁定，與圖台位置無關',
+        synced: '已同步',
+        unbound: '未綁定',
+        entrance: '入口',
+        linkId: '連結',
+        linkAlias: '別名',
+        fieldBounds: '場域範圍',
+        fieldBoundsEmpty: '尚未從入口同步場域範圍',
+        fieldBoundsValue:
+          '橫向 {{xMin}} … {{xMax}} m／縱向 {{yMin}} … {{yMax}} m',
+        axisX: '橫向',
+        axisY: '縱向',
+        min: '最小',
+        max: '最大',
+        childCount: '隸屬設施 {{count}}',
+      },
+      parentZone: {
+        title: '所屬分區',
+        hint:
+          '僅「設施」元件可隸屬分區。加入後，拖曳時會依分區圖台相對位置換算真實場域座標。',
+        select: '分區',
+        none: '（未加入）',
+        local: '相對座標 u={{u}} v={{v}}',
+      },
       labelStyle: {
         title: '名稱顯示樣式',
         showName: '顯示名稱',
@@ -1748,14 +1815,14 @@ const zhTW = {
       positionX: '橫向位置',
       positionY: '縱向位置',
       areaDragHint:
-        '在圖台上拖曳調整位置；拉伸 Area 外框時區域座標不變。實際場域語意請用下方「參照場域範圍」。',
+        '在圖台上拖曳調整位置；拉伸 Area 外框時區域座標不變。實際場域語意請用下方「場域範圍」。',
       pixelSizeInArea: '像素尺寸（Area 內顯示）',
       pixelWidth: '像素橫向尺寸',
       pixelHeight: '像素縱向尺寸',
       noPixelSize:
         '尚無像素尺寸；請在圖台上拖曳邊線調整大小，或載入含 areaSizePx 的地圖。',
       pixelSizeHint:
-        '圖台絕對畫素，與 Area 外框、場域尺寸無關；實際場域語意請用「參照場域範圍」。',
+        '圖台絕對畫素，與 Area 外框、場域尺寸無關；實際場域語意請用「場域範圍」。',
       mqtt: {
         title: 'MQTT 對接',
         hintBefore: '對接路徑為',
@@ -1857,8 +1924,14 @@ const zhTW = {
         branch: '岔線（斜向）',
         placeholder: '例：D04',
         color: '底色',
+        dashColor: '虛線顏色',
         fontSize: '字級 (px)',
+        style: '顯示',
+        styleFill: '色塊（實心）',
+        styleDashed: '虛線軌道（無填色）',
         hint: '單一元件代表兩條軌道，名稱分別設定。生成預覽中亦可逐段選取命名。',
+        hintSwitch:
+          '單一元件代表主線與岔線。可分別命名／上色；亦可把其中一條改成虛線軌道（同外形虛線描邊、不填色）。',
       },
       crossTrack: {
         title: '途經點與方向',
@@ -1867,8 +1940,8 @@ const zhTW = {
         pingPortal: '在圖上標示此口',
         waypointCode: '途經點代號',
         alias: '別名（顯示名稱）',
-        fieldX: '參照場域橫向位置 (m)',
-        fieldY: '參照場域縱向位置 (m)',
+        fieldX: '場域橫向座標 (m)',
+        fieldY: '場域縱向座標 (m)',
         fieldHint:
           '場域座標（公尺，原點左下）。高精地圖生成的軌道自動計算，其餘依容器網域換算。',
         autoValue: '自動計算，隨元件位置與尺寸更新',
@@ -1900,8 +1973,8 @@ const zhTW = {
         codePlaceholder: '例：xo_1_{{key}}',
         alias: '別名（顯示名稱）',
         aliasPlaceholder: '空則顯示代號',
-        fieldX: '參照場域橫向位置 (m)',
-        fieldY: '參照場域縱向位置 (m)',
+        fieldX: '場域橫向座標 (m)',
+        fieldY: '場域縱向座標 (m)',
         fieldHint:
           '場域座標（公尺，原點左下）。拖動端點或磁吸接合時同步更新；此處輸入僅修正數值，不移動圖上端點。',
         strokeWidth: '兩邊線徑寬度（間距）',
@@ -1924,7 +1997,7 @@ const zhTW = {
         graphSummary:
           '圖上 {{nodes}} 個節點 · {{edges}} 條邊 · {{components}} 個連通塊',
         coordsHint:
-          '參照場域範圍於生成時自動填入，座標沿用 .xodr（TWD97，公尺），與車端回報同一座標系。',
+          '場域範圍於生成時自動填入，座標沿用 .xodr（TWD97，公尺），與車端回報同一座標系。',
         loadedNotGenerated: '已載入 {{fileName}}，尚未生成軌道',
         noXodr: '尚未載入 .xodr',
         dialogHint:
@@ -1983,7 +2056,9 @@ const zhTW = {
         slotVacant: '空',
         slotOccupied: '佔',
         resizeEdge: '拖曳此邊調整大小',
+        resizeCorner: '拖曳此角調整大小',
         resizeProportional: '拖曳等比放大縮小',
+        addFacilityInZone: '在分區內新增設施',
         rotateDrag: '拖曳旋轉（按住 Shift 吸到 15 度）',
         cornerArcY: '拖曳調整上緣弧度',
         cornerArcX: '拖曳調整下緣弧度',
@@ -2002,6 +2077,7 @@ const zhTW = {
         toolbarRotate: '旋轉',
         rotateCcw1: '逆時針微調 1°',
         rotateCw1: '順時針微調 1°',
+        rotateCcw90: '逆時針轉 90°',
         rotateCw90: '順時針轉 90°',
         formatPaint:
           '複製格式（大小、角度、填色、框線有無與線型、字級；僅可貼到相同元件）',
@@ -2016,7 +2092,7 @@ const zhTW = {
       facilityDockingPart: ' · 設施停靠 {{count}}',
       emptyHint: ' — 請從左側清單加入點位',
       shortcutHint:
-        '⌘/Ctrl+Z 還原 · ⌘/Ctrl+Shift+Z 復原｜選線後拖兩端改接；中點彎折｜設施↔停靠類＝虛線，停靠↔停靠＝實線',
+        '⌘/Ctrl+Z 還原 · ⌘/Ctrl+Shift+Z 復原｜空白處拖曳框選；Shift 加選｜選線後拖兩端改接；中點彎折｜設施↔停靠類＝虛線，停靠↔停靠＝實線',
       close: '關閉',
       listToggleOpen: '開啟點位清單',
       listToggleClose: '關閉點位清單',
@@ -2038,7 +2114,7 @@ const zhTW = {
         facility: '設施',
       },
       listHint:
-        '雙擊已載入 → 置中；「移除」退回路網外可再加入；Delete 亦可刪選取點／線',
+        '空白處拖曳框選多個；Shift／⌘ 點選可加選｜雙擊已載入 → 置中；「移除」退回路網外可再加入；Delete 刪選取點／線',
       inNetwork: '已在路網 · {{count}}',
       noneAdded: '尚未加入任何點位',
       centerOnDoubleClick: '雙擊：移到畫面正中心',
@@ -2049,7 +2125,7 @@ const zhTW = {
       allLoaded: '地圖上可載入的點位都已加入',
       noSearchMatch: '無符合搜尋的可加入項目',
       add: '加入',
-      panHint: '觸控板雙指滑動可平移整張拓撲圖',
+      panHint: '空白處拖曳框選；觸控板雙指滑動可平移整張拓撲圖',
       dropReconnect: '放開以改接至「{{label}}」',
       dropConnect: '放開以連接到「{{label}}」',
       kindDockingPoint: '停靠點',
@@ -2107,6 +2183,12 @@ const zhTW = {
       avgTime: '平均時間（秒）',
       minGtAvg: '最快時間不可大於平均時間，請修正後才能套用路網拓撲。',
       distance: '實際距離（公尺）',
+      simEstimate: '模擬路徑估算',
+      simEstimateTitle:
+        '依路線清單已繪製的模擬路徑，估算這兩個點之間最相關的一段距離',
+      simEstimateOk: '已填入 {{meters}} m（來源：{{route}}）',
+      simEstimateMiss:
+        '找不到涵蓋此連線的模擬路徑。請確認路線站序含此兩點，或已繪製 pathWaypoints。',
       deleteEdge: '刪除此連線',
       edgeBendHint: '{{from}} → {{to}}｜中點拖曳彎折；兩端白點拖到其他節點可改接',
       fastLabel: '快{{value}}s',
@@ -2252,7 +2334,11 @@ const zhTW = {
       revisionHistory: '編修紀錄',
       revisionHistoryTitle: '編修紀錄：還原先前自動／正式儲存的圖台快照',
       rulers: '刻度',
-      rulersTitle: '顯示／隱藏 Area 公尺刻度',
+      rulersScale: '刻度',
+      rulersField: '座標',
+      rulersTitle: '循環切換：關閉 → 刻度（等距）→ 座標（場域，等距；兩者不同時混寫）',
+      rulersTitleScale: '目前：刻度模式（等距 domain）。再按切換為場域座標',
+      rulersTitleField: '目前：座標模式（等距場域座標）。再按關閉',
       cropGroupAria: '裁減畫布',
       crop: '裁減',
       cropTitle: '進入／結束裁減模式（拖曳琥珀色外框）',
@@ -2263,9 +2349,9 @@ const zhTW = {
       areaLabels: '區域標示',
       areaLabelsTitle:
         '顯示／隱藏所有 Area 中央總覽標示（名稱 / 場域範圍 / 像素尺寸）',
-      facilityBars: '元件列',
+      facilityBars: '工具列',
       facilityBarsTitle:
-        '顯示／隱藏所有選取元件的圓形工具列（旋轉、格式複製、刪除等）',
+        '顯示／隱藏選取元件的圓形工具列（旋轉、格式複製、刪除等）；開啟時選取會連線至刻度軸',
       tester: '測試器',
       hideTester: '隱藏測試器',
       testerTitle: '顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）',
@@ -2364,6 +2450,8 @@ const zhTW = {
     },
     chrome: {
       unnamedMap: '未命名地圖',
+      creationModeBlank: '空白地圖',
+      creationModeTrackGen: '高精地圖',
       coords: '座標（m）：{{x}}, {{y}}',
       selectedMany: ' · 已選 {{count}} 個元件（{{name}}）',
       selectHint: '選取 Area 或設施以顯示座標（m）',
@@ -2387,19 +2475,18 @@ const zhTW = {
       propertiesViewHint: '請點選畫布上的物件以檢視屬性（檢視模式無法編輯）。',
       propertiesEditHint:
         '請點選畫布上的物件以編輯屬性；⌘/Ctrl+A 全選 Area；工具列「裁減」進入裁切模式。',
-      propertiesAreaNote: '元件可設定參照場域位置；Area 僅作為畫布上的群組容器。',
+      propertiesAreaNote: '元件可設定場域座標；Area 僅作為畫布上的群組容器。',
       propertiesEditExtra: ' 按「編輯」後可拖曳、旋轉與修改。',
       propertiesShortcuts:
         ' 快捷鍵：⌘/Ctrl+A 全選 Area；工具列「裁減」在較大工作區拖切框。⌘/Ctrl+C／V、Delete、⌘/Ctrl+Z。',
-      rulersToggleOne: '切換「{{name}}」公尺刻度',
-      rulersToggleAll: '切換全部 Area 公尺刻度',
+      rulersToggleOne: '切換「{{name}}」刻度／座標顯示',
+      rulersToggleAll: '切換全部 Area 刻度／座標：關閉 → 刻度 → 座標',
       areaLabelsHint: '顯示／隱藏全部 Area 中央標示（名稱、場域範圍、像素尺寸）',
-      displayFrameLabel: '正式顯示範圍',
-      displayFrameTitle: '深藍色區塊＝最終可顯示／部署範圍；外圍黑色區僅供編輯暫放',
       zoomBarHint: '顯示／隱藏底部圖台縮放列（1 近～7 遠）',
       testerHint: '顯示／隱藏底部測試器（斷路掃描、MQTT 模擬）',
       cropHint: '裁減模式：在較大工作區拖曳裁切框調整輸出解析度',
-      facilityBarsHint: '顯示／隱藏選取元件的圓形工具列（旋轉、格式複製、刪除）',
+      facilityBarsHint:
+        '顯示／隱藏選取元件的圓形工具列（旋轉、格式複製、刪除）；開啟時選取會連線至刻度軸',
       mapNotFound: '找不到地圖，請重新整理清單。',
       editingAutosaveLabel: '編輯中：變更將自動儲存至地圖庫',
       savedAt: '已儲存 {{time}}',
@@ -2626,7 +2713,7 @@ const zhTW = {
       multiSelectTitle: '已選取 {{count}} 個元件',
       multiSelectHint:
         '可一起拖曳或方向鍵微調；按 Delete 一次刪除全部。Shift+點擊加選，Shift+拖曳框選。',
-      unsupportedType: '此元件類型已不支援，請刪除後改用元件列中的通用元件。',
+      unsupportedType: '此元件類型已不支援，請刪除後改用工具列中的通用元件。',
       deleteWidget: '刪除元件',
       removeWidget: '移除元件',
       positionSize: '位置與尺寸',

@@ -168,7 +168,7 @@ function placementAtFacilityAreaCenter(
   };
 }
 
-/** 整備／充電／臨停：對齊地圖格子的參照場域或元件外框中心 */
+/** 整備／充電／臨停：對齊地圖格子的場域座標或元件外框中心 */
 export function resolveYardFacilityPlacement(
   areas: MapAreaObject[],
   payload: Record<string, unknown> | undefined,
@@ -249,7 +249,7 @@ export function findTrackBySegmentLabel(
 }
 
 /**
- * 場域 (x,y) 公尺 → 設施元件在 Area 內的區域座標（依參照場域範圍參數化映射）。
+ * 場域 (x,y) 公尺 → 設施元件在 Area 內的區域座標（依場域範圍參數化映射）。
  * extrapolate=false 時 along 箝制在 0–1（範圍外不應呼叫）。
  */
 export function fieldPositionToFacilityAreaLocal(
@@ -360,7 +360,7 @@ export function fieldPositionToTrackAreaLocal(
   options?: { extrapolate?: boolean },
 ): { x: number; y: number } | null {
   /*
-   * 生成的軌道自己帶著真實路徑與圖面路徑，<strong>不必先看參照場域範圍</strong>。
+   * 生成的軌道自己帶著真實路徑與圖面路徑，<strong>不必先看場域範圍</strong>。
    *
    * 那四個數字是給手工放的軌道用的：沒有路徑可循時，只能拿一個方框做線性內插。生成的
    * 軌道兩條路徑都在身上，範圍再檢查一次只是多一道會擋掉東西的門——而且那個方框只有
@@ -382,7 +382,7 @@ export function fieldPositionToTrackAreaLocal(
     );
   }
 
-  // 手工放的軌道沒有路徑，只能靠參照場域範圍做線性內插
+  // 手工放的軌道沒有路徑，只能靠場域範圍做線性內插
   if (!hasValidRefFieldBounds(track.parameters)) return null;
   const bounds = getValidRefFieldBounds(track.parameters);
   if (!bounds) return null;
@@ -456,7 +456,7 @@ export function resolveVehicleTrackPlacementInArea(
   area: MapAreaObject,
 ): VehicleTrackPlacement | null {
   /*
-   * 命中多段時挑真實中心線最近的。參照場域範圍是外接方框，彎道與垂直段本來就會
+   * 命中多段時挑真實中心線最近的。場域範圍是外接方框，彎道與垂直段本來就會
    * 蓋到鄰居；照順序取第一個會讓車子在重疊處左右跳。
    */
   let picked: FacilityObject | null = null;

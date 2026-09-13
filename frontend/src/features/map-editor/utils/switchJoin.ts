@@ -1,4 +1,8 @@
-import { switchTrackEndSegmentsPx, type SwitchTrackGeometry } from './trackShapes'
+import {
+  normalizeSwitchTrackGeometry,
+  switchTrackEndSegmentsPx,
+  type SwitchTrackGeometry,
+} from './trackShapes'
 import type { EndSegment } from './taperJoin'
 
 /**
@@ -111,7 +115,10 @@ export function buildSwitchFromEndSegments(
     }
   }
   if (!best || best.err > 2) return null
-  return best.built
+  return {
+    geometry: normalizeSwitchTrackGeometry(best.built.geometry),
+    box: best.built.box,
+  }
 }
 
 /**
@@ -126,5 +133,15 @@ export function alignSwitchFaces(
   const axis: 'x' | 'y' | null = flat(target, 'x') ? 'x' : flat(target, 'y') ? 'y' : null
   if (!axis) return null
   if (!flat(cur.a, axis) || !flat(cur.m, axis) || !flat(cur.b, axis)) return null
-  return { ...cur, [end]: target }
+  /*
+   * 對手邊端點順序常與本面相反；對齊到與被換那一面相同的沿面方向，
+   * 避免重建後 a／m from→to 反向畫成蝴蝶。
+   */
+  const along = (p: { x: number; y: number }) => (axis === 'x' ? p.y : p.x)
+  const face = cur[end]
+  const faceDir = along(face[1]) - along(face[0])
+  const targetDir = along(target[1]) - along(target[0])
+  const aligned: EndSegment =
+    faceDir * targetDir < 0 ? [target[1], target[0]] : target
+  return { ...cur, [end]: aligned }
 }

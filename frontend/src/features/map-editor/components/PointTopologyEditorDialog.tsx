@@ -9,6 +9,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import i18n from '../../../i18n'
 import type { MapAreaObject } from '../types/area'
+import type { MapPlannedRoute } from '../types/mapFile'
 import type {
   PointTopology,
   PointTopologyEdge,
@@ -38,6 +39,7 @@ import {
   labelForTopologyNode,
   listInvalidTravelEdges,
   listTopologyLoadCandidates,
+  resolveTopologyNodeLabelFromAreas,
   movePointTopologyNodesByDelta,
   NODE_RADIUS_PX,
   reconnectPointTopologyEdge,
@@ -50,6 +52,7 @@ import {
   TOPOLOGY_KIND_COLORS,
   updatePointTopologyEdge,
 } from '../utils/pointTopology'
+import { estimateTopologyEdgeDistanceFromSimRoutes } from '../utils/topologySimRouteDistance'
 
 /** 拓撲畫布四周留白，便於平移，並讓任意點位可捲到畫面正中心 */
 const CANVAS_PAN_PAD_PX = 2400
@@ -57,6 +60,8 @@ const CANVAS_PAN_PAD_PX = 2400
 type PointTopologyEditorDialogProps = {
   open: boolean
   areas: MapAreaObject[]
+  /** 地圖模擬路線（供距離估算） */
+  routes?: readonly MapPlannedRoute[]
   topology: PointTopology
   onClose: () => void
   onApply: (topology: PointTopology) => void
@@ -89,6 +94,8 @@ const ANCHOR_OFFSET = NODE_RADIUS_PX + 10
 const ANCHOR_SIZE = 10
 const RECONNECT_HANDLE_SIZE = 14
 const DRAG_CLICK_THRESHOLD_PX = 4
+/** 框選超過此距離才進入框選模式（否則視為點空白取消選取） */
+const MARQUEE_THRESHOLD_PX = 6
 /** 連線磁吸半徑（含圓外圍） */
 const LINK_MAGNET_RADIUS_PX = NODE_RADIUS_PX + 36
 /** 自由拖曳時對齊水平／垂直的磁吸閾值 */
@@ -352,6 +359,7 @@ function EdgeArrow({
 
   return (
     <g
+      data-topology-edge
       className={bending ? 'cursor-grabbing' : 'cursor-grab'}
       opacity={opacity}
       onPointerDown={onBendPointerDown}
@@ -443,6 +451,7 @@ function EdgeArrow({
 export function PointTopologyEditorDialog({
   open,
   areas,
+  routes = [],
   topology,
   onClose,
   onApply,
@@ -451,7 +460,18 @@ export function PointTopologyEditorDialog({
   const [draft, setDraft] = useState<PointTopology>(() =>
     syncPointTopologyWithAreas(topology, areas),
   )
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([])
+  const selectedNodeId =
+    selectedNodeIds.length > 0
+      ? selectedNodeIds[selectedNodeIds.length - 1]!
+      : null
+  const selectedNodeIdSet = useMemo(
+    () => new Set(selectedNodeIds),
+    [selectedNodeIds],
+  )
+  const setSelectedNodeId = useCallback((id: string | null) => {
+    setSelectedNodeIds(id ? [id] : [])
+  }, [])
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   /** 雙擊節點／邊才打開屬性側欄；單擊只選取 */
   const [inspectorTarget, setInspectorTarget] = useState<
@@ -460,6 +480,12 @@ export function PointTopologyEditorDialog({
     | null
   >(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [marquee, setMarquee] = useState<{
+    x0: number
+    y0: number
+    x1: number
+    y1: number
+  } | null>(null)
   const [bendingEdgeId, setBendingEdgeId] = useState<string | null>(null)
   const [linkDraft, setLinkDraft] = useState<LinkDraft | null>(null)
   const [reconnectDraft, setReconnectDraft] = useState<ReconnectDraft | null>(null)
@@ -468,8 +494,24 @@ export function PointTopologyEditorDialog({
   const [legendOpen, setLegendOpen] = useState(false)
   const [historyEpoch, setHistoryEpoch] = useState(0)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
-  const dragStartRef = useRef({ x: 0, y: 0, moved: false, subtree: false })
+  const dragStartRef = useRef({
+    x: 0,
+    y: 0,
+    moved: false,
+    subtree: false,
+    moveIds: [] as string[],
+  })
   const lastPointerRef = useRef({ x: 0, y: 0 })
+  const selectedNodeIdsRef = useRef(selectedNodeIds)
+  selectedNodeIdsRef.current = selectedNodeIds
+  const marqueeSessionRef = useRef<{
+    pointerId: number
+    x0: number
+    y0: number
+    additive: boolean
+    baselineIds: string[]
+    moved: boolean
+  } | null>(null)
   const edgeBendStartRef = useRef({ x: 0, y: 0, moved: false })
   const historyRef = useRef<{ past: PointTopology[]; future: PointTopology[] }>({
     past: [],
@@ -560,10 +602,12 @@ export function PointTopologyEditorDialog({
 
     const synced = syncPointTopologyWithAreas(topology, areas)
     setDraft(synced)
-    setSelectedNodeId(null)
+    setSelectedNodeIds([])
     setSelectedEdgeId(null)
     setInspectorTarget(null)
     setDraggingId(null)
+    setMarquee(null)
+    marqueeSessionRef.current = null
     setBendingEdgeId(null)
     setLinkDraft(null)
     setReconnectDraft(null)
@@ -655,19 +699,27 @@ export function PointTopologyEditorDialog({
     [areas, draft],
   )
 
+  /** 別名優先；無別名才用站點 ID／設施 id（與點位清單一致，且即時讀 areas） */
+  const nodeDisplayLabel = useCallback(
+    (nodeId: string, fallback = '') =>
+      resolveTopologyNodeLabelFromAreas(nodeId, areas) ?? fallback,
+    [areas],
+  )
+
   const availableToAdd = useMemo(() => {
     const q = listQuery.trim().toLowerCase()
     return loadCandidates.filter((item) => {
       if (item.alreadyInTopology) return false
       if (!q) return true
+      const label = nodeDisplayLabel(item.nodeId, item.label)
       return (
-        item.label.toLowerCase().includes(q)
+        label.toLowerCase().includes(q)
         || item.areaName.toLowerCase().includes(q)
         || item.facilityId.toLowerCase().includes(q)
         || item.nodeId.toLowerCase().includes(q)
       )
     })
-  }, [loadCandidates, listQuery])
+  }, [loadCandidates, listQuery, nodeDisplayLabel])
 
   const selectedEdge = useMemo(
     () => draft.edges.find((edge) => edge.id === selectedEdgeId) ?? null,
@@ -744,16 +796,21 @@ export function PointTopologyEditorDialog({
   const sortedNodes = useMemo(() => {
     const q = listQuery.trim().toLowerCase()
     const list = [...draft.nodes].sort((a, b) =>
-      a.label.localeCompare(b.label, 'zh-Hant'),
+      nodeDisplayLabel(a.id, a.label).localeCompare(
+        nodeDisplayLabel(b.id, b.label),
+        'zh-Hant',
+      ),
     )
     if (!q) return list
-    return list.filter(
-      (node) =>
-        node.label.toLowerCase().includes(q)
+    return list.filter((node) => {
+      const label = nodeDisplayLabel(node.id, node.label)
+      return (
+        label.toLowerCase().includes(q)
         || node.id.toLowerCase().includes(q)
-        || (node.stationId ?? '').toLowerCase().includes(q),
-    )
-  }, [draft.nodes, listQuery])
+        || (node.stationId ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [draft.nodes, listQuery, nodeDisplayLabel])
 
   const scrollNodeIntoView = useCallback((nodeId: string) => {
     const node = draft.nodes.find((item) => item.id === nodeId)
@@ -992,6 +1049,23 @@ export function PointTopologyEditorDialog({
       event.preventDefault()
       event.stopPropagation()
       const local = canvasLocalPoint(event.clientX, event.clientY)
+      const additive = event.shiftKey || event.metaKey
+      const prevIds = selectedNodeIdsRef.current
+      let nextIds: string[]
+      if (additive) {
+        nextIds = prevIds.includes(node.id)
+          ? prevIds.filter((id) => id !== node.id)
+          : [...prevIds, node.id]
+      } else if (prevIds.includes(node.id) && prevIds.length > 1) {
+        // 點在已多選集合內：保留選取，以便一起拖曳
+        nextIds = prevIds
+      } else {
+        nextIds = [node.id]
+      }
+      setSelectedNodeIds(nextIds)
+      setSelectedEdgeId(null)
+      const moveIds =
+        nextIds.includes(node.id) && nextIds.length > 1 ? nextIds : [node.id]
       dragOffsetRef.current = {
         x: local.x - node.x,
         y: local.y - node.y,
@@ -1001,12 +1075,11 @@ export function PointTopologyEditorDialog({
         y: local.y,
         moved: false,
         subtree: isSubtreeDragModifierPressed(event),
+        moveIds,
       }
       lastPointerRef.current = { x: node.x, y: node.y }
       historyBaselineRef.current = cloneTopology(draftRef.current)
       setDraggingId(node.id)
-      setSelectedNodeId(node.id)
-      setSelectedEdgeId(null)
       event.currentTarget.setPointerCapture(event.pointerId)
     },
     [canvasLocalPoint],
@@ -1041,7 +1114,13 @@ export function PointTopologyEditorDialog({
           const ids = collectSubtreeNodeIds(prev, draggingId)
           return movePointTopologyNodesByDelta(prev, ids, dx, dy)
         }
-        return movePointTopologyNodesByDelta(prev, [draggingId], dx, dy)
+        const ids = dragStartRef.current.moveIds
+        return movePointTopologyNodesByDelta(
+          prev,
+          ids.length > 0 ? ids : [draggingId],
+          dx,
+          dy,
+        )
       })
     },
     [draggingId, canvasLocalPoint, draft.nodes],
@@ -1137,12 +1216,118 @@ export function PointTopologyEditorDialog({
     [linkDraft, canvasLocalPoint, draft, applyDraft],
   )
 
-  const onCanvasBackgroundPointerDown = useCallback(() => {
-    setSelectedNodeId(null)
-    setSelectedEdgeId(null)
-    setInspectorTarget(null)
-    setReconnectDraft(null)
-  }, [])
+  const nodesInMarquee = useCallback(
+    (box: { x0: number; y0: number; x1: number; y1: number }) => {
+      const left = Math.min(box.x0, box.x1)
+      const right = Math.max(box.x0, box.x1)
+      const top = Math.min(box.y0, box.y1)
+      const bottom = Math.max(box.y0, box.y1)
+      return draftRef.current.nodes
+        .filter(
+          (node) =>
+            node.x >= left
+            && node.x <= right
+            && node.y >= top
+            && node.y <= bottom,
+        )
+        .map((node) => node.id)
+    },
+    [],
+  )
+
+  const onCanvasBackgroundPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return
+      const target = event.target as HTMLElement | null
+      // 點在節點／邊／錨點上不要開框選（它們會自己處理）
+      if (
+        target?.closest(
+          'button, [data-topology-edge], [data-topology-node]',
+        )
+      ) {
+        return
+      }
+      event.preventDefault()
+      const local = canvasLocalPoint(event.clientX, event.clientY)
+      const additive = event.shiftKey || event.metaKey
+      marqueeSessionRef.current = {
+        pointerId: event.pointerId,
+        x0: local.x,
+        y0: local.y,
+        additive,
+        baselineIds: additive ? [...selectedNodeIdsRef.current] : [],
+        moved: false,
+      }
+      setMarquee({ x0: local.x, y0: local.y, x1: local.x, y1: local.y })
+      setSelectedEdgeId(null)
+      setInspectorTarget(null)
+      setReconnectDraft(null)
+      if (!additive) setSelectedNodeIds([])
+
+      const pointerId = event.pointerId
+      const onMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== pointerId) return
+        const session = marqueeSessionRef.current
+        if (!session) return
+        const point = canvasLocalPoint(moveEvent.clientX, moveEvent.clientY)
+        if (
+          !session.moved
+          && Math.hypot(point.x - session.x0, point.y - session.y0)
+            > MARQUEE_THRESHOLD_PX
+        ) {
+          session.moved = true
+        }
+        const box = {
+          x0: session.x0,
+          y0: session.y0,
+          x1: point.x,
+          y1: point.y,
+        }
+        setMarquee(box)
+        if (!session.moved) return
+        const hit = nodesInMarquee(box)
+        if (session.additive) {
+          const merged = new Set(session.baselineIds)
+          for (const id of hit) merged.add(id)
+          setSelectedNodeIds([...merged])
+        } else {
+          setSelectedNodeIds(hit)
+        }
+      }
+      const onUp = (upEvent: PointerEvent) => {
+        if (upEvent.pointerId !== pointerId) return
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        const session = marqueeSessionRef.current
+        marqueeSessionRef.current = null
+        setMarquee(null)
+        if (!session) return
+        if (!session.moved) {
+          if (!session.additive) setSelectedNodeIds([])
+          return
+        }
+        const point = canvasLocalPoint(upEvent.clientX, upEvent.clientY)
+        const hit = nodesInMarquee({
+          x0: session.x0,
+          y0: session.y0,
+          x1: point.x,
+          y1: point.y,
+        })
+        if (session.additive) {
+          const merged = new Set(session.baselineIds)
+          for (const id of hit) merged.add(id)
+          setSelectedNodeIds([...merged])
+        } else {
+          setSelectedNodeIds(hit)
+        }
+      }
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
+    },
+    [canvasLocalPoint, nodesInMarquee],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -1173,17 +1358,18 @@ export function PointTopologyEditorDialog({
         setSelectedEdgeId(null)
         return
       }
-      if (selectedNodeId) {
+      if (selectedNodeIdsRef.current.length > 0) {
         event.preventDefault()
         event.stopImmediatePropagation()
-        applyDraft((prev) => removeNodesFromPointTopology(prev, [selectedNodeId]))
-        setSelectedNodeId(null)
+        const ids = [...selectedNodeIdsRef.current]
+        applyDraft((prev) => removeNodesFromPointTopology(prev, ids))
+        setSelectedNodeIds([])
       }
     }
     // capture：先於地圖編輯器的 window keydown，避免 Cmd+Z 同時還原整張地圖
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [open, selectedEdgeId, selectedNodeId, undoDraft, redoDraft, applyDraft])
+  }, [open, selectedEdgeId, undoDraft, redoDraft, applyDraft])
 
   // 拖曳節點時的對齊輔助線
   const dragAlignGuides = useMemo(() => {
@@ -1204,8 +1390,13 @@ export function PointTopologyEditorDialog({
     () =>
       [...draft.nodes]
         .filter((node) => node.kind === 'docking')
-        .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant')),
-    [draft.nodes],
+        .sort((a, b) =>
+          nodeDisplayLabel(a.id, a.label).localeCompare(
+            nodeDisplayLabel(b.id, b.label),
+            'zh-Hant',
+          ),
+        ),
+    [draft.nodes, nodeDisplayLabel],
   )
 
   const selectedEdgePath = useMemo(() => {
@@ -1253,7 +1444,7 @@ export function PointTopologyEditorDialog({
   const removeNodesFromDraft = (nodeIds: string[]) => {
     if (nodeIds.length === 0) return
     applyDraft((prev) => removeNodesFromPointTopology(prev, nodeIds))
-    setSelectedNodeId((prev) => (prev && nodeIds.includes(prev) ? null : prev))
+    setSelectedNodeIds((prev) => prev.filter((id) => !nodeIds.includes(id)))
     setSelectedEdgeId(null)
   }
 
@@ -1395,7 +1586,7 @@ export function PointTopologyEditorDialog({
                 ) : (
                   sortedNodes.map((node) => {
                     const field = fieldMetersByNodeId.get(node.id)
-                    const active = selectedNodeId === node.id
+                    const active = selectedNodeIdSet.has(node.id)
                     return (
                       <li key={node.id}>
                         <div
@@ -1422,7 +1613,7 @@ export function PointTopologyEditorDialog({
                                 style={{ backgroundColor: node.color }}
                               />
                               <span className="truncate text-[11px] font-medium text-zinc-100">
-                                {node.label}
+                                {nodeDisplayLabel(node.id, node.label)}
                               </span>
                             </span>
                             <span className="block pl-3.5 text-[9px] text-zinc-500">
@@ -1476,7 +1667,7 @@ export function PointTopologyEditorDialog({
                       <div className="flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-zinc-800/60">
                         <div className="min-w-0 flex-1 px-0.5">
                           <p className="truncate text-[11px] font-medium text-zinc-200">
-                            {item.label}
+                            {nodeDisplayLabel(item.nodeId, item.label)}
                           </p>
                           <p className="truncate text-[9px] text-zinc-500">
                             {kindLabel(item.kind)} · {item.areaName}
@@ -1574,12 +1765,14 @@ export function PointTopologyEditorDialog({
                     const selected =
                       selectedEdgeId === edge.id
                       || (twin != null && selectedEdgeId === twin.id)
-                    const focusActive = Boolean(selectedNodeId || selectedEdgeId)
+                    const focusActive =
+                      selectedNodeIds.length > 0 || Boolean(selectedEdgeId)
                     const touchesSelectedNode =
-                      selectedNodeId === edge.fromNodeId
-                      || selectedNodeId === edge.toNodeId
+                      selectedNodeIdSet.has(edge.fromNodeId)
+                      || selectedNodeIdSet.has(edge.toNodeId)
                     const emphasized =
-                      selected || (Boolean(selectedNodeId) && touchesSelectedNode)
+                      selected
+                      || (selectedNodeIds.length > 0 && touchesSelectedNode)
                     const dimmed = focusActive && !emphasized
                     return (
                       <EdgeArrow
@@ -1597,7 +1790,7 @@ export function PointTopologyEditorDialog({
                         bending={bendingEdgeId === edge.id}
                         onDoubleClickEdge={() => {
                           setSelectedEdgeId(edge.id)
-                          setSelectedNodeId(null)
+                          setSelectedNodeIds([])
                           setInspectorTarget({ kind: 'edge', id: edge.id })
                         }}
                         onBendPointerDown={(event) => onBendPointerDownEdge(event, edge)}
@@ -1661,9 +1854,23 @@ export function PointTopologyEditorDialog({
                 </g>
               </svg>
 
+              {marquee
+                && Math.hypot(marquee.x1 - marquee.x0, marquee.y1 - marquee.y0)
+                  > MARQUEE_THRESHOLD_PX ? (
+                <div
+                  className="pointer-events-none absolute z-[5] border border-cyan-400/80 bg-cyan-400/15"
+                  style={{
+                    left: Math.min(marquee.x0, marquee.x1),
+                    top: Math.min(marquee.y0, marquee.y1),
+                    width: Math.abs(marquee.x1 - marquee.x0),
+                    height: Math.abs(marquee.y1 - marquee.y0),
+                  }}
+                />
+              ) : null}
+
               {draft.nodes.map((node) => {
                 const size = NODE_RADIUS_PX * 2
-                const selected = selectedNodeId === node.id
+                const selected = selectedNodeIdSet.has(node.id)
                 const linkReady = linkHoverTargetId === node.id
                 const field = fieldMetersByNodeId.get(node.id)
                 const fieldText = field
@@ -1671,6 +1878,7 @@ export function PointTopologyEditorDialog({
                   : null
                 // 只有設施類節點才顯示所在 Area 別名——停靠／途經點不屬於任何維修廠區
                 const areaName = node.kind === 'facility' ? areaNameByNodeId.get(node.id) : undefined
+                const displayLabel = nodeDisplayLabel(node.id, node.label)
                 const linkBlocked =
                   (Boolean(linkDraft)
                     && node.id !== linkDraft!.fromNodeId
@@ -1689,11 +1897,12 @@ export function PointTopologyEditorDialog({
                   <button
                     key={node.id}
                     type="button"
+                    data-topology-node
                     title={
                       linkReady
-                        ? (reconnectDraft ? t('mapEditor.pointTopology.dropReconnect', { label: node.label }) : t('mapEditor.pointTopology.dropConnect', { label: node.label }))
+                        ? (reconnectDraft ? t('mapEditor.pointTopology.dropReconnect', { label: displayLabel }) : t('mapEditor.pointTopology.dropConnect', { label: displayLabel }))
                         : [
-                            `${node.label}（${
+                            `${displayLabel}（${
                               node.kind === 'docking'
                                 ? t('mapEditor.pointTopology.kindDockingPoint')
                                 : node.kind === 'crossover-waypoint'
@@ -1746,7 +1955,7 @@ export function PointTopologyEditorDialog({
                     }}
                   >
                     <span className="line-clamp-2 max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight">
-                      {node.label}
+                      {displayLabel}
                     </span>
                     {field ? (
                       <span className="mt-0.5 flex flex-col items-center gap-px font-mono text-[7px] font-medium leading-none tabular-nums opacity-95">
@@ -1927,8 +2136,8 @@ export function PointTopologyEditorDialog({
               <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                 <EdgePropertiesForm
                   edge={selectedEdge}
-                  fromLabel={labelForTopologyNode(draft, selectedEdge.fromNodeId)}
-                  toLabel={labelForTopologyNode(draft, selectedEdge.toNodeId)}
+                  fromLabel={labelForTopologyNode(draft, selectedEdge.fromNodeId, areas)}
+                  toLabel={labelForTopologyNode(draft, selectedEdge.toNodeId, areas)}
                   roleHint={
                     isDispatchAfterServiceEdge(
                       nodeById.get(selectedEdge.fromNodeId),
@@ -1962,6 +2171,18 @@ export function PointTopologyEditorDialog({
                     )
                     if (!oppositeId) return
                     applyDraft((prev) => removePointTopologyEdge(prev, oppositeId))
+                  }}
+                  onEstimateSimDistance={() => {
+                    const from = nodeById.get(selectedEdge.fromNodeId)
+                    const to = nodeById.get(selectedEdge.toNodeId)
+                    if (!from || !to) return null
+                    return estimateTopologyEdgeDistanceFromSimRoutes(
+                      from,
+                      to,
+                      routes,
+                      areas,
+                      draft,
+                    )
                   }}
                   onChange={(patch) => {
                     applyDraft((prev) =>
@@ -2010,7 +2231,9 @@ export function PointTopologyEditorDialog({
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2.5">
                 <div>
-                  <p className="text-[11px] font-medium text-zinc-100">{selectedNode.label}</p>
+                  <p className="text-[11px] font-medium text-zinc-100">
+                    {nodeDisplayLabel(selectedNode.id, selectedNode.label)}
+                  </p>
                   {areaNameByNodeId.get(selectedNode.id) ? (
                     <p className="mt-0.5 text-[10px] text-cyan-400">
                       {t('mapEditor.pointTopology.areaPrefix', { name: areaNameByNodeId.get(selectedNode.id) })}
@@ -2035,7 +2258,7 @@ export function PointTopologyEditorDialog({
                     <option value="">{t('mapEditor.pointTopology.notAssigned')}</option>
                     {dockingNodes.map((node) => (
                       <option key={node.id} value={node.id}>
-                        {node.label}
+                        {nodeDisplayLabel(node.id, node.label)}
                       </option>
                     ))}
                   </select>
@@ -2046,7 +2269,9 @@ export function PointTopologyEditorDialog({
                   </p>
                 ) : selectedFacilityDispatchId ? (
                   <p className="text-[10px] leading-snug text-lime-200/80">
-                    {t('mapEditor.pointTopology.assignedDispatch', { label: labelForTopologyNode(draft, selectedFacilityDispatchId) })}
+                    {t('mapEditor.pointTopology.assignedDispatch', {
+                      label: labelForTopologyNode(draft, selectedFacilityDispatchId, areas),
+                    })}
                   </p>
                 ) : (
                   <p className="text-[10px] leading-snug text-zinc-500">
@@ -2124,6 +2349,7 @@ function EdgePropertiesForm({
   onReverse,
   onResetBend,
   onDelete,
+  onEstimateSimDistance,
 }: {
   edge: PointTopologyEdge
   fromLabel: string
@@ -2150,9 +2376,18 @@ function EdgePropertiesForm({
   onReverse: () => void
   onResetBend: () => void
   onDelete: () => void
+  onEstimateSimDistance?: () => {
+    distanceMeters: number
+    routeDisplayName: string
+    source: string
+  } | null
 }) {
   const { t } = useTranslation()
   const customBend = hasCustomEdgeBend(edge)
+  const [simEstimateHint, setSimEstimateHint] = useState<string | null>(null)
+  useEffect(() => {
+    setSimEstimateHint(null)
+  }, [edge.id])
   return (
     <div className="space-y-3">
       <div>
@@ -2259,20 +2494,51 @@ function EdgePropertiesForm({
           {t('mapEditor.pointTopology.minGtAvg')}
         </p>
       ) : null}
-      <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.distance')}</span>
-        <input
-          type="number"
-          min={0}
-          step={0.1}
-          disabled={readOnly}
-          value={edge.distanceMeters ?? ''}
-          onChange={(event) =>
-            onChange({ distanceMeters: parseOptionalNumber(event.target.value) })
-          }
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
-        />
-      </label>
+      <div className="space-y-1">
+        <div className="flex items-end justify-between gap-2">
+          <label className="min-w-0 flex-1 space-y-1">
+            <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.distance')}</span>
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              disabled={readOnly}
+              value={edge.distanceMeters ?? ''}
+              onChange={(event) => {
+                setSimEstimateHint(null)
+                onChange({ distanceMeters: parseOptionalNumber(event.target.value) })
+              }}
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+            />
+          </label>
+          {!readOnly && onEstimateSimDistance ? (
+            <button
+              type="button"
+              title={t('mapEditor.pointTopology.simEstimateTitle')}
+              onClick={() => {
+                const est = onEstimateSimDistance()
+                if (!est) {
+                  setSimEstimateHint(t('mapEditor.pointTopology.simEstimateMiss'))
+                  return
+                }
+                onChange({ distanceMeters: est.distanceMeters })
+                setSimEstimateHint(
+                  t('mapEditor.pointTopology.simEstimateOk', {
+                    meters: est.distanceMeters,
+                    route: est.routeDisplayName,
+                  }),
+                )
+              }}
+              className="shrink-0 rounded-md border border-cyan-700/70 bg-cyan-950/50 px-2 py-1.5 text-[10px] font-medium text-cyan-100 transition hover:bg-cyan-900/60"
+            >
+              {t('mapEditor.pointTopology.simEstimate')}
+            </button>
+          ) : null}
+        </div>
+        {simEstimateHint ? (
+          <p className="text-[10px] leading-snug text-zinc-500">{simEstimateHint}</p>
+        ) : null}
+      </div>
       {!readOnly ? (
         <button
           type="button"

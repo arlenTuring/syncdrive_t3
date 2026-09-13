@@ -2,6 +2,8 @@ import type { FacilityObject } from '../types/facility'
 import { CROSS_PARTS, SWITCH_PARTS, type TrackGenPart } from './trackGenGroups'
 import { TRACK_DEFAULT_LABEL_FONT_PX } from './facilityLabelStyle'
 
+export type { TrackGenPart } from './trackGenGroups'
+
 /**
  * 交叉與分岔<strong>一個元件、兩條軌道</strong>。
  */
@@ -9,6 +11,12 @@ import { TRACK_DEFAULT_LABEL_FONT_PX } from './facilityLabelStyle'
 export const TRACKGEN_PART_NAMES_KEY = 'trackGenPartNames'
 export const TRACKGEN_PART_COLORS_KEY = 'trackGenPartColors'
 export const TRACKGEN_PART_FONT_KEY = 'trackGenPartFontPx'
+/** 分岔主線／岔線顯示：fill=實心色塊，dashed=同形虛線軌道（無填色） */
+export const TRACKGEN_PART_STYLES_KEY = 'trackGenPartStyles'
+/** 各半名字相對幾何中心的偏移（元件內像素） */
+export const TRACKGEN_PART_LABEL_OFFSETS_KEY = 'trackGenPartLabelOffsets'
+
+export type TrackGenPartStyle = 'fill' | 'dashed'
 
 /**
  * 兩半名字的預設字級——與一般軌道 {@link TRACK_DEFAULT_LABEL_FONT_PX} 一致。
@@ -58,6 +66,51 @@ export function getTrackGenPartFontPx(f: FacilityObject): Record<string, number>
   return out
 }
 
+/** 分岔主線／岔線顯示樣式；未設定視為色塊 */
+export function getTrackGenPartStyles(
+  f: FacilityObject,
+): Record<string, TrackGenPartStyle> {
+  const v = f.parameters?.[TRACKGEN_PART_STYLES_KEY]
+  if (!v || typeof v !== 'object') return {}
+  const out: Record<string, TrackGenPartStyle> = {}
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (raw === 'fill' || raw === 'dashed') out[k] = raw
+  }
+  return out
+}
+
+export function getTrackGenPartStyle(
+  f: FacilityObject,
+  part: TrackGenPart,
+): TrackGenPartStyle {
+  return getTrackGenPartStyles(f)[part] ?? 'fill'
+}
+
+/** 各半名字相對該半幾何中心的偏移；未拖過則沒有該鍵 */
+export function getTrackGenPartLabelOffsets(
+  f: FacilityObject,
+): Record<string, { x: number; y: number }> {
+  const v = f.parameters?.[TRACKGEN_PART_LABEL_OFFSETS_KEY]
+  if (!v || typeof v !== 'object') return {}
+  const out: Record<string, { x: number; y: number }> = {}
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!raw || typeof raw !== 'object') continue
+    const o = raw as { x?: unknown; y?: unknown }
+    const x = typeof o.x === 'number' && Number.isFinite(o.x) ? o.x : null
+    const y = typeof o.y === 'number' && Number.isFinite(o.y) ? o.y : null
+    if (x === null || y === null) continue
+    out[k] = { x, y }
+  }
+  return out
+}
+
+export function getTrackGenPartLabelOffset(
+  f: FacilityObject,
+  part: TrackGenPart,
+): { x: number; y: number } {
+  return getTrackGenPartLabelOffsets(f)[part] ?? { x: 0, y: 0 }
+}
+
 /** 只改一半的名字，另一半原封不動 */
 export function patchTrackGenPartName(
   f: FacilityObject,
@@ -94,4 +147,37 @@ export function patchTrackGenPartFont(
   if (px === null || !Number.isFinite(px)) delete next[part]
   else next[part] = Math.max(MIN_PART_FONT_PX, Math.min(MAX_PART_FONT_PX, Math.round(px)))
   return { [TRACKGEN_PART_FONT_KEY]: next }
+}
+
+/** 只改一半的顯示樣式（色塊／虛線） */
+export function patchTrackGenPartStyle(
+  f: FacilityObject,
+  part: TrackGenPart,
+  style: TrackGenPartStyle,
+): Record<string, unknown> {
+  const next = { ...getTrackGenPartStyles(f) }
+  if (style === 'fill') delete next[part]
+  else next[part] = style
+  return { [TRACKGEN_PART_STYLES_KEY]: next }
+}
+
+/** 只改一半名字的位置偏移（相對該半幾何中心） */
+export function patchTrackGenPartLabelOffset(
+  f: FacilityObject,
+  part: TrackGenPart,
+  offset: { x: number; y: number } | null,
+): Record<string, unknown> {
+  const next = { ...getTrackGenPartLabelOffsets(f) }
+  if (
+    offset === null ||
+    (Math.abs(offset.x) < 0.5 && Math.abs(offset.y) < 0.5)
+  ) {
+    delete next[part]
+  } else {
+    next[part] = {
+      x: Math.round(offset.x * 10) / 10,
+      y: Math.round(offset.y * 10) / 10,
+    }
+  }
+  return { [TRACKGEN_PART_LABEL_OFFSETS_KEY]: next }
 }

@@ -443,15 +443,15 @@ function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
   // 長短不一才像真的班表；固定序列，不用亂數（避免每次 render 都跳動）
   const widths = [82, 54, 68, 91, 47, 73, 60, 88, 51, 76];
   return (
-    <div
+        <div
       className="flex min-h-[320px] flex-1 flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3"
       role="status"
       aria-live="polite"
-    >
+        >
       <div className="flex items-center gap-2 text-[12px] text-zinc-400">
         <Loader2 className="size-4 animate-spin" />
         {t('shiftList.scheduleAdjust.generating')}
-      </div>
+        </div>
       {/* 時間軸 */}
       <div className="schedule-skeleton-bar h-4 w-full shrink-0" />
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
@@ -533,7 +533,7 @@ function IssueGroupCard({
             <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
               {t('shiftList.scheduleAdjust.issueCount', { count: group.issues.length })}
             </span>
-          </div>
+        </div>
           {!expanded ? (
             <div className="mt-1 truncate text-[11px] opacity-70">
               {group.issues
@@ -691,8 +691,8 @@ function FeasibilityMessages({
                 {mode === 'hidePolicy' ? <Filter className="size-3 shrink-0" /> : null}
                 {label}
               </button>
-            ))}
-          </div>
+      ))}
+    </div>
         </div>
         <p className="text-[10px] leading-4 text-zinc-500">
           {t('shiftList.scheduleAdjust.gateHint')}
@@ -1485,7 +1485,7 @@ export function StepShiftScheduleAdjust({
   }
 
   const renderToolbar = () => {
-    return (
+  return (
       <div className="flex shrink-0 select-none items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-2 py-1">
         <button
           type="button"
@@ -1660,7 +1660,7 @@ export function StepShiftScheduleAdjust({
                 className="text-lg font-semibold leading-7 text-[#F3F4F6]"
               >
                 {t('shiftList.scheduleAdjust.confirmRegenTitle')}
-              </h2>
+      </h2>
               <button
                 type="button"
                 onClick={() => setShowRebuildConfirm(false)}
@@ -1795,11 +1795,11 @@ export function StepShiftScheduleAdjust({
           ) : null}
           <div className={`flex min-h-0 flex-1 ${isManual ? 'flex-row gap-3' : 'flex-col'}`}>
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              {plan ? (
-                <ShiftSchedulePlanGrid
-                  plan={plan}
-                  intervals={intervals}
-                  attributes={attributes}
+      {plan ? (
+        <ShiftSchedulePlanGrid
+          plan={plan}
+          intervals={intervals}
+          attributes={attributes}
                   templateTasks={templateTasks}
                   selectedBlockId={selectedBlockId}
                   onSelectBlock={setSelectedBlockId}
@@ -1817,8 +1817,8 @@ export function StepShiftScheduleAdjust({
                   onDeleteBlock={isManual ? handleDeleteBlock : undefined}
                   onDuplicateBlock={isManual ? handleDuplicateBlock : undefined}
                   zoom={gridZoom}
-                />
-              ) : (
+        />
+      ) : (
                 <PanelNoData message={t('shiftList.scheduleAdjust.cannotGenerate')} className="min-h-[240px]" />
               )}
             </div>

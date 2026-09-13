@@ -1,5 +1,5 @@
 /**
- * 非 D/U 軌道、設施、圍籬：參照場域範圍設為 0；D/U 軌道與號誌不變。
+ * 非 D/U 軌道、設施、圍籬：場域範圍設為 0；D/U 軌道與號誌不變。
  *
  * 執行：node frontend/scripts/zero-non-du-ref-fields.mjs [map.json]
  */

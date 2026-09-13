@@ -114,7 +114,7 @@ export class MapController {
 
   @Get(':mapId/operation-nodes')
   @ApiOperation({
-    summary: '擷取地圖停靠站點（stationId + 別名 + 參照場域座標）',
+    summary: '擷取地圖停靠站點（stationId + 別名 + 場域座標）',
   })
   getOperationNodes(@Param('mapId') mapId: string) {
     return this.mapService.getOperationNodes(mapId);

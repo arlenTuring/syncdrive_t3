@@ -72,7 +72,7 @@ function resolveListRefField(
     return { text: '0（占位）', key: 'zero' }
   }
   if (usesRefFieldBounds(facility.type)) {
-    return { text: '未設定參照場域', key: 'unset-bounds' }
+    return { text: '未設定場域範圍', key: 'unset-bounds' }
   }
   const ref = getRefFieldPosition(facility.parameters)
   if (ref.xM !== null && ref.yM !== null) {
@@ -190,7 +190,7 @@ export function collectFacilityDockingPointEntries(
   const out: FacilityListEntry[] = []
   for (const area of areas) {
     for (const f of area.facilities) {
-      if (f.type !== 'Facility') continue
+      if (f.type !== 'Facility' || f.name !== 'FacilityArea') continue
       const point = getFacilityDockingPoint(f)
       if (!point) continue
       const local = fieldPositionToFacilityAreaLocal(point.xM, point.yM, f, area, {
@@ -246,7 +246,7 @@ export function resolveFacilityFocusPx(
   if (!facility) return null
 
   // 有設施停靠點時，清單／對焦優先對準該點
-  if (facility.type === 'Facility') {
+  if (facility.type === 'Facility' && facility.name === 'FacilityArea') {
     const dock = getFacilityDockingPoint(facility)
     if (dock) {
       const local = fieldPositionToFacilityAreaLocal(

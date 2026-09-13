@@ -345,6 +345,17 @@ export const DEFAULT_TAPER_TRACK: TaperTrackGeometry = {
   entryDeg: 0,
 }
 
+/**
+ * 兩端面 from→to 方向相反時長邊必交叉成沙漏；對調 b 端即可解開。
+ * 舊接合資料可能已寫進地圖，讀取時先正規化避免畫面打結。
+ */
+export function normalizeTaperTrackGeometry(
+  g: TaperTrackGeometry,
+): TaperTrackGeometry {
+  if ((g.aFrom - g.aTo) * (g.bFrom - g.bTo) >= 0) return g
+  return { ...g, bFrom: g.bTo, bTo: g.bFrom }
+}
+
 export function readTaperTrack(
   parameters: Record<string, unknown> | undefined,
 ): TaperTrackGeometry {
@@ -359,13 +370,13 @@ export function readTaperTrack(
   const clamp = (v: number) => Math.max(0, Math.min(1, v))
 
   if (num(o.aFrom) !== null && num(o.bTo) !== null) {
-    return {
+    return normalizeTaperTrackGeometry({
       aFrom: clamp(o.aFrom!),
       aTo: clamp(num(o.aTo) ?? DEFAULT_TAPER_TRACK.aTo),
       bFrom: clamp(num(o.bFrom) ?? DEFAULT_TAPER_TRACK.bFrom),
       bTo: clamp(o.bTo!),
       entryDeg: num(o.entryDeg) ?? 0,
-    }
+    })
   }
 
   /*
@@ -377,13 +388,13 @@ export function readTaperTrack(
       ? 1 - ((num(o.topCutRatio) ?? 0) + (num(o.bottomCutRatio) ?? 0)) / 2
       : null
   const d = clamp(num(o.offsetRatio) ?? legacyCut ?? 0.4)
-  return {
+  return normalizeTaperTrackGeometry({
     aFrom: 0,
     aTo: clamp(1 - d),
     bFrom: d,
     bTo: 1,
     entryDeg: num(o.entryDeg) ?? 0,
-  }
+  })
 }
 
 function taperSpin(g: TaperTrackGeometry, boxWPx: number, boxHPx: number) {
@@ -471,6 +482,24 @@ export function taperTrackEndSegmentsPx(
   }
 }
 
+/**
+ * 斜接填色四角（相對左上、y 向下），標籤 A→B→C→D：
+ * A=A 端起、B=A 端迄、C=B 端迄、D=B 端起。
+ */
+export function taperTrackCornersPx(
+  g: TaperTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): Record<'A' | 'B' | 'C' | 'D', ShapePoint> {
+  const segs = taperTrackEndSegmentsPx(g, boxWPx, boxHPx)
+  return {
+    A: segs.a[0],
+    B: segs.a[1],
+    C: segs.b[1],
+    D: segs.b[0],
+  }
+}
+
 /* ── 分岔軌道 ────────────────────────────────────────────────────
    一進兩出：一條軌道分成直行與岔出兩條。斜接軌道只能表示「整條線平移過去」，
    表達不了「主線繼續、同時分出一條」——生成時只好讓兩條線在路口各畫各的，結果
@@ -513,6 +542,35 @@ export const DEFAULT_SWITCH_TRACK: SwitchTrackGeometry = {
   entryDeg: 0,
 }
 
+/**
+ * 主線四邊形依 aFrom→aTo 對 mFrom→mTo 連線；兩邊方向相反會長成交叉蝴蝶。
+ * 接合時對手邊端點順序常反，讀取／重建時先對齊三個面的 from→to。
+ */
+export function normalizeSwitchTrackGeometry(
+  g: SwitchTrackGeometry,
+): SwitchTrackGeometry {
+  let next = g
+  // 進口慣例：from < to；整組對調以保留相對關係
+  if (next.aFrom > next.aTo) {
+    next = {
+      ...next,
+      aFrom: next.aTo,
+      aTo: next.aFrom,
+      mFrom: next.mTo,
+      mTo: next.mFrom,
+      bFrom: next.bTo,
+      bTo: next.bFrom,
+    }
+  }
+  if ((next.aTo - next.aFrom) * (next.mTo - next.mFrom) < 0) {
+    next = { ...next, mFrom: next.mTo, mTo: next.mFrom }
+  }
+  if ((next.aTo - next.aFrom) * (next.bTo - next.bFrom) < 0) {
+    next = { ...next, bFrom: next.bTo, bTo: next.bFrom }
+  }
+  return next
+}
+
 export function readSwitchTrack(
   parameters: Record<string, unknown> | undefined,
 ): SwitchTrackGeometry {
@@ -521,7 +579,7 @@ export function readSwitchTrack(
   const o = raw as Partial<SwitchTrackGeometry>
   const num = (v: unknown, d: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d
-  return {
+  return normalizeSwitchTrackGeometry({
     aFrom: num(o.aFrom, DEFAULT_SWITCH_TRACK.aFrom),
     aTo: num(o.aTo, DEFAULT_SWITCH_TRACK.aTo),
     mFrom: num(o.mFrom, DEFAULT_SWITCH_TRACK.mFrom),
@@ -535,7 +593,7 @@ export function readSwitchTrack(
       typeof o.entryDeg === 'number' && Number.isFinite(o.entryDeg)
         ? o.entryDeg
         : DEFAULT_SWITCH_TRACK.entryDeg,
-  }
+  })
 }
 
 function switchSpin(g: SwitchTrackGeometry, boxWPx: number, boxHPx: number) {
@@ -572,9 +630,15 @@ export function switchTrackPath(
   g: SwitchTrackGeometry,
   boxWPx: number,
   boxHPx: number,
+  options?: { includeStraight?: boolean; includeBranch?: boolean },
 ): string {
+  const includeStraight = options?.includeStraight !== false
+  const includeBranch = options?.includeBranch !== false
   const { straight, branch } = switchTrackPartPaths(g, boxWPx, boxHPx)
-  return `${straight} ${branch}`
+  const parts: string[] = []
+  if (includeStraight) parts.push(straight)
+  if (includeBranch) parts.push(branch)
+  return parts.join(' ')
 }
 
 /**
@@ -608,12 +672,12 @@ export function switchTrackPartPaths(
   const eMid = (a0 + a1) / 2
   const bHalf = Math.abs(b1 - b0) / 2
 
-  // 主線：進口 → 主線出口
+  // 主線：進口 → 主線出口（兩端各取 min／max，避免 from→to 反向時畫成蝴蝶）
   const straight = poly([
-    [0, a0],
-    [at(g.mAt), m0],
-    [at(g.mAt), m1],
-    [0, a1],
+    [0, Math.min(a0, a1)],
+    [at(g.mAt), Math.min(m0, m1)],
+    [at(g.mAt), Math.max(m0, m1)],
+    [0, Math.max(a0, a1)],
   ])
 
   /*
@@ -629,6 +693,30 @@ export function switchTrackPartPaths(
   ])
 
   return { straight, branch }
+}
+
+/** 主線／岔線中心線（標註／除錯用） */
+export function switchTrackPartCenterlinePaths(
+  g: SwitchTrackGeometry,
+  boxWPx: number,
+  boxHPx: number,
+): { straight: string; branch: string } {
+  const { w, h, T } = switchSpin(g, boxWPx, boxHPx)
+  const c = (v: number) => Math.max(0, Math.min(1, v)) * h
+  const at = (v: number) => Math.max(0, Math.min(1, v)) * w
+  const line = (x0: number, y0: number, x1: number, y1: number) => {
+    const p0 = T(x0, y0)
+    const p1 = T(x1, y1)
+    return `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} L ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`
+  }
+  const aMid = (Math.min(c(g.aFrom), c(g.aTo)) + Math.max(c(g.aFrom), c(g.aTo))) / 2
+  const mMid = (Math.min(c(g.mFrom), c(g.mTo)) + Math.max(c(g.mFrom), c(g.mTo))) / 2
+  const bMid = (Math.min(c(g.bFrom), c(g.bTo)) + Math.max(c(g.bFrom), c(g.bTo))) / 2
+  return {
+    /** 各一條中心線：純虛線樣式只畫這個，不描色塊外框 */
+    straight: line(0, aMid, at(g.mAt), mMid),
+    branch: line(0, aMid, at(g.bAt), bMid),
+  }
 }
 
 /** 進口 a、直行出口 m、岔出出口 b */

@@ -1,6 +1,10 @@
 import type { MapAreaObject, MapPixelOrigin, MapPixelSize } from '../types/area'
 import type { MapBasemapObject } from '../types/basemap'
-import type { MapPlannedRoute, MapRouteGroup } from '../types/mapFile'
+import type {
+  MapCreationMode,
+  MapPlannedRoute,
+  MapRouteGroup,
+} from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
 
 export type LoadedMapMetaSnapshot = {
@@ -10,6 +14,8 @@ export type LoadedMapMetaSnapshot = {
   version: string
   pixelSize: MapPixelSize
   pixelOrigin: MapPixelOrigin
+  /** 建立模式；缺省 blank */
+  creationMode?: MapCreationMode
 }
 
 export type EditSessionSnapshot = {

@@ -12,6 +12,27 @@ import { buildCrossFromEndSegments } from './crossJoin'
 import type { GraphEdge, GraphNode, TrackGraph } from './trackGenGraph'
 
 /**
+ * 束內一條邊各車道的側位係數（乘 levelPx 後再加 away）。
+ *
+ * - <code>base</code>：該邊在束內的起始車道序（已依真實位置排）
+ * - <code>laneSign</code>：只翻「同一條 road 多車道」的左右，不翻整條邊在束裡的上下
+ */
+export function bundleLaneOffsetFactors(
+  base: number,
+  laneCount: number,
+  totalInBundle: number,
+  laneSign: number,
+): number[] {
+  const n = Math.max(1, laneCount)
+  const edgeCentre = base + (n - 1) / 2 - (totalInBundle - 1) / 2
+  const sign = laneSign === 0 ? 1 : Math.sign(laneSign)
+  return Array.from(
+    { length: n },
+    (_, k) => edgeCentre + (k - (n - 1) / 2) * sign,
+  )
+}
+
+/**
  * 圖 → 版面形狀。
  *
  * 節點各有座標，邊連在節點之間，所以環會閉合、岔出就是節點多一條邊。座標由真實座標
@@ -447,13 +468,21 @@ function layoutOnce(
     crossPlans.push({ nodeId: cross.nodeId, groups: [gA, gB], halves })
   }
 
-  /** 這條邊每一條車道的橫向偏移（版面像素）：束內依序排開，再加上讓開的量 */
+  /**
+   * 這條邊每一條車道的橫向偏移（版面像素）。
+   *
+   * 束內的邊已用真實側位排好 baseIndex——那一段<strong>不能</strong>再乘 laneSign，
+   * 否則對向車道會把上下翻面，預覽裡鄰近直軌／分岔就接成 X（上接下、下接上）。
+   *
+   * 同一條 road 上多車道仍要乘 laneSign：laneId 越大越靠行駛方向左側，才映得到版面。
+   */
   const offsetsOf = (e: GraphEdge) => {
     const total = bundleCount.get(bundleKey(e)) ?? e.lanes.length
     const base = baseIndex.get(e.id) ?? 0
     const away = shift.get(e.id) ?? 0
-    const sign = laneSign(e)
-    return e.lanes.map((_, k) => ((base + k - (total - 1) / 2) * levelPx) * sign + away)
+    return bundleLaneOffsetFactors(base, e.lanes.length, total, laneSign(e)).map(
+      (f) => f * levelPx + away,
+    )
   }
 
   /*
@@ -1619,13 +1648,15 @@ function layoutOnce(
     const perp = (o: number): Vec =>
       job.stem.orient === 'h' ? { x: 0, y: o } : { x: o, y: 0 }
     for (let k = 0; k < count; k += 1) {
+      // 梗端用 stem 自己的側位，才接得上梗那一束畫出來的直軌（勿沿用 through 的 o）
+      const oStem = stemRank[k]!.o
       const oMain = throughRank[k]!.o
       const oBranch = branchRank[k]!.o
       const at = (t: number, o: number): Vec => ({
         x: N.x + dir.x * t + perp(o).x,
         y: N.y + dir.y * t + perp(o).y,
       })
-      const fit = fitSwitchAt(at(job.runPx, oMain), at(0, oMain), at(0, oBranch), bandW)
+      const fit = fitSwitchAt(at(job.runPx, oStem), at(0, oMain), at(0, oBranch), bandW)
       if (!fit) continue
       const laneMain = job.through.lanes[throughRank[k]!.k]!
       const laneBranch = job.branch.lanes[branchRank[k]!.k]!
@@ -1637,7 +1668,7 @@ function layoutOnce(
         lineLengthM: job.branch.lengthM,
         realLatFromM: 0,
         realLatToM: 0,
-        samples: [at(job.runPx, oMain), at(0, oBranch)],
+        samples: [at(job.runPx, oStem), at(0, oBranch)],
         /*
          * 分岔認領三段：梗讓出來的那一截，以及兩個出口各自的起頭。車輛不管走直行還是
          * 岔出，在路口那一小段都查得到這一塊。

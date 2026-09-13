@@ -84,7 +84,7 @@ export function MapPlatformLayer({
         if (trackSegments === 0) {
           setAreas([]);
           setError(
-            '地圖缺少軌道參照場域（refField），MQTT 車輛無法定位。請到「應用程式設定 → 還原圖台範例」後重新整理。',
+            '地圖缺少軌道場域範圍（refField），MQTT 車輛無法定位。請到「應用程式設定 → 還原圖台範例」後重新整理。',
           );
           return;
         }

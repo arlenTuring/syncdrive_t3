@@ -592,7 +592,7 @@ function findMissingRefFieldIssues(areas: MapAreaObject[]): ConnectivityIssue[] 
         trackId: f.id,
         trackCode: f.customName?.trim() || null,
         areaId: area.id,
-        message: `${label} 缺少有效參照場域範圍（refField）`,
+        message: `${label} 缺少有效場域範圍（refField）`,
         fieldPoint: {
           xM: f.position?.x ?? 0,
           yM: f.position?.y ?? 0,

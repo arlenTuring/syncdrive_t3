@@ -1,6 +1,7 @@
 import {
   cornerTrackEndSegmentsPx,
   cornerArcCentrePx,
+  readCornerTrack,
   type CornerTrackGeometry,
 } from './trackShapes'
 import type { EndSegment } from './taperJoin'
@@ -19,13 +20,49 @@ type Built = {
   box: { x: number; y: number; w: number; h: number }
 }
 
+type Pt = { x: number; y: number }
+
 function segError(got: EndSegment, want: EndSegment): number {
-  const d = (p: { x: number; y: number }, q: { x: number; y: number }) =>
-    Math.hypot(p.x - q.x, p.y - q.y)
+  const d = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.y - q.y)
   return Math.min(
     Math.max(d(got[0], want[0]), d(got[1], want[1])),
     Math.max(d(got[0], want[1]), d(got[1], want[0])),
   )
+}
+
+function flatOn(s: EndSegment, axis: 'x' | 'y'): boolean {
+  return Math.abs(s[0][axis] - s[1][axis]) <= AXIS_EPS
+}
+
+function segLen(s: EndSegment): number {
+  return Math.hypot(s[1].x - s[0].x, s[1].y - s[0].y)
+}
+
+/**
+ * 接合時：被拖的那一面換成對手的邊（齊寬、同位），對面保持與之垂直並保留原長度。
+ *
+ * 圓角必須一橫一豎。對面若已垂直則原樣保留（兩端寬度可不同）；若與對手同向或歪斜
+ * 則無法可靠還原 L 形，回 null——呼叫端不要硬接。
+ */
+export function alignCornerFaces(
+  cur: { a: EndSegment; b: EndSegment },
+  end: 'a' | 'b',
+  target: EndSegment,
+): { a: EndSegment; b: EndSegment } | null {
+  const axis: 'x' | 'y' | null = flatOn(target, 'x')
+    ? 'x'
+    : flatOn(target, 'y')
+      ? 'y'
+      : null
+  if (!axis) return null
+  if (!(segLen(target) > 1)) return null
+
+  const perp: 'x' | 'y' = axis === 'x' ? 'y' : 'x'
+  const otherKey = end === 'a' ? 'b' : 'a'
+  const other = cur[otherKey]
+  if (!flatOn(other, perp)) return null
+
+  return end === 'a' ? { a: target, b: other } : { a: other, b: target }
 }
 
 export function buildCornerFromEndSegments(a: EndSegment, b: EndSegment): Built | null {
@@ -93,4 +130,17 @@ export function buildCornerFromEndSegments(a: EndSegment, b: EndSegment): Built 
   }
   if (!best || best.err > 2) return null
   return best.built
+}
+
+/** 接合後保留原先的 bulge（曲率），避免 TrackGen 圓角被重設成直角感 */
+export function cornerGeometryWithPreservedBulge(
+  built: CornerTrackGeometry,
+  previous: Record<string, unknown> | undefined,
+): CornerTrackGeometry {
+  const prev = readCornerTrack(previous)
+  return {
+    ...built,
+    outerBulge: prev.outerBulge,
+    innerBulge: prev.innerBulge,
+  }
 }

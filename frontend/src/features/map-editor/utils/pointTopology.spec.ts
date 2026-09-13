@@ -22,9 +22,11 @@ import {
   isDispatchAfterServiceEdge,
   isPointTopologyEdgeTravelInvalid,
   isServiceFacilityLinkEdge,
+  labelForTopologyFacility,
   listInvalidTravelEdges,
   listTopologyLoadCandidates,
   movePointTopologyNodesByDelta,
+  resolveTopologyNodeLabelFromAreas,
   parsePointTopology,
   reconnectPointTopologyEdge,
   removePointTopologyEdge,
@@ -122,6 +124,7 @@ describe('pointTopology', () => {
       facility({
         id: 'd1',
         type: 'DockingPoint',
+        customName: '',
         parameters: { stationId: 'S1', stationName: '站一' },
       }),
       facility({
@@ -501,6 +504,66 @@ describe('pointTopology', () => {
     assert.equal(listed[0]!.id, 'e:b->a')
   })
 
+  it('topology labels prefer alias over stationId for docking points', () => {
+    const docking = facility({
+      id: '090',
+      type: 'DockingPoint',
+      customName: 'N2W上行停靠',
+      parameters: { stationId: 'n2w_d_end' },
+    })
+    assert.equal(labelForTopologyFacility(docking), 'N2W上行停靠')
+    const areas = areaWith(docking)
+    const candidates = listTopologyLoadCandidates(areas, emptyPointTopology())
+    assert.equal(candidates.length, 1)
+    assert.equal(candidates[0]!.label, 'N2W上行停靠')
+    assert.equal(
+      resolveTopologyNodeLabelFromAreas('090', areas),
+      'N2W上行停靠',
+    )
+    const noAlias = facility({
+      id: '091',
+      type: 'DockingPoint',
+      customName: '',
+      parameters: { stationId: 'n2w_d_start' },
+    })
+    assert.equal(labelForTopologyFacility(noAlias), 'n2w_d_start')
+  })
+
+  it('excludes zone partitions and entrances from topology load candidates', () => {
+    const areas = areaWith(
+      facility({
+        id: 'zone-1',
+        type: 'Facility',
+        name: 'ZonePartition',
+        customName: '調度區',
+      }),
+      facility({
+        id: 'ent-1',
+        type: 'Facility',
+        name: 'ZoneEntrance',
+        customName: '入口',
+      }),
+      facility({
+        id: 'f1',
+        type: 'Facility',
+        customName: '充電格 A',
+      }),
+      facility({
+        id: 'd1',
+        type: 'DockingPoint',
+        customName: 'T3上行',
+        parameters: { stationId: 't3_u' },
+      }),
+    )
+    const candidates = listTopologyLoadCandidates(areas, emptyPointTopology())
+    assert.deepEqual(
+      candidates.map((c) => c.nodeId).sort(),
+      ['d1', 'f1'],
+    )
+    assert.ok(!candidates.some((c) => c.nodeId === 'zone-1'))
+    assert.ok(!candidates.some((c) => c.nodeId === 'ent-1'))
+  })
+
   it('facility fingerprint changes when docking is added or removed', () => {
     const a = areaWith(facility({ id: 'd1', type: 'DockingPoint', customName: 'D1' }))
     const b = areaWith(
@@ -549,7 +612,7 @@ describe('pointTopology', () => {
     assert.ok(dockNode)
     assert.equal(dockNode!.id, 'fdock:f1')
     assert.equal(dockNode!.color, TOPOLOGY_KIND_COLORS['facility-docking'])
-    assert.equal(dockNode!.label, '車場 A停')
+    assert.equal(dockNode!.label, '車場 A停靠點')
 
     const withoutDock = areaWith(
       facility({

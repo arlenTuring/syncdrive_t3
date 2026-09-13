@@ -1,5 +1,5 @@
 /**
- * 驗證地圖 JSON 是否符合編輯器 schema v2 與參照場域原則。
+ * 驗證地圖 JSON 是否符合編輯器 schema v2 與 refField（場域座標／範圍）原則。
  * 用法：node scripts/validate-map-file.mjs <path-to.json>
  */
 import fs from 'node:fs'
@@ -174,19 +174,19 @@ function validate(filePath) {
     warnings.push(`缺少 areaLayoutAnchor: ${stats.missingLayoutAnchor.length} 個`)
   }
   if (stats.pointMissingKeys.length) {
-    warnings.push(`單點參照場域缺欄位: ${stats.pointMissingKeys.length} 個`)
+    warnings.push(`單點場域座標缺欄位: ${stats.pointMissingKeys.length} 個`)
   }
   if (stats.boundsMissingKeys.length) {
-    warnings.push(`範圍參照場域缺欄位: ${stats.boundsMissingKeys.length} 個`)
+    warnings.push(`場域範圍缺欄位: ${stats.boundsMissingKeys.length} 個`)
   }
   if (stats.signalsMissingRef.length) {
     warnings.push(
-      `號誌尚未設定有效參照場域位置: ${stats.signalsMissingRef.join(', ')}`,
+      `號誌尚未設定有效場域座標: ${stats.signalsMissingRef.join(', ')}`,
     )
   }
   if (stats.boundsInvalid.length) {
     warnings.push(
-      `軌道參照場域範圍無效: ${stats.boundsInvalid.slice(0, 10).join(', ')}${stats.boundsInvalid.length > 10 ? '…' : ''}`,
+      `軌道場域範圍無效: ${stats.boundsInvalid.slice(0, 10).join(', ')}${stats.boundsInvalid.length > 10 ? '…' : ''}`,
     )
   }
 

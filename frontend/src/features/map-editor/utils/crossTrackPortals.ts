@@ -239,7 +239,9 @@ export function resolveCrossPortalFields(
       x: h.x / Math.max(1e-6, size.w),
       y: h.y / Math.max(1e-6, size.h),
     })
-    const field = fieldMetersAtAreaLocal(area, local.x, local.y)
+    const field = fieldMetersAtAreaLocal(area, local.x, local.y, {
+      preferTrackId: facility.id,
+    })
     out[key] = { xM: field.xM, yM: field.yM, auto: true }
   }
   return out

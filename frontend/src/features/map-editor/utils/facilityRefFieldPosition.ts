@@ -1,4 +1,4 @@
-/** 元件 parameters 內「參照場域位置」（單點，公尺，場域座標系） */
+/** 元件 parameters 內「場域座標」（單點，公尺，場域座標系） */
 export const REF_FIELD_X_M = 'refFieldXM'
 export const REF_FIELD_Y_M = 'refFieldYM'
 

@@ -33,7 +33,7 @@ const laneKey = (roadId: string, laneId: number) => `${roadId}:${laneId}`
 /**
  * 掃全圖的 DockingPoint，換算成里程。
  *
- * 沒填站號、沒有參照場域位置、或反查不到軌道的都略過——那三種都代表這個點還沒有被
+ * 沒填站號、沒有場域座標、或反查不到軌道的都略過——那三種都代表這個點還沒有被
  * 放到路網上，硬給一個里程只會讓後面的計算看起來有答案而已。
  */
 export function buildStationMileageIndex(

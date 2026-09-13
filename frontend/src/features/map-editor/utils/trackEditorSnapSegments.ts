@@ -13,7 +13,7 @@ import type { TrackNetworkSegment } from '../vehicles/trackNetwork/types'
 
 /**
  * 虛擬渡線吸附／勾子：只對軌道「畫面上的實體外框」做碰撞（areaPosition + areaSize）。
- * 與元件參數「參照場域範圍」(refField*) 無關；refField 僅供車輛定位／導通等邏輯使用。
+ * 與元件參數「場域範圍」(refField*) 無關；refField 僅供車輛定位／導通等邏輯使用。
  */
 export function trackVisualFieldBounds(
   track: FacilityObject,

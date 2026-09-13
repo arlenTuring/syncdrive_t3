@@ -4,7 +4,9 @@ import type { FacilityObject } from '../types/facility'
 export function facilityUsesDraggableMapLabel(facility: FacilityObject): boolean {
   return (
     facility.type === 'Track' ||
-    facility.type === 'Facility' ||
+    facility.name === 'FacilityArea' ||
+    facility.name === 'ZoneEntrance' ||
+    facility.name === 'ZonePartition' ||
     facility.type === 'Signal' ||
     facility.type === 'Pole' ||
     facility.type === 'DockingPoint'

@@ -633,4 +633,50 @@ describe('mapFileJson', () => {
     assert.equal(recovered.areas[0]?.facilities.find((f) => f.id === 'c1')?.name, 'RailCorner')
     assert.equal(recovered.areas[0]?.facilities.find((f) => f.id === 't1')?.name, 'RailTaper')
   })
+
+  it('defaults missing creationMode to blank and keeps areas', () => {
+    const doc = buildMapFileV2(
+      'map-legacy',
+      '舊圖',
+      DEFAULT_MAP_PIXEL_SIZE,
+      [createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE)],
+    )
+    assert.equal(doc.creationMode, undefined)
+    const parsed = parseMapFileJson(doc)
+    assert.equal(parsed.creationMode, 'blank')
+    assert.equal(parsed.areas.length, 1)
+  })
+
+  it('round-trips trackGen creationMode and allows empty areas', () => {
+    const doc = buildMapFileV2(
+      'map-hd',
+      '高精',
+      DEFAULT_MAP_PIXEL_SIZE,
+      [],
+      {
+        creationMode: 'trackGen',
+        basemaps: [
+          {
+            id: '1',
+            customName: '高精地圖',
+            layout: {
+              xPx: 0,
+              yPx: 0,
+              wPx: DEFAULT_MAP_PIXEL_SIZE.width,
+              hPx: DEFAULT_MAP_PIXEL_SIZE.height,
+            },
+            parameters: { componentKind: 'trackGenerator' },
+          },
+        ],
+      },
+    )
+    assert.equal(doc.creationMode, 'trackGen')
+    assert.equal(doc.areas.length, 0)
+    assert.equal(doc.basemaps?.length, 1)
+    const parsed = parseMapFileJson(JSON.parse(JSON.stringify(doc)))
+    assert.equal(parsed.creationMode, 'trackGen')
+    assert.equal(parsed.areas.length, 0)
+    assert.equal(parsed.basemaps.length, 1)
+    assert.equal(parsed.basemaps[0]?.parameters?.componentKind, 'trackGenerator')
+  })
 })

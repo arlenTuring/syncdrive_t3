@@ -302,7 +302,7 @@ export function collectStationsFromAreas(areas: MapAreaObject[]) {
       const stationId = getDockingPointStationId(f)
       if (!stationId) continue
       const params = f.parameters ?? {}
-      // 與途經點一致：參照場域未填時回退到圖台 position，避免新建停靠點從清單消失
+      // 與途經點一致：場域座標未填時回退到圖台 position，避免新建停靠點從清單消失
       const xM =
         typeof params.refFieldXM === 'number' && Number.isFinite(params.refFieldXM)
           ? params.refFieldXM

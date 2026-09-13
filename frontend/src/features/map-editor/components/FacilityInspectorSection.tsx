@@ -18,7 +18,7 @@ export function FacilityInspectorSection({
   onFieldFocus,
   onFieldBlur,
 }: Props) {
-  if (facility.type !== 'Facility') return null
+  if (facility.type !== 'Facility' || facility.name !== 'FacilityArea') return null
 
   const params = facility.parameters ?? {}
   const rules = parseFacilityColorRules(params.colorRules)

@@ -13,6 +13,7 @@ import {
 import { resolveTextWrapMode } from '../../../lib/textLayout'
 import { getFacilitySizeMeters } from '../constants/facilityDimensions'
 import type { MapAreaLayout, MapAreaObject } from '../types/area'
+import type { MapBasemapObject } from '../types/basemap'
 import {
   resolveSlotEquipmentEnabled,
   resolveSlotOccupancyEnabled,
@@ -59,10 +60,22 @@ import { FacilityDockingPointInspectorSection } from './FacilityDockingPointInsp
 import { FacilityLayerSection } from './FacilityLayerSection'
 import { FacilityRefFieldPositionSection } from './FacilityRefFieldPositionSection'
 import { FacilityRefFieldBoundsSection } from './FacilityRefFieldBoundsSection'
+import { ZoneEntranceInspectorSection } from './ZoneEntranceInspectorSection'
+import {
+  ParentZoneInspectorSection,
+  ZonePartitionInspectorSection,
+} from './ZonePartitionInspectorSection'
 import {
   usesRefFieldBounds,
   usesRefFieldPoint,
 } from '../utils/facilityRefFieldBinding'
+import {
+  isFacilityAreaBlock,
+  isZoneEntrance,
+  isZonePartition,
+  canBelongToParentZone,
+  type ZoneEntranceLink,
+} from '../utils/zonePartition'
 
 type FacilityLabelStyleSectionProps = {
   facility: FacilityObject
@@ -319,7 +332,7 @@ type InspectorProps = {
   onDelete: () => void
   onFieldFocus: () => void
   onFieldBlur: () => void
-  /** 編輯圖台區域像素尺寸（僅影響 Area 內顯示，不影響參照場域範圍） */
+  /** 編輯圖台區域像素尺寸（僅影響 Area 內顯示，不影響場域範圍） */
   onChangeAreaSizePx?: (wPx: number, hPx: number) => void
   geofenceSelectedLabelId?: string | null
   onSelectGeofenceLabel?: (facilityId: string, labelId: string | null) => void
@@ -329,8 +342,14 @@ type InspectorProps = {
   areaLayout?: MapAreaLayout
   /** 全圖 Area（停靠點站名唯一性、節點 ID 產生） */
   mapAreas?: MapAreaObject[]
+  /** 底圖（判定高精 Area 連結） */
+  mapBasemaps?: MapBasemapObject[]
+  /** 所屬 Area（場域座標自動閘門） */
+  parentArea?: MapAreaObject | null
   onApplyDockingPoint?: (facility: FacilityObject) => void
   onApplyWaypoint?: (facility: FacilityObject) => void
+  /** 分區入口：一次提交完整連結表（會同步綁定分區場域範圍） */
+  onCommitZoneEntranceLinks?: (links: ZoneEntranceLink[]) => void
 }
 
 export function Inspector({
@@ -352,8 +371,11 @@ export function Inspector({
   domainMaxM: _domainMaxM,
   areaLayout: _areaLayout,
   mapAreas = [],
+  mapBasemaps,
+  parentArea = null,
   onApplyDockingPoint,
   onApplyWaypoint,
+  onCommitZoneEntranceLinks,
 }: InspectorProps) {
   const { t } = useTranslation()
   void _domainMaxM
@@ -451,7 +473,7 @@ export function Inspector({
             />
           </div>
           {onPatchParameters &&
-          facility.type === 'Facility' ? (
+          isFacilityAreaBlock(facility) ? (
             <div>
               <label htmlFor="facility-purpose" className="mb-1 block text-[10px] text-zinc-500">
                 {t('mapEditor.inspector.purpose')}
@@ -602,7 +624,9 @@ export function Inspector({
           </div>
         </InspectorSection>
 
-        {onPatchParameters && facility.type !== 'Slot' ? (
+        {onPatchParameters &&
+        facility.type !== 'Slot' &&
+        !isZonePartition(facility) ? (
           <FacilityLayerSection
             facility={facility}
             readOnly={readOnly}
@@ -610,9 +634,13 @@ export function Inspector({
           />
         ) : null}
 
-        {usesRefFieldBounds(facility.type) ? (
+        {usesRefFieldBounds(facility.type) &&
+        !isZonePartition(facility) &&
+        !isZoneEntrance(facility) ? (
           <FacilityRefFieldBoundsSection
             facility={facility}
+            area={parentArea}
+            basemaps={mapBasemaps}
             readOnly={readOnly || !onPatchParameters}
             onPatchParameters={onPatchParameters ?? (() => {})}
             onFieldFocus={onFieldFocus}
@@ -623,6 +651,8 @@ export function Inspector({
         {usesRefFieldPoint(facility.type) ? (
           <FacilityRefFieldPositionSection
             facility={facility}
+            area={parentArea}
+            basemaps={mapBasemaps}
             readOnly={readOnly || !onPatchParameters}
             onPatchParameters={onPatchParameters ?? (() => {})}
             onFieldFocus={onFieldFocus}
@@ -1061,7 +1091,7 @@ export function Inspector({
             onFieldBlur={onFieldBlur}
           />
         ) : null}
-        {facility.type === 'Facility' && onPatchParameters ? (
+        {isFacilityAreaBlock(facility) && onPatchParameters ? (
           <FacilityInspectorSection
             facility={facility}
             readOnly={readOnly}
@@ -1070,9 +1100,37 @@ export function Inspector({
             onFieldBlur={onFieldBlur}
           />
         ) : null}
-        {facility.type === 'Facility' && onPatchParameters ? (
+        {isFacilityAreaBlock(facility) && onPatchParameters ? (
           <FacilityDockingPointInspectorSection
             facility={facility}
+            readOnly={readOnly}
+            onPatchParameters={onPatchParameters}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+          />
+        ) : null}
+        {isZoneEntrance(facility) && onCommitZoneEntranceLinks ? (
+          <ZoneEntranceInspectorSection
+            facility={facility}
+            areaFacilities={parentArea?.facilities ?? []}
+            readOnly={readOnly}
+            onCommitLinks={onCommitZoneEntranceLinks}
+            onFieldFocus={onFieldFocus}
+            onFieldBlur={onFieldBlur}
+          />
+        ) : null}
+        {isZonePartition(facility) ? (
+          <ZonePartitionInspectorSection
+            facility={facility}
+            areaFacilities={parentArea?.facilities ?? []}
+            readOnly={readOnly}
+          />
+        ) : null}
+        {onPatchParameters &&
+        canBelongToParentZone(facility) ? (
+          <ParentZoneInspectorSection
+            facility={facility}
+            areaFacilities={parentArea?.facilities ?? []}
             readOnly={readOnly}
             onPatchParameters={onPatchParameters}
             onFieldFocus={onFieldFocus}

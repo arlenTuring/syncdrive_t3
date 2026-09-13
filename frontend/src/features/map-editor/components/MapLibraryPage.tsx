@@ -13,11 +13,13 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MapPixelSize } from '../types/area'
+import type { MapCreationMode } from '../types/mapFile'
 import { sanitizeMapExportFilename } from '../utils/mapExportFilename'
 import { parseMapFileJson } from '../utils/mapFileJson'
 import { applyRefFieldZeroPolicyToParsed } from '../utils/mergeBuiltinRefFields'
 import {
   createBlankMapEntry,
+  createTrackGenMapEntry,
   deleteMapLibraryEntry,
   duplicateMapEntry,
   ensureMapLibrarySeeded,
@@ -40,6 +42,7 @@ import {
   fetchPublishedMapDocument,
   fetchPublishedMapList,
   isMapLibraryEntryActive,
+  publishMapLibraryEntryToBackend,
   setActiveMapLibraryEntry,
   type PublishedMapSummary,
 } from '../api/mapLibraryApi'
@@ -116,25 +119,74 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     setEntries(next)
   }, [])
 
-  const handleCreateBlank = useCallback(
-    (pixelSize: MapPixelSize) => {
+  /** 地圖名稱／內容必須上後端；清單以伺服器為準，禁止只改本機。 */
+  const syncEntryToBackend = useCallback(
+    async (
+      entry: MapLibraryEntry,
+      options?: { updateActive?: boolean },
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const published = await publishMapLibraryEntryToBackend(entry)
+      if (!published.ok) {
+        return {
+          ok: false,
+          error: t('mapLibrary.backendRequired'),
+        }
+      }
+      const shouldUpdateActive =
+        options?.updateActive
+        ?? isMapLibraryEntryActive(entry, activeMapId, activeLibraryId)
+      if (shouldUpdateActive) {
+        const active = await setActiveMapLibraryEntry(entry)
+        if (!active.ok) {
+          return {
+            ok: false,
+            error: active.error ?? t('mapLibrary.backendRequired'),
+          }
+        }
+        await refreshActiveStatus()
+      }
+      return { ok: true }
+    },
+    [activeLibraryId, activeMapId, refreshActiveStatus, t],
+  )
+
+  const handleCreateMap = useCallback(
+    async (pixelSize: MapPixelSize, creationMode: MapCreationMode) => {
       setNewMapDialogOpen(false)
-      const entry = createBlankMapEntry(pixelSize)
-      const next = upsertMapLibraryEntry(readMapLibrary(), entry)
-      persistEntries(next)
+      const entry =
+        creationMode === 'trackGen'
+          ? createTrackGenMapEntry(pixelSize)
+          : createBlankMapEntry(pixelSize)
+      const synced = await publishMapLibraryEntryToBackend(entry)
+      const stored: MapLibraryEntry = {
+        ...entry,
+        publishState: synced.ok ? 'published' : 'pending',
+      }
+      persistEntries(upsertMapLibraryEntry(readMapLibrary(), stored))
+      if (!synced.ok) {
+        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+      }
       onOpenMap(entry.libraryId)
     },
-    [onOpenMap, persistEntries],
+    [onOpenMap, persistEntries, t],
   )
 
   const handleDuplicate = useCallback(
-    (libraryId: string) => {
+    async (libraryId: string) => {
       const nextLib = readMapLibrary()
       const copy = duplicateMapEntry(nextLib, libraryId)
       if (!copy) return
-      persistEntries(upsertMapLibraryEntry(nextLib, copy))
+      const synced = await publishMapLibraryEntryToBackend(copy)
+      const stored: MapLibraryEntry = {
+        ...copy,
+        publishState: synced.ok ? 'published' : 'pending',
+      }
+      persistEntries(upsertMapLibraryEntry(readMapLibrary(), stored))
+      if (!synced.ok) {
+        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+      }
     },
-    [persistEntries],
+    [persistEntries, t],
   )
 
   const startRename = useCallback((entry: MapLibraryEntry) => {
@@ -143,13 +195,34 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   }, [])
 
   const commitRename = useCallback(
-    (libraryId: string) => {
-      const next = renameMapLibraryEntry(readMapLibrary(), libraryId, renameDraft)
-      persistEntries(next)
+    async (libraryId: string) => {
+      const trimmed = renameDraft.trim()
+      const current = readMapLibrary()
+      const prev = current.find((e) => e.libraryId === libraryId)
       setRenamingId(null)
       setRenameDraft('')
+      if (!prev || !trimmed || trimmed === prev.displayName) return
+
+      const next = renameMapLibraryEntry(current, libraryId, trimmed)
+      const entry = next.find((e) => e.libraryId === libraryId)
+      if (!entry) return
+
+      const sync = await syncEntryToBackend(entry)
+      if (!sync.ok) {
+        alert(
+          t('mapLibrary.renameSyncFailed', {
+            error: sync.error ?? t('mapLibrary.backendRequired'),
+          }),
+        )
+        return
+      }
+      persistEntries(
+        next.map((e) =>
+          e.libraryId === libraryId ? { ...e, publishState: 'published' as const } : e,
+        ),
+      )
     },
-    [persistEntries, renameDraft],
+    [persistEntries, renameDraft, syncEntryToBackend, t],
   )
 
   const handleDelete = useCallback(
@@ -205,13 +278,21 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   }, [])
 
   const importParsed = useCallback(
-    (parsed: ReturnType<typeof parseMapFileJson>) => {
+    async (parsed: ReturnType<typeof parseMapFileJson>) => {
       const entry = importMapEntryFromParsed(parsed)
-      persistEntries(upsertMapLibraryEntry(readMapLibrary(), entry))
+      const synced = await publishMapLibraryEntryToBackend(entry)
+      const stored: MapLibraryEntry = {
+        ...entry,
+        publishState: synced.ok ? 'published' : 'pending',
+      }
+      persistEntries(upsertMapLibraryEntry(readMapLibrary(), stored))
       setPasteOpen(false)
       setPasteText('')
+      if (!synced.ok) {
+        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+      }
     },
-    [persistEntries],
+    [persistEntries, t],
   )
 
   const handleImportFile = useCallback(
@@ -554,6 +635,17 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           <span className="font-medium text-zinc-100">
                             {entry.displayName}
                           </span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] ${
+                              entry.mapDocument.creationMode === 'trackGen'
+                                ? 'bg-emerald-950/70 text-emerald-300/90'
+                                : 'bg-zinc-800 text-zinc-400'
+                            }`}
+                          >
+                            {entry.mapDocument.creationMode === 'trackGen'
+                              ? t('mapLibrary.modeTrackGen')
+                              : t('mapLibrary.modeBlank')}
+                          </span>
                           {entry.builtinId && (
                             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
                               {t('mapLibrary.builtin')}
@@ -655,7 +747,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
       <NewMapPixelDialog
         open={newMapDialogOpen}
-        onConfirm={handleCreateBlank}
+        onConfirm={handleCreateMap}
         onCancel={() => setNewMapDialogOpen(false)}
       />
     </div>

@@ -1,4 +1,5 @@
 import {
+  LayoutGrid,
   Paintbrush,
   RotateCcw,
   RotateCw,
@@ -14,7 +15,11 @@ import {
   DEFAULT_PART_FONT_PX,
   getTrackGenPartColors,
   getTrackGenPartFontPx,
+  getTrackGenPartLabelOffset,
   getTrackGenPartNames,
+  getTrackGenPartStyle,
+  patchTrackGenPartLabelOffset,
+  type TrackGenPart,
 } from '../utils/trackGenParts'
 import {
   CROSS_PORTAL_KEYS,
@@ -32,6 +37,7 @@ import {
   cornerTrackHandlesPx,
   cornerTrackPath,
   taperTrackHandlesPx,
+  taperTrackCornersPx,
   cornerTrackEndSegmentsPx,
   taperTrackPath,
   readTaperTrack,
@@ -116,7 +122,12 @@ import {
   type SnapRect,
 } from '../utils/facilityDragAlign'
 import { snapDragPosition } from '../utils/snapDrag'
-import { applyEdgeResizePx, resizeCursorForEdge } from '../../../lib/elementResize'
+import {
+  applyEdgeResizePx,
+  applyElementResize,
+  resizeCursorForEdge,
+  screenDeltaToLocal,
+} from '../../../lib/elementResize'
 import { normalizeDegrees, resolveRotatedRectAabb } from '../utils/rotation'
 import { clientToWorldCoords } from '../utils/pointerCoords'
 import {
@@ -197,12 +208,18 @@ import {
 } from '../utils/facilityFormatPainter'
 import { resolveFacilityAreaSize } from '../utils/facilityAreaCoords'
 import { facilityUsesDraggableMapLabel } from '../utils/facilityInspectorUi'
+import {
+  isFacilityAreaBlock,
+  isFacilityFamilyBlock,
+  isZoneEntrance,
+  isZonePartition,
+} from '../utils/zonePartition'
 
 /**
  * 可拖曳縮放的把手。
  *
- * 四個邊照舊只改一個方向；四個角是<strong>等比</strong>縮放——圓角軌道與斜接軌道
- * 的形狀是用外框比例算出來的，只拉單一邊會把弧與斜切一起拉扁。
+ * 四個邊只改一個方向；四個角可同時改長寬。
+ * 圓角／斜接／分岔軌道的角把手仍用<strong>等比</strong>縮放（形狀依外框比例）。
  */
 type FacilityResizeEdge =
   | 'left'
@@ -234,6 +251,15 @@ function isCornerResizeEdge(
   return (CORNER_RESIZE_EDGES as readonly string[]).includes(edge)
 }
 
+function cornerEdgeToSnapDirection(
+  edge: (typeof CORNER_RESIZE_EDGES)[number],
+): 'topLeft' | 'topRight' | 'bottomRight' | 'bottomLeft' {
+  if (edge === 'nw') return 'topLeft'
+  if (edge === 'ne') return 'topRight'
+  if (edge === 'se') return 'bottomRight'
+  return 'bottomLeft'
+}
+
 /**
  * 角把手的等比縮放。
  *
@@ -261,6 +287,50 @@ function applyCornerScaleResize(
   const s = Math.max(lo, Math.min(Math.max(lo, hi), scale))
   const w = start.w * s
   const h = start.h * s
+  return {
+    w,
+    h,
+    x: signX > 0 ? start.x : start.x + start.w - w,
+    y: signY > 0 ? start.y : start.y + start.h - h,
+  }
+}
+
+/** 角把手自由縮放（縱橫獨立），錨點為對角 */
+function applyFreeCornerResize(
+  edge: (typeof CORNER_RESIZE_EDGES)[number],
+  dX: number,
+  dY: number,
+  start: { w: number; h: number; x: number; y: number },
+  limits: { minW: number; minH: number; maxW: number; maxH: number },
+  rotationDeg: number,
+): { w: number; h: number; x: number; y: number } {
+  const rot = normalizeDegrees(rotationDeg)
+  const local =
+    rot % 360 !== 0 ? screenDeltaToLocal(dX, dY, rot) : { dx: dX, dy: dY }
+  const result = applyElementResize(
+    edge,
+    local.dx,
+    local.dy,
+    { x: start.x, y: start.y, width: start.w, height: start.h },
+    {
+      anchorCenter: rot % 360 !== 0,
+      minWidth: limits.minW,
+      minHeight: limits.minH,
+    },
+  )
+  const w = Math.min(limits.maxW, Math.max(limits.minW, result.width))
+  const h = Math.min(limits.maxH, Math.max(limits.minH, result.height))
+  if (rot % 360 !== 0) {
+    return {
+      w,
+      h,
+      x: start.x + start.w / 2 - w / 2,
+      y: start.y + start.h / 2 - h / 2,
+    }
+  }
+  // 夾住 max 後必要時重算錨點，避免只縮一邊
+  const signX = edge === 'ne' || edge === 'se' ? 1 : -1
+  const signY = edge === 'se' || edge === 'sw' ? 1 : -1
   return {
     w,
     h,
@@ -320,11 +390,13 @@ type FacilityNodeProps = {
     target: TaperEndProbe | null,
     pointer: { clientX: number; clientY: number },
   ) => void
-  /** Area 模式：僅更新圖台區域像素尺寸，不影響參照場域範圍 */
+  /** Area 模式：僅更新圖台區域像素尺寸，不影響場域範圍 */
   onResize?: (id: string, areaSizePx: { w: number; h: number }) => void
   onResizeSessionStart?: () => void
   /** 編輯模式：刪除此設施 */
   onDelete?: () => void
+  /** 分區工具列：在此分區內新增一般設施（FacilityArea） */
+  onAddFacilityInsideZone?: () => void
   /** 圖層順序（愈大愈在上，可互相覆蓋） */
   stackZIndex?: number
   /** Area 內渲染：尺寸以公尺×scale 換算，position 為局部像素 */
@@ -396,6 +468,7 @@ export const FacilityNode = memo(function FacilityNode({
   onResize,
   onResizeSessionStart,
   onDelete,
+  onAddFacilityInsideZone,
   stackZIndex = 10,
   meterMode = false,
   mapScale = 1,
@@ -459,7 +532,24 @@ export const FacilityNode = memo(function FacilityNode({
         ? mqttLive.rotationDeg
         : facility.rotation
   const showRotNorm = normalizeDegrees(showRot)
-  const angleLabel = `${showRotNorm.toFixed(0)}°`
+  /** 異形軌道工具列顯示 entryDeg＋CSS；CSS transform 仍只用 showRot */
+  const shapedOrientLabelDeg = (() => {
+    if (facility.type !== 'Track') return showRotNorm
+    if (facility.name === 'RailSwitch') {
+      return normalizeDegrees(readSwitchTrack(facility.parameters).entryDeg + (showRot ?? 0))
+    }
+    if (facility.name === 'RailCorner') {
+      return normalizeDegrees(readCornerTrack(facility.parameters).entryDeg + (showRot ?? 0))
+    }
+    if (facility.name === 'RailTaper') {
+      return normalizeDegrees(readTaperTrack(facility.parameters).entryDeg + (showRot ?? 0))
+    }
+    if (facility.name === 'RailCross') {
+      return normalizeDegrees(readCrossTrack(facility.parameters).entryDeg + (showRot ?? 0))
+    }
+    return showRotNorm
+  })()
+  const angleLabel = `${shapedOrientLabelDeg.toFixed(0)}°`
 
   const [imageError, setImageError] = useState(false)
   const [facilityIconError, setFacilityIconError] = useState(false)
@@ -533,7 +623,10 @@ export const FacilityNode = memo(function FacilityNode({
   const isRoadLine = facility.type === 'RoadLine'
   const isBasemap = facility.type === 'Basemap'
   const isTrackCrossover = facility.type === 'TrackCrossover'
-  const isFacilityArea = facility.type === 'Facility'
+  const isFacilityArea = isFacilityAreaBlock(facility)
+  const isZoneEntranceBlock = isZoneEntrance(facility)
+  const isZonePartitionBlock = isZonePartition(facility)
+  const isFacilityFamily = isFacilityFamilyBlock(facility)
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false)
 
   const basemapPreviewUrl = isBasemap
@@ -846,7 +939,16 @@ export const FacilityNode = memo(function FacilityNode({
   const dockingIconUrl = isDockingPoint ? resolveDockingPointIconUrl(facility) : null
   const facilityDisplay = isFacilityArea
     ? resolveFacilityDisplay(facility, mqttLive)
-    : null
+    : isZoneEntranceBlock
+      ? { fillColor: 'transparent' as const }
+      : isZonePartitionBlock
+        ? {
+            fillColor:
+              typeof facility.parameters?.defaultFillColor === 'string'
+                ? facility.parameters.defaultFillColor
+                : 'rgba(34, 211, 238, 0.06)',
+          }
+        : null
   const facilityRemarks = isFacilityArea ? getFacilityRemarks(facility) : ''
   const facilityIconDisplay =
     isFacilityArea &&
@@ -1001,7 +1103,7 @@ export const FacilityNode = memo(function FacilityNode({
 
   const useWideRow =
     isPsd ||
-    isFacilityArea ||
+    isFacilityFamily ||
     isBasemap ||
     facility.type === 'Track' ||
     isRoadLine ||
@@ -1269,10 +1371,87 @@ export const FacilityNode = memo(function FacilityNode({
     () => (isSwitchTrack ? readSwitchTrack(facility.parameters) : null),
     [isSwitchTrack, facility.parameters],
   )
-  const switchTrackClipPath = useMemo(
-    () => (switchTrackGeom ? switchTrackPath(switchTrackGeom, nw, nh) : ''),
-    [switchTrackGeom, nw, nh],
-  )
+  const switchStraightDashed =
+    isSwitchTrack && getTrackGenPartStyle(facility, 'straight') === 'dashed'
+  const switchBranchDashed =
+    isSwitchTrack && getTrackGenPartStyle(facility, 'branch') === 'dashed'
+  /** 實心那一半的外框 path；虛線軌道改畫同形虛線描邊，不進實心 clip */
+  const switchTrackClipPath = useMemo(() => {
+    if (!switchTrackGeom) return ''
+    if (switchStraightDashed && switchBranchDashed) return ''
+    return switchTrackPath(switchTrackGeom, nw, nh, {
+      includeStraight: !switchStraightDashed,
+      includeBranch: !switchBranchDashed,
+    })
+  }, [switchTrackGeom, nw, nh, switchStraightDashed, switchBranchDashed])
+  /**
+   * 虛線軌道：用與色塊相同的帶狀外形，無填色、虛線描邊（有寬度的軌道，不是中心細線）。
+   */
+  const switchDashedParts = useMemo(() => {
+    if (!switchTrackGeom) return null
+    if (!switchStraightDashed && !switchBranchDashed) return null
+    const paths = switchTrackPartPaths(switchTrackGeom, nw, nh)
+    const colors = getTrackGenPartColors(facility)
+    const out: Array<{ part: 'straight' | 'branch'; d: string; stroke: string }> = []
+    if (switchStraightDashed) {
+      out.push({
+        part: 'straight',
+        d: paths.straight,
+        stroke: colors.straight ?? trackFillColor ?? '#94a3b8',
+      })
+    }
+    if (switchBranchDashed) {
+      out.push({
+        part: 'branch',
+        d: paths.branch,
+        stroke: colors.branch ?? trackFillColor ?? '#94a3b8',
+      })
+    }
+    return out
+  }, [
+    switchTrackGeom,
+    nw,
+    nh,
+    switchStraightDashed,
+    switchBranchDashed,
+    facility,
+    trackFillColor,
+  ])
+  /**
+   * 分岔實心半邊走 SVG 色塊；虛線半邊見 switchDashedParts。
+   */
+  const switchFillParts = useMemo(() => {
+    if (!isSwitchTrack || !switchTrackGeom) return null
+    if (switchStraightDashed && switchBranchDashed) return null
+    const paths = switchTrackPartPaths(switchTrackGeom, nw, nh)
+    const colors = getTrackGenPartColors(facility)
+    const fallback = trackFillColor ?? '#94a3b8'
+    const out: Array<{ part: 'straight' | 'branch'; d: string; fill: string }> = []
+    if (!switchStraightDashed) {
+      out.push({
+        part: 'straight',
+        d: paths.straight,
+        fill: colors.straight ?? fallback,
+      })
+    }
+    if (!switchBranchDashed) {
+      out.push({
+        part: 'branch',
+        d: paths.branch,
+        fill: colors.branch ?? fallback,
+      })
+    }
+    return out.length > 0 ? out : null
+  }, [
+    isSwitchTrack,
+    switchTrackGeom,
+    nw,
+    nh,
+    switchStraightDashed,
+    switchBranchDashed,
+    facility,
+    trackFillColor,
+  ])
   const crossTrackGeom = useMemo(
     () => (isCrossTrack ? readCrossTrack(facility.parameters) : null),
     [isCrossTrack, facility.parameters],
@@ -1312,6 +1491,7 @@ export const FacilityNode = memo(function FacilityNode({
    *
    * 元件只有一個底色，可是它在現場是兩條軌道；兩半分屬不同的線時，就把另一半的
    * 顏色疊上去，名字也各標各的。沒分開命名的元件不會進到這裡。
+   * 分岔色塊改由 switchFillParts 繪製；這裡只負責交叉填色與兩半名字。
    */
   const trackPartOverlay = useMemo(() => {
     if (!isCrossTrack && !isSwitchTrack) return null
@@ -1320,8 +1500,6 @@ export const FacilityNode = memo(function FacilityNode({
     const names = getTrackGenPartNames(facility)
     const colors = getTrackGenPartColors(facility)
     const fonts = getTrackGenPartFontPx(facility)
-    // 只設了色、還沒命名的那一半也要上色
-    if (!Object.keys(names).length && !Object.keys(colors).length) return null
     const d =
       isCrossTrack && crossTrackGeom
         ? (crossTrackPartPaths(crossTrackGeom, nw, nh) as Record<string, string>)
@@ -1335,6 +1513,22 @@ export const FacilityNode = memo(function FacilityNode({
           ? (switchTrackPartCentresPx(switchTrackGeom, nw, nh) as Record<string, { x: number; y: number }>)
           : null
     if (!d || !c) return null
+    // 分岔：名字可單獨有；色塊不在這裡畫（避免與純虛線搶畫面）
+    if (isSwitchTrack) {
+      if (!Object.keys(names).length) return null
+      return parts
+        .filter((part) => names[part])
+        .map((part) => ({
+          part,
+          d: d[part]!,
+          at: c[part]!,
+          fill: undefined as string | undefined,
+          name: names[part] ?? '',
+          fontPx: fonts[part] ?? DEFAULT_PART_FONT_PX,
+        }))
+    }
+    // 交叉：只設了色、還沒命名的那一半也要上色
+    if (!Object.keys(names).length && !Object.keys(colors).length) return null
     return parts
       .filter((part) => names[part] || colors[part])
       .map((part) => ({
@@ -1438,9 +1632,15 @@ export const FacilityNode = memo(function FacilityNode({
       : 'transparent'
   const strokeStyleRaw = facility.parameters?.strokeStyle
   const strokeStyle =
-    strokeStyleRaw === 'dashed' || strokeStyleRaw === 'dotted' || strokeStyleRaw === 'solid'
-      ? strokeStyleRaw
-      : 'solid'
+    isZonePartitionBlock
+      ? 'solid'
+      : strokeStyleRaw === 'dashed' ||
+          strokeStyleRaw === 'dotted' ||
+          strokeStyleRaw === 'solid'
+        ? strokeStyleRaw
+        : isZoneEntranceBlock
+          ? 'dashed'
+          : 'solid'
   const effectiveFrameWidthPx =
     strokeColor === 'transparent' ? 0 : strokeWidthPx
 
@@ -2005,22 +2205,31 @@ export const FacilityNode = memo(function FacilityNode({
         let newX = start.x
         let newY = start.y
         if (isCornerResizeEdge(edge)) {
-          const scaled = applyCornerScaleResize(edge, dX, dY, start, {
+          const limits = {
             minW: minWpx,
             minH: minHpx,
             maxW: maxWpx,
             maxH: maxHpx,
-          })
+          }
+          const scaled =
+            isCornerTrack || isTaperTrack || isSwitchTrack
+              ? (() => {
+                  const s = applyCornerScaleResize(edge, dX, dY, start, limits)
+                  if (rot % 360 !== 0) {
+                    return {
+                      w: s.w,
+                      h: s.h,
+                      x: start.x + start.w / 2 - s.w / 2,
+                      y: start.y + start.h / 2 - s.h / 2,
+                    }
+                  }
+                  return s
+                })()
+              : applyFreeCornerResize(edge, dX, dY, start, limits, rot)
           newW = scaled.w
           newH = scaled.h
-          if (rot % 360 !== 0) {
-            // 旋轉過的元件以中心為錨，跟既有的旋轉縮放一致
-            newX = start.x + start.w / 2 - newW / 2
-            newY = start.y + start.h / 2 - newH / 2
-          } else {
-            newX = scaled.x
-            newY = scaled.y
-          }
+          newX = scaled.x
+          newY = scaled.y
         } else if (rot % 360 !== 0) {
           const resized = applyEdgeResizePx(
             edge,
@@ -2047,12 +2256,18 @@ export const FacilityNode = memo(function FacilityNode({
           newY = start.y + (start.h - newH)
         }
 
-        // 等比縮放不吸附：對齊會改動其中一邊，比例就破了
-        if (rot % 360 === 0 && !isCornerResizeEdge(edge)) {
+        // 等比角縮放不吸附：對齊會改動其中一邊，比例就破了
+        const proportionalCorner =
+          isCornerResizeEdge(edge) &&
+          (isCornerTrack || isTaperTrack || isSwitchTrack)
+        if (rot % 360 === 0 && !proportionalCorner) {
           const snapThreshold = resolveFacilityAlignSnapThresholdPx(mapScaleRef.current)
+          const snapDir = isCornerResizeEdge(edge)
+            ? cornerEdgeToSnapDirection(edge)
+            : edge
           const { rect: snapped, guides } = snapResizeRectWithAlignGuides(
             { left: newX, top: newY, width: newW, height: newH },
-            edge,
+            snapDir,
             peerSnapRectsRef.current,
             { left: 0, top: 0, width: layout.wPx, height: layout.hPx },
             snapThreshold,
@@ -2109,21 +2324,31 @@ export const FacilityNode = memo(function FacilityNode({
       let newX = start.x
       let newY = start.y
       if (isCornerResizeEdge(edge)) {
-        const scaled = applyCornerScaleResize(edge, dX, dY, start, {
+        const limits = {
           minW: minPx,
           minH: minPx,
           maxW: maxWpx,
           maxH: maxHpx,
-        })
+        }
+        const scaled =
+          isCornerTrack || isTaperTrack || isSwitchTrack
+            ? (() => {
+                const s = applyCornerScaleResize(edge, dX, dY, start, limits)
+                if (rot % 360 !== 0) {
+                  return {
+                    w: s.w,
+                    h: s.h,
+                    x: start.x + start.w / 2 - s.w / 2,
+                    y: start.y + start.h / 2 - s.h / 2,
+                  }
+                }
+                return s
+              })()
+            : applyFreeCornerResize(edge, dX, dY, start, limits, rot)
         newW = scaled.w
         newH = scaled.h
-        if (rot % 360 !== 0) {
-          newX = start.x + start.w / 2 - newW / 2
-          newY = start.y + start.h / 2 - newH / 2
-        } else {
-          newX = scaled.x
-          newY = scaled.y
-        }
+        newX = scaled.x
+        newY = scaled.y
       } else if (rot % 360 !== 0) {
         const resized = applyEdgeResizePx(
           edge,
@@ -2169,7 +2394,7 @@ export const FacilityNode = memo(function FacilityNode({
       )
       onDrag(facilityRef.current.id, snappedPos)
     },
-    [onDrag, onResize, onResizeSessionStart, resolveShowRot, scaleX, scaleY, worldRef, meterMode, areaMeterContext, domainBoundsM, mapExtent],
+    [onDrag, onResize, onResizeSessionStart, resolveShowRot, scaleX, scaleY, worldRef, meterMode, areaMeterContext, domainBoundsM, mapExtent, isCornerTrack, isTaperTrack, isSwitchTrack],
   )
 
   const endResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -2389,8 +2614,14 @@ export const FacilityNode = memo(function FacilityNode({
     if (!st) return
     const now = pointerAngleDeg(st.centreX, st.centreY, e.clientX, e.clientY)
     const raw = st.startRotDeg + (now - st.startPointerDeg)
-    // 按住 Shift 吸到 15 度，方便對齊；平常取整數度
-    const step = e.shiftKey ? 15 : 1
+    // 異形軌道方位寫在 entryDeg，拖曳預覽也吸 90°，與放下後烘焙一致
+    const shaped =
+      facilityRef.current.type === 'Track' &&
+      (facilityRef.current.name === 'RailSwitch' ||
+        facilityRef.current.name === 'RailCorner' ||
+        facilityRef.current.name === 'RailTaper' ||
+        facilityRef.current.name === 'RailCross')
+    const step = shaped ? 90 : e.shiftKey ? 15 : 1
     liveRotRef.current = Math.round(raw / step) * step
     setLiveRotDeg(liveRotRef.current)
   }, [])
@@ -2552,10 +2783,10 @@ export const FacilityNode = memo(function FacilityNode({
           style={{
             width: nw,
             height: nh,
-            ...(isFacilityArea && facilityDisplay
+            ...(isFacilityFamily && facilityDisplay
               ? { backgroundColor: facilityDisplay.fillColor }
               : {}),
-            ...(isFacilityArea || isTrack
+            ...(isFacilityFamily || isTrack
               ? {
                   borderWidth: `${effectiveFrameWidthPx}px`,
                   borderColor: strokeColor,
@@ -2566,19 +2797,28 @@ export const FacilityNode = memo(function FacilityNode({
               : {}),
             ...(isTrack
               ? {
-                  backgroundColor: trackFillColor ?? undefined,
+                  /*
+                   * 分岔色塊改由 SVG switchFillParts 畫；底層保持透明，
+                   * 純虛線那一半才不會被 CSS clip 色塊蓋住。
+                   */
+                  backgroundColor:
+                    isSwitchTrack
+                      ? 'transparent'
+                      : trackFillColor ?? undefined,
                   ...(isCornerTrack || isTaperTrack || isSwitchTrack || isCrossTrack
                     ? {
                         borderWidth: 0,
-                        clipPath: `path('${
-                          isCornerTrack
-                            ? cornerTrackClipPath
-                            : isSwitchTrack
-                              ? switchTrackClipPath
-                              : isCrossTrack
-                                ? crossTrackClipPath
-                                : taperTrackClipPath
-                        }')`,
+                        ...(isSwitchTrack
+                          ? {}
+                          : {
+                              clipPath: `path('${
+                                isCornerTrack
+                                  ? cornerTrackClipPath
+                                  : isCrossTrack
+                                    ? crossTrackClipPath
+                                    : taperTrackClipPath
+                              }')`,
+                            }),
                       }
                     : {
                         borderRadius: `${trackCornersPx.tl}px ${trackCornersPx.tr}px ${trackCornersPx.br}px ${trackCornersPx.bl}px`,
@@ -2595,8 +2835,12 @@ export const FacilityNode = memo(function FacilityNode({
                 ? 'flex size-full items-center justify-center border-0 p-0 shadow-none bg-transparent'
                 : isTrackCrossover
                   ? 'relative size-full border-0 p-0 shadow-none bg-transparent'
-                : isFacilityArea
-                  ? 'flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-400/60 p-1 text-zinc-100 shadow-md'
+                : isFacilityFamily
+                  ? isZoneEntranceBlock
+                    ? 'flex flex-col items-center justify-center rounded-md border-2 border-dashed border-cyan-400/70 bg-transparent p-1 text-zinc-100'
+                    : isZonePartitionBlock
+                      ? 'flex flex-col items-center justify-center rounded-md border border-solid border-cyan-400/45 p-1 text-zinc-100 shadow-none'
+                      : 'flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-400/60 p-1 text-zinc-100 shadow-md'
                   : [
                       'overflow-hidden rounded-md border text-zinc-200 shadow-lg',
                       useWideRow
@@ -2621,7 +2865,7 @@ export const FacilityNode = memo(function FacilityNode({
                     : 'hover:ring-1 hover:ring-cyan-500/35'
                   : isTrackCrossover
                     ? ''
-                  : isFacilityArea
+                  : isFacilityFamily
                     ? selected
                       ? 'ring-2 ring-cyan-400/95 ring-offset-0'
                       : 'hover:ring-1 hover:ring-cyan-500/35'
@@ -2864,7 +3108,7 @@ export const FacilityNode = memo(function FacilityNode({
                 <Icon className="size-full" strokeWidth={1.75} />
               </div>
             )
-          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityArea && !isBasemap ? (
+          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityFamily && !isBasemap ? (
             <div
               className="shrink-0 text-cyan-300"
               style={{ width: iconWorld, height: iconWorld }}
@@ -2967,16 +3211,6 @@ export const FacilityNode = memo(function FacilityNode({
                 />
               </div>
             ))}
-          </>
-        )}
-        {/*
-         * 四個角的等比縮放把手。
-         *
-         * 圓角軌道與斜接軌道的弧度、斜切都是外框的比例，只拉單邊會把形狀拉扁；
-         * 角把手同時改長寬、鎖住比例，錨點是對角那一角。
-         */}
-        {(isCornerTrack || isTaperTrack || isSwitchTrack) && selected && !readOnly && onResize && (
-          <>
             {([
               ['nw', { left: -7, top: -7 }],
               ['ne', { right: -7, top: -7 }],
@@ -3002,7 +3236,11 @@ export const FacilityNode = memo(function FacilityNode({
               >
                 <div
                   className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-cyan-300 bg-zinc-900 shadow-md ring-1 ring-cyan-500/40"
-                  title={t('mapEditor.inspector.node.resizeProportional')}
+                  title={
+                    isCornerTrack || isTaperTrack || isSwitchTrack
+                      ? t('mapEditor.inspector.node.resizeProportional')
+                      : t('mapEditor.inspector.node.resizeCorner')
+                  }
                 />
               </div>
             ))}
@@ -3017,6 +3255,19 @@ export const FacilityNode = memo(function FacilityNode({
           *
           * 不吃滑鼠事件：把手就疊在同一個位置上，攔下來的話就拉不動了。
           */}
+        {switchFillParts && switchFillParts.length > 0 ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[68] overflow-visible"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            {switchFillParts.map((p) => (
+              <path key={`switch-fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} />
+            ))}
+          </svg>
+        ) : null}
         {/*
           * 異形軌道框線：clip-path 會裁掉 CSS border，所以另外用同一條 path 描深色描邊。
           */}
@@ -3038,6 +3289,29 @@ export const FacilityNode = memo(function FacilityNode({
             />
           </svg>
         )}
+        {switchDashedParts && switchDashedParts.length > 0 ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[70] overflow-visible"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            {switchDashedParts.map((p) => (
+              <path
+                key={`switch-dash-${p.part}`}
+                d={p.d}
+                fill="none"
+                stroke={p.stroke}
+                strokeWidth={2.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="8 5"
+                opacity={0.95}
+              />
+            ))}
+          </svg>
+        ) : null}
         {trackPartOverlay ? (
           <svg
             className="pointer-events-none absolute left-0 top-0 z-[71]"
@@ -3208,38 +3482,52 @@ export const FacilityNode = memo(function FacilityNode({
             })()}
           </svg>
         ) : null}
-        {trackPartOverlay ? (
-          <svg
-            className="pointer-events-none absolute left-0 top-0 z-[73]"
-            width={nw}
-            height={nh}
-            viewBox={`0 0 ${nw} ${nh}`}
-            aria-hidden
-          >
-            {/* 名字壓在虛線之上，避免被斜線切開 */}
-            {trackPartOverlay.map((p) =>
+        {/* 分岔／交叉各半名字：可拖到元件內任意位置 */}
+        {trackPartOverlay
+          ? trackPartOverlay.map((p) =>
               p.name ? (
-                <text
-                  key={`name-${p.part}`}
-                  x={p.at.x}
-                  y={p.at.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={p.fontPx}
-                  fontWeight={600}
-                  fill="#fafafa"
-                  style={{
-                    paintOrder: 'stroke',
-                    stroke: '#09090b',
-                    strokeWidth: Math.max(2, p.fontPx * 0.27),
+                <FacilityDraggableLabel
+                  key={`part-name-${p.part}`}
+                  label={p.name}
+                  labelCss={{
+                    fontSize: p.fontPx,
+                    color: '#fafafa',
+                    fontWeight: 600,
+                    fontStyle: 'normal',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    textWrap: 'single',
                   }}
-                >
-                  {p.name}
-                </text>
+                  anchorX={p.at.x}
+                  anchorY={p.at.y}
+                  offset={getTrackGenPartLabelOffset(
+                    facility,
+                    p.part as TrackGenPart,
+                  )}
+                  labelRotationDeg={0}
+                  boxW={nw}
+                  boxH={nh}
+                  bodyRotationDeg={showRot}
+                  interactive={!readOnly && !!onPatchParameters}
+                  selected={selected}
+                  onSelect={() => onSelect(facility.id)}
+                  onOffsetChange={
+                    !readOnly && onPatchParameters
+                      ? (off) =>
+                          onPatchParameters(
+                            facility.id,
+                            patchTrackGenPartLabelOffset(
+                              facility,
+                              p.part as TrackGenPart,
+                              off,
+                            ),
+                          )
+                      : undefined
+                  }
+                />
               ) : null,
-            )}
-          </svg>
-        ) : null}
+            )
+          : null}
         {/*
           * 拖曳旋轉把手。
           *
@@ -3300,6 +3588,27 @@ export const FacilityNode = memo(function FacilityNode({
             })()}
           </>
         )}
+        {/* 斜接選取時：四角標 A–D，與屬性面板角點對應 */}
+        {isTaperTrack && selected && taperTrackGeom
+          ? (
+              Object.entries(
+                taperTrackCornersPx(taperTrackGeom, nw, nh),
+              ) as Array<['A' | 'B' | 'C' | 'D', { x: number; y: number }]>
+            ).map(([label, pt]) => (
+              <div
+                key={`taper-corner-${label}`}
+                className="pointer-events-none absolute z-[87] flex size-4 items-center justify-center rounded-sm border border-emerald-300/90 bg-emerald-950/90 text-[9px] font-bold leading-none text-emerald-100 shadow"
+                style={{
+                  left: pt.x,
+                  top: pt.y,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                aria-hidden
+              >
+                {label}
+              </div>
+            ))
+          : null}
         {/*
           * 接合把手：一般、圓角、斜接、分岔都有，把手就落在自己的端面中點上。
           * 拖到別條軌道的邊上放手，那一面就換成那條邊。
@@ -3642,10 +3951,21 @@ export const FacilityNode = memo(function FacilityNode({
                 <>
                   <button
                     type="button"
-                    title={t('mapEditor.inspector.node.rotateCcw1')}
+                    title={
+                      isSwitchTrack || isCornerTrack || isTaperTrack || isCrossTrack
+                        ? t('mapEditor.inspector.node.rotateCcw90')
+                        : t('mapEditor.inspector.node.rotateCcw1')
+                    }
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onClick={() => onRotateDelta(facility.id, -1)}
+                    onClick={() =>
+                      onRotateDelta(
+                        facility.id,
+                        isSwitchTrack || isCornerTrack || isTaperTrack || isCrossTrack
+                          ? -90
+                          : -1,
+                      )
+                    }
                     className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
                   >
                     <RotateCcw className="size-4" aria-hidden />
@@ -3655,10 +3975,21 @@ export const FacilityNode = memo(function FacilityNode({
                   </span>
                   <button
                     type="button"
-                    title={t('mapEditor.inspector.node.rotateCw1')}
+                    title={
+                      isSwitchTrack || isCornerTrack || isTaperTrack || isCrossTrack
+                        ? t('mapEditor.inspector.node.rotateCw90')
+                        : t('mapEditor.inspector.node.rotateCw1')
+                    }
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onClick={() => onRotateDelta(facility.id, 1)}
+                    onClick={() =>
+                      onRotateDelta(
+                        facility.id,
+                        isSwitchTrack || isCornerTrack || isTaperTrack || isCrossTrack
+                          ? 90
+                          : 1,
+                      )
+                    }
                     className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
                   >
                     <RotateCw className="size-4" aria-hidden />
@@ -3695,6 +4026,22 @@ export const FacilityNode = memo(function FacilityNode({
                   <Paintbrush className="size-4" aria-hidden />
                 </button>
               )}
+              {isZonePartitionBlock && onAddFacilityInsideZone ? (
+                <button
+                  type="button"
+                  title={t('mapEditor.inspector.node.addFacilityInZone')}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onAddFacilityInsideZone()
+                  }}
+                  className="rounded-full p-1.5 text-emerald-200/95 transition hover:bg-emerald-950/70 hover:text-emerald-100"
+                >
+                  <LayoutGrid className="size-4" aria-hidden />
+                </button>
+              ) : null}
               {onDelete && (
                 <button
                   type="button"
