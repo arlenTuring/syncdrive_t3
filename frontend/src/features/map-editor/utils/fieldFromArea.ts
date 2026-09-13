@@ -164,6 +164,21 @@ function fieldFromTrack(
 }
 
 /**
+ * 這個容器裡有沒有生成出來的軌道。
+ *
+ * 有的話，<strong>容器自己的網域不是場域座標</strong>：網域是 0 到寬、0 到高的格線，
+ * 生成的軌道用的是 .xodr 的座標（T3 那份在 −100 到 −900 之間）。兩者混在同一組數字裡，
+ * 會得到一個看起來像座標、實際上差了幾百公尺的答案——實測一塊斜接的場域範圍因此
+ * 橫跨整張圖（x −884～119、y −194～447）。所以呼叫端拿到 source 'area' 的答案時，
+ * 要先問這一句再決定能不能用。
+ */
+export function areaHasTrackGenTracks(area: MapAreaObject): boolean {
+  return area.facilities.some(
+    (f) => f.type === 'Track' && getTrackGenPaths(f.parameters) !== null,
+  )
+}
+
+/**
  * 離軌道多遠<strong>還算得出</strong>真實座標（公尺）。
  *
  * 與車輛定位同一個上限：再遠就沒有依據說它屬於哪條路，換算出來的數字只是把一條

@@ -5,7 +5,7 @@ import {
   resolveFacilityAreaPosition,
   resolveFacilityAreaSize,
 } from './facilityAreaCoords'
-import { fieldMetersAtAreaLocal } from './fieldFromArea'
+import { areaHasTrackGenTracks, fieldMetersAtAreaLocal } from './fieldFromArea'
 import {
   areaSupportsAutoFieldCoords,
 } from './facilityRefFieldAuto'
@@ -161,6 +161,7 @@ export function suggestRefFieldCornersFromPlacement(
   const locals = trackFootprintCornersAreaLocal(facility, area)
   if (locals.length < REF_FIELD_CORNER_COUNT) return null
 
+  const generated = areaHasTrackGenTracks(area)
   const corners: RefFieldCornerMeters[] = []
   for (let i = 0; i < REF_FIELD_CORNER_COUNT; i += 1) {
     const c = locals[i]!
@@ -168,6 +169,14 @@ export function suggestRefFieldCornersFromPlacement(
       preferTrackId: facility.id,
     })
     if (!Number.isFinite(field.xM) || !Number.isFinite(field.yM)) return null
+    /*
+     * 有生成軌道的圖上，沒有任何一塊能解釋這個角。
+     *
+     * 換算會退回容器自己的網域，那是另一個座標系；四個角混著兩套數字寫進去，出來的
+     * 範圍會橫跨整張圖。這種時候<strong>不要寫</strong>——沒有場域範圍的方塊，下游看得
+     * 出來它沒有；範圍是錯的則看不出來。
+     */
+    if (generated && field.source === 'area') return null
     corners.push({
       xM: roundFieldMeters(field.xM),
       yM: roundFieldMeters(field.yM),
@@ -220,6 +229,7 @@ export function suggestRefFieldBoundsFromPlacement(
   const locals = trackFootprintCornersAreaLocal(facility, area)
   if (locals.length < 2) return null
 
+  const generated = areaHasTrackGenTracks(area)
   let xMin = Infinity
   let xMax = -Infinity
   let yMin = Infinity
@@ -229,6 +239,8 @@ export function suggestRefFieldBoundsFromPlacement(
       preferTrackId: facility.id,
     })
     if (!Number.isFinite(field.xM) || !Number.isFinite(field.yM)) continue
+    // 混到容器網域的答案就整塊不寫，理由同 suggestRefFieldCornersFromPlacement
+    if (generated && field.source === 'area') return null
     if (field.xM < xMin) xMin = field.xM
     if (field.xM > xMax) xMax = field.xM
     if (field.yM < yMin) yMin = field.yM

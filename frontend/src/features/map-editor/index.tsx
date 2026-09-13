@@ -117,6 +117,10 @@ import {
   applyAutoRefFieldBoundsIfUnset,
   ensureAutoRefFieldBoundsInAreas,
 } from './utils/facilityRefFieldBoundsAuto'
+import {
+  dropSharedTrackGenIdentityInAreas,
+  facilityCopyWithoutTrackGenIdentity,
+} from './utils/trackGenIdentity'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
@@ -953,13 +957,35 @@ export default function MapEditorApp({
       const creationMode = loaded.creationMode ?? 'blank'
       setMapPixelSize(loaded.pixelSize)
       setMapPixelOrigin(loaded.pixelOrigin)
+      /*
+       * 修掉「兩塊宣稱自己是同一段路」的舊資料。
+       *
+       * 早期的複製貼上會把生成軌道的現場身分一起抄過去。先拿掉後面那幾塊的身分，
+       * 再讓底下的 ensureAutoRefFieldBoundsInAreas 照它們實際待的位置重新推算範圍。
+       * 這一步只改記憶體裡的內容，要等使用者自己存檔才寫回去。
+       */
+      const repaired = dropSharedTrackGenIdentityInAreas(
+        applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
+      )
+      if (repaired.stripped.length > 0) {
+        console.warn(
+          `[map] ${repaired.stripped.length} 塊軌道與別塊共用同一條現場中心線，`
+          + '已清掉重複的那幾塊的現場身分，改照圖上位置推算：'
+          + repaired.stripped.join('、'),
+        )
+      }
+      if (repaired.cleared.length > 0) {
+        console.warn(
+          `[map] ${repaired.cleared.length} 塊軌道的場域範圍不在路網涵蓋的範圍內，`
+          + '已清掉改照圖上位置推算：'
+          + repaired.cleared.join('、'),
+        )
+      }
       setAreas(
         ensureAutoRefFieldBoundsInAreas(
           ensureAutoRefFieldPositionsInAreas(
             ensureWaypointCodesInAreas(
-              ensureDockingPointStationIdsInAreas(
-                applyExampleMapDefaultLabelStyleToAreas(loaded.areas, loaded.mapId),
-              ),
+              ensureDockingPointStationIdsInAreas(repaired.areas),
             ),
             loaded.basemaps ?? [],
           ),
@@ -2856,27 +2882,35 @@ export default function MapEditorApp({
             return { ...p, mqttInstanceId: id }
           })(),
         }
+    /*
+     * 複製出來的是「一樣形狀的方塊」，不是「同一段路」。
+     * 生成軌道的現場身分留在本尊身上，見 trackGenIdentity。
+     */
+    const freshFacility = facilityCopyWithoutTrackGenIdentity(
+      newFacility,
+      areasRef.current ?? [],
+    )
     const typedFacility =
-      newFacility.type === 'Waypoint'
+      freshFacility.type === 'Waypoint'
         ? ensureWaypointCode(
             {
-              ...newFacility,
+              ...freshFacility,
               parameters: {
-                ...(newFacility.parameters ?? {}),
+                ...(freshFacility.parameters ?? {}),
                 waypointCode: generateNextWaypointCode(areasRef.current ?? []),
               },
             },
             areasRef.current ?? [],
           )
-        : newFacility.type === 'DockingPoint'
+        : freshFacility.type === 'DockingPoint'
           ? {
-              ...newFacility,
+              ...freshFacility,
               parameters: {
-                ...(newFacility.parameters ?? {}),
+                ...(freshFacility.parameters ?? {}),
                 stationId: generateNextStationId(areasRef.current ?? []),
               },
             }
-          : newFacility
+          : freshFacility
     const pastedFacility = area
       ? applyAutoRefFieldBoundsIfUnset(
           applyAutoRefFieldPositionIfUnset(typedFacility, area, basemapsRef.current),
