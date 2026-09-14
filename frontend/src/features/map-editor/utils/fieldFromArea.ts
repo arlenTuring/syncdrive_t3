@@ -231,10 +231,23 @@ export function fieldMetersAtAreaLocal(
     preferTrackId?: string
   },
 ): FieldPoint {
+  /*
+   * 指定了由哪一塊解釋，那一塊算不出來時<strong>不要偷偷換一塊</strong>。
+   *
+   * 原本算不出來就掉回全域最佳解，於是呼叫端問「請用 U19 解釋這個點」，拿回來的卻是
+   * D19 算的數字，而且看不出來被換過。實測 T3上行 那個停靠點：它畫在 U19 框內，但
+   * U19 缺 trackGenLatPerBox（橫向比例尺）算不出來，答案就由 87 像素外的 D19 給了
+   * ——座標落在隔壁那條線再往旁邊 16 公尺，而兩條線只差 3.5 公尺。
+   *
+   * 改成回容器網域那個答案：呼叫端本來就會檢查 source 是不是 'area'，在有生成軌道的
+   * 圖上看到 'area' 就不寫。答錯不如不答。
+   */
   if (options?.preferTrackId) {
     const f = area.facilities.find((x) => x.id === options.preferTrackId)
     const got = f ? fieldFromTrack(f, area, xPx, yPx) : null
     if (got) return got
+    const m = areaLocalPxToMeter(xPx, yPx, area.domain, area.layout)
+    return { xM: m.x, yM: m.y, source: 'area' }
   }
   /*
    * 挑<strong>離中心線最近</strong>的那一塊。

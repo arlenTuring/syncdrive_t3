@@ -1,6 +1,9 @@
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
-import { resolveFacilityAreaSize } from './facilityAreaCoords'
+import {
+  resolveFacilityAreaPosition,
+  resolveFacilityAreaSize,
+} from './facilityAreaCoords'
 import {
   patchRefFieldBounds,
 } from './facilityRefFieldBounds'
@@ -10,8 +13,10 @@ import {
   type RefFieldCornerMeters,
 } from './facilityRefFieldCorners'
 import {
+  getTrackGenLatPerBox,
   getTrackGenPaths,
   pointAlongPath,
+  TRACKGEN_LAT_PER_BOX_KEY,
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_REAL_PATH_KEY,
 } from './trackGenPaths'
@@ -100,7 +105,14 @@ function cornersFromCentreline(
   ]
 }
 
-type Anchor = { px: number; py: number; xM: number; yM: number }
+type Anchor = {
+  px: number
+  py: number
+  xM: number
+  yM: number
+  /** 這一塊的橫向比例尺，推出來的那塊沒有時抄它的 */
+  latPerBox: [number, number] | null
+}
 
 function collectAnchors(area: MapAreaObject): Anchor[] {
   const out: Anchor[] = []
@@ -112,7 +124,13 @@ function collectAnchors(area: MapAreaObject): Anchor[] {
       const uv = pointAlongPath(paths.local, t)
       const local = trackLocalPathPointToAreaLocal(f, area, uv)
       const real = pointAlongPath(paths.real, t)
-      out.push({ px: local.x, py: local.y, xM: real.x, yM: real.y })
+      out.push({
+        px: local.x,
+        py: local.y,
+        xM: real.x,
+        yM: real.y,
+        latPerBox: getTrackGenLatPerBox(f.parameters),
+      })
     }
   }
   return out
@@ -245,6 +263,19 @@ export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
         [TRACKGEN_LOCAL_PATH_KEY]: local,
       }
       /*
+       * 橫向比例尺跟著鄰居走。
+       *
+       * 少了它，這一塊就算有中心線也<strong>算不出任何一點</strong>——橫向偏移沒有
+       * 尺可以換算成公尺，fieldFromTrack 直接回 null，於是框裡的停靠點會被隔壁那塊
+       * 搶去解釋。相鄰的兩塊是同一條帶子、畫在同一個比例上，抄過來就對。
+       */
+      if (!(f.parameters ?? {})[TRACKGEN_LAT_PER_BOX_KEY]) {
+        const donor = ends
+          .map((e) => e.anchor?.latPerBox)
+          .find((v) => Array.isArray(v) && v.length === 2)
+        if (donor) parameters = { ...parameters, [TRACKGEN_LAT_PER_BOX_KEY]: donor }
+      }
+      /*
        * 斜接的場域範圍是四個角，屬性框顯示的、下游用的都是它。只寫左右上下四個數
        * 的話，舊的四個角會原封不動留著——畫面上看起來完全沒變，實際上還是指著別的
        * 地方。推完中心線就把角一起重算。
@@ -278,4 +309,61 @@ export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
   })
 
   return { areas: nextAreas, derived, skipped }
+}
+
+/**
+ * 補上缺的橫向比例尺。
+ *
+ * 有中心線、卻沒有 trackGenLatPerBox 的方塊，<strong>一個點都算不出來</strong>：橫向
+ * 偏移沒有尺可以換算成公尺，fieldFromTrack 直接回 null。症狀是框裡的停靠點被隔壁那塊
+ * 搶去解釋——實測 T3上行 畫在 U19 框內，卻由 87 像素外的 D19 給了答案，座標落在隔壁
+ * 那條線再往旁邊 16 公尺，而兩條線只差 3.5 公尺。
+ *
+ * 橫向比例尺是「這條帶子畫多粗代表現場多寬」，相鄰同一條帶子的方塊是同一個值，所以
+ * 抄圖面上最近、外框大小又最像的那一塊。
+ */
+export function backfillTrackGenLatPerBoxInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  filled: string[]
+} {
+  const filled: string[] = []
+  const next = areas.map((area) => {
+    const box = (f: FacilityObject) => {
+      const pos = resolveFacilityAreaPosition(f, area.domain, area.layout)
+      const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+      return { cx: pos.x + size.w / 2, cy: pos.y + size.h / 2, w: size.w, h: size.h }
+    }
+    const donors = area.facilities
+      .filter((f) => f.type === 'Track' && getTrackGenLatPerBox(f.parameters))
+      .map((f) => ({ ...box(f), lat: getTrackGenLatPerBox(f.parameters)! }))
+    if (donors.length === 0) return area
+
+    let changed = false
+    const facilities = area.facilities.map((f) => {
+      if (f.type !== 'Track') return f
+      if (!getTrackGenPaths(f.parameters)) return f
+      if (getTrackGenLatPerBox(f.parameters)) return f
+      const me = box(f)
+      let best: (typeof donors)[number] | null = null
+      let bestScore = Infinity
+      for (const d of donors) {
+        // 先看畫面上多近，再看外框像不像——同一條帶子上的方塊兩者都接近
+        const score = Math.hypot(d.cx - me.cx, d.cy - me.cy)
+          + (Math.abs(d.w - me.w) + Math.abs(d.h - me.h)) * 2
+        if (score < bestScore) {
+          bestScore = score
+          best = d
+        }
+      }
+      if (!best) return f
+      changed = true
+      filled.push(f.customName?.trim() || f.id)
+      return {
+        ...f,
+        parameters: { ...(f.parameters ?? {}), [TRACKGEN_LAT_PER_BOX_KEY]: best.lat },
+      } as FacilityObject
+    })
+    return changed ? { ...area, facilities } : area
+  })
+  return { areas: next, filled }
 }

@@ -122,7 +122,10 @@ import {
   dropSharedTrackGenIdentityInAreas,
   facilityCopyWithoutTrackGenIdentity,
 } from './utils/trackGenIdentity'
-import { deriveShapedTrackPathsInAreas } from './utils/shapedTrackPaths'
+import {
+  backfillTrackGenLatPerBoxInAreas,
+  deriveShapedTrackPathsInAreas,
+} from './utils/shapedTrackPaths'
 import { getTrackGenPaths } from './utils/trackGenPaths'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
@@ -1003,7 +1006,16 @@ export default function MapEditorApp({
        * 分岔是「主線道一條、分支一條」：進口→直行出口是主線道（就是外框囊括的那條），
        * 進口→岔出出口是分支（斜的，與斜接軌道同一回事）。兩端都在隔壁找得到對應才寫。
        */
-      const shaped = deriveShapedTrackPathsInAreas(repaired.areas)
+      // 缺橫向比例尺的方塊一個點都算不出來，先補起來再推中心線
+      const scaled = backfillTrackGenLatPerBoxInAreas(repaired.areas)
+      if (scaled.filled.length > 0) {
+        console.warn(
+          `[map] ${scaled.filled.length} 塊軌道缺橫向比例尺（框裡的點會被隔壁那塊搶去解釋），`
+          + '已照最近的同型方塊補上：'
+          + scaled.filled.join('、'),
+        )
+      }
+      const shaped = deriveShapedTrackPathsInAreas(scaled.areas)
       if (shaped.derived.length > 0) {
         console.warn(
           `[map] ${shaped.derived.length} 塊斜／彎軌道沒有中心線，已照形狀與鄰居推出來：`
