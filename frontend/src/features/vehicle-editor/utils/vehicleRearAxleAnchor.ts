@@ -127,11 +127,17 @@ export function computeVehicleBodyCenterOffsetFromRearAxleInDisplayPx(
   const vy = bodyCenter.y - pivot.contentY;
   const scaledVx = vx * sx;
   const scaledVy = vy * sy;
+  /*
+   * 與 CSS rotate() 同向。顯示框是 y 向下的座標，rotate(θ) 把 (x, y) 轉成
+   * (x·cosθ − y·sinθ, x·sinθ + y·cosθ)。之前這裡的 sin 是反號，等於轉了 −θ：
+   * θ=0 看不出來，θ=±90° 車身中心就被算到後軸的另一側，整台車往車頭方向平移約
+   * 兩倍的後軸偏移量（T3 場區實測差 28 px，車長才 37 px），看起來就像停在格子上緣。
+   */
   const rad = (rotateDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  const dx = scaledVx * cos + scaledVy * sin;
-  const dy = -scaledVx * sin + scaledVy * cos;
+  const dx = scaledVx * cos - scaledVy * sin;
+  const dy = scaledVx * sin + scaledVy * cos;
   return { dx, dy };
 }
 
@@ -174,8 +180,8 @@ export function computeIconBodyCenterOffsetFromRearAxleInDisplayPx(
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return {
-    dx: vx * cos + vy * sin,
-    dy: -vx * sin + vy * cos,
+    dx: vx * cos - vy * sin,
+    dy: vx * sin + vy * cos,
   };
 }
 
