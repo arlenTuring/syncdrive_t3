@@ -100,6 +100,7 @@ export function VehicleDefinitionMapView({
   livePayloadOnly = false,
   mapHeadingRad,
   mapSteeringRad,
+  mapRotateDeg,
 }: {
   definition: VehicleDefinition;
   liveData?: Record<string, unknown>;
@@ -110,6 +111,13 @@ export function VehicleDefinitionMapView({
   livePayloadOnly?: boolean;
   mapHeadingRad?: number | null;
   mapSteeringRad?: number | null;
+  /**
+   * 圖台指定的車體旋轉角（度，順時針）。
+   *
+   * 圖台是示意圖：同一段路在現場是南北向，圖上卻可能畫成橫的帶子，所以車該轉幾度要由
+   * 呼叫端照「那一塊畫出來的方向」算，不能在這裡拿 heading 自己轉。有給就用這個值。
+   */
+  mapRotateDeg?: number | null;
 }) {
   const renderBounds = computeVehicleMapRenderBounds(definition);
   const display = mapDisplayContentSize(definition, renderBounds);
@@ -143,11 +151,13 @@ export function VehicleDefinitionMapView({
       mapSteeringRad,
     );
     const rotateDeg =
-      pivotRotateDeg != null
-        ? pivotRotateDeg
-        : landscape
-          ? 0
-          : -90;
+      mapRotateDeg != null && Number.isFinite(mapRotateDeg)
+        ? mapRotateDeg
+        : pivotRotateDeg != null
+          ? pivotRotateDeg
+          : landscape
+            ? 0
+            : -90;
     const transform = `rotate(${rotateDeg}deg) ${scalePart}`;
 
     return (

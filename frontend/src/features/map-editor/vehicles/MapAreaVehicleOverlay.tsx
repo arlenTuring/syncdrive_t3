@@ -320,6 +320,12 @@ export function MapAreaVehicleOverlay({
         const markerH = vehicleDefinition
           ? (scaledSize?.heightPx ?? displayH)
           : iconSpec.height;
+        /*
+         * 有比例尺換算時長寬各自代表真實公尺數：沿線與橫向的 px/m 本來就不同（同一格
+         * 一個方向壓縮、另一個沒有），用 contain 取兩者小的那個縮放，等於把已經算對的
+         * 其中一軸再縮一次。這時只能各軸獨立縮。
+         */
+        const fitMode = scaledSize ? 'stretch' : vehicleFitMode;
 
         const headingRad = readVehicleHeadingRad(vehicle.payload);
         const steeringRad = readVehicleSteeringAngleRad(vehicle.payload);
@@ -358,7 +364,7 @@ export function MapAreaVehicleOverlay({
               vehicleDefinition,
               markerW,
               markerH,
-              vehicleFitMode,
+              fitMode,
             )
           : null;
         const anchorX = vehicleDefinition
@@ -377,7 +383,7 @@ export function MapAreaVehicleOverlay({
                 vehicleDefinition,
                 markerW,
                 markerH,
-                vehicleFitMode,
+                fitMode,
                 containerRotateDeg,
                 facilityCenterLocal,
               )
@@ -479,23 +485,29 @@ export function MapAreaVehicleOverlay({
                 style={{ ...style, overflow: 'visible', pointerEvents: showEditSizer ? 'auto' : 'none' }}
               >
                 <div className="pointer-events-none">
+                  {/*
+                    畫出來的尺寸與轉角必須跟上面定位用的同一組值：外層是拿 markerW／markerH
+                    和 containerRotateDeg 反算後軸錨點的，這裡若還是用樣板固定尺寸＋現場
+                    heading，車就會被畫在錨點以外的地方、還轉錯方向。
+                  */}
                   <VehicleDefinitionMapView
                     definition={vehicleDefinition}
                     liveData={liveData}
-                    displayWidth={displayW}
-                    displayHeight={displayH}
-                    fitMode={vehicleFitMode}
+                    displayWidth={markerW}
+                    displayHeight={markerH}
+                    fitMode={fitMode}
                     layoutMode="rear-axle-pivot"
                     livePayloadOnly
                     mapHeadingRad={headingRad}
                     mapSteeringRad={steeringRad}
+                    mapRotateDeg={containerRotateDeg}
                   />
                 </div>
                 {vehicleBehavior ? (
                   <MapVehicleBehaviorOverlay
                     config={vehicleBehavior}
-                    vehicleCenterX={displayW / 2}
-                    vehicleCenterY={displayH / 2}
+                    vehicleCenterX={markerW / 2}
+                    vehicleCenterY={markerH / 2}
                     liveData={liveData}
                   />
                 ) : null}
