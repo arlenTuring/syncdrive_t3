@@ -111,6 +111,7 @@ import { ensureDockingPointStationIdsInAreas, generateNextStationId } from './ut
 import {
   applyAutoRefFieldPositionIfUnset,
   ensureAutoRefFieldPositionsInAreas,
+  resyncAutoRefFieldPositionsInAreas,
   syncAutoRefFieldPositionFromPlacement,
 } from './utils/facilityRefFieldAuto'
 import {
@@ -1032,7 +1033,14 @@ export default function MapEditorApp({
           + zoneSynced.changed.join('、'),
         )
       }
-      setAreas(
+      /*
+       * 停靠點／途經點照目前畫的位置重算場域座標。
+       *
+       * 那個值是某一刻寫下來的：後來軌道被合併、微調、重放，同一個圖面位置底下的
+       * 方塊換了一塊，值就過期了。圖上放在哪裡就是哪裡——那一段的比例被壓縮過，
+       * 放進去的元件也該照同一個比例映射。
+       */
+      const repositioned = resyncAutoRefFieldPositionsInAreas(
         ensureAutoRefFieldBoundsInAreas(
           ensureAutoRefFieldPositionsInAreas(
             ensureWaypointCodesInAreas(
@@ -1042,7 +1050,18 @@ export default function MapEditorApp({
           ),
           loaded.basemaps ?? [],
         ),
+        loaded.basemaps ?? [],
       )
+      if (repositioned.moved.length > 0) {
+        console.warn(
+          `[map] ${repositioned.moved.length} 個停靠點／途經點的場域座標與它畫的位置對不上，`
+          + '已照畫的位置重算：'
+          + repositioned.moved
+            .map((m) => `${m.name}（${m.fromM} → ${m.toM}）`)
+            .join('、'),
+        )
+      }
+      setAreas(repositioned.areas)
       const nextBasemaps = structuredClone(loaded.basemaps ?? [])
       setBasemaps(nextBasemaps)
       setNextNumericId(nextNumericIdFromAreas(loaded.areas, nextBasemaps))

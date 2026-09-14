@@ -128,6 +128,57 @@ export function applyAutoRefFieldPositionIfUnset(
   return syncAutoRefFieldPositionFromPlacement(facility, area, basemaps)
 }
 
+/**
+ * 照目前畫的位置<strong>重算</strong>停靠點／途經點的場域座標。
+ *
+ * <h3>為什麼只補空的不夠</h3>
+ * applyAutoRefFieldPositionIfUnset 只在「還沒有值」時寫入，有值就不碰。但那個值是
+ * <strong>某一刻</strong>寫下來的：後來軌道被合併、微調、重放，同一個圖面位置底下的
+ * 方塊換了一塊，那個值就過期了，而且沒有任何跡象。
+ *
+ * 實測 T3 那兩個停靠點：畫在 D19／U19（那一段的場域是 −178.5 ～ −244.7），身上記的
+ * 卻是 −135.38——那是上面一塊 D18／U18 的範圍，差了 76 公尺。路線的端點錨在這個值上，
+ * 中間的折線卻照畫的位置走，所以路徑會先跑過頭再折回來。
+ *
+ * 圖上放在哪裡就是哪裡：那一段的比例被壓縮過，放進去的元件也該照同一個比例映射。
+ * 所以載入時照畫的位置重算一次，不管原本有沒有值。
+ */
+export function resyncAutoRefFieldPositionsInAreas(
+  areas: MapAreaObject[],
+  basemaps?: readonly MapBasemapObject[],
+): { areas: MapAreaObject[]; moved: Array<{ name: string; fromM: string; toM: string }> } {
+  const moved: Array<{ name: string; fromM: string; toM: string }> = []
+  let changed = false
+  const next = areas.map((area) => {
+    if (!areaSupportsAutoFieldCoords(area, basemaps)) return area
+    let areaChanged = false
+    const facilities = area.facilities.map((f) => {
+      const synced = syncAutoRefFieldPositionFromPlacement(f, area, basemaps)
+      if (synced === f) return f
+      const before = getRefFieldPosition(f.parameters)
+      const after = getRefFieldPosition(synced.parameters)
+      const shift = Math.hypot(
+        (after.xM ?? 0) - (before.xM ?? 0),
+        (after.yM ?? 0) - (before.yM ?? 0),
+      )
+      // 只有原本就有值、而且真的搬了一段，才值得說一聲
+      if (before.xM !== null && before.yM !== null && shift > 0.5) {
+        moved.push({
+          name: f.customName?.trim() || f.id,
+          fromM: `${before.xM}, ${before.yM}`,
+          toM: `${after.xM}, ${after.yM}`,
+        })
+      }
+      areaChanged = true
+      return synced
+    })
+    if (!areaChanged) return area
+    changed = true
+    return { ...area, facilities }
+  })
+  return { areas: changed ? next : areas, moved }
+}
+
 /** 對 Area 內所有可自動帶入的點位補齊未設定的場域座標 */
 export function ensureAutoRefFieldPositionsInAreas(
   areas: MapAreaObject[],
