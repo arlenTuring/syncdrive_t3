@@ -7,6 +7,10 @@ import {
   type StationProgress,
 } from '../utils/trackGenStations';
 import { VehicleDefinitionMapView } from '../../vehicle-editor/elements/VehicleDefinitionMapView';
+import {
+  drawnDirectionAtField,
+  rotateDegForDrawnDirection,
+} from './resolveVehicleTrackPlacement';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
@@ -305,8 +309,31 @@ export function MapAreaVehicleOverlay({
         const landscape = vehicleDefinition
           ? isLandscapeVehicleDefinition(vehicleDefinition)
           : true;
-        const containerRotateDeg =
-          headingRad != null
+        /*
+         * 車頭照<strong>它所在那一塊畫出來的方向</strong>轉，不是照現場的 heading。
+         *
+         * 示意圖會把同一段路畫成別的方向：T3 支線在現場是南北向，圖上那幾塊卻是橫的
+         * 帶子。照 heading 轉，車就會跟它所在的那條帶子交叉——實測正線上的車被畫成
+         * 直立的，橫跨整條帶子。圖面與現場的對應每一塊自己帶著，取切線就有答案。
+         *
+         * 沒有生成路徑的方塊（手工放的、場區格位）退回照 heading 轉。
+         */
+        const drawnTrack = placement.placement.trackId
+          ? area.facilities.find((f) => f.id === placement.placement.trackId)
+          : undefined;
+        const drawnDir =
+          drawnTrack && headingRad != null
+            ? drawnDirectionAtField(
+                drawnTrack,
+                area,
+                vehicle.xM,
+                vehicle.yM,
+                headingRad,
+              )
+            : null;
+        const containerRotateDeg = drawnDir
+          ? rotateDegForDrawnDirection(drawnDir)
+          : headingRad != null
             ? mapVehiclePivotRotateDeg(headingRad, landscape, steeringRad) ?? 0
             : 0;
         const rearAxleAnchor = vehicleDefinition

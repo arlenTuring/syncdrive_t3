@@ -395,6 +395,71 @@ function offsetLocalPoint(
   return { x: uv.x + Math.sign(n.x || 1) * sideM * latPerBox[0], y: uv.y };
 }
 
+/**
+ * 這台車在它所在那一塊上「<strong>畫出來</strong>」的行進方向。
+ *
+ * <h3>為什麼不能直接照 heading 轉圖示</h3>
+ * heading 是現場的朝向，示意圖卻會把同一段路畫成別的方向：T3 支線在現場是南北向，
+ * 圖上那幾塊卻是橫的帶子（元件本身轉了 90 度）；正線在現場微彎，圖上是一條直的。
+ * 照 heading 轉，車頭就會跟它所在的那條帶子交叉——實測正線上的車被畫成直立的，
+ * 橫跨整條帶子。
+ *
+ * 圖面方向與現場方向的對應，每一塊自己帶著（trackGenLocalPath 對 trackGenRealPath）。
+ * 取車所在位置的圖面切線，再照現場切線決定車頭朝前還是朝後。
+ *
+ * 回傳的是<strong>區域座標</strong>的單位向量（y 向上）。沒有生成路徑的方塊回 null，
+ * 呼叫端退回照 heading 轉。
+ */
+export function drawnDirectionAtField(
+  track: FacilityObject,
+  area: MapAreaObject,
+  xM: number,
+  yM: number,
+  headingRad?: number,
+): { x: number; y: number } | null {
+  const paths = getTrackGenPaths(track.parameters);
+  if (!paths) return null;
+  const { along } = projectAlongPath(paths.real, xM, yM);
+  const localTan = tangentAlongPath(paths.local, along);
+  const size = resolveFacilityAreaSize(track, area.domain, area.layout);
+  // 圖面切線的 y 向下，區域座標的 y 向上
+  let dx = localTan.x * size.w;
+  let dy = -localTan.y * size.h;
+  const rot = readRotationDeg(track);
+  if (Math.abs(rot) > 0.001) {
+    const rad = (rot * Math.PI) / 180;
+    const nx = dx * Math.cos(rad) - dy * Math.sin(rad);
+    const ny = dx * Math.sin(rad) + dy * Math.cos(rad);
+    dx = nx;
+    dy = ny;
+  }
+  const len = Math.hypot(dx, dy);
+  if (!(len > 1e-9)) return null;
+  dx /= len;
+  dy /= len;
+  // 車頭朝前還是朝後：拿現場朝向跟這一塊的現場切線比
+  if (headingRad != null && Number.isFinite(headingRad)) {
+    const realTan = tangentAlongPath(paths.real, along);
+    const dot = Math.cos(headingRad) * realTan.x + Math.sin(headingRad) * realTan.y;
+    if (dot < 0) {
+      dx = -dx;
+      dy = -dy;
+    }
+  }
+  return { x: dx, y: dy };
+}
+
+/**
+ * 區域座標的方向向量 → 載具容器的旋轉角（度）。
+ * 模板 rot=0 時車頭朝西，也就是畫面的 (−1, 0)；CSS rotate 是順時針。
+ */
+export function rotateDegForDrawnDirection(dir: { x: number; y: number }): number {
+  // 區域座標 y 向上，畫面 y 向下
+  const sx = dir.x;
+  const sy = -dir.y;
+  return (Math.atan2(-sy, -sx) * 180) / Math.PI;
+}
+
 export function fieldPositionToTrackAreaLocal(
   xM: number,
   yM: number,
