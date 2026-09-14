@@ -121,6 +121,7 @@ import {
   dropSharedTrackGenIdentityInAreas,
   facilityCopyWithoutTrackGenIdentity,
 } from './utils/trackGenIdentity'
+import { deriveShapedTrackPathsInAreas } from './utils/shapedTrackPaths'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
@@ -995,7 +996,26 @@ export default function MapEditorApp({
        * 裡面的設施疊在一起而且沒有任何跡象——實測這張圖的「整備區」綁在「調度區」
        * 那條連結上。多出來的先解除綁定，等使用者重新接。
        */
-      const rebound = dropDuplicateZoneBindingsInAreas(repaired.areas)
+      /*
+       * 分岔、斜接這種斜的方塊沒有中心線時，照形狀與鄰居推一條出來。
+       * 分岔是「主線道一條、分支一條」：進口→直行出口是主線道（就是外框囊括的那條），
+       * 進口→岔出出口是分支（斜的，與斜接軌道同一回事）。兩端都在隔壁找得到對應才寫。
+       */
+      const shaped = deriveShapedTrackPathsInAreas(repaired.areas)
+      if (shaped.derived.length > 0) {
+        console.warn(
+          `[map] ${shaped.derived.length} 塊斜／彎軌道沒有中心線，已照形狀與鄰居推出來：`
+          + shaped.derived.join('、'),
+        )
+      }
+      if (shaped.skipped.length > 0) {
+        console.warn(
+          `[map] ${shaped.skipped.length} 塊斜／彎軌道推不出中心線（有一端在圖上找不到相接的方塊），`
+          + '那幾塊的位置只能照外框估：'
+          + shaped.skipped.join('、'),
+        )
+      }
+      const rebound = dropDuplicateZoneBindingsInAreas(shaped.areas)
       if (rebound.unbound.length > 0) {
         console.warn(
           `[map] ${rebound.unbound.length} 個分區與別的分區綁在同一條入口連結上，`

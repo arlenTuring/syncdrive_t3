@@ -1,0 +1,196 @@
+import type { MapAreaObject } from '../types/area'
+import type { FacilityObject } from '../types/facility'
+import { resolveFacilityAreaSize } from './facilityAreaCoords'
+import {
+  patchRefFieldBounds,
+} from './facilityRefFieldBounds'
+import {
+  getTrackGenPaths,
+  pointAlongPath,
+  TRACKGEN_LOCAL_PATH_KEY,
+  TRACKGEN_REAL_PATH_KEY,
+} from './trackGenPaths'
+import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import {
+  readSwitchTrack,
+  readTaperTrack,
+  switchTrackHandlesPx,
+  taperTrackHandlesPx,
+} from './trackShapes'
+
+/**
+ * 沒有生成身分的斜／彎軌道，照形狀與鄰居推出一條中心線。
+ *
+ * <h3>為什麼需要</h3>
+ * 一般軌道是水平或垂直的帶子，外框內插就等於中心線，沒有中心線也不影響。但分岔、
+ * 斜接、圓角的中心線是斜的，外框裡大半是空地——沒有中心線時，車開到那一塊會被算到
+ * 空地上的某個點。這些方塊多半是手工放的或複製來的，身上沒有生成器寫的路徑。
+ *
+ * <h3>分岔怎麼表示</h3>
+ * <strong>主線道一個、分支一個</strong>：
+ * <pre>
+ *   主線道   進口 a → 直行出口 m   ——就是外框囊括的那條，與一般軌道同一回事
+ *   分支     進口 a → 岔出出口 b   ——斜的，與斜接軌道同一回事
+ * </pre>
+ * 一個元件一條中心線，所以圖上把分岔畫成兩塊（一塊標直行、一塊標岔出）時，各自推
+ * 各自那一條；只畫一塊時推主線道那條。
+ *
+ * <h3>現場座標從哪來</h3>
+ * 端面的意義是「這裡接上隔壁那一塊」，所以答案在隔壁：找圖面上貼著這個端面的軌道
+ * 方塊，取它中心線的那一端。自己身上那組參照場域範圍不能用——它正是壞掉的那個東西
+ * （實測一塊分岔的範圍縱向橫跨 248 公尺，而它畫出來只有 131 像素）。
+ */
+
+/** 端面與隔壁方塊端點視為同一點的圖面距離（區域像素） */
+const JOIN_NEAR_PX = 40
+
+type Anchor = { px: number; py: number; xM: number; yM: number }
+
+function collectAnchors(area: MapAreaObject): Anchor[] {
+  const out: Anchor[] = []
+  for (const f of area.facilities) {
+    if (f.type !== 'Track') continue
+    const paths = getTrackGenPaths(f.parameters)
+    if (!paths) continue
+    for (const t of [0, 1]) {
+      const uv = pointAlongPath(paths.local, t)
+      const local = trackLocalPathPointToAreaLocal(f, area, uv)
+      const real = pointAlongPath(paths.real, t)
+      out.push({ px: local.x, py: local.y, xM: real.x, yM: real.y })
+    }
+  }
+  return out
+}
+
+function nearestAnchor(anchors: Anchor[], px: number, py: number): Anchor | null {
+  let best: Anchor | null = null
+  let bestD = Infinity
+  for (const a of anchors) {
+    const d = Math.hypot(a.px - px, a.py - py)
+    if (d > JOIN_NEAR_PX || d >= bestD) continue
+    best = a
+    bestD = d
+  }
+  return best
+}
+
+/** 端面在外框內的比例位置（0–1，v 向下）；handles 回的是相對元件左上角的像素 */
+function faceUv(
+  handle: { x: number; y: number },
+  size: { w: number; h: number },
+): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.min(1, handle.x / Math.max(1e-6, size.w))),
+    y: Math.max(0, Math.min(1, handle.y / Math.max(1e-6, size.h))),
+  }
+}
+
+/**
+ * 這一塊要接的是哪兩個端面。
+ *
+ * 分岔看它標的是哪一部分：只標了岔出就推分支那條，其餘（標直行、或沒標）推主線道。
+ */
+function facesOf(
+  facility: FacilityObject,
+  size: { w: number; h: number },
+): [{ x: number; y: number }, { x: number; y: number }] | null {
+  if (facility.name === 'RailSwitch') {
+    const g = readSwitchTrack(facility.parameters)
+    const handles = switchTrackHandlesPx(g, size.w, size.h)
+    const parts = facility.parameters?.trackGenPartNames as
+      | Record<string, unknown>
+      | undefined
+    const branchOnly =
+      typeof parts?.branch === 'string' && typeof parts?.straight !== 'string'
+    return [handles.a, branchOnly ? handles.b : handles.m]
+  }
+  if (facility.name === 'RailTaper') {
+    const g = readTaperTrack(facility.parameters)
+    const handles = taperTrackHandlesPx(g, size.w, size.h)
+    return [handles.a, handles.b]
+  }
+  return null
+}
+
+/**
+ * 把推得出來的中心線補上去。
+ *
+ * 兩端都在隔壁找得到對應才寫——只找到一端的話，另一端要嘛編一個座標、要嘛照壞掉的
+ * 外框推，兩種都是給一個看起來合理的錯答案。
+ */
+export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  derived: string[]
+  skipped: string[]
+} {
+  const derived: string[] = []
+  const skipped: string[] = []
+
+  const nextAreas = areas.map((area) => {
+    const anchors = collectAnchors(area)
+    if (anchors.length === 0) return area
+
+    let touched = false
+    const facilities = area.facilities.map((f) => {
+      if (f.type !== 'Track') return f
+      if (getTrackGenPaths(f.parameters)) return f
+      const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+      const faces = facesOf(f, size)
+      if (!faces) return f
+
+      const label = f.customName?.trim() || (f.parameters?.trackGenPartNames as
+        | Record<string, string>
+        | undefined)?.branch
+        || (f.parameters?.trackGenPartNames as Record<string, string> | undefined)?.straight
+        || f.id
+
+      const ends = faces.map((handle) => {
+        const uv = faceUv(handle, size)
+        const local = trackLocalPathPointToAreaLocal(f, area, { x: uv.x, y: uv.y })
+        return { uv, anchor: nearestAnchor(anchors, local.x, local.y) }
+      })
+      if (ends.some((e) => !e.anchor)) {
+        skipped.push(label)
+        return f
+      }
+
+      const real: Array<[number, number]> = ends.map((e) => [
+        Number(e.anchor!.xM.toFixed(2)),
+        Number(e.anchor!.yM.toFixed(2)),
+      ])
+      const local: Array<[number, number]> = ends.map((e) => [
+        Number(e.uv.x.toFixed(4)),
+        Number(e.uv.y.toFixed(4)),
+      ])
+      if (Math.hypot(real[1][0] - real[0][0], real[1][1] - real[0][1]) < 0.5) {
+        skipped.push(label)
+        return f
+      }
+
+      touched = true
+      derived.push(label)
+      const xs = real.map((r) => r[0])
+      const ys = real.map((r) => r[1])
+      return {
+        ...f,
+        parameters: patchRefFieldBounds(
+          {
+            ...(f.parameters ?? {}),
+            [TRACKGEN_REAL_PATH_KEY]: real,
+            [TRACKGEN_LOCAL_PATH_KEY]: local,
+          },
+          {
+            xMinM: Number(Math.min(...xs).toFixed(2)),
+            xMaxM: Number(Math.max(...xs).toFixed(2)),
+            yMinM: Number(Math.min(...ys).toFixed(2)),
+            yMaxM: Number(Math.max(...ys).toFixed(2)),
+          },
+        ),
+      } as FacilityObject
+    })
+
+    return touched ? { ...area, facilities } : area
+  })
+
+  return { areas: nextAreas, derived, skipped }
+}
