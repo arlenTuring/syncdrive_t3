@@ -9,7 +9,10 @@ import {
   resolveFacilityAreaSize,
 } from '../utils/facilityAreaCoords';
 import type { AreaVehicleLive } from './types';
-import { getTrackGenPaths } from '../utils/trackGenPaths';
+import {
+  getTrackGenLatPerBox,
+  getTrackGenPaths,
+} from '../utils/trackGenPaths';
 
 /** 依軌道元件尺寸計算載具在地圖上的顯示寬高（px） */
 export interface MapVehicleTrackSizing {
@@ -190,15 +193,32 @@ export function pxPerMeterOnFacility(
     );
     if (!(drawnPx > 0.01)) return null;
     const along = drawnPx / realM;
-    // 橫向：外框短邊對場域短邊
+    /*
+     * 橫向的比例尺問生成器自己記的 trackGenLatPerBox：那一組就是「橫向偏移一公尺，
+     * 佔外框的幾分之幾」，沿寬、沿高各一個。
+     *
+     * 不能拿外框短邊對場域短邊算——中心線只有兩點的直段，場域範圍的短邊會退化成
+     * 0.11 公尺（D19 實測），算出來是 487 px/m，車身就被夾到跟整條帶子一樣寬。
+     */
+    const a = paths.local[0]!;
+    const b = paths.local[paths.local.length - 1]!;
+    const alongIsWidth = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]);
+    const lat = getTrackGenLatPerBox(facility.parameters);
+    if (lat) {
+      const perBox = alongIsWidth ? lat[1] : lat[0];
+      const acrossPx = alongIsWidth ? size.h : size.w;
+      if (perBox > 1e-9) {
+        return { alongPxPerM: along, acrossPxPerM: perBox * acrossPx };
+      }
+    }
     const p = facility.parameters as Record<string, number> | undefined;
     const fw = Math.abs((p?.refFieldXMaxM ?? 0) - (p?.refFieldXMinM ?? 0));
     const fh = Math.abs((p?.refFieldYMaxM ?? 0) - (p?.refFieldYMinM ?? 0));
-    const acrossM = Math.min(fw, fh);
-    const acrossPx = Math.min(size.w, size.h);
+    const acrossM = alongIsWidth ? fh : fw;
+    const acrossPx = alongIsWidth ? size.h : size.w;
     return {
       alongPxPerM: along,
-      acrossPxPerM: acrossM > 0.01 ? acrossPx / acrossM : along,
+      acrossPxPerM: acrossM > 0.5 ? acrossPx / acrossM : along,
     };
   }
 
@@ -240,35 +260,55 @@ export function medianPxPerMeter(
 }
 
 /**
+ * 一台車在現場有多大（公尺）。
+ *
+ * <h3>為什麼是常數，不是從樣板反推</h3>
+ * 先前拿樣板尺寸除以全圖的代表比例尺反推，沿線那一軸勉強說得通，橫向完全不行——橫向的
+ * 比例尺量的是「軌道帶畫多粗代表幾公尺股距」，不是「畫面上橫向一公尺是幾像素」，兩者差
+ * 一個數量級。反推出來的車寬是 <strong>0.67 公尺</strong>，畫出來就是一條線。
+ *
+ * 車有多大是現場的事實，跟圖怎麼畫無關，所以直接寫成常數。這張圖的整備格是 5.33×11.84
+ * 公尺，車長取 12 公尺、車寬 2.6 公尺是一般巴士的尺寸。
+ */
+export const VEHICLE_LENGTH_M = 12;
+export const VEHICLE_WIDTH_M = 2.6;
+
+/** 車身最寬可以到車長的幾成。真車約 0.22，放寬到 0.6 留給示意圖壓縮 */
+const MAX_VEHICLE_ASPECT = 0.6;
+
+/**
  * 載具在某一塊上該畫多大。
  *
  * <h3>為什麼車身長度要跟著比例尺變</h3>
  * 同樣大的一格，代表的路徑長度可能差好幾倍——那正是示意圖的用意：畫面上一樣的距離，
  * 在現場可能是 50 公尺也可能是 200 公尺。車的<strong>真實長度是固定的</strong>，所以
  * 在比例尺大的地方畫得長、小的地方畫得短，看起來就是在那一段走得慢或快，這是對的。
- *
- * 車身真實長寬由樣板尺寸除以全圖的代表比例尺反推——使用者在儀表板上調的那個大小，
- * 就當成「在代表比例尺下該有多大」。
  */
 export function vehicleDisplaySizeOnFacility(opts: {
   facility: FacilityObject;
   area: MapAreaObject;
-  /** 樣板尺寸（像素） */
-  templateWidthPx: number;
-  templateHeightPx: number;
-  /** 全圖代表比例尺 */
-  reference: { alongPxPerM: number; acrossPxPerM: number };
+  /** 車輛真實尺寸（公尺），未給時用一般巴士 */
+  lengthM?: number;
+  widthM?: number;
 }): { widthPx: number; heightPx: number } | null {
   const scale = pxPerMeterOnFacility(opts.facility, opts.area);
   if (!scale) return null;
-  const lengthM = opts.templateWidthPx / Math.max(1e-6, opts.reference.alongPxPerM);
-  const widthM = opts.templateHeightPx / Math.max(1e-6, opts.reference.acrossPxPerM);
+  const lengthM = opts.lengthM ?? VEHICLE_LENGTH_M;
+  const widthM = opts.widthM ?? VEHICLE_WIDTH_M;
   const box = resolveFacilityAreaSize(opts.facility, opts.area.domain, opts.area.layout);
   const longSide = Math.max(box.w, box.h);
   const shortSide = Math.min(box.w, box.h);
-  return {
-    // 夾住：再怎麼換算也不該長過它所在的那一塊，也不該細到看不見
-    widthPx: Math.min(longSide, Math.max(6, lengthM * scale.alongPxPerM)),
-    heightPx: Math.min(shortSide * 0.9, Math.max(3, widthM * scale.acrossPxPerM)),
-  };
+  // 夾住：再怎麼換算也不該長過它所在的那一塊，也不該細到看不見
+  const widthPx = Math.min(longSide, Math.max(6, lengthM * scale.alongPxPerM));
+  /*
+   * 沿線被壓得很扁的那幾段，橫向卻是整條帶子的寬度：D08 一公尺只畫 1.65 像素，橫向卻有
+   * 15.72，照實換算出來是 20 長 × 41 寬——一台比自己還寬的巴士。那是示意圖兩軸壓縮率不同
+   * 的必然結果，不是算錯，但畫出來認不出是車。所以留一個上限，讓它至少還像一台車。
+   */
+  const heightPx = Math.min(
+    shortSide * 0.9,
+    widthPx * MAX_VEHICLE_ASPECT,
+    Math.max(3, widthM * scale.acrossPxPerM),
+  );
+  return { widthPx, heightPx };
 }

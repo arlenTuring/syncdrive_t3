@@ -11,10 +11,7 @@ import {
   drawnDirectionAtField,
   rotateDegForDrawnDirection,
 } from './resolveVehicleTrackPlacement';
-import {
-  medianPxPerMeter,
-  vehicleDisplaySizeOnFacility,
-} from './resolveMapVehicleTrackSizing';
+import { vehicleDisplaySizeOnFacility } from './resolveMapVehicleTrackSizing';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
@@ -279,12 +276,6 @@ export function MapAreaVehicleOverlay({
 
   const displayW = Math.max(4, vehicleDisplayWidthPx);
   const displayH = Math.max(2, vehicleDisplayHeightPx);
-  /*
-   * 全圖的代表比例尺：載具的真實長寬由樣板尺寸除以它反推，再乘上每一塊自己的比例尺。
-   * 同樣大的一格代表的路徑長度可能差好幾倍，車的真實長度卻是固定的——所以車在比例尺
-   * 大的地方畫得長、小的地方畫得短，看起來就是在那一段走得慢或快。
-   */
-  const referenceScale = medianPxPerMeter(areas);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
@@ -314,15 +305,14 @@ export function MapAreaVehicleOverlay({
         const sizingFacility = placement.placement.trackId
           ? area.facilities.find((f) => f.id === placement.placement.trackId)
           : undefined;
+        /*
+         * 車身尺寸照它所在那一塊的比例尺換算：車的真實長寬是固定的，示意圖各段的比例尺
+         * 卻差很多（這張圖沿線 0.52～12.68 px/m），用同一個像素尺寸走遍全圖，在正線剛好，
+         * 到場區就塞不進格位。
+         */
         const scaledSize =
-          vehicleDefinition && sizingFacility && referenceScale
-            ? vehicleDisplaySizeOnFacility({
-                facility: sizingFacility,
-                area,
-                templateWidthPx: displayW,
-                templateHeightPx: displayH,
-                reference: referenceScale,
-              })
+          vehicleDefinition && sizingFacility
+            ? vehicleDisplaySizeOnFacility({ facility: sizingFacility, area })
             : null;
         const markerW = vehicleDefinition
           ? (scaledSize?.widthPx ?? displayW)
