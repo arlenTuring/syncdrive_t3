@@ -11,6 +11,10 @@ import {
   refFieldBoundsSpanMeters,
 } from '../utils/facilityRefFieldBounds';
 import {
+  absoluteToZoneLocal,
+  isZonePartition,
+} from '../utils/zonePartition';
+import {
   isYardParkableFacilityId,
   parseYardSlotFromPayload,
   resolveYardFacilityFieldMeters,
@@ -84,6 +88,45 @@ export function isYardVehiclePayload(
     );
   }
   return false;
+}
+
+/**
+ * 落在分區裡的車：照分區的場域範圍反算圖面位置。
+ *
+ * <h3>為什麼需要這一步</h3>
+ * 場區（整備、調度、充電）底下沒有軌道，所以軌道那條路查不到。車停著時靠 telemetry
+ * 帶的 yard_slot_id 對到格位，但<strong>正在開進去的時候不帶那個欄位</strong>——車還
+ * 沒停好，說不出自己在哪一格。於是那幾秒鐘定位失敗，圖台只能沿用上一幀，車看起來卡
+ * 在別的地方不動（實測一台進整備區的車被畫在八百公尺外的正線旁邊）。
+ *
+ * 分區本來就記著「這塊圖面＝現場哪一塊」，把那個對應反過來用就是了。
+ */
+function locateInZonePartition(
+  areas: MapAreaObject[],
+  xM: number,
+  yM: number,
+): VehiclePlacementAcrossAreas | null {
+  for (const area of areas) {
+    for (const zone of area.facilities) {
+      if (!isZonePartition(zone)) continue;
+      const bounds = getValidRefFieldBounds(zone.parameters);
+      if (!bounds) continue;
+      if (!fieldPointInRefField(xM, yM, bounds)) continue;
+      const local = absoluteToZoneLocal(xM, yM, bounds);
+      const pos = resolveFacilityAreaPosition(zone, area.domain, area.layout);
+      const size = resolveFacilityAreaSize(zone, area.domain, area.layout);
+      return {
+        area,
+        placement: {
+          areaLocalX: pos.x + local.u * size.w,
+          areaLocalY: pos.y + local.v * size.h,
+          trackId: zone.id,
+          score: 1,
+        },
+      };
+    }
+  }
+  return null;
 }
 
 function locateInAreaDomain(
@@ -516,6 +559,10 @@ export function resolveVehiclePlacementAcrossAreas(
   // 略寬：portal 外緣、尚未落入任何 refField 的點
   const onCrossoverLoose = locateOnCrossover(areas, xM, yM, 6);
   if (onCrossoverLoose) return onCrossoverLoose;
+
+  // 場區底下沒有軌道：開進去的那幾秒沒有 yard_slot_id，照分區的對應反算
+  const inZone = locateInZonePartition(areas, xM, yM);
+  if (inZone) return inZone;
 
   return locateInAreaDomain(areas, xM, yM);
 }
