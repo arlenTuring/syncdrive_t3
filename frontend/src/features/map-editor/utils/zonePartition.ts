@@ -59,10 +59,26 @@ export type ZoneEntranceLink = {
 }
 
 export type ZoneLocalField = {
-  /** 相對分區寬 0–1（左→右） */
+  /** 中心相對分區寬 0–1（左→右） */
   u: number
-  /** 相對分區高 0–1（下→上） */
+  /** 中心相對分區高 0–1（下→上） */
   v: number
+  /**
+   * 外框寬相對分區寬 0–1。
+   *
+   * <h3>為什麼位置不夠，尺寸也要記</h3>
+   * 分區的意義是「圖上這一塊＝現場那一塊」，所以裡面的設施<strong>整個外框</strong>
+   * 都該照同一個比例換算，不只是中心點。先前只換算中心、尺寸沿用設施身上原本那一組
+   * 數字，於是圖改版之後格位還帶著上一版的大小——實測充電格畫成 82×39 像素（橫的），
+   * 場域範圍卻還是 9.42×24.02 公尺（直的），而且比它所在的分區（9 公尺高）還高。
+   *
+   * 車端拿場域範圍判斷「我停在哪一格」、圖台拿它的長邊擺車頭，兩邊都會錯。
+   *
+   * 舊資料沒有這兩個值；沒有時維持舊行為（只搬中心、尺寸不動）。
+   */
+  du?: number
+  /** 外框高相對分區高 0–1 */
+  dv?: number
 }
 
 export function isZoneEntrance(f: FacilityObject): boolean {
@@ -254,9 +270,13 @@ export function readZoneLocalField(
   const u = num(o.u, NaN)
   const v = num(o.v, NaN)
   if (!Number.isFinite(u) || !Number.isFinite(v)) return null
+  const du = num((o as { du?: unknown }).du, NaN)
+  const dv = num((o as { dv?: unknown }).dv, NaN)
   return {
     u: Math.max(0, Math.min(1, u)),
     v: Math.max(0, Math.min(1, v)),
+    ...(Number.isFinite(du) && du > 0 ? { du: Math.min(1, du) } : {}),
+    ...(Number.isFinite(dv) && dv > 0 ? { dv: Math.min(1, dv) } : {}),
   }
 }
 
@@ -275,6 +295,33 @@ export function absoluteToZoneLocal(
   return {
     u: Math.max(0, Math.min(1, (xM - xMin) / w)),
     v: Math.max(0, Math.min(1, (yM - yMin) / h)),
+  }
+}
+
+/**
+ * 相對 0–1 的外框 → 分區絕對場域外框。
+ *
+ * 沒有記尺寸（舊資料）就回 null，呼叫端維持「只搬中心」的舊行為。
+ */
+export function zoneLocalRectToAbsolute(
+  local: ZoneLocalField,
+  bounds: Pick<RefFieldBoundsMeters, 'xMinM' | 'xMaxM' | 'yMinM' | 'yMaxM'>,
+): { xMinM: number; xMaxM: number; yMinM: number; yMaxM: number } | null {
+  if (local.du == null || local.dv == null) return null
+  const xMin = bounds.xMinM ?? 0
+  const xMax = bounds.xMaxM ?? 0
+  const yMin = bounds.yMinM ?? 0
+  const yMax = bounds.yMaxM ?? 0
+  const w = xMax - xMin
+  const h = yMax - yMin
+  const centre = zoneLocalToAbsolute(local, bounds)
+  const halfW = Math.abs(local.du * w) / 2
+  const halfH = Math.abs(local.dv * h) / 2
+  return {
+    xMinM: centre.xM - halfW,
+    xMaxM: centre.xM + halfW,
+    yMinM: centre.yM - halfH,
+    yMaxM: centre.yM + halfH,
   }
 }
 
@@ -331,6 +378,9 @@ export function zoneLocalFromCanvasPlacement(
   return {
     u: Math.max(0, Math.min(1, (cx - zPos.x) / zSize.w)),
     v: Math.max(0, Math.min(1, (cy - zPos.y) / zSize.h)),
+    // 外框也一起記：分區的兩個軸比例尺可以不同，尺寸必須各乘各的
+    du: Math.max(0, Math.min(1, cSize.w / zSize.w)),
+    dv: Math.max(0, Math.min(1, cSize.h / zSize.h)),
   }
 }
 
@@ -478,6 +528,12 @@ function applyAbsoluteFieldToFacility(
   facility: FacilityObject,
   xM: number,
   yM: number,
+  /**
+   * 照分區比例換算出來的外框。
+   *
+   * 給了就整個外框照它寫；沒給（舊資料沒記尺寸）才退回「只搬中心、尺寸不動」。
+   */
+  rect?: { xMinM: number; xMaxM: number; yMinM: number; yMaxM: number } | null,
 ): FacilityObject {
   const rx = round2(xM)
   const ry = round2(yM)
@@ -488,6 +544,17 @@ function applyAbsoluteFieldToFacility(
     }
   }
   if (usesRefFieldBounds(facility.type)) {
+    if (rect) {
+      return {
+        ...facility,
+        parameters: patchRefFieldBounds(facility.parameters, {
+          xMinM: round2(rect.xMinM),
+          xMaxM: round2(rect.xMaxM),
+          yMinM: round2(rect.yMinM),
+          yMaxM: round2(rect.yMaxM),
+        }),
+      }
+    }
     const b = getRefFieldBounds(facility.parameters)
     if (hasValidRefFieldBounds(facility.parameters)) {
       const halfW = ((b.xMaxM ?? 0) - (b.xMinM ?? 0)) / 2
@@ -543,11 +610,16 @@ export function syncZoneChildFieldFromPlacement(
     ...facility,
     parameters: {
       ...(facility.parameters ?? {}),
-      [ZONE_LOCAL_FIELD_KEY]: { u: local.u, v: local.v },
+      [ZONE_LOCAL_FIELD_KEY]: local,
       [PARENT_ZONE_ID_KEY]: parentId,
     },
   }
-  return applyAbsoluteFieldToFacility(withLocal, abs.xM, abs.yM)
+  return applyAbsoluteFieldToFacility(
+    withLocal,
+    abs.xM,
+    abs.yM,
+    zoneLocalRectToAbsolute(local, bounds),
+  )
 }
 
 /**
@@ -568,7 +640,12 @@ export function resyncZoneChildrenFromLocal(
     const local = readZoneLocalField(f.parameters)
     if (!local) return f
     const abs = zoneLocalToAbsolute(local, bounds)
-    return applyAbsoluteFieldToFacility(f, abs.xM, abs.yM)
+    return applyAbsoluteFieldToFacility(
+      f,
+      abs.xM,
+      abs.yM,
+      zoneLocalRectToAbsolute(local, bounds),
+    )
   })
 }
 
@@ -601,14 +678,16 @@ export function ensureZoneChildrenLocalFields(
   return facilities.map((f) => {
     if (!canBelongToParentZone(f)) return f
     if (readParentZoneId(f.parameters) !== zoneId) return f
-    if (readZoneLocalField(f.parameters)) return f
+    // 已經記過、而且連尺寸都記了就不動；只有 u／v 的舊資料要補上尺寸
+    const existing = readZoneLocalField(f.parameters)
+    if (existing && existing.du != null && existing.dv != null) return f
     const local = zoneLocalFromCanvasPlacement(f, zone, areaCtx)
     if (!local) return f
     return {
       ...f,
       parameters: {
         ...(f.parameters ?? {}),
-        [ZONE_LOCAL_FIELD_KEY]: { u: local.u, v: local.v },
+        [ZONE_LOCAL_FIELD_KEY]: local,
         [PARENT_ZONE_ID_KEY]: zoneId,
       },
     }
@@ -653,14 +732,31 @@ export function rematerializeZoneChildrenOntoZoneCanvas(
       ...next,
       parameters: {
         ...(next.parameters ?? {}),
-        [ZONE_LOCAL_FIELD_KEY]: { u: local.u, v: local.v },
+        [ZONE_LOCAL_FIELD_KEY]: local,
         [PARENT_ZONE_ID_KEY]: zoneId,
       },
     }
     next = clampFacilityInsideParentZone(next, areaCtx)
     if (bounds) {
-      const abs = zoneLocalToAbsolute(local, bounds)
-      next = applyAbsoluteFieldToFacility(next, abs.xM, abs.yM)
+      /*
+       * 夾進分區之後外框可能被縮過，所以相對尺寸要照<strong>夾完</strong>的結果重算，
+       * 不能沿用夾之前那一組——不然場域範圍會比圖上畫的還大。
+       */
+      const settled = zoneLocalFromCanvasPlacement(next, zone, {
+        ...areaCtx,
+        facilities: areaCtx.facilities.map((x) => (x.id === next.id ? next : x)),
+      }) ?? local
+      next = {
+        ...next,
+        parameters: { ...(next.parameters ?? {}), [ZONE_LOCAL_FIELD_KEY]: settled },
+      }
+      const abs = zoneLocalToAbsolute(settled, bounds)
+      next = applyAbsoluteFieldToFacility(
+        next,
+        abs.xM,
+        abs.yM,
+        zoneLocalRectToAbsolute(settled, bounds),
+      )
     }
     return next
   })
@@ -779,4 +875,175 @@ export function facilityAbsoluteFieldCenter(
     }
   }
   return null
+}
+
+/**
+ * 載入地圖後：把分區內設施的場域範圍照「圖上外框 × 分區對應」重算一次。
+ *
+ * <h3>為什麼載入時就要做</h3>
+ * 分區的意義是「圖上這一塊＝現場那一塊」，裡面的設施場域範圍是<strong>推導出來的</strong>，
+ * 不是自己帶的。先前只換算中心、尺寸沿用舊值，於是換過圖的檔案裡留著上一版的大小——
+ * 充電格畫成橫的、場域範圍卻是直的，比整個分區還高。那份數字沒有任何跡象說自己過期了，
+ * 車端照它判斷停在哪一格、圖台照它的長邊擺車頭，兩邊都錯。
+ *
+ * 只改記憶體裡的內容，要等使用者存檔才寫回去；差距在 1 公分以內就當作沒變。
+ */
+export function resyncZoneChildBoundsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  changed: string[]
+} {
+  const changed: string[] = []
+  const nextAreas = areas.map((area) => {
+    const zones = area.facilities.filter(
+      (f) => isZonePartition(f) && hasValidRefFieldBounds(f.parameters),
+    )
+    if (zones.length === 0) return area
+
+    const facilities = area.facilities.map((f) => {
+      if (!canBelongToParentZone(f)) return f
+      const parentId = readParentZoneId(f.parameters)
+      if (!parentId) return f
+      const zone = zones.find((z) => z.id === parentId)
+      if (!zone) return f
+      const local = zoneLocalFromCanvasPlacement(f, zone, area)
+      if (!local) return f
+      const bounds = getRefFieldBounds(zone.parameters)
+      const rect = zoneLocalRectToAbsolute(local, bounds)
+      if (!rect) return f
+      const before = getRefFieldBounds(f.parameters)
+      const same =
+        hasValidRefFieldBounds(f.parameters)
+        && Math.abs((before.xMinM ?? 0) - rect.xMinM) < 0.01
+        && Math.abs((before.xMaxM ?? 0) - rect.xMaxM) < 0.01
+        && Math.abs((before.yMinM ?? 0) - rect.yMinM) < 0.01
+        && Math.abs((before.yMaxM ?? 0) - rect.yMaxM) < 0.01
+      const abs = zoneLocalToAbsolute(local, bounds)
+      const next = applyAbsoluteFieldToFacility(
+        {
+          ...f,
+          parameters: {
+            ...(f.parameters ?? {}),
+            [ZONE_LOCAL_FIELD_KEY]: local,
+            [PARENT_ZONE_ID_KEY]: parentId,
+          },
+        },
+        abs.xM,
+        abs.yM,
+        rect,
+      )
+      if (!same) changed.push(f.customName || f.id)
+      return next
+    })
+
+    return { ...area, facilities }
+  })
+
+  return { areas: nextAreas, changed }
+}
+
+/**
+ * 貼上時：分區的「現場身分」也留在本尊身上。
+ *
+ * 一個分區不只是圖上的框，它同時宣告「我就是入口連結上的那一塊現場」。複製貼上把
+ * 整包 parameters 照抄，於是兩個分區指向同一個連結、各自宣稱自己是那塊現場——實測
+ * 這張圖的「整備區」就綁在「調度區」那條連結上，兩區的設施因此落在同一塊 27×68
+ * 公尺的範圍裡互相重疊，圖上完全看不出來。
+ *
+ * 所以貼出來的分區是<strong>沒有綁定</strong>的空框，等使用者自己接到入口連結；
+ * 分區裡的設施則拿掉相對座標與場域範圍，照它貼到的新位置重算。
+ */
+export function facilityCopyWithoutZoneBinding(facility: FacilityObject): FacilityObject {
+  const p = { ...(facility.parameters ?? {}) } as Record<string, unknown>
+
+  if (isZonePartition(facility)) {
+    delete p[ZONE_PARTITION_ENTRANCE_ID_KEY]
+    delete p[ZONE_PARTITION_LINK_ID_KEY]
+    delete p[REF_FIELD_X_MIN_M]
+    delete p[REF_FIELD_X_MAX_M]
+    delete p[REF_FIELD_Y_MIN_M]
+    delete p[REF_FIELD_Y_MAX_M]
+    return { ...facility, parameters: p } as FacilityObject
+  }
+
+  if (isZoneEntrance(facility)) {
+    // 連結裡記著「這個分區是哪一塊」，照抄會讓兩個入口爭同一個分區
+    delete p[ZONE_ENTRANCE_LINKS_KEY]
+    return { ...facility, parameters: p } as FacilityObject
+  }
+
+  if (canBelongToParentZone(facility) && readParentZoneId(p)) {
+    delete p[ZONE_LOCAL_FIELD_KEY]
+    delete p[REF_FIELD_X_MIN_M]
+    delete p[REF_FIELD_X_MAX_M]
+    delete p[REF_FIELD_Y_MIN_M]
+    delete p[REF_FIELD_Y_MAX_M]
+    return { ...facility, parameters: p } as FacilityObject
+  }
+
+  return facility
+}
+
+/**
+ * 載入地圖後：一條入口連結只能有一個分區。
+ *
+ * 兩個分區綁同一條連結時，它們會算出同一塊現場範圍——裡面的設施疊在一起，而且沒有
+ * 任何跡象。留下連結自己指名的那一個（<code>zoneFacilityId</code>），指名的不在就
+ * 留文件順序裡先出現的；其餘解除綁定，等使用者重新接。
+ *
+ * 只改記憶體裡的內容，要等使用者存檔才寫回去。
+ */
+export function dropDuplicateZoneBindingsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  unbound: string[]
+} {
+  const unbound: string[] = []
+  const nextAreas = areas.map((area) => {
+    const entrances = area.facilities.filter(isZoneEntrance)
+    const keep = new Set<string>()
+    const seen = new Map<string, string>()
+
+    for (const zone of area.facilities) {
+      if (!isZonePartition(zone)) continue
+      const binding = readZonePartitionBinding(zone.parameters)
+      if (!binding?.entranceId || !binding.linkId) continue
+      const key = `${binding.entranceId}|${binding.linkId}`
+      const entrance = entrances.find((e) => e.id === binding.entranceId)
+      const link = entrance
+        ? readZoneEntranceLinks(entrance.parameters).find((l) => l.id === binding.linkId)
+        : undefined
+      // 連結指名誰就是誰；沒指名（或指名的不在）才用先來後到
+      if (link?.zoneFacilityId === zone.id) keep.add(zone.id)
+      else if (!seen.has(key)) seen.set(key, zone.id)
+    }
+    for (const [key, id] of seen) {
+      const claimed = area.facilities.some((f) => {
+        if (!isZonePartition(f) || !keep.has(f.id)) return false
+        const b = readZonePartitionBinding(f.parameters)
+        return b != null && `${b.entranceId}|${b.linkId}` === key
+      })
+      if (!claimed) keep.add(id)
+    }
+
+    let touched = false
+    const facilities = area.facilities.map((zone) => {
+      if (!isZonePartition(zone)) return zone
+      const binding = readZonePartitionBinding(zone.parameters)
+      if (!binding?.entranceId || !binding.linkId) return zone
+      if (keep.has(zone.id)) return zone
+      touched = true
+      unbound.push(zone.customName || zone.id)
+      const p = { ...(zone.parameters ?? {}) } as Record<string, unknown>
+      delete p[ZONE_PARTITION_ENTRANCE_ID_KEY]
+      delete p[ZONE_PARTITION_LINK_ID_KEY]
+      delete p[REF_FIELD_X_MIN_M]
+      delete p[REF_FIELD_X_MAX_M]
+      delete p[REF_FIELD_Y_MIN_M]
+      delete p[REF_FIELD_Y_MAX_M]
+      return { ...zone, parameters: p } as FacilityObject
+    })
+
+    return touched ? { ...area, facilities } : area
+  })
+
+  return { areas: nextAreas, unbound }
 }

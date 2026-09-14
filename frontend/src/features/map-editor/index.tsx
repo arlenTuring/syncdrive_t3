@@ -215,6 +215,9 @@ import {
   clampFacilityInsideParentZone,
   createFacilityAreaInsideZone,
   ensureZoneChildrenLocalFields,
+  resyncZoneChildBoundsInAreas,
+  dropDuplicateZoneBindingsInAreas,
+  facilityCopyWithoutZoneBinding,
   isZoneEntrance,
   isZonePartition,
   PARENT_ZONE_ID_KEY,
@@ -981,11 +984,38 @@ export default function MapEditorApp({
           + repaired.cleared.join('、'),
         )
       }
+      /*
+       * 分區內設施的場域範圍是<strong>推導</strong>出來的：圖上外框照分區的對應
+       * 換算成現場公尺。先前只換算中心、尺寸沿用舊值，換過圖的檔案會留著上一版的
+       * 大小（實測充電格畫成橫的、場域範圍卻是直的，比整個分區還高）。載入時重算
+       * 一次，之後車端判斷停在哪一格、圖台擺車頭才有正確的長邊。
+       */
+      /*
+       * 一條入口連結只能有一個分區。兩個分區綁同一條時會算出同一塊現場範圍，
+       * 裡面的設施疊在一起而且沒有任何跡象——實測這張圖的「整備區」綁在「調度區」
+       * 那條連結上。多出來的先解除綁定，等使用者重新接。
+       */
+      const rebound = dropDuplicateZoneBindingsInAreas(repaired.areas)
+      if (rebound.unbound.length > 0) {
+        console.warn(
+          `[map] ${rebound.unbound.length} 個分區與別的分區綁在同一條入口連結上，`
+          + '已解除綁定，請到入口重新接：'
+          + rebound.unbound.join('、'),
+        )
+      }
+      const zoneSynced = resyncZoneChildBoundsInAreas(rebound.areas)
+      if (zoneSynced.changed.length > 0) {
+        console.warn(
+          `[map] ${zoneSynced.changed.length} 個分區內設施的場域範圍與圖上外框對不起來，`
+          + '已照分區對應重算：'
+          + zoneSynced.changed.join('、'),
+        )
+      }
       setAreas(
         ensureAutoRefFieldBoundsInAreas(
           ensureAutoRefFieldPositionsInAreas(
             ensureWaypointCodesInAreas(
-              ensureDockingPointStationIdsInAreas(repaired.areas),
+              ensureDockingPointStationIdsInAreas(zoneSynced.areas),
             ),
             loaded.basemaps ?? [],
           ),
@@ -2886,9 +2916,8 @@ export default function MapEditorApp({
      * 複製出來的是「一樣形狀的方塊」，不是「同一段路」。
      * 生成軌道的現場身分留在本尊身上，見 trackGenIdentity。
      */
-    const freshFacility = facilityCopyWithoutTrackGenIdentity(
-      newFacility,
-      areasRef.current ?? [],
+    const freshFacility = facilityCopyWithoutZoneBinding(
+      facilityCopyWithoutTrackGenIdentity(newFacility, areasRef.current ?? []),
     )
     const typedFacility =
       freshFacility.type === 'Waypoint'
@@ -2911,13 +2940,23 @@ export default function MapEditorApp({
               },
             }
           : freshFacility
-    const pastedFacility = area
+    const placedFacility = area
       ? applyAutoRefFieldBoundsIfUnset(
           applyAutoRefFieldPositionIfUnset(typedFacility, area, basemapsRef.current),
           area,
           basemapsRef.current,
         )
       : typedFacility
+    /*
+     * 貼進分區裡的設施：場域範圍照它<strong>貼到的位置</strong>重算。
+     * 沿用來源那一份等於宣稱自己在現場的同一個地方，兩塊會疊在一起。
+     */
+    const pastedFacility = area
+      ? syncZoneChildFieldFromPlacement(placedFacility, {
+          ...area,
+          facilities: [...area.facilities, placedFacility],
+        })
+      : placedFacility
     mapAreaFacilities(areaId, (facilities) => [...facilities, pastedFacility])
     updateSelection(areaId, [id])
     setNextNumericId((n) => n + 1)
