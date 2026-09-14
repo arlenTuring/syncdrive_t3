@@ -213,3 +213,62 @@ export function pxPerMeterOnFacility(
     acrossPxPerM: (alongIsW ? size.h : size.w) / Math.min(fw, fh),
   };
 }
+
+/**
+ * 這張圖「一公尺畫幾像素」的代表值（沿線、橫向各一個），取所有軌道的中位數。
+ *
+ * 用中位數不用某一塊：終端那塊畫得特別大（6.67 px/m），正線中段只有 1.65，差四倍；
+ * 拿單一塊當基準，整張圖的載具大小會被那一塊綁架。
+ */
+export function medianPxPerMeter(
+  areas: MapAreaObject[],
+): { alongPxPerM: number; acrossPxPerM: number } | null {
+  const along: number[] = [];
+  const across: number[] = [];
+  for (const area of areas) {
+    for (const f of area.facilities) {
+      if (f.type !== 'Track') continue;
+      const s = pxPerMeterOnFacility(f, area);
+      if (!s) continue;
+      if (s.alongPxPerM > 0) along.push(s.alongPxPerM);
+      if (s.acrossPxPerM > 0) across.push(s.acrossPxPerM);
+    }
+  }
+  if (along.length === 0 || across.length === 0) return null;
+  const mid = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+  return { alongPxPerM: mid(along), acrossPxPerM: mid(across) };
+}
+
+/**
+ * 載具在某一塊上該畫多大。
+ *
+ * <h3>為什麼車身長度要跟著比例尺變</h3>
+ * 同樣大的一格，代表的路徑長度可能差好幾倍——那正是示意圖的用意：畫面上一樣的距離，
+ * 在現場可能是 50 公尺也可能是 200 公尺。車的<strong>真實長度是固定的</strong>，所以
+ * 在比例尺大的地方畫得長、小的地方畫得短，看起來就是在那一段走得慢或快，這是對的。
+ *
+ * 車身真實長寬由樣板尺寸除以全圖的代表比例尺反推——使用者在儀表板上調的那個大小，
+ * 就當成「在代表比例尺下該有多大」。
+ */
+export function vehicleDisplaySizeOnFacility(opts: {
+  facility: FacilityObject;
+  area: MapAreaObject;
+  /** 樣板尺寸（像素） */
+  templateWidthPx: number;
+  templateHeightPx: number;
+  /** 全圖代表比例尺 */
+  reference: { alongPxPerM: number; acrossPxPerM: number };
+}): { widthPx: number; heightPx: number } | null {
+  const scale = pxPerMeterOnFacility(opts.facility, opts.area);
+  if (!scale) return null;
+  const lengthM = opts.templateWidthPx / Math.max(1e-6, opts.reference.alongPxPerM);
+  const widthM = opts.templateHeightPx / Math.max(1e-6, opts.reference.acrossPxPerM);
+  const box = resolveFacilityAreaSize(opts.facility, opts.area.domain, opts.area.layout);
+  const longSide = Math.max(box.w, box.h);
+  const shortSide = Math.min(box.w, box.h);
+  return {
+    // 夾住：再怎麼換算也不該長過它所在的那一塊，也不該細到看不見
+    widthPx: Math.min(longSide, Math.max(6, lengthM * scale.alongPxPerM)),
+    heightPx: Math.min(shortSide * 0.9, Math.max(3, widthM * scale.acrossPxPerM)),
+  };
+}

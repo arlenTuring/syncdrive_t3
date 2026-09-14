@@ -11,6 +11,10 @@ import {
   drawnDirectionAtField,
   rotateDegForDrawnDirection,
 } from './resolveVehicleTrackPlacement';
+import {
+  medianPxPerMeter,
+  vehicleDisplaySizeOnFacility,
+} from './resolveMapVehicleTrackSizing';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
@@ -275,6 +279,12 @@ export function MapAreaVehicleOverlay({
 
   const displayW = Math.max(4, vehicleDisplayWidthPx);
   const displayH = Math.max(2, vehicleDisplayHeightPx);
+  /*
+   * 全圖的代表比例尺：載具的真實長寬由樣板尺寸除以它反推，再乘上每一塊自己的比例尺。
+   * 同樣大的一格代表的路徑長度可能差好幾倍，車的真實長度卻是固定的——所以車在比例尺
+   * 大的地方畫得長、小的地方畫得短，看起來就是在那一段走得慢或快。
+   */
+  const referenceScale = medianPxPerMeter(areas);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
@@ -301,8 +311,25 @@ export function MapAreaVehicleOverlay({
               trackNetwork,
             );
 
-        const markerW = vehicleDefinition ? displayW : iconSpec.width;
-        const markerH = vehicleDefinition ? displayH : iconSpec.height;
+        const sizingFacility = placement.placement.trackId
+          ? area.facilities.find((f) => f.id === placement.placement.trackId)
+          : undefined;
+        const scaledSize =
+          vehicleDefinition && sizingFacility && referenceScale
+            ? vehicleDisplaySizeOnFacility({
+                facility: sizingFacility,
+                area,
+                templateWidthPx: displayW,
+                templateHeightPx: displayH,
+                reference: referenceScale,
+              })
+            : null;
+        const markerW = vehicleDefinition
+          ? (scaledSize?.widthPx ?? displayW)
+          : iconSpec.width;
+        const markerH = vehicleDefinition
+          ? (scaledSize?.heightPx ?? displayH)
+          : iconSpec.height;
 
         const headingRad = readVehicleHeadingRad(vehicle.payload);
         const steeringRad = readVehicleSteeringAngleRad(vehicle.payload);

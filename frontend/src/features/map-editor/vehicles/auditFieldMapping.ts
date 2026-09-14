@@ -38,6 +38,10 @@ export type FieldMappingAudit = {
   blocks: Array<{
     code: string;
     id: string;
+    /** 元件種類：Rail／RailCorner／RailTaper／RailSwitch／RailCross */
+    kind: string;
+    /** 路口的元件（斜接、分岔、交叉）多條帶子重疊，取樣點被鄰居接走是正常的 */
+    junction: boolean;
     /** 往返誤差最大值（公尺） */
     worstM: number;
     /** 取樣點被判給別塊的次數 */
@@ -90,6 +94,8 @@ export function auditFieldMapping(
       blocks.push({
         code: f.customName?.trim() || f.id,
         id: f.id,
+        kind: f.name,
+        junction: /Taper|Switch|Cross/.test(f.name),
         worstM: Number(worstM.toFixed(2)),
         wrongBlock,
         samples: SAMPLE_FRACTIONS.length,
