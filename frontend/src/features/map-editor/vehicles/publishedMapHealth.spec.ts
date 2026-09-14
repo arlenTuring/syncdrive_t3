@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { auditMapData, describeMapDataIssues } from '../utils/auditMapData'
 import { parseMapFileJson } from '../utils/mapFileJson'
 import { auditFieldMapping, describeFieldMappingAudit } from './auditFieldMapping'
 
@@ -69,6 +70,23 @@ describe.skipIf(maps.length === 0)('發布出去的圖：車畫得準不準', ()
       it('每一塊都量得出比例尺', () => {
         const missing = audit.blocks.filter((b) => b.alongPxPerM == null)
         expect(missing.map((b) => b.code)).toEqual([])
+      })
+
+      const issues = auditMapData(areas)
+      const of = (kind: 'docking' | 'zone' | 'slot') =>
+        issues.filter((i) => i.kind === kind).map((i) => `${i.target}：${i.detail}`)
+
+      it('停靠點的座標要跟它畫的位置對得上', () => {
+        if (issues.length > 0) console.warn(describeMapDataIssues(issues))
+        expect(of('docking')).toEqual([])
+      })
+
+      it('分區的綁定與範圍要完整', () => {
+        expect(of('zone')).toEqual([])
+      })
+
+      it('格位要在自己的分區裡、長邊對得上、不重疊', () => {
+        expect(of('slot')).toEqual([])
       })
     })
   }

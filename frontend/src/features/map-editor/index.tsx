@@ -130,6 +130,7 @@ import {
   auditFieldMapping,
   describeFieldMappingAudit,
 } from './vehicles/auditFieldMapping'
+import { auditMapData, describeMapDataIssues } from './utils/auditMapData'
 import { getTrackGenPaths } from './utils/trackGenPaths'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
@@ -1076,6 +1077,8 @@ export default function MapEditorApp({
       if (audit.overThreshold.length > 0 || audit.blocks.some((b) => b.wrongBlock > 0)) {
         console.warn(describeFieldMappingAudit(audit))
       }
+      const dataIssues = auditMapData(repositioned.areas)
+      if (dataIssues.length > 0) console.warn(describeMapDataIssues(dataIssues))
       if (repositioned.moved.length > 0) {
         console.warn(
           `[map] ${repositioned.moved.length} 個停靠點／途經點的場域座標與它畫的位置對不上，`
