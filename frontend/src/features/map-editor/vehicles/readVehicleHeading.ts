@@ -52,12 +52,22 @@ function normalizeHeadingRad(headingRad: number): number {
   return h;
 }
 
-/** 順時針方位角（度，東=0、南=90、西=180、北=270） */
+/**
+ * 順時針方位角（度，東=0、南=90、西=180、北=270）。
+ *
+ * <h3>為什麼要反號</h3>
+ * 協議的 <code>local_pose.heading</code> 是車端 ROS2 map frame 的朝向，由四元數
+ * （繞 z 軸）轉出來的——<strong>x 向東、y 向北、逆時針為正</strong>。畫面的方位角
+ * 是順時針的，兩者旋轉方向相反。
+ *
+ * 少了這個負號，橫向剛好看不出來（0 與 180 反號之後還是自己），縱向卻整個顛倒：
+ * 往北開的車被算成朝南，畫出來的車頭朝下。斜接與圓角上則是沿水平軸鏡射。
+ * 實測 heading ＝ +90°（正北）會算出 rotate −90°，車頭指向畫面下方。
+ */
 export function headingRadToClockwiseDeg(headingRad: number): number {
-  let deg = (headingRad * 180) / Math.PI;
-  while (deg < 0) deg += 360;
-  while (deg >= 360) deg -= 360;
-  return deg;
+  // 取餘數再位移，才不會在 heading 為 0 時留下 −0
+  const deg = (-headingRad * 180) / Math.PI;
+  return ((deg % 360) + 360) % 360;
 }
 
 /**
