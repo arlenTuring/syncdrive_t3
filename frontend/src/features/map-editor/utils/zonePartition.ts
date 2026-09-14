@@ -628,6 +628,8 @@ export function syncZoneChildFieldFromPlacement(
 export function resyncZoneChildrenFromLocal(
   facilities: FacilityObject[],
   zoneId: string,
+  /** 有給就可以在舊資料缺尺寸時回圖上量一次 */
+  area?: MapAreaObject,
 ): FacilityObject[] {
   const zone = facilities.find((f) => f.id === zoneId)
   if (!zone || !isZonePartition(zone) || !hasValidRefFieldBounds(zone.parameters)) {
@@ -637,11 +639,25 @@ export function resyncZoneChildrenFromLocal(
   return facilities.map((f) => {
     if (!canBelongToParentZone(f)) return f
     if (readParentZoneId(f.parameters) !== zoneId) return f
-    const local = readZoneLocalField(f.parameters)
+    /*
+     * 舊資料只記了中心、沒記外框尺寸。
+     *
+     * 這種時候要回圖上量一次，不能只搬中心——只搬中心就會留著上一版的大小，而這一步
+     * 正是「分區範圍換了」才跑的，大小沿用舊的等於沒換。實測整備區改接之後，D1–D5
+     * 的中心跟著移動了，尺寸卻還是 9.54×23.84（圖上量出來是 5.33×11.84）。
+     */
+    const stored = readZoneLocalField(f.parameters)
+    const local =
+      stored && stored.du != null && stored.dv != null
+        ? stored
+        : (area ? zoneLocalFromCanvasPlacement(f, zone, area) : null) ?? stored
     if (!local) return f
     const abs = zoneLocalToAbsolute(local, bounds)
     return applyAbsoluteFieldToFacility(
-      f,
+      {
+        ...f,
+        parameters: { ...(f.parameters ?? {}), [ZONE_LOCAL_FIELD_KEY]: local },
+      },
       abs.xM,
       abs.yM,
       zoneLocalRectToAbsolute(local, bounds),
@@ -767,6 +783,8 @@ export function applyEntranceLinksToAreaFacilities(
   facilities: FacilityObject[],
   entranceId: string,
   links: ZoneEntranceLink[],
+  /** 有給就可以在舊資料缺尺寸時回圖上量一次，見 resyncZoneChildrenFromLocal */
+  area?: MapAreaObject,
 ): FacilityObject[] {
   const entrance = facilities.find((f) => f.id === entranceId)
   if (!entrance || !isZoneEntrance(entrance)) return facilities
@@ -798,7 +816,11 @@ export function applyEntranceLinksToAreaFacilities(
   })
   for (const link of links) {
     if (!link.zoneFacilityId) continue
-    next = resyncZoneChildrenFromLocal(next, link.zoneFacilityId)
+    next = resyncZoneChildrenFromLocal(
+      next,
+      link.zoneFacilityId,
+      area ? { ...area, facilities: next } : undefined,
+    )
   }
   return next
 }

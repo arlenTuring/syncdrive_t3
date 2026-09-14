@@ -3225,6 +3225,7 @@ export default function MapEditorApp({
             facilities,
             facilityId,
             links,
+            areasRef.current.find((a) => a.id === areaId),
           )
         }
 
@@ -3332,7 +3333,12 @@ export default function MapEditorApp({
       if (!areaId || !facilityId) return
       pushHistory()
       mapAreaFacilities(areaId, (facilities) =>
-        applyEntranceLinksToAreaFacilities(facilities, facilityId, links),
+        applyEntranceLinksToAreaFacilities(
+          facilities,
+          facilityId,
+          links,
+          areasRef.current.find((a) => a.id === areaId),
+        ),
       )
     },
     [pushHistory, mapAreaFacilities],

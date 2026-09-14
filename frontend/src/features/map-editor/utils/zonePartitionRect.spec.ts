@@ -11,6 +11,7 @@ import {
   availableZonePartitionsForEntrance,
   readZoneEntranceLinks,
   resyncZoneChildBoundsInAreas,
+  resyncZoneChildrenFromLocal,
   syncZoneChildFieldFromPlacement,
   zoneLocalRectToAbsolute,
 } from './zonePartition'
@@ -189,5 +190,29 @@ describe('連結的圖元不見了', () => {
     // 整備區那一條的範圍，不是調度區的
     expect(q.refFieldYMinM).toBe(-380)
     expect(q.refFieldYMaxM).toBe(-330)
+  })
+})
+
+describe('分區範圍換掉之後', () => {
+  it('舊資料只記了中心時，尺寸回圖上量一次，不沿用舊值', () => {
+    const area = makeArea()
+    const z = zone()
+    // 只有 u／v 的舊資料，身上還帶著上一版的大小
+    const child = slot({
+      [ZONE_LOCAL_FIELD_KEY]: { u: 0.5, v: 0.5 },
+      refFieldXMinM: -5, refFieldXMaxM: 5, refFieldYMinM: -12, refFieldYMaxM: 12,
+    })
+    area.facilities = [z, child]
+
+    // 沒給 area：只能搬中心，尺寸留著舊的
+    const without = resyncZoneChildrenFromLocal(area.facilities, 'zone-1')[1]
+    const a = without.parameters as Record<string, number>
+    expect(a.refFieldYMaxM - a.refFieldYMinM).toBeCloseTo(24, 1)
+
+    // 給了 area：回圖上量，外框跟著圖上的 80×20 像素走
+    const withArea = resyncZoneChildrenFromLocal(area.facilities, 'zone-1', area)[1]
+    const b = withArea.parameters as Record<string, number>
+    expect(b.refFieldXMaxM - b.refFieldXMinM).toBeCloseTo(16, 1)
+    expect(b.refFieldYMaxM - b.refFieldYMinM).toBeCloseTo(1, 1)
   })
 })
