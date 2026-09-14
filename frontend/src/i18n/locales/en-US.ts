@@ -1782,6 +1782,8 @@ const enUS: DeepStringify<typeof zhTW> = {
         createZone: 'Create zone graphic',
         linkExisting: 'Link zone on map',
         pickZone: 'Select a zone to link…',
+        rebind: 'Re-link to a zone on canvas',
+        rebindHint: "This link's zone graphic is gone. Pick a zone on the canvas to re-link; the name and field range stay as they are.",
         noAvailable:
           'No zones available (place a Zone from the palette, or all are already linked)',
       },

@@ -43,6 +43,19 @@ export function ZoneEntranceInspectorSection({
     onCommitLinks(links.filter((l) => l.id !== id))
   }
 
+  /**
+   * 把<strong>這一條</strong>連結改接到場上某個分區。
+   *
+   * 名稱與場域範圍不動——那是使用者填的現場資料，只有「對應到哪個圖元」壞掉了。
+   */
+  const rebindLink = (linkId: string, zoneId: string) => {
+    if (!available.some((z) => z.id === zoneId)) return
+    if (links.some((l) => l.zoneFacilityId === zoneId)) return
+    onCommitLinks(
+      links.map((l) => (l.id === linkId ? { ...l, zoneFacilityId: zoneId } : l)),
+    )
+  }
+
   const linkZone = (zoneId: string) => {
     const zone = areaFacilities.find((f) => f.id === zoneId)
     if (!zone) return
@@ -104,6 +117,46 @@ export function ZoneEntranceInspectorSection({
                         })
                       : t('mapEditor.inspector.zoneEntrance.unbound')}
                 </p>
+                {/*
+                  這一條還沒接上、或接的圖元不在了：就地改接。
+                  底下那個「連結場上分區」是<strong>新增</strong>一條連結，修不了
+                  已經存在的這一條——只會多出一條同名的，舊的那條照樣壞著。
+                */}
+                {!readOnly && !bound ? (
+                  available.length === 0 ? (
+                    <p className="text-[10px] text-amber-300/80">
+                      {t('mapEditor.inspector.zoneEntrance.noAvailable')}
+                    </p>
+                  ) : (
+                    <label className="block text-[10px] text-amber-300/80">
+                      {t('mapEditor.inspector.zoneEntrance.rebind')}
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const zoneId = e.target.value.trim()
+                          e.target.value = ''
+                          if (!zoneId) return
+                          rebindLink(link.id, zoneId)
+                        }}
+                        onFocus={onFieldFocus}
+                        onBlur={onFieldBlur}
+                        className="mt-0.5 w-full rounded border border-amber-700/70 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-cyan-500"
+                      >
+                        <option value="">
+                          {t('mapEditor.inspector.zoneEntrance.pickZone')}
+                        </option>
+                        {available.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            {zoneDisplayLabel(z)}（{z.id}）
+                          </option>
+                        ))}
+                      </select>
+                      <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-600">
+                        {t('mapEditor.inspector.zoneEntrance.rebindHint')}
+                      </span>
+                    </label>
+                  )
+                ) : null}
                 <label className="block text-[10px] text-zinc-500">
                   {t('mapEditor.inspector.zoneEntrance.zoneName')}
                   <input

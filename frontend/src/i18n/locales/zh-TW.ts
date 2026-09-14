@@ -1768,6 +1768,8 @@ const zhTW = {
         createZone: '建立分區圖元',
         linkExisting: '連結場上分區',
         pickZone: '選擇要連結的分區…',
+        rebind: '改接場上分區',
+        rebindHint: '這一條的分區圖元不在了；選一個場上的分區接回來，名稱與場域範圍維持不變。',
         noAvailable: '沒有可連結的分區（請先從元件庫放置分區，或已全部連結）',
       },
       zonePartition: {

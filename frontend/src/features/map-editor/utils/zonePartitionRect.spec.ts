@@ -4,7 +4,12 @@ import { createBlankArea, DEFAULT_MAP_PIXEL_SIZE } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import {
   PARENT_ZONE_ID_KEY,
+  ZONE_ENTRANCE_LINKS_KEY,
   ZONE_LOCAL_FIELD_KEY,
+  ZONE_PARTITION_LINK_ID_KEY,
+  applyEntranceLinksToAreaFacilities,
+  availableZonePartitionsForEntrance,
+  readZoneEntranceLinks,
   resyncZoneChildBoundsInAreas,
   syncZoneChildFieldFromPlacement,
   zoneLocalRectToAbsolute,
@@ -119,5 +124,70 @@ describe('載入時重算', () => {
       slot({ refFieldXMinM: -68, refFieldXMaxM: -52, refFieldYMinM: -25.5, refFieldYMaxM: -24.5 }),
     ]
     expect(resyncZoneChildBoundsInAreas([area]).changed).toEqual([])
+  })
+})
+
+describe('連結的圖元不見了', () => {
+  /** 入口有兩條連結：一條接得好好的，一條指向已經被刪掉的圖元 */
+  function entranceWithBrokenLink(): FacilityObject {
+    return {
+      id: 'entrance-1',
+      type: 'Facility',
+      name: 'ZoneEntrance',
+      customName: '整備調度區',
+      position: { x: 0, y: 0 },
+      rotation: 0,
+      currentState: 'Normal',
+      areaPosition: { x: 0, y: 0 },
+      areaSizePx: { w: 50, h: 50 },
+      parameters: {
+        [ZONE_ENTRANCE_LINKS_KEY]: [
+          { id: 'link-ok', name: '調度區', xMinM: -900, xMaxM: -873, yMinM: -330, yMaxM: -262, zoneFacilityId: 'zone-ok' },
+          // 指向的圖元已經不在了
+          { id: 'link-broken', name: '整備區', xMinM: -900, xMaxM: -873, yMinM: -380, yMaxM: -330, zoneFacilityId: 'deleted-127' },
+        ],
+      },
+    } as FacilityObject
+  }
+
+  function partition(id: string, name: string, parameters: Record<string, unknown> = {}): FacilityObject {
+    return {
+      id,
+      type: 'Facility',
+      name: 'ZonePartition',
+      customName: name,
+      position: { x: 0, y: 0 },
+      rotation: 0,
+      currentState: 'Normal',
+      areaPosition: { x: 0, y: 0 },
+      areaSizePx: { w: 100, h: 100 },
+      parameters,
+    } as FacilityObject
+  }
+
+  it('場上沒被任何連結指名的分區，可以拿來改接', () => {
+    const facilities = [
+      entranceWithBrokenLink(),
+      partition('zone-ok', '調度區'),
+      partition('zone-129', '整備區'),
+    ]
+    expect(availableZonePartitionsForEntrance(facilities).map((z) => z.id)).toEqual([
+      'zone-129',
+    ])
+  })
+
+  it('改接之後，分區拿到的是這一條連結的場域範圍', () => {
+    const entrance = entranceWithBrokenLink()
+    const facilities = [entrance, partition('zone-ok', '調度區'), partition('zone-129', '整備區')]
+    const links = readZoneEntranceLinks(entrance.parameters).map((l) =>
+      l.id === 'link-broken' ? { ...l, zoneFacilityId: 'zone-129' } : l,
+    )
+    const next = applyEntranceLinksToAreaFacilities(facilities, 'entrance-1', links)
+    const zone = next.find((f) => f.id === 'zone-129')!
+    const q = zone.parameters as Record<string, unknown>
+    expect(q[ZONE_PARTITION_LINK_ID_KEY]).toBe('link-broken')
+    // 整備區那一條的範圍，不是調度區的
+    expect(q.refFieldYMinM).toBe(-380)
+    expect(q.refFieldYMaxM).toBe(-330)
   })
 })
