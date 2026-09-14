@@ -45,7 +45,8 @@ function roundFieldMeters(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-function usesCornerFieldRange(facility: FacilityObject): boolean {
+/** 斜接的場域範圍是四個角，不是左右上下四個數 */
+export function usesCornerFieldRange(facility: FacilityObject): boolean {
   return facility.type === 'Track' && facility.name === 'RailTaper'
 }
 

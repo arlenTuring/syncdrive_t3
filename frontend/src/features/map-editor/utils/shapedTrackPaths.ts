@@ -5,12 +5,18 @@ import {
   patchRefFieldBounds,
 } from './facilityRefFieldBounds'
 import {
+  REF_FIELD_CORNERS_M,
+  serializeRefFieldCorners,
+  type RefFieldCornerMeters,
+} from './facilityRefFieldCorners'
+import {
   getTrackGenPaths,
   pointAlongPath,
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_REAL_PATH_KEY,
 } from './trackGenPaths'
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import { usesCornerFieldRange } from './facilityRefFieldBoundsAuto'
 import {
   readSwitchTrack,
   readTaperTrack,
@@ -43,6 +49,56 @@ import {
 
 /** 端面與隔壁方塊端點視為同一點的圖面距離（區域像素） */
 const JOIN_NEAR_PX = 40
+
+/**
+ * 這張圖的軌道有多寬（公尺）。
+ *
+ * 斜接的場域範圍是<strong>四個角</strong>，不是兩端點，所以推完中心線還要往兩側撐開。
+ * 寬度不能用圖面像素換算——示意圖沿線與橫向的比例尺是兩回事，照沿線的比例尺撐開，
+ * 在被壓扁的那幾段會撐出三十幾公尺寬的軌道。
+ *
+ * 改成回頭問這張圖自己：取直軌道場域範圍的短邊中位數，那就是這條路的軌道寬。
+ */
+function laneWidthMOf(area: MapAreaObject): number {
+  const widths: number[] = []
+  for (const f of area.facilities) {
+    if (f.type !== 'Track' || f.name !== 'Rail') continue
+    const p = f.parameters as Record<string, number> | undefined
+    if (!p) continue
+    const w = Math.abs((p.refFieldXMaxM ?? 0) - (p.refFieldXMinM ?? 0))
+    const h = Math.abs((p.refFieldYMaxM ?? 0) - (p.refFieldYMinM ?? 0))
+    const short = Math.min(w, h)
+    if (short > 0.5 && short < 20) widths.push(short)
+  }
+  if (widths.length === 0) return 3.5
+  widths.sort((a, b) => a - b)
+  return widths[Math.floor(widths.length / 2)]!
+}
+
+/**
+ * 中心線兩端 ± 半個軌道寬 → 梯形四角。
+ * 順序照屬性框：A 端起 → A 端迄 → B 端迄 → B 端起。
+ */
+function cornersFromCentreline(
+  real: Array<[number, number]>,
+  widthM: number,
+): RefFieldCornerMeters[] {
+  const a = real[0]!
+  const b = real[real.length - 1]!
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const len = Math.hypot(dx, dy)
+  if (!(len > 1e-6)) return []
+  const nx = (-dy / len) * (widthM / 2)
+  const ny = (dx / len) * (widthM / 2)
+  const round = (n: number) => Number(n.toFixed(2))
+  return [
+    { xM: round(a[0] + nx), yM: round(a[1] + ny) },
+    { xM: round(a[0] - nx), yM: round(a[1] - ny) },
+    { xM: round(b[0] - nx), yM: round(b[1] - ny) },
+    { xM: round(b[0] + nx), yM: round(b[1] + ny) },
+  ]
+}
 
 type Anchor = { px: number; py: number; xM: number; yM: number }
 
@@ -142,6 +198,7 @@ export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
   const nextAreas = areas.map((area) => {
     const anchors = collectAnchors(area)
     if (anchors.length === 0) return area
+    const laneWidthM = laneWidthMOf(area)
 
     let touched = false
     const facilities = area.facilities.map((f) => {
@@ -182,23 +239,38 @@ export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
 
       touched = true
       derived.push(label)
-      const xs = real.map((r) => r[0])
-      const ys = real.map((r) => r[1])
+      let parameters: Record<string, unknown> = {
+        ...(f.parameters ?? {}),
+        [TRACKGEN_REAL_PATH_KEY]: real,
+        [TRACKGEN_LOCAL_PATH_KEY]: local,
+      }
+      /*
+       * 斜接的場域範圍是四個角，屬性框顯示的、下游用的都是它。只寫左右上下四個數
+       * 的話，舊的四個角會原封不動留著——畫面上看起來完全沒變，實際上還是指著別的
+       * 地方。推完中心線就把角一起重算。
+       */
+      const corners = usesCornerFieldRange(f)
+        ? cornersFromCentreline(real, laneWidthM)
+        : []
+      if (corners.length === 4) {
+        parameters = {
+          ...parameters,
+          [REF_FIELD_CORNERS_M]: serializeRefFieldCorners(corners),
+        }
+      }
+      const pts = corners.length === 4
+        ? corners.map((c) => [c.xM, c.yM] as [number, number])
+        : real
+      const xs = pts.map((r) => r[0])
+      const ys = pts.map((r) => r[1])
       return {
         ...f,
-        parameters: patchRefFieldBounds(
-          {
-            ...(f.parameters ?? {}),
-            [TRACKGEN_REAL_PATH_KEY]: real,
-            [TRACKGEN_LOCAL_PATH_KEY]: local,
-          },
-          {
-            xMinM: Number(Math.min(...xs).toFixed(2)),
-            xMaxM: Number(Math.max(...xs).toFixed(2)),
-            yMinM: Number(Math.min(...ys).toFixed(2)),
-            yMaxM: Number(Math.max(...ys).toFixed(2)),
-          },
-        ),
+        parameters: patchRefFieldBounds(parameters, {
+          xMinM: Number(Math.min(...xs).toFixed(2)),
+          xMaxM: Number(Math.max(...xs).toFixed(2)),
+          yMinM: Number(Math.min(...ys).toFixed(2)),
+          yMaxM: Number(Math.max(...ys).toFixed(2)),
+        }),
       } as FacilityObject
     })
 
