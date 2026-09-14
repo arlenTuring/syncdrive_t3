@@ -126,6 +126,10 @@ import {
   backfillTrackGenLatPerBoxInAreas,
   deriveShapedTrackPathsInAreas,
 } from './utils/shapedTrackPaths'
+import {
+  auditFieldMapping,
+  describeFieldMappingAudit,
+} from './vehicles/auditFieldMapping'
 import { getTrackGenPaths } from './utils/trackGenPaths'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
@@ -1064,6 +1068,14 @@ export default function MapEditorApp({
         ),
         loaded.basemaps ?? [],
       )
+      /*
+       * 健檢：沿每一塊的中心線取樣，走完定位那條路再換回現場，看回不回得到原地。
+       * 不必看畫面、也不必知道正確答案——比對的是系統自己的兩個方向。
+       */
+      const audit = auditFieldMapping(repositioned.areas)
+      if (audit.overThreshold.length > 0 || audit.blocks.some((b) => b.wrongBlock > 0)) {
+        console.warn(describeFieldMappingAudit(audit))
+      }
       if (repositioned.moved.length > 0) {
         console.warn(
           `[map] ${repositioned.moved.length} 個停靠點／途經點的場域座標與它畫的位置對不上，`

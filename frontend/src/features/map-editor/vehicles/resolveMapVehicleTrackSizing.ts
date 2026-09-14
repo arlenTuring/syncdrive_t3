@@ -9,6 +9,7 @@ import {
   resolveFacilityAreaSize,
 } from '../utils/facilityAreaCoords';
 import type { AreaVehicleLive } from './types';
+import { getTrackGenPaths } from '../utils/trackGenPaths';
 
 /** 依軌道元件尺寸計算載具在地圖上的顯示寬高（px） */
 export interface MapVehicleTrackSizing {
@@ -152,4 +153,63 @@ export function pickPreviewArea(areas: MapAreaObject[]): MapAreaObject | null {
     }
   }
   return best ?? areas[0] ?? null;
+}
+
+/**
+ * 這一塊「一公尺畫幾像素」——沿線與橫向各一個。
+ *
+ * <h3>為什麼要分兩軸</h3>
+ * 示意圖不是等比例縮放：同一張圖上，正線一公尺約 0.29 像素，調度區沿 x 是 5.89、
+ * 沿 y 是 2.21——同一區的兩軸就差 2.7 倍。載具用同一個像素尺寸走遍全圖，在正線剛好，
+ * 到場區就塞不進格位（實測 60 像素的車身擺進 37×63 的格位，整台凸出去還疊到隔壁）。
+ *
+ * 生成的軌道兩條中心線都在身上，長度比一除就是沿線的比例尺；橫向拿外框的短邊對
+ * 參照場域範圍的短邊。場區格位沒有中心線，直接拿外框對場域範圍。
+ */
+export function pxPerMeterOnFacility(
+  facility: FacilityObject,
+  area: MapAreaObject,
+): { alongPxPerM: number; acrossPxPerM: number } | null {
+  const size = resolveFacilityAreaSize(facility, area.domain, area.layout);
+  if (!(size.w > 0) || !(size.h > 0)) return null;
+
+  const paths = getTrackGenPaths(facility.parameters);
+  if (paths) {
+    const pathLen = (pts: ReadonlyArray<readonly [number, number]>) => {
+      let total = 0;
+      for (let i = 1; i < pts.length; i += 1) {
+        total += Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]);
+      }
+      return total;
+    };
+    const realM = pathLen(paths.real);
+    if (!(realM > 0.01)) return null;
+    // 圖面路徑是 0–1 的比例，乘外框才是像素
+    const drawnPx = pathLen(
+      paths.local.map(([u, v]) => [u * size.w, v * size.h] as const),
+    );
+    if (!(drawnPx > 0.01)) return null;
+    const along = drawnPx / realM;
+    // 橫向：外框短邊對場域短邊
+    const p = facility.parameters as Record<string, number> | undefined;
+    const fw = Math.abs((p?.refFieldXMaxM ?? 0) - (p?.refFieldXMinM ?? 0));
+    const fh = Math.abs((p?.refFieldYMaxM ?? 0) - (p?.refFieldYMinM ?? 0));
+    const acrossM = Math.min(fw, fh);
+    const acrossPx = Math.min(size.w, size.h);
+    return {
+      alongPxPerM: along,
+      acrossPxPerM: acrossM > 0.01 ? acrossPx / acrossM : along,
+    };
+  }
+
+  const p = facility.parameters as Record<string, number> | undefined;
+  const fw = Math.abs((p?.refFieldXMaxM ?? 0) - (p?.refFieldXMinM ?? 0));
+  const fh = Math.abs((p?.refFieldYMaxM ?? 0) - (p?.refFieldYMinM ?? 0));
+  if (!(fw > 0.01) || !(fh > 0.01)) return null;
+  // 沒有中心線：長邊當沿線
+  const alongIsW = fw >= fh;
+  return {
+    alongPxPerM: (alongIsW ? size.w : size.h) / Math.max(fw, fh),
+    acrossPxPerM: (alongIsW ? size.h : size.w) / Math.min(fw, fh),
+  };
 }
