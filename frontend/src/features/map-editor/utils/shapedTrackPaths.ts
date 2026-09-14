@@ -109,6 +109,19 @@ function facesOf(
     const handles = taperTrackHandlesPx(g, size.w, size.h)
     return [handles.a, handles.b]
   }
+  /*
+   * 一般軌道與圓角：端面就是外框長邊的兩端。
+   *
+   * 拖過來放下的那一塊還沒有中心線，只有一個框；它要接的是框的兩頭，所以就拿兩頭去
+   * 問隔壁。圓角的兩頭在相鄰的兩條邊上，用外框兩端當近似——找隔壁只需要「大概在哪個
+   * 角」，差幾像素不影響挑到誰。
+   */
+  if (facility.type === 'Track') {
+    const horizontal = size.w >= size.h
+    return horizontal
+      ? [{ x: 0, y: size.h / 2 }, { x: size.w, y: size.h / 2 }]
+      : [{ x: size.w / 2, y: size.h }, { x: size.w / 2, y: 0 }]
+  }
   return null
 }
 

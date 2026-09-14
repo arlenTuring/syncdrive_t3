@@ -187,6 +187,32 @@ export function areaHasTrackGenTracks(area: MapAreaObject): boolean {
 const MAX_OFF_TRACK_M = 25
 
 /**
+ * 這個點離一塊軌道<strong>畫出來的框</strong>多遠（區域像素）；在框內就是 0。
+ *
+ * 挑「由誰解釋這個點」時要比這個，不能比公尺——見 fieldMetersAtAreaLocal。
+ */
+function footprintDistancePx(
+  f: FacilityObject,
+  area: MapAreaObject,
+  xPx: number,
+  yPx: number,
+): number {
+  const pos = resolveFacilityAreaPosition(f, area.domain, area.layout)
+  const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+  const dx = Math.max(pos.x - xPx, 0, xPx - (pos.x + size.w))
+  const dy = Math.max(pos.y - yPx, 0, yPx - (pos.y + size.h))
+  return Math.hypot(dx, dy)
+}
+
+/**
+ * 還算「就在旁邊」的圖面距離（區域像素）。
+ *
+ * 一塊軌道畫出來大約 50–170 像素寬，取 40 大致是「貼著或差一點點」。再遠就不是鄰居，
+ * 不該由它來解釋這個點。
+ */
+const NEAR_FOOTPRINT_PX = 40
+
+/**
  * 區域座標（Area 內、左下原點、y 向上）→ 現場真實座標。
  *
  * 先問生成的軌道；都構不上時照容器的網域換算。
@@ -216,18 +242,42 @@ export function fieldMetersAtAreaLocal(
    * 試過再加一項「跑出框外多遠」把遠處的候選推開，量出來一個數字都沒變——贏的本來
    * 就是那一塊，錯不在挑塊。所以維持只比偏移量。
    */
+  /*
+   * 挑<strong>圖面上就在旁邊</strong>的那一塊，不是「偏移公尺數最小」的那一塊。
+   *
+   * 示意圖各段的比例尺差很多：正線那一段 57 像素畫 9.7 公尺（0.17 公尺/像素），
+   * T3 支線 53 像素畫 66 公尺（1.25 公尺/像素），差七倍。照公尺比的話，一塊在畫面上
+   * 隔了兩千多像素、但被壓得很扁的正線方塊，算出來的偏移量反而比正下方那塊 T3 支線
+   * 還小，就把點搶走了——實測新放在 T3 轉角的一塊斜接，四個角有兩個被判給正線，
+   * 場域座標因此差了 180 公尺。
+   *
+   * 拖曳的人看到的是圖面上的相鄰關係，那也正是唯一可靠的依據：貼著誰，就由誰解釋。
+   * 公尺只留著在同樣貼著的幾塊之間分高下（上下行疊在一起時就靠它）。
+   */
   let best: FieldPoint | null = null
-  /** 全都超出上限時的退路：離得最近的那一塊 */
+  let bestPx = Infinity
+  let bestOff = Infinity
+  /** 全都構不上時的退路：圖面上離得最近的那一塊 */
   let fallback: FieldPoint | null = null
-  const better = (a: FieldPoint, b: FieldPoint | null) =>
-    !b || Math.abs(a.offsetM ?? Infinity) < Math.abs(b.offsetM ?? Infinity)
+  let fallbackPx = Infinity
   for (const f of area.facilities) {
     if (f.type !== 'Track') continue
     const got = fieldFromTrack(f, area, xPx, yPx)
     if (!got) continue
-    if (better(got, fallback)) fallback = got
+    const px = footprintDistancePx(f, area, xPx, yPx)
+    if (px < fallbackPx) {
+      fallback = got
+      fallbackPx = px
+    }
+    if (px > NEAR_FOOTPRINT_PX) continue
     if (Math.abs(got.offsetM ?? 0) > MAX_OFF_TRACK_M) continue
-    if (better(got, best)) best = got
+    const off = Math.abs(got.offsetM ?? Infinity)
+    // 先比圖面距離；一樣近（例如上下行疊著）才比偏移量
+    if (px < bestPx - 0.5 || (Math.abs(px - bestPx) <= 0.5 && off < bestOff)) {
+      best = got
+      bestPx = px
+      bestOff = off
+    }
   }
   if (best) return best
   /*

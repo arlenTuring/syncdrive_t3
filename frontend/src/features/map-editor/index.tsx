@@ -122,6 +122,7 @@ import {
   facilityCopyWithoutTrackGenIdentity,
 } from './utils/trackGenIdentity'
 import { deriveShapedTrackPathsInAreas } from './utils/shapedTrackPaths'
+import { getTrackGenPaths } from './utils/trackGenPaths'
 import { cycleMapRulerDisplayMode } from './utils/mapRulerDisplay'
 import { ensureWaypointCodesInAreas, generateNextWaypointCode, ensureWaypointCode } from './utils/waypointCode'
 import { getDockingPointStationId } from './utils/dockingPointFacility'
@@ -2107,6 +2108,33 @@ export default function MapEditorApp({
       selectedArea,
       basemaps,
     )
+    /*
+     * 軌道：場域座標照<strong>它接到誰</strong>來定，不是照圖台映射猜。
+     *
+     * 圖台映射是拿「這個像素落在哪一塊的範圍內」反推的，但示意圖各段的比例尺差很多
+     * （正線 0.17 公尺/像素、T3 支線 1.25 公尺/像素，差七倍），畫面上隔很遠、被壓得
+     * 很扁的那一塊算出來的偏移量反而比正下方那塊小——新放在 T3 轉角的一塊斜接因此
+     * 有兩個角被判給正線，座標差了 180 公尺。
+     *
+     * 軌道是接起來的，端面的意義就是「這裡接上隔壁」，所以答案在隔壁的 .xodr 中心線
+     * 端點上。推得出來就用推的，推不出來（兩端都沒有相接的方塊）才留給圖台映射。
+     */
+    if (seeded.type === 'Track' && !getTrackGenPaths(seeded.parameters)) {
+      const probeArea = {
+        ...selectedArea,
+        facilities: selectedArea.facilities.map((f) =>
+          (f.id === seeded.id ? seeded : f),
+        ),
+      }
+      const linked = deriveShapedTrackPathsInAreas([probeArea])
+      const got = linked.areas[0]?.facilities.find((f) => f.id === seeded.id)
+      if (got && getTrackGenPaths(got.parameters)) {
+        mapAreaFacilities(selectedArea.id, (facilities) =>
+          facilities.map((f) => (f.id === got.id ? got : f)),
+        )
+        return
+      }
+    }
     if (seeded === selectedFacility) return
     mapAreaFacilities(selectedArea.id, (facilities) =>
       facilities.map((f) => (f.id === seeded.id ? seeded : f)),
