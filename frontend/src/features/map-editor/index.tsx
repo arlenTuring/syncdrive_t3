@@ -122,6 +122,8 @@ import {
   dropSharedTrackGenIdentityInAreas,
   facilityCopyWithoutTrackGenIdentity,
 } from './utils/trackGenIdentity'
+import { repairTrackRefFieldBoundsInAreas } from './utils/trackRefFieldBoundsRepair'
+import { backfillTrackGenSpansInAreas } from './utils/trackGenSpanBackfill'
 import {
   backfillTrackGenLatPerBoxInAreas,
   deriveShapedTrackPathsInAreas,
@@ -1034,7 +1036,47 @@ export default function MapEditorApp({
           + shaped.skipped.join('、'),
         )
       }
-      const rebound = dropDuplicateZoneBindingsInAreas(shaped.areas)
+      /*
+       * 有中心線卻沒有里程對應的方塊，照鄰居把里程接回來。
+       *
+       * 定位主索引開頭就是 if (!spans.length) continue——沒有里程的方塊根本不會
+       * 成為候選。它照樣畫在圖上，只是永遠不會被選中，落在它上面的點被判給附近
+       * 別的方塊。實測 D18 自己中心線上的九個點，七個被判給對向的 U18／U19。
+       */
+      const spanned = backfillTrackGenSpansInAreas(shaped.areas)
+      if (spanned.filled.length > 0) {
+        console.warn(
+          `[map] ${spanned.filled.length} 塊軌道有中心線卻沒有里程對應（不會進定位索引，`
+          + '上面的點會被判給隔壁），已照兩端鄰居接回來：'
+          + spanned.filled
+            .map((f) => `${f.name} road ${f.road} lane ${f.lane} s ${f.s0}→${f.s1}`)
+            .join('、'),
+        )
+      }
+      if (spanned.skipped.length > 0) {
+        console.warn(
+          `[map] ${spanned.skipped.length} 塊軌道沒有里程對應，而且兩端鄰居對不起來（接的不是同一條車道），`
+          + '無法補上：'
+          + spanned.skipped.join('、'),
+        )
+      }
+      /*
+       * 場域範圍對不上自己的真實路徑時，照路徑重算。
+       *
+       * 方框本來就是從路徑算出來的，但算完就存下來；路徑後來被重新生成、方塊被
+       * 重畫，方框沒跟著重算就分家了。分家不報錯，因為每一塊自己的換算仍然自洽，
+       * 壞的是別人——方框太大的那一塊會把鄰居範圍內的點吸過去。
+       */
+      const bounded = repairTrackRefFieldBoundsInAreas(spanned.areas)
+      if (bounded.repaired.length > 0) {
+        console.warn(
+          `[map] ${bounded.repaired.length} 塊軌道的場域範圍與自己的中心線對不上，已照中心線重算：`
+          + bounded.repaired
+            .map((r) => `${r.name} 差 ${r.worstM} m（${r.fromM} → ${r.toM}）`)
+            .join('；'),
+        )
+      }
+      const rebound = dropDuplicateZoneBindingsInAreas(bounded.areas)
       if (rebound.unbound.length > 0) {
         console.warn(
           `[map] ${rebound.unbound.length} 個分區與別的分區綁在同一條入口連結上，`

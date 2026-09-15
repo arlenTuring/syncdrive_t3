@@ -68,12 +68,12 @@ export type ApplyResult = {
 }
 
 /** 場域範圍要往兩側撐半個車道，範圍才蓋得住整條軌道帶 */
-const LANE_HALF_W_M = 1.675
+export const LANE_HALF_W_M = 1.675
 
 /**
  * 這一段軌道在真實場域裡蓋到的範圍，直接寫進「場域範圍」。
  */
-function realBounds(path: Vec2[]) {
+export function realBounds(path: Vec2[]) {
   let xMin = Infinity
   let xMax = -Infinity
   let yMin = Infinity
