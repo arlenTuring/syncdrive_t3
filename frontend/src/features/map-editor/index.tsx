@@ -395,6 +395,9 @@ export default function MapEditorApp({
   )
 
   const [backendSyncFailed, setBackendSyncFailed] = useState(false)
+  /** 本機有改動還沒發布到正式環境 */
+  const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [mapScreen, setMapScreen] = useState<MapEditorScreen>('library')
   const [mapExtentMeters] = useState<MapExtentMeters>(defaultMapExtentMeters)
   const [loadedMapMeta, setLoadedMapMeta] = useState<LoadedMapMeta>({
@@ -1171,6 +1174,25 @@ export default function MapEditorApp({
     [resetHistory, exitMapEditorChromeAfterLoad, clearSelection],
   )
 
+  /**
+   * 存進本機地圖庫，標成未發布。
+   *
+   * 「編輯」與「發布」拆開的關鍵在這裡：編輯過程只寫本機，正式環境那份要等使用者
+   * 按下發布才會換。先前自動儲存直接呼叫 publishAndReport，於是進編輯模式 900 毫秒
+   * 後就把圖推上線——不小心開錯一張圖也會重新發布一次，而載入時的自動修復若有 bug，
+   * 同樣會被無聲地推到正式環境。
+   */
+  const markEntryUnpublished = useCallback((entry: MapLibraryEntry) => {
+    writeMapLibrary(
+      readMapLibrary().map((e) =>
+        e.libraryId === entry.libraryId
+          ? { ...e, publishState: 'pending' as const }
+          : e,
+      ),
+    )
+    setHasUnpublishedChanges(true)
+  }, [])
+
   const persistCurrentMapToLibrary = useCallback(() => {
     const meta = loadedMapMetaRef.current
     if (!meta.libraryId) return
@@ -1192,8 +1214,8 @@ export default function MapEditorApp({
       basemapsRef.current,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-    void publishAndReport(updated)
-  }, [])
+    markEntryUnpublished(updated)
+  }, [markEntryUnpublished])
 
   const routePlanningPickMode =
     listDrawerTab === 'routes' &&
@@ -1623,6 +1645,20 @@ export default function MapEditorApp({
     )
   }, [])
 
+  /** 使用者明確按下發布：把本機這份送上正式環境 */
+  const publishCurrentMap = useCallback(async () => {
+    const meta = loadedMapMetaRef.current
+    const entry = getMapLibraryEntry(meta.libraryId)
+    if (!entry) return
+    setPublishing(true)
+    try {
+      await publishAndReport(entry)
+      setHasUnpublishedChanges(false)
+    } finally {
+      setPublishing(false)
+    }
+  }, [publishAndReport])
+
   const openLibraryMap = useCallback(
     async (libraryId: string) => {
       /*
@@ -1805,7 +1841,7 @@ export default function MapEditorApp({
         basemapsRef.current,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-      void publishAndReport(updated)
+      markEntryUnpublished(updated)
     }
     clearMapDraft(meta.libraryId)
     setMapPixelSize(pixelSize)
@@ -1900,7 +1936,7 @@ export default function MapEditorApp({
             basemapsRef.current,
           )
           writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
-          void publishAndReport(updated)
+          markEntryUnpublished(updated)
         }
         clearMapDraft(libraryId)
         const savedAt = new Date()
@@ -4343,6 +4379,31 @@ export default function MapEditorApp({
             {autosaveStatus === 'saving'
               ? t('mapEditor.chrome.autosaving')
               : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')}
+          </span>
+          {/*
+            自動儲存只寫本機，正式環境那份要按這裡才會換。分開之後，「我改到一半」
+            與「這一版可以上線了」是兩個狀態，不會因為開錯一張圖就把它重新發布。
+          */}
+          <span className="ml-auto flex items-center gap-2">
+            <span
+              className={
+                hasUnpublishedChanges ? 'text-amber-300' : 'text-zinc-500'
+              }
+            >
+              {hasUnpublishedChanges
+                ? t('mapEditor.chrome.unpublishedChanges')
+                : t('mapEditor.chrome.published')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void publishCurrentMap()}
+              disabled={publishing || !hasUnpublishedChanges}
+              className="rounded border border-cyan-700/70 bg-cyan-950/40 px-2 py-0.5 text-cyan-200 enabled:hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {publishing
+                ? t('mapEditor.chrome.publishing')
+                : t('mapEditor.chrome.publish')}
+            </button>
           </span>
         </div>
       )}

@@ -309,8 +309,16 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
     const t = v ? Date.parse(v) : NaN
     return Number.isFinite(t) ? t : 0
   }
-  /** 本機比後端新的，補水完要推上去 */
-  const toPublish: MapLibraryEntry[] = []
+  /**
+   * 本機比後端新的：<strong>留著，但不要自動推上去</strong>。
+   *
+   * 「編輯」與「發布」是兩件事。自動推等於使用者一改就上線，沒有一個時點可以說
+   * 「我確認過了」——載入時的自動修復若有 bug，也會照樣被推到正式環境。
+   *
+   * 所以這裡只把它標成未發布：補水時的刪除掃描會因此留著它（見下方 pending 的
+   * 例外），編輯器再依這個狀態顯示「有未發布的變更」。要上線得按發布。
+   */
+  const localNewer: MapLibraryEntry[] = []
 
   for (const summary of published.maps) {
     const mapId = resolveMapId(summary.mapId || summary.libraryId)
@@ -318,8 +326,10 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
 
     const existing = byId.get(mapId)
     if (existing && stamp(existing.updatedAt) > stamp(summary.updatedAt)) {
-      // 本機這份比較新：別動它，改把它送上去
-      toPublish.push(existing)
+      // 本機這份比較新：別動它，標成未發布，等使用者自己按發布
+      const pending: MapLibraryEntry = { ...existing, publishState: 'pending' }
+      byId.set(mapId, pending)
+      localNewer.push(pending)
       continue
     }
 
@@ -382,8 +392,12 @@ export async function hydrateMapLibraryFromBackend(): Promise<{
   const merged = kept
   writeMapLibrary(merged)
 
-  if (toPublish.length > 0) {
-    await Promise.all(toPublish.map((entry) => publishMapLibraryEntryToBackend(entry)))
+  if (localNewer.length > 0) {
+    console.info(
+      `[map-library] 這幾張本機的比後端新，尚未發布：${localNewer
+        .map((e) => e.displayName)
+        .join('、')}`,
+    )
   }
 
   /*
