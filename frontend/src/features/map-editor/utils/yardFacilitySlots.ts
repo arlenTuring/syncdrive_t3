@@ -2,31 +2,26 @@ import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import { getValidRefFieldBounds } from './facilityRefFieldBounds'
 
-/** 場下可停車的設施格（軌道 T 不算） */
-export const YARD_PARKABLE_FACILITY_IDS = new Set([
-  'E1',
-  'E2',
-  'E3',
-  'E4',
-  'H1',
-  'H2',
-  'H3',
-  'M1',
-  'M2',
-  'M3',
-  'M4',
-  'W1',
-  'P1',
-  'P2',
-  'P3',
-  'P4',
-])
-
-/** 臨停格 P1–P4（v0.1.10：每格獨立設施，容量 1） */
-export const PARKING_SLOT_IDS = ['P1', 'P2', 'P3', 'P4'] as const
+/**
+ * 場區停車格的<strong>代號長相</strong>：一個字母加一到兩位數字（E1、M3、D5、P12）。
+ *
+ * <h3>為什麼不是寫死的清單</h3>
+ * 這裡原本是一組列舉（E1–E4、H1–H3、M1–M4、W1、P1–P4）。後來圖上多了調度區
+ * D1–D5，清單沒跟著加，於是停在那五格的車<strong>整條定位鏈直接回傳 null</strong>——
+ * 不是停錯位置，是連位置都算不出來，圖台只能沿用上一幀，車散在莫名其妙的地方。
+ * 每加一個分區就要記得回來改一行，這種清單一定會過期。
+ *
+ * 真正該問的不是「代號在不在清單裡」，而是「圖上有沒有這個設施、它是不是軌道、
+ * 有沒有場域範圍」——那三件事 {@link resolveYardFacilityFieldMeters} 本來就在查。
+ * 所以這裡只做形狀的預篩，實際認定交給圖資。
+ *
+ * 下行軌道叫 D01～D37、上行叫 U01～U37，形狀上也會通過這一關，但它們的 type 是
+ * Track，會在下一步被擋掉。
+ */
+const YARD_SLOT_ID_SHAPE = /^[A-Z]\d{1,2}$/i
 
 export function isYardParkableFacilityId(slotId: string): boolean {
-  return YARD_PARKABLE_FACILITY_IDS.has(slotId.trim())
+  return YARD_SLOT_ID_SHAPE.test(slotId.trim())
 }
 
 export function parseYardSlotFromPayload(

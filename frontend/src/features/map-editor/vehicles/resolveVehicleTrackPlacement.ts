@@ -79,7 +79,12 @@ export function isYardVehiclePayload(
   const segment = payload.segment_label;
   if (typeof segment === 'string') {
     const label = segment.trim();
-    if (/^(E\d+|P[1-4]|H\d+|M\d+|W\d+)$/i.test(label)) return true;
+    /*
+     * 這裡也曾經漏掉調度區的 D。清單式的比對每加一個分區就要回來補一次，補漏了
+     * 也不會報錯——只是那一區的車不被當成場區車，定位鏈直接走空。改用同一支形狀
+     * 判定，實際是不是停車格由圖資認定（見 isYardParkableFacilityId）。
+     */
+    if (isYardParkableFacilityId(label)) return true;
     return (
       label.startsWith('充電 ') ||
       label.startsWith('充電等候 ') ||
