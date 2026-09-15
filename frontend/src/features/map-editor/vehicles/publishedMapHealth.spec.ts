@@ -92,16 +92,24 @@ describe.skipIf(maps.length === 0)('發布出去的圖：車畫得準不準', ()
       })
 
       /*
-       * 路口那幾塊的中心線會延伸進 junction 的連接道，而連接道是另一組 road，
-       * 目前的 spans 沒有涵蓋，所以只約束一般軌道。
+       * 路口方塊的中心線會延伸進 junction 的連接道，而連接道是另一組 road。
+       * 那幾段由 scripts/fill-junction-track-spans.mts 依幾何比對補上，所以這裡
+       * 連路口一起約束——沒蓋滿就是有一截查不到，那一截上的點會被隔壁搶去解釋。
        */
-      it('一般軌道的里程對應要蓋滿整條中心線', () => {
-        const partial = audit.blocks.filter(
-          (b) => !b.junction && b.spanCoverage < 0.999,
-        )
+      it('里程對應要蓋滿整條中心線', () => {
+        const partial = audit.blocks.filter((b) => b.spanCoverage < 0.999)
         expect(
           partial.map((b) => `${b.code} ${(b.spanCoverage * 100).toFixed(0)}%`),
         ).toEqual([])
+      })
+
+      /*
+       * 不分一般或路口：點應該被判給它自己所在的那一塊。這條先前只約束一般軌道，
+       * 於是 D04/T01 有三個點被判給 D05、U04/T03 有六個被判給對向，都沒被攔下來。
+       */
+      it('點不該被判給別塊', () => {
+        const bad = audit.blocks.filter((b) => b.wrongBlock > 0)
+        expect(bad.map((b) => `${b.code} ${b.wrongBlock}/${b.samples}`)).toEqual([])
       })
 
       it('每一塊都量得出比例尺', () => {
