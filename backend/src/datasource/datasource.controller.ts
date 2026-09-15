@@ -40,7 +40,11 @@ export class DatasourceController {
   @ApiBody({
     schema: {
       example: {
-        query: 'SELECT vehicle_code, speed_kmh, created_at FROM telemetry_logs ORDER BY created_at DESC',
+        // telemetry_logs 只有 raw_payload 一個 jsonb 欄位，沒有 speed_kmh 這種展開欄位；
+        // 車端速度單位是 m/s（車端介接說明書 §四.2），換算只在顯示端做一次。
+        query:
+          "SELECT vehicle_code, (raw_payload->'kinematics'->>'velocity')::float AS velocity_mps, timestamp"
+          + ' FROM telemetry_logs ORDER BY timestamp DESC',
         limit: 100,
       },
     },
