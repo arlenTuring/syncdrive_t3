@@ -1,6 +1,6 @@
 import type { MapAreaObject } from '../types/area';
 import { fieldMetersAtAreaLocal } from '../utils/fieldFromArea';
-import { getTrackGenPaths, pointAlongPath } from '../utils/trackGenPaths';
+import { getTrackGenPaths, getTrackGenSpans, pointAlongPath } from '../utils/trackGenPaths';
 import {
   buildTrackNetwork,
   resolveVehiclePlacementAcrossAreas,
@@ -44,6 +44,8 @@ export type FieldMappingAudit = {
     junction: boolean;
     /** 往返誤差最大值（公尺） */
     worstM: number;
+    /** spans 蓋到這條中心線的幾成（1 = 整條都有里程對應） */
+    spanCoverage: number;
     /** 取樣點被判給別塊的次數 */
     wrongBlock: number;
     samples: number;
@@ -58,6 +60,34 @@ export type FieldMappingAudit = {
 };
 
 const SAMPLE_FRACTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+
+/**
+ * spans 蓋到這條中心線的幾成。
+ *
+ * 沒被蓋到的那一截沒有 road／lane／里程，定位索引查不到它，落在那裡的點只能被
+ * 附近別的段搶去解釋——投影到錯的位置，回推就對不回原地。T3 實測：三塊路口的
+ * 往返誤差偏大，缺口的位置與誤差出現的取樣點<strong>完全吻合</strong>
+ * （D03/U03 缺 0.564~0.842，誤差正好在 t=0.6、0.7）。
+ *
+ * 誤差是症狀，覆蓋率才是原因。分開報，才不會每次都要重新追一遍。
+ */
+function spanCoverageOf(parameters: Record<string, unknown> | undefined): number {
+  const spans = getTrackGenSpans(parameters);
+  if (spans.length === 0) return 0;
+  const segments = spans
+    .map((sp) => [Math.min(sp.f0, sp.f1), Math.max(sp.f0, sp.f1)] as const)
+    .sort((a, b) => a[0] - b[0]);
+  let covered = 0;
+  let cursor = 0;
+  for (const [from, to] of segments) {
+    const start = Math.max(from, cursor);
+    if (to > start) {
+      covered += to - start;
+      cursor = to;
+    }
+  }
+  return Math.min(1, covered);
+}
 
 export function auditFieldMapping(
   areas: MapAreaObject[],
@@ -97,6 +127,7 @@ export function auditFieldMapping(
         kind: f.name,
         junction: /Taper|Switch|Cross/.test(f.name),
         worstM: Number(worstM.toFixed(2)),
+        spanCoverage: Number(spanCoverageOf(f.parameters).toFixed(3)),
         wrongBlock,
         samples: SAMPLE_FRACTIONS.length,
         alongPxPerM: scale ? Number(scale.alongPxPerM.toFixed(3)) : null,
@@ -137,6 +168,15 @@ export function describeFieldMappingAudit(audit: FieldMappingAudit): string {
         .filter((b) => audit.overThreshold.includes(b.code))
         .slice(0, 10)
         .map((b) => `${b.code} ${b.worstM}m`)
+        .join('、')}`,
+    );
+  }
+  const partial = audit.blocks.filter((b) => b.spanCoverage < 0.999);
+  if (partial.length > 0) {
+    lines.push(
+      `  里程對應沒蓋滿整條中心線（沒蓋到的那一截會被隔壁搶去解釋）：${partial
+        .slice(0, 10)
+        .map((b) => `${b.code} ${(b.spanCoverage * 100).toFixed(0)}%`)
         .join('、')}`,
     );
   }
