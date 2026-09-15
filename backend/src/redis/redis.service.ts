@@ -1,6 +1,14 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import {
+  isFreshHeartbeat,
+  isVehicleOffline,
+  VEHICLE_OFFLINE_AFTER_MS_DEFAULT,
+  VEHICLE_REPORTED_HEALTH_VALUES,
+  withDerivedOffline,
+  type VehicleLivenessMark,
+} from '../common/vehicle-liveness';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -53,8 +61,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async setHealth(vehicleCode: string, payload: any): Promise<{ degraded: boolean, previousHealth: string }> {
     const key = `vtms:health:${vehicleCode}`;
 
-    // 1. 驗證 overall_health 值域
-    const validOverallHealth = ['OK', 'WARNING', 'ERROR', 'OFFLINE'];
+    /*
+     * 1. 驗證 overall_health 值域
+     *
+     * OFFLINE 不在裡面：那是中心端推導的值，車自己說不出「我失聯了」。車端只送
+     * OK／WARNING／ERROR 三個（《設備健康與異常告警協議》§四）。收到 OFFLINE
+     * 代表對方誤用了我方的推導值，照既有的閉鎖式處理丟棄並記錄。
+     */
+    const validOverallHealth: readonly string[] = VEHICLE_REPORTED_HEALTH_VALUES;
     if (!validOverallHealth.includes(payload.overall_health)) {
       this.logger.warn(`[Health] Invalid overall_health value: '${payload.overall_health}' from ${vehicleCode}, discarding.`);
       return { degraded: false, previousHealth: 'OK' };
@@ -74,7 +88,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const hasErrorSubsystem = Object.values(payload.subsystems).some(
       (sub: any) => sub?.status === 'ERROR'
     );
-    if (hasErrorSubsystem && payload.overall_health !== 'ERROR' && payload.overall_health !== 'OFFLINE') {
+    if (hasErrorSubsystem && payload.overall_health !== 'ERROR') {
       this.logger.warn(
         `[Health] Data inconsistency from ${vehicleCode}: subsystem has ERROR but overall_health is '${payload.overall_health}'. Force-correcting to ERROR.`
       );
@@ -102,7 +116,71 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.client.set(key, JSON.stringify(payload));
+    await this.markHeartbeat(vehicleCode, payload.timestamp ?? null);
     return { degraded, previousHealth };
+  }
+
+  /** 失聯門檻（毫秒）。心跳 1 Hz，預設五秒＝連掉四拍才判失聯。 */
+  get offlineAfterMs(): number {
+    const raw = Number(
+      this.configService.get<string>(
+        'VEHICLE_OFFLINE_AFTER_MS',
+        String(VEHICLE_OFFLINE_AFTER_MS_DEFAULT),
+      ),
+    );
+    return Number.isFinite(raw) && raw > 0 ? raw : VEHICLE_OFFLINE_AFTER_MS_DEFAULT;
+  }
+
+  private livenessKey(vehicleCode: string) {
+    return `vtms:health-seen:${vehicleCode}`;
+  }
+
+  /**
+   * 記下「最後一次真的收到心跳」是什麼時候。
+   *
+   * 存的是<strong>中心端的到達時刻</strong>而不是車端帶的 timestamp：兩邊時鐘不一定
+   * 對得起來，用對方的時間判自己收不收得到，差一秒就會誤判。
+   *
+   * retain 重送那一則的 timestamp 與上一次完全相同，不刷新存活——否則後端一重啟，
+   * broker 補送的舊心跳會讓所有車瞬間變成「剛剛還活著」。
+   */
+  private async markHeartbeat(vehicleCode: string, timestamp: unknown) {
+    const ts = timestamp == null ? null : String(timestamp);
+    const previous = await this.getLivenessMark(vehicleCode);
+    if (!isFreshHeartbeat(previous, ts)) return;
+    const mark: VehicleLivenessMark = { receivedAt: Date.now(), timestamp: ts };
+    await this.client.set(this.livenessKey(vehicleCode), JSON.stringify(mark));
+  }
+
+  /** 讀取車輛最新一筆 health 快取（車端上報的原樣，不含推導的失聯狀態） */
+  async getHealth(vehicleCode: string): Promise<Record<string, unknown> | null> {
+    const raw = await this.client.get(`vtms:health:${vehicleCode}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  async getLivenessMark(vehicleCode: string): Promise<VehicleLivenessMark | null> {
+    const raw = await this.client.get(this.livenessKey(vehicleCode));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as VehicleLivenessMark;
+      return Number.isFinite(parsed?.receivedAt) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** 這台車現在算不算失聯（中心端推導） */
+  async isOffline(vehicleCode: string, now = Date.now()): Promise<boolean> {
+    return isVehicleOffline(
+      await this.getLivenessMark(vehicleCode),
+      now,
+      this.offlineAfterMs,
+    );
   }
 
   async setOperationUpdate(vehicleCode: string, payload: any) {
@@ -127,17 +205,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async getAllVehiclesSnapshot(vehicleCodes: string[]): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
+    const now = Date.now();
+    const offlineAfterMs = this.offlineAfterMs;
 
     for (const code of vehicleCodes) {
-      const [telemetryRaw, healthRaw, operationRaw] = await Promise.all([
+      const [telemetryRaw, healthRaw, operationRaw, mark] = await Promise.all([
         this.client.get(`vtms:telemetry:${code}`),
         this.client.get(`vtms:health:${code}`),
         this.client.get(`vtms:operation:${code}`),
+        this.getLivenessMark(code),
       ]);
 
+      // 失聯是中心端推導的，疊在輸出上；快取裡那一則保持車端原樣以供稽核
+      const offline = isVehicleOffline(mark, now, offlineAfterMs);
       result[code] = {
         telemetry:  telemetryRaw  ? JSON.parse(telemetryRaw)  : null,
-        health:     healthRaw     ? JSON.parse(healthRaw)     : null,
+        health:     withDerivedOffline(
+          healthRaw ? JSON.parse(healthRaw) : null,
+          offline,
+          mark,
+        ),
         operation:  operationRaw  ? JSON.parse(operationRaw)  : null,
       };
     }

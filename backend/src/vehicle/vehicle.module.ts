@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Vehicle } from '../database/entities/vehicle.entity';
 import { VehicleController } from './vehicle.controller';
 import { VehicleService } from './vehicle.service';
+import { VehicleLivenessService } from './vehicle-liveness.service';
 import { RedisModule } from '../redis/redis.module';
 import { OperationShiftModule } from '../operation-shift/operation-shift.module';
 import { VehicleEtaController } from './eta/vehicle-eta.controller';
@@ -16,6 +17,6 @@ import { VehicleEtaService } from './eta/vehicle-eta.service';
     TypeOrmModule.forFeature([Vehicle]),
   ],
   controllers: [VehicleController, VehicleEtaController],
-  providers: [VehicleService, VehicleEtaService],
+  providers: [VehicleService, VehicleEtaService, VehicleLivenessService],
 })
 export class VehicleModule {}
