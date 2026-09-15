@@ -12,7 +12,7 @@ export class VehicleService {
 
   async listActive(): Promise<Vehicle[]> {
     return this.vehicles.find({
-      where: { isActive: true, vehicleCode: Like('PMS-%') },
+      where: { isActive: true, vehicleCode: Like('PMS%') },
       order: { vehicleCode: 'ASC' },
     });
   }

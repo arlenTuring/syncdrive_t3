@@ -5,7 +5,7 @@ import {
   resolveVehiclePlacementAcrossAreas,
 } from './resolveVehicleTrackPlacement';
 
-const DEMO_IDS = ['PMS-01', 'PMS-02', 'PMS-03', 'PMS-04'] as const;
+const DEMO_IDS = ['PMS01', 'PMS02', 'PMS03', 'PMS04'] as const;
 const DEMO_HEALTH = ['OK', 'WARNING', 'ERROR', 'OFFLINE'] as const;
 /** 示範作動代碼（不含號誌；號誌僅由 MQTT 停等紅綠燈時出現） */
 const DEMO_ACTIONS = ['door_open', 'door_close', 'dispatch', 'alert'] as const;

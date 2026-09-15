@@ -43,7 +43,7 @@ class IssueTokenDto {
 
   @ApiPropertyOptional({
     description: '需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。',
-    example: ['PMS-01', 'PMS-02'],
+    example: ['PMS01', 'PMS02'],
     type: [String],
   })
   @IsOptional()
@@ -53,7 +53,7 @@ class IssueTokenDto {
 }
 
 class MqttClientCertificateDto {
-  @ApiProperty({ description: '車輛代號', example: 'PMS-01' })
+  @ApiProperty({ description: '車輛代號', example: 'PMS01' })
   vehicle_code!: string;
 
   @ApiProperty({ description: '該車客戶端憑證，PEM 格式' })

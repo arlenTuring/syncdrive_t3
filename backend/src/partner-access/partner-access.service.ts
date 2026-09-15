@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { PartnerApiKey } from '../database/entities/partner-api-key.entity';
 import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
+import { VTMS_VEHICLE_CODES, normalizeVehicleCode } from '../common/vehicle-codes';
 
 /** 預設有效期：24 小時 */
 export const DEFAULT_TTL_MINUTES = 24 * 60;
@@ -123,7 +124,7 @@ export class PartnerAccessService {
   private knownVehicleCodes(): string[] {
     const raw = this.config.get<string>('MQTT_VEHICLE_CODES', '').trim();
     if (raw) return raw.split(',').map((item) => item.trim()).filter(Boolean);
-    return Array.from({ length: 11 }, (_, i) => `PMS-${String(i + 1).padStart(2, '0')}`);
+    return [...VTMS_VEHICLE_CODES];
   }
 
   async issue(input: {
@@ -149,8 +150,12 @@ export class PartnerAccessService {
     }
 
     const ttl = this.normaliseTtl(input.ttlMinutes);
+    // 廠商手上可能還拿著改名前的 PMS-01，收斂後再比對，不要用「代號不存在」擋在門外；
+    // 憑證 CN 一律用新寫法簽發，broker 的 ACL（pattern write v1/vtms/%u/#）才對得上。
     const codes = input.vehicleCodes?.length
-      ? input.vehicleCodes.map((code) => String(code).trim().toUpperCase())
+      ? input.vehicleCodes.map((code) =>
+          normalizeVehicleCode(String(code).trim().toUpperCase()),
+        )
       : this.knownVehicleCodes();
     // 到期時間先定下來，金鑰與憑證共用同一個值——兩者必須同時失效
     const issuedAt = Date.now();

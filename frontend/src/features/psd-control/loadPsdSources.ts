@@ -4,7 +4,7 @@ import { resolveMapId } from '../map-editor/constants/builtinMaps';
 import { resolveParsedMapForPlatform } from '../map-editor/utils/mapLibraryStorage';
 import { resolveBrowserApiBaseUrl } from '../../lib/browserApiBase';
 
-const PMS_CODE = /^PMS-/i;
+const PMS_CODE = /^PMS/i;
 
 export type PsdVehicleCard = {
   id: string;

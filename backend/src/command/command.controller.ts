@@ -24,7 +24,7 @@ export class CommandController {
   /**
    * 中心端下發動態控制指令
    * 支援兩種 vehicle_code：
-   *   - 特定車輛：'PMS-01' ~ 'PMS-11'
+   *   - 特定車輛：'PMS01' ~ 'PMS11'
    *   - 全車隊廣播：'all'
    * 對應 Topic: v1/vtms/{vehicle_code}/command/execute (retain: false)
    */
@@ -33,7 +33,7 @@ export class CommandController {
   @ApiBody({
     schema: {
       example: {
-        vehicle_code: 'PMS-05',
+        vehicle_code: 'PMS05',
         action: 'EMERGENCY_STOP',
         params: { deceleration: 'MAX', hazard_light: true },
       },
@@ -43,7 +43,7 @@ export class CommandController {
     const { vehicle_code, action } = dto;
     const sourceIp = req.ip || req.socket.remoteAddress;
 
-    // 驗證 vehicle_code 格式：允許 'all' 或 'PMS-01'~'PMS-11'
+    // 驗證 vehicle_code 格式：允許 'all' 或 'PMS01'~'PMS11'
     const validVehicleCode = VTMS_VEHICLE_CODE_OR_ALL_PATTERN.test(vehicle_code);
     if (!validVehicleCode) {
       // 稽核：驗證失敗的操作也要留紀錄
@@ -56,7 +56,7 @@ export class CommandController {
         failureReason: `Invalid vehicle_code: '${vehicle_code}'`,
       });
       throw new BadRequestException(
-        `Invalid vehicle_code: '${vehicle_code}'. Must be 'all' or PMS-01~PMS-11.`
+        `Invalid vehicle_code: '${vehicle_code}'. Must be 'all' or PMS01~PMS11.`
       );
     }
 

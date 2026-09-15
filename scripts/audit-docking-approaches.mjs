@@ -39,7 +39,7 @@ function scanStation(label, tStart, tEnd) {
   let prev = null;
 
   for (let t = tStart; t < tEnd; t += 50) {
-    const v = m.getVehiclePublishMotion('PMS-01', t, 0, { managed: 0 });
+    const v = m.getVehiclePublishMotion('PMS01', t, 0, { managed: 0 });
     if (!v) continue;
 
     if (v.dwelling && v.station === label) {
@@ -69,7 +69,7 @@ function scanStation(label, tStart, tEnd) {
   };
 }
 
-// PMS-01 offset 0: down leg ~0–360s, up leg ~360–720s
+// PMS01 offset 0: down leg ~0–360s, up leg ~360–720s
 const windows = {
   'N2W下行': [0, 30_000],
   'T3下行': [150_000, 210_000],

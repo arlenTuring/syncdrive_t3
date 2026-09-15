@@ -6,7 +6,7 @@ export class Vehicle {
   id: string;
 
   @Column({ name: 'vehicle_code', unique: true, length: 10 })
-  vehicleCode: string; // e.g. PMS-01
+  vehicleCode: string; // e.g. PMS01
 
   @Column({ name: 'display_name', nullable: true })
   displayName: string;

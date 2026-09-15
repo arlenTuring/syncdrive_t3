@@ -1325,7 +1325,7 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         behaviorIconSize: 20,
         actionIconRules: [],
         mqttDataSourceId: 'default-mqtt',
-        mqttTopic: 'v1/vtms/PMS-01/operation/update',
+        mqttTopic: 'v1/vtms/PMS01/operation/update',
       };
     case 'tab-list':
     case 'shift-list':

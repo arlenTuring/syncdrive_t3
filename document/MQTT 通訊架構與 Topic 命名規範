@@ -17,7 +17,7 @@
 1.  **`{version}` (版本號)**：當前固定為 `v1`。
 2.  **`{domain}` (領域/場域)**：當前固定為 `vtms`。
 3.  **`{vehicle_code}` (車輛實體)**：
-    * **特定車輛**：格式為 `PMS-01` ~ `PMS-11`（連字號分隔）。
+    * **特定車輛**：格式為 `PMS01` ~ `PMS11`（無分隔符號）。
     * **廣播代碼 (Magic Value)**：固定為 `all`。用於中心端對全車隊下發指令。
 4.  **`{channel}` (通訊通道)**：對應系統的四大核心協議。
     * `telemetry`：第一類 車輛動態協議
@@ -37,15 +37,15 @@
 
 ### 二、 四大協議 Topic 映射對照表
 
-| 協議類別 | 傳輸方向 | 具體 Topic 路徑範例 (以 PMS-05 為例) | Retain 設定 |
+| 協議類別 | 傳輸方向 | 具體 Topic 路徑範例 (以 PMS05 為例) | Retain 設定 |
 | :--- | :--- | :--- | :--- |
-| **第一類：車輛動態** | 車端 ➔ 中心 | `v1/vtms/PMS-05/telemetry/update` | `false` |
-| **第二類：營運任務** | 車端 ➔ 中心 | `v1/vtms/PMS-05/operation/update` | **`true`** |
-| **第三類：設備健康** | 車端 ➔ 中心 | `v1/vtms/PMS-05/health/heartbeat` | **`true`** |
-| **第四類：動態控制** | 中心 ➔ 車端 | `v1/vtms/PMS-05/command/execute` | `false` |
+| **第一類：車輛動態** | 車端 ➔ 中心 | `v1/vtms/PMS05/telemetry/update` | `false` |
+| **第二類：營運任務** | 車端 ➔ 中心 | `v1/vtms/PMS05/operation/update` | **`true`** |
+| **第三類：設備健康** | 車端 ➔ 中心 | `v1/vtms/PMS05/health/heartbeat` | **`true`** |
+| **第四類：動態控制** | 中心 ➔ 車端 | `v1/vtms/PMS05/command/execute` | `false` |
 | **第四類：廣播指令** | 中心 ➔ 車隊 | `v1/vtms/all/command/execute` | `false` |
-| **第四類：指令確認** | 車端 ➔ 中心 | `v1/vtms/PMS-05/command/ack` | `false` |
-| **第四類：特殊事件** | 車端 ➔ 中心 | `v1/vtms/PMS-05/event/report` | `false` |
+| **第四類：指令確認** | 車端 ➔ 中心 | `v1/vtms/PMS05/command/ack` | `false` |
+| **第四類：特殊事件** | 車端 ➔ 中心 | `v1/vtms/PMS05/event/report` | `false` |
 
 > **Retain 實作規範**：標示為 `true` 者，由 **發布端 (Publisher)** 於發送時設定 `retain=true` 標誌。Broker 會保留最後一筆訊息，確保訂閱者在中斷重連後能立即取得最新狀態。
 
@@ -74,7 +74,7 @@
     每個 JSON 的最外層 (Root) 必須包含 `vehicle_code` 與 `timestamp` 兩個屬性。**嚴禁包裹於 `params`、`data` 或任何子物件中**。
     ```json
     {
-      "vehicle_code": "PMS-05",
+      "vehicle_code": "PMS05",
       "timestamp": 1713868200000,
       ...
     }

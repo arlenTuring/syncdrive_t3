@@ -54,7 +54,7 @@ export function assignStickyPoolSlots(
     if (prevKey !== key) changedIndices.push(i);
   }
 
-  // 左靠齊：避免中間留空洞（例如 PMS-05/06 班次結束後，PMS-01 仍卡在第 5 格）
+  // 左靠齊：避免中間留空洞（例如 PMS05/06 班次結束後，PMS01 仍卡在第 5 格）
   const occupied = next.filter((c): c is NonNullable<SlotCell> => c !== null);
   const compacted: SlotCell[] = [
     ...occupied,

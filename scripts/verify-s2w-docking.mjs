@@ -21,7 +21,7 @@ const EXPECT = {
 
 function findDwell(stationLabel) {
   for (let t = 0; t < 800_000; t += 100) {
-    const v = motion.getVehiclePublishMotion('PMS-01', t, 0, { managed: 0 });
+    const v = motion.getVehiclePublishMotion('PMS01', t, 0, { managed: 0 });
     if (!v?.dwelling || v.station !== stationLabel) continue;
     return { t, v };
   }

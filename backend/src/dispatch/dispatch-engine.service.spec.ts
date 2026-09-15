@@ -99,8 +99,8 @@ function build(
   };
   const vehicleRepository = {
     find: jest.fn().mockResolvedValue([
-      { vehicleCode: 'PMS-02', isActive: true },
-      { vehicleCode: 'PMS-01', isActive: true },
+      { vehicleCode: 'PMS02', isActive: true },
+      { vehicleCode: 'PMS01', isActive: true },
     ]),
   };
   const orderRepository = {
@@ -212,7 +212,7 @@ describe('DispatchEngineService.tick', () => {
   });
 
   it('車隊依代號排序，第 N 列固定對到第 N 台', async () => {
-    // vehicleRepository 故意回傳 PMS-02 在前
+    // vehicleRepository 故意回傳 PMS02 在前
     const { engine, created } = build([
       trip(12 * 3600 + 60, 1, 'ROW1'),
       trip(12 * 3600 + 60, 2, 'ROW2'),
@@ -221,8 +221,8 @@ describe('DispatchEngineService.tick', () => {
     await engine.tick({ now: REFERENCE });
 
     expect(created.map((order) => order.vehicle_code)).toEqual([
-      'PMS-01',
-      'PMS-02',
+      'PMS01',
+      'PMS02',
     ]);
   });
 

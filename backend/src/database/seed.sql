@@ -1,6 +1,6 @@
 -- Seed test data for SyncDrive T3
 
--- 1. Vehicles：營運車隊為 PMS-*（儀表板 seed 會補齊 PMS-01～11）；勿再插入 AGV/AMR
+-- 1. Vehicles：營運車隊為 PMS*（儀表板 seed 會補齊 PMS01～11）；勿再插入 AGV/AMR
 DELETE FROM vehicles WHERE vehicle_code ~ '^(AGV|AMR)-';
 
 -- 2. Facility Slots (Static Layout)

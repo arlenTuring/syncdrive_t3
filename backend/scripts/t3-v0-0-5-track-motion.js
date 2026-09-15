@@ -4,7 +4,7 @@
  * 規則1（D 軌道）：N2W下行 → D01–D16 → T3下行 → D20–D33 → S2W下行（每站 36s）
  * 規則2（U 軌道）：S2W上行 → U35–U20 → T3上行 → U16–U03 → N2W上行（每站 36s）
  * 規則3：規則1 → 規則2 無限循環
- * 規則4（示範場景）：場上 4 台（PMS-01～11 池輪替），間隔 3 分鐘 — 僅模擬器設定，非系統容量上限
+ * 規則4（示範場景）：場上 4 台（PMS01～11 池輪替），間隔 3 分鐘 — 僅模擬器設定，非系統容量上限
  * 規則5：不跨軌道（D 走 D、U 走 U）；號誌前 20m 停等 5s
  */
 const fs = require('fs');
@@ -36,9 +36,9 @@ const D_LOWER_LANE_Y = (D_LOWER_Y_MIN + D_LOWER_Y_MAX) / 2;
 const U_UPPER_LANE_Y = (U_UPPER_Y_MIN + U_UPPER_Y_MAX) / 2;
 const U_LOWER_LANE_Y = (U_LOWER_Y_MIN + U_LOWER_Y_MAX) / 2;
 
-const VEHICLE_POOL = Array.from({ length: 11 }, (_, i) => `PMS-${String(i + 1).padStart(2, '0')}`);
+const VEHICLE_POOL = Array.from({ length: 11 }, (_, i) => `PMS${String(i + 1).padStart(2, '0')}`);
 /** 場上四台示範車（0/3/6/9 分鐘發車） */
-const ACTIVE_SLOT_VEHICLE_IDS = ['PMS-01', 'PMS-02', 'PMS-08', 'PMS-11'];
+const ACTIVE_SLOT_VEHICLE_IDS = ['PMS01', 'PMS02', 'PMS08', 'PMS11'];
 const ACTIVE_SLOT_COUNT = 4;
 const SLOT_OFFSETS_MIN = [0, 3, 6, 9];
 const BATTERY_DRAIN_PER_MIN = 3;

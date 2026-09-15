@@ -105,7 +105,7 @@ function movingVehicle(overrides: Record<string, unknown> = {}) {
 
 describe('VehicleEtaService.getByStation', () => {
   it('一律列出全部停靠點，無車駛近者為空陣列', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByStation({ limitPerStation: 3 });
 
     expect(result.station_count).toBe(2);
@@ -117,11 +117,11 @@ describe('VehicleEtaService.getByStation', () => {
   });
 
   it('車端回報的 eta 與距離原值帶出，eta_at 恆等於 observed_at + eta_seconds×1000', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByStation({ limitPerStation: 3 });
     const entry = result.stations[0].etas[0];
 
-    expect(entry.vehicle_code).toBe('PMS-05');
+    expect(entry.vehicle_code).toBe('PMS05');
     expect(entry.eta_seconds).toBe(25);
     expect(entry.distance_to_station_m).toBe(120);
     expect(entry.arrival_state).toBe('APPROACHING');
@@ -130,7 +130,7 @@ describe('VehicleEtaService.getByStation', () => {
   });
 
   it('計畫值取自班表，delay_seconds 為即時值減計畫值', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByStation({ limitPerStation: 3 });
     const plan = result.stations[0].etas[0].plan;
 
@@ -143,15 +143,15 @@ describe('VehicleEtaService.getByStation', () => {
   it('依 eta_at 由近到遠排序，並截斷到 limit_per_station', async () => {
     const service = makeService({
       snapshot: {
-        'PMS-01': movingVehicle({
+        'PMS01': movingVehicle({
           current_leg: {
             target_station_id: 'station_4',
             distance_to_target_m: 3520,
             eta_seconds: 790,
           },
         }),
-        'PMS-05': movingVehicle(),
-        'PMS-09': movingVehicle({
+        'PMS05': movingVehicle(),
+        'PMS09': movingVehicle({
           current_leg: {
             target_station_id: 'station_4',
             distance_to_target_m: 1840,
@@ -164,14 +164,14 @@ describe('VehicleEtaService.getByStation', () => {
     const etas = result.stations[0].etas;
 
     expect(etas.map((entry) => entry.vehicle_code)).toEqual([
-      'PMS-05',
-      'PMS-09',
+      'PMS05',
+      'PMS09',
     ]);
     expect(etas).toHaveLength(2);
   });
 
   it('station_id 指定時只回那一站', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByStation({
       stationIds: ['station_9'],
       limitPerStation: 3,
@@ -185,7 +185,7 @@ describe('VehicleEtaService.getByStation', () => {
     const stale = movingVehicle();
     stale.operation.timestamp = NOW - 120_000;
     stale.telemetry.timestamp = NOW - 120_000;
-    const service = makeService({ snapshot: { 'PMS-05': stale } });
+    const service = makeService({ snapshot: { 'PMS05': stale } });
     const result = await service.getByStation({ limitPerStation: 3 });
     const entry = result.stations[0].etas[0];
 
@@ -205,14 +205,14 @@ describe('VehicleEtaService.getByStation', () => {
   });
 
   it('部分車輛回報時為 DEGRADED——分母是車隊清單，不是有回報的車', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByStation({ limitPerStation: 3 });
     expect(result.meta.data_quality).toBe('DEGRADED');
   });
 
   it('班表讀不到時不整支失敗：source 為 none、計畫值全 null', async () => {
     const service = makeService({
-      snapshot: { 'PMS-05': movingVehicle() },
+      snapshot: { 'PMS05': movingVehicle() },
       stationEtasThrows: true,
     });
     const result = await service.getByStation({ limitPerStation: 3 });
@@ -228,7 +228,7 @@ describe('trip_code 與班表的對應', () => {
   it('對不上班表的班次照規格回 NO_PLAN，不猜也不改寫代號', async () => {
     // 加班車、調度車，或班表尚未載入都屬此類
     const service = makeService({
-      snapshot: { 'PMS-05': movingVehicle({ trip_code: 'ST9999' }) },
+      snapshot: { 'PMS05': movingVehicle({ trip_code: 'ST9999' }) },
     });
     const result = await service.getByStation({ limitPerStation: 3 });
     const entry = result.stations[0].etas[0];
@@ -244,7 +244,7 @@ describe('trip_code 與班表的對應', () => {
 
 describe('VehicleEtaService.getByVehicle', () => {
   it('sequence 1 用車端值，之後的站由班表外推', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByVehicle({ nextStops: 3 });
     const vehicle = result.vehicles[0];
 
@@ -263,25 +263,25 @@ describe('VehicleEtaService.getByVehicle', () => {
   });
 
   it('next_stops 截斷到指定站數', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const result = await service.getByVehicle({ nextStops: 1 });
     expect(result.vehicles[0].next_stops).toHaveLength(1);
   });
 
   it('vehicle_code 指定時只回那幾台', async () => {
     const service = makeService({
-      snapshot: { 'PMS-01': movingVehicle(), 'PMS-05': movingVehicle() },
+      snapshot: { 'PMS01': movingVehicle(), 'PMS05': movingVehicle() },
     });
     const result = await service.getByVehicle({
-      vehicleCodes: ['PMS-05'],
+      vehicleCodes: ['PMS05'],
       nextStops: 3,
     });
     expect(result.vehicle_count).toBe(1);
-    expect(result.vehicles[0].vehicle_code).toBe('PMS-05');
+    expect(result.vehicles[0].vehicle_code).toBe('PMS05');
   });
 
   it('位置取自 telemetry；資料逾時時為 null', async () => {
-    const service = makeService({ snapshot: { 'PMS-05': movingVehicle() } });
+    const service = makeService({ snapshot: { 'PMS05': movingVehicle() } });
     const fresh = await service.getByVehicle({ nextStops: 3 });
     expect(fresh.vehicles[0].position).toEqual({
       latitude: 25.077612,
@@ -294,7 +294,7 @@ describe('VehicleEtaService.getByVehicle', () => {
     stale.operation.timestamp = NOW - 120_000;
     stale.telemetry.timestamp = NOW - 120_000;
     const staleResult = await makeService({
-      snapshot: { 'PMS-05': stale },
+      snapshot: { 'PMS05': stale },
     }).getByVehicle({ nextStops: 3 });
     expect(staleResult.vehicles[0].position).toBeNull();
   });

@@ -74,9 +74,9 @@ async function main() {
     
     // Simulation Loop
     setInterval(() => {
-      // Top row route progress (PMS-01 to PMS-08)
+      // Top row route progress (PMS01 to PMS08)
       for (let i = 1; i <= 8; i++) {
-        const name = `PMS-${i.toString().padStart(2, '0')}`;
+        const name = `PMS${i.toString().padStart(2, '0')}`;
         const progress = Math.floor((Date.now() / 1000 + i * 10) % 100);
         
         mqttClient.publish(`v1/agv/${name}/status`, JSON.stringify({
@@ -88,9 +88,9 @@ async function main() {
         }));
       }
 
-      // Bottom row gauges (PMS-01 to PMS-11)
+      // Bottom row gauges (PMS01 to PMS11)
       for (let i = 1; i <= 11; i++) {
-        const name = `PMS-${i.toString().padStart(2, '0')}`;
+        const name = `PMS${i.toString().padStart(2, '0')}`;
         const speed = (Math.random() * 2 + 1).toFixed(1);
         const soc = Math.floor(Math.random() * 20 + 80); // 80-100%
         
@@ -103,7 +103,7 @@ async function main() {
         }));
 
         // Also insert into telemetry_logs for the chart
-        if (name === 'PMS-01' || name === 'AGV-001') {
+        if (name === 'PMS01' || name === 'AGV-001') {
             db.query(`
               INSERT INTO telemetry_logs (vehicle_code, raw_payload)
               VALUES ($1, $2)

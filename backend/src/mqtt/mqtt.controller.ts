@@ -4,6 +4,7 @@ import { RedisService } from '../redis/redis.service';
 import { EventsGateway } from '../events/events.gateway';
 import { MqttService } from './mqtt.service';
 import { TelemetryWriteQueue } from './telemetry-write.queue';
+import { normalizeVehicleCode } from '../common/vehicle-codes';
 
 @Controller()
 export class MqttController {
@@ -16,11 +17,31 @@ export class MqttController {
     private readonly telemetryWriteQueue: TelemetryWriteQueue,
   ) {}
 
+  /**
+   * 從 topic 取車輛代號，順手把舊寫法 `01` 收成 `PMS01`，並蓋回 payload。
+   *
+   * 改名不是所有發布端同一秒切換：車端、模擬器、broker 上既存的 retain 訊息會有一段
+   * 混用期。topic 與 payload 各留各的寫法，下游就會出現同一台車兩個身分——訂單同步
+   * 靠 vehicle_code 對 operation_orders，對不上時不會拋例外，只是安靜地什麼都沒更新。
+   * 兩邊都在入口收斂成同一種寫法，後面就不必再處理。
+   */
+  private vehicleCodeFromTopic(topic: string, data: unknown): string | null {
+    const raw = topic.split('/')[2];
+    if (!raw) return null;
+    const vehicleCode = normalizeVehicleCode(raw);
+    if (data && typeof data === 'object') {
+      const payload = data as Record<string, unknown>;
+      if (typeof payload.vehicle_code === 'string') {
+        payload.vehicle_code = normalizeVehicleCode(payload.vehicle_code);
+      }
+    }
+    return vehicleCode;
+  }
+
   @MessagePattern('v1/vtms/+/telemetry/update')
   async handleTelemetry(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    const parts = topic.split('/');
-    const vehicleCode = parts[2];
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
 
     await this.redisService.setTelemetry(vehicleCode, data);
@@ -35,8 +56,7 @@ export class MqttController {
   @MessagePattern('v1/vtms/+/health/heartbeat')
   async handleHealth(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    const parts = topic.split('/');
-    const vehicleCode = parts[2];
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
 
     const { degraded, previousHealth } = await this.redisService.setHealth(vehicleCode, data);
@@ -63,8 +83,7 @@ export class MqttController {
   @MessagePattern('v1/vtms/+/operation/update')
   async handleOperationUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    const parts = topic.split('/');
-    const vehicleCode = parts[2];
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
 
     const enriched = await this.mqttService.enrichWithFacilityLocation(vehicleCode, data);
@@ -79,8 +98,7 @@ export class MqttController {
   @MessagePattern('v1/vtms/+/command/ack')
   async handleCommandAck(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    const parts = topic.split('/');
-    const vehicleCode = parts[2];
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
 
     await this.mqttService.handleCommandAck(vehicleCode, data);
@@ -89,8 +107,7 @@ export class MqttController {
   @MessagePattern('v1/vtms/+/event/report')
   async handleEventReport(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    const parts = topic.split('/');
-    const vehicleCode = parts[2];
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
 
     await this.mqttService.handleEventReport(vehicleCode, data);

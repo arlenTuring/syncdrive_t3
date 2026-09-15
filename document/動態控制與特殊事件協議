@@ -32,7 +32,7 @@
 ```json
 {
   "command_id": "CMD-20260423-0001",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713868200000,
   "action": "EMERGENCY_STOP",
   "params": { 
@@ -46,7 +46,7 @@
 ```json
 {
   "command_id": "CMD-20260423-0002",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713870300000,
   "action": "DOOR_CONTROL",
   "params": { 
@@ -60,7 +60,7 @@
 ```json
 {
   "command_id": "CMD-20260423-0003",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713868275000,
   "action": "SET_SPEED_LIMIT",
   "params": { 
@@ -73,7 +73,7 @@
 ```json
 {
   "command_id": "CMD-20260423-0004",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713868365000,
   "action": "SET_DIRECTION",
   "params": { 
@@ -93,7 +93,7 @@
 ```json
 {
   "event_id": "EVT-20260423-0001",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713872100000,
   "event_code": "UNSCHEDULED_DOOR_OPEN",
   "severity": "CRITICAL",
@@ -106,7 +106,7 @@
 ```json
 {
   "event_id": "EVT-20260423-0002",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713872130000,
   "event_code": "OBSTACLE_DETECTED",
   "severity": "WARNING",
@@ -119,7 +119,7 @@
 ```json
 {
   "event_id": "EVT-20260423-0003",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713872180000,
   "event_code": "PATH_BLOCKED",
   "severity": "CRITICAL",
@@ -132,7 +132,7 @@
 ```json
 {
   "event_id": "EVT-20260423-0004",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713872290000,
   "event_code": "DIRECTION_VIOLATION",
   "severity": "CRITICAL",
@@ -145,7 +145,7 @@
 ```json
 {
   "event_id": "EVT-20260423-0005",
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713872400000,
   "event_code": "INTERLOCK_REQ",
   "severity": "INFO",

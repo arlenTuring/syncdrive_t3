@@ -29,7 +29,7 @@ mqttClient.on('connect', () => {
   // 準備發送您剛剛貼的完整假資料
   const fakeEvent = {
     event_id: "EVT-20260423-0001",
-    vehicle_code: "PMS-05",
+    vehicle_code: "PMS05",
     timestamp: 1713872100000,
     event_code: "UNSCHEDULED_DOOR_OPEN",
     severity: "CRITICAL",
@@ -39,8 +39,8 @@ mqttClient.on('connect', () => {
 
   // 延遲 1 秒後發送
   setTimeout(() => {
-    console.log('\n📤 [Vehicle 發送] 往 v1/vtms/PMS-05/event/report 發布事件...');
-    mqttClient.publish('v1/vtms/PMS-05/event/report', JSON.stringify(fakeEvent));
+    console.log('\n📤 [Vehicle 發送] 往 v1/vtms/PMS05/event/report 發布事件...');
+    mqttClient.publish('v1/vtms/PMS05/event/report', JSON.stringify(fakeEvent));
   }, 1000);
 });
 

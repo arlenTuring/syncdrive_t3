@@ -36,7 +36,7 @@ export function createVehicleElement(
         defaultTintColor: DEFAULT_BODY_TINT,
         imageRules: [],
         mqttDataSourceId: 'default-mqtt',
-        mqttTopic: 'v1/vtms/PMS-01/health/heartbeat',
+        mqttTopic: 'v1/vtms/PMS01/health/heartbeat',
       } satisfies VehicleBodyElement;
     case 'text':
       return {
@@ -50,7 +50,7 @@ export function createVehicleElement(
         color: '#ffffff',
         textAlign: 'center',
         mqttDataSourceId: 'default-mqtt',
-        mqttTopic: 'v1/vtms/PMS-01/health/heartbeat',
+        mqttTopic: 'v1/vtms/PMS01/health/heartbeat',
       } satisfies VehicleTextElement;
     case 'light':
       return {
@@ -61,7 +61,7 @@ export function createVehicleElement(
         defaultImage: DEFAULT_LIGHT_IMAGE,
         imageRules: [],
         mqttDataSourceId: 'default-mqtt',
-        mqttTopic: 'v1/vtms/PMS-01/health/heartbeat',
+        mqttTopic: 'v1/vtms/PMS01/health/heartbeat',
       } satisfies VehicleLightElement;
     case 'door':
       return {
@@ -75,7 +75,7 @@ export function createVehicleElement(
         alarmField: 'door_alarm',
         defaultOpenPercent: 0,
         mqttDataSourceId: 'default-mqtt',
-        mqttTopic: 'v1/vtms/PMS-01/telemetry/update',
+        mqttTopic: 'v1/vtms/PMS01/telemetry/update',
       } satisfies VehicleDoorElement;
     default:
       return createVehicleElement('text', x, y);

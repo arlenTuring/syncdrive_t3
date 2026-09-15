@@ -3,7 +3,7 @@
 
 UPDATE operation_orders
 SET created_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint
-WHERE order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%';
+WHERE order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%';
 
 -- 班次中心 DEMO-SHIFT：交錯完成時間，方便測試進度條
 WITH ranked AS (

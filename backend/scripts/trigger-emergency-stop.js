@@ -2,10 +2,10 @@
 /**
  * 驗收用：中心端下發 EMERGENCY_STOP → 車端應 command/ack + event/report + operation vehicle_phase=FAULTED
  *
- * 用法：node backend/scripts/trigger-emergency-stop.js [PMS-05]
+ * 用法：node backend/scripts/trigger-emergency-stop.js [PMS05]
  * 前置：後端 + 模擬器已啟動，目標車已在正線班次（PROCESSING）
  */
-const vehicleCode = process.argv[2] || 'PMS-05';
+const vehicleCode = process.argv[2] || 'PMS05';
 const apiBase = process.env.SYNC_API || 'http://127.0.0.1:3000/syncdrive-api';
 
 async function main() {

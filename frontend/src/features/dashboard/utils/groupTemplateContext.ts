@@ -5,7 +5,7 @@ import { FIELD_PREVIEW_SAMPLES } from './widgetEditPreview';
 /** 車輛監控編輯預覽（皆正常；執行時異常僅來自即時 MQTT） */
 const VEHICLE_MONITOR_PREVIEW_PROFILES: Record<string, unknown>[] = [
   {
-    vehicle_code: 'PMS-01',
+    vehicle_code: 'PMS01',
     overall_health: 'OK',
     alert_message: '',
     status_computing: 'OK',
@@ -23,7 +23,7 @@ const VEHICLE_MONITOR_PREVIEW_PROFILES: Record<string, unknown>[] = [
     demo_load: 75,
   },
   {
-    vehicle_code: 'PMS-02',
+    vehicle_code: 'PMS02',
     overall_health: 'OK',
     alert_message: '',
     status_computing: 'OK',
@@ -46,7 +46,7 @@ const VEHICLE_MONITOR_PREVIEW_PROFILES: Record<string, unknown>[] = [
     demo_load: 82,
   },
   {
-    vehicle_code: 'PMS-03',
+    vehicle_code: 'PMS03',
     overall_health: 'OK',
     alert_message: '',
     status_computing: 'OK',
@@ -69,7 +69,7 @@ const VEHICLE_MONITOR_PREVIEW_PROFILES: Record<string, unknown>[] = [
     demo_load: 89,
   },
   {
-    vehicle_code: 'PMS-04',
+    vehicle_code: 'PMS04',
     overall_health: 'OK',
     alert_message: '',
     status_computing: 'OK',

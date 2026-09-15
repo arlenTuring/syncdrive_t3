@@ -27,7 +27,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   const makeOrder = (status: OrderStatus): OperationOrder =>
     ({
       id: '260624-U1030',
-      vehicleCode: 'PMS-05',
+      vehicleCode: 'PMS05',
       status,
       payload: {},
     }) as OperationOrder;
@@ -125,7 +125,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
     it('faultActiveOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
       orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
       const result = await service.faultActiveOrderForVehicle(
-        'PMS-05',
+        'PMS05',
         'PATH_BLOCKED',
       );
       expect(result?.status).toBe(OrderStatus.FAULTED);
@@ -135,7 +135,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
 
     it('recoverFaultedOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
       orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.FAULTED));
-      const result = await service.recoverFaultedOrderForVehicle('PMS-05');
+      const result = await service.recoverFaultedOrderForVehicle('PMS05');
       expect(result?.status).toBe(OrderStatus.PROCESSING);
       expect(result?.payload).not.toHaveProperty('vehicle_phase');
     });
@@ -191,7 +191,7 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
   function existingOrder(): OperationOrder {
     return {
       id: '260826-NT1403',
-      vehicleCode: 'PMS-07',
+      vehicleCode: 'PMS07',
       tripCode: 'NT1403',
       lineKind: 'MAINLINE',
       status: OrderStatus.PROCESSING,
@@ -205,8 +205,8 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     const order = existingOrder();
     orderRepo.findOne.mockResolvedValue(order);
 
-    await service.applyOperationMqttUpdate('PMS-07', {
-      vehicle_code: 'PMS-07',
+    await service.applyOperationMqttUpdate('PMS07', {
+      vehicle_code: 'PMS07',
       order_id: '260826-NT1403',
       trip_code: 'NT1403',
       line_kind: 'MAINLINE',
@@ -230,8 +230,8 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     const order = existingOrder();
     orderRepo.findOne.mockResolvedValue(order);
 
-    await service.applyOperationMqttUpdate('PMS-07', {
-      vehicle_code: 'PMS-07',
+    await service.applyOperationMqttUpdate('PMS07', {
+      vehicle_code: 'PMS07',
       order_id: '260826-NT1403',
       trip_code: 'NT1403',
       line_kind: 'MAINLINE',
@@ -251,8 +251,8 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     order.plannedEnd = undefined;
     orderRepo.findOne.mockResolvedValue(order);
 
-    await service.applyOperationMqttUpdate('PMS-07', {
-      vehicle_code: 'PMS-07',
+    await service.applyOperationMqttUpdate('PMS07', {
+      vehicle_code: 'PMS07',
       order_id: '260826-NT1403',
       trip_code: 'NT1403',
       line_kind: 'MAINLINE',
@@ -271,8 +271,8 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     order.routeId = undefined;
     orderRepo.findOne.mockResolvedValue(order);
 
-    const saved = await service.applyOperationMqttUpdate('PMS-07', {
-      vehicle_code: 'PMS-07',
+    const saved = await service.applyOperationMqttUpdate('PMS07', {
+      vehicle_code: 'PMS07',
       order_id: '260826-NT1403',
       trip_code: 'NT1403',
       order_status: 'PROCESSING',
@@ -294,8 +294,8 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     };
     orderRepo.findOne.mockResolvedValue(order);
 
-    await service.applyOperationMqttUpdate('PMS-07', {
-      vehicle_code: 'PMS-07',
+    await service.applyOperationMqttUpdate('PMS07', {
+      vehicle_code: 'PMS07',
       order_id: '260826-NT1403',
       trip_code: 'NT1403',
       order_status: 'PROCESSING',

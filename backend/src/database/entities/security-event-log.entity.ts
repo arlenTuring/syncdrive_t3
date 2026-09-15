@@ -56,7 +56,7 @@ export class SecurityEventLog {
   @Column({ name: 'display_message', type: 'text', nullable: true })
   displayMessage: string;
 
-  /** 儀表板展示：副標（如 PMS-02） */
+  /** 儀表板展示：副標（如 PMS02） */
   @Column({ name: 'sub_label', nullable: true, length: 32 })
   subLabel: string;
 

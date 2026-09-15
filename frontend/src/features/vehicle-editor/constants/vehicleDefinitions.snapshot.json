@@ -1,12 +1,12 @@
 [
   {
     "id": "sampleywe93qb",
-    "name": "VTMS 巴士 · PMS-01",
+    "name": "VTMS 巴士 · PMS01",
     "width": 260,
     "height": 78,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -39,7 +39,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elx6omf8y",
@@ -53,7 +53,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elk9m2tail",
@@ -67,7 +67,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elhofqpk0",
@@ -83,7 +83,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elqhufkx0",
@@ -99,7 +99,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "eldoorfl01",
@@ -114,7 +114,7 @@
         "openPercentField": "door_fl_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eldoorfr01",
@@ -129,7 +129,7 @@
         "openPercentField": "door_fr_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eldoorrl01",
@@ -144,7 +144,7 @@
         "openPercentField": "door_rl_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eldoorrr01",
@@ -159,18 +159,18 @@
         "openPercentField": "door_rr_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
   {
     "id": "vylmcz85",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 420,
     "height": 100,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -197,7 +197,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat",
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat",
         "rotationDeg": 0
       },
       {
@@ -211,7 +211,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update",
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update",
         "rotationDeg": 0
       },
       {
@@ -225,7 +225,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update",
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update",
         "rotationDeg": 0
       },
       {
@@ -241,7 +241,7 @@
         "color": "#94a3b8",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat",
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat",
         "rotationDeg": 0
       },
       {
@@ -257,7 +257,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat",
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat",
         "rotationDeg": 0
       },
       {
@@ -273,7 +273,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat",
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat",
         "rotationDeg": 0
       },
       {
@@ -288,7 +288,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update",
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update",
         "rotationDeg": 0
       }
     ]
@@ -301,7 +301,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -319,12 +319,12 @@
   },
   {
     "id": "vwizx89a",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -352,7 +352,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el6ngl17l",
@@ -366,7 +366,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "el19yaga1",
@@ -380,7 +380,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "el3bemvxm",
@@ -396,7 +396,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elcrldr5u",
@@ -412,7 +412,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elw0lacme",
@@ -427,7 +427,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elbnfw48k",
@@ -442,7 +442,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -454,7 +454,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -472,12 +472,12 @@
   },
   {
     "id": "v7dwxa1e",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -505,7 +505,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el1gbnbld",
@@ -519,7 +519,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eld8ff8h3",
@@ -533,7 +533,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elhixzmxe",
@@ -549,7 +549,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elpff168s",
@@ -565,7 +565,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elgw0dlgi",
@@ -580,7 +580,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eln89eg5k",
@@ -595,7 +595,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -607,7 +607,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -625,12 +625,12 @@
   },
   {
     "id": "volzxcnf",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -658,7 +658,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elue7xekr",
@@ -672,7 +672,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elvg6rrwo",
@@ -686,7 +686,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "el445oegl",
@@ -702,7 +702,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elljjk0pp",
@@ -718,7 +718,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el3enbem5",
@@ -733,7 +733,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elale7vca",
@@ -748,7 +748,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -760,7 +760,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -778,12 +778,12 @@
   },
   {
     "id": "vrzqglub",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -811,7 +811,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elk8nnc2y",
@@ -825,7 +825,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elh5x4kgf",
@@ -839,7 +839,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "el8gd389q",
@@ -855,7 +855,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el32ykwr2",
@@ -871,7 +871,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el25ld2xq",
@@ -886,7 +886,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "eloz7sm69",
@@ -901,7 +901,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -913,7 +913,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -931,12 +931,12 @@
   },
   {
     "id": "vau53guw",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -964,7 +964,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elozh0mdx",
@@ -978,7 +978,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elee0jyyw",
@@ -992,7 +992,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elcfs1gaf",
@@ -1008,7 +1008,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elpikc8lu",
@@ -1024,7 +1024,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elg00kj8e",
@@ -1039,7 +1039,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "els3fs2hj",
@@ -1054,7 +1054,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -1066,7 +1066,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",
@@ -1084,12 +1084,12 @@
   },
   {
     "id": "vjst6pop",
-    "name": "VTMS 巴士 · PMS-01（複本）",
+    "name": "VTMS 巴士 · PMS01（複本）",
     "width": 230,
     "height": 69,
     "backgroundColor": "transparent",
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "U0951",
       "badge_label": "U0951",
       "direction_label": "上行",
@@ -1117,7 +1117,7 @@
         "defaultTintColor": "#3B67AC",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "el9av27pw",
@@ -1131,7 +1131,7 @@
         "visibilityField": "head_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elerhuwn3",
@@ -1145,7 +1145,7 @@
         "visibilityField": "tail_light_on",
         "imageRules": [],
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "elg88a5dl",
@@ -1161,7 +1161,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elf8vdfi6",
@@ -1177,7 +1177,7 @@
         "color": "#ffffff",
         "textAlign": "center",
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/health/heartbeat"
+        "mqttTopic": "v1/vtms/PMS01/health/heartbeat"
       },
       {
         "id": "elqnn97pf",
@@ -1192,7 +1192,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       },
       {
         "id": "el5wru30o",
@@ -1207,7 +1207,7 @@
         "openPercentField": "door_open_percent",
         "defaultOpenPercent": 0,
         "mqttDataSourceId": "default-mqtt",
-        "mqttTopic": "v1/vtms/PMS-01/telemetry/update"
+        "mqttTopic": "v1/vtms/PMS01/telemetry/update"
       }
     ]
   },
@@ -1219,7 +1219,7 @@
     "backgroundColor": "transparent",
     "elements": [],
     "previewData": {
-      "vehicle_code": "PMS-01",
+      "vehicle_code": "PMS01",
       "trip_code": "D0950",
       "badge_label": "D0950",
       "direction_label": "下行",

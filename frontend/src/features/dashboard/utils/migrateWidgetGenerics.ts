@@ -121,7 +121,7 @@ export function migrateChildWidgetGenerics(child: ChildWidget): ChildWidget {
     if (w.behaviorOffsetY === undefined) w.behaviorOffsetY = -28;
     if (w.behaviorIconSize === undefined) w.behaviorIconSize = 20;
     if (!w.mqttDataSourceId) w.mqttDataSourceId = 'default-mqtt';
-    if (!w.mqttTopic) w.mqttTopic = 'v1/vtms/PMS-01/operation/update';
+    if (!w.mqttTopic) w.mqttTopic = 'v1/vtms/PMS01/operation/update';
   }
 
   return w as unknown as ChildWidget;

@@ -176,7 +176,7 @@
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
-        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。欄位定義見車端介接說明書 §五.2。",
+        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，走 event/report 上報，不往本端點加狀態值。欄位定義見車端介接說明書 §五.2。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -592,7 +592,7 @@
             "application/json": {
               "schema": {
                 "example": {
-                  "vehicle_code": "PMS-05",
+                  "vehicle_code": "PMS05",
                   "action": "EMERGENCY_STOP",
                   "params": {
                     "deceleration": "MAX",
@@ -728,7 +728,7 @@
             "name": "vehicle_code",
             "required": false,
             "in": "query",
-            "description": "指定車輛，可重複指定多個（如 ?vehicle_code=PMS-01&vehicle_code=PMS-05）",
+            "description": "指定車輛，可重複指定多個（如 ?vehicle_code=PMS01&vehicle_code=PMS05）",
             "schema": {}
           }
         ],
@@ -1217,7 +1217,7 @@
             "application/json": {
               "schema": {
                 "example": {
-                  "query": "SELECT vehicle_code, speed_kmh, created_at FROM telemetry_logs ORDER BY created_at DESC",
+                  "query": "SELECT vehicle_code, (raw_payload->'kinematics'->>'velocity')::float AS velocity_mps, timestamp FROM telemetry_logs ORDER BY timestamp DESC",
                   "limit": 100
                 }
               }
@@ -2298,6 +2298,166 @@
           "對外｜存取憑據"
         ]
       }
+    },
+    "/syncdrive-api/system/health/snapshot": {
+      "get": {
+        "operationId": "SystemHealthController_snapshot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "取得主機資源與核心服務即時監測狀態",
+        "tags": [
+          "SystemHealth"
+        ]
+      }
+    },
+    "/syncdrive-api/system/health/history": {
+      "get": {
+        "operationId": "SystemHealthController_history",
+        "parameters": [
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "取得主機資源歷史趨勢（記憶體環形緩衝，程序重啟後清空）",
+        "tags": [
+          "SystemHealth"
+        ]
+      }
+    },
+    "/syncdrive-api/system/health/thresholds": {
+      "get": {
+        "operationId": "SystemHealthController_getThresholds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "取得系統共用監測閾值設定（system_settings）",
+        "tags": [
+          "SystemHealth"
+        ]
+      },
+      "put": {
+        "operationId": "SystemHealthController_putThresholds",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "四項指標的通知人員與閾值條件",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "儲存系統共用監測閾值設定（所有操作人員共用）",
+        "tags": [
+          "SystemHealth"
+        ]
+      }
+    },
+    "/syncdrive-api/system/foundation/settings": {
+      "get": {
+        "operationId": "SystemFoundationController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "取得系統基礎設定（全系統共用；密碼已遮罩）",
+        "tags": [
+          "SystemFoundation"
+        ]
+      },
+      "put": {
+        "operationId": "SystemFoundationController_putSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "系統基礎設定完整物件",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "儲存系統基礎設定（全系統共用）",
+        "tags": [
+          "SystemFoundation"
+        ]
+      }
+    },
+    "/syncdrive-api/system/foundation/ssl/certificate": {
+      "get": {
+        "operationId": "SystemFoundationController_getCertificateStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "取得 HTTPS 傳輸憑證狀態（僅公開 metadata，不含私鑰）",
+        "tags": [
+          "SystemFoundation"
+        ]
+      },
+      "put": {
+        "operationId": "SystemFoundationController_rotateCertificate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateHttpsCertificateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "上傳／輪替 HTTPS 憑證與私鑰（私鑰只寫入磁碟，回應不含私鑰）",
+        "tags": [
+          "SystemFoundation"
+        ]
+      }
     }
   },
   "info": {
@@ -2455,7 +2615,7 @@
         "properties": {
           "vehicle_code": {
             "type": "string",
-            "example": "PMS-05"
+            "example": "PMS05"
           },
           "order_id": {
             "type": "object",
@@ -2729,7 +2889,7 @@
         "properties": {
           "vehicle_code": {
             "type": "string",
-            "example": "PMS-05"
+            "example": "PMS05"
           },
           "vehicle_phase": {
             "type": "string",
@@ -3329,8 +3489,8 @@
           "vehicle_codes": {
             "description": "需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
             "example": [
-              "PMS-01",
-              "PMS-02"
+              "PMS01",
+              "PMS02"
             ],
             "type": "array",
             "items": {
@@ -3349,11 +3509,21 @@
           "vehicle_code": {
             "type": "string",
             "description": "車輛代號",
-            "example": "PMS-01"
+            "example": "PMS01"
           },
           "certificate": {
             "type": "string",
             "description": "該車客戶端憑證，PEM 格式"
+          },
+          "not_before": {
+            "type": "number",
+            "description": "憑證生效時間，Unix Epoch 毫秒",
+            "example": 1787889940000
+          },
+          "not_after": {
+            "type": "number",
+            "description": "憑證失效時間，Unix Epoch 毫秒。等於本次申請金鑰的 expires_at",
+            "example": 1787976400000
           },
           "private_key": {
             "type": "string",
@@ -3363,6 +3533,8 @@
         "required": [
           "vehicle_code",
           "certificate",
+          "not_before",
+          "not_after",
           "private_key"
         ]
       },
@@ -3386,7 +3558,11 @@
           },
           "ca_certificate": {
             "type": "string",
-            "description": "CA 憑證，PEM 格式"
+            "description": "信任憑證，PEM 格式。設為 TLS 的 ca，整份填入，用於驗證 broker"
+          },
+          "intermediate_certificate": {
+            "type": "string",
+            "description": "中介憑證，PEM 格式。接於 clients[].certificate 之後一併送出（該車憑證在前、中介憑證在後）"
           },
           "clients": {
             "description": "各車之客戶端憑證與私鑰",
@@ -3401,6 +3577,7 @@
           "port",
           "tls",
           "ca_certificate",
+          "intermediate_certificate",
           "clients"
         ]
       },
@@ -3448,6 +3625,10 @@
           "expires_in_minutes",
           "mqtt"
         ]
+      },
+      "RotateHttpsCertificateDto": {
+        "type": "object",
+        "properties": {}
       }
     }
   }

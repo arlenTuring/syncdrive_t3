@@ -509,7 +509,7 @@
             <div class="spec-group-body">
               <table class="param-table db-field-table">
                 <tr><th>欄位</th><th>型別</th><th>儀表板用途</th><th>模組</th></tr>
-                <tr><td><code>vehicle_code</code></td><td>varchar UK</td><td>車號；群組迭代鍵（PMS-%）</td><td>正線、分佈、狀態</td></tr>
+                <tr><td><code>vehicle_code</code></td><td>varchar UK</td><td>車號；群組迭代鍵（PMS%）</td><td>正線、分佈、狀態</td></tr>
                 <tr><td><code>display_name</code></td><td>varchar</td><td>顯示名稱（JOIN 正線卡）</td><td>正線班次</td></tr>
                 <tr><td><code>is_active</code></td><td>boolean</td><td>納入車輛分佈統計</td><td>車輛分佈、車輛狀態</td></tr>
                 <tr><td><code>id</code> · <code>created_at</code> · <code>updated_at</code></td><td>—</td><td>系統用；儀表板 UI 未顯示</td><td>—</td></tr>
@@ -718,7 +718,7 @@
                 <tr><td><code>v1/vtms/${vehicle_code}/operation/update</code></td><td><code>{vehicle_code}</code></td><td>班次軌道進度、位置文字</td><td>正線、整備、車輛狀態</td></tr>
                 <tr><td><code>v1/vtms/${vehicle_code}/telemetry/update</code></td><td><code>{vehicle_code}</code></td><td><code>kinematics.velocity</code>、<code>energy.battery_level</code></td><td>車輛狀態 gauge</td></tr>
                 <tr><td><code>v1/vtms/${vehicle_code}/health/heartbeat</code></td><td><code>{vehicle_code}</code></td><td>健康外框、alert-banner 輪播</td><td>車輛狀態</td></tr>
-                <tr><td><code>v1/vtms/PMS-01/operation/update</code></td><td>固定</td><td>圖台 overlay 載具</td><td>即時圖台</td></tr>
+                <tr><td><code>v1/vtms/PMS01/operation/update</code></td><td>固定</td><td>圖台 overlay 載具</td><td>即時圖台</td></tr>
                 <tr><td><code>v1/vtms/dashboard/capacity/live</code></td><td>—</td><td>運能即時 KPI</td><td>運能趨勢</td></tr>
                 <tr><td><code>v1/vtms/+/telemetry/update</code></td><td>萬用字元</td><td>資料來源 <code>default-mqtt</code> 預設訂閱</td><td>圖台 ingest</td></tr>
               </table>
@@ -1306,12 +1306,12 @@ LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
         </div>
         <div class="spec-table-box">
           <h3>本模組使用的資料表：<span class="table-name">operation_orders</span></h3>
-          <p class="entity-ref">主要 Entity · 篩選 <code>created_at</code> ≥ 7 天且 <code>DEMO-%</code> / <code>PMS-%</code></p>
+          <p class="entity-ref">主要 Entity · 篩選 <code>created_at</code> ≥ 7 天且 <code>DEMO-%</code> / <code>PMS%</code></p>
           <table class="param-table col-map-table">
             <tr><th>欄位</th><th>說明</th><th>元件用途</th></tr>
             <tr><td><code>status</code></td><td>PENDING / PROCESSING / END / FAULTED</td><td>KPI 完成、延誤計數；達成率</td></tr>
             <tr><td><code>created_at</code></td><td>bigint 毫秒</td><td>時間窗口篩選</td></tr>
-            <tr><td><code>vehicle_code</code></td><td>車輛</td><td>示範資料篩選 <code>PMS-%</code></td></tr>
+            <tr><td><code>vehicle_code</code></td><td>車輛</td><td>示範資料篩選 <code>PMS%</code></td></tr>
             <tr><td><code>order_id</code></td><td>訂單鍵</td><td>示範 <code>DEMO-%</code></td></tr>
           </table>
         </div>
@@ -1342,7 +1342,7 @@ LIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)</pre>
   … achievement_pct, achievement_line, remaining_line …
 FROM operation_orders
 WHERE created_at >= (過去 7 天)
-  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%')</pre>
+  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')</pre>
                 <p class="note">常數 <code>SHIFT_CENTER_SUMMARY_SQL</code>，三卡共用。</p>
                 <h4>MQTT</h4>
                 <ul class="mqtt-list">
@@ -1733,7 +1733,7 @@ WHERE line_kind = 'MAINLINE' AND status IN ('PENDING','PROCESSING','FAULTED')</p
           <table class="param-table col-map-table">
             <tr><th>類型</th><th>說明</th></tr>
             <tr><td>地圖資產</td><td><code>mapId: t3-main-version</code>（圖編器 JSON，非 DB 表）</td></tr>
-            <tr><td>車輛定義</td><td><code>vehicle-editor</code> 協定檔 · VTMS PMS-01</td></tr>
+            <tr><td>車輛定義</td><td><code>vehicle-editor</code> 協定檔 · VTMS PMS01</td></tr>
             <tr><td>即時資料</td><td>MQTT（見各 overlay）</td></tr>
           </table>
         </div>
@@ -1767,7 +1767,7 @@ WHERE line_kind = 'MAINLINE' AND status IN ('PENDING','PROCESSING','FAULTED')</p
               <tr><td><code>clock</code></td><td>無</td><td>無（本機時間）</td></tr>
               <tr><td><code>status-badge</code> 全場狀態</td><td>無</td><td>無（靜態預設文案）</td></tr>
               <tr><td><code>text</code> 班距 / 正線營運</td><td>無</td><td>無（示範靜態）</td></tr>
-              <tr><td><code>vehicle-container</code> PMS-01</td><td>無</td><td><code>v1/vtms/PMS-01/operation/update</code></td></tr>
+              <tr><td><code>vehicle-container</code> PMS01</td><td>無</td><td><code>v1/vtms/PMS01/operation/update</code></td></tr>
             </table>
           </div>
         </details>
@@ -1795,7 +1795,7 @@ WHERE line_kind = 'MAINLINE' AND status IN ('PENDING','PROCESSING','FAULTED')</p
           <h3>本模組使用的資料表</h3>
           <table class="param-table col-map-table">
             <tr><th>資料表</th><th>用途</th></tr>
-            <tr><td><code>vehicles</code></td><td>車隊主檔 · <code>vehicle_code</code>（PMS-%）</td></tr>
+            <tr><td><code>vehicles</code></td><td>車隊主檔 · <code>vehicle_code</code>（PMS%）</td></tr>
             <tr><td><code>operation_orders</code></td><td>活躍訂單 → 任務徽章、線別、站點</td></tr>
             <tr><td><code>vehicle_monitor_demo</code></td><td>示範遙測/健康/子系統狀態、速度電量 demo 欄</td></tr>
           </table>

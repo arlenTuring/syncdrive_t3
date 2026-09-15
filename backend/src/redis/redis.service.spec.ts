@@ -43,7 +43,7 @@ describe('RedisService', () => {
           CHASSIS: { status: 'OK' },
         },
       };
-      await expect(service.setHealth('PMS-01', payload)).resolves.toEqual({
+      await expect(service.setHealth('PMS01', payload)).resolves.toEqual({
         degraded: false,
         previousHealth: 'OK',
       });
@@ -59,7 +59,7 @@ describe('RedisService', () => {
           CHASSIS: { status: 'OK' },
         },
       };
-      const result = await service.setHealth('PMS-01', payload);
+      const result = await service.setHealth('PMS01', payload);
       expect(result.degraded).toBe(true);
     });
   });

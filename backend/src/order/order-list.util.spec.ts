@@ -11,7 +11,7 @@ describe('order-list.util', () => {
   const baseOrder = {
     id: '260624-U1030',
     tripCode: 'U1030',
-    vehicleCode: 'PMS-05',
+    vehicleCode: 'PMS05',
     lineKind: 'MAINLINE',
     status: OrderStatus.PROCESSING,
     delayMinutes: 0,

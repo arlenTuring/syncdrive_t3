@@ -96,7 +96,7 @@ export class MqttService {
     if (this.telemetryPersistDisabled) return false;
     if (process.env.TELEMETRY_PERSIST_ALL === '1') return true;
     // 儀表板 PMS 示範車：即時資料走 Redis／Socket，不寫入時序庫
-    return !/^PMS-\d{2}$/i.test(vehicleCode);
+    return !/^PMS\d{2}$/i.test(vehicleCode);
   }
 
   /** MQTT operation/update → 增量更新訂單（單一路徑，委派 OrderService） */

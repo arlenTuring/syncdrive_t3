@@ -42,7 +42,7 @@ export const FALLBACK_EVENT: MajorEventData = {
 };
 
 export const FALLBACK_VEHICLES = Array.from({ length: 12 }, (_, i) =>
-  `PMS-${String(i + 1).padStart(2, '0')}`,
+  `PMS${String(i + 1).padStart(2, '0')}`,
 );
 
 export const FALLBACK_MAINLINE: ShiftRow[] = [
@@ -50,7 +50,7 @@ export const FALLBACK_MAINLINE: ShiftRow[] = [
     shiftKey: 'D0954',
     tripCode: 'D0954',
     directionLabel: '下行',
-    vehicleCode: 'PMS-01',
+    vehicleCode: 'PMS01',
     routeStations: '[{"name":"S2W"},{"name":"T3"},{"name":"N2W"}]',
     routeProgress: 35,
     segmentIndex: 0,
@@ -64,7 +64,7 @@ export const FALLBACK_MAINLINE: ShiftRow[] = [
     shiftKey: 'U1000',
     tripCode: 'U1000',
     directionLabel: '上行',
-    vehicleCode: 'PMS-02',
+    vehicleCode: 'PMS02',
     routeStations: '[{"name":"S2W"},{"name":"T3"},{"name":"N2W"}]',
     routeProgress: 62,
     segmentIndex: 1,
@@ -81,7 +81,7 @@ export const FALLBACK_MAINTENANCE: ShiftRow[] = [
     shiftKey: 'M-01',
     tripCode: 'M-01',
     directionLabel: '—',
-    vehicleCode: 'PMS-08',
+    vehicleCode: 'PMS08',
     routeStations: '[{"name":"S2W"},{"name":"W1"}]',
     routeProgress: 50,
     segmentIndex: 0,

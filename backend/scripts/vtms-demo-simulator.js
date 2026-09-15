@@ -1,6 +1,6 @@
 /**
  * VTMS 儀表板範例 — MQTT 模擬器
- * 發布 v1/vtms/PMS-01〜11/{telemetry|health|operation}/update
+ * 發布 v1/vtms/PMS01〜11/{telemetry|health|operation}/update
  * 以及 v1/vtms/{vehicle}/door/update、v1/vtms/{psd_id}/psd/update（月台門與車門協議）
  * 需：MQTT broker (1883)、Nest 後端 (3000) 已啟動以轉發 Socket.IO
  *
@@ -9,7 +9,7 @@
  *
  * 執行（對正式 broker 8883，TLS 客戶端憑證，與車端介接說明書 §2.1 相同的認證方式）：
  *   MQTT_URL=mqtts://<host>:8883 \
- *   MQTT_TLS_CA=./ca.crt MQTT_TLS_CERT=./PMS-01.crt MQTT_TLS_KEY=./PMS-01.key \
+ *   MQTT_TLS_CA=./ca.crt MQTT_TLS_CERT=./PMS01.crt MQTT_TLS_KEY=./PMS01.key \
  *   node scripts/vtms-demo-simulator.js
  *
  * 憑證由 POST /syncdrive-api/auth/token 取得（見協力廠商介接說明書 §一），
@@ -40,7 +40,7 @@ function buildConnectOptions(clientId) {
 }
 
 const VEHICLES = Array.from({ length: 11 }, (_, i) =>
-  `PMS-${String(i + 1).padStart(2, '0')}`,
+  `PMS${String(i + 1).padStart(2, '0')}`,
 );
 
 const DEMO_PSD_IDS = ['psd-demo-s2w', 'psd-demo-t3', 'psd-demo-n2w'];
@@ -168,7 +168,7 @@ function telemetry(vehicleCode, speed, battery, x, y) {
   };
 }
 
-/** 對齊 vehicle_monitor_demo 種子（PMS-01～04 四態示範） */
+/** 對齊 vehicle_monitor_demo 種子（PMS01～04 四態示範） */
 const HEALTH_PROFILES = [
   {
     overall: 'OK',

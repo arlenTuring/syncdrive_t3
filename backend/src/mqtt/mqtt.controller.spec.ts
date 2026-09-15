@@ -29,14 +29,14 @@ describe('MqttController', () => {
       route_progress: 25,
     };
     const context = {
-      getTopic: () => 'v1/vtms/PMS-05/telemetry/update',
+      getTopic: () => 'v1/vtms/PMS05/telemetry/update',
     };
 
     await controller.handleTelemetry(payload, context as any);
 
-    expect(redisService.setTelemetry).toHaveBeenCalledWith('PMS-05', payload);
+    expect(redisService.setTelemetry).toHaveBeenCalledWith('PMS05', payload);
     expect(mqttService.syncOperationOrderFromLive).not.toHaveBeenCalled();
     expect(telemetryWriteQueue.enqueue).not.toHaveBeenCalled();
-    expect(eventsGateway.broadcastTelemetry).toHaveBeenCalledWith('PMS-05', payload);
+    expect(eventsGateway.broadcastTelemetry).toHaveBeenCalledWith('PMS05', payload);
   });
 });

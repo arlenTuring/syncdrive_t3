@@ -10,8 +10,8 @@ socket.on('connect', () => {
   console.log('✅ [Frontend] WebSocket 連線成功！等待資料推播...');
 });
 
-socket.on('telemetry/PMS-05', (data) => {
-  console.log('\n🚀 [Frontend 收到推播] 收到 PMS-05 即時動態 (延遲: 0ms):');
+socket.on('telemetry/PMS05', (data) => {
+  console.log('\n🚀 [Frontend 收到推播] 收到 PMS05 即時動態 (延遲: 0ms):');
   console.log(JSON.stringify(data, null, 2));
   console.log('\n🎉 驗證成功！MQTT -> Redis -> WebSocket 資料管線全線暢通！');
   
@@ -28,7 +28,7 @@ mqttClient.on('connect', () => {
   
   // 準備發送符合 Telemetry 協議的完整假資料
   const fakeTelemetry = {
-    vehicle_code: "PMS-05",
+    vehicle_code: "PMS05",
     timestamp: Date.now(),
     global_pose: {
       latitude: 25.077612,
@@ -68,8 +68,8 @@ mqttClient.on('connect', () => {
 
   // 延遲 1 秒後發送，確保 WebSocket 準備好
   setTimeout(() => {
-    console.log('\n📤 [Vehicle 發送] 往 v1/vtms/PMS-05/telemetry/update 發布資料...');
-    mqttClient.publish('v1/vtms/PMS-05/telemetry/update', JSON.stringify(fakeTelemetry));
+    console.log('\n📤 [Vehicle 發送] 往 v1/vtms/PMS05/telemetry/update 發布資料...');
+    mqttClient.publish('v1/vtms/PMS05/telemetry/update', JSON.stringify(fakeTelemetry));
   }, 1000);
 });
 

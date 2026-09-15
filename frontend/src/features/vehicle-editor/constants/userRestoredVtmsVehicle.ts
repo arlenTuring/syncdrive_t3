@@ -20,27 +20,27 @@ export const VTMS_DOOR_OPEN_PERCENT_FIELDS = [
 
 const MQTT_HEARTBEAT = {
   mqttDataSourceId: 'default-mqtt',
-  mqttTopic: 'v1/vtms/PMS-01/health/heartbeat',
+  mqttTopic: 'v1/vtms/PMS01/health/heartbeat',
 } as const;
 
 const MQTT_TELEMETRY = {
   mqttDataSourceId: 'default-mqtt',
-  mqttTopic: 'v1/vtms/PMS-01/telemetry/update',
+  mqttTopic: 'v1/vtms/PMS01/telemetry/update',
 } as const;
 
 /**
- * VTMS 巴士 PMS-01：260×78 橫向車體，四角落獨立車門。
+ * VTMS 巴士 PMS01：260×78 橫向車體，四角落獨立車門。
  * 元件座標為手動拉好後的版本，勿在 migrate 時重算尺寸。
  */
 export function createUserRestoredVtmsVehicle(): VehicleDefinition {
   return {
     id: USER_RESTORED_VEHICLE_ID,
-    name: 'VTMS 巴士 · PMS-01',
+    name: 'VTMS 巴士 · PMS01',
     width: 260,
     height: 78,
     backgroundColor: 'transparent',
     previewData: {
-      vehicle_code: 'PMS-01',
+      vehicle_code: 'PMS01',
       trip_code: 'U0951',
       badge_label: 'U0951',
       direction_label: '上行',

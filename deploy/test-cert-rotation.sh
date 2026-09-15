@@ -80,7 +80,7 @@ fetch() {  # $1=名稱
   cp "$CERTS/ca-published.crt" "$d/trust.pem"
   openssl genrsa -out "$d/vehicle.key" 2048 2>/dev/null
   openssl req -new -key "$d/vehicle.key" -out "$d/vehicle.csr" \
-    -subj "/C=TW/O=SyncDrive T3/CN=PMS-01" 2>/dev/null
+    -subj "/C=TW/O=SyncDrive T3/CN=PMS01" 2>/dev/null
   openssl x509 -req -in "$d/vehicle.csr" -CA "$CERTS/client-ca.crt" -CAkey "$CERTS/client-ca.key" \
     -CAcreateserial -out "$d/leaf.crt" -days 1 -sha256 2>/dev/null
   # 送出的憑證＝車輛憑證接中介憑證

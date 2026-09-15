@@ -20,7 +20,7 @@ export class OperationOrder {
   routeId?: string;
 
   @Column({ name: 'vehicle_code' })
-  vehicleCode: string; // e.g., PMS-05
+  vehicleCode: string; // e.g., PMS05
 
   @Column({ name: 'priority_level', type: 'int', default: 50 })
   priorityLevel: number; // 預設 50 (正線營運)

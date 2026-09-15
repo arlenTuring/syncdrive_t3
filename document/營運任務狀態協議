@@ -29,7 +29,7 @@
 
 為確保跨系統識別一致性，嚴格定義以下 ID 格式：
 
-1. **車輛代號 (`vehicle_code`)**: `PMS-` + 兩碼數字。(例：`PMS-01` ~ `PMS-11`)。
+1. **車輛代號 (`vehicle_code`)**: `PMS` + 兩碼數字。(例：`PMS01` ~ `PMS11`)。
 2. **班次代碼 (`trip_code`)**: 班次模板識別碼，格式為 `[方向][時間]`。(例：`U1030`, `D2135`)。
 3. **實體訂單 (`order_id`)**: `[YYMMDD]-[trip_code]`。(例：`260422-U1030`)。
 4. **任務代號 (`task_id`)**: `[order_id]_[task_name]_[sequence]`。(例：`260422-U1030_OPEN_N2W_02`)。
@@ -47,7 +47,7 @@
     * **Payload**: 
     ```json
     { 
-     "vehicle_code": "PMS-05", 
+     "vehicle_code": "PMS05", 
      "timestamp": 1713752700000, 
      "order_id": "260422-U1030", 
      "priority_level": 50 
@@ -74,11 +74,11 @@
 
 ## 五、 車端狀態回報 MQTT Payload 格式
 
-**情境描述**：`PMS-05` 正在執行任務，已完成到站前語音，目前抵達路口節點正在等待路權。
+**情境描述**：`PMS05` 正在執行任務，已完成到站前語音，目前抵達路口節點正在等待路權。
 
 ```json
 {
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1713752865000,
   "order_id": "260422-U1030",
   "trip_code": "U1030",

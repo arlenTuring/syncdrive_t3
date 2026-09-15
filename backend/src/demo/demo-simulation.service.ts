@@ -329,7 +329,7 @@ export class DemoSimulationService {
   }> {
     const code = String(vehicleCode ?? '').trim().toUpperCase();
     if (!VTMS_VEHICLE_CODE_PATTERN.test(code)) {
-      throw new Error(`無效的 vehicle_code：${vehicleCode}（須為 PMS-01～PMS-11）`);
+      throw new Error(`無效的 vehicle_code：${vehicleCode}（須為 PMS01～PMS11）`);
     }
     if (!this.isManagedRunning()) {
       throw new Error('模擬未運行，請先按「開始模擬」');
@@ -523,7 +523,7 @@ export class DemoSimulationService {
   /**
    * 已停用：中心端不再自己生車輛資料。
    *
-   * 這裡以前會 spawn vtms-shift-demo-simulator.js，那支程式代替全部 PMS-01～11
+   * 這裡以前會 spawn vtms-shift-demo-simulator.js，那支程式代替全部 PMS01～11
    * 發布 telemetry。問題是模擬器<strong>只該有一份</strong>：它跑在開發者機器上
    * （simulator/），以外部廠商身分連線。兩邊同時跑會搶同一批車號，輪流蓋掉對方
    * 的位置，圖台上的車就散在莫名其妙的地方（實測那支回報 x=1025，超出圖資的
@@ -573,7 +573,7 @@ export class DemoSimulationService {
               24,
               GREATEST(8, COALESCE(demo_speed, 14) + (floor(random() * 3) - 1)::int)
             )
-        WHERE vehicle_code NOT LIKE 'PMS-%'
+        WHERE vehicle_code NOT LIKE 'PMS%'
       `);
       await this.dataSource.query(`
         UPDATE operation_orders

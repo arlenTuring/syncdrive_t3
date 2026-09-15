@@ -80,7 +80,7 @@ export class VehicleEtaController {
     name: 'vehicle_code',
     required: false,
     description:
-      '指定車輛，可重複指定多個（如 ?vehicle_code=PMS-01&vehicle_code=PMS-05）',
+      '指定車輛，可重複指定多個（如 ?vehicle_code=PMS01&vehicle_code=PMS05）',
   })
   @ApiQuery({
     name: 'next_stops',

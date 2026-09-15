@@ -184,7 +184,7 @@ export function SimulationTransportToolbar() {
     lastSimulatedEvent,
   } = useDemoSimulation();
 
-  const [faultVehicleCode, setFaultVehicleCode] = useState('PMS-02');
+  const [faultVehicleCode, setFaultVehicleCode] = useState('PMS02');
 
   const running = status.running;
   const managed = running && status.source === 'managed';

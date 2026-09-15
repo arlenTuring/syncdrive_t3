@@ -81,7 +81,7 @@ export class EtaPlanDto {
 
 /** by-station：某一站底下的一筆車輛預測 */
 export class StationEtaEntryDto {
-  @ApiProperty({ example: 'PMS-05' })
+  @ApiProperty({ example: 'PMS05' })
   vehicle_code!: string;
 
   @ApiProperty({ nullable: true, example: '260816-ST0007' })
@@ -251,7 +251,7 @@ export class VehicleNextStopDto {
 }
 
 export class VehicleEtaEntryDto {
-  @ApiProperty({ example: 'PMS-05' })
+  @ApiProperty({ example: 'PMS05' })
   vehicle_code!: string;
 
   @ApiProperty({ nullable: true, enum: ['TRANSITING', 'FAULTED'] })

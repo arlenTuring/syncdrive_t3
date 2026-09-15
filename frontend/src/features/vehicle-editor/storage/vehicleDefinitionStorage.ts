@@ -23,7 +23,7 @@ function persistVehicleDefinitions(list: VehicleDefinition[]): void {
 
 export { migrateVehicleDefinition } from '../utils/migrateVehicleDefinition';
 
-export const DEFAULT_VEHICLE_DEFINITION_NAME = 'VTMS 巴士 · PMS-01';
+export const DEFAULT_VEHICLE_DEFINITION_NAME = 'VTMS 巴士 · PMS01';
 
 export function loadVehicleDefinitions(): VehicleDefinition[] {
   try {
@@ -88,7 +88,7 @@ export function createBlankVehicleForContainer(name = '圖台載具'): string {
       backgroundColor: 'transparent',
       elements: [],
       previewData: {
-        vehicle_code: 'PMS-01',
+        vehicle_code: 'PMS01',
         trip_code: 'D0950',
         overall_health: 'OK',
       },

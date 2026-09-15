@@ -65,10 +65,10 @@ describe('MqttService', () => {
       task_group: [{ task_id: '260624-D1401_RT-DOWN-T3-DOCK', task_name: 'PLATFORM_DOCKING', status: 'IN_PROGRESS' }],
     };
 
-    await service.syncOperationOrderFromLive('PMS-03', payload);
+    await service.syncOperationOrderFromLive('PMS03', payload);
 
     expect(orderServiceMock.applyOperationMqttUpdate).toHaveBeenCalledWith(
-      'PMS-03',
+      'PMS03',
       expect.objectContaining({
         order_id: '260624-D1401',
         trip_code: 'D1401',
@@ -79,7 +79,7 @@ describe('MqttService', () => {
   describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {
     it('車端已帶 yard_slot_id 時不覆蓋', async () => {
       const payload = { yard_slot_id: 'H1', vehicle_phase: 'IDLE' };
-      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      const result = await service.enrichWithFacilityLocation('PMS01', payload);
       expect(result).toBe(payload);
       expect(redisServiceMock.getTelemetry).not.toHaveBeenCalled();
     });
@@ -94,7 +94,7 @@ describe('MqttService', () => {
         equipmentKind: 'yard_slot',
       });
       const payload = { vehicle_phase: 'IDLE' };
-      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      const result = await service.enrichWithFacilityLocation('PMS01', payload);
       expect(result).toMatchObject({ yard_slot_id: 'H2' });
       expect(mapServiceMock.findFacilityAtPoint).toHaveBeenCalledWith('map-test', 52, 62);
     });
@@ -105,7 +105,7 @@ describe('MqttService', () => {
       });
       mapServiceMock.findFacilityAtPoint.mockReturnValueOnce(null);
       const payload = { vehicle_phase: 'TRANSITING' };
-      const result = await service.enrichWithFacilityLocation('PMS-01', payload);
+      const result = await service.enrichWithFacilityLocation('PMS01', payload);
       expect(result).not.toHaveProperty('yard_slot_id');
     });
   });

@@ -2,11 +2,11 @@
 /**
  * 訂閱 operation/update，印出 vehicle_phase（驗收 FAULTED 用）
  *
- * 用法：node backend/scripts/verify-vehicle-phase.js [PMS-05]
+ * 用法：node backend/scripts/verify-vehicle-phase.js [PMS05]
  */
 const mqtt = require('mqtt');
 
-const vehicleCode = process.argv[2] || 'PMS-05';
+const vehicleCode = process.argv[2] || 'PMS05';
 const mqttUrl = process.env.MQTT_URL || 'mqtt://127.0.0.1:1883';
 const topic = `v1/vtms/${vehicleCode}/operation/update`;
 const timeoutMs = 30_000;

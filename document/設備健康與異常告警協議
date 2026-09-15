@@ -13,18 +13,18 @@
 
 為確保跨系統的識別一致性與資料庫解析效能，嚴格定義以下格式：
 
-1. **車輛代號 (`vehicle_code`)**: `PMS-` + 兩碼數字。 (例：`PMS-01` ~ `PMS-11`)
+1. **車輛代號 (`vehicle_code`)**: `PMS` + 兩碼數字。 (例：`PMS01` ~ `PMS11`)
 2. **命名規範 (`SCREAMING_SNAKE_CASE`)**: 所有的子系統節點名稱以及陣列內的錯誤碼 (`error_codes`) 字串，一律強制使用**全大寫英文及底線 (`SCREAMING_SNAKE_CASE`)**，嚴禁包含空格或特殊符號。
 
 ---
 
 ## 三、 MQTT Payload 格式範例
 
-以下範例情境：車輛 **PMS-05** 發生了感測器盲區以及 5G 網路延遲，導致整機健康狀態轉為 `ERROR`。
+以下範例情境：車輛 **PMS05** 發生了感測器盲區以及 5G 網路延遲，導致整機健康狀態轉為 `ERROR`。
 
 ```json
 {
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1716536357050,
   "overall_health": "ERROR",
   "subsystems": {
@@ -61,7 +61,7 @@
 
 | JSON 欄位 | 型別 | 值域 / 實作邏輯說明 |
 | :--- | :--- | :--- |
-| `vehicle_code` | String | `PMS-01` ~ `PMS-11`。車輛之系統唯一識別碼。 |
+| `vehicle_code` | String | `PMS01` ~ `PMS11`。車輛之系統唯一識別碼。 |
 | `timestamp` | Long | Unix Epoch (ms)。產生此筆健康事件的絕對時間戳記。 |
 | `overall_health` | String | `OK`, `WARNING`, `ERROR`, `OFFLINE`。<br>**車輛整機健康總評**：只要四大子系統中有任一項為 `ERROR`，此值即必須為 `ERROR`。中心端 UI 的車輛健康告警燈號將直接綁定此欄位。<br>`OFFLINE` 為**中心端推導值**（心跳逾時/失聯時由中心標記，車端不主動上報），用於 UI 區分「失聯」與「故障」。 |
 

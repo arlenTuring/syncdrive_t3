@@ -8,10 +8,10 @@ import { VTMS_VEHICLE_CODE_OR_ALL_PATTERN } from '../../common/vehicle-codes';
  * 集中以 class-validator 強制協議約束，取代散落於 controller 的手寫驗證。
  */
 export class ExecuteCommandDto {
-  @ApiProperty({ example: 'PMS-05', description: "'all' 或 PMS-01~PMS-11" })
+  @ApiProperty({ example: 'PMS05', description: "'all' 或 PMS01~PMS11" })
   @IsString()
   @Matches(VTMS_VEHICLE_CODE_OR_ALL_PATTERN, {
-    message: "vehicle_code 必須為 'all' 或 PMS-01~PMS-11",
+    message: "vehicle_code 必須為 'all' 或 PMS01~PMS11",
   })
   vehicle_code: string;
 

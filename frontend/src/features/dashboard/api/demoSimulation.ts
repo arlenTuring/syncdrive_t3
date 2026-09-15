@@ -174,7 +174,7 @@ export async function pauseDemoSimulation(backendUrl: string): Promise<DemoSimul
 
 export const VTMS_DEMO_VEHICLE_CODES = Array.from(
   { length: 11 },
-  (_, i) => `PMS-${String(i + 1).padStart(2, '0')}`,
+  (_, i) => `PMS${String(i + 1).padStart(2, '0')}`,
 );
 
 export async function triggerDemoVehicleFault(

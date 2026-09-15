@@ -1428,7 +1428,7 @@ const elements: CanvasElementProps[] = [
     backgroundColor: '#020617', backgroundImage: '', opacity: 100,
     canvasKind: 'map-platform', mapId: 't3-main-version', zoomFactor: 1.15,
     useDefaultVehicleDefinition: true,
-    vehicleDefinitionName: 'VTMS 巴士 · PMS-01',
+    vehicleDefinitionName: 'VTMS 巴士 · PMS01',
     children: [],
   },
   {
@@ -1744,14 +1744,14 @@ function mapVehicleContainerWidget(): VehicleContainerWidget {
     id: cid(),
     width: MAP_VEHICLE_SIZE.width,
     height: MAP_VEHICLE_SIZE.height,
-    label: 'PMS-01',
+    label: 'PMS01',
     vehicleDefinitionId: USER_RESTORED_VEHICLE_ID,
     behaviorOffsetX: 0,
     behaviorOffsetY: -30,
     behaviorIconSize: 22,
     actionIconRules: buildVehicleBehaviorActionRules('operation_action'),
     mqttDataSourceId: MQTT,
-    mqttTopic: 'v1/vtms/PMS-01/operation/update',
+    mqttTopic: 'v1/vtms/PMS01/operation/update',
   };
 }
 

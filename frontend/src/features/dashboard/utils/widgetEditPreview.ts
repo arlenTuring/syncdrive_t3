@@ -4,9 +4,9 @@ import type { ChildWidget, RouteStation } from '../types';
 /** 依 valueField 推斷的編輯預覽示範 */
 export const FIELD_PREVIEW_SAMPLES: Record<string, string> = {
   category: '線控',
-  vehicle_code: 'PMS-01',
+  vehicle_code: 'PMS01',
   message: '防鎖死煞車系統故障',
-  sub_label: 'PMS-02',
+  sub_label: 'PMS02',
   severity: 'warning',
   trip_code: 'S0000',
   next_station: 'E2',

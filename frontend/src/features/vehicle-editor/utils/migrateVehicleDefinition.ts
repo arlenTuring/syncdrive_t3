@@ -8,7 +8,7 @@ function normalizePreviewData(
   preview: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   const merged = {
-    vehicle_code: 'PMS-01',
+    vehicle_code: 'PMS01',
     trip_code: 'D0950',
     badge_label: 'D0950',
     direction_label: '下行',

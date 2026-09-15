@@ -37,15 +37,15 @@ function row(
 
 /** 對齊設計稿示範列；後端清單 API 尚未建立 */
 export const FALLBACK_DISPATCH_ITEMS: DispatchListItem[] = [
-  row('D0954', 'emergency', 'PMS-01', 'running'),
-  row('U1000', 'maintenance', 'PMS-02', 'pending'),
-  row('D1006', 'general', 'PMS-03', 'running'),
-  row('U1012', 'general', 'PMS-04', 'pending_approval'),
-  row('D1018', 'general', 'PMS-05', 'pending_approval'),
-  row('U1024', 'general', 'PMS-06', 'pending_approval'),
-  row('D1030', 'general', 'PMS-01', 'pending_approval'),
-  row('U1036', 'general', 'PMS-02', 'pending_approval'),
-  row('D1042', 'general', 'PMS-03', 'completed'),
-  row('U1048', 'general', 'PMS-04', 'completed'),
-  row('D1054', 'general', 'PMS-05', 'rejected'),
+  row('D0954', 'emergency', 'PMS01', 'running'),
+  row('U1000', 'maintenance', 'PMS02', 'pending'),
+  row('D1006', 'general', 'PMS03', 'running'),
+  row('U1012', 'general', 'PMS04', 'pending_approval'),
+  row('D1018', 'general', 'PMS05', 'pending_approval'),
+  row('U1024', 'general', 'PMS06', 'pending_approval'),
+  row('D1030', 'general', 'PMS01', 'pending_approval'),
+  row('U1036', 'general', 'PMS02', 'pending_approval'),
+  row('D1042', 'general', 'PMS03', 'completed'),
+  row('U1048', 'general', 'PMS04', 'completed'),
+  row('D1054', 'general', 'PMS05', 'rejected'),
 ];

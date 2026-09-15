@@ -10,17 +10,17 @@
 
 ## 二、 核心命名與代碼規範
 為確保跨系統的識別一致性，嚴格定義以下格式：
-1. **車輛代號 (`vehicle_code`)**: `PMS-` + 兩碼數字。 (例：`PMS-01` ~ `PMS-11`)
+1. **車輛代號 (`vehicle_code`)**: `PMS` + 兩碼數字。 (例：`PMS01` ~ `PMS11`)
 
 ---
 
 ## 三、 MQTT Payload 格式範例
 
-以下範例情境：車輛 **PMS-05** 正在以時速 10.5 km/h 行駛中，並回傳當下絕對座標、車輛姿態與底盤線控反饋。
+以下範例情境：車輛 **PMS05** 正在以時速 10.5 km/h 行駛中，並回傳當下絕對座標、車輛姿態與底盤線控反饋。
 
 ```json
 {
-  "vehicle_code": "PMS-05",
+  "vehicle_code": "PMS05",
   "timestamp": 1716536357000,
   "global_pose": {
     "latitude": 25.077612,
@@ -81,7 +81,7 @@
 ### 1. 識別與全域定位層 (Identification & Global Pose)
 | JSON 欄位 | 型別 | 值域 / 實作邏輯說明 |
 | :--- | :--- | :--- |
-| `vehicle_code` | String | `PMS-01` ~ `PMS-11`。車輛之系統唯一識別碼。 |
+| `vehicle_code` | String | `PMS01` ~ `PMS11`。車輛之系統唯一識別碼。 |
 | `timestamp` | Long | Unix Epoch (ms)。產生此筆資料的絕對時間戳記。 |
 | `global_pose.latitude` | Double | 緯度 (WGS84)。衛星定位之絕對緯度，供前端 Web 圖台底圖定位。 |
 | `global_pose.longitude`| Double | 經度 (WGS84)。衛星定位之絕對經度。 |

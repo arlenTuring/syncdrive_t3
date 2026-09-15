@@ -1,4 +1,4 @@
--- 載具監控示範（PMS-01～11 · 班次模擬車隊；預設皆正常，異常僅來自即時 MQTT 健康心跳）
+-- 載具監控示範（PMS01～11 · 班次模擬車隊；預設皆正常，異常僅來自即時 MQTT 健康心跳）
 CREATE TABLE IF NOT EXISTS vehicle_monitor_demo (
   vehicle_code VARCHAR(32) PRIMARY KEY,
   overall_health VARCHAR(16) NOT NULL DEFAULT 'OK',
@@ -23,27 +23,27 @@ INSERT INTO vehicle_monitor_demo (
   badge_label, trip_badge_bg, trip_badge_color, badge_outline,
   demo_speed, demo_load, segment_label
 ) VALUES
-  ('PMS-01', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS01', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 0, 88.0, 'P1'),
-  ('PMS-02', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS02', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 17.2, 87.0, 'D12'),
-  ('PMS-03', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS03', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 16.2, 85.5, 'D08'),
-  ('PMS-04', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS04', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 16.8, 86.5, 'D20'),
-  ('PMS-05', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS05', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 15.8, 84.5, 'D28'),
-  ('PMS-06', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS06', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 17.5, 87.5, 'U08'),
-  ('PMS-07', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS07', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 0, 86.0, 'H1'),
-  ('PMS-08', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS08', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 15.5, 84.0, 'U28'),
-  ('PMS-09', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS09', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 16.0, 85.0, 'D18'),
-  ('PMS-10', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS10', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 0, 83.5, 'E1'),
-  ('PMS-11', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
+  ('PMS11', 'OK', '', '#00c897', 'OK', 'OK', 'OK', 'OK',
    NULL, '#7e57c2', '#f3e8ff', '0', 0, 82.0, 'P4')
 ON CONFLICT (vehicle_code) DO UPDATE SET
   overall_health = EXCLUDED.overall_health,

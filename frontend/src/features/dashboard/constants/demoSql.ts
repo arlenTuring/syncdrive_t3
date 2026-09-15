@@ -116,7 +116,7 @@ SELECT
   END AS remaining_line
 FROM operation_orders
 WHERE created_at >= ${DAY_MS}
-  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS-%')
+  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')
 `.trim();
 
 /** 班表部署管理 — 目前模式卡（示意；之後可改綁營運模式狀態） */
@@ -169,7 +169,7 @@ export const DEPLOYMENT_VEHICLE_LIST_SQL = `
 SELECT
   vehicle_code
 FROM vehicles
-WHERE vehicle_code LIKE 'PMS-%'
+WHERE vehicle_code LIKE 'PMS%'
 ORDER BY vehicle_code
 `.trim();
 
@@ -294,7 +294,7 @@ FROM (
     END AS status_code
   FROM vehicles v
   WHERE v.is_active = true
-    AND (v.vehicle_code LIKE 'PMS-%' OR v.vehicle_code LIKE 'AMR-%' OR v.vehicle_code LIKE 'AGV-%')
+    AND (v.vehicle_code LIKE 'PMS%' OR v.vehicle_code LIKE 'AMR-%' OR v.vehicle_code LIKE 'AGV-%')
 ) fleet
 GROUP BY status_code
 ORDER BY CASE status_code
@@ -444,7 +444,7 @@ LEFT JOIN LATERAL (
 LEFT JOIN operation_orders o
   ON o.vehicle_code = v.vehicle_code AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
 WHERE v.is_active = true
-  AND v.vehicle_code LIKE 'PMS-%'
+  AND v.vehicle_code LIKE 'PMS%'
 ORDER BY v.vehicle_code, o.created_at DESC NULLS LAST
 `.trim();
 

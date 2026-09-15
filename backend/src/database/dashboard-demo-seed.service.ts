@@ -46,24 +46,24 @@ export class DashboardDemoSeedService implements OnApplicationBootstrap {
         DELETE FROM order_action_states
         WHERE order_id IN (
           SELECT order_id FROM operation_orders
-          WHERE vehicle_code LIKE 'PMS-%' OR order_id ~ '-R[0-9]+$'
+          WHERE vehicle_code LIKE 'PMS%' OR order_id ~ '-R[0-9]+$'
         )
       `);
       await this.dataSource.query(`
         DELETE FROM order_events
         WHERE order_id IN (
           SELECT order_id FROM operation_orders
-          WHERE vehicle_code LIKE 'PMS-%' OR order_id ~ '-R[0-9]+$'
+          WHERE vehicle_code LIKE 'PMS%' OR order_id ~ '-R[0-9]+$'
         )
       `);
       await this.dataSource.query(`
         DELETE FROM operation_orders
-        WHERE vehicle_code LIKE 'PMS-%' OR order_id ~ '-R[0-9]+$'
+        WHERE vehicle_code LIKE 'PMS%' OR order_id ~ '-R[0-9]+$'
       `);
       await this.dataSource.query(`
         UPDATE vehicle_monitor_demo
         SET badge_label = NULL, segment_label = NULL, demo_speed = NULL
-        WHERE vehicle_code LIKE 'PMS-%'
+        WHERE vehicle_code LIKE 'PMS%'
       `);
       this.logger.log('Cleared PMS demo orders and monitor badges');
     } catch (err) {
@@ -78,7 +78,7 @@ export class DashboardDemoSeedService implements OnApplicationBootstrap {
     await this.runSqlFile('seed-dashboard-demo.sql', async () => {
       const [vehicles]: { c: number }[][] = await Promise.all([
         this.dataSource.query(
-          `SELECT count(*)::int AS c FROM vehicles WHERE vehicle_code LIKE 'PMS-%' AND is_active = true`,
+          `SELECT count(*)::int AS c FROM vehicles WHERE vehicle_code LIKE 'PMS%' AND is_active = true`,
         ),
       ]);
       return Number(vehicles[0]?.c ?? 0) >= 11;

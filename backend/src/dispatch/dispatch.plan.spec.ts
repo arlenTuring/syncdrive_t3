@@ -7,7 +7,7 @@ import {
   vehicleForRow,
 } from './dispatch.plan';
 
-const FLEET = ['PMS-01', 'PMS-02', 'PMS-03'];
+const FLEET = ['PMS01', 'PMS02', 'PMS03'];
 
 function trip(overrides: Partial<TimetableTripDto> = {}): TimetableTripDto {
   return {
@@ -60,8 +60,8 @@ const MIDNIGHT = localMidnight(REFERENCE);
 
 describe('vehicleForRow', () => {
   it('第 N 列對到第 N 台', () => {
-    expect(vehicleForRow(1, FLEET)).toBe('PMS-01');
-    expect(vehicleForRow(3, FLEET)).toBe('PMS-03');
+    expect(vehicleForRow(1, FLEET)).toBe('PMS01');
+    expect(vehicleForRow(3, FLEET)).toBe('PMS03');
   });
 
   it('列號超過車隊台數時回 null——寧可少一班，不要兩列共用一台', () => {
@@ -101,7 +101,7 @@ describe('planDispatches', () => {
     expect(planned).toHaveLength(1);
     const item = planned[0];
     expect(item.orderId).toBe('260826-A01-0800');
-    expect(item.vehicleCode).toBe('PMS-01');
+    expect(item.vehicleCode).toBe('PMS01');
     expect(item.departAt).toBe(MIDNIGHT + 8 * 3600 * 1000);
     expect(item.arriveAt).toBe(MIDNIGHT + (8 * 3600 + 1800) * 1000);
   });

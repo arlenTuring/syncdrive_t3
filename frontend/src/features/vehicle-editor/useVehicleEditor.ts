@@ -235,7 +235,7 @@ export function useVehicleEditor() {
         height,
         backgroundColor: '#000000',
         previewData: {
-          vehicle_code: 'PMS-01',
+          vehicle_code: 'PMS01',
           trip_code: 'D0950',
           overall_health: 'OK',
         },
