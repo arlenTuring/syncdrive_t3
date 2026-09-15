@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * parseOpenDriveXodr 用瀏覽器的 DOMParser 解 XML，Node 沒有這個全域物件。
+ * 圖台本來就跑在瀏覽器，不為了測試改用別的解析器——換一支解析器就不是在測
+ * 正式環境跑的那段程式了。
+ */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

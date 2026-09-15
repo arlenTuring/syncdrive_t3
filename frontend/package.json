@@ -15,7 +15,8 @@
     "bake:demo-plane": "tsx scripts/bake-demo-plane-snapshot.ts",
     "validate:demo-plane": "tsx scripts/validate-demo-plane-snapshot.ts",
     "import:demo-plane": "node scripts/import-demo-plane-snapshot.mjs",
-    "audit:demo-plane": "tsx scripts/audit-dashboard-template.ts"
+    "audit:demo-plane": "tsx scripts/audit-dashboard-template.ts",
+    "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {
     "i18next": "^26.4.2",
@@ -37,11 +38,13 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "jsdom": "^24.1.3",
     "playwright": "^1.49.0",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.22.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }
