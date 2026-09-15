@@ -1,3 +1,14 @@
+/**
+ * 複製格式：只帶「長相」，不帶「這個元件代表現場的哪裡」。
+ *
+ * <h3>場域範圍為什麼不能複製</h3>
+ * refFieldXMinM/XMaxM/YMinM/YMaxM 是這一塊對應到現場的哪一段，圖台↔場域的換算全靠
+ * 它。複製格式原本把這四個值一起貼過去，於是兩塊不同位置的元件宣稱自己代表同一段
+ * 現場——車輛定位、路徑規劃、停靠點反算全部跟著錯，而且畫面上看起來完全正常，只有
+ * 車跑到別的地方時才會發現。
+ *
+ * 工具列上寫的是「大小、角度、填色、框線、字級」，場域位置本來就不在裡面。
+ */
 import { getFacilitySizeMeters } from '../constants/facilityDimensions'
 import type { MapAreaDomain, MapAreaLayout } from '../types/area'
 import type { FacilityName, FacilityObject, GeofenceFacility, RotationDeg } from '../types/facility'
@@ -14,12 +25,6 @@ import {
   labelStyleToParameters,
   type FacilityLabelStyle,
 } from './facilityLabelStyle'
-import {
-  REF_FIELD_X_MAX_M,
-  REF_FIELD_X_MIN_M,
-  REF_FIELD_Y_MAX_M,
-  REF_FIELD_Y_MIN_M,
-} from './facilityRefFieldBounds'
 import { TRACK_CORNER_RADIUS_KEY } from './trackCornerRadius'
 
 export type FacilityFrameStrokeSnapshot = {
@@ -124,17 +129,6 @@ export function extractFacilityFormat(
         fontWeight: firstLabel.fontWeight,
       }
     }
-    const gfParams = facility.parameters ?? {}
-    for (const key of [
-      REF_FIELD_X_MIN_M,
-      REF_FIELD_X_MAX_M,
-      REF_FIELD_Y_MIN_M,
-      REF_FIELD_Y_MAX_M,
-    ] as const) {
-      if (typeof gfParams[key] === 'number') {
-        parameters[key] = gfParams[key]
-      }
-    }
   } else {
     const params = facility.parameters ?? {}
     if (typeof params.defaultFillColor === 'string') {
@@ -144,17 +138,6 @@ export function extractFacilityFormat(
     const labelStyle = getFacilityLabelStyle(facility)
     if (Object.keys(labelStyle).length > 0) {
       parameters.labelStyle = cloneLabelStyle(labelStyle)
-    }
-
-    for (const key of [
-      REF_FIELD_X_MIN_M,
-      REF_FIELD_X_MAX_M,
-      REF_FIELD_Y_MIN_M,
-      REF_FIELD_Y_MAX_M,
-    ] as const) {
-      if (typeof params[key] === 'number') {
-        parameters[key] = params[key]
-      }
     }
 
     const trackCorners = params[TRACK_CORNER_RADIUS_KEY]
@@ -236,17 +219,8 @@ export function applyFacilityFormat(
       snapshot.layoutSizeM,
     )
     const nextLabels = applyGeofenceLabelFont(cur.labels, font)
+    // 場域範圍留在目標身上，不從來源帶過來（見檔頭說明）
     const gfParams: Record<string, unknown> = { ...(gf.parameters ?? {}) }
-    for (const key of [
-      REF_FIELD_X_MIN_M,
-      REF_FIELD_X_MAX_M,
-      REF_FIELD_Y_MIN_M,
-      REF_FIELD_Y_MAX_M,
-    ] as const) {
-      if (snapshot.parameters[key] !== undefined) {
-        gfParams[key] = snapshot.parameters[key]
-      }
-    }
     const synced = syncGeofenceFacility({
       ...gf,
       parameters: {
@@ -298,17 +272,6 @@ export function applyFacilityFormat(
         snapshot.parameters.labelStyle as FacilityLabelStyle,
       ),
     )
-  }
-
-  for (const key of [
-    REF_FIELD_X_MIN_M,
-    REF_FIELD_X_MAX_M,
-    REF_FIELD_Y_MIN_M,
-    REF_FIELD_Y_MAX_M,
-  ] as const) {
-    if (snapshot.parameters[key] !== undefined) {
-      nextParams[key] = snapshot.parameters[key]
-    }
   }
 
   if (snapshot.parameters[TRACK_CORNER_RADIUS_KEY] !== undefined) {
