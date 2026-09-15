@@ -1,6 +1,11 @@
 import type { MapAreaObject } from '../types/area';
 import { fieldMetersAtAreaLocal } from '../utils/fieldFromArea';
-import { getTrackGenPaths, getTrackGenSpans, pointAlongPath } from '../utils/trackGenPaths';
+import {
+  getTrackGenPaths,
+  getTrackGenSpans,
+  pointAlongPath,
+  type PathXY,
+} from '../utils/trackGenPaths';
 import {
   buildTrackNetwork,
   resolveVehiclePlacementAcrossAreas,
@@ -46,6 +51,22 @@ export type FieldMappingAudit = {
     worstM: number;
     /** spans 蓋到這條中心線的幾成（1 = 整條都有里程對應） */
     spanCoverage: number;
+    /**
+     * 這一塊畫出來的中心線上，有幾個取樣點在圖面上更貼近<strong>別塊</strong>的中心線。
+     *
+     * 那是示意圖把兩條線畫重疊了：同一個像素兩塊都說得通，單看圖面反推無解。不影響
+     * 車輛定位（那是場域→圖面的正向），但反推那條路（停靠點座標）在這幾個像素上
+     * 必須由呼叫端指定是哪一塊，不能讓它自己挑。
+     */
+    overlappedByOther: number;
+    /**
+     * 畫出來的中心線在沿線那一軸上塌掉了（大部分點擠在同一個值）。
+     *
+     * 反推靠「沿線那一軸等於某個值」去找位置（alongAtAxisValue）。塌掉的話只有第一
+     * 段有效，後面整段找不到，回推就飽和在同一個地方——實測 D04/T01 後半段的回推
+     * x 都落在 −125 附近，真值卻一路走到 −136。
+     */
+    collapsedDrawnPath: boolean;
     /** 取樣點被判給別塊的次數 */
     wrongBlock: number;
     samples: number;
@@ -71,6 +92,22 @@ const SAMPLE_FRACTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
  *
  * 誤差是症狀，覆蓋率才是原因。分開報，才不會每次都要重新追一遍。
  */
+/**
+ * 畫出來的中心線有沒有在沿線那一軸上塌掉。
+ *
+ * 沿線那一軸（長邊）上的相異值少於三個，就不是一條帶子而是一疊點。兩點的直線只有
+ * 兩個值，是正常的，所以只在三個點以上才判。
+ */
+function drawnPathCollapsed(local: PathXY): boolean {
+  if (local.length < 3) return false;
+  const first = local[0]!;
+  const last = local[local.length - 1]!;
+  const axis: 0 | 1 =
+    Math.abs(last[0] - first[0]) >= Math.abs(last[1] - first[1]) ? 0 : 1;
+  const distinct = new Set(local.map((p) => p[axis].toFixed(3)));
+  return distinct.size < 3;
+}
+
 function spanCoverageOf(parameters: Record<string, unknown> | undefined): number {
   const spans = getTrackGenSpans(parameters);
   if (spans.length === 0) return 0;
@@ -104,6 +141,7 @@ export function auditFieldMapping(
       if (!paths) continue;
       let worstM = 0;
       let wrongBlock = 0;
+      let overlappedByOther = 0;
       for (const t of SAMPLE_FRACTIONS) {
         const pt = pointAlongPath(paths.real, t);
         const place = resolveVehiclePlacementAcrossAreas(areas, pt.x, pt.y, net);
@@ -112,13 +150,41 @@ export function auditFieldMapping(
           continue;
         }
         if (place.placement.trackId !== f.id) wrongBlock += 1;
+        /*
+         * 回推時指定由畫它的那一塊解釋。
+         *
+         * 產品程式碼反推座標時本來就會指定（preferTrackId）；讓健檢自己重挑一次，
+         * 量到的會是「示意圖在這個像素上模稜兩可」而不是「這一塊算錯了」。那兩件事
+         * 要分開報，否則每次看到十幾公尺都要重追一遍才知道是哪一種。
+         */
         const back = fieldMetersAtAreaLocal(
           place.area,
           place.placement.areaLocalX,
           place.placement.areaLocalY,
+          { preferTrackId: place.placement.trackId },
         );
         const err = Math.hypot(back.xM - pt.x, back.yM - pt.y);
         if (Number.isFinite(err) && err > worstM) worstM = err;
+
+        // 同一個像素有沒有別塊的中心線畫得更近
+        const mine = fieldMetersAtAreaLocal(
+          place.area,
+          place.placement.areaLocalX,
+          place.placement.areaLocalY,
+          { preferTrackId: f.id },
+        );
+        const free = fieldMetersAtAreaLocal(
+          place.area,
+          place.placement.areaLocalX,
+          place.placement.areaLocalY,
+        );
+        if (
+          free.trackId &&
+          free.trackId !== f.id &&
+          (free.sidePx ?? Infinity) < (mine.sidePx ?? Infinity)
+        ) {
+          overlappedByOther += 1;
+        }
       }
       const scale = pxPerMeterOnFacility(f, area);
       blocks.push({
@@ -128,6 +194,8 @@ export function auditFieldMapping(
         junction: /Taper|Switch|Cross/.test(f.name),
         worstM: Number(worstM.toFixed(2)),
         spanCoverage: Number(spanCoverageOf(f.parameters).toFixed(3)),
+        overlappedByOther,
+        collapsedDrawnPath: drawnPathCollapsed(paths.local),
         wrongBlock,
         samples: SAMPLE_FRACTIONS.length,
         alongPxPerM: scale ? Number(scale.alongPxPerM.toFixed(3)) : null,
@@ -177,6 +245,24 @@ export function describeFieldMappingAudit(audit: FieldMappingAudit): string {
       `  里程對應沒蓋滿整條中心線（沒蓋到的那一截會被隔壁搶去解釋）：${partial
         .slice(0, 10)
         .map((b) => `${b.code} ${(b.spanCoverage * 100).toFixed(0)}%`)
+        .join('、')}`,
+    );
+  }
+  const collapsed = audit.blocks.filter((b) => b.collapsedDrawnPath);
+  if (collapsed.length > 0) {
+    lines.push(
+      `  畫出來的中心線在長邊上塌掉了（後半段反推不出位置）：${collapsed
+        .slice(0, 10)
+        .map((b) => b.code)
+        .join('、')}`,
+    );
+  }
+  const overlapped = audit.blocks.filter((b) => b.overlappedByOther > 0);
+  if (overlapped.length > 0) {
+    lines.push(
+      `  圖上與別塊畫重疊（反推那條路要指定是哪一塊，不能讓它自己挑）：${overlapped
+        .slice(0, 10)
+        .map((b) => `${b.code} ${b.overlappedByOther}/${b.samples}`)
         .join('、')}`,
     );
   }

@@ -29,6 +29,13 @@ export type FieldPoint = {
   source: 'track' | 'area'
   /** 從軌道反推時，離那一段中心線多遠（公尺，左正右負） */
   offsetM?: number
+  /**
+   * 離那一段<strong>畫出來的</strong>中心線多遠（區域像素）。
+   *
+   * 挑「由誰解釋這個點」時要比這個，不能比公尺：各段的比例尺差到二十四倍，
+   * 同樣的像素距離換算出來的公尺數完全不同，跨塊比公尺等於比不同單位。
+   */
+  sidePx?: number
   trackId?: string
 }
 
@@ -97,6 +104,7 @@ function fieldFromTrack(
 
   let along: number
   let sideM: number
+  let sidePx: number
   if (getTrackGenLatMode(f.parameters) === 'arc') {
     /*
      * 圓角：並排的軌道是同心弧，偏移量沿法線。外框近似正方形，所以兩軸的比例尺
@@ -109,6 +117,8 @@ function fieldFromTrack(
     const scale = (latPerBox[0] + latPerBox[1]) / 2
     // projectAlongPath 的 side 是圖面座標的左手邊，真實世界的左手邊相反
     sideM = scale > 1e-12 ? -hit.side / scale : 0
+    // 圓角的外框近似正方形，兩軸比例尺相同，取平均邊長換回像素
+    sidePx = Math.abs(hit.side) * ((size.w + size.h) / 2)
   } else {
     /*
      * 其餘：帶子沿外框的一軸走，偏移量沿另一軸。沿線的位置由「走的那一軸」決定，
@@ -126,6 +136,8 @@ function fieldFromTrack(
     const sign = alongU ? Math.sign(-d.x || 1) : Math.sign(d.y || 1)
     const per = alongU ? latPerBox[1] : latPerBox[0]
     sideM = per > 1e-12 ? delta / (sign * per) : 0
+    // delta 是比例座標裡的偏移，乘回那一軸的邊長就是像素
+    sidePx = Math.abs(delta) * (alongU ? size.h : size.w)
   }
 
   /*
@@ -159,6 +171,7 @@ function fieldFromTrack(
     yM: base.y + d.x * sideM,
     source: 'track',
     offsetM: sideM,
+    sidePx,
     trackId: f.id,
   }
 }
@@ -266,6 +279,16 @@ export function fieldMetersAtAreaLocal(
    *
    * 拖曳的人看到的是圖面上的相鄰關係，那也正是唯一可靠的依據：貼著誰，就由誰解釋。
    * 公尺只留著在同樣貼著的幾塊之間分高下（上下行疊在一起時就靠它）。
+   */
+  /*
+   * 平手（框重疊）時比離中心線多遠。
+   *
+   * 試過改比像素而不是公尺——分岔那兩塊沒有變好：實測 U04/T03 的中心線上有一點，
+   * 離 D05 畫出來的線只有 2.0 像素，離自己那條 4.9 像素。示意圖在那裡把兩條線畫得
+   * 重疊，<strong>單看圖面，反推本來就無解</strong>，換哪一種尺都一樣。
+   *
+   * 要正確反推只能由呼叫端指定是哪一塊（preferTrackId）。所以這裡維持原樣，不做
+   * 沒有改善的變動。
    */
   let best: FieldPoint | null = null
   let bestPx = Infinity
