@@ -1175,13 +1175,36 @@ export default function MapEditorApp({
   )
 
   /**
-   * 存進本機地圖庫，標成未發布。
+   * 存到後端，失敗要講。
    *
-   * 「編輯」與「發布」拆開的關鍵在這裡：編輯過程只寫本機，正式環境那份要等使用者
-   * 按下發布才會換。先前自動儲存直接呼叫 publishAndReport，於是進編輯模式 900 毫秒
-   * 後就把圖推上線——不小心開錯一張圖也會重新發布一次，而載入時的自動修復若有 bug，
-   * 同樣會被無聲地推到正式環境。
+   * 圖資是<strong>大家共用</strong>的資料，不是這台瀏覽器的偏好設定：使用者存完之後
+   * 換一台電腦、或是模擬器、排班引擎來讀，看到的都必須是同一份。所以每一次儲存都
+   * 送後端，本機快取只是後端掛掉時仍能繼續編的備援。
+   *
+   * 「存到後端」與「設為當前使用」是兩件事：這一支只更新這張圖的內容，哪一張是正式
+   * 環境在讀的那一張由地圖清單的「設為當前使用」決定。
    */
+  const publishAndReport = useCallback(async (entry: MapLibraryEntry) => {
+    const result = await publishMapLibraryEntryToBackend(entry)
+    setBackendSyncFailed(!result.ok)
+    // 橫幅講的是「還沒同步到伺服器」，送成功就該消失
+    setHasUnpublishedChanges(!result.ok)
+    /*
+     * 送成功就記下來。
+     *
+     * 補水時要靠這個欄位分辨「後端沒有這一張」是被刪掉了還是根本還沒送上去；沒有
+     * 這一筆的話，剛建好還來不及發佈的地圖會在下一次重新整理時被當成已刪除清掉。
+     */
+    writeMapLibrary(
+      readMapLibrary().map((e) =>
+        e.libraryId === entry.libraryId
+          ? { ...e, publishState: result.ok ? ('published' as const) : ('pending' as const) }
+          : e,
+      ),
+    )
+  }, [])
+
+  /** 標成「還沒同步到伺服器」；送成功後由 publishAndReport 清掉 */
   const markEntryUnpublished = useCallback((entry: MapLibraryEntry) => {
     writeMapLibrary(
       readMapLibrary().map((e) =>
@@ -1215,7 +1238,8 @@ export default function MapEditorApp({
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
     markEntryUnpublished(updated)
-  }, [markEntryUnpublished])
+    void publishAndReport(updated)
+  }, [markEntryUnpublished, publishAndReport])
 
   const routePlanningPickMode =
     listDrawerTab === 'routes' &&
@@ -1620,31 +1644,6 @@ export default function MapEditorApp({
     })
   }, [])
 
-  /**
-   * 存到後端，失敗要講。
-   *
-   * 原本是 void publishMapLibraryEntryToBackend(updated)——射後不理。使用者以為存好了，
-   * 其實只進了這台瀏覽器的快取；換一台電腦打開就是舊的，而且沒有任何線索。
-   * 本機快取照樣先寫（後端掛掉時畫面仍要能編），但沒送成功一定要說。
-   */
-  const publishAndReport = useCallback(async (entry: MapLibraryEntry) => {
-    const result = await publishMapLibraryEntryToBackend(entry)
-    setBackendSyncFailed(!result.ok)
-    /*
-     * 送成功就記下來。
-     *
-     * 補水時要靠這個欄位分辨「後端沒有這一張」是被刪掉了還是根本還沒送上去；沒有
-     * 這一筆的話，剛建好還來不及發佈的地圖會在下一次重新整理時被當成已刪除清掉。
-     */
-    writeMapLibrary(
-      readMapLibrary().map((e) =>
-        e.libraryId === entry.libraryId
-          ? { ...e, publishState: result.ok ? ('published' as const) : ('pending' as const) }
-          : e,
-      ),
-    )
-  }, [])
-
   /** 使用者明確按下發布：把本機這份送上正式環境 */
   const publishCurrentMap = useCallback(async () => {
     const meta = loadedMapMetaRef.current
@@ -1937,6 +1936,15 @@ export default function MapEditorApp({
           )
           writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
           markEntryUnpublished(updated)
+          /*
+           * 自動儲存也送後端。
+           *
+           * 之前拆自動儲存與發布時把這一段一起拿掉了，結果編輯過程完全不離開瀏覽器
+           * ——使用者畫好路線、加好途經點，伺服器上什麼都沒有，模擬器與排班引擎讀到
+           * 的還是舊的那一份，而且畫面上看不出來。要防的是「還沒決定好就換掉正式環境
+           * 那一張」，那件事由「設為當前使用」把關，不該連存檔都不送。
+           */
+          void publishAndReport(updated)
         }
         clearMapDraft(libraryId)
         const savedAt = new Date()

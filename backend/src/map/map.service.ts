@@ -5,7 +5,14 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { backendScriptPath } from '../common/backend-script-path';
+import { MapEntity } from '../database/entities/map.entity';
+import {
+  MapVersion,
+  MapVersionStatus,
+} from '../database/entities/map-version.entity';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mapNodes = require(backendScriptPath('map-operation-nodes.js'));
@@ -98,8 +105,18 @@ function activeMapId(): string {
   );
 }
 
+/** 草稿固定用第 0 版；發布之後才遞增（見 MapVersion 的欄位說明） */
+const DRAFT_VERSION = 0;
+
 @Injectable()
 export class MapService implements OnModuleInit {
+  constructor(
+    @InjectRepository(MapEntity)
+    private readonly maps: Repository<MapEntity>,
+    @InjectRepository(MapVersion)
+    private readonly mapVersions: Repository<MapVersion>,
+  ) {}
+
   onModuleInit() {
     try {
       const id = activeMapId();
@@ -164,7 +181,20 @@ export class MapService implements OnModuleInit {
     return this.getPublishedMapLibrary(activeMapId());
   }
 
-  publishMapLibrary(
+  /**
+   * 地圖編輯器儲存。
+   *
+   * <h3>為什麼要寫資料庫</h3>
+   * 圖資是整個系統共用的資產，不是某一台瀏覽器的偏好設定：一個人畫好的路線與途經點，
+   * 模擬器、排班引擎、另一台電腦上的同事都要看得到同一份。之前只寫
+   * backend/data/published-maps 的 JSON 檔，而且是按下發布才寫——編輯過程完全留在
+   * localStorage，於是「我明明畫好了」與「伺服器上什麼都沒有」同時成立。
+   *
+   * 現在每一次儲存都進 map_versions（草稿版，第 0 版），地圖清單與開圖都讀資料庫。
+   * 檔案那一份仍然同步寫：waypoints、operation-nodes 那幾支腳本與模擬器是讀檔的，
+   * 拿掉會讓它們一起瞎掉。
+   */
+  async publishMapLibrary(
     mapId: string,
     body: {
       libraryId?: string;
@@ -173,7 +203,7 @@ export class MapService implements OnModuleInit {
       updatedAt?: string;
       mapDocument: Record<string, unknown>;
     },
-  ): PublishedMapLibraryDocumentDto {
+  ): Promise<PublishedMapLibraryDocumentDto> {
     const docMapId = String(body.mapDocument?.mapId ?? mapId).trim();
     if (docMapId && docMapId !== mapId) {
       throw new ForbiddenException('mapDocument.mapId must match URL mapId');
@@ -185,7 +215,68 @@ export class MapService implements OnModuleInit {
       updatedAt: body.updatedAt,
       mapDocument: body.mapDocument,
     });
+    await this.saveMapDraftToDb(mapId, body);
     return written as PublishedMapLibraryDocumentDto;
+  }
+
+  /** 存一份到資料庫；資料庫不通時不擋存檔（檔案那一份已經寫好了），但要留紀錄 */
+  private async saveMapDraftToDb(
+    mapId: string,
+    body: {
+      libraryId?: string;
+      displayName?: string;
+      version?: string;
+      updatedAt?: string;
+      mapDocument: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      const now = Date.now();
+      const displayName = String(
+        body.displayName ?? body.mapDocument?.displayName ?? mapId,
+      );
+      const existing = await this.maps.findOne({ where: { mapId } });
+      if (existing) {
+        existing.displayName = displayName;
+        existing.updatedAt = now;
+        await this.maps.save(existing);
+      } else {
+        await this.maps.save(
+          this.maps.create({
+            mapId,
+            displayName,
+            isActive: false,
+            currentVersion: 0,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
+      }
+
+      const draft = await this.mapVersions.findOne({
+        where: { mapId, version: DRAFT_VERSION },
+      });
+      if (draft) {
+        draft.body = body.mapDocument;
+        draft.schemaVersion = String(body.version ?? '');
+        draft.updatedAt = now;
+        await this.mapVersions.save(draft);
+      } else {
+        await this.mapVersions.save(
+          this.mapVersions.create({
+            mapId,
+            version: DRAFT_VERSION,
+            status: MapVersionStatus.DRAFT,
+            body: body.mapDocument,
+            schemaVersion: String(body.version ?? ''),
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
+      }
+    } catch (err) {
+      console.warn(`[map-library] 寫入資料庫失敗（${mapId}）`, err);
+    }
   }
 
   /**
@@ -204,23 +295,25 @@ export class MapService implements OnModuleInit {
     return { ok: Boolean(result.ok), mapId: id };
   }
 
-  setActiveMapLibrary(body: {
+  async setActiveMapLibrary(body: {
     mapId: string;
     libraryId?: string;
     displayName?: string;
     version?: string;
     updatedAt?: string;
     mapDocument?: Record<string, unknown>;
-  }): PublishedMapLibraryDocumentDto & {
-    activeMapId: string;
-    activeLibraryId: string;
-  } {
+  }): Promise<
+    PublishedMapLibraryDocumentDto & {
+      activeMapId: string;
+      activeLibraryId: string;
+    }
+  > {
     const mapId = String(body.mapId ?? '').trim();
     if (!mapId) {
       throw new BadRequestException('mapId is required');
     }
     if (body.mapDocument) {
-      this.publishMapLibrary(mapId, {
+      await this.publishMapLibrary(mapId, {
         libraryId: body.libraryId,
         displayName: body.displayName,
         version: body.version,
