@@ -4,7 +4,9 @@ import {
   getTrackGenLatMode,
   getTrackGenLatPerBox,
   getTrackGenPaths,
+  getTrackGenSpans,
   projectAlongPath,
+  type PathXY,
 } from '../utils/trackGenPaths'
 import {
   offsetLocalPoint,
@@ -81,6 +83,39 @@ export type TrackCell = {
   offsetM: number
   /** 已經離開這條軌道，格化沒有意義——畫在真正的位置上 */
   offTrack: boolean
+  /**
+   * 沿<strong>行車方向</strong>走到幾成（0–1）。
+   *
+   * {@link alongRaw} 是沿著折線記的順序，而折線的方向是圖資生成時決定的，跟車往
+   * 哪邊開沒有關係：下行那幾塊剛好同向，上行整排是反的。進度條照 alongRaw 畫，
+   * 上行的車就會從第四格倒退回第一格。
+   */
+  alongTravel: number
+  /** 折線順序與行車方向相反 */
+  reversed: boolean
+}
+
+/**
+ * 這一塊的折線順序跟行車方向是不是相反。
+ *
+ * span 的 h 是這一段的行車方向（弳度）。跟折線首尾連線的方向比一下：夾角超過
+ * 九十度就是反的。沒有 h 的舊資料當成同向，維持原本的行為。
+ */
+export function trackAlongIsReversed(
+  parameters: Record<string, unknown> | undefined,
+  path: PathXY,
+): boolean {
+  if (path.length < 2) return false
+  const heading = getTrackGenSpans(parameters)
+    .map((span) => span.h)
+    .find((h): h is number => typeof h === 'number' && Number.isFinite(h))
+  if (heading === undefined) return false
+  const [ax, ay] = path[0]
+  const [bx, by] = path[path.length - 1]
+  const pathRad = Math.atan2(by - ay, bx - ax)
+  let gap = Math.abs(pathRad - heading) % (Math.PI * 2)
+  if (gap > Math.PI) gap = Math.PI * 2 - gap
+  return gap > Math.PI / 2
 }
 
 /**
@@ -140,6 +175,7 @@ export function quantisedTrackCellPlacement(
   const { along, side } = projected ?? projectAlongPath(paths.real, xM, yM)
   const cell = quantiseAlong(along, previousCell)
   const lateral = quantiseLateral(side)
+  const reversed = trackAlongIsReversed(track.parameters, paths.real)
 
   const point = offsetLocalPoint(
     paths.local,
@@ -156,6 +192,10 @@ export function quantisedTrackCellPlacement(
     lateralRatio: side / TRACK_HALF_WIDTH_M,
     offsetM: side,
     offTrack: Math.abs(side / TRACK_HALF_WIDTH_M) > OFF_TRACK_RATIO,
+    alongTravel: reversed
+      ? 1 - Math.min(1, Math.max(0, along))
+      : Math.min(1, Math.max(0, along)),
+    reversed,
     x: local.x,
     y: local.y,
   }

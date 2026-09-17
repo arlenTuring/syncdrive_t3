@@ -581,19 +581,37 @@ export function MapAreaVehicleOverlay({
               whiteSpace: 'nowrap',
             }}
           >
+            {/*
+              進度條，不是「現在在第幾格」。
+              走完一格那一格就整格填滿，正在走的那一格照比例填——一格一格跳看不出
+              走到哪裡，也分不出剛進這一格還是快走完。
+
+              方向照<strong>行車方向</strong>，不是折線的記錄順序：折線方向是圖資
+              生成時決定的，上行整排跟行車方向相反，照折線畫的話進度條會從第四格
+              倒退回第一格。
+            */}
             <span className="flex gap-[2px]" aria-hidden>
-              {Array.from({ length: ALONG_CELLS }, (_, i) => (
-                <span
-                  key={i}
-                  className="inline-block h-[10px] w-[6px] rounded-[2px]"
-                  style={{
-                    backgroundColor:
-                      i === quantised.cell
-                        ? 'rgb(103, 232, 249)'
-                        : 'rgba(148, 163, 184, 0.35)',
-                  }}
-                />
-              ))}
+              {Array.from({ length: ALONG_CELLS }, (_, i) => {
+                const fill = Math.min(
+                  1,
+                  Math.max(0, quantised.alongTravel * ALONG_CELLS - i),
+                );
+                return (
+                  <span
+                    key={i}
+                    className="relative inline-block h-[10px] w-[6px] overflow-hidden rounded-[2px]"
+                    style={{ backgroundColor: 'rgba(148, 163, 184, 0.35)' }}
+                  >
+                    <span
+                      className="absolute left-0 top-0 h-full"
+                      style={{
+                        width: `${fill * 100}%`,
+                        backgroundColor: 'rgb(103, 232, 249)',
+                      }}
+                    />
+                  </span>
+                );
+              })}
             </span>
             {/*
               數值歸數值、位置歸位置。
