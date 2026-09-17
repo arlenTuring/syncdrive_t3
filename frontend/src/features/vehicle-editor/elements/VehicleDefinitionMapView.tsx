@@ -11,10 +11,17 @@ import { VehicleElementRenderer } from './VehicleElementRenderer';
 
 export type VehicleMapLayoutMode = 'fill-container' | 'rear-axle-pivot';
 
-/** 橫向行駛（rotate≈0°/180°）才 counter-rotate；縱向時文字跟車体，不另轉 */
-function shouldCounterRotateMapText(rotateDeg: number): boolean {
-  const mod = ((rotateDeg % 180) + 180) % 180;
-  return mod <= 45 || mod >= 135;
+/**
+ * 圖台上的車體文字一律轉回正立。
+ *
+ * 這裡原本只在車接近水平（rotate≈0°/180°）時才把文字轉回來，縱向行駛時讓文字跟著
+ * 車體轉。結果是車一轉直，車號就變成直式的，要歪著頭看——而車號正是圖台上最常要
+ * 讀的東西。
+ *
+ * 車體轉是為了表達行進方向，文字轉沒有表達任何東西。所以文字一律抵消外層的旋轉。
+ */
+function shouldCounterRotateMapText(): boolean {
+  return true;
 }
 
 function VehicleElementsLayer({
@@ -46,7 +53,7 @@ function VehicleElementsLayer({
           textCounterRotateDeg != null &&
           Number.isFinite(textCounterRotateDeg) &&
           el.type === 'text' &&
-          shouldCounterRotateMapText(textCounterRotateDeg);
+          shouldCounterRotateMapText();
 
         const parts: string[] = [];
         if (el.rotationDeg) parts.push(`rotate(${el.rotationDeg}deg)`);

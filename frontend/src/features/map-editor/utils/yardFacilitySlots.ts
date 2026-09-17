@@ -65,6 +65,49 @@ function findFacilityByName(
   return null
 }
 
+/**
+ * 場區停車格的場域範圍清單，給「這個座標落在哪一格」用。
+ *
+ * 先算好一份再逐台車比對，比每台車都走一次 areas 便宜；圖資變了才重算。
+ */
+export function collectYardSlotFieldBoxes(
+  areas: MapAreaObject[],
+): Array<{ slotId: string; xMinM: number; xMaxM: number; yMinM: number; yMaxM: number }> {
+  const boxes: Array<{ slotId: string; xMinM: number; xMaxM: number; yMinM: number; yMaxM: number }> = []
+  for (const area of areas) {
+    for (const facility of area.facilities ?? []) {
+      if (facility.type === 'Track') continue
+      const slotId = facility.customName?.trim()
+      if (!slotId || !isYardParkableFacilityId(slotId)) continue
+      const bounds = getValidRefFieldBounds(facility.parameters)
+      if (!bounds) continue
+      boxes.push({ slotId, ...bounds })
+    }
+  }
+  return boxes
+}
+
+/**
+ * 這個座標是不是停在某一格裡。
+ *
+ * 車端執行任務時<strong>不回報格位</strong>——協議規定格位由中心端比對座標自動判定
+ * （車只說自己在哪裡）。少了這一步，正開進充電格的車會被當成正線車，硬貼到最近的
+ * 軌道格上；充電區就在正線旁邊，畫面上就是好幾台車疊在下行線上不動。
+ */
+export function findYardSlotAtFieldMeters(
+  boxes: ReturnType<typeof collectYardSlotFieldBoxes>,
+  xM: number,
+  yM: number,
+): string | null {
+  if (!Number.isFinite(xM) || !Number.isFinite(yM)) return null
+  for (const box of boxes) {
+    if (xM >= box.xMinM && xM <= box.xMaxM && yM >= box.yMinM && yM <= box.yMaxM) {
+      return box.slotId
+    }
+  }
+  return null
+}
+
 /** 依設施格代號（E1、P1、H1…）解析場域座標 */
 export function resolveYardFacilityFieldMeters(
   slotId: string,

@@ -48,6 +48,13 @@ export type VehicleNetworkFix = {
   sM: number;
   /** 離該段真實中心線多遠（公尺），可用來判斷是不是根本不在軌道上 */
   offsetM: number;
+  /**
+   * 落在這一塊中心線的幾成（0–1）。
+   *
+   * 挑塊的時候就已經投影算過了，帶出來給格化用——不帶的話下游得再投影一次，
+   * 兩次的結果在邊界附近會不一致（實測同一個點，挑塊算 0.75、重算 0.7499，差一格）。
+   */
+  alongFrac: number;
 };
 
 export type VehicleTrackPlacement = {
@@ -371,7 +378,7 @@ export function trackLocalPathPointToAreaLocal(
 /**
  * 圖面路徑上的一點，<strong>再照偏移量往旁邊移出去</strong>。
  */
-function offsetLocalPoint(
+export function offsetLocalPoint(
   local: PathXY,
   along: number,
   sideM: number,
@@ -452,6 +459,45 @@ export function drawnDirectionAtField(
     }
   }
   return { x: dx, y: dy };
+}
+
+/**
+ * 車頭朝向：<strong>順著帶子畫，但把現場的擺動疊上去</strong>。
+ *
+ * 兩件事要分開。「這條路在圖上往哪走」是示意圖的事——T3 支線在現場是南北向，圖上
+ * 卻是橫的帶子；照現場 heading 轉，車會直立橫跨整條帶子。「車頭相對於路偏了幾度」
+ * 才是現場的事實：轉彎、蛇行、進站擺正，都在這個差值裡。
+ *
+ * 所以基準取帶子的方向，再加上「現場 heading 減去現場切線」那個偏差。車始終順著
+ * 帶子，該擺動的時候照樣看得到。
+ *
+ * 沒有 heading 就只有基準方向，沒有擺動可疊。
+ */
+export function drawnRotateWithSwingDeg(
+  track: FacilityObject,
+  area: MapAreaObject,
+  xM: number,
+  yM: number,
+  headingRad?: number | null,
+): number | null {
+  const dir = drawnDirectionAtField(track, area, xM, yM, headingRad ?? undefined);
+  if (!dir) return null;
+  const base = rotateDegForDrawnDirection(dir);
+  if (headingRad == null || !Number.isFinite(headingRad)) return base;
+
+  const paths = getTrackGenPaths(track.parameters);
+  if (!paths) return base;
+  const { along } = projectAlongPath(paths.real, xM, yM);
+  const realTan = tangentAlongPath(paths.real, along);
+  let tanRad = Math.atan2(realTan.y, realTan.x);
+  // 逆著這一塊畫的方向走時，切線要反過來才是「車頭該對的那一邊」
+  if (Math.cos(headingRad) * realTan.x + Math.sin(headingRad) * realTan.y < 0) {
+    tanRad += Math.PI;
+  }
+  let swing = headingRad - tanRad;
+  swing = Math.atan2(Math.sin(swing), Math.cos(swing));
+  // 現場的角度逆時針為正，CSS rotate 順時針為正
+  return base - (swing * 180) / Math.PI;
 }
 
 /**

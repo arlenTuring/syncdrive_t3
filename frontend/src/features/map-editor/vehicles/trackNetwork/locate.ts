@@ -83,7 +83,13 @@ function locateGeneratedSegment(
   if (Math.abs(hit.offsetM) > MAX_OFF_TRACK_M) return null;
   return {
     segment,
-    fix: { roadId: hit.road, laneId: hit.lane, sM: hit.sM, offsetM: hit.offsetM },
+    fix: {
+      roadId: hit.road,
+      laneId: hit.lane,
+      sM: hit.sM,
+      offsetM: hit.offsetM,
+      alongFrac: hit.along,
+    },
   };
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import {
@@ -9,9 +9,13 @@ import {
 import { VehicleDefinitionMapView } from '../../vehicle-editor/elements/VehicleDefinitionMapView';
 import {
   drawnDirectionAtField,
+  drawnRotateWithSwingDeg,
   rotateDegForDrawnDirection,
 } from './resolveVehicleTrackPlacement';
-import { vehicleDisplaySizeOnFacility } from './resolveMapVehicleTrackSizing';
+import {
+  ALONG_CELLS,
+  quantisedTrackCellPlacement,
+} from './quantisedTrackCell';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
@@ -37,6 +41,7 @@ import { resolveMapVehicleBgColor } from './resolveMapVehicleAppearance';
 import type { AreaVehicleLive, MapVehicleIconSpec } from './types';
 import { MapVehicleDisplaySizer } from '../../dashboard/elements/MapVehicleDisplaySizer';
 import {
+  computeVehicleBodyCenterOffsetFromRearAxleInDisplayPx,
   computeVehicleRearAxleAnchorPx,
   computeRearAxleAreaLocalForBodyCenterAt,
   computeRearAxleAreaLocalForIconBodyCenterAt,
@@ -47,6 +52,23 @@ import {
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
 import { readLegSnapKey } from '../../dashboard/utils/simClock';
+import {
+  collectYardSlotFieldBoxes,
+  findYardSlotAtFieldMeters,
+} from '../utils/yardFacilitySlots';
+
+/**
+ * 軌道上的車一律畫這麼大（區域像素）。
+ *
+ * 位置已經格化，不再照每一塊自己的比例尺換算，所以尺寸也不必跟著變——那個比例尺
+ * 沿線差十三倍，同一台車走一圈會一路脹縮。帶子寬度在這張圖上倒是相當一致（中位
+ * 53 像素），所以固定成比帶子窄一點，貼邊時剛好看得出一半探出去。
+ *
+ * 真實長寬比（12 × 2.6 公尺，4.6:1）在這裡放棄了：要照比例，車寬跟帶子相稱時車長
+ * 會超過一半的方塊。位置本來就不是連續比例，長寬比再堅持沒有意義。
+ */
+const TRACK_VEHICLE_WIDTH_PX = 72;
+const TRACK_VEHICLE_HEIGHT_PX = 30;
 
 function radToDeg(rad: number): number {
   return (rad * 180) / Math.PI;
@@ -209,6 +231,20 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  const yardSlotBoxes = useMemo(() => collectYardSlotFieldBoxes(areas), [areas]);
+  /*
+   * 停在格子裡的車就當成場區車，不管它回報什麼。
+   *
+   * 車端執行任務時不回報格位（協議把格位判定交給中心端），所以正開進充電格的車
+   * 在 payload 上看起來跟正線車一樣，會被貼到最近的軌道格——充電區 E1～E3 就在
+   * 下行線旁邊，畫面上是好幾台車疊在線上。
+   */
+  const isYardVehicle = useCallback(
+    (vehicle: AreaVehicleLive) =>
+      isYardVehiclePayload(vehicle.payload)
+      || findYardSlotAtFieldMeters(yardSlotBoxes, vehicle.xM, vehicle.yM) !== null,
+    [yardSlotBoxes],
+  );
   /*
    * 停靠站的里程表。站是人放的，與軌道之間本來沒有關聯；換算成里程之後，「離下一站
    * 多遠」就只是兩個里程相減，不受簡圖比例尺影響。
@@ -232,7 +268,7 @@ export function MapAreaVehicleOverlay({
     vehicle: AreaVehicleLive,
     network: ReturnType<typeof buildTrackNetwork>,
   ): VehiclePlacementAcrossAreas | null {
-    const preferYard = isYardVehiclePayload(vehicle.payload);
+    const preferYard = isYardVehicle(vehicle);
     // 朝向會決定挑到上行還是下行，所以要進快取的鍵，不然轉頭之後還會拿到舊的那一條
     const headingRad = readVehicleHeadingRad(vehicle.payload);
     const inputKey = [
@@ -261,6 +297,8 @@ export function MapAreaVehicleOverlay({
 
   // 判斷「大跳躍（發車／換段／重生）」用：committed=上一個 commit 的座標（render 時唯讀），
   // staging=本次 render 暫存；commit 後才搬進 committed。如此在 StrictMode 雙重 render 下仍正確。
+  /** 上一幀每台車落在第幾格，換格遲滯要用 */
+  const trackCellRef = useRef<Map<string, number>>(new Map());
   const committedPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
   const committedLegRef = useRef<Map<string, string>>(new Map());
   const stagingPosRef = useRef<Map<string, { left: number; top: number }>>(new Map());
@@ -280,7 +318,7 @@ export function MapAreaVehicleOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
       {vehicles.map((vehicle) => {
-        const preferYard = isYardVehiclePayload(vehicle.payload);
+        const preferYard = isYardVehicle(vehicle);
         const placement = resolveCachedPlacement(vehicle, trackNetwork);
         if (!placement) return null;
         const { area, stackOrder } = {
@@ -310,22 +348,54 @@ export function MapAreaVehicleOverlay({
          * 卻差很多（這張圖沿線 0.52～12.68 px/m），用同一個像素尺寸走遍全圖，在正線剛好，
          * 到場區就塞不進格位。
          */
-        const scaledSize =
-          vehicleDefinition && sizingFacility
-            ? vehicleDisplaySizeOnFacility({ facility: sizingFacility, area })
+        /*
+         * 軌道上的車位置已經格化（見 quantisedTrackCell），不再照每一塊的比例尺
+         * 換算，所以尺寸固定。場區格位還是照格子的比例尺——那邊的位置仍然是連續的。
+         */
+        const quantised =
+          !preferYard && sizingFacility
+            ? quantisedTrackCellPlacement(
+                sizingFacility,
+                area,
+                vehicle.xM,
+                vehicle.yM,
+                trackCellRef.current.get(vehicle.vehicleId),
+                placement.placement.network
+                  ? {
+                      along: placement.placement.network.alongFrac,
+                      side: placement.placement.network.offsetM,
+                    }
+                  : undefined,
+              )
             : null;
-        const markerW = vehicleDefinition
-          ? (scaledSize?.widthPx ?? displayW)
-          : iconSpec.width;
-        const markerH = vehicleDefinition
-          ? (scaledSize?.heightPx ?? displayH)
-          : iconSpec.height;
+        if (quantised) trackCellRef.current.set(vehicle.vehicleId, quantised.cell);
+        /*
+         * 格化之後落點換成那一格的位置；後軸對齊該點的語意不變。
+         *
+         * 但車已經離開軌道時就不格化——那時候「第幾格」沒有意義，硬吸過去等於把車
+         * 畫在一個它不在的地方。改用連續座標（那是照真實偏移量算出來的位置），
+         * 偏多少畫多少。
+         */
+        const placementLocal =
+          quantised && !quantised.offTrack
+            ? { x: quantised.x, y: quantised.y }
+            : facilityCenterLocal;
+
+        /*
+         * 場區格位的車也用同一個固定尺寸。
+         *
+         * 原本格位上的車照格子的比例尺換算，於是同一台車停在充電區是 65×35、停在
+         * 整備區是 38×15——而它只是停著。格子代表的現場尺寸不一致（E 格宣稱橫向
+         * 只有 2.3 公尺，比車還窄）本身是圖資問題，不該由車的大小去承擔。
+         */
+        const markerW = vehicleDefinition ? TRACK_VEHICLE_WIDTH_PX : iconSpec.width;
+        const markerH = vehicleDefinition ? TRACK_VEHICLE_HEIGHT_PX : iconSpec.height;
         /*
          * 有比例尺換算時長寬各自代表真實公尺數：沿線與橫向的 px/m 本來就不同（同一格
          * 一個方向壓縮、另一個沒有），用 contain 取兩者小的那個縮放，等於把已經算對的
          * 其中一軸再縮一次。這時只能各軸獨立縮。
          */
-        const fitMode = scaledSize ? 'stretch' : vehicleFitMode;
+        const fitMode = vehicleDefinition ? 'stretch' : vehicleFitMode;
 
         const headingRad = readVehicleHeadingRad(vehicle.payload);
         const steeringRad = readVehicleSteeringAngleRad(vehicle.payload);
@@ -354,11 +424,26 @@ export function MapAreaVehicleOverlay({
                 headingRad,
               )
             : null;
-        const containerRotateDeg = drawnDir
-          ? rotateDegForDrawnDirection(drawnDir)
-          : headingRad != null
-            ? mapVehiclePivotRotateDeg(headingRad, landscape, steeringRad) ?? 0
-            : 0;
+        /*
+         * 順著帶子畫，但把現場的擺動疊上去：基準是這一塊畫出來的方向，再加上
+         * 「現場 heading 減去現場切線」那個偏差。轉彎與蛇行看得到，車不會橫跨帶子。
+         */
+        const swungRotateDeg = drawnTrack
+          ? drawnRotateWithSwingDeg(
+              drawnTrack,
+              area,
+              vehicle.xM,
+              vehicle.yM,
+              headingRad,
+            )
+          : null;
+        const containerRotateDeg =
+          swungRotateDeg ??
+          (drawnDir
+            ? rotateDegForDrawnDirection(drawnDir)
+            : headingRad != null
+              ? mapVehiclePivotRotateDeg(headingRad, landscape, steeringRad) ?? 0
+              : 0);
         const rearAxleAnchor = vehicleDefinition
           ? computeVehicleRearAxleAnchorPx(
               vehicleDefinition,
@@ -385,7 +470,7 @@ export function MapAreaVehicleOverlay({
                 markerH,
                 fitMode,
                 containerRotateDeg,
-                facilityCenterLocal,
+                placementLocal,
               )
             : computeRearAxleAreaLocalForIconBodyCenterAt(
                 markerW,
@@ -393,9 +478,9 @@ export function MapAreaVehicleOverlay({
                 anchorX,
                 anchorY,
                 containerRotateDeg,
-                facilityCenterLocal,
+                placementLocal,
               )
-          : facilityCenterLocal;
+          : placementLocal;
 
         const areaPos = {
           x: anchorLocal.x - markerW * anchorX,
@@ -444,6 +529,90 @@ export function MapAreaVehicleOverlay({
             : null),
         };
 
+        /*
+         * 進度與偏移：不隨車縮放、也不隨車旋轉。
+         *
+         * 格化之後「在這一塊的第幾格」看不出來了，所以畫成四格。後面那個百分比是
+         * <strong>沒有格化的原始偏移</strong>——以半個軌道寬為 100%，跟橫向分級用的
+         * 是同一把尺：±15% 以內算在中間，±100% 就是軌道邊界，超過就是整台在外面。
+         *
+         * 用比例不用公尺：公尺要先知道軌道多寬才知道算不算偏很多，比例本身就說完了。
+         *
+         * 沿線的百分比拿掉了——四格已經說明在哪一段，數字是多餘的。車號也不放這裡，
+         * 它已經畫在車身上。
+         */
+        /*
+         * 標籤要對準<strong>車身</strong>中心，不是容器中心。
+         *
+         * 車身在容器裡是繞後軸轉的，後軸又在車長約八成的位置，所以容器的中心跟車身
+         * 畫出來的中心差很多——掛在容器中心，標籤會飄在車的斜前上方。
+         *
+         * 後軸的畫面位置是 (coordLeft, coordTop)，加上「後軸到車身中心」那段位移就是
+         * 車身中心；再往上退半個車身高度（轉過之後的高度）才貼在車頂上方。
+         */
+        const bodyOffset = vehicleDefinition
+          ? computeVehicleBodyCenterOffsetFromRearAxleInDisplayPx(
+              vehicleDefinition,
+              markerW,
+              markerH,
+              fitMode,
+              containerRotateDeg,
+            )
+          : { dx: 0, dy: 0 };
+        const rotRad = (containerRotateDeg * Math.PI) / 180;
+        const bodyHalfSpanY =
+          (Math.abs(markerW * Math.sin(rotRad)) +
+            Math.abs(markerH * Math.cos(rotRad))) /
+          2;
+        const badgeCenterX = coordLeft + bodyOffset.dx;
+        const badgeTopY = coordTop + bodyOffset.dy - bodyHalfSpanY - 4;
+
+        const cellBadge = quantised ? (
+          <div
+            key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
+            className="pointer-events-none absolute flex items-center gap-2 rounded px-2 py-[2px] font-mono text-[18px] leading-none text-white"
+            style={{
+              left: badgeCenterX,
+              top: badgeTopY,
+              zIndex: zIndex + 1,
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              // 自己往左半個、往上整個——貼在車的正上方置中
+              transform: 'translate(-50%, -100%)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span className="flex gap-[2px]" aria-hidden>
+              {Array.from({ length: ALONG_CELLS }, (_, i) => (
+                <span
+                  key={i}
+                  className="inline-block h-[10px] w-[6px] rounded-[2px]"
+                  style={{
+                    backgroundColor:
+                      i === quantised.cell
+                        ? 'rgb(103, 232, 249)'
+                        : 'rgba(148, 163, 184, 0.35)',
+                  }}
+                />
+              ))}
+            </span>
+            {/*
+              數值歸數值、位置歸位置。
+              畫在哪一格是為了讓車固定大小、看得出在這一塊的哪一段；但「走到幾成」
+              與「偏離中心線多少」是現場的事實，照原樣顯示，不跟著格化。
+            */}
+            <span
+              className={
+                Math.abs(quantised.lateralRatio) > 1
+                  ? 'text-amber-300'
+                  : 'text-zinc-300'
+              }
+            >
+              {quantised.lateralRatio >= 0 ? '+' : '−'}
+              {Math.abs(quantised.lateralRatio * 100).toFixed(0)}%
+            </span>
+          </div>
+        ) : null;
+
         const coordLabel = showMqttCoords ? (
           <MapVehicleMqttCoordLabel
             xM={vehicle.xM}
@@ -481,6 +650,7 @@ export function MapAreaVehicleOverlay({
             <div key={vehicleKey}>
               {coordLabel}
               {anchorDebug}
+              {cellBadge}
               <div
                 style={{ ...style, overflow: 'visible', pointerEvents: showEditSizer ? 'auto' : 'none' }}
               >
@@ -532,6 +702,7 @@ export function MapAreaVehicleOverlay({
           <div key={`${vehicle.areaId}:${vehicle.vehicleId}`}>
             {coordLabel}
             {anchorDebug}
+            {cellBadge}
             <MapVehicleMarker
               spec={iconSpec}
               vehicleId={vehicle.vehicleId}
