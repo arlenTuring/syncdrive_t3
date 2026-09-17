@@ -12,6 +12,10 @@ import {
 } from '../features/vehicle-editor/api/vehicleDefinitionsApi';
 import type { DashboardPlane } from '../features/dashboard/types';
 import type { VehicleDefinition } from '../features/vehicle-editor/types';
+import { migrateVehicleDefinition } from '../features/vehicle-editor/utils/migrateVehicleDefinition';
+
+/** 載具定義快取被後端內容換掉時發出；圖台聽到就重新套用車輛外觀 */
+export const VEHICLE_DEFINITIONS_UPDATED_EVENT = 'syncdrive:vehicle-definitions-updated';
 
 /**
  * 本機快取 → 伺服器的一次性遷移
@@ -71,6 +75,22 @@ export function migrateLocalCacheToServer(): void {
       if (remoteVehicles.length === 0) {
         const local = readCache<VehicleDefinition>(VEHICLE_DEFINITIONS_STORAGE_KEY);
         if (local.length > 0) await saveVehicleDefinitions(local);
+      } else {
+        /*
+         * 伺服器有就<strong>以伺服器為準寫回快取</strong>。
+         *
+         * 圖台上的車長什麼樣子，是照快取裡的載具定義畫的；而後端那份原本只有打開
+         * 載具編輯器才會被拉下來。沒開過載具編輯器的瀏覽器（換一台電腦、或直接開
+         * GCP 那個網址）快取裡找不到版面指定的那個定義，車就退回預設小圖示——實測
+         * 本機與 GCP 的資料表已經一模一樣，GCP 畫面上的車還是縮成一小塊、車號擠在
+         * 一起。
+         */
+        const next = remoteVehicles.map(migrateVehicleDefinition);
+        const serialized = JSON.stringify(next);
+        if (window.localStorage.getItem(VEHICLE_DEFINITIONS_STORAGE_KEY) !== serialized) {
+          window.localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, serialized);
+          window.dispatchEvent(new Event(VEHICLE_DEFINITIONS_UPDATED_EVENT));
+        }
       }
     } catch {
       /* 後端不可用：下次啟動或下次存檔再補 */

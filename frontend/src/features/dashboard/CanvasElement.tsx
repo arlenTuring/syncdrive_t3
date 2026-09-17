@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Rnd } from 'react-rnd';
 import type { CanvasElementProps, ChildWidget, WidgetType } from './types';
 import { WidgetRenderer } from './elements/WidgetRenderer';
+import { VEHICLE_DEFINITIONS_UPDATED_EVENT } from '../../lib/migrateLocalCacheToServer';
 import { GroupCanvasRenderer } from './elements/GroupCanvasRenderer';
 import { MapPlatformLayer } from './elements/MapPlatformLayer';
 import { BindingWarningIcon } from './components/BindingWarningIcon';
@@ -365,9 +366,18 @@ export function CanvasElement({
   }
 
   const isMapPlatform = element.canvasKind === 'map-platform';
+  // 載具定義快取被後端內容換掉時重新套用（見 migrateLocalCacheToServer）
+  const [vehicleDefinitionsVersion, setVehicleDefinitionsVersion] = useState(0);
+  useEffect(() => {
+    if (!isMapPlatform) return;
+    const bump = () => setVehicleDefinitionsVersion((v) => v + 1);
+    window.addEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
+    return () => window.removeEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
+  }, [isMapPlatform]);
   const vehicleTemplate = useMemo(
     () => (isMapPlatform ? resolveMapVehicleTemplate(element) : null),
-    [element, isMapPlatform],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [element, isMapPlatform, vehicleDefinitionsVersion],
   );
   const boxShadow = isEditMode && isSelected
     ? (canDropCanvas ? '0 0 0 2px #06b6d4, 0 0 12px rgba(6,182,212,0.25)' : '0 0 0 4px #ef4444, 0 0 20px rgba(239,68,68,0.5)')
