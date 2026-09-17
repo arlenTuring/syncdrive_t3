@@ -1115,6 +1115,7 @@ export function Inspector({
             areaFacilities={parentArea?.facilities ?? []}
             readOnly={readOnly}
             onCommitLinks={onCommitZoneEntranceLinks}
+            onPatchParameters={readOnly ? undefined : onPatchParameters}
             onFieldFocus={onFieldFocus}
             onFieldBlur={onFieldBlur}
           />

@@ -34,6 +34,28 @@ import {
 import { usesRefFieldBounds, usesRefFieldPoint } from './facilityRefFieldBinding'
 
 export const ZONE_ENTRANCE_LINKS_KEY = 'zoneEntranceLinks'
+/**
+ * 這個分區入口對應的途經點（Waypoint 設施 id）。
+ *
+ * <h3>為什麼要綁在入口上</h3>
+ * 「車要從哪裡進出這個場區」原本是用幾何猜的：找包住格位的方塊，再找落在那個方塊
+ * 裡的途經點。但入口點通常畫在分區<strong>外面</strong>——它是從正線轉進來的那個
+ * 路口。實測整備調度入口點落在整備區的框裡、卻不在調度區的框裡，而「整備調度區」
+ * 「充電洗車區」這兩個涵蓋用的大方塊場域範圍是 0，框不住任何東西：十四個格位只
+ * 猜中四個。
+ *
+ * 猜不準不是調參數的問題，是這件事本來就該由人指定。分區入口已經知道自己底下有
+ * 哪些分區（zoneEntranceLinks），格位也已經知道自己屬於哪個分區（parentZoneId），
+ * 少的只是入口到途經點這一段。補上之後整條鏈是：
+ *
+ * <pre>
+ *   格位 --parentZoneId--> 分區 --zonePartitionEntranceId--> 分區入口
+ *        --zoneEntranceWaypointId--> 途經點
+ * </pre>
+ *
+ * 全部是明寫的對應，沒有距離、沒有包含關係。
+ */
+export const ZONE_ENTRANCE_WAYPOINT_ID_KEY = 'zoneEntranceWaypointId'
 export const ZONE_PARTITION_LINK_ID_KEY = 'zonePartitionLinkId'
 export const ZONE_PARTITION_ENTRANCE_ID_KEY = 'zonePartitionEntranceId'
 /** 設施隸屬的分區 id（sibling facility） */
@@ -123,6 +145,7 @@ export function sanitizeZoneParameters(
   }
   if (!isZoneEntrance(facility)) {
     drop(ZONE_ENTRANCE_LINKS_KEY)
+    drop(ZONE_ENTRANCE_WAYPOINT_ID_KEY)
   }
   if (!isZonePartition(facility)) {
     drop(ZONE_PARTITION_ENTRANCE_ID_KEY)
@@ -849,6 +872,45 @@ export function linkedZoneFacilityIds(
  * 可加入此入口的分區：場上 ZonePartition，且尚未被任何入口連結。
  * （目前連結列上正在使用的 id 也會排除，避免重複。）
  */
+/** 讀分區入口綁定的途經點 id；沒綁就是空字串 */
+export function readZoneEntranceWaypointId(
+  parameters: Record<string, unknown> | undefined,
+): string {
+  const raw = parameters?.[ZONE_ENTRANCE_WAYPOINT_ID_KEY]
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
+/** 場上可以綁給分區入口的途經點 */
+export function listWaypointsInArea(
+  facilities: readonly FacilityObject[],
+): FacilityObject[] {
+  return facilities.filter((f) => f.type === 'Waypoint')
+}
+
+/**
+ * 這一格要從哪個途經點進出。
+ *
+ * 照明寫的鏈走：格位 → 分區 → 分區入口 → 途經點。任何一段沒接上就回 null，
+ * 不用幾何補——猜出來的答案比沒有答案更難查。
+ */
+export function resolveEntranceWaypointForFacility(
+  facilities: readonly FacilityObject[],
+  facility: FacilityObject,
+): FacilityObject | null {
+  const zoneId = readParentZoneId(facility.parameters)
+  if (!zoneId) return null
+  const zone = facilities.find((f) => f.id === zoneId)
+  if (!zone || !isZonePartition(zone)) return null
+  const binding = readZonePartitionBinding(zone.parameters)
+  if (!binding?.entranceId) return null
+  const entrance = facilities.find((f) => f.id === binding.entranceId)
+  if (!entrance || !isZoneEntrance(entrance)) return null
+  const waypointId = readZoneEntranceWaypointId(entrance.parameters)
+  if (!waypointId) return null
+  const waypoint = facilities.find((f) => f.id === waypointId)
+  return waypoint && waypoint.type === 'Waypoint' ? waypoint : null
+}
+
 export function availableZonePartitionsForEntrance(
   facilities: readonly FacilityObject[],
 ): FacilityObject[] {

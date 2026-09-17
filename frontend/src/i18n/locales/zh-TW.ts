@@ -1771,6 +1771,12 @@ const zhTW = {
         rebind: '改接場上分區',
         rebindHint: '這一條的分區圖元不在了；選一個場上的分區接回來，名稱與場域範圍維持不變。',
         noAvailable: '沒有可連結的分區（請先從元件庫放置分區，或已全部連結）',
+        waypointLabel: '進出場途經點',
+        waypointNone: '未指定',
+        waypointEmpty: '此 Area 沒有途經點（請先從元件庫放置途經點）',
+        waypointMissing: '指定的途經點不在了（{{id}}）',
+        waypointHint:
+          '車輛進出這個場區都走這個點：進場開到它就停進格位，出場從它起步；格位到它之間不產生移動。底下每一個分區裡的設施都套用同一個點。',
       },
       zonePartition: {
         title: '分區',

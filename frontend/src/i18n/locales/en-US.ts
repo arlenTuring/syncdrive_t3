@@ -1786,6 +1786,12 @@ const enUS: DeepStringify<typeof zhTW> = {
         rebindHint: "This link's zone graphic is gone. Pick a zone on the canvas to re-link; the name and field range stay as they are.",
         noAvailable:
           'No zones available (place a Zone from the palette, or all are already linked)',
+        waypointLabel: 'Entry/exit waypoint',
+        waypointNone: 'Not set',
+        waypointEmpty: 'No waypoints in this area (place one from the palette first)',
+        waypointMissing: 'The chosen waypoint is gone ({{id}})',
+        waypointHint:
+          'Vehicles enter and leave this yard through this point: arriving they drive to it and are then placed in their slot; leaving they start from it. Nothing moves between the slot and this point. Every facility in the linked zones uses it.',
       },
       zonePartition: {
         title: 'Zone',

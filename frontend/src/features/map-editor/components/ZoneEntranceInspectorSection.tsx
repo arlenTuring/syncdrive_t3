@@ -4,9 +4,13 @@ import type { FacilityObject } from '../types/facility'
 import {
   availableZonePartitionsForEntrance,
   createZoneEntranceLinkFromPartition,
+  listWaypointsInArea,
   readZoneEntranceLinks,
+  readZoneEntranceWaypointId,
+  ZONE_ENTRANCE_WAYPOINT_ID_KEY,
   type ZoneEntranceLink,
 } from '../utils/zonePartition'
+import { resolveWaypointDisplayName, getWaypointCode } from '../utils/waypointFacility'
 
 type Props = {
   facility: FacilityObject
@@ -14,6 +18,8 @@ type Props = {
   areaFacilities: readonly FacilityObject[]
   readOnly: boolean
   onCommitLinks: (links: ZoneEntranceLink[]) => void
+  /** 綁定途經點用；唯讀時不給 */
+  onPatchParameters?: (patch: Record<string, unknown>) => void
   onFieldFocus: () => void
   onFieldBlur: () => void
 }
@@ -28,12 +34,18 @@ export function ZoneEntranceInspectorSection({
   areaFacilities,
   readOnly,
   onCommitLinks,
+  onPatchParameters,
   onFieldFocus,
   onFieldBlur,
 }: Props) {
   const { t } = useTranslation()
   const links = readZoneEntranceLinks(facility.parameters)
   const available = availableZonePartitionsForEntrance(areaFacilities)
+  const waypoints = listWaypointsInArea(areaFacilities)
+  const boundWaypointId = readZoneEntranceWaypointId(facility.parameters)
+  const boundWaypoint = boundWaypointId
+    ? areaFacilities.find((f) => f.id === boundWaypointId)
+    : undefined
 
   const updateLink = (id: string, patch: Partial<ZoneEntranceLink>) => {
     onCommitLinks(links.map((l) => (l.id === id ? { ...l, ...patch } : l)))
@@ -73,6 +85,59 @@ export function ZoneEntranceInspectorSection({
       <p className="text-[10px] leading-relaxed text-zinc-600">
         {t('mapEditor.inspector.zoneEntrance.hint')}
       </p>
+
+      {/*
+        進出場途經點。
+        車要從哪裡進出這個場區，由人指定，不用幾何去猜——入口點常常畫在分區外面
+        （它是從正線轉進來的路口），猜不準。
+      */}
+      <div className="space-y-1.5 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+        <span className="text-[10px] font-medium text-zinc-400">
+          {t('mapEditor.inspector.zoneEntrance.waypointLabel')}
+        </span>
+        {readOnly || !onPatchParameters ? (
+          <p className="text-[10px] text-zinc-500">
+            {boundWaypoint
+              ? resolveWaypointDisplayName(boundWaypoint)
+              : t('mapEditor.inspector.zoneEntrance.waypointNone')}
+          </p>
+        ) : waypoints.length === 0 ? (
+          <p className="text-[10px] text-amber-300/80">
+            {t('mapEditor.inspector.zoneEntrance.waypointEmpty')}
+          </p>
+        ) : (
+          <select
+            value={boundWaypointId}
+            onFocus={onFieldFocus}
+            onBlur={onFieldBlur}
+            onChange={(e) =>
+              onPatchParameters({
+                [ZONE_ENTRANCE_WAYPOINT_ID_KEY]: e.target.value.trim() || undefined,
+              })
+            }
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-200"
+          >
+            <option value="">{t('mapEditor.inspector.zoneEntrance.waypointNone')}</option>
+            {waypoints.map((w) => {
+              const code = getWaypointCode(w)
+              const name = resolveWaypointDisplayName(w)
+              return (
+                <option key={w.id} value={w.id}>
+                  {code && code !== name ? `${name}（${code}）` : name}
+                </option>
+              )
+            })}
+          </select>
+        )}
+        {boundWaypointId && !boundWaypoint ? (
+          <p className="text-[10px] text-amber-300/80">
+            {t('mapEditor.inspector.zoneEntrance.waypointMissing', { id: boundWaypointId })}
+          </p>
+        ) : null}
+        <p className="text-[10px] leading-relaxed text-zinc-600">
+          {t('mapEditor.inspector.zoneEntrance.waypointHint')}
+        </p>
+      </div>
 
       {links.length === 0 ? (
         <p className="text-[11px] text-zinc-500">
