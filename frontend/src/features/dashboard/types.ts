@@ -369,6 +369,12 @@ export interface RouteStation {
   value: number; // 軌道上的錨點位置 0–100（等距站點由系統計算）
   /** 前往此站之進度段上的剩餘距離 %（0=已到站，100=剛離開前站），供推算用 */
   remainPct?: number;
+  /**
+   * 不畫這一站的點與站名。
+   *
+   * 站還在序列裡——車子的位置是照完整站序算的，抽掉會讓進度跳位——只是不顯示。
+   */
+  hidden?: boolean;
 }
 
 /** 作動行為對應：變數符合條件時在巴士上顯示圖示（檔案放 public/vehicle-operation-actions/icons/） */
@@ -409,6 +415,14 @@ export interface RouteProgressWidget extends WidgetBase, WidgetDataBinding {
   stationSource?: RouteStationSource;
   /** JSON 陣列欄位鍵名，例：[{ "name":"S2W", "remain_pct": 40 }, ...] */
   stationsJsonVarKey?: string;
+  /**
+   * 要畫哪些站。
+   *
+   * <code>stops</code>（預設）只畫車會停的站；轉線點那種「經過但不停」的站仍算在
+   * 站序裡，只是不畫點也不寫名字——一條路線常常有一半以上是這種點，全部畫出來
+   * 站名會疊成一團。<code>all</code> 是全部都畫。
+   */
+  stationDisplayFilter?: 'all' | 'stops';
   /** 目前所在區段索引（0 = 第 1 站→第 2 站） */
   segmentIndexVarKey?: string;
   /** 該區段剩餘距離 %（100=剛離開前站，0=快到下一站） */

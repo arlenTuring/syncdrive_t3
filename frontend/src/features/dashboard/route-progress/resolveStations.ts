@@ -6,6 +6,25 @@ export interface RouteStationJsonItem {
   stationId?: string;
   remain_pct?: number;
   remainPct?: number;
+  /** origin / intermediate / terminal，來自班表站序 */
+  role?: string;
+  /** 停留秒數；轉線點這類只是經過的站是 0 */
+  dwell_seconds?: number;
+  dwellSeconds?: number;
+}
+
+/**
+ * 這一站車會不會停。
+ *
+ * 起點與終點一定停；中間站看停留秒數，0 秒的是轉線點那種經過而已的點。
+ * 兩個欄位都沒帶的資料（像整備班表自己組的兩站）一律當成停靠站，不隱藏。
+ */
+function isStoppingStation(item: RouteStationJsonItem): boolean {
+  const role = String(item.role ?? '').trim().toLowerCase();
+  if (!role) return true;
+  if (role === 'origin' || role === 'terminal' || role === 'destination') return true;
+  const dwell = num(item.dwell_seconds ?? item.dwellSeconds);
+  return dwell === undefined || dwell > 0;
 }
 
 function num(n: unknown): number | undefined {
@@ -50,12 +69,15 @@ export function resolveRouteStations(
     const items = parseJsonStations(raw);
     if (items && items.length > 0) {
       const anchors = evenStationAnchors(items.length);
+      // 只藏不刪：錨點仍照完整站序等距分布，車子的位置才不會因為少畫幾站就跳掉。
+      const stopsOnly = (widget.stationDisplayFilter ?? 'stops') === 'stops';
       return items.map((item, i) => ({
         id: `json-${i}`,
         name: String(item.name ?? `站${i + 1}`),
         stationId: String(item.station_id ?? item.stationId ?? '').trim() || undefined,
         value: anchors[i] ?? 0,
         remainPct: num(item.remain_pct ?? item.remainPct),
+        hidden: stopsOnly && !isStoppingStation(item),
       }));
     }
     const legacyNames = ['st_a', 'st_b', 'st_c']

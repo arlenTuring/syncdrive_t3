@@ -5,6 +5,7 @@ import { resolveActiveMaintenanceMapId } from '../api/fieldEquipmentApi';
 import type { FieldEquipmentItem } from '../api/fieldEquipmentApi';
 import {
   fetchMapWaypoints,
+  waypointOptionLabel,
   type MapWaypointItem,
 } from '../api/waypointsApi';
 import type { MaintenanceFacilityEquipmentRow } from '../types/create';
@@ -154,6 +155,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
 
               <select
                 value={row.waypointCode}
+                title={t('maintenanceTasks.facilityRows.waypointAria')}
                 onChange={(e) =>
                   updateRow(row.id, { waypointCode: e.target.value } as Partial<TRow>)
                 }
@@ -164,7 +166,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
                 <option value="">{t('maintenanceTasks.facilityRows.noWaypoint')}</option>
                 {waypoints.map((item) => (
                   <option key={item.waypointCode} value={item.waypointCode}>
-                    {item.waypointCode}
+                    {waypointOptionLabel(item)}
                   </option>
                 ))}
               </select>

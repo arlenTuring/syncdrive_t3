@@ -2385,6 +2385,7 @@ const zhTW = {
         '正線停靠點來自元件庫；設施停靠點在大型設施屬性中設定，綠色圓點標示於設施內。',
       docking: '停靠點',
       facilityDocking: '設施停靠點',
+      waypoint: '途經點',
       facilityHint:
         '大型區塊：充電格、停車格、維修格等（type = Facility，用途於屬性填寫）。',
       facility: '設施',
@@ -3360,6 +3361,11 @@ const zhTW = {
       modeLegacy: '舊版三欄位站名（st_a…）',
       modeManual: '手動站點（預覽／備援）',
       stationsJsonKey: '站點 JSON 變數鍵',
+      stationFilter: '顯示哪些站',
+      stationFilterStops: '只顯示停靠站',
+      stationFilterAll: '全部站點（含途經點）',
+      stationFilterHint:
+        '途經點（轉線點這種停留 0 秒的站）仍算在站序裡，車輛位置照完整站序算；只是不畫點也不寫站名。',
       legacyFields: '站名欄位（逗號分隔三鍵）',
       segmentIndex: '區段索引變數',
       segmentRemain: '區段剩餘 % 變數',

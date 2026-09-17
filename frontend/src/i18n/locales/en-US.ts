@@ -2420,6 +2420,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         'Mainline berths come from the palette; facility berths are set in large-facility properties (green dots inside).',
       docking: 'Berths',
       facilityDocking: 'Facility berths',
+      waypoint: 'Waypoints',
       facilityHint:
         'Large blocks: charging, parking, maintenance bays (type = Facility; purpose in properties).',
       facility: 'Facilities',
@@ -3421,6 +3422,11 @@ const enUS: DeepStringify<typeof zhTW> = {
       modeLegacy: 'Legacy three name fields (st_a…)',
       modeManual: 'Manual stations (preview / fallback)',
       stationsJsonKey: 'Stations JSON variable key',
+      stationFilter: 'Stations to show',
+      stationFilterStops: 'Stops only',
+      stationFilterAll: 'All stations (including pass-through)',
+      stationFilterHint:
+        'Pass-through points (zero dwell, such as line-change points) stay in the sequence and the vehicle position still follows the full sequence; they are just not drawn or labelled.',
       legacyFields: 'Station name fields (three keys, comma-separated)',
       segmentIndex: 'Segment index variable',
       segmentRemain: 'Segment remain % variable',

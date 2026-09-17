@@ -13,6 +13,7 @@ import {
   collectEquipmentEntries,
   collectFacilityDockingPointEntries,
   collectFacilityEntries,
+  collectWaypointEntries,
   type FacilityListEntry,
 } from '../utils/facilityListEntries'
 import type { RoutePlanningDraft } from '../utils/routePlanning'
@@ -227,6 +228,7 @@ export function MapListDrawer({
     () => collectFacilityDockingPointEntries(areas),
     [areas],
   )
+  const waypointEntries = useMemo(() => collectWaypointEntries(areas), [areas])
   const facilityEntries = useMemo(
     () => collectFacilityEntries(areas),
     [areas],
@@ -418,6 +420,20 @@ export function MapListDrawer({
                     <SectionBlock
                       title={t('mapEditor.listDrawer.facilityDocking')}
                       entries={facilityDockingEntries}
+                      selectedAreaId={selectedAreaId}
+                      selectedFacilityId={selectedFacilityId}
+                      onSelectEntry={onSelectEntry}
+                      onEntryDoubleClick={onEntryDoubleClick}
+                    />
+                  </section>
+                  <section>
+                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+                      <MapPin className="size-3.5" />
+                      {t('mapEditor.listDrawer.waypoint')}
+                    </h4>
+                    <SectionBlock
+                      title={t('mapEditor.listDrawer.waypoint')}
+                      entries={waypointEntries}
                       selectedAreaId={selectedAreaId}
                       selectedFacilityId={selectedFacilityId}
                       onSelectEntry={onSelectEntry}

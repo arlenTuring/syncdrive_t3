@@ -89,7 +89,7 @@ function DispatchTrack({
         />
       </div>
 
-      {sortedStations.map((station) => {
+      {sortedStations.filter((station) => !station.hidden).map((station) => {
         const stationPercent = ((station.value - minVal) / range) * 100;
         const isPassed = currentVal >= station.value;
         const isTarget =
@@ -416,7 +416,7 @@ function MaintenanceTrack({
         />
       </div>
 
-      {sortedStations.map((station) => {
+      {sortedStations.filter((station) => !station.hidden).map((station) => {
         const stationPercent = ((station.value - minVal) / range) * 100;
         const isPassed = currentVal >= station.value;
         const isTarget =

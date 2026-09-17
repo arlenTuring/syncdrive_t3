@@ -31,7 +31,7 @@ function currentStationIndex(
 
 export function RouteTrackView({
   widget,
-  stations,
+  stations: allStations,
   progressPercent,
   vehicleIconBg,
   actionIconUrl,
@@ -46,6 +46,14 @@ export function RouteTrackView({
   /** @deprecated 站名僅顯示於站點圓點下方 */
   vehicleStationLabel?: string;
 }) {
+  /*
+   * 途經點不畫。
+   *
+   * 錨點沒有重算——每一站的 value 還是照完整站序算出來的，所以畫出來的站仍在它真正
+   * 的位置上，車子的進度也不會因為少畫幾個點就跳位。轉線點那種停留 0 秒的站本來
+   * 就不是「一站」，全部畫出來只會讓站名疊成一團。
+   */
+  const stations = allStations.filter((station) => !station.hidden);
   const minVal = stations.length > 0 ? stations[0].value : 0;
   const maxVal = stations.length > 0 ? stations[stations.length - 1].value : 100;
   const range = maxVal - minVal || 1;

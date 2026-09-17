@@ -214,16 +214,33 @@ export function RouteProgressSettings({
           </select>
         </Field>
         {stationSource === 'json' && (
-          <Field label={t('dashboard.routeProgress.stationsJsonKey')}>
-            <input
-              value={w.stationsJsonVarKey ?? 'route_stations'}
-              onChange={(e) => onUpdate({ stationsJsonVarKey: e.target.value })}
-              className={inputCls}
-            />
-            <p className="text-[9px] text-zinc-500 mt-1 font-mono leading-relaxed">
-              [{'{'}&quot;name&quot;:&quot;STATION_A&quot;,&quot;remain_pct&quot;:40{'}'}, …]
-            </p>
-          </Field>
+          <>
+            <Field label={t('dashboard.routeProgress.stationsJsonKey')}>
+              <input
+                value={w.stationsJsonVarKey ?? 'route_stations'}
+                onChange={(e) => onUpdate({ stationsJsonVarKey: e.target.value })}
+                className={inputCls}
+              />
+              <p className="text-[9px] text-zinc-500 mt-1 font-mono leading-relaxed">
+                [{'{'}&quot;name&quot;:&quot;STATION_A&quot;,&quot;remain_pct&quot;:40{'}'}, …]
+              </p>
+            </Field>
+            <Field label={t('dashboard.routeProgress.stationFilter')}>
+              <select
+                value={w.stationDisplayFilter ?? 'stops'}
+                onChange={(e) =>
+                  onUpdate({ stationDisplayFilter: e.target.value as 'all' | 'stops' })
+                }
+                className={selectCls}
+              >
+                <option value="stops">{t('dashboard.routeProgress.stationFilterStops')}</option>
+                <option value="all">{t('dashboard.routeProgress.stationFilterAll')}</option>
+              </select>
+              <p className="text-[9px] text-zinc-500 mt-1 leading-relaxed">
+                {t('dashboard.routeProgress.stationFilterHint')}
+              </p>
+            </Field>
+          </>
         )}
         {stationSource === 'legacy-columns' && (
           <Field label={t('dashboard.routeProgress.legacyFields')}>

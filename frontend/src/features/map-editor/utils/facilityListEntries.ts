@@ -13,7 +13,19 @@ import {
   getFacilityDockingPoint,
   resolveFacilityDockingPointListTitle,
 } from './facilityDockingPoint'
-import { resolveWaypointDisplayName } from './waypointFacility'
+import { getWaypointCode, resolveWaypointDisplayName } from './waypointFacility'
+import {
+  CROSS_PORTAL_UI_ORDER,
+  getCrossPortals,
+  resolveCrossPortalDisplayName,
+  resolveCrossPortalFields,
+} from './crossTrackPortals'
+import {
+  CROSSOVER_PORTAL_KEYS,
+  crossoverPortalFieldMeters,
+  getCrossoverPortals,
+  resolveCrossoverPortalDisplayName,
+} from './trackCrossoverFacility'
 import { usesRefFieldBounds } from './facilityRefFieldBinding'
 import { getValidRefFieldBounds, isZeroRefFieldBoundsSpan } from './facilityRefFieldBounds'
 import { getRefFieldPosition } from './facilityRefFieldPosition'
@@ -33,8 +45,8 @@ export type FacilityListEntry = {
   refFieldKey: string
   pxX: number
   pxY: number
-  /** 點位分類：正線停靠點 vs 設施內停靠點 */
-  pointKind?: 'docking' | 'facility-docking'
+  /** 點位分類：正線停靠點、設施內停靠點、途經點 */
+  pointKind?: 'docking' | 'facility-docking' | 'waypoint'
 }
 
 function resolveListTitle(f: FacilityObject): string {
@@ -212,6 +224,91 @@ export function collectFacilityDockingPointEntries(
       )
     }
   }
+  return sortEntries(out)
+}
+
+/**
+ * 途經點清單。
+ *
+ * 途經點原本<strong>哪裡都列不到</strong>：點位清單只有停靠點與設施停靠點兩節，
+ * 設施清單只收 type = Facility。放下去的途經點只有在路網拓撲編輯器裡看得到，
+ * 於是「我明明加了兩個」跟「清單裡沒有」同時成立。
+ *
+ * 三種來源都算途經點，功能一樣，只是存的地方不同：
+ * - 元件庫放下去的 Waypoint
+ * - 交叉軌道（RailCross）的四個口
+ * - 舊圖虛擬渡線（TrackCrossover）的兩個端點
+ */
+export function collectWaypointEntries(
+  areas: MapAreaObject[],
+): FacilityListEntry[] {
+  const out: FacilityListEntry[] = []
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
+
+  for (const area of areas) {
+    for (const f of area.facilities) {
+      if (f.type === 'Waypoint') {
+        out.push(
+          toListEntry(area, f, {
+            purpose: getWaypointCode(f),
+            pointKind: 'waypoint',
+          }),
+        )
+        continue
+      }
+
+      if (f.name === 'RailCross') {
+        const portals = getCrossPortals(f)
+        const fields = resolveCrossPortalFields(f, area)
+        for (const key of CROSS_PORTAL_UI_ORDER) {
+          const code = portals[key].waypointCode?.trim()
+          if (!code) continue
+          const field = fields[key]
+          const known = field.xM !== null && field.yM !== null
+          const px = known
+            ? meterToAreaLocalPx(field.xM as number, field.yM as number, area.domain, area.layout)
+            : null
+          out.push(
+            toListEntry(area, f, {
+              name: resolveCrossPortalDisplayName(portals[key]),
+              purpose: code,
+              refFieldText: known
+                ? `${fmt(field.xM as number)}, ${fmt(field.yM as number)} m`
+                : '未設定場域座標',
+              refFieldKey: `xcwp|${f.id}|${key}|${field.xM}|${field.yM}`,
+              ...(px ? { pxX: px.x, pxY: px.y } : {}),
+              pointKind: 'waypoint',
+            }),
+          )
+        }
+        continue
+      }
+
+      if (f.type === 'TrackCrossover') {
+        const portals = getCrossoverPortals(f)
+        if (!portals) continue
+        for (const key of CROSSOVER_PORTAL_KEYS) {
+          const portal = portals[key]
+          const code = portal.waypointCode?.trim()
+          if (!code) continue
+          const { xM, yM } = crossoverPortalFieldMeters(portal)
+          const px = meterToAreaLocalPx(xM, yM, area.domain, area.layout)
+          out.push(
+            toListEntry(area, f, {
+              name: resolveCrossoverPortalDisplayName(portal),
+              purpose: code,
+              refFieldText: `${fmt(xM)}, ${fmt(yM)} m`,
+              refFieldKey: `xowp|${f.id}|${key}|${xM}|${yM}`,
+              pxX: px.x,
+              pxY: px.y,
+              pointKind: 'waypoint',
+            }),
+          )
+        }
+      }
+    }
+  }
+
   return sortEntries(out)
 }
 

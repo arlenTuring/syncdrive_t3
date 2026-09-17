@@ -5,7 +5,19 @@ export type MapWaypointItem = {
   facilityId: string;
   areaId: string;
   areaName: string;
+  /** 畫圖的人給的名字（如「整備調度入口點」）；沒取名時後端不送這一欄 */
+  alias?: string;
+  /** 虛擬渡線途經點才會分 a／b 兩個端點 */
+  kindLabel?: string;
+  xM?: number;
+  yM?: number;
 };
+
+/** 下拉要顯示的字：有取名就用名字，代號放在後面對照 */
+export function waypointOptionLabel(item: MapWaypointItem): string {
+  const alias = item.alias?.trim();
+  return alias ? `${alias}（${item.waypointCode}）` : item.waypointCode;
+}
 
 export type MapWaypointsResponse = {
   mapId: string;
