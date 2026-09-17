@@ -5,8 +5,14 @@ import {
   MAINLINE_FLEET_STATUS_SQL,
 } from '../constants/demoSql';
 
-/** 內建群組 SQL：名冊 bootstrap（載入時查一次）；槽位增刪由 MQTT operation/update 即時驅動 */
-export const SHIFT_ROSTER_REFRESH_INTERVAL = 0;
+/**
+ * 名冊多久重查一次。
+ *
+ * 原本是 0——只在載入時查一次，之後全靠 MQTT operation/update 推。問題是車端只報
+ * 單號、目標站與剩餘秒數，不報這一班停哪些站；排班引擎每隔一兩分鐘就換一班，名冊
+ * 不重查就會停在上一班的站序。十秒重查一次，SQL 的落後就限制在十秒內。
+ */
+export const SHIFT_ROSTER_REFRESH_INTERVAL = 10_000;
 
 export function resolveBuiltinGroupSql(element: CanvasElementProps): {
   sqlQuery?: string;

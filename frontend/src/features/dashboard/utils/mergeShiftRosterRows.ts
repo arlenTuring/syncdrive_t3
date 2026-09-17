@@ -57,6 +57,14 @@ function mergeRosterFromMqtt(
   mqttByVehicle: Map<string, Record<string, unknown>>,
   isActive: (p: Record<string, unknown>) => boolean,
   buildMinimal: (p: Record<string, unknown>) => Record<string, unknown>,
+  /**
+   * 車輛回報的單號在 SQL 名冊裡找不到時，要不要只憑 MQTT 生一列出來。
+   *
+   * 整備卡要（格位的增減本來就只有車端知道）；正線卡不要——正線卡靠 SQL 帶站序，
+   * 只有 MQTT 的話拿不到這一班停哪些站，硬生出來的那一列會是「新的班次代號配上
+   * 上一班的站序」，畫面上就是下一站寫著 s2w_d_end、軌道卻畫著另一條路線。
+   */
+  allowMqttOnlyRows: boolean,
 ): Record<string, unknown>[] {
   const sqlByKey = new Map<string, Record<string, unknown>>();
   const sqlByVehicle = new Map<string, Record<string, unknown>>();
@@ -80,10 +88,13 @@ function mergeRosterFromMqtt(
     seenOrder.add(orderId);
     const vehicleCode = String(payload.vehicle_code ?? '').trim().toUpperCase();
     if (vehicleCode) mqttVehicleCodes.add(vehicleCode);
-    const base =
-      sqlByKey.get(orderId)
-      ?? (vehicleCode ? sqlByVehicle.get(vehicleCode) : undefined)
-      ?? buildMinimal(payload);
+    const sameOrder = sqlByKey.get(orderId);
+    const base = allowMqttOnlyRows
+      ? sameOrder
+        ?? (vehicleCode ? sqlByVehicle.get(vehicleCode) : undefined)
+        ?? buildMinimal(payload)
+      : sameOrder;
+    if (!base) continue;
     const merged = mergeOperationMqttShiftRow(base, payload);
     mqttRows.push(merged);
     mqttByKey.set(orderId, merged);
@@ -94,6 +105,14 @@ function mergeRosterFromMqtt(
 
   const merged: Record<string, unknown>[] = [];
   const usedKeys = new Set<string>();
+  /*
+   * 一台車同時只會執行一張單，所以同一列即時資料只能出現一次。
+   *
+   * SQL 可能同時回這台車的兩張單（剛結束的那張還在寬限期內、新的那張已經開始），
+   * 兩張都會被換成同一列即時資料——畫面上就是同一個班次代號的卡片出現兩張。
+   * 已經放過的那一列就不再放，多出來的那張舊單直接不列。
+   */
+  const emittedLive = new Set<Record<string, unknown>>();
 
   for (const sqlRow of sqlRows) {
     const key = String(sqlRow.shift_key ?? sqlRow.order_id ?? '');
@@ -101,6 +120,8 @@ function mergeRosterFromMqtt(
     if (vehicleCode && mqttVehicleCodes.has(vehicleCode)) {
       const live = mqttByKey.get(key) ?? mqttByVehicleRow.get(vehicleCode);
       if (live) {
+        if (emittedLive.has(live)) continue;
+        emittedLive.add(live);
         merged.push(live);
         usedKeys.add(String(live.shift_key ?? live.order_id ?? key));
       } else {
@@ -134,6 +155,7 @@ export function mergeMainlineShiftRoster(
     mqttByVehicle,
     isActiveMainlineMqtt,
     buildMainlineRowFromMqtt,
+    false,
   );
 }
 
@@ -156,6 +178,7 @@ export function mergeMaintenanceShiftRoster(
     yardMqtt,
     isActiveMaintenanceMqtt,
     buildMaintenanceRowFromMqtt,
+    true,
   );
   return merged.filter((row) => {
     const vc = String(row.vehicle_code ?? '').trim().toUpperCase();

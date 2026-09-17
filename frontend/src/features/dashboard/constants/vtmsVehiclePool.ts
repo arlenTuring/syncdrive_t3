@@ -3,11 +3,21 @@ export const VTMS_VEHICLE_POOL = Array.from({ length: 11 }, (_, i) =>
   `PMS${String(i + 1).padStart(2, '0')}`,
 );
 
-export const SHIFT_TRIP_CODE_PATTERN = /^[DU]\d{4}$/i;
+/**
+ * 正線班次代號。
+ *
+ * 舊的是方向加時間（U0830、D1133），排班引擎現在發的是路線代號加時間：NT1510 是
+ * N2W 開往 T3、TNB1507 是往備用月台的那一條。只認舊格式的話，MQTT 進來的即時班次
+ * 一律被當成不是正線班次丟掉，卡片就只剩 SQL 那份、不會即時更新。
+ */
+export const SHIFT_TRIP_CODE_PATTERN = /^([DU]|[A-Z]{2,3})\d{4}$/i;
+
+/** 舊格式（U0830／D1133）：代號本身就帶發車時間，才推得出時刻 */
+export const LEGACY_SHIFT_TRIP_CODE_PATTERN = /^[DU]\d{4}$/i;
 
 /** 與 demoSql MAINLINE_SHIFTS 一致：D1133 → 11:33 發、+6 分結束 */
 export function tripStartMinutesFromCode(tripCode: string): number | null {
-  const m = SHIFT_TRIP_CODE_PATTERN.exec(tripCode.trim());
+  const m = LEGACY_SHIFT_TRIP_CODE_PATTERN.exec(tripCode.trim());
   if (!m) return null;
   const hour = parseInt(tripCode.slice(1, 3), 10);
   const minute = parseInt(tripCode.slice(3, 5), 10);

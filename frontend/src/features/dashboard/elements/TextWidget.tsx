@@ -53,6 +53,28 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
     mqttValuePath: widget.mqttValuePath,
   });
 
+  /*
+   * 位置列要多訂一條 telemetry/update。
+   *
+   * 這一列綁的是 operation/update，那裡面只有目標站與剩餘距離，沒有「現在在第幾段」。
+   * 段號得由車端回報的座標分，而座標在 telemetry/update。少了這一條，跑在正線上的車
+   * 位置只能顯示「—」。
+   */
+  const isVehicleLocationLabel =
+    /^\{[^{}]+\}$/.test(widget.content.trim())
+    && normalizeValueFieldKey(widget.content) === 'segment_label';
+  const telemetryTopic =
+    isVehicleLocationLabel && widget.mqttTopic
+      ? interpolateVariables(
+        widget.mqttTopic.replace(/\/operation\/update$/, '/telemetry/update'),
+        variables,
+      )
+      : undefined;
+  const telemetryMqttData = useMqttData({
+    mqttDataSourceId: widget.mqttDataSourceId,
+    mqttTopic: telemetryTopic,
+  });
+
   // content 本身先做變數插值（支援 {varName} 格式）
   let interpolatedContent = interpolateVariables(widget.content, variables);
   const isTemplatePlaceholder = /\{[^{}]+\}/.test(widget.content);
@@ -73,14 +95,13 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
   let rawValue: any = null;
   const colorField = widget.colorOnlyField ?? (widget.colorRulesEnabled ? widget.valueField : undefined);
 
-  const isPureVariableTemplateEarly = /^\{[^{}]+\}$/.test(widget.content.trim());
-  const contentVarKeyEarly = isPureVariableTemplateEarly ? normalizeValueFieldKey(widget.content) : undefined;
-  const isVehicleLocationLabel = contentVarKeyEarly === 'segment_label';
-
   if (isVehicleLocationLabel) {
     const operation = mqttData.data !== null ? unwrapMqttPayload(mqttData.data) : null;
-    const loc = resolveVehicleLocationLabel({ variables, operation });
+    const telemetry =
+      telemetryMqttData.data !== null ? unwrapMqttPayload(telemetryMqttData.data) : null;
+    const loc = resolveVehicleLocationLabel({ variables, operation, telemetry });
     const hasLocContext = mqttData.data !== null
+      || telemetryMqttData.data !== null
       || variables.segment_label !== undefined
       || variables.yard_slot_id !== undefined
       || variables.line_kind !== undefined
