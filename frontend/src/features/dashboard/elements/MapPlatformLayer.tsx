@@ -46,7 +46,17 @@ export function MapPlatformLayer({
   const { paused, transportPaused, running, speedMultiplier } = useDemoSimulationPlayback();
   const simPlaybackActive = running && !paused && !transportPaused;
   /** 模擬中：存滿 3 幀 MQTT 後從第 1 幀 lerp 播放；暫停／逐幀瞬間定位；非模擬用 CSS 補間 */
-  const liveTweenMs = simPlaybackActive ? 0 : transportPaused || paused ? 0 : 1200;
+  /*
+   * 位置補間的時長。
+   *
+   * 原本寫成「沒在播放、又沒暫停才補 1200 毫秒」。可是暫停狀態來自示範模擬的播放
+   * context，而中心端已經不再啟動示範模擬，沒有任何地方提供這個 context——拿到的是
+   * 預設值：paused = true。於是 `paused` 永遠成立，補間永遠是 0，車每秒瞬移一次。
+   *
+   * 「示範模擬正在跑」才由模擬的時鐘逐幀補（見 useSimExtrapolatedVehicles），補間交給
+   * 它；其餘（真實遙測）一律補間，不看 paused。
+   */
+  const liveTweenMs = running ? 0 : 1200;
 
   const areaVehiclesRaw = useMemo(() => {
     if (isEditMode) return [];
