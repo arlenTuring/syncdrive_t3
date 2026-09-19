@@ -26,7 +26,7 @@
 ```
 
 - `creationMode`：`blank`（空白圖台）或 `trackGen`（進場即鋪滿高精地圖元件）。省略視為 `blank`（舊檔相容）
-- `areas[]`：各 Area 及其 `facilities[]`（含 `TrackCrossover`、`Facility.facilityDockingPoint` 等）
+- `areas[]`：各 Area 及其 `facilities[]`（含 `Facility.facilityDockingPoint` 等）
 - `routes`／`routeGroups`：營運路線與群組（可省略若為空）
 - `visibleRouteIds`：地圖上要顯示的路線 id（眼睛開關）。省略或 `[]`＝全部隱藏；**載入／匯入依此還原，不強制全開**
 - `pointTopology`：路網拓撲（節點＋有向邊；可省略若為空）。細節見 `document/點位拓撲規格.md`
@@ -36,9 +36,9 @@
 
 | 資料 | JSON 位置 |
 |---|---|
-| 虛擬渡線 `TrackCrossover` | `areas[].facilities[]`，`parameters.trackCrossoverPortals`（`a`／`b`：`xM`/`yM`/`attachedTrackId`/`waypointCode`/`alias`） |
+| 交叉軌道 `RailCross` | `areas[].facilities[]`（`type: Track`），`parameters.crossTrackPortals`（`lt`／`lb`／`rt`／`rb` 四個接口：`waypointCode`/`alias`/`xM`/`yM`） |
 | 設施停靠點 | `Facility.parameters.facilityDockingPoint`：`{ xM, yM, alias? }` |
-| 路網拓撲 | 頂層 `pointTopology`（含 `facility-docking`、`crossover-waypoint` 等 kind） |
+| 路網拓撲 | 頂層 `pointTopology`（含 `facility-docking`、`cross-waypoint` 等 kind） |
 | 路線／群組 | 頂層 `routes`、`routeGroups` |
 | 路線可視 | 頂層 `visibleRouteIds`（眼睛開關） |
 
@@ -107,7 +107,7 @@ State fields:
 - `DockingPoint` (`name`: `DockingPoint`) — 地圖停靠點／營運節點參照
 - `Waypoint` (`name`: `Waypoint`) — 途經點；自駕車必經點位（預設綠色圓點）
 - `RoadLine` (`name`: `RoadLine`)
-- `TrackCrossover` (`name`: `TrackCrossover`) — 虛擬渡線；端點 A／B 為途經點，可入路線與拓撲
+- `Track` (`name`: `RailCross`) — 交叉軌道；四個接口（lt／lb／rt／rb）為途經點，可入路線與拓撲
 ## Parameters by component
 
 ### Shared/common
@@ -234,31 +234,22 @@ State fields:
 }
 ```
 
-### TrackCrossover（虛擬渡線）
+### RailCross（交叉軌道）
 
-- `trackCrossoverColor` / `trackCrossoverColorOpacity`
-- `trackCrossoverStrokePx` / `trackCrossoverCenterGapPct`
-- `trackCrossoverBgColor` / `trackCrossoverBgOpacity`
-- `trackCrossoverPortals`:
+`type: Track`、`name: RailCross`。兩條軌道交會，四口互通（直行兩條、斜行兩條）。
+
+- `crossTrackPortals`：四個接口各帶一個對外途經點（`kind: cross-waypoint`）。`xM`／`yM` 為 `null` 時，座標由相接軌道的場域座標推得。
 
 ```json
 {
-  "a": {
-    "xM": 40,
-    "yM": 20,
-    "attachedTrackId": "151",
-    "waypointCode": "xo_3_a",
-    "alias": "終點別名"
-  },
-  "b": {
-    "xM": 40,
-    "yM": 40,
-    "attachedTrackId": "063",
-    "waypointCode": "xo_3_b",
-    "alias": "起點別名"
-  }
+  "lt": { "waypointCode": "n2w_u2d_go_end",     "alias": "下行轉N2W正線終點", "xM": null, "yM": null },
+  "lb": { "waypointCode": "n2w_u2d_back_start", "alias": "上行轉N2W正線起點", "xM": null, "yM": null },
+  "rt": { "waypointCode": "n2w_u2d_back_end",   "alias": "上行轉N2W正線終點", "xM": null, "yM": null },
+  "rb": { "waypointCode": "n2w_u2d_go_start",   "alias": "下行轉N2W正線起點", "xM": null, "yM": null }
 }
 ```
+
+> 舊版的虛擬渡線（`TrackCrossover`）已由交叉軌道取代，不再使用；含有它的舊地圖不能用。
 
 ### Geofence
 

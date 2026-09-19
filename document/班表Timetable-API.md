@@ -202,7 +202,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/operation-shift/timetable/trips?fro
 | `station_id` | 否 | 只取單一站 |
 
 每筆事件含：**停靠點別名** `station_alias`（地圖）、**到站** `eta_arrive`、**離站／靠站完成** `eta_depart`、**靠站**／**緩衝**／**有效停靠**、`non_stop`（到站＝離站時為 true）、`role`。  
-預設**排除虛擬渡線**（`xo_*`）；回應的 `stations[]` 會列出**地圖上全部停靠點別名**（含 ETA 為 0），方便站顯固定頁籤。  
+預設**排除途經點**（交叉軌道途經點與入口途經點，只保留停靠點）；回應的 `stations[]` 會列出**地圖上全部停靠點別名**（含 ETA 為 0），方便站顯固定頁籤。  
 `vehicle_id` **目前一律 `null`**。
 
 ### 互動取用（建議）

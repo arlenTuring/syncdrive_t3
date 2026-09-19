@@ -15,7 +15,7 @@ SyncDrive T3 是 T3 場域的車隊營運管理平台：把圖資、路線、時
 | 部分 | 實際職責 | 主要位置 |
 |---|---|---|
 | 操作介面 | 模組側欄、圖台與儀表板編排、營運操作頁面，中英文切換 | frontend/src/features/schedule-management、dashboard |
-| 地圖編輯 | 場域、軌道、站點、設施、渡線、OpenDRIVE、圖面與實地座標、拓撲與路線 | frontend/src/features/map-editor |
+| 地圖編輯 | 場域、軌道、站點、設施、交叉軌道、OpenDRIVE、圖面與實地座標、拓撲與路線 | frontend/src/features/map-editor |
 | 載具外觀 | 車身、燈號、門及車輛圖示的定義與編輯 | frontend/src/features/vehicle-editor |
 | 營運規劃 | 時間模板、整備任務、路線關係、生成與人工調整班表、發布檢查 | frontend/src/features/time-templates、maintenance-tasks、shift-list |
 | 營運執行 | 部署班表、展開今日工作、依時刻建立訂單、回報生命週期 | backend/src/operation-shift、dispatch、order |
