@@ -3,10 +3,26 @@ import type {
   VehiclePlacementAcrossAreas,
   VehicleTrackPlacement,
 } from '../resolveVehicleTrackPlacement';
-import { fieldPositionToTrackAreaLocal } from '../resolveVehicleTrackPlacement';
+import {
+  fieldPositionToTrackAreaLocal,
+  trackAreaLocalAt,
+} from '../resolveVehicleTrackPlacement';
 import type { TrackNetwork, TrackNetworkSegment } from './types';
 import { trackGenPickScore } from '../../utils/trackGenPaths';
-import { locateByField } from '../../utils/trackGenLocate';
+import { locateByField, type LocateOptions } from '../../utils/trackGenLocate';
+
+/** 定位的旁證：車頭、車速，以及上一筆判給這台車的軌道 */
+export type TrackLocateOptions = LocateOptions & {
+  /** 上一筆判給這台車的軌道（設施 id）；偏向留在原地或走到相連的下一塊 */
+  previousTrackId?: string;
+};
+
+function toLocateOptions(input?: number | TrackLocateOptions): LocateOptions {
+  if (typeof input === 'number') return { headingRad: input };
+  if (!input) return {};
+  const { previousTrackId, ...rest } = input;
+  return { ...rest, previousFacilityId: input.previousFacilityId ?? previousTrackId };
+}
 
 function fieldPointInRefField(
   xM: number,
@@ -73,10 +89,10 @@ function locateGeneratedSegment(
   network: TrackNetwork,
   xM: number,
   yM: number,
-  headingRad?: number,
+  options?: number | TrackLocateOptions,
 ): { segment: TrackNetworkSegment; fix: VehicleNetworkFix } | null {
   if (!network.genIndex) return null;
-  const hit = locateByField(network.genIndex, xM, yM, headingRad);
+  const hit = locateByField(network.genIndex, xM, yM, toLocateOptions(options));
   if (!hit) return null;
   const segment = network.byTrackId.get(hit.facilityId);
   if (!segment) return null;
@@ -89,6 +105,10 @@ function locateGeneratedSegment(
       sM: hit.sM,
       offsetM: hit.offsetM,
       alongFrac: hit.along,
+      distanceM: hit.distanceM,
+      confidence: hit.confidence,
+      margin: hit.margin,
+      travelRad: hit.travelRad,
     },
   };
 }
@@ -101,9 +121,9 @@ export function locateOnTrackNetwork(
   network: TrackNetwork,
   xM: number,
   yM: number,
-  headingRad?: number,
+  options?: number | TrackLocateOptions,
 ): VehiclePlacementAcrossAreas | null {
-  const generated = locateGeneratedSegment(network, xM, yM, headingRad);
+  const generated = locateGeneratedSegment(network, xM, yM, options);
   const segment =
     generated?.segment ??
     pickRefFieldSegment(findRefFieldSegmentsAtPoint(network, xM, yM), {
@@ -112,9 +132,21 @@ export function locateOnTrackNetwork(
     });
   if (!segment) return null;
 
-  const local = fieldPositionToTrackAreaLocal(xM, yM, segment.track, segment.renderArea, {
-    extrapolate: false,
-  });
+  /*
+   * 生成軌道：位置照挑塊時算好的「走了幾成、偏了多少」換算，不再對整條折線重投影。
+   * 挑塊只看這一段自己的那一截，重投影看整條——一塊路口元件橫跨兩條腿，兩次會選到
+   * 不同的腿。
+   */
+  const local = generated
+    ? trackAreaLocalAt(
+        segment.track,
+        segment.renderArea,
+        generated.fix.alongFrac,
+        generated.fix.offsetM,
+      )
+    : fieldPositionToTrackAreaLocal(xM, yM, segment.track, segment.renderArea, {
+        extrapolate: false,
+      });
   if (!local) return null;
 
   const placement: VehicleTrackPlacement = {

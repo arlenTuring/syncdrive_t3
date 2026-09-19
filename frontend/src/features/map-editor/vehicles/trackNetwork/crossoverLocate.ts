@@ -93,6 +93,25 @@ export function locateOnCrossover(
   yM: number,
   toleranceM = 2,
 ): VehiclePlacementAcrossAreas | null {
+  return locateOnCrossoverDetailed(areas, xM, yM, toleranceM)?.located ?? null
+}
+
+/** 命中的橫渡線，連同離渡線多遠、渡線走向——決定「要不要真的信它」用 */
+export type CrossoverHit = {
+  located: VehiclePlacementAcrossAreas
+  /** 離渡線連線的距離（公尺） */
+  distanceM: number
+  /** 渡線 A→B 的走向（弧度，場域座標）；車頭可以順著也可以逆著，看的是夾角 */
+  directionRad: number
+  facilityId: string
+}
+
+export function locateOnCrossoverDetailed(
+  areas: MapAreaObject[],
+  xM: number,
+  yM: number,
+  toleranceM = 2,
+): CrossoverHit | null {
   let best: { segment: CrossoverFieldSegment; t: number; distance: number } | null =
     null
 
@@ -115,12 +134,20 @@ export function locateOnCrossover(
 
   const { segment, t } = best
   return {
-    area: segment.area,
-    placement: {
-      areaLocalX: segment.aLocal.x + (segment.bLocal.x - segment.aLocal.x) * t,
-      areaLocalY: segment.aLocal.y + (segment.bLocal.y - segment.aLocal.y) * t,
-      trackId: segment.facilityId,
-      score: 1,
+    located: {
+      area: segment.area,
+      placement: {
+        areaLocalX: segment.aLocal.x + (segment.bLocal.x - segment.aLocal.x) * t,
+        areaLocalY: segment.aLocal.y + (segment.bLocal.y - segment.aLocal.y) * t,
+        trackId: segment.facilityId,
+        score: 1,
+      },
     },
+    distanceM: best.distance,
+    directionRad: Math.atan2(
+      segment.bField.yM - segment.aField.yM,
+      segment.bField.xM - segment.aField.xM,
+    ),
+    facilityId: segment.facilityId,
   }
 }

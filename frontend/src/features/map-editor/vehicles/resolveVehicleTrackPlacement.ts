@@ -35,7 +35,12 @@ import {
   tangentAlongPath,
   trackGenPickScore,
 } from '../utils/trackGenPaths';
-import { locateOnCrossover } from './trackNetwork/crossoverLocate';
+import {
+  locateOnCrossover,
+  locateOnCrossoverDetailed,
+  type CrossoverHit,
+} from './trackNetwork/crossoverLocate';
+import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
 /**
@@ -55,6 +60,14 @@ export type VehicleNetworkFix = {
    * 兩次的結果在邊界附近會不一致（實測同一個點，挑塊算 0.75、重算 0.7499，差一格）。
    */
   alongFrac: number;
+  /** 離中心線的距離（公尺，無正負號）。 */
+  distanceM?: number;
+  /** 判給這一塊有多少把握（0–1）；低的時候畫面上要看得出「這是猜的」。 */
+  confidence?: number;
+  /** 第二名比第一名差多少分；只有一塊候選時是 Infinity。 */
+  margin?: number;
+  /** 這個位置局部的行車方向（弧度，場域座標）。 */
+  travelRad?: number;
 };
 
 export type VehicleTrackPlacement = {
@@ -428,10 +441,15 @@ export function drawnDirectionAtField(
   xM: number,
   yM: number,
   headingRad?: number,
+  /**
+   * 已經知道走了幾成就帶進來，不要再對整條折線投影一次（見 trackAreaLocalAt）。
+   * 沿路徑補間的每一幀也靠它——補間中的位置不對應任何一筆遙測座標。
+   */
+  alongHint?: number,
 ): { x: number; y: number } | null {
   const paths = getTrackGenPaths(track.parameters);
   if (!paths) return null;
-  const { along } = projectAlongPath(paths.real, xM, yM);
+  const along = alongHint ?? projectAlongPath(paths.real, xM, yM).along;
   const localTan = tangentAlongPath(paths.local, along);
   const size = resolveFacilityAreaSize(track, area.domain, area.layout);
   // 圖面切線的 y 向下，區域座標的 y 向上
@@ -479,15 +497,16 @@ export function drawnRotateWithSwingDeg(
   xM: number,
   yM: number,
   headingRad?: number | null,
+  alongHint?: number,
 ): number | null {
-  const dir = drawnDirectionAtField(track, area, xM, yM, headingRad ?? undefined);
+  const dir = drawnDirectionAtField(track, area, xM, yM, headingRad ?? undefined, alongHint);
   if (!dir) return null;
   const base = rotateDegForDrawnDirection(dir);
   if (headingRad == null || !Number.isFinite(headingRad)) return base;
 
   const paths = getTrackGenPaths(track.parameters);
   if (!paths) return base;
-  const { along } = projectAlongPath(paths.real, xM, yM);
+  const along = alongHint ?? projectAlongPath(paths.real, xM, yM).along;
   const realTan = tangentAlongPath(paths.real, along);
   let tanRad = Math.atan2(realTan.y, realTan.x);
   // 逆著這一塊畫的方向走時，切線要反過來才是「車頭該對的那一邊」
@@ -511,6 +530,36 @@ export function rotateDegForDrawnDirection(dir: { x: number; y: number }): numbe
   return (Math.atan2(-sy, -sx) * 180) / Math.PI;
 }
 
+/**
+ * 已經知道「走了幾成、偏了多少」，直接換成 Area 內座標。
+ *
+ * <h3>為什麼要獨立出來</h3>
+ * 定位挑塊時已經投影過一次（而且只看那一段自己的那一截）。原本換算圖面位置時又把座標
+ * 對<strong>整條折線</strong>重新投影一次——一塊路口元件橫跨兩條腿，兩次投影可以選到
+ * 不同的腿，車就被畫到挑塊時沒看中的那個位置。挑塊算一次，之後的位置、方向、偏差
+ * 全部吃同一組值。
+ */
+export function trackAreaLocalAt(
+  track: FacilityObject,
+  area: MapAreaObject,
+  along: number,
+  sideM: number,
+): { x: number; y: number } | null {
+  const paths = getTrackGenPaths(track.parameters);
+  if (!paths) return null;
+  return trackLocalPathPointToAreaLocal(
+    track,
+    area,
+    offsetLocalPoint(
+      paths.local,
+      along,
+      sideM,
+      getTrackGenLatPerBox(track.parameters),
+      getTrackGenLatMode(track.parameters),
+    ),
+  );
+}
+
 export function fieldPositionToTrackAreaLocal(
   xM: number,
   yM: number,
@@ -528,17 +577,7 @@ export function fieldPositionToTrackAreaLocal(
   const paths = getTrackGenPaths(track.parameters);
   if (paths) {
     const { along: t, side } = projectAlongPath(paths.real, xM, yM);
-    return trackLocalPathPointToAreaLocal(
-      track,
-      area,
-      offsetLocalPoint(
-        paths.local,
-        t,
-        side,
-        getTrackGenLatPerBox(track.parameters),
-        getTrackGenLatMode(track.parameters),
-      ),
-    );
+    return trackAreaLocalAt(track, area, t, side);
   }
 
   // 手工放的軌道沒有路徑，只能靠場域範圍做線性內插
@@ -636,6 +675,56 @@ export function resolveVehicleTrackPlacementInArea(
 }
 
 /**
+ * 靠近橫渡線時，要不要真的畫在渡線上。
+ *
+ * <h3>為什麼不能無條件優先</h3>
+ * 橫渡線是斜的，一定會穿過上下行軌道帶。原本只要離渡線 2 公尺內就一律判渡線——可是
+ * 車只是沿著正線開過渡線旁邊，離自己那條中心線 0 公尺、離渡線 1.5 公尺，也被拉到
+ * 渡線上去，畫面上就是突然側向飄過去，再飄回來。
+ *
+ * 判給渡線要同時滿足兩件事：
+ * <ul>
+ *   <li>離渡線<strong>明顯比離軌道中心線近</strong>——車在軌道上的話，離自己的中心線
+ *       應該接近 0；離渡線更近才是真的在渡線上。</li>
+ *   <li>車頭跟渡線走向大致同向（六十度內）。斜渡線與正線夾角大，沿正線開的車頭朝向
+ *       跟渡線差很多；真的在轉線的車頭才會順著渡線。</li>
+ * </ul>
+ * 上一筆已經在這條渡線上的，只要還在容許範圍內就留著，不要在中途被拉回軌道。
+ *
+ * 軌道不是生成的（沒有中心線可比）時維持舊行為：沒有可比的距離，就沿用「渡線優先」。
+ */
+const CROSSOVER_HEADING_LIMIT_RAD = (60 * Math.PI) / 180;
+const CROSSOVER_CLEARLY_CLOSER_M = 0.5;
+
+function crossoverWins(
+  hit: CrossoverHit,
+  onTrack: VehiclePlacementAcrossAreas | null,
+  options?: { headingRad?: number; speedMps?: number; previousTrackId?: string },
+): boolean {
+  if (options?.previousTrackId === hit.facilityId) return true;
+  if (!onTrack) return true;
+
+  const trackDistance = onTrack.placement.network?.distanceM;
+  const headingKnown =
+    options?.headingRad !== undefined &&
+    (options.speedMps === undefined || options.speedMps >= HEADING_RELIABLE_MPS);
+
+  if (trackDistance === undefined) {
+    // 沒有中心線可比：只用方向擋一擋（沒有朝向就照舊）
+    return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
+  }
+  if (!(hit.distanceM + CROSSOVER_CLEARLY_CLOSER_M < trackDistance)) return false;
+  return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
+}
+
+/** 車頭跟一條直線走向的夾角（不分順逆）在六十度內 */
+function headingAlongLine(headingRad: number, lineRad: number): boolean {
+  let d = Math.abs(headingRad - lineRad) % Math.PI;
+  if (d > Math.PI / 2) d = Math.PI - d;
+  return d <= CROSSOVER_HEADING_LIMIT_RAD;
+}
+
+/**
  * 全圖定位：橫渡線優先，再掃 Track refField。
  *
  * 橫渡線與軌道帶在場域上重疊——若先吸到軌道中心線，轉線途中的車會在上下行之間
@@ -656,6 +745,10 @@ export function resolveVehiclePlacementAcrossAreas(
      * 位置分不出來，走向差 180 度卻一目了然。沒給就退回純距離。
      */
     headingRad?: number;
+    /** 車速（公尺／秒）。停著時 heading 只是殘留，方向的權重會降低。 */
+    speedMps?: number;
+    /** 上一筆判給這台車的軌道（設施 id）；換塊要有足夠的證據。 */
+    previousTrackId?: string;
   },
 ): VehiclePlacementAcrossAreas | null {
   const net = network ?? getTrackNetwork(areas);
@@ -665,11 +758,18 @@ export function resolveVehiclePlacementAcrossAreas(
     return resolveYardFacilityPlacement(areas, options?.payload);
   }
 
-  // 緊貼橫渡線（2 m）：即使同時落在軌道帶 AABB 裡，也畫在渡線上
-  const onCrossover = locateOnCrossover(areas, xM, yM, 2);
-  if (onCrossover) return onCrossover;
+  const onTrack = locateOnTrackNetwork(net, xM, yM, {
+    headingRad: options?.headingRad,
+    speedMps: options?.speedMps,
+    previousTrackId: options?.previousTrackId,
+  });
 
-  const onTrack = locateOnTrackNetwork(net, xM, yM, options?.headingRad);
+  // 緊貼橫渡線（2 m）：要先確認車<strong>真的在轉線</strong>才畫在渡線上
+  const nearCrossover = locateOnCrossoverDetailed(areas, xM, yM, 2);
+  if (nearCrossover && crossoverWins(nearCrossover, onTrack, options)) {
+    return nearCrossover.located;
+  }
+
   if (onTrack) return onTrack;
 
   // 略寬：portal 外緣、尚未落入任何 refField 的點
