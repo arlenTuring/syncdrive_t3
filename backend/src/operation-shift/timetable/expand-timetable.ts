@@ -16,7 +16,8 @@ import {
 import { resolveTimetableTripCode } from './trip-code';
 import {
   buildStationAliasIndexFromMapDocument,
-  isVirtualCrossoverStationId,
+  collectWaypointIdsFromMapDocument,
+  isNonPassengerWaypointId,
   loadMapDocumentForShift,
   resolveStationAlias,
 } from './station-alias';
@@ -393,7 +394,7 @@ export function expandStationEtas(args: {
   body: Record<string, unknown>;
   range: TimeRangeFilter;
   stationId?: string;
-  /** 預設 true：排除虛擬渡線端點，只留停靠點 */
+  /** 預設 true：排除途經點（入口點、交叉軌道接口），只留停靠點 */
   passengerStopsOnly?: boolean;
 }): StationEtaEventDto[] {
   const trips = expandTimetableTrips({
@@ -406,12 +407,13 @@ export function expandStationEtas(args: {
   const passengerStopsOnly = args.passengerStopsOnly !== false;
   const { mapDocument } = loadMapDocumentForShift(args.body);
   const aliasIndex = buildStationAliasIndexFromMapDocument(mapDocument);
+  const waypointIds = collectWaypointIdsFromMapDocument(mapDocument);
   const events: StationEtaEventDto[] = [];
 
   for (const trip of trips) {
     for (const stop of trip.stations) {
       if (stationFilter && stop.station_id !== stationFilter) continue;
-      if (passengerStopsOnly && isVirtualCrossoverStationId(stop.station_id)) {
+      if (passengerStopsOnly && isNonPassengerWaypointId(stop.station_id, waypointIds)) {
         continue;
       }
 
@@ -480,7 +482,7 @@ export type StationEtaGroupDto = {
 
 /**
  * 依站分組；並補齊地圖上全部停靠點別名（0 筆也要列出）。
- * 虛擬渡線端點不列為頁籤。
+ * 途經點（入口點、交叉軌道接口）不列為頁籤。
  */
 export function groupStationEtasIncludingMapAliases(args: {
   etas: StationEtaEventDto[];
@@ -511,8 +513,9 @@ export function groupStationEtasIncludingMapAliases(args: {
   }
 
   const aliasIndex = buildStationAliasIndexFromMapDocument(args.mapDocument);
+  const waypointIds = collectWaypointIdsFromMapDocument(args.mapDocument);
   for (const [stationId, alias] of aliasIndex.entries()) {
-    if (isVirtualCrossoverStationId(stationId)) continue;
+    if (isNonPassengerWaypointId(stationId, waypointIds)) continue;
     if (stationFilter && stationId !== stationFilter) continue;
     const existing = map.get(stationId);
     if (existing) {

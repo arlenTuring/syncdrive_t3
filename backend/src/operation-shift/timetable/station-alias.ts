@@ -6,10 +6,52 @@ const mapPublishedStore = require(backendScriptPath('map-published-store.js'));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mapOperationNodes = require(backendScriptPath('map-operation-nodes.js'));
 
-/** 虛擬渡線端點：不算乘客可見停靠點 */
-export function isVirtualCrossoverStationId(stationId: string): boolean {
-  const id = stationId.trim();
+/**
+ * 舊版虛擬渡線途經點的代號（`xo_1_a`、`xowp:…`）。
+ *
+ * 虛擬渡線已由交叉軌道取代、不再有這種設施；留著只是因為舊班表資料可能還帶著這種代號。
+ */
+function isLegacyCrossoverId(id: string): boolean {
   return /^xo_\d+_[ab]$/i.test(id) || /^xowp:/i.test(id);
+}
+
+/**
+ * 這張圖上所有<strong>途經點</strong>的代號：入口途經點（`Waypoint`）與交叉軌道
+ * （`RailCross`）四個接口的 `waypointCode`。它們是車輛必經的點位，不是乘客可見的停靠點。
+ */
+export function collectWaypointIdsFromMapDocument(
+  mapDocument: Record<string, unknown> | null | undefined,
+): Set<string> {
+  const ids = new Set<string>();
+  const areas = Array.isArray(mapDocument?.areas) ? mapDocument.areas : [];
+  for (const area of areas) {
+    const facilities = asRecord(area)?.facilities;
+    if (!Array.isArray(facilities)) continue;
+    for (const facility of facilities) {
+      const fac = asRecord(facility);
+      const params = asRecord(fac?.parameters);
+      if (!fac || !params) continue;
+      if (fac.type === 'Waypoint') {
+        const code = typeof params.waypointCode === 'string' ? params.waypointCode.trim() : '';
+        if (code) ids.add(code);
+      }
+      const portals = asRecord(params.crossTrackPortals);
+      for (const portal of Object.values(portals ?? {})) {
+        const code = asRecord(portal)?.waypointCode;
+        if (typeof code === 'string' && code.trim()) ids.add(code.trim());
+      }
+    }
+  }
+  return ids;
+}
+
+/** 途經點不算乘客可見停靠點；`waypointIds` 沒給時只認舊版代號 */
+export function isNonPassengerWaypointId(
+  stationId: string,
+  waypointIds?: ReadonlySet<string>,
+): boolean {
+  const id = stationId.trim();
+  return isLegacyCrossoverId(id) || (waypointIds?.has(id) ?? false);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

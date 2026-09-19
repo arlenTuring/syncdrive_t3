@@ -224,7 +224,7 @@ describe('expandTimetableTrips', () => {
     expect(paxOnly.map((t) => t.task_type)).toEqual(['passenger']);
   });
 
-  it('filters virtual crossover portals from passenger-stop etas', () => {
+  it('filters legacy crossover portal ids from passenger-stop etas', () => {
     const withXo = {
       selectedRoutes: [
         {
