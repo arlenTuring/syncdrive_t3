@@ -473,22 +473,43 @@ WITH active_orders AS (
     mid_st.station_id AS route_mid,
     last_st.station_id AS route_destination,
     /*
-     * 一台車只列一張單。
+     * 一台車只列一張單，而且<strong>車實際在做的那張優先</strong>。
      *
-     * 上一班的時間窗還在寬限期內、下一班已經開始的那幾十秒，同一台車會有兩張單都算
-     * 「還在跑」，卡片就出現兩張同車不同班次的。正在跑的那張優先，其次才是接下來要發的。
+     * 以前先比「計畫時間窗有沒有涵蓋現在」：前班晚了幾十秒、下一班的時間窗已經開始，
+     * 卡片就先換成下一班——畫面上顯示下一班待發，車卻還在跑上一班。現在依實際狀態排：
+     * 故障、執行中的單永遠排前面，不管計畫結束時間過了沒；接下來要發的 PENDING 只有在這台
+     * 車沒有進行中的單時才會出現。
      */
     ROW_NUMBER() OVER (
       PARTITION BY o.vehicle_code
       ORDER BY
+        CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,
         (
           o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
           AND COALESCE(o.planned_end, o.planned_start + 600000)
               >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
         ) DESC,
-        CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,
         o.planned_start
-    ) AS vehicle_rank
+    ) AS vehicle_rank,
+    /* 車端最後一次回報距今多久（毫秒）；從沒回報過就當作很久 */
+    (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+      - COALESCE((o.payload->>'updated_at')::bigint, 0) AS report_age_ms,
+    /* 這班還在跑，但計畫結束時間已經過了 15 秒以上：逾時仍在執行 */
+    (
+      o.status = 'PROCESSING'
+      AND o.planned_end IS NOT NULL
+      AND o.planned_end < (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 15000
+    ) AS is_overdue,
+    /* 同一台車有下一班已經到點、只是被這班佔住 */
+    EXISTS (
+      SELECT 1 FROM operation_orders nx
+      WHERE nx.vehicle_code = o.vehicle_code
+        AND nx.order_id <> o.order_id
+        AND nx.status = 'PENDING'
+        AND nx.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+        AND COALESCE(nx.planned_end, nx.planned_start + 600000)
+            >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+    ) AS next_due_waiting
   FROM operation_orders o
   JOIN vehicles v ON v.vehicle_code = o.vehicle_code
   LEFT JOIN operation_routes r ON r.route_id = o.route_id
@@ -528,6 +549,11 @@ WITH active_orders AS (
      * 的 updated_at 是幾秒前）。不擋掉的話卡片會被半夜那幾百筆殭屍班次塞滿。
      *
      * 留 60 秒寬限，剛到站的那一班不會瞬間消失。
+     *
+     * 執行中的單<strong>不看計畫結束時間</strong>：晚到的班次就算過了計畫結束仍在跑，卡片不能
+     * 消失、也不能被下一班取代。改看車端有沒有回報——十分鐘內回報過的才是真的在跑，更久
+     * 沒有回報的是前幾班留下的殭屍單，不列。半分鐘到十分鐘之間標成「資料過期」，不自動換成
+     * 別的班次。
      */
     AND (
       COALESCE(o.planned_end, o.planned_start + 600000)
@@ -535,7 +561,7 @@ WITH active_orders AS (
       OR (
         o.status = 'PROCESSING'
         AND COALESCE((o.payload->>'updated_at')::bigint, 0)
-          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 10000
+          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000
       )
     )
 ),
@@ -571,32 +597,41 @@ SELECT
   '#2B7FFF' AS direction_pill_bg,
   '#FFFFFF' AS direction_pill_color,
   '下一站' AS station_label,
-  '剩餘到站' AS eta_label,
+  CASE
+    WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '通訊中斷，資料過期'
+    WHEN o.is_overdue AND o.next_due_waiting THEN '逾時，後續班次等待前班完成'
+    WHEN o.is_overdue THEN '逾時，仍在執行'
+    ELSE '剩餘到站'
+  END AS eta_label,
   o.status AS order_status,
   CASE
     WHEN o.status = 'FAULTED' THEN '故障'
     WHEN o.status = 'PENDING' THEN '待發'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '延誤'
+    WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '資料過期'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '延誤'
     WHEN o.status = 'PROCESSING' THEN '準時'
     ELSE '待命'
   END AS status_label,
   CASE
     WHEN o.status = 'FAULTED' THEN '#450a0a'
     WHEN o.status = 'PENDING' THEN '#27272a'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#422006'
+    WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '#27272a'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '#422006'
     WHEN o.status = 'PROCESSING' THEN 'rgba(0, 212, 146, 0.3)'
     ELSE '#27272a'
   END AS status_bg,
   CASE
     WHEN o.status = 'FAULTED' THEN '#f87171'
     WHEN o.status = 'PENDING' THEN '#a1a1aa'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'
+    WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '#a1a1aa'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '#fb923c'
     WHEN o.status = 'PROCESSING' THEN '#00BC7D'
     ELSE '#a1a1aa'
   END AS status_color,
   CASE
     WHEN o.status = 'FAULTED' THEN 'rgba(239,68,68,0.75)'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'rgba(249,115,22,0.75)'
+    WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN 'rgba(113,113,122,0.55)'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN 'rgba(249,115,22,0.75)'
     WHEN o.status = 'PROCESSING' THEN '#009966'
     WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.45)'
     ELSE 'rgba(113,113,122,0.35)'
