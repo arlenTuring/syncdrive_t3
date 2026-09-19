@@ -44,7 +44,11 @@ export function resolveFreshness(binding: WidgetDataBinding): EffectiveRefresh {
       case 'live':
         return { refreshMode: 'stream', reasonKey: 'live' };
       case 'on_change':
-        return { refreshMode: 'event', reasonKey: 'on_change' };
+        return {
+          refreshMode: 'event',
+          refreshInterval: binding.refreshInterval,
+          reasonKey: 'on_change',
+        };
       case 'interval': {
         const sec = binding.refreshInterval && binding.refreshInterval > 0
           ? binding.refreshInterval
@@ -67,6 +71,7 @@ export function resolveFreshness(binding: WidgetDataBinding): EffectiveRefresh {
     }
     return {
       refreshMode: binding.refreshMode,
+      refreshInterval: binding.refreshMode === 'event' ? binding.refreshInterval : undefined,
       reasonKey: 'legacy_mode',
       reasonParams: { mode: binding.refreshMode },
     };

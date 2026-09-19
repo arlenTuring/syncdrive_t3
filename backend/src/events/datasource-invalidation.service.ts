@@ -9,6 +9,7 @@ export const DS_TAGS = {
   SHIFT_CENTER: 'domain:shift_center',
   EVENT_CENTER: 'domain:event_center',
   VEHICLE_MONITOR: 'domain:vehicle_monitor',
+  VEHICLE_MONITOR_TABLE: 'table:vehicle_monitor_demo',
   MAINTENANCE_SLOTS: 'domain:maintenance_slots',
   VEHICLE_DISTRIBUTION: 'domain:vehicle_distribution',
   CAPACITY_TREND: 'domain:capacity_trend',
@@ -55,6 +56,16 @@ export class DatasourceInvalidationService {
 
   emitEventCenter(): void {
     this.emit([DS_TAGS.EVENT_CENTER, DS_TAGS.SECURITY_EVENTS, DS_TAGS.SHIFT_CENTER], 'security_event');
+  }
+
+  emitVehiclePosition(vehicleCode?: string): void {
+    const tags: string[] = [
+      DS_TAGS.VEHICLE_MONITOR,
+      DS_TAGS.VEHICLE_MONITOR_TABLE,
+      DS_TAGS.VEHICLE_DISTRIBUTION,
+    ];
+    if (vehicleCode) tags.push(`vehicle:${String(vehicleCode).trim().toUpperCase()}`);
+    this.emit(tags, 'vehicle_position');
   }
 
   emitMaintenanceSlots(): void {

@@ -1,8 +1,8 @@
 import type { VariableMap } from '../VariableContext';
 import { maintTypeLabelColor, maintTypeLabelFromSlot } from './maintenanceTaskModel';
 
-/** 正線班次：D/U + 4 位時分（營運任務狀態協議 §三） */
-const SHIFT_TRIP_CODE_RE = /^[DU]\d{4}$/;
+/** 正線班次：路線代號（1–3 大寫字母）+ 4 位時分，例如 ST1450、TN1415。 */
+const SHIFT_TRIP_CODE_RE = /^[A-Z]{1,3}\d{4}$/;
 
 export const ORDER_PRIORITY_LINE = 50;
 export const ORDER_PRIORITY_MAINT = 40;
@@ -18,6 +18,13 @@ export interface VehicleMonitorBadge {
   color: string;
   kind: VehicleMonitorBadgeKind;
 }
+
+const EMPTY_BADGE: VehicleMonitorBadge = {
+  label: '',
+  bg: '',
+  color: '',
+  kind: 'none',
+};
 
 export function isShiftTripCode(code: unknown): boolean {
   if (code === null || code === undefined) return false;
@@ -73,7 +80,7 @@ function orderStatus(ctx: Record<string, unknown>): string {
 
 function isMainlineOrder(ctx: Record<string, unknown>): boolean {
   const kind = readStr(ctx, 'line_kind').toUpperCase();
-  if (kind === 'MAINLINE') return true;
+  if (kind === 'MAINLINE' || kind === 'TEST') return true;
   const pri = readNum(ctx, 'priority_level');
   return pri === ORDER_PRIORITY_LINE;
 }
@@ -119,10 +126,40 @@ export function resolveVehicleMonitorBadge(
   variables: VariableMap,
   sources: { operation?: Record<string, unknown> | null } = {},
 ): VehicleMonitorBadge {
+  // 車卡的業務狀態以部署班表當下的時間線為權威；SQL 已將目前卡換成
+  // badge_label/badge_kind。operation/update 只負責執行進度，不得把班表標籤蓋掉。
+  const scheduledLabel = readStr(variables, 'badge_label');
+  const scheduledKind = readStr(variables, 'badge_kind').toLowerCase();
+  if (scheduledLabel) {
+    if (scheduledKind === 'mainline' && isShiftTripCode(scheduledLabel)) {
+      return {
+        label: scheduledLabel,
+        bg: readStr(variables, 'trip_badge_bg') || '#7e57c2',
+        color: readStr(variables, 'trip_badge_color') || '#f3e8ff',
+        kind: 'mainline',
+      };
+    }
+    if (scheduledKind === 'maintenance') {
+      return maintenanceBadgeFromLabel(variables, scheduledLabel);
+    }
+  }
+
   const ctx = mergeOperationContext(variables, sources.operation);
   const status = orderStatus(ctx);
   const phase = readStr(ctx, 'vehicle_phase').toUpperCase();
   const trip = readStr(ctx, 'trip_code') || readStr(ctx, 'badge_label');
+
+  // operation/update 是即時真相。車端已回到 IDLE 且沒有訂單時，不可再讓 SQL 中
+  // 尚未到時間的整備單補上一個「充電／保養」徽章。
+  if (
+    sources.operation
+    && status.toUpperCase() === 'IDLE'
+    && !readStr(sources.operation, 'order_id')
+    && !readStr(sources.operation, 'trip_code')
+    && !readStr(sources.operation, 'maint_type_label')
+  ) {
+    return EMPTY_BADGE;
+  }
 
   // 營運任務 MQTT：執行階段 + 有效班次代碼（協議 trip_code）
   if (isShiftTripCode(trip) && ACTIVE_MAINLINE_PHASES.has(phase)) {
@@ -179,13 +216,6 @@ export function resolveVehicleMonitorBadge(
   if (inferred) {
     return maintenanceBadgeFromLabel(ctx, inferred);
   }
-
-  const EMPTY_BADGE: VehicleMonitorBadge = {
-    label: '',
-    bg: '',
-    color: '',
-    kind: 'none',
-  };
 
   return EMPTY_BADGE;
 }

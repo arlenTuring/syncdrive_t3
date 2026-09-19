@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS vehicle_monitor_demo (
   segment_label VARCHAR(32)
 );
 
+ALTER TABLE vehicle_monitor_demo ADD COLUMN IF NOT EXISTS location_kind VARCHAR(16);
+ALTER TABLE vehicle_monitor_demo ADD COLUMN IF NOT EXISTS location_object_id VARCHAR(128);
+ALTER TABLE vehicle_monitor_demo ADD COLUMN IF NOT EXISTS position_x DOUBLE PRECISION;
+ALTER TABLE vehicle_monitor_demo ADD COLUMN IF NOT EXISTS position_y DOUBLE PRECISION;
+ALTER TABLE vehicle_monitor_demo ADD COLUMN IF NOT EXISTS position_updated_at BIGINT;
+
 INSERT INTO vehicle_monitor_demo (
   vehicle_code, overall_health, alert_message, card_border_color,
   status_computing, status_sensing, status_communication, status_chassis,

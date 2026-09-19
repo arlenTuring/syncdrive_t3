@@ -440,4 +440,13 @@ export class MapService implements OnModuleInit {
   ): { mapCode: string; equipmentId: string; equipmentKind: string } | null {
     return mapFieldEquipment.findFacilityAtPoint(mapId, xM, yM);
   }
+
+  /** 車輛即時座標 → 站點／最小命中設施／軌道（依此優先序）。 */
+  findVehicleLocationAtPoint(
+    mapId: string,
+    xM: number,
+    yM: number,
+  ): { kind: 'STATION' | 'FACILITY' | 'TRACK'; label: string; objectId: string } | null {
+    return mapFieldEquipment.findVehicleLocationAtPoint(mapId, xM, yM);
+  }
 }

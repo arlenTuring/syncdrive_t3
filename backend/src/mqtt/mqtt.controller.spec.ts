@@ -10,6 +10,7 @@ describe('MqttController', () => {
       broadcastMqttMessage: jest.fn(),
     };
     const mqttService = {
+      updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(false),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
     };
@@ -35,6 +36,7 @@ describe('MqttController', () => {
     await controller.handleTelemetry(payload, context as any);
 
     expect(redisService.setTelemetry).toHaveBeenCalledWith('PMS05', payload);
+    expect(mqttService.updateVehicleLivePosition).toHaveBeenCalledWith('PMS05', payload);
     expect(mqttService.syncOperationOrderFromLive).not.toHaveBeenCalled();
     expect(telemetryWriteQueue.enqueue).not.toHaveBeenCalled();
     expect(eventsGateway.broadcastTelemetry).toHaveBeenCalledWith('PMS05', payload);
@@ -52,6 +54,7 @@ describe('MqttController', () => {
       broadcastMqttMessage: jest.fn(),
     };
     const mqttService = {
+      updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(false),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
     };
@@ -79,6 +82,7 @@ describe('MqttController', () => {
       broadcastMqttMessage: jest.fn(),
     };
     const mqttService = {
+      updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(true),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
     };

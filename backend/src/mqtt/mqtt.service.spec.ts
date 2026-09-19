@@ -9,19 +9,29 @@ import { DatasourceInvalidationService } from '../events/datasource-invalidation
 import { RedisService } from '../redis/redis.service';
 import { MapService } from '../map/map.service';
 import { MqttService } from './mqtt.service';
+import { DataSource } from 'typeorm';
 
-const invalidationMock = { emit: jest.fn(), emitOrderLifecycle: jest.fn(), emitEventCenter: jest.fn(), emitMaintenanceSlots: jest.fn() };
+const invalidationMock = {
+  emit: jest.fn(),
+  emitOrderLifecycle: jest.fn(),
+  emitEventCenter: jest.fn(),
+  emitMaintenanceSlots: jest.fn(),
+  emitVehiclePosition: jest.fn(),
+};
 const redisServiceMock = { getTelemetry: jest.fn().mockResolvedValue(null) };
 const mapServiceMock = {
   getActiveMapLibraryStatus: jest.fn().mockReturnValue({ activeMapId: 'map-test' }),
   findFacilityAtPoint: jest.fn().mockReturnValue(null),
+  findVehicleLocationAtPoint: jest.fn().mockReturnValue(null),
 };
+const dataSourceMock = { query: jest.fn().mockResolvedValue([]) };
 
 describe('MqttService', () => {
   let service: MqttService;
   let orderServiceMock: { applyOperationMqttUpdate: jest.Mock };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const repositoryMock = {
       create: jest.fn((value) => value),
       findOne: jest.fn(),
@@ -42,6 +52,7 @@ describe('MqttService', () => {
         { provide: DatasourceInvalidationService, useValue: invalidationMock },
         { provide: RedisService, useValue: redisServiceMock },
         { provide: MapService, useValue: mapServiceMock },
+        { provide: DataSource, useValue: dataSourceMock },
       ],
     }).compile();
 
@@ -74,6 +85,7 @@ describe('MqttService', () => {
         trip_code: 'D1401',
       }),
     );
+    expect(invalidationMock.emitOrderLifecycle).toHaveBeenCalledWith('PMS03');
   });
 
   describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {
@@ -108,5 +120,22 @@ describe('MqttService', () => {
       const result = await service.enrichWithFacilityLocation('PMS01', payload);
       expect(result).not.toHaveProperty('yard_slot_id');
     });
+  });
+
+  it('每筆 telemetry 將後端判定的位置寫入車輛快照', async () => {
+    mapServiceMock.findVehicleLocationAtPoint.mockReturnValueOnce({
+      kind: 'TRACK', label: 'D03', objectId: 'track-d03',
+    });
+    await service.updateVehicleLivePosition('PMS03', {
+      timestamp: 123,
+      local_pose: { position: { x: -820, y: -2 } },
+      kinematics: { velocity: 5 },
+      energy: { battery_level: 83 },
+    });
+    expect(dataSourceMock.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO vehicle_monitor_demo'),
+      ['PMS03', 'D03', 'TRACK', 'track-d03', -820, -2, 123, 18, 83],
+    );
+    expect(invalidationMock.emitVehiclePosition).toHaveBeenCalledWith('PMS03');
   });
 });

@@ -45,6 +45,7 @@ export class MqttController {
     if (!vehicleCode || !data) return;
 
     await this.redisService.setTelemetry(vehicleCode, data);
+    await this.mqttService.updateVehicleLivePosition(vehicleCode, data);
     if (this.mqttService.shouldPersistTelemetry(vehicleCode)) {
       this.telemetryWriteQueue.enqueue(vehicleCode, data);
     }

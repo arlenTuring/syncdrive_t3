@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CommandLog } from '../database/entities/command-log.entity';
 import { SecurityEventLog, EventCode, Severity } from '../database/entities/security-event-log.entity';
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
@@ -15,6 +15,7 @@ export class MqttService {
   private readonly logger = new Logger(MqttService.name);
   private telemetryPersistDisabled = false;
   private readonly operationSyncCache = new Map<string, { at: number; key: string }>();
+  private lastVehiclePositionInvalidationAt = 0;
 
   constructor(
     @InjectRepository(CommandLog)
@@ -29,7 +30,60 @@ export class MqttService {
     private readonly datasourceInvalidation: DatasourceInvalidationService,
     private readonly redisService: RedisService,
     private readonly mapService: MapService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * 每筆 telemetry 都由中心端依啟用圖資判定位置，並覆寫一車一筆的 DB 快照。
+   * 顯示優先序在 MapService 固定為站點 → 設施 → 軌道；前端只讀結果，不再重算。
+   */
+  async updateVehicleLivePosition(vehicleCode: string, payload: Record<string, unknown>): Promise<void> {
+    const position = (payload as { local_pose?: { position?: { x?: unknown; y?: unknown } } })
+      ?.local_pose?.position;
+    const x = Number(position?.x);
+    const y = Number(position?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
+    const location = this.mapService.findVehicleLocationAtPoint(mapId, x, y);
+    const velocity = Number((payload as { kinematics?: { velocity?: unknown } }).kinematics?.velocity);
+    const battery = Number((payload as { energy?: { battery_level?: unknown } }).energy?.battery_level);
+    const timestamp = Number(payload.timestamp);
+    await this.dataSource.query(
+      `INSERT INTO vehicle_monitor_demo (
+         vehicle_code, segment_label, location_kind, location_object_id,
+         position_x, position_y, position_updated_at, demo_speed, demo_load
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (vehicle_code) DO UPDATE SET
+         segment_label = EXCLUDED.segment_label,
+         location_kind = EXCLUDED.location_kind,
+         location_object_id = EXCLUDED.location_object_id,
+         position_x = EXCLUDED.position_x,
+         position_y = EXCLUDED.position_y,
+         position_updated_at = EXCLUDED.position_updated_at,
+         demo_speed = EXCLUDED.demo_speed,
+         demo_load = EXCLUDED.demo_load`,
+      [
+        vehicleCode,
+        location?.label ?? '場域外',
+        location?.kind ?? 'UNKNOWN',
+        location?.objectId ?? null,
+        x,
+        y,
+        Number.isFinite(timestamp) ? timestamp : Date.now(),
+        Number.isFinite(velocity) ? velocity * 3.6 : null,
+        Number.isFinite(battery) ? battery : null,
+      ],
+    );
+
+    // 一秒內通常會連續收到整個車隊的 telemetry。資料逐筆寫庫，但失效通知合併成
+    // 每秒最多一次；前端收到後會重查整張車輛快照，避免 11 台車造成 11 次 SQL。
+    const now = Date.now();
+    if (now - this.lastVehiclePositionInvalidationAt >= 1_000) {
+      this.lastVehiclePositionInvalidationAt = now;
+      this.datasourceInvalidation.emitVehiclePosition(vehicleCode);
+    }
+  }
 
   /**
    * operation/update 不再要求車端回報 yard_slot_id：改由中心端用車輛最近一次
@@ -140,6 +194,9 @@ export class MqttService {
         trip_code: tripCode,
         vehicle_code: vehicleCode,
       });
+      // 訂單的 leg_eta_max／segment 由中心端依班表計算。寫庫後通知事件型 SQL
+      // 元件重讀一次；卡片之後仍由 1 Hz MQTT 倒數平滑更新，不必輪詢資料庫。
+      this.datasourceInvalidation.emitOrderLifecycle(vehicleCode);
     } catch (err) {
       this.logger.warn(`operation/update sync failed for ${vehicleCode}: ${(err as Error)?.message ?? err}`);
     }

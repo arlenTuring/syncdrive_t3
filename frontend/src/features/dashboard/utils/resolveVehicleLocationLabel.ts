@@ -1,6 +1,5 @@
 import type { VariableMap } from '../VariableContext';
 import { formatMqttDisplayScalar } from './mqttFieldResolve';
-import { resolveT3TrackCode } from '../../map-editor/vehicles/t3FieldTrackClassifier';
 
 /** 停靠點／站名（非軌道段、非設施格） */
 const DOCKING_STATION_NAME_RE = /^(N2W|S2W|T3)(上行|下行)?$/i;
@@ -94,33 +93,18 @@ export function sanitizeTrackOrFacilityLabel(raw: unknown): string | undefined {
   return undefined;
 }
 
-/**
- * 車子回報的座標落在哪一段軌道。
- *
- * 協議裡沒有「現在在哪一段」這個欄位，車端報的是 local_pose.position（場域公尺），
- * 段號是中心端自己依座標分的——圖台上的車就是這樣定位的，這裡用同一支分類器，
- * 卡片與圖台才會說同一件事。
- */
-function trackCodeFromTelemetryPose(
-  telemetry: Record<string, unknown> | null | undefined,
-): string | undefined {
-  const pose = telemetry?.local_pose;
-  if (!pose || typeof pose !== 'object') return undefined;
-  const position = (pose as { position?: unknown }).position;
-  if (!position || typeof position !== 'object') return undefined;
-  const { x, y } = position as { x?: unknown; y?: unknown };
-  const xM = Number(x);
-  const yM = Number(y);
-  if (!Number.isFinite(xM) || !Number.isFinite(yM)) return undefined;
-  return resolveT3TrackCode(xM, yM) ?? undefined;
-}
-
 /** 車輛卡位置：yard_slot_id（設施）或 segment_label（軌道段）；不含停靠點站名 */
 export function resolveVehicleLocationLabel(sources: {
   variables?: VariableMap;
   operation?: Record<string, unknown> | null;
   telemetry?: Record<string, unknown> | null;
 }): string {
+  // 位置的權威來源是後端依 telemetry 座標與啟用圖資算出的 DB 快照。
+  // 站點名稱可以不是 D03/E1 這類代號，因此這裡不再用軌道代號白名單過濾。
+  const persisted = formatMqttDisplayScalar(sources.variables?.segment_label);
+  if (persisted) return persisted;
+
+  // 相容尚未完成位置快照遷移的頁面；正式車卡有 DB 值時不會走到這裡。
   const yardFromOperation = sanitizeTrackOrFacilityLabel(
     sources.operation?.yard_slot_id
     ?? (sources.operation && 'value' in sources.operation ? sources.operation.value : undefined),
@@ -145,8 +129,6 @@ export function resolveVehicleLocationLabel(sources: {
       );
       if (yard) return yard;
     }
-    const fromPose = trackCodeFromTelemetryPose(sources.telemetry);
-    if (fromPose) return fromPose;
     const track = sanitizeTrackOrFacilityLabel(
       sources.telemetry?.segment_label
       ?? sources.variables?.segment_label,
@@ -163,9 +145,6 @@ export function resolveVehicleLocationLabel(sources: {
   );
   if (yard) return yard;
 
-  const fromPose = trackCodeFromTelemetryPose(sources.telemetry);
-  if (fromPose) return fromPose;
-
   const track = sanitizeTrackOrFacilityLabel(
     sources.telemetry?.segment_label
     ?? sources.variables?.segment_label,
@@ -173,8 +152,5 @@ export function resolveVehicleLocationLabel(sources: {
   if (track) return track;
 
   // 沒有任何任務在身上時 SQL 直接寫「待命」，那也是一種位置說明，照它顯示。
-  const idle = String(sources.variables?.segment_label ?? '').trim();
-  if (idle === '待命') return idle;
-
   return '—';
 }

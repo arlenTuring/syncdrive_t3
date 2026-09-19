@@ -251,19 +251,141 @@ function findFacilityAtPoint(mapId, xM, yM) {
   const mapPath = resolveMapJsonPath(mapId);
   if (!mapPath) return null;
   const items = loadFacilityGeometryFromMapFile(mapPath);
-  const hit = items.find((item) => {
+  const hit = items.filter((item) => {
     if (!item.bounds) return false;
     return (
       xM >= item.bounds.xMinM && xM <= item.bounds.xMaxM
       && yM >= item.bounds.yMinM && yM <= item.bounds.yMaxM
     );
-  });
+  }).sort((a, b) => {
+    const area = (item) => (item.bounds.xMaxM - item.bounds.xMinM)
+      * (item.bounds.yMaxM - item.bounds.yMinM);
+    return area(a) - area(b);
+  })[0];
   if (!hit) return null;
   return {
     mapCode: hit.mapCode,
     equipmentId: hit.equipmentId,
     equipmentKind: hit.equipmentKind,
   };
+}
+
+function pointSegmentDistance(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  if (dx === 0 && dy === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+const vehicleGeometryCache = new Map();
+
+function loadVehicleLocationGeometry(mapId) {
+  const mapPath = resolveMapJsonPath(mapId);
+  if (!mapPath) return null;
+  const stat = fs.statSync(mapPath);
+  const cached = vehicleGeometryCache.get(mapId);
+  if (cached?.path === mapPath && cached?.mtimeMs === stat.mtimeMs) return cached.geometry;
+
+  const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+  const geometry = { stations: [], facilities: [], tracks: [] };
+  for (const area of Array.isArray(map.areas) ? map.areas : []) {
+    for (const entry of Array.isArray(area.facilities) ? area.facilities : []) {
+      const params = entry.parameters ?? {};
+      if (entry.type === 'DockingPoint') {
+        const xM = params.refFieldXM;
+        const yM = params.refFieldYM;
+        if (Number.isFinite(xM) && Number.isFinite(yM)) {
+          geometry.stations.push({
+            label: normalizeCode(entry.customName) || normalizeCode(params.stationName)
+              || normalizeCode(params.stationId) || String(entry.id ?? ''),
+            objectId: String(entry.id ?? ''),
+            xM,
+            yM,
+          });
+        }
+        continue;
+      }
+
+      const classified = classifyMapObject(entry);
+      if (classified?.category === OBJECT_CATEGORY.FACILITY) {
+        const bounds = getRefFieldBounds(params);
+        if (bounds) {
+          geometry.facilities.push({
+            label: normalizeCode(entry.customName) || String(entry.id ?? ''),
+            objectId: String(entry.id ?? ''),
+            bounds,
+          });
+        }
+        continue;
+      }
+
+      if (entry.type === 'Track') {
+        const rawPath = Array.isArray(params.trackGenRealPath) ? params.trackGenRealPath : [];
+        const pathPoints = rawPath
+          .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+          .map((point) => ({ xM: Number(point[0]), yM: Number(point[1]) }));
+        const bounds = getRefFieldBounds(params);
+        geometry.tracks.push({
+          label: normalizeCode(entry.customName) || normalizeCode(params.segmentId) || String(entry.id ?? ''),
+          objectId: String(entry.id ?? ''),
+          pathPoints,
+          bounds,
+        });
+      }
+    }
+  }
+  vehicleGeometryCache.set(mapId, { path: mapPath, mtimeMs: stat.mtimeMs, geometry });
+  return geometry;
+}
+
+/**
+ * 車輛座標分類。顯示層級固定：停靠站點 → 場區設施 → 軌道段。
+ * 站點以 8m 半徑判定；設施使用實際矩形；軌道取中心線最近距離。
+ */
+function findVehicleLocationAtPoint(mapId, xM, yM) {
+  if (!Number.isFinite(xM) || !Number.isFinite(yM)) return null;
+  const geometry = loadVehicleLocationGeometry(mapId);
+  if (!geometry) return null;
+
+  let nearestStation = null;
+  for (const station of geometry.stations) {
+    const distanceM = Math.hypot(xM - station.xM, yM - station.yM);
+    if (distanceM <= 8 && (!nearestStation || distanceM < nearestStation.distanceM)) {
+      nearestStation = { ...station, distanceM };
+    }
+  }
+  if (nearestStation) {
+    return { kind: 'STATION', label: nearestStation.label, objectId: nearestStation.objectId };
+  }
+
+  const facility = geometry.facilities.filter(({ bounds }) => (
+    xM >= bounds.xMinM && xM <= bounds.xMaxM
+    && yM >= bounds.yMinM && yM <= bounds.yMaxM
+  )).sort((a, b) => {
+    const area = (item) => (item.bounds.xMaxM - item.bounds.xMinM)
+      * (item.bounds.yMaxM - item.bounds.yMinM);
+    return area(a) - area(b);
+  })[0];
+  if (facility) return { kind: 'FACILITY', label: facility.label, objectId: facility.objectId };
+
+  let nearestTrack = null;
+  for (const track of geometry.tracks) {
+    let distanceM = Infinity;
+    for (let index = 1; index < track.pathPoints.length; index += 1) {
+      const a = track.pathPoints[index - 1];
+      const b = track.pathPoints[index];
+      distanceM = Math.min(distanceM, pointSegmentDistance(xM, yM, a.xM, a.yM, b.xM, b.yM));
+    }
+    if (!Number.isFinite(distanceM) && track.bounds
+      && xM >= track.bounds.xMinM && xM <= track.bounds.xMaxM
+      && yM >= track.bounds.yMinM && yM <= track.bounds.yMaxM) distanceM = 0;
+    if (!nearestTrack || distanceM < nearestTrack.distanceM) nearestTrack = { ...track, distanceM };
+  }
+  if (nearestTrack && nearestTrack.distanceM <= 12) {
+    return { kind: 'TRACK', label: nearestTrack.label, objectId: nearestTrack.objectId };
+  }
+  return null;
 }
 
 module.exports = {
@@ -281,4 +403,5 @@ module.exports = {
   loadFacilityGeometryFromMapFile,
   resolveFacilityCenterById,
   findFacilityAtPoint,
+  findVehicleLocationAtPoint,
 };
