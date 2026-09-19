@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { TRACK_CROSSOVER_PORTALS_KEY } from '../utils/trackCrossoverFacility'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
-import { resolveVehiclePlacementAcrossAreas } from './resolveVehicleTrackPlacement'
+import { previousTrackIdOf, resolveVehiclePlacementAcrossAreas } from './resolveVehicleTrackPlacement'
 
 /**
  * 橫渡線只有在車<strong>真的在轉線</strong>時才畫在渡線上。
@@ -134,5 +134,52 @@ describe('渡線：要真的在轉線才判渡線', () => {
       speedMps: 0,
     })
     expect(p?.placement.trackId).toBe('xo-1')
+  })
+})
+
+describe('渡線的連續性：上一筆要真的傳進來', () => {
+  it('previousTrackIdOf：渡線的結果也算，場區車位不算', () => {
+    const onXo = resolveVehiclePlacementAcrossAreas(areasWith(SHALLOW()), 700, 103.5, undefined, {
+      headingRad: 0.05,
+      speedMps: 8,
+    })
+    // 渡線的結果沒有 network 欄位——只認 network 的呼叫端永遠拿不到渡線上一筆
+    expect(onXo?.placement.network).toBeUndefined()
+    expect(previousTrackIdOf(onXo, false)).toBe('xo-1')
+    expect(previousTrackIdOf(onXo, true)).toBeUndefined()
+    expect(previousTrackIdOf(null, false)).toBeUndefined()
+  })
+
+  it('上一筆在原軌道：渡線要更明顯地贏才搶', () => {
+    // (700, 103.0)：離 D 1.25、離渡線約 0.5
+    const opts = { headingRad: 0.05, speedMps: 8 }
+    const fresh = resolveVehiclePlacementAcrossAreas(areasWith(SHALLOW()), 700, 103.0, undefined, opts)
+    expect(fresh?.placement.trackId).toBe('xo-1')
+    const stay = resolveVehiclePlacementAcrossAreas(areasWith(SHALLOW()), 700, 103.0, undefined, {
+      ...opts,
+      previousTrackId: 'D',
+    })
+    expect(stay?.placement.trackId).toBe('D')
+  })
+
+  it('沿著渡線一路開過去：逐筆帶上一筆，不在軌道與渡線之間來回跳', () => {
+    const areas = areasWith(SHALLOW())
+    const seen: string[] = []
+    let last: ReturnType<typeof resolveVehiclePlacementAcrossAreas> = null
+    // 沿渡線從 (655, 101.9) 走到 (745, 105.1)，每 5 公尺一筆，車頭順著渡線
+    for (let x = 655; x <= 745; x += 5) {
+      const y = 101.75 + ((x - 650) / 100) * 3.5
+      last = resolveVehiclePlacementAcrossAreas(areas, x, y, undefined, {
+        headingRad: Math.atan2(3.5, 100),
+        speedMps: 8,
+        previousTrackId: previousTrackIdOf(last, false),
+      })
+      seen.push(last!.placement.trackId)
+    }
+    // 換手次數：D → xo-1 → U，最多兩次，不能來回
+    let switches = 0
+    for (let i = 1; i < seen.length; i += 1) if (seen[i] !== seen[i - 1]) switches += 1
+    expect(switches).toBeLessThanOrEqual(2)
+    expect(seen.filter((t) => t === 'xo-1').length).toBeGreaterThan(seen.length / 2)
   })
 })

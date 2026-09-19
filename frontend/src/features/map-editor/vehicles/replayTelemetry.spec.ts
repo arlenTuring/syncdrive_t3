@@ -10,6 +10,7 @@ import { readVehicleHeadingRad, readVehicleSpeedMps } from './readVehicleHeading
 import {
   buildTrackNetwork,
   isYardVehiclePayload,
+  previousTrackIdOf,
   resolveVehiclePlacementAcrossAreas,
 } from './resolveVehicleTrackPlacement'
 import { TRACK_HALF_WIDTH_M } from './quantisedTrackCell'
@@ -79,7 +80,7 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('真實遙測重播
       previousTrackId: previous.get(p.vehicle_code),
     })
     const fix = placement?.placement.network
-    previous.set(p.vehicle_code, fix ? placement!.placement.trackId : undefined)
+    previous.set(p.vehicle_code, previousTrackIdOf(placement, yard))
     rows.push({
       code: p.vehicle_code,
       x,

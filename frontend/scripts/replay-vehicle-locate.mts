@@ -25,6 +25,7 @@ import { repairTrackRefFieldBoundsInAreas } from '../src/features/map-editor/uti
 import {
   buildTrackNetwork,
   isYardVehiclePayload,
+  previousTrackIdOf,
   resolveVehiclePlacementAcrossAreas,
 } from '../src/features/map-editor/vehicles/resolveVehicleTrackPlacement'
 import {
@@ -124,7 +125,7 @@ type Row = {
 }
 
 const rows: Row[] = []
-const lastOf = new Map<string, { s: Sample; trackId: string | null }>()
+const lastOf = new Map<string, { s: Sample; trackId: string | null; yard: boolean; placement: ReturnType<typeof resolveVehiclePlacementAcrossAreas> }>()
 const perVehicle = new Map<string, Row[]>()
 
 for (const s of samples) {
@@ -138,7 +139,7 @@ for (const s of samples) {
     headingRad: s.headingRad ?? undefined,
     // 新版會用；舊版直接忽略這兩個欄位
     speedMps: s.speedMps,
-    previousTrackId: last?.trackId ?? undefined,
+    previousTrackId: previousTrackIdOf(last?.placement, last?.yard ?? false),
   } as never)
   const fix = placement?.placement.network
   const trackId = placement?.placement.trackId ?? null
@@ -164,7 +165,7 @@ for (const s of samples) {
   const list = perVehicle.get(s.code) ?? []
   list.push(row)
   perVehicle.set(s.code, list)
-  lastOf.set(s.code, { s, trackId })
+  lastOf.set(s.code, { s, trackId, yard, placement })
 }
 
 // ── 摘要 ─────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import {
   buildTrackNetwork,
   isYardVehiclePayload,
   parseYardSlotIdFromPayload,
+  previousTrackIdOf,
   resolveVehiclePlacementAcrossAreas,
   resolveTrackCodeForDisplay,
   type VehicleNetworkFix,
@@ -265,7 +266,10 @@ export function MapAreaVehicleOverlay({
     livePositionTweenMs,
   );
   const placementCacheRef = useRef<
-    Map<string, { inputKey: string; placement: VehiclePlacementAcrossAreas | null }>
+    Map<
+      string,
+      { inputKey: string; placement: VehiclePlacementAcrossAreas | null; preferYard: boolean }
+    >
   >(new Map());
 
   useEffect(() => {
@@ -301,9 +305,7 @@ export function MapAreaVehicleOverlay({
      * 每一秒都像第一次看到這台車一樣重新挑，就會在路口與平行軌道之間來回跳。有上一筆
      * 的話，偏向留在原地或走到相連的下一塊；它只是加減分，位置明顯在別處時照樣換。
      */
-    const previousTrackId = cached?.placement?.placement.network
-      ? cached.placement.placement.trackId
-      : undefined;
+    const previousTrackId = previousTrackIdOf(cached?.placement, cached?.preferYard === true);
     const placement = resolveVehiclePlacementAcrossAreas(
       areas,
       vehicle.xM,
@@ -317,7 +319,7 @@ export function MapAreaVehicleOverlay({
         previousTrackId,
       },
     );
-    placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement });
+    placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement, preferYard });
     return placement;
   }
 

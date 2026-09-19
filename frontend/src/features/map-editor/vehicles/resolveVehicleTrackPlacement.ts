@@ -695,6 +695,22 @@ export function resolveVehicleTrackPlacementInArea(
  */
 const CROSSOVER_HEADING_LIMIT_RAD = (60 * Math.PI) / 180;
 const CROSSOVER_CLEARLY_CLOSER_M = 0.5;
+const CROSSOVER_STAY_EXTRA_M = 1;
+
+/**
+ * 下一筆定位要帶的「上一筆軌道」。
+ *
+ * 生成軌道與<strong>渡線</strong>的結果都要算：渡線的結果沒有 network 欄位，
+ * 只認 network 的話，轉線中的車每一筆都像第一次被看到，渡線的「上一筆在這裡就留著」
+ * 永遠用不上。場區車位（格位）不是軌道，不帶。
+ */
+export function previousTrackIdOf(
+  last: VehiclePlacementAcrossAreas | null | undefined,
+  wasYard: boolean,
+): string | undefined {
+  if (!last || wasYard) return undefined;
+  return last.placement.trackId || undefined;
+}
 
 function crossoverWins(
   hit: CrossoverHit,
@@ -713,7 +729,9 @@ function crossoverWins(
     // 沒有中心線可比：只用方向擋一擋（沒有朝向就照舊）
     return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
   }
-  if (!(hit.distanceM + CROSSOVER_CLEARLY_CLOSER_M < trackDistance)) return false;
+  // 上一筆本來就在這條軌道上：渡線要更明顯地贏才搶（多要 1 公尺），別在兩者之間來回抖
+  const stayMargin = options?.previousTrackId === onTrack.placement.trackId ? CROSSOVER_STAY_EXTRA_M : 0;
+  if (!(hit.distanceM + CROSSOVER_CLEARLY_CLOSER_M + stayMargin < trackDistance)) return false;
   return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
 }
 
