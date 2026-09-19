@@ -1,46 +1,7 @@
--- 事件中心 + 班次中心（可重複執行）
+-- 事件中心（可重複執行）
 
-INSERT INTO operation_orders (order_id, trip_code, vehicle_code, priority_level, status, payload, created_at, completed_at)
-VALUES
-  ('DEMO-SHIFT-01', 'U2001', 'PMS01', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-02', 'U2002', 'PMS02', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-03', 'D2003', 'PMS03', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-04', 'U2004', 'PMS04', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-05', 'D2005', 'PMS05', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-06', 'U2006', 'PMS06', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-07', 'D2007', 'PMS07', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-08', 'U2008', 'PMS08', 50, 'FAULTED',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-09', 'D2009', 'PMS09', 50, 'FAULTED',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-10', 'U2010', 'PMS10', 50, 'FAULTED',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-11', 'D2011', 'PMS11', 50, 'PENDING',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-12', 'U2012', 'PMS01', 50, 'PENDING',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-13', 'D2013', 'PMS02', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-14', 'U2014', 'PMS03', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-15', 'D2015', 'PMS04', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-16', 'U2016', 'PMS06', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-17', 'D2017', 'PMS07', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-18', 'U2018', 'PMS08', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-19', 'D2019', 'PMS09', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-20', 'U2020', 'PMS10', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-21', 'D2021', 'PMS11', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-22', 'U2022', 'PMS01', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-23', 'D2023', 'PMS02', 50, 'PENDING',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-24', 'U2024', 'PMS03', 50, 'PENDING',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-25', 'D2025', 'PMS04', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-26', 'U2026', 'PMS05', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-27', 'D2027', 'PMS06', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-28', 'U2028', 'PMS07', 50, 'PROCESSING', '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-29', 'D2029', 'PMS08', 50, 'PENDING',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL),
-  ('DEMO-SHIFT-30', 'U2030', 'PMS09', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-31', 'D2031', 'PMS10', 50, 'END',        '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-  ('DEMO-SHIFT-32', 'U2032', 'PMS11', 50, 'FAULTED',    '{}'::jsonb, (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint, NULL)
-ON CONFLICT (order_id) DO UPDATE SET
-  trip_code = EXCLUDED.trip_code,
-  vehicle_code = EXCLUDED.vehicle_code,
-  status = EXCLUDED.status,
-  payload = EXCLUDED.payload,
-  created_at = EXCLUDED.created_at,
-  completed_at = EXCLUDED.completed_at;
+-- 班次中心的班次來自排班引擎與 seed-dashboard-shifts.sql；
+-- 不再灌沒有路線／起訖點的 DEMO-SHIFT 訂單（模擬器接單時會報「缺起訖點」）。
 
 DELETE FROM security_event_logs WHERE event_id LIKE 'DEMO-EVT-%';
 
