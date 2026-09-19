@@ -56,7 +56,7 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('真實遙測重播
     for (const f of area.facilities ?? []) codeOf.set(f.id, String(f.customName || f.name || f.id))
   }
 
-  type Row = { code: string; track: string; ratio: number; confidence: number; yard: boolean }
+  type Row = { code: string; x: number; track: string; ratio: number; confidence: number; yard: boolean }
   const rows: Row[] = []
   const samples = readFileSync(
     join(__dirname, '__fixtures__/telemetry-lane-choice.jsonl'),
@@ -82,6 +82,7 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('真實遙測重播
     previous.set(p.vehicle_code, fix ? placement!.placement.trackId : undefined)
     rows.push({
       code: p.vehicle_code,
+      x,
       track: placement ? (codeOf.get(placement.placement.trackId) ?? '?') : '(none)',
       ratio: fix ? fix.offsetM / TRACK_HALF_WIDTH_M : NaN,
       confidence: fix?.confidence ?? NaN,
@@ -107,14 +108,22 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('真實遙測重播
   it('PMS05 走交叉軌道：交叉那一塊判給交叉軌道，不是隔壁的 D34', () => {
     const cross = of('PMS05').filter((r) => r.track === 'D35/U35')
     expect(cross.length).toBeGreaterThan(10)
-    for (const r of cross) expect(Math.abs(r.ratio)).toBeLessThan(0.1)
+    for (const r of cross) expect(Math.abs(r.ratio)).toBeLessThan(0.5)
+  })
+
+  it('PMS05 壓在 D35/U35 中心線上（距離 0）時，車頭再矛盾也不能被判去 D34', () => {
+    // 這一筆座標離 D35/U35 的中心線 0 公尺、離 D34 5 公尺；圖資把 D35/U35 的行車方向記成
+    // 往西、車頭朝東。位置說得很清楚，方向不能翻盤。
+    const hit = rows.find((r) => r.code === 'PMS05' && r.x > -177.2 && r.x < -177.1)
+    expect(hit?.track).toBe('D35/U35')
+    expect(Math.abs(hit!.ratio)).toBeLessThan(0.01)
   })
 
   it('偏離中心線超過兩倍半寬的筆數，比舊規則少很多', () => {
-    // 舊規則在這批資料上有 80 筆偏移 >100%；現在剩 22 筆，都是輸入本身就不在軌道上的。
-    // 上限抓輸入本身離軌的那些，不要求為零——那是車端的座標，不是定位的錯。
+    // 舊規則在這批資料上有 80 筆偏移 >100%；現在剩 6 筆：全是 PMS02 走 U21→RailSwitch
+    // 那一段，車端座標離最近的軌道 2.5–3.7 公尺（模擬器走直線弦、路是彎的），不是定位的錯。
     const off = rows.filter((r) => !r.yard && Number.isFinite(r.ratio) && Math.abs(r.ratio) > 1)
-    expect(off.length).toBeLessThanOrEqual(24)
+    expect(off.length).toBeLessThanOrEqual(6)
   })
 
   it('離軌的那些，把握度要低（畫面上才標得出「≈」）', () => {

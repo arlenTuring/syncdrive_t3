@@ -41,6 +41,11 @@ type Piece = {
    * 半圈才是「車該朝的那一邊」。
    */
   againstPath: boolean
+  /**
+   * 同一塊元件上有兩條車道走在<strong>同一條折線</strong>上（例如 D35/U35 這種合併的站體）：
+   * 它兩個方向都能開，車頭朝哪邊都不該扣分。
+   */
+  bidirectional: boolean
 }
 
 /** 這一塊的哪一端接到另一塊的哪一端：0 是折線起點、1 是終點 */
@@ -87,6 +92,20 @@ function cellSizeFor(pieces: Piece[]): number {
   return Math.max(5, Math.min(100, lens[Math.floor(lens.length / 2)]!))
 }
 
+/** 同一塊元件上，同一段折線同時掛了正負兩條車道：兩個方向都能開 */
+function markBidirectional(pieces: Piece[]): void {
+  const seen = new Map<string, { pos: Piece[]; neg: Piece[] }>()
+  for (const p of pieces) {
+    const key = `${p.facilityId}|${p.f0}|${p.f1}`
+    const entry = seen.get(key) ?? { pos: [], neg: [] }
+    ;(p.lane > 0 ? entry.pos : entry.neg).push(p)
+    seen.set(key, entry)
+  }
+  for (const { pos, neg } of seen.values()) {
+    if (pos.length && neg.length) for (const p of [...pos, ...neg]) p.bidirectional = true
+  }
+}
+
 export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex {
   const pieces: Piece[] = []
   for (const f of facilities) {
@@ -111,9 +130,12 @@ export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex 
         // 逐段記的方向優先；舊資料沒有時退回整塊的頭尾連線
         travelRad: sp.h ?? (sp.lane > 0 ? alongS + Math.PI : alongS),
         againstPath: angleGap(sp.h ?? (sp.lane > 0 ? alongS + Math.PI : alongS), alongS) > Math.PI / 2,
+        bidirectional: false,
       })
     }
   }
+
+  markBidirectional(pieces)
 
   const cellM = cellSizeFor(pieces)
   const grid = new Map<string, number[]>()
@@ -229,6 +251,13 @@ export type Located = {
   /** 第二名（別的塊）比第一名的分數多多少；只有一塊候選時是 Infinity */
   margin: number
   /**
+   * 車頭跟所選那一塊的行車方向幾乎相反（超過 120 度），而且車速夠、heading 可信。
+   *
+   * 位置壓在中心線上就不會因此換塊，所以這是<strong>診斷</strong>：資料的方向定義、
+   * 車端的 heading、或車真的逆向，三者之一有問題，把握度會跟著降低。
+   */
+  headingConflict: boolean
+  /**
    * 這個位置<strong>局部</strong>的行車方向（弧度，場域座標）。
    *
    * 不是整段固定的 h：彎道上切線一直在轉，拿固定值去比車頭，轉彎中的車會被說成
@@ -288,7 +317,25 @@ export const HEADING_PENALTY_M = 6
 
 /** 車速低於這個值，heading 只是上一次的殘留，不是現在的行進方向 */
 export const HEADING_RELIABLE_MPS = 0.5
-const SLOW_HEADING_WEIGHT = 0.25
+/**
+ * 停著時完全不用 heading：那是上一趟殘留的方向，不是現在的行進方向。
+ * （原本留 25% 權重，殘留的 heading 在兩條車道中間還是能把車推到反向那條。）
+ */
+const SLOW_HEADING_WEIGHT = 0
+
+/**
+ * 方向與上一筆只能在「位置分不出來」的候選之間做決定。
+ *
+ * 比最近的那一塊遠超過這個距離的候選，不參與方向／連續性的比較。位置說車就壓在
+ * 某條中心線上（差 0 公尺），方向再矛盾也不能把它判給旁邊 3.5 公尺外的另一條——
+ * 那是資料的方向定義不一致或車頭讀值的問題，該由診斷（headingConflict）指出來，
+ * 而不是用猜的換一條軌道。
+ */
+export const CANDIDATE_GATE_M = 1.2
+
+/** 車頭跟行車方向差超過這個角度就算「幾乎相反」 */
+const HEADING_CONFLICT_RAD = (120 * Math.PI) / 180
+const CONFLICT_CONFIDENCE_FACTOR = 0.6
 
 /** 還在上一塊：少算這麼多，換塊要有足夠的證據 */
 export const STICKY_BONUS_M = 0.8
@@ -350,23 +397,44 @@ export function locateByField(
       ? SLOW_HEADING_WEIGHT
       : 1
 
-  let best: (Located & { score: number }) | null = null
-  // 每一塊自己最好的分數：領先幅度要跟「別的塊」比，同一塊的另一段不算對手
-  const bestByFacility = new Map<string, number>()
+  // 第一輪：每一段各自投影，不含任何旁證
+  type Cand = {
+    piece: Piece
+    along: number
+    distance: number
+    side: number
+    travelRad: number
+  }
+  const cands: Cand[] = []
+  let minDistance = Infinity
   for (const i of candidates) {
     const p = index.pieces[i]!
     // 只在這一段自己那一截上比：一塊路口元件橫跨好幾段，整條一起量會每一段都同分
     const { along, distance, side } = projectAlongPath(p.real, xM, yM, { from: p.f0, to: p.f1 })
-    const travelRad = localTravelRad(p, along)
+    cands.push({ piece: p, along, distance, side, travelRad: localTravelRad(p, along) })
+    if (distance < minDistance) minDistance = distance
+  }
 
-    let score = distance
-    if (options.headingRad !== undefined) {
-      score += headingPenalty(angleGap(options.headingRad, travelRad), headingWeight)
-    }
-    const prev = options.previousFacilityId
-    if (prev) {
-      if (p.facilityId === prev) score -= STICKY_BONUS_M
-      else if (!tracksAreConnected(index, prev, p.facilityId)) score += NON_ADJACENT_PENALTY_M
+  // 第二輪：方向與連續性只在「位置分不出來」的候選之間決定
+  let best: (Located & { score: number }) | null = null
+  // 每一塊自己最好的分數：領先幅度要跟「別的塊」比，同一塊的另一段不算對手
+  const bestByFacility = new Map<string, number>()
+  for (const c of cands) {
+    const p = c.piece
+    const eligible = c.distance <= minDistance + CANDIDATE_GATE_M
+    let score = c.distance
+    if (eligible) {
+      if (options.headingRad !== undefined && !p.bidirectional) {
+        score += headingPenalty(angleGap(options.headingRad, c.travelRad), headingWeight)
+      }
+      const prev = options.previousFacilityId
+      if (prev) {
+        if (p.facilityId === prev) score -= STICKY_BONUS_M
+        else if (!tracksAreConnected(index, prev, p.facilityId)) score += NON_ADJACENT_PENALTY_M
+      }
+    } else {
+      // 遠離最近的那一塊：不靠旁證翻盤，照純距離排在後面
+      score += CANDIDATE_GATE_M * 10
     }
 
     const seen = bestByFacility.get(p.facilityId)
@@ -378,14 +446,19 @@ export function locateByField(
         road: p.road,
         lane: p.lane,
         // 里程照這一段自己佔的那一截換算：路口的元件橫跨兩條腿，用整塊的比例會差很遠
-        sM: p.s0 + (p.s1 - p.s0) * spanFrac(p, along),
-        along,
-        local: pointAlongPath(p.local, along),
-        offsetM: side,
-        distanceM: distance,
+        sM: p.s0 + (p.s1 - p.s0) * spanFrac(p, c.along),
+        along: c.along,
+        local: pointAlongPath(p.local, c.along),
+        offsetM: c.side,
+        distanceM: c.distance,
         confidence: 0,
         margin: Infinity,
-        travelRad,
+        headingConflict:
+          options.headingRad !== undefined &&
+          headingWeight > 0 &&
+          !p.bidirectional &&
+          angleGap(options.headingRad, c.travelRad) > HEADING_CONFLICT_RAD,
+        travelRad: c.travelRad,
         score,
       }
     }
@@ -397,5 +470,6 @@ export function locateByField(
   }
   const margin = Number.isFinite(runnerUp) ? runnerUp - best.score : Infinity
   const { score: _score, ...located } = best
-  return { ...located, margin, confidence: confidenceOf(best.distanceM, margin) }
+  const confidence = confidenceOf(best.distanceM, margin) * (best.headingConflict ? CONFLICT_CONFIDENCE_FACTOR : 1)
+  return { ...located, margin, confidence }
 }

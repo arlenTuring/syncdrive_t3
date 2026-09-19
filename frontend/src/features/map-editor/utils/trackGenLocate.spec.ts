@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildTrackGenIndex,
+  CANDIDATE_GATE_M,
   HEADING_PENALTY_M,
   locateByField,
   NON_ADJACENT_PENALTY_M,
@@ -61,9 +62,41 @@ describe('方向：漸進扣分，不是直接淘汰', () => {
   it('反向車道贏不了同距離的順向車道', () => {
     // 離 down 0.5、離 up 3.0；車頭朝東（順著 down）
     expect(locateByField(index, 50, 0.5, { headingRad: EAST })?.facilityId).toBe('down')
-    // 車頭朝東、卻在 up 的中心線上（y=3.5）：順向的 down 離 3.5，反向的 up 離 0
-    // 反向扣分 6 公尺 > 3.5，所以判給 down——這正是「方向可以壓過位置」的那一頭
-    expect(locateByField(index, 50, 3.5, { headingRad: EAST })?.facilityId).toBe('down')
+    // 車頭朝東、卻壓在 up 的中心線上（y=3.5）：down 離 3.5，up 離 0。
+    // 位置說得很清楚，方向不能翻盤——判給 up，並標出 headingConflict 讓人查資料。
+    const hit = locateByField(index, 50, 3.5, { headingRad: EAST, speedMps: 8 })
+    expect(hit?.facilityId).toBe('up')
+    expect(hit?.headingConflict).toBe(true)
+    expect(hit?.confidence).toBeLessThan(0.7)
+  })
+
+  it('候選離最近那一塊超過門檻，方向就不能讓它翻盤', () => {
+    // 離 up 0.5、離 down 3.0：差 2.5 > CANDIDATE_GATE_M
+    expect(locateByField(index, 50, 3.0, { headingRad: EAST })?.facilityId).toBe('up')
+    // 差 0.4（y=1.95，down 1.95、up 1.55）在門檻內，方向照樣能決定
+    expect(locateByField(index, 50, 1.95, { headingRad: EAST })?.facilityId).toBe('down')
+    expect(CANDIDATE_GATE_M).toBeGreaterThan(0.4)
+  })
+
+  it('同一塊元件兩條車道共用一條折線（合併站體）：兩個方向都不扣分', () => {
+    const merged = buildTrackGenIndex([
+      {
+        id: 'merged',
+        parameters: {
+          trackGenRealPath: [[100, 0], [0, 0]],
+          trackGenLocalPath: [[0.1, 0], [0, 0]],
+          trackGenSpans: [
+            { road: 'm', lane: -1, s0: 0, s1: 100, h: WEST, f0: 0, f1: 1 },
+            { road: 'm', lane: 1, s0: 0, s1: 100, h: WEST, f0: 0, f1: 1 },
+          ],
+        },
+      },
+      piece('other', [[0, 3.5], [100, 3.5]], EAST),
+    ])
+    // 車在 merged 的中心線上朝東；圖資把兩條車道都記成往西也不該被推去 other
+    const hit = locateByField(merged, 50, 0, { headingRad: EAST, speedMps: 8 })
+    expect(hit?.facilityId).toBe('merged')
+    expect(hit?.headingConflict).toBe(false)
   })
 
   it('順向車道遠到超過扣分上限，反向那條就該贏', () => {
@@ -215,10 +248,10 @@ describe('停著的車：heading 不可信', () => {
     piece('up', [[100, 3.5], [0, 3.5]], WEST),
   ])
 
-  it('停著時方向權重降低：車就停在 up 上，殘留的 heading 不該把它推到 down', () => {
-    // 車在 up 中心線上；heading 是上一趟殘留的朝東。開著的時候方向壓過位置（判 down），
-    // 停著就不該——位置說在 up，就信位置。
-    expect(locateByField(index, 50, 3.5, { headingRad: EAST, speedMps: 8 })?.facilityId).toBe('down')
-    expect(locateByField(index, 50, 3.5, { headingRad: EAST, speedMps: 0 })?.facilityId).toBe('up')
+  it('停著時完全不用 heading：殘留的方向不該把車推到反向那條', () => {
+    // y=1.95：離 down 1.95、離 up 1.55，兩條都在門檻內。heading 是上一趟殘留的朝東。
+    // 開著的時候方向決定（down）；停著就只看位置（up）。
+    expect(locateByField(index, 50, 1.95, { headingRad: EAST, speedMps: 8 })?.facilityId).toBe('down')
+    expect(locateByField(index, 50, 1.95, { headingRad: EAST, speedMps: 0 })?.facilityId).toBe('up')
   })
 })
