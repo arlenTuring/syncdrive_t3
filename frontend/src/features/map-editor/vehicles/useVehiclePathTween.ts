@@ -44,7 +44,7 @@ export function useVehiclePathTween(index: TrackGenIndex | undefined, durationMs
       if (!state) {
         state = {
           signature,
-          tween: { from: target, to: target, startMs: now, durationMs: 0, via: null },
+          tween: { from: target, to: target, startMs: now, durationMs: 0, steps: null },
         }
         states.set(vehicleId, state)
         return target
@@ -54,7 +54,7 @@ export function useVehiclePathTween(index: TrackGenIndex | undefined, durationMs
         // 從「現在畫在哪裡」補到新位置，不是從上一筆的目標——補到一半又來新資料時才不會倒退
         const shown = samplePathTween(state.tween, now).pose
         state.tween = teleport
-          ? { from: target, to: target, startMs: now, durationMs: 0, via: null }
+          ? { from: target, to: target, startMs: now, durationMs: 0, steps: null }
           : planPathTween(index, shown, target, now, durationMs)
         state.signature = signature
       }

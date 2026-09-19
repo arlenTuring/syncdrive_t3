@@ -400,7 +400,9 @@ export function MapAreaVehicleOverlay({
                   along: network.alongFrac,
                   side: network.offsetM,
                 },
-                teleported,
+                // 只有首幀瞬移。換 leg（到站、下一段出發）位置是接著的，照樣沿路補；
+                // 真的不連續（換單、重新發車）由補間自己判斷——不相連或超過 80 公尺就直接到位
+                !prevPosNow,
               )
             : null;
         const displayFacility =
