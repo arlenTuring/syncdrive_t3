@@ -3,6 +3,8 @@ import type { FacilityObject } from '../types/facility'
 import { resolveFacilityAreaSize } from './facilityAreaCoords'
 import { fieldMetersAtAreaLocal } from './fieldFromArea'
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import { getValidRefFieldBounds } from './facilityRefFieldBounds'
+import { getTrackGenPaths } from './trackGenPaths'
 import {
   CROSS_HANDLE_KEYS,
   crossTrackHandlesPx,
@@ -207,8 +209,51 @@ export function patchCrossRoute(
   return { [CROSS_ROUTES_KEY]: { ...getCrossRoutes(facility), [key]: direction } }
 }
 
+/** 口與隔壁方塊端點視為同一點的圖面距離（區域座標）。交叉的外框不大，超過就不是鄰居了。 */
+export const CROSS_PORTAL_NEAR_PX = 30
+
+/** 鄰居端點與方框內插的估計值最多差多少公尺（內插實測差 2–6 公尺）。 */
+export const CROSS_PORTAL_FIELD_SLACK_M = 15
+
+/**
+ * 貼著這個口的隔壁軌道，取它中心線的那一端在現場的位置。
+ *
+ * 口的定義是「這裡接上隔壁那一塊」，答案在隔壁：外接方框的角不是軌道的端點——照方框
+ * 內插算出來的座標實測差 2–6 公尺，上下兩個口甚至會對調（圖面的左上口，現場其實貼著
+ * 目錄裡的左下口）。找不到隔壁回 null，由呼叫端退回方框內插。
+ */
+function neighbourEndField(
+  facility: FacilityObject,
+  area: MapAreaObject,
+  handle: { x: number; y: number },
+  estimate: { xM: number; yM: number },
+): { xM: number; yM: number } | null {
+  let best: { d: number; xM: number; yM: number } | null = null
+  for (const other of area.facilities ?? []) {
+    if (other.id === facility.id) continue
+    const paths = getTrackGenPaths(other.parameters)
+    if (!paths) continue
+    const ends: Array<[number, number][]> = [
+      [paths.local[0]!, paths.real[0]!],
+      [paths.local[paths.local.length - 1]!, paths.real[paths.real.length - 1]!],
+    ]
+    for (const [uv, field] of ends) {
+      const at = trackLocalPathPointToAreaLocal(other, area, { x: uv![0], y: uv![1] })
+      const d = Math.hypot(at.x - handle.x, at.y - handle.y)
+      if (d > CROSS_PORTAL_NEAR_PX) continue
+      if (best && d >= best.d) continue
+      // 圖面上貼著、現場卻差很遠：那一塊的現場座標是別處抄來的，不算鄰居
+      if (Math.hypot(field![0] - estimate.xM, field![1] - estimate.yM) > CROSS_PORTAL_FIELD_SLACK_M) continue
+      best = { d, xM: field![0], yM: field![1] }
+    }
+  }
+  return best ? { xM: best.xM, yM: best.yM } : null
+}
+
 /**
  * 四個口<strong>現在</strong>在現場的哪裡。
+ *
+ * 人工填過以人工為準；否則取貼著這個口的隔壁軌道的端點；都沒有才照外接方框內插。
  */
 export function resolveCrossPortalFields(
   facility: FacilityObject,
@@ -242,7 +287,24 @@ export function resolveCrossPortalFields(
     const field = fieldMetersAtAreaLocal(area, local.x, local.y, {
       preferTrackId: facility.id,
     })
-    out[key] = { xM: field.xM, yM: field.yM, auto: true }
+    const unit = { x: h.x / Math.max(1e-6, size.w), y: h.y / Math.max(1e-6, size.h) }
+    const neighbour = neighbourEndField(facility, area, local, field)
+    if (neighbour) {
+      out[key] = { ...neighbour, auto: true }
+      continue
+    }
+    /*
+     * 沒有鄰居：照參照場域範圍內插——模擬器與站點目錄用的就是這個，兩邊的途經點座標
+     * 才會一致。範圍不可信才退回圖面換算。
+     */
+    const bounds = getValidRefFieldBounds(facility.parameters)
+    out[key] = bounds
+      ? {
+          xM: bounds.xMinM + (bounds.xMaxM - bounds.xMinM) * unit.x,
+          yM: bounds.yMaxM - (bounds.yMaxM - bounds.yMinM) * unit.y,
+          auto: true,
+        }
+      : { xM: field.xM, yM: field.yM, auto: true }
   }
   return out
 }

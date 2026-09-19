@@ -55,6 +55,7 @@ import {
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
 import { readLegSnapKey } from '../../dashboard/utils/simClock';
 import { collectYardSlotFieldBoxes } from '../utils/yardFacilitySlots';
+import { withCrossBranchTracks } from '../utils/crossBranches';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { classifyYardVehicle, type YardDecision } from './yardClassification';
 import type { MapPlannedRoute } from '../types/mapFile';
@@ -192,7 +193,7 @@ function MapVehicleAnchorDebugMark({
 }
 
 export function MapAreaVehicleOverlay({
-  areas,
+  areas: sourceAreas,
   vehicles,
   iconSpec = DEFAULT_MAP_VEHICLE_ICON,
   showLabels = true,
@@ -235,6 +236,11 @@ export function MapAreaVehicleOverlay({
    */
   livePositionTweenMs?: number;
 }) {
+  /*
+   * 定位用的區域：交叉軌道換成各分支（斜行、直行各自一條中心線），見 crossBranches。
+   * 之後所有查詢（挑塊、走廊、里程、畫面座標）都吃這一份，才會對到同一組軌道 id。
+   */
+  const areas = useMemo(() => withCrossBranchTracks(sourceAreas), [sourceAreas]);
   const areaById = useMemo(
     () => new Map(areas.map((a, i) => [a.id, { area: a, stackOrder: i }])),
     [areas],
