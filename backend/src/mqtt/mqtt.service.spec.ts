@@ -138,4 +138,18 @@ describe('MqttService', () => {
     );
     expect(invalidationMock.emitVehiclePosition).toHaveBeenCalledWith('PMS03');
   });
+
+  it('位置分類帶上車速：開著的車座標落進設施矩形（M1 被支線穿過）不算在設施裡', async () => {
+    await service.updateVehicleLivePosition('PMS03', {
+      timestamp: 123,
+      local_pose: { position: { x: -882, y: -281 } },
+      kinematics: { velocity: 5 },
+    });
+    expect(mapServiceMock.findVehicleLocationAtPoint).toHaveBeenCalledWith(
+      expect.any(String),
+      -882,
+      -281,
+      { speedMps: 5 },
+    );
+  });
 });

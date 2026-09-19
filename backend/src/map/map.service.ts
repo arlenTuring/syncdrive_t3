@@ -446,7 +446,10 @@ export class MapService implements OnModuleInit {
     mapId: string,
     xM: number,
     yM: number,
+    options: { speedMps?: number | null } = {},
   ): { kind: 'STATION' | 'FACILITY' | 'TRACK'; label: string; objectId: string } | null {
-    return mapFieldEquipment.findVehicleLocationAtPoint(mapId, xM, yM);
+    return mapFieldEquipment.findVehicleLocationAtPoint(mapId, xM, yM, {
+      speedMps: options.speedMps ?? undefined,
+    });
   }
 }

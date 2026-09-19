@@ -45,8 +45,11 @@ export class MqttService {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
     const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
-    const location = this.mapService.findVehicleLocationAtPoint(mapId, x, y);
     const velocity = Number((payload as { kinematics?: { velocity?: unknown } }).kinematics?.velocity);
+    // 車速（m/s）一起給：開著的車座標落進設施矩形（例如被支線穿過的 M1）不算「在設施裡」
+    const location = this.mapService.findVehicleLocationAtPoint(mapId, x, y, {
+      speedMps: Number.isFinite(velocity) ? velocity : null,
+    });
     const battery = Number((payload as { energy?: { battery_level?: unknown } }).energy?.battery_level);
     const timestamp = Number(payload.timestamp);
     await this.dataSource.query(

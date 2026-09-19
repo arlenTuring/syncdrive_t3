@@ -70,10 +70,16 @@ function findFacilityByName(
  *
  * 先算好一份再逐台車比對，比每台車都走一次 areas 便宜；圖資變了才重算。
  */
-export function collectYardSlotFieldBoxes(
-  areas: MapAreaObject[],
-): Array<{ slotId: string; xMinM: number; xMaxM: number; yMinM: number; yMaxM: number }> {
-  const boxes: Array<{ slotId: string; xMinM: number; xMaxM: number; yMinM: number; yMaxM: number }> = []
+export type YardSlotFieldBox = {
+  slotId: string
+  xMinM: number
+  xMaxM: number
+  yMinM: number
+  yMaxM: number
+}
+
+export function collectYardSlotFieldBoxes(areas: MapAreaObject[]): YardSlotFieldBox[] {
+  const boxes: YardSlotFieldBox[] = []
   for (const area of areas) {
     for (const facility of area.facilities ?? []) {
       if (facility.type === 'Track') continue
@@ -95,7 +101,7 @@ export function collectYardSlotFieldBoxes(
  * 軌道格上；充電區就在正線旁邊，畫面上就是好幾台車疊在下行線上不動。
  */
 export function findYardSlotAtFieldMeters(
-  boxes: ReturnType<typeof collectYardSlotFieldBoxes>,
+  boxes: readonly YardSlotFieldBox[],
   xM: number,
   yM: number,
 ): string | null {

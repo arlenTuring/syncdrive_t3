@@ -5,10 +5,10 @@ import { mergePayloadIntoLive } from '../../map-editor/live/mqttPayload';
 import { getMqttEntityId } from '../../map-editor/live/mqttEntityId';
 import { readVehicleMetersFromPayload } from '../../map-editor/utils/areaVehicleMqtt';
 import { readVehicleHeadingRad } from '../../map-editor/vehicles/readVehicleHeading';
+import { isYardMarkerTrusted } from '../../map-editor/vehicles/yardClassification';
 import { EMPTY_TRACK_NETWORK } from '../../map-editor/vehicles/trackNetwork/scanMap';
 import {
   buildTrackNetwork,
-  isYardVehiclePayload,
   parseYardSlotIdFromPayload,
   resolveVehiclePlacementAcrossAreas,
   resolveYardFacilityPlacement,
@@ -186,7 +186,7 @@ const OPERATION_DOOR_FIELDS = [
   'door_rr_open_percent',
 ] as const;
 
-function mergeOperationFields(
+export function mergeOperationFields(
   telemetryPayload: Record<string, unknown>,
   operation: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
@@ -215,10 +215,32 @@ function mergeOperationFields(
     ...(telemetryPayload.yard_slot_id != null && telemetryPayload.yard_slot_id !== ''
       ? { yard_slot_id: telemetryPayload.yard_slot_id }
       : {}),
-    ...(operation.yard_slot_id != null && operation.yard_slot_id !== ''
+    /*
+     * 營運訊息的格位標記只在<strong>沒有更新的遙測</strong>時才算數。
+     *
+     * 遙測與營運是兩條各自到達的訊息：車離開格位、開始跑任務之後，最後一筆待命的營運訊息
+     * 還留在快取裡，帶著舊的 yard_slot_id。遙測已經比它新（而且不帶格位）時，那個標記早就
+     * 作廢了——不擋掉的話，車在正線上也會被畫到那一格。
+     */
+    ...(operation.yard_slot_id != null
+      && operation.yard_slot_id !== ''
+      && !operationMarkerIsStale(telemetryPayload, operation)
       ? { yard_slot_id: operation.yard_slot_id }
       : {}),
   };
+}
+
+/** 遙測比營運訊息新超過這麼久：營運訊息裡的格位標記視為過期（毫秒） */
+export const YARD_MARKER_MAX_SKEW_MS = 1500;
+
+function operationMarkerIsStale(
+  telemetry: Record<string, unknown>,
+  operation: Record<string, unknown>,
+): boolean {
+  const telemetryAt = Number(telemetry.timestamp);
+  const operationAt = Number(operation.timestamp);
+  if (!Number.isFinite(telemetryAt) || !Number.isFinite(operationAt)) return false;
+  return telemetryAt - operationAt > YARD_MARKER_MAX_SKEW_MS;
 }
 
 type MergeCacheEntry = {
@@ -348,7 +370,7 @@ export function createMapMqttIngestPipeline(
     payload?: Record<string, unknown>,
     headingRad?: number,
   ): string | null {
-    const preferYard = isYardVehiclePayload(payload);
+    const preferYard = isYardMarkerTrusted(payload);
 
     if (preferYard && payload) {
       const yardPlacement = resolveYardFacilityPlacement(areas, payload);
@@ -426,7 +448,7 @@ export function createMapMqttIngestPipeline(
     mergeCache.delete(vehicleId);
 
     const yardSnap = yardCoordsFromPayload(payloadObj);
-    if (yardSnap && isYardVehiclePayload(payloadObj)) {
+    if (yardSnap && isYardMarkerTrusted(payloadObj)) {
       const merged = mergeOperationFieldsCached(vehicleId, {}, payloadObj);
       pendingVehicles.set(vehicleId, {
         vehicleId,
@@ -583,13 +605,14 @@ export function createMapMqttIngestPipeline(
       next.delete(vehicleId);
     }
     for (const pending of pendingVehicles.values()) {
-      let xM = pending.xM;
-      let yM = pending.yM;
-      const yardSnap = yardCoordsFromPayload(pending.payload);
-      if (yardSnap && isYardVehiclePayload(pending.payload)) {
-        xM = yardSnap.xM;
-        yM = yardSnap.yM;
-      }
+      const { xM, yM } = pending;
+      /*
+       * 原始座標保留，不拿格位中心覆寫。
+       *
+       * 「這台車停在哪一格」是分類的結果，只決定畫在哪裡（見 classifyYardVehicle）；覆寫座標
+       * 等於把分類錯誤直接寫進資料——車其實在正線上，座標卻變成格位中心，之後的軌道判位、
+       * 補間、除錯顯示全部跟著錯。
+       */
 
       const areaId = resolveAreaIdForVehicle(
         pending.vehicleId,

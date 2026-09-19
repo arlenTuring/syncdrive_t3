@@ -339,11 +339,19 @@ function loadVehicleLocationGeometry(mapId) {
   return geometry;
 }
 
+/** 車速達到這個值就不是「停在格位裡」（公尺／秒） */
+const MOVING_MPS = 1.0;
+
 /**
  * 車輛座標分類。顯示層級固定：停靠站點 → 場區設施 → 軌道段。
  * 站點以 8m 半徑判定；設施使用實際矩形；軌道取中心線最近距離。
+ *
+ * <h3>開著的車不算「在設施裡」</h3>
+ * 設施（場區格位）的矩形跟軌道的中心線沒有互斥關係：本地圖資 M1 就被 T3 支線穿過，沿支線
+ * 開的車座標會落在 M1 裡。車速 ≥ 1 m/s 時只當作在軌道上，設施命中要停著才算——跟圖台的
+ * 場區判定同一條規則（見前端 yardClassification）。沒給車速就照舊。
  */
-function findVehicleLocationAtPoint(mapId, xM, yM) {
+function findVehicleLocationAtPoint(mapId, xM, yM, options = {}) {
   if (!Number.isFinite(xM) || !Number.isFinite(yM)) return null;
   const geometry = loadVehicleLocationGeometry(mapId);
   if (!geometry) return null;
@@ -367,7 +375,8 @@ function findVehicleLocationAtPoint(mapId, xM, yM) {
       * (item.bounds.yMaxM - item.bounds.yMinM);
     return area(a) - area(b);
   })[0];
-  if (facility) return { kind: 'FACILITY', label: facility.label, objectId: facility.objectId };
+  const moving = Number.isFinite(options.speedMps) && Math.abs(options.speedMps) >= MOVING_MPS;
+  if (facility && !moving) return { kind: 'FACILITY', label: facility.label, objectId: facility.objectId };
 
   let nearestTrack = null;
   for (const track of geometry.tracks) {

@@ -726,13 +726,21 @@ export function resolveVehiclePlacementAcrossAreas(
     previousTrackId?: string;
     /** 訂單路線的走廊（見 routeCorridor）：走廊外的軌道在挑塊時多扣分。 */
     corridorFacilityIds?: ReadonlySet<string>;
+    /**
+     * 場區判定（見 yardClassification）已經決定要畫進哪一格時給它。格位代號不再只能從 payload
+     * 取：只有座標落進格位、payload 沒有標記的停著的車，原本取不到代號、定位回 null，車就消失。
+     */
+    yardSlotId?: string | null;
   },
 ): VehiclePlacementAcrossAreas | null {
   const net = network ?? getTrackNetwork(areas);
   const preferYard = options?.preferYardPlacement === true;
 
   if (preferYard) {
-    return resolveYardFacilityPlacement(areas, options?.payload);
+    return resolveYardFacilityPlacement(
+      areas,
+      options?.yardSlotId ? { yard_slot_id: options.yardSlotId } : options?.payload,
+    );
   }
 
   const onTrack = locateOnTrackNetwork(net, xM, yM, {

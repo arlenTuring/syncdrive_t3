@@ -23,8 +23,6 @@ import {
 } from '../utils/areaCoords';
 import {
   buildTrackNetwork,
-  isYardVehiclePayload,
-  parseYardSlotIdFromPayload,
   previousTrackIdOf,
   resolveVehiclePlacementAcrossAreas,
   resolveTrackCodeForDisplay,
@@ -56,11 +54,9 @@ import {
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
 import { readLegSnapKey } from '../../dashboard/utils/simClock';
-import {
-  collectYardSlotFieldBoxes,
-  findYardSlotAtFieldMeters,
-} from '../utils/yardFacilitySlots';
+import { collectYardSlotFieldBoxes } from '../utils/yardFacilitySlots';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
+import { classifyYardVehicle, type YardDecision } from './yardClassification';
 import type { MapPlannedRoute } from '../types/mapFile';
 import { buildRouteCorridors, readTargetStationId } from './routeCorridor';
 
@@ -260,10 +256,24 @@ export function MapAreaVehicleOverlay({
    * 在 payload 上看起來跟正線車一樣，會被貼到最近的軌道格——充電區 E1～E3 就在
    * 下行線旁邊，畫面上是好幾台車疊在線上。
    */
-  const isYardVehicle = useCallback(
-    (vehicle: AreaVehicleLive) =>
-      isYardVehiclePayload(vehicle.payload)
-      || findYardSlotAtFieldMeters(yardSlotBoxes, vehicle.xM, vehicle.yM) !== null,
+  const yardStateRef = useRef<Map<string, { key: string; decision: YardDecision }>>(new Map());
+  const yardDecisionOf = useCallback(
+    (vehicle: AreaVehicleLive): YardDecision => {
+      // 同一筆資料在一次 render 裡會被問好幾次；只推進一次狀態
+      const key = `${vehicle.updatedAt}|${vehicle.xM}|${vehicle.yM}`;
+      const cached = yardStateRef.current.get(vehicle.vehicleId);
+      if (cached?.key === key) return cached.decision;
+      const decision = classifyYardVehicle({
+        payload: vehicle.payload,
+        xM: vehicle.xM,
+        yM: vehicle.yM,
+        boxes: yardSlotBoxes,
+        nowMs: vehicle.updatedAt ?? Date.now(),
+        previous: cached?.decision.state,
+      });
+      yardStateRef.current.set(vehicle.vehicleId, { key, decision });
+      return decision;
+    },
     [yardSlotBoxes],
   );
   /*
@@ -301,7 +311,8 @@ export function MapAreaVehicleOverlay({
     vehicle: AreaVehicleLive,
     network: ReturnType<typeof buildTrackNetwork>,
   ): VehiclePlacementAcrossAreas | null {
-    const preferYard = isYardVehicle(vehicle);
+    const yardDecision = yardDecisionOf(vehicle);
+    const preferYard = yardDecision.yard;
     // 朝向會決定挑到上行還是下行，所以要進快取的鍵，不然轉頭之後還會拿到舊的那一條
     const headingRad = readVehicleHeadingRad(vehicle.payload);
     // 車速只影響「heading 還可不可信」；分成動與不動兩檔就夠，不要讓每一筆速度都破快取
@@ -313,7 +324,7 @@ export function MapAreaVehicleOverlay({
     const inputKey = [
       vehicle.xM.toFixed(2),
       vehicle.yM.toFixed(2),
-      preferYard ? 'y' : 't',
+      preferYard ? `y:${yardDecision.slotId}` : 't',
       headingRad == null ? '-' : headingRad.toFixed(3),
       speedMps == null ? '-' : speedMps < HEADING_RELIABLE_MPS ? 's' : 'm',
       readLegSnapKey(vehicle.payload ?? {}),
@@ -336,6 +347,7 @@ export function MapAreaVehicleOverlay({
       network,
       {
         preferYardPlacement: preferYard,
+        yardSlotId: yardDecision.slotId,
         payload: vehicle.payload,
         headingRad: headingRad ?? undefined,
         speedMps: speedMps ?? undefined,
@@ -370,7 +382,8 @@ export function MapAreaVehicleOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
       {vehicles.map((vehicle) => {
-        const preferYard = isYardVehicle(vehicle);
+        const yardDecision = yardDecisionOf(vehicle);
+        const preferYard = yardDecision.yard;
         const placement = resolveCachedPlacement(vehicle, trackNetwork);
         if (!placement) return null;
         const { area, stackOrder } = {
@@ -384,7 +397,7 @@ export function MapAreaVehicleOverlay({
         };
 
         const fieldTrackCode = preferYard
-          ? parseYardSlotIdFromPayload(vehicle.payload)
+          ? yardDecision.slotId
           : resolveTrackCodeForDisplay(
               areas,
               vehicle.xM,
