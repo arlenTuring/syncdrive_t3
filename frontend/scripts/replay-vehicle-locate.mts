@@ -96,8 +96,8 @@ for (const line of readFileSync(telemetryPath, 'utf-8').split('\n')) {
       x: pos.x,
       y: pos.y,
       headingRad: readVehicleHeadingRad(p),
-      // 協議把 velocity 定義成 km/h
-      speedMps: (Number(p.kinematics?.velocity) || 0) / 3.6,
+      // 車端介接說明書：velocity = m/s
+      speedMps: Number(p.kinematics?.velocity) || 0,
       payload: p,
     })
   } catch {

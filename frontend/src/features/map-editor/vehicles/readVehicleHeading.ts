@@ -133,7 +133,7 @@ export function mapHeadingRadToContainerRotateDeg(
 /**
  * 從 MQTT telemetry 讀車速（公尺／秒）。
  *
- * 協議把 kinematics.velocity 定義成 km/h。沒有這個欄位回 null——呼叫端不要當成 0：
+ * 車端介接說明書把 kinematics.velocity 定義成 m/s，原值即可。沒有這個欄位回 null——呼叫端不要當成 0：
  * 「不知道」跟「停著」對定位的意義不一樣。
  */
 export function readVehicleSpeedMps(
@@ -143,5 +143,5 @@ export function readVehicleSpeedMps(
   const kin = payload.kinematics;
   if (!kin || typeof kin !== 'object') return null;
   const v = (kin as Record<string, unknown>).velocity;
-  return typeof v === 'number' && Number.isFinite(v) ? Math.abs(v) / 3.6 : null;
+  return typeof v === 'number' && Number.isFinite(v) ? Math.abs(v) : null;
 }
