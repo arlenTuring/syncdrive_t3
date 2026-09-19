@@ -50,6 +50,7 @@ import {
 } from '../types/mapFile'
 import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
+import { normalizeTrackGenOrientation } from './trackGenOrientation'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
@@ -579,7 +580,8 @@ function parseCreationMode(raw: unknown): MapCreationMode {
 export function parseMapFileJson(json: unknown): ParsedMapFile {
   if (isMapFileV2(json)) {
     const pixelSize = clampMapPixelSize(json.pixelSize ?? DEFAULT_MAP_PIXEL_SIZE)
-    const areas = (json.areas ?? []).map((a, i) => parseAreaEntry(a, i))
+    // 圖面路徑與真實路徑順序不一致的方塊倒過來（見 trackGenOrientation）
+    const areas = normalizeTrackGenOrientation((json.areas ?? []).map((a, i) => parseAreaEntry(a, i)))
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)
