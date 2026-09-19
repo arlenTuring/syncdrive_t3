@@ -328,8 +328,8 @@ if $need_backend; then
 fi
 echo ""
 
-# VTMS 模擬器已移除：它是外部單位，程式在另一個資料夾，自己啟動
-#   cd ../syncdrive_t3_simulator && npm start   →  http://127.0.0.1:4300
+# 外部模擬器（另一個資料夾）：./scripts/simulator-start.sh 或 npm run simulator
+#   → http://127.0.0.1:4300
 
 # ── Frontend ──
 need_frontend=true
@@ -370,6 +370,7 @@ echo "  Swagger       http://localhost:3000/api"
 echo "  資料庫 GUI    http://localhost:8080"
 echo ""
 echo "  完整重啟+資料  npm run dev:restart"
+echo "  外部模擬器      npm run simulator   → http://127.0.0.1:4300"
 echo "  停止全部      ./scripts/dev-stop.sh"
 echo "  查看日誌      tail -f .dev/backend.log .dev/frontend.log"
 echo ""

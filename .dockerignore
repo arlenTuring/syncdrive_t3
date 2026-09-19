@@ -1,0 +1,20 @@
+# Only build inputs; exclude runtime data, credentials, dependency trees and backups.
+**
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+!document/
+!document/**
+!deploy/
+!deploy/Dockerfile.*
+!deploy/nginx.conf
+!deploy/portal/
+!deploy/portal/**
+**/node_modules
+**/dist
+**/.env*
+**/.git
+backend/data
+backend/https-certs
+frontend/.dev

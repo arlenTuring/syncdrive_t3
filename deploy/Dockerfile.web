@@ -37,6 +37,8 @@ COPY document/營運任務狀態協議.md          /usr/share/nginx/public-docs/
 COPY document/設備健康與異常告警協議.md    /usr/share/nginx/public-docs/
 COPY document/動態控制與特殊事件協議.md    /usr/share/nginx/public-docs/
 COPY document/月台門與車門協議.md          /usr/share/nginx/public-docs/
+COPY document/T3地圖站點與路線清單.md document/訂單API錯誤與對帳.md /usr/share/nginx/public-docs/
+COPY document/release-20260918/ /usr/share/nginx/public-docs/release-20260918/
 COPY deploy/portal/docs/ /usr/share/nginx/public-docs/
 
 # 兩個入口頁
