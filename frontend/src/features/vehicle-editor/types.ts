@@ -87,6 +87,14 @@ export interface VehicleDefinition {
   height: number;
   backgroundColor: string;
   elements: VehicleElement[];
+  /**
+   * 後軸中心距車尾端的比例（沿車體長度，0＝車尾、1＝車頭）。
+   *
+   * 車端回報的 local_pose.position 是<strong>後軸中心</strong>，圖上車輛就是把這個點壓在軌道上。
+   * 有明確值就用它；沒有時才由尾燈位置估（見 vehicleRearAxleAnchor 的 rearAxleAnchorSource）。
+   * 估算只是暫時的替代，車型量得出來就填。
+   */
+  rearAxleFromTailRatio?: number;
   /** 編輯模式無即時資料時的預覽 payload */
   previewData?: Record<string, unknown>;
   createdAt: number;

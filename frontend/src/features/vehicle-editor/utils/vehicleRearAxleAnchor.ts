@@ -4,14 +4,34 @@ import {
   mapDisplayContentSize,
 } from './vehicleContentBounds';
 
-/** 後軸距車尾端比例（沿車體長度 0→1，固定於樣板） */
+/** 後軸距車尾端比例（沿車體長度 0→1，固定於樣板）。只在車型沒有明確後軸資料時用來估算 */
 const REAR_AXLE_FROM_TAIL_RATIO = 0.18;
+
+/** 後軸位置的來源：車型明確填的、由尾燈估的、或連尾燈都沒有的預設值 */
+export type RearAxleAnchorSource = 'explicit' | 'estimated-from-tail-light' | 'default'
+
+function explicitRatio(definition: VehicleDefinition): number | null {
+  const v = definition.rearAxleFromTailRatio
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null
+}
+
+/** 後軸位置怎麼來的；圖台診斷與車型編輯提醒「這是估的」用 */
+export function rearAxleAnchorSource(definition: VehicleDefinition): RearAxleAnchorSource {
+  if (explicitRatio(definition) !== null) return 'explicit'
+  const body = definition.elements.find((el) => el.type === 'body')
+  const tail = definition.elements.find(
+    (el) => el.type === 'light' && el.visibilityField === 'tail_light_on',
+  )
+  return body && tail ? 'estimated-from-tail-light' : 'default'
+}
 
 /**
  * 後軸在車體上的固定比例（tail 端向內）。
  * 不隨 heading 翻轉：轉彎時只旋轉車體，後軸像素點必須固定，否則錨點會在頭尾之間跳動。
  */
 function fixedRearAxleAlongBody(definition: VehicleDefinition): number {
+  const explicit = explicitRatio(definition);
+  if (explicit !== null) return Math.max(0, Math.min(1, 1 - explicit));
   const body = definition.elements.find((el) => el.type === 'body');
   const tail = definition.elements.find(
     (el) => el.type === 'light' && el.visibilityField === 'tail_light_on',
