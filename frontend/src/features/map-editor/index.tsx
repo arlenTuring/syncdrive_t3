@@ -267,9 +267,6 @@ import {
 import { buildFacilitiesFromLayout } from './utils/trackGenApply'
 import type { TrackGenGroup } from './utils/trackGenGroups'
 import type { TrackGenLayout } from './utils/trackGenLayout'
-import {
-  defaultTrackCrossoverParameters,
-} from './utils/trackCrossoverFacility'
 import type { MapWorldBounds } from './utils/mapViewport'
 
 type LoadedMapMeta = EditSessionSnapshot['loadedMapMeta']
@@ -2594,24 +2591,6 @@ export default function MapEditorApp({
           parameters: {
             ...defaultRefFieldParametersForType('Track'),
             [CORNER_TRACK_KEY]: { ...DEFAULT_CORNER_TRACK },
-          },
-        }
-      }
-      if (item.type === 'TrackCrossover') {
-        return {
-          id,
-          type: 'TrackCrossover',
-          name: 'TrackCrossover',
-          customName: '',
-          areaPosition,
-          position: positionMeters,
-          rotation: 0,
-          currentState: getDefaultStateForType('TrackCrossover'),
-          parameters: {
-            ...defaultTrackCrossoverParameters(
-              positionMeters.x,
-              positionMeters.y,
-            ),
           },
         }
       }

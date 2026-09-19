@@ -35,12 +35,6 @@ import {
   tangentAlongPath,
   trackGenPickScore,
 } from '../utils/trackGenPaths';
-import {
-  locateOnCrossover,
-  locateOnCrossoverDetailed,
-  type CrossoverHit,
-} from './trackNetwork/crossoverLocate';
-import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { locateOnTrackNetwork, trackCodeAtFieldPoint } from './trackNetwork/locate';
 
 /**
@@ -700,34 +694,7 @@ export function resolveVehicleTrackPlacementInArea(
 }
 
 /**
- * 靠近橫渡線時，要不要真的畫在渡線上。
- *
- * <h3>為什麼不能無條件優先</h3>
- * 橫渡線是斜的，一定會穿過上下行軌道帶。原本只要離渡線 2 公尺內就一律判渡線——可是
- * 車只是沿著正線開過渡線旁邊，離自己那條中心線 0 公尺、離渡線 1.5 公尺，也被拉到
- * 渡線上去，畫面上就是突然側向飄過去，再飄回來。
- *
- * 判給渡線要同時滿足兩件事：
- * <ul>
- *   <li>離渡線<strong>明顯比離軌道中心線近</strong>——車在軌道上的話，離自己的中心線
- *       應該接近 0；離渡線更近才是真的在渡線上。</li>
- *   <li>車頭跟渡線走向大致同向（六十度內）。斜渡線與正線夾角大，沿正線開的車頭朝向
- *       跟渡線差很多；真的在轉線的車頭才會順著渡線。</li>
- * </ul>
- * 上一筆已經在這條渡線上的，只要還在容許範圍內就留著，不要在中途被拉回軌道。
- *
- * 軌道不是生成的（沒有中心線可比）時維持舊行為：沒有可比的距離，就沿用「渡線優先」。
- */
-const CROSSOVER_HEADING_LIMIT_RAD = (60 * Math.PI) / 180;
-const CROSSOVER_CLEARLY_CLOSER_M = 0.5;
-const CROSSOVER_STAY_EXTRA_M = 1;
-
-/**
- * 下一筆定位要帶的「上一筆軌道」。
- *
- * 生成軌道與<strong>渡線</strong>的結果都要算：渡線的結果沒有 network 欄位，
- * 只認 network 的話，轉線中的車每一筆都像第一次被看到，渡線的「上一筆在這裡就留著」
- * 永遠用不上。場區車位（格位）不是軌道，不帶。
+ * 下一筆定位要帶的「上一筆軌道」。場區車位（格位）不是軌道，不帶。
  */
 export function previousTrackIdOf(
   last: VehiclePlacementAcrossAreas | null | undefined,
@@ -737,42 +704,7 @@ export function previousTrackIdOf(
   return last.placement.trackId || undefined;
 }
 
-function crossoverWins(
-  hit: CrossoverHit,
-  onTrack: VehiclePlacementAcrossAreas | null,
-  options?: { headingRad?: number; speedMps?: number; previousTrackId?: string },
-): boolean {
-  if (options?.previousTrackId === hit.facilityId) return true;
-  if (!onTrack) return true;
-
-  const trackDistance = onTrack.placement.network?.distanceM;
-  const headingKnown =
-    options?.headingRad !== undefined &&
-    (options.speedMps === undefined || options.speedMps >= HEADING_RELIABLE_MPS);
-
-  if (trackDistance === undefined) {
-    // 沒有中心線可比：只用方向擋一擋（沒有朝向就照舊）
-    return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
-  }
-  // 上一筆本來就在這條軌道上：渡線要更明顯地贏才搶（多要 1 公尺），別在兩者之間來回抖
-  const stayMargin = options?.previousTrackId === onTrack.placement.trackId ? CROSSOVER_STAY_EXTRA_M : 0;
-  if (!(hit.distanceM + CROSSOVER_CLEARLY_CLOSER_M + stayMargin < trackDistance)) return false;
-  return !headingKnown || headingAlongLine(options!.headingRad!, hit.directionRad);
-}
-
-/** 車頭跟一條直線走向的夾角（不分順逆）在六十度內 */
-function headingAlongLine(headingRad: number, lineRad: number): boolean {
-  let d = Math.abs(headingRad - lineRad) % Math.PI;
-  if (d > Math.PI / 2) d = Math.PI - d;
-  return d <= CROSSOVER_HEADING_LIMIT_RAD;
-}
-
-/**
- * 全圖定位：橫渡線優先，再掃 Track refField。
- *
- * 橫渡線與軌道帶在場域上重疊——若先吸到軌道中心線，轉線途中的車會在上下行之間
- * 「飄／跳」。模擬器路徑點正確、圖台卻飄，多半就是這裡少了橫渡線這一步。
- */
+/** 全圖定位：場區車位、生成軌道的中心線，再退回分區與區域範圍。 */
 export function resolveVehiclePlacementAcrossAreas(
   areas: MapAreaObject[],
   xM: number,
@@ -810,17 +742,7 @@ export function resolveVehiclePlacementAcrossAreas(
     corridorFacilityIds: options?.corridorFacilityIds,
   });
 
-  // 緊貼橫渡線（2 m）：要先確認車<strong>真的在轉線</strong>才畫在渡線上
-  const nearCrossover = locateOnCrossoverDetailed(areas, xM, yM, 2);
-  if (nearCrossover && crossoverWins(nearCrossover, onTrack, options)) {
-    return nearCrossover.located;
-  }
-
   if (onTrack) return onTrack;
-
-  // 略寬：portal 外緣、尚未落入任何 refField 的點
-  const onCrossoverLoose = locateOnCrossover(areas, xM, yM, 6);
-  if (onCrossoverLoose) return onCrossoverLoose;
 
   // 場區底下沒有軌道：開進去的那幾秒沒有 yard_slot_id，照分區的對應反算
   const inZone = locateInZonePartition(areas, xM, yM);

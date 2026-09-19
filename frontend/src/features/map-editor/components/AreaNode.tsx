@@ -81,9 +81,6 @@ import {
 } from '../utils/paletteDrag'
 import { FacilityNode } from './FacilityNode'
 import { FacilityDragGuidesOverlay } from './FacilityDragGuidesOverlay'
-import { CrossoverSnapOverlay } from './CrossoverSnapOverlay'
-import { buildEditorTrackSnapSegments } from '../utils/trackEditorSnapSegments'
-import type { CrossoverSnapUi } from '../utils/crossoverSnapUi'
 import { GeofenceNode } from './GeofenceNode'
 import type { AlignGuideLine, SnapRect } from '../utils/facilityDragAlign'
 import { buildCrossAreaPeerSnapRects } from '../utils/facilityDragAlign'
@@ -387,9 +384,6 @@ export const AreaNode = memo(function AreaNode({
   const [dragAlignGuides, setDragAlignGuides] = useState<AlignGuideLine[] | null>(
     null,
   )
-  const [crossoverSnapUi, setCrossoverSnapUi] = useState<CrossoverSnapUi | null>(
-    null,
-  )
   const [dragStartPositions, setDragStartPositions] = useState<Record<
     string,
     { x: number; y: number }
@@ -667,90 +661,6 @@ export const AreaNode = memo(function AreaNode({
     rulerDisplayMode,
     selectedFacilityIds,
     showFacilityToolbars,
-  ])
-
-  const crossoverSegmentById = useMemo(
-    () => buildEditorTrackSnapSegments(area),
-    [area],
-  )
-
-  const onCrossoverSnapUiChange = useCallback((ui: CrossoverSnapUi | null) => {
-    setCrossoverSnapUi(ui)
-  }, [])
-
-  const crossoverSnapOverlayModel = useMemo(() => {
-    if (!crossoverSnapUi) return null
-    const primaryIds = new Set(crossoverSnapUi.hooks.map((h) => h.trackId))
-    const trackGlows: Array<{
-      trackId: string
-      x1: number
-      y1: number
-      x2: number
-      y2: number
-      primary: boolean
-    }> = []
-    for (const trackId of crossoverSnapUi.nearbyTrackIds) {
-      const seg = crossoverSegmentById.get(trackId)
-      if (!seg) continue
-      const b = seg.bounds
-      const p1 = meterToAreaLocalPx(b.xMinM, b.yMinM, displayDomain, committedLayout)
-      const p2 = meterToAreaLocalPx(b.xMaxM, b.yMaxM, displayDomain, committedLayout)
-      // Area local Y 向上 → CSS Y 向下
-      const h = committedLayout.hPx
-      if (seg.horizontal) {
-        const y = h - (p1.y + p2.y) / 2
-        trackGlows.push({
-          trackId,
-          x1: Math.min(p1.x, p2.x),
-          y1: y,
-          x2: Math.max(p1.x, p2.x),
-          y2: y,
-          primary: primaryIds.has(trackId),
-        })
-      } else {
-        const x = (p1.x + p2.x) / 2
-        trackGlows.push({
-          trackId,
-          x1: x,
-          y1: h - Math.max(p1.y, p2.y),
-          x2: x,
-          y2: h - Math.min(p1.y, p2.y),
-          primary: primaryIds.has(trackId),
-        })
-      }
-    }
-    const hooks = crossoverSnapUi.hooks.map((hook) => {
-      const at = meterToAreaLocalPx(
-        hook.xM,
-        hook.yM,
-        displayDomain,
-        committedLayout,
-      )
-      const from = meterToAreaLocalPx(
-        hook.fromXM,
-        hook.fromYM,
-        displayDomain,
-        committedLayout,
-      )
-      const h = committedLayout.hPx
-      return {
-        trackId: hook.trackId,
-        x: at.x,
-        y: h - at.y,
-        fromX: from.x,
-        fromY: h - from.y,
-        horizontal: hook.horizontal,
-        openNx: hook.openNx,
-        openNy: -hook.openNy,
-        engaged: hook.engaged,
-      }
-    })
-    return { trackGlows, hooks }
-  }, [
-    committedLayout,
-    crossoverSegmentById,
-    crossoverSnapUi,
-    displayDomain,
   ])
 
   const clientToInnerLocal = useCallback(
@@ -1169,8 +1079,7 @@ export const AreaNode = memo(function AreaNode({
   /**
    * 一個元件<strong>自己</strong>的接合面，依面的代號取用。
    *
-   * 四種軌道都有：一般兩個（兩條短邊）、圓角兩個、斜接兩個、分岔三個。虛擬渡線不在
-   * 這個機制裡——它本來就是靠兩個 portal 貼上軌道，不是靠端面。
+   * 四種軌道都有：一般兩個（兩條短邊）、圓角兩個、斜接兩個、分岔三個。
    */
   const trackFacesLocal = useCallback(
     (f: FacilityObject): Record<string, EndSegment> | null => {
@@ -1888,107 +1797,6 @@ export const AreaNode = memo(function AreaNode({
       )
     }
 
-    if (f.type === 'TrackCrossover') {
-      const resizeDrag = layoutDragRef.current
-      const isAreaResizePreview =
-        liveLayout != null && resizeDrag?.kind === 'resize'
-      const freeze =
-        isAreaResizePreview && resizeDrag
-          ? areaLayoutResizeMapFreezeOffset(resizeDrag.layout, liveLayout)
-          : { left: 0, top: 0 }
-      return (
-        <div
-          key={f.id}
-          data-facility-root
-          data-track-crossover-root
-          className="pointer-events-none absolute overflow-visible"
-          style={{
-            left: freeze.left,
-            top: freeze.top,
-            width: isAreaResizePreview ? committedLayout.wPx : displayLayout.wPx,
-            height: isAreaResizePreview ? committedLayout.hPx : displayLayout.hPx,
-            zIndex: z,
-          }}
-          onPointerDown={(e) => {
-            if (editMode || e.button !== 0) return
-            // 命中由線徑端點／線身處理；此處僅擋冒泡到 Area
-            if (!(e.target as HTMLElement).closest('[data-crossover-portal-handle], line, circle')) {
-              return
-            }
-            e.stopPropagation()
-            selectFacilityInViewMode(f.id, e.shiftKey)
-          }}
-        >
-          <FacilityNode
-            facility={f}
-            displayPosition={{ x: 0, y: 0 }}
-            areaAnchorPx={{ x: freeze.left, y: freeze.top }}
-            mqttLive={mqttLive}
-            slotPreview={preview}
-            selected={isSelected}
-            scaleX={pxPerMeterX}
-            scaleY={pxPerMeterY}
-            mapScale={mapScale}
-            meterMode
-            domainBoundsM={displayDomain}
-            areaMeterContext={areaMeterContext}
-            mapViewportRef={mapViewportRef}
-            readOnly={readOnly || !editMode}
-            worldRef={innerRef as RefObject<HTMLDivElement>}
-            onSelect={(id, options) => onSelectFacility(area.id, id, options)}
-            onOpenProperties={
-              onFacilityDoubleClick
-                ? () => onFacilityDoubleClick(area.id, f.id)
-                : undefined
-            }
-            onDrag={(_id, update) => {
-              if (!('areaPosition' in update)) return
-              setDragLiveAreaPos(update.areaPosition)
-              onDragFacility(area.id, f.id, update)
-            }}
-            onDragSessionStart={onDragSessionStart}
-            peerSnapRects={[]}
-            onFacilityResizeActiveChange={undefined}
-            onHoverChange={
-              editMode && onFacilityHover
-                ? (hovered) => onFacilityHover(area.id, f.id, hovered)
-                : undefined
-            }
-            onFacilityDragActiveChange={(active) => {
-              setDraggingFacilityId(active ? f.id : null)
-              if (!active) {
-                setDragStartPositions(null)
-                setDragLiveAreaPos(null)
-                setDragAlignGuides(null)
-              }
-            }}
-            onResize={
-              onResizeFacility
-                ? (_id, size) => onResizeFacility(area.id, f.id, size)
-                : undefined
-            }
-            onPatchParameters={
-              onPatchFacilityParameters
-                ? (_id, patch) => onPatchFacilityParameters(area.id, f.id, patch)
-                : undefined
-            }
-            onRotateLeft90={() => onRotateLeft90(area.id, f.id)}
-            onRotateRight90={() => onRotateRight90(area.id, f.id)}
-            onRotateDelta={(_id, deg) => onRotateDelta(area.id, f.id, deg)}
-            onDelete={
-              onDeleteFacility && editMode
-                ? () => onDeleteFacility(area.id, f.id)
-                : undefined
-            }
-            stackZIndex={z}
-            showFacilityToolbar={showFacilityToolbars}
-            crossoverSegmentById={crossoverSegmentById}
-            onCrossoverSnapUiChange={onCrossoverSnapUiChange}
-          />
-        </div>
-      )
-    }
-
     const resizeDrag = layoutDragRef.current
     const isAreaResizePreview =
       liveLayout != null && resizeDrag?.kind === 'resize'
@@ -2213,20 +2021,12 @@ export const AreaNode = memo(function AreaNode({
           }
           onCancelFormatPaint={onCancelFormatPaint}
           stackZIndex={
-            connectivityScanHighlightTrackIds?.includes(f.id) ||
-            crossoverSnapUi?.nearbyTrackIds.includes(f.id)
+            connectivityScanHighlightTrackIds?.includes(f.id)
               ? Math.max(z, 9000)
               : z
           }
           showFacilityToolbar={showFacilityToolbars}
           connectivityScanHighlight={connectivityScanHighlightTrackIds?.includes(f.id) ?? false}
-          crossoverSnapHighlight={
-            crossoverSnapUi?.nearbyTrackIds.includes(f.id) ?? false
-          }
-          crossoverSnapPrimary={
-            crossoverSnapUi?.hooks.some((h) => h.trackId === f.id) ?? false
-          }
-          crossoverSegmentById={crossoverSegmentById}
         />
       </div>
     )
@@ -2238,7 +2038,7 @@ export const AreaNode = memo(function AreaNode({
     transformFacilityId && dragLiveAreaPos
       ? (() => {
           const target = area.facilities.find((f) => f.id === transformFacilityId)
-          if (!target || target.type === 'TrackCrossover') return null
+          if (!target) return null
           const snap = resolveFacilitySnapRectCss(
             { ...target, areaPosition: dragLiveAreaPos },
             displayDomain,
@@ -2457,14 +2257,6 @@ export const AreaNode = memo(function AreaNode({
             }}
           />
         )}
-        {crossoverSnapOverlayModel ? (
-          <CrossoverSnapOverlay
-            width={committedLayout.wPx}
-            height={committedLayout.hPx}
-            trackGlows={crossoverSnapOverlayModel.trackGlows}
-            hooks={crossoverSnapOverlayModel.hooks}
-          />
-        ) : null}
         {showCenterLabel && (
           <div className="pointer-events-none absolute inset-0 z-[1400] grid place-items-center">
             <div className="max-w-[88%] rounded-xl border border-amber-300/70 bg-amber-950/65 px-4 py-3 text-center shadow-[0_0_20px_rgba(251,191,36,0.35)] backdrop-blur-sm">

@@ -24,7 +24,7 @@ import { resolveCrossPortalFields } from './crossTrackPortals'
 import { resolveRoutePreviewGeometry } from './routeTrackPath'
 import {
   resolveFacilityDockingRouteStopMapPx,
-  resolveCrossoverPortalRouteStopMapPx,
+  resolveCrossPortalRouteStopMapPx,
   resolveRouteStationPoints,
   stationDisplayLabel,
 } from './routePlanning'
@@ -51,8 +51,8 @@ function resolveStopWithMeters(
 ): { x: number; y: number; stationName: string; xM?: number; yM?: number } | null {
   const fdock = resolveFacilityDockingRouteStopMapPx(areas, stationId)
   if (fdock) return fdock
-  const crossover = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
-  if (crossover) return crossover
+  const cross = resolveCrossPortalRouteStopMapPx(areas, stationId)
+  if (cross) return cross
   const points = resolveRouteStationPoints(areas, [stationId])
   const p = points[0]
   if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null
@@ -187,10 +187,10 @@ export type FieldBox = {
   facilityId: string
 }
 
-/** 圖台像素上的軌道方塊與渡線，供吸附／落點檢查 */
+/** 圖台像素上的軌道方塊與交叉軌道的兩條對角線，供吸附／落點檢查 */
 export function collectSimRouteFieldTargets(areas: MapAreaObject[]): {
   boxes: FieldBox[]
-  crossovers: Array<{
+  crossDiagonals: Array<{
     id: string
     code: string
     a: { px: number; py: number }
@@ -198,7 +198,7 @@ export function collectSimRouteFieldTargets(areas: MapAreaObject[]): {
   }>
 } {
   const boxes: FieldBox[] = []
-  const crossovers: Array<{
+  const crossDiagonals: Array<{
     id: string
     code: string
     a: { px: number; py: number }
@@ -211,7 +211,7 @@ export function collectSimRouteFieldTargets(areas: MapAreaObject[]): {
       h: domainHeightM(area.domain),
     }
     for (const f of area.facilities) {
-      if (f.type !== 'Track' && f.type !== 'TrackCrossover') continue
+      if (f.type !== 'Track') continue
       const { css, areaSize } = resolveFacilityRenderPlacement(
         f,
         area.domain,
@@ -222,20 +222,18 @@ export function collectSimRouteFieldTargets(areas: MapAreaObject[]): {
       const y = area.layout.yPx + css.top
       const w = areaSize.w
       const h = areaSize.h
-      if (f.type === 'Track') {
-        boxes.push({
-          id: f.id,
-          type: 'Track',
-          code: f.customName || f.id,
-          x,
-          y,
-          w,
-          h,
-          areaId: area.id,
-          facilityId: f.id,
-        })
-      }
-      if (f.type === 'TrackCrossover') {
+      boxes.push({
+        id: f.id,
+        type: 'Track',
+        code: f.customName || f.id,
+        x,
+        y,
+        w,
+        h,
+        areaId: area.id,
+        facilityId: f.id,
+      })
+      if (f.name === 'RailCross') {
         const fields = resolveCrossPortalFields(f, area)
         const pushSeg = (
           id: string,
@@ -253,24 +251,24 @@ export function collectSimRouteFieldTargets(areas: MapAreaObject[]): {
           const a = fieldMetersToMapPx(areas, area.id, aM.xM, aM.yM)
           const b = fieldMetersToMapPx(areas, area.id, bM.xM, bM.yM)
           if (!a || !b) return
-          crossovers.push({
+          crossDiagonals.push({
             id,
             code: f.customName || f.id,
             a,
             b,
           })
         }
-        // 渡線兩條對角：lt↔rb、rt↔lb
+        // 交叉軌道兩條對角：lt↔rb、rt↔lb
         pushSeg(`${f.id}-lt-rb`, fields.lt, fields.rb)
         pushSeg(`${f.id}-rt-lb`, fields.rt, fields.lb)
       }
     }
   }
-  return { boxes, crossovers }
+  return { boxes, crossDiagonals }
 }
 
 export function buildSimRouteSnapTargets(areas: MapAreaObject[]): SnapTargets {
-  const { boxes, crossovers } = collectSimRouteFieldTargets(areas)
+  const { boxes, crossDiagonals } = collectSimRouteFieldTargets(areas)
   const verticals: SnapTargets['verticals'] = []
   const horizontals: SnapTargets['horizontals'] = []
   for (const box of boxes) {
@@ -294,7 +292,7 @@ export function buildSimRouteSnapTargets(areas: MapAreaObject[]): SnapTargets {
       })
     }
   }
-  const segments: SnapSegment[] = crossovers.map((xo) => ({
+  const segments: SnapSegment[] = crossDiagonals.map((xo) => ({
     ax: xo.a.px,
     ay: xo.a.py,
     bx: xo.b.px,
@@ -308,7 +306,7 @@ export function isSimRoutePointOnField(
   areas: MapAreaObject[],
   p: { x: number; y: number },
 ): boolean {
-  const { boxes, crossovers } = collectSimRouteFieldTargets(areas)
+  const { boxes, crossDiagonals } = collectSimRouteFieldTargets(areas)
   if (
     boxes.some(
       (f) => p.x >= f.x && p.x <= f.x + f.w && p.y >= f.y && p.y <= f.y + f.h,
@@ -316,7 +314,7 @@ export function isSimRoutePointOnField(
   ) {
     return true
   }
-  return crossovers.some((xo) => {
+  return crossDiagonals.some((xo) => {
     const dx = xo.b.px - xo.a.px
     const dy = xo.b.py - xo.a.py
     const lenSq = dx * dx + dy * dy

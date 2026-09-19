@@ -211,7 +211,6 @@ export const AREA_DROP_DEFAULTS = {
   /** 分岔軌道整體縮放（相對帶寬反推外框） */
   railSwitchScale: 0.8,
   taperRampRun: 3,
-  trackCrossover: { wBandMul: 8, hBandMul: 4 },
 } as const
 
 function trackDropSizeMeters(
@@ -223,9 +222,6 @@ function trackDropSizeMeters(
   const d = AREA_DROP_DEFAULTS
   const band = Math.min(spanW, spanH) / d.trackBandDivisor
   if (!(band > 0)) return null
-  if (type === 'TrackCrossover') {
-    return { w: band * d.trackCrossover.wBandMul, h: band * d.trackCrossover.hBandMul }
-  }
   if (type !== 'Track') return null
   if (name === 'RailCorner') {
     const side = band / (1 - DEFAULT_CORNER_TRACK.innerXRatio)
@@ -371,7 +367,7 @@ function fitDropSizeIntoLayout(
 /**
  * 一個設施剛放進 Area 時的大小（Area 局部像素）。
  *
- * - 軌道／渡線：依場域公尺 span 推帶寬再換成 layout px（接得上、比例對）
+ * - 軌道：依場域公尺 span 推帶寬再換成 layout px（接得上、比例對）
  * - 其餘設備：依 Area 正式佈局像素比例（跟當前顯示畫布成比例）
  */
 export function defaultAreaSizePxForDrop(
@@ -486,9 +482,6 @@ export function defaultSizeMetersForType(
       return { w: 3.5, h: 3.5 }
     case 'RoadLine':
       return { w: 40, h: 1.2 }
-    case 'TrackCrossover':
-      // 預設約覆蓋一節平行股交叉區（寬沿軌道、高跨 U/D 間距）
-      return { w: 28, h: 14 }
     case 'Facility':
       return { w: 16, h: 12 }
     case 'Geofence':

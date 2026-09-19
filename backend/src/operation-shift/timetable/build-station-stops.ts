@@ -68,14 +68,11 @@ function normalizeDwellSlackSeconds(raw: unknown): number {
   return Math.round(raw);
 }
 
-function looksLikeCrossoverPortal(stationId: string): boolean {
-  return /^xo_\d+_[ab]$/i.test(stationId.trim());
-}
-
 function isStationDwellRequired(dwell: TimetableStationDwell): boolean {
   if (dwell.dwellRequired === false) return false;
   if (dwell.dwellRequired === true) return true;
-  return !looksLikeCrossoverPortal(dwell.stationId);
+  // 途經點由地圖目錄載入時標註 dwellRequired: false；沒標就當停靠點
+  return true;
 }
 
 function resolveStationDwellMode(

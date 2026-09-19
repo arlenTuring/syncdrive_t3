@@ -767,59 +767,17 @@ describe('pointTopology', () => {
     assert.equal(isDispatchAfterServiceEdge(facility, fdock), false)
   })
 
-  it('keeps TrackCrossover portal waypoints when syncing topology with areas', () => {
-    const areas = areaWith(
-      facility({
-        id: 'dock-1',
-        type: 'DockingPoint',
-        parameters: { stationId: 'S1', stationName: '站1' },
-      }),
-      facility({
-        id: 'xo1',
-        type: 'TrackCrossover',
-        parameters: {
-          trackCrossoverPortals: {
-            a: {
-              xM: 10,
-              yM: 20,
-              attachedTrackId: 't1',
-              waypointCode: 'xo_1_a',
-              alias: '上行轉N2W正線終點',
-            },
-            b: {
-              xM: 30,
-              yM: 40,
-              attachedTrackId: 't2',
-              waypointCode: 'xo_1_b',
-              alias: '上行轉N2W正線起點',
-            },
-          },
-        },
-      }),
-    )
-
-    const loaded = addFacilitiesToPointTopology(emptyPointTopology(), areas, [
-      'dock-1',
-      'xowp:xo1:a',
-      'xowp:xo1:b',
-    ])
-    assert.equal(loaded.nodes.length, 3)
-    assert.ok(loaded.nodes.some((n) => n.id === 'xowp:xo1:a' && n.kind === 'crossover-waypoint'))
-    assert.ok(loaded.nodes.some((n) => n.id === 'xowp:xo1:b' && n.kind === 'crossover-waypoint'))
-
-    const synced = syncPointTopologyWithAreas(loaded, areas)
-    assert.equal(synced.nodes.length, 3)
-    const portalA = synced.nodes.find((n) => n.id === 'xowp:xo1:a')
-    assert.equal(portalA?.kind, 'crossover-waypoint')
-    assert.equal(portalA?.stationId, 'xo_1_a')
-    assert.equal(portalA?.label, '上行轉N2W正線終點')
-
-    const candidates = listTopologyLoadCandidates(areas, synced)
-    assert.ok(
-      candidates.some(
-        (c) => c.nodeId === 'xowp:xo1:a' && c.kind === 'crossover-waypoint' && c.alreadyInTopology,
-      ),
-    )
+  it('drops legacy crossover-waypoint nodes (and their edges) when parsing a saved topology', () => {
+    // 虛擬渡線已移除；舊圖存檔裡的途經點節點若照未知 kind 退回 docking 會變成假停靠點
+    const parsed = parsePointTopology({
+      nodes: [
+        { id: 'dock-1', kind: 'docking', label: '站1', stationId: 'S1', x: 0, y: 0 },
+        { id: 'xowp:xo1:a', kind: 'crossover-waypoint', label: '舊渡線', stationId: 'xo_1_a', x: 10, y: 0 },
+      ],
+      edges: [{ id: 'e1', fromNodeId: 'dock-1', toNodeId: 'xowp:xo1:a' }],
+    })
+    assert.deepEqual(parsed.nodes.map((n) => n.id), ['dock-1'])
+    assert.equal(parsed.edges.length, 0)
   })
 
   it('keeps RailCross portal waypoints when syncing topology with areas', () => {

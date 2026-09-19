@@ -223,60 +223,6 @@ describe('expandTimetableTrips', () => {
     });
     expect(paxOnly.map((t) => t.task_type)).toEqual(['passenger']);
   });
-
-  it('filters legacy crossover portal ids from passenger-stop etas', () => {
-    const withXo = {
-      selectedRoutes: [
-        {
-          routeId: 'tn',
-          routeName: 'TN',
-          routeCode: 'TN',
-          stationIds: ['t3', 'xo_1_a', 'n2w'],
-          stationDwells: [
-            { stationId: 't3', stationName: 'T3', dwellSeconds: 0, dwellRequired: false },
-            { stationId: 'xo_1_a', stationName: '渡線', dwellSeconds: 0, dwellRequired: false },
-            { stationId: 'n2w', stationName: 'N2W', dwellSeconds: 40 },
-          ],
-          stationLegTravels: [
-            { fromStationId: 't3', toStationId: 'xo_1_a', avgTravelTimeSeconds: 50, minTravelTimeSeconds: 50 },
-            { fromStationId: 'xo_1_a', toStationId: 'n2w', avgTravelTimeSeconds: 50, minTravelTimeSeconds: 50 },
-          ],
-          minTravelTimeSeconds: 100,
-          avgTravelTimeSeconds: 100,
-          dwellSlackSeconds: 0,
-        },
-      ],
-      scheduleOutput: {
-        plan: {
-          timelines: [
-            {
-              row: 1,
-              blocks: [
-                {
-                  id: 'b1',
-                  timelineRow: 1,
-                  taskType: 'passenger',
-                  routeId: 'tn',
-                  routeCode: 'TN',
-                  plannedStartMinute: 0,
-                  plannedEndMinute: 150 / 60,
-                  source: 'template_bar',
-                },
-              ],
-            },
-          ],
-        },
-      },
-    };
-    const etas = expandStationEtas({
-      body: withXo,
-      range: parseTimeRangeQuery({}),
-      passengerStopsOnly: true,
-    });
-    expect(etas.every((e) => e.station_id !== 'xo_1_a')).toBe(true);
-    expect(etas.some((e) => e.station_id === 't3')).toBe(true);
-    expect(etas.some((e) => e.station_id === 'n2w')).toBe(true);
-  });
 });
 
 describe('groupStationEtasIncludingMapAliases', () => {

@@ -1,9 +1,8 @@
 /**
  * 從 MapFileV2 擷取途經點：
  * - kind: 'waypoint'＝一般途經點（Waypoint 設施）
- * - kind: 'crossover-waypoint'＝虛擬渡線途經點（TrackCrossover 端點 A／B）
  * - kind: 'cross-waypoint'＝交叉軌道四口途經點（RailCross 的 lt／rb／lb／rt）
- * 三者功能相同（可入路線／拓樸），資料來源與分類分開。
+ * 兩者功能相同（可入路線／拓樸），資料來源與分類分開。
  */
 const fs = require('fs');
 const path = require('path');
@@ -64,10 +63,9 @@ function loadWaypointsFromMapFile(mapPath) {
       /*
        * 交叉軌道的四個口。
        *
-       * 這一段本來沒有，於是「途經點」清單對現行圖資一筆都回不出來——生成式圖資
-       * 裡的分岔是 RailCross（type 仍是 Track），四個口掛在 crossTrackPortals，
-       * 跟舊圖的 TrackCrossover 不是同一個欄位。路線編輯器讀得到它們（正線路線的
-       * 站序裡就有 n2w_u2d_back_start 這種），只有這支 API 看不到。
+       * 生成式圖資裡的分岔是 RailCross（type 仍是 Track），四個口掛在
+       * crossTrackPortals。路線編輯器讀得到它們（正線路線的站序裡就有
+       * n2w_u2d_back_start 這種），這支 API 也要給。
        */
       const crossPortals = entry.parameters?.crossTrackPortals;
       if (crossPortals && typeof crossPortals === 'object') {
@@ -93,35 +91,6 @@ function loadWaypointsFromMapFile(mapPath) {
           });
         }
         continue;
-      }
-
-      if (type !== 'TrackCrossover') continue;
-      const portals = entry.parameters?.trackCrossoverPortals;
-      if (!portals || typeof portals !== 'object') continue;
-      for (const portalKey of ['a', 'b']) {
-        const portal = portals[portalKey];
-        if (!portal || typeof portal !== 'object') continue;
-        const waypointCode = normalizeCode(portal.waypointCode);
-        if (!waypointCode) continue;
-        items.push({
-          waypointCode,
-          facilityId: String(entry.id ?? ''),
-          areaId: String(area.id ?? ''),
-          areaName: String(area.customName ?? area.id ?? ''),
-          kind: 'crossover-waypoint',
-          kindLabel: '虛擬渡線途經點',
-          portalKey,
-          topologyNodeId: `xowp:${String(entry.id ?? '')}:${portalKey}`,
-          alias: normalizeCode(portal.alias) || undefined,
-          // 現場座標優先。端點有兩對座標：xM／yM 是圖面位置（畫給人看的），
-          // refFieldXM／refFieldYM 是現場實際位置。對外要的是後者——車輛拿它
-          // 定位，取到圖面座標會讓車開到不存在的地方。
-          //
-          // 舊圖資沒有 refField，退回 xM／yM：在兩者分家之前，那一對本來就同時
-          // 扮演兩個角色。
-          xM: fieldMeter(portal.refFieldXM, portal.xM),
-          yM: fieldMeter(portal.refFieldYM, portal.yM),
-        });
       }
     }
   }

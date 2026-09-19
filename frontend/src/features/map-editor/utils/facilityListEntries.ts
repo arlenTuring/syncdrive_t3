@@ -20,12 +20,6 @@ import {
   resolveCrossPortalDisplayName,
   resolveCrossPortalFields,
 } from './crossTrackPortals'
-import {
-  CROSSOVER_PORTAL_KEYS,
-  crossoverPortalFieldMeters,
-  getCrossoverPortals,
-  resolveCrossoverPortalDisplayName,
-} from './trackCrossoverFacility'
 import { usesRefFieldBounds } from './facilityRefFieldBinding'
 import { getValidRefFieldBounds, isZeroRefFieldBoundsSpan } from './facilityRefFieldBounds'
 import { getRefFieldPosition } from './facilityRefFieldPosition'
@@ -234,10 +228,9 @@ export function collectFacilityDockingPointEntries(
  * 設施清單只收 type = Facility。放下去的途經點只有在路網拓撲編輯器裡看得到，
  * 於是「我明明加了兩個」跟「清單裡沒有」同時成立。
  *
- * 三種來源都算途經點，功能一樣，只是存的地方不同：
+ * 兩種來源都算途經點，功能一樣，只是存的地方不同：
  * - 元件庫放下去的 Waypoint
  * - 交叉軌道（RailCross）的四個口
- * - 舊圖虛擬渡線（TrackCrossover）的兩個端點
  */
 export function collectWaypointEntries(
   areas: MapAreaObject[],
@@ -282,29 +275,6 @@ export function collectWaypointEntries(
           )
         }
         continue
-      }
-
-      if (f.type === 'TrackCrossover') {
-        const portals = getCrossoverPortals(f)
-        if (!portals) continue
-        for (const key of CROSSOVER_PORTAL_KEYS) {
-          const portal = portals[key]
-          const code = portal.waypointCode?.trim()
-          if (!code) continue
-          const { xM, yM } = crossoverPortalFieldMeters(portal)
-          const px = meterToAreaLocalPx(xM, yM, area.domain, area.layout)
-          out.push(
-            toListEntry(area, f, {
-              name: resolveCrossoverPortalDisplayName(portal),
-              purpose: code,
-              refFieldText: `${fmt(xM)}, ${fmt(yM)} m`,
-              refFieldKey: `xowp|${f.id}|${key}|${xM}|${yM}`,
-              pxX: px.x,
-              pxY: px.y,
-              pointKind: 'waypoint',
-            }),
-          )
-        }
       }
     }
   }

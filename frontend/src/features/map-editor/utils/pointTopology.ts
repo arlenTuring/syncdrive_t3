@@ -18,13 +18,6 @@ import {
   resolveFacilityDockingPointTopologyLabel,
 } from './facilityDockingPoint'
 import {
-  crossoverPortalTopologyNodeId,
-  getCrossoverPortals,
-  parseCrossoverPortalTopologyNodeId,
-  resolveCrossoverPortalDisplayName,
-  CROSSOVER_PORTAL_KEYS,
-} from './trackCrossoverFacility'
-import {
   CROSS_PORTAL_UI_ORDER,
   crossPortalTopologyNodeId,
   getCrossPortals,
@@ -35,10 +28,7 @@ import {
   getWaypointCode,
   getWaypointName,
 } from './waypointFacility'
-import {
-  collectCrossoverPortalWaypointsFromAreas,
-  collectCrossPortalWaypointsFromAreas,
-} from './waypointCode'
+import { collectCrossPortalWaypointsFromAreas } from './waypointCode'
 import { isZoneEntrance, isZonePartition } from './zonePartition'
 
 const NODE_RADIUS_PX = 36
@@ -67,8 +57,6 @@ export const TOPOLOGY_KIND_COLORS: Record<PointTopologyNodeKind, string> = {
   facility: '#4a9e6e',
   /** 與設施綠拉開：暖琥珀 */
   'facility-docking': '#e59a2d',
-  /** 虛擬渡線端點途經點 */
-  'crossover-waypoint': '#8b7ec8',
   /** 交叉軌道四口途經點 */
   'cross-waypoint': '#6d9e9b',
 }
@@ -77,7 +65,7 @@ export function colorForTopologyNodeKind(kind: PointTopologyNodeKind): string {
   return TOPOLOGY_KIND_COLORS[kind]
 }
 
-/** 可載入路網拓撲：停靠點、途經點、大型設施（不含分區／分區入口；虛擬渡線端點另以 xowp 載入） */
+/** 可載入路網拓撲：停靠點、途經點、大型設施（不含分區／分區入口；交叉軌道的四個口另以 xcwp 載入） */
 export function isTopologyLoadableFacility(facility: FacilityObject): boolean {
   if (facility.type === 'DockingPoint' || facility.type === 'Waypoint') return true
   if (facility.type !== 'Facility') return false
@@ -144,17 +132,6 @@ export function resolveTopologyNodeLabelFromAreas(
     return null
   }
 
-  const crossoverRef = parseCrossoverPortalTopologyNodeId(nodeId)
-  if (crossoverRef) {
-    const facility = findFacilityInAreasById(areaList, crossoverRef.facilityId)
-    if (facility?.type === 'TrackCrossover') {
-      const portals = getCrossoverPortals(facility)
-      const portal = portals?.[crossoverRef.key]
-      if (portal) return resolveCrossoverPortalDisplayName(portal)
-    }
-    return null
-  }
-
   const crossRef = parseCrossPortalTopologyNodeId(nodeId)
   if (crossRef) {
     const facility = findFacilityInAreasById(areaList, crossRef.facilityId)
@@ -198,26 +175,6 @@ export function listTopologyLoadCandidates(
   const list: TopologyLoadCandidate[] = []
   for (const area of areas) {
     for (const facility of area.facilities) {
-      if (facility.type === 'TrackCrossover') {
-        const portals = getCrossoverPortals(facility)
-        if (!portals) continue
-        for (const key of CROSSOVER_PORTAL_KEYS) {
-          const portal = portals[key]
-          const code = portal.waypointCode?.trim()
-          if (!code) continue
-          const nodeId = crossoverPortalTopologyNodeId(facility.id, key)
-          list.push({
-            nodeId,
-            facilityId: facility.id,
-            areaId: area.id,
-            areaName: area.customName || area.id,
-            kind: 'crossover-waypoint',
-            label: resolveCrossoverPortalDisplayName(portal),
-            alreadyInTopology: inTopology.has(nodeId),
-          })
-        }
-        continue
-      }
       if (facility.type === 'Track' && facility.name === 'RailCross') {
         const portals = getCrossPortals(facility)
         for (const key of CROSS_PORTAL_UI_ORDER) {
@@ -266,9 +223,8 @@ export function listTopologyLoadCandidates(
       docking: 0,
       'facility-docking': 1,
       waypoint: 2,
-      'crossover-waypoint': 3,
-      'cross-waypoint': 4,
-      facility: 5,
+      'cross-waypoint': 3,
+      facility: 4,
     }
     const kd = kindOrder[a.kind] - kindOrder[b.kind]
     if (kd !== 0) return kd
@@ -509,7 +465,6 @@ function parsePointTopologyNodeKind(raw: unknown): PointTopologyNodeKind {
   if (raw === 'waypoint') return 'waypoint'
   if (raw === 'facility') return 'facility'
   if (raw === 'facility-docking') return 'facility-docking'
-  if (raw === 'crossover-waypoint') return 'crossover-waypoint'
   if (raw === 'cross-waypoint') return 'cross-waypoint'
   return 'docking'
 }
@@ -535,11 +490,6 @@ export function buildTopologyFacilityFingerprint(areas: MapAreaObject[]): string
       }
     }
   }
-  for (const portal of collectCrossoverPortalWaypointsFromAreas(areas)) {
-    parts.push(
-      `${portal.topologyNodeId}\0crossover-waypoint\0${portal.stationId}\0${portal.stationName}\0${portal.xM}\0${portal.yM}`,
-    )
-  }
   for (const portal of collectCrossPortalWaypointsFromAreas(areas)) {
     parts.push(
       `${portal.topologyNodeId}\0cross-waypoint\0${portal.stationId}\0${portal.stationName}\0${portal.xM}\0${portal.yM}`,
@@ -561,6 +511,8 @@ export function parsePointTopology(raw: unknown): PointTopology {
     const n = item as Record<string, unknown>
     const id = typeof n.id === 'string' ? n.id.trim() : ''
     if (!id) continue
+    // 舊圖虛擬渡線的途經點節點：虛擬渡線已移除，節點與連到它的邊一併丟掉
+    if (n.kind === 'crossover-waypoint') continue
     const kind = parsePointTopologyNodeKind(n.kind)
     const label = typeof n.label === 'string' && n.label.trim() ? n.label.trim() : id
     const x = typeof n.x === 'number' && Number.isFinite(n.x) ? n.x : 0
@@ -572,7 +524,7 @@ export function parsePointTopology(raw: unknown): PointTopology {
       kind,
       label,
       stationId:
-        kind === 'docking' || kind === 'crossover-waypoint' || kind === 'cross-waypoint'
+        kind === 'docking' || kind === 'cross-waypoint'
           ? stationId
           : undefined,
       x,
@@ -660,27 +612,6 @@ export function syncPointTopologyWithAreas(
       continue
     }
 
-    const crossoverRef = parseCrossoverPortalTopologyNodeId(prev.id)
-    if (crossoverRef) {
-      const facility = findFacilityInAreasById(areas, crossoverRef.facilityId)
-      if (!facility || facility.type !== 'TrackCrossover') continue
-      const portals = getCrossoverPortals(facility)
-      const portal = portals?.[crossoverRef.key]
-      const code = portal?.waypointCode?.trim()
-      if (!portal || !code) continue
-      const kind: PointTopologyNodeKind = 'crossover-waypoint'
-      nextNodes.push({
-        id: prev.id,
-        kind,
-        label: resolveCrossoverPortalDisplayName(portal),
-        stationId: code,
-        x: prev.x,
-        y: prev.y,
-        color: colorForTopologyNodeKind(kind),
-      })
-      continue
-    }
-
     const crossRef = parseCrossPortalTopologyNodeId(prev.id)
     if (crossRef) {
       const facility = findFacilityInAreasById(areas, crossRef.facilityId)
@@ -731,8 +662,8 @@ export function syncPointTopologyWithAreas(
 }
 
 /**
- * 將選定的地圖點位／設施／設施停靠點／虛擬渡線／交叉軌道途經點加入路網拓撲（已存在者略過）。
- * `nodeIds` 可為 facility.id、`fdock:${facilityId}`、`xowp:${facilityId}:a|b`，或 `xcwp:${facilityId}:lt|lb|rt|rb`。
+ * 將選定的地圖點位／設施／設施停靠點／交叉軌道途經點加入路網拓撲（已存在者略過）。
+ * `nodeIds` 可為 facility.id、`fdock:${facilityId}`，或 `xcwp:${facilityId}:lt|lb|rt|rb`。
  */
 export function addFacilitiesToPointTopology(
   topology: PointTopology,
@@ -745,7 +676,6 @@ export function addFacilitiesToPointTopology(
     for (const facility of area.facilities) {
       if (
         isTopologyLoadableFacility(facility)
-        || facility.type === 'TrackCrossover'
         || (facility.type === 'Track' && facility.name === 'RailCross')
       ) {
         facilityById.set(facility.id, facility)
@@ -773,33 +703,6 @@ export function addFacilitiesToPointTopology(
         id: nodeId,
         kind,
         label: resolveFacilityDockingPointTopologyLabel(facility),
-        x: layout.x,
-        y: layout.y,
-        color: colorForTopologyNodeKind(kind),
-      })
-      existing.add(nodeId)
-      continue
-    }
-
-    const crossoverRef = parseCrossoverPortalTopologyNodeId(nodeId)
-    if (crossoverRef) {
-      const facility = facilityById.get(crossoverRef.facilityId)
-      if (!facility || facility.type !== 'TrackCrossover') continue
-      const portals = getCrossoverPortals(facility)
-      const portal = portals?.[crossoverRef.key]
-      const code = portal?.waypointCode?.trim()
-      if (!portal || !code) continue
-      const kind: PointTopologyNodeKind = 'crossover-waypoint'
-      const layout = defaultLayoutPosition(
-        topology.nodes.length + addIndex,
-        topology.nodes.length + nodeIds.length,
-      )
-      addIndex += 1
-      nextNodes.push({
-        id: nodeId,
-        kind,
-        label: resolveCrossoverPortalDisplayName(portal),
-        stationId: code,
         x: layout.x,
         y: layout.y,
         color: colorForTopologyNodeKind(kind),

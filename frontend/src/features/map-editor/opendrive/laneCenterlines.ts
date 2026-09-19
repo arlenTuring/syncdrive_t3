@@ -17,7 +17,7 @@ export type LaneCenterline = {
   laneId: number
   laneType: string
   mmslLaneId: string | null
-  /** 是否位於 junction 內（渡線／連接道） */
+  /** 是否位於 junction 內（連接道） */
   inJunction: boolean
   /** 中心線取樣點，已依<strong>行車方向</strong>排序 */
   points: OpenDrivePoint[]

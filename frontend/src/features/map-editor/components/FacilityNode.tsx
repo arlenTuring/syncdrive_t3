@@ -139,7 +139,6 @@ import {
   cssTopLeftToAreaPosition,
   domainHeightM,
   domainWidthM,
-  meterToAreaLocalPx,
 } from '../utils/areaCoords'
 import type { MapAreaDomain, MapAreaLayout } from '../types/area'
 import { FacilityTransformOverlay } from './FacilityTransformOverlay'
@@ -170,37 +169,6 @@ import {
   openDriveSpanM,
   parseBasemapOpenDrivePlan,
 } from '../utils/basemapFacility'
-import {
-  TrackCrossoverGraphic,
-  portalsToAreaCssPoints,
-  strokePxFromWidthHandlePointer,
-} from './TrackCrossoverGraphic'
-import type { TrackNetworkSegment } from '../vehicles/trackNetwork/types'
-import {
-  dragCrossoverPortal,
-  ensureCrossoverPortals,
-  getCrossoverPortals,
-  clampTrackCrossoverStrokePx,
-  parseTrackCrossoverColor,
-  parseTrackCrossoverColorOpacity,
-  parseTrackCrossoverStrokePx,
-  parseTrackCrossoverCenterGapPct,
-  parseTrackCrossoverBgColor,
-  parseTrackCrossoverBgOpacity,
-  TRACK_CROSSOVER_STROKE_PX_KEY,
-  translateCrossoverPortals,
-  type CrossoverPortalKey,
-  type CrossoverPortals,
-} from '../utils/trackCrossoverFacility'
-import {
-  buildCrossoverSnapUiForPoint,
-  mergeCrossoverSnapUi,
-  type CrossoverSnapUi,
-} from '../utils/crossoverSnapUi'
-import {
-  clientPointToFieldMeters,
-  syncLayoutFromCrossoverPortals,
-} from '../utils/trackCrossoverLayout'
 import { resolveMapEditorAssetUrl } from '../utils/mapEditorAssetUrl'
 import {
   canApplyFacilityFormat,
@@ -375,7 +343,7 @@ type FacilityNodeProps = {
    * 軌道端面拖曳中：回報指標位置，取得目前碰到的軌道邊。
    *
    * 一般、圓角、斜接、分岔共用同一套；面的代號各自不同（分岔是 a／m／b，其餘是 a／b），
-   * 所以這裡只當字串傳。虛擬渡線不走這條——它是靠兩個 portal 貼上軌道的。
+   * 所以這裡只當字串傳。
    */
   onTrackEndProbe?: (
     facilityId: string,
@@ -433,14 +401,6 @@ type FacilityNodeProps = {
   connectivityScanHighlight?: boolean
   /** 導通掃描：斷點閃爍三次 */
   connectivityScanFlashing?: boolean
-  /** 虛擬渡線：供端點吸附軌道中心 */
-  crossoverSegmentById?: Map<string, TrackNetworkSegment> | null
-  /** 虛擬渡線拖曳：此軌道為鄰近候選（先標示） */
-  crossoverSnapHighlight?: boolean
-  /** 虛擬渡線拖曳：此軌道為目前勾子目標 */
-  crossoverSnapPrimary?: boolean
-  /** 回報 Area：鄰近軌道標示 + 勾子疊層 */
-  onCrossoverSnapUiChange?: (ui: CrossoverSnapUi | null) => void
 }
 
 export const FacilityNode = memo(function FacilityNode({
@@ -487,10 +447,6 @@ export const FacilityNode = memo(function FacilityNode({
   showFacilityToolbar = true,
   connectivityScanHighlight = false,
   connectivityScanFlashing = false,
-  crossoverSegmentById = null,
-  crossoverSnapHighlight = false,
-  crossoverSnapPrimary = false,
-  onCrossoverSnapUiChange,
 }: FacilityNodeProps) {
   const { t } = useTranslation()
   const mapExtent = useMapExtent()
@@ -585,19 +541,11 @@ export const FacilityNode = memo(function FacilityNode({
             : undefined,
         )
       : null
-  const isTrackCrossoverEarly = facility.type === 'TrackCrossover'
-  /** 虛擬渡線：整區疊層自由線（與圍籬／拓撲線相同），不用 AABB 方框尺寸 */
-  const { w: nw, h: nh } =
-    isTrackCrossoverEarly && meterMode && areaMeterContext
-      ? {
-          w: areaMeterContext.layout.wPx,
-          h: areaMeterContext.layout.hPx,
-        }
-      : areaSizePx
-        ? { w: areaSizePx.w, h: areaSizePx.h }
-        : meterMode
-          ? { w: sizeMeters.w * scaleX, h: sizeMeters.h * scaleY }
-          : facilityNodeWorldSize(facility)
+  const { w: nw, h: nh } = areaSizePx
+    ? { w: areaSizePx.w, h: areaSizePx.h }
+    : meterMode
+      ? { w: sizeMeters.w * scaleX, h: sizeMeters.h * scaleY }
+      : facilityNodeWorldSize(facility)
   const minDim = Math.min(nw, nh)
   const widthM = worldPxToMeters(nw)
   const heightM = worldPxToMeters(nh)
@@ -622,7 +570,6 @@ export const FacilityNode = memo(function FacilityNode({
   const isCrossTrack = isTrack && facility.name === 'RailCross'
   const isRoadLine = facility.type === 'RoadLine'
   const isBasemap = facility.type === 'Basemap'
-  const isTrackCrossover = facility.type === 'TrackCrossover'
   const isFacilityArea = isFacilityAreaBlock(facility)
   const isZoneEntranceBlock = isZoneEntrance(facility)
   const isZonePartitionBlock = isZonePartition(facility)
@@ -670,14 +617,6 @@ export const FacilityNode = memo(function FacilityNode({
     }
   }, [facility.id])
 
-  const [crossoverPortalPreview, setCrossoverPortalPreview] =
-    useState<CrossoverPortals | null>(null)
-  const [crossoverStrokePreview, setCrossoverStrokePreview] = useState<
-    number | null
-  >(null)
-  const crossoverWidthDragRef = useRef<{
-    pointerId: number
-  } | null>(null)
   const facilityDockingBounds = isFacilityArea
     ? getValidRefFieldBounds(facility.parameters)
     : null
@@ -810,132 +749,6 @@ export const FacilityNode = memo(function FacilityNode({
     [facility, onPatchParameters],
   )
 
-  const applyCrossoverPortalsUpdate = useCallback(
-    (nextPortals: CrossoverPortals) => {
-      if (!areaMeterContext || !onPatchParameters) return
-      const sync = syncLayoutFromCrossoverPortals(
-        nextPortals,
-        areaMeterContext.domain,
-        areaMeterContext.layout,
-        // 動作前的端點：沒動到的那一個要保留它的現場座標
-        getCrossoverPortals(facility),
-      )
-      onPatchParameters(facility.id, sync.parametersPatch)
-      onResize?.(facility.id, sync.areaSizePx)
-      onDrag(facility.id, {
-        areaPosition: sync.areaPosition,
-        position: sync.position,
-      })
-    },
-    [areaMeterContext, facility.id, onDrag, onPatchParameters, onResize],
-  )
-
-  const onCrossoverPortalPointerDown = useCallback(
-    (key: CrossoverPortalKey, e: React.PointerEvent<SVGCircleElement>) => {
-      if (readOnly || !onPatchParameters || !areaMeterContext) return
-      if (!crossoverSegmentById) return
-      e.stopPropagation()
-      e.preventDefault()
-      onSelect(facility.id)
-      onDragSessionStart?.()
-      const startPortals = ensureCrossoverPortals(facility)
-      crossoverPortalDragRef.current = {
-        key,
-        pointerId: e.pointerId,
-        startPortals,
-      }
-      setCrossoverPortalPreview(startPortals)
-      const portal = startPortals[key]
-      onCrossoverSnapUiChange?.(
-        buildCrossoverSnapUiForPoint(
-          portal.xM,
-          portal.yM,
-          key,
-          crossoverSegmentById,
-          portal.attachedTrackId,
-        ),
-      )
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-    },
-    [
-      areaMeterContext,
-      crossoverSegmentById,
-      facility,
-      onCrossoverSnapUiChange,
-      onDragSessionStart,
-      onPatchParameters,
-      onSelect,
-      readOnly,
-    ],
-  )
-
-  const onCrossoverPortalPointerMove = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      const drag = crossoverPortalDragRef.current
-      if (!drag || drag.pointerId !== e.pointerId) return
-      if (!areaMeterContext || !crossoverSegmentById || !worldRef.current) return
-      e.stopPropagation()
-      const field = clientPointToFieldMeters(
-        e.clientX,
-        e.clientY,
-        worldRef.current,
-        mapScale,
-        areaMeterContext.domain,
-        areaMeterContext.layout,
-      )
-      const next = dragCrossoverPortal(
-        drag.startPortals,
-        drag.key,
-        field.xM,
-        field.yM,
-        crossoverSegmentById,
-      )
-      drag.startPortals = next
-      setCrossoverPortalPreview(next)
-      const portal = next[drag.key]
-      onCrossoverSnapUiChange?.(
-        buildCrossoverSnapUiForPoint(
-          field.xM,
-          field.yM,
-          drag.key,
-          crossoverSegmentById,
-          portal.attachedTrackId,
-        ),
-      )
-    },
-    [
-      areaMeterContext,
-      crossoverSegmentById,
-      mapScale,
-      onCrossoverSnapUiChange,
-      worldRef,
-    ],
-  )
-
-  const onCrossoverPortalPointerEnd = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      const drag = crossoverPortalDragRef.current
-      if (!drag || drag.pointerId !== e.pointerId) return
-      e.stopPropagation()
-      crossoverPortalDragRef.current = null
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-      onCrossoverSnapUiChange?.(null)
-      setCrossoverPortalPreview((preview) => {
-        if (preview) applyCrossoverPortalsUpdate(preview)
-        return null
-      })
-    },
-    [applyCrossoverPortalsUpdate, onCrossoverSnapUiChange],
-  )
-
   const dockingIconUrl = isDockingPoint ? resolveDockingPointIconUrl(facility) : null
   const facilityDisplay = isFacilityArea
     ? resolveFacilityDisplay(facility, mqttLive)
@@ -980,116 +793,6 @@ export const FacilityNode = memo(function FacilityNode({
   const roadLineColor = isRoadLine
     ? parseRoadLineColor(facility.parameters?.roadLineColor)
     : ''
-  const trackCrossoverColor = isTrackCrossover
-    ? parseTrackCrossoverColor(facility.parameters?.trackCrossoverColor)
-    : ''
-  const trackCrossoverColorOpacity = isTrackCrossover
-    ? parseTrackCrossoverColorOpacity(
-        facility.parameters?.trackCrossoverColorOpacity,
-      )
-    : 100
-  const trackCrossoverStrokePx = isTrackCrossover
-    ? parseTrackCrossoverStrokePx(facility.parameters?.trackCrossoverStrokePx)
-    : 0
-  const trackCrossoverCenterGapPct = isTrackCrossover
-    ? parseTrackCrossoverCenterGapPct(
-        facility.parameters?.trackCrossoverCenterGapPct,
-      )
-    : 0
-  const trackCrossoverBgColor = isTrackCrossover
-    ? parseTrackCrossoverBgColor(facility.parameters?.trackCrossoverBgColor)
-    : null
-  const trackCrossoverBgOpacity = isTrackCrossover
-    ? parseTrackCrossoverBgOpacity(facility.parameters?.trackCrossoverBgOpacity)
-    : 35
-  const crossoverPortals = isTrackCrossover
-    ? (crossoverPortalPreview ?? ensureCrossoverPortals(facility))
-    : null
-  const crossoverPortalsLocal =
-    crossoverPortals && areaMeterContext
-      ? portalsToAreaCssPoints(
-          crossoverPortals,
-          areaMeterContext.layout,
-          (xM, yM) =>
-            meterToAreaLocalPx(
-              xM,
-              yM,
-              areaMeterContext.domain,
-              areaMeterContext.layout,
-            ),
-        )
-      : []
-  const trackCrossoverStrokeDisplay =
-    crossoverStrokePreview ?? trackCrossoverStrokePx
-
-  const onCrossoverWidthPointerDown = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      if (readOnly || !onPatchParameters) return
-      e.stopPropagation()
-      e.preventDefault()
-      onSelect(facility.id)
-      onDragSessionStart?.()
-      crossoverWidthDragRef.current = { pointerId: e.pointerId }
-      setCrossoverStrokePreview(trackCrossoverStrokePx)
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-    },
-    [
-      facility.id,
-      onDragSessionStart,
-      onPatchParameters,
-      onSelect,
-      readOnly,
-      trackCrossoverStrokePx,
-    ],
-  )
-
-  const onCrossoverWidthPointerMove = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const drag = crossoverWidthDragRef.current
-      if (!drag || drag.pointerId !== e.pointerId) return
-      if (!worldRef.current) return
-      e.stopPropagation()
-      const css = clientToAreaLocalPx(
-        e.clientX,
-        e.clientY,
-        worldRef.current,
-        mapScale,
-      )
-      if (crossoverPortalsLocal.length === 0) return
-      const raw = strokePxFromWidthHandlePointer(crossoverPortalsLocal, css)
-      if (raw == null) return
-      setCrossoverStrokePreview(clampTrackCrossoverStrokePx(raw))
-    },
-    [crossoverPortalsLocal, mapScale, worldRef],
-  )
-
-  const onCrossoverWidthPointerEnd = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const drag = crossoverWidthDragRef.current
-      if (!drag || drag.pointerId !== e.pointerId) return
-      e.stopPropagation()
-      crossoverWidthDragRef.current = null
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-      setCrossoverStrokePreview((preview) => {
-        if (preview != null && onPatchParameters) {
-          onPatchParameters(facility.id, {
-            [TRACK_CROSSOVER_STROKE_PX_KEY]: preview,
-          })
-        }
-        return null
-      })
-    },
-    [facility.id, onPatchParameters],
-  )
-
   const signalDisplay =
     facility.type === 'Signal' ? resolveSignalDisplay(facility, mqttLive) : null
 
@@ -1107,7 +810,6 @@ export const FacilityNode = memo(function FacilityNode({
     isBasemap ||
     facility.type === 'Track' ||
     isRoadLine ||
-    isTrackCrossover ||
     (nw >= nh * 4 && nh < 60)
   /** 世界座標邊長；外層 scale(sx,sy) 後，圖示約佔卡片可讀比例 */
   const useDraggableMapLabel = facilityUsesDraggableMapLabel(facility)
@@ -1158,9 +860,7 @@ export const FacilityNode = memo(function FacilityNode({
   )
   const slotSubFontWorld = Math.max(8, Math.min(12, minDim * 0.12))
 
-  const { padX: hitPadX, padY: hitPadY } = isTrackCrossover
-    ? { padX: 0, padY: 0 }
-    : meterMode
+  const { padX: hitPadX, padY: hitPadY } = meterMode
       ? areaSizePx
         ? { padX: 0, padY: 0 }
         : (() => {
@@ -1240,23 +940,10 @@ export const FacilityNode = memo(function FacilityNode({
       isResizing ||
       (selected && isRoadLine) ||
       (selected && isBasemap) ||
-      (selected && showRotNorm !== 0 && !isTrackCrossover))
+      (selected && showRotNorm !== 0))
   const rotAabb = resolveRotatedRectAabb(nw, nh, showRotNorm)
   const aabbBottomCenterLeft = hitPadX + rotAabb.offsetLeft + rotAabb.w / 2
   const aabbBottomPx = hitPadY + rotAabb.offsetTop + rotAabb.h
-  const crossoverMidLocal = (() => {
-    if (!isTrackCrossover || crossoverPortalsLocal.length === 0) return null
-    let sx = 0
-    let sy = 0
-    for (const p of crossoverPortalsLocal) {
-      sx += p.x
-      sy += p.y
-    }
-    return {
-      x: sx / crossoverPortalsLocal.length,
-      y: sy / crossoverPortalsLocal.length,
-    }
-  })()
   const draggingRef = useRef(false)
   const toolbarAnchorRef = useRef<HTMLDivElement>(null)
   /** 旋轉把手要以元件外框中心為圓心，所以需要拿到根節點 */
@@ -1282,17 +969,6 @@ export const FacilityNode = memo(function FacilityNode({
   const grabOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartClientRef = useRef({ x: 0, y: 0 })
   const dragStartMeterRef = useRef<{ x: number; y: number } | null>(null)
-  const crossoverDragStartPortalsRef = useRef<CrossoverPortals | null>(null)
-  const crossoverDragStartFieldRef = useRef<{ xM: number; yM: number } | null>(
-    null,
-  )
-  const crossoverSegmentByIdRef = useRef(crossoverSegmentById)
-  crossoverSegmentByIdRef.current = crossoverSegmentById
-  const crossoverPortalDragRef = useRef<{
-    key: CrossoverPortalKey
-    pointerId: number
-    startPortals: CrossoverPortals
-  } | null>(null)
   const grabOffsetLocalRef = useRef({ x: 0, y: 0 })
   const dragActiveRef = useRef(false)
   const DRAG_START_PX = 4
@@ -1709,10 +1385,7 @@ export const FacilityNode = memo(function FacilityNode({
       dragHistoryPushedRef.current = false
       setIsDragging(false)
       dragStartMeterRef.current = null
-      crossoverDragStartPortalsRef.current = null
-      crossoverDragStartFieldRef.current = null
       grabOffsetLocalRef.current = { x: 0, y: 0 }
-      onCrossoverSnapUiChange?.(null)
       onAlignGuidesChangeRef.current?.(null)
       releaseMapViewportScroll()
       onFacilityDragActiveChange?.(false)
@@ -1725,7 +1398,7 @@ export const FacilityNode = memo(function FacilityNode({
         }
       }
     },
-    [clearDragWindowListeners, onCrossoverSnapUiChange, onFacilityDragActiveChange, releaseMapViewportScroll],
+    [clearDragWindowListeners, onFacilityDragActiveChange, releaseMapViewportScroll],
   )
 
   const applyDragMove = useCallback(
@@ -1748,61 +1421,6 @@ export const FacilityNode = memo(function FacilityNode({
 
       const id = facilityRef.current.id
       const meterCtx = areaMeterContextRef.current
-
-      // 虛擬渡線：整組拖移＝平移端點；已接合端點鎖在原軌道
-      if (
-        meterMode
-        && meterCtx
-        && facilityRef.current.type === 'TrackCrossover'
-        && onPatchParameters
-        && crossoverSegmentByIdRef.current
-        && crossoverDragStartPortalsRef.current
-        && crossoverDragStartFieldRef.current
-      ) {
-        const { domain, layout } = meterCtx
-        const field = clientPointToFieldMeters(
-          clientX,
-          clientY,
-          world,
-          mapScaleRef.current,
-          domain,
-          layout,
-        )
-        const dxM = field.xM - crossoverDragStartFieldRef.current.xM
-        const dyM = field.yM - crossoverDragStartFieldRef.current.yM
-        const nextPortals = translateCrossoverPortals(
-          crossoverDragStartPortalsRef.current,
-          dxM,
-          dyM,
-          crossoverSegmentByIdRef.current,
-        )
-        const sync = syncLayoutFromCrossoverPortals(
-          nextPortals,
-          domain,
-          layout,
-          crossoverDragStartPortalsRef.current,
-        )
-        onPatchParameters(id, sync.parametersPatch)
-        onResize?.(id, sync.areaSizePx)
-        onDrag(id, {
-          areaPosition: sync.areaPosition,
-          position: sync.position,
-        })
-        onCrossoverSnapUiChange?.(
-          mergeCrossoverSnapUi(
-            (['a', 'b'] as const).map((key) =>
-              buildCrossoverSnapUiForPoint(
-                nextPortals[key].xM,
-                nextPortals[key].yM,
-                key,
-                crossoverSegmentByIdRef.current!,
-                nextPortals[key].attachedTrackId,
-              ),
-            ),
-          ),
-        )
-        return
-      }
 
       if (meterMode && meterCtx) {
         const { domain, layout } = meterCtx
@@ -1903,7 +1521,6 @@ export const FacilityNode = memo(function FacilityNode({
     },
     [
       meterMode,
-      onCrossoverSnapUiChange,
       onDrag,
       onDragSessionStart,
       onPatchParameters,
@@ -2016,10 +1633,6 @@ export const FacilityNode = memo(function FacilityNode({
       if ((e.target as HTMLElement).closest('[data-facility-label-drag]')) return
       if ((e.target as HTMLElement).closest('[data-facility-label-rotate-handle]'))
         return
-      if ((e.target as HTMLElement).closest('[data-crossover-portal-handle]'))
-        return
-      if ((e.target as HTMLElement).closest('[data-crossover-width-handle]'))
-        return
       if ((e.target as HTMLElement).closest('[data-basemap-pick]')) return
 
       if (formatPaintSnapshot) {
@@ -2075,25 +1688,8 @@ export const FacilityNode = memo(function FacilityNode({
           x: local.x - cssAnchor.left,
           y: local.y - cssAnchor.top,
         }
-        if (f.type === 'TrackCrossover' && crossoverSegmentByIdRef.current) {
-          crossoverDragStartPortalsRef.current = ensureCrossoverPortals(f)
-          const field = clientPointToFieldMeters(
-            e.clientX,
-            e.clientY,
-            world,
-            mapScaleRef.current,
-            areaMeterContext.domain,
-            areaMeterContext.layout,
-          )
-          crossoverDragStartFieldRef.current = field
-        } else {
-          crossoverDragStartPortalsRef.current = null
-          crossoverDragStartFieldRef.current = null
-        }
       } else {
         dragStartMeterRef.current = null
-        crossoverDragStartPortalsRef.current = null
-        crossoverDragStartFieldRef.current = null
         const p = clientToWorldCoords(e.clientX, e.clientY, world, scaleX, scaleY)
         const dp = displayPosRef.current
         grabOffsetRef.current = { x: p.x - dp.x, y: p.y - dp.y }
@@ -2705,11 +2301,7 @@ export const FacilityNode = memo(function FacilityNode({
       data-facility
       data-facility-root
         className={`absolute left-0 top-0 touch-none select-none ${
-          isTrackCrossover
-            ? 'overflow-visible pointer-events-none'
-            : isRoadLine || isBasemap
-              ? 'overflow-visible pointer-events-auto'
-              : ''
+          isRoadLine || isBasemap ? 'overflow-visible pointer-events-auto' : ''
         }`}
       title={
         isFacilityArea && facilityRemarks
@@ -2765,15 +2357,13 @@ export const FacilityNode = memo(function FacilityNode({
           </div>
         )}
       <div
-        className={`absolute overflow-visible ${bodyCursorClass} ${
-          isTrackCrossover ? 'pointer-events-none' : ''
-        }`}
+        className={`absolute overflow-visible ${bodyCursorClass}`}
         style={{
           left: hitPadX,
           top: hitPadY,
           width: nw,
           height: nh,
-          transform: isTrackCrossover ? undefined : `rotate(${showRot}deg)`,
+          transform: `rotate(${showRot}deg)`,
           transformOrigin: 'center center',
           cursor: bodyCursor,
         }}
@@ -2833,8 +2423,6 @@ export const FacilityNode = memo(function FacilityNode({
               ? 'flex size-full items-center justify-center border border-transparent bg-transparent p-0 shadow-none'
               : isTrack || isRoadLine || isBasemap
                 ? 'flex size-full items-center justify-center border-0 p-0 shadow-none bg-transparent'
-                : isTrackCrossover
-                  ? 'relative size-full border-0 p-0 shadow-none bg-transparent'
                 : isFacilityFamily
                   ? isZoneEntranceBlock
                     ? 'flex flex-col items-center justify-center rounded-md border-2 border-dashed border-cyan-400/70 bg-transparent p-1 text-zinc-100'
@@ -2863,8 +2451,6 @@ export const FacilityNode = memo(function FacilityNode({
                   ? selected
                     ? 'ring-2 ring-cyan-400/90 ring-offset-0'
                     : 'hover:ring-1 hover:ring-cyan-500/35'
-                  : isTrackCrossover
-                    ? ''
                   : isFacilityFamily
                     ? selected
                       ? 'ring-2 ring-cyan-400/95 ring-offset-0'
@@ -2878,11 +2464,6 @@ export const FacilityNode = memo(function FacilityNode({
               : '',
             isTrack && connectivityScanHighlight
               ? 'ring-2 ring-amber-400/75 ring-offset-0 outline outline-2 outline-amber-400/45'
-              : '',
-            isTrack && crossoverSnapHighlight
-              ? crossoverSnapPrimary
-                ? 'ring-2 ring-amber-300 ring-offset-0 outline outline-2 outline-amber-400/80 shadow-[0_0_18px_rgba(250,204,21,0.55)]'
-                : 'ring-2 ring-cyan-400/80 ring-offset-0 outline outline-2 outline-cyan-400/50 shadow-[0_0_14px_rgba(56,189,248,0.4)]'
               : '',
             isTrack && connectivityScanFlashing
               ? 'animate-connectivity-scan-flash-loop'
@@ -2926,32 +2507,6 @@ export const FacilityNode = memo(function FacilityNode({
                 style={roadLineStyle}
                 strokeWidthPx={roadLineWidthPx}
                 color={roadLineColor}
-              />
-            </div>
-          ) : isTrackCrossover ? (
-            <div
-              className="relative size-full overflow-visible pointer-events-none"
-              style={{ isolation: 'isolate' }}
-            >
-              <TrackCrossoverGraphic
-                width={nw}
-                height={nh}
-                portalsLocal={crossoverPortalsLocal}
-                color={trackCrossoverColor}
-                colorOpacity={trackCrossoverColorOpacity}
-                strokeWidthPx={trackCrossoverStrokeDisplay}
-                centerGapPct={trackCrossoverCenterGapPct}
-                bgColor={trackCrossoverBgColor}
-                bgOpacity={trackCrossoverBgOpacity}
-                emphasized={selected}
-                interactive={!readOnly && !!crossoverSegmentById}
-                showWidthHandles={selected && !readOnly}
-                onPortalPointerDown={onCrossoverPortalPointerDown}
-                onPortalPointerMove={onCrossoverPortalPointerMove}
-                onPortalPointerUp={onCrossoverPortalPointerEnd}
-                onWidthPointerDown={onCrossoverWidthPointerDown}
-                onWidthPointerMove={onCrossoverWidthPointerMove}
-                onWidthPointerUp={onCrossoverWidthPointerEnd}
               />
             </div>
           ) : isDockingPoint && dockingIconUrl && !dockingIconError ? (
@@ -3108,7 +2663,7 @@ export const FacilityNode = memo(function FacilityNode({
                 <Icon className="size-full" strokeWidth={1.75} />
               </div>
             )
-          ) : !isTrack && !isRoadLine && !isTrackCrossover && !isFacilityFamily && !isBasemap ? (
+          ) : !isTrack && !isRoadLine && !isFacilityFamily && !isBasemap ? (
             <div
               className="shrink-0 text-cyan-300"
               style={{ width: iconWorld, height: iconWorld }}
@@ -3167,13 +2722,13 @@ export const FacilityNode = memo(function FacilityNode({
             {label}
           </div>
         )}
-        {selected && !isTrackCrossover && (
+        {selected && (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 z-[74] border-2 border-cyan-400/95"
           />
         )}
-        {selected && !readOnly && onResize && !isTrackCrossover && (
+        {selected && !readOnly && onResize && (
           <>
             {([
               ['left', { left: -7, top: 0, width: 14, height: nh }],
@@ -3534,7 +3089,7 @@ export const FacilityNode = memo(function FacilityNode({
           * 放在右緣外側、跟著元件一起轉——工具列的 ±1 度按鈕留在原位不動，這個是
           * 給「大概轉到那個角度」用的。按住 Shift 吸到 15 度。
           */}
-        {selected && !readOnly && !isTrackCrossover && (
+        {selected && !readOnly && (
           <div
             data-facility-rotate-handle
             role="presentation"
@@ -3613,7 +3168,7 @@ export const FacilityNode = memo(function FacilityNode({
           * 接合把手：一般、圓角、斜接、分岔都有，把手就落在自己的端面中點上。
           * 拖到別條軌道的邊上放手，那一面就換成那條邊。
           */}
-        {isTrack && !isTrackCrossover && selected && !readOnly && onTrackEndCommit
+        {isTrack && selected && !readOnly && onTrackEndCommit
           ? (() => {
               const faces: Array<[string, { x: number; y: number }, string]> = isSwitchTrack
                 ? switchTrackGeom
@@ -3909,7 +3464,7 @@ export const FacilityNode = memo(function FacilityNode({
           anchorLeft={aabbBottomCenterLeft}
           anchorTop={aabbBottomPx + 6}
           showSize
-          usePx={isRoadLine || isTrackCrossover}
+          usePx={isRoadLine}
         />
       )}
 
@@ -3920,14 +3475,11 @@ export const FacilityNode = memo(function FacilityNode({
             ref={toolbarAnchorRef}
             className="pointer-events-none absolute size-0"
             style={{
-              left: crossoverMidLocal
-                ? hitPadX + crossoverMidLocal.x
-                : aabbBottomCenterLeft,
-              top: crossoverMidLocal
-                ? hitPadY + crossoverMidLocal.y + 14
-                : aabbBottomPx +
-                  (showTransformSizeOverlay ? 26 : 6) +
-                  (useDraggableMapLabel ? 28 : 0),
+              left: aabbBottomCenterLeft,
+              top:
+                aabbBottomPx +
+                (showTransformSizeOverlay ? 26 : 6) +
+                (useDraggableMapLabel ? 28 : 0),
             }}
             aria-hidden
           />
@@ -3941,14 +3493,9 @@ export const FacilityNode = memo(function FacilityNode({
             <div
               className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
               role="toolbar"
-              aria-label={
-                isTrackCrossover
-                  ? t('mapEditor.inspector.node.toolbarPath')
-                  : t('mapEditor.inspector.node.toolbarRotate')
-              }
+              aria-label={t('mapEditor.inspector.node.toolbarRotate')}
             >
-              {!isTrackCrossover ? (
-                <>
+              <>
                   <button
                     type="button"
                     title={
@@ -4004,9 +3551,8 @@ export const FacilityNode = memo(function FacilityNode({
                   >
                     <RotateCwSquare className="size-4" aria-hidden />
                   </button>
-                </>
-              ) : null}
-              {!isTrackCrossover && onStartFormatPaint && (
+              </>
+              {onStartFormatPaint && (
                 <button
                   type="button"
                   title={t('mapEditor.inspector.node.formatPaint')}

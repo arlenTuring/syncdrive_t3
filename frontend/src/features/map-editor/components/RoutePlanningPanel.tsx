@@ -32,7 +32,6 @@ function groupRouteAppendOptionsByKind(options: TopologyRouteAppendOption[]) {
     docking: options.filter((option) => option.kind === 'docking'),
     facilityDocking: options.filter((option) => option.kind === 'facility-docking'),
     waypoint: options.filter((option) => option.kind === 'waypoint'),
-    crossoverWaypoint: options.filter((option) => option.kind === 'crossover-waypoint'),
     crossWaypoint: options.filter((option) => option.kind === 'cross-waypoint'),
   }
 }
@@ -375,13 +374,6 @@ export function RoutePlanningPanel({
                             onPick={pickStation}
                           />
                           <RouteAppendOptionGroup
-                            title={t('mapEditor.routePlanning.crossoverWaypoint')}
-                            titleClassName="text-violet-400/80"
-                            options={selectableGroups.crossoverWaypoint}
-                            dropdownStationId={dropdownStationId}
-                            onPick={pickStation}
-                          />
-                          <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.crossWaypoint')}
                             titleClassName="text-teal-400/80"
                             options={selectableGroups.crossWaypoint}
@@ -415,14 +407,6 @@ export function RoutePlanningPanel({
                             title={t('mapEditor.routePlanning.waypoint')}
                             titleClassName="text-zinc-600"
                             options={disabledGroups.waypoint}
-                            disabled
-                            dropdownStationId={dropdownStationId}
-                            onPick={pickStation}
-                          />
-                          <RouteAppendOptionGroup
-                            title={t('mapEditor.routePlanning.crossoverWaypoint')}
-                            titleClassName="text-zinc-600"
-                            options={disabledGroups.crossoverWaypoint}
                             disabled
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}

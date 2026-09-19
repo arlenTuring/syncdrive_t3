@@ -51,7 +51,6 @@ import { SignalInspectorSection } from './SignalInspectorSection'
 import { DockingPointInspectorSection } from './DockingPointInspectorSection'
 import { WaypointInspectorSection } from './WaypointInspectorSection'
 import { RoadLineInspectorSection } from './RoadLineInspectorSection'
-import { TrackCrossoverInspectorSection } from './TrackCrossoverInspectorSection'
 import { CrossTrackInspectorSection } from './CrossTrackInspectorSection'
 import { TrackPartInspectorSection } from './TrackPartInspectorSection'
 import { GeofenceInspectorSection } from './GeofenceInspectorSection'
@@ -660,7 +659,7 @@ export function Inspector({
           />
         ) : null}
 
-        {onPatchParameters && facility.type !== 'RoadLine' && facility.type !== 'TrackCrossover' && (
+        {onPatchParameters && facility.type !== 'RoadLine' && (
           <InspectorSection
             title={t('mapEditor.inspector.mqtt.title')}
             className="border-amber-900/35 bg-amber-950/12"
@@ -1197,23 +1196,12 @@ export function Inspector({
             mapAreas={mapAreas}
           />
         ) : null}
-        {facility.type === 'TrackCrossover' && onPatchParameters ? (
-          <TrackCrossoverInspectorSection
-            facility={facility}
-            readOnly={readOnly}
-            onPatchParameters={onPatchParameters}
-            onFieldFocus={onFieldFocus}
-            onFieldBlur={onFieldBlur}
-            mapAreas={mapAreas}
-          />
-        ) : null}
         {facility.type !== 'Slot' &&
         facility.type !== 'Geofence' &&
         facility.type !== 'Track' &&
         facility.type !== 'Facility' &&
         facility.type !== 'Signal' &&
         facility.type !== 'RoadLine' &&
-        facility.type !== 'TrackCrossover' &&
         facility.type !== 'Waypoint' ? (
           <InspectorSection title={t('mapEditor.inspector.displayState', { type: facility.type })}>
             <select

@@ -14,7 +14,6 @@ import {
   Signal as SignalIcon,
   SquareDashed,
   TrainTrack,
-  Waypoints,
   Wrench,
   CornerDownRight,
   Spline,
@@ -47,7 +46,6 @@ export const PALETTE_ICON_BY_NAME: Record<
   DockingPoint: MapPin,
   Waypoint: CircleDot,
   RoadLine: Minus,
-  TrackCrossover: Waypoints,
   Basemap: ImageIcon,
 }
 

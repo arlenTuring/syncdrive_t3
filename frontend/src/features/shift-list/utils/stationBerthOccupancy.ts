@@ -7,7 +7,6 @@ import type { GeneratedSchedulePlan } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
 import {
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
 } from './schedule-engine/physics';
 import {
@@ -241,16 +240,14 @@ export function collectStationBerthOccupancies(
       for (let si = 0; si < stops.length; si += 1) {
         const stop = stops[si]!;
         const dwellMeta = route.stationDwells.find((d) => d.stationId === stop.stationId);
-        const isPortal =
-          looksLikeDefaultCrossoverPortalStationId(stop.stationId)
-          || (dwellMeta != null && !isStationDwellRequired(dwellMeta));
+        const isPortal = dwellMeta != null && !isStationDwellRequired(dwellMeta);
         const isTerminal = si === stops.length - 1;
         const isOrigin = si === 0;
 
         const startMinute = stop.arrivalMinute;
         let endMinute = Math.max(stop.departureMinute, stop.arrivalMinute);
 
-        // 途經／虛擬渡線且無實際停靠秒：不參與站位碰撞
+        // 途經點且無實際停靠秒：不參與站位碰撞
         if (isPortal && !isOrigin && !isTerminal && stop.dwellSeconds <= 0) {
           continue;
         }

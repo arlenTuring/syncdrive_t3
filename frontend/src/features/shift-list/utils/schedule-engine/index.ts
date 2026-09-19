@@ -44,7 +44,6 @@ export {
   areStationDwellsComplete,
   isStationDwellEntryComplete,
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   resolveStationDwellListRole,
   formatStationDwellRoleLabel,
   resolveRouteCycleSeconds,

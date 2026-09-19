@@ -109,7 +109,6 @@ const FACILITY_TYPES = [
   'DockingPoint',
   'Waypoint',
   'RoadLine',
-  'TrackCrossover',
   'Basemap',
   'Zone',
 ] as const
@@ -274,6 +273,12 @@ function parseFacilityEntryMeters(
   const migratedEntry = migrateMisclassifiedSmartPoleEntry(entry)
   const rawType = String(migratedEntry.type)
   const type = migrateFacilityType(rawType)
+  if (rawType === 'TrackCrossover') {
+    // 虛擬渡線已由交叉軌道取代並移除；明講原因，比「不支援的 type」好找
+    throw new Error(
+      `第 ${index + 1} 筆設施: 虛擬渡線（TrackCrossover）已移除，這張地圖要改用交叉軌道重新製作`,
+    )
+  }
   if (!FACILITY_TYPES.includes(rawType as (typeof FACILITY_TYPES)[number]) && type !== 'Facility') {
     throw new Error(`第 ${index + 1} 筆設施: 不支援的 type「${rawType}」`)
   }

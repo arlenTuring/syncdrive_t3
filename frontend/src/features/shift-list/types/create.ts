@@ -56,7 +56,6 @@ import {
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   resolveStationDwellListRole,
   formatStationDwellRoleLabel,
 } from '../utils/schedule-engine/physics';
@@ -122,7 +121,6 @@ export {
   resolveRouteRotationMinSeconds,
   buildRouteGroupsParamsFingerprint,
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   resolveStationDwellListRole,
   formatStationDwellRoleLabel,
 };
@@ -221,7 +219,7 @@ export type ShiftScheduleStationDwell = {
    * 停靠秒數。
    * - dwellMode=seconds：必填正整數
    * - no_stop／line_change：固定 0，且不加靠站緩衝
-   * - 首站／虛擬渡線等 dwellRequired=false：固定 0
+   * - 首站／途經點等 dwellRequired=false：固定 0
    */
   dwellSeconds: number | null;
   /**
@@ -231,7 +229,7 @@ export type ShiftScheduleStationDwell = {
   dwellMode?: ShiftStationDwellMode;
   /**
    * 是否需填寫停靠時間。
-   * false＝首站（出發）／虛擬渡線端點等（僅顯示「首站／途經」，不設秒數）。
+   * false＝首站（出發）／途經點等（僅顯示「首站／途經」，不設秒數）。
    */
   dwellRequired?: boolean;
 };
@@ -504,8 +502,7 @@ export function emptyStationDwellsFromIds(
 ): ShiftScheduleStationDwell[] {
   return stationIds.map((stationId, index) => {
     const isOrigin = index === 0;
-    const isCrossover = looksLikeDefaultCrossoverPortalStationId(stationId);
-    if (isOrigin || isCrossover) {
+    if (isOrigin) {
       return {
         stationId,
         stationName: stationNameById?.get(stationId) ?? stationId,
@@ -932,12 +929,12 @@ function parseStationDwells(
         dwellSeconds = 0;
       } else if (typeof dwellRaw === 'number' && Number.isFinite(dwellRaw)) {
         const rounded = Math.round(dwellRaw);
-        if (dwellRequired === false || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+        if (dwellRequired === false) {
           dwellSeconds = Math.max(0, rounded);
         } else if (rounded > 0) {
           dwellSeconds = rounded;
         }
-      } else if (dwellRequired === false || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+      } else if (dwellRequired === false) {
         dwellSeconds = 0;
       }
       byId.set(stationId, {
@@ -971,7 +968,7 @@ function parseStationDwells(
       }
       return existing;
     }
-    if (index === 0 || looksLikeDefaultCrossoverPortalStationId(stationId)) {
+    if (index === 0) {
       return {
         stationId,
         stationName: stationId,

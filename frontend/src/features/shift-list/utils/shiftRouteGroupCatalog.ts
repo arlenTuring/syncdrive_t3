@@ -16,7 +16,7 @@ import {
   resolveFacilityDockingPointListTitle,
 } from '../../map-editor/utils/facilityDockingPoint';
 import { parsePositiveRouteSeconds } from '../../map-editor/utils/routePlanning';
-import { collectCrossoverPortalWaypointsFromAreas, collectCrossPortalWaypointsFromAreas } from '../../map-editor/utils/waypointCode';
+import { collectCrossPortalWaypointsFromAreas } from '../../map-editor/utils/waypointCode';
 import {
   buildMaintenanceFirstTripOriginsFromTopology,
   type MaintenanceFirstTripOrigin,
@@ -32,7 +32,7 @@ export type ShiftRouteOption = {
   stationPathLabel: string;
   stationIds: string[];
   stationNames: string[];
-  /** 與 stationIds 對齊：false＝虛擬渡線端點，不停靠、不需填停靠時間 */
+  /** 與 stationIds 對齊：false＝途經點（交叉軌道的口），不停靠、不需填停靠時間 */
   stationDwellRequired?: boolean[];
   avgTravelTimeSeconds: number | null;
   minTravelTimeSeconds: number | null;
@@ -143,13 +143,13 @@ function collectFacilityDockingStationNames(
 function buildRouteOption(
   route: MapPlannedRoute,
   stationNameById: Map<string, string>,
-  crossoverStationIds: ReadonlySet<string>,
+  waypointStationIds: ReadonlySet<string>,
   areas: MapAreaObject[],
   topology: PointTopology,
 ): ShiftRouteOption {
   const stationNames = route.stationIds.map((id) => stationNameById.get(id) ?? id);
   const stationPathLabel = stationNames.join(' → ') || '（無有效站點）';
-  const stationDwellRequired = route.stationIds.map((id) => !crossoverStationIds.has(id));
+  const stationDwellRequired = route.stationIds.map((id) => !waypointStationIds.has(id));
   const fromTopology = buildStationLegTravelsFromTopology(
     topology,
     areas,
@@ -218,9 +218,6 @@ export async function loadShiftRouteGroupCatalog(
   const stationNameById = new Map(
     stations.map((s) => [s.stationId, s.stationName]),
   );
-  for (const waypoint of collectCrossoverPortalWaypointsFromAreas(parsed.areas)) {
-    stationNameById.set(waypoint.stationId, waypoint.stationName);
-  }
   for (const waypoint of collectCrossPortalWaypointsFromAreas(parsed.areas)) {
     stationNameById.set(waypoint.stationId, waypoint.stationName);
   }
@@ -234,16 +231,16 @@ export async function loadShiftRouteGroupCatalog(
   for (const dock of collectFacilityDockingStationNames(parsed.areas)) {
     stationNameById.set(dock.stationId, dock.stationName);
   }
-  const crossoverStationIds = new Set([
-    ...collectCrossoverPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
-    ...collectCrossPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
-  ]);
+  // 交叉軌道的四個口是途經點，不停靠
+  const waypointStationIds = new Set(
+    collectCrossPortalWaypointsFromAreas(parsed.areas).map((w) => w.stationId),
+  );
 
   const groups: ShiftRouteGroupCatalogItem[] = sections.map(({ group, routes: groupRoutes }) => ({
     groupId: group.groupId,
     groupName: group.displayName,
     routes: groupRoutes.map((route) =>
-      buildRouteOption(route, stationNameById, crossoverStationIds, parsed.areas, topology),
+      buildRouteOption(route, stationNameById, waypointStationIds, parsed.areas, topology),
     ),
   }));
 
@@ -252,7 +249,7 @@ export async function loadShiftRouteGroupCatalog(
       groupId: '__ungrouped__',
       groupName: '未分組路線',
       routes: ungrouped.map((route) =>
-        buildRouteOption(route, stationNameById, crossoverStationIds, parsed.areas, topology),
+        buildRouteOption(route, stationNameById, waypointStationIds, parsed.areas, topology),
       ),
     });
   }

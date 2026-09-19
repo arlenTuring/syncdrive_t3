@@ -1,7 +1,6 @@
 import type { MapAreaObject } from '../types/area'
 import { collectStationsFromAreas } from './dockingPointStationId'
 import {
-  resolveCrossoverPortalRouteStopMapPx,
   resolveCrossPortalRouteStopMapPx,
   resolveDockingPointNodeMapPx,
   resolveFacilityDockingRouteStopMapPx,
@@ -10,31 +9,16 @@ import {
   type RouteStationPoint,
 } from './routePlanning'
 import {
-  collectCrossoverPortalWaypointsFromAreas,
   collectCrossPortalWaypointsFromAreas,
   collectWaypointsFromAreas,
 } from './waypointCode'
-import {
-  getCrossoverPortals,
-  parseCrossoverPortalTopologyNodeId,
-} from './trackCrossoverFacility'
-import {
-  areaPositionToCssTopLeft,
-  meterToAreaLocalPx,
-} from './areaCoords'
 import {
   buildContinuousChainPathForTrackIds,
   buildTrackRoutingContext,
   fieldPointToMapPx,
   sampleTrackSegmentBetweenFieldPoints,
 } from './trackConnectivityScan'
-import {
-  adjWithCrossoverBridges,
-  buildMapPathBetweenTrackSnaps,
-  collectCrossoverBridges,
-  indexCrossoverBridges,
-  type CrossoverBridge,
-} from './trackCrossoverRouting'
+import { buildMapPathBetweenTrackSnaps } from './trackSnapPath'
 import {
   findRefFieldSegmentsAtPoint,
   pickRefFieldSegment,
@@ -417,16 +401,13 @@ export function ensureRightAnglePathPx(
 
 /**
  * 兩站連線（順序＝路線站序／畫面編號）：
- * - 沿實體軌道鄰接尋路
- * - 已接合的虛擬渡線可作為軌道圖橋（只認 attachedTrackId，不發明上下行）
- * - 虛擬渡線站序明示 A/B 另段處理
+ * 沿實體軌道鄰接尋路。
  */
 function resolveOnTrackLegPoints(
   segmentById: Map<string, TrackNetworkSegment>,
   adj: Map<string, Set<string>>,
   from: TrackSnap,
   to: TrackSnap,
-  bridgesByKey: Map<string, CrossoverBridge[]> = new Map(),
 ): Array<{ x: number; y: number }> | null {
   if (from.trackId === to.trackId) {
     const seg = segmentById.get(from.trackId)
@@ -443,7 +424,6 @@ function resolveOnTrackLegPoints(
   const points = buildMapPathBetweenTrackSnaps(
     trackPath,
     segmentById,
-    bridgesByKey,
     from,
     to,
     buildContinuousChainPathForTrackIds,
@@ -508,7 +488,6 @@ function resolveTopologyAssistedTrackLegPx(
   toStationId: string,
   segmentById: Map<string, TrackNetworkSegment>,
   adj: Map<string, Set<string>>,
-  bridgesByKey: Map<string, CrossoverBridge[]>,
 ): Array<{ x: number; y: number }> | null {
   const breakdown = buildTopologyStationLegBreakdown(
     topology,
@@ -523,16 +502,11 @@ function resolveTopologyAssistedTrackLegPx(
   for (const nodeId of breakdown.nodePath) {
     const field = resolveTopologyNodeFieldMeters(areas, nodeId, topology)
     if (!field) continue
-    const prefer = resolvePreferTrackIdForStation(areas, nodeId)
-      ?? resolvePreferTrackIdForStation(
-        areas,
-        topology.nodes.find((n) => n.id === nodeId)?.stationId ?? '',
-      )
     const snap = snapFieldPointToTrackForStop(
       field.xM,
       field.yM,
       segmentById,
-      prefer,
+      null,
       continuityTrackId,
     )
     if (snap) {
@@ -550,7 +524,6 @@ function resolveTopologyAssistedTrackLegPx(
       adj,
       snaps[i]!,
       snaps[i + 1]!,
-      bridgesByKey,
     )
     if (!hop || hop.length < 2) continue
     appendPathPoints(out, hop)
@@ -562,7 +535,7 @@ function resolveTopologyAssistedTrackLegPx(
 
 /**
  * 依已接合軌道／最近軌道吸附。不做上下行等語意偏好（泛用圖台只認幾何）。
- * 有 preferTrackId（渡線 attachedTrackId）時以接合為準，不因偏離中心線而放棄。
+ * 有 preferTrackId 時以它為準，不因偏離中心線而放棄。
  * continuityTrackId：路線上一站已吸附的軌道；兩站同走廊（如 U02 的 2→3）優先續吸同股，
  * 避免第二點因橫向微偏被吸到對向股而畫出垂直跳線。
  */
@@ -652,36 +625,6 @@ function snapFieldPointToTrackForStop(
   return nearest
 }
 
-function resolvePreferTrackIdForStation(
-  areas: MapAreaObject[],
-  stationId: string,
-): string | null {
-  const crossover = collectCrossoverPortalWaypointsFromAreas(areas).find(
-    (s) => s.stationId === stationId || s.topologyNodeId === stationId,
-  )
-  if (crossover) {
-    for (const area of areas) {
-      const facility = area.facilities.find((f) => f.id === crossover.facilityId)
-      if (facility?.type !== 'TrackCrossover') continue
-      const portals = getCrossoverPortals(facility)
-      const portal = portals?.[crossover.portalKey]
-      const attached = portal?.attachedTrackId?.trim()
-      if (attached) return attached
-    }
-  }
-  const topo = parseCrossoverPortalTopologyNodeId(stationId)
-  if (topo) {
-    for (const area of areas) {
-      const facility = area.facilities.find((f) => f.id === topo.facilityId)
-      if (facility?.type !== 'TrackCrossover') continue
-      const portals = getCrossoverPortals(facility)
-      const attached = portals?.[topo.key]?.attachedTrackId?.trim()
-      if (attached) return attached
-    }
-  }
-  return null
-}
-
 function pathLengthPx(points: Array<{ x: number; y: number }>): number {
   let len = 0
   for (let i = 0; i < points.length - 1; i++) {
@@ -744,64 +687,13 @@ function mapPxToRefFieldMeters(
   return { xM: best.xM, yM: best.yM }
 }
 
-/**
- * 站序相鄰兩點是否為同一虛擬渡線的 A／B 端點；若是則回傳渡線道路折線（圖台 px）。
- * 方向依路線站序（from → to），不自動幫其他站間段走渡線。
- */
-export function resolveExplicitCrossoverPortalLegPathPx(
-  areas: MapAreaObject[],
-  fromStationId: string,
-  toStationId: string,
-): Array<{ x: number; y: number }> | null {
-  const portals = collectCrossoverPortalWaypointsFromAreas(areas)
-  const from = portals.find(
-    (s) => s.stationId === fromStationId || s.topologyNodeId === fromStationId,
-  )
-  const to = portals.find(
-    (s) => s.stationId === toStationId || s.topologyNodeId === toStationId,
-  )
-  if (!from || !to) return null
-  if (from.facilityId !== to.facilityId) return null
-  if (from.portalKey === to.portalKey) return null
-
-  const mapPxForPortal = (
-    stop: (typeof portals)[number],
-  ): { x: number; y: number } | null => {
-    const viaStop = resolveCrossoverPortalRouteStopMapPx(areas, stop.stationId)
-    if (viaStop) return { x: viaStop.x, y: viaStop.y }
-    const area = areas.find((a) => a.id === stop.areaId)
-    if (!area) return null
-    const local = meterToAreaLocalPx(stop.xM, stop.yM, area.domain, area.layout)
-    const css = areaPositionToCssTopLeft(local, { w: 0, h: 0 }, area.layout.hPx)
-    return {
-      x: area.layout.xPx + css.left,
-      y: area.layout.yPx + css.top,
-    }
-  }
-
-  const fromStop = mapPxForPortal(from)
-  const toStop = mapPxForPortal(to)
-  if (!fromStop || !toStop) return null
-
-  const steps = 10
-  const out: Array<{ x: number; y: number }> = []
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    out.push({
-      x: fromStop.x + (toStop.x - fromStop.x) * t,
-      y: fromStop.y + (toStop.y - fromStop.y) * t,
-    })
-  }
-  return out.length >= 2 ? collapseColinearPathPx(out) : null
-}
-
 function stitchBadgeToTrackPath(
   fromPx: { x: number; y: number },
   trackPoints: Array<{ x: number; y: number }>,
   toPx: { x: number; y: number },
   options?: { allowLongStub?: boolean },
 ): Array<{ x: number; y: number }> | null {
-  // 中段保留軌道路徑（含明示渡線對角）；不可整段強制直角，否則會把交叉道折成 L
+  // 中段保留軌道路徑（含交叉軌道的對角線）；不可整段強制直角，否則會把交叉道折成 L
   const mid = collapseColinearPathPx(trackPoints)
   if (mid.length < 1) {
     if (options?.allowLongStub) {
@@ -839,16 +731,9 @@ function resolveLegPathPx(
   adj: Map<string, Set<string>>,
   from: TrackSnap,
   to: TrackSnap,
-  bridgesByKey: Map<string, CrossoverBridge[]> = new Map(),
 ): { points: Array<{ x: number; y: number }>; onTrack: boolean } {
-  // 供 canConnectStationsViaTrack 使用：僅實體軌道（可含渡線橋）
-  const points = resolveOnTrackLegPoints(
-    segmentById,
-    adj,
-    from,
-    to,
-    bridgesByKey,
-  )
+  // 供 canConnectStationsViaTrack 使用：僅實體軌道
+  const points = resolveOnTrackLegPoints(segmentById, adj, from, to)
   if (!points) {
     return {
       points: [],
@@ -907,14 +792,6 @@ function resolveStationFieldMeters(
   )
   if (waypoint) return { xM: waypoint.xM, yM: waypoint.yM }
 
-  const crossover = collectCrossoverPortalWaypointsFromAreas(areas).find(
-    (s) => s.stationId === stationId || s.topologyNodeId === stationId,
-  )
-  if (crossover) return { xM: crossover.xM, yM: crossover.yM }
-
-  const crossoverPx = resolveCrossoverPortalRouteStopMapPx(areas, stationId)
-  if (crossoverPx) return { xM: crossoverPx.xM, yM: crossoverPx.yM }
-
   const cross = collectCrossPortalWaypointsFromAreas(areas).find(
     (s) => s.stationId === stationId || s.topologyNodeId === stationId,
   )
@@ -942,8 +819,7 @@ function stationMapPxAtIndex(
 /**
  * 路線預覽連線（順序＝使用者加入的站序＝畫面 1,2,3,4…）：
  *
- * - 軌道連軌道：沿實體軌道鄰接；已接合渡線可橋接
- * - 渡線連渡線：站序連續經過同一虛擬渡線 A／B
+ * - 軌道連軌道：沿實體軌道鄰接
  * - 拓樸有途經點時：沿途經點串接貼軌
  * - 仍不相通 → 紅虛線斷線標示
  */
@@ -967,20 +843,12 @@ export function resolveRoutePreviewGeometry(
 
   const network = buildTrackNetwork(areas)
   const hasTracks = uniqueSegments(network.segments).length > 0
-  const { segmentById, adj: adjPhysical } = hasTracks
+  const { segmentById, adj } = hasTracks
     ? buildTrackRoutingContext(areas)
     : {
         segmentById: new Map<string, TrackNetworkSegment>(),
         adj: new Map<string, Set<string>>(),
       }
-
-  const bridges = hasTracks
-    ? collectCrossoverBridges(areas, segmentById)
-    : []
-  const bridgesByKey = indexCrossoverBridges(bridges)
-  const adj = hasTracks
-    ? adjWithCrossoverBridges(adjPhysical, bridges)
-    : adjPhysical
 
   const fields = stationIds.map((stationId) =>
     hasTracks ? resolveStationFieldMeters(areas, stationId) : null,
@@ -989,7 +857,6 @@ export function resolveRoutePreviewGeometry(
   const snaps: Array<TrackSnap | null> = []
   let continuityTrackId: string | null = null
   for (let i = 0; i < stationIds.length; i++) {
-    const stationId = stationIds[i]!
     if (!hasTracks) {
       snaps.push(null)
       continue
@@ -1000,12 +867,11 @@ export function resolveRoutePreviewGeometry(
       continuityTrackId = null
       continue
     }
-    const preferTrackId = resolvePreferTrackIdForStation(areas, stationId)
     const snap = snapFieldPointToTrackForStop(
       field.xM,
       field.yM,
       segmentById,
-      preferTrackId,
+      null,
       continuityTrackId,
     )
     snaps.push(snap)
@@ -1040,23 +906,13 @@ export function resolveRoutePreviewGeometry(
     let points: Array<{ x: number; y: number }> | null = null
     let onTrack = false
 
-    // 1) 站序明示：同一虛擬渡線 A↔B
-    const xoLeg = resolveExplicitCrossoverPortalLegPathPx(areas, fromId, toId)
-    if (xoLeg && xoLeg.length >= 2) {
-      points = stitchBadgeToTrackPath(fromPx, xoLeg, toPx, {
-        allowLongStub: true,
-      })
-      onTrack = points != null && points.length >= 2
-    }
-
-    // 2) 實體軌道（含已接合渡線橋）
-    if (!onTrack && fromSnap && toSnap) {
+    // 1) 實體軌道
+    if (fromSnap && toSnap) {
       const physical = resolveOnTrackLegPoints(
         segmentById,
         adj,
         fromSnap,
         toSnap,
-        bridgesByKey,
       )
       if (physical && physical.length >= 2) {
         const strict = stitchBadgeToTrackPath(fromPx, physical, toPx)
@@ -1073,7 +929,7 @@ export function resolveRoutePreviewGeometry(
       }
     }
 
-    // 3) 拓樸途經點串接貼軌（直連兩端失敗時補上）
+    // 2) 拓樸途經點串接貼軌（直連兩端失敗時補上）
     if (!onTrack && pointTopology && hasTracks) {
       const assisted = resolveTopologyAssistedTrackLegPx(
         areas,
@@ -1082,7 +938,6 @@ export function resolveRoutePreviewGeometry(
         toId,
         segmentById,
         adj,
-        bridgesByKey,
       )
       if (assisted && assisted.length >= 2) {
         const stitched = stitchBadgeToTrackPath(fromPx, assisted, toPx, {
@@ -1115,7 +970,7 @@ export function resolveRoutePreviewGeometry(
             ? '起點無法吸附至軌道'
             : !toSnap
               ? '終點無法吸附至軌道'
-              : '無連續軌道路徑（請確認中間軌道銜接，或將渡線兩端加入站序）'
+              : '無連續軌道路徑（請確認中間軌道銜接，或將交叉軌道的口加入站序）'
       warnings.push({
         fromStationId: fromId,
         toStationId: toId,
@@ -1159,7 +1014,6 @@ function canConnectStationsViaTrack(
   adj: Map<string, Set<string>>,
   from: { xM: number; yM: number },
   to: { xM: number; yM: number },
-  bridgesByKey: Map<string, CrossoverBridge[]> = new Map(),
 ): { ok: boolean; reason?: string } {
   const fromResult = stationSnapOrReason(from.xM, from.yM, segmentById)
   const toResult = stationSnapOrReason(to.xM, to.yM, segmentById)
@@ -1174,7 +1028,6 @@ function canConnectStationsViaTrack(
     adj,
     fromResult.snap,
     toResult.snap,
-    bridgesByKey,
   )
   if (!leg.onTrack) {
     return { ok: false, reason: '無連續軌道路徑' }
@@ -1205,10 +1058,7 @@ export function partitionStationsForRouteAppend(
     }
   }
 
-  const { segmentById, adj: adjPhysical } = buildTrackRoutingContext(areas)
-  const bridges = collectCrossoverBridges(areas, segmentById)
-  const bridgesByKey = indexCrossoverBridges(bridges)
-  const adj = adjWithCrossoverBridges(adjPhysical, bridges)
+  const { segmentById, adj } = buildTrackRoutingContext(areas)
   const byId = new Map(all.map((s) => [s.stationId, s]))
   const selectable: RouteStationAppendOption[] = []
   const disabled: RouteStationAppendOption[] = []
@@ -1243,7 +1093,6 @@ export function partitionStationsForRouteAppend(
       adj,
       { xM: lastStation.xM, yM: lastStation.yM },
       { xM: candidate.xM, yM: candidate.yM },
-      bridgesByKey,
     )
     if (result.ok) {
       selectable.push({

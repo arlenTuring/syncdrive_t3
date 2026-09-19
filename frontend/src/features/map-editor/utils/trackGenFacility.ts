@@ -90,7 +90,6 @@ export type TrackGenSettings = {
   blockLengthM: number
   /** 區塊標籤字級，0 表示隱藏 */
   labelSizePx: number
-  showCrossovers: boolean
   showSidings: boolean
 }
 
@@ -107,7 +106,6 @@ export const DEFAULT_TRACKGEN_SETTINGS: TrackGenSettings = {
   cornerRadiusM: 57,
   blockLengthM: 50,
   labelSizePx: 16,
-  showCrossovers: true,
   showSidings: true,
 }
 

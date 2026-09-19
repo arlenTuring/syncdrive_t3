@@ -305,7 +305,7 @@ describe('mapFileJson', () => {
     assert.equal(doc.areas[0]?.facilities[0]?.id, 'trk-no-anchor')
   })
 
-  it('round-trips TrackCrossover portals, facilityDockingPoint, and topology kinds', () => {
+  it('round-trips RailCross portals, facilityDockingPoint, and topology kinds', () => {
     const facilities = [
       baseFacility({
         id: 'fac-p1',
@@ -322,27 +322,23 @@ describe('mapFileJson', () => {
         },
       }),
       baseFacility({
-        id: 'xo-3',
-        type: 'TrackCrossover',
-        name: 'TrackCrossover',
+        id: 'cross-3',
+        type: 'Track',
+        name: 'RailCross',
         currentState: 'Normal',
         parameters: {
-          trackCrossoverColor: '#94a3b8',
-          trackCrossoverStrokePx: 12,
-          trackCrossoverPortals: {
-            a: {
+          crossTrackPortals: {
+            lt: {
+              waypointCode: 'go_end',
+              alias: '下行轉S2W正線終點',
               xM: 40,
               yM: 20,
-              attachedTrackId: 'trk-u',
-              waypointCode: 'xo_3_a',
-              alias: '下行轉S2W正線終點',
             },
-            b: {
+            rb: {
+              waypointCode: 'go_start',
+              alias: '下行轉S2W正線起點',
               xM: 40,
               yM: 40,
-              attachedTrackId: 'trk-d',
-              waypointCode: 'xo_3_b',
-              alias: '下行轉S2W正線起點',
             },
           },
         },
@@ -366,12 +362,12 @@ describe('mapFileJson', () => {
       facilities,
     }
 
-    const doc = buildMapFileV2('map-xo', '渡線與拓撲', DEFAULT_MAP_PIXEL_SIZE, [area], {
+    const doc = buildMapFileV2('map-cross', '交叉軌道與拓撲', DEFAULT_MAP_PIXEL_SIZE, [area], {
       routes: [
         {
           routeId: 'route-down',
           displayName: '下行',
-          stationIds: ['fdock:fac-p1', 'station_2', 'xo_3_b'],
+          stationIds: ['fdock:fac-p1', 'station_2', 'go_start'],
           avgTravelTimeSeconds: 180,
           minTravelTimeSeconds: 150,
         },
@@ -400,10 +396,10 @@ describe('mapFileJson', () => {
             color: '#22c55e',
           },
           {
-            id: 'xowp:xo-3:b',
-            kind: 'crossover-waypoint',
+            id: 'xcwp:cross-3:rb',
+            kind: 'cross-waypoint',
             label: '下行轉S2W正線起點',
-            stationId: 'xo_3_b',
+            stationId: 'go_start',
             x: 50,
             y: 60,
             color: '#2a9fbf',
@@ -423,7 +419,7 @@ describe('mapFileJson', () => {
           {
             id: 'e2',
             fromNodeId: 'dock-2',
-            toNodeId: 'xowp:xo-3:b',
+            toNodeId: 'xcwp:cross-3:rb',
             minTravelTimeSeconds: 140,
             avgTravelTimeSeconds: 170,
             distanceMeters: 810,
@@ -446,17 +442,15 @@ describe('mapFileJson', () => {
       },
     )
 
-    const xo = parsed.areas[0]!.facilities.find((f) => f.id === 'xo-3')
-    assert.equal(xo?.type, 'TrackCrossover')
-    const portals = xo?.parameters?.trackCrossoverPortals as {
-      a: { waypointCode: string; attachedTrackId: string; alias?: string }
-      b: { waypointCode: string; attachedTrackId: string; alias?: string }
+    const cross = parsed.areas[0]!.facilities.find((f) => f.id === 'cross-3')
+    assert.equal(cross?.name, 'RailCross')
+    const portals = cross?.parameters?.crossTrackPortals as {
+      lt: { waypointCode: string; alias?: string }
+      rb: { waypointCode: string; alias?: string }
     }
-    assert.equal(portals.a.waypointCode, 'xo_3_a')
-    assert.equal(portals.b.waypointCode, 'xo_3_b')
-    assert.equal(portals.a.attachedTrackId, 'trk-u')
-    assert.equal(portals.b.attachedTrackId, 'trk-d')
-    assert.equal(portals.b.alias, '下行轉S2W正線起點')
+    assert.equal(portals.lt.waypointCode, 'go_end')
+    assert.equal(portals.rb.waypointCode, 'go_start')
+    assert.equal(portals.rb.alias, '下行轉S2W正線起點')
 
     const fac = parsed.areas[0]!.facilities.find((f) => f.id === 'fac-p1')
     assert.deepEqual(fac?.parameters?.facilityDockingPoint, { xM: 5, yM: 4 })
@@ -470,12 +464,33 @@ describe('mapFileJson', () => {
     assert.equal(edge1?.curveOffsetX, 12)
     assert.equal(edge1?.curveOffsetY, -4)
 
-    const rebuiltXo = rebuilt.areas[0]!.facilities.find((f) => f.id === 'xo-3')
+    const rebuiltCross = rebuilt.areas[0]!.facilities.find((f) => f.id === 'cross-3')
     assert.deepEqual(
-      rebuiltXo?.parameters?.trackCrossoverPortals,
-      xo?.parameters?.trackCrossoverPortals,
+      rebuiltCross?.parameters?.crossTrackPortals,
+      cross?.parameters?.crossTrackPortals,
     )
     assert.equal(rebuilt.pointTopology?.edges.length, 2)
+  })
+
+  it('舊圖的虛擬渡線（TrackCrossover）讀不進來，錯誤訊息說明已移除', () => {
+    const area = {
+      ...createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE),
+      facilities: [
+        baseFacility({
+          id: 'xo-old',
+          type: 'Track',
+          name: 'Rail',
+          currentState: 'Normal',
+          parameters: {},
+        }),
+      ],
+    }
+    const doc = JSON.parse(
+      JSON.stringify(buildMapFileV2('map-old', '舊圖', DEFAULT_MAP_PIXEL_SIZE, [area])),
+    ) as { areas: Array<{ facilities: Array<Record<string, unknown>> }> }
+    doc.areas[0]!.facilities[0]!.type = 'TrackCrossover'
+    doc.areas[0]!.facilities[0]!.name = 'TrackCrossover'
+    assert.throws(() => parseMapFileJson(doc), /虛擬渡線.*已移除/)
   })
 
   it('round-trips visibleRouteIds and does not force all visible when missing', () => {

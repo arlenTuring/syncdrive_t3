@@ -49,12 +49,11 @@ describe('collectThroughStationOptions grouping', () => {
       makeRoute({
         instanceId: 'A',
         routeId: 'A',
-        stationIds: ['s1', 's2', 'fdock:p1', 'xowp:xo:a'],
+        stationIds: ['s1', 's2', 'fdock:p1'],
         stationNames: [
           '[備用]N2W上行停靠',
           '[備用]S2W下行出發',
           'P1停靠點',
-          '渡線A',
         ],
       }),
     ]);
@@ -63,7 +62,6 @@ describe('collectThroughStationOptions grouping', () => {
       '備用 · 上行',
       '備用 · 下行',
       '設施停靠點',
-      '渡線途經點',
     ]);
   });
 });

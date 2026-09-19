@@ -33,7 +33,7 @@ export type SnapLine = {
   kind: 'track' | 'point'
 }
 
-/** 橫渡線那種斜的線段，只能整段投影上去，沒辦法拆成 x／y 兩軸 */
+/** 交叉軌道的對角線那種斜的線段，只能整段投影上去，沒辦法拆成 x／y 兩軸 */
 export type SnapSegment = {
   ax: number
   ay: number
@@ -58,14 +58,14 @@ type RoutePathOverlayProps = {
   points: EditPoint[]
   /** 這個點有沒有落在方塊上；false 會標紅，因為它存不進去 */
   isOnField: (p: { x: number; y: number }) => boolean
-  /** 拖曳時可以吸附的東西：軌道中心線與橫渡線 */
+  /** 拖曳時可以吸附的東西：軌道中心線與交叉軌道的對角線 */
   snapTargets: SnapTargets
   /** 對齊線要畫多長——畫滿整張圖，才看得出來是跟哪一條軌道對齊 */
   bounds: { left: number; top: number; right: number; bottom: number }
   onChange: (next: EditPoint[]) => void
   /**
    * 車輛實際照著走的虛擬路徑點（等距樣點）。只顯示、不能拖也不能刪——
-   * 用來核對折線有沒有沿軌道／渡線，還是弦切過空地。
+   * 用來核對折線有沒有沿軌道／對角線，還是弦切過空地。
    */
   vehicleSamples?: Array<{ px: number; py: number }>
 }
@@ -221,7 +221,7 @@ export function SimRoutePathOverlay({
    * 相鄰點也當成吸附目標，是為了<strong>平行</strong>：跟前一點齊平，這一段就是正橫；
    * 跟後一點對齊，下一段就是正直。
    *
-   * 兩軸都沒吸到才試橫渡線——那是斜的，只能整個點投影上去，沒辦法拆成兩軸。
+   * 兩軸都沒吸到才試交叉軌道的對角線——那是斜的，只能整個點投影上去，沒辦法拆成兩軸。
    */
   const snap = (x: number, y: number, index: number): { x: number; y: number; guide: ActiveGuide } => {
     const tolerance = u(9)

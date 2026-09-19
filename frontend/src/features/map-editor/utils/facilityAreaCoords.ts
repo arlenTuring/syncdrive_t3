@@ -20,10 +20,6 @@ import {
   parseRoadLineWidthPx,
   resolveRoadLineAreaHeightPx,
 } from './roadLineFacility'
-import {
-  crossoverPortalsAabb,
-  getCrossoverPortals,
-} from './trackCrossoverFacility'
 import { normalizeDegrees, resolveRotatedRectAabb } from './rotation'
 
 export type AreaLayoutAnchor = { wPx: number; hPx: number }
@@ -116,18 +112,6 @@ export function resolveFacilityAreaSize(
     return {
       w: base.w,
       h: resolveRoadLineAreaHeightPx(base.h, sw),
-    }
-  }
-  if (f.type === 'TrackCrossover') {
-    const portals = getCrossoverPortals(f)
-    if (portals) {
-      const aabb = crossoverPortalsAabb(portals)
-      return meterSizeToAreaLocalPx(
-        Math.max(0.5, aabb.xMaxM - aabb.xMinM),
-        Math.max(0.5, aabb.yMaxM - aabb.yMinM),
-        domain,
-        layout,
-      )
     }
   }
   if (hasStoredAreaSizePx(asp)) {

@@ -3,10 +3,8 @@ import { describe, it } from 'node:test'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import {
-  collectCrossoverPortalWaypointsFromAreas,
-  generateNextCrossoverPortalCodes,
+  collectWaypointCodes,
   isWaypointCodeTaken,
-  patchCrossoverPortalWaypointCode,
 } from './waypointCode'
 
 function facility(
@@ -37,61 +35,59 @@ function areasWith(...facilities: FacilityObject[]): MapAreaObject[] {
   ]
 }
 
-describe('waypointCode crossover portals', () => {
-  it('generates unique xo_n_a / xo_n_b codes', () => {
-    const areas = areasWith(
-      facility({
-        id: 'wp1',
-        type: 'Waypoint',
-        parameters: { waypointCode: 'xo_1_a' },
-      }),
-    )
-    const pair = generateNextCrossoverPortalCodes(areas)
-    assert.equal(pair.a, 'xo_2_a')
-    assert.equal(pair.b, 'xo_2_b')
-  })
-
-  it('treats crossover portal codes as globally unique with waypoints', () => {
-    const areas = areasWith(
-      facility({
-        id: 'xo1',
-        type: 'TrackCrossover',
-        parameters: {
-          trackCrossoverPortals: {
-            a: { xM: 0, yM: 0, attachedTrackId: null, waypointCode: 'xo_1_a' },
-            b: { xM: 1, yM: 1, attachedTrackId: null, waypointCode: 'xo_1_b' },
-          },
+describe('waypointCode cross portals', () => {
+  const rail = () =>
+    facility({
+      id: 'cross1',
+      type: 'Track',
+      name: 'RailCross',
+      parameters: {
+        crossTrackPortals: {
+          lt: { waypointCode: 'n2w_go_end' },
+          lb: { waypointCode: 'n2w_back_start' },
+          rt: { waypointCode: 'n2w_back_end' },
+          rb: { waypointCode: 'n2w_go_start' },
         },
-      }),
+      },
+    })
+
+  it('交叉軌道四個口的代號跟一般途經點共用同一組，不能重複', () => {
+    const areas = areasWith(
+      rail(),
       facility({
         id: 'wp1',
         type: 'Waypoint',
         parameters: { waypointCode: 'WP1' },
       }),
     )
-
-    assert.equal(isWaypointCodeTaken(areas, 'xo_1_a'), true)
+    assert.equal(isWaypointCodeTaken(areas, 'n2w_go_end'), true)
     assert.equal(isWaypointCodeTaken(areas, 'WP1'), true)
+    assert.equal(isWaypointCodeTaken(areas, 'unused_code'), false)
+  })
+
+  it('編輯某一個口自己的代號時，不算撞自己', () => {
+    const areas = areasWith(rail())
     assert.equal(
-      isWaypointCodeTaken(areas, 'xo_1_a', {
-        crossoverPortal: { facilityId: 'xo1', key: 'a' },
+      isWaypointCodeTaken(areas, 'n2w_go_end', {
+        crossPortal: { facilityId: 'cross1', key: 'lt' },
       }),
       false,
     )
-
-    const conflict = patchCrossoverPortalWaypointCode(
-      areas[0]!.facilities[0]!,
-      areas,
-      'b',
-      'WP1',
+    assert.equal(
+      isWaypointCodeTaken(areas, 'n2w_back_start', {
+        crossPortal: { facilityId: 'cross1', key: 'lt' },
+      }),
+      true,
     )
-    assert.equal(conflict.error, '此代號已被其他途經點使用')
+  })
 
-    const collected = collectCrossoverPortalWaypointsFromAreas(areas)
-    assert.equal(collected.length, 2)
-    assert.deepEqual(
-      collected.map((c) => c.stationId).sort(),
-      ['xo_1_a', 'xo_1_b'],
-    )
+  it('collectWaypointCodes 收得到四個口', () => {
+    const codes = collectWaypointCodes(areasWith(rail()))
+    assert.deepEqual([...codes].sort(), [
+      'n2w_back_end',
+      'n2w_back_start',
+      'n2w_go_end',
+      'n2w_go_start',
+    ])
   })
 })

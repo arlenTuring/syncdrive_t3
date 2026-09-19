@@ -254,7 +254,6 @@ export function getFacilityLabelStyle(facility: FacilityObject): FacilityLabelSt
   const parsed = parseFacilityLabelStyle(facility.parameters?.[LABEL_STYLE_PARAM_KEY])
   if (
     (facility.type === 'RoadLine' ||
-      facility.type === 'TrackCrossover' ||
       facility.type === 'DockingPoint' ||
       facility.type === 'Waypoint') &&
     parsed.visible === undefined

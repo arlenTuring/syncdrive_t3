@@ -15,7 +15,6 @@ import {
 } from './buildBlockStationDepartures';
 import {
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   resolveInterTripGapSeconds,
   resolvePassengerRouteOccupancy,
   resolveRouteOriginStationId,
@@ -98,9 +97,7 @@ export function projectBlockBerthWindowsSeconds(
   for (let si = 0; si < stops.length; si += 1) {
     const stop = stops[si]!;
     const dwellMeta = route.stationDwells.find((d) => d.stationId === stop.stationId);
-    const isPortal =
-      looksLikeDefaultCrossoverPortalStationId(stop.stationId)
-      || (dwellMeta != null && !isStationDwellRequired(dwellMeta));
+    const isPortal = dwellMeta != null && !isStationDwellRequired(dwellMeta);
     const isTerminal = si === stops.length - 1;
     const isOrigin = si === 0;
 

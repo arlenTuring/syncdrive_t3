@@ -35,7 +35,6 @@ import {
   isPrimarySelectedRoute,
   isSelectedRouteDwellReady,
   isStationDwellRequired,
-  looksLikeDefaultCrossoverPortalStationId,
   moveSelectedRouteExecutionOrder,
   setSelectedRouteAsHead,
   nextExecutionOrder,
@@ -125,7 +124,7 @@ function buildStationDwells(
           ? true
           : prev?.dwellRequired === false
             ? false
-            : !looksLikeDefaultCrossoverPortalStationId(stationId);
+            : true;
     const dwellMode = dwellRequired
       ? (prev?.dwellMode === 'no_stop' || prev?.dwellMode === 'line_change' || prev?.dwellMode === 'seconds'
           ? prev.dwellMode

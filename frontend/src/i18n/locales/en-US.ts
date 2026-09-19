@@ -1620,7 +1620,6 @@ const enUS: DeepStringify<typeof zhTW> = {
       docking: 'Mainline stops',
       facilityDocking: 'Facility stops',
       waypoint: 'Waypoints',
-      crossoverWaypoint: 'Crossover waypoints',
       crossWaypoint: 'Cross-track waypoints',
       cannotConnect: 'Cannot connect (unavailable)',
       add: 'Add',
@@ -1746,10 +1745,6 @@ const enUS: DeepStringify<typeof zhTW> = {
         railCross: {
           label: 'Crossing track',
           hint: 'Crossing track — two tracks meeting, all four mouths connected (two straight, two diagonal); each joint adapts to the track it is attached to',
-        },
-        trackCrossover: {
-          label: 'Virtual crossover',
-          hint: 'Virtual crossover — superseded by the crossing track; kept for existing maps',
         },
       },
     },
@@ -1994,42 +1989,6 @@ const enUS: DeepStringify<typeof zhTW> = {
           off: 'Closed',
         },
       },
-      trackCrossover: {
-        title: 'Virtual crossover',
-        hint:
-          'Dual edge solid lines. Path width = gap between edges; center fade opens a symmetric gap from the middle. Ends A/B are built-in waypoints for topology and routes.',
-        portalWaypoints: 'End waypoints',
-        endA: 'End A',
-        endB: 'End B',
-        trackNamed: 'Track: {{name}}',
-        trackId: 'ID: {{id}}',
-        trackUnattached: 'Track not attached',
-        attached: 'Attached',
-        empty: 'Empty',
-        waypointCode: 'Waypoint code',
-        codePlaceholder: 'e.g. xo_1_{{key}}',
-        alias: 'Alias (display name)',
-        aliasPlaceholder: 'Empty shows the code',
-        fieldX: 'Field X (m)',
-        fieldY: 'Field Y (m)',
-        fieldHint:
-          'Real-world field meters (origin bottom-left). Updated when dragging ends or snapping; typing here only corrects the measured value and does not move the on-map end.',
-        strokeWidth: 'Path width (edge gap)',
-        strokeWidthHint:
-          'When selected, you can also drag the square handles beside both edges.',
-        centerGap: 'Center fade amount',
-        centerGapHint:
-          '0% = full solid; larger values fade symmetrically from the center.',
-        lineColor: 'Line color',
-        lineOpacity: 'Line opacity',
-        bgColor: 'Background color',
-        clearBg: 'Clear (no background)',
-        defaultNoBg: 'No background by default',
-        bgPlaceholder: 'None (leave empty)',
-        bgOpacity: 'Background opacity',
-        bgOpacityHint:
-          'Requires a background color first; 0% fully transparent, 100% opaque.',
-      },
       trackGen: {
         name: 'Name',
         networkSummary: 'Network {{totalM}} m · {{lanes}} lanes',
@@ -2113,7 +2072,6 @@ const enUS: DeepStringify<typeof zhTW> = {
         taperJoin:
           'Drag to a track edge; release to join and match the other width',
         cornerHandle: 'Drag to adjust this corner radius',
-        toolbarPath: 'Path controls',
         toolbarRotate: 'Rotate',
         rotateCcw1: 'Nudge 1° counterclockwise',
         rotateCw1: 'Nudge 1° clockwise',
@@ -2149,7 +2107,6 @@ const enUS: DeepStringify<typeof zhTW> = {
       kind: {
         docking: 'Stop',
         waypoint: 'Waypoint',
-        crossoverWaypoint: 'Crossover waypoint',
         crossWaypoint: 'Cross-track waypoint',
         facilityDocking: 'Facility stop',
         facility: 'Facility',
@@ -2170,7 +2127,6 @@ const enUS: DeepStringify<typeof zhTW> = {
       dropReconnect: 'Release to reconnect to “{{label}}”',
       dropConnect: 'Release to connect to “{{label}}”',
       kindDockingPoint: 'Berth',
-      kindCrossoverWaypoint: 'Crossover waypoint',
       kindCrossWaypoint: 'Cross-track waypoint',
       kindFacilityDocking: 'Facility berth',
       kindFacility: 'Facility',

@@ -76,8 +76,7 @@ export function findFacilityAtAreaLocalPx(
     facilities.filter(
       (f) =>
         f.type !== 'Geofence'
-        && f.type !== 'RoadLine'
-        && f.type !== 'TrackCrossover',
+        && f.type !== 'RoadLine',
     ),
   )
   for (let i = sorted.length - 1; i >= 0; i--) {

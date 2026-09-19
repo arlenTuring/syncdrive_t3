@@ -53,11 +53,6 @@ describe('途經點不算乘客可見停靠點', () => {
     expect(isNonPassengerWaypointId(' charge_and_wash_waypoint', ids)).toBe(true);
   });
 
-  it('舊版虛擬渡線代號仍排除（舊班表資料可能還帶著）', () => {
-    expect(isNonPassengerWaypointId('xo_1_a')).toBe(true);
-    expect(isNonPassengerWaypointId('xowp:abc:a')).toBe(true);
-  });
-
   it('沒有圖資時不誤殺任何一般代號', () => {
     expect(isNonPassengerWaypointId('n2w_u2d_back_end')).toBe(false);
     expect(collectWaypointIdsFromMapDocument(null).size).toBe(0);

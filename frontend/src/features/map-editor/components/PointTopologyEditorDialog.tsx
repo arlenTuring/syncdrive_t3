@@ -1424,7 +1424,6 @@ export function PointTopologyEditorDialog({
   const waypointCount = draft.nodes.filter(
     (n) =>
       n.kind === 'waypoint'
-      || n.kind === 'crossover-waypoint'
       || n.kind === 'cross-waypoint',
   ).length
   const facilityCount = draft.nodes.filter((n) => n.kind === 'facility').length
@@ -1462,13 +1461,11 @@ export function PointTopologyEditorDialog({
       ? t('mapEditor.pointTopology.kind.docking')
       : kind === 'waypoint'
         ? t('mapEditor.pointTopology.kind.waypoint')
-        : kind === 'crossover-waypoint'
-          ? t('mapEditor.pointTopology.kind.crossoverWaypoint')
-          : kind === 'cross-waypoint'
-            ? t('mapEditor.pointTopology.kind.crossWaypoint')
-            : kind === 'facility-docking'
-              ? t('mapEditor.pointTopology.kind.facilityDocking')
-              : t('mapEditor.pointTopology.kind.facility')
+        : kind === 'cross-waypoint'
+          ? t('mapEditor.pointTopology.kind.crossWaypoint')
+          : kind === 'facility-docking'
+            ? t('mapEditor.pointTopology.kind.facilityDocking')
+            : t('mapEditor.pointTopology.kind.facility')
 
   const selectedFacilityDispatchId =
     selectedNode?.kind === 'facility'
@@ -1905,10 +1902,8 @@ export function PointTopologyEditorDialog({
                             `${displayLabel}（${
                               node.kind === 'docking'
                                 ? t('mapEditor.pointTopology.kindDockingPoint')
-                                : node.kind === 'crossover-waypoint'
-                                  ? t('mapEditor.pointTopology.kindCrossoverWaypoint')
-                                  : node.kind === 'cross-waypoint'
-                                    ? t('mapEditor.pointTopology.kindCrossWaypoint')
+                                : node.kind === 'cross-waypoint'
+                                  ? t('mapEditor.pointTopology.kindCrossWaypoint')
                                   : node.kind === 'facility-docking'
                                     ? t('mapEditor.pointTopology.kindFacilityDocking')
                                     : node.kind === 'facility'

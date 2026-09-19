@@ -7,7 +7,7 @@ export type MapWaypointItem = {
   areaName: string;
   /** 畫圖的人給的名字（如「整備調度入口點」）；沒取名時後端不送這一欄 */
   alias?: string;
-  /** 虛擬渡線途經點才會分 a／b 兩個端點 */
+  /** 途經點的顯示類別（如入口途經點、交叉軌道途經點） */
   kindLabel?: string;
   xM?: number;
   yM?: number;

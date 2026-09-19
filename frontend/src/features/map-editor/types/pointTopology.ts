@@ -9,12 +9,6 @@ export type PointTopologyNodeKind =
   /** 大型設施內的設施停靠點（拓撲上為琥珀色） */
   | 'facility-docking'
   /**
-   * 虛擬渡線途經點（TrackCrossover 端點 A／B 內建）。
-   * 與一般 `waypoint` 功能相同（可連線、可入路線），但資料來源與清單分類分開。
-   * 穩定 id＝`xowp:<facilityId>:a|b`；對外站序 id＝portal.waypointCode。
-   */
-  | 'crossover-waypoint'
-  /**
    * 交叉軌道途經點（RailCross 四口 lt／lb／rt／rb）。
    * 穩定 id＝`xcwp:<facilityId>:lt|lb|rt|rb`；對外站序 id＝portal.waypointCode。
    */
@@ -29,7 +23,7 @@ export type PointTopologyNode = {
   kind: PointTopologyNodeKind
   /** 顯示名稱（開啟編輯器時會自設施同步） */
   label: string
-  /** DockingPoint／虛擬渡線／交叉軌道途經點的對外代號（waypointCode）；一般 Waypoint 可省略（用 facility id） */
+  /** DockingPoint／交叉軌道途經點的對外代號（waypointCode）；一般 Waypoint 可省略（用 facility id） */
   stationId?: string
   x: number
   y: number

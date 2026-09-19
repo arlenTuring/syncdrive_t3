@@ -181,14 +181,6 @@ export function sumStationDwellSecondsWithSlack(
   return total;
 }
 
-/**
- * 預設虛擬渡線端點代號（xo_N_a / xo_N_b）。
- * 自訂代號請在草稿寫入 dwellRequired: false（目錄載入時會標註）。
- */
-export function looksLikeDefaultCrossoverPortalStationId(stationId: string): boolean {
-  return /^xo_\d+_[ab]$/i.test(stationId.trim());
-}
-
 /** 路線起點站（站序第一站） */
 export function resolveRouteOriginStationId(
   route: Pick<ShiftScheduleSelectedRoute, 'stationIds' | 'stationDwells'>,
@@ -227,11 +219,11 @@ export function routesShareTurnaroundStation(
   return Boolean(terminal && origin && terminal === origin);
 }
 
-/** 是否需填寫停靠時間（首站／虛擬渡線端點為 false） */
+/** 是否需填寫停靠時間（首站／途經點為 false；途經點由地圖目錄載入時標註 dwellRequired: false） */
 export function isStationDwellRequired(dwell: ShiftScheduleStationDwell): boolean {
   if (dwell.dwellRequired === false) return false;
   if (dwell.dwellRequired === true) return true;
-  return !looksLikeDefaultCrossoverPortalStationId(dwell.stationId);
+  return true;
 }
 
 /** 站序列 UI 角色：首站／途經僅標示，其餘可編輯停靠 */

@@ -9,7 +9,6 @@ export type FacilityType =
   | 'DockingPoint'
   | 'Waypoint'
   | 'RoadLine'
-  | 'TrackCrossover'
   | 'Basemap'
 
 export type FacilityName =
@@ -32,7 +31,6 @@ export type FacilityName =
   | 'DockingPoint'
   | 'Waypoint'
   | 'RoadLine'
-  | 'TrackCrossover'
   | 'Basemap'
 
 /** 旋轉角度（度），可為任意數值以利微調 */
@@ -66,9 +64,6 @@ export type WaypointState = 'Normal' | 'Inactive'
 /** 道路線（純視覺標記） */
 export type RoadLineState = 'Normal'
 
-/** 虛擬渡線／交叉連通（兩端各接合一條軌道物件） */
-export type TrackCrossoverState = 'Normal'
-
 /** 底圖（可載入本機圖片作為 Area 內背景） */
 export type BasemapState = 'Normal'
 
@@ -87,7 +82,6 @@ export type NonSlotFacilityState =
   | DockingPointState
   | WaypointState
   | RoadLineState
-  | TrackCrossoverState
   | BasemapState
   | FacilityAreaState
   | GeofenceState
@@ -136,7 +130,6 @@ export type FacilityObject =
         | 'DockingPoint'
         | 'Waypoint'
         | 'RoadLine'
-        | 'TrackCrossover'
         | 'Basemap'
       name: FacilityName
       customName: string

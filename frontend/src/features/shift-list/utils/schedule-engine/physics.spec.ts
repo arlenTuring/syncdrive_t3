@@ -147,11 +147,11 @@ describe('resolvePassengerRouteOccupancy station-aligned min', () => {
     const tnLike: ShiftScheduleSelectedRoute = {
       ...route('TN', 1, 185, 155, 36),
       dwellSlackSeconds: 5,
-      stationIds: ['station_4', 'xo_1_b', 'xo_1_a', 'station_9', 'fdock:028'],
+      stationIds: ['station_4', 'wp_b', 'wp_a', 'station_9', 'fdock:028'],
       stationDwells: [
         { stationId: 'station_4', stationName: 'T3', dwellSeconds: 0, dwellRequired: false },
-        { stationId: 'xo_1_b', stationName: 'xo_b', dwellSeconds: 0, dwellRequired: false },
-        { stationId: 'xo_1_a', stationName: 'xo_a', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'wp_b', stationName: '途經點B', dwellSeconds: 0, dwellRequired: false },
+        { stationId: 'wp_a', stationName: '途經點A', dwellSeconds: 0, dwellRequired: false },
         {
           stationId: 'station_9',
           stationName: 'N2W',
@@ -170,18 +170,18 @@ describe('resolvePassengerRouteOccupancy station-aligned min', () => {
       stationLegTravels: [
         {
           fromStationId: 'station_4',
-          toStationId: 'xo_1_b',
+          toStationId: 'wp_b',
           avgTravelTimeSeconds: 165,
           minTravelTimeSeconds: 135,
         },
         {
-          fromStationId: 'xo_1_b',
-          toStationId: 'xo_1_a',
+          fromStationId: 'wp_b',
+          toStationId: 'wp_a',
           avgTravelTimeSeconds: 5,
           minTravelTimeSeconds: 5,
         },
         {
-          fromStationId: 'xo_1_a',
+          fromStationId: 'wp_a',
           toStationId: 'station_9',
           avgTravelTimeSeconds: 5,
           minTravelTimeSeconds: 5,

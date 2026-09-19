@@ -39,7 +39,6 @@ const GROUP_ORDER = [
   'backup-up',
   'backup-down',
   'facility-docking',
-  'crossover',
   'other',
 ] as const;
 
@@ -51,9 +50,6 @@ function classifyThroughStation(
   const name = stationName.trim();
   if (id.startsWith('fdock:')) {
     return { groupKey: 'facility-docking', groupLabel: '設施停靠點' };
-  }
-  if (id.startsWith('xowp:')) {
-    return { groupKey: 'crossover', groupLabel: '渡線途經點' };
   }
   const isBackup = /\[備用\]|^備用/.test(name);
   const isUp = name.includes('上行');
