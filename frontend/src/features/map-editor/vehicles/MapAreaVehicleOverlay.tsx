@@ -476,6 +476,14 @@ export function MapAreaVehicleOverlay({
             : undefined;
         // 走了幾成直接帶進去：補間中的位置不對應任何一筆遙測座標，重投影只會投回起點
         const alongHint = pathPose?.along ?? network?.alongFrac;
+        // 車頭讀值屬於「定位那一點」，不屬於補間中的位置（見 HeadingReference）
+        const headingReference =
+          pathPose && network
+            ? (() => {
+                const track = area.facilities.find((f) => f.id === placement.placement.trackId);
+                return track ? { track, along: network.alongFrac } : undefined;
+              })()
+            : undefined;
         const drawnDir =
           drawnTrack && headingRad != null
             ? drawnDirectionAtField(
@@ -485,6 +493,7 @@ export function MapAreaVehicleOverlay({
                 vehicle.yM,
                 headingRad,
                 alongHint,
+                headingReference,
               )
             : null;
         /*
@@ -499,6 +508,7 @@ export function MapAreaVehicleOverlay({
               vehicle.yM,
               headingRad,
               alongHint,
+              headingReference,
             )
           : null;
         const containerRotateDeg =

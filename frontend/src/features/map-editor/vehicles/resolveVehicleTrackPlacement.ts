@@ -421,6 +421,22 @@ export function offsetLocalPoint(
 }
 
 /**
+ * 車頭讀值是<strong>最新那一筆遙測</strong>當下的朝向，對應的是「最新定位」那一點。
+ *
+ * 畫面上的車位置是補間出來的、還在往那一點移動；如果拿補間中的位置去算「車頭 − 切線」，
+ * 彎道入口的車會吃到出口的角度，車身提前轉向、斜出軌道。所以擺動量（heading 相對切線
+ * 差多少）永遠用<strong>定位那一點</strong>的切線算，再疊到「畫的這個位置」的切線上。
+ */
+export type HeadingReference = { track: FacilityObject; along: number };
+
+function realTangentRadAt(ref: HeadingReference): number | null {
+  const paths = getTrackGenPaths(ref.track.parameters);
+  if (!paths) return null;
+  const t = tangentAlongPath(paths.real, ref.along);
+  return Math.atan2(t.y, t.x);
+}
+
+/**
  * 這台車在它所在那一塊上「<strong>畫出來</strong>」的行進方向。
  *
  * <h3>為什麼不能直接照 heading 轉圖示</h3>
@@ -446,6 +462,8 @@ export function drawnDirectionAtField(
    * 沿路徑補間的每一幀也靠它——補間中的位置不對應任何一筆遙測座標。
    */
   alongHint?: number,
+  /** 車頭讀值對應的定位點；沒給就用畫的這個點 */
+  reference?: HeadingReference,
 ): { x: number; y: number } | null {
   const paths = getTrackGenPaths(track.parameters);
   if (!paths) return null;
@@ -469,7 +487,9 @@ export function drawnDirectionAtField(
   dy /= len;
   // 車頭朝前還是朝後：拿現場朝向跟這一塊的現場切線比
   if (headingRad != null && Number.isFinite(headingRad)) {
-    const realTan = tangentAlongPath(paths.real, along);
+    const refRad = reference ? realTangentRadAt(reference) : null;
+    const realTan =
+      refRad !== null ? { x: Math.cos(refRad), y: Math.sin(refRad) } : tangentAlongPath(paths.real, along);
     const dot = Math.cos(headingRad) * realTan.x + Math.sin(headingRad) * realTan.y;
     if (dot < 0) {
       dx = -dx;
@@ -498,8 +518,9 @@ export function drawnRotateWithSwingDeg(
   yM: number,
   headingRad?: number | null,
   alongHint?: number,
+  reference?: HeadingReference,
 ): number | null {
-  const dir = drawnDirectionAtField(track, area, xM, yM, headingRad ?? undefined, alongHint);
+  const dir = drawnDirectionAtField(track, area, xM, yM, headingRad ?? undefined, alongHint, reference);
   if (!dir) return null;
   const base = rotateDegForDrawnDirection(dir);
   if (headingRad == null || !Number.isFinite(headingRad)) return base;
@@ -507,10 +528,12 @@ export function drawnRotateWithSwingDeg(
   const paths = getTrackGenPaths(track.parameters);
   if (!paths) return base;
   const along = alongHint ?? projectAlongPath(paths.real, xM, yM).along;
+  // 擺動量用定位那一點的切線算（車頭讀值就是那一點的），不是補間中的位置
+  const refRad = reference ? realTangentRadAt(reference) : null;
   const realTan = tangentAlongPath(paths.real, along);
-  let tanRad = Math.atan2(realTan.y, realTan.x);
+  let tanRad = refRad ?? Math.atan2(realTan.y, realTan.x);
   // 逆著這一塊畫的方向走時，切線要反過來才是「車頭該對的那一邊」
-  if (Math.cos(headingRad) * realTan.x + Math.sin(headingRad) * realTan.y < 0) {
+  if (Math.cos(headingRad) * Math.cos(tanRad) + Math.sin(headingRad) * Math.sin(tanRad) < 0) {
     tanRad += Math.PI;
   }
   let swing = headingRad - tanRad;
