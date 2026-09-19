@@ -16,6 +16,7 @@ function trip(overrides: Partial<TimetableTripDto> = {}): TimetableTripDto {
     timeline_row: 1,
     task_type: 'passenger',
     label: null,
+    card_label: '環線 A',
     source: 'plan',
     route_id: 'route-a',
     route_code: 'A01',
@@ -102,6 +103,7 @@ describe('planDispatches', () => {
     const item = planned[0];
     expect(item.orderId).toBe('260826-A01-0800');
     expect(item.vehicleCode).toBe('PMS01');
+    expect(item.cardLabel).toBe('環線 A');
     expect(item.departAt).toBe(MIDNIGHT + 8 * 3600 * 1000);
     expect(item.arriveAt).toBe(MIDNIGHT + (8 * 3600 + 1800) * 1000);
   });

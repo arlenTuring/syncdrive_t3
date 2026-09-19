@@ -27,6 +27,7 @@ export type TimetableRoute = {
   routeId: string;
   routeName?: string;
   routeCode?: string;
+  cardLabel?: string;
   stationIds: string[];
   stationDwells: TimetableStationDwell[];
   stationLegTravels: TimetableStationLegTravel[];

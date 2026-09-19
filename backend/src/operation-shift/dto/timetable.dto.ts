@@ -117,6 +117,9 @@ export class TimetableTripDto {
   @ApiProperty({ example: '正線' })
   label!: string;
 
+  @ApiProperty({ example: '環線 A', description: '即時數據儀表板班次卡標籤' })
+  card_label!: string;
+
   @ApiProperty({ example: 'template_bar', description: '這張卡的產生來源' })
   source!: string;
 

@@ -37,6 +37,7 @@ export type PlannedDispatch = {
   vehicleCode: string;
   timelineRow: number;
   taskType: string;
+  cardLabel: string;
   routeCode: string | null;
   routeName: string | null;
   /** 絕對發車時刻（Epoch 毫秒） */
@@ -187,6 +188,7 @@ export function planDispatches(args: {
       vehicleCode,
       timelineRow: trip.timeline_row,
       taskType: trip.task_type,
+      cardLabel: trip.card_label,
       routeCode: trip.route_code,
       routeName: trip.route_name,
       departAt,
@@ -274,6 +276,7 @@ export function planYardMoves(args: {
       vehicleCode,
       timelineRow: move.timelineRow,
       taskType: 'dispatch',
+      cardLabel: move.label || '調度',
       routeCode: null,
       routeName: move.label,
       departAt,
@@ -342,6 +345,7 @@ export function planYardTasks(args: {
       vehicleCode,
       timelineRow: task.timelineRow,
       taskType: 'maintenance',
+      cardLabel: task.cardLabel,
       routeCode: null,
       routeName: task.cardLabel,
       departAt,

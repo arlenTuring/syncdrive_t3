@@ -371,6 +371,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         shift_name: shiftName,
         timeline_row: item.timelineRow,
         task_type: item.taskType,
+        card_label: item.cardLabel,
         route_code: item.routeCode,
         route_name: item.routeName,
         planned_depart_at: item.departAt,

@@ -15,8 +15,11 @@ import {
 } from '../utils/resolveMaintenanceEntrySlackSeconds';
 import {
   emptyMaintenanceSectionCodeBySection,
+  defaultMaintenanceSectionCardLabelBySection,
   findMaintenanceSectionCodeIssues,
+  normalizeMaintenanceSectionCardLabelBySection,
   normalizeMaintenanceSectionCodeBySection,
+  sanitizeMaintenanceSectionCardLabelInput,
   sanitizeMaintenanceSectionCodeInput,
   type MaintenanceSectionCodeKey,
 } from '../utils/maintenanceSectionCode';
@@ -66,6 +69,9 @@ export function StepShiftMaintenanceTask({
   );
   const sectionCodeBySection = normalizeMaintenanceSectionCodeBySection(
     draft.sectionCodeBySection,
+  );
+  const sectionCardLabelBySection = normalizeMaintenanceSectionCardLabelBySection(
+    draft.sectionCardLabelBySection,
   );
   const sectionEnabled = draft.sectionEnabled;
   const codeIssues = findMaintenanceSectionCodeIssues(
@@ -162,6 +168,7 @@ export function StepShiftMaintenanceTask({
       skipped: false,
       entrySlackBySection: emptyMaintenanceEntrySlackBySectionInput(),
       sectionCodeBySection: emptyMaintenanceSectionCodeBySection(),
+      sectionCardLabelBySection: defaultMaintenanceSectionCardLabelBySection(),
       sectionEnabled: {
         charging: false,
         carWash: false,
@@ -191,6 +198,31 @@ export function StepShiftMaintenanceTask({
       },
     });
   };
+
+  const patchCardLabel = (key: MaintenanceSectionCodeKey, value: string) => {
+    onChange({
+      ...draft,
+      sectionCardLabelBySection: {
+        ...sectionCardLabelBySection,
+        [key]: sanitizeMaintenanceSectionCardLabelInput(value),
+      },
+    });
+  };
+
+  const cardLabelField = (key: MaintenanceSectionCodeKey) => (
+    <label className="block">
+      <span className="mb-2 block text-sm text-zinc-300">班次卡標籤</span>
+      <input
+        type="text"
+        value={sectionCardLabelBySection[key]}
+        onChange={(e) => patchCardLabel(key, e.target.value)}
+        placeholder="儀表板顯示文字"
+        maxLength={12}
+        className={SELECT_CLASS}
+      />
+      <p className="mt-1.5 text-xs text-zinc-500">顯示在即時數據儀表板的班次卡左上角。</p>
+    </label>
+  );
 
   const sectionCodeField = (key: MaintenanceSectionCodeKey) => {
     const issue = codeIssueByKey.get(key);
@@ -233,30 +265,35 @@ export function StepShiftMaintenanceTask({
     charging: (
       <div className="space-y-4">
         {sectionCodeField('charging')}
+        {cardLabelField('charging')}
         {creationMode === 'parametric' ? slackField('charging') : null}
       </div>
     ),
     carWash: (
       <div className="space-y-4">
         {sectionCodeField('carWash')}
+        {cardLabelField('carWash')}
         {creationMode === 'parametric' ? slackField('carWash') : null}
       </div>
     ),
     maintenance: (
       <div className="space-y-4">
         {sectionCodeField('maintenance')}
+        {cardLabelField('maintenance')}
         {creationMode === 'parametric' ? slackField('maintenance') : null}
       </div>
     ),
     preTrip: (
       <div className="space-y-4">
         {sectionCodeField('preTrip')}
+        {cardLabelField('preTrip')}
         {creationMode === 'parametric' ? slackField('preTrip') : null}
       </div>
     ),
     mobile: (
       <div className="space-y-4">
         {sectionCodeField('mobile')}
+        {cardLabelField('mobile')}
         {creationMode === 'parametric' ? slackField('mobile') : null}
       </div>
     ),

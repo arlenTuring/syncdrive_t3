@@ -1,7 +1,6 @@
 import { SHIFT_TRIP_CODE_PATTERN } from '../constants/vtmsVehiclePool';
 import { mergeOperationMqttShiftRow } from './mergeOperationMqttShiftRow';
 import { buildMainlineRowFromMqtt } from './mainlineTaskModel';
-import { enrichMaintenanceShiftFields, maintenanceDemoOrderId } from './maintenanceTaskModel';
 
 function tripSortKey(tripCode: string): number {
   const m = /^[DU](\d{2})(\d{2})$/i.exec(tripCode.trim());
@@ -15,41 +14,6 @@ function isActiveMainlineMqtt(payload: Record<string, unknown>): boolean {
   const status = String(payload.order_status ?? '').toUpperCase();
   if (status === 'END' || status === 'ENDED' || status === 'CANCELLED') return false;
   return true;
-}
-
-function isActiveMaintenanceMqtt(payload: Record<string, unknown>): boolean {
-  const lineKind = String(payload.line_kind ?? '').toUpperCase();
-  if (lineKind !== 'MAINTENANCE' && !payload.maint_type_label) return false;
-  const status = String(payload.order_status ?? '').toUpperCase();
-  if (status === 'END' || status === 'ENDED' || status === 'CANCELLED') return false;
-  // 整備卡需有格位才列入（避免 operation retain 僅剩徽章、地圖無車的幽靈列）
-  const yardSlot = String(payload.yard_slot_id ?? '').trim();
-  if (!yardSlot) return false;
-  return !!(payload.maint_type_label || lineKind === 'MAINTENANCE');
-}
-
-function buildMaintenanceRowFromMqtt(payload: Record<string, unknown>): Record<string, unknown> {
-  const vehicleCode = String(payload.vehicle_code ?? '');
-  const yardSlot = String(payload.yard_slot_id ?? '').trim();
-  const orderId = String(
-    payload.order_id ?? maintenanceDemoOrderId(vehicleCode, yardSlot),
-  );
-  return enrichMaintenanceShiftFields(
-    {
-      shift_key: orderId,
-      order_id: orderId,
-      vehicle_code: vehicleCode,
-      trip_code: payload.trip_code ?? '',
-      trip_header: String(payload.badge_label ?? payload.maint_type_label ?? vehicleCode),
-      line_kind: 'MAINTENANCE',
-      maint_type_label: payload.maint_type_label,
-      maint_type_bg: payload.maint_type_bg,
-      maint_type_color: payload.maint_type_color,
-      delay_minutes: 0,
-      is_alert: false,
-    },
-    payload,
-  );
 }
 
 function mergeRosterFromMqtt(
@@ -162,27 +126,9 @@ export function mergeMainlineShiftRoster(
 /** 整備名冊：MQTT 觸發槽位更新（正線執勤車輛不列入整備卡） */
 export function mergeMaintenanceShiftRoster(
   sqlRows: Record<string, unknown>[],
-  mqttByVehicle: Map<string, Record<string, unknown>>,
+  _mqttByVehicle: Map<string, Record<string, unknown>>,
 ): Record<string, unknown>[] {
-  const yardMqtt = new Map<string, Record<string, unknown>>();
-  for (const [vehicleCode, payload] of mqttByVehicle) {
-    if (isActiveMainlineMqtt(payload)) continue;
-    yardMqtt.set(vehicleCode, payload);
-  }
-  const merged = mergeRosterFromMqtt(
-    sqlRows.filter((row) => {
-      const vc = String(row.vehicle_code ?? '').trim().toUpperCase();
-      const live = mqttByVehicle.get(vc);
-      return !live || !isActiveMainlineMqtt(live);
-    }),
-    yardMqtt,
-    isActiveMaintenanceMqtt,
-    buildMaintenanceRowFromMqtt,
-    true,
-  );
-  return merged.filter((row) => {
-    const vc = String(row.vehicle_code ?? '').trim().toUpperCase();
-    const live = mqttByVehicle.get(vc);
-    return !live || !isActiveMainlineMqtt(live);
-  });
+  // 整備卡是部署班表時間線的呈現；MQTT operation/update 僅是執行回報，不能新增、
+  // 移除或改寫班表卡的標籤。SQL 每 10 秒依目前時間重算進度即可。
+  return sqlRows;
 }

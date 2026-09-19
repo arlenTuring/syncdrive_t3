@@ -21,6 +21,7 @@ function trip(
     timeline_row: row,
     task_type: 'passenger',
     label: null,
+    card_label: '環線 A',
     source: 'plan',
     route_id: 'route-a',
     route_code: 'A01',
@@ -70,6 +71,7 @@ type CreatedOrder = {
     kind: string;
     yard_slot_id?: string;
     route_name: string | null;
+    card_label?: string;
     shift_name: string;
     origin: { id: string; name: string; kind: string } | null;
     destination: { id: string; name: string; kind: string } | null;
@@ -237,6 +239,7 @@ describe('DispatchEngineService.tick', () => {
     expect(payload.destination?.id).toBe('st-2');
     expect(payload.stations).toHaveLength(2);
     expect(payload.shift_name).toBe('模擬正線');
+    expect(payload.card_label).toBe('環線 A');
     expect(created[0].planned_start).toBe(MIDNIGHT + (12 * 3600 + 60) * 1000);
   });
 });
@@ -557,6 +560,18 @@ describe('整備班次', () => {
     expect(
       (order.payload as unknown as { yard_slot_id?: string }).yard_slot_id,
     ).toBe('E3');
+  });
+
+  it('整備訂單使用班表作者設定的班次卡標籤', async () => {
+    const body = yardBody([CHARGING]);
+    Object.assign(body, {
+      maintenanceSectionCardLabelBySection: { charging: '補能作業' },
+    });
+    const { engine, created } = build([], [], body);
+
+    await engine.tick({ now: REFERENCE });
+
+    expect(created[0].payload.card_label).toBe('補能作業');
   });
 
   it('徽章看格位代號，不看卡片標籤', async () => {

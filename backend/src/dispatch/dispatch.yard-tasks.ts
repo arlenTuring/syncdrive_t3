@@ -122,6 +122,14 @@ export function extractYardTasks(body: Record<string, unknown>): {
   const skipped: Array<{ blockId: string; reason: string }> = [];
   if (!Array.isArray(timelines)) return { tasks, skipped };
 
+  const configuredLabels = asRecord(body.maintenanceSectionCardLabelBySection);
+  const labelKeyByTaskType: Record<string, string> = {
+    charging: 'charging',
+    inspection: 'preTrip',
+    servicing: 'maintenance',
+    standby: 'mobile',
+  };
+
   for (const timeline of timelines) {
     const tl = asRecord(timeline);
     if (!tl || !Array.isArray(tl.blocks)) continue;
@@ -158,12 +166,16 @@ export function extractYardTasks(body: Record<string, unknown>): {
 
       const row = num(block.timelineRow) ?? 1;
       const meta = maintenanceMetaForSlot(yardSlotId);
+      const labelKey = labelKeyByTaskType[taskType];
+      const configuredLabel = labelKey ? str(configuredLabels?.[labelKey]) : null;
 
       tasks.push({
         blockId,
         timelineRow: row,
         tripCode: buildTripCode(yardSlotId, row, startMinute),
-        cardLabel: str(block.label) ?? meta.label,
+        cardLabel: str(block.source) === 'hold'
+          ? '暫停'
+          : configuredLabel ?? str(block.label) ?? meta.label,
         maintTypeLabel: meta.label,
         maintTypeBg: meta.bg,
         maintTypeColor: meta.color,

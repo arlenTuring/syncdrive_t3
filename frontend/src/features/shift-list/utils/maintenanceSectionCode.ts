@@ -17,6 +17,37 @@ export type MaintenanceSectionCodeBySection = {
 
 export type MaintenanceSectionCodeKey = keyof MaintenanceSectionCodeBySection;
 
+/** 儀表板班次卡顯示文字；與內部任務種類、格位分類分開保存。 */
+export type MaintenanceSectionCardLabelBySection = Record<MaintenanceSectionCodeKey, string>;
+
+export function defaultMaintenanceSectionCardLabelBySection(): MaintenanceSectionCardLabelBySection {
+  return {
+    charging: '充電',
+    carWash: '洗車',
+    maintenance: '保養',
+    preTrip: '行檢',
+    mobile: '待命',
+  };
+}
+
+export function sanitizeMaintenanceSectionCardLabelInput(raw: unknown): string {
+  return typeof raw === 'string' ? raw.trim().slice(0, 12) : '';
+}
+
+export function normalizeMaintenanceSectionCardLabelBySection(
+  raw: Partial<MaintenanceSectionCardLabelBySection> | null | undefined,
+): MaintenanceSectionCardLabelBySection {
+  const defaults = defaultMaintenanceSectionCardLabelBySection();
+  if (!raw || typeof raw !== 'object') return defaults;
+  return {
+    charging: sanitizeMaintenanceSectionCardLabelInput(raw.charging) || defaults.charging,
+    carWash: sanitizeMaintenanceSectionCardLabelInput(raw.carWash) || defaults.carWash,
+    maintenance: sanitizeMaintenanceSectionCardLabelInput(raw.maintenance) || defaults.maintenance,
+    preTrip: sanitizeMaintenanceSectionCardLabelInput(raw.preTrip) || defaults.preTrip,
+    mobile: sanitizeMaintenanceSectionCardLabelInput(raw.mobile) || defaults.mobile,
+  };
+}
+
 export function emptyMaintenanceSectionCodeBySection(): MaintenanceSectionCodeBySection {
   return {
     charging: '',

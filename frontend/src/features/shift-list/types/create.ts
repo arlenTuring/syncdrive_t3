@@ -20,9 +20,12 @@ import {
 import {
   emptyMaintenanceSectionCodeBySection,
   normalizeMaintenanceSectionCodeBySection,
+  defaultMaintenanceSectionCardLabelBySection,
+  normalizeMaintenanceSectionCardLabelBySection,
   buildMaintenanceSectionCodeFingerprint,
   isMaintenanceSectionCodesComplete,
   type MaintenanceSectionCodeBySection,
+  type MaintenanceSectionCardLabelBySection,
 } from '../utils/maintenanceSectionCode';
 import {
   SHIFT_SCHEDULE_DEFAULT_SWITCH_BUFFER_SECONDS,
@@ -176,6 +179,8 @@ export type ShiftScheduleMaintenanceTaskDraft = {
    * 班次代號 = 整備代號 + 列碼(A/B/C…) + 開始 HHMM。
    */
   sectionCodeBySection: MaintenanceSectionCodeBySection;
+  /** 儀表板班次卡標籤；不拿來推論上／下行或任務種類。 */
+  sectionCardLabelBySection: MaintenanceSectionCardLabelBySection;
   /** 選定整備任務各區塊是否啟用（載入 detail 後寫入，供代號必填判斷） */
   sectionEnabled: {
     charging: boolean;
@@ -243,6 +248,8 @@ export type ShiftScheduleSelectedRoute = {
   routeName: string;
   /** 路線代號（必填）：班次卡／衝突訊息顯示用，非固定 D／U */
   routeCode?: string | null;
+  /** 即時數據儀表板班次卡左上角顯示文字。 */
+  cardLabel?: string | null;
   groupId: string;
   groupName: string;
   stationIds: string[];
@@ -459,6 +466,7 @@ export function emptyShiftScheduleCreateDraft(
       skipped: false,
       entrySlackBySection: emptyMaintenanceEntrySlackBySectionInput(),
       sectionCodeBySection: emptyMaintenanceSectionCodeBySection(),
+      sectionCardLabelBySection: defaultMaintenanceSectionCardLabelBySection(),
       sectionEnabled: {
         charging: false,
         carWash: false,
@@ -870,6 +878,9 @@ export function serializeShiftScheduleBody(
     maintenanceSectionCodeBySection: normalizeMaintenanceSectionCodeBySection(
       draft.maintenanceTask.sectionCodeBySection,
     ),
+    maintenanceSectionCardLabelBySection: normalizeMaintenanceSectionCardLabelBySection(
+      draft.maintenanceTask.sectionCardLabelBySection,
+    ),
     maintenanceSectionEnabled: draft.maintenanceTask.sectionEnabled,
     timeTemplateId: draft.timeTemplate.templateId,
     timeTemplateName: draft.timeTemplate.templateName,
@@ -995,6 +1006,10 @@ export function parseShiftScheduleSelectedRoutes(raw: unknown): ShiftScheduleSel
         typeof o.routeCode === 'string' && o.routeCode.trim()
           ? o.routeCode.trim().toUpperCase()
           : undefined,
+      cardLabel:
+        typeof o.cardLabel === 'string' && o.cardLabel.trim()
+          ? o.cardLabel.trim().slice(0, 12)
+          : null,
       groupId: typeof o.groupId === 'string' ? o.groupId : '',
       groupName: typeof o.groupName === 'string' ? o.groupName : '',
       stationIds,
@@ -1105,6 +1120,12 @@ export function buildShiftScheduleDraftFromStored(
         body.maintenanceSectionCodeBySection
         && typeof body.maintenanceSectionCodeBySection === 'object'
           ? (body.maintenanceSectionCodeBySection as Partial<MaintenanceSectionCodeBySection>)
+          : undefined,
+      ),
+      sectionCardLabelBySection: normalizeMaintenanceSectionCardLabelBySection(
+        body.maintenanceSectionCardLabelBySection
+        && typeof body.maintenanceSectionCardLabelBySection === 'object'
+          ? (body.maintenanceSectionCardLabelBySection as Partial<MaintenanceSectionCardLabelBySection>)
           : undefined,
       ),
       sectionEnabled: parseSectionEnabled(body.maintenanceSectionEnabled),

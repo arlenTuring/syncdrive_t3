@@ -801,6 +801,7 @@ export function StepShiftRouteGroups({
                   groupId: group.groupId,
                   groupName: group.groupName,
                   routeCode: routeIdentityChanged ? null : selected.routeCode,
+                  cardLabel: routeIdentityChanged ? null : selected.cardLabel,
                   stationIds: [...meta.stationIds],
                 stationDwells: buildStationDwells(
                   meta,
@@ -1010,6 +1011,7 @@ export function StepShiftRouteGroups({
     routeId: route.routeId,
     routeName: route.label,
     routeCode: options?.existing?.routeCode,
+    cardLabel: options?.existing?.cardLabel,
     groupId: group.groupId,
     groupName: group.groupName,
     stationIds: [...route.stationIds],
@@ -1253,6 +1255,12 @@ export function StepShiftRouteGroups({
     patchSelectedRoute(instanceId, {
       routeCode: val.trim() ? val.trim().toUpperCase() : null,
       stationDwellsConfirmed: false,
+    });
+  };
+
+  const updateCardLabel = (instanceId: string, val: string) => {
+    patchSelectedRoute(instanceId, {
+      cardLabel: val.slice(0, 12),
     });
   };
 
@@ -1678,6 +1686,18 @@ export function StepShiftRouteGroups({
                   />
                 </label>
                 <span className="text-xs text-zinc-500">{route.groupName}</span>
+                <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                  <span className="shrink-0">班次卡標籤</span>
+                  <input
+                    type="text"
+                    value={route.cardLabel ?? ''}
+                    maxLength={12}
+                    placeholder="例：環線 A"
+                    onChange={(e) => updateCardLabel(instanceId, e.target.value)}
+                    className="h-7 w-28 rounded-md border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none"
+                    aria-label={`${route.routeName} 班次卡標籤`}
+                  />
+                </label>
                 {!isManual ? (
                   <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
                     <span className="shrink-0">{t('shiftList.routeGroups.serviceDir')}</span>

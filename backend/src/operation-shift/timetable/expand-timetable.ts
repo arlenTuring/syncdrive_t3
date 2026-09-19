@@ -49,6 +49,8 @@ export type TimetableTripDto = {
   task_type: string;
   /** 任務顯示名（保養／行檢／充電等）；正線常為空 */
   label: string | null;
+  /** 儀表板班次卡標籤；由班表作者明確設定，不由路線方向推論。 */
+  card_label: string;
   source: string;
   route_id: string | null;
   route_code: string | null;
@@ -189,6 +191,39 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+const DEFAULT_SECTION_CARD_LABELS: Record<string, string> = {
+  charging: '充電',
+  washing: '洗車',
+  servicing: '保養',
+  inspection: '行檢',
+  standby: '待命',
+  idle: '暫停',
+  dispatch: '調度',
+};
+
+function resolveCardLabel(args: {
+  body: Record<string, unknown>;
+  block: TimetableBlock;
+  route: TimetableRoute | null;
+}): string {
+  const { body, block, route } = args;
+  if (block.source === 'hold') return '暫停';
+  if (block.taskType === 'passenger') return route?.cardLabel?.trim() || '營運';
+
+  const labels = asRecord(body.maintenanceSectionCardLabelBySection);
+  const key = block.taskType === 'washing'
+    ? 'carWash'
+    : block.taskType === 'servicing'
+      ? 'maintenance'
+      : block.taskType === 'inspection'
+        ? 'preTrip'
+        : block.taskType === 'standby'
+          ? 'mobile'
+          : block.taskType;
+  const configured = typeof labels?.[key] === 'string' ? String(labels[key]).trim() : '';
+  return configured || DEFAULT_SECTION_CARD_LABELS[block.taskType] || block.label?.trim() || '整備';
+}
+
 function parseStationDwells(raw: unknown): TimetableStationDwell[] {
   if (!Array.isArray(raw)) return [];
   const out: TimetableStationDwell[] = [];
@@ -246,6 +281,7 @@ export function parseSelectedRoutes(body: Record<string, unknown>): TimetableRou
       routeId: row.routeId,
       routeName: typeof row.routeName === 'string' ? row.routeName : undefined,
       routeCode: typeof row.routeCode === 'string' ? row.routeCode : undefined,
+      cardLabel: typeof row.cardLabel === 'string' ? row.cardLabel.trim() : undefined,
       stationIds,
       stationDwells: parseStationDwells(row.stationDwells),
       stationLegTravels: parseLegs(row.stationLegTravels),
@@ -335,6 +371,7 @@ export function expandTimetableTrips(args: {
       timeline_row: block.timelineRow,
       task_type: block.taskType,
       label: block.label?.trim() || null,
+      card_label: resolveCardLabel({ body: args.body, block, route }),
       source: block.source ?? 'template_bar',
       route_id: block.routeId ?? route?.routeId ?? null,
       route_code: block.routeCode ?? route?.routeCode ?? null,

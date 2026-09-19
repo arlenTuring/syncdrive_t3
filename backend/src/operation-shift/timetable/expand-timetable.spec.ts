@@ -28,6 +28,7 @@ describe('expandTimetableTrips', () => {
         routeId: 'st',
         routeName: 'S2W上行 > T3上行',
         routeCode: 'ST',
+        cardLabel: '環線 A',
         stationIds: ['s2w', 't3'],
         stationDwells: [
           { stationId: 's2w', stationName: 'S2W', dwellSeconds: 0, dwellRequired: false },
@@ -112,6 +113,7 @@ describe('expandTimetableTrips', () => {
     });
     expect(trips).toHaveLength(2);
     expect(trips[0]!.trip_code).toBe('ST0007');
+    expect(trips[0]!.card_label).toBe('環線 A');
     expect(trips[0]!.card_start).toBe('00:07:40');
     expect(trips[0]!.stations[0]!.role).toBe('origin');
     expect(trips[0]!.stations[0]!.departure).toBe('00:07:40');
@@ -120,6 +122,31 @@ describe('expandTimetableTrips', () => {
     expect(last.role).toBe('terminal');
     expect(last.dwell_complete).toBe('00:11:30');
     expect(trips[1]!.stations[0]!.departure).toBe('00:11:30');
+  });
+
+  it('暫停卡固定使用暫停標籤', () => {
+    const trips = expandTimetableTrips({
+      body: {
+        scheduleOutput: {
+          plan: {
+            timelines: [{
+              row: 1,
+              blocks: [{
+                id: 'hold-1',
+                timelineRow: 1,
+                taskType: 'idle',
+                label: '舊文字',
+                source: 'hold',
+                plannedStartMinute: 10,
+                plannedEndMinute: 20,
+              }],
+            }],
+          },
+        },
+      },
+      range: parseTimeRangeQuery({}),
+    });
+    expect(trips[0]!.card_label).toBe('暫停');
   });
 
   it('filters by time range on card overlap', () => {
