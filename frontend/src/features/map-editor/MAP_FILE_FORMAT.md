@@ -238,7 +238,7 @@ State fields:
 
 `type: Track`、`name: RailCross`。兩條軌道交會，四口互通（直行兩條、斜行兩條）。
 
-- `crossTrackPortals`：四個接口各帶一個對外途經點（`kind: cross-waypoint`）。`xM`／`yM` 為 `null` 時，座標由相接軌道的場域座標推得。
+- `crossTrackPortals`：四個接口各帶一個對外途經點（`kind: cross-waypoint`）。`xM`／`yM` 為 `null` 時，座標依序取：圖面上貼著這個口的隔壁軌道的中心線端點（且現場座標與方框內插相差 15 公尺內）→ 參照場域範圍內插。方框內插實測差 2–6 公尺，只當最後的退路。
 
 ```json
 {
@@ -248,6 +248,17 @@ State fields:
   "rb": { "waypointCode": "n2w_u2d_go_start",   "alias": "下行轉N2W正線起點", "xM": null, "yM": null }
 }
 ```
+
+**分支（推導，不存檔）**：檔案裡交叉軌道只有一條折線（`trackGenRealPath`／`trackGenLocalPath` 兩點連線），代表不了兩條斜線。車輛定位與模擬器換算時，每一條通行的路徑（`crossTrackRoutes` 不是 `off`）各推導成一條有自己端點、方向、圖面中心線與現場中心線的軌道：
+
+| 路徑 | 分支代號（例） | 起 → 迄（正向） |
+| --- | --- | --- |
+| `straightTop` | `D03U03_STRAIGHT_TOP` | `lt` → `rt` |
+| `straightBottom` | `D03U03_STRAIGHT_BOTTOM` | `lb` → `rb` |
+| `diagDown` | `D03U03_DIAG_DOWN` | `lt` → `rb` |
+| `diagUp` | `D03U03_DIAG_UP` | `lb` → `rt` |
+
+方向設 `reverse` 時起迄對調、`both` 時雙向。現場中心線是兩個口座標的連線，圖面中心線是兩個口在方塊內的位置連線，兩者頭尾一一對應；端點就是隔壁軌道接進來的那一端，所以換塊與補間自然相連。分支設施 id 為 `<母體 id>~<DIAG_UP…>`，代號（`D03U03_DIAG_UP`）穩定，供訂單／任務記「預期經過哪一條」。實作見 `utils/crossBranches.ts`（前端）與 `src/mapGeometry.js` 的 `expandCrossBranches`（模擬器），兩邊必須一致。
 
 > 舊版的虛擬渡線（`TrackCrossover`）已由交叉軌道取代，不再使用；含有它的舊地圖不能用。
 

@@ -3,7 +3,11 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { getTrackNetwork } from '../vehicles/trackNetwork'
-import { resolveVehiclePlacementAcrossAreas } from '../vehicles/resolveVehicleTrackPlacement'
+import {
+  buildTrackNetwork,
+  previousTrackIdOf,
+  resolveVehiclePlacementAcrossAreas,
+} from '../vehicles/resolveVehicleTrackPlacement'
 import {
   CROSS_BRANCH_ID_SEPARATOR,
   deriveCrossBranches,
@@ -128,5 +132,61 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
     const neighbours = (index.joins.get(up.facilityId) ?? []).map((j) => j.to)
     expect(neighbours.length).toBeGreaterThanOrEqual(2)
     for (const n of neighbours) expect(tracksAreConnected(index, up.facilityId, n)).toBe(true)
+  })
+
+  /*
+   * 重播：模擬器沿「圖台畫的營運路線」走過兩塊交叉軌道時每一點的座標與行進方向
+   * （__fixtures__/route-through-cross.json，從模擬器路線取樣）。
+   * 單一中線時，走斜線的路線離中線最多 6.97 公尺；拆成分支後每條路線都明顯縮小。
+   */
+  describe('沿營運路線重播', () => {
+    type Route = { route: string; zone: string; points: Array<{ x: number; y: number; heading: number }> }
+    const routes = JSON.parse(
+      readFileSync(join(__dirname, '../vehicles/__fixtures__/route-through-cross.json'), 'utf-8'),
+    ) as Route[]
+
+    function crossMaxOffset(mapAreas: typeof areas, route: Route) {
+      const network = buildTrackNetwork(mapAreas)
+      const isCross = new Map<string, boolean>()
+      for (const area of mapAreas) {
+        for (const f of area.facilities ?? []) isCross.set(f.id, f.name === 'RailCross')
+      }
+      let previous: string | undefined
+      let max = 0
+      let placed = 0
+      for (const p of route.points) {
+        const hit = resolveVehiclePlacementAcrossAreas(mapAreas, p.x, p.y, network, {
+          headingRad: p.heading,
+          speedMps: 5,
+          previousTrackId: previous,
+        })
+        previous = previousTrackIdOf(hit, false)
+        if (hit) placed += 1
+        if (hit && isCross.get(hit.placement.trackId)) {
+          max = Math.max(max, Math.abs(hit.placement.network?.offsetM ?? 0))
+        }
+      }
+      return { max, placed }
+    }
+
+    it('每一點都定得到位，走斜線的路線離中心線的最大偏移縮小', () => {
+      const derived = withCrossBranchTracks(areas)
+      let improved = 0
+      for (const route of routes) {
+        const before = crossMaxOffset(areas, route)
+        const after = crossMaxOffset(derived, route)
+        expect(after.placed, route.route).toBe(route.points.length)
+        // 沒有任何一條路線變差（容許 0.05 公尺的數值誤差）
+        expect(after.max, route.route).toBeLessThanOrEqual(before.max + 0.05)
+        if (after.max < before.max - 1) improved += 1
+      }
+      // 至少一半的路線改善超過 1 公尺
+      expect(improved).toBeGreaterThanOrEqual(Math.ceil(routes.length / 2))
+    })
+
+    it('拆分支後整體最大偏移不超過 3.5 公尺（單一中線時是 6.97）', () => {
+      const derived = withCrossBranchTracks(areas)
+      for (const route of routes) expect(crossMaxOffset(derived, route).max, route.route).toBeLessThan(3.5)
+    })
   })
 })
