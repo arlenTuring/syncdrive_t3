@@ -1,10 +1,11 @@
 {
+  "id": "demo-plane",
   "name": "SyncDrive 總控大屏 (3840×1080)",
   "width": 3840,
   "height": 1080,
   "elements": [
     {
-      "id": "j85qe5y",
+      "id": "iq2s0le",
       "type": "canvas",
       "x": 32,
       "y": 32,
@@ -16,7 +17,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "zq45np8",
+          "id": "rzsgg8z",
           "type": "text",
           "x": 12,
           "y": 12,
@@ -29,6 +30,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -38,7 +40,7 @@
           "colorRules": []
         },
         {
-          "id": "sruvveo",
+          "id": "t1fmzy2",
           "type": "stat-card",
           "x": 12,
           "y": 42,
@@ -67,11 +69,12 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_events,\n  COUNT(*) FILTER (WHERE NOT COALESCE(is_acknowledged, false))::int AS unprocessed_events,\n  COUNT(*) FILTER (WHERE COALESCE(is_acknowledged, false))::int AS processed_events\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         },
         {
-          "id": "rrhh64d",
+          "id": "57dt4zt",
           "type": "stat-card",
           "x": 118,
           "y": 42,
@@ -100,11 +103,12 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_events,\n  COUNT(*) FILTER (WHERE NOT COALESCE(is_acknowledged, false))::int AS unprocessed_events,\n  COUNT(*) FILTER (WHERE COALESCE(is_acknowledged, false))::int AS processed_events\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         },
         {
-          "id": "nelml9d",
+          "id": "anrfa3u",
           "type": "stat-card",
           "x": 224,
           "y": 42,
@@ -133,16 +137,17 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_events,\n  COUNT(*) FILTER (WHERE NOT COALESCE(is_acknowledged, false))::int AS unprocessed_events,\n  COUNT(*) FILTER (WHERE COALESCE(is_acknowledged, false))::int AS processed_events\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         }
       ]
     },
     {
-      "id": "tgzcwy7",
+      "id": "te9unct",
       "type": "canvas",
       "x": 32,
-      "y": 131,
+      "y": 132,
       "width": 330,
       "height": 84,
       "label": "事件輪播",
@@ -151,7 +156,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "883zawr",
+          "id": "1oi6ir8",
           "type": "color-block",
           "x": 0,
           "y": 0,
@@ -164,12 +169,12 @@
           "opacity": 100
         },
         {
-          "id": "klxzqd2",
+          "id": "xcuj8ys",
           "type": "color-block",
-          "x": 10,
+          "x": 8,
           "y": 8,
-          "width": 51,
-          "height": 70,
+          "width": 46,
+          "height": 68,
           "backgroundColor": "#FB2C36",
           "borderRadius": 8,
           "borderWidth": 1,
@@ -178,13 +183,14 @@
           "severityStripColor": true,
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT severity\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "1ao69q9",
+          "id": "2m717qm",
           "type": "text",
-          "x": 15,
-          "y": 21,
+          "x": 10,
+          "y": 14,
           "width": 42,
           "height": 18,
           "content": "",
@@ -194,6 +200,7 @@
           "fontWeight": "bold",
           "color": "#030712",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -203,23 +210,25 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT category\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "category",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "n91e9ys",
+          "id": "xado38x",
           "type": "text",
-          "x": 9,
-          "y": 42,
-          "width": 54,
-          "height": 29,
+          "x": 10,
+          "y": 34,
+          "width": 42,
+          "height": 18,
           "content": "",
-          "fontSize": 12,
+          "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "bold",
           "color": "#030712",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -229,15 +238,16 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT vehicle_code\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "vehicle_code",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "agzdcnt",
+          "id": "5dvl5yb",
           "type": "status-badge",
           "x": 64,
           "y": 8,
-          "width": 81,
+          "width": 74,
           "height": 24,
           "valueField": "status_label",
           "defaultLabel": "—",
@@ -254,9 +264,9 @@
           "outlineBorderColor": "#99A1AF"
         },
         {
-          "id": "mg519re",
+          "id": "gxfmykf",
           "type": "text",
-          "x": 136,
+          "x": 138,
           "y": 8,
           "width": 148,
           "height": 24,
@@ -267,6 +277,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -276,16 +287,17 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT event_time\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "event_time",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "b2tpe36",
+          "id": "39kkqev",
           "type": "text",
-          "x": 289,
+          "x": 290,
           "y": 16,
-          "width": 13,
-          "height": 10,
+          "width": 8,
+          "height": 8,
           "content": "",
           "fontSize": 8,
           "lineHeight": 1,
@@ -293,6 +305,7 @@
           "fontWeight": "bold",
           "color": "#51A2FF",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -302,16 +315,17 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT CASE WHEN COALESCE(is_acknowledged, false) THEN '' ELSE '●' END AS dot\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "dot",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "tlavwxc",
+          "id": "f53kkjs",
           "type": "text",
-          "x": 68,
+          "x": 64,
           "y": 34,
-          "width": 170,
-          "height": 29,
+          "width": 162,
+          "height": 24,
           "content": "",
           "fontSize": 18,
           "lineHeight": 1.33,
@@ -319,6 +333,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -328,14 +343,15 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT message\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "message",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "filw3tu",
+          "id": "kry6rkl",
           "type": "text",
-          "x": 68,
-          "y": 63,
+          "x": 230,
+          "y": 37,
           "width": 68,
           "height": 18,
           "content": "",
@@ -345,6 +361,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -354,7 +371,8 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT sub_label\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "sub_label",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         }
       ],
@@ -364,7 +382,8 @@
       "slotKeyField": "event_id",
       "dataSourceId": "default-internal",
       "sqlQuery": "SELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12",
-      "refreshInterval": 15,
+      "refreshInterval": 0,
+      "refreshMode": "event",
       "variableName": "item",
       "groupVariableMode": "index",
       "groupTileFit": "fixed",
@@ -380,7 +399,7 @@
       },
       "childrenDefault": [
         {
-          "id": "6vraekp",
+          "id": "w7z7ce8",
           "type": "empty-state",
           "x": 0,
           "y": 0,
@@ -397,7 +416,7 @@
       ],
       "childrenNormal": [
         {
-          "id": "883zawr",
+          "id": "1oi6ir8",
           "type": "color-block",
           "x": 0,
           "y": 0,
@@ -410,12 +429,12 @@
           "opacity": 100
         },
         {
-          "id": "klxzqd2",
+          "id": "xcuj8ys",
           "type": "color-block",
-          "x": 10,
+          "x": 8,
           "y": 8,
-          "width": 51,
-          "height": 70,
+          "width": 46,
+          "height": 68,
           "backgroundColor": "#FB2C36",
           "borderRadius": 8,
           "borderWidth": 1,
@@ -424,13 +443,14 @@
           "severityStripColor": true,
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT severity\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "1ao69q9",
+          "id": "2m717qm",
           "type": "text",
-          "x": 15,
-          "y": 21,
+          "x": 10,
+          "y": 14,
           "width": 42,
           "height": 18,
           "content": "",
@@ -440,6 +460,7 @@
           "fontWeight": "bold",
           "color": "#030712",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -449,23 +470,25 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT category\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "category",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "n91e9ys",
+          "id": "xado38x",
           "type": "text",
-          "x": 9,
-          "y": 42,
-          "width": 54,
-          "height": 29,
+          "x": 10,
+          "y": 34,
+          "width": 42,
+          "height": 18,
           "content": "",
-          "fontSize": 12,
+          "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "bold",
           "color": "#030712",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -475,15 +498,16 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT vehicle_code\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "vehicle_code",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "agzdcnt",
+          "id": "5dvl5yb",
           "type": "status-badge",
           "x": 64,
           "y": 8,
-          "width": 81,
+          "width": 74,
           "height": 24,
           "valueField": "status_label",
           "defaultLabel": "—",
@@ -500,9 +524,9 @@
           "outlineBorderColor": "#99A1AF"
         },
         {
-          "id": "mg519re",
+          "id": "gxfmykf",
           "type": "text",
-          "x": 136,
+          "x": 138,
           "y": 8,
           "width": 148,
           "height": 24,
@@ -513,6 +537,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -522,16 +547,17 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT event_time\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "event_time",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "b2tpe36",
+          "id": "39kkqev",
           "type": "text",
-          "x": 289,
+          "x": 290,
           "y": 16,
-          "width": 13,
-          "height": 10,
+          "width": 8,
+          "height": 8,
           "content": "",
           "fontSize": 8,
           "lineHeight": 1,
@@ -539,6 +565,7 @@
           "fontWeight": "bold",
           "color": "#51A2FF",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -548,16 +575,17 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT CASE WHEN COALESCE(is_acknowledged, false) THEN '' ELSE '●' END AS dot\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "dot",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "tlavwxc",
+          "id": "f53kkjs",
           "type": "text",
-          "x": 68,
+          "x": 64,
           "y": 34,
-          "width": 170,
-          "height": 29,
+          "width": 162,
+          "height": 24,
           "content": "",
           "fontSize": 18,
           "lineHeight": 1.33,
@@ -565,6 +593,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -574,14 +603,15 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT message\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "message",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         },
         {
-          "id": "filw3tu",
+          "id": "kry6rkl",
           "type": "text",
-          "x": 68,
-          "y": 63,
+          "x": 230,
+          "y": 37,
           "width": 68,
           "height": 18,
           "content": "",
@@ -591,6 +621,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -600,13 +631,14 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT sub_label\nFROM (\nSELECT\n  event_id,\n  COALESCE(category_label, '線控') AS category,\n  vehicle_code,\n  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,\n  to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,\n  COALESCE(display_message, detail, event_code::text) AS message,\n  COALESCE(sub_label, vehicle_code) AS sub_label,\n  COALESCE(is_acknowledged, false) AS is_acknowledged,\n  severity::text AS severity\nFROM security_event_logs\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\nORDER BY created_at DESC\nLIMIT 12\n) AS __rows\nLIMIT 1 OFFSET GREATEST(0, COALESCE({item}, 0)::int)",
           "valueField": "sub_label",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "textWrap": "nowrap"
         }
       ]
     },
     {
-      "id": "zwmo573",
+      "id": "9882sq5",
       "type": "canvas",
       "x": 382,
       "y": 32,
@@ -618,7 +650,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "hprko20",
+          "id": "cvse623",
           "type": "text",
           "x": 12,
           "y": 12,
@@ -631,6 +663,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -640,7 +673,7 @@
           "colorRules": []
         },
         {
-          "id": "gnszzz0",
+          "id": "3oiy1nl",
           "type": "stat-card",
           "x": 12,
           "y": 42,
@@ -669,11 +702,12 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         },
         {
-          "id": "t647jfa",
+          "id": "vafg9a9",
           "type": "stat-card",
           "x": 118,
           "y": 42,
@@ -702,11 +736,12 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         },
         {
-          "id": "t3oxc2n",
+          "id": "0c8j1iv",
           "type": "stat-card",
           "x": 224,
           "y": 42,
@@ -735,11 +770,12 @@
           "colorRules": [],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500"
         },
         {
-          "id": "x365r2p",
+          "id": "e92sbp2",
           "type": "color-block",
           "x": 12,
           "y": 100,
@@ -752,7 +788,7 @@
           "opacity": 100
         },
         {
-          "id": "ze5a12m",
+          "id": "yag95da",
           "type": "text",
           "x": 24,
           "y": 108,
@@ -765,6 +801,7 @@
           "fontWeight": "bold",
           "color": "#51A2FF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -774,12 +811,13 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
           "valueField": "achievement_line",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "contentPadding": "0",
           "textWrap": "nowrap"
         },
         {
-          "id": "46trh7k",
+          "id": "4ibk0fe",
           "type": "text",
           "x": 138,
           "y": 108,
@@ -792,6 +830,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -802,12 +841,13 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
           "valueField": "remaining_line",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "contentPadding": "0",
           "textWrap": "nowrap"
         },
         {
-          "id": "1324o4p",
+          "id": "d62nh7q",
           "type": "progress-bar",
           "x": 24,
           "y": 134,
@@ -834,13 +874,14 @@
           ],
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COUNT(*)::int AS total_shifts,\n  COUNT(*) FILTER (WHERE status = 'END')::int AS completed_shifts,\n  COUNT(*) FILTER (WHERE status = 'FAULTED')::int AS delayed_shifts,\n  COALESCE(\n    ROUND(\n      100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n      / NULLIF(COUNT(*)::numeric, 0)\n    )::int,\n    0\n  ) AS achievement_pct,\n  (\n    '達成了 '\n    || COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    )::text\n    || '%'\n  ) AS achievement_line,\n  (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::int AS remaining_shifts,\n  CASE\n    WHEN COALESCE(\n      ROUND(\n        100.0 * COUNT(*) FILTER (WHERE status = 'END')::numeric\n        / NULLIF(COUNT(*)::numeric, 0)\n      )::int,\n      0\n    ) >= 100 THEN ''\n    ELSE (\n      '剩餘'\n      || (COUNT(*) - COUNT(*) FILTER (WHERE status = 'END'))::text\n      || '班次'\n    )\n  END AS remaining_line\nFROM operation_orders\nWHERE created_at >= (EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000)::bigint\n  AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontSize": 12
         }
       ]
     },
     {
-      "id": "6rhr2zd",
+      "id": "lyo4y87",
       "type": "canvas",
       "x": 732,
       "y": 32,
@@ -852,7 +893,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "8lrn86j",
+          "id": "bgiaeqz",
           "type": "color-block",
           "x": 0,
           "y": 0,
@@ -866,11 +907,11 @@
           "bindBorderColorVar": "card_border_color"
         },
         {
-          "id": "lohil21",
+          "id": "sdte672",
           "type": "status-badge",
-          "x": 4,
+          "x": 12,
           "y": 12,
-          "width": 56,
+          "width": 44,
           "height": 24,
           "valueField": "{direction_label}",
           "defaultLabel": "—",
@@ -885,11 +926,11 @@
           "variableColorKey": "direction_pill_color"
         },
         {
-          "id": "hvjzi3w",
+          "id": "tyvqwmy",
           "type": "text",
-          "x": 60,
+          "x": 62,
           "y": 12,
-          "width": 55,
+          "width": 47,
           "height": 24,
           "content": "{trip_code}",
           "fontSize": 16,
@@ -898,6 +939,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -908,19 +950,20 @@
           "contentPadding": "0"
         },
         {
-          "id": "g56eu2t",
+          "id": "cypu7fz",
           "type": "text",
           "x": 113,
           "y": 12,
-          "width": 71,
+          "width": 104,
           "height": 24,
           "content": "{vehicle_code}",
-          "fontSize": 16,
+          "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -931,11 +974,11 @@
           "contentPadding": "0"
         },
         {
-          "id": "297bvg1",
+          "id": "vyypy45",
           "type": "status-badge",
-          "x": 207,
+          "x": 223,
           "y": 12,
-          "width": 75,
+          "width": 58,
           "height": 24,
           "valueField": "{status_label}",
           "defaultLabel": "—",
@@ -950,7 +993,7 @@
           "variableColorKey": "status_color"
         },
         {
-          "id": "3ooovxk",
+          "id": "r5d4uzz",
           "type": "text",
           "x": 12,
           "y": 48,
@@ -963,6 +1006,7 @@
           "fontWeight": "normal",
           "color": "#51A2FF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -973,19 +1017,20 @@
           "contentPadding": "0"
         },
         {
-          "id": "febdf9r",
+          "id": "epujlyb",
           "type": "text",
-          "x": 22,
+          "x": 36,
           "y": 48,
-          "width": 68,
+          "width": 57,
           "height": 18,
-          "content": "下一站",
+          "content": "{station_label}",
           "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -994,7 +1039,7 @@
           "colorRules": []
         },
         {
-          "id": "m55v3nx",
+          "id": "nt4y1pb",
           "type": "text",
           "x": 36,
           "y": 66,
@@ -1007,6 +1052,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1017,7 +1063,7 @@
           "contentPadding": "0"
         },
         {
-          "id": "xqv0vug",
+          "id": "xoh3jel",
           "type": "text",
           "x": 164,
           "y": 48,
@@ -1030,6 +1076,7 @@
           "fontWeight": "normal",
           "color": "#51A2FF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1040,19 +1087,20 @@
           "contentPadding": "0"
         },
         {
-          "id": "jhidb8d",
+          "id": "axtclpr",
           "type": "text",
-          "x": 177,
+          "x": 188,
           "y": 48,
-          "width": 85,
+          "width": 71,
           "height": 18,
-          "content": "剩餘到站",
+          "content": "{eta_label}",
           "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1061,7 +1109,7 @@
           "colorRules": []
         },
         {
-          "id": "vsooxip",
+          "id": "u7sm1od",
           "type": "text",
           "x": 188,
           "y": 66,
@@ -1074,6 +1122,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1084,7 +1133,7 @@
           "contentPadding": "0"
         },
         {
-          "id": "kbxg741",
+          "id": "kj13wg8",
           "type": "route-progress",
           "x": 0,
           "y": 94,
@@ -1124,13 +1173,31 @@
           ],
           "actionIconRules": [
             {
+              "id": "op-enter",
+              "label": "進站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "enter",
+              "iconFile": "enter.png",
+              "priority": 0
+            },
+            {
+              "id": "op-exit",
+              "label": "出站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "exit",
+              "iconFile": "exit.png",
+              "priority": 1
+            },
+            {
               "id": "op-music",
               "label": "音樂",
               "sourceVarKey": "operation_action",
               "matchOp": "eq",
               "threshold": "music",
               "iconFile": "music.png",
-              "priority": 0
+              "priority": 2
             },
             {
               "id": "op-door_open",
@@ -1139,7 +1206,7 @@
               "matchOp": "eq",
               "threshold": "door_open",
               "iconFile": "door-open.png",
-              "priority": 1
+              "priority": 3
             },
             {
               "id": "op-door_close",
@@ -1148,7 +1215,7 @@
               "matchOp": "eq",
               "threshold": "door_close",
               "iconFile": "door-close.png",
-              "priority": 2
+              "priority": 4
             },
             {
               "id": "op-signal",
@@ -1157,7 +1224,7 @@
               "matchOp": "eq",
               "threshold": "signal",
               "iconFile": "signal.png",
-              "priority": 3
+              "priority": 5
             },
             {
               "id": "op-alert",
@@ -1166,7 +1233,7 @@
               "matchOp": "eq",
               "threshold": "alert",
               "iconFile": "alert.png",
-              "priority": 4
+              "priority": 6
             },
             {
               "id": "op-dispatch",
@@ -1175,7 +1242,7 @@
               "matchOp": "eq",
               "threshold": "dispatch",
               "iconFile": "dispatch.png",
-              "priority": 5
+              "priority": 7
             },
             {
               "id": "op-charging",
@@ -1184,7 +1251,7 @@
               "matchOp": "eq",
               "threshold": "charging",
               "iconFile": "charging.png",
-              "priority": 6
+              "priority": 8
             },
             {
               "id": "op-wash",
@@ -1193,7 +1260,7 @@
               "matchOp": "eq",
               "threshold": "wash",
               "iconFile": "wash.png",
-              "priority": 7
+              "priority": 9
             },
             {
               "id": "op-maintenance",
@@ -1202,7 +1269,7 @@
               "matchOp": "eq",
               "threshold": "maintenance",
               "iconFile": "maintenance.png",
-              "priority": 8
+              "priority": 10
             },
             {
               "id": "op-repair",
@@ -1211,7 +1278,7 @@
               "matchOp": "eq",
               "threshold": "repair",
               "iconFile": "repair.png",
-              "priority": 9
+              "priority": 11
             },
             {
               "id": "op-parking",
@@ -1220,7 +1287,7 @@
               "matchOp": "eq",
               "threshold": "parking",
               "iconFile": "parking.png",
-              "priority": 10
+              "priority": 12
             },
             {
               "id": "alert-flag",
@@ -1241,16 +1308,17 @@
             }
           ],
           "variant": "track",
+          "trackStyle": "mainline",
           "animateSegmentMovement": true,
           "dataSourceId": "default-internal",
           "sqlQuery": "",
           "refreshInterval": 0,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/operation/update",
-          "mqttProgressPath": "route_progress"
+          "mqttProgressPath": "current_leg.eta_seconds"
         },
         {
-          "id": "12tnxt8",
+          "id": "xnj3cmi",
           "type": "color-block",
           "x": 0,
           "y": 166,
@@ -1263,7 +1331,7 @@
           "opacity": 100
         },
         {
-          "id": "2c81j3c",
+          "id": "epi4ruq",
           "type": "text",
           "x": 6,
           "y": 172,
@@ -1276,6 +1344,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1287,11 +1356,11 @@
           "contentPadding": "0 2px"
         },
         {
-          "id": "zagb6hd",
+          "id": "7waqtur",
           "type": "text",
-          "x": 184,
+          "x": 146,
           "y": 172,
-          "width": 98,
+          "width": 146,
           "height": 18,
           "content": "結束 {end_time}",
           "fontSize": 12,
@@ -1300,6 +1369,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1328,13 +1398,14 @@
       "templateWidth": 293,
       "templateHeight": 196,
       "dataSourceId": "default-internal",
-      "sqlQuery": "WITH active_orders AS (\n  SELECT\n    o.*,\n    v.display_name,\n    /*\n     * 方向。\n     *\n     * 即時調度引擎產的訂單沒有 route_id（operation_routes 只有兩筆舊的 D/U 路線），\n     * 於是 direction_letter 一律是 null，下面的 CASE 全部落到同一邊——實測整排卡片\n     * 都顯示「上行」，下一站都是「N2W下行」。\n     *\n     * 站名本身就帶方向（「S2W上行出發」「N2W下行出發」），那是最可靠的來源。\n     */\n    COALESCE(\n      r.direction_letter,\n      CASE\n        WHEN o.payload->'origin'->>'name' LIKE '%下行%' THEN 'D'\n        WHEN o.payload->'origin'->>'name' LIKE '%上行%' THEN 'U'\n        ELSE NULL\n      END\n    ) AS trip_direction,\n    CASE\n      WHEN o.planned_start IS NOT NULL THEN\n        EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60\n        + EXTRACT(MINUTE FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int\n      WHEN o.trip_code ~ '^[DU][0-9]{4}$'\n        AND SUBSTRING(o.trip_code, 2, 2)::int BETWEEN 0 AND 23\n        AND SUBSTRING(o.trip_code, 4, 2)::int BETWEEN 0 AND 59\n        THEN SUBSTRING(o.trip_code, 2, 2)::int * 60 + SUBSTRING(o.trip_code, 4, 2)::int\n      ELSE NULL\n    END AS trip_start_minutes,\n    first_st.station_id AS route_origin,\n    mid_st.station_id AS route_mid,\n    last_st.station_id AS route_destination,\n    /*\n     * 一台車只列一張單。\n     *\n     * 上一班的時間窗還在寬限期內、下一班已經開始的那幾十秒，同一台車會有兩張單都算\n     * 「還在跑」，卡片就出現兩張同車不同班次的。正在跑的那張優先，其次才是接下來要發的。\n     */\n    ROW_NUMBER() OVER (\n      PARTITION BY o.vehicle_code\n      ORDER BY\n        (\n          o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n          AND COALESCE(o.planned_end, o.planned_start + 600000)\n              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n        ) DESC,\n        CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,\n        o.planned_start\n    ) AS vehicle_rank\n  FROM operation_orders o\n  JOIN vehicles v ON v.vehicle_code = o.vehicle_code\n  LEFT JOIN operation_routes r ON r.route_id = o.route_id\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order ASC LIMIT 1\n  ) first_st ON true\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order ASC OFFSET 1 LIMIT 1\n  ) mid_st ON true\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order DESC LIMIT 1\n  ) last_st ON true\n  WHERE o.line_kind = 'MAINLINE'\n    AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL\n    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    /*\n     * 只看今天。\n     *\n     * 少了這一條，同一個班次代號會把每一天的那一筆都撈出來——實測 TS1217 一次回\n     * 十九列（8/29 到 9/16 各一），畫面上看起來像重複的卡片。而且排序從最早的\n     * 00:00 開始，正在跑的 13:20 那幾班反而看不到。\n     */\n    AND o.planned_start >= (\n      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())))) * 1000\n    )::bigint\n    AND o.planned_start < (\n      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())) + interval '1 day')) * 1000\n    )::bigint\n    /*\n     * 只留還沒跑完的。\n     *\n     * 排班引擎跑完一班不一定會把狀態收成 END：今天 218 筆裡有 208 筆掛在 PROCESSING，\n     * 其中 204 筆的 planned_end 早就過了。真正在跑的只有 4 筆（四台車各一筆，payload\n     * 的 updated_at 是幾秒前）。不擋掉的話卡片會被半夜那幾百筆殭屍班次塞滿。\n     *\n     * 留 60 秒寬限，剛到站的那一班不會瞬間消失。\n     */\n    AND COALESCE(o.planned_end, o.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n),\nroute_json AS (\n  SELECT\n    o.order_id,\n    json_agg(\n      json_build_object(\n        'name', COALESCE(NULLIF(rs.station_display_name, ''), rs.station_id),\n        'station_id', rs.station_id,\n        'actions', COALESCE((\n          SELECT json_agg(json_build_object(\n            'action_id', a.action_id,\n            'action_type', a.action_type,\n            'action_status', a.action_status,\n            'trigger_offset_m', a.trigger_offset_m\n          ) ORDER BY a.action_id)\n          FROM order_action_states a\n          WHERE a.order_id = o.order_id AND a.station_id = rs.station_id\n        ), '[]'::json)\n      ) ORDER BY rs.sequence_order\n    )::text AS route_stations\n  FROM active_orders o\n  JOIN operation_route_stations rs ON rs.route_id = o.route_id\n  GROUP BY o.order_id\n)\nSELECT\n  o.order_id AS shift_key,\n  o.vehicle_code,\n  o.trip_code,\n  CONCAT(o.trip_code, ' ', COALESCE(o.display_name, o.vehicle_code)) AS trip_header,\n  CASE WHEN o.trip_direction = 'D' THEN '下行' ELSE '上行' END AS direction_label,\n  CASE WHEN o.trip_direction = 'D' THEN '#8E51FF' ELSE '#51A2FF' END AS direction_pill_bg,\n  '#FFFFFF' AS direction_pill_color,\n  '下一站' AS station_label,\n  '剩餘到站' AS eta_label,\n  o.status AS order_status,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '故障'\n    WHEN o.status = 'PENDING' THEN '待發'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '延誤'\n    WHEN o.status = 'PROCESSING' THEN '準時'\n    ELSE '待命'\n  END AS status_label,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '#450a0a'\n    WHEN o.status = 'PENDING' THEN '#27272a'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#422006'\n    WHEN o.status = 'PROCESSING' THEN 'rgba(0, 212, 146, 0.3)'\n    ELSE '#27272a'\n  END AS status_bg,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '#f87171'\n    WHEN o.status = 'PENDING' THEN '#a1a1aa'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'\n    WHEN o.status = 'PROCESSING' THEN '#00BC7D'\n    ELSE '#a1a1aa'\n  END AS status_color,\n  CASE\n    WHEN o.status = 'FAULTED' THEN 'rgba(239,68,68,0.75)'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'rgba(249,115,22,0.75)'\n    WHEN o.status = 'PROCESSING' THEN '#009966'\n    WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.45)'\n    ELSE 'rgba(113,113,122,0.35)'\n  END AS card_border_color,\n  /*\n   * 起／中／訖三站直接取 payload 的站序。\n   *\n   * 這三欄原本是照方向寫死的字串，方向一 null 就整排一樣。真正的站序在\n   * payload->'stations' 裡，每一班都不同，照它取才是這一班真的會停的站。\n   */\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int ASC LIMIT 1),\n    CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END\n  ) AS st_a,\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int ASC OFFSET 1 LIMIT 1),\n    CASE WHEN o.trip_direction = 'U' THEN 'T3上行' ELSE 'T3下行' END\n  ) AS st_b,\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int DESC LIMIT 1),\n    CASE WHEN o.trip_direction = 'U' THEN 'N2W上行' ELSE 'S2W下行' END\n  ) AS st_c,\n  COALESCE(\n    NULLIF(rj.route_stations, '[]'),\n    -- 即時調度引擎下的訂單沒有 route_id（那張表只有兩筆舊的 D/U 路線），\n    -- 站序改放在 payload。這一支才是新班表的真站序，優先於下面的固定備援。\n    (\n      SELECT json_agg(\n        json_build_object(\n          'name', COALESCE(NULLIF(st->>'station_name', ''), st->>'station_id'),\n          'station_id', st->>'station_id',\n          -- 這一站是停靠還是只是經過。班表裡「上行轉N2W正線起點」這種轉線點也算一站，\n          -- 但車不停，停留秒數是 0。卡片要不要畫它由元件決定，這裡只把事實帶上去。\n          'role', st->>'role',\n          'dwell_seconds', COALESCE((st->>'dwell_seconds')::int, 0),\n          'actions', '[]'::json\n        ) ORDER BY (st->>'order')::int\n      )::text\n      FROM jsonb_array_elements(\n        CASE\n          WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations'\n          ELSE '[]'::jsonb\n        END\n      ) st\n    ),\n    CASE\n      WHEN o.trip_direction = 'U' THEN\n        '[{\"name\":\"S2W上行\",\"station_id\":\"station_6\"},{\"name\":\"T3上行\",\"station_id\":\"station_4\"},{\"name\":\"N2W上行\",\"station_id\":\"station_1\"}]'\n      ELSE '[{\"name\":\"N2W下行\",\"station_id\":\"station_2\"},{\"name\":\"T3下行\",\"station_id\":\"station_3\"},{\"name\":\"S2W下行\",\"station_id\":\"station_5\"}]'\n    END\n  ) AS route_stations,\n  CASE WHEN o.trip_direction = 'U' THEN 1 ELSE 0 END AS trip_leg_hint,\n  /*\n   * 車子現在跑在第幾段（0 = 第一站到第二站）。\n   *\n   * 原本是拿 current_leg 的目標站去跟 route_mid 比，對到就 0、對不到就 1——route_mid\n   * 來自 route_id，而這裡每一筆 route_id 都是 null，所以永遠是 1。班次的站數又不是固定\n   * 三站（實測 2 到 5 站都有），只有 0/1 兩種值也不夠用。\n   *\n   * 改成去 payload 的站序裡找目標站排第幾，減一就是段號。\n   */\n  CASE\n    WHEN o.status = 'PENDING' THEN 0\n    ELSE COALESCE(\n      (\n        SELECT GREATEST((st->>'order')::int - 2, 0)\n        FROM jsonb_array_elements(\n          CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n        ) st\n        WHERE st->>'station_id' = o.payload->'current_leg'->>'target_station_id'\n        LIMIT 1\n      ),\n      (o.payload->>'segment_index')::int,\n      0\n    )\n  END AS segment_index,\n  -- 這一段還剩幾 %。引擎算出來的值會超過 100（實測 121，因為 eta 比這段的基準還長），\n  -- 夾回 0–100 再送出去，免得進度條倒著長。\n  LEAST(100, GREATEST(0, CASE\n    WHEN o.status = 'PENDING' THEN 100\n    WHEN o.status = 'FAULTED' THEN COALESCE(FLOOR((o.payload->>'segment_remain_pct')::numeric)::int, 100)\n    ELSE COALESCE(\n      FLOOR((o.payload->>'segment_remain_pct')::numeric)::int,\n      CASE\n        WHEN jsonb_typeof(o.payload->'current_leg') = 'object'\n          AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0\n          AND COALESCE((o.payload->'current_leg'->>'distance_to_target_m')::numeric, 0) <= 0\n        THEN 0\n        WHEN COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0 THEN 100\n        WHEN COALESCE(\n          (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric,\n          0\n        ) > 0 THEN ROUND(\n          (o.payload->'current_leg'->>'eta_seconds')::numeric\n          / (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric\n          * 100\n        )::int\n        ELSE 100\n      END\n    )\n  END)) AS segment_remain_pct,\n  /*\n   * 下一站。\n   *\n   * 原本整段都靠 route_id 去 operation_route_stations 撈站名，route_id 是 null 就\n   * 整排顯示同一個固定字串（實測每張卡都寫「N2W下行」）。真正的下一站在\n   * payload->'current_leg'->>'target_station_id'，站名在 payload->'stations' 裡。\n   * 還沒發車的就顯示起站，其餘退回終點站名。\n   */\n  COALESCE(\n    (\n      SELECT COALESCE(NULLIF(TRIM(rs.station_display_name), ''), rs.station_id)\n      FROM operation_route_stations rs\n      WHERE rs.route_id = o.route_id\n        AND rs.station_id = NULLIF(TRIM(o.next_station), '')\n      LIMIT 1\n    ),\n    (\n      /*\n       * 「下一站」要說的是下一個會停的站。\n       *\n       * 車端回報的目標站可能是轉線點（「上行轉N2W正線起點」，停留 0 秒），那是路徑上的\n       * 一個點，不是一站。從目標站往後找第一個真的會停的站——起站、終點站，或停留\n       * 秒數大於 0 的中間站。\n       */\n      SELECT st->>'station_name'\n      FROM jsonb_array_elements(\n        CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n      ) st\n      WHERE (st->>'order')::int >= COALESCE(\n        (\n          SELECT (target->>'order')::int\n          FROM jsonb_array_elements(\n            CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n          ) target\n          WHERE target->>'station_id' = COALESCE(\n            NULLIF(TRIM(o.next_station), ''),\n            o.payload->'current_leg'->>'target_station_id'\n          )\n          LIMIT 1\n        ),\n        1\n      )\n      AND (\n        st->>'role' IN ('origin', 'terminal')\n        OR COALESCE((st->>'dwell_seconds')::int, 0) > 0\n      )\n      ORDER BY (st->>'order')::int\n      LIMIT 1\n    ),\n    CASE WHEN o.status = 'PENDING' THEN o.payload->'origin'->>'name' END,\n    o.payload->'destination'->>'name',\n    CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END\n  ) AS next_station,\n  CASE\n    WHEN o.status = 'PENDING' AND o.trip_start_minutes IS NOT NULL THEN\n      LPAD((\n        GREATEST(\n          0,\n          o.trip_start_minutes\n            - (EXTRACT(HOUR FROM NOW())::int * 60 + EXTRACT(MINUTE FROM NOW())::int)\n        ) / 60\n      )::int::text, 2, '0')\n      || ':'\n      || LPAD((\n        GREATEST(\n          0,\n          o.trip_start_minutes\n            - (EXTRACT(HOUR FROM NOW())::int * 60 + EXTRACT(MINUTE FROM NOW())::int)\n        ) % 60\n      )::int::text, 2, '0')\n    ELSE COALESCE(\n      LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0))) / 60)::int::text, 2, '0')\n      || ':'\n      || LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0)))::int % 60)::text, 2, '0'),\n      NULLIF(TRIM(o.eta_remain), ''),\n      '00:00'\n    )\n  END AS eta_remain,\n  CASE WHEN COALESCE(o.delay_minutes, 0) > 0 THEN CONCAT('+', o.delay_minutes, '分') ELSE '' END AS eta_delay,\n  CASE\n    WHEN o.trip_start_minutes IS NOT NULL THEN\n      LPAD(((o.trip_start_minutes / 60) % 24)::int::text, 2, '0') || ':' ||\n      LPAD((o.trip_start_minutes % 60)::int::text, 2, '0')\n    ELSE to_char(to_timestamp(COALESCE(o.planned_start, o.created_at) / 1000.0), 'HH24:MI')\n  END AS depart_time,\n  -- 到站時間。原本是「開車時間 + 6 分」的假值，但每一筆都有 planned_end，照它寫。\n  to_char(\n    timezone(\n      'Asia/Taipei',\n      to_timestamp(COALESCE(o.planned_end, (o.payload->'destination'->>'arrive_at')::bigint, o.created_at + 360000) / 1000.0)\n    ),\n    'HH24:MI'\n  ) AS end_time,\n  COALESCE((o.payload->>'route_progress')::int, CASE WHEN o.status = 'PENDING' THEN 0 ELSE 18 END) AS route_progress,\n  (o.status = 'FAULTED') AS is_alert,\n  COALESCE(o.delay_minutes, 0) AS delay_minutes,\n  COALESCE(\n    NULLIF(TRIM(o.payload->>'operation_action'), ''),\n    (SELECT CASE\n      WHEN EXISTS (\n        SELECT 1 FROM order_action_states a\n        WHERE a.order_id = o.order_id\n          AND a.action_type = 'STATION_DEPARTURE'\n          AND a.action_status = 'IN_PROGRESS'\n      ) THEN 'exit'\n      WHEN EXISTS (\n        SELECT 1 FROM order_action_states a\n        WHERE a.order_id = o.order_id\n          AND a.action_type = 'PLATFORM_DOCKING'\n          AND a.action_status = 'IN_PROGRESS'\n      ) THEN 'enter'\n      ELSE NULL\n    END),\n    CASE\n      WHEN o.status = 'FAULTED' THEN 'alert'\n      WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'dispatch'\n      WHEN o.status = 'PENDING' THEN 'music'\n      ELSE ''\n    END\n  ) AS operation_action,\n  CASE\n    WHEN o.status = 'PENDING' THEN '#52525b'\n    WHEN o.status = 'FAULTED' THEN '#ef4444'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'\n    ELSE '#51A2FF'\n  END AS icon_bg_color,\n  'mainline' AS line_kind\nFROM active_orders o\nLEFT JOIN route_json rj ON rj.order_id = o.order_id\nWHERE o.vehicle_rank = 1\nORDER BY\n  CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 WHEN 'PENDING' THEN 2 ELSE 3 END,\n  o.planned_start,\n  o.trip_code\nLIMIT 12",
-      "refreshInterval": 15,
+      "sqlQuery": "WITH active_orders AS (\n  SELECT\n    o.*,\n    v.display_name,\n    COALESCE(NULLIF(TRIM(o.payload->>'card_label'), ''), '營運') AS card_label,\n    CASE\n      WHEN o.planned_start IS NOT NULL THEN\n        EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60\n        + EXTRACT(MINUTE FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int\n      WHEN o.trip_code ~ '^[DU][0-9]{4}$'\n        AND SUBSTRING(o.trip_code, 2, 2)::int BETWEEN 0 AND 23\n        AND SUBSTRING(o.trip_code, 4, 2)::int BETWEEN 0 AND 59\n        THEN SUBSTRING(o.trip_code, 2, 2)::int * 60 + SUBSTRING(o.trip_code, 4, 2)::int\n      ELSE NULL\n    END AS trip_start_minutes,\n    first_st.station_id AS route_origin,\n    mid_st.station_id AS route_mid,\n    last_st.station_id AS route_destination,\n    /*\n     * 一台車只列一張單。\n     *\n     * 上一班的時間窗還在寬限期內、下一班已經開始的那幾十秒，同一台車會有兩張單都算\n     * 「還在跑」，卡片就出現兩張同車不同班次的。正在跑的那張優先，其次才是接下來要發的。\n     */\n    ROW_NUMBER() OVER (\n      PARTITION BY o.vehicle_code\n      ORDER BY\n        (\n          o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n          AND COALESCE(o.planned_end, o.planned_start + 600000)\n              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n        ) DESC,\n        CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,\n        o.planned_start\n    ) AS vehicle_rank\n  FROM operation_orders o\n  JOIN vehicles v ON v.vehicle_code = o.vehicle_code\n  LEFT JOIN operation_routes r ON r.route_id = o.route_id\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order ASC LIMIT 1\n  ) first_st ON true\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order ASC OFFSET 1 LIMIT 1\n  ) mid_st ON true\n  LEFT JOIN LATERAL (\n    SELECT station_id FROM operation_route_stations\n    WHERE route_id = o.route_id ORDER BY sequence_order DESC LIMIT 1\n  ) last_st ON true\n  WHERE o.line_kind IN ('MAINLINE', 'TEST')\n    AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL\n    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    /*\n     * 只看今天。\n     *\n     * 少了這一條，同一個班次代號會把每一天的那一筆都撈出來——實測 TS1217 一次回\n     * 十九列（8/29 到 9/16 各一），畫面上看起來像重複的卡片。而且排序從最早的\n     * 00:00 開始，正在跑的 13:20 那幾班反而看不到。\n     */\n    AND o.planned_start >= (\n      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())))) * 1000\n    )::bigint\n    AND o.planned_start < (\n      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())) + interval '1 day')) * 1000\n    )::bigint\n    /*\n     * 只留還沒跑完的。\n     *\n     * 排班引擎跑完一班不一定會把狀態收成 END：今天 218 筆裡有 208 筆掛在 PROCESSING，\n     * 其中 204 筆的 planned_end 早就過了。真正在跑的只有 4 筆（四台車各一筆，payload\n     * 的 updated_at 是幾秒前）。不擋掉的話卡片會被半夜那幾百筆殭屍班次塞滿。\n     *\n     * 留 60 秒寬限，剛到站的那一班不會瞬間消失。\n     */\n    AND COALESCE(o.planned_end, o.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n),\nroute_json AS (\n  SELECT\n    o.order_id,\n    json_agg(\n      json_build_object(\n        'name', COALESCE(NULLIF(rs.station_display_name, ''), rs.station_id),\n        'station_id', rs.station_id,\n        'actions', COALESCE((\n          SELECT json_agg(json_build_object(\n            'action_id', a.action_id,\n            'action_type', a.action_type,\n            'action_status', a.action_status,\n            'trigger_offset_m', a.trigger_offset_m\n          ) ORDER BY a.action_id)\n          FROM order_action_states a\n          WHERE a.order_id = o.order_id AND a.station_id = rs.station_id\n        ), '[]'::json)\n      ) ORDER BY rs.sequence_order\n    )::text AS route_stations\n  FROM active_orders o\n  JOIN operation_route_stations rs ON rs.route_id = o.route_id\n  GROUP BY o.order_id\n)\nSELECT\n  o.order_id AS shift_key,\n  o.vehicle_code,\n  o.trip_code,\n  CONCAT(o.trip_code, ' ', COALESCE(o.display_name, o.vehicle_code)) AS trip_header,\n  o.card_label AS direction_label,\n  '#2B7FFF' AS direction_pill_bg,\n  '#FFFFFF' AS direction_pill_color,\n  '下一站' AS station_label,\n  '剩餘到站' AS eta_label,\n  o.status AS order_status,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '故障'\n    WHEN o.status = 'PENDING' THEN '待發'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '延誤'\n    WHEN o.status = 'PROCESSING' THEN '準時'\n    ELSE '待命'\n  END AS status_label,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '#450a0a'\n    WHEN o.status = 'PENDING' THEN '#27272a'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#422006'\n    WHEN o.status = 'PROCESSING' THEN 'rgba(0, 212, 146, 0.3)'\n    ELSE '#27272a'\n  END AS status_bg,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '#f87171'\n    WHEN o.status = 'PENDING' THEN '#a1a1aa'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'\n    WHEN o.status = 'PROCESSING' THEN '#00BC7D'\n    ELSE '#a1a1aa'\n  END AS status_color,\n  CASE\n    WHEN o.status = 'FAULTED' THEN 'rgba(239,68,68,0.75)'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'rgba(249,115,22,0.75)'\n    WHEN o.status = 'PROCESSING' THEN '#009966'\n    WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.45)'\n    ELSE 'rgba(113,113,122,0.35)'\n  END AS card_border_color,\n  /*\n   * 起／中／訖三站直接取 payload 的站序。\n   *\n   * 這三欄原本是照方向寫死的字串，方向一 null 就整排一樣。真正的站序在\n   * payload->'stations' 裡，每一班都不同，照它取才是這一班真的會停的站。\n   */\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int ASC LIMIT 1),\n    NULLIF(o.payload->'origin'->>'name', ''),\n    NULLIF(o.route_origin, ''),\n    '—'\n  ) AS st_a,\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int ASC OFFSET 1 LIMIT 1),\n    NULLIF(o.route_mid, ''),\n    NULLIF(o.payload->'destination'->>'name', ''),\n    '—'\n  ) AS st_b,\n  COALESCE(\n    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st\n      ORDER BY (st->>'order')::int DESC LIMIT 1),\n    NULLIF(o.payload->'destination'->>'name', ''),\n    NULLIF(o.route_destination, ''),\n    '—'\n  ) AS st_c,\n  COALESCE(\n    NULLIF(rj.route_stations, '[]'),\n    -- 即時調度引擎下的訂單沒有 route_id（那張表只有兩筆舊的 D/U 路線），\n    -- 站序改放在 payload。這一支才是新班表的真站序，優先於下面的固定備援。\n    (\n      SELECT json_agg(\n        json_build_object(\n          'name', COALESCE(NULLIF(st->>'station_name', ''), st->>'station_id'),\n          'station_id', st->>'station_id',\n          -- 這一站是停靠還是只是經過。班表裡「上行轉N2W正線起點」這種轉線點也算一站，\n          -- 但車不停，停留秒數是 0。卡片要不要畫它由元件決定，這裡只把事實帶上去。\n          'role', st->>'role',\n          'dwell_seconds', COALESCE((st->>'dwell_seconds')::int, 0),\n          'actions', '[]'::json\n        ) ORDER BY (st->>'order')::int\n      )::text\n      FROM jsonb_array_elements(\n        CASE\n          WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations'\n          ELSE '[]'::jsonb\n        END\n      ) st\n    ),\n    '[]'\n  ) AS route_stations,\n  0 AS trip_leg_hint,\n  /*\n   * 車子現在跑在第幾段（0 = 第一站到第二站）。\n   *\n   * 原本是拿 current_leg 的目標站去跟 route_mid 比，對到就 0、對不到就 1——route_mid\n   * 來自 route_id，而這裡每一筆 route_id 都是 null，所以永遠是 1。班次的站數又不是固定\n   * 三站（實測 2 到 5 站都有），只有 0/1 兩種值也不夠用。\n   *\n   * 改成去 payload 的站序裡找目標站排第幾，減一就是段號。\n   */\n  CASE\n    WHEN o.status = 'PENDING' THEN 0\n    ELSE COALESCE(\n      (\n        SELECT GREATEST((st->>'order')::int - 2, 0)\n        FROM jsonb_array_elements(\n          CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n        ) st\n        WHERE st->>'station_id' = o.payload->'current_leg'->>'target_station_id'\n        LIMIT 1\n      ),\n      (o.payload->>'segment_index')::int,\n      0\n    )\n  END AS segment_index,\n  -- 這一段還剩幾 %。引擎算出來的值會超過 100（實測 121，因為 eta 比這段的基準還長），\n  -- 夾回 0–100 再送出去，免得進度條倒著長。\n  LEAST(100, GREATEST(0, CASE\n    WHEN o.status = 'PENDING' THEN 100\n    WHEN o.status = 'FAULTED' THEN COALESCE(FLOOR((o.payload->>'segment_remain_pct')::numeric)::int, 100)\n    ELSE COALESCE(\n      FLOOR((o.payload->>'segment_remain_pct')::numeric)::int,\n      CASE\n        WHEN jsonb_typeof(o.payload->'current_leg') = 'object'\n          AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0\n          AND COALESCE((o.payload->'current_leg'->>'distance_to_target_m')::numeric, 0) <= 0\n        THEN 0\n        WHEN COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0 THEN 100\n        WHEN COALESCE(\n          (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric,\n          0\n        ) > 0 THEN ROUND(\n          (o.payload->'current_leg'->>'eta_seconds')::numeric\n          / (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric\n          * 100\n        )::int\n        ELSE 100\n      END\n    )\n  END)) AS segment_remain_pct,\n  /*\n   * 下一站。\n   *\n   * 原本整段都靠 route_id 去 operation_route_stations 撈站名，route_id 是 null 就\n   * 整排顯示同一個固定字串（實測每張卡都寫「N2W下行」）。真正的下一站在\n   * payload->'current_leg'->>'target_station_id'，站名在 payload->'stations' 裡。\n   * 還沒發車的就顯示起站，其餘退回終點站名。\n   */\n  COALESCE(\n    (\n      SELECT COALESCE(NULLIF(TRIM(rs.station_display_name), ''), rs.station_id)\n      FROM operation_route_stations rs\n      WHERE rs.route_id = o.route_id\n        AND rs.station_id = NULLIF(TRIM(o.next_station), '')\n      LIMIT 1\n    ),\n    (\n      /*\n       * 「下一站」要說的是下一個會停的站。\n       *\n       * 車端回報的目標站可能是轉線點（「上行轉N2W正線起點」，停留 0 秒），那是路徑上的\n       * 一個點，不是一站。從目標站往後找第一個真的會停的站——起站、終點站，或停留\n       * 秒數大於 0 的中間站。\n       */\n      SELECT st->>'station_name'\n      FROM jsonb_array_elements(\n        CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n      ) st\n      WHERE (st->>'order')::int >= COALESCE(\n        (\n          SELECT (target->>'order')::int\n          FROM jsonb_array_elements(\n            CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END\n          ) target\n          WHERE target->>'station_id' = COALESCE(\n            NULLIF(TRIM(o.next_station), ''),\n            o.payload->'current_leg'->>'target_station_id'\n          )\n          LIMIT 1\n        ),\n        1\n      )\n      AND (\n        st->>'role' IN ('origin', 'terminal')\n        OR COALESCE((st->>'dwell_seconds')::int, 0) > 0\n      )\n      ORDER BY (st->>'order')::int\n      LIMIT 1\n    ),\n    CASE WHEN o.status = 'PENDING' THEN o.payload->'origin'->>'name' END,\n    o.payload->'destination'->>'name',\n    '—'\n  ) AS next_station,\n  CASE\n    WHEN o.status = 'PENDING' AND o.trip_start_minutes IS NOT NULL THEN\n      LPAD((\n        GREATEST(\n          0,\n          o.trip_start_minutes\n            - (EXTRACT(HOUR FROM NOW())::int * 60 + EXTRACT(MINUTE FROM NOW())::int)\n        ) / 60\n      )::int::text, 2, '0')\n      || ':'\n      || LPAD((\n        GREATEST(\n          0,\n          o.trip_start_minutes\n            - (EXTRACT(HOUR FROM NOW())::int * 60 + EXTRACT(MINUTE FROM NOW())::int)\n        ) % 60\n      )::int::text, 2, '0')\n    ELSE COALESCE(\n      LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0))) / 60)::int::text, 2, '0')\n      || ':'\n      || LPAD((FLOOR(GREATEST(0, COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0)))::int % 60)::text, 2, '0'),\n      NULLIF(TRIM(o.eta_remain), ''),\n      '00:00'\n    )\n  END AS eta_remain,\n  CASE WHEN COALESCE(o.delay_minutes, 0) > 0 THEN CONCAT('+', o.delay_minutes, '分') ELSE '' END AS eta_delay,\n  CASE\n    WHEN o.trip_start_minutes IS NOT NULL THEN\n      LPAD(((o.trip_start_minutes / 60) % 24)::int::text, 2, '0') || ':' ||\n      LPAD((o.trip_start_minutes % 60)::int::text, 2, '0')\n    ELSE to_char(to_timestamp(COALESCE(o.planned_start, o.created_at) / 1000.0), 'HH24:MI')\n  END AS depart_time,\n  -- 到站時間。原本是「開車時間 + 6 分」的假值，但每一筆都有 planned_end，照它寫。\n  to_char(\n    timezone(\n      'Asia/Taipei',\n      to_timestamp(COALESCE(o.planned_end, (o.payload->'destination'->>'arrive_at')::bigint, o.created_at + 360000) / 1000.0)\n    ),\n    'HH24:MI'\n  ) AS end_time,\n  COALESCE((o.payload->>'route_progress')::int, CASE WHEN o.status = 'PENDING' THEN 0 ELSE 18 END) AS route_progress,\n  (o.status = 'FAULTED') AS is_alert,\n  COALESCE(o.delay_minutes, 0) AS delay_minutes,\n  COALESCE(\n    NULLIF(TRIM(o.payload->>'operation_action'), ''),\n    (SELECT CASE\n      WHEN EXISTS (\n        SELECT 1 FROM order_action_states a\n        WHERE a.order_id = o.order_id\n          AND a.action_type = 'STATION_DEPARTURE'\n          AND a.action_status = 'IN_PROGRESS'\n      ) THEN 'exit'\n      WHEN EXISTS (\n        SELECT 1 FROM order_action_states a\n        WHERE a.order_id = o.order_id\n          AND a.action_type = 'PLATFORM_DOCKING'\n          AND a.action_status = 'IN_PROGRESS'\n      ) THEN 'enter'\n      ELSE NULL\n    END),\n    CASE\n      WHEN o.status = 'FAULTED' THEN 'alert'\n      WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'dispatch'\n      WHEN o.status = 'PENDING' THEN 'music'\n      ELSE ''\n    END\n  ) AS operation_action,\n  CASE\n    WHEN o.status = 'PENDING' THEN '#52525b'\n    WHEN o.status = 'FAULTED' THEN '#ef4444'\n    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'\n    ELSE '#51A2FF'\n  END AS icon_bg_color,\n  'mainline' AS line_kind\nFROM active_orders o\nLEFT JOIN route_json rj ON rj.order_id = o.order_id\nWHERE o.vehicle_rank = 1\nORDER BY\n  CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 WHEN 'PENDING' THEN 2 ELSE 3 END,\n  o.planned_start,\n  o.trip_code\nLIMIT 12",
+      "refreshInterval": 0,
+      "refreshMode": "event",
       "variableName": "row",
       "iteratorField": "shift_key"
     },
     {
-      "id": "rau0g2i",
+      "id": "a5c5qox",
       "type": "canvas",
       "x": 2585,
       "y": 32,
@@ -1346,7 +1417,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "5sm4o02",
+          "id": "rz75mlc",
           "type": "color-block",
           "x": 0,
           "y": 0,
@@ -1355,16 +1426,16 @@
           "backgroundColor": "#18181B",
           "borderRadius": 12,
           "borderWidth": 1,
-          "borderColor": "#FB2C36",
+          "borderColor": "#009966",
           "opacity": 100,
           "bindBorderColorVar": "card_border_color"
         },
         {
-          "id": "9zxvuoz",
+          "id": "2r8og5q",
           "type": "status-badge",
-          "x": 4,
+          "x": 12,
           "y": 12,
-          "width": 61,
+          "width": 47,
           "height": 24,
           "valueField": "{maint_type_label}",
           "defaultLabel": "充電",
@@ -1380,11 +1451,11 @@
           "variableColorKey": "maint_type_color"
         },
         {
-          "id": "z6vgwvk",
+          "id": "tldms2e",
           "type": "text",
           "x": 65,
           "y": 12,
-          "width": 62,
+          "width": 57,
           "height": 24,
           "content": "{vehicle_code}",
           "fontSize": 16,
@@ -1393,6 +1464,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1403,9 +1475,9 @@
           "contentPadding": "0"
         },
         {
-          "id": "ipp69zs",
+          "id": "43u86ru",
           "type": "text",
-          "x": 132,
+          "x": 126,
           "y": 12,
           "width": 77,
           "height": 24,
@@ -1416,6 +1488,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1426,16 +1499,16 @@
           "contentPadding": "0"
         },
         {
-          "id": "i3lsgm2",
+          "id": "uh9hzbr",
           "type": "status-badge",
-          "x": 202,
+          "x": 209,
           "y": 12,
-          "width": 79,
+          "width": 72,
           "height": 24,
           "valueField": "{status_label}",
           "defaultLabel": "—",
-          "defaultBgColor": "rgba(255, 100, 103, 0.3)",
-          "defaultTextColor": "#FF6467",
+          "defaultBgColor": "rgba(0, 212, 146, 0.3)",
+          "defaultTextColor": "#00BC7D",
           "showDot": true,
           "fontSize": 14,
           "borderRadius": 8,
@@ -1445,7 +1518,7 @@
           "variableColorKey": "status_color"
         },
         {
-          "id": "jqofvro",
+          "id": "cb3f3j7",
           "type": "text",
           "x": 12,
           "y": 48,
@@ -1458,6 +1531,7 @@
           "fontWeight": "normal",
           "color": "#51A2FF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1468,19 +1542,20 @@
           "contentPadding": "0"
         },
         {
-          "id": "5e5nzx9",
+          "id": "qr8eh8r",
           "type": "text",
-          "x": 22,
+          "x": 36,
           "y": 48,
-          "width": 86,
+          "width": 57,
           "height": 18,
-          "content": "整備站點",
+          "content": "{station_label}",
           "fontSize": 14,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1489,9 +1564,9 @@
           "colorRules": []
         },
         {
-          "id": "vpzhq6t",
+          "id": "rk3c0ic",
           "type": "text",
-          "x": 32,
+          "x": 36,
           "y": 66,
           "width": 57,
           "height": 20,
@@ -1502,6 +1577,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1512,7 +1588,7 @@
           "contentPadding": "0"
         },
         {
-          "id": "6i3u5cq",
+          "id": "daacaao",
           "type": "text",
           "x": 164,
           "y": 48,
@@ -1525,6 +1601,7 @@
           "fontWeight": "normal",
           "color": "#51A2FF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1535,7 +1612,7 @@
           "contentPadding": "0"
         },
         {
-          "id": "sjtap85",
+          "id": "c4fc7fc",
           "type": "text",
           "x": 188,
           "y": 48,
@@ -1548,6 +1625,7 @@
           "fontWeight": "normal",
           "color": "#99A1AF",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1556,7 +1634,7 @@
           "colorRules": []
         },
         {
-          "id": "2l1p973",
+          "id": "ta53cjn",
           "type": "text",
           "x": 188,
           "y": 66,
@@ -1569,6 +1647,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1588,7 +1667,7 @@
           "colorOnlyField": "eta_label"
         },
         {
-          "id": "x2k79ng",
+          "id": "2cv0c0f",
           "type": "route-progress",
           "x": 0,
           "y": 94,
@@ -1628,13 +1707,31 @@
           ],
           "actionIconRules": [
             {
+              "id": "op-enter",
+              "label": "進站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "enter",
+              "iconFile": "enter.png",
+              "priority": 0
+            },
+            {
+              "id": "op-exit",
+              "label": "出站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "exit",
+              "iconFile": "exit.png",
+              "priority": 1
+            },
+            {
               "id": "op-music",
               "label": "音樂",
               "sourceVarKey": "operation_action",
               "matchOp": "eq",
               "threshold": "music",
               "iconFile": "music.png",
-              "priority": 0
+              "priority": 2
             },
             {
               "id": "op-door_open",
@@ -1643,7 +1740,7 @@
               "matchOp": "eq",
               "threshold": "door_open",
               "iconFile": "door-open.png",
-              "priority": 1
+              "priority": 3
             },
             {
               "id": "op-door_close",
@@ -1652,7 +1749,7 @@
               "matchOp": "eq",
               "threshold": "door_close",
               "iconFile": "door-close.png",
-              "priority": 2
+              "priority": 4
             },
             {
               "id": "op-signal",
@@ -1661,7 +1758,7 @@
               "matchOp": "eq",
               "threshold": "signal",
               "iconFile": "signal.png",
-              "priority": 3
+              "priority": 5
             },
             {
               "id": "op-alert",
@@ -1670,7 +1767,7 @@
               "matchOp": "eq",
               "threshold": "alert",
               "iconFile": "alert.png",
-              "priority": 4
+              "priority": 6
             },
             {
               "id": "op-dispatch",
@@ -1679,7 +1776,7 @@
               "matchOp": "eq",
               "threshold": "dispatch",
               "iconFile": "dispatch.png",
-              "priority": 5
+              "priority": 7
             },
             {
               "id": "op-charging",
@@ -1688,7 +1785,7 @@
               "matchOp": "eq",
               "threshold": "charging",
               "iconFile": "charging.png",
-              "priority": 6
+              "priority": 8
             },
             {
               "id": "op-wash",
@@ -1697,7 +1794,7 @@
               "matchOp": "eq",
               "threshold": "wash",
               "iconFile": "wash.png",
-              "priority": 7
+              "priority": 9
             },
             {
               "id": "op-maintenance",
@@ -1706,7 +1803,7 @@
               "matchOp": "eq",
               "threshold": "maintenance",
               "iconFile": "maintenance.png",
-              "priority": 8
+              "priority": 10
             },
             {
               "id": "op-repair",
@@ -1715,7 +1812,7 @@
               "matchOp": "eq",
               "threshold": "repair",
               "iconFile": "repair.png",
-              "priority": 9
+              "priority": 11
             },
             {
               "id": "op-parking",
@@ -1724,7 +1821,7 @@
               "matchOp": "eq",
               "threshold": "parking",
               "iconFile": "parking.png",
-              "priority": 10
+              "priority": 12
             },
             {
               "id": "alert-flag",
@@ -1745,17 +1842,17 @@
             }
           ],
           "variant": "track",
+          "trackStyle": "maintenance",
           "animateSegmentMovement": true,
           "dataSourceId": "default-internal",
           "sqlQuery": "",
           "refreshInterval": 0,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/operation/update",
-          "mqttProgressPath": "route_progress",
-          "trackStyle": "maintenance"
+          "mqttProgressPath": "current_leg.eta_seconds"
         },
         {
-          "id": "b0etp4n",
+          "id": "7c4y6xt",
           "type": "color-block",
           "x": 0,
           "y": 166,
@@ -1768,7 +1865,7 @@
           "opacity": 100
         },
         {
-          "id": "f00l8m8",
+          "id": "c26q4qo",
           "type": "text",
           "x": 6,
           "y": 172,
@@ -1781,6 +1878,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1792,11 +1890,11 @@
           "contentPadding": "0 2px"
         },
         {
-          "id": "uigly2l",
+          "id": "cyjrnw4",
           "type": "text",
-          "x": 183,
+          "x": 146,
           "y": 172,
-          "width": 98,
+          "width": 146,
           "height": 18,
           "content": "結束 {end_time}",
           "fontSize": 12,
@@ -1805,6 +1903,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1833,13 +1932,14 @@
       "templateWidth": 293,
       "templateHeight": 196,
       "dataSourceId": "default-internal",
-      "sqlQuery": "WITH m0 AS (\n  SELECT\n    o.*,\n    COALESCE(\n      NULLIF(TRIM(o.payload->>'yard_slot_id'), ''),\n      NULLIF(TRIM(o.next_station), '')\n    ) AS slot_id\n  FROM operation_orders o\n  WHERE o.line_kind = 'MAINTENANCE'\n    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    /*\n     * 原本這裡綁 order_id LIKE 'DEMO-ORD-%'，只認早期那批手寫的示範單。現在整備單由\n     * 排班引擎發（MT-M1-R3-48600 這種），一筆都對不上，整個整備班表是空的。\n     *\n     * 改成跟正線一樣：只認還沒過期的單。\n     */\n    AND COALESCE(o.planned_end, o.planned_start + 1800000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n    AND COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), NULLIF(TRIM(o.next_station), '')) IS NOT NULL\n    -- 同一台車如果正線也有單在跑，以正線為準，這裡不重複列。一樣只看還沒跑完的，\n    -- 不然清晨那些沒收乾淨的正線單會把每一台車都擋掉。\n    AND NOT EXISTS (\n      SELECT 1 FROM operation_orders ml\n      WHERE ml.vehicle_code = o.vehicle_code\n        AND ml.line_kind = 'MAINLINE'\n        AND ml.status IN ('PENDING', 'PROCESSING')\n        AND COALESCE(ml.planned_end, ml.planned_start + 600000)\n            >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n    )\n)\nSELECT DISTINCT ON (o.vehicle_code)\n  o.order_id AS shift_key,\n  o.vehicle_code,\n  COALESCE(o.trip_code, '—') AS trip_code,\n  COALESCE(o.trip_code, '—') AS trip_header,\n  CASE\n    WHEN slot_id LIKE 'E%' THEN '充電'\n    WHEN slot_id LIKE 'P%' THEN '臨停'\n    WHEN slot_id LIKE 'W%' THEN '洗車'\n    WHEN slot_id LIKE 'H%' THEN '調度'\n    WHEN slot_id LIKE 'M%' THEN '保養'\n    ELSE COALESCE(o.maint_type_label, '整備')\n  END AS maint_type_label,\n  COALESCE(o.maint_type_bg, 'transparent') AS maint_type_bg,\n  CASE\n    WHEN slot_id LIKE 'P%' OR COALESCE(o.maint_type_label, '') = '臨停' THEN '#FD9A00'\n    ELSE COALESCE(o.maint_type_color, '#FD9A00')\n  END AS maint_type_color,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '進行中'\n    WHEN o.status = 'PENDING' THEN '停留中'\n    ELSE '進行中'\n  END AS status_label,\n  CASE\n    WHEN o.status = 'END' THEN '#422006'\n    WHEN o.status = 'PENDING' THEN '#27272a'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN 'rgba(0, 212, 146, 0.3)'\n    ELSE '#27272a'\n  END AS status_bg,\n  CASE\n    WHEN o.status = 'END' THEN '#fb923c'\n    WHEN o.status = 'PENDING' THEN '#a1a1aa'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#00BC7D'\n    ELSE '#a1a1aa'\n  END AS status_color,\n  CASE\n    WHEN o.status = 'END' THEN 'rgba(249,115,22,0.75)'\n    WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.55)'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#009966'\n    ELSE 'rgba(113,113,122,0.45)'\n  END AS card_border_color,\n  'S2W' AS st_a,\n  o.slot_id AS st_b,\n  o.slot_id AS st_c,\n  json_build_array(\n    json_build_object('name', 'S2W', 'remain_pct', 0),\n    json_build_object('name', o.slot_id, 'remain_pct', 100)\n  )::text AS route_stations,\n  0 AS segment_index,\n  0 AS segment_remain_pct,\n  o.slot_id AS next_station,\n  '整備站點' AS station_label,\n  CASE\n    WHEN o.status = 'END' THEN '逾時滯留'\n    ELSE '完成預估'\n  END AS eta_label,\n  /*\n   * 距離整備完成還剩多久，以 planned_end 直接算，格式是「時:分」。\n   *\n   * 原本讀 operation_orders.eta_remain 那一欄，裡面是「926:09」這種值（926 分鐘，\n   * 停到隔天午夜），當成時分看就變成 926 小時。\n   */\n  LPAD((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)\n        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 3600000)::int::text, 2, '0')\n  || ':'\n  || LPAD(((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)\n        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 60000)::int % 60)::text, 2, '0') AS eta_remain,\n  -- 時間一律換算到台北，不然跟著資料庫時區跑，畫面上會差好幾個小時。\n  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_start, o.created_at) / 1000.0)), 'HH24:MI') AS depart_time,\n  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_end, o.created_at + 1800000) / 1000.0)), 'HH24:MI') AS end_time,\n  COALESCE(\n    (o.payload->>'route_progress')::int,\n    100\n  ) AS route_progress,\n  false AS is_alert,\n  CASE\n    WHEN slot_id LIKE 'E%' THEN 'charging'\n    WHEN slot_id LIKE 'W%' THEN 'wash'\n    WHEN slot_id LIKE 'P%' THEN 'parking'\n    WHEN slot_id LIKE 'M%' THEN 'maintenance'\n    WHEN slot_id LIKE 'H%' THEN 'dispatch'\n    ELSE 'maintenance'\n  END AS operation_action,\n  '#51A2FF' AS icon_bg_color,\n  'maintenance' AS line_kind\nFROM m0 o\nORDER BY o.vehicle_code, o.created_at DESC\nLIMIT 12",
-      "refreshInterval": 15,
+      "sqlQuery": "WITH m0 AS (\n  SELECT\n    o.*,\n    COALESCE(\n      NULLIF(TRIM(o.payload->>'yard_slot_id'), ''),\n      NULLIF(TRIM(o.next_station), '')\n    ) AS slot_id\n  FROM operation_orders o\n  WHERE o.line_kind = 'MAINTENANCE'\n    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    /*\n     * 原本這裡綁 order_id LIKE 'DEMO-ORD-%'，只認早期那批手寫的示範單。現在整備單由\n     * 排班引擎發（MT-M1-R3-48600 這種），一筆都對不上，整個整備班表是空的。\n     *\n     * 改成跟正線一樣：只認還沒過期的單。\n     */\n    AND COALESCE(o.planned_end, o.planned_start + 1800000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n    AND (\n      o.status <> 'PENDING'\n      OR o.planned_start BETWEEN\n        (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n        AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000\n    )\n    AND COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), NULLIF(TRIM(o.next_station), '')) IS NOT NULL\n    -- 同一台車如果正線也有單在跑，以正線為準，這裡不重複列。一樣只看還沒跑完的，\n    -- 不然清晨那些沒收乾淨的正線單會把每一台車都擋掉。\n    AND NOT EXISTS (\n      SELECT 1 FROM operation_orders ml\n      WHERE ml.vehicle_code = o.vehicle_code\n        AND ml.line_kind IN ('MAINLINE', 'TEST')\n        AND ml.status IN ('PENDING', 'PROCESSING')\n        AND COALESCE(ml.planned_end, ml.planned_start + 600000)\n            >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n        AND (\n          ml.status <> 'PENDING'\n          OR ml.planned_start BETWEEN\n            (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n            AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000\n        )\n    )\n)\nSELECT DISTINCT ON (o.vehicle_code)\n  o.order_id AS shift_key,\n  o.vehicle_code,\n  COALESCE(o.trip_code, '—') AS trip_code,\n  COALESCE(o.trip_code, '—') AS trip_header,\n  COALESCE(NULLIF(TRIM(o.payload->>'card_label'), ''), CASE\n    WHEN slot_id LIKE 'E%' THEN '充電'\n    WHEN slot_id LIKE 'P%' THEN '臨停'\n    WHEN slot_id LIKE 'W%' THEN '洗車'\n    WHEN slot_id LIKE 'H%' THEN '調度'\n    WHEN slot_id LIKE 'M%' THEN '保養'\n    ELSE COALESCE(o.maint_type_label, '整備')\n  END) AS maint_type_label,\n  COALESCE(o.maint_type_bg, 'transparent') AS maint_type_bg,\n  CASE\n    WHEN slot_id LIKE 'P%' OR COALESCE(o.maint_type_label, '') = '臨停' THEN '#FD9A00'\n    ELSE COALESCE(o.maint_type_color, '#FD9A00')\n  END AS maint_type_color,\n  CASE\n    WHEN o.status = 'FAULTED' THEN '進行中'\n    WHEN o.status = 'PENDING' THEN '停留中'\n    ELSE '進行中'\n  END AS status_label,\n  CASE\n    WHEN o.status = 'END' THEN '#422006'\n    WHEN o.status = 'PENDING' THEN '#27272a'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN 'rgba(0, 212, 146, 0.3)'\n    ELSE '#27272a'\n  END AS status_bg,\n  CASE\n    WHEN o.status = 'END' THEN '#fb923c'\n    WHEN o.status = 'PENDING' THEN '#a1a1aa'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#00BC7D'\n    ELSE '#a1a1aa'\n  END AS status_color,\n  CASE\n    WHEN o.status = 'END' THEN 'rgba(249,115,22,0.75)'\n    WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.55)'\n    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#009966'\n    ELSE 'rgba(113,113,122,0.45)'\n  END AS card_border_color,\n  'S2W' AS st_a,\n  o.slot_id AS st_b,\n  o.slot_id AS st_c,\n  json_build_array(\n    json_build_object('name', 'S2W', 'remain_pct', 0),\n    json_build_object('name', o.slot_id, 'remain_pct', 100)\n  )::text AS route_stations,\n  0 AS segment_index,\n  0 AS segment_remain_pct,\n  o.slot_id AS next_station,\n  '整備站點' AS station_label,\n  CASE\n    WHEN o.status = 'END' THEN '逾時滯留'\n    ELSE '完成預估'\n  END AS eta_label,\n  /*\n   * 距離整備完成還剩多久，以 planned_end 直接算，格式是「時:分」。\n   *\n   * 原本讀 operation_orders.eta_remain 那一欄，裡面是「926:09」這種值（926 分鐘，\n   * 停到隔天午夜），當成時分看就變成 926 小時。\n   */\n  LPAD((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)\n        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 3600000)::int::text, 2, '0')\n  || ':'\n  || LPAD(((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)\n        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 60000)::int % 60)::text, 2, '0') AS eta_remain,\n  -- 時間一律換算到台北，不然跟著資料庫時區跑，畫面上會差好幾個小時。\n  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_start, o.created_at) / 1000.0)), 'HH24:MI') AS depart_time,\n  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_end, o.created_at + 1800000) / 1000.0)), 'HH24:MI') AS end_time,\n  COALESCE(\n    (o.payload->>'route_progress')::int,\n    100\n  ) AS route_progress,\n  false AS is_alert,\n  CASE\n    WHEN slot_id LIKE 'E%' THEN 'charging'\n    WHEN slot_id LIKE 'W%' THEN 'wash'\n    WHEN slot_id LIKE 'P%' THEN 'parking'\n    WHEN slot_id LIKE 'M%' THEN 'maintenance'\n    WHEN slot_id LIKE 'H%' THEN 'dispatch'\n    ELSE 'maintenance'\n  END AS operation_action,\n  '#51A2FF' AS icon_bg_color,\n  'maintenance' AS line_kind\nFROM m0 o\nORDER BY o.vehicle_code, o.created_at DESC\nLIMIT 12",
+      "refreshInterval": 0,
+      "refreshMode": "event",
       "variableName": "row",
       "iteratorField": "shift_key"
     },
     {
-      "id": "hkb0yzb",
+      "id": "3bosi6o",
       "type": "canvas",
       "x": 32,
       "y": 250,
@@ -1851,7 +1951,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "0p3z4ev",
+          "id": "ot0io3o",
           "type": "text",
           "x": 12,
           "y": 12,
@@ -1864,6 +1964,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1873,7 +1974,7 @@
           "colorRules": []
         },
         {
-          "id": "u27v66d",
+          "id": "q5ipwxa",
           "type": "stat-card",
           "x": 12,
           "y": 42,
@@ -1901,15 +2002,17 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
           "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500",
           "contentVAlign": "start",
           "mqttDataSourceId": "default-mqtt",
-          "mqttTopic": "v1/vtms/dashboard/capacity/live"
+          "mqttTopic": "v1/vtms/dashboard/capacity/live",
+          "freshnessPolicy": "once"
         },
         {
-          "id": "lt49lci",
+          "id": "lvwq08d",
           "type": "stat-card",
           "x": 172,
           "y": 42,
@@ -1937,13 +2040,14 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
-          "refreshInterval": 15,
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500",
           "contentVAlign": "start"
         },
         {
-          "id": "eu2y43a",
+          "id": "tsnyqg8",
           "type": "stat-card",
           "x": 332,
           "y": 42,
@@ -1971,25 +2075,27 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
-          "refreshInterval": 15,
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500",
           "contentVAlign": "start"
         },
         {
-          "id": "wcxt8nz",
+          "id": "73071l5",
           "type": "text",
-          "x": 423,
-          "y": 72,
+          "x": 370,
+          "y": 70,
           "width": 98,
           "height": 24,
           "content": "",
-          "fontSize": 12,
+          "fontSize": 14,
           "lineHeight": 1.2,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -1998,14 +2104,15 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
           "valueField": "avail_hint",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "contentPadding": "0",
           "textWrap": "nowrap"
         },
         {
-          "id": "ffysuku",
+          "id": "e5d6nq7",
           "type": "stat-card",
           "x": 492,
           "y": 42,
@@ -2033,25 +2140,27 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
-          "refreshInterval": 15,
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "valueFontWeight": "500",
           "contentVAlign": "start"
         },
         {
-          "id": "sqxb19z",
+          "id": "49kzcpl",
           "type": "text",
-          "x": 561,
-          "y": 72,
+          "x": 530,
+          "y": 70,
           "width": 98,
           "height": 24,
           "content": "",
-          "fontSize": 12,
+          "fontSize": 14,
           "lineHeight": 1.2,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2060,18 +2169,19 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  live.utilization::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  nxt.utilization::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint\nFROM capacity_trend_demo_points live\nJOIN capacity_trend_demo_points nxt\n  ON nxt.demo_set_id = 'DEMO' AND nxt.offset_minutes = 60\nWHERE live.demo_set_id = 'DEMO' AND live.offset_minutes = 0",
+          "sqlQuery": "SELECT\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO'\n    ORDER BY ABS(offset_minutes)\n    LIMIT 1\n  )::int AS live_val,\n  1200 AS target_val,\n  200 AS avail_val,\n  '可調度2輛' AS avail_hint,\n  (\n    SELECT utilization FROM capacity_trend_demo_points\n    WHERE demo_set_id = 'DEMO' AND offset_minutes >= 30\n    ORDER BY offset_minutes ASC\n    LIMIT 1\n  )::int AS next_val,\n  to_char(date_trunc('minute', timezone('Asia/Taipei', NOW())) + interval '60 minutes', 'HH24:MI') AS next_hint",
           "valueField": "next_hint",
-          "refreshInterval": 15,
+          "refreshInterval": 0,
+          "refreshMode": "event",
           "contentPadding": "0",
           "textWrap": "nowrap"
         },
         {
-          "id": "3yea3d2",
+          "id": "iif4bik",
           "type": "line-chart",
           "x": 12,
           "y": 102,
-          "width": 647,
+          "width": 628,
           "height": 188,
           "title": "",
           "xField": "time",
@@ -2134,10 +2244,10 @@
           "viewportMode": "fixed-axis",
           "viewportPadding": 0.12,
           "chartPadding": {
-            "top": 16,
-            "right": 10,
-            "bottom": 20,
-            "left": 20
+            "top": 58,
+            "right": 32,
+            "bottom": 32,
+            "left": 33
           },
           "chartGridColor": "rgba(212, 212, 212, 0.25)",
           "chartAxisLabelColor": "#99A1AF",
@@ -2170,12 +2280,13 @@
           "chartCalloutFontSize": 14,
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  to_char(\n    date_trunc('minute', timezone('Asia/Taipei', NOW())) + (offset_minutes || ' minutes')::interval,\n    'HH24:MI'\n  ) AS time,\n  actual_util,\n  forecast_util,\n  segment_code,\n  is_anomaly,\n  anomaly_label\nFROM capacity_trend_demo_points\nWHERE demo_set_id = 'DEMO'\nORDER BY offset_minutes",
-          "refreshInterval": 30
+          "refreshInterval": 0,
+          "refreshMode": "event"
         }
       ]
     },
     {
-      "id": "6w0cu15",
+      "id": "38s7rgp",
       "type": "canvas",
       "x": 32,
       "y": 568,
@@ -2187,7 +2298,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "kdbnyyh",
+          "id": "n2inu5j",
           "type": "text",
           "x": 12,
           "y": 12,
@@ -2200,6 +2311,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2209,7 +2321,7 @@
           "colorRules": []
         },
         {
-          "id": "fuzwfu4",
+          "id": "pf8ec5k",
           "type": "text",
           "x": 596,
           "y": 14,
@@ -2222,6 +2334,7 @@
           "fontWeight": "normal",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2231,10 +2344,11 @@
           "dataSourceId": "default-internal",
           "sqlQuery": "SELECT\n  COALESCE(active_zones, 0)::text || ' / ' || COALESCE(total_zones, 6)::text AS header_line\nFROM (\n  SELECT\n    COUNT(DISTINCT fs.zone) FILTER (\n      WHERE st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n    )::int AS active_zones,\n    (SELECT COUNT(DISTINCT zone) FROM facility_slots WHERE zone LIKE '整備-%' AND is_active = true)::int AS total_zones\n  FROM facility_slots fs\n  LEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\n  WHERE fs.zone LIKE '整備-%' AND fs.is_active = true\n) sub",
           "valueField": "header_line",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "flxghzr",
+          "id": "a7cnfqc",
           "type": "color-block",
           "x": 12,
           "y": 42,
@@ -2247,7 +2361,7 @@
           "opacity": 100
         },
         {
-          "id": "enj44g3",
+          "id": "9kd2mi3",
           "type": "text",
           "x": 20,
           "y": 46,
@@ -2260,6 +2374,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2269,7 +2384,7 @@
           "colorRules": []
         },
         {
-          "id": "2v7tk9f",
+          "id": "z40pg8x",
           "type": "text",
           "x": 292,
           "y": 46,
@@ -2282,6 +2397,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2289,12 +2405,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "knwh63f",
+          "id": "uazvmga",
           "type": "slot-grid",
           "x": 20,
           "y": 70,
@@ -2346,11 +2463,16 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-充電' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         },
         {
-          "id": "cn7ikdr",
+          "id": "nsl0ljj",
           "type": "color-block",
           "x": 328,
           "y": 42,
@@ -2363,7 +2485,7 @@
           "opacity": 100
         },
         {
-          "id": "82f8xk0",
+          "id": "m08z412",
           "type": "text",
           "x": 336,
           "y": 46,
@@ -2376,6 +2498,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2385,7 +2508,7 @@
           "colorRules": []
         },
         {
-          "id": "84wctpo",
+          "id": "u1uqf3x",
           "type": "text",
           "x": 608,
           "y": 46,
@@ -2398,6 +2521,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2405,12 +2529,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "64dg5r9",
+          "id": "v2yzqz8",
           "type": "slot-grid",
           "x": 336,
           "y": 70,
@@ -2462,11 +2587,16 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-洗車' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         },
         {
-          "id": "1q447ub",
+          "id": "emc38w3",
           "type": "color-block",
           "x": 12,
           "y": 102,
@@ -2479,7 +2609,7 @@
           "opacity": 100
         },
         {
-          "id": "tvjjfn1",
+          "id": "3ywda19",
           "type": "text",
           "x": 20,
           "y": 106,
@@ -2492,6 +2622,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2501,7 +2632,7 @@
           "colorRules": []
         },
         {
-          "id": "ec0co3a",
+          "id": "wjoaywd",
           "type": "text",
           "x": 292,
           "y": 106,
@@ -2514,6 +2645,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2521,12 +2653,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "gfxjt7e",
+          "id": "p5gkcvz",
           "type": "slot-grid",
           "x": 20,
           "y": 130,
@@ -2578,11 +2711,16 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-保養' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         },
         {
-          "id": "5r8evdl",
+          "id": "tc40mtt",
           "type": "color-block",
           "x": 328,
           "y": 102,
@@ -2595,7 +2733,7 @@
           "opacity": 100
         },
         {
-          "id": "pbqi3cn",
+          "id": "xgsruaz",
           "type": "text",
           "x": 336,
           "y": 106,
@@ -2608,6 +2746,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2617,7 +2756,7 @@
           "colorRules": []
         },
         {
-          "id": "6qi9gs5",
+          "id": "82024xs",
           "type": "text",
           "x": 608,
           "y": 106,
@@ -2630,6 +2769,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2637,12 +2777,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "g81dhj2",
+          "id": "lfwhrsg",
           "type": "slot-grid",
           "x": 336,
           "y": 130,
@@ -2694,11 +2835,16 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-維修' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         },
         {
-          "id": "x31xqo8",
+          "id": "5zp8069",
           "type": "color-block",
           "x": 12,
           "y": 162,
@@ -2711,7 +2857,7 @@
           "opacity": 100
         },
         {
-          "id": "t4smnv0",
+          "id": "ql456le",
           "type": "text",
           "x": 20,
           "y": 166,
@@ -2724,6 +2870,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2733,7 +2880,7 @@
           "colorRules": []
         },
         {
-          "id": "xcivunu",
+          "id": "j8stwjf",
           "type": "text",
           "x": 292,
           "y": 166,
@@ -2746,6 +2893,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2753,12 +2901,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "4jwhze9",
+          "id": "xido65r",
           "type": "slot-grid",
           "x": 20,
           "y": 190,
@@ -2810,11 +2959,16 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-調度' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         },
         {
-          "id": "oylqeu0",
+          "id": "ndpg3ib",
           "type": "color-block",
           "x": 328,
           "y": 162,
@@ -2827,7 +2981,7 @@
           "opacity": 100
         },
         {
-          "id": "6g8yl9i",
+          "id": "pfvnnlv",
           "type": "text",
           "x": 336,
           "y": 166,
@@ -2840,6 +2994,7 @@
           "fontWeight": "bold",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2849,7 +3004,7 @@
           "colorRules": []
         },
         {
-          "id": "gn7xjq1",
+          "id": "j7ohx8o",
           "type": "text",
           "x": 608,
           "y": 166,
@@ -2862,6 +3017,7 @@
           "fontWeight": "bold",
           "color": "#D1D5DC",
           "textAlign": "right",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -2869,12 +3025,13 @@
           "colorRulesEnabled": false,
           "colorRules": [],
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT COUNT(*)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true\n  AND (\n    st.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n    OR st.vehicle_code IS NOT NULL\n  )",
+          "sqlQuery": "SELECT COALESCE(SUM(\n  CASE\n    WHEN COALESCE((st.raw_payload->>'occupancy')::int, 0) > 0\n      THEN (st.raw_payload->>'occupancy')::int\n    WHEN st.status IN ('OCCUPIED', 'CHARGING', 'ERROR') OR st.vehicle_code IS NOT NULL\n      THEN 1\n    ELSE 0\n  END\n), 0)::int AS total\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true",
           "valueField": "total",
-          "refreshInterval": 15
+          "refreshInterval": 0,
+          "refreshMode": "event"
         },
         {
-          "id": "r19rzau",
+          "id": "59ljreo",
           "type": "slot-grid",
           "x": 336,
           "y": 190,
@@ -2926,13 +3083,18 @@
           "slotFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M1'\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone = '整備-調度' THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  fs.slot_id,\n  COALESCE(st.status::text, 'AVAILABLE') AS status,\n  (\n    CASE\n      WHEN fs.zone = '整備-充電' THEN 'E' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-洗車' THEN 'W' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-保養' THEN 'M' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-維修' THEN 'M2'\n      WHEN fs.zone IN ('整備-調度', '整備-整備格') THEN 'H' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      WHEN fs.zone = '整備-臨停' THEN 'P' || LTRIM(SPLIT_PART(fs.slot_id, '-', 3), '0')\n      ELSE fs.slot_id\n    END\n  ) AS slot_label\nFROM facility_slots fs\nLEFT JOIN slot_statuses st ON st.slot_id = fs.slot_id\nWHERE fs.zone = '整備-臨停' AND fs.is_active = true\nORDER BY fs.slot_id ASC",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:maintenance_slots",
+            "table:slot_status"
+          ]
         }
       ]
     },
     {
-      "id": "ctd87mt",
+      "id": "0hfxwdw",
       "type": "canvas",
       "x": 32,
       "y": 815,
@@ -2944,12 +3106,12 @@
       "opacity": 100,
       "children": [
         {
-          "id": "extoq49",
+          "id": "e07ye8a",
           "type": "segment-bar",
           "x": 12,
           "y": 12,
           "width": 628,
-          "height": 71,
+          "height": 75,
           "title": "車輛分佈",
           "statusField": "status_code",
           "pctField": "pct",
@@ -2980,13 +3142,19 @@
           "tagFontSize": 14,
           "emptyHintFontSize": 14,
           "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT\n  status_code,\n  ROUND(100.0 * COUNT(*)::numeric / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) AS pct,\n  COUNT(*)::int AS vehicle_count\nFROM (\n  SELECT\n    CASE\n      WHEN EXISTS (\n        SELECT 1 FROM operation_orders o\n        WHERE o.vehicle_code = v.vehicle_code AND o.status = 'PROCESSING'\n      ) THEN 'IN_SERVICE'\n      WHEN EXISTS (\n        SELECT 1 FROM slot_statuses ss\n        JOIN facility_slots fs ON fs.slot_id = ss.slot_id\n        WHERE ss.vehicle_code = v.vehicle_code\n          AND fs.zone LIKE '整備-%'\n          AND ss.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n      ) THEN 'MAINTENANCE'\n      ELSE 'STANDBY'\n    END AS status_code\n  FROM vehicles v\n  WHERE v.is_active = true\n    AND (v.vehicle_code LIKE 'PMS%' OR v.vehicle_code LIKE 'AMR-%' OR v.vehicle_code LIKE 'AGV-%')\n) fleet\nGROUP BY status_code\nORDER BY CASE status_code\n  WHEN 'IN_SERVICE' THEN 1\n  WHEN 'MAINTENANCE' THEN 2\n  ELSE 3\nEND",
-          "refreshInterval": 15
+          "sqlQuery": "SELECT\n  status_code,\n  ROUND(100.0 * COUNT(*)::numeric / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) AS pct,\n  COUNT(*)::int AS vehicle_count\nFROM (\n  SELECT\n    CASE\n      WHEN EXISTS (\n        SELECT 1 FROM operation_orders o\n        WHERE o.vehicle_code = v.vehicle_code\n          AND o.line_kind IN ('MAINLINE', 'TEST')\n          AND o.status = 'PROCESSING'\n          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n          AND COALESCE(o.planned_end, o.planned_start + 600000)\n              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n      ) THEN 'IN_SERVICE'\n      WHEN EXISTS (\n        SELECT 1 FROM operation_orders o\n        WHERE o.vehicle_code = v.vehicle_code\n          AND o.line_kind = 'MAINTENANCE'\n          AND o.status = 'PROCESSING'\n          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n          AND COALESCE(o.planned_end, o.planned_start + 1800000)\n              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n      ) THEN 'MAINTENANCE'\n      WHEN EXISTS (\n        SELECT 1 FROM slot_statuses ss\n        JOIN facility_slots fs ON fs.slot_id = ss.slot_id\n        WHERE ss.vehicle_code = v.vehicle_code\n          AND fs.zone LIKE '整備-%'\n          AND ss.status IN ('OCCUPIED', 'CHARGING', 'ERROR')\n          AND ss.last_updated >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 120000\n      ) THEN 'MAINTENANCE'\n      ELSE 'STANDBY'\n    END AS status_code\n  FROM vehicles v\n  WHERE v.is_active = true\n    AND (v.vehicle_code LIKE 'PMS%' OR v.vehicle_code LIKE 'AMR-%' OR v.vehicle_code LIKE 'AGV-%')\n) fleet\nGROUP BY status_code\nORDER BY CASE status_code\n  WHEN 'IN_SERVICE' THEN 1\n  WHEN 'MAINTENANCE' THEN 2\n  ELSE 3\nEND",
+          "refreshInterval": 0,
+          "refreshMode": "event",
+          "invalidateTags": [
+            "domain:vehicle_distribution",
+            "table:operation_orders",
+            "table:slot_status"
+          ]
         }
       ]
     },
     {
-      "id": "vq53epo",
+      "id": "60f26zd",
       "type": "canvas",
       "x": 732,
       "y": 250,
@@ -3003,35 +3171,35 @@
       "vehicleDefinitionName": "VTMS 巴士 · PMS01",
       "children": [
         {
-          "id": "o77xaip",
+          "id": "vdemlsv",
           "type": "clock",
-          "x": 0,
-          "y": 4,
-          "width": 324,
-          "height": 91,
+          "x": 24,
+          "y": 20,
+          "width": 420,
+          "height": 72,
           "format": "12h",
           "showDate": true,
           "showSeconds": true,
           "dateFormat": "YYYY-MM-DD",
-          "fontSize": 35,
-          "dateFontSize": 23,
+          "fontSize": 24,
+          "dateFontSize": 12,
           "color": "#f1f5f9",
           "dateColor": "#94a3b8",
           "fontFamily": "monospace"
         },
         {
-          "id": "x0j558u",
+          "id": "ho78pcn",
           "type": "status-badge",
-          "x": 324,
-          "y": 12,
-          "width": 275,
+          "x": 520,
+          "y": 20,
+          "width": 260,
           "height": 44,
           "valueField": "status",
           "defaultLabel": "正常營運中 Level 1",
           "defaultBgColor": "#064e3b",
           "defaultTextColor": "#34d399",
           "showDot": true,
-          "fontSize": 20,
+          "fontSize": 16,
           "borderRadius": 8,
           "rules": [
             {
@@ -3055,19 +3223,20 @@
           ]
         },
         {
-          "id": "antb8q1",
+          "id": "n685f11",
           "type": "text",
-          "x": 617,
-          "y": 15,
-          "width": 173,
-          "height": 38,
+          "x": 780,
+          "y": 24,
+          "width": 180,
+          "height": 32,
           "content": "班距 03:00",
-          "fontSize": 27,
+          "fontSize": 16,
           "lineHeight": 1.2,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "bold",
           "color": "#fdba74",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3076,19 +3245,20 @@
           "colorRules": []
         },
         {
-          "id": "pwwf9m9",
+          "id": "klbv2x2",
           "type": "text",
-          "x": 799,
-          "y": 18,
-          "width": 175,
+          "x": 980,
+          "y": 24,
+          "width": 220,
           "height": 32,
           "content": "正線營運 4 / 4",
-          "fontSize": 24,
+          "fontSize": 16,
           "lineHeight": 1.2,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "bold",
           "color": "#7dd3fc",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3097,18 +3267,36 @@
           "colorRules": []
         },
         {
-          "id": "3sa6shc",
+          "id": "zl2qjlg",
           "type": "vehicle-container",
-          "x": 2909,
-          "y": 34,
-          "width": 88,
-          "height": 30,
+          "x": 1180,
+          "y": 228,
+          "width": 260,
+          "height": 78,
           "vehicleDefinitionId": "sampleywe93qb",
           "label": "PMS01",
-          "behaviorOffsetX": -1,
-          "behaviorOffsetY": -41,
+          "behaviorOffsetX": 0,
+          "behaviorOffsetY": -30,
           "behaviorIconSize": 22,
           "actionIconRules": [
+            {
+              "id": "op-enter",
+              "label": "進站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "enter",
+              "iconFile": "behaviors/enter.svg",
+              "priority": 0
+            },
+            {
+              "id": "op-exit",
+              "label": "出站",
+              "sourceVarKey": "operation_action",
+              "matchOp": "eq",
+              "threshold": "exit",
+              "iconFile": "behaviors/exit.svg",
+              "priority": 1
+            },
             {
               "id": "op-music",
               "label": "音樂",
@@ -3116,7 +3304,7 @@
               "matchOp": "eq",
               "threshold": "music",
               "iconFile": "behaviors/music.svg",
-              "priority": 0
+              "priority": 2
             },
             {
               "id": "op-door_open",
@@ -3125,7 +3313,7 @@
               "matchOp": "eq",
               "threshold": "door_open",
               "iconFile": "behaviors/door_open.svg",
-              "priority": 1
+              "priority": 3
             },
             {
               "id": "op-door_close",
@@ -3134,7 +3322,7 @@
               "matchOp": "eq",
               "threshold": "door_close",
               "iconFile": "behaviors/door_close.svg",
-              "priority": 2
+              "priority": 4
             },
             {
               "id": "op-signal",
@@ -3143,7 +3331,7 @@
               "matchOp": "eq",
               "threshold": "signal",
               "iconFile": "behaviors/traffic_light.svg",
-              "priority": 3
+              "priority": 5
             },
             {
               "id": "op-alert",
@@ -3152,7 +3340,7 @@
               "matchOp": "eq",
               "threshold": "alert",
               "iconFile": "behaviors/warning.svg",
-              "priority": 4
+              "priority": 6
             },
             {
               "id": "op-dispatch",
@@ -3161,7 +3349,7 @@
               "matchOp": "eq",
               "threshold": "dispatch",
               "iconFile": "behaviors/dispatch.svg",
-              "priority": 5
+              "priority": 7
             },
             {
               "id": "op-charging",
@@ -3170,7 +3358,7 @@
               "matchOp": "eq",
               "threshold": "charging",
               "iconFile": "behaviors/charging.svg",
-              "priority": 6
+              "priority": 8
             },
             {
               "id": "op-wash",
@@ -3179,7 +3367,7 @@
               "matchOp": "eq",
               "threshold": "wash",
               "iconFile": "behaviors/wash.svg",
-              "priority": 7
+              "priority": 9
             },
             {
               "id": "op-maintenance",
@@ -3188,7 +3376,7 @@
               "matchOp": "eq",
               "threshold": "maintenance",
               "iconFile": "behaviors/maintain.svg",
-              "priority": 8
+              "priority": 10
             },
             {
               "id": "op-repair",
@@ -3197,7 +3385,7 @@
               "matchOp": "eq",
               "threshold": "repair",
               "iconFile": "behaviors/repair.svg",
-              "priority": 9
+              "priority": 11
             },
             {
               "id": "op-parking",
@@ -3206,18 +3394,16 @@
               "matchOp": "eq",
               "threshold": "parking",
               "iconFile": "behaviors/park.svg",
-              "priority": 10
+              "priority": 12
             }
           ],
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/PMS01/operation/update"
         }
-      ],
-      "vehicleDisplayWidthPx": 88,
-      "vehicleDisplayHeightPx": 30
+      ]
     },
     {
-      "id": "la2s16b",
+      "id": "94wo97h",
       "type": "canvas",
       "x": 32,
       "y": 856,
@@ -3229,7 +3415,7 @@
       "opacity": 100,
       "children": [
         {
-          "id": "4qcgepz",
+          "id": "co5fwiq",
           "type": "color-block",
           "x": 0,
           "y": 0,
@@ -3247,7 +3433,20 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "cysmqwx",
+          "id": "yr6ct1n",
+          "type": "color-block",
+          "x": 0,
+          "y": 0,
+          "width": 330,
+          "height": 172,
+          "backgroundColor": "rgba(212, 212, 216, 0.1)",
+          "borderRadius": 0,
+          "borderWidth": 0,
+          "borderColor": "transparent",
+          "opacity": 100
+        },
+        {
+          "id": "fdfnpzn",
           "type": "text",
           "x": 13,
           "y": 13,
@@ -3260,6 +3459,7 @@
           "fontWeight": "normal",
           "color": "#F3F4F6",
           "textAlign": "left",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3270,14 +3470,14 @@
           "iconGap": 6
         },
         {
-          "id": "ohyn3up",
+          "id": "vyam42w",
           "type": "status-badge",
-          "x": 219,
+          "x": 247,
           "y": 13,
-          "width": 98,
+          "width": 70,
           "height": 24,
           "valueField": "{badge_label}",
-          "defaultLabel": "—",
+          "defaultLabel": "",
           "defaultBgColor": "#8E51FF",
           "defaultTextColor": "#FFFFFF",
           "showDot": false,
@@ -3293,74 +3493,60 @@
           ],
           "variableBgKey": "trip_badge_bg",
           "variableColorKey": "trip_badge_color",
-          "outlineFromVarKey": "badge_outline"
+          "outlineFromVarKey": "badge_outline",
+          "mqttDataSourceId": "default-mqtt",
+          "mqttTopic": "v1/vtms/${vehicle_code}/operation/update"
         },
         {
-          "id": "2w7335j",
+          "id": "a12yrez",
           "type": "gauge",
           "x": 13,
           "y": 45,
           "width": 149,
-          "height": 82,
+          "height": 90,
           "title": "",
           "valueField": "demo_speed",
           "unit": "km/h",
           "min": 0,
           "max": 40,
-          "gaugeValueFontSize": 30,
-          "gaugeUnitFontSize": 12,
+          "gaugeValueFontSize": 18,
+          "gaugeUnitFontSize": 14,
           "colorStops": [],
           "gaugeVariant": "semi-arc",
           "arcVariant": "speed",
           "panelBackgroundColor": "rgba(212, 212, 216, 0.1)",
-          "panelBorderRadius": 5,
+          "panelBorderRadius": 8,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/telemetry/update",
           "mqttValuePath": "kinematics.velocity",
-          "refreshInterval": 0,
-          "gaugeTextGap": 9,
-          "gaugeContentPadding": {
-            "top": 10,
-            "right": 10,
-            "bottom": 10,
-            "left": 10
-          },
-          "gaugeArcStrokeWidth": 6
+          "refreshInterval": 0
         },
         {
-          "id": "wj12lmq",
+          "id": "t0a9cdq",
           "type": "gauge",
           "x": 168,
           "y": 45,
           "width": 149,
-          "height": 82,
+          "height": 90,
           "title": "",
           "valueField": "demo_load",
           "unit": "%",
           "min": 0,
           "max": 100,
-          "gaugeValueFontSize": 30,
-          "gaugeUnitFontSize": 12,
+          "gaugeValueFontSize": 18,
+          "gaugeUnitFontSize": 14,
           "colorStops": [],
           "gaugeVariant": "semi-arc",
-          "arcVariant": "speed",
+          "arcVariant": "load",
           "panelBackgroundColor": "rgba(212, 212, 216, 0.1)",
-          "panelBorderRadius": 5,
+          "panelBorderRadius": 8,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/telemetry/update",
           "mqttValuePath": "energy.battery_level",
-          "refreshInterval": 0,
-          "gaugeTextGap": 9,
-          "gaugeContentPadding": {
-            "top": 10,
-            "right": 10,
-            "bottom": 10,
-            "left": 10
-          },
-          "gaugeArcStrokeWidth": 6
+          "refreshInterval": 0
         },
         {
-          "id": "5rl4eml",
+          "id": "fs6gbgo",
           "type": "alert-banner",
           "x": 13,
           "y": 45,
@@ -3453,10 +3639,10 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "euurivx",
+          "id": "l43k254",
           "type": "text",
           "x": 13,
-          "y": 137,
+          "y": 141,
           "width": 71,
           "height": 24,
           "content": "運算",
@@ -3466,6 +3652,7 @@
           "fontWeight": "normal",
           "color": "#00BC7D",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 8,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3508,10 +3695,10 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "5pk4pca",
+          "id": "ezstl00",
           "type": "text",
           "x": 90,
-          "y": 136.5,
+          "y": 141,
           "width": 71,
           "height": 24,
           "content": "感測",
@@ -3521,6 +3708,7 @@
           "fontWeight": "normal",
           "color": "#00BC7D",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 8,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3563,10 +3751,10 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "2xg8qh9",
+          "id": "kyz5bxe",
           "type": "text",
           "x": 167,
-          "y": 136.5,
+          "y": 141,
           "width": 71,
           "height": 24,
           "content": "通訊",
@@ -3576,6 +3764,7 @@
           "fontWeight": "normal",
           "color": "#00BC7D",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 8,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3618,10 +3807,10 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "4hlj76d",
+          "id": "nufr0tp",
           "type": "text",
-          "x": 243,
-          "y": 136.5,
+          "x": 244,
+          "y": 141,
           "width": 71,
           "height": 24,
           "content": "線控",
@@ -3631,6 +3820,7 @@
           "fontWeight": "normal",
           "color": "#00BC7D",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 8,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3673,11 +3863,11 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "ucrirbz",
+          "id": "5o72lz6",
           "type": "color-block",
-          "x": 0,
+          "x": 116,
           "y": 172,
-          "width": 330,
+          "width": 97,
           "height": 20,
           "backgroundColor": "rgba(212, 212, 216, 0.1)",
           "borderRadius": 0,
@@ -3686,19 +3876,20 @@
           "opacity": 100
         },
         {
-          "id": "bcaw1np",
+          "id": "7sdk6u1",
           "type": "text",
-          "x": 124,
+          "x": 13,
           "y": 172,
-          "width": 79,
+          "width": 304,
           "height": 20,
           "content": "{segment_label}",
-          "fontSize": 14,
+          "fontSize": 12,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
           "color": "#D1D5DC",
           "textAlign": "center",
+          "verticalAlign": "center",
           "borderRadius": 4,
           "borderWidth": 0,
           "borderColor": "transparent",
@@ -3709,15 +3900,15 @@
           "textWrap": "nowrap",
           "contentPadding": "0 10px 2px 6px",
           "mqttDataSourceId": "default-mqtt",
-          "mqttTopic": "v1/vtms/${vehicle_code}/operation/update",
-          "mqttValuePath": "current_leg.target_station_id"
+          "mqttTopic": "v1/vtms/${vehicle_code}/operation/update"
         }
       ],
       "isGroup": true,
       "groupRepeatMode": "tile",
       "dataSourceId": "default-internal",
-      "sqlQuery": "SELECT\n  v.vehicle_code,\n  COALESCE(v.display_name, v.vehicle_code) AS vehicle_display,\n  live_order.priority_level,\n  live_order.line_kind,\n  live_order.status AS order_status,\n  live_order.trip_code,\n  live_order.maint_type_label,\n  live_order.maint_type_bg,\n  live_order.maint_type_color,\n  CASE\n    WHEN live_order.line_kind = 'MAINLINE'\n      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL\n      THEN live_order.trip_code\n    WHEN live_order.line_kind = 'MAINTENANCE'\n      THEN COALESCE(\n        NULLIF(TRIM(live_order.maint_type_label), ''),\n        CASE\n          WHEN live_order.yard_slot_id LIKE 'E%' THEN '充電'\n          WHEN live_order.yard_slot_id LIKE 'P%' THEN '臨停'\n          WHEN live_order.yard_slot_id LIKE 'W%' THEN '洗車'\n          WHEN live_order.yard_slot_id LIKE 'H%' THEN '調度'\n          WHEN live_order.yard_slot_id LIKE 'M%' THEN '保養'\n          ELSE '整備'\n        END\n      )\n    ELSE NULL\n  END AS badge_label,\n  CASE\n    WHEN live_order.line_kind = 'MAINLINE'\n      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL THEN 'mainline'\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN 'maintenance'\n    ELSE NULL\n  END AS badge_kind,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_bg, '#422006')\n    ELSE COALESCE(m.trip_badge_bg, '#7e57c2')\n  END AS trip_badge_bg,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_color, '#fdba74')\n    ELSE COALESCE(m.trip_badge_color, '#f3e8ff')\n  END AS trip_badge_color,\n  COALESCE(m.badge_outline, '0') AS badge_outline,\n  COALESCE(m.overall_health, 'OK') AS overall_health,\n  COALESCE(m.alert_message, '') AS alert_message,\n  COALESCE(m.card_border_color, '#00c897') AS card_border_color,\n  COALESCE(m.status_computing, 'OK') AS status_computing,\n  COALESCE(m.status_sensing, 'OK') AS status_sensing,\n  COALESCE(m.status_communication, 'OK') AS status_communication,\n  COALESCE(m.status_chassis, 'OK') AS status_chassis,\n  /*\n   * 位置。\n   *\n   * 這一欄原本有一段 ('D' || (32 + 車號 % 18))，車號 4 就寫 D20、車號 6 就寫 U08——\n   * 那是拿車號算出來的假格位，跟車子真正在哪裡沒有關係，畫面上看到的 D20／D28／U08\n   * 就是它。整備車的格位是真的（派單時就指定了），正線車的位置則只能說到「正往哪一站」。\n   *\n   * 欄位寬度只有 79px，站名放不下（「上行轉N2W正線起點」有九個字），所以壓成站牌代號\n   * 加方向：t3_d 寫成 T3下、n2w_u2d_back_start 寫成 N2W。\n   */\n  COALESCE(\n    CASE\n      WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')\n      WHEN live_order.line_kind = 'MAINLINE' THEN (\n        SELECT UPPER(SPLIT_PART(sid.id, '_', 1))\n          || CASE SPLIT_PART(sid.id, '_', 2) WHEN 'u' THEN '上' WHEN 'd' THEN '下' ELSE '' END\n        FROM (\n          SELECT COALESCE(\n            NULLIF(TRIM(live_order.next_station), ''),\n            live_order.payload->'current_leg'->>'target_station_id',\n            live_order.payload->'origin'->>'id'\n          ) AS id\n        ) sid\n        WHERE NULLIF(sid.id, '') IS NOT NULL\n      )\n      ELSE NULL\n    END,\n    NULLIF(TRIM(maint_order.yard_slot_id), ''),\n    '待命'\n  ) AS segment_label,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')\n    ELSE NULLIF(TRIM(maint_order.yard_slot_id), '')\n  END AS yard_slot_id,\n  /*\n   * 速度。MQTT telemetry/update 有報就用那個，這裡只是沒車在線時的底稿。\n   *\n   * 原本寫成 18 + 車號 % 8 + 車號 * 0.3，停在保養格的車也會顯示 16.8 km/h。沒有回報\n   * 就是不知道它在動，填 0 比編一個數字誠實。\n   */\n  0::numeric AS demo_speed,\n  COALESCE(m.demo_load, 0)::numeric AS demo_load\nFROM vehicles v\nLEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code\nLEFT JOIN LATERAL (\n  /*\n   * 車子現在真正在執行的那一張單。\n   *\n   * 排班引擎跑完不一定會把狀態收成 END，今天光是 MAINLINE 就有兩百多張掛在\n   * PROCESSING、planned_end 早就過了的殭屍單。原本這裡只看狀態不看時間，撈到的\n   * 常常是清晨那一班——卡片上顯示 NT0837，車其實在跑 NT1325。\n   *\n   * 排序先看「現在是否落在這張單的時間窗內」，同分再比狀態與開始時間。\n   */\n  SELECT o3.priority_level, o3.line_kind, o3.status, o3.trip_code,\n         o3.maint_type_label, o3.maint_type_bg, o3.maint_type_color,\n         o3.next_station, o3.payload,\n         UPPER(NULLIF(TRIM(o3.payload->>'yard_slot_id'), '')) AS yard_slot_id\n  FROM operation_orders o3\n  WHERE o3.vehicle_code = v.vehicle_code\n    AND o3.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    AND COALESCE(o3.planned_end, o3.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n  ORDER BY\n    (\n      o3.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n      AND COALESCE(o3.planned_end, o3.planned_start + 600000)\n          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n    ) DESC,\n    CASE o3.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,\n    o3.priority_level DESC,\n    o3.planned_start DESC,\n    o3.created_at DESC\n  LIMIT 1\n) live_order ON true\nLEFT JOIN LATERAL (\n  -- 正線車沒單的時候拿來當位置的備援，同樣只認還沒過期的整備單：不擋時間的話，\n  -- 早上進過保養格的車一整天都會顯示在那一格。\n  SELECT UPPER(NULLIF(TRIM(o4.payload->>'yard_slot_id'), '')) AS yard_slot_id\n  FROM operation_orders o4\n  WHERE o4.vehicle_code = v.vehicle_code\n    AND o4.line_kind = 'MAINTENANCE'\n    AND o4.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    AND NULLIF(TRIM(o4.payload->>'yard_slot_id'), '') IS NOT NULL\n    AND COALESCE(o4.planned_end, o4.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n  ORDER BY o4.created_at DESC\n  LIMIT 1\n) maint_order ON true\nWHERE v.is_active = true\n  AND v.vehicle_code LIKE 'PMS%'\nORDER BY v.vehicle_code",
-      "refreshInterval": 60,
+      "sqlQuery": "SELECT\n  v.vehicle_code,\n  COALESCE(v.display_name, v.vehicle_code) AS vehicle_display,\n  live_order.priority_level,\n  live_order.line_kind,\n  live_order.status AS order_status,\n  live_order.trip_code,\n  live_order.maint_type_label,\n  live_order.maint_type_bg,\n  live_order.maint_type_color,\n  CASE\n    WHEN live_order.line_kind IN ('MAINLINE', 'TEST')\n      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL\n      THEN live_order.trip_code\n    WHEN live_order.line_kind = 'MAINTENANCE'\n      THEN COALESCE(\n        NULLIF(TRIM(live_order.maint_type_label), ''),\n        CASE\n          WHEN live_order.yard_slot_id LIKE 'E%' THEN '充電'\n          WHEN live_order.yard_slot_id LIKE 'P%' THEN '臨停'\n          WHEN live_order.yard_slot_id LIKE 'W%' THEN '洗車'\n          WHEN live_order.yard_slot_id LIKE 'H%' THEN '調度'\n          WHEN live_order.yard_slot_id LIKE 'M%' THEN '保養'\n          ELSE '整備'\n        END\n      )\n    ELSE NULL\n  END AS badge_label,\n  CASE\n    WHEN live_order.line_kind IN ('MAINLINE', 'TEST')\n      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL THEN 'mainline'\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN 'maintenance'\n    ELSE NULL\n  END AS badge_kind,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_bg, '#422006')\n    ELSE COALESCE(m.trip_badge_bg, '#7e57c2')\n  END AS trip_badge_bg,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_color, '#fdba74')\n    ELSE COALESCE(m.trip_badge_color, '#f3e8ff')\n  END AS trip_badge_color,\n  COALESCE(m.badge_outline, '0') AS badge_outline,\n  COALESCE(m.overall_health, 'OK') AS overall_health,\n  COALESCE(m.alert_message, '') AS alert_message,\n  COALESCE(m.card_border_color, '#00c897') AS card_border_color,\n  COALESCE(m.status_computing, 'OK') AS status_computing,\n  COALESCE(m.status_sensing, 'OK') AS status_sensing,\n  COALESCE(m.status_communication, 'OK') AS status_communication,\n  COALESCE(m.status_chassis, 'OK') AS status_chassis,\n  /*\n   * 位置。\n   *\n   * 這一欄原本有一段 ('D' || (32 + 車號 % 18))，車號 4 就寫 D20、車號 6 就寫 U08——\n   * 那是拿車號算出來的假格位，跟車子真正在哪裡沒有關係，畫面上看到的 D20／D28／U08\n   * 就是它。整備車的格位是真的（派單時就指定了），正線車的位置則只能說到「正往哪一站」。\n   *\n   * 欄位寬度只有 79px，站名放不下（「上行轉N2W正線起點」有九個字），所以壓成站牌代號\n   * 加方向：t3_d 寫成 T3下、n2w_u2d_back_start 寫成 N2W。\n   */\n  COALESCE(\n    CASE\n      WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')\n      WHEN live_order.line_kind IN ('MAINLINE', 'TEST') THEN (\n        SELECT UPPER(SPLIT_PART(sid.id, '_', 1))\n          || CASE SPLIT_PART(sid.id, '_', 2) WHEN 'u' THEN '上' WHEN 'd' THEN '下' ELSE '' END\n        FROM (\n          SELECT COALESCE(\n            NULLIF(TRIM(live_order.next_station), ''),\n            live_order.payload->'current_leg'->>'target_station_id',\n            live_order.payload->'origin'->>'id'\n          ) AS id\n        ) sid\n        WHERE NULLIF(sid.id, '') IS NOT NULL\n      )\n      ELSE NULL\n    END,\n    NULLIF(TRIM(maint_order.yard_slot_id), ''),\n    '待命'\n  ) AS segment_label,\n  CASE\n    WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')\n    ELSE NULLIF(TRIM(maint_order.yard_slot_id), '')\n  END AS yard_slot_id,\n  /*\n   * 速度。MQTT telemetry/update 有報就用那個，這裡只是沒車在線時的底稿。\n   *\n   * 原本寫成 18 + 車號 % 8 + 車號 * 0.3，停在保養格的車也會顯示 16.8 km/h。沒有回報\n   * 就是不知道它在動，填 0 比編一個數字誠實。\n   */\n  0::numeric AS demo_speed,\n  COALESCE(m.demo_load, 0)::numeric AS demo_load\nFROM vehicles v\nLEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code\nLEFT JOIN LATERAL (\n  /*\n   * 車子現在真正在執行的那一張單。\n   *\n   * 排班引擎跑完不一定會把狀態收成 END，今天光是 MAINLINE 就有兩百多張掛在\n   * PROCESSING、planned_end 早就過了的殭屍單。原本這裡只看狀態不看時間，撈到的\n   * 常常是清晨那一班——卡片上顯示 NT0837，車其實在跑 NT1325。\n   *\n   * 排序先看「現在是否落在這張單的時間窗內」，同分再比狀態與開始時間。\n   */\n  SELECT o3.priority_level, o3.line_kind, o3.status, o3.trip_code,\n         o3.maint_type_label, o3.maint_type_bg, o3.maint_type_color,\n         o3.next_station, o3.payload,\n         UPPER(NULLIF(TRIM(o3.payload->>'yard_slot_id'), '')) AS yard_slot_id\n  FROM operation_orders o3\n  WHERE o3.vehicle_code = v.vehicle_code\n    AND o3.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    AND COALESCE(o3.planned_end, o3.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n    AND (\n      o3.status <> 'PENDING'\n      OR o3.planned_start BETWEEN\n        (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n        AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000\n    )\n  ORDER BY\n    (\n      o3.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n      AND COALESCE(o3.planned_end, o3.planned_start + 600000)\n          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint\n    ) DESC,\n    CASE o3.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,\n    o3.priority_level DESC,\n    o3.planned_start DESC,\n    o3.created_at DESC\n  LIMIT 1\n) live_order ON true\nLEFT JOIN LATERAL (\n  -- 正線車沒單的時候拿來當位置的備援，同樣只認還沒過期的整備單：不擋時間的話，\n  -- 早上進過保養格的車一整天都會顯示在那一格。\n  SELECT UPPER(NULLIF(TRIM(o4.payload->>'yard_slot_id'), '')) AS yard_slot_id\n  FROM operation_orders o4\n  WHERE o4.vehicle_code = v.vehicle_code\n    AND o4.line_kind = 'MAINTENANCE'\n    AND o4.status IN ('PENDING', 'PROCESSING', 'FAULTED')\n    AND NULLIF(TRIM(o4.payload->>'yard_slot_id'), '') IS NOT NULL\n    AND COALESCE(o4.planned_end, o4.planned_start + 600000)\n        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n    AND (\n      o4.status <> 'PENDING'\n      OR o4.planned_start BETWEEN\n        (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000\n        AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000\n    )\n  ORDER BY o4.created_at DESC\n  LIMIT 1\n) maint_order ON true\nWHERE v.is_active = true\n  AND v.vehicle_code LIKE 'PMS%'\nORDER BY v.vehicle_code",
+      "refreshInterval": 0,
+      "refreshMode": "event",
       "variableName": "row",
       "iteratorField": "vehicle_code",
       "layoutMode": "grid",
@@ -3734,8 +3925,7 @@
       "templateHeight": 192
     }
   ],
-  "demoLayoutVersion": 114,
-  "id": "demo-plane",
-  "createdAt": 1782643067360,
-  "updatedAt": 1782643067360
+  "createdAt": 1789713696758,
+  "updatedAt": 1789713696762,
+  "demoLayoutVersion": 112
 }

@@ -29,6 +29,7 @@ import { resolveActionIconUrl } from '../route-progress/resolveActionIcon';
 import { resolveVehicleIconBgColor } from '../vehicle-operation-actions';
 import { RouteTrackView } from '../route-progress/RouteTrackView';
 import { RouteVehicleMarker } from '../route-progress/RouteVehicleMarker';
+import { resolveStationLabelAppearance } from '../route-progress/stationLabelAppearance';
 
 /** 班次卡設計稿基準（正線／整備共用，與 demoPlane 子範本一致） */
 const CARD_DESIGN_W = 176;
@@ -95,6 +96,11 @@ function DispatchTrack({
         const isTarget =
           station.name === nextSt
           || (station.stationId != null && station.stationId === nextSt);
+        const labelAppearance = resolveStationLabelAppearance(
+          widget,
+          isPassed || isTarget,
+          Math.max(9, Math.round(10 * scale)),
+        );
         return (
           <div
             key={station.id}
@@ -129,11 +135,26 @@ function DispatchTrack({
               }}
             />
             <div
-              className="whitespace-nowrap font-bold"
+              className="font-bold"
               style={{
                 marginTop: Math.round(6 * scale),
-                fontSize: labelFs,
-                color: isPassed || isTarget ? widget.activeColor : widget.inactiveColor,
+                width: Math.max(64, Math.round(78 * scale)),
+                textAlign: stationPercent <= 1 ? 'left' : stationPercent >= 99 ? 'right' : 'center',
+                transform: stationPercent <= 1
+                  ? 'translateX(50%)'
+                  : stationPercent >= 99
+                    ? 'translateX(-50%)'
+                    : undefined,
+                whiteSpace: labelAppearance.wrap ? 'normal' : 'nowrap',
+                overflowWrap: labelAppearance.wrap ? 'anywhere' : 'normal',
+                lineHeight: 1.1,
+                display: labelAppearance.wrap ? '-webkit-box' : 'block',
+                WebkitBoxOrient: labelAppearance.wrap ? 'vertical' : undefined,
+                WebkitLineClamp: labelAppearance.wrap ? labelAppearance.maxLines : undefined,
+                overflow: 'hidden',
+                textOverflow: labelAppearance.wrap ? undefined : 'ellipsis',
+                fontSize: labelAppearance.fontSize,
+                color: labelAppearance.color,
                 opacity: isPassed || isTarget ? 1 : 0.5,
               }}
             >
@@ -302,7 +323,17 @@ function DispatchCardView({
             <div className="text-zinc-500" style={{ fontSize: labelFs }}>
               {stationLabel}
             </div>
-            <div className="font-bold leading-tight text-zinc-50" style={{ fontSize: valueFs }}>
+            <div
+              className="font-bold leading-tight text-zinc-50"
+              style={{
+                fontSize: valueFs,
+                overflowWrap: 'anywhere',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                overflow: 'hidden',
+              }}
+            >
               {nextSt || '—'}
             </div>
           </div>
@@ -422,6 +453,11 @@ function MaintenanceTrack({
         const isTarget =
           station.name === nextSt
           || (station.stationId != null && station.stationId === nextSt);
+        const labelAppearance = resolveStationLabelAppearance(
+          widget,
+          isPassed || isTarget,
+          Math.max(9, Math.round(10 * scale)),
+        );
         return (
           <div
             key={station.id}
@@ -456,11 +492,26 @@ function MaintenanceTrack({
               }}
             />
             <div
-              className="whitespace-nowrap font-bold"
+              className="font-bold"
               style={{
                 marginTop: Math.round(6 * scale),
-                fontSize: labelFs,
-                color: isPassed || isTarget ? widget.activeColor : widget.inactiveColor,
+                width: Math.max(64, Math.round(78 * scale)),
+                textAlign: stationPercent <= 1 ? 'left' : stationPercent >= 99 ? 'right' : 'center',
+                transform: stationPercent <= 1
+                  ? 'translateX(50%)'
+                  : stationPercent >= 99
+                    ? 'translateX(-50%)'
+                    : undefined,
+                whiteSpace: labelAppearance.wrap ? 'normal' : 'nowrap',
+                overflowWrap: labelAppearance.wrap ? 'anywhere' : 'normal',
+                lineHeight: 1.1,
+                display: labelAppearance.wrap ? '-webkit-box' : 'block',
+                WebkitBoxOrient: labelAppearance.wrap ? 'vertical' : undefined,
+                WebkitLineClamp: labelAppearance.wrap ? labelAppearance.maxLines : undefined,
+                overflow: 'hidden',
+                textOverflow: labelAppearance.wrap ? undefined : 'ellipsis',
+                fontSize: labelAppearance.fontSize,
+                color: labelAppearance.color,
                 opacity: isPassed || isTarget ? 1 : 0.5,
               }}
             >
@@ -632,7 +683,17 @@ function MaintenanceCardView({
             <div className="text-zinc-500" style={{ fontSize: labelFs }}>
               {stationLabel}
             </div>
-            <div className="font-bold leading-tight text-zinc-50" style={{ fontSize: valueFs }}>
+            <div
+              className="font-bold leading-tight text-zinc-50"
+              style={{
+                fontSize: valueFs,
+                overflowWrap: 'anywhere',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                overflow: 'hidden',
+              }}
+            >
               {nextSt || '—'}
             </div>
           </div>
@@ -733,6 +794,12 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
       : null;
   const mqttPayload =
     mqttPayloadRaw && mqttPayloadIsFresh(mqttPayloadRaw) ? mqttPayloadRaw : null;
+  const progressMqttPayload = useMemo(() => {
+    if (!mqttPayload || mqttPayload.leg_eta_max != null || variables.leg_eta_max == null) {
+      return mqttPayload;
+    }
+    return { ...mqttPayload, leg_eta_max: variables.leg_eta_max };
+  }, [mqttPayload, variables.leg_eta_max]);
 
   let rawValue: unknown = undefined;
   if (widget.mqttProgressPath && mqttPayload && !isShiftCardTrack) {
@@ -758,7 +825,7 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
     variables as Record<string, unknown>,
     sqlRow,
     rawValue,
-    mqttPayload,
+    progressMqttPayload,
     { mqttOnly: isShiftCardTrack },
   );
   const isPending = readOrderStatus(variables as Record<string, unknown>, sqlRow, mqttPayload) === 'PENDING';

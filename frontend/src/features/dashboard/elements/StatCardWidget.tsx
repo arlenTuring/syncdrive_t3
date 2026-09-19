@@ -246,8 +246,6 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
     </div>
   );
 
-  const innerBlocks = labelFirst ? [labelNode, valueNode] : [valueNode, labelNode];
-
   return (
     <div
       style={{
@@ -276,7 +274,7 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
           maxWidth: '100%',
         }}
       >
-        {innerBlocks.filter(Boolean)}
+        {labelFirst ? <>{labelNode}{valueNode}</> : <>{valueNode}{labelNode}</>}
       </div>
       {hintText && widget.hintPosition !== 'value-right' && (
         <div

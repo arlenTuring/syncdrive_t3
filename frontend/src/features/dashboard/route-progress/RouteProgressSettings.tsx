@@ -156,6 +156,46 @@ export function RouteProgressSettings({
           className={inputCls}
         />
       </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={t('dashboard.routeProgress.stationLabelActiveColor')}>
+          <input
+            type="color"
+            value={w.stationLabelActiveColor ?? w.activeColor}
+            onChange={(e) => onUpdate({ stationLabelActiveColor: e.target.value })}
+            className={inputCls}
+            style={{ height: 28 }}
+          />
+        </Field>
+        <Field label={t('dashboard.routeProgress.stationLabelInactiveColor')}>
+          <input
+            type="color"
+            value={w.stationLabelInactiveColor ?? w.inactiveColor}
+            onChange={(e) => onUpdate({ stationLabelInactiveColor: e.target.value })}
+            className={inputCls}
+            style={{ height: 28 }}
+          />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-zinc-300">
+        <input
+          type="checkbox"
+          checked={w.stationLabelWrap ?? true}
+          onChange={(e) => onUpdate({ stationLabelWrap: e.target.checked })}
+          className="accent-cyan-500"
+        />
+        {t('dashboard.routeProgress.stationLabelWrap')}
+      </label>
+      {(w.stationLabelWrap ?? true) && (
+        <Field label={t('dashboard.routeProgress.stationLabelMaxLines')}>
+          <NumberInput
+            min={1}
+            max={6}
+            value={w.stationLabelMaxLines ?? 2}
+            onChange={(n) => onUpdate({ stationLabelMaxLines: Math.min(6, Math.max(1, n || 2)) })}
+            className={inputCls}
+          />
+        </Field>
+      )}
       {(w.variant === 'detail-card' || w.variant === 'service-card') && (
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.routeProgress.cardStationLabel')}>

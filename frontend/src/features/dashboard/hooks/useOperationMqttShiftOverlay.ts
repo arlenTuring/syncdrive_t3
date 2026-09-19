@@ -15,8 +15,14 @@ export function useOperationMqttShiftOverlay(
   const { running, paused, transportPaused, speedMultiplier } = useDemoSimulationPlayback();
   const simPlaying = running && !paused && !transportPaused;
   const fleetPayload = useShiftVehicleOperationMqtt(enabled ? vehicleCode : undefined);
+  const rowOrderId = String(sqlRow?.shift_key ?? sqlRow?.order_id ?? '').trim();
+  const mqttOrderId = String(fleetPayload?.order_id ?? '').trim();
   const freshPayload =
-    fleetPayload && mqttPayloadIsFresh(fleetPayload) ? fleetPayload : null;
+    fleetPayload
+    && mqttPayloadIsFresh(fleetPayload)
+    && (!rowOrderId || !mqttOrderId || rowOrderId === mqttOrderId)
+      ? fleetPayload
+      : null;
   const simTick = useSimClockFrame(enabled && simPlaying && !!freshPayload);
 
   return useMemo(() => {

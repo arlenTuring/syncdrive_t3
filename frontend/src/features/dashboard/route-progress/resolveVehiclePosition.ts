@@ -24,7 +24,14 @@ function normalizeCurrentLeg(
   const target = String(leg.target_station_id ?? '').trim();
   let legEtaMax = num(leg.leg_eta_max);
   if ((legEtaMax === undefined || legEtaMax <= 0) && payload && target) {
-    const bucket = payload.leg_eta_max;
+    let bucket = payload.leg_eta_max;
+    if (typeof bucket === 'string') {
+      try {
+        bucket = JSON.parse(bucket) as unknown;
+      } catch {
+        bucket = null;
+      }
+    }
     if (bucket && typeof bucket === 'object') {
       legEtaMax = num((bucket as Record<string, unknown>)[target]);
     }

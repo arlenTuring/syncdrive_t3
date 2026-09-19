@@ -1,5 +1,6 @@
 import type { RouteProgressWidget, RouteStation } from '../types';
 import { RouteVehicleMarker } from './RouteVehicleMarker';
+import { resolveStationLabelAppearance } from './stationLabelAppearance';
 
 const LINE_H = 2;
 const VEHICLE_SIZE = 10;
@@ -83,6 +84,12 @@ export function RouteTrackView({
           const isStart = index === 0;
           const isEnd = index === stations.length - 1;
           const isCurrent = index === currentIdx;
+          const isReached = !isPending && stationPercent <= progressPercent;
+          const labelAppearance = resolveStationLabelAppearance(
+            widget,
+            isReached || isCurrent || (isPending && isStart),
+            STATION_LABEL_FS,
+          );
 
           let dotSize = 6;
           let dotColor = '#51A2FF';
@@ -141,12 +148,30 @@ export function RouteTrackView({
                 }}
               />
               <div
-                className="absolute top-full mt-1 max-w-[80px] truncate whitespace-nowrap"
+                className="absolute top-full mt-1"
                 style={{
-                  fontSize: stationLabelFontSize(widget),
+                  left: '50%',
+                  width: 88,
+                  transform: isStart
+                    ? 'translateX(0)'
+                    : isEnd
+                      ? 'translateX(-100%)'
+                      : 'translateX(-50%)',
+                  textAlign: isStart ? 'left' : isEnd ? 'right' : 'center',
+                  whiteSpace: labelAppearance.wrap ? 'normal' : 'nowrap',
+                  overflowWrap: labelAppearance.wrap ? 'anywhere' : 'normal',
+                  lineHeight: 1.05,
+                  display: labelAppearance.wrap ? '-webkit-box' : 'block',
+                  WebkitBoxOrient: labelAppearance.wrap ? 'vertical' : undefined,
+                  WebkitLineClamp: labelAppearance.wrap ? labelAppearance.maxLines : undefined,
+                  overflow: 'hidden',
+                  textOverflow: labelAppearance.wrap ? undefined : 'ellipsis',
+                  fontSize: labelAppearance.fontSize,
                   fontWeight: 400,
                   letterSpacing: '0.5px',
-                  color: labelColor,
+                  color: widget.stationLabelActiveColor || widget.stationLabelInactiveColor
+                    ? labelAppearance.color
+                    : labelColor,
                   opacity: labelOpacity,
                 }}
                 title={station.name}

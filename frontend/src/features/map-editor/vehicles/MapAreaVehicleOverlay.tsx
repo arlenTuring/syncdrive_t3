@@ -64,17 +64,14 @@ import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 const LOW_CONFIDENCE = 0.5;
 
 /**
- * 軌道上的車一律畫這麼大（區域像素）。
+ * 沒有載具容器校準尺寸時的後備（區域像素）。
  *
- * 位置已經格化，不再照每一塊自己的比例尺換算，所以尺寸也不必跟著變——那個比例尺
- * 沿線差十三倍，同一台車走一圈會一路脹縮。帶子寬度在這張圖上倒是相當一致（中位
- * 53 像素），所以固定成比帶子窄一點，貼邊時剛好看得出一半探出去。
- *
- * 真實長寬比（12 × 2.6 公尺，4.6:1）在這裡放棄了：要照比例，車寬跟帶子相稱時車長
- * 會超過一半的方塊。位置本來就不是連續比例，長寬比再堅持沒有意義。
+ * 有 vehicle-container／vehicleDisplay*Px 時以校準為準——儀表板編輯器調好的長寬
+ * 才是車號可讀性的來源。這裡硬編死會讓本地跟雲端只要平面設定不同就長得不一樣，
+ * 而且會把樣板上 20–23px 的車號壓到幾乎看不清。
  */
-const TRACK_VEHICLE_WIDTH_PX = 72;
-const TRACK_VEHICLE_HEIGHT_PX = 30;
+const FALLBACK_TRACK_VEHICLE_WIDTH_PX = 120;
+const FALLBACK_TRACK_VEHICLE_HEIGHT_PX = 42;
 
 function radToDeg(rad: number): number {
   return (rad * 180) / Math.PI;
@@ -434,14 +431,21 @@ export function MapAreaVehicleOverlay({
           : facilityCenterLocal;
 
         /*
-         * 場區格位的車也用同一個固定尺寸。
+         * 場區格位的車也用同一個固定尺寸（來自儀表板載具容器校準）。
          *
          * 原本格位上的車照格子的比例尺換算，於是同一台車停在充電區是 65×35、停在
          * 整備區是 38×15——而它只是停著。格子代表的現場尺寸不一致（E 格宣稱橫向
          * 只有 2.3 公尺，比車還窄）本身是圖資問題，不該由車的大小去承擔。
+         *
+         * 尺寸必須吃 vehicleDisplay*Px：那是儀表板上調好的「車號要多大才看得清」。
+         * 硬編 72×30 會把樣板字級壓掉，本地／雲端只要平面校準不同就對不齊。
          */
-        const markerW = vehicleDefinition ? TRACK_VEHICLE_WIDTH_PX : iconSpec.width;
-        const markerH = vehicleDefinition ? TRACK_VEHICLE_HEIGHT_PX : iconSpec.height;
+        const markerW = vehicleDefinition
+          ? displayW || FALLBACK_TRACK_VEHICLE_WIDTH_PX
+          : iconSpec.width;
+        const markerH = vehicleDefinition
+          ? displayH || FALLBACK_TRACK_VEHICLE_HEIGHT_PX
+          : iconSpec.height;
         /*
          * 有比例尺換算時長寬各自代表真實公尺數：沿線與橫向的 px/m 本來就不同（同一格
          * 一個方向壓縮、另一個沒有），用 contain 取兩者小的那個縮放，等於把已經算對的

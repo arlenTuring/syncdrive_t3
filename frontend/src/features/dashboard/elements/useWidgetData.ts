@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { clearDatasourceQueryCacheForTags, executeDatasourceQuery } from '../store/useDataSourceStore';
+import { clearDatasourceQueryCacheForQuery, executeDatasourceQuery } from '../store/useDataSourceStore';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { expandBuiltinSqlMacros } from '../constants/demoSql';
 import { subscribeDatasourceInvalidation } from '../utils/datasourceInvalidationBus';
@@ -14,6 +14,7 @@ export interface WidgetFetchState {
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
+const EVENT_FALLBACK_INTERVAL_SEC = 30;
 
 export type WidgetDataOptions = WidgetDataBinding & {
   refreshInterval?: number;
@@ -22,7 +23,7 @@ export type WidgetDataOptions = WidgetDataBinding & {
 /**
  * 統一 Widget 資料 Hook
  * - stream：MQTT（refreshMode=stream 時不查 SQL）
- * - event：後端寫庫 → Socket 失效標籤 → 重查（取代 15s 輪詢）
+ * - event：後端寫庫 → Socket 失效標籤 → 立即重查，並以低頻輪詢防止漏事件
  * - once：僅 mount 查一次
  * - poll：legacy 定時輪詢
  */
@@ -61,7 +62,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
     let aborted = false;
 
-    const fetchData = async () => {
+    const fetchData = async (force = false) => {
       if (dataSourceId && sqlQuery?.trim()) {
         const finalSql = interpolateVariables(expandBuiltinSqlMacros(sqlQuery), vars);
         if (/\{[a-zA-Z_]\w*\}/.test(finalSql)) {
@@ -74,6 +75,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
           return;
         }
         try {
+          if (force) clearDatasourceQueryCacheForQuery(dataSourceId, finalSql);
           const rows = await executeDatasourceQuery(dataSourceId, finalSql, FETCH_TIMEOUT_MS);
           if (aborted) return;
           lastGoodData.current = rows;
@@ -120,8 +122,13 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     setState((s) => ({ ...s, loading: true, error: null }));
     void fetchData();
 
-    if (refreshMode === 'poll' && refreshInterval && refreshInterval > 0) {
-      timer = setInterval(() => void fetchData(), refreshInterval * 1000);
+    const timerIntervalSec = refreshMode === 'poll'
+      ? refreshInterval
+      : refreshMode === 'event'
+        ? (refreshInterval && refreshInterval > 0 ? refreshInterval : EVENT_FALLBACK_INTERVAL_SEC)
+        : undefined;
+    if (timerIntervalSec && timerIntervalSec > 0) {
+      timer = setInterval(() => void fetchData(true), timerIntervalSec * 1000);
     }
 
     let unsubscribeInvalidate: (() => void) | undefined;
@@ -130,17 +137,25 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
         if (!tagsOverlap(invalidateTags, payload.tags)) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          clearDatasourceQueryCacheForTags(payload.tags);
-          void fetchData();
+          void fetchData(true);
         }, 200);
       });
     }
+
+    // 瀏覽器在背景會節流 timer；切回畫面時立即補查，不必重新進入頁面。
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void fetchData(true);
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
     return () => {
       aborted = true;
       if (timer) clearInterval(timer);
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribeInvalidate?.();
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [dataSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags]);
 

@@ -103,9 +103,8 @@ export function needsShiftPanelsSimulationSqlFix(plane: DashboardPlane): boolean
       if (!sql.includes('station_display_name')) return true;
     }
     if (label === '整備班表') {
-      if (!sql.includes('WITH m0')) return true;
-      if (!sql.includes("'S2W' AS st_a")) return true;
-      if (sql.includes('zone_label')) return true;
+      if (!sql.includes("scheduleOutput'->'plan'->'timelines")) return true;
+      if (!sql.includes('current_blocks')) return true;
     }
   }
   return false;
@@ -287,7 +286,6 @@ function patchVehicleMonitorBadgeMqtt(child: ChildWidget): ChildWidget {
 
 /** 車輛狀態卡：SQL 改為活躍訂單班次／整備標籤，徽章訂閱 operation/update */
 export function patchVehicleMonitorBadgeProtocol(plane: DashboardPlane): DashboardPlane {
-  if (!needsVehicleMonitorBadgeProtocolFix(plane)) return plane;
   return {
     ...plane,
     elements: plane.elements.map((el) => {
@@ -347,6 +345,24 @@ function canvasNeedsEventDrivenRefresh(el: CanvasElementProps): boolean {
 
 /** 執行期 patch 是否仍需要（已是最新樣板時跳過整棵樹 walk） */
 export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
+  const vehicleStatus = plane.elements.find((el) => el.label === '車輛狀態' && el.isGroup);
+  if (vehicleStatus && (
+    !(vehicleStatus.sqlQuery ?? '').includes("scheduleOutput'->'plan'->'timelines")
+    || !(vehicleStatus.sqlQuery ?? '').includes('position_updated_at')
+  )) {
+    return true;
+  }
+  const mainline = plane.elements.find((el) => el.label === '正線班次' && el.isGroup);
+  if (mainline && !(mainline.sqlQuery ?? '').includes("payload->>'card_label'")) {
+    return true;
+  }
+  const distribution = plane.elements.find((el) => el.label === '車輛分佈' && el.isGroup);
+  if (distribution) {
+    const segment = (distribution.children ?? []).find((child) => child.type === 'segment-bar');
+    if (segment && !((segment as { sqlQuery?: string }).sqlQuery ?? '').includes('ss.last_updated')) {
+      return true;
+    }
+  }
   if (needsVehicleMonitorBadgeProtocolFix(plane)) return true;
   if (needsShiftPanelsSimulationSqlFix(plane)) return true;
   if (isStaleMaintenanceSlotSqlOnPlane(plane)) return true;

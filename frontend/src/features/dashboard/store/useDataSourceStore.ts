@@ -214,6 +214,11 @@ export function clearDatasourceQueryCache(): void {
   queryCache.clear();
 }
 
+/** 定時／回到分頁重查時，只略過指定 SQL 的短期快取。 */
+export function clearDatasourceQueryCacheForQuery(datasourceId: string, sqlQuery: string): void {
+  queryCache.delete(`${datasourceId}::${expandBuiltinSqlMacros(sqlQuery)}`);
+}
+
 /** 僅清除與失效標籤重疊的 SQL 快取（避免整池清空造成查詢雪崩） */
 export function clearDatasourceQueryCacheForTags(incomingTags: string[]): void {
   if (incomingTags.length === 0) {

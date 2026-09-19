@@ -75,13 +75,6 @@ function SlotTransitionBox({
   const childrenRef = useRef(children);
   childrenRef.current = children;
 
-  // 僅在 animKey 變更時同步內容；不可依賴 children（每次 render 新參考會無限 setState → 黑屏）
-  useEffect(() => {
-    if (skipAnim) return;
-    if (animKey !== shown.key) return;
-    setShown({ key: animKey, node: childrenRef.current });
-  }, [skipAnim, animKey, shown.key]);
-
   useEffect(() => {
     if (skipAnim) return;
     if (animKey === shown.key) return;
@@ -97,6 +90,10 @@ function SlotTransitionBox({
     return <div className={className} style={style}>{children}</div>;
   }
 
+  // 同一張卡直接用本次 render 的內容，ETA／狀態才會隨 MQTT 更新。
+  // 只有 animKey 改變的退場階段需要暫存上一張卡。
+  const visibleNode = animKey === shown.key ? children : shown.node;
+
   if (transition === 'fade') {
     return (
       <div
@@ -108,7 +105,7 @@ function SlotTransitionBox({
           transition: 'opacity 0.45s ease, transform 0.45s ease',
         }}
       >
-        {shown.node}
+        {visibleNode}
       </div>
     );
   }
@@ -133,7 +130,7 @@ function SlotTransitionBox({
           backfaceVisibility: 'hidden',
         }}
       >
-        {shown.node}
+        {visibleNode}
       </div>
     </div>
   );
@@ -160,7 +157,9 @@ function TemplateInstance({
   const hideChrome = !!element.templateHideChrome && !isPreviewMode;
   const varName = element.variableName || 'item';
   const rowFingerprint = row ? JSON.stringify(row) : '';
-  const useLiveMqtt = isShiftRosterGroup(element.label) && !isPreviewMode && !isEditMode;
+  // 正線卡需要 MQTT 補即時進度；整備卡的業務標籤與時間則以部署班表為準。
+  // 若整備卡也套 operation/update，舊 retain 訊息會把使用者設定的 cardLabel 蓋掉。
+  const useLiveMqtt = element.label === '正線班次' && !isPreviewMode && !isEditMode;
   const vehicleCode = row?.vehicle_code != null ? String(row.vehicle_code) : undefined;
   const liveRow = useOperationMqttShiftOverlay(vehicleCode, row, useLiveMqtt);
   const variables = useMemo(

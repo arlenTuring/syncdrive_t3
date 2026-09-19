@@ -281,14 +281,29 @@ FROM (
     CASE
       WHEN EXISTS (
         SELECT 1 FROM operation_orders o
-        WHERE o.vehicle_code = v.vehicle_code AND o.status = 'PROCESSING'
+        WHERE o.vehicle_code = v.vehicle_code
+          AND o.line_kind IN ('MAINLINE', 'TEST')
+          AND o.status = 'PROCESSING'
+          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+          AND COALESCE(o.planned_end, o.planned_start + 600000)
+              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
       ) THEN 'IN_SERVICE'
+      WHEN EXISTS (
+        SELECT 1 FROM operation_orders o
+        WHERE o.vehicle_code = v.vehicle_code
+          AND o.line_kind = 'MAINTENANCE'
+          AND o.status = 'PROCESSING'
+          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+          AND COALESCE(o.planned_end, o.planned_start + 1800000)
+              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+      ) THEN 'MAINTENANCE'
       WHEN EXISTS (
         SELECT 1 FROM slot_statuses ss
         JOIN facility_slots fs ON fs.slot_id = ss.slot_id
         WHERE ss.vehicle_code = v.vehicle_code
           AND fs.zone LIKE '整備-%'
           AND ss.status IN ('OCCUPIED', 'CHARGING', 'ERROR')
+          AND ss.last_updated >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 120000
       ) THEN 'MAINTENANCE'
       ELSE 'STANDBY'
     END AS status_code
@@ -312,46 +327,44 @@ END
  * 是車子沒在線時的底稿，也負責算 MQTT 不報的東西：現在執行哪一張單、人在哪裡。
  */
 export const VEHICLE_STATUS_ROW_SQL = `
+WITH deployed AS (
+  SELECT body
+  FROM operation_shifts
+  WHERE usage_status = 'in_use'
+  ORDER BY updated_at DESC
+  LIMIT 1
+), clock AS (
+  SELECT
+    EXTRACT(HOUR FROM timezone('Asia/Taipei', now())) * 60
+    + EXTRACT(MINUTE FROM timezone('Asia/Taipei', now()))
+    + EXTRACT(SECOND FROM timezone('Asia/Taipei', now())) / 60 AS minute_now
+)
 SELECT
   v.vehicle_code,
   COALESCE(v.display_name, v.vehicle_code) AS vehicle_display,
-  live_order.priority_level,
-  live_order.line_kind,
-  live_order.status AS order_status,
-  live_order.trip_code,
-  live_order.maint_type_label,
-  live_order.maint_type_bg,
-  live_order.maint_type_color,
+  CASE WHEN schedule_block.task_type = 'passenger' THEN 50 ELSE 40 END AS priority_level,
+  CASE WHEN schedule_block.task_type = 'passenger' THEN 'MAINLINE' ELSE 'MAINTENANCE' END AS line_kind,
+  CASE WHEN schedule_block.block IS NULL THEN NULL ELSE 'PROCESSING' END AS order_status,
+  schedule_block.trip_code,
+  CASE WHEN schedule_block.task_type <> 'passenger' THEN schedule_block.card_label END AS maint_type_label,
+  CASE WHEN schedule_block.task_type <> 'passenger' THEN '#422006' END AS maint_type_bg,
+  CASE WHEN schedule_block.task_type <> 'passenger' THEN '#FD9A00' END AS maint_type_color,
   CASE
-    WHEN live_order.line_kind = 'MAINLINE'
-      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL
-      THEN live_order.trip_code
-    WHEN live_order.line_kind = 'MAINTENANCE'
-      THEN COALESCE(
-        NULLIF(TRIM(live_order.maint_type_label), ''),
-        CASE
-          WHEN live_order.yard_slot_id LIKE 'E%' THEN '充電'
-          WHEN live_order.yard_slot_id LIKE 'P%' THEN '臨停'
-          WHEN live_order.yard_slot_id LIKE 'W%' THEN '洗車'
-          WHEN live_order.yard_slot_id LIKE 'H%' THEN '調度'
-          WHEN live_order.yard_slot_id LIKE 'M%' THEN '保養'
-          ELSE '整備'
-        END
-      )
+    WHEN schedule_block.task_type = 'passenger' THEN schedule_block.trip_code
+    WHEN schedule_block.block IS NOT NULL THEN schedule_block.card_label
     ELSE NULL
   END AS badge_label,
   CASE
-    WHEN live_order.line_kind = 'MAINLINE'
-      AND NULLIF(TRIM(live_order.trip_code), '') IS NOT NULL THEN 'mainline'
-    WHEN live_order.line_kind = 'MAINTENANCE' THEN 'maintenance'
+    WHEN schedule_block.task_type = 'passenger' THEN 'mainline'
+    WHEN schedule_block.block IS NOT NULL THEN 'maintenance'
     ELSE NULL
   END AS badge_kind,
   CASE
-    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_bg, '#422006')
+    WHEN schedule_block.task_type <> 'passenger' THEN '#422006'
     ELSE COALESCE(m.trip_badge_bg, '#7e57c2')
   END AS trip_badge_bg,
   CASE
-    WHEN live_order.line_kind = 'MAINTENANCE' THEN COALESCE(live_order.maint_type_color, '#fdba74')
+    WHEN schedule_block.task_type <> 'passenger' THEN '#FD9A00'
     ELSE COALESCE(m.trip_badge_color, '#f3e8ff')
   END AS trip_badge_color,
   COALESCE(m.badge_outline, '0') AS badge_outline,
@@ -362,95 +375,63 @@ SELECT
   COALESCE(m.status_sensing, 'OK') AS status_sensing,
   COALESCE(m.status_communication, 'OK') AS status_communication,
   COALESCE(m.status_chassis, 'OK') AS status_chassis,
-  /*
-   * 位置。
-   *
-   * 這一欄原本有一段 ('D' || (32 + 車號 % 18))，車號 4 就寫 D20、車號 6 就寫 U08——
-   * 那是拿車號算出來的假格位，跟車子真正在哪裡沒有關係，畫面上看到的 D20／D28／U08
-   * 就是它。整備車的格位是真的（派單時就指定了），正線車的位置則只能說到「正往哪一站」。
-   *
-   * 欄位寬度只有 79px，站名放不下（「上行轉N2W正線起點」有九個字），所以壓成站牌代號
-   * 加方向：t3_d 寫成 T3下、n2w_u2d_back_start 寫成 N2W。
-   */
-  COALESCE(
-    CASE
-      WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')
-      WHEN live_order.line_kind = 'MAINLINE' THEN (
-        SELECT UPPER(SPLIT_PART(sid.id, '_', 1))
-          || CASE SPLIT_PART(sid.id, '_', 2) WHEN 'u' THEN '上' WHEN 'd' THEN '下' ELSE '' END
-        FROM (
-          SELECT COALESCE(
-            NULLIF(TRIM(live_order.next_station), ''),
-            live_order.payload->'current_leg'->>'target_station_id',
-            live_order.payload->'origin'->>'id'
-          ) AS id
-        ) sid
-        WHERE NULLIF(sid.id, '') IS NOT NULL
-      )
-      ELSE NULL
-    END,
-    NULLIF(TRIM(maint_order.yard_slot_id), ''),
-    '待命'
-  ) AS segment_label,
-  CASE
-    WHEN live_order.line_kind = 'MAINTENANCE' THEN NULLIF(TRIM(live_order.yard_slot_id), '')
-    ELSE NULLIF(TRIM(maint_order.yard_slot_id), '')
-  END AS yard_slot_id,
-  /*
-   * 速度。MQTT telemetry/update 有報就用那個，這裡只是沒車在線時的底稿。
-   *
-   * 原本寫成 18 + 車號 % 8 + 車號 * 0.3，停在保養格的車也會顯示 16.8 km/h。沒有回報
-   * 就是不知道它在動，填 0 比編一個數字誠實。
-   */
-  0::numeric AS demo_speed,
+  COALESCE(NULLIF(TRIM(m.segment_label), ''), '—') AS segment_label,
+  CASE WHEN m.location_kind = 'FACILITY' THEN NULLIF(TRIM(m.segment_label), '') END AS yard_slot_id,
+  COALESCE(m.demo_speed, 0)::numeric AS demo_speed,
   COALESCE(m.demo_load, 0)::numeric AS demo_load
 FROM vehicles v
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
+LEFT JOIN deployed d ON true
 LEFT JOIN LATERAL (
-  /*
-   * 車子現在真正在執行的那一張單。
-   *
-   * 排班引擎跑完不一定會把狀態收成 END，今天光是 MAINLINE 就有兩百多張掛在
-   * PROCESSING、planned_end 早就過了的殭屍單。原本這裡只看狀態不看時間，撈到的
-   * 常常是清晨那一班——卡片上顯示 NT0837，車其實在跑 NT1325。
-   *
-   * 排序先看「現在是否落在這張單的時間窗內」，同分再比狀態與開始時間。
-   */
-  SELECT o3.priority_level, o3.line_kind, o3.status, o3.trip_code,
-         o3.maint_type_label, o3.maint_type_bg, o3.maint_type_color,
-         o3.next_station, o3.payload,
-         UPPER(NULLIF(TRIM(o3.payload->>'yard_slot_id'), '')) AS yard_slot_id
-  FROM operation_orders o3
-  WHERE o3.vehicle_code = v.vehicle_code
-    AND o3.status IN ('PENDING', 'PROCESSING', 'FAULTED')
-    AND COALESCE(o3.planned_end, o3.planned_start + 600000)
-        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
-  ORDER BY
-    (
-      o3.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
-      AND COALESCE(o3.planned_end, o3.planned_start + 600000)
-          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
-    ) DESC,
-    CASE o3.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,
-    o3.priority_level DESC,
-    o3.planned_start DESC,
-    o3.created_at DESC
+  SELECT
+    block,
+    block->>'taskType' AS task_type,
+    CASE WHEN block->>'taskType' = 'passenger' THEN
+      UPPER(COALESCE(block->>'routeCode', ''))
+      || LPAD(FLOOR((block->>'plannedStartMinute')::numeric / 60)::text, 2, '0')
+      || LPAD(FLOOR(MOD((block->>'plannedStartMinute')::numeric, 60))::text, 2, '0')
+    END AS trip_code,
+    CASE
+      WHEN block->>'source' = 'hold' THEN '暫停'
+      WHEN block->>'taskType' = 'passenger' THEN COALESCE(
+        (SELECT route->>'cardLabel'
+         FROM jsonb_array_elements(COALESCE(d.body->'selectedRoutes', '[]'::jsonb)) route
+         WHERE route->>'routeId' = block->>'routeId'
+         LIMIT 1),
+        '營運'
+      )
+      ELSE COALESCE(
+        NULLIF(d.body->'maintenanceSectionCardLabelBySection'->>CASE block->>'taskType'
+          WHEN 'washing' THEN 'carWash'
+          WHEN 'servicing' THEN 'maintenance'
+          WHEN 'inspection' THEN 'preTrip'
+          WHEN 'standby' THEN 'mobile'
+          ELSE block->>'taskType'
+        END, ''),
+        NULLIF(block->>'cardLabel', ''),
+        CASE block->>'taskType'
+          WHEN 'charging' THEN '充電'
+          WHEN 'washing' THEN '洗車'
+          WHEN 'servicing' THEN '保養'
+          WHEN 'inspection' THEN '行檢'
+          WHEN 'standby' THEN '待命'
+          WHEN 'idle' THEN '暫停'
+          WHEN 'dispatch' THEN '調度'
+          ELSE NULLIF(block->>'label', '')
+        END,
+        '整備'
+      )
+    END AS card_label
+  FROM jsonb_array_elements(COALESCE(d.body->'scheduleOutput'->'plan'->'timelines', '[]'::jsonb)) timeline
+  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(timeline->'blocks', '[]'::jsonb)) block
+  CROSS JOIN clock
+  WHERE COALESCE((timeline->>'row')::int, (block->>'timelineRow')::int)
+        = NULLIF(regexp_replace(v.vehicle_code, '\\D', '', 'g'), '')::int
+    AND (block->>'plannedStartMinute')::numeric <= clock.minute_now
+    AND (block->>'plannedEndMinute')::numeric > clock.minute_now
+  ORDER BY (block->>'plannedStartMinute')::numeric DESC
   LIMIT 1
-) live_order ON true
-LEFT JOIN LATERAL (
-  -- 正線車沒單的時候拿來當位置的備援，同樣只認還沒過期的整備單：不擋時間的話，
-  -- 早上進過保養格的車一整天都會顯示在那一格。
-  SELECT UPPER(NULLIF(TRIM(o4.payload->>'yard_slot_id'), '')) AS yard_slot_id
-  FROM operation_orders o4
-  WHERE o4.vehicle_code = v.vehicle_code
-    AND o4.line_kind = 'MAINTENANCE'
-    AND o4.status IN ('PENDING', 'PROCESSING', 'FAULTED')
-    AND NULLIF(TRIM(o4.payload->>'yard_slot_id'), '') IS NOT NULL
-    AND COALESCE(o4.planned_end, o4.planned_start + 600000)
-        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
-  ORDER BY o4.created_at DESC
-  LIMIT 1
-) maint_order ON true
+) schedule_block ON true
 WHERE v.is_active = true
   AND v.vehicle_code LIKE 'PMS%'
 ORDER BY v.vehicle_code
@@ -477,23 +458,7 @@ WITH active_orders AS (
   SELECT
     o.*,
     v.display_name,
-    /*
-     * 方向。
-     *
-     * 即時調度引擎產的訂單沒有 route_id（operation_routes 只有兩筆舊的 D/U 路線），
-     * 於是 direction_letter 一律是 null，下面的 CASE 全部落到同一邊——實測整排卡片
-     * 都顯示「上行」，下一站都是「N2W下行」。
-     *
-     * 站名本身就帶方向（「S2W上行出發」「N2W下行出發」），那是最可靠的來源。
-     */
-    COALESCE(
-      r.direction_letter,
-      CASE
-        WHEN o.payload->'origin'->>'name' LIKE '%下行%' THEN 'D'
-        WHEN o.payload->'origin'->>'name' LIKE '%上行%' THEN 'U'
-        ELSE NULL
-      END
-    ) AS trip_direction,
+    COALESCE(NULLIF(TRIM(o.payload->>'card_label'), ''), '營運') AS card_label,
     CASE
       WHEN o.planned_start IS NOT NULL THEN
         EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60
@@ -539,7 +504,7 @@ WITH active_orders AS (
     SELECT station_id FROM operation_route_stations
     WHERE route_id = o.route_id ORDER BY sequence_order DESC LIMIT 1
   ) last_st ON true
-  WHERE o.line_kind = 'MAINLINE'
+  WHERE o.line_kind IN ('MAINLINE', 'TEST')
     AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     /*
@@ -564,8 +529,15 @@ WITH active_orders AS (
      *
      * 留 60 秒寬限，剛到站的那一班不會瞬間消失。
      */
-    AND COALESCE(o.planned_end, o.planned_start + 600000)
+    AND (
+      COALESCE(o.planned_end, o.planned_start + 600000)
         >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+      OR (
+        o.status = 'PROCESSING'
+        AND COALESCE((o.payload->>'updated_at')::bigint, 0)
+          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 10000
+      )
+    )
 ),
 route_json AS (
   SELECT
@@ -595,8 +567,8 @@ SELECT
   o.vehicle_code,
   o.trip_code,
   CONCAT(o.trip_code, ' ', COALESCE(o.display_name, o.vehicle_code)) AS trip_header,
-  CASE WHEN o.trip_direction = 'D' THEN '下行' ELSE '上行' END AS direction_label,
-  CASE WHEN o.trip_direction = 'D' THEN '#8E51FF' ELSE '#51A2FF' END AS direction_pill_bg,
+  o.card_label AS direction_label,
+  '#2B7FFF' AS direction_pill_bg,
   '#FFFFFF' AS direction_pill_color,
   '下一站' AS station_label,
   '剩餘到站' AS eta_label,
@@ -638,17 +610,23 @@ SELECT
   COALESCE(
     (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
       ORDER BY (st->>'order')::int ASC LIMIT 1),
-    CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END
+    NULLIF(o.payload->'origin'->>'name', ''),
+    NULLIF(o.route_origin, ''),
+    '—'
   ) AS st_a,
   COALESCE(
     (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
       ORDER BY (st->>'order')::int ASC OFFSET 1 LIMIT 1),
-    CASE WHEN o.trip_direction = 'U' THEN 'T3上行' ELSE 'T3下行' END
+    NULLIF(o.route_mid, ''),
+    NULLIF(o.payload->'destination'->>'name', ''),
+    '—'
   ) AS st_b,
   COALESCE(
     (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
       ORDER BY (st->>'order')::int DESC LIMIT 1),
-    CASE WHEN o.trip_direction = 'U' THEN 'N2W上行' ELSE 'S2W下行' END
+    NULLIF(o.payload->'destination'->>'name', ''),
+    NULLIF(o.route_destination, ''),
+    '—'
   ) AS st_c,
   COALESCE(
     NULLIF(rj.route_stations, '[]'),
@@ -662,7 +640,7 @@ SELECT
           -- 這一站是停靠還是只是經過。班表裡「上行轉N2W正線起點」這種轉線點也算一站，
           -- 但車不停，停留秒數是 0。卡片要不要畫它由元件決定，這裡只把事實帶上去。
           'role', st->>'role',
-          'dwell_seconds', COALESCE((st->>'dwell_seconds')::int, 0),
+          'dwell_seconds', COALESCE(FLOOR((st->>'dwell_seconds')::numeric)::int, 0),
           'actions', '[]'::json
         ) ORDER BY (st->>'order')::int
       )::text
@@ -673,13 +651,10 @@ SELECT
         END
       ) st
     ),
-    CASE
-      WHEN o.trip_direction = 'U' THEN
-        '[{"name":"S2W上行","station_id":"station_6"},{"name":"T3上行","station_id":"station_4"},{"name":"N2W上行","station_id":"station_1"}]'
-      ELSE '[{"name":"N2W下行","station_id":"station_2"},{"name":"T3下行","station_id":"station_3"},{"name":"S2W下行","station_id":"station_5"}]'
-    END
+    '[]'
   ) AS route_stations,
-  CASE WHEN o.trip_direction = 'U' THEN 1 ELSE 0 END AS trip_leg_hint,
+  COALESCE(o.payload->'leg_eta_max', '{}'::jsonb)::text AS leg_eta_max,
+  0 AS trip_leg_hint,
   /*
    * 車子現在跑在第幾段（0 = 第一站到第二站）。
    *
@@ -773,14 +748,14 @@ SELECT
       )
       AND (
         st->>'role' IN ('origin', 'terminal')
-        OR COALESCE((st->>'dwell_seconds')::int, 0) > 0
+        OR COALESCE((st->>'dwell_seconds')::numeric, 0) > 0
       )
       ORDER BY (st->>'order')::int
       LIMIT 1
     ),
     CASE WHEN o.status = 'PENDING' THEN o.payload->'origin'->>'name' END,
     o.payload->'destination'->>'name',
-    CASE WHEN o.trip_direction = 'U' THEN 'S2W上行' ELSE 'N2W下行' END
+    '—'
   ) AS next_station,
   CASE
     WHEN o.status = 'PENDING' AND o.trip_start_minutes IS NOT NULL THEN
@@ -822,7 +797,7 @@ SELECT
     ),
     'HH24:MI'
   ) AS end_time,
-  COALESCE((o.payload->>'route_progress')::int, CASE WHEN o.status = 'PENDING' THEN 0 ELSE 18 END) AS route_progress,
+  COALESCE(FLOOR((o.payload->>'route_progress')::numeric)::int, CASE WHEN o.status = 'PENDING' THEN 0 ELSE 18 END) AS route_progress,
   (o.status = 'FAULTED') AS is_alert,
   COALESCE(o.delay_minutes, 0) AS delay_minutes,
   COALESCE(
@@ -882,133 +857,112 @@ FROM (
       WHERE o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     )::int AS roster_count
   FROM operation_orders o
-  WHERE o.line_kind = 'MAINLINE'
+  WHERE o.line_kind IN ('MAINLINE', 'TEST')
     AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     -- 跟班次卡同一套「還在跑」的定義。少了這一條會把歷來每一天沒收乾淨的
     -- PROCESSING 全部算進去，標題列會寫成「正線營運 208 / 415」。
     AND COALESCE(o.planned_end, o.planned_start + 600000)
         >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+    AND (
+      o.status <> 'PENDING'
+      OR o.planned_start BETWEEN
+        (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+        AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000
+    )
 ) s
 `.trim();
 
 /** 整備班表：一卡一任務，軌道 S2W→格位；示範模式車已在格上 */
 export const MAINTENANCE_SHIFTS_SQL = `
-WITH m0 AS (
+WITH deployed AS (
+  SELECT body
+  FROM operation_shifts
+  WHERE usage_status = 'in_use'
+  ORDER BY updated_at DESC
+  LIMIT 1
+), clock AS (
+  SELECT EXTRACT(HOUR FROM timezone('Asia/Taipei', now())) * 60
+    + EXTRACT(MINUTE FROM timezone('Asia/Taipei', now()))
+    + EXTRACT(SECOND FROM timezone('Asia/Taipei', now())) / 60 AS minute_now
+), current_blocks AS (
   SELECT
-    o.*,
-    COALESCE(
-      NULLIF(TRIM(o.payload->>'yard_slot_id'), ''),
-      NULLIF(TRIM(o.next_station), '')
-    ) AS slot_id
-  FROM operation_orders o
-  WHERE o.line_kind = 'MAINTENANCE'
-    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
-    /*
-     * 原本這裡綁 order_id LIKE 'DEMO-ORD-%'，只認早期那批手寫的示範單。現在整備單由
-     * 排班引擎發（MT-M1-R3-48600 這種），一筆都對不上，整個整備班表是空的。
-     *
-     * 改成跟正線一樣：只認還沒過期的單。
-     */
-    AND COALESCE(o.planned_end, o.planned_start + 1800000)
-        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
-    AND COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), NULLIF(TRIM(o.next_station), '')) IS NOT NULL
-    -- 同一台車如果正線也有單在跑，以正線為準，這裡不重複列。一樣只看還沒跑完的，
-    -- 不然清晨那些沒收乾淨的正線單會把每一台車都擋掉。
-    AND NOT EXISTS (
-      SELECT 1 FROM operation_orders ml
-      WHERE ml.vehicle_code = o.vehicle_code
-        AND ml.line_kind = 'MAINLINE'
-        AND ml.status IN ('PENDING', 'PROCESSING')
-        AND COALESCE(ml.planned_end, ml.planned_start + 600000)
-            >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
-    )
+    timeline->>'row' AS row_no,
+    block,
+    d.body,
+    clock.minute_now
+  FROM deployed d
+  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(d.body->'scheduleOutput'->'plan'->'timelines', '[]'::jsonb)) timeline
+  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(timeline->'blocks', '[]'::jsonb)) block
+  CROSS JOIN clock
+  WHERE block->>'taskType' <> 'passenger'
+    AND (block->>'plannedStartMinute')::numeric <= clock.minute_now
+    AND (block->>'plannedEndMinute')::numeric > clock.minute_now
 )
-SELECT DISTINCT ON (o.vehicle_code)
-  o.order_id AS shift_key,
-  o.vehicle_code,
-  COALESCE(o.trip_code, '—') AS trip_code,
-  COALESCE(o.trip_code, '—') AS trip_header,
+SELECT
+  block->>'id' AS shift_key,
+  'PMS' || LPAD(row_no, 2, '0') AS vehicle_code,
+  '—' AS trip_code,
+  'PMS' || LPAD(row_no, 2, '0') AS trip_header,
   CASE
-    WHEN slot_id LIKE 'E%' THEN '充電'
-    WHEN slot_id LIKE 'P%' THEN '臨停'
-    WHEN slot_id LIKE 'W%' THEN '洗車'
-    WHEN slot_id LIKE 'H%' THEN '調度'
-    WHEN slot_id LIKE 'M%' THEN '保養'
-    ELSE COALESCE(o.maint_type_label, '整備')
+    WHEN block->>'source' = 'hold' THEN '暫停'
+    ELSE COALESCE(
+      NULLIF(body->'maintenanceSectionCardLabelBySection'->>CASE block->>'taskType'
+        WHEN 'washing' THEN 'carWash'
+        WHEN 'servicing' THEN 'maintenance'
+        WHEN 'inspection' THEN 'preTrip'
+        WHEN 'standby' THEN 'mobile'
+        ELSE block->>'taskType'
+      END, ''),
+      NULLIF(block->>'cardLabel', ''),
+      CASE block->>'taskType'
+        WHEN 'charging' THEN '充電'
+        WHEN 'washing' THEN '洗車'
+        WHEN 'servicing' THEN '保養'
+        WHEN 'inspection' THEN '行檢'
+        WHEN 'standby' THEN '待命'
+        WHEN 'idle' THEN '暫停'
+        WHEN 'dispatch' THEN '調度'
+        ELSE NULLIF(block->>'label', '')
+      END,
+      '整備'
+    )
   END AS maint_type_label,
-  COALESCE(o.maint_type_bg, 'transparent') AS maint_type_bg,
-  CASE
-    WHEN slot_id LIKE 'P%' OR COALESCE(o.maint_type_label, '') = '臨停' THEN '#FD9A00'
-    ELSE COALESCE(o.maint_type_color, '#FD9A00')
-  END AS maint_type_color,
-  CASE
-    WHEN o.status = 'FAULTED' THEN '進行中'
-    WHEN o.status = 'PENDING' THEN '停留中'
-    ELSE '進行中'
-  END AS status_label,
-  CASE
-    WHEN o.status = 'END' THEN '#422006'
-    WHEN o.status = 'PENDING' THEN '#27272a'
-    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN 'rgba(0, 212, 146, 0.3)'
-    ELSE '#27272a'
-  END AS status_bg,
-  CASE
-    WHEN o.status = 'END' THEN '#fb923c'
-    WHEN o.status = 'PENDING' THEN '#a1a1aa'
-    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#00BC7D'
-    ELSE '#a1a1aa'
-  END AS status_color,
-  CASE
-    WHEN o.status = 'END' THEN 'rgba(249,115,22,0.75)'
-    WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.55)'
-    WHEN o.status IN ('PROCESSING', 'FAULTED') THEN '#009966'
-    ELSE 'rgba(113,113,122,0.45)'
-  END AS card_border_color,
-  'S2W' AS st_a,
-  o.slot_id AS st_b,
-  o.slot_id AS st_c,
+  '#422006' AS maint_type_bg,
+  '#FD9A00' AS maint_type_color,
+  '進行中' AS status_label,
+  'rgba(0, 212, 146, 0.3)' AS status_bg,
+  '#00BC7D' AS status_color,
+  '#009966' AS card_border_color,
+  COALESCE(NULLIF(m.segment_label, ''), '—') AS st_a,
+  COALESCE(NULLIF(block->>'yardFacilityLabel', ''), NULLIF(m.segment_label, ''), '—') AS st_b,
+  COALESCE(NULLIF(block->>'yardFacilityLabel', ''), NULLIF(m.segment_label, ''), '—') AS st_c,
   json_build_array(
-    json_build_object('name', 'S2W', 'remain_pct', 0),
-    json_build_object('name', o.slot_id, 'remain_pct', 100)
+    json_build_object('name', COALESCE(NULLIF(m.segment_label, ''), '—'), 'remain_pct', 0),
+    json_build_object('name', COALESCE(NULLIF(block->>'yardFacilityLabel', ''), NULLIF(m.segment_label, ''), '—'), 'remain_pct', 100)
   )::text AS route_stations,
   0 AS segment_index,
   0 AS segment_remain_pct,
-  o.slot_id AS next_station,
+  COALESCE(NULLIF(block->>'yardFacilityLabel', ''), NULLIF(m.segment_label, ''), '—') AS next_station,
   '整備站點' AS station_label,
-  CASE
-    WHEN o.status = 'END' THEN '逾時滯留'
-    ELSE '完成預估'
-  END AS eta_label,
-  /*
-   * 距離整備完成還剩多久，以 planned_end 直接算，格式是「時:分」。
-   *
-   * 原本讀 operation_orders.eta_remain 那一欄，裡面是「926:09」這種值（926 分鐘，
-   * 停到隔天午夜），當成時分看就變成 926 小時。
-   */
-  LPAD((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)
-        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 3600000)::int::text, 2, '0')
-  || ':'
-  || LPAD(((GREATEST(0, COALESCE(o.planned_end, o.created_at + 1800000)
-        - (EXTRACT(EPOCH FROM now()) * 1000)::bigint) / 60000)::int % 60)::text, 2, '0') AS eta_remain,
-  -- 時間一律換算到台北，不然跟著資料庫時區跑，畫面上會差好幾個小時。
-  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_start, o.created_at) / 1000.0)), 'HH24:MI') AS depart_time,
-  to_char(timezone('Asia/Taipei', to_timestamp(COALESCE(o.planned_end, o.created_at + 1800000) / 1000.0)), 'HH24:MI') AS end_time,
-  COALESCE(
-    (o.payload->>'route_progress')::int,
-    100
-  ) AS route_progress,
+  '完成預估' AS eta_label,
+  LPAD(FLOOR(GREATEST(0, (block->>'plannedEndMinute')::numeric - minute_now) / 60)::text, 2, '0')
+    || ':' || LPAD(FLOOR(MOD(GREATEST(0, (block->>'plannedEndMinute')::numeric - minute_now), 60))::text, 2, '0') AS eta_remain,
+  LPAD(FLOOR((block->>'plannedStartMinute')::numeric / 60)::text, 2, '0') || ':'
+    || LPAD(FLOOR(MOD((block->>'plannedStartMinute')::numeric, 60))::text, 2, '0') AS depart_time,
+  LPAD(FLOOR((block->>'plannedEndMinute')::numeric / 60)::text, 2, '0') || ':'
+    || LPAD(FLOOR(MOD((block->>'plannedEndMinute')::numeric, 60))::text, 2, '0') AS end_time,
+  LEAST(100, GREATEST(0, ROUND(100 * (minute_now - (block->>'plannedStartMinute')::numeric)
+    / NULLIF((block->>'plannedEndMinute')::numeric - (block->>'plannedStartMinute')::numeric, 0))))::int AS route_progress,
   false AS is_alert,
   CASE
-    WHEN slot_id LIKE 'E%' THEN 'charging'
-    WHEN slot_id LIKE 'W%' THEN 'wash'
-    WHEN slot_id LIKE 'P%' THEN 'parking'
-    WHEN slot_id LIKE 'M%' THEN 'maintenance'
-    WHEN slot_id LIKE 'H%' THEN 'dispatch'
-    ELSE 'maintenance'
+    WHEN block->>'taskType' = 'washing' THEN 'wash'
+    WHEN block->>'taskType' = 'idle' THEN 'parking'
+    ELSE block->>'taskType'
   END AS operation_action,
   '#51A2FF' AS icon_bg_color,
   'maintenance' AS line_kind
-FROM m0 o
-ORDER BY o.vehicle_code, o.created_at DESC
+FROM current_blocks
+LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = 'PMS' || LPAD(row_no, 2, '0')
+ORDER BY row_no::int
 LIMIT 12
 `.trim();

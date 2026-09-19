@@ -447,6 +447,14 @@ export interface RouteProgressWidget extends WidgetBase, WidgetDataBinding {
   cardMetricAlertValues?: string[];
   /** 軌道站點標籤字級（px）；未設時軌道版用 14、卡片版依縮放 */
   fontSize?: number;
+  /** 已通過／目前站點的文字色；未設時沿用走過路線顏色 */
+  stationLabelActiveColor?: string;
+  /** 尚未到達站點的文字色；未設時沿用未走路線顏色 */
+  stationLabelInactiveColor?: string;
+  /** 站名是否自動換行；舊資料預設啟用 */
+  stationLabelWrap?: boolean;
+  /** 自動換行最多顯示幾行 */
+  stationLabelMaxLines?: number;
   unitLabel?: string;
   statusLabel?: string;
   statusBgColor?: string;
@@ -1813,4 +1821,3 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
       };
   }
 }
-

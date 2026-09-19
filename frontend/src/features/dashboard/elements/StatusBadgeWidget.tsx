@@ -57,9 +57,9 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
   if (vehicleBadge) {
     resolvedBadge = resolveVehicleMonitorBadge(variables, { operation: operationPayload });
     rawValue = resolvedBadge.label;
-    if (!rawValue) {
-      rawValue = String(variables.badge_label ?? variables.maint_type_label ?? '').trim();
-    }
+    // resolveVehicleMonitorBadge 已同時處理 MQTT 與 SQL fallback。若最新
+    // operation/update 明確回報 IDLE，它會刻意回傳空徽章；這裡不可再把 SQL
+    // 裡尚未結束的舊整備單補回來，否則就會出現「位置 D1、狀態充電」。
     hasLiveData = !!rawValue || !!operationPayload;
   } else if (mqttData.data !== null) {
     rawValue = String(mqttData.data.value ?? mqttData.data);

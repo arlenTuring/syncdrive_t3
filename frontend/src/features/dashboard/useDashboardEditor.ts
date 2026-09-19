@@ -26,6 +26,10 @@ import {
   type DualCanvasLane,
 } from './utils/dualCanvas';
 import { migrateChildWidgetGenerics } from './utils/migrateWidgetGenerics';
+import {
+  needsDashboardRuntimePatch,
+  patchDashboardRuntimeFixes,
+} from './utils/migrateVehicleMonitorProtocol';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -131,14 +135,17 @@ function freshDemoPlane(): DashboardPlane {
  * 用寫死的範本覆蓋。使用者存了什麼，就該讀回什麼；真的要升級舊格式，那是一次性的
  * 資料轉換，不是每次載入都跑的東西。
  *
- * 保留的只有 <code>migrateCanvasElement</code>：它做的是純相容處理（移除已下架的
- * widget 型別、補上舊版沒有的欄位），不會去拿範本的內容覆蓋。
+ * <code>migrateCanvasElement</code> 處理舊元件欄位；系統內建監控元件若使用舊版資料
+ * 協議，另只替換其 SQL／MQTT 綁定。兩者都不改使用者排過的座標、尺寸與版面。
  */
 function migratePlane(plane: DashboardPlane): DashboardPlane {
-  return {
+  const compatible = {
     ...plane,
     elements: (plane.elements ?? []).map(migrateCanvasElement),
   };
+  return needsDashboardRuntimePatch(compatible)
+    ? patchDashboardRuntimeFixes(compatible)
+    : compatible;
 }
 
 function getInitialPlanes(): DashboardPlane[] {
