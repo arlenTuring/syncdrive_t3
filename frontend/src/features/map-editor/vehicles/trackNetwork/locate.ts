@@ -108,6 +108,7 @@ function locateGeneratedSegment(
       distanceM: hit.distanceM,
       confidence: hit.confidence,
       margin: hit.margin,
+      headingConflict: hit.headingConflict,
       travelRad: hit.travelRad,
     },
   };

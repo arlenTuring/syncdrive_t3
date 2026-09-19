@@ -66,6 +66,8 @@ export type VehicleNetworkFix = {
   confidence?: number;
   /** 第二名比第一名差多少分；只有一塊候選時是 Infinity。 */
   margin?: number;
+  /** 車頭跟所選軌道的行車方向幾乎相反（診斷用）。 */
+  headingConflict?: boolean;
   /** 這個位置局部的行車方向（弧度，場域座標）。 */
   travelRad?: number;
 };

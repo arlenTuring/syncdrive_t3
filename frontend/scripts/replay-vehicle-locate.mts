@@ -119,6 +119,7 @@ type Row = {
   ratio: number
   along: number
   confidence: number | null
+  uncertain: boolean
   yard: boolean
   stepM: number
   impliedMps: number
@@ -157,6 +158,11 @@ for (const s of samples) {
     ratio: fix ? fix.offsetM / TRACK_HALF_WIDTH_M : NaN,
     along: fix?.alongFrac ?? NaN,
     confidence: (fix as { confidence?: number } | undefined)?.confidence ?? null,
+    // 圖台徽章的「≈」：第二名只差不到 1 公尺，或車頭與所選軌道方向矛盾
+    uncertain:
+      !!fix &&
+      (((fix as { margin?: number }).margin ?? Infinity) < 1 ||
+        (fix as { headingConflict?: boolean }).headingConflict === true),
     yard,
     stepM,
     impliedMps: dt > 0 ? stepM / dt : 0,
@@ -172,18 +178,20 @@ for (const s of samples) {
 const pad = (v: string | number, n: number) => String(v).padEnd(n)
 console.log(`圖資 ${mapPath.split('/').pop()}，遙測 ${samples.length} 筆，${perVehicle.size} 台車`)
 console.log(
-  pad('車', 7) + pad('筆數', 6) + pad('場區', 6) + pad('換塊', 6) + pad('來回跳', 8) + pad('|偏移|>100%', 12)
+  pad('車', 7) + pad('筆數', 6) + pad('場區', 6) + pad('換塊', 6) + pad('來回跳', 8) + pad('離軌', 8) + pad('猜的', 8)
   + pad('最大偏移%', 10) + pad('速度對不上', 10),
 )
 
 let totalSwitch = 0
 let totalFlip = 0
 let totalOff = 0
+let totalGuess = 0
 let totalSpeedMismatch = 0
 for (const [code, list] of [...perVehicle.entries()].sort()) {
   let switches = 0
   let flips = 0
   let off = 0
+  let guess = 0
   let maxRatio = 0
   let mismatch = 0
   for (let k = 0; k < list.length; k += 1) {
@@ -195,7 +203,12 @@ for (const [code, list] of [...perVehicle.entries()].sort()) {
       if (k > 1 && !list[k - 2]!.yard && list[k - 2]!.trackId === r.trackId) flips += 1
     }
     if (Number.isFinite(r.ratio)) {
-      if (Math.abs(r.ratio) > 1) off += 1
+      // 離軌：偏移超過半寬、而且不是「猜的」（沒有對手，座標本身就不在這條軌道上）
+      // 猜的：偏移超過半寬、但旁邊有差不多近的別條或方向矛盾——先當定位存疑，不算離軌
+      if (Math.abs(r.ratio) > 1) {
+        if (r.uncertain) guess += 1
+        else off += 1
+      }
       if (Math.abs(r.ratio) > Math.abs(maxRatio)) maxRatio = r.ratio
     }
   }
@@ -211,15 +224,16 @@ for (const [code, list] of [...perVehicle.entries()].sort()) {
   totalSwitch += switches
   totalFlip += flips
   totalOff += off
+  totalGuess += guess
   totalSpeedMismatch += mismatch
   console.log(
     pad(code, 7) + pad(list.length, 6) + pad(list.filter((r) => r.yard).length, 6) + pad(switches, 6)
-    + pad(flips, 8) + pad(off, 12) + pad(`${(maxRatio * 100).toFixed(0)}%`, 10) + pad(mismatch, 10),
+    + pad(flips, 8) + pad(off, 8) + pad(guess, 8) + pad(`${(maxRatio * 100).toFixed(0)}%`, 10) + pad(mismatch, 10),
   )
 }
 console.log(
   pad('合計', 7) + pad(rows.length, 6) + pad(rows.filter((r) => r.yard).length, 6) + pad(totalSwitch, 6)
-  + pad(totalFlip, 8) + pad(totalOff, 12)
+  + pad(totalFlip, 8) + pad(totalOff, 8) + pad(totalGuess, 8)
   + pad('', 10) + pad(totalSpeedMismatch, 10),
 )
 

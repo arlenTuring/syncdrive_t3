@@ -15,6 +15,7 @@ import {
 import {
   ALONG_CELLS,
   quantisedTrackCellPlacement,
+  TRACK_HALF_WIDTH_M,
 } from './quantisedTrackCell';
 import type { MapAreaObject } from '../types/area';
 import {
@@ -63,6 +64,9 @@ import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 
 /** 定位把握低於這個值，徽章標「≈」 */
 const LOW_CONFIDENCE = 0.5;
+
+/** 第二名只差這麼一點：位置分不出是哪條，偏差數字不可靠 */
+const AMBIGUOUS_MARGIN_M = 1;
 
 /**
  * 沒有載具容器校準尺寸時的後備（區域像素）。
@@ -641,8 +645,24 @@ export function MapAreaVehicleOverlay({
         const badgeCenterX = coordLeft + bodyOffset.dx;
         const badgeTopY = coordTop + bodyOffset.dy - bodyHalfSpanY - 4;
 
+        /*
+         * 兩件不同的事，畫面上分開標：
+         *   猜的（≈）：旁邊有差不多近的別條軌道、或車頭跟所選軌道方向矛盾——選錯的可能性高，
+         *              偏差數字是相對「可能選錯的那條」算的，不能當事實。
+         *   離軌（紅）：沒有對手，這台車就是離所選軌道中心線超過半寬——是輸入座標的事實。
+         * 數字一律取<strong>最新定位</strong>的偏差，不是補間中的值：徽章是診斷，不是動畫，
+         * 跟「≈」必須指同一個時刻。
+         */
+        const uncertain =
+          network !== undefined &&
+          ((network.margin !== undefined && network.margin < AMBIGUOUS_MARGIN_M) ||
+            network.headingConflict === true);
+        const fixRatio = network ? network.offsetM / TRACK_HALF_WIDTH_M : (quantised?.lateralRatio ?? 0);
+        const offCentre = Math.abs(fixRatio) > 1;
+        // 離得遠而把握低是「離軌」（紅），不是「猜的」
         const lowConfidence =
-          network?.confidence !== undefined && network.confidence < LOW_CONFIDENCE;
+          uncertain ||
+          (!offCentre && network?.confidence !== undefined && network.confidence < LOW_CONFIDENCE);
         const cellBadge = quantised ? (
           <div
             key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
@@ -702,20 +722,22 @@ export function MapAreaVehicleOverlay({
             <span
               title={
                 lowConfidence
-                  ? `定位把握 ${Math.round((network?.confidence ?? 0) * 100)}%：可能判給了旁邊的軌道`
-                  : undefined
+                  ? `定位不確定（把握 ${Math.round((network?.confidence ?? 0) * 100)}%${network?.headingConflict ? '，車頭與軌道方向矛盾' : ''}）：可能判給了旁邊的軌道`
+                  : offCentre
+                    ? `離中心線 ${network?.distanceM?.toFixed(1) ?? '?'} 公尺：座標本身就不在這條軌道上`
+                    : undefined
               }
               className={
-                Math.abs(quantised.lateralRatio) > 1
-                  ? 'text-amber-300'
-                  : lowConfidence
-                    ? 'text-amber-200'
+                lowConfidence
+                  ? 'text-amber-200'
+                  : offCentre
+                    ? 'text-rose-300'
                     : 'text-zinc-300'
               }
             >
               {lowConfidence ? '≈' : ''}
-              {quantised.lateralRatio >= 0 ? '+' : '−'}
-              {Math.abs(quantised.lateralRatio * 100).toFixed(0)}%
+              {fixRatio >= 0 ? '+' : '−'}
+              {Math.abs(fixRatio * 100).toFixed(0)}%
             </span>
           </div>
         ) : null;
