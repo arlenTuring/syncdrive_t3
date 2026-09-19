@@ -1,6 +1,46 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/syncdrive-api/order/active": {
+      "get": {
+        "description": "包含 PENDING、PROCESSING、FAULTED；MQTT assign 僅通知 id，錯過通知可由本端點取回。依 API 金鑰的 vehicle_codes 授權。",
+        "operationId": "OrderController_activeOrders",
+        "parameters": [
+          {
+            "name": "vehicle_code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PMS99",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ vehicle_code, items: 訂單陣列 }，無訂單時 items=[]"
+          },
+          "400": {
+            "description": "400 VEHICLE_CODE_REQUIRED：缺少 vehicle_code"
+          },
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "查詢本車未結案訂單（連線／重連／換證後對帳）",
+        "tags": [
+          "營運任務"
+        ]
+      }
+    },
     "/syncdrive-api/order/queryById": {
       "get": {
         "description": "取得指定訂單之站序、各站計畫時刻與起訖點座標。`operation/assign` 僅傳遞訂單編號，任務內容以本端點取得。中心端不提供路徑，路徑由車端依站序與場域座標自行規劃。欄位定義見車端介接說明書 §五.1。",
@@ -25,6 +65,9 @@
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
           },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
+          },
           "404": {
             "description": "訂單不存在"
           }
@@ -42,7 +85,7 @@
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
-        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，走 event/report 上報，不往本端點加狀態值。欄位定義見車端介接說明書 §五.2。",
+        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING 或 FAULTED；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，走 event/report 上報，不往本端點加狀態值。欄位定義見車端介接說明書 §五.2。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -58,6 +101,11 @@
             "required": true,
             "in": "query",
             "schema": {
+              "enum": [
+                "PROCESSING",
+                "END",
+                "FAULTED"
+              ],
               "type": "string"
             }
           }
@@ -71,6 +119,9 @@
           },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           },
           "404": {
             "description": "訂單不存在"
@@ -120,6 +171,9 @@
           },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           },
           "404": {
             "description": "動作識別碼不存在"
@@ -371,7 +425,7 @@
     },
     "/syncdrive-api/auth/token": {
       "post": {
-        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。欄位定義見介接說明書 §一。",
+        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。換發不撤銷尚有效的舊金鑰／憑證，不主動中斷 MQTT；重連後請以 order/active 對帳。欄位定義見介接說明書 §一。",
         "operationId": "PartnerAccessController_issue",
         "parameters": [],
         "requestBody": {
@@ -385,7 +439,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "API 金鑰與 MQTT 客戶端憑證",
             "content": {
               "application/json": {
@@ -577,10 +631,9 @@
             "maximum": 43200
           },
           "vehicle_codes": {
-            "description": "需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
+            "description": "本次 REST 訂單授權與 MQTT 憑證的車輛代號。PMS99 為聯測車；未指定時取全部登錄車輛。",
             "example": [
-              "PMS01",
-              "PMS02"
+              "PMS99"
             ],
             "type": "array",
             "items": {

@@ -19,9 +19,112 @@
       "post": {
         "operationId": "OrderController_saveOrder",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "訂單內容。PMS99 人工測試單請使用 line_kind=TEST，避免納入正式排班。",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "order_id",
+                  "vehicle_code",
+                  "trip_code",
+                  "line_kind",
+                  "planned_start",
+                  "planned_end",
+                  "payload"
+                ],
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "example": "TEST-PMS99-20260918-001"
+                  },
+                  "vehicle_code": {
+                    "type": "string",
+                    "example": "PMS99"
+                  },
+                  "trip_code": {
+                    "type": "string",
+                    "example": "TEST-PMS99-20260918-001"
+                  },
+                  "line_kind": {
+                    "type": "string",
+                    "enum": [
+                      "MAINLINE",
+                      "MAINTENANCE",
+                      "TEST"
+                    ],
+                    "example": "TEST"
+                  },
+                  "priority_level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 50
+                  },
+                  "planned_start": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Epoch 毫秒",
+                    "example": 1789693200000
+                  },
+                  "planned_end": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Epoch 毫秒",
+                    "example": 1789693320000
+                  },
+                  "payload": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "example": {
+                      "source": "manual_test",
+                      "kind": "passenger",
+                      "test_route_id": "route_1",
+                      "route_name": "N2W下行→T3下行",
+                      "origin": {
+                        "id": "n2w_d_start",
+                        "name": "N2W下行出發",
+                        "x": -14.96,
+                        "y": 0
+                      },
+                      "destination": {
+                        "id": "t3_d",
+                        "name": "T3下行",
+                        "x": -882.31,
+                        "y": -195.42
+                      },
+                      "stations": [
+                        {
+                          "order": 1,
+                          "station_id": "n2w_d_start",
+                          "station_name": "N2W下行出發",
+                          "role": "origin"
+                        },
+                        {
+                          "order": 2,
+                          "station_id": "t3_d",
+                          "station_name": "T3下行",
+                          "role": "terminal"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
+          },
+          "401": {
+            "description": "401 INVALID_API_KEY：金鑰缺漏、無效或過期"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           }
         },
         "summary": "建立新營運訂單（含 route_id → 站點動作實例化）",
@@ -102,6 +205,12 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "401 INVALID_API_KEY：金鑰缺漏、無效或過期"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           }
         },
         "summary": "班次運行紀錄列表（分頁、篩選）",
@@ -126,11 +235,58 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "401 INVALID_API_KEY：金鑰缺漏、無效或過期"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           }
         },
         "summary": "班次運行紀錄詳情（含站點動作與 task_group）",
         "tags": [
           "Operation Orders"
+        ]
+      }
+    },
+    "/syncdrive-api/order/active": {
+      "get": {
+        "description": "包含 PENDING、PROCESSING、FAULTED；MQTT assign 僅通知 id，錯過通知可由本端點取回。依 API 金鑰的 vehicle_codes 授權。",
+        "operationId": "OrderController_activeOrders",
+        "parameters": [
+          {
+            "name": "vehicle_code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PMS99",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ vehicle_code, items: 訂單陣列 }，無訂單時 items=[]"
+          },
+          "400": {
+            "description": "400 VEHICLE_CODE_REQUIRED：缺少 vehicle_code"
+          },
+          "401": {
+            "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "summary": "查詢本車未結案訂單（連線／重連／換證後對帳）",
+        "tags": [
+          "Operation Orders",
+          "對外｜營運任務"
         ]
       }
     },
@@ -158,6 +314,9 @@
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
           },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
+          },
           "404": {
             "description": "訂單不存在"
           }
@@ -176,7 +335,7 @@
     },
     "/syncdrive-api/order/updateOrderProgress/{id}": {
       "put": {
-        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，走 event/report 上報，不往本端點加狀態值。欄位定義見車端介接說明書 §五.2。",
+        "description": "本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，不採信 MQTT 訊息中的狀態欄位。允許之狀態轉移：PENDING → PROCESSING 或 FAULTED；PROCESSING → END 或 FAULTED；FAULTED → PROCESSING 或 END。END 為終態。值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，走 event/report 上報，不往本端點加狀態值。欄位定義見車端介接說明書 §五.2。",
         "operationId": "OrderController_updateOrderProgress",
         "parameters": [
           {
@@ -192,6 +351,11 @@
             "required": true,
             "in": "query",
             "schema": {
+              "enum": [
+                "PROCESSING",
+                "END",
+                "FAULTED"
+              ],
               "type": "string"
             }
           }
@@ -205,6 +369,9 @@
           },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           },
           "404": {
             "description": "訂單不存在"
@@ -255,6 +422,9 @@
           },
           "401": {
             "description": "缺少或不正確的 x-api-key 標頭"
+          },
+          "403": {
+            "description": "403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作"
           },
           "404": {
             "description": "動作識別碼不存在"
@@ -2262,7 +2432,7 @@
     },
     "/syncdrive-api/auth/token": {
       "post": {
-        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。欄位定義見介接說明書 §一。",
+        "description": "以配發之帳號密碼申請存取憑據。回應包含後續呼叫各介面所需的 `x-api-key`，以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。換發不撤銷尚有效的舊金鑰／憑證，不主動中斷 MQTT；重連後請以 order/active 對帳。欄位定義見介接說明書 §一。",
         "operationId": "PartnerAccessController_issue",
         "parameters": [],
         "requestBody": {
@@ -2276,7 +2446,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "API 金鑰與 MQTT 客戶端憑證",
             "content": {
               "application/json": {
@@ -3487,10 +3657,9 @@
             "maximum": 43200
           },
           "vehicle_codes": {
-            "description": "需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。",
+            "description": "本次 REST 訂單授權與 MQTT 憑證的車輛代號。PMS99 為聯測車；未指定時取全部登錄車輛。",
             "example": [
-              "PMS01",
-              "PMS02"
+              "PMS99"
             ],
             "type": "array",
             "items": {

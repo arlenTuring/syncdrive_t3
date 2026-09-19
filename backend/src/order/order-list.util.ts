@@ -73,6 +73,13 @@ export function buildRouteLabel(order: OperationOrder): string {
   if (SHIFT_TRIP_PATTERN.test(order.tripCode ?? '')) {
     return mainlineRouteLabel(order.tripCode);
   }
+  const routeName = String(order.payload?.route_name ?? '').trim();
+  if (routeName) return routeName;
+  const stations = Array.isArray(order.payload?.stations) ? order.payload.stations : [];
+  const stationNames = stations
+    .map((station: Record<string, unknown>) => String(station.station_name ?? station.station_id ?? '').trim())
+    .filter(Boolean);
+  if (stationNames.length > 1) return stationNames.join('→');
   return '—';
 }
 
@@ -147,6 +154,6 @@ export function matchesTab(order: OperationOrder, tab: ShiftTab): boolean {
     return lineKind === 'MAINTENANCE';
   }
   if (lineKind === 'MAINTENANCE') return false;
-  if (lineKind === 'MAINLINE') return true;
+  if (lineKind === 'MAINLINE' || lineKind === 'TEST') return true;
   return SHIFT_TRIP_PATTERN.test(order.tripCode ?? '');
 }

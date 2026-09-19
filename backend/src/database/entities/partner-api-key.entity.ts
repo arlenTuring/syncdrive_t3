@@ -20,6 +20,10 @@ export class PartnerApiKey {
   @PrimaryColumn({ type: 'varchar', length: 64, name: 'key_hash' })
   keyHash: string;
 
+  /** 可操作的車輛；舊金鑰為 null，限原營運車隊，不含測試車。 */
+  @Column({ type: 'jsonb', name: 'vehicle_codes', nullable: true })
+  vehicleCodes: string[] | null;
+
   /** 申請這把金鑰的帳號 */
   @Column({ type: 'varchar', name: 'username' })
   username: string;

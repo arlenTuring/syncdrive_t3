@@ -1,6 +1,7 @@
 import { OrderStatus } from '../database/entities/operation-order.entity';
 import {
   buildRouteLabel,
+  matchesTab,
   resolveDepartTime,
   resolveEndTime,
   resolveExecutionStatus,
@@ -46,6 +47,17 @@ describe('order-list.util', () => {
       payload: { yard_slot_id: 'E3' },
     } as never);
     expect(label).toBe('S2W→E3');
+  });
+
+  it('shows TEST orders in the mainline monitor with their selected route name', () => {
+    const order = {
+      ...baseOrder,
+      lineKind: 'TEST',
+      tripCode: 'TEST-PMS99-1',
+      payload: { route_name: 'N2W下行→T3下行' },
+    } as never;
+    expect(matchesTab(order, 'mainline')).toBe(true);
+    expect(buildRouteLabel(order)).toBe('N2W下行→T3下行');
   });
 
   it('end time uses planned_end (shift duration), not completed_at wall clock', () => {

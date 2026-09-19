@@ -1,8 +1,13 @@
-import { BadRequestException, Controller, Post, Get, Put, Body, Query, Param, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Get, Put, Body, Query, Param, Req, UseFilters } from '@nestjs/common';
+import { OrderErrorFilter } from './order-error.filter';
 import type { Request } from 'express';
 import { OrderService } from './order.service';
 import {
   ApiBadRequestResponse,
+  ApiBody,
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
+  ApiQuery,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -10,7 +15,7 @@ import {
   ApiPropertyOptional,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsString } from 'class-validator';
 import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
@@ -30,16 +35,23 @@ class UpdateActionStatusDto {
 
   @ApiPropertyOptional({ description: '實際開始時刻，Epoch 毫秒' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   actual_start_time?: number;
 
   @ApiPropertyOptional({ description: '實際結束時刻，Epoch 毫秒' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   actual_end_time?: number;
 }
 
+@ApiUnauthorizedResponse({ description: '401 INVALID_API_KEY：金鑰缺漏、無效或過期' })
+@ApiForbiddenResponse({ description: '403 VEHICLE_NOT_AUTHORIZED：非授權車輛的訂單／動作' })
 @ApiTags('Operation Orders')
+@UseFilters(OrderErrorFilter)
 @Controller('syncdrive-api/order')
 export class OrderController {
   constructor(
@@ -49,6 +61,38 @@ export class OrderController {
 
   @Post('save')
   @ApiOperation({ summary: '建立新營運訂單（含 route_id → 站點動作實例化）' })
+  @ApiBody({
+    description: '訂單內容。PMS99 人工測試單請使用 line_kind=TEST，避免納入正式排班。',
+    schema: {
+      type: 'object',
+      required: ['order_id', 'vehicle_code', 'trip_code', 'line_kind', 'planned_start', 'planned_end', 'payload'],
+      properties: {
+        order_id: { type: 'string', example: 'TEST-PMS99-20260918-001' },
+        vehicle_code: { type: 'string', example: 'PMS99' },
+        trip_code: { type: 'string', example: 'TEST-PMS99-20260918-001' },
+        line_kind: { type: 'string', enum: ['MAINLINE', 'MAINTENANCE', 'TEST'], example: 'TEST' },
+        priority_level: { type: 'integer', minimum: 0, maximum: 100, default: 50 },
+        planned_start: { type: 'integer', format: 'int64', description: 'Epoch 毫秒', example: 1789693200000 },
+        planned_end: { type: 'integer', format: 'int64', description: 'Epoch 毫秒', example: 1789693320000 },
+        payload: {
+          type: 'object',
+          additionalProperties: true,
+          example: {
+            source: 'manual_test',
+            kind: 'passenger',
+            test_route_id: 'route_1',
+            route_name: 'N2W下行→T3下行',
+            origin: { id: 'n2w_d_start', name: 'N2W下行出發', x: -14.96, y: 0 },
+            destination: { id: 't3_d', name: 'T3下行', x: -882.31, y: -195.42 },
+            stations: [
+              { order: 1, station_id: 'n2w_d_start', station_name: 'N2W下行出發', role: 'origin' },
+              { order: 2, station_id: 't3_d', station_name: 'T3下行', role: 'terminal' },
+            ],
+          },
+        },
+      },
+    },
+  })
   async saveOrder(@Body() createOrderDto: Record<string, unknown>, @Req() req: Request) {
     const result = await this.orderService.createOrder(createOrderDto as Parameters<OrderService['createOrder']>[0]);
 
@@ -105,6 +149,16 @@ export class OrderController {
     return this.orderService.getOrderDetail(id);
   }
 
+  @Get('active')
+  @ExternalApi('營運任務')
+  @ApiOperation({ summary: '查詢本車未結案訂單（連線／重連／換證後對帳）', description: '包含 PENDING、PROCESSING、FAULTED；MQTT assign 僅通知 id，錯過通知可由本端點取回。依 API 金鑰的 vehicle_codes 授權。' })
+  @ApiQuery({ name: 'vehicle_code', required: true, example: 'PMS99' })
+  @ApiOkResponse({ description: '{ vehicle_code, items: 訂單陣列 }，無訂單時 items=[]' })
+  @ApiBadRequestResponse({ description: '400 VEHICLE_CODE_REQUIRED：缺少 vehicle_code' })
+  async activeOrders(@Query('vehicle_code') code: string, @Req() req: Request & { vehicleScope?: string[] }) {
+    return this.orderService.activeOrders(code, req.vehicleScope);
+  }
+
   @Get('queryById')
   @ExternalApi('營運任務')
   @ApiOperation({
@@ -118,21 +172,20 @@ export class OrderController {
   @ApiOkResponse({ description: '訂單內容' })
   @ApiBadRequestResponse({ description: '缺少 id 參數' })
   @ApiNotFoundResponse({ description: '訂單不存在' })
-  async queryOrder(@Query('id') id?: string) {
-    if (!id) {
-      throw new BadRequestException('id is required');
-    }
+  async queryOrder(@Query('id') id: string, @Req() req: Request & { vehicleScope?: string[] }) {
+    await this.orderService.authorizeOrder(id, req.vehicleScope);
     return this.orderService.getOrderByIdWithCoordinates(id);
   }
 
   @Put('updateOrderProgress/:id')
+  @ApiQuery({ name: 'status', enum: ['PROCESSING', 'END', 'FAULTED'], required: true })
   @ExternalApi('營運任務')
   @ApiOperation({
     summary: '回報訂單狀態',
     description:
       '本端點為訂單狀態之唯一權威來源。中心端之訂單狀態僅依本端點的 HTTP 成功回應變更，'
       + '不採信 MQTT 訊息中的狀態欄位。'
-      + '允許之狀態轉移：PENDING → PROCESSING；PROCESSING → END 或 FAULTED；'
+      + '允許之狀態轉移：PENDING → PROCESSING 或 FAULTED；PROCESSING → END 或 FAULTED；'
       + 'FAULTED → PROCESSING 或 END。END 為終態。'
       + '值域固定三個，不擴充：END 表營運契約了結，FAULTED 收納所有非正常結束'
       + '（拒絕、失敗、無法到達、中止、取消）。車端更細的結束分類屬自動化層語意，'
@@ -147,6 +200,7 @@ export class OrderController {
     @Query('status') status: string,
     @Req() req: Request,
   ) {
+    await this.orderService.authorizeOrder(id, (req as Request & { vehicleScope?: string[] }).vehicleScope);
     const result = await this.orderService.updateOrderStatus(id, status);
 
     await this.auditService.write({
@@ -176,6 +230,7 @@ export class OrderController {
     @Body() body: UpdateActionStatusDto,
     @Req() req: Request,
   ) {
+    await this.orderService.authorizeAction(actionId, (req as Request & { vehicleScope?: string[] }).vehicleScope);
     const result = await this.orderService.updateActionStatus(actionId, body);
 
     await this.auditService.write({
@@ -189,4 +244,3 @@ export class OrderController {
     return result;
   }
 }
-

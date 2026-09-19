@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiOkResponse,
+  ApiCreatedResponse,
   ApiOperation,
   ApiProperty,
   ApiPropertyOptional,
@@ -42,8 +42,8 @@ class IssueTokenDto {
   ttl_minutes?: number;
 
   @ApiPropertyOptional({
-    description: '需取得 MQTT 客戶端憑證之車輛代號；未指定時回傳全部已簽發之車輛。',
-    example: ['PMS01', 'PMS02'],
+    description: '本次 REST 訂單授權與 MQTT 憑證的車輛代號。PMS99 為聯測車；未指定時取全部登錄車輛。',
+    example: ['PMS99'],
     type: [String],
   })
   @IsOptional()
@@ -139,9 +139,10 @@ export class PartnerAccessController {
       + '以及連線 MQTT broker 所需的 CA 憑證與各車之客戶端憑證與私鑰。'
       + '金鑰於 `expires_at` 之後失效，屆時重新呼叫本端點取得新金鑰。'
       + '金鑰值僅於本回應出現一次，中心端僅保存其雜湊值，無法回查。'
+      + '換發不撤銷尚有效的舊金鑰／憑證，不主動中斷 MQTT；重連後請以 order/active 對帳。'
       + '欄位定義見介接說明書 §一。',
   })
-  @ApiOkResponse({ description: 'API 金鑰與 MQTT 客戶端憑證', type: IssuedTokenDto })
+  @ApiCreatedResponse({ description: 'API 金鑰與 MQTT 客戶端憑證', type: IssuedTokenDto })
   @ApiBadRequestResponse({
     description: 'ttl_minutes 逾值域，或 vehicle_codes 含未簽發之車輛代號',
   })

@@ -30,3 +30,10 @@
 線上規格：[`/api/docs/public`](/api/docs/public)，可直接 Authorize 後 Try it out。
 
 有任何與實際回應不符之處，請以實際回應為準並通知我方。
+
+## 2026-09-18 聯測 Release
+
+- [版本變更與聯測步驟](release-20260918/README.md)
+- [下載完整介接文件 ZIP](release-20260918/SyncDrive-T3-Partner-API-v4.0.zip ":ignore")
+- [T3 地圖點位與路線](T3地圖站點與路線清單.md)
+- [訂單錯誤與對帳](訂單API錯誤與對帳.md)

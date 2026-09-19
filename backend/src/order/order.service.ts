@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -38,7 +40,7 @@ export type ListOrdersQuery = {
 };
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.PENDING]: [OrderStatus.PROCESSING],
+  [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.FAULTED],
   [OrderStatus.PROCESSING]: [OrderStatus.END, OrderStatus.FAULTED],
   [OrderStatus.END]: [],
   [OrderStatus.FAULTED]: [OrderStatus.PROCESSING, OrderStatus.END],
@@ -179,18 +181,30 @@ export class OrderService {
       status: options?.initialStatus ?? OrderStatus.PENDING,
       createdAt: String(Date.now()),
     });
-    const saved = await this.orderRepository.save(order);
+    // Manual test submissions must never overwrite a previously accepted order.
+    let saved: OperationOrder;
+    if (data.line_kind === 'TEST') {
+      try { await this.orderRepository.insert(order); }
+      catch (error) {
+        if ((error as { code?: string }).code === '23505') throw new ConflictException('測試訂單編號已存在，請先查詢原訂單');
+        throw error;
+      }
+      saved = order;
+    } else {
+      saved = await this.orderRepository.save(order);
+    }
 
     if (routeId) {
       await this.orderRouteService.materializeActionStates(saved.id, routeId);
     }
 
     if (!options?.skipAssign) {
-      this.orderMqttPublisher.publishAssign(
+      const mqttAssign = this.orderMqttPublisher.publishAssign(
         saved.vehicleCode,
         saved.id,
         saved.priorityLevel,
       );
+      (saved as OperationOrder & { mqtt_assign?: typeof mqttAssign }).mqtt_assign = mqttAssign;
     }
 
     this.datasourceInvalidation.emitOrderLifecycle(saved.vehicleCode);
@@ -201,11 +215,11 @@ export class OrderService {
     if (!this.nonEmpty(id)) {
       // id 缺漏時 TypeORM 的 where:{id:undefined} 會被忽略，等於查全表第一筆——
       // 對外查詢絕不能讓缺參數變成「隨機回一筆」，必須先擋掉。
-      throw new BadRequestException('id is required');
+      throw new BadRequestException({ statusCode: 400, code: 'ORDER_ID_REQUIRED', message: 'id is required' });
     }
     const order = await this.orderRepository.findOne({ where: { id } });
     if (!order) {
-      throw new NotFoundException(`Order with id '${id}' not found`);
+      throw new NotFoundException({ statusCode: 404, code: 'ORDER_NOT_FOUND', message: `Order '${id}' not found` });
     }
     return order;
   }
@@ -225,6 +239,7 @@ export class OrderService {
 
   private attachEndpointCoordinates(order: OperationOrder): OperationOrder {
     const payload = (order.payload ?? {}) as Record<string, unknown>;
+    if (payload.map_snapshot) return order; // 測試單保存建立時座標，不隨換圖改寫。
     const origin = this.resolveEndpointCoordinates(payload.origin);
     const destination = this.resolveEndpointCoordinates(payload.destination);
     if (!origin && !destination) {
@@ -488,25 +503,50 @@ export class OrderService {
     return saved;
   }
 
+  assertVehicleScope(vehicleCode: string, scope?: string[]): void {
+    if (scope && !scope.includes(vehicleCode)) {
+      throw new ForbiddenException({ statusCode: 403, code: 'VEHICLE_NOT_AUTHORIZED', message: '此金鑰未授權操作該車輛訂單' });
+    }
+  }
+
+  async activeOrders(vehicleCode: string, scope?: string[]) {
+    if (!vehicleCode?.trim()) throw new BadRequestException({ statusCode: 400, code: 'VEHICLE_CODE_REQUIRED', message: 'vehicle_code is required' });
+    this.assertVehicleScope(vehicleCode, scope);
+    const items = await this.orderRepository.find({
+      where: { vehicleCode, status: In([OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.FAULTED]) },
+      order: { createdAt: 'ASC' },
+    });
+    return { vehicle_code: vehicleCode, items: items.map(order => this.attachEndpointCoordinates(order)) };
+  }
+
+  async authorizeOrder(id: string, scope?: string[]): Promise<OperationOrder> {
+    const order = await this.getOrderById(id);
+    this.assertVehicleScope(order.vehicleCode, scope);
+    return order;
+  }
+
+  async authorizeAction(id: string, scope?: string[]): Promise<void> {
+    const action = await this.actionStateRepository.findOne({ where: { id } });
+    if (!action) throw new NotFoundException({ statusCode: 404, code: 'ACTION_NOT_FOUND', message: `Action '${id}' not found` });
+    await this.authorizeOrder(action.orderId, scope);
+  }
+
   async updateOrderStatus(id: string, statusStr: string): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
     const normalizedStatus = this.nonEmpty(statusStr);
     if (!normalizedStatus) {
-      throw new BadRequestException('status is required');
+      throw new BadRequestException({ statusCode: 400, code: 'STATUS_REQUIRED', message: 'status is required' });
     }
-    const targetStatus = normalizedStatus.toUpperCase() as OrderStatus;
+    const targetStatus = normalizedStatus as OrderStatus;
 
-    if (!Object.values(OrderStatus).includes(targetStatus)) {
-      throw new BadRequestException(
-        `Invalid status: '${statusStr}'. Allowed: ${Object.values(OrderStatus).join(', ')}`,
-      );
+    if (![OrderStatus.PROCESSING, OrderStatus.END, OrderStatus.FAULTED].includes(targetStatus)) {
+      throw new BadRequestException({ statusCode: 400, code: 'INVALID_ORDER_STATUS', message: 'status 必須為 PROCESSING、END 或 FAULTED（大寫）' });
     }
 
+    if (order.status === targetStatus) return order; // HTTP 回應遺失後可安全重試。
     const allowedNextStatuses = VALID_TRANSITIONS[order.status];
     if (!allowedNextStatuses.includes(targetStatus)) {
-      throw new BadRequestException(
-        `Invalid state transition: '${order.status}' → '${targetStatus}'.`,
-      );
+      throw new BadRequestException({ statusCode: 400, code: 'INVALID_ORDER_TRANSITION', message: `Invalid state transition: '${order.status}' → '${targetStatus}'.` });
     }
 
     order.status = targetStatus;
@@ -528,12 +568,13 @@ export class OrderService {
   ): Promise<OrderActionState> {
     const row = await this.actionStateRepository.findOne({ where: { id: actionId } });
     if (!row) {
-      throw new NotFoundException(`Action '${actionId}' not found`);
+      throw new NotFoundException({ statusCode: 404, code: 'ACTION_NOT_FOUND', message: `Action '${actionId}' not found` });
     }
 
-    const status = this.orderRouteService.normalizeActionStatus(body.status);
+    const status = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'].includes(body.status)
+      ? this.orderRouteService.normalizeActionStatus(body.status) : null;
     if (!status) {
-      throw new BadRequestException(`Invalid action status: '${body.status}'`);
+      throw new BadRequestException({ statusCode: 400, code: 'INVALID_ACTION_STATUS', message: `Invalid action status: '${body.status}'` });
     }
 
     row.actionStatus = status;
@@ -611,7 +652,7 @@ export class OrderService {
       && this.isShiftTripCode(tripCode)
       && (vehiclePhase === 'TRANSITING' || vehiclePhase === 'DWELLING' || vehiclePhase === 'DOCKING')
     ) {
-      order = await this.updateOrderStatus(orderId, 'processing');
+      order = await this.updateOrderStatus(orderId, 'PROCESSING');
     }
 
     if (order.status !== OrderStatus.PROCESSING) {
@@ -830,7 +871,7 @@ export class OrderService {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
     if (order.status === OrderStatus.PENDING) {
-      return this.updateOrderStatus(orderId, 'processing');
+      return this.updateOrderStatus(orderId, 'PROCESSING');
     }
     return order;
   }
@@ -904,7 +945,7 @@ export class OrderService {
       activeOrderIds.add(snap.orderId);
       const order = await this.ensureMaintenanceShift(snap);
       if (snap.phase === 'processing' && order.status === OrderStatus.PENDING) {
-        await this.updateOrderStatus(snap.orderId, 'processing');
+        await this.updateOrderStatus(snap.orderId, 'PROCESSING');
       }
     }
 

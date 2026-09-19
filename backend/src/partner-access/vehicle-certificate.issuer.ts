@@ -13,6 +13,12 @@ export type IssuedClientCertificate = {
   not_after: number;
 };
 
+export function positiveSerialNumber(bytes: Buffer): string {
+  const serial = Buffer.from(bytes);
+  serial[0] = (serial[0] & 0x7f) || 1;
+  return serial.toString('hex');
+}
+
 /**
  * 車輛客戶端憑證的即時簽發。
  *
@@ -148,8 +154,10 @@ export class VehicleCertificateIssuer {
 
     const cert = forge.pki.createCertificate();
     cert.publicKey = forge.pki.publicKeyFromPem(publicKey);
-    // 序號必須是正整數；最高位設 0 避免被當成負數
-    cert.serialNumber = `00${randomBytes(16).toString('hex')}`;
+    // DER INTEGER 必須用最短編碼。無條件在序號前補 00，遇到原本最高位就是 0 的
+    // 序號時會形成多餘 padding，OpenSSL 會以 ASN1_ILLEGAL_PADDING 拒絕整張憑證。
+    // 直接把最高位清掉，並確保第一個 byte 不為 0，就能同時維持正數與最短編碼。
+    cert.serialNumber = positiveSerialNumber(randomBytes(16));
     cert.validity.notBefore = notBefore;
     cert.validity.notAfter = notAfter;
     cert.setSubject([

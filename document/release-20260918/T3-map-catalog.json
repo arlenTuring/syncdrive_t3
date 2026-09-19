@@ -1,0 +1,277 @@
+{
+  "map_id": "map-1789194688160-bu1e5q6",
+  "map_name": "地圖_20260913",
+  "map_version": "v0.1.0",
+  "map_updated_at": "2026-09-17T04:23:54.497Z",
+  "map_hash": "68416bc50f1a26a2d8cbf6cc961cf4743f2532ef431d907f03f81ab23aff0274",
+  "coordinate_frame": "T3.xodr",
+  "points": [
+    {
+      "id": "n2w_u_end",
+      "name": "[備用]N2W上行停靠",
+      "kind": "docking",
+      "x": -28.69,
+      "y": -8.07
+    },
+    {
+      "id": "n2w_u_start",
+      "name": "[備用]N2W下行出發",
+      "kind": "docking",
+      "x": -14.97,
+      "y": -8.09
+    },
+    {
+      "id": "s2w_u_start",
+      "name": "[備用]S2W上行出發",
+      "kind": "docking",
+      "x": -25.4,
+      "y": -330.2
+    },
+    {
+      "id": "s2w_u_end",
+      "name": "[備用]S2W下行停靠",
+      "kind": "docking",
+      "x": -48.73,
+      "y": -330.16
+    },
+    {
+      "id": "n2w_d_end",
+      "name": "N2W上行停靠",
+      "kind": "docking",
+      "x": -28.68,
+      "y": 0
+    },
+    {
+      "id": "n2w_d_start",
+      "name": "N2W下行出發",
+      "kind": "docking",
+      "x": -14.96,
+      "y": 0
+    },
+    {
+      "id": "s2w_d_start",
+      "name": "S2W上行出發",
+      "kind": "docking",
+      "x": -25.48,
+      "y": -337.93
+    },
+    {
+      "id": "s2w_d_end",
+      "name": "S2W下行停靠",
+      "kind": "docking",
+      "x": -48.89,
+      "y": -337.86
+    },
+    {
+      "id": "t3_u",
+      "name": "T3上行",
+      "kind": "docking",
+      "x": -878.78,
+      "y": -179.81
+    },
+    {
+      "id": "t3_d",
+      "name": "T3下行",
+      "kind": "docking",
+      "x": -882.31,
+      "y": -195.42
+    },
+    {
+      "id": "n2w_u2d_back_start",
+      "name": "上行轉N2W正線起點",
+      "kind": "cross-waypoint",
+      "x": -114.09,
+      "y": -12.022499999999999
+    },
+    {
+      "id": "n2w_u2d_back_end",
+      "name": "上行轉N2W正線終點",
+      "kind": "cross-waypoint",
+      "x": -68.03,
+      "y": -0.96
+    },
+    {
+      "id": "s2w_d2u_go_start",
+      "name": "上行轉S2W正線起點",
+      "kind": "cross-waypoint",
+      "x": -135.18,
+      "y": -334.85
+    },
+    {
+      "id": "s2w_d2u_go_end",
+      "name": "上行轉S2W正線終點",
+      "kind": "cross-waypoint",
+      "x": -180.83,
+      "y": -330.5
+    },
+    {
+      "id": "n2w_u2d_go_start",
+      "name": "下行轉N2W正線起點",
+      "kind": "cross-waypoint",
+      "x": -67.15,
+      "y": -8.52
+    },
+    {
+      "id": "n2w_u2d_go_end",
+      "name": "下行轉N2W正線終點",
+      "kind": "cross-waypoint",
+      "x": -112.89,
+      "y": -14.7
+    },
+    {
+      "id": "s2w_d2u_back_start",
+      "name": "下行轉S2W正線起點",
+      "kind": "cross-waypoint",
+      "x": -180.97,
+      "y": -333.99
+    },
+    {
+      "id": "s2w_d2u_back_end",
+      "name": "下行轉S2W正線終點",
+      "kind": "cross-waypoint",
+      "x": -135.15,
+      "y": -331.35
+    },
+    {
+      "id": "charge_and_wash_waypoint",
+      "name": "充電洗車入口點",
+      "kind": "waypoint",
+      "x": -145.29,
+      "y": -10.85
+    },
+    {
+      "id": "maintain_dispatch_waypoint",
+      "name": "整備調度入口點",
+      "kind": "waypoint",
+      "x": -874.59,
+      "y": -286.83
+    }
+  ],
+  "routes": [
+    {
+      "id": "route_1",
+      "name": "N2W下行>T3下行",
+      "station_ids": [
+        "n2w_d_start",
+        "t3_d"
+      ]
+    },
+    {
+      "id": "route_2",
+      "name": "T3下行>S2W下行",
+      "station_ids": [
+        "t3_d",
+        "s2w_d_end",
+        "s2w_d_start"
+      ]
+    },
+    {
+      "id": "route_3",
+      "name": "T3下行>[備用]S2W下行停靠",
+      "station_ids": [
+        "t3_d",
+        "s2w_d2u_back_start",
+        "s2w_d2u_back_end",
+        "s2w_u_end",
+        "s2w_u_start"
+      ]
+    },
+    {
+      "id": "route_4",
+      "name": "[備用]N2W下行>T3下行",
+      "station_ids": [
+        "n2w_u_start",
+        "n2w_u2d_go_start",
+        "n2w_u2d_go_end",
+        "t3_d"
+      ]
+    },
+    {
+      "id": "route_5",
+      "name": "S2W上行>T3上行",
+      "station_ids": [
+        "s2w_d_start",
+        "s2w_d2u_go_start",
+        "s2w_d2u_go_end",
+        "t3_u"
+      ]
+    },
+    {
+      "id": "route_6",
+      "name": "T3上行>N2W上行",
+      "station_ids": [
+        "t3_u",
+        "n2w_u2d_back_start",
+        "n2w_u2d_back_end",
+        "n2w_d_end",
+        "n2w_d_start"
+      ]
+    },
+    {
+      "id": "route_7",
+      "name": "T3上行>[備用]N2W上行停靠",
+      "station_ids": [
+        "t3_u",
+        "n2w_u_end",
+        "n2w_u_start"
+      ]
+    },
+    {
+      "id": "route_8",
+      "name": "[備用]S2W上行出發>T3上行",
+      "station_ids": [
+        "s2w_u_start",
+        "t3_u"
+      ]
+    },
+    {
+      "id": "route_9",
+      "name": "N2W>充電洗車區",
+      "station_ids": [
+        "n2w_d_start",
+        "charge_and_wash_waypoint"
+      ]
+    },
+    {
+      "id": "route_10",
+      "name": "T3下行>整備調度區",
+      "station_ids": [
+        "t3_d",
+        "maintain_dispatch_waypoint"
+      ]
+    },
+    {
+      "id": "route_11",
+      "name": "T3上行>整備調度區",
+      "station_ids": [
+        "t3_u",
+        "maintain_dispatch_waypoint"
+      ]
+    },
+    {
+      "id": "route_12",
+      "name": "充電洗車區>N2W",
+      "station_ids": [
+        "charge_and_wash_waypoint",
+        "n2w_d_start"
+      ]
+    },
+    {
+      "id": "route_13",
+      "name": "整備調度區>T3下行",
+      "station_ids": [
+        "maintain_dispatch_waypoint",
+        "t3_d"
+      ]
+    },
+    {
+      "id": "route_14",
+      "name": "整備調度區>T3上行",
+      "station_ids": [
+        "maintain_dispatch_waypoint",
+        "t3_u"
+      ]
+    }
+  ],
+  "xodr_sha256": "737a6004b8b6f26187582923adce57df5941ecad3a3c7da1b0ba2abfda13919d"
+}

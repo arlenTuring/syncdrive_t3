@@ -2,6 +2,18 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as mqtt from 'mqtt';
 
+export type AssignPublishTrace = {
+  topic: string;
+  qos: 1;
+  retain: false;
+  payload: {
+    vehicle_code: string;
+    timestamp: number;
+    order_id: string;
+    priority_level: number;
+  };
+};
+
 /**
  * 專門負責「中心端 → 車端」的 MQTT Publish 服務
  * 與 MqttController (訂閱端) 完全分離，避免角色混淆
@@ -24,20 +36,21 @@ export class OrderMqttPublisher implements OnModuleInit {
    * Topic: v1/vtms/{vehicle_code}/operation/assign
    * Retain: false (非持久性觸發訊號)
    */
-  publishAssign(vehicleCode: string, orderId: string, priorityLevel: number) {
+  publishAssign(vehicleCode: string, orderId: string, priorityLevel: number): AssignPublishTrace {
     const topic = `v1/vtms/${vehicleCode}/operation/assign`;
-    const payload = JSON.stringify({
+    const payload = {
       vehicle_code: vehicleCode,
       timestamp: new Date().getTime(), // 13-bit Epoch (ms)
       order_id: orderId,
       priority_level: priorityLevel,
-    });
+    };
 
-    // retain: false (非持久性觸發訊號)，QoS 1 確保發車宣告送達車端
-    this.mqttClient.publish(topic, payload, { retain: false, qos: 1 }, (err) => {
+    // retain: false (非持久性觸發訊號)，QoS 1 確認 broker 收件；不保證離線車端收到，車端以 order/active 對帳
+    this.mqttClient.publish(topic, JSON.stringify(payload), { retain: false, qos: 1 }, (err) => {
       if (err) {
         this.logger.error(`[Assign Failed] Could not publish to ${topic}`, err);
       }
     });
+    return { topic, qos: 1, retain: false, payload };
   }
 }

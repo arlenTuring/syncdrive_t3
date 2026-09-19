@@ -75,8 +75,8 @@ describe('filterExternalDocument', () => {
     const operation = (
       out.paths['/syncdrive-api/operation-shift/timetable/trips'] as any
     ).get;
-    expect(operation.tags).toEqual(['對外｜班表計畫']);
-    expect(out.tags?.map((tag) => tag.name)).toEqual(['對外｜班表計畫']);
+    expect(operation.tags).toEqual(['班表計畫']);
+    expect(out.tags?.map((tag) => tag.name)).toEqual(['班表計畫']);
   });
 
   it('只保留對外路徑參照得到的 schema，遞移參照要跟著留', () => {

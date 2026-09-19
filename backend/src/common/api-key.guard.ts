@@ -50,7 +50,11 @@ export class ApiKeyGuard implements CanActivate {
     if (provided && expected && provided === expected) return true;
 
     if (provided && this.partnerAccess) {
-      if (await this.partnerAccess.verify(provided)) return true;
+      if (await this.partnerAccess.verify(provided)) {
+        (request as Request & { vehicleScope?: string[] }).vehicleScope =
+          await this.partnerAccess.vehicleScope(provided);
+        return true;
+      }
     }
 
     if (!expected && !this.partnerAccess) {
@@ -68,8 +72,6 @@ export class ApiKeyGuard implements CanActivate {
       return true;
     }
 
-    throw new UnauthorizedException(
-      'x-api-key 缺少、不正確或已過期。請以 POST /syncdrive-api/auth/token 取得新的金鑰。',
-    );
+    throw new UnauthorizedException({ statusCode: 401, code: 'INVALID_API_KEY', message: 'x-api-key 缺少、不正確或已過期，請重新申請。' });
   }
 }

@@ -124,7 +124,7 @@ export class PartnerAccessService {
   private knownVehicleCodes(): string[] {
     const raw = this.config.get<string>('MQTT_VEHICLE_CODES', '').trim();
     if (raw) return raw.split(',').map((item) => item.trim()).filter(Boolean);
-    return [...VTMS_VEHICLE_CODES];
+    return [...VTMS_VEHICLE_CODES, 'PMS99'];
   }
 
   async issue(input: {
@@ -169,6 +169,7 @@ export class PartnerAccessService {
       this.keys.create({
         keyHash: this.hash(apiKey),
         username: input.username,
+        vehicleCodes: [...new Set(codes)],
         issuedAt: String(issuedAt),
         expiresAt: String(expiresAt),
         ttlMinutes: ttl,
@@ -224,6 +225,11 @@ export class PartnerAccessService {
     // 不 await：更新使用時間失敗不該讓一個合法請求被拒
     void this.keys.update({ keyHash: row.keyHash }, { lastUsedAt: String(Date.now()) });
     return true;
+  }
+
+  async vehicleScope(apiKey: string): Promise<string[]> {
+    const row = await this.keys.findOne({ where: { keyHash: this.hash(apiKey) } });
+    return row?.vehicleCodes ?? [...VTMS_VEHICLE_CODES];
   }
 
   private async purgeExpired(): Promise<void> {

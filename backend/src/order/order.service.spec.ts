@@ -53,18 +53,43 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
     service = module.get(OrderService);
   });
 
+  it('允許未接單直接拒絕並容許重試相同狀態', async () => {
+    const order = makeOrder(OrderStatus.PENDING);
+    orderRepo.findOne.mockResolvedValue(order);
+    expect((await service.updateOrderStatus(order.id, 'FAULTED')).status).toBe(OrderStatus.FAULTED);
+    await service.updateOrderStatus(order.id, 'FAULTED');
+    expect(orderRepo.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('小寫狀態拒絕，PENDING 不能由進度端點寫回', async () => {
+    orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
+    for (const value of ['processing', 'end', 'faulted', 'PENDING']) {
+      await expect(service.updateOrderStatus('260624-U1030', value)).rejects.toMatchObject({
+        response: { statusCode: 400, code: 'INVALID_ORDER_STATUS' },
+      });
+    }
+  });
+
+  it('只准授權車輛，拒絕其他車輛的既存訂單', async () => {
+    orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+    await expect(service.authorizeOrder('260624-U1030', ['PMS99'])).rejects.toMatchObject({
+      response: { statusCode: 403, code: 'VEHICLE_NOT_AUTHORIZED' },
+    });
+    await expect(service.authorizeOrder('260624-U1030', ['PMS05'])).resolves.toHaveProperty('vehicleCode', 'PMS05');
+  });
+
   it('允許 PENDING → PROCESSING', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PENDING));
     const result = await service.updateOrderStatus(
       '260624-U1030',
-      'processing',
+      'PROCESSING',
     );
     expect(result.status).toBe(OrderStatus.PROCESSING);
   });
 
   it('允許 PROCESSING → END 並寫入 completedAt', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
-    const result = await service.updateOrderStatus('260624-U1030', 'end');
+    const result = await service.updateOrderStatus('260624-U1030', 'END');
     expect(result.status).toBe(OrderStatus.END);
     expect(result.completedAt).toBeTruthy();
   });
@@ -73,7 +98,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.FAULTED));
     const result = await service.updateOrderStatus(
       '260624-U1030',
-      'processing',
+      'PROCESSING',
     );
     expect(result.status).toBe(OrderStatus.PROCESSING);
   });
@@ -81,14 +106,14 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   it('拒絕 PENDING → END（非法跳轉）', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PENDING));
     await expect(
-      service.updateOrderStatus('260624-U1030', 'end'),
+      service.updateOrderStatus('260624-U1030', 'END'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('拒絕從終態 END 再跳轉', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.END));
     await expect(
-      service.updateOrderStatus('260624-U1030', 'processing'),
+      service.updateOrderStatus('260624-U1030', 'PROCESSING'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -102,7 +127,7 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   it('找不到訂單時拋 NotFound', async () => {
     orderRepo.findOne.mockResolvedValue(null);
     await expect(
-      service.updateOrderStatus('nope', 'processing'),
+      service.updateOrderStatus('nope', 'PROCESSING'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
