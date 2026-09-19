@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Map as MapIcon } from 'lucide-react';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
+import type { MapPlannedRoute } from '../../map-editor/types/mapFile';
 import { DEFAULT_MAP_PIXEL_SIZE } from '../../map-editor/types/area';
 import { resolveMapId } from '../../map-editor/constants/builtinMaps';
 import { resolveParsedMapForPlatform } from '../../map-editor/utils/mapLibraryStorage';
@@ -38,6 +39,7 @@ export function MapPlatformLayer({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [areas, setAreas] = useState<MapAreaObject[]>([]);
+  const [routes, setRoutes] = useState<MapPlannedRoute[]>([]);
   const [pixelSize, setPixelSize] = useState<MapPixelSize>(DEFAULT_MAP_PIXEL_SIZE);
   const [pixelOrigin, setPixelOrigin] = useState({ x: 0, y: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function MapPlatformLayer({
   useEffect(() => {
     if (!mapId) {
       setAreas([]);
+      setRoutes([]);
       setError(null);
       return;
     }
@@ -99,6 +102,7 @@ export function MapPlatformLayer({
           return;
         }
         setAreas(parsed.areas);
+        setRoutes(parsed.routes ?? []);
         setPixelSize(parsed.pixelSize);
         setPixelOrigin(parsed.pixelOrigin);
         setError(null);
@@ -156,6 +160,7 @@ export function MapPlatformLayer({
         vehicleDefinition={vehicleDefinition}
         vehicleDisplayWidthPx={vehicleDisplayWidthPx}
         vehicleDisplayHeightPx={vehicleDisplayHeightPx}
+        routes={routes}
         vehicleBehavior={
           vehicleTemplate
             ? {

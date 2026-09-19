@@ -16,6 +16,7 @@ import type {
 } from '../types/area'
 import { DEFAULT_MAP_PIXEL_ORIGIN } from '../types/area'
 import type { MapBasemapLayout, MapBasemapObject } from '../types/basemap'
+import type { MapPlannedRoute } from '../types/mapFile'
 import type { TrackGenLayout } from '../utils/trackGenLayout'
 import type { PaletteItem } from '../constants/palette'
 import type {
@@ -90,6 +91,8 @@ type MapAreaCanvasProps = {
   vehicleDisplayWidthPx?: number
   /** 載具縱向顯示尺寸（px，垂直軌道） */
   vehicleDisplayHeightPx?: number
+  /** 地圖上的營運路線：車輛定位用來推算「這台車該在哪幾塊軌道上」 */
+  routes?: readonly MapPlannedRoute[]
   /** stretch：填滿樣板框；contain：等比縮放 */
   vehicleFitMode?: 'contain' | 'stretch'
   /** 載具樣板作動行為設定 */
@@ -234,6 +237,7 @@ export function MapAreaCanvas({
   vehicleDefinition = null,
   vehicleDisplayWidthPx,
   vehicleDisplayHeightPx,
+  routes,
   vehicleFitMode = 'contain',
   vehicleBehavior,
   showVehicleTelemetry = true,
@@ -899,6 +903,7 @@ export function MapAreaCanvas({
                 vehicleDisplayWidthPx={vehicleDisplayWidthPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX}
                 vehicleDisplayHeightPx={vehicleDisplayHeightPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX}
                 vehicleFitMode={vehicleFitMode}
+                routes={routes}
                 vehicleBehavior={vehicleBehavior}
                 vehicleEditSizer={vehicleEditSizer}
                 livePositionTweenMs={livePositionTweenMsProp ?? (isEmbedded ? 1200 : 0)}

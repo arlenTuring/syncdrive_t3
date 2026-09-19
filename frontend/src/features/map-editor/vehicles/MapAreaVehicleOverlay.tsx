@@ -61,6 +61,8 @@ import {
   findYardSlotAtFieldMeters,
 } from '../utils/yardFacilitySlots';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
+import type { MapPlannedRoute } from '../types/mapFile';
+import { buildRouteCorridors, readTargetStationId } from './routeCorridor';
 
 /** 定位把握低於這個值，徽章標「≈」 */
 const LOW_CONFIDENCE = 0.5;
@@ -203,6 +205,7 @@ export function MapAreaVehicleOverlay({
   vehicleDefinition = null,
   vehicleDisplayWidthPx,
   vehicleDisplayHeightPx,
+  routes,
   vehicleFitMode = 'contain',
   vehicleBehavior,
   vehicleEditSizer = null,
@@ -221,6 +224,8 @@ export function MapAreaVehicleOverlay({
   vehicleDisplayWidthPx: number;
   /** 載具縱向顯示尺寸（px，垂直軌道） */
   vehicleDisplayHeightPx: number;
+  /** 地圖上的營運路線；有的話用訂單目標站推出走廊，限縮挑塊的候選軌道 */
+  routes?: readonly MapPlannedRoute[];
   vehicleFitMode?: 'contain' | 'stretch';
   vehicleBehavior?: MapVehicleBehaviorConfig;
   /** 儀表板編輯：對第一輛預覽載具顯示校準框 */
@@ -239,6 +244,14 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  /*
+   * 訂單路線的走廊：終點站 → 沿路網走得到的那幾塊軌道。車的 current_leg.target_station_id
+   * 就是鍵。沒給路線、站沒放在路網上、目標不是站（進出場入口點）時沒有走廊，等於沒有這條旁證。
+   */
+  const routeCorridors = useMemo(
+    () => buildRouteCorridors(areas, routes ?? [], trackNetwork.genIndex),
+    [areas, routes, trackNetwork],
+  );
   const yardSlotBoxes = useMemo(() => collectYardSlotFieldBoxes(areas), [areas]);
   /*
    * 停在格子裡的車就當成場區車，不管它回報什麼。
@@ -293,6 +306,10 @@ export function MapAreaVehicleOverlay({
     const headingRad = readVehicleHeadingRad(vehicle.payload);
     // 車速只影響「heading 還可不可信」；分成動與不動兩檔就夠，不要讓每一筆速度都破快取
     const speedMps = readVehicleSpeedMps(vehicle.payload);
+    const targetStationId = readTargetStationId(vehicle.payload);
+    const corridorFacilityIds = targetStationId
+      ? routeCorridors.byTargetStation.get(targetStationId)
+      : undefined;
     const inputKey = [
       vehicle.xM.toFixed(2),
       vehicle.yM.toFixed(2),
@@ -300,6 +317,8 @@ export function MapAreaVehicleOverlay({
       headingRad == null ? '-' : headingRad.toFixed(3),
       speedMps == null ? '-' : speedMps < HEADING_RELIABLE_MPS ? 's' : 'm',
       readLegSnapKey(vehicle.payload ?? {}),
+      // 走廊只跟目標站有關；目標站換了（下一段）才需要重算
+      corridorFacilityIds ? targetStationId : '-',
     ].join('|');
     const cached = placementCacheRef.current.get(vehicle.vehicleId);
     if (cached?.inputKey === inputKey) return cached.placement;
@@ -321,6 +340,7 @@ export function MapAreaVehicleOverlay({
         headingRad: headingRad ?? undefined,
         speedMps: speedMps ?? undefined,
         previousTrackId,
+        corridorFacilityIds,
       },
     );
     placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement, preferYard });

@@ -300,6 +300,11 @@ export type LocateOptions = {
   speedMps?: number
   /** 上一筆判給這台車的那一塊；有的話偏向留在原地或走到相連的下一塊 */
   previousFacilityId?: string
+  /**
+   * 訂單路線的走廊：這台車該在的那幾塊軌道（見 routeCorridor）。
+   * 有的話，走廊外的候選多扣 OFF_ROUTE_PENALTY_M；只在位置分不出來的候選之間決定。
+   */
+  corridorFacilityIds?: ReadonlySet<string>
 }
 
 /**
@@ -336,6 +341,9 @@ export const CANDIDATE_GATE_M = 1.2
 /** 車頭跟行車方向差超過這個角度就算「幾乎相反」 */
 const HEADING_CONFLICT_RAD = (120 * Math.PI) / 180
 const CONFLICT_CONFIDENCE_FACTOR = 0.6
+
+/** 不在訂單路線的走廊上：多算這麼多。比留在原地的加分（0.8）大，比離開軌道的代價小。 */
+export const OFF_ROUTE_PENALTY_M = 1.5
 
 /** 還在上一塊：少算這麼多，換塊要有足夠的證據 */
 export const STICKY_BONUS_M = 0.8
@@ -431,6 +439,9 @@ export function locateByField(
       if (prev) {
         if (p.facilityId === prev) score -= STICKY_BONUS_M
         else if (!tracksAreConnected(index, prev, p.facilityId)) score += NON_ADJACENT_PENALTY_M
+      }
+      if (options.corridorFacilityIds && !options.corridorFacilityIds.has(p.facilityId)) {
+        score += OFF_ROUTE_PENALTY_M
       }
     } else {
       // 遠離最近的那一塊：不靠旁證翻盤，照純距離排在後面

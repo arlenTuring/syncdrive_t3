@@ -5,6 +5,7 @@ import { memo } from 'react';
 import { MapAreaCanvas } from '../../map-editor/components/MapAreaCanvas';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
+import type { MapPlannedRoute } from '../../map-editor/types/mapFile';
 import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import { DEFAULT_MAP_VEHICLE_ICON } from '../../map-editor/vehicles/defaultMapVehicleIcon';
@@ -24,6 +25,7 @@ export type MapSimVehicleMotionBridgeProps = {
   vehicleDefinition: VehicleDefinition | null;
   vehicleDisplayWidthPx: number;
   vehicleDisplayHeightPx: number;
+  routes?: readonly MapPlannedRoute[];
   vehicleBehavior?: MapVehicleBehaviorConfig;
   viewportRef: React.RefObject<HTMLDivElement | null>;
 };
@@ -41,6 +43,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
   vehicleDefinition,
   vehicleDisplayWidthPx,
   vehicleDisplayHeightPx,
+  routes,
   vehicleBehavior,
   viewportRef,
 }: MapSimVehicleMotionBridgeProps) {
@@ -70,6 +73,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
       vehicleDisplayWidthPx={vehicleDisplayWidthPx}
       vehicleDisplayHeightPx={vehicleDisplayHeightPx}
       vehicleFitMode="stretch"
+      routes={routes}
       vehicleBehavior={vehicleBehavior}
       vehicleEditSizer={null}
       slotPreview={null}

@@ -792,6 +792,8 @@ export function resolveVehiclePlacementAcrossAreas(
     speedMps?: number;
     /** 上一筆判給這台車的軌道（設施 id）；換塊要有足夠的證據。 */
     previousTrackId?: string;
+    /** 訂單路線的走廊（見 routeCorridor）：走廊外的軌道在挑塊時多扣分。 */
+    corridorFacilityIds?: ReadonlySet<string>;
   },
 ): VehiclePlacementAcrossAreas | null {
   const net = network ?? getTrackNetwork(areas);
@@ -805,6 +807,7 @@ export function resolveVehiclePlacementAcrossAreas(
     headingRad: options?.headingRad,
     speedMps: options?.speedMps,
     previousTrackId: options?.previousTrackId,
+    corridorFacilityIds: options?.corridorFacilityIds,
   });
 
   // 緊貼橫渡線（2 m）：要先確認車<strong>真的在轉線</strong>才畫在渡線上

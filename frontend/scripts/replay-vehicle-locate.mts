@@ -32,6 +32,7 @@ import {
   collectYardSlotFieldBoxes,
   findYardSlotAtFieldMeters,
 } from '../src/features/map-editor/utils/yardFacilitySlots'
+import { buildRouteCorridors, readTargetStationId } from '../src/features/map-editor/vehicles/routeCorridor'
 import { readVehicleHeadingRad } from '../src/features/map-editor/vehicles/readVehicleHeading'
 import { TRACK_HALF_WIDTH_M } from '../src/features/map-editor/vehicles/quantisedTrackCell'
 
@@ -61,10 +62,14 @@ if (!telemetryPath) {
 
 const rawMap = JSON.parse(readFileSync(mapPath, 'utf-8')) as { mapDocument?: unknown }
 const inner = (rawMap.mapDocument ?? rawMap) as Record<string, unknown>
-const loaded = parseMapFileJson(inner).areas
+const parsedMap = parseMapFileJson(inner)
+const loaded = parsedMap.areas
 const areas = repairTrackRefFieldBoundsInAreas(backfillTrackGenSpansInAreas(loaded).areas).areas
 const network = buildTrackNetwork(areas)
 const yardBoxes = collectYardSlotFieldBoxes(areas)
+// 訂單路線走廊：--no-corridor 關掉，拿同一批資料比對有沒有這條旁證的差別
+const useCorridor = !process.argv.includes('--no-corridor')
+const corridors = buildRouteCorridors(areas, parsedMap.routes ?? [], network.genIndex)
 
 const codeOf = new Map<string, string>()
 for (const area of areas) {
@@ -84,11 +89,18 @@ type Sample = {
 }
 
 const samples: Sample[] = []
+const lastLeg = new Map<string, unknown>()
 for (const line of readFileSync(telemetryPath, 'utf-8').split('\n')) {
   const t = line.trim()
   if (!t.startsWith('{')) continue
   try {
     const p = JSON.parse(t) as Record<string, any>
+    if (p._topic === 'operation') {
+      // operation/update：只留 current_leg，併進這台車之後的遙測（跟圖台收到的 payload 一樣）
+      lastLeg.set(String(p.vehicle_code), p.current_leg)
+      continue
+    }
+    if (lastLeg.has(String(p.vehicle_code))) p.current_leg = lastLeg.get(String(p.vehicle_code))
     const pos = p.local_pose?.position
     if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) continue
     samples.push({
@@ -141,6 +153,9 @@ for (const s of samples) {
     // 新版會用；舊版直接忽略這兩個欄位
     speedMps: s.speedMps,
     previousTrackId: previousTrackIdOf(last?.placement, last?.yard ?? false),
+    corridorFacilityIds: useCorridor
+      ? corridors.byTargetStation.get(readTargetStationId(s.payload) ?? '')
+      : undefined,
   } as never)
   const fix = placement?.placement.network
   const trackId = placement?.placement.trackId ?? null
