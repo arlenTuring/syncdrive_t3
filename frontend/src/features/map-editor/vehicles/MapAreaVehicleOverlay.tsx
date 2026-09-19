@@ -31,10 +31,12 @@ import {
 } from './resolveVehicleTrackPlacement';
 import {
   readVehicleHeadingRad,
+  readVehicleSpeedMps,
   readVehicleSteeringAngleRad,
   mapVehiclePivotRotateDeg,
   headingRadToClockwiseDeg,
 } from './readVehicleHeading';
+import { useVehiclePathTween } from './useVehiclePathTween';
 import { DEFAULT_MAP_VEHICLE_ICON } from './defaultMapVehicleIcon';
 import { MapVehicleMarker } from './MapVehicleMarker';
 import { resolveMapVehicleBgColor } from './resolveMapVehicleAppearance';
@@ -56,6 +58,10 @@ import {
   collectYardSlotFieldBoxes,
   findYardSlotAtFieldMeters,
 } from '../utils/yardFacilitySlots';
+import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
+
+/** 定位把握低於這個值，徽章標「≈」 */
+const LOW_CONFIDENCE = 0.5;
 
 /**
  * 軌道上的車一律畫這麼大（區域像素）。
@@ -253,6 +259,14 @@ export function MapAreaVehicleOverlay({
     () => buildStationMileageIndex(areas, trackNetwork.genIndex),
     [areas, trackNetwork],
   );
+  /*
+   * 軌道上的車沿路徑補間，不在畫面上直線滑。見 pathTween：直線補間走的是兩點的弦，
+   * 彎道兩側的兩個點之間會切出軌道。編輯模式（補間 0 毫秒）不補。
+   */
+  const { resolve: resolvePathPose, prune: prunePathTween } = useVehiclePathTween(
+    trackNetwork.genIndex ?? undefined,
+    livePositionTweenMs,
+  );
   const placementCacheRef = useRef<
     Map<string, { inputKey: string; placement: VehiclePlacementAcrossAreas | null }>
   >(new Map());
@@ -262,7 +276,8 @@ export function MapAreaVehicleOverlay({
     for (const id of placementCacheRef.current.keys()) {
       if (!activeIds.has(id)) placementCacheRef.current.delete(id);
     }
-  }, [vehicles]);
+    prunePathTween(activeIds);
+  }, [vehicles, prunePathTween]);
 
   function resolveCachedPlacement(
     vehicle: AreaVehicleLive,
@@ -271,15 +286,27 @@ export function MapAreaVehicleOverlay({
     const preferYard = isYardVehicle(vehicle);
     // 朝向會決定挑到上行還是下行，所以要進快取的鍵，不然轉頭之後還會拿到舊的那一條
     const headingRad = readVehicleHeadingRad(vehicle.payload);
+    // 車速只影響「heading 還可不可信」；分成動與不動兩檔就夠，不要讓每一筆速度都破快取
+    const speedMps = readVehicleSpeedMps(vehicle.payload);
     const inputKey = [
       vehicle.xM.toFixed(2),
       vehicle.yM.toFixed(2),
       preferYard ? 'y' : 't',
       headingRad == null ? '-' : headingRad.toFixed(3),
+      speedMps == null ? '-' : speedMps < HEADING_RELIABLE_MPS ? 's' : 'm',
       readLegSnapKey(vehicle.payload ?? {}),
     ].join('|');
     const cached = placementCacheRef.current.get(vehicle.vehicleId);
     if (cached?.inputKey === inputKey) return cached.placement;
+    /*
+     * 上一筆判給這台車的軌道。
+     *
+     * 每一秒都像第一次看到這台車一樣重新挑，就會在路口與平行軌道之間來回跳。有上一筆
+     * 的話，偏向留在原地或走到相連的下一塊；它只是加減分，位置明顯在別處時照樣換。
+     */
+    const previousTrackId = cached?.placement?.placement.network
+      ? cached.placement.placement.trackId
+      : undefined;
     const placement = resolveVehiclePlacementAcrossAreas(
       areas,
       vehicle.xM,
@@ -289,6 +316,8 @@ export function MapAreaVehicleOverlay({
         preferYardPlacement: preferYard,
         payload: vehicle.payload,
         headingRad: headingRad ?? undefined,
+        speedMps: speedMps ?? undefined,
+        previousTrackId,
       },
     );
     placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement });
@@ -349,37 +378,60 @@ export function MapAreaVehicleOverlay({
          * 到場區就塞不進格位。
          */
         /*
-         * 軌道上的車位置已經格化（見 quantisedTrackCell），不再照每一塊的比例尺
-         * 換算，所以尺寸固定。場區格位還是照格子的比例尺——那邊的位置仍然是連續的。
+         * 位置：定位挑塊時算好的「走了幾成、偏了多少」，補間期間換成補間中的值。
+         *
+         * 挑塊算一次，之後的位置、方向、偏差全部吃同一組值——不再各自重新投影。
+         * 補間走的是沿線位置，每一幀從那一塊的圖面路徑取座標，所以彎道上不會切出軌道。
          */
+        const network = placement.placement.network;
+        const legKeyNow = readLegSnapKey(
+          vehicle.payload as Record<string, unknown> | undefined,
+        );
+        const prevPosNow = committedPosRef.current.get(vehicle.vehicleId);
+        const prevLegNow = committedLegRef.current.get(vehicle.vehicleId);
+        // 大跳躍：首幀或班次／站別切換（發車、換 leg）→ 瞬間定位
+        const teleported =
+          !prevPosNow || (prevLegNow != null && legKeyNow !== prevLegNow && legKeyNow !== '');
+        const pathPose =
+          !preferYard && network && sizingFacility && placement.placement.trackId
+            ? resolvePathPose(
+                vehicle.vehicleId,
+                {
+                  trackId: placement.placement.trackId,
+                  along: network.alongFrac,
+                  side: network.offsetM,
+                },
+                teleported,
+              )
+            : null;
+        const displayFacility =
+          pathPose && pathPose.trackId !== placement.placement.trackId
+            ? (area.facilities.find((f) => f.id === pathPose.trackId) ?? sizingFacility)
+            : sizingFacility;
+        const shownProjection = pathPose
+          ? { along: pathPose.along, side: pathPose.side }
+          : network
+            ? { along: network.alongFrac, side: network.offsetM }
+            : undefined;
         const quantised =
-          !preferYard && sizingFacility
+          !preferYard && displayFacility
             ? quantisedTrackCellPlacement(
-                sizingFacility,
+                displayFacility,
                 area,
                 vehicle.xM,
                 vehicle.yM,
                 trackCellRef.current.get(vehicle.vehicleId),
-                placement.placement.network
-                  ? {
-                      along: placement.placement.network.alongFrac,
-                      side: placement.placement.network.offsetM,
-                    }
-                  : undefined,
+                shownProjection,
               )
             : null;
         if (quantised) trackCellRef.current.set(vehicle.vehicleId, quantised.cell);
         /*
-         * 格化之後落點換成那一格的位置；後軸對齊該點的語意不變。
-         *
-         * 但車已經離開軌道時就不格化——那時候「第幾格」沒有意義，硬吸過去等於把車
-         * 畫在一個它不在的地方。改用連續座標（那是照真實偏移量算出來的位置），
-         * 偏多少畫多少。
+         * 位置格化預設關閉（見 QUANTISE_ALONG_POSITION／QUANTISE_LATERAL_POSITION）：
+         * 車畫在真實位置上，偏差以數字與顏色呈現，不再被放大成「整台壓在邊緣」。
          */
-        const placementLocal =
-          quantised && !quantised.offTrack
-            ? { x: quantised.x, y: quantised.y }
-            : facilityCenterLocal;
+        const placementLocal = quantised
+          ? { x: quantised.x, y: quantised.y }
+          : facilityCenterLocal;
 
         /*
          * 場區格位的車也用同一個固定尺寸。
@@ -411,9 +463,13 @@ export function MapAreaVehicleOverlay({
          *
          * 沒有生成路徑的方塊（手工放的、場區格位）退回照 heading 轉。
          */
-        const drawnTrack = placement.placement.trackId
-          ? area.facilities.find((f) => f.id === placement.placement.trackId)
-          : undefined;
+        const drawnTrack = pathPose
+          ? displayFacility
+          : placement.placement.trackId
+            ? area.facilities.find((f) => f.id === placement.placement.trackId)
+            : undefined;
+        // 走了幾成直接帶進去：補間中的位置不對應任何一筆遙測座標，重投影只會投回起點
+        const alongHint = pathPose?.along ?? network?.alongFrac;
         const drawnDir =
           drawnTrack && headingRad != null
             ? drawnDirectionAtField(
@@ -422,6 +478,7 @@ export function MapAreaVehicleOverlay({
                 vehicle.xM,
                 vehicle.yM,
                 headingRad,
+                alongHint,
               )
             : null;
         /*
@@ -435,6 +492,7 @@ export function MapAreaVehicleOverlay({
               vehicle.xM,
               vehicle.yM,
               headingRad,
+              alongHint,
             )
           : null;
         const containerRotateDeg =
@@ -503,13 +561,9 @@ export function MapAreaVehicleOverlay({
         const bgColor = resolveMapVehicleBgColor(vehicle);
         const zIndex = 100 + stackOrder;
 
-        // 大跳躍：首幀或班次／站別切換（發車、換 leg）→ 瞬間定位；高倍速行進仍走 CSS 補間
-        const prevPos = committedPosRef.current.get(vehicle.vehicleId);
-        const legKey = readLegSnapKey(livePayload);
-        const prevLeg = committedLegRef.current.get(vehicle.vehicleId);
-        const teleported = !prevPos || (prevLeg != null && legKey !== prevLeg && legKey !== '');
+        // 大跳躍的判斷在上面（teleported）；高倍速行進仍走 CSS 補間
         stagingPosRef.current.set(vehicle.vehicleId, { left, top });
-        stagingLegRef.current.set(vehicle.vehicleId, legKey);
+        stagingLegRef.current.set(vehicle.vehicleId, legKeyNow);
 
         const style: CSSProperties = {
           position: 'absolute',
@@ -520,8 +574,10 @@ export function MapAreaVehicleOverlay({
           transform: `translate3d(${left}px, ${top}px, 0)`,
           zIndex,
           ...(livePositionTweenMs > 0
-            ? teleported
-              ? { transition: 'none' }
+            ? teleported || pathPose
+              ? // 沿路徑補間的車位置每一幀由程式算，不能再疊 CSS 補間（會變成雙重補間、
+                // 又走回弦的直線）
+                { transition: 'none' }
               : {
                   transition: `transform ${livePositionTweenMs}ms linear`,
                   willChange: 'transform',
@@ -567,6 +623,8 @@ export function MapAreaVehicleOverlay({
         const badgeCenterX = coordLeft + bodyOffset.dx;
         const badgeTopY = coordTop + bodyOffset.dy - bodyHalfSpanY - 4;
 
+        const lowConfidence =
+          network?.confidence !== undefined && network.confidence < LOW_CONFIDENCE;
         const cellBadge = quantised ? (
           <div
             key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
@@ -618,13 +676,26 @@ export function MapAreaVehicleOverlay({
               畫在哪一格是為了讓車固定大小、看得出在這一塊的哪一段；但「走到幾成」
               與「偏離中心線多少」是現場的事實，照原樣顯示，不跟著格化。
             */}
+            {/*
+              把握不高的時候標出來。位置是猜的（分岔口、上下行只差三公尺）就不能讓
+              這個數字看起來像事實——偏差是相對「選中的那條中心線」算的，選錯了數字
+              就跟著錯。
+            */}
             <span
+              title={
+                lowConfidence
+                  ? `定位把握 ${Math.round((network?.confidence ?? 0) * 100)}%：可能判給了旁邊的軌道`
+                  : undefined
+              }
               className={
                 Math.abs(quantised.lateralRatio) > 1
                   ? 'text-amber-300'
-                  : 'text-zinc-300'
+                  : lowConfidence
+                    ? 'text-amber-200'
+                    : 'text-zinc-300'
               }
             >
+              {lowConfidence ? '≈' : ''}
               {quantised.lateralRatio >= 0 ? '+' : '−'}
               {Math.abs(quantised.lateralRatio * 100).toFixed(0)}%
             </span>

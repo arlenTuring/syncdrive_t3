@@ -1,17 +1,12 @@
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import {
-  getTrackGenLatMode,
-  getTrackGenLatPerBox,
   getTrackGenPaths,
   getTrackGenSpans,
   projectAlongPath,
   type PathXY,
 } from '../utils/trackGenPaths'
-import {
-  offsetLocalPoint,
-  trackLocalPathPointToAreaLocal,
-} from './resolveVehicleTrackPlacement'
+import { trackAreaLocalAt } from './resolveVehicleTrackPlacement'
 
 /**
  * 車輛在軌道上的位置改成<strong>格</strong>，不再是連續座標。
@@ -30,7 +25,26 @@ import {
  * 半個軌道寬的幾成，不是連續飄移。
  */
 
-/** 沿線分幾格 */
+/**
+ * 位置要不要格化。兩個都關掉＝車畫在真實位置上，沿路徑連續移動。
+ *
+ * 一開始為了讓車固定大小、又看得出在這一塊的哪一段，位置分成四格、橫向分成五級。
+ * 代價是：
+ * <ul>
+ *   <li>沿線每 25% 才動一次，跳格；彎道上落點與朝向還不同步。</li>
+ *   <li>橫向偏差超過半寬的 15% 就整台壓到軌道邊緣——不到 30 公分的偏差看起來像
+ *       整台偏出去，畫面上分不出是真的偏了還是被放大了。</li>
+ * </ul>
+ * 位置是「車在哪」的證據，被格化之後沒辦法用來判斷定位對不對。現在改成連續，偏差以
+ * 數字與顏色另外呈現；四格的進度指示（{@link ALONG_CELLS}）仍然保留，那是讀數，
+ * 不影響車畫在哪裡。
+ *
+ * 要回到格化：兩個開關改成 true 即可，其餘程式不必動。
+ */
+export const QUANTISE_ALONG_POSITION = false
+export const QUANTISE_LATERAL_POSITION = false
+
+/** 沿線分幾格（進度指示用；位置是否格化看 {@link QUANTISE_ALONG_POSITION}） */
 export const ALONG_CELLS = 4
 
 /** 軌道半寬（公尺）。偏移量除以它就是「佔半邊的幾成」。 */
@@ -177,21 +191,19 @@ export function quantisedTrackCellPlacement(
   const lateral = quantiseLateral(side)
   const reversed = trackAlongIsReversed(track.parameters, paths.real)
 
-  const point = offsetLocalPoint(
-    paths.local,
-    cell / ALONG_CELLS,
-    lateralMeters(lateral),
-    getTrackGenLatPerBox(track.parameters),
-    getTrackGenLatMode(track.parameters),
-  )
-  const local = trackLocalPathPointToAreaLocal(track, area, point)
+  // 沒開格化就照真實的走了幾成、偏了多少畫；已經離軌的格化沒有意義，也照真實位置畫
+  const offTrack = Math.abs(side / TRACK_HALF_WIDTH_M) > OFF_TRACK_RATIO
+  const drawAlong = QUANTISE_ALONG_POSITION && !offTrack ? cell / ALONG_CELLS : along
+  const drawSide = QUANTISE_LATERAL_POSITION && !offTrack ? lateralMeters(lateral) : side
+  const local = trackAreaLocalAt(track, area, drawAlong, drawSide)
+  if (!local) return null
   return {
     cell,
     lateral,
     alongRaw: along,
     lateralRatio: side / TRACK_HALF_WIDTH_M,
     offsetM: side,
-    offTrack: Math.abs(side / TRACK_HALF_WIDTH_M) > OFF_TRACK_RATIO,
+    offTrack,
     alongTravel: reversed
       ? 1 - Math.min(1, Math.max(0, along))
       : Math.min(1, Math.max(0, along)),
