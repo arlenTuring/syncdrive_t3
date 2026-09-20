@@ -274,3 +274,22 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道接到分區入�
   })
 })
 
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('補里程：疊在一起的兄弟不當接續', () => {
+  it('D20 的里程被清掉重補：接著 D19 往南遞減（不是拿疊在同處的 T02 往北延伸）', async () => {
+    const { backfillTrackGenSpansInAreas } = await import('./trackGenSpanBackfill')
+    const area = parseMapFileJson(doc as never).areas[0]!
+    const d20 = area.facilities.find((f) => f.customName === 'D20')
+    const t02 = area.facilities.find((f) => f.customName === 'T02')
+    if (!d20 || !t02) return
+    const params = { ...d20.parameters } as Record<string, unknown>
+    delete params.trackGenSpans
+    const rest = area.facilities.map((f) => (f.id === d20.id ? { ...d20, parameters: params } : f))
+    // T02 排在最前面：先被找到的鄰居若是它，就會拿到往北延伸的里程
+    const probe = { ...area, facilities: [t02, ...rest.filter((f) => f.id !== t02.id)] }
+    const out = backfillTrackGenSpansInAreas([probe])
+    const span = (out.areas[0]!.facilities.find((f) => f.id === d20.id)!.parameters as { trackGenSpans: Array<{ s0: number; s1: number }> }).trackGenSpans[0]!
+    expect(span.s0).toBe(50)
+    expect(span.s1).toBeLessThan(50)
+  })
+})
+

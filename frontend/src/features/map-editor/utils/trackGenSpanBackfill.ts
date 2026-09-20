@@ -65,6 +65,8 @@ type Neighbour = {
 function neighbourAt(
   facility: FacilityObject,
   point: Endpoint,
+  /** 自己另一端的位置：鄰居的本體必須在接點的<strong>另一側</strong>，同一側的是疊在一起的兄弟 */
+  ownFar: Endpoint,
 ): Neighbour | null {
   const paths = getTrackGenPaths(facility.parameters)
   if (!paths) return null
@@ -72,6 +74,16 @@ function neighbourAt(
   if (spans.length === 0) return null
   const ends = endpointsOf(paths.real)
   if (!ends) return null
+
+  /*
+   * 同一處還有另一塊「往同一邊走」的（例如新拉的替換軌道疊在舊的上面），它不是接續，
+   * 是重疊；拿它的里程當接續會把里程往反方向延伸（D20 因此得到 50→124，與 D18 重疊）。
+   */
+  const otherEnd = near(ends.head, point) ? ends.tail : near(ends.tail, point) ? ends.head : null
+  if (!otherEnd) return null
+  const sameSide =
+    (otherEnd.x - point.x) * (ownFar.x - point.x) + (otherEnd.y - point.y) * (ownFar.y - point.y) > 0
+  if (sameSide) return null
 
   // f=0 那一端對應第一段的 s0，f=1 那一端對應最後一段的 s1
   if (near(ends.head, point)) {
@@ -89,10 +101,11 @@ function findNeighbour(
   facilities: readonly FacilityObject[],
   selfId: string,
   point: Endpoint,
+  ownFar: Endpoint,
 ): Neighbour | null {
   for (const f of facilities) {
     if (f.id === selfId) continue
-    const hit = neighbourAt(f, point)
+    const hit = neighbourAt(f, point, ownFar)
     if (hit) return hit
   }
   return null
@@ -131,8 +144,8 @@ export function backfillTrackGenSpansInAreas(areas: MapAreaObject[]): {
         return facility
       }
 
-      const head = findNeighbour(facilities, facility.id, ends.head)
-      const tail = findNeighbour(facilities, facility.id, ends.tail)
+      const head = findNeighbour(facilities, facility.id, ends.head, ends.tail)
+      const tail = findNeighbour(facilities, facility.id, ends.tail, ends.head)
       let span: TrackGenSpan
       if (head && tail && head.road === tail.road && head.lane === tail.lane) {
         // 兩端接的是同一條車道：里程取兩端鄰居的值
