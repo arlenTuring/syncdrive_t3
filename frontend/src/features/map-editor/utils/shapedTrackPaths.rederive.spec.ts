@@ -11,6 +11,7 @@ import {
 } from './rederiveAfterMove'
 import {
   findStaleTrackPathEnds,
+  healStaleTrackPathsInAreas,
   listStaleTrackPaths,
   rederiveIfStale,
   rederiveTrackPath,
@@ -40,10 +41,28 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
   const area = areas[0]!
   const byName = (name: string) => area.facilities.find((f) => f.customName === name)!
 
-  it('偵測只抓真的接不上的：過期的 U04（與它的鄰居 U05）、已知的 U18／U19，其餘 72 塊都不誤報', () => {
+  it('載入時自動修好複製來的 U04；只有一端對不上的 U18／U19 不動；其餘不誤報', () => {
     const labels = listStaleTrackPaths(areas).map((s) => s.label).sort()
-    // U04 已修復的圖資裡不會再出現；未修復時是 U04 與 U05 成對
-    expect(labels.filter((l) => !['U04', 'U05', 'U18', 'U19'].includes(l))).toEqual([])
+    // U04 兩端都對不上：載入就已依鄰居重建，不會再被列為過期；U05 也跟著接上了
+    expect(labels).not.toContain('U04')
+    expect(labels).not.toContain('U05')
+    expect(labels.filter((l) => !['U18', 'U19'].includes(l))).toEqual([])
+    const real = getTrackGenPaths(byName('U04').parameters)!.real
+    expect(Math.hypot(real[0]![0] + 138.4, real[0]![1] + 19.86)).toBeLessThan(0.05)
+    expect(real[real.length - 1]![1]).toBeGreaterThan(-14)
+  })
+
+  it('healStaleTrackPathsInAreas：兩端都錯才改，一端錯的（互相對不上）只回報', () => {
+    // 用還沒修的原始資料：把 U04 換回複製來的樣子
+    const u06 = byName('U06')
+    const stale = {
+      ...byName('U04'),
+      parameters: { ...byName('U04').parameters, trackGenRealPath: u06.parameters!.trackGenRealPath },
+    }
+    const broken = { ...area, facilities: area.facilities.map((f) => (f.id === stale.id ? stale : f)) }
+    const out = healStaleTrackPathsInAreas([broken])
+    expect(out.healed).toEqual(['U04'])
+    expect(out.ambiguous.sort()).toEqual(['U18', 'U19'])
   })
 
   it('正常接著隔壁的軌道不是過期', () => {
@@ -51,9 +70,10 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
   })
 
   it('重建 U04：兩端改接 U05 的終點與交叉的口，橫向比例尺換成這一塊的外框', () => {
-    const u04 = byName('U04')
-    const stale = findStaleTrackPathEnds(u04, area)
-    if (stale.length === 0) return // 圖資已經修過
+    const u04 = {
+      ...byName('U04'),
+      parameters: { ...byName('U04').parameters, trackGenRealPath: byName('U06').parameters!.trackGenRealPath },
+    }
     const res = rederiveTrackPath(u04, area)
     expect(res.ok).toBe(true)
     if (!res.ok) return
@@ -63,8 +83,7 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
     // 終點在交叉左側口（y 約 −12～−13），不再是 U06 的 −19.96
     expect(real[real.length - 1]![1]).toBeGreaterThan(-14)
     // 重建後與隔壁對得上
-    const fixed = { ...area, facilities: area.facilities.map((f) => (f.id === u04.id ? res.facility : f)) }
-    expect(findStaleTrackPathEnds(res.facility, fixed)).toEqual([])
+    expect(findStaleTrackPathEnds(res.facility, area)).toEqual([])
     // 一公尺橫向偏移佔外框高的比例 ＝ 同圖同把尺（3.5 公尺 ≈ 一條帶子高）
     const lat = res.facility.parameters!.trackGenLatPerBox as [number, number]
     expect(1 / lat[1]).toBeGreaterThan(3)

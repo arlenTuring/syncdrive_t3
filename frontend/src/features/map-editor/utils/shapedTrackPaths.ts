@@ -464,6 +464,44 @@ export function findStaleTrackPathEnds(
   return out
 }
 
+/**
+ * 載入時自動修好「兩端都接不上隔壁」的軌道。
+ *
+ * 使用者不會、也不該去想複製一塊軌道會連中心線一起複製：U04 是 U06 的複製，拖到 U05 與交叉
+ * 之間，兩端都跟隔壁差了幾十公尺，就是它錯。判斷規則：
+ * <ul>
+ *   <li>兩端在圖上都找得到貼著的隔壁，而且<strong>兩端都對不上</strong>——才自動重建。</li>
+ *   <li>只有一端對不上的不動：兩塊互相對不上時（U18／U19）看不出誰對誰錯，各自的另一端
+ *       都接得上，硬改一塊就是拿正確的去配錯誤的。這種只回報。</li>
+ * </ul>
+ * 這樣圖資載入（編輯器、儀表板、任何讀圖的地方）就是對的，編輯器存檔時也會把修好的寫回去，
+ * 不需要有人去按任何按鈕。
+ */
+export function healStaleTrackPathsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  healed: string[]
+  ambiguous: string[]
+} {
+  const healed: string[] = []
+  const next = areas.map((area) => {
+    const anchors = collectAnchors(area)
+    let touched = false
+    const facilities = area.facilities.map((f) => {
+      // 兩端都對不上才改；只有一端對不上的先不動，等這一輪修完再看還剩誰
+      if (findStaleTrackPathEnds(f, area, anchors).length < 2) return f
+      const res = rederiveTrackPath(f, area)
+      if (!res.ok) return f
+      touched = true
+      healed.push(f.customName?.trim() || f.id)
+      return res.facility
+    })
+    return touched ? { ...area, facilities } : area
+  })
+  // 修完之後還對不上的：鄰居是被修好的那一塊的，現在已經接上；剩下的才是真的看不出誰錯
+  const ambiguous = listStaleTrackPaths(next).map((s) => s.label)
+  return { areas: next, healed, ambiguous }
+}
+
 /** 整張圖裡中心線過期的軌道（載入時只回報，不自動改：兩塊互相對不上時看不出誰對誰錯） */
 export function listStaleTrackPaths(
   areas: MapAreaObject[],

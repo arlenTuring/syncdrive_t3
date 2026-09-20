@@ -51,6 +51,7 @@ import {
 import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { normalizeTrackGenOrientation } from './trackGenOrientation'
+import { healStaleTrackPathsInAreas } from './shapedTrackPaths'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
@@ -581,7 +582,16 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
   if (isMapFileV2(json)) {
     const pixelSize = clampMapPixelSize(json.pixelSize ?? DEFAULT_MAP_PIXEL_SIZE)
     // 圖面路徑與真實路徑順序不一致的方塊倒過來（見 trackGenOrientation）
-    const areas = normalizeTrackGenOrientation((json.areas ?? []).map((a, i) => parseAreaEntry(a, i)))
+    const oriented = normalizeTrackGenOrientation((json.areas ?? []).map((a, i) => parseAreaEntry(a, i)))
+    // 複製來的軌道兩端都接不上隔壁：載入時就依鄰居修好（見 healStaleTrackPathsInAreas）
+    const healedAreas = healStaleTrackPathsInAreas(oriented)
+    if (healedAreas.healed.length > 0) {
+      console.warn(`[map] ${healedAreas.healed.length} 塊軌道的中心線兩端都接不上隔壁，已依鄰居重建：${healedAreas.healed.join('、')}`)
+    }
+    if (healedAreas.ambiguous.length > 0) {
+      console.warn(`[map] ${healedAreas.ambiguous.length} 塊軌道的中心線只有一端接不上隔壁，看不出哪一塊有問題，沒有動：${healedAreas.ambiguous.join('、')}`)
+    }
+    const areas = healedAreas.areas
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)

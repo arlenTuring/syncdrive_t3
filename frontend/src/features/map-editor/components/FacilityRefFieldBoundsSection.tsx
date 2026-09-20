@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapBasemapObject } from '../types/basemap'
 import type { FacilityObject } from '../types/facility'
@@ -10,8 +9,6 @@ import {
   syncAutoRefFieldBoundsFromPlacement,
   patchRefFieldCornersAndBounds,
 } from '../utils/facilityRefFieldBoundsAuto'
-import { getTrackGenPaths } from '../utils/trackGenPaths'
-import { findStaleTrackPathEnds, rederiveTrackPath } from '../utils/shapedTrackPaths'
 import {
   describeRefFieldBoundsIssue,
   getRefFieldBounds,
@@ -80,30 +77,6 @@ export function FacilityRefFieldBoundsSection({
     onFieldBlur()
   }
 
-  /*
-   * 生成出來（或已推導出中心線）的軌道，場域座標由它自己身上的<strong>現場中心線</strong>決定，
-   * 下面這四個數字只是從中心線反推的結果。所以在圖上移動它，範圍不會跟著變：現場的路沒有動。
-   * 複製一塊軌道再拖到別處，連中心線一起複製過去，兩端就接不上隔壁——這時要重建中心線。
-   */
-  const hasCentreline = facility.type === 'Track' && !!getTrackGenPaths(facility.parameters)
-  const staleEnds = area && hasCentreline ? findStaleTrackPathEnds(facility, area) : []
-  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
-
-  const handleRebuildCentreline = () => {
-    if (!area || readOnly) return
-    const res = rederiveTrackPath(facility, area)
-    if (!res.ok) {
-      setRebuildNote(`無法重建：${res.reason}`)
-      return
-    }
-    const patch: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(res.facility.parameters ?? {})) {
-      if (JSON.stringify(v) !== JSON.stringify(facility.parameters?.[k])) patch[k] = v
-    }
-    onPatchParameters(patch)
-    setRebuildNote(`已重建：中心線兩端改接隔壁，起點移動 ${res.changedM.toFixed(1)} 公尺`)
-  }
-
   const handleResyncFromCanvas = () => {
     if (!area || readOnly) return
     const next = syncAutoRefFieldBoundsFromPlacement(facility, area, basemaps)
@@ -158,33 +131,6 @@ export function FacilityRefFieldBoundsSection({
               ? '此元件在實際場域中的代表範圍（左右上下四個數字）。高精 Area 內載入與軌道接合後會依圖上形狀自動填；亦可手動修改。座標為場域公尺（原點左下）。'
               : '此元件在實際場域中的代表範圍；僅能在此手動設定，數值即為對外語意。圖台拖曳、調整像素尺寸或拉伸 Area 外框均不會改變此範圍。座標為場域公尺（原點左下，橫向／縱向）。'}
       </p>
-
-      {hasCentreline ? (
-        <p className="text-[10px] leading-relaxed text-sky-300/80">
-          這一塊有自己的現場中心線，場域範圍由它決定；在圖上移動位置不會改變範圍（現場的路沒有動）。
-        </p>
-      ) : null}
-      {staleEnds.length > 0 ? (
-        <div className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/30 p-2">
-          <p className="text-[10px] leading-relaxed text-amber-300">
-            中心線與圖上貼著它的軌道對不上：
-            {staleEnds
-              .map((e) => `${e.end === 0 ? '起點' : '終點'}差 ${e.diffM.toFixed(1)} 公尺`)
-              .join('、')}
-            。多半是複製後移到別處、中心線還是原本那塊的。
-          </p>
-          {!readOnly ? (
-            <button
-              type="button"
-              onClick={handleRebuildCentreline}
-              className="rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-1 text-[10px] text-amber-200 hover:border-amber-500 hover:bg-amber-900/40"
-            >
-              依接合的鄰居重建中心線
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {rebuildNote ? <p className="text-[10px] text-emerald-300/90">{rebuildNote}</p> : null}
 
       {isTaper ? (
         <>
