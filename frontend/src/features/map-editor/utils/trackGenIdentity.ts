@@ -51,6 +51,8 @@ const IDENTITY_KEYS = [
   TRACKGEN_LAT_PER_BOX_KEY,
   TRACKGEN_LAT_MODE_KEY,
   'trackGenRole',
+  // 接點綁定（utils/trackJoints）：複製出來的方塊不接在原本那些接點上
+  'trackGenEnds',
   'trackGenLine',
   'trackGenLineLengthM',
   'segmentId',

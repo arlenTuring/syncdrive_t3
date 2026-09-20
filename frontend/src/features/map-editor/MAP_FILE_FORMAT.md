@@ -38,6 +38,7 @@
 |---|---|
 | 交叉軌道 `RailCross` | `areas[].facilities[]`（`type: Track`），`parameters.crossTrackPortals`（`lt`／`lb`／`rt`／`rb` 四個接口：`waypointCode`/`alias`/`xM`/`yM`） |
 | 設施停靠點 | `Facility.parameters.facilityDockingPoint`：`{ xM, yM, alias? }` |
+| 軌道接點 | `areas[].trackJoints[]`：`{ id, px, py, xM, yM }`。軌道相接處的現場座標**只存這一份**（`xM/yM`）；`px/py` 是圖上位置快取。軌道以 `parameters.trackGenEnds` 綁定：一般／斜接／圓角 `{ start, end }`、交叉軌道 `{ lt, lb, rt, rb }`，值為接點 id。中心線（`trackGenRealPath`）頭尾由接點決定，讀檔時整理接點並對齊（`utils/trackJoints`） |
 | 路網拓撲 | 頂層 `pointTopology`（含 `facility-docking`、`cross-waypoint` 等 kind） |
 | 路線／群組 | 頂層 `routes`、`routeGroups` |
 | 路線可視 | 頂層 `visibleRouteIds`（眼睛開關） |

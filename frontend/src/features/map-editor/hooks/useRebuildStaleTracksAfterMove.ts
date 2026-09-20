@@ -8,6 +8,7 @@ import {
 } from '../utils/rederiveAfterMove'
 import { healTrackChainsInAreas } from '../utils/shapedTrackPaths'
 import { reanchorFieldPointsAfterTrackHeal } from '../utils/reanchorPointsAfterHeal'
+import { settleTrackJointsInAreas } from '../utils/trackJoints'
 
 /** 動完之後等多久才檢查——拖曳過程中每一幀都動，只在停手後算一次 */
 const SETTLE_MS = 600
@@ -30,9 +31,12 @@ export function useRebuildStaleTracksAfterMove(
   useEffect(() => {
     const next = snapshotGeometry(areas)
     const moved = active ? movedFacilityKeys(baseline.current, next) : null
+    // 刪掉軌道：沒有東西要重建，但它原本的接點要整理（只剩一塊的接點不留）
+    const removed =
+      active && baseline.current.size > 0 && [...baseline.current.keys()].some((k) => !next.has(k))
     baseline.current = next
-    if (!moved || moved.length === 0) return
-    for (const k of moved) pending.current.add(k)
+    if ((!moved || moved.length === 0) && !removed) return
+    for (const k of moved ?? []) pending.current.add(k)
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       timer.current = null
@@ -50,7 +54,6 @@ export function useRebuildStaleTracksAfterMove(
         ]
         console.info(`[map] 軌道鏈修正：${parts.join('、')}`)
       }
-      if (outcome.rebuilt.length === 0 && !chainChanged) return
       for (const r of outcome.rebuilt) {
         console.info(
           `[map] ${r.label} 移動後場域位置已跟著相接的軌道更新（位移 ${r.changedM.toFixed(1)} 公尺）`,
@@ -60,7 +63,10 @@ export function useRebuildStaleTracksAfterMove(
       setAreas((prev) => {
         const rebuilt = rebuildStaleAmong(prev, keys).areas
         const healed = healTrackChainsInAreas(rebuilt).areas
-        return reanchorFieldPointsAfterTrackHeal(rebuilt, healed).areas
+        const anchored = reanchorFieldPointsAfterTrackHeal(rebuilt, healed).areas
+        // 最後整理接點：拖開的放掉、貼上的併成接點，中心線頭尾依接點對齊
+        const settled = settleTrackJointsInAreas(anchored).areas
+        return settled.every((a, i) => a === prev[i]) && settled.length === prev.length ? prev : settled
       })
       // 重建改的是參數，位置與大小沒變：快照不必更新
     }, SETTLE_MS)

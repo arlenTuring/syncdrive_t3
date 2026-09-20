@@ -269,6 +269,7 @@ import {
   TAPER_TRACK_KEY,
 } from './utils/trackShapes'
 import { buildFacilitiesFromLayout } from './utils/trackGenApply'
+import { settleTrackJointsInAreas } from './utils/trackJoints'
 import type { TrackGenGroup } from './utils/trackGenGroups'
 import type { TrackGenLayout } from './utils/trackGenLayout'
 import type { MapWorldBounds } from './utils/mapViewport'
@@ -2866,7 +2867,8 @@ export default function MapEditorApp({
       const prevAreaId = getTrackGenAreaId(basemap.parameters)
       setAreas((prev) => {
         const kept = prevAreaId ? prev.filter((a) => a.id !== prevAreaId) : prev
-        return [...kept, { ...area, facilities }]
+        // 新生成的軌道：相接處直接建成接點（現場座標只存一份）
+        return [...kept, settleTrackJointsInAreas([{ ...area, facilities }]).areas[0]!]
       })
       setBasemaps((prev) =>
         prev.map((b) =>

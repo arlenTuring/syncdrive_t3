@@ -279,6 +279,17 @@ export function resolveCrossPortalFields(
       out[key] = { xM: null, yM: null, auto: true }
       continue
     }
+    /*
+     * 口若已綁在接點上，現場座標就是接點的——接點只存一份，見 utils/trackJoints。
+     * 這裡直接讀資料而不 import trackJoints（那支會反過來依賴本檔）。
+     */
+    const ends = facility.parameters?.trackGenEnds as Record<string, unknown> | undefined
+    const jointId = typeof ends?.[key] === 'string' ? (ends[key] as string) : null
+    const joint = jointId ? area.trackJoints?.find((j) => j.id === jointId) : undefined
+    if (joint) {
+      out[key] = { xM: joint.xM, yM: joint.yM, auto: true }
+      continue
+    }
     const h = handles[key]
     const local = trackLocalPathPointToAreaLocal(facility, area, {
       x: h.x / Math.max(1e-6, size.w),

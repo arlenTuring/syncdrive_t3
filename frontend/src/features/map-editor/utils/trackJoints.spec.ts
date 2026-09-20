@@ -58,4 +58,38 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道接點（真實�
     expect(JSON.stringify(again.trackJoints)).toBe(json)
     expect(again.facilities.map((f) => JSON.stringify(getTrackEnds(f.parameters)))).toEqual(ends)
   })
+
+  const plain = area.facilities.find(
+    (f) => f.type === 'Track' && f.name === 'Rail' && Object.keys(getTrackEnds(f.parameters)).length === 2,
+  )!
+
+  it('刪掉一塊軌道：只剩一塊的接點放掉，鄰居的綁定一併清掉', () => {
+    const ends = Object.values(getTrackEnds(plain.parameters))
+    const cut = { ...area, facilities: area.facilities.filter((f) => f.id !== plain.id) }
+    const out = settleTrackJointsInAreas([cut]).areas[0]!
+    expect(validateTrackJoints(out).filter((i) => i.kind !== 'lonely')).toEqual([])
+    for (const id of ends) {
+      const users = out.facilities.filter((f) => Object.values(getTrackEnds(f.parameters)).includes(id))
+      // 還有兩塊以上的（例如交叉口）才會留下；否則整個接點都不在
+      expect(users.length === 0 || users.length >= 2).toBe(true)
+    }
+  })
+
+  it('把軌道拖離接點很遠：放掉綁定，不會把別塊拉過去', () => {
+    const before = plain.areaPosition!
+    const moved = {
+      ...area,
+      facilities: area.facilities.map((f) =>
+        f.id === plain.id ? { ...f, areaPosition: { x: before.x + 400, y: before.y + 300 } } : f,
+      ),
+    }
+    const out = settleTrackJointsInAreas([moved]).areas[0]!
+    const after = out.facilities.find((f) => f.id === plain.id)!
+    expect(Object.keys(getTrackEnds(after.parameters)).length).toBeLessThan(2)
+  })
+
+  it('複製貼上：綁定不跟著走', async () => {
+    const { stripTrackGenIdentity } = await import('./trackGenIdentity')
+    expect(getTrackEnds(stripTrackGenIdentity(plain.parameters))).toEqual({})
+  })
 })
