@@ -11,6 +11,7 @@ import {
 import {
   CROSS_BRANCH_ID_SEPARATOR,
   deriveCrossBranches,
+  deriveSwitchBranches,
   parentFacilityIdOfBranch,
   withCrossBranchTracks,
 } from './crossBranches'
@@ -109,7 +110,14 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
 
   it('同一份區域只推導一次，且沒有交叉軌道時原樣回傳', () => {
     expect(withCrossBranchTracks(areas)).toBe(withCrossBranchTracks(areas))
-    const none = [{ ...areas[0]!, facilities: (areas[0]!.facilities ?? []).filter((f) => f.name !== 'RailCross') }]
+    const none = [
+      {
+        ...areas[0]!,
+        facilities: (areas[0]!.facilities ?? []).filter(
+          (f) => f.name !== 'RailCross' && f.name !== 'RailSwitch',
+        ),
+      },
+    ]
     expect(withCrossBranchTracks(none)).toBe(none)
   })
 
@@ -133,7 +141,8 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
       const id = hit?.placement.trackId ?? ''
       if (id.includes('~')) seen.add(id.split('~')[1]!)
     }
-    expect([...seen]).toEqual(['STRAIGHT_TOP'])
+    // 交叉走上直行、隨後分岔走直行；斜線與岔出都沒有
+    expect([...seen].sort()).toEqual(['STRAIGHT', 'STRAIGHT_TOP'])
   })
 
   it('斜線上的車判給那一條分支，偏移量近乎 0；改用單一中線會差好幾公尺', () => {
@@ -218,6 +227,73 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
     it('拆分支後整體最大偏移不超過 3.5 公尺（單一中線時是 6.97）', () => {
       const derived = withCrossBranchTracks(areas)
       for (const route of routes) expect(crossMaxOffset(derived, route).max, route.route).toBeLessThan(3.5)
+    })
+  })
+
+  describe('分岔（RailSwitch D04/T01）', () => {
+    type Route = { route: string; zone: string; points: Array<{ x: number; y: number; heading: number }> }
+    const routes = JSON.parse(
+      readFileSync(join(__dirname, '../vehicles/__fixtures__/route-through-cross.json'), 'utf-8'),
+    ) as Route[]
+
+    function tracksAlong(route: string) {
+      const derived = withCrossBranchTracks(areas)
+      const network = getTrackNetwork(derived)
+      const r = routes.find((x) => x.route === route && x.zone === 'switch')!
+      let previous: string | undefined
+      return r.points.map((p) => {
+        const hit = resolveVehiclePlacementAcrossAreas(derived, p.x, p.y, network, {
+          headingRad: p.heading,
+          speedMps: 5,
+          previousTrackId: previous,
+        })
+        previous = previousTrackIdOf(hit, false)
+        const id = hit?.placement.trackId ?? ''
+        return { id: id.includes('~') ? id.split('~')[1]! : id, x: p.x, y: p.y, off: Math.abs(hit?.placement.network?.offsetM ?? 0) }
+      })
+    }
+
+    it('拆出直行與岔出兩條：直行接到 D05 的端點，岔出沿原本那條折線', () => {
+      let found = false
+      for (const area of areas) {
+        for (const f of area.facilities ?? []) {
+          if (f.name !== 'RailSwitch' || f.customName !== 'D04/T01') continue
+          found = true
+          const by = new Map(deriveSwitchBranches(f, area).map((b) => [b.route, b]))
+          const straight = by.get('straight')!
+          const branch = by.get('branch')!
+          // 進口是與交叉相接的那一端；直行出口是 D05 的端點，岔出出口是折線遠端
+          expect(straight.real[0]).toEqual(branch.real[0])
+          const end = straight.real[straight.real.length - 1]!
+          expect(Math.hypot(end[0] - -138.41, end[1] - -16.36)).toBeLessThan(0.1)
+          const far = branch.real[branch.real.length - 1]!
+          expect(Math.hypot(far[0] - -138.89, far[1] - -6.75)).toBeLessThan(0.1)
+          // 岔出沿著原本那條彎的折線，不是兩點連線
+          expect(branch.real.length).toBeGreaterThan(10)
+        }
+      }
+      expect(found).toBe(true)
+    })
+
+    it('正線（N2W下行 → T3下行）走直行，全程不繞去岔線（單一折線時最遠偏 8 公尺）', () => {
+      const rows = tracksAlong('N2W下行>T3下行')
+      expect(rows.some((r) => r.id === 'BRANCH')).toBe(false)
+      expect(rows.some((r) => r.id === 'STRAIGHT')).toBe(true)
+      for (const r of rows) expect(r.off).toBeLessThan(0.5)
+      // 正線在這一段 y 只從 −14.2 緩降到 −16.3
+      for (const r of rows.filter((x) => x.id === 'STRAIGHT')) expect(r.y).toBeLessThan(-14)
+    })
+
+    it('岔出（N2W → 充電洗車區）走岔出那條，進出方向的路線都一樣', () => {
+      for (const route of ['N2W>充電洗車區', '充電洗車區>N2W']) {
+        const rows = tracksAlong(route)
+        const onBranch = rows.filter((r) => r.id === 'BRANCH')
+        expect(onBranch.length, route).toBeGreaterThan(5)
+        // 折線本身（x > −137.5）貼著中心線；折線遠端之後到場區入口點那 7 公尺沒有軌道幾何，不在此列
+        for (const r of onBranch.filter((x) => x.x > -137.5 && x.y > -14)) {
+          expect(r.off, route).toBeLessThan(0.5)
+        }
+      }
     })
   })
 })

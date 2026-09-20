@@ -222,7 +222,7 @@ export const CROSS_PORTAL_FIELD_SLACK_M = 15
  * 內插算出來的座標實測差 2–6 公尺，上下兩個口甚至會對調（圖面的左上口，現場其實貼著
  * 目錄裡的左下口）。找不到隔壁回 null，由呼叫端退回方框內插。
  */
-function neighbourEndField(
+export function neighbourEndField(
   facility: FacilityObject,
   area: MapAreaObject,
   handle: { x: number; y: number },

@@ -98,6 +98,19 @@ describe.skipIf(!loaded || loaded.doc.creationMode !== 'trackGen')('真實圖資
   for (const a of doc.areas) {
     for (const f of a.facilities) if (f.parameters?.trackGenLocalPath) rawLocal.set(f.id, f.parameters.trackGenLocalPath)
   }
+  /*
+   * 圖資可能已經是倒正後存回來的（編輯器載入時會倒正，自動儲存就把倒正的順序寫進檔案）。
+   * 這一組測試要比的是「倒正前」與「倒正後」，倒正前的樣子由已知的兩塊（D03/U03＝072、121）
+   * 反推：載入後沒變＝檔案裡已經是倒正的，倒過來就是原始樣子。
+   */
+  {
+    const parsed = parseMapFileJson(doc).areas
+    for (const id of ['072', '121']) {
+      const now = parsed.flatMap((a) => a.facilities).find((f) => f.id === id)?.parameters?.trackGenLocalPath
+      const stored = rawLocal.get(id) as number[][] | undefined
+      if (stored && JSON.stringify(now) === JSON.stringify(stored)) rawLocal.set(id, [...stored].reverse())
+    }
+  }
   const build = (restoreRaw: boolean): MapAreaObject[] => {
     let areas = repairTrackRefFieldBoundsInAreas(backfillTrackGenSpansInAreas(parseMapFileJson(doc).areas).areas).areas
     if (restoreRaw) {

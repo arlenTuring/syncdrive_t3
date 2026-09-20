@@ -16,7 +16,19 @@ import {
   type PathXY,
 } from './trackGenPaths'
 import { getTrackGenPartNames } from './trackGenParts'
-import { crossTrackHandlesPx, readCrossTrack } from './trackShapes'
+import { getTrackGenPaths } from './trackGenPaths'
+import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
+import { neighbourEndField } from './crossTrackPortals'
+import {
+  crossTrackHandlesPx,
+  readCrossTrack,
+  readSwitchTrack,
+  switchTrackHandlesPx,
+  type SwitchHandleKey,
+} from './trackShapes'
+
+/** 分岔的兩條路徑：直行（進口 → 直行出口）與岔出（進口 → 岔出出口） */
+export type SwitchBranchKey = 'straight' | 'branch'
 
 /**
  * 交叉軌道的分支：每一條通行的路徑（斜行、直行）各自是一條有自己中心線的軌道。
@@ -57,10 +69,11 @@ export type CrossBranch = {
   /** 分支設施 id（母體 id + ~ + 後綴） */
   facilityId: string
   parentId: string
-  route: CrossRouteKey
-  /** 行車方向的起訖口（'both' 時是 CROSS_ROUTE_ENDS 的順序） */
-  from: CrossPortalKey
-  to: CrossPortalKey
+  /** 交叉：CrossRouteKey；分岔：'straight'／'branch' */
+  route: CrossRouteKey | SwitchBranchKey
+  /** 行車方向的起訖口（'both' 時是 CROSS_ROUTE_ENDS 的順序）；分岔是 a／m／b */
+  from: CrossPortalKey | SwitchHandleKey
+  to: CrossPortalKey | SwitchHandleKey
   bidirectional: boolean
   /** 現場中心線（公尺），照行車方向排 */
   real: PathXY
@@ -151,10 +164,110 @@ export function deriveCrossBranches(
   return out
 }
 
+function polylineLength(path: PathXY): number {
+  let total = 0
+  for (let i = 1; i < path.length; i += 1) {
+    total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1])
+  }
+  return total
+}
+
+/**
+ * 分岔（RailSwitch）拆成直行與岔出兩條。
+ *
+ * <h3>為什麼要拆</h3>
+ * 生成出來的分岔只記<strong>一條</strong>折線，而且是「進口 → 岔出」那條（road 12 這種連接路），
+ * 圖面路徑卻畫成直行的橫線。於是主線上的車被換算到岔線的現場座標：D02→D04→D05 的正線，
+ * 在 D04/T01 那一塊繞去岔線的方向再繞回來，最遠偏 8 公尺——圖上就是車突然斜插出去又折回。
+ *
+ * <h3>三個口的現場座標</h3>
+ * 進口取折線靠進口那一端。直行、岔出出口取貼著該口的隔壁軌道的端點（與交叉軌道同一套）；
+ * 只有一個口找得到鄰居時（岔出去的另一頭通往場區入口點，不是軌道），沒鄰居的那一口取折線
+ * 的另一端——那條折線本來就是通往它的。兩個口都沒鄰居就不拆，維持原樣。
+ */
+export function deriveSwitchBranches(
+  facility: FacilityObject,
+  area: MapAreaObject,
+): CrossBranch[] {
+  if (facility.type !== 'Track' || facility.name !== 'RailSwitch') return []
+  const stored = getTrackGenPaths(facility.parameters)
+  if (!stored || stored.real.length < 2 || stored.local.length < 2) return []
+  const size = resolveFacilityAreaSize(facility, area.domain, area.layout)
+  const handles = switchTrackHandlesPx(readSwitchTrack(facility.parameters), size.w, size.h)
+  const unit = (k: SwitchHandleKey) => ({
+    x: handles[k].x / Math.max(1e-6, size.w),
+    y: handles[k].y / Math.max(1e-6, size.h),
+  })
+  const units = { a: unit('a'), m: unit('m'), b: unit('b') }
+
+  // 折線的哪一端在進口那一側：圖面路徑兩端裡離進口口較近的那一端
+  const dist = (uv: [number, number], k: SwitchHandleKey) =>
+    Math.hypot(uv[0] - units[k].x, uv[1] - units[k].y)
+  const head = stored.local[0]!
+  const tail = stored.local[stored.local.length - 1]!
+  const aAtHead = dist(head as [number, number], 'a') <= dist(tail as [number, number], 'a')
+  const real = aAtHead ? stored.real : [...stored.real].reverse()
+  const aPoint = real[0]!
+  const farPoint = real[real.length - 1]!
+
+  const neighbour = (k: 'm' | 'b'): [number, number] | null => {
+    const at = trackLocalPathPointToAreaLocal(facility, area, units[k])
+    // 兩個出口離折線遠端都不遠；口自己的現場位置換算不出來（沒有對應的中心線），拿遠端當粗估
+    const hit = neighbourEndField(facility, area, at, { xM: farPoint[0], yM: farPoint[1] })
+    return hit ? [hit.xM, hit.yM] : null
+  }
+  let m = neighbour('m')
+  let b = neighbour('b')
+  const near = (p: [number, number], q: [number, number]) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 2
+  let branchPath: PathXY | null = null
+  if (m && !b && !near(m, farPoint)) {
+    b = farPoint
+    branchPath = real
+  } else if (b && !m && !near(b, farPoint)) {
+    m = farPoint
+  }
+  if (!m || !b) return []
+
+  const code = codeOfFacility(facility)
+  const partNames = getTrackGenPartNames(facility)
+  const make = (
+    route: SwitchBranchKey,
+    to: SwitchHandleKey,
+    path: PathXY,
+  ): CrossBranch | null => {
+    const lengthM = polylineLength(path)
+    if (lengthM < MIN_BRANCH_M) return null
+    return {
+      code: `${code}_${route === 'straight' ? 'STRAIGHT' : 'BRANCH'}`,
+      name: partNames[route] ?? null,
+      facilityId: `${facility.id}${CROSS_BRANCH_ID_SEPARATOR}${route === 'straight' ? 'STRAIGHT' : 'BRANCH'}`,
+      parentId: facility.id,
+      route,
+      from: 'a',
+      to,
+      // 分岔的兩條腿都能雙向開（進場、出場都會走），定位時方向不加減分
+      bidirectional: true,
+      real: path,
+      local: [
+        [units.a.x, units.a.y],
+        [units[to].x, units[to].y],
+      ],
+      lengthM,
+    }
+  }
+  const out: CrossBranch[] = []
+  const straight = make('straight', 'm', [aPoint as [number, number], m])
+  const branch = make('branch', 'b', branchPath ?? [aPoint as [number, number], b])
+  if (straight) out.push(straight)
+  if (branch) out.push(branch)
+  return out
+}
+
 /** 分支換成一塊「像普通生成軌道」的設施：自己的兩條中心線與車道，其餘沿用母體 */
 export function crossBranchToFacility(parent: FacilityObject, branch: CrossBranch): FacilityObject {
-  const [[x0, y0], [x1, y1]] = branch.real
-  const heading = Math.atan2(y1 - y0, x1 - x0)
+  const first = branch.real[0]!
+  const last = branch.real[branch.real.length - 1]!
+  const heading = Math.atan2(last[1] - first[1], last[0] - first[0])
   const span = (lane: number, h: number) => ({
     road: branch.code,
     lane,
@@ -204,7 +317,8 @@ export function withCrossBranchTracks(areas: MapAreaObject[]): MapAreaObject[] {
     let touched = false
     const facilities: FacilityObject[] = []
     for (const f of area.facilities ?? []) {
-      const branches = deriveCrossBranches(f, area)
+      const branches =
+        f.name === 'RailSwitch' ? deriveSwitchBranches(f, area) : deriveCrossBranches(f, area)
       if (!branches.length) {
         facilities.push(f)
         continue
