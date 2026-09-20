@@ -596,10 +596,9 @@ export default function MapEditorApp({
     [deferredAreasForCheck],
   )
   const [trackIssuesOpen, setTrackIssuesOpen] = useState(false)
-  const [showTrackDirections, setShowTrackDirections] = useState(false)
   const trackDiagnosticsForCanvas = useMemo(
-    () => ({ statusById: trackDiagnostics.statusByFacility, showDirections: showTrackDirections }),
-    [trackDiagnostics, showTrackDirections],
+    () => ({ statusById: trackDiagnostics.statusByFacility }),
+    [trackDiagnostics],
   )
 
   const onSelectConnectivityIssue = useCallback(
@@ -4308,8 +4307,6 @@ export default function MapEditorApp({
           trackIssueCount={trackDiagnostics.issues.length}
           trackIssuesOpen={trackIssuesOpen}
           onToggleTrackIssues={() => setTrackIssuesOpen((v) => !v)}
-          showTrackDirections={showTrackDirections}
-          onToggleTrackDirections={() => setShowTrackDirections((v) => !v)}
         />
       )}
       {isMapWorkspace && mapScreen === 'editor' && (

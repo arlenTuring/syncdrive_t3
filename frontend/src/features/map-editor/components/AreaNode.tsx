@@ -301,7 +301,6 @@ type AreaNodeProps = {
   /** 軌道檢查：有問題的軌道狀態與是否畫方向 */
   trackDiagnostics?: {
     statusById: ReadonlyMap<string, 'error' | 'warn'>
-    showDirections: boolean
   } | null
 }
 
@@ -2034,7 +2033,6 @@ export const AreaNode = memo(function AreaNode({
           showFacilityToolbar={showFacilityToolbars}
           connectivityScanHighlight={connectivityScanHighlightTrackIds?.includes(f.id) ?? false}
           trackDiagStatus={trackDiagnostics?.statusById.get(f.id) ?? null}
-          showTrackDirection={trackDiagnostics?.showDirections ?? false}
         />
       </div>
     )

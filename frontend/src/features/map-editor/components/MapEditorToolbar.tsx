@@ -13,7 +13,6 @@ import {
   Component,
   FlaskConical,
   ScanSearch,
-  MoveRight,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -67,8 +66,6 @@ type MapEditorToolbarProps = {
   trackIssuesOpen?: boolean
   onToggleTrackIssues?: () => void
   /** 在每塊軌道上畫現場行進方向 */
-  showTrackDirections?: boolean
-  onToggleTrackDirections?: () => void
 }
 
 /** Map editor toolbar */
@@ -112,8 +109,6 @@ export function MapEditorToolbar({
   trackIssueCount = null,
   trackIssuesOpen = false,
   onToggleTrackIssues,
-  showTrackDirections = false,
-  onToggleTrackDirections,
 }: MapEditorToolbarProps) {
   const { t } = useTranslation()
 
@@ -346,28 +341,6 @@ export function MapEditorToolbar({
             ) : (
               <span className="text-emerald-400" aria-label={t('mapEditor.toolbar.trackCheckOk')}>✓</span>
             )}
-          </button>
-        )}
-
-        {onToggleTrackDirections && (
-          <button
-            type="button"
-            onClick={onToggleTrackDirections}
-            aria-pressed={showTrackDirections}
-            data-testid="track-direction-button"
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm ${
-              showTrackDirections
-                ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
-                : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
-            }`}
-            title={t('mapEditor.toolbar.trackDirectionsTitle')}
-          >
-            <MoveRight className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">
-              {showTrackDirections
-                ? t('mapEditor.toolbar.trackDirectionsHide')
-                : t('mapEditor.toolbar.trackDirections')}
-            </span>
           </button>
         )}
 

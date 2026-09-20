@@ -210,7 +210,6 @@ type MapAreaCanvasProps = {
   /** 軌道檢查：有問題的軌道狀態與是否畫方向（見 trackDiagnostics） */
   trackDiagnostics?: {
     statusById: ReadonlyMap<string, 'error' | 'warn'>
-    showDirections: boolean
   } | null
   onFacilityDoubleClick?: (areaId: string, facilityId: string) => void
   onBasemapDoubleClick?: (basemapId: string) => void
