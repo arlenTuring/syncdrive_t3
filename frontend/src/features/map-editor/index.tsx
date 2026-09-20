@@ -1067,6 +1067,9 @@ export default function MapEditorApp({
        */
       // 剛推出中心線的軌道（例如接到分區入口的）也要併進接點
       const spanned = backfillTrackGenSpansInAreas(settleTrackJointsInAreas(shaped.areas).areas)
+      if (spanned.reset.length > 0) {
+        console.warn(`[map] ${spanned.reset.length} 塊軌道的里程與鄰居對不上，已拿掉照鄰居重算：${spanned.reset.join('、')}`)
+      }
       if (spanned.filled.length > 0) {
         console.warn(
           `[map] ${spanned.filled.length} 塊軌道有中心線卻沒有里程對應（不會進定位索引，`

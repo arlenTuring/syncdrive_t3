@@ -8,6 +8,7 @@ import {
   findRealOverlaps,
   type TrackAnchor,
 } from './shapedTrackPaths'
+import { getTrackEnds } from './trackJoints'
 import { getTrackGenPaths, getTrackGenSpans, pointAlongPath } from './trackGenPaths'
 import { readSwitchTrack, switchTrackHandlesPx } from './trackShapes'
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
@@ -54,6 +55,28 @@ export const SPAN_OVERLAP_M = 5
 
 function isPlainTrack(f: FacilityObject): boolean {
   return f.type === 'Track' && (f.name === 'Rail' || f.name === 'RailTaper' || f.name === 'RailCorner')
+}
+
+/**
+ * 分岔：兩塊共用<strong>剛好一個</strong>接點，而且各自從那裡往<strong>同一邊</strong>走，另一端各奔東西。
+ * 兩端都共用的是重複疊放；在接點兩側的是接續（D19 → D20），它們若重疊就是真的多算了。
+ */
+function isFork(a: FacilityObject, b: FacilityObject): boolean {
+  const ea = getTrackEnds(a.parameters)
+  const eb = getTrackEnds(b.parameters)
+  const shared = Object.entries(ea).filter(([, id]) => Object.values(eb).includes(id))
+  if (new Set(shared.map(([, id]) => id)).size !== 1) return false
+  const jointId = shared[0]![1]
+  const dirOf = (f: FacilityObject, ends: Record<string, string>) => {
+    const real = getTrackGenPaths(f.parameters)?.real
+    if (!real) return null
+    const slot = Object.entries(ends).find(([, id]) => id === jointId)?.[0]
+    const [from, to] = slot === 'start' ? [real[0]!, real[real.length - 1]!] : [real[real.length - 1]!, real[0]!]
+    return { x: to[0] - from[0], y: to[1] - from[1] }
+  }
+  const da = dirOf(a, ea)
+  const db = dirOf(b, eb)
+  return !!da && !!db && da.x * db.x + da.y * db.y > 0
 }
 
 function labelOf(f: FacilityObject | undefined): string {
@@ -142,6 +165,8 @@ export function diagnoseTracks(areas: MapAreaObject[]): TrackDiagnostics {
     }
     for (const p of pairs.values()) {
       if (p.overlap <= SPAN_OVERLAP_M) continue
+      // 從同一個接點分出去的兩塊（分岔）共用一段路是正常的
+      if (isFork(p.longer, p.shorter)) continue
       const ln = labelOf(p.longer)
       const sn = labelOf(p.shorter)
       issues.push({

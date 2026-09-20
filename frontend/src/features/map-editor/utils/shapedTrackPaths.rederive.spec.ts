@@ -235,16 +235,19 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道鏈：多算一�
   }
   const near = (p: readonly number[], q: readonly number[]) => Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!) < 0.5
 
-  it('載入後 T3 這條 U 車道是連續的：U17 → U18 → U19 → U20，每一塊接著下一塊，沒有折回', () => {
+  it('載入後 T3 這條 U 車道是連續的：U17 → U18 → U19 → U20，相鄰兩塊各有一端接在一起，不折回', () => {
     if (!byName(areas, 'U18') || !byName(areas, 'U19') || !byName(areas, 'U20')) return
-    const [u18a, u18b] = endsOf(areas, 'U18')
-    const [u19a, u19b] = endsOf(areas, 'U19')
-    const [u20a] = endsOf(areas, 'U20')
-    // 由北往南：U18 的南端 ＝ U19 的北端，U19 的南端 ＝ U20 的北端（現場座標 y 由大變小）
-    const ys = [u18a[1], u18b[1], u19b[1], u19a[1], u20a[1]]
-    expect(near(u18b, u19b)).toBe(true)
-    expect(near(u19a, u20a)).toBe(true)
-    for (let i = 1; i < ys.length; i += 1) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]! + 0.5)
+    const chain = ['U17', 'U18', 'U19', 'U20']
+    // 一塊的頭尾記錄順序不拘（重拉的 U20 是由南往北記）：看相鄰兩塊有沒有一端貼在一起
+    for (let i = 1; i < chain.length; i += 1) {
+      const a = endsOf(areas, chain[i - 1]!)
+      const b = endsOf(areas, chain[i]!)
+      expect(a.some((p) => b.some((q) => near(p, q)))).toBe(true)
+    }
+    // 由北往南 y 遞減：U18 與 U19 的另一端各在更南邊
+    const north = (name: string) => Math.max(...endsOf(areas, name).map((p) => p[1]))
+    expect(north('U19')).toBeLessThanOrEqual(north('U18') + 0.5)
+    expect(north('U20')).toBeLessThanOrEqual(north('U19') + 0.5)
   })
 })
 
@@ -290,6 +293,34 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('補里程：疊在一�
     const span = (out.areas[0]!.facilities.find((f) => f.id === d20.id)!.parameters as { trackGenSpans: Array<{ s0: number; s1: number }> }).trackGenSpans[0]!
     expect(span.s0).toBe(50)
     expect(span.s1).toBeLessThan(50)
+  })
+})
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('里程自相矛盾：自動重算', () => {
+  it('健康的圖不會動任何一塊的里程', async () => {
+    const { resetContradictingSpans } = await import('./trackGenSpanBackfill')
+    const area = parseMapFileJson(doc as never).areas[0]!
+    expect(resetContradictingSpans(area.facilities).reset).toEqual([])
+  })
+
+  it('D20 的里程被延伸到反方向（50→124.52）：拿掉重算，接回 D19 往南遞減', async () => {
+    const { backfillTrackGenSpansInAreas } = await import('./trackGenSpanBackfill')
+    const area = parseMapFileJson(doc as never).areas[0]!
+    const d20 = area.facilities.find((f) => f.customName === 'D20')
+    if (!d20) return
+    const bad = {
+      ...area,
+      facilities: area.facilities.map((f) =>
+        f.id === d20.id
+          ? { ...f, parameters: { ...f.parameters, trackGenSpans: [{ road: '11', lane: 2, s0: 50, s1: 124.52, h: null, f0: 0, f1: 1 }] } }
+          : f,
+      ),
+    }
+    const out = backfillTrackGenSpansInAreas([bad])
+    expect(out.reset).toContain('D20')
+    const spans = (out.areas[0]!.facilities.find((f) => f.id === d20.id)!.parameters as { trackGenSpans: Array<{ s0: number; s1: number }> }).trackGenSpans
+    expect(spans[0]!.s0).toBe(50)
+    expect(spans[0]!.s1).toBeLessThan(50)
   })
 })
 

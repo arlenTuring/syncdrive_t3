@@ -94,7 +94,7 @@ describe('補里程對應', () => {
   it('本來就有里程的不碰', () => {
     const a = track('A', [[0, 0], [0, -10]], [span('11', 2, 300, 200)])
     const b = track('B', [[0, -10], [0, -30]], [span('11', 2, 199, 150)])
-    const c = track('C', [[0, -50], [0, -30]], [span('11', 2, 50, 100)])
+    const c = track('C', [[0, -50], [0, -30]], [span('11', 2, 100, 150)])
 
     const out = backfillTrackGenSpansInAreas(areaWith([a, b, c]))
     assert.equal(out.filled.length, 0)
