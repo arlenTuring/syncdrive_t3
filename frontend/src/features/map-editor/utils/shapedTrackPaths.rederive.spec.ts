@@ -251,3 +251,58 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('T3 分岔 120／121：
     }
   })
 })
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道鏈：多算一段、圖面路徑反、往外傳', () => {
+  const areas = parseMapFileJson(doc as never).areas
+  const byName = (list: typeof areas, name: string) => list[0]!.facilities.find((f) => f.customName === name)
+  const endsOf = (list: typeof areas, name: string) => {
+    const real = getTrackGenPaths(byName(list, name)!.parameters)!.real
+    return [real[0]!, real[real.length - 1]!] as const
+  }
+  const near = (p: readonly number[], q: readonly number[]) => Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!) < 0.5
+
+  it('載入後 T3 這條 U 車道是連續的：U17 → U18 → U19 → U20，每一塊接著下一塊，沒有折回', () => {
+    if (!byName(areas, 'U18') || !byName(areas, 'U19') || !byName(areas, 'U20')) return
+    const [u18a, u18b] = endsOf(areas, 'U18')
+    const [u19a, u19b] = endsOf(areas, 'U19')
+    const [u20a] = endsOf(areas, 'U20')
+    // 由北往南：U18 的南端 ＝ U19 的北端，U19 的南端 ＝ U20 的北端（現場座標 y 由大變小）
+    const ys = [u18a[1], u18b[1], u19b[1], u19a[1], u20a[1]]
+    expect(near(u18b, u19b)).toBe(true)
+    expect(near(u19a, u20a)).toBe(true)
+    for (let i = 1; i < ys.length; i += 1) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]! + 0.5)
+  })
+
+  it('造回使用者當時的狀態（U18 多算成 168 公尺、U19 圖面路徑反、U20 接在反的 U19 後面）：自動修回連續的鏈', async () => {
+    const { healTrackChainsInAreas } = await import('./shapedTrackPaths')
+    const u17 = byName(areas, 'U17')
+    const u18 = byName(areas, 'U18')
+    const u19 = byName(areas, 'U19')
+    const u20 = byName(areas, 'U20')
+    if (!u17 || !u18 || !u19 || !u20) return
+    const [, u17End] = endsOf(areas, 'U17')
+    const [u19South, u19North] = endsOf(areas, 'U19')
+    const [, u20End] = endsOf(areas, 'U20')
+    const patch = (list: typeof areas, id: string, params: Record<string, unknown>) =>
+      list.map((a) => ({
+        ...a,
+        facilities: a.facilities.map((f) => (f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f)),
+      }))
+    let broken = patch(areas, u18.id, { trackGenRealPath: [[...u17End], [...u19South]] })
+    // U19：現場中心線不變，圖面路徑頭尾對調（北端拿到南端的座標）
+    const l19 = getTrackGenPaths(u19.parameters)!.local
+    broken = patch(broken, u19.id, { trackGenLocalPath: [...l19].reverse() })
+    broken = patch(broken, u20.id, { trackGenRealPath: [[...u19North], [...u20End]] })
+    const out = healTrackChainsInAreas(broken)
+    expect(out.trimmed).toContain('U18')
+    expect(out.flipped).toContain('U19')
+    expect(out.propagated).toContain('U20')
+    const [a18, b18] = endsOf(out.areas, 'U18')
+    const [a19, b19] = endsOf(out.areas, 'U19')
+    const [a20] = endsOf(out.areas, 'U20')
+    expect(near(a18, u17End)).toBe(true)
+    expect(near(b18, b19)).toBe(true)
+    expect(near(a19, a20)).toBe(true)
+    expect(a19[1]).toBeLessThan(b19[1])
+  })
+})

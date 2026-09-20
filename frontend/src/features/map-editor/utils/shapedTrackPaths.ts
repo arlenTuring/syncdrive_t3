@@ -24,6 +24,7 @@ import {
   getTrackGenPaths,
   getTrackGenSpans,
   pointAlongPath,
+  projectAlongPath,
   TRACKGEN_LAT_PER_BOX_KEY,
   TRACKGEN_SPANS_KEY,
   TRACKGEN_LOCAL_PATH_KEY,
@@ -928,4 +929,371 @@ export function faceUvOfHandle(
   size: { w: number; h: number },
 ): { x: number; y: number } {
   return faceUv(handle, size)
+}
+
+/* ── 圖面路徑上下顛倒、中心線多算了一段 ────────────────────────────────────── */
+
+type LaneSpan = { road: string; lane: number; s0: number; s1: number }
+
+/** 只有單一 span 的一般軌道才有明確的「頭是哪個里程、尾是哪個里程」 */
+function singleSpanOf(f: FacilityObject): LaneSpan | null {
+  if (!checksStaleness(f)) return null
+  const spans = getTrackGenSpans(f.parameters)
+  if (spans.length !== 1) return null
+  const sp = spans[0]!
+  return { road: sp.road, lane: sp.lane, s0: sp.s0, s1: sp.s1 }
+}
+
+/** 同一條車道上，兩塊軌道的現場中心線相距這麼近（公尺）才算「走在同一條線上」 */
+const SAME_LANE_M = 1.2
+/** 走在同一條線上的重疊長度超過這麼多公尺，就是有一塊多算了（公尺） */
+export const REAL_OVERLAP_M = 20
+/** 翻過來之後接點座標的總差距至少少這麼多公尺才翻 */
+const FLIP_GAIN_M = 20
+
+function realLength(path: Array<[number, number]>): number {
+  let total = 0
+  for (let i = 1; i < path.length; i += 1) {
+    total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1])
+  }
+  return total
+}
+
+/** 較短那條的取樣點落在較長那條旁邊（SAME_LANE_M 內）的長度（公尺） */
+function collinearOverlapM(
+  short: Array<[number, number]>,
+  long: Array<[number, number]>,
+): number {
+  const len = realLength(short)
+  if (!(len > 1)) return 0
+  const step = 4
+  const n = Math.max(2, Math.ceil(len / step))
+  let hit = 0
+  for (let i = 0; i <= n; i += 1) {
+    const at = pointAlongPath(short, i / n)
+    if (projectAlongPath(long, at.x, at.y).distance <= SAME_LANE_M) hit += 1
+  }
+  return (hit / (n + 1)) * len
+}
+
+export type RealOverlap = {
+  longer: FacilityObject
+  shorter: FacilityObject
+  overlapM: number
+}
+
+/**
+ * 現場中心線走在同一條線上、又重疊一大段的兩塊軌道（同一條車道上不該有兩塊蓋同一段路）。
+ *
+ * U18 的現場中心線長 168 公尺，是圖上 U18 與 U19 兩塊的長度加起來，一半與 U19 疊在一起。
+ * 這個判斷只看現場座標，不依賴里程（span）——里程欄位被重建、重接之後常常就沒了。
+ * 較長的那塊多半是多算的。
+ */
+export function findRealOverlaps(area: MapAreaObject): RealOverlap[] {
+  const plain = area.facilities
+    .filter((f) => checksStaleness(f))
+    .map((f) => ({ f, paths: getTrackGenPaths(f.parameters) }))
+    .filter((x): x is { f: FacilityObject; paths: NonNullable<ReturnType<typeof getTrackGenPaths>> } => x.paths !== null)
+  const out: RealOverlap[] = []
+  for (let i = 0; i < plain.length; i += 1) {
+    for (let j = i + 1; j < plain.length; j += 1) {
+      const a = plain[i]!
+      const b = plain[j]!
+      const la = realLength(a.paths.real)
+      const lb = realLength(b.paths.real)
+      const [longer, shorter, longLen, shortLen] = la >= lb ? [a, b, la, lb] : [b, a, lb, la]
+      // 兩條的外框差太遠就不必逐點算
+      const near = longer.paths.real.some(([x, y]) =>
+        shorter.paths.real.some(([u, v]) => Math.hypot(x - u, y - v) < 30),
+      )
+      if (!near) continue
+      const overlap = collinearOverlapM(shorter.paths.real, longer.paths.real)
+      // 重疊夠長，而且佔較短那塊的一大半（只是擦邊、接點附近並排的不算）
+      if (overlap < REAL_OVERLAP_M || overlap < shortLen * 0.6 || longLen < shortLen * 1.3) continue
+      out.push({ longer: longer.f, shorter: shorter.f, overlapM: overlap })
+    }
+  }
+  return out
+}
+
+/**
+ * 用接點座標判斷圖面路徑是不是上下顛倒。
+ *
+ * 圖面路徑頭尾與現場中心線頭尾一一對應；順序若反了，圖上貼著鄰居的那一端拿到的是另一端的現場座標
+ * （U19 的圖面路徑反了：北端拿到 −244、南端拿到 −160，接分岔的南端差 84 公尺）。翻過來之後接點座標
+ * 的總差距明顯變小（至少少 20 公尺）才翻，證據不足不動。
+ *
+ * 多算了一段的軌道（見 findRealOverlaps）的端點不可信，不拿來當證據——否則 U19 翻過來之後，接 U18
+ * 的那端又差 84 公尺，兩邊打平，永遠翻不動。
+ */
+export function alignLocalPathsByJunctionsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  flipped: string[]
+} {
+  const flipped: string[] = []
+  const next = areas.map((area) => {
+    const overlong = new Set(findRealOverlaps(area).map((o) => o.longer.id))
+    const anchors = collectAnchors(area).filter((a) => !overlong.has(a.facilityId))
+    let touched = false
+    const facilities = area.facilities.map((f) => {
+      if (!checksStaleness(f)) return f
+      const paths = getTrackGenPaths(f.parameters)
+      if (!paths) return f
+      let cur = 0
+      let alt = 0
+      let evidence = 0
+      for (const t of [0, 1] as const) {
+        const uv = pointAlongPath(paths.local, t)
+        const at = trackLocalPathPointToAreaLocal(f, area, uv)
+        const near = nearestAnchor(anchors, at.x, at.y, f.id, STALE_NEAR_PX)
+        if (!near) continue
+        const own = pointAlongPath(paths.real, t)
+        const other = pointAlongPath(paths.real, (1 - t) as 0 | 1)
+        cur += Math.hypot(near.xM - own.x, near.yM - own.y)
+        alt += Math.hypot(near.xM - other.x, near.yM - other.y)
+        evidence += 1
+      }
+      if (evidence === 0 || cur - alt < FLIP_GAIN_M) return f
+      touched = true
+      flipped.push(f.customName?.trim() || f.id)
+      return {
+        ...f,
+        parameters: { ...(f.parameters ?? {}), [TRACKGEN_LOCAL_PATH_KEY]: [...paths.local].reverse() },
+      } as FacilityObject
+    })
+    return touched ? { ...area, facilities } : area
+  })
+  return { areas: next, flipped }
+}
+
+/**
+ * 多算了一段的軌道：拿掉與別塊重疊的那一段，只留自己那一段。
+ *
+ * 用「減掉重疊」而不是「依鄰居重建」：多算的那塊端點所貼的鄰居，可能本身也是依它算錯的
+ * （U18 的南端貼著 U19，而 U19 的圖面路徑是反的，重建只會拿到同一個錯誤座標）。減掉重疊不依賴
+ * 鄰居——U18 的中心線 −76 → −244 減去與 U19 重疊的 −160 → −244，剩下的 −76 → −160 就是它自己那段。
+ */
+function subtractOverlap(
+  longer: Array<[number, number]>,
+  shorter: Array<[number, number]>,
+): Array<[number, number]> | null {
+  // 較短那塊的兩端投影到較長那塊上，兩個投影之間就是被蓋住的那一段
+  const s0 = shorter[0]!
+  const s1 = shorter[shorter.length - 1]!
+  const p0 = projectAlongPath(longer, s0[0], s0[1]).along
+  const p1 = projectAlongPath(longer, s1[0], s1[1]).along
+  const [loP, hiP, loPt, hiPt] = p0 <= p1 ? [p0, p1, s0, s1] : [p1, p0, s1, s0]
+  const head = loP // 前面沒被蓋住的比例
+  const tail = 1 - hiP // 後面沒被蓋住的比例
+  // 只有一頭有剩才有明確答案；兩頭都有（重疊在中間）或都沒有就不動
+  if (head > 0.05 && tail <= 0.05) {
+    const start = pointAlongPath(longer, 0)
+    return [[Number(start.x.toFixed(2)), Number(start.y.toFixed(2))], [Number(loPt[0].toFixed(2)), Number(loPt[1].toFixed(2))]]
+  }
+  if (tail > 0.05 && head <= 0.05) {
+    const end = pointAlongPath(longer, 1)
+    return [[Number(hiPt[0].toFixed(2)), Number(hiPt[1].toFixed(2))], [Number(end.x.toFixed(2)), Number(end.y.toFixed(2))]]
+  }
+  return null
+}
+
+/** 一塊軌道的里程與圖面路徑同一個方向的「行進向量」（圖上：里程增加的那一端減去里程小的那一端） */
+function mileageVectorPx(f: FacilityObject, area: MapAreaObject): { x: number; y: number } | null {
+  const span = singleSpanOf(f)
+  const paths = getTrackGenPaths(f.parameters)
+  if (!span || !paths) return null
+  const hi: 0 | 1 = span.s1 >= span.s0 ? 1 : 0
+  const a = trackLocalPathPointToAreaLocal(f, area, pointAlongPath(paths.local, hi))
+  const b = trackLocalPathPointToAreaLocal(f, area, pointAlongPath(paths.local, (1 - hi) as 0 | 1))
+  return { x: a.x - b.x, y: a.y - b.y }
+}
+
+/**
+ * 修正一整段軌道鏈：多算的減掉重疊、圖面路徑反的翻回來、再把因此對不上的鄰居依新的端點重建。
+ *
+ * 順序是有意的：
+ * <ol>
+ *   <li>多算了一段的（現場中心線與別塊疊在同一條線上），減掉重疊。</li>
+ *   <li>圖面路徑上下顛倒的：接點座標翻過來明顯更好（≥ {@link FLIP_GAIN_M} 公尺）就翻；打平時
+ *       （兩端的鄰居各自都「接得上」，只是都建立在錯的座標上）用<strong>同一條 road 的另一條車道</strong>
+ *       裁決——兩條並排車道的里程增加方向在圖上必須一致，與已接得上的那條相反的就是反的。</li>
+ *   <li>剛修好的那幾塊，鄰居若因此對不上、而且兩端都貼著鄰居，就依新的端點重建（把修正往外傳）。</li>
+ * </ol>
+ * 兩端證據不足的不動，交給軌道檢查列出來。
+ */
+export function healTrackChainsInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  trimmed: string[]
+  flipped: string[]
+  propagated: string[]
+} {
+  const trimmed: string[] = []
+  const flipped: string[] = []
+  const propagated: string[] = []
+  const next = areas.map((area) => {
+    let facilities = area.facilities
+    const label = (f: FacilityObject) => f.customName?.trim() || f.id
+    const fixed = new Set<string>()
+    const rebuild = (fn: (a: MapAreaObject) => FacilityObject[]) => {
+      facilities = fn({ ...area, facilities })
+    }
+    const withFacilities = (): MapAreaObject => ({ ...area, facilities })
+
+    // 1. 多算的減掉重疊
+    for (const o of findRealOverlaps(withFacilities())) {
+      const paths = getTrackGenPaths(o.longer.parameters)
+      const other = getTrackGenPaths(o.shorter.parameters)
+      if (!paths || !other) continue
+      const cut = subtractOverlap(paths.real, other.real)
+      if (!cut) continue
+      const bounds = realBounds(cut.map(([x, y]) => ({ x, y }))) as Record<string, number>
+      const local = paths.local
+      // 圖面路徑保持整條（圖上那塊還在原處）；現場中心線縮成自己那段，頭尾方向不變
+      const keepOrder =
+        Math.hypot(cut[0]![0] - paths.real[0]![0], cut[0]![1] - paths.real[0]![1]) <=
+        Math.hypot(cut[1]![0] - paths.real[0]![0], cut[1]![1] - paths.real[0]![1])
+      const real = keepOrder ? cut : [cut[1]!, cut[0]!]
+      rebuild((a) =>
+        a.facilities.map((f) => {
+          if (f.id !== o.longer.id) return f
+          fixed.add(f.id)
+          trimmed.push(label(f))
+          const spans = getTrackGenSpans(f.parameters)
+          const sp0 = spans[0]
+          const params: Record<string, unknown> = {
+            ...(f.parameters ?? {}),
+            [TRACKGEN_REAL_PATH_KEY]: real,
+            [TRACKGEN_LOCAL_PATH_KEY]: local,
+          }
+          if (sp0) {
+            const len = realLength(real)
+            params[TRACKGEN_SPANS_KEY] = [
+              { ...sp0, s1: Number((sp0.s0 + (sp0.s1 >= sp0.s0 ? len : -len)).toFixed(2)), f0: 0, f1: 1 },
+            ]
+          }
+          return {
+            ...f,
+            parameters: patchRefFieldBounds(params, {
+              xMinM: bounds.refFieldXMinM!,
+              xMaxM: bounds.refFieldXMaxM!,
+              yMinM: bounds.refFieldYMinM!,
+              yMaxM: bounds.refFieldYMaxM!,
+            }),
+          } as FacilityObject
+        }),
+      )
+    }
+
+    // 2. 圖面路徑反的翻回來
+    {
+      const cur = withFacilities()
+      const overlongNow = new Set(findRealOverlaps(cur).map((o) => o.longer.id))
+      const anchors = collectAnchors(cur).filter((an) => !overlongNow.has(an.facilityId))
+      const byId = new Map(cur.facilities.map((f) => [f.id, f]))
+      const toFlip: string[] = []
+      for (const f of cur.facilities) {
+        if (!checksStaleness(f)) continue
+        const paths = getTrackGenPaths(f.parameters)
+        if (!paths) continue
+        let c = 0
+        let alt = 0
+        let evidence = 0
+        for (const t of [0, 1] as const) {
+          const at = trackLocalPathPointToAreaLocal(f, cur, pointAlongPath(paths.local, t))
+          const near = nearestAnchor(anchors, at.x, at.y, f.id, STALE_NEAR_PX)
+          if (!near) continue
+          const own = pointAlongPath(paths.real, t)
+          const other = pointAlongPath(paths.real, (1 - t) as 0 | 1)
+          c += Math.hypot(near.xM - own.x, near.yM - own.y)
+          alt += Math.hypot(near.xM - other.x, near.yM - other.y)
+          evidence += 1
+        }
+        if (evidence === 0) continue
+        if (c - alt >= FLIP_GAIN_M) {
+          toFlip.push(f.id)
+          continue
+        }
+        // 打平（或都接得上）：拿同一條 road 的另一條車道裁決
+        const span = singleSpanOf(f)
+        const v = mileageVectorPx(f, cur)
+        if (!span || !v || Math.abs(c - alt) >= FLIP_GAIN_M) continue
+        let agree = 0
+        let disagree = 0
+        for (const q of cur.facilities) {
+          if (q.id === f.id) continue
+          const qs = singleSpanOf(q)
+          if (!qs || qs.road !== span.road || qs.lane === span.lane) continue
+          const overlap =
+            Math.min(Math.max(span.s0, span.s1), Math.max(qs.s0, qs.s1)) -
+            Math.max(Math.min(span.s0, span.s1), Math.min(qs.s0, qs.s1))
+          const shortLen = Math.min(Math.abs(span.s1 - span.s0), Math.abs(qs.s1 - qs.s0))
+          if (!(overlap > shortLen * 0.6)) continue
+          // 手足自己要「兩端都接得上」才有資格當標準
+          const qPaths = getTrackGenPaths(q.parameters)
+          if (!qPaths) continue
+          let qCost = 0
+          let qEv = 0
+          for (const t of [0, 1] as const) {
+            const at = trackLocalPathPointToAreaLocal(q, cur, pointAlongPath(qPaths.local, t))
+            const near = nearestAnchor(anchors, at.x, at.y, q.id, STALE_NEAR_PX)
+            if (!near) continue
+            const own = pointAlongPath(qPaths.real, t)
+            qCost += Math.hypot(near.xM - own.x, near.yM - own.y)
+            qEv += 1
+          }
+          if (qEv < 2 || qCost > STALE_PATH_END_M) continue
+          const qv = mileageVectorPx(q, cur)
+          if (!qv) continue
+          if (v.x * qv.x + v.y * qv.y < 0) disagree += 1
+          else agree += 1
+        }
+        if (disagree > 0 && agree === 0) toFlip.push(f.id)
+      }
+      void byId
+      if (toFlip.length > 0) {
+        const set = new Set(toFlip)
+        rebuild((a) =>
+          a.facilities.map((f) => {
+            if (!set.has(f.id)) return f
+            const paths = getTrackGenPaths(f.parameters)!
+            fixed.add(f.id)
+            flipped.push(label(f))
+            return {
+              ...f,
+              parameters: { ...(f.parameters ?? {}), [TRACKGEN_LOCAL_PATH_KEY]: [...paths.local].reverse() },
+            } as FacilityObject
+          }),
+        )
+      }
+    }
+
+    // 3. 把修正往外傳：鄰居因為剛修好的這幾塊而對不上、而且兩端都貼著鄰居的，依新的端點重建
+    for (let round = 0; round < 3 && fixed.size > 0; round += 1) {
+      const cur = withFacilities()
+      const anchors = collectAnchors(cur)
+      let progressed = false
+      for (const f of cur.facilities) {
+        if (fixed.has(f.id) || !checksStaleness(f)) continue
+        const stale = findStaleTrackPathEnds(f, cur, anchors)
+        if (stale.length === 0) continue
+        if (!stale.every((e) => fixed.has(e.neighbourId))) continue
+        const res = rederiveTrackPath(f, cur, MOVE_FOLLOW_NEAR_PX)
+        if (!res.ok) continue
+        rebuild((a) => a.facilities.map((x) => (x.id === f.id ? res.facility : x)))
+        fixed.add(f.id)
+        propagated.push(label(f))
+        progressed = true
+        break // 端點變了，錨點要重算
+      }
+      if (!progressed) break
+    }
+
+    return facilities === area.facilities ? area : { ...area, facilities }
+  })
+  return {
+    areas: next.every((a, i) => a === areas[i]) ? areas : next,
+    trimmed,
+    flipped,
+    propagated,
+  }
 }

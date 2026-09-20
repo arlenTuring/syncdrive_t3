@@ -41,11 +41,25 @@ function endpointsOf(path: PathXY): { head: Endpoint; tail: Endpoint } | null {
   return { head: { x: a[0], y: a[1] }, tail: { x: b[0], y: b[1] } }
 }
 
+function pathLengthOf(path: PathXY): number {
+  let total = 0
+  for (let i = 1; i < path.length; i += 1) {
+    total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1])
+  }
+  return total
+}
+
 function near(a: Endpoint, b: Endpoint): boolean {
   return Math.hypot(a.x - b.x, a.y - b.y) <= JOINT_TOLERANCE_M
 }
 
-type Neighbour = { road: string; lane: number; sM: number }
+type Neighbour = {
+  road: string
+  lane: number
+  sM: number
+  /** 鄰居在它<strong>另一端</strong>的里程：兩者相減就是里程往哪個方向增加 */
+  sOther: number
+}
 
 /** 這個鄰居的中心線有沒有一端接在 point 上；有的話回報它在那一端的里程 */
 function neighbourAt(
@@ -62,11 +76,11 @@ function neighbourAt(
   // f=0 那一端對應第一段的 s0，f=1 那一端對應最後一段的 s1
   if (near(ends.head, point)) {
     const first = spans[0]!
-    return { road: first.road, lane: first.lane, sM: first.s0 }
+    return { road: first.road, lane: first.lane, sM: first.s0, sOther: spans[spans.length - 1]!.s1 }
   }
   if (near(ends.tail, point)) {
     const last = spans[spans.length - 1]!
-    return { road: last.road, lane: last.lane, sM: last.s1 }
+    return { road: last.road, lane: last.lane, sM: last.s1, sOther: spans[0]!.s0 }
   }
   return null
 }
@@ -119,20 +133,27 @@ export function backfillTrackGenSpansInAreas(areas: MapAreaObject[]): {
 
       const head = findNeighbour(facilities, facility.id, ends.head)
       const tail = findNeighbour(facilities, facility.id, ends.tail)
-      // 接的必須是同一條車道，否則補出來的里程是別條線的
-      if (!head || !tail || head.road !== tail.road || head.lane !== tail.lane) {
+      let span: TrackGenSpan
+      if (head && tail && head.road === tail.road && head.lane === tail.lane) {
+        // 兩端接的是同一條車道：里程取兩端鄰居的值
+        span = { road: head.road, lane: head.lane, s0: head.sM, s1: tail.sM, h: null, f0: 0, f1: 1 }
+      } else if (head || tail) {
+        /*
+         * 只有一端接得上同一條車道（另一端接到別條 road，例如換掉分岔的一般軌道，一頭是原車道、一頭
+         * 已經是轉角的另一條 road）：從接得上的那一端延伸，長度取自己的中心線，往哪個方向增加則
+         * 接續鄰居——鄰居的里程往它內側增加，往外就是減少。憑空編一個里程不行，接續是有依據的。
+         */
+        const nb = (head ?? tail)!
+        const outward = Math.sign(nb.sOther - nb.sM) === 0 ? 1 : -Math.sign(nb.sOther - nb.sM)
+        const len = pathLengthOf(paths.real)
+        const sMatched = nb.sM
+        const sFar = Number((sMatched + outward * len).toFixed(2))
+        span = head
+          ? { road: nb.road, lane: nb.lane, s0: sMatched, s1: sFar, h: null, f0: 0, f1: 1 }
+          : { road: nb.road, lane: nb.lane, s0: sFar, s1: sMatched, h: null, f0: 0, f1: 1 }
+      } else {
         skipped.push(label)
         return facility
-      }
-
-      const span: TrackGenSpan = {
-        road: head.road,
-        lane: head.lane,
-        s0: head.sM,
-        s1: tail.sM,
-        h: null,
-        f0: 0,
-        f1: 1,
       }
       filled.push({
         name: label,

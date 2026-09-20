@@ -5,6 +5,7 @@ import {
   collectTrackAnchors,
   nearestTrackAnchor,
   faceUvOfHandle,
+  findRealOverlaps,
   type TrackAnchor,
 } from './shapedTrackPaths'
 import { getTrackGenPaths, getTrackGenSpans, pointAlongPath } from './trackGenPaths'
@@ -124,6 +125,21 @@ export function diagnoseTracks(areas: MapAreaObject[]): TrackDiagnostics {
         }
       }
     }
+    // 里程欄位被重建、重接之後常常就沒了：另外用現場座標判斷——中心線走在同一條線上又疊了一大段
+    for (const o of findRealOverlaps(area)) {
+      const key = `real|${o.longer.id}|${o.shorter.id}`
+      if ([...pairs.values()].some((p) => p.longer.id === o.longer.id && p.shorter.id === o.shorter.id)) continue
+      pairs.set(key, {
+        lane: '（現場座標）',
+        longer: o.longer,
+        shorter: o.shorter,
+        overlap: o.overlapM,
+        lLo: 0,
+        lHi: 0,
+        sLo: 0,
+        sHi: 0,
+      })
+    }
     for (const p of pairs.values()) {
       if (p.overlap <= SPAN_OVERLAP_M) continue
       const ln = labelOf(p.longer)
@@ -137,8 +153,10 @@ export function diagnoseTracks(areas: MapAreaObject[]): TrackDiagnostics {
         severity: 'error',
         title: `${ln} 與 ${sn} 覆蓋了同一段路（${p.overlap.toFixed(0)} 公尺）`,
         detail:
-          `車道 ${p.lane} 上，${ln} 的里程 ${p.lLo.toFixed(0)}～${p.lHi.toFixed(0)} 與 ` +
-          `${sn} 的 ${p.sLo.toFixed(0)}～${p.sHi.toFixed(0)} 重疊 ${p.overlap.toFixed(0)} 公尺。`,
+          p.lane === '（現場座標）'
+            ? `${ln} 的現場中心線與 ${sn} 走在同一條線上，重疊 ${p.overlap.toFixed(0)} 公尺。`
+            : `車道 ${p.lane} 上，${ln} 的里程 ${p.lLo.toFixed(0)}～${p.lHi.toFixed(0)} 與 ` +
+              `${sn} 的 ${p.sLo.toFixed(0)}～${p.sHi.toFixed(0)} 重疊 ${p.overlap.toFixed(0)} 公尺。`,
         suggestion:
           `${ln} 的現場中心線多半多算了一段（可能是兩塊軌道的長度合起來卻畫成一塊）。` +
           `把 ${ln} 的現場中心線縮短到只涵蓋它自己那段。`,

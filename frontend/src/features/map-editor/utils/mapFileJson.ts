@@ -51,8 +51,13 @@ import {
 import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { normalizeTrackGenOrientation } from './trackGenOrientation'
-import { bridgeSwitchCentrelinesInAreas, healStaleTrackPathsInAreas } from './shapedTrackPaths'
+import {
+  bridgeSwitchCentrelinesInAreas,
+  healStaleTrackPathsInAreas,
+  healTrackChainsInAreas,
+} from './shapedTrackPaths'
 import { alignTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
+import { reanchorFieldPointsAfterTrackHeal } from './reanchorPointsAfterHeal'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
@@ -592,8 +597,23 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     if (healedAreas.ambiguous.length > 0) {
       console.warn(`[map] ${healedAreas.ambiguous.length} 塊軌道的中心線只有一端接不上隔壁，看不出哪一塊有問題，沒有動：${healedAreas.ambiguous.join('、')}`)
     }
+    // 一整段軌道鏈：多算的減掉重疊、圖面路徑反的翻回來、把修正往外傳（見 healTrackChainsInAreas）
+    const chainedRaw = healTrackChainsInAreas(healedAreas.areas)
+    // 軌道修正後停靠點留在它的現場座標上，圖上位置跟著搬（座標是班表對得上的依據）
+    const reanchored = reanchorFieldPointsAfterTrackHeal(healedAreas.areas, chainedRaw.areas)
+    if (reanchored.moved.length > 0) {
+      console.warn(`[map] 軌道修正後，${reanchored.moved.length} 個停靠點／途經點的圖上位置依現場座標搬動：${reanchored.moved.join('、')}`)
+    }
+    const chained = { ...chainedRaw, areas: reanchored.areas }
+    if (chained.trimmed.length + chained.flipped.length + chained.propagated.length > 0) {
+      const parts: string[] = []
+      if (chained.trimmed.length) parts.push(`多算一段已減掉重疊：${chained.trimmed.join('、')}`)
+      if (chained.flipped.length) parts.push(`圖面路徑上下顛倒已翻正：${chained.flipped.join('、')}`)
+      if (chained.propagated.length) parts.push(`鄰居因此依新端點重建：${chained.propagated.join('、')}`)
+      console.warn(`[map] 軌道鏈修正——${parts.join('；')}`)
+    }
     // 分岔的中心線在路口前面斷掉：把缺的那一段補接到轉角軌道（見 bridgeSwitchCentrelinesInAreas）
-    const bridgedAreas = bridgeSwitchCentrelinesInAreas(healedAreas.areas)
+    const bridgedAreas = bridgeSwitchCentrelinesInAreas(chained.areas)
     if (bridgedAreas.bridged.length > 0) {
       console.warn(`[map] ${bridgedAreas.bridged.length} 塊分岔的中心線比路口短，已補接到相接的軌道：${bridgedAreas.bridged.join('、')}`)
     }

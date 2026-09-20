@@ -60,22 +60,33 @@ describe('補里程對應', () => {
     assert.equal(filled[0]!.s1, 100)
   })
 
-  it('兩端接到不同車道就不補——寧可沒有，也不要接成別條線', () => {
+  it('兩端接到不同車道：不把兩條線的里程混成一條，改從有依據的那一端延伸（與鄰居接續）', () => {
     const a = track('A', [[0, 0], [0, -10]], [span('11', 2, 300, 200)])
     const b = track('B', [[0, -10], [0, -30]])
     const c = track('C', [[0, -50], [0, -30]], [span('11', -2, 50, 100)])
 
     const out = backfillTrackGenSpansInAreas(areaWith([a, b, c]))
-    assert.equal(out.filled.length, 0)
-    assert.deepEqual(out.skipped, ['B'])
-    assert.equal(getTrackGenSpans(out.areas[0]!.facilities[1]!.parameters).length, 0)
+    assert.equal(out.filled.length, 1)
+    const spans = getTrackGenSpans(out.areas[0]!.facilities[1]!.parameters)
+    // 接的是 A（road 11 lane 2）：A 的里程往 B 的方向遞減，B 從 200 接續往下、長 20 公尺
+    assert.equal(spans[0]!.road, '11')
+    assert.equal(spans[0]!.lane, 2)
+    assert.equal(spans[0]!.s0, 200)
+    assert.equal(spans[0]!.s1, 180)
   })
 
-  it('只有一端找得到鄰居也不補', () => {
+  it('只有一端找得到鄰居：從那一端延伸（換掉分岔的一般軌道，另一頭是別條 road）', () => {
     const a = track('A', [[0, 0], [0, -10]], [span('11', 2, 300, 200)])
     const b = track('B', [[0, -10], [0, -30]])
 
     const out = backfillTrackGenSpansInAreas(areaWith([a, b]))
+    assert.equal(out.filled.length, 1)
+    assert.deepEqual(out.skipped, [])
+  })
+
+  it('兩端都找不到鄰居才不補', () => {
+    const b = track('B', [[0, -10], [0, -30]])
+    const out = backfillTrackGenSpansInAreas(areaWith([b]))
     assert.equal(out.filled.length, 0)
     assert.deepEqual(out.skipped, ['B'])
   })
