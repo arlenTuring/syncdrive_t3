@@ -112,3 +112,44 @@ export function repairTrackRefFieldBoundsInAreas(areas: MapAreaObject[]): {
 }
 
 export { TOLERANCE_M as TRACK_REF_FIELD_BOUNDS_TOLERANCE_M }
+
+/**
+ * 有中心線的直軌道與圓角：場域範圍一律等於「中心線外框往兩側撐半個車道」。
+ *
+ * 上面的修復留了一個車道寬的容差（版本差異不重寫），代價是同一張圖裡的範圍有的是生成器
+ * 寫的、有的是後來按「重算」寫的，兩個定義差 1–2 公尺——於是每按一次「依圖上形狀重算範圍」
+ * 就改掉一批軌道。範圍本來就是從中心線導出來的，載入時直接對齊，「重算」就成了空操作。
+ */
+export function alignTrackRefFieldBoundsInAreas(areas: MapAreaObject[]): MapAreaObject[] {
+  let changed = false
+  const next = areas.map((area) => {
+    let areaChanged = false
+    const facilities = area.facilities.map((facility) => {
+      if (facility.type !== 'Track') return facility
+      if (facility.name !== 'Rail' && facility.name !== 'RailCorner') return facility
+      const bounds = boundsFromRealPath(facility)
+      const before = getValidRefFieldBounds(facility.parameters)
+      if (!bounds || !before) return facility
+      const same =
+        Math.abs(before.xMinM - bounds[REF_FIELD_X_MIN_M]) < 0.005 &&
+        Math.abs(before.xMaxM - bounds[REF_FIELD_X_MAX_M]) < 0.005 &&
+        Math.abs(before.yMinM - bounds[REF_FIELD_Y_MIN_M]) < 0.005 &&
+        Math.abs(before.yMaxM - bounds[REF_FIELD_Y_MAX_M]) < 0.005
+      if (same) return facility
+      areaChanged = true
+      return {
+        ...facility,
+        parameters: patchRefFieldBounds(facility.parameters, {
+          xMinM: bounds[REF_FIELD_X_MIN_M],
+          xMaxM: bounds[REF_FIELD_X_MAX_M],
+          yMinM: bounds[REF_FIELD_Y_MIN_M],
+          yMaxM: bounds[REF_FIELD_Y_MAX_M],
+        }),
+      }
+    })
+    if (!areaChanged) return area
+    changed = true
+    return { ...area, facilities }
+  })
+  return changed ? next : areas
+}

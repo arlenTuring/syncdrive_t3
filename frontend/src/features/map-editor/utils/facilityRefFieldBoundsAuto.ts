@@ -1,3 +1,5 @@
+import { getTrackGenPaths } from './trackGenPaths'
+import { realBounds } from './trackGenApply'
 import type { MapAreaObject } from '../types/area'
 import type { MapBasemapObject } from '../types/basemap'
 import type { FacilityObject, FacilityType } from '../types/facility'
@@ -224,6 +226,27 @@ export function suggestRefFieldBoundsFromPlacement(
       xMaxM: bounds.xMaxM,
       yMinM: bounds.yMinM,
       yMaxM: bounds.yMaxM,
+    }
+  }
+
+  /*
+   * 有現場中心線的直軌道與圓角：範圍就是中心線的外框往兩側撐半個車道——生成器寫的就是這個
+   * （trackGenApply.realBounds）。「重算」與載入時的範圍必須是同一個定義，否則每按一次、
+   * 每載入一次都會改一批軌道的數字（72 塊裡 40 塊）。
+   */
+  if (facility.name === 'Rail' || facility.name === 'RailCorner') {
+    const paths = getTrackGenPaths(facility.parameters)
+    if (paths && paths.real.length > 0) {
+      const b = realBounds(paths.real.map(([x, y]) => ({ x, y })))
+      if (Object.keys(b).length === 4) {
+        const v = b as Record<string, number>
+        return {
+          xMinM: v.refFieldXMinM!,
+          xMaxM: v.refFieldXMaxM!,
+          yMinM: v.refFieldYMinM!,
+          yMaxM: v.refFieldYMaxM!,
+        }
+      }
     }
   }
 

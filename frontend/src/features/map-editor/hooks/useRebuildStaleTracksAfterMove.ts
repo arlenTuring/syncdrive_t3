@@ -40,7 +40,7 @@ export function useRebuildStaleTracksAfterMove(
       if (outcome.rebuilt.length === 0) return
       for (const r of outcome.rebuilt) {
         console.info(
-          `[map] ${r.label} 的中心線與相接的軌道對不上（起點差 ${r.changedM.toFixed(1)} 公尺），已依鄰居重建`,
+          `[map] ${r.label} 移動後場域位置已跟著相接的軌道更新（位移 ${r.changedM.toFixed(1)} 公尺）`,
         )
       }
       // 用最新的狀態再算一次：等待期間使用者可能又改了別的

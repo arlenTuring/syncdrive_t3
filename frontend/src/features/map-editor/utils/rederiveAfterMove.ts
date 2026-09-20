@@ -1,6 +1,6 @@
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
-import { rederiveIfStale } from './shapedTrackPaths'
+import { followNeighboursAfterMove } from './shapedTrackPaths'
 
 /**
  * 移動、縮放、複製貼上之後，把「兩端接不上隔壁」的軌道中心線重建。
@@ -67,7 +67,7 @@ export function rebuildStaleAmong(areas: MapAreaObject[], keys: string[]): Rebui
     const area = next.find((a) => a.id === areaId)
     const f = area?.facilities.find((x) => x.id === facilityId)
     if (!area || !f || f.type !== 'Track') continue
-    const res = rederiveIfStale(f, area)
+    const res = followNeighboursAfterMove(f, area)
     if (!res || !res.ok) continue
     rebuilt.push({ areaId: area.id, facilityId: f.id, label: f.customName?.trim() || f.id, changedM: res.changedM })
     next = next.map((a) =>

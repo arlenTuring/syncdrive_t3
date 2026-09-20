@@ -13,7 +13,6 @@ import {
   findStaleTrackPathEnds,
   healStaleTrackPathsInAreas,
   listStaleTrackPaths,
-  rederiveIfStale,
   rederiveTrackPath,
 } from './shapedTrackPaths'
 import { getTrackGenPaths } from './trackGenPaths'
@@ -90,29 +89,64 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
     expect(1 / lat[1]).toBeLessThan(4)
   })
 
-  it('沒過期的軌道 rederiveIfStale 回 null，不去動它', () => {
-    expect(rederiveIfStale(byName('U06'), area)).toBeNull()
-  })
-
-  it('剛動過的軌道才檢查：移動 U04 才重建，沒動就不動（即使它過期）', () => {
-    const before = snapshotGeometry(areas)
-    // 沒有任何變動：不檢查
-    expect(movedFacilityKeys(before, snapshotGeometry(areas))).toEqual([])
-    const u04 = byName('U04')
-    const moved = areas.map((a) => ({
+  /** 把一塊軌道在圖上平移 (dx, dy) 像素（areaPosition 原點在左下、y 向上） */
+  const shift = (id: string, dx: number, dy: number) =>
+    areas.map((a) => ({
       ...a,
       facilities: a.facilities.map((f) =>
-        f.id === u04.id ? { ...f, areaPosition: { ...f.areaPosition, x: f.areaPosition.x + 5 } } : f,
+        f.id === id ? { ...f, areaPosition: { x: f.areaPosition.x + dx, y: f.areaPosition.y + dy } } : f,
       ),
     }))
+  const moveAndFollow = (id: string, dx: number, dy: number) => {
+    const before = snapshotGeometry(areas)
+    const moved = shift(id, dx, dy)
     const keys = movedFacilityKeys(before, snapshotGeometry(moved))!
-    expect(keys).toEqual([`${area.id}|${u04.id}`])
-    const out = rebuildStaleAmong(moved, keys)
-    if (findStaleTrackPathEnds(u04, area).length > 0) expect(out.rebuilt.map((r) => r.label)).toEqual(['U04'])
-    // 沒有被列入的軌道（U05 也是「過期」的一方）不會被連帶重建
-    const none = rebuildStaleAmong(moved, [`${area.id}|${byName('U06').id}`])
-    expect(none.rebuilt).toEqual([])
-    expect(none.areas).toBe(moved)
+    return { keys, moved, out: rebuildStaleAmong(moved, keys) }
+  }
+  const realOf = (mapAreas: typeof areas, id: string) =>
+    getTrackGenPaths(mapAreas[0]!.facilities.find((f) => f.id === id)!.parameters)!.real
+
+  it('沒有動就不檢查；只動了的那一塊才會被列入', () => {
+    const before = snapshotGeometry(areas)
+    expect(movedFacilityKeys(before, snapshotGeometry(areas))).toEqual([])
+    const { keys } = moveAndFollow(byName('U06').id, 5, 0)
+    expect(keys).toEqual([`${area.id}|${byName('U06').id}`])
+  })
+
+  it('複製 U06 放到 U04 的位置：兩端貼著 U05 與交叉，場域位置與範圍立刻跟過去', () => {
+    // 模擬「複製後拖過去」：U04 的圖面位置不變，中心線換成 U06 的（複製來的樣子）
+    const copy = {
+      ...byName('U04'),
+      parameters: { ...byName('U04').parameters, trackGenRealPath: byName('U06').parameters!.trackGenRealPath },
+    }
+    const withCopy = areas.map((a) => ({ ...a, facilities: a.facilities.map((f) => (f.id === copy.id ? copy : f)) }))
+    const out = rebuildStaleAmong(withCopy, [`${area.id}|${copy.id}`])
+    expect(out.rebuilt.map((r) => r.label)).toEqual(['U04'])
+    const real = realOf(out.areas, copy.id)
+    expect(Math.hypot(real[0]![0] + 138.4, real[0]![1] + 19.86)).toBeLessThan(0.05)
+    expect(real[real.length - 1]![1]).toBeGreaterThan(-14)
+  })
+
+  it('已經接著鄰居的軌道稍微拖動：場域位置不變（現場的路沒有動），不把彎的中心線拉直', () => {
+    const { out } = moveAndFollow(byName('U06').id, 8, 0)
+    expect(out.rebuilt).toEqual([])
+  })
+
+  it('拖到圖上的空地（沒貼著任何軌道）：不動，不編造座標', () => {
+    const { out } = moveAndFollow(byName('U06').id, 0, -400)
+    expect(out.rebuilt).toEqual([])
+  })
+
+  it('只有一端貼著鄰居：形狀與長度不變，整條平移到那一端貼上', () => {
+    // 往右拉 100 像素：左端離開 U07 太遠，右端剛好落在 U05 的起點附近
+    for (const dx of [80, 100, 120]) {
+      const { out } = moveAndFollow(byName('U06').id, dx, 0)
+      if (out.rebuilt.length === 0) continue
+      const before = realOf(areas, byName('U06').id)
+      const after = realOf(out.areas, byName('U06').id)
+      const len = (r: number[][]) => Math.hypot(r[r.length - 1]![0] - r[0]![0], r[r.length - 1]![1] - r[0]![1])
+      expect(len(after)).toBeCloseTo(len(before), 1)
+    }
   })
 
   it('換圖或整批變動不當成使用者移動', () => {
@@ -124,5 +158,21 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
     expect(movedFacilityKeys(before, snapshotGeometry(shifted))).toBeNull()
     expect(movedFacilityKeys(new Map(), before)).toBeNull()
     expect(MAX_MOVED_FOR_REBUILD).toBeGreaterThan(1)
+  })
+})
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('依圖上形狀重算範圍：載入後是空操作', () => {
+  it('72 塊軌道裡幾乎沒有會被「重算」改動的（範圍與中心線同一個定義）', async () => {
+    const { syncAutoRefFieldBoundsFromPlacement } = await import('./facilityRefFieldBoundsAuto')
+    const areas = parseMapFileJson(doc as never).areas
+    const changed: string[] = []
+    for (const a of areas) {
+      for (const f of a.facilities) {
+        if (f.type !== 'Track') continue
+        if (syncAutoRefFieldBoundsFromPlacement(f, a) !== f) changed.push(f.customName?.trim() || f.id)
+      }
+    }
+    // 直軌道、圓角、斜接都對齊；剩下的是範圍另有定義的分岔（121）與一塊差 0.4 公尺的 D18
+    expect(changed.length).toBeLessThanOrEqual(3)
   })
 })

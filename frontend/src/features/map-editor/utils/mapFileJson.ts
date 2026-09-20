@@ -52,6 +52,7 @@ import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { normalizeTrackGenOrientation } from './trackGenOrientation'
 import { healStaleTrackPathsInAreas } from './shapedTrackPaths'
+import { alignTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
 import { resolveAreaFillStyle } from './areaLayoutStyle'
@@ -591,7 +592,8 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     if (healedAreas.ambiguous.length > 0) {
       console.warn(`[map] ${healedAreas.ambiguous.length} 塊軌道的中心線只有一端接不上隔壁，看不出哪一塊有問題，沒有動：${healedAreas.ambiguous.join('、')}`)
     }
-    const areas = healedAreas.areas
+    // 場域範圍是從中心線導出來的：載入時對齊，「依圖上形狀重算範圍」才不會每次都改一批
+    const areas = alignTrackRefFieldBoundsInAreas(healedAreas.areas)
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)

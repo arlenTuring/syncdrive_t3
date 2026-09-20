@@ -5,9 +5,12 @@ import {
   resolveFacilityAreaSize,
 } from './facilityAreaCoords'
 import {
+  getRefFieldBounds,
   patchRefFieldBounds,
 } from './facilityRefFieldBounds'
 import {
+  getRefFieldCorners,
+  hasValidRefFieldCorners,
   REF_FIELD_CORNERS_M,
   serializeRefFieldCorners,
   type RefFieldCornerMeters,
@@ -25,6 +28,7 @@ import {
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
 import { usesCornerFieldRange } from './facilityRefFieldBoundsAuto'
 import { resolveCrossPortalFields } from './crossTrackPortals'
+import { realBounds } from './trackGenApply'
 import {
   CROSS_HANDLE_KEYS,
   crossTrackHandlesPx,
@@ -552,7 +556,11 @@ export type RederiveResult =
  * 連帶更新里程（接在隔壁後面）、行進方向、橫向比例尺與場域範圍——只換中心線不換這些，
  * 場域範圍與里程還是指著舊的位置。
  */
-export function rederiveTrackPath(f: FacilityObject, area: MapAreaObject): RederiveResult {
+export function rederiveTrackPath(
+  f: FacilityObject,
+  area: MapAreaObject,
+  nearPx: number = JOIN_NEAR_PX,
+): RederiveResult {
   if (f.type !== 'Track') return { ok: false, reason: '不是軌道' }
   if (f.name === 'RailCross' || f.name === 'RailSwitch') {
     return { ok: false, reason: '交叉與分岔的中心線由口與各段決定，不能這樣重建' }
@@ -565,7 +573,7 @@ export function rederiveTrackPath(f: FacilityObject, area: MapAreaObject): Reder
   const ends = faces.map((handle) => {
     const uv = faceUv(handle, size)
     const local = trackLocalPathPointToAreaLocal(f, area, { x: uv.x, y: uv.y })
-    return { uv, anchor: nearestAnchor(anchors, local.x, local.y, f.id) }
+    return { uv, anchor: nearestAnchor(anchors, local.x, local.y, f.id, nearPx) }
   })
   if (ends.some((e) => !e.anchor)) {
     return { ok: false, reason: '有一端在圖上找不到相接的軌道' }
@@ -634,17 +642,32 @@ export function rederiveTrackPath(f: FacilityObject, area: MapAreaObject): Reder
   const pts = corners.length === 4 ? corners.map((c) => [c.xM, c.yM] as [number, number]) : real
   const xs = pts.map((r) => r[0])
   const ys = pts.map((r) => r[1])
+  // 直軌道與圓角：與生成器、「重算」同一個定義（中心線外框往兩側撐半個車道）
+  const canonical =
+    (f.name === 'Rail' || f.name === 'RailCorner') && !usesCornerFieldRange(f)
+      ? (realBounds(real.map(([x, y]) => ({ x, y }))) as Record<string, number>)
+      : null
   return {
     ok: true,
     changedM,
     facility: {
       ...f,
-      parameters: patchRefFieldBounds(parameters, {
-        xMinM: Number(Math.min(...xs).toFixed(2)),
-        xMaxM: Number(Math.max(...xs).toFixed(2)),
-        yMinM: Number(Math.min(...ys).toFixed(2)),
-        yMaxM: Number(Math.max(...ys).toFixed(2)),
-      }),
+      parameters: patchRefFieldBounds(
+        parameters,
+        canonical
+          ? {
+              xMinM: canonical.refFieldXMinM!,
+              xMaxM: canonical.refFieldXMaxM!,
+              yMinM: canonical.refFieldYMinM!,
+              yMaxM: canonical.refFieldYMaxM!,
+            }
+          : {
+              xMinM: Number(Math.min(...xs).toFixed(2)),
+              xMaxM: Number(Math.max(...xs).toFixed(2)),
+              yMinM: Number(Math.min(...ys).toFixed(2)),
+              yMaxM: Number(Math.max(...ys).toFixed(2)),
+            },
+      ),
     } as FacilityObject,
   }
 }
@@ -653,4 +676,78 @@ export function rederiveTrackPath(f: FacilityObject, area: MapAreaObject): Reder
 export function rederiveIfStale(f: FacilityObject, area: MapAreaObject): RederiveResult | null {
   if (findStaleTrackPathEnds(f, area).length === 0) return null
   return rederiveTrackPath(f, area)
+}
+
+/* ── 移動之後：場域位置跟著接到的鄰居走 ───────────────────────────────────── */
+
+/** 使用者放下一塊軌道，大概貼在鄰居旁邊就算「接上」：比載入時的 40 像素寬鬆 */
+export const MOVE_FOLLOW_NEAR_PX = 60
+
+/** 兩端已經接著鄰居（差不到這麼多公尺）就不必動它，免得把彎的中心線拉成直線 */
+const FOLLOW_CONSISTENT_M = 0.3
+
+/**
+ * 剛移動過的軌道，場域位置跟著它接到的鄰居走。
+ *
+ * <ul>
+ *   <li>兩端都貼著鄰居：中心線重建成兩端接鄰居（複製來的 U04 就是這樣接回 U05 與交叉）。</li>
+ *   <li>只有一端貼著鄰居：形狀與長度不變，整條平移到那一端貼上去。</li>
+ *   <li>沒有貼著任何鄰居：不動——圖上空地沒有對應的現場座標，硬換算只會編一個數字。</li>
+ *   <li>已經接著鄰居（差不到 {@link FOLLOW_CONSISTENT_M} 公尺）：不動。</li>
+ * </ul>
+ * 沒有要改的回 null。
+ */
+export function followNeighboursAfterMove(
+  f: FacilityObject,
+  area: MapAreaObject,
+): RederiveResult | null {
+  if (!checksStaleness(f)) return null
+  const paths = getTrackGenPaths(f.parameters)
+  if (!paths) return null
+  const anchors = collectAnchors(area)
+  const ends = ([0, 1] as const).map((t) => {
+    const uv = pointAlongPath(paths.local, t)
+    const at = trackLocalPathPointToAreaLocal(f, area, uv)
+    return {
+      t,
+      own: pointAlongPath(paths.real, t),
+      anchor: nearestAnchor(anchors, at.x, at.y, f.id, MOVE_FOLLOW_NEAR_PX),
+    }
+  })
+  const found = ends.filter((e) => e.anchor)
+  if (found.length === 0) return null
+  const diff = (e: (typeof ends)[number]) => Math.hypot(e.anchor!.xM - e.own.x, e.anchor!.yM - e.own.y)
+  if (found.every((e) => diff(e) <= FOLLOW_CONSISTENT_M)) return null
+
+  if (found.length === 2) return rederiveTrackPath(f, area, MOVE_FOLLOW_NEAR_PX)
+
+  // 只有一端：整條平移，讓那一端貼上鄰居
+  const e = found[0]!
+  const dx = e.anchor!.xM - e.own.x
+  const dy = e.anchor!.yM - e.own.y
+  const real = paths.real.map(([x, y]) => [Number((x + dx).toFixed(2)), Number((y + dy).toFixed(2))] as [number, number])
+  let parameters: Record<string, unknown> = { ...(f.parameters ?? {}), [TRACKGEN_REAL_PATH_KEY]: real }
+  const bounds = realBounds(real.map(([x, y]) => ({ x, y })))
+  const corners = getRefFieldCorners(f.parameters)
+  if (usesCornerFieldRange(f) && hasValidRefFieldCorners(f.parameters)) {
+    parameters[REF_FIELD_CORNERS_M] = serializeRefFieldCorners(
+      corners.map((c) => ({ xM: Number(((c.xM ?? 0) + dx).toFixed(2)), yM: Number(((c.yM ?? 0) + dy).toFixed(2)) })),
+    )
+    const b = getRefFieldBounds(f.parameters)
+    parameters = patchRefFieldBounds(parameters, {
+      xMinM: Number(((b.xMinM ?? 0) + dx).toFixed(2)),
+      xMaxM: Number(((b.xMaxM ?? 0) + dx).toFixed(2)),
+      yMinM: Number(((b.yMinM ?? 0) + dy).toFixed(2)),
+      yMaxM: Number(((b.yMaxM ?? 0) + dy).toFixed(2)),
+    })
+  } else if (Object.keys(bounds).length === 4) {
+    const v = bounds as Record<string, number>
+    parameters = patchRefFieldBounds(parameters, {
+      xMinM: v.refFieldXMinM!,
+      xMaxM: v.refFieldXMaxM!,
+      yMinM: v.refFieldYMinM!,
+      yMaxM: v.refFieldYMaxM!,
+    })
+  }
+  return { ok: true, facility: { ...f, parameters } as FacilityObject, changedM: Math.hypot(dx, dy) }
 }
