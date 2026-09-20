@@ -7,6 +7,10 @@ import {
 import {
   getRefFieldBounds,
   patchRefFieldBounds,
+  REF_FIELD_X_MAX_M,
+  REF_FIELD_X_MIN_M,
+  REF_FIELD_Y_MAX_M,
+  REF_FIELD_Y_MIN_M,
 } from './facilityRefFieldBounds'
 import {
   getRefFieldCorners,
@@ -750,4 +754,113 @@ export function followNeighboursAfterMove(
     })
   }
   return { ok: true, facility: { ...f, parameters } as FacilityObject, changedM: Math.hypot(dx, dy) }
+}
+
+/* ── 分岔中心線在路口前面斷掉：補一段接到隔壁 ─────────────────────────────── */
+
+/** 分岔兩端與隔壁差這麼多公尺以內是正常的出口偏移（073 的直行出口差 9.6 公尺），不補 */
+export const SWITCH_BRIDGE_MIN_M = 15
+/** 差超過這麼多就不是「路口前斷掉一小段」，是兩塊根本對不上，不硬接 */
+export const SWITCH_BRIDGE_MAX_M = 60
+/** 分岔的口與隔壁端點視為「貼著」的圖面距離（像素） */
+const SWITCH_FACE_NEAR_PX = 40
+
+/**
+ * 分岔（RailSwitch）的中心線比路口短：把缺的那一段補上，接到隔壁。
+ *
+ * 生成的分岔只記到連接路（road 11 這種）結束的地方；圖上它緊貼著轉角軌道，現場座標卻差
+ * 二三十公尺，中間沒有任何軌道——T3 靠 S2W 的轉角就是這樣：120／121 的中心線在 y = −294 結束，
+ * 轉角 D21／U21 從 y = −318 開始。車開到那裡只能沿一條不存在的直線走過去。
+ *
+ * 規則：
+ * <ul>
+ *   <li>只看貼著分岔各個口、而且是<strong>一般軌道或交叉口</strong>的鄰居（不看另一個分岔——
+ *       兩個分岔並排時互相都是對方的鄰居，看不出誰接誰）。</li>
+ *   <li>中心線有一端與某個口的鄰居差 {@link SWITCH_BRIDGE_MIN_M}～{@link SWITCH_BRIDGE_MAX_M}
+ *       公尺、而且那一端沒有接著任何別的口的鄰居，就把鄰居的端點接在那一端後面。</li>
+ *   <li>差不到 {@link SWITCH_BRIDGE_MIN_M} 的是正常的出口偏移；超過 {@link SWITCH_BRIDGE_MAX_M}
+ *       的是兩塊對不上（U18／U19 那種），都不動。</li>
+ * </ul>
+ */
+export function bridgeSwitchCentrelinesInAreas(areas: MapAreaObject[]): {
+  areas: MapAreaObject[]
+  bridged: string[]
+} {
+  const bridged: string[] = []
+  let changed = false
+  const next = areas.map((area) => {
+    const anchors = collectAnchors(area).filter((a) => {
+      const owner = area.facilities.find((f) => f.id === a.facilityId)
+      return owner && owner.name !== 'RailSwitch'
+    })
+    let touched = false
+    const facilities = area.facilities.map((f) => {
+      if (f.type !== 'Track' || f.name !== 'RailSwitch') return f
+      const paths = getTrackGenPaths(f.parameters)
+      if (!paths || paths.real.length < 2) return f
+      const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+      const handles = switchTrackHandlesPx(readSwitchTrack(f.parameters), size.w, size.h)
+      const first = paths.real[0]!
+      const last = paths.real[paths.real.length - 1]!
+      const ends = [
+        { key: 'first' as const, x: first[0], y: first[1], matched: false },
+        { key: 'last' as const, x: last[0], y: last[1], matched: false },
+      ]
+      const faces = (['a', 'm', 'b'] as const)
+        .map((k) => {
+          const uv = faceUv(handles[k], size)
+          const at = trackLocalPathPointToAreaLocal(f, area, uv)
+          return { k, n: nearestAnchor(anchors, at.x, at.y, f.id, SWITCH_FACE_NEAR_PX) }
+        })
+        .filter((x) => x.n)
+      // 先看哪些端已經接著某個口的鄰居；那個口也就有主了，不能再讓另一端去接
+      const taken = new Set<string>()
+      for (const e of ends) {
+        for (const face of faces) {
+          if (Math.hypot(face.n!.xM - e.x, face.n!.yM - e.y) <= STALE_PATH_END_M) {
+            e.matched = true
+            taken.add(face.k)
+          }
+        }
+      }
+      // 沒接著任何口的那一端，找最近的、差距落在補接範圍內的鄰居
+      let best: { end: 'first' | 'last'; x: number; y: number; d: number } | null = null
+      for (const e of ends) {
+        if (e.matched) continue
+        for (const face of faces) {
+          if (taken.has(face.k)) continue
+          const d = Math.hypot(face.n!.xM - e.x, face.n!.yM - e.y)
+          if (d < SWITCH_BRIDGE_MIN_M || d > SWITCH_BRIDGE_MAX_M) continue
+          if (!best || d < best.d) best = { end: e.key, x: face.n!.xM, y: face.n!.yM, d }
+        }
+      }
+      if (!best) return f
+      const point: [number, number] = [Number(best.x.toFixed(2)), Number(best.y.toFixed(2))]
+      const real = best.end === 'last' ? [...paths.real, point] : [point, ...paths.real]
+      const parameters: Record<string, unknown> = { ...(f.parameters ?? {}), [TRACKGEN_REAL_PATH_KEY]: real }
+      // 里程接長一段
+      const spans = getTrackGenSpans(f.parameters)
+      if (spans.length > 0) {
+        const lastSpan = spans[spans.length - 1]!
+        parameters[TRACKGEN_SPANS_KEY] = spans.map((sp, i) =>
+          i === spans.length - 1 ? { ...sp, s1: Number((sp.s1 + (sp.s1 >= sp.s0 ? best!.d : -best!.d)).toFixed(2)) } : sp,
+        )
+        void lastSpan
+      }
+      // 範圍納入補上的那一點
+      const b = getRefFieldBounds(f.parameters)
+      if (b.xMinM !== null && b.xMaxM !== null && b.yMinM !== null && b.yMaxM !== null) {
+        parameters[REF_FIELD_X_MIN_M] = Number(Math.min(b.xMinM, point[0] - 1.675).toFixed(2))
+        parameters[REF_FIELD_X_MAX_M] = Number(Math.max(b.xMaxM, point[0] + 1.675).toFixed(2))
+        parameters[REF_FIELD_Y_MIN_M] = Number(Math.min(b.yMinM, point[1] - 1.675).toFixed(2))
+        parameters[REF_FIELD_Y_MAX_M] = Number(Math.max(b.yMaxM, point[1] + 1.675).toFixed(2))
+      }
+      touched = true
+      bridged.push(`${f.customName?.trim() || f.id}（補 ${best.d.toFixed(1)} 公尺）`)
+      return { ...f, parameters } as FacilityObject
+    })
+    if (touched) changed = true
+    return touched ? { ...area, facilities } : area
+  })
+  return { areas: changed ? next : areas, bridged }
 }

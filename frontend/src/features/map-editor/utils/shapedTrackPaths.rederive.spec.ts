@@ -61,7 +61,8 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
     const broken = { ...area, facilities: area.facilities.map((f) => (f.id === stale.id ? stale : f)) }
     const out = healStaleTrackPathsInAreas([broken])
     expect(out.healed).toEqual(['U04'])
-    expect(out.ambiguous.sort()).toEqual(['U18', 'U19'])
+    // U18／U19 曾是互相對不上的一對；圖資修好之後不再出現，未修好時也只回報不動
+    expect(out.ambiguous.filter((l) => !['U18', 'U19'].includes(l))).toEqual([])
   })
 
   it('正常接著隔壁的軌道不是過期', () => {
@@ -174,5 +175,31 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('依圖上形狀重算�
     }
     // 直軌道、圓角、斜接都對齊；剩下的是範圍另有定義的分岔（121）與一塊差 0.4 公尺的 D18
     expect(changed.length).toBeLessThanOrEqual(3)
+  })
+})
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('分岔中心線比路口短：補接到隔壁', () => {
+  const areas = parseMapFileJson(doc as never).areas
+  const byId = (id: string) => areas[0]!.facilities.find((f) => f.id === id)
+  const lastOf = (id: string) => {
+    const real = getTrackGenPaths(byId(id)!.parameters)!.real
+    return real[real.length - 1]!
+  }
+
+  it('120／121（T3 靠 S2W 的轉角）補接到 D21／U21 的端點', () => {
+    if (!byId('120') || !byId('121')) return
+    const e121 = lastOf('121')
+    expect(Math.hypot(e121[0] + 872.73, e121[1] + 318.62)).toBeLessThan(0.1)
+    const e120 = lastOf('120')
+    expect(Math.hypot(e120[0] + 869.86, e120[1] + 316.62)).toBeLessThan(0.1)
+  })
+
+  it('D04/T01 的直行出口只差 9.6 公尺（正常出口偏移），不補；已補過的再跑一次不變', async () => {
+    const { bridgeSwitchCentrelinesInAreas } = await import('./shapedTrackPaths')
+    const before = getTrackGenPaths(byId('073')!.parameters)!.real
+    expect(before.length).toBeGreaterThan(10)
+    const again = bridgeSwitchCentrelinesInAreas(areas)
+    expect(again.bridged).toEqual([])
+    expect(again.areas).toBe(areas)
   })
 })

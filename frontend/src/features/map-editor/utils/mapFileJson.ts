@@ -51,7 +51,7 @@ import {
 import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { normalizeTrackGenOrientation } from './trackGenOrientation'
-import { healStaleTrackPathsInAreas } from './shapedTrackPaths'
+import { bridgeSwitchCentrelinesInAreas, healStaleTrackPathsInAreas } from './shapedTrackPaths'
 import { alignTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
@@ -592,8 +592,13 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     if (healedAreas.ambiguous.length > 0) {
       console.warn(`[map] ${healedAreas.ambiguous.length} 塊軌道的中心線只有一端接不上隔壁，看不出哪一塊有問題，沒有動：${healedAreas.ambiguous.join('、')}`)
     }
+    // 分岔的中心線在路口前面斷掉：把缺的那一段補接到轉角軌道（見 bridgeSwitchCentrelinesInAreas）
+    const bridgedAreas = bridgeSwitchCentrelinesInAreas(healedAreas.areas)
+    if (bridgedAreas.bridged.length > 0) {
+      console.warn(`[map] ${bridgedAreas.bridged.length} 塊分岔的中心線比路口短，已補接到相接的軌道：${bridgedAreas.bridged.join('、')}`)
+    }
     // 場域範圍是從中心線導出來的：載入時對齊，「依圖上形狀重算範圍」才不會每次都改一批
-    const areas = alignTrackRefFieldBoundsInAreas(healedAreas.areas)
+    const areas = alignTrackRefFieldBoundsInAreas(bridgedAreas.areas)
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)
