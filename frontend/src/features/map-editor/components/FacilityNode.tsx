@@ -2859,6 +2859,14 @@ export const FacilityNode = memo(function FacilityNode({
               strokeWidth={effectiveFrameWidthPx}
               strokeLinejoin="round"
               strokeLinecap="round"
+              // 斜接／圓角／交叉的框線是 SVG 描邊，CSS 的 borderStyle 管不到，要自己給虛線間隔
+              strokeDasharray={
+                strokeStyle === 'dashed'
+                  ? `${Math.max(4, effectiveFrameWidthPx * 3)} ${Math.max(3, effectiveFrameWidthPx * 2)}`
+                  : strokeStyle === 'dotted'
+                    ? `0.1 ${Math.max(3, effectiveFrameWidthPx * 2)}`
+                    : undefined
+              }
             />
           </svg>
         )}
