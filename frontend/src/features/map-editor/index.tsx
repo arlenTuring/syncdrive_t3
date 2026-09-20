@@ -1065,7 +1065,8 @@ export default function MapEditorApp({
        * 成為候選。它照樣畫在圖上，只是永遠不會被選中，落在它上面的點被判給附近
        * 別的方塊。實測 D18 自己中心線上的九個點，七個被判給對向的 U18／U19。
        */
-      const spanned = backfillTrackGenSpansInAreas(shaped.areas)
+      // 剛推出中心線的軌道（例如接到分區入口的）也要併進接點
+      const spanned = backfillTrackGenSpansInAreas(settleTrackJointsInAreas(shaped.areas).areas)
       if (spanned.filled.length > 0) {
         console.warn(
           `[map] ${spanned.filled.length} 塊軌道有中心線卻沒有里程對應（不會進定位索引，`

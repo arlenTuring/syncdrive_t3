@@ -247,3 +247,30 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道鏈：多算一�
     for (let i = 1; i < ys.length; i += 1) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]! + 0.5)
   })
 })
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道接到分區入口', () => {
+  const areas = parseMapFileJson(doc as never).areas
+  const area = areas[0]!
+
+  it('入口外框上的端面，現場座標取入口綁定的途經點', async () => {
+    const entrance = area.facilities.find((f) => f.name === 'ZoneEntrance')
+    if (!entrance) return
+    const { deriveShapedTrackPathsInAreas } = await import('./shapedTrackPaths')
+    const wp = area.facilities.find((f) => f.id === entrance.parameters?.zoneEntranceWaypointId)!
+    const fx = Number(wp.parameters?.refFieldXM)
+    const fy = Number(wp.parameters?.refFieldYM)
+    // 把 T02 的中心線拿掉，重推：一端貼著 D19、另一端貼著入口
+    const t02 = area.facilities.find((f) => f.customName === 'T02')
+    if (!t02) return
+    const params = { ...t02.parameters } as Record<string, unknown>
+    delete params.trackGenRealPath
+    delete params.trackGenLocalPath
+    const probe = { ...area, facilities: area.facilities.map((f) => (f.id === t02.id ? { ...t02, parameters: params } : f)) }
+    const out = deriveShapedTrackPathsInAreas([probe])
+    expect(out.derived).toContain('T02')
+    const real = getTrackGenPaths(out.areas[0]!.facilities.find((f) => f.id === t02.id)!.parameters)!.real
+    const ends = [real[0]!, real[real.length - 1]!]
+    expect(ends.some((e) => Math.hypot(e[0] - fx, e[1] - fy) < 0.05)).toBe(true)
+  })
+})
+

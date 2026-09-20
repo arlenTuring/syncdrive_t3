@@ -29,6 +29,7 @@ import {
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
 import { usesCornerFieldRange } from './facilityRefFieldBoundsAuto'
 import { resolveCrossPortalFields } from './crossTrackPortals'
+import { ZONE_ENTRANCE_WAYPOINT_ID_KEY } from './zonePartition'
 import { realBounds } from './trackGenApply'
 import {
   CROSS_HANDLE_KEYS,
@@ -124,6 +125,11 @@ type Anchor = {
   end: 0 | 1
   /** 交叉軌道才有：是四個口的哪一個 */
   port?: string
+  /**
+   * 分區入口才有：入口外框的四條邊（區域座標，[x0, y0, x1, y1]）。軌道可以接在邊上任何一處，
+   * 所以比對時算到<strong>線段</strong>的距離；現場座標是入口綁定的途經點，整個入口只有這一個。
+   */
+  edges?: Array<[number, number, number, number]>
   px: number
   py: number
   xM: number
@@ -132,8 +138,58 @@ type Anchor = {
   latPerBox: [number, number] | null
 }
 
-function collectAnchors(area: MapAreaObject): Anchor[] {
+/** 入口外框的四條邊（區域座標，y 向上）；旋轉照元件的順時針角度 */
+function entranceEdges(f: FacilityObject, area: MapAreaObject): Array<[number, number, number, number]> {
+  const pos = resolveFacilityAreaPosition(f, area.domain, area.layout)
+  const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+  const cx = pos.x + size.w / 2
+  const cy = pos.y + size.h / 2
+  const rad = (-(f.rotation ?? 0) * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const corner = (dx: number, dy: number): [number, number] => [
+    cx + dx * cos - dy * sin,
+    cy + dx * sin + dy * cos,
+  ]
+  const hw = size.w / 2
+  const hh = size.h / 2
+  const c = [corner(-hw, -hh), corner(hw, -hh), corner(hw, hh), corner(-hw, hh)]
+  return c.map((p, i) => [p[0], p[1], c[(i + 1) % 4]![0], c[(i + 1) % 4]![1]])
+}
+
+/**
+ * 分區入口：軌道接到入口的邊上，現場座標是入口綁定的途經點（zoneEntranceWaypointId）。
+ * 入口的圖台位置與大小不決定現場範圍，所以邊上每一處都答同一個座標。沒綁途經點就沒有答案。
+ */
+function entranceAnchor(f: FacilityObject, area: MapAreaObject): Anchor | null {
+  const wpId = f.parameters?.[ZONE_ENTRANCE_WAYPOINT_ID_KEY]
+  const wp = typeof wpId === 'string' ? area.facilities.find((x) => x.id === wpId) : undefined
+  const xM = Number(wp?.parameters?.refFieldXM)
+  const yM = Number(wp?.parameters?.refFieldYM)
+  if (!wp || !Number.isFinite(xM) || !Number.isFinite(yM)) return null
+  const edges = entranceEdges(f, area)
+  return {
+    facilityId: f.id,
+    end: 0,
+    px: (edges[0]![0] + edges[2]![0]) / 2,
+    py: (edges[0]![1] + edges[2]![1]) / 2,
+    xM,
+    yM,
+    latPerBox: null,
+    edges,
+  }
+}
+
+function collectAnchors(area: MapAreaObject, withEntrances = false): Anchor[] {
   const out: Anchor[] = []
+  if (withEntrances) {
+    for (const f of area.facilities) {
+      if (f.type === 'Facility' && f.name === 'ZoneEntrance') {
+        const a = entranceAnchor(f, area)
+        if (a) out.push(a)
+      }
+    }
+  }
   for (const f of area.facilities) {
     if (f.type !== 'Track') continue
     /*
@@ -184,6 +240,14 @@ function collectAnchors(area: MapAreaObject): Anchor[] {
   return out
 }
 
+function distToSegment(px: number, py: number, e: [number, number, number, number]): number {
+  const dx = e[2] - e[0]
+  const dy = e[3] - e[1]
+  const len2 = dx * dx + dy * dy
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - e[0]) * dx + (py - e[1]) * dy) / len2)) : 0
+  return Math.hypot(px - (e[0] + t * dx), py - (e[1] + t * dy))
+}
+
 function nearestAnchor(
   anchors: Anchor[],
   px: number,
@@ -195,7 +259,9 @@ function nearestAnchor(
   let bestD = Infinity
   for (const a of anchors) {
     if (exceptId && a.facilityId === exceptId) continue
-    const d = Math.hypot(a.px - px, a.py - py)
+    const d = a.edges
+      ? Math.min(...a.edges.map((e) => distToSegment(px, py, e)))
+      : Math.hypot(a.px - px, a.py - py)
     if (d > nearPx || d >= bestD) continue
     best = a
     bestD = d
@@ -269,7 +335,7 @@ export function deriveShapedTrackPathsInAreas(areas: MapAreaObject[]): {
   const skipped: string[] = []
 
   const nextAreas = areas.map((area) => {
-    const anchors = collectAnchors(area)
+    const anchors = collectAnchors(area, true)
     if (anchors.length === 0) return area
     const laneWidthM = laneWidthMOf(area)
 
@@ -519,7 +585,7 @@ export function rederiveTrackPath(
   const faces = facesOf(f, size)
   if (!faces) return { ok: false, reason: '這種軌道沒有可接的端面' }
 
-  const anchors = collectAnchors(area)
+  const anchors = collectAnchors(area, true)
   const ends = faces.map((handle) => {
     const uv = faceUv(handle, size)
     const local = trackLocalPathPointToAreaLocal(f, area, { x: uv.x, y: uv.y })
@@ -648,7 +714,7 @@ export function followNeighboursAfterMove(
   if (!checksStaleness(f)) return null
   const paths = getTrackGenPaths(f.parameters)
   if (!paths) return null
-  const anchors = collectAnchors(area)
+  const anchors = collectAnchors(area, true)
   const ends = ([0, 1] as const).map((t) => {
     const uv = pointAlongPath(paths.local, t)
     const at = trackLocalPathPointToAreaLocal(f, area, uv)
