@@ -56,6 +56,7 @@ import {
   healStaleTrackPathsInAreas,
   healTrackChainsInAreas,
 } from './shapedTrackPaths'
+import { settleTrackJointsInAreas } from './trackJoints'
 import { alignTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 import { reanchorFieldPointsAfterTrackHeal } from './reanchorPointsAfterHeal'
 import { parseMapRouteGroups } from './routeGroupPlanning'
@@ -443,6 +444,7 @@ function parseAreaEntry(entry: MapFileAreaEntry, index: number): MapAreaObject {
     showRuler: entry.showRuler !== false,
     mqtt: entry.mqtt,
     view,
+    trackJoints: parseTrackJoints(entry.trackJoints),
     facilities: syncAreaFacilitiesFieldCoords(
       clampAreaFacilitiesInLayout(
         sanitizeFacilitiesForEditor(
@@ -461,6 +463,19 @@ function parseAreaEntry(entry: MapFileAreaEntry, index: number): MapAreaObject {
       areaLayout,
     ),
   })
+}
+
+function parseTrackJoints(raw: unknown): MapAreaObject['trackJoints'] {
+  if (!Array.isArray(raw)) return undefined
+  const out: NonNullable<MapAreaObject['trackJoints']> = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const nums = [o.px, o.py, o.xM, o.yM].map(Number)
+    if (typeof o.id !== 'string' || !nums.every(Number.isFinite)) continue
+    out.push({ id: o.id, px: nums[0]!, py: nums[1]!, xM: nums[2]!, yM: nums[3]! })
+  }
+  return out.length > 0 ? out : undefined
 }
 
 function migrateV1ToAreas(json: MapFileV1, pixelSize: MapPixelSize): MapAreaObject[] {
@@ -618,7 +633,9 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       console.warn(`[map] ${bridgedAreas.bridged.length} 塊分岔的中心線比路口短，已補接到相接的軌道：${bridgedAreas.bridged.join('、')}`)
     }
     // 場域範圍是從中心線導出來的：載入時對齊，「依圖上形狀重算範圍」才不會每次都改一批
-    const areas = alignTrackRefFieldBoundsInAreas(bridgedAreas.areas)
+    // 接點：軌道相接處的現場座標只留一份，中心線頭尾依它對齊
+    const settled = settleTrackJointsInAreas(bridgedAreas.areas)
+    const areas = alignTrackRefFieldBoundsInAreas(settled.areas)
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)
@@ -730,6 +747,7 @@ export function areaToMapEntry(a: MapAreaObject): MapFileAreaEntry {
     mqtt: a.mqtt,
     view: { ...a.view },
     facilities: a.facilities.map(facilityToMapEntry),
+    ...(a.trackJoints && a.trackJoints.length > 0 ? { trackJoints: a.trackJoints.map((j) => ({ ...j })) } : {}),
   }
 }
 

@@ -134,6 +134,8 @@ export interface MapFileAreaEntry {
   mqtt?: MapAreaMqttFieldsEntry
   view?: MapAreaViewEntry
   facilities: MapFileFacilityEntry[]
+  /** 軌道接點（見 MapAreaObject.trackJoints） */
+  trackJoints?: Array<{ id: string; px: number; py: number; xM: number; yM: number }>
 }
 
 /** 路線群組：第一層目錄，內含多條營運路線 */

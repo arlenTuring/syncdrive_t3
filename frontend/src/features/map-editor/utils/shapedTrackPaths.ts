@@ -126,6 +126,8 @@ type Anchor = {
   facilityId: string
   /** 中心線的哪一端：0 起點、1 終點 */
   end: 0 | 1
+  /** 交叉軌道才有：是四個口的哪一個 */
+  port?: string
   px: number
   py: number
   xM: number
@@ -156,6 +158,7 @@ function collectAnchors(area: MapAreaObject): Anchor[] {
         out.push({
           facilityId: f.id,
           end: key === 'lt' || key === 'lb' ? 0 : 1,
+          port: key,
           px: local.x,
           py: local.y,
           xM: at.xM,

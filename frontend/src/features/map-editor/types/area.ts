@@ -65,6 +65,23 @@ export interface MapAreaObject {
   view: MapAreaView
   /** 設施 areaPosition 為區域座標；position 為場域公尺（隨 layout/domain 同步） */
   facilities: FacilityObject[]
+  /**
+   * 軌道接點：兩塊以上的軌道在同一點相接時，<strong>現場座標只存這一份</strong>。
+   * 軌道端點引用接點（parameters.trackGenEnds），現場中心線的頭尾由接點決定——
+   * 「兩端各說各的」在結構上不會發生。見 utils/trackJoints。
+   */
+  trackJoints?: TrackJoint[]
+}
+
+/** 軌道接點：圖上位置（區域像素）與現場座標（公尺）各一份 */
+export interface TrackJoint {
+  id: string
+  /** 圖上位置（區域座標，左下原點） */
+  px: number
+  py: number
+  /** 現場座標（公尺） */
+  xM: number
+  yM: number
 }
 
 export interface MapPixelSize {
