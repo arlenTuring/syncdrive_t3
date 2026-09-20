@@ -97,3 +97,24 @@ export function resolveTrackFillColor(
   return DEFAULT_ORDINARY_TRACK_FILL_COLOR
 }
 
+
+/** 軌道填色不透明度（0–1）；沒設視為 1（不透明） */
+export const TRACK_FILL_OPACITY_KEY = 'trackFillOpacity'
+
+export function getTrackFillOpacity(f: FacilityObject): number {
+  const raw = f.parameters?.[TRACK_FILL_OPACITY_KEY]
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1
+  return Math.max(0, Math.min(1, raw))
+}
+
+/**
+ * 把填色調成指定的不透明度。
+ *
+ * 用 color-mix 而不是自己解析顏色字串：填色可能是 #hex、rgb()、命名色或規則帶進來的任意 CSS 色，
+ * color-mix 對哪一種都成立。不透明度 1 原樣回傳，不多包一層。
+ */
+export function withFillOpacity(color: string, opacity: number): string {
+  if (opacity >= 1) return color
+  const pct = Math.round(Math.max(0, opacity) * 100)
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
+}

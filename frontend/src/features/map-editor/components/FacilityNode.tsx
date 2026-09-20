@@ -148,7 +148,7 @@ import {
   getFacilityRemarks,
   resolveFacilityDisplay,
 } from '../utils/facilityArea'
-import { resolveTrackFillColor } from '../utils/trackFacility'
+import { getTrackFillOpacity, resolveTrackFillColor, withFillOpacity } from '../utils/trackFacility'
 import {
   parseRoadLineColor,
   parseRoadLineStyle,
@@ -792,6 +792,8 @@ export const FacilityNode = memo(function FacilityNode({
   }, [facilityCustomIconUrl])
 
   const trackFillColor = isTrack ? resolveTrackFillColor(facility, mqttLive) : null
+  // 軌道填色的不透明度（屬性框「軌道透明度」）；0 就是完全透明，只留框線與名稱
+  const trackFillOpacity = isTrack ? getTrackFillOpacity(facility) : 1
   const roadLineStyle = isRoadLine
     ? parseRoadLineStyle(facility.parameters?.roadLineStyle)
     : null
@@ -2445,7 +2447,9 @@ export const FacilityNode = memo(function FacilityNode({
                   backgroundColor:
                     isSwitchTrack
                       ? 'transparent'
-                      : trackFillColor ?? undefined,
+                      : trackFillColor
+                        ? withFillOpacity(trackFillColor, trackFillOpacity)
+                        : undefined,
                   ...(isCornerTrack || isTaperTrack || isSwitchTrack || isCrossTrack
                     ? {
                         borderWidth: 0,
@@ -2933,7 +2937,7 @@ export const FacilityNode = memo(function FacilityNode({
             aria-hidden
           >
             {trackPartOverlay.map((p) =>
-              p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95} /> : null,
+              p.fill ? <path key={`fill-${p.part}`} d={p.d} fill={p.fill} opacity={0.95 * trackFillOpacity} /> : null,
             )}
           </svg>
         ) : null}
