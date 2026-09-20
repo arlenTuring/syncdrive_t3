@@ -1940,8 +1940,11 @@ const enUS: DeepStringify<typeof zhTW> = {
       },
       trackParts: {
         title: 'Per-track naming',
-        up: 'Up line (upper)',
-        down: 'Down line (lower)',
+        up: 'Upper side',
+        down: 'Lower side',
+        diagUp: 'Lower-left to upper-right',
+        diagDown: 'Lower-right to upper-left',
+        showName: 'Show name',
         straight: 'Through (straight)',
         branch: 'Branch (diagonal)',
         placeholder: 'e.g. D04',
@@ -1951,7 +1954,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         style: 'Display',
         styleFill: 'Solid fill',
         styleDashed: 'Dashed track (outline, no fill)',
-        hint: 'One component represents two tracks; names are set separately. Also selectable per track in the generation preview.',
+        hint: 'One component covers the upper and lower straights plus two diagonals; names are set separately and the diagonals\' names can be hidden. The two straights can also be named in the generation preview.',
         hintSwitch:
           'One component is through + branch. Name/color each; either can be a dashed track (same band shape, dashed outline, no fill).',
       },

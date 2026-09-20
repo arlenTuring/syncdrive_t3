@@ -16,6 +16,7 @@ import {
   getTrackGenPartColors,
   getTrackGenPartFontPx,
   getTrackGenPartLabelOffset,
+  getTrackGenPartLabelHidden,
   getTrackGenPartNames,
   getTrackGenPartStyle,
   patchTrackGenPartLabelOffset,
@@ -1203,16 +1204,18 @@ export const FacilityNode = memo(function FacilityNode({
           fontPx: fonts[part] ?? DEFAULT_PART_FONT_PX,
         }))
     }
-    // 交叉：只設了色、還沒命名的那一半也要上色
+    // 交叉：只設了色、還沒命名的那一半也要上色；斜行兩條沒有色塊，只有名字（可關閉）
+    const hidden = getTrackGenPartLabelHidden(facility)
+    const isDiag = (part: string) => part === 'diagUp' || part === 'diagDown'
     if (!Object.keys(names).length && !Object.keys(colors).length) return null
     return parts
-      .filter((part) => names[part] || colors[part])
+      .filter((part) => (isDiag(part) ? names[part] : names[part] || colors[part]))
       .map((part) => ({
         part,
-        d: d[part]!,
+        d: d[part] ?? '',
         at: c[part]!,
-        fill: colors[part],
-        name: names[part] ?? '',
+        fill: isDiag(part) ? undefined : colors[part],
+        name: isDiag(part) && hidden[part] ? '' : (names[part] ?? ''),
         fontPx: fonts[part] ?? DEFAULT_PART_FONT_PX,
       }))
   }, [isCrossTrack, isSwitchTrack, facility, crossTrackGeom, switchTrackGeom, nw, nh])

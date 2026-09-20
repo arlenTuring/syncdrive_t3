@@ -15,6 +15,7 @@ import {
   TRACKGEN_SPANS_KEY,
   type PathXY,
 } from './trackGenPaths'
+import { getTrackGenPartNames } from './trackGenParts'
 import { crossTrackHandlesPx, readCrossTrack } from './trackShapes'
 
 /**
@@ -40,9 +41,19 @@ export const CROSS_BRANCH_SUFFIX: Record<CrossRouteKey, string> = {
 /** 分支設施 id 與母體 id 的分隔；母體 id 本身不含它 */
 export const CROSS_BRANCH_ID_SEPARATOR = '~'
 
+/** 每條路徑在屬性框「軌道分段命名」裡對應哪一段 */
+const CROSS_ROUTE_PART: Record<CrossRouteKey, 'up' | 'down' | 'diagUp' | 'diagDown'> = {
+  straightTop: 'up',
+  straightBottom: 'down',
+  diagDown: 'diagDown',
+  diagUp: 'diagUp',
+}
+
 export type CrossBranch = {
   /** 穩定代號，如 D03U03_DIAG_UP：改設施 id 之外也不變，給訂單／任務記「預期走哪一條」 */
   code: string
+  /** 使用者在屬性框幫這一段取的名字；沒取為 null。圖上的車輛標籤與診斷優先顯示它 */
+  name: string | null
   /** 分支設施 id（母體 id + ~ + 後綴） */
   facilityId: string
   parentId: string
@@ -96,6 +107,7 @@ export function deriveCrossBranches(
   const fields = resolveCrossPortalFields(facility, area)
   const units = portalUnits(facility, area)
   const code = codeOfFacility(facility)
+  const partNames = getTrackGenPartNames(facility)
   const out: CrossBranch[] = []
   for (const route of CROSS_ROUTE_KEYS) {
     /*
@@ -118,6 +130,7 @@ export function deriveCrossBranches(
     if (lengthM < MIN_BRANCH_M) continue
     out.push({
       code: `${code}_${CROSS_BRANCH_SUFFIX[route]}`,
+      name: partNames[CROSS_ROUTE_PART[route]] ?? null,
       facilityId: crossBranchFacilityId(facility.id, route),
       parentId: facility.id,
       route,
@@ -154,6 +167,8 @@ export function crossBranchToFacility(parent: FacilityObject, branch: CrossBranc
   return {
     ...parent,
     id: branch.facilityId,
+    // 車輛標籤顯示這一條的名字；沒取名就沿用母體的
+    customName: branch.name ?? parent.customName,
     parameters: {
       ...parent.parameters,
       [TRACKGEN_REAL_PATH_KEY]: branch.real,

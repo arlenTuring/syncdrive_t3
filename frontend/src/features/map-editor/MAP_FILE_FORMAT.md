@@ -253,12 +253,14 @@ State fields:
 
 | 路徑 | 分支代號（例） | 起 → 迄（正向） |
 | --- | --- | --- |
-| `straightTop` | `D03U03_STRAIGHT_TOP` | `lt` → `rt` |
-| `straightBottom` | `D03U03_STRAIGHT_BOTTOM` | `lb` → `rb` |
+| `straightTop`（`up`） | `D03U03_STRAIGHT_TOP` | `lt` → `rt` |
+| `straightBottom`（`down`） | `D03U03_STRAIGHT_BOTTOM` | `lb` → `rb` |
 | `diagDown` | `D03U03_DIAG_DOWN` | `lt` → `rb` |
 | `diagUp` | `D03U03_DIAG_UP` | `lb` → `rt` |
 
-方向設 `reverse` 時起迄對調、`both` 時雙向。現場中心線是兩個口座標的連線，圖面中心線是兩個口在方塊內的位置連線，兩者頭尾一一對應；端點就是隔壁軌道接進來的那一端，所以換塊與補間自然相連。分支設施 id 為 `<母體 id>~<DIAG_UP…>`，代號（`D03U03_DIAG_UP`）穩定，供訂單／任務記「預期經過哪一條」。實作見 `utils/crossBranches.ts`（前端）與 `src/mapGeometry.js` 的 `expandCrossBranches`（模擬器），兩邊必須一致。
+**命名**：`trackGenPartNames` 的鍵 `up`（上側，`straightTop`）、`down`（下側，`straightBottom`）、`diagUp`（左下右上側）、`diagDown`（右下左上側）各自對應一條路徑；名字只是標籤，「上／下」指圖面位置，不代表現場有上行下行之分。`trackGenPartLabelHidden`（`{ "diagUp": true }`）關掉斜行兩條的名稱顯示。取了名字的分支，圖上的車輛標籤用它的名字；沒取名沿用母體名字。
+
+方向設 `reverse` 時起迄對調、`both` 時雙向；`off`（不通）只影響路線規劃，幾何仍推導、當雙向只用來定位——直行兩條是正線本身的車道。現場中心線是兩個口座標的連線，圖面中心線是兩個口在方塊內的位置連線，兩者頭尾一一對應；端點就是隔壁軌道接進來的那一端，所以換塊與補間自然相連。分支設施 id 為 `<母體 id>~<DIAG_UP…>`，代號（`D03U03_DIAG_UP`）穩定，供訂單／任務記「預期經過哪一條」。實作見 `utils/crossBranches.ts`（前端）與 `src/mapGeometry.js` 的 `expandCrossBranches`（模擬器），兩邊必須一致。
 
 > 舊版的虛擬渡線（`TrackCrossover`）已由交叉軌道取代，不再使用；含有它的舊地圖不能用。
 

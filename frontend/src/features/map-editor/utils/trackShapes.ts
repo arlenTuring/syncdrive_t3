@@ -964,16 +964,32 @@ export function crossTrackGuidesPx(
   }
 }
 
-/** 兩條直行各自的中心（相對元件左上角的像素）——名字標在自己那條上 */
+/**
+ * 四條路徑各自的名字錨點（相對元件左上角的像素）。
+ *
+ * 兩條直行標在自己的中心。兩條斜線在中央相交，名字若都標在正中間會疊在一起，所以各偏
+ * 一邊：左下→右上那條標在靠左下的四分之一處，右下→左上那條標在靠右下的四分之一處。
+ */
 export function crossTrackPartCentresPx(
   g: CrossTrackGeometry,
   boxWPx: number,
   boxHPx: number,
-): { up: ShapePoint; down: ShapePoint } {
+): { up: ShapePoint; down: ShapePoint; diagUp: ShapePoint; diagDown: ShapePoint } {
   const { w, h, T } = crossSpin(g, boxWPx, boxHPx)
   const mid = (p: CrossFace, q: CrossFace) =>
     T(((p.at + q.at) / 2) * w, ((p.from + p.to + q.from + q.to) / 4) * h)
-  return { up: mid(g.lt, g.rt), down: mid(g.lb, g.rb) }
+  const face = (f: CrossFace) => ({ x: f.at * w, y: ((f.from + f.to) / 2) * h })
+  const along = (a: CrossFace, b: CrossFace, t: number) => {
+    const p = face(a)
+    const q = face(b)
+    return T(p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t)
+  }
+  return {
+    up: mid(g.lt, g.rt),
+    down: mid(g.lb, g.rb),
+    diagUp: along(g.lb, g.rt, 0.25),
+    diagDown: along(g.rb, g.lt, 0.25),
+  }
 }
 
 export type CrossHandleKey = 'lt' | 'lb' | 'rt' | 'rb'

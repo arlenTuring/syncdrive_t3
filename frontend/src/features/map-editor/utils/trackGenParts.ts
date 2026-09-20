@@ -1,5 +1,5 @@
 import type { FacilityObject } from '../types/facility'
-import { CROSS_PARTS, SWITCH_PARTS, type TrackGenPart } from './trackGenGroups'
+import { CROSS_DIAG_PARTS, CROSS_PARTS, SWITCH_PARTS, type TrackGenPart } from './trackGenGroups'
 import { TRACK_DEFAULT_LABEL_FONT_PX } from './facilityLabelStyle'
 
 export type { TrackGenPart } from './trackGenGroups'
@@ -26,11 +26,42 @@ export const DEFAULT_PART_FONT_PX = TRACK_DEFAULT_LABEL_FONT_PX
 export const MIN_PART_FONT_PX = 6
 export const MAX_PART_FONT_PX = 48
 
-/** 這個設施分不分成兩半，分的話是哪兩半 */
+/** 各段名字要不要標在圖上；只有斜行兩條可以關（沒有的鍵視為顯示） */
+export const TRACKGEN_PART_LABEL_HIDDEN_KEY = 'trackGenPartLabelHidden'
+
+/** 這個設施分成哪幾段可以各自命名：交叉是兩條直行加兩條斜行，分岔是主線與岔線 */
 export function facilityParts(f: FacilityObject): readonly TrackGenPart[] | null {
-  if (f.name === 'RailCross') return CROSS_PARTS
+  if (f.name === 'RailCross') return [...CROSS_PARTS, ...CROSS_DIAG_PARTS]
   if (f.name === 'RailSwitch') return SWITCH_PARTS
   return null
+}
+
+/** 這一段的名字能不能關掉不標：只有斜行可以 */
+export function partLabelCanHide(part: TrackGenPart): boolean {
+  return (CROSS_DIAG_PARTS as readonly string[]).includes(part)
+}
+
+/** 被關掉名稱顯示的段 */
+export function getTrackGenPartLabelHidden(f: FacilityObject): Record<string, boolean> {
+  const v = f.parameters?.[TRACKGEN_PART_LABEL_HIDDEN_KEY]
+  if (!v || typeof v !== 'object') return {}
+  const out: Record<string, boolean> = {}
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (raw === true) out[k] = true
+  }
+  return out
+}
+
+/** 只改一段的名稱顯示；顯示（預設）就把鍵拿掉 */
+export function patchTrackGenPartLabelHidden(
+  f: FacilityObject,
+  part: TrackGenPart,
+  hidden: boolean,
+): Record<string, unknown> {
+  const next = { ...getTrackGenPartLabelHidden(f) }
+  if (hidden) next[part] = true
+  else delete next[part]
+  return { [TRACKGEN_PART_LABEL_HIDDEN_KEY]: next }
 }
 
 function readMap(v: unknown): Record<string, string> {

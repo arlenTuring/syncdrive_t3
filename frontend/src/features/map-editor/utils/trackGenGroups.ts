@@ -21,8 +21,18 @@ export type TrackGenGroup = {
  * 交叉與分岔在圖上是一個元件，在現場卻是<strong>兩條軌道</strong>。
  */
 export const CROSS_PARTS = ['up', 'down'] as const
+/**
+ * 交叉軌道另有兩條斜行：左下→右上（diagUp）與右下→左上（diagDown）。
+ *
+ * 生成時只分上、下兩條直行（CROSS_PARTS）；斜行是事後在屬性框命名的，所以不進生成流程。
+ * 名字只是標籤：「上／下」指圖面上的位置，不代表現場有上行、下行之分。
+ */
+export const CROSS_DIAG_PARTS = ['diagUp', 'diagDown'] as const
 export const SWITCH_PARTS = ['straight', 'branch'] as const
-export type TrackGenPart = (typeof CROSS_PARTS)[number] | (typeof SWITCH_PARTS)[number]
+export type TrackGenPart =
+  | (typeof CROSS_PARTS)[number]
+  | (typeof CROSS_DIAG_PARTS)[number]
+  | (typeof SWITCH_PARTS)[number]
 
 /** 這一種形狀分不分成兩半，分的話有哪兩半 */
 export function partsOfKind(kind: string): readonly TrackGenPart[] | null {
