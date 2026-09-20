@@ -834,29 +834,69 @@ export function bridgeSwitchCentrelinesInAreas(areas: MapAreaObject[]): {
           if (!best || d < best.d) best = { end: e.key, x: face.n!.xM, y: face.n!.yM, d }
         }
       }
-      if (!best) return f
-      const point: [number, number] = [Number(best.x.toFixed(2)), Number(best.y.toFixed(2))]
-      const real = best.end === 'last' ? [...paths.real, point] : [point, ...paths.real]
-      const parameters: Record<string, unknown> = { ...(f.parameters ?? {}), [TRACKGEN_REAL_PATH_KEY]: real }
-      // 里程接長一段
-      const spans = getTrackGenSpans(f.parameters)
-      if (spans.length > 0) {
-        const lastSpan = spans[spans.length - 1]!
-        parameters[TRACKGEN_SPANS_KEY] = spans.map((sp, i) =>
-          i === spans.length - 1 ? { ...sp, s1: Number((sp.s1 + (sp.s1 >= sp.s0 ? best!.d : -best!.d)).toFixed(2)) } : sp,
-        )
-        void lastSpan
+      let real = paths.real
+      let parameters: Record<string, unknown> = { ...(f.parameters ?? {}) }
+      let note = ''
+      if (best) {
+        const point: [number, number] = [Number(best.x.toFixed(2)), Number(best.y.toFixed(2))]
+        real = best.end === 'last' ? [...paths.real, point] : [point, ...paths.real]
+        parameters[TRACKGEN_REAL_PATH_KEY] = real
+        // 里程接長一段
+        const spans = getTrackGenSpans(f.parameters)
+        if (spans.length > 0) {
+          parameters[TRACKGEN_SPANS_KEY] = spans.map((sp, i) =>
+            i === spans.length - 1 ? { ...sp, s1: Number((sp.s1 + (sp.s1 >= sp.s0 ? best!.d : -best!.d)).toFixed(2)) } : sp,
+          )
+        }
+        // 範圍納入補上的那一點
+        const b = getRefFieldBounds(f.parameters)
+        if (b.xMinM !== null && b.xMaxM !== null && b.yMinM !== null && b.yMaxM !== null) {
+          parameters[REF_FIELD_X_MIN_M] = Number(Math.min(b.xMinM, point[0] - 1.675).toFixed(2))
+          parameters[REF_FIELD_X_MAX_M] = Number(Math.max(b.xMaxM, point[0] + 1.675).toFixed(2))
+          parameters[REF_FIELD_Y_MIN_M] = Number(Math.min(b.yMinM, point[1] - 1.675).toFixed(2))
+          parameters[REF_FIELD_Y_MAX_M] = Number(Math.max(b.yMaxM, point[1] + 1.675).toFixed(2))
+        }
+        note = `補 ${best.d.toFixed(1)} 公尺`
       }
-      // 範圍納入補上的那一點
-      const b = getRefFieldBounds(f.parameters)
-      if (b.xMinM !== null && b.xMaxM !== null && b.yMinM !== null && b.yMaxM !== null) {
-        parameters[REF_FIELD_X_MIN_M] = Number(Math.min(b.xMinM, point[0] - 1.675).toFixed(2))
-        parameters[REF_FIELD_X_MAX_M] = Number(Math.max(b.xMaxM, point[0] + 1.675).toFixed(2))
-        parameters[REF_FIELD_Y_MIN_M] = Number(Math.min(b.yMinM, point[1] - 1.675).toFixed(2))
-        parameters[REF_FIELD_Y_MAX_M] = Number(Math.max(b.yMaxM, point[1] + 1.675).toFixed(2))
+
+      /*
+       * 圖面路徑要畫在分岔自己的形狀上。
+       *
+       * 生成器給分岔的圖面路徑是外框的長邊中線，形狀卻是進口一側、出口一側（可能整個轉了 90 度）：
+       * 120 的圖面路徑是橫的，形狀與現場都是直的（往南）。現場座標與圖面位置就這樣對不上——車在
+       * 分岔框裡橫著走過去、模擬器把圖上畫的直線折成橫向跳一步。
+       * 中心線與哪個出口的鄰居接上，圖面路徑就是「進口 → 那個出口」的連線。
+       */
+      const realFirst = real[0]!
+      const realLast = real[real.length - 1]!
+      const exitFace = faces.find(
+        (face) =>
+          face.k !== 'a' &&
+          (Math.hypot(face.n!.xM - realLast[0], face.n!.yM - realLast[1]) <= STALE_PATH_END_M ||
+            Math.hypot(face.n!.xM - realFirst[0], face.n!.yM - realFirst[1]) <= STALE_PATH_END_M),
+      )
+      if (exitFace) {
+        const exitAtLast =
+          Math.hypot(exitFace.n!.xM - realLast[0], exitFace.n!.yM - realLast[1]) <= STALE_PATH_END_M
+        const aUv = faceUv(handles.a, size)
+        const eUv = faceUv(handles[exitFace.k], size)
+        const near = (u: number[], v: { x: number; y: number }) => Math.hypot(u[0]! - v.x, u[1]! - v.y) < 0.1
+        const cur = paths.local
+        const curOk =
+          (near(cur[0]!, aUv) && near(cur[cur.length - 1]!, eUv)) ||
+          (near(cur[0]!, eUv) && near(cur[cur.length - 1]!, aUv))
+        if (!curOk) {
+          const r4 = (v: number) => Number(v.toFixed(4))
+          const local: Array<[number, number]> = exitAtLast
+            ? [[r4(aUv.x), r4(aUv.y)], [r4(eUv.x), r4(eUv.y)]]
+            : [[r4(eUv.x), r4(eUv.y)], [r4(aUv.x), r4(aUv.y)]]
+          parameters[TRACKGEN_LOCAL_PATH_KEY] = local
+          note = note ? `${note}，圖面路徑改為進口→${exitFace.k === 'm' ? '直行' : '岔出'}出口` : `圖面路徑改為進口→${exitFace.k === 'm' ? '直行' : '岔出'}出口`
+        }
       }
+      if (!note) return f
       touched = true
-      bridged.push(`${f.customName?.trim() || f.id}（補 ${best.d.toFixed(1)} 公尺）`)
+      bridged.push(`${f.customName?.trim() || f.id}（${note}）`)
       return { ...f, parameters } as FacilityObject
     })
     if (touched) changed = true

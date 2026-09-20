@@ -203,3 +203,51 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('分岔中心線比路�
     expect(again.areas).toBe(areas)
   })
 })
+
+describe.skipIf(!doc || doc.creationMode !== 'trackGen')('T3 分岔 120／121：圖面路徑畫在自己的形狀上', () => {
+  const areas = parseMapFileJson(doc as never).areas
+  const byId = (id: string) => areas[0]!.facilities.find((f) => f.id === id)
+
+  it('120 的圖面路徑是直的（原本是橫的，形狀與現場都是直的）；121 是進口到岔出出口的斜線', () => {
+    if (!byId('120') || !byId('121')) return
+    const l120 = getTrackGenPaths(byId('120')!.parameters)!.local
+    // 兩端 x 幾乎相同、y 不同：直的
+    expect(Math.abs(l120[0]![0]! - l120[l120.length - 1]![0]!)).toBeLessThan(0.02)
+    expect(Math.abs(l120[0]![1]! - l120[l120.length - 1]![1]!)).toBeGreaterThan(0.5)
+    const l121 = getTrackGenPaths(byId('121')!.parameters)!.local
+    expect(Math.abs(l121[0]![0]! - l121[l121.length - 1]![0]!)).toBeGreaterThan(0.3)
+  })
+
+  it('沿路線重播經過 T3 分岔路口（120／121，不含 U18／U19）：畫面位置一步一步連續，沒有橫向跳一大步，偏移都在中心線上', async () => {
+    if (!byId('120') || !byId('121')) return
+    const { buildTrackNetwork, resolveVehiclePlacementAcrossAreas, previousTrackIdOf } = await import(
+      '../vehicles/resolveVehicleTrackPlacement'
+    )
+    const routes = JSON.parse(
+      readFileSync(join(__dirname, '../vehicles/__fixtures__/route-through-t3-junction.json'), 'utf-8'),
+    ) as Array<{ route: string; points: Array<{ x: number; y: number; heading: number }> }>
+    const net = buildTrackNetwork(areas)
+    for (const r of routes) {
+      let prev: string | undefined
+      let last: { x: number; y: number } | null = null
+      let worstStep = 0
+      let worstOff = 0
+      for (const p of r.points) {
+        const hit = resolveVehiclePlacementAcrossAreas(areas, p.x, p.y, net, {
+          headingRad: p.heading,
+          speedMps: 5,
+          previousTrackId: prev,
+        })
+        prev = previousTrackIdOf(hit, false)
+        expect(hit, r.route).not.toBeNull()
+        const at = { x: hit!.placement.areaLocalX, y: hit!.placement.areaLocalY }
+        if (last) worstStep = Math.max(worstStep, Math.hypot(at.x - last.x, at.y - last.y))
+        last = at
+        worstOff = Math.max(worstOff, Math.abs(hit!.placement.network?.offsetM ?? 0))
+      }
+      // 取樣間隔約 3–5 公尺，圖上每步 3–10 像素；橫向亂跳時單步會到 30–60 像素。分岔與轉角的接點圖面上有 20 像素左右的落差，容許到 30
+      expect(worstStep, r.route).toBeLessThan(30)
+      expect(worstOff, r.route).toBeLessThan(0.5)
+    }
+  })
+})

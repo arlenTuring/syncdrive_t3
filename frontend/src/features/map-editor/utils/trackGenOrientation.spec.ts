@@ -160,7 +160,8 @@ describe.skipIf(!loaded || loaded.doc.creationMode !== 'trackGen')('真實圖資
         changed.push(String(a.customName || a.id))
       }
     }
-    expect(changed.sort()).toEqual(['121', 'D03/U03'])
+    // 121、D03/U03 是倒正；120 是載入時把分岔的圖面路徑改畫在自己的形狀上（見 bridgeSwitchCentrelinesInAreas）
+    expect(changed.sort()).toEqual(['120', '121', 'D03/U03'])
   })
 
   it('由 D02 開進 D03/U03，畫面位置一步一步連續，接點處不會整個外框寬地跳過去', () => {
