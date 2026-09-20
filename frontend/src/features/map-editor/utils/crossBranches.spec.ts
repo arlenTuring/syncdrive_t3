@@ -93,8 +93,16 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
     const upStart = up.real[0]!
     const downEnd = down.real[1]!
     expect(Math.hypot(upStart[0] - downEnd[0], upStart[1] - downEnd[1])).toBeGreaterThan(2)
-    // 直行兩條關著，不產生分支
-    expect(byCode.size).toBe(2)
+    // 直行兩條在設定裡是「不通」（只影響路線規劃），但它們是正線本身的車道，幾何一律推導
+    expect([...byCode.keys()].sort()).toEqual([
+      'D03U03_DIAG_DOWN',
+      'D03U03_DIAG_UP',
+      'D03U03_STRAIGHT_BOTTOM',
+      'D03U03_STRAIGHT_TOP',
+    ])
+    // 正線從 D02（rt）進、D04（lt）出：走的是上直行，不是斜線
+    const top = byCode.get('D03U03_STRAIGHT_TOP')!
+    expect([top.from, top.to].sort()).toEqual(['lt', 'rt'])
     expect(up.facilityId).toBe(`${f.id}${CROSS_BRANCH_ID_SEPARATOR}DIAG_UP`)
     expect(parentFacilityIdOfBranch(up.facilityId)).toBe(f.id)
   })
@@ -103,6 +111,29 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
     expect(withCrossBranchTracks(areas)).toBe(withCrossBranchTracks(areas))
     const none = [{ ...areas[0]!, facilities: (areas[0]!.facilities ?? []).filter((f) => f.name !== 'RailCross') }]
     expect(withCrossBranchTracks(none)).toBe(none)
+  })
+
+  it('正線上的車（D02 → D04）走上直行，不被吸到斜線上', () => {
+    const derived = withCrossBranchTracks(areas)
+    const network = getTrackNetwork(derived)
+    const route = (
+      JSON.parse(
+        readFileSync(join(__dirname, '../vehicles/__fixtures__/route-through-cross.json'), 'utf-8'),
+      ) as Array<{ route: string; zone: string; points: Array<{ x: number; y: number; heading: number }> }>
+    ).find((r) => r.route === 'N2W下行>T3下行' && r.zone === 'n2w')!
+    const seen = new Set<string>()
+    let previous: string | undefined
+    for (const p of route.points) {
+      const hit = resolveVehiclePlacementAcrossAreas(derived, p.x, p.y, network, {
+        headingRad: p.heading,
+        speedMps: 5,
+        previousTrackId: previous,
+      })
+      previous = previousTrackIdOf(hit, false)
+      const id = hit?.placement.trackId ?? ''
+      if (id.includes('~')) seen.add(id.split('~')[1]!)
+    }
+    expect([...seen]).toEqual(['STRAIGHT_TOP'])
   })
 
   it('斜線上的車判給那一條分支，偏移量近乎 0；改用單一中線會差好幾公尺', () => {
@@ -176,8 +207,8 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
         const before = crossMaxOffset(areas, route)
         const after = crossMaxOffset(derived, route)
         expect(after.placed, route.route).toBe(route.points.length)
-        // 沒有任何一條路線變差（容許 0.05 公尺的數值誤差）
-        expect(after.max, route.route).toBeLessThanOrEqual(before.max + 0.05)
+        // 沒有任何一條路線明顯變差（分支共用一個口的那一小段兩條線幾乎重疊，容許 0.5 公尺）
+        expect(after.max, route.route).toBeLessThanOrEqual(before.max + 0.5)
         if (after.max < before.max - 1) improved += 1
       }
       // 至少一半的路線改善超過 1 公尺

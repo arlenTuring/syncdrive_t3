@@ -98,8 +98,16 @@ export function deriveCrossBranches(
   const code = codeOfFacility(facility)
   const out: CrossBranch[] = []
   for (const route of CROSS_ROUTE_KEYS) {
-    const direction = routes[route]
-    if (direction === 'off') continue
+    /*
+     * 「不通」只影響路線規劃，不代表那條軌道不存在。
+     *
+     * 交叉軌道同時是<strong>正線本身</strong>：直行兩條就是正線的兩條車道（D02 進、D04 出），
+     * 車照樣從那裡開過去，只是規劃路線時不把它當成可選的轉線。少了它，正線上的車在推導出
+     * 的軌道裡只剩兩條斜線可挑，被吸到斜線上，圖上就是車頭左右歪、位置上下跳。
+     * 所以幾何一律推導；方向照設定，不通的當成雙向（只用來定位）。
+     */
+    const configured = routes[route]
+    const direction = configured === 'off' ? 'both' : configured
     const [a, b] = CROSS_ROUTE_ENDS[route]
     const from = direction === 'reverse' ? b : a
     const to = direction === 'reverse' ? a : b
