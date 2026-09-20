@@ -11,8 +11,6 @@ import {
 } from './rederiveAfterMove'
 import {
   findStaleTrackPathEnds,
-  healStaleTrackPathsInAreas,
-  listStaleTrackPaths,
   rederiveTrackPath,
 } from './shapedTrackPaths'
 import { getTrackGenPaths } from './trackGenPaths'
@@ -40,29 +38,14 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道中心線過期�
   const area = areas[0]!
   const byName = (name: string) => area.facilities.find((f) => f.customName === name)!
 
-  it('載入時自動修好複製來的 U04；只有一端對不上的 U18／U19 不動；其餘不誤報', () => {
-    const labels = listStaleTrackPaths(areas).map((s) => s.label).sort()
-    // U04 兩端都對不上：載入就已依鄰居重建，不會再被列為過期；U05 也跟著接上了
-    expect(labels).not.toContain('U04')
-    expect(labels).not.toContain('U05')
-    expect(labels.filter((l) => !['U18', 'U19'].includes(l))).toEqual([])
+  it('存好的圖資裡沒有中心線接不上隔壁的軌道', () => {
+    const stale = area.facilities
+      .filter((f) => f.type === 'Track' && findStaleTrackPathEnds(f, area).length > 0)
+      .map((f) => f.customName || f.id)
+    expect(stale).toEqual([])
     const real = getTrackGenPaths(byName('U04').parameters)!.real
     expect(Math.hypot(real[0]![0] + 138.4, real[0]![1] + 19.86)).toBeLessThan(0.05)
     expect(real[real.length - 1]![1]).toBeGreaterThan(-14)
-  })
-
-  it('healStaleTrackPathsInAreas：兩端都錯才改，一端錯的（互相對不上）只回報', () => {
-    // 用還沒修的原始資料：把 U04 換回複製來的樣子
-    const u06 = byName('U06')
-    const stale = {
-      ...byName('U04'),
-      parameters: { ...byName('U04').parameters, trackGenRealPath: u06.parameters!.trackGenRealPath },
-    }
-    const broken = { ...area, facilities: area.facilities.map((f) => (f.id === stale.id ? stale : f)) }
-    const out = healStaleTrackPathsInAreas([broken])
-    expect(out.healed).toEqual(['U04'])
-    // U18／U19 曾是互相對不上的一對；圖資修好之後不再出現，未修好時也只回報不動
-    expect(out.ambiguous.filter((l) => !['U18', 'U19'].includes(l))).toEqual([])
   })
 
   it('正常接著隔壁的軌道不是過期', () => {
@@ -193,15 +176,6 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('分岔中心線比路�
     const e120 = lastOf('120')
     expect(Math.hypot(e120[0] + 869.86, e120[1] + 316.62)).toBeLessThan(0.1)
   })
-
-  it('D04/T01 的直行出口只差 9.6 公尺（正常出口偏移），不補；已補過的再跑一次不變', async () => {
-    const { bridgeSwitchCentrelinesInAreas } = await import('./shapedTrackPaths')
-    const before = getTrackGenPaths(byId('073')!.parameters)!.real
-    expect(before.length).toBeGreaterThan(10)
-    const again = bridgeSwitchCentrelinesInAreas(areas)
-    expect(again.bridged).toEqual([])
-    expect(again.areas).toBe(areas)
-  })
 })
 
 describe.skipIf(!doc || doc.creationMode !== 'trackGen')('T3 分岔 120／121：圖面路徑畫在自己的形狀上', () => {
@@ -271,38 +245,5 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('軌道鏈：多算一�
     expect(near(u18b, u19b)).toBe(true)
     expect(near(u19a, u20a)).toBe(true)
     for (let i = 1; i < ys.length; i += 1) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]! + 0.5)
-  })
-
-  it('造回使用者當時的狀態（U18 多算成 168 公尺、U19 圖面路徑反、U20 接在反的 U19 後面）：自動修回連續的鏈', async () => {
-    const { healTrackChainsInAreas } = await import('./shapedTrackPaths')
-    const u17 = byName(areas, 'U17')
-    const u18 = byName(areas, 'U18')
-    const u19 = byName(areas, 'U19')
-    const u20 = byName(areas, 'U20')
-    if (!u17 || !u18 || !u19 || !u20) return
-    const [, u17End] = endsOf(areas, 'U17')
-    const [u19South, u19North] = endsOf(areas, 'U19')
-    const [, u20End] = endsOf(areas, 'U20')
-    const patch = (list: typeof areas, id: string, params: Record<string, unknown>) =>
-      list.map((a) => ({
-        ...a,
-        facilities: a.facilities.map((f) => (f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f)),
-      }))
-    let broken = patch(areas, u18.id, { trackGenRealPath: [[...u17End], [...u19South]] })
-    // U19：現場中心線不變，圖面路徑頭尾對調（北端拿到南端的座標）
-    const l19 = getTrackGenPaths(u19.parameters)!.local
-    broken = patch(broken, u19.id, { trackGenLocalPath: [...l19].reverse() })
-    broken = patch(broken, u20.id, { trackGenRealPath: [[...u19North], [...u20End]] })
-    const out = healTrackChainsInAreas(broken)
-    expect(out.trimmed).toContain('U18')
-    expect(out.flipped).toContain('U19')
-    expect(out.propagated).toContain('U20')
-    const [a18, b18] = endsOf(out.areas, 'U18')
-    const [a19, b19] = endsOf(out.areas, 'U19')
-    const [a20] = endsOf(out.areas, 'U20')
-    expect(near(a18, u17End)).toBe(true)
-    expect(near(b18, b19)).toBe(true)
-    expect(near(a19, a20)).toBe(true)
-    expect(a19[1]).toBeLessThan(b19[1])
   })
 })

@@ -160,8 +160,8 @@ describe.skipIf(!loaded || loaded.doc.creationMode !== 'trackGen')('真實圖資
         changed.push(String(a.customName || a.id))
       }
     }
-    // 121、D03/U03 是倒正；120 是載入時把分岔的圖面路徑改畫在自己的形狀上（見 bridgeSwitchCentrelinesInAreas）
-    // U19 是載入時依接點座標翻正的（見 healTrackChainsInAreas）
+    // 121、D03/U03 是倒正；120 是載入時把分岔的圖面路徑改畫在自己的形狀上（已存進圖資）
+    // U19 是載入時依接點座標翻正的（已存進圖資）
     // 圖資存檔時編輯器會把倒正／對齊的結果寫回檔案，所以已存過的圖裡這幾塊不再變動：只要不多動別的就對
     expect(changed.filter((c) => !['120', '121', 'D03/U03', 'U19'].includes(c))).toEqual([])
   })
