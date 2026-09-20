@@ -207,6 +207,11 @@ type MapAreaCanvasProps = {
   connectivityScan?: ConnectivityScanState | null
   /** 清單跳轉：地圖像素座標（含 origin） */
   facilityFocusTarget?: { x: number; y: number; token: number } | null
+  /** 軌道檢查：有問題的軌道狀態與是否畫方向（見 trackDiagnostics） */
+  trackDiagnostics?: {
+    statusById: ReadonlyMap<string, 'error' | 'warn'>
+    showDirections: boolean
+  } | null
   onFacilityDoubleClick?: (areaId: string, facilityId: string) => void
   onBasemapDoubleClick?: (basemapId: string) => void
   /** 路線製作預覽 overlay（地圖 content 像素座標） */
@@ -288,6 +293,7 @@ export function MapAreaCanvas({
   onBulkAreasLayoutCommit,
   connectivityScan = null,
   facilityFocusTarget = null,
+  trackDiagnostics = null,
   onFacilityDoubleClick,
   onBasemapDoubleClick,
   routePlanningOverlay = null,
@@ -851,6 +857,7 @@ export function MapAreaCanvas({
                 showFacilityToolbars={showFacilityToolbars}
                 allAreas={areas}
                 connectivityScanHighlightTrackIds={connectivityScan?.highlightTrackIds ?? null}
+                trackDiagnostics={trackDiagnostics}
               />
             ))}
             {basemapsAbove.map((basemap, stackOrder) => (

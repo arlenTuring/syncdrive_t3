@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { RefObject } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getTrackGenPaths, getTrackGenSpans, tangentAlongPath } from '../utils/trackGenPaths'
 import { useTranslation } from 'react-i18next'
 import { MapFloatingAnchorPortal } from './MapFloatingAnchorPortal'
 import {
@@ -402,6 +403,10 @@ type FacilityNodeProps = {
   connectivityScanHighlight?: boolean
   /** 導通掃描：斷點閃爍三次 */
   connectivityScanFlashing?: boolean
+  /** 軌道檢查：這一塊有問題時的嚴重程度 */
+  trackDiagStatus?: 'error' | 'warn' | null
+  /** 軌道檢查：畫出現場行進方向 */
+  showTrackDirection?: boolean
 }
 
 export const FacilityNode = memo(function FacilityNode({
@@ -448,6 +453,8 @@ export const FacilityNode = memo(function FacilityNode({
   showFacilityToolbar = true,
   connectivityScanHighlight = false,
   connectivityScanFlashing = false,
+  trackDiagStatus = null,
+  showTrackDirection = false,
 }: FacilityNodeProps) {
   const { t } = useTranslation()
   const mapExtent = useMapExtent()
@@ -1227,6 +1234,46 @@ export const FacilityNode = memo(function FacilityNode({
    * 不通的不畫；正向靠起點、反向靠終點、雙向兩頭各一；斜行就沿斜線頭尾標，
    * 直行就沿直行頭尾標——你開斜上／斜下，圖上就是斜的 ›››。
    */
+  /**
+   * 軌道檢查：這一塊在<strong>現場</strong>往哪個方向走，畫在它自己的圖面路徑上。
+   *
+   * 圖面路徑頭尾順序與現場中心線一一對應（第一個點對第一個點），所以沿圖面路徑畫箭頭就是把現場
+   * 的行進方向投影回圖上。若這一塊的圖面路徑上下顛倒，箭頭會指到鄰居的反方向——這正是要讓人一眼
+   * 看出來的事。有記行車方向（span.h）的，箭頭照行車方向；沒有的照中心線頭到尾。
+   * 交叉軌道自己已經畫了四條路徑的方向，這裡不畫。
+   */
+  const trackDirectionOverlay = useMemo(() => {
+    if (!showTrackDirection || !isTrack || isCrossTrack) return null
+    const paths = getTrackGenPaths(facility.parameters)
+    if (!paths || paths.local.length < 2 || paths.real.length < 2) return null
+    const spans = getTrackGenSpans(facility.parameters)
+    const h = spans.find((sp) => sp.h !== null)?.h ?? null
+    const mid = tangentAlongPath(paths.real, 0.5)
+    // 行車方向與中心線記錄順序相反（例如下行車道）：箭頭由終點指向起點
+    let reversed = false
+    if (h !== null) {
+      const along = Math.atan2(mid.y, mid.x)
+      let d = Math.abs(h - along) % (2 * Math.PI)
+      if (d > Math.PI) d = 2 * Math.PI - d
+      reversed = d > Math.PI / 2
+    }
+    const pts = paths.local.map(([u, v]) => ({ x: u * nw, y: v * nh }))
+    const ordered = reversed ? [...pts].reverse() : pts
+    const real = reversed ? [...paths.real].reverse() : paths.real
+    const a = ordered[ordered.length - 2]!
+    const b = ordered[ordered.length - 1]!
+    const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
+    const from = real[0]!
+    const to = real[real.length - 1]!
+    return {
+      d: ordered.map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' '),
+      start: ordered[0]!,
+      end: b,
+      angle,
+      tip: `起 (${from[0].toFixed(1)}, ${from[1].toFixed(1)}) → 迄 (${to[0].toFixed(1)}, ${to[1].toFixed(1)})`,
+    }
+  }, [showTrackDirection, isTrack, isCrossTrack, facility.parameters, nw, nh])
+
   const crossTrackOverlay = useMemo(() => {
     if (!isCrossTrack || !crossTrackGeom) return null
     const pts = crossTrackHandlesPx(crossTrackGeom, nw, nh)
@@ -2302,6 +2349,7 @@ export const FacilityNode = memo(function FacilityNode({
     <div
       ref={rootRef}
       data-facility
+      data-facility-id={facility.id}
       data-facility-root
         className={`absolute left-0 top-0 touch-none select-none ${
           isRoadLine || isBasemap ? 'overflow-visible pointer-events-auto' : ''
@@ -2471,6 +2519,12 @@ export const FacilityNode = memo(function FacilityNode({
             isTrack && connectivityScanFlashing
               ? 'animate-connectivity-scan-flash-loop'
               : '',
+            // 軌道檢查：圖面位置與現場座標對不上的軌道，紅（嚴重）或琥珀（注意）框起來
+            isTrack && trackDiagStatus === 'error'
+              ? 'outline outline-2 outline-offset-1 outline-red-500/90'
+              : isTrack && trackDiagStatus === 'warn'
+                ? 'outline outline-2 outline-offset-1 outline-amber-400/90'
+                : '',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -2886,6 +2940,36 @@ export const FacilityNode = memo(function FacilityNode({
         {/*
           * 斜行虛線必須疊在路段填色之上，否則改色幾乎看不出來。
           */}
+        {trackDirectionOverlay ? (
+          <svg
+            className="pointer-events-none absolute left-0 top-0 z-[74] overflow-visible"
+            width={nw}
+            height={nh}
+            viewBox={`0 0 ${nw} ${nh}`}
+            aria-hidden
+          >
+            <title>{trackDirectionOverlay.tip}</title>
+            {(() => {
+              const c =
+                trackDiagStatus === 'error'
+                  ? '#ef4444'
+                  : trackDiagStatus === 'warn'
+                    ? '#fbbf24'
+                    : '#34d399'
+              const t = trackDirectionOverlay
+              return (
+                <g>
+                  <path d={t.d} fill="none" stroke="#020617" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+                  <path d={t.d} fill="none" stroke={c} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx={t.start.x} cy={t.start.y} r={4} fill={c} stroke="#020617" strokeWidth={1.5} />
+                  <g transform={`translate(${t.end.x} ${t.end.y}) rotate(${t.angle})`}>
+                    <path d="M 0 0 L -9 -5.5 L -9 5.5 Z" fill={c} stroke="#020617" strokeWidth={1.5} strokeLinejoin="round" />
+                  </g>
+                </g>
+              )
+            })()}
+          </svg>
+        ) : null}
         {isCrossTrack && crossTrackGuides && (
           <svg
             className="pointer-events-none absolute left-0 top-0 z-[72] overflow-visible"

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -26,6 +27,8 @@ import { MapCanvas } from './components/MapCanvas'
 import { MapEditorTestDock } from './components/MapEditorTestDock'
 import { useTrackConnectivityScan } from './hooks/useTrackConnectivityScan'
 import { useRebuildStaleTracksAfterMove } from './hooks/useRebuildStaleTracksAfterMove'
+import { diagnoseTracks } from './utils/trackDiagnostics'
+import { TrackDiagnosticsPanel } from './components/TrackDiagnosticsPanel'
 import { TrajectoryZoomBar } from './components/TrajectoryZoomBar'
 import { ZoomLevelBar } from './components/ZoomLevelBar'
 import {
@@ -581,6 +584,22 @@ export default function MapEditorApp({
   const connectivityScan = useTrackConnectivityScan(areas)
   // 軌道複製、移動之後兩端接不上隔壁，就依鄰居重建它的中心線
   useRebuildStaleTracksAfterMove(areas, mapEditorMode === 'edit', setAreas)
+
+  /*
+   * 軌道檢查：整張圖的軌道圖面位置與現場座標對不對得上。拖曳時 areas 每一幀都在變，延後到
+   * 空閒時再算，不拖慢畫面。
+   */
+  const deferredAreasForCheck = useDeferredValue(areas)
+  const trackDiagnostics = useMemo(
+    () => diagnoseTracks(deferredAreasForCheck),
+    [deferredAreasForCheck],
+  )
+  const [trackIssuesOpen, setTrackIssuesOpen] = useState(false)
+  const [showTrackDirections, setShowTrackDirections] = useState(false)
+  const trackDiagnosticsForCanvas = useMemo(
+    () => ({ statusById: trackDiagnostics.statusByFacility, showDirections: showTrackDirections }),
+    [trackDiagnostics, showTrackDirections],
+  )
 
   const onSelectConnectivityIssue = useCallback(
     (trackId: string, areaId: string) => {
@@ -4284,6 +4303,11 @@ export default function MapEditorApp({
             mapEditorMode === 'edit' ? onToggleFacilityToolbars : undefined
           }
           facilityToolbarsToggleHint={t('mapEditor.chrome.facilityBarsHint')}
+          trackIssueCount={trackDiagnostics.issues.length}
+          trackIssuesOpen={trackIssuesOpen}
+          onToggleTrackIssues={() => setTrackIssuesOpen((v) => !v)}
+          showTrackDirections={showTrackDirections}
+          onToggleTrackDirections={() => setShowTrackDirections((v) => !v)}
         />
       )}
       {isMapWorkspace && mapScreen === 'editor' && (
@@ -4404,6 +4428,13 @@ export default function MapEditorApp({
           aria-label={isMapWorkspace ? t('mapEditor.chrome.mapEditAria') : t('mapEditor.chrome.trajectoryAria')}
         >
           <div className="relative min-h-0 w-full flex-1">
+            {isMapWorkspace && mapScreen === 'editor' && trackIssuesOpen && (
+              <TrackDiagnosticsPanel
+                diagnostics={trackDiagnostics}
+                onLocate={onListEntrySelect}
+                onClose={() => setTrackIssuesOpen(false)}
+              />
+            )}
             <div
               className={`absolute inset-0 flex min-h-0 flex-col ${
                 isMapWorkspace && mapScreen === 'editor'
@@ -4546,6 +4577,7 @@ export default function MapEditorApp({
                 }
                 connectivityScan={showTestDock ? connectivityScan.state : null}
                 facilityFocusTarget={facilityFocusTarget}
+                trackDiagnostics={trackDiagnosticsForCanvas}
                 onFacilityDoubleClick={onFacilityDoubleClick}
                 onBasemapDoubleClick={onBasemapDoubleClick}
                 routePlanningOverlay={

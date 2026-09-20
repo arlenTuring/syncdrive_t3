@@ -12,6 +12,8 @@ import {
   ZoomIn,
   Component,
   FlaskConical,
+  ScanSearch,
+  MoveRight,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -60,6 +62,13 @@ type MapEditorToolbarProps = {
   showFacilityToolbars?: boolean
   onToggleFacilityToolbars?: () => void
   facilityToolbarsToggleHint?: string
+  /** 軌道檢查：有問題的軌道數（null＝還沒算完）與面板開關 */
+  trackIssueCount?: number | null
+  trackIssuesOpen?: boolean
+  onToggleTrackIssues?: () => void
+  /** 在每塊軌道上畫現場行進方向 */
+  showTrackDirections?: boolean
+  onToggleTrackDirections?: () => void
 }
 
 /** Map editor toolbar */
@@ -100,6 +109,11 @@ export function MapEditorToolbar({
   showFacilityToolbars = true,
   onToggleFacilityToolbars,
   facilityToolbarsToggleHint,
+  trackIssueCount = null,
+  trackIssuesOpen = false,
+  onToggleTrackIssues,
+  showTrackDirections = false,
+  onToggleTrackDirections,
 }: MapEditorToolbarProps) {
   const { t } = useTranslation()
 
@@ -308,6 +322,55 @@ export function MapEditorToolbar({
       </div>
 
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+        {onToggleTrackIssues && (
+          <button
+            type="button"
+            onClick={onToggleTrackIssues}
+            aria-pressed={trackIssuesOpen}
+            data-testid="track-check-button"
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm ${
+              trackIssueCount
+                ? 'border-amber-600/70 bg-amber-950/60 text-amber-200'
+                : trackIssuesOpen
+                  ? 'border-emerald-600/70 bg-emerald-950/60 text-emerald-200'
+                  : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+            }`}
+            title={t('mapEditor.toolbar.trackCheckTitle')}
+          >
+            <ScanSearch className="size-4 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">{t('mapEditor.toolbar.trackCheck')}</span>
+            {trackIssueCount === null ? null : trackIssueCount > 0 ? (
+              <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold leading-4 text-zinc-950">
+                {trackIssueCount}
+              </span>
+            ) : (
+              <span className="text-emerald-400" aria-label={t('mapEditor.toolbar.trackCheckOk')}>✓</span>
+            )}
+          </button>
+        )}
+
+        {onToggleTrackDirections && (
+          <button
+            type="button"
+            onClick={onToggleTrackDirections}
+            aria-pressed={showTrackDirections}
+            data-testid="track-direction-button"
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60 sm:px-3 sm:text-sm ${
+              showTrackDirections
+                ? 'border-cyan-600/70 bg-cyan-950/60 text-cyan-200'
+                : 'border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+            }`}
+            title={t('mapEditor.toolbar.trackDirectionsTitle')}
+          >
+            <MoveRight className="size-4 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">
+              {showTrackDirections
+                ? t('mapEditor.toolbar.trackDirectionsHide')
+                : t('mapEditor.toolbar.trackDirections')}
+            </span>
+          </button>
+        )}
+
         {onToggleTestDock && (
           <button
             type="button"

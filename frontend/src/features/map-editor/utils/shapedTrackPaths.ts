@@ -119,6 +119,7 @@ function cornersFromCentreline(
   ]
 }
 
+export type TrackAnchor = Anchor
 type Anchor = {
   /** 這一端屬於哪一塊；重推自己時要排除自己，否則會找到自己 */
   facilityId: string
@@ -903,4 +904,28 @@ export function bridgeSwitchCentrelinesInAreas(areas: MapAreaObject[]): {
     return touched ? { ...area, facilities } : area
   })
   return { areas: changed ? next : areas, bridged }
+}
+
+/** 給軌道檢查用：整個區域所有軌道端點（與交叉口）的錨點 */
+export function collectTrackAnchors(area: MapAreaObject): TrackAnchor[] {
+  return collectAnchors(area)
+}
+
+/** 給軌道檢查用：圖面位置附近最近的錨點（排除自己） */
+export function nearestTrackAnchor(
+  anchors: TrackAnchor[],
+  px: number,
+  py: number,
+  exceptId: string | undefined,
+  nearPx: number,
+): TrackAnchor | null {
+  return nearestAnchor(anchors, px, py, exceptId, nearPx)
+}
+
+/** 端面把手（相對元件左上角的像素）→ 外框內的比例位置 */
+export function faceUvOfHandle(
+  handle: { x: number; y: number },
+  size: { w: number; h: number },
+): { x: number; y: number } {
+  return faceUv(handle, size)
 }

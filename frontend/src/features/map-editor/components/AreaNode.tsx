@@ -298,6 +298,11 @@ type AreaNodeProps = {
   allAreas?: MapAreaObject[]
   /** 導通掃描：附近可能涉及的軌道 id */
   connectivityScanHighlightTrackIds?: readonly string[] | null
+  /** 軌道檢查：有問題的軌道狀態與是否畫方向 */
+  trackDiagnostics?: {
+    statusById: ReadonlyMap<string, 'error' | 'warn'>
+    showDirections: boolean
+  } | null
 }
 
 /** Area 外框拖曳軌道 z-index；內層含選中設施時須高於此值 */
@@ -353,6 +358,7 @@ export const AreaNode = memo(function AreaNode({
   showFacilityToolbars = true,
   allAreas,
   connectivityScanHighlightTrackIds = null,
+  trackDiagnostics = null,
 }: AreaNodeProps) {
   const outerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -2027,6 +2033,8 @@ export const AreaNode = memo(function AreaNode({
           }
           showFacilityToolbar={showFacilityToolbars}
           connectivityScanHighlight={connectivityScanHighlightTrackIds?.includes(f.id) ?? false}
+          trackDiagStatus={trackDiagnostics?.statusById.get(f.id) ?? null}
+          showTrackDirection={trackDiagnostics?.showDirections ?? false}
         />
       </div>
     )
