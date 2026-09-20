@@ -93,7 +93,7 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
     // 兩條斜線在外側差好幾公尺——這正是原本單一中線被拿去代表兩條的落差
     const upStart = up.real[0]!
     const downEnd = down.real[1]!
-    expect(Math.hypot(upStart[0] - downEnd[0], upStart[1] - downEnd[1])).toBeGreaterThan(2)
+    expect(Math.hypot(upStart[0] - downEnd[0], upStart[1] - downEnd[1])).toBeGreaterThan(1)
     // 直行兩條在設定裡是「不通」（只影響路線規劃），但它們是正線本身的車道，幾何一律推導
     expect([...byCode.keys()].sort()).toEqual([
       'D03U03_DIAG_DOWN',

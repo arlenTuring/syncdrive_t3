@@ -25,6 +25,7 @@ import {
 import { MapCanvas } from './components/MapCanvas'
 import { MapEditorTestDock } from './components/MapEditorTestDock'
 import { useTrackConnectivityScan } from './hooks/useTrackConnectivityScan'
+import { useRebuildStaleTracksAfterMove } from './hooks/useRebuildStaleTracksAfterMove'
 import { TrajectoryZoomBar } from './components/TrajectoryZoomBar'
 import { ZoomLevelBar } from './components/ZoomLevelBar'
 import {
@@ -578,6 +579,8 @@ export default function MapEditorApp({
   }, [clearMapSelection])
 
   const connectivityScan = useTrackConnectivityScan(areas)
+  // 軌道複製、移動之後兩端接不上隔壁，就依鄰居重建它的中心線
+  useRebuildStaleTracksAfterMove(areas, mapEditorMode === 'edit', setAreas)
 
   const onSelectConnectivityIssue = useCallback(
     (trackId: string, areaId: string) => {

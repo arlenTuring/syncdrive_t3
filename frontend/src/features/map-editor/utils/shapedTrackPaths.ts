@@ -15,14 +15,20 @@ import {
 import {
   getTrackGenLatPerBox,
   getTrackGenPaths,
+  getTrackGenSpans,
   pointAlongPath,
   TRACKGEN_LAT_PER_BOX_KEY,
+  TRACKGEN_SPANS_KEY,
   TRACKGEN_LOCAL_PATH_KEY,
   TRACKGEN_REAL_PATH_KEY,
 } from './trackGenPaths'
 import { trackLocalPathPointToAreaLocal } from '../vehicles/resolveVehicleTrackPlacement'
 import { usesCornerFieldRange } from './facilityRefFieldBoundsAuto'
+import { resolveCrossPortalFields } from './crossTrackPortals'
 import {
+  CROSS_HANDLE_KEYS,
+  crossTrackHandlesPx,
+  readCrossTrack,
   readSwitchTrack,
   readTaperTrack,
   switchTrackHandlesPx,
@@ -106,6 +112,10 @@ function cornersFromCentreline(
 }
 
 type Anchor = {
+  /** 這一端屬於哪一塊；重推自己時要排除自己，否則會找到自己 */
+  facilityId: string
+  /** 中心線的哪一端：0 起點、1 終點 */
+  end: 0 | 1
   px: number
   py: number
   xM: number
@@ -118,13 +128,42 @@ function collectAnchors(area: MapAreaObject): Anchor[] {
   const out: Anchor[] = []
   for (const f of area.facilities) {
     if (f.type !== 'Track') continue
+    /*
+     * 交叉軌道對外的接口是四個口，不是它那條頭尾連線的折線（那條只是把兩條直行併成一條，
+     * 端點離口差好幾公尺）。隔壁要接的是口，所以拿口當錨點。
+     */
+    if (f.name === 'RailCross') {
+      const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+      const handles = crossTrackHandlesPx(readCrossTrack(f.parameters), size.w, size.h)
+      const fields = resolveCrossPortalFields(f, area)
+      for (const key of CROSS_HANDLE_KEYS) {
+        const at = fields[key]
+        if (at.xM === null || at.yM === null) continue
+        const local = trackLocalPathPointToAreaLocal(f, area, {
+          x: handles[key].x / Math.max(1e-6, size.w),
+          y: handles[key].y / Math.max(1e-6, size.h),
+        })
+        out.push({
+          facilityId: f.id,
+          end: key === 'lt' || key === 'lb' ? 0 : 1,
+          px: local.x,
+          py: local.y,
+          xM: at.xM,
+          yM: at.yM,
+          latPerBox: getTrackGenLatPerBox(f.parameters),
+        })
+      }
+      continue
+    }
     const paths = getTrackGenPaths(f.parameters)
     if (!paths) continue
-    for (const t of [0, 1]) {
+    for (const t of [0, 1] as const) {
       const uv = pointAlongPath(paths.local, t)
       const local = trackLocalPathPointToAreaLocal(f, area, uv)
       const real = pointAlongPath(paths.real, t)
       out.push({
+        facilityId: f.id,
+        end: t,
         px: local.x,
         py: local.y,
         xM: real.x,
@@ -136,12 +175,19 @@ function collectAnchors(area: MapAreaObject): Anchor[] {
   return out
 }
 
-function nearestAnchor(anchors: Anchor[], px: number, py: number): Anchor | null {
+function nearestAnchor(
+  anchors: Anchor[],
+  px: number,
+  py: number,
+  exceptId?: string,
+  nearPx: number = JOIN_NEAR_PX,
+): Anchor | null {
   let best: Anchor | null = null
   let bestD = Infinity
   for (const a of anchors) {
+    if (exceptId && a.facilityId === exceptId) continue
     const d = Math.hypot(a.px - px, a.py - py)
-    if (d > JOIN_NEAR_PX || d >= bestD) continue
+    if (d > nearPx || d >= bestD) continue
     best = a
     bestD = d
   }
@@ -366,4 +412,207 @@ export function backfillTrackGenLatPerBoxInAreas(areas: MapAreaObject[]): {
     return changed ? { ...area, facilities } : area
   })
   return { areas: next, filled }
+}
+
+/* ── 中心線過期：複製、移動之後兩端不再接到隔壁 ─────────────────────────── */
+
+/**
+ * 中心線的一端與圖面上貼著它的隔壁差超過這麼多公尺，就當它過期了。
+ *
+ * 生成出來的軌道兩端本來就接著隔壁，差距是 0.0x 公尺；差幾公尺以上只有一個原因：這一塊
+ * 的圖面位置換了、身上的現場中心線還是別處的（複製一塊軌道再拖到別處，連中心線一起複製
+ * 了過去）。
+ */
+export const STALE_PATH_END_M = 3
+
+/** 圖面上貼著多近才算「隔壁」——比接合用的 JOIN_NEAR_PX 嚴，過期判斷不能誤把別條車道當鄰居 */
+const STALE_NEAR_PX = 12
+
+/** 過期偵測只看單純的帶子；交叉與分岔的中心線本來就不等於各口的位置 */
+function checksStaleness(f: FacilityObject): boolean {
+  return f.type === 'Track' && (f.name === 'Rail' || f.name === 'RailTaper' || f.name === 'RailCorner')
+}
+
+export type StaleTrackPathEnd = {
+  end: 0 | 1
+  /** 這一端的現場座標與隔壁那一端差多少公尺 */
+  diffM: number
+  neighbourId: string
+}
+
+/**
+ * 這一塊的中心線哪幾端與隔壁對不上。空陣列＝沒過期（或找不到隔壁，無從比較）。
+ */
+export function findStaleTrackPathEnds(
+  f: FacilityObject,
+  area: MapAreaObject,
+  anchors: Anchor[] = collectAnchors(area),
+): StaleTrackPathEnd[] {
+  if (!checksStaleness(f)) return []
+  const paths = getTrackGenPaths(f.parameters)
+  if (!paths) return []
+  const out: StaleTrackPathEnd[] = []
+  for (const t of [0, 1] as const) {
+    const uv = pointAlongPath(paths.local, t)
+    const at = trackLocalPathPointToAreaLocal(f, area, uv)
+    const near = nearestAnchor(anchors, at.x, at.y, f.id, STALE_NEAR_PX)
+    if (!near) continue
+    const own = pointAlongPath(paths.real, t)
+    const diffM = Math.hypot(near.xM - own.x, near.yM - own.y)
+    if (diffM > STALE_PATH_END_M) out.push({ end: t, diffM, neighbourId: near.facilityId })
+  }
+  return out
+}
+
+/** 整張圖裡中心線過期的軌道（載入時只回報，不自動改：兩塊互相對不上時看不出誰對誰錯） */
+export function listStaleTrackPaths(
+  areas: MapAreaObject[],
+): Array<{ areaId: string; facilityId: string; label: string; ends: StaleTrackPathEnd[] }> {
+  const out: Array<{ areaId: string; facilityId: string; label: string; ends: StaleTrackPathEnd[] }> = []
+  for (const area of areas) {
+    const anchors = collectAnchors(area)
+    for (const f of area.facilities) {
+      const ends = findStaleTrackPathEnds(f, area, anchors)
+      if (ends.length > 0) {
+        out.push({ areaId: area.id, facilityId: f.id, label: f.customName?.trim() || f.id, ends })
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * 這張圖裡「畫多粗代表現場多寬」：每公尺橫向偏移佔幾個像素。
+ *
+ * 同一張圖是同一把尺，所以取直軌道的中位數；新推出來的中心線用它換算橫向比例，才不會
+ * 抄到別的外框尺寸的值（複製來的 U04 就是這樣被標成 7 公尺寬）。
+ */
+function lateralPxPerMOf(area: MapAreaObject): number | null {
+  const values: number[] = []
+  for (const f of area.facilities) {
+    if (f.type !== 'Track' || f.name !== 'Rail') continue
+    const lat = getTrackGenLatPerBox(f.parameters)
+    if (!lat) continue
+    const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+    const v = size.w >= size.h ? lat[1] * size.h : lat[0] * size.w
+    if (v > 0.5 && Number.isFinite(v)) values.push(v)
+  }
+  if (values.length === 0) return null
+  values.sort((a, b) => a - b)
+  return values[Math.floor(values.length / 2)]!
+}
+
+export type RederiveResult =
+  | { ok: true; facility: FacilityObject; changedM: number }
+  | { ok: false; reason: string }
+
+/**
+ * 依隔壁重建這一塊的中心線（複製或移動之後用）。
+ *
+ * 跟載入時補中心線是同一套：兩端各找圖面上貼著的隔壁（排除自己），取它中心線的那一端；
+ * 兩端都找得到才寫。差別是這裡<strong>覆寫既有的</strong>：要重建的正是那條複製來的、過期的。
+ * 連帶更新里程（接在隔壁後面）、行進方向、橫向比例尺與場域範圍——只換中心線不換這些，
+ * 場域範圍與里程還是指著舊的位置。
+ */
+export function rederiveTrackPath(f: FacilityObject, area: MapAreaObject): RederiveResult {
+  if (f.type !== 'Track') return { ok: false, reason: '不是軌道' }
+  if (f.name === 'RailCross' || f.name === 'RailSwitch') {
+    return { ok: false, reason: '交叉與分岔的中心線由口與各段決定，不能這樣重建' }
+  }
+  const size = resolveFacilityAreaSize(f, area.domain, area.layout)
+  const faces = facesOf(f, size)
+  if (!faces) return { ok: false, reason: '這種軌道沒有可接的端面' }
+
+  const anchors = collectAnchors(area)
+  const ends = faces.map((handle) => {
+    const uv = faceUv(handle, size)
+    const local = trackLocalPathPointToAreaLocal(f, area, { x: uv.x, y: uv.y })
+    return { uv, anchor: nearestAnchor(anchors, local.x, local.y, f.id) }
+  })
+  if (ends.some((e) => !e.anchor)) {
+    return { ok: false, reason: '有一端在圖上找不到相接的軌道' }
+  }
+  const real: Array<[number, number]> = ends.map((e) => [
+    Number(e.anchor!.xM.toFixed(2)),
+    Number(e.anchor!.yM.toFixed(2)),
+  ])
+  const lengthM = Math.hypot(real[1]![0] - real[0]![0], real[1]![1] - real[0]![1])
+  if (lengthM < 0.5) return { ok: false, reason: '兩端接到同一點' }
+
+  const old = getTrackGenPaths(f.parameters)
+  const oldEnd = old ? pointAlongPath(old.real, 0) : null
+  const changedM = oldEnd ? Math.hypot(oldEnd.x - real[0]![0], oldEnd.y - real[0]![1]) : 0
+
+  const local: Array<[number, number]> = ends.map((e) => [
+    Number(e.uv.x.toFixed(4)),
+    Number(e.uv.y.toFixed(4)),
+  ])
+  let parameters: Record<string, unknown> = {
+    ...(f.parameters ?? {}),
+    [TRACKGEN_REAL_PATH_KEY]: real,
+    [TRACKGEN_LOCAL_PATH_KEY]: local,
+  }
+
+  // 橫向比例尺：同一張圖同一把尺，換成這一塊的外框
+  const pxPerM = lateralPxPerMOf(area)
+  if (pxPerM) {
+    parameters[TRACKGEN_LAT_PER_BOX_KEY] = [
+      Number((pxPerM / Math.max(1, size.w)).toFixed(6)),
+      Number((pxPerM / Math.max(1, size.h)).toFixed(6)),
+    ]
+  }
+
+  // 里程與行進方向：沿用原本的 road／lane；里程接在起點那一端的隔壁後面
+  const heading = Math.atan2(real[1]![1] - real[0]![1], real[1]![0] - real[0]![0])
+  const span0 = getTrackGenSpans(f.parameters)[0]
+  if (span0) {
+    const owner = area.facilities.find((g) => g.id === ends[0]!.anchor!.facilityId)
+    const ownerSpans = owner ? getTrackGenSpans(owner.parameters) : []
+    const ownerTail = ownerSpans[ownerSpans.length - 1]
+    // 隔壁同一條 road／lane、而且是接在它的終點後面，里程就從它結束的地方接下去
+    const s0 =
+      ownerTail && ends[0]!.anchor!.end === 1 && ownerTail.road === span0.road && ownerTail.lane === span0.lane
+        ? ownerTail.s1
+        : span0.s0
+    parameters[TRACKGEN_SPANS_KEY] = [
+      {
+        road: span0.road,
+        lane: span0.lane,
+        s0: Number(s0.toFixed(2)),
+        s1: Number((s0 + lengthM).toFixed(2)),
+        h: Number(heading.toFixed(4)),
+        f0: 0,
+        f1: 1,
+      },
+    ]
+  }
+
+  // 場域範圍：斜接是四個角，其餘取中心線兩側各半個軌道寬的外接矩形
+  const laneWidthM = laneWidthMOf(area)
+  const corners = cornersFromCentreline(real, laneWidthM)
+  if (usesCornerFieldRange(f) && corners.length === 4) {
+    parameters[REF_FIELD_CORNERS_M] = serializeRefFieldCorners(corners)
+  }
+  const pts = corners.length === 4 ? corners.map((c) => [c.xM, c.yM] as [number, number]) : real
+  const xs = pts.map((r) => r[0])
+  const ys = pts.map((r) => r[1])
+  return {
+    ok: true,
+    changedM,
+    facility: {
+      ...f,
+      parameters: patchRefFieldBounds(parameters, {
+        xMinM: Number(Math.min(...xs).toFixed(2)),
+        xMaxM: Number(Math.max(...xs).toFixed(2)),
+        yMinM: Number(Math.min(...ys).toFixed(2)),
+        yMaxM: Number(Math.max(...ys).toFixed(2)),
+      }),
+    } as FacilityObject,
+  }
+}
+
+/** 過期才重建：沒過期回 null（呼叫端不必動它） */
+export function rederiveIfStale(f: FacilityObject, area: MapAreaObject): RederiveResult | null {
+  if (findStaleTrackPathEnds(f, area).length === 0) return null
+  return rederiveTrackPath(f, area)
 }
