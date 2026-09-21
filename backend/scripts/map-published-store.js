@@ -177,22 +177,42 @@ function activeMapConfigPath() {
   return path.join(resolvePublishedDir(), 'active-map.json');
 }
 
+/**
+ * 依檔案修改時間快取。遙測每一筆、訂單每個端點都會問「現行地圖是哪一張」，
+ * 每次都存在檢查＋讀檔＋parse 是同步 I/O，放在熱路徑上會吃住事件迴圈。
+ * 檔案被換掉（mtime 變）或不存在時自動重讀。
+ */
+let activeMapConfigCache = null;
+
 function readActiveMapConfig() {
   const configPath = activeMapConfigPath();
-  if (!fs.existsSync(configPath)) return null;
+  let mtimeMs;
+  try {
+    mtimeMs = fs.statSync(configPath).mtimeMs;
+  } catch {
+    activeMapConfigCache = null;
+    return null;
+  }
+  if (activeMapConfigCache && activeMapConfigCache.mtimeMs === mtimeMs) {
+    return activeMapConfigCache.config;
+  }
+  let config = null;
   try {
     const raw = readJsonFile(configPath);
     const activeMapId = safeMapId(raw.activeMapId);
-    if (!activeMapId) return null;
-    return {
-      activeMapId,
-      libraryId: String(raw.libraryId ?? activeMapId),
-      displayName: raw.displayName ? String(raw.displayName) : undefined,
-      updatedAt: raw.updatedAt ? String(raw.updatedAt) : null,
-    };
+    if (activeMapId) {
+      config = {
+        activeMapId,
+        libraryId: String(raw.libraryId ?? activeMapId),
+        displayName: raw.displayName ? String(raw.displayName) : undefined,
+        updatedAt: raw.updatedAt ? String(raw.updatedAt) : null,
+      };
+    }
   } catch {
-    return null;
+    config = null;
   }
+  activeMapConfigCache = { mtimeMs, config };
+  return config;
 }
 
 function writeActiveMapConfig(config) {
@@ -210,6 +230,7 @@ function writeActiveMapConfig(config) {
     `${JSON.stringify(payload, null, 2)}\n`,
     'utf8',
   );
+  activeMapConfigCache = null;
   return payload;
 }
 
