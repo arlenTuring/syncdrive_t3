@@ -53,47 +53,47 @@ describe('最短路：走廊就是沿路網走得到的那幾塊', () => {
     expect(shortestCorridor(index, at('d1'), at('u1'))).toBeNull()
   })
 
-  it('中間空了一小段（圖資缺一塊）：搭橋接過去，走廊不斷', () => {
+  it('中間空了一小段：不憑距離猜，沒接上就沒有走廊（相接由接點保證）', () => {
     const gapped = buildTrackGenIndex([
       piece('a', [[0, 0], [50, 0]], EAST),
       // 空 15 公尺
       piece('b', [[65, 0], [115, 0]], EAST),
     ])
-    const a = gapped.pieces.findIndex((p) => p.facilityId === 'a')
-    const b = gapped.pieces.findIndex((p) => p.facilityId === 'b')
-    expect([...shortestCorridor(gapped, a, b)!].sort()).toEqual(['a', 'b'])
+    expect(shortestCorridor(gapped, 0, 1)).toBeNull()
   })
 
-  it('空太大（超過 25 公尺）就不接', () => {
-    const far = buildTrackGenIndex([
-      piece('a', [[0, 0], [50, 0]], EAST),
-      piece('b', [[90, 0], [140, 0]], EAST),
-    ])
-    expect(shortestCorridor(far, 0, 1)).toBeNull()
-  })
-
-  it('橫向錯開一條車道寬的合併處（同方向）：接得起來', () => {
+  it('橫向差一條車道寬（3.4 公尺）：不算相連，不能從一條車道跳到隔壁', () => {
     const shifted = buildTrackGenIndex([
       piece('a', [[0, 0], [50, 0]], EAST),
       piece('b', [[50, 3.4], [100, 3.4]], EAST),
     ])
-    expect([...shortestCorridor(shifted, 0, 1)!].sort()).toEqual(['a', 'b'])
+    expect(shortestCorridor(shifted, 0, 1)).toBeNull()
   })
 
-  it('逆著記錄的行車方向走貴很多：有順向的路就不走逆向', () => {
-    // 兩條路從 s 到 t：上面一條順向、下面一條逆向（h 相反）。逆向的比較短也不選它。
+  it('沒有方向：記錄順序與前進方向相反的軌道照樣連得起來', () => {
+    const mixed = buildTrackGenIndex([
+      piece('a', [[0, 0], [50, 0]], EAST),
+      // 中心線記成由東往西，端點一樣相接
+      piece('b', [[100, 0], [50, 0]], WEST),
+      piece('c', [[100, 0], [150, 0]], EAST),
+    ])
+    expect([...shortestCorridor(mixed, 0, 2)!].sort()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('兩條路都接得起來：走比較短的，與記錄的行車方向無關', () => {
     const two = buildTrackGenIndex([
       piece('s', [[0, 0], [10, 0]], EAST),
-      // 順向繞路：長 60
       piece('long', [[10, 0], [70, 0]], EAST),
-      // 逆向捷徑：長 20，但 h 記成往西（againstPath）
       piece('short', [[10, 10], [30, 10]], WEST),
       piece('t', [[70, 0], [80, 0]], EAST),
       piece('s2short', [[10, 0], [10, 10]], EAST),
       piece('short2t', [[30, 10], [70, 0]], EAST),
     ])
-    const path = shortestCorridor(two, two.pieces.findIndex((p) => p.facilityId === 's'), two.pieces.findIndex((p) => p.facilityId === 't'))!
+    const at2 = (id: string) => two.pieces.findIndex((p) => p.facilityId === id)
+    const path = shortestCorridor(two, at2('s'), at2('t'))!
+    // 60 公尺的直路 vs 10 + 20 + 約 41 公尺的繞路
     expect(path.has('long')).toBe(true)
+    expect(path.has('short')).toBe(false)
   })
 })
 
