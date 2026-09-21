@@ -97,30 +97,27 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen' || !existsSync(FIXTURE))
   }
 
   /*
-   * 進出分區的接駁路線（整備調度區、充電洗車區）：站在軌道外面，沒有人畫過路徑，路徑是站點之間的
-   * 近似線，經過 D20／T02／T03、交叉口那些疊在一起的地方時會在相鄰車道之間跳。先列出來、不擋——
-   * 要根治得在模擬路線上把它們畫出來。
+   * 進出分區的接駁路線（整備調度區、充電洗車區）：起訖是分區入口的途經點，站在軌道端點上，路徑是站點之間的
+   * 近似線，經過 D20／T02／T03、交叉口那些疊在一起的地方。沒有走廊時只剩車頭朝向決定判給哪一塊，車會在
+   * 相鄰車道之間來回換；有走廊（途經點也當站解析）就沿著該走的那幾塊。所以這幾條只驗「有走廊」。
    */
   const isZoneLink = (r: RouteFixture) => /整備調度區|充電洗車區/.test(r.route)
 
-  for (const useCorridor of [false, true]) {
-    it(`正線路線每一條都連續（${useCorridor ? '有走廊' : '沒有走廊'}）`, () => {
-      const report: Record<string, string[]> = {}
-      for (const route of fixtures.filter((r) => !isZoneLink(r))) {
-        const problems = findProblems(drive(route, useCorridor))
-        if (problems.length > 0) report[route.route] = problems.slice(0, 6)
-      }
-      expect(report).toEqual({})
-    })
-  }
-
-  it('進出分區的接駁路線：列出還有哪幾條會跳（資訊用，不擋）', () => {
+  it('正線路線沒有走廊也連續', () => {
     const report: Record<string, string[]> = {}
-    for (const route of fixtures.filter(isZoneLink)) {
+    for (const route of fixtures.filter((r) => !isZoneLink(r))) {
+      const problems = findProblems(drive(route, false))
+      if (problems.length > 0) report[route.route] = problems.slice(0, 6)
+    }
+    expect(report).toEqual({})
+  })
+
+  it('所有路線（含進出分區的接駁）有走廊時每一條都連續', () => {
+    const report: Record<string, string[]> = {}
+    for (const route of fixtures) {
       const problems = findProblems(drive(route, true))
       if (problems.length > 0) report[route.route] = problems.slice(0, 6)
     }
-    if (Object.keys(report).length > 0) console.info('[接駁路線畫面不連續]', JSON.stringify(report))
-    expect(true).toBe(true)
+    expect(report).toEqual({})
   })
 })

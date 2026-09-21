@@ -1,6 +1,7 @@
 import type { MapAreaObject } from '../types/area'
 import type { MapPlannedRoute } from '../types/mapFile'
 import { getDockingPointStationId } from '../utils/dockingPointFacility'
+import { getWaypointCode } from '../utils/waypointFacility'
 import { getRefFieldPosition } from '../utils/facilityRefFieldPosition'
 import { locateByField, type TrackGenIndex } from '../utils/trackGenLocate'
 import { pointAlongPath } from '../utils/trackGenPaths'
@@ -168,8 +169,14 @@ export function resolveStationPieces(
   const out = new Map<string, number>()
   for (const area of areas) {
     for (const facility of area.facilities ?? []) {
-      if (facility.type !== 'DockingPoint') continue
-      const stationId = getDockingPointStationId(facility)
+      /*
+       * 停靠點與途經點都算「站」：進出分區的路線，起訖是分區入口的途經點。它落在軌道的端點上
+       * （T02／T03 共用的那個接點），少了它走廊就找不到，只剩車頭朝向決定判給哪一塊，
+       * 車在 T03、D20、T02 之間來回換。
+       */
+      if (facility.type !== 'DockingPoint' && facility.type !== 'Waypoint') continue
+      const stationId =
+        facility.type === 'DockingPoint' ? getDockingPointStationId(facility) : getWaypointCode(facility)
       if (!stationId) continue
       const { xM, yM } = getRefFieldPosition(facility.parameters)
       if (xM === null || yM === null) continue
