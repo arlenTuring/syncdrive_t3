@@ -172,11 +172,22 @@ describe('走廊在挑塊時只是加減分', () => {
     expect(OFF_ROUTE_PENALTY_M).toBeGreaterThan(0)
   })
 
-  it('加減分是疊加的，不是硬規則：走廊外但一直黏著的那條，證據夠強時仍贏', () => {
-    // y=1.9：D 1.9、U 1.6。上一筆在 U（黏著 −0.8），走廊在 D（U 多 +1.5）：
-    //   U = 1.6 − 0.8 + 1.5 = 2.3
-    //   D = 1.9 + 跳到不相連 1.5 = 3.4
+  it('位置只差一點點（D 1.9、U 1.6）：分不出來，走廊比「上一筆在 U」重要', () => {
+    // 座標說不清楚時，訂單大致會經過哪些軌道是最可靠的旁證
     const hit = locateByField(index, 25, 1.9, { previousFacilityId: 'u1', corridorFacilityIds: corridor })
+    expect(hit?.facilityId).toBe('d1')
+  })
+
+  it('位置差得多（D 2.9、U 0.6）：走廊與上一筆都翻不了，貼著哪條就是哪條', () => {
+    const hit = locateByField(index, 25, 2.9, { previousFacilityId: 'd1', corridorFacilityIds: corridor })
     expect(hit?.facilityId).toBe('u1')
+  })
+
+  it('有走廊時車頭朝向只是最後的旁證：朝向與走廊打架，聽走廊的', () => {
+    // 中間位置（各 1.75），走廊在 D、車頭卻朝著 U 車道的行進方向
+    const uHeading = index.pieces.find((p) => p.facilityId === 'u1')!.travelRad
+    expect(
+      locateByField(index, 25, 1.75, { corridorFacilityIds: corridor, headingRad: uHeading, speedMps: 5 })?.facilityId,
+    ).toBe('d1')
   })
 })

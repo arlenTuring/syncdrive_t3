@@ -332,6 +332,9 @@ export type LocateOptions = {
  */
 export const HEADING_PENALTY_M = 6
 
+/** 已經有走廊時，車頭朝向的權重只剩這麼多 */
+const CORRIDOR_HEADING_FACTOR = 0.25
+
 /** 車速低於這個值，heading 只是上一次的殘留，不是現在的行進方向 */
 export const HEADING_RELIABLE_MPS = 0.5
 /**
@@ -354,8 +357,15 @@ export const CANDIDATE_GATE_M = 1.2
 const HEADING_CONFLICT_RAD = (120 * Math.PI) / 180
 const CONFLICT_CONFIDENCE_FACTOR = 0.6
 
-/** 不在訂單路線的走廊上：多算這麼多。比留在原地的加分（0.8）大，比離開軌道的代價小。 */
-export const OFF_ROUTE_PENALTY_M = 1.5
+/**
+ * 不在訂單路線的走廊上：多算這麼多。
+ *
+ * 位置由場域座標決定；只有座標分不出來（兩塊同樣近，例如 D20 與 T03 的中心線交叉處）時，
+ * 才看這條訂單大致會經過哪些軌道。走廊只是「差不多該經過的軌道」，所以不會把明顯貼著另一塊的
+ * 車拉走（仍受 CANDIDATE_GATE_M 限制），但在分不出來時它比車頭朝向可靠——朝向資料一旦不對，
+ * 車就被吸到反向車道。
+ */
+export const OFF_ROUTE_PENALTY_M = 6
 
 /** 還在上一塊：少算這麼多，換塊要有足夠的證據 */
 export const STICKY_BONUS_M = 0.8
@@ -412,10 +422,11 @@ export function locateByField(
   const candidates = index.grid.get(cellKey(cx, cy))
   if (!candidates?.length) return null
 
+  // 有走廊時，車頭朝向退成最後的旁證（只用來分開走廊內同樣近的兩塊）
   const headingWeight =
-    options.speedMps !== undefined && options.speedMps < HEADING_RELIABLE_MPS
+    (options.speedMps !== undefined && options.speedMps < HEADING_RELIABLE_MPS
       ? SLOW_HEADING_WEIGHT
-      : 1
+      : 1) * (options.corridorFacilityIds ? CORRIDOR_HEADING_FACTOR : 1)
 
   // 第一輪：每一段各自投影，不含任何旁證
   type Cand = {
