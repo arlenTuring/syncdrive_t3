@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { acquireSocket, releaseSocket } from '../elements/socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
-import { VTMS_VEHICLE_POOL } from '../constants/vtmsVehiclePool';
+import { VTMS_DEBUG_VEHICLES, VTMS_VEHICLE_POOL } from '../constants/vtmsVehiclePool';
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import type { VtmsStreamKind } from '../utils/vtmsTopic';
 import { vtmsRowKeyForStream } from '../utils/vtmsMqttRowKey';
@@ -173,7 +173,7 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
     socket.on('disconnect', onDisconnect);
     if (socket.connected) onConnect();
 
-    for (const vehicleCode of VTMS_VEHICLE_POOL) {
+    for (const vehicleCode of [...VTMS_VEHICLE_POOL, ...VTMS_DEBUG_VEHICLES]) {
       for (const stream of ['telemetry', 'operation', 'health'] as const) {
         const topic = `v1/vtms/${vehicleCode}/${STREAM_SUFFIX[stream]}`;
         const eventName = `mqtt/${topic}`;

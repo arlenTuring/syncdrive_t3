@@ -4,6 +4,12 @@ export const VTMS_VEHICLE_POOL = Array.from({ length: 11 }, (_, i) =>
 );
 
 /**
+ * 聯測／除錯車：不在車隊清單（班表、派車都不列），但地圖要能看到它——
+ * 模擬器的「PMS99 單車除錯」讓它一台單獨上線，沿選定路線開。
+ */
+export const VTMS_DEBUG_VEHICLES = ['PMS99'] as const;
+
+/**
  * 正線班次代號。
  *
  * 舊的是方向加時間（U0830、D1133），排班引擎現在發的是路線代號加時間：NT1510 是
