@@ -624,8 +624,9 @@ export function rederiveTrackPath(
     ]
   }
 
-  // 里程與行進方向：沿用原本的 road／lane；里程接在起點那一端的隔壁後面
-  const heading = Math.atan2(real[1]![1] - real[0]![1], real[1]![0] - real[0]![0])
+  // 里程：沿用原本的 road／lane；里程接在起點那一端的隔壁後面。
+  // 行車方向（h）不寫：那是車道的事（負車道往里程增加的方向、正車道往減少的方向），不是這條線畫的順序。
+  // 以前照畫的順序寫成 h，正車道的 D19 因此被記成往北（實際往南），停站時被翻頭。
   const span0 = getTrackGenSpans(f.parameters)[0]
   if (span0) {
     const owner = area.facilities.find((g) => g.id === ends[0]!.anchor!.facilityId)
@@ -642,7 +643,7 @@ export function rederiveTrackPath(
         lane: span0.lane,
         s0: Number(s0.toFixed(2)),
         s1: Number((s0 + lengthM).toFixed(2)),
-        h: Number(heading.toFixed(4)),
+        h: null,
         f0: 0,
         f1: 1,
       },
