@@ -200,7 +200,19 @@ function facilityCenterMeters(entry) {
 }
 
 /** 載入所有 facility 類設施的幾何資料（中心點＋範圍），供座標查詢重用。 */
+const facilityGeometryCache = new Map();
+
 function loadFacilityGeometryFromMapFile(mapPath) {
+  // 依檔案修改時間快取：每次座標查詢都重新 parse 整張地圖會把事件迴圈吃住
+  const mtimeMs = fs.statSync(mapPath).mtimeMs;
+  const cached = facilityGeometryCache.get(mapPath);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.items;
+  const items = readFacilityGeometry(mapPath);
+  facilityGeometryCache.set(mapPath, { mtimeMs, items });
+  return items;
+}
+
+function readFacilityGeometry(mapPath) {
   const raw = fs.readFileSync(mapPath, 'utf8');
   const map = JSON.parse(raw);
   const areas = Array.isArray(map.areas) ? map.areas : [];

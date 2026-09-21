@@ -109,9 +109,21 @@ function collectOperationNodesFromMap(map) {
   return collectStationsFromMap(map);
 }
 
+/**
+ * 依檔案修改時間快取。訂單列表每筆訂單、每個端點都會來查站點，沒快取時每次都把整張
+ * 地圖 JSON 讀進來重新 parse，一秒內就佔掉好幾百毫秒；事件迴圈被吃住，MQTT 遙測就
+ * 一批一批才轉出去，前端的車輛便走走停停。
+ */
+const stationRegistryCache = new Map();
+
 function loadStationsFromMapFile(mapPath) {
+  const mtimeMs = fs.statSync(mapPath).mtimeMs;
+  const cached = stationRegistryCache.get(mapPath);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.registry;
   const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-  return collectStationsFromMap(map);
+  const registry = collectStationsFromMap(map);
+  stationRegistryCache.set(mapPath, { mtimeMs, registry });
+  return registry;
 }
 
 function loadOperationNodesFromMapFile(mapPath) {
