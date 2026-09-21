@@ -186,6 +186,38 @@ export function resetContradictingSpans(facilities: readonly FacilityObject[]): 
   return { facilities: next, reset }
 }
 
+/**
+ * 記的行車方向與車道對不上的，拿掉 h 讓定位改由車道推。
+ *
+ * 一塊直的軌道只有一段里程：負車道往里程增加的方向開、正車道往減少的方向開，這條規則在生成的圖上
+ * 一致（65 塊裡沒有例外）。使用者複製、重拉出來的 D15、D19、D23 帶著別處抄來的 h，與車道相反——
+ * 往南開的車在 D19 上判不到自己這一塊。h 是選填的，拿掉就退回由車道推。
+ */
+export function dropContradictingHeadings(facilities: readonly FacilityObject[]): {
+  facilities: FacilityObject[]
+  cleared: string[]
+} {
+  const cleared: string[] = []
+  const next = facilities.map((f) => {
+    if (f.type !== 'Track' || f.name === 'RailCross') return f
+    const paths = getTrackGenPaths(f.parameters)
+    const spans = getTrackGenSpans(f.parameters)
+    if (!paths || spans.length !== 1 || spans[0]!.h === null) return f
+    const sp = spans[0]!
+    const a = paths.real[0]!
+    const b = paths.real[paths.real.length - 1]!
+    const alongS = Math.atan2(b[1] - a[1], b[0] - a[0])
+    const alongPath = (sp.lane < 0) === (sp.s1 >= sp.s0)
+    let gap = Math.abs(sp.h! - alongS) % (2 * Math.PI)
+    if (gap > Math.PI) gap = 2 * Math.PI - gap
+    if ((gap < Math.PI / 2) === alongPath) return f
+    cleared.push(f.customName?.trim() || f.id)
+    const raw = (f.parameters?.[TRACKGEN_SPANS_KEY] as Array<Record<string, unknown>>).map((x) => ({ ...x, h: null }))
+    return { ...f, parameters: { ...(f.parameters ?? {}), [TRACKGEN_SPANS_KEY]: raw } } as FacilityObject
+  })
+  return { facilities: cleared.length > 0 ? next : [...facilities], cleared }
+}
+
 export type TrackGenSpanBackfill = {
   name: string
   id: string
@@ -209,9 +241,10 @@ export function backfillTrackGenSpansInAreas(areas: MapAreaObject[]): {
 
   const next = areas.map((area) => {
     const cleared = resetContradictingSpans(area.facilities)
-    const facilities = cleared.facilities
+    const headed = dropContradictingHeadings(cleared.facilities)
+    const facilities = headed.facilities
     resetLabels.push(...cleared.reset)
-    let areaChanged = cleared.reset.length > 0
+    let areaChanged = cleared.reset.length > 0 || headed.cleared.length > 0
     const nextFacilities = facilities.map((facility) => {
       const paths = getTrackGenPaths(facility.parameters)
       if (!paths) return facility

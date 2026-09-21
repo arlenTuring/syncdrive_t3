@@ -230,4 +230,29 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
       for (const route of routes) expect(crossMaxOffset(derived, route).max, route.route).toBeLessThan(3.5)
     })
   })
+
+  it('T3 下方 D20 與 T03 的中心線交叉處：往南開的 D 車道車判給 D20、往北開的判給 T03', () => {
+    const derived = withCrossBranchTracks(areas)
+    const network = getTrackNetwork(derived)
+    const byName = (n: string) => areas[0]!.facilities.find((f) => f.customName === n)
+    const d20 = byName('D20')
+    const t03 = byName('T03')
+    if (!d20 || !t03) return
+    const realOf = (f: NonNullable<typeof d20>) =>
+      (f.parameters as { trackGenRealPath: Array<[number, number]> }).trackGenRealPath
+    const [a, b] = [realOf(d20)[0]!, realOf(d20).at(-1)!]
+    const [c, d] = [realOf(t03)[0]!, realOf(t03).at(-1)!]
+    // 兩條直線的交點
+    const den = (a[0] - b[0]) * (c[1] - d[1]) - (a[1] - b[1]) * (c[0] - d[0])
+    if (Math.abs(den) < 1e-9) return
+    const px = ((a[0] * b[1] - a[1] * b[0]) * (c[0] - d[0]) - (a[0] - b[0]) * (c[0] * d[1] - c[1] * d[0])) / den
+    const py = ((a[0] * b[1] - a[1] * b[0]) * (c[1] - d[1]) - (a[1] - b[1]) * (c[0] * d[1] - c[1] * d[0])) / den
+    const name = (id: string | undefined) => areas[0]!.facilities.find((f) => f.id === id)?.customName
+    for (const [dx, dy] of [[0, 0], [0.3, 1], [-0.3, -1]]) {
+      const south = resolveVehiclePlacementAcrossAreas(derived, px + dx, py + dy, network, { headingRad: -Math.PI / 2, speedMps: 5 })
+      expect(name(south?.placement.trackId), '往南').toBe('D20')
+      const north = resolveVehiclePlacementAcrossAreas(derived, px + dx, py + dy, network, { headingRad: Math.PI / 2, speedMps: 5 })
+      expect(name(north?.placement.trackId), '往北').toBe('T03')
+    }
+  })
 })

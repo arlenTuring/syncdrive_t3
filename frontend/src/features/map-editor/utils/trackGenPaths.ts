@@ -61,7 +61,8 @@ export function getTrackGenSpans(
     const s0 = Number(o.s0)
     const s1 = Number(o.s1)
     if (!road || ![lane, s0, s1].every(Number.isFinite)) continue
-    const h = Number(o.h)
+    // null／缺欄位是「沒記」，不能讓 Number(null) 變成 0（正東）——那會讓每一塊沒記方向的軌道都被當成往東開
+    const h = o.h === null || o.h === undefined || o.h === '' ? NaN : Number(o.h)
     const f0 = Number(o.f0)
     const f1 = Number(o.f1)
     out.push({

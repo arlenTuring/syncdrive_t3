@@ -106,6 +106,18 @@ function markBidirectional(pieces: Piece[]): void {
   }
 }
 
+/**
+ * 沒有記行車方向時，由車道推：負車道往里程增加的方向開、正車道往里程減少的方向開。
+ * 中心線的記錄順序不一定是里程增加的方向（重拉的 T03、D20 就是里程往路徑遞減），所以要看
+ * 這一段的里程沿路徑是增是減，不能一律當成「負車道順著路徑、正車道逆著路徑」——
+ * 那樣 D 車道的 D20 會被判成往北、隔壁 U 車道的 T03 反而判成往南，往南開的車就被吸過去。
+ */
+function laneTravelRad(sp: { lane: number; s0: number; s1: number }, alongS: number): number {
+  const sIncreasesAlongPath = sp.s1 >= sp.s0
+  const alongPath = (sp.lane < 0) === sIncreasesAlongPath
+  return alongPath ? alongS : alongS + Math.PI
+}
+
 export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex {
   const pieces: Piece[] = []
   for (const f of facilities) {
@@ -128,8 +140,8 @@ export function buildTrackGenIndex(facilities: LocateFacility[]): TrackGenIndex 
         real: paths.real,
         local: paths.local,
         // 逐段記的方向優先；舊資料沒有時退回整塊的頭尾連線
-        travelRad: sp.h ?? (sp.lane > 0 ? alongS + Math.PI : alongS),
-        againstPath: angleGap(sp.h ?? (sp.lane > 0 ? alongS + Math.PI : alongS), alongS) > Math.PI / 2,
+        travelRad: sp.h ?? laneTravelRad(sp, alongS),
+        againstPath: angleGap(sp.h ?? laneTravelRad(sp, alongS), alongS) > Math.PI / 2,
         bidirectional: false,
       })
     }
