@@ -483,7 +483,16 @@ export function drawnDirectionAtField(
   dy /= len;
   // 車頭朝前還是朝後：拿現場朝向跟這一塊的現場切線比
   if (headingRad != null && Number.isFinite(headingRad)) {
-    const refRad = reference ? realTangentRadAt(reference) : null;
+    /*
+     * 車頭朝前還是朝後，只能拿<strong>畫的這一塊自己</strong>的現場切線比。
+     *
+     * 定位點（reference）可能在<strong>下一塊</strong>：換塊補間的前半段，畫的位置還在上一塊、定位點已經在
+     * 下一塊。兩塊的中心線記錄順序不一定同向（D16 由西往東記、接著的 D17 由接點往西南記），拿下一塊的
+     * 切線去決定上一塊的方向會整個判反——實測 D16 → D17 的補間前 0.4 秒車頭轉了 174 度，
+     * 以後軸為軸心整台翻到後面，看起來就是倒退一下再回來。
+     * 只有定位點就在畫的這一塊上時，才用它的切線（那是最貼近車頭讀值的那一點）。
+     */
+    const refRad = reference && reference.track.id === track.id ? realTangentRadAt(reference) : null;
     const realTan =
       refRad !== null ? { x: Math.cos(refRad), y: Math.sin(refRad) } : tangentAlongPath(paths.real, along);
     const dot = Math.cos(headingRad) * realTan.x + Math.sin(headingRad) * realTan.y;
