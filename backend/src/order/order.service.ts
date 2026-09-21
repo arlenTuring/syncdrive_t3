@@ -237,11 +237,15 @@ export class OrderService {
     return this.attachEndpointCoordinates(order);
   }
 
-  private attachEndpointCoordinates(order: OperationOrder): OperationOrder {
+  /** mapId 由呼叫端傳進來：列表一次幾百張單，不必每個端點都重讀一次現行地圖設定 */
+  private attachEndpointCoordinates(
+    order: OperationOrder,
+    mapId: string = this.mapService.getActiveMapLibraryStatus().activeMapId,
+  ): OperationOrder {
     const payload = (order.payload ?? {}) as Record<string, unknown>;
     if (payload.map_snapshot) return order; // 測試單保存建立時座標，不隨換圖改寫。
-    const origin = this.resolveEndpointCoordinates(payload.origin);
-    const destination = this.resolveEndpointCoordinates(payload.destination);
+    const origin = this.resolveEndpointCoordinates(payload.origin, mapId);
+    const destination = this.resolveEndpointCoordinates(payload.destination, mapId);
     if (!origin && !destination) {
       return order;
     }
@@ -255,7 +259,7 @@ export class OrderService {
     } as OperationOrder;
   }
 
-  private resolveEndpointCoordinates(point: unknown): Record<string, unknown> | null {
+  private resolveEndpointCoordinates(point: unknown, mapId: string): Record<string, unknown> | null {
     if (!point || typeof point !== 'object') return null;
     const endpoint = point as Record<string, unknown>;
     const endpointId = typeof endpoint.id === 'string' ? endpoint.id : undefined;
@@ -264,7 +268,6 @@ export class OrderService {
       return { ...endpoint };
     }
     try {
-      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
       if (kind === 'station') {
         const station = this.mapService.getStation(mapId, endpointId);
         return { ...endpoint, x: station.xM, y: station.yM };
@@ -516,7 +519,8 @@ export class OrderService {
       where: { vehicleCode, status: In([OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.FAULTED]) },
       order: { createdAt: 'ASC' },
     });
-    return { vehicle_code: vehicleCode, items: items.map(order => this.attachEndpointCoordinates(order)) };
+    const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
+    return { vehicle_code: vehicleCode, items: items.map(order => this.attachEndpointCoordinates(order, mapId)) };
   }
 
   async authorizeOrder(id: string, scope?: string[]): Promise<OperationOrder> {
