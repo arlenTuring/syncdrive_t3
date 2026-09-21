@@ -11,6 +11,7 @@ type ShellWorkspaceFrameProps = {
   onAdminModeChange: (enabled: boolean) => void;
   supervisorApproval: boolean;
   onSupervisorApprovalChange: (enabled: boolean) => void;
+  onOpenSystemFoundation: () => void;
 };
 
 /**
@@ -25,6 +26,7 @@ export function ShellWorkspaceFrame({
   onAdminModeChange,
   supervisorApproval,
   onSupervisorApprovalChange,
+  onOpenSystemFoundation,
 }: ShellWorkspaceFrameProps) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#121214] p-3">
@@ -39,6 +41,7 @@ export function ShellWorkspaceFrame({
             onAdminModeChange={onAdminModeChange}
             supervisorApproval={supervisorApproval}
             onSupervisorApprovalChange={onSupervisorApprovalChange}
+            onOpenSystemFoundation={onOpenSystemFoundation}
           />
         </header>
         <div

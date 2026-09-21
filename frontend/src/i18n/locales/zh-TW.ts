@@ -1724,10 +1724,6 @@ const zhTW = {
           label: '斜接軌道',
           hint: '斜接軌道 — 矩形切掉右上與左下兩個對角；上下各一個控制點調整切角',
         },
-        railSwitch: {
-          label: '分岔軌道',
-          hint: '分岔軌道 — 一進兩出；三個控制點分別調整進口、直行出口與岔出出口',
-        },
         railCross: {
           label: '交叉軌道',
           hint: '交叉軌道 — 兩條軌道交會，四口互通（直行兩條、斜行兩條）；四個連接點可接合其他軌道並自動對齊端面',
@@ -2351,6 +2347,15 @@ const zhTW = {
       createRoute: '製作路線',
       topology: '路網拓撲',
       palette: '元件庫',
+      tabDocking: '點位',
+      tabFacility: '設施',
+      tabEquipment: '設備',
+      tabRoutes: '路線',
+      tabGeofence: '圍籬',
+      geofenceList: '圍籬清單',
+      geofence: '虛擬圍籬',
+      geofenceHint: '虛擬圍籬在「虛擬圍籬管理」建立；這裡只列出圖台上已有的圍籬。',
+      expand: '展開清單',
       collapse: '收合清單',
       dockingHint:
         '正線停靠點來自元件庫；設施停靠點在大型設施屬性中設定，綠色圓點標示於設施內。',

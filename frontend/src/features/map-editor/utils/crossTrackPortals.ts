@@ -255,6 +255,9 @@ export function neighbourEndField(
  *
  * 人工填過以人工為準；否則取貼著這個口的隔壁軌道的端點；都沒有才照外接方框內插。
  */
+/** 內插估計離中心線頭尾多近（公尺）才改用中心線頭尾 */
+const CROSS_PORT_SNAP_M = 15
+
 export function resolveCrossPortalFields(
   facility: FacilityObject,
   area: MapAreaObject | null | undefined,
@@ -309,13 +312,31 @@ export function resolveCrossPortalFields(
      * 才會一致。範圍不可信才退回圖面換算。
      */
     const bounds = getValidRefFieldBounds(facility.parameters)
-    out[key] = bounds
+    const interpolated = bounds
       ? {
           xM: bounds.xMinM + (bounds.xMaxM - bounds.xMinM) * unit.x,
           yM: bounds.yMaxM - (bounds.yMaxM - bounds.yMinM) * unit.y,
-          auto: true,
         }
-      : { xM: field.xM, yM: field.yM, auto: true }
+      : { xM: field.xM, yM: field.yM }
+    /*
+     * 範圍內插只是粗估（範圍是外接方框，不是口的位置；T3 的 lt 口估到 y = −2.6，實際在 −14.6）。
+     * 交叉軌道自己的中心線頭尾就是兩個斜向的口，離估計值夠近就用它——新拉的軌道接到還沒有鄰居的
+     * 口時，才不會把錯的估計值傳給隔壁、再存成接點。
+     */
+    const real = getTrackGenPaths(facility.parameters)?.real
+    const realEnds = real ? [real[0]!, real[real.length - 1]!] : []
+    let best: [number, number] | null = null
+    let bestD = CROSS_PORT_SNAP_M
+    for (const e of realEnds) {
+      const d = Math.hypot(e[0] - interpolated.xM, e[1] - interpolated.yM)
+      if (d < bestD) {
+        best = e
+        bestD = d
+      }
+    }
+    out[key] = best
+      ? { xM: best[0], yM: best[1], auto: true }
+      : { ...interpolated, auto: true }
   }
   return out
 }

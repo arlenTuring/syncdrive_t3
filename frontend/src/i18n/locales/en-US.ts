@@ -1738,10 +1738,6 @@ const enUS: DeepStringify<typeof zhTW> = {
           label: 'Taper track',
           hint: 'Taper track — rectangle with opposite corners cut; one handle per side',
         },
-        railSwitch: {
-          label: 'Switch track',
-          hint: 'Switch track — one in, two out; handles for entry, through, and branch exits',
-        },
         railCross: {
           label: 'Crossing track',
           hint: 'Crossing track — two tracks meeting, all four mouths connected (two straight, two diagonal); each joint adapts to the track it is attached to',
@@ -2383,6 +2379,15 @@ const enUS: DeepStringify<typeof zhTW> = {
       createRoute: 'Create route',
       topology: 'Topology',
       palette: 'Palette',
+      tabDocking: 'Points',
+      tabFacility: 'Facility',
+      tabEquipment: 'Device',
+      tabRoutes: 'Routes',
+      tabGeofence: 'Fence',
+      geofenceList: 'Geofences',
+      geofence: 'Geofences',
+      geofenceHint: 'Geofences are created in Virtual fence management; this lists the ones on the map.',
+      expand: 'Expand list',
       collapse: 'Collapse list',
       dockingHint:
         'Mainline berths come from the palette; facility berths are set in large-facility properties (green dots inside).',

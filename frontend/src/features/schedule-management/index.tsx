@@ -216,6 +216,7 @@ export default function ScheduleManagementApp({
     onAdminModeChange: setAdminMode,
     supervisorApproval,
     onSupervisorApprovalChange: setSupervisorApproval,
+    onOpenSystemFoundation: () => setView('system-foundation'),
   };
 
   const scheduleContent = (

@@ -289,6 +289,11 @@ export function collectFacilityEntries(
   return collectByType(areas, ['Facility'])
 }
 
+/** 圍籬清單：虛擬圍籬（在圍籬管理建立，圖台只顯示） */
+export function collectGeofenceEntries(areas: MapAreaObject[]): FacilityListEntry[] {
+  return collectByType(areas, ['Geofence'])
+}
+
 export function collectEquipmentEntries(areas: MapAreaObject[]): {
   signals: FacilityListEntry[]
   poles: FacilityListEntry[]

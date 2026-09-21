@@ -52,6 +52,8 @@ import type { PointTopology } from '../types/pointTopology'
 import { parseMapRoutes } from './routePlanning'
 import { normalizeTrackGenOrientation } from './trackGenOrientation'
 import { settleTrackJointsInAreas } from './trackJoints'
+import { backfillTrackGenLatPerBoxInAreas, deriveShapedTrackPathsInAreas } from './shapedTrackPaths'
+import { backfillTrackGenSpansInAreas } from './trackGenSpanBackfill'
 import { alignTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 import { parseMapRouteGroups } from './routeGroupPlanning'
 import { parsePointTopology } from './pointTopology'
@@ -600,8 +602,11 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
     const oriented = normalizeTrackGenOrientation((json.areas ?? []).map((a, i) => parseAreaEntry(a, i)))
     // 場域範圍是從中心線導出來的：載入時對齊，「依圖上形狀重算範圍」才不會每次都改一批
     // 接點：軌道相接處的現場座標只留一份，中心線頭尾依它對齊
-    const settled = settleTrackJointsInAreas(oriented)
-    const areas = alignTrackRefFieldBoundsInAreas(settled.areas)
+    // 新拉的軌道（沒有中心線、里程）：照隔壁與分區入口補齊，載入與編輯共用同一條路
+    const shaped = deriveShapedTrackPathsInAreas(backfillTrackGenLatPerBoxInAreas(oriented).areas)
+    const settled = settleTrackJointsInAreas(shaped.areas)
+    const spanned = backfillTrackGenSpansInAreas(settled.areas)
+    const areas = alignTrackRefFieldBoundsInAreas(spanned.areas)
     const basemaps = (json.basemaps ?? []).map(parseBasemapEntry)
     const routes = parseMapRoutes(json.routes)
     const creationMode = parseCreationMode(json.creationMode)

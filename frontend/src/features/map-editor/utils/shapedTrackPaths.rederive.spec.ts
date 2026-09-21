@@ -156,8 +156,9 @@ describe.skipIf(!doc || doc.creationMode !== 'trackGen')('依圖上形狀重算�
         if (syncAutoRefFieldBoundsFromPlacement(f, a) !== f) changed.push(f.customName?.trim() || f.id)
       }
     }
-    // 直軌道、圓角、斜接都對齊；剩下的是範圍另有定義的分岔（121）與一塊差 0.4 公尺的 D18
-    expect(changed.length).toBeLessThanOrEqual(3)
+    // 直軌道、圓角都對齊；斜接的四個角是估的，只有少數幾塊會差
+    // 使用者新拉的斜接（D20、T03、T01）四個角由寬度估出，與依外框重算的差幾公分，算在裡面
+    expect(changed.length).toBeLessThanOrEqual(6)
   })
 })
 

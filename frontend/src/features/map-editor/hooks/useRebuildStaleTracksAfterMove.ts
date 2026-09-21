@@ -6,6 +6,8 @@ import {
   snapshotGeometry,
   type GeometrySnapshot,
 } from '../utils/rederiveAfterMove'
+import { backfillTrackGenLatPerBoxInAreas, deriveShapedTrackPathsInAreas } from '../utils/shapedTrackPaths'
+import { backfillTrackGenSpansInAreas } from '../utils/trackGenSpanBackfill'
 import { settleTrackJointsInAreas } from '../utils/trackJoints'
 
 /** 動完之後等多久才檢查——拖曳過程中每一幀都動，只在停手後算一次 */
@@ -49,8 +51,11 @@ export function useRebuildStaleTracksAfterMove(
       // 用最新的狀態再算一次：等待期間使用者可能又改了別的
       setAreas((prev) => {
         const rebuilt = rebuildStaleAmong(prev, keys).areas
+        // 新拉的軌道：先補中心線（接隔壁或分區入口），再整理接點，最後補里程；
+        // 不然要等下次重新載入才補，期間存出去的檔案缺這些
+        const shaped = deriveShapedTrackPathsInAreas(backfillTrackGenLatPerBoxInAreas(rebuilt).areas).areas
         // 整理接點：拖開的放掉、貼上的併成接點，中心線頭尾依接點對齊
-        const settled = settleTrackJointsInAreas(rebuilt).areas
+        const settled = backfillTrackGenSpansInAreas(settleTrackJointsInAreas(shaped).areas).areas
         return settled.every((a, i) => a === prev[i]) && settled.length === prev.length ? prev : settled
       })
       // 重建改的是參數，位置與大小沒變：快照不必更新

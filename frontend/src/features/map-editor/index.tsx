@@ -4315,16 +4315,12 @@ export default function MapEditorApp({
       )}
       {isMapWorkspace && mapScreen === 'editor' && (
       <div
-        className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-1.5 font-mono text-xs text-zinc-400"
+        className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-1.5 text-xs text-zinc-400"
+        role="status"
         aria-live="polite"
       >
-        <span className="truncate text-zinc-300">
-          {loadedMapMeta.displayName || t('mapEditor.chrome.unnamedMap')}
-          <span className="text-zinc-600"> · </span>
-          {loadedMapMeta.version}
-        </span>
         <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
             loadedMapMeta.creationMode === 'trackGen'
               ? 'bg-emerald-950/70 text-emerald-300/90'
               : 'bg-zinc-800 text-zinc-500'
@@ -4334,10 +4330,7 @@ export default function MapEditorApp({
             ? t('mapEditor.chrome.creationModeTrackGen')
             : t('mapEditor.chrome.creationModeBlank')}
         </span>
-        <span className="text-zinc-600" aria-hidden>
-          |
-        </span>
-        <span>
+        <span className="min-w-0 truncate font-mono">
           {activeViewportCenterMeters ? (
             <>
               {t('mapEditor.chrome.coords', { x: activeViewportCenterMeters.x.toFixed(2), y: activeViewportCenterMeters.y.toFixed(2) })}
@@ -4353,12 +4346,41 @@ export default function MapEditorApp({
             t('mapEditor.chrome.selectHint')
           )}
         </span>
-        <span className="text-zinc-600" aria-hidden>
-          |
-        </span>
-        <span>
+        <span className="hidden shrink-0 font-mono text-zinc-500 md:inline">
           {t('mapEditor.chrome.canvasPx', { w: mapPixelSize.width, h: mapPixelSize.height })}
         </span>
+        {mapEditorMode === 'edit' && (
+          <span className="ml-auto flex shrink-0 items-center gap-2">
+            {autosaveStatus === 'saving' && (
+              <Loader2 className="size-3.5 shrink-0 animate-spin text-cyan-400" aria-hidden />
+            )}
+            <span className="hidden sm:inline">
+              {autosaveStatus === 'saving'
+                ? t('mapEditor.chrome.autosaving')
+                : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')}
+            </span>
+            <span className="h-3.5 w-px bg-zinc-700" aria-hidden />
+            {/*
+              自動儲存只寫本機，正式環境那份要按這裡才會換。分開之後，「我改到一半」
+              與「這一版可以上線了」是兩個狀態，不會因為開錯一張圖就把它重新發布。
+            */}
+            <span className={hasUnpublishedChanges ? 'text-amber-300' : 'text-zinc-500'}>
+              {hasUnpublishedChanges
+                ? t('mapEditor.chrome.unpublishedChanges')
+                : t('mapEditor.chrome.published')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void publishCurrentMap()}
+              disabled={publishing || !hasUnpublishedChanges}
+              className="h-6 rounded-md border border-cyan-700/70 bg-cyan-950/40 px-2.5 text-cyan-200 enabled:hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {publishing
+                ? t('mapEditor.chrome.publishing')
+                : t('mapEditor.chrome.publish')}
+            </button>
+          </span>
+        )}
       </div>
       )}
       {isTrajectoryWorkspace && (
@@ -4379,50 +4401,6 @@ export default function MapEditorApp({
           {t('mapEditor.chrome.viewCenter', { x: trajectoryViewportCenterMeters.x.toFixed(2), y: trajectoryViewportCenterMeters.y.toFixed(2) })}
         </span>
       </div>
-      )}
-      {isMapWorkspace && mapScreen === 'editor' && mapEditorMode === 'edit' && (
-        <div
-          className="flex shrink-0 items-center gap-2 border-b border-zinc-800 bg-zinc-900/80 px-4 py-1.5 text-xs text-zinc-400"
-          role="status"
-          aria-live="polite"
-        >
-          {autosaveStatus === 'saving' && (
-            <Loader2
-              className="size-3.5 shrink-0 animate-spin text-cyan-400"
-              aria-hidden
-            />
-          )}
-          <span>
-            {autosaveStatus === 'saving'
-              ? t('mapEditor.chrome.autosaving')
-              : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')}
-          </span>
-          {/*
-            自動儲存只寫本機，正式環境那份要按這裡才會換。分開之後，「我改到一半」
-            與「這一版可以上線了」是兩個狀態，不會因為開錯一張圖就把它重新發布。
-          */}
-          <span className="ml-auto flex items-center gap-2">
-            <span
-              className={
-                hasUnpublishedChanges ? 'text-amber-300' : 'text-zinc-500'
-              }
-            >
-              {hasUnpublishedChanges
-                ? t('mapEditor.chrome.unpublishedChanges')
-                : t('mapEditor.chrome.published')}
-            </span>
-            <button
-              type="button"
-              onClick={() => void publishCurrentMap()}
-              disabled={publishing || !hasUnpublishedChanges}
-              className="rounded border border-cyan-700/70 bg-cyan-950/40 px-2 py-0.5 text-cyan-200 enabled:hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {publishing
-                ? t('mapEditor.chrome.publishing')
-                : t('mapEditor.chrome.publish')}
-            </button>
-          </span>
-        </div>
       )}
       {(!isMapWorkspace || mapScreen === 'editor') && (
       <div className="relative flex min-h-0 flex-1">

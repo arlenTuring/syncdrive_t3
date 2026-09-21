@@ -20,6 +20,8 @@ type ShellAccountToolbarProps = {
   onAdminModeChange: (enabled: boolean) => void;
   supervisorApproval: boolean;
   onSupervisorApprovalChange: (enabled: boolean) => void;
+  /** 右上角齒輪：直接進「系統基礎模組」頁 */
+  onOpenSystemFoundation: () => void;
 };
 
 export function ShellAccountToolbar({
@@ -28,6 +30,7 @@ export function ShellAccountToolbar({
   onAdminModeChange,
   supervisorApproval,
   onSupervisorApprovalChange,
+  onOpenSystemFoundation,
 }: ShellAccountToolbarProps) {
   const { t, i18n } = useTranslation();
   const [account, setAccountId] = useDemoAccount();
@@ -95,6 +98,9 @@ export function ShellAccountToolbar({
 
       <button
         type="button"
+        onClick={() => setSettingsOpen((open) => !open)}
+        aria-expanded={settingsOpen}
+        aria-controls={panelId}
         className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#1f1f22] pl-2 pr-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 hover:text-white"
         title={t('shell.account')}
         aria-label={t('shell.accountWithTitle', {
@@ -113,16 +119,13 @@ export function ShellAccountToolbar({
 
       <button
         type="button"
-        onClick={() => setSettingsOpen((open) => !open)}
-        className={`inline-flex size-8 items-center justify-center rounded-full transition ${
-          settingsOpen
-            ? 'bg-sky-600/25 text-sky-300'
-            : 'bg-[#1f1f22] text-zinc-300 hover:bg-zinc-800 hover:text-white'
-        }`}
+        onClick={() => {
+          setSettingsOpen(false);
+          onOpenSystemFoundation();
+        }}
+        className="inline-flex size-8 items-center justify-center rounded-full bg-[#1f1f22] text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
         title={t('shell.settings')}
         aria-label={t('shell.settings')}
-        aria-expanded={settingsOpen}
-        aria-controls={panelId}
       >
         <Settings className="size-4" />
       </button>

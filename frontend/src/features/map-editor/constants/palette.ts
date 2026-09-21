@@ -125,12 +125,6 @@ export const FACILITY_PALETTE_ITEMS: readonly FacilityPaletteItem[] = [
     hint: 'mapEditor.palette.items.railTaper.hint',
   },
   {
-    label: 'mapEditor.palette.items.railSwitch.label',
-    type: 'Track',
-    name: 'RailSwitch',
-    hint: 'mapEditor.palette.items.railSwitch.hint',
-  },
-  {
     label: 'mapEditor.palette.items.railCross.label',
     type: 'Track',
     name: 'RailCross',

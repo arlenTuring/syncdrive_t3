@@ -84,6 +84,8 @@ function neighbourAt(
   /** 自己另一端的位置：鄰居的本體必須在接點的<strong>另一側</strong>，同一側的是疊在一起的兄弟 */
   ownFar: Endpoint,
 ): Neighbour | null {
+  // 交叉軌道有四條並排的分支、好幾組 road／lane，看不出接的是哪一條，不當接續的依據
+  if (facility.name === 'RailCross') return null
   const paths = getTrackGenPaths(facility.parameters)
   if (!paths) return null
   const spans = getTrackGenSpans(facility.parameters)
