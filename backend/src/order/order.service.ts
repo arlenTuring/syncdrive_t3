@@ -565,6 +565,43 @@ export class OrderService {
     return saved;
   }
 
+  /**
+   * 中心端主動取消一張已下發訂單（行控人員操作，內部端點，不對外）。
+   *
+   * 只負責發起，不強制車端結案：REST 立刻在 payload 寫下 cancel_requested_at
+   * 當作權威事實，MQTT operation/cancel 只是低延遲通知——跟建立訂單時
+   * REST 寫庫、MQTT operation/assign 只通知是同一個模式。車端收到通知或下次對帳
+   * 發現這個欄位後，照既有協議呼叫 updateOrderProgress?status=FAULTED 結案；
+   * 中心端這裡不等、也不替車端把狀態轉成 FAULTED——那是車端的權威回報，不是中心端
+   * 能代打的。
+   *
+   * 只有 PENDING、PROCESSING 能取消：END／FAULTED 已經是終態，取消沒有意義。
+   * 重複呼叫同一張已請求取消的單，冪等回傳、不重發 MQTT（不然行控多點兩下，
+   * 車端就收到兩則一樣的通知）。
+   */
+  async requestCancel(id: string): Promise<OperationOrder> {
+    const order = await this.getOrderById(id);
+
+    if (order.status === OrderStatus.END || order.status === OrderStatus.FAULTED) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'ORDER_ALREADY_CLOSED',
+        message: `訂單已是終態 '${order.status}'，無法取消`,
+      });
+    }
+
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    if (payload.cancel_requested_at) {
+      return order; // 已經請求過，冪等回傳，不重發 MQTT
+    }
+
+    order.payload = { ...payload, cancel_requested_at: Date.now() };
+    const saved = await this.orderRepository.save(order);
+    this.orderMqttPublisher.publishCancel(saved.vehicleCode, saved.id);
+    this.datasourceInvalidation.emitOrderLifecycle(saved.vehicleCode);
+    return saved;
+  }
+
   /** 車端以 action_id 回報動作狀態（REST SSOT） */
   async updateActionStatus(
     actionId: string,

@@ -14,6 +14,17 @@ export type AssignPublishTrace = {
   };
 };
 
+export type CancelPublishTrace = {
+  topic: string;
+  qos: 1;
+  retain: false;
+  payload: {
+    vehicle_code: string;
+    timestamp: number;
+    order_id: string;
+  };
+};
+
 /**
  * 專門負責「中心端 → 車端」的 MQTT Publish 服務
  * 與 MqttController (訂閱端) 完全分離，避免角色混淆
@@ -49,6 +60,32 @@ export class OrderMqttPublisher implements OnModuleInit {
     this.mqttClient.publish(topic, JSON.stringify(payload), { retain: false, qos: 1 }, (err) => {
       if (err) {
         this.logger.error(`[Assign Failed] Could not publish to ${topic}`, err);
+      }
+    });
+    return { topic, qos: 1, retain: false, payload };
+  }
+
+  /**
+   * 中心端主動取消一張已下發訂單的低延遲通知。
+   * Topic: v1/vtms/{vehicle_code}/operation/cancel
+   * Retain: false——跟 assign 同理，非持久性觸發訊號，不保證離線車端收得到。
+   *
+   * 這裡只負責「通知」，不是取消的權威來源。真相是 REST：中心端呼叫取消端點的當下
+   * 就已經在 order.payload 寫下 cancel_requested_at；車端就算錯過這則 MQTT，
+   * 下一次 order/active 或 queryById 對帳也會看到同一個欄位。車端收到後照既有協議
+   * 呼叫 updateOrderProgress?status=FAULTED 把單結掉，不必新開任何端點。
+   */
+  publishCancel(vehicleCode: string, orderId: string): CancelPublishTrace {
+    const topic = `v1/vtms/${vehicleCode}/operation/cancel`;
+    const payload = {
+      vehicle_code: vehicleCode,
+      timestamp: new Date().getTime(),
+      order_id: orderId,
+    };
+
+    this.mqttClient.publish(topic, JSON.stringify(payload), { retain: false, qos: 1 }, (err) => {
+      if (err) {
+        this.logger.error(`[Cancel Failed] Could not publish to ${topic}`, err);
       }
     });
     return { topic, qos: 1, retain: false, payload };

@@ -165,6 +165,75 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
       expect(result?.payload).not.toHaveProperty('vehicle_phase');
     });
   });
+
+  describe('requestCancel：中心端主動取消', () => {
+    let cancelService: OrderService;
+    let cancelOrderRepo: { findOne: jest.Mock; save: jest.Mock };
+    let publisherMock: { publishAssign: jest.Mock; publishCancel: jest.Mock };
+
+    beforeEach(async () => {
+      cancelOrderRepo = {
+        findOne: jest.fn(),
+        save: jest.fn((o) => Promise.resolve(o)),
+      };
+      publisherMock = { publishAssign: jest.fn(), publishCancel: jest.fn() };
+      const noop = {} as never;
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          OrderService,
+          { provide: getRepositoryToken(OperationOrder), useValue: cancelOrderRepo },
+          { provide: getRepositoryToken(OrderActionState), useValue: noop },
+          { provide: getRepositoryToken(OrderEvent), useValue: noop },
+          { provide: OrderMqttPublisher, useValue: publisherMock },
+          { provide: OrderRouteService, useValue: noop },
+          { provide: DatasourceInvalidationService, useValue: invalidationMock },
+          { provide: MapService, useValue: noop },
+        ],
+      }).compile();
+      cancelService = module.get(OrderService);
+    });
+
+    it('PENDING 可取消：寫入 cancel_requested_at 並發布 MQTT operation/cancel', async () => {
+      cancelOrderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+      const result = await cancelService.requestCancel('260624-U1030');
+      expect(result.payload).toHaveProperty('cancel_requested_at');
+      expect(publisherMock.publishCancel).toHaveBeenCalledWith('PMS05', '260624-U1030');
+    });
+
+    it('PROCESSING 可取消', async () => {
+      cancelOrderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
+      const result = await cancelService.requestCancel('260624-U1030');
+      expect(result.payload).toHaveProperty('cancel_requested_at');
+      expect(publisherMock.publishCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('END／FAULTED 已是終態，拒絕取消', async () => {
+      cancelOrderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.END));
+      await expect(cancelService.requestCancel('260624-U1030')).rejects.toMatchObject({
+        response: { statusCode: 400, code: 'ORDER_ALREADY_CLOSED' },
+      });
+      cancelOrderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.FAULTED));
+      await expect(cancelService.requestCancel('260624-U1030')).rejects.toMatchObject({
+        response: { statusCode: 400, code: 'ORDER_ALREADY_CLOSED' },
+      });
+      expect(publisherMock.publishCancel).not.toHaveBeenCalled();
+    });
+
+    it('重複取消同一張單：冪等回傳，不重發 MQTT', async () => {
+      const order = makeOrder(OrderStatus.PROCESSING);
+      order.payload = { cancel_requested_at: 1700000000000 };
+      cancelOrderRepo.findOne.mockResolvedValue(order);
+      const result = await cancelService.requestCancel('260624-U1030');
+      expect(result.payload).toMatchObject({ cancel_requested_at: 1700000000000 });
+      expect(publisherMock.publishCancel).not.toHaveBeenCalled();
+      expect(cancelOrderRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('找不到訂單時拋 NotFound', async () => {
+      cancelOrderRepo.findOne.mockResolvedValue(null);
+      await expect(cancelService.requestCancel('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });
 
 describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務內容', () => {

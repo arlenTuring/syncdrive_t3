@@ -4,6 +4,7 @@ export enum OperatorActionType {
   COMMAND_DISPATCH = 'COMMAND_DISPATCH', // 下發控制指令
   ORDER_CREATE = 'ORDER_CREATE', // 建立訂單
   ORDER_UPDATE = 'ORDER_UPDATE', // 更新訂單狀態
+  ORDER_CANCEL = 'ORDER_CANCEL', // 中心端主動取消訂單
   SPEED_LIMIT_SET = 'SPEED_LIMIT_SET', // 設定速限
   DIRECTION_CHANGE = 'DIRECTION_CHANGE', // 方向切換
 }

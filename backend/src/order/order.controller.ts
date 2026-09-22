@@ -214,6 +214,35 @@ export class OrderController {
     return result;
   }
 
+  @Put('cancel/:id')
+  @ApiOperation({
+    summary: '中心端主動取消訂單（內部用，不對外）',
+    description:
+      '行控人員在班表部署清單裡按下取消。只允許 PENDING、PROCESSING 兩種狀態；'
+      + 'END／FAULTED 已是終態，回 400。'
+      + '本端點只負責發起：立刻在訂單 payload 寫下 cancel_requested_at 作為權威事實，'
+      + '並發布 MQTT v1/vtms/{vehicle_code}/operation/cancel 作低延遲通知（retain false，'
+      + '車端可能錯過）。訂單的實際結案仍由車端依既有協議呼叫'
+      + 'updateOrderProgress?status=FAULTED，中心端這裡不代為轉狀態。'
+      + '重複呼叫同一張已請求取消的單，冪等回傳、不重發 MQTT。',
+  })
+  @ApiOkResponse({ description: '更新後之訂單（payload 含 cancel_requested_at）' })
+  @ApiBadRequestResponse({ description: '400 ORDER_ALREADY_CLOSED：訂單已是終態' })
+  @ApiNotFoundResponse({ description: '訂單不存在' })
+  async cancelOrder(@Param('id') id: string, @Req() req: Request) {
+    const result = await this.orderService.requestCancel(id);
+
+    await this.auditService.write({
+      sourceIp: req.ip,
+      actionType: OperatorActionType.ORDER_CANCEL,
+      targetVehicle: result.vehicleCode,
+      actionDetail: { order_id: id },
+      result: ActionResult.SUCCESS,
+    });
+
+    return result;
+  }
+
   @Put('action/:actionId')
   @ExternalApi('營運任務')
   @ApiOperation({
