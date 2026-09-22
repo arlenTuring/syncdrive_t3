@@ -1,6 +1,6 @@
 # 訂單 API 錯誤、對帳與換證
 
-Release 2026-09-22（新增：中心端取消訂單）。對外基址 `http://34.80.84.224:3100/syncdrive-api`。所有端點以 `x-api-key` 驗證；新發金鑰只授權本次 `vehicle_codes`。PMS99 測試請明確申請 `vehicle_codes: ["PMS99"]`。舊版未記錄車號範圍的金鑰沿用 PMS01～PMS11，請重新申請 PMS99 金鑰。
+Release 2026-09-22（新增：車輛監控系統端取消訂單）。對外基址 `http://34.80.84.224:3100/syncdrive-api`。所有端點以 `x-api-key` 驗證；新發金鑰只授權本次 `vehicle_codes`。PMS99 測試請明確申請 `vehicle_codes: ["PMS99"]`。舊版未記錄車號範圍的金鑰沿用 PMS01～PMS11，請重新申請 PMS99 金鑰。
 
 ## 訂單發現與對帳
 
@@ -12,11 +12,11 @@ MQTT `v1/vtms/PMS99/operation/assign` 為低延遲通知，含 `order_id`，不�
 4. 初次上線、每次重連、換證後必須對帳；在線時建議每 30 秒對帳一次，失敗以 5、10、30 秒退避重試。即使完全錯過 assign，仍可用清單發現訂單。
 5. 依 `plannedStart` 約定執行時間；PENDING 代表等待接單。PROCESSING 是已開始的訂單，重啟後先恢復本機執行紀錄，不得再次從頭執行。FAULTED 待人工確認處理，不自動重跑。
 
-中心端測試頁按送出即建立訂單並發 assign，指定的時間是預計執行時間，不是延遲建立時間。對方現在即可查詢，無須猜測編號。
+車輛監控系統端測試頁按送出即建立訂單並發 assign，指定的時間是預計執行時間，不是延遲建立時間。對方現在即可查詢，無須猜測編號。
 
-## 中心端取消訂單
+## 車輛監控系統端取消訂單
 
-只能取消 PENDING、PROCESSING；END、FAULTED 拒絕取消。取消永遠由中心端發起。
+只能取消 PENDING、PROCESSING；END、FAULTED 拒絕取消。取消永遠由車輛監控系統端發起。
 
 - 新欄位 `cancel_requested_at`（Epoch 毫秒）：`GET /order/active`、`GET /order/queryById` 回應會帶到；未取消時不會有這個欄位。
 - 新通知 MQTT `v1/vtms/{vehicle_code}/operation/cancel`，只送本車，不 Retain，可能漏收，靠對帳兜底。
@@ -34,7 +34,7 @@ MQTT `v1/vtms/PMS99/operation/assign` 為低延遲通知，含 `order_id`，不�
 | FAULTED | PROCESSING、END |
 | END | 無其他狀態 |
 
-重送目前相同狀態回 200（冪等），可在成功回應遺失時安全重試；PENDING 不能由進度端點寫入。無法接單可直接 PENDING → FAULTED，再用 event/report 補充原因，無須短暫顯示 PROCESSING。FAULTED 處理完成後以 END 結案。沒有額外車端建立／取消訂單介面；測試頁使用中心端內部建立介面。
+重送目前相同狀態回 200（冪等），可在成功回應遺失時安全重試；PENDING 不能由進度端點寫入。無法接單可直接 PENDING → FAULTED，再用 event/report 補充原因，無須短暫顯示 PROCESSING。FAULTED 處理完成後以 END 結案。沒有額外車端建立／取消訂單介面；測試頁使用車輛監控系統端內部建立介面。
 
 ## HTTP 狀態與錯誤代碼
 

@@ -119,7 +119,7 @@ Cache-Control: no-cache, max-age=0
 | `planned_arrival_at` | `planned_arrival_clock` |
 | `planned_departure_at` | `planned_departure_clock` |
 
-`*_clock` 由中心端依當地時區換算後提供，使用方可直接輸出至顯示畫面，無需自行轉換。兩者恆指向同一時刻；若不一致，以 `*_at` 為準。
+`*_clock` 由車輛監控系統端依當地時區換算後提供，使用方可直接輸出至顯示畫面，無需自行轉換。兩者恆指向同一時刻；若不一致，以 `*_at` 為準。
 
 秒數型欄位（`eta_seconds`、`delay_seconds`、`data_age_seconds`）為**時間長度**，非時間點，不適用上述規則。
 
@@ -611,7 +611,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `generated_at` | Long | 中心端產生本次快照的時刻，13 位 Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
+| `generated_at` | Long | 車輛監控系統端產生本次快照的時刻，13 位 Unix Epoch 毫秒。可據此判斷回應是否為新資料 |
 | `generated_clock` | String | `generated_at` 的當地時刻表示，`HH:MM:SS`。可直接顯示為「資料更新於」 |
 | `shift_id` | String \| null | 本次計畫值所依據的班表識別碼。無可用班表時為 `null` |
 | `source` | String | 計畫值來源，見 7.2 |
@@ -637,7 +637,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 | `DEGRADED` | 部分車輛資料逾時，或班表未載入 | 顯示，並對 `arrival_state` 為 `UNKNOWN` 者標示資料中斷 |
 | `DOWN` | 無法取得任何車輛資料 | **必須**停止顯示 ETA，改顯示資料中斷 |
 
-判定基礎：中心端已知車隊應有的車輛清單（`PMS01` 至 `PMS11`），逐車比對其最新資料的 `data_age_seconds`。任一車超過逾時門檻即為 `DEGRADED`；全部車輛皆無資料或皆逾時則為 `DOWN`。
+判定基礎：車輛監控系統端已知車隊應有的車輛清單（`PMS01` 至 `PMS11`），逐車比對其最新資料的 `data_age_seconds`。任一車超過逾時門檻即為 `DEGRADED`；全部車輛皆無資料或皆逾時則為 `DOWN`。
 
 ### 7.4 計數欄位
 
@@ -771,7 +771,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，13 位 Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以中心端收訊時刻替代 |
+| `observed_at` | Long | 本筆推估所依據的**車端回報時刻**，13 位 Unix Epoch 毫秒。取自車端上行封包根層的時間戳；車端未提供時，改以車輛監控系統端收訊時刻替代 |
 | `observed_clock` | String | `observed_at` 的當地時刻表示，`HH:MM:SS` |
 | `data_age_seconds` | Int | `generated_at` 減 `observed_at`，單位秒。表示這筆資料有多舊 |
 
@@ -779,10 +779,10 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 
 #### 更新基礎
 
-車端以 1 Hz 上行，中心端逐筆覆寫該車的最新狀態，**不設過期清除**。因此：
+車端以 1 Hz 上行，車輛監控系統端逐筆覆寫該車的最新狀態，**不設過期清除**。因此：
 
 - 車輛正常回報時，`data_age_seconds` 通常為 0–2 秒。
-- 車輛停止回報時，中心端仍保有其最後一筆資料，`data_age_seconds` 將持續累加。**失聯是以「資料變舊」呈現，不是以「資料消失」呈現**，使用方必須檢查 `data_age_seconds` 或 `arrival_state`，不可僅以欄位是否存在判斷。
+- 車輛停止回報時，車輛監控系統端仍保有其最後一筆資料，`data_age_seconds` 將持續累加。**失聯是以「資料變舊」呈現，不是以「資料消失」呈現**，使用方必須檢查 `data_age_seconds` 或 `arrival_state`，不可僅以欄位是否存在判斷。
 
 ### 7.12 `position`（車輛位置）
 
@@ -803,7 +803,7 @@ curl -s "http://127.0.0.1:3000/syncdrive-api/vehicles/eta/by-vehicle?vehicle_cod
 |------|------|------|
 | `sequence` | Int | 該停靠點為此車接下來的第幾站，自 `1` 起算 |
 
-`sequence` 為 `1` 者為車輛當前行駛中的目標站，其 `eta_seconds` 直接採用車端回報值；`sequence` 為 `2` 以後者由中心端依班表站間旅行時間外推，誤差隨站序累積。
+`sequence` 為 `1` 者為車輛當前行駛中的目標站，其 `eta_seconds` 直接採用車端回報值；`sequence` 為 `2` 以後者由車輛監控系統端依班表站間旅行時間外推，誤差隨站序累積。
 
 ---
 
