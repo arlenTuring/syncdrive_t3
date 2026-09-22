@@ -1,6 +1,6 @@
 ## ## MQTT 通訊架構與 Topic 命名規範
 
-> 目前版：2026-09-18。站點以 [T3 地圖清單](T3地圖站點與路線清單.md) 為準；訂單新規格見 [錯誤與對帳](訂單API錯誤與對帳.md)。
+> 目前版：2026-09-22（新增中心端取消訂單：operation/cancel、cancel_requested_at）。站點以 [T3 地圖清單](T3地圖站點與路線清單.md) 為準；訂單新規格見 [錯誤與對帳](訂單API錯誤與對帳.md)。
 
 ### 零、 術語與系統定義 (Definitions)
 為確保開發邊界對齊，特此定義本系統之縮寫與權責：
@@ -34,6 +34,7 @@
     * `ack`：指令確認回覆
     * `report`：突發事件上報
     * `assign`：中心端發車與優先權宣告（搭配 `operation` channel，中心 ➔ 車端，retain: false）
+    * `cancel`：中心端取消一張已下發訂單（搭配 `operation` channel，中心 ➔ 車端，retain: false）
 
 ---
 
@@ -44,6 +45,7 @@
 | **第一類：車輛動態** | 車端 ➔ 中心 | `v1/vtms/PMS05/telemetry/update` | `false` |
 | **第二類：營運任務** | 車端 ➔ 中心 | `v1/vtms/PMS05/operation/update` | **`true`** |
 | **第三類：設備健康** | 車端 ➔ 中心 | `v1/vtms/PMS05/health/heartbeat` | **`true`** |
+| **第二類：訂單取消** | 中心 ➔ 車端 | `v1/vtms/PMS05/operation/cancel` | `false` |
 | **第四類：動態控制** | 中心 ➔ 車端 | `v1/vtms/PMS05/command/execute` | `false` |
 | **第四類：廣播指令** | 中心 ➔ 車隊 | `v1/vtms/all/command/execute` | `false` |
 | **第四類：指令確認** | 車端 ➔ 中心 | `v1/vtms/PMS05/command/ack` | `false` |
