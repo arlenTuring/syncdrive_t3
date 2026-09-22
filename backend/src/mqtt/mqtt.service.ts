@@ -16,6 +16,7 @@ export class MqttService {
   private telemetryPersistDisabled = false;
   private readonly operationSyncCache = new Map<string, { at: number; key: string }>();
   private lastVehiclePositionInvalidationAt = 0;
+  private lastOrderLifecycleInvalidationAt = 0;
 
   constructor(
     @InjectRepository(CommandLog)
@@ -197,9 +198,21 @@ export class MqttService {
         trip_code: tripCode,
         vehicle_code: vehicleCode,
       });
-      // 訂單的 leg_eta_max／segment 由中心端依班表計算。寫庫後通知事件型 SQL
-      // 元件重讀一次；卡片之後仍由 1 Hz MQTT 倒數平滑更新，不必輪詢資料庫。
-      this.datasourceInvalidation.emitOrderLifecycle(vehicleCode);
+      /*
+       * 訂單的 leg_eta_max／segment 由中心端依班表計算。寫庫後通知事件型 SQL
+       * 元件重讀一次；卡片之後仍由 1 Hz MQTT 倒數平滑更新，不必輪詢資料庫。
+       *
+       * 跟 updateVehicleLivePosition 一樣的節流，理由也一樣：這裡沒節流時，
+       * 車隊同時有好幾台在跑，dedup 只擋掉 2.5 秒內同一台車完全沒變的重複，
+       * ETA 每 5 秒跨一次進位、好幾台車交錯，全域失效通知變成一秒好幾次，
+       * 任何訂閱了 table:operation_orders 的清單頁（例如班次運行紀錄）就跟著
+       * 一直重新整理、畫面一直閃（2026-09-23 實測：11 台車跑著，5 秒內 25 次）。
+       */
+      const now = Date.now();
+      if (now - this.lastOrderLifecycleInvalidationAt >= 1_000) {
+        this.lastOrderLifecycleInvalidationAt = now;
+        this.datasourceInvalidation.emitOrderLifecycle(vehicleCode);
+      }
     } catch (err) {
       this.logger.warn(`operation/update sync failed for ${vehicleCode}: ${(err as Error)?.message ?? err}`);
     }

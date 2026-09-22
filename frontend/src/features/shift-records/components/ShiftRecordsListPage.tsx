@@ -64,8 +64,21 @@ export function ShiftRecordsListPage({
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  /**
+   * silent＝true 時不動 loading 旗標。
+   *
+   * 車隊在跑，MQTT operation/update 一有實質變化（ETA 跨 5 秒進位、任務進度…）
+   * 中心端就會發 table:operation_orders 失效通知——好幾台車交錯，一秒可能來好幾次。
+   * 原本每次都 setLoading(true) 把整個表格清空再填回去，畫面就一直閃
+   * （2026-09-23 使用者回報「班次運行紀錄」頁面一直閃）。
+   *
+   * 背景重整（這裡訂閱失效通知觸發的）改成靜默：資料到了才整批換掉舊列，
+   * 換之前畫面维持原樣。使用者自己切分頁／改篩選時仍走正常 loading，
+   * 給操作有回應的感覺，不受影響。
+   */
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetchShiftRecordList({
@@ -83,10 +96,12 @@ export function ShiftRecordsListPage({
       setSelected(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setItems([]);
-      setTotal(0);
+      if (!silent) {
+        setItems([]);
+        setTotal(0);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [tab, keyword, executionStatus, vehicleCode, appliedDateRange, page]);
 
@@ -97,7 +112,7 @@ export function ShiftRecordsListPage({
   useEffect(() => {
     return subscribeDatasourceInvalidation((payload) => {
       if (payload.tags.some((t) => t === 'table:operation_orders' || t.includes('operation'))) {
-        void load();
+        void load({ silent: true });
       }
     });
   }, [load]);
