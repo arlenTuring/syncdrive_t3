@@ -16,18 +16,12 @@ MQTT `v1/vtms/PMS99/operation/assign` 為低延遲通知，含 `order_id`，不�
 
 ## 中心端取消訂單
 
-行控人員可在中心端主動取消一張尚未結案的訂單（PENDING 或 PROCESSING）。跟發車通知同一個模式：**REST 為準，MQTT 只是低延遲通知**。
+只能取消 PENDING、PROCESSING；END、FAULTED 拒絕取消。取消永遠由中心端發起。
 
-1. 中心端取消當下，訂單內容立刻多一個欄位 `cancel_requested_at`（Epoch 毫秒）——`GET /order/active` 與 `GET /order/queryById` 的回應都會帶到。錯過 MQTT 通知的話，下一次對帳（初次上線、重連、換證、或例行 30 秒）就會看到這個欄位。
-2. 同時發布 MQTT `v1/vtms/{vehicle_code}/operation/cancel`，只送本車，不 Retain：
-   ```json
-   {"vehicle_code":"PMS99","timestamp":1789693200000,"order_id":"TEST-PMS99-20260918-001"}
-   ```
-3. 收到通知或對帳發現 `cancel_requested_at` 後，車端停止該訂單既有任務，照現有協議呼叫 `PUT /order/updateOrderProgress/{id}?status=FAULTED` 結案——**不新增端點**，取消沿用 FAULTED 既有語意（見下方狀態轉移表）。
-4. 已是終態（END、FAULTED）的訂單無法再取消，中心端會拒絕該次取消操作；車端不會因此收到任何新通知。
-5. 同一張單被取消一次以後，`cancel_requested_at` 是固定值，不會因為重複取消而改變或重送 MQTT。
-
-沒有額外車端「發起」取消的介面——取消永遠由中心端發起，車端只負責回報結案。
+- 新欄位 `cancel_requested_at`（Epoch 毫秒）：`GET /order/active`、`GET /order/queryById` 回應會帶到；未取消時不會有這個欄位。
+- 新通知 MQTT `v1/vtms/{vehicle_code}/operation/cancel`，只送本車，不 Retain，可能漏收，靠對帳兜底。
+- 車端結案：照現有 `PUT /order/updateOrderProgress/{id}?status=FAULTED`，沒有新端點。
+- 冪等：同一張單重複取消，`cancel_requested_at` 不變、不重發 MQTT。
 
 ## 狀態與拒單
 
