@@ -59,6 +59,7 @@ export const FALLBACK_MAINLINE: ShiftRow[] = [
     statusBg: 'rgba(249,115,22,0.2)',
     statusColor: '#FB923C',
     departTime: '09:54 → 09:59',
+    orderStatus: 'PROCESSING',
   },
   {
     shiftKey: 'U1000',
@@ -73,6 +74,7 @@ export const FALLBACK_MAINLINE: ShiftRow[] = [
     statusBg: 'rgba(34,197,94,0.2)',
     statusColor: '#4ADE80',
     departTime: '10:00 → 10:00',
+    orderStatus: 'PENDING',
   },
 ];
 
@@ -91,5 +93,6 @@ export const FALLBACK_MAINTENANCE: ShiftRow[] = [
     statusColor: '#60A5FA',
     departTime: '11:20',
     maintTypeLabel: '洗車',
+    orderStatus: '',
   },
 ];

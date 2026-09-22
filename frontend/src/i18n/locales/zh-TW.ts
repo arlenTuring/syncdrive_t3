@@ -3617,6 +3617,9 @@ const zhTW = {
       vehicleStart: '「自駕啟動 · {{vehicleCode}}」將於後續步驟接上視窗。',
       vehicleReset: '「系統重置 · {{vehicleCode}}」將於後續步驟接上視窗。',
       fallback: '此操作將於後續接上。',
+      confirmCancel: '確定要取消班次 {{tripCode}} 嗎？車端會收到取消通知，需自行回報結案。',
+      cancelSuccess: '已送出取消：{{tripCode}}',
+      cancelFailed: '取消失敗：{{message}}',
     },
     summary: {
       currentMode: '目前模式',
@@ -3652,6 +3655,7 @@ const zhTW = {
       expectedComplete: '預計完成時間',
       empty: '目前沒有班次',
       viewDetail: '查看詳情',
+      cancel: '取消',
     },
     adjust: {
       title: '班表調整申請',

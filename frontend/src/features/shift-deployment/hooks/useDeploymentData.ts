@@ -8,7 +8,7 @@ import {
   MAINLINE_SHIFTS_SQL,
   MAINTENANCE_SHIFTS_SQL,
 } from '../../dashboard/constants/demoSql';
-import { executeDatasourceQuery } from '../../dashboard/store/useDataSourceStore';
+import { executeDatasourceQuery, getDataSourceById } from '../../dashboard/store/useDataSourceStore';
 import {
   fetchOperationShiftDetail,
   fetchOperationShiftList,
@@ -68,6 +68,7 @@ function mapShiftRow(row: Record<string, unknown>): ShiftRow {
     statusColor: str(row, 'status_color', '#4ADE80'),
     departTime: str(row, 'depart_time', '—'),
     maintTypeLabel: str(row, 'maint_type_label') || undefined,
+    orderStatus: str(row, 'order_status'),
   };
 }
 
@@ -76,6 +77,26 @@ async function querySql(sql: string): Promise<Record<string, unknown>[]> {
     return await executeDatasourceQuery(DS, sql);
   } catch {
     return [];
+  }
+}
+
+/**
+ * 中心端主動取消一張正線訂單。orderId 是 MAINLINE_SHIFTS_SQL 的 shift_key，
+ * 即 operation_orders.order_id——不是整備班次那種計畫區塊 id，那種沒有真訂單
+ * 可以取消，呼叫端要先擋掉。
+ *
+ * 端點是內部用的（見 backend order.controller.ts 的 PUT order/cancel/:id），
+ * 不掛 @ExternalApi，只有本機／內網打得到，不對協力廠商開放。
+ */
+export async function cancelShiftOrder(orderId: string): Promise<void> {
+  const ds = getDataSourceById(DS);
+  const backendUrl = ds?.backendUrl ?? '';
+  const res = await fetch(`${backendUrl}/syncdrive-api/order/cancel/${encodeURIComponent(orderId)}`, {
+    method: 'PUT',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? `取消失敗（HTTP ${res.status}）`);
   }
 }
 

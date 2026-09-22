@@ -6,7 +6,8 @@ export type ShiftDeploymentAction =
   | { kind: 'vehicle-stop'; vehicleCode: string }
   | { kind: 'vehicle-start'; vehicleCode: string }
   | { kind: 'vehicle-reset'; vehicleCode: string }
-  | { kind: 'shift-detail'; tab: ShiftListTab; row: ShiftRow };
+  | { kind: 'shift-detail'; tab: ShiftListTab; row: ShiftRow }
+  | { kind: 'shift-cancel'; row: ShiftRow };
 
 export type CurrentModeData = {
   modeLabel: string;
@@ -53,4 +54,11 @@ export type ShiftRow = {
   statusColor: string;
   departTime: string;
   maintTypeLabel?: string;
+  /**
+   * 原始訂單狀態（PENDING／PROCESSING／END／FAULTED）。
+   *
+   * 整備班次的 shiftKey 來自班表計畫區塊（block id），不是真的 operation_orders
+   * 訂單，這個欄位在那裡會是空字串——取消只對正線班次的真訂單開放。
+   */
+  orderStatus: string;
 };

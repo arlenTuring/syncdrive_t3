@@ -5,7 +5,7 @@ import { DeploymentShiftTable } from './components/DeploymentShiftTable';
 import { ScheduleAdjustApplyDialog } from './components/ScheduleAdjustApplyDialog';
 import { SummaryCards } from './components/SummaryCards';
 import { VehicleControlSection } from './components/VehicleControlSection';
-import { useDeploymentData } from './hooks/useDeploymentData';
+import { cancelShiftOrder, useDeploymentData } from './hooks/useDeploymentData';
 import type { ShiftDeploymentAction } from './types';
 
 export function ShiftDeploymentPage() {
@@ -39,6 +39,23 @@ export function ShiftDeploymentPage() {
     if (action.kind === 'shift-detail') {
       setHint(null);
       setDetailOrderId(action.row.shiftKey);
+      return;
+    }
+    if (action.kind === 'shift-cancel') {
+      const { row } = action;
+      if (!window.confirm(t('shiftDeployment.actions.confirmCancel', { tripCode: row.tripCode }))) {
+        return;
+      }
+      setHint(null);
+      cancelShiftOrder(row.shiftKey)
+        .then(() => {
+          setHint(t('shiftDeployment.actions.cancelSuccess', { tripCode: row.tripCode }));
+          data.reload();
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          setHint(t('shiftDeployment.actions.cancelFailed', { message }));
+        });
       return;
     }
     setHint(describeAction(action));

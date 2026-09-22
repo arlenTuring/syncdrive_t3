@@ -87,13 +87,24 @@ export function DeploymentShiftTable({
                   </Td>
                   <Td className="whitespace-nowrap text-zinc-400">{row.departTime}</Td>
                   <Td>
-                    <button
-                      type="button"
-                      onClick={() => onAction({ kind: 'shift-detail', tab, row })}
-                      className="text-sky-400 hover:underline"
-                    >
-                      {t('shiftDeployment.table.viewDetail')}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onAction({ kind: 'shift-detail', tab, row })}
+                        className="text-sky-400 hover:underline"
+                      >
+                        {t('shiftDeployment.table.viewDetail')}
+                      </button>
+                      {row.orderStatus === 'PENDING' || row.orderStatus === 'PROCESSING' ? (
+                        <button
+                          type="button"
+                          onClick={() => onAction({ kind: 'shift-cancel', row })}
+                          className="text-red-400 hover:underline"
+                        >
+                          {t('shiftDeployment.table.cancel')}
+                        </button>
+                      ) : null}
+                    </div>
                   </Td>
                 </tr>
               ))

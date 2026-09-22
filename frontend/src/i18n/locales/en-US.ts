@@ -3679,6 +3679,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       vehicleStart: '“Autonomous start · {{vehicleCode}}” will open in a later step.',
       vehicleReset: '“System reset · {{vehicleCode}}” will open in a later step.',
       fallback: 'This action will be connected later.',
+      confirmCancel: 'Cancel trip {{tripCode}}? The vehicle will be notified and must report its own closeout.',
+      cancelSuccess: 'Cancel sent: {{tripCode}}',
+      cancelFailed: 'Cancel failed: {{message}}',
     },
     summary: {
       currentMode: 'Current mode',
@@ -3714,6 +3717,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       expectedComplete: 'Expected completion',
       empty: 'No trips right now',
       viewDetail: 'View details',
+      cancel: 'Cancel',
     },
     adjust: {
       title: 'Schedule change request',
