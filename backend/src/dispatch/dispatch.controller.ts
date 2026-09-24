@@ -27,11 +27,14 @@ export class DispatchController {
   @ApiOperation({
     summary: '今日完整調度計畫',
     description:
-      '把部署中的班表展開成今日全部待下訂單。純讀取，不會發訂單，可用來對照班表與實際指派。',
+      '把部署中的班表展開成今日全部待下訂單。純讀取，不會發訂單，可用來對照班表與實際指派。'
+      + '`full=1` 時每筆多帶完整起訖點與站序（含各站計畫時刻），供外部工具（例如模擬器的'
+      + '整日班表重播）自行組出訂單內容，不需要重新展開班表。',
   })
-  async plan(): Promise<Record<string, unknown>> {
+  async plan(@Query('full') full?: string): Promise<Record<string, unknown>> {
     const plan = await this.engine.planToday();
     if (!plan) return { deployed: false, message: '目前沒有部署中的班表' };
+    const detailed = full === '1' || full === 'true';
     return {
       deployed: true,
       shift_id: plan.shiftId,
@@ -50,6 +53,13 @@ export class DispatchController {
         origin: item.origin?.name ?? null,
         destination: item.destination?.name ?? null,
         station_count: item.stations.length,
+        ...(detailed
+          ? {
+              origin_point: item.origin,
+              destination_point: item.destination,
+              stations: item.stations,
+            }
+          : {}),
       })),
     };
   }
