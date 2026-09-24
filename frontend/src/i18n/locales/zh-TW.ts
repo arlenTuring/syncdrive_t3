@@ -3620,6 +3620,11 @@ const zhTW = {
       confirmCancel: '確定要取消班次 {{tripCode}} 嗎？車端會收到取消通知，需自行回報結案。',
       cancelSuccess: '已送出取消：{{tripCode}}',
       cancelFailed: '取消失敗：{{message}}',
+      confirmDispatchPause: '確定要暫停即時調度引擎嗎？暫停後不會再自動下新訂單，已經在跑的訂單不受影響，會照常開完。',
+      confirmDispatchStart: '確定要恢復即時調度引擎嗎？恢復後會照班表自動下新訂單。',
+      dispatchPaused: '已暫停自動下訂單',
+      dispatchStarted: '已恢復自動下訂單',
+      dispatchToggleFailed: '設定失敗：{{message}}',
     },
     summary: {
       currentMode: '目前模式',
@@ -3636,6 +3641,14 @@ const zhTW = {
       reviewer: '審核人',
       majorEvent: '重大事件',
       noMoreEvents: '無更多事件',
+    },
+    dispatch: {
+      label: '即時調度引擎',
+      running: '調度中',
+      paused: '已暫停',
+      unknown: '狀態未知',
+      pause: '暫停部署',
+      start: '開始部署',
     },
     table: {
       tabMainline: '正線班次',

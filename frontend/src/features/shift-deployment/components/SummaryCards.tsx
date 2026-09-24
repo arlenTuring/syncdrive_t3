@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   CircleX,
   Clock,
+  Pause,
+  Play,
   User,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -24,12 +26,15 @@ export function SummaryCards({
   stats,
   schedule,
   event,
+  dispatchEnabled,
   onAction,
 }: {
   mode: CurrentModeData;
   stats: DataStatsData;
   schedule: ExecutingScheduleData;
   event: MajorEventData;
+  /** 即時調度引擎目前有沒有在自動下訂單；null 表示還沒拉到、狀態未知 */
+  dispatchEnabled: boolean | null;
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const { t } = useTranslation();
@@ -106,6 +111,7 @@ export function SummaryCards({
             {t('shiftDeployment.summary.scheduleAdjust')}
           </button>
         </div>
+        <DispatchControlPanel dispatchEnabled={dispatchEnabled} onAction={onAction} />
         <div className="mt-3 flex flex-1 flex-col rounded-xl bg-[#212124] p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-zinc-400">{schedule.scheduleMeta}</span>
@@ -176,6 +182,63 @@ export function SummaryCards({
           {t('shiftDeployment.summary.noMoreEvents')}
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * 即時調度引擎的小控制面板：暫停／開始自動下訂單。
+ *
+ * 要在地端拿模擬器測試時，得先讓真實班表停下來，不然調度引擎跟模擬器手動
+ * 建的測試單會搶同一批車。暫停不影響已經在跑的訂單，車輛照樣把手上這一趟
+ * 開完，只是不會再收到下一張——真的要清空車隊還是得等在跑的訂單自然結束，
+ * 或另外用取消。
+ */
+function DispatchControlPanel({
+  dispatchEnabled,
+  onAction,
+}: {
+  dispatchEnabled: boolean | null;
+  onAction: (action: ShiftDeploymentAction) => void;
+}) {
+  const { t } = useTranslation();
+  const statusLabel = dispatchEnabled === null
+    ? t('shiftDeployment.dispatch.unknown')
+    : dispatchEnabled
+      ? t('shiftDeployment.dispatch.running')
+      : t('shiftDeployment.dispatch.paused');
+  const dotColor = dispatchEnabled === null
+    ? 'bg-zinc-500'
+    : dispatchEnabled
+      ? 'bg-emerald-400'
+      : 'bg-orange-400';
+
+  return (
+    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#212124] px-3 py-2">
+      <div className="flex items-center gap-1.5 text-[12px] text-zinc-300">
+        <span className={`size-1.5 rounded-full ${dotColor}`} />
+        {t('shiftDeployment.dispatch.label')}：{statusLabel}
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => onAction({ kind: 'dispatch-pause' })}
+          disabled={dispatchEnabled === false}
+          className="flex items-center gap-1 rounded-md border border-orange-500 px-2 py-1 text-[11px] text-orange-400 transition hover:bg-orange-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-600"
+        >
+          <Pause className="size-3" />
+          {t('shiftDeployment.dispatch.pause')}
+        </button>
+        <button
+          type="button"
+          onClick={() => onAction({ kind: 'dispatch-start' })}
+          disabled={dispatchEnabled === true}
+          className="flex items-center gap-1 rounded-md border border-emerald-500 px-2 py-1 text-[11px] text-emerald-400 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-600"
+        >
+          <Play className="size-3" />
+          {t('shiftDeployment.dispatch.start')}
+        </button>
+      </div>
     </div>
   );
 }

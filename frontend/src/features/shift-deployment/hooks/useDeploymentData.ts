@@ -100,6 +100,45 @@ export async function cancelShiftOrder(orderId: string): Promise<void> {
   }
 }
 
+/**
+ * 即時調度引擎目前有沒有在自動下訂單。內部用端點（見 backend
+ * dispatch.controller.ts），不掛 @ExternalApi。
+ *
+ * 拉不到（後端沒開、網路問題）回 null，畫面上顯示「狀態未知」而不是猜一個值——
+ * 猜錯的話，行控人員會以為引擎已經停了，其實還在照常發車。
+ */
+export async function fetchDispatchEnabled(): Promise<boolean | null> {
+  try {
+    const ds = getDataSourceById(DS);
+    const backendUrl = ds?.backendUrl ?? '';
+    const res = await fetch(`${backendUrl}/syncdrive-api/dispatch/status`);
+    if (!res.ok) return null;
+    const body = await res.json();
+    return typeof body?.enabled === 'boolean' ? body.enabled : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 暫停／恢復即時調度引擎下新訂單。暫停不影響已經在跑的訂單——車輛會把手上
+ * 這一趟開完，只是不會再收到下一張，讓模擬器可以接手測試用的車輛而不用跟
+ * 真實班表搶車。
+ */
+export async function setDispatchEnabled(enabled: boolean): Promise<void> {
+  const ds = getDataSourceById(DS);
+  const backendUrl = ds?.backendUrl ?? '';
+  const res = await fetch(`${backendUrl}/syncdrive-api/dispatch/enable`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? `設定失敗（HTTP ${res.status}）`);
+  }
+}
+
 function readDeploymentMeta(body: Record<string, unknown> | undefined): {
   deployedBy: string;
 } {
@@ -119,13 +158,14 @@ export function useDeploymentData() {
   const [vehicles, setVehicles] = useState<string[]>(FALLBACK_VEHICLES);
   const [mainline, setMainline] = useState<ShiftRow[]>(FALLBACK_MAINLINE);
   const [maintenance, setMaintenance] = useState<ShiftRow[]>(FALLBACK_MAINTENANCE);
+  const [dispatchEnabled, setDispatchEnabledState] = useState<boolean | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [modeRows, statsRows, scheduleRows, eventRows, vehicleRows, mainRows, maintRows] =
+      const [modeRows, statsRows, scheduleRows, eventRows, vehicleRows, mainRows, maintRows, dispatchEnabledValue] =
         await Promise.all([
           querySql(DEPLOYMENT_CURRENT_MODE_SQL),
           querySql(DEPLOYMENT_DATA_STATS_SQL),
@@ -134,8 +174,10 @@ export function useDeploymentData() {
           querySql(DEPLOYMENT_VEHICLE_LIST_SQL),
           querySql(MAINLINE_SHIFTS_SQL),
           querySql(MAINTENANCE_SHIFTS_SQL),
+          fetchDispatchEnabled(),
         ]);
       if (cancelled) return;
+      setDispatchEnabledState(dispatchEnabledValue);
 
       const modeRow = modeRows[0];
       if (modeRow) {
@@ -249,5 +291,5 @@ export function useDeploymentData() {
     };
   }, [reloadToken]);
 
-  return { mode, stats, schedule, event, vehicles, mainline, maintenance, reload };
+  return { mode, stats, schedule, event, vehicles, mainline, maintenance, dispatchEnabled, reload };
 }

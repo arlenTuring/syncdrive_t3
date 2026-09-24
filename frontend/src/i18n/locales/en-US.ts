@@ -3682,6 +3682,11 @@ const enUS: DeepStringify<typeof zhTW> = {
       confirmCancel: 'Cancel trip {{tripCode}}? The vehicle will be notified and must report its own closeout.',
       cancelSuccess: 'Cancel sent: {{tripCode}}',
       cancelFailed: 'Cancel failed: {{message}}',
+      confirmDispatchPause: 'Pause the real-time dispatch engine? No new orders will be issued; trips already running are unaffected and will finish normally.',
+      confirmDispatchStart: 'Resume the real-time dispatch engine? It will start issuing new orders per schedule again.',
+      dispatchPaused: 'Auto-dispatch paused',
+      dispatchStarted: 'Auto-dispatch resumed',
+      dispatchToggleFailed: 'Failed: {{message}}',
     },
     summary: {
       currentMode: 'Current mode',
@@ -3698,6 +3703,14 @@ const enUS: DeepStringify<typeof zhTW> = {
       reviewer: 'Reviewer',
       majorEvent: 'Major events',
       noMoreEvents: 'No more events',
+    },
+    dispatch: {
+      label: 'Dispatch engine',
+      running: 'Running',
+      paused: 'Paused',
+      unknown: 'Unknown',
+      pause: 'Pause dispatch',
+      start: 'Start dispatch',
     },
     table: {
       tabMainline: 'Mainline trips',

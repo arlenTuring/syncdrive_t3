@@ -7,7 +7,9 @@ export type ShiftDeploymentAction =
   | { kind: 'vehicle-start'; vehicleCode: string }
   | { kind: 'vehicle-reset'; vehicleCode: string }
   | { kind: 'shift-detail'; tab: ShiftListTab; row: ShiftRow }
-  | { kind: 'shift-cancel'; row: ShiftRow };
+  | { kind: 'shift-cancel'; row: ShiftRow }
+  | { kind: 'dispatch-pause' }
+  | { kind: 'dispatch-start' };
 
 export type CurrentModeData = {
   modeLabel: string;

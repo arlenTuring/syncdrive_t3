@@ -5,7 +5,7 @@ import { DeploymentShiftTable } from './components/DeploymentShiftTable';
 import { ScheduleAdjustApplyDialog } from './components/ScheduleAdjustApplyDialog';
 import { SummaryCards } from './components/SummaryCards';
 import { VehicleControlSection } from './components/VehicleControlSection';
-import { cancelShiftOrder, useDeploymentData } from './hooks/useDeploymentData';
+import { cancelShiftOrder, setDispatchEnabled, useDeploymentData } from './hooks/useDeploymentData';
 import type { ShiftDeploymentAction } from './types';
 
 export function ShiftDeploymentPage() {
@@ -58,6 +58,26 @@ export function ShiftDeploymentPage() {
         });
       return;
     }
+    if (action.kind === 'dispatch-pause' || action.kind === 'dispatch-start') {
+      const enabling = action.kind === 'dispatch-start';
+      const confirmKey = enabling
+        ? 'shiftDeployment.actions.confirmDispatchStart'
+        : 'shiftDeployment.actions.confirmDispatchPause';
+      if (!window.confirm(t(confirmKey))) return;
+      setHint(null);
+      setDispatchEnabled(enabling)
+        .then(() => {
+          setHint(t(enabling
+            ? 'shiftDeployment.actions.dispatchStarted'
+            : 'shiftDeployment.actions.dispatchPaused'));
+          data.reload();
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          setHint(t('shiftDeployment.actions.dispatchToggleFailed', { message }));
+        });
+      return;
+    }
     setHint(describeAction(action));
   };
 
@@ -81,6 +101,7 @@ export function ShiftDeploymentPage() {
           stats={data.stats}
           schedule={data.schedule}
           event={data.event}
+          dispatchEnabled={data.dispatchEnabled}
           onAction={onAction}
         />
         <VehicleControlSection vehicles={data.vehicles} onAction={onAction} />
