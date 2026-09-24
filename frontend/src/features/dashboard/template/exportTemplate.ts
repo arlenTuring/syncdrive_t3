@@ -8,6 +8,7 @@ import {
   DASHBOARD_TEMPLATE_VERSION,
   type DashboardTemplateFile,
 } from './types';
+import { collectAllChildArrays } from './childArrayVariants';
 
 function collectBindingFromWidget(w: WidgetDataBinding, ids: Set<string>, mqttIds: Set<string>) {
   if (w.dataSourceId) ids.add(w.dataSourceId);
@@ -20,9 +21,21 @@ function collectFromPlane(plane: DashboardPlane) {
 
   for (const el of plane.elements) {
     if (el.dataSourceId) dataSourceIds.add(el.dataSourceId);
-    for (const child of el.children) {
-      collectBindingFromWidget(child as ChildWidget & WidgetDataBinding, dataSourceIds, mqttIds);
+    // 走過所有樣板變體（children／childrenDefault／childrenNormal／childrenTabN／
+    // tabs[].children／genericGroup.templates[].children），不是只顧 children——
+    // 漏掉哪一種，那個樣板變體裡綁的資料來源就不會被收進匯出檔。
+    for (const children of collectAllChildArrays(el)) {
+      for (const child of children) {
+        collectBindingFromWidget(child as ChildWidget & WidgetDataBinding, dataSourceIds, mqttIds);
+      }
     }
+    if (el.genericGroup?.sources) {
+      for (const source of el.genericGroup.sources) {
+        if (source.dataSourceId) dataSourceIds.add(source.dataSourceId);
+        if (source.mqttDataSourceId) mqttIds.add(source.mqttDataSourceId);
+      }
+    }
+    if (el.displayGate?.dataSourceId) dataSourceIds.add(el.displayGate.dataSourceId);
   }
 
   return { dataSourceIds, mqttIds: mqttIds };

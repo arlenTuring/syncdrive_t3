@@ -43,6 +43,7 @@ import {
 } from '../../lib/textAlignment';
 import { IconImageField } from './components/IconImageField';
 import { DualCanvasSettings } from './components/DualCanvasSettings';
+import { GenericGroupSettings } from './components/GenericGroupSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
@@ -1623,11 +1624,12 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   );
 }
 
-function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
+function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterTemplateEditMode }: {
   el: CanvasElementProps;
   onUpdate: (p: Partial<CanvasElementProps>) => void;
   onDelete: () => void;
   onEnterEditGroupMode?: () => void;
+  onEnterTemplateEditMode?: (templateId: string) => void;
 }) {
   const { t } = useTranslation();
   const [maps, setMaps] = React.useState(() => getAvailableMaps());
@@ -1709,14 +1711,34 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
 
       {el.isGroup && (
         <div className="pt-3 border-t border-purple-500/20 space-y-3">
-          {onEnterEditGroupMode && (
-            <button
-              type="button"
-              onClick={onEnterEditGroupMode}
-              className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
-            >
-              {t('dashboard.properties.canvas.editSubcanvas')}
-            </button>
+          {el.genericGroup?.enabled ? (
+            // 泛用群組唯一的子畫布編輯入口：不分樣板數量都從這裡進去（預設樣板優先，
+            // 沒設預設就用第一套），進去之後在工具列切換要編輯哪一套——不要在這裡
+            // 另外每套樣板各放一顆「編輯內容」按鈕，不然使用者搞不清楚點哪顆才是
+            // 「正確」入口，也不知道還有其他樣板可以編輯。
+            onEnterTemplateEditMode && (el.genericGroup.templates?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const templates = el.genericGroup?.templates ?? [];
+                  const defaultTpl = templates.find(t => t.isDefault) ?? templates[0];
+                  if (defaultTpl) onEnterTemplateEditMode(defaultTpl.id);
+                }}
+                className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
+              >
+                {t('dashboard.properties.canvas.editSubcanvas')}
+              </button>
+            )
+          ) : (
+            onEnterEditGroupMode && (
+              <button
+                type="button"
+                onClick={onEnterEditGroupMode}
+                className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
+              >
+                {t('dashboard.properties.canvas.editSubcanvas')}
+              </button>
+            )
           )}
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
             <Database size={12} className="text-purple-400" />
@@ -1812,7 +1834,9 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode }: {
             </div>
           </div>
 
-          <DualCanvasSettings el={el} onUpdate={onUpdate} />
+          {!el.genericGroup?.enabled && <DualCanvasSettings el={el} onUpdate={onUpdate} />}
+
+          <GenericGroupSettings el={el} onUpdate={onUpdate} />
 
           <DataBindingSettings w={el as any} onUpdate={onUpdate as any} />
 
@@ -3220,6 +3244,8 @@ interface Props {
   onUpdateChild: (p: Partial<ChildWidget>) => void;
   onDeleteChild: () => void;
   onEnterEditGroupMode?: (groupId: string) => void;
+  /** 泛用群組：進入編輯指定樣板的子畫布（只在群組被選取、還沒進入子畫布編輯時可用） */
+  onEnterTemplateEditMode?: (templateId: string) => void;
   onEnterEditVehicleContainer?: () => void;
   onEnterEditTabListCell?: (tabId: string, columnId: string) => void;
   /** 雙畫板子畫布：選取中間閘道設定區 */
@@ -3239,6 +3265,7 @@ export function PropertiesPanel({
   onUpdateElement, onDeleteElement,
   onUpdateChild, onDeleteChild,
   onEnterEditGroupMode,
+  onEnterTemplateEditMode,
   onEnterEditVehicleContainer,
   onEnterEditTabListCell,
   dualGateSettingsActive,
@@ -3388,6 +3415,11 @@ export function PropertiesPanel({
             onEnterEditGroupMode={
               !editingGroupLabel && selectedElement.isGroup && onEnterEditGroupMode
                 ? () => onEnterEditGroupMode(selectedElement.id)
+                : undefined
+            }
+            onEnterTemplateEditMode={
+              !editingGroupLabel && selectedElement.isGroup && onEnterTemplateEditMode
+                ? (templateId: string) => onEnterTemplateEditMode(templateId)
                 : undefined
             }
           />

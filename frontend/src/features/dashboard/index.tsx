@@ -51,6 +51,13 @@ import {
   deleteTabChild,
   addTabChild,
 } from './utils/tabCanvas';
+import {
+  getTemplateChildren,
+  patchTemplateChild,
+  deleteTemplateChild,
+  addTemplateChild,
+  makeTemplateCanvasId,
+} from './utils/groupTemplateEdit';
 import { createWidget } from './types';
 
 function cloneCanvasElement(el: CanvasElementProps): CanvasElementProps {
@@ -86,6 +93,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   const [editingTabCanvasId, setEditingTabCanvasId] = useState<string | null>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [tabEditSnapshot, setTabEditSnapshot] = useState<CanvasElementProps | null>(null);
+  /** 泛用群組多樣板子畫布編輯狀態（跟 Tab Canvas 同一套模式，見 groupTemplateEdit.ts） */
+  const [editingTemplateGroupId, setEditingTemplateGroupId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateEditSnapshot, setTemplateEditSnapshot] = useState<CanvasElementProps | null>(null);
   /** 圖台內載具容器：進入內嵌載具編輯器 */
   /** 載具容器內嵌編輯（與儀表板畫布選取分離，僅由此狀態驅動 UI） */
   const [editingVehicleContainer, setEditingVehicleContainer] = useState<{
@@ -108,6 +119,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         setEditingGroupId(null);
         setGroupEditSnapshot(null);
         setShowGroupExitDialog(false);
+        setEditingTemplateGroupId(null);
+        setEditingTemplateId(null);
+        setTemplateEditSnapshot(null);
         resetHistory();
       }
       return next;
@@ -117,6 +131,18 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   const enterEditGroupMode = useCallback((groupId: string) => {
     const group = activePlane?.elements.find(e => e.id === groupId);
     if (!group) return;
+    // 泛用群組的內容在樣板裡，不在 children／雙畫板；畫布上的浮動按鈕、雙擊、側欄
+    // 都走這支，統一轉進樣板編輯，免得從不同入口進到兩套不同的編輯器。
+    const templates = group.genericGroup?.enabled ? group.genericGroup.templates ?? [] : [];
+    if (templates.length > 0) {
+      const target = templates.find(tpl => tpl.isDefault) ?? templates[0];
+      setTemplateEditSnapshot(cloneCanvasElement(group));
+      setEditingTemplateGroupId(groupId);
+      setEditingTemplateId(target.id);
+      setIsEditMode(true);
+      selectElement(groupId);
+      return;
+    }
     setGroupEditSnapshot(cloneCanvasElement(group));
     setEditingGroupId(groupId);
     setIsEditMode(true);
@@ -194,6 +220,59 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   }, [editingTabCanvas, editingTabId]);
 
   const isEditingTabCanvas = !!editingTabCanvasId && !!editingTabId;
+
+  /** 進入泛用群組的某一套樣板編輯 */
+  const enterTemplateEditMode = useCallback((groupId: string, templateId: string) => {
+    const group = activePlane?.elements.find(e => e.id === groupId);
+    if (!group) return;
+    setTemplateEditSnapshot(cloneCanvasElement(group));
+    setEditingTemplateGroupId(groupId);
+    setEditingTemplateId(templateId);
+    setIsEditMode(true);
+    selectElement(groupId);
+  }, [activePlane, selectElement]);
+
+  /** 在同一次編輯工作階段內切換要編輯的樣板（多樣板群組用，不重設快照——
+   *  離開時的「不儲存退出」還原到進入整段編輯時的狀態，不是回到切換前那個樣板） */
+  const switchEditingTemplate = useCallback((templateId: string) => {
+    setEditingTemplateId(templateId);
+  }, []);
+
+  /** 儲存並退出樣板編輯 */
+  const saveAndExitTemplateEdit = useCallback(() => {
+    const keepId = editingTemplateGroupId;
+    setTemplateEditSnapshot(null);
+    setEditingTemplateGroupId(null);
+    setEditingTemplateId(null);
+    selectElement(keepId);
+    setSaveStatus('ok');
+    setTimeout(() => setSaveStatus('idle'), 1500);
+  }, [editingTemplateGroupId, selectElement]);
+
+  /** 不儲存退出樣板編輯 */
+  const discardAndExitTemplateEdit = useCallback(() => {
+    if (templateEditSnapshot && editingTemplateGroupId) {
+      updateElement(editingTemplateGroupId, cloneCanvasElement(templateEditSnapshot));
+    }
+    const keepId = editingTemplateGroupId;
+    setTemplateEditSnapshot(null);
+    setEditingTemplateGroupId(null);
+    setEditingTemplateId(null);
+    selectElement(keepId);
+  }, [templateEditSnapshot, editingTemplateGroupId, updateElement, selectElement]);
+
+  /** 目前編輯中的樣板所屬群組 */
+  const editingTemplateGroup = editingTemplateGroupId
+    ? activePlane?.elements.find(e => e.id === editingTemplateGroupId) ?? null
+    : null;
+
+  /** 目前樣板的資料 */
+  const editingTemplateDef = useMemo(() => {
+    if (!editingTemplateGroup || !editingTemplateId) return null;
+    return (editingTemplateGroup.genericGroup?.templates ?? []).find(t => t.id === editingTemplateId) ?? null;
+  }, [editingTemplateGroup, editingTemplateId]);
+
+  const isEditingTemplate = !!editingTemplateGroupId && !!editingTemplateId;
 
   const enterEditVehicleContainer = useCallback((canvasId: string, childId: string) => {
     setEditingVehicleContainer({ canvasId, childId });
@@ -316,14 +395,17 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     if (editingGroup) {
       return findChildInGroup(editingGroup, selectedChildId, subcanvasLane);
     }
+    if (isEditingTemplate && editingTemplateGroup && editingTemplateId) {
+      return getTemplateChildren(editingTemplateGroup, editingTemplateId).find(c => c.id === selectedChildId) ?? null;
+    }
     if (editingTabListCell) return tabListCellSelectedChild;
     return selectedChild;
-  }, [editingGroup, editingTabListCell, selectedChild, selectedChildId, selectedChildIds.length, subcanvasLane, tabListCellSelectedChild]);
+  }, [editingGroup, editingTabListCell, isEditingTemplate, editingTemplateGroup, editingTemplateId, selectedChild, selectedChildId, selectedChildIds.length, subcanvasLane, tabListCellSelectedChild]);
 
   const activeSelectedChildIds = useMemo(() => {
-    if (editingGroup || editingTabListCell) return selectedChildIds;
+    if (editingGroup || editingTabListCell || isEditingTemplate) return selectedChildIds;
     return selectedElementIds.length === 1 ? selectedChildIds : [];
-  }, [editingGroup, editingTabListCell, selectedChildIds, selectedElementIds.length]);
+  }, [editingGroup, editingTabListCell, isEditingTemplate, selectedChildIds, selectedElementIds.length]);
 
   // 鍵盤複製貼上、刪除、復原／重做 (僅在編輯器模式生效)
   useEffect(() => {
@@ -596,7 +678,22 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     && !panelSelectedChild;
 
   /** 未選子元件時顯示範本尺寸（templateWidth×Height），避免露出群組在大平面上的 3776×168 */
-  const panelSelectedElement: CanvasElementProps | null = editingGroup
+  const panelSelectedElement: CanvasElementProps | null = isEditingTemplate && editingTemplateGroup
+    ? panelSelectedChild
+      ? null
+      : {
+          ...editingTemplateGroup,
+          isGroup: false,
+          genericGroup: undefined,
+          width: editingTemplateGroup.templateWidth || editingTemplateGroup.width,
+          height: editingTemplateGroup.templateHeight || editingTemplateGroup.height,
+          label: t('dashboard.editorChrome.editGenericTemplate', {
+            group: editingTemplateGroup.label,
+            template: editingTemplateDef?.name ?? '',
+            defaultValue: `${editingTemplateGroup.label} · ${editingTemplateDef?.name ?? ''}`,
+          }),
+        }
+    : editingGroup
     ? panelSelectedChild
       ? null
       : dualGatePanel
@@ -734,6 +831,16 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         return newChild.id;
       }
     }
+    // 泛用群組樣板子畫布路由
+    if (isEditingTemplate && editingTemplateGroupId && editingTemplateId) {
+      const canvas = activePlane?.elements.find(e => e.id === editingTemplateGroupId);
+      if (canvas) {
+        const newChild = createWidget(widgetType, x, y);
+        const patch = addTemplateChild(canvas, editingTemplateId, newChild);
+        updateElement(editingTemplateGroupId, patch);
+        return newChild.id;
+      }
+    }
     const lane = editingGroup?.dualCanvasEnabled
       ? laneFromTemplateCanvasId(canvasId)
       : null;
@@ -789,6 +896,15 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         return;
       }
     }
+    // 泛用群組樣板子畫布路由
+    if (isEditingTemplate && editingTemplateGroupId && editingTemplateId) {
+      const canvas = activePlane?.elements.find(e => e.id === editingTemplateGroupId);
+      if (canvas) {
+        const elPatch = patchTemplateChild(canvas, editingTemplateId, childId, patch);
+        updateElement(editingTemplateGroupId, elPatch);
+        return;
+      }
+    }
     const lane = editingGroup?.dualCanvasEnabled
       ? laneFromTemplateCanvasId(canvasId)
       : null;
@@ -827,6 +943,15 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
       if (canvas) {
         const elPatch = deleteTabChild(canvas, editingTabId, childId);
         updateElement(editingTabCanvasId, elPatch);
+        return;
+      }
+    }
+    // 泛用群組樣板子畫布路由
+    if (isEditingTemplate && editingTemplateGroupId && editingTemplateId) {
+      const canvas = activePlane?.elements.find(e => e.id === editingTemplateGroupId);
+      if (canvas) {
+        const elPatch = deleteTemplateChild(canvas, editingTemplateId, childId);
+        updateElement(editingTemplateGroupId, elPatch);
         return;
       }
     }
@@ -915,6 +1040,42 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     tabCanvasDisplaySelectedId = `tab-canvas:${editingTabId}`;
   }
 
+  // ─── 泛用群組樣板子畫布編輯平面建構（跟 Tab Canvas 同一套做法） ───
+  let templateEditDisplayPlane = tabCanvasDisplayPlane;
+  let templateEditDisplaySelectedId = tabCanvasDisplaySelectedId;
+  if (isEditingTemplate && editingTemplateGroup && editingTemplateId) {
+    const templateChildren = getTemplateChildren(editingTemplateGroup, editingTemplateId);
+    const editW = Math.max(editingTemplateGroup.templateWidth || editingTemplateGroup.width, 400);
+    const editH = Math.max(editingTemplateGroup.templateHeight || editingTemplateGroup.height, 300);
+    const virtualId = makeTemplateCanvasId(editingTemplateId);
+    templateEditDisplayPlane = {
+      id: 'generic-template-edit-plane',
+      name: t('dashboard.editorChrome.editGenericTemplate', {
+        group: editingTemplateGroup.label,
+        template: editingTemplateDef?.name ?? '',
+        defaultValue: `編輯樣板：${editingTemplateGroup.label} · ${editingTemplateDef?.name ?? ''}`,
+      }),
+      width: editW,
+      height: editH,
+      elements: [{
+        ...editingTemplateGroup,
+        id: virtualId,
+        x: 0,
+        y: 0,
+        width: editW,
+        height: editH,
+        isGroup: false, // 編輯單一樣板內容時關閉群組渲染（不然會遞迴跑一次泛用群組管線）
+        genericGroup: undefined,
+        label: `${editingTemplateGroup.label} · ${editingTemplateDef?.name ?? ''}`,
+        children: templateChildren,
+        opacity: 100,
+      }],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    templateEditDisplaySelectedId = virtualId;
+  }
+
   // ─── 編輯器視圖 ───
   return (
     <DemoSimulationProvider>
@@ -980,6 +1141,44 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 label: editingTabDef?.label ?? '',
               })}
             </span>
+          </>
+        ) : isEditingTemplate ? (
+          <>
+            <button
+              type="button"
+              onClick={saveAndExitTemplateEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all"
+            >
+              <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
+            </button>
+            <button
+              type="button"
+              onClick={discardAndExitTemplateEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
+                         text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
+            >
+              {t('dashboard.exitWithoutSave')}
+            </button>
+            <span className="text-xs text-zinc-500">
+              {t('dashboard.editorChrome.editGenericGroup', {
+                group: editingTemplateGroup?.label ?? '',
+                defaultValue: `編輯樣板：${editingTemplateGroup?.label ?? ''}`,
+              })}
+            </span>
+            {(editingTemplateGroup?.genericGroup?.templates?.length ?? 0) > 1 ? (
+              <select
+                value={editingTemplateId ?? ''}
+                onChange={e => switchEditingTemplate(e.target.value)}
+                className="text-xs bg-zinc-800 border border-purple-500/40 text-purple-300 font-bold rounded-md px-2 py-1"
+                title={t('dashboard.editorChrome.switchTemplateHint', { defaultValue: '切換要編輯的樣板' })}
+              >
+                {(editingTemplateGroup?.genericGroup?.templates ?? []).map(tpl => (
+                  <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-xs font-bold text-purple-300">{editingTemplateDef?.name ?? ''}</span>
+            )}
           </>
         ) : editingGroup ? (
           <>
@@ -1234,6 +1433,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             key={
               editingTabListCell
                 ? `tab-cell-${editingTabListCell.widgetId}-${editingTabListCell.tabId}-${editingTabListCell.columnId}`
+                : isEditingTemplate
+                ? `gtpl-${editingTemplateGroupId}-${editingTemplateId}`
                 : isEditingTabCanvas
                 ? `tab-${editingTabCanvasId}-${editingTabId}`
                 : (editingGroupId ?? `plane-${activePlane?.id ?? 'main'}-${view}`)
@@ -1241,6 +1442,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             plane={
               editingTabListCell
                 ? (tabListCellDisplayPlane ?? displayPlane)
+                : isEditingTemplate
+                ? (templateEditDisplayPlane ?? displayPlane)
                 : isEditingTabCanvas
                 ? (tabCanvasDisplayPlane ?? displayPlane)
                 : displayPlane
@@ -1251,6 +1454,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                     width: Math.max(editingTabListCellInfo.column.width || 200, 80),
                     height: Math.max(editingTabListCellInfo.widget.rowHeight || 44, 36),
                   }
+                : isEditingTemplate
+                ? { width: editingTemplateGroup?.templateWidth || editingTemplateGroup?.width || 400, height: editingTemplateGroup?.templateHeight || editingTemplateGroup?.height || 300 }
                 : isEditingTabCanvas
                 ? { width: editingTabCanvas?.width ?? 600, height: (editingTabCanvas?.height ?? 440) - (editingTabCanvas?.tabBarHeight ?? 40) }
                 : dualSubcanvas
@@ -1274,6 +1479,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             selectedElementId={
               editingTabListCell
                 ? tabListCellDisplaySelectedId
+                : isEditingTemplate
+                ? templateEditDisplaySelectedId
                 : isEditingTabCanvas
                 ? tabCanvasDisplaySelectedId
                 : displaySelectedElementId
@@ -1281,6 +1488,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             selectedElementIds={
               editingTabListCell
                 ? (tabListCellDisplaySelectedId ? [tabListCellDisplaySelectedId] : [])
+                : isEditingTemplate
+                ? (templateEditDisplaySelectedId ? [templateEditDisplaySelectedId] : [])
                 : isEditingTabCanvas
                 ? (tabCanvasDisplaySelectedId ? [tabCanvasDisplaySelectedId] : [])
                 : (editingGroup && displaySelectedElementId
@@ -1291,11 +1500,13 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             selectedChildIds={
               editingTabListCell
                 ? selectedChildIds
+                : isEditingTemplate
+                ? selectedChildIds
                 : isEditingTabCanvas
                 ? selectedChildIds
                 : activeSelectedChildIds
             }
-            isEditMode={isEditMode || !!editingGroup || isEditingTabCanvas || !!editingTabListCell}
+            isEditMode={isEditMode || !!editingGroup || isEditingTabCanvas || isEditingTemplate || !!editingTabListCell}
             onSelectElement={(id, opts) => {
               if (editingGroup?.dualCanvasEnabled) {
                 if (id) setDualEditFocusId(id);
@@ -1303,6 +1514,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 return;
               }
               if (editingGroup) selectElement(editingGroupId!);
+              else if (isEditingTemplate) selectElement(editingTemplateGroupId!);
               else selectElement(id, opts);
             }}
             onSelectElements={(ids, opts) => {
@@ -1311,16 +1523,19 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 selectElement(editingGroupId!);
                 return;
               }
+              if (isEditingTemplate) { selectElement(editingTemplateGroupId!); return; }
               selectElements(ids, opts);
             }}
             onSelectChild={(canvasId, childId, opts) => {
               if (editingGroup?.dualCanvasEnabled) setDualEditFocusId(canvasId);
               if (editingGroup) selectChild(editingGroupId!, childId, opts);
+              else if (isEditingTemplate) selectChild(editingTemplateGroupId!, childId, opts);
               else selectChild(canvasId, childId, opts);
             }}
             onSelectChildren={(canvasId, childIds, opts) => {
               if (editingGroup?.dualCanvasEnabled) setDualEditFocusId(canvasId);
               if (editingGroup) selectChildren(editingGroupId!, childIds, opts);
+              else if (isEditingTemplate) selectChildren(editingTemplateGroupId!, childIds, opts);
               else selectChildren(canvasId, childIds, opts);
             }}
             onUpdateElement={(id, patch) => handleUpdateElement(id, patch, { fromCanvas: true })}
@@ -1346,8 +1561,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             }}
             onDeleteChild={handleDeleteChild}
             onAddCanvas={(isGroup, x, y, canvasKind, initialWidgetType) => addCanvasElement(isGroup, x, y, canvasKind, initialWidgetType)}
-            onEnterEditGroupMode={isEditingTabCanvas || !!editingTabListCell ? undefined : enterEditGroupMode}
-            onEnterTabCanvasMode={isEditingTabCanvas || !!editingTabListCell ? undefined : enterTabCanvasMode}
+            onEnterEditGroupMode={isEditingTabCanvas || isEditingTemplate || !!editingTabListCell ? undefined : enterEditGroupMode}
+            onEnterTabCanvasMode={isEditingTabCanvas || isEditingTemplate || !!editingTabListCell ? undefined : enterTabCanvasMode}
             onEditSessionStart={recordHistory}
           />
         ) : (
@@ -1364,7 +1579,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         {/* 屬性面板（載具內嵌編輯時由 VehicleEditorEmbed 自帶） */}
         {!editingVehicleContainer && (
         <PropertiesPanel
-          isEditMode={isEditMode || !!editingGroup || !!editingTabListCell}
+          isEditMode={isEditMode || !!editingGroup || isEditingTemplate || !!editingTabListCell}
           activePlane={activePlane}
           editingGroupLabel={editingGroup?.label}
           editingGroup={editingGroup}
@@ -1390,12 +1605,19 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               if (width !== undefined) groupPatch.templateWidth = width;
               if (height !== undefined) groupPatch.templateHeight = height;
               updateElement(editingGroupId!, groupPatch);
+            } else if (isEditingTemplate) {
+              // 樣板編輯中未選子元件：改的是範本尺寸（templateWidth/Height），不是群組本體
+              const { x: _x, y: _y, width, height, ...rest } = patch;
+              const groupPatch: Partial<CanvasElementProps> = { ...rest };
+              if (width !== undefined) groupPatch.templateWidth = width;
+              if (height !== undefined) groupPatch.templateHeight = height;
+              updateElement(editingTemplateGroupId!, groupPatch);
             } else if (selectedElement) {
               updateElement(selectedElement.id, patch);
             }
           }}
           onDeleteElement={() => {
-            if (!editingGroup && selectedElement) deleteElement(selectedElement.id);
+            if (!editingGroup && !isEditingTemplate && selectedElement) deleteElement(selectedElement.id);
           }}
           onUpdateChild={(patch) => {
             recordPropertyHistory();
@@ -1414,6 +1636,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 patch,
                 activeDualLane(),
               );
+            } else if (isEditingTemplate && editingTemplateGroupId && editingTemplateId && panelSelectedChild) {
+              notifyCloseCanvasChildList(editingTemplateGroupId);
+              handleUpdateChild(editingTemplateGroupId, panelSelectedChild.id, patch, { fromCanvas: true });
             } else if (selectedElement && selectedChild) {
               notifyCloseCanvasChildList(selectedElement.id);
               updateChildWidget(selectedElement.id, selectedChild.id, patch);
@@ -1424,11 +1649,17 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               handleDeleteChild(`tab-list-cell:${editingTabListCell.columnId}`, panelSelectedChild.id);
             } else if (editingGroup && panelSelectedChild) {
               deleteChildWidget(editingGroupId!, panelSelectedChild.id, activeDualLane());
+            } else if (isEditingTemplate && editingTemplateGroupId && panelSelectedChild) {
+              handleDeleteChild(editingTemplateGroupId, panelSelectedChild.id);
             } else if (selectedElement && selectedChild) {
               deleteChildWidget(selectedElement.id, selectedChild.id);
             }
           }}
           onEnterEditGroupMode={enterEditGroupMode}
+          onEnterTemplateEditMode={(templateId) => {
+            const targetId = editingGroup ? editingGroupId : selectedElement?.id;
+            if (targetId) enterTemplateEditMode(targetId, templateId);
+          }}
           onEnterEditVehicleContainer={() => {
             if (selectedElement && selectedChild?.type === 'vehicle-container') {
               enterEditVehicleContainer(selectedElement.id, selectedChild.id);
@@ -1446,8 +1677,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
       {/* ── 底部元件工具欄 ── */}
       {!editingVehicleContainer && (
-      <ComponentPalette 
-        isEditMode={isEditMode || !!editingGroup || isEditingTabCanvas || !!editingTabListCell}
+      <ComponentPalette
+        isEditMode={isEditMode || !!editingGroup || isEditingTabCanvas || isEditingTemplate || !!editingTabListCell}
         hasActiveCanvas={!!displayPlane && !!displaySelectedElementId}
         hasActivePlane={!!displayPlane}
         activeCanvasKind={selectedElement?.canvasKind}
@@ -1458,6 +1689,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             handleAddChild(editingTabListCell.canvasId, wt, 20, 20);
           } else if (isEditingTabCanvas && editingTabCanvasId) {
             handleAddChild(editingTabCanvasId, wt, 20, 20);
+          } else if (isEditingTemplate && editingTemplateGroupId) {
+            handleAddChild(editingTemplateGroupId, wt, 20, 20);
           } else if (selectedElement) {
             handleAddChild(selectedElement.id, wt, 20, 20);
           } else {

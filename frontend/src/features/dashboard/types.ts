@@ -967,6 +967,163 @@ export interface DualCanvasDisplayGate {
   compareValue?: string;
 }
 
+// ─── 泛用群組：多來源／有效性／優先程度／多樣板 ──────────────────────
+//
+// 群組展示的是「符合條件的候選項目」，不限定車輛或班次；正線班次、緊急調度、
+// 告警都只是資料來源的例子，不在這裡寫死任何場域分類。候選資料數量由來源
+// 決定，可見容量由使用者設定的版面決定——資料超過容量時低優先項目進入候補、
+// 不刪除來源資料；資料不足時由 `overflowFill` 決定撐滿或留空。
+
+/** 單一資料來源設定：每個來源各自管理連線、載入、失敗與更新時間。 */
+export interface GroupDataSource {
+  /** 來源在這個群組內的識別 id（不是資料庫 id），組成候選項目唯一鍵的一部分 */
+  id: string;
+  label?: string;
+  dataSourceId?: string;
+  sqlQuery?: string;
+  dataUrl?: string;
+  mqttDataSourceId?: string;
+  mqttTopic?: string;
+  mqttValuePath?: string;
+  freshnessPolicy?: FreshnessPolicy;
+  refreshInterval?: number;
+  refreshMode?: WidgetDataBinding['refreshMode'];
+  invalidateTags?: string[];
+  /** 項目識別欄位（辨識同一資訊項目）；未設時用群組層級的 itemIdField */
+  itemIdField?: string;
+  /** 內容版本欄位：值改變視為換頁，不是原地更新 */
+  contentVersionField?: string;
+  /** 這筆資料的更新時間欄位，供新鮮度／過期判斷 */
+  updatedAtField?: string;
+  /** 有效開始／結束時間欄位；沒有就不設定，視為一直有效 */
+  validStartField?: string;
+  validEndField?: string;
+  /** 狀態欄位＋視為失效的狀態值（如 status=CANCELLED），與時間條件並用 */
+  invalidStatusField?: string;
+  invalidStatusValues?: string[];
+  /** 這個來源候選項目的預設優先程度；命中 priorityRules 時被覆寫 */
+  defaultPriority?: number;
+  /** 欄位別名：把來源自身欄位名映射成樣板共用欄位名，如 { order_id: 'item_id' }。
+   *  原始欄位仍保留，別名是新增鍵，不覆蓋原始欄位。 */
+  fieldAliases?: Record<string, string>;
+  /**
+   * 候選項目建立前的後處理識別碼。平台本身不認得任何值、也不做任何判斷——
+   * 純粹把這個字串原封轉給渲染這個群組的頁面自己查表用（見
+   * `GroupCanvasRenderer.tsx` 的 `sourcePostProcessors`）。用來接「這批 SQL 列
+   * 需要跟另一份即時資料依鍵值疊加」這類場域專屬邏輯，而不必讓平台認得任何
+   * 場域分類。未設定就是原始 SQL 列直接使用，不做任何後處理。
+   */
+  postProcessId?: string;
+}
+
+export type GroupConditionOperator =
+  | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte'
+  | 'contains' | 'not_contains' | 'empty' | 'not_empty'
+  | 'before_now' | 'after_now';
+
+export interface GroupFieldCondition {
+  field: string;
+  operator: GroupConditionOperator;
+  value?: string;
+}
+
+/** 有效性規則：命中即視為失效（預設）或視為有效；規則之間為 AND。 */
+export interface GroupValidityRule {
+  id: string;
+  label?: string;
+  field: string;
+  operator: GroupConditionOperator;
+  value?: string;
+  effect?: 'invalid' | 'valid';
+}
+
+/** 優先程度規則：由上而下依序比對，命中第一條即採用；規則順序可調整。 */
+export interface GroupPriorityRule {
+  id: string;
+  label?: string;
+  /** 只套用於此來源；未設則套用所有來源 */
+  sourceId?: string;
+  conditions?: GroupFieldCondition[];
+  priority: number;
+}
+
+/** 同優先程度時的次排序；完全相同時保持穩定次序（不重新洗牌）。 */
+export interface GroupSortRule {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+/** 樣板選擇條件：規則之間為 AND，條件全部符合才選用此樣板。 */
+export interface GroupTemplateCondition {
+  field: string;
+  operator: GroupConditionOperator;
+  value?: string;
+}
+
+/** 一套樣板＝一棵獨立子元件樹＋選用條件。 */
+export interface GroupTemplateDef {
+  id: string;
+  name: string;
+  children: ChildWidget[];
+  /** 依序比對，命中第一個符合條件（或設為預設）的樣板 */
+  conditions?: GroupTemplateCondition[];
+  /** 找不到符合條件的樣板時使用；清單中應恰有一個 */
+  isDefault?: boolean;
+  /**
+   * 這套樣板自己的設計尺寸；未設時沿用群組層級的 `templateWidth`/`templateHeight`。
+   * 不同樣板的原始卡片設計大小常常不一樣（如遷移既有卡片時，正線卡跟整備卡本來
+   * 就不是同一個尺寸畫的）——沒有各自的設計尺寸，縮放比例會用「錯的那一套」的
+   * 尺寸去算，內容比例跟著跑掉。
+   */
+  templateWidth?: number;
+  templateHeight?: number;
+}
+
+export type GroupOverflowFill = 'stretch' | 'blank';
+
+/** 可見容量與資料不足時的處理方式。 */
+export interface GroupCapacityConfig {
+  capacity: number;
+  overflowFill?: GroupOverflowFill;
+  /** 顯示候補數量提示（如「+3 未顯示」） */
+  showPendingCount?: boolean;
+}
+
+export type GroupTransitionType = 'none' | 'fade' | 'flip-up';
+
+export interface GroupTransitionConfig {
+  type?: GroupTransitionType;
+  durationMs?: number;
+}
+
+/** 過期資料處理：不能默默讓重要資訊消失，要有明確設定。 */
+export type GroupStaleDataPolicy = 'remove' | 'keep' | 'mark';
+
+/**
+ * 泛用群組設定。所有欄位皆可選——舊群組（`enabled` 未設或 false）維持單一
+ * `dataSourceId`／`children` 的既有行為，不自動遷移。
+ */
+export interface GenericGroupConfig {
+  enabled?: boolean;
+  sources?: GroupDataSource[];
+  /** 跨來源合併識別欄位；未設時唯一鍵＝「來源 id＋項目 id」，不同來源不互相覆蓋。
+   *  這個欄位必須由使用者明確設定，平台不自動猜測共同識別欄位。 */
+  mergeIdField?: string;
+  /** 群組層級預設識別欄位；各來源可用自己的 itemIdField 覆寫 */
+  itemIdField?: string;
+  validityRules?: GroupValidityRule[];
+  priorityRules?: GroupPriorityRule[];
+  /** 沒有規則命中時的預設優先程度 */
+  defaultPriority?: number;
+  sortRules?: GroupSortRule[];
+  /** 同優先程度的新項目預設不搶占目前顯示中的項目，避免畫面抖動 */
+  preemptEqualPriority?: boolean;
+  templates?: GroupTemplateDef[];
+  capacityConfig?: GroupCapacityConfig;
+  transitionConfig?: GroupTransitionConfig;
+  staleDataPolicy?: GroupStaleDataPolicy;
+}
+
 // ─── Canvas 元件型別 ───────────────────────────────────────────────
 
 export interface CanvasElementProps {
@@ -1075,6 +1232,16 @@ export interface CanvasElementProps {
   groupTilePadY?: number;
   /** tile 模式：隱藏範本外框（車輛狀態卡等自帶邊框） */
   templateHideChrome?: boolean;
+
+  /**
+   * 泛用群組設定（多來源／有效性／優先程度／多樣板／容量與轉場）。
+   *
+   * 未設或 `enabled` 非 true 時，群組維持舊行為：單一 `dataSourceId`/`sqlQuery`、
+   * 單一 `children` 樣板、`groupSlotAssignment` 的索引式 sticky-pool——舊文件不會
+   * 被自動轉換。啟用後，`sources`/`templates` 取代單一資料綁定與 `children`，
+   * 但 `children` 仍保留（作為找不到符合條件樣板時的最後備援）。
+   */
+  genericGroup?: GenericGroupConfig;
 
   // --- 雙畫板子畫布（預設／常態互斥顯示，元件樹不共用） ---
   /** 啟用雙畫板編輯與執行時 Gate 切換 */

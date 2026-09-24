@@ -2661,6 +2661,9 @@ const zhTW = {
       listFallback: '清單',
       columnFallback: '欄位',
       editTabSubcanvas: '編輯 Tab「{{label}}」子畫布',
+      editGenericTemplate: '編輯樣板：{{group}} · {{template}}',
+      editGenericGroup: '編輯樣板：{{group}}',
+      switchTemplateHint: '切換要編輯的樣板',
     },
     newPlane: {
       title: '新增平面',

@@ -7,6 +7,7 @@ import {
 import { mergeTemplateDataSources } from '../store/useDataSourceStore';
 import { countBindingIssues } from './bindingHealth';
 import { patchDashboardRuntimeFixes } from '../utils/migrateVehicleMonitorProtocol';
+import { mapAllChildArrays } from './childArrayVariants';
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -24,12 +25,12 @@ export function clonePlaneWithNewIds(
   body: DashboardTemplateFile['plane'],
   name?: string,
 ): DashboardPlane {
+  // 走過所有樣板變體（見 collectAllChildArrays 註解）重建 ID，不是只顧
+  // children／childrenDefault／childrenNormal——漏掉哪一種，那個變體裡的子
+  // 元件會跟來源平面共用 ID，兩邊互相干擾。
   const elements: CanvasElementProps[] = body.elements.map(el => ({
-    ...el,
+    ...mapAllChildArrays(el, remapChildIds),
     id: newId('canvas'),
-    children: remapChildIds(el.children ?? []),
-    childrenDefault: el.childrenDefault?.length ? remapChildIds(el.childrenDefault) : el.childrenDefault,
-    childrenNormal: el.childrenNormal?.length ? remapChildIds(el.childrenNormal) : el.childrenNormal,
   }));
 
   return patchDashboardRuntimeFixes({

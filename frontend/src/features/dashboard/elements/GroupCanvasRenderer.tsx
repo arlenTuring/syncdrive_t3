@@ -7,6 +7,7 @@ import { WidgetRenderer } from './WidgetRenderer';
 import { computeGroupTileLayout, getTemplateDesignSize, getTemplateUniformScale } from './groupTileLayout';
 import { EditModeProvider } from '../context/EditModeContext';
 import { assignStickyPoolSlots } from '../utils/groupSlotPool';
+import { useGenericGroupSlots } from './useGenericGroupSlots';
 import {
   getNormalChildren,
   isDualCanvasGroup,
@@ -55,20 +56,26 @@ function buildVariables(
   return variables;
 }
 
+/** 舊群組的轉場設定（groupTransition）與新泛用群組的轉場設定（genericGroup.transitionConfig）共用同一個盒子。 */
+export type SlotTransitionType = 'none' | 'fade' | 'flip' | 'flip-up';
+
 function SlotTransitionBox({
   children,
   className = '',
   style,
   animKey,
   transition = 'flip',
+  durationMs,
 }: {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
   animKey?: string;
-  transition?: 'none' | 'fade' | 'flip';
+  transition?: SlotTransitionType;
+  /** 泛用群組可自訂轉場時間；舊群組不傳，沿用各轉場原本的預設值 */
+  durationMs?: number;
 }) {
-  const flipMs = 520;
+  const flipMs = transition === 'flip-up' ? (durationMs ?? 380) : 520;
   const skipAnim = transition === 'none' || animKey === undefined;
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [shown, setShown] = useState<{ key?: string; node: ReactNode }>({ key: animKey, node: children });
@@ -79,12 +86,13 @@ function SlotTransitionBox({
     if (skipAnim) return;
     if (animKey === shown.key) return;
     setPhase('out');
+    const outMs = transition === 'flip' ? flipMs * 0.42 : transition === 'flip-up' ? flipMs * 0.5 : 50;
     const t = window.setTimeout(() => {
       setShown({ key: animKey, node: childrenRef.current });
       setPhase('in');
-    }, transition === 'flip' ? flipMs * 0.42 : 50);
+    }, outMs);
     return () => clearTimeout(t);
-  }, [skipAnim, animKey, shown.key, transition]);
+  }, [skipAnim, animKey, shown.key, transition, flipMs]);
 
   if (skipAnim) {
     return <div className={className} style={style}>{children}</div>;
@@ -106,6 +114,33 @@ function SlotTransitionBox({
         }}
       >
         {visibleNode}
+      </div>
+    );
+  }
+
+  if (transition === 'flip-up') {
+    // 向上翻頁：舊卡往上翻出／淡出，新卡從原位「翻」進來——不是左右滑動，
+    // 是單一元素在同一個位置做垂直位移＋透明度轉場，跟班表／航班資訊看板的
+    // 翻頁效果同一種視覺語彙，但不用真的做兩片式 3D 翻牌（成本高、這裡不需要）。
+    return (
+      <div
+        className={className}
+        style={{
+          ...style,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            transform: phase === 'in' ? 'translateY(0)' : 'translateY(-14%)',
+            opacity: phase === 'in' ? 1 : 0,
+            transition: `transform ${flipMs}ms cubic-bezier(0.22, 0.9, 0.28, 1), opacity ${flipMs}ms ease`,
+          }}
+        >
+          {visibleNode}
+        </div>
       </div>
     );
   }
@@ -144,6 +179,9 @@ function TemplateInstance({
   animKey,
   isEditMode,
   slotTransition = 'flip',
+  transitionDurationMs,
+  liveMqttEnabled,
+  template,
 }: {
   element: CanvasElementProps;
   row: Record<string, unknown> | null;
@@ -151,15 +189,30 @@ function TemplateInstance({
   style?: CSSProperties;
   animKey?: string;
   isEditMode: boolean;
-  slotTransition?: 'none' | 'fade' | 'flip';
+  slotTransition?: SlotTransitionType;
+  transitionDurationMs?: number;
+  /**
+   * 覆寫「正線班次才疊 MQTT」的舊寫死判斷。未傳時維持原行為（比對 label 字串），
+   * 泛用群組路徑一律明確傳 false——即時疊加交給來源自己在候選項目成形前做好
+   * （見 groupCandidates 管線），不是每個樣板各自認 label。
+   */
+  liveMqttEnabled?: boolean;
+  /**
+   * 泛用群組依條件選出的樣板；未傳時沿用 element.children（舊行為）。傳整個
+   * `GroupTemplateDef`（不是只傳 children）是因為樣板可能有自己的設計尺寸
+   * （`templateWidth`/`templateHeight`）——不同樣板的原始卡片大小常常不一樣，
+   * 縮放比例要用「這套樣板自己的」尺寸算，不能套用群組共用的那一份。
+   */
+  template?: import('../types').GroupTemplateDef | null;
 }) {
   const isPreviewMode = row === null;
   const hideChrome = !!element.templateHideChrome && !isPreviewMode;
   const varName = element.variableName || 'item';
   const rowFingerprint = row ? JSON.stringify(row) : '';
+  const effectiveChildren = template?.children ?? element.children ?? [];
   // 正線卡需要 MQTT 補即時進度；整備卡的業務標籤與時間則以部署班表為準。
   // 若整備卡也套 operation/update，舊 retain 訊息會把使用者設定的 cardLabel 蓋掉。
-  const useLiveMqtt = element.label === '正線班次' && !isPreviewMode && !isEditMode;
+  const useLiveMqtt = liveMqttEnabled ?? (element.label === '正線班次' && !isPreviewMode && !isEditMode);
   const vehicleCode = row?.vehicle_code != null ? String(row.vehicle_code) : undefined;
   const liveRow = useOperationMqttShiftOverlay(vehicleCode, row, useLiveMqtt);
   const variables = useMemo(
@@ -170,10 +223,21 @@ function TemplateInstance({
     },
     [element.variableName, element.groupVariableMode, element.iteratorField, element.label, rowFingerprint, index, isEditMode, useLiveMqtt, liveRow],
   );
-  const { designW, designH } = getTemplateDesignSize(element);
+  // 多樣板時，設計尺寸／縮放要依「這個樣板自己的子元件範圍與設計尺寸」算，不是
+  // 群組共用的 element.children／templateWidth——樣板之間的畫面內容大小本來就
+  // 可能不同（如遷移既有卡片時，正線卡跟整備卡本來就不是同一個尺寸畫的）。
+  const layoutElement = template
+    ? {
+        ...element,
+        children: template.children,
+        templateWidth: template.templateWidth ?? element.templateWidth,
+        templateHeight: template.templateHeight ?? element.templateHeight,
+      }
+    : element;
+  const { designW, designH } = getTemplateDesignSize(layoutElement);
   const fallbackLayout =
     isPreviewMode && ((element.groupTileFit ?? 'fill') === 'fill' || element.groupTileFit === 'slot')
-      ? computeGroupTileLayout(element, 1)
+      ? computeGroupTileLayout(layoutElement, 1)
       : null;
   const posLeft = typeof style?.left === 'number' ? style.left : 0;
   const posTop = typeof style?.top === 'number' ? style.top : 0;
@@ -186,7 +250,7 @@ function TemplateInstance({
       ? style.height
       : (fallbackLayout?.tileHeight ?? designH);
   const { scale, scaleX, scaleY, offsetX, offsetY, designW: canvasDesignW, designH: canvasDesignH } =
-    getTemplateUniformScale(element, actualW, actualH);
+    getTemplateUniformScale(layoutElement, actualW, actualH);
   const tplScaleX = scaleX ?? scale;
   const tplScaleY = scaleY ?? scale;
   const tplScaled =
@@ -257,7 +321,7 @@ function TemplateInstance({
               overflow: 'hidden',
             }}
           >
-            {(element.children ?? []).map((child) => (
+            {effectiveChildren.map((child) => (
               <div
                 key={child.id}
                 style={{
@@ -284,6 +348,7 @@ function TemplateInstance({
       <SlotTransitionBox
         animKey={animKey}
         transition={slotTransition}
+        durationMs={transitionDurationMs}
         style={{
           position: useAbsoluteSlot ? 'absolute' : 'relative',
           ...(useAbsoluteSlot ? { left: posLeft, top: posTop } : {}),
@@ -551,6 +616,133 @@ function SlotsGroupView({
   );
 }
 
+/**
+ * 泛用群組（`genericGroup.enabled`）的可見格位渲染。跟舊 `SlotsGroupView` 平行
+ * 存在、互不影響——資料管線（多來源／有效性／優先程度／候補）在
+ * `useGenericGroupSlots` 裡，樣板選擇也是每格各自決定，這裡只負責把結果排版
+ * ＋接上轉場。共用同一個 `groupTileLayout`（規格 §7：所有樣板共用一個格位池，
+ * 不按樣板預留位置）。
+ */
+function GenericSlotsGroupView({
+  element,
+  isEditMode,
+  isPreviewMode,
+}: {
+  element: CanvasElementProps;
+  isEditMode: boolean;
+  isPreviewMode: boolean;
+}) {
+  const config = element.genericGroup;
+  const capacity = Math.max(1, config?.capacityConfig?.capacity ?? element.slotCount ?? element.gridColumns ?? 6);
+  const overflowFill = config?.capacityConfig?.overflowFill ?? 'blank';
+  const showPendingCount = config?.capacityConfig?.showPendingCount ?? false;
+  const transitionType = config?.transitionConfig?.type ?? 'flip-up';
+  const transitionDurationMs = config?.transitionConfig?.durationMs;
+
+  /*
+   * 場域專屬的來源後處理表——不是平台邏輯，是「這個儀表板頁面」自己決定要提供
+   * 哪些後處理器；平台的 useGenericGroupSlots／groupCandidates.ts 完全不認得
+   * 'mainline-mqtt-merge' 這個字串，只是原封查表。正線班次來源設定
+   * `postProcessId: 'mainline-mqtt-merge'` 才會套用；其他群組／其他來源不受影響。
+   */
+  const fleetMqtt = useShiftFleetMqttMap();
+  const sourcePostProcessors = useMemo(
+    () => ({
+      'mainline-mqtt-merge': (rows: Record<string, unknown>[]) => mergeMainlineShiftRoster(rows, fleetMqtt),
+    }),
+    [fleetMqtt],
+  );
+
+  const { fetchers, slots, pendingCount, isInitialLoading, templatesBySlot } = useGenericGroupSlots(config, capacity, {
+    sourcePostProcessors,
+  });
+
+  const occupiedCount = slots.filter(Boolean).length;
+  // stretch：欄數＝實際筆數（撐滿、無空格）；blank：欄數固定＝容量（資料不足時留空格）
+  const layoutCols = overflowFill === 'stretch' ? Math.max(1, occupiedCount) : capacity;
+  const { tileWidth: tplW, tileHeight: tplH, padX, padY, gapX } = computeGroupTileLayout(
+    element,
+    layoutCols,
+    { gridColumns: layoutCols },
+  );
+  const visibleSlots = overflowFill === 'stretch' ? slots.slice(0, occupiedCount) : slots;
+
+  if (isPreviewMode) {
+    // 編輯模式下未接資料來源：顯示第一套樣板（或 children 備援）當預覽範本
+    return (
+      <div className="relative w-full h-full overflow-hidden" style={{ padding: `${padY}px ${padX}px` }}>
+        <TemplateInstance
+          element={element}
+          row={null}
+          index={0}
+          isEditMode={isEditMode}
+          liveMqttEnabled={false}
+          template={config?.templates?.[0]}
+          style={{ position: 'relative', left: 0, top: 0, width: tplW, height: tplH }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {fetchers}
+      <div className="relative w-full h-full overflow-hidden" style={{ padding: `${padY}px ${padX}px` }}>
+        {isInitialLoading && occupiedCount === 0 ? (
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-500">
+            <span className="animate-pulse">載入資料…</span>
+          </div>
+        ) : occupiedCount === 0 ? (
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-600">
+            尚無資料
+          </div>
+        ) : (
+          <div className="relative" style={{ width: '100%', height: tplH }}>
+            {visibleSlots.map((cell, i) => (
+              <div
+                key={`gslot-${i}`}
+                style={{
+                  position: 'absolute',
+                  left: i * (tplW + gapX),
+                  top: 0,
+                  width: tplW,
+                  height: tplH,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {cell ? (
+                  <TemplateInstance
+                    element={element}
+                    row={cell.row}
+                    index={i}
+                    isEditMode={isEditMode}
+                    // 身分不變但內容版本或樣板換了也要翻頁（規格 §7），不是只有 uid 變才翻；
+                    // 單純數值更新（版本、樣板都沒變）animKey 不變，原地更新不觸發轉場。
+                    animKey={`${cell.uid}::${cell.contentVersion ?? ''}::${templatesBySlot[i]?.id ?? ''}`}
+                    slotTransition={isEditMode ? 'none' : transitionType}
+                    transitionDurationMs={transitionDurationMs}
+                    liveMqttEnabled={false}
+                    template={templatesBySlot[i]}
+                    style={{ position: 'relative', left: 0, top: 0, width: tplW, height: tplH }}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+        {showPendingCount && pendingCount > 0 && (
+          <div
+            className="absolute bottom-1 right-1 rounded px-2 py-0.5 text-[10px] text-zinc-400"
+            style={{ background: 'rgba(15,23,42,0.6)', pointerEvents: 'none' }}
+          >
+            +{pendingCount} 未顯示
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function TileGroupView({
   element,
   rows,
@@ -619,6 +811,10 @@ function TileGroupView({
 }
 
 export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onEnterEditMode }: Props) {
+  const useGenericGroup = !!element.genericGroup?.enabled;
+  // 泛用群組取代單一資料綁定與單一範本：雙畫板閘道只看群組本身的單一查詢，
+  // 泛用群組沒有那份資料，閘道永遠判成 0 筆，檢視模式會一直落在空的預設畫板。
+  const isDual = !useGenericGroup && isDualCanvasGroup(element);
   const gate = element.displayGate;
   const builtinSql = resolveBuiltinGroupSql(element);
   const gateSql = gate?.sqlQuery?.trim() ? gate.sqlQuery : builtinSql.sqlQuery;
@@ -638,14 +834,17 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
     && gateDs === element.dataSourceId;
 
   const gateQuery = useWidgetData({
-    dataSourceId: isDualCanvasGroup(element) && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateDs : undefined,
-    sqlQuery: isDualCanvasGroup(element) && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateSql : undefined,
+    dataSourceId: isDual && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateDs : undefined,
+    sqlQuery: isDual && gate?.sqlQuery?.trim() && !gateSameAsMain ? gateSql : undefined,
     refreshInterval: gate?.refreshInterval ?? element.refreshInterval,
     refreshMode: gate?.refreshMode ?? element.refreshMode,
     invalidateTags: gate?.invalidateTags ?? element.invalidateTags,
   });
 
-  const hasDataSource = !!(element.dataSourceId || element.dataUrl);
+  // 泛用群組的資料來自 genericGroup.sources[]，不是群組本身的 dataSourceId——
+  // 舊的「有沒有接資料來源」判斷不能沿用，不然設定了來源還是會被當成預覽模式。
+  const isGenericGroupWithSources = !!element.genericGroup?.enabled && (element.genericGroup.sources?.length ?? 0) > 0;
+  const hasDataSource = isGenericGroupWithSources || !!(element.dataSourceId || element.dataUrl);
   const isPreviewMode = !hasDataSource;
   const isLoading = hasDataSource && loading;
   const isShiftRoster = isShiftRosterGroup(element.label);
@@ -667,17 +866,17 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
   const gateRows = gateSameAsMain ? data : (gate?.sqlQuery?.trim() ? gateQuery.data : data);
   const gateRowCount = gateRows.length;
   const gateFirst = gateRows[0] ?? null;
-  const showNormalPanel = !isDualCanvasGroup(element) || isEditMode
+  const showNormalPanel = !isDual || isEditMode
     ? true
     : shouldShowNormalPanel(element, gateRowCount, gateFirst);
 
-  const renderElement = isDualCanvasGroup(element)
+  const renderElement = isDual
     ? { ...element, children: getNormalChildren(element) }
     : element;
 
   const mode = element.groupRepeatMode || 'tile';
 
-  if (isDualCanvasGroup(element) && !showNormalPanel && !isEditMode) {
+  if (isDual && !showNormalPanel && !isEditMode) {
     return (
       <DualCanvasDefaultView
         element={element}
@@ -689,22 +888,28 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
 
   return (
     <div className={`relative w-full h-full ${mode === 'tile' ? 'overflow-visible' : 'overflow-hidden'}`}>
-      {mode === 'scroll' && (
-        <ScrollGroupView
-          element={renderElement}
-          rows={rows}
-          isPreviewMode={isPreviewMode}
-          isEmpty={isEmpty}
-          isLoading={isLoading}
-          isEditMode={isEditMode}
-          onEnterEditMode={onEnterEditMode}
-        />
-      )}
-      {mode === 'slots' && (
-        <SlotsGroupView element={renderElement} rows={rows} isPreviewMode={isPreviewMode} isEditMode={isEditMode} />
-      )}
-      {mode === 'tile' && (
-        <TileGroupView element={renderElement} rows={rows} isEditMode={isEditMode} />
+      {useGenericGroup ? (
+        <GenericSlotsGroupView element={renderElement} isEditMode={isEditMode} isPreviewMode={isPreviewMode} />
+      ) : (
+        <>
+          {mode === 'scroll' && (
+            <ScrollGroupView
+              element={renderElement}
+              rows={rows}
+              isPreviewMode={isPreviewMode}
+              isEmpty={isEmpty}
+              isLoading={isLoading}
+              isEditMode={isEditMode}
+              onEnterEditMode={onEnterEditMode}
+            />
+          )}
+          {mode === 'slots' && (
+            <SlotsGroupView element={renderElement} rows={rows} isPreviewMode={isPreviewMode} isEditMode={isEditMode} />
+          )}
+          {mode === 'tile' && (
+            <TileGroupView element={renderElement} rows={rows} isEditMode={isEditMode} />
+          )}
+        </>
       )}
 
       {isEditMode && isCanvasSelected && (

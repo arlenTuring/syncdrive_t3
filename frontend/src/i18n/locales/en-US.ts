@@ -2704,6 +2704,9 @@ const enUS: DeepStringify<typeof zhTW> = {
       listFallback: 'List',
       columnFallback: 'column',
       editTabSubcanvas: 'Edit Tab “{{label}}” subcanvas',
+      editGenericTemplate: 'Edit template: {{group}} · {{template}}',
+      editGenericGroup: 'Edit template: {{group}}',
+      switchTemplateHint: 'Switch template to edit',
     },
     newPlane: {
       title: 'New plane',
