@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ClipboardList,
@@ -162,6 +162,9 @@ export default function ScheduleManagementApp({
   const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
+  // 後端的對應拉回來之前不能回寫：初始值是這台瀏覽器的舊快取，一掛載就送出去會把
+  // 其他人改好的對應（例如重新指定版面）蓋回舊值。
+  const modulePagesSyncedRef = useRef(false);
 
   /**
    * 模組頁面對應以後端為準。
@@ -173,7 +176,9 @@ export default function ScheduleManagementApp({
   useEffect(() => {
     let cancelled = false;
     void refreshModuleDashboardPages().then((pages) => {
-      if (!cancelled) setModulePages(pages);
+      if (cancelled) return;
+      modulePagesSyncedRef.current = true;
+      setModulePages(pages);
     });
     // 版面要一起拉。只補對應的話，乾淨的瀏覽器點進子頁會看到「找不到儀表板平面」
     // ——對應查得到、版面還在後端沒進本機快取。
@@ -193,6 +198,7 @@ export default function ScheduleManagementApp({
   }, [adminMode]);
 
   useEffect(() => {
+    if (!modulePagesSyncedRef.current) return;
     writeModuleDashboardPages(modulePages);
   }, [modulePages]);
 
