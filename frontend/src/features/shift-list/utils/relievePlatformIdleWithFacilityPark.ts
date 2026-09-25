@@ -364,6 +364,21 @@ export function relievePlatformIdleWithFacilityPark(args: {
           continue;
         }
 
+        /**
+         * 甲／乙兩案唯一的判準：中途格身分是不是就是目的整備格本人。
+         *
+         * <strong>不能用 <code>plan.hopSeconds === 0</code> 判斷。</strong>甲的
+         * hopSeconds 恆為 0（沒有中途格，本來就不必再跳一段）；但乙的中途格若跟
+         * 目的格在拓樸上零秒相鄰（沒填行駛時間、或就是零秒轉場），
+         * <code>hop.avgSeconds</code> 一樣會算出 0——這時兩案的 hopSeconds 一樣，
+         * 但物理事實完全不同：乙的車還停在別格（例 W1），沒有真的到 E2。
+         * 拿 hopSeconds 當判準會把乙誤當甲，害中途格的佔用整段憑空消失，
+         * 且把目的格的整備時刻拉到車根本還沒到的時間點（2026-09-25 實錄：
+         * W1 借用零秒轉場到 E2，充電被錯誤提前到 23:46:50，撞上另一台車還在
+         * E2 待到 00:00:00 的整備，兩車同格重疊 790 秒）。
+         */
+        const isDirectEntry = plan.waitNodeId === targetNodeId;
+
         const stationLabel = occupancy.stationName ?? occupancy.stationId;
         const idTag = `${occupancy.blockId}-${Math.round(leaveSecond)}`;
         const waitStartSecond = snapUpToClockAlignSeconds(leaveSecond + plan.inboundSeconds);
@@ -387,7 +402,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
 
         const added: GeneratedScheduleBlock[] = [];
         // 乙才需要自己的入場移動卡；甲直接沿用既有的入廠移動卡
-        if (plan.hopSeconds > 0) {
+        if (!isDirectEntry) {
           added.push({
             id: `berthpark-early-in-${idTag}`,
             timelineRow: timelineForRow.row,
@@ -404,7 +419,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
             yardEntryFacilityLabel: plan.waitLabel,
           } as GeneratedScheduleBlock);
         }
-        const pullYardHead = plan.hopSeconds === 0 && yardAfterEntry != null;
+        const pullYardHead = isDirectEntry && yardAfterEntry != null;
         if (!pullYardHead) added.push({
           id: `berthpark-early-stay-${idTag}`,
           timelineRow: timelineForRow.row,
@@ -425,7 +440,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
         const keepEnd = nextBlock.plannedEndMinute;
         const keepAnchor = nextBlock.anchorStartMinute;
         const keepTravel = nextBlock.travelSeconds;
-        const movedStartMinute = plan.hopSeconds > 0
+        const movedStartMinute = !isDirectEntry
           ? secondToMinute(waitEndSecond)
           : secondToMinute(leaveSecond);
         // 先檢查再動：任何一條早退路徑都不能留下改到一半的版面。
@@ -461,8 +476,8 @@ export function relievePlatformIdleWithFacilityPark(args: {
 
         nextBlock.plannedStartMinute = movedStartMinute;
         nextBlock.anchorStartMinute = movedStartMinute;
-        nextBlock.plannedEndMinute = plan.hopSeconds > 0 ? arriveMinute : secondToMinute(waitStartSecond);
-        if (plan.hopSeconds > 0) nextBlock.travelSeconds = plan.hopSeconds;
+        nextBlock.plannedEndMinute = !isDirectEntry ? arriveMinute : secondToMinute(waitStartSecond);
+        if (!isDirectEntry) nextBlock.travelSeconds = plan.hopSeconds;
         timelineForRow.blocks.push(...added);
         const afterEarly = countBlockedBy(timelines, selectedRoutes, collisionProtectionSeconds);
         if (afterEarly.total >= total) {
@@ -490,7 +505,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
             `時間線 ${timelineForRow.row}：跑完一趟在`
             + `「${stationLabel}」等著進廠 ${idle.toFixed(1)} 分鐘，`
             + `擋住 ${count} 台後車——已改成跑完就開進「${plan.waitLabel}」`
-            + (plan.hopSeconds > 0
+            + (!isDirectEntry
               ? `等，再開進「${targetLabel}」整備，整備時刻不變。`
               : '，整備跟著提早開始（結束時刻不變）。'),
           detail: {
