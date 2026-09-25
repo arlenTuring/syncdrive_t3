@@ -755,6 +755,14 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         true,
         `剩下的回報應該都是「整列沒有載客班次」，實際：${result.skipped.map((s) => s.reason).join(' / ')}`,
       );
+      // 整天沒有載客任務＝車沒有要去的地方，不是排不出卡：一律標成
+      // necessity:'not_needed'，跟「有後續任務、卻排不出移動」的必要轉場
+      // 失敗分開，不可以混在同一種分類裡。
+      assert.equal(
+        result.skipped.every((s) => s.necessity === 'not_needed'),
+        true,
+        `整天無載客班次的回報都該標 not_needed，實際：${JSON.stringify(result.skipped)}`,
+      );
     });
 
     it('移動時間長到會把後一段推過結束時刻時，回報而不強插', () => {
@@ -775,6 +783,13 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const forwardSkip = result.skipped.find((x) => x.fromTaskType === 'charging');
       assert.ok(forwardSkip, '充電→保養這個方向要被擋下並回報');
       assert.match(forwardSkip.reason, /沒設定設施/);
+      // 這個 fixture 前後都有正線任務（見 plan()），車確實需要轉場，只是設施
+      // 沒設定排不出來——是必要轉場失敗，不能標成 not_needed。
+      assert.equal(
+        forwardSkip.necessity,
+        undefined,
+        '有後續任務、只是排不出移動，necessity 不該是 not_needed',
+      );
     });
 
     it('沒有拓樸時安靜略過，不當成錯誤', () => {

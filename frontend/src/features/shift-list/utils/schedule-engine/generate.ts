@@ -781,15 +781,30 @@ export function generateShiftSchedule(
    */
   timelines = fillYardHoldGaps({ timelines, selectedRoutes: routesForBerth }).timelines;
 
+  /**
+   * 「不需要轉場」跟「必要轉場失敗」分開分類，不是全部套同一句策略說明。
+   *
+   * 這一列整天沒有前／後載客任務（`necessity==='not_needed'`）：車沒有要去的
+   * 地方，出廠／入廠卡本來就不需要，多半是刻意保留的備援車，歸 policy——
+   * 正常情況、收合顯示，需要時使用者自己展開檢查。
+   *
+   * 後續<strong>有</strong>載客任務、卻排不出合法移動（沒填欄位、拓樸沒接、候選
+   * 都被擋⋯）：車實際上到不了它該去的地方，是必要銜接失敗，歸 actionable——
+   * 使用者該實際去看，不能跟前者一起被摺疊。訊息維持 `skip.reason`（已經是
+   * insertMaintenanceTransferCards 算出來的實際原因，不是套用通用說明）。
+   */
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType
       ? `「${skip.fromTaskType}」轉「${skip.toTaskType}」`
       : `「${skip.taskType}」`;
+    const notNeeded = skip.necessity === 'not_needed';
     pushIssue(warnings, {
       code: 'MAINTENANCE_TRANSFER_UNRESOLVED',
       severity: 'warning',
-      kind: 'policy',
-      message: `時間線 ${skip.timelineRow}：${label}排不出整備轉場卡——${skip.reason}`,
+      kind: notNeeded ? 'policy' : 'actionable',
+      message: notNeeded
+        ? `時間線 ${skip.timelineRow}：${label}不需要整備轉場卡——${skip.reason}`
+        : `時間線 ${skip.timelineRow}：${label}排不出必要的整備轉場卡——${skip.reason}`,
       detail: {
         timelineRow: skip.timelineRow,
         blockId: skip.blockId,
@@ -797,6 +812,7 @@ export function generateShiftSchedule(
         fromTaskType: skip.fromTaskType,
         toTaskType: skip.toTaskType,
         reason: skip.reason,
+        necessity: skip.necessity ?? 'required',
       },
     });
   }

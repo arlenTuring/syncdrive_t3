@@ -175,6 +175,12 @@ export type MaintenanceTransferCardsResult = {
     fromTaskType?: string;
     toTaskType?: string;
     reason: string;
+    /**
+     * 這一列整天都沒有前／後載客班次——車沒有要去的地方，本來就不需要入出廠卡，
+     * 不是排不出來。跟「有後續任務、但排不出合法移動」的必要轉場失敗分開；
+     * 預設（不填）就是後者，呼叫端只在確認全天無載客任務時才標 'not_needed'。
+     */
+    necessity?: 'not_needed';
   }>;
   /**
    * 整段時間內找不到任何一台空設施的整備任務——車沒地方停，是產能不足，
@@ -1166,16 +1172,27 @@ export function insertMaintenanceTransferCards(args: {
       // 往回找最近一段載客，找不到就繞回當日最後一段（同一台車前一天的尾巴）
       const prevPax = findPrevCyclic(sorted, i, (b) => b.taskType === 'passenger');
       const previousPassenger = prevPax?.block;
-      if (!prevPax || !previousPassenger?.routeId) {
+      if (!prevPax) {
+        // 這一列整天沒有前面的載客任務——車沒有要從哪裡開進來，本來就不需要
+        // 入廠卡，不是排不出來；跟下面「有前一段載客、卻查不出路線代號」的
+        // 必要轉場失敗分開標記。
+        skipped.push({
+          timelineRow: timeline.row,
+          blockId: yard.id,
+          taskType: yard.taskType,
+          reason: '這一列整天沒有任何載客班次，找不到車是從哪裡開進來的',
+          necessity: 'not_needed',
+        });
+        continue;
+      }
+      if (!previousPassenger?.routeId) {
         // 沉默略過的話，畫面上就是「這段整備沒有入廠卡」，跟排不出來、
         // 跟同區域 0 秒轉移長得一模一樣。要卡而給不出卡，一律講原因。
         skipped.push({
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
-          reason: prevPax
-            ? '前一段載客沒有路線代號，查不出它停在哪一站，無從算入廠路徑'
-            : '這一列整天沒有任何載客班次，找不到車是從哪裡開進來的',
+          reason: '前一段載客沒有路線代號，查不出它停在哪一站，無從算入廠路徑',
         });
         continue;
       }
@@ -2056,13 +2073,16 @@ export function insertMaintenanceTransferCards(args: {
       // 所以整備排在當日尾巴時仍然找得到它要銜接的那一段載客（時刻 +1440）。
       const nextPax = findNextCyclic(sorted, i, requiresVehicleAtStation);
       if (!nextPax) {
-        // 繞一整圈都沒有載客班次＝這一列整天只有整備，車永遠不出廠。
-        // 這通常是模板那一列排錯了，不該安靜吞掉。
+        // 繞一整圈都沒有載客班次＝這一列整天只有整備，車沒有要去的地方，
+        // 出廠卡本來就不需要——不是排不出來。這通常是刻意保留的備援車，
+        // 但也可能是模板那一列排錯了，所以仍然回報，不安靜吞掉；
+        // 只是標成「不需要」而非「必要轉場失敗」，不跟真的排不出路徑混在一起。
         skipped.push({
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
-          reason: '這一列整天沒有任何載客班次，車沒有要去的地方，排不出出廠卡',
+          reason: '這一列整天沒有任何載客班次，車沒有要去的地方，不需要出廠卡（若非刻意保留備援車，請檢查模板排班）',
+          necessity: 'not_needed',
         });
         continue;
       }
