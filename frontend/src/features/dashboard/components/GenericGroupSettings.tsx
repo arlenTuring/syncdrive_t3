@@ -3,6 +3,7 @@ import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react
 import type {
   CanvasElementProps,
   GenericGroupConfig,
+  GroupArrangeMode,
   GroupConditionOperator,
   GroupDataSource,
   GroupFieldCondition,
@@ -456,7 +457,21 @@ export function GenericGroupSettings({
             </label>
           </Section>
 
-          <Section title="同優先次排序">
+          <Section
+            title="可見卡片排列"
+            hint="決定卡片選進畫面後的位置。卡片只是換位置時會平移過去，不會當成換卡翻頁。"
+          >
+            <select
+              value={config.arrangeMode ?? 'priority'}
+              onChange={e => patch({ arrangeMode: e.target.value as GroupArrangeMode })}
+              className={selectCls}
+            >
+              <option value="priority">優先程度高者在前</option>
+              <option value="keep">保留既有位置</option>
+            </select>
+          </Section>
+
+          <Section title="同優先次排序" hint="優先程度相同時依此欄位排序；再相同則維持目前位置。">
             <div className="grid grid-cols-2 gap-1.5">
               <input
                 value={sortRules[0]?.field ?? ''}

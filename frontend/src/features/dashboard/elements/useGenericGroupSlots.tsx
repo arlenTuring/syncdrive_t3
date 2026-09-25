@@ -151,6 +151,7 @@ export function useGenericGroupSlots(
     });
     const result = assignPrioritySlots(poolRef.current, candidates, capacity, {
       preemptEqualPriority: config?.preemptEqualPriority,
+      arrange: config?.arrangeMode ?? 'priority',
     });
     poolRef.current = result.slots;
     return result;

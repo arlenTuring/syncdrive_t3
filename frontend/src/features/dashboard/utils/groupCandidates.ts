@@ -175,22 +175,14 @@ export function buildCandidatesFromSource(input: BuildCandidatesInput): Priority
     const valid = sourceValid && isRowValid(row, validityRules);
     const priority = resolvePriority(row, source.id, priorityRules, source.defaultPriority, groupDefaultPriority);
     const sortField = sortRules?.[0]?.field;
-    let sortKey: string | number | undefined;
-    if (sortField) {
-      const v = toComparable(row[sortField]);
-      if (v != null) {
-        const dir = sortRules?.[0]?.direction ?? 'asc';
-        // 降冪：數字取負、字串前綴反轉排序不好做，這裡只處理數字反向；
-        // 字串降冪留給呼叫端在 UI 層面提醒（多數排序鍵是時間/數字）
-        sortKey = dir === 'desc' && typeof v === 'number' ? -v : v;
-      }
-    }
+    const sortKey = sortField ? toComparable(row[sortField]) ?? undefined : undefined;
+    const sortDesc = sortRules?.[0]?.direction === 'desc';
     const updatedAtRaw = source.updatedAtField ? row[source.updatedAtField] : undefined;
     const updatedAt = typeof updatedAtRaw === 'number' ? updatedAtRaw : Date.parse(String(updatedAtRaw ?? '')) || undefined;
     const contentVersion = source.contentVersionField
       ? String(row[source.contentVersionField] ?? '')
       : undefined;
-    return { uid, priority, sortKey, updatedAt, valid, contentVersion, row };
+    return { uid, priority, sortKey, sortDesc, updatedAt, valid, contentVersion, row };
   });
 }
 

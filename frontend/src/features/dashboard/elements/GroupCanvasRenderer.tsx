@@ -66,6 +66,7 @@ function SlotTransitionBox({
   animKey,
   transition = 'flip',
   durationMs,
+  enterOnMount = false,
 }: {
   children: ReactNode;
   className?: string;
@@ -74,10 +75,20 @@ function SlotTransitionBox({
   transition?: SlotTransitionType;
   /** 泛用群組可自訂轉場時間；舊群組不傳，沿用各轉場原本的預設值 */
   durationMs?: number;
+  /** 掛載時從退場狀態翻進來（依身分渲染的格位：新進項目要有進場效果） */
+  enterOnMount?: boolean;
 }) {
   const flipMs = transition === 'flip-up' ? (durationMs ?? 380) : 520;
   const skipAnim = transition === 'none' || animKey === undefined;
-  const [phase, setPhase] = useState<'in' | 'out'>('in');
+  const [phase, setPhase] = useState<'in' | 'out'>(() => (enterOnMount && !skipAnim ? 'out' : 'in'));
+
+  useEffect(() => {
+    if (phase !== 'out' || !enterOnMount) return;
+    // 先讓退場狀態畫出一幀，轉場才有起點
+    const t = window.setTimeout(() => setPhase('in'), 30);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [shown, setShown] = useState<{ key?: string; node: ReactNode }>({ key: animKey, node: children });
   const childrenRef = useRef(children);
   childrenRef.current = children;
@@ -182,6 +193,7 @@ function TemplateInstance({
   transitionDurationMs,
   liveMqttEnabled,
   template,
+  enterOnMount,
 }: {
   element: CanvasElementProps;
   row: Record<string, unknown> | null;
@@ -191,6 +203,7 @@ function TemplateInstance({
   isEditMode: boolean;
   slotTransition?: SlotTransitionType;
   transitionDurationMs?: number;
+  enterOnMount?: boolean;
   /**
    * 覆寫「正線班次才疊 MQTT」的舊寫死判斷。未傳時維持原行為（比對 label 字串），
    * 泛用群組路徑一律明確傳 false——即時疊加交給來源自己在候選項目成形前做好
@@ -349,6 +362,7 @@ function TemplateInstance({
         animKey={animKey}
         transition={slotTransition}
         durationMs={transitionDurationMs}
+        enterOnMount={enterOnMount}
         style={{
           position: useAbsoluteSlot ? 'absolute' : 'relative',
           ...(useAbsoluteSlot ? { left: posLeft, top: posTop } : {}),
@@ -667,6 +681,20 @@ function GenericSlotsGroupView({
   );
   const visibleSlots = overflowFill === 'stretch' ? slots.slice(0, occupiedCount) : slots;
 
+  // 依身分（uid）渲染：同一張卡換位置是位移，不是換卡翻頁。DOM 順序固定用 uid 排，
+  // 讓 React 只改 left、不搬動節點——節點被搬動時瀏覽器不會播放 left 的轉場。
+  const placed = visibleSlots
+    .map((cell, i) => (cell ? { cell, i } : null))
+    .filter((x): x is { cell: NonNullable<typeof slots[number]>; i: number } => x !== null)
+    .sort((a, b) => (a.cell.uid < b.cell.uid ? -1 : a.cell.uid > b.cell.uid ? 1 : 0));
+  const moveMs = transitionType === 'none' ? 0 : (transitionDurationMs ?? 450);
+  // 第一次有資料時整排一起出現，不要每張卡都播進場
+  const hasShownDataRef = useRef(false);
+  const enterOnMount = hasShownDataRef.current && !isEditMode && transitionType !== 'none';
+  useEffect(() => {
+    if (occupiedCount > 0) hasShownDataRef.current = true;
+  }, [occupiedCount]);
+
   if (isPreviewMode) {
     // 編輯模式下未接資料來源：顯示第一套樣板（或 children 備援）當預覽範本
     return (
@@ -698,9 +726,10 @@ function GenericSlotsGroupView({
           </div>
         ) : (
           <div className="relative" style={{ width: '100%', height: tplH }}>
-            {visibleSlots.map((cell, i) => (
+            {placed.map(({ cell, i }) => (
               <div
-                key={`gslot-${i}`}
+                key={cell.uid}
+                data-slot-uid={cell.uid}
                 style={{
                   position: 'absolute',
                   left: i * (tplW + gapX),
@@ -708,24 +737,24 @@ function GenericSlotsGroupView({
                   width: tplW,
                   height: tplH,
                   boxSizing: 'border-box',
+                  transition: isEditMode || moveMs === 0 ? undefined : `left ${moveMs}ms cubic-bezier(0.22, 0.9, 0.28, 1)`,
                 }}
               >
-                {cell ? (
-                  <TemplateInstance
-                    element={element}
-                    row={cell.row}
-                    index={i}
-                    isEditMode={isEditMode}
-                    // 身分不變但內容版本或樣板換了也要翻頁（規格 §7），不是只有 uid 變才翻；
-                    // 單純數值更新（版本、樣板都沒變）animKey 不變，原地更新不觸發轉場。
-                    animKey={`${cell.uid}::${cell.contentVersion ?? ''}::${templatesBySlot[i]?.id ?? ''}`}
-                    slotTransition={isEditMode ? 'none' : transitionType}
-                    transitionDurationMs={transitionDurationMs}
-                    liveMqttEnabled={false}
-                    template={templatesBySlot[i]}
-                    style={{ position: 'relative', left: 0, top: 0, width: tplW, height: tplH }}
-                  />
-                ) : null}
+                <TemplateInstance
+                  element={element}
+                  row={cell.row}
+                  index={i}
+                  isEditMode={isEditMode}
+                  // 同一張卡內容版本或樣板換了才翻頁（規格 §7）；單純數值更新原地換，
+                  // 單純換位置由外層 left 轉場處理。
+                  animKey={`${cell.contentVersion ?? ''}::${templatesBySlot[i]?.id ?? ''}`}
+                  slotTransition={isEditMode ? 'none' : transitionType}
+                  transitionDurationMs={transitionDurationMs}
+                  enterOnMount={enterOnMount}
+                  liveMqttEnabled={false}
+                  template={templatesBySlot[i]}
+                  style={{ position: 'relative', left: 0, top: 0, width: tplW, height: tplH }}
+                />
               </div>
             ))}
           </div>

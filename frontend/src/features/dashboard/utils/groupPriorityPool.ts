@@ -16,17 +16,24 @@
  *   8. 同優先的新項目預設不搶占（`preemptEqualPriority` 為 false 時，只有嚴格更高
  *      優先才會替換）；設 true 時同優先且 `tieBreakUpdatedAt` 較新的才搶占。
  *
- * 格位以「索引」為單位（跟 groupTileLayout 的排版邏輯一致），項目在格位間的
- * 位置變動（重新靠左排列）由呼叫端另外判斷是否需要位移動畫，這裡只回報
- * 「這個索引的身分（uid）變了」。
+ * 分兩步：先「選出」哪些項目可見（上面 1–8），再「排列」可見項目的位置：
+ *   - arrange='priority'（預設）：優先程度高者在前；同優先依次排序；再相同維持
+ *     上一輪的位置，新進項目排在同分的既有項目後面（穩定，不會同分互換）。
+ *   - arrange='keep'：保留既有位置，只把空格往左補齊。
+ * 選取時保留舊格位只是為了判斷「誰被換掉」，最後位置一律由排列步驟決定。
+ *
+ * changedIndices 只回報「這個索引上的身分（uid）跟上一輪不同」；卡片只是換位置
+ * 時呼叫端應該依 uid 做位移動畫，不是當成換卡翻頁（見 GenericSlotsGroupView）。
  */
 
 export interface PriorityCandidate {
   /** 唯一鍵——預設「來源 id + 項目 id」，由呼叫端組好傳入 */
   uid: string;
   priority: number;
-  /** 同優先次排序用；型別統一成可比較的 string｜number，呼叫端依 GroupSortRule 算好 */
+  /** 同優先次排序用；型別統一成可比較的 string｜number，呼叫端依 GroupSortRule 取值 */
   sortKey?: string | number;
+  /** 次排序降冪（數字與字串都適用） */
+  sortDesc?: boolean;
   /** preemptEqualPriority 時的同優先「較新」判斷依據 */
   updatedAt?: number;
   /** 是否通過有效性規則；呼叫端算好傳入，這裡只做篩選不做判斷 */
@@ -50,22 +57,25 @@ export interface AssignPrioritySlotsResult {
   pendingCount: number;
 }
 
-function compareCandidates(a: PriorityCandidate, b: PriorityCandidate, order: number): number {
+/** 優先程度降冪，再依次排序；都相同回傳 0，交給呼叫端決定穩定次序 */
+function compareByPriority(a: PriorityCandidate, b: PriorityCandidate): number {
   if (a.priority !== b.priority) return b.priority - a.priority;
   if (a.sortKey != null && b.sortKey != null && a.sortKey !== b.sortKey) {
-    return a.sortKey < b.sortKey ? -1 : 1;
+    const asc = a.sortKey < b.sortKey ? -1 : 1;
+    return a.sortDesc ? -asc : asc;
   }
-  return order; // 穩定次序：保留原始陣列相對位置
+  return 0;
 }
 
 export function assignPrioritySlots(
   prevSlots: PrioritySlotCell[],
   candidates: PriorityCandidate[],
   capacity: number,
-  opts: { preemptEqualPriority?: boolean } = {},
+  opts: { preemptEqualPriority?: boolean; arrange?: 'priority' | 'keep' } = {},
 ): AssignPrioritySlotsResult {
   const n = Math.max(1, capacity);
   const preemptEqual = opts.preemptEqualPriority ?? false;
+  const arrange = opts.arrange ?? 'priority';
 
   // 規則 1：只認 valid 的候選；順便記住原始順序供穩定排序
   const validCandidates = candidates
@@ -74,7 +84,7 @@ export function assignPrioritySlots(
   const byUid = new Map(validCandidates.map(({ c }) => [c.uid, c]));
 
   // 規則 2、3：全體候選排序（高優先在前，同優先依 sortKey，再不然依原始順序）
-  const ranked = [...validCandidates].sort((x, y) => compareCandidates(x.c, y.c, x.i - y.i));
+  const ranked = [...validCandidates].sort((x, y) => compareByPriority(x.c, y.c) || x.i - y.i);
   const rankOf = new Map(ranked.map(({ c }, idx) => [c.uid, idx]));
 
   const next: PrioritySlotCell[] = Array.from({ length: n }, (_, i) => prevSlots[i] ?? null);
@@ -147,23 +157,38 @@ export function assignPrioritySlots(
   };
   preempt();
 
-  // 左靠齊：跟 sticky-pool 一致，避免中間留空洞；同 uid 換位置不算身分變更，
-  // 由呼叫端依 uid 是否相同決定要不要用位移動畫（見 GroupCanvasRenderer）
-  const occupied = next.filter((c): c is NonNullable<PrioritySlotCell> => c !== null);
-  const compacted: PrioritySlotCell[] = [
-    ...occupied,
+  // 排列步驟。keep：維持選取後的格位，只左靠齊；priority：依優先程度重排，
+  // 同分時上一輪在前的維持在前（prevSlots 的索引），新進的排在同分既有項目之後。
+  const occupied = next
+    .map((cell, idx) => ({ cell, idx }))
+    .filter((x): x is { cell: NonNullable<PrioritySlotCell>; idx: number } => x.cell !== null);
+  if (arrange === 'priority') {
+    const prevIndex = new Map<string, number>();
+    prevSlots.forEach((cell, i) => { if (cell) prevIndex.set(cell.uid, i); });
+    const origOrder = new Map(validCandidates.map(({ c, i }) => [c.uid, i]));
+    occupied.sort((x, y) => {
+      const byPriority = compareByPriority(byUid.get(x.cell.uid)!, byUid.get(y.cell.uid)!);
+      if (byPriority !== 0) return byPriority;
+      const px = prevIndex.get(x.cell.uid) ?? Number.POSITIVE_INFINITY;
+      const py = prevIndex.get(y.cell.uid) ?? Number.POSITIVE_INFINITY;
+      if (px !== py) return px - py;
+      return (origOrder.get(x.cell.uid) ?? 0) - (origOrder.get(y.cell.uid) ?? 0);
+    });
+  }
+  const arranged: PrioritySlotCell[] = [
+    ...occupied.map(x => x.cell),
     ...Array.from({ length: n - occupied.length }, () => null),
   ];
+
+  // 身分變更一律跟上一輪比：同一個 uid 只是換位置，在新位置上仍會被標記（該索引的
+  // 身分確實變了），但呼叫端依 uid 渲染時那是位移，不是換卡。
+  changedIndices.length = 0;
   for (let i = 0; i < n; i++) {
-    const beforeUid = next[i]?.uid ?? null;
-    const afterUid = compacted[i]?.uid ?? null;
-    if (beforeUid !== afterUid && !changedIndices.includes(i)) {
-      changedIndices.push(i);
-    }
+    if ((prevSlots[i]?.uid ?? null) !== (arranged[i]?.uid ?? null)) changedIndices.push(i);
   }
 
-  const finalShown = new Set(compacted.filter((c): c is NonNullable<PrioritySlotCell> => c !== null).map(c => c.uid));
+  const finalShown = new Set(occupied.map(x => x.cell.uid));
   const pendingCount = validCandidates.filter(({ c }) => !finalShown.has(c.uid)).length;
 
-  return { slots: compacted, changedIndices: [...new Set(changedIndices)].sort((a, b) => a - b), pendingCount };
+  return { slots: arranged, changedIndices, pendingCount };
 }

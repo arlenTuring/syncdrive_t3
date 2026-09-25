@@ -1053,6 +1053,8 @@ export interface GroupSortRule {
   direction: 'asc' | 'desc';
 }
 
+export type GroupArrangeMode = 'priority' | 'keep';
+
 /** 樣板選擇條件：規則之間為 AND，條件全部符合才選用此樣板。 */
 export interface GroupTemplateCondition {
   field: string;
@@ -1118,6 +1120,12 @@ export interface GenericGroupConfig {
   sortRules?: GroupSortRule[];
   /** 同優先程度的新項目預設不搶占目前顯示中的項目，避免畫面抖動 */
   preemptEqualPriority?: boolean;
+  /**
+   * 可見項目選定後怎麼排列：
+   * - priority（預設）：優先程度高者在前，同優先依次排序，再相同維持目前位置
+   * - keep：保留既有位置，只把空格往左補齊
+   */
+  arrangeMode?: GroupArrangeMode;
   templates?: GroupTemplateDef[];
   capacityConfig?: GroupCapacityConfig;
   transitionConfig?: GroupTransitionConfig;

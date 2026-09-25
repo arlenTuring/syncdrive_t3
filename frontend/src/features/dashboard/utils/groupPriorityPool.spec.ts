@@ -113,6 +113,54 @@ describe('assignPrioritySlots', () => {
     expect(round2.changedIndices).toEqual([0]);
   });
 
+  describe('排列步驟', () => {
+    const fiveLow = () => ['M-1', 'M-2', 'M-3', 'M-4', 'M-5'].map(uid => candidate(uid, 50));
+
+    it('驗收：先顯示五張低優先卡，加入高優先卡後排到第一張（有空格時）', () => {
+      const round1 = assignPrioritySlots(empty(6), fiveLow(), 6);
+      expect(round1.slots.map(s => s?.uid ?? null)).toEqual(['M-1', 'M-2', 'M-3', 'M-4', 'M-5', null]);
+
+      const round2 = assignPrioritySlots(round1.slots, [...fiveLow(), candidate('X-1', 100)], 6);
+      expect(round2.slots.map(s => s?.uid ?? null)).toEqual(['X-1', 'M-1', 'M-2', 'M-3', 'M-4', 'M-5']);
+    });
+
+    it('驗收：滿位時高優先卡搶占後同樣排到第一張，其餘維持原相對順序', () => {
+      const round1 = assignPrioritySlots(empty(5), fiveLow(), 5);
+      const round2 = assignPrioritySlots(round1.slots, [...fiveLow(), candidate('X-1', 100)], 5);
+      expect(round2.slots.map(s => s?.uid)).toEqual(['X-1', 'M-1', 'M-2', 'M-3', 'M-4']);
+      expect(round2.pendingCount).toBe(1);
+    });
+
+    it('驗收：修改既有卡片的優先程度立即重新排列', () => {
+      const round1 = assignPrioritySlots(empty(5), fiveLow(), 5);
+      const bumped = fiveLow().map(c => (c.uid === 'M-4' ? { ...c, priority: 90 } : c));
+      const round2 = assignPrioritySlots(round1.slots, bumped, 5);
+      expect(round2.slots.map(s => s?.uid)).toEqual(['M-4', 'M-1', 'M-2', 'M-3', 'M-5']);
+    });
+
+    it('同優先維持上一輪位置，不因候選陣列順序改變而互換', () => {
+      const round1 = assignPrioritySlots(empty(3), [candidate('A', 5), candidate('B', 5), candidate('C', 5)], 3);
+      const round2 = assignPrioritySlots(round1.slots, [candidate('C', 5), candidate('B', 5), candidate('A', 5)], 3);
+      expect(round2.slots.map(s => s?.uid)).toEqual(['A', 'B', 'C']);
+      expect(round2.changedIndices).toEqual([]);
+    });
+
+    it('同優先依次排序；降冪對字串也有效', () => {
+      const cs = [
+        candidate('A', 5, { sortKey: '01:30', sortDesc: true }),
+        candidate('B', 5, { sortKey: '02:00', sortDesc: true }),
+        candidate('C', 5, { sortKey: '00:00', sortDesc: true }),
+      ];
+      expect(assignPrioritySlots(empty(3), cs, 3).slots.map(s => s?.uid)).toEqual(['B', 'A', 'C']);
+    });
+
+    it("arrange='keep' 保留既有位置，只左靠齊", () => {
+      const round1 = assignPrioritySlots(empty(6), fiveLow(), 6, { arrange: 'keep' });
+      const round2 = assignPrioritySlots(round1.slots, [...fiveLow(), candidate('X-1', 100)], 6, { arrange: 'keep' });
+      expect(round2.slots.map(s => s?.uid ?? null)).toEqual(['M-1', 'M-2', 'M-3', 'M-4', 'M-5', 'X-1']);
+    });
+  });
+
   it('容量大於資料筆數時保留空格（呼叫端另決定 overflowFill 撐滿或留空，這裡本身不硬撐）', () => {
     const result = assignPrioritySlots(empty(5), [candidate('A-1', 1), candidate('A-2', 1)], 5);
     expect(result.slots.filter(Boolean).length).toBe(2);
