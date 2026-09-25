@@ -109,9 +109,13 @@ function build(
     find: jest.fn().mockResolvedValue(existingOrderIds.map((id) => ({ id }))),
   };
 
+  const maintenanceTaskService = {
+    getTaskDetail: jest.fn().mockRejectedValue(new Error('not used')),
+  };
   const engine = new DispatchEngineService(
     shiftService as never,
     orderService as never,
+    maintenanceTaskService as never,
     vehicleRepository as never,
     orderRepository as never,
   );

@@ -45,6 +45,8 @@ const YARD_TASK_TYPES = new Set([
 
 export type YardTask = {
   blockId: string;
+  /** 班表卡的任務類型（charging、inspection、servicing、standby、idle），原封保留 */
+  taskType: string;
   timelineRow: number;
   /** 供 order_id 使用的短碼，同一份班表內穩定 */
   tripCode: string;
@@ -171,6 +173,7 @@ export function extractYardTasks(body: Record<string, unknown>): {
 
       tasks.push({
         blockId,
+        taskType,
         timelineRow: row,
         tripCode: buildTripCode(yardSlotId, row, startMinute),
         cardLabel: str(block.source) === 'hold'

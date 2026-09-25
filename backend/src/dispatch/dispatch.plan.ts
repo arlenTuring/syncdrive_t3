@@ -30,6 +30,10 @@ export type PlannedDispatch = {
     typeLabel: string;
     typeBg: string;
     typeColor: string;
+    /** 班表卡原本的任務類型（charging…）；車端靠它判斷作業內容，不看卡片文字 */
+    taskType: string;
+    /** 充電作業參數；只有充電卡才有，其餘為 null */
+    charging: ChargingSpec | null;
   } | null;
   /** 協議 §三：[YYMMDD]-[trip_code] */
   orderId: string;
@@ -50,6 +54,21 @@ export type PlannedDispatch = {
   destination: DispatchPoint | null;
   /** 完整站序，含各站計畫時刻。空車移動為空陣列。 */
   stations: DispatchStation[];
+};
+
+/**
+ * 充電作業參數，取自班表綁定的整備任務（充電步驟的設備列與上限）。
+ *
+ * 設定缺漏時仍然下單（整備佔格位照常），但把原因寫進 <code>error</code>，
+ * 車端看到就明確回報「無法充電」，不自己猜一個速率。
+ */
+export type ChargingSpec = {
+  equipmentCode: string;
+  rateKwhPerMin: number | null;
+  /** 充電上限（%）；未啟用上限偵測時為 100 */
+  upperLimitPercent: number;
+  maintenanceTaskId: string | null;
+  error: string | null;
 };
 
 /**
@@ -270,6 +289,8 @@ export function planYardMoves(args: {
         typeLabel: '調度',
         typeBg: '#422006',
         typeColor: '#FD9A00',
+        taskType: 'dispatch',
+        charging: null,
       },
       orderId: buildOrderId(move.tripCode, departAt),
       tripCode: move.tripCode,
@@ -304,11 +325,13 @@ export function planYardTasks(args: {
   tasks: YardTask[];
   fleet: readonly string[];
   reference: number;
+  /** 依格位代號查充電參數；呼叫端從班表綁定的整備任務建好 */
+  chargingFor?: (yardSlotId: string) => ChargingSpec;
 }): {
   planned: PlannedDispatch[];
   skipped: Array<{ tripCode: string; reason: string }>;
 } {
-  const { tasks, fleet, reference } = args;
+  const { tasks, fleet, reference, chargingFor } = args;
   const midnight = localMidnight(reference);
 
   const planned: PlannedDispatch[] = [];
@@ -339,6 +362,16 @@ export function planYardTasks(args: {
         typeLabel: task.maintTypeLabel,
         typeBg: task.maintTypeBg,
         typeColor: task.maintTypeColor,
+        taskType: task.taskType,
+        charging: task.taskType === 'charging'
+          ? chargingFor?.(task.yardSlotId) ?? {
+              equipmentCode: task.yardSlotId,
+              rateKwhPerMin: null,
+              upperLimitPercent: 100,
+              maintenanceTaskId: null,
+              error: '調度引擎沒有提供充電參數',
+            }
+          : null,
       },
       orderId: buildOrderId(task.tripCode, departAt),
       tripCode: task.tripCode,

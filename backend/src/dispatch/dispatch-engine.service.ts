@@ -22,6 +22,8 @@ import {
 } from './dispatch.plan';
 import { extractYardMoves } from './dispatch.yard-moves';
 import { extractYardTasks } from './dispatch.yard-tasks';
+import { buildChargingLookup, maintenancePayloadFields } from './dispatch.charging';
+import { MaintenanceTaskService } from '../maintenance-task/maintenance-task.service';
 
 /**
  * 即時調度引擎。
@@ -85,6 +87,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly operationShiftService: OperationShiftService,
     private readonly orderService: OrderService,
+    private readonly maintenanceTaskService: MaintenanceTaskService,
     @InjectRepository(Vehicle)
     private readonly vehicleRepository: Repository<Vehicle>,
     @InjectRepository(OperationOrder)
@@ -190,6 +193,9 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       tasks: rawTasks.tasks,
       fleet,
       reference,
+      chargingFor: rawTasks.tasks.some((task) => task.taskType === 'charging')
+        ? await this.chargingLookupFor(deployed.body)
+        : undefined,
     });
 
     // 補齊只記了一端的移動卡，要在兩種來源合併之後做——缺的那一端通常在正線班次上
@@ -328,6 +334,20 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** 班表綁定的整備任務 → 充電參數查詢表。取不到就讓每張充電單都帶著原因。 */
+  private async chargingLookupFor(body: Record<string, unknown>) {
+    const taskId = typeof body.maintenanceTaskId === 'string' ? body.maintenanceTaskId.trim() : '';
+    if (!taskId) return buildChargingLookup(null);
+    try {
+      const task = await this.maintenanceTaskService.getTaskDetail(taskId);
+      return buildChargingLookup({ id: task.task_id, body: task.body });
+    } catch (err) {
+      const reason = `找不到班表綁定的整備任務 ${taskId}：${(err as Error).message}`;
+      this.logger.warn(reason);
+      return buildChargingLookup(null, reason);
+    }
+  }
+
   /**
    * 真的下一張訂單。
    *
@@ -364,9 +384,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         source: 'dispatch_engine',
         kind: item.kind,
         // 整備分佈的 SQL 讀 payload->>'yard_slot_id' 判斷哪一格被佔著
-        ...(item.maintenance
-          ? { yard_slot_id: item.maintenance.yardSlotId }
-          : {}),
+        ...maintenancePayloadFields(item.maintenance),
         shift_id: shiftId,
         shift_name: shiftName,
         timeline_row: item.timelineRow,

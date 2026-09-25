@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { maintenancePayloadFields } from './dispatch.charging';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DispatchEngineService } from './dispatch-engine.service';
 
@@ -58,6 +59,7 @@ export class DispatchController {
               origin_point: item.origin,
               destination_point: item.destination,
               stations: item.stations,
+              maintenance: maintenancePayloadFields(item.maintenance),
             }
           : {}),
       })),
