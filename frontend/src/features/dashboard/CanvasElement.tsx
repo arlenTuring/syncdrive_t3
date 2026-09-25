@@ -706,6 +706,7 @@ export function CanvasElement({
               zoomFactor={element.zoomFactor ?? 1.35}
               vehicleTemplate={vehicleTemplate}
               isEditMode={isEditMode}
+              vehicleRoofIndicator={element.vehicleRoofIndicator ?? null}
             />
           </div>
         )}

@@ -97,6 +97,8 @@ type MapAreaCanvasProps = {
   vehicleFitMode?: 'contain' | 'stretch'
   /** 載具樣板作動行為設定 */
   vehicleBehavior?: import('../../dashboard/elements/MapVehicleBehaviorOverlay').MapVehicleBehaviorConfig
+  /** 車頂軌道進度指標設定 */
+  vehicleRoofIndicator?: import('../vehicles/vehicleRoofIndicator').VehicleRoofIndicatorConfig | null
   /** 圖台車輛座標／heading 等除錯標籤 */
   showVehicleTelemetry?: boolean
   /** 儀表板編輯：載具顯示校準框（地圖像素座標，與載具同層） */
@@ -244,6 +246,7 @@ export function MapAreaCanvas({
   routes,
   vehicleFitMode = 'contain',
   vehicleBehavior,
+  vehicleRoofIndicator,
   showVehicleTelemetry = true,
   vehicleEditSizer = null,
   slotPreview = null,
@@ -911,6 +914,7 @@ export function MapAreaCanvas({
                 vehicleFitMode={vehicleFitMode}
                 routes={routes}
                 vehicleBehavior={vehicleBehavior}
+                roofIndicator={vehicleRoofIndicator}
                 vehicleEditSizer={vehicleEditSizer}
                 livePositionTweenMs={livePositionTweenMsProp ?? (isEmbedded ? 1200 : 0)}
               />

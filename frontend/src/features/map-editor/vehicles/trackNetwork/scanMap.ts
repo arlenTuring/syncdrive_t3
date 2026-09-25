@@ -8,7 +8,8 @@ import {
 import { buildTrackGenIndex } from '../../utils/trackGenLocate';
 import type { TrackNetwork, TrackNetworkSegment } from './types';
 
-function trackCodeFromFacility(track: FacilityObject): string | null {
+/** 軌道名稱：自訂名稱優先，沒有就用 segmentId（跟定位網路註冊的代號同一套規則） */
+export function trackCodeFromFacility(track: FacilityObject): string | null {
   const fromName = track.customName?.trim();
   if (fromName) return fromName;
   const segId = track.parameters?.segmentId;

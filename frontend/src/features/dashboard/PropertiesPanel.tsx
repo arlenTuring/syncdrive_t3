@@ -44,6 +44,7 @@ import {
 import { IconImageField } from './components/IconImageField';
 import { DualCanvasSettings } from './components/DualCanvasSettings';
 import { GenericGroupSettings } from './components/GenericGroupSettings';
+import { VehicleRoofIndicatorSettings } from './components/VehicleRoofIndicatorSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
@@ -1687,6 +1688,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           </p>
         </div>
       )}
+
+      {isMap && <VehicleRoofIndicatorSettings el={el} onUpdate={onUpdate} />}
 
       <div className="grid grid-cols-2 gap-2">
         <Field label="X"><NumberInput value={el.x} onChange={n => onUpdate({ x: n })} className={inputCls} /></Field>

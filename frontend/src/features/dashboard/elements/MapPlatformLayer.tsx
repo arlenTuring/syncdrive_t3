@@ -25,6 +25,7 @@ export function MapPlatformLayer({
   showVehicleTelemetry = false,
   vehicleTemplate = null,
   isEditMode = false,
+  vehicleRoofIndicator = null,
 }: {
   mapId: string;
   /** @deprecated 嵌入模式固定依容器等比顯示，不再使用縮放滑桿 */
@@ -36,6 +37,8 @@ export function MapPlatformLayer({
   /** 載具容器定義的樣板（套用至所有即時車輛） */
   vehicleTemplate?: MapVehicleTemplateConfig | null;
   isEditMode?: boolean;
+  /** 車頂軌道進度指標設定（圖台元件上存的那一份） */
+  vehicleRoofIndicator?: import('../../map-editor/vehicles/vehicleRoofIndicator').VehicleRoofIndicatorConfig | null;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [areas, setAreas] = useState<MapAreaObject[]>([]);
@@ -171,6 +174,7 @@ export function MapPlatformLayer({
               }
             : undefined
         }
+        vehicleRoofIndicator={vehicleRoofIndicator}
         viewportRef={viewportRef}
       />
     </div>

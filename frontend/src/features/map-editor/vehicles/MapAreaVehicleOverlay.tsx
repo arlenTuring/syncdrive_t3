@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import {
   buildStationMileageIndex,
@@ -13,10 +13,17 @@ import {
   rotateDegForDrawnDirection,
 } from './resolveVehicleTrackPlacement';
 import {
-  ALONG_CELLS,
   quantisedTrackCellPlacement,
   TRACK_HALF_WIDTH_M,
 } from './quantisedTrackCell';
+import { trackCodeFromFacility } from './trackNetwork/scanMap';
+import {
+  passageProgress,
+  resolveRoofIndicatorConfig,
+  type TrackPassageState,
+  type VehicleRoofIndicatorConfig,
+} from './vehicleRoofIndicator';
+import { VehicleTrackProgressBadge } from './VehicleTrackProgressBadge';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
@@ -207,6 +214,7 @@ export function MapAreaVehicleOverlay({
   vehicleBehavior,
   vehicleEditSizer = null,
   livePositionTweenMs = 0,
+  roofIndicator,
 }: {
   areas: MapAreaObject[];
   vehicles: AreaVehicleLive[];
@@ -235,7 +243,12 @@ export function MapAreaVehicleOverlay({
    * 讓 1Hz 的遙測座標在兩幀之間平滑滑動（避免「一格一格跳」）。0 表示即時定位（編輯器用）。
    */
   livePositionTweenMs?: number;
+  /** 車頂軌道進度指標的外觀與顯示項目（存在儀表板圖台元件上） */
+  roofIndicator?: VehicleRoofIndicatorConfig | null;
 }) {
+  const roofConfig = useMemo(() => resolveRoofIndicatorConfig(roofIndicator), [roofIndicator]);
+  /** 每台車目前這一次通行的方向（只在記憶體；換軌道就重新判斷） */
+  const passageRef = useRef(new Map<string, TrackPassageState>());
   /*
    * 定位用的區域：交叉軌道換成各分支（斜行、直行各自一條中心線），見 crossBranches。
    * 之後所有查詢（挑塊、走廊、里程、畫面座標）都吃這一份，才會對到同一組軌道 id。
@@ -702,84 +715,53 @@ export function MapAreaVehicleOverlay({
         const lowConfidence =
           uncertain ||
           (!offCentre && network?.confidence !== undefined && network.confidence < LOW_CONFIDENCE);
-        const cellBadge = quantised ? (
-          <div
-            key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
-            className="pointer-events-none absolute flex items-center gap-2 rounded px-2 py-[2px] font-mono text-[18px] leading-none text-white"
-            style={{
-              left: badgeCenterX,
-              top: badgeTopY,
-              zIndex: zIndex + 1,
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
-              // 自己往左半個、往上整個——貼在車的正上方置中
-              transform: 'translate(-50%, -100%)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {/*
-              進度條，不是「現在在第幾格」。
-              走完一格那一格就整格填滿，正在走的那一格照比例填——一格一格跳看不出
-              走到哪裡，也分不出剛進這一格還是快走完。
-
-              方向照<strong>行車方向</strong>，不是折線的記錄順序：折線方向是圖資
-              生成時決定的，上行整排跟行車方向相反，照折線畫的話進度條會從第四格
-              倒退回第一格。
-            */}
-            <span className="flex gap-[2px]" aria-hidden>
-              {Array.from({ length: ALONG_CELLS }, (_, i) => {
-                const fill = Math.min(
-                  1,
-                  Math.max(0, quantised.alongTravel * ALONG_CELLS - i),
-                );
-                return (
-                  <span
-                    key={i}
-                    className="relative inline-block h-[10px] w-[6px] overflow-hidden rounded-[2px]"
-                    style={{ backgroundColor: 'rgba(148, 163, 184, 0.35)' }}
-                  >
-                    <span
-                      className="absolute left-0 top-0 h-full"
-                      style={{
-                        width: `${fill * 100}%`,
-                        backgroundColor: 'rgb(103, 232, 249)',
-                      }}
-                    />
-                  </span>
-                );
-              })}
-            </span>
-            {/*
-              數值歸數值、位置歸位置。
-              畫在哪一格是為了讓車固定大小、看得出在這一塊的哪一段；但「走到幾成」
-              與「偏離中心線多少」是現場的事實，照原樣顯示，不跟著格化。
-            */}
-            {/*
-              把握不高的時候標出來。位置是猜的（分岔口、上下行只差三公尺）就不能讓
-              這個數字看起來像事實——偏差是相對「選中的那條中心線」算的，選錯了數字
-              就跟著錯。
-            */}
-            <span
-              title={
-                lowConfidence
-                  ? `定位不確定（把握 ${Math.round((network?.confidence ?? 0) * 100)}%${network?.headingConflict ? '，車頭與軌道方向矛盾' : ''}）：可能判給了旁邊的軌道`
-                  : offCentre
-                    ? `離中心線 ${network?.distanceM?.toFixed(1) ?? '?'} 公尺：座標本身就不在這條軌道上`
-                    : undefined
-              }
-              className={
-                lowConfidence
-                  ? 'text-amber-200'
-                  : offCentre
-                    ? 'text-rose-300'
-                    : 'text-zinc-300'
-              }
+        /*
+         * 車頂軌道進度：名稱與進度都取自同一條判給的軌道（displayFacility），不另外
+         * 依座標查附近的名稱。停在格位（沒有 quantised）不畫；把握不高只寫「定位未確認」。
+         */
+        let cellBadge: ReactElement | null = null;
+        if (quantised && displayFacility && roofConfig.enabled) {
+          const rawAlong = quantised.reversed ? 1 - quantised.alongTravel : quantised.alongTravel;
+          const passage = passageProgress(
+            passageRef.current.get(vehicle.vehicleId),
+            displayFacility.id,
+            rawAlong,
+            quantised.reversed,
+          );
+          passageRef.current.set(vehicle.vehicleId, passage.state);
+          const offsetM = network && Number.isFinite(network.offsetM) ? network.offsetM : null;
+          cellBadge = (
+            <div
+              key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
+              className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
+              style={{
+                left: badgeCenterX,
+                top: badgeTopY,
+                zIndex: zIndex + 1,
+                backgroundColor: roofConfig.backgroundColor,
+                // 自己往左半個、往上整個——貼在車的正上方置中；不隨車身旋轉
+                transform: 'translate(-50%, -100%)',
+                whiteSpace: 'nowrap',
+              }}
             >
-              {lowConfidence ? '≈' : ''}
-              {fixRatio >= 0 ? '+' : '−'}
-              {Math.abs(fixRatio * 100).toFixed(0)}%
-            </span>
-          </div>
-        ) : null;
+              <VehicleTrackProgressBadge
+                config={roofConfig}
+                trackName={trackCodeFromFacility(displayFacility)}
+                progress={passage.progress}
+                offsetM={offsetM}
+                offTrack={offCentre}
+                unconfirmed={lowConfidence}
+                title={
+                  lowConfidence
+                    ? `定位不確定（把握 ${Math.round((network?.confidence ?? 0) * 100)}%${network?.headingConflict ? '，車頭與軌道方向矛盾' : ''}）：可能判給了旁邊的軌道`
+                    : offCentre
+                      ? `離中心線 ${network?.distanceM?.toFixed(1) ?? '?'} 公尺：座標本身就不在這條軌道上`
+                      : undefined
+                }
+              />
+            </div>
+          );
+        }
 
         const coordLabel = showMqttCoords ? (
           <MapVehicleMqttCoordLabel

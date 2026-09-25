@@ -1163,6 +1163,8 @@ export interface CanvasElementProps {
   vehicleDisplayWidthPx?: number;
   /** 圖台容器：載具縱向顯示尺寸（px，垂直軌道方向） */
   vehicleDisplayHeightPx?: number;
+  /** 圖台容器：車頂軌道進度指標（名稱、進度、偏移）的顯示項目與外觀 */
+  vehicleRoofIndicator?: import('../map-editor/vehicles/vehicleRoofIndicator').VehicleRoofIndicatorConfig;
   /**
    * overlay：疊在群組下方的輔助畫布（如空狀態）；未選取時點擊穿透至下層群組
    */

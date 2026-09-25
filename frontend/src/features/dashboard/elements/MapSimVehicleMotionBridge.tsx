@@ -1,6 +1,7 @@
 /**
  * 隔離 sim 時鐘 extrapolation：僅此子樹隨 ~20fps tick 重繪，不拖動 MapPlatformLayer 上層。
  */
+import type { VehicleRoofIndicatorConfig } from '../../map-editor/vehicles/vehicleRoofIndicator';
 import { memo } from 'react';
 import { MapAreaCanvas } from '../../map-editor/components/MapAreaCanvas';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
@@ -27,6 +28,7 @@ export type MapSimVehicleMotionBridgeProps = {
   vehicleDisplayHeightPx: number;
   routes?: readonly MapPlannedRoute[];
   vehicleBehavior?: MapVehicleBehaviorConfig;
+  vehicleRoofIndicator?: VehicleRoofIndicatorConfig | null;
   viewportRef: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -45,6 +47,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
   vehicleDisplayHeightPx,
   routes,
   vehicleBehavior,
+  vehicleRoofIndicator,
   viewportRef,
 }: MapSimVehicleMotionBridgeProps) {
   const areaVehicles = useSimExtrapolatedVehicles(vehiclesRaw, {
@@ -75,6 +78,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
       vehicleFitMode="stretch"
       routes={routes}
       vehicleBehavior={vehicleBehavior}
+      vehicleRoofIndicator={vehicleRoofIndicator}
       vehicleEditSizer={null}
       slotPreview={null}
       onSelectArea={() => {}}
