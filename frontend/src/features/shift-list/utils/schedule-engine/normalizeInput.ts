@@ -1668,6 +1668,16 @@ function assignDirectionalDepartures(args: {
         // 這一趟的錨點是依「這一條路線的佔用秒數」算出來的；記下來讓指派階段
         // 照著走，不要各自重新推導出另一條（見 ScheduleTask 的欄位說明）。
         plannedRouteInstanceId: resolveSelectedRouteInstanceId(leg.route),
+        // 交路識別／起班時刻／來源時段／班距目標：同一輪展開的每一腿都記同一個
+        // 起班脈衝（departure），不是各腿自己再重查一次時段——見 ScheduleTask
+        // 的欄位說明；班距檢查／修復拿這個當基準，不解析 id 猜。
+        cycleChainId: `cycle-${chosenRow}-${chosenStartSecond}`,
+        cycleOriginSecond: chosenStartSecond,
+        cycleOriginIntervalId: departure.intervalId,
+        // 用「這一脈跟上一脈真正要守住的間隔」，不是單純新時段的 headwaySeconds——
+        // 跨時段的第一脈已經用 max(舊班距,新班距) 頂起來，記下來那個較嚴值，
+        // 後面班距檢查／修復才不會誤以為只要守住新時段自己的班距就好。
+        cycleHeadwayTargetSeconds: departure.requiredGapFromPreviousSeconds,
       });
       trackedLegs.push({
         taskIndex: finalTaskIndex,

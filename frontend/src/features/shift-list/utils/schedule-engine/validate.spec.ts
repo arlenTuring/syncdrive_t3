@@ -7,7 +7,9 @@ import type {
   GeneratedScheduleBlock,
   GeneratedSchedulePlan,
 } from './types';
+import type { TimeSlotAttribute, TimeSlotInterval } from '../../../time-templates/types/editor';
 import {
+  validatePassengerHeadway,
   validateRouteSuccessorContinuity,
   validateRouteSwitchBuffers,
   validateStationTimingsWithinBlocks,
@@ -353,5 +355,74 @@ describe('validateTimelineOverlaps', () => {
     validateTimelineOverlaps(plan([first, second]), errors);
 
     expect(errors.map((issue) => issue.code)).toContain('TIMELINE_OVERLAP');
+  });
+});
+
+describe('validatePassengerHeadway：班距目標優先用交路來源，不用當下時刻硬查', () => {
+  // 00:00–00:10 班距 300 秒（疏），00:10–00:40 班距 180 秒（密）
+  const intervals: TimeSlotInterval[] = [
+    { id: 'interval-a', attributeId: 'attr-300', name: '前段', startTime: '00:00', endTime: '00:10', isDraft: false },
+    { id: 'interval-b', attributeId: 'attr-180', name: '後段', startTime: '00:10', endTime: '00:40', isDraft: false },
+  ];
+  const attributes: TimeSlotAttribute[] = [
+    { id: 'attr-300', name: '疏', color: '#0f0', headwaySeconds: 300, capacityPphpd: 300, isDraft: false },
+    { id: 'attr-180', name: '密', color: '#00f', headwaySeconds: 180, capacityPphpd: 500, isDraft: false },
+  ];
+  const selected = route('r1', 'route-1', 'R1', 'P1', 'P2');
+  const routeById = new Map([['route-1', selected]]);
+
+  it('後車自己交路起班當下的班距目標若已滿足，就算跨時段、就算比 max(舊,新) 小也不報警——不是誤判邊界', () => {
+    const errors: FeasibilityIssue[] = [];
+    const warnings: FeasibilityIssue[] = [];
+    const earlier = block('earlier', selected, 0); // 00:00，前段（300s）
+    const later = {
+      ...block('later', selected, 200 / 60), // 200 秒後＝00:03:20
+      cycleChainId: 'chain-2',
+      cycleOriginIntervalId: 'interval-b',
+      cycleHeadwayTargetSeconds: 180,
+    };
+    // 間隔 200 秒：< max(300,180)=300（舊邏輯會誤報），但 ≥ 後車自己交路的門檻 180
+    validatePassengerHeadway([earlier, later], intervals, attributes, routeById, errors, warnings);
+    expect(warnings.filter((w) => w.code === 'HEADWAY_BELOW_TARGET')).toEqual([]);
+  });
+
+  it('兩班交路都在同一時段起班，真的低於門檻：分類成同時段擠壓，訊息不提「跨時段」', () => {
+    const errors: FeasibilityIssue[] = [];
+    const warnings: FeasibilityIssue[] = [];
+    const earlier = {
+      ...block('earlier', selected, 20), // 00:20，後段
+      cycleChainId: 'chain-1',
+      cycleOriginIntervalId: 'interval-b',
+      cycleHeadwayTargetSeconds: 180,
+    };
+    const later = {
+      ...block('later', selected, 20 + 100 / 60), // 100 秒後
+      cycleChainId: 'chain-2',
+      cycleOriginIntervalId: 'interval-b',
+      cycleHeadwayTargetSeconds: 180,
+    };
+    validatePassengerHeadway([earlier, later], intervals, attributes, routeById, errors, warnings);
+    const issue = warnings.find((w) => w.code === 'HEADWAY_BELOW_TARGET');
+    assert.ok(issue, '同時段內真的擠太近，應該報警');
+    expect((issue!.detail as { originClassification: string }).originClassification).toEqual(
+      'crossChainSameInterval',
+    );
+    assert.ok(
+      issue!.message.includes('同一時段') && !issue!.message.includes('取較嚴者'),
+      `應該明說是同時段排太擠，不是套用舊版「取較嚴者」的邊界說法：${issue!.message}`,
+    );
+  });
+
+  it('沒有交路來源資料（手動製作／舊產物）：退回舊的「跨時段取較嚴者」邏輯', () => {
+    const errors: FeasibilityIssue[] = [];
+    const warnings: FeasibilityIssue[] = [];
+    const earlier = block('earlier', selected, 8); // 00:08，前段
+    const later = block('later', selected, 8 + 200 / 60); // 200 秒後，跨進後段
+    // 間隔 200 秒 < max(300,180)=300，兩邊都沒有交路來源欄位 → 退回舊邏輯，一樣報警
+    validatePassengerHeadway([earlier, later], intervals, attributes, routeById, errors, warnings);
+    const issue = warnings.find((w) => w.code === 'HEADWAY_BELOW_TARGET');
+    assert.ok(issue, '沒有交路來源資料時應沿用舊邏輯，跨時段間隔不足要報警');
+    expect((issue!.detail as { originClassification: string }).originClassification).toEqual('legacy');
+    assert.ok(issue!.message.includes('取較嚴者'), `應該是舊版「取較嚴者」說法：${issue!.message}`);
   });
 });

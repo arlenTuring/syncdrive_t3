@@ -257,4 +257,92 @@ describe('repairRouteHeadwaysBelowTarget', () => {
       `Pass B must not create new upstream deficit, got ${upstreamGapSec}s vs target 400s`,
     );
   });
+
+  it('Pass B 不把同一台車拉進它自己前一件非正線任務（調度移動）還沒做完的時段', () => {
+    const tn = route('tn');
+    // p@0s（上游，離 a 1000s，遠超 400s 目標＝有 600s 既有餘裕，理論上 Pass B 可借）。
+    // row2：a 前面緊接一張「調度移動」400s–490s，a@500s——車 490s 才做完調度移動，
+    // 500s 這個發車時刻本身已經很勉強（只留 10s 恢復），不能再往前拉。
+    // b@560s（缺 400-60=340s）；b 同列下一班 740s 頂住，Pass A 只推得到 530s，
+    // 缺口交給 Pass B：若沒看到 a 前面的調度移動，Pass B 會借上游的 600s 餘裕把 a
+    // 拉到 400s——落在調度移動 400s–490s 裡面，車根本不可能同時在調度又發車。
+    const dispatch = {
+      ...block('dispatch', 2, 400 / 60),
+      taskType: 'dispatch' as const,
+      source: 'transition' as const,
+      routeId: undefined,
+      routeCode: undefined,
+      routeName: undefined,
+      routeInstanceId: undefined,
+      plannedEndMinute: 490 / 60,
+    };
+    const timelines = [
+      { row: 1, blocks: [block('p', 1, 0)] },
+      { row: 2, blocks: [dispatch, block('a', 2, 500 / 60)] },
+      {
+        row: 3,
+        blocks: [
+          block('b', 3, 560 / 60),
+          block('b-next', 3, 740 / 60),
+        ],
+      },
+    ];
+    const repaired = repairRouteHeadwaysBelowTarget({
+      timelines,
+      selectedRoutes: [tn],
+      minimumRecoveryTimeSeconds: 30,
+      ...attrs(400),
+    });
+    const blocks = repaired.flatMap((t) => t.blocks);
+    const a = blocks.find((b) => b.id === 'a')!;
+    const dispatchAfter = blocks.find((b) => b.id === 'dispatch')!;
+
+    assert.ok(
+      dispatchAfter.plannedEndMinute * 60 <= a.plannedStartMinute * 60 + 1e-6,
+      `a 不能早於它自己的調度移動做完：dispatch 到 ${dispatchAfter.plannedEndMinute * 60}s，`
+      + `a 卻排在 ${a.plannedStartMinute * 60}s`,
+    );
+    assert.ok(
+      a.plannedStartMinute * 60 >= 490 - 1e-6,
+      `a 不該被 Pass B 拉進調度移動時段裡，實際排到 ${a.plannedStartMinute * 60}s`,
+    );
+  });
+
+  it('Pass A 往後推發車前，也要驗延後造成來源站多待的那段——不能只驗到站那頭的窗', () => {
+    const tn = route('tn');
+    // b 用另一條路線（不同 routeId，起點同樣是 A，不受這條路線自己的班距處理影響，
+    // 求解過程中不會被推走）在 250s 發車，卡在這段加長的停留裡。
+    const other = route('other');
+    // earlier@0s；a 前面 50s–100s 有一件任務把它送到起點站 A，本來 110s 就發車
+    // （只在 A 待 10s）。目標班距 500s，要把 a 推到 500s 才夠——但這樣一來 a 會在
+    // A 多待到 100s→500s，390 秒的空檔。b 250s 發車落在這段加長的停留裡：
+    // a 若真的被推到 500s，兩台車 250s 前後都算「在 A」，這是
+    // projectProtectedBerthWindowsSeconds 只看 a 自己起點窄窗量不出來的。
+    const predecessor = {
+      ...block('pred-a', 1, 50 / 60),
+      taskType: 'dispatch' as const,
+      source: 'transition' as const,
+      routeId: undefined,
+      routeCode: undefined,
+      routeName: undefined,
+      routeInstanceId: undefined,
+      plannedEndMinute: 100 / 60,
+    };
+    const timelines = [
+      { row: 1, blocks: [predecessor, block('a', 1, 110 / 60)] },
+      { row: 2, blocks: [block('earlier', 2, 0)] },
+      { row: 3, blocks: [block('b', 3, 250 / 60, 'other')] },
+    ];
+    const repaired = repairRouteHeadwaysBelowTarget({
+      timelines,
+      selectedRoutes: [tn, other],
+      ...attrs(500),
+    });
+    const a = repaired.flatMap((t) => t.blocks).find((b) => b.id === 'a')!;
+    assert.equal(
+      a.plannedStartMinute,
+      110 / 60,
+      `a 延後會在來源站撞上 b，這次推不該成立，實際被推到 ${a.plannedStartMinute * 60}s`,
+    );
+  });
 });

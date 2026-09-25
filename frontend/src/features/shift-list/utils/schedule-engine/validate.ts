@@ -272,7 +272,14 @@ export function validatePassengerHeadway(
   // 不同方向（如上行 vs 下行）的發車交錯不構成班距違規
   const departuresByRoute = new Map<
     string,
-    { startSecond: number; routeId?: string; blockId: string }[]
+    {
+      startSecond: number;
+      routeId?: string;
+      blockId: string;
+      cycleChainId?: string;
+      cycleOriginIntervalId?: string;
+      cycleHeadwayTargetSeconds?: number;
+    }[]
   >();
   for (const block of blocks) {
     if (block.taskType !== 'passenger' || block.source !== 'template_bar') continue;
@@ -283,6 +290,9 @@ export function validatePassengerHeadway(
       startSecond: minuteToSecond(block.plannedStartMinute),
       routeId: block.routeId,
       blockId: block.id,
+      cycleChainId: block.cycleChainId,
+      cycleOriginIntervalId: block.cycleOriginIntervalId,
+      cycleHeadwayTargetSeconds: block.cycleHeadwayTargetSeconds,
     });
     departuresByRoute.set(key, list);
   }
@@ -302,7 +312,14 @@ export function validatePassengerHeadway(
 }
 
 function validateSameRouteHeadway(
-  departures: { startSecond: number; routeId?: string; blockId: string }[],
+  departures: {
+    startSecond: number;
+    routeId?: string;
+    blockId: string;
+    cycleChainId?: string;
+    cycleOriginIntervalId?: string;
+    cycleHeadwayTargetSeconds?: number;
+  }[],
   intervals: TimeSlotInterval[],
   attributes: TimeSlotAttribute[],
   routeById: Map<string, ShiftScheduleSelectedRoute>,
@@ -356,12 +373,24 @@ function validateSameRouteHeadway(
       });
     }
 
-    const headwayTarget = resolvePairHeadwaySeconds(
-      secondToMinute(current.startSecond),
-      secondToMinute(next.startSecond),
-      intervals,
-      attributes,
-    );
+    /**
+     * 班距目標優先用「後車自己交路起班當下」記下來的值（見 ScheduleTask／
+     * GeneratedScheduleBlock 的 cycleHeadwayTargetSeconds 說明）——那才是這一對
+     * 發車在生成當下真正被要求要守住的門檻：已在尖峰起班的交路，後續某一腿的時刻
+     * 就算被站位讓渡挪到跨過時段邊界，門檻仍是起班當時的尖峰班距，不必因為挪動
+     * 就改用離峰的較嚴門檻；新開交路本來就是照它起班當下的時段記下來，不需要另外
+     * 判斷「新舊」。兩班都拿不到這個欄位（手動製作／舊產物）才退回用當下時刻各自
+     * 查時段、取較嚴者的舊算法。
+     */
+    const originAware = next.cycleHeadwayTargetSeconds != null;
+    const headwayTarget = originAware
+      ? next.cycleHeadwayTargetSeconds!
+      : resolvePairHeadwaySeconds(
+          secondToMinute(current.startSecond),
+          secondToMinute(next.startSecond),
+          intervals,
+          attributes,
+        );
     if (headwayTarget != null && gapSeconds < headwayTarget) {
       const earlierHw = resolveHeadwaySecondsAtMinute(
         secondToMinute(current.startSecond),
@@ -382,13 +411,52 @@ function validateSameRouteHeadway(
           : deficitSeconds > 180
             ? 'severe'
             : 'moderate';
+      /**
+       * 依交路來源分類，不是全部套同一句策略說明：
+       * - sameChain：同一台車自己交路裡的兩腿（理論上罕見，多半是迴圈路線）。
+       * - crossChainSameInterval：兩台不同車，但都在同一個時段起班——真的是這個
+       *   時段本身排太擠，不是跨時段邊界造成的。
+       * - crossChainAcrossInterval：兩台不同車，交路分別起班於不同時段——用的是
+       *   後車自己起班當下的門檻，不是「取兩邊較嚴」；這對真的低於門檻，不是邊界
+       *   假象。
+       * - legacy：至少一邊沒有交路來源資料（手動製作／舊產物），退回舊的「跨時段
+       *   取較嚴者」描述。
+       */
+      const originClassification: 'sameChain' | 'crossChainSameInterval' | 'crossChainAcrossInterval' | 'legacy' =
+        !originAware
+          ? 'legacy'
+          : current.cycleChainId != null && current.cycleChainId === next.cycleChainId
+            ? 'sameChain'
+            : current.cycleOriginIntervalId != null
+                && current.cycleOriginIntervalId === next.cycleOriginIntervalId
+              ? 'crossChainSameInterval'
+              : 'crossChainAcrossInterval';
+      const message = (() => {
+        switch (originClassification) {
+          case 'sameChain':
+            return `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，`
+              + `是同一交路自己的兩腿，仍低於班距目標 ${headwayTarget} 秒`;
+          case 'crossChainSameInterval':
+            return `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，`
+              + `兩班交路都在同一時段起班，低於該時段班距目標 ${headwayTarget} 秒——`
+              + `時段本身排太擠，不是跨時段邊界造成的`;
+          case 'crossChainAcrossInterval':
+            return `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，`
+              + `低於後車交路起班當下的班距目標 ${headwayTarget} 秒（起班時段 `
+              + `${next.cycleOriginIntervalId ?? '未知'}）——不是邊界誤判，後車自己`
+              + `起班當下就該守住這個門檻`;
+          case 'legacy':
+          default:
+            return straddlesInterval
+              ? `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於跨時段班距下限 ${headwayTarget} 秒（兩時段 ${earlierHw}/${laterHw}，取較嚴者；沒有交路來源資料，無法判斷是否為邊界假象）`
+              : `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於時段班距 ${headwayTarget} 秒（多半來自補完／延後／多車擠班）`;
+        }
+      })();
       pushIssue(warnings, {
         code: 'HEADWAY_BELOW_TARGET',
         severity: 'warning',
         kind: 'limit',
-        message: straddlesInterval
-          ? `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於跨時段班距下限 ${headwayTarget} 秒（兩時段 ${earlierHw}/${laterHw}，取較嚴者；此對班多半非乾淨脈衝）`
-          : `${routeLabel} 相鄰發車 ${earlierLabel}→${laterLabel} 間隔 ${gapSeconds} 秒，低於時段班距 ${headwayTarget} 秒（多半來自補完／延後／多車擠班）`,
+        message,
         detail: {
           earlierBlockId: current.blockId,
           laterBlockId: next.blockId,
@@ -402,6 +470,9 @@ function validateSameRouteHeadway(
           laterIntervalHeadwaySeconds: laterHw,
           straddlesInterval,
           routeId: current.routeId,
+          originClassification,
+          earlierCycleOriginIntervalId: current.cycleOriginIntervalId ?? null,
+          laterCycleOriginIntervalId: next.cycleOriginIntervalId ?? null,
         },
       });
     }

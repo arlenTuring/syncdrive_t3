@@ -114,9 +114,16 @@ function fingerprintTimelines(
       // 配合車輛停放位置改派）。換路線＝換停靠站＝站位佔用整個變了，
       // 但時刻沒動——指紋只看時刻的話，迴圈會判定「這輪沒變化」直接收工，
       // 那些新產生的站位衝突<strong>永遠不會被求解</strong>。
+      //
+      // 同理也要含<strong>格位／站位</strong>：closeYardHeadGaps 改整備開始時刻
+      // 會被時刻抓到，但改派到另一格設施、或改成另一個進出廠停靠站，若時刻與路線
+      // 剛好都沒動，只看前面那幾項一樣看不出這輪有變化——換過去的那一格會不會撞人
+      // 因此永遠不會被下一輪重新驗證。
       parts.push(
         `${timeline.row}|${block.id}|${block.plannedStartMinute}|${block.plannedEndMinute}`
-        + `|${block.routeInstanceId ?? block.routeId ?? ''}`,
+        + `|${block.routeInstanceId ?? block.routeId ?? ''}`
+        + `|${block.yardFacilityNodeId ?? ''}|${block.yardFacilityStationId ?? ''}`
+        + `|${block.yardExitFacilityNodeId ?? ''}|${block.yardExitStationId ?? ''}`,
       );
     }
   }

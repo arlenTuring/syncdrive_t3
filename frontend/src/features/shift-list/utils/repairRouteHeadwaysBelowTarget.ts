@@ -35,6 +35,28 @@ import type { TimeSlotAttribute, TimeSlotInterval } from '../../time-templates/t
 /** 修復後仍在此寬限內視為已達標，不再繼續擠壓（對齊 densify slack） */
 const REPAIR_SLACK_SECONDS = 20;
 
+/**
+ * 一對相鄰發車該守住的班距目標：優先用<strong>後車自己交路起班當下</strong>記下來的
+ * <code>cycleHeadwayTargetSeconds</code>（見 GeneratedScheduleBlock 的欄位說明），
+ * 不用兩邊當下時刻各自查時段、取較嚴者——已在尖峰起班的交路，後車被前面幾輪修復
+ * 挪過時段邊界也不該因此改用離峰的較嚴門檻；新開交路本來就是照起班當下的時段記下來
+ * 的。兩邊都沒有交路來源資料（手動製作／舊產物）才退回舊算法。
+ */
+function resolvePairHeadwayTarget(
+  earlier: { plannedStartMinute: number },
+  later: GeneratedScheduleBlock,
+  intervals: TimeSlotInterval[],
+  attributes: TimeSlotAttribute[],
+): number | null {
+  if (later.cycleHeadwayTargetSeconds != null) return later.cycleHeadwayTargetSeconds;
+  return resolvePairHeadwaySeconds(
+    earlier.plannedStartMinute,
+    later.plannedStartMinute,
+    intervals,
+    attributes,
+  );
+}
+
 function occupancySecondsOf(block: GeneratedScheduleBlock): number {
   return Math.max(
     SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
@@ -63,20 +85,29 @@ function bookAllExcept(
   return booked;
 }
 
-function sameRowNeighborPassenger(
+/**
+ * 同一列（同一台車）在這張卡前面／後面緊接著的<strong>任何任務</strong>——不只正線。
+ *
+ * 先前這裡只在同列的「正線」卡片之間找鄰居，中間如果夾著整備、調度、暫停等非正線
+ * 任務會被直接跳過——floor／ceiling 算出來的其實是「跟再前一張正線卡的空檔」，
+ * 不是「車真的下一件事什麼時候開始」。班距修復把發車往前拉或往後推時，因此可能
+ * 拉進車還在整備裡的時段、或推進下一件已排定任務的時段，物理上做不到。
+ * 同車前後所有實際任務都要看，不能只看 passenger。
+ */
+function sameRowNeighborBlock(
   timelines: GeneratedSchedulePlan['timelines'],
   block: GeneratedScheduleBlock,
   side: 'prev' | 'next',
 ): GeneratedScheduleBlock | null {
   const row = timelines.find((t) => t.row === block.timelineRow);
   if (!row) return null;
-  const passengers = [...row.blocks]
-    .filter((b) => b.taskType === 'passenger')
-    .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
-  const index = passengers.findIndex((b) => b.id === block.id);
+  const ordered = [...row.blocks].sort(
+    (a, b) => a.plannedStartMinute - b.plannedStartMinute || a.id.localeCompare(b.id),
+  );
+  const index = ordered.findIndex((b) => b.id === block.id);
   if (index < 0) return null;
-  if (side === 'prev') return index > 0 ? passengers[index - 1]! : null;
-  return index + 1 < passengers.length ? passengers[index + 1]! : null;
+  if (side === 'prev') return index > 0 ? ordered[index - 1]! : null;
+  return index + 1 < ordered.length ? ordered[index + 1]! : null;
 }
 
 /** 同列前一班（同車輛，任何任務型別）結束＋轉乘空檔，之後才可發車——硬底線。 */
@@ -87,22 +118,25 @@ function sameRowVehicleFloorSeconds(
   selectedRoutes: ShiftScheduleSelectedRoute[],
   minimumRecoveryTimeSeconds: number,
 ): number | null {
-  const prevSameRow = sameRowNeighborPassenger(timelines, block, 'prev');
+  const prevSameRow = sameRowNeighborBlock(timelines, block, 'prev');
   if (!prevSameRow) return null;
   const prevRoute = resolveRouteForBlock(prevSameRow, selectedRoutes);
-  if (!prevRoute) return null;
-  const interGap = resolveInterTripGapSeconds({
-    minimumRecoveryTimeSeconds,
-    previousRouteSwitchBufferSeconds: prevRoute.switchBufferAfterSeconds,
-    isRouteSwitch: prevRoute.routeId !== route.routeId,
-    includeRecovery: shouldIncludeRecoveryForRouteSwitch({
-      previousRoute: prevRoute,
-      nextRoute: route,
-      rotationRoutes: selectedRoutes,
-    }),
-    previousRoute: prevRoute,
-    nextRoute: route,
-  });
+  // 前一件不是正線（整備、調度、暫停…）：沒有換線緩衝這種概念可算，
+  // 車就是得等它排定的結束時刻＋最低恢復時間，不能因為「不是正線」就當沒這回事。
+  const interGap = prevRoute
+    ? resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds,
+        previousRouteSwitchBufferSeconds: prevRoute.switchBufferAfterSeconds,
+        isRouteSwitch: prevRoute.routeId !== route.routeId,
+        includeRecovery: shouldIncludeRecoveryForRouteSwitch({
+          previousRoute: prevRoute,
+          nextRoute: route,
+          rotationRoutes: selectedRoutes,
+        }),
+        previousRoute: prevRoute,
+        nextRoute: route,
+      })
+    : minimumRecoveryTimeSeconds;
   return minuteToSecond(prevSameRow.plannedEndMinute) + interGap;
 }
 
@@ -115,24 +149,64 @@ function sameRowVehicleCeilingSeconds(
   selectedRoutes: ShiftScheduleSelectedRoute[],
   minimumRecoveryTimeSeconds: number,
 ): number | null {
-  const nextSameRow = sameRowNeighborPassenger(timelines, block, 'next');
+  const nextSameRow = sameRowNeighborBlock(timelines, block, 'next');
   if (!nextSameRow) return null;
   const nextRoute = resolveRouteForBlock(nextSameRow, selectedRoutes);
-  if (!nextRoute) return null;
-  const interGap = resolveInterTripGapSeconds({
-    minimumRecoveryTimeSeconds,
-    previousRouteSwitchBufferSeconds: route.switchBufferAfterSeconds,
-    isRouteSwitch: route.routeId !== nextRoute.routeId,
-    includeRecovery: shouldIncludeRecoveryForRouteSwitch({
-      previousRoute: route,
-      nextRoute,
-      rotationRoutes: selectedRoutes,
-    }),
-    previousRoute: route,
-    nextRoute,
-  });
+  // 下一件不是正線：一樣沒有換線緩衝可算，退回最低恢復時間——不能因為「不是正線」
+  // 就當它不存在，把本班往後推進下一件已排定任務（整備、調度…）的時段裡。
+  const interGap = nextRoute
+    ? resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds,
+        previousRouteSwitchBufferSeconds: route.switchBufferAfterSeconds,
+        isRouteSwitch: route.routeId !== nextRoute.routeId,
+        includeRecovery: shouldIncludeRecoveryForRouteSwitch({
+          previousRoute: route,
+          nextRoute,
+          rotationRoutes: selectedRoutes,
+        }),
+        previousRoute: route,
+        nextRoute,
+      })
+    : minimumRecoveryTimeSeconds;
   const latestEnd = minuteToSecond(nextSameRow.plannedStartMinute) - interGap;
   return latestEnd - occupiedSeconds;
+}
+
+/**
+ * 把發車往後推等於車在來源站多待一段——真正到站的時刻（同列前一件任務結束的
+ * 時刻）不會跟著發車一起往後挪，只有發車晚了，中間那段「已經到了、還沒開」的
+ * 停留跟著變長。{@link projectProtectedBerthWindowsSeconds} 算出來的來源站窗口只有
+ * 路線設定的靠站秒數，量不出這段加長的部分；這裡另外拼一個從「真正到站」到「這次
+ * 延後後的發車」的完整區間，跟別台車在同一站的預約比對一次。
+ */
+function originLingerCollides(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  later: GeneratedScheduleBlock;
+  route: ShiftScheduleSelectedRoute;
+  finalStartSecond: number;
+  booked: BerthWindowSec[];
+  protection: BerthProtectionContext;
+}): boolean {
+  const { timelines, later, route, finalStartSecond, booked, protection } = args;
+  const origin = route.stationDwells[0];
+  if (!origin) return false;
+  const prevSameRow = sameRowNeighborBlock(timelines, later, 'prev');
+  const realArrivalSecond = prevSameRow ? minuteToSecond(prevSameRow.plannedEndMinute) : null;
+  // 沒有前一件任務（本輪第一班），或真正到站本來就晚於這次算出來的發車：
+  // 沒有「多待一段」這回事，不需要另外驗證。
+  if (realArrivalSecond == null || realArrivalSecond >= finalStartSecond - 1e-9) return false;
+
+  const protectionSeconds = Math.max(0, protection.collisionProtectionSeconds ?? 0) * 2;
+  const lingerWindow: BerthWindowSec = {
+    stationId: origin.stationId,
+    stationName: origin.stationName || origin.stationId,
+    startSecond: realArrivalSecond,
+    naturalEndSecond: finalStartSecond,
+    endSecond: finalStartSecond + protectionSeconds,
+    timelineRow: later.timelineRow,
+    blockId: later.id,
+  };
+  return resolveBerthClearDelaySeconds([lingerWindow], booked) > 1e-6;
 }
 
 /**
@@ -228,6 +302,26 @@ function pushLaterForward(args: {
 
   if (finalStart <= laterStart + 1e-9) return false;
 
+  /**
+   * 延後發車＝車在來源站多待一段（真正到站的時刻不會跟著發車一起往後挪，只有
+   * 發車晚了）。這段加長的停留也要驗證，不能只驗到 projectProtectedBerthWindowsSeconds
+   * 算出來的那個窄窗——那個窗只含路線設定的靠站秒數，量不出「因為這次延後，車在
+   * 來源站多佔了多久」。真的多佔的這段如果跟別台車在同一站的預約撞上，這次延後
+   * 就不成立，不能假裝沒這回事直接推。
+   */
+  if (
+    originLingerCollides({
+      timelines,
+      later,
+      route,
+      finalStartSecond: finalStart,
+      booked,
+      protection,
+    })
+  ) {
+    return false;
+  }
+
   later.plannedStartMinute = secondToMinute(finalStart);
   later.plannedEndMinute = secondToMinute(finalStart + occupied);
   return true;
@@ -285,9 +379,9 @@ function pullEarlierBackward(args: {
   // 不倒欠上游：earlier 不得拉進「與它自己上一班」的目標班距之內。
   if (upstreamPredecessor) {
     const upstreamStart = minuteToSecond(upstreamPredecessor.plannedStartMinute);
-    const upstreamTarget = resolvePairHeadwaySeconds(
-      secondToMinute(upstreamStart),
-      secondToMinute(earlierStart),
+    const upstreamTarget = resolvePairHeadwayTarget(
+      upstreamPredecessor,
+      earlier,
       intervals,
       attributes,
     );
@@ -403,12 +497,7 @@ export function repairRouteHeadwaysBelowTarget(args: {
         const gap = laterStart - earlierStart;
         if (gap <= 0) continue;
 
-        const target = resolvePairHeadwaySeconds(
-          secondToMinute(earlierStart),
-          secondToMinute(laterStart),
-          intervals,
-          attributes,
-        );
+        const target = resolvePairHeadwayTarget(earlier, later, intervals, attributes);
         if (target == null || target <= 0) continue;
         if (gap + REPAIR_SLACK_SECONDS >= target) continue;
 
@@ -437,12 +526,7 @@ export function repairRouteHeadwaysBelowTarget(args: {
         const gap = laterStart - earlierStart;
         if (gap <= 0) continue;
 
-        const target = resolvePairHeadwaySeconds(
-          secondToMinute(earlierStart),
-          secondToMinute(laterStart),
-          intervals,
-          attributes,
-        );
+        const target = resolvePairHeadwayTarget(earlier, later, intervals, attributes);
         if (target == null || target <= 0) continue;
         if (gap + REPAIR_SLACK_SECONDS >= target) continue;
 

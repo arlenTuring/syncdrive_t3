@@ -765,6 +765,27 @@ export type ScheduleTask = {
    * 非掛車產生的任務沒有這個欄位，指派階段維持原本的推導邏輯。
    */
   plannedRouteInstanceId?: string;
+  /**
+   * 這一趟屬於哪一個交路（同一台車依 Step 4 successor chain 連續展開的一整輪）；
+   * 同一交路的每一腿都是同一個值。掛車階段展開時寫入，非掛車產生的任務沒有這個
+   * 欄位。只用來識別／分類，不影響排班決策。
+   */
+  cycleChainId?: string;
+  /** 這一趟所屬交路的起班脈衝時刻（秒，自 00:00 起，可能 ≥ 86400 表示延續到隔天） */
+  cycleOriginSecond?: number;
+  /** 這一趟所屬交路起班脈衝當下落在哪個時段（TimeSlotInterval.id） */
+  cycleOriginIntervalId?: string;
+  /**
+   * 這一趟所屬交路起班脈衝當下的班距目標（秒）——掛車階段展開整條交路時，
+   * 每一腿的同方向班距檢查（{@link cycleViolatesSameRouteHeadway}）用的都是這個值，
+   * 不是各腿自己當下時刻所在時段重新查一次。
+   *
+   * <strong>為什麼要記下來，不之後用時刻重新查。</strong>已在尖峰起班的交路，後續
+   * 站位讓渡／班距修復可能把某一腿的時刻挪到跨過時段邊界之後；那時候用「當下時刻」
+   * 重新查時段，會把整條交路在尖峰時就已經合法的班距，誤判成要用離峰的較嚴門檻。
+   * 交路的班距基準在起班那一刻就定了，不會因為後面哪一腿被挪動而改變。
+   */
+  cycleHeadwayTargetSeconds?: number;
 };
 
 /** Figma TaskBar colors — opaque bg so bars don't shift hue over the grid. */

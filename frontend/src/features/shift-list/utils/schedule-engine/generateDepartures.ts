@@ -61,6 +61,14 @@ export type DirectionalHeadwayDeparture = HeadwayDeparture & {
   routeId: string;
   /** 在執行順序中的索引（0 = 第一條路線） */
   routeIndex: number;
+  /**
+   * 這一脈跟<strong>上一脈</strong>之間真正要守住的間隔（秒）——一般脈衝就是
+   * <code>headwaySeconds</code>；跨時段的第一脈已經用 max(舊班距, 新班距) 頂起來
+   * （見下方 transitionGap），這裡記的是<strong>算出來的那個較嚴值</strong>，不是
+   * 新時段自己的 headwaySeconds。班距檢查／修復拿這個當「這一對該守住的門檻」，
+   * 不必自己再判斷「是不是跨時段的第一脈」。
+   */
+  requiredGapFromPreviousSeconds: number;
 };
 
 /**
@@ -167,16 +175,19 @@ export function generateDirectionalDeparturesFromHeadway(args: {
     }
 
     let cursor = intervalStart;
+    let firstPulseRequiredGap = headwaySeconds;
     if (lastDepartureSecond != null) {
       const transitionGap = Math.max(
         lastHeadwaySeconds ?? headwaySeconds,
         headwaySeconds,
       );
+      firstPulseRequiredGap = transitionGap;
       cursor = Math.max(
         cursor,
         snapUpToClockAlignSeconds(lastDepartureSecond + transitionGap),
       );
     }
+    let isFirstPulseOfInterval = true;
     while (cursor < pulseEnd) {
       result.push({
         startSecond: cursor,
@@ -185,10 +196,14 @@ export function generateDirectionalDeparturesFromHeadway(args: {
         intervalName: interval.name,
         routeId: startRoute.routeId,
         routeIndex: 0,
+        requiredGapFromPreviousSeconds: isFirstPulseOfInterval
+          ? firstPulseRequiredGap
+          : headwaySeconds,
       });
       lastDepartureSecond = cursor;
       lastHeadwaySeconds = headwaySeconds;
       cursor += headwaySeconds;
+      isFirstPulseOfInterval = false;
     }
   }
 

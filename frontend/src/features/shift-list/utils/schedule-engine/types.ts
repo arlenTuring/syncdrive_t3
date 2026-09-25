@@ -71,6 +71,15 @@ export type GeneratedScheduleBlock = {
   routeInstanceId?: string;
   routeName?: string;
   routeCode?: string;
+  /**
+   * 這一趟所屬交路的識別／起班時刻／來源時段／班距目標，從 ScheduleTask 原封不動
+   * 帶過來（見 ScheduleTask 的欄位說明）——不靠解析 id 猜。非掛車產生的區塊沒有
+   * 這些欄位；班距檢查／修復拿得到就優先用，拿不到才退回用當下時刻查時段的舊邏輯。
+   */
+  cycleChainId?: string;
+  cycleOriginSecond?: number;
+  cycleOriginIntervalId?: string;
+  cycleHeadwayTargetSeconds?: number;
   /** 模板甘特上的發車錨點（分鐘，自 00:00 起） */
   anchorStartMinute: number;
   plannedStartMinute: number;
