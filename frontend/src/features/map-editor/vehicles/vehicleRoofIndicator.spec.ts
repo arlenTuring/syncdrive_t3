@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  formatOffsetM,
   passageProgress,
   resolveRoofIndicatorConfig,
-  shouldShowOffset,
   type TrackPassageState,
 } from './vehicleRoofIndicator';
+import { VehicleTrackProgressBadge } from './VehicleTrackProgressBadge';
 
 function drive(trackId: string, raws: number[], defaultReversed: boolean, start?: TrackPassageState) {
   let state = start;
@@ -46,30 +47,28 @@ describe('passageProgress：這一次通行的入口 → 出口', () => {
   });
 });
 
-describe('偏移', () => {
-  it('公尺、正負號、兩位小數；未知是「—」不是 0', () => {
-    expect(formatOffsetM(-0.123)).toBe('−0.12 m');
-    expect(formatOffsetM(0.3)).toBe('+0.30 m');
-    expect(formatOffsetM(null)).toBe('—');
-    expect(formatOffsetM(Number.NaN)).toBe('—');
-  });
-
-  it('門檻模式：超過門檻才顯示；離軌一律顯示；未知在門檻模式不顯示', () => {
-    expect(shouldShowOffset('threshold', 0.25, 0.1, false)).toBe(false);
-    expect(shouldShowOffset('threshold', 0.25, -0.3, false)).toBe(true);
-    expect(shouldShowOffset('threshold', 0.25, 0.1, true)).toBe(true);
-    expect(shouldShowOffset('threshold', 0.25, null, false)).toBe(false);
-    expect(shouldShowOffset('always', 0.25, null, false)).toBe(true);
-    expect(shouldShowOffset('off', 0.25, 5, true)).toBe(false);
-  });
-});
-
-describe('resolveRoofIndicatorConfig', () => {
-  it('未設定的欄位用預設值，設定過的保留', () => {
-    const c = resolveRoofIndicatorConfig({ fontSizePx: 20, showPercent: false });
+describe('只畫名稱、進度線、百分比', () => {
+  it('舊樣板存了 offsetMode／offsetThresholdM：讀得進來，但不控制畫面', () => {
+    const c = resolveRoofIndicatorConfig({ offsetMode: 'always', offsetThresholdM: 0, fontSizePx: 20 });
     expect(c.fontSizePx).toBe(20);
-    expect(c.showPercent).toBe(false);
-    expect(c.enabled).toBe(true);
-    expect(c.offsetMode).toBe('threshold');
+    expect('offsetMode' in c).toBe(false);
+    expect('offsetThresholdM' in c).toBe(false);
+  });
+
+  it('舊樣板設定顯示偏移：徽章仍只有名稱、進度線、百分比', () => {
+    const config = resolveRoofIndicatorConfig({ offsetMode: 'always' });
+    const html = renderToStaticMarkup(createElement(VehicleTrackProgressBadge, { config, trackName: 'U19', progress: 0.47 }));
+    expect(html).toContain('U19');
+    expect(html).toContain('47%');
+    expect(html).toContain('<svg');
+    expect(html).not.toMatch(/偏移|未確認|方向異常|過期|title=/);
+  });
+
+  it('關掉名稱與百分比時只剩進度線', () => {
+    const config = resolveRoofIndicatorConfig({ showTrackName: false, showPercent: false });
+    const html = renderToStaticMarkup(createElement(VehicleTrackProgressBadge, { config, trackName: 'U19', progress: 0.5 }));
+    expect(html).not.toContain('U19');
+    expect(html).not.toContain('%');
+    expect(html).toContain('<svg');
   });
 });

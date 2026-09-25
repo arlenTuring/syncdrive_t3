@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
 import { buildTrackGenIndex, locateByField, OFF_ROUTE_PENALTY_M, type LocateFacility } from '../utils/trackGenLocate'
-import { buildRouteCorridors, readTargetStationId, shortestCorridor } from './routeCorridor'
+import {
+  advanceRouteIndex,
+  buildRoutePath,
+  buildRouteCorridors,
+  readTargetStationId,
+  routeWindow,
+  shortestCorridor,
+  shortestPiecePath,
+} from './routeCorridor'
 
 /**
  * 訂單路線 → 走廊。用手算得出答案的小路網驗：
@@ -189,5 +197,46 @@ describe('走廊在挑塊時只是加減分', () => {
     expect(
       locateByField(index, 25, 1.75, { corridorFacilityIds: corridor, headingRad: uHeading, speedMps: 5 })?.facilityId,
     ).toBe('d1')
+  })
+})
+
+describe('任務的有序路徑', () => {
+  const stationPieces = new Map([
+    ['A', at('d1')],
+    ['B', at('d3')],
+  ])
+
+  it('最短路照行車順序排', () => {
+    expect(shortestPiecePath(index, at('d1'), at('d3'))!.map((i) => index.pieces[i]!.facilityId)).toEqual([
+      'd1',
+      'd2',
+      'd3',
+    ])
+  })
+
+  it('站序逐段接起來，得到有順序的分支清單', () => {
+    const path = buildRoutePath(index, stationPieces, ['A', 'B'], 'order-1')!
+    expect(path.branchIds).toEqual(['d1', 'd2', 'd3'])
+    expect(path.key).toBe('order-1')
+  })
+
+  it('站序裡查不到軌道的站列為未解析，前後查得到的照樣接', () => {
+    const path = buildRoutePath(index, stationPieces, ['A', 'X', 'B'], 'k')!
+    expect(path.branchIds).toEqual(['d1', 'd2', 'd3'])
+    expect(path.unresolvedStations).toEqual(['X'])
+  })
+
+  it('合法後續：目前這一條加往前幾條；位置未知時整條路徑', () => {
+    const path = buildRoutePath(index, stationPieces, ['A', 'B'], 'k')!
+    expect([...routeWindow(path, 1, 1)]).toEqual(['d2', 'd3'])
+    expect([...routeWindow(path, null)].sort()).toEqual(['d1', 'd2', 'd3'])
+  })
+
+  it('路徑進度只往前走；不在窗口內的分支不改進度', () => {
+    const path = buildRoutePath(index, stationPieces, ['A', 'B'], 'k')!
+    expect(advanceRouteIndex(path, null, 'd2')).toBe(1)
+    expect(advanceRouteIndex(path, 1, 'd3')).toBe(2)
+    expect(advanceRouteIndex(path, 2, 'd1')).toBe(2)
+    expect(advanceRouteIndex(path, 1, 'u2')).toBe(1)
   })
 })

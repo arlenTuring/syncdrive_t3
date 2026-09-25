@@ -1,23 +1,17 @@
 /**
- * 車頂軌道進度指標：`U28  ○━━━━●────▷  42%   偏移 −0.12 m`
+ * 車頂軌道進度指標：`U19 ──●──▷ 47%`
  *
- * 語意：
+ * 只畫三件事：
  *   - 名稱：車目前判給的那一條軌道（跟進度同一條，不另外依座標查附近的名稱）。
- *   - 左端：這一次通行的入口；箭頭端：出口；移動點：車在這條軌道上的位置。
+ *   - 進度線：左端是這一次通行的入口、箭頭端是出口、移動點是車在這條軌道上的位置。
  *   - 百分比：這條軌道走了幾成，不是整張訂單的進度；換軌道就重新算。
- *   - 偏移：離中心線幾公尺，另外一項，不跟進度混在一起。未知顯示「—」，不顯示 0。
- * 電量不放這裡（車輛狀態卡片才有電量）。
+ * 偏移、定位狀態等診斷不放在這裡（見開發紀錄與錄製工具）；電量在車輛狀態卡片。
  */
-
-export type RoofIndicatorOffsetMode = 'off' | 'threshold' | 'always';
 
 export type VehicleRoofIndicatorConfig = {
   enabled?: boolean;
   showTrackName?: boolean;
   showPercent?: boolean;
-  offsetMode?: RoofIndicatorOffsetMode;
-  /** offsetMode='threshold' 時，偏移超過幾公尺才顯示 */
-  offsetThresholdM?: number;
   fontSizePx?: number;
   /** 線段長度（px） */
   barWidthPx?: number;
@@ -27,16 +21,21 @@ export type VehicleRoofIndicatorConfig = {
   railColor?: string;
   backgroundColor?: string;
   textColor?: string;
+  /**
+   * @deprecated 舊版的偏移顯示設定。已存的儀表板可能還帶著，讀得進來但不再影響畫面。
+   */
+  offsetMode?: 'off' | 'threshold' | 'always';
+  /** @deprecated 同上 */
+  offsetThresholdM?: number;
 };
 
-export type ResolvedRoofIndicatorConfig = Required<VehicleRoofIndicatorConfig>;
+/** 真正會控制畫面的欄位（舊的偏移欄位不在裡面） */
+export type ResolvedRoofIndicatorConfig = Required<Omit<VehicleRoofIndicatorConfig, 'offsetMode' | 'offsetThresholdM'>>;
 
 export const DEFAULT_ROOF_INDICATOR: ResolvedRoofIndicatorConfig = {
   enabled: true,
   showTrackName: true,
   showPercent: true,
-  offsetMode: 'threshold',
-  offsetThresholdM: 0.25,
   fontSizePx: 16,
   barWidthPx: 72,
   progressColor: '#67e8f9',
@@ -45,6 +44,7 @@ export const DEFAULT_ROOF_INDICATOR: ResolvedRoofIndicatorConfig = {
   textColor: '#e4e4e7',
 };
 
+/** 只取會控制畫面的欄位；舊的 offsetMode／offsetThresholdM 讀到也直接忽略 */
 export function resolveRoofIndicatorConfig(
   config: VehicleRoofIndicatorConfig | null | undefined,
 ): ResolvedRoofIndicatorConfig {
@@ -57,27 +57,6 @@ export function resolveRoofIndicatorConfig(
     }
   }
   return merged;
-}
-
-/** 偏移文字：有正負號、公尺、兩位小數；不知道就是「—」，不是 0 */
-export function formatOffsetM(offsetM: number | null | undefined): string {
-  if (offsetM == null || !Number.isFinite(offsetM)) return '—';
-  const sign = offsetM > 0 ? '+' : offsetM < 0 ? '−' : '±';
-  return `${sign}${Math.abs(offsetM).toFixed(2)} m`;
-}
-
-/** 要不要顯示偏移：離軌一律顯示；未知在「一律顯示」模式才顯示「—」 */
-export function shouldShowOffset(
-  mode: RoofIndicatorOffsetMode,
-  thresholdM: number,
-  offsetM: number | null | undefined,
-  offTrack: boolean,
-): boolean {
-  if (mode === 'off') return false;
-  if (offTrack) return true;
-  if (offsetM == null || !Number.isFinite(offsetM)) return mode === 'always';
-  if (mode === 'always') return true;
-  return Math.abs(offsetM) >= thresholdM;
 }
 
 /** 單車在單一軌道上的通行狀態（只在記憶體） */

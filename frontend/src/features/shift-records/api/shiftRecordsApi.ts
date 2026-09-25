@@ -37,6 +37,11 @@ export type ShiftRecordAction = {
 };
 
 export type ShiftRecordDetail = ShiftRecordListItem & {
+  /** 訂單 payload（調度引擎下單時寫的）：路線代號與有序站序 */
+  payload?: {
+    route_code?: string | null;
+    stations?: Array<{ station_id?: string | null }>;
+  } | null;
   actions: ShiftRecordAction[];
   task_group: Array<Record<string, unknown>>;
   vehicle_phase: unknown;

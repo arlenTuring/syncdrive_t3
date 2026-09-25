@@ -237,8 +237,30 @@ export function tracksAreConnected(index: TrackGenIndex, a: string, b: string): 
   return (index.joins.get(a) ?? []).some((j) => j.to === b)
 }
 
+/**
+ * 軌道身分（判給哪一條通行分支）的判定。
+ *
+ * <ul>
+ *   <li>confirmed／geometry：只有這一條分支貼近座標，其他分支都遠在門檻外。</li>
+ *   <li>confirmed／continuity：座標附近有兩條以上分不開，上一筆確認的分支（或它唯一的
+ *       相連後續）在其中。</li>
+ *   <li>confirmed／route：分不開的分支裡，只有一條在這張任務的有序路徑上。</li>
+ *   <li>confirmed／heading：分不開、也沒有路徑與上一筆可用，車速可信時只有一條順著車頭。</li>
+ *   <li>ambiguous／geometric_tie：座標真的分不出來，其他證據也分不出來。畫面不能編造進度。</li>
+ * </ul>
+ * 方向矛盾<strong>不</strong>影響這個判定（另見 headingConflict）。
+ */
+export type BranchIdentity =
+  | { status: 'confirmed'; reason: 'geometry' | 'continuity' | 'route' | 'heading'; rivals: string[] }
+  | { status: 'ambiguous'; reason: 'geometric_tie'; rivals: string[] }
+
 export type Located = {
   facilityId: string
+  /**
+   * 通行分支的穩定識別。一般軌道就是設施 id；交叉／分岔軌道已經拆成各分支設施
+   * （母體 id + ~ + 分支代號，見 crossBranches），所以同一個交叉的斜行與直行各自獨立。
+   */
+  branchId: string
   road: string
   lane: number
   /** 沿該 road 參考線的里程（公尺） */
@@ -254,19 +276,27 @@ export type Located = {
   /** 離這一段中心線的距離（公尺，無正負號） */
   distanceM: number
   /**
-   * 這一筆判給這一塊有多少把握（0–1）。
-   *
-   * 由兩件事組成：離中心線夠不夠近、以及第二名比第一名差多少。第二名幾乎一樣好的
-   * 時候（分岔口、上下行只差三公尺）答案不可靠，畫面上要能看出「這是猜的」。
+   * 候選<strong>綜合評分</strong>差（別的分支最佳評分 − 所選分支評分；診斷用，單位不是公尺）。
+   * 評分含距離、方向、連續性與路線的加減分；選分支已不靠它，留著給錄製與比較。
+   * 只有一條候選時是 Infinity。
    */
-  confidence: number
-  /** 第二名（別的塊）比第一名的分數多多少；只有一塊候選時是 Infinity */
-  margin: number
+  scoreMargin: number
   /**
-   * 車頭跟所選那一塊的行車方向幾乎相反（超過 120 度），而且車速夠、heading 可信。
+   * 幾何距離差（公尺）：最近的「對手分支」離座標的距離 − 所選分支的距離。
+   * 相連的前後段在接縫處不算對手。沒有對手時是 Infinity；所選分支因為連續性或路線
+   * 而不是最近的那一條時可能是負數。
+   */
+  distanceMarginM: number
+  identity: BranchIdentity
+  /** 有任務路徑時：所選分支不在路徑（目前這一段與合法後續）上。沒有路徑資訊時是 null。 */
+  offRoute: boolean | null
+  /** 只有 options.collectCandidates 時才有 */
+  candidates?: LocateCandidateDiag[]
+  /**
+   * 車頭跟所選分支的行車方向幾乎相反（超過 120 度），而且車速夠、heading 可信。
    *
-   * 位置壓在中心線上就不會因此換塊，所以這是<strong>診斷</strong>：資料的方向定義、
-   * 車端的 heading、或車真的逆向，三者之一有問題，把握度會跟著降低。
+   * 這是<strong>方向異常</strong>的診斷，不影響軌道身分：座標已經確認在這條分支上時，
+   * 判位照樣成立，畫面另外提示方向異常（資料的方向定義、車端 heading、或車真的逆向）。
    */
   headingConflict: boolean
   /**
@@ -317,6 +347,39 @@ export type LocateOptions = {
    * 有的話，走廊外的候選多扣 OFF_ROUTE_PENALTY_M；只在位置分不出來的候選之間決定。
    */
   corridorFacilityIds?: ReadonlySet<string>
+  /**
+   * 這張任務的有序路徑上，目前這一段與合法後續的分支（見 routeCorridor.buildRoutePath）。
+   * 優先於 corridorFacilityIds；只在座標分不開的分支之間決定，不會把車吸回路線。
+   */
+  routeBranchIds?: ReadonlySet<string>
+  /**
+   * 每條分支<strong>接受為軌道定位</strong>的最大距離（公尺，對該段中心線的完整距離）。
+   *
+   * 給了之後，超過的候選在挑選前就排除——路線、上一筆與車頭只能在合理的候選之間選，不能
+   * 讓超出範圍的軌道變成有效定位；全部超過就回 null。不給時照舊（只比相對遠近），呼叫端
+   * 不能把 confirmed 當成「距離合理」。
+   */
+  maxDistanceM?: (branchId: string) => number
+  /** 診斷用：回傳每個候選的距離與各項加減分（只在錄製異常時開，平常不算） */
+  collectCandidates?: boolean
+}
+
+/** 單一候選的評分拆解（診斷用） */
+export type LocateCandidateDiag = {
+  facilityId: string
+  road: string
+  lane: number
+  along: number
+  distanceM: number
+  offsetM: number
+  eligible: boolean
+  headingGapDeg: number | null
+  headingPenalty: number
+  stickyBonus: number
+  nonAdjacentPenalty: number
+  offRoutePenalty: number
+  gatePenalty: number
+  score: number
 }
 
 /**
@@ -355,7 +418,6 @@ export const CANDIDATE_GATE_M = 1.2
 
 /** 車頭跟行車方向差超過這個角度就算「幾乎相反」 */
 const HEADING_CONFLICT_RAD = (120 * Math.PI) / 180
-const CONFLICT_CONFIDENCE_FACTOR = 0.6
 
 /**
  * 不在訂單路線的走廊上：多算這麼多。
@@ -391,17 +453,20 @@ function headingPenalty(gap: number, weight: number): number {
 }
 
 /**
- * 距離與領先幅度合成 0–1 的把握。
+ * 接縫遲滯（公尺）：上一筆確認的分支只要不比最近那條遠超過這麼多，就留在原分支。
  *
- * 相乘不相加：離中心線很遠的時候，就算旁邊沒有對手，「判給這一塊」也只是因為它是
- * 唯一的選項，不是因為它對；相加會讓這種情況還有一半的把握。壓在中心線上但第二名一樣
- * 近（上下行中間、分岔口），也只剩兩成。
+ * 前後相連的兩段在接縫處都貼著座標；沒有遲滯的話，車在接縫附近每一筆都可能換一次。
  */
-function confidenceOf(distanceM: number, margin: number): number {
-  const near = 1 - Math.min(1, distanceM / 3.35)
-  const clear = Number.isFinite(margin) ? Math.min(1, margin / 2) : 1
-  return Math.max(0, Math.min(1, near * (0.2 + 0.8 * clear)))
-}
+export const SEAM_HYSTERESIS_M = 0.3
+
+/**
+ * 分不開的分支之間，最近的一條要比其他條近這麼多（公尺）才算幾何上已經分開。
+ * 分岔口剛分開的兩條分支彼此貼著，差距小於這個值時不能只憑幾何宣稱判定。
+ */
+export const GEOMETRY_SEPARATION_M = 0.3
+
+/** 投影落在折線端點上（車已經走出這一段、或還沒進來） */
+const END_EPS = 1e-4
 
 /**
  * 場域座標 → 圖面位置。
@@ -442,68 +507,232 @@ export function locateByField(
     const p = index.pieces[i]!
     // 只在這一段自己那一截上比：一塊路口元件橫跨好幾段，整條一起量會每一段都同分
     const { along, distance, side } = projectAlongPath(p.real, xM, yM, { from: p.f0, to: p.f1 })
+    if (options.maxDistanceM && distance > options.maxDistanceM(p.facilityId)) continue
     cands.push({ piece: p, along, distance, side, travelRad: localTravelRad(p, along) })
     if (distance < minDistance) minDistance = distance
   }
+  if (!cands.length) return null
 
-  // 第二輪：方向與連續性只在「位置分不出來」的候選之間決定
-  let best: (Located & { score: number }) | null = null
+  // 第二輪：綜合評分（診斷用）——距離加上方向、連續性、路線的加減分
+  // 評分最好的一筆（只給診斷的評分差用；選分支看下面的幾何判定）
+  let best: { score: number } | null = null
+  const diags: LocateCandidateDiag[] | null = options.collectCandidates ? [] : null
   // 每一塊自己最好的分數：領先幅度要跟「別的塊」比，同一塊的另一段不算對手
   const bestByFacility = new Map<string, number>()
   for (const c of cands) {
     const p = c.piece
     const eligible = c.distance <= minDistance + CANDIDATE_GATE_M
     let score = c.distance
+    let hp = 0
+    let sticky = 0
+    let nonAdj = 0
+    let offRoute = 0
+    let gate = 0
     if (eligible) {
       if (options.headingRad !== undefined && !p.bidirectional) {
-        score += headingPenalty(angleGap(options.headingRad, c.travelRad), headingWeight)
+        hp = headingPenalty(angleGap(options.headingRad, c.travelRad), headingWeight)
+        score += hp
       }
       const prev = options.previousFacilityId
       if (prev) {
-        if (p.facilityId === prev) score -= STICKY_BONUS_M
-        else if (!tracksAreConnected(index, prev, p.facilityId)) score += NON_ADJACENT_PENALTY_M
+        if (p.facilityId === prev) {
+          sticky = STICKY_BONUS_M
+          score -= STICKY_BONUS_M
+        } else if (!tracksAreConnected(index, prev, p.facilityId)) {
+          nonAdj = NON_ADJACENT_PENALTY_M
+          score += NON_ADJACENT_PENALTY_M
+        }
       }
       if (options.corridorFacilityIds && !options.corridorFacilityIds.has(p.facilityId)) {
+        offRoute = OFF_ROUTE_PENALTY_M
         score += OFF_ROUTE_PENALTY_M
       }
     } else {
       // 遠離最近的那一塊：不靠旁證翻盤，照純距離排在後面
-      score += CANDIDATE_GATE_M * 10
+      gate = CANDIDATE_GATE_M * 10
+      score += gate
     }
+    diags?.push({
+      facilityId: p.facilityId,
+      road: p.road,
+      lane: p.lane,
+      along: c.along,
+      distanceM: c.distance,
+      offsetM: c.side,
+      eligible,
+      headingGapDeg:
+        options.headingRad !== undefined ? (angleGap(options.headingRad, c.travelRad) * 180) / Math.PI : null,
+      headingPenalty: hp,
+      stickyBonus: sticky,
+      nonAdjacentPenalty: nonAdj,
+      offRoutePenalty: offRoute,
+      gatePenalty: gate,
+      score,
+    })
 
     const seen = bestByFacility.get(p.facilityId)
     if (seen === undefined || score < seen) bestByFacility.set(p.facilityId, score)
 
-    if (!best || score < best.score) {
-      best = {
-        facilityId: p.facilityId,
-        road: p.road,
-        lane: p.lane,
-        // 里程照這一段自己佔的那一截換算：路口的元件橫跨兩條腿，用整塊的比例會差很遠
-        sM: p.s0 + (p.s1 - p.s0) * spanFrac(p, c.along),
-        along: c.along,
-        local: pointAlongPath(p.local, c.along),
-        offsetM: c.side,
-        distanceM: c.distance,
-        confidence: 0,
-        margin: Infinity,
-        headingConflict:
-          options.headingRad !== undefined &&
-          headingWeight > 0 &&
-          !p.bidirectional &&
-          angleGap(options.headingRad, c.travelRad) > HEADING_CONFLICT_RAD,
-        travelRad: c.travelRad,
-        score,
-      }
-    }
+    if (!best || score < best.score) best = { score }
   }
   if (!best) return null
+
+  // ── 軌道身分：只看幾何分不分得開，旁證只在分不開的分支之間決定 ──
+  type BranchGeo = { cand: (typeof cands)[number]; clampedEnd: 0 | 1 | null }
+  const geoByBranch = new Map<string, BranchGeo>()
+  for (const c of cands) {
+    const id = c.piece.facilityId
+    const seen = geoByBranch.get(id)
+    if (!seen || c.distance < seen.cand.distance) {
+      const clampedEnd: 0 | 1 | null = c.along <= END_EPS ? 0 : c.along >= 1 - END_EPS ? 1 : null
+      geoByBranch.set(id, { cand: c, clampedEnd })
+    }
+  }
+  const nearest = [...geoByBranch.entries()].sort((x, y) => x[1].cand.distance - y[1].cand.distance)[0]!
+  const nearestD = nearest[1].cand.distance
+  const tied = [...geoByBranch.entries()].filter(([, g]) => g.cand.distance <= nearestD + CANDIDATE_GATE_M)
+
+  /** b 是 a 在接縫上的前後段：兩者端點相接，而且其中一方的投影就停在相接的那一端 */
+  const isSeamContinuation = (a: string, b: string): boolean => {
+    const ga = geoByBranch.get(a)
+    const gb = geoByBranch.get(b)
+    if (!ga || !gb) return false
+    return (index.joins.get(a) ?? []).some(
+      (j) => j.to === b && (ga.clampedEnd === j.end || gb.clampedEnd === j.toEnd),
+    )
+  }
+
+  const prev = options.previousFacilityId
+  const prevGeo = prev ? geoByBranch.get(prev) : undefined
+  let chosen = nearest[0]
+  let reason: 'geometry' | 'continuity' | 'route' | 'heading' = 'geometry'
+  // 接縫遲滯：上一筆的分支還貼著座標（不比最近那條遠超過遲滯量）就留著
+  if (prev && prevGeo && prev !== chosen && prevGeo.cand.distance <= nearestD + SEAM_HYSTERESIS_M) {
+    chosen = prev
+    reason = 'continuity'
+  }
+  const rivalsOf = (id: string) =>
+    tied.map(([bid]) => bid).filter((bid) => bid !== id && !isSeamContinuation(id, bid))
+
+  let rivals = rivalsOf(chosen)
+  let status: 'confirmed' | 'ambiguous' = 'confirmed'
+  if (rivals.length > 0) {
+    // 分不開：路線與連續性只負責縮小「合理的分支」，合理的分支之間仍然由幾何決定
+    let supported = [chosen, ...rivals]
+    let why: 'route' | 'continuity' | null = null
+    const allowed = options.routeBranchIds ?? options.corridorFacilityIds
+    if (allowed) {
+      const onRoute = supported.filter((id) => allowed.has(id))
+      if (onRoute.length > 0) {
+        supported = onRoute
+        why = 'route'
+      }
+    }
+    if (prev) {
+      const linked = supported.filter((id) => id === prev || tracksAreConnected(index, prev, id))
+      if (linked.length > 0) {
+        supported = linked
+        why = why ?? 'continuity'
+      }
+    }
+    const dist = (id: string) => geoByBranch.get(id)!.cand.distance
+    supported.sort((a, b) => dist(a) - dist(b))
+    let pick = supported[0]!
+    if (prev && supported.includes(prev) && dist(prev) <= dist(pick) + SEAM_HYSTERESIS_M) pick = prev
+    const others = supported.filter((id) => id !== pick && !isSeamContinuation(pick, id))
+    const separation = others.length ? Math.min(...others.map(dist)) - dist(pick) : Infinity
+    const reliableHeading =
+      options.headingRad !== undefined &&
+      !(options.speedMps !== undefined && options.speedMps < HEADING_RELIABLE_MPS)
+    const alongHeading = reliableHeading
+      ? supported.filter((id) => {
+          const gg = geoByBranch.get(id)!
+          return gg.cand.piece.bidirectional || angleGap(options.headingRad!, gg.cand.travelRad) < Math.PI / 2
+        })
+      : []
+    /** 在一組候選裡挑最近的（上一筆有遲滯），看它跟其他條是否已經拉開 */
+    const nearestOf = (ids: string[]) => {
+      const sorted = [...ids].sort((a, b) => dist(a) - dist(b))
+      let best = sorted[0]!
+      if (prev && sorted.includes(prev) && dist(prev) <= dist(best) + SEAM_HYSTERESIS_M) best = prev
+      const rest = sorted.filter((id) => id !== best && !isSeamContinuation(best, id))
+      const sep = rest.length ? Math.min(...rest.map(dist)) - dist(best) : Infinity
+      return { best, separated: rest.length === 0 || sep >= GEOMETRY_SEPARATION_M }
+    }
+    chosen = pick
+    let decided = false
+    if (others.length === 0) {
+      reason = why ?? 'geometry'
+      decided = true
+    } else if (why && separation >= GEOMETRY_SEPARATION_M) {
+      // 路線或連續性已經縮小到合理的分支，其中最近的一條已經幾何上拉開：不讓車頭翻盤
+      // （同一條分支可能被逆著圖資方向走，例如進出分區的接駁）
+      reason = why
+      decided = true
+    }
+    if (!decided && alongHeading.length > 0 && alongHeading.length < supported.length) {
+      // 可信的車頭排除了逆向的分支；剩下順著車頭的分支之間仍由幾何決定
+      const h = nearestOf(alongHeading)
+      if (h.separated) {
+        chosen = h.best
+        reason = 'heading'
+        decided = true
+      }
+    }
+    if (!decided && separation >= GEOMETRY_SEPARATION_M) {
+      reason = why ?? 'geometry'
+      decided = true
+    }
+    if (!decided && prev && pick === prev) {
+      reason = 'continuity'
+      decided = true
+    }
+    if (!decided) status = 'ambiguous'
+    rivals = rivalsOf(chosen)
+  }
+
+  const g = geoByBranch.get(chosen)!
+  const c = g.cand
+  const p = c.piece
+  const reliable =
+    options.headingRad !== undefined &&
+    !(options.speedMps !== undefined && options.speedMps < HEADING_RELIABLE_MPS)
+  const headingConflict =
+    reliable && !p.bidirectional && angleGap(options.headingRad!, c.travelRad) > HEADING_CONFLICT_RAD
+
+  // 幾何距離差：最近的對手（接縫上的前後段不算）
+  let rivalD = Infinity
+  for (const [bid, bg] of geoByBranch) {
+    if (bid === chosen || isSeamContinuation(chosen, bid)) continue
+    rivalD = Math.min(rivalD, bg.cand.distance)
+  }
+  // 評分差：診斷用
   let runnerUp = Infinity
   for (const [id, sc] of bestByFacility) {
-    if (id !== best.facilityId) runnerUp = Math.min(runnerUp, sc)
+    if (id !== chosen) runnerUp = Math.min(runnerUp, sc)
   }
-  const margin = Number.isFinite(runnerUp) ? runnerUp - best.score : Infinity
-  const { score: _score, ...located } = best
-  const confidence = confidenceOf(best.distanceM, margin) * (best.headingConflict ? CONFLICT_CONFIDENCE_FACTOR : 1)
-  return { ...located, margin, confidence }
+  const chosenScore = bestByFacility.get(chosen) ?? best.score
+  const allowed = options.routeBranchIds ?? options.corridorFacilityIds
+
+  return {
+    facilityId: p.facilityId,
+    branchId: p.facilityId,
+    road: p.road,
+    lane: p.lane,
+    sM: p.s0 + (p.s1 - p.s0) * spanFrac(p, c.along),
+    along: c.along,
+    local: pointAlongPath(p.local, c.along),
+    offsetM: c.side,
+    distanceM: c.distance,
+    scoreMargin: Number.isFinite(runnerUp) ? runnerUp - chosenScore : Infinity,
+    distanceMarginM: Number.isFinite(rivalD) ? rivalD - c.distance : Infinity,
+    identity:
+      status === 'confirmed'
+        ? { status, reason, rivals }
+        : { status, reason: 'geometric_tie', rivals },
+    offRoute: allowed ? !allowed.has(chosen) : null,
+    headingConflict,
+    travelRad: c.travelRad,
+    ...(diags ? { candidates: diags } : {}),
+  }
 }

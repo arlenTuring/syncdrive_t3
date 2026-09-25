@@ -17,7 +17,8 @@ import {
 } from './crossBranches'
 import { resolveCrossPortalFields } from './crossTrackPortals'
 import { parseMapFileJson } from './mapFileJson'
-import { tracksAreConnected } from './trackGenLocate'
+import { locateByField, tracksAreConnected } from './trackGenLocate'
+import { trackAcceptDistanceM } from '../vehicles/trackNetwork/locate'
 import { backfillTrackGenSpansInAreas } from './trackGenSpanBackfill'
 import { repairTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 
@@ -195,6 +196,8 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
       let previous: string | undefined
       let max = 0
       let placed = 0
+      /** 沒有定位到的點：必須是真的離所有軌道都超出接受距離（不能是漏判） */
+      const unplaced: Array<{ x: number; y: number; nearestM: number; acceptM: number }> = []
       for (const p of route.points) {
         const hit = resolveVehiclePlacementAcrossAreas(mapAreas, p.x, p.y, network, {
           headingRad: p.heading,
@@ -203,11 +206,20 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
         })
         previous = previousTrackIdOf(hit, false)
         if (hit) placed += 1
+        else {
+          const nearest = network.genIndex ? locateByField(network.genIndex, p.x, p.y) : null
+          unplaced.push({
+            x: p.x,
+            y: p.y,
+            nearestM: nearest?.distanceM ?? Infinity,
+            acceptM: trackAcceptDistanceM(nearest ? network.byTrackId.get(nearest.facilityId)?.track : undefined),
+          })
+        }
         if (hit && isCross.get(hit.placement.trackId)) {
           max = Math.max(max, Math.abs(hit.placement.network?.offsetM ?? 0))
         }
       }
-      return { max, placed }
+      return { max, placed, unplaced }
     }
 
     it('每一點都定得到位，走斜線的路線離中心線的最大偏移縮小', () => {
@@ -216,7 +228,14 @@ describe.skipIf(!inner || inner.creationMode !== 'trackGen')('交叉軌道分支
       for (const route of routes) {
         const before = crossMaxOffset(areas, route)
         const after = crossMaxOffset(derived, route)
-        expect(after.placed, route.route).toBe(route.points.length)
+        /*
+         * 每一點都要定得到位，除非它離所有軌道都超出接受距離（「找到最近軌道」不等於「在軌道上」）。
+         * 目前只有 N2W⇄充電洗車區 在支線 174 旁的 3 點：模擬器照圖台畫的路線走，那一段畫的路線離 174
+         * 中心線 2.9–4.6 m，又不在任何場區分區裡，沒有可用映射——保留無匹配，不假造軌道位置。
+         */
+        for (const u of after.unplaced) expect(u.nearestM, `${route.route} (${u.x},${u.y})`).toBeGreaterThan(u.acceptM)
+        expect(after.placed + after.unplaced.length, route.route).toBe(route.points.length)
+        expect(after.unplaced.length, route.route).toBeLessThanOrEqual(3)
         // 沒有任何一條路線明顯變差（分支共用一個口的那一小段兩條線幾乎重疊，容許 0.5 公尺）
         expect(after.max, route.route).toBeLessThanOrEqual(before.max + 0.5)
         if (after.max < before.max - 1) improved += 1

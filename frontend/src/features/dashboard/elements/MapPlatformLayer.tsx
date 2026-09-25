@@ -18,6 +18,7 @@ import type { MapVehicleTemplateConfig } from '../utils/resolveMapVehicleTemplat
 import { useMapMqttLive } from './useMapMqttLive';
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import { MapSimVehicleMotionBridge } from './MapSimVehicleMotionBridge';
+import { useOrderRouteStations } from './useOrderRouteStations';
 
 export function MapPlatformLayer({
   mapId,
@@ -69,6 +70,8 @@ export function MapPlatformLayer({
     if (showDemoVehicles) return buildDemoAreaVehicles(areas);
     return [];
   }, [mqttVehicles, showDemoVehicles, isEditMode, areas]);
+  // 每台車目前任務的有序站序：判位用來知道這張任務接下來該走哪幾條分支
+  const orderStationsById = useOrderRouteStations(areaVehiclesRaw);
 
   const vehicleDefinition = vehicleTemplate?.definition ?? null;
   const vehicleDisplayWidthPx =
@@ -175,6 +178,7 @@ export function MapPlatformLayer({
             : undefined
         }
         vehicleRoofIndicator={vehicleRoofIndicator}
+        orderStationsById={orderStationsById}
         viewportRef={viewportRef}
       />
     </div>

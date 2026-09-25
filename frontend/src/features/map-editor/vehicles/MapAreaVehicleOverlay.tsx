@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import {
@@ -14,8 +14,9 @@ import {
 } from './resolveVehicleTrackPlacement';
 import {
   quantisedTrackCellPlacement,
-  TRACK_HALF_WIDTH_M,
+  trackAlongIsReversed,
 } from './quantisedTrackCell';
+import { getTrackGenPaths } from '../utils/trackGenPaths';
 import { trackCodeFromFacility } from './trackNetwork/scanMap';
 import {
   passageProgress,
@@ -24,13 +25,26 @@ import {
   type VehicleRoofIndicatorConfig,
 } from './vehicleRoofIndicator';
 import { VehicleTrackProgressBadge } from './VehicleTrackProgressBadge';
+import {
+  trackerNext,
+  trackerPrior,
+  type BranchTrackState,
+  type TrackerFrame,
+  type TrackerPrior,
+} from './vehicleBranchTracker';
+import { locateByField } from '../utils/trackGenLocate';
+import {
+  isLocateRecording,
+  pickLocateRaw,
+  publishLocateMap,
+  recordLocateFrame,
+} from './locateRecorder';
 import type { MapAreaObject } from '../types/area';
 import {
   areaPositionToCssTopLeft,
 } from '../utils/areaCoords';
 import {
   buildTrackNetwork,
-  previousTrackIdOf,
   resolveVehiclePlacementAcrossAreas,
   resolveTrackCodeForDisplay,
   type VehicleNetworkFix,
@@ -61,18 +75,38 @@ import {
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
 import { readLegSnapKey } from '../../dashboard/utils/simClock';
+import { vehicleLastSeenAt } from '../../dashboard/elements/vehicleLastSeen';
 import { collectYardSlotFieldBoxes } from '../utils/yardFacilitySlots';
 import { withCrossBranchTracks } from '../utils/crossBranches';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { classifyYardVehicle, type YardDecision } from './yardClassification';
 import type { MapPlannedRoute } from '../types/mapFile';
-import { buildRouteCorridors, readTargetStationId } from './routeCorridor';
+import {
+  buildRouteCorridors,
+  buildRoutePath,
+  readTargetStationId,
+  resolveStationPieces,
+  routeWindow,
+  type RoutePath,
+} from './routeCorridor';
 
-/** 定位把握低於這個值，徽章標「≈」 */
-const LOW_CONFIDENCE = 0.5;
+/** 每份地圖物件一個識別：換圖時跨時間的分支狀態與路徑快取要失效 */
+let mapKeySeq = 0;
+const mapKeyOf = new WeakMap<object, string>();
+function mapKeyFor(areas: object): string {
+  let key = mapKeyOf.get(areas);
+  if (!key) {
+    mapKeySeq += 1;
+    key = `map-${mapKeySeq}`;
+    mapKeyOf.set(areas, key);
+  }
+  return key;
+}
 
-/** 第二名只差這麼一點：位置分不出是哪條，偏差數字不可靠 */
-const AMBIGUOUS_MARGIN_M = 1;
+function readOrderId(payload: Record<string, unknown> | undefined): string | null {
+  const id = payload?.order_id;
+  return typeof id === 'string' && id.trim() ? id.trim() : null;
+}
 
 /**
  * 沒有載具容器校準尺寸時的後備（區域像素）。
@@ -215,6 +249,7 @@ export function MapAreaVehicleOverlay({
   vehicleEditSizer = null,
   livePositionTweenMs = 0,
   roofIndicator,
+  orderStationsById,
 }: {
   areas: MapAreaObject[];
   vehicles: AreaVehicleLive[];
@@ -245,6 +280,8 @@ export function MapAreaVehicleOverlay({
   livePositionTweenMs?: number;
   /** 車頂軌道進度指標的外觀與顯示項目（存在儀表板圖台元件上） */
   roofIndicator?: VehicleRoofIndicatorConfig | null;
+  /** 每張訂單的有序站序（訂單 id → 站代號）：建任務路徑，判位時只在合法的分支之間決定 */
+  orderStationsById?: Record<string, readonly string[]>;
 }) {
   const roofConfig = useMemo(() => resolveRoofIndicatorConfig(roofIndicator), [roofIndicator]);
   /** 每台車目前這一次通行的方向（只在記憶體；換軌道就重新判斷） */
@@ -259,6 +296,8 @@ export function MapAreaVehicleOverlay({
     [areas],
   );
   const trackNetwork = useMemo(() => buildTrackNetwork(areas), [areas]);
+  // 診斷錄製：記下當時的地圖與路線（原始 areas，不是拆過分支的那一份），離線重播要用同一份
+  if (isLocateRecording()) publishLocateMap(sourceAreas, routes ?? []);
   /*
    * 訂單路線的走廊：終點站 → 沿路網走得到的那幾塊軌道。車的 current_leg.target_station_id
    * 就是鍵。沒給路線、站沒放在路網上、目標不是站（進出場入口點）時沒有走廊，等於沒有這條旁證。
@@ -267,6 +306,36 @@ export function MapAreaVehicleOverlay({
     () => buildRouteCorridors(areas, routes ?? [], trackNetwork.genIndex),
     [areas, routes, trackNetwork],
   );
+  const mapKey = mapKeyFor(sourceAreas);
+  /** 站 → 所在分支（段）；任務路徑用 */
+  const stationPieces = useMemo(
+    () => (trackNetwork.genIndex ? resolveStationPieces(areas, trackNetwork.genIndex) : new Map<string, number>()),
+    [areas, trackNetwork],
+  );
+  const routePathCacheRef = useRef<Map<string, RoutePath | null>>(new Map());
+  /** 訂單 → 有序分支路徑（依地圖與站序快取；換圖自然換 key） */
+  const routePathFor = (orderId: string, stations: readonly string[]): RoutePath | null => {
+    if (!trackNetwork.genIndex) return null;
+    const key = `${mapKey}|${orderId}|${stations.join('>')}`;
+    const cache = routePathCacheRef.current;
+    if (!cache.has(key)) {
+      if (cache.size > 200) cache.clear();
+      cache.set(key, buildRoutePath(trackNetwork.genIndex, stationPieces, stations, `${orderId}|${stations.join('>')}`));
+    }
+    return cache.get(key) ?? null;
+  };
+  /** 每台車跨時間的分支狀態（見 vehicleBranchTracker） */
+  const branchTrackerRef = useRef<Map<string, BranchTrackState>>(new Map());
+  /*
+   * 停站的車畫面不變、不會重新繪製，跨時間分支狀態的時間就不會往前推，再開動時會被當成斷訊。
+   * 每兩秒重看一次，讓還在收資料的車把狀態時間往前推（見 resolveCachedPlacement）。
+   */
+  const [, setTrackerTick] = useState(0);
+  useEffect(() => {
+    if (vehicles.length === 0) return undefined;
+    const id = window.setInterval(() => setTrackerTick((n) => n + 1), 2_000);
+    return () => window.clearInterval(id);
+  }, [vehicles.length]);
   const yardSlotBoxes = useMemo(() => collectYardSlotFieldBoxes(areas), [areas]);
   /*
    * 停在格子裡的車就當成場區車，不管它回報什麼。
@@ -307,7 +376,7 @@ export function MapAreaVehicleOverlay({
    * 軌道上的車沿路徑補間，不在畫面上直線滑。見 pathTween：直線補間走的是兩點的弦，
    * 彎道兩側的兩個點之間會切出軌道。編輯模式（補間 0 毫秒）不補。
    */
-  const { resolve: resolvePathPose, prune: prunePathTween } = useVehiclePathTween(
+  const { resolve: resolvePathPose, prune: prunePathTween, reset: resetPathTween } = useVehiclePathTween(
     trackNetwork.genIndex ?? undefined,
     livePositionTweenMs,
   );
@@ -337,9 +406,34 @@ export function MapAreaVehicleOverlay({
     // 車速只影響「heading 還可不可信」；分成動與不動兩檔就夠，不要讓每一筆速度都破快取
     const speedMps = readVehicleSpeedMps(vehicle.payload);
     const targetStationId = readTargetStationId(vehicle.payload);
-    const corridorFacilityIds = targetStationId
-      ? routeCorridors.byTargetStation.get(targetStationId)
-      : undefined;
+    /*
+     * 任務路徑：這張訂單自己的有序站序接成的分支清單。有的話用「目前這一段＋合法後續」；
+     * 沒有（還沒拿到站序、不是訂單任務）才退回依目標站推的走廊。
+     */
+    const orderKey = readOrderId(vehicle.payload);
+    const stations = orderKey ? orderStationsById?.[orderKey] : undefined;
+    const routePath = orderKey && stations ? routePathFor(orderKey, stations) : null;
+    const corridorFacilityIds =
+      !routePath && targetStationId ? routeCorridors.byTargetStation.get(targetStationId) : undefined;
+    const frame: TrackerFrame = {
+      // 最後<strong>收到</strong>遙測的時刻：停站時畫面不變、updatedAt 不動，拿它量斷訊會把停站誤判成斷訊
+      t: vehicleLastSeenAt(vehicle.vehicleId) ?? vehicle.updatedAt ?? Date.now(),
+      xM: vehicle.xM,
+      yM: vehicle.yM,
+      orderKey,
+      routeKey: routePath?.key ?? null,
+      mapKey,
+      speedMps: speedMps ?? null,
+    };
+    const trackerState = branchTrackerRef.current.get(vehicle.vehicleId);
+    /*
+     * 上一筆確認的分支：只有地圖、任務沒換、沒有斷訊太久、位置沒有跳變時才沿用
+     * （見 vehicleBranchTracker）。它只在座標分不開的分支之間起作用，位置明顯在別處時照樣換。
+     */
+    const prior: TrackerPrior = preferYard
+      ? { routeIndex: null, resetReason: 'none' }
+      : trackerPrior(trackerState, frame);
+    const routeBranchIds = routePath ? routeWindow(routePath, prior.routeIndex) : undefined;
     const inputKey = [
       vehicle.xM.toFixed(2),
       vehicle.yM.toFixed(2),
@@ -347,18 +441,19 @@ export function MapAreaVehicleOverlay({
       headingRad == null ? '-' : headingRad.toFixed(3),
       speedMps == null ? '-' : speedMps < HEADING_RELIABLE_MPS ? 's' : 'm',
       readLegSnapKey(vehicle.payload ?? {}),
-      // 走廊只跟目標站有關；目標站換了（下一段）才需要重算
-      corridorFacilityIds ? targetStationId : '-',
+      routePath ? `${routePath.key}#${prior.routeIndex ?? '-'}` : corridorFacilityIds ? targetStationId : '-',
+      prior.previousBranchId ?? '-',
+      mapKey,
     ].join('|');
     const cached = placementCacheRef.current.get(vehicle.vehicleId);
-    if (cached?.inputKey === inputKey) return cached.placement;
-    /*
-     * 上一筆判給這台車的軌道。
-     *
-     * 每一秒都像第一次看到這台車一樣重新挑，就會在路口與平行軌道之間來回跳。有上一筆
-     * 的話，偏向留在原地或走到相連的下一塊；它只是加減分，位置明顯在別處時照樣換。
-     */
-    const previousTrackId = previousTrackIdOf(cached?.placement, cached?.preferYard === true);
+    if (cached?.inputKey === inputKey) {
+      // 輸入沒變（停著）但資料還在進來：分支狀態仍然有效，時間往前推，不要被當成斷訊
+      if (trackerState && prior.resetReason === null && frame.t > trackerState.t) {
+        branchTrackerRef.current.set(vehicle.vehicleId, { ...trackerState, t: frame.t });
+      }
+      return cached.placement;
+    }
+    const previousTrackId = prior.previousBranchId;
     const placement = resolveVehiclePlacementAcrossAreas(
       areas,
       vehicle.xM,
@@ -372,11 +467,88 @@ export function MapAreaVehicleOverlay({
         speedMps: speedMps ?? undefined,
         previousTrackId,
         corridorFacilityIds,
+        routeBranchIds,
       },
     );
     placementCacheRef.current.set(vehicle.vehicleId, { inputKey, placement, preferYard });
+    const fix = placement?.placement.network;
+    if (preferYard || placement?.placement.source !== 'generated') {
+      // 停格、場區移動、沒有有效軌道匹配：不帶著上一條軌道的分支狀態
+      branchTrackerRef.current.delete(vehicle.vehicleId);
+    } else {
+      const next = trackerNext(
+        trackerState,
+        frame,
+        prior,
+        placement && fix
+          ? {
+              branchId: placement.placement.trackId,
+              alongFrac: fix.alongFrac,
+              confirmed: fix.identity?.status === 'confirmed',
+            }
+          : null,
+        routePath,
+      );
+      if (next) branchTrackerRef.current.set(vehicle.vehicleId, next);
+      else branchTrackerRef.current.delete(vehicle.vehicleId);
+    }
+    if (isLocateRecording()) {
+      // 診斷錄製：同一組輸入再算一次，帶回每個候選的評分拆解（只有重算時才錄，不是每個影格）
+      const diag =
+        !preferYard && network.genIndex
+          ? locateByField(network.genIndex, vehicle.xM, vehicle.yM, {
+              headingRad: headingRad ?? undefined,
+              speedMps: speedMps ?? undefined,
+              previousFacilityId: previousTrackId,
+              corridorFacilityIds,
+              routeBranchIds,
+              collectCandidates: true,
+            })
+          : null;
+      recordLocateFrame({
+        t: frame.t,
+        vehicleId: vehicle.vehicleId,
+        xM: vehicle.xM,
+        yM: vehicle.yM,
+        headingRad: headingRad ?? null,
+        speedMps: speedMps ?? null,
+        targetStationId,
+        legKey: readLegSnapKey(vehicle.payload ?? {}),
+        raw: pickLocateRaw(vehicle.payload),
+        preferYard,
+        yardSlotId: yardDecision.slotId ?? null,
+        previousTrackId: previousTrackId ?? null,
+        corridor: corridorFacilityIds ? [...corridorFacilityIds] : null,
+        route: routePath
+          ? { key: routePath.key, branchIds: routePath.branchIds, index: prior.routeIndex, window: [...(routeBranchIds ?? [])] }
+          : null,
+        trackerReset: prior.resetReason,
+        placement: placement
+          ? {
+              source: placement.placement.source ?? null,
+              trackId: placement.placement.trackId,
+              areaId: placement.area.id,
+              areaLocalX: placement.placement.areaLocalX,
+              areaLocalY: placement.placement.areaLocalY,
+            }
+          : null,
+        result: {
+          trackId: placement?.placement.trackId ?? null,
+          alongFrac: fix?.alongFrac ?? null,
+          offsetM: fix?.offsetM ?? null,
+          distanceM: fix?.distanceM ?? null,
+          identity: fix?.identity ?? null,
+          distanceMarginM: fix != null && Number.isFinite(fix.distanceMarginM) ? (fix.distanceMarginM ?? null) : null,
+          scoreMargin: fix != null && Number.isFinite(fix.scoreMargin) ? (fix.scoreMargin ?? null) : null,
+          offRoute: fix?.offRoute ?? null,
+          headingConflict: fix?.headingConflict ?? null,
+        },
+        candidates: diag?.candidates ?? null,
+      });
+    }
     return placement;
   }
+
 
   // 判斷「大跳躍（發車／換段／重生）」用：committed=上一個 commit 的座標（render 時唯讀），
   // staging=本次 render 暫存；commit 後才搬進 committed。如此在 StrictMode 雙重 render 下仍正確。
@@ -439,6 +611,16 @@ export function MapAreaVehicleOverlay({
          * 補間走的是沿線位置，每一幀從那一塊的圖面路徑取座標，所以彎道上不會切出軌道。
          */
         const network = placement.placement.network;
+        /*
+         * 不在有效軌道上（停格、場區移動、區域座標、手工軌道）：清掉這台車的軌道補間、格化與
+         * 通行進度，重新進軌道時不會從過時的軌道位置補過去，也不會沿用舊的進度方向。
+         */
+        const onGeneratedTrack = placement.placement.source === 'generated' && network !== undefined;
+        if (!onGeneratedTrack) {
+          resetPathTween(vehicle.vehicleId);
+          trackCellRef.current.delete(vehicle.vehicleId);
+          passageRef.current.delete(vehicle.vehicleId);
+        }
         const legKeyNow = readLegSnapKey(
           vehicle.payload as Record<string, unknown> | undefined,
         );
@@ -447,8 +629,9 @@ export function MapAreaVehicleOverlay({
         // 大跳躍：首幀或班次／站別切換（發車、換 leg）→ 瞬間定位
         const teleported =
           !prevPosNow || (prevLegNow != null && legKeyNow !== prevLegNow && legKeyNow !== '');
+        // 只有有效軌道定位才進軌道補間（偏移也只有通過距離檢查的才會進來）
         const pathPose =
-          !preferYard && network && sizingFacility && placement.placement.trackId
+          !preferYard && onGeneratedTrack && network && sizingFacility && placement.placement.trackId
             ? resolvePathPose(
                 vehicle.vehicleId,
                 {
@@ -471,7 +654,7 @@ export function MapAreaVehicleOverlay({
             ? { along: network.alongFrac, side: network.offsetM }
             : undefined;
         const quantised =
-          !preferYard && displayFacility
+          !preferYard && onGeneratedTrack && displayFacility
             ? quantisedTrackCellPlacement(
                 displayFacility,
                 area,
@@ -527,10 +710,14 @@ export function MapAreaVehicleOverlay({
          *
          * 沒有生成路徑的方塊（手工放的、場區格位）退回照 heading 轉。
          */
+        // 只有軌道定位才照軌道的方向畫；場區分區、區域座標、格位不拿任何軌道的切線（照 heading）
+        const placedFacility = placement.placement.trackId
+          ? area.facilities.find((f) => f.id === placement.placement.trackId)
+          : undefined;
         const drawnTrack = pathPose
           ? displayFacility
-          : placement.placement.trackId
-            ? area.facilities.find((f) => f.id === placement.placement.trackId)
+          : onGeneratedTrack || (placement.placement.source === 'manual' && placedFacility?.type === 'Track')
+            ? placedFacility
             : undefined;
         // 走了幾成直接帶進去：補間中的位置不對應任何一筆遙測座標，重投影只會投回起點
         const alongHint = pathPose?.along ?? network?.alongFrac;
@@ -698,69 +885,47 @@ export function MapAreaVehicleOverlay({
         const badgeTopY = coordTop + bodyOffset.dy - bodyHalfSpanY - 4;
 
         /*
-         * 兩件不同的事，畫面上分開標：
-         *   猜的（≈）：旁邊有差不多近的別條軌道、或車頭跟所選軌道方向矛盾——選錯的可能性高，
-         *              偏差數字是相對「可能選錯的那條」算的，不能當事實。
-         *   離軌（紅）：沒有對手，這台車就是離所選軌道中心線超過半寬——是輸入座標的事實。
-         * 數字一律取<strong>最新定位</strong>的偏差，不是補間中的值：徽章是診斷，不是動畫，
-         * 跟「≈」必須指同一個時刻。
-         */
-        const uncertain =
-          network !== undefined &&
-          ((network.margin !== undefined && network.margin < AMBIGUOUS_MARGIN_M) ||
-            network.headingConflict === true);
-        const fixRatio = network ? network.offsetM / TRACK_HALF_WIDTH_M : (quantised?.lateralRatio ?? 0);
-        const offCentre = Math.abs(fixRatio) > 1;
-        // 離得遠而把握低是「離軌」（紅），不是「猜的」
-        const lowConfidence =
-          uncertain ||
-          (!offCentre && network?.confidence !== undefined && network.confidence < LOW_CONFIDENCE);
-        /*
-         * 車頂軌道進度：名稱與進度都取自同一條判給的軌道（displayFacility），不另外
-         * 依座標查附近的名稱。停在格位（沒有 quantised）不畫；把握不高只寫「定位未確認」。
+         * 車頂軌道進度：只有<strong>有效的軌道定位</strong>、而且進度是有限值時才畫。名稱與
+         * 百分比取自同一份判位結果與它判給的那一條軌道（不用補間中的軌道），格位停車、場區
+         * 移動沒有對應軌道就不畫——不補 0%，也不拿最近的軌道充數。
          */
         let cellBadge: ReactElement | null = null;
-        if (quantised && displayFacility && roofConfig.enabled) {
-          const rawAlong = quantised.reversed ? 1 - quantised.alongTravel : quantised.alongTravel;
+        const fixTrackId = placement.placement.trackId;
+        const fixFacility = network ? area.facilities.find((f) => f.id === fixTrackId) : undefined;
+        if (!preferYard && network && fixFacility && roofConfig.enabled && Number.isFinite(network.alongFrac)) {
+          const realPath = getTrackGenPaths(fixFacility.parameters)?.real;
+          const defaultReversed = realPath ? trackAlongIsReversed(fixFacility.parameters, realPath) : false;
           const passage = passageProgress(
             passageRef.current.get(vehicle.vehicleId),
-            displayFacility.id,
-            rawAlong,
-            quantised.reversed,
+            fixFacility.id,
+            network.alongFrac,
+            defaultReversed,
           );
-          passageRef.current.set(vehicle.vehicleId, passage.state);
-          const offsetM = network && Number.isFinite(network.offsetM) ? network.offsetM : null;
-          cellBadge = (
-            <div
-              key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
-              className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
-              style={{
-                left: badgeCenterX,
-                top: badgeTopY,
-                zIndex: zIndex + 1,
-                backgroundColor: roofConfig.backgroundColor,
-                // 自己往左半個、往上整個——貼在車的正上方置中；不隨車身旋轉
-                transform: 'translate(-50%, -100%)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <VehicleTrackProgressBadge
-                config={roofConfig}
-                trackName={trackCodeFromFacility(displayFacility)}
-                progress={passage.progress}
-                offsetM={offsetM}
-                offTrack={offCentre}
-                unconfirmed={lowConfidence}
-                title={
-                  lowConfidence
-                    ? `定位不確定（把握 ${Math.round((network?.confidence ?? 0) * 100)}%${network?.headingConflict ? '，車頭與軌道方向矛盾' : ''}）：可能判給了旁邊的軌道`
-                    : offCentre
-                      ? `離中心線 ${network?.distanceM?.toFixed(1) ?? '?'} 公尺：座標本身就不在這條軌道上`
-                      : undefined
-                }
-              />
-            </div>
-          );
+          // 分不開的那一筆，along 可能是別條分支的：不拿來更新這台車的通行方向
+          if (network.identity?.status !== 'ambiguous') passageRef.current.set(vehicle.vehicleId, passage.state);
+          if (Number.isFinite(passage.progress)) {
+            cellBadge = (
+              <div
+                key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
+                className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
+                style={{
+                  left: badgeCenterX,
+                  top: badgeTopY,
+                  zIndex: zIndex + 1,
+                  backgroundColor: roofConfig.backgroundColor,
+                  // 自己往左半個、往上整個——貼在車的正上方置中；不隨車身旋轉
+                  transform: 'translate(-50%, -100%)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <VehicleTrackProgressBadge
+                  config={roofConfig}
+                  trackName={trackCodeFromFacility(fixFacility)}
+                  progress={passage.progress}
+                />
+              </div>
+            );
+          }
         }
 
         const coordLabel = showMqttCoords ? (

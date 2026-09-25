@@ -80,5 +80,10 @@ export function useVehiclePathTween(index: TrackGenIndex | undefined, durationMs
     return () => window.clearTimeout(timer)
   })
 
-  return { resolve, prune }
+  /** 這台車離開軌道（進場區、停格）時清掉，重新進軌道不會從過時的軌道位置補過去 */
+  const reset = useCallback((vehicleId: string) => {
+    statesRef.current.delete(vehicleId)
+  }, [])
+
+  return { resolve, prune, reset }
 }

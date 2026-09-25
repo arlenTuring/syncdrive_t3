@@ -2,13 +2,12 @@ import type { CanvasElementProps } from '../types';
 import {
   DEFAULT_ROOF_INDICATOR,
   resolveRoofIndicatorConfig,
-  type RoofIndicatorOffsetMode,
   type VehicleRoofIndicatorConfig,
 } from '../../map-editor/vehicles/vehicleRoofIndicator';
 
 const inputCls = 'w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-200';
 
-/** 圖台容器：車頂軌道進度指標（軌道名稱、這一段走了幾成、偏移公尺） */
+/** 圖台容器：車頂軌道進度指標（軌道名稱、進度線、百分比） */
 export function VehicleRoofIndicatorSettings({
   el,
   onUpdate,
@@ -47,7 +46,7 @@ export function VehicleRoofIndicatorSettings({
     <div className="space-y-2 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
       <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">車頂軌道進度</div>
       <p className="text-[9px] leading-relaxed text-zinc-500">
-        名稱＝車目前判給的軌道；線段左端是這次通行的入口、箭頭是出口；百分比是這條軌道走了幾成（換軌道重算，不是整張訂單的進度）。停在格位不顯示，定位不可信時顯示「定位未確認」。
+        名稱＝車目前判給的軌道；線段左端是這次通行的入口、箭頭是出口；百分比是這條軌道走了幾成（換軌道重算，不是整張訂單的進度）。停在格位、在場區移動（沒有對應軌道）時不顯示。
       </p>
       {check('enabled', '顯示')}
       {current.enabled && (
@@ -57,30 +56,6 @@ export function VehicleRoofIndicatorSettings({
             {check('showPercent', '百分比')}
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <label className="block text-[9px] text-zinc-500">
-              偏移（公尺）
-              <select
-                value={current.offsetMode}
-                onChange={e => patch({ offsetMode: e.target.value as RoofIndicatorOffsetMode })}
-                className={inputCls}
-              >
-                <option value="threshold">超過門檻才顯示</option>
-                <option value="always">一律顯示</option>
-                <option value="off">不顯示</option>
-              </select>
-            </label>
-            <label className="block text-[9px] text-zinc-500">
-              門檻（m）
-              <input
-                type="number"
-                min={0}
-                step={0.05}
-                value={current.offsetThresholdM}
-                disabled={current.offsetMode !== 'threshold'}
-                onChange={e => patch({ offsetThresholdM: Math.max(0, Number(e.target.value) || 0) })}
-                className={inputCls}
-              />
-            </label>
             <label className="block text-[9px] text-zinc-500">
               字級（px）
               <input

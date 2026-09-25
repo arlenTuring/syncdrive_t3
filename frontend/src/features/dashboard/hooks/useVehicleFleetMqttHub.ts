@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { markVehicleSeen } from '../elements/vehicleLastSeen';
 import { acquireSocket, releaseSocket } from '../elements/socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { VTMS_DEBUG_VEHICLES, VTMS_VEHICLE_POOL } from '../constants/vtmsVehiclePool';
@@ -182,6 +183,8 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
           if (!payload || typeof payload !== 'object') return;
           const row = payload as Record<string, unknown>;
           const code = String(row.vehicle_code ?? vehicleCode).toUpperCase();
+          // 收到就記：下面的去重會丟掉內容沒變的遙測（停站的車），但那仍然是「有收到」
+          if (stream === 'telemetry') markVehicleSeen(code);
           pendingRef.current[stream].set(code, row);
           scheduleFlush();
         };

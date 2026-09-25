@@ -63,11 +63,11 @@ describe('方向：漸進扣分，不是直接淘汰', () => {
     // 離 down 0.5、離 up 3.0；車頭朝東（順著 down）
     expect(locateByField(index, 50, 0.5, { headingRad: EAST })?.facilityId).toBe('down')
     // 車頭朝東、卻壓在 up 的中心線上（y=3.5）：down 離 3.5，up 離 0。
-    // 位置說得很清楚，方向不能翻盤——判給 up，並標出 headingConflict 讓人查資料。
+    // 位置說得很清楚，方向不能翻盤——判給 up，身分照樣確認，另外標出方向異常。
     const hit = locateByField(index, 50, 3.5, { headingRad: EAST, speedMps: 8 })
     expect(hit?.facilityId).toBe('up')
     expect(hit?.headingConflict).toBe(true)
-    expect(hit?.confidence).toBeLessThan(0.7)
+    expect(hit?.identity).toMatchObject({ status: 'confirmed', reason: 'geometry' })
   })
 
   it('候選離最近那一塊超過門檻，方向就不能讓它翻盤', () => {
@@ -217,28 +217,159 @@ describe('連續性：留在原地，或走到相連的下一塊', () => {
   })
 })
 
-describe('把握（confidence）', () => {
-  it('兩條一樣近：把握低', () => {
-    const index = buildTrackGenIndex([
+describe('軌道身分：只看幾何分不分得開', () => {
+  const parallel = () =>
+    buildTrackGenIndex([
       piece('down', [[0, 0], [100, 0]], EAST),
       piece('up', [[100, 3.5], [0, 3.5]], WEST),
     ])
-    const mid = locateByField(index, 50, 1.75)!
-    expect(mid.margin).toBeLessThan(0.1)
-    expect(mid.confidence).toBeLessThan(0.5)
+
+  it('兩條一樣近、沒有任何旁證：不確定，並列出對手', () => {
+    const mid = locateByField(parallel(), 50, 1.75)!
+    expect(mid.identity.status).toBe('ambiguous')
+    expect(mid.identity.rivals.length).toBe(1)
+    expect(mid.distanceMarginM).toBeLessThan(0.1)
   })
 
-  it('壓在中心線上、旁邊沒有對手：把握高', () => {
+  it('壓在中心線上、旁邊沒有對手：幾何確認，距離差是 Infinity', () => {
     const index = buildTrackGenIndex([piece('only', [[0, 0], [100, 0]], EAST)])
     const hit = locateByField(index, 50, 0)!
-    expect(hit.margin).toBe(Infinity)
-    expect(hit.confidence).toBeGreaterThan(0.9)
+    expect(hit.identity).toEqual({ status: 'confirmed', reason: 'geometry', rivals: [] })
+    expect(hit.distanceMarginM).toBe(Infinity)
+    expect(hit.scoreMargin).toBe(Infinity)
   })
 
-  it('離中心線很遠：把握低，即使旁邊沒有對手', () => {
+  it('離中心線很遠但沒有對手：身分照樣確認（偏多遠另外看 distanceM／offsetM）', () => {
     const index = buildTrackGenIndex([piece('only', [[0, 0], [100, 0]], EAST)])
     const hit = locateByField(index, 50, 6)!
-    expect(hit.confidence).toBeLessThan(0.6)
+    expect(hit.identity.status).toBe('confirmed')
+    expect(hit.distanceM).toBeCloseTo(6, 5)
+  })
+
+  it('scoreMargin 是評分差、distanceMarginM 是公尺差，兩者分開', () => {
+    const hit = locateByField(parallel(), 50, 0.5, { headingRad: EAST, speedMps: 8 })!
+    expect(hit.distanceMarginM).toBeCloseTo(2.5, 5)
+    // 評分含方向加減分，跟公尺差不一樣
+    expect(hit.scoreMargin).not.toBeCloseTo(hit.distanceMarginM, 1)
+  })
+})
+
+describe('平行上下行：不跳線', () => {
+  const index = buildTrackGenIndex([
+    piece('down', [[0, 0], [100, 0]], EAST),
+    piece('up', [[100, 3.5], [0, 3.5]], WEST),
+  ])
+
+  it('一路貼著 down 開、偶爾偏向中間：上一筆在 down 就留在 down，不跳到 up', () => {
+    let prev: string | undefined
+    const ys = [0.1, 0.4, 1.2, 1.8, 1.6, 0.9, 0.2]
+    const picks = ys.map((y, i) => {
+      const hit = locateByField(index, 10 + i * 10, y, { headingRad: EAST, speedMps: 8, previousFacilityId: prev })!
+      prev = hit.facilityId
+      return hit
+    })
+    expect(picks.map((h) => h.facilityId)).toEqual(Array(ys.length).fill('down'))
+    expect(picks.every((h) => h.identity.status === 'confirmed')).toBe(true)
+  })
+
+  it('座標明顯到了 up：上一筆不能困住它', () => {
+    const hit = locateByField(index, 50, 3.4, { headingRad: WEST, speedMps: 8, previousFacilityId: 'down' })!
+    expect(hit.facilityId).toBe('up')
+    expect(hit.identity.status).toBe('confirmed')
+  })
+})
+
+describe('交叉：兩條分支各自通過都判對', () => {
+  // 模擬交叉拆成的分支：斜行 X（左下→右上）與直行 S（y=0），在 (50,0) 交會；
+  // 兩邊各有鄰居接進來。
+  const index = buildTrackGenIndex([
+    piece('inS', [[-50, 0], [0, 0]], EAST),
+    piece('inX', [[-50, -50], [0, -50]], EAST),
+    piece('S', [[0, 0], [100, 0]], EAST),
+    piece('X', [[0, -50], [100, 50]], Math.PI / 4),
+    piece('outS', [[100, 0], [150, 0]], EAST),
+    piece('outX', [[100, 50], [150, 50]], EAST),
+  ])
+
+  it('交叉中心兩條都貼著座標：直行通過時照上一筆留在 S', () => {
+    const hit = locateByField(index, 50, 0, { headingRad: EAST, speedMps: 8, previousFacilityId: 'S' })!
+    expect(hit.facilityId).toBe('S')
+    expect(hit.identity.status).toBe('confirmed')
+  })
+
+  it('交叉中心：斜行通過時照上一筆留在 X，不被直行吸走', () => {
+    const hit = locateByField(index, 50, 0, { headingRad: Math.PI / 4, speedMps: 8, previousFacilityId: 'X' })!
+    expect(hit.facilityId).toBe('X')
+    expect(hit.identity.status).toBe('confirmed')
+  })
+
+  it('沒有上一筆時：任務路徑只含其中一條，照路徑判', () => {
+    const hit = locateByField(index, 50, 0, { speedMps: 0, routeBranchIds: new Set(['inX', 'X', 'outX']) })!
+    expect(hit.facilityId).toBe('X')
+    expect(hit.identity).toMatchObject({ status: 'confirmed', reason: 'route' })
+  })
+
+  it('交叉中心、停著、沒有上一筆也沒有路徑：不確定', () => {
+    const hit = locateByField(index, 50, 0, { speedMps: 0 })!
+    expect(hit.identity.status).toBe('ambiguous')
+  })
+})
+
+describe('相鄰段接縫：正常交接，不判成不確定', () => {
+  const index = buildTrackGenIndex([
+    piece('a', [[0, 0], [50, 0]], EAST),
+    piece('b', [[50, 0], [100, 0]], EAST),
+  ])
+
+  it('剛過接縫：上一段的端點不是對手，確認在下一段', () => {
+    const hit = locateByField(index, 50.6, 0, { headingRad: EAST, speedMps: 8, previousFacilityId: 'a' })!
+    expect(hit.facilityId).toBe('b')
+    expect(hit.identity.status).toBe('confirmed')
+    expect(hit.distanceMarginM).toBe(Infinity)
+  })
+
+  it('接縫遲滯：剛好在接點上仍留在上一段，不來回換', () => {
+    const hit = locateByField(index, 50.05, 0, { headingRad: EAST, speedMps: 8, previousFacilityId: 'a' })!
+    expect(hit.facilityId).toBe('a')
+    expect(hit.identity.status).toBe('confirmed')
+  })
+
+  it('一路開過接縫：只換一次段', () => {
+    let prev: string | undefined
+    const seq = [48, 49, 49.8, 50, 50.2, 50.4, 51, 52].map((x) => {
+      const hit = locateByField(index, x, 0.02, { headingRad: EAST, speedMps: 8, previousFacilityId: prev })!
+      prev = hit.facilityId
+      return hit.facilityId
+    })
+    const switches = seq.filter((id, i) => i > 0 && id !== seq[i - 1]).length
+    expect(switches).toBe(1)
+    expect(seq.at(-1)).toBe('b')
+  })
+})
+
+describe('方向與偏離', () => {
+  const index = buildTrackGenIndex([piece('only', [[0, 0], [100, 0]], EAST)])
+
+  it('座標明確、heading 反了：只報方向異常，身分確認', () => {
+    const hit = locateByField(index, 50, 0.1, { headingRad: WEST, speedMps: 8 })!
+    expect(hit.identity.status).toBe('confirmed')
+    expect(hit.headingConflict).toBe(true)
+  })
+
+  it('停著：殘留 heading 不算方向異常', () => {
+    const hit = locateByField(index, 50, 0.1, { headingRad: WEST, speedMps: 0 })!
+    expect(hit.headingConflict).toBe(false)
+  })
+
+  it('真正偏離任務路徑：不吸回路線，回報 offRoute', () => {
+    const two = buildTrackGenIndex([
+      piece('route', [[0, 0], [100, 0]], EAST),
+      piece('side', [[0, 8], [100, 8]], EAST),
+    ])
+    const hit = locateByField(two, 50, 8, { headingRad: EAST, speedMps: 8, routeBranchIds: new Set(['route']) })!
+    expect(hit.facilityId).toBe('side')
+    expect(hit.offRoute).toBe(true)
+    expect(hit.identity).toMatchObject({ status: 'confirmed', reason: 'geometry' })
   })
 })
 

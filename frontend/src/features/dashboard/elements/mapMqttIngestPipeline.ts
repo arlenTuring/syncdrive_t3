@@ -1,4 +1,5 @@
 import type { MapAreaObject } from '../../map-editor/types/area';
+import { markVehicleSeen } from './vehicleLastSeen';
 import type { FacilityObject } from '../../map-editor/types/facility';
 import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import { mergePayloadIntoLive } from '../../map-editor/live/mqttPayload';
@@ -578,6 +579,8 @@ export function createMapMqttIngestPipeline(
     if (topic.includes('/operation/')) {
       ingestOperation(topic, payloadObj);
     } else if (topic.includes('/telemetry/')) {
+      const seenId = resolveVehicleId(topic, payloadObj);
+      if (seenId) markVehicleSeen(seenId);
       ingestVehicle(topic, payloadObj);
     }
     scheduleFlush();

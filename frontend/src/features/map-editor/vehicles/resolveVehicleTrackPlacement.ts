@@ -56,11 +56,17 @@ export type VehicleNetworkFix = {
   alongFrac: number;
   /** 離中心線的距離（公尺，無正負號）。 */
   distanceM?: number;
-  /** 判給這一塊有多少把握（0–1）；低的時候畫面上要看得出「這是猜的」。 */
-  confidence?: number;
-  /** 第二名比第一名差多少分；只有一塊候選時是 Infinity。 */
-  margin?: number;
-  /** 車頭跟所選軌道的行車方向幾乎相反（診斷用）。 */
+  /** 通行分支識別（一般軌道即設施 id；交叉／分岔為分支設施 id） */
+  branchId?: string;
+  /** 軌道身分判定：confirmed（附理由）或 ambiguous；畫面依此決定能不能顯示進度 */
+  identity?: import('../utils/trackGenLocate').BranchIdentity;
+  /** 幾何距離差（公尺）：最近對手分支比所選分支遠多少；接縫前後段不算對手 */
+  distanceMarginM?: number;
+  /** 綜合評分差（診斷用，不是公尺） */
+  scoreMargin?: number;
+  /** 有任務路徑時所選分支不在路徑上；沒有路徑資訊為 null */
+  offRoute?: boolean | null;
+  /** 車頭跟所選分支的行車方向幾乎相反：方向異常，不影響軌道身分。 */
   headingConflict?: boolean;
   /** 這個位置局部的行車方向（弧度，場域座標）。 */
   travelRad?: number;
@@ -74,6 +80,12 @@ export type VehicleTrackPlacement = {
   score: number;
   /** 反查到的路網位置；手工軌道或查不到時沒有這一欄 */
   network?: VehicleNetworkFix;
+  /**
+   * 這個位置怎麼來的：generated＝生成軌道（通過距離檢查）、manual＝手工軌道的場域範圍、
+   * zone＝場區分區的座標映射、area＝區域座標直接換算、yard＝已確認停在格位。
+   * 只有 generated 有軌道名稱與進度。
+   */
+  source?: 'generated' | 'manual' | 'zone' | 'area' | 'yard';
 };
 
 export type VehiclePlacementAcrossAreas = {
@@ -143,6 +155,7 @@ function locateInZonePartition(
           areaLocalY: pos.y + local.v * size.h,
           trackId: zone.id,
           score: 1,
+          source: 'zone',
         },
       };
     }
@@ -165,6 +178,7 @@ function locateInAreaDomain(
         areaLocalY: local.y,
         trackId: 'yard',
         score: 1,
+        source: 'area',
       },
     };
   }
@@ -228,6 +242,7 @@ function placementAtFacilityAreaCenter(
       areaLocalY: areaPos.y + areaSize.h / 2,
       trackId: facility.id,
       score: 1,
+      source: 'yard',
     },
   };
 }
@@ -736,6 +751,11 @@ export function resolveVehiclePlacementAcrossAreas(
     /** 訂單路線的走廊（見 routeCorridor）：走廊外的軌道在挑塊時多扣分。 */
     corridorFacilityIds?: ReadonlySet<string>;
     /**
+     * 這張任務有序路徑上目前這一段與合法後續（見 routeCorridor.routeWindow）。
+     * 優先於走廊；只在座標分不開的分支之間決定，不會把車吸回路線。
+     */
+    routeBranchIds?: ReadonlySet<string>;
+    /**
      * 場區判定（見 yardClassification）已經決定要畫進哪一格時給它。格位代號不再只能從 payload
      * 取：只有座標落進格位、payload 沒有標記的停著的車，原本取不到代號、定位回 null，車就消失。
      */
@@ -757,6 +777,7 @@ export function resolveVehiclePlacementAcrossAreas(
     speedMps: options?.speedMps,
     previousTrackId: options?.previousTrackId,
     corridorFacilityIds: options?.corridorFacilityIds,
+    routeBranchIds: options?.routeBranchIds,
   });
 
   if (onTrack) return onTrack;

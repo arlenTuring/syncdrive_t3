@@ -94,16 +94,16 @@ function pieceGraph(index: TrackGenIndex): PieceGraph {
 }
 
 /**
- * from 那一段走到 to 那一段，最短路上經過的設施。
+ * from 那一段走到 to 那一段的最短路，<strong>照走的順序</strong>回傳經過的段（pieces 索引）。
  *
- * 起點那一段從允許的那一端出發（不知道站在這一段的哪個位置，整段都算）。找不到路回 null。
+ * 起點那一段從哪一端出發都可以（不知道站在這一段的哪個位置，整段都算）。找不到路回 null。
  */
-export function shortestCorridor(
+export function shortestPiecePath(
   index: TrackGenIndex,
   fromPiece: number,
   toPiece: number,
-): Set<string> | null {
-  if (fromPiece === toPiece) return new Set([index.pieces[fromPiece]!.facilityId])
+): number[] | null {
+  if (fromPiece === toPiece) return [fromPiece]
   const g = pieceGraph(index)
 
   // Dijkstra：狀態＝（段，從哪一端進來）。從 entry 進、走完這一段到 1-entry 出，再接下一段。
@@ -124,7 +124,15 @@ export function shortestCorridor(
     queue.sort((m, n) => m.cost - n.cost)
     const { key, piece, entry, cost } = queue.shift()!
     if (cost > (dist.get(key) ?? Infinity)) continue
-    if (piece === toPiece) return facilitiesOn(index, prev, key)
+    if (piece === toPiece) {
+      const order: number[] = []
+      let k: string | null = key
+      while (k) {
+        order.push(Number(k.split('|')[0]))
+        k = prev.get(k) ?? null
+      }
+      return order.reverse()
+    }
     const exitEnd: 0 | 1 = entry === 0 ? 1 : 0
     const through = piece === fromPiece ? 0 : g.lengthM[piece]!
     for (const l of g.links.get(`${piece}|${exitEnd}`) ?? []) {
@@ -134,14 +142,14 @@ export function shortestCorridor(
   return null
 }
 
-function facilitiesOn(index: TrackGenIndex, prev: Map<string, string | null>, endKey: string): Set<string> {
-  const out = new Set<string>()
-  let k: string | null = endKey
-  while (k) {
-    out.add(index.pieces[Number(k.split('|')[0])]!.facilityId)
-    k = prev.get(k) ?? null
-  }
-  return out
+/** from 那一段走到 to 那一段，最短路上經過的設施（無順序；走廊用） */
+export function shortestCorridor(
+  index: TrackGenIndex,
+  fromPiece: number,
+  toPiece: number,
+): Set<string> | null {
+  const path = shortestPiecePath(index, fromPiece, toPiece)
+  return path ? new Set(path.map((i) => index.pieces[i]!.facilityId)) : null
 }
 
 /**
@@ -231,4 +239,66 @@ export function readTargetStationId(payload: Record<string, unknown> | undefined
   if (!leg || typeof leg !== 'object') return null
   const id = (leg as { target_station_id?: unknown }).target_station_id
   return typeof id === 'string' && id.trim() ? id.trim() : null
+}
+
+/**
+ * 一張任務的<strong>有序</strong>分支路徑。
+ *
+ * 走廊（byTargetStation）只知道「差不多會經過哪些軌道」，沒有順序，也不知道現在走到哪；
+ * 同一個終點站被好幾條路線抵達時還會把別條路線的軌道也算進來。這裡改用<strong>這張任務
+ * 自己的站序</strong>（訂單 payload.stations，含交叉軌道的進出口站），逐段走最短路接起來，
+ * 得到照行車順序排好的分支清單。
+ */
+export type RoutePath = {
+  /** 路線識別（例如訂單 id＋站序），換任務或換路線時用來讓追蹤狀態失效 */
+  key: string
+  stationIds: string[]
+  /** 照行車順序排列的分支（設施 id），相鄰重複已合併 */
+  branchIds: string[]
+  /** 站序裡查不到軌道的站（接不起來的地方），診斷用 */
+  unresolvedStations: string[]
+}
+
+export function buildRoutePath(
+  index: TrackGenIndex,
+  stationPieces: ReadonlyMap<string, number>,
+  stationIds: readonly string[],
+  key: string,
+): RoutePath | null {
+  const unresolved = stationIds.filter((id) => !stationPieces.has(id))
+  const known = stationIds.filter((id) => stationPieces.has(id))
+  if (known.length < 2) return null
+  const branchIds: string[] = []
+  const pushBranch = (id: string) => {
+    if (branchIds[branchIds.length - 1] !== id) branchIds.push(id)
+  }
+  for (let i = 1; i < known.length; i += 1) {
+    const leg = shortestPiecePath(index, stationPieces.get(known[i - 1]!)!, stationPieces.get(known[i]!)!)
+    if (!leg) return null
+    for (const piece of leg) pushBranch(index.pieces[piece]!.facilityId)
+  }
+  return { key, stationIds: [...stationIds], branchIds, unresolvedStations: unresolved }
+}
+
+/** 路徑上往前看幾條分支當「合法後續」（短的分支一筆遙測就可能走過一條） */
+export const ROUTE_LOOKAHEAD = 3
+
+/**
+ * 目前這一段與合法後續。index 未知（剛上線、剛換任務）時整條路徑都算——那仍然只在座標
+ * 分不開的分支之間決定。
+ */
+export function routeWindow(path: RoutePath, currentIndex: number | null, ahead = ROUTE_LOOKAHEAD): Set<string> {
+  if (currentIndex == null || currentIndex < 0) return new Set(path.branchIds)
+  return new Set(path.branchIds.slice(currentIndex, currentIndex + 1 + ahead))
+}
+
+/**
+ * 確認的分支落在路徑的第幾條：只往前找（index 已知時限在窗口內），找不到就維持原索引
+ * （可能暫時偏離，由 offRoute 回報，不改路徑進度）。
+ */
+export function advanceRouteIndex(path: RoutePath, currentIndex: number | null, branchId: string): number | null {
+  const from = currentIndex == null || currentIndex < 0 ? 0 : currentIndex
+  const until = currentIndex == null ? path.branchIds.length : Math.min(path.branchIds.length, from + 1 + ROUTE_LOOKAHEAD)
+  for (let i = from; i < until; i += 1) if (path.branchIds[i] === branchId) return i
+  return currentIndex
 }

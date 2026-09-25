@@ -99,6 +99,8 @@ type MapAreaCanvasProps = {
   vehicleBehavior?: import('../../dashboard/elements/MapVehicleBehaviorOverlay').MapVehicleBehaviorConfig
   /** 車頂軌道進度指標設定 */
   vehicleRoofIndicator?: import('../vehicles/vehicleRoofIndicator').VehicleRoofIndicatorConfig | null
+  /** 每張訂單的有序站序（訂單 id → 站代號）；判位依此建任務路徑 */
+  orderStationsById?: Record<string, readonly string[]>
   /** 圖台車輛座標／heading 等除錯標籤 */
   showVehicleTelemetry?: boolean
   /** 儀表板編輯：載具顯示校準框（地圖像素座標，與載具同層） */
@@ -247,6 +249,7 @@ export function MapAreaCanvas({
   vehicleFitMode = 'contain',
   vehicleBehavior,
   vehicleRoofIndicator,
+  orderStationsById,
   showVehicleTelemetry = true,
   vehicleEditSizer = null,
   slotPreview = null,
@@ -915,6 +918,7 @@ export function MapAreaCanvas({
                 routes={routes}
                 vehicleBehavior={vehicleBehavior}
                 roofIndicator={vehicleRoofIndicator}
+                orderStationsById={orderStationsById}
                 vehicleEditSizer={vehicleEditSizer}
                 livePositionTweenMs={livePositionTweenMsProp ?? (isEmbedded ? 1200 : 0)}
               />
