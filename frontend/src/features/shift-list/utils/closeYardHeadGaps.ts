@@ -2,6 +2,9 @@ import type {
   GeneratedScheduleBlock,
   GeneratedScheduleTimeline,
 } from './schedule-engine/types';
+import { minuteToSecond } from './schedule-engine/types';
+import { collectFacilityOccupancies } from './stationBerthOccupancy';
+import { daySegmentOverlapSeconds } from './moveCardShared';
 
 /**
  * 整備前面不留空白：車到了就開始，整備自己往前長
@@ -23,6 +26,13 @@ import type {
  *
  * <strong>不搶別人的格子。</strong>要往前拉的那段時間，該設施格必須沒有別列車預約——
  * 提早開工不能是特權（見 insertMaintenanceTransferCards 對 EG1926 排擠案例的說明）。
+ *
+ * <strong>「別列車有沒有預約」看的是實際佔用，不是卡片自己的起訖。</strong>整備／
+ * 停留類卡片就算排定的區塊結束了，車沒真的開走之前格位仍算佔著（見
+ * {@link collectFacilityOccupancies} 的說明）——這裡要拉的候選空位檢查如果只看
+ * 卡片自己的 <code>plannedEndMinute</code>，會把「已經佔著、只是排定的整備區塊寫的
+ * 結束時刻比較早」的格子誤判成空的。比對也用跨午夜安全的日循環重疊（見
+ * {@link daySegmentOverlapSeconds}），不直接比較 start／end 的分鐘數字。
  */
 
 function isYardBlock(block: GeneratedScheduleBlock): boolean {
@@ -50,7 +60,14 @@ export function closeYardHeadGaps(args: {
 }): { timelines: GeneratedScheduleTimeline[]; closed: number; secondsRecovered: number } {
   const { timelines } = args;
 
-  // 各設施格目前被哪些區間佔著；key 帶上卡片 id，往前拉時要排除自己
+  // 整備／停留類卡片的實際離開時刻——沒補「暫停」卡也分析得出來，跟最後驗證
+  // （validateFacilityOccupancy）同一個答案，見 collectFacilityOccupancies 的說明。
+  const actualDepartByBlockId = new Map(
+    collectFacilityOccupancies(timelines).map((occ) => [occ.blockId, occ.actualDepartMinute]),
+  );
+
+  // 各設施格目前被哪些區間佔著；key 帶上卡片 id，往前拉時要排除自己。
+  // 整備／停留類卡片用實際離開時刻，不是卡片自己寫的結束時刻。
   const bookings: { nodeId: string; start: number; end: number; blockId: string; row: number }[] = [];
   for (const timeline of timelines) {
     for (const block of timeline.blocks) {
@@ -59,7 +76,7 @@ export function closeYardHeadGaps(args: {
       bookings.push({
         nodeId,
         start: block.plannedStartMinute,
-        end: block.plannedEndMinute,
+        end: actualDepartByBlockId.get(block.id) ?? block.plannedEndMinute,
         blockId: block.id,
         row: timeline.row,
       });
@@ -113,8 +130,12 @@ export function closeYardHeadGaps(args: {
           booking.nodeId === nodeId
           && booking.blockId !== yard.id
           && booking.blockId !== previous.id
-          && booking.start < yard.plannedStartMinute - 1e-9
-          && booking.end > newStart + 1e-9,
+          && daySegmentOverlapSeconds(
+            minuteToSecond(newStart),
+            minuteToSecond(yard.plannedStartMinute),
+            minuteToSecond(booking.start),
+            minuteToSecond(booking.end),
+          ) > 1e-6,
       );
       if (taken) continue;
 

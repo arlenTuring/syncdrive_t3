@@ -65,7 +65,7 @@ const DAY_SECONDS = SCHEDULE_DAY_MINUTES * 60;
  * 「00:00–01:30」。直接比大小的話這兩段永遠不會判定成重疊，但它們在實體上
  * 就是同一台設施的同一段時間，會排出兩台車同時佔一格。
  */
-function daySegmentsOf(startSecond: number, endSecond: number): Array<[number, number]> {
+export function daySegmentsOf(startSecond: number, endSecond: number): Array<[number, number]> {
   const span = endSecond - startSecond;
   if (span <= 0) return [];
   if (span >= DAY_SECONDS) return [[0, DAY_SECONDS]];
@@ -73,6 +73,33 @@ function daySegmentsOf(startSecond: number, endSecond: number): Array<[number, n
   const end = start + span;
   if (end <= DAY_SECONDS) return [[start, end]];
   return [[start, DAY_SECONDS], [0, end - DAY_SECONDS]];
+}
+
+/**
+ * 兩段時間<strong>跨午夜安全</strong>的重疊秒數。
+ *
+ * 引擎內部同一段整備，不同呼叫端可能一個記「23:5x–1440+」（延續到隔天），另一個
+ * 記「00:00–01:30」（折回鐘面）——兩種都對，只是基準不同，直接比大小永遠對不上
+ * （見上方 {@link daySegmentsOf} 的說明）。這裡先各自拆成鐘面上的區段再比對，
+ * 求解時的候選空位檢查跟最後驗證的碰撞判定要拿到同一個答案，都該走這支，
+ * 不要各自比較 start／end 數字。
+ */
+export function daySegmentOverlapSeconds(
+  aStartSecond: number,
+  aEndSecond: number,
+  bStartSecond: number,
+  bEndSecond: number,
+): number {
+  const segA = daySegmentsOf(aStartSecond, aEndSecond);
+  const segB = daySegmentsOf(bStartSecond, bEndSecond);
+  let total = 0;
+  for (const [as, ae] of segA) {
+    for (const [bs, be] of segB) {
+      const overlap = Math.min(ae, be) - Math.max(as, bs);
+      if (overlap > 0) total += overlap;
+    }
+  }
+  return total;
 }
 
 /** 同一台設施在該時段是否已被別列車佔著（日循環比對） */

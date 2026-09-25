@@ -34,6 +34,8 @@ import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDay
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
+  collectFacilityOccupancies,
+  findFacilityOccupancyCollisions,
   type StationBerthOccupancy,
 } from '../stationBerthOccupancy';
 import {
@@ -1333,14 +1335,6 @@ export function validateRotationCyclesComplete(
 }
 
 /** 車真的停在裡面的那幾種整備；暫停卡（source 'hold'）同樣代表車還在格子裡 */
-const FACILITY_STAY_TASK_TYPES = new Set([
-  'charging',
-  'servicing',
-  'inspection',
-  'standby',
-  'washing',
-]);
-
 /**
  * 設施格佔用驗證：同一格同一時刻只能有一台車。
  *
@@ -1354,103 +1348,66 @@ const FACILITY_STAY_TASK_TYPES = new Set([
  * 的事，不是偏好問題；而「交接該隔多久」是營運規則，使用者定為
  * <code>2 × 碰撞保護</code>——與站位同一套（後車到站 ≥ 前車實際離站 ＋ 兩倍保護），
  * 留給兩台車移動的差異緩衝。
+ *
+ * <strong>佔用定義搬到 {@link collectFacilityOccupancies}。</strong>這支原本自己收
+ * 「stays」清單，只認 <code>source==='hold'</code> 或整備任務類型的原始
+ * <code>[start,end]</code>，等於<strong>依賴</strong>「暫停」卡已經插好才量得到正確
+ * 佔用——求解階段（見 closeYardHeadGaps）跑在補卡之前，用的是另一套（沒延伸的）
+ * 定義，兩邊會看到不一樣的答案。現在兩邊都呼叫
+ * {@link collectFacilityOccupancies}：沒補卡時用空檔推論分析出實際離開時刻，
+ * 補了卡就直接採用卡上的時刻——答案一致，「暫停」卡因此只負責<strong>呈現</strong>，
+ * 不是佔用判定唯一的資料來源。比對也一併換成
+ * {@link findFacilityOccupancyCollisions} 的跨午夜安全比對（見
+ * {@link daySegmentOverlapSeconds} 的說明），不再直接比較 start／end 的分鐘數字。
  */
 export function validateFacilityOccupancy(
   timelines: GeneratedSchedulePlan['timelines'],
   errors: FeasibilityIssue[],
   options: { collisionProtectionSeconds?: number; warnings?: FeasibilityIssue[] } = {},
 ): void {
-  const protectionMinutes =
-    (Math.max(0, options.collisionProtectionSeconds ?? 0) * 2) / 60;
+  const protectionSeconds = Math.max(0, options.collisionProtectionSeconds ?? 0);
+  const occupancies = collectFacilityOccupancies(timelines);
+  const collisions = findFacilityOccupancyCollisions(occupancies, protectionSeconds);
 
-  type Stay = {
-    facilityNodeId: string;
-    facilityLabel: string;
-    timelineRow: number;
-    blockId: string;
-    label: string;
-    startMinute: number;
-    endMinute: number;
-  };
+  for (const collision of collisions) {
+    const { earlier, later } = collision;
+    const detail = {
+      facilityNodeId: collision.facilityNodeId,
+      facilityLabel: collision.facilityLabel,
+      earlierTimelineRow: earlier.timelineRow,
+      laterTimelineRow: later.timelineRow,
+      blockId: later.blockId,
+      earlierBlockId: earlier.blockId,
+      overlapSeconds: Math.round(Math.max(0, collision.overlapSeconds)),
+      // 沿用既有欄位語意：重疊時為負，交接空檔時為正（collision.gapSeconds 已是這個正負號）
+      gapSeconds: Math.round(collision.gapSeconds),
+    };
 
-  const stays: Stay[] = [];
-  for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      const facilityNodeId = block.yardFacilityNodeId?.trim();
-      if (!facilityNodeId) continue;
-      const isStay =
-        FACILITY_STAY_TASK_TYPES.has(block.taskType) || block.source === 'hold';
-      if (!isStay) continue;
-      if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
-      stays.push({
-        facilityNodeId,
-        facilityLabel: block.yardFacilityLabel ?? facilityNodeId,
-        timelineRow: timeline.row,
-        blockId: block.id,
-        label: block.label,
-        startMinute: block.plannedStartMinute,
-        endMinute: block.plannedEndMinute,
+    if (collision.kind === 'overlap') {
+      pushIssue(errors, {
+        code: 'FACILITY_SLOT_COLLISION',
+        severity: 'error',
+        kind: 'limit',
+        message:
+          `設施格「${collision.facilityLabel}」同時被兩台車佔用：`
+          + `時間線 ${earlier.timelineRow} 待到 ${formatMinuteHms(earlier.actualDepartMinute)}，`
+          + `時間線 ${later.timelineRow} 卻在 ${formatMinuteHms(later.startMinute)} 就進來，`
+          + `重疊 ${Math.round(collision.overlapSeconds)} 秒`,
+        detail,
       });
-    }
-  }
-
-  const byFacility = new Map<string, Stay[]>();
-  for (const stay of stays) {
-    byFacility.set(stay.facilityNodeId, [
-      ...(byFacility.get(stay.facilityNodeId) ?? []),
-      stay,
-    ]);
-  }
-
-  for (const list of byFacility.values()) {
-    list.sort((a, b) => a.startMinute - b.startMinute);
-    for (let i = 0; i < list.length; i += 1) {
-      for (let j = i + 1; j < list.length; j += 1) {
-        const earlier = list[i]!;
-        const later = list[j]!;
-        // 同一列＝同一台車，它自己的連續停留不算衝突
-        if (earlier.timelineRow === later.timelineRow) continue;
-        if (later.startMinute >= earlier.endMinute + protectionMinutes - 1e-9) break;
-
-        const overlapMinutes = earlier.endMinute - later.startMinute;
-        const detail = {
-          facilityNodeId: earlier.facilityNodeId,
-          facilityLabel: earlier.facilityLabel,
-          earlierTimelineRow: earlier.timelineRow,
-          laterTimelineRow: later.timelineRow,
-          blockId: later.blockId,
-          earlierBlockId: earlier.blockId,
-          overlapSeconds: Math.round(Math.max(0, overlapMinutes) * 60),
-          gapSeconds: Math.round(-overlapMinutes * 60),
-        };
-
-        if (overlapMinutes > 1e-9) {
-          pushIssue(errors, {
-            code: 'FACILITY_SLOT_COLLISION',
-            severity: 'error',
-            kind: 'limit',
-            message:
-              `設施格「${earlier.facilityLabel}」同時被兩台車佔用：`
-              + `時間線 ${earlier.timelineRow} 待到 ${formatMinuteHms(earlier.endMinute)}，`
-              + `時間線 ${later.timelineRow} 卻在 ${formatMinuteHms(later.startMinute)} 就進來，`
-              + `重疊 ${Math.round(overlapMinutes * 60)} 秒`,
-            detail,
-          });
-        } else if (options.warnings) {
-          pushIssue(options.warnings, {
-            code: 'FACILITY_HANDOVER_GAP',
-            severity: 'warning',
-            kind: 'limit',
-            message:
-              `設施格「${earlier.facilityLabel}」交接太緊：`
-              + `時間線 ${earlier.timelineRow} ${formatMinuteHms(earlier.endMinute)} 離開、`
-              + `時間線 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} 進來，`
-              + `只隔 ${Math.round(-overlapMinutes * 60)} 秒`
-              + `（需要 ${Math.round(protectionMinutes * 60)} 秒）`,
-            detail,
-          });
-        }
-      }
+    } else if (options.warnings) {
+      pushIssue(options.warnings, {
+        code: 'FACILITY_HANDOVER_GAP',
+        severity: 'warning',
+        kind: 'limit',
+        message:
+          `設施格「${collision.facilityLabel}」交接太緊：`
+          + `時間線 ${earlier.timelineRow} ${formatMinuteHms(earlier.actualDepartMinute)} 離開、`
+          + `時間線 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} 進來，`
+          + `只隔 ${Math.round(collision.gapSeconds)} 秒`
+          + `（需要 ${Math.round(protectionSeconds * 2)} 秒）`,
+        detail,
+      });
     }
   }
 }

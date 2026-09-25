@@ -14,6 +14,7 @@ import {
   resolveRouteClearanceInsertGapSeconds,
 } from './stationClearanceInsert';
 import { resolveEffectiveRouteTravelSeconds } from './stationLegTravel';
+import { daySegmentOverlapSeconds } from './moveCardShared';
 
 /**
  * 同一列（同一台車）在這個區塊之後，下一個任務幾分鐘開始。
@@ -381,6 +382,178 @@ export function findStationBerthCollisions(
           requiredClearanceSeconds: required,
           protectionShortfallSeconds: minuteToSecond(shortfallMin),
         });
+      }
+    }
+  }
+
+  return collisions;
+}
+
+/** 車真的停在裡面、會佔著設施格的整備任務類型（不含調度、不含暫停卡本身） */
+const FACILITY_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby', 'washing']);
+
+/**
+ * 同一列在這個區塊之後，是否有一段「還停在同一個設施格」的空檔——不論有沒有補過
+ * 「暫停」卡都問得到答案。
+ *
+ * 跟 {@link resolveHoldEndMinuteAfter} 同一套判準，鑰匙從 stationId 換成
+ * facilityNodeId：暫停卡已經插了就直接採用卡上的時刻（照事實），沒插就退回
+ * {@link resolveSameRowIdleOccupiedUntilMinute} 的空檔推論——兩條路算出來的答案
+ * 一致，求解時的候選空位檢查（補卡之前）跟最後驗證（補卡之後）才會看到同一個
+ * 佔用，不會因為「暫停」卡插了沒而有兩種答案（見 {@link collectFacilityOccupancies}）。
+ */
+function resolveFacilityActualDepartMinute(
+  timelines: GeneratedSchedulePlan['timelines'],
+  block: { id: string; timelineRow: number; plannedEndMinute: number },
+  facilityNodeId: string,
+): number | null {
+  const row = timelines.find((t) => t.row === block.timelineRow);
+  if (row) {
+    for (const other of row.blocks) {
+      if (other.source !== 'hold') continue;
+      if (Math.abs(other.plannedStartMinute - block.plannedEndMinute) > 1e-9) continue;
+      if ((other.yardFacilityNodeId?.trim() ?? '') !== facilityNodeId) continue;
+      return other.plannedEndMinute;
+    }
+  }
+  return resolveSameRowIdleOccupiedUntilMinute(timelines, block);
+}
+
+export type FacilityOccupancy = {
+  facilityNodeId: string;
+  facilityLabel: string;
+  timelineRow: number;
+  blockId: string;
+  label: string;
+  /** 整備／停留本身的排定起訖（分鐘） */
+  startMinute: number;
+  endMinute: number;
+  /**
+   * 車真正開走的時刻（分鐘）＝整備結束後車還賴著的那段也算進去。
+   * 沒有補「暫停」卡時用跟站位同一套空檔推論分析出來，不等於 {@link endMinute}
+   * 也不代表有卡；見檔案頂端 {@link resolveFacilityActualDepartMinute} 的說明。
+   */
+  actualDepartMinute: number;
+};
+
+/**
+ * 蒐集各設施格跨車的佔用區間，車真正開走前都算佔著。
+ *
+ * <strong>不依賴「暫停」卡是否已經補過。</strong>設施佔用先前只記
+ * <code>[整備開始, 整備結束]</code>——那段推論後來搬進 fillYardHoldGaps 插的
+ * 「暫停」卡才現形，但求解／候選空位檢查（見 closeYardHeadGaps）都跑在補卡
+ * <strong>之前</strong>，看到的還是沒補過的窄佔用，跟最後驗證（補卡之後）用的
+ * 不是同一個答案。這支兩種情況都用同一套空檔推論分析出 actualDepartMinute，
+ * 補卡前後呼叫都拿到一致的結果——「暫停」卡因此只負責<strong>呈現</strong>已經
+ * 分析出來的停留，不是佔用判定唯一的資料來源。
+ *
+ * 「暫停」卡本身（<code>source==='hold'</code>）不獨立算一筆佔用——它延伸的是
+ * 前一張整備卡的佔用區間，跟站位那邊（{@link collectStationBerthOccupancies}）
+ * 同一條規矩，避免兩種模型描述同一件事，重複計算。
+ */
+export function collectFacilityOccupancies(
+  timelines: GeneratedSchedulePlan['timelines'],
+): FacilityOccupancy[] {
+  const out: FacilityOccupancy[] = [];
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.source === 'hold') continue;
+      const facilityNodeId = block.yardFacilityNodeId?.trim();
+      if (!facilityNodeId) continue;
+      if (!FACILITY_STAY_TASK_TYPES.has(block.taskType)) continue;
+      const startMinute = block.plannedStartMinute;
+      const endMinute = Math.max(block.plannedEndMinute, startMinute);
+      if (endMinute <= startMinute + 1e-9) continue;
+
+      const idleUntil = resolveFacilityActualDepartMinute(timelines, block, facilityNodeId);
+      const actualDepartMinute = idleUntil != null ? Math.max(endMinute, idleUntil) : endMinute;
+
+      out.push({
+        facilityNodeId,
+        facilityLabel: block.yardFacilityLabel ?? facilityNodeId,
+        timelineRow: timeline.row,
+        blockId: block.id,
+        label: block.label,
+        startMinute,
+        endMinute,
+        actualDepartMinute,
+      });
+    }
+  }
+  return out;
+}
+
+export type FacilityOccupancyCollisionKind = 'overlap' | 'protection_gap';
+
+export type FacilityOccupancyCollision = {
+  facilityNodeId: string;
+  facilityLabel: string;
+  kind: FacilityOccupancyCollisionKind;
+  earlier: FacilityOccupancy;
+  later: FacilityOccupancy;
+  overlapSeconds: number;
+  /** 後車進格與前車實際離開的間距（秒）；重疊時為負 */
+  gapSeconds: number;
+};
+
+/**
+ * 不同車在同一設施格的佔用區間不得重疊；沒重疊但交接秒數不夠也回報（分開列出，
+ * 呼叫端決定哪一種算硬錯誤——{@link validateFacilityOccupancy} 是重疊記錯誤、
+ * 交接不足記警告，跟站位那邊 {@link findStationBerthCollisions} 同一套規矩）。
+ *
+ * <strong>跨午夜安全</strong>：用 {@link daySegmentOverlapSeconds} 逐段比對，不直接
+ * 比較 start／end 的分鐘數字——同一段整備、不同呼叫端記法不一致時（見
+ * {@link daySegmentOverlapSeconds} 的說明）才不會漏判或誤判。
+ */
+export function findFacilityOccupancyCollisions(
+  occupancies: FacilityOccupancy[],
+  protectionSeconds: number,
+): FacilityOccupancyCollision[] {
+  const byFacility = new Map<string, FacilityOccupancy[]>();
+  for (const occ of occupancies) {
+    byFacility.set(occ.facilityNodeId, [...(byFacility.get(occ.facilityNodeId) ?? []), occ]);
+  }
+
+  const collisions: FacilityOccupancyCollision[] = [];
+  const requiredSeconds = Math.max(0, protectionSeconds) * 2;
+
+  for (const [, list] of byFacility) {
+    const sorted = [...list].sort((a, b) => a.startMinute - b.startMinute);
+    for (let i = 0; i < sorted.length; i += 1) {
+      for (let j = i + 1; j < sorted.length; j += 1) {
+        const earlier = sorted[i]!;
+        const later = sorted[j]!;
+        if (earlier.timelineRow === later.timelineRow) continue;
+
+        const overlapSeconds = daySegmentOverlapSeconds(
+          minuteToSecond(earlier.startMinute),
+          minuteToSecond(earlier.actualDepartMinute),
+          minuteToSecond(later.startMinute),
+          minuteToSecond(later.actualDepartMinute),
+        );
+        const gapSeconds = minuteToSecond(later.startMinute - earlier.actualDepartMinute);
+
+        if (overlapSeconds > 1e-6) {
+          collisions.push({
+            facilityNodeId: earlier.facilityNodeId,
+            facilityLabel: earlier.facilityLabel,
+            kind: 'overlap',
+            earlier,
+            later,
+            overlapSeconds,
+            gapSeconds,
+          });
+        } else if (requiredSeconds > 0 && gapSeconds < requiredSeconds - 1e-6) {
+          collisions.push({
+            facilityNodeId: earlier.facilityNodeId,
+            facilityLabel: earlier.facilityLabel,
+            kind: 'protection_gap',
+            earlier,
+            later,
+            overlapSeconds: 0,
+            gapSeconds,
+          });
+        }
       }
     }
   }

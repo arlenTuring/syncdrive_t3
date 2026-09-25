@@ -864,9 +864,14 @@ export function generateShiftSchedule(
   /**
    * 設施格佔用：同一格同一時刻只能有一台車。
    *
-   * 以「車實際還在裡面」為準——整備做完到出場移動開始之間車仍佔著那一格，時間軸上
-   * 就是那張「暫停」卡（見 fillYardHoldGaps）。所以這一支必須排在補卡之後。
-   * 重疊記硬錯誤（物理上做不到），交接不足 2 × 碰撞保護記警告（營運規則）。
+   * 以「車實際還在裡面」為準——整備做完到出場移動開始之間車仍佔著那一格。這一支
+   * 內部呼叫 stationBerthOccupancy.ts 的 collectFacilityOccupancies／
+   * findFacilityOccupancyCollisions：沒補過「暫停」卡（見 fillYardHoldGaps）時用
+   * 跟站位同一套空檔推論分析出實際離開時刻，補過卡就直接採用卡上的時刻——答案
+   * 一致，所以<strong>不再依賴排在補卡之後才對</strong>；closeYardHeadGaps 的候選
+   * 空位檢查（求解階段，跑在補卡之前）用的是同一份定義，求解跟這裡的最終驗證不會
+   * 看到不同的佔用。重疊記硬錯誤（物理上做不到），交接不足 2 × 碰撞保護記警告
+   * （營運規則）。
    */
   validateFacilityOccupancy(timelines, errors, {
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
