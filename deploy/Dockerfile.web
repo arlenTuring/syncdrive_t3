@@ -26,19 +26,19 @@ COPY document/ /usr/share/nginx/docs/
 # ——那些都不該給協力廠商。用「排除法」遲早會漏：新增一份內部文件時沒有人會
 # 想到要去補排除清單，而漏掉的後果是它直接出現在對外站上。列舉法的失敗方向
 # 相反：忘了加就是廠商看不到，會被問，然後補上。
-COPY document/協力廠商介接說明書.md   /usr/share/nginx/public-docs/
-COPY document/車端介接說明書.md       /usr/share/nginx/public-docs/
-COPY document/班表與到站預測介面.md   /usr/share/nginx/public-docs/
+COPY document/對外介接/協力廠商介接說明書.md   /usr/share/nginx/public-docs/
+COPY document/對外介接/車端介接說明書.md       /usr/share/nginx/public-docs/
+COPY document/對外介接/班表與到站預測介面.md   /usr/share/nginx/public-docs/
 # 六份通訊協議：那是與車端／中心端的契約，本來就要給對方看
 # 路徑含空白必須用 JSON 陣列形式；shell 形式的引號 Docker 的 COPY 解析不吃
-COPY ["document/MQTT 通訊架構與 Topic 命名規範.md", "/usr/share/nginx/public-docs/"]
-COPY document/車輛動態協議.md              /usr/share/nginx/public-docs/
-COPY document/營運任務狀態協議.md          /usr/share/nginx/public-docs/
-COPY document/設備健康與異常告警協議.md    /usr/share/nginx/public-docs/
-COPY document/動態控制與特殊事件協議.md    /usr/share/nginx/public-docs/
-COPY document/月台門與車門協議.md          /usr/share/nginx/public-docs/
-COPY document/T3地圖站點與路線清單.md document/訂單API錯誤與對帳.md /usr/share/nginx/public-docs/
-COPY document/release-20260918/ /usr/share/nginx/public-docs/release-20260918/
+COPY ["document/對外介接/MQTT 通訊架構與 Topic 命名規範.md", "/usr/share/nginx/public-docs/"]
+COPY document/對外介接/車輛動態協議.md              /usr/share/nginx/public-docs/
+COPY document/對外介接/營運任務狀態協議.md          /usr/share/nginx/public-docs/
+COPY document/對外介接/設備健康與異常告警協議.md    /usr/share/nginx/public-docs/
+COPY document/對外介接/動態控制與特殊事件協議.md    /usr/share/nginx/public-docs/
+COPY document/對外介接/月台門與車門協議.md          /usr/share/nginx/public-docs/
+COPY document/對外介接/T3地圖站點與路線清單.md document/對外介接/訂單API錯誤與對帳.md /usr/share/nginx/public-docs/
+COPY document/對外介接/release-20260918/ /usr/share/nginx/public-docs/release-20260918/
 COPY deploy/portal/docs/ /usr/share/nginx/public-docs/
 
 # 兩個入口頁

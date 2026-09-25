@@ -35,6 +35,6 @@
 
 4. **後端連線**：`MQTT_URL` 帶帳密，例如 `mqtt://vtms-backend:<密碼>@mosquitto:1883`。
 
-5. **車端連線**：不帶帳密，改帶 CA 憑證與該車的客戶端憑證／私鑰（TLS mutual auth），見[車端介接說明書](../../document/車端介接說明書.md) §2.1。
+5. **車端連線**：不帶帳密，改帶 CA 憑證與該車的客戶端憑證／私鑰（TLS mutual auth），見[車端介接說明書](../../document/對外介接/車端介接說明書.md) §2.1。
 
 `passwordfile` 與 `/mosquitto/certs/*.key` 皆含機密內容，**不應提交進版控**（已由 `.gitignore` 排除）。

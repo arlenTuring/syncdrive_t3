@@ -109,7 +109,7 @@ P0 表示建議先封堵的資料／權限風險；P1 表示正式聯測前應�
 
 [nginx.conf](/Users/arlen/Desktop/development/syncdrive_t3/deploy/nginx.conf:25) 與 [bootstrap.sh](/Users/arlen/Desktop/development/syncdrive_t3/deploy/bootstrap.sh:151) 顯示，web 帳密檔包含內部與 vendor 帳號；這組保護同時用於內部 API。後端內部路由多數沒有使用者與動作權限檢查。進得了圖台不應等於可以修改部署、查任意表或建立訂單。
 
-另一方面，`document/系統帳號與金鑰.md` 是被 git 追蹤的檔案，文件索引明示其中放實際憑據，而 [Dockerfile.web](/Users/arlen/Desktop/development/syncdrive_t3/deploy/Dockerfile.web:21) 整包複製 document 到內部文件站。本次未開啟或摘錄其敏感值，因此不能判定哪些仍有效；但儲存及打包策略本身需要修正。
+另一方面，`document/維運/系統帳號與金鑰.md` 是被 git 追蹤的檔案，文件索引明示其中放實際憑據，而 [Dockerfile.web](/Users/arlen/Desktop/development/syncdrive_t3/deploy/Dockerfile.web:21) 整包複製 document 到內部文件站。本次未開啟或摘錄其敏感值，因此不能判定哪些仍有效；但儲存及打包策略本身需要修正。
 
 **改善：**先限制 vendor 對內部寫入與 SQL 工具的存取；將真實機密移出版本庫與文件映像，若曾提交有效值，應輪替並依需要處理歷史。再補伺服器端身分及角色權限，至少分檢視、操作、發布、管理。UI 的主管切換不可作授權依據。
 

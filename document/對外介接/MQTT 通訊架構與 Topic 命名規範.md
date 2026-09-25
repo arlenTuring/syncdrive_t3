@@ -81,7 +81,7 @@
     `vehicle_code`**（例 `PMS05`）——這一段不是密碼，是 CA 簽出來的，換不了也借不了。
 
     車端憑證由 `POST /syncdrive-api/auth/token` 取得，續簽機制見
-    [MQTT 憑證體系與自動續簽](MQTT憑證體系與自動續簽.md)。
+    [MQTT 憑證體系與自動續簽](../維運/MQTT憑證體系與自動續簽.md)。
 
     連線字串格式：
 

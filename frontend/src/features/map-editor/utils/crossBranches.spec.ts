@@ -25,7 +25,7 @@ import { repairTrackRefFieldBoundsInAreas } from './trackRefFieldBoundsRepair'
 /**
  * 交叉軌道分支：用真實發布的圖資驗。圖資不在 git 裡，沒有就跳過。
  *
- * 四個口的座標對照 T3 站點目錄（document/release-20260918/T3-map-catalog.json）——那是
+ * 四個口的座標對照 T3 站點目錄（document/對外介接/release-20260918/T3-map-catalog.json）——那是
  * 車端／模擬器實際使用的途經點座標。
  */
 const MAPS_DIR = join(__dirname, '../../../../../backend/data/published-maps')

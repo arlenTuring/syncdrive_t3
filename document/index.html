@@ -184,6 +184,9 @@
       nameLink: '/',
       repo: '',
       loadSidebar: true,
+      // 文件已經分資料夾整理；相對連結（不是 / 開頭的）要跟著目前頁面的位置解析，
+      // 不然子資料夾裡彼此互連的文件全部連到文件站根目錄去。
+      relativePath: true,
       subMaxLevel: 3,
       auto2top: true,
       search: {

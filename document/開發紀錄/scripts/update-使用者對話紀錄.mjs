@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * 從 Cursor agent transcript 擷取使用者訊息，寫入 document/使用者對話紀錄.md
+ * 從 Cursor agent transcript 擷取使用者訊息，寫入 document/開發紀錄/使用者對話紀錄.md
  * 最新一則在最上方。
  *
  * 用法（專案根目錄）：
- *   node document/scripts/update-使用者對話紀錄.mjs
- *   node document/scripts/update-使用者對話紀錄.mjs --transcript /path/to/session.jsonl
+ *   node document/開發紀錄/scripts/update-使用者對話紀錄.mjs
+ *   node document/開發紀錄/scripts/update-使用者對話紀錄.mjs --transcript /path/to/session.jsonl
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '../..');
-const OUT_PATH = path.join(ROOT, 'document/使用者對話紀錄.md');
+const ROOT = path.resolve(__dirname, '../../..');
+const OUT_PATH = path.join(ROOT, 'document/開發紀錄/使用者對話紀錄.md');
 
 const DEFAULT_TRANSCRIPT = path.join(
   process.env.HOME ?? '',
@@ -83,7 +83,7 @@ function renderMarkdown(messages) {
   const updatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
   let out = `# 使用者對話紀錄\n\n`;
   out += `> 最新訊息在最上方。最後更新：${updatedAt}（UTC）\n`;
-  out += `> 重新整理：\`node document/scripts/update-使用者對話紀錄.mjs\`\n\n`;
+  out += `> 重新整理：\`node document/開發紀錄/scripts/update-使用者對話紀錄.mjs\`\n\n`;
   messages.forEach((text, i) => {
     const n = messages.length - i;
     out += `---\n\n## ${n}\n\n${text}\n\n`;

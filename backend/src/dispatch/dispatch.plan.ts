@@ -121,7 +121,7 @@ export function buildOrderId(tripCode: string, departAt: number): string {
  * <strong>目前是固定對應</strong>：第 N 列由 PMS0N 擔任。這是「完美情境」的假設
  * ——不考慮保養到期、電量、故障。真正的每日綁定是即時調度引擎的下一階段，屆時
  * 這個函式會換成查詢當日綁定表，其餘邏輯不必動（見
- * document/即時調度引擎-架構草案.md）。
+ * document/架構與設計/即時調度引擎-架構草案.md）。
  *
  * 列號超出車隊時回 null，那一班不下訂單並記錄——寧可少一班，也不要把兩列的
  * 訂單都指派給同一台車。
