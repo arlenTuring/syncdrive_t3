@@ -66,7 +66,7 @@ function groupIcon(groupId: string) {
   if (groupId === 'vehicle') return Route;
   if (groupId === 'site') return Map;
   if (groupId === 'operations') return Activity;
-  if (groupId === 'system' || groupId === 'permission') return Settings;
+  if (groupId === 'permission') return Settings;
   if (groupId === 'service' || groupId === 'media') {
     return LayoutDashboard;
   }
@@ -77,7 +77,6 @@ function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return isSiteView(activeView);
   if (groupId === 'vehicle') return activeView === 'trajectory';
   if (groupId === 'operations') return isOperationsView(activeView);
-  if (groupId === 'system') return activeView === 'system-foundation';
   if (groupId === 'schedule') {
     return (
       activeView === 'shift-records'

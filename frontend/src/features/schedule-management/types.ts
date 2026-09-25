@@ -106,12 +106,7 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   },
   { id: 'service', label: 'nav.modules.service', enabled: false },
   { id: 'media', label: 'nav.modules.media', enabled: false },
-  {
-    id: 'system',
-    label: 'nav.modules.system',
-    enabled: true,
-    navigateTo: 'system-foundation',
-  },
+  // 系統基礎模組只從右上角齒輪進入，側欄不另設入口
   { id: 'permission', label: 'nav.modules.permission', enabled: false },
 ];
 
