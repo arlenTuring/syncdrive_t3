@@ -17,12 +17,13 @@ import type {
 import { minuteToSecond, secondToMinute } from './schedule-engine/types';
 import { earliestStartPastBlockerOnDayCycle } from './scheduleDayCycle';
 import {
+  bookBerthWindowsExcept,
+  movedTripLingerCollides,
   projectProtectedBerthWindowsSeconds,
   resolveBerthClearDelaySeconds,
   type BerthProtectionContext,
-  type BerthWindowSec,
 } from './stationBerthConstraint';
-import { resolvePairHeadwaySeconds } from './schedule-engine/validate';
+import { resolvePairHeadwayTarget } from './schedule-engine/validate';
 import type { TimeSlotAttribute, TimeSlotInterval } from '../../time-templates/types/editor';
 
 const DENSIFY_SLACK_SECONDS = 20;
@@ -32,27 +33,6 @@ function occupancySecondsOf(block: GeneratedScheduleBlock): number {
     SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
     minuteToSecond(block.plannedEndMinute) - minuteToSecond(block.plannedStartMinute),
   );
-}
-
-function bookAllExcept(
-  timelines: GeneratedSchedulePlan['timelines'],
-  selectedRoutes: ShiftScheduleSelectedRoute[],
-  exceptId: string,
-  protection: BerthProtectionContext,
-): BerthWindowSec[] {
-  const booked: BerthWindowSec[] = [];
-  for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      if (block.taskType !== 'passenger') continue;
-      if (block.id === exceptId) continue;
-      const route = resolveRouteForBlock(block, selectedRoutes);
-      if (!route) continue;
-      for (const win of projectProtectedBerthWindowsSeconds(block, route, protection)) {
-        booked.push(win);
-      }
-    }
-  }
-  return booked;
 }
 
 function sameRowPreviousPassenger(
@@ -165,14 +145,8 @@ export function densifyRouteHeadwaysAfterBerth(args: {
       const later = blocks[i]!;
       const earlierStart = minuteToSecond(earlier.plannedStartMinute);
       const laterStart = minuteToSecond(later.plannedStartMinute);
-      const target =
-        resolvePairHeadwaySeconds(
-          secondToMinute(earlierStart),
-          secondToMinute(laterStart),
-          intervals,
-          attributes,
-        )
-        ?? null;
+      // 跟驗證、班距修復同一個目標（交路起班當下的班距），不再各自查時段
+      const target = resolvePairHeadwayTarget(earlier, later, intervals, attributes);
       if (target == null || target <= 0) continue;
       const idealStart = snapUpToClockAlignSeconds(earlierStart + target);
       if (laterStart <= idealStart + DENSIFY_SLACK_SECONDS) continue;
@@ -219,11 +193,24 @@ export function densifyRouteHeadwaysAfterBerth(args: {
         plannedStartMinute: secondToMinute(candidate),
         plannedEndMinute: secondToMinute(candidate + occupied),
       };
-      const booked = bookAllExcept(timelines, selectedRoutes, later.id, protection);
+      const booked = bookBerthWindowsExcept(timelines, selectedRoutes, later.id, protection);
       const windows = projectProtectedBerthWindowsSeconds(probe, route, protection);
       const berthDelay = resolveBerthClearDelaySeconds(windows, booked);
       const finalStart = snapUpToClockAlignSeconds(candidate + berthDelay);
       if (finalStart >= laterStart - 1e-9) continue;
+      // 往前拉＝終點站提早到、停更久；那段多出來的停留撞到別人就不拉
+      if (
+        movedTripLingerCollides({
+          timelines,
+          selectedRoutes,
+          block: later,
+          route,
+          newStartSecond: finalStart,
+          newEndSecond: finalStart + occupied,
+          booked,
+          protection,
+        })
+      ) continue;
 
       later.plannedStartMinute = secondToMinute(finalStart);
       later.plannedEndMinute = secondToMinute(finalStart + occupied);

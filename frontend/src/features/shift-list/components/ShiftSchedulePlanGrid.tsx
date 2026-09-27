@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../../i18n';
 import { Info, AlertTriangle, Trash2, CopyPlus } from 'lucide-react';
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -49,10 +50,12 @@ import {
 import {
   buildBlockStationDepartures,
   resolveBlockStationDwellInputs,
+  resolveBlockDwellSlackBreakdown,
   resolveRouteForBlock,
   type BlockStationStopTime,
 } from '../utils/buildBlockStationDepartures';
 import { resolveEffectiveRouteTravelSeconds } from '../utils/stationLegTravel';
+import { applyStationDwellWithSlack } from '../utils/schedule-engine/physics';
 import {
   isMoveCardBlockSource,
   resolveGeneratedBlockTripCode,
@@ -471,7 +474,13 @@ function BlockAlgorithmHoverCard({
     actualTravelSeconds: number;
     /** 各站靠站秒數加總（不含緩衝） */
     dwellBaseSeconds: number;
+    /** 實際採用的緩衝（原始＋系統增加） */
     dwellSlackSeconds: number;
+    baseSlackSeconds: number;
+    addedSlackSeconds: number;
+    /** 各站實際加到的緩衝（不適用的站是 0）；跟逐站時刻同一套規則 */
+    slackAtStop: number[];
+    slackAdjustment?: GeneratedScheduleBlock['dwellSlackAdjustment'];
     switchBufferSeconds: number;
     recoverySeconds: number;
   };
@@ -510,6 +519,14 @@ function BlockAlgorithmHoverCard({
         {t('shiftList.planGrid.dwell')} {sec(summary.dwellBaseSeconds)}
         <span className="text-zinc-600"> · </span>
         {t('shiftList.planGrid.slack')} {sec(summary.dwellSlackSeconds)}
+        {summary.addedSlackSeconds > 0 ? (
+          <span className="text-sky-300">
+            （{t('shiftList.planGrid.slackBreakdown', {
+              base: summary.baseSlackSeconds,
+              added: summary.addedSlackSeconds,
+            })}）
+          </span>
+        ) : null}
         {!hideStrategyBuffers ? (
           <>
             <span className="text-zinc-600"> · </span>
@@ -537,6 +554,29 @@ function BlockAlgorithmHoverCard({
             {entryServiceBerthCheck.slackSeconds}s
           </span>
         </p>
+      ) : null}
+
+      {summary.slackAdjustment && summary.addedSlackSeconds > 0 ? (
+        <div className="mt-1 rounded border border-sky-700/50 bg-sky-950/40 px-1.5 py-1 text-[10px] leading-[14px] tabular-nums text-sky-100">
+          <p className="font-semibold">{t('shiftList.planGrid.slackAdjusted')}</p>
+          <p className="text-sky-200/90">{summary.slackAdjustment.reason.message}</p>
+          {summary.slackAdjustment.affectedStops.map((stop) => {
+            const now = stops.find((item) => item.order === stop.order);
+            return (
+              <p key={stop.order}>
+                {t('shiftList.planGrid.slackAdjustedStop', {
+                  station: stop.stationName,
+                  before: stop.dwellBeforeSeconds,
+                  now: now?.dwellSeconds ?? stop.dwellAfterSeconds,
+                  arriveBefore: formatMinuteToHms(stop.arrivalBeforeMinute),
+                  arriveNow: formatMinuteToHms(now?.arrivalMinute ?? stop.arrivalAfterMinute),
+                  departBefore: formatMinuteToHms(stop.departureBeforeMinute),
+                  departNow: formatMinuteToHms(now?.departureMinute ?? stop.departureAfterMinute),
+                })}
+              </p>
+            );
+          })}
+        </div>
       ) : null}
 
       {stops.length === 0 ? (
@@ -614,9 +654,7 @@ function BlockAlgorithmHoverCard({
                   <span className="shrink-0 text-right tabular-nums text-zinc-500">
                     {t('shiftList.planGrid.dwell')} {sec(stop.baseDwellSeconds)}
                     <span className="text-zinc-600"> · </span>
-                    {t('shiftList.planGrid.slack')} {sec(summary.dwellSlackSeconds > 0 && stop.baseDwellSeconds > 0
-                      ? summary.dwellSlackSeconds
-                      : 0)}
+                    {t('shiftList.planGrid.slack')} {sec(summary.slackAtStop[index] ?? 0)}
                   </span>
                 </div>
                 {showLeg ? (
@@ -977,7 +1015,10 @@ function ShiftScheduleBlockBar({
   primaryCopy = true,
   leadingInsetPx = 0,
   trackOffsetPx = 0,
+  pinnedDetail = false,
 }: {
+  /** 從報表定位過來：明細（ⓘ 懸浮卡）釘住打開，捲動時跟著卡片走 */
+  pinnedDetail?: boolean;
   block: GeneratedScheduleBlock;
   blockIndex: number;
   slotWidthPx: number;
@@ -1106,6 +1147,11 @@ function ShiftScheduleBlockBar({
     const travel = route ? resolveEffectiveRouteTravelSeconds(route) : null;
     const dwellInputs = resolveBlockStationDwellInputs(block, route);
     const dwellSlackSeconds = dwellInputs?.dwellSlackSeconds ?? 0;
+    const slackBreakdown = resolveBlockDwellSlackBreakdown(block, route);
+    const slackAtStop = dwellInputs
+      ? dwellInputs.stations.map((station, index) =>
+          applyStationDwellWithSlack(station, 1, index) > 0 ? dwellSlackSeconds : 0)
+      : [];
     const dwellBaseSeconds =
       dwellInputs != null
         ? dwellInputs.stations.reduce(
@@ -1119,6 +1165,10 @@ function ShiftScheduleBlockBar({
       actualTravelSeconds: block.travelSeconds,
       dwellBaseSeconds,
       dwellSlackSeconds,
+      baseSlackSeconds: slackBreakdown.baseSlackSeconds,
+      addedSlackSeconds: slackBreakdown.addedSeconds,
+      slackAtStop,
+      slackAdjustment: block.dwellSlackAdjustment,
       switchBufferSeconds: normalizeSwitchBufferAfterSeconds(route?.switchBufferAfterSeconds),
       recoverySeconds: normalizeMinimumRecoveryTimeSeconds(minimumRecoveryTimeSeconds),
     };
@@ -1127,6 +1177,24 @@ function ShiftScheduleBlockBar({
     minimumRecoveryTimeSeconds,
     route,
   ]);
+
+  useEffect(() => {
+    if (!pinnedDetail || !primaryCopy || block.taskType !== 'passenger') return undefined;
+    const place = () => {
+      const el = document.getElementById(`block-card-${block.id}`);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setStationHoverPos({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    };
+    const timers = [150, 450, 900].map((delay) => setTimeout(place, delay));
+    const scroller = document.querySelector('[data-schedule-grid-scroll]');
+    scroller?.addEventListener('scroll', place, { passive: true });
+    return () => {
+      timers.forEach(clearTimeout);
+      scroller?.removeEventListener('scroll', place);
+      setStationHoverPos(null);
+    };
+  }, [pinnedDetail, primaryCopy, block.id, block.taskType]);
 
   const topologyLegs = useMemo(
     () => route?.stationLegTravels ?? [],
@@ -1518,6 +1586,14 @@ function ShiftScheduleBlockBar({
         {block.routeName ? (
           <div className="flex min-w-0 items-center gap-0.5 truncate text-[11px] leading-tight text-zinc-200/90 font-medium">
             <span className="truncate">{block.routeName}</span>
+            {algorithmSummary.addedSlackSeconds > 0 ? (
+              <span
+                className="shrink-0 rounded-sm bg-sky-500/30 px-0.5 text-[9px] leading-3 tabular-nums text-sky-100"
+                title={block.dwellSlackAdjustment?.reason.message}
+              >
+                {t('shiftList.planGrid.slackAdjustedBadge', { added: algorithmSummary.addedSlackSeconds })}
+              </span>
+            ) : null}
             {showStationInfo ? (
               <button
                 type="button"
@@ -1614,6 +1690,8 @@ export type ShiftSchedulePlanGridProps = {
   onSelectBlock?: (blockId: string | null) => void;
   report?: ShiftScheduleFeasibilityReport | null;
   highlightedBlockId?: string | null;
+  /** 明細釘住打開的卡片（報表定位用）；null＝沒有 */
+  pinnedDetailBlockId?: string | null;
   selectedRoutes?: ShiftScheduleSelectedRoute[];
   /** Step 4 最低恢復時間；供班次卡 i 對照顯示 */
   minimumRecoveryTimeSeconds?: number | null;
@@ -1652,6 +1730,7 @@ export function ShiftSchedulePlanGrid({
   onSelectBlock,
   report = null,
   highlightedBlockId = null,
+  pinnedDetailBlockId = null,
   selectedRoutes = [],
   minimumRecoveryTimeSeconds = null,
   hideStrategyBuffers = false,
@@ -1883,6 +1962,7 @@ export function ShiftSchedulePlanGrid({
                           onSelect={onSelectBlock}
                           report={report}
                           highlighted={highlightedBlockId === entry.block.id}
+                          pinnedDetail={pinnedDetailBlockId === entry.block.id}
                           selectedRoutes={selectedRoutes}
                           minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
                           sectionCodes={sectionCodes}

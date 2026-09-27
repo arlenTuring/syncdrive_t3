@@ -1,3 +1,4 @@
+import { resolveBlockDwellSlackBreakdown } from './buildBlockStationDepartures';
 import {
   clampScheduleMinute,
   snapScheduleMinuteUnbounded,
@@ -130,13 +131,14 @@ function resolveManualBlockLabel(taskType: TaskTypeKey): string {
 
 /** 靠站＋緩衝合計秒數（未填站視為 0；不停靠／換線停靠不加緩衝） */
 export function resolveManualBlockDwellTotalSeconds(
-  block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSeconds'>,
+  block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSeconds' | 'dwellSlackAdjustment'>,
 ): number {
   const dwells = block.stationDwells ?? [];
   if (dwells.length === 0) {
     return Math.max(0, Math.round(block.dwellSeconds ?? 0));
   }
-  const slack = normalizeDwellSlackSeconds(block.dwellSlackSeconds ?? 0);
+  // 跟逐站時刻同一套解析：單班明確緩衝（含 0）＋系統增加量
+  const slack = resolveBlockDwellSlackBreakdown(block, null).effectiveSlackSeconds;
   let total = 0;
   for (const [index, dwell] of dwells.entries()) {
     total += applyStationDwellWithSlack(dwell, slack, index);
@@ -146,7 +148,7 @@ export function resolveManualBlockDwellTotalSeconds(
 
 /** 班次卡最短占用分鐘（不得短於靠站合計；且至少 10 秒格） */
 export function resolveManualBlockMinDurationMinutes(
-  block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSeconds'>,
+  block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSeconds' | 'dwellSlackAdjustment'>,
 ): number {
   return Math.max(MIN_DURATION_MINUTES, resolveManualBlockDwellTotalSeconds(block) / 60);
 }

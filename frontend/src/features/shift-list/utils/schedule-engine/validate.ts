@@ -4,6 +4,11 @@ import {
   type TimeSlotInterval,
 } from '../../../time-templates/types/editor';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
+import type { PointTopology } from '../../../map-editor/types/pointTopology';
+import {
+  collectMoveJunctionPasses,
+  findJunctionConflictsForBlocks,
+} from '../moveJunctionPasses';
 import { resolveSelectedRouteInstanceId } from '../../types/create';
 import {
   resolveRouteOriginStation,
@@ -80,6 +85,29 @@ export function resolvePairHeadwaySeconds(
   const later = resolveHeadwaySecondsAtMinute(laterMinute, intervals, attributes);
   if (earlier == null && later == null) return null;
   return Math.max(earlier ?? 0, later ?? 0);
+}
+
+/**
+ * 一對相鄰同方向發車該守住的班距目標——驗證、班距補疏、班距修復共用這一支。
+ *
+ * 優先用<strong>後車自己交路起班當下</strong>記下來的 <code>cycleHeadwayTargetSeconds</code>：
+ * 已在尖峰起班的交路，某一腿被挪過時段邊界，門檻仍是起班當時的班距。三處各自查
+ * 時段的話，補疏用舊的跨時段較嚴者、修復用交路目標，兩道會互相抵銷。兩班都沒有
+ * 交路來源資料（手動製作／舊產物）才退回用當下時刻各自查時段、取較嚴者。
+ */
+export function resolvePairHeadwayTarget(
+  earlier: { plannedStartMinute: number },
+  later: { plannedStartMinute: number; cycleHeadwayTargetSeconds?: number },
+  intervals: TimeSlotInterval[],
+  attributes: TimeSlotAttribute[],
+): number | null {
+  if (later.cycleHeadwayTargetSeconds != null) return later.cycleHeadwayTargetSeconds;
+  return resolvePairHeadwaySeconds(
+    earlier.plannedStartMinute,
+    later.plannedStartMinute,
+    intervals,
+    attributes,
+  );
 }
 
 /** 1.6 折返時限：單路線 error；多路線一整輪用鎖定組合（有則）或執行順序加總 warning */
@@ -383,14 +411,15 @@ function validateSameRouteHeadway(
      * 查時段、取較嚴者的舊算法。
      */
     const originAware = next.cycleHeadwayTargetSeconds != null;
-    const headwayTarget = originAware
-      ? next.cycleHeadwayTargetSeconds!
-      : resolvePairHeadwaySeconds(
-          secondToMinute(current.startSecond),
-          secondToMinute(next.startSecond),
-          intervals,
-          attributes,
-        );
+    const headwayTarget = resolvePairHeadwayTarget(
+      { plannedStartMinute: secondToMinute(current.startSecond) },
+      {
+        plannedStartMinute: secondToMinute(next.startSecond),
+        cycleHeadwayTargetSeconds: next.cycleHeadwayTargetSeconds,
+      },
+      intervals,
+      attributes,
+    );
     if (headwayTarget != null && gapSeconds < headwayTarget) {
       const earlierHw = resolveHeadwaySecondsAtMinute(
         secondToMinute(current.startSecond),
@@ -1144,7 +1173,10 @@ export function validateStationBerthCollisions(
       kind: 'limit',
       message:
         `${hit.stationName} 站位碰撞：${earlierLabel} 與 ${laterLabel}`
-        + ` 同時佔用同一個停靠點，重疊 ${Math.round(hit.overlapSeconds)} 秒`,
+        + ` 同時佔用同一個停靠點——前者 ${formatMinuteHms(hit.earlier.startMinute)} 到站、`
+        + `${formatMinuteHms(hit.earlier.actualDepartMinute)} 才開走，`
+        + `後者 ${formatMinuteHms(hit.later.startMinute)} 就進站，`
+        + `重疊 ${Math.round(hit.overlapSeconds)} 秒`,
       detail,
     });
     reported += 1;
@@ -1480,5 +1512,192 @@ export function validateFacilityOccupancy(
         detail,
       });
     }
+  }
+}
+
+type VehiclePlace = { kind: 'station' | 'facility'; id: string; label: string };
+
+function isMoveCard(block: GeneratedScheduleBlock): boolean {
+  return (
+    block.taskType === 'dispatch'
+    || block.source === 'yard_exit_move'
+    || block.source === 'yard_entry_move'
+  );
+}
+
+/**
+ * 這張卡開始／結束時車在哪。移動卡回傳 'move'；查不出來回傳 null（不參與判定——
+ * 寧可不判，也不要拿猜的地點去報錯）。
+ */
+function resolveVehiclePlaces(
+  block: GeneratedScheduleBlock,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+): { start: VehiclePlace; end: VehiclePlace } | 'move' | null {
+  if (isMoveCard(block)) return 'move';
+  if (block.taskType === 'passenger') {
+    const route = resolveRouteForBlock(block, selectedRoutes);
+    if (!route) return null;
+    const stops = buildBlockStationDepartures(block, route);
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    if (!first?.stationId || !last?.stationId) return null;
+    return {
+      start: { kind: 'station', id: first.stationId, label: first.stationName || first.stationId },
+      end: { kind: 'station', id: last.stationId, label: last.stationName || last.stationId },
+    };
+  }
+  const stationId = block.yardFacilityStationId?.trim();
+  if (stationId) {
+    const place: VehiclePlace = { kind: 'station', id: stationId, label: block.yardFacilityLabel ?? stationId };
+    return { start: place, end: place };
+  }
+  const nodeId = block.yardFacilityNodeId?.trim();
+  if (nodeId) {
+    const place: VehiclePlace = { kind: 'facility', id: nodeId, label: block.yardFacilityLabel ?? nodeId };
+    return { start: place, end: place };
+  }
+  return null;
+}
+
+/**
+ * 車的位置在時間軸上要接得起來。
+ *
+ * 同一列依時間排序（日循環：最後一張接回第一張），任兩張相鄰、地點已知的卡之間：
+ * 前一張結束時車在 A、後一張開始時要在 B，A ≠ B 就一定要有移動卡。只判定牽涉
+ * 設施格的銜接（設施↔正線、設施↔另一格）；正線站與站之間的接續由路線連續性驗證
+ * 負責。
+ *
+ * 只看班表本身，不看產生過程——手改過的班表在發布前重驗證也抓得到。
+ * <code>explainedBlockIds</code>：生成時已經用 MAINTENANCE_TRANSFER_REQUIRED_MISSING
+ * 講過原因的整備卡，這裡不重複報同一件事。
+ */
+export function validateVehicleLocationContinuity(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  errors: FeasibilityIssue[];
+  explainedBlockIds?: ReadonlySet<string>;
+}): void {
+  const { timelines, selectedRoutes, errors, explainedBlockIds } = args;
+  for (const timeline of timelines) {
+    const ordered = [...timeline.blocks].sort(
+      (a, b) =>
+        a.plannedStartMinute - b.plannedStartMinute
+        || (a.plannedEndMinute - a.plannedStartMinute) - (b.plannedEndMinute - b.plannedStartMinute)
+        || a.id.localeCompare(b.id),
+    );
+    type Entry = { block: GeneratedScheduleBlock; places: ReturnType<typeof resolveVehiclePlaces> };
+    const entries: Entry[] = ordered.map((block) => ({
+      block,
+      places: resolveVehiclePlaces(block, selectedRoutes),
+    }));
+    const located = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.places !== null && entry.places !== 'move');
+    if (located.length < 2) continue;
+
+    for (let k = 0; k < located.length; k += 1) {
+      const from = located[k]!;
+      const to = located[(k + 1) % located.length]!;
+      const wraps = k === located.length - 1;
+      // 中間任一張卡地點未知，就不判定這一對
+      const between = wraps
+        ? [...entries.slice(from.index + 1), ...entries.slice(0, to.index)]
+        : entries.slice(from.index + 1, to.index);
+      if (between.some((entry) => entry.places === null)) continue;
+      const hasMove = between.some((entry) => entry.places === 'move');
+      if (hasMove) continue;
+
+      const fromPlace = (from.entry.places as { end: VehiclePlace }).end;
+      const toPlace = (to.entry.places as { start: VehiclePlace }).start;
+      if (fromPlace.kind === toPlace.kind && fromPlace.id === toPlace.id) continue;
+      if (fromPlace.kind !== 'facility' && toPlace.kind !== 'facility') continue;
+      // 生成時已講過原因的整備卡，可能被暫停卡隔開——同一段同地點停留都算同一件事
+      if (explainedBlockIds) {
+        const samePlaceRun = (startK: number, step: 1 | -1, side: 'start' | 'end'): string[] => {
+          const ids: string[] = [];
+          const anchor = located[startK]!;
+          const anchorPlace = (anchor.entry.places as Record<'start' | 'end', VehiclePlace>)[side];
+          for (let m = 0; m < located.length; m += 1) {
+            const item = located[(startK + step * m + located.length * 2) % located.length]!;
+            const places = item.entry.places as { start: VehiclePlace; end: VehiclePlace };
+            const place = step < 0 ? places.end : places.start;
+            if (place.kind !== anchorPlace.kind || place.id !== anchorPlace.id) break;
+            ids.push(item.entry.block.id);
+          }
+          return ids;
+        };
+        const involved = [
+          ...samePlaceRun(k, -1, 'end'),
+          ...samePlaceRun((k + 1) % located.length, 1, 'start'),
+        ];
+        if (involved.some((id) => explainedBlockIds.has(id))) continue;
+      }
+
+      const fromBlock = from.entry.block;
+      const toBlock = to.entry.block;
+      pushIssue(errors, {
+        code: 'VEHICLE_LOCATION_DISCONTINUITY',
+        severity: 'error',
+        kind: 'limit',
+        message:
+          `時間線 ${timeline.row}：「${fromBlock.label}」${formatMinuteHms(fromBlock.plannedEndMinute)} 結束時車在`
+          + `「${fromPlace.label}」，接著「${toBlock.label}」${formatMinuteHms(toBlock.plannedStartMinute)}`
+          + ` 要在「${toPlace.label}」，中間沒有任何移動卡——車到不了`,
+        detail: {
+          timelineRow: timeline.row,
+          blockId: toBlock.id,
+          fromBlockId: fromBlock.id,
+          fromPlaceKind: fromPlace.kind,
+          fromPlaceId: fromPlace.id,
+          toPlaceKind: toPlace.kind,
+          toPlaceId: toPlace.id,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * 移動卡在同一個轉折點貼太近（警告、擋發布）。
+ *
+ * 排卡時 insertMaintenanceTransferCards 會錯開轉折點，但讓站、提早進廠等策略
+ * 事後插的移動卡不經過那一關——2026-09-26 實測基準班表有 2 筆兩台車 40 秒內
+ * 經過同一個入口點，沒有任何驗證抓得到。這裡從班表本身重建每張移動卡的經過
+ * 時刻（見 collectMoveJunctionPasses），任何來源的移動卡都一起檢查。
+ */
+export function validateMoveJunctionConflicts(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  topology: PointTopology | null | undefined;
+  collisionProtectionSeconds: number;
+  warnings: FeasibilityIssue[];
+}): void {
+  const bufferSeconds = Math.max(0, args.collisionProtectionSeconds) * 2;
+  if (bufferSeconds <= 0 || !args.topology) return;
+  const passes = collectMoveJunctionPasses(args.timelines, args.topology);
+  const ids = new Set(passes.map((pass) => pass.blockId));
+  const seen = new Set<string>();
+  for (const { mine, other, gapSeconds } of findJunctionConflictsForBlocks(passes, ids, bufferSeconds)) {
+    if (mine.timelineRow > other.timelineRow) continue;
+    const key = `${mine.blockId}|${other.blockId}|${mine.nodeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pushIssue(args.warnings, {
+      code: 'MOVE_JUNCTION_CONFLICT',
+      severity: 'warning',
+      kind: 'limit',
+      message:
+        `「${mine.nodeLabel}」：時間線 ${mine.timelineRow} ${formatMinuteHms(secondToMinute(mine.instant))} 經過、`
+        + `時間線 ${other.timelineRow} ${formatMinuteHms(secondToMinute(other.instant))} 經過，`
+        + `只差 ${Math.round(gapSeconds)} 秒（需要 ${Math.round(bufferSeconds)} 秒）`,
+      detail: {
+        nodeId: mine.nodeId,
+        nodeLabel: mine.nodeLabel,
+        blockId: other.blockId,
+        earlierBlockId: mine.blockId,
+        timelineRow: mine.timelineRow,
+        otherTimelineRow: other.timelineRow,
+        gapSeconds: Math.round(gapSeconds),
+      },
+    });
   }
 }

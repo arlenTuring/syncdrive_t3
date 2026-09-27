@@ -80,7 +80,7 @@ export function yieldIdleBlockArrival(args: {
    * 沒有空等就沒有餘裕可用——那是單純兩班排太近，不歸這一支管。
    */
   const idleMinutesOf = (occupancy: StationBerthOccupancy): number =>
-    Math.max(0, occupancy.actualDepartMinute - occupancy.endMinute);
+    Math.max(0, occupancy.actualDepartMinute - occupancy.readyMinute);
 
   /** 這一趟可以整段往後挪多少分鐘（不壓到同列下一段、不動整備後首班） */
   const shiftRoomOf = (block: GeneratedScheduleBlock): number | null => {

@@ -1,9 +1,11 @@
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type {
+  AppliedSlackAdjustmentItem,
   ScheduleAnalysisReport,
   ScheduleAnalysisSuggestion,
 } from '../utils/buildScheduleAnalysisReport';
+import { formatScheduleClockHms } from '../utils/scheduleDayCycle';
 
 function formatClock(minute: number): string {
   const total = Math.max(0, Math.round(minute));
@@ -34,15 +36,99 @@ const SUGGESTION_CODES: Array<ScheduleAnalysisSuggestion['code']> = [
 const TH = 'px-2 py-1.5 text-left text-[11px] font-semibold text-zinc-400';
 const TD = 'px-2 py-1.5 text-[11px] text-zinc-200 tabular-nums';
 
+/**
+ * 「已套用的緩衝調整」一筆。按鈕是原生 button，Tab 聚焦、Enter／Space 觸發都照原生行為。
+ */
+function AppliedSlackItem({
+  item,
+  onLocate,
+  missing,
+}: {
+  item: AppliedSlackAdjustmentItem;
+  onLocate?: (blockId: string) => void;
+  missing: boolean;
+}) {
+  const { t } = useTranslation();
+  const hms = formatScheduleClockHms;
+  return (
+    <li className="rounded border border-sky-800/50 bg-sky-950/25 px-2 py-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 text-[11px] leading-4 text-zinc-200">
+          <span className="font-semibold tabular-nums text-sky-300">{item.tripCode}</span>
+          <span className="ml-1.5 text-zinc-400">
+            {t('shiftList.analysisReport.appliedSlack.row', { row: item.timelineRow })}
+          </span>
+          <span className="ml-1.5 tabular-nums text-zinc-400">
+            {t('shiftList.analysisReport.appliedSlack.blockRange', {
+              before: `${hms(item.blockBefore.startMinute)}–${hms(item.blockBefore.endMinute)}`,
+              now: `${hms(item.blockStartMinute)}–${hms(item.blockEndMinute)}`,
+            })}
+          </span>
+        </div>
+        {onLocate ? (
+          <button
+            type="button"
+            onClick={() => onLocate(item.blockId)}
+            aria-label={t('shiftList.analysisReport.appliedSlack.locateAria', {
+              code: item.tripCode,
+              row: item.timelineRow,
+            })}
+            className="shrink-0 rounded border border-sky-700/60 px-1.5 py-0.5 text-[10px] text-sky-200 transition hover:bg-sky-900/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          >
+            {t('shiftList.analysisReport.appliedSlack.locate')}
+          </button>
+        ) : null}
+      </div>
+      <p className="mt-0.5 text-[11px] tabular-nums text-zinc-300">
+        {t('shiftList.analysisReport.appliedSlack.slackBreakdown', {
+          base: item.baseSlackSeconds,
+          added: item.addedSeconds,
+          effective: item.effectiveSlackSeconds,
+        })}
+      </p>
+      <p className="text-[11px] text-zinc-400">
+        {t('shiftList.analysisReport.appliedSlack.reason', { message: item.reasonMessage })}
+      </p>
+      <ul className="mt-0.5 space-y-0.5">
+        {item.stops.map((stop) => (
+          <li key={stop.order} className="border-l border-sky-800/60 pl-2 text-[10px] leading-4 tabular-nums text-zinc-300">
+            {t('shiftList.analysisReport.appliedSlack.stopLine', {
+              station: stop.stationName,
+              base: stop.baseDwellSeconds,
+              before: stop.dwellBeforeSeconds,
+              now: stop.dwellNowSeconds,
+              arriveBefore: hms(stop.arrivalBeforeMinute),
+              arriveNow: hms(stop.arrivalNowMinute),
+              departBefore: hms(stop.departureBeforeMinute),
+              departNow: hms(stop.departureNowMinute),
+            })}
+          </li>
+        ))}
+      </ul>
+      {missing ? (
+        <p role="alert" className="mt-1 text-[11px] text-amber-300">
+          {t('shiftList.analysisReport.appliedSlack.targetMissing', { code: item.tripCode })}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 export function ScheduleAnalysisReportPanel({
   report,
   onClose,
+  onLocateBlock,
+  missingBlockId,
 }: {
   report: ScheduleAnalysisReport;
   onClose: () => void;
+  /** 點「查看班次」：用確切 blockId 定位，不靠解析班次名稱 */
+  onLocateBlock?: (blockId: string) => void;
+  /** 上一次定位找不到的卡片（班表改過了），在那一筆下面明確提示 */
+  missingBlockId?: string | null;
 }) {
   const { t } = useTranslation();
-  const { fleet, berths, suggestions, summary } = report;
+  const { fleet, berths, suggestions, summary, appliedSlackAdjustments, appliedRetimes } = report;
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-950">
@@ -70,6 +156,90 @@ export function ScheduleAnalysisReportPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <section className="mb-3" aria-labelledby="applied-slack-title">
+          <h3 id="applied-slack-title" className="mb-1 text-xs font-semibold text-zinc-300">
+            {t('shiftList.analysisReport.appliedSlack.title')}
+            <span className="ml-1 font-normal text-zinc-500">
+              {t('shiftList.analysisReport.itemCount', { count: appliedSlackAdjustments.length })}
+            </span>
+          </h3>
+          {appliedSlackAdjustments.length === 0 ? (
+            <p className="text-[11px] text-zinc-500">{t('shiftList.analysisReport.appliedSlack.none')}</p>
+          ) : (
+            <>
+              <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
+                {t('shiftList.analysisReport.appliedSlack.hint')}
+              </p>
+              <ul className="space-y-1.5">
+                {appliedSlackAdjustments.map((item) => (
+                  <AppliedSlackItem
+                    key={item.blockId}
+                    item={item}
+                    onLocate={onLocateBlock}
+                    missing={missingBlockId === item.blockId}
+                  />
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+
+        {appliedRetimes.length > 0 ? (
+          <section className="mb-3" aria-labelledby="applied-retime-title">
+            <h3 id="applied-retime-title" className="mb-1 text-xs font-semibold text-zinc-300">
+              {t('shiftList.analysisReport.appliedRetime.title')}
+              <span className="ml-1 font-normal text-zinc-500">
+                {t('shiftList.analysisReport.itemCount', { count: appliedRetimes.length })}
+              </span>
+            </h3>
+            <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
+              {t('shiftList.analysisReport.appliedRetime.hint')}
+            </p>
+            <ul className="space-y-1">
+              {appliedRetimes.map((item) => (
+                <li key={item.blockId} className="rounded border border-violet-800/50 bg-violet-950/20 px-2 py-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 text-[11px] leading-4 text-zinc-200">
+                      <span className="font-semibold tabular-nums text-violet-300">{item.tripCode}</span>
+                      <span className="ml-1.5 text-zinc-400">
+                        {t('shiftList.analysisReport.appliedSlack.row', { row: item.timelineRow })}
+                      </span>
+                      <span className="ml-1.5 tabular-nums text-zinc-400">
+                        {t('shiftList.analysisReport.appliedSlack.blockRange', {
+                          before: `${formatScheduleClockHms(item.blockBefore.startMinute)}–${formatScheduleClockHms(item.blockBefore.endMinute)}`,
+                          now: `${formatScheduleClockHms(item.blockStartMinute)}–${formatScheduleClockHms(item.blockEndMinute)}`,
+                        })}
+                      </span>
+                      <p className="text-zinc-300">{item.description}</p>
+                      <p className="text-zinc-400">
+                        {t('shiftList.analysisReport.appliedSlack.reason', { message: item.reasonMessage })}
+                      </p>
+                      {missingBlockId === item.blockId ? (
+                        <p role="alert" className="text-amber-300">
+                          {t('shiftList.analysisReport.appliedSlack.targetMissing', { code: item.tripCode })}
+                        </p>
+                      ) : null}
+                    </div>
+                    {onLocateBlock ? (
+                      <button
+                        type="button"
+                        onClick={() => onLocateBlock(item.blockId)}
+                        aria-label={t('shiftList.analysisReport.appliedSlack.locateAria', {
+                          code: item.tripCode,
+                          row: item.timelineRow,
+                        })}
+                        className="shrink-0 rounded border border-violet-700/60 px-1.5 py-0.5 text-[10px] text-violet-200 transition hover:bg-violet-900/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      >
+                        {t('shiftList.analysisReport.appliedSlack.locate')}
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {suggestions.length === 0 ? (
           <p className="rounded border border-emerald-800/50 bg-emerald-950/30 px-2 py-1.5 text-[11px] text-emerald-200">
             {t('shiftList.analysisReport.noIssues')}

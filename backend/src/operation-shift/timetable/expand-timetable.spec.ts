@@ -352,3 +352,52 @@ describe('buildTimetableStationStops', () => {
     expect(stops[1]!.departureSecond).toBe(160);
   });
 });
+
+describe('靠站緩衝：站點與緩衝分開解析、系統增加量不丟', () => {
+  const route = {
+    routeId: 'r',
+    stationIds: ['a', 'b', 'c'],
+    stationDwells: [
+      { stationId: 'a', stationName: 'A', dwellSeconds: 0 },
+      { stationId: 'b', stationName: 'B', dwellSeconds: 30 },
+      { stationId: 'c', stationName: 'C', dwellSeconds: 20 },
+    ],
+    stationLegTravels: [],
+    avgTravelTimeSeconds: 200,
+    minTravelTimeSeconds: 160,
+    dwellSlackSeconds: 5,
+  };
+  const base = {
+    id: 't', timelineRow: 1, taskType: 'passenger', routeId: 'r',
+    plannedStartMinute: 600,
+  };
+
+  it('只給單班緩衝、沒覆寫站點：單班緩衝生效', () => {
+    const stops = buildTimetableStationStops(
+      { ...base, plannedEndMinute: 600 + (200 + 30 + 20 + 24) / 60, dwellSlackSeconds: 12 },
+      route,
+    );
+    expect(stops[1]!.dwellSeconds).toBe(42);
+  });
+
+  it('單班明確給 0：是 0，不退回路線設定', () => {
+    const stops = buildTimetableStationStops(
+      { ...base, plannedEndMinute: 600 + (200 + 50) / 60, dwellSlackSeconds: 0 },
+      route,
+    );
+    expect(stops[1]!.dwellSeconds).toBe(30);
+  });
+
+  it('系統增加緩衝會加在每個適用站上', () => {
+    const stops = buildTimetableStationStops(
+      {
+        ...base,
+        plannedEndMinute: 600 + (200 + 50 + 10 + 120) / 60,
+        dwellSlackAdjustment: { addedSeconds: 60 },
+      },
+      route,
+    );
+    expect(stops[1]!.dwellSeconds).toBe(30 + 65);
+    expect(stops[0]!.dwellSeconds).toBe(0);
+  });
+});

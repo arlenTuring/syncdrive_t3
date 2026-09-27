@@ -55,7 +55,7 @@ import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
 } from '../utils/maintenanceSectionCode';
-import { scrollScheduleGridToMinute } from '../../../components/scheduleGridDayCycle';
+import { scrollScheduleGridToBlock } from '../utils/locateScheduleBlock';
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 import { ManualScheduleEditorSidebar } from './ManualScheduleEditorSidebar';
@@ -327,6 +327,8 @@ const ROOT_CAUSES: RootCauseDefinition[] = [
     codes: new Set([
       'MAINTENANCE_FACILITY_UNAVAILABLE',
       'MAINTENANCE_TRANSFER_UNRESOLVED',
+      'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+      'VEHICLE_LOCATION_DISCONTINUITY',
       'MAINTENANCE_FACILITY_YIELDED',
     ]),
     hint:
@@ -870,6 +872,10 @@ export function StepShiftScheduleAdjust({
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [highlightedBlockId, setHighlightedBlockId] = useState<string | null>(null);
+  /** 從報表定位過來、明細要釘住打開的那張卡；選別張卡就收起 */
+  const [pinnedDetailBlockId, setPinnedDetailBlockId] = useState<string | null>(null);
+  /** 上一次定位找不到的卡片（班表改過了），報表裡明確提示 */
+  const [missingLocateBlockId, setMissingLocateBlockId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [history, setHistory] = useState<PlanAdjustHistoryEntry[]>([]);
@@ -1366,11 +1372,29 @@ export function StepShiftScheduleAdjust({
     }
   };
 
-  const handleIssueClick = (issue: FeasibilityIssue) => {
-    if (!plan) return;
-    const targetBlockId = resolveFeasibilityIssueJumpBlockId(issue, plan);
-    if (!targetBlockId) return;
-
+  /**
+   * 定位一張卡片：問題清單跳轉與分析報表「查看班次」共用。
+   *
+   * 用確切的 blockId 找，找不到就明確提示、不動畫面——不能靠解析班次名稱，也不能
+   * 找不到就跳到同列第一張卡（那是錯的班次）。從報表來的：切回班次預覽、收合報表
+   * （讓格線有完整高度，不被報表壓住）、釘住那張卡的明細。捲動等畫面重排之後再做，
+   * 沿用支援畫面外卡片的定位方式（見 scrollScheduleGridToBlock）。
+   */
+  const locateBlock = (targetBlockId: string, options: { fromReport?: boolean } = {}): boolean => {
+    if (!plan) return false;
+    const targetBlock = plan.timelines
+      .flatMap((timeline) => timeline.blocks)
+      .find((block) => block.id === targetBlockId);
+    if (!targetBlock) {
+      setMissingLocateBlockId(targetBlockId);
+      return false;
+    }
+    setMissingLocateBlockId(null);
+    setActiveTab('schedule');
+    if (options.fromReport) {
+      setShowAnalysisReport(false);
+      setPinnedDetailBlockId(targetBlockId);
+    }
     setSelectedBlockId(targetBlockId);
     setHighlightedBlockId(targetBlockId);
     if (highlightTimeoutRef.current) {
@@ -1379,45 +1403,15 @@ export function StepShiftScheduleAdjust({
     highlightTimeoutRef.current = setTimeout(() => {
       setHighlightedBlockId(null);
     }, 3000);
+    setTimeout(() => scrollScheduleGridToBlock(targetBlock), 0);
+    return true;
+  };
 
-    /**
-     * 先<strong>用時刻算出橫向位置</strong>捲過去，再靠 DOM 做垂直對齊。
-     *
-     * 只用 <code>getElementById</code> 會失敗：格線有視窗裁切，畫面外的卡片
-     * 根本不在 DOM 裡，找不到元素就什麼都不做——使用者按了「跳轉」沒反應
-     * （2026-08-11 使用者回報）。橫向先到位之後裁切才會把那張卡畫出來，
-     * 這時再拿元素做垂直置中。
-     *
-     * 橫向座標從捲動容器自己量：內容寬 ＝ 列號欄 ＋ 三份日拷貝，
-     * 所以一天的寬度是 (scrollWidth − 列號欄) ÷ 3，目標落在<strong>中間那份</strong>。
-     */
-    const targetId = targetBlockId;
-    const targetBlock = plan.timelines
-      .flatMap((timeline) => timeline.blocks)
-      .find((block) => block.id === targetId);
-    const grid = document.querySelector('[data-schedule-grid-scroll]');
-    if (grid instanceof HTMLElement && targetBlock) {
-      scrollScheduleGridToMinute(grid, targetBlock.plannedStartMinute, 48);
-    }
-
-    setTimeout(() => {
-      const el = document.getElementById(`block-card-${targetId}`);
-      if (!el || !(grid instanceof HTMLElement)) return;
-      /**
-       * 只調垂直，橫向<strong>絕對不要碰</strong>。
-       *
-       * <code>scrollIntoView</code> 就算給 <code>inline: 'nearest'</code>，
-       * 元素橫向不在畫面內時照樣會捲——而回中隨時可能把畫面移到另一份日拷貝，
-       * 那份看起來一模一樣但 DOM id 只掛在中間那份上，於是它會把畫面拉去
-       * 一個「看起來沒必要」的地方。改成自己算垂直差值。
-       */
-      const rect = el.getBoundingClientRect();
-      const gridRect = grid.getBoundingClientRect();
-      grid.scrollBy({
-        top: rect.top - gridRect.top - grid.clientHeight / 2 + rect.height / 2,
-        behavior: 'smooth',
-      });
-    }, 120);
+  const handleIssueClick = (issue: FeasibilityIssue) => {
+    if (!plan) return;
+    const targetBlockId = resolveFeasibilityIssueJumpBlockId(issue, plan);
+    if (!targetBlockId) return;
+    locateBlock(targetBlockId);
   };
 
   // 分析報表：純計算，跟著 plan／時段／路線走；plan 還沒好就不算
@@ -1439,8 +1433,10 @@ export function StepShiftScheduleAdjust({
       collisionProtectionSeconds:
         draft.routeGroups.collisionProtectionSeconds
         ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
+      sectionCodes: draft.maintenanceTask.sectionCodeBySection,
     });
   }, [
+    draft.maintenanceTask.sectionCodeBySection,
     plan,
     intervals,
     attributes,
@@ -1790,6 +1786,8 @@ export function StepShiftScheduleAdjust({
               <ScheduleAnalysisReportPanel
                 report={analysisReport}
                 onClose={() => setShowAnalysisReport(false)}
+                onLocateBlock={(blockId) => locateBlock(blockId, { fromReport: true })}
+                missingBlockId={missingLocateBlockId}
               />
             </div>
           ) : null}
@@ -1802,7 +1800,11 @@ export function StepShiftScheduleAdjust({
           attributes={attributes}
                   templateTasks={templateTasks}
                   selectedBlockId={selectedBlockId}
-                  onSelectBlock={setSelectedBlockId}
+                  onSelectBlock={(blockId) => {
+                    setSelectedBlockId(blockId);
+                    if (blockId !== pinnedDetailBlockId) setPinnedDetailBlockId(null);
+                  }}
+                  pinnedDetailBlockId={pinnedDetailBlockId}
                   report={isManual ? null : report}
                   highlightedBlockId={highlightedBlockId}
                   selectedRoutes={draft.routeGroups.selectedRoutes}

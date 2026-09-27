@@ -97,6 +97,35 @@ function resolveParkedStation(
   return { stationId, stationName: last!.stationName || stationId };
 }
 
+/**
+ * 出廠移動開到下一班的起點站、提早到了：車在那一站等下一班發車。
+ * 只認「移動的目的站＝下一班起點站」，其他情形不猜。
+ */
+function resolveStationAfterExitMove(
+  previous: GeneratedScheduleBlock,
+  next: GeneratedScheduleBlock,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+): { stationId: string; stationName: string } | null {
+  if (previous.source !== 'yard_exit_move' || next.taskType !== 'passenger') return null;
+  const stationId = previous.yardExitStationId?.trim();
+  if (!stationId) return null;
+  const route = resolveRouteForBlock(next, selectedRoutes);
+  if (route?.stationIds?.[0]?.trim() !== stationId) return null;
+  return { stationId, stationName: previous.yardExitStationLabel ?? stationId };
+}
+
+/**
+ * 重建一列的暫停卡：先拿掉這一列所有暫停卡，再照目前的卡片重新補。
+ * 候選改了這一列的時刻之後呼叫，暫停卡永遠跟著卡片走，不會留下過期卡或重複插卡。
+ */
+export function rebuildRowHoldCards(
+  timeline: GeneratedScheduleTimeline,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+): void {
+  timeline.blocks = timeline.blocks.filter((block) => block.source !== 'hold');
+  fillYardHoldGaps({ timelines: [timeline], selectedRoutes });
+}
+
 export function fillYardHoldGaps(args: {
   timelines: GeneratedScheduleTimeline[];
   /**
@@ -137,9 +166,13 @@ export function fillYardHoldGaps(args: {
         ? previous.yardFacilityNodeId?.trim()
         : undefined;
 
-      // 正線側：跑完一趟停在末站等下一趟。地點是停靠站，不是設施格
+      // 正線側：跑完一趟停在末站等下一趟；或出廠移動提早到站、在起點站等下一趟。
+      // 地點是停靠站，不是設施格
       if (!facilityNodeId) {
-        const parked = selectedRoutes ? resolveParkedStation(previous, selectedRoutes) : null;
+        const parked = selectedRoutes
+          ? resolveParkedStation(previous, selectedRoutes)
+            ?? resolveStationAfterExitMove(previous, next, selectedRoutes)
+          : null;
         if (!parked) continue;
         added.push({
           id: `hold-${previous.id}-${Math.round(previous.plannedEndMinute * 60)}`,

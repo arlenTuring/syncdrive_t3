@@ -642,6 +642,23 @@ const enUS: DeepStringify<typeof zhTW> = {
       manual: 'Manual',
     },
     analysisReport: {
+      appliedRetime: {
+        title: 'Applied timing adjustments',
+        hint: 'To resolve resource conflicts the engine changed these trips\' departure or arrival within legal travel ranges (or shifted a chain). Values come from the current schedule.',
+      },
+      appliedSlack: {
+        title: 'Applied dwell buffer adjustments',
+        hint: 'To resolve resource conflicts the engine added dwell buffer to these trips. Base dwell is unchanged; only buffer is added. Values come from the current schedule. These are applied adjustments, not unresolved problems.',
+        none: 'No engine-added buffer in this schedule.',
+        row: 'Timeline {{row}}',
+        slackBreakdown: 'Buffer: original {{base}}s + added {{added}}s = effective {{effective}}s',
+        blockRange: 'Trip {{before}} → {{now}}',
+        reason: 'Reason: {{message}}',
+        stopLine: '{{station}}: base dwell {{base}}s, effective stop {{before}} → {{now}}s; arrive {{arriveBefore}} → {{arriveNow}}, depart {{departBefore}} → {{departNow}}',
+        locate: 'View trip',
+        locateAria: 'Show {{code}} (timeline {{row}}) on the schedule',
+        targetMissing: 'Trip {{code}} not found — the schedule changed and this adjustment no longer matches a card.',
+      },
       title: 'Schedule analysis',
       summary:
         '{{timelines}} timelines · {{trips}} trips · {{hours}} vehicle·hours revenue',
@@ -846,6 +863,10 @@ const enUS: DeepStringify<typeof zhTW> = {
       loadingCapacity: 'Loading capacity trend…',
     },
     planGrid: {
+      slackBreakdown: 'original {{base}}s + added {{added}}s',
+      slackAdjusted: 'Engine-added buffer',
+      slackAdjustedBadge: 'Buffer +{{added}}s',
+      slackAdjustedStop: '{{station}}: stop {{before}}s → {{now}}s, arrive {{arriveBefore}} → {{arriveNow}}, depart {{departBefore}} → {{departNow}}',
       errorsAndWarnings: 'Errors & warnings',
       warnings: 'Warnings',
       countItems: '({{count}})',

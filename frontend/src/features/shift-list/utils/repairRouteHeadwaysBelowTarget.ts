@@ -24,65 +24,23 @@ import type {
 } from './schedule-engine/types';
 import { minuteToSecond, secondToMinute } from './schedule-engine/types';
 import {
+  bookBerthWindowsExcept,
+  movedTripLingerCollides,
   projectProtectedBerthWindowsSeconds,
   resolveBerthClearDelaySeconds,
   type BerthProtectionContext,
-  type BerthWindowSec,
 } from './stationBerthConstraint';
-import { resolvePairHeadwaySeconds } from './schedule-engine/validate';
+import { resolvePairHeadwayTarget } from './schedule-engine/validate';
 import type { TimeSlotAttribute, TimeSlotInterval } from '../../time-templates/types/editor';
 
 /** 修復後仍在此寬限內視為已達標，不再繼續擠壓（對齊 densify slack） */
 const REPAIR_SLACK_SECONDS = 20;
-
-/**
- * 一對相鄰發車該守住的班距目標：優先用<strong>後車自己交路起班當下</strong>記下來的
- * <code>cycleHeadwayTargetSeconds</code>（見 GeneratedScheduleBlock 的欄位說明），
- * 不用兩邊當下時刻各自查時段、取較嚴者——已在尖峰起班的交路，後車被前面幾輪修復
- * 挪過時段邊界也不該因此改用離峰的較嚴門檻；新開交路本來就是照起班當下的時段記下來
- * 的。兩邊都沒有交路來源資料（手動製作／舊產物）才退回舊算法。
- */
-function resolvePairHeadwayTarget(
-  earlier: { plannedStartMinute: number },
-  later: GeneratedScheduleBlock,
-  intervals: TimeSlotInterval[],
-  attributes: TimeSlotAttribute[],
-): number | null {
-  if (later.cycleHeadwayTargetSeconds != null) return later.cycleHeadwayTargetSeconds;
-  return resolvePairHeadwaySeconds(
-    earlier.plannedStartMinute,
-    later.plannedStartMinute,
-    intervals,
-    attributes,
-  );
-}
 
 function occupancySecondsOf(block: GeneratedScheduleBlock): number {
   return Math.max(
     SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
     minuteToSecond(block.plannedEndMinute) - minuteToSecond(block.plannedStartMinute),
   );
-}
-
-function bookAllExcept(
-  timelines: GeneratedSchedulePlan['timelines'],
-  selectedRoutes: ShiftScheduleSelectedRoute[],
-  exceptId: string,
-  protection: BerthProtectionContext,
-): BerthWindowSec[] {
-  const booked: BerthWindowSec[] = [];
-  for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      if (block.taskType !== 'passenger') continue;
-      if (block.id === exceptId) continue;
-      const route = resolveRouteForBlock(block, selectedRoutes);
-      if (!route) continue;
-      for (const win of projectProtectedBerthWindowsSeconds(block, route, protection)) {
-        booked.push(win);
-      }
-    }
-  }
-  return booked;
 }
 
 /**
@@ -173,43 +131,6 @@ function sameRowVehicleCeilingSeconds(
 }
 
 /**
- * 把發車往後推等於車在來源站多待一段——真正到站的時刻（同列前一件任務結束的
- * 時刻）不會跟著發車一起往後挪，只有發車晚了，中間那段「已經到了、還沒開」的
- * 停留跟著變長。{@link projectProtectedBerthWindowsSeconds} 算出來的來源站窗口只有
- * 路線設定的靠站秒數，量不出這段加長的部分；這裡另外拼一個從「真正到站」到「這次
- * 延後後的發車」的完整區間，跟別台車在同一站的預約比對一次。
- */
-function originLingerCollides(args: {
-  timelines: GeneratedSchedulePlan['timelines'];
-  later: GeneratedScheduleBlock;
-  route: ShiftScheduleSelectedRoute;
-  finalStartSecond: number;
-  booked: BerthWindowSec[];
-  protection: BerthProtectionContext;
-}): boolean {
-  const { timelines, later, route, finalStartSecond, booked, protection } = args;
-  const origin = route.stationDwells[0];
-  if (!origin) return false;
-  const prevSameRow = sameRowNeighborBlock(timelines, later, 'prev');
-  const realArrivalSecond = prevSameRow ? minuteToSecond(prevSameRow.plannedEndMinute) : null;
-  // 沒有前一件任務（本輪第一班），或真正到站本來就晚於這次算出來的發車：
-  // 沒有「多待一段」這回事，不需要另外驗證。
-  if (realArrivalSecond == null || realArrivalSecond >= finalStartSecond - 1e-9) return false;
-
-  const protectionSeconds = Math.max(0, protection.collisionProtectionSeconds ?? 0) * 2;
-  const lingerWindow: BerthWindowSec = {
-    stationId: origin.stationId,
-    stationName: origin.stationName || origin.stationId,
-    startSecond: realArrivalSecond,
-    naturalEndSecond: finalStartSecond,
-    endSecond: finalStartSecond + protectionSeconds,
-    timelineRow: later.timelineRow,
-    blockId: later.id,
-  };
-  return resolveBerthClearDelaySeconds([lingerWindow], booked) > 1e-6;
-}
-
-/**
  * Pass A：把 later 往目標班距推；推不到全額就推到能推的極限（同列下一班／maxPushSeconds／
  * 站位允許的最遠處），不是全有全無。
  */
@@ -277,7 +198,7 @@ function pushLaterForward(args: {
     plannedStartMinute: secondToMinute(candidate),
     plannedEndMinute: secondToMinute(candidate + occupied),
   };
-  const booked = bookAllExcept(timelines, selectedRoutes, later.id, protection);
+  const booked = bookBerthWindowsExcept(timelines, selectedRoutes, later.id, protection);
   const windows = projectProtectedBerthWindowsSeconds(probe, route, protection);
   const berthDelay = resolveBerthClearDelaySeconds(windows, booked);
   let finalStart = snapUpToClockAlignSeconds(candidate + berthDelay);
@@ -310,11 +231,13 @@ function pushLaterForward(args: {
    * 就不成立，不能假裝沒這回事直接推。
    */
   if (
-    originLingerCollides({
+    movedTripLingerCollides({
       timelines,
-      later,
+      selectedRoutes,
+      block: later,
       route,
-      finalStartSecond: finalStart,
+      newStartSecond: finalStart,
+      newEndSecond: finalStart + occupied,
       booked,
       protection,
     })
@@ -409,11 +332,26 @@ function pullEarlierBackward(args: {
     plannedStartMinute: secondToMinute(candidate),
     plannedEndMinute: secondToMinute(candidate + earlierOccupied),
   };
-  const booked = bookAllExcept(timelines, selectedRoutes, earlier.id, protection);
+  const booked = bookBerthWindowsExcept(timelines, selectedRoutes, earlier.id, protection);
   const windows = projectProtectedBerthWindowsSeconds(probe, earlierRoute, protection);
   const berthDelay = resolveBerthClearDelaySeconds(windows, booked);
   const finalStart = snapUpToClockAlignSeconds(candidate + berthDelay);
   if (finalStart >= earlierStart - 1e-9) return false;
+  // 往前拉＝終點站提早到、停更久；那段多出來的停留也要驗
+  if (
+    movedTripLingerCollides({
+      timelines,
+      selectedRoutes,
+      block: earlier,
+      route: earlierRoute,
+      newStartSecond: finalStart,
+      newEndSecond: finalStart + earlierOccupied,
+      booked,
+      protection,
+    })
+  ) {
+    return false;
+  }
 
   earlier.plannedStartMinute = secondToMinute(finalStart);
   earlier.plannedEndMinute = secondToMinute(finalStart + earlierOccupied);
@@ -460,7 +398,7 @@ export function repairRouteHeadwaysBelowTarget(args: {
       // 起點站上工，發車時刻由正線開始時刻往回推算，不必遷就同方向班距。
       // validatePassengerHeadway 本來就只檢查 template_bar，這裡對齊，
       // 避免為了滿足一個根本沒被檢查的班距而延後調度車。
-      // 註：它們仍以 bookAllExcept／同列鄰居身分限制其他班次，物理約束不受影響。
+      // 註：它們仍以 bookBerthWindowsExcept／同列鄰居身分限制其他班次，物理約束不受影響。
       if (block.source !== 'template_bar') continue;
       const routeId = block.routeId?.trim();
       if (!routeId) continue;

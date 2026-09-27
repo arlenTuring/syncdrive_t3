@@ -5,7 +5,13 @@ import type {
   GeneratedSchedulePlan,
   ShiftScheduleStoredOutput,
 } from './schedule-engine/types';
-import { validateStationBerthCollisions } from './schedule-engine/validate';
+import {
+  validateFacilityOccupancy,
+  validateMoveJunctionConflicts,
+  validateStationBerthCollisions,
+  validateVehicleLocationContinuity,
+} from './schedule-engine/validate';
+import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 
 /**
@@ -49,8 +55,10 @@ export type SchedulePublishState =
   | 'ready';
 
 /**
- * plan 內容指紋：只取「排班結果本身」——哪一列、哪一張卡、起訖時刻。
- * 不含 id 以外的顯示欄位，改個標籤不該讓檢查失效。
+ * plan 內容指紋：只取「排班結果本身」——哪一列、哪一張卡、起訖時刻，以及會改變
+ * 實體佔用的欄位（路線、停放格位／站位、移動卡端點、停靠與緩衝）。換格或改路線但時刻
+ * 不變，佔用就不同了，不能沿用舊的通過結果。改個標籤不該讓檢查失效，所以不含
+ * 顯示用文字。
  */
 export function buildPlanFingerprint(
   plan: GeneratedSchedulePlan | null | undefined,
@@ -60,7 +68,27 @@ export function buildPlanFingerprint(
   for (const timeline of plan.timelines) {
     for (const block of timeline.blocks) {
       parts.push(
-        `${timeline.row}|${block.id}|${block.plannedStartMinute}|${block.plannedEndMinute}`,
+        [
+          timeline.row,
+          block.id,
+          block.plannedStartMinute,
+          block.plannedEndMinute,
+          block.taskType,
+          block.source,
+          block.routeId ?? '',
+          block.routeInstanceId ?? '',
+          block.yardFacilityNodeId ?? '',
+          block.yardFacilityStationId ?? '',
+          block.yardExitFacilityNodeId ?? '',
+          block.yardExitStationId ?? '',
+          (block as { yardEntryFacilityNodeId?: string }).yardEntryFacilityNodeId ?? '',
+          // 站內佔用由停靠與緩衝決定：卡片起訖沒變、緩衝變了，逐站時刻也變了
+          block.dwellSlackSeconds ?? '',
+          block.dwellSlackAdjustment?.addedSeconds ?? '',
+          (block.stationDwells ?? [])
+            .map((dwell) => `${dwell.stationId}:${dwell.dwellSeconds ?? ''}:${dwell.dwellMode ?? ''}:${dwell.dwellRequired ?? ''}`)
+            .join(','),
+        ].join('|'),
       );
     }
   }
@@ -71,8 +99,8 @@ export function buildPlanFingerprint(
 /**
  * 跑一次發布前檢查。
  *
- * 目前只檢查站位相關（重疊與碰撞保護）——這是唯一「物理上做不到／有行車
- * 安全疑慮」的一類，也是擋發布的唯一理由。班距、未承接脈衝那些屬服務品質，
+ * 檢查「物理上做不到／有行車安全疑慮」的全部幾類：站位重疊與碰撞保護、設施格
+ * 重疊與交接間隔、車的位置連續性（缺移動）。班距、未承接脈衝那些屬服務品質，
  * 由分析報表與既有警告呈現，不擋發布。
  */
 export function runSchedulePublishCheck(args: {
@@ -80,8 +108,10 @@ export function runSchedulePublishCheck(args: {
   selectedRoutes: ShiftScheduleSelectedRoute[];
   collisionProtectionSeconds: number;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  /** 有給才檢查移動卡轉折點（經過時刻要沿拓樸行駛秒數推算） */
+  topology?: PointTopology | null;
 }): SchedulePublishCheckResult {
-  const { plan, selectedRoutes, collisionProtectionSeconds, sectionCodes } = args;
+  const { plan, selectedRoutes, collisionProtectionSeconds, sectionCodes, topology } = args;
   const errors: FeasibilityIssue[] = [];
   const warnings: FeasibilityIssue[] = [];
 
@@ -89,6 +119,17 @@ export function runSchedulePublishCheck(args: {
     collisionProtectionSeconds,
     warnings,
     sectionCodes,
+  });
+  validateFacilityOccupancy(plan.timelines, errors, {
+    collisionProtectionSeconds,
+    warnings,
+  });
+  validateVehicleLocationContinuity({ timelines: plan.timelines, selectedRoutes, errors });
+  validateMoveJunctionConflicts({
+    timelines: plan.timelines,
+    topology,
+    collisionProtectionSeconds,
+    warnings,
   });
 
   const blockingIssues = [...errors, ...warnings].filter((issue) =>

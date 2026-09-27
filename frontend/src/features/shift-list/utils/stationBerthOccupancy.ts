@@ -3,7 +3,7 @@ import {
   buildBlockStationDepartures,
   resolveRouteForBlock,
 } from './buildBlockStationDepartures';
-import type { GeneratedSchedulePlan } from './schedule-engine/types';
+import type { GeneratedSchedulePlan, GeneratedScheduleBlock } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
 import {
   isStationDwellRequired,
@@ -108,8 +108,18 @@ export type StationBerthOccupancy = {
   routeId: string | null;
   /** 到站（分鐘） */
   startMinute: number;
-  /** 離站／可出發（分鐘）＝該站自然在站時間結束 */
+  /**
+   * 佔用窗結束（分鐘）＝該站自然在站時間結束；零秒起終站會補一格最小佔用，
+   * 只為了同秒進出不漏判碰撞——<strong>不是</strong>車必須多等的時刻，
+   * 車何時能動看 {@link readyMinute}。
+   */
   endMinute: number;
+  /**
+   * 車在這一站<strong>最早可以動</strong>的時刻（分鐘）＝實際停靠完成，不含為了防漏判
+   * 補的最小佔用。要開去別處（讓站、進廠）時再加最低恢復時間，見
+   * {@link resolveVehicleReadyMinute}。
+   */
+  readyMinute: number;
   /**
    * 這個佔用所屬<strong>班次卡</strong>的起訖（分鐘）。
    *
@@ -141,6 +151,20 @@ export type StationBerthOccupancy = {
    */
   protectedUntilMinute: number;
 };
+
+/**
+ * 車跑完這一站之後，最早可以開去別處（讓站、進廠）的時刻（分鐘）。
+ *
+ * 實際停靠完成 ＋ 最低恢復時間，跟入廠卡的「前一段載客跑完 ＋ 最低恢復」同一條規則。
+ * 別車何時能進來是另一回事（看 actualDepartMinute 與保護時間），兩者不能混用：
+ * 為了防漏判補的最小佔用不是移動命令，也不能為了早點動就刪掉別人的保護窗。
+ */
+export function resolveVehicleReadyMinute(
+  occupancy: Pick<StationBerthOccupancy, 'readyMinute'>,
+  minimumRecoveryTimeSeconds: number,
+): number {
+  return occupancy.readyMinute + Math.max(0, minimumRecoveryTimeSeconds) / 60;
+}
 
 export type StationBerthCollisionKind =
   /** 兩台車的到離站區間真的重疊——同一時刻兩台車都在站位上 */
@@ -208,7 +232,36 @@ export function collectStationBerthOccupancies(
        * 暫停卡的價值在於它是<strong>事實</strong>，可以取代 60 秒門檻的推論，
        * 不在於多開一種佔用型別。
        */
-      if (block.source === 'hold') continue;
+      if (block.source === 'hold') {
+        // 接在載客後面的暫停由末站分支的 actualDepartMinute 吸收（上面的說明）；
+        // 不是的（提早出廠到站上等、站位待命做完還沒走）沒有別人會記，自己算一筆
+        const stationId = block.yardFacilityStationId?.trim();
+        const extendsTrip = blocks.some(
+          (other) =>
+            other.taskType === 'passenger'
+            && Math.abs(other.plannedEndMinute - block.plannedStartMinute) < 1e-9,
+        );
+        if (!stationId || extendsTrip || block.plannedEndMinute <= block.plannedStartMinute + 1e-9) {
+          continue;
+        }
+        out.push({
+          stationId,
+          stationName: block.yardFacilityLabel ?? stationId,
+          timelineRow: timeline.row,
+          blockId: block.id,
+          routeCode: null,
+          routeId: null,
+          startMinute: block.plannedStartMinute,
+          endMinute: block.plannedEndMinute,
+          readyMinute: block.plannedEndMinute,
+          blockStartMinute: block.plannedStartMinute,
+          blockEndMinute: block.plannedEndMinute,
+          actualDepartMinute: block.plannedEndMinute,
+          berthClearMinute: block.plannedEndMinute + protectionMin / 2,
+          protectedUntilMinute: block.plannedEndMinute + protectionMin,
+        });
+        continue;
+      }
       // 待命停在正線停靠站：整段時間都實實在在佔著那一格。
       // 這跟「正線跑完把整備硬掛在末站」不一樣——那是沒有明確地點的推測，
       // 這是使用者指定、引擎也挑定的地點，車真的停在那裡，別台車進不來。
@@ -224,6 +277,7 @@ export function collectStationBerthOccupancies(
           routeId: null,
           startMinute,
           endMinute,
+          readyMinute: block.plannedEndMinute,
           blockStartMinute: block.plannedStartMinute,
           blockEndMinute: block.plannedEndMinute,
           actualDepartMinute: endMinute,
@@ -246,7 +300,8 @@ export function collectStationBerthOccupancies(
         const isOrigin = si === 0;
 
         const startMinute = stop.arrivalMinute;
-        let endMinute = Math.max(stop.departureMinute, stop.arrivalMinute);
+        const readyMinute = Math.max(stop.departureMinute, stop.arrivalMinute);
+        let endMinute = readyMinute;
 
         // 途經點且無實際停靠秒：不參與站位碰撞
         if (isPortal && !isOrigin && !isTerminal && stop.dwellSeconds <= 0) {
@@ -264,10 +319,11 @@ export function collectStationBerthOccupancies(
 
         // 別台車最早可以進來的時刻。兩塊各自獨立：
         // 1) 末站滯留——這一趟跑完後車還停在原地等下一個任務，站位一直被佔著。
-        //    只有末站會滯留（車開過中間站不會停在那裡等）。
+        //    只有末站會滯留（車開過中間站不會停在那裡等）。這是實體佔用，
+        //    跟碰撞保護開不開無關。
         // 2) 碰撞保護時間 ×2——A 車駛離衝突區要一份，B 車開進來要另一份。
         let actualDepartMinute = endMinute;
-        if (protectionOn && isTerminal) {
+        if (isTerminal) {
           const holdEnd = resolveHoldEndMinuteAfter(timelines, block, stop.stationId);
           const idleUntil = holdEnd ?? resolveSameRowIdleOccupiedUntilMinute(timelines, block);
           if (idleUntil != null) {
@@ -288,6 +344,7 @@ export function collectStationBerthOccupancies(
           routeId: block.routeId ?? route.routeId,
           startMinute,
           endMinute,
+          readyMinute,
           blockStartMinute: block.plannedStartMinute,
           blockEndMinute: block.plannedEndMinute,
           actualDepartMinute,
@@ -352,13 +409,14 @@ export function findStationBerthCollisions(
         if (later.timelineRow === earlier.timelineRow) continue;
         // 已排序，後面的只會更晚：一旦連碰撞保護都清得開就不必再往後看
         const protectedFloor = Math.max(
-          earlier.endMinute + requiredMin,
+          earlier.actualDepartMinute + requiredMin,
           earlier.protectedUntilMinute,
         );
         if (later.startMinute >= protectedFloor - 1e-12) break;
 
+        // 實體重疊看車真正開走的時刻，不是靠站結束：末站滯留期間車還在站位上
         const overlapMin =
-          Math.min(earlier.endMinute, later.endMinute)
+          Math.min(earlier.actualDepartMinute, later.actualDepartMinute)
           - Math.max(earlier.startMinute, later.startMinute);
         const shortfallMin = Math.max(
           0,
@@ -378,7 +436,7 @@ export function findStationBerthCollisions(
           earlier,
           later,
           overlapSeconds: minuteToSecond(Math.max(0, overlapMin)),
-          clearanceGapSeconds: minuteToSecond(later.startMinute - earlier.endMinute),
+          clearanceGapSeconds: minuteToSecond(later.startMinute - earlier.actualDepartMinute),
           requiredClearanceSeconds: required,
           protectionShortfallSeconds: minuteToSecond(shortfallMin),
         });
@@ -389,96 +447,131 @@ export function findStationBerthCollisions(
   return collisions;
 }
 
-/** 車真的停在裡面、會佔著設施格的整備任務類型（不含調度、不含暫停卡本身） */
+/** 車真的停在裡面、會佔著設施格的整備任務類型 */
 const FACILITY_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby', 'washing']);
 
+const DAY_SECONDS = 24 * 60 * 60;
+
 /**
- * 同一列在這個區塊之後，是否有一段「還停在同一個設施格」的空檔——不論有沒有補過
- * 「暫停」卡都問得到答案。
+ * 這張卡代表「車停在某一個設施格裡」時，回傳那一格；否則 null。
  *
- * 跟 {@link resolveHoldEndMinuteAfter} 同一套判準，鑰匙從 stationId 換成
- * facilityNodeId：暫停卡已經插了就直接採用卡上的時刻（照事實），沒插就退回
- * {@link resolveSameRowIdleOccupiedUntilMinute} 的空檔推論——兩條路算出來的答案
- * 一致，求解時的候選空位檢查（補卡之前）跟最後驗證（補卡之後）才會看到同一個
- * 佔用，不會因為「暫停」卡插了沒而有兩種答案（見 {@link collectFacilityOccupancies}）。
+ * 除了整備／待命之外，<code>idle</code> 也算：暫停卡（<code>source 'hold'</code>）
+ * 與讓站、提早進廠插的臨時停格（<code>source 'transition'</code>）都寫了明確格位，
+ * 車就停在那裡。只要有格位就是事實，不看它是哪一條策略插的。
  */
-function resolveFacilityActualDepartMinute(
-  timelines: GeneratedSchedulePlan['timelines'],
-  block: { id: string; timelineRow: number; plannedEndMinute: number },
-  facilityNodeId: string,
-): number | null {
-  const row = timelines.find((t) => t.row === block.timelineRow);
-  if (row) {
-    for (const other of row.blocks) {
-      if (other.source !== 'hold') continue;
-      if (Math.abs(other.plannedStartMinute - block.plannedEndMinute) > 1e-9) continue;
-      if ((other.yardFacilityNodeId?.trim() ?? '') !== facilityNodeId) continue;
-      return other.plannedEndMinute;
-    }
-  }
-  return resolveSameRowIdleOccupiedUntilMinute(timelines, block);
+export function facilityPresenceNodeId(block: GeneratedScheduleBlock): string | null {
+  const nodeId = block.yardFacilityNodeId?.trim();
+  if (!nodeId) return null;
+  if (FACILITY_STAY_TASK_TYPES.has(block.taskType) || block.taskType === 'idle') return nodeId;
+  return null;
 }
 
 export type FacilityOccupancy = {
   facilityNodeId: string;
   facilityLabel: string;
   timelineRow: number;
+  /** 這段連續停留的第一張卡（優先取非暫停卡） */
   blockId: string;
+  /** 同車同格連續停留合併後，涵蓋的每一張卡 */
+  blockIds: string[];
   label: string;
-  /** 整備／停留本身的排定起訖（分鐘） */
+  /** 車進格（這段連續停留最早的一張卡開始） */
   startMinute: number;
+  /** 排定的停留／整備卡最晚結束的時刻（不含暫停卡延伸） */
   endMinute: number;
   /**
-   * 車真正開走的時刻（分鐘）＝整備結束後車還賴著的那段也算進去。
-   * 沒有補「暫停」卡時用跟站位同一套空檔推論分析出來，不等於 {@link endMinute}
-   * 也不代表有卡；見檔案頂端 {@link resolveFacilityActualDepartMinute} 的說明。
+   * 車真正離開這一格的時刻（分鐘）＝同列下一張「不是停在同一格」的卡開始的時刻。
+   * 下一張是移動卡就是移動開始；下一張不是移動卡（缺了必要移動）也只能停在這一刻，
+   * 那是銜接失敗，由連續性驗證另外回報，這裡不假設車已經成功開走。
    */
   actualDepartMinute: number;
 };
 
 /**
- * 蒐集各設施格跨車的佔用區間，車真正開走前都算佔著。
+ * 蒐集各設施格跨車的實際佔用區間。
  *
- * <strong>不依賴「暫停」卡是否已經補過。</strong>設施佔用先前只記
- * <code>[整備開始, 整備結束]</code>——那段推論後來搬進 fillYardHoldGaps 插的
- * 「暫停」卡才現形，但求解／候選空位檢查（見 closeYardHeadGaps）都跑在補卡
- * <strong>之前</strong>，看到的還是沒補過的窄佔用，跟最後驗證（補卡之後）用的
- * 不是同一個答案。這支兩種情況都用同一套空檔推論分析出 actualDepartMinute，
- * 補卡前後呼叫都拿到一致的結果——「暫停」卡因此只負責<strong>呈現</strong>已經
- * 分析出來的停留，不是佔用判定唯一的資料來源。
+ * <strong>以格位身分為準，不靠時間門檻。</strong>同一列依時間排序後，連續幾張停在
+ * 同一格的卡（整備、待命、暫停卡、臨時停格）合併成一段；這一段一直延續到下一張
+ * 「不是停在這一格」的卡開始為止——那張通常是移動卡，車從那一刻開走。
  *
- * 「暫停」卡本身（<code>source==='hold'</code>）不獨立算一筆佔用——它延伸的是
- * 前一張整備卡的佔用區間，跟站位那邊（{@link collectStationBerthOccupancies}）
- * 同一條規矩，避免兩種模型描述同一件事，重複計算。
+ * 先前的版本有兩個漏洞：
+ * <ul>
+ *   <li>沒有暫停卡時退回「空隙超過 60 秒才算滯留」的推論，60 秒以下的停留全部
+ *       看不見（整備到 10:00、出場移動 10:00:30 才開始，佔用只算到 10:00）。</li>
+ *   <li>類型清單不含 <code>idle</code>，讓站／提早進廠插的臨時停格整段漏掉。</li>
+ * </ul>
+ * 空隙是不是移動，看的是下一張卡是不是移動卡，不是看空隙長短。
+ *
+ * 補暫停卡前後結果一致：暫停卡的格位跟它延伸的那張卡相同，會被併進同一段，
+ * 不另開一筆，也不會重複計算。
  */
 export function collectFacilityOccupancies(
   timelines: GeneratedSchedulePlan['timelines'],
 ): FacilityOccupancy[] {
   const out: FacilityOccupancy[] = [];
   for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      if (block.source === 'hold') continue;
-      const facilityNodeId = block.yardFacilityNodeId?.trim();
-      if (!facilityNodeId) continue;
-      if (!FACILITY_STAY_TASK_TYPES.has(block.taskType)) continue;
-      const startMinute = block.plannedStartMinute;
-      const endMinute = Math.max(block.plannedEndMinute, startMinute);
-      if (endMinute <= startMinute + 1e-9) continue;
+    // 同時刻開始的零長度卡（同區域轉場示意卡）排前面：它在那一刻就把車帶走了
+    const ordered = [...timeline.blocks].sort(
+      (a, b) =>
+        a.plannedStartMinute - b.plannedStartMinute
+        || (a.plannedEndMinute - a.plannedStartMinute) - (b.plannedEndMinute - b.plannedStartMinute)
+        || a.id.localeCompare(b.id),
+    );
 
-      const idleUntil = resolveFacilityActualDepartMinute(timelines, block, facilityNodeId);
-      const actualDepartMinute = idleUntil != null ? Math.max(endMinute, idleUntil) : endMinute;
+    type Run = {
+      nodeId: string;
+      label: string;
+      members: GeneratedScheduleBlock[];
+      startMinute: number;
+      /** 所有成員（含暫停卡）最晚結束 */
+      lastEndMinute: number;
+    };
+    let run: Run | null = null;
 
+    const close = (current: Run, leaveMinute: number | null) => {
+      const stays = current.members.filter((member) => member.source !== 'hold');
+      const anchor = stays[0] ?? current.members[0]!;
+      const endMinute = stays.length > 0
+        ? Math.max(...stays.map((member) => member.plannedEndMinute))
+        : current.lastEndMinute;
+      const actualDepartMinute = Math.max(current.lastEndMinute, leaveMinute ?? current.lastEndMinute);
+      if (actualDepartMinute <= current.startMinute + 1e-9) return;
       out.push({
-        facilityNodeId,
-        facilityLabel: block.yardFacilityLabel ?? facilityNodeId,
+        facilityNodeId: current.nodeId,
+        facilityLabel: current.label,
         timelineRow: timeline.row,
-        blockId: block.id,
-        label: block.label,
-        startMinute,
+        blockId: anchor.id,
+        blockIds: current.members.map((member) => member.id),
+        label: anchor.label,
+        startMinute: current.startMinute,
         endMinute,
         actualDepartMinute,
       });
+    };
+
+    for (const block of ordered) {
+      const nodeId = facilityPresenceNodeId(block);
+      if (run && nodeId === run.nodeId) {
+        run.members.push(block);
+        run.lastEndMinute = Math.max(run.lastEndMinute, block.plannedEndMinute);
+        continue;
+      }
+      if (run) {
+        close(run, block.plannedStartMinute);
+        run = null;
+      }
+      if (nodeId) {
+        run = {
+          nodeId,
+          label: block.yardFacilityLabel ?? nodeId,
+          members: [block],
+          startMinute: block.plannedStartMinute,
+          lastEndMinute: block.plannedEndMinute,
+        };
+      }
     }
+    // 當天沒排定下一件事就不假設車待到何時，只算到排定的停留結束
+    if (run) close(run, null);
   }
   return out;
 }
@@ -489,21 +582,28 @@ export type FacilityOccupancyCollision = {
   facilityNodeId: string;
   facilityLabel: string;
   kind: FacilityOccupancyCollisionKind;
+  /** 先佔用、先離開的那一台（交接不足時就是讓出格子的那一台） */
   earlier: FacilityOccupancy;
   later: FacilityOccupancy;
   overlapSeconds: number;
-  /** 後車進格與前車實際離開的間距（秒）；重疊時為負 */
+  /** 後車進格與前車實際離開的間距（秒，日循環上量）；重疊時為負的重疊秒數 */
   gapSeconds: number;
 };
+
+function cyclicForwardSeconds(fromSecond: number, toSecond: number): number {
+  return (((toSecond - fromSecond) % DAY_SECONDS) + DAY_SECONDS) % DAY_SECONDS;
+}
 
 /**
  * 不同車在同一設施格的佔用區間不得重疊；沒重疊但交接秒數不夠也回報（分開列出，
  * 呼叫端決定哪一種算硬錯誤——{@link validateFacilityOccupancy} 是重疊記錯誤、
- * 交接不足記警告，跟站位那邊 {@link findStationBerthCollisions} 同一套規矩）。
+ * 交接不足另外處理，跟站位那邊 {@link findStationBerthCollisions} 同一套規矩）。
  *
- * <strong>跨午夜安全</strong>：用 {@link daySegmentOverlapSeconds} 逐段比對，不直接
- * 比較 start／end 的分鐘數字——同一段整備、不同呼叫端記法不一致時（見
- * {@link daySegmentOverlapSeconds} 的說明）才不會漏判或誤判。
+ * <strong>重疊與交接都在日循環上量</strong>：引擎內部同一段整備有時記成
+ * 「23:5x–1440+」、有時折回鐘面「00:00–01:30」，直接比分鐘數字會漏判（見
+ * {@link daySegmentOverlapSeconds}）。交接間距一樣——A 車 23:59:30 離格、B 車
+ * 00:00:00 進格，直接相減得到將近一整天，實際只隔 30 秒。兩個方向（A 讓給 B、
+ * B 讓給 A）都量，取真正貼著的那一個方向，前車／後車照那個方向標。
  */
 export function findFacilityOccupancyCollisions(
   occupancies: FacilityOccupancy[],
@@ -521,39 +621,46 @@ export function findFacilityOccupancyCollisions(
     const sorted = [...list].sort((a, b) => a.startMinute - b.startMinute);
     for (let i = 0; i < sorted.length; i += 1) {
       for (let j = i + 1; j < sorted.length; j += 1) {
-        const earlier = sorted[i]!;
-        const later = sorted[j]!;
-        if (earlier.timelineRow === later.timelineRow) continue;
+        const a = sorted[i]!;
+        const b = sorted[j]!;
+        if (a.timelineRow === b.timelineRow) continue;
 
-        const overlapSeconds = daySegmentOverlapSeconds(
-          minuteToSecond(earlier.startMinute),
-          minuteToSecond(earlier.actualDepartMinute),
-          minuteToSecond(later.startMinute),
-          minuteToSecond(later.actualDepartMinute),
-        );
-        const gapSeconds = minuteToSecond(later.startMinute - earlier.actualDepartMinute);
+        const aStart = minuteToSecond(a.startMinute);
+        const aLeave = minuteToSecond(a.actualDepartMinute);
+        const bStart = minuteToSecond(b.startMinute);
+        const bLeave = minuteToSecond(b.actualDepartMinute);
 
+        const overlapSeconds = daySegmentOverlapSeconds(aStart, aLeave, bStart, bLeave);
         if (overlapSeconds > 1e-6) {
           collisions.push({
-            facilityNodeId: earlier.facilityNodeId,
-            facilityLabel: earlier.facilityLabel,
+            facilityNodeId: a.facilityNodeId,
+            facilityLabel: a.facilityLabel,
             kind: 'overlap',
-            earlier,
-            later,
+            earlier: a,
+            later: b,
             overlapSeconds,
-            gapSeconds,
+            gapSeconds: -overlapSeconds,
           });
-        } else if (requiredSeconds > 0 && gapSeconds < requiredSeconds - 1e-6) {
-          collisions.push({
-            facilityNodeId: earlier.facilityNodeId,
-            facilityLabel: earlier.facilityLabel,
-            kind: 'protection_gap',
-            earlier,
-            later,
-            overlapSeconds: 0,
-            gapSeconds,
-          });
+          continue;
         }
+        if (requiredSeconds <= 0) continue;
+
+        // 任一段占滿整天就不會有交接（上面已判重疊）
+        if (aLeave - aStart >= DAY_SECONDS || bLeave - bStart >= DAY_SECONDS) continue;
+        const aThenB = cyclicForwardSeconds(aLeave, bStart);
+        const bThenA = cyclicForwardSeconds(bLeave, aStart);
+        const aFirst = aThenB <= bThenA;
+        const gapSeconds = aFirst ? aThenB : bThenA;
+        if (gapSeconds >= requiredSeconds - 1e-6) continue;
+        collisions.push({
+          facilityNodeId: a.facilityNodeId,
+          facilityLabel: a.facilityLabel,
+          kind: 'protection_gap',
+          earlier: aFirst ? a : b,
+          later: aFirst ? b : a,
+          overlapSeconds: 0,
+          gapSeconds,
+        });
       }
     }
   }

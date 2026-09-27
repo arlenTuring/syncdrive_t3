@@ -147,6 +147,12 @@ export type NormalizeInputArgs = {
   pointTopology?: PointTopology | null;
   /** 地圖場域管理模組的 Area 容器清單；整備間轉場判斷同區域用 */
   areas?: MapAreaObject[] | null;
+  /**
+   * 掛脈衝時，本輪某一腿晚於既有同向班次卻貼太近：預設直接放棄這一台車（舊行為）；
+   * 打開則改成「再往後推到所需間隔」繼續試（仍守脈衝期限、整備視窗、完整交路）。
+   * 會改變後面所有脈衝的承接，好壞要看整張班表——由呼叫端在副本上比較後決定用不用。
+   */
+  allowBumpPastEarlierSameRoute?: boolean;
 };
 
 function resolveRouteOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
@@ -642,6 +648,8 @@ function assignDirectionalDepartures(args: {
   successorPolicy?: RouteSuccessorPolicy;
   /** 掛不上班距需求時留下可觀測 issue，不再靜默丟棄 */
   warnings?: FeasibilityIssue[];
+  /** 見 NormalizeInputArgs.allowBumpPastEarlierSameRoute */
+  allowBumpPastEarlierSameRoute?: boolean;
 }): ScheduleTask[] {
   const {
     departures,
@@ -654,6 +662,7 @@ function assignDirectionalDepartures(args: {
     yardRotationExitByTaskType = {},
     successorPolicy,
     warnings,
+    allowBumpPastEarlierSameRoute = false,
   } = args;
   const routeCount = passengerRoutes.length;
   if (scheduleRowCount <= 0 || departures.length === 0 || routeCount === 0) return [];
@@ -993,7 +1002,8 @@ function assignDirectionalDepartures(args: {
               if (other.routeId !== leg.route.routeId) continue;
               const gap = Math.abs(leg.startSecond - other.startSecond);
               if (gap + 1e-9 >= required) continue;
-              if (leg.startSecond > other.startSecond + 1e-9) {
+              // 晚於對方卻貼太近：預設放棄；選配打開時同一個公式就是「再晚到所需間隔」
+              if (leg.startSecond > other.startSecond + 1e-9 && !allowBumpPastEarlierSameRoute) {
                 neededBump = -1;
                 break;
               }
@@ -1639,6 +1649,35 @@ function assignDirectionalDepartures(args: {
       }
     }
 
+    /**
+     * 整輪<strong>真正起班</strong>的時段，不一定是承接的那一脈所屬的時段。
+     *
+     * 脈衝時刻只是需求；這一輪被延後、推過時段邊界才真正開出去時，它從來沒有在舊
+     * 時段出發過，不能沿用「已出發交路守舊時段班距」的待遇——那個待遇是給已經在
+     * 路上、後來才被挪過邊界的腿。這種情形改記真正起班時所在時段，門檻取兩邊較嚴者
+     * （跟跨時段第一脈同一條規則）。
+     */
+    const cycleOrigin = (() => {
+      let governing: DirectionalHeadwayDeparture | null = null;
+      for (const candidate of departures) {
+        if (candidate.startSecond > chosenStartSecond + 1e-9) continue;
+        if (!governing || candidate.startSecond > governing.startSecond) governing = candidate;
+      }
+      if (!governing || governing.intervalId === departure.intervalId) {
+        return {
+          intervalId: departure.intervalId,
+          headwayTargetSeconds: departure.requiredGapFromPreviousSeconds,
+        };
+      }
+      return {
+        intervalId: governing.intervalId,
+        headwayTargetSeconds: Math.max(
+          departure.requiredGapFromPreviousSeconds,
+          governing.headwaySeconds,
+        ),
+      };
+    })();
+
     let finalTaskIndex = -1;
     let cycleAnchorTaskIndex = tasks.length;
     for (const [legIndex, leg] of cycleLegs.entries()) {
@@ -1673,11 +1712,11 @@ function assignDirectionalDepartures(args: {
         // 的欄位說明；班距檢查／修復拿這個當基準，不解析 id 猜。
         cycleChainId: `cycle-${chosenRow}-${chosenStartSecond}`,
         cycleOriginSecond: chosenStartSecond,
-        cycleOriginIntervalId: departure.intervalId,
+        cycleOriginIntervalId: cycleOrigin.intervalId,
         // 用「這一脈跟上一脈真正要守住的間隔」，不是單純新時段的 headwaySeconds——
         // 跨時段的第一脈已經用 max(舊班距,新班距) 頂起來，記下來那個較嚴值，
         // 後面班距檢查／修復才不會誤以為只要守住新時段自己的班距就好。
-        cycleHeadwayTargetSeconds: departure.requiredGapFromPreviousSeconds,
+        cycleHeadwayTargetSeconds: cycleOrigin.headwayTargetSeconds,
       });
       trackedLegs.push({
         taskIndex: finalTaskIndex,
@@ -2047,6 +2086,7 @@ export function normalizeEngineInput(
       yardRotationExitByTaskType,
       successorPolicy,
       warnings,
+      allowBumpPastEarlierSameRoute: args.allowBumpPastEarlierSameRoute,
     });
 
     deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, passengerTasks);

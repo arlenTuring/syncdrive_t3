@@ -16,6 +16,7 @@ import {
 import type { GeneratedScheduleBlock } from './schedule-engine/types';
 import { minuteToSecond, secondToMinute } from './schedule-engine/types';
 import {
+  resolveEffectiveRouteTravelSeconds,
   resolveLegTravelSecondsForBudget,
   type ShiftScheduleStationLegTravel,
 } from './stationLegTravel';
@@ -93,6 +94,8 @@ type BlockStationTimingPlan = {
   dwells: number[];
   startSecond: number;
   legTravelSeconds: number[];
+  /** 各段放寬上限加總（對齊後） */
+  maxTravelSeconds: number;
 };
 
 function resolveBlockStationTimingPlan(
@@ -154,6 +157,7 @@ function resolveBlockStationTimingPlan(
     (sum, bound) => sum + bound.minTravel,
     0,
   );
+  const maxTravelSeconds = bounds.reduce((sum, bound) => sum + bound.maxTravel, 0);
 
   if (endSecond < startSecond) {
     return {
@@ -169,6 +173,7 @@ function resolveBlockStationTimingPlan(
       dwells,
       startSecond,
       legTravelSeconds: [],
+      maxTravelSeconds,
     };
   }
   if (availableTravelSeconds < minRequiredTravelSeconds) {
@@ -185,11 +190,11 @@ function resolveBlockStationTimingPlan(
       dwells,
       startSecond,
       legTravelSeconds: [],
+      maxTravelSeconds,
     };
   }
 
   const legTravelSeconds = bounds.map((bound) => bound.minTravel);
-  const maxTravelSeconds = bounds.reduce((sum, bound) => sum + bound.maxTravel, 0);
   const targetTravelSeconds =
     minRequiredTravelSeconds
     + Math.floor(
@@ -233,6 +238,47 @@ function resolveBlockStationTimingPlan(
     dwells,
     startSecond,
     legTravelSeconds,
+    maxTravelSeconds,
+  };
+}
+
+/**
+ * 一趟班次卡在目前停靠設定下的<strong>合法時長</strong>（秒）。
+ *
+ * 最短＝各站有效停靠＋各段最快行駛（對齊 10 秒到站）；再短就塞不下。
+ * 最長＝各站有效停靠＋各段平均行駛的放寬上限。候選改時刻一律拿這個判斷，不另外寫一套。
+ */
+export function resolveBlockDurationBounds(
+  block: GeneratedScheduleBlock,
+  route: ShiftScheduleSelectedRoute | null | undefined,
+): { minSeconds: number; maxSeconds: number; maxTravelSeconds: number; dwellSeconds: number } | null {
+  const plan = resolveBlockStationTimingPlan(block, route);
+  if (!plan) return null;
+  const dwellSeconds = plan.dwells.reduce((sum, value) => sum + value, 0);
+  /**
+   * 行駛最長可以拉到多少：由<strong>路線設定的平均行駛</strong>推（各段平均 × 放寬倍率，
+   * 至少多一格對齊），跟這張卡本身多長無關。逐站配置在缺站間資料時會把卡片預算當成
+   * 平均，那樣卡拉多長行駛就多長，等於沒有上限——候選不能拿那個當合法範圍。
+   */
+  const effective = route ? resolveEffectiveRouteTravelSeconds(route) : null;
+  const legCount = Math.max(0, plan.stations.length - 1);
+  let legalMaxTravelSeconds = plan.maxTravelSeconds;
+  if (effective && legCount > 0) {
+    const avgLegs = resolveLegTravelSecondsForBudget({
+      stationIds: plan.stations.map((station) => station.stationId),
+      legs: route?.stationLegTravels,
+      travelBudgetSeconds: effective.avgTravelTimeSeconds,
+    });
+    legalMaxTravelSeconds = avgLegs.reduce((sum, avg) => {
+      const stretched = Math.max(avg * STATION_ARRIVAL_MAX_AVG_STRETCH, avg + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS);
+      return sum + snapDownToClockAlignSeconds(stretched);
+    }, 0);
+  }
+  return {
+    minSeconds: dwellSeconds + plan.feasibility.minRequiredTravelSeconds,
+    maxSeconds: dwellSeconds + Math.max(plan.feasibility.minRequiredTravelSeconds, legalMaxTravelSeconds),
+    maxTravelSeconds: legalMaxTravelSeconds,
+    dwellSeconds,
   };
 }
 
@@ -281,8 +327,35 @@ export function resolveClockAlignedArrivalSecond(args: {
 }
 
 /**
- * 班次卡靠站來源：優先用卡上覆寫的 stationDwells／dwellSlackSeconds（手動製作），
- * 否則回退路線群組預設。
+ * 班次卡的靠站緩衝怎麼來的（秒）：原始設定＋系統增加＝實際採用。
+ *
+ * 站點設定與緩衝<strong>分開解析</strong>：單班明確給了 dwellSlackSeconds（含 0）就用單班，
+ * 不管有沒有覆寫站點；沒給時，有覆寫站點沿用既有相容行為（0），沒覆寫就用路線設定。
+ * 系統增加量只加在緩衝上，不動基本停靠秒數。
+ */
+export function resolveBlockDwellSlackBreakdown(
+  block: Pick<GeneratedScheduleBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSlackAdjustment'>,
+  route: Pick<ShiftScheduleSelectedRoute, 'dwellSlackSeconds'> | null | undefined,
+): { baseSlackSeconds: number; addedSeconds: number; effectiveSlackSeconds: number; source: 'block' | 'route' } {
+  const hasStationOverride = Boolean(block.stationDwells && block.stationDwells.length > 0);
+  const explicit = typeof block.dwellSlackSeconds === 'number' && Number.isFinite(block.dwellSlackSeconds);
+  const baseSlackSeconds = explicit
+    ? normalizeDwellSlackSeconds(block.dwellSlackSeconds)
+    : hasStationOverride
+      ? 0
+      : normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
+  const addedSeconds = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
+  return {
+    baseSlackSeconds,
+    addedSeconds,
+    effectiveSlackSeconds: baseSlackSeconds + addedSeconds,
+    source: explicit || hasStationOverride ? 'block' : 'route',
+  };
+}
+
+/**
+ * 班次卡靠站來源：站點用卡上覆寫的 stationDwells（手動製作），否則路線群組預設；
+ * 緩衝另外解析（{@link resolveBlockDwellSlackBreakdown}），兩者互不綁定。
  */
 export function resolveBlockStationDwellInputs(
   block: GeneratedScheduleBlock,
@@ -291,16 +364,13 @@ export function resolveBlockStationDwellInputs(
   stations: ShiftScheduleStationDwell[];
   dwellSlackSeconds: number;
 } | null {
-  if (block.stationDwells && block.stationDwells.length > 0) {
-    return {
-      stations: block.stationDwells.map((station) => ({ ...station })),
-      dwellSlackSeconds: normalizeDwellSlackSeconds(block.dwellSlackSeconds ?? 0),
-    };
-  }
-  if (!route || route.stationDwells.length === 0) return null;
+  const stationSource = block.stationDwells && block.stationDwells.length > 0
+    ? block.stationDwells
+    : route?.stationDwells;
+  if (!stationSource || stationSource.length === 0) return null;
   return {
-    stations: route.stationDwells.map((station) => ({ ...station })),
-    dwellSlackSeconds: normalizeDwellSlackSeconds(route.dwellSlackSeconds),
+    stations: stationSource.map((station) => ({ ...station })),
+    dwellSlackSeconds: resolveBlockDwellSlackBreakdown(block, route).effectiveSlackSeconds,
   };
 }
 

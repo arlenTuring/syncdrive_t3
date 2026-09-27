@@ -60,6 +60,8 @@ export type PlanScore = {
     hardErrorCount: number;
     /** 碰撞保護不足的班次對數 */
     protectionGapPairs: number;
+    /** 設施格交接不足（2 × 碰撞保護）的對數 */
+    facilityHandoverGaps: number;
     /** 班距低於目標的次數 */
     headwayBelowTargetCount: number;
     /** 載客班次數（越多越好，向量裡取負） */
@@ -97,10 +99,20 @@ export function scoreSchedulePlan(args: {
    * 設施格重疊也算硬錯誤——兩台車同時在一格是物理上做不到的事。
    *
    * 不放進來的話，任何「把車從格子裡早點放出來」的處理都會被閘門判定成「沒變好」
-   * 而撤回：它修的東西根本不在分數裡。交接不足（警告）不計入，那是營運規則不是
-   * 物理事實，收進第二位會讓它壓過班距。
+   * 而撤回：它修的東西根本不在分數裡。
+   *
+   * <strong>交接不足也計入安全層</strong>（跟站位碰撞保護同一位，排在班距之前）。
+   * 先前刻意不計，理由是「那是營運規則不是物理事實」；但本場域 60 秒交接是必須遵守
+   * 的安全間隔，不計的話任何處理都能拿交接去換班距，閘門看不到。
    */
-  validateFacilityOccupancy(timelines, errors, { collisionProtectionSeconds });
+  const facilityWarnings: FeasibilityIssue[] = [];
+  validateFacilityOccupancy(timelines, errors, {
+    collisionProtectionSeconds,
+    warnings: facilityWarnings,
+  });
+  const facilityHandoverGaps = facilityWarnings.filter(
+    (issue) => issue.code === 'FACILITY_HANDOVER_GAP',
+  ).length;
 
   // 站位碰撞自己數，避開報告器 40 則的截斷
   const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
@@ -148,6 +160,7 @@ export function scoreSchedulePlan(args: {
   const detail = {
     hardErrorCount: errors.length + berthCollisionPairs,
     protectionGapPairs,
+    facilityHandoverGaps,
     headwayBelowTargetCount,
     passengerTripCount,
     tripSpreadAcrossRows,
@@ -157,7 +170,8 @@ export function scoreSchedulePlan(args: {
     // 不碰撞 > 班距 > 班次穩定；PPHPD 由班次數代表（承接率是它的下游）
     vector: [
       detail.hardErrorCount,
-      detail.protectionGapPairs,
+      // 安全間隔：站位碰撞保護與設施交接同一層，都排在班距之前
+      detail.protectionGapPairs + detail.facilityHandoverGaps,
       detail.headwayBelowTargetCount,
       -detail.passengerTripCount,
       detail.tripSpreadAcrossRows,
@@ -181,6 +195,7 @@ export function formatPlanScore(score: PlanScore): string {
   const d = score.detail;
   return (
     `硬錯誤 ${d.hardErrorCount}／保護不足 ${d.protectionGapPairs} 對／`
+    + `設施交接不足 ${d.facilityHandoverGaps}／`
     + `班距不足 ${d.headwayBelowTargetCount}／班次 ${d.passengerTripCount}／`
     + `列間差 ${d.tripSpreadAcrossRows}`
   );

@@ -102,15 +102,24 @@ export function daySegmentOverlapSeconds(
   return total;
 }
 
-/** 同一台設施在該時段是否已被別列車佔著（日循環比對） */
+/**
+ * 同一台設施在該時段是否已被別列車佔著（日循環比對）。
+ *
+ * <code>handoverSeconds</code>：兩台車在同一格交接至少要隔多久（2 × 碰撞保護），
+ * 與最終驗證 FACILITY_HANDOVER_GAP 同一條規則。求解時不留這段，就會排出
+ * 「前車 00:00:00 離格、後車 00:00:01 進格」這種驗證才抓得到的交接。
+ */
 export function moveCardFacilityIsFree(
   bookings: MoveCardFacilityBooking[],
   facilityNodeId: string,
   startSecond: number,
   endSecond: number,
   timelineRow: number,
+  handoverSeconds = 0,
 ): boolean {
-  const want = daySegmentsOf(startSecond, endSecond);
+  // 沒有停留就沒有佔用，也談不上交接
+  if (endSecond - startSecond <= 0) return true;
+  const want = daySegmentsOf(startSecond - handoverSeconds, endSecond + handoverSeconds);
   if (want.length === 0) return true;
   return !bookings.some((b) => {
     if (b.facilityNodeId !== facilityNodeId) return false;

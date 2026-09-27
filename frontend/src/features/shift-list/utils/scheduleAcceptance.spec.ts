@@ -86,4 +86,34 @@ describe('scheduleAcceptance', () => {
     assert.ok(summary.criteria.some((line) => line.includes('硬閘')));
     assert.ok(summary.criteria.some((line) => line.includes('qualityPassed')));
   });
+
+  it('設施交接、轉折點、缺移動、必要轉場失敗都擋發布（不只站位）', () => {
+    for (const code of [
+      'FACILITY_HANDOVER_GAP',
+      'FACILITY_SLOT_COLLISION',
+      'MOVE_JUNCTION_CONFLICT',
+      'VEHICLE_LOCATION_DISCONTINUITY',
+      'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+    ] as const) {
+      const severity = code === 'FACILITY_HANDOVER_GAP' || code === 'MOVE_JUNCTION_CONFLICT'
+        ? 'warning' as const
+        : 'error' as const;
+      const issue = { code, severity, message: code } as FeasibilityIssue;
+      const summary = evaluateScheduleAcceptance({
+        ok: severity !== 'error',
+        errors: severity === 'error' ? [issue] : [],
+        warnings: severity === 'warning' ? [issue] : [],
+      });
+      assert.equal(summary.publishSafe, false, `${code} 應擋發布`);
+    }
+  });
+
+  it('「不需要轉場卡」的策略說明不擋發布', () => {
+    const summary = evaluateScheduleAcceptance({
+      ok: true,
+      errors: [],
+      warnings: [{ code: 'MAINTENANCE_TRANSFER_UNRESOLVED', severity: 'warning', kind: 'policy', message: 'x' }],
+    });
+    assert.equal(summary.publishSafe, true);
+  });
 });

@@ -28,8 +28,12 @@ export function isClockAlignedSeconds(
   return Math.round(seconds) % gridSeconds === 0;
 }
 
+/**
+ * 分鐘 → 整數秒。班表卡的起訖分鐘是浮點（例：1959.9999999999998 秒 / 60），
+ * 不取整會讓行駛預算少 1 秒、整段逐站時刻晚一格對齊，與前端 minuteToSecond 不一致。
+ */
 export function minuteToSecond(minute: number): number {
-  return minute * 60;
+  return Math.round(minute * 60);
 }
 
 export function secondToMinute(second: number): number {

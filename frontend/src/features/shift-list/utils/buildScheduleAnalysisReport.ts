@@ -12,6 +12,15 @@ import {
 } from './schedule-engine/physics';
 import type { RouteSuccessorPolicy } from './schedule-engine/routeSuccessorPolicy';
 import type { GeneratedSchedulePlan } from './schedule-engine/types';
+import {
+  buildBlockStationDepartures,
+  resolveBlockDwellSlackBreakdown,
+  resolveRouteForBlock,
+} from './buildBlockStationDepartures';
+import {
+  resolveGeneratedBlockTripCode,
+  type MaintenanceSectionCodeBySection,
+} from './maintenanceSectionCode';
 import { splitIntoDayCycleSegments } from './scheduleDayCycle';
 import {
   collectStationBerthOccupancies,
@@ -115,7 +124,55 @@ export type ScheduleAnalysisSuggestion = {
   message: string;
 };
 
+/**
+ * 一筆「已套用的緩衝調整」：系統為解除資源衝突替某一趟增加的靠站緩衝。
+ *
+ * 除了原因與調整前的時刻（生成當下記下來的）之外，其餘數值都從<strong>目前有效班表</strong>
+ * 即時算——班表被手動改過，這裡看到的就是改過之後的實際值，不會拿過期的紀錄唬人。
+ */
+export type AppliedSlackAdjustmentItem = {
+  blockId: string;
+  timelineRow: number;
+  tripCode: string;
+  blockStartMinute: number;
+  blockEndMinute: number;
+  blockBefore: { startMinute: number; endMinute: number };
+  baseSlackSeconds: number;
+  addedSeconds: number;
+  effectiveSlackSeconds: number;
+  reasonMessage: string;
+  resourceLabel: string;
+  counterpartBlockIds: string[];
+  stops: Array<{
+    order: number;
+    stationName: string;
+    baseDwellSeconds: number;
+    dwellBeforeSeconds: number;
+    dwellNowSeconds: number;
+    arrivalBeforeMinute: number;
+    arrivalNowMinute: number;
+    departureBeforeMinute: number;
+    departureNowMinute: number;
+  }>;
+};
+
+/** 一筆「已套用的時刻調整」：殘留衝突修復改了這一趟的發車／到站 */
+export type AppliedRetimeItem = {
+  blockId: string;
+  timelineRow: number;
+  tripCode: string;
+  blockBefore: { startMinute: number; endMinute: number };
+  blockStartMinute: number;
+  blockEndMinute: number;
+  description: string;
+  reasonMessage: string;
+};
+
 export type ScheduleAnalysisReport = {
+  /** 已套用的緩衝調整（預設可見；成功採用的調整不是未解決問題） */
+  appliedSlackAdjustments: AppliedSlackAdjustmentItem[];
+  /** 已套用的時刻調整（改了發車或到站的班次） */
+  appliedRetimes: AppliedRetimeItem[];
   fleet: FleetSupplyDemandRow[];
   berths: BerthCapacityRow[];
   suggestions: ScheduleAnalysisSuggestion[];
@@ -384,6 +441,8 @@ export function buildScheduleAnalysisReport(args: {
   minimumRecoveryTimeSeconds: number;
   collisionProtectionSeconds: number;
   successorPolicy?: RouteSuccessorPolicy | null;
+  /** 整備區塊代號，用來把班次代號算出來（畫面上看到的就是代號） */
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
 }): ScheduleAnalysisReport {
   const {
     plan,
@@ -623,7 +682,30 @@ export function buildScheduleAnalysisReport(args: {
     .map((row) => row.surplusVehicles)
     .filter((value): value is number => value != null);
 
+  const appliedSlackAdjustments = collectAppliedSlackAdjustments(
+    plan,
+    selectedRoutes,
+    args.sectionCodes ?? null,
+  );
+
+  const appliedRetimes: AppliedRetimeItem[] = plan.timelines
+    .flatMap((timeline) => timeline.blocks)
+    .filter((block) => block.conflictRetime)
+    .map((block) => ({
+      blockId: block.id,
+      timelineRow: block.timelineRow,
+      tripCode: resolveGeneratedBlockTripCode(block, 0, args.sectionCodes ?? null),
+      blockBefore: block.conflictRetime!.blockBefore,
+      blockStartMinute: block.plannedStartMinute,
+      blockEndMinute: block.plannedEndMinute,
+      description: block.conflictRetime!.description,
+      reasonMessage: block.conflictRetime!.reason.message,
+    }))
+    .sort((a, b) => a.blockStartMinute - b.blockStartMinute || a.timelineRow - b.timelineRow);
+
   return {
+    appliedSlackAdjustments,
+    appliedRetimes,
     fleet,
     berths,
     suggestions,
@@ -639,4 +721,51 @@ export function buildScheduleAnalysisReport(args: {
       ),
     },
   };
+}
+
+function collectAppliedSlackAdjustments(
+  plan: GeneratedSchedulePlan,
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  sectionCodes: MaintenanceSectionCodeBySection | null,
+): AppliedSlackAdjustmentItem[] {
+  const items: AppliedSlackAdjustmentItem[] = [];
+  for (const timeline of plan.timelines) {
+    for (const block of timeline.blocks) {
+      const adjustment = block.dwellSlackAdjustment;
+      if (!adjustment) continue;
+      const route = resolveRouteForBlock(block, selectedRoutes);
+      const breakdown = resolveBlockDwellSlackBreakdown(block, route);
+      if (breakdown.addedSeconds <= 0) continue;
+      const stopsNow = buildBlockStationDepartures(block, route);
+      items.push({
+        blockId: block.id,
+        timelineRow: timeline.row,
+        tripCode: resolveGeneratedBlockTripCode(block, 0, sectionCodes),
+        blockStartMinute: block.plannedStartMinute,
+        blockEndMinute: block.plannedEndMinute,
+        blockBefore: adjustment.blockBefore,
+        baseSlackSeconds: breakdown.baseSlackSeconds,
+        addedSeconds: breakdown.addedSeconds,
+        effectiveSlackSeconds: breakdown.effectiveSlackSeconds,
+        reasonMessage: adjustment.reason.message,
+        resourceLabel: adjustment.reason.resourceLabel,
+        counterpartBlockIds: adjustment.reason.counterpartBlockIds,
+        stops: adjustment.affectedStops.map((stop) => {
+          const now = stopsNow.find((item) => item.order === stop.order);
+          return {
+            order: stop.order,
+            stationName: stop.stationName,
+            baseDwellSeconds: now?.baseDwellSeconds ?? stop.baseDwellSeconds,
+            dwellBeforeSeconds: stop.dwellBeforeSeconds,
+            dwellNowSeconds: now?.dwellSeconds ?? stop.dwellAfterSeconds,
+            arrivalBeforeMinute: stop.arrivalBeforeMinute,
+            arrivalNowMinute: now?.arrivalMinute ?? stop.arrivalAfterMinute,
+            departureBeforeMinute: stop.departureBeforeMinute,
+            departureNowMinute: now?.departureMinute ?? stop.departureAfterMinute,
+          };
+        }),
+      });
+    }
+  }
+  return items.sort((a, b) => a.blockStartMinute - b.blockStartMinute || a.timelineRow - b.timelineRow);
 }

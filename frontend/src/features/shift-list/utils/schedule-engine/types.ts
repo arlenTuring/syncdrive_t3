@@ -60,6 +60,44 @@ export type ScheduleBlockSource =
    */
   | 'hold';
 
+/**
+ * 系統為了解除某筆資源衝突，替這一趟<strong>增加</strong>的靠站緩衝。
+ *
+ * 只能增加、不改基本停靠秒數，也不寫回原始設定：原始緩衝（路線或單班設定）另外記在
+ * {@link baseSlackSeconds}，實際採用＝原始＋系統增加。重新生成一律從原始設定重算，
+ * 不會拿上次的結果再往上加。只有正式採用的候選才會寫這個欄位。
+ */
+export type DwellSlackAdjustment = {
+  /** 原始設定緩衝（秒）：單班明確設定就用單班，否則路線設定 */
+  baseSlackSeconds: number;
+  /** 系統增加量（秒）；實際緩衝＝baseSlackSeconds＋addedSeconds */
+  addedSeconds: number;
+  /** 為了解哪一筆衝突（代號＋資源），給報告與定位用 */
+  reason: {
+    code: string;
+    resourceId: string;
+    resourceLabel: string;
+    /** 衝突另一方的卡片 */
+    counterpartBlockIds: string[];
+    message: string;
+  };
+  /** 受影響的每一站（只有適用緩衝的站） */
+  affectedStops: Array<{
+    order: number;
+    stationId: string;
+    stationName: string;
+    baseDwellSeconds: number;
+    dwellBeforeSeconds: number;
+    dwellAfterSeconds: number;
+    arrivalBeforeMinute: number;
+    departureBeforeMinute: number;
+    arrivalAfterMinute: number;
+    departureAfterMinute: number;
+  }>;
+  /** 調整前的班次卡起訖 */
+  blockBefore: { startMinute: number; endMinute: number };
+};
+
 export type GeneratedScheduleBlock = {
   id: string;
   timelineRow: number;
@@ -89,8 +127,19 @@ export type GeneratedScheduleBlock = {
   source: ScheduleBlockSource;
   /** 手動製作：此班次卡各站靠站秒數（選定路線後可編輯） */
   stationDwells?: ShiftScheduleStationDwell[];
-  /** 手動製作：此班次卡靠站緩衝秒數 */
+  /** 手動製作：此班次卡靠站緩衝秒數（明確設定才生效，0 也是設定） */
   dwellSlackSeconds?: number;
+  /** 系統增加的靠站緩衝與原因；沒有就是沒調整（見 DwellSlackAdjustment） */
+  dwellSlackAdjustment?: DwellSlackAdjustment;
+  /**
+   * 殘留衝突修復為了解某筆資源衝突，改了這一趟的發車／到站時刻（在合法行駛範圍內，
+   * 或整串推移）。記下原本的起訖與原因，報表才能揭露「這一班為什麼跟原本排的不一樣」。
+   */
+  conflictRetime?: {
+    blockBefore: { startMinute: number; endMinute: number };
+    description: string;
+    reason: DwellSlackAdjustment['reason'];
+  };
   /** 調度班次：首班起點站 stationId */
   firstTripOriginStationId?: string;
   /** 調度班次：首班起點站顯示名 */
@@ -206,6 +255,23 @@ export type FeasibilityViolationCode =
    * 同一個模組、同一個代號——見 insertMaintenanceTransferCards.ts。
    */
   | 'MAINTENANCE_TRANSFER_UNRESOLVED'
+  /**
+   * 必要的整備轉場卡排不出來：車下一段要去的地方跟它現在停的地方不同，卻沒有
+   * 合法移動可用（硬錯誤、擋發布）。「不需要轉場卡」的情形仍走
+   * MAINTENANCE_TRANSFER_UNRESOLVED（策略說明）。
+   */
+  | 'MAINTENANCE_TRANSFER_REQUIRED_MISSING'
+  /**
+   * 車的位置在時間軸上接不起來：前一張卡結束時車在某一格（或某一站），下一張卡
+   * 卻要它在另一個地方，中間沒有任何移動卡（硬錯誤、擋發布）。只看班表本身，
+   * 手改過的班表重驗證也抓得到。
+   */
+  | 'VEHICLE_LOCATION_DISCONTINUITY'
+  /**
+   * 不同列車的移動卡（出入廠、讓站、轉場）經過同一個轉折點的時刻太近，不滿足
+   * 2 × 碰撞保護（警告、擋發布）。
+   */
+  | 'MOVE_JUNCTION_CONFLICT'
   /**
    * 整備設施不足：這一段整備的<strong>整段時間內，該類設施沒有任何一台是空的</strong>
    * ——車沒地方停。這跟轉場卡排不出來（路徑問題）是兩回事，處置也不同：

@@ -314,26 +314,66 @@ describe('碰撞保護時間', () => {
     assert.equal(p1Hits(timelines, 30).length, 0);
   });
 
-  it('開啟時：前車跑完還滯留在站上等下一個任務，滯留期間都算佔用', () => {
+  it('開啟時：前車跑完還滯留在站上等下一個任務，滯留期間後車進站是實體重疊', () => {
     // A 車 62:40 抵達完 P1，但下一個任務要到 66:00 才開始——車還停在 P1。
     // B 車 64:30 到 P1：離 A 車「跑完」有 110 秒，看似夠，
-    // 但 A 車真正開走是 66:00，加保護後要 67:00 才輪得到 B 車。
+    // 但 A 車真正開走是 66:00：B 車 64:30–65:10 在站時 A 車還在，兩車同時在站位上。
     const timelines = twoCarsAtP1({
       laterArriveMinute: 64.5,
       earlierNextTaskStartMinute: 66,
     });
     const hits = p1Hits(timelines, 30);
     assert.equal(hits.length, 1);
-    assert.equal(hits[0]!.kind, 'protection_gap');
+    assert.equal(hits[0]!.kind, 'overlap', '看實際離站，不是靠站結束');
+    assert.equal(Math.round(hits[0]!.overlapSeconds), 40);
+    assert.equal(Math.round(hits[0]!.clearanceGapSeconds), -90, '間距以實際離站 66:00 起算');
     assert.equal(Math.round(hits[0]!.protectionShortfallSeconds), 150);
   });
 
-  it('滯留佔用屬於防碰撞判定的一部分：碰撞保護關閉時同樣不檢查', () => {
+  it('滯留是實體佔用：碰撞保護關閉也照樣算，只是不再加保護秒數', () => {
     const timelines = twoCarsAtP1({
       laterArriveMinute: 64.5,
       earlierNextTaskStartMinute: 66,
     });
-    assert.equal(p1Hits(timelines).length, 0);
+    const hits = p1Hits(timelines);
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0]!.kind, 'overlap');
+    assert.equal(Math.round(hits[0]!.overlapSeconds), 40);
+  });
+
+  it('暫停卡寫著前車賴站到 10:10:30，後車 10:05:30 進站：實體重疊，不是保護不足', () => {
+    // 2026-09-25 實錄：時間線 3 10:02:30 到站、10:10:30 才走；時間線 8 10:05:30 到同一站。
+    const earlierArrive = 10 * 60 + 2.5;
+    const timelines = [
+      {
+        row: 3,
+        blocks: [
+          block({
+            id: 'a', timelineRow: 3,
+            plannedStartMinute: earlierArrive - 2, plannedEndMinute: earlierArrive + 40 / 60,
+          }),
+          block({
+            id: 'a-hold', timelineRow: 3, taskType: 'idle', source: 'hold',
+            plannedStartMinute: earlierArrive + 40 / 60, plannedEndMinute: 10 * 60 + 10.5,
+            yardFacilityStationId: 'P1',
+          }),
+        ],
+      },
+      {
+        row: 8,
+        blocks: [
+          block({
+            id: 'b', timelineRow: 8,
+            plannedStartMinute: 10 * 60 + 5.5 - 2, plannedEndMinute: 10 * 60 + 5.5 + 40 / 60,
+          }),
+        ],
+      },
+    ];
+    const hits = p1Hits(timelines, 30);
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0]!.kind, 'overlap');
+    assert.equal(Math.round(hits[0]!.overlapSeconds), 40);
+    assert.equal(Math.round(hits[0]!.earlier.actualDepartMinute * 60), (10 * 60 + 10.5) * 60);
   });
 
   it('回報用的欄位帶的是班次卡起訖，不是幾秒的站位佔用窗', () => {
@@ -435,7 +475,7 @@ describe('collectFacilityOccupancies：設施格佔用不依賴「暫停」卡�
     assert.equal(before.actualDepartMinute, after.actualDepartMinute);
   });
 
-  it('緊接著就走（間隔在門檻內）：不當成滯留，實際離開＝自然結束', () => {
+  it('緊接著就走（零秒空隙）：實際離開＝出場移動開始＝自然結束', () => {
     const timelines = [
       {
         row: 1,
@@ -454,6 +494,64 @@ describe('collectFacilityOccupancies：設施格佔用不依賴「暫停」卡�
     ];
     const [occ] = collectFacilityOccupancies(timelines);
     assert.equal(occ!.actualDepartMinute, 630);
+  });
+
+  it('60 秒以下的停留也算：整備到 10:00、出場移動 10:00:30 才開始，佔用算到 10:00:30', () => {
+    // 先前走「空隙超過 60 秒才算滯留」的推論，這 30 秒在補暫停卡前完全看不見
+    const exitStart = 600 + 0.5;
+    const withoutHold = [
+      {
+        row: 1,
+        blocks: [
+          chargingBlock({
+            id: 'chg', timelineRow: 1, plannedStartMinute: 570, plannedEndMinute: 600,
+            yardFacilityNodeId: 'E2',
+          }),
+          block({
+            id: 'exit', timelineRow: 1, taskType: 'dispatch', source: 'yard_exit_move',
+            plannedStartMinute: exitStart, plannedEndMinute: exitStart + 1,
+            yardExitFacilityNodeId: 'E2',
+          }),
+        ],
+      },
+    ];
+    const withHold = [
+      {
+        row: 1,
+        blocks: [
+          ...withoutHold[0]!.blocks,
+          block({
+            id: 'hold', timelineRow: 1, taskType: 'idle', source: 'hold',
+            plannedStartMinute: 600, plannedEndMinute: exitStart,
+            yardFacilityNodeId: 'E2',
+          }),
+        ],
+      },
+    ];
+    const before = collectFacilityOccupancies(withoutHold);
+    const after = collectFacilityOccupancies(withHold);
+    assert.equal(before.length, 1);
+    assert.equal(after.length, 1);
+    assert.equal(before[0]!.actualDepartMinute, exitStart);
+    assert.equal(after[0]!.actualDepartMinute, exitStart);
+    assert.deepEqual(after[0]!.blockIds.sort(), ['chg', 'hold']);
+  });
+
+  it('下一張不是移動卡（缺必要移動）：不假設車已開走，佔用延續到那張卡開始', () => {
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          chargingBlock({
+            id: 'chg', timelineRow: 1, plannedStartMinute: 600, plannedEndMinute: 630,
+            yardFacilityNodeId: 'E2',
+          }),
+          block({ id: 'pax', timelineRow: 1, plannedStartMinute: 640, plannedEndMinute: 643 }),
+        ],
+      },
+    ];
+    const [occ] = collectFacilityOccupancies(timelines);
+    assert.equal(occ!.actualDepartMinute, 640);
   });
 
   it('「暫停」卡本身不獨立算一筆佔用，避免跟它延伸的那張整備卡重複計算', () => {
@@ -477,6 +575,72 @@ describe('collectFacilityOccupancies：設施格佔用不依賴「暫停」卡�
     assert.equal(occs.length, 1);
     assert.equal(occs[0]!.blockId, 'chg');
   });
+
+  it('讓站／提早進廠插的臨時停格（idle, transition）有明確格位就算佔用', () => {
+    const timelines = [
+      {
+        row: 7,
+        blocks: [
+          block({
+            id: 'in', timelineRow: 7, taskType: 'dispatch', source: 'yard_entry_move',
+            plannedStartMinute: 1426 + 20 / 60, plannedEndMinute: 1426 + 50 / 60,
+          }),
+          block({
+            id: 'park', timelineRow: 7, taskType: 'idle', source: 'transition',
+            plannedStartMinute: 1426 + 50 / 60, plannedEndMinute: 1440 + 1 / 60,
+            yardFacilityNodeId: 'W1',
+          }),
+          block({
+            id: 'hop', timelineRow: 7, taskType: 'dispatch', source: 'yard_entry_move',
+            plannedStartMinute: 1440 + 1 / 60, plannedEndMinute: 1440 + 1 / 60,
+          }),
+          chargingBlock({
+            id: 'chg', timelineRow: 7, plannedStartMinute: 1440 + 1 / 60, plannedEndMinute: 1530,
+            yardFacilityNodeId: 'E2',
+          }),
+        ],
+      },
+    ];
+    const occs = collectFacilityOccupancies(timelines);
+    const w1 = occs.find((occ) => occ.facilityNodeId === 'W1');
+    assert.ok(w1, 'W1 臨時停格不能漏掉');
+    assert.equal(w1!.blockId, 'park');
+    assert.equal(w1!.actualDepartMinute, 1440 + 1 / 60);
+    assert.ok(occs.some((occ) => occ.facilityNodeId === 'E2'));
+  });
+
+  it('同車同格連續停留合併成一段；換格才結束', () => {
+    const timelines = [
+      {
+        row: 1,
+        blocks: [
+          chargingBlock({
+            id: 'chg', timelineRow: 1, plannedStartMinute: 600, plannedEndMinute: 630,
+            yardFacilityNodeId: 'E2',
+          }),
+          chargingBlock({
+            id: 'stby', timelineRow: 1, taskType: 'standby', plannedStartMinute: 640, plannedEndMinute: 700,
+            yardFacilityNodeId: 'E2',
+          }),
+          block({
+            id: 'move', timelineRow: 1, taskType: 'dispatch', source: 'yard_exit_move',
+            plannedStartMinute: 710, plannedEndMinute: 711, yardExitFacilityNodeId: 'E2',
+          }),
+          chargingBlock({
+            id: 'other', timelineRow: 1, plannedStartMinute: 711, plannedEndMinute: 750,
+            yardFacilityNodeId: 'E3',
+          }),
+        ],
+      },
+    ];
+    const occs = collectFacilityOccupancies(timelines);
+    assert.equal(occs.length, 2);
+    const e2 = occs.find((occ) => occ.facilityNodeId === 'E2')!;
+    assert.deepEqual(e2.blockIds, ['chg', 'stby']);
+    assert.equal(e2.startMinute, 600);
+    assert.equal(e2.endMinute, 700);
+    assert.equal(e2.actualDepartMinute, 710);
+  });
 });
 
 describe('findFacilityOccupancyCollisions：重疊記錯誤、交接不足記警告，跨午夜安全', () => {
@@ -489,6 +653,7 @@ describe('findFacilityOccupancyCollisions：重疊記錯誤、交接不足記警
       facilityLabel: 'E2',
       label: '充電',
       endMinute: partial.actualDepartMinute,
+      blockIds: [partial.blockId],
       ...partial,
     };
   }
@@ -556,5 +721,45 @@ describe('findFacilityOccupancyCollisions：重疊記錯誤、交接不足記警
     assert.equal(hits.length, 1, '跨午夜的重疊不能被直接比大小漏掉');
     assert.equal(hits[0]!.kind, 'overlap');
     assert.equal(Math.round(hits[0]!.overlapSeconds), 5 * 60);
+  });
+
+  it('跨午夜交接：A 23:59:30 離格、B 00:00:00 進格，只隔 30 秒要回報，前後車順序正確', () => {
+    const hits = findFacilityOccupancyCollisions(
+      [
+        // B 記在鐘面上，排序時反而在前面
+        occ({ timelineRow: 2, blockId: 'b', startMinute: 0, actualDepartMinute: 90 }),
+        occ({ timelineRow: 1, blockId: 'a', startMinute: 1380, actualDepartMinute: 1439.5 }),
+      ],
+      30,
+    );
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0]!.kind, 'protection_gap');
+    assert.equal(Math.round(hits[0]!.gapSeconds), 30);
+    assert.equal(hits[0]!.earlier.blockId, 'a', '先離開的是 A');
+    assert.equal(hits[0]!.later.blockId, 'b');
+  });
+
+  it('跨午夜交接：延續記法（1440+）也一樣量得到', () => {
+    const hits = findFacilityOccupancyCollisions(
+      [
+        occ({ timelineRow: 4, blockId: 'a', startMinute: 1332, actualDepartMinute: 1440 }),
+        occ({ timelineRow: 7, blockId: 'b', startMinute: 1440 + 1 / 60, actualDepartMinute: 1530 }),
+      ],
+      30,
+    );
+    assert.equal(hits.length, 1);
+    assert.equal(Math.round(hits[0]!.gapSeconds), 1);
+    assert.equal(hits[0]!.earlier.blockId, 'a');
+  });
+
+  it('跨午夜但交接夠久：不回報', () => {
+    const hits = findFacilityOccupancyCollisions(
+      [
+        occ({ timelineRow: 2, blockId: 'b', startMinute: 1, actualDepartMinute: 90 }),
+        occ({ timelineRow: 1, blockId: 'a', startMinute: 1380, actualDepartMinute: 1439.5 }),
+      ],
+      30,
+    );
+    assert.equal(hits.length, 0);
   });
 });

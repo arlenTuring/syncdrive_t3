@@ -632,6 +632,23 @@ const zhTW = {
       manual: '手動製作',
     },
     analysisReport: {
+      appliedRetime: {
+        title: '已套用的時刻調整',
+        hint: '系統為了解除資源衝突，在合法行駛範圍內改了下列班次的發車或到站（或整串推移）。數值來自目前的班表。',
+      },
+      appliedSlack: {
+        title: '已套用的緩衝調整',
+        hint: '系統為了解除資源衝突，替下列班次增加了靠站緩衝。基本停靠秒數不變，只增加緩衝；數值來自目前的班表。這些是已採用的調整，不是未解決的問題。',
+        none: '這份班表沒有系統增加的緩衝。',
+        row: '時間線 {{row}}',
+        slackBreakdown: '緩衝：原始 {{base}} 秒＋系統增加 {{added}} 秒＝實際 {{effective}} 秒',
+        blockRange: '班次 {{before}} → {{now}}',
+        reason: '原因：{{message}}',
+        stopLine: '{{station}}：基本停靠 {{base}} 秒，有效停留 {{before}} → {{now}} 秒；到 {{arriveBefore}} → {{arriveNow}}，發 {{departBefore}} → {{departNow}}',
+        locate: '查看班次',
+        locateAria: '在班表上查看 {{code}}（時間線 {{row}}）',
+        targetMissing: '找不到班次 {{code}}——班表已經改過，這筆調整對應的卡片已不存在。',
+      },
       title: '班表分析報表',
       summary:
         '{{timelines}} 條時間線 · 全日 {{trips}} 班 · 載客 {{hours}} 車·小時',
@@ -835,6 +852,10 @@ const zhTW = {
       loadingCapacity: '載入運能趨勢…',
     },
     planGrid: {
+      slackBreakdown: '原始 {{base}}s＋系統 {{added}}s',
+      slackAdjusted: '系統增加緩衝',
+      slackAdjustedBadge: '緩衝 +{{added}}s',
+      slackAdjustedStop: '{{station}}：停 {{before}}s → {{now}}s，到 {{arriveBefore}} → {{arriveNow}}，發 {{departBefore}} → {{departNow}}',
       errorsAndWarnings: '錯誤與警告',
       warnings: '警告',
       countItems: '（{{count}} 則）',

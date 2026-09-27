@@ -331,6 +331,12 @@ export function extractPlanBlocks(body: Record<string, unknown>): TimetableBlock
         stationDwells: parseStationDwells(row.stationDwells),
         dwellSlackSeconds:
           typeof row.dwellSlackSeconds === 'number' ? row.dwellSlackSeconds : undefined,
+        // 引擎增加的緩衝要跟前端逐站時刻一致，不能在展開時丟掉
+        dwellSlackAdjustment: (() => {
+          const adjustment = asRecord(row.dwellSlackAdjustment);
+          const added = adjustment?.addedSeconds;
+          return typeof added === 'number' && Number.isFinite(added) ? { addedSeconds: added } : undefined;
+        })(),
       });
     }
   }

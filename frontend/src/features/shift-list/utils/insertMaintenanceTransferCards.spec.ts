@@ -712,6 +712,32 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(servicing.plannedStartMinute, charging.plannedEndMinute);
     });
 
+    it('同一個 Area 但拓樸查得到路徑：照實際路徑給時間，不當 0 秒（整張圖一個 Area 的情形）', () => {
+      // 2026-09-27 模擬器驗收：整張圖只有一個 Area，所有整備間轉場都成了 0 秒，
+      // 實際要開 60～270 秒，車到不了。有路徑就是真的要開。
+      const areas = [
+        {
+          id: 'area-all',
+          customName: '整張圖',
+          facilities: [
+            { id: 'E1', type: 'Facility' },
+            { id: 'M1', type: 'Facility' },
+          ],
+        },
+      ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['areas'];
+      const p = plan();
+      const result = run(p, undefined, undefined, areas);
+      assert.equal(result.skipped.filter((x) => x.fromTaskType === 'charging').length, 0);
+      const blocks = p.timelines[0]!.blocks;
+      const mo = blocks.find((b) => b.source === 'yard_exit_move' && b.id.includes('charging-1'))!;
+      const mi = blocks.find((b) => b.source === 'yard_entry_move' && b.id.includes('servicing-1'))!;
+      assert.equal(mo.travelSeconds, 30, '同 Area 仍照拓樸：出廠卡是第一段邊');
+      assert.equal(mi.travelSeconds, 230);
+      assert.equal(mo.yardExitStationId, 'N2W', '分界點照實際路徑');
+      const servicing = blocks.find((b) => b.id === 'servicing-1')!;
+      assert.equal(servicing.plannedStartMinute, 430 + 260 / 60, '後一段開始被推遲實際移動的時間');
+    });
+
     it('兩座設施不在同一個 Area（或沒有 Area 資料）時，照樣走拓樸找路徑', () => {
       const p = plan();
       // 不傳 areas（預設空陣列）——沒有 Area 資料就不算同區域，跟原本一樣查拓樸
@@ -751,7 +777,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       // 這個 fixture 整列只有兩段保養、沒有任何正線，入廠與出廠都給不出卡。
       // 那是要讓使用者看到的（整天沒有載客班次），不能安靜吞掉。
       assert.equal(
-        result.skipped.every((s) => s.reason.includes('沒有任何載客班次')),
+        result.skipped.every((s) => s.reason.includes('沒有載客班次') && s.reason.includes('同格續留')),
         true,
         `剩下的回報應該都是「整列沒有載客班次」，實際：${result.skipped.map((s) => s.reason).join(' / ')}`,
       );

@@ -64,6 +64,9 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
+  MAINTENANCE_TRANSFER_REQUIRED_MISSING: '必要的整備轉場排不出來，車到不了下一段',
+  VEHICLE_LOCATION_DISCONTINUITY: '車的位置接不起來（缺移動）',
+  MOVE_JUNCTION_CONFLICT: '移動卡在同一個轉折點貼太近',
   MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
   MAINTENANCE_FACILITY_YIELDED: '已請別列車換設施讓位',
   MAINTENANCE_ENTRY_EARLY_BLOCKED: '提早進廠被擋，車在站位上多等',
@@ -116,6 +119,9 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
+  MAINTENANCE_TRANSFER_REQUIRED_MISSING: { id: 's10', label: '§10.5 整備轉場小卡' },
+  VEHICLE_LOCATION_DISCONTINUITY: { id: 's10', label: '§10.5 整備轉場小卡' },
+  MOVE_JUNCTION_CONFLICT: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_FACILITY_YIELDED: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: 's10', label: '§10.5 整備轉場小卡' },
@@ -187,7 +193,8 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
       '站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。',
   },
   GEOMETRY_PASS_REVERTED: {
-    kind: 'limit',
+    // 過程紀錄：某道處理被安全閘拒絕，不是場域容量極限
+    kind: 'policy',
     guidance:
       '幾何後處理的每一道跑完都會用同一把全域尺打分（不碰撞 > 班距 > 班次穩定），讓整張班表變差的就整道撤回，連同它寫進報告的訊息一起收回。所以這一則不代表班表有問題——那些動作等於沒發生。它的用途是指出哪一道處理的策略與其他處理衝突：撤回次數高的那幾道應該回頭檢討它到底想解什麼問題，而不是留著讓它每一輪都做白工。',
   },
@@ -327,11 +334,25 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
       '車停的位置跟原本指派的路線起點不同，已改成同終點、從車所在位置出發的那一條，省掉一段空跑。終點與發車時刻都不動，交路後面不受影響。這是最佳化結果不是問題；不想讓某條路線被這樣用，把它從關聯圖的後繼拿掉。',
   },
   MAINTENANCE_TRANSFER_UNRESOLVED: {
-    // 預設值只在呼叫端沒填 issue.kind 時才會用到；這裡實際固定會被
-    // generate.ts 依 necessity 覆寫成 policy（不需要）或 actionable（必要失敗）。
-    kind: 'actionable',
+    // 只剩「不需要轉場卡」這一種；必要轉場失敗改走 MAINTENANCE_TRANSFER_REQUIRED_MISSING（硬錯誤）
+    kind: 'policy',
     guidance:
-      '轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。這一則若寫著「不需要」，多半是這一列整天沒有載客任務、車沒有要去的地方，通常是刻意保留的備援車，確認一下模板排班是不是故意的就好；若寫著「排不出必要的」，車實際上到不了它下一段該去的地方，原因訊息裡已經寫了——沒設施就去整備任務補，沒路徑就到路網拓樸檢查那個方向的邊（入廠與出廠常是不同方向），路徑被別列車在同一個轉折點卡住就檢查那個交會點的時間差有沒有調整空間。',
+      '轉場卡三種：入廠、出廠、整備間轉場。代號跟著該段整備的區段代號走（充電 E → EI／EO，行檢 P → PI／PO）。這一則是「不需要」：訊息會寫出依據——車從哪一格開始、下一段接的是什麼（同一格續留，或由整備間轉場負責）。通常是刻意保留的備援車，確認模板排班是不是故意的就好。',
+  },
+  MAINTENANCE_TRANSFER_REQUIRED_MISSING: {
+    kind: 'limit',
+    guidance:
+      '車下一段要去的地方跟它現在停的地方不同，引擎試過所有候選（設施、路徑、轉折點錯開、可動時段內的出發時刻）仍排不出合法移動。班表與班次保留供檢查，但這一則會擋發布——車實際上到不了。原因訊息寫著卡在哪：路徑被別列車在同一個轉折點卡住，就看那一刻前後誰能讓；時段不夠，就要一起調整前後班次，不是只移動轉場卡。',
+  },
+  VEHICLE_LOCATION_DISCONTINUITY: {
+    kind: 'limit',
+    guidance:
+      '這是對班表本身的連續性檢查（手改過的班表也會重驗）：前一張卡結束時車在某一格或某一站，下一張卡卻要它在另一個地方，中間沒有任何移動卡。補一張移動卡，或把前後兩段改成同一個地點。',
+  },
+  MOVE_JUNCTION_CONFLICT: {
+    kind: 'limit',
+    guidance:
+      '移動卡是車真的開在路網上：不同列車經過同一個中途節點（例如多座設施共用的入口點）至少要差開 2 × 碰撞保護時間。這一則是對班表本身的檢查，時刻由卡片途經節點沿拓樸行駛秒數推算。要消掉它：讓其中一張移動卡早一點或晚一點出發，或改走不經過同一點的路徑。',
   },
   STATION_BERTH_RELIEF_INSERTED: {
     kind: 'policy',

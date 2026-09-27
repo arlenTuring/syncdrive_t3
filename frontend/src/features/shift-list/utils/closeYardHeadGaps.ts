@@ -63,7 +63,8 @@ export function closeYardHeadGaps(args: {
   // 整備／停留類卡片的實際離開時刻——沒補「暫停」卡也分析得出來，跟最後驗證
   // （validateFacilityOccupancy）同一個答案，見 collectFacilityOccupancies 的說明。
   const actualDepartByBlockId = new Map(
-    collectFacilityOccupancies(timelines).map((occ) => [occ.blockId, occ.actualDepartMinute]),
+    collectFacilityOccupancies(timelines).flatMap((occ) =>
+      occ.blockIds.map((blockId) => [blockId, occ.actualDepartMinute] as const)),
   );
 
   // 各設施格目前被哪些區間佔著；key 帶上卡片 id，往前拉時要排除自己。
@@ -128,6 +129,7 @@ export function closeYardHeadGaps(args: {
       const taken = bookings.some(
         (booking) =>
           booking.nodeId === nodeId
+          && booking.row !== timeline.row
           && booking.blockId !== yard.id
           && booking.blockId !== previous.id
           && daySegmentOverlapSeconds(

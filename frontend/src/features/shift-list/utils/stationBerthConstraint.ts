@@ -1085,3 +1085,138 @@ export function enforceStationBerthConstraints(args: {
     unresolvedCount,
   };
 }
+
+/**
+ * 站位求解類處理（班距補疏、班距修復）共用的「別人已經預約的站位」。
+ *
+ * 除了其他載客班次的到離站窗，<strong>明確停在正線停靠站的待命</strong>也要算：那是
+ * 使用者指定、引擎挑定的地點，整段時間都壓著那一格。先前兩支各自維護一份只收載客
+ * 窗的清單，待命在它們眼中不存在。末站滯留仍不收（理由見
+ * {@link BerthProtectionContext}）——被挪動那一班自己多出來的停留，另由
+ * {@link movedTripLingerCollides} 驗。
+ */
+export function bookBerthWindowsExcept(
+  timelines: GeneratedSchedulePlan['timelines'],
+  selectedRoutes: ShiftScheduleSelectedRoute[],
+  exceptId: string,
+  protection: BerthProtectionContext,
+): BerthWindowSec[] {
+  const booked: BerthWindowSec[] = [];
+  const protectionSeconds = Math.max(0, protection.collisionProtectionSeconds) * 2;
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.id === exceptId) continue;
+      if (block.taskType === 'standby' && block.yardFacilityStationId) {
+        const startSecond = minuteToSecond(block.plannedStartMinute);
+        const naturalEndSecond = Math.max(
+          minuteToSecond(block.plannedEndMinute),
+          startSecond + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
+        );
+        booked.push({
+          stationId: block.yardFacilityStationId,
+          stationName: block.yardFacilityLabel ?? block.yardFacilityStationId,
+          startSecond,
+          naturalEndSecond,
+          endSecond: naturalEndSecond + protectionSeconds,
+          timelineRow: timeline.row,
+          blockId: block.id,
+        });
+        continue;
+      }
+      if (block.taskType !== 'passenger') continue;
+      const route = resolveRouteForBlock(block, selectedRoutes);
+      if (!route) continue;
+      booked.push(...projectProtectedBerthWindowsSeconds(block, route, protection));
+    }
+  }
+  return booked;
+}
+
+/**
+ * 挪動一班之後，這台車在起點站／終點站<strong>多出來的停留</strong>會不會撞到別人。
+ *
+ * 發車往後推：真正到起點站的時刻（同列前一件結束）不會跟著動，「已經到了、還沒開」
+ * 的那段變長。整班往前拉：終點站提早到，離同列下一件開始的那段變長。
+ * {@link projectProtectedBerthWindowsSeconds} 只算路線設定的靠站秒數，量不出這兩段；
+ * 這裡把「真正到站 → 真正離站」拼出來，跟別台車在同一站的預約比一次。
+ * 前後鄰居不是停在同一站的（中間有整備、移動）就沒有這段停留，不驗。
+ */
+export function movedTripLingerCollides(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  selectedRoutes: ShiftScheduleSelectedRoute[];
+  block: GeneratedScheduleBlock;
+  route: ShiftScheduleSelectedRoute;
+  newStartSecond: number;
+  newEndSecond: number;
+  booked: BerthWindowSec[];
+  protection: BerthProtectionContext;
+}): boolean {
+  const { timelines, selectedRoutes, block, route, newStartSecond, newEndSecond, booked, protection } = args;
+  const row = timelines.find((timeline) => timeline.row === block.timelineRow);
+  if (!row) return false;
+  const ordered = [...row.blocks]
+    .filter((other) => other.source !== 'hold')
+    .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute || a.id.localeCompare(b.id));
+  const index = ordered.findIndex((other) => other.id === block.id);
+  if (index < 0) return false;
+  const stationIds = route.stationIds ?? [];
+  const originId = stationIds[0]?.trim();
+  const terminalId = stationIds[stationIds.length - 1]?.trim();
+  const protectionSeconds = Math.max(0, protection.collisionProtectionSeconds) * 2;
+  const stationName = (stationId: string) =>
+    route.stationDwells.find((dwell) => dwell.stationId === stationId)?.stationName || stationId;
+  /** 車在這張卡「結束時」／「開始時」停在哪一站；不在正線站上回傳 null */
+  const stationAt = (other: GeneratedScheduleBlock, side: 'start' | 'end'): string | null => {
+    if (other.taskType === 'passenger') {
+      const ids = resolveRouteForBlock(other, selectedRoutes)?.stationIds ?? [];
+      return (side === 'end' ? ids[ids.length - 1] : ids[0])?.trim() || null;
+    }
+    if (other.taskType === 'dispatch') return null;
+    return other.yardFacilityStationId?.trim() || null;
+  };
+
+  const lingerWindows = (startSecond: number, endSecond: number): BerthWindowSec[] => {
+  const windows: BerthWindowSec[] = [];
+  const prev = index > 0 ? ordered[index - 1]! : null;
+  // 前一件是移動卡：它就是把車送到起點站的那一段，車從它結束起就在起點站上等
+  if (prev && originId && (prev.taskType === 'dispatch' || stationAt(prev, 'end') === originId)) {
+    const arrive = minuteToSecond(prev.plannedEndMinute);
+    if (arrive < startSecond - 1e-9) {
+      windows.push({
+        stationId: originId,
+        stationName: stationName(originId),
+        startSecond: arrive,
+        naturalEndSecond: startSecond,
+        endSecond: startSecond + protectionSeconds,
+        timelineRow: block.timelineRow,
+        blockId: block.id,
+      });
+    }
+  }
+  const next = index + 1 < ordered.length ? ordered[index + 1]! : null;
+  // 下一件是移動卡：車在終點站等到移動開始才離開
+  if (next && terminalId && (next.taskType === 'dispatch' || stationAt(next, 'start') === terminalId)) {
+    const leave = minuteToSecond(next.plannedStartMinute);
+    if (leave > endSecond + 1e-9) {
+      windows.push({
+        stationId: terminalId,
+        stationName: stationName(terminalId),
+        startSecond: endSecond,
+        naturalEndSecond: leave,
+        endSecond: leave + protectionSeconds,
+        timelineRow: block.timelineRow,
+        blockId: block.id,
+      });
+    }
+  }
+  return windows;
+  };
+  const collides = (windows: BerthWindowSec[]) =>
+    windows.length > 0 && resolveBerthClearDelaySeconds(windows, booked) > 1e-6;
+  // 只拒絕這次挪動「新造成」的衝突；原本就撞的不算在這次頭上（由全域評分把關）
+  if (!collides(lingerWindows(newStartSecond, newEndSecond))) return false;
+  return !collides(lingerWindows(
+    minuteToSecond(block.plannedStartMinute),
+    minuteToSecond(block.plannedEndMinute),
+  ));
+}

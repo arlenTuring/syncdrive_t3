@@ -49,7 +49,10 @@ export type TimetableBlock = {
   source?: string;
   entryServiceSectionCode?: string;
   stationDwells?: TimetableStationDwell[];
+  /** 單班明確設定的緩衝（含 0）；沒給才看路線 */
   dwellSlackSeconds?: number;
+  /** 排班引擎為解除資源衝突增加的緩衝；實際緩衝＝原始＋addedSeconds（見前端 DwellSlackAdjustment） */
+  dwellSlackAdjustment?: { addedSeconds?: number | null } | null;
 };
 
 export type TimetableStationStop = {
@@ -179,20 +182,37 @@ function resolveLegBounds(
   return { minTravel, avgTravel, maxTravel };
 }
 
+/**
+ * 與前端 `resolveBlockDwellSlackBreakdown` 相同：站點設定與緩衝分開解析。
+ * 單班明確給緩衝（含 0）就用單班；沒給時有覆寫站點沿用 0、沒覆寫用路線設定；
+ * 再加上引擎增加的量。只加在緩衝上，不動基本停靠秒數。
+ */
+export function resolveBlockEffectiveDwellSlackSeconds(
+  block: Pick<TimetableBlock, 'stationDwells' | 'dwellSlackSeconds' | 'dwellSlackAdjustment'>,
+  route: Pick<TimetableRoute, 'dwellSlackSeconds'> | null | undefined,
+): number {
+  const hasStationOverride = Boolean(block.stationDwells && block.stationDwells.length > 0);
+  const explicit = typeof block.dwellSlackSeconds === 'number' && Number.isFinite(block.dwellSlackSeconds);
+  const base = explicit
+    ? normalizeDwellSlackSeconds(block.dwellSlackSeconds)
+    : hasStationOverride
+      ? 0
+      : normalizeDwellSlackSeconds(route?.dwellSlackSeconds ?? 0);
+  const added = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
+  return base + added;
+}
+
 function resolveBlockStationDwellInputs(
   block: TimetableBlock,
   route: TimetableRoute | null | undefined,
 ): { stations: TimetableStationDwell[]; dwellSlackSeconds: number } | null {
-  if (block.stationDwells && block.stationDwells.length > 0) {
-    return {
-      stations: block.stationDwells.map((station) => ({ ...station })),
-      dwellSlackSeconds: normalizeDwellSlackSeconds(block.dwellSlackSeconds ?? 0),
-    };
-  }
-  if (!route || route.stationDwells.length === 0) return null;
+  const stationSource = block.stationDwells && block.stationDwells.length > 0
+    ? block.stationDwells
+    : route?.stationDwells;
+  if (!stationSource || stationSource.length === 0) return null;
   return {
-    stations: route.stationDwells.map((station) => ({ ...station })),
-    dwellSlackSeconds: normalizeDwellSlackSeconds(route.dwellSlackSeconds ?? 0),
+    stations: stationSource.map((station) => ({ ...station })),
+    dwellSlackSeconds: resolveBlockEffectiveDwellSlackSeconds(block, route),
   };
 }
 

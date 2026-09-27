@@ -4,7 +4,7 @@ import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
-import { computeScheduleGateOk } from '../scheduleAcceptance';
+import { computeScheduleGateOk, PUBLISH_BLOCKING_CODES } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
   FeasibilityViolationCode,
@@ -37,6 +37,8 @@ import {
   validateStationTimingsWithinBlocks,
   validateStationBerthCollisions,
   validateYardExitContinuity,
+  validateVehicleLocationContinuity,
+  validateMoveJunctionConflicts,
   validateFacilityOccupancy,
 } from './validate';
 import {
@@ -53,6 +55,10 @@ import { evenOutRouteHeadwayPhase } from '../evenOutRouteHeadwayPhase';
 import { relievePlatformIdleWithSecondaryEdge } from '../relievePlatformIdleWithSecondaryEdge';
 import { relievePlatformIdleWithFacilityPark } from '../relievePlatformIdleWithFacilityPark';
 import { closeYardHeadGaps } from '../closeYardHeadGaps';
+import {
+  collectStationBerthOccupancies,
+  findStationBerthCollisions,
+} from '../stationBerthOccupancy';
 import { fillYardHoldGaps } from '../fillYardHoldGaps';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
@@ -62,6 +68,16 @@ import {
 } from '../mainlineMaintenanceEntryYield';
 import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
 import { pushIssue } from './feasibilityIssueMeta';
+import type { PlanEvaluationContext } from './evaluatePlan';
+import {
+  DEFAULT_RESIDUAL_REPAIR_BUDGET,
+  type ResidualRepairBudget,
+  rerouteTripInCopy,
+  resolveResidualConflicts,
+  shiftTripInCopy,
+} from './resolveResidualConflicts';
+import { collectPlanViolations, compareViolations, type PlanViolation } from './evaluatePlan';
+import { snapUpToClockAlignSeconds } from './physics';
 import {
   comparePlanScores,
   formatPlanScore,
@@ -87,6 +103,11 @@ export type GenerateShiftScheduleInput = {
   pointTopology?: PointTopology | null;
   /** 地圖場域管理模組的 Area 容器清單；整備間轉場判斷「兩座設施是不是同一區域」用 */
   areas?: MapAreaObject[] | null;
+  /**
+   * 殘留衝突搜尋的候選數／聯動深度上限（不設時間上限）。未傳用預設值；
+   * 測試用它驗證「預算用盡時如實揭露、不假裝可行」。
+   */
+  residualRepairBudget?: Partial<ResidualRepairBudget>;
 };
 
 /**
@@ -133,12 +154,73 @@ function fingerprintTimelines(
 
 /**
  * 排班引擎主入口：依策略文件 1.1–1.8、S1–S4 與優化算法展開班表。
+ *
+ * 有未承接脈衝時，會用「掛脈衝時可再往後推過貼太近的同向班次」再完整重跑一次
+ * （見 NormalizeInputArgs.allowBumpPastEarlierSameRoute），兩份整張比較：
+ * 硬錯誤與擋發布的安全問題都不能變多，之後依 班距 > 承接 > 班次 取較好的一份。
+ * 不是直接拿掉拒絕條件——實測直接拿掉承接 2 → 1、班次 1184 → 1188，卻多出站位
+ * 保護不足與班距不足，所以只在整張變好時才用。
  */
 export function generateShiftSchedule(
   input: GenerateShiftScheduleInput,
 ): GenerateShiftScheduleResult {
+  const base = generateShiftScheduleOnce(input, false);
+  const unserved = base.report.warnings.filter((issue) => issue.code === 'UNSERVED_SERVICE_PULSE');
+  if (unserved.length === 0 || !base.plan) return base;
+  const alt = generateShiftScheduleOnce(input, true);
+  if (!alt.plan) return base;
+  const keyOf = (result: GenerateShiftScheduleResult): number[] => {
+    const count = (code: string) =>
+      result.report.warnings.filter((issue) => issue.code === code).length;
+    const safety = result.report.warnings.filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code)).length;
+    const trips = result.plan?.timelines.reduce(
+      (sum, timeline) => sum + timeline.blocks.filter((block) => block.taskType === 'passenger').length,
+      0,
+    ) ?? 0;
+    return [
+      result.report.errors.length,
+      safety,
+      count('HEADWAY_BELOW_TARGET'),
+      count('UNSERVED_SERVICE_PULSE'),
+      -trips,
+    ];
+  };
+  const baseKey = keyOf(base);
+  const altKey = keyOf(alt);
+  // 每一種硬錯誤、每一種擋發布的問題都不能變多——拿一種換另一種不算改善
+  const countByCode = (issues: FeasibilityIssue[]) => {
+    const counts = new Map<string, number>();
+    for (const issue of issues) counts.set(issue.code, (counts.get(issue.code) ?? 0) + 1);
+    return counts;
+  };
+  const safetyIssues = (result: GenerateShiftScheduleResult) => [
+    ...result.report.errors,
+    ...result.report.warnings.filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code)),
+  ];
+  const baseCounts = countByCode(safetyIssues(base));
+  const safetyNotWorse = [...countByCode(safetyIssues(alt)).entries()].every(
+    ([code, count]) => count <= (baseCounts.get(code) ?? 0),
+  );
+  let better = false;
+  for (let index = 0; index < baseKey.length; index += 1) {
+    if (altKey[index] !== baseKey[index]) {
+      better = altKey[index]! < baseKey[index]!;
+      break;
+    }
+  }
+  return safetyNotWorse && better ? alt : base;
+}
+
+function generateShiftScheduleOnce(
+  input: GenerateShiftScheduleInput,
+  allowBumpPastEarlierSameRoute: boolean,
+): GenerateShiftScheduleResult {
   const errors: FeasibilityIssue[] = [];
   const warnings: FeasibilityIssue[] = [];
+  const residualBudget: ResidualRepairBudget = {
+    ...DEFAULT_RESIDUAL_REPAIR_BUDGET,
+    ...input.residualRepairBudget,
+  };
 
   const engineInput = normalizeEngineInput(
     {
@@ -151,6 +233,7 @@ export function generateShiftSchedule(
       firstTripOrigins: input.firstTripOrigins,
       pointTopology: input.pointTopology,
       areas: input.areas,
+      allowBumpPastEarlierSameRoute,
     },
     errors,
     warnings,
@@ -300,6 +383,19 @@ export function generateShiftSchedule(
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       scheduleRowCount: engineInput.scheduleRowCount,
     });
+  const evaluationContext: PlanEvaluationContext = {
+    selectedRoutes: routesForBerth,
+    routeById,
+    passengerRoutes: engineInput.passengerRoutes,
+    successorPolicy: engineInput.successorPolicy,
+    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    intervals: engineInput.intervals,
+    attributes: engineInput.attributes,
+    scheduleRowCount: engineInput.scheduleRowCount,
+    topology: engineInput.pointTopology,
+    yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
+  };
   const snapshotOf = (
     candidate: GeneratedSchedulePlan['timelines'],
   ): GeneratedSchedulePlan['timelines'] =>
@@ -475,6 +571,7 @@ export function generateShiftSchedule(
         selectedRoutes: routesForBerth,
         topology: engineInput.pointTopology,
         collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       }).timelines);
 
     // 班距太疏 → 把後車往前拉回目標
@@ -537,15 +634,16 @@ export function generateShiftSchedule(
 
   if (rejectedPasses.size > 0) {
     const ranked = [...rejectedPasses.entries()].sort((a, b) => b[1] - a[1]);
+    // 這是過程紀錄（某道處理的嘗試被安全閘拒絕），不是場域容量極限，歸策略說明
     pushIssue(warnings, {
       code: 'GEOMETRY_PASS_REVERTED',
       severity: 'warning',
-      kind: 'limit',
+      kind: 'policy',
       message:
-        '幾何後處理有處理被整道撤回——它讓整張班表依優先序（不碰撞 > 班距 > '
-        + `班次穩定）變差了：${ranked.map(([name, count]) => `${name} ${count} 次`).join('、')}。`
-        + '班表本身不受影響（那些動作等於沒發生），但撤回次數高的處理代表它的策略'
-        + '與其他處理衝突，值得回頭檢討。',
+        '過程紀錄：幾何後處理有處理被全域評分閘門整道撤回——它讓整張班表依優先序'
+        + `（不碰撞 > 班距 > 班次穩定）變差了：${ranked.map(([name, count]) => `${name} ${count} 次`).join('、')}。`
+        + '班表本身不受影響（那些動作等於沒發生），這不代表場域容量到了極限；撤回次數高的'
+        + '處理代表它的策略與其他處理衝突，值得回頭檢討。',
       detail: { rejectedPasses: Object.fromEntries(ranked) },
     });
   }
@@ -707,17 +805,22 @@ export function generateShiftSchedule(
   // 不動；出廠：串尾補，往前貼齊下一段發車、空間不夠可吃整備尾巴；轉場：
   // 串內部兩段不同類型整備直接銜接，前一段跑滿全長，後一段開始被推遲、
   // 結束不動。三段共用同一份設施佔用表，見 insertMaintenanceTransferCards.ts。
-  const maintenanceTransfer = insertMaintenanceTransferCards({
-    timelines,
-    topology: engineInput.pointTopology,
-    areas: engineInput.areas,
-    maintenanceBody: engineInput.maintenanceBody,
-    selectedRoutes: engineInput.selectedRoutes,
-    minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
-    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-    sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
-  });
-  timelines = maintenanceTransfer.timelines;
+  type JunctionReservation = { nodeId: string; instant: number; timelineRow: number };
+  const runTransfer = (
+    candidate: GeneratedSchedulePlan['timelines'],
+    reservedJunctionPasses?: JunctionReservation[],
+  ) =>
+    insertMaintenanceTransferCards({
+      reservedJunctionPasses,
+      timelines: candidate,
+      topology: engineInput.pointTopology,
+      areas: engineInput.areas,
+      maintenanceBody: engineInput.maintenanceBody,
+      selectedRoutes: engineInput.selectedRoutes,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    });
 
   /**
    * 繞不去別站（關聯圖上沒有回得來的路線）→ 開進附近設施格暫停放，時間到再回來。
@@ -725,61 +828,287 @@ export function generateShiftSchedule(
    * 放在<strong>整備轉場卡之後</strong>，不在幾何收斂迴圈裡。原因是轉場卡是迴圈
    * 跑完才真正插進去的（迴圈裡只先決定地點），在迴圈裡看到的空檔其實已被預定；
    * 2026-08-17 第一版擺在迴圈內，硬塞的結果是 391 則 TIMELINE_OVERLAP。
-   *
-   * 擺在這裡的代價是站位求解器不會針對讓出來的站格再跑一次，收益因此保守；
-   * 但這一支只移動「已經確定在空等」的車、且不改任何發車時刻，本來就不需要
-   * 求解器重新介入。
    */
-  timelines = relievePlatformIdleWithFacilityPark({
-    timelines,
-    selectedRoutes: routesForBerth,
-    topology: engineInput.pointTopology,
-    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-    warnings,
-  }).timelines;
-
-  // 整備前面不留空白：車已經在格子裡了，整備就從那一刻開始（結束不動）。
-  // 放在讓渡之後——讓渡會把入廠卡往前挪，挪完才知道車實際幾點到格子。
-  timelines = closeYardHeadGaps({ timelines }).timelines;
-
-
+  const runFinalRelieve = (
+    candidate: GeneratedSchedulePlan['timelines'],
+    sink: FeasibilityIssue[],
+    onlyRows?: ReadonlySet<number>,
+  ) =>
+    relievePlatformIdleWithFacilityPark({
+      timelines: candidate,
+      selectedRoutes: routesForBerth,
+      topology: engineInput.pointTopology,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      onlyRows,
+      warnings: sink,
+    }).timelines;
   /**
-   * 收尾微調：早到幾秒卡進別人碰撞保護窗的，往後挪剛好差的那幾秒。
+   * 讓站之後的兩道收尾。
    *
-   * <strong>這一支必須放在最後面。</strong>它挪的是「到站後反正要空等」的車，
-   * 對那台車本身零代價；但那段空等同時也是站位讓渡（繞去別站等、開進設施格暫停放）
-   * 拿來解衝突的資源。放在收斂迴圈裡先把它用掉，讓渡就沒東西可用——2026-08-20
-   * 兩種寫法都實測過，結果一致：迴圈內動手，最終站位碰撞從 1 對變成 3 對。
-   * 放到所有處理跑完之後，沒有下游會被影響，省下來的就是純賺。
+   * 整備前面不留空白：車已經在格子裡了，整備就從那一刻開始（結束不動）。放在讓渡
+   * 之後——讓渡會把入廠卡往前挪，挪完才知道車實際幾點到格子。
    *
-   * 每挪一趟都用同一把全域尺驗證一次，沒變好就還原那一次——整趟往後挪連帶影響
-   * 起點站的發車，不能盲挪（盲挪實測第一輪就從 3 筆硬錯誤變成 27 筆）。
+   * 收尾微調：早到幾秒卡進別人碰撞保護窗的，往後挪剛好差的那幾秒。<strong>必須放在
+   * 最後面。</strong>它挪的是「到站後反正要空等」的車，對那台車本身零代價；但那段空等
+   * 同時也是站位讓渡拿來解衝突的資源，放在收斂迴圈裡先用掉，讓渡就沒東西可用
+   * （2026-08-20 兩種寫法都實測過：迴圈內動手，最終站位碰撞從 1 對變成 3 對）。
+   * 每挪一趟都用同一把全域尺驗證一次，沒變好就還原那一次。
    */
-  {
-    let reference = scoreOf(timelines);
+  const finishAfterRelieve = (
+    candidate: GeneratedSchedulePlan['timelines'],
+    sink: FeasibilityIssue[],
+  ): GeneratedSchedulePlan['timelines'] => {
+    const closed = closeYardHeadGaps({ timelines: candidate }).timelines;
+    let reference = scoreOf(closed);
     yieldIdleBlockArrival({
-      timelines,
+      timelines: closed,
       selectedRoutes: routesForBerth,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
-      warnings,
+      warnings: sink,
       accept: () => {
-        const next = scoreOf(timelines);
+        const next = scoreOf(closed);
         if (comparePlanScores(next, reference) >= 0) return false;
         reference = next;
         return true;
       },
     });
-  }
+    return closed;
+  };
 
   /**
-   * 補上「暫停」卡：整備做完、車還在格子裡的那段。
+   * 迴圈之後的整段後處理：轉場卡 → 讓站 → 收尾 → 暫停卡 → 殘留衝突修復。
    *
-   * 放在<strong>所有會動時刻的處理跑完之後、驗證之前</strong>：這幾張卡是事實的載體，不是新
-   * 規則——它們讓「車在哪裡」在時間軸上變成完整且明示的事實，任何偵測器都不必再自己
-   * 推論一次。放在迴圈裡會改變各道處理看到的前後相鄰關係，那是另一回事，也是先前
-   * 踩過的雷。
+   * 包成一段是為了<strong>候選要跑完整段才比較</strong>：在轉場卡之前改了班次時刻，
+   * 後面的讓站、暫停卡、殘留修復都會跟著變，只比中途的版面會誤判。每次呼叫都從同一份
+   * 迴圈結果的副本開始，重跑不會累加或重複插卡。
    */
-  timelines = fillYardHoldGaps({ timelines, selectedRoutes: routesForBerth }).timelines;
+  const runPostLoop = (
+    pre: GeneratedSchedulePlan['timelines'],
+    reservedJunctionPasses?: JunctionReservation[],
+  ) => {
+    const transfer = runTransfer(snapshotOf(pre), reservedJunctionPasses);
+    const sink: FeasibilityIssue[] = [];
+    let result = finishAfterRelieve(runFinalRelieve(transfer.timelines, sink), sink);
+    /**
+     * 補上「暫停」卡：整備做完、車還在格子裡的那段。放在所有會動時刻的處理跑完之後、
+     * 驗證之前：這幾張卡是事實的載體，不是新規則。
+     */
+    result = fillYardHoldGaps({ timelines: result, selectedRoutes: routesForBerth }).timelines;
+    /**
+     * 殘留站位衝突：依衝突邊界產生候選、雙方都試，副本上整組驗證後才採用
+     * （見 resolveResidualConflicts）。候選改了哪一列，就重建那一列的暫停卡與讓站。
+     */
+    const residual = resolveResidualConflicts({
+      timelines: result,
+      ctx: evaluationContext,
+      budget: residualBudget,
+      replanRows: (candidate, rows) => {
+        const replanSink: FeasibilityIssue[] = [];
+        return { timelines: runFinalRelieve(candidate, replanSink, rows), warnings: replanSink };
+      },
+    });
+    result = residual.timelines;
+    // 候選重排過讓站的那幾列：對不到實際卡片的「已改開進某格暫停放」收回，換上採用的訊息
+    const changedRows = new Set(residual.applied.map((edit) => edit.timelineRow));
+    if (changedRows.size > 0) {
+      const parkCards = result.flatMap((timeline) => timeline.blocks)
+        .filter((block) => block.id.startsWith('berthpark-'))
+        .map((block) => block.id);
+      for (let index = sink.length - 1; index >= 0; index -= 1) {
+        const issue = sink[index]!;
+        if (issue.code !== 'STATION_BERTH_ARRIVAL_YIELDED') continue;
+        const detail = issue.detail as { timelineRow?: number; blockId?: string } | undefined;
+        if (detail?.timelineRow == null || !changedRows.has(detail.timelineRow)) continue;
+        if (!parkCards.some((id) => detail.blockId && id.includes(detail.blockId))) sink.splice(index, 1);
+      }
+      sink.push(...residual.warnings);
+    }
+    const required = transfer.skipped.filter((skip) => skip.necessity !== 'not_needed').length;
+    return {
+      timelines: result,
+      transfer,
+      warnings: sink,
+      residual,
+      violations: collectPlanViolations(evaluationContext, result),
+      required,
+    };
+  };
+
+  const preTransfer = snapshotOf(timelines);
+
+  /**
+   * 必要轉場排不出來時的聯動搜尋
+   * ============================
+   *
+   * 狀態＝（轉場前的版面, 轉折點保留, 跑完整段後處理的結果）。每一筆必要轉場失敗，
+   * 由它自己的失敗原因推出候選：
+   *
+   * - 轉折點保留：只輸在「別列車的移動先訂走轉折點」時，把它原訂要經過的節點先保留給它，
+   *   整段重排，讓彈性大的移動（可以晚一點出發的整備間轉場）去閃——先處理到的先贏，
+   *   不代表先處理到的比較沒得挪。
+   * - 出廠往後錯開才過得去（skip.exitDelay，量由轉折點預約邊界算出）：下一班晚發壓縮
+   *   行駛、或整串推移（只吃空檔扣掉必要間隔的餘裕）。
+   * - 換起點：下一班改跑同終點、下游相同的已允許路線。
+   *
+   * 每個候選都在副本上跑完整段後處理。必要轉場失敗真的變少、且沒有新增任何硬錯誤或安全
+   * 問題才採用；採用後的狀態疊加（保留與改動都留著），再找下一筆。候選減少了失敗、只多出
+   * 站位問題時，往下一層：對新站位問題牽涉的班次試換起點，整組完成後仍要比採用前好。
+   * 輪數以一開始的失敗數為上限（每採用一次至少少一筆）。
+   */
+  type PostState = {
+    pre: GeneratedSchedulePlan['timelines'];
+    reservations: JunctionReservation[];
+    post: ReturnType<typeof runPostLoop>;
+    notes: FeasibilityIssue[];
+  };
+  const noNewProblems = (before: PlanViolation[], after: PlanViolation[]) => {
+    const comparison = compareViolations(before, after);
+    return {
+      ok: comparison.introduced.length === 0
+        && comparison.countsAfter[0] <= comparison.countsBefore[0]
+        && comparison.countsAfter[1] <= comparison.countsBefore[1],
+      introduced: comparison.introduced,
+    };
+  };
+  const rerouteNote = (row: number, blockId: string, from: string, to: string, why: string): FeasibilityIssue => ({
+    code: 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION',
+    severity: 'warning',
+    kind: 'policy',
+    message:
+      `時間線 ${row}：${why}，已把「${from}」改派為同終點、下游相同的「${to}」，`
+      + '從它的起點站發車；班次時刻不變。',
+    detail: { timelineRow: row, blockId, fromRouteId: from, toRouteId: to },
+  });
+
+  let state: PostState = {
+    pre: preTransfer,
+    reservations: [],
+    post: runPostLoop(preTransfer),
+    notes: [],
+  };
+  const triedNotes = new Map<string, string[]>();
+  const note = (blockId: string | undefined, text: string) => {
+    const list = triedNotes.get(blockId ?? '') ?? [];
+    if (list.length < 6) list.push(text);
+    triedNotes.set(blockId ?? '', list);
+  };
+  const maxRounds = state.post.required;
+  for (let round = 0; round < maxRounds; round += 1) {
+    let adopted: PostState | null = null;
+    const base = state;
+    for (const skip of base.post.transfer.skipped) {
+      if (adopted) break;
+      if (skip.necessity === 'not_needed') continue;
+      type Candidate = {
+        label: string;
+        pre: GeneratedSchedulePlan['timelines'] | null;
+        reservations: JunctionReservation[];
+        notes: FeasibilityIssue[];
+      };
+      const candidates: Candidate[] = [];
+      if (skip.junctionReservation?.length) {
+        candidates.push({
+          label: '把原訂經過的轉折點先保留給它、其他移動去閃',
+          pre: base.pre,
+          reservations: [
+            ...base.reservations,
+            ...skip.junctionReservation.map((pass) => ({ ...pass, timelineRow: skip.timelineRow })),
+          ],
+          notes: [],
+        });
+      }
+      if (skip.exitDelay) {
+        const delayMinutes = snapUpToClockAlignSeconds(skip.exitDelay.seconds) / 60;
+        const delaySeconds = Math.round(delayMinutes * 60);
+        const nextBlockId = skip.exitDelay.nextBlockId;
+        for (const [startShift, endShift, label] of [
+          [delayMinutes, 0, `下一班晚 ${delaySeconds} 秒發車、壓縮行駛（到站不變）`],
+          [delayMinutes, delayMinutes, `下一班起整串推移 ${delaySeconds} 秒`],
+        ] as const) {
+          const edited = shiftTripInCopy(base.pre, nextBlockId, startShift, endShift, evaluationContext, label);
+          candidates.push({
+            label: edited?.description ?? label,
+            pre: edited?.timelines ?? null,
+            reservations: base.reservations,
+            notes: [],
+          });
+        }
+        for (const item of rerouteTripInCopy(base.pre, nextBlockId, evaluationContext)) {
+          const from = item.fromRoute.routeName ?? item.fromRoute.routeId;
+          const to = item.toRoute.routeName ?? item.toRoute.routeId;
+          candidates.push({
+            label: item.description,
+            pre: item.timelines,
+            reservations: base.reservations,
+            notes: [rerouteNote(skip.timelineRow, nextBlockId, from, to, '整備後的出廠卡原本排不出（原起點的路徑或站位被擋）')],
+          });
+        }
+      }
+      for (const candidate of candidates) {
+        if (!candidate.pre) {
+          note(skip.blockId, `${candidate.label}：超出合法行駛範圍或前後任務間隔`);
+          continue;
+        }
+        const result = runPostLoop(candidate.pre, candidate.reservations);
+        const check = noNewProblems(base.post.violations, result.violations);
+        if (result.required < base.post.required && check.ok) {
+          adopted = { pre: candidate.pre, reservations: candidate.reservations, post: result, notes: [...base.notes, ...candidate.notes] };
+          break;
+        }
+        // 下一層：失敗變少、只多出站位問題 → 對牽涉的班次試換起點
+        const stationOnly = check.introduced.length > 0
+          && check.introduced.every((item) => item.code.startsWith('STATION_BERTH_'));
+        if (result.required < base.post.required && stationOnly) {
+          const involved = [...new Set(check.introduced.flatMap((item) => item.blockIds))];
+          for (const blockId of involved) {
+            if (adopted) break;
+            for (const item of rerouteTripInCopy(candidate.pre, blockId, evaluationContext)) {
+              const deeper = runPostLoop(item.timelines, candidate.reservations);
+              if (deeper.required < base.post.required && noNewProblems(base.post.violations, deeper.violations).ok) {
+                const from = item.fromRoute.routeName ?? item.fromRoute.routeId;
+                const to = item.toRoute.routeName ?? item.toRoute.routeId;
+                const row = item.timelines.find((timeline) => timeline.blocks.some((block) => block.id === blockId))?.row ?? skip.timelineRow;
+                adopted = {
+                  pre: item.timelines,
+                  reservations: candidate.reservations,
+                  post: deeper,
+                  notes: [
+                    ...base.notes,
+                    ...candidate.notes,
+                    rerouteNote(row, blockId, from, to, `配合時間線 ${skip.timelineRow} 的整備移動讓出站位`),
+                  ],
+                };
+                break;
+              }
+            }
+          }
+          if (adopted) break;
+        }
+        note(
+          skip.blockId,
+          `${candidate.label}：`
+          + (result.required >= base.post.required
+            ? '移動仍排不出'
+            : `引出 ${check.introduced.map((item) => item.code).join('、') || '更多安全問題'}`),
+        );
+      }
+    }
+    if (!adopted) break;
+    state = adopted;
+  }
+  let post = state.post;
+  post.warnings.push(...state.notes);
+  for (const skip of post.transfer.skipped) {
+    const list = skip.blockId ? triedNotes.get(skip.blockId) : undefined;
+    if (skip.necessity !== 'not_needed' && list && list.length > 0) {
+      skip.reason += `；已在副本上試過（皆未採用）：${list.join('；')}`;
+    }
+  }
+  timelines = post.timelines;
+  const maintenanceTransfer = post.transfer;
+  const residual = post.residual;
+  warnings.push(...post.warnings);
 
   /**
    * 「不需要轉場」跟「必要轉場失敗」分開分類，不是全部套同一句策略說明。
@@ -792,16 +1121,22 @@ export function generateShiftSchedule(
    * 都被擋⋯）：車實際上到不了它該去的地方，是必要銜接失敗，歸 actionable——
    * 使用者該實際去看，不能跟前者一起被摺疊。訊息維持 `skip.reason`（已經是
    * insertMaintenanceTransferCards 算出來的實際原因，不是套用通用說明）。
+   *
+   * 必要轉場失敗記<strong>硬錯誤</strong>（MAINTENANCE_TRANSFER_REQUIRED_MISSING）：
+   * 車到不了下一段該去的地方，跟站位重疊一樣是物理上做不到的事。班表與班次照樣
+   * 保留給使用者檢查、手改；擋的是發布，不是生成。
    */
+  const requiredTransferBlockIds = new Set<string>();
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType
       ? `「${skip.fromTaskType}」轉「${skip.toTaskType}」`
       : `「${skip.taskType}」`;
     const notNeeded = skip.necessity === 'not_needed';
-    pushIssue(warnings, {
-      code: 'MAINTENANCE_TRANSFER_UNRESOLVED',
-      severity: 'warning',
-      kind: notNeeded ? 'policy' : 'actionable',
+    if (!notNeeded && skip.blockId) requiredTransferBlockIds.add(skip.blockId);
+    pushIssue(notNeeded ? warnings : errors, {
+      code: notNeeded ? 'MAINTENANCE_TRANSFER_UNRESOLVED' : 'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+      severity: notNeeded ? 'warning' : 'error',
+      kind: notNeeded ? 'policy' : 'limit',
       message: notNeeded
         ? `時間線 ${skip.timelineRow}：${label}不需要整備轉場卡——${skip.reason}`
         : `時間線 ${skip.timelineRow}：${label}排不出必要的整備轉場卡——${skip.reason}`,
@@ -912,6 +1247,33 @@ export function generateShiftSchedule(
       sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     },
   );
+  // 殘留衝突的搜尋結果寫進訊息：試過幾個候選、代表性的拒絕原因、是否因運算預算停止。
+  // 這是「目前未找到方案」，不是「已證明不可行」。
+  for (const issue of [...errors, ...warnings]) {
+    if (issue.code !== 'STATION_BERTH_COLLISION' && issue.code !== 'STATION_BERTH_PROTECTION_GAP') continue;
+    const detail = issue.detail as { earlierBlockId?: string; laterBlockId?: string; stationId?: string } | undefined;
+    const attempt = residual.attempts.find(
+      (item) =>
+        item.resource === detail?.stationId
+        && item.blockIds.includes(detail?.earlierBlockId ?? '')
+        && item.blockIds.includes(detail?.laterBlockId ?? ''),
+    );
+    if (attempt) {
+      issue.message += `\n目前未找到方案（非已證明不可行）：試過 ${attempt.candidatesTried} 個合法候選`
+        + `（雙方的整趟平移、壓縮／拉長行駛、增加停靠緩衝，含聯動 ${residualBudget.maxDepth} 層），`
+        + `都會引出新的衝突或解不掉`
+        + (attempt.rejectedSamples.length > 0 ? `：${attempt.rejectedSamples.slice(0, 3).join('；')}` : '')
+        + (residual.budgetExhausted ? '。搜尋因運算預算停止，未探索完。' : '。');
+    } else if (residual.budgetExhausted) {
+      // 預算在輪到這筆之前就用完：沒搜過，更不能說成可行或不可行
+      issue.message += `\n目前未找到方案（非已證明不可行）：搜尋因運算預算（${residualBudget.maxEvaluations} 次評估）`
+        + '用盡，這筆尚未搜尋。';
+    } else {
+      continue;
+    }
+    (issue.detail as Record<string, unknown>).resolutionStatus = 'not_found';
+    (issue.detail as Record<string, unknown>).searchBudgetExhausted = residual.budgetExhausted;
+  }
   // 整備做完車就停在出場站，接著那一段一定要從那一站發車——不是的話車不在，開不了
   validateYardExitContinuity({
     timelines,
@@ -920,6 +1282,65 @@ export function generateShiftSchedule(
     yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     errors,
+  });
+  /**
+   * 最終問題清單要照<strong>完成後的班表</strong>重新核對。
+   *
+   * 「沒有路線可讓站、只能原地等」是次要邊讓渡當下的結論；後面的處理（開進設施格
+   * 暫停放、提早進廠等）可能已經把那段空等解掉了。那則還掛著「仍無解」就是過期
+   * 警告。重新核對：那張卡在最終班表上已經不擋任何人，就把它降為過程紀錄，並講
+   * 出後來是怎麼解的。
+   */
+  {
+    const finalBlockers = new Set(
+      findStationBerthCollisions(
+        collectStationBerthOccupancies(timelines, routesForBerth, {
+          collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        }),
+        routesForBerth,
+      ).map((hit) => `${hit.earlier.blockId}@${hit.stationId}`),
+    );
+    for (const issue of warnings) {
+      if (issue.code !== 'STATION_BERTH_RELIEF_UNAVAILABLE') continue;
+      const detail = issue.detail as {
+        timelineRow?: number;
+        stationId?: string;
+        earlierBlockId?: string;
+      } | undefined;
+      if (!detail?.earlierBlockId || !detail.stationId) continue;
+      if (finalBlockers.has(`${detail.earlierBlockId}@${detail.stationId}`)) continue;
+      const row = timelines.find((timeline) => timeline.row === detail.timelineRow);
+      const park = row?.blocks.find(
+        (block) =>
+          block.id.startsWith('berthpark-')
+          && block.id.includes(detail.earlierBlockId!)
+          && block.yardFacilityNodeId,
+      );
+      issue.kind = 'policy';
+      issue.message =
+        '過程紀錄（已解決）：' + issue.message
+        + (park
+          ? `\n後續已改成開進「${park.yardFacilityLabel ?? park.yardFacilityNodeId}」`
+            + `${formatMinuteClock(park.plannedStartMinute)}–${formatMinuteClock(park.plannedEndMinute)} 等待，`
+            + '最終班表上這段空等已不擋任何班次。'
+          : '\n最終班表上這段空等已不擋任何班次（由後續處理解掉）。');
+      (issue.detail as Record<string, unknown>).resolvedInFinalPlan = true;
+    }
+  }
+
+  // 車的位置要接得起來：沒被上面「必要轉場失敗」講過的缺口（例如別的處理插卡後
+  // 留下的），在這裡從班表本身抓出來
+  validateVehicleLocationContinuity({
+    timelines,
+    selectedRoutes: routesForBerth,
+    errors,
+    explainedBlockIds: requiredTransferBlockIds,
+  });
+  validateMoveJunctionConflicts({
+    timelines,
+    topology: engineInput.pointTopology,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    warnings,
   });
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
   validateRouteSwitchBuffers(
@@ -1026,4 +1447,12 @@ function buildServiceMetrics(
         ? (Math.max(...rowCounts) - Math.min(...rowCounts)) / rowAverage
         : null,
   };
+}
+
+function formatMinuteClock(minute: number): string {
+  const total = Math.round(minute * 60);
+  const day = ((total % 86400) + 86400) % 86400;
+  return [Math.floor(day / 3600), Math.floor(day / 60) % 60, day % 60]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':');
 }

@@ -75,11 +75,22 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
   new Set([
     'STATION_BERTH_COLLISION',
     'STATION_BERTH_PROTECTION_GAP',
+    // 設施格同樣是實體位置：重疊做不到，交接 60 秒是本場域必須遵守的安全間隔
+    'FACILITY_SLOT_COLLISION',
+    'FACILITY_HANDOVER_GAP',
+    // 車到不了下一段該去的地方
+    'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+    'VEHICLE_LOCATION_DISCONTINUITY',
+    // 移動卡在同一個轉折點貼太近：兩台車實際在路網上交會
+    'MOVE_JUNCTION_CONFLICT',
   ]);
 
 /** 常見硬錯誤代號（文件／報表用；實際硬閘以 severity=error 為準） */
 export const DOCUMENTED_HARD_ERROR_CODES: readonly FeasibilityViolationCode[] = [
   'STATION_BERTH_COLLISION',
+  'FACILITY_SLOT_COLLISION',
+  'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+  'VEHICLE_LOCATION_DISCONTINUITY',
   'ROTATION_CYCLE_INCOMPLETE',
   'TIMELINE_OVERLAP',
   'ANCHOR_CONFLICT',
