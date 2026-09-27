@@ -109,6 +109,78 @@ export async function setActiveMapLibraryEntry(
   }
 }
 
+export type MapActivationIssue = { code: string; message: string }
+
+/** 設為主要地圖前的檢查結果（規則見後端 map-activation.ts） */
+export type MapActivationCheck = {
+  mapId: string
+  displayName: string | null
+  alreadyActive: boolean
+  currentActive: { mapId: string; displayName: string | null }
+  routeCount: number
+  stationCount: number
+  deployedShift: { shiftId: string; shiftName: string } | null
+  blockers: MapActivationIssue[]
+  warnings: MapActivationIssue[]
+  canActivate: boolean
+}
+
+/**
+ * 設為主要地圖前的檢查：部署中的班表在這張地圖上接不接得上。
+ * 先把這張的最新內容存上後端，檢查的才是現在這一版。
+ */
+export async function checkMapActivation(
+  entry: MapLibraryEntry,
+): Promise<{ ok: true; check: MapActivationCheck } | { ok: false; error: string }> {
+  const published = await publishMapLibraryEntryToBackend(entry)
+  if (!published.ok) return { ok: false, error: '地圖沒有存到伺服器，請確認後端已啟動' }
+  try {
+    const res = await fetch(
+      `/syncdrive-api/map-activation/${encodeURIComponent(published.mapId)}/check`,
+      { headers: { Accept: 'application/json' } },
+    )
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+    return { ok: true, check: (await res.json()) as MapActivationCheck }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** 設為主要地圖：後端會再檢查一次，不過就回 409 與檢查結果 */
+export async function activateMapLibraryEntry(
+  entry: MapLibraryEntry,
+): Promise<
+  | { ok: true; mapId: string }
+  | { ok: false; error: string; check?: MapActivationCheck }
+> {
+  const mapId = mapDocumentMapId(entry)
+  try {
+    const res = await fetch(`/syncdrive-api/map-activation/${encodeURIComponent(mapId)}`, {
+      method: 'POST',
+      headers: internalHeaders(),
+      body: JSON.stringify({
+        libraryId: entry.libraryId,
+        displayName: entry.displayName,
+        version: entry.version,
+        updatedAt: entry.updatedAt,
+        mapDocument: entry.mapDocument,
+      }),
+    })
+    if (res.ok) return { ok: true, mapId }
+    const body = (await res.json().catch(() => null)) as
+      | { message?: string | { message?: string; check?: MapActivationCheck }; check?: MapActivationCheck }
+      | null
+    const detail = typeof body?.message === 'object' ? body.message : body
+    return {
+      ok: false,
+      error: (typeof detail?.message === 'string' && detail.message) || `HTTP ${res.status}`,
+      check: detail?.check,
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function isMapLibraryEntryActive(
   entry: MapLibraryEntry,
   activeMapId: string | null,

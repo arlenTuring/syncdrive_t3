@@ -1,6 +1,6 @@
 import { ZOOM_LEVEL_COUNT } from './zoom'
 
-/** 像素 Map 縮放段數（與 ZoomLevelBar 一致） */
+/** 像素 Map 縮放段數（滾輪／觸控板縮放的等級數） */
 export const MAP_PIXEL_ZOOM_LEVEL_COUNT = ZOOM_LEVEL_COUNT
 
 /** 預設縮放等級：6 遠（1 近、7 最遠） */

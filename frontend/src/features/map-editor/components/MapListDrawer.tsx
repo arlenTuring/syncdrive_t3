@@ -78,7 +78,7 @@ function formatRef(entry: FacilityListEntry): string {
 }
 
 function formatPx(entry: FacilityListEntry): string {
-  return `${entry.pxX.toFixed(1)}, ${entry.pxY.toFixed(1)} px`
+  return `${entry.pxX.toFixed(1)} px , ${entry.pxY.toFixed(1)} px`
 }
 
 function formatListDescription(entry: FacilityListEntry): string {
@@ -109,20 +109,24 @@ function ListRow({
         onDoubleClickOpen()
       }}
       className={[
-        'w-full rounded-md border px-2.5 py-2 text-left transition-colors',
+        'flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors',
         selected
-          ? 'border-cyan-500/70 bg-cyan-500/10'
-          : 'border-zinc-700/80 bg-zinc-950/40 hover:border-zinc-500 hover:bg-zinc-900/80',
+          ? 'border-[#51A2FF]/70 bg-[rgba(43,127,255,0.12)]'
+          : 'border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.04)] hover:border-[rgba(212,212,212,0.3)] hover:bg-[rgba(142,197,255,0.08)]',
       ].join(' ')}
     >
-      <p className="truncate text-[11px] font-medium text-zinc-100">{entry.name}</p>
-      <p className="mt-0.5 truncate text-[10px] text-zinc-500">
+      <p className="w-full truncate text-sm font-medium leading-[18px] tracking-[0.5px] text-[#F3F4F6]">
+        {entry.name}
+      </p>
+      <p className="w-full truncate text-xs leading-4 text-[#99A1AF]">
         {formatListDescription(entry)}
       </p>
-      <div className="mt-1 grid grid-cols-1 gap-0.5 font-mono text-[10px] text-zinc-400">
-        <span>{t('mapEditor.listDrawer.field', { value: formatRef(entry) })}</span>
-        <span>{t('mapEditor.listDrawer.pixels', { value: formatPx(entry) })}</span>
-      </div>
+      <p className="w-full truncate text-xs leading-4 text-[#D1D5DC]">
+        {t('mapEditor.listDrawer.field', { value: formatRef(entry) })}
+      </p>
+      <p className="w-full truncate text-xs leading-4 text-[#D1D5DC]">
+        {t('mapEditor.listDrawer.pixels', { value: formatPx(entry) })}
+      </p>
     </button>
   )
 }
@@ -145,13 +149,13 @@ function SectionBlock({
   const { t } = useTranslation()
   if (entries.length === 0) {
     return (
-      <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-3 text-center text-[10px] text-zinc-600">
+      <p className="rounded-xl border border-dashed border-[rgba(212,212,212,0.15)] px-2 py-3 text-center text-xs text-[#6A7282]">
         {t('mapEditor.listDrawer.emptySection', { title })}
       </p>
     )
   }
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-2">
       {entries.map((entry) => (
         <ListRow
           key={`${entry.areaId}:${entry.facilityId}:${entry.refFieldKey}:${entry.pxX.toFixed(2)}:${entry.pxY.toFixed(2)}:${entry.purpose}`}
@@ -287,6 +291,17 @@ export function MapListDrawer({
             : t('mapEditor.listDrawer.routeList')
           : t('mapEditor.listDrawer.equipmentList')
 
+  const PanelIcon =
+    openTab === 'docking'
+      ? MapPin
+      : openTab === 'facility'
+        ? ClipboardList
+        : openTab === 'routes'
+          ? RouteIcon
+          : openTab === 'geofence'
+            ? Fence
+            : Radio
+
   /** 頂端箭頭：清單收著就打開上次看的（第一次是點位），開著就收起 */
   const lastTab = useRef<Exclude<MapListDrawerTab, 'palette' | null>>('docking')
   if (openTab && openTab !== 'palette') lastTab.current = openTab
@@ -299,12 +314,13 @@ export function MapListDrawer({
         {/* 僅按鈕與面板可點；空白區不攔截，避免擋住其他左緣 UI */}
         <div
           className={[
-            'pointer-events-none flex h-full flex-col items-stretch gap-1 p-2 pt-16',
+            'pointer-events-none flex h-full flex-col items-stretch gap-1 p-2',
             // 抽屜開啟時底部留給整塊抽屜，避免雙把手重疊
             paletteOpen ? 'pb-24' : '',
           ].join(' ')}
         >
-          <div className="pointer-events-auto flex w-12 min-h-0 flex-1 flex-col items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] px-1.5 py-2 backdrop-blur-md">
+          {/* 設計稿 rgba(212,212,216,0.1) 是放在黑底上；這裡疊在地圖上，改用等值的實色，才不會透出軌道 */}
+          <div className="pointer-events-auto flex w-12 min-h-0 flex-1 flex-col items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(22,22,24,0.96)] px-1.5 py-2 backdrop-blur-md">
             <button
               type="button"
               title={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')}
@@ -343,13 +359,10 @@ export function MapListDrawer({
                 active={openTab === 'routes'}
                 onClick={() => toggleTab('routes')}
               />
-              <TabUnit
-                label={t('mapEditor.listDrawer.tabGeofence')}
-                title={t('mapEditor.listDrawer.geofenceList')}
-                Icon={Fence}
-                active={openTab === 'geofence'}
-                onClick={() => toggleTab('geofence')}
-              />
+              {/*
+                圍籬有自己的頁面（場域管理模組 → 虛擬圍籬管理），設計稿這裡不放圍籬分頁。
+                清單內容（openTab === 'geofence'）保留，其他地方仍可直接打開。
+              */}
             </div>
             {onOpenPointTopology ? (
               <TabUnit
@@ -375,21 +388,14 @@ export function MapListDrawer({
         </div>
 
         {panelOpen ? (
-          <div className="pointer-events-auto my-2 mr-2 mt-16 flex w-80 max-w-[min(20rem,100%)] flex-col overflow-hidden rounded-xl border border-[rgba(212,212,212,0.15)] bg-zinc-900/90 shadow-2xl backdrop-blur-md" style={{ height: 'calc(100% - 4.5rem)' }}>
-            <div className="flex shrink-0 items-center justify-between border-b border-zinc-700/80 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
+          <div className="pointer-events-auto my-2 mr-2 flex w-60 flex-col gap-3 overflow-hidden rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(22,22,24,0.96)] px-2 py-3 shadow-2xl backdrop-blur-md">
+            <div className="flex shrink-0 items-center gap-1 px-2">
+              <PanelIcon className="size-4 shrink-0 text-[#99A1AF]" aria-hidden />
+              <p className="truncate text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6]">
                 {panelTitle}
               </p>
-              <button
-                type="button"
-                onClick={() => onOpenTab(null)}
-                className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                title={t('mapEditor.listDrawer.collapse')}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {openTab === 'routes' ? (
                 <RoutePlanningPanel
                   areas={areas}
@@ -423,12 +429,12 @@ export function MapListDrawer({
                   onAppendStation={onAppendRouteStation}
                 />
               ) : openTab === 'docking' ? (
-                <div className="space-y-4">
-                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                <div className="flex flex-col gap-4">
+                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
                     {t('mapEditor.listDrawer.dockingHint')}
                   </p>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-blue-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.docking')}
                     </h4>
@@ -442,7 +448,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-emerald-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.facilityDocking')}
                     </h4>
@@ -456,7 +462,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-sky-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.waypoint')}
                     </h4>
@@ -471,8 +477,8 @@ export function MapListDrawer({
                   </section>
                 </div>
               ) : openTab === 'geofence' ? (
-                <div className="space-y-3">
-                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                <div className="flex flex-col gap-3">
+                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
                     {t('mapEditor.listDrawer.geofenceHint')}
                   </p>
                   <SectionBlock
@@ -485,8 +491,8 @@ export function MapListDrawer({
                   />
                 </div>
               ) : openTab === 'facility' ? (
-                <div className="space-y-3">
-                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                <div className="flex flex-col gap-3">
+                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
                     {t('mapEditor.listDrawer.facilityHint')}
                   </p>
                   <SectionBlock
@@ -499,12 +505,12 @@ export function MapListDrawer({
                   />
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-[10px] leading-relaxed text-zinc-500">
+                <div className="flex flex-col gap-4">
+                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
                     {t('mapEditor.listDrawer.equipmentHint')}
                   </p>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-amber-400/90">
                       <Radio className="size-3.5" />
                       {t('mapEditor.listDrawer.trafficLight')}
                     </h4>
@@ -518,7 +524,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-emerald-400/90">
                       <Zap className="size-3.5" />
                       {t('mapEditor.listDrawer.smartPole')}
                     </h4>
@@ -532,7 +538,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-sky-400/90">
                       <DoorOpen className="size-3.5" />
                       {t('mapEditor.listDrawer.psd')}
                     </h4>

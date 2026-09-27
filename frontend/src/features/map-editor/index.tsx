@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   useCallback,
   useDeferredValue,
@@ -18,19 +18,17 @@ import { LeaveEditConfirmDialog } from './components/LeaveEditConfirmDialog'
 import { PointTopologyEditorDialog } from './components/PointTopologyEditorDialog'
 import { MapAreaCanvas } from './components/MapAreaCanvas'
 import { MapListDrawer, type MapListDrawerTab } from './components/MapListDrawer'
+import { SetPrimaryMapDialog } from './components/SetPrimaryMapDialog'
 import { RoutePlanningOverlay, routeColorForIndex } from './components/RoutePlanningOverlay'
 import {
   SimRoutePathOverlay,
   type EditPoint,
 } from './components/SimRoutePathOverlay'
 import { MapCanvas } from './components/MapCanvas'
-import { MapEditorTestDock } from './components/MapEditorTestDock'
-import { useTrackConnectivityScan } from './hooks/useTrackConnectivityScan'
 import { useRebuildStaleTracksAfterMove } from './hooks/useRebuildStaleTracksAfterMove'
 import { diagnoseTracks } from './utils/trackDiagnostics'
 import { TrackDiagnosticsPanel } from './components/TrackDiagnosticsPanel'
 import { TrajectoryZoomBar } from './components/TrajectoryZoomBar'
-import { ZoomLevelBar } from './components/ZoomLevelBar'
 import {
   getLatestTrajectoryEntry,
   getTrajectoryCatalogForVehicle,
@@ -93,7 +91,6 @@ import {
   domainHeightM,
   domainWidthM,
   cssTopLeftToAreaPosition,
-  meterToAreaLocalPx,
   normalizeAreaDomain,
   normalizeAreaView,
   type MapAreaPatch,
@@ -173,7 +170,6 @@ import {
 } from './utils/mapPixelZoom'
 import { isAreaPaletteItem, isBasemapPaletteItem, isTrackGenPaletteItem } from './utils/paletteDrag'
 import {
-  flattenAreaFacilities,
   nextNumericIdFromAreas,
   type ParsedMapFile,
 } from './utils/mapFileJson'
@@ -191,7 +187,11 @@ import {
   type MapLibraryEntry,
   writeMapLibrary,
 } from './utils/mapLibraryStorage'
-import { publishMapLibraryEntryToBackend } from './api/mapLibraryApi'
+import {
+  fetchMapLibraryBackendStatus,
+  isMapLibraryEntryActive,
+  publishMapLibraryEntryToBackend,
+} from './api/mapLibraryApi'
 import {
   type EditSessionSnapshot,
   isEditSessionDirty,
@@ -206,14 +206,7 @@ import {
   scrollViewportToTrajectoryHead,
   scrollViewportToTrajectoryMeters,
 } from './utils/mapViewport'
-import {
-  MQTT_DEMO_BLINK_FACILITY_ID,
-  MQTT_DEMO_VEHICLE_FACILITY_ID,
-} from './live/mqttDemoIds'
-import { getMqttEntityId } from './live/mqttEntityId'
-import { mergePayloadIntoLive } from './live/mqttPayload'
-import type { MqttLiveEntry, MqttLogLine } from './live/mqttLiveTypes'
-import { mockMqttSingleton } from './sim/mockMqtt'
+import type { MqttLiveEntry } from './live/mqttLiveTypes'
 import type { PaletteItem } from './constants/palette'
 import { syncGeofenceFacility } from './utils/geofence'
 import { sanitizeFacilitiesForEditor } from './utils/sanitizeFacility'
@@ -331,6 +324,9 @@ function readStoredAxisZoom(
   return { x: 1, y: 1 }
 }
 
+/** 地圖編輯器沒有即時資料來源（原本只有已移除的測試器 MQTT 模擬），固定傳空的 */
+const NO_LIVE_ENTRIES: Record<string, MqttLiveEntry> = {}
+
 export default function MapEditorApp({
   workspace = 'map',
   onBackToHome,
@@ -353,12 +349,8 @@ export default function MapEditorApp({
     string | null
   >(null)
   const [nextNumericId, setNextNumericId] = useState(1)
-  const [liveById, setLiveById] = useState<Record<string, MqttLiveEntry>>({})
-  const [mqttLog, setMqttLog] = useState<MqttLogLine[]>([])
   /** Map 像素畫布縮放：1 近、7 遠（一屏看全圖） */
   const [mapZoomLevel, setMapZoomLevel] = useState(MAP_PIXEL_ZOOM_DEFAULT_LEVEL)
-  const [showZoomLevelBar, setShowZoomLevelBar] = useState(false)
-  const [showTestDock, setShowTestDock] = useState(false)
   const [showFacilityToolbars, setShowFacilityToolbars] = useState(
     readStoredFacilityToolbarsVisible,
   )
@@ -397,9 +389,11 @@ export default function MapEditorApp({
   )
 
   const [backendSyncFailed, setBackendSyncFailed] = useState(false)
-  /** 本機有改動還沒發布到正式環境 */
-  const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false)
-  const [publishing, setPublishing] = useState(false)
+  /** 正在重送（自動儲存送後端失敗後，使用者按重試） */
+  const [retryingSync, setRetryingSync] = useState(false)
+  /** 後端回報的「哪一張是主要地圖」：是的話自動儲存就等於直接改系統在讀的那一張 */
+  const [primaryMapCheck, setPrimaryMapCheck] = useState<{ libraryId: string; primary: boolean } | null>(null)
+  const [primaryDialogEntry, setPrimaryDialogEntry] = useState<MapLibraryEntry | null>(null)
   const [mapScreen, setMapScreen] = useState<MapEditorScreen>('library')
   const [mapExtentMeters] = useState<MapExtentMeters>(defaultMapExtentMeters)
   const [loadedMapMeta, setLoadedMapMeta] = useState<LoadedMapMeta>({
@@ -431,7 +425,6 @@ export default function MapEditorApp({
 
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true)
   const [listDrawerTab, setListDrawerTab] = useState<MapListDrawerTab>(null)
-  const paletteOpen = mapEditorMode === 'edit' && listDrawerTab === 'palette'
   const [mapRoutes, setMapRoutes] = useState<MapPlannedRoute[]>([])
   const [mapRouteGroups, setMapRouteGroups] = useState<MapRouteGroup[]>([])
   const [pointTopology, setPointTopology] = useState<PointTopology>(() =>
@@ -582,7 +575,6 @@ export default function MapEditorApp({
     clearMapSelection()
   }, [clearMapSelection])
 
-  const connectivityScan = useTrackConnectivityScan(areas)
   // 軌道複製、移動之後兩端接不上隔壁，就依鄰居重建它的中心線
   useRebuildStaleTracksAfterMove(areas, mapEditorMode === 'edit', setAreas)
 
@@ -599,19 +591,6 @@ export default function MapEditorApp({
   const trackDiagnosticsForCanvas = useMemo(
     () => ({ statusById: trackDiagnostics.statusByFacility }),
     [trackDiagnostics],
-  )
-
-  const onSelectConnectivityIssue = useCallback(
-    (trackId: string, areaId: string) => {
-      updateSelection(areaId, [trackId])
-      setInspectorCollapsed(false)
-    },
-    [updateSelection],
-  )
-
-  const allFacilities = useMemo(
-    () => flattenAreaFacilities(areas),
-    [areas],
   )
 
   /** 設施列表變動後，清除已不存在的選取 */
@@ -660,34 +639,6 @@ export default function MapEditorApp({
       return changed ? next : prev
     })
   }, [mapEditorMode])
-
-  useEffect(() => {
-    return mockMqttSingleton.subscribe('#', (msg) => {
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(msg.payload)
-      } catch {
-        return
-      }
-      const o = parsed as { entityId?: unknown }
-      if (typeof o.entityId !== 'string' || !o.entityId.trim()) return
-      const entityId = o.entityId.trim()
-      setLiveById((prev) => ({
-        ...prev,
-        [entityId]: mergePayloadIntoLive(
-          prev[entityId],
-          msg.topic,
-          msg.payload,
-        ),
-      }))
-      setMqttLog((prev) =>
-        [{ ts: Date.now(), topic: msg.topic, payload: msg.payload }, ...prev].slice(
-          0,
-          50,
-        ),
-      )
-    })
-  }, [])
 
   useEffect(() => {
     inspectorEditPushedRef.current = false
@@ -1209,9 +1160,8 @@ export default function MapEditorApp({
    */
   const publishAndReport = useCallback(async (entry: MapLibraryEntry) => {
     const result = await publishMapLibraryEntryToBackend(entry)
-    setBackendSyncFailed(!result.ok)
     // 橫幅講的是「還沒同步到伺服器」，送成功就該消失
-    setHasUnpublishedChanges(!result.ok)
+    setBackendSyncFailed(!result.ok)
     /*
      * 送成功就記下來。
      *
@@ -1227,7 +1177,7 @@ export default function MapEditorApp({
     )
   }, [])
 
-  /** 標成「還沒同步到伺服器」；送成功後由 publishAndReport 清掉 */
+  /** 標成「還沒同步到伺服器」；送成功後由 publishAndReport 改回 published */
   const markEntryUnpublished = useCallback((entry: MapLibraryEntry) => {
     writeMapLibrary(
       readMapLibrary().map((e) =>
@@ -1236,7 +1186,6 @@ export default function MapEditorApp({
           : e,
       ),
     )
-    setHasUnpublishedChanges(true)
   }, [])
 
   const persistCurrentMapToLibrary = useCallback(() => {
@@ -1667,19 +1616,45 @@ export default function MapEditorApp({
     })
   }, [])
 
-  /** 使用者明確按下發布：把本機這份送上正式環境 */
-  const publishCurrentMap = useCallback(async () => {
+  /**
+   * 自動儲存送後端失敗時重送一次。
+   *
+   * 沒有「發布到正式環境」這一步：每次儲存都送後端，哪一張是系統在讀的由地圖清單的
+   * 「設為主要地圖」決定（會先檢查部署中的班表接不接得上）。
+   */
+  const retryBackendSync = useCallback(async () => {
     const meta = loadedMapMetaRef.current
     const entry = getMapLibraryEntry(meta.libraryId)
     if (!entry) return
-    setPublishing(true)
+    setRetryingSync(true)
     try {
       await publishAndReport(entry)
-      setHasUnpublishedChanges(false)
     } finally {
-      setPublishing(false)
+      setRetryingSync(false)
     }
   }, [publishAndReport])
+
+  // 開圖時問後端這張是不是主要地圖
+  useEffect(() => {
+    const libraryId = loadedMapMeta.libraryId
+    if (!isMapWorkspace || mapScreen !== 'editor' || !libraryId) return undefined
+    let cancelled = false
+    void fetchMapLibraryBackendStatus().then((status) => {
+      if (cancelled) return
+      const entry = getMapLibraryEntry(libraryId)
+      setPrimaryMapCheck({
+        libraryId,
+        primary: Boolean(
+          status && entry && isMapLibraryEntryActive(entry, status.activeMapId, status.activeLibraryId),
+        ),
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isMapWorkspace, mapScreen, loadedMapMeta.libraryId])
+  const isPrimaryMap =
+    primaryMapCheck?.primary === true && primaryMapCheck.libraryId === loadedMapMeta.libraryId
 
   const openLibraryMap = useCallback(
     async (libraryId: string) => {
@@ -3240,20 +3215,6 @@ export default function MapEditorApp({
         const start = session.areaPositions[facilityId]!
         const dx = update.areaPosition.x - start.x
         const dy = update.areaPosition.y - start.y
-        for (const id of Object.keys(session.areaPositions)) {
-          const f = area.facilities.find((x) => x.id === id)
-          if (!f) continue
-          setLiveById((prev) => {
-            const eid = getMqttEntityId(f)
-            if (!prev[eid]?.positionMeters) return prev
-            const next = { ...prev }
-            const cur = next[eid]
-            if (!cur) return prev
-            const { positionMeters: _pm, ...rest } = cur
-            next[eid] = rest
-            return next
-          })
-        }
         mapAreaFacilities(areaId, (facilities) => {
           let next = facilities.map((fac) => {
             const origin = session.areaPositions[fac.id]
@@ -3288,19 +3249,6 @@ export default function MapEditorApp({
         return
       }
 
-      const f = area?.facilities.find((x) => x.id === facilityId)
-      if (f) {
-        setLiveById((prev) => {
-          const eid = getMqttEntityId(f)
-          if (!prev[eid]?.positionMeters) return prev
-          const next = { ...prev }
-          const cur = next[eid]
-          if (!cur) return prev
-          const { positionMeters: _pm, ...rest } = cur
-          next[eid] = rest
-          return next
-        })
-      }
       mapAreaFacilities(areaId, (facilities) => {
         const areaNow = areasRef.current.find((a) => a.id === areaId)
         if (!areaNow) return facilities
@@ -3785,56 +3733,6 @@ export default function MapEditorApp({
     [updateSelection],
   )
 
-  const hasDemoNodes = useMemo(
-    () =>
-      allFacilities.some((f) => f.id === MQTT_DEMO_BLINK_FACILITY_ID) &&
-      allFacilities.some((f) => f.id === MQTT_DEMO_VEHICLE_FACILITY_ID),
-    [allFacilities],
-  )
-
-  const onAddDemoNodes = useCallback(() => {
-    if (hasDemoNodes) return
-    const targetArea = areasRef.current[0]
-    if (!targetArea) return
-    pushHistory()
-    const domain = targetArea.domain
-    const cx = (domain.xMinM + domain.xMaxM) / 2
-    const cy = (domain.yMinM + domain.yMaxM) / 2
-    const layout = targetArea.layout
-    const blinkPos = { x: cx - 10, y: cy - 5 }
-    const vehiclePos = { x: cx + 5, y: cy }
-    const blink: FacilityObject = {
-      id: MQTT_DEMO_BLINK_FACILITY_ID,
-      type: 'Signal',
-      name: 'Light',
-      customName: t('mapEditor.chrome.mqttDemoBlink'),
-      areaPosition: meterToAreaLocalPx(blinkPos.x, blinkPos.y, domain, layout),
-      position: blinkPos,
-      rotation: 0,
-      currentState: 'Normal',
-      parameters: { mqttInstanceId: 'demo-blink' },
-    }
-    const vehicle: FacilityObject = {
-      id: MQTT_DEMO_VEHICLE_FACILITY_ID,
-      type: 'Slot',
-      name: 'Parking',
-      customName: t('mapEditor.chrome.mqttDemoVehicle'),
-      areaPosition: meterToAreaLocalPx(vehiclePos.x, vehiclePos.y, domain, layout),
-      position: vehiclePos,
-      rotation: 0,
-      slotOccupancy: 'Vacant',
-      slotEquipmentState: 'Idle',
-      parameters: { mqttInstanceId: 'demo-1' },
-    }
-    mapAreaFacilities(targetArea.id, (facilities) => [
-      ...facilities,
-      blink,
-      vehicle,
-    ])
-    setMapEditorMode('edit')
-    updateSelection(targetArea.id, [MQTT_DEMO_VEHICLE_FACILITY_ID])
-  }, [hasDemoNodes, pushHistory, mapAreaFacilities, updateSelection])
-
   const applyFacilityAreaSizePx = useCallback(
     (
       areaId: string,
@@ -4029,8 +3927,6 @@ export default function MapEditorApp({
     },
     [],
   )
-
-  const onClearMqttLog = useCallback(() => setMqttLog([]), [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -4232,24 +4128,17 @@ export default function MapEditorApp({
     setShowAreaCenterLabels((v) => !v)
   }, [])
 
-  const onToggleZoomLevelBar = useCallback(() => {
-    setShowZoomLevelBar((v) => !v)
-  }, [])
-
-  const onToggleTestDock = useCallback(() => {
-    setShowTestDock((prev) => {
-      if (prev) connectivityScan.resetScan()
-      return !prev
-    })
-  }, [connectivityScan])
-
   const onToggleFacilityToolbars = useCallback(() => {
     setShowFacilityToolbars((v) => !v)
   }, [])
 
   return (
     <MapExtentProvider extent={mapExtentMeters}>
-    <div className="flex h-screen min-h-0 flex-col bg-zinc-950 text-zinc-100">
+    <div
+      className={`flex h-screen min-h-0 flex-col text-zinc-100 ${
+        isMapWorkspace ? 'bg-[#18181B]' : 'bg-zinc-950'
+      }`}
+    >
       {isMapWorkspace && mapScreen === 'library' && (
         <MapLibraryPage onOpenMap={openLibraryMap} onBackToHome={onBackToHome} />
       )}
@@ -4282,12 +4171,6 @@ export default function MapEditorApp({
           showAreaCenterLabels={showAreaCenterLabels}
           onToggleAreaCenterLabels={onToggleAreaCenterLabels}
           areaCenterLabelsToggleHint={t('mapEditor.chrome.areaLabelsHint')}
-          showZoomLevelBar={showZoomLevelBar}
-          onToggleZoomLevelBar={onToggleZoomLevelBar}
-          zoomLevelBarToggleHint={t('mapEditor.chrome.zoomBarHint')}
-          showTestDock={showTestDock}
-          onToggleTestDock={onToggleTestDock}
-          testDockToggleHint={t('mapEditor.chrome.testerHint')}
           mapCanvasResizeActive={mapCropModeActive}
           onToggleMapCanvasResize={
             mapEditorMode === 'edit' ? onToggleCropMode : undefined
@@ -4311,77 +4194,48 @@ export default function MapEditorApp({
           trackIssueCount={trackDiagnostics.issues.length}
           trackIssuesOpen={trackIssuesOpen}
           onToggleTrackIssues={() => setTrackIssuesOpen((v) => !v)}
-        />
-      )}
-      {isMapWorkspace && mapScreen === 'editor' && (
-      <div
-        className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-1.5 text-xs text-zinc-400"
-        role="status"
-        aria-live="polite"
-      >
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
+          coordsText={
+            activeViewportCenterMeters
+              ? t('mapEditor.chrome.coords', {
+                  x: activeViewportCenterMeters.x.toFixed(2),
+                  y: activeViewportCenterMeters.y.toFixed(2),
+                }) +
+                (selectedFacility
+                  ? selectedFacilityIds.length > 1
+                    ? t('mapEditor.chrome.selectedMany', {
+                        count: selectedFacilityIds.length,
+                        name: selectedFacility.customName.trim() || selectedFacility.id,
+                      })
+                    : ` · ${selectedFacility.customName.trim() || selectedFacility.id}`
+                  : selectedArea
+                    ? ` · ${selectedArea.customName.trim() || selectedArea.id}`
+                    : '')
+              : t('mapEditor.chrome.selectHint')
+          }
+          canvasText={t('mapEditor.chrome.canvasPx', {
+            w: mapPixelSize.width,
+            h: mapPixelSize.height,
+          })}
+          infoTitle={
             loadedMapMeta.creationMode === 'trackGen'
-              ? 'bg-emerald-950/70 text-emerald-300/90'
-              : 'bg-zinc-800 text-zinc-500'
-          }`}
-        >
-          {loadedMapMeta.creationMode === 'trackGen'
-            ? t('mapEditor.chrome.creationModeTrackGen')
-            : t('mapEditor.chrome.creationModeBlank')}
-        </span>
-        <span className="min-w-0 truncate font-mono">
-          {activeViewportCenterMeters ? (
-            <>
-              {t('mapEditor.chrome.coords', { x: activeViewportCenterMeters.x.toFixed(2), y: activeViewportCenterMeters.y.toFixed(2) })}
-              {selectedFacility
-                ? selectedFacilityIds.length > 1
-                  ? t('mapEditor.chrome.selectedMany', { count: selectedFacilityIds.length, name: selectedFacility.customName.trim() || selectedFacility.id })
-                  : ` · ${selectedFacility.customName.trim() || selectedFacility.id}`
-                : selectedArea
-                  ? ` · ${selectedArea.customName.trim() || selectedArea.id}`
-                  : ''}
-            </>
-          ) : (
-            t('mapEditor.chrome.selectHint')
-          )}
-        </span>
-        <span className="hidden shrink-0 font-mono text-zinc-500 md:inline">
-          {t('mapEditor.chrome.canvasPx', { w: mapPixelSize.width, h: mapPixelSize.height })}
-        </span>
-        {mapEditorMode === 'edit' && (
-          <span className="ml-auto flex shrink-0 items-center gap-2">
-            {autosaveStatus === 'saving' && (
-              <Loader2 className="size-3.5 shrink-0 animate-spin text-cyan-400" aria-hidden />
-            )}
-            <span className="hidden sm:inline">
-              {autosaveStatus === 'saving'
-                ? t('mapEditor.chrome.autosaving')
-                : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')}
-            </span>
-            <span className="h-3.5 w-px bg-zinc-700" aria-hidden />
-            {/*
-              自動儲存只寫本機，正式環境那份要按這裡才會換。分開之後，「我改到一半」
-              與「這一版可以上線了」是兩個狀態，不會因為開錯一張圖就把它重新發布。
-            */}
-            <span className={hasUnpublishedChanges ? 'text-amber-300' : 'text-zinc-500'}>
-              {hasUnpublishedChanges
-                ? t('mapEditor.chrome.unpublishedChanges')
-                : t('mapEditor.chrome.published')}
-            </span>
-            <button
-              type="button"
-              onClick={() => void publishCurrentMap()}
-              disabled={publishing || !hasUnpublishedChanges}
-              className="h-6 rounded-md border border-cyan-700/70 bg-cyan-950/40 px-2.5 text-cyan-200 enabled:hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {publishing
-                ? t('mapEditor.chrome.publishing')
-                : t('mapEditor.chrome.publish')}
-            </button>
-          </span>
-        )}
-      </div>
+              ? t('mapEditor.chrome.creationModeTrackGen')
+              : t('mapEditor.chrome.creationModeBlank')
+          }
+          autosaving={autosaveStatus === 'saving'}
+          autosaveLabel={
+            autosaveStatus === 'saving'
+              ? t('mapEditor.chrome.autosaving')
+              : autosaveTimeLabel || t('mapEditor.chrome.editingAutosave')
+          }
+          syncFailed={backendSyncFailed}
+          retryingSync={retryingSync}
+          onRetrySync={() => void retryBackendSync()}
+          isPrimaryMap={isPrimaryMap}
+          onSetPrimaryMap={() => {
+            const entry = getMapLibraryEntry(loadedMapMetaRef.current.libraryId)
+            if (entry) setPrimaryDialogEntry(entry)
+          }}
+        />
       )}
       {isTrajectoryWorkspace && (
       <div
@@ -4403,7 +4257,12 @@ export default function MapEditorApp({
       </div>
       )}
       {(!isMapWorkspace || mapScreen === 'editor') && (
-      <div className="relative flex min-h-0 flex-1">
+      <div
+        className={`relative flex min-h-0 flex-1 ${
+          // 設計稿：地圖放在黑底圓角面板裡，左右下留 12
+          isMapWorkspace ? 'mx-3 mb-3 overflow-hidden rounded-xl bg-black' : ''
+        }`}
+      >
         <div
           className="relative flex min-h-0 min-w-0 flex-1 flex-col"
           aria-label={isMapWorkspace ? t('mapEditor.chrome.mapEditAria') : t('mapEditor.chrome.trajectoryAria')}
@@ -4436,7 +4295,8 @@ export default function MapEditorApp({
                 viewportRef={mapViewportRef}
                 readOnly={mapEditorMode === 'view'}
                 editMode={mapEditorMode === 'edit'}
-                liveById={liveById}
+                liveById={NO_LIVE_ENTRIES}
+                wheelZoomMode="mouse"
                 slotPreview={slotPreview}
                 onSelectArea={onSelectArea}
                 onSelectBasemap={onSelectBasemap}
@@ -4556,7 +4416,6 @@ export default function MapEditorApp({
                 onBulkAreasLayoutCommit={
                   mapEditorMode === 'edit' ? onBulkAreasLayoutCommit : undefined
                 }
-                connectivityScan={showTestDock ? connectivityScan.state : null}
                 facilityFocusTarget={facilityFocusTarget}
                 trackDiagnostics={trackDiagnosticsForCanvas}
                 onFacilityDoubleClick={onFacilityDoubleClick}
@@ -4628,34 +4487,6 @@ export default function MapEditorApp({
             </div>
           ) : null}
 
-          {isMapWorkspace && mapScreen === 'editor' && showZoomLevelBar && (
-            <ZoomLevelBar
-              level={mapZoomLevel}
-              onLevelChange={setMapZoomLevel}
-              paletteOpen={mapEditorMode === 'edit' && paletteOpen}
-              testDockOffset={showTestDock}
-              onDismiss={() => setShowZoomLevelBar(false)}
-            />
-          )}
-          {isMapWorkspace && mapScreen === 'editor' && showTestDock && (
-            <MapEditorTestDock
-              facilities={allFacilities}
-              liveById={liveById}
-              mqttLog={mqttLog}
-              onClearLog={onClearMqttLog}
-              onAddDemoNodes={onAddDemoNodes}
-              viewportCenterMeters={activeViewportCenterMeters ?? { x: 0, y: 0 }}
-              hasDemoNodes={hasDemoNodes}
-              scanState={connectivityScan.state}
-              onStartScan={connectivityScan.startScan}
-              onContinueScan={connectivityScan.continueScan}
-              onStopScan={connectivityScan.stopScan}
-              onResetScan={connectivityScan.resetScan}
-              onSelectIssue={onSelectConnectivityIssue}
-              paletteOpen={mapEditorMode === 'edit' && paletteOpen}
-            />
-          )}
-
           {isTrajectoryWorkspace && (
             <TrajectoryZoomBar
               zoomFactorX={trajectoryZoomFactorX}
@@ -4707,6 +4538,18 @@ export default function MapEditorApp({
             onPickPaletteItem={mapEditorMode === 'edit' ? addFromPalette : undefined}
           />
         )}
+
+        {isMapWorkspace && mapScreen === 'editor' && primaryDialogEntry ? (
+          <SetPrimaryMapDialog
+            entry={primaryDialogEntry}
+            onClose={() => setPrimaryDialogEntry(null)}
+            onActivated={() => {
+              setPrimaryMapCheck({ libraryId: primaryDialogEntry.libraryId, primary: true })
+              setBackendSyncFailed(false)
+              setPrimaryDialogEntry(null)
+            }}
+          />
+        ) : null}
 
         {isMapWorkspace && mapScreen === 'editor' ? (
           <PointTopologyEditorDialog
@@ -4897,17 +4740,14 @@ export default function MapEditorApp({
             <button
               type="button"
               onClick={() => setInspectorCollapsed(false)}
-              className="pointer-events-auto absolute right-0 top-1/2 z-40 flex min-h-0 w-11 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-l-md border border-r-0 border-zinc-700/80 bg-zinc-900/95 py-4 text-[11px] font-medium text-zinc-400 shadow-lg backdrop-blur-sm transition hover:bg-zinc-800 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="pointer-events-auto absolute right-2 top-2 z-40 flex h-12 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] px-2 py-3 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] backdrop-blur-md transition hover:bg-[rgba(212,212,216,0.16)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60"
               title={t('mapEditor.chrome.expandInspector')}
               aria-label={t('mapEditor.chrome.expandInspector')}
             >
-              <ChevronLeft className="size-4 shrink-0" aria-hidden />
-              <span
-                className="text-center leading-tight tracking-wide"
-                style={{ writingMode: 'vertical-rl' }}
-              >
-                {t('mapEditor.chrome.properties')}
+              <span className="flex size-6 items-center justify-center p-0.5">
+                <ChevronLeft className="size-[18px] text-[#D1D5DC]" aria-hidden />
               </span>
+              <span className="pr-2">{t('mapEditor.chrome.properties')}</span>
             </button>
           ))}
         {isTrajectoryWorkspace && (

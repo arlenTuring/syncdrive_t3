@@ -1,20 +1,20 @@
 import {
   ArrowLeft,
+  Component,
   Crosshair,
+  Eye,
   Frame,
   Highlighter,
   History,
-  LogOut,
+  Loader2,
+  MapPin,
   Pencil,
   Redo2,
   Ruler,
-  Undo2,
-  ZoomIn,
-  Component,
-  FlaskConical,
   ScanSearch,
+  Undo2,
 } from 'lucide-react'
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 
 type MapEditorToolbarProps = {
@@ -28,6 +28,11 @@ type MapEditorToolbarProps = {
   onMapDisplayNameChange: (value: string) => void
   onMapVersionChange: (value: string) => void
   onCenterMap: () => void
+  /** 座標資訊框：選取物件的座標（沒選取時顯示提示）與畫布尺寸 */
+  coordsText: string
+  canvasText: string
+  /** 資訊框的 tooltip（地圖模式等補充） */
+  infoTitle?: string
   /** Edit mode only: undo / redo */
   canUndo: boolean
   canRedo: boolean
@@ -44,14 +49,6 @@ type MapEditorToolbarProps = {
   showAreaCenterLabels?: boolean
   onToggleAreaCenterLabels?: () => void
   areaCenterLabelsToggleHint?: string
-  /** Bottom zoom bar (1 near – 7 far) */
-  showZoomLevelBar?: boolean
-  onToggleZoomLevelBar?: () => void
-  zoomLevelBarToggleHint?: string
-  /** Bottom tester (gap scan + MQTT sim) */
-  showTestDock?: boolean
-  onToggleTestDock?: () => void
-  testDockToggleHint?: string
   /** Edit mode: crop mode */
   mapCanvasResizeActive?: boolean
   onToggleMapCanvasResize?: () => void
@@ -66,24 +63,34 @@ type MapEditorToolbarProps = {
   trackIssueCount?: number | null
   trackIssuesOpen?: boolean
   onToggleTrackIssues?: () => void
-  /** 在每塊軌道上畫現場行進方向 */
+  /** 編輯模式：自動儲存狀態；送後端失敗時可重試 */
+  autosaving?: boolean
+  autosaveLabel?: string
+  syncFailed?: boolean
+  retryingSync?: boolean
+  onRetrySync?: () => void
+  /** 這張是主要地圖：修改存下就是系統在讀的內容 */
+  isPrimaryMap?: boolean
+  /** 不是主要地圖時：設為主要地圖（會先檢查部署中的班表，見 SetPrimaryMapDialog） */
+  onSetPrimaryMap?: () => void
 }
 
-/** 一組相關的工具：同一個外框，內部靠留白分開 */
-function ToolGroup({ children, label }: { children: ReactNode; label?: string }) {
-  return (
-    <div
-      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900/70 p-0.5"
-      role="group"
-      aria-label={label}
-    >
-      {children}
-    </div>
-  )
-}
+/**
+ * 設計稿的按鈕：高 34、圓角 8、左右 14、字 14/18 字距 0.5、圖示 18。
+ * outline＝1px 半透明框（清單、置中）；ghost＝無框（編輯工具列裡的工具）。
+ */
+const BTN_BASE =
+  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium leading-[18px] tracking-[0.5px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60 disabled:cursor-not-allowed disabled:opacity-40'
+const BTN_OUTLINE = `${BTN_BASE} border border-[rgba(212,212,212,0.25)] text-[#D1D5DC] enabled:hover:bg-[rgba(209,213,220,0.08)]`
+const INPUT_CLASS =
+  'h-[34px] w-[120px] shrink-0 rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] outline-none placeholder:text-[#99A1AF] focus:ring-1 focus:ring-[#51A2FF]'
 
-function Divider() {
-  return <span className="mx-0.5 h-5 w-px shrink-0 bg-zinc-700/70" aria-hidden />
+type ToolTone = 'blue' | 'amber' | 'emerald'
+
+const ACTIVE_TONE: Record<ToolTone, string> = {
+  blue: 'bg-[rgba(43,127,255,0.2)] text-[#51A2FF]',
+  amber: 'bg-amber-950/70 text-amber-200',
+  emerald: 'bg-emerald-950/70 text-emerald-200',
 }
 
 type ToolButtonProps = {
@@ -93,24 +100,13 @@ type ToolButtonProps = {
   onClick?: () => void
   active?: boolean
   disabled?: boolean
-  /** active 時的色調；預設 cyan */
-  tone?: 'cyan' | 'amber' | 'emerald'
+  tone?: ToolTone
   testId?: string
-  badge?: ReactNode
-  /** 單獨放（不在群組裡）時要有自己的外框 */
-  standalone?: boolean
+  /** 窄畫面只留圖示（名稱在 tooltip） */
+  compact?: boolean
 }
 
-const ACTIVE_TONE = {
-  cyan: 'bg-cyan-950/70 text-cyan-200',
-  amber: 'bg-amber-950/70 text-amber-200',
-  emerald: 'bg-emerald-950/70 text-emerald-200',
-} as const
-
-/**
- * 工具列上的按鈕：高度一致（32px）、圖示在前。
- * 寬度不夠時只留圖示（名稱在 tooltip），2xl 以上才顯示文字，避免一排擠到互相蓋住。
- */
+/** 編輯工具列上的工具：無框，開啟中的切換鈕淡藍底 */
 function ToolButton({
   Icon,
   label,
@@ -118,10 +114,9 @@ function ToolButton({
   onClick,
   active = false,
   disabled = false,
-  tone = 'cyan',
+  tone = 'blue',
   testId,
-  badge,
-  standalone = false,
+  compact = false,
 }: ToolButtonProps) {
   return (
     <button
@@ -133,19 +128,34 @@ function ToolButton({
       title={title ?? label}
       data-testid={testId}
       className={[
-        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 disabled:cursor-not-allowed disabled:opacity-40 2xl:px-2.5',
-        standalone ? 'border border-zinc-700/80 bg-zinc-900/70' : '',
-        active ? ACTIVE_TONE[tone] : 'text-zinc-300 enabled:hover:bg-zinc-800 enabled:hover:text-zinc-100',
+        BTN_BASE,
+        'px-2.5',
+        active ? ACTIVE_TONE[tone] : 'text-[#D1D5DC] enabled:hover:bg-[rgba(209,213,220,0.08)]',
       ].join(' ')}
     >
-      <Icon className="size-4 shrink-0" aria-hidden />
-      <span className="hidden 2xl:inline">{label}</span>
-      {badge}
+      <Icon className="size-[18px] shrink-0" aria-hidden />
+      <span className={compact ? 'hidden xl:inline' : ''}>{label}</span>
     </button>
   )
 }
 
-/** Map editor toolbar */
+function Divider() {
+  return <span className="mx-1 h-5 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+}
+
+/**
+ * 地圖編輯器頂部工具列。
+ *
+ * <h3>第一列（設計稿）</h3>
+ * 清單 ｜ 地圖名稱、版本 ｜（靠右）座標資訊框 ｜ 軌道檢查 ｜ 置中 ｜ 檢視／編輯切換。
+ *
+ * <h3>第二列（只有編輯模式）</h3>
+ * 左邊是編輯用的工具：復原、重做、編修紀錄 ｜ 刻度、區域標示、工具列、裁減；
+ * 右邊是自動儲存與發布狀態、「發布到正式環境」。檢視模式用不到，整列不出現。
+ *
+ * 縮放只靠滑鼠滾輪與觸控板（見 MapAreaCanvas 的 wheelZoomMode），不再有縮放列；
+ * 測試器（斷路掃描、MQTT 模擬）已移除。
+ */
 export function MapEditorToolbar({
   mapEditorMode,
   onEnterEdit,
@@ -157,6 +167,9 @@ export function MapEditorToolbar({
   onMapDisplayNameChange,
   onMapVersionChange,
   onCenterMap,
+  coordsText,
+  canvasText,
+  infoTitle,
   canUndo,
   canRedo,
   onUndo,
@@ -169,12 +182,6 @@ export function MapEditorToolbar({
   showAreaCenterLabels = false,
   onToggleAreaCenterLabels,
   areaCenterLabelsToggleHint,
-  showZoomLevelBar = false,
-  onToggleZoomLevelBar,
-  zoomLevelBarToggleHint,
-  showTestDock = false,
-  onToggleTestDock,
-  testDockToggleHint,
   mapCanvasResizeActive = false,
   onToggleMapCanvasResize,
   mapCanvasResizeToggleHint,
@@ -186,6 +193,13 @@ export function MapEditorToolbar({
   trackIssueCount = null,
   trackIssuesOpen = false,
   onToggleTrackIssues,
+  autosaving = false,
+  autosaveLabel,
+  syncFailed = false,
+  retryingSync = false,
+  onRetrySync,
+  isPrimaryMap = false,
+  onSetPrimaryMap,
 }: MapEditorToolbarProps) {
   const { t } = useTranslation()
   const isEdit = mapEditorMode === 'edit'
@@ -203,107 +217,171 @@ export function MapEditorToolbar({
       : rulerDisplayMode === 'scale'
         ? t('mapEditor.toolbar.rulersTitleScale')
         : t('mapEditor.toolbar.rulersTitle'))
-  const hasViewTools =
-    (isEdit && (onCycleRulerDisplayMode || onToggleRulers)) ||
-    (isEdit && onToggleMapCanvasResize) ||
-    (isEdit && onToggleAreaCenterLabels) ||
-    (isEdit && onToggleFacilityToolbars) ||
-    onToggleZoomLevelBar
+
+  const hasTrackIssues = typeof trackIssueCount === 'number' && trackIssueCount > 0
 
   return (
-    <div
-      className="flex shrink-0 items-center gap-2 border-b border-zinc-700/80 bg-zinc-950 px-4 py-2"
-      role="toolbar"
-      aria-label={t('mapEditor.toolbar.aria')}
-    >
-      {/* 左：離開、地圖身分、復原重做 */}
-      <ToolButton
-        Icon={ArrowLeft}
-        label={t('mapEditor.toolbar.list')}
-        title={t('mapEditor.toolbar.backToList')}
-        onClick={onBackToLibrary}
-        standalone
-      />
+    <div className="shrink-0" role="toolbar" aria-label={t('mapEditor.toolbar.aria')}>
+      {/* 第一列 */}
+      <div className="flex h-[60px] items-center gap-3 p-3">
+        <button
+          type="button"
+          onClick={onBackToLibrary}
+          className={BTN_OUTLINE}
+          title={t('mapEditor.toolbar.backToList')}
+        >
+          <ArrowLeft className="size-[18px] shrink-0" aria-hidden />
+          {t('mapEditor.toolbar.list')}
+        </button>
 
-      <span
-        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${
-          isEdit
-            ? 'bg-cyan-950/80 text-cyan-300 ring-cyan-700/60'
-            : 'bg-zinc-800 text-zinc-400 ring-zinc-600'
-        }`}
-      >
-        {isEdit ? t('mapEditor.toolbar.edit') : t('mapEditor.toolbar.view')}
-      </span>
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+          <input
+            id="map-editor-display-name"
+            aria-label={t('mapEditor.toolbar.mapName')}
+            value={mapDisplayName}
+            onChange={(e) => onMapDisplayNameChange(e.target.value)}
+            className={INPUT_CLASS}
+            title={mapDisplayName || t('mapEditor.toolbar.mapName')}
+          />
+          <input
+            id="map-editor-version"
+            aria-label={t('mapEditor.toolbar.version')}
+            value={mapVersion}
+            onChange={(e) => onMapVersionChange(e.target.value)}
+            className={INPUT_CLASS}
+            title={t('mapEditor.toolbar.version')}
+          />
 
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <label className="sr-only" htmlFor="map-editor-display-name">
-          {t('mapEditor.toolbar.mapName')}
-        </label>
-        <input
-          id="map-editor-display-name"
-          value={mapDisplayName}
-          onChange={(e) => onMapDisplayNameChange(e.target.value)}
-          className="h-8 min-w-[6rem] max-w-[16rem] flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 text-sm font-medium text-zinc-100 outline-none focus:border-cyan-500"
-          title={t('mapEditor.toolbar.mapName')}
-        />
-        <label className="sr-only" htmlFor="map-editor-version">
-          {t('mapEditor.toolbar.version')}
-        </label>
-        <input
-          id="map-editor-version"
-          value={mapVersion}
-          onChange={(e) => onMapVersionChange(e.target.value)}
-          className="h-8 w-20 shrink-0 rounded-md border border-zinc-700 bg-zinc-900 px-2 font-mono text-xs text-zinc-300 outline-none focus:border-cyan-500"
-          title={t('mapEditor.toolbar.version')}
-        />
+          <div
+            className="ml-auto hidden h-[34px] min-w-0 items-center gap-3 rounded-lg xl:flex bg-[rgba(142,197,255,0.04)] px-4 py-2 text-sm leading-[18px] tracking-[0.5px] text-[#99A1AF]"
+            role="status"
+            aria-live="polite"
+            title={infoTitle}
+          >
+            <span className="min-w-0 truncate">{coordsText}</span>
+            <span className="h-[18px] w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+            <span className="hidden shrink-0 whitespace-nowrap md:inline">{canvasText}</span>
+          </div>
+        </div>
 
-        {(isEdit || onOpenRevisionHistory) && (
-          <ToolGroup label={t('mapEditor.toolbar.undoRedoAria')}>
-            {isEdit && (
-              <>
-                <ToolButton
-                  Icon={Undo2}
-                  label={t('mapEditor.toolbar.undo')}
-                  title={t('mapEditor.toolbar.undoTitle')}
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                />
-                <ToolButton
-                  Icon={Redo2}
-                  label={t('mapEditor.toolbar.redo')}
-                  title={t('mapEditor.toolbar.redoTitle')}
-                  onClick={onRedo}
-                  disabled={!canRedo}
-                />
-              </>
+        {onToggleTrackIssues && (
+          <button
+            type="button"
+            onClick={onToggleTrackIssues}
+            aria-pressed={trackIssuesOpen}
+            data-testid="track-check-button"
+            className={`${BTN_OUTLINE} ${
+              trackIssuesOpen ? 'border-[rgba(81,162,255,0.5)] text-[#51A2FF]' : ''
+            }`}
+            title={t('mapEditor.toolbar.trackCheckTitle')}
+          >
+            <ScanSearch className="size-[18px] shrink-0" aria-hidden />
+            <span className="hidden 2xl:inline">{t('mapEditor.toolbar.trackCheck')}</span>
+            {trackIssueCount === null ? null : hasTrackIssues ? (
+              <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold leading-4 text-zinc-950">
+                {trackIssueCount}
+              </span>
+            ) : (
+              <span className="text-emerald-400" aria-label={t('mapEditor.toolbar.trackCheckOk')}>
+                ✓
+              </span>
             )}
-            {isEdit && onOpenRevisionHistory ? <Divider /> : null}
-            {onOpenRevisionHistory && (
-              <ToolButton
-                Icon={History}
-                label={t('mapEditor.toolbar.revisionHistory')}
-                title={t('mapEditor.toolbar.revisionHistoryTitle')}
-                onClick={onOpenRevisionHistory}
-              />
-            )}
-          </ToolGroup>
+          </button>
         )}
+
+        <button
+          type="button"
+          onClick={onCenterMap}
+          className={BTN_OUTLINE}
+          title={t('mapEditor.toolbar.centerTitle')}
+        >
+          <Crosshair className="size-[18px] shrink-0" aria-hidden />
+          {t('mapEditor.toolbar.center')}
+        </button>
+
+        {/* 檢視／編輯：切到檢視＝離開編輯（有變更會先詢問） */}
+        <div
+          className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] p-1"
+          role="radiogroup"
+          aria-label={t('mapEditor.toolbar.modeAria')}
+        >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!isEdit}
+            onClick={() => {
+              if (isEdit) onLeaveEdit()
+            }}
+            title={isEdit ? t('mapEditor.toolbar.leaveEditTitle') : undefined}
+            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-sm leading-[18px] tracking-[0.5px] transition ${
+              !isEdit ? 'bg-[#2B7FFF] font-medium text-white' : 'text-[#6A7282] hover:text-[#D1D5DC]'
+            }`}
+          >
+            <Eye className="size-4 shrink-0" aria-hidden />
+            {t('mapEditor.toolbar.view')}
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={isEdit}
+            onClick={() => {
+              if (!isEdit) onEnterEdit()
+            }}
+            title={isEdit ? undefined : t('mapEditor.toolbar.enterEditTitle')}
+            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-sm leading-[18px] tracking-[0.5px] transition ${
+              isEdit ? 'bg-[#2B7FFF] font-medium text-white' : 'text-[#6A7282] hover:text-[#D1D5DC]'
+            }`}
+          >
+            <Pencil className="size-4 shrink-0" aria-hidden />
+            {t('mapEditor.toolbar.edit')}
+          </button>
+        </div>
       </div>
 
-      {/* 右：畫面輔助 → 檢查與測試 → 編輯／離開 → 置中 */}
-      {hasViewTools && (
-        <ToolGroup label={t('mapEditor.toolbar.cropGroupAria')}>
-          {isEdit && (onCycleRulerDisplayMode || onToggleRulers) && (
+      {/* 第二列：編輯工具（只有編輯模式） */}
+      {isEdit && (
+        <div
+          className="flex min-h-[46px] flex-wrap items-center gap-1 px-3 pb-3"
+          role="group"
+          aria-label={t('mapEditor.toolbar.editToolsAria')}
+        >
+          <ToolButton
+            Icon={Undo2}
+            label={t('mapEditor.toolbar.undo')}
+            title={t('mapEditor.toolbar.undoTitle')}
+            onClick={onUndo}
+            disabled={!canUndo}
+            compact
+          />
+          <ToolButton
+            Icon={Redo2}
+            label={t('mapEditor.toolbar.redo')}
+            title={t('mapEditor.toolbar.redoTitle')}
+            onClick={onRedo}
+            disabled={!canRedo}
+            compact
+          />
+          {onOpenRevisionHistory && (
+            <ToolButton
+              Icon={History}
+              label={t('mapEditor.toolbar.revisionHistory')}
+              title={t('mapEditor.toolbar.revisionHistoryTitle')}
+              onClick={onOpenRevisionHistory}
+              compact
+            />
+          )}
+          <Divider />
+          {(onCycleRulerDisplayMode || onToggleRulers) && (
             <ToolButton
               Icon={Ruler}
               label={rulerLabel}
               title={rulerTitle}
               onClick={onCycleRulerDisplayMode ?? onToggleRulers}
               active={rulerActive}
-              tone={rulerDisplayMode === 'field' ? 'emerald' : 'cyan'}
+              tone={rulerDisplayMode === 'field' ? 'emerald' : 'blue'}
             />
           )}
-          {isEdit && onToggleAreaCenterLabels && (
+          {onToggleAreaCenterLabels && (
             <ToolButton
               Icon={Highlighter}
               label={t('mapEditor.toolbar.areaLabels')}
@@ -312,7 +390,7 @@ export function MapEditorToolbar({
               active={showAreaCenterLabels}
             />
           )}
-          {isEdit && onToggleFacilityToolbars && (
+          {onToggleFacilityToolbars && (
             <ToolButton
               Icon={Component}
               label={t('mapEditor.toolbar.facilityBars')}
@@ -321,18 +399,7 @@ export function MapEditorToolbar({
               active={showFacilityToolbars}
             />
           )}
-          {onToggleZoomLevelBar && (
-            <ToolButton
-              Icon={ZoomIn}
-              label={
-                showZoomLevelBar ? t('mapEditor.toolbar.hideZoom') : t('mapEditor.toolbar.zoomBar')
-              }
-              title={zoomLevelBarToggleHint ?? t('mapEditor.toolbar.zoomBarTitle')}
-              onClick={onToggleZoomLevelBar}
-              active={showZoomLevelBar}
-            />
-          )}
-          {isEdit && onToggleMapCanvasResize && (
+          {onToggleMapCanvasResize && (
             <>
               <ToolButton
                 Icon={Frame}
@@ -346,7 +413,7 @@ export function MapEditorToolbar({
                 <button
                   type="button"
                   onClick={onApplyMapCrop}
-                  className="inline-flex h-8 shrink-0 items-center rounded-md border border-amber-600/70 bg-amber-950/70 px-2.5 text-xs font-medium text-amber-100 transition hover:bg-amber-900/60"
+                  className={`${BTN_BASE} border border-amber-600/70 bg-amber-950/70 text-amber-100 hover:bg-amber-900/60`}
                   title={t('mapEditor.toolbar.applyCropTitle')}
                 >
                   {t('mapEditor.toolbar.applyCrop')}
@@ -356,7 +423,7 @@ export function MapEditorToolbar({
                 <button
                   type="button"
                   onClick={onCancelMapCrop}
-                  className="inline-flex h-8 shrink-0 items-center rounded-md px-2.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+                  className={`${BTN_BASE} text-[#99A1AF] hover:bg-[rgba(209,213,220,0.08)] hover:text-[#D1D5DC]`}
                   title={t('mapEditor.toolbar.cancelCropTitle')}
                 >
                   {t('mapEditor.toolbar.cancel')}
@@ -364,71 +431,54 @@ export function MapEditorToolbar({
               ) : null}
             </>
           )}
-        </ToolGroup>
-      )}
 
-      {(onToggleTrackIssues || onToggleTestDock) && (
-        <ToolGroup>
-          {onToggleTrackIssues && (
-            <ToolButton
-              Icon={ScanSearch}
-              label={t('mapEditor.toolbar.trackCheck')}
-              title={t('mapEditor.toolbar.trackCheckTitle')}
-              onClick={onToggleTrackIssues}
-              active={trackIssuesOpen || !!trackIssueCount}
-              tone={trackIssueCount ? 'amber' : 'emerald'}
-              testId="track-check-button"
-              badge={
-                trackIssueCount === null ? null : trackIssueCount > 0 ? (
-                  <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold leading-4 text-zinc-950">
-                    {trackIssueCount}
-                  </span>
-                ) : (
-                  <span className="text-emerald-400" aria-label={t('mapEditor.toolbar.trackCheckOk')}>
-                    ✓
-                  </span>
-                )
-              }
-            />
-          )}
-          {onToggleTestDock && (
-            <ToolButton
-              Icon={FlaskConical}
-              label={showTestDock ? t('mapEditor.toolbar.hideTester') : t('mapEditor.toolbar.tester')}
-              title={testDockToggleHint ?? t('mapEditor.toolbar.testerTitle')}
-              onClick={onToggleTestDock}
-              active={showTestDock}
-            />
-          )}
-        </ToolGroup>
+          {/*
+            右：自動儲存狀態。每次儲存都送後端，沒有「發布」這一步；哪一張是系統在讀的，
+            由地圖清單的「設為主要地圖」決定。
+          */}
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-sm leading-[18px] tracking-[0.5px]">
+            {!isPrimaryMap && onSetPrimaryMap && (
+              <ToolButton
+                Icon={MapPin}
+                label={t('mapLibrary.setActive')}
+                title={t('mapLibrary.setActiveTitle')}
+                onClick={onSetPrimaryMap}
+                compact
+              />
+            )}
+            {isPrimaryMap && (
+              <span
+                className="inline-flex h-[26px] items-center gap-1 rounded-lg bg-[rgba(0,212,146,0.2)] px-3 text-sm font-medium text-[#F3F4F6]"
+                title={t('mapEditor.chrome.primaryMapLiveTitle')}
+              >
+                <span className="size-2 rounded-full bg-[#00D492]" aria-hidden />
+                {t('mapEditor.chrome.primaryMapLive')}
+              </span>
+            )}
+            {syncFailed ? (
+              <>
+                <span className="text-amber-300">{t('mapEditor.chrome.syncFailed')}</span>
+                {onRetrySync && (
+                  <button
+                    type="button"
+                    onClick={onRetrySync}
+                    disabled={retryingSync}
+                    className={`${BTN_BASE} border border-amber-600/60 text-amber-200 enabled:hover:bg-amber-950/60`}
+                  >
+                    {retryingSync && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
+                    {t('mapEditor.chrome.retrySync')}
+                  </button>
+                )}
+              </>
+            ) : (
+              <span className="hidden items-center gap-1.5 text-[#99A1AF] sm:inline-flex">
+                {autosaving && <Loader2 className="size-3.5 shrink-0 animate-spin text-[#51A2FF]" aria-hidden />}
+                {autosaveLabel}
+              </span>
+            )}
+          </div>
+        </div>
       )}
-
-      {isEdit ? (
-        <ToolButton
-          Icon={LogOut}
-          label={t('mapEditor.toolbar.leaveEdit')}
-          title={t('mapEditor.toolbar.leaveEditTitle')}
-          onClick={onLeaveEdit}
-          standalone
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={onEnterEdit}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 text-xs font-medium text-cyan-200 transition hover:bg-cyan-900/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
-          title={t('mapEditor.toolbar.enterEditTitle')}
-        >
-          <Pencil className="size-4 shrink-0" aria-hidden />
-          <span>{t('mapEditor.toolbar.enterEdit')}</span>
-        </button>
-      )}
-      <ToolButton
-        Icon={Crosshair}
-        label={t('mapEditor.toolbar.center')}
-        title={t('mapEditor.toolbar.centerTitle')}
-        onClick={onCenterMap}
-        standalone
-      />
     </div>
   )
 }

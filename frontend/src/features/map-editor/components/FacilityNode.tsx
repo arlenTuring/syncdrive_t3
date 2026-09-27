@@ -398,10 +398,6 @@ type FacilityNodeProps = {
   onCancelFormatPaint?: () => void
   /** 選取時顯示圓形工具列 */
   showFacilityToolbar?: boolean
-  /** 導通掃描：問題軌道高亮 */
-  connectivityScanHighlight?: boolean
-  /** 導通掃描：斷點閃爍三次 */
-  connectivityScanFlashing?: boolean
   /** 軌道檢查：這一塊有問題時的嚴重程度 */
   trackDiagStatus?: 'error' | 'warn' | null
   /** 軌道檢查：畫出現場行進方向 */
@@ -449,8 +445,6 @@ export const FacilityNode = memo(function FacilityNode({
   onFormatPaintPick,
   onCancelFormatPaint,
   showFacilityToolbar = true,
-  connectivityScanHighlight = false,
-  connectivityScanFlashing = false,
   trackDiagStatus = null,
 }: FacilityNodeProps) {
   const { t } = useTranslation()
@@ -2473,12 +2467,6 @@ export const FacilityNode = memo(function FacilityNode({
             !isPsd && (mqttLive?.blinkSeq ?? 0) > 0 ? 'animate-mqtt-flash' : '',
             !isPsd && highlightFlash
               ? 'outline outline-2 outline-amber-400/95 outline-offset-1'
-              : '',
-            isTrack && connectivityScanHighlight
-              ? 'ring-2 ring-amber-400/75 ring-offset-0 outline outline-2 outline-amber-400/45'
-              : '',
-            isTrack && connectivityScanFlashing
-              ? 'animate-connectivity-scan-flash-loop'
               : '',
             // 軌道檢查：圖面位置與現場座標對不上的軌道，紅（嚴重）或琥珀（注意）框起來
             isTrack && trackDiagStatus === 'error'

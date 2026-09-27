@@ -31,55 +31,6 @@ body {
   animation: mqtt-flash 0.75s ease-out 1;
 }
 
-@keyframes connectivity-scan-flash {
-  0%,
-  14%,
-  28%,
-  42%,
-  56%,
-  70%,
-  100% {
-    opacity: 1;
-    filter: brightness(1);
-  }
-  7%,
-  21%,
-  35% {
-    opacity: 0.2;
-    filter: brightness(2) drop-shadow(0 0 14px rgba(248, 113, 113, 0.95));
-  }
-}
-
-.animate-connectivity-scan-flash {
-  animation: connectivity-scan-flash 0.5s ease-in-out 1;
-}
-
-.animate-connectivity-scan-flash-loop {
-  animation: connectivity-scan-flash 0.85s ease-in-out infinite;
-}
-
-@keyframes connectivity-laser-pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(0.6);
-    opacity: 0.9;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.4);
-    opacity: 0;
-  }
-}
-
-@keyframes connectivity-issue-ring {
-  0% {
-    transform: translate(-50%, -50%) scale(0.85);
-    opacity: 0.95;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.35);
-    opacity: 0.15;
-  }
-}
-
 /* Step 2 任務排班 — 時軸縮放滑桿（滿格：實心藍條 + 右側圓形 thumb） */
 .schedule-time-zoom-slider {
   -webkit-appearance: none;

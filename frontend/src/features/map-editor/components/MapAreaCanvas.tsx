@@ -33,7 +33,7 @@ import {
   MAP_PIXEL_ZOOM_DEFAULT_LEVEL,
 } from '../utils/mapPixelZoom'
 import { MAP_EDITOR_VIEWPORT_PAN_GUTTER_PX } from '../constants/map'
-import { isCanvasZoomWheelEvent } from '../utils/mapWheelZoom'
+import { isCanvasZoomWheelEvent, isMouseWheelNotchEvent } from '../utils/mapWheelZoom'
 import type { FacilityFormatSnapshot } from '../utils/facilityFormatPainter'
 import type { AreaVehicleLive, MapVehicleIconSpec } from '../vehicles/types'
 import {
@@ -43,8 +43,6 @@ import {
 import { MapAreaVehicleOverlay } from '../vehicles/MapAreaVehicleOverlay'
 import { AreaNode } from './AreaNode'
 import { MapCropModeOverlay } from './MapCropModeOverlay'
-import { TrackConnectivityScanOverlay } from './TrackConnectivityScanOverlay'
-import type { ConnectivityScanState } from '../hooks/useTrackConnectivityScan'
 import type { MapCropRect, MapCropWorkspace } from '../utils/mapCropMode'
 
 export type MapAreaCanvasDisplayMode = 'editor' | 'embedded'
@@ -75,7 +73,11 @@ type MapAreaCanvasProps = {
    * - pinch：觸控板捏合／Ctrl+滾輪（預設）
    * - wheel：一般滾輪／觸控板捲動皆可縮放
    */
-  wheelZoomMode?: 'pinch' | 'wheel'
+  /**
+   * pinch：只有觸控板捏合／Ctrl+滾輪縮放；wheel：所有滾輪都縮放；
+   * mouse：捏合＋滑鼠滾輪縮放，觸控板兩指滑動仍是平移
+   */
+  wheelZoomMode?: 'pinch' | 'wheel' | 'mouse'
   /** 即時車輛位置補間毫秒；連續播放給 1200，暫停／逐幀請給 0（瞬間定位）。未傳則依 isEmbedded 預設。 */
   livePositionTweenMs?: number
   /** 1 = 最放大，7 = 一屏看全圖；未傳則使用內建 state（預設 7） */
@@ -212,8 +214,6 @@ type MapAreaCanvasProps = {
   onBulkAreasLayoutSessionStart?: () => void
   onBulkAreasLayoutMove?: (dx: number, dy: number) => void
   onBulkAreasLayoutCommit?: () => void
-  /** 導通掃描狀態（雷射 overlay + 軌道高亮） */
-  connectivityScan?: ConnectivityScanState | null
   /** 清單跳轉：地圖像素座標（含 origin） */
   facilityFocusTarget?: { x: number; y: number; token: number } | null
   /** 軌道檢查：有問題的軌道狀態與是否畫方向（見 trackDiagnostics） */
@@ -302,7 +302,6 @@ export function MapAreaCanvas({
   onBulkAreasLayoutSessionStart,
   onBulkAreasLayoutMove,
   onBulkAreasLayoutCommit,
-  connectivityScan = null,
   facilityFocusTarget = null,
   trackDiagnostics = null,
   onFacilityDoubleClick,
@@ -418,47 +417,6 @@ export function MapAreaCanvas({
     vp.scrollTop = panGutterPx
     didInitPanScrollRef.current = true
   }, [isEmbedded, panGutterPx, scaledW, scaledH, viewportRef])
-
-  useEffect(() => {
-    if (!connectivityScan) return
-    const { phase, lasers, discoveringTrackId } = connectivityScan
-    if (phase !== 'flashing' || !discoveringTrackId || lasers.length === 0 || isEmbedded) {
-      return
-    }
-    const vp = viewportRef.current
-    if (!vp) return
-
-    const issueLaser =
-      lasers.find((l) => l.discovering) ??
-      lasers.find((l) => l.trackId === discoveringTrackId)
-    if (!issueLaser) return
-
-    const focusPx = issueLaser.laserPx
-    const mapX = focusPx.x - contentOrigin.x + clipLeft
-    const mapY = focusPx.y - contentOrigin.y + clipTop
-    const targetLeft = mapX * mapScale + panGutterPx - vp.clientWidth / 2
-    const targetTop = mapY * mapScale + panGutterPx - vp.clientHeight / 2
-    const maxLeft = Math.max(0, scrollSurfaceW - vp.clientWidth)
-    const maxTop = Math.max(0, scrollSurfaceH - vp.clientHeight)
-
-    vp.scrollTo({
-      left: Math.max(0, Math.min(targetLeft, maxLeft)),
-      top: Math.max(0, Math.min(targetTop, maxTop)),
-      behavior: 'smooth',
-    })
-  }, [
-    connectivityScan,
-    contentOrigin.x,
-    contentOrigin.y,
-    clipLeft,
-    clipTop,
-    mapScale,
-    panGutterPx,
-    scrollSurfaceW,
-    scrollSurfaceH,
-    isEmbedded,
-    viewportRef,
-  ])
 
   useEffect(() => {
     if (!facilityFocusTarget || isEmbedded) return
@@ -638,10 +596,15 @@ export function MapAreaCanvas({
     const onWheel = (e: WheelEvent) => {
       if (inCropMode) return
       const allow =
-        wheelZoomMode === 'wheel' || isCanvasZoomWheelEvent(e)
+        wheelZoomMode === 'wheel' ||
+        isCanvasZoomWheelEvent(e) ||
+        (wheelZoomMode === 'mouse' && isMouseWheelNotchEvent(e))
       if (!allow) return
       e.preventDefault()
-      applyWheelZoom(e.clientX, e.clientY, e.deltaY)
+      // 以行／頁為單位的滾輪（Firefox 滑鼠）換成像素，一格的縮放幅度才跟其他瀏覽器一致
+      const deltaPx =
+        e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * vp.clientHeight : e.deltaY
+      applyWheelZoom(e.clientX, e.clientY, deltaPx)
     }
     vp.addEventListener('wheel', onWheel, { passive: false })
     return () => vp.removeEventListener('wheel', onWheel)
@@ -867,7 +830,6 @@ export function MapAreaCanvas({
                 showCenterLabel={showAreaCenterLabels}
                 showFacilityToolbars={showFacilityToolbars}
                 allAreas={areas}
-                connectivityScanHighlightTrackIds={connectivityScan?.highlightTrackIds ?? null}
                 trackDiagnostics={trackDiagnostics}
               />
             ))}
@@ -903,11 +865,6 @@ export function MapAreaCanvas({
                 onDoubleClick={onBasemapDoubleClick}
               />
             ))}
-            {connectivityScan &&
-            (connectivityScan.phase === 'scanning' ||
-              connectivityScan.phase === 'flashing') ? (
-              <TrackConnectivityScanOverlay scanState={connectivityScan} />
-            ) : null}
             {routePlanningOverlay}
             {areaVehiclesFromContext || (areaVehicles && areaVehicles.length > 0) ? (
               <MapAreaVehicleOverlay

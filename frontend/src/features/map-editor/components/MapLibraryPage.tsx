@@ -1,16 +1,25 @@
 import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
+  CloudDownload,
   Copy,
   Download,
   FileText,
   FolderOpen,
   Loader2,
   MapPin,
+  MoreHorizontal,
   Pencil,
   Plus,
+  RotateCw,
+  Search,
+  Server,
   Trash2,
-  CloudDownload,
 } from 'lucide-react'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MapPixelSize } from '../types/area'
 import type { MapCreationMode } from '../types/mapFile'
@@ -24,7 +33,6 @@ import {
   duplicateMapEntry,
   ensureMapLibrarySeeded,
   hydrateMapLibraryFromBackend,
-  formatMapLibraryDate,
   importMapEntryFromParsed,
   importMapEntryFromServer,
   readMapLibrary,
@@ -35,7 +43,9 @@ import {
 } from '../utils/mapLibraryStorage'
 import { clearMapRevisionsForLibrary } from '../utils/mapRevisionHistory'
 import { NewMapPixelDialog } from './NewMapPixelDialog'
+import { SetPrimaryMapDialog } from './SetPrimaryMapDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
+import { StatusTag, type StatusTagStyle } from '../../../components/StatusTag'
 import {
   fetchMapLibraryBackendStatus,
   deletePublishedMap,
@@ -50,6 +60,55 @@ import {
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
   onBackToHome?: () => void
+}
+
+type MapLibrarySortKey = 'name' | 'status' | 'version' | 'resolution' | 'createdAt' | 'updatedAt'
+
+const PAGE_SIZE = 20
+
+/** 不是主要地圖：灰色，不搶眼；要換主要地圖從該列的「…」選單 */
+const NOT_IN_USE_TAG_STYLE: StatusTagStyle = {
+  container: 'bg-zinc-800/80',
+  dot: 'bg-zinc-500',
+}
+
+const IN_USE_TAG_STYLE: StatusTagStyle = {
+  container: 'bg-[rgba(0,212,146,0.2)]',
+  dot: 'bg-[#00D492]',
+}
+
+/** 清單上的時間：YYYY-MM-DD HH:mm（本地時間） */
+function formatMapListDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function compareMapLibraryEntries(
+  a: MapLibraryEntry,
+  b: MapLibraryEntry,
+  key: MapLibrarySortKey,
+  activeMapId: string | null,
+  activeLibraryId: string | null,
+): number {
+  switch (key) {
+    case 'name':
+      return a.displayName.localeCompare(b.displayName, 'zh-Hant')
+    case 'status':
+      return (
+        Number(isMapLibraryEntryActive(b, activeMapId, activeLibraryId))
+        - Number(isMapLibraryEntryActive(a, activeMapId, activeLibraryId))
+      )
+    case 'version':
+      return a.version.localeCompare(b.version, undefined, { numeric: true })
+    case 'resolution':
+      return a.pixelSize.width * a.pixelSize.height - b.pixelSize.width * b.pixelSize.height
+    case 'createdAt':
+      return Date.parse(a.createdAt) - Date.parse(b.createdAt)
+    case 'updatedAt':
+      return Date.parse(a.updatedAt) - Date.parse(b.updatedAt)
+  }
 }
 
 export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps) {
@@ -72,9 +131,15 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   const [renameDraft, setRenameDraft] = useState('')
   const [activeMapId, setActiveMapId] = useState<string | null>(null)
   const [activeLibraryId, setActiveLibraryId] = useState<string | null>(null)
-  const [activatingLibraryId, setActivatingLibraryId] = useState<string | null>(
-    null,
-  )
+  const [primaryTarget, setPrimaryTarget] = useState<MapLibraryEntry | null>(null)
+  const [keywordDraft, setKeywordDraft] = useState('')
+  const [keyword, setKeyword] = useState('')
+  const [sort, setSort] = useState<{ key: MapLibrarySortKey; dir: 'asc' | 'desc' } | null>(null)
+  const [page, setPage] = useState(1)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [importMenuOpen, setImportMenuOpen] = useState(false)
+  const rowMenuRef = useRef<HTMLDivElement>(null)
+  const importMenuRef = useRef<HTMLDivElement>(null)
 
   const refreshActiveStatus = useCallback(async () => {
     const status = await fetchMapLibraryBackendStatus()
@@ -386,364 +451,602 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     }
   }, [importParsed, pasteText, t])
 
+  /** 設為主要地圖：先檢查再切換（見 SetPrimaryMapDialog） */
   const handleSetActive = useCallback(
-    async (entry: MapLibraryEntry) => {
+    (entry: MapLibraryEntry) => {
       if (isMapLibraryEntryActive(entry, activeMapId, activeLibraryId)) return
-      setActivatingLibraryId(entry.libraryId)
-      try {
-        const result = await setActiveMapLibraryEntry(entry)
-        if (!result.ok) {
-          alert(
-            t('mapLibrary.setActiveFailed', {
-              error: result.error ?? t('mapLibrary.backendRequired'),
-            }),
-          )
-          return
-        }
-        setActiveMapId(result.mapId)
-        setActiveLibraryId(entry.libraryId)
-      } finally {
-        setActivatingLibraryId(null)
-      }
+      setPrimaryTarget(entry)
     },
-    [activeLibraryId, activeMapId, t],
+    [activeLibraryId, activeMapId],
   )
 
+  const handlePrimaryActivated = useCallback(
+    (mapId: string) => {
+      if (!primaryTarget) return
+      setActiveMapId(mapId)
+      setActiveLibraryId(primaryTarget.libraryId)
+      // 切換時已把最新內容存上後端
+      persistEntries(
+        readMapLibrary().map((e) =>
+          e.libraryId === primaryTarget.libraryId ? { ...e, publishState: 'published' as const } : e,
+        ),
+      )
+      setPrimaryTarget(null)
+    },
+    [persistEntries, primaryTarget],
+  )
+
+  const keywordActive = keyword.trim().length > 0
+  const canSearch = keywordDraft.trim().length > 0
+  const canReset = keywordDraft.length > 0 || keywordActive || sort != null
+
+  const visibleEntries = useMemo(() => {
+    const needle = keyword.trim().toLowerCase()
+    const filtered = needle
+      ? entries.filter((e) => e.displayName.toLowerCase().includes(needle))
+      : entries
+    if (!sort) return filtered
+    const dir = sort.dir === 'asc' ? 1 : -1
+    return [...filtered].sort(
+      (a, b) =>
+        dir * compareMapLibraryEntries(a, b, sort.key, activeMapId, activeLibraryId),
+    )
+  }, [entries, keyword, sort, activeMapId, activeLibraryId])
+
+  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageEntries = visibleEntries.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+  const pageNumbers = useMemo(() => {
+    const max = Math.min(5, totalPages)
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - max + 1))
+    return Array.from({ length: max }, (_, i) => start + i)
+  }, [currentPage, totalPages])
+
+  const applySearch = () => {
+    setPage(1)
+    setKeyword(keywordDraft.trim())
+  }
+
+  const resetFilters = () => {
+    setKeywordDraft('')
+    setKeyword('')
+    setSort(null)
+    setPage(1)
+  }
+
+  /** 同一欄：升冪 → 降冪 → 不排序 */
+  const toggleSort = (key: MapLibrarySortKey) => {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: 'asc' }
+      if (prev.dir === 'asc') return { key, dir: 'desc' }
+      return null
+    })
+  }
+
+  useEffect(() => {
+    if (!openMenuId && !importMenuOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (openMenuId && rowMenuRef.current && !rowMenuRef.current.contains(target)) {
+        setOpenMenuId(null)
+      }
+      if (importMenuOpen && importMenuRef.current && !importMenuRef.current.contains(target)) {
+        setImportMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [openMenuId, importMenuOpen])
+
+  const columns: Array<{ key: MapLibrarySortKey; label: string; width: string }> = [
+    { key: 'status', label: t('mapLibrary.columns.status'), width: 'w-[120px] min-w-[120px]' },
+    { key: 'version', label: t('mapLibrary.columns.version'), width: 'w-[120px] min-w-[120px]' },
+    { key: 'resolution', label: t('mapLibrary.columns.resolution'), width: 'min-w-[194px]' },
+    { key: 'createdAt', label: t('mapLibrary.columns.createdAt'), width: 'min-w-[194px]' },
+    { key: 'updatedAt', label: t('mapLibrary.columns.updatedAt'), width: 'min-w-[194px]' },
+  ]
+
+  const renderSortButton = (key: MapLibrarySortKey) => {
+    const active = sort?.key === key
+    const Icon = !active ? ChevronsUpDown : sort.dir === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className={`inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 transition hover:bg-[rgba(209,213,220,0.08)] ${
+          active ? 'text-[#51A2FF]' : 'text-[#99A1AF]'
+        }`}
+        title={t('mapLibrary.sortTitle')}
+        aria-label={t('mapLibrary.sortTitle')}
+      >
+        <Icon className="size-[18px]" aria-hidden />
+      </button>
+    )
+  }
+
+  const menuItemClass =
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]'
+  const headCellClass =
+    'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-sm font-normal leading-[18px] tracking-[0.5px] text-[#99A1AF]'
+  const bodyCellClass =
+    'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6]'
+  /** 固定左欄／右欄：底色蓋住捲過去的內容，陰影標出固定邊 */
+  const fixedLeftClass =
+    'sticky left-0 z-10 w-[200px] min-w-[200px] bg-[#18181B] shadow-[12px_6px_16px_rgba(2,9,19,0.2)]'
+  const fixedRightClass =
+    'sticky right-0 z-10 w-[58px] min-w-[58px] bg-[#18181B] shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]'
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-zinc-950 text-zinc-100">
-      <div className="border-b border-zinc-800 bg-zinc-900/90 px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            {onBackToHome && (
-              <BackToHomeButton onClick={onBackToHome} className="mt-0.5" />
-            )}
-            <div>
-              <h1 className="flex items-center gap-2 text-lg font-semibold text-zinc-100">
-                {t('mapLibrary.title')}
-                {offline && (
-                  <span
-                    title={t('mapLibrary.offlineTitle')}
-                    className="rounded border border-amber-800 px-1.5 py-0.5 text-[11px] font-normal text-amber-300"
-                  >
-                    {t('mapLibrary.offline')}
-                  </span>
-                )}
-              </h1>
-              <p className="mt-1 text-sm text-zinc-400">
-                {t('mapLibrary.subtitle')}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setNewMapDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-sm font-medium text-cyan-200 hover:bg-cyan-900/50"
-            >
-              <Plus className="size-4" aria-hidden />
-              {t('mapLibrary.newBlank')}
-            </button>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-[#18181B] p-3 text-[#F3F4F6]">
+      {/* 篩選列 */}
+      <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-2xl p-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
+          <div className="flex h-[34px] w-[180px] items-center rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5">
+            <Search className="mr-1 size-5 shrink-0 text-[#99A1AF]" aria-hidden />
             <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) void handleImportFile(f)
-                e.target.value = ''
+              type="search"
+              value={keywordDraft}
+              onChange={(e) => setKeywordDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && canSearch) applySearch()
               }}
+              placeholder={t('common.keywordPlaceholder')}
+              className="min-w-0 flex-1 bg-transparent py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] placeholder:text-[#99A1AF] focus:outline-none"
             />
+          </div>
+          <button
+            type="button"
+            onClick={applySearch}
+            disabled={!canSearch}
+            className={`inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 transition ${
+              canSearch
+                ? 'bg-[rgba(43,127,255,0.2)] text-[#51A2FF] hover:bg-[rgba(43,127,255,0.3)]'
+                : 'cursor-not-allowed bg-[rgba(98,116,142,0.2)] text-[#4A5565]'
+            }`}
+            title={t('common.search')}
+            aria-label={t('common.search')}
+          >
+            <Search className="size-6" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={!canReset}
+            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] transition ${
+              canReset
+                ? 'text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]'
+                : 'cursor-not-allowed text-[#4A5565]'
+            }`}
+            title={t('common.resetFiltersTitle')}
+          >
+            <RotateCw className="size-[18px]" aria-hidden />
+            {t('mapLibrary.reset')}
+          </button>
+          {offline && (
+            <span
+              title={t('mapLibrary.offlineTitle')}
+              className="rounded-lg border border-amber-800/70 px-2 py-1 text-xs text-amber-300"
+            >
+              {t('mapLibrary.offline')}
+            </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleImportFile(f)
+              e.target.value = ''
+            }}
+          />
+          {/* 匯入：檔案、貼上、從伺服器載入收在同一顆按鈕 */}
+          <div ref={importMenuRef} className="relative">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
+              onClick={() => setImportMenuOpen((v) => !v)}
+              aria-expanded={importMenuOpen}
+              className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-[#51A2FF] transition hover:bg-[rgba(81,162,255,0.08)]"
             >
-              <FolderOpen className="size-4" aria-hidden />
+              <CloudDownload className="size-[18px]" aria-hidden />
               {t('mapLibrary.importFile')}
             </button>
+            {importMenuOpen && (
+              <div className="absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMenuOpen(false)
+                    fileInputRef.current?.click()
+                  }}
+                  className={menuItemClass}
+                >
+                  <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
+                  {t('mapLibrary.importFromFile')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMenuOpen(false)
+                    setPasteOpen((v) => !v)
+                  }}
+                  className={menuItemClass}
+                >
+                  <FileText className="size-4 text-[#99A1AF]" aria-hidden />
+                  {t('mapLibrary.pasteFile')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMenuOpen(false)
+                    void handleOpenServerList()
+                  }}
+                  className={menuItemClass}
+                >
+                  <Server className="size-4 text-[#99A1AF]" aria-hidden />
+                  {t('mapLibrary.loadFromServer')}
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setNewMapDialogOpen(true)}
+            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
+          >
+            <Plus className="size-[18px]" strokeWidth={2} aria-hidden />
+            {t('mapLibrary.newBlank')}
+          </button>
+        </div>
+      </div>
+
+      {serverOpen && (
+        <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
+          <p className="text-xs text-[#99A1AF]">
+            {t('mapLibrary.serverHintBefore')}
+            <span className="text-[#D1D5DC]">{t('mapLibrary.serverHintEmphasis')}</span>
+            {t('mapLibrary.serverHintAfter')}
+          </p>
+
+          {serverError ? (
+            <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 px-2 py-1.5 text-xs text-red-300">
+              {t('mapLibrary.serverListFailed', { error: serverError })}
+            </p>
+          ) : serverMaps === null ? (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-[#99A1AF]">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              {t('mapLibrary.serverLoading')}
+            </p>
+          ) : serverMaps.length === 0 ? (
+            <p className="mt-2 text-xs text-[#99A1AF]">{t('mapLibrary.serverEmpty')}</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-[rgba(212,212,212,0.15)]">
+              {serverMaps.map((m) => (
+                <li key={m.mapId} className="flex items-center gap-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate text-sm text-[#F3F4F6]">
+                      {m.displayName}
+                      {m.mapId === serverActiveId ? (
+                        <StatusTag label={t('mapLibrary.inUse')} style={IN_USE_TAG_STYLE} />
+                      ) : null}
+                    </p>
+                    <p className="truncate text-[11px] text-[#99A1AF]">
+                      {m.mapId} · {m.version ?? t('mapLibrary.noVersion')}
+                      {m.updatedAt ? ` · ${formatMapListDate(m.updatedAt)}` : ''}
+                      {typeof m.routeCount === 'number'
+                        ? ` · ${t('mapLibrary.routeCount', { count: m.routeCount })}`
+                        : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={serverLoadingId != null}
+                    onClick={() => void handleLoadFromServer(m)}
+                    className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 text-sm font-medium text-[#51A2FF] hover:bg-[rgba(81,162,255,0.08)] disabled:opacity-40"
+                  >
+                    {serverLoadingId === m.mapId ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <CloudDownload className="size-4" aria-hidden />
+                    )}
+                    {t('mapLibrary.load')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {pasteOpen && (
+        <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
+          <label htmlFor={pasteAreaId} className="text-xs text-[#99A1AF]">
+            {t('mapLibrary.pasteLabel')}
+          </label>
+          <textarea
+            id={pasteAreaId}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={6}
+            className="mt-1 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-2 font-mono text-xs text-[#F3F4F6] outline-none focus:ring-1 focus:ring-[#51A2FF]"
+            placeholder='{"schemaVersion":2,"mapId":"...", ...}'
+          />
+          <div className="mt-2 flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => setPasteOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
+              onClick={() => {
+                setPasteOpen(false)
+                setPasteText('')
+              }}
+              className="inline-flex h-[34px] items-center rounded-lg bg-[rgba(209,213,220,0.12)] px-3.5 text-sm font-medium text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.18)]"
             >
-              <FileText className="size-4" aria-hidden />
-              {t('mapLibrary.pasteFile')}
+              {t('common.cancel')}
             </button>
             <button
               type="button"
-              onClick={() => void handleOpenServerList()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-700"
+              onClick={handlePasteImport}
+              className="inline-flex h-[34px] items-center rounded-lg bg-[#2B7FFF] px-3.5 text-sm font-medium text-white hover:bg-[#2569e6]"
             >
-              <CloudDownload className="size-4" aria-hidden />
-              {t('mapLibrary.loadFromServer')}
+              {t('mapLibrary.import')}
             </button>
           </div>
         </div>
+      )}
 
-        {serverOpen && (
-          <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-            <p className="text-xs text-zinc-400">
-              {t('mapLibrary.serverHintBefore')}
-              <span className="text-zinc-300">{t('mapLibrary.serverHintEmphasis')}</span>
-              {t('mapLibrary.serverHintAfter')}
-            </p>
-
-            {serverError ? (
-              <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 px-2 py-1.5 text-xs text-red-300">
-                {t('mapLibrary.serverListFailed', { error: serverError })}
-              </p>
-            ) : serverMaps === null ? (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                {t('mapLibrary.serverLoading')}
-              </p>
-            ) : serverMaps.length === 0 ? (
-              <p className="mt-2 text-xs text-zinc-500">{t('mapLibrary.serverEmpty')}</p>
+      {/* 表格 + 分頁 */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        {/* 內距放在捲動容器外：固定欄貼齊捲動邊界，左右不露出捲過去的內容 */}
+        <div className="flex min-h-0 flex-1 flex-col px-3">
+          <div className="min-h-0 flex-1 overflow-auto">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-[#99A1AF]">
+                <Loader2 className="size-5 animate-spin" aria-hidden />
+                {t('mapLibrary.loading')}
+              </div>
+            ) : error ? (
+              <p className="py-4 text-sm text-red-400">{error}</p>
             ) : (
-              <ul className="mt-2 divide-y divide-zinc-800">
-                {serverMaps.map((m) => (
-                  <li key={m.mapId} className="flex items-center gap-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-zinc-100">
-                        {m.displayName}
-                        {m.mapId === serverActiveId ? (
-                          <span className="ml-2 rounded border border-cyan-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
-                            {t('mapLibrary.inUse')}
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="truncate text-[11px] text-zinc-500">
-                        {m.mapId} · {m.version ?? t('mapLibrary.noVersion')}
-                        {m.updatedAt ? ` · ${formatMapLibraryDate(m.updatedAt)}` : ''}
-                        {typeof m.routeCount === 'number'
-                          ? ` · ${t('mapLibrary.routeCount', { count: m.routeCount })}`
-                          : ''}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={serverLoadingId != null}
-                      onClick={() => void handleLoadFromServer(m)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-cyan-700/60 bg-cyan-950/50 px-2.5 py-1 text-xs text-cyan-200 hover:bg-cyan-900/50 disabled:opacity-40"
-                    >
-                      {serverLoadingId === m.mapId ? (
-                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                      ) : (
-                        <CloudDownload className="size-3.5" aria-hidden />
-                      )}
-                      {t('mapLibrary.load')}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {pasteOpen && (
-          <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-            <label htmlFor={pasteAreaId} className="text-xs text-zinc-400">
-              {t('mapLibrary.pasteLabel')}
-            </label>
-            <textarea
-              id={pasteAreaId}
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-              rows={6}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-cyan-500"
-              placeholder='{"schemaVersion":2,"mapId":"...", ...}'
-            />
-            <div className="mt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPasteOpen(false)
-                  setPasteText('')
-                }}
-                className="rounded-md border border-zinc-600 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handlePasteImport}
-                className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1 text-sm text-cyan-100 hover:bg-cyan-900/50"
-              >
-                {t('mapLibrary.import')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
-            <Loader2 className="size-5 animate-spin" aria-hidden />
-            {t('mapLibrary.loading')}
-          </div>
-        ) : error ? (
-          <p className="text-sm text-red-400">{error}</p>
-        ) : entries.length === 0 ? (
-          <p className="text-sm text-zinc-500">{t('mapLibrary.empty')}</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.name')}</th>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.status')}</th>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.version')}</th>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.resolution')}</th>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.createdAt')}</th>
-                  <th className="px-4 py-3 font-medium">{t('mapLibrary.columns.updatedAt')}</th>
-                  <th className="px-4 py-3 font-medium text-right">{t('mapLibrary.columns.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {entries.map((entry) => {
-                  const isActive = isMapLibraryEntryActive(
-                    entry,
-                    activeMapId,
-                    activeLibraryId,
-                  )
-                  const isActivating = activatingLibraryId === entry.libraryId
-                  return (
-                  <tr
-                    key={entry.libraryId}
-                    className={isActive ? 'bg-cyan-950/20 hover:bg-cyan-950/30' : 'hover:bg-zinc-900/50'}
-                  >
-                    <td className="px-4 py-3">
-                      {renamingId === entry.libraryId ? (
-                        <input
-                          value={renameDraft}
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          onBlur={() => commitRename(entry.libraryId)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitRename(entry.libraryId)
-                            if (e.key === 'Escape') {
-                              setRenamingId(null)
-                              setRenameDraft('')
-                            }
-                          }}
-                          autoFocus
-                          className="w-full min-w-[10rem] rounded border border-cyan-600 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 outline-none"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-zinc-100">
-                            {entry.displayName}
-                          </span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] ${
-                              entry.mapDocument.creationMode === 'trackGen'
-                                ? 'bg-emerald-950/70 text-emerald-300/90'
-                                : 'bg-zinc-800 text-zinc-400'
+              <table className="w-full min-w-[1040px] border-separate border-spacing-0">
+                <thead className="sticky top-0 z-20 bg-[#18181B]">
+                  <tr>
+                    <th className={`${headCellClass} ${fixedLeftClass} z-30`}>
+                      <div className="flex items-center gap-1">
+                        <span className="flex-1">{t('mapLibrary.columns.name')}</span>
+                        {renderSortButton('name')}
+                      </div>
+                    </th>
+                    {columns.map((col) => (
+                      <th key={col.key} className={`${headCellClass} ${col.width}`}>
+                        <div className="flex items-center gap-1">
+                          <span className="flex-1 whitespace-nowrap">{col.label}</span>
+                          {renderSortButton(col.key)}
+                        </div>
+                      </th>
+                    ))}
+                    <th
+                      className={`${headCellClass} ${fixedRightClass} z-30`}
+                      aria-label={t('mapLibrary.columns.actions')}
+                    />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length + 2} className="py-16 text-center text-sm text-[#99A1AF]">
+                        {entries.length === 0 ? t('mapLibrary.empty') : t('mapLibrary.noMatch')}
+                      </td>
+                    </tr>
+                  ) : (
+                    pageEntries.map((entry) => {
+                      const isActive = isMapLibraryEntryActive(entry, activeMapId, activeLibraryId)
+                        return (
+                        <tr key={entry.libraryId} className="group">
+                          <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-[#1f1f23]`}>
+                            {renamingId === entry.libraryId ? (
+                              <input
+                                value={renameDraft}
+                                onChange={(e) => setRenameDraft(e.target.value)}
+                                onBlur={() => commitRename(entry.libraryId)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitRename(entry.libraryId)
+                                  if (e.key === 'Escape') {
+                                    setRenamingId(null)
+                                    setRenameDraft('')
+                                  }
+                                }}
+                                autoFocus
+                                className="h-[34px] w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-sm text-[#F3F4F6] outline-none focus:ring-1 focus:ring-[#51A2FF]"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onOpenMap(entry.libraryId)}
+                                className="block w-full truncate text-left hover:text-[#51A2FF]"
+                                title={t('mapLibrary.openTitle')}
+                              >
+                                {entry.displayName}
+                              </button>
+                            )}
+                          </td>
+                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                            {isActive ? (
+                              <StatusTag label={t('mapLibrary.inUse')} style={IN_USE_TAG_STYLE} />
+                            ) : (
+                              <StatusTag label={t('mapLibrary.notInUse')} style={NOT_IN_USE_TAG_STYLE} />
+                            )}
+                          </td>
+                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{entry.version}</td>
+                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                            {entry.pixelSize.width} x {entry.pixelSize.height}
+                          </td>
+                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                            {formatMapListDate(entry.createdAt)}
+                          </td>
+                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                            {formatMapListDate(entry.updatedAt)}
+                          </td>
+                          {/* 選單開著的那一格要疊在後面幾列的固定欄之上，不然選單被下一列的「…」蓋住 */}
+                          <td
+                            className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-[#1f1f23] ${
+                              openMenuId === entry.libraryId ? '!z-[25]' : ''
                             }`}
                           >
-                            {entry.mapDocument.creationMode === 'trackGen'
-                              ? t('mapLibrary.modeTrackGen')
-                              : t('mapLibrary.modeBlank')}
-                          </span>
-                          {entry.builtinId && (
-                            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                              {t('mapLibrary.builtin')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {isActive ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/50 bg-cyan-950/50 px-2 py-0.5 text-[10px] font-medium text-cyan-200">
-                          <MapPin className="size-3 shrink-0" aria-hidden />
-                          {t('mapLibrary.inUse')}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-300">
-                      {entry.version}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-300">
-                      {entry.pixelSize.width}×{entry.pixelSize.height}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">
-                      {formatMapLibraryDate(entry.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">
-                      {formatMapLibraryDate(entry.updatedAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {!isActive ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleSetActive(entry)}
-                            disabled={isActivating}
-                            className="inline-flex items-center gap-1 rounded-md border border-amber-600/50 bg-amber-950/40 px-2 py-1 text-xs text-amber-100 hover:bg-amber-900/50 disabled:opacity-50"
-                            title={t('mapLibrary.setActiveTitle')}
-                          >
-                            {isActivating ? (
-                              <Loader2 className="size-3 animate-spin" aria-hidden />
-                            ) : (
-                              <MapPin className="size-3" aria-hidden />
-                            )}
-                            {t('mapLibrary.setActive')}
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => onOpenMap(entry.libraryId)}
-                          className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-900/50"
-                          title={t('mapLibrary.openTitle')}
-                        >
-                          {t('mapLibrary.open')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startRename(entry)}
-                          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title={t('mapLibrary.renameTitle')}
-                        >
-                          <Pencil className="size-3.5" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicate(entry.libraryId)}
-                          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title={t('mapLibrary.duplicateTitle')}
-                        >
-                          <Copy className="size-3.5" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleExport(entry)}
-                          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                          title={t('mapLibrary.exportTitle')}
-                        >
-                          <Download className="size-3.5" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(entry)}
-                          className="rounded-md p-1.5 text-zinc-400 hover:bg-red-950/60 hover:text-red-300"
-                          title={t('common.delete')}
-                        >
-                          <Trash2 className="size-3.5" aria-hidden />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                            <div
+                              ref={openMenuId === entry.libraryId ? rowMenuRef : undefined}
+                              className="relative flex justify-center"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenMenuId((prev) =>
+                                    prev === entry.libraryId ? null : entry.libraryId,
+                                  )
+                                }
+                                className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]"
+                                title={t('common.moreActions')}
+                                aria-label={t('common.moreActions')}
+                              >
+                                <MoreHorizontal className="size-6" aria-hidden />
+                              </button>
+                              {openMenuId === entry.libraryId && (
+                                <div className="absolute right-0 top-full z-40 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null)
+                                      onOpenMap(entry.libraryId)
+                                    }}
+                                    className={menuItemClass}
+                                  >
+                                    <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
+                                    {t('mapLibrary.openTitle')}
+                                  </button>
+                                  {!isActive && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null)
+                                        handleSetActive(entry)
+                                      }}
+                                      className={menuItemClass}
+                                      title={t('mapLibrary.setActiveTitle')}
+                                    >
+                                      <MapPin className="size-4 text-[#99A1AF]" aria-hidden />
+                                      {t('mapLibrary.setActive')}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null)
+                                      startRename(entry)
+                                    }}
+                                    className={menuItemClass}
+                                  >
+                                    <Pencil className="size-4 text-[#99A1AF]" aria-hidden />
+                                    {t('mapLibrary.renameTitle')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null)
+                                      void handleDuplicate(entry.libraryId)
+                                    }}
+                                    className={menuItemClass}
+                                  >
+                                    <Copy className="size-4 text-[#99A1AF]" aria-hidden />
+                                    {t('mapLibrary.duplicateTitle')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null)
+                                      handleExport(entry)
+                                    }}
+                                    className={menuItemClass}
+                                  >
+                                    <Download className="size-4 text-[#99A1AF]" aria-hidden />
+                                    {t('mapLibrary.exportTitle')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null)
+                                      void handleDelete(entry)
+                                    }}
+                                    className={`${menuItemClass} hover:text-red-300`}
+                                  >
+                                    <Trash2 className="size-4 text-[#99A1AF]" aria-hidden />
+                                    {t('common.delete')}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
+        </div>
+
+        {!loading && !error && visibleEntries.length > 0 && (
+          <nav className="flex h-6 shrink-0 items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+              className="inline-flex size-6 items-center justify-center rounded-lg text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
+              aria-label={t('mapLibrary.prevPage')}
+            >
+              <ChevronLeft className="size-[18px]" aria-hidden />
+            </button>
+            {pageNumbers.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPage(n)}
+                aria-current={n === currentPage ? 'page' : undefined}
+                className={`inline-flex size-6 items-center justify-center rounded-lg text-sm leading-[18px] tracking-[0.5px] ${
+                  n === currentPage
+                    ? 'border border-[#51A2FF] text-[#51A2FF]'
+                    : 'text-[#F3F4F6] hover:bg-[rgba(209,213,220,0.08)]'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+              className="inline-flex size-6 items-center justify-center rounded-lg text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
+              aria-label={t('mapLibrary.nextPage')}
+            >
+              <ChevronRight className="size-[18px]" aria-hidden />
+            </button>
+          </nav>
         )}
       </div>
+
+      {primaryTarget && (
+        <SetPrimaryMapDialog
+          entry={primaryTarget}
+          onClose={() => setPrimaryTarget(null)}
+          onActivated={handlePrimaryActivated}
+        />
+      )}
 
       <NewMapPixelDialog
         open={newMapDialogOpen}

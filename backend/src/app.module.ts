@@ -56,6 +56,7 @@ import { VehicleModule } from './vehicle/vehicle.module';
 import { DatasourceModule } from './datasource/datasource.module';
 import { FacilityModule } from './facility/facility.module';
 import { OperationMetricsModule } from './operation-metrics/operation-metrics.module';
+import { MapActivationModule } from './map-activation/map-activation.module';
 import { DemoSimulationModule } from './demo/demo-simulation.module';
 import { MapModule } from './map/map.module';
 import { TimeTemplateModule } from './time-template/time-template.module';
@@ -145,6 +146,7 @@ import { DatabaseInitService } from './database/database-init.service';
     DatasourceModule,
     FacilityModule,
     OperationMetricsModule,
+    MapActivationModule,
     DemoSimulationModule,
     MapModule,
     TimeTemplateModule,
