@@ -7,6 +7,10 @@ import {
   MAINLINE_FLEET_STATUS_SQL,
   VEHICLE_DISTRIBUTION_INVALIDATE_TAGS,
   VEHICLE_DISTRIBUTION_URL,
+  SHIFT_CENTER_URL,
+  CAPACITY_SUMMARY_URL,
+  CAPACITY_TREND_URL,
+  OPERATION_METRICS_INVALIDATE_TAGS,
   maintenanceSlotsSql,
   maintenanceZoneCountSql,
 } from '../constants/demoSql';
@@ -469,8 +473,46 @@ export function patchVehicleDistributionSource(plane: DashboardPlane): Dashboard
   return changed ? { ...plane, elements } : plane;
 }
 
+/**
+ * 班次中心、運能趨勢：舊 SQL 讀近 7 天全部訂單與 capacity_trend_demo_points 示範表。
+ * 依 SQL 認出是哪一種，改接後端營運指標（欄位名稱不變，只換資料來源）。
+ */
+function operationMetricsUrlFor(child: ChildWidget): string | null {
+  const sql = String((child as { sqlQuery?: string }).sqlQuery ?? '');
+  if (!sql) return null;
+  if (sql.includes('total_shifts') && sql.includes('FROM operation_orders')) return SHIFT_CENTER_URL;
+  if (sql.includes('capacity_trend_demo_points') && sql.includes('live_val')) return CAPACITY_SUMMARY_URL;
+  if (sql.includes('capacity_trend_demo_points') && sql.includes('forecast_util')) return CAPACITY_TREND_URL;
+  return null;
+}
+
+export function patchOperationMetricsSources(plane: DashboardPlane): DashboardPlane {
+  let changed = false;
+  const elements = plane.elements.map((el) => {
+    const children = el.children ?? [];
+    if (!children.some((child) => operationMetricsUrlFor(child))) return el;
+    changed = true;
+    return {
+      ...el,
+      children: children.map((child) => {
+        const url = operationMetricsUrlFor(child);
+        if (!url) return child;
+        return {
+          ...withoutSqlBinding(child as ChildWidget & { sqlQuery?: string; dataSourceId?: string }),
+          dataUrl: url,
+          refreshMode: 'event',
+          refreshInterval: 0,
+          invalidateTags: [...OPERATION_METRICS_INVALIDATE_TAGS],
+        } as ChildWidget;
+      }),
+    };
+  });
+  return changed ? { ...plane, elements } : plane;
+}
+
 export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlane {
   return patchEventDrivenSqlRefresh(
+    patchOperationMetricsSources(
     patchVehicleDistributionSource(
     patchMaintenanceDistributionWidget(
     patchMaintenanceDistributionSql(
@@ -485,6 +527,7 @@ export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlan
           ),
         ),
       ),
+    ),
     ),
     ),
     ),

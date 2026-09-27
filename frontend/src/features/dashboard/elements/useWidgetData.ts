@@ -16,6 +16,36 @@ export interface WidgetFetchState {
 const FETCH_TIMEOUT_MS = 10_000;
 const EVENT_FALLBACK_INTERVAL_SEC = 30;
 
+/**
+ * 同一個 REST 網址在這段時間內只真的打一次，其餘元件共用結果。
+ *
+ * 一塊面板常常好幾個元件綁同一支 API（運能趨勢四個數值卡＋兩行說明綁同一個 summary）。
+ * 訂單失效通知約每秒一次，各自重打會把後端壓垮：請求排隊超過逾時就被放棄，畫面
+ * 反而一直是空的。共用進行中的請求、短時間內重用結果，一支 API 每秒最多一次。
+ */
+const REST_SHARE_MS = 2_000;
+const restShared = new Map<string, { at: number; promise: Promise<unknown> }>();
+
+function fetchJsonShared(url: string): Promise<unknown> {
+  const now = Date.now();
+  const hit = restShared.get(url);
+  if (hit && now - hit.at < REST_SHARE_MS) return hit.promise;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const promise = fetch(url, { signal: controller.signal })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<unknown>;
+    })
+    .catch((error: unknown) => {
+      restShared.delete(url);
+      throw error;
+    })
+    .finally(() => clearTimeout(timeoutId));
+  restShared.set(url, { at: now, promise });
+  return promise;
+}
+
 export type WidgetDataOptions = WidgetDataBinding & {
   refreshInterval?: number;
 };
@@ -93,22 +123,17 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
       }
 
       if (dataUrl?.trim()) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         try {
           const finalUrl = interpolateVariables(dataUrl, vars);
-          const r = await fetch(finalUrl, { signal: controller.signal });
-          const d = await r.json();
+          const d = await fetchJsonShared(finalUrl) as Record<string, unknown> | Record<string, unknown>[];
           if (aborted) return;
-          const rows = Array.isArray(d) ? d : (d.data ?? [d]);
+          const rows = Array.isArray(d) ? d : ((d.data as Record<string, unknown>[] | undefined) ?? [d]);
           lastGoodData.current = rows;
           setState({ data: rows, loading: false, error: null });
         } catch (e: unknown) {
           if (aborted) return;
           const msg = e instanceof Error ? e.message : String(e);
           setState({ data: lastGoodData.current, loading: false, error: msg });
-        } finally {
-          clearTimeout(timeoutId);
         }
         return;
       }

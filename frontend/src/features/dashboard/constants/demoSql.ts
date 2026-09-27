@@ -76,6 +76,18 @@ ORDER BY created_at DESC
 LIMIT 12
 `.trim();
 
+/**
+ * 班次中心、運能趨勢的資料來源：後端依部署班表、時間模板與當天訂單計算
+ * （backend/src/operation-metrics）。舊的 SQL 讀近 7 天全部訂單與 capacity_trend_demo_points 示範表，
+ * 已不使用；儲存的版面在載入時自動改接（patchOperationMetricsSources）。
+ */
+export const SHIFT_CENTER_URL = '/syncdrive-api/operation-metrics/shift-center';
+export const CAPACITY_SUMMARY_URL = '/syncdrive-api/operation-metrics/capacity-summary';
+export const CAPACITY_TREND_URL = '/syncdrive-api/operation-metrics/capacity-trend';
+/** 訂單狀態改變（開始、結束、故障）時重查；其餘由 30 秒補查兜底 */
+export const OPERATION_METRICS_INVALIDATE_TAGS = ['table:operation_orders', 'domain:shift_center'] as const;
+
+/** @deprecated 近 7 天全部訂單；已改用 SHIFT_CENTER_URL */
 export const SHIFT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_shifts,

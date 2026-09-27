@@ -40,7 +40,11 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
   const sqlData = useWidgetData({
     dataSourceId: fleetSql ? (widget.dataSourceId || 'default-internal') : widget.dataSourceId,
     sqlQuery: fleetSql ?? widget.sqlQuery,
+    dataUrl: fleetSql ? undefined : widget.dataUrl,
     refreshInterval: fleetSql ? MAINLINE_FLEET_REFRESH_INTERVAL : widget.refreshInterval,
+    ...(fleetSql
+      ? {}
+      : { refreshMode: widget.refreshMode, invalidateTags: widget.invalidateTags, freshnessPolicy: widget.freshnessPolicy }),
   });
 
   const resolvedMqttTopic = widget.mqttTopic

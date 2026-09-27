@@ -22,6 +22,9 @@ export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget })
     sqlQuery: widget.sqlQuery,
     dataUrl: widget.dataUrl,
     refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    invalidateTags: widget.invalidateTags,
+    freshnessPolicy: widget.freshnessPolicy,
   });
 
   const mqttData = useMqttData({

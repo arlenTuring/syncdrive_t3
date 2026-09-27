@@ -94,6 +94,29 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
     expect(result.completedAt).toBeTruthy();
   });
 
+  it('開始執行記下實際發車時刻；故障復歸不覆寫', async () => {
+    const order = makeOrder(OrderStatus.PENDING);
+    orderRepo.findOne.mockResolvedValue(order);
+    const started = await service.updateOrderStatus(order.id, 'PROCESSING');
+    const firstStart = (started.payload as Record<string, unknown>).actual_started_at;
+    expect(typeof firstStart).toBe('number');
+
+    const faulted = { ...started, status: OrderStatus.FAULTED } as OperationOrder;
+    orderRepo.findOne.mockResolvedValue(faulted);
+    const recovered = await service.updateOrderStatus(order.id, 'PROCESSING');
+    expect((recovered.payload as Record<string, unknown>).actual_started_at).toBe(firstStart);
+  });
+
+  it('結束時寫延誤分鐘：晚於計畫結束一分鐘以上才算延誤', async () => {
+    const late = { ...makeOrder(OrderStatus.PROCESSING), plannedEnd: String(Date.now() - 150_000) } as OperationOrder;
+    orderRepo.findOne.mockResolvedValue(late);
+    expect((await service.updateOrderStatus(late.id, 'END')).delayMinutes).toBe(2);
+
+    const onTime = { ...makeOrder(OrderStatus.PROCESSING), plannedEnd: String(Date.now() - 30_000) } as OperationOrder;
+    orderRepo.findOne.mockResolvedValue(onTime);
+    expect((await service.updateOrderStatus(onTime.id, 'END')).delayMinutes).toBe(0);
+  });
+
   it('允許 FAULTED → PROCESSING（人工復歸）', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.FAULTED));
     const result = await service.updateOrderStatus(

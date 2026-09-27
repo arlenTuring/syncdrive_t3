@@ -553,12 +553,24 @@ export class OrderService {
       throw new BadRequestException({ statusCode: 400, code: 'INVALID_ORDER_TRANSITION', message: `Invalid state transition: '${order.status}' → '${targetStatus}'.` });
     }
 
+    const now = Date.now();
     order.status = targetStatus;
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
-      order.completedAt = String(Date.now());
+      order.completedAt = String(now);
+      // 延誤＝實際結束晚於計畫結束的整分鐘數（不到一分鐘算準點）。班次中心的「延誤班次」
+      // 與班次運行紀錄的準點／延誤篩選都讀這個欄位；先前只有示範模擬會寫它。
+      const plannedEnd = Number(order.plannedEnd);
+      if (targetStatus === OrderStatus.END && Number.isFinite(plannedEnd) && plannedEnd > 0) {
+        order.delayMinutes = Math.max(0, Math.floor((now - plannedEnd) / 60_000));
+      }
     } else if (targetStatus === OrderStatus.PROCESSING) {
       // bigint 欄位清空須用 null，不可用空字串
       order.completedAt = null;
+      // 實際發車時刻：運能趨勢的「即時數值」照實際發車算，不照計畫。故障復歸不覆寫。
+      const payload = (order.payload ?? {}) as Record<string, unknown>;
+      if (payload.actual_started_at == null) {
+        order.payload = { ...payload, actual_started_at: now };
+      }
     }
     const saved = await this.orderRepository.save(order);
     this.datasourceInvalidation.emitOrderLifecycle(saved.vehicleCode);
