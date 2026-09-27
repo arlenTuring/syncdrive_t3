@@ -17,6 +17,8 @@ export class MqttService {
   private readonly operationSyncCache = new Map<string, { at: number; key: string }>();
   private lastVehiclePositionInvalidationAt = 0;
   private lastOrderLifecycleInvalidationAt = 0;
+  /** 各車上一次判定的所在設施（無則空字串）；換格或離格時才通知整備分佈重查 */
+  private readonly lastFacilityByVehicle = new Map<string, string>();
 
   constructor(
     @InjectRepository(CommandLog)
@@ -79,6 +81,14 @@ export class MqttService {
         Number.isFinite(battery) ? battery : null,
       ],
     );
+
+    // 整備分佈只在「車進出格位」時需要重查：每秒的 telemetry 大多只是位置微動
+    const facilityId = location?.kind === 'FACILITY' ? String(location.objectId ?? '') : '';
+    const previousFacilityId = this.lastFacilityByVehicle.get(vehicleCode);
+    this.lastFacilityByVehicle.set(vehicleCode, facilityId);
+    if (previousFacilityId !== undefined && previousFacilityId !== facilityId) {
+      this.datasourceInvalidation.emitMaintenanceSlots();
+    }
 
     // 一秒內通常會連續收到整個車隊的 telemetry。資料逐筆寫庫，但失效通知合併成
     // 每秒最多一次；前端收到後會重查整張車輛快照，避免 11 台車造成 11 次 SQL。

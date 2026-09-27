@@ -270,6 +270,15 @@ WHERE fs.zone LIKE '整備-%' AND fs.is_active = true
   )
 `.trim();
 
+/**
+ * 車輛分布資料來源：後端依車輛即時位置、進行中訂單與部署班表判定
+ * （跟整備分佈同一套判斷），回傳 status_code／pct／vehicle_count。
+ */
+export const VEHICLE_DISTRIBUTION_URL = '/syncdrive-api/facility/vehicle-distribution';
+/** 車輛狀態只在訂單狀態改變或車進出格位時會變 */
+export const VEHICLE_DISTRIBUTION_INVALIDATE_TAGS = ['domain:maintenance_slots', 'table:operation_orders'] as const;
+
+/** @deprecated 「整備中」讀 slot_statuses 示範表；已改用 VEHICLE_DISTRIBUTION_URL */
 /** 車輛分布：依車輛狀態彙總比例與數量（每列一個 status_code） */
 export const VEHICLE_DISTRIBUTION_SQL = `
 SELECT

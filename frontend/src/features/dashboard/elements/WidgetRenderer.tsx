@@ -13,6 +13,7 @@ import { ProgressBarWidgetView } from './ProgressBarWidget';
 import { ClockWidgetView }       from './ClockWidget';
 import { EmptyStateWidgetView }  from './EmptyStateWidget';
 import { SegmentBarWidgetView }  from './SegmentBarWidget';
+import { MaintenanceDistributionWidgetView } from './MaintenanceDistributionWidget';
 import { BarChartWidgetView }    from './BarChartWidget';
 import { MapCanvasWidgetView }   from './MapCanvasWidget';
 import { UnitTelemetryCardWidgetView } from './UnitTelemetryCardWidget';
@@ -46,6 +47,7 @@ export function WidgetRenderer({
     case 'clock':          return <ClockWidgetView widget={widget} />;
     case 'empty-state':    return <EmptyStateWidgetView widget={widget} />;
     case 'segment-bar':    return <SegmentBarWidgetView widget={widget} />;
+    case 'maintenance-distribution': return <MaintenanceDistributionWidgetView widget={widget} />;
     case 'bar-chart':      return <BarChartWidgetView widget={widget} />;
     case 'map-canvas':     return <MapCanvasWidgetView widget={widget} />;
     case 'unit-telemetry-card': return <UnitTelemetryCardWidgetView widget={widget} />;

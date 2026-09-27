@@ -344,6 +344,29 @@ export class OperationShiftService {
     /** 原始計畫內容。空車移動卡的起訖點只存在這裡，班次展開結果不含。 */
     body: Record<string, unknown>;
   } | null> {
+    const deployed = await this.getDeployedShift();
+    if (!deployed) return null;
+
+    const range = parseTimeRangeQuery({});
+    return {
+      ...deployed,
+      trips: expandTimetableTrips({
+        body: deployed.body,
+        range,
+        passengerOnly: false,
+      }),
+    };
+  }
+
+  /**
+   * 部署中的那一份班表（不展開班次）。只要設定內容的地方（例如整備分佈要知道
+   * 有哪些整備區塊、各用哪些格位）用這一支，不必為了讀設定展開整天的班次。
+   */
+  async getDeployedShift(): Promise<{
+    shiftId: string;
+    shiftName: string;
+    body: Record<string, unknown>;
+  } | null> {
     const rows = await this.repo.find({
       where: { usageStatus: OperationShiftUsageStatus.IN_USE },
       order: { updatedAt: 'DESC' },
@@ -351,18 +374,7 @@ export class OperationShiftService {
     });
     const deployed = rows.find((row) => this.bodyHasPlan(row.body ?? {}));
     if (!deployed) return null;
-
-    const range = parseTimeRangeQuery({});
-    return {
-      shiftId: deployed.id,
-      shiftName: deployed.name,
-      body: deployed.body ?? {},
-      trips: expandTimetableTrips({
-        body: deployed.body ?? {},
-        range,
-        passengerOnly: false,
-      }),
-    };
+    return { shiftId: deployed.id, shiftName: deployed.name, body: deployed.body ?? {} };
   }
 
   async getStationEtas(query: {

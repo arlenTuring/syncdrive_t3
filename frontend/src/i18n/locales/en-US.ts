@@ -3057,6 +3057,15 @@ const enUS: DeepStringify<typeof zhTW> = {
           statusLegend: 'Status color map (built-in; not stored in DB)',
           statusCode: 'Status code',
         },
+        maintenanceDistribution: {
+          title: 'Maintenance distribution',
+          dataUrl: 'Data API',
+          columns: 'Cards per row',
+          slotFontSize: 'Slot font size',
+          titleFontSize: 'Title font size',
+          cardTitleFontSize: 'Card title font size',
+          hint: 'Categories, slots and occupancy come from the backend: categories are the enabled maintenance sections of the deployed schedule, slots are the facilities each section uses, occupied means a vehicle is currently inside the slot. Updates when vehicles enter or leave slots.',
+        },
         slotGrid: {
           title: 'Slot grid',
           nameField: 'Slot label field',
@@ -3371,6 +3380,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         statusBadge: { label: 'Status badge', description: 'Dynamic colored status tag' },
         routeProgress: { label: 'Route progress', description: 'Linear route / detail card' },
         slotGrid: { label: 'Slot grid', description: 'Site slot status monitor' },
+        maintenanceDistribution: { label: 'Maintenance distribution', description: 'Slot occupancy by deployed maintenance sections' },
         unitTelemetry: {
           label: 'Telemetry card',
           description: 'Dual gauges + four subsystem lights',

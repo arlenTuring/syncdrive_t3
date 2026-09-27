@@ -30,7 +30,11 @@ export function SegmentBarWidgetView({ widget }: { widget: SegmentBarType }) {
   const { data, loading } = useWidgetData({
     dataSourceId: widget.dataSourceId,
     sqlQuery: widget.sqlQuery,
+    dataUrl: widget.dataUrl,
     refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    invalidateTags: widget.invalidateTags,
+    freshnessPolicy: widget.freshnessPolicy,
   });
 
   const rules = widget.colorRules ?? [];

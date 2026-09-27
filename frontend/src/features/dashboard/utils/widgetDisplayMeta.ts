@@ -18,6 +18,7 @@ const WIDGET_TYPE_LABELS: Record<WidgetType, string> = {
   'status-badge': '狀態徽章',
   'route-progress': '路線進度',
   'slot-grid': '格位陣列',
+  'maintenance-distribution': '整備分佈',
   'unit-telemetry-card': '遙測卡',
   'map-canvas': '圖台',
   'vehicle-container': '載具樣板',
@@ -52,6 +53,8 @@ export function getWidgetDisplayName(child: ChildWidget): string {
       return child.stations?.[0]?.name?.trim() || child.valueField?.trim() || '路線進度';
     case 'slot-grid':
       return child.title?.trim() || '格位陣列';
+    case 'maintenance-distribution':
+      return child.title?.trim() || '整備分佈';
     case 'progress-bar':
       return child.label?.trim() || '進度條';
     case 'segment-bar':

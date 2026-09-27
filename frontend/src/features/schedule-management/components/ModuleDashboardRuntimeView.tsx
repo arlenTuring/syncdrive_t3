@@ -1,5 +1,5 @@
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BindingHealthProvider } from '../../dashboard/context/BindingHealthContext';
 import { DemoSimulationProvider } from '../../dashboard/context/DemoSimulationContext';
@@ -8,6 +8,7 @@ import { FormatPainterProvider } from '../../dashboard/context/FormatPainterCont
 import { PlaneWorkspace } from '../../dashboard/PlaneWorkspace';
 import type { DashboardPlane } from '../../dashboard/types';
 import { VariableProvider } from '../../dashboard/VariableContext';
+import { patchDashboardRuntimeFixes } from '../../dashboard/utils/migrateVehicleMonitorProtocol';
 import {
   findStoredDashboardPlane,
   refreshDashboardPlanesCache,
@@ -42,8 +43,19 @@ export function ModuleDashboardRuntimeView({
     plane: DashboardPlane | null;
   } | null>(null);
 
-  const plane = cached ?? (fetched?.planeId === planeId ? fetched.plane : null);
+  const storedPlane = cached ?? (fetched?.planeId === planeId ? fetched.plane : null);
   const resolving = !cached && fetched?.planeId !== planeId;
+  /**
+   * 跟儀表板編輯器載入時套同一組執行期修正（例如舊版整備分佈換成新元件）。
+   * 少了這一步，編輯器裡看到的是新版、模組子頁卻還在畫舊的那一份。
+   * cached 每次 render 都是新物件，用版面身分與更新時間當相依。
+   */
+  const storedKey = storedPlane ? `${storedPlane.id}:${storedPlane.updatedAt}:${storedPlane.elements.length}` : '';
+  const plane = useMemo(
+    () => (storedPlane ? patchDashboardRuntimeFixes(storedPlane) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storedKey],
+  );
 
   useEffect(() => {
     if (cached) return undefined;

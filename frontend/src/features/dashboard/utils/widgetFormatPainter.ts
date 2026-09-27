@@ -25,6 +25,7 @@ const CONTENT_PRESERVE: Partial<Record<WidgetType, readonly string[]>> = {
   'line-chart': ['title'],
   gauge: ['title'],
   'slot-grid': ['title'],
+  'maintenance-distribution': ['title'],
   'segment-bar': ['title'],
   'bar-chart': ['title'],
   'empty-state': ['label', 'subLabel'],

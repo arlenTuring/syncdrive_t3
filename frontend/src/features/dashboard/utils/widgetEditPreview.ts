@@ -77,6 +77,7 @@ const TYPE_PREVIEW_LABELS: Partial<Record<ChildWidget['type'], string>> = {
   database: '資料表預覽',
   'segment-bar': '分布預覽',
   'slot-grid': '格位預覽',
+  'maintenance-distribution': '整備分佈預覽',
   'empty-state': '空狀態預覽',
   'route-progress': '路線進度預覽',
   'unit-telemetry-card': '遙測卡預覽',

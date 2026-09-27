@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
-  LineChartWidget, LineChartSeriesConfig, LineChartEventLabelStyle, ChartAxisBandConfig, ChartAxisBandColorRule, ChartAxisConfig, ChartAxisUnit, ChartViewportMode, DatabaseWidget, GaugeWidget, SlotGridWidget, ColorRule, WidgetDataBinding,
+  LineChartWidget, LineChartSeriesConfig, LineChartEventLabelStyle, ChartAxisBandConfig, ChartAxisBandColorRule, ChartAxisConfig, ChartAxisUnit, ChartViewportMode, DatabaseWidget, GaugeWidget, SlotGridWidget, MaintenanceDistributionWidget, ColorRule, WidgetDataBinding,
   ColorBlockWidget, StatusBadgeWidget, StatusBadgeRule,
   StatCardWidget, ProgressBarWidget, ClockWidget, EmptyStateWidget, SegmentBarWidget, SegmentBarColorRule, BarChartWidget, MapCanvasWidget,
   AlertBannerWidget, AlertRule, AlertTriggerMode, AlertDisplayMode,
@@ -851,6 +851,31 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
       </div>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
         {t('dashboard.properties.widgets.slotGrid.hint')}
+      </p>
+
+      <PositionFields widget={w} onUpdate={onUpdate as any} />
+      <DeleteBtn onDelete={onDelete} />
+    </div>
+  );
+}
+
+function MaintenanceDistributionSettings({ w, onUpdate, onDelete }: { w: MaintenanceDistributionWidget; onUpdate: (p: Partial<MaintenanceDistributionWidget>) => void; onDelete: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4">
+      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.maintenanceDistribution.title')} color="#f43f5e" />
+      <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <Field label={t('dashboard.properties.widgets.maintenanceDistribution.dataUrl')}>
+        <input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={inputCls} placeholder="/syncdrive-api/facility/maintenance-distribution" />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={t('dashboard.properties.widgets.maintenanceDistribution.columns')}><NumberInput min={1} max={4} value={w.columns ?? 2} onChange={n => onUpdate({ columns: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.maintenanceDistribution.slotFontSize')}><NumberInput min={8} value={w.slotFontSize ?? 14} onChange={n => onUpdate({ slotFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.maintenanceDistribution.titleFontSize')}><NumberInput min={8} value={w.titleFontSize ?? 16} onChange={n => onUpdate({ titleFontSize: n })} className={inputCls} /></Field>
+        <Field label={t('dashboard.properties.widgets.maintenanceDistribution.cardTitleFontSize')}><NumberInput min={8} value={w.cardTitleFontSize ?? 16} onChange={n => onUpdate({ cardTitleFontSize: n })} className={inputCls} /></Field>
+      </div>
+      <p className="text-[10px] text-zinc-500 leading-relaxed">
+        {t('dashboard.properties.widgets.maintenanceDistribution.hint')}
       </p>
 
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -3368,6 +3393,7 @@ export function PropertiesPanel({
               case 'database':       return <DatabaseSettings {...props as any} />;
               case 'gauge':          return <GaugeSettings {...props as any} />;
               case 'slot-grid':      return <SlotGridSettings {...props as any} />;
+              case 'maintenance-distribution': return <MaintenanceDistributionSettings {...props as any} />;
               case 'route-progress': return <RouteProgressSettings {...props as any} />;
               case 'color-block':    return <ColorBlockSettings {...props as any} />;
               case 'status-badge':   return <StatusBadgeSettings {...props as any} />;

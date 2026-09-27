@@ -5,6 +5,7 @@
 import type {
   CanvasElementProps,
   ChildWidget,
+  MaintenanceDistributionWidget,
   ClockWidget,
   ColorBlockWidget,
   DashboardPlane,
@@ -12,8 +13,6 @@ import type {
   RouteProgressWidget,
   ProgressBarWidget,
   SegmentBarWidget,
-  SlotGridWidget,
-  SlotStatusColorRule,
   StatCardWidget,
   StatusBadgeWidget,
   TextWidget,
@@ -40,13 +39,11 @@ import {
   LIST_INDEX_VAR,
   listSqlRowFieldByIndex,
   listSqlRowUnreadDotByIndex,
-  MAINTENANCE_HEADER_LINE_SQL,
-  maintenanceSlotsSql,
-  maintenanceZoneCountSql,
   SHIFT_CENTER_SUMMARY_SQL,
   MAINLINE_SHIFTS_SQL,
   MAINTENANCE_SHIFTS_SQL,
-  VEHICLE_DISTRIBUTION_SQL,
+  VEHICLE_DISTRIBUTION_INVALIDATE_TAGS,
+  VEHICLE_DISTRIBUTION_URL,
   VEHICLE_STATUS_ROW_SQL,
 } from './demoSql';
 import { buildCatalogActionRules } from '../vehicle-operation-actions';
@@ -158,105 +155,31 @@ function colorBlock(
   };
 }
 
-const MAINT_SLOT_STATUS_RULES: SlotStatusColorRule[] = [
-  { status: 'AVAILABLE', bgColor: 'rgba(98, 116, 142, 0.2)', textColor: '#99A1AF' },
-  { status: 'OCCUPIED', bgColor: 'rgba(255, 255, 255, 0.5)', textColor: '#030712' },
-  { status: 'CHARGING', bgColor: 'rgba(255, 255, 255, 0.5)', textColor: '#030712' },
-  { status: 'ERROR', bgColor: '#FB2C36', textColor: '#030712' },
-  { status: 'OFFLINE', bgColor: 'rgba(98, 116, 142, 0.2)', textColor: '#99A1AF' },
-];
-
-function maintenanceSlotGrid(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  zone: string,
-): SlotGridWidget {
-  const base = createWidget('slot-grid', x, y) as SlotGridWidget;
-  return {
-    ...base,
-    id: cid(),
-    width: w,
-    height: h,
-    title: '',
-    variant: 'compact-row',
-    hideTitle: true,
-    layout: 'horizontal',
-    nameField: 'slot_label',
-    statusField: 'status',
-    statusColorRules: MAINT_SLOT_STATUS_RULES,
-    inactiveColor: 'rgba(98, 116, 142, 0.2)',
-    activeColor: 'rgba(255, 255, 255, 0.5)',
-    defaultSlotTextColor: '#99A1AF',
-    slotWidth: 40,
-    slotHeight: h,
-    slotGap: 4,
-    slotFontSize: 14,
-    emptyHintFontSize: 14,
-    dataSourceId: DS,
-    sqlQuery: maintenanceSlotsSql(zone),
-    refreshInterval: 0,
-    refreshMode: 'event',
-    invalidateTags: ['domain:maintenance_slots', 'table:slot_status'],
-  };
-}
-
-/** 整備分布單卡：Figma Card/Occupied status 312×56 */
-function maintenanceCategoryCard(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  label: string,
-  iconImage: string,
-  zone: string,
-): ChildWidget[] {
-  const padX = 8;
-  const padTop = 4;
-  const headlineH = 20;
-  const slotH = 20;
-  const innerGap = 4;
-  const slotY = y + padTop + headlineH + innerGap;
-  const slotW = w - padX * 2;
-  const countW = 24;
-  return [
-    colorBlock(x, y, w, h, 'rgba(212, 212, 216, 0.1)', 8),
-    {
-      ...staticText(x + padX, y + padTop, w - padX * 2 - countW, headlineH, label, 16, '#F3F4F6', 'bold', 'left', 1.25, { iconImage }),
-      id: cid(),
-    },
-    boundText(x + w - padX - countW, y + padTop, countW, headlineH, 'total', maintenanceZoneCountSql(zone), 16, '#D1D5DC', 'bold', 'right'),
-    maintenanceSlotGrid(x + padX, slotY, slotW, slotH, zone),
-  ];
-}
-
-/** 整備分布：Figma 2×3 格位卡（628 內容寬） */
+/**
+ * 整備分布：一個元件，類別／格位／有車全部來自後端
+ * （/syncdrive-api/facility/maintenance-distribution，跟著部署班表的整備區塊與車輛即時位置）。
+ */
 function maintenanceDistributionBlock(
   originX: number,
   originY: number,
 ): ChildWidget[] {
-  const rows: Array<{ label: string; iconImage: string; zone: string }> = [
-    { label: '充電', iconImage: ICON.facilityCharging, zone: '整備-充電' },
-    { label: '洗車', iconImage: ICON.facilityWash, zone: '整備-洗車' },
-    { label: '保養', iconImage: ICON.facilityMaintain, zone: '整備-保養' },
-    { label: '維修', iconImage: ICON.facilityRepair, zone: '整備-維修' },
-    { label: '調度', iconImage: ICON.facilityDispatch, zone: '整備-調度' },
-    { label: '臨停', iconImage: ICON.facilityPark, zone: '整備-臨停' },
+  const widget = createWidget('maintenance-distribution', originX, originY) as MaintenanceDistributionWidget;
+  return [
+    {
+      ...widget,
+      id: cid(),
+      width: MAINT_CONTENT_W,
+      height: MAINT_TITLE_H + MAINT_SECTION_GAP + 3 * MAINT_ROW_H + 2 * MAINT_ROW_GAP,
+      titleIconImage: ICON.maintenanceDistribution,
+      sectionIconImages: {
+        charging: ICON.facilityCharging,
+        carWash: ICON.facilityWash,
+        maintenance: ICON.facilityMaintain,
+        preTrip: ICON.facilityRepair,
+        mobile: ICON.facilityPark,
+      },
+    },
   ];
-  const children: ChildWidget[] = [
-    staticText(originX, originY, MAINT_CONTENT_W - 48, MAINT_TITLE_H, '整備分佈', 16, '#F3F4F6', 'bold', 'left', 1.25, { iconImage: ICON.maintenanceDistribution }),
-    boundText(originX + MAINT_CONTENT_W - 44, originY + 2, 44, MAINT_TITLE_H, 'header_line', MAINTENANCE_HEADER_LINE_SQL, 14, '#D1D5DC', 'normal', 'right'),
-  ];
-  const gridY = originY + MAINT_TITLE_H + MAINT_SECTION_GAP;
-  rows.forEach((row, idx) => {
-    const col = idx % 2;
-    const rowIdx = Math.floor(idx / 2);
-    const cx = originX + col * (MAINT_CARD_W + MAINT_COL_GAP);
-    const cy = gridY + rowIdx * (MAINT_ROW_H + MAINT_ROW_GAP);
-    children.push(...maintenanceCategoryCard(cx, cy, MAINT_CARD_W, MAINT_ROW_H, row.label, row.iconImage, row.zone));
-  });
-  return children;
 }
 
 function vehicleDistributionWidget(x: number, y: number, w: number, h: number): SegmentBarWidget {
@@ -283,11 +206,11 @@ function vehicleDistributionWidget(x: number, y: number, w: number, h: number): 
     barTextFontSize: VEH_DIST_FS.bar,
     tagFontSize: VEH_DIST_FS.tag,
     emptyHintFontSize: VEH_DIST_FS.legend,
-    dataSourceId: DS,
-    sqlQuery: VEHICLE_DISTRIBUTION_SQL,
+    // 跟整備分佈同一套判斷（後端計算），車進出格位、訂單狀態改變時重查
+    dataUrl: VEHICLE_DISTRIBUTION_URL,
     refreshInterval: 0,
     refreshMode: 'event',
-    invalidateTags: ['domain:vehicle_distribution', 'table:operation_orders', 'table:slot_status'],
+    invalidateTags: [...VEHICLE_DISTRIBUTION_INVALIDATE_TAGS],
   };
 }
 
@@ -1273,8 +1196,6 @@ const MAINT_SECTION_GAP = 6;
 const MAINT_CONTENT_W = 628;
 const MAINT_ROW_H = 56;
 const MAINT_ROW_GAP = 4;
-const MAINT_COL_GAP = 4;
-const MAINT_CARD_W = 312;
 
 /** 車輛分佈 Figma：padding 12/12/4、內容 628×75（標題 24 + gap 6 + 條 45） */
 const VEH_DIST_PAD = { top: 12, x: 12, bottom: 4 };

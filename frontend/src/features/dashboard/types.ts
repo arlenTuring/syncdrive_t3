@@ -361,6 +361,25 @@ export interface SlotGridWidget extends WidgetBase, WidgetDataBinding {
   emptyHintFontSize?: number;
 }
 
+/**
+ * 整備分佈：類別與格位都來自後端（部署中班表的整備區塊、整備任務的格位、車輛即時位置），
+ * 元件本身不寫死任何類別或格位代號。資料預設取
+ * <code>/syncdrive-api/facility/maintenance-distribution</code>。
+ */
+export interface MaintenanceDistributionWidget extends WidgetBase, WidgetDataBinding {
+  type: 'maintenance-distribution';
+  title: string;
+  titleIconImage?: string;
+  /** 各整備區塊的圖示（key：charging／carWash／maintenance／preTrip／mobile） */
+  sectionIconImages?: Record<string, string>;
+  /** 一列幾張卡（預設 2） */
+  columns?: number;
+  titleFontSize?: number;
+  headerFontSize?: number;
+  cardTitleFontSize?: number;
+  slotFontSize?: number;
+}
+
 export interface RouteStation {
   id: string;
   name: string;
@@ -918,6 +937,7 @@ export type ChildWidget =
   | DatabaseWidget 
   | GaugeWidget 
   | SlotGridWidget
+  | MaintenanceDistributionWidget
   | RouteProgressWidget
   | ColorBlockWidget
   | StatusBadgeWidget
@@ -1465,6 +1485,15 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         subLabel: '查詢結果為空',
         borderRadius: 8,
         visibilityMode: 'when-empty',
+      };
+    case 'maintenance-distribution':
+      return {
+        id, type, x, y, width: 656, height: 207,
+        title: '整備分佈',
+        columns: 2,
+        dataUrl: '/syncdrive-api/facility/maintenance-distribution',
+        refreshMode: 'event',
+        invalidateTags: ['domain:maintenance_slots', 'table:operation_orders'],
       };
     case 'segment-bar':
       return {

@@ -1,10 +1,12 @@
-import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget, StatusBadgeWidget, SlotGridWidget, CanvasElementProps, ColorBlockWidget } from '../types';
+import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget, StatusBadgeWidget, SlotGridWidget, CanvasElementProps, ColorBlockWidget, MaintenanceDistributionWidget } from '../types';
+import { createWidget } from '../types';
 import {
   VEHICLE_STATUS_ROW_SQL,
   MAINLINE_SHIFTS_SQL,
   MAINTENANCE_SHIFTS_SQL,
   MAINLINE_FLEET_STATUS_SQL,
-  VEHICLE_DISTRIBUTION_SQL,
+  VEHICLE_DISTRIBUTION_INVALIDATE_TAGS,
+  VEHICLE_DISTRIBUTION_URL,
   maintenanceSlotsSql,
   maintenanceZoneCountSql,
 } from '../constants/demoSql';
@@ -175,22 +177,26 @@ function patchShiftRouteProgressChild(child: ChildWidget): ChildWidget {
   };
 }
 
-/** 車輛分佈 segment-bar：修正高度裁切、補失效標籤 */
+/** 拿掉 SQL 綁定（改接 REST 時，留著 SQL 會被 useWidgetData 優先採用） */
+function withoutSqlBinding<T extends { sqlQuery?: string; dataSourceId?: string }>(widget: T): T {
+  const copy = { ...widget };
+  delete copy.sqlQuery;
+  delete copy.dataSourceId;
+  return copy;
+}
+
+/** 車輛分佈 segment-bar：修正高度裁切；資料改接後端（見 patchVehicleDistributionSource） */
 function patchVehicleDistributionSegmentBar(children: ChildWidget[]): ChildWidget[] {
   return children.map((child) => {
     if (child.type !== 'segment-bar') return child;
-    const bar = child as import('../types').SegmentBarWidget;
+    const bar = withoutSqlBinding(child as import('../types').SegmentBarWidget);
     return {
       ...bar,
       height: Math.max(bar.height ?? 0, 75),
-      refreshMode: bar.refreshMode ?? 'event',
+      refreshMode: 'event',
       refreshInterval: 0,
-      sqlQuery: VEHICLE_DISTRIBUTION_SQL,
-      invalidateTags: [
-        'domain:vehicle_distribution',
-        'table:operation_orders',
-        'table:slot_status',
-      ],
+      dataUrl: VEHICLE_DISTRIBUTION_URL,
+      invalidateTags: [...VEHICLE_DISTRIBUTION_INVALIDATE_TAGS],
     };
   });
 }
@@ -387,8 +393,86 @@ function canvasNeedsEventDrivenRefreshOnPlane(plane: DashboardPlane): boolean {
 }
 
 /** 執行期資料修補（不變更版面座標） */
+/**
+ * 舊版整備分佈：六張寫死類別的卡（充電／洗車／保養／維修／調度／臨停），每張各一個
+ * 綁 facility_slots／slot_statuses 示範表的格位陣列。那兩張表的格位是寫死的
+ * （E／W／M／H／P），狀態也只有示範模擬會寫，接真車或模擬器時永遠是 0。
+ *
+ * 整組換成一個「整備分佈」元件：類別跟著部署班表的整備區塊、格位跟著整備任務、
+ * 有車跟著車輛即時位置（後端 /syncdrive-api/facility/maintenance-distribution）。
+ */
+function isLegacyMaintenanceDistributionChildren(children: ChildWidget[]): boolean {
+  const legacyGrids = children.filter(
+    (child) =>
+      child.type === 'slot-grid'
+      && String((child as SlotGridWidget).sqlQuery ?? '').includes('facility_slots')
+      && String((child as SlotGridWidget).sqlQuery ?? '').includes("'整備-"),
+  );
+  return legacyGrids.length >= 2;
+}
+
+export function patchMaintenanceDistributionWidget(plane: DashboardPlane): DashboardPlane {
+  let changed = false;
+  const elements = plane.elements.map((el) => {
+    const children = el.children ?? [];
+    if (!isLegacyMaintenanceDistributionChildren(children)) return el;
+    changed = true;
+    const titleChild = children.find(
+      (child) => child.type === 'text' && String((child as TextWidget).content ?? '').includes('整備分'),
+    ) as (TextWidget & { iconImage?: string }) | undefined;
+    // 原本的內容區：標題左上角起算，到最後一列格位為止
+    const x = titleChild?.x ?? 12;
+    const y = titleChild?.y ?? 12;
+    const right = Math.max(...children.map((child) => child.x + child.width));
+    const bottom = Math.max(...children.map((child) => child.y + child.height));
+    const widget: MaintenanceDistributionWidget = {
+      ...(createWidget('maintenance-distribution', x, y) as MaintenanceDistributionWidget),
+      id: `${el.id}-maintenance-distribution`,
+      width: Math.max(200, right - x),
+      height: Math.max(80, bottom - y),
+      ...(titleChild?.iconImage ? { titleIconImage: titleChild.iconImage } : {}),
+      ...(titleChild?.fontSize ? { titleFontSize: titleChild.fontSize } : {}),
+    };
+    return { ...el, children: [widget] };
+  });
+  return changed ? { ...plane, elements } : plane;
+}
+
+/**
+ * 舊版車輛分佈：SQL 裡「整備中」讀 slot_statuses 示範表，接真車或模擬器時永遠不會變。
+ * 改接後端 /syncdrive-api/facility/vehicle-distribution（跟整備分佈同一套判斷）。
+ * 欄位（status_code／pct／vehicle_count）不變，只換資料來源。
+ */
+function isLegacyVehicleDistributionWidget(child: ChildWidget): boolean {
+  if (child.type !== 'segment-bar') return false;
+  const sql = String((child as { sqlQuery?: string }).sqlQuery ?? '');
+  return sql.includes('status_code') && sql.includes("'IN_SERVICE'") && sql.includes("'MAINTENANCE'");
+}
+
+export function patchVehicleDistributionSource(plane: DashboardPlane): DashboardPlane {
+  let changed = false;
+  const patchChild = (child: ChildWidget): ChildWidget => {
+    if (!isLegacyVehicleDistributionWidget(child)) return child;
+    changed = true;
+    return {
+      ...withoutSqlBinding(child as ChildWidget & { sqlQuery?: string; dataSourceId?: string }),
+      dataUrl: VEHICLE_DISTRIBUTION_URL,
+      refreshMode: 'event',
+      invalidateTags: [...VEHICLE_DISTRIBUTION_INVALIDATE_TAGS],
+    } as ChildWidget;
+  };
+  const elements = plane.elements.map((el) => {
+    const children = el.children ?? [];
+    if (!children.some(isLegacyVehicleDistributionWidget)) return el;
+    return { ...el, children: children.map(patchChild) };
+  });
+  return changed ? { ...plane, elements } : plane;
+}
+
 export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlane {
   return patchEventDrivenSqlRefresh(
+    patchVehicleDistributionSource(
+    patchMaintenanceDistributionWidget(
     patchMaintenanceDistributionSql(
       patchMainlineFleetStatusWidget(
         patchShiftCardRouteProgressMqtt(
@@ -401,6 +485,8 @@ export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlan
           ),
         ),
       ),
+    ),
+    ),
     ),
   );
 }

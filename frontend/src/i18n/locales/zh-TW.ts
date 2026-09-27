@@ -3008,6 +3008,15 @@ const zhTW = {
           statusLegend: '狀態色對照表（元件內建，不寫入資料庫）',
           statusCode: '狀態碼',
         },
+        maintenanceDistribution: {
+          title: '整備分佈屬性',
+          dataUrl: '資料來源 API',
+          columns: '每列卡片數',
+          slotFontSize: '格位字級',
+          titleFontSize: '標題字級',
+          cardTitleFontSize: '卡片標題字級',
+          hint: '類別、格位與有車狀態都來自後端：類別＝部署中班表啟用的整備區塊，格位＝整備任務各區塊用的設施格，有車＝車輛即時位置落在格位內。車進出格位時自動更新。',
+        },
         slotGrid: {
           title: '格位陣列屬性',
           nameField: '格內文字欄位',
@@ -3319,6 +3328,7 @@ const zhTW = {
         statusBadge: { label: '狀態徽章', description: '動態彩色狀態標籤' },
         routeProgress: { label: '路線進度', description: '線性路線進度／詳情卡' },
         slotGrid: { label: '格位陣列', description: '場域格位狀態監控' },
+        maintenanceDistribution: { label: '整備分佈', description: '依部署班表的整備區塊顯示格位佔用' },
         unitTelemetry: { label: '遙測卡', description: '雙儀表 + 四子系統狀態燈' },
         vehicleContainer: {
           label: '載具樣板',

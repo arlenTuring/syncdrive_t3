@@ -1047,7 +1047,7 @@ function ChildWidgetRnd({
 
 const color =  {
     text: '#f59e0b', image: '#10b981', 'line-chart': '#06b6d4', database: '#a78bfa',
-    gauge: '#ec4899', 'slot-grid': '#f43f5e', 'route-progress': '#3b82f6',
+    gauge: '#ec4899', 'slot-grid': '#f43f5e', 'maintenance-distribution': '#f43f5e', 'route-progress': '#3b82f6',
     'color-block': '#64748b', 'status-badge': '#22c55e', 'stat-card': '#e879f9',
     'progress-bar': '#38bdf8', clock: '#a3e635',
     'segment-bar': '#22c55e', 'bar-chart': '#f97316', 'map-canvas': '#0ea5e9',
@@ -1061,7 +1061,7 @@ const color =  {
   }[child.type] || '#94a3b8';
   const label = {
     text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB',
-    gauge: 'GAUGE', 'slot-grid': 'SLOTS', 'route-progress': 'ROUTE',
+    gauge: 'GAUGE', 'slot-grid': 'SLOTS', 'maintenance-distribution': 'MAINT', 'route-progress': 'ROUTE',
     'color-block': 'COLOR', 'status-badge': 'BADGE', 'stat-card': 'KPI',
     'progress-bar': 'BAR', clock: 'CLOCK',
     'segment-bar': 'SEG', 'bar-chart': 'BARS', 'map-canvas': 'MAP',

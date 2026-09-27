@@ -56,6 +56,7 @@ const PALETTE_ITEMS: PaletteItemDef[] = [
   { type: 'status-badge', i18nKey: 'statusBadge', icon: <Tag size={18} />, color: '#22c55e', category: 'kpi' },
   { type: 'route-progress', i18nKey: 'routeProgress', icon: <Route size={18} />, color: '#3b82f6', category: 'ops' },
   { type: 'slot-grid', i18nKey: 'slotGrid', icon: <LayoutGrid size={18} />, color: '#f43f5e', category: 'ops' },
+  { type: 'maintenance-distribution', i18nKey: 'maintenanceDistribution', icon: <LayoutGrid size={18} />, color: '#f43f5e', category: 'ops' },
   { type: 'unit-telemetry-card', i18nKey: 'unitTelemetry', icon: <Activity size={18} />, color: '#a78bfa', category: 'ops' },
   { type: 'vehicle-container', i18nKey: 'vehicleContainer', icon: <Bus size={18} />, color: '#f59e0b', category: 'ops' },
   { type: 'tab-list', i18nKey: 'tabList', icon: <List size={18} />, color: '#3b82f6', category: 'ops' },
