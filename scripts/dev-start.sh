@@ -2,7 +2,7 @@
 # SyncDrive T3 — 一鍵啟動本機開發環境（Docker + 後端 + VTMS + 前端）
 # 用法：
 #   ./scripts/dev-start.sh           # 啟動（已運行且健康則略過）
-#   ./scripts/dev-start.sh --force   # 強制重啟所有程序
+#   ./scripts/dev-start.sh --force   # 強制重啟所有程序（含清掉佔用 3000／3100／5173 的殘留程序）
 #   ./scripts/dev-start.sh --seed    # 啟動後寫入示範資料到 DB
 #   ./scripts/dev-start.sh --demo    # 同時啟動 VTMS MQTT 班次模擬（預設由儀表板「開始模擬」按鈕控制）
 # 停止：./scripts/dev-stop.sh
@@ -57,7 +57,9 @@ start_log_trimmer() {
           && mv "${log_file}.trim" "$log_file"
       fi
     done
-  ) &
+  ) </dev/null >/dev/null 2>&1 &
+  # 背景裁切不能繼承呼叫端的輸出：被接在管線後面（例如 dev-start.sh | tail）時，
+  # 它一直握著管線不放，呼叫端就永遠等不到結束
   echo $! >"$trimmer_pid_file"
 }
 
@@ -134,21 +136,40 @@ port_listen() {
   wait "$pid"
 }
 
+# 清掉佔著某個埠的程序（不管是不是這支腳本起的）：先 TERM，3 秒內沒走再 KILL。
+# lsof 加 -nP 不查 DNS／服務名，避免卡住。
 kill_port_listeners() {
   local port="$1"
   local pids=""
   if command -v lsof >/dev/null 2>&1; then
-    pids="$( ( lsof -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null ) & pid=$!; sleep 2; kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; )" || true
+    pids="$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
   fi
-  if [[ -z "$pids" ]]; then
-    pkill -f "nest start" 2>/dev/null || true
-    pkill -f "node dist/main" 2>/dev/null || true
-    return 0
-  fi
+  [[ -n "$pids" ]] || return 0
+  local pid
+  for pid in $pids; do
+    kill "$pid" 2>/dev/null || true
+  done
+  local i
+  for i in $(seq 1 12); do
+    pids="$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+    [[ -z "$pids" ]] && break
+    sleep 0.25
+  done
   for pid in $pids; do
     kill -9 "$pid" 2>/dev/null || true
   done
+  yellow "已清掉佔用 port $port 的程序"
 }
+
+# 只殺這個專案底下的殘留程序，不波及別的專案的 nest／vite
+kill_project_processes() {
+  local pattern="$1"
+  pkill -f "$pattern" 2>/dev/null || true
+  sleep 0.5
+  pkill -9 -f "$pattern" 2>/dev/null || true
+}
+BACKEND_PROC_PATTERN="$ROOT/backend/(node_modules/\.bin/nest|dist/main)"
+FRONTEND_PROC_PATTERN="$ROOT/frontend/node_modules/(\.bin/vite|@esbuild)"
 
 backend_healthy() {
   curl -sf --max-time 3 http://127.0.0.1:3000/syncdrive-api/datasource/ping 2>/dev/null \
@@ -307,10 +328,13 @@ need_backend=true
 if ! $FORCE && is_running "$BACKEND_PID_FILE" && backend_healthy; then
   yellow "[backend] 已在執行且健康 (PID $(cat "$BACKEND_PID_FILE"))，略過"
   need_backend=false
-elif $FORCE || is_running "$BACKEND_PID_FILE" || port_listen 3000; then
+elif $FORCE || is_running "$BACKEND_PID_FILE" || port_listen 3000 || port_listen 3100; then
+  # 強制重啟／殘留：PID 檔那一支、佔著 3000（內部 API）與 3100（對外 API）的、
+  # 這個專案底下殘留的 nest watch 與 dist/main，全部清掉再起
   stop_pid_file "backend" "$BACKEND_PID_FILE"
+  kill_project_processes "$BACKEND_PROC_PATTERN"
   kill_port_listeners 3000
-  pkill -f "nest start" 2>/dev/null || true
+  kill_port_listeners 3100
   sleep 1
 fi
 if $need_backend; then
@@ -318,9 +342,11 @@ if $need_backend; then
   [[ -d "$ROOT/backend/node_modules" ]] || (cd "$ROOT/backend" && npm install)
   start_process "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG" "$ROOT/backend" "LOG_LEVEL=warn npm run start:dev"
   if ! wait_backend; then
-    yellow "後端啟動異常，嘗試清掉 port 3000 後重試一次…"
-    kill_port_listeners 3000
+    yellow "後端啟動異常，嘗試清掉 port 3000／3100 後重試一次…"
     stop_pid_file "backend" "$BACKEND_PID_FILE"
+    kill_project_processes "$BACKEND_PROC_PATTERN"
+    kill_port_listeners 3000
+    kill_port_listeners 3100
     sleep 1
     start_process "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG" "$ROOT/backend" "LOG_LEVEL=warn npm run start:dev"
     wait_backend
@@ -329,7 +355,7 @@ fi
 echo ""
 
 # 外部模擬器（另一個資料夾）：./scripts/simulator-start.sh 或 npm run simulator
-#   → http://127.0.0.1:4300
+#   → http://127.0.0.1:4300（實作在模擬器那邊的 sim.sh）
 
 # ── Frontend ──
 need_frontend=true
@@ -337,8 +363,10 @@ if ! $FORCE && is_running "$FRONTEND_PID_FILE" && port_listen 5173; then
   yellow "[frontend] 已在執行 (PID $(cat "$FRONTEND_PID_FILE"))，略過"
   need_frontend=false
 elif $FORCE || is_running "$FRONTEND_PID_FILE" || port_listen 5173; then
+  # 只清這個專案的 vite 與佔著 5173 的程序；不再 pkill 所有 vite（會殺到別的專案）
   stop_pid_file "frontend" "$FRONTEND_PID_FILE"
-  pkill -f "vite" 2>/dev/null || true
+  kill_project_processes "$FRONTEND_PROC_PATTERN"
+  kill_port_listeners 5173
   sleep 1
 fi
 if $need_frontend; then

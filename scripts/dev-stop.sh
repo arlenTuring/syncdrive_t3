@@ -39,17 +39,25 @@ echo "==> 停止 SyncDrive T3 開發程序"
 stop_pid_file "frontend" "$FRONTEND_PID_FILE"
 stop_pid_file "backend" "$BACKEND_PID_FILE"
 
-# 清掉佔用 3000 的殘留程序（避免 EADDRINUSE 導致後端無法啟動）
+# 清掉殘留：這個專案底下的 nest／vite（不波及別的專案），以及佔著 3000（內部 API）、
+# 3100（對外 API）、5173（前端）的程序——避免下次啟動 EADDRINUSE
+pkill -f "$ROOT/backend/(node_modules/\.bin/nest|dist/main)" 2>/dev/null || true
+pkill -f "$ROOT/frontend/node_modules/(\.bin/vite|@esbuild)" 2>/dev/null || true
+sleep 0.5
 if command -v lsof >/dev/null 2>&1; then
-  stale="$( ( lsof -t -iTCP:3000 -sTCP:LISTEN 2>/dev/null ) & pid=$!; sleep 2; kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; )" || true
-  if [[ -n "$stale" ]]; then
+  for port in 3000 3100 5173; do
+    stale="$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+    [[ -n "$stale" ]] || continue
     for pid in $stale; do
-      kill -9 "$pid" 2>/dev/null || true
-      echo "[backend] 已清掉佔用 port 3000 的殘留 PID $pid"
+      kill "$pid" 2>/dev/null || true
     done
-  fi
+    sleep 1
+    for pid in $stale; do
+      if kill -0 "$pid" 2>/dev/null; then kill -9 "$pid" 2>/dev/null || true; fi
+      echo "已清掉佔用 port $port 的殘留 PID $pid"
+    done
+  done
 fi
-pkill -f "nest start" 2>/dev/null || true
 
 for pid_file in "$PID_DIR"/*.log.trimmer.pid; do
   [[ -f "$pid_file" ]] || continue
