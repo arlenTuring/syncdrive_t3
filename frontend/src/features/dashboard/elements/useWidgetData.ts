@@ -61,6 +61,28 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
   const { dataSourceId, sqlQuery, dataUrl } = opts;
   const [state, setState] = useState<WidgetFetchState>({ data: [], loading: false, error: null });
   const lastGoodData = useRef<Record<string, unknown>[]>([]);
+  /**
+   * 上一次交給畫面的資料（序列化）。重查結果一模一樣就不 setState：失效通知一來，
+   * 綁同一張表的元件全部重查，但絕大多數時候資料根本沒變，照樣 setState 會讓整排
+   * 元件重畫——儀表板每秒卡一下的主因之一。
+   */
+  const lastShownJson = useRef<string | null>(null);
+  const showRows = (rows: Record<string, unknown>[]) => {
+    lastGoodData.current = rows;
+    let json: string | null;
+    try {
+      json = JSON.stringify(rows);
+    } catch {
+      json = null;
+    }
+    if (json !== null && json === lastShownJson.current) {
+      // 資料沒變：只在還掛著「載入中／錯誤」時收掉，其餘不動
+      setState((prev) => (prev.loading || prev.error ? { data: prev.data, loading: false, error: null } : prev));
+      return;
+    }
+    lastShownJson.current = json;
+    setState({ data: rows, loading: false, error: null });
+  };
   const vars = useVariables();
   const varsKey = useMemo(() => {
     const keys = Object.keys(vars).sort();
@@ -108,8 +130,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
           if (force) clearDatasourceQueryCacheForQuery(dataSourceId, finalSql);
           const rows = await executeDatasourceQuery(dataSourceId, finalSql, FETCH_TIMEOUT_MS);
           if (aborted) return;
-          lastGoodData.current = rows;
-          setState({ data: rows, loading: false, error: null });
+          showRows(rows);
         } catch (e: unknown) {
           if (aborted) return;
           const msg = e instanceof Error ? e.message : String(e);
@@ -128,8 +149,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
           const d = await fetchJsonShared(finalUrl) as Record<string, unknown> | Record<string, unknown>[];
           if (aborted) return;
           const rows = Array.isArray(d) ? d : ((d.data as Record<string, unknown>[] | undefined) ?? [d]);
-          lastGoodData.current = rows;
-          setState({ data: rows, loading: false, error: null });
+          showRows(rows);
         } catch (e: unknown) {
           if (aborted) return;
           const msg = e instanceof Error ? e.message : String(e);
@@ -144,6 +164,8 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
       }
     };
 
+    // 資料來源或查詢換了：舊的比對基準作廢
+    lastShownJson.current = null;
     setState((s) => ({ ...s, loading: true, error: null }));
     void fetchData();
 

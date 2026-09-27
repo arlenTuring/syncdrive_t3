@@ -40,6 +40,28 @@ export class MaintenanceDistributionService {
     return buildVehicleDistribution({ fleetCodes: fleet, processingOrders, maintenance });
   }
 
+  /**
+   * 啟用中地圖的設施（代號 ↔ id）。每次都讀檔解析整張地圖（約 300 KB）會卡住事件迴圈，
+   * 拖慢 MQTT 轉送；地圖不常換，同一張圖 30 秒內沿用。
+   */
+  private facilityCache: { mapId: string; at: number; items: Array<{ mapCode: string; equipmentId: string }> } | null = null;
+
+  private activeMapFacilities(): Array<{ mapCode: string; equipmentId: string }> {
+    try {
+      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
+      const now = Date.now();
+      if (this.facilityCache?.mapId === mapId && now - this.facilityCache.at < 30_000) {
+        return this.facilityCache.items;
+      }
+      const items = this.mapService.getFieldEquipment(mapId, 'facility').items;
+      this.facilityCache = { mapId, at: now, items };
+      return items;
+    } catch (err) {
+      this.logger.warn(`讀不到啟用中的地圖設施：${(err as Error).message}`);
+      return [];
+    }
+  }
+
   private async load(): Promise<{
     maintenance: MaintenanceDistribution;
     fleet: string[];
@@ -63,13 +85,7 @@ export class MaintenanceDistributionService {
       }
     }
 
-    let facilities: Array<{ mapCode: string; equipmentId: string }> = [];
-    try {
-      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
-      facilities = this.mapService.getFieldEquipment(mapId, 'facility').items;
-    } catch (err) {
-      this.logger.warn(`讀不到啟用中的地圖設施：${(err as Error).message}`);
-    }
+    const facilities = this.activeMapFacilities();
 
     const vehicleLocations: Array<{ vehicle_code: string; location_object_id: string }> = await this.dataSource.query(`
       SELECT m.vehicle_code, m.location_object_id

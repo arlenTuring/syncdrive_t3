@@ -5,7 +5,7 @@ import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { acquireSocket, releaseSocket } from './socketManager';
 import { useDemoSimulationLiveClearEpoch, useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
-import { useVehicleFleetMqttHubContext } from '../context/VehicleFleetMqttContext';
+import { useVehicleFleetStore } from '../context/VehicleFleetMqttContext';
 import { isVtmsVehicleStreamTopic } from '../utils/vtmsTopic';
 import { createMapMqttIngestPipeline } from './mapMqttIngestPipeline';
 
@@ -18,7 +18,8 @@ export type MapMqttLiveState = {
  * 圖台容器：訂閱 Area MQTT，更新設施 live 狀態與 Area 內車輛座標。
  *
  * 效能策略：
- * - VTMS 車輛：VehicleFleetMqttHub 單點訂閱 → hub.tick 驅動 ingest（不再 socket.onAny 重複消化）
+ * - VTMS 車輛：VehicleFleetMqttHub 單點訂閱 → 訂閱 store 驅動 ingest（不再 socket.onAny 重複消化）；
+ *   不讀 hub context，hub 每次 flush 不重畫圖台，只有車或設施真的變了才 setState
  * - 設施 / syncdrive：socket.onAny 僅處理非 VTMS topic
  * - requestAnimationFrame 每幀最多一次 flush
  * - live / vehicles 分開 setState，避免不必要的整棵樹重繪
@@ -43,7 +44,7 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   const paused = running && transportPaused;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
-  const fleetHub = useVehicleFleetMqttHubContext();
+  const fleetStore = useVehicleFleetStore();
   const ingestCountRef = useRef(0);
 
   const pipelineRef = useRef<ReturnType<typeof createMapMqttIngestPipeline> | null>(null);
@@ -78,9 +79,14 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   }, [areas]);
 
   useEffect(() => {
-    if (paused || areas.length === 0 || !fleetHub) return;
-    pipelineRef.current?.ingestVtmsFromFleetHub(fleetHub.telemetry, fleetHub.operation);
-  }, [fleetHub?.tick, paused, areas]);
+    if (paused || areas.length === 0 || !fleetStore) return undefined;
+    const ingest = () => {
+      const hub = fleetStore.getHub();
+      pipelineRef.current?.ingestVtmsFromFleetHub(hub.telemetry, hub.operation);
+    };
+    ingest();
+    return fleetStore.subscribe(ingest);
+  }, [fleetStore, paused, areas]);
 
   useEffect(() => {
     if (areas.length === 0) return undefined;

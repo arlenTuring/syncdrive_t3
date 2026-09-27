@@ -4,6 +4,7 @@
 import type { VehicleRoofIndicatorConfig } from '../../map-editor/vehicles/vehicleRoofIndicator';
 import { memo } from 'react';
 import { MapAreaCanvas } from '../../map-editor/components/MapAreaCanvas';
+import { MapAreaVehiclesContext } from '../../map-editor/vehicles/MapAreaVehiclesContext';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
 import type { MapPlannedRoute } from '../../map-editor/types/mapFile';
@@ -33,6 +34,14 @@ export type MapSimVehicleMotionBridgeProps = {
   viewportRef: React.RefObject<HTMLDivElement | null>;
 };
 
+/*
+ * 車輛經 MapAreaVehiclesContext 送到車輛圖層，圖台本身包 memo、props 全部穩定：
+ * 車每秒更新好幾次，只有車輛圖層重畫，設施與標籤不動（原本每次整張圖台重畫 60～70 毫秒）。
+ */
+const StaticMapAreaCanvas = memo(MapAreaCanvas);
+const NO_SELECTED_FACILITIES: string[] = [];
+const noop = () => {};
+
 export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge({
   pixelSize,
   pixelOrigin,
@@ -58,37 +67,39 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
   });
 
   return (
-    <MapAreaCanvas
-      pixelSize={pixelSize}
-      pixelOrigin={pixelOrigin}
-      areas={areas}
-      selectedAreaId={null}
-      selectedFacilityIds={[]}
-      geofenceSelectedLabelId={null}
-      viewportRef={viewportRef}
-      displayMode="embedded"
-      livePositionTweenMs={liveTweenMs}
-      readOnly
-      editMode={false}
-      liveById={liveById}
-      areaVehicles={areaVehicles}
-      showVehicleTelemetry={showVehicleTelemetry}
-      vehicleIconSpec={DEFAULT_MAP_VEHICLE_ICON}
-      vehicleDefinition={vehicleDefinition}
-      vehicleDisplayWidthPx={vehicleDisplayWidthPx}
-      vehicleDisplayHeightPx={vehicleDisplayHeightPx}
-      vehicleFitMode="stretch"
-      routes={routes}
-      vehicleBehavior={vehicleBehavior}
-      vehicleRoofIndicator={vehicleRoofIndicator}
-      orderStationsById={orderStationsById}
-      vehicleEditSizer={null}
-      slotPreview={null}
-      onSelectArea={() => {}}
-      onSelectFacility={() => {}}
-      onSelectGeofenceLabel={() => {}}
-      onDragFacility={() => {}}
-      onDragSessionStart={() => {}}
-    />
+    <MapAreaVehiclesContext.Provider value={areaVehicles}>
+      <StaticMapAreaCanvas
+        pixelSize={pixelSize}
+        pixelOrigin={pixelOrigin}
+        areas={areas}
+        selectedAreaId={null}
+        selectedFacilityIds={NO_SELECTED_FACILITIES}
+        geofenceSelectedLabelId={null}
+        viewportRef={viewportRef}
+        displayMode="embedded"
+        livePositionTweenMs={liveTweenMs}
+        readOnly
+        editMode={false}
+        liveById={liveById}
+        areaVehiclesFromContext
+        showVehicleTelemetry={showVehicleTelemetry}
+        vehicleIconSpec={DEFAULT_MAP_VEHICLE_ICON}
+        vehicleDefinition={vehicleDefinition}
+        vehicleDisplayWidthPx={vehicleDisplayWidthPx}
+        vehicleDisplayHeightPx={vehicleDisplayHeightPx}
+        vehicleFitMode="stretch"
+        routes={routes}
+        vehicleBehavior={vehicleBehavior}
+        vehicleRoofIndicator={vehicleRoofIndicator}
+        orderStationsById={orderStationsById}
+        vehicleEditSizer={null}
+        slotPreview={null}
+        onSelectArea={noop}
+        onSelectFacility={noop}
+        onSelectGeofenceLabel={noop}
+        onDragFacility={noop}
+        onDragSessionStart={noop}
+      />
+    </MapAreaVehiclesContext.Provider>
   );
 });

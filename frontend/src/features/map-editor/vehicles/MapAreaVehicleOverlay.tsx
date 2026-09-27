@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
+import { MapAreaVehiclesContext } from './MapAreaVehiclesContext';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
 import {
   buildStationMileageIndex,
@@ -58,6 +59,7 @@ import {
   headingRadToClockwiseDeg,
 } from './readVehicleHeading';
 import { useVehiclePathTween } from './useVehiclePathTween';
+import { readTelemetrySampleMs } from './pathPlayout';
 import { DEFAULT_MAP_VEHICLE_ICON } from './defaultMapVehicleIcon';
 import { MapVehicleMarker } from './MapVehicleMarker';
 import { resolveMapVehicleBgColor } from './resolveMapVehicleAppearance';
@@ -233,9 +235,11 @@ function MapVehicleAnchorDebugMark({
   );
 }
 
+const NO_VEHICLES: AreaVehicleLive[] = [];
+
 export function MapAreaVehicleOverlay({
   areas: sourceAreas,
-  vehicles,
+  vehicles: vehiclesProp,
   iconSpec = DEFAULT_MAP_VEHICLE_ICON,
   showLabels = true,
   showMqttCoords = true,
@@ -252,7 +256,8 @@ export function MapAreaVehicleOverlay({
   orderStationsById,
 }: {
   areas: MapAreaObject[];
-  vehicles: AreaVehicleLive[];
+  /** 沒給就讀 MapAreaVehiclesContext */
+  vehicles?: AreaVehicleLive[];
   iconSpec?: MapVehicleIconSpec;
   showLabels?: boolean;
   /** 車輛旁顯示場域參照座標（公尺，非圖台 px） */
@@ -283,6 +288,8 @@ export function MapAreaVehicleOverlay({
   /** 每張訂單的有序站序（訂單 id → 站代號）：建任務路徑，判位時只在合法的分支之間決定 */
   orderStationsById?: Record<string, readonly string[]>;
 }) {
+  const vehiclesFromContext = useContext(MapAreaVehiclesContext);
+  const vehicles = vehiclesProp ?? vehiclesFromContext ?? NO_VEHICLES;
   const roofConfig = useMemo(() => resolveRoofIndicatorConfig(roofIndicator), [roofIndicator]);
   /** 每台車目前這一次通行的方向（只在記憶體；換軌道就重新判斷） */
   const passageRef = useRef(new Map<string, TrackPassageState>());
@@ -642,6 +649,8 @@ export function MapAreaVehicleOverlay({
                 // 只有首幀瞬移。換 leg（到站、下一段出發）位置是接著的，照樣沿路補；
                 // 真的不連續（換單、重新發車）由補間自己判斷——不相連或超過 80 公尺就直接到位
                 !prevPosNow,
+                // 遙測時間戳：有的話照車端時間緩衝播放，送達時間抖動不會讓車走走停停
+                readTelemetrySampleMs(vehicle.payload as Record<string, unknown> | undefined),
               )
             : null;
         const displayFacility =

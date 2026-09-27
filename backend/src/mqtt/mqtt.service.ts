@@ -19,6 +19,11 @@ export class MqttService {
   private lastOrderLifecycleInvalidationAt = 0;
   /** 各車上一次判定的所在設施（無則空字串）；換格或離格時才通知整備分佈重查 */
   private readonly lastFacilityByVehicle = new Map<string, string>();
+  /** 各車上一次判定的位置標籤（站／設施／軌道）；變了才需要通知車輛狀態重查 */
+  private readonly lastLocationByVehicle = new Map<string, string>();
+  private vehiclePositionDirty = false;
+  /** 各車上一次通知時的訂單顯示狀態；沒變就不通知 */
+  private readonly lastOrderDisplayKeyByVehicle = new Map<string, string>();
 
   constructor(
     @InjectRepository(CommandLog)
@@ -90,11 +95,19 @@ export class MqttService {
       this.datasourceInvalidation.emitMaintenanceSlots();
     }
 
-    // 一秒內通常會連續收到整個車隊的 telemetry。資料逐筆寫庫，但失效通知合併成
-    // 每秒最多一次；前端收到後會重查整張車輛快照，避免 11 台車造成 11 次 SQL。
+    // 一秒內通常會連續收到整個車隊的 telemetry。資料逐筆寫庫，但失效通知只在
+    // 「某台車的位置標籤變了」時才發，而且合併成每秒最多一次。速度、電量等即時數值
+    // 儀表板直接吃 MQTT，不靠重查；原本每筆遙測都觸發整張車輛快照重查＋整排卡片重畫，
+    // 畫面每秒卡一下（2026-09-27 實測 100～190 毫秒的長任務）。
+    const locationKey = `${location?.kind ?? ''}|${location?.label ?? ''}|${location?.objectId ?? ''}`;
+    if (this.lastLocationByVehicle.get(vehicleCode) !== locationKey) {
+      this.lastLocationByVehicle.set(vehicleCode, locationKey);
+      this.vehiclePositionDirty = true;
+    }
     const now = Date.now();
-    if (now - this.lastVehiclePositionInvalidationAt >= 1_000) {
+    if (this.vehiclePositionDirty && now - this.lastVehiclePositionInvalidationAt >= 1_000) {
       this.lastVehiclePositionInvalidationAt = now;
+      this.vehiclePositionDirty = false;
       this.datasourceInvalidation.emitVehiclePosition(vehicleCode);
     }
   }
@@ -202,7 +215,7 @@ export class MqttService {
       // line_kind／route_id 不再由這裡猜測：訂單建立時中心端已經寫死
       // order.lineKind／order.routeId，applyOperationMqttUpdate 會直接信任
       // 既有訂單記錄，不需要在進來的路上先幫車端補值。
-      await this.orderService.applyOperationMqttUpdate(vehicleCode, {
+      const order = await this.orderService.applyOperationMqttUpdate(vehicleCode, {
         ...payload,
         order_id: orderId,
         trip_code: tripCode,
@@ -218,9 +231,24 @@ export class MqttService {
        * 任何訂閱了 table:operation_orders 的清單頁（例如班次運行紀錄）就跟著
        * 一直重新整理、畫面一直閃（2026-09-23 實測：11 台車跑著，5 秒內 25 次）。
        */
+      //
+      // 而且只在「畫面會顯示的訂單狀態」變了才通知：狀態、下一站、目前這一段的目標站、
+      // 任務進度。倒數秒數每秒都在變，但卡片的倒數本來就吃 MQTT，不需要重查資料庫；
+      // 原本連倒數變了都通知，儀表板上所有綁訂單的元件幾乎每秒整批重查、重畫。
+      const displayKey = JSON.stringify({
+        orderId,
+        status: order?.status ?? null,
+        nextStation: order?.nextStation ?? null,
+        legTarget: leg?.target_station_id ?? null,
+        taskRev: JSON.parse(syncKey).taskRev,
+      });
       const now = Date.now();
-      if (now - this.lastOrderLifecycleInvalidationAt >= 1_000) {
+      if (
+        this.lastOrderDisplayKeyByVehicle.get(vehicleCode) !== displayKey
+        && now - this.lastOrderLifecycleInvalidationAt >= 1_000
+      ) {
         this.lastOrderLifecycleInvalidationAt = now;
+        this.lastOrderDisplayKeyByVehicle.set(vehicleCode, displayKey);
         this.datasourceInvalidation.emitOrderLifecycle(vehicleCode);
       }
     } catch (err) {

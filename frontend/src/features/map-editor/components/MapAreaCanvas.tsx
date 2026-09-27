@@ -84,6 +84,11 @@ type MapAreaCanvasProps = {
   liveById?: Record<string, MqttLiveEntry>
   /** Area 內即時／示範車輛（儀表板圖台） */
   areaVehicles?: AreaVehicleLive[]
+  /**
+   * 車輛改從 MapAreaVehiclesContext 讀（不給 areaVehicles）。車輛更新時只有車輛圖層重畫，
+   * 圖台本身（設施、標籤）不跟著重畫；呼叫端要把 MapAreaCanvas 包 memo、props 保持穩定才有效。
+   */
+  areaVehiclesFromContext?: boolean
   vehicleIconSpec?: MapVehicleIconSpec
   /** 載具編輯器定義（圖台容器） */
   vehicleDefinition?: import('../../vehicle-editor/types').VehicleDefinition | null
@@ -241,6 +246,7 @@ export function MapAreaCanvas({
   onZoomLevelChange: onZoomLevelChangeProp,
   liveById,
   areaVehicles,
+  areaVehiclesFromContext = false,
   vehicleIconSpec,
   vehicleDefinition = null,
   vehicleDisplayWidthPx,
@@ -903,10 +909,10 @@ export function MapAreaCanvas({
               <TrackConnectivityScanOverlay scanState={connectivityScan} />
             ) : null}
             {routePlanningOverlay}
-            {areaVehicles && areaVehicles.length > 0 ? (
+            {areaVehiclesFromContext || (areaVehicles && areaVehicles.length > 0) ? (
               <MapAreaVehicleOverlay
                 areas={areas}
-                vehicles={areaVehicles}
+                vehicles={areaVehiclesFromContext ? undefined : areaVehicles}
                 iconSpec={vehicleIconSpec}
                 showLabels={showVehicleTelemetry}
                 showMqttCoords={showVehicleTelemetry}

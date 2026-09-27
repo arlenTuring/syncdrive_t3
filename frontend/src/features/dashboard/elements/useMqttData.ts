@@ -4,7 +4,7 @@ import { acquireSocket, releaseSocket } from './socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
-import { useVehicleFleetMqttHubContext } from '../context/VehicleFleetMqttContext';
+import { useHasVehicleFleetHub, useVehicleFleetSelector } from '../context/VehicleFleetMqttContext';
 import { parseVtmsVehicleTopic } from '../utils/vtmsTopic';
 
 interface MqttState {
@@ -13,22 +13,25 @@ interface MqttState {
   error: string | null;
 }
 
+function readMqttPath(payload: Record<string, unknown>, mqttValuePath: string): unknown {
+  let temp: unknown = payload;
+  for (const p of mqttValuePath.split('.')) {
+    if (temp == null || typeof temp !== 'object') return undefined;
+    temp = (temp as Record<string, unknown>)[p];
+  }
+  return temp;
+}
+
 function extractMqttValue(
   payload: Record<string, unknown>,
   mqttValuePath?: string,
 ): Record<string, unknown> {
   if (!mqttValuePath) return payload;
-  const parts = mqttValuePath.split('.');
-  let temp: unknown = payload;
-  for (const p of parts) {
-    if (temp == null || typeof temp !== 'object') {
-      temp = undefined;
-      break;
-    }
-    temp = (temp as Record<string, unknown>)[p];
-  }
-  return { value: temp };
+  return { value: readMqttPath(payload, mqttValuePath) };
 }
+
+/** 車隊 hub 裡還沒有這台車的這個串流 */
+const NO_FLEET_ROW = Symbol('no-fleet-row');
 
 /**
  * MQTT 即時資料訂閱 Hook
@@ -45,7 +48,7 @@ export function useMqttData(opts: {
   const paused = useDemoSimulationPaused();
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
-  const fleetHub = useVehicleFleetMqttHubContext();
+  const hasFleetHub = useHasVehicleFleetHub();
   const vars = useVariables();
   const varsKey = useMemo(() => {
     const keys = Object.keys(vars).sort();
@@ -65,15 +68,24 @@ export function useMqttData(opts: {
   const useFleetHub = Boolean(
     mqttDataSourceId
     && fleetParsed
-    && fleetHub,
+    && hasFleetHub,
   );
 
-  const fleetData = useMemo(() => {
-    if (!useFleetHub || !fleetParsed || !fleetHub) return null;
-    const raw = fleetHub[fleetParsed.stream].get(fleetParsed.vehicleCode);
-    if (!raw) return null;
-    return extractMqttValue(raw, mqttValuePath);
-  }, [useFleetHub, fleetParsed, fleetHub, mqttValuePath, fleetHub?.tick]);
+  // 只挑自己那一個值：值沒變就不重畫（整張儀表板不再跟著每一波遙測重畫）。
+  // 有路徑時挑原始子值，不能在 selector 裡包 { value }——每次都是新物件，等於每波都重畫。
+  const fleetSelected = useVehicleFleetSelector<unknown>((hub) => {
+    if (!useFleetHub || !fleetParsed) return NO_FLEET_ROW;
+    const raw = hub[fleetParsed.stream].get(fleetParsed.vehicleCode);
+    if (!raw) return NO_FLEET_ROW;
+    return mqttValuePath ? readMqttPath(raw, mqttValuePath) : raw;
+  }, NO_FLEET_ROW);
+  const fleetConnected = useVehicleFleetSelector((hub) => hub.connected, false);
+
+  const fleetData = useMemo((): Record<string, unknown> | null => {
+    if (fleetSelected === NO_FLEET_ROW) return null;
+    if (mqttValuePath) return { value: fleetSelected };
+    return fleetSelected as Record<string, unknown>;
+  }, [fleetSelected, mqttValuePath]);
 
   useEffect(() => {
     if (useFleetHub) {
@@ -125,10 +137,10 @@ export function useMqttData(opts: {
     };
   }, [useFleetHub, mqttDataSourceId, mqttTopic, mqttValuePath, finalTopic]);
 
-  if (useFleetHub && fleetHub) {
+  if (useFleetHub) {
     return {
       data: fleetData,
-      connected: fleetHub.connected,
+      connected: fleetConnected,
       error: null,
     };
   }

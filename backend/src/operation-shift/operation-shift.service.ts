@@ -367,15 +367,37 @@ export class OperationShiftService {
     shiftName: string;
     body: Record<string, unknown>;
   } | null> {
-    const rows = await this.repo.find({
+    /*
+     * 班表內容是好幾 MB 的 JSON（整份排班結果＋復原歷史），每次都整份讀出來解析會卡住
+     * 事件迴圈——儀表板每秒好幾支 API 都要它，實測讓 MQTT 遙測轉送延遲到 0.7 秒、
+     * 車在圖台上走走停停。先只查身分與更新時間，沒變就沿用上一次讀好的內容。
+     */
+    const heads = await this.repo.find({
+      select: { id: true, name: true, updatedAt: true },
       where: { usageStatus: OperationShiftUsageStatus.IN_USE },
       order: { updatedAt: 'DESC' },
       take: 5,
     });
-    const deployed = rows.find((row) => this.bodyHasPlan(row.body ?? {}));
-    if (!deployed) return null;
-    return { shiftId: deployed.id, shiftName: deployed.name, body: deployed.body ?? {} };
+    for (const head of heads) {
+      const key = `${head.id}:${head.updatedAt}`;
+      let cached = this.deployedBodyCache.get(key);
+      if (!cached) {
+        const row = await this.repo.findOne({ where: { id: head.id } });
+        cached = { body: row?.body ?? {}, hasPlan: this.bodyHasPlan(row?.body ?? {}) };
+        // 只留目前部署中的那幾份，舊版本（更新前的內容）不要一直佔著記憶體
+        const liveKeys = new Set(heads.map((item) => `${item.id}:${item.updatedAt}`));
+        for (const existing of this.deployedBodyCache.keys()) {
+          if (!liveKeys.has(existing)) this.deployedBodyCache.delete(existing);
+        }
+        this.deployedBodyCache.set(key, cached);
+      }
+      if (cached.hasPlan) return { shiftId: head.id, shiftName: head.name, body: cached.body };
+    }
+    return null;
   }
+
+  /** 部署中班表內容快取，鍵＝id:updated_at（內容一改 updated_at 就變，自然失效） */
+  private readonly deployedBodyCache = new Map<string, { body: Record<string, unknown>; hasPlan: boolean }>();
 
   async getStationEtas(query: {
     from?: string;

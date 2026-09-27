@@ -74,6 +74,19 @@ export function MapPlatformLayer({
   const orderStationsById = useOrderRouteStations(areaVehiclesRaw);
 
   const vehicleDefinition = vehicleTemplate?.definition ?? null;
+  // 圖台包了 memo：每次車輛更新都給新物件會讓整張圖台重畫
+  const vehicleBehavior = useMemo(
+    () =>
+      vehicleTemplate
+        ? {
+            actionIconRules: vehicleTemplate.actionIconRules,
+            behaviorOffsetX: vehicleTemplate.behaviorOffsetX,
+            behaviorOffsetY: vehicleTemplate.behaviorOffsetY,
+            behaviorIconSize: vehicleTemplate.behaviorIconSize,
+          }
+        : undefined,
+    [vehicleTemplate],
+  );
   const vehicleDisplayWidthPx =
     vehicleTemplate?.displayWidthPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX;
   const vehicleDisplayHeightPx =
@@ -167,16 +180,7 @@ export function MapPlatformLayer({
         vehicleDisplayWidthPx={vehicleDisplayWidthPx}
         vehicleDisplayHeightPx={vehicleDisplayHeightPx}
         routes={routes}
-        vehicleBehavior={
-          vehicleTemplate
-            ? {
-                actionIconRules: vehicleTemplate.actionIconRules,
-                behaviorOffsetX: vehicleTemplate.behaviorOffsetX,
-                behaviorOffsetY: vehicleTemplate.behaviorOffsetY,
-                behaviorIconSize: vehicleTemplate.behaviorIconSize,
-              }
-            : undefined
-        }
+        vehicleBehavior={vehicleBehavior}
         vehicleRoofIndicator={vehicleRoofIndicator}
         orderStationsById={orderStationsById}
         viewportRef={viewportRef}
