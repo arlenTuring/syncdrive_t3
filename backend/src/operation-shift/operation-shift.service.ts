@@ -515,7 +515,20 @@ export class OperationShiftService {
       order: { updatedAt: 'DESC' },
       take: 20,
     });
-    const publishedWithPlan = published.find((row) => this.bodyHasPlan(row.body ?? {}));
+    /*
+     * 更新時間相同時，部署中的那一份優先。部署會把前一份改成 idle 並寫入同一個時間
+     * （見 deployShift），每次部署之後「最新已發布」都是新舊兩份同分——不排這一層，
+     * 對外班表可能回舊的那份，跟調度下單用的部署中班表對不上。
+     */
+    published.sort(
+      (a, b) =>
+        Number(b.updatedAt) - Number(a.updatedAt) ||
+        Number(b.usageStatus === OperationShiftUsageStatus.IN_USE) -
+          Number(a.usageStatus === OperationShiftUsageStatus.IN_USE),
+    );
+    const publishedWithPlan = published.find((row) =>
+      this.bodyHasPlan(row.body ?? {}),
+    );
     if (publishedWithPlan) {
       return { row: publishedWithPlan, source: 'published' };
     }

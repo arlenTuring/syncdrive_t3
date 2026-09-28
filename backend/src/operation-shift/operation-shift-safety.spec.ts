@@ -238,3 +238,33 @@ describe('清單上的檢查狀態', () => {
     expect(resolveOperationShiftPublishCheckState(g.body)).toBe('blocked');
   });
 });
+
+describe('對外班表讀哪一份', () => {
+  it('部署後新舊兩份「最新已發布」同一個更新時間：回部署中的那一份', async () => {
+    const f = fixture({ secondTripMinute: 630 });
+    const row = (id: string, usage: OperationShiftUsageStatus) =>
+      ({
+        id,
+        name: id,
+        body: f.body,
+        publishStatus: OperationShiftPublishStatus.PUBLISHED,
+        usageStatus: usage,
+        updatedAt: '1790446966554',
+      }) as unknown as OperationShift;
+    const repo = {
+      // 資料庫對同分的排序不保證：刻意把舊的排前面
+      find: jest
+        .fn()
+        .mockResolvedValue([
+          row('old', OperationShiftUsageStatus.IDLE),
+          row('deployed', OperationShiftUsageStatus.IN_USE),
+        ]),
+    };
+    const service = new OperationShiftService(
+      repo as never,
+      { getPublishedMapLibrary: jest.fn() } as never,
+    );
+    const result = await service.getTimetableTrips({});
+    expect(result.meta.shift_id).toBe('deployed');
+  });
+});
