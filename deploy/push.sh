@@ -35,10 +35,14 @@ if [ "${1:-}" = "--gcloud" ]; then
   #
   # COPYFILE_DISABLE 讓 macOS 的 tar 不要產生 ._* AppleDouble 檔——它們在遠端
   # 一樣會解壓失敗。
+  #
+  # backend/logs 是本機排班重播與追蹤的輸出（.gitignore 擋著，可達 GB 級），
+  # 不是執行需要的東西，不送上去。
   COPYFILE_DISABLE=1 tar --exclude-vcs \
       --exclude='node_modules' --exclude='dist' --exclude='.dev' \
       --exclude='deploy/.env' --exclude='deploy/.state' \
       --exclude='mosquitto/certs' --exclude='._*' \
+      --exclude='backend/logs' \
       -czf - . \
     | gcloud compute ssh "$INSTANCE" "${GCLOUD_ARGS[@]}" --command "tar -xzf - -C $REMOTE_DIR"
   # deploy/.env 是 root:root 600（裡面有資料庫與 broker 的密碼），docker compose
@@ -68,6 +72,7 @@ rsync -az --delete \
   --exclude='deploy/.state' \
   --exclude='mosquitto/certs' \
   --exclude='._*' \
+  --exclude='backend/logs' \
   ./ "$TARGET:$REMOTE_DIR/"
 
 log "在遠端執行部署"
