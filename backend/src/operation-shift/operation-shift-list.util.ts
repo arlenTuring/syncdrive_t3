@@ -4,6 +4,9 @@ import {
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 
+import { buildPlanFingerprint as bundledPlanFingerprint } from './safety/schedule-safety.generated';
+import { buildSafetySettingsFingerprint } from './safety/schedule-safety';
+
 export const UNTITLED_OPERATION_SHIFT_NAME = '未完成的正線班表';
 
 /**
@@ -19,35 +22,17 @@ export const OPERATION_SHIFT_PUBLISH_CHECK_LABEL: Record<
   string
 > = {
   unchecked: '未檢查',
-  blocked: '不建議發布',
+  blocked: '禁止發布',
   ready: '可發布',
 };
 
 /**
- * plan 內容指紋：列、卡 id、起訖時刻。
- * 必須與前端 buildPlanFingerprint() 完全一致，否則清單會永遠顯示未檢查。
+ * plan 內容指紋。與前端 buildPlanFingerprint() 是同一份程式（安全檢查打包檔），
+ * 不在後端另寫一份——兩份遲早對不起來，清單就會永遠顯示未檢查或誤判可發布。
  */
-function buildPlanFingerprint(plan: unknown): string {
-  if (!plan || typeof plan !== 'object') return '';
-  const timelines = (plan as { timelines?: unknown }).timelines;
-  if (!Array.isArray(timelines)) return '';
-  const parts: string[] = [];
-  for (const timeline of timelines) {
-    if (!timeline || typeof timeline !== 'object') continue;
-    const row = (timeline as { row?: unknown }).row;
-    const blocks = (timeline as { blocks?: unknown }).blocks;
-    if (!Array.isArray(blocks)) continue;
-    for (const block of blocks) {
-      if (!block || typeof block !== 'object') continue;
-      const b = block as Record<string, unknown>;
-      parts.push(
-        `${String(row)}|${String(b.id)}|${String(b.plannedStartMinute)}|${String(b.plannedEndMinute)}`,
-      );
-    }
-  }
-  parts.sort();
-  return parts.join('\n');
-}
+export const buildPlanFingerprint = bundledPlanFingerprint as (
+  plan: unknown,
+) => string;
 
 export function resolveOperationShiftPublishCheckState(
   body: Record<string, unknown> | null | undefined,
@@ -65,7 +50,23 @@ export function resolveOperationShiftPublishCheckState(
     return 'unchecked';
   }
   if (c.planFingerprint !== buildPlanFingerprint(o.plan)) return 'unchecked';
-  return c.publishSafe ? 'ready' : 'blocked';
+  // 路線停靠、碰撞保護等設定改了（或舊紀錄沒記設定），舊結論不能沿用
+  const settings = buildSafetySettingsFingerprint({
+    selectedRoutes: Array.isArray(body?.selectedRoutes)
+      ? body.selectedRoutes
+      : [],
+    collisionProtectionSeconds:
+      typeof body?.collisionProtectionSeconds === 'number'
+        ? body.collisionProtectionSeconds
+        : null,
+    sectionCodes: body?.maintenanceSectionCodeBySection,
+  });
+  if (
+    typeof c.settingsFingerprint !== 'string' ||
+    c.settingsFingerprint !== settings
+  )
+    return 'unchecked';
+  return c.publishSafe && c.publishBlockingCount === 0 ? 'ready' : 'blocked';
 }
 
 export type OperationShiftListItem = {

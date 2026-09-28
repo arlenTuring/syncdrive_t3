@@ -16,6 +16,7 @@ import { AttributeLegendBadgeChip } from '../../time-templates/components/Attrib
 import type { ShiftScheduleCreateDraft, ShiftScheduleSelectedRoute } from '../types/create';
 import { isShiftScheduleOutputFresh } from '../types/create';
 import { buildScheduleAnalysisReport } from '../utils/buildScheduleAnalysisReport';
+import { loadShiftRouteGroupCatalog } from '../utils/shiftRouteGroupCatalog';
 import {
   SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
   normalizeMinimumRecoveryTimeSeconds,
@@ -24,6 +25,7 @@ import { ScheduleAnalysisReportPanel } from './ScheduleAnalysisReportPanel';
 import { ScheduleTimeZoomToolbar } from './ScheduleTimeZoomToolbar';
 import {
   PUBLISH_STATE_LABEL,
+  buildSafetySettingsFingerprint,
   resolveSchedulePublishState,
   runSchedulePublishCheck,
   toPublishCheckRecord,
@@ -475,6 +477,42 @@ function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
   );
 }
 
+/**
+ * 引擎寫在 detail.searchLog 的搜尋過程（試過哪些候選、為什麼不採用）；主畫面只顯示結論。
+ * 同一句重複出現（同一個候選在幾輪搜尋裡被拒絕同一個理由）合併成一行並標次數。
+ */
+function issueSearchLog(issue: FeasibilityIssue): string[] {
+  const log = (issue.detail as { searchLog?: unknown } | undefined)?.searchLog;
+  if (!Array.isArray(log)) return [];
+  const counts = new Map<string, number>();
+  for (const line of log) {
+    if (typeof line !== 'string') continue;
+    counts.set(line, (counts.get(line) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([line, count]) => (count > 1 ? `${line}（×${count}）` : line));
+}
+
+function formatGeneratedClock(iso: string | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('zh-TW', { hour12: false });
+}
+
+function IssueSearchLog({ lines }: { lines: string[] }) {
+  const { t } = useTranslation();
+  if (lines.length === 0) return null;
+  return (
+    <details className="mt-1 rounded border border-white/10 bg-black/10 px-2 py-1 text-[11px] text-zinc-400">
+      <summary className="cursor-pointer select-none text-zinc-300">
+        {t('shiftList.scheduleAdjust.searchLog', { count: lines.length })}
+      </summary>
+      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+        {lines.map((line, index) => <li key={index}>{line}</li>)}
+      </ul>
+    </details>
+  );
+}
+
 function IssueGroupCard({
   group,
   plan,
@@ -562,9 +600,10 @@ function IssueGroupCard({
               const jumpable =
                 plan != null && resolveFeasibilityIssueJumpBlockId(issue, plan) != null;
               const rowKey = `${group.key}-${index}-${tripCode}-${issue.message}`;
+              const searchLog = issueSearchLog(issue);
               if (jumpable) {
                 return (
-                  <li key={rowKey}>
+                  <li key={rowKey} className="space-y-1">
                     <button
                       type="button"
                       onClick={() => onIssueClick(issue)}
@@ -578,6 +617,7 @@ function IssueGroupCard({
                       </span>
                       <span className={`shrink-0 text-[10px] ${jumpHint}`}>{t('shiftList.scheduleAdjust.jump')}</span>
                     </button>
+                    <IssueSearchLog lines={searchLog} />
                   </li>
                 );
               }
@@ -591,6 +631,7 @@ function IssueGroupCard({
                   </span>
                   <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
                     {issue.message}
+                    <IssueSearchLog lines={searchLog} />
                   </span>
                 </li>
               );
@@ -626,7 +667,7 @@ function FeasibilityMessages({
   const errorCount = report.errors.length;
   const warningCount = report.warnings.length;
   const visibleGroups = groups.filter((g) => {
-    if (viewMode === 'hard') return g.severity === 'error';
+    if (viewMode === 'hard') return resolveIssueDisplayLayerFromIssue({ code: g.code, severity: g.severity, kind: g.issues[0]?.kind }) === 'hard';
     if (viewMode === 'hidePolicy') {
       const layer = resolveIssueDisplayLayerFromIssue({
         code: g.code,
@@ -639,15 +680,25 @@ function FeasibilityMessages({
   });
 
   if (groups.length === 0) return null;
+  const unresolvedCount = Math.max(errorCount, acceptance.publishBlockingCount);
 
   return (
     <div className="mb-4 space-y-2">
       <div className="mb-2 space-y-1.5 px-1">
+        {/* 計算已經結束：講清楚是「算完了、還有問題」，不是還在算 */}
+        <div className="text-[11px] text-zinc-400" role="status">
+          {acceptance.gatePassed
+            ? t('shiftList.scheduleAdjust.calcDonePassed', { time: formatGeneratedClock(plan?.generatedAt) })
+            : t('shiftList.scheduleAdjust.calcDoneWithIssues', {
+              count: unresolvedCount,
+              time: formatGeneratedClock(plan?.generatedAt),
+            })}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          {errorCount > 0 ? (
+          {!acceptance.gatePassed ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-400 ring-1 ring-red-500/30">
               <AlertCircle className="size-3 shrink-0" />
-              {t('shiftList.scheduleAdjust.hardErrors', { count: errorCount })}
+              {t('shiftList.scheduleAdjust.hardErrors', { count: Math.max(errorCount, acceptance.publishBlockingCount) })}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-500/25">
@@ -835,7 +886,7 @@ function revalidatePlan(
   );
 
   return {
-    ok: computeScheduleGateOk(errors),
+    ok: computeScheduleGateOk(errors, warnings),
     errors,
     warnings,
   };
@@ -867,6 +918,7 @@ export function StepShiftScheduleAdjust({
   const [publishCheck, setPublishCheck] = useState<SchedulePublishCheckRecord | null>(
     draft.scheduleOutput?.publishCheck ?? null,
   );
+  const [checkingPublish, setCheckingPublish] = useState(false);
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
@@ -1446,24 +1498,50 @@ export function StepShiftScheduleAdjust({
   ]);
 
   // 發布前檢查：可重跑的動作。班表可以手動改，所以指紋對不上就回到「未檢查」
-  const publishState = resolveSchedulePublishState(publishCheck, plan);
-
-  const handleRunPublishCheck = () => {
-    if (!plan) return;
-    const result = runSchedulePublishCheck({
-      plan,
+  // 路線停靠、保護時間等設定改了，舊的檢查結果不能沿用（路網在發布時由後端重驗）
+  const publishSettingsFingerprint = useMemo(
+    () => buildSafetySettingsFingerprint({
       selectedRoutes: draft.routeGroups.selectedRoutes,
       collisionProtectionSeconds:
         draft.routeGroups.collisionProtectionSeconds
         ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
       sectionCodes: draft.maintenanceTask.sectionCodeBySection,
-    });
-    const record = toPublishCheckRecord(result, new Date().toISOString());
-    setPublishCheck(record);
-    // 檢查結果要跟著班表存起來，清單欄位才讀得到
-    const base = draft.scheduleOutput;
-    if (base) {
-      void onScheduleOutputReady({ ...base, publishCheck: record }, { flush: true });
+    }),
+    [draft.routeGroups.selectedRoutes, draft.routeGroups.collisionProtectionSeconds, draft.maintenanceTask.sectionCodeBySection],
+  );
+  const publishState = resolveSchedulePublishState(publishCheck, plan, {
+    settingsFingerprint: publishSettingsFingerprint,
+  });
+
+  const handleRunPublishCheck = async () => {
+    if (!plan || checkingPublish) return;
+    setCheckingPublish(true);
+    setError(null);
+    try {
+      const catalog = await loadShiftRouteGroupCatalog(draft.routeGroups.mapId);
+      // 載入期間若使用者已修改班表，檢查結果不能覆蓋新版。
+      if (planRef.current !== plan) return;
+      const result = runSchedulePublishCheck({
+        plan,
+        selectedRoutes: draft.routeGroups.selectedRoutes,
+        collisionProtectionSeconds:
+          draft.routeGroups.collisionProtectionSeconds
+          ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
+        sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+        topology: catalog.pointTopology,
+      });
+      const record = toPublishCheckRecord(result, new Date().toISOString());
+      setPublishCheck(record);
+      // 檢查結果要跟著班表存起來，清單欄位才讀得到
+      const base = draft.scheduleOutput;
+      if (base) {
+        await onScheduleOutputReady({ ...base, publishCheck: record }, { flush: true });
+      }
+    } catch (checkError) {
+      setPublishCheck(null);
+      setError(checkError instanceof Error ? checkError.message : String(checkError));
+    } finally {
+      setCheckingPublish(false);
     }
   };
 
@@ -1568,8 +1646,8 @@ export function StepShiftScheduleAdjust({
 
         <button
           type="button"
-          disabled={!plan}
-          onClick={handleRunPublishCheck}
+          disabled={!plan || checkingPublish}
+          onClick={() => void handleRunPublishCheck()}
           className={`rounded p-1.5 transition ${
             !plan
               ? 'cursor-not-allowed text-zinc-600 opacity-40'
@@ -1587,7 +1665,7 @@ export function StepShiftScheduleAdjust({
                 : t('shiftList.scheduleAdjust.publishUnchecked')
           }
         >
-          <ShieldCheck className="size-4" />
+          {checkingPublish ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
         </button>
 
         <button

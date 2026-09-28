@@ -286,6 +286,10 @@ export type FeasibilityViolationCode =
   | 'ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY'
   | 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE'
   | 'GEOMETRY_NOT_CONVERGED'
+  /** 共用搜尋預算用盡、仍有安全問題：搜尋未完成（不是已證明無解），禁止發布 */
+  | 'SCHEDULE_SEARCH_INCOMPLETE'
+  /** 系統為了排移動縮短了整備工作時間（晚開始／提早結束），逐筆揭露（警告） */
+  | 'MAINTENANCE_WORK_SHORTENED'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   | 'STATION_BERTH_DELAY_SOURCE'
@@ -480,6 +484,9 @@ export type ShiftScheduleStoredOutput = {
   publishCheck?: {
     checkedAt: string;
     planFingerprint: string;
+    /** 檢查當下的安全設定／路網指紋（舊紀錄沒有：視為未檢查） */
+    settingsFingerprint?: string;
+    topologyFingerprint?: string;
     publishSafe: boolean;
     publishBlockingCount: number;
     publishBlockingByCode: Record<string, number>;

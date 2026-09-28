@@ -10,8 +10,8 @@
  * - 等價變形（改名、整體平移、重跑、從上次輸出再生成）：結果要與基準等價
  *   （改名：把基準結果套同一張改名表後指紋相同；平移：所有時刻差固定值、數量相同）。
  * - 改條件（班距、時段邊界、行駛時間、車數、設施、緩衝、搜尋預算）：不要求結果一樣，
- *   但必須守住不變量——獨立重驗證找得到的問題報告裡都有（不假裝可行）、殘留站位衝突都標
- *   「目前未找到」、卡片身分不重複、系統緩衝只加不改原始設定、前後端逐站時刻一致。
+ *   但必須通過安全檢查；有碰撞或安全間隔不足，即使報告列出也算失敗。
+ *   另檢查卡片身分、原始設定不變，以及前後端逐站時刻一致。
  *
  * 不經過任何會存檔／部署班表的入口。
  */
@@ -33,7 +33,15 @@ import {
   resolveRouteForBlock,
 } from '../src/features/shift-list/utils/buildBlockStationDepartures';
 import { buildTimetableStationStops } from '../../backend/src/operation-shift/timetable/build-station-stops';
-import { buildThroughVerificationFingerprint } from '../src/features/shift-list/utils/routeRelationThroughCycles';
+import { extractFacilityMapCodes } from '../src/features/shift-list/utils/maintenanceFirstTripOrigins';
+import { nodeMatchesMoveCardCodes } from '../src/features/shift-list/utils/moveCardShared';
+import {
+  checkShiftedTemplate,
+  renameScheduleInput,
+  reverifyThroughFingerprint,
+  shiftClock,
+  shiftScheduleInputMinutes,
+} from '../src/features/shift-list/testing/scheduleInputTransforms';
 
 type Input = GenerateShiftScheduleInput;
 type Result = ReturnType<typeof generateShiftSchedule>;
@@ -59,7 +67,9 @@ const clone = <T,>(value: T): T => structuredClone(value);
 
 function run(input: Input): { result: Result; elapsedMs: number } {
   const startedAt = Date.now();
+  const originalInput = JSON.stringify(input);
   const result = generateShiftSchedule(input);
+  if (JSON.stringify(input) !== originalInput) throw new Error('生成引擎改動了原始輸入參數');
   return { result, elapsedMs: Date.now() - startedAt };
 }
 
@@ -104,7 +114,20 @@ function invariants(input: Input, result: Result): string[] {
   const failures: string[] = [];
   const plan = result.plan;
   if (!plan) return ['沒有產出 plan'];
+  const blocking = allIssues(result).filter((issue) => issue.severity === 'error' || PUBLISH_BLOCKING_CODES.has(issue.code));
+  if (blocking.length > 0) failures.push(`安全驗收失敗：${blocking.length} 筆阻擋發布的問題`);
+  if (!result.report.ok) failures.push('生成結果未通過驗收');
   const routes = input.draft.routeGroups.selectedRoutes;
+  const parkingCodes = extractFacilityMapCodes(input.maintenanceTaskBody, 'mobile');
+  const allowedParking = new Set((input.pointTopology?.nodes ?? [])
+    .filter((node) => ['facility', 'docking', 'facility-docking'].includes(node.kind)
+      && nodeMatchesMoveCardCodes(node, parkingCodes)).map((node) => node.id));
+  for (const block of plan.timelines.flatMap((timeline) => timeline.blocks)) {
+    if (block.id.startsWith('berthpark-') && block.taskType === 'idle'
+      && !allowedParking.has(block.yardFacilityNodeId ?? '')) {
+      failures.push(`${block.id} 借用了待命清單以外的位置`);
+    }
+  }
 
   // 1. 卡片身分不重複（重跑／聯動不重複插卡）
   const seen = new Set<string>();
@@ -123,6 +146,7 @@ function invariants(input: Input, result: Result): string[] {
     topology: input.pointTopology,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
   });
+  if (recheck.blockingIssues.length > 0) failures.push(`獨立安全檢查失敗：${recheck.blockingIssues.length} 筆問題`);
   const reported: Record<string, number> = {};
   for (const issue of allIssues(result)) reported[issue.code] = (reported[issue.code] ?? 0) + 1;
   // 缺移動的那一列若已報「必要轉場排不出」，就是同一件事換個說法（報告合併成一筆），不算漏報
@@ -193,81 +217,8 @@ function invariants(input: Input, result: Result): string[] {
 
 // ───────────────────────── 變形 ─────────────────────────
 
-const ID_KEY = /(^id$|Id$|Ids$|^from$|^to$|NodeId|StationId|InstanceId)/;
-/** 拓樸／軌道接點裡指向節點的欄位（名字不帶 Id） */
-const REF_KEY = /^(start|end|waypointCode|rt|rb|lb|lt|up|down|stationIds)$/;
-const COMPOSITE_KEY = /(id$|Id$|Ids$|Fingerprint$|Key$|key$)/;
-const NAME_KEY = /^(name|customName|label|labels|stationName|routeName|routeCode|cardLabel|groupName|serviceDirectionName|templateName|taskName|startStationName|endStationName)$/;
-
-/**
- * 改名表。
- * - prefix：每個名字前面加同一段前綴。任何比較方式（字碼、localeCompare）下相對順序都不變，
- *   所以結果必須與基準<strong>完全等價</strong>；引擎若認得某個名字（例如看開頭字樣）就會露餡。
- * - opaque：換成與原名無關的代號，排序關係會變。引擎在平手時依識別碼決定先後，
- *   這一種只檢查不變量，並揭露結果對平手順序有多敏感。
- */
-function renameMap(values: Iterable<string>, mode: 'prefix' | 'opaque', prefix: string): Map<string, string> {
-  const unique = [...new Set(values)].filter((value) => value.length > 0);
-  if (mode === 'prefix') return new Map(unique.map((value) => [value, `${prefix}${value}`]));
-  // 反序編號：刻意打亂原本的排序關係
-  const sorted = unique.sort().reverse();
-  return new Map(sorted.map((value, index) => [value, `${prefix}${String(index).padStart(5, '0')}`]));
-}
-
-function collect(value: unknown, key: string, ids: Set<string>, names: Set<string>): void {
-  if (Array.isArray(value)) {
-    for (const item of value) collect(item, key, ids, names);
-    return;
-  }
-  if (value && typeof value === 'object') {
-    for (const [childKey, child] of Object.entries(value)) collect(child, childKey, ids, names);
-    return;
-  }
-  if (typeof value !== 'string') return;
-  if (ID_KEY.test(key) || key === 'stationIds') ids.add(value);
-  if (NAME_KEY.test(key)) names.add(value);
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function renameInput(input: Input, mode: 'prefix' | 'opaque'): { input: Input; rename: (value: unknown) => unknown } {
-  const ids = new Set<string>();
-  const names = new Set<string>();
-  // 上次的產出不是這次的輸入，不收它的名字
-  const { scheduleOutput: _omit, ...draftRest } = input.draft as Input['draft'] & { scheduleOutput?: unknown };
-  collect({ ...input, draft: draftRest }, '', ids, names);
-  for (const id of ids) names.delete(id);
-  const idMap = renameMap(ids, mode, 'x_');
-  const nameMap = renameMap(names, mode, '改名');
-  const idPattern = idMap.size > 0
-    ? new RegExp(`(?<![A-Za-z0-9_])(${[...idMap.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp).join('|')})(?![A-Za-z0-9_])`, 'g')
-    : null;
-  const renameString = (text: string, key: string): string => {
-    // 純數字的識別碼（設施 "100"）可能跟數值欄位（充電上限 "100"）撞字面：只在參照欄位換
-    if (idMap.has(text) && (!/^\d+$/.test(text) || ID_KEY.test(key) || REF_KEY.test(key))) return idMap.get(text)!;
-    if (nameMap.has(text)) return nameMap.get(text)!;
-    if (idPattern && COMPOSITE_KEY.test(key)) return text.replace(idPattern, (match) => idMap.get(match) ?? match);
-    return text;
-  };
-  const rename = (value: unknown, key = ''): unknown => {
-    if (Array.isArray(value)) return value.map((item) => rename(item, key));
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value).map(([childKey, child]) => [idMap.get(childKey) ?? childKey, rename(child, childKey)]),
-      );
-    }
-    return typeof value === 'string' ? renameString(value, key) : value;
-  };
-  return { input: rename(input) as Input, rename: (value) => rename(value) };
-}
-
-function shiftClock(text: string, minutes: number): string {
-  const [h, m] = text.split(':').map(Number);
-  const total = ((h! * 60 + m! + minutes) % 1440 + 1440) % 1440;
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
+// 改名、平移等變形與「驗證變形本身」放在共用模組（有自己的測試），這裡只引用
+const renameInput = renameScheduleInput;
 
 type TemplateBody = {
   tasks: Array<{ rowIndex: number; startMinute: number; durationMinutes: number; taskType: string }>;
@@ -278,37 +229,13 @@ type TemplateBody = {
 const template = (input: Input) => input.templateBody as unknown as TemplateBody;
 
 function shiftTime(input: Input, minutes: number): Input {
-  const next = clone(input);
-  for (const task of template(next).tasks) task.startMinute += minutes;
-  for (const interval of template(next).intervals) {
-    interval.startTime = shiftClock(interval.startTime, minutes);
-    interval.endTime = shiftClock(interval.endTime, minutes);
-  }
+  const next = shiftScheduleInputMinutes(input, minutes);
+  const problems = checkShiftedTemplate(input, next, minutes);
+  if (problems.length > 0) throw new Error(`平移變形本身不正確（不是引擎問題）：${problems.slice(0, 5).join('；')}`);
   return next;
 }
 
-/**
- * 改了路線參數，產品要求使用者回 Step 4 重新驗證交路（指紋對不上就停止排班）。
- * 測試模擬「使用者重新驗證」：用同一個指紋函式重算；不改任何排班參數。
- */
-function reverify(input: Input): Input {
-  const groups = input.draft.routeGroups;
-  const anchors = groups.throughAnchors;
-  if (!anchors?.verifiedFingerprint || !groups.routeRelationGraph) return input;
-  const routeMode = anchors.startInstanceIds.length > 0 || anchors.endInstanceIds.length > 0;
-  const fingerprint = buildThroughVerificationFingerprint({
-    startStationIds: routeMode ? [] : anchors.startStationIds,
-    endStationIds: routeMode ? [] : anchors.endStationIds,
-    startInstanceIds: anchors.startInstanceIds,
-    endInstanceIds: anchors.endInstanceIds,
-    routes: groups.selectedRoutes,
-    graph: groups.routeRelationGraph,
-    minimumRecoveryTimeSeconds: groups.minimumRecoveryTimeSeconds,
-  });
-  anchors.verifiedFingerprint = fingerprint;
-  if ('listedFingerprint' in anchors) (anchors as { listedFingerprint?: string }).listedFingerprint = fingerprint;
-  return input;
-}
+const reverify = reverifyThroughFingerprint;
 
 const variants: Array<{
   name: string;
@@ -316,6 +243,7 @@ const variants: Array<{
   build: (input: Input) => Input;
 }> = [
   { name: 'rerun', kind: 'equivalent', build: clone },
+  { name: 'label-rename', kind: 'equivalent', build: (input) => renameInput(input, 'prefix', true).input },
   /**
    * 真實資料改名不要求逐卡等價：引擎在平手時用識別碼／設施名稱決定先後（確定性的次序，
    * 不是認得某個名字），而改名會讓「使用者給的名字」和「引擎產生的識別碼」之間的先後
@@ -442,11 +370,14 @@ let failed = baseFailures.length > 0;
 for (const variant of variants) {
   if (only && !only.includes(variant.name)) continue;
   const built = variant.build(original);
-  const input = variant.kind === 'changed' || variant.name.startsWith('rename') ? reverify(built) : built;
+  const input = variant.kind === 'changed' || variant.name.includes('rename') ? reverify(built) : built;
   const { result, elapsedMs } = run(input);
   const variantMetrics = metrics(result);
   const failures = invariants(input, result);
-  if (dumpDir) writeFileSync(`${dumpDir}/${variant.name}.json`, JSON.stringify(result));
+  if (dumpDir) {
+    writeFileSync(`${dumpDir}/${variant.name}.json`, JSON.stringify(result));
+    writeFileSync(`${dumpDir}/${variant.name}-input.json`, JSON.stringify(input));
+  }
   const equivalence: string[] = [];
   if (variant.kind === 'equivalent' && result.plan && baseRun.result.plan) {
     if (variant.name === 'rerun') {
@@ -489,6 +420,7 @@ for (const variant of variants) {
   }
   if (failures.length > 0 || equivalence.length > 0) failed = true;
   report[variant.name] = { kind: variant.kind, elapsedMs, metrics: variantMetrics, invariantFailures: failures, equivalence };
+  if (flag('out')) writeFileSync(flag('out')!, JSON.stringify(report, null, 2));
   console.error(`[${variant.name}] ${elapsedMs}ms 不變量失敗 ${failures.length}${equivalence.length ? `，等價失敗 ${equivalence.length}` : ''}`);
 }
 

@@ -44,7 +44,7 @@ export function nodeMatchesMoveCardCodes(
   return codes.some((raw) => {
     const code = normalizeMoveCardCode(raw);
     if (!code || code === 'UNSPECIFIED') return false;
-    return code === id || code === label || label.startsWith(code) || id.endsWith(code);
+    return code === id || code === label;
   });
 }
 
@@ -53,6 +53,8 @@ export type MoveCardFacilityBooking = {
   startSecond: number;
   endSecond: number;
   timelineRow: number;
+  /** 佔用這一格的卡片（整備區塊）；排不出轉場時用來講「是誰擋著」 */
+  blockId?: string;
 };
 
 const DAY_SECONDS = SCHEDULE_DAY_MINUTES * 60;
@@ -117,15 +119,29 @@ export function moveCardFacilityIsFree(
   timelineRow: number,
   handoverSeconds = 0,
 ): boolean {
+  return findMoveCardFacilityConflict(
+    bookings, facilityNodeId, startSecond, endSecond, timelineRow, handoverSeconds,
+  ) === null;
+}
+
+/** 同 {@link moveCardFacilityIsFree}，但回傳擋住的那一筆佔用（沒有就是 null） */
+export function findMoveCardFacilityConflict(
+  bookings: MoveCardFacilityBooking[],
+  facilityNodeId: string,
+  startSecond: number,
+  endSecond: number,
+  timelineRow: number,
+  handoverSeconds = 0,
+): MoveCardFacilityBooking | null {
   // 沒有停留就沒有佔用，也談不上交接
-  if (endSecond - startSecond <= 0) return true;
+  if (endSecond - startSecond <= 0) return null;
   const want = daySegmentsOf(startSecond - handoverSeconds, endSecond + handoverSeconds);
-  if (want.length === 0) return true;
-  return !bookings.some((b) => {
+  if (want.length === 0) return null;
+  return bookings.find((b) => {
     if (b.facilityNodeId !== facilityNodeId) return false;
     if (b.timelineRow === timelineRow) return false;
     const booked = daySegmentsOf(b.startSecond, b.endSecond);
     return booked.some(([bs, be]) =>
       want.some(([ws, we]) => bs < we - 1e-9 && ws < be - 1e-9));
-  });
+  }) ?? null;
 }

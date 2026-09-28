@@ -1,5 +1,5 @@
 import type { PointTopology } from '../../map-editor/types/pointTopology';
-import { edgeSeconds } from './findTopologyPath';
+import { edgeHasTravelTime, edgeSeconds } from './findTopologyPath';
 import type { GeneratedScheduleTimeline } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
 
@@ -31,15 +31,34 @@ function cyclicGapSeconds(a: number, b: number): number {
   return Math.min(raw, DAY_SECONDS - raw);
 }
 
+/** 移動卡路徑上無法算出經過時刻的地方 */
+export type MoveJunctionGap = {
+  blockId: string;
+  timelineRow: number;
+  fromLabel: string;
+  toLabel: string;
+  /** missing-time：這段邊沒有行駛時間；no-edge：兩點之間沒有邊；unknown／ambiguous-node：名稱對不到唯一節點 */
+  reason: 'missing-time' | 'no-edge' | 'unknown-node' | 'ambiguous-node';
+};
+
 export function collectMoveJunctionPasses(
   timelines: GeneratedScheduleTimeline[],
   topology: PointTopology | null | undefined,
+  /**
+   * 移動卡經過的某一段沒有行駛時間：經過時刻算不出來，轉折點碰撞也就無從檢查。
+   * 不能當 0 秒略過——呼叫端（最終驗證）要把它當成缺資料擋下。
+   */
+  onMissingTravelTime?: (gap: MoveJunctionGap) => void,
 ): MoveJunctionPass[] {
   if (!topology) return [];
   const nodeIdByLabel = new Map<string, string>();
+  // 同一個名稱對到兩個節點：路徑對不回路網，不能挑第一個將就
+  const ambiguousLabels = new Set<string>();
   for (const node of topology.nodes) {
     const label = (node.label ?? '').trim();
-    if (label && !nodeIdByLabel.has(label)) nodeIdByLabel.set(label, node.id);
+    if (!label) continue;
+    if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
+    else nodeIdByLabel.set(label, node.id);
   }
   const edgeByPair = new Map<string, (typeof topology.edges)[number]>();
   for (const edge of topology.edges) {
@@ -56,12 +75,33 @@ export function collectMoveJunctionPasses(
       if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
       const labels = block.yardMoveViaLabels ?? [];
       if (labels.length < 3) continue;
-      const ids = labels.map((label) => nodeIdByLabel.get(label.trim()) ?? null);
-      if (ids.some((id) => id == null)) continue;
+      const ids = labels.map((label) =>
+        ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
+      // 經過的點對不回路網：經過時刻算不出來，跟缺行駛時間一樣要回報，不能整張略過
+      const unresolved = ids.findIndex((id) => id == null);
+      if (unresolved >= 0) {
+        onMissingTravelTime?.({
+          blockId: block.id,
+          timelineRow: timeline.row,
+          fromLabel: labels[unresolved]!,
+          toLabel: labels[unresolved]!,
+          reason: ambiguousLabels.has(labels[unresolved]!.trim()) ? 'ambiguous-node' : 'unknown-node',
+        });
+        continue;
+      }
       let instant = minuteToSecond(block.plannedStartMinute);
       for (let index = 1; index < ids.length; index += 1) {
         const edge = edgeByPair.get(`${ids[index - 1]}>${ids[index]}`);
-        if (!edge) break;
+        if (!edge || !edgeHasTravelTime(edge)) {
+          onMissingTravelTime?.({
+            blockId: block.id,
+            timelineRow: timeline.row,
+            fromLabel: labels[index - 1]!,
+            toLabel: labels[index]!,
+            reason: edge ? 'missing-time' : 'no-edge',
+          });
+          break;
+        }
         instant += edgeSeconds(edge, 'avg');
         if (index === ids.length - 1) break;
         passes.push({

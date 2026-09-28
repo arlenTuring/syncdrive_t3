@@ -1484,6 +1484,7 @@ export function validateFacilityOccupancy(
       overlapSeconds: Math.round(Math.max(0, collision.overlapSeconds)),
       // 沿用既有欄位語意：重疊時為負，交接空檔時為正（collision.gapSeconds 已是這個正負號）
       gapSeconds: Math.round(collision.gapSeconds),
+      shortfallSeconds: Math.max(0, protectionSeconds * 2 - collision.gapSeconds),
     };
 
     if (collision.kind === 'overlap') {
@@ -1672,8 +1673,34 @@ export function validateMoveJunctionConflicts(args: {
   warnings: FeasibilityIssue[];
 }): void {
   const bufferSeconds = Math.max(0, args.collisionProtectionSeconds) * 2;
-  if (bufferSeconds <= 0 || !args.topology) return;
-  const passes = collectMoveJunctionPasses(args.timelines, args.topology);
+  if (!args.topology) return;
+  const missing = new Set<string>();
+  const passes = collectMoveJunctionPasses(args.timelines, args.topology, (gap) => {
+    const key = `${gap.blockId}|${gap.fromLabel}|${gap.toLabel}|${gap.reason}`;
+    if (missing.has(key)) return;
+    missing.add(key);
+    // 經過時刻算不出來＝路徑安全無法驗證；缺資料不能當成沒問題
+    const what = gap.reason === 'missing-time'
+      ? `經過「${gap.fromLabel}」→「${gap.toLabel}」，路網上這一段沒有行駛時間`
+      : gap.reason === 'no-edge'
+        ? `經過「${gap.fromLabel}」→「${gap.toLabel}」，路網上這兩點之間沒有路段`
+        : gap.reason === 'ambiguous-node'
+          ? `經過的「${gap.fromLabel}」在路網上有不只一個同名節點，對不回實際路徑`
+          : `經過的「${gap.fromLabel}」在路網上找不到`;
+    pushIssue(args.warnings, {
+      code: 'MISSING_TRAVEL_TIME',
+      severity: 'error',
+      kind: 'limit',
+      message:
+        `時間線 ${gap.timelineRow}：移動卡${what}，無法確認經過時刻與轉折點安全。`
+        + (gap.reason === 'missing-time' ? '請到地圖路網補上這一段的行駛時間。' : '請確認地圖路網後重新生成。'),
+      detail: {
+        timelineRow: gap.timelineRow, blockId: gap.blockId,
+        fromLabel: gap.fromLabel, toLabel: gap.toLabel, reason: gap.reason,
+      },
+    });
+  });
+  if (bufferSeconds <= 0) return;
   const ids = new Set(passes.map((pass) => pass.blockId));
   const seen = new Set<string>();
   for (const { mine, other, gapSeconds } of findJunctionConflictsForBlocks(passes, ids, bufferSeconds)) {
@@ -1697,6 +1724,7 @@ export function validateMoveJunctionConflicts(args: {
         timelineRow: mine.timelineRow,
         otherTimelineRow: other.timelineRow,
         gapSeconds: Math.round(gapSeconds),
+        shortfallSeconds: Math.max(0, bufferSeconds - gapSeconds),
       },
     });
   }

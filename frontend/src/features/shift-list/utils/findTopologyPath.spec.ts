@@ -3,7 +3,12 @@ import { describe, it } from 'node:test';
 
 import { emptyPointTopology } from '../../map-editor/types/pointTopology';
 import type { PointTopology } from '../../map-editor/types/pointTopology';
-import { findTopologyPath } from './findTopologyPath';
+import {
+  explainTopologyPathGap,
+  findTopologyPath,
+  listTopologyTravelTimeGaps,
+  missingTravelTimeEdgesBetween,
+} from './findTopologyPath';
 
 function node(id: string, kind: 'facility' | 'docking' = 'docking') {
   return { id, kind, label: id, x: 0, y: 0, color: '#111111' } as const;
@@ -103,7 +108,7 @@ describe('findTopologyPath', () => {
     );
   });
 
-  it('拓樸缺行駛時間時仍可通行，只是該段算 0 秒', () => {
+  it('拓樸缺行駛時間的邊不能當 0 秒走：找不到路徑，並說出缺哪一段', () => {
     const topology: PointTopology = {
       ...emptyPointTopology(),
       nodes: [node('A'), node('B')],
@@ -118,8 +123,32 @@ describe('findTopologyPath', () => {
         },
       ],
     };
-    const path = findTopologyPath(topology, 'A', 'B');
-    assert.deepEqual(path?.nodeIds, ['A', 'B']);
-    assert.equal(path?.avgSeconds, 0);
+    assert.equal(findTopologyPath(topology, 'A', 'B'), null);
+    assert.match(explainTopologyPathGap(topology, 'A', 'B') ?? '', /A.*B/);
+    // 使用者明確填 0 秒是資料，不是缺資料
+    const zero: PointTopology = {
+      ...topology,
+      edges: [{ ...topology.edges[0]!, minTravelTimeSeconds: 0, avgTravelTimeSeconds: 0 }],
+    };
+    assert.equal(findTopologyPath(zero, 'A', 'B')?.avgSeconds, 0);
+  });
+
+  it('資料檢查：缺時間與明確填 0 秒分開列；有資料完整的替代路徑就不算缺', () => {
+    const topology: PointTopology = {
+      ...emptyPointTopology(),
+      nodes: [node('A'), node('B'), node('C')],
+      edges: [
+        { ...edge('A', 'B', 0, 0), minTravelTimeSeconds: null, avgTravelTimeSeconds: null },
+        edge('B', 'C', 0, 0),
+        edge('A', 'C', 20, 20),
+      ],
+    };
+    const gaps = listTopologyTravelTimeGaps(topology);
+    assert.deepEqual(gaps.missing.map((item) => [item.fromLabel, item.toLabel]), [['A', 'B']]);
+    assert.deepEqual(gaps.explicitZero.map((item) => [item.fromLabel, item.toLabel]), [['B', 'C']]);
+    // A→B 只有那一段：缺的是它
+    assert.deepEqual(missingTravelTimeEdgesBetween(topology, 'A', 'B')?.map((item) => item.toLabel), ['B']);
+    // A→C 有完整的直達邊：不缺
+    assert.equal(missingTravelTimeEdgesBetween(topology, 'A', 'C'), null);
   });
 });

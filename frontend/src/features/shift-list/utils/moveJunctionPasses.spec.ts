@@ -56,6 +56,30 @@ describe('moveJunctionPasses', () => {
     const zero = { ...move('z', 1, 1000, ['E1', '入口點', 'E2']), plannedEndMinute: 1000 / 60 };
     assert.equal(collectMoveJunctionPasses([{ row: 1, blocks: [zero] }], topology).length, 0);
   });
+
+  it('經過時刻算不出來（缺時間、沒有路段、名稱對不到或重名）都要回報，不能略過當沒問題', () => {
+    const gaps: Array<{ reason: string; fromLabel: string; toLabel: string }> = [];
+    const collect = (topo: PointTopology, via: string[]) => {
+      gaps.length = 0;
+      collectMoveJunctionPasses([{ row: 1, blocks: [move('m', 1, 1000, via)] }], topo, (gap) => gaps.push(gap));
+      return gaps.map((gap) => [gap.reason, gap.fromLabel, gap.toLabel]);
+    };
+    const noTime = {
+      ...topology,
+      edges: topology.edges.map((edge) => edge.id === 'b'
+        ? { ...edge, avgTravelTimeSeconds: null, minTravelTimeSeconds: null } : edge),
+    } as unknown as PointTopology;
+    assert.deepEqual(collect(noTime, ['N2W', '入口點', 'E1']), [['missing-time', '入口點', 'E1']]);
+    assert.deepEqual(collect(topology, ['E1', 'E2', '入口點']), [['no-edge', 'E1', 'E2']]);
+    assert.deepEqual(collect(topology, ['N2W', '不存在', 'E1']), [['unknown-node', '不存在', '不存在']]);
+    const duplicated = {
+      ...topology,
+      nodes: [...topology.nodes, { id: 'gate-2', label: '入口點', kind: 'waypoint' }],
+    } as unknown as PointTopology;
+    assert.deepEqual(collect(duplicated, ['N2W', '入口點', 'E1']), [['ambiguous-node', '入口點', '入口點']]);
+    // 資料齊全：不回報
+    assert.deepEqual(collect(topology, ['N2W', '入口點', 'E1']), []);
+  });
 });
 
 describe('moveCardFacilityIsFree：交接間隔', () => {

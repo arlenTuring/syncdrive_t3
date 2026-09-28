@@ -6,6 +6,7 @@ import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import type { GeneratedScheduleBlock, GeneratedScheduleTimeline } from './schedule-engine/types';
 import { relievePlatformIdleWithFacilityPark } from './relievePlatformIdleWithFacilityPark';
+import { collectStationBerthOccupancies } from './stationBerthOccupancy';
 
 function node(id: string, kind: 'facility' | 'docking', stationId?: string) {
   return { id, kind, label: id, stationId, x: 0, y: 0, color: '#111111' } as const;
@@ -165,13 +166,88 @@ function timelinesWithYardEntry(ownTravelSeconds: number): GeneratedScheduleTime
   ];
 }
 
+describe('relievePlatformIdleWithFacilityPark：等待位置被別張卡佔住（局部連動搜尋的依據）', () => {
+  /** 第 3 列的待命佔著 W1 的那段時間，正好是第 1 列想進去等的時間 */
+  function withStandbyOnW1(): GeneratedScheduleTimeline[] {
+    const timelines = timelinesWithYardEntry(0);
+    timelines.push({ row: 3, blocks: [block({
+      id: 'row3-standby', timelineRow: 3, taskType: 'standby', label: '待命', source: 'template_bar',
+      plannedStartMinute: 55, plannedEndMinute: 100, travelSeconds: 0, dwellSeconds: 45 * 60,
+      routeId: undefined, routeCode: undefined, routeInstanceId: undefined,
+      yardFacilityNodeId: 'W1', yardFacilityLabel: 'W1',
+    })] });
+    return timelines;
+  }
+
+  it('等待位置被佔：講出是哪一張卡佔著，不借用', () => {
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines: withStandbyOnW1(), selectedRoutes: [routeA, routeOther],
+      topology: topology(), standbyFacilityCodes: ['W1'], collisionProtectionSeconds: 30,
+    });
+    assert.equal(result.parked, 0);
+    const unresolved = result.entryWaitUnresolved.find((item) => item.timelineRow === 1);
+    assert.ok(unresolved, JSON.stringify(result.entryWaitUnresolved));
+    const w1 = unresolved!.busySpots.find((spot) => spot.nodeId === 'W1');
+    assert.ok(w1?.blockers.some((blocker) => blocker.blockId === 'row3-standby' && blocker.timelineRow === 3));
+  });
+
+  it('佔位的那張卡換到別處之後，同一段等待就排得進去（連動搜尋的下一步）', () => {
+    const timelines = withStandbyOnW1();
+    const standby = timelines.find((timeline) => timeline.row === 3)!.blocks[0]!;
+    standby.yardFacilityNodeId = 'E9';
+    standby.yardFacilityLabel = 'E9';
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines, selectedRoutes: [routeA, routeOther],
+      topology: topology(), standbyFacilityCodes: ['W1'], collisionProtectionSeconds: 30,
+    });
+    assert.equal(result.parked, 1);
+    assert.equal(result.entryWaitUnresolved.length, 0);
+  });
+});
+
 describe('relievePlatformIdleWithFacilityPark：甲／乙判準改用格位身分', () => {
+  it('沒有待命授權或指定清單以外的位置，一律不能借用', () => {
+    for (const standbyFacilityCodes of [[], ['不存在的位置'], ['E2']]) {
+      const result = relievePlatformIdleWithFacilityPark({
+        timelines: timelinesWithYardEntry(0), selectedRoutes: [routeA, routeOther],
+        topology: topology(), standbyFacilityCodes, collisionProtectionSeconds: 30,
+      });
+      assert.equal(result.parked, 0);
+    }
+  });
+
+  it('待命設定可使用中文設施名稱，與原本英文名稱結果相同', () => {
+    const topo = topology();
+    topo.nodes.find((n) => n.id === 'W1')!.label = '臨時等待區';
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines: timelinesWithYardEntry(0), selectedRoutes: [routeA, routeOther],
+      topology: topo, standbyFacilityCodes: ['臨時等待區'], collisionProtectionSeconds: 30,
+    });
+    assert.equal(result.parked, 1);
+    assert.equal(result.timelines[0]!.blocks.find((b) => b.id.startsWith('berthpark-early-stay-'))?.yardFacilityNodeId, 'W1');
+  });
+
+  it('清單中的停靠站可借用，等待時間也會占用該站位', () => {
+    const topo = topology();
+    const wait = topo.nodes.find((n) => n.id === 'W1')!;
+    wait.kind = 'docking';
+    wait.stationId = 'wait-station';
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines: timelinesWithYardEntry(0), selectedRoutes: [routeA, routeOther],
+      topology: topo, standbyFacilityCodes: ['W1'], collisionProtectionSeconds: 30,
+    });
+    assert.equal(result.parked, 1);
+    const occupied = collectStationBerthOccupancies(result.timelines, [routeA, routeOther], { collisionProtectionSeconds: 30 });
+    assert.ok(occupied.some((o) => o.stationId === 'wait-station' && o.actualDepartMinute === 90));
+  });
+
   it('不同格位、零秒轉場（乙）：保留 W1 等待區間，E2 整備時刻不提前', () => {
     const warnings: never[] = [];
     const result = relievePlatformIdleWithFacilityPark({
       timelines: timelinesWithYardEntry(0),
       selectedRoutes: [routeA, routeOther],
       topology: topology(),
+      standbyFacilityCodes: ['W1', 'E2'],
       collisionProtectionSeconds: 30,
       warnings: warnings as never,
     });
@@ -188,6 +264,7 @@ describe('relievePlatformIdleWithFacilityPark：甲／乙判準改用格位身�
 
     // 進 E2 的那段（原本的入廠移動卡）即使零秒，也要貼齊原訂進廠時刻，不能被拉到離站就開始算
     const hopToE2 = row1.blocks.find((b) => b.id === 'entry-e2')!;
+    assert.deepEqual(hopToE2.yardMoveViaLabels, ['W1', 'E2']);
     assert.ok(
       Math.abs(hopToE2.plannedEndMinute - 90) < 0.2,
       `hop 段應該在原訂 90 分鐘結束，實際 ${hopToE2.plannedEndMinute}`,
@@ -200,11 +277,31 @@ describe('relievePlatformIdleWithFacilityPark：甲／乙判準改用格位身�
     assert.equal(result.parked, 1);
   });
 
+  it('待命清單中的停靠站已有另一台車時，不得借用', () => {
+    const topo = topology();
+    const wait = topo.nodes.find((n) => n.id === 'W1')!;
+    wait.kind = 'docking';
+    wait.stationId = 'wait-station';
+    const occupiedRoute = route({ routeId: 'occupied', routeCode: 'O', stationIds: ['Z', 'wait-station'] });
+    const timelines = timelinesWithYardEntry(0);
+    timelines.push({ row: 3, blocks: [block({
+      id: 'occupied-trip', timelineRow: 3, plannedStartMinute: 61, plannedEndMinute: 64,
+      routeId: 'occupied', routeInstanceId: 'occupied', routeCode: 'O',
+    })] });
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines, selectedRoutes: [routeA, routeOther, occupiedRoute],
+      topology: topo, standbyFacilityCodes: ['W1'], collisionProtectionSeconds: 30,
+    });
+    assert.equal(result.parked, 0);
+    assert.equal(result.timelines.flatMap((t) => t.blocks).some((b) => b.id.startsWith('berthpark-')), false);
+  });
+
   it('直接進目的格本人（甲）：沿用既有入廠卡、整備照樣提早開始（行為不變）', () => {
     const result = relievePlatformIdleWithFacilityPark({
       timelines: timelinesWithYardEntry(30),
       selectedRoutes: [routeA, routeOther],
       topology: topology(),
+      standbyFacilityCodes: ['W1', 'E2'],
       collisionProtectionSeconds: 30,
       warnings: [],
     });

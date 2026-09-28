@@ -1476,6 +1476,8 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>FACILITY_HANDOVER_GAP</code></td><td>warn</td><td>兩台車在同一個設施格交接，中間不足「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝（見 §6）。本場域 60 秒為必須遵守的安全間隔：<strong>擋發布</strong>，求解時插卡階段由進格方讓出</td><td><code>validate.ts</code></td></tr>
 <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
       <tr><td><code>GEOMETRY_NOT_CONVERGED</code></td><td>warn</td><td>站位求解、讓渡、班距修復會互相影響，跑滿輪數仍在變動，沒到不動點（見 §3）</td><td><code>generate.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_WORK_SHORTENED</code></td><td>warn</td><td>入廠晚到、轉場移動或出廠吃尾巴縮短了整備工作時間；晚開始不超過整備設定的讓渡餘裕、剩餘工作不少於設定的作業時長，逐筆揭露（見 §6）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>SCHEDULE_SEARCH_INCOMPLETE</code></td><td>error</td><td>整次生成共用的搜尋預算（候選數、完整評估數、時間）用盡時仍有安全問題：搜尋未完成，不是已證明無解；禁止發布（見 §3）</td><td><code>generate.ts</code>、<code>searchBudget.ts</code></td></tr>
       <tr><td><code>GEOMETRY_BEST_ROUND_USED</code></td><td>warn</td><td>迴圈未收斂，已改用過程中全域評分最好的那一輪作為結果，所以輸出不會比過程中最好的那版差。看到這一則代表班表可用但還不是穩定解（見 §3）</td><td><code>generate.ts</code></td></tr>
       <tr><td><code>GEOMETRY_PASS_REVERTED</code></td><td>warn</td><td>某一道幾何處理讓整張班表變差，已整道撤回，連同它寫進報告的訊息一起收回——那些動作等於沒發生。用途是指出哪一道處理與其他處理衝突（見 §3）</td><td><code>generate.ts</code></td></tr>
     </tbody>

@@ -1,3 +1,4 @@
+import { nodeMatchesMoveCardCodes } from './moveCardShared';
 import type { PointTopology } from '../../map-editor/types/pointTopology';
 import { isDispatchAfterServiceEdge } from '../../map-editor/utils/pointTopology';
 import { snapUpToClockAlignSeconds } from './schedule-engine/physics';
@@ -151,17 +152,7 @@ function normalizeFacilityCode(raw: string): string {
 }
 
 function facilityCodeMatches(mapCode: string, facilityId: string, facilityLabel: string): boolean {
-  const code = normalizeFacilityCode(mapCode);
-  if (!code || code === 'UNSPECIFIED') return false;
-  const id = normalizeFacilityCode(facilityId);
-  const label = normalizeFacilityCode(facilityLabel);
-  return (
-    code === id
-    || code === label
-    || label === code
-    || label.startsWith(code)
-    || id.endsWith(code)
-  );
+  return nodeMatchesMoveCardCodes({ id: facilityId, label: facilityLabel }, [mapCode]);
 }
 
 /** 整備任務 body 內含 equipmentRows 的區段鍵 */

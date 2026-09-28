@@ -32,8 +32,8 @@ describe('feasibilityIssueMeta', () => {
       code: 'HEADWAY_BELOW_TARGET',
     });
     expect(meta.kind).toBe('limit');
-    expect(meta.guidance).toMatch(/較嚴者/);
-    expect(meta.kindLabel).toBe('演算法極限');
+    expect(meta.guidance).toMatch(/實際班距未達設定目標/);
+    expect(meta.kindLabel).toBe('尚未排妥');
   });
 
   it('allows caller override of guidance', () => {

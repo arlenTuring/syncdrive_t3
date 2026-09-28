@@ -260,6 +260,8 @@ function parsePublishCheck(
     publishCheck: {
       checkedAt: o.checkedAt,
       planFingerprint: o.planFingerprint,
+      ...(typeof o.settingsFingerprint === 'string' ? { settingsFingerprint: o.settingsFingerprint } : {}),
+      ...(typeof o.topologyFingerprint === 'string' ? { topologyFingerprint: o.topologyFingerprint } : {}),
       publishSafe: o.publishSafe,
       publishBlockingCount:
         typeof o.publishBlockingCount === 'number'

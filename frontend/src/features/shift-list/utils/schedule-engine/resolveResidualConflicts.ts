@@ -1,3 +1,4 @@
+import { planStateKey, SearchBudget } from './searchBudget';
 import { resolveSelectedRouteInstanceId, type ShiftScheduleSelectedRoute } from '../../types/create';
 import {
   buildBlockStationDepartures,
@@ -33,6 +34,7 @@ import type {
 } from './types';
 import { minuteToSecond } from './types';
 import { resolvePairHeadwayTarget } from './validate';
+import { engineTrace, engineTraceEnabled } from './engineTrace';
 
 /**
  * 殘留衝突修復：依衝突本身推導候選，在副本上整組驗證，失敗回滾
@@ -82,7 +84,10 @@ export type ResidualRepairBudget = {
   maxIntroducedPerStep: number;
   /** 每一層最多展開幾個聯動候選 */
   maxFollowUpsPerStep: number;
-  /** 整個修復最多做幾次完整評估 */
+  /**
+   * 完整評估次數上限。只在呼叫端<strong>沒有</strong>給共用預算（searchBudget）時使用；
+   * 生成流程一律給共用預算，整次生成一起算，不會每次呼叫重新拿一份。
+   */
   maxEvaluations: number;
 };
 
@@ -114,6 +119,8 @@ export type ConflictAttempt = {
   resource: string;
   blockIds: string[];
   outcome: 'resolved' | 'not_found';
+  /** 沒找到是因為預算用盡、搜尋沒做完（不是搜完了沒有） */
+  searchIncomplete?: boolean;
   candidatesTried: number;
   /** 被拒絕的候選各自引出什麼（前幾筆） */
   rejectedSamples: string[];
@@ -137,6 +144,9 @@ function clonePlan(timelines: Plan): Plan {
     blocks: timeline.blocks.map((block) => ({ ...block })),
   }));
 }
+
+/** 車停在格子裡做的整備（入廠卡提早時，整備可以從車到格子那一刻開始） */
+const YARD_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby']);
 
 function isTrip(block: GeneratedScheduleBlock): boolean {
   return block.taskType === 'passenger';
@@ -266,7 +276,36 @@ function buildShiftCandidate(
   const prev = index > 0 ? tasks[index - 1]! : null;
   if (prev) {
     const gap = interTripGapSeconds(prev, trip, ctx.selectedRoutes, ctx.minimumRecoveryTimeSeconds);
-    if (minuteToSecond(toStart) < minuteToSecond(prev.plannedEndMinute) + gap - 1e-6) return null;
+    // 出廠移動也要跟著首班移動，否則晚發的車仍照舊提早到站占位。
+    // 整備本身不動；移動卡必須仍放得進整備結束後的空檔。
+    if (prev.source === 'yard_exit_move' && startShiftMinutes !== 0) {
+      const moveStart = prev.plannedStartMinute + startShiftMinutes;
+      const moveEnd = prev.plannedEndMinute + startShiftMinutes;
+      const beforeMove = index > 1 ? tasks[index - 2]! : null;
+      if (beforeMove && moveStart < beforeMove.plannedEndMinute - 1e-6) return null;
+      if (minuteToSecond(toStart) < minuteToSecond(moveEnd) + gap - 1e-6) return null;
+      changes.push({ blockId: prev.id, toStartMinute: moveStart, toEndMinute: moveEnd });
+    } else if (minuteToSecond(toStart) < minuteToSecond(prev.plannedEndMinute) + gap - 1e-6) {
+      // 提早的班次也須往前聯動；先用合法行駛餘裕，再使用既有空檔。
+      // 遇到不能移動的整備任務就放棄，不能改短使用者設定的作業時間。
+      let following = trip;
+      let followingStart = toStart;
+      for (let k = index - 1; k >= 0; k -= 1) {
+        const previous = tasks[k]!;
+        const required = interTripGapSeconds(previous, following, ctx.selectedRoutes, ctx.minimumRecoveryTimeSeconds);
+        const deficit = minuteToSecond(previous.plannedEndMinute - followingStart) + required;
+        if (deficit <= 1e-6) break;
+        if (!isTrip(previous)) return null;
+        const shift = snapUpToClockAlignSeconds(deficit) / 60;
+        const end = previous.plannedEndMinute - shift;
+        const start = tripShapeIsLegal(previous, previous.plannedStartMinute, end, ctx)
+          ? previous.plannedStartMinute : previous.plannedStartMinute - shift;
+        if (!tripShapeIsLegal(previous, start, end, ctx)) return null;
+        changes.push({ blockId: previous.id, toStartMinute: start, toEndMinute: end });
+        following = previous;
+        followingStart = start;
+      }
+    }
   }
   changes.push({
     blockId: trip.id,
@@ -275,6 +314,36 @@ function buildShiftCandidate(
     ...(addSlackSeconds > 0 ? { addSlackSeconds } : {}),
   });
 
+  /*
+   * 早到站、後面接的是入廠卡：入廠卡跟著提早，車到了就進廠，不在站位上空等。
+   *
+   * 只挪班次、不挪入廠卡的話，中間的空檔會被暫停卡補上——車照樣停在站位上等到原本的入廠
+   * 時刻，站位佔用一秒都沒少，「整趟早 N 秒」這類候選永遠解不了衝突（2026-09-28 重播：
+   * 時間線 2 早 80 秒，衝突仍在）。進廠後的整備從車到格子那一刻開始、結束不動（跟
+   * closeYardHeadGaps 同一條規則）；設施那段時間空不空由整張班表的驗證判定。
+   */
+  const afterTrip = tasks[index + 1];
+  if (endShiftMinutes < 0 && afterTrip?.source === 'yard_entry_move') {
+    const entryStart = afterTrip.plannedStartMinute + endShiftMinutes;
+    const entryEnd = afterTrip.plannedEndMinute + endShiftMinutes;
+    if (entryStart < toEnd - 1e-9) return null;
+    changes.push({ blockId: afterTrip.id, toStartMinute: entryStart, toEndMinute: entryEnd });
+    const inYard = tasks[index + 2];
+    if (
+      inYard
+      && inYard.plannedStartMinute > entryEnd + 1e-9
+      && (YARD_STAY_TASK_TYPES.has(inYard.taskType) || inYard.id.startsWith('berthpark-early-stay-'))
+    ) {
+      changes.push({ blockId: inYard.id, toStartMinute: entryEnd, toEndMinute: inYard.plannedEndMinute });
+    }
+    const pushed = changes.length - 1;
+    return {
+      row: trip.timelineRow,
+      changes,
+      description: `時間線 ${trip.timelineRow} ${description}，入廠卡跟著提早（連動 ${pushed} 張相鄰卡片）`,
+    };
+  }
+
   let previousOriginal = trip;
   let previousEnd = toEnd;
   for (let k = index + 1; k < tasks.length; k += 1) {
@@ -282,11 +351,13 @@ function buildShiftCandidate(
     const required = interTripGapSeconds(previousOriginal, next, ctx.selectedRoutes, ctx.minimumRecoveryTimeSeconds);
     const needShift = minuteToSecond(previousEnd) + required - minuteToSecond(next.plannedStartMinute);
     if (needShift <= 1e-6) break;
-    if (!isTrip(next)) return null;
     const shiftMinutes = snapUpToClockAlignSeconds(needShift) / 60;
     const nextStart = next.plannedStartMinute + shiftMinutes;
     const nextEnd = next.plannedEndMinute + shiftMinutes;
-    if (!tripShapeIsLegal(next, nextStart, nextEnd, ctx)) return null;
+    if (next.source === 'yard_entry_move') {
+      const afterMove = tasks[k + 1];
+      if (!afterMove || nextEnd > afterMove.plannedStartMinute + 1e-6) return null;
+    } else if (!isTrip(next) || !tripShapeIsLegal(next, nextStart, nextEnd, ctx)) return null;
     changes.push({ blockId: next.id, toStartMinute: nextStart, toEndMinute: nextEnd });
     previousOriginal = next;
     previousEnd = nextEnd;
@@ -295,7 +366,7 @@ function buildShiftCandidate(
   return {
     row: trip.timelineRow,
     changes,
-    description: `時間線 ${trip.timelineRow} ${description}${pushed > 0 ? `（後面 ${pushed} 趟跟著推）` : ''}`,
+    description: `時間線 ${trip.timelineRow} ${description}${pushed > 0 ? `（連動 ${pushed} 張相鄰卡片）` : ''}`,
   };
 }
 
@@ -362,6 +433,11 @@ function stationConflictCandidates(
       for (const [startShift, endShift, description] of variants) {
         const candidate = buildShiftCandidate(timelines, trip, startShift, endShift, ctx, description);
         if (candidate) out.push({ ...candidate, retimeReason: reason });
+        else if (engineTraceEnabled()) {
+          engineTrace('residual-candidate', {
+            row: trip.timelineRow, blockId: trip.id, description, outcome: 'illegal',
+          });
+        }
       }
     }
   }
@@ -551,6 +627,91 @@ export function rerouteTripInCopy(
 }
 
 /**
+ * 停站換位：車跑完一趟停在某一站等下一班，那一站被別列車要用時，把「進站那一趟」與
+ * 「下一班」一起換成停在同一區另一個停靠位的已允許路線。
+ *
+ * - 進站那一趟：起點不變、終點換成另一個停靠位（S'）。
+ * - 下一班：從 S' 發車、終點不變。
+ * - 前一趟 → 進站那一趟 → 下一班 → 再下一班，每一段都要是關聯圖上允許的銜接（優先或次要邊）。
+ * - 時刻不動，兩趟都要在新路線的合法行駛範圍內。
+ *
+ * 不寫任何站名：S' 由路線資料推導（同起點、不同終點；同終點、從 S' 出發）。
+ */
+export function rerouteBerthPairInCopy(
+  timelines: Plan,
+  arrivingBlockId: string,
+  ctx: PlanEvaluationContext,
+): Array<{ timelines: Plan; description: string; fromRoutes: [ShiftScheduleSelectedRoute, ShiftScheduleSelectedRoute]; toRoutes: [ShiftScheduleSelectedRoute, ShiftScheduleSelectedRoute] }> {
+  const policy = ctx.successorPolicy?.valid ? ctx.successorPolicy : null;
+  if (!policy) return [];
+  const timeline = timelines.find((item) => item.blocks.some((block) => block.id === arrivingBlockId));
+  if (!timeline) return [];
+  const trips = timeline.blocks.filter(isTrip).sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+  const index = trips.findIndex((block) => block.id === arrivingBlockId);
+  const arriving = trips[index];
+  const next = trips[index + 1];
+  if (!arriving || !next) return [];
+  const previous = trips[index - 1] ?? null;
+  const after = trips[index + 2] ?? null;
+  const instanceOf = (block: GeneratedScheduleBlock) => {
+    const route = resolveRouteForBlock(block, ctx.selectedRoutes);
+    return route ? block.routeInstanceId?.trim() || resolveSelectedRouteInstanceId(route) : null;
+  };
+  const arrivingRoute = resolveRouteForBlock(arriving, ctx.selectedRoutes);
+  const nextRoute = resolveRouteForBlock(next, ctx.selectedRoutes);
+  const arrivingId = instanceOf(arriving);
+  const nextId = instanceOf(next);
+  if (!arrivingRoute || !nextRoute || !arrivingId || !nextId) return [];
+  const originOf = (route: ShiftScheduleSelectedRoute) => route.stationIds?.[0]?.trim() || null;
+  const destinationOf = (route: ShiftScheduleSelectedRoute) => route.stationIds?.at(-1)?.trim() || null;
+  const allowed = (from: string | null, to: string) =>
+    from === null
+    || (policy.prioritySuccessors.get(from) ?? []).includes(to)
+    || (policy.secondarySuccessors.get(from) ?? []).includes(to);
+  const previousId = previous ? instanceOf(previous) : null;
+  const afterId = after ? instanceOf(after) : null;
+  const berth = destinationOf(arrivingRoute);
+  const retime = (block: GeneratedScheduleBlock, route: ShiftScheduleSelectedRoute, id: string): GeneratedScheduleBlock => ({
+    ...block,
+    routeId: route.routeId,
+    routeInstanceId: id,
+    routeCode: route.routeCode ?? block.routeCode,
+    routeName: route.routeName ?? block.routeName,
+  });
+  const out: ReturnType<typeof rerouteBerthPairInCopy> = [];
+  for (const [inId, inRoute] of policy.routesByInstanceId) {
+    if (inId === arrivingId) continue;
+    if (originOf(inRoute) !== originOf(arrivingRoute)) continue;
+    const altBerth = destinationOf(inRoute);
+    if (!altBerth || altBerth === berth) continue;
+    if (!allowed(previousId, inId)) continue;
+    const newArriving = retime(arriving, inRoute, inId);
+    if (!tripShapeIsLegal(newArriving, arriving.plannedStartMinute, arriving.plannedEndMinute, ctx)) continue;
+    for (const [outId, outRoute] of policy.routesByInstanceId) {
+      if (originOf(outRoute) !== altBerth) continue;
+      if (destinationOf(outRoute) !== destinationOf(nextRoute)) continue;
+      if (!allowed(inId, outId)) continue;
+      if (afterId && !allowed(outId, afterId)) continue;
+      const newNext = retime(next, outRoute, outId);
+      if (!tripShapeIsLegal(newNext, next.plannedStartMinute, next.plannedEndMinute, ctx)) continue;
+      const copy = clonePlan(timelines);
+      for (const item of copy) {
+        item.blocks = item.blocks.map((block) =>
+          block.id === arriving.id ? { ...newArriving } : block.id === next.id ? { ...newNext } : block);
+      }
+      out.push({
+        timelines: copy,
+        description: `停站換位：「${arrivingRoute.routeName ?? arrivingRoute.routeId}」→「${inRoute.routeName ?? inRoute.routeId}」、`
+          + `「${nextRoute.routeName ?? nextRoute.routeId}」→「${outRoute.routeName ?? outRoute.routeId}」`,
+        fromRoutes: [arrivingRoute, nextRoute],
+        toRoutes: [inRoute, outRoute],
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * 在副本上套用候選：拆掉這一列受影響時段裡的暫停放卡（它們是跟著舊的空等長出來的）、
  * 改時刻、重排這一列的讓站、重建暫停卡。其他列一張卡都不動。
  */
@@ -691,17 +852,22 @@ export function resolveResidualConflicts(args: {
   ctx: PlanEvaluationContext;
   replanRows?: ReplanRows;
   budget?: ResidualRepairBudget;
+  /** 整次生成共用的搜尋預算（見 searchBudget.ts）；沒給就用 budget.maxEvaluations 建一份自己的 */
+  searchBudget?: SearchBudget;
 }): ResidualRepairResult {
   const { ctx, replanRows } = args;
   const budget = args.budget ?? DEFAULT_RESIDUAL_REPAIR_BUDGET;
+  const shared = args.searchBudget ?? new SearchBudget({ maxEvaluations: budget.maxEvaluations });
   let evaluations = 0;
-  let budgetExhausted = false;
+  let budgetExhausted = shared.exhausted;
   const evaluate = (candidate: Plan): PlanViolation[] => {
     evaluations += 1;
     return collectPlanViolations(ctx, candidate);
   };
 
   let current = clonePlan(args.timelines);
+  // 基準狀態本身一定要評估（計入，但不因預算用盡而跳過）
+  shared.countEvaluation();
   let currentViolations = evaluate(current);
   const applied: TripEdit[] = [];
   const adoptedWarnings: FeasibilityIssue[] = [];
@@ -742,7 +908,8 @@ export function resolveResidualConflicts(args: {
     const blockById = new Map(plan.flatMap((timeline) => timeline.blocks).map((block) => [block.id, block] as const));
 
     for (const candidate of stationConflictCandidates(plan, target, ctx)) {
-      if (evaluations >= budget.maxEvaluations) {
+      // 在重建候選<strong>之前</strong>扣預算：被快篩擋掉的候選一樣花了重建的運算
+      if (!shared.tryCandidate()) {
         budgetExhausted = true;
         break;
       }
@@ -763,6 +930,10 @@ export function resolveResidualConflicts(args: {
         if (rejected.length < 6) rejected.push(`${candidate.description}：引出 ${newStation.length} 筆新的站位衝突`);
         continue;
       }
+      if (!shared.tryEvaluation()) {
+        budgetExhausted = true;
+        break;
+      }
       const nextViolations = evaluate(next);
       const edit: TripEdit = {
         timelineRow: candidate.row,
@@ -781,6 +952,14 @@ export function resolveResidualConflicts(args: {
       };
       const stillThere = nextViolations.some((item) => item.key === targetKey);
       const comparison = compareViolations(base, nextViolations);
+      if (engineTraceEnabled()) {
+        engineTrace('residual-candidate', {
+          targetKey, depth, row: candidate.row, description: candidate.description,
+          outcome: stillThere ? 'still-there' : comparison.better ? 'better' : 'not-better',
+          introduced: compareViolations(planViolations, nextViolations).introduced.map(describeViolation),
+          worsened: comparison.worsened.map(describeViolation),
+        });
+      }
       if (!stillThere && comparison.better) {
         const slackSeconds = candidate.changes.reduce((sum, change) => sum + (change.addSlackSeconds ?? 0), 0);
         const rank = rankCandidate(nextViolations, edit, slackSeconds, headwayOverGapSeconds(next, ctx));
@@ -808,7 +987,7 @@ export function resolveResidualConflicts(args: {
     // 引出越少的越有希望，先試；每層展開數有上限
     followUps.sort((a, b) => a.introduced.length - b.introduced.length);
     for (const followUp of followUps.slice(0, budget.maxFollowUpsPerStep)) {
-      if (evaluations >= budget.maxEvaluations) {
+      if (shared.exhausted) {
         budgetExhausted = true;
         break;
       }
@@ -839,7 +1018,23 @@ export function resolveResidualConflicts(args: {
 
   for (;;) {
     const pending = collisionsOf(current).filter((collision) => !settled.has(keyOf(collision)));
-    if (pending.length === 0 || budgetExhausted) break;
+    if (pending.length === 0) break;
+    if (budgetExhausted) {
+      // 預算在輪到它們之前就用完：一筆一筆記下「沒搜」，報告才不會把它們當成搜過沒找到
+      for (const collision of pending) {
+        attempts.push({
+          searchIncomplete: true,
+          targetKey: keyOf(collision),
+          code: collision.kind === 'overlap' ? 'STATION_BERTH_COLLISION' : 'STATION_BERTH_PROTECTION_GAP',
+          resource: collision.stationId,
+          blockIds: [collision.earlier.blockId, collision.later.blockId],
+          outcome: 'not_found',
+          candidatesTried: 0,
+          rejectedSamples: ['共用搜尋預算已用盡，這一筆沒有搜尋'],
+        });
+      }
+      break;
+    }
     // 實體重疊先處理，同級依差得多的先
     pending.sort((a, b) =>
       (a.kind === 'overlap' ? 0 : 1) - (b.kind === 'overlap' ? 0 : 1)
@@ -849,8 +1044,31 @@ export function resolveResidualConflicts(args: {
     settled.add(key);
     const rejected: string[] = [];
     const counter = { tried: 0 };
-    const found = search(current, currentViolations, target, 1, currentViolations, rejected, counter);
+    // 同一個版面、同一筆衝突，這次生成裡已經完整搜過：直接沿用當時的結果（找到或沒找到），不重搜。
+    // 外層重跑後處理時常回到同一個版面；只有搜完的才記，因預算中斷的不記。
+    type Memo = { found: Found | null; tried: number; rejected: string[] };
+    const memoKey = `residual|${planStateKey(current)}|${key}`;
+    const known = shared.memo.get(memoKey) as Memo | undefined;
+    let found: Found | null;
+    if (known) {
+      shared.noteReuse();
+      found = known.found
+        ? { ...known.found, plan: clonePlan(known.found.plan), edits: [...known.found.edits], warnings: [...known.found.warnings] }
+        : null;
+      counter.tried = known.tried;
+      rejected.push(...known.rejected);
+    } else {
+      found = search(current, currentViolations, target, 1, currentViolations, rejected, counter);
+      if (!budgetExhausted) {
+        shared.memo.set(memoKey, {
+          found: found ? { ...found, plan: clonePlan(found.plan) } : null,
+          tried: counter.tried,
+          rejected: [...rejected],
+        } satisfies Memo);
+      }
+    }
     attempts.push({
+      searchIncomplete: !found && !known && budgetExhausted,
       targetKey: key,
       code: target.kind === 'overlap' ? 'STATION_BERTH_COLLISION' : 'STATION_BERTH_PROTECTION_GAP',
       resource: target.stationId,

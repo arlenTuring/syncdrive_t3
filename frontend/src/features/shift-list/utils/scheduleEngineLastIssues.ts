@@ -458,12 +458,12 @@ function renderAcceptanceBox(
 
   return `
 <section class="accept">
-  <h2>驗收定義</h2>
-  <p class="accept-pill ${gateClass}">硬閘 gatePassed=<code>${acceptance.gatePassed}</code>（report.ok=<code>${ok}</code>）· 硬錯誤 ${acceptance.hardErrorCount}</p>
-  <p class="accept-pill ${qualityClass}">品質目標 qualityPassed=<code>${acceptance.qualityPassed}</code>${
-    qualityCodes ? ` · 未清零：${escapeHtml(qualityCodes)}` : ' · 無班距／脈衝品質警告'
+  <h2>檢查結果</h2>
+  <p class="accept-pill ${gateClass}">${acceptance.gatePassed && ok ? '安全檢查通過' : '檢查未通過，禁止發布'} · ${acceptance.publishBlockingCount} 項阻擋問題</p>
+  <p class="accept-pill ${qualityClass}">${acceptance.qualityPassed ? '服務目標達標' : '服務目標未達標'}${
+    qualityCodes ? ` · ${escapeHtml(qualityCodes)}` : ' · 班距與班次數符合目標'
   }</p>
-  <p class="meta">策略噪音 ${acceptance.policyNoiseCount}／極限警告 ${acceptance.limitWarningCount}／可調警告 ${acceptance.actionableWarningCount}</p>
+  <p class="meta">已採取調整 ${acceptance.policyNoiseCount}／尚待處理 ${acceptance.limitWarningCount + acceptance.actionableWarningCount}</p>
   ${hardCodes ? `<p class="meta">硬錯誤代號：${escapeHtml(hardCodes)}</p>` : ''}
   <ul class="criteria">${criteria}</ul>
 </section>`;

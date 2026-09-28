@@ -1,13 +1,21 @@
+import { engineTrace, engineTraceEnabled } from './engineTrace';
+import { planStateKey, SearchBudget, type SearchBudgetLimits } from './searchBudget';
+import { listTopologyTravelTimeGaps, type TopologyEdgeRef } from '../findTopologyPath';
+import { YARD_TASK_TYPES } from '../moveCardShared';
+import { TASK_TYPE_OPTIONS } from '../../../time-templates/types/editor';
+
 import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import type { MapAreaObject } from '../../../map-editor/types/area';
 import type { ShiftScheduleCreateDraft } from '../../types/create';
 import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins';
+import { extractFacilityMapCodes } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
 import { computeScheduleGateOk, PUBLISH_BLOCKING_CODES } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
   FeasibilityViolationCode,
+  GeneratedScheduleBlock,
   GeneratedSchedulePlan,
   GeneratedScheduleTimeline,
   GenerateShiftScheduleResult,
@@ -72,11 +80,12 @@ import type { PlanEvaluationContext } from './evaluatePlan';
 import {
   DEFAULT_RESIDUAL_REPAIR_BUDGET,
   type ResidualRepairBudget,
+  rerouteBerthPairInCopy,
   rerouteTripInCopy,
   resolveResidualConflicts,
   shiftTripInCopy,
 } from './resolveResidualConflicts';
-import { collectPlanViolations, compareViolations, type PlanViolation } from './evaluatePlan';
+import { collectPlanViolations, compareViolations, violationFromIssue, type PlanViolation } from './evaluatePlan';
 import { snapUpToClockAlignSeconds } from './physics';
 import {
   comparePlanScores,
@@ -84,6 +93,15 @@ import {
   scoreSchedulePlan,
   type PlanScore,
 } from './scorePlan';
+
+/** 任務類型的中文名稱（訊息用，不直接顯示 charging／standby 這類代號） */
+function taskTypeName(key: string | undefined): string {
+  return TASK_TYPE_OPTIONS.find((option) => option.key === key)?.label ?? key ?? '';
+}
+
+function formatEdgeList(edges: TopologyEdgeRef[]): string {
+  return edges.map((edge) => `「${edge.fromLabel}」→「${edge.toLabel}」`).join('、');
+}
 
 export type GenerateShiftScheduleInput = {
   shiftId?: string;
@@ -108,6 +126,11 @@ export type GenerateShiftScheduleInput = {
    * 測試用它驗證「預算用盡時如實揭露、不假裝可行」。
    */
   residualRepairBudget?: Partial<ResidualRepairBudget>;
+  /**
+   * 整次生成共用的搜尋預算上限（候選數、完整評估數、時間）。未傳用預設值；
+   * 測試用它驗證停止機制。
+   */
+  searchBudget?: Partial<SearchBudgetLimits>;
 };
 
 /**
@@ -153,6 +176,25 @@ function fingerprintTimelines(
 }
 
 /**
+ * 追蹤用的版面摘要：每列每張卡的種類、起迄、路線與格位（不含名稱）。只在追蹤開啟時產生，
+ * 用來比對兩份輸入從哪一道處理開始排出不同的版面。
+ */
+function traceLayout(
+  stage: string,
+  timelines: GeneratedSchedulePlan['timelines'],
+  extra: Record<string, unknown> = {},
+): void {
+  if (!engineTraceEnabled()) return;
+  const rows = timelines.map((timeline) => ({
+    row: timeline.row,
+    blocks: timeline.blocks.map((block) =>
+      `${block.taskType}/${block.source ?? ''}@${Math.round(block.plannedStartMinute * 60)}-${Math.round(block.plannedEndMinute * 60)}`
+      + `|${block.routeInstanceId ?? block.routeId ?? ''}|${block.yardFacilityNodeId ?? ''}|${block.yardExitFacilityNodeId ?? ''}`),
+  }));
+  engineTrace('layout', { at: stage, ...extra, rows });
+}
+
+/**
  * 排班引擎主入口：依策略文件 1.1–1.8、S1–S4 與優化算法展開班表。
  *
  * 有未承接脈衝時，會用「掛脈衝時可再往後推過貼太近的同向班次」再完整重跑一次
@@ -161,13 +203,58 @@ function fingerprintTimelines(
  * 不是直接拿掉拒絕條件——實測直接拿掉承接 2 → 1、班次 1184 → 1188，卻多出站位
  * 保護不足與班距不足，所以只在整張變好時才用。
  */
+/** 殘留修復之後重算轉場的最多輪數（每輪都要比上一輪好才採用） */
+const POST_RESIDUAL_RECOMPUTE_ROUNDS = 3;
+
+/**
+ * 把後處理結果裡「班次」的時刻與路線寫回轉場前的版面（以卡片 id 對應）。
+ * 系統產生的移動卡、讓站卡、暫停卡不在轉場前的版面裡，重跑時會重建；整備任務本身的時刻
+ * 也交給重跑決定（轉場規則會重新推算）。
+ */
+function carryTripEditsIntoPre(
+  pre: GeneratedSchedulePlan['timelines'],
+  after: GeneratedSchedulePlan['timelines'],
+): { timelines: GeneratedSchedulePlan['timelines']; changed: number } {
+  const afterById = new Map<string, GeneratedScheduleBlock>();
+  for (const timeline of after) {
+    for (const block of timeline.blocks) {
+      if (block.taskType === 'passenger') afterById.set(block.id, block);
+    }
+  }
+  let changed = 0;
+  const timelines = pre.map((timeline) => ({
+    ...timeline,
+    blocks: timeline.blocks.map((block) => {
+      if (block.taskType !== 'passenger') return { ...block };
+      const edited = afterById.get(block.id);
+      if (!edited) return { ...block };
+      const same = Math.abs(edited.plannedStartMinute - block.plannedStartMinute) < 1e-9
+        && Math.abs(edited.plannedEndMinute - block.plannedEndMinute) < 1e-9
+        && edited.routeInstanceId === block.routeInstanceId
+        && edited.routeId === block.routeId
+        && (edited.dwellSlackAdjustment?.addedSeconds ?? 0) === (block.dwellSlackAdjustment?.addedSeconds ?? 0);
+      if (same) return { ...block };
+      changed += 1;
+      return { ...edited };
+    }),
+  }));
+  return { timelines, changed };
+}
+
 export function generateShiftSchedule(
   input: GenerateShiftScheduleInput,
 ): GenerateShiftScheduleResult {
-  const base = generateShiftScheduleOnce(input, false);
+  // 一次生成只有一份搜尋預算：兩次完整生成（見下）與其中所有後處理搜尋共用，不會各自重拿
+  const searchBudget = new SearchBudget({
+    ...(input.residualRepairBudget?.maxEvaluations != null
+      ? { maxEvaluations: input.residualRepairBudget.maxEvaluations }
+      : {}),
+    ...input.searchBudget,
+  });
+  const base = generateShiftScheduleOnce(input, false, searchBudget);
   const unserved = base.report.warnings.filter((issue) => issue.code === 'UNSERVED_SERVICE_PULSE');
   if (unserved.length === 0 || !base.plan) return base;
-  const alt = generateShiftScheduleOnce(input, true);
+  const alt = generateShiftScheduleOnce(input, true, searchBudget);
   if (!alt.plan) return base;
   const keyOf = (result: GenerateShiftScheduleResult): number[] => {
     const count = (code: string) =>
@@ -187,20 +274,11 @@ export function generateShiftSchedule(
   };
   const baseKey = keyOf(base);
   const altKey = keyOf(alt);
-  // 每一種硬錯誤、每一種擋發布的問題都不能變多——拿一種換另一種不算改善
-  const countByCode = (issues: FeasibilityIssue[]) => {
-    const counts = new Map<string, number>();
-    for (const issue of issues) counts.set(issue.code, (counts.get(issue.code) ?? 0) + 1);
-    return counts;
-  };
   const safetyIssues = (result: GenerateShiftScheduleResult) => [
     ...result.report.errors,
     ...result.report.warnings.filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code)),
-  ];
-  const baseCounts = countByCode(safetyIssues(base));
-  const safetyNotWorse = [...countByCode(safetyIssues(alt)).entries()].every(
-    ([code, count]) => count <= (baseCounts.get(code) ?? 0),
-  );
+  ].map((issue) => violationFromIssue(issue, issue.severity === 'error' ? 'hard' : 'safety'));
+  const safetyNotWorse = compareViolations(safetyIssues(base), safetyIssues(alt)).safeToAdopt;
   let better = false;
   for (let index = 0; index < baseKey.length; index += 1) {
     if (altKey[index] !== baseKey[index]) {
@@ -214,9 +292,11 @@ export function generateShiftSchedule(
 function generateShiftScheduleOnce(
   input: GenerateShiftScheduleInput,
   allowBumpPastEarlierSameRoute: boolean,
+  searchBudget: SearchBudget,
 ): GenerateShiftScheduleResult {
   const errors: FeasibilityIssue[] = [];
   const warnings: FeasibilityIssue[] = [];
+  const standbyFacilityCodes = extractFacilityMapCodes(input.maintenanceTaskBody, 'mobile');
   const residualBudget: ResidualRepairBudget = {
     ...DEFAULT_RESIDUAL_REPAIR_BUDGET,
     ...input.residualRepairBudget,
@@ -286,6 +366,7 @@ function generateShiftScheduleOnce(
     }
   }
 
+  traceLayout('expand', timelines);
   timelines = insertMaintenanceEntryServiceTrips({
     timelines,
     selectedRoutes: [
@@ -326,6 +407,8 @@ function generateShiftScheduleOnce(
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     decideOnly: true,
   });
+
+  traceLayout('decide-only', timelines);
 
   // ── 幾何後處理：收斂迴圈 ────────────────────────────────────────────────
   //
@@ -469,6 +552,9 @@ function generateShiftScheduleOnce(
       berthDelayLog.length = delayLogMark;
       rejectedPasses.set(name, (rejectedPasses.get(name) ?? 0) + 1);
     }
+    traceLayout(`r${currentRound} ${name}`, timelines, {
+      reverted: comparePlanScores(afterScore, beforeScore) > 0,
+    });
   };
 
   let bestScore: PlanScore | null = null;
@@ -568,6 +654,7 @@ function generateShiftScheduleOnce(
     runGuarded('relievePlatformIdleWithFacilityPark', () =>
   relievePlatformIdleWithFacilityPark({
         timelines,
+        standbyFacilityCodes,
         selectedRoutes: routesForBerth,
         topology: engineInput.pointTopology,
         collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
@@ -806,12 +893,17 @@ function generateShiftScheduleOnce(
   // 串內部兩段不同類型整備直接銜接，前一段跑滿全長，後一段開始被推遲、
   // 結束不動。三段共用同一份設施佔用表，見 insertMaintenanceTransferCards.ts。
   type JunctionReservation = { nodeId: string; instant: number; timelineRow: number };
+  type YardSpotAvoid = { blockId: string; nodeId: string };
   const runTransfer = (
     candidate: GeneratedSchedulePlan['timelines'],
     reservedJunctionPasses?: JunctionReservation[],
+    avoidYardSpots?: YardSpotAvoid[],
   ) =>
     insertMaintenanceTransferCards({
       reservedJunctionPasses,
+      avoidYardSpots,
+      searchBudget,
+      maintenanceEntrySlackBySection: engineInput.maintenanceEntrySlackBySection,
       timelines: candidate,
       topology: engineInput.pointTopology,
       areas: engineInput.areas,
@@ -829,20 +921,26 @@ function generateShiftScheduleOnce(
    * 跑完才真正插進去的（迴圈裡只先決定地點），在迴圈裡看到的空檔其實已被預定；
    * 2026-08-17 第一版擺在迴圈內，硬塞的結果是 391 則 TIMELINE_OVERLAP。
    */
-  const runFinalRelieve = (
+  const runFinalRelieveFull = (
     candidate: GeneratedSchedulePlan['timelines'],
     sink: FeasibilityIssue[],
     onlyRows?: ReadonlySet<number>,
   ) =>
     relievePlatformIdleWithFacilityPark({
       timelines: candidate,
+      standbyFacilityCodes,
       selectedRoutes: routesForBerth,
       topology: engineInput.pointTopology,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       onlyRows,
       warnings: sink,
-    }).timelines;
+    });
+  const runFinalRelieve = (
+    candidate: GeneratedSchedulePlan['timelines'],
+    sink: FeasibilityIssue[],
+    onlyRows?: ReadonlySet<number>,
+  ) => runFinalRelieveFull(candidate, sink, onlyRows).timelines;
   /**
    * 讓站之後的兩道收尾。
    *
@@ -861,6 +959,7 @@ function generateShiftScheduleOnce(
   ): GeneratedSchedulePlan['timelines'] => {
     const closed = closeYardHeadGaps({ timelines: candidate }).timelines;
     let reference = scoreOf(closed);
+    let referenceViolations = collectPlanViolations(evaluationContext, closed);
     yieldIdleBlockArrival({
       timelines: closed,
       selectedRoutes: routesForBerth,
@@ -869,7 +968,10 @@ function generateShiftScheduleOnce(
       accept: () => {
         const next = scoreOf(closed);
         if (comparePlanScores(next, reference) >= 0) return false;
+        const violations = collectPlanViolations(evaluationContext, closed);
+        if (!compareViolations(referenceViolations, violations).safeToAdopt) return false;
         reference = next;
+        referenceViolations = violations;
         return true;
       },
     });
@@ -886,10 +988,14 @@ function generateShiftScheduleOnce(
   const runPostLoop = (
     pre: GeneratedSchedulePlan['timelines'],
     reservedJunctionPasses?: JunctionReservation[],
+    avoidYardSpots?: YardSpotAvoid[],
+    /** 篩選用：不跑殘留衝突修復（只看轉場排不排得出，快很多） */
+    screenOnly = false,
   ) => {
-    const transfer = runTransfer(snapshotOf(pre), reservedJunctionPasses);
+    const transfer = runTransfer(snapshotOf(pre), reservedJunctionPasses, avoidYardSpots);
     const sink: FeasibilityIssue[] = [];
-    let result = finishAfterRelieve(runFinalRelieve(transfer.timelines, sink), sink);
+    const relieved = runFinalRelieveFull(transfer.timelines, sink);
+    let result = finishAfterRelieve(relieved.timelines, sink);
     /**
      * 補上「暫停」卡：整備做完、車還在格子裡的那段。放在所有會動時刻的處理跑完之後、
      * 驗證之前：這幾張卡是事實的載體，不是新規則。
@@ -899,15 +1005,18 @@ function generateShiftScheduleOnce(
      * 殘留站位衝突：依衝突邊界產生候選、雙方都試，副本上整組驗證後才採用
      * （見 resolveResidualConflicts）。候選改了哪一列，就重建那一列的暫停卡與讓站。
      */
-    const residual = resolveResidualConflicts({
-      timelines: result,
-      ctx: evaluationContext,
-      budget: residualBudget,
-      replanRows: (candidate, rows) => {
-        const replanSink: FeasibilityIssue[] = [];
-        return { timelines: runFinalRelieve(candidate, replanSink, rows), warnings: replanSink };
-      },
-    });
+    const residual: ReturnType<typeof resolveResidualConflicts> = screenOnly
+      ? { timelines: result, applied: [], warnings: [], attempts: [], evaluations: 0, budgetExhausted: false }
+      : resolveResidualConflicts({
+        timelines: result,
+        ctx: evaluationContext,
+        budget: residualBudget,
+        searchBudget,
+        replanRows: (candidate, rows) => {
+          const replanSink: FeasibilityIssue[] = [];
+          return { timelines: runFinalRelieve(candidate, replanSink, rows), warnings: replanSink };
+        },
+      });
     result = residual.timelines;
     // 候選重排過讓站的那幾列：對不到實際卡片的「已改開進某格暫停放」收回，換上採用的訊息
     const changedRows = new Set(residual.applied.map((edit) => edit.timelineRow));
@@ -925,9 +1034,22 @@ function generateShiftScheduleOnce(
       sink.push(...residual.warnings);
     }
     const required = transfer.skipped.filter((skip) => skip.necessity !== 'not_needed').length;
+    if (engineTraceEnabled()) {
+      engineTrace('post-loop', {
+        required,
+        skipped: transfer.skipped.map((skip) => ({
+          row: skip.timelineRow, blockId: skip.blockId, from: skip.fromTaskType, to: skip.toTaskType,
+          necessity: skip.necessity ?? 'required', reason: skip.reason, blockers: skip.blockers,
+        })),
+        residualApplied: residual.applied,
+        violations: collectPlanViolations(evaluationContext, result).map((item) => ({ code: item.code, blockIds: item.blockIds })),
+      });
+    }
     return {
       timelines: result,
       transfer,
+      /** 跑完一趟要在站上等進廠、卻沒有地方先進去等的：候選位置各被誰佔著（局部連動搜尋用） */
+      entryWaitUnresolved: relieved.entryWaitUnresolved,
       warnings: sink,
       residual,
       violations: collectPlanViolations(evaluationContext, result),
@@ -935,7 +1057,54 @@ function generateShiftScheduleOnce(
     };
   };
 
+  /**
+   * 搜尋用的整段後處理：同一個（轉場前版面, 轉折點保留, 待命排除）只算一次；
+   * 新狀態要先扣共用預算，用盡回 null——呼叫端停止這一段搜尋，保留目前最好的結果。
+   */
+  const postLoopCache = new Map<string, ReturnType<typeof runPostLoop>>();
+  const postLoopKey = (
+    pre: GeneratedSchedulePlan['timelines'],
+    reservations?: JunctionReservation[],
+    avoid?: YardSpotAvoid[],
+  ) => `${planStateKey(pre)}|${JSON.stringify(reservations ?? [])}|${JSON.stringify(avoid ?? [])}`;
+  const searchPostLoop = (
+    pre: GeneratedSchedulePlan['timelines'],
+    reservations?: JunctionReservation[],
+    avoid?: YardSpotAvoid[],
+  ): ReturnType<typeof runPostLoop> | null => {
+    const key = postLoopKey(pre, reservations, avoid);
+    const cached = postLoopCache.get(key);
+    if (cached) return cached;
+    if (!searchBudget.tryCandidate()) return null;
+    const result = runPostLoop(pre, reservations, avoid);
+    postLoopCache.set(key, result);
+    return result;
+  };
+
+  /**
+   * 篩選：候選只為了讓「必要轉場排不出」變少時，先不跑殘留衝突修復（佔整段後處理大部分時間），
+   * 轉場排得出來才做完整評估。轉場在殘留修復之前就定案，篩選結果跟完整評估的轉場結果相同。
+   * 回傳 null＝預算用盡。
+   */
+  const screenCache = new Map<string, number>();
+  const screenRequired = (
+    pre: GeneratedSchedulePlan['timelines'],
+    reservations?: JunctionReservation[],
+    avoid?: YardSpotAvoid[],
+  ): number | null => {
+    const key = postLoopKey(pre, reservations, avoid);
+    const full = postLoopCache.get(key);
+    if (full) return full.required;
+    const cached = screenCache.get(key);
+    if (cached != null) return cached;
+    if (!searchBudget.tryCandidate()) return null;
+    const required = runPostLoop(pre, reservations, avoid, true).required;
+    screenCache.set(key, required);
+    return required;
+  };
+
   const preTransfer = snapshotOf(timelines);
+  traceLayout('pre-transfer', timelines);
 
   /**
    * 必要轉場排不出來時的聯動搜尋
@@ -959,15 +1128,15 @@ function generateShiftScheduleOnce(
   type PostState = {
     pre: GeneratedSchedulePlan['timelines'];
     reservations: JunctionReservation[];
+    /** 整備不要再選的位置（見「待命替換換下一個位置」與「局部連動搜尋」）；之前各步都是空的 */
+    avoidYardSpots?: YardSpotAvoid[];
     post: ReturnType<typeof runPostLoop>;
     notes: FeasibilityIssue[];
   };
   const noNewProblems = (before: PlanViolation[], after: PlanViolation[]) => {
     const comparison = compareViolations(before, after);
     return {
-      ok: comparison.introduced.length === 0
-        && comparison.countsAfter[0] <= comparison.countsBefore[0]
-        && comparison.countsAfter[1] <= comparison.countsBefore[1],
+      ok: comparison.safeToAdopt,
       introduced: comparison.introduced,
     };
   };
@@ -987,6 +1156,7 @@ function generateShiftScheduleOnce(
     post: runPostLoop(preTransfer),
     notes: [],
   };
+  postLoopCache.set(postLoopKey(preTransfer), state.post);
   const triedNotes = new Map<string, string[]>();
   const note = (blockId: string | undefined, text: string) => {
     const list = triedNotes.get(blockId ?? '') ?? [];
@@ -1000,6 +1170,11 @@ function generateShiftScheduleOnce(
     for (const skip of base.post.transfer.skipped) {
       if (adopted) break;
       if (skip.necessity === 'not_needed') continue;
+      // 只輸在缺行駛時間：是缺資料，不是時序衝突，換時刻、換路線都解不了，不在這裡反覆搜
+      if (skip.onlyMissingData) {
+        note(skip.blockId, '缺少路段行駛時間，沒有其他資料完整的路徑；未搜尋移動時刻');
+        continue;
+      }
       type Candidate = {
         label: string;
         pre: GeneratedSchedulePlan['timelines'] | null;
@@ -1050,7 +1225,20 @@ function generateShiftScheduleOnce(
           note(skip.blockId, `${candidate.label}：超出合法行駛範圍或前後任務間隔`);
           continue;
         }
-        const result = runPostLoop(candidate.pre, candidate.reservations);
+        const screened = screenRequired(candidate.pre, candidate.reservations);
+        if (screened === null) {
+          note(skip.blockId, `${candidate.label}：搜尋預算用盡，未試`);
+          break;
+        }
+        if (screened >= base.post.required) {
+          note(skip.blockId, `${candidate.label}：移動仍排不出`);
+          continue;
+        }
+        const result = searchPostLoop(candidate.pre, candidate.reservations);
+        if (!result) {
+          note(skip.blockId, `${candidate.label}：搜尋預算用盡，未試`);
+          break;
+        }
         const check = noNewProblems(base.post.violations, result.violations);
         if (result.required < base.post.required && check.ok) {
           adopted = { pre: candidate.pre, reservations: candidate.reservations, post: result, notes: [...base.notes, ...candidate.notes] };
@@ -1064,7 +1252,8 @@ function generateShiftScheduleOnce(
           for (const blockId of involved) {
             if (adopted) break;
             for (const item of rerouteTripInCopy(candidate.pre, blockId, evaluationContext)) {
-              const deeper = runPostLoop(item.timelines, candidate.reservations);
+              const deeper = searchPostLoop(item.timelines, candidate.reservations);
+              if (!deeper) break;
               if (deeper.required < base.post.required && noNewProblems(base.post.violations, deeper.violations).ok) {
                 const from = item.fromRoute.routeName ?? item.fromRoute.routeId;
                 const to = item.toRoute.routeName ?? item.toRoute.routeId;
@@ -1097,12 +1286,307 @@ function generateShiftScheduleOnce(
     if (!adopted) break;
     state = adopted;
   }
-  let post = state.post;
+  // 時刻調整仍解不了的站位衝突，也要試已允許的同終點路線。
+  // 路線與出入廠移動一起重算；不能只改正線卡而留下舊移動路徑。
+  const stationRepairRounds = state.post.violations.filter((issue) => issue.code.startsWith('STATION_BERTH_')).length;
+  for (let round = 0; round < stationRepairRounds; round += 1) {
+    const base = state;
+    let adopted: PostState | null = null;
+    const involved = [...new Set(base.post.violations
+      .filter((issue) => issue.code.startsWith('STATION_BERTH_')).flatMap((issue) => issue.blockIds))];
+    for (const blockId of involved) {
+      for (const candidate of rerouteTripInCopy(base.pre, blockId, evaluationContext)) {
+        const result = searchPostLoop(candidate.timelines, base.reservations);
+        if (!result) break;
+        if (result.required > base.post.required
+          || !compareViolations(base.post.violations, result.violations).better) continue;
+        const row = candidate.timelines.find((timeline) => timeline.blocks.some((block) => block.id === blockId))!.row;
+        adopted = { pre: candidate.timelines, reservations: base.reservations, post: result,
+          notes: [...base.notes, rerouteNote(row, blockId,
+            candidate.fromRoute.routeName ?? candidate.fromRoute.routeId,
+            candidate.toRoute.routeName ?? candidate.toRoute.routeId, '避開尚未排開的站位衝突')] };
+        break;
+      }
+      if (adopted) break;
+      // 停在站上等下一班的那台：進站那一趟與下一班一起換到同一區另一個停靠位
+      for (const candidate of rerouteBerthPairInCopy(base.pre, blockId, evaluationContext)) {
+        const result = searchPostLoop(candidate.timelines, base.reservations);
+        if (!result) break;
+        if (result.required > base.post.required
+          || !compareViolations(base.post.violations, result.violations).better) continue;
+        const row = candidate.timelines.find((timeline) => timeline.blocks.some((block) => block.id === blockId))!.row;
+        adopted = { pre: candidate.timelines, reservations: base.reservations, post: result,
+          notes: [...base.notes, {
+            code: 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION',
+            severity: 'warning',
+            kind: 'policy',
+            message:
+              `時間線 ${row}：為避開尚未排開的站位衝突，${candidate.description}；`
+              + '兩趟的時刻不變，起訖站與下游銜接都在已驗證的路線關聯內。',
+            detail: {
+              timelineRow: row,
+              blockId,
+              fromRouteIds: candidate.fromRoutes.map((route) => route.routeId),
+              toRouteIds: candidate.toRoutes.map((route) => route.routeId),
+            },
+          }] };
+        break;
+      }
+      if (adopted) break;
+    }
+    if (!adopted) break;
+    state = adopted;
+  }
+  /**
+   * 殘留修復之後，重算轉場與佔用
+   * ============================
+   *
+   * 後處理的順序是「轉場卡 → 讓站 → 暫停卡 → 殘留修復」：轉場卡（與它的失敗清單）是照
+   * 修復<strong>之前</strong>的班次時刻排的。修復改了班次時刻之後，原本排不出的轉場可能
+   * 已經排得出來、原本的失敗原因可能已經不存在——只算一次的話，最終報告會帶著過期的
+   * 「必要轉場缺失」。
+   *
+   * 做法：把修復改過的班次時刻寫回「轉場前的版面」，整段後處理重跑一次。重跑是從轉場前的
+   * 副本開始，系統產生的移動卡、讓站卡、暫停卡全部重建，使用者任務不動，不會重複插卡；
+   * 失敗清單、佔用與安全報告都是新版面自己的。
+   *
+   * 停止條件：必要轉場失敗變少且沒有新增安全問題、或整體變好才採用；否則停，保留原結果。
+   * 只在還有未解問題（必要轉場失敗或安全問題）時才重算，最多幾輪。
+   */
+  for (let round = 0; round < POST_RESIDUAL_RECOMPUTE_ROUNDS; round += 1) {
+    const base = state;
+    const unresolvedSafety = base.post.violations.some((item) => item.severity !== 'quality');
+    if (base.post.residual.applied.length === 0) break;
+    if (base.post.required === 0 && !unresolvedSafety) break;
+    const carried = carryTripEditsIntoPre(base.pre, base.post.timelines);
+    if (carried.changed === 0) break;
+    const result = searchPostLoop(carried.timelines, base.reservations, base.avoidYardSpots);
+    if (!result) break;
+    const comparison = compareViolations(base.post.violations, result.violations);
+    const adopt = (result.required < base.post.required && comparison.safeToAdopt)
+      || (result.required <= base.post.required && comparison.better);
+    engineTrace('post-residual-recompute', {
+      round,
+      carriedTrips: carried.changed,
+      requiredBefore: base.post.required,
+      requiredAfter: result.required,
+      violationsBefore: base.post.violations.length,
+      violationsAfter: result.violations.length,
+      adopted: adopt,
+    });
+    if (!adopt) break;
+    state = {
+      pre: carried.timelines, reservations: base.reservations, avoidYardSpots: base.avoidYardSpots,
+      post: result, notes: base.notes,
+    };
+  }
+  /**
+   * 待命替換換下一個位置
+   * ==================
+   *
+   * 待命在原定位置排不出入廠時，轉場模組會改停待命清單上成本最低、排得出的位置。那個選擇
+   * 只看待命自己：換過去的位置可能正是別列車讓站、等候要用的格子（實錄：待命換到某設施格，
+   * 另一列車跑完最後一趟要在那格等進廠，被擠回正線站上等，撞到後車）。
+   *
+   * 還有安全問題時，對每一筆替換試「排除它現在的位置、整段重算」——替換改用清單上的下一個
+   * 位置，進場、停留、出場、讓站、殘留修復全部照新位置重排。整體安全問題變少、且必要轉場
+   * 失敗沒有變多才採用；沒採用就再排除一個、換下一個位置，直到替換本身排不出為止。
+   * 每筆替換最多換幾次，總試算次數有上限。
+   */
+  const STANDBY_ALTERNATIVE_TRIES_PER_RELOCATION = 4;
+  const STANDBY_ALTERNATIVE_MAX_EVALUATIONS = 12;
+  const safetyCount = (items: PlanViolation[]) => items.filter((item) => item.severity !== 'quality').length;
+  let standbyEvaluations = 0;
+  standbySearch: while (standbyEvaluations < STANDBY_ALTERNATIVE_MAX_EVALUATIONS) {
+    const base = state;
+    if (!base.post.violations.some((item) => item.severity !== 'quality')) break;
+    const relocations = base.post.transfer.standbyRelocations;
+    if (relocations.length === 0) break;
+    for (const relocation of relocations) {
+      let avoid = [...(base.avoidYardSpots ?? [])];
+      let current: { toNodeId: string; toLabel: string } | undefined = relocation;
+      const tried: string[] = [];
+      for (let attempt = 0; attempt < STANDBY_ALTERNATIVE_TRIES_PER_RELOCATION && current; attempt += 1) {
+        if (standbyEvaluations >= STANDBY_ALTERNATIVE_MAX_EVALUATIONS) break standbySearch;
+        avoid = [...avoid, { blockId: relocation.blockId, nodeId: current.toNodeId }];
+        tried.push(current.toLabel);
+        standbyEvaluations += 1;
+        const result = searchPostLoop(base.pre, base.reservations, avoid);
+        if (!result) break standbySearch;
+        const comparison = compareViolations(base.post.violations, result.violations);
+        const next = result.transfer.standbyRelocations.find((item) => item.blockId === relocation.blockId);
+        const adopt = result.required <= base.post.required && comparison.better;
+        engineTrace('standby-alternative', {
+          row: relocation.timelineRow,
+          blockId: relocation.blockId,
+          avoided: tried,
+          nowAt: next?.toLabel ?? null,
+          requiredBefore: base.post.required,
+          requiredAfter: result.required,
+          violationsBefore: base.post.violations.length,
+          violationsAfter: result.violations.length,
+          adopted: adopt,
+        });
+        if (adopt) {
+          state = {
+            pre: base.pre,
+            reservations: base.reservations,
+            avoidYardSpots: avoid,
+            post: result,
+            notes: [...base.notes, {
+              code: 'MAINTENANCE_FACILITY_YIELDED',
+              severity: 'warning',
+              kind: 'policy',
+              message:
+                `時間線 ${relocation.timelineRow}：待命替換沒有停「${tried.join('」「')}」——`
+                + `停在那裡會擋住別列車讓站或進廠，整張班表的安全問題由 ${safetyCount(base.post.violations)} 筆`
+                + `降為 ${safetyCount(result.violations)} 筆；改停「${next?.toLabel ?? '原定位置'}」。`,
+              detail: {
+                timelineRow: relocation.timelineRow,
+                blockId: relocation.blockId,
+                taskType: 'standby',
+                avoidedFacilityLabels: tried,
+                facilityLabel: next?.toLabel ?? null,
+              },
+            }],
+          };
+          continue standbySearch;
+        }
+        // 新位置害別列車排不出轉場也不採用，但清單上還有下一個位置就繼續換；
+        // 替換本身排不出（沒有下一個位置）才停
+        current = next;
+      }
+    }
+    break;
+  }
+  /**
+   * 局部連動搜尋：擋路的是別張卡的停放位置
+   * ==================================
+   *
+   * 站位衝突常常是「跑完一趟要等進廠的車，找不到地方先進去等」——候選的等待位置都被別的
+   * 整備佔著；必要轉場排不出、設施格兩台車重疊，也常常是被一段可以換位置的待命佔了別人
+   * 必須用的設施（實錄：待命停進行檢唯二可用的那一格）。那些佔位的卡（待命、或設施可以換的
+   * 整備）如果換到允許清單上的其他位置，位置就空出來了。所以把「擋住的那張卡」拉進同一組
+   * 候選：排除它現在的位置、整段重排（它的進場、停留、出場跟著重算）。
+   *
+   * 中間一步可以暫時引出新問題（例如換過去的位置又擋到第三張卡），這時往下一層：
+   * 對新結果裡同樣的擋路者再換一次。只有整組做完、整份班表的安全檢查比採用前好，
+   * 且必要轉場失敗沒有變多，才採用。使用者的作業時刻與安全間隔都不動；位置只在允許清單內換。
+   * 用共用預算，用盡就停，保留目前最好的結果。
+   */
+  const LOCAL_SEARCH_MAX_DEPTH = 2;
+  const LOCAL_SEARCH_MAX_ROUNDS = 6;
+  const yardBlockIds = (timelinesForIds: GeneratedSchedulePlan['timelines']) => new Set(timelinesForIds
+    .flatMap((timeline) => timeline.blocks)
+    .filter((block) => YARD_TASK_TYPES.has(block.taskType))
+    .map((block) => block.id));
+  /** 這個結果裡，站位衝突牽涉的等待車：它的候選位置被哪些「可以換位置」的卡擋著 */
+  const blockerMoves = (
+    candidate: { pre: GeneratedSchedulePlan['timelines']; post: ReturnType<typeof runPostLoop> },
+    avoid: YardSpotAvoid[],
+  ): YardSpotAvoid[] => {
+    const involved = new Set(candidate.post.violations
+      .filter((item) => item.severity !== 'quality' && item.code.startsWith('STATION_BERTH_'))
+      .flatMap((item) => item.blockIds));
+    const movable = yardBlockIds(candidate.pre);
+    const out: YardSpotAvoid[] = [];
+    const seen = new Set(avoid.map((item) => `${item.blockId}@${item.nodeId}`));
+    const add = (blockId: string | undefined, nodeId: string) => {
+      if (!blockId || !movable.has(blockId)) return;
+      const key = `${blockId}@${nodeId}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ blockId, nodeId });
+    };
+    for (const item of candidate.post.entryWaitUnresolved) {
+      if (!involved.has(item.occupancyBlockId)) continue;
+      for (const spot of item.busySpots) for (const blocker of spot.blockers) add(blocker.blockId, spot.nodeId);
+    }
+    // 必要轉場排不出、擋它的是別張可以換位置的卡：那張卡也一起換
+    for (const skip of candidate.post.transfer.skipped) {
+      if (skip.necessity === 'not_needed') continue;
+      for (const blocker of skip.blockers ?? []) add(blocker.blockingBlockId, blocker.nodeId);
+    }
+    // 設施格被兩台車同時佔用：兩邊可以換位置的都試著請它換
+    const facilityOf = new Map(candidate.post.timelines.flatMap((timeline) => timeline.blocks)
+      .map((block) => [block.id, block.yardFacilityNodeId] as const));
+    for (const item of candidate.post.violations) {
+      if (item.severity === 'quality' || !item.code.startsWith('FACILITY_')) continue;
+      for (const blockId of item.blockIds) {
+        const nodeId = facilityOf.get(blockId);
+        if (nodeId) add(blockId, nodeId);
+      }
+    }
+    return out;
+  };
+  const localSearch = (
+    base: PostState,
+    /** 這一層要分析的結果（第一層是採用前的狀態，往下是上一層試出來的結果） */
+    current: ReturnType<typeof runPostLoop>,
+    avoid: YardSpotAvoid[],
+    depth: number,
+  ): { avoid: YardSpotAvoid[]; post: ReturnType<typeof runPostLoop> } | 'budget' | null => {
+    for (const move of blockerMoves({ pre: base.pre, post: current }, avoid)) {
+      const nextAvoid = [...avoid, move];
+      const result = searchPostLoop(base.pre, base.reservations, nextAvoid);
+      if (!result) return 'budget';
+      const comparison = compareViolations(base.post.violations, result.violations);
+      engineTrace('local-search', {
+        depth, move, requiredBefore: base.post.required, requiredAfter: result.required,
+        violationsBefore: base.post.violations.length, violationsAfter: result.violations.length,
+        better: comparison.better,
+      });
+      // 必要轉場失敗變少且沒有新增安全問題、或轉場不變多且整體安全變好，才算這一組成立
+      if ((result.required < base.post.required && comparison.safeToAdopt)
+        || (result.required <= base.post.required && comparison.better)) return { avoid: nextAvoid, post: result };
+      if (depth < LOCAL_SEARCH_MAX_DEPTH) {
+        const deeper = localSearch(base, result, nextAvoid, depth + 1);
+        if (deeper) return deeper;
+      }
+    }
+    return null;
+  };
+  for (let round = 0; round < LOCAL_SEARCH_MAX_ROUNDS; round += 1) {
+    const base = state;
+    if (!base.post.violations.some((item) => item.severity !== 'quality') && base.post.required === 0) break;
+    const found = localSearch(base, base.post, base.avoidYardSpots ?? [], 1);
+    if (!found || found === 'budget') break;
+    const moved = found.avoid.slice((base.avoidYardSpots ?? []).length);
+    const labelOf = (nodeId: string) =>
+      engineInput.pointTopology?.nodes.find((node) => node.id === nodeId)?.label ?? nodeId;
+    const rowOf = (blockId: string) =>
+      base.pre.find((timeline) => timeline.blocks.some((block) => block.id === blockId))?.row;
+    state = {
+      pre: base.pre,
+      reservations: base.reservations,
+      avoidYardSpots: found.avoid,
+      post: found.post,
+      notes: [...base.notes, {
+        code: 'MAINTENANCE_FACILITY_YIELDED',
+        severity: 'warning',
+        kind: 'policy',
+        message:
+          `為了排開尚未解決的衝突，請 ${moved.map((item) => `時間線 ${rowOf(item.blockId) ?? '?'} 的整備不要停「${labelOf(item.nodeId)}」`).join('、')}，`
+          + `改停允許清單上的其他位置（進場、停留、出場一起重算）；安全問題由 `
+          + `${safetyCount(base.post.violations)} 筆降為 ${safetyCount(found.post.violations)} 筆、`
+          + `必要轉場失敗由 ${base.post.required} 筆降為 ${found.post.required} 筆。作業時刻不變。`,
+        detail: {
+          blockId: moved[0]?.blockId,
+          timelineRow: moved[0] ? rowOf(moved[0].blockId) : undefined,
+          movedAwayFrom: moved.map((item) => ({ blockId: item.blockId, facilityLabel: labelOf(item.nodeId) })),
+        },
+      }],
+    };
+  }
+
+  const post = state.post;
   post.warnings.push(...state.notes);
+  // 試過的聯動候選不寫進主訊息（太長），放進 detail.searchLog，畫面上收在展開區
+  const transferSearchLog = new Map<string, string[]>();
   for (const skip of post.transfer.skipped) {
     const list = skip.blockId ? triedNotes.get(skip.blockId) : undefined;
-    if (skip.necessity !== 'not_needed' && list && list.length > 0) {
-      skip.reason += `；已在副本上試過（皆未採用）：${list.join('；')}`;
+    if (skip.necessity !== 'not_needed' && list && list.length > 0 && skip.blockId) {
+      transferSearchLog.set(skip.blockId, [`已在副本上試過（皆未採用）：`, ...list]);
     }
   }
   timelines = post.timelines;
@@ -1129,8 +1613,8 @@ function generateShiftScheduleOnce(
   const requiredTransferBlockIds = new Set<string>();
   for (const skip of maintenanceTransfer.skipped) {
     const label = skip.fromTaskType && skip.toTaskType
-      ? `「${skip.fromTaskType}」轉「${skip.toTaskType}」`
-      : `「${skip.taskType}」`;
+      ? `「${taskTypeName(skip.fromTaskType)}」轉「${taskTypeName(skip.toTaskType)}」`
+      : `「${taskTypeName(skip.taskType)}」`;
     const notNeeded = skip.necessity === 'not_needed';
     if (!notNeeded && skip.blockId) requiredTransferBlockIds.add(skip.blockId);
     pushIssue(notNeeded ? warnings : errors, {
@@ -1139,7 +1623,10 @@ function generateShiftScheduleOnce(
       kind: notNeeded ? 'policy' : 'limit',
       message: notNeeded
         ? `時間線 ${skip.timelineRow}：${label}不需要整備轉場卡——${skip.reason}`
-        : `時間線 ${skip.timelineRow}：${label}排不出必要的整備轉場卡——${skip.reason}`,
+        : skip.onlyMissingData
+          ? `時間線 ${skip.timelineRow}：${label}排不出必要的整備轉場卡——缺少路段行駛時間`
+            + `（${formatEdgeList(skip.missingTravelTimeEdges ?? [])}）；補齊後才能排移動，未搜尋移動時刻。`
+          : `時間線 ${skip.timelineRow}：${label}排不出必要的整備轉場卡——${skip.reason}`,
       detail: {
         timelineRow: skip.timelineRow,
         blockId: skip.blockId,
@@ -1148,7 +1635,68 @@ function generateShiftScheduleOnce(
         toTaskType: skip.toTaskType,
         reason: skip.reason,
         necessity: skip.necessity ?? 'required',
+        ...(skip.blockers ? { blockers: skip.blockers } : {}),
+        ...(skip.missingTravelTimeEdges ? { missingTravelTimeEdges: skip.missingTravelTimeEdges } : {}),
+        ...(skip.onlyMissingData ? { onlyMissingData: true } : {}),
+        ...(skip.blockId && transferSearchLog.has(skip.blockId)
+          ? { searchLog: transferSearchLog.get(skip.blockId) }
+          : {}),
       },
+    });
+  }
+  /**
+   * 生成前的資料檢查結果：路網上沒填行駛時間的路段，以及因此排不出移動的任務。
+   * 缺資料跟排程衝突分開講——這不是容量不足，也不是演算法沒搜完，是要先補資料。
+   * 缺值不當 0 秒；正式時間必須來自地圖資料或使用者設定，這裡不自行補值。
+   */
+  {
+    const gaps = listTopologyTravelTimeGaps(engineInput.pointTopology);
+    if (gaps.missing.length > 0) {
+      const affected = maintenanceTransfer.skipped.filter(
+        (skip) => skip.necessity !== 'not_needed' && (skip.missingTravelTimeEdges?.length ?? 0) > 0,
+      );
+      const used = new Set(affected.flatMap((skip) => skip.missingTravelTimeEdges ?? [])
+        .map((edge) => `${edge.fromNodeId}>${edge.toNodeId}`));
+      pushIssue(affected.length > 0 ? errors : warnings, {
+        code: 'MISSING_TRAVEL_TIME',
+        severity: affected.length > 0 ? 'error' : 'warning',
+        kind: 'actionable',
+        message:
+          `路網上有 ${gaps.missing.length} 段沒有行駛時間：${formatEdgeList(gaps.missing)}。`
+          + (affected.length > 0
+            ? `其中 ${used.size} 段害 ${affected.length} 個必要轉場排不出（時間線 `
+              + `${[...new Set(affected.map((skip) => skip.timelineRow))].sort((a, b) => a - b).join('、')}）。`
+              + '請到地圖路網補上這些路段的行駛時間；缺值不當 0 秒，補齊前禁止發布。'
+            : '目前沒有移動需要經過這些路段，但請到地圖路網確認並補上。'),
+        detail: {
+          // 點選時跳到第一張受影響的卡（路段本身在地圖路網編輯，班表畫面沒有路段可定位）
+          ...(affected[0]?.blockId ? { blockId: affected[0].blockId, timelineRow: affected[0].timelineRow } : {}),
+          missingTravelTimeEdges: gaps.missing,
+          affectedTasks: affected.map((skip) => ({
+            timelineRow: skip.timelineRow,
+            blockId: skip.blockId,
+            missingTravelTimeEdges: skip.missingTravelTimeEdges,
+            onlyMissingData: skip.onlyMissingData === true,
+          })),
+        },
+      });
+    }
+  }
+  // 系統縮短的整備工作時間：哪一張卡、少了多少、剩多少、依據哪個設定，逐筆講出來
+  for (const item of maintenanceTransfer.yardWorkShortened) {
+    const minutes = (seconds: number) => `${Math.round(seconds / 6) / 10} 分`;
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_WORK_SHORTENED',
+      severity: 'warning',
+      kind: 'policy',
+      message:
+        `時間線 ${item.timelineRow}：「${taskTypeName(item.taskType)}」`
+        + (item.kind === 'late-start' ? `晚 ${item.seconds} 秒開始` : `提早 ${item.seconds} 秒結束`)
+        + `，實際工作 ${minutes(item.remainingWorkSeconds)}`
+        + `（設定最少 ${minutes(item.minimumWorkSeconds)}`
+        + (item.limitSeconds != null ? `、讓渡餘裕 ${item.limitSeconds} 秒` : '')
+        + `）。原因：${item.reason}。`,
+      detail: { ...item },
     });
   }
   // 決策樹第三層：請別列車換一台設施，把位子讓出來。只換格子不動時間，
@@ -1159,7 +1707,7 @@ function generateShiftScheduleOnce(
       severity: 'warning',
       kind: 'policy',
       message:
-        `時間線 ${item.timelineRow}：「${item.taskType}」原本沒地方停——`
+        `時間線 ${item.timelineRow}：「${taskTypeName(item.taskType)}」原本沒地方停——`
         + `已請時間線 ${item.movedRows.join('、')} 的整備改停別台設施，`
         + `讓出 ${item.facilityLabel}。雙方時間都沒有動。`,
       detail: {
@@ -1171,6 +1719,25 @@ function generateShiftScheduleOnce(
       },
     });
   }
+  // 待命在原定位置排不出入廠，改到待命清單上另一個位置：換了哪裡、為什麼，都要講出來
+  for (const item of maintenanceTransfer.standbyRelocations) {
+    pushIssue(warnings, {
+      code: 'MAINTENANCE_FACILITY_YIELDED',
+      severity: 'warning',
+      kind: 'policy',
+      message:
+        `時間線 ${item.timelineRow}：待命原定停「${item.fromLabel}」，入廠排不出（${item.reason}），`
+        + `已改停待命清單上的「${item.toLabel}」；進場、停留、出場都照新位置重算。`,
+      detail: {
+        timelineRow: item.timelineRow,
+        blockId: item.blockId,
+        taskType: 'standby',
+        facilityLabel: item.toLabel,
+        fromFacilityLabel: item.fromLabel,
+        reason: item.reason,
+      },
+    });
+  }
   // 提早進廠被別列車擋下：代價會落到站位上，必須講出來，否則就是把
   // 「設施不足」無聲換成「站位碰撞」——使用者最頭痛的兩件事互相搬家。
   for (const item of maintenanceTransfer.entryEarlyBlocked) {
@@ -1179,7 +1746,7 @@ function generateShiftScheduleOnce(
       severity: 'warning',
       kind: 'limit',
       message:
-        `時間線 ${item.timelineRow}：「${item.taskType}」本來可以提早`
+        `時間線 ${item.timelineRow}：「${taskTypeName(item.taskType)}」本來可以提早`
         + ` ${item.blockedMinutes.toFixed(1)} 分鐘進廠，但 ${item.facilityLabel}`
         + ` 那段時間被別列車佔著——車只好在「${item.waitStationName}」多等這段時間，`
         + `期間佔著那個站位。`,
@@ -1200,7 +1767,7 @@ function generateShiftScheduleOnce(
       code: 'MAINTENANCE_FACILITY_UNAVAILABLE',
       severity: 'warning',
       kind: 'limit',
-      message: `時間線 ${item.timelineRow}：「${item.taskType}」沒有可用設施——${item.reason}`,
+      message: `時間線 ${item.timelineRow}：「${taskTypeName(item.taskType)}」沒有可用設施——${item.reason}`,
       detail: {
         timelineRow: item.timelineRow,
         blockId: item.blockId,
@@ -1258,21 +1825,29 @@ function generateShiftScheduleOnce(
         && item.blockIds.includes(detail?.earlierBlockId ?? '')
         && item.blockIds.includes(detail?.laterBlockId ?? ''),
     );
-    if (attempt) {
-      issue.message += `\n目前未找到方案（非已證明不可行）：試過 ${attempt.candidatesTried} 個合法候選`
-        + `（雙方的整趟平移、壓縮／拉長行駛、增加停靠緩衝，含聯動 ${residualBudget.maxDepth} 層），`
-        + `都會引出新的衝突或解不掉`
-        + (attempt.rejectedSamples.length > 0 ? `：${attempt.rejectedSamples.slice(0, 3).join('；')}` : '')
-        + (residual.budgetExhausted ? '。搜尋因運算預算停止，未探索完。' : '。');
+    // 主訊息只講結論與處理方向；試過哪些候選放進 detail.searchLog（畫面上收在展開區）
+    const searchLog: string[] = [];
+    if (attempt && attempt.searchIncomplete && attempt.candidatesTried === 0) {
+      issue.message += '\n尚未找到安全排法（搜尋未完成）：共用搜尋預算在輪到這一筆之前就用完了。';
+      searchLog.push('搜尋因共用預算用盡，這筆尚未搜尋。');
+    } else if (attempt) {
+      issue.message += '\n尚未找到安全排法（不代表場域容量不足）：請調整相關班次時刻、待命位置或路線後重新生成。';
+      searchLog.push(
+        `本次試了 ${attempt.candidatesTried} 個候選（雙方的整趟平移、壓縮／拉長行駛、增加停靠緩衝，`
+        + `聯動最多 ${residualBudget.maxDepth} 層），試過的都會引出新的衝突或解不掉`,
+        ...attempt.rejectedSamples,
+      );
+      if (attempt.searchIncomplete) searchLog.push('這一筆的搜尋因共用預算用盡而中途停止，未探索完。');
     } else if (residual.budgetExhausted) {
       // 預算在輪到這筆之前就用完：沒搜過，更不能說成可行或不可行
-      issue.message += `\n目前未找到方案（非已證明不可行）：搜尋因運算預算（${residualBudget.maxEvaluations} 次評估）`
-        + '用盡，這筆尚未搜尋。';
+      issue.message += '\n尚未找到安全排法（搜尋未完成）：請調整相關班次後重新生成。';
+      searchLog.push('搜尋因共用預算用盡，這筆尚未搜尋。');
     } else {
       continue;
     }
+    (issue.detail as Record<string, unknown>).searchLog = searchLog;
     (issue.detail as Record<string, unknown>).resolutionStatus = 'not_found';
-    (issue.detail as Record<string, unknown>).searchBudgetExhausted = residual.budgetExhausted;
+    (issue.detail as Record<string, unknown>).searchBudgetExhausted = attempt ? attempt.searchIncomplete === true : true;
   }
   // 整備做完車就停在出場站，接著那一段一定要從那一站發車——不是的話車不在，開不了
   validateYardExitContinuity({
@@ -1369,6 +1944,40 @@ function generateShiftScheduleOnce(
     warnings,
   );
 
+  /**
+   * 搜尋沒做完、又還有安全問題：明講「本次計算未找到安全排法（搜尋未完成）」並禁止發布。
+   * 不能讓人以為已經搜完、場域容量不夠——預算用盡只代表這次沒有搜完。
+   */
+  const budgetReport = searchBudget.report();
+  const unresolvedSafety = [...errors, ...warnings].some(
+    (issue) => issue.code !== 'SCHEDULE_SEARCH_INCOMPLETE'
+      && (issue.severity === 'error' || PUBLISH_BLOCKING_CODES.has(issue.code)),
+  );
+  if (budgetReport.exhaustedBy && unresolvedSafety) {
+    const by = budgetReport.exhaustedBy === 'time'
+      ? `時間上限 ${Math.round(budgetReport.limits.timeLimitMs / 1000)} 秒`
+      : budgetReport.exhaustedBy === 'candidates'
+        ? `候選嘗試上限 ${budgetReport.limits.maxCandidates} 次`
+        : `完整評估上限 ${budgetReport.limits.maxEvaluations} 次`;
+    pushIssue(errors, {
+      code: 'SCHEDULE_SEARCH_INCOMPLETE',
+      severity: 'error',
+      kind: 'limit',
+      message:
+        `本次計算未找到安全排法（搜尋未完成）：已用完這次生成的${by}，下面的安全問題還沒有排開。`
+        + '這不代表已證明沒有安全排法，也不代表場域容量不足；班表禁止發布。',
+      detail: {
+        searchBudgetExhausted: true,
+        exhaustedBy: budgetReport.exhaustedBy,
+        candidates: budgetReport.candidates,
+        evaluations: budgetReport.evaluations,
+        duplicatesSkipped: budgetReport.duplicatesSkipped,
+        elapsedMs: budgetReport.elapsedMs,
+        limits: budgetReport.limits,
+      },
+    });
+  }
+
   const plan: GeneratedSchedulePlan = {
     shiftId: engineInput.shiftId,
     generatedAt: new Date().toISOString(),
@@ -1381,7 +1990,7 @@ function generateShiftScheduleOnce(
   };
 
   const ok =
-    computeScheduleGateOk(errors)
+    computeScheduleGateOk(errors, warnings)
     && resolvedByTaskId.size === engineInput.confirmedTasks.length;
   return {
     plan: plan,

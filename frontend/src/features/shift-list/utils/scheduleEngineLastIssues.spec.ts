@@ -61,12 +61,12 @@ describe('scheduleEngineLastIssues', () => {
     assert.equal(snapshot.acceptance.gatePassed, false);
     assert.equal(snapshot.acceptance.qualityPassed, false);
     assert.equal(snapshot.acceptance.policyNoiseCount, 1);
-    assert.ok(snapshot.standaloneHtml.includes('驗收定義'));
-    assert.ok(snapshot.standaloneHtml.includes('策略說明'));
+    assert.ok(snapshot.standaloneHtml.includes('檢查結果'));
+    assert.ok(snapshot.standaloneHtml.includes('已採取的調整'));
     assert.ok(snapshot.standaloneHtml.includes('預設摺疊'));
 
     const html = renderLastIssuesStandaloneHtml(snapshot);
-    assert.match(html, /硬錯誤（阻擋驗收）/);
+    assert.match(html, /安全與排班問題/);
     assert.match(html, /MA1403/);
     assert.match(html, /班距需求 01:10/);
   });

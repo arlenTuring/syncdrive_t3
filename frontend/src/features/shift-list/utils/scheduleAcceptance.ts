@@ -1,7 +1,7 @@
 /**
  * 排班引擎驗收閘門與問題展示分層（P0）。
  *
- * 硬閘（ok / gatePassed）：不可有任何 severity=error。
+ * 驗收（ok / gatePassed）：不可有排班錯誤或阻擋發布的安全警告。
  * 品質目標（qualityPassed）：不阻擋 ok，但應用來判斷「是否還有可接受的殘留警告」。
  * 策略說明：正常求解日誌，預設摺疊、不計入失敗。
  */
@@ -27,10 +27,10 @@ export const ISSUE_DISPLAY_LAYER_ORDER: IssueDisplayLayer[] = [
 ];
 
 export const ISSUE_DISPLAY_LAYER_LABEL: Record<IssueDisplayLayer, string> = {
-  hard: '硬錯誤（阻擋驗收）',
-  limit: '演算法極限警告',
+  hard: '安全與排班問題',
+  limit: '尚待處理',
   actionable: '可調整警告',
-  policy: '策略說明（不阻擋驗收）',
+  policy: '已採取的調整',
 };
 
 /**
@@ -75,7 +75,7 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
   new Set([
     'STATION_BERTH_COLLISION',
     'STATION_BERTH_PROTECTION_GAP',
-    // 設施格同樣是實體位置：重疊做不到，交接 60 秒是本場域必須遵守的安全間隔
+    // 設施格也遵守使用者設定的碰撞保護時間。
     'FACILITY_SLOT_COLLISION',
     'FACILITY_HANDOVER_GAP',
     // 車到不了下一段該去的地方
@@ -83,6 +83,8 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
     'VEHICLE_LOCATION_DISCONTINUITY',
     // 移動卡在同一個轉折點貼太近：兩台車實際在路網上交會
     'MOVE_JUNCTION_CONFLICT',
+    // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
+    'SCHEDULE_SEARCH_INCOMPLETE',
   ]);
 
 /** 常見硬錯誤代號（文件／報表用；實際硬閘以 severity=error 為準） */
@@ -110,14 +112,13 @@ export const DOCUMENTED_HARD_ERROR_CODES: readonly FeasibilityViolationCode[] = 
 ];
 
 export const ACCEPTANCE_CRITERIA_LINES = [
-  '硬閘（ok=true）：errors 必須為 0（含站位碰撞、未跑完迴圈、時間線重疊等）。',
-  '警告不阻擋硬閘：策略延後／改線、略過進場載客、班距低於目標、肩段未承接脈衝。',
-  '品質目標（qualityPassed）：另要求 0×UNSERVED_SERVICE_PULSE 與 0×HEADWAY_BELOW_TARGET；未達標仍可 ok=true。',
-  '策略說明預設摺疊，不計入「失敗體感」主列表。',
+  '碰撞、安全間隔不足或其他排班錯誤，皆不通過驗收且禁止發布。',
+  '班距與班次數是否達標另列說明，不得以增加碰撞風險換取達標。',
+  '已採取的調整可展開查看。',
 ] as const;
 
 export type ScheduleAcceptanceSummary = {
-  /** 與 report.ok 語意對齊：無任何 error */
+  /** 與 report.ok 語意對齊：無排班錯誤或安全問題 */
   gatePassed: boolean;
   hardErrorCount: number;
   hardErrorsByCode: Record<string, number>;
@@ -126,7 +127,7 @@ export type ScheduleAcceptanceSummary = {
   qualityFailByCode: Record<string, number>;
   /**
    * 安全閘：沒有任何站位重疊／碰撞保護不足。
-   * false 時班表仍可編輯、可儲存，但<strong>不建議發布</strong>。
+   * false 時班表仍可編輯、可儲存，但禁止發布。
    */
   publishSafe: boolean;
   publishBlockingCount: number;
@@ -151,7 +152,7 @@ export function resolveIssueDisplayLayer(
   kind: FeasibilityIssueKind,
   code: FeasibilityViolationCode,
 ): IssueDisplayLayer {
-  if (severity === 'error') return 'hard';
+  if (severity === 'error' || PUBLISH_BLOCKING_CODES.has(code)) return 'hard';
   if (kind === 'policy' || POLICY_NOISE_CODES.has(code)) return 'policy';
   if (kind === 'limit') return 'limit';
   return 'actionable';
@@ -169,8 +170,8 @@ export function layerSortKey(layer: IssueDisplayLayer): number {
 }
 
 /** 硬閘：與產生器／重驗證一致 */
-export function computeScheduleGateOk(errors: FeasibilityIssue[]): boolean {
-  return errors.length === 0;
+export function computeScheduleGateOk(errors: FeasibilityIssue[], warnings: FeasibilityIssue[] = []): boolean {
+  return errors.length === 0 && !warnings.some((issue) => PUBLISH_BLOCKING_CODES.has(issue.code));
 }
 
 export function evaluateScheduleAcceptance(
@@ -192,9 +193,9 @@ export function evaluateScheduleAcceptance(
     else actionableWarningCount += 1;
   }
 
-  const gatePassed = computeScheduleGateOk(report.errors);
+  const gatePassed = report.ok && computeScheduleGateOk(report.errors, report.warnings);
   const publishBlockingIssues = [...report.errors, ...report.warnings].filter(
-    (issue) => PUBLISH_BLOCKING_CODES.has(issue.code),
+    (issue) => issue.severity === 'error' || PUBLISH_BLOCKING_CODES.has(issue.code),
   );
 
   return {

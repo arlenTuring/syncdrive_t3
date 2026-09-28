@@ -90,12 +90,20 @@ function issueResource(issue: FeasibilityIssue): string {
 
 function issueMagnitude(issue: FeasibilityIssue): number {
   const detail = (issue.detail ?? {}) as Record<string, unknown>;
-  for (const field of ['overlapSeconds', 'deficitSeconds', 'shortfallSeconds']) {
+  for (const field of ['deficitSeconds', 'shortfallSeconds', 'protectionShortfallSeconds', 'worstShortfallSeconds', 'overlapSeconds']) {
     const value = detail[field];
     if (typeof value === 'number' && Number.isFinite(value)) return Math.abs(value);
   }
   const gap = detail.gapSeconds;
   return typeof gap === 'number' ? Math.max(0, -gap) : 1;
+}
+
+/** 將報告中的同一筆問題按資源與班次比對，不能只比較總筆數。 */
+export function violationFromIssue(issue: FeasibilityIssue, severity: ViolationSeverity): PlanViolation {
+  const blockIds = issueBlockIds(issue);
+  const resource = issueResource(issue);
+  return { key: `${issue.code}|${resource}|${blockIds.join('+')}`, code: issue.code,
+    severity, resource, blockIds, magnitude: issueMagnitude(issue) };
 }
 
 export function collectPlanViolations(
@@ -104,16 +112,7 @@ export function collectPlanViolations(
 ): PlanViolation[] {
   const out: PlanViolation[] = [];
   const push = (issue: FeasibilityIssue, severity: ViolationSeverity) => {
-    const blockIds = issueBlockIds(issue);
-    const resource = issueResource(issue);
-    out.push({
-      key: `${issue.code}|${resource}|${blockIds.join('+')}`,
-      code: issue.code,
-      severity,
-      resource,
-      blockIds,
-      magnitude: issueMagnitude(issue),
-    });
+    out.push(violationFromIssue(issue, severity));
   };
   const errors: FeasibilityIssue[] = [];
   const warnings: FeasibilityIssue[] = [];
@@ -191,6 +190,10 @@ export type ViolationComparison = {
   better: boolean;
   /** 候選新增的硬錯誤／安全問題（非空就不能採用） */
   introduced: PlanViolation[];
+  /** 同一筆硬錯誤／安全問題比原本更嚴重。 */
+  worsened: PlanViolation[];
+  /** 可保留原有問題，但不能增加或惡化安全問題。 */
+  safeToAdopt: boolean;
   resolved: PlanViolation[];
   /** 依嚴重度的數量：[硬, 安全, 品質] */
   countsBefore: [number, number, number];
@@ -221,8 +224,18 @@ export function compareViolations(
   const resolved = before.filter((item) => !afterKeys.has(item.key));
   const countsBefore = counts(before);
   const countsAfter = counts(after);
+  const worsened = after.filter((item) => {
+    if (item.severity === 'quality') return false;
+    const previous = beforeKeys.get(item.key);
+    return previous != null && (
+      SEVERITY_RANK[item.severity] < SEVERITY_RANK[previous.severity]
+      || item.magnitude > previous.magnitude + 1e-6
+    );
+  });
+  const safeToAdopt = introduced.length === 0 && worsened.length === 0
+    && countsAfter[0] <= countsBefore[0] && countsAfter[1] <= countsBefore[1];
   let better = false;
-  if (introduced.length === 0 && countsAfter[0] <= countsBefore[0] && countsAfter[1] <= countsBefore[1]) {
+  if (safeToAdopt) {
     if (countsAfter[0] < countsBefore[0] || countsAfter[1] < countsBefore[1]) {
       better = true;
     } else {
@@ -239,5 +252,5 @@ export function compareViolations(
       better = (lighter && !heavier) || (!heavier && countsAfter[2] < countsBefore[2]);
     }
   }
-  return { better, introduced, resolved, countsBefore, countsAfter };
+  return { better, introduced, worsened, safeToAdopt, resolved, countsBefore, countsAfter };
 }

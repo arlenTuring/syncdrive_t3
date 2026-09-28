@@ -162,7 +162,7 @@ export function revalidateAdjustedPlan(args: {
   );
 
   return {
-    ok: computeScheduleGateOk(errors),
+    ok: computeScheduleGateOk(errors, warnings),
     errors,
     warnings,
   };

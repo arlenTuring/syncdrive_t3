@@ -21,7 +21,7 @@ export type FeasibilityIssueMeta = {
 
 const KIND_LABEL: Record<FeasibilityIssueKind, string> = {
   policy: '策略說明',
-  limit: '演算法極限',
+  limit: '尚未排妥',
   actionable: '可調整',
 };
 
@@ -29,31 +29,31 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MISSING_TEMPLATE_TASKS: '缺少可排班任務',
   NO_ROUTE_FOR_TASK_TYPE: '任務無可用路線',
   MISSING_TRAVEL_TIME: '缺少行駛／停靠時間',
-  STATION_LEG_TRAVEL_INCOMPLETE: '站間 leg 不完整',
-  STATION_LEG_TRAVEL_INVALID: '站間 leg 無效',
+  STATION_LEG_TRAVEL_INCOMPLETE: '站間行駛時間不完整',
+  STATION_LEG_TRAVEL_INVALID: '站間行駛時間無效',
   STATION_TIMING_INFEASIBLE: '逐站時刻超出班次卡',
   STATION_BERTH_COLLISION: '停靠點站位碰撞',
   FACILITY_SLOT_COLLISION: '設施格同時被兩台車佔用',
-  FACILITY_HANDOVER_GAP: '設施格交接時間不足',
+  FACILITY_HANDOVER_GAP: '前車離開後，後車太快進入',
   STATION_BERTH_PROTECTION_GAP: '碰撞保護時間不足',
-  STATION_BERTH_RELIEF_UNAVAILABLE: '沒有可用的讓渡路線',
-  STATION_BERTH_ARRIVAL_YIELDED: '滯留車晚一點進站讓路',
-  STATION_BERTH_DELAYED: '站位約束延後',
-  STATION_BERTH_DELAY_SOURCE: '站位延後成因',
-  GEOMETRY_BEST_ROUND_USED: '改用最佳輪次結果',
-  GEOMETRY_PASS_REVERTED: '幾何處理被撤回',
-  STATION_BERTH_BACKUP_USED: '站位約束改選路線',
-  ANCHOR_CONFLICT: '錨點衝突',
+  STATION_BERTH_RELIEF_UNAVAILABLE: '未找到暫停放方案',
+  STATION_BERTH_ARRIVAL_YIELDED: '已調整進站或停放安排',
+  STATION_BERTH_DELAYED: '已延後班次',
+  STATION_BERTH_DELAY_SOURCE: '造成延後的班次',
+  GEOMETRY_BEST_ROUND_USED: '試算已達上限',
+  GEOMETRY_PASS_REVERTED: '已撤回不適合的調整',
+  STATION_BERTH_BACKUP_USED: '已改走替代路線',
+  ANCHOR_CONFLICT: '趕不上下一項任務',
   TIMELINE_OVERLAP: '時間線任務重疊',
   HEADWAY_PHYSICAL_IMPOSSIBLE: '班距低於物理下限',
   HEADWAY_BELOW_TARGET: '班距低於目標',
-  HEADWAY_PHASE_EVENED: '已把發車相位推回等間隔',
-  UNSERVED_SERVICE_PULSE: '班距需求未被承接',
+  HEADWAY_PHASE_EVENED: '已調整發車間隔',
+  UNSERVED_SERVICE_PULSE: '目標發車時刻未排到車',
   INSUFFICIENT_TIMELINES: '時間線列數不足',
   RECOVERY_INSUFFICIENT: '恢復空檔不足',
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: '換線空檔不足',
-  ROUTE_SUCCESSOR_POLICY_INVALID: '路線繼任策略無效',
-  ROUTE_SUCCESSOR_MISMATCH: '相鄰路線不符繼任關係',
+  ROUTE_SUCCESSOR_POLICY_INVALID: '路線接續設定需重新驗證',
+  ROUTE_SUCCESSOR_MISMATCH: '前後班次路線接不上',
   ROUTE_INSTANCE_AMBIGUOUS: '路線實例無法辨識',
   ROUTE_STATION_DISCONTINUITY: '相鄰停靠點不連續',
   CLOCK_ALIGN_VIOLATION: '未對齊 10 秒格',
@@ -61,19 +61,21 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   ROUTE_ROTATION_OVER_TURNAROUND: '路線組合超過折返時限',
   ROTATION_CYCLE_INCOMPLETE: '未跑完一整輪',
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
-  STATION_BERTH_RELIEF_INSERTED: '站位讓渡（次要邊）',
+  STATION_BERTH_RELIEF_INSERTED: '已安排替代路線讓出站位',
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: '必要的整備轉場排不出來，車到不了下一段',
   VEHICLE_LOCATION_DISCONTINUITY: '車的位置接不起來（缺移動）',
-  MOVE_JUNCTION_CONFLICT: '移動卡在同一個轉折點貼太近',
-  MAINTENANCE_FACILITY_UNAVAILABLE: '整備設施不足，車沒地方停',
-  MAINTENANCE_FACILITY_YIELDED: '已請別列車換設施讓位',
+  MOVE_JUNCTION_CONFLICT: '車輛通過路口的間隔不足',
+  MAINTENANCE_FACILITY_UNAVAILABLE: '未找到可用整備位置',
+  MAINTENANCE_FACILITY_YIELDED: '已調整停放位置',
   MAINTENANCE_ENTRY_EARLY_BLOCKED: '提早進廠被擋，車在站位上多等',
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: '已改派路線，配合車輛實際停放位置',
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: '已改派路線，讓車開到進得了廠的那一站',
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）',
-  GEOMETRY_NOT_CONVERGED: '幾何後處理未收斂'
+  GEOMETRY_NOT_CONVERGED: '本次試算尚未排妥',
+  SCHEDULE_SEARCH_INCOMPLETE: '本次計算未找到安全排法（搜尋未完成）',
+  MAINTENANCE_WORK_SHORTENED: '整備工作時間被移動佔用'
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -129,6 +131,8 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: { id: 's10', label: '§10.5 整備轉場小卡' },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: 's7', label: '§7 路線關聯圖' },
   GEOMETRY_NOT_CONVERGED: { id: 's3', label: '§3 流水線' },
+  SCHEDULE_SEARCH_INCOMPLETE: { id: 's3', label: '§3 流水線' },
+  MAINTENANCE_WORK_SHORTENED: { id: 's6', label: '§6 整備與設施佔用' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -160,58 +164,58 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   FACILITY_SLOT_COLLISION: {
     kind: 'limit',
     guidance:
-      '同一個設施格在同一時刻只能停一台車。這一則以「車實際還在裡面」為準——整備做完到出場移動開始之間，車仍佔著那一格（時間軸上就是那張「暫停」卡）。先前設施佔用只記 [整備開始, 整備結束]，那段帳上是空的，所以兩台車同格量不出來；補上暫停卡之後才現形。要消掉它：讓前一台早一點開走（出場移動可以提前），或把後一台改排到別的格子。',
+      '兩台車同時占用同一位置。整備結束後若尚未離開，仍算占用。請錯開進出時間，或改停待命清單中其他可用的位置。',
   },
   FACILITY_HANDOVER_GAP: {
     kind: 'limit',
     guidance:
-      '兩台車在同一個設施格交接時，中間至少要隔「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝。前一台還沒完全開出來，後一台就不能開進去。要消掉它：讓前一台早一點開走，或把後一台的進場時刻往後挪。',
+      '前車離開到後車抵達的間隔不足。至少須保留 2 倍碰撞保護時間；請提早移出前車或延後後車進場。',
   },
   STATION_BERTH_COLLISION: {
     kind: 'limit',
     guidance:
-      '生成時已嘗試「延後發車／改派備用」仍無法清開同一停靠點的到站～離站重疊。請加時間線、縮短靠站、或手動改備援點。這不是班距警告。',
+      '兩台車同時占用同一停靠點。請查看相關班次，錯開抵達與離開時間，或使用待命清單中可到達的空位。修正前禁止發布。',
   },
   STATION_BERTH_PROTECTION_GAP: {
     kind: 'actionable',
     guidance:
-      '規則是「後車到站 ≥ 前車實際離站 + 2 × 碰撞保護時間」——站位在「前車離站 + 1 倍」就空了，後車還要花同樣的時間才能開進來，所以是兩倍。前車若因調度滯留在站上，以真正開走的時刻起算。訊息會直接告訴你「同時最多有幾台車停在這個停靠點」：只要超過 1 台，就代表該時段的車比班距需要的多，多出來的車跑完一輪沒有下一個脈衝可接，只好停在原地等，於是全擠在同一個停靠點。這不是把兩班拉開就能解的——要減少該時段的時間線列數、把多餘的車安排進整備／待命，或讓它們改停別的站位（關聯圖上要有終點在別站的備用路線）。',
+      '後車抵達前，須從前車實際離開起保留 2 倍碰撞保護時間。請調整相關班次；等待中的車也算占用。',
   },
   STATION_BERTH_ARRIVAL_YIELDED: {
     kind: 'policy',
     guidance:
-      '一台車跑完一趟停在站上等下一趟，這段空等會擋住只是路過的別列車。既有機制只會延後後車；這裡改成讓滯留的那台晚一點進站——它反正要在站上空等，晚幾分鐘到沒有損失，下一趟的發車時刻與班距完全不變。屬正常求解，不是錯誤。',
+      '已調整抵達時間或安排暫停位置，讓出原本占用的停靠點。調整內容見相關班次。',
   },
   STATION_BERTH_RELIEF_UNAVAILABLE: {
     kind: 'limit',
     guidance:
-      '車跑完一輪、在終點站空等下一個脈衝時會擋到別列車。引擎已經試過讓它先開去別站等再回來，但關聯圖上沒有「從這裡出發、又回得來」的路線可用，只能留在原地。這不是漏掉沒處理，是沒有可用的替代動線。要消掉它：減少該時段同時在線的車、把多餘的車安排進整備／待命，或讓其中一台改停別的站位。',
+      '目前未找到能及時往返的替代路線或停放方案。請查看待命清單、路網及相關班次；這不代表已證明場域容量不足。',
   },
   STATION_BERTH_DELAYED: {
     kind: 'policy',
     guidance:
-      '站位占用約束把後車整趟延後（10 秒格），讓前車離站後再進站。屬正常求解，不是錯誤。',
+      '已延後此班次，讓前車離開後再進站。',
   },
   GEOMETRY_PASS_REVERTED: {
     // 過程紀錄：某道處理被安全閘拒絕，不是場域容量極限
     kind: 'policy',
     guidance:
-      '幾何後處理的每一道跑完都會用同一把全域尺打分（不碰撞 > 班距 > 班次穩定），讓整張班表變差的就整道撤回，連同它寫進報告的訊息一起收回。所以這一則不代表班表有問題——那些動作等於沒發生。它的用途是指出哪一道處理的策略與其他處理衝突：撤回次數高的那幾道應該回頭檢討它到底想解什麼問題，而不是留著讓它每一輪都做白工。',
+      '部分試算讓結果變差，已撤回；撤回的調整不會套用到班表。',
   },
   GEOMETRY_BEST_ROUND_USED: {
     kind: 'limit',
     guidance:
-      '幾何後處理迴圈裡的十二道處理會互相推翻，跑滿輪數仍未收斂到不動點。引擎已改為在過程中按全域評分（不碰撞 > 班距 > 班次穩定）留下最好的一版，並用它作為結果，所以輸出不會比過程中最好的那一輪差。看到這一則代表班表可用但還不是穩定解——同樣的輸入稍微變動，結果可能明顯不同。要根治要讓那些處理不再互相推翻，不是調輪數上限。',
+      '已達本次試算上限，保留目前較佳結果。是否可發布仍依安全檢查判定。',
   },
   STATION_BERTH_DELAY_SOURCE: {
     kind: 'actionable',
     guidance:
-      '這一則講的是「誰把別人推晚的」。站位求解在幾何收斂迴圈裡每一輪都會延後班次，但過去只有第一輪的延後會被回報，後面幾輪完全看不到——實測有單筆班次被往後推了 520 秒卻在報告上查不到任何紀錄。現在把整個迴圈的延後累計起來，依「擋路的那一張卡」歸戶：某一台車佔著某一站不走，累計害多少班次、被推遲多少秒。要消掉它：處理被指名的那一張卡（讓它離開站位、改路線、或改時刻），而不是去調延後上限。',
+      '此班次占用站位，造成其他班次延後。請點選查看影響範圍與可調整時間。',
   },
   STATION_BERTH_BACKUP_USED: {
     kind: 'policy',
     guidance:
-      '這一趟原本要跑的路線會跟別台車搶同一個停靠點，所以改跑關聯圖上另一條接得起來的路線。改完之後這台車就停在新路線的終點站，再從那裡接下一趟（可以在站上等）。這不是「整組換成備用路線」，只是這一趟改走別條。屬正常求解，不是錯誤。',
+      '此班次已改走設定允許的替代路線，避免占用相同停靠點。',
   },
   ANCHOR_CONFLICT: {
     kind: 'limit',
@@ -230,17 +234,17 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   HEADWAY_PHASE_EVENED: {
     kind: 'policy',
     guidance:
-      '站位求解為了清開停靠點會把個別班次往後延，每延一次同一條路線的發車相位就歪一次，班距因此忽大忽小、運能曲線出現低谷。這一步把每一班往「與前後班等間隔」的位置靠（一次走一半，數輪收斂），只在該列自己的空檔內微調，而且移動之前已經逐站確認過不會造成碰撞——挪過去會撞的那些整筆放棄、完全不動。不新增也不刪除任何班次。屬正常求解，不是錯誤。',
+      '已在可用空檔內調整發車時間，使班距更均勻；班次數不變。',
   },
   HEADWAY_BELOW_TARGET: {
     kind: 'limit',
     guidance:
-      '跨時段班距下限刻意取「兩班時段較嚴者」，不是誤判。此對班多半來自補完回程、掛車延後或多車擠班，而非乾淨脈衝。可試：增加列數、略降恢復／換線、拉長整備讓渡；或接受該方向略過部分脈衝。',
+      '這段實際班距未達設定目標。請查看受影響班次與時段，評估車輛及整備安排。',
   },
   UNSERVED_SERVICE_PULSE: {
     kind: 'limit',
     guidance:
-      '此班距脈衝在一般與補掛輪都找不到能及時出發的車，實際 PPHPD 會下降（警告，非硬錯誤）。請檢查可用車視窗、整備錯開、待命可派、交路週期，或增加時間線列數。',
+      '這個目標發車時刻未排到車。請查看相鄰班次、車輛可用時間與整備安排。',
   },
   INSUFFICIENT_TIMELINES: {
     kind: 'actionable',
@@ -313,6 +317,16 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     guidance:
       '這一段整備原本沒地方停。求解器發現擋路的那台車自己也停得下別台設施，就請它換過去、把位子讓出來——兩邊的時間都沒有動，只是換了格子，所以沒有代價。會看到某一列的整備跑到跟平常不同的設施上，那是這個機制造成的，不是排錯。',
   },
+  MAINTENANCE_WORK_SHORTENED: {
+    kind: 'policy',
+    guidance:
+      '入廠晚到、整備間轉場的移動時間、或出廠吃掉尾巴，會讓這一段整備的實際工作時間比時間模板短。晚開始的量不超過整備設定的讓渡餘裕，剩下的工作時間不少於整備設定的作業時長；超過就不會這樣排。點選可跳到那張卡。',
+  },
+  SCHEDULE_SEARCH_INCOMPLETE: {
+    kind: 'limit',
+    guidance:
+      '這次生成的搜尋次數或時間上限已用完，還有安全問題沒排開。這代表這次沒有搜完，不代表已證明沒有安全排法，也不代表場域容量不足。班表禁止發布；可以調整相關班次或待命位置後重新生成。',
+  },
   GEOMETRY_NOT_CONVERGED: {
     kind: 'limit',
     guidance:
@@ -342,7 +356,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: {
     kind: 'limit',
     guidance:
-      '車下一段要去的地方跟它現在停的地方不同，引擎試過所有候選（設施、路徑、轉折點錯開、可動時段內的出發時刻）仍排不出合法移動。班表與班次保留供檢查，但這一則會擋發布——車實際上到不了。原因訊息寫著卡在哪：路徑被別列車在同一個轉折點卡住，就看那一刻前後誰能讓；時段不夠，就要一起調整前後班次，不是只移動轉場卡。',
+      '車下一段要去的地方跟它現在停的地方不同，這次計算在試過的候選（設施、路徑、轉折點錯開、可動時段內的出發時刻）裡沒有排出合法移動；這不代表已證明沒有排法。班表與班次保留供檢查，但這一則會擋發布——車實際上到不了。原因訊息寫著卡在哪：路徑被別列車在同一個轉折點卡住，就看那一刻前後誰能讓；時段不夠，就要一起調整前後班次，不是只移動轉場卡。',
   },
   VEHICLE_LOCATION_DISCONTINUITY: {
     kind: 'limit',

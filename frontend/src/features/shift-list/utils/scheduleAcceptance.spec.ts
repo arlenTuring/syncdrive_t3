@@ -83,8 +83,8 @@ describe('scheduleAcceptance', () => {
       warnings: [],
     });
     assert.equal(summary.gatePassed, false);
-    assert.ok(summary.criteria.some((line) => line.includes('硬閘')));
-    assert.ok(summary.criteria.some((line) => line.includes('qualityPassed')));
+    assert.ok(summary.criteria.some((line) => line.includes('禁止發布')));
+    assert.ok(summary.criteria.some((line) => line.includes('班距')));
   });
 
   it('設施交接、轉折點、缺移動、必要轉場失敗都擋發布（不只站位）', () => {
@@ -105,7 +105,15 @@ describe('scheduleAcceptance', () => {
         warnings: severity === 'warning' ? [issue] : [],
       });
       assert.equal(summary.publishSafe, false, `${code} 應擋發布`);
+      assert.equal(summary.gatePassed, false, `${code} 不得顯示驗收通過`);
     }
+  });
+
+  it('其他硬錯誤也不得顯示可安全發布', () => {
+    const summary = evaluateScheduleAcceptance({ ok: false, warnings: [], errors: [
+      { code: 'STATION_TIMING_INFEASIBLE', severity: 'error', message: '時間不足' },
+    ] });
+    assert.equal(summary.publishSafe, false);
   });
 
   it('「不需要轉場卡」的策略說明不擋發布', () => {

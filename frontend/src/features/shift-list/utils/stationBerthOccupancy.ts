@@ -265,7 +265,8 @@ export function collectStationBerthOccupancies(
       // 待命停在正線停靠站：整段時間都實實在在佔著那一格。
       // 這跟「正線跑完把整備硬掛在末站」不一樣——那是沒有明確地點的推測，
       // 這是使用者指定、引擎也挑定的地點，車真的停在那裡，別台車進不來。
-      if (block.taskType === 'standby' && block.yardFacilityStationId) {
+      if ((block.taskType === 'standby' || (block.taskType === 'idle' && block.source === 'transition'))
+        && block.yardFacilityStationId) {
         const startMinute = block.plannedStartMinute;
         const endMinute = Math.max(block.plannedEndMinute, startMinute + minPresenceMin);
         out.push({

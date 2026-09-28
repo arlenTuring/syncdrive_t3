@@ -168,6 +168,23 @@ describe('排班引擎泛用性', () => {
     assert.equal(buildPlanFingerprint(regenerated.plan), buildPlanFingerprint(baseline.plan));
   });
 
+  it('高衝突（碰撞保護時間極大）＋很小的共用搜尋預算：很快停下；仍有安全問題就標搜尋未完成、禁止發布', () => {
+    const crowded = input();
+    crowded.draft.routeGroups.collisionProtectionSeconds = 900;
+    const startedAt = Date.now();
+    const result = generateShiftSchedule({ ...crowded, searchBudget: { maxCandidates: 5, maxEvaluations: 5, timeLimitMs: 60_000 } });
+    assert.ok(Date.now() - startedAt < 60_000);
+    const issues = [...result.report.errors, ...result.report.warnings];
+    const incomplete = issues.find((issue) => issue.code === 'SCHEDULE_SEARCH_INCOMPLETE');
+    const otherSafety = issues.some((issue) => issue.code.startsWith('STATION_BERTH_'));
+    assert.ok(otherSafety, '這個情境應該有站位問題');
+    assert.ok(incomplete, issueCodes(result).join(','));
+    assert.equal(incomplete!.severity, 'error');
+    assert.equal(result.report.ok, false);
+    assert.doesNotMatch(incomplete!.message, /容量不足(?!；)|已證明無解/);
+    assert.equal((incomplete!.detail as { searchBudgetExhausted?: boolean }).searchBudgetExhausted, true);
+  });
+
   it('保存／重開：JSON 來回後指紋與緩衝紀錄不變', () => {
     const reopened = JSON.parse(JSON.stringify(baseline.plan)) as GeneratedSchedulePlan;
     assert.equal(buildPlanFingerprint(reopened), buildPlanFingerprint(baseline.plan));

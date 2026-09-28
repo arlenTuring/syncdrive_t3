@@ -11,6 +11,11 @@ import {
   UNTITLED_OPERATION_SHIFT_NAME,
   type OperationShiftListItem,
 } from './operation-shift-list.util';
+import { MapService } from '../map/map.service';
+import {
+  describeSafetyFailure,
+  runStoredShiftSafetyCheck,
+} from './safety/schedule-safety';
 import {
   expandStationEtas,
   expandTimetableTrips,
@@ -53,6 +58,7 @@ export class OperationShiftService {
   constructor(
     @InjectRepository(OperationShift)
     private readonly repo: Repository<OperationShift>,
+    private readonly mapService: MapService,
   ) {}
 
   async listShifts(query: ListOperationShiftsQuery): Promise<{
@@ -250,12 +256,57 @@ export class OperationShiftService {
     await this.repo.delete({ id });
   }
 
+  /**
+   * 發布／部署前的獨立安全重驗：用資料庫裡實際儲存的班表、路線停靠設定、碰撞保護時間與
+   * 地圖路網重算（規則與前端同一份，見 safety/schedule-safety.ts）。
+   *
+   * 不看前端存的「可發布」紀錄——那只是當時的結論，班表或設定之後可能改過，也可能不是
+   * 用最新的規則算的。必須在任何狀態變更之前呼叫；不通過就丟例外，正在使用的班表不受影響。
+   */
+  private assertPublishSafe(body: Record<string, unknown>): void {
+    const result = runStoredShiftSafetyCheck(
+      body,
+      this.loadShiftTopology(body),
+    );
+    if (!result.publishSafe) {
+      throw new BadRequestException(describeSafetyFailure(result));
+    }
+  }
+
+  /** 班表綁定地圖的路網；班表沒記地圖、或地圖已不存在就回 null（由安全檢查報缺資料） */
+  private loadShiftTopology(
+    body: Record<string, unknown>,
+  ): { nodes: unknown[]; edges: unknown[] } | null {
+    const mapId =
+      typeof body.routeGroupsMapId === 'string'
+        ? body.routeGroupsMapId.trim()
+        : '';
+    if (!mapId) return null;
+    try {
+      const document = this.mapService.getPublishedMapLibrary(mapId)
+        .mapDocument as Record<string, unknown> | undefined;
+      const topology = document?.pointTopology as
+        | { nodes?: unknown; edges?: unknown }
+        | undefined;
+      if (
+        !topology ||
+        !Array.isArray(topology.nodes) ||
+        !Array.isArray(topology.edges)
+      )
+        return null;
+      return { nodes: topology.nodes, edges: topology.edges };
+    } catch {
+      return null;
+    }
+  }
+
   /** 發布班表（供站顯／外部系統讀取 timetable） */
   async publishShift(id: string): Promise<OperationShiftListItem> {
     const row = await this.getShiftById(id);
     if (!this.bodyHasPlan(row.body ?? {})) {
       throw new BadRequestException('此班表尚無排班產出（scheduleOutput.plan），無法發布');
     }
+    this.assertPublishSafe(row.body);
     row.publishStatus = OperationShiftPublishStatus.PUBLISHED;
     row.updatedAt = String(Date.now());
     const saved = await this.repo.save(row);
@@ -271,6 +322,7 @@ export class OperationShiftService {
     if (!this.bodyHasPlan(row.body ?? {})) {
       throw new BadRequestException('此班表尚無排班產出（scheduleOutput.plan），無法部署');
     }
+    this.assertPublishSafe(row.body);
 
     const now = String(Date.now());
     await this.repo
