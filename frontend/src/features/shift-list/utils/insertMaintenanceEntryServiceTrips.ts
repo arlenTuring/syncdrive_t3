@@ -7,7 +7,10 @@ import {
 } from './maintenanceSectionCode';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { buildJoinedRouteSegment } from './joinedRouteSegment';
-import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
+import { findTopologyPath } from './findTopologyPath';
+import type { PointTopology } from '../../map-editor/types/pointTopology';
+import { extractFacilityMapCodes, type MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
+import { FACILITY_SECTION_BY_TASK_TYPE, nodeMatchesMoveCardCodes } from './moveCardShared';
 import { resolveYardPostTaskPolicy } from './maintenancePostTaskPolicy';
 import {
   resolveInterTripGapSeconds,
@@ -537,6 +540,11 @@ export function insertMaintenanceEntryServiceTrips(args: {
   minimumRecoveryTimeSeconds: number;
   /** 碰撞保護時間（秒）；預設 0＝維持舊行為 */
   collisionProtectionSeconds?: number;
+  /**
+   * 路網拓樸：判斷「不載客的出場移動」這條退路存不存在（出場站開得到下一班起點）。
+   * 沒給＝沒有退路。
+   */
+  pointTopology?: PointTopology | null;
   warnings: FeasibilityIssue[];
 }): GeneratedScheduleTimeline[] {
   const {
@@ -547,6 +555,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
     sectionCodes,
     minimumRecoveryTimeSeconds,
     collisionProtectionSeconds = 0,
+    pointTopology = null,
     warnings,
   } = args;
   if (firstTripOrigins.length === 0 || selectedRoutes.length === 0) return timelines;
@@ -570,6 +579,31 @@ export function insertMaintenanceEntryServiceTrips(args: {
   if (!anyDispatchAllowed) return timelines;
 
   const routeById = new Map(selectedRoutes.map((route) => [route.routeId, route] as const));
+
+  /**
+   * 不載這一趟客，車還有沒有別的路到下一班起點：路網上從這一類整備的設施（整備任務設定的那幾格）
+   * 到起點站有一條每段都有時間的路，出場移動卡就能把車空車送過去。只看位置與路網，不看整備名稱
+   * （白皮書 DISPATCH-04）。
+   */
+  const stationNodeId = new Map<string, string>();
+  for (const node of pointTopology?.nodes ?? []) {
+    const stationId = node.stationId?.trim();
+    if (!stationId) continue;
+    if (node.kind === 'docking' || !stationNodeId.has(stationId)) stationNodeId.set(stationId, node.id);
+  }
+  const deadheadFallbackExists = (taskType: string, toStationId: string): boolean => {
+    const toNode = stationNodeId.get(toStationId);
+    const section = FACILITY_SECTION_BY_TASK_TYPE[taskType as keyof typeof FACILITY_SECTION_BY_TASK_TYPE];
+    if (!pointTopology || !toNode || !section) return false;
+    const codes = extractFacilityMapCodes(maintenanceBody, section);
+    return pointTopology.nodes.some(
+      (node) =>
+        node.id !== toNode
+        && ['facility', 'docking', 'facility-docking'].includes(node.kind)
+        && nodeMatchesMoveCardCodes(node, codes)
+        && findTopologyPath(pointTopology, node.id, toNode) != null,
+    );
+  };
 
   // 安全插入基準：含已落地的進場載客，動態更新上一班／下一班
   const departureSecondsByRoute = collectRouteDepartureSeconds(timelines);
@@ -712,8 +746,12 @@ export function insertMaintenanceEntryServiceTrips(args: {
        * 先前充電、待命只准一段、不強制插入；保養、行檢不限段數、非插不可時帶著站位衝突也插。
        * 換一張地圖，充電區可能離首發站很遠、保養區反而就在旁邊，名稱不代表位置。現在一律：
        * - 段數不限，由路網與關聯圖上實際接得到的路線決定；可以從路線中途的出場站加入。
-       * - 不強制插入：每一種整備做完都有「不載客的出場移動卡」可以把車送到下一班起點
-       *   （整備轉場卡），排不下就退回那張卡，絕不帶著站位衝突硬插。
+       * - 有退路就不強制插入：路網上這一類整備的設施開得到下一班起點時，「不載客的出場移動卡」可以把車
+       *   送過去，排不下就退回那張卡，不帶著站位衝突硬插。
+       * - 沒有退路（車不在起點、路網上也開不過去）才非插不可：不插，車就憑空出現在起點。
+       *   這時照插，衝突交給最終驗證擋發布（跟 2026-08-08 的 mandatory 同一個理由）。
+       *   第四批一度一律不強制，沒路網的案例因此排出「車不在起點卻發車」的班表
+       *   （shiftScheduleEngine.spec「yields an already-placed same-direction trip」）。
        * - 整串要嘛全部插、要嘛都不插，不會把車留在半路。
        */
       const candidates = listEntryChainCandidates({
@@ -752,8 +790,8 @@ export function insertMaintenanceEntryServiceTrips(args: {
         firstTripRouteId: nextPassenger.routeId,
         yardEndMinute: afterYard.chainEndMinute,
         exitStationIds,
-        // 每一種整備都有退路（不載客的出場移動卡），塞不下就別硬插——見上方說明
-        mandatory: false,
+        // 有退路（不載客的出場移動卡開得過去）就別硬插；沒有退路才非插不可——見上方說明
+        mandatory: dispatchIsRequired && !deadheadFallbackExists(yard.taskType, originStationId),
         minimumRecoveryTimeSeconds,
         collisionProtectionSeconds,
         rotationRoutes: selectedRoutes,

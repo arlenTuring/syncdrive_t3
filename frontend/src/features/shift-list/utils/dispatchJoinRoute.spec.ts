@@ -224,4 +224,53 @@ describe('insertMaintenanceEntryServiceTrips：中途加入（整合）', () => 
     assert.equal(next[0]!.blocks.filter((block) => block.source === 'entry_service').length, 0);
     assert.equal(next[0]!.blocks.find((block) => block.id === 'yard')!.plannedEndMinute, 598, '整備尾巴不被截短');
   });
+
+  /**
+   * 撞站位時要不要硬插，看位置不看名稱：另一台車 10:00 同時到 C，這一趟一定撞。
+   * 路網上設施開得到 C（有不載客的退路）就不插；開不到（不插車就憑空出現在 C）才照插，
+   * 衝突交給最終驗證擋發布。
+   */
+  function conflictRun(withDeadheadPath: boolean) {
+    const conflicted = timelines('inspection');
+    conflicted.push({
+      row: 2,
+      blocks: [{
+        id: 'other', timelineRow: 2, taskType: 'passenger', label: '正線',
+        routeId: 'ABC', routeCode: 'ABC', routeName: 'ABC',
+        anchorStartMinute: 600 - 460 / 60, plannedStartMinute: 600 - 460 / 60, plannedEndMinute: 600,
+        travelSeconds: 400, dwellSeconds: 60, source: 'template_bar',
+      }] as GeneratedScheduleBlock[],
+    });
+    const withPath: PointTopology = {
+      ...topology,
+      edges: [
+        ...topology.edges,
+        ...(withDeadheadPath
+          ? [{ id: 'e-bc', fromNodeId: 'dock-b', toNodeId: 'dock-c', minTravelTimeSeconds: 200, avgTravelTimeSeconds: 200, distanceMeters: 300 }]
+          : []),
+      ],
+    } as PointTopology;
+    const next = insertMaintenanceEntryServiceTrips({
+      timelines: conflicted,
+      selectedRoutes: [routeAbc, routeCd],
+      firstTripOrigins: buildMaintenanceFirstTripOriginsFromTopology(topology),
+      maintenanceBody,
+      sectionCodes,
+      minimumRecoveryTimeSeconds: 0,
+      collisionProtectionSeconds: 30,
+      pointTopology: withPath,
+      warnings: [],
+    });
+    return next[0]!.blocks.filter((block) => block.source === 'entry_service');
+  }
+
+  it('會撞站位、但設施開得到首班起點（有退路）：不硬插', () => {
+    assert.equal(conflictRun(true).length, 0);
+  });
+
+  it('會撞站位、而且設施開不到首班起點（沒有退路）：照插，不讓車憑空出現在起點', () => {
+    const entries = conflictRun(false);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0]!.entryJoinedAtStationId, 'B');
+  });
 });

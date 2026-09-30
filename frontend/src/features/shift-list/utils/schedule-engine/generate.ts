@@ -398,6 +398,7 @@ function generateShiftScheduleOnce(
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    pointTopology: input.pointTopology,
     warnings,
   });
 
