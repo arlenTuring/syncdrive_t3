@@ -86,3 +86,16 @@ it('停站換位：進站那一趟與下一班一起換到另一個停靠位（�
     assert.equal(rerouteBerthPairInCopy(plan, 't2', context(pairs)).length, 0, `少了 ${missing.join('→')} 仍然換了`);
   }
 });
+
+/**
+ * 重現：出廠要閃別列車、首班整串晚一點，撞到的另一列車也得跟著晚一點，而那一班後面緊接著進廠
+ * （基準班表時間線 1／7 的模式）。轉場卡還沒插的版面裡，那一班後面直接是模板上的整備，
+ * 而且整備開頭本來就被讓渡蓋住一段（模板時刻早於班次到站）。
+ */
+it('整串推移推到模板上的整備：停在整備前面，整備何時開始交給之後的入廠卡決定', () => {
+  const plan = [{ row: 1, blocks: [block('trip', 6, 8, 'passenger'), block('charge', 7, 20, 'charging')] }];
+  const moved = shiftTripInCopy(plan, 'trip', 1, 1, ctx, '測試');
+  assert.ok(moved, '先前在這裡整串放棄，「前一班晚一點、整備跟著晚開始」這種合法解永遠試不到');
+  assert.deepEqual(moved.timelines[0]!.blocks.map((b) => [b.id, b.plannedStartMinute, b.plannedEndMinute]),
+    [['trip', 7, 9], ['charge', 7, 20]]);
+});
