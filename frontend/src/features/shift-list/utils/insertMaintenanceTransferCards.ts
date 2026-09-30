@@ -218,6 +218,18 @@ export type TransferBlocker = {
   nodeId: string;
   /** kind='junction'：撞在哪個轉折點 */
   junctionNodeId?: string;
+  /**
+   * 這個擋路者限制了什麼：
+   * - destination-occupied：要去的格子在那段時間有人
+   * - origin-next-occupant：原格有人要進來，所以不能在原格多等（可延後範圍因此縮小）
+   * - junction：轉折點被它的移動訂走
+   */
+  role?: 'destination-occupied' | 'origin-next-occupant' | 'junction';
+  /**
+   * 擋路的是引擎排出來、可以重新安排的東西（整備停哪一格、移動卡時刻），不是使用者固定的規則。
+   * 呼叫端只對 adjustable 的擋路者試「請它換位置／改時刻」。
+   */
+  adjustable?: boolean;
   blockingRow: number;
   blockingBlockId?: string;
   occupiedFrom: number;
@@ -283,6 +295,18 @@ export type MaintenanceTransferCardsResult = {
     blockers?: TransferBlocker[];
     /** 候選因路網某幾段沒填行駛時間而到不了：缺的是哪幾段 */
     missingTravelTimeEdges?: TopologyEdgeRef[];
+    /**
+     * 第一組候選的離開時間窗：最早、最晚可以離開前一個位置的時刻（日內秒），各被什麼限制，
+     * 那個限制是使用者固定的規則（作業不截尾、作業不歸零、安全間隔）還是引擎可以重排的結果。
+     */
+    departureWindow?: {
+      earliestSecond: number;
+      earliestReason: string;
+      earliestFixed: boolean;
+      latestSecond: number;
+      latestReason: string;
+      latestFixed: boolean;
+    };
     /**
      * 所有候選都只輸在「缺行駛時間」（沒有被佔、沒有撞轉折點、不是時間不夠）：
      * 這是缺資料，不是排程衝突。呼叫端不必再為它搜移動時刻，直接回報待補資料。
@@ -1014,11 +1038,15 @@ export function insertMaintenanceTransferCards(args: {
     facilityBlockers: FacilityBlocker[];
     /** 轉折點被誰的移動訂走（可以請它換位置的那幾張卡） */
     junctionBlockers: TransferBlocker[];
+    /** 縮小可延後範圍的那一方（原格下一台要進來的車） */
+    limitBlockers: TransferBlocker[];
+    departureWindow: NonNullable<MaintenanceTransferCardsResult['skipped'][number]['departureWindow']> | null;
   };
   function newTally(): RejectTally {
     return {
       noPath: 0, facilityBusy: 0, junctionBusy: 0, noTime: 0, noPathMissingTime: 0, missingEdges: [],
       junctionDetail: null, noPathDetail: null, facilityDetail: null, facilityBlockers: [], junctionBlockers: [],
+      limitBlockers: [], departureWindow: null,
     };
   }
   /** 候選到不了：計數，並寫下缺的是哪一段（沒有路徑或沒有行駛時間，含起終點） */
@@ -1056,7 +1084,7 @@ export function insertMaintenanceTransferCards(args: {
     tally.facilityBusy += 1;
     const blocker = lastBlocker;
     if (!blocker) return;
-    tally.facilityBlockers.push(blocker);
+    tally.facilityBlockers.push({ ...blocker, adjustable: blocker.adjustable ?? Boolean(blocker.blockingBlockId) });
     tally.facilityDetail ??= describeBlocker(blocker);
   }
   /** 組出「撞在哪、想幾點過、有多少挪動空間、誰擋著」 */
@@ -1253,6 +1281,8 @@ export function insertMaintenanceTransferCards(args: {
         if (tally.junctionBlockers.some((item) => item.blockingBlockId === booking.owner!.blockId)) continue;
         tally.junctionBlockers.push({
           kind: 'junction',
+          role: 'junction',
+          adjustable: true,
           nodeId: booking.owner.facilityNodeId,
           junctionNodeId: point.nodeId,
           blockingRow: booking.timelineRow,
@@ -1267,9 +1297,21 @@ export function insertMaintenanceTransferCards(args: {
     }
   }
   /** 失敗紀錄的擋路者：設施被佔的與轉折點被訂走的一起交出去 */
-  function blockersOf(tally: RejectTally): { blockers?: TransferBlocker[] } {
-    const all = [...tally.facilityBlockers, ...tally.junctionBlockers];
-    return all.length > 0 ? { blockers: all.slice(0, 8) } : {};
+  function blockersOf(tally: RejectTally): {
+    blockers?: TransferBlocker[];
+    departureWindow?: NonNullable<MaintenanceTransferCardsResult['skipped'][number]['departureWindow']>;
+  } {
+    const seen = new Set<string>();
+    const all = [...tally.limitBlockers, ...tally.junctionBlockers, ...tally.facilityBlockers].filter((item) => {
+      const key = `${item.role ?? item.kind}|${item.blockingBlockId ?? item.blockingRow}|${item.nodeId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return {
+      ...(all.length > 0 ? { blockers: all.slice(0, 12) } : {}),
+      ...(tally.departureWindow ? { departureWindow: tally.departureWindow } : {}),
+    };
   }
 
   /**
@@ -2317,9 +2359,12 @@ export function insertMaintenanceTransferCards(args: {
     let transferReservation: Array<{ nodeId: string; instant: number }> | null = null;
     // 先找守交接間隔的候選；全滅才退一步只求排得出移動（缺移動比交接不足更糟，
     // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋發布）
+    /** 守交接間隔那一輪的淘汰紀錄：擋路者與時間窗照完整安全規則回報，不用放寬後那一輪的 */
+    let strictTally: RejectTally | null = null;
     for (const enforceHandover of [true, false]) {
       handoverEnforced = enforceHandover;
       tally = newTally();
+      if (enforceHandover) strictTally = tally;
       for (const exitFacility of exitFacilities) {
         for (const entryFacility of entryFacilities) {
           const exitAreaId = facilityAreaId.get(exitFacility.id);
@@ -2477,6 +2522,9 @@ export function insertMaintenanceTransferCards(args: {
             // 只有我為了閃避而多留時，才不能留到擋住別人已排好的進格
             && (shift <= 0 || handoverEdgeIsClear(exitFacility.id, timeline.row, exitStayEndAt(shift), 'leaving'));
           let maxShift = Math.max(0, laterLatestStartSecond - baseArriveSecond);
+          /** 最晚離開被什麼限制：後一段要留下作業時間（固定規則），或原格下一台要進來（可重排） */
+          let latestReason = `後一段「${later.label}」要留下作業時間，最晚 ${formatSecondOfDay(laterLatestStartSecond)} 開始`;
+          let latestFixed = true;
           if (maxShift > 0 && !exitFacilityFreeAt(maxShift)) {
             let free = 0;
             let busy = maxShift;
@@ -2485,7 +2533,26 @@ export function insertMaintenanceTransferCards(args: {
               if (exitFacilityFreeAt(mid)) free = mid; else busy = mid;
             }
             maxShift = Math.floor(free);
+            // 可延後範圍是被「原格下一台要進來」縮小的：那一台也要交給搜尋，不能只報最後撞到的轉折點
+            exitFacilityFreeAt(busy);
+            const limiter = lastBlocker as TransferBlocker | null;
+            if (limiter) {
+              tally.limitBlockers.push({ ...limiter, role: 'origin-next-occupant', adjustable: Boolean(limiter.blockingBlockId) });
+              latestReason = `原格「${exitFacility.label || exitFacility.id}」`
+                + `時間線 ${limiter.blockingRow} 要進來（${formatSecondOfDay(limiter.occupiedFrom)}），交接要隔 ${collisionBufferSeconds} 秒`;
+              latestFixed = false;
+            }
           }
+          tally.departureWindow ??= {
+            earliestSecond: candidateDepartSecond,
+            earliestReason: isWorkYardTaskType(earlier.taskType)
+              ? `「${earlier.label}」是作業，做滿才走（不截尾）`
+              : `「${earlier.label}」至少留一個刻度`,
+            earliestFixed: true,
+            latestSecond: candidateDepartSecond + maxShift,
+            latestReason,
+            latestFixed,
+          };
           // 一秒都不挪就已經佔到別人的格子——這組設施不能用，換下一組
           if (!exitFacilityFreeAt(0)) { tallyFacilityBusy(tally); continue; }
           const entryFacilityFreeAt = (shift: number) => {
@@ -2632,7 +2699,7 @@ export function insertMaintenanceTransferCards(args: {
               + '但佔完之後「' + later.label + '」會沒有工作時間（整備不能歸零）'
             : ''),
         ...(transferReservation ? { junctionReservation: transferReservation } : {}),
-        ...blockersOf(tally),
+        ...blockersOf(strictTally ?? tally),
         ...dataGapFields(tally),
       });
       return;

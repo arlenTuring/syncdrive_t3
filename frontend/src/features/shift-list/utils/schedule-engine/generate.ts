@@ -1623,7 +1623,8 @@ function generateShiftScheduleOnce(
     // 必要轉場排不出、擋它的是別張可以換位置的卡：那張卡也一起換
     for (const skip of candidate.post.transfer.skipped) {
       if (skip.necessity === 'not_needed') continue;
-      for (const blocker of skip.blockers ?? []) add(blocker.blockingBlockId, blocker.nodeId);
+      // 只請引擎排出來、可以重排的擋路者換位置（原格下一台進入者、轉折點上的移動、目的格佔用者）
+      for (const blocker of skip.blockers ?? []) if (blocker.adjustable !== false) add(blocker.blockingBlockId, blocker.nodeId);
     }
     // 設施格被兩台車同時佔用：兩邊可以換位置的都試著請它換
     const facilityOf = new Map(candidate.post.timelines.flatMap((timeline) => timeline.blocks)
@@ -1768,6 +1769,7 @@ function generateShiftScheduleOnce(
         reason: skip.reason,
         necessity: skip.necessity ?? 'required',
         ...(skip.blockers ? { blockers: skip.blockers } : {}),
+        ...(skip.departureWindow ? { departureWindow: skip.departureWindow } : {}),
         ...(skip.missingTravelTimeEdges ? { missingTravelTimeEdges: skip.missingTravelTimeEdges } : {}),
         ...(skip.onlyMissingData ? { onlyMissingData: true } : {}),
         ...(skip.blockId && transferSearchLog.has(skip.blockId)

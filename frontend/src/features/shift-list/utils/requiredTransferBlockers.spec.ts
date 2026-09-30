@@ -90,6 +90,21 @@ describe('必要轉場被別列車的移動佔住轉折點：回報是誰擋的�
     );
   });
 
+  it('可延後範圍被「原格下一台要進來」縮小：那一台也交給搜尋，時間窗寫明哪一邊是固定規則、哪一邊可重排', () => {
+    const { skip } = run();
+    const limiter = (skip?.blockers ?? []).find((item) => item.role === 'origin-next-occupant');
+    assert.ok(limiter, '先前只報最後撞到的轉折點，縮小範圍的那一台沒有交出去');
+    assert.equal(limiter.blockingBlockId, 'service-3');
+    assert.equal(limiter.nodeId, 'E1');
+    assert.equal(limiter.adjustable, true);
+    const window = skip!.departureWindow!;
+    assert.equal(window.earliestSecond, 430 * 60, '充電做滿才走');
+    assert.equal(window.earliestFixed, true, '作業不截尾是使用者固定規則');
+    assert.ok(window.latestSecond < 431.5 * 60 - 59, '最晚要在時間線 3 進 E1 前讓出（含交接間隔）');
+    assert.equal(window.latestFixed, false, '原格下一台進入者是引擎排出來的，可以重排');
+    assert.match(window.latestReason, /時間線 3 要進來/);
+  });
+
   it('請時間線 3 的保養不要停 E1（改走 G2 去 E5）：G 與 E1 都讓出來，時間線 1 的轉場排得出來', () => {
     const { plan, skip } = run([{ blockId: 'service-3', nodeId: 'E1' }]);
     assert.equal(skip, undefined, skip?.reason);
