@@ -343,6 +343,8 @@ export type FeasibilityViolationCode =
   | 'ROTATION_CYCLE_INCOMPLETE'
   /** 保養／行檢後調度無法接到首班起點站 */
   | 'MAINTENANCE_DISPATCH_UNREACHABLE'
+  /** 整備後插入的調度載客（含從路線中途加入）：從哪裡出來、在哪一站加入、服務哪些站、接哪一班（資訊性，DISPATCH-05） */
+  | 'ENTRY_SERVICE_INSERTED'
   /** 站位讓渡：已插入次要邊讓車先去別站等，避開共用站位碰撞（資訊性） */
   | 'STATION_BERTH_RELIEF_INSERTED'
   /** 整備結束後的第一段班次，起點站不是該整備設施的出場站——車不在那裡，開不了 */

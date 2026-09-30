@@ -61,6 +61,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   ROUTE_ROTATION_OVER_TURNAROUND: '路線組合超過折返時限',
   ROTATION_CYCLE_INCOMPLETE: '未跑完一整輪',
   MAINTENANCE_DISPATCH_UNREACHABLE: '略過進場載客',
+  ENTRY_SERVICE_INSERTED: '整備後已插入調度載客',
   STATION_BERTH_RELIEF_INSERTED: '已安排替代路線讓出站位',
   YARD_EXIT_STATION_MISMATCH: '整備出場站接不上',
   MAINTENANCE_TRANSFER_UNRESOLVED: '整備轉場卡排不出來',
@@ -120,6 +121,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   ROUTE_ROTATION_OVER_TURNAROUND: { id: 's3', label: '§3 完整流水線' },
   ROTATION_CYCLE_INCOMPLETE: { id: 's1', label: '§1 核心原則（服從順序）' },
   MAINTENANCE_DISPATCH_UNREACHABLE: { id: 's10', label: '§10 進場載客' },
+  ENTRY_SERVICE_INSERTED: { id: 's10', label: '§10 進場載客' },
   STATION_BERTH_RELIEF_INSERTED: { id: 's8', label: '§8 站位約束決策' },
   YARD_EXIT_STATION_MISMATCH: { id: 's10', label: '§10 整備後的調度營運班次' },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: 's10', label: '§10 整備後的調度營運班次' },
@@ -295,6 +297,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'limit',
     guidance:
       '引擎寧願撤未成輪去程，也不硬塞違規回程。可試：加大整備切入餘裕、加列數、略降恢復／換線，或放寬該時段班距。',
+  },
+  ENTRY_SERVICE_INSERTED: {
+    kind: 'policy',
+    guidance:
+      '整備做完，車停的出場站不是下一班起點，所以插了一串載客班次把車送過去。訊息寫出從哪一段整備出來、在哪一站加入（可能是路線中途）、服務哪些站、接哪一班；加入站之前的站沒有服務。點選可跳到那張卡。',
   },
   MAINTENANCE_DISPATCH_UNREACHABLE: {
     kind: 'policy',
