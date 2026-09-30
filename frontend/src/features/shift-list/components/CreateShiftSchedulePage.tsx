@@ -38,6 +38,8 @@ import {
 import { StepShiftActionSettings } from './StepShiftActionSettings';
 import { StepShiftMaintenanceTask } from './StepShiftMaintenanceTask';
 import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
+import { ScheduleDataCheckPanel } from './ScheduleDataCheckPanel';
+import { useScheduleDataCheck } from '../hooks/useScheduleDataCheck';
 import { StepShiftRouteGroups } from './StepShiftRouteGroups';
 import { StepShiftScheduleAdjust } from './StepShiftScheduleAdjust';
 import { StepShiftSchedulePreview } from './StepShiftSchedulePreview';
@@ -538,12 +540,21 @@ export function CreateShiftSchedulePage({
     return anchors?.listedThroughCycles?.find((cycle) => cycle.id === preferred)?.minCycleSeconds ?? null;
   }, [draft.routeGroups.throughAnchors]);
 
+  /** 第 4 步：選圖／改路線當下檢查必要資料（MAP-02～04）；沒過不能往下 */
+  const dataCheck = useScheduleDataCheck({
+    draft,
+    active: draft.currentStep === 4 && draft.creationMode === 'parametric' && hydrated,
+    onRecord: (record) =>
+      updateDraft((prev) => ({ ...prev, routeGroups: { ...prev.routeGroups, dataCheck: record } })),
+  });
+
   const canGoNext = useMemo(() => {
     if (loading || loadError) return false;
     const nameUnique = nameUniqueState === 'unique';
     if (draft.currentStep === 3 && draft.creationMode === 'parametric' && allowanceBlockingCount > 0) return false;
+    if (draft.currentStep === 4 && draft.creationMode === 'parametric' && !dataCheck.passed) return false;
     return isShiftScheduleStepComplete(draft, nameUnique, turnaroundLimitSeconds);
-  }, [allowanceBlockingCount, draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
+  }, [allowanceBlockingCount, dataCheck.passed, draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
 
   const isScheduleInvalidated = useMemo(() => {
     // 手動製作不走引擎重新生成；改設定後不鎖步驟、不顯示黃框失效提示
@@ -745,6 +756,11 @@ export function CreateShiftSchedulePage({
                     }
                   />
                 )}
+                {draft.currentStep === 4 && draft.creationMode === 'parametric' ? (
+                  <div className="mt-4 shrink-0">
+                    <ScheduleDataCheckPanel {...dataCheck} />
+                  </div>
+                ) : null}
                 {draft.currentStep === 4 && draft.creationMode === 'parametric' && !draft.maintenanceTask.skipped && draft.maintenanceTask.taskId ? (
                   <div className="mt-4 shrink-0">
                     <YardEntryAllowancePanel
