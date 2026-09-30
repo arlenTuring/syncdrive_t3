@@ -1,15 +1,42 @@
 import { Loader2 } from 'lucide-react';
 import type { ScheduleDataCheckState } from '../hooks/useScheduleDataCheck';
 
-/** 路線群組的必要資料檢查結果（白皮書 MAP-02～04）；狀態由 useScheduleDataCheck 提供 */
+/**
+ * 路線群組的必要資料檢查結果（白皮書 MAP-02～04）；狀態由 useScheduleDataCheck 提供。
+ *
+ * 分兩段顯示，同一次檢查、同一支檢查函式（scheduleInputDataCheck.ts）的結果依 scope 分開：
+ * 1. 地圖本身（選圖當下就看得到）：路網拓樸、路段、路段端點。
+ * 2. 本次選取（路線、整備、模板選好之後）：路線站點在路網上、整備設施在路網上、本次必要行駛時間。
+ */
 type Props = ScheduleDataCheckState;
 
 export function ScheduleDataCheckPanel({ running, error, record, recheck }: Props) {
+  const mapIssues = record?.issues.filter((issue) => issue.scope === 'map') ?? [];
+  const selectionIssues = record?.issues.filter((issue) => issue.scope !== 'map') ?? [];
   const tone = running || (!record && !error)
     ? 'border-zinc-700/80 bg-zinc-900/40 text-zinc-300'
     : error || !record?.ok
       ? 'border-red-500/50 bg-red-500/10 text-red-200'
       : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+  const stage = (title: string, issues: Array<{ message: string }>, pending?: string) => (
+    <div className="mt-1.5">
+      <span className="font-medium">{title}：</span>
+      {pending ? (
+        <span className="text-zinc-400">{pending}</span>
+      ) : issues.length === 0 ? (
+        <span>通過</span>
+      ) : (
+        <>
+          <span>{issues.length} 項要補齊</span>
+          <ul className="mt-0.5 list-disc space-y-0.5 pl-5">
+            {issues.map((issue, index) => (
+              <li key={index}>{issue.message}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
   return (
     <div className={`rounded-md border px-3 py-2 text-xs leading-relaxed ${tone}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -26,7 +53,7 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck }: Prop
         ) : record.ok ? (
           <span>通過（地圖「{record.mapId}」，{new Date(record.checkedAt).toLocaleString()} 檢查）</span>
         ) : (
-          <span>未通過：{record.issues.length} 項要補齊，補好之前不能往下一步</span>
+          <span>未通過，補好之前不能往下一步</span>
         )}
         <button
           type="button"
@@ -37,12 +64,15 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck }: Prop
           重新檢查
         </button>
       </div>
-      {!running && record && !record.ok ? (
-        <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
-          {record.issues.map((issue, index) => (
-            <li key={index}>{issue.message}</li>
-          ))}
-        </ul>
+      {!running && record ? (
+        <>
+          {stage('1. 地圖本身', mapIssues)}
+          {stage(
+            '2. 本次選取的路線與整備',
+            selectionIssues,
+            mapIssues.length > 0 ? '地圖本身通過後才檢查' : undefined,
+          )}
+        </>
       ) : null}
       {!running && record?.ok ? (
         <p className="mt-1 text-emerald-300/80">
