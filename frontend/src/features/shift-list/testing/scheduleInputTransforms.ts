@@ -119,6 +119,8 @@ const ID_KEY = /(^id$|Id$|Ids$|^from$|^to$|NodeId|StationId|InstanceId)/;
 /** 拓樸／軌道接點裡指向節點的欄位（名字不帶 Id） */
 const REF_KEY = /^(start|end|waypointCode|rt|rb|lb|lt|up|down|stationIds)$/;
 const COMPOSITE_KEY = /(id$|Id$|Ids$|Fingerprint$|Key$|key$)/;
+/** 組合 id 的分隔字元（見 routeRelationThroughCycles.ts 的路線組合 id） */
+const COMPOSITE_SEPARATOR = '>';
 /**
  * 列舉值欄位：值是程式認得的固定字，不是使用者取的名字。即使剛好跟某個名字同字
  * （地圖上真的有物件就叫「DockingPoint」），也絕對不能改。
@@ -152,6 +154,12 @@ function collect(value: unknown, key: string, ids: Set<string>, names: Set<strin
     return;
   }
   if (typeof value !== 'string') return;
+  /**
+   * 由別的識別碼串成的組合 id（路線組合「起點站>路線…>終點站」）不是獨立的識別碼：引擎每次用
+   * 目前的 id 重新串一次再比對。整串換成一個代號，改名後就對不上、默默改用別的組合——
+   * 那是測試工具造成的差異，不是引擎依名稱做決策。組合 id 交給下面的逐段替換（COMPOSITE_KEY）。
+   */
+  if (value.includes(COMPOSITE_SEPARATOR)) return;
   if (ID_KEY.test(key) || key === 'stationIds') ids.add(value);
   if (NAME_KEY.test(key)) names.add(value);
 }
