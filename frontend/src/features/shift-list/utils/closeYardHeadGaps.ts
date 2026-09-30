@@ -62,6 +62,12 @@ function vehicleEndsAtFacility(block: GeneratedScheduleBlock): string | null {
   return facilityOf(block);
 }
 
+/** 同一刻結束的卡誰在後：整備做完 → 出廠 → 入廠（入廠才把車送到下一格） */
+function sameInstantOrder(block: GeneratedScheduleBlock): number {
+  if (block.taskType !== 'dispatch') return 0;
+  return block.source === 'yard_exit_move' ? 1 : 2;
+}
+
 export function closeYardHeadGaps(args: {
   timelines: GeneratedScheduleTimeline[];
 }): { timelines: GeneratedScheduleTimeline[]; closed: number; secondsRecovered: number } {
@@ -95,43 +101,52 @@ export function closeYardHeadGaps(args: {
   let secondsRecovered = 0;
 
   for (const timeline of timelines) {
-    const sorted = [...timeline.blocks].sort(
-      (a, b) => a.plannedStartMinute - b.plannedStartMinute,
-    );
-    for (let index = 1; index < sorted.length; index += 1) {
-      const yard = sorted[index]!;
+    for (const yard of timeline.blocks) {
       if (!isYardBlock(yard)) continue;
       if (isWorkYardTaskType(yard.taskType)) continue;
       const nodeId = facilityOf(yard);
       if (!nodeId) continue;
 
       /**
-       * 找前一張<strong>有長度</strong>的卡。整備間轉場的出廠／入廠卡在同一區域內
-       * 是零長度的（M2 → H1 不用跑），夾在中間會讓「前一張」看起來是那張零長度卡，
-       * 空白就永遠關不掉。
+       * 前一張＝在待命開始前、<strong>最晚結束</strong>的那張卡，也就是車開進待命前最後在做的事。
+       *
+       * 不能照開始時刻排序取鄰居：整備間轉場為了閃轉折點會把零長度的出廠／入廠卡往後挪，
+       * 挪到跟待命同一刻開始（例：充電 16:00 結束、E2 → E4 轉場挪到 16:01、待命也是 16:01）。
+       * 同一刻開始的卡排序不穩定，待命排在轉場卡前面時，「前一張」會變成充電，待命就被拉回
+       * 16:00——車 16:01 才離開 E2，班表卻說它 16:00 已經在 E4 待命（2026-09-30 重播實錄，
+       * VEHICLE_LOCATION_DISCONTINUITY）。
+       *
+       * 同一刻開始的零長度移動卡算在待命之前：它在那一刻就把車送到了。
        */
-      let previousIndex = index - 1;
-      const zeroLength: GeneratedScheduleBlock[] = [];
-      while (
-        previousIndex >= 0
-        && sorted[previousIndex]!.plannedEndMinute - sorted[previousIndex]!.plannedStartMinute
-          <= 1e-9
-      ) {
-        zeroLength.push(sorted[previousIndex]!);
-        previousIndex -= 1;
-      }
-      if (previousIndex < 0) continue;
-      const previous = sorted[previousIndex]!;
+      const previous = timeline.blocks
+        .filter(
+          (block) =>
+            block !== yard
+            && (block.plannedStartMinute < yard.plannedStartMinute - 1e-9
+              || (block.taskType === 'dispatch'
+                && Math.abs(block.plannedStartMinute - yard.plannedStartMinute) <= 1e-9
+                && block.plannedEndMinute - block.plannedStartMinute <= 1e-9)),
+        )
+        .reduce<GeneratedScheduleBlock | null>(
+          (latest, block) =>
+            latest == null
+            || block.plannedEndMinute > latest.plannedEndMinute + 1e-9
+            || (Math.abs(block.plannedEndMinute - latest.plannedEndMinute) <= 1e-9
+              && sameInstantOrder(block) > sameInstantOrder(latest))
+              ? block
+              : latest,
+          null,
+        );
+      if (!previous) continue;
       const gapMinutes = yard.plannedStartMinute - previous.plannedEndMinute;
       if (gapMinutes <= 1 / 60) continue;
       /**
-       * 車必須已經在廠裡，否則那段空白是還在路上或還在站上，拉過去等於瞬間移動。
-       * 兩種算數：前一張把車送到了這一格，或前一張本身就是同一列的另一段整備
-       * （中間只隔著零長度的轉場卡，車根本沒離開廠區）。
+       * 車必須已經在這一格裡：前一張把車送到了這一格（移動卡的目的地），或前一張本身
+       * 就停在這一格。停在別格（中間沒有移動卡）就是車還沒過來，拉過去等於瞬間移動
+       * ——先前「只要還在廠區就算」的放寬正是那樣；移動卡的時刻由轉場搜尋定案
+       * （含閃轉折點的位移），這裡只把待命的頭接到車真正抵達的那一刻，不動移動卡。
        */
-      const parkedHere = vehicleEndsAtFacility(previous) === nodeId;
-      const stillInYard = isYardBlock(previous) && facilityOf(previous) != null;
-      if (!parkedHere && !stillInYard) continue;
+      if (vehicleEndsAtFacility(previous) !== nodeId) continue;
 
       const newStart = previous.plannedEndMinute;
       const taken = bookings.some(
@@ -151,14 +166,6 @@ export function closeYardHeadGaps(args: {
 
       const booking = bookings.find((item) => item.blockId === yard.id);
       if (booking) booking.start = newStart;
-      // 零長度的轉場卡跟著整備的頭一起往前移，維持「出廠→入廠→整備」的相鄰關係
-      for (const card of zeroLength) {
-        card.plannedStartMinute = newStart;
-        card.plannedEndMinute = newStart;
-        if (card.anchorStartMinute != null) card.anchorStartMinute = newStart;
-        const cardBooking = bookings.find((item) => item.blockId === card.id);
-        if (cardBooking) { cardBooking.start = newStart; cardBooking.end = newStart; }
-      }
       if (yard.anchorStartMinute != null) {
         yard.anchorStartMinute -= yard.plannedStartMinute - newStart;
       }
