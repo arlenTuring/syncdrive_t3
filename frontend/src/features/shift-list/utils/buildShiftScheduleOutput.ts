@@ -1,7 +1,7 @@
 import { fetchMaintenanceTaskDetail } from '../../maintenance-tasks/api/maintenanceTasksApi';
 import type { ShiftScheduleCreateDraft } from '../types/create';
 import { buildRouteGroupsParamsFingerprint } from './schedule-engine/physics';
-import { runShiftScheduleEngineForDraft } from './runShiftScheduleEngineForDraft';
+import { runShiftScheduleEngineForDraft, type RunShiftScheduleEngineOptions } from './runShiftScheduleEngineForDraft';
 import {
   CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION,
   type ShiftScheduleMaintenanceTaskBinding,
@@ -72,7 +72,7 @@ export async function buildMaintenanceTaskBinding(
 
 export async function buildShiftScheduleStoredOutput(
   draft: ShiftScheduleCreateDraft,
-  options: { shiftId?: string; backendUrl?: string } = {},
+  options: RunShiftScheduleEngineOptions = {},
 ): Promise<ShiftScheduleStoredOutput> {
   if (draft.creationMode === 'manual') {
     const [rowCount, maintenanceTaskBinding] = await Promise.all([

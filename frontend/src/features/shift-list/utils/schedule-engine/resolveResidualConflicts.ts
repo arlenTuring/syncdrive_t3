@@ -8,6 +8,7 @@ import {
   resolveRouteForBlock,
 } from '../buildBlockStationDepartures';
 import { rebuildRowHoldCards } from '../fillYardHoldGaps';
+import { isWorkYardTaskType } from '../yardWorkMinimum';
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
@@ -192,6 +193,7 @@ function tripShapeIsLegal(
   endMinute: number,
   ctx: PlanEvaluationContext,
   addSlackSeconds = 0,
+  slackStationIndex?: number,
 ): boolean {
   const startSecond = minuteToSecond(startMinute);
   const endSecond = minuteToSecond(endMinute);
@@ -199,18 +201,18 @@ function tripShapeIsLegal(
   const route = resolveRouteForBlock(block, ctx.selectedRoutes);
   if (!route) return false;
   const bounds = resolveBlockDurationBounds(
-    withAddedSlack({ ...block, plannedStartMinute: startMinute, plannedEndMinute: endMinute }, addSlackSeconds),
+    withAddedSlack({ ...block, plannedStartMinute: startMinute, plannedEndMinute: endMinute }, addSlackSeconds, slackStationIndex),
     route,
   );
   const duration = endSecond - startSecond;
   if (!bounds || duration < bounds.minSeconds - 1e-6) return false;
   // 拉長也有上限：原本就比上限長的（例如手動製作）只准不再變長
   const originalDuration = minuteToSecond(block.plannedEndMinute - block.plannedStartMinute)
-    + addSlackSeconds * countSlackStations(block, ctx);
+    + addSlackSeconds * (slackStationIndex != null ? 1 : countSlackStations(block, ctx));
   return duration <= Math.max(bounds.maxSeconds, originalDuration) + 1e-6;
 }
 
-function withAddedSlack(block: GeneratedScheduleBlock, addSlackSeconds: number): GeneratedScheduleBlock {
+function withAddedSlack(block: GeneratedScheduleBlock, addSlackSeconds: number, stationIndex?: number): GeneratedScheduleBlock {
   if (addSlackSeconds <= 0) return block;
   const previous = block.dwellSlackAdjustment;
   return {
@@ -223,6 +225,7 @@ function withAddedSlack(block: GeneratedScheduleBlock, addSlackSeconds: number):
         blockBefore: { startMinute: block.plannedStartMinute, endMinute: block.plannedEndMinute },
       }),
       addedSeconds: (previous?.addedSeconds ?? 0) + addSlackSeconds,
+      ...(stationIndex != null ? { stationIndex } : {}),
     },
   };
 }
@@ -242,8 +245,9 @@ type TripCandidate = {
     blockId: string;
     toStartMinute: number;
     toEndMinute: number;
-    /** 這一趟再增加的靠站緩衝（秒，每個適用站都加） */
+    /** 這一趟再增加的等待（秒），只加在 slackStationIndex 那一站（白皮書 GEN-03） */
     addSlackSeconds?: number;
+    slackStationIndex?: number;
   }>;
   description: string;
   /** 增加緩衝時：為了哪一筆衝突（寫進調整紀錄） */
@@ -265,6 +269,7 @@ function buildShiftCandidate(
   ctx: PlanEvaluationContext,
   description: string,
   addSlackSeconds = 0,
+  slackStationIndex?: number,
 ): TripCandidate | null {
   const tasks = rowTasks(timelines, trip.timelineRow);
   const index = tasks.findIndex((block) => block.id === trip.id);
@@ -272,7 +277,7 @@ function buildShiftCandidate(
   const changes: TripCandidate['changes'] = [];
   const toStart = trip.plannedStartMinute + startShiftMinutes;
   const toEnd = trip.plannedEndMinute + endShiftMinutes;
-  if (!tripShapeIsLegal(trip, toStart, toEnd, ctx, addSlackSeconds)) return null;
+  if (!tripShapeIsLegal(trip, toStart, toEnd, ctx, addSlackSeconds, slackStationIndex)) return null;
   const prev = index > 0 ? tasks[index - 1]! : null;
   if (prev) {
     const gap = interTripGapSeconds(prev, trip, ctx.selectedRoutes, ctx.minimumRecoveryTimeSeconds);
@@ -311,7 +316,7 @@ function buildShiftCandidate(
     blockId: trip.id,
     toStartMinute: toStart,
     toEndMinute: toEnd,
-    ...(addSlackSeconds > 0 ? { addSlackSeconds } : {}),
+    ...(addSlackSeconds > 0 ? { addSlackSeconds, ...(slackStationIndex != null ? { slackStationIndex } : {}) } : {}),
   });
 
   /*
@@ -319,8 +324,9 @@ function buildShiftCandidate(
    *
    * 只挪班次、不挪入廠卡的話，中間的空檔會被暫停卡補上——車照樣停在站位上等到原本的入廠
    * 時刻，站位佔用一秒都沒少，「整趟早 N 秒」這類候選永遠解不了衝突（2026-09-28 重播：
-   * 時間線 2 早 80 秒，衝突仍在）。進廠後的整備從車到格子那一刻開始、結束不動（跟
-   * closeYardHeadGaps 同一條規則）；設施那段時間空不空由整張班表的驗證判定。
+   * 時間線 2 早 80 秒，衝突仍在）。作業類整備照原訂時刻開始，提早到的那段是在格子裡等待
+   * （格位從抵達就算佔用，白皮書 YARD-07）；待命與暫停放本身就是等待，跟著提早開始。
+   * 設施那段時間空不空由整張班表的驗證判定。
    */
   const afterTrip = tasks[index + 1];
   if (endShiftMinutes < 0 && afterTrip?.source === 'yard_entry_move') {
@@ -332,7 +338,8 @@ function buildShiftCandidate(
     if (
       inYard
       && inYard.plannedStartMinute > entryEnd + 1e-9
-      && (YARD_STAY_TASK_TYPES.has(inYard.taskType) || inYard.id.startsWith('berthpark-early-stay-'))
+      && ((YARD_STAY_TASK_TYPES.has(inYard.taskType) && !isWorkYardTaskType(inYard.taskType))
+        || inYard.id.startsWith('berthpark-early-stay-'))
     ) {
       changes.push({ blockId: inYard.id, toStartMinute: entryEnd, toEndMinute: inYard.plannedEndMinute });
     }
@@ -443,9 +450,10 @@ function stationConflictCandidates(
   }
 
   /**
-   * 增加前方停靠緩衝：讓某一方<strong>晚一點到</strong>衝突的那一站，發車不動。
-   * 只有這一站之前有適用緩衝的站才做得到；每站增加量取能補上差額的最小值（對齊刻度），
-   * 所有適用站都會加（不能假裝只改一站），卡尾跟著延長、後面班次只在空檔吸收不了時推。
+   * 在前方<strong>指定一站</strong>多等一下：讓某一方晚一點到衝突的那一站，發車不動（白皮書 GEN-03）。
+   * 只加在衝突站之前、最近一個有停靠的站；差額一次加在那一站（對齊刻度），其他站不動。
+   * 卡尾跟著延長，後面班次只在空檔吸收不了時才推；行駛不會比最快更快（合法時長照舊檢查）。
+   * 同一趟已經在別站加過等待的不再換站加，避免一趟被分散加在好幾站。
    */
   for (const occupancy of [collision.earlier, collision.later]) {
     const trip = blockById.get(occupancy.blockId);
@@ -460,25 +468,29 @@ function stationConflictCandidates(
         && Math.abs(stop.arrivalMinute - occupancy.startMinute) < 1e-6,
     );
     if (targetIndex <= 0) continue;
-    const applicable = inputs.stations.map((station, index) => applyStationDwellWithSlack(station, 1, index) > 0);
-    const before = applicable.slice(0, targetIndex).filter(Boolean).length;
-    const total = applicable.filter(Boolean).length;
-    if (before === 0) continue;
+    let holdIndex = -1;
+    for (let index = targetIndex - 1; index >= 1; index -= 1) {
+      if (applyStationDwellWithSlack(inputs.stations[index]!, 1, index) > 0) { holdIndex = index; break; }
+    }
+    if (holdIndex < 0) continue;
+    const existingIndex = trip.dwellSlackAdjustment?.stationIndex;
+    if (trip.dwellSlackAdjustment && (existingIndex == null || existingIndex !== holdIndex)) continue;
     const counterpart = occupancy === collision.earlier ? collision.later : collision.earlier;
     const deficit = occupancy === collision.later
       ? minuteToSecond(collision.earlier.protectedUntilMinute - collision.later.startMinute)
       : minuteToSecond(collision.later.protectedUntilMinute - collision.earlier.startMinute);
     if (deficit <= 1e-6) continue;
-    const perStation = snapUpToClockAlignSeconds(deficit / before);
-    const endShift = (perStation * total) / 60;
+    const addSeconds = snapUpToClockAlignSeconds(deficit);
+    const holdStation = stops[holdIndex]!;
     const candidate = buildShiftCandidate(
       timelines,
       trip,
       0,
-      endShift,
+      addSeconds / 60,
       ctx,
-      `增加靠站緩衝每站 ${perStation} 秒（${total} 站適用），晚 ${perStation * before} 秒到「${occupancy.stationName}」`,
-      perStation,
+      `在「${holdStation.stationName}」多停 ${addSeconds} 秒，晚 ${addSeconds} 秒到「${occupancy.stationName}」`,
+      addSeconds,
+      holdIndex,
     );
     if (!candidate) continue;
     candidate.slackReason = {
@@ -520,9 +532,12 @@ function buildSlackAdjustmentRecord(
   const afterStops = buildBlockStationDepartures(after, route);
   const inputs = resolveBlockStationDwellInputs(after, route);
   const affectedStops: DwellSlackAdjustment['affectedStops'] = [];
+  const fromIndex = after.dwellSlackAdjustment?.stationIndex;
   for (const [index, stop] of afterStops.entries()) {
     const station = inputs?.stations[index];
     if (!station || applyStationDwellWithSlack(station, 1, index) <= 0) continue;
+    // 只加在指定站時，列出那一站與之後受影響的站
+    if (fromIndex != null && index < fromIndex) continue;
     const previous = beforeStops[index];
     affectedStops.push({
       order: stop.order,
@@ -540,6 +555,7 @@ function buildSlackAdjustmentRecord(
   return {
     baseSlackSeconds: breakdown.baseSlackSeconds,
     addedSeconds: breakdown.addedSeconds,
+    ...(fromIndex != null ? { stationIndex: fromIndex } : {}),
     reason,
     affectedStops,
     blockBefore: before.dwellSlackAdjustment?.blockBefore
@@ -736,7 +752,7 @@ function applyCandidate(
     block.plannedStartMinute = change.toStartMinute;
     block.plannedEndMinute = change.toEndMinute;
     if (change.addSlackSeconds && candidate.slackReason) {
-      const withSlack = withAddedSlack(block, change.addSlackSeconds);
+      const withSlack = withAddedSlack(block, change.addSlackSeconds, change.slackStationIndex);
       block.dwellSlackAdjustment = buildSlackAdjustmentRecord(before, withSlack, candidate.slackReason, ctx);
     } else {
       const reason = candidate.retimeReason ?? candidate.slackReason;

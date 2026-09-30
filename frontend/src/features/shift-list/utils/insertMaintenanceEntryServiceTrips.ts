@@ -6,6 +6,7 @@ import {
   resolveMaintenanceSectionCodeForTaskType,
 } from './maintenanceSectionCode';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
+import { buildJoinedRouteSegment } from './joinedRouteSegment';
 import type { MaintenanceFirstTripOrigin } from './maintenanceFirstTripOrigins';
 import { resolveYardPostTaskPolicy } from './maintenancePostTaskPolicy';
 import {
@@ -45,6 +46,11 @@ import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/typ
 type RouteHop = {
   route: ShiftScheduleSelectedRoute;
   durationSeconds: number;
+  /**
+   * 從路線中途加入（白皮書 DISPATCH-01～03）：route 是從這一站起算的那一段（站序已截短），
+   * 原路線在 fullRoute。只會出現在一串的第一段——車從設施出來開到這一站，之後才開始載客。
+   */
+  joinedFrom?: { fullRoute: ShiftScheduleSelectedRoute; stationIndex: number };
 };
 
 type PlacedHop = {
@@ -80,7 +86,7 @@ function listEntryChainCandidates(args: {
   originStationId: string;
   exitStationIds: Set<string>;
   selectedRoutes: ShiftScheduleSelectedRoute[];
-  /** 最多幾段；充電／待命限 1 段，其餘不限（見呼叫端說明） */
+  /** 呼叫端明確要求的段數上限；沒給就不限（不依整備任務名稱區分，白皮書 DISPATCH-04） */
   maxHops?: number;
 }): RouteHop[][] {
   const { originStationId, exitStationIds, selectedRoutes } = args;
@@ -96,6 +102,17 @@ function listEntryChainCandidates(args: {
     const list = routesByEnd.get(to) ?? [];
     list.push({ route, durationSeconds: run });
     routesByEnd.set(to, list);
+    // 路線中途經過出場站：可以從那一站加入，只服務之後的站（車不必先繞回路線起點）
+    route.stationIds.forEach((stationId, index) => {
+      if (index <= 0 || index >= route.stationIds.length - 1) return;
+      if (!exitStationIds.has(stationId.trim())) return;
+      const segment = buildJoinedRouteSegment(route, index);
+      const segmentRun = segment ? resolveRouteRunSeconds(segment) : null;
+      if (!segment || segmentRun == null) return;
+      const joined = routesByEnd.get(to) ?? [];
+      joined.push({ route: segment, durationSeconds: segmentRun, joinedFrom: { fullRoute: route, stationIndex: index } });
+      routesByEnd.set(to, joined);
+    });
   }
 
   const pathTo = new Map<string, RouteHop[]>([[originStationId, []]]);
@@ -111,6 +128,11 @@ function listEntryChainCandidates(args: {
       if (pathTo.has(prev)) continue;
       const path = [hop, ...suffix];
       if (path.length > hopLimit) continue;
+      // 中途加入的那一段只能是整串的第一段（前面再接別的路線，就不是「從設施出來加入」）
+      if (hop.joinedFrom) {
+        if (exitStationIds.has(prev) && prev !== originStationId) candidates.push(path);
+        continue;
+      }
       pathTo.set(prev, path);
       // 起點須為出場站，且不得是「原地 0 跳」（origin 自己）
       if (exitStationIds.has(prev) && path.length > 0 && prev !== originStationId) {
@@ -536,11 +558,15 @@ export function insertMaintenanceEntryServiceTrips(args: {
   const dispatchCapableTaskTypes = [
     'servicing', 'inspection', 'washing', 'charging', 'standby',
   ] as const;
-  const anyDispatchAllowed = dispatchCapableTaskTypes.some(
-    (taskType) =>
-      resolveYardPostTaskPolicy({ taskType, origins: firstTripOrigins, maintenanceBody })
-        .allowEntryService,
-  );
+  /**
+   * 車做完整備停在哪幾站：依這一類設施在路網上的出場站（實際位置），不依整備任務名稱決定能不能排調度載客
+   * （白皮書 DISPATCH-04）。
+   */
+  const dispatchExitStations = (taskType: string): string[] => {
+    const policy = resolveYardPostTaskPolicy({ taskType, origins: firstTripOrigins, maintenanceBody });
+    return policy.entryServiceExitStationIds.length > 0 ? policy.entryServiceExitStationIds : policy.exitStationCandidateIds;
+  };
+  const anyDispatchAllowed = dispatchCapableTaskTypes.some((taskType) => dispatchExitStations(taskType).length > 0);
   if (!anyDispatchAllowed) return timelines;
 
   const routeById = new Map(selectedRoutes.map((route) => [route.routeId, route] as const));
@@ -556,17 +582,10 @@ export function insertMaintenanceEntryServiceTrips(args: {
 
     for (let i = 0; i < sorted.length; i += 1) {
       const yard = sorted[i]!;
-      const yardPolicy = resolveYardPostTaskPolicy({
-        taskType: yard.taskType,
-        origins: firstTripOrigins,
-        maintenanceBody,
-      });
-      if (
-        yard.source !== 'template_bar'
-        || !yardPolicy.allowEntryService
-      ) {
+      if (yard.source !== 'template_bar' || !(dispatchCapableTaskTypes as readonly string[]).includes(yard.taskType)) {
         continue;
       }
+      const yardExitStationIds = dispatchExitStations(yard.taskType);
 
       // 出場站與代號都依「這一段整備是哪一種」決定：保養→M、行檢→P。
       const sectionCode = resolveMaintenanceSectionCodeForTaskType(
@@ -578,7 +597,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
       // 等於認為車可以從路網上任何一站冒出來——實際上車就停在該整備設施的出場站。
       // 行檢設施在 M、出來接 T3上行，卻因為這個退路排出「從 N2W 發車」的 PNT 班次，
       // 而那台車根本不在 N2W。查不到就<strong>不排</strong>，回報讓使用者去補設施拓樸。
-      if (yardPolicy.entryServiceExitStationIds.length === 0) {
+      if (yardExitStationIds.length === 0) {
         pushIssue(warnings, {
           code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
           severity: 'warning',
@@ -596,7 +615,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
         });
         continue;
       }
-      const exitStationIds = new Set(yardPolicy.entryServiceExitStationIds);
+      const exitStationIds = new Set(yardExitStationIds);
 
       const afterYard = findPassengerAfterContiguousYard(sorted, i);
       if (!afterYard?.passenger.routeId) continue;
@@ -688,26 +707,19 @@ export function insertMaintenanceEntryServiceTrips(args: {
       }
 
       /**
-       * <strong>充電與待命：只准一段，而且不強制插入。</strong>
+       * <strong>不依整備任務名稱區分</strong>（白皮書 DISPATCH-04）。
        *
-       * 只准一段——保養／行檢的設施離首發站遠，車要開一段路才上得了工，途中經過幾站
-       * 就順便載幾站，所以那幾種不限段數且刻意「最長優先」。充電與待命不一樣：車就停
-       * 在正線邊上，缺的只有「從這一站開到下一班發車站」那一段。硬套最長優先會挑出多段
-       * 串，而串只放得下前面幾段時車就被丟在半路——實測（2026-08-20）目標是 NT
-       * （起點 N2W下行出發），卻插進終點在 S2W 的 TS，後面的正線只好從 ST 接，整輪相位
-       * 被打亂，ROTATION_CYCLE_INCOMPLETE 0 → 6。
-       *
-       * 不強制插入——mandatory 的語意是「不插這一趟，車就憑空出現在起點」，所以寧可
-       * 帶著站位衝突也要插。但充電與待命<strong>有退路</strong>：原本的出場移動空跑卡。
-       * 塞不下就維持空跑，不會產生物理上做不到的班表。實測（2026-08-21）不設這道，
-       * 13 班硬塞進去製造出 15 對碰撞保護不足。
+       * 先前充電、待命只准一段、不強制插入；保養、行檢不限段數、非插不可時帶著站位衝突也插。
+       * 換一張地圖，充電區可能離首發站很遠、保養區反而就在旁邊，名稱不代表位置。現在一律：
+       * - 段數不限，由路網與關聯圖上實際接得到的路線決定；可以從路線中途的出場站加入。
+       * - 不強制插入：每一種整備做完都有「不載客的出場移動卡」可以把車送到下一班起點
+       *   （整備轉場卡），排不下就退回那張卡，絕不帶著站位衝突硬插。
+       * - 整串要嘛全部插、要嘛都不插，不會把車留在半路。
        */
-      const softDispatch = yard.taskType === 'charging' || yard.taskType === 'standby';
       const candidates = listEntryChainCandidates({
         originStationId,
         exitStationIds,
         selectedRoutes,
-        maxHops: softDispatch ? 1 : undefined,
       });
 
       // 若出場站集合中只有首班起點站本身（設施出場 == 路線首站），車已在起點，
@@ -740,8 +752,8 @@ export function insertMaintenanceEntryServiceTrips(args: {
         firstTripRouteId: nextPassenger.routeId,
         yardEndMinute: afterYard.chainEndMinute,
         exitStationIds,
-        // 充電／待命有退路（原本的出場移動空跑卡），塞不下就別硬插——見上方說明
-        mandatory: dispatchIsRequired && !softDispatch,
+        // 每一種整備都有退路（不載客的出場移動卡），塞不下就別硬插——見上方說明
+        mandatory: false,
         minimumRecoveryTimeSeconds,
         collisionProtectionSeconds,
         rotationRoutes: selectedRoutes,
@@ -774,27 +786,33 @@ export function insertMaintenanceEntryServiceTrips(args: {
         continue;
       }
 
-      for (const item of fitting) {
-        // 檢查該時間線上是否已經存在同時間段運行的既有正線班次 (template_bar)
-        // 若已有既有正線班次，絕不得插入進場載客覆蓋原有的正線班次
-        const overlapsExistingPassenger = sorted.some(
-          (b) =>
-            b.taskType === 'passenger'
-            && b.source === 'template_bar'
-            && b.plannedStartMinute < item.endMinute - 1e-9
-            && b.plannedEndMinute > item.startMinute + 1e-9,
-        );
-        if (overlapsExistingPassenger) {
-          continue;
-        }
+      // 整串要嘛全部插、要嘛都不插：任何一段會蓋到這台車既有的模板正線，就整串放棄，
+      // 退回不載客的出場移動卡——只插前半段會把車留在半路，後面接不上首班。
+      const overlapsExistingPassenger = fitting.some((item) => sorted.some(
+        (b) =>
+          b.taskType === 'passenger'
+          && b.source === 'template_bar'
+          && b.plannedStartMinute < item.endMinute - 1e-9
+          && b.plannedEndMinute > item.startMinute + 1e-9,
+      ));
+      if (overlapsExistingPassenger) {
+        continue;
+      }
 
+      for (const item of fitting) {
+        const joined = item.hop.joinedFrom;
+        const joinedStation = joined ? item.hop.route.stationDwells[0] : undefined;
+        const joinedStationId = joined ? item.hop.route.stationIds[0]?.trim() : undefined;
+        const joinedStationName = joinedStation?.stationName?.trim() || joinedStationId;
         const block: GeneratedScheduleBlock = {
           // 識別碼不放路線：站位求解之後這一趟可能被改派，識別碼卻不能跟著變
           // （見 normalizeInput 對 template-pax 識別碼的說明）。實際路線看 routeId。
           id: `entry-${yard.id}-${Math.round(item.startMinute * 60)}`,
           timelineRow: timeline.row,
           taskType: 'passenger',
-          label: `進場載客 · ${item.hop.route.routeName || item.hop.route.routeId}`,
+          label: joined
+            ? `進場載客 · ${item.hop.route.routeName || item.hop.route.routeId}（自 ${joinedStationName} 加入）`
+            : `進場載客 · ${item.hop.route.routeName || item.hop.route.routeId}`,
           routeId: item.hop.route.routeId,
           routeName: item.hop.route.routeName,
           routeCode: item.hop.route.routeCode ?? undefined,
@@ -806,6 +824,9 @@ export function insertMaintenanceEntryServiceTrips(args: {
           source: 'entry_service',
           firstTripOriginStationId: originStationId,
           entryServiceSectionCode: sectionCode ?? undefined,
+          ...(joined && joinedStationId
+            ? { entryJoinedAtStationId: joinedStationId, entryJoinedAtStationName: joinedStationName }
+            : {}),
           entryServiceBerthCheck: item.berthCheck
             ? {
                 arriveStationId: item.berthCheck.arriveStationId,
@@ -822,6 +843,44 @@ export function insertMaintenanceEntryServiceTrips(args: {
         list.sort((a, b) => a - b);
         departureSecondsByRoute.set(item.hop.route.routeId, list);
       }
+
+      // 每一串都留下紀錄：從哪一段整備出來、在哪一站加入哪條路線、服務哪些站、接哪一班（白皮書 DISPATCH-05）
+      const inserted = extras.slice(-fitting.length);
+      const firstItem = fitting[0]!;
+      const joinStationId = firstItem.hop.route.stationIds[0]?.trim() ?? '';
+      const joinStationName = firstItem.hop.route.stationDwells[0]?.stationName?.trim() || joinStationId;
+      const servedStationNames = fitting.flatMap((item) =>
+        item.hop.route.stationDwells
+          .slice(1)
+          .map((dwell) => dwell.stationName?.trim() || dwell.stationId));
+      const routeNames = fitting.map((item) => item.hop.route.routeName || item.hop.route.routeId);
+      pushIssue(warnings, {
+        code: 'ENTRY_SERVICE_INSERTED',
+        severity: 'warning',
+        kind: 'policy',
+        message:
+          `時間線 ${timeline.row}：「${yard.label}」做完後，車在「${joinStationName}」`
+          + `${firstItem.hop.joinedFrom ? '中途加入' : '發車'}，載客跑 ${routeNames.join(' → ')}`
+          + `（服務 ${servedStationNames.join('、')}），再接首班正線`,
+        detail: {
+          timelineRow: timeline.row,
+          yardBlockId: yard.id,
+          yardTaskType: yard.taskType,
+          yardLabel: yard.label,
+          joinStationId,
+          joinStationName,
+          joinedMidRoute: Boolean(firstItem.hop.joinedFrom),
+          routeIds: fitting.map((item) => item.hop.route.routeId),
+          routeNames,
+          servedStationNames,
+          insertedBlockIds: inserted.map((block) => block.id),
+          blockId: inserted[0]?.id,
+          nextPassengerBlockId: nextPassenger.id,
+          startMinute: firstItem.startMinute,
+          endMinute: fitting[fitting.length - 1]!.endMinute,
+          tripCode: resolveGeneratedBlockTripCode(yard, i, sectionCodes),
+        },
+      });
     }
 
     if (extras.length === 0) return timeline;

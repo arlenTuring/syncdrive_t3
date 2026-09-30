@@ -439,7 +439,9 @@ export function shouldIncludeRecoveryForRouteSwitch(args: {
 /**
  * 同一時間線兩趟正線之間的最短空檔（秒）。
  *
- * - 同站折返接續（前路終點＝後路起點）：0（關節站只有一次出發，不另塞空檔）
+ * - 同站接續（前路終點＝後路起點）：換線時只加前一路線的換線緩衝（車在這一站準備換線，
+ *   使用者 31#6）；同路線自己接自己為 0。都不加恢復時間——恢復時間（延誤預留）的新規則尚待決定，
+ *   這裡維持原本「同站不加恢復」的行為，只補上漏掉的換線準備。
  * - 同路線連續：最低恢復時間
  * - 換路線中段（導通繼任）：僅前一路線換線緩衝（與 Step 4「均」一致）
  * - 換路線折返／非繼任：最低恢復 + 換線緩衝（相加，不可取 max）
@@ -461,7 +463,9 @@ export function resolveInterTripGapSeconds(args: {
     && args.nextRoute
     && routesShareTurnaroundStation(args.previousRoute, args.nextRoute)
   ) {
-    return 0;
+    return args.isRouteSwitch
+      ? normalizeSwitchBufferAfterSeconds(args.previousRouteSwitchBufferSeconds)
+      : 0;
   }
   const recovery = Math.max(0, Math.round(args.minimumRecoveryTimeSeconds));
   const includeRecovery = args.includeRecovery ?? !args.isRouteSwitch;

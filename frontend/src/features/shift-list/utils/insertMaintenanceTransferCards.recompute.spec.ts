@@ -10,8 +10,8 @@ import type { GeneratedScheduleBlock, GeneratedSchedulePlan } from './schedule-e
  * 轉場與佔用的重算。
  *
  * 情境（名稱與時刻都只是測試資料）：兩台車共用一台充電設施 C1。
- * - 列 1：充電到 10:00，下一班 10:01 從站 S 發車。出廠 C1 → S 要 300 秒，出廠卡只能吃掉
- *   充電尾巴，09:56 就離格。
+ * - 列 1：充電到 09:56，下一班 10:01 從站 S 發車。出廠 C1 → S 要 300 秒，09:56 一做完就離格
+ *   （作業類整備不吃尾巴，白皮書 YARD-07）。
  * - 列 2：待命格 P1 待到 09:58，接著在 C1 充電到 10:00:30（時段很緊，沒有往後挪的空間）。
  *
  * 轉場階段排在出廠階段之前：排列 2 的「待命 → 充電」時，列 1 的出廠卡還沒排，列 1 在 C1 的
@@ -100,7 +100,7 @@ function plan(): GeneratedSchedulePlan {
         row: 1,
         blocks: [
           block({ id: 'r1-in', timelineRow: 1, taskType: 'passenger', routeId: 'as', plannedStartMinute: minute(8, 0), plannedEndMinute: minute(8, 30) }),
-          block({ id: 'r1-charge', timelineRow: 1, taskType: 'charging', plannedStartMinute: minute(8, 31), plannedEndMinute: minute(10, 0) }),
+          block({ id: 'r1-charge', timelineRow: 1, taskType: 'charging', plannedStartMinute: minute(8, 31), plannedEndMinute: minute(9, 56) }),
           block({ id: 'r1-out', timelineRow: 1, taskType: 'passenger', routeId: 'sa', plannedStartMinute: minute(10, 1), plannedEndMinute: minute(10, 31) }),
         ],
       },
@@ -134,7 +134,7 @@ const transitCards = (timelines: GeneratedSchedulePlan['timelines'], row: number
 describe('轉場與佔用重算', () => {
   it('別列出廠卡提早離格後，先前判定「設施被佔」的轉場要重算成功，舊錯誤消失', () => {
     const result = run(plan().timelines);
-    // 列 1 的出廠卡吃掉充電尾巴，09:56 就離開 C1
+    // 列 1 充電 09:56 做完就出廠，離開 C1（出廠之前，列 1 在 C1 的佔用暫時算到 10:01 發車）
     const exit = result.timelines.find((timeline) => timeline.row === 1)!.blocks
       .find((item) => item.source === 'yard_exit_move');
     assert.ok(exit, '列 1 要有出廠卡');

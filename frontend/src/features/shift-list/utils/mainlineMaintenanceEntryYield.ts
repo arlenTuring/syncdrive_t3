@@ -29,6 +29,38 @@ import {
   SCHEDULE_DAY_MINUTES,
   earliestStartPastBlockerOnDayCycle,
 } from './scheduleDayCycle';
+import { minimumYardWorkSeconds } from './yardWorkMinimum';
+
+export type MaintenanceYieldOptions = {
+  /** 整備設定；用來算各類整備讓渡後至少要留下的工作時間（見 yardWorkMinimum.ts） */
+  maintenanceBody?: Record<string, unknown> | null;
+  /** 刪掉一班正線時告知原因（報表逐班揭露，見 generate.ts 的 PASSENGER_TRIP_REMOVED） */
+  onPassengerRemoved?: (blockId: string, reason: PassengerRemovalReason) => void;
+};
+
+/**
+ * 正線被刪的原因：
+ * - crosses-yards：推過整備要跨兩段以上相接整備、延後 45 分以上，錨點與實際差太遠，不排這一班。
+ * - past-midnight：推過整備之後落到 24:00 以後，當日放不下。
+ * - incomplete-rotation：不成輪的尾巴（trimIncompleteRotationCycles）。
+ */
+export type PassengerRemovalReason = 'crosses-yards' | 'past-midnight' | 'incomplete-rotation';
+
+/**
+ * 讓這一串正線占掉開頭之後，整備還剩不剩得下最低工作時間。
+ *
+ * 剩不下的讓渡是不合法的候選：整備不能被壓成零、也不能刪卡假裝做完（白皮書 YARD-03）。
+ * 這種占用者不讓渡，改由 {@link pushPassengerPastPrecedingYard} 把正線推過整備；推不動就留著
+ * 重疊，由整道評分撤回與最終驗證回報，不刪整備。
+ */
+function yieldWouldEraseWork(
+  occupier: GeneratedScheduleBlock,
+  maint: GeneratedScheduleBlock,
+  options: MaintenanceYieldOptions,
+): boolean {
+  const minimumMinutes = minimumYardWorkSeconds(maint.taskType, options.maintenanceBody) / 60;
+  return occupier.plannedEndMinute > maint.plannedEndMinute - minimumMinutes + 1e-9;
+}
 import { resolveContiguousYardBusyUntilMinute } from './maintenancePostTaskPolicy';
 import { MEANINGFUL_IDLE_GAP_SECONDS } from './stationBerthOccupancy';
 
@@ -117,6 +149,7 @@ function mustNotStealYardTail(
  */
 export function applyMainlineMaintenanceEntryYield(
   timelines: GeneratedSchedulePlan['timelines'],
+  options: MaintenanceYieldOptions = {},
 ): GeneratedSchedulePlan['timelines'] {
   return timelines.map((timeline) => {
     const blocks = timeline.blocks.map((block) => ({ ...block }));
@@ -148,6 +181,7 @@ export function applyMainlineMaintenanceEntryYield(
         // 與整備同時起點（例保養尾接行檢 09:30）＝不得讓渡壓縮整備，改由 push 推過整串。
         const runStartMinute = resolveContinuousRunStartMinute(ordered, other, maint.id);
         if (runStartMinute >= floorStartMinute - 1e-9) continue;
+        if (yieldWouldEraseWork(other, maint, options)) continue;
         if (
           other.plannedStartMinute < lockedEndMinute - 1e-9
           && other.plannedEndMinute > floorStartMinute + 1e-9
@@ -157,26 +191,16 @@ export function applyMainlineMaintenanceEntryYield(
       }
 
       if (Math.abs(nextStartMinute - maint.plannedStartMinute) > 1e-9) {
+        // 只收剩得下最低工作時間的占用者（見 yieldWouldEraseWork），開始一定早於結束；結束鎖住不動
         maint.plannedStartMinute = nextStartMinute;
-        if (nextStartMinute >= lockedEndMinute - 1e-9) {
-          maint.plannedEndMinute = nextStartMinute;
-        } else {
-          // 縮回時務必鎖住原尾，把被壓縮的時長還原
-          maint.plannedEndMinute = lockedEndMinute;
-        }
+        maint.plannedEndMinute = lockedEndMinute;
       }
     }
 
+    // 整備一張都不刪：壓不下的占用者交給 pushPassengerPastPrecedingYard
     return {
       ...timeline,
       blocks: blocks
-        .filter(
-          (block) =>
-            !(
-              isYieldableMaintenanceBlock(block)
-              && block.plannedEndMinute <= block.plannedStartMinute + 1e-9
-            ),
-        )
         .sort(
           (a, b) =>
             a.plannedStartMinute - b.plannedStartMinute
@@ -193,6 +217,7 @@ export function applyMainlineMaintenanceEntryYield(
  */
 export function pushPassengerPastPrecedingYard(
   timelines: GeneratedSchedulePlan['timelines'],
+  options: MaintenanceYieldOptions = {},
 ): GeneratedSchedulePlan['timelines'] {
   return timelines.map((timeline) => {
     const blocks = timeline.blocks.map((block) => ({ ...block }));
@@ -220,7 +245,7 @@ export function pushPassengerPastPrecedingYard(
         // 根本還沒進去整備。該往後移的是整備開始時刻（applyMainlineMaintenanceEntryYield
         // 已在同一輪先做過），不是把正線推走——推走會讓班次落到整備結束之後、
         // 超出正線視窗而被撤掉，等於讓渡餘裕白設。
-        if (canOccupierYieldMaint(current, prev)) {
+        if (canOccupierYieldMaint(current, prev) && !yieldWouldEraseWork(current, prev, options)) {
           const yardFloorMinute = Math.min(
             prev.plannedStartMinute,
             prev.anchorStartMinute,
@@ -272,6 +297,7 @@ export function pushPassengerPastPrecedingYard(
         }).length;
         if (pushDeltaMinutes >= 45 && yardsCrossed >= 2) {
           dropIds.add(current.id);
+          options.onPassengerRemoved?.(current.id, 'crosses-yards');
           break;
         }
         earliestStartSecond = Math.max(
@@ -296,6 +322,7 @@ export function pushPassengerPastPrecedingYard(
       // 跨夜保養窗仍佔住隔日清晨：正線被推到 ≥24:00 → 當日循環放不下，刪除
       if (current.plannedStartMinute >= SCHEDULE_DAY_MINUTES - 1e-9) {
         dropIds.add(current.id);
+        options.onPassengerRemoved?.(current.id, 'past-midnight');
         continue;
       }
 
@@ -320,6 +347,7 @@ export function pushPassengerPastPrecedingYard(
         next.plannedEndMinute = secondToMinute(nextStart + nextOcc);
         if (next.plannedStartMinute >= SCHEDULE_DAY_MINUTES - 1e-9) {
           dropIds.add(next.id);
+          options.onPassengerRemoved?.(next.id, 'past-midnight');
           break;
         }
         prevOccupier = next;

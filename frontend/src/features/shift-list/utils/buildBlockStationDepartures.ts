@@ -13,6 +13,7 @@ import {
   snapDownToClockAlignSeconds,
   snapUpToClockAlignSeconds,
 } from './schedule-engine/physics';
+import { routeForJoinedBlock } from './joinedRouteSegment';
 import type { GeneratedScheduleBlock } from './schedule-engine/types';
 import { minuteToSecond, secondToMinute } from './schedule-engine/types';
 import {
@@ -102,6 +103,7 @@ function resolveBlockStationTimingPlan(
   block: GeneratedScheduleBlock,
   route: ShiftScheduleSelectedRoute | null | undefined,
 ): BlockStationTimingPlan | null {
+  route = routeForJoinedBlock(block, route);
   const dwellInputs = resolveBlockStationDwellInputs(block, route);
   if (!dwellInputs) return null;
 
@@ -111,8 +113,9 @@ function resolveBlockStationTimingPlan(
     if (mode === 'no_stop' || mode === 'line_change') return 0;
     return Math.max(0, station.dwellSeconds ?? 0);
   });
+  const extraDwells = resolveBlockStationExtraDwellSeconds(block, stations);
   const dwells = stations.map((station, index) =>
-    applyStationDwellWithSlack(station, slackSeconds, index),
+    applyStationDwellWithSlack(station, slackSeconds, index) + (extraDwells[index] ?? 0),
   );
   const dwellTotal = dwells.reduce((sum, value) => sum + value, 0);
   const startSecond = snapUpToClockAlignSeconds(minuteToSecond(block.plannedStartMinute));
@@ -252,6 +255,7 @@ export function resolveBlockDurationBounds(
   block: GeneratedScheduleBlock,
   route: ShiftScheduleSelectedRoute | null | undefined,
 ): { minSeconds: number; maxSeconds: number; maxTravelSeconds: number; dwellSeconds: number } | null {
+  route = routeForJoinedBlock(block, route);
   const plan = resolveBlockStationTimingPlan(block, route);
   if (!plan) return null;
   const dwellSeconds = plan.dwells.reduce((sum, value) => sum + value, 0);
@@ -345,12 +349,31 @@ export function resolveBlockDwellSlackBreakdown(
       ? 0
       : normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
   const addedSeconds = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
+  // 指定站的增加量不算進「每站都加」的緩衝，另外加在那一站（見 resolveBlockStationExtraDwellSeconds）
+  const perStationAdded = block.dwellSlackAdjustment?.stationIndex != null ? 0 : addedSeconds;
   return {
     baseSlackSeconds,
     addedSeconds,
-    effectiveSlackSeconds: baseSlackSeconds + addedSeconds,
+    effectiveSlackSeconds: baseSlackSeconds + perStationAdded,
     source: explicit || hasStationOverride ? 'block' : 'route',
   };
+}
+
+/**
+ * 系統只在指定站增加的等待（秒），依站序排列；沒有指定站時全是 0。
+ * 只有適用緩衝的站（有停靠、不是首站／途經／換線）才會加。
+ */
+export function resolveBlockStationExtraDwellSeconds(
+  block: Pick<GeneratedScheduleBlock, 'dwellSlackAdjustment'>,
+  stations: ShiftScheduleStationDwell[],
+): number[] {
+  const extra = stations.map(() => 0);
+  const adjustment = block.dwellSlackAdjustment;
+  const index = adjustment?.stationIndex;
+  if (adjustment == null || index == null || index < 0 || index >= stations.length) return extra;
+  if (applyStationDwellWithSlack(stations[index]!, 1, index) <= 0) return extra;
+  extra[index] = Math.max(0, Math.round(adjustment.addedSeconds));
+  return extra;
 }
 
 /**
@@ -364,6 +387,7 @@ export function resolveBlockStationDwellInputs(
   stations: ShiftScheduleStationDwell[];
   dwellSlackSeconds: number;
 } | null {
+  route = routeForJoinedBlock(block, route);
   const stationSource = block.stationDwells && block.stationDwells.length > 0
     ? block.stationDwells
     : route?.stationDwells;
@@ -463,11 +487,11 @@ export function resolveRouteForBlock(
     const byInstance = selectedRoutes.find(
       (route) => resolveSelectedRouteInstanceId(route) === instanceId,
     );
-    if (byInstance) return byInstance;
+    if (byInstance) return routeForJoinedBlock(block, byInstance);
   }
   if (block.routeId) {
     const byId = selectedRoutes.find((route) => route.routeId === block.routeId);
-    if (byId) return byId;
+    if (byId) return routeForJoinedBlock(block, byId);
   }
   if (block.routeName) {
     const byName = selectedRoutes.find((route) => route.routeName === block.routeName);

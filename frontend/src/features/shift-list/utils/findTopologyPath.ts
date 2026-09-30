@@ -85,7 +85,10 @@ export function findTopologyPath(
   options?: {
     /** 不得經過的節點（例：已被別台車佔住的設施） */
     blockedNodeIds?: ReadonlySet<string>;
-    /** 最多幾段；超過視為找不到（避免繞遠路繞到不合理） */
+    /**
+     * 呼叫端明確要求的段數上限（例如只看直達的一段）。沒給就不限段數：路徑存不存在只看路網本身，
+     * 繞圈由「同一條路徑不重複經過節點」與「每個節點只留最佳成本」擋住（白皮書 ROUTE-03）。
+     */
     maxHops?: number;
     /** 只給診斷用：允許走缺時間的邊（用來找出「缺的是哪一段」），排班不可用 */
     allowMissingTime?: boolean;
@@ -97,7 +100,7 @@ export function findTopologyPath(
   }
 
   const blocked = options?.blockedNodeIds;
-  const maxHops = options?.maxHops ?? 8;
+  const maxHops = options?.maxHops ?? Number.POSITIVE_INFINITY;
   /** 設施節點：可以是起點（出廠）或終點（入廠），但不可以被路過 */
   const facilityNodeIds = new Set<string>();
   for (const node of topology.nodes) {

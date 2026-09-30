@@ -48,6 +48,7 @@ import {
   validateVehicleLocationContinuity,
   validateMoveJunctionConflicts,
   validateFacilityOccupancy,
+  validateYardWorkPreserved,
 } from './validate';
 import {
   enforceStationBerthConstraints,
@@ -138,6 +139,24 @@ export type GenerateShiftScheduleInput = {
  * 正常 2–3 輪就不動了；上限只是防呆，避免互相破壞的處理無限來回。
  */
 const GEOMETRY_CONVERGENCE_MAX_ROUNDS = 14;
+
+/**
+ * 生成進度（給背景執行緒回報畫面用）。只報「做到哪一階段」，不影響任何決策：沒有接收者時是空操作，
+ * 同一份輸入有沒有接收者，結果完全相同。
+ */
+export type ScheduleEngineProgress = { stage: 'normalize' | 'geometry' | 'transfer' | 'search' | 'validate'; message: string; fraction: number };
+let progressReporter: ((progress: ScheduleEngineProgress) => void) | null = null;
+export function setScheduleEngineProgressReporter(reporter: ((progress: ScheduleEngineProgress) => void) | null): void {
+  progressReporter = reporter;
+}
+function reportProgress(progress: ScheduleEngineProgress): void {
+  if (!progressReporter) return;
+  try {
+    progressReporter(progress);
+  } catch {
+    // 回報失敗不能影響生成
+  }
+}
 
 /** 站位延後成因最多逐則列出幾個擋路點，其餘收成一則匯總 */
 const BERTH_DELAY_SOURCE_REPORT_LIMIT = 10;
@@ -302,6 +321,7 @@ function generateShiftScheduleOnce(
     ...input.residualRepairBudget,
   };
 
+  reportProgress({ stage: 'normalize', message: '整理輸入、派車', fraction: 0.05 });
   const engineInput = normalizeEngineInput(
     {
       shiftId: input.shiftId,
@@ -564,6 +584,11 @@ function generateShiftScheduleOnce(
   let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
     currentRound = round;
+    reportProgress({
+      stage: 'geometry',
+      message: `站位與班距調整，第 ${round + 1} 輪`,
+      fraction: 0.1 + 0.4 * (round / GEOMETRY_CONVERGENCE_MAX_ROUNDS),
+    });
     const before = fingerprintTimelines(timelines);
 
     // 車停在哪，下一班就從那裡發——待命的地點是被站位限制夾出來的、常常沒得選，
@@ -685,11 +710,11 @@ function generateShiftScheduleOnce(
 
     // 正線可吃接下來那段整備的開頭（有重疊才讓）
     runGuarded('applyMainlineMaintenanceEntryYield', () =>
-      applyMainlineMaintenanceEntryYield(timelines));
+      applyMainlineMaintenanceEntryYield(timelines, { maintenanceBody: engineInput.maintenanceBody }));
 
     // 不准佔用整備尾巴：壓到前一段整備的正線，整趟推到整備結束之後
     runGuarded('pushPassengerPastPrecedingYard', () =>
-      pushPassengerPastPrecedingYard(timelines));
+      pushPassengerPastPrecedingYard(timelines, { maintenanceBody: engineInput.maintenanceBody }));
 
     /**
      * 撤掉不成輪的尾巴。<strong>留在迴圈內</strong>——它是破壞性算子（刪班次），
@@ -1150,6 +1175,7 @@ function generateShiftScheduleOnce(
     detail: { timelineRow: row, blockId, fromRouteId: from, toRouteId: to },
   });
 
+  reportProgress({ stage: 'transfer', message: '安排整備進出與轉場', fraction: 0.55 });
   let state: PostState = {
     pre: preTransfer,
     reservations: [],
@@ -1165,6 +1191,11 @@ function generateShiftScheduleOnce(
   };
   const maxRounds = state.post.required;
   for (let round = 0; round < maxRounds; round += 1) {
+    reportProgress({
+      stage: 'search',
+      message: `搜尋必要轉場的排法（${round + 1}／${maxRounds}）`,
+      fraction: 0.6 + 0.3 * (round / Math.max(1, maxRounds)),
+    });
     let adopted: PostState | null = null;
     const base = state;
     for (const skip of base.post.transfer.skipped) {
@@ -1693,7 +1724,9 @@ function generateShiftScheduleOnce(
         `時間線 ${item.timelineRow}：「${taskTypeName(item.taskType)}」`
         + (item.kind === 'late-start' ? `晚 ${item.seconds} 秒開始` : `提早 ${item.seconds} 秒結束`)
         + `，實際工作 ${minutes(item.remainingWorkSeconds)}`
-        + `（設定最少 ${minutes(item.minimumWorkSeconds)}`
+        + (item.remainingWorkSeconds + 1e-6 < item.minimumWorkSeconds
+          ? `，低於整備設定的作業時長 ${minutes(item.minimumWorkSeconds)}（移動佔用了開頭；使用者 2026-09-30 同意，不能歸零`
+          : `（整備設定的作業時長 ${minutes(item.minimumWorkSeconds)}`)
         + (item.limitSeconds != null ? `、讓渡餘裕 ${item.limitSeconds} 秒` : '')
         + `）。原因：${item.reason}。`,
       detail: { ...item },
@@ -1780,6 +1813,7 @@ function generateShiftScheduleOnce(
 
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
+  reportProgress({ stage: 'validate', message: '最終驗證', fraction: 0.95 });
   validateTimelineOverlaps(timelines, errors);
   validateStationTimingsWithinBlocks(
     timelines,
@@ -1801,6 +1835,13 @@ function generateShiftScheduleOnce(
   validateFacilityOccupancy(timelines, errors, {
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
     warnings,
+  });
+  // 整備不能被刪、不能壓到低於最低工作時間（白皮書 YARD-03）
+  validateYardWorkPreserved({
+    timelines,
+    yardTasks: engineInput.templateYardTasks ?? [],
+    maintenanceBody: engineInput.maintenanceBody,
+    errors,
   });
 
   validateStationBerthCollisions(

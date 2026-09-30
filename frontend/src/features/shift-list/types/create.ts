@@ -132,8 +132,8 @@ export const CREATE_SHIFT_SCHEDULE_STEPS: Array<{
   label: string;
 }> = [
   { step: 1, label: '基本資料' },
-  { step: 2, label: '整備任務' },
-  { step: 3, label: '時間模板' },
+  { step: 2, label: '時間模板' },
+  { step: 3, label: '整備任務' },
   { step: 4, label: '路線群組' },
   { step: 5, label: '行動設定' },
   { step: 6, label: '調整班表' },
@@ -142,15 +142,19 @@ export const CREATE_SHIFT_SCHEDULE_STEPS: Array<{
 
 export const CREATE_SHIFT_SCHEDULE_STEP_HEADERS: Record<CreateShiftScheduleStep, string> = {
   1: '設定班表基本資料',
-  2: '選擇整備任務規則包',
-  3: '選擇時間模板',
+  2: '選擇時間模板',
+  3: '選擇整備任務規則包',
   4: '設定路線群組與停靠時間',
   5: '設定站間行動清單',
   6: '調整自動生成的班表細節',
   7: '確認班表細節並完成建立',
 };
 
-export const SHIFT_SCHEDULE_BODY_EDITOR_VERSION = 3;
+/**
+ * v4（2026-09-30）：第 2 步改為時間模板、第 3 步改為整備任務（白皮書 YARD-01）——先有模板，
+ * 輸入「正線可壓縮整備開頭」時才能即時對照模板上的整備長度。舊草稿的步驟代號照此對調。
+ */
+export const SHIFT_SCHEDULE_BODY_EDITOR_VERSION = 4;
 
 export type ShiftScheduleBasicDraft = {
   name: string;
@@ -1050,6 +1054,13 @@ function migrateStepFromEditorV1(step: number): number {
   return step;
 }
 
+/** editor v3 → v4：第 2、3 步對調（時間模板改到整備任務之前） */
+function migrateStepFromEditorV3(step: number): number {
+  if (step === 2) return 3;
+  if (step === 3) return 2;
+  return step;
+}
+
 /** editor v2（六步）→ v3：在路線群組後插入行動設定 */
 function migrateStepFromEditorV2(step: number): number {
   if (step >= 5) return step + 1;
@@ -1081,6 +1092,11 @@ export function buildShiftScheduleDraftFromStored(
   if (editorVersion < 3) {
     migratedCurrent = migrateStepFromEditorV2(migratedCurrent);
     migratedMax = migrateStepFromEditorV2(migratedMax);
+  }
+  if (editorVersion < 4) {
+    migratedCurrent = migrateStepFromEditorV3(migratedCurrent);
+    // 已走到的最遠步驟：舊的第 2 步（整備）現在是第 3 步；走到第 3 步以後的不受影響
+    migratedMax = migratedMax === 2 ? 3 : migratedMax;
   }
 
   const currentStep = clampStep(migratedCurrent);
@@ -1213,15 +1229,15 @@ export function isCreateShiftScheduleStepComplete(
     return isShiftScheduleBasicStepComplete(draft.basic) && nameUniqueOk;
   }
   if (step === 2) {
+    return draft.timeTemplate.templateId.trim().length > 0;
+  }
+  if (step === 3) {
     if (draft.maintenanceTask.skipped) return true;
     if (!draft.maintenanceTask.taskId.trim()) return false;
     return isMaintenanceSectionCodesComplete(
       draft.maintenanceTask.sectionCodeBySection,
       draft.maintenanceTask.sectionEnabled,
     );
-  }
-  if (step === 3) {
-    return draft.timeTemplate.templateId.trim().length > 0;
   }
   if (step === 4) {
     const routes = draft.routeGroups.selectedRoutes;

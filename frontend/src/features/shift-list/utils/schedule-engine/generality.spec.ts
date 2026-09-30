@@ -9,6 +9,8 @@ import type { ScheduleTask } from '../../../time-templates/types/editor';
 import { generateShiftSchedule, type GenerateShiftScheduleInput } from './generate';
 import type { GeneratedSchedulePlan } from './types';
 import { buildPlanFingerprint } from '../schedulePublishCheck';
+import { withListedOrderRelationGraph } from '../../testing/relationGraphFixture';
+import { runScheduleEngineInBackground, ScheduleEngineCancelledError } from './worker/runScheduleEngineInBackground';
 
 /**
  * 泛用性：結果只由輸入條件決定。
@@ -58,6 +60,8 @@ function input(options: { shiftMinutes?: number; prefix?: string } = {}): Genera
       collisionProtectionSeconds: 30,
     },
   };
+  // 像使用者一樣畫好關聯圖（下行 → 上行 → 下行）並檢查過路線組合；名字換掉關聯圖跟著換
+  draft.routeGroups = withListedOrderRelationGraph(draft.routeGroups);
   const tasks: ScheduleTask[] = [
     { id: `${prefix}w1`, rowIndex: 1, taskType: 'passenger', startMinute: 30 + shift, durationMinutes: 90, label: `${prefix}正線` },
     { id: `${prefix}w2`, rowIndex: 2, taskType: 'passenger', startMinute: 30 + shift, durationMinutes: 90, label: `${prefix}正線` },
@@ -137,6 +141,20 @@ describe('排班引擎泛用性', () => {
   it('同一份輸入重跑：完全一樣', () => {
     const again = generateShiftSchedule(input());
     assert.equal(buildPlanFingerprint(again.plan), buildPlanFingerprint(baseline.plan));
+  });
+
+  it('搬到背景執行緒：進度回報開著、輸入經過結構化複製，結果完全一樣（白皮書 GEN-15）', async () => {
+    const stages: string[] = [];
+    const background = await runScheduleEngineInBackground(structuredClone(input()), {
+      onProgress: (progress) => stages.push(progress.stage),
+    });
+    assert.equal(buildPlanFingerprint(background.plan), buildPlanFingerprint(baseline.plan));
+    assert.deepEqual(issueCodes(background), issueCodes(baseline));
+    assert.ok(stages.includes('normalize') && stages.includes('validate'), `進度要回報各階段：${stages.join(',')}`);
+    // 已取消的請求不會跑
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(runScheduleEngineInBackground(input(), { signal: controller.signal }), ScheduleEngineCancelledError);
   });
 
   it('草稿帶著上次的產出（含系統增加緩衝）再生成：從原始設定算起，不累加', () => {

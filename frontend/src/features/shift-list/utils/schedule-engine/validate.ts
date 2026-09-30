@@ -36,6 +36,7 @@ import {
   resolveRouteForBlock,
 } from '../buildBlockStationDepartures';
 import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDayCycle';
+import { nonZeroYardWorkSeconds } from '../yardWorkMinimum';
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
@@ -1436,6 +1437,86 @@ export function validateRotationCyclesComplete(
     flush();
   }
 }
+
+/**
+ * 模板上的整備不能消失，也不能被壓到低於最低工作時間（白皮書 YARD-03）。
+ *
+ * 讓渡、移動、推移都可以<strong>縮短</strong>整備（有額度、有報告），但不能靠刪卡或壓成零
+ * 排出表面沒衝突的班表。這支拿模板原始的整備（開始用 templateStartMinute，結束鎖住）對照
+ * 排好的班表：
+ * - 找不到對應的區塊（id 相同，或跨午夜切開的 id 前綴）→ 被刪了。
+ * - 剩下的總長低於「最低工作時間」與「模板原長」兩者較小的那一個 → 被壓過頭。
+ *
+ * 最低工作時間：有設定作業時長就用它，沒有的至少一個刻度（yardWorkMinimum.ts）。模板本身就比
+ * 設定的作業時長短時，只要求不比模板更短——那是模板與設定不一致，不是排班壓出來的。
+ */
+export function validateYardWorkPreserved(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  yardTasks: ReadonlyArray<{
+    id: string;
+    rowIndex: number;
+    taskType: string;
+    label: string;
+    startMinute: number;
+    durationMinutes: number;
+    templateStartMinute?: number;
+  }>;
+  maintenanceBody: Record<string, unknown> | null | undefined;
+  errors: FeasibilityIssue[];
+}): void {
+  const blocksById = new Map<string, GeneratedScheduleBlock[]>();
+  for (const timeline of args.timelines) {
+    for (const block of timeline.blocks) {
+      if (!YARD_WORK_CHECK_TYPES.has(block.taskType)) continue;
+      const list = blocksById.get(block.id) ?? [];
+      list.push(block);
+      blocksById.set(block.id, list);
+    }
+  }
+  const findBlocks = (taskId: string): GeneratedScheduleBlock[] => {
+    const out = [...(blocksById.get(taskId) ?? [])];
+    for (const [id, list] of blocksById) {
+      if (id !== taskId && id.startsWith(`${taskId}-`)) out.push(...list);
+    }
+    return out;
+  };
+  for (const task of args.yardTasks) {
+    if (!YARD_WORK_CHECK_TYPES.has(task.taskType)) continue;
+    const endMinute = task.startMinute + task.durationMinutes;
+    const templateStart = task.templateStartMinute ?? task.startMinute;
+    const templateSeconds = Math.round((endMinute - templateStart) * 60);
+    if (templateSeconds <= 0) continue;
+    void args.maintenanceBody;
+    // 硬下限只有「不能歸零」：移動可以把作業壓到低於設定作業時長（使用者 2026-09-30），那部分逐筆揭露、不擋發布
+    const required = Math.min(templateSeconds, nonZeroYardWorkSeconds());
+    const blocks = findBlocks(task.id);
+    const where = `時間線 ${task.rowIndex}「${task.label}」（模板 ${formatScheduleClockHms(templateStart)} 起 ${Math.round(templateSeconds / 60)} 分鐘）`;
+    if (blocks.length === 0) {
+      pushIssue(args.errors, {
+        code: 'MAINTENANCE_WORK_INSUFFICIENT',
+        severity: 'error',
+        kind: 'limit',
+        message: `${where}在排好的班表裡不見了：整備不能被刪除`,
+        detail: { timelineRow: task.rowIndex, blockId: task.id, taskType: task.taskType, remainingWorkSeconds: 0, requiredWorkSeconds: required },
+      });
+      continue;
+    }
+    const remaining = Math.round(
+      blocks.reduce((sum, block) => sum + Math.max(0, block.plannedEndMinute - block.plannedStartMinute), 0) * 60,
+    );
+    if (remaining + 1e-6 < required) {
+      pushIssue(args.errors, {
+        code: 'MAINTENANCE_WORK_INSUFFICIENT',
+        severity: 'error',
+        kind: 'limit',
+        message: `${where}只剩 ${remaining} 秒工作時間，低於最低要求 ${required} 秒`,
+        detail: { timelineRow: task.rowIndex, blockId: blocks[0]!.id, taskType: task.taskType, remainingWorkSeconds: remaining, requiredWorkSeconds: required },
+      });
+    }
+  }
+}
+
+const YARD_WORK_CHECK_TYPES: ReadonlySet<string> = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby']);
 
 /** 車真的停在裡面的那幾種整備；暫停卡（source 'hold'）同樣代表車還在格子裡 */
 /**

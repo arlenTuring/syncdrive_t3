@@ -596,12 +596,12 @@ export function StepShiftSchedulePreview({
           />
         </ReviewSection>
 
-        <ReviewSection step={2} title={t('shiftList.schedulePreview.maintenance')} onNavigate={onNavigateToStep}>
-          <SimpleNameLine value={maintenanceDisplayName} />
+        <ReviewSection step={2} title={t('shiftList.schedulePreview.timeTemplate')} onNavigate={onNavigateToStep}>
+          <SimpleNameLine value={templateDisplayName} />
         </ReviewSection>
 
-        <ReviewSection step={3} title={t('shiftList.schedulePreview.timeTemplate')} onNavigate={onNavigateToStep}>
-          <SimpleNameLine value={templateDisplayName} />
+        <ReviewSection step={3} title={t('shiftList.schedulePreview.maintenance')} onNavigate={onNavigateToStep}>
+          <SimpleNameLine value={maintenanceDisplayName} />
         </ReviewSection>
 
         <ReviewSection step={4} title={t('shiftList.schedulePreview.routeGroups')} onNavigate={onNavigateToStep}>

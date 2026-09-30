@@ -58,7 +58,9 @@ var GROUP_TITLE = {
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: "\u51FA\u5EE0\u5361\u8981\u7A7A\u8DD1\u4E00\u6BB5\uFF08\u8ECA\u4E0D\u5728\u4E0B\u4E00\u73ED\u7684\u8D77\u9EDE\uFF09",
   GEOMETRY_NOT_CONVERGED: "\u672C\u6B21\u8A66\u7B97\u5C1A\u672A\u6392\u59A5",
   SCHEDULE_SEARCH_INCOMPLETE: "\u672C\u6B21\u8A08\u7B97\u672A\u627E\u5230\u5B89\u5168\u6392\u6CD5\uFF08\u641C\u5C0B\u672A\u5B8C\u6210\uFF09",
-  MAINTENANCE_WORK_SHORTENED: "\u6574\u5099\u5DE5\u4F5C\u6642\u9593\u88AB\u79FB\u52D5\u4F54\u7528"
+  MAINTENANCE_WORK_SHORTENED: "\u6574\u5099\u5DE5\u4F5C\u6642\u9593\u88AB\u79FB\u52D5\u4F54\u7528",
+  MAINTENANCE_WORK_INSUFFICIENT: "\u6574\u5099\u88AB\u522A\u9664\u6216\u5DE5\u4F5C\u6642\u9593\u4E0D\u8DB3",
+  SCHEDULE_DATA_INCOMPLETE: "\u751F\u6210\u524D\u7684\u5FC5\u8981\u8CC7\u6599\u4E0D\u5B8C\u6574"
 };
 var ALL_FEASIBILITY_VIOLATION_CODES = Object.keys(GROUP_TITLE);
 var DOC_ANCHOR = {
@@ -111,7 +113,9 @@ var DOC_ANCHOR = {
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: "s7", label: "\xA77 \u8DEF\u7DDA\u95DC\u806F\u5716" },
   GEOMETRY_NOT_CONVERGED: { id: "s3", label: "\xA73 \u6D41\u6C34\u7DDA" },
   SCHEDULE_SEARCH_INCOMPLETE: { id: "s3", label: "\xA73 \u6D41\u6C34\u7DDA" },
-  MAINTENANCE_WORK_SHORTENED: { id: "s6", label: "\xA76 \u6574\u5099\u8207\u8A2D\u65BD\u4F54\u7528" }
+  MAINTENANCE_WORK_SHORTENED: { id: "s6", label: "\xA76 \u6574\u5099\u8207\u8A2D\u65BD\u4F54\u7528" },
+  MAINTENANCE_WORK_INSUFFICIENT: { id: "YARD-03", label: "YARD-03 \u7981\u6B62\u96F6\u6574\u5099" },
+  SCHEDULE_DATA_INCOMPLETE: { id: "MAP-02", label: "MAP-01\uFF5E03 \u5730\u5716\u8207\u5FC5\u8981\u8CC7\u6599" }
 };
 var DEFAULT_META = {
   MISSING_TEMPLATE_TASKS: {
@@ -273,7 +277,15 @@ var DEFAULT_META = {
   },
   MAINTENANCE_WORK_SHORTENED: {
     kind: "policy",
-    guidance: "\u5165\u5EE0\u665A\u5230\u3001\u6574\u5099\u9593\u8F49\u5834\u7684\u79FB\u52D5\u6642\u9593\u3001\u6216\u51FA\u5EE0\u5403\u6389\u5C3E\u5DF4\uFF0C\u6703\u8B93\u9019\u4E00\u6BB5\u6574\u5099\u7684\u5BE6\u969B\u5DE5\u4F5C\u6642\u9593\u6BD4\u6642\u9593\u6A21\u677F\u77ED\u3002\u665A\u958B\u59CB\u7684\u91CF\u4E0D\u8D85\u904E\u6574\u5099\u8A2D\u5B9A\u7684\u8B93\u6E21\u9918\u88D5\uFF0C\u5269\u4E0B\u7684\u5DE5\u4F5C\u6642\u9593\u4E0D\u5C11\u65BC\u6574\u5099\u8A2D\u5B9A\u7684\u4F5C\u696D\u6642\u9577\uFF1B\u8D85\u904E\u5C31\u4E0D\u6703\u9019\u6A23\u6392\u3002\u9EDE\u9078\u53EF\u8DF3\u5230\u90A3\u5F35\u5361\u3002"
+    guidance: "\u5165\u5EE0\u665A\u5230\u3001\u6216\u6574\u5099\u9593\u8F49\u5834\u7684\u79FB\u52D5\u6642\u9593\uFF0C\u6703\u8B93\u9019\u4E00\u6BB5\u6574\u5099\u665A\u958B\u59CB\u3001\u7D50\u675F\u4E0D\u52D5\uFF0C\u5BE6\u969B\u5DE5\u4F5C\u6642\u9593\u6BD4\u6642\u9593\u6A21\u677F\u77ED\u3002\u665A\u958B\u59CB\u7684\u91CF\u4E0D\u8D85\u904E\u6574\u5099\u8A2D\u5B9A\u7684\u8B93\u6E21\u9918\u88D5\uFF0C\u5269\u4E0B\u7684\u5DE5\u4F5C\u6642\u9593\u4E0D\u5C11\u65BC\u6574\u5099\u8A2D\u5B9A\u7684\u4F5C\u696D\u6642\u9577\uFF1B\u8D85\u904E\u5C31\u4E0D\u6703\u9019\u6A23\u6392\u3002\u4F5C\u696D\u985E\u6574\u5099\u7684\u5C3E\u5DF4\u4E0D\u6703\u88AB\u622A\u77ED\u3002\u9EDE\u9078\u53EF\u8DF3\u5230\u90A3\u5F35\u5361\u3002"
+  },
+  SCHEDULE_DATA_INCOMPLETE: {
+    kind: "actionable",
+    guidance: "\u751F\u6210\u524D\u5148\u6AA2\u67E5\u9019\u4E00\u6B21\u6703\u7528\u5230\u7684\u5730\u5716\u8CC7\u6599\uFF1A\u5FC5\u9808\u9078\u4E00\u5F35\u5730\u5716\u3001\u5730\u5716\u8981\u6709\u8DEF\u7DB2\u62D3\u6A38\u8207\u8DEF\u6BB5\u3001\u9078\u7684\u8DEF\u7DDA\u7AD9\u9EDE\u8981\u5728\u8DEF\u7DB2\u4E0A\u3001\u6A21\u677F\u7528\u5230\u7684\u6574\u5099\u8A2D\u65BD\u8981\u5728\u8DEF\u7DB2\u4E0A\uFF0C\u800C\u4E14\u9032\u51FA\u5834\u81F3\u5C11\u5404\u6709\u4E00\u689D\u6BCF\u6BB5\u90FD\u6709\u884C\u99DB\u6642\u9593\u7684\u8DEF\u3002\u7F3A\u4EFB\u4F55\u4E00\u9805\u5C31\u4E0D\u751F\u6210\uFF1B\u7CFB\u7D71\u4E0D\u6703\u6539\u7528\u5225\u5F35\u5730\u5716\u3001\u4E0D\u6703\u628A\u7F3A\u7684\u6642\u9593\u7576 0 \u79D2\u3002\u7167\u8A0A\u606F\u5230\u8DEF\u7DDA\u7FA4\u7D44\u3001\u6574\u5099\u4EFB\u52D9\u6216\u5730\u5716\u7DE8\u8F2F\u88DC\u9F4A\u5F8C\u91CD\u65B0\u751F\u6210\u3002"
+  },
+  MAINTENANCE_WORK_INSUFFICIENT: {
+    kind: "limit",
+    guidance: "\u6A21\u677F\u4E0A\u7684\u9019\u4E00\u6BB5\u6574\u5099\u5728\u6392\u597D\u7684\u73ED\u8868\u88E1\u4E0D\u898B\u4E86\uFF0C\u6216\u5269\u4E0B\u7684\u5DE5\u4F5C\u6642\u9593\u4F4E\u65BC\u6700\u4F4E\u8981\u6C42\uFF08\u6709\u8A2D\u5B9A\u4F5C\u696D\u6642\u9577\u5C31\u7528\u5B83\uFF0C\u6C92\u6709\u7684\u81F3\u5C11\u4E0D\u80FD\u662F\u96F6\uFF09\u3002\u6574\u5099\u4E0D\u80FD\u88AB\u58D3\u6210\u96F6\u3001\u4E5F\u4E0D\u80FD\u522A\u5361\u5047\u88DD\u505A\u5B8C\uFF0C\u6240\u4EE5\u73ED\u8868\u7981\u6B62\u767C\u5E03\u3002\u591A\u534A\u662F\u6B63\u7DDA\u8B93\u6E21\u6216\u79FB\u52D5\u5360\u6389\u592A\u591A\u958B\u982D\uFF1A\u52A0\u9577\u6A21\u677F\u4E0A\u7684\u6574\u5099\u3001\u8ABF\u5C0F\u6B63\u7DDA\u53EF\u58D3\u7E2E\u6574\u5099\u958B\u982D\uFF0C\u6216\u628A\u524D\u5F8C\u73ED\u6B21\u932F\u958B\u3002"
   },
   SCHEDULE_SEARCH_INCOMPLETE: {
     kind: "limit",
@@ -356,7 +368,9 @@ var PUBLISH_BLOCKING_CODES = /* @__PURE__ */ new Set([
   // 移動卡在同一個轉折點貼太近：兩台車實際在路網上交會
   "MOVE_JUNCTION_CONFLICT",
   // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
-  "SCHEDULE_SEARCH_INCOMPLETE"
+  "SCHEDULE_SEARCH_INCOMPLETE",
+  // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表
+  "MAINTENANCE_WORK_INSUFFICIENT"
 ]);
 
 // src/features/shift-list/utils/stationLegTravel.ts
@@ -1351,6 +1365,7 @@ function collectFacilityOccupancies(timelines) {
       (a, b) => a.plannedStartMinute - b.plannedStartMinute || a.plannedEndMinute - a.plannedStartMinute - (b.plannedEndMinute - b.plannedStartMinute) || a.id.localeCompare(b.id)
     );
     let run = null;
+    let arrival = null;
     const close = (current, leaveMinute) => {
       const stays = current.members.filter((member) => member.source !== "hold");
       const anchor = stays[0] ?? current.members[0];
@@ -1381,13 +1396,19 @@ function collectFacilityOccupancies(timelines) {
         run = null;
       }
       if (nodeId) {
+        const pending = arrival;
+        const arrivedEarly = pending && pending.nodeId === nodeId && pending.minute < block.plannedStartMinute ? pending.minute : null;
         run = {
           nodeId,
           label: block.yardFacilityLabel ?? nodeId,
           members: [block],
-          startMinute: block.plannedStartMinute,
+          startMinute: arrivedEarly ?? block.plannedStartMinute,
           lastEndMinute: block.plannedEndMinute
         };
+        arrival = null;
+      } else if (block.plannedEndMinute - block.plannedStartMinute > 1e-9) {
+        const destination = block.source === "yard_entry_move" ? block.yardExitFacilityNodeId?.trim() : "";
+        arrival = destination ? { nodeId: destination, minute: block.plannedEndMinute } : null;
       }
     }
     if (run) close(run, null);

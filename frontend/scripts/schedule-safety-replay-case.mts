@@ -24,6 +24,7 @@ import type { FeasibilityIssue } from '../src/features/shift-list/utils/schedule
 import { PUBLISH_BLOCKING_CODES } from '../src/features/shift-list/utils/scheduleAcceptance';
 import { listTopologyTravelTimeGaps } from '../src/features/shift-list/utils/findTopologyPath';
 import { runSchedulePublishCheck } from '../src/features/shift-list/utils/schedulePublishCheck';
+import { checkScheduleInputData } from '../src/features/shift-list/utils/scheduleInputDataCheck';
 import {
   checkShiftedTemplate,
   enumFieldChanges,
@@ -34,10 +35,20 @@ import {
 
 type Input = GenerateShiftScheduleInput;
 export type ReplayTransform =
+  | ReplayInvalidTransform
   | { kind: 'shift-minutes'; minutes: number }
   | { kind: 'rename'; mode: 'prefix' | 'opaque'; displayOnly?: boolean }
   | { kind: 'drop-standby-facility'; index: number }
-  | { kind: 'protection-seconds'; seconds: number };
+  | { kind: 'protection-seconds'; seconds: number }
+  /**
+   * 模板調整假設（白皮書 YARD-06）：某類整備緊接在另一段整備後面時，把兩段的交界往前移 minutes 分鐘，
+   * 讓後一段多出放移動的時間（前一段等量變短）。只用來驗證「模板照建議調整後排不排得出」，不是正式資料。
+   */
+  | { kind: 'widen-yard-boundary'; taskType: string; minutes: number }
+  /** 路網長度不同：所有路段與路線的行駛時間乘上 factor（泛用性測試；不是正式資料） */
+  | { kind: 'scale-travel'; factor: number };
+/** 非法輸入：清掉路線群組選的地圖／拿掉關聯圖（驗證正式入口會擋下） */
+export type ReplayInvalidTransform = { kind: 'drop-map-id' } | { kind: 'drop-relation-graph' };
 export type ReplayCaseSpec = {
   name: string;
   /** 原始輸入檔（絕對路徑） */
@@ -88,6 +99,64 @@ function applyTransform(input: Input, transform: ReplayTransform): { input: Inpu
     rows.splice(transform.index, 1);
     return { input: next, problems: [] };
   }
+  if (transform.kind === 'drop-map-id') {
+    const next = structuredClone(input);
+    next.draft.routeGroups.mapId = '';
+    return { input: next, problems: [] };
+  }
+  if (transform.kind === 'drop-relation-graph') {
+    const next = structuredClone(input);
+    const groups = next.draft.routeGroups as { routeRelationGraph?: unknown; throughAnchors?: unknown };
+    groups.routeRelationGraph = { nodes: [], links: [] };
+    groups.throughAnchors = undefined;
+    return { input: next, problems: [] };
+  }
+  if (transform.kind === 'scale-travel') {
+    const next = structuredClone(input);
+    const scale = (value: number | null | undefined) =>
+      typeof value === 'number' && Number.isFinite(value) ? Math.round(value * transform.factor) : value;
+    for (const edge of next.pointTopology?.edges ?? []) {
+      edge.avgTravelTimeSeconds = scale(edge.avgTravelTimeSeconds) as typeof edge.avgTravelTimeSeconds;
+      edge.minTravelTimeSeconds = scale(edge.minTravelTimeSeconds) as typeof edge.minTravelTimeSeconds;
+    }
+    for (const route of next.draft.routeGroups.selectedRoutes) {
+      route.avgTravelTimeSeconds = scale(route.avgTravelTimeSeconds) as number;
+      route.minTravelTimeSeconds = scale(route.minTravelTimeSeconds) as number;
+      for (const leg of route.stationLegTravels ?? []) {
+        leg.avgTravelTimeSeconds = scale(leg.avgTravelTimeSeconds) as number;
+        leg.minTravelTimeSeconds = scale(leg.minTravelTimeSeconds) as number;
+      }
+    }
+    // 行駛時間是驗算指紋的一部分：模擬使用者回路線群組重新檢查路線組合
+    return { input: reverifyThroughFingerprint(next), problems: transform.factor > 0 ? [] : ['倍率必須大於 0'] };
+  }
+  if (transform.kind === 'widen-yard-boundary') {
+    const next = structuredClone(input);
+    const raw = next.templateBody as unknown;
+    const body = (typeof raw === 'string' ? JSON.parse(raw) : raw) as { tasks: Array<{ rowIndex: number; taskType: string; startMinute: number; durationMinutes: number }> };
+    const yardTypes = new Set(['charging', 'servicing', 'inspection', 'standby', 'washing']);
+    const problems: string[] = [];
+    let changed = 0;
+    for (const task of body.tasks) {
+      if (task.taskType !== transform.taskType) continue;
+      const previous = body.tasks.find(
+        (other) => other !== task && other.rowIndex === task.rowIndex && yardTypes.has(other.taskType)
+          && Math.abs(other.startMinute + other.durationMinutes - task.startMinute) < 1e-9,
+      );
+      if (!previous) continue;
+      if (previous.durationMinutes <= transform.minutes) {
+        problems.push(`時間線 ${task.rowIndex} 前一段只有 ${previous.durationMinutes} 分鐘，不能讓出 ${transform.minutes} 分鐘`);
+        continue;
+      }
+      previous.durationMinutes -= transform.minutes;
+      task.startMinute -= transform.minutes;
+      task.durationMinutes += transform.minutes;
+      changed += 1;
+    }
+    if (changed === 0) problems.push('沒有找到可以調整的交界');
+    next.templateBody = (typeof raw === 'string' ? JSON.stringify(body) : body) as typeof next.templateBody;
+    return { input: next, problems };
+  }
   const next = structuredClone(input);
   (next.draft.routeGroups as { collisionProtectionSeconds?: number }).collisionProtectionSeconds = transform.seconds;
   return { input: next, problems: [] };
@@ -98,6 +167,7 @@ function classifyReasons(issues: FeasibilityIssue[]): string[] {
   const reasons = new Set<string>();
   for (const issue of issues) {
     const detail = (issue.detail ?? {}) as Record<string, unknown>;
+    if (issue.code === 'SCHEDULE_DATA_INCOMPLETE') reasons.add('data-incomplete');
     if (issue.code === 'MISSING_TRAVEL_TIME' || (Array.isArray(detail.missingTravelTimeEdges) && detail.missingTravelTimeEdges.length > 0)) {
       reasons.add('missing-travel-time');
     }
@@ -157,7 +227,11 @@ function main(caseDir: string): void {
   }
 
   const startedAt = Date.now();
-  const result = generateShiftSchedule(input);
+  // 跟正式生成入口同一套生成前資料檢查（白皮書 MAP-01～03）：缺就不生成
+  const dataIssues = checkScheduleInputData(input);
+  const result = dataIssues.length > 0
+    ? { plan: null, report: { ok: false, errors: dataIssues, warnings: [] } } as ReturnType<typeof generateShiftSchedule>
+    : generateShiftSchedule(input);
   summary.elapsedMs = Date.now() - startedAt;
   writeFileSync(join(caseDir, 'result.json'), JSON.stringify(result));
   const issues = [...result.report.errors, ...result.report.warnings];

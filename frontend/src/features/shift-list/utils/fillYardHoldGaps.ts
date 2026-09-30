@@ -166,6 +166,30 @@ export function fillYardHoldGaps(args: {
         ? previous.yardFacilityNodeId?.trim()
         : undefined;
 
+      // 入廠卡提早抵達：車已經在格子裡等，整備照原訂時刻開始（白皮書 YARD-07）。
+      // 這段等待也佔著格位，補一張「等待」卡讓它看得到
+      const arrivedAt = previous.source === 'yard_entry_move' ? previous.yardExitFacilityNodeId?.trim() : undefined;
+      if (arrivedAt && next.yardFacilityNodeId?.trim() === arrivedAt && YARD_TASK_TYPES.has(next.taskType)) {
+        added.push({
+          id: `hold-${previous.id}-${Math.round(previous.plannedEndMinute * 60)}`,
+          timelineRow: timeline.row,
+          taskType: 'idle',
+          label: `列車 ${timeline.row} · 等待`,
+          anchorStartMinute: previous.plannedEndMinute,
+          plannedStartMinute: previous.plannedEndMinute,
+          plannedEndMinute: next.plannedStartMinute,
+          travelSeconds: 0,
+          dwellSeconds: Math.round(gapMinutes * 60),
+          source: 'hold',
+          yardFacilityNodeId: arrivedAt,
+          yardFacilityLabel: next.yardFacilityLabel ?? previous.yardExitFacilityLabel ?? arrivedAt,
+          yardFacilityStationId: next.yardFacilityStationId,
+        } as GeneratedScheduleBlock);
+        inserted += 1;
+        heldSeconds += gapMinutes * 60;
+        continue;
+      }
+
       // 正線側：跑完一趟停在末站等下一趟；或出廠移動提早到站、在起點站等下一趟。
       // 地點是停靠站，不是設施格
       if (!facilityNodeId) {

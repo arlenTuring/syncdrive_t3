@@ -78,14 +78,6 @@ function collectTrackLocationOptions(areas: MapAreaObject[]): ShiftLocationOptio
     .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant', { numeric: true }));
 }
 
-async function resolveActiveMapId(): Promise<string> {
-  const status = await fetchMapLibraryBackendStatus();
-  if (status?.activeMapId) {
-    return resolveMapId(status.activeMapId);
-  }
-  return 't3-main-version';
-}
-
 async function listAvailableMaps(
   activeMapId: string,
   activeDisplayName?: string | null,
@@ -110,12 +102,6 @@ async function listAvailableMaps(
     byId.set(resolvedActive, {
       mapId: resolvedActive,
       displayName: activeDisplayName?.trim() || resolvedActive,
-    });
-  }
-  if (byId.size === 0) {
-    byId.set('t3-main-version', {
-      mapId: 't3-main-version',
-      displayName: '軌道合併加道路線',
     });
   }
   return [...byId.values()].sort((a, b) =>
@@ -193,8 +179,23 @@ export async function loadShiftRouteGroupCatalog(
   const preferred = preferredMapId?.trim()
     ? resolveMapId(preferredMapId.trim())
     : '';
-  const mapId = preferred || (await resolveActiveMapId());
+  /**
+   * 不替使用者挑地圖（白皮書 MAP-01）：沒選就只回可選清單，等使用者在路線群組明確選一張。
+   * 先前會改用系統啟用地圖、再退回某一張內建地圖，使用者可能在不知情下用錯地圖生成。
+   */
+  const mapId = preferred;
   const availableMaps = await listAvailableMaps(mapId);
+  if (!mapId) {
+    return {
+      mapId: '',
+      mapDisplayName: '',
+      groups: [],
+      availableMaps,
+      firstTripOrigins: [],
+      pointTopology: emptyPointTopology(),
+      trackLocations: [],
+    };
+  }
   const parsed = await resolveParsedMapForPlatform(mapId);
   if (!parsed) {
     return {

@@ -189,6 +189,56 @@ describe('applyMainlineMaintenanceEntryYield', () => {
   });
 });
 
+describe('整備不能被讓渡壓成零（白皮書 YARD-03）', () => {
+  // 一串正線從充電原定開始前就出發，一路跑到充電結束之後：讓渡會把充電吃光
+  const run = () => [
+    {
+      row: 1,
+      blocks: [
+        block({ id: 'p1', taskType: 'passenger', plannedStartMinute: 55, plannedEndMinute: 62 }),
+        block({ id: 'p2', taskType: 'passenger', plannedStartMinute: 62, plannedEndMinute: 71 }),
+        block({ id: 'ch', taskType: 'charging', plannedStartMinute: 60, plannedEndMinute: 70, label: '充電' }),
+      ],
+    },
+  ];
+
+  it('讓渡會吃光整備時不讓渡，整備卡一張都不刪', () => {
+    const timelines = applyMainlineMaintenanceEntryYield(run());
+    const charging = timelines[0]!.blocks.find((item) => item.id === 'ch');
+    assert.ok(charging, '整備卡不能被刪');
+    // p1 結束 62，剩 8 分鐘 ≥ 最低工作時間：這一段可以讓；p2 跑到 71 會吃光，不讓
+    assert.equal(charging!.plannedStartMinute, 62);
+    assert.equal(charging!.plannedEndMinute, 70, '結束鎖住');
+  });
+
+  it('不能讓的那一班改由推移處理：推到整備結束之後，整備保留', () => {
+    const yielded = applyMainlineMaintenanceEntryYield(run());
+    const pushed = pushPassengerPastPrecedingYard(yielded);
+    const blocks = pushed[0]!.blocks;
+    assert.ok(blocks.find((item) => item.id === 'ch'), '整備保留');
+    const p2 = blocks.find((item) => item.id === 'p2');
+    if (p2) assert.ok(p2.plannedStartMinute >= 70 - 1e-9, `p2 ${p2.plannedStartMinute} 要推到充電結束之後`);
+  });
+
+  it('有設定作業時長時，讓渡後至少留下作業時長', () => {
+    const timelines = applyMainlineMaintenanceEntryYield(
+      [
+        {
+          row: 1,
+          blocks: [
+            block({ id: 'p1', taskType: 'passenger', plannedStartMinute: 55, plannedEndMinute: 65 }),
+            block({ id: 'insp', taskType: 'inspection', plannedStartMinute: 60, plannedEndMinute: 80, label: '行檢' }),
+          ],
+        },
+      ],
+      { maintenanceBody: { preTrip: { operationDurationMinutes: '18' } } },
+    );
+    const inspection = timelines[0]!.blocks.find((item) => item.id === 'insp')!;
+    // 讓到 65 只剩 15 分 < 設定的 18 分：不讓
+    assert.equal(inspection.plannedStartMinute, 60);
+  });
+});
+
 describe('pushPassengerPastPrecedingYard', () => {
   it('pushes passenger that steals 行檢 tail to after 行檢 end', () => {
     const inspectionStart = 9 * 60 + 30;

@@ -152,3 +152,39 @@ describe('findTopologyPath', () => {
     assert.equal(missingTravelTimeEdgesBetween(topology, 'A', 'C'), null);
   });
 });
+
+describe('不設固定段數上限（白皮書 ROUTE-03）', () => {
+  // 設施 → 12 段轉折 → 站；名稱只是測試資料
+  const hops = 12;
+  const chainIds = ['fac', ...Array.from({ length: hops - 1 }, (_, i) => `w${i}`), 'st'];
+  const chain: PointTopology = {
+    ...emptyPointTopology(),
+    nodes: chainIds.map((id) => node(id, id === 'fac' ? 'facility' : 'docking')),
+    edges: chainIds.slice(0, -1).map((id, i) => edge(id, chainIds[i + 1]!, 10, 10)),
+  };
+
+  it('合法路徑超過 8 段也找得到', () => {
+    const path = findTopologyPath(chain, 'fac', 'st');
+    assert.ok(path, '12 段的合法路徑應該被找到');
+    assert.equal(path!.edges.length, hops);
+    assert.equal(path!.avgSeconds, 120);
+  });
+
+  it('方向仍然嚴格：反方向沒有路', () => {
+    assert.equal(findTopologyPath(chain, 'st', 'fac'), null);
+  });
+
+  it('呼叫端明確給的段數上限仍然有效', () => {
+    assert.equal(findTopologyPath(chain, 'fac', 'st', { maxHops: 3 }), null);
+  });
+
+  it('設施不能當中途通道', () => {
+    const through: PointTopology = {
+      ...emptyPointTopology(),
+      nodes: [node('a'), node('mid', 'facility'), node('b')],
+      edges: [edge('a', 'mid', 10, 10), edge('mid', 'b', 10, 10)],
+    };
+    assert.equal(findTopologyPath(through, 'a', 'b'), null);
+    assert.ok(findTopologyPath(through, 'a', 'mid'), '設施當目的地可以');
+  });
+});

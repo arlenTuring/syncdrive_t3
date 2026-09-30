@@ -24,6 +24,7 @@ import type {
 import { minuteToSecond, secondToMinute } from './schedule-engine/types';
 import { snapUpToClockAlignSeconds } from './schedule-engine/physics';
 import { compareViolations, type PlanViolation } from './schedule-engine/evaluatePlan';
+import { isWorkYardTaskType } from './yardWorkMinimum';
 
 /**
  * 站位讓渡：把空等的車暫時開進設施格
@@ -64,8 +65,14 @@ import { compareViolations, type PlanViolation } from './schedule-engine/evaluat
  * 必須讓求解器在同一輪就看得到。
  */
 
-/** 停進去至少要待這麼久才划算——比這短的話光是進出就把時間吃完了 */
-const MIN_PARK_SECONDS = 60;
+/**
+ * 停進去至少要待多久：只要求「真的有停」（大於零）。
+ *
+ * 先前固定要 60 秒才考慮，40、50 秒就能解開衝突的格位會被直接略過。使用者（31#24）不給這個門檻：
+ * 短停只要進出時間與安全間隔照算、而且真的讓整張班表變好（全域評分與安全比較），就可以用。
+ * 值不值得交給評分決定，不在這裡用固定秒數先篩掉。
+ */
+const MIN_PARK_SECONDS = 0;
 
 type ParkCandidate = {
   /** 擋人的那一筆站位佔用（終站、且停靠完還賴著） */
@@ -623,7 +630,8 @@ export function relievePlatformIdleWithFacilityPark(args: {
               yardEntryFacilityLabel: plan.waitLabel,
             } as GeneratedScheduleBlock);
           }
-          const pullYardHead = isDirectEntry && yardAfterEntry != null;
+          // 2026-09-29 起只有待命往前接；作業類整備提早到只是等待（白皮書 YARD-07），插「提早進廠等待」卡
+          const pullYardHead = isDirectEntry && yardAfterEntry != null && !isWorkYardTaskType(yardAfterEntry.taskType);
           if (!pullYardHead) added.push({
             id: `berthpark-early-stay-${idTag}`,
             timelineRow: timelineForRow.row,

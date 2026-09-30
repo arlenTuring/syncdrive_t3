@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>排班引擎算法全覽 · 審核用</title>
+  <title>排班引擎白皮書</title>
   <style>
     :root {
       --bg: #f6f4ef;
@@ -208,14 +208,74 @@
       nav { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
       main { padding: 24px 18px 64px; }
     }
+
+    /* ── 白皮書規則版 ── */
+    .tag.now { background: #e3e8f2; color: #34507a; }
+    .tag.todo { background: #f5e6d3; color: var(--warn); }
+    .tag.later { background: #ece4f3; color: #5b3f7a; }
+    .version-line { font-size: 13px; color: var(--muted); }
+    .rule {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin: 14px 0;
+      background: #fff;
+      scroll-margin-top: 16px;
+    }
+    .rule h3 { margin: 0 0 8px; font-size: 1rem; }
+    .rule h3 code { font-size: 0.95em; background: var(--accent-soft); color: var(--accent); }
+    .rule dl { display: grid; grid-template-columns: 7.5em 1fr; gap: 4px 12px; margin: 8px 0; }
+    .rule dt { font-weight: 700; color: var(--muted); font-size: 13px; }
+    .rule dd { margin: 0; }
+    .rule details { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+    .rule details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+    .ex { scroll-margin-top: 16px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    nav .group { margin: 14px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+    .history-banner {
+      border: 2px solid var(--warn);
+      background: var(--warn-bg);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 48px 0 18px;
+    }
+    .history-banner h2 { margin-top: 0; color: var(--warn); }
+    .history-body { opacity: 0.93; }
+    .scroll { overflow-x: auto; }
+    table.strategy { font-size: 12.5px; min-width: 1100px; }
+    table.strategy td, table.decisions td { vertical-align: top; }
+    table.decisions { font-size: 13px; }
   </style>
 </head>
 <body>
 <div class="layout">
 <nav>
-  <p class="brand">排班引擎審核</p>
-  <p class="meta">2026-08-07 · 對齊現行程式 <code>a1ff6d1</code>（工作區含未提交變更）<br/>產出路徑 <code>generate.ts</code></p>
+  <p class="brand">排班引擎白皮書</p>
+  <p class="meta">2026-09-29 第二版（審閱中）<br/>程式查核基準 <code>a18e2c4</code>＋工作區<br/>唯一正式規則文件</p>
   <p class="meta" style="margin-bottom:10px"><a href="./排班引擎最近問題.html">→ 最近一次生成的問題（逐則）</a></p>
+  <p class="group">正文</p>
+  <ol start="0">
+    <li><a href="#w0">怎麼讀</a></li>
+    <li><a href="#w1">引擎與部署管理的分工</a></li>
+    <li><a href="#w2">規則總表</a></li>
+    <li><a href="#w3">地圖與必要資料</a></li>
+    <li><a href="#w4">路線、關聯圖、路網</a></li>
+    <li><a href="#w5">5 秒刻度與實際耗時</a></li>
+    <li><a href="#w6">延誤預留</a></li>
+    <li><a href="#w7">步驟、整備開頭、零整備</a></li>
+    <li><a href="#w8">中途加入的調度載客</a></li>
+    <li><a href="#w9">行駛、停靠與解衝突</a></li>
+    <li><a href="#w10">安全、品質與發布</a></li>
+    <li><a href="#w11">交路、充電與運算</a></li>
+    <li><a href="#w12">報告呈現</a></li>
+    <li><a href="#w-decisions">使用者決定對照表</a></li>
+    <li><a href="#w-strategies">排班策略盤點</a></li>
+    <li><a href="#w13">待確認清單</a></li>
+    <li><a href="#w14">現況差異清單</a></li>
+    <li><a href="#w15">部署管理後續</a></li>
+    <li><a href="#w16">文件驗收與版本</a></li>
+  </ol>
+  <p class="group">歷史附錄（非規格）</p>
   <ol start="0">
     <li><a href="#s0">怎麼讀這份文件</a></li>
     <li><a href="#s1">核心原則與服從順序</a></li>
@@ -240,14 +300,914 @@
 
 <main>
 <header class="hero">
+  <p class="eyebrow">SyncDrive T3 · Schedule Engine White Paper</p>
+  <h1>排班引擎白皮書</h1>
+  <p class="version-line">版本 <strong>2026-09-29 第二版（審閱中）</strong> · 規則核對時間 2026-09-29 · 程式查核基準 <code>a18e2c4</code>＋當日工作區</p>
+  <p>這一份是排班引擎<strong>唯一的正式規則文件</strong>。上半部是使用者已確認的規則與待確認事項；下半部「歷史附錄」保留 2026-09-28 以前的實作說明與改版紀錄，那些是<strong>當時程式怎麼做</strong>，不是規格。</p>
+  <div class="callout warn">
+    <strong>這一頁不是引擎功能驗收。</strong>規則寫進白皮書不代表程式已經照做。每條規則旁邊都標了程式現況；與規則不一致的地方集中在〈<a href="#w14">現況差異清單</a>〉，要等使用者與 Codex 審閱後，下一輪才拆成程式修改與測試。
+  </div>
+</header>
+
+<section id="w0">
+  <h2>0. 怎麼讀這份白皮書</h2>
+  <p>每條規則都有固定編號（例如 <code>MAP-01</code>），審閱時直接引用編號。規則旁的標籤：</p>
+  <table>
+    <tr><th>標籤</th><th>意思</th></tr>
+    <tr><td><span class="tag confirmed">使用者已確認</span></td><td>使用者明確做過的決定，是規格。</td></tr>
+    <tr><td><span class="tag pending">待確認</span></td><td>還沒授權的細節。文件只列選項，不自己挑一個寫成規格。</td></tr>
+    <tr><td><span class="tag now">程式現況</span></td><td>現在的程式實際怎麼做，附函式與檔案位置（以執行邏輯為準，不以註解為準）。</td></tr>
+    <tr><td><span class="tag todo">尚待修改</span></td><td>現況與已確認規則不一致，下一輪要改。</td></tr>
+    <tr><td><span class="tag later">部署管理後續</span></td><td>屬於班表部署管理，本階段不做，但要記著。</td></tr>
+  </table>
+  <p>每條規則用同一個格式說明：<strong>做什麼 → 什麼時候用 → 允許改什麼 → 不能改什麼 → 排不出來怎麼呈現</strong>。技術細節收在「程式現況」的展開區。</p>
+  <p>兩個固定用語：</p>
+  <ul>
+    <li><strong>「本次沒有找到安全排法」</strong>：搜尋在有限的時間、次數或策略內沒找到。<strong>不等於</strong>已證明場域無解，也不等於容量不足。</li>
+    <li><strong>「以前測試通過」</strong>：只代表當時那一版程式、當時那份資料通過，不代表最新程式也通過。</li>
+  </ul>
+</section>
+
+<section id="w1">
+  <h2>1. 引擎負責什麼，部署管理負責什麼</h2>
+  <div class="rule" id="GEN-01">
+    <h3><code>GEN-01</code> 引擎規劃的是「時間線工作計畫」 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>排班引擎依時間模板規劃每一條<strong>時間線</strong>的工作：載客班次、整備、移動。它<strong>不是</strong>派車命令，不決定哪一台實體車去跑哪一條時間線。</p>
+    <table>
+      <tr><th>排班引擎（本白皮書）</th><th>班表部署管理（後續）</th></tr>
+      <tr><td>依模板時間線安排工作</td><td>把實際車輛分配到時間線</td></tr>
+      <tr><td>依路線、關聯圖、路網安排可行的移動</td><td>確認車輛當下真的在哪裡、能不能用</td></tr>
+      <tr><td>依模板安排充電時間</td><td>判斷故障、臨時換車、接班</td></tr>
+      <tr><td>計算計畫內的站位與設施占用</td><td>處理實際遲到（延誤預留的執行面）</td></tr>
+      <tr><td>產生每日循環班表</td><td>不同日期、不同模板之間的交接</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong><span class="tag later">部署管理後續</span> 初始位置是目前最大的假設。</strong>
+      班表是一個每日無限循環的計畫，引擎目前<strong>假設開始營運前，車已經在時間線需要的起點</strong>。實體車會維修、保養，部署管理要決定哪一台車接哪一條時間線；車不在那個位置時，還得另外安排把車調過去，這會打亂班次計畫。這件事目前沒有解，列為後續必須處理的問題（使用者 31#22）。
+    </div>
+  </div>
+  <div class="rule" id="GEN-16">
+    <h3><code>GEN-16</code> 只驗證「同一個模板的每日循環」 <span class="tag confirmed">使用者已確認</span> <span class="tag later">部署管理後續</span></h3>
+    <p>前一天與後一天用同一份模板時，午夜前後的銜接有檢查。<strong>每天用不同模板時的交接</strong>還沒有處理，要等部署管理做順之後再討論（使用者 31#29）。已有的班次差異比對（diff）不等於交接問題已解決。</p>
+  </div>
+  <div class="rule" id="GEN-02">
+    <h3><code>GEN-02</code> 不能針對特定場域寫死 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>不得依車號、站名、班次代碼、某一天或某個時刻寫修復邏輯。白皮書與報告裡的數字只是說明或回歸案例，不能變成程式裡的常數。</p>
+  </div>
+</section>
+
+<section id="w2">
+  <h2>2. 規則總表</h2>
+  <table class="summary">
+    <tr><th>編號</th><th>主題</th><th>狀態</th><th>程式現況一句話</th></tr>
+    <tr><td><a href="#MAP-01">MAP-01</a></td><td>必須明確選一張可用地圖</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>地圖空白會退回啟用地圖或 <code>t3-main-version</code></td></tr>
+    <tr><td><a href="#MAP-02">MAP-02</a></td><td>導入時檢查圖資、路線、站點、路網</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>沒有導入檢查；生成時只報缺行駛時間</td></tr>
+    <tr><td><a href="#MAP-03">MAP-03</a></td><td>依本次選取內容檢查連線與時間</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">部分</span> <span class="tag pending">0 秒有效性待確認</span></td><td>缺時間會列出並擋發布；0 秒照算；未區分整張圖／本次選取</td></tr>
+    <tr><td><a href="#MAP-04">MAP-04</a></td><td>生成時確認仍是檢查過的版本</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">部分</span></td><td>發布檢查有路網指紋；生成前沒有比對</td></tr>
+    <tr><td><a href="#ROUTE-01">ROUTE-01</a></td><td>路線／關聯圖／路網三者分工</td><td><span class="tag confirmed">已確認</span></td><td>三者分開</td></tr>
+    <tr><td><a href="#ROUTE-02">ROUTE-02</a></td><td>正線接續只依關聯圖</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>沒有關聯圖時依執行順序輪替</td></tr>
+    <tr><td><a href="#ROUTE-03">ROUTE-03</a></td><td>取消固定段數上限</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>預設最多 8 段</td></tr>
+    <tr><td><a href="#ROUTE-04">ROUTE-04</a></td><td>「最短」的定義要寫明</td><td><span class="tag confirmed">已確認</span> <span class="tag pending">成本定義待確認</span></td><td>均時最短；挑設施另加外部成本</td></tr>
+    <tr><td><a href="#ROUTE-05">ROUTE-05</a></td><td>重用路徑、不得自行繞路</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">部分</span></td><td>沒有快取；部分策略會用到新路徑</td></tr>
+    <tr><td><a href="#TIME-01">TIME-01~03</a></td><td>5 秒刻度評估</td><td><span class="tag confirmed">方向已確認</span> <span class="tag pending">切換待評估</span></td><td>目前 10 秒</td></tr>
+    <tr><td><a href="#RESERVE-01">RESERVE-01~06</a></td><td>延誤預留（原「恢復時間」）</td><td><span class="tag confirmed">核心已確認</span> <span class="tag pending">參數待確認</span></td><td>目前是固定加在部分銜接上的空檔（同站接續為 0）</td></tr>
+    <tr><td><a href="#YARD-01">YARD-01</a></td><td>步驟：2 時間模板、3 整備任務</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>目前 2 整備、3 模板</td></tr>
+    <tr><td><a href="#YARD-02">YARD-02~06</a></td><td>整備開頭額度、長整備一輪、禁止零整備、模板建議</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>沒有 H≥D 檢查；一輪額度沒有「不得吃光」檢查；壓到零的整備會被刪掉</td></tr>
+    <tr><td><a href="#YARD-07">YARD-07</a></td><td>提早到≠提早工作；不吃尾巴</td><td><span class="tag confirmed">已確認</span> <span class="tag todo">尚待修改</span></td><td>提早到就提早開工；出廠卡會吃尾巴</td></tr>
+    <tr><td><a href="#DISPATCH-01">DISPATCH-01~05</a></td><td>從路線中途加入的調度載客班次</td><td><span class="tag confirmed">方向已確認</span> <span class="tag todo">尚待修改</span></td><td>依任務名稱決定許可差異</td></tr>
+    <tr><td><a href="#GEN-03">GEN-03~15</a></td><td>停靠、慢行、待命、安全、品質、交路、充電、效能</td><td>見各條</td><td>見各條</td></tr>
+  </table>
+</section>
+
+<section id="w3">
+  <h2>3. 地圖與必要資料</h2>
+  <div class="rule" id="MAP-01">
+    <h3><code>MAP-01</code> 使用者必須明確選一張可用地圖 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>生成只用使用者在路線群組選定的那一張地圖。</dd>
+      <dt>什麼時候擋</dt><dd>沒有選、選的版本不存在、地圖載入失敗 → 不能進入生成。</dd>
+      <dt>不能做</dt><dd>不得自動改用系統啟用地圖、<code>t3-main-version</code> 或空路網繼續生成。</dd>
+      <dt>怎麼呈現</dt><dd>停在生成前，說明是哪一種狀況（沒選／版本不存在／載入失敗），指引回路線群組重新選。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第二批已修正</span></summary>
+      <p>2026-09-30：<code>runShiftScheduleEngineForDraft.ts</code> 只用路線群組選的地圖；沒選、找不到、載入失敗都停在生成前（<code>SCHEDULE_DATA_INCOMPLETE</code>），不再改用啟用地圖、內建地圖或空路網。路線群組畫面（<code>shiftRouteGroupCatalog.ts</code>）也不再替使用者預選地圖。</p>
+    </details>
+  </div>
+  <div class="rule" id="MAP-02">
+    <h3><code>MAP-02</code> 導入時檢查四類必要資料 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>選用地圖時檢查<strong>圖資、路線、站點、路網拓樸</strong>。不只看「有沒有」，還要看：互相引用是否有效、是否屬於同一個地圖版本、路線上的站點是否存在、路網端點與行車方向是否可用。</dd>
+      <dt>什麼時候擋</dt><dd>任一項不完整 → 這張地圖不能選用。</dd>
+      <dt>怎麼呈現</dt><dd>列出缺哪一項、缺在哪裡（例：「路線 A 的第 3 站在路網上找不到」「路網上 X → Y 沒有行駛時間」），以及應該到哪個畫面補。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第二批部分修正</span></summary>
+      <p>2026-09-30：生成前檢查 <code>scheduleInputDataCheck.ts</code>（正式入口與重播工具共用）：地圖要有路網拓樸與路段、選的路線每一站在路網上找得到、路線有行駛時間、模板用到的整備有設定設施且設施在路網上。還沒做的：在「選地圖」當下（路線群組畫面）就擋，目前是生成前才擋。</p>
+    </details>
+  </div>
+  <div class="rule" id="MAP-03">
+    <h3><code>MAP-03</code> 依本次選取的路線、設施、待命位置檢查連線與時間 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>把使用者選的路線、整備設施、待命位置合起來，檢查本次排班會用到的連線與行駛時間。</dd>
+      <dt>不能做</dt><dd>缺路段或缺時間（欄位空白），不得猜一個數字補上，也不得當 0 秒。不得自動修改使用者在地圖上填的任何原值。</dd>
+      <dt>怎麼呈現</dt><dd>分兩類列：「整張地圖的必要結構缺失」（這張圖不能用）與「本次選取內容不能生成」（換個選法可能可以）。地圖其他沒用到的區域有問題也列出來，但標明不影響本次。</dd>
+    </dl>
+    <p><strong>明確填 0 秒的路段，分成「現況」與「待確認」兩件事：</strong></p>
+    <ul>
+      <li><span class="tag now">程式現況</span> 欄位有填、而且是 0：尋路照 0 秒算，另外在資料檢查列出來（見下方展開區）。這是<strong>程式目前的行為</strong>，不代表使用者已經核准所有 0 秒移動。</li>
+      <li><span class="tag pending">待確認</span> 0 秒資料在什麼條件下算有效，還沒有規則（見〈<a href="#w13">待確認清單</a>〉Q12）。規則定出來之前，文件與程式都不能自己決定「0 秒一律有效」或「0 秒一律無效」。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">部分符合</span></summary>
+      <p>缺時間不當 0 秒、列出缺的路段與受影響的必要轉場、擋發布：已做（<code>generate.ts</code> 資料檢查、<code>insertMaintenanceTransferCards.ts</code> 的 <code>missingTravelTimeEdges</code>）。明確 0 秒：<code>findTopologyPath.ts</code> 的 <code>listTopologyTravelTimeGaps</code> 把「平均時間為 0、起訖不同」的路段放進 <code>explicitZero</code>；重播工具會列出（<code>dataChecks.explicitZeroTravelTime</code>），畫面上還沒有。「整張地圖／本次選取」沒有分開。</p>
+    </details>
+  </div>
+  <div class="rule" id="MAP-04">
+    <h3><code>MAP-04</code> 生成時確認仍是檢查過的版本 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>換地圖、換路線或地圖出新版本，就重新檢查。前端選單能選到的，正式生成入口也要用同一套檢查擋；不能「畫面擋住了、入口沒擋」。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">部分符合</span></summary>
+      <p>發布前的安全檢查紀錄帶路網指紋（<code>schedulePublishCheck.ts</code> 的 <code>buildTopologyFingerprint</code>），路網改了舊結論就失效。生成前沒有「已檢查的資料版本」比對。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-map">
+    <h4>範例：三種擋法</h4>
+    <table>
+      <tr><th>狀況</th><th>系統怎麼做</th><th>使用者看到</th></tr>
+      <tr><td>路線群組沒選地圖</td><td>不進入生成</td><td>「請先在路線群組選擇地圖」＋跳回該步驟</td></tr>
+      <tr><td>選的地圖路網裡，整備調度入口點 → D1 沒有行駛時間，而本次待命清單用到 D1</td><td>不進入生成（本次選取不可生成）</td><td>「路網上『整備調度入口點』→『D1』沒有行駛時間；本次待命位置 D1 需要它。請到地圖路網補時間，或在整備任務改選其他待命位置」</td></tr>
+      <tr><td>生成前地圖被重新發布（版本改變）</td><td>重新檢查，不沿用舊結論</td><td>「地圖已更新，重新檢查中」；有問題照上面兩列呈現</td></tr>
+    </table>
+    <p class="muted">地點名稱只是說明用的例子。</p>
+  </div>
+</section>
+
+<section id="w4">
+  <h2>4. 路線、關聯圖、路網拓樸</h2>
+  <div class="rule" id="ROUTE-01">
+    <h3><code>ROUTE-01</code> 三者各自負責不同事情，不可互相冒充 <span class="tag confirmed">使用者已確認</span></h3>
+    <table>
+      <tr><th>資料</th><th>決定什麼</th></tr>
+      <tr><td>服務路線</td><td>一班車沿哪些站提供載客服務（站序）</td></tr>
+      <tr><td>路線關聯圖</td><td>這條跑完之後，允許接哪一條</td></tr>
+      <tr><td>路網拓樸</td><td>車從站點、分區入口到設施格位，實際可以怎麼走、要多久</td></tr>
+    </table>
+  </div>
+  <div class="rule" id="ROUTE-02">
+    <h3><code>ROUTE-02</code> 正線接續只依關聯圖；設施移動依路網 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>正線接續遵循使用者畫的關聯圖。去調度區、整備區、待命區的移動由路網求出。</dd>
+      <dt>允許</dt><dd>畫面可以把移動簡化成「經過分區入口」（兩區交換）。</dd>
+      <dt>不能做</dt><dd>沒有關聯圖時，不能默默按路線排列順序循環假裝接續合法。畫面簡化了，<strong>計時與最終位置仍要包含入口到指定格位的那一段</strong>，不能省略內部移動時間。</dd>
+      <dt>怎麼呈現</dt><dd>沒有關聯圖 → 不能生成，指引到路線群組畫關聯圖。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第二批已修正</span></summary>
+      <p>2026-09-30 第二批：<code>routeSuccessorPolicy.ts</code> 拿掉依執行順序輪替；沒有關聯圖（或沒檢查過路線組合）回傳無效策略 <code>RELATION_GRAPH_MISSING</code>，生成停在 <code>ROUTE_SUCCESSOR_POLICY_INVALID</code> 並指引到路線群組。設施移動的計時包含到格位的整段路徑（<code>insertMaintenanceTransferCards.ts</code>），符合。</p>
+    </details>
+  </div>
+  <div class="rule" id="ROUTE-03">
+    <h3><code>ROUTE-03</code> 取消固定段數上限 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>依實際路網找合法的最短路徑。繞圈用「同一個節點／狀態不重複處理」解決。</dd>
+      <dt>不能做</dt><dd>不能用固定 8 段判斷路徑存不存在，也不能換成另一個固定的 10、16。8 這個數字是從路線群組算出來的，不是規則。</dd>
+      <dt>排不出來怎麼呈現</dt><dd>搜尋時間或次數用盡 → 回報「路徑搜尋未完成」，不能說「無路可走」。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第二批已修正</span></summary>
+      <p>2026-09-30 第二批：<code>findTopologyPath.ts</code> 沒給段數上限就不限（原本預設 8）；Dijkstra 用「每個節點的最佳成本」與「同一路徑不重複節點」防繞圈。呼叫端明確要求的上限仍有效（例如進場載客只看直達一段，第四批處理）。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-hops">
+    <h4>範例：合法路徑超過 8 段</h4>
+    <p>設施 A → 入口 → 轉折 1 → 轉折 2 → … → 轉折 8 → 站 S，共 10 段，每段都有行駛時間、方向都正確。</p>
+    <ul>
+      <li>現況：超過 8 段，被判「到不了」，轉場排不出來。</li>
+      <li>規則：這是一條合法路徑，應該被找到；如果它是最短的就用它。只有真的沒有路、或搜尋沒做完，才分別回報「沒有路徑」「搜尋未完成」。</li>
+    </ul>
+  </div>
+  <div class="rule" id="ROUTE-04">
+    <h3><code>ROUTE-04</code> 寫明「最短」用什麼算 <span class="tag confirmed">使用者已確認</span> <span class="tag pending">成本定義待確認</span></h3>
+    <p>「最短」目前是以<strong>每段路的平均行駛時間</strong>加總來比較；但平均時間不一定每段都有，還有幾種節點不能經過。這些分支都會影響找到哪一條路，所以全部列出。</p>
+    <p><span class="tag now">程式現況</span> 尋路分支表（<code>findTopologyPath.ts</code> <code>findTopologyPath</code>、<code>edgeSeconds</code>、<code>edgeHasTravelTime</code>）：</p>
+    <table>
+      <tr><th>條件</th><th>這一段怎麼算／能不能走</th></tr>
+      <tr><td>平均時間有值（0 以上的數字）</td><td>可以走；比較用的成本＝平均時間</td></tr>
+      <tr><td>平均時間空白，最快時間有值</td><td>可以走；<strong>成本退用最快時間</strong>（同一條邊，平均與最快互相遞補）</td></tr>
+      <tr><td>平均、最快都空白（或不是數字、是負數）</td><td><strong>禁止通行</strong>，不當 0 秒。只有「找出缺哪一段」的診斷功能會走它</td></tr>
+      <tr><td>明確填 0</td><td>可以走、照 0 秒算，並列入 0 秒清單（有效性待確認，見 MAP-03、Q12）</td></tr>
+      <tr><td>行車方向</td><td>只能照路段的起點 → 終點走，<strong>不自動補反向</strong></td></tr>
+      <tr><td>下一個節點是設施格，而且不是這次的目的地</td><td><strong>禁止通行</strong>：設施是目的地，不是走廊。設施當起點（出廠）或終點（入廠）可以</td></tr>
+      <tr><td>下一個節點在呼叫端給的「不得經過」名單裡（例：別台車正占用的設施），而且不是目的地</td><td><strong>禁止通行</strong>；目的地本身不受這份名單限制</td></tr>
+      <tr><td>同一條路徑已經經過的節點</td><td>不再走一次（不繞圈）</td></tr>
+      <tr><td>已走段數達到上限（呼叫端沒給就是 8）</td><td>不再往下延伸（ROUTE-03 要取消）</td></tr>
+      <tr><td>起點＝終點</td><td>不用走，0 秒</td></tr>
+    </table>
+    <p>找到路之後，全程時間分兩個數字：「全程最快」＝各段最快（缺就用平均）加總；「全程平均」＝各段平均（缺就用最快）加總；兩者各自往上對齊 10 秒刻度。移動卡的時間用「全程平均」。</p>
+    <p>挑哪一個設施／格位時另有比較成本＝全程平均＋（中途節點數 × 2 × 碰撞保護時間），用來少選會卡住共用轉折點的路。這個加項只用來比較，不會加到卡片時間上。車種等通行限制：路網目前沒有這類資料，引擎沒有處理。</p>
+    <p><span class="tag pending">待確認</span> 要不要把成本改成別的定義（例如最快時間、距離），以及「平均缺值時退用最快」要不要保留，由使用者決定（Q5）；本文件不自行更換。</p>
+  </div>
+  <div class="rule" id="ROUTE-05">
+    <h3><code>ROUTE-05</code> 重用路徑；不得自行繞路 <span class="tag confirmed">使用者已確認</span></h3>
+    <dl>
+      <dt>做什麼</dt><dd>同一個地圖版本、相同起終點與通行條件，路徑算一次就重用。</dd>
+      <dt>不能做</dt><dd>最短路徑被時間衝突擋住時，先處理時刻與既有允許的策略，不能悄悄改走一條沒人知道的繞路。</dd>
+      <dt>怎麼呈現</dt><dd>如果真的產生了不是正線、也不是一般入出廠的路線（例如調度班次的走法），報告裡寫出來：為什麼、從哪裡、走哪幾段（使用者 31#19）。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">部分符合</span></summary>
+      <p>路徑沒有快取，每次嘗試重新查。讓站的「借格位等」策略會算出經過正線的移動路徑（例：從 D1 繞回正線再進充電樁），會寫出讓站訊息，但沒有標成「新路線」讓使用者注意。</p>
+    </details>
+  </div>
+</section>
+
+<section id="w5">
+  <h2>5. 5 秒刻度與實際耗時</h2>
+  <div class="rule" id="TIME-01">
+    <h3><code>TIME-01</code> 排班刻度與真正需要的時間分開 <span class="tag confirmed">方向已確認</span> <span class="tag pending">是否切換待評估</span></h3>
+    <p>可以評估把排班刻度從 10 秒細化成 5 秒，但<strong>不能順便縮短</strong>使用者的停靠時間、轉場時間或安全間隔。36 秒的作業還是 36 秒；為了對齊發車而多等的秒數，要跟作業時間分開記。</p>
+    <p>5 秒能幫的：位置最早 10:00:35 可用時，10 秒刻度只能排 10:00:40，5 秒刻度可以排 10:00:35。它<strong>不能</strong>解決：兩台車真的同時需要唯一的格位、缺路段時間、3 分鐘的移動只有 1 分鐘空檔、違反安全間隔。</p>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p><code>schedule-engine/physics.ts</code> 第 18 行 <code>SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS = 10</code>；到站時刻對齊 10 秒格（<code>buildBlockStationDepartures.ts</code>）。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-36">
+    <h4>範例：36 秒作業在 10 秒／5 秒刻度下</h4>
+    <table>
+      <tr><th></th><th>10 秒刻度</th><th>5 秒刻度</th></tr>
+      <tr><td>到站</td><td>10:00:05</td><td>10:00:05</td></tr>
+      <tr><td>停靠作業（使用者設定）</td><td>36 秒 → 10:00:41 作業完成</td><td>36 秒 → 10:00:41 作業完成</td></tr>
+      <tr><td>最早可發車的刻度</td><td>10:00:50</td><td>10:00:45</td></tr>
+      <tr><td>對齊等待（另外記）</td><td>9 秒</td><td>4 秒</td></tr>
+      <tr><td>站位占用</td><td>10:00:05–10:00:50</td><td>10:00:05–10:00:45</td></tr>
+    </table>
+    <p>兩種刻度下停靠作業都是 36 秒；差別只在對齊等待。不能為了對齊把作業寫成 40 秒，也不能縮成 35 秒。</p>
+  </div>
+  <div class="rule" id="TIME-02">
+    <h3><code>TIME-02</code> 用「幾個刻度」表示的業務上限要改成秒 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>刻度減半時，不能連安全間隔或可延後上限一起減半。真正以秒定義的規則保持原值。</p>
+    <details><summary><span class="tag now">程式現況</span>：目前用刻度表示的地方</summary>
+      <ul>
+        <li>逐站慢行上限：<code>max(平均 × 1.3, 平均 + 1 個刻度)</code>（<code>buildBlockStationDepartures.ts</code> 第 65、273 行）。</li>
+        <li>解衝突加的停靠緩衝對齊刻度（<code>resolveResidualConflicts.ts</code> 第 472 行）。</li>
+        <li>剩餘作業時間在沒有設定作業時長時至少留 1 個刻度（<code>insertMaintenanceTransferCards.ts</code> <code>minimumYardWorkSeconds</code>）。</li>
+      </ul>
+      <p>改刻度前要逐一決定：這個值是「業務上限（秒）」還是「對齊用」。</p>
+    </details>
+  </div>
+  <div class="rule" id="TIME-03">
+    <h3><code>TIME-03</code> 5／10 秒比較方法 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>同一批輸入分別用 5 秒、10 秒生成，比較：安全問題數、漏排班次、班距偏差、占用整備的時間、運算時間、畫面可讀性。本輪只定方法，不跑長時間全案例重播，也不宣稱 5 秒一定比較好。</p>
+  </div>
+</section>
+
+<section id="w6">
+  <h2>6. 延誤預留（原「恢復時間」）</h2>
+  <div class="rule" id="RESERVE-01">
+    <h3><code>RESERVE-01</code> 預留是為了吸收小延誤，不是跑完後的固定作業 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>靜態班表事先安排可用的餘裕；部署管理在執行時用它盡量守住已發布的計畫。</p>
+    <ul>
+      <li>不得因為要預留，就把所有既定班次全面往後推。</li>
+      <li>不得把預留當成「晚到之後還必須重新做滿」的固定作業。</li>
+    </ul>
+    <p>使用者的原始意圖（31#8）：預計 14:35:30 到、停 36 秒、14:36:10 發車。車晚 10 秒到（14:35:40），開門時間不能縮短，14:36:16 才完成靠站——原本會變成延誤班次。有 20 秒預留時，下一班排在 14:36:30 發車，就吸收了這 10 秒。</p>
+    <details open><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span>：「最低恢復時間」不是每次都加</summary>
+      <p>目前的「最低恢復時間」是一個<strong>靜態排班時的時間限制</strong>：同一條時間線前後兩班之間，空檔至少要有多少秒。加不加、加多少，看前後兩班的關係（<code>physics.ts</code> <code>resolveInterTripGapSeconds</code>、<code>shouldIncludeRecoveryForRouteSwitch</code>；生成時 <code>expand.ts</code>、驗證時 <code>validate.ts</code> 用同一套）：</p>
+      <table>
+        <tr><th>前後兩班的關係（依判斷順序）</th><th>兩班之間至少要空</th></tr>
+        <tr><td>① 前一班的終點站＝後一班的起點站（含同一條環狀路線自己接自己、換線但在同一站銜接）</td><td>換線時只加<strong>前一條路線的換線緩衝</strong>；同一條路線自己接自己為 0；恢復時間都不加（2026-09-29 第一批修正：原本一律回傳 0，漏掉換線準備）</td></tr>
+        <tr><td>② 同一條路線連續跑（終點站≠起點站）</td><td>恢復時間</td></tr>
+        <tr><td>③ 換線，而且後一班是路線組合裡緊接的下一條（一輪的中段）</td><td>只加<strong>前一條路線的換線緩衝</strong>，不加恢復時間</td></tr>
+        <tr><td>④ 換線，後一班繞回組合的第一條（一輪跑完、重新開始）</td><td>恢復時間＋換線緩衝</td></tr>
+        <tr><td>⑤ 換線，但不是組合裡的下一條（折返、非正常接續）；或組合只有一條；或找不到路線在組合中的位置</td><td>恢復時間＋換線緩衝</td></tr>
+        <tr><td>⑥ 前後任一班找不到路線資料</td><td>恢復時間（無法判斷同站，不會回傳零）</td></tr>
+      </table>
+      <p>恢復時間另外還出現在三個地方：</p>
+      <ul>
+        <li>車跑完這一站後「最早可以開去別處（讓站、進廠）」＝實際停靠完成＋恢復時間（<code>stationBerthOccupancy.ts</code> <code>resolveVehicleReadyMinute</code>）。</li>
+        <li>單線折返時限檢查：最快一圈＋恢復時間不得超過折返時限（<code>physics.ts</code> <code>resolveRouteMinTurnaroundBudgetSeconds</code>）。</li>
+        <li>路線組合「一輪」的時間含一次恢復時間（<code>routeRelationThroughCycles.ts</code> <code>minCycleSeconds</code>，見 YARD-04）。</li>
+      </ul>
+      <p>所以舊說法「跑完一趟之後強制多停」太籠統：分支 ① 完全不加，③ 只加換線緩衝。它與 RESERVE-01 不同的地方在於：它是固定加在某些銜接上的空檔，不是依「延誤會在哪裡發生、要保護哪一個發車」計算的 A。</p>
+      <p><strong>靜態限制不等於執行時的行為。</strong>上表只保證「排出來的班表」在這些銜接上留了空檔。車實際晚到之後，執行端會不會讓它重新等滿這些秒數、還是直接照計畫時刻發車，要看班表部署／執行端的程式——<strong>本次沒有查部署執行程式</strong>，不能把兩件事當成同一件事（列入〈<a href="#w15">部署管理後續</a>〉）。</p>
+    </details>
+  </div>
+  <div class="rule" id="RESERVE-02">
+    <h3><code>RESERVE-02</code> 三個數字分開：U、R、A <span class="tag confirmed">使用者已確認</span> <span class="tag pending">R 的預設值待確認</span></h3>
+    <table>
+      <tr><th>代號</th><th>意思</th><th>誰決定</th></tr>
+      <tr><td><strong>U</strong> 上限</td><td>系統允許使用者設定的最大值</td><td>使用者指定初始上限 <strong>10 秒</strong></td></tr>
+      <tr><td><strong>R</strong> 最小預留</td><td>這份班表要求每個受保護銜接至少要有的預留；不能超過 U</td><td>使用者選；<span class="tag pending">預設值待確認</span></td></tr>
+      <tr><td><strong>A</strong> 實際可用</td><td>某個受保護銜接實際算出來的預留；可以大於 R，也可以大於 U</td><td>由班表算出</td></tr>
+    </table>
+    <ul>
+      <li><code>R ≤ U</code>。<span class="tag pending">待確認</span>兩件事分開決定：R 能不能是 0（Q4a）；R 是正值時最小單位是多少（Q4b）。最小單位不預設等於排班刻度。</li>
+      <li>U＝10 限制的是「使用者能要求的最低值」，<strong>不代表</strong>要刪掉原本超過 10 秒的空檔，也<strong>不代表</strong>每個地方一律加 10 秒。</li>
+      <li>上限 U 與預設 R 是兩個欄位。超級管理員之後可以在受權限保護的管理設定修改，不必改原始碼（未來介面規格，本輪不做）。</li>
+      <li>設定改了不回寫已發布的班表；每份班表記下它用的設定版本。</li>
+    </ul>
+  </div>
+  <div class="rule" id="RESERVE-03">
+    <h3><code>RESERVE-03</code> 逐個銜接計算 A，不能把空檔加總 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>對每個宣稱受保護的銜接：從計畫發車時刻往前，扣掉不能壓縮的停靠作業、換線準備、必要移動、安全限制之後，剩下的才是 A；必須 <code>A ≥ R</code>。</p>
+    <ul>
+      <li>延誤發生的位置必須用得到這段餘裕，而且等待的位置合法、不擋其他車。</li>
+      <li>前面早已經過的空檔，不能拿來吸收後面才發生的延誤。</li>
+      <li>有空檔不等於每個地方都有延誤保護。</li>
+    </ul>
+  </div>
+  <div class="ex" id="ex-reserve-a">
+    <h4>範例：U、R、A 不混淆</h4>
+    <p>假設 U＝10、這份班表選 R＝10（示範值）。同一台車在站 S 跑完一班、接下一班：</p>
+    <table>
+      <tr><th></th><th>銜接甲</th><th>銜接乙</th></tr>
+      <tr><td>計畫到站</td><td>10:00:00</td><td>11:00:00</td></tr>
+      <tr><td>停靠作業 36 秒完成</td><td>10:00:36</td><td>11:00:36</td></tr>
+      <tr><td>換線準備 20 秒完成</td><td>10:00:56</td><td>11:00:56</td></tr>
+      <tr><td>下一班計畫發車</td><td>10:01:10</td><td>11:01:00</td></tr>
+      <tr><td>A</td><td>14 秒</td><td>4 秒</td></tr>
+      <tr><td>判定</td><td>A ≥ R，受保護</td><td>A &lt; R，<strong>最低預留不足</strong>（單獨列出，見 RESERVE-06）</td></tr>
+    </table>
+    <p>銜接甲的 A＝14 大於 U＝10 沒關係：U 限制的是 R，不會把甲多出的 4 秒刪掉。銜接乙前面如果有一段 30 秒的空檔，也不能拿來補乙，因為車在那之後才晚到。</p>
+    <p class="muted">表中計畫到站與計畫發車都落在 10 秒刻度上（也在 5 秒刻度上），是可以出現在靜態班表裡的時刻；停靠完成、換線準備完成是作業時間算出來的時點，不必對齊刻度。A 由這些時點直接相減，也不必是刻度的倍數。</p>
+  </div>
+  <div class="rule" id="RESERVE-04">
+    <h3><code>RESERVE-04</code> 覆蓋範圍 <span class="tag pending">待確認</span></h3>
+    <p>待審閱的方案（不是已核定）：以「<strong>同一台車接續下一個載客班次的發車</strong>」為主要檢查點，逐一列出受保護與未受保護的銜接。</p>
+    <ul>
+      <li>路線中間每一站要不要保護，另外決定；不能自行在每站加 R。</li>
+      <li>合併班次、同站接續，不能沒說一聲就略過已承諾的保護。</li>
+    </ul>
+  </div>
+  <div class="rule" id="RESERVE-05">
+    <h3><code>RESERVE-05</code> 準時、晚 R 秒、超過 R 秒：這台車與其他車分開看 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>延用上面的銜接甲（A＝14、R＝10）。這一次把同一個站位上的<strong>前車、後車</strong>一起列出來，才看得出「預留有沒有降低風險」。</p>
+    <p><strong>示範設定</strong>（數字只是說明用）：站 S 只有一個站位；碰撞保護時間 10 秒，所以後車最早到站＝前車實際離站＋2 × 10＝＋20 秒（見 GEN-10）。靜態班表上的計畫時刻都在 10 秒刻度上：</p>
+    <table>
+      <tr><th>車</th><th>計畫占用站位 S</th><th>別車最早可進 S</th><th>與前一台的間隔餘裕</th></tr>
+      <tr><td>前車 P</td><td>09:58:30–09:59:30</td><td>09:59:50</td><td>—</td></tr>
+      <tr><td>本車 V</td><td>10:00:00–10:01:10（到站、停靠 36 秒、換線準備 20 秒、下一班 10:01:10 從 S 發車）</td><td>10:01:30</td><td>10 秒（10:00:00 − 09:59:50）</td></tr>
+      <tr><td>後車 W</td><td>10:01:40 到站</td><td>—</td><td>10 秒（10:01:40 − 10:01:30）</td></tr>
+      <tr><td>對照：後車 W′</td><td>10:01:30 到站（剛好貼著保護窗排）</td><td>—</td><td>0 秒</td></tr>
+    </table>
+    <p><strong>延誤發生在哪裡：</strong>V 準時離開上一站，在「上一站 → S」這段行駛中變慢，晚到 S。<strong>這段預留保護的發車點：</strong>V 在 S 接的下一班（計畫 10:01:10 從 S 發車）。預留不保護 V 更後面的班次，也不保護別台車。</p>
+    <table>
+      <tr><th>情境</th><th>V 實際到 S</th><th>停靠完成</th><th>換線準備完成</th><th>V 離開 S</th><th>別車最早可進 S</th><th>後車 W（10:01:40）</th><th>後車 W′（10:01:30）</th></tr>
+      <tr><td>準時</td><td>10:00:00</td><td>10:00:36</td><td>10:00:56</td><td>10:01:10（計畫發車）</td><td>10:01:30</td><td>照計畫</td><td>照計畫</td></tr>
+      <tr><td>晚 R＝10 秒</td><td>10:00:10</td><td>10:00:46</td><td>10:01:06</td><td>10:01:10（計畫發車）</td><td>10:01:30（不變）</td><td>照計畫</td><td>照計畫</td></tr>
+      <tr><td>晚 20 秒（超過 A）</td><td>10:00:20</td><td>10:00:56</td><td>10:01:16</td><td><strong>10:01:16</strong>＝完成作業後的最早可能離站時間（不是已核准的發車時間）</td><td>10:01:36</td><td>10:01:40 仍在保護窗之後，照計畫——靠的是 W 自己多出的 10 秒，不是 V 的預留</td><td>10:01:30 會進入 V 的保護窗，要等到 10:01:36 才能進站；靜態班表沒有安排這 6 秒，屬於執行面處理</td></tr>
+    </table>
+    <p>三種情境裡，前車 P 都不受影響：V 晚到只會讓 V 與 P 的間隔變大。</p>
+    <p><strong>「這台車來得及」與「其他車也不受影響」是兩個不同的判斷：</strong></p>
+    <table>
+      <tr><th>判斷</th><th>要看什麼</th><th>晚 10 秒</th><th>晚 20 秒</th></tr>
+      <tr><td>這台車來得及</td><td>延誤 ≤ A：做完停靠與換線準備，還趕得上計畫發車</td><td>來得及（10 ≤ 14）</td><td>來不及，晚 6 秒</td></tr>
+      <tr><td>後車不受影響</td><td>V 離開 S 的時刻有沒有變晚；變晚的話，後車到站是否仍在「V 離站＋2 × 保護」之後</td><td>不受影響（V 離站時刻不變）</td><td>W 沒事、W′ 受影響——取決於後車自己的間隔餘裕</td></tr>
+      <tr><td>前車不受影響</td><td>V 有沒有比計畫更早占用 S</td><td>不受影響</td><td>不受影響</td></tr>
+      <tr><td>途中其他占用</td><td>V 晚通過「上一站 → S」途中與別車共用的轉折點或分區入口時，那裡的間隔是否仍足夠</td><td colspan="2">本例假設這段沒有共用轉折點或入口；實際班表要逐處檢查，不能由 A ≥ 延誤推出</td></tr>
+      <tr><td>V 的下一班沿線</td><td>V 晚發之後，下游各站、各轉折點與別車的間隔</td><td>不受影響（準點發車）</td><td>可能受影響；靜態班表沒有檢查</td></tr>
+    </table>
+    <ul>
+      <li>三種情境都不縮短基本停靠（晚 20 秒時停靠仍是 36 秒），晚發之後也不得用快於最短行駛時間的速度追回來。</li>
+      <li>預留保護的是<strong>這台車自己的下一班發車</strong>。它能讓後車不受影響，前提是這台車離站時刻沒變；一旦超過 A，後車會不會受影響要看後車自己的餘裕，不能說「有預留就不碰撞」。</li>
+      <li>「單次 R 秒」不保證多次累積的延誤。同一段預留用掉了，不能又算成下一段仍完整可用。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p>引擎目前沒有 R、A 的計算，也不產生上表這種逐銜接的前後車影響分析。靜態班表只保證計畫時刻本身符合站位保護（<code>stationBerthOccupancy.ts</code>：後車到站 ≥ 前車實際離站＋2 × 碰撞保護時間）。晚到之後怎麼處理，屬於部署執行端，本次沒有查。</p>
+    </details>
+  </div>
+  <div class="rule" id="RESERVE-06">
+    <h3><code>RESERVE-06</code> 最低預留不足要單獨呈現 <span class="tag confirmed">使用者已確認</span> <span class="tag pending">是否擋發布待確認</span></h3>
+    <p>A &lt; R 的銜接單獨列出，不能標成已滿足。它<strong>不是</strong>碰撞；碰撞、安全間隔不足仍照原規定擋發布。預留不足要不要擋發布由使用者決定，不順手加入新的全面發布限制。</p>
+  </div>
+  <div class="callout">
+    <strong>待確認的四項</strong>（詳見〈<a href="#w13">待確認清單</a>〉Q1–Q4）：覆蓋範圍、預設 R、預留不足如何處理、R＝0 與正值的最小單位。
+  </div>
+</section>
+
+<section id="w7">
+  <h2>7. 步驟順序、整備開頭額度、禁止零整備</h2>
+  <div class="rule" id="YARD-01">
+    <h3><code>YARD-01</code> 第 2 步選時間模板，第 3 步填整備任務與「正線可壓縮整備開頭」 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>本輪只寫規格與受影響位置，不改介面。之後實作不能只交換標題，要一起處理：資料載入、下一步條件、返回修改、草稿恢復、步驟代號對應。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第三批已修正</span></summary>
+      <p>2026-09-30：<code>types/create.ts</code> 第 2 步時間模板、第 3 步整備任務（編輯器版本 4）；舊草稿的步驟代號自動對調（停在舊第 2 步整備的，打開後在第 3 步）。建立頁、整體預覽的「回到某一步」、步驟標籤一起改。「正線可壓縮整備開頭」欄位在第 3 步，已能對照第 2 步選的模板。</p>
+    </details>
+  </div>
+  <div class="rule" id="YARD-02">
+    <h3><code>YARD-02</code> H 是上限；H ≥ D 即時判不合法 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>D＝整備的實際連續長度，H＝正線可壓縮的整備開頭額度。H 是<strong>允許使用的上限</strong>，不代表每次要用滿，更不代表可以把整備壓到零。</p>
+    <dl>
+      <dt>什麼時候檢查</dt><dd>輸入 H 時，針對這個參數適用的所有模板整備區塊即時檢查。</dd>
+      <dt>擋法</dt><dd><code>H ≥ D</code> → 輸入不合法，列出受影響的區塊、位置、長度與原因，不允許帶著這個設定繼續。</dd>
+      <dt>跨午夜</dt><dd>跨午夜的區塊算成一段完整時間，不能因為畫面拆成兩張卡就各自當短整備。00:00 到隔天 00:00 是一整天，不是零。</dd>
+    </dl>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第三批已修正</span></summary>
+      <p>2026-09-30：第 3 步輸入 H 時即時對照模板上該類的每一段整備（<code>yardEntryAllowanceCheck.ts</code>、<code>YardEntryAllowancePanel.tsx</code>）；H ≥ D 列出哪一段、多長，並擋住「下一步」。</p>
+    </details>
+  </div>
+  <div class="rule" id="YARD-03">
+    <h3><code>YARD-03</code> H &lt; D 只是初步檢查；生成後工作歸零也要擋 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>生成時還要算進真正占用工作時間的進場移動與其他已授權調整，確保<strong>實際工作結束晚於實際工作開始</strong>。等待、行車、安全緩衝不得冒充已完成的整備。</p>
+    <ul>
+      <li>實際被壓到零或負數 → 拒絕這個候選。</li>
+      <li>不能刪掉卡片假裝完成，也不能補一張 1 秒的卡掩蓋。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第一批已修正</span></summary>
+      <p>2026-09-29 第一批：讓渡會讓整備剩不到最低工作時間的占用者不讓渡、改由推移處理，整備卡一律不刪（<code>mainlineMaintenanceEntryYield.ts</code>）；生成階段的讓渡縮短也不壓到最低工作時間以下（<code>normalizeInput.ts</code>）。最終驗證 <code>validateYardWorkPreserved</code>：模板上的整備被刪或壓到歸零就報 <code>MAINTENANCE_WORK_INSUFFICIENT</code>（錯誤、擋發布）。</p>
+      <p>2026-09-30 使用者決定：泛用平台的模板不會替整備之間的移動留時間，移動（入廠晚到、整備間轉場）可以佔用後一段作業的開頭，工作時間低於設定作業時長也可以，逐筆以 <code>MAINTENANCE_WORK_SHORTENED</code> 註明「低於整備設定的作業時長」，但不能歸零。正線讓渡（手填 H、長整備一輪）仍以設定作業時長為下限。</p>
+      <p>更正：先前寫的「推過午夜就丟掉（<code>dropIds</code>）」刪的是<strong>正線班次</strong>，不是整備；仍在，列入差異 D25（沒有逐筆報告）。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-h-d">
+    <h4>範例：H 與 D</h4>
+    <table>
+      <tr><th>整備區塊</th><th>D</th><th>H</th><th>判定</th></tr>
+      <tr><td>行檢 09:00–09:05</td><td>5 分</td><td>5 分</td><td><strong>輸入時就不合法</strong>：「這段整備只有 5 分鐘，允許壓縮開頭也是 5 分鐘，可能完全沒有作業時間。請縮小可壓縮時間，或加長模板中的整備。」</td></tr>
+      <tr><td>行檢 09:00–09:05</td><td>5 分</td><td>4 分</td><td>輸入時初步合法。生成時正線吃了開頭 4 分、進場移動又占掉 70 秒 → 實際工作 −10 秒 → <strong>拒絕這個候選</strong>，不刪卡、不補 1 秒卡。</td></tr>
+      <tr><td>充電 23:50–00:20（跨午夜）</td><td>30 分</td><td>10 分</td><td>D 算 30 分鐘（不是兩張各 10、20 分的卡），合法。</td></tr>
+      <tr><td>待命 00:00–隔天 00:00</td><td>24 小時</td><td>10 分</td><td>D＝一整天，不是 0，合法。</td></tr>
+    </table>
+    <p class="muted">數字只是示範，不得寫進演算法。</p>
+  </div>
+  <div class="rule" id="YARD-04">
+    <h3><code>YARD-04</code> 長整備可讓正線跑完一輪；仍然不能零整備 <span class="tag confirmed">使用者已確認</span></h3>
+    <p><strong>已確認的優先規則</strong>（使用者 31#12：「這是可以優先使用的規則」，並同意 Codex 列的兩個細節）：符合下列條件的長整備，正線可以先把手上這一輪跑完再進場，這時開頭額度用「一輪時間」，<strong>取代</strong>手填的 H。最新補充（8 項修正 #5）：即使適用這個例外，也不能把整備壓成零。</p>
+    <dl>
+      <dt>適用條件</dt><dd>兩個都成立才用一輪額度，否則用這一段整備所屬區段的手填 H：<br/>① 這一段整備在時間模板上的長度<strong>超過 1 小時</strong>（剛好 1 小時不算）；<br/>② 路線群組有合法的關聯圖，而且認得出鎖定的完整循環（一輪），算得出它的時間。</dd>
+      <dt>一輪怎麼算</dt><dd>一輪＝鎖定循環裡每一段路線的<strong>最快行駛時間</strong>＋各段各站的停靠時間（含停靠餘裕）＋段與段之間的換線緩衝（最後一段之後不加）＋<strong>一次</strong>最低恢復時間，四捨五入到秒。用最快時間，所以這是「一輪最少要多久」。</dd>
+      <dt>額度的意思</dt><dd>正線這一輪必須在整備原定開始<strong>之前</strong>就出發；整輪結束不得晚於「整備原定開始＋額度」。這是一條固定的線，不是每掛一輪就往後推一次，所以只讓得出一輪。實際被占掉的開頭＝整輪結束時刻 − 整備原定開始，一定小於一輪。</dd>
+      <dt>兩個細節（已同意）</dt><dd>一輪各段的發車仍受整備開始界線限制，不是第一段提早出發就什麼都能跨；洗車、保養在不同處理中的讓渡判斷不完全一致（見〈<a href="#w-strategies">排班策略盤點</a>〉）。</dd>
+      <dt>不能做</dt><dd>讓完一輪後，整備剩下的實際工作時間必須大於零，而且不低於 YARD-05 的最低工作時間；做不到就<strong>拒絕這個候選</strong>，不能事後刪卡、不能補 1 秒卡。本次不擴大這項授權（例如不延伸到短整備、不讓兩輪）。</dd>
+    </dl>
+    <p>這個額度要有路線組合（第 4 步）才能算，所以分三次檢查：</p>
+    <ol>
+      <li>第 3 步：檢查輸入的 H（YARD-02）。</li>
+      <li>第 4 步資料齊備後：對每一段適用一輪額度的長整備，檢查「一輪」是否會吃光它。</li>
+      <li>生成完成後：再用實際結果檢查一次（YARD-03）。</li>
+    </ol>
+    <p>不能宣稱第 3 步就保證了之後所有情境。<strong>與其他已確認規則的關係：</strong>目前沒有找到兩條已確認規則真的互相衝突的情境——「一輪額度」決定最多能占多少開頭，「禁止零整備」決定占完之後必須還剩多少；兩者同時成立時，只會把某些候選擋掉，不需要使用者重新選擇。之後如果查到真的衝突，會列出具體情境再討論，不整項退回待確認。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">部分符合</span></summary>
+      <p><code>normalizeInput.ts</code> <code>resolveYardEntrySlackSeconds</code>（第 393–428 行）：<code>LONG_YARD_YIELD_THRESHOLD_SECONDS = 3600</code>，整備模板長度 &gt; 3600 秒且 <code>resolveLockedRotationMinSeconds</code> 算得出一輪時，額度＝一輪；否則用各區段設定（沒填預設 600 秒）。一輪時間來自 <code>routeRelationThroughCycles.ts</code> 的 <code>minCycleSeconds</code>；沒有合法關聯圖時是 null，退回 H。額度界線由 <code>cycleViolatesMaintenanceEntryPolicy</code> 檢查（整輪須在整備開始前發車、結束 ≤ 開始＋額度）。</p>
+      <p>2026-09-29 第一批：一輪額度保留；實際可用額度上限改為「整備長度 − 最低工作時間」（<code>resolveNextMaintenanceAfterWindow</code>），會吃光整備的那一輪不是合法候選。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-long-yard">
+    <h4>範例：長整備一輪與禁止零整備同時成立</h4>
+    <table>
+      <tr><th>情況</th><th>適用額度</th><th>判定</th></tr>
+      <tr><td>行檢 30 分鐘，手填 H＝5 分，一輪 18 分鐘</td><td>H＝5 分（不到 1 小時，不用一輪）</td><td>開頭最多被占 5 分</td></tr>
+      <tr><td>保養 70 分鐘，手填 H＝5 分，一輪 18 分鐘</td><td>一輪＝18 分（取代 H）</td><td>某一輪在保養原定開始前 4 分鐘出發 → 占掉 14 分，剩 56 分鐘，合法</td></tr>
+      <tr><td>保養 70 分鐘，一輪 80 分鐘</td><td>一輪＝80 分</td><td>某一輪在保養原定開始前 5 分鐘出發 → 會占掉 75 分，超過保養本身 → <strong>拒絕這個候選</strong>，報「這一輪跑完會吃光整備」，不刪保養卡；改找其他候選（例如更早出發、或不在這段讓渡）</td></tr>
+      <tr><td>保養 70 分鐘，但路線群組沒有合法關聯圖</td><td>算不出一輪 → 用 H</td><td>照 H 處理（沒有關聯圖本身依 ROUTE-02 另外擋）</td></tr>
+    </table>
+  </div>
+  <div class="rule" id="YARD-05">
+    <h3><code>YARD-05</code> 「大於零」不等於「夠用」 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>使用者目前明確禁止零整備，但還沒指定各種作業的最低有效工作時間。白皮書要講清楚：工作時間大於零，不代表已經足夠充電或保養。不得自行加一個全平台固定的作業分鐘數。</p>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p><code>insertMaintenanceTransferCards.ts</code> 的 <code>minimumYardWorkSeconds</code>：用整備設定裡使用者填的作業時長（行檢、洗車；保養取各項目最長的一項）當最低剩餘工作時間；沒有設定的至少留一個刻度。每次縮短都以 <code>MAINTENANCE_WORK_SHORTENED</code> 報告。這是使用者設定值，不是平台常數；「至少一個刻度」是對齊用的下限。</p>
+    </details>
+  </div>
+  <div class="rule" id="YARD-06">
+    <h3><code>YARD-06</code> 時間模板的建議長度用「本段實際適用的額度」計算 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>撤回「全平台額外加固定分鐘數」的建議（使用者 8#6）。建議長度的算法：</p>
+    <p class="callout"><strong>模板建議長度 ＝ 希望保留的工作時間 W ＋ 本段實際適用的開頭額度 E ＋ 尚未包含的必要耗時 M</strong></p>
+    <table>
+      <tr><th>項目</th><th>意思</th></tr>
+      <tr><td>W</td><td>使用者希望這段整備實際保留多少工作時間。</td></tr>
+      <tr><td>E</td><td>這一段整備實際適用的開頭額度：一般是這個整備區段手填的 H；符合 YARD-04 條件的長整備改用<strong>一輪時間</strong>。一輪可能比 H 長，所以不能一律用 H 算，否則建議長度不足以保留 W。</td></tr>
+      <tr><td>M</td><td>會落在這段整備時間內、真的占掉工作時間，而且<strong>沒有算在 E 裡</strong>的已授權耗時（例：進場移動卡如果排在整備時段內，那一段移動）。排在整備開始之前、不占整備時段的移動不算；出場不得吃尾巴（YARD-07），所以出場移動不算。</td></tr>
+    </table>
+    <p><strong>不重複計算：</strong>同一段移動或等待只能算一次。例如 E 本身已經涵蓋「正線占開頭時車還在路上」那段時間，就不能在 M 再加一次同一段。</p>
+    <p><strong>兩階段計算：</strong></p>
+    <ol>
+      <li><strong>路線組合還沒選好（第 3 步）：</strong>還算不出一輪，只能顯示<strong>初估</strong>：先用 H 算，並提示「這段整備如果超過 1 小時，選好路線組合後可能改用一輪額度，建議長度會重算」。</li>
+      <li><strong>路線組合選好之後（第 4 步）：</strong>重新計算，明確寫出本段採用哪一種額度：「手填額度 H＝5 分」或「一輪額度 18 分（鎖定組合一輪）」。</li>
+      <li>如果建議長度剛好讓這段整備跨過 1 小時門檻（例如用 H 算不到 1 小時、加長後超過 1 小時就改用一輪），兩種長度與各自適用的額度都列出來，由使用者決定，不自動挑。</li>
+    </ol>
+    <table>
+      <tr><th>例子（示範值）</th><th>E</th><th>建議長度</th></tr>
+      <tr><td>行檢：想保留 20 分工作，H＝5 分，進場移動有 70 秒落在整備時段內</td><td>H＝5 分</td><td>20 分＋5 分＋1 分 10 秒＝至少 26 分 10 秒</td></tr>
+      <tr><td>保養：想保留 60 分工作，H＝5 分，一輪 18 分；第 3 步初估</td><td>H＝5 分（初估）</td><td>初估 65 分；提示：超過 1 小時，選好路線組合後會重算</td></tr>
+      <tr><td>同上，第 4 步重算</td><td>一輪＝18 分</td><td>60 分＋18 分＝至少 78 分（說明：本段適用一輪額度）</td></tr>
+    </table>
+    <ul>
+      <li>只顯示建議，<strong>不自動修改模板</strong>。</li>
+      <li>建議只保證「開頭被占滿額度後仍有 W」，不代表 W 已足夠充電或保養（YARD-05）。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第三批已修正</span></summary>
+      <p>2026-09-30：第 3 步顯示初估（用手填 H）；第 4 步路線組合選好後，超過 1 小時的整備改用一輪額度重算，額度會吃到最低工作時間以下的也標出實際最多讓多少。建議長度＝整備設定的作業時長 W＋本段額度 E；移動佔用多少由生成報告逐筆揭露（使用者 2026-09-30 同意移動可佔用開頭）。不自動改模板。</p>
+    </details>
+  </div>
+  <div class="rule" id="YARD-07">
+    <h3><code>YARD-07</code> 提早到可以等，但不提早工作；不吃尾巴 <span class="tag confirmed">使用者已確認</span></h3>
+    <ul>
+      <li>提早到設施可以是<strong>等待</strong>，但不能因此提早開工或提早完成；從到場到離開都算格位占用，前提是那一格真的可以被占用。</li>
+      <li>整備尾巴沒有獲得新授權：不能用「出場需要時間」當理由默默截短。</li>
+      <li>如果真的需要例外，先提出具體好處（例如不這樣運量會降低、班距無法達成）、上限與替代方案，等使用者決定（使用者 31#14）。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第一批已修正</span></summary>
+      <ul>
+        <li>提早到：充電、保養、行檢、洗車照原訂時刻開始；抵達到開始之間是等待，格位從抵達就算佔用（<code>collectFacilityOccupancies</code>、轉場卡的格位預約），班表上補一張「等待」卡。待命本身就是等待，仍跟著提早開始。</li>
+        <li>尾巴：作業類整備不再被出廠卡、轉場「前一段讓出」、閃轉折點截短。放不下出場移動時回報「下一班要晚多少」，交給既有的聯動搜尋評估下一班延後、整串推移或換起點；都不行就是必要轉場排不出（擋發布）。</li>
+        <li>待命不是作業：出廠時間不夠時仍可提早離開待命（有標示）。這一點是本批的解讀，使用者可以再改。</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<section id="w8">
+  <h2>8. 從路線中途加入的調度載客班次</h2>
+  <div class="rule" id="DISPATCH-01">
+    <h3><code>DISPATCH-01</code> 目的：銜接營運、利用可提供的運能 <span class="tag confirmed">方向已確認</span></h3>
+    <p>車從設施出來，不必先繞回路線組合的固定起點，可以在合法位置接入既有服務路線的中段（使用者 31#23：這是為了完成營運服務）。</p>
+  </div>
+  <div class="rule" id="DISPATCH-02">
+    <h3><code>DISPATCH-02</code> 非載客移動與載客服務分開 <span class="tag confirmed">方向已確認</span></h3>
+    <p>分開保存「設施到合法接入點的非載客移動」和「接入後的載客服務」。非營運道路不當載客路段；只有具備載客條件的站點提供上下客。不能因為路網走得通，就自行建立一條客運路線。</p>
+  </div>
+  <div class="rule" id="DISPATCH-03">
+    <h3><code>DISPATCH-03</code> 接入點、方向、後續站序與接續都要合法 <span class="tag confirmed">方向已確認</span></h3>
+    <p>轉場、進站、停靠、後續行車、時間線占用、與其他車的安全間隔一起驗證。接入點不一定是原路線起點，但不能跳過必要準備，也不能假裝已經服務過前面的站。</p>
+  </div>
+  <div class="rule" id="DISPATCH-04">
+    <h3><code>DISPATCH-04</code> 依實際位置決定，不依任務名稱 <span class="tag confirmed">方向已確認</span></h3>
+    <p>用實際位置、可行路網、接入後的服務與安全銜接決定；不能依「充電／保養」這種名稱寫死許可差異。路線組合的起點是計算參照，不是所有出場車都必須回去的實體起點（使用者 31#16：換地圖後充電區可能很遠、保養區就在旁邊）。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p><code>insertMaintenanceEntryServiceTrips.ts</code> 第 705–744 行：<code>softDispatch = 任務是充電或待命</code>，據此決定最多走幾段（<code>maxHops: softDispatch ? 1 : 不限</code>）與是否必要。這是依任務名稱決定的差異，違反 DISPATCH-04。</p>
+    </details>
+  </div>
+  <div class="rule" id="DISPATCH-05">
+    <h3><code>DISPATCH-05</code> 報告揭露 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>班次卡照一般班次呈現起終站、服務範圍、時間，不另加醒目的異常樣式。<strong>報告</strong>要寫出：為什麼產生、從哪個設施出來、在哪裡加入哪條路線、哪幾段不載客、服務哪些站、接哪個後續班次；可以點擊定位到班次卡。相同路徑可以群組呈現，保留每一班的連結。</p>
+    <p><span class="tag pending">介面提案，待確認</span> 是否在班次卡上加一個低干擾的「調度載客」標籤。</p>
+  </div>
+  <div class="ex" id="ex-dispatch">
+    <h4>範例：從設施接入服務路線中段</h4>
+    <p>路線 X 的站序是 A → B → C → D。車在充電樁 E2 充完電，下一個工作是接路線 X。</p>
+    <table>
+      <tr><th>段落</th><th>內容</th><th>載客？</th></tr>
+      <tr><td>非載客移動</td><td>E2 → 充電區入口 → 路網 → 站 C（C 是合法接入點，方向與 X 一致）</td><td>否</td></tr>
+      <tr><td>載客服務</td><td>在 C 停靠開門，C → D 服務（不假裝服務過 A、B）</td><td>是</td></tr>
+      <tr><td>後續接續</td><td>D 跑完後依關聯圖接 X 的下一條</td><td>依關聯圖</td></tr>
+    </table>
+    <p>報告寫：「時間線 3：充電後從 E2 出場，於 C 加入路線 X，E2→C 不載客，服務 C、D，接續路線 Y。」點擊跳到那張班次卡。</p>
+  </div>
+</section>
+
+<section id="w9">
+  <h2>9. 行駛、停靠與解衝突</h2>
+  <div class="rule" id="GEN-03">
+    <h3><code>GEN-03</code> 基本停靠與行駛時間不能被靜默改值 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>解衝突時可以在<strong>指定站</strong>增加有紀錄的等待，但不能全站統一加秒數；後面的行駛不能快於使用者給的最短時間，要在「最快」與「平均」之間。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p><code>resolveResidualConflicts.ts</code> 第 472–480 行：加停靠緩衝是「每個適用站都加同樣秒數」，不是只在指定站。每筆調整有紀錄（<code>dwellSlackAdjustment</code>：原始緩衝、增加量、原因、每站前後時刻），分析報告可點擊定位。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-04">
+    <h3><code>GEN-04</code> 慢行有上限，逐班揭露 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>正常行駛調整優先在最快與平均之間。超過平均的慢行要有有限上限（乘客不能在車上無限等），報告逐班寫出：哪一班、慢多少、為什麼（使用者 31#5）。</p>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p>上限是 <code>max(平均 × 1.3, 平均 + 1 個刻度)</code>（<code>buildBlockStationDepartures.ts</code> 第 65、273 行）。這是<strong>現況</strong>，不是永久核定的常數。逐班慢行目前沒有專門的報告項目。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-05">
+    <h3><code>GEN-05</code> 這些時間分開說明、分開計算 <span class="tag confirmed">使用者已確認</span></h3>
+    <table>
+      <tr><th>項目</th><th>是什麼</th></tr>
+      <tr><td>基本停靠作業</td><td>使用者設定的開門上下客時間</td></tr>
+      <tr><td>換線準備</td><td>同一站接下一班也要的準備時間（31#6：車可能需要準備點什麼）</td></tr>
+      <tr><td>延誤預留</td><td>見 RESERVE-01~06</td></tr>
+      <tr><td>為解衝突而等待</td><td>引擎加的，有紀錄</td></tr>
+      <tr><td>對齊等待</td><td>刻度造成的，見 TIME-01</td></tr>
+      <tr><td>安全間隔</td><td>碰撞保護時間，見 GEN-10</td></tr>
+    </table>
+    <p>同一站接下一班，不代表不用換線準備。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p>2026-09-29 第一批：前一班終點站＝後一班起點站時，換線要加前一條路線的換線緩衝（<code>physics.ts</code> <code>resolveInterTripGapSeconds</code>），只算一次；恢復時間在同站接續照舊不加（延誤預留的新規則未定）。完整分支見 RESERVE-01 的程式現況表。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-06">
+    <h3><code>GEN-06</code> 待命位置 <span class="tag confirmed">使用者已確認</span></h3>
+    <ul>
+      <li>待命卡指定允許暫停的位置；清單排序不是強制優先序。</li>
+      <li>可以偏好設施格（比停在正線停靠點好），但要檢查實際占用與到下一個任務的可達性。</li>
+      <li>同區的比較成本算零，不代表移動時間是零。</li>
+    </ul>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p><code>insertMaintenanceTransferCards.ts</code> <code>pickLocationForStay</code>：設施格優先於停靠點；同 Area 比較成本 0，但必須真的有路徑（2026-09-29 修正：先前同 Area 沒有路徑也當 0，待命停進去之後到不了下一個充電樁）。</p>
+    </details>
+  </div>
+  <div class="ex" id="ex-standby">
+    <h4>白話說明：待命能派車，為什麼連續整備期間又可能不能插入正線（使用者 31#17）</h4>
+    <p>先分清楚兩種狀態：<strong>待命</strong>＝車停著等，沒有在做事；<strong>整備</strong>（充電、行檢、保養、洗車）＝車正在做事。</p>
+    <table>
+      <tr><th>程式裡的規則</th><th>白話</th><th>程式位置</th></tr>
+      <tr><td>待命可以當派車時段</td><td>這條時間線在待命<strong>之後還有正線工作</strong>，引擎就把這段待命當成「可以叫車出去跑一輪」的時段。整天只有待命的時間線是備援車，不會被叫上正線。</td><td><code>normalizeInput.ts</code> 第 2025–2030 行、<code>maintenancePostTaskPolicy.ts</code> <code>isStandbyDispatchableForMainline</code></td></tr>
+      <tr><td>整備串中間不插正線</td><td>同一條時間線上首尾相接的幾段整備叫「整備串」（例：保養 02:00–09:30 緊接行檢 09:30–10:00）。車正在做事，不能做到一半出去跑正線；發車時刻落在串裡，就推到整串結束，推太遠就不派這台。</td><td><code>normalizeInput.ts</code> 第 906–921、950–964 行、<code>maintenancePostTaskPolicy.ts</code> <code>resolveContiguousYardBusyUntilMinute</code></td></tr>
+    </table>
+    <p><strong>兩條為什麼會互相卡住：</strong>判斷「整備串」時，程式把<strong>待命也算成整備的一種</strong>（<code>maintenancePostTaskPolicy.ts</code> 的整備類型清單含 <code>standby</code>）。所以發車時刻只要落在待命裡，第二條規則就可能把它推到待命結束；待命後面又緊接充電等整備時，會一路推到整串結束。第一條說「可以派」，第二條又把它推出去。</p>
+    <p><strong>簡單案例實測</strong>（2026-09-29，示範值：1 條時間線、班距 10 分、營運 01:00 起）：</p>
+    <table>
+      <tr><th>模板</th><th>結果</th></tr>
+      <tr><td>01:00–04:00 全是正線（對照）</td><td>01:00 起就有班次</td></tr>
+      <tr><td>待命 01:00–02:00，之後正線</td><td>待命期間沒有派出任何班次，第一班 02:00</td></tr>
+      <tr><td>正線 01:00–01:30、待命 01:30–02:00、之後正線</td><td>待命期間沒有派車，02:00 才接著跑</td></tr>
+      <tr><td>待命 01:00–02:00 接充電 02:00–02:30，之後正線</td><td>第一班 02:30</td></tr>
+      <tr><td>整天只有待命</td><td>不派車（符合「備援車不上正線」）</td></tr>
+    </table>
+    <p>在這些案例裡，「待命可派車」實際上沒有發生，報告也沒有出現「目標發車時刻未排到車」來說明待命期間的發車需求去了哪裡。是不是就是上面兩條規則互卡造成的，還沒有逐步追到底。</p>
+    <p><span class="tag confirmed">使用者已確認</span> 規則本身不變（31#17 同意，只要求寫白話）：<strong>待命之後還有正線工作的，待命期間可以派車；整天待命的不上正線；整備串中間不插正線。</strong>程式在上面的案例沒有做到第一句，列為差異 D23，下一輪查明原因。若查出來真的是「待命被算進整備串」造成的，會把具體情境列出來再討論，不自行決定待命算不算整備串。</p>
+  </div>
+  <div class="rule" id="GEN-07">
+    <h3><code>GEN-07</code> 不用固定「至少停 60 秒」排除有用的暫停方案 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>短停可行、又能解衝突，就可以考慮（40、50 秒也行）；實際進出時間與安全限制照算（使用者 31#24）。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p><code>relievePlatformIdleWithFacilityPark.ts</code> 第 68 行 <code>MIN_PARK_SECONDS = 60</code>：進出加起來再留 60 秒塞不進空等，就不考慮那一格。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-08">
+    <h3><code>GEN-08</code> 尖峰轉離峰 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>尖峰轉離峰時，可以讓已出發的交路跑完，再調整後續班距；也要處理格位不足、必須讓車離開的情況。現況：先依時間規則產生發車需求，停車壓力由後面的讓站、移動與改線補救，<strong>不是</strong>完整的「依現場格位壓力逐步拉開班距」（使用者 31#10）。</p>
+  </div>
+  <div class="rule" id="GEN-09">
+    <h3><code>GEN-09</code> 路線選擇可以考量延後程度 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>備用路線不必永遠排在優先路線後面，比較時會先看延遲（使用者 31#21）；但一定要是已允許的路線。</p>
+  </div>
+  <div class="rule" id="GEN-10">
+    <h3><code>GEN-10</code> 設施換車的安全間隔 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>前車完全離開、後車才可以進入，中間要隔的時間。暫時跟站位、轉折點沿用同一套安全參數（2 × 碰撞保護時間），不自行分成三套（使用者 31#26）。</p>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p><code>validate.ts</code> 第 1675 行、<code>insertMaintenanceTransferCards.ts</code> <code>collisionBufferSeconds</code>：2 × 碰撞保護時間。</p>
+    </details>
+  </div>
+</section>
+
+<section id="w10">
+  <h2>10. 安全、品質與發布</h2>
+  <div class="rule" id="GEN-11">
+    <h3><code>GEN-11</code> 安全問題不能當成可發布的成果 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>碰撞、安全間隔不足、必要移動缺失、車的位置接不起來，都禁止發布。測試要分開算「不合法輸入被成功擋下」與「成功生成安全班表」，不能混成一個通過率。</p>
+    <details><summary><span class="tag now">程式現況</span></summary>
+      <p>擋發布的代號：<code>scheduleAcceptance.ts</code> <code>PUBLISH_BLOCKING_CODES</code>；後端發布／部署前用儲存的資料重新檢查（<code>backend/src/operation-shift/safety/schedule-safety.ts</code>）。重播工具分開記「測試是否符合預期」與「班表是否安全」。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-12">
+    <h3><code>GEN-12</code> 班距／運能品質不擋發布 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>班距或運量沒達標，由使用者自己決定是否發布（使用者 31#30），不新增「品質不好就一律禁止發布」。延誤預留不足怎麼歸類另外決定（RESERVE-06）。</p>
+  </div>
+  <div class="rule" id="GEN-17">
+    <h3><code>GEN-17</code> 不能用這些手段排出表面沒衝突的班表 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>這套引擎不是逐秒模擬車身、煞車、加速度與整段道路占用的碰撞模擬器；安全是靠使用者給的參數（停靠、行駛、碰撞保護）表達，所以參數必須服從，實際行為不對時由使用者調參數（使用者 31#27）。</p>
+    <ul>
+      <li>降低使用者的基本停靠時間。</li>
+      <li>縮小安全保護時間或安全間隔。</li>
+      <li>偷偷吃整備尾巴，或把整備壓到零後刪卡。</li>
+      <li>讓行駛快於使用者給的最短時間。</li>
+      <li>自行加長模板、改地圖資料、把缺值當 0 秒。</li>
+    </ul>
+    <p>排不出來就如實回報，見〈<a href="#w12">報告呈現</a>〉。</p>
+  </div>
+</section>
+
+<section id="w11">
+  <h2>11. 交路、充電與運算方式</h2>
+  <div class="rule" id="GEN-13">
+    <h3><code>GEN-13</code> 不完整交路的處理 <span class="tag pending">取捨待確認</span></h3>
+    <p>刪除、保留合法短交路、或補完，還沒有定案。已確認的只有：不能用「班次數能不能整除某個數字」代替合法路線判定（不同合法交路可能段數不同）。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag todo">尚待修改</span></summary>
+      <p><code>trimIncompleteRotationCycles.ts</code> 第 57–67 行：每一段正線趟數除以路線數有餘數，就把多出來的尾巴刪掉（「寧可刪掉不完整的一輪」）。</p>
+    </details>
+  </div>
+  <div class="rule" id="GEN-14">
+    <h3><code>GEN-14</code> 充電照模板安排 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>充電時間照模板指定的時段排進班表，引擎不自行做能源規劃（使用者 31#31）。工作時長不等於能源足夠，這兩件事要分清楚。</p>
+  </div>
+  <div class="rule" id="GEN-15">
+    <h3><code>GEN-15</code> 重運算移到背景執行 <span class="tag confirmed">使用者已確認</span> <span class="tag later">後續改造</span></h3>
+    <p>生成要移到 Web Worker 或適合的背景方式，避免頁面無回應、跳出「請稍候」。要有進度、可取消、並處理過期的結果。轉圈圖示或 async 包裝本身不能消除主執行緒被卡住（使用者 31#28）。</p>
+    <details><summary><span class="tag now">程式現況</span> <span class="tag confirmed">第三批已修正</span></summary>
+      <p>2026-09-30 第三批：生成改在背景執行緒（<code>schedule-engine/worker/</code>）；畫面顯示階段與百分比、可以取消；新的一次開始就終止舊的，舊結果不會蓋掉新的。沒有 Worker 的環境（單元測試、重播工具）在原執行緒跑同一個函式。同一份輸入前後結果相同（<code>generality.spec.ts</code>）；只有「搜尋用盡時間上限」的案例會因機器快慢不同而不同，這在搬背景前也是如此。</p>
+    </details>
+  </div>
+</section>
+
+<section id="w12">
+  <h2>12. 報告呈現準則</h2>
+  <div class="rule" id="REPORT-01">
+    <h3><code>REPORT-01</code> 已採用的調整要揭露、可定位 <span class="tag confirmed">使用者已確認</span></h3>
+    <p>引擎做過的每一種調整（加停靠緩衝、慢行、改路線、換停靠位、換待命位置、縮短整備、調度載客）都要寫：哪一班、改了什麼、原值與新值、為什麼；點擊可以跳到那張卡。</p>
+  </div>
+  <div class="rule" id="REPORT-02">
+    <h3><code>REPORT-02</code> 未找到方案要分清楚原因 <span class="tag confirmed">使用者已確認</span></h3>
+    <table>
+      <tr><th>類別</th><th>意思</th><th>呈現</th></tr>
+      <tr><td>資料缺失</td><td>缺路段、缺時間、沒有關聯圖</td><td>列出缺哪一項、到哪裡補</td></tr>
+      <tr><td>搜尋未完成</td><td>次數或時間用盡</td><td>「本次計算未找到安全排法（搜尋未完成）」，不說無解</td></tr>
+      <tr><td>已試方案仍不行</td><td>搜完了，試過的都會引出新問題</td><td>主畫面寫結論與位置，試過哪些收在展開區</td></tr>
+    </table>
+    <p>不能一律寫成「演算法極限」或「場域容量不足」。</p>
+  </div>
+</section>
+
+<section id="w-decisions">
+  <h2>13. 使用者決定對照表（31 項＋8 項）</h2>
+  <p>逐項列出使用者先前的決定對應到哪一條規則、目前是已確認還是待確認、白皮書是否已完整納入。「31#n」＝對 Codex 31 項說明的第 n 項回覆（2026-09-28）；「8#n」＝最新 8 項修正（2026-09-29）。後者與前者衝突時，以後者為準。</p>
+  <p>狀態欄只記<strong>規則</strong>；程式有沒有照做看〈<a href="#w14">現況差異清單</a>〉。</p>
+  <table class="decisions">
+    <tr><th>#</th><th>使用者決定（摘要）</th><th>對應規則</th><th>狀態</th><th>白皮書</th></tr>
+    <tr><td>31#1</td><td>「模板允許排幾台」與「現場真的有幾台可用車」是兩回事；後者屬部署管理</td><td><a href="#GEN-01">GEN-01</a>、<a href="#w15">部署後續</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#2</td><td>看不懂地圖退路的問題（後由 8#1 明確決定）</td><td><a href="#MAP-01">MAP-01</a></td><td><span class="tag confirmed">已確認（8#1）</span></td><td>完整</td></tr>
+    <tr><td>31#3</td><td>正線依關聯圖與路網拓樸；不接受「相容舊資料」的輪替；設施移動收斂成分區入口交換，但要放到指定格位</td><td><a href="#ROUTE-01">ROUTE-01</a>、<a href="#ROUTE-02">ROUTE-02</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#4</td><td>10 秒刻度是為了清楚；請評估 5 秒是否更有彈性（8#3 補：刻度與真正時間分開）</td><td><a href="#TIME-01">TIME-01~03</a></td><td><span class="tag confirmed">方向已確認</span> <span class="tag pending">是否切換待評估（Q11）</span></td><td>完整</td></tr>
+    <tr><td>31#5</td><td>慢行可以，但乘客不能無限等；上限（1.3 倍／1 刻度）要寫明，逐班報告哪一班、為什麼</td><td><a href="#GEN-04">GEN-04</a>、<a href="#TIME-02">TIME-02</a></td><td><span class="tag confirmed">已確認</span></td><td>完整（報告缺口見 D17）</td></tr>
+    <tr><td>31#6</td><td>換線停靠＝跑完回到臨時停靠點，通常就是下一班起點；要有緩衝讓車準備換線</td><td><a href="#GEN-05">GEN-05</a></td><td><span class="tag confirmed">已確認</span></td><td>完整；同站接續回傳 0 的現況本版補上（D22）</td></tr>
+    <tr><td>31#7</td><td>解衝突在指定站加；後段行駛介於最快與平均之間，不得快於最快</td><td><a href="#GEN-03">GEN-03</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#8</td><td>恢復時間是吸收小延誤（14:35 範例），不是跑完後補償；討論要不要改回</td><td><a href="#RESERVE-01">RESERVE-01~06</a></td><td><span class="tag confirmed">核心已確認（8#4）</span> <span class="tag pending">R 預設、覆蓋、不足處理、零與最小單位待確認（Q1–Q4）</span></td><td>完整；本版補前後車範例與程式分支表</td></tr>
+    <tr><td>31#9</td><td>內建的延後界線要分門別類寫進白皮書</td><td><a href="#w-strategies">排班策略盤點</a>（初始派車、站位延後）</td><td><span class="tag confirmed">已確認（要求寫入）</span></td><td>本版補齊（原本只在歷史附錄）</td></tr>
+    <tr><td>31#10</td><td>尖峰轉離峰不是依格位壓力逐步拉開，要寫進白皮書</td><td><a href="#GEN-08">GEN-08</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#11</td><td>本來就開放引擎占用部分整備時間；模板要提示整備條多拉長、至少多少（8#6：依正線可壓縮整備開頭）</td><td><a href="#YARD-06">YARD-06</a></td><td><span class="tag confirmed">已確認</span></td><td>本版改成 W＋E＋M，E 用實際適用的額度</td></tr>
+    <tr><td>31#12</td><td>長整備改用一輪額度「是可以優先使用的規則」，兩個細節同意</td><td><a href="#YARD-04">YARD-04</a></td><td><span class="tag confirmed">已確認</span></td><td>本版改列已確認，刪除重問的 Q6</td></tr>
+    <tr><td>31#13</td><td>會縮短整備：對；零長度整備是什麼？（8#5：零整備不允許）</td><td><a href="#YARD-02">YARD-02</a>、<a href="#YARD-03">YARD-03</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#14</td><td>不允許吃尾巴，除非說明真實需要（運量、班距），而且只能很低限度</td><td><a href="#YARD-07">YARD-07</a></td><td><span class="tag confirmed">已確認</span> <span class="tag pending">例外待確認（Q8）</span></td><td>完整</td></tr>
+    <tr><td>31#15</td><td>提早到不代表提早工作；可以提早到讓調度順暢，但格位要真的能占</td><td><a href="#YARD-07">YARD-07</a></td><td><span class="tag confirmed">已確認</span></td><td>完整；本版在盤點表補上 closeYardHeadGaps 也會提早開工</td></tr>
+    <tr><td>31#16</td><td>依任務名稱決定調度是隱藏規則、降低泛用性；要讓使用者知道</td><td><a href="#DISPATCH-04">DISPATCH-04</a>、<a href="#DISPATCH-05">DISPATCH-05</a></td><td><span class="tag confirmed">方向已確認（8#8）</span> <span class="tag pending">卡片標籤待確認（Q10）</span></td><td>完整</td></tr>
+    <tr><td>31#17</td><td>待命可派車與整備串不可插正線：可以，但要寫白話</td><td><a href="#ex-standby">白話說明</a></td><td><span class="tag confirmed">已確認</span></td><td>本版補白話說明與實測（D23）</td></tr>
+    <tr><td>31#18</td><td>清單次序不代表優先；設施格優先可以；同區比較成本為零但移動仍要查路網</td><td><a href="#GEN-06">GEN-06</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#19</td><td>8 段不是規則；找最短路徑；自發的研究路線不應常發生，發生就寫報告（8#7：不該有 8 這個常數）</td><td><a href="#ROUTE-03">ROUTE-03~05</a></td><td><span class="tag confirmed">已確認</span> <span class="tag pending">成本定義待確認（Q5）</span></td><td>完整；本版補尋路分支表</td></tr>
+    <tr><td>31#20</td><td>「寧可刪掉不完整的一輪」（使用者未另寫意見）</td><td><a href="#GEN-13">GEN-13</a></td><td><span class="tag pending">待確認（Q9）</span></td><td>列為待確認</td></tr>
+    <tr><td>31#21</td><td>優先路線不一定永遠在前面（比較時先看延遲）：對</td><td><a href="#GEN-09">GEN-09</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#22</td><td>先假設開始營運前車在起點；但這是大問題，要特別標示並記下擔憂</td><td><a href="#GEN-01">GEN-01</a>、<a href="#w15">部署後續</a></td><td><span class="tag confirmed">已確認（假設）</span> <span class="tag later">部署管理後續</span></td><td>完整</td></tr>
+    <tr><td>31#23</td><td>為了讓站而移動變成載客服務沒有問題，是為了完成營運服務</td><td><a href="#DISPATCH-01">DISPATCH-01</a>、<a href="#w-strategies">盤點：次要路線讓站</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#24</td><td>不給「至少停 60 秒」門檻；40、50 秒能解就可以</td><td><a href="#GEN-07">GEN-07</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#25</td><td>20 秒處理寬限「你自己決定」；知道有些調整會改整趟發車、晚到有代價</td><td><a href="#w-strategies">盤點：班距拉近／修復</a></td><td><span class="tag confirmed">授權引擎決定，須揭露</span></td><td>本版在盤點表列出</td></tr>
+    <tr><td>31#26</td><td>站點、充電格、交叉口的安全間隔先不分開</td><td><a href="#GEN-10">GEN-10</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#27</td><td>很清楚不是逐秒碰撞模擬器；所以參數要服從，看實際行為調參數</td><td><a href="#GEN-17">GEN-17</a></td><td><span class="tag confirmed">已確認</span></td><td>本版在 GEN-17 補寫</td></tr>
+    <tr><td>31#28</td><td>反覆協調知道了；頁面卡住要改用背景執行緒</td><td><a href="#GEN-15">GEN-15</a>、<a href="#w-strategies">盤點：收斂迴圈</a></td><td><span class="tag confirmed">已確認</span> <span class="tag later">後續改造</span></td><td>完整</td></tr>
+    <tr><td>31#29</td><td>不同日交接要等部署管理做順；記在後續擔憂</td><td><a href="#GEN-16">GEN-16</a>、<a href="#w15">部署後續</a></td><td><span class="tag later">部署管理後續</span></td><td>完整</td></tr>
+    <tr><td>31#30</td><td>班距沒達標先不要擋發布，由使用者決定</td><td><a href="#GEN-12">GEN-12</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>31#31</td><td>充電照模板指定時間排，不管能源是否足夠</td><td><a href="#GEN-14">GEN-14</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>8#1</td><td>使用者必須選一張可用地圖；導入檢查路線、圖資、站點、路網，缺就不能用</td><td><a href="#MAP-01">MAP-01~04</a></td><td><span class="tag confirmed">已確認</span></td><td>完整；0 秒路段的有效性另列待確認（Q12），不算在已確認內</td></tr>
+    <tr><td>8#2</td><td>關聯圖與路網拓樸各自負責不同事情：同意</td><td><a href="#ROUTE-01">ROUTE-01</a>、<a href="#ROUTE-02">ROUTE-02</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>8#3</td><td>5 秒刻度：排班刻度與真正需要的時間分開：同意</td><td><a href="#TIME-01">TIME-01~03</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>8#4</td><td>延誤預留：靜態班表預留、部署管理盡量達成計畫；最小預留 R、上限預設 10 秒；超級管理員可改；空檔超過最小預留就可以</td><td><a href="#RESERVE-01">RESERVE-01~06</a></td><td><span class="tag confirmed">核心已確認</span> <span class="tag pending">Q1–Q4</span></td><td>完整；本版把「R＝0」與「最小單位」拆開（Q4a、Q4b），不綁刻度</td></tr>
+    <tr><td>8#5</td><td>步驟順序：2 時間模板、3 整備；輸入 H 時即時檢查；零整備不允許，介面要告知</td><td><a href="#YARD-01">YARD-01~03</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>8#6</td><td>模板建議不能全平台固定加 10 分鐘，要依「正線可壓縮整備開頭」</td><td><a href="#YARD-06">YARD-06</a></td><td><span class="tag confirmed">已確認</span></td><td>本版補：長整備時用一輪額度、初估與重算</td></tr>
+    <tr><td>8#7</td><td>maxHops 不該是 8 這種常數</td><td><a href="#ROUTE-03">ROUTE-03</a></td><td><span class="tag confirmed">已確認</span></td><td>完整</td></tr>
+    <tr><td>8#8</td><td>非預期路線移動是為了不浪費運能、車不從路線起點出來；不一定要從組合起點接；班次不必特別醒目，但報告要揭露</td><td><a href="#DISPATCH-01">DISPATCH-01~05</a></td><td><span class="tag confirmed">方向已確認</span> <span class="tag pending">卡片標籤（Q10）</span></td><td>完整</td></tr>
+  </table>
+  <p class="muted">原始回覆全文：<code>backend/logs/schedule-engine/whitepaper-20260929/user-31-answers.md</code>、<code>user-8-corrections.md</code>（本機工作紀錄，不部署）。</p>
+</section>
+
+<section id="w-strategies">
+  <h2>14. 排班策略盤點</h2>
+  <p>下表是目前程式裡<strong>每一道會改班表的處理</strong>，依執行順序排列。它們現在都在生效，所以列在正文，不只放歷史附錄。每一道是否符合規則，看最後一欄；不符合的已列入〈<a href="#w14">現況差異清單</a>〉。</p>
+  <p>兩種撤回方式先說明：</p>
+  <ul>
+    <li><strong>整道評分撤回</strong>（收斂迴圈內 <code>runGuarded</code>）：這一道跑完，用同一把尺比較整張班表，順序是「硬錯誤 → 安全間隔不足 → 班距不足 → 班次數（越多越好）→ 各時間線班次數差距」；變差就整道還原，連它寫的報告訊息一起收回，報告記「已撤回不適合的調整」（<code>GEOMETRY_PASS_REVERTED</code>）。</li>
+    <li><strong>候選比較</strong>（迴圈之後）：在副本上跑完整段後處理，用最終驗證的同一套限制比較（<code>compareViolations</code>）；沒有新增硬錯誤或安全問題、整體變好才採用，否則丟掉候選。所有候選共用一份搜尋預算（候選 20000 個、評估 6000 次、240 秒），用完報「本次計算未找到安全排法（搜尋未完成）」。</li>
+  </ul>
+  <div class="scroll">
+  <table class="strategy">
+    <tr><th>#</th><th>策略</th><th>何時使用</th><th>會改什麼</th><th>會縮短或刪卡嗎</th><th>用什麼限制</th><th>失敗如何撤回</th><th>報告怎麼呈現</th><th>與規則</th></tr>
+    <tr><td>S1</td><td>初始派車（依班距產生發車需求，掛到時間線）<br/><code>normalizeInput.ts</code></td><td>生成一開始</td><td>決定每一班的時間線、路線、發車時刻</td><td>不刪卡；可以<strong>延後</strong>發車、把上一班從平均壓到最快；接不上就不承接（漏班）</td><td>正線時段、同方向班距、能跑完一輪、整輪不超過下一段整備額度（H 或一輪，YARD-04，且不超過整備長度 − 最低工作時間）、發車不得落在整備串內；作業類整備之後的第一班至少留出「該類設施 → 正線起點站」的最短出廠時間（2026-09-29 起，因為不再截尾巴）。延後上限：該方向還沒有前班時 120 秒（內建）；有前班依班距；不得跨過下一個發車需求</td><td>候選不合就換下一台時間線；第一次完整生成有漏班時，再跑一次「較願意往後挪同路線前班」的版本，安全不變差且（錯誤、安全、班距、漏班、班次數）更好才採用</td><td>「目標發車時刻未排到車」（<code>UNSERVED_SERVICE_PULSE</code>）、班距不足；120 秒等內建上限沒有對應的使用者設定</td><td>GEN-08、GEN-09；待命期間不派車的現象見 D23</td></tr>
+    <tr><td>S2</td><td>整備讓渡（生成階段）<br/><code>deferNonPassengerTasksAfterCycleSpill</code></td><td>派好的正線一輪跨進同列下一段整備開頭</td><td>整備開始延後到正線結束，結束不動</td><td><strong>縮短整備</strong>；不低於最低工作時間（2026-09-29 起），整備不刪</td><td>S1 已保證整輪在額度內；額度上限＝整備長度 − 最低工作時間</td><td>無撤回</td><td>無專門報告</td><td>YARD-03、YARD-04（D10、D11、D25）</td></tr>
+    <tr><td>S3</td><td>進場載客（整備後送車到首發站）<br/><code>insertMaintenanceEntryServiceTrips.ts</code></td><td>整備之後，出場站不是下一班的起點站</td><td>新增一段載客班次，把車從出場站載客開到下一班起點</td><td>排不出就略過（改用不載客的出場移動）</td><td>關聯圖上的路線可以接到；<strong>依任務名稱</strong>分兩種：充電、待命只找 1 段路線、塞不下就不插；其他類型不限段數，必要時帶著衝突也要插。生成階段也只為行檢、保養、洗車預留這段時間（<code>maintenancePostTaskPolicy.ts</code>）</td><td>略過並報告</td><td>「略過進場載客」（<code>MAINTENANCE_DISPATCH_UNREACHABLE</code>）</td><td>DISPATCH-04（D14）、DISPATCH-05（D15）</td></tr>
+    <tr><td>S4</td><td>改派路線配合車的位置<br/><code>alignRouteWithVehicleLocation.ts</code></td><td>下一班起點不是車現在停的地方</td><td>換成從車所在站出發的另一條允許路線（主線／備用）</td><td>不縮短、不刪</td><td>候選的關聯圖優先後繼要與原本相同，換了之後後續交路不歪</td><td>整道評分撤回</td><td>「已改派路線，配合車輛實際停放位置」；換不了時「出廠卡要空跑一段」</td><td>ROUTE-02、GEN-09</td></tr>
+    <tr><td>S5</td><td>改派路線讓車到得了進廠站<br/><code>alignRouteWithMaintenanceEntry.ts</code></td><td>車跑完要進廠，但停的站進不了廠</td><td>換成終點能進廠的允許路線</td><td>不縮短、不刪</td><td>關聯圖允許的路線</td><td>整道評分撤回</td><td>「已改派路線，讓車開到進得了廠的那一站」</td><td>ROUTE-02</td></tr>
+    <tr><td>S6</td><td>班距均分<br/><code>evenOutRouteHeadwayPhase.ts</code></td><td>同路線前後班距不均</td><td>把發車往中點挪（一次走一半），可前可後</td><td>不刪、不改時長</td><td>只在自己這列的空檔內移動；移動前逐站自驗「後車到站 ≥ 前車離站＋2 × 保護」，任何一站不滿足就整筆放棄；每趟只均分一次</td><td>自己放棄＋整道評分撤回</td><td>「已調整發車間隔」</td><td>符合</td></tr>
+    <tr><td>S7</td><td>站位求解（延後後車）<br/><code>stationBerthConstraint.ts</code></td><td>同一站位兩車間隔不足</td><td>延後後車發車；或改走延後較少的備用路線</td><td>不刪</td><td>延後上限：一般 120 秒、等待型 1800 秒（內建）；只延後、不提前</td><td>整道評分撤回</td><td>「已延後班次」＋造成延後的班次；「已改走替代路線」</td><td>GEN-09；上限值為內建（31#9 要求寫入）</td></tr>
+    <tr><td>S8</td><td>沿次要路線讓站<br/><code>relievePlatformIdleWithSecondaryEdge.ts</code></td><td>車在站上空等、擋住別車，關聯圖有次要路線可以繞回</td><td>插入一段沿次要路線的班次，之後回來</td><td>不刪；新增的是<strong>載客服務</strong></td><td>關聯圖允許的次要路線；站位保護</td><td>整道評分撤回</td><td>「已安排替代路線讓出站位」；找不到時「未找到暫停放方案」</td><td>31#23 已同意；ROUTE-05 要求報告寫出走法（D6）</td></tr>
+    <tr><td>S9</td><td>開進待命格暫停放（迴圈內、迴圈後各一次）<br/><code>relievePlatformIdleWithFacilityPark.ts</code></td><td>車在站上空等、擋住別車，沒有次要路線可繞</td><td>插入「進格、停放、出格」三張卡</td><td>不刪</td><td>待命清單允許的格位、路網可達、格位占用；<strong>至少停 60 秒才考慮</strong></td><td>迴圈內整道評分撤回；迴圈後屬候選比較</td><td>「已調整進站或停放安排」</td><td>GEN-07（D18）、ROUTE-05（D6）</td></tr>
+    <tr><td>S10</td><td>班距拉近<br/><code>densifyRouteHeadwaysAfterBerth.ts</code></td><td>站位延後之後班距被拉大</td><td>把發車<strong>往前拉</strong>，只往前</td><td>不刪、不改時長</td><td>不得拉進同列整備尾巴；20 秒處理寬限（內建）</td><td>整道評分撤回</td><td>無專門報告</td><td>31#25 授權引擎決定寬限；揭露缺口（D25）</td></tr>
+    <tr><td>S11</td><td>班距修復<br/><code>repairRouteHeadwaysBelowTarget.ts</code></td><td>同路線跨時間線班距低於目標</td><td>把前班往前拉開到目標班距</td><td>不刪、不改時長</td><td>拉前後的終點站停留要驗碰撞；20 秒處理寬限（內建）</td><td>整道評分撤回</td><td>無專門報告；最後的班距檢查仍可能列出不足</td><td>同上（D25）</td></tr>
+    <tr><td>S12</td><td>整備讓渡（落地）<br/><code>applyMainlineMaintenanceEntryYield</code></td><td>正線或進場載客這一串在整備原定開始<strong>之前</strong>就出發，跑進整備開頭</td><td>整備開始推到正線結束，結束不動；正線消失時縮回模板原起點</td><td><strong>縮短整備</strong>；會吃光整備的占用者不讓渡、改推移，整備不刪（2026-09-29 起）</td><td>保養的開頭只允許進場載客占；洗車不在這一道處理；充電、行檢、待命允許正線占</td><td>整道評分撤回</td><td>無專門報告</td><td>YARD-03（D10）、YARD-04（D11）、REPORT-01（D25）</td></tr>
+    <tr><td>S13</td><td>正線推過整備<br/><code>pushPassengerPastPrecedingYard</code></td><td>正線壓在同列整備上（不是讓渡那種情況）</td><td>整趟平移到整備（串）結束，同列後面被壓到的正線一起往後</td><td><strong>刪正線</strong>：一推要超過 45 分鐘而且跨過 2 段以上整備時刪；推到 24:00 以後刪</td><td>進場載客可以占保養尾巴；其他正線不得占任何整備尾巴</td><td>整道評分撤回</td><td>無專門報告</td><td>REPORT-01（D25）</td></tr>
+    <tr><td>S14</td><td>清掉不完整的一輪<br/><code>trimIncompleteRotationCycles.ts</code></td><td>每一段（以整備切段）正線趟數不是路線數的整數倍</td><td>從該段末班往前刪到整輪</td><td><strong>刪正線</strong></td><td>以「能不能整除」判斷</td><td><strong>不受評分撤回</strong>（刻意排除：它會降低班次數，套上閘門就永遠被擋）</td><td>刪除本身無專門報告；驗證時「未跑完一整輪」</td><td>GEN-13（Q9、D19）</td></tr>
+    <tr><td>S15</td><td>收斂與最佳輪<br/><code>generate.ts</code></td><td>S4–S14 反覆跑到版面不再變化</td><td>沒收斂時改用過程中分數最好的那一輪</td><td>—</td><td>輪數上限</td><td>—</td><td>「試算已達上限」「本次試算尚未排妥」</td><td>GEN-15（效能）</td></tr>
+    <tr><td>S16</td><td>整備進出與轉場卡<br/><code>insertMaintenanceTransferCards.ts</code></td><td>迴圈結束後，每段整備串的首、尾、中間換類型處</td><td>入廠：補移動卡，作業類提早到只等待（2026-09-29 起）；出廠：從下一班往前推出場移動；轉場：前一段跑滿，後一段開頭延後；挑設施格與待命位置</td><td><strong>會縮短開頭</strong>，不截尾巴（2026-09-29 起；待命除外）：晚進場可推遲上限 max(60 秒, 4 × 2 × 保護)（有讓渡設定時改用設定）；剩餘作業時間不低於設定的作業時長（沒設定至少 1 刻度）</td><td>路網、格位占用、設施交接 2 × 保護、路口間隔</td><td>排不出就報告；候選比較（轉場候選篩選、錯開路口、換格位）</td><td>「整備工作時間被移動佔用」「已調整停放位置」「提早進廠被擋」「整備轉場卡排不出來」「必要的整備轉場排不出來」「路口間隔不足」</td><td>YARD-07（D12）</td></tr>
+    <tr><td>S17</td><td>整備前不留空白<br/><code>closeYardHeadGaps.ts</code></td><td>車已經在那一格，整備開始前還有空白</td><td>待命開始提前到車到格位的時刻（2026-09-29 起作業類整備不處理）</td><td>加長（不縮短）</td><td>前一張卡必須是開進同一格的移動或同格整備；那段時間別列車沒有占用該格</td><td>屬候選比較的一部分</td><td>無專門報告</td><td>YARD-07：提早到≠提早工作（D12）</td></tr>
+    <tr><td>S18</td><td>滯留車晚一點進站<br/><code>yieldIdleBlockArrival.ts</code></td><td>早到後本來就要空等的車，卡進別車的保護窗</td><td>整趟往後挪剛好差的秒數；下一趟發車不動</td><td>不刪、不改時長</td><td>每挪一趟用全域評分與安全比較驗一次</td><td>沒變好就還原那一趟</td><td>「已調整進站或停放安排」</td><td>符合</td></tr>
+    <tr><td>S19</td><td>補「暫停」卡<br/><code>fillYardHoldGaps.ts</code></td><td>整備做完、車還在格位；或出廠提早到下一班起點站</td><td>補一張停留卡，讓占用看得到</td><td>不改時刻</td><td>只認得出確定的地點</td><td>—</td><td>班表上看得到暫停卡</td><td>符合</td></tr>
+    <tr><td>S20</td><td>殘留衝突修復<br/><code>resolveResidualConflicts.ts</code></td><td>前面都跑完，還剩站位衝突</td><td>雙方都試：整趟平移、只挪發車（壓縮行駛，不快於最快）、只挪到站（拉長行駛，上限約平均 × 1.3）；對某一班加停靠緩衝（<strong>每個適用站都加</strong>）；可動前後班並聯動處理新衝突</td><td>不刪；會改時長（行駛時間在合法範圍內）</td><td>合法行駛範圍、前後任務的恢復／換線間隔、深度與評估次數上限</td><td>副本整組驗證，候選比較；用盡記錄</td><td>「已套用的時刻調整」列原時刻、新時刻與原因，可點擊定位；搜尋用盡報「搜尋未完成」</td><td>GEN-03（D16）、GEN-04（D17）</td></tr>
+    <tr><td>S21</td><td>聯合搜尋<br/><code>generate.ts</code></td><td>S16–S20 之後仍不安全</td><td>轉場候選篩選、站位改線＋成對調整、殘留修復後重算、待命替代位置、局部阻擋班次搜尋</td><td>依各候選</td><td>共用搜尋預算</td><td>候選比較</td><td>「本次計算未找到安全排法（搜尋未完成）」</td><td>REPORT-02</td></tr>
+  </table>
+  </div>
+  <p class="muted">盤點依據：<code>generate.ts</code> 的執行順序與各檔案的判斷式（HEAD <code>a18e2c4</code>＋當日工作區）。「無專門報告」表示這一道改了班表，但報告沒有逐筆寫出它改了什麼，列入差異 D25。</p>
+</section>
+
+<section id="w13">
+  <h2>15. 待確認清單</h2>
+  <table>
+    <tr><th>#</th><th>項目</th><th>選項（不代表已選）</th></tr>
+    <tr><td>Q1</td><td>RESERVE-04 覆蓋範圍</td><td>(a) 只保護「同車接下一個載客班次的發車」；(b) 另加路線中途指定站；(c) 另加所有停靠站</td></tr>
+    <tr><td>Q2</td><td>RESERVE-02 預設 R</td><td>(a) 預設等於 U（10 秒）；(b) 預設 5 秒；(c) 預設 0＝關閉，由使用者自己開</td></tr>
+    <tr><td>Q3</td><td>RESERVE-06 預留不足怎麼處理</td><td>(a) 只列出不擋發布；(b) 列出並要求確認後才能發布；(c) 擋發布</td></tr>
+    <tr><td>Q4a</td><td>延誤預留是否允許 R＝0</td><td>(a) 允許，代表這份班表不要求最低預留（等於關閉）；(b) 不允許，啟用延誤預留就必須是正值</td></tr>
+    <tr><td>Q4b</td><td>R 是正值時，最小單位是多少</td><td>另外決定，<strong>不預設等於排班刻度</strong>：(a) 1 秒；(b) 使用者或超級管理員另外指定。排班刻度只決定計畫時刻對齊在哪裡；A 由實際時點相減，本來就不必是刻度的倍數</td></tr>
+    <tr><td>Q5</td><td>ROUTE-04 最短成本</td><td>(a) 維持平均行駛時間（缺平均退用最快）；(b) 改最快時間；(c) 改距離</td></tr>
+    <tr><td>Q7</td><td>YARD-05 各作業最低有效工作時間</td><td>(a) 由整備設定的作業時長決定（現況有部分）；(b) 另設欄位；(c) 只要大於零</td></tr>
+    <tr><td>Q8</td><td>YARD-07 吃尾巴的例外</td><td>現況程式會吃（見差異 D12）。(a) 全部移除；(b) 給一個有上限、要揭露的例外（需列出具體好處）</td></tr>
+    <tr><td>Q9</td><td>GEN-13 不完整交路</td><td>(a) 刪除；(b) 保留合法短交路；(c) 補完</td></tr>
+    <tr><td>Q10</td><td>DISPATCH-05 班次卡標籤</td><td>(a) 不加；(b) 加低干擾的「調度載客」標籤</td></tr>
+    <tr><td>Q11</td><td>TIME-01 是否切換 5 秒</td><td>依 TIME-03 比較結果再決定</td></tr>
+    <tr><td>Q12</td><td>MAP-03 明確填 0 秒的路段怎樣算有效</td><td>(a) 一律視為有效，只列出提醒；(b) 使用者逐段確認後才能用於排班；(c) 只允許特定情況（例：兩個節點其實是同一個實體位置）。不論哪一種，都不自動改使用者原值</td></tr>
+  </table>
+  <p class="muted">Q6（長整備一輪額度與手填 H 的關係）已刪除：使用者 31#12 已確認，見 <a href="#YARD-04">YARD-04</a>。編號不重排，避免舊的審閱紀錄對不上。</p>
+</section>
+
+<section id="w14">
+  <h2>16. 現況差異清單（尚待修改）</h2>
+  <p>以下是已確認規則與現行程式不一致的地方，依影響排序。本輪只列出，不修改。</p>
+  <table class="diff">
+    <tr><th>#</th><th>規則</th><th>現況</th><th>程式位置</th></tr>
+    <tr><td>D1</td><td>MAP-01</td><td><span class="tag confirmed">第二批已修正</span> 只用選定地圖，沒選或載入失敗就停在生成前</td><td><code>runShiftScheduleEngineForDraft.ts</code> 86–95</td></tr>
+    <tr><td>D2</td><td>MAP-02／03</td><td><span class="tag confirmed">第二批部分修正</span> 生成前檢查路網、站點、設施、本次進出場必要行駛時間；選圖當下即時擋留待第三批畫面流程</td><td><code>findTopologyPath.ts</code> <code>listTopologyTravelTimeGaps</code>、<code>generate.ts</code></td></tr>
+    <tr><td>D3</td><td>MAP-04</td><td>生成前不比對資料版本</td><td><code>runShiftScheduleEngineForDraft.ts</code></td></tr>
+    <tr><td>D4</td><td>ROUTE-02</td><td><span class="tag confirmed">第二批已修正</span> 沒有關聯圖（或沒檢查過路線組合）就不生成，不再依排列順序輪替</td><td><code>routeSuccessorPolicy.ts</code>（<code>execution-order-ring-v1</code>）</td></tr>
+    <tr><td>D5</td><td>ROUTE-03</td><td><span class="tag confirmed">第二批已修正</span> 不設預設段數上限；方向、設施不當通道、不得經過名單照舊</td><td><code>findTopologyPath.ts</code> 100</td></tr>
+    <tr><td>D6</td><td>ROUTE-05</td><td>路徑沒有快取；新產生的移動路線沒有另外標示</td><td><code>findTopologyPath.ts</code>、<code>relievePlatformIdleWithFacilityPark.ts</code></td></tr>
+    <tr><td>D7</td><td>RESERVE-01~06</td><td>恢復時間是跑完後強制停留；沒有 U／R／A</td><td><code>stationBerthOccupancy.ts</code> 164–166、<code>physics.ts</code> 275–296</td></tr>
+    <tr><td>D8</td><td>YARD-01</td><td><span class="tag confirmed">第三批已修正</span> 第 2 步時間模板、第 3 步整備任務；舊草稿自動對調</td><td><code>types/create.ts</code> 134–140</td></tr>
+    <tr><td>D9</td><td>YARD-02</td><td><span class="tag confirmed">第三批已修正</span> 輸入時即時檢查並擋下一步</td><td><code>StepShiftMaintenanceTask.tsx</code> 255–262</td></tr>
+    <tr><td>D10</td><td>YARD-03</td><td><span class="tag confirmed">第一批已修正</span> 整備不再被刪、不壓到最低工作時間以下，最終驗證會擋（更正：<code>dropIds</code> 刪的是正線，見 D25）</td><td><code>mainlineMaintenanceEntryYield.ts</code> 170–178、<code>dropIds</code></td></tr>
+    <tr><td>D11</td><td>YARD-04</td><td><span class="tag confirmed">第一批已修正</span> 一輪額度保留，實際可用額度上限＝整備長度 − 最低工作時間</td><td><code>normalizeInput.ts</code> 393–433</td></tr>
+    <tr><td>D12</td><td>YARD-07</td><td><span class="tag confirmed">第一批已修正</span> 作業類整備提早到只等待（佔格位）、不截尾巴；待命維持可提早開始與離開</td><td><code>insertMaintenanceTransferCards.ts</code>、<code>closeYardHeadGaps.ts</code></td></tr>
+    <tr><td>D13</td><td>YARD-06</td><td><span class="tag confirmed">第三批已修正</span> 第 3 步初估、第 4 步依路線組合重算</td><td><code>StepShiftTimeTemplate.tsx</code></td></tr>
+    <tr><td>D14</td><td>DISPATCH-04</td><td>依充電／待命名稱決定調度載客的段數與必要性</td><td><code>insertMaintenanceEntryServiceTrips.ts</code> 705–744</td></tr>
+    <tr><td>D15</td><td>DISPATCH-05</td><td>報告沒有逐項寫出接入點、不載客路段、後續接班</td><td><code>generate.ts</code> 報告區</td></tr>
+    <tr><td>D16</td><td>GEN-03</td><td>加停靠緩衝是每個適用站一起加</td><td><code>resolveResidualConflicts.ts</code> 472–480</td></tr>
+    <tr><td>D17</td><td>GEN-04</td><td>逐班慢行沒有專門的報告項目</td><td><code>buildBlockStationDepartures.ts</code></td></tr>
+    <tr><td>D18</td><td>GEN-07</td><td>固定 60 秒最短暫停</td><td><code>relievePlatformIdleWithFacilityPark.ts</code> 68</td></tr>
+    <tr><td>D19</td><td>GEN-13</td><td>以整除判定不完整交路</td><td><code>trimIncompleteRotationCycles.ts</code> 57–67</td></tr>
+    <tr><td>D20</td><td>GEN-15</td><td><span class="tag confirmed">第三批已修正</span> 背景執行緒、進度、取消、過期結果處理</td><td><code>runShiftScheduleEngineForDraft.ts</code> 149</td></tr>
+    <tr><td>D21</td><td>TIME-02</td><td>多處用刻度倍數表示上限</td><td>見 TIME-02 展開區</td></tr>
+    <tr><td>D22</td><td>GEN-05、RESERVE-01</td><td><span class="tag confirmed">第一批已修正</span> 同站接續換線時加換線緩衝；恢復時間照舊不加（待延誤預留規則）</td><td><code>physics.ts</code> <code>resolveInterTripGapSeconds</code></td></tr>
+    <tr><td>D23</td><td>31#17（<a href="#ex-standby">白話說明</a>）</td><td>待命之後還有正線的時間線，簡單案例實測待命期間沒有派出班次，報告也沒有說明；原因未查完（疑似「待命被算進整備串」）</td><td><code>normalizeInput.ts</code> 2025–2030、906–921；<code>maintenancePostTaskPolicy.ts</code></td></tr>
+    <tr><td>D24</td><td>MAP-03</td><td>明確 0 秒的路段照 0 秒排，有效性規則未定（Q12）；畫面沒有列出</td><td><code>findTopologyPath.ts</code> <code>listTopologyTravelTimeGaps</code></td></tr>
+    <tr><td>D25</td><td>REPORT-01</td><td>會改班表但沒有逐筆報告的處理：生成階段與落地的整備讓渡縮短（含刪零長度整備）、正線推過整備（含刪正線）、清掉不完整一輪（刪正線）、班距拉近與修復挪班、整備前空白併入整備</td><td>見〈<a href="#w-strategies">排班策略盤點</a>〉S2、S10–S14、S17</td></tr>
+  </table>
+  <p class="muted">查核範圍：從正式入口 <code>runShiftScheduleEngineForDraft</code> → <code>generateShiftSchedule</code> 追到的位置，各道處理逐一對照見〈<a href="#w-strategies">排班策略盤點</a>〉。盤點看的是程式的判斷式；D23 以外沒有逐道跑案例驗證，下一輪拆程式修改時，每一項改動都要附測試案例。部署執行端（晚到之後怎麼處理）沒有查，列在〈<a href="#w15">部署管理後續</a>〉。</p>
+</section>
+
+<section id="w15">
+  <h2>17. 部署管理後續議題</h2>
+  <table>
+    <tr><th>議題</th><th>來源</th></tr>
+    <tr><td>車不在時間線起點時，如何安排接班前的移動；那段移動是否占用其他車的站位、入口與格位</td><td>GEN-01、31#22</td></tr>
+    <tr><td>維修、保養後能否接回原時間線</td><td>GEN-01</td></tr>
+    <tr><td>「模板允許排幾台」與「現場真的有幾台可用車」分開</td><td>31#1</td></tr>
+    <tr><td>不同日模板的交接</td><td>GEN-16、31#29</td></tr>
+    <tr><td>延誤預留的執行面：實際晚到時怎麼使用預留、超過時怎麼處理；超過 A 時後車要不要等、等多久（RESERVE-05 的後車 W′）</td><td>RESERVE-01、RESERVE-05</td></tr>
+    <tr><td>查部署執行程式：車晚到之後，會不會重新等滿恢復時間／換線緩衝，還是照計畫時刻發車。靜態班表的時間限制不能證明這件事</td><td>RESERVE-01 程式現況</td></tr>
+    <tr><td>U 與預設 R 的超級管理員設定介面</td><td>RESERVE-02</td></tr>
+  </table>
+</section>
+
+<section id="w16">
+  <h2>18. 文件驗收與版本紀錄</h2>
+  <p>本白皮書必須能逐條審閱以下範例／準則：</p>
+  <table>
+    <tr><th>要求</th><th>位置</th></tr>
+    <tr><td>地圖沒選、缺資料、版本改變如何阻擋與指引</td><td><a href="#ex-map">範例：三種擋法</a>、MAP-01~04</td></tr>
+    <tr><td>合法路徑超過 8 段仍要納入</td><td><a href="#ex-hops">範例：超過 8 段</a>、ROUTE-03</td></tr>
+    <tr><td>36 秒作業在 5／10 秒刻度下保持真實時長</td><td><a href="#ex-36">範例：36 秒</a>、TIME-01</td></tr>
+    <tr><td>U＝10 與 R、A 不混淆；有空檔不等於有保護</td><td><a href="#ex-reserve-a">範例：U、R、A</a>、RESERVE-02~03</td></tr>
+    <tr><td>準時、延誤 R、超過 R：這台車與前車、後車分開判斷；超過時標「完成作業後的最早可能離站時間」</td><td><a href="#RESERVE-05">RESERVE-05 表</a></td></tr>
+    <tr><td>H 等於／超過 D 即時擋；跨午夜不誤判；生成後歸零也擋</td><td><a href="#ex-h-d">範例：H 與 D</a>、YARD-02~03</td></tr>
+    <tr><td>長整備一輪（已確認）與禁止零整備同時成立；一輪怎麼算</td><td><a href="#ex-long-yard">範例：長整備一輪</a>、YARD-04</td></tr>
+    <tr><td>模板建議長度用實際適用的額度（H 或一輪），初估與重算</td><td><a href="#YARD-06">YARD-06</a></td></tr>
+    <tr><td>恢復時間、尋路的現況分支：什麼條件下加、不加、禁止通行</td><td><a href="#RESERVE-01">RESERVE-01 程式現況</a>、<a href="#ROUTE-04">ROUTE-04</a></td></tr>
+    <tr><td>31＋8 項使用者決定逐項對應</td><td><a href="#w-decisions">使用者決定對照表</a></td></tr>
+    <tr><td>每一道處理：何時用、改什麼、會不會縮短或刪卡、限制、撤回、報告</td><td><a href="#w-strategies">排班策略盤點</a></td></tr>
+    <tr><td>待命能派車、整備串不插正線的白話說明</td><td><a href="#ex-standby">白話說明</a></td></tr>
+    <tr><td>從設施接入服務路線中段，非載客、載客、後續接班分開</td><td><a href="#ex-dispatch">範例：調度載客</a>、DISPATCH-01~05</td></tr>
+    <tr><td>不能用降低停靠、安全保護、偷吃尾巴排出表面無衝突的班表</td><td><a href="#GEN-17">GEN-17</a></td></tr>
+    <tr><td>報告揭露已採用調整、可定位；未找到方案分清原因</td><td><a href="#w12">REPORT-01~02</a></td></tr>
+  </table>
+  <h3>版本紀錄</h3>
+  <ul>
+    <li><strong>2026-09-29 第二版（審閱中）</strong>：依 Codex 審閱 7 項修訂——RESERVE-05 改成前後車範例並刪除「不碰撞」的宣稱、11:01:01 改 11:01:00；YARD-04 改列已確認並刪除 Q6；YARD-06 改用實際適用額度；恢復時間、尋路補分支表；新增使用者決定對照表與排班策略盤點；MAP-03 的 0 秒與 Q4 的最小單位改列待確認（Q12、Q4a、Q4b）；新增差異 D22–D25。程式未修改。</li>
+    <li><strong>2026-09-29 規則版</strong>：依使用者 31 項回覆、8 項修正與〈排班白皮書 Claude 執行指示 20260929〉整理成規則；舊內容移入歷史附錄。程式未修改。</li>
+    <li>2026-08-07 起的實作說明與改版紀錄：見〈<a href="#history">歷史附錄</a>〉。</li>
+  </ul>
+</section>
+
+<section id="history" class="history-banner">
+  <h2>歷史附錄：2026-09-28 以前的實作說明（不是規格）</h2>
+  <p>以下 §0–§17 是舊版「排班調度演算法全覽」的內容，原樣保留（含使用者註記與改版紀錄），用來追查程式<strong>當時</strong>怎麼做、為什麼那樣做。</p>
+  <ul>
+    <li>與上面正文規則衝突時，<strong>以正文為準</strong>。例如：舊文寫「沒有關聯圖時依執行順序輪替」「尋路最多 8 段」「恢復時間是跑完後的停留」，這些都已被 ROUTE-02、ROUTE-03、RESERVE-01 取代。</li>
+    <li>舊文裡的測試結果只代表當時那一版程式，不代表最新程式也通過。</li>
+    <li>章節錨點（<code>#s3</code>、<code>#s13</code>…）保留不變：排班畫面上的「詳見 §N」連結仍指到這裡。</li>
+  </ul>
+</section>
+<div class="history-body">
+
+<div class="hero" id="h-intro">
   <p class="eyebrow">SyncDrive T3 · Schedule Engine Audit</p>
-  <h1>排班調度演算法全覽</h1>
+  <h2>排班調度演算法全覽（2026-08-07 起的實作說明）</h2>
   <p>本頁把<strong>現行生產路徑</strong>（建立班表 Step 6 → <code>runShiftScheduleEngineForDraft</code> → <code>generateShiftSchedule</code>，固定 <code>passengerTimetableMode: 'template'</code>）重新梳一遍，方便你核對我對流程、優先順序、約束、決策與欄位的理解是否正確。</p>
   <div class="callout">
     <strong>一句話模型：</strong>
     關聯圖決定一台車跑完這條之後能接哪條 → 每個班距需求都要整輪派車 → 正線可以吃掉<strong>接下來那段整備的開頭</strong> → <strong>絕對不能佔用任何整備的尾巴</strong> → 同一個停靠點不能兩台車搶 → 真的排不出來就明講缺車，不用違規班次假裝達標。
   </div>
-</header>
+</div>
 
 <section id="s0">
   <h2>0. 怎麼讀這份文件</h2>
@@ -1476,7 +2436,9 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>FACILITY_HANDOVER_GAP</code></td><td>warn</td><td>兩台車在同一個設施格交接，中間不足「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝（見 §6）。本場域 60 秒為必須遵守的安全間隔：<strong>擋發布</strong>，求解時插卡階段由進格方讓出</td><td><code>validate.ts</code></td></tr>
 <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
       <tr><td><code>GEOMETRY_NOT_CONVERGED</code></td><td>warn</td><td>站位求解、讓渡、班距修復會互相影響，跑滿輪數仍在變動，沒到不動點（見 §3）</td><td><code>generate.ts</code></td></tr>
-      <tr><td><code>MAINTENANCE_WORK_SHORTENED</code></td><td>warn</td><td>入廠晚到、轉場移動或出廠吃尾巴縮短了整備工作時間；晚開始不超過整備設定的讓渡餘裕、剩餘工作不少於設定的作業時長，逐筆揭露（見 §6）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_WORK_SHORTENED</code></td><td>warn</td><td>入廠晚到或轉場移動讓整備晚開始、結束不動，工作時間變短；晚開始不超過整備設定的讓渡餘裕、剩餘工作不少於設定的作業時長，逐筆揭露（2026-09-29 起作業類整備不再被出廠截短尾巴）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>
+      <tr><td><code>MAINTENANCE_WORK_INSUFFICIENT</code></td><td>error</td><td>模板上的整備在班表裡被刪掉，或被壓到歸零；禁止發布（2026-09-29 新增；2026-09-30 起低於設定作業時長改為逐筆揭露、不擋，見正文 YARD-03）</td><td><code>validate.ts</code> <code>validateYardWorkPreserved</code></td></tr>
+      <tr><td><code>SCHEDULE_DATA_INCOMPLETE</code></td><td>error</td><td>生成前的必要資料不完整：沒選地圖、地圖沒有路網或路段、選的路線站點在路網找不到、模板用到的整備設施沒設定或不在路網上、本次進出場沒有一條每段都有行駛時間的路；不生成（2026-09-30 新增，見正文 MAP-01～03）</td><td><code>scheduleInputDataCheck.ts</code>、<code>runShiftScheduleEngineForDraft.ts</code></td></tr>
       <tr><td><code>SCHEDULE_SEARCH_INCOMPLETE</code></td><td>error</td><td>整次生成共用的搜尋預算（候選數、完整評估數、時間）用盡時仍有安全問題：搜尋未完成，不是已證明無解；禁止發布（見 §3）</td><td><code>generate.ts</code>、<code>searchBudget.ts</code></td></tr>
       <tr><td><code>GEOMETRY_BEST_ROUND_USED</code></td><td>warn</td><td>迴圈未收斂，已改用過程中全域評分最好的那一輪作為結果，所以輸出不會比過程中最好的那版差。看到這一則代表班表可用但還不是穩定解（見 §3）</td><td><code>generate.ts</code></td></tr>
       <tr><td><code>GEOMETRY_PASS_REVERTED</code></td><td>warn</td><td>某一道幾何處理讓整張班表變差，已整道撤回，連同它寫進報告的訊息一起收回——那些動作等於沒發生。用途是指出哪一道處理與其他處理衝突（見 §3）</td><td><code>generate.ts</code></td></tr>
@@ -6142,11 +7104,11 @@ backend/src/dev-log/
   </ul>
 </section>
 
+
+</div>
 <footer>
-  開啟方式：文件站（<code>npm run docs</code>）造訪
-  <code>http://localhost:4000/排班引擎算法全覽-審核.html</code>。
-  檔案位於
-  <code>document/排班引擎算法全覽-審核.html</code>。
+  內部 wiki：<code>/docs/排班引擎算法全覽-審核.html</code>（port 80，內部帳號）；本機開發：<code>http://localhost:3100/schedule-whitepaper</code>（只接受本機連線，其他機器連進來是 404）、<code>npm run docs</code> 後 <code>http://localhost:4000/排班引擎算法全覽-審核.html</code>。
+  檔案位於 <code>document/排班引擎算法全覽-審核.html</code>。
 </footer>
 </main>
 </div>

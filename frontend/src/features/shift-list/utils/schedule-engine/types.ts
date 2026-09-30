@@ -72,6 +72,11 @@ export type DwellSlackAdjustment = {
   baseSlackSeconds: number;
   /** 系統增加量（秒）；實際緩衝＝baseSlackSeconds＋addedSeconds */
   addedSeconds: number;
+  /**
+   * 系統增加的等待只加在這一站（站序 index，白皮書 GEN-03「在指定站增加」）。2026-09-30 起新產生的
+   * 調整都有這個欄位；沒有的是舊紀錄，意思是每個適用站都加 addedSeconds（相容舊班表）。
+   */
+  stationIndex?: number;
   /** 為了解哪一筆衝突（代號＋資源），給報告與定位用 */
   reason: {
     code: string;
@@ -146,6 +151,12 @@ export type GeneratedScheduleBlock = {
   firstTripOriginLabel?: string;
   /** 進場載客：來源整備區段代號（班次代號 = 整備代號 + 路線代號 + 開始時刻） */
   entryServiceSectionCode?: string;
+  /**
+   * 進場載客從路線中途加入（白皮書 DISPATCH-01～03）：加入站 stationId／顯示名。
+   * 有值時這一趟只跑加入站之後的站；站序、停靠、站間行駛一律由 routeForJoinedBlock 換成截短那一段。
+   */
+  entryJoinedAtStationId?: string;
+  entryJoinedAtStationName?: string;
   /** 出場移動：出發的整備設施節點 id（具體到哪一台，例 M2 那一格） */
   yardExitFacilityNodeId?: string;
   /** 出場移動：出發的整備設施顯示名／代號（例 M2） */
@@ -290,6 +301,10 @@ export type FeasibilityViolationCode =
   | 'SCHEDULE_SEARCH_INCOMPLETE'
   /** 系統為了排移動縮短了整備工作時間（晚開始／提早結束），逐筆揭露（警告） */
   | 'MAINTENANCE_WORK_SHORTENED'
+  /** 模板上的整備被刪掉，或剩下的工作時間低於最低工作時間（錯誤，禁止發布） */
+  | 'MAINTENANCE_WORK_INSUFFICIENT'
+  /** 生成前的必要資料不完整（沒選地圖、路網缺、站點或設施找不到、本次必要路段缺時間）：不生成 */
+  | 'SCHEDULE_DATA_INCOMPLETE'
   /** 後車進站太貼著前車離站，不滿足碰撞保護時間×2（警告） */
   | 'STATION_BERTH_PROTECTION_GAP'
   | 'STATION_BERTH_DELAY_SOURCE'

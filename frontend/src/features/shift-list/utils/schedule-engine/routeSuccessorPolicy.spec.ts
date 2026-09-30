@@ -12,7 +12,6 @@ import {
   resolveStartInstanceId,
   ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
   ROUTE_SUCCESSOR_ALGORITHM_INVALID_GRAPH,
-  ROUTE_SUCCESSOR_ALGORITHM_RING,
   routeAssignmentAlgorithmId,
 } from './routeSuccessorPolicy';
 
@@ -133,17 +132,18 @@ describe('buildRouteSuccessorPolicy', () => {
     );
   });
 
-  it('keeps execution-order ring compatibility only when no graph exists', () => {
+  it('沒有關聯圖：無效策略，不依排列順序自動輪替（白皮書 ROUTE-02）', () => {
     const policy = buildRouteSuccessorPolicy({
       routes,
       graph: { nodes: [], links: [] },
       minimumRecoveryTimeSeconds: 30,
     });
 
-    expect(policy.algorithm).toBe(ROUTE_SUCCESSOR_ALGORITHM_RING);
-    expect(policy.valid).toBe(true);
-    expect(policy.rotationRoutes.map((r) => r.routeId)).toEqual(['A', 'B', 'D']);
-    expect(routeAssignmentAlgorithmId(policy)).toBe('constraint-greedy-v1');
+    expect(policy.algorithm).toBe(ROUTE_SUCCESSOR_ALGORITHM_INVALID_GRAPH);
+    expect(policy.valid).toBe(false);
+    expect(policy.issue).toBe('RELATION_GRAPH_MISSING');
+    expect(policy.rotationRoutes.length).toBe(0);
+    expect(resolveNextInstanceId(policy, 'A')).toBeNull();
   });
 
   it('uses canonical through cycle when verification is current', () => {

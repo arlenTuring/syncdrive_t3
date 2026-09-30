@@ -85,6 +85,8 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
     'MOVE_JUNCTION_CONFLICT',
     // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
     'SCHEDULE_SEARCH_INCOMPLETE',
+    // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表
+    'MAINTENANCE_WORK_INSUFFICIENT',
   ]);
 
 /** 常見硬錯誤代號（文件／報表用；實際硬閘以 severity=error 為準） */
@@ -93,6 +95,7 @@ export const DOCUMENTED_HARD_ERROR_CODES: readonly FeasibilityViolationCode[] = 
   'FACILITY_SLOT_COLLISION',
   'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
   'VEHICLE_LOCATION_DISCONTINUITY',
+  'MAINTENANCE_WORK_INSUFFICIENT',
   'ROTATION_CYCLE_INCOMPLETE',
   'TIMELINE_OVERLAP',
   'ANCHOR_CONFLICT',

@@ -33,7 +33,7 @@ function block(
  * 出場移動卡自己的窗口 [120,121) 不會跟 [100,110) 重疊，只看卡片原始窗口的候選
  * 檢查完全看不出這段被佔著。
  */
-function timelines(row2ExitStart: number): GeneratedScheduleTimeline[] {
+function timelines(row2ExitStart: number, row1TaskType: GeneratedScheduleBlock['taskType'] = 'standby'): GeneratedScheduleTimeline[] {
   return [
     {
       row: 1,
@@ -44,7 +44,7 @@ function timelines(row2ExitStart: number): GeneratedScheduleTimeline[] {
           yardExitFacilityNodeId: 'E2',
         }),
         block({
-          id: 'charge1', timelineRow: 1, taskType: 'charging', source: 'template_bar',
+          id: 'charge1', timelineRow: 1, taskType: row1TaskType, source: 'template_bar',
           plannedStartMinute: 110, plannedEndMinute: 160,
           yardFacilityNodeId: 'E2', yardFacilityLabel: 'E2',
         }),
@@ -79,13 +79,20 @@ describe('closeYardHeadGaps：候選空位檢查要看實際離開時刻，不�
     assert.equal(charge1.plannedStartMinute, 110, '維持原訂時刻，沒有把車瞬移進還有人在的格子');
   });
 
-  it('別列車真的已經離開（出場移動緊接著開）：格子確實空著，正常拉', () => {
+  it('別列車真的已經離開（出場移動緊接著開）：格子確實空著，待命正常往前接', () => {
     // exit2 緊接在 charge2 結束後開（t=95.5，間隔 30 秒，在 60 秒門檻內不算滯留）
     const result = closeYardHeadGaps({ timelines: timelines(95.5) });
     const row1 = result.timelines.find((t) => t.row === 1)!;
     const charge1 = row1.blocks.find((b) => b.id === 'charge1')!;
     assert.equal(result.closed, 1);
-    assert.equal(charge1.plannedStartMinute, 100, '車已經在 E2 裡面，充電往前拉到抵達時刻');
+    assert.equal(charge1.plannedStartMinute, 100, '車已經在 E2 裡面，待命往前拉到抵達時刻');
     assert.equal(charge1.plannedEndMinute, 160, '結束時刻不動');
+  });
+
+  it('作業類整備（充電）不往前拉：提早到只是等待（白皮書 YARD-07）', () => {
+    const result = closeYardHeadGaps({ timelines: timelines(95.5, 'charging') });
+    const charge1 = result.timelines.find((t) => t.row === 1)!.blocks.find((b) => b.id === 'charge1')!;
+    assert.equal(result.closed, 0);
+    assert.equal(charge1.plannedStartMinute, 110, '充電照原訂時刻開始');
   });
 });

@@ -5,10 +5,17 @@ import type {
 import { minuteToSecond } from './schedule-engine/types';
 import { collectFacilityOccupancies } from './stationBerthOccupancy';
 import { daySegmentOverlapSeconds } from './moveCardShared';
+import { isWorkYardTaskType } from './yardWorkMinimum';
 
 /**
- * 整備前面不留空白：車到了就開始，整備自己往前長
- * ==============================================
+ * 待命前面不留空白：車到了就開始待命
+ * ==================================
+ *
+ * <strong>2026-09-29 起只適用待命。</strong>充電、保養、行檢、洗車是作業：提早到只能等待，
+ * 不能提早開工（白皮書 YARD-07）。作業類整備前面的空檔維持原訂開始時刻，格位佔用從抵達就算
+ * （collectFacilityOccupancies），畫面由 fillYardHoldGaps 補一張「等待」卡。待命本身就是等待，
+ * 照舊往前接起來。以下是這支原本的說明。
+ *
  *
  * <strong>問題長相。</strong>車跑完最後一趟開進整備格，卻要在格子裡乾等到整備區塊
  * 的原訂開始時刻——班表上就是「入廠卡一張，後面一大段空白，再接充電卡」。使用者
@@ -94,6 +101,7 @@ export function closeYardHeadGaps(args: {
     for (let index = 1; index < sorted.length; index += 1) {
       const yard = sorted[index]!;
       if (!isYardBlock(yard)) continue;
+      if (isWorkYardTaskType(yard.taskType)) continue;
       const nodeId = facilityOf(yard);
       if (!nodeId) continue;
 

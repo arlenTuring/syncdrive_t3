@@ -1,4 +1,4 @@
-import { resolveBlockDwellSlackBreakdown } from './buildBlockStationDepartures';
+import { resolveBlockDwellSlackBreakdown, resolveBlockStationExtraDwellSeconds } from './buildBlockStationDepartures';
 import {
   clampScheduleMinute,
   snapScheduleMinuteUnbounded,
@@ -139,9 +139,10 @@ export function resolveManualBlockDwellTotalSeconds(
   }
   // 跟逐站時刻同一套解析：單班明確緩衝（含 0）＋系統增加量
   const slack = resolveBlockDwellSlackBreakdown(block, null).effectiveSlackSeconds;
+  const extra = resolveBlockStationExtraDwellSeconds(block, dwells);
   let total = 0;
   for (const [index, dwell] of dwells.entries()) {
-    total += applyStationDwellWithSlack(dwell, slack, index);
+    total += applyStationDwellWithSlack(dwell, slack, index) + (extra[index] ?? 0);
   }
   return total;
 }

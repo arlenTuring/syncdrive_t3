@@ -34,6 +34,7 @@ import type {
   GeneratedSchedulePlan,
 } from './schedule-engine/types';
 import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/types';
+import { routeForJoinedBlock } from './joinedRouteSegment';
 import { resolveSameRowIdleOccupiedUntilMinute } from './stationBerthOccupancy';
 
 /** 單一路線為清站位可接受的最大延後（秒）；可被同列整備開頭再夾緊 */
@@ -88,6 +89,7 @@ export function projectBlockBerthWindowsSeconds(
   route: ShiftScheduleSelectedRoute,
 ): BerthWindowSec[] {
   if (block.taskType !== 'passenger') return [];
+  route = routeForJoinedBlock(block, route);
   const stops = buildBlockStationDepartures(block, route);
   if (stops.length === 0) return [];
 
@@ -527,6 +529,7 @@ function occupancySecondsForBlockRoute(
   block: GeneratedScheduleBlock,
   route: ShiftScheduleSelectedRoute,
 ): number {
+  route = routeForJoinedBlock(block, route);
   const resolved = resolvePassengerRouteOccupancy(route);
   if (resolved) {
     const current =
@@ -1151,7 +1154,8 @@ export function movedTripLingerCollides(args: {
   booked: BerthWindowSec[];
   protection: BerthProtectionContext;
 }): boolean {
-  const { timelines, selectedRoutes, block, route, newStartSecond, newEndSecond, booked, protection } = args;
+  const { timelines, selectedRoutes, block, newStartSecond, newEndSecond, booked, protection } = args;
+  const route = routeForJoinedBlock(block, args.route);
   const row = timelines.find((timeline) => timeline.row === block.timelineRow);
   if (!row) return false;
   const ordered = [...row.blocks]

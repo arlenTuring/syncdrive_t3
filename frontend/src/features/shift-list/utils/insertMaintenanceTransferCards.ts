@@ -38,6 +38,7 @@ import {
 import { SCHEDULE_DAY_MINUTES } from './scheduleDayCycle';
 import { SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS, snapUpToClockAlignSeconds } from './schedule-engine/physics';
 import { collectStationBerthOccupancies } from './stationBerthOccupancy';
+import { isWorkYardTaskType, minimumYardWorkSeconds as minimumYardWorkSecondsFor, nonZeroYardWorkSeconds } from './yardWorkMinimum';
 import {
   minuteToSecond,
   secondToMinute,
@@ -755,6 +756,30 @@ export function insertMaintenanceTransferCards(args: {
     return Number.isFinite(leave) ? Math.max(endSecond, leave) : endSecond;
   }
 
+  /**
+   * 車<strong>真正進到</strong>這一格的時刻。
+   *
+   * 提早到設施只是等待，整備照原訂時刻開始（白皮書 YARD-07）——但從抵達那一刻起車就在格子裡，
+   * 格位從抵達就被佔住。前一張有長度的卡是開進同一格的入廠卡時，回傳它的抵達時刻；否則就是
+   * 整備自己的開始時刻。
+   */
+  function vehicleArrivesFacilityAtSecond(block: GeneratedScheduleBlock, nodeId: string): number {
+    const startSecond = minuteToSecond(block.plannedStartMinute);
+    const timeline = timelines.find((item) => item.row === block.timelineRow);
+    if (!timeline) return startSecond;
+    let previous: GeneratedScheduleBlock | null = null;
+    for (const other of timeline.blocks) {
+      if (other === block) continue;
+      if (other.plannedEndMinute - other.plannedStartMinute <= 1e-9) continue;
+      if (other.plannedEndMinute > block.plannedStartMinute + 1e-9) continue;
+      if (!previous || other.plannedEndMinute > previous.plannedEndMinute) previous = other;
+    }
+    if (previous?.source === 'yard_entry_move' && previous.yardExitFacilityNodeId?.trim() === nodeId) {
+      return Math.min(startSecond, minuteToSecond(previous.plannedEndMinute));
+    }
+    return startSecond;
+  }
+
   function assignYardFacility(
     block: GeneratedScheduleBlock,
     nodeId: string,
@@ -768,8 +793,8 @@ export function insertMaintenanceTransferCards(args: {
     block.yardFacilityStationId =
       node?.kind === 'docking' ? node.stationId?.trim() || undefined : undefined;
 
-    const startSecond = minuteToSecond(block.plannedStartMinute);
-    // 鎖到車真正開走，不是整備結束——中間那段車還在格子裡（見上方說明）
+    // 從車進格（提早到的等待也算）鎖到車真正開走，不是整備的起訖——前後那段車都在格子裡
+    const startSecond = vehicleArrivesFacilityAtSecond(block, nodeId);
     const endSecond = vehicleLeavesFacilityAtSecond(block);
     const existing = yardBookingByBlockId.get(block.id);
     if (existing) {
@@ -1133,30 +1158,16 @@ export function insertMaintenanceTransferCards(args: {
     return Math.max(60, collisionBufferSeconds * 4);
   }
   /**
-   * 晚進廠之後整備至少要留下的工作時間：<strong>使用者在整備設定裡填的作業時長</strong>
-   * （行檢、洗車的作業時間；保養取各保養項目中最長的一項）。沒有設定作業時長的（充電、待命）
-   * 至少留一個時刻刻度；這類的上限由讓渡餘裕管。
+   * 移動（入廠晚到、整備間轉場）之後整備至少要留下的工作時間：不能是零就好（使用者 2026-09-30：
+   * 模板不會替移動留時間，移動可以佔用後一段作業的開頭，低於設定作業時長時逐筆揭露）。
    */
   function minimumYardWorkSeconds(taskType: string): number {
-    return Math.max(configuredYardWorkSeconds(taskType), SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS);
+    void taskType;
+    return nonZeroYardWorkSeconds();
   }
-  /** 整備設定裡填的作業時長（秒）；沒有設定回 0 */
-  function configuredYardWorkSeconds(taskType: string): number {
-    const body = (maintenanceBody ?? {}) as Record<string, Record<string, unknown> | undefined>;
-    const minutes = (value: unknown) => {
-      const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
-      return Number.isFinite(parsed) && parsed > 0 ? parsed * 60 : 0;
-    };
-    let configured = 0;
-    if (taskType === 'inspection') configured = minutes(body.preTrip?.operationDurationMinutes);
-    else if (taskType === 'washing') configured = minutes(body.carWash?.operationDurationMinutes);
-    else if (taskType === 'servicing') {
-      const conditions = body.maintenance?.cycleConditions;
-      configured = Array.isArray(conditions)
-        ? Math.max(0, ...conditions.map((item) => minutes((item as { durationMinutes?: unknown }).durationMinutes)))
-        : 0;
-    }
-    return configured;
+  /** 整備設定裡的作業時長（沒有設定的是一個刻度）；只用來在報告裡對照 */
+  function configuredWorkSeconds(taskType: string): number {
+    return minimumYardWorkSecondsFor(taskType, maintenanceBody);
   }
   /** reserved：呼叫端事先保留、那一列還沒真的排出移動的經過時刻 */
   type JunctionBooking = { nodeId: string; instant: number; timelineRow: number; reserved?: boolean };
@@ -1933,8 +1944,6 @@ export function insertMaintenanceTransferCards(args: {
           reason: describeReject(firstTally, facilities.length),
         });
       }
-      bookJunction(chosen.gatewayNodeId, chosen.gatewayInstant, timeline.row);
-
       /**
        * <strong>「提早進廠」是選配，不是特權。</strong>
        *
@@ -2035,6 +2044,23 @@ export function insertMaintenanceTransferCards(args: {
           });
         }
       }
+      /**
+       * 轉折點預約要用<strong>最後定案</strong>的時刻：上面為了不佔別人的格子可能把抵達往後挪，
+       * 經過轉折點的時刻也跟著挪。先前在挪之前就預約，卡片實際經過的時刻跟預約對不上，
+       * 別列車照舊預約排進同一刻（2026-09-29 重播：兩列同一秒經過充電洗車入口點）。
+       * 挪過之後的時刻撞到別人的預約，就退回原本檢查過的抵達時刻。
+       */
+      {
+        const shift = arriveSecond - plannedArriveSecond;
+        if (Math.abs(shift) > 1e-9 && !junctionIsFree(chosen.gatewayNodeId, chosen.gatewayInstant + shift, timeline.row)) {
+          arriveSecond = plannedArriveSecond;
+          // 退回原本的抵達時刻：先前記下的「提早被擋」不再成立
+          for (let k = entryEarlyBlocked.length - 1; k >= 0; k -= 1) {
+            if (entryEarlyBlocked[k]!.blockId === yard.id) entryEarlyBlocked.splice(k, 1);
+          }
+        }
+        bookJunction(chosen.gatewayNodeId, chosen.gatewayInstant + (arriveSecond - plannedArriveSecond), timeline.row);
+      }
       const departureSecond = arriveSecond - chosen.seconds;
       /**
        * 出發落在午夜之前（前一段載客在前一天）時，把<strong>卡片與整備區塊
@@ -2079,9 +2105,15 @@ export function insertMaintenanceTransferCards(args: {
       };
       timeline.blocks.push(card);
 
-      // 車一到就開始整備——不站格子、提早進廠、提早開工。抵達落在午夜之前時
-      // 整備區塊整個往後平移一天（開始 23:5x、結束 1440＋），日循環位置不變。
-      yard.plannedStartMinute = secondToMinute(arriveSecond) + dayShiftMinute;
+      /**
+       * 提早到是<strong>等待</strong>，不是提早開工（白皮書 YARD-07）：作業類整備照原訂時刻開始，
+       * 抵達到開始之間車在格子裡等，格位從抵達就算佔用（見 vehicleArrivesFacilityAtSecond、
+       * collectFacilityOccupancies），最後由 fillYardHoldGaps 補一張「等待」卡呈現。
+       * 待命本身就是等待，提早到就提早開始待命，沒有工作量的問題。
+       * 抵達落在午夜之前時整備區塊整個往後平移一天（開始 23:5x、結束 1440＋），日循環位置不變。
+       */
+      const earlyWait = arriveSecond < yardStartSecond - 1e-9 && isWorkYardTaskType(yard.taskType);
+      yard.plannedStartMinute = secondToMinute(earlyWait ? yardStartSecond : arriveSecond) + dayShiftMinute;
       yard.plannedEndMinute += dayShiftMinute;
       // 被設施或轉折點擋住而晚進廠時，整備開始被推遲、結束不動＝工作時間變短，
       // 跟整備間轉場的「後一段被壓縮」是同一件事，計進同一個數字。
@@ -2095,11 +2127,11 @@ export function insertMaintenanceTransferCards(args: {
           kind: 'late-start',
           seconds: Math.round(arriveSecond - yardStartSecond),
           remainingWorkSeconds: Math.round(yardEndSecond - arriveSecond),
-          minimumWorkSeconds: minimumYardWorkSeconds(yard.taskType),
+          minimumWorkSeconds: configuredWorkSeconds(yard.taskType),
           limitSeconds: yardStartPushLimitSeconds(yard.taskType),
           reason: '入廠要等設施空出來或錯開轉折點，車晚到，整備跟著晚開始、結束不動',
         });
-      } else yardHeadExtended += 1;
+      } else if (!earlyWait && arriveSecond < yardStartSecond - 1e-9) yardHeadExtended += 1;
       // 時刻定案後才綁設施——assignYardFacility 會用當下的 [開始, 結束] 佔位
       assignYardStay(yard, chosen.nodeId, chosen.label);
       inserted += 1;
@@ -2255,13 +2287,12 @@ export function insertMaintenanceTransferCards(args: {
           const transferPath = findTopologyPath(topology, exitFacility.id, entryFacility.id);
           const placeholder = transferPath !== null && transferPath.edges.length === 0;
           /**
-           * 後一段剩下的工作時間要守住整備設定的作業時長。抵達太晚時，改由<strong>前一段提早
-           * 結束</strong>把移動時間讓出來（前一段剩下的也不得少於它自己的作業時長）——移動時間
-           * 總要佔掉某一段的工作時間，不能靠把有作業時長要求的那一段壓到不夠來排出卡片。
+           * 作業類前一段跑滿全長才出廠：整備尾巴沒有授權，不能為了讓後一段留足作業時長而提早結束
+           * （白皮書 YARD-07）。後一段放不下作業時長就回報，由使用者調整模板（YARD-06）。
+           * 前一段是待命（不是作業）時可以提早離開，把移動時間讓出來，待命至少留一個刻度。
            */
-          // 只在後一段有設定作業時長時才這樣做；沒有設定的照原規則（後一段被推遲、放不下就回報）
           const travelSecondsForWork = transferPath && !placeholder ? transferPath.avgSeconds : 0;
-          const earlyDepartureShift = configuredYardWorkSeconds(later.taskType) > 0
+          const earlyDepartureShift = !isWorkYardTaskType(earlier.taskType)
             ? -snapUpToClockAlignSeconds(Math.max(0, departSecond + travelSecondsForWork - laterLatestStartSecond))
             : 0;
           const candidateDepartSecond = departSecond + earlyDepartureShift;
@@ -2391,14 +2422,16 @@ export function insertMaintenanceTransferCards(args: {
           const entryFacilityFreeAt = (shift: number) => {
             const start = Math.max(laterStartSecond, baseArriveSecond + shift);
             if (start > laterLatestStartSecond + 1e-9) return false;
+            // 提早到只是等待（後一段照原訂開始），但車從抵達起就在目的格裡：佔用從抵達算起
+            const occupyFrom = Math.min(start, baseArriveSecond + shift);
             return stayFacilityIsFree(
               entryFacility.id,
               later,
               timeline.row,
-              start - laterOffsetSecond,
+              occupyFrom - laterOffsetSecond,
               laterEndSecond - laterOffsetSecond,
             )
-            && handoverEdgeIsClear(entryFacility.id, timeline.row, start - laterOffsetSecond, 'entering');
+            && handoverEdgeIsClear(entryFacility.id, timeline.row, occupyFrom - laterOffsetSecond, 'entering');
           };
           let facilityShift: number;
           if (entryFacilityFreeAt(0)) {
@@ -2420,12 +2453,8 @@ export function insertMaintenanceTransferCards(args: {
 
           // 轉折點撞上就再往後挪一點。往後挪只會讓目的設施的佔用窗更短，
           // 不會把剛解好的設施衝突變回來。
-          /**
-           * 也可以<strong>提早</strong>離開前一段，閃開轉折點：只在後一段有設定作業時長（不能再往後推）、
-           * 目的設施不用等（facilityShift＝0）時才往前找，而且前一段剩下的不得少於它自己的作業時長。
-           * 提早到的那段車已經在目的設施裡，下面會從實際抵達起檢查那一格。
-           */
-          const earliestJunctionShift = facilityShift === 0 && configuredYardWorkSeconds(later.taskType) > 0
+          // 閃轉折點：作業類前一段只能晚一點出廠（不吃尾巴）；前一段是待命才可以提早離開
+          const earliestJunctionShift = !isWorkYardTaskType(earlier.taskType)
             ? Math.min(
               0,
               minuteToSecond(earlier.plannedStartMinute) + minimumYardWorkSeconds(earlier.taskType) - candidateDepartSecond,
@@ -2459,8 +2488,8 @@ export function insertMaintenanceTransferCards(args: {
             continue;
           }
           const departureShift = facilityShift + junctionShift;
-          if (junctionShift < 0) {
-            // 提早抵達：車從抵達那一刻就在目的設施裡，那一格要從抵達起空著
+          if (departureShift < 0) {
+            // 提早離開待命、提早到：車從抵達起就在目的格裡等，那一格要從抵達起空著
             const earlyArriveSecond = baseArriveSecond + departureShift;
             if (
               !stayFacilityIsFree(
@@ -2478,11 +2507,8 @@ export function insertMaintenanceTransferCards(args: {
             if (entryGateway) entryGateway = { ...entryGateway, instant: entryGateway.instant + departureShift };
           }
           const arriveSecond = baseArriveSecond + departureShift;
-          // 為了閃轉折點提早到：跟入廠一樣「車一到就開工」，後一段從抵達開始（只會變長），
-          // 這樣它在目的設施的佔用也從抵達算起
-          const finalLaterStartSecond = junctionShift < 0
-            ? Math.min(laterStartSecond, arriveSecond)
-            : Math.max(laterStartSecond, arriveSecond);
+          // 後一段只會被往後推：提早到是等待，不提前開工（白皮書 YARD-07）
+          const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
           // 後一段被推遲後，剩下的工作時間不少於整備設定的作業時長（轉場的移動時間本來就佔後一段開頭）
           if (finalLaterStartSecond > laterEndSecond - minimumYardWorkSeconds(later.taskType) + 1e-9) {
             tally.noTime += 1;
@@ -2523,7 +2549,11 @@ export function insertMaintenanceTransferCards(args: {
         fromTaskType: earlier.taskType,
         toTaskType: later.taskType,
         reason:
-          `排不出整備間轉場（出廠＋入廠）：${describeReject(tally, exitFacilities.length * entryFacilities.length)}`,
+          `排不出整備間轉場（出廠＋入廠）：${describeReject(tally, exitFacilities.length * entryFacilities.length)}`
+          + (tally.noTime > 0 && isWorkYardTaskType(earlier.taskType)
+            ? `；「${earlier.label}」是作業、尾巴不能截短，移動時間只能佔用「${later.label}」的開頭，`
+              + '但佔完之後「' + later.label + '」會沒有工作時間（整備不能歸零）'
+            : ''),
         ...(transferReservation ? { junctionReservation: transferReservation } : {}),
         ...(tally.facilityBlockers.length > 0 ? { blockers: tally.facilityBlockers.slice(0, 8) } : {}),
         ...dataGapFields(tally),
@@ -2539,11 +2569,12 @@ export function insertMaintenanceTransferCards(args: {
 
     // 為閃開轉折點／等目的格交接而延後的出廠時刻——車在原本那台設施裡多留這幾秒
     const actualDepartSecond = departSecond + chosen.departureShiftSeconds;
-    // 車還在原格裡，前一段整備就順延到實際離格，不讓晚走的代價落到做完的量上
-    if (chosen.departureShiftSeconds > 0) {
+    // 延後出廠時車還在原格裡：作業類整備照原訂時刻做完，多出的是等待（格位佔用一路算到實際離格，
+    // 見 vehicleLeavesFacilityAtSecond；畫面由 fillYardHoldGaps 補卡）。待命本身就是等待，順延即可。
+    if (chosen.departureShiftSeconds > 0 && !isWorkYardTaskType(earlier.taskType)) {
       earlier.plannedEndMinute = secondToMinute(actualDepartSecond);
     } else if (chosen.departureShiftSeconds < 0) {
-      // 提早離格：後一段的作業時長不夠，移動時間改由前一段的結尾讓出來
+      // 只有待命會走到這裡：提早離開待命，把移動時間讓給後一段（逐筆記錄）
       yardWorkShortened.push({
         timelineRow: timeline.row,
         blockId: earlier.id,
@@ -2551,8 +2582,8 @@ export function insertMaintenanceTransferCards(args: {
         kind: 'early-end',
         seconds: Math.round(-chosen.departureShiftSeconds),
         remainingWorkSeconds: Math.round(actualDepartSecond - minuteToSecond(earlier.plannedStartMinute)),
-        minimumWorkSeconds: minimumYardWorkSeconds(earlier.taskType),
-        reason: `下一段「${later.label}」要留足整備設定的作業時長，移動時間改由這一段的結尾讓出`,
+        minimumWorkSeconds: configuredWorkSeconds(earlier.taskType),
+        reason: `待命提早結束，把移動時間讓給下一段「${later.label}」（待命不是作業，不影響工作量）`,
       });
       earlier.plannedEndMinute = secondToMinute(actualDepartSecond);
     }
@@ -2629,7 +2660,7 @@ export function insertMaintenanceTransferCards(args: {
         kind: 'late-start',
         seconds: Math.round((later.plannedStartMinute - laterStartBefore) * 60),
         remainingWorkSeconds: Math.round((later.plannedEndMinute - later.plannedStartMinute) * 60),
-        minimumWorkSeconds: minimumYardWorkSeconds(later.taskType),
+        minimumWorkSeconds: configuredWorkSeconds(later.taskType),
         reason: '整備間轉場的移動時間佔用後一段的開頭（前一段跑滿全長，後一段晚開始、結束不動）',
       });
     }
@@ -2818,10 +2849,23 @@ export function insertMaintenanceTransferCards(args: {
     let laterNeededSeconds: number | null = null;
     /** 只輸在轉折點時，原訂時刻要經過的節點（最優先的那台設施） */
     let exitReservation: Array<{ nodeId: string; instant: number }> | null = null;
+    /**
+     * 出廠最早什麼時候可以離格。作業類整備要做滿到原訂結束：尾巴沒有授權，不能為了出場移動截短
+     * （白皮書 YARD-07）。放不下就回報「下一班要晚多少」，交給呼叫端連同後續班次一起評估。
+     * 待命不是作業，提早離開待命仍可以（剩下不少於一個刻度）。
+     */
+    const earliestLeaveSecond = isWorkYardTaskType(yard.taskType)
+      ? yardEndSecond
+      : yardStartSecond + minimumYardWorkSeconds(yard.taskType);
     for (const { facility, seconds, edges, viaLabels } of candidates) {
       const startSecond = departSecond - seconds;
-      // 出場移動吃整備尾巴時，剩下的工作時間不得少於使用者設定的作業時長
-      if (startSecond < yardStartSecond + minimumYardWorkSeconds(yard.taskType) - 1e-9) { tally.noTime += 1; continue; }
+      if (startSecond < earliestLeaveSecond - 1e-9) {
+        tally.noTime += 1;
+        // 下一班要晚這麼多，出廠移動才放得進整備結束之後
+        const needed = snapUpToClockAlignSeconds(earliestLeaveSecond - startSecond);
+        if (laterNeededSeconds == null || needed < laterNeededSeconds) laterNeededSeconds = needed;
+        continue;
+      }
       // 出廠時刻釘在下一班發車，交接由之後進格的那一方讓
       if (!stayFacilityIsFree(facility.id, yard, timeline.row, yardStartSecond, startSecond)) {
         tallyFacilityBusy(tally);
@@ -2840,7 +2884,7 @@ export function insertMaintenanceTransferCards(args: {
          * 多吃的量照樣記進 yardWorkShortened、在報告逐筆列出。
          * 往後錯開則要連同下一班與交路一起挪，這裡只算出要晚多少、寫進原因。
          */
-        const earliestStart = yardStartSecond + minimumYardWorkSeconds(yard.taskType);
+        const earliestStart = earliestLeaveSecond;
         const candidateShifts: number[] = [];
         for (const booking of junctionBookings) {
           if (booking.nodeId !== gateway.nodeId || booking.timelineRow === timeline.row) continue;
@@ -2871,7 +2915,7 @@ export function insertMaintenanceTransferCards(args: {
           if (later != null) laterNeededSeconds = later;
           tally.junctionBusy += 1;
           tally.junctionDetail ??= describeJunctionBlock([gateway], timeline.row, 0, 0)
-            + `；往前（剩下的整備不少於 ${Math.round(minimumYardWorkSeconds(yard.taskType))} 秒、最早 ${formatSecondOfDay(earliestStart)}、到站後的等待不撞站位）`
+            + `；往前（最早 ${formatSecondOfDay(earliestStart)} 才能離格、到站後的等待不撞站位）`
             + `找不到可行出發時刻`;
           continue;
         }
@@ -2916,7 +2960,7 @@ export function insertMaintenanceTransferCards(args: {
         kind: 'early-end',
         seconds: Math.round(yardEndSecond - chosenStart),
         remainingWorkSeconds: Math.round(chosenStart - yardStartSecond),
-        minimumWorkSeconds: minimumYardWorkSeconds(yard.taskType),
+        minimumWorkSeconds: configuredWorkSeconds(yard.taskType),
         reason: '整備結束到下一班發車之間放不下出廠移動，出廠卡吃掉整備尾巴',
       });
       yard.plannedEndMinute = secondToMinute(chosenStart);

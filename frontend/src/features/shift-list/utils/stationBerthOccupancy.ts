@@ -528,6 +528,11 @@ export function collectFacilityOccupancies(
       lastEndMinute: number;
     };
     let run: Run | null = null;
+    /**
+     * 最近一張開進設施格的入廠卡：車在它結束時就到了那一格。提早到的車在格子裡等待，整備照原訂
+     * 時刻開始（白皮書 YARD-07）——格位從抵達就被佔住，佔用起點要從抵達算，不是整備開始。
+     */
+    let arrival: { nodeId: string; minute: number } | null = null;
 
     const close = (current: Run, leaveMinute: number | null) => {
       const stays = current.members.filter((member) => member.source !== 'hold');
@@ -562,13 +567,22 @@ export function collectFacilityOccupancies(
         run = null;
       }
       if (nodeId) {
+        const pending: { nodeId: string; minute: number } | null = arrival;
+        const arrivedEarly: number | null =
+          pending && pending.nodeId === nodeId && pending.minute < block.plannedStartMinute
+            ? pending.minute
+            : null;
         run = {
           nodeId,
           label: block.yardFacilityLabel ?? nodeId,
           members: [block],
-          startMinute: block.plannedStartMinute,
+          startMinute: arrivedEarly ?? block.plannedStartMinute,
           lastEndMinute: block.plannedEndMinute,
         };
+        arrival = null;
+      } else if (block.plannedEndMinute - block.plannedStartMinute > 1e-9) {
+        const destination = block.source === 'yard_entry_move' ? block.yardExitFacilityNodeId?.trim() : '';
+        arrival = destination ? { nodeId: destination, minute: block.plannedEndMinute } : null;
       }
     }
     // 當天沒排定下一件事就不假設車待到何時，只算到排定的停留結束

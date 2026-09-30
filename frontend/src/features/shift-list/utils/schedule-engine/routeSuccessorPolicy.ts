@@ -3,7 +3,8 @@
  *
  * - `relation-graph-through-anchors-v1`：班際繼任**只允許關聯圖上的短邊**（拓樸拆解後的唯一可能）；
  *   「優先採用」導通組合只用於開輪相位／同分偏好，不得發明 TN→NTB 這類圖上不存在的繞回。
- * - `execution-order-ring-v1`：完全沒有關聯圖時才用執行順序硬輪替（相容舊資料）。
+ * 沒有關聯圖（或沒有已驗證的路線組合）就是無效策略，不生成；2026-09-30 起不再依路線排列順序
+ * 自動輪替（白皮書 ROUTE-02：正線接續只依關聯圖）。
  */
 
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
@@ -33,16 +34,16 @@ import {
 
 export const ROUTE_SUCCESSOR_ALGORITHM_GRAPH =
   'relation-graph-through-anchors-v1' as const;
-export const ROUTE_SUCCESSOR_ALGORITHM_RING = 'execution-order-ring-v1' as const;
 export const ROUTE_SUCCESSOR_ALGORITHM_INVALID_GRAPH =
   'invalid-relation-graph-v1' as const;
 
 export type RouteSuccessorAlgorithm =
   | typeof ROUTE_SUCCESSOR_ALGORITHM_GRAPH
-  | typeof ROUTE_SUCCESSOR_ALGORITHM_RING
   | typeof ROUTE_SUCCESSOR_ALGORITHM_INVALID_GRAPH;
 
 export type RouteSuccessorPolicyIssue =
+  /** 路線群組沒有畫關聯圖（或只有一條路線卻沒有檢查過路線組合） */
+  | 'RELATION_GRAPH_MISSING'
   | 'THROUGH_VERIFICATION_INVALID'
   | 'NO_PRIORITY_THROUGH_PATH'
   | 'THROUGH_PATH_ROUTE_MISSING';
@@ -146,35 +147,6 @@ function buildSuccessorsFromRelationGraph(
   return { prioritySuccessors, secondarySuccessors };
 }
 
-function buildRingPolicy(
-  routes: ShiftScheduleSelectedRoute[],
-): RouteSuccessorPolicy {
-  const routesByInstanceId = new Map(
-    routes.map((route) => [resolveSelectedRouteInstanceId(route), route] as const),
-  );
-  const instanceIds = routes.map((route) => resolveSelectedRouteInstanceId(route));
-  const prioritySuccessors = new Map<string, string[]>();
-  for (let i = 0; i < instanceIds.length; i += 1) {
-    const from = instanceIds[i]!;
-    const to = instanceIds[(i + 1) % instanceIds.length]!;
-    prioritySuccessors.set(from, instanceIds.length > 1 ? [to] : []);
-  }
-  return {
-    algorithm: ROUTE_SUCCESSOR_ALGORITHM_RING,
-    valid: true,
-    routesByInstanceId,
-    rotationRoutes: routes,
-    prioritySuccessors,
-    secondarySuccessors: new Map(),
-    startInstanceIds: instanceIds.length > 0 ? [instanceIds[0]!] : [],
-    endInstanceIds: new Set(
-      instanceIds.length > 0 ? [instanceIds[instanceIds.length - 1]!] : [],
-    ),
-    canonicalCycleInstanceIds: instanceIds,
-    throughCycles: [],
-  };
-}
-
 function buildInvalidGraphPolicy(
   routes: ShiftScheduleSelectedRoute[],
   issue: RouteSuccessorPolicyIssue,
@@ -208,12 +180,12 @@ export function buildRouteSuccessorPolicy(input: {
   minimumRecoveryTimeSeconds?: number | null;
 }): RouteSuccessorPolicy {
   const routes = input.routes;
-  const ring = buildRingPolicy(routes);
   const graph = input.graph ?? emptyShiftRouteRelationGraph();
   if (routes.length === 0) {
-    return graph.links.length > 0
-      ? buildInvalidGraphPolicy(routes, 'THROUGH_VERIFICATION_INVALID')
-      : ring;
+    return buildInvalidGraphPolicy(
+      routes,
+      graph.links.length > 0 ? 'THROUGH_VERIFICATION_INVALID' : 'RELATION_GRAPH_MISSING',
+    );
   }
   const anchors = input.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
   const recovery = normalizeMinimumRecoveryTimeSeconds(
@@ -226,7 +198,11 @@ export function buildRouteSuccessorPolicy(input: {
     graph,
     minimumRecoveryTimeSeconds: recovery,
   });
-  if (graph.links.length === 0) return ring;
+  // 沒畫關聯圖、也沒有檢查過路線組合：不能自己依排列順序輪替（ROUTE-02）。
+  // 只有一條路線時，關聯圖可以沒有連線，但仍要在路線群組指定起算／結算並檢查過。
+  if (graph.links.length === 0 && !verified) {
+    return buildInvalidGraphPolicy(routes, 'RELATION_GRAPH_MISSING');
+  }
   if (!verified) {
     return buildInvalidGraphPolicy(routes, 'THROUGH_VERIFICATION_INVALID');
   }
@@ -417,17 +393,6 @@ export function resolveNextInstanceId(
   if (!policy.valid) return null;
   const allowSecondary = options?.allowSecondary === true;
 
-  if (policy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_RING) {
-    const index = resolveRouteIndexInRotation(policy, currentInstanceId);
-    if (index < 0 || policy.rotationRoutes.length === 0) return null;
-    const next =
-      policy.rotationRoutes[(index + 1) % policy.rotationRoutes.length]!;
-    return {
-      instanceId: resolveSelectedRouteInstanceId(next),
-      kind: 'ring',
-    };
-  }
-
   const preferredIds = policy.canonicalCycleInstanceIds;
   const preferredIndex = preferredIds.indexOf(currentInstanceId);
   const preferredNext =
@@ -472,11 +437,6 @@ export function listNextInstanceCandidates(
   options?: { allowSecondary?: boolean },
 ): Array<{ instanceId: string; kind: 'priority' | 'secondary' | 'ring' }> {
   const allowSecondary = options?.allowSecondary === true;
-  if (policy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_RING) {
-    const next = resolveNextInstanceId(policy, currentInstanceId);
-    return next ? [next] : [];
-  }
-
   const primary = resolveNextInstanceId(policy, currentInstanceId, {
     allowSecondary,
   });
@@ -503,11 +463,6 @@ export function isCycleClosingInstance(
   instanceId: string,
 ): boolean {
   if (!policy.valid) return false;
-  if (policy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_RING) {
-    if (policy.rotationRoutes.length <= 1) return true;
-    const last = policy.rotationRoutes[policy.rotationRoutes.length - 1]!;
-    return resolveSelectedRouteInstanceId(last) === instanceId;
-  }
   return policy.endInstanceIds.has(instanceId);
 }
 
@@ -522,32 +477,6 @@ export function estimatePolicyCycleSeconds(
 ): number {
   const routes = policy.rotationRoutes;
   if (routes.length === 0) return 0;
-
-  if (policy.algorithm === ROUTE_SUCCESSOR_ALGORITHM_RING) {
-    const startIndex = Math.max(0, resolveRouteIndexInRotation(policy, startInstanceId));
-    let total = 0;
-    for (let hop = 0; hop < routes.length; hop += 1) {
-      const index = (startIndex + hop) % routes.length;
-      const route = routes[index]!;
-      if (hop > 0) {
-        const prev = routes[(startIndex + hop - 1) % routes.length]!;
-        total += resolveInterTripGapSeconds({
-          minimumRecoveryTimeSeconds,
-          previousRouteSwitchBufferSeconds: prev.switchBufferAfterSeconds,
-          isRouteSwitch: prev.routeId !== route.routeId,
-          includeRecovery: shouldIncludeRecoveryForRouteSwitch({
-            previousRoute: prev,
-            nextRoute: route,
-            rotationRoutes: routes,
-          }),
-          previousRoute: prev,
-          nextRoute: route,
-        });
-      }
-      total += occupancySeconds(route);
-    }
-    return total;
-  }
 
   const maxHops = Math.max(1, policy.canonicalCycleInstanceIds.length);
   let total = 0;

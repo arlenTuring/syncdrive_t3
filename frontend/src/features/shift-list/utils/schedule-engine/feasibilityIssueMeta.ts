@@ -75,7 +75,9 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）',
   GEOMETRY_NOT_CONVERGED: '本次試算尚未排妥',
   SCHEDULE_SEARCH_INCOMPLETE: '本次計算未找到安全排法（搜尋未完成）',
-  MAINTENANCE_WORK_SHORTENED: '整備工作時間被移動佔用'
+  MAINTENANCE_WORK_SHORTENED: '整備工作時間被移動佔用',
+  MAINTENANCE_WORK_INSUFFICIENT: '整備被刪除或工作時間不足',
+  SCHEDULE_DATA_INCOMPLETE: '生成前的必要資料不完整'
 };
 
 /** 全部 31 個代號（型別 exhaustive 檢查來源）；供文件覆蓋率測試核對 §13。 */
@@ -133,6 +135,8 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   GEOMETRY_NOT_CONVERGED: { id: 's3', label: '§3 流水線' },
   SCHEDULE_SEARCH_INCOMPLETE: { id: 's3', label: '§3 流水線' },
   MAINTENANCE_WORK_SHORTENED: { id: 's6', label: '§6 整備與設施佔用' },
+  MAINTENANCE_WORK_INSUFFICIENT: { id: 'YARD-03', label: 'YARD-03 禁止零整備' },
+  SCHEDULE_DATA_INCOMPLETE: { id: 'MAP-02', label: 'MAP-01～03 地圖與必要資料' },
 };
 
 const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 'kindLabel' | 'groupTitle' | 'docAnchor'>> = {
@@ -320,7 +324,17 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   MAINTENANCE_WORK_SHORTENED: {
     kind: 'policy',
     guidance:
-      '入廠晚到、整備間轉場的移動時間、或出廠吃掉尾巴，會讓這一段整備的實際工作時間比時間模板短。晚開始的量不超過整備設定的讓渡餘裕，剩下的工作時間不少於整備設定的作業時長；超過就不會這樣排。點選可跳到那張卡。',
+      '入廠晚到、或整備間轉場的移動時間，會讓這一段整備晚開始、結束不動，實際工作時間比時間模板短。晚開始的量不超過整備設定的讓渡餘裕，剩下的工作時間不少於整備設定的作業時長；超過就不會這樣排。作業類整備的尾巴不會被截短。點選可跳到那張卡。',
+  },
+  SCHEDULE_DATA_INCOMPLETE: {
+    kind: 'actionable',
+    guidance:
+      '生成前先檢查這一次會用到的地圖資料：必須選一張地圖、地圖要有路網拓樸與路段、選的路線站點要在路網上、模板用到的整備設施要在路網上，而且進出場至少各有一條每段都有行駛時間的路。缺任何一項就不生成；系統不會改用別張地圖、不會把缺的時間當 0 秒。照訊息到路線群組、整備任務或地圖編輯補齊後重新生成。',
+  },
+  MAINTENANCE_WORK_INSUFFICIENT: {
+    kind: 'limit',
+    guidance:
+      '模板上的這一段整備在排好的班表裡不見了，或剩下的工作時間低於最低要求（有設定作業時長就用它，沒有的至少不能是零）。整備不能被壓成零、也不能刪卡假裝做完，所以班表禁止發布。多半是正線讓渡或移動占掉太多開頭：加長模板上的整備、調小正線可壓縮整備開頭，或把前後班次錯開。',
   },
   SCHEDULE_SEARCH_INCOMPLETE: {
     kind: 'limit',

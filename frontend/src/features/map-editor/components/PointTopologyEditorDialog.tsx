@@ -2152,6 +2152,27 @@ export function PointTopologyEditorDialog({
                     draft,
                     selectedEdge.id,
                   )}
+                  oppositeEdge={(() => {
+                    const oppositeId = findOppositePointTopologyEdgeId(draft, selectedEdge.id)
+                    return oppositeId ? draft.edges.find((item) => item.id === oppositeId) ?? null : null
+                  })()}
+                  onSelectOpposite={() => {
+                    const oppositeId = findOppositePointTopologyEdgeId(draft, selectedEdge.id)
+                    if (!oppositeId) return
+                    setSelectedEdgeId(oppositeId)
+                    setInspectorTarget({ kind: 'edge', id: oppositeId })
+                  }}
+                  onCopyTimesToOpposite={() => {
+                    const oppositeId = findOppositePointTopologyEdgeId(draft, selectedEdge.id)
+                    if (!oppositeId) return
+                    applyDraft((prev) =>
+                      updatePointTopologyEdge(prev, oppositeId, {
+                        minTravelTimeSeconds: selectedEdge.minTravelTimeSeconds,
+                        avgTravelTimeSeconds: selectedEdge.avgTravelTimeSeconds,
+                        distanceMeters: selectedEdge.distanceMeters,
+                      }),
+                    )
+                  }}
                   onMakeBidirectional={() => {
                     const { topology, newEdgeId } =
                       makePointTopologyEdgeBidirectional(draft, selectedEdge.id)
@@ -2338,6 +2359,9 @@ function EdgePropertiesForm({
   readOnly,
   canReverse,
   isBidirectional,
+  oppositeEdge,
+  onSelectOpposite,
+  onCopyTimesToOpposite,
   onMakeBidirectional,
   onRemoveOpposite,
   onChange,
@@ -2354,6 +2378,13 @@ function EdgePropertiesForm({
   canReverse: boolean
   /** 對向邊已存在＝這一對節點已經是雙向 */
   isBidirectional: boolean
+  /**
+   * 對向那一條邊（雙向時才有）。兩個方向是兩條獨立的邊、各自有行駛時間；面板只編輯選到的這一條，
+   * 所以要把對向有沒有填時間講出來——「已設為雙向」不代表反方向也有時間。
+   */
+  oppositeEdge?: PointTopologyEdge | null
+  onSelectOpposite?: () => void
+  onCopyTimesToOpposite?: () => void
   onMakeBidirectional: () => void
   onRemoveOpposite: () => void
   onChange: (
@@ -2403,6 +2434,41 @@ function EdgePropertiesForm({
               <div className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-center text-xs font-medium text-emerald-200">
                 {t('mapEditor.pointTopology.bidirectional')}
               </div>
+              {oppositeEdge ? (
+                (() => {
+                  const known = (value: number | null | undefined) =>
+                    typeof value === 'number' && Number.isFinite(value) && value >= 0
+                  const oppositeHasTime = known(oppositeEdge.avgTravelTimeSeconds) || known(oppositeEdge.minTravelTimeSeconds)
+                  return (
+                    <div
+                      className={`rounded-lg border px-2.5 py-2 text-[11px] leading-snug ${
+                        oppositeHasTime
+                          ? 'border-zinc-700 bg-zinc-900/60 text-zinc-300'
+                          : 'border-amber-600/60 bg-amber-950/40 text-amber-200'
+                      }`}
+                    >
+                      <p>
+                        對向 {toLabel} → {fromLabel}：
+                        {oppositeHasTime
+                          ? `最快 ${oppositeEdge.minTravelTimeSeconds ?? '—'} 秒・平均 ${oppositeEdge.avgTravelTimeSeconds ?? '—'} 秒`
+                          : '還沒有行駛時間。兩個方向是各自的線，這一段在排班裡不能走（不會當 0 秒）。'}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {onSelectOpposite ? (
+                          <button type="button" onClick={onSelectOpposite} className="rounded border border-zinc-600 px-2 py-0.5 text-zinc-200 hover:bg-zinc-800">
+                            編輯對向這一條
+                          </button>
+                        ) : null}
+                        {!oppositeHasTime && onCopyTimesToOpposite ? (
+                          <button type="button" onClick={onCopyTimesToOpposite} className="rounded border border-amber-600/70 px-2 py-0.5 text-amber-100 hover:bg-amber-900/40">
+                            對向沿用這一條的時間與距離
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : null}
               <button
                 type="button"
                 onClick={onRemoveOpposite}

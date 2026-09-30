@@ -296,7 +296,7 @@ describe('relievePlatformIdleWithFacilityPark：甲／乙判準改用格位身�
     assert.equal(result.timelines.flatMap((t) => t.blocks).some((b) => b.id.startsWith('berthpark-')), false);
   });
 
-  it('直接進目的格本人（甲）：沿用既有入廠卡、整備照樣提早開始（行為不變）', () => {
+  it('直接進目的格本人（甲）：沿用既有入廠卡；充電照原訂開始，提早到的那段是等待（白皮書 YARD-07）', () => {
     const result = relievePlatformIdleWithFacilityPark({
       timelines: timelinesWithYardEntry(30),
       selectedRoutes: [routeA, routeOther],
@@ -313,22 +313,45 @@ describe('relievePlatformIdleWithFacilityPark：甲／乙判準改用格位身�
       false,
       '甲直接沿用既有入廠卡，不該多插一張進 W1 的卡',
     );
-    assert.equal(
-      row1.blocks.some((b) => b.id.startsWith('berthpark-early-stay-')),
-      false,
-      '甲在目的格本人裡面等，不該插等待卡',
-    );
-
     const hopToE2 = row1.blocks.find((b) => b.id === 'entry-e2')!;
-    // 甲：既有入廠卡整張往前挪到跑完就走，只涵蓋自己的行駛秒數（30 秒）
     assert.ok(hopToE2.plannedStartMinute < 63, '應該提早出發，不是等到 90 分鐘');
     assert.ok(hopToE2.plannedEndMinute < 64, '30 秒的行駛，不該拉到 90 分鐘那麼長');
 
-    // 整備跟著提早開始（車已經在 E2 裡面了，等待就是在裡面等）
+    // 充電是作業：照原訂 90 分開始；車在 E2 裡等，等待卡佔同一格
     const charge = row1.blocks.find((b) => b.id === 'charge-e2')!;
-    assert.ok(charge.plannedStartMinute < 64 && charge.plannedStartMinute > 62, '整備應該跟著提早開始');
-    assert.notEqual(charge.plannedStartMinute, 90);
+    assert.equal(charge.plannedStartMinute, 90, '作業類整備不提前開工');
+    const stay = row1.blocks.find((b) => b.id.startsWith('berthpark-early-stay-'))!;
+    assert.ok(stay, '提早到的那段要有等待卡');
+    assert.equal(stay.yardFacilityNodeId, charge.yardFacilityNodeId);
+    assert.ok(Math.abs(stay.plannedStartMinute - hopToE2.plannedEndMinute) < 1e-9);
 
     assert.equal(result.parked, 1);
+  });
+});
+
+describe('relievePlatformIdleWithFacilityPark：不設「至少停 60 秒」門檻（白皮書 GEN-07）', () => {
+  it('只能停 40 秒也可以借格位等，前提是真的解開站位衝突', () => {
+    const timelines = timelinesWithYardEntry(0);
+    const entry = timelines[0]!.blocks.find((b) => b.id === 'entry-e2')!;
+    entry.plannedStartMinute = 64;
+    entry.plannedEndMinute = 64;
+    entry.anchorStartMinute = 64;
+    const charge = timelines[0]!.blocks.find((b) => b.id === 'charge-e2')!;
+    charge.plannedStartMinute = 64;
+    charge.anchorStartMinute = 64;
+    // 另一台車 64:02 到 T3，正好在第 1 列空等的那一分多鐘裡（第 1 列若照舊賴到 64:00 就擋到它）
+    const other = timelines[1]!.blocks[0]!;
+    other.plannedStartMinute = 61.7;
+    other.plannedEndMinute = 61.7 + 170 / 60;
+    other.anchorStartMinute = 61.7;
+    const result = relievePlatformIdleWithFacilityPark({
+      timelines, selectedRoutes: [routeA, routeOther],
+      topology: topology(), standbyFacilityCodes: ['W1'], collisionProtectionSeconds: 30,
+    });
+    const stay = result.timelines[0]!.blocks.find((b) => b.id.startsWith('berthpark-early-stay-'));
+    assert.equal(result.parked, 1, '短停也要能用');
+    assert.ok(stay, '要有等待卡');
+    const staySeconds = Math.round((stay!.plannedEndMinute - stay!.plannedStartMinute) * 60);
+    assert.ok(staySeconds > 0 && staySeconds < 60, `停 ${staySeconds} 秒`);
   });
 });

@@ -111,7 +111,6 @@ export {
   routeAssignmentAlgorithmId,
   rotationCompletionAlgorithmId,
   ROUTE_SUCCESSOR_ALGORITHM_GRAPH,
-  ROUTE_SUCCESSOR_ALGORITHM_RING,
   type RouteSuccessorPolicy,
   type RouteSuccessorAlgorithm,
 } from './routeSuccessorPolicy';

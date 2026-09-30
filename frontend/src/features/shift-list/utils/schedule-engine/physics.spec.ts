@@ -94,7 +94,7 @@ describe('shouldIncludeRecoveryForRouteSwitch / resolveInterTripGapSeconds', () 
     );
   });
 
-  it('returns 0 gap when successive routes share the turnaround station', () => {
+  it('same-station switch keeps the switch buffer (換線準備), no recovery, no double count', () => {
     const inbound = route('st', 1, 100, 90, 40, 2);
     inbound.stationIds = ['a', 't3'];
     inbound.stationDwells = [
@@ -116,6 +116,31 @@ describe('shouldIncludeRecoveryForRouteSwitch / resolveInterTripGapSeconds', () 
         includeRecovery: false,
         previousRoute: inbound,
         nextRoute: outbound,
+      }),
+      2,
+    );
+    // 恢復時間在同站接續照舊不加（延誤預留新規則未定），換線緩衝只算一次
+    assert.equal(
+      resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds: 30,
+        previousRouteSwitchBufferSeconds: 2,
+        isRouteSwitch: true,
+        includeRecovery: true,
+        previousRoute: inbound,
+        nextRoute: outbound,
+      }),
+      2,
+    );
+    // 同一條環狀路線自己接自己：不換線，沒有換線準備
+    const loop = route('loop', 1, 100, 90, 40, 5);
+    loop.stationIds = ['t3', 'a', 't3'];
+    assert.equal(
+      resolveInterTripGapSeconds({
+        minimumRecoveryTimeSeconds: 30,
+        previousRouteSwitchBufferSeconds: 5,
+        isRouteSwitch: false,
+        previousRoute: loop,
+        nextRoute: loop,
       }),
       0,
     );

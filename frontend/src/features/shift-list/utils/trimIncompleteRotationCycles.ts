@@ -37,6 +37,8 @@ export function trimIncompleteRotationCyclesOnTimelines(args: {
   timelines: GeneratedSchedulePlan['timelines'];
   /** 主交路筆數（不含僅掛 backupFor* 的列） */
   routeCount: number;
+  /** 撤掉一班時告知（報表逐班揭露） */
+  onRemoved?: (blockId: string) => void;
 }): TrimIncompleteRotationResult {
   const routeCount = Math.max(0, Math.floor(args.routeCount));
   if (routeCount <= 1) {
@@ -66,6 +68,7 @@ export function trimIncompleteRotationCyclesOnTimelines(args: {
       if (remainder > 0) {
         for (const block of stretch.slice(stretch.length - remainder)) {
           dropIds.add(block.id);
+          args.onRemoved?.(block.id);
         }
       }
       stretch = [];

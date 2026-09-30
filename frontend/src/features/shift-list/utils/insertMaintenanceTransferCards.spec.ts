@@ -4,6 +4,8 @@ import { describe, it } from 'node:test';
 import { emptyPointTopology } from '../../map-editor/types/pointTopology';
 import type { PointTopology } from '../../map-editor/types/pointTopology';
 import { insertMaintenanceTransferCards } from './insertMaintenanceTransferCards';
+import { collectFacilityOccupancies } from './stationBerthOccupancy';
+import { fillYardHoldGaps } from './fillYardHoldGaps';
 import type { GeneratedSchedulePlan } from './schedule-engine/types';
 
 function edge(from: string, to: string, seconds: number) {
@@ -147,13 +149,13 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       });
     }
 
-    it('整備開始提前到抵達時刻，結束時刻不動（時長變長）', () => {
+    it('提早到是等待：保養照原訂 10:00 開始，格位從 09:31 抵達就算佔用（白皮書 YARD-07）', () => {
       // 正線 09:30 結束，保養原訂 10:00–11:00，M1 要 60 秒 → 09:31 就到得了
       const p = plan({ yardStartMinute: 10 * 60 });
       const result = run(p);
 
       assert.equal(result.inserted, 1);
-      assert.equal(result.yardHeadExtended, 1);
+      assert.equal(result.yardHeadExtended, 0, '作業類整備不提前開工');
 
       const blocks = p.timelines[0]!.blocks;
       const card = blocks.find((b) => b.source === 'yard_entry_move')!;
@@ -162,8 +164,18 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(card.plannedEndMinute, 9 * 60 + 31);
 
       const yard = blocks.find((b) => b.id === 'yard-1')!;
-      assert.equal(yard.plannedStartMinute, 9 * 60 + 31, '整備開始要提前到 MI 抵達');
+      assert.equal(yard.plannedStartMinute, 10 * 60, '整備照原訂時刻開始，不因提早到而提早開工');
       assert.equal(yard.plannedEndMinute, 11 * 60, '整備結束時刻必須不動');
+
+      // 等待也佔格位：佔用從抵達算起；補卡後看得到一張「等待」卡
+      const occupancy = collectFacilityOccupancies(p.timelines).find((item) => item.blockIds.includes('yard-1'))!;
+      assert.equal(occupancy.startMinute, 9 * 60 + 31, '格位從抵達就被佔住');
+      fillYardHoldGaps({ timelines: p.timelines });
+      const wait = p.timelines[0]!.blocks.find((b) => b.source === 'hold' && b.label.includes('等待'))!;
+      assert.ok(wait, '抵達到開始之間要有一張等待卡');
+      assert.equal(wait.plannedStartMinute, 9 * 60 + 31);
+      assert.equal(wait.plannedEndMinute, 10 * 60);
+      assert.equal(wait.yardFacilityNodeId, yard.yardFacilityNodeId);
     });
 
     it('沒有提前空間時，整備開始跟著實際進廠時刻往後（結束時刻仍然不動）', () => {
@@ -223,7 +235,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       );
     });
 
-    it('剩下的工作時間不少於整備設定的作業時長（保養取各項目最長的一項）', () => {
+    it('移動可以佔用作業開頭、低於設定作業時長（使用者 2026-09-30），逐筆揭露；但不能歸零', () => {
       const bodyWith = (minutes: number) => ({
         maintenance: { ...BODY.maintenance, cycleConditions: [{ durationMinutes: '2' }, { durationMinutes: String(minutes) }] },
       });
@@ -233,8 +245,12 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         p.timelines[0]!.blocks.find((b) => b.id === 'yard-1')!.plannedEndMinute = 9 * 60 + 35;
         return run(p, bodyWith(minutes));
       };
-      assert.equal(tryRun(4).inserted, 1, '設定 4 分鐘：剩 4 分鐘剛好可以');
-      assert.equal(tryRun(5).inserted, 0, '設定 5 分鐘：剩 4 分鐘不夠，不能靠縮短工作時間排出來');
+      assert.equal(tryRun(4).inserted, 1, '設定 4 分鐘：剩 4 分鐘');
+      const under = tryRun(5);
+      assert.equal(under.inserted, 1, '設定 5 分鐘：剩 4 分鐘也排，移動佔用開頭');
+      const shortened = under.yardWorkShortened.find((item) => item.blockId === 'yard-1')!;
+      assert.ok(shortened.remainingWorkSeconds < shortened.minimumWorkSeconds, '低於設定作業時長要記下來');
+      assert.equal(shortened.minimumWorkSeconds, 300);
     });
 
     it('挑最快到得了的設施', () => {
@@ -491,7 +507,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(trip?.plannedEndMinute, 75);
     });
 
-    it('整備完零秒就要發車時，才吃整備尾巴（全系統唯一有此特權的卡）', () => {
+    it('整備完零秒就要發車：不吃尾巴，回報下一班要晚多少（白皮書 YARD-07）', () => {
       // 保養 00:00–01:10，發車也在 01:10 → 完全沒有空檔
       const timelines = buildTimelines({
         yardStartMinute: 0,
@@ -500,15 +516,32 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       });
       const result = run(timelines);
 
-      assert.equal(result.inserted, 1);
-      assert.equal(result.ateYardTail, 1);
+      assert.equal(result.inserted, 0, '放不下就不插卡，不截短整備');
+      assert.equal(result.ateYardTail, 0);
       const yard = timelines[0]!.blocks.find((b) => b.id === 'yard-1');
+      assert.equal(yard?.plannedEndMinute, 70, '整備做滿到原訂結束');
+      const skip = result.skipped.find((item) => item.blockId === 'yard-1' && item.reason.startsWith('排不出出廠卡'));
+      assert.ok(skip, '排不出要回報');
+      // M1 出場 30 秒 → 下一班至少晚 30 秒，交給呼叫端連同後續班次一起評估
+      assert.deepEqual(skip?.exitDelay, { nextBlockId: 'trip-1', seconds: 30 });
+      assert.equal(result.yardWorkShortened.length, 0);
+    });
+
+    it('待命不是作業：出場時間不夠時仍可提早離開待命', () => {
+      const timelines = buildTimelines({
+        yardStartMinute: 0,
+        yardEndMinute: 70,
+        departMinute: 70,
+      });
+      const yardBlock = timelines[0]!.blocks.find((b) => b.id === 'yard-1')!;
+      yardBlock.taskType = 'standby';
+      yardBlock.label = '待命';
+      const result = run(timelines, { mobile: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'M1' }] } });
+      assert.equal(result.inserted, 1);
       const card = timelines[0]!.blocks.find((b) => b.source === 'yard_exit_move');
-      // 整備結束被往前縮 30 秒，卡片接上去
-      assert.equal(yard?.plannedEndMinute, 70 - 0.5);
-      assert.equal(card?.plannedStartMinute, 70 - 0.5);
       assert.equal(card?.plannedEndMinute, 70);
-      assert.equal(card?.yardExitAteYardTail, true);
+      assert.equal(card?.plannedStartMinute, 70 - 0.5);
+      assert.equal(yardBlock.plannedEndMinute, 70 - 0.5, '待命提早 30 秒結束，車開去發車站');
     });
 
     it('同一台設施同一時刻不給兩列車用，用完就回報排不出來', () => {
@@ -641,49 +674,63 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       });
     }
 
-    it('後一段的時長剛好等於整備設定的作業時長：移動時間改由前一段結尾讓出，兩段都不低於設定', () => {
+    it('後一段的時長剛好等於整備設定的作業時長：前一段不截尾，移動佔用後一段開頭並揭露（使用者 2026-09-30）', () => {
       const p = plan();
-      // 保養 07:10–07:40，設定保養項目要 30 分鐘——一秒都不能被移動佔掉
       p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!.plannedEndMinute = 460;
       const body = { ...BODY, maintenance: { ...BODY.maintenance, cycleConditions: [{ durationMinutes: '30' }] } };
       const result = run(p, topology(), body);
       assert.equal(result.skipped.filter((x) => x.fromTaskType === 'charging').length, 0);
       const blocks = p.timelines[0]!.blocks;
-      const charging = blocks.find((b) => b.id === 'charging-1')!;
+      assert.equal(blocks.find((b) => b.id === 'charging-1')!.plannedEndMinute, 430, '充電做滿原訂時長');
       const servicing = blocks.find((b) => b.id === 'servicing-1')!;
-      assert.equal(servicing.plannedStartMinute, 430, '保養照原訂開始，作業時長不縮短');
-      assert.equal(servicing.plannedEndMinute, 460);
-      // 路程 260 秒 → 充電提早 260 秒（對齊 10 秒刻度）結束
-      assert.ok(Math.abs(charging.plannedEndMinute - (430 - 260 / 60)) < 1e-6, `充電結束 ${charging.plannedEndMinute}`);
-      assert.deepEqual(
-        result.yardWorkShortened.map((item) => [item.blockId, item.kind, item.seconds]),
-        [['charging-1', 'early-end', 260]],
-      );
+      assert.ok(servicing.plannedStartMinute > 430, '保養開頭被移動佔用');
+      assert.equal(servicing.plannedEndMinute, 460, '保養結束不動');
+      const shortened = result.yardWorkShortened.find((item) => item.blockId === 'servicing-1')!;
+      assert.equal(shortened.kind, 'late-start');
+      assert.ok(shortened.remainingWorkSeconds < shortened.minimumWorkSeconds, '低於設定作業時長 30 分，揭露');
     });
 
-    it('後一段不能往後推、轉折點被別列車佔著：前一段再提早一點離開閃開，後一段從抵達開工', () => {
+    it('轉折點被別列車佔著：只能晚一點出廠（後一段晚開始），不能提早離開前一段', () => {
       const p = plan();
-      p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!.plannedEndMinute = 460;
-      const body = { ...BODY, maintenance: { ...BODY.maintenance, cycleConditions: [{ durationMinutes: '30' }] } };
-      // 充電要提早 260 秒離開才留得下保養 30 分；那時經過 N2W 是 430 分 − 260 秒 + 30 秒。
-      // 別列車正好在那一刻經過 N2W（保護 30 秒＝差開 60 秒），得再提早 60 秒
-      const passN2W = 430 * 60 - 260 + 30;
+      const passN2W = 430 * 60 + 30;
       const result = insertMaintenanceTransferCards({
         timelines: p.timelines, topology: topology(), areas: [],
-        maintenanceBody: body as Record<string, unknown>, selectedRoutes: ROUTES,
+        maintenanceBody: BODY as Record<string, unknown>, selectedRoutes: ROUTES,
         minimumRecoveryTimeSeconds: 0, collisionProtectionSeconds: 30, sectionCodes: SECTION_CODES,
         reservedJunctionPasses: [{ nodeId: 'N2W', instant: passN2W, timelineRow: 9 }],
       });
       assert.equal(result.skipped.filter((x) => x.fromTaskType === 'charging').length, 0);
       const charging = p.timelines[0]!.blocks.find((b) => b.id === 'charging-1')!;
       const servicing = p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!;
-      assert.ok(Math.abs(charging.plannedEndMinute * 60 - (430 * 60 - 320)) < 1e-6, `充電結束 ${charging.plannedEndMinute * 60}`);
-      assert.ok(servicing.plannedStartMinute <= 430 + 1e-9, '保養不晚於原訂開始');
-      assert.ok(servicing.plannedEndMinute - servicing.plannedStartMinute >= 30 - 1e-9, '保養不少於設定的 30 分');
-      assert.equal(servicing.plannedEndMinute, 460);
+      assert.equal(charging.plannedEndMinute, 430, '充電照原訂結束，不提早也不延長');
+      const exit = p.timelines[0]!.blocks.find((b) => b.id.startsWith('yardtransit-out-charging-1'))!;
+      assert.ok(exit.plannedStartMinute * 60 >= 430 * 60 + 30, `出廠 ${exit.plannedStartMinute * 60} 要晚於轉折點預約`);
+      assert.equal(servicing.plannedEndMinute, 650);
+      // 車在充電格裡多等的那段仍佔著格位
+      const occupancy = collectFacilityOccupancies(p.timelines).find((item) => item.blockIds.includes('charging-1'))!;
+      assert.ok(occupancy.actualDepartMinute >= exit.plannedStartMinute - 1e-9);
     });
 
-    it('兩段都有作業時長要求、空檔又放不下移動：排不出（不靠壓縮任一段）', () => {
+    it('前一段是待命：可以提早離開待命，把移動時間讓給有作業時長的後一段', () => {
+      const p = plan();
+      const first = p.timelines[0]!.blocks.find((b) => b.id === 'charging-1')!;
+      first.taskType = 'standby';
+      first.label = '待命';
+      p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!.plannedEndMinute = 460;
+      const body = {
+        mobile: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'E1' }] },
+        maintenance: { ...BODY.maintenance, cycleConditions: [{ durationMinutes: '30' }] },
+      };
+      const result = run(p, topology(), body);
+      assert.equal(result.skipped.filter((x) => x.fromTaskType === 'standby').length, 0);
+      const servicing = p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!;
+      assert.equal(servicing.plannedEndMinute, 460);
+      assert.ok(first.plannedEndMinute <= 430, '待命不會延長');
+      // 待命提早離開或保養開頭被佔用，兩者都可能；逐筆揭露，保養不歸零
+      assert.ok(servicing.plannedEndMinute - servicing.plannedStartMinute > 0);
+    });
+
+    it('兩段都有作業時長要求、空檔放不下移動：前一段不截尾，後一段開頭被佔用（低於設定、揭露）', () => {
       const p = plan();
       const first = p.timelines[0]!.blocks.find((b) => b.id === 'charging-1')!;
       first.taskType = 'inspection';
@@ -693,10 +740,20 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
         preTrip: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'E1' }], operationDurationMinutes: '5' },
         maintenance: { ...BODY.maintenance, cycleConditions: [{ durationMinutes: '30' }] },
       };
-      // 行檢 07:05–07:10 設定要 5 分、保養 07:10–07:40 設定要 30 分：260 秒的移動誰都讓不出來
       const result = run(p, topology(), body);
-      assert.equal(result.skipped.filter((x) => x.fromTaskType === 'inspection').length, 1);
-      assert.equal(first.plannedEndMinute, 430, '排不出就不動');
+      assert.equal(result.skipped.filter((x) => x.fromTaskType === 'inspection').length, 0);
+      assert.equal(first.plannedEndMinute, 430, '行檢做滿，不截尾');
+      const servicing = p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!;
+      assert.ok(servicing.plannedStartMinute > 430 && servicing.plannedStartMinute < 460);
+    });
+
+    it('移動時間比後一段整段還長：排不出（整備不能歸零）', () => {
+      const p = plan();
+      const servicing = p.timelines[0]!.blocks.find((b) => b.id === 'servicing-1')!;
+      servicing.plannedEndMinute = 433; // 只有 3 分鐘，移動要 260 秒
+      const result = run(p);
+      assert.equal(result.skipped.filter((x) => x.fromTaskType === 'charging').length, 1);
+      assert.equal(servicing.plannedStartMinute, 430, '排不出就不動');
     });
 
     it('前一段跑滿全長、結束時刻不動；後一段開始被推遲、結束時刻不動', () => {

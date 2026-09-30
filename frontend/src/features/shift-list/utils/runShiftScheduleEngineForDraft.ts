@@ -13,15 +13,21 @@ import {
   postScheduleEngineLog,
 } from './scheduleEngineLog';
 import { buildScheduleEngineLastIssuesSnapshot } from './scheduleEngineLastIssues';
+import { type GenerateShiftScheduleResult } from './shiftScheduleEngine';
 import {
-  generateShiftSchedule,
-  type GenerateShiftScheduleResult,
-} from './shiftScheduleEngine';
+  runScheduleEngineInBackground,
+  type ScheduleEngineProgress,
+} from './schedule-engine/worker/runScheduleEngineInBackground';
 import { enrichFeasibilityIssue } from './schedule-engine/feasibilityIssueMeta';
+import { checkScheduleInputData } from './scheduleInputDataCheck';
 
 export type RunShiftScheduleEngineOptions = {
   shiftId?: string;
   backendUrl?: string;
+  /** 取消這次生成（換頁、按取消、開始了更新的生成） */
+  signal?: AbortSignal;
+  /** 生成進度（背景執行緒回報） */
+  onProgress?: (progress: ScheduleEngineProgress) => void;
 };
 
 /**
@@ -76,39 +82,44 @@ export async function runShiftScheduleEngineForDraft(
     maintenanceTaskBody = maintenanceDetail.body ?? {};
   }
 
-  const [{ resolveMapId }, { fetchMapLibraryBackendStatus }, { resolveParsedMapForPlatform }] =
+  const [{ resolveMapId }, { resolveParsedMapForPlatform }] =
     await Promise.all([
       import('../../map-editor/constants/builtinMaps'),
-      import('../../map-editor/api/mapLibraryApi'),
       import('../../map-editor/utils/mapLibraryStorage'),
     ]);
 
+  /**
+   * 只用使用者在路線群組選定的那一張地圖（白皮書 MAP-01）。
+   *
+   * 先前地圖欄位空白時會改用系統啟用地圖，再不行就退回某一張內建地圖；載入失敗則改用空路網繼續排。
+   * 兩種退路都拿掉了：沒選、選的版本不存在、載入失敗，一律停在生成前講清楚，不換地圖、不用空路網。
+   */
+  const dataError = (message: string): GenerateShiftScheduleResult => ({
+    plan: null,
+    report: {
+      ok: false,
+      errors: [enrichFeasibilityIssue({ code: 'SCHEDULE_DATA_INCOMPLETE', severity: 'error', message })],
+      warnings: [],
+    },
+  });
   const fromDraft = draft.routeGroups.mapId?.trim();
-  let mapId = fromDraft ? resolveMapId(fromDraft) : '';
-  if (!mapId) {
-    try {
-      const status = await fetchMapLibraryBackendStatus();
-      mapId = status?.activeMapId
-        ? resolveMapId(status.activeMapId)
-        : 't3-main-version';
-    } catch {
-      mapId = 't3-main-version';
-    }
+  if (!fromDraft) {
+    return dataError('尚未在路線群組選擇地圖：請回路線群組選一張可用的地圖。系統不會自動改用其他地圖。');
   }
-
-  let firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(
-    emptyPointTopology(),
-  );
-  let pointTopology = emptyPointTopology();
-  let areas: MapAreaObject[] = [];
+  const mapId = resolveMapId(fromDraft);
+  let mapDocument: Awaited<ReturnType<typeof resolveParsedMapForPlatform>>;
   try {
-    const mapDocument = await resolveParsedMapForPlatform(mapId);
-    pointTopology = mapDocument?.pointTopology ?? emptyPointTopology();
-    areas = mapDocument?.areas ?? [];
-    firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(pointTopology);
+    mapDocument = await resolveParsedMapForPlatform(mapId);
   } catch (mapError) {
-    console.warn('[schedule-engine] 地圖拓樸載入失敗，改用空首班起點', mapError);
+    console.warn('[schedule-engine] 地圖載入失敗', mapError);
+    return dataError(`路線群組選的地圖「${fromDraft}」載入失敗：請確認地圖仍存在並已發布，或回路線群組重新選擇。`);
   }
+  if (!mapDocument) {
+    return dataError(`路線群組選的地圖「${fromDraft}」找不到（可能已刪除或版本不存在）：請回路線群組重新選擇。`);
+  }
+  const pointTopology = mapDocument.pointTopology ?? emptyPointTopology();
+  const areas: MapAreaObject[] = mapDocument.areas ?? [];
+  const firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(pointTopology);
 
   const engineInput = {
     shiftId,
@@ -146,7 +157,11 @@ export async function runShiftScheduleEngineForDraft(
     maxBytes: 9_000_000,
   });
 
-  const result = generateShiftSchedule(engineInput);
+  // 生成前的必要資料檢查（白皮書 MAP-02、MAP-03）：缺什麼就停在這裡講清楚，不帶著缺漏去排
+  const dataIssues = checkScheduleInputData(engineInput);
+  const result: GenerateShiftScheduleResult = dataIssues.length > 0
+    ? { plan: null, report: { ok: false, errors: dataIssues.map((issue) => enrichFeasibilityIssue(issue)), warnings: [] } }
+    : await runScheduleEngineInBackground(engineInput, { signal: options.signal, onProgress: options.onProgress });
 
   // 開發輔助：每次生成把輸入摘要與完整報錯寫成 log 檔（fire-and-forget）。
   // lastIssues 另會覆寫 .dev JSON＋審核 HTML「最近一次生成」區塊。

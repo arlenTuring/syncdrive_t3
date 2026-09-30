@@ -565,8 +565,8 @@ const enUS: DeepStringify<typeof zhTW> = {
       rebuildSchedule: 'Save and rebuild schedule',
       steps: {
         '1': 'Basic info',
-        '2': 'Maintenance task',
-        '3': 'Time template',
+        '2': 'Time template',
+        '3': 'Maintenance task',
         '4': 'Route groups',
         '5': 'Action settings',
         '6': 'Adjust schedule',

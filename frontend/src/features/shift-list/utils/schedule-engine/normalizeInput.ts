@@ -22,6 +22,10 @@ import {
   shouldApplyYardExitRotationAlign,
 } from '../maintenancePostTaskPolicy';
 import { resolveRouteClearanceInsertGapSeconds } from '../stationClearanceInsert';
+import { isWorkYardTaskType, minimumYardWorkSeconds } from '../yardWorkMinimum';
+import { extractFacilityMapCodes } from '../maintenanceFirstTripOrigins';
+import { FACILITY_SECTION_BY_TASK_TYPE, nodeMatchesMoveCardCodes } from '../moveCardShared';
+import { findTopologyPath } from '../findTopologyPath';
 import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
 import type { TaskTypeKey } from '../../../time-templates/types/editor';
 import {
@@ -97,6 +101,8 @@ export type EngineInput = {
    * 真正下一跳仍以關聯圖優／次邊為準，不是「誰的備用槽」。
    */
   backupRoutes: ShiftScheduleSelectedRoute[];
+  /** 模板原本的整備任務（讓渡縮短前的副本），給最終驗證核對整備沒有被刪或壓過頭 */
+  templateYardTasks?: ScheduleTask[];
   maintenanceBody: Record<string, unknown> | null;
   maintenanceEntrySlackBySection: MaintenanceEntrySlackBySection;
   emptyIntervalMainlineSlackSeconds: number;
@@ -433,6 +439,7 @@ function resolveNextMaintenanceAfterWindow(
   nonPassengerTasks: ScheduleTask[],
   slackBySection: MaintenanceEntrySlackBySection,
   lockedRotationSeconds: number | null,
+  maintenanceBody: Record<string, unknown> | null,
 ): { startSecond: number; entrySlackSeconds: number } | null {
   const next = nonPassengerTasks
     .filter(
@@ -442,14 +449,22 @@ function resolveNextMaintenanceAfterWindow(
     )
     .sort((a, b) => a.startMinute - b.startMinute)[0];
   if (!next) return null;
+  const yardDurationSeconds = Math.round(next.durationMinutes * 60);
+  const allowance = resolveYardEntrySlackSeconds({
+    taskType: next.taskType,
+    yardDurationSeconds,
+    lockedRotationSeconds,
+    slackBySection,
+  });
+  /**
+   * 額度（手填 H 或長整備的一輪）是「最多能占多少開頭」；占完之後整備仍要留下最低工作時間，
+   * 不能被壓成零（白皮書 YARD-03、YARD-04）。所以實際可用的額度不超過「整備長度 − 最低工作時間」，
+   * 會吃光整備的那一輪在這裡就不是合法候選。
+   */
+  const keepSeconds = minimumYardWorkSeconds(next.taskType, maintenanceBody);
   return {
     startSecond: minuteToSecondApprox(next.startMinute),
-    entrySlackSeconds: resolveYardEntrySlackSeconds({
-      taskType: next.taskType,
-      yardDurationSeconds: Math.round(next.durationMinutes * 60),
-      lockedRotationSeconds,
-      slackBySection,
-    }),
+    entrySlackSeconds: Math.max(0, Math.min(allowance, yardDurationSeconds - keepSeconds)),
   };
 }
 
@@ -1758,6 +1773,7 @@ function pulseSecond(departure: DirectionalHeadwayDeparture): number {
 function deferNonPassengerTasksAfterCycleSpill(
   nonPassengerTasks: ScheduleTask[],
   passengerTasks: ScheduleTask[],
+  maintenanceBody: Record<string, unknown> | null,
 ): void {
   const passengerByRow = new Map<number, ScheduleTask[]>();
   for (const task of passengerTasks) {
@@ -1787,6 +1803,8 @@ function deferNonPassengerTasksAfterCycleSpill(
     }
 
     if (deferredStartSecond <= originalStartSecond) continue;
+    // 讓渡後整備仍要留下最低工作時間；留不下就不縮（重疊交給後處理把正線推過整備），絕不壓成零
+    if (originalEndSecond - deferredStartSecond < minimumYardWorkSeconds(task.taskType, maintenanceBody) - 1e-9) continue;
     // 記住模板原起點，避免後續幽靈正線被 push 走後充電開頭無法縮回。
     if (task.templateStartMinute == null) {
       task.templateStartMinute = task.startMinute;
@@ -1940,9 +1958,11 @@ export function normalizeEngineInput(
     pushIssue(errors, {
       code: 'ROUTE_SUCCESSOR_POLICY_INVALID',
       severity: 'error',
-      message:
-        `路線關聯圖尚未形成可用的已驗證交路（${successorPolicy.issue ?? 'UNKNOWN'}），`
-        + '已停止排班，避免退回執行順序產生跨停靠點錯接',
+      message: successorPolicy.issue === 'RELATION_GRAPH_MISSING'
+        ? '路線群組沒有關聯圖（或沒有檢查過路線組合）：正線接續只依關聯圖，系統不會依路線排列順序自動輪替。'
+          + '請到路線群組畫關聯圖、指定起算／結算並按「檢查路線組合」後重新生成。'
+        : `路線關聯圖尚未形成可用的已驗證交路（${successorPolicy.issue ?? 'UNKNOWN'}），`
+          + '已停止排班，避免退回執行順序產生跨停靠點錯接',
       detail: {
         algorithm: successorPolicy.algorithm,
         policyIssue: successorPolicy.issue,
@@ -1978,6 +1998,8 @@ export function normalizeEngineInput(
     (task) => task.rowIndex >= 1 && task.rowIndex <= template.scheduleRowCount,
   );
   const nonPassengerTasks = templateTasks.filter((task) => task.taskType !== 'passenger');
+  // 模板原本的整備（讓渡縮短之前的副本）：最終驗證拿它對照，確認沒有整備被刪或壓過頭
+  const templateYardTasks = nonPassengerTasks.map((task) => ({ ...task }));
 
   let confirmedTasks: ScheduleTask[] = templateTasks;
   let timetableGenerationAlgorithm: string | undefined;
@@ -2003,7 +2025,7 @@ export function normalizeEngineInput(
       });
       return null;
     }
-    deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, generatedPassenger);
+    deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, generatedPassenger, maintenanceBody);
     confirmedTasks = [
       ...nonPassengerTasks.filter((task) => task.durationMinutes > 0),
       ...generatedPassenger,
@@ -2030,6 +2052,33 @@ export function normalizeEngineInput(
     });
     // 一個完整輪迴要多久——長整備的讓渡額度就是這個數字（見 resolveYardEntrySlackSeconds）
     const lockedRotationSeconds = resolveLockedRotationMinSeconds(successorPolicy);
+    /**
+     * 作業類整備做滿才出廠（不截尾巴，白皮書 YARD-07），所以整備結束後至少要先開完出廠移動，
+     * 第一班才可能在站上發車。取「這一類任一設施 → 任一條正線路線起點站」在路網上的最短時間當下界；
+     * 實際挑到的設施與站可能更遠，排卡時照實際路徑算。拓樸沒有資料時為 0（照舊）。
+     */
+    const exitSecondsByTaskType = new Map<string, number>();
+    const minimumYardExitSeconds = (taskType: string): number => {
+      const cached = exitSecondsByTaskType.get(taskType);
+      if (cached != null) return cached;
+      const section = FACILITY_SECTION_BY_TASK_TYPE[taskType as keyof typeof FACILITY_SECTION_BY_TASK_TYPE];
+      const topology = args.pointTopology;
+      let best: number | null = null;
+      if (section && topology) {
+        const codes = extractFacilityMapCodes(maintenanceBody, section);
+        const originStations = new Set(passengerRoutes.map((route) => route.stationIds[0]?.trim()).filter(Boolean));
+        const facilities = topology.nodes.filter((node) => node.kind === 'facility' && nodeMatchesMoveCardCodes(node, codes));
+        const stations = topology.nodes.filter((node) => node.kind === 'docking' && originStations.has(node.stationId?.trim() ?? ''));
+        for (const facility of facilities) {
+          for (const station of stations) {
+            const path = findTopologyPath(topology, facility.id, station.id);
+            if (path && (best == null || path.avgSeconds < best)) best = path.avgSeconds;
+          }
+        }
+      }
+      exitSecondsByTaskType.set(taskType, best ?? 0);
+      return best ?? 0;
+    };
     for (const pTask of dispatchWindowTasks) {
       const startSec = pTask.startMinute * 60;
       const endSec = (pTask.startMinute + pTask.durationMinutes) * 60;
@@ -2039,6 +2088,7 @@ export function normalizeEngineInput(
         nonPassengerTasks,
         slackBySection,
         lockedRotationSeconds,
+        maintenanceBody,
       );
       const spill = resolveNextSpillBoundary({
         windowEndSecond: endSec,
@@ -2053,13 +2103,25 @@ export function normalizeEngineInput(
         startSec,
       );
       const dispatchLeadSeconds = precedingYard
-        ? resolveYardDispatchLeadSeconds({
-            taskType: precedingYard.taskType,
-            origins: firstTripOrigins,
-            maintenanceBody,
-            passengerRoutes,
-            minimumRecoveryTimeSeconds: minimumRecovery,
-          })
+        ? Math.max(
+            resolveYardDispatchLeadSeconds({
+              taskType: precedingYard.taskType,
+              origins: firstTripOrigins,
+              maintenanceBody,
+              passengerRoutes,
+              minimumRecoveryTimeSeconds: minimumRecovery,
+            }),
+            // 作業類整備做滿才出廠（不截尾巴，白皮書 YARD-07）：至少要留出場移動的時間，
+            // 否則第一班只有靠吃整備尾巴才趕得上
+            isWorkYardTaskType(precedingYard.taskType)
+              ? Math.max(
+                  0,
+                  minuteToSecondApprox(precedingYard.startMinute + precedingYard.durationMinutes)
+                    + minimumYardExitSeconds(precedingYard.taskType)
+                    - startSec,
+                )
+              : 0,
+          )
         : 0;
       const list = rowActiveWindows.get(pTask.rowIndex) ?? [];
       list.push({
@@ -2089,7 +2151,7 @@ export function normalizeEngineInput(
       allowBumpPastEarlierSameRoute: args.allowBumpPastEarlierSameRoute,
     });
 
-    deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, passengerTasks);
+    deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, passengerTasks, maintenanceBody);
     confirmedTasks = [
       ...nonPassengerTasks.filter((task) => task.durationMinutes > 0),
       ...passengerTasks,
@@ -2113,6 +2175,7 @@ export function normalizeEngineInput(
     shiftId: args.shiftId,
     scheduleRowCount: template.scheduleRowCount,
     confirmedTasks,
+    templateYardTasks,
     servicePulseDemand,
     intervals: template.intervals,
     attributes: template.attributes,

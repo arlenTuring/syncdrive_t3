@@ -37,6 +37,7 @@ import {
 } from '../types/create';
 import { StepShiftActionSettings } from './StepShiftActionSettings';
 import { StepShiftMaintenanceTask } from './StepShiftMaintenanceTask';
+import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
 import { StepShiftRouteGroups } from './StepShiftRouteGroups';
 import { StepShiftScheduleAdjust } from './StepShiftScheduleAdjust';
 import { StepShiftSchedulePreview } from './StepShiftSchedulePreview';
@@ -527,11 +528,22 @@ export function CreateShiftSchedulePage({
       && draft.maxReachedStep > 1
       && draft.basic.name.trim().length > 0);
 
+  /** 第 3 步：「正線可壓縮整備開頭」≥ 整備長度的段數（YARD-02：輸入不合法，不能往下） */
+  const [allowanceBlockingCount, setAllowanceBlockingCount] = useState(0);
+  /** 第 4 步選定的路線組合一輪時間（秒）；長整備的開頭額度用它重算（YARD-04、YARD-06） */
+  const lockedRotationSeconds = useMemo(() => {
+    const anchors = draft.routeGroups.throughAnchors;
+    const preferred = anchors?.preferredThroughCycleId?.trim();
+    if (!preferred) return null;
+    return anchors?.listedThroughCycles?.find((cycle) => cycle.id === preferred)?.minCycleSeconds ?? null;
+  }, [draft.routeGroups.throughAnchors]);
+
   const canGoNext = useMemo(() => {
     if (loading || loadError) return false;
     const nameUnique = nameUniqueState === 'unique';
+    if (draft.currentStep === 3 && draft.creationMode === 'parametric' && allowanceBlockingCount > 0) return false;
     return isShiftScheduleStepComplete(draft, nameUnique, turnaroundLimitSeconds);
-  }, [draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
+  }, [allowanceBlockingCount, draft, loadError, loading, nameUniqueState, turnaroundLimitSeconds]);
 
   const isScheduleInvalidated = useMemo(() => {
     // 手動製作不走引擎重新生成；改設定後不鎖步驟、不顯示黃框失效提示
@@ -688,20 +700,23 @@ export function CreateShiftSchedulePage({
                   />
                 )}
                 {draft.currentStep === 2 && (
-                  <StepShiftMaintenanceTask
-                    draft={draft.maintenanceTask}
-                    creationMode={draft.creationMode}
-                    onChange={(maintenanceTask) =>
-                      updateDraft((prev) => ({ ...prev, maintenanceTask }))
-                    }
-                  />
-                )}
-                {draft.currentStep === 3 && (
                   <StepShiftTimeTemplate
                     draft={draft.timeTemplate}
                     creationMode={draft.creationMode}
                     onChange={(timeTemplate) =>
                       updateDraft((prev) => ({ ...prev, timeTemplate }))
+                    }
+                  />
+                )}
+                {draft.currentStep === 3 && (
+                  <StepShiftMaintenanceTask
+                    draft={draft.maintenanceTask}
+                    creationMode={draft.creationMode}
+                    templateId={draft.timeTemplate.templateId}
+                    lockedRotationSeconds={lockedRotationSeconds}
+                    onAllowanceBlockingCountChange={setAllowanceBlockingCount}
+                    onChange={(maintenanceTask) =>
+                      updateDraft((prev) => ({ ...prev, maintenanceTask }))
                     }
                   />
                 )}
@@ -730,6 +745,15 @@ export function CreateShiftSchedulePage({
                     }
                   />
                 )}
+                {draft.currentStep === 4 && draft.creationMode === 'parametric' && !draft.maintenanceTask.skipped && draft.maintenanceTask.taskId ? (
+                  <div className="mt-4 shrink-0">
+                    <YardEntryAllowancePanel
+                      templateId={draft.timeTemplate.templateId}
+                      maintenance={draft.maintenanceTask}
+                      lockedRotationSeconds={lockedRotationSeconds}
+                    />
+                  </div>
+                ) : null}
                 {draft.currentStep === 5 && (
                   <StepShiftActionSettings
                     draft={draft.actionSettings}

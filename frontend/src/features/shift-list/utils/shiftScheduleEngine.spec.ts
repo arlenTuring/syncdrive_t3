@@ -6,6 +6,7 @@ import {
   type ShiftScheduleSelectedRoute,
 } from '../types/create';
 import type { ScheduleTask } from '../../time-templates/types/editor';
+import { connectListedRoutesIntoLoop, withListedOrderRelationGraph } from '../testing/relationGraphFixture';
 import { generateShiftSchedule } from './schedule-engine/generate';
 import { expandRowBlocks } from './schedule-engine/expand';
 import {
@@ -81,7 +82,21 @@ function passengerRoute(
   };
 }
 
+/**
+ * 草稿：路線群組一律附上依列出順序接下去的關聯圖（像使用者畫好、檢查過路線組合一樣）。
+ * 引擎不再自己依排列順序輪替（白皮書 ROUTE-02），要測其他規則就得先有合法的關聯圖。
+ */
 function buildDraft(
+  patch: Partial<ShiftScheduleCreateDraft> = {},
+): ShiftScheduleCreateDraft {
+  const draft = buildDraftWithoutGraph(patch);
+  const routeGroups = draft.routeGroups.routeRelationGraph?.links?.length
+    ? draft.routeGroups
+    : { ...draft.routeGroups, selectedRoutes: connectListedRoutesIntoLoop(draft.routeGroups.selectedRoutes) };
+  return { ...draft, routeGroups: withListedOrderRelationGraph(routeGroups) };
+}
+
+function buildDraftWithoutGraph(
   patch: Partial<ShiftScheduleCreateDraft> = {},
 ): ShiftScheduleCreateDraft {
   const base = emptyShiftScheduleCreateDraft();
@@ -336,7 +351,7 @@ describe('generateShiftSchedule', () => {
     assert.ok(errors.some((issue) => issue.code === 'HEADWAY_PHYSICAL_IMPOSSIBLE'));
   });
 
-  it('rotates routes by execution order for same task type', () => {
+  it('rotates routes along the drawn relation graph (listed order drawn as links)', () => {
     const tasks: ScheduleTask[] = [
       {
         id: 't1',
@@ -377,7 +392,7 @@ describe('generateShiftSchedule', () => {
     );
     assert.equal(passengerBlocks[0]!.routeId, 'r1');
     assert.equal(passengerBlocks[1]!.routeId, 'r2');
-    assert.equal(result.plan!.routeAssignmentAlgorithm, 'constraint-greedy-v1');
+    assert.equal(result.plan!.routeAssignmentAlgorithm, 'route-assignment-relation-graph-v1');
   });
 
   it('hard-rotates execution order even when switch gap is tight (reports error)', () => {
@@ -719,7 +734,8 @@ describe('generateShiftSchedule', () => {
         },
       }),
       templateBody: templateBody(tasks, 1),
-      turnaroundLimitSeconds: 300,
+      // 鎖定的路線組合一輪＝最快 90×2＋停靠 30×2＋段間換線 50＝290 秒（跟 Step 4 同一套算法）
+      turnaroundLimitSeconds: 280,
       passengerTimetableMode: 'template',
     });
 
@@ -775,7 +791,7 @@ describe('generateShiftSchedule', () => {
     assert.equal(result.report.ok, true);
     assert.ok(result.plan);
     assert.equal(result.plan!.timetableGenerationAlgorithm, 'periodic-cycle-headway-v2');
-    assert.equal(result.plan!.routeAssignmentAlgorithm, 'constraint-greedy-v1');
+    assert.equal(result.plan!.routeAssignmentAlgorithm, 'route-assignment-relation-graph-v1');
 
     const passengerBars = result.plan!.timelines
       .flatMap((timeline) => timeline.blocks)
@@ -1419,7 +1435,9 @@ describe('rotation cycle completion（來回約束）', () => {
     const startsWithSlack = withSlack.plan!.timelines[0]!.blocks
       .filter((block) => block.taskType === 'passenger')
       .map((block) => Math.round(block.plannedStartMinute * 60));
-    assert.ok(startsWithSlack.includes(910), '上一輪完成後應立即補掛漏掉的 00:10 脈衝');
+    // 關聯圖上兩條路線在同一站接續（上行終點＝下行起點）：一輪 440＋440 秒後在同一站接下一輪，
+    // 同站接續不加恢復時間（延誤預留規則未定前的現況），所以下一輪 880 秒發車
+    assert.ok(startsWithSlack.includes(880), '上一輪完成後應立即補掛漏掉的 00:10 脈衝');
 
     const withoutSlack = generateShiftSchedule({
       draft: buildDraft({

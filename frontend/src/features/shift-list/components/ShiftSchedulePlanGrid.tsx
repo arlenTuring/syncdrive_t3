@@ -51,6 +51,7 @@ import {
   buildBlockStationDepartures,
   resolveBlockStationDwellInputs,
   resolveBlockDwellSlackBreakdown,
+  resolveBlockStationExtraDwellSeconds,
   resolveRouteForBlock,
   type BlockStationStopTime,
 } from '../utils/buildBlockStationDepartures';
@@ -1148,9 +1149,11 @@ function ShiftScheduleBlockBar({
     const dwellInputs = resolveBlockStationDwellInputs(block, route);
     const dwellSlackSeconds = dwellInputs?.dwellSlackSeconds ?? 0;
     const slackBreakdown = resolveBlockDwellSlackBreakdown(block, route);
+    // 系統只加在指定站的等待另外算（白皮書 GEN-03），其他站只有原本的緩衝
+    const extraAtStop = dwellInputs ? resolveBlockStationExtraDwellSeconds(block, dwellInputs.stations) : [];
     const slackAtStop = dwellInputs
       ? dwellInputs.stations.map((station, index) =>
-          applyStationDwellWithSlack(station, 1, index) > 0 ? dwellSlackSeconds : 0)
+          applyStationDwellWithSlack(station, 1, index) > 0 ? dwellSlackSeconds + (extraAtStop[index] ?? 0) : 0)
       : [];
     const dwellBaseSeconds =
       dwellInputs != null

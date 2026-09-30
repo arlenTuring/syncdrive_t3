@@ -25,6 +25,7 @@ import {
 } from '../utils/maintenanceSectionCode';
 import { MainlineSlackSecondsField } from './MainlineSlackSecondsField';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
+import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
 
 const SELECT_CLASS =
   'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
@@ -36,6 +37,11 @@ type StepShiftMaintenanceTaskProps = {
   draft: ShiftScheduleMaintenanceTaskDraft;
   creationMode?: ShiftScheduleCreationMode;
   onChange: (next: ShiftScheduleMaintenanceTaskDraft) => void;
+  /** 第 2 步選的時間模板：用來即時對照「正線可壓縮整備開頭」與整備長度 */
+  templateId?: string;
+  /** 路線組合已選時的一輪時間（回頭修改時才有） */
+  lockedRotationSeconds?: number | null;
+  onAllowanceBlockingCountChange?: (count: number) => void;
 };
 
 function resolveSectionEnabled(
@@ -54,6 +60,9 @@ export function StepShiftMaintenanceTask({
   draft,
   creationMode = 'parametric',
   onChange,
+  templateId = '',
+  lockedRotationSeconds = null,
+  onAllowanceBlockingCountChange,
 }: StepShiftMaintenanceTaskProps) {
   const [items, setItems] = useState<MaintenanceTaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -338,6 +347,17 @@ export function StepShiftMaintenanceTask({
           </p>
         )}
       </label>
+
+      {creationMode === 'parametric' && draft.taskId && !draft.skipped ? (
+        <div className="mt-6 max-w-4xl shrink-0">
+          <YardEntryAllowancePanel
+            templateId={templateId}
+            maintenance={draft}
+            lockedRotationSeconds={lockedRotationSeconds}
+            onBlockingCountChange={onAllowanceBlockingCountChange}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-8 min-h-[280px] flex-1 overflow-auto rounded-xl border border-zinc-800/80 bg-zinc-950/40">
         {!draft.taskId ? (

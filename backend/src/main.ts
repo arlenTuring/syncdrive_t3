@@ -3,10 +3,12 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, type LogLevel } from '@nestjs/common';
 import { createServer } from 'node:http';
+import { resolve } from 'node:path';
 import { json, urlencoded } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { ExternalPortGuard } from './common/external-port.guard';
+import { scheduleWhitepaperDevMiddleware } from './common/schedule-whitepaper.dev';
 import {
   buildInternalDocument,
   buildPublicDocument,
@@ -63,6 +65,15 @@ async function bootstrap() {
 
   // 對外 port 的路由圍籬：從那個 port 進來、卻不是對外端點的請求一律 404
   app.useGlobalGuards(new ExternalPortGuard(app.get(Reflector)));
+
+  // 本機開發用的排班白皮書入口（只有兩份指定檔案；正式環境不掛）
+  if (process.env.NODE_ENV !== 'production') {
+    app.use(
+      scheduleWhitepaperDevMiddleware(
+        resolve(__dirname, '..', '..', 'document'),
+      ),
+    );
+  }
 
   /**
    * 對外 port 上把內部那份文件擋掉。

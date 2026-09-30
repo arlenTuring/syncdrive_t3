@@ -1,4 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import {
+  ScheduleEngineCancelledError,
+  type ScheduleEngineProgress,
+} from '../utils/schedule-engine/worker/runScheduleEngineInBackground';
 import i18n from '../../../i18n';
 import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -438,10 +442,19 @@ function RootCauseSection({
  * 時間軸一列、下面幾列長短不一的條子——跑完換成真的內容時版面不會跳。
  *
  * 動畫<strong>只用 CSS 的 transform／opacity</strong>（見 index.css）。
- * 排班生成是主執行緒上的重運算，期間 JS 計時器不會跑，所以用 setInterval
- * 輪播「正在做哪一步」的文字反而會整段凍住；交給合成器做的動畫則照樣流暢。
+ * 2026-09-30 起排班生成在背景執行緒跑（白皮書 GEN-15），主執行緒不再被卡住；進度由背景回報，
+ * 可以按「取消生成」。
  */
-function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
+function ScheduleGeneratingSkeleton({
+  rowCount,
+  progress,
+  onCancel,
+}: {
+  rowCount: number;
+  /** 背景執行緒回報的進度（生成在背景跑，主畫面仍可操作） */
+  progress?: ScheduleEngineProgress | null;
+  onCancel?: () => void;
+}) {
   const { t } = useTranslation();
   const rows = Math.min(10, Math.max(4, rowCount));
   // 長短不一才像真的班表；固定序列，不用亂數（避免每次 render 都跳動）
@@ -452,10 +465,29 @@ function ScheduleGeneratingSkeleton({ rowCount }: { rowCount: number }) {
       role="status"
       aria-live="polite"
         >
-      <div className="flex items-center gap-2 text-[12px] text-zinc-400">
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-zinc-400">
         <Loader2 className="size-4 animate-spin" />
         {t('shiftList.scheduleAdjust.generating')}
+        {progress ? (
+          <span className="text-zinc-500">
+            {progress.message}（約 {Math.round(progress.fraction * 100)}%）
+          </span>
+        ) : null}
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-auto rounded-md border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
+          >
+            取消生成
+          </button>
+        ) : null}
         </div>
+      {progress ? (
+        <div className="h-1 w-full shrink-0 overflow-hidden rounded bg-zinc-800">
+          <div className="h-full bg-[#2B7FFF] transition-[width] duration-300" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
+        </div>
+      ) : null}
       {/* 時間軸 */}
       <div className="schedule-skeleton-bar h-4 w-full shrink-0" />
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
@@ -901,6 +933,23 @@ type StepShiftScheduleAdjustProps = {
   ) => void | Promise<void>;
 };
 
+/**
+ * 生成沒有產出班表時，把報告裡的錯誤原因列出來（沒選地圖、缺路段行駛時間、沒有關聯圖……）。
+ * 只顯示「無法生成」而不講原因，使用者無從下手。每一則原因一行，最多 8 則，其餘以數量帶過。
+ */
+function describeGenerationFailure(
+  headline: string,
+  report: { errors?: Array<{ message?: string }> } | null | undefined,
+): string {
+  const reasons = (report?.errors ?? [])
+    .map((issue) => issue.message?.trim())
+    .filter((message): message is string => Boolean(message));
+  if (reasons.length === 0) return headline;
+  const shown = reasons.slice(0, 8).map((message) => `• ${message}`);
+  if (reasons.length > shown.length) shown.push(`…另有 ${reasons.length - shown.length} 則`);
+  return `${headline}：\n${shown.join('\n')}`;
+}
+
 export function StepShiftScheduleAdjust({
   draft,
   shiftId,
@@ -910,6 +959,19 @@ export function StepShiftScheduleAdjust({
   const isManual = draft.creationMode === 'manual';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** 生成在背景執行緒跑：目前這一次的取消控制與進度（新的一次開始就取消舊的，舊結果不會蓋掉新的） */
+  const generationAbortRef = useRef<AbortController | null>(null);
+  const [generationProgress, setGenerationProgress] = useState<ScheduleEngineProgress | null>(null);
+  const startGeneration = () => {
+    generationAbortRef.current?.abort();
+    const controller = new AbortController();
+    generationAbortRef.current = controller;
+    setGenerationProgress(null);
+    return controller;
+  };
+  const cancelGeneration = () => {
+    generationAbortRef.current?.abort();
+  };
   const [plan, setPlan] = useState<GeneratedSchedulePlan | null>(null);
   const planRef = useRef<GeneratedSchedulePlan | null>(null);
   planRef.current = plan;
@@ -1011,6 +1073,7 @@ export function StepShiftScheduleAdjust({
 
   useEffect(() => {
     let cancelled = false;
+    let effectController: AbortController | null = null;
     setLoading(true);
     setError(null);
 
@@ -1020,7 +1083,13 @@ export function StepShiftScheduleAdjust({
         const needsRegen = !storedOutput?.plan || !isShiftScheduleOutputFresh(draft);
 
         if (needsRegen) {
-          storedOutput = await buildShiftScheduleStoredOutput(draft, { shiftId });
+          const controller = startGeneration();
+          effectController = controller;
+          storedOutput = await buildShiftScheduleStoredOutput(draft, {
+            shiftId,
+            signal: controller.signal,
+            onProgress: (progress) => { if (!cancelled) setGenerationProgress(progress); },
+          });
           if (cancelled) return;
           void onScheduleOutputReady(storedOutput, { flush: true });
         }
@@ -1096,11 +1165,19 @@ export function StepShiftScheduleAdjust({
           setReport(null);
           setHistory([]);
           setHistoryIndex(-1);
+          // 沒有產出班表時要講原因（例如沒選地圖、缺路段行駛時間、沒有關聯圖），不能只留空白
+          if (!storedOutput.plan) {
+            setError(describeGenerationFailure(i18n.t('shiftList.scheduleAdjust.genFailed'), storedOutput.feasibilityReport));
+          }
         }
         setSelectedBlockId(null);
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
+          setError(
+            e instanceof ScheduleEngineCancelledError
+              ? '已取消生成。設定沒有改變；按「重新生成」可以再跑一次。'
+              : e instanceof Error ? e.message : String(e),
+          );
           setPlan(null);
           setReport(null);
         }
@@ -1111,6 +1188,8 @@ export function StepShiftScheduleAdjust({
 
     return () => {
       cancelled = true;
+      // 換頁或設定改變：背景的那一次不再需要，終止它，結果也不會回來蓋掉新的
+      effectController?.abort();
     };
   }, [
     draft.creationMode,
@@ -1170,13 +1249,18 @@ export function StepShiftScheduleAdjust({
 
     setLoading(true);
     setError(null);
+    const controller = startGeneration();
     try {
       const storedOutput = await buildShiftScheduleStoredOutput(draft, {
         shiftId,
+        signal: controller.signal,
+        onProgress: (progress) => { if (generationAbortRef.current === controller) setGenerationProgress(progress); },
       });
+      // 期間又開始了更新的一次：這個結果已過期，丟掉
+      if (generationAbortRef.current !== controller) return;
 
       if (!storedOutput.plan) {
-        throw new Error(i18n.t('shiftList.scheduleAdjust.regenFailed'));
+        throw new Error(describeGenerationFailure(i18n.t('shiftList.scheduleAdjust.regenFailed'), storedOutput.feasibilityReport));
       }
 
       const newEntry: PlanAdjustHistoryEntry = {
@@ -1200,9 +1284,14 @@ export function StepShiftScheduleAdjust({
         { flush: true },
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (generationAbortRef.current !== controller && !(e instanceof ScheduleEngineCancelledError)) return;
+      setError(
+        e instanceof ScheduleEngineCancelledError
+          ? '已取消重新生成，畫面保留原本的班表。'
+          : e instanceof Error ? e.message : String(e),
+      );
     } finally {
-      setLoading(false);
+      if (generationAbortRef.current === controller) setLoading(false);
     }
   };
 
@@ -1547,13 +1636,21 @@ export function StepShiftScheduleAdjust({
 
   if (loading) {
     // 用上一次的列數畫骨架，換成真內容時列數不會跳；沒有就給 8 列
-    return <ScheduleGeneratingSkeleton rowCount={plan?.scheduleRowCount ?? 8} />;
+    return (
+      <ScheduleGeneratingSkeleton
+        rowCount={plan?.scheduleRowCount ?? 8}
+        progress={generationProgress}
+        onCancel={cancelGeneration}
+      />
+    );
   }
 
   if (error && !plan) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
-        {error}
+      <div className="flex min-h-[240px] items-center justify-center p-4">
+        <div className="max-w-3xl whitespace-pre-line rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200">
+          {error}
+        </div>
       </div>
     );
   }
@@ -1711,7 +1808,7 @@ export function StepShiftScheduleAdjust({
   return (
     <div className={isMaximized ? "fixed inset-0 z-50 bg-[#0c1017] p-6 flex flex-col overflow-y-auto" : "flex min-h-0 flex-1 flex-col"}>
       {error && plan ? (
-        <div className="mb-3 shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+        <div className="mb-3 max-h-60 shrink-0 overflow-y-auto whitespace-pre-line rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm leading-relaxed text-amber-200">
           {error}
         </div>
       ) : null}
