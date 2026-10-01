@@ -7,6 +7,22 @@ export const POST_PROCESSOR_DEFINITIONS = [
     id: 'mainline-mqtt-merge',
     label: '正線即時車況合併',
     description: '依車號以 MQTT operation/update 覆寫下一站、剩餘時間與行程進度。',
+    mqtt: {
+      // 與 useVehicleFleetMqttHub 的實際訂閱一致；這是後處理輸入，不會複製到子元件。
+      dataSourceId: 'default-mqtt',
+      topic: 'v1/vtms/${vehicle_code}/operation/update',
+      inputsByOutput: {
+        order_status: ['order_status', 'vehicle_phase'],
+        status_label: ['order_status', 'vehicle_phase', 'delay_minutes (SQL)'],
+        next_station: ['current_leg.target_station_id', 'route_stations (SQL)'],
+        eta_remain: ['current_leg.eta_seconds', 'trip_start_minutes (SQL fallback)'],
+        trip_code: ['trip_code'],
+        vehicle_code: ['vehicle_code'],
+        route_progress: ['current_leg.target_station_id', 'current_leg.eta_seconds'],
+        segment_index: ['current_leg.target_station_id'],
+        segment_remain_pct: ['current_leg.eta_seconds'],
+      } as Record<string, string[]>,
+    },
   },
 ] as const;
 

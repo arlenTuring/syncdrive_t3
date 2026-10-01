@@ -1,10 +1,15 @@
-import type { CanvasElementProps, ChildWidget, GroupDataSource } from '../types';
+import type { CanvasElementProps, ChildWidget, GroupDataSource, WidgetDataBinding } from '../types';
+
+/** 編輯某一類來源時只改該類欄位；不得清掉另外兩個有效綁定。 */
+export function dataSourceSelectionPatch(mode: 'sql' | 'mqtt', id: string): Partial<WidgetDataBinding> {
+  return mode === 'sql' ? { dataSourceId: id } : { mqttDataSourceId: id };
+}
 import { MAINLINE_ROW_FIELD_ORIGINS } from './mainlineTaskModel';
 import { MAINTENANCE_ROW_FIELD_ORIGINS } from './maintenanceTaskModel';
 import { getRowSourceMetadata, type RowSourceMetadata } from './rowRules';
 
 /**
- * 元件的資料從哪裡來——屬性面板「資料來源」卡片與全元件盤點腳本共用這一份判斷。
+ * 元件的資料從哪裡來——原「數據綁定」區塊與全元件盤點腳本共用這一份判斷。
  *
  * 判斷只看元件與群組<strong>存下來的綁定</strong>，跟執行時元件實際拿資料的欄位一一對應
  * （SQL：dataSourceId＋sqlQuery；REST：dataUrl；MQTT：mqttDataSourceId＋mqttTopic；

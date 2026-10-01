@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import type { CanvasElementProps, ChildWidget, DashboardPlane } from '../types';
 import { cloneDemoPlane } from '../constants/demoPlane';
 import { migratePlane } from './migrateDashboardPlane';
-import { describeWidgetDataLineage } from './widgetDataLineage';
+import { dataSourceSelectionPatch, describeWidgetDataLineage } from './widgetDataLineage';
 import { enrichMainlineShiftFields } from './mainlineTaskModel';
 import { enrichMaintenanceShiftFields } from './maintenanceTaskModel';
 import { resolveWidgetEditPreview, resolveNumericEditPreview } from './widgetEditPreview';
@@ -26,6 +26,36 @@ const mainlineGroup = {
 } as unknown as CanvasElementProps;
 
 describe('元件資料來源：面板說的就是實際跑的', () => {
+  it('讀取繼承群組來源不會把設定複製進子元件', () => {
+    const child = text('{eta_remain}');
+    const before = JSON.stringify(child);
+
+    const lineage = describeWidgetDataLineage(child, mainlineGroup);
+
+    assert.equal(lineage.status, 'group-row');
+    assert.equal(JSON.stringify(child), before);
+    assert.equal((child as unknown as Record<string, unknown>).dataSourceId, undefined);
+    assert.equal((child as unknown as Record<string, unknown>).mqttDataSourceId, undefined);
+  });
+
+  it('切換或修改某一類來源不會清掉其他有效綁定', () => {
+    const binding = {
+      dataSourceId: 'sql-a',
+      sqlQuery: 'SELECT battery_level FROM vehicle',
+      mqttDataSourceId: 'mqtt-a',
+      mqttTopic: 'v1/vehicle/update',
+      mqttValuePath: 'battery_level',
+      dataUrl: '/syncdrive-api/vehicle',
+    };
+
+    const next = { ...binding, ...dataSourceSelectionPatch('mqtt', 'mqtt-b') };
+
+    assert.equal(next.mqttDataSourceId, 'mqtt-b');
+    assert.equal(next.dataSourceId, binding.dataSourceId);
+    assert.equal(next.sqlQuery, binding.sqlQuery);
+    assert.equal(next.dataUrl, binding.dataUrl);
+  });
+
   it('沒有真實預覽列時只列可能來源，不宣稱 MQTT 覆寫已生效', () => {
     const lineage = describeWidgetDataLineage(text('{eta_remain}'), mainlineGroup);
     assert.equal(lineage.status, 'group-row');

@@ -19,7 +19,6 @@ export interface GroupPreviewRowsState {
   loading: boolean;
   error: string | null;
   stale: boolean;
-  unplacedCount: number;
 }
 
 function GenericGroupRowsProbe({
@@ -54,7 +53,6 @@ function GenericGroupRowsProbe({
       loading: isInitialLoading,
       error: [...errors, ...postProcessProblems].join('；') || null,
       stale,
-      unplacedCount: Math.max(0, candidates.length - capacity),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint, isInitialLoading, errors.join('|'), stale, postProcessProblems.join('|'), candidates.length, capacity]);
@@ -85,7 +83,7 @@ function LegacyGroupRowsProbe({
   }, [group.label, data, fleetMqtt]);
   const fingerprint = JSON.stringify(rows);
   useEffect(() => {
-    onChange({ rows, loading, error: error ?? null, stale: !!error && rows.length > 0, unplacedCount: 0 });
+    onChange({ rows, loading, error: error ?? null, stale: !!error && rows.length > 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint, loading, error]);
   return null;
