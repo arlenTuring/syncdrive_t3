@@ -1,6 +1,7 @@
 import type { CanvasElementProps, ChildWidget, GroupDataSource } from '../types';
 import { MAINLINE_ROW_FIELD_ORIGINS } from './mainlineTaskModel';
 import { MAINTENANCE_ROW_FIELD_ORIGINS } from './maintenanceTaskModel';
+import { getRowSourceMetadata, type RowSourceMetadata } from './rowRules';
 
 /**
  * 元件的資料從哪裡來——屬性面板「資料來源」卡片與全元件盤點腳本共用這一份判斷。
@@ -54,6 +55,7 @@ export interface WidgetDataLineage {
     id: string;
     label: string;
     sources: LineageSource[];
+    hasPreviewRow: boolean;
   };
   /** 元件讀的群組列欄位 */
   fields: LineageField[];
@@ -142,9 +144,11 @@ export function ownBindingSources(binding: {
 }
 
 /** 群組每一列從哪裡來 */
-export function groupRowSources(group: CanvasElementProps): LineageSource[] {
+export function groupRowSources(group: CanvasElementProps, sourceId?: string): LineageSource[] {
   if (group.genericGroup?.enabled) {
-    return (group.genericGroup.sources ?? []).flatMap((source: GroupDataSource) => ownBindingSources(source));
+    return (group.genericGroup.sources ?? [])
+      .filter((source) => !sourceId || source.id === sourceId)
+      .flatMap((source: GroupDataSource) => ownBindingSources(source));
   }
   return ownBindingSources(group);
 }
@@ -155,9 +159,11 @@ export function groupRowSources(group: CanvasElementProps): LineageSource[] {
  * 正線班次列套 mainline-mqtt-merge 後處理（泛用群組）或舊群組名稱就是「正線班次」時，
  * 執行畫面會用車端 MQTT operation/update 覆寫部分欄位；整備班表同理。
  */
-function derivedFieldNote(group: CanvasElementProps, field: string): string | undefined {
+function derivedFieldNote(group: CanvasElementProps, field: string, metadata?: RowSourceMetadata): string | undefined {
   const sources = group.genericGroup?.enabled ? group.genericGroup.sources ?? [] : [];
-  const mainline = sources.some((source) => source.postProcessId === 'mainline-mqtt-merge')
+  const mainline = metadata
+    ? metadata.postProcessId === 'mainline-mqtt-merge'
+    : sources.length === 1 && sources[0].postProcessId === 'mainline-mqtt-merge'
     || (!group.genericGroup?.enabled && group.label === '正線班次');
   if (mainline && MAINLINE_ROW_FIELD_ORIGINS[field]) return MAINLINE_ROW_FIELD_ORIGINS[field];
   const maintenance = !group.genericGroup?.enabled && group.label === '整備班表';
@@ -182,6 +188,7 @@ function staticTextOf(widget: ChildWidget): string | undefined {
 export function describeWidgetDataLineage(
   widget: ChildWidget,
   group: CanvasElementProps | null,
+  previewRow?: Record<string, unknown> | null,
 ): WidgetDataLineage {
   const own = ownBindingSources(widget as unknown as Parameters<typeof ownBindingSources>[0]);
   const refs = widgetFieldRefs(widget);
@@ -193,18 +200,19 @@ export function describeWidgetDataLineage(
     }
   }
 
+  const metadata = getRowSourceMetadata(previewRow);
   const fields: LineageField[] = group
-    ? refs.map((name) => ({ name, derivedFrom: derivedFieldNote(group, name) }))
+    ? refs.map((name) => ({ name, derivedFrom: previewRow ? derivedFieldNote(group, name, metadata) : undefined }))
     : [];
   const readsGroupRow = !!group && refs.length > 0;
 
   if (group && readsGroupRow) {
-    const sources = groupRowSources(group);
+    const sources = groupRowSources(group, metadata?.sourceId);
     if (sources.length === 0) problems.push(`群組「${group.label}」沒有設定資料來源，{欄位} 不會有值`);
     return {
       status: own.length > 0 ? 'own+group-row' : 'group-row',
       own,
-      group: { id: group.id, label: group.label, sources },
+      group: { id: group.id, label: group.label, sources, hasPreviewRow: !!previewRow },
       fields,
       problems,
     };

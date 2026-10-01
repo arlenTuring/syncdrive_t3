@@ -37,6 +37,15 @@ export class DashboardPlaneController {
     return this.service.replacePlanes(body?.items ?? [], body?.updatedBy);
   }
 
+  @Put('planes/:planeId')
+  @ApiOperation({ summary: '新增或更新單一圖台版面（不刪除其他版面）' })
+  async savePlane(
+    @Param('planeId') planeId: string,
+    @Body() body: Omit<DashboardPlanePayload, 'planeId'>,
+  ) {
+    return this.service.savePlane({ ...body, planeId });
+  }
+
   @Get('module-pages')
   @ApiOperation({ summary: '模組與版面對應清單' })
   async listPages(@Query('module_id') moduleId?: string) {

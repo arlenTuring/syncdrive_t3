@@ -15,18 +15,27 @@ const CHILDREN_TAB_KEYS = Array.from({ length: 9 }, (_, i) => `childrenTab${i + 
 /** 讀取：回傳這個元件身上所有非空的子元件陣列（供匯出時收集資料來源綁定）。 */
 export function collectAllChildArrays(el: CanvasElementProps): ChildWidget[][] {
   const arrays: ChildWidget[][] = [];
-  if (el.children?.length) arrays.push(el.children);
-  if (el.childrenDefault?.length) arrays.push(el.childrenDefault);
-  if (el.childrenNormal?.length) arrays.push(el.childrenNormal);
+  const add = (children: ChildWidget[] | undefined) => {
+    if (!children?.length) return;
+    arrays.push(children);
+    for (const child of children) {
+      if ((child.type === 'tab-list' || child.type === 'shift-list') && child.tabs?.length) {
+        for (const tab of child.tabs) for (const column of tab.columns ?? []) add(column.children);
+      }
+    }
+  };
+  add(el.children);
+  add(el.childrenDefault);
+  add(el.childrenNormal);
   for (const key of CHILDREN_TAB_KEYS) {
     const arr = el[key] as ChildWidget[] | undefined;
-    if (arr?.length) arrays.push(arr);
+    add(arr);
   }
   if (el.tabs?.length) {
-    for (const tab of el.tabs) if (tab.children?.length) arrays.push(tab.children);
+    for (const tab of el.tabs) add(tab.children);
   }
   if (el.genericGroup?.templates?.length) {
-    for (const tpl of el.genericGroup.templates) if (tpl.children?.length) arrays.push(tpl.children);
+    for (const tpl of el.genericGroup.templates) add(tpl.children);
   }
   return arrays;
 }
@@ -36,25 +45,35 @@ export function mapAllChildArrays(
   el: CanvasElementProps,
   fn: (children: ChildWidget[]) => ChildWidget[],
 ): CanvasElementProps {
-  const next: CanvasElementProps = { ...el, children: fn(el.children ?? []) };
+  const mapChildren = (children: ChildWidget[]): ChildWidget[] => fn(children.map((child): ChildWidget => {
+    if ((child.type !== 'tab-list' && child.type !== 'shift-list') || !child.tabs?.length) return child;
+    return {
+      ...child,
+      tabs: child.tabs.map((tab) => ({
+        ...tab,
+        columns: tab.columns.map((column) => ({ ...column, children: mapChildren(column.children ?? []) })),
+      })),
+    } as ChildWidget;
+  }));
+  const next: CanvasElementProps = { ...el, children: mapChildren(el.children ?? []) };
 
-  if (el.childrenDefault?.length) next.childrenDefault = fn(el.childrenDefault);
-  if (el.childrenNormal?.length) next.childrenNormal = fn(el.childrenNormal);
+  if (el.childrenDefault?.length) next.childrenDefault = mapChildren(el.childrenDefault);
+  if (el.childrenNormal?.length) next.childrenNormal = mapChildren(el.childrenNormal);
 
   for (const key of CHILDREN_TAB_KEYS) {
     const arr = el[key] as ChildWidget[] | undefined;
-    if (arr?.length) (next as unknown as Record<string, unknown>)[key as string] = fn(arr);
+    if (arr?.length) (next as unknown as Record<string, unknown>)[key as string] = mapChildren(arr);
   }
 
   if (el.tabs?.length) {
-    next.tabs = el.tabs.map((tab) => (tab.children?.length ? { ...tab, children: fn(tab.children) } : tab));
+    next.tabs = el.tabs.map((tab) => (tab.children?.length ? { ...tab, children: mapChildren(tab.children) } : tab));
   }
 
   if (el.genericGroup?.templates?.length) {
     next.genericGroup = {
       ...el.genericGroup,
       templates: el.genericGroup.templates.map((tpl) =>
-        tpl.children?.length ? { ...tpl, children: fn(tpl.children) } : tpl,
+        tpl.children?.length ? { ...tpl, children: mapChildren(tpl.children) } : tpl,
       ),
     };
   }

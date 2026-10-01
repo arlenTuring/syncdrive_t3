@@ -15,6 +15,7 @@ import type {
 } from '../types';
 import { createGroupTemplate, duplicateGroupTemplate } from '../utils/groupTemplateEdit';
 import { DataSourceIdSelect } from '../elements/DataSourceIdSelect';
+import { POST_PROCESSOR_DEFINITIONS, getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
 
 /**
  * 泛用群組的設定介面：資料來源、有效性、優先程度、排序、樣板、容量、轉場。
@@ -116,6 +117,25 @@ function SourceEditor({
       </div>
       {open && (
         <div className="space-y-2 pl-4">
+          <div>
+            <label className="block text-[9px] text-zinc-500 mb-0.5">後處理</label>
+            <select
+              value={source.postProcessId ?? ''}
+              onChange={e => onUpdate({ postProcessId: e.target.value || undefined })}
+              className={selectCls}
+            >
+              <option value="">不使用</option>
+              {POST_PROCESSOR_DEFINITIONS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {source.postProcessId && !getPostProcessorDefinition(source.postProcessId) && (
+                <option value={source.postProcessId}>設定問題：未知處理器 {source.postProcessId}</option>
+              )}
+            </select>
+            <p className={`mt-1 text-[9px] ${source.postProcessId && !getPostProcessorDefinition(source.postProcessId) ? 'text-amber-300' : 'text-zinc-500'}`}>
+              {source.postProcessId
+                ? getPostProcessorDefinition(source.postProcessId)?.description ?? `找不到處理器「${source.postProcessId}」，執行時不會套用。`
+                : '直接使用來源回傳的資料列。'}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             <div>
               <DataSourceIdSelect

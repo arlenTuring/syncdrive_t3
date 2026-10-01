@@ -24,6 +24,7 @@ backend/coverage/
 
 # ── 測試輸出 ────────────────────────────
 frontend/test-results/
+frontend/artifacts/dashboard-backups/
 
 # ── 手工快照備份（改用 git 歷史）──────────
 .backups/

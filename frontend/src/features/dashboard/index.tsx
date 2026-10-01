@@ -589,11 +589,11 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   // 換群組／換樣板時，前一個群組的列與選到第幾列都不算數（依 key 對，不在 effect 裡清）
   const [previewRowsByKey, setPreviewRowsByKey] = useState<{ key: string; state: GroupPreviewRowsState }>({
     key: '',
-    state: { rows: [], loading: true, error: null },
+    state: { rows: [], loading: true, error: null, stale: false, unplacedCount: 0 },
   });
   const previewRowsState: GroupPreviewRowsState = previewRowsByKey.key === previewProbeKey
     ? previewRowsByKey.state
-    : { rows: [], loading: true, error: null };
+    : { rows: [], loading: true, error: null, stale: false, unplacedCount: 0 };
   const setPreviewRowsState = useCallback(
     (state: GroupPreviewRowsState) => setPreviewRowsByKey({ key: previewProbeKey, state }),
     [previewProbeKey],
@@ -1630,6 +1630,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           editingGroup={editingGroup}
           dualGateSettingsActive={dualGatePanel}
           dataContextGroup={previewGroup}
+          dataContextRow={previewRow}
           selectedElement={panelSelectedElement}
           selectedChild={panelSelectedChild}
           selectedChildCount={activeSelectedChildIds.length}

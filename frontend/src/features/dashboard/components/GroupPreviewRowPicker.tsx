@@ -22,7 +22,9 @@ export function GroupPreviewRowPicker({
   onChangeRowIndex: (index: number) => void;
 }) {
   if (state.error) {
-    return <span className="text-xs text-red-400">預覽資料：載入失敗（{state.error}）</span>;
+    return <span className={`text-xs ${state.stale ? 'text-amber-400' : 'text-red-400'}`}>
+      {state.stale ? `預覽資料：本次更新失敗，顯示上次成功資料（${state.error}）` : `預覽資料：載入失敗（${state.error}）`}
+    </span>;
   }
   if (state.rows.length === 0) {
     return (
@@ -47,6 +49,7 @@ export function GroupPreviewRowPicker({
           </option>
         ))}
       </select>
+      {state.unplacedCount > 0 && <span className="text-amber-400">含 {state.unplacedCount} 筆目前未排入大屏</span>}
     </label>
   );
 }

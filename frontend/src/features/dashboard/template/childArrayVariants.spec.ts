@@ -20,6 +20,18 @@ function baseElement(overrides: Partial<CanvasElementProps> = {}): CanvasElement
 }
 
 describe('collectAllChildArrays / mapAllChildArrays 涵蓋全部樣板變體', () => {
+  it('遞迴涵蓋 Tab 表格儲存格內的元件', () => {
+    const table = {
+      id: 'table', type: 'tab-list', x: 0, y: 0, width: 100, height: 100,
+      tabs: [{ id: 'tab', label: '班次', columns: [{ id: 'col', name: '狀態', width: 80, children: [textWidget('cell')] }] }],
+    } as ChildWidget;
+    const el = baseElement({ children: [table] });
+    expect(collectAllChildArrays(el).flat().map((child) => child.id)).toEqual(['table', 'cell']);
+    const next = mapAllChildArrays(el, (children) => children.map((child) => ({ ...child, id: `new-${child.id}` })));
+    const nextTable = next.children[0] as typeof table;
+    expect(nextTable.tabs[0].columns[0].children[0].id).toBe('new-cell');
+  });
+
   it('collect：children／childrenDefault／childrenNormal／childrenTabN／tabs[].children／genericGroup.templates[].children 全部收到', () => {
     const el = baseElement({
       children: [textWidget('a')],

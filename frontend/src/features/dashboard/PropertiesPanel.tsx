@@ -3281,6 +3281,7 @@ interface Props {
   dualGateSettingsActive?: boolean;
   /** 選取元件所在的群組（子畫布或樣板編輯中）；資料來源卡依它說明 {欄位} 從哪裡來 */
   dataContextGroup?: CanvasElementProps | null;
+  dataContextRow?: Record<string, unknown> | null;
 }
 
 export function PropertiesPanel({
@@ -3301,6 +3302,7 @@ export function PropertiesPanel({
   onEnterEditTabListCell,
   dualGateSettingsActive,
   dataContextGroup = null,
+  dataContextRow = null,
 }: Props) {
   const { t } = useTranslation();
   const { issueMap } = useBindingHealth();
@@ -3387,7 +3389,7 @@ export function PropertiesPanel({
           </div>
         ) : selectedChild ? (
           <React.Fragment key={selectedChild.id}>
-          <WidgetDataLineageCard widget={selectedChild} group={dataContextGroup ?? editingGroup ?? null} />
+          <WidgetDataLineageCard widget={selectedChild} group={dataContextGroup ?? editingGroup ?? null} previewRow={dataContextRow} />
           {(() => {
             const props = { w: selectedChild, onUpdate: onUpdateChild, onDelete: onDeleteChild };
             switch (selectedChild.type) {

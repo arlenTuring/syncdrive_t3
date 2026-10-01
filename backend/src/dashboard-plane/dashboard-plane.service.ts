@@ -66,6 +66,25 @@ export class DashboardPlaneService {
     return found;
   }
 
+  /** 單份 upsert；資料升級或樣板匯入不得為了改一份版面刪掉其他版面。 */
+  async savePlane(item: DashboardPlanePayload): Promise<DashboardPlane> {
+    const key = item.planeId?.trim();
+    if (!key) throw new NotFoundException('缺少圖台版面 ID');
+    const now = Date.now();
+    const prior = await this.planes.findOne({ where: { planeId: key } });
+    const row = prior ?? this.planes.create({ planeId: key, createdAt: now });
+    row.name = item.name ?? key;
+    row.width = item.width ?? 1920;
+    row.height = item.height ?? 1080;
+    row.viewportMode = toViewportMode(item.viewportMode);
+    row.elements = item.elements ?? [];
+    row.isTemplate = item.isTemplate ?? false;
+    row.version = prior ? (prior.version ?? 0) + 1 : 1;
+    row.updatedBy = item.updatedBy ?? undefined!;
+    row.updatedAt = now;
+    return this.planes.save(row);
+  }
+
   /**
    * 整批覆寫版面清單。
    *

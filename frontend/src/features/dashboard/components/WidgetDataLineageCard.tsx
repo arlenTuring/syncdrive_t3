@@ -3,6 +3,7 @@ import type { CanvasElementProps, ChildWidget } from '../types';
 import { useVariables } from '../VariableContext';
 import { getDataSourceById } from '../store/useDataSourceStore';
 import { describeWidgetDataLineage, type LineageSource } from '../utils/widgetDataLineage';
+import { getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
 
 /**
  * 屬性面板最上方的「資料來源」卡：這個元件畫面上的值實際從哪裡來、現在是多少。
@@ -34,7 +35,10 @@ function SourceLine({ source }: { source: LineageSource }) {
       </code>
       {source.path && <div className="text-[9px] text-zinc-500">JSON 路徑：{source.path}</div>}
       {source.postProcessId && (
-        <div className="text-[9px] text-zinc-500">後處理：{source.postProcessId}（依車端即時 MQTT 覆寫部分欄位）</div>
+        <div className={`text-[9px] ${getPostProcessorDefinition(source.postProcessId) ? 'text-zinc-500' : 'text-amber-300'}`}>
+          後處理：{getPostProcessorDefinition(source.postProcessId)?.label ?? `設定問題：找不到 ${source.postProcessId}`}
+          {getPostProcessorDefinition(source.postProcessId) && `（${getPostProcessorDefinition(source.postProcessId)?.description}）`}
+        </div>
       )}
     </li>
   );
@@ -50,12 +54,14 @@ function formatValue(value: unknown): string {
 export function WidgetDataLineageCard({
   widget,
   group,
+  previewRow,
 }: {
   widget: ChildWidget;
   group: CanvasElementProps | null;
+  previewRow?: Record<string, unknown> | null;
 }) {
   const variables = useVariables();
-  const lineage = useMemo(() => describeWidgetDataLineage(widget, group), [widget, group]);
+  const lineage = useMemo(() => describeWidgetDataLineage(widget, group, previewRow), [widget, group, previewRow]);
 
   if (lineage.status === 'decorative') return null;
   if (lineage.status === 'label') {
@@ -93,8 +99,9 @@ export function WidgetDataLineageCard({
       {lineage.group && (
         <div>
           <div className="text-zinc-400">
-            讀群組「{lineage.group.label}」每一列的欄位，群組資料來自
+            讀群組「{lineage.group.label}」每一列的欄位，{lineage.group.hasPreviewRow ? '目前預覽列實際來自' : '已設定的可能來源'}
           </div>
+          {!lineage.group.hasPreviewRow && <p className="text-amber-300">目前無預覽資料，尚無法確認哪條流程實際生效。</p>}
           {lineage.group.sources.length > 0 ? (
             <ul className="mt-0.5 space-y-1.5">
               {lineage.group.sources.map((source, index) => <SourceLine key={index} source={source} />)}
