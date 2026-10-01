@@ -102,6 +102,30 @@ describe('改名', () => {
     });
   }
 
+  it('opaque：路線組合 id（起點站>路線…>終點站）逐段改名，跟改名後的路線、站點重新串出來的一致', () => {
+    const original = input();
+    const groups = original.draft.routeGroups as unknown as Record<string, unknown>;
+    const cycleId = 'st_a>r-1>r-2>st_a';
+    groups.throughAnchors = {
+      startStationIds: ['st_a'], endStationIds: ['st_a'], startInstanceIds: [], endInstanceIds: [],
+      preferredThroughCycleId: cycleId,
+      listedThroughCycles: [{ id: cycleId, instanceIds: ['r-1', 'r-2'] }],
+    };
+    groups.selectedRoutes = [
+      { instanceId: 'r-1', routeId: 'r-1', stationIds: ['st_a', 'st_b'] },
+      { instanceId: 'r-2', routeId: 'r-2', stationIds: ['st_b', 'st_a'] },
+    ];
+    const renamed = renameScheduleInput(original, 'opaque').input;
+    const anchors = (renamed.draft.routeGroups as unknown as { throughAnchors: {
+      preferredThroughCycleId: string; startStationIds: string[]; listedThroughCycles: Array<{ id: string; instanceIds: string[] }>;
+    } }).throughAnchors;
+    const cycle = anchors.listedThroughCycles[0]!;
+    const rebuilt = [anchors.startStationIds[0], ...cycle.instanceIds, anchors.startStationIds[0]].join('>');
+    assert.notEqual(anchors.preferredThroughCycleId, cycleId, '有改名');
+    assert.equal(anchors.preferredThroughCycleId, rebuilt, '先前整串換成一個代號，引擎重新串出來對不上');
+    assert.equal(cycle.id, rebuilt);
+  });
+
   it('只改顯示名稱時識別碼不動', () => {
     const original = input();
     const renamed = renameScheduleInput(original, 'prefix', true).input;

@@ -422,7 +422,44 @@ export type ShiftScheduleRouteGroupsDraft = {
    * 舊草稿缺省視為未鎖定；鎖定後引擎只走這些組合。
    */
   throughAnchors?: ShiftRouteThroughAnchorsDraft;
+  /**
+   * 路線群組選圖當下跑的必要資料檢查（白皮書 MAP-02～04，見 utils/scheduleDataVersion.ts）。
+   * 生成前重算資料指紋比對；舊草稿沒有這一欄＝尚未檢查。
+   */
+  dataCheck?: ScheduleDataCheckRecord | null;
 };
+
+export type ScheduleDataCheckRecord = {
+  /** 檢查時的選取內容（地圖、模板、整備任務、路線）；跟目前草稿不同代表檢查已過期 */
+  selectionKey: string;
+  /** 檢查時實際載入資料的指紋；生成時重算比對 */
+  fingerprint: string;
+  mapId: string;
+  checkedAt: string;
+  ok: boolean;
+  issues: Array<{ message: string; scope?: string }>;
+};
+
+function parseScheduleDataCheckRecord(raw: unknown): ScheduleDataCheckRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.selectionKey !== 'string' || typeof o.fingerprint !== 'string') return null;
+  return {
+    selectionKey: o.selectionKey,
+    fingerprint: o.fingerprint,
+    mapId: typeof o.mapId === 'string' ? o.mapId : '',
+    checkedAt: typeof o.checkedAt === 'string' ? o.checkedAt : '',
+    ok: o.ok === true,
+    issues: Array.isArray(o.issues)
+      ? o.issues
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+        .map((item) => ({
+          message: typeof item.message === 'string' ? item.message : '',
+          ...(typeof item.scope === 'string' ? { scope: item.scope } : {}),
+        }))
+      : [],
+  };
+}
 
 export type ShiftScheduleCreateDraft = {
   /** 參數生成 | 手動製作 */
@@ -899,6 +936,7 @@ export function serializeShiftScheduleBody(
     routeRelationGraph: draft.routeGroups.routeRelationGraph ?? emptyShiftRouteRelationGraph(),
     throughAnchors:
       draft.routeGroups.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
+    routeGroupsDataCheck: draft.routeGroups.dataCheck ?? null,
     actionSettings: draft.actionSettings,
     scheduleOutput: draft.scheduleOutput,
     currentStep: draft.currentStep,
@@ -1188,6 +1226,7 @@ export function buildShiftScheduleDraftFromStored(
         selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
       ),
       throughAnchors: parseShiftRouteThroughAnchorsDraft(body.throughAnchors),
+      dataCheck: parseScheduleDataCheckRecord(body.routeGroupsDataCheck),
     },
     actionSettings,
     scheduleOutput: parseShiftScheduleStoredOutput(body.scheduleOutput),

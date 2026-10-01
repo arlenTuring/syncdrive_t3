@@ -358,6 +358,13 @@ function buildShiftCandidate(
     const required = interTripGapSeconds(previousOriginal, next, ctx.selectedRoutes, ctx.minimumRecoveryTimeSeconds);
     const needShift = minuteToSecond(previousEnd) + required - minuteToSecond(next.plannedStartMinute);
     if (needShift <= 1e-6) break;
+    /**
+     * 推到模板上的整備（轉場卡還沒插的版面）：停在它前面，不推整備本身。
+     * 整備何時真的開始由之後插入的入廠卡決定——車晚到就晚開始、結束不動，晚開始的量不超過
+     * 讓渡餘裕、作業不歸零，那一步會檢查並回報；這裡放棄整串的話，「前一班晚一點、整備跟著
+     * 晚一點開始」這種合法解永遠試不到。
+     */
+    if (next.source === 'template_bar' && YARD_STAY_TASK_TYPES.has(next.taskType)) break;
     const shiftMinutes = snapUpToClockAlignSeconds(needShift) / 60;
     const nextStart = next.plannedStartMinute + shiftMinutes;
     const nextEnd = next.plannedEndMinute + shiftMinutes;

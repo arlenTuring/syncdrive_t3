@@ -398,6 +398,7 @@ function generateShiftScheduleOnce(
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    pointTopology: input.pointTopology,
     warnings,
   });
 
@@ -1175,6 +1176,33 @@ function generateShiftScheduleOnce(
     detail: { timelineRow: row, blockId, fromRouteId: from, toRouteId: to },
   });
 
+  /**
+   * 聯動搜尋推移過的班次寫上 conflictRetime：報表逐班揭露「這一班為什麼跟原本排的不一樣」。
+   * 已經被調過的沿用最初的時刻。只比對載客班次（移動卡會整段重排，不是調整）。
+   */
+  const markRetimed = (
+    before: GeneratedSchedulePlan['timelines'],
+    after: GeneratedSchedulePlan['timelines'],
+    description: string,
+    reason: NonNullable<GeneratedScheduleBlock['conflictRetime']>['reason'],
+  ) => {
+    const beforeById = new Map(before.flatMap((timeline) => timeline.blocks).map((block) => [block.id, block] as const));
+    for (const block of after.flatMap((timeline) => timeline.blocks)) {
+      const original = beforeById.get(block.id);
+      if (!original || block.taskType !== 'passenger') continue;
+      if (Math.abs(original.plannedStartMinute - block.plannedStartMinute) < 1e-9
+        && Math.abs(original.plannedEndMinute - block.plannedEndMinute) < 1e-9) continue;
+      block.conflictRetime = {
+        blockBefore: original.conflictRetime?.blockBefore
+          ?? { startMinute: original.plannedStartMinute, endMinute: original.plannedEndMinute },
+        description,
+        reason,
+      };
+    }
+  };
+  const rowOfBlock = (plan: GeneratedSchedulePlan['timelines'], blockId: string) =>
+    plan.find((timeline) => timeline.blocks.some((block) => block.id === blockId))?.row ?? null;
+
   reportProgress({ stage: 'transfer', message: '安排整備進出與轉場', fraction: 0.55 });
   let state: PostState = {
     pre: preTransfer,
@@ -1186,7 +1214,7 @@ function generateShiftScheduleOnce(
   const triedNotes = new Map<string, string[]>();
   const note = (blockId: string | undefined, text: string) => {
     const list = triedNotes.get(blockId ?? '') ?? [];
-    if (list.length < 6) list.push(text);
+    if (list.length < 16) list.push(text);
     triedNotes.set(blockId ?? '', list);
   };
   const maxRounds = state.post.required;
@@ -1233,6 +1261,15 @@ function generateShiftScheduleOnce(
           [delayMinutes, delayMinutes, `下一班起整串推移 ${delaySeconds} 秒`],
         ] as const) {
           const edited = shiftTripInCopy(base.pre, nextBlockId, startShift, endShift, evaluationContext, label);
+          if (edited) {
+            markRetimed(base.pre, edited.timelines, edited.description, {
+              code: 'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+              resourceId: skip.blockId ?? '',
+              resourceLabel: '整備出廠',
+              counterpartBlockIds: [],
+              message: `時間線 ${skip.timelineRow} 的出廠要閃開別列車的移動，下一班晚 ${delaySeconds} 秒`,
+            });
+          }
           candidates.push({
             label: edited?.description ?? label,
             pre: edited?.timelines ?? null,
@@ -1301,6 +1338,56 @@ function generateShiftScheduleOnce(
                 };
                 break;
               }
+            }
+          }
+          if (adopted) break;
+          /**
+           * 擋路的是別列車的班次：把它（與它後面整串）也一起推。推多少由衝突本身算——
+           * 碰撞保護差多少秒，重疊則再加一整段保護（前車走、後車進各一份）；不寫死任何秒數。
+           * 推不動（超出合法行駛範圍或前後任務間隔）、或推了引出別的問題，都記進搜尋紀錄。
+           */
+          for (const violation of check.introduced) {
+            if (adopted) break;
+            if (!violation.code.startsWith('STATION_BERTH_')) continue;
+            const pushSeconds = snapUpToClockAlignSeconds(
+              violation.code === 'STATION_BERTH_PROTECTION_GAP'
+                ? violation.magnitude
+                : violation.magnitude + 2 * engineInput.collisionProtectionSeconds,
+            );
+            if (pushSeconds <= 0) continue;
+            for (const blockId of violation.blockIds) {
+              const otherRow = rowOfBlock(candidate.pre, blockId);
+              if (otherRow == null || otherRow === skip.timelineRow) continue;
+              const pushLabel = `連帶時間線 ${otherRow} 的那一班起整串推移 ${pushSeconds} 秒（讓出 ${violation.resource} 的碰撞保護）`;
+              const pushed = shiftTripInCopy(
+                candidate.pre, blockId, pushSeconds / 60, pushSeconds / 60, evaluationContext,
+                `配合時間線 ${skip.timelineRow} 的整備出廠讓出站位，這一班起整串推移 ${pushSeconds} 秒`,
+              );
+              if (!pushed) {
+                note(skip.blockId, `${candidate.label}＋${pushLabel}：超出合法行駛範圍或前後任務間隔`);
+                continue;
+              }
+              markRetimed(candidate.pre, pushed.timelines, pushed.description, {
+                code: violation.code,
+                resourceId: violation.resource,
+                resourceLabel: violation.resource,
+                counterpartBlockIds: violation.blockIds.filter((id) => id !== blockId),
+                message: `配合時間線 ${skip.timelineRow} 的整備出廠，讓出站位碰撞保護`,
+              });
+              const deeper = searchPostLoop(pushed.timelines, candidate.reservations);
+              if (!deeper) break;
+              const deeperCheck = noNewProblems(base.post.violations, deeper.violations);
+              if (deeper.required < base.post.required && deeperCheck.ok) {
+                adopted = { pre: pushed.timelines, reservations: candidate.reservations, post: deeper, notes: [...base.notes, ...candidate.notes] };
+                break;
+              }
+              note(
+                skip.blockId,
+                `${candidate.label}＋${pushLabel}：`
+                + (deeper.required >= base.post.required
+                  ? '移動仍排不出'
+                  : `引出 ${deeperCheck.introduced.map((item) => item.code).join('、') || '更多安全問題'}`),
+              );
             }
           }
           if (adopted) break;
@@ -1536,7 +1623,8 @@ function generateShiftScheduleOnce(
     // 必要轉場排不出、擋它的是別張可以換位置的卡：那張卡也一起換
     for (const skip of candidate.post.transfer.skipped) {
       if (skip.necessity === 'not_needed') continue;
-      for (const blocker of skip.blockers ?? []) add(blocker.blockingBlockId, blocker.nodeId);
+      // 只請引擎排出來、可以重排的擋路者換位置（原格下一台進入者、轉折點上的移動、目的格佔用者）
+      for (const blocker of skip.blockers ?? []) if (blocker.adjustable !== false) add(blocker.blockingBlockId, blocker.nodeId);
     }
     // 設施格被兩台車同時佔用：兩邊可以換位置的都試著請它換
     const facilityOf = new Map(candidate.post.timelines.flatMap((timeline) => timeline.blocks)
@@ -1550,6 +1638,11 @@ function generateShiftScheduleOnce(
     }
     return out;
   };
+  /** 局部連動搜尋每一步，記進被它影響的那幾筆必要轉場的搜尋紀錄（逐案寫出被什麼拒絕） */
+  const skipsBlockedBy = (post: ReturnType<typeof runPostLoop>, blockerBlockId: string) =>
+    post.transfer.skipped
+      .filter((skip) => skip.necessity !== 'not_needed' && (skip.blockers ?? []).some((item) => item.blockingBlockId === blockerBlockId))
+      .map((skip) => skip.blockId);
   const localSearch = (
     base: PostState,
     /** 這一層要分析的結果（第一層是採用前的狀態，往下是上一層試出來的結果） */
@@ -1570,6 +1663,15 @@ function generateShiftScheduleOnce(
       // 必要轉場失敗變少且沒有新增安全問題、或轉場不變多且整體安全變好，才算這一組成立
       if ((result.required < base.post.required && comparison.safeToAdopt)
         || (result.required <= base.post.required && comparison.better)) return { avoid: nextAvoid, post: result };
+      const moveLabel = `請時間線 ${rowOfBlock(base.pre, move.blockId) ?? '?'} 的整備不要停「`
+        + `${engineInput.pointTopology?.nodes.find((node) => node.id === move.nodeId)?.label ?? move.nodeId}」`
+        + (depth > 1 ? `（第 ${depth} 層）` : '');
+      const outcome = result.required > base.post.required
+        ? `必要轉場失敗由 ${base.post.required} 筆變 ${result.required} 筆`
+        : result.required === base.post.required && !comparison.better
+          ? `移動仍排不出${comparison.introduced.length > 0 ? `，且引出 ${comparison.introduced.map((item) => item.code).join('、')}` : ''}`
+          : `引出 ${comparison.introduced.map((item) => item.code).join('、') || '更多安全問題'}`;
+      for (const blockId of skipsBlockedBy(current, move.blockId)) note(blockId, `${moveLabel}：${outcome}`);
       if (depth < LOCAL_SEARCH_MAX_DEPTH) {
         const deeper = localSearch(base, result, nextAvoid, depth + 1);
         if (deeper) return deeper;
@@ -1667,6 +1769,7 @@ function generateShiftScheduleOnce(
         reason: skip.reason,
         necessity: skip.necessity ?? 'required',
         ...(skip.blockers ? { blockers: skip.blockers } : {}),
+        ...(skip.departureWindow ? { departureWindow: skip.departureWindow } : {}),
         ...(skip.missingTravelTimeEdges ? { missingTravelTimeEdges: skip.missingTravelTimeEdges } : {}),
         ...(skip.onlyMissingData ? { onlyMissingData: true } : {}),
         ...(skip.blockId && transferSearchLog.has(skip.blockId)

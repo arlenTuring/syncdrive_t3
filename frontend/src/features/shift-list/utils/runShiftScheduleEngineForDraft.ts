@@ -6,7 +6,7 @@ import { parseStoredTemplateBody } from '../../time-templates/types/editor';
 import { resolveStrictestTurnaroundLimitSeconds } from '../../time-templates/utils/turnaroundLimitSegments';
 import { emptyPointTopology } from '../../map-editor/types/pointTopology';
 import type { MapAreaObject } from '../../map-editor/types/area';
-import type { ShiftScheduleCreateDraft } from '../types/create';
+import type { ScheduleDataCheckRecord, ShiftScheduleCreateDraft } from '../types/create';
 import { buildMaintenanceFirstTripOriginsFromTopology } from './maintenanceFirstTripOrigins';
 import {
   buildScheduleEngineLogPayload,
@@ -20,6 +20,13 @@ import {
 } from './schedule-engine/worker/runScheduleEngineInBackground';
 import { enrichFeasibilityIssue } from './schedule-engine/feasibilityIssueMeta';
 import { checkScheduleInputData } from './scheduleInputDataCheck';
+import {
+  fingerprintScheduleEngineInput,
+  resolveScheduleDataSelectionKey,
+  verifyScheduleDataVersion,
+} from './scheduleDataVersion';
+import type { GenerateShiftScheduleInput } from './schedule-engine/generate';
+import type { FeasibilityIssue } from './schedule-engine/types';
 
 export type RunShiftScheduleEngineOptions = {
   shiftId?: string;
@@ -37,27 +44,33 @@ export type RunShiftScheduleEngineOptions = {
  *
  * 地圖相關模組採動態 import，避免 Node 單元測試經 create→output 靜態鏈結到 Vite env。
  */
-export async function runShiftScheduleEngineForDraft(
+type EngineInputForDraft =
+  | {
+      ok: true;
+      engineInput: GenerateShiftScheduleInput;
+      mapId: string;
+      firstTripOrigins: ReturnType<typeof buildMaintenanceFirstTripOriginsFromTopology>;
+      maintenanceTaskBody: Record<string, unknown> | null;
+      parsed: ReturnType<typeof parseStoredTemplateBody>;
+    }
+  | { ok: false; issue: FeasibilityIssue };
+
+/**
+ * 依草稿載入時間模板、整備任務與選定地圖，組成引擎輸入。正式生成與路線群組的即時檢查共用，
+ * 兩邊看到的一定是同一份資料（白皮書 MAP-04「前端選單限制與正式生成入口的檢查必須一致」）。
+ */
+export async function buildScheduleEngineInputForDraft(
   draft: ShiftScheduleCreateDraft,
-  options: RunShiftScheduleEngineOptions = {},
-): Promise<GenerateShiftScheduleResult> {
+  options: { shiftId?: string; backendUrl?: string } = {},
+): Promise<EngineInputForDraft> {
   const { shiftId, backendUrl } = options;
+  const dataIssue = (message: string, code: FeasibilityIssue['code'] = 'SCHEDULE_DATA_INCOMPLETE'): EngineInputForDraft => ({
+    ok: false,
+    issue: { code, severity: 'error', kind: 'actionable', message, detail: { scope: code === 'SCHEDULE_DATA_INCOMPLETE' ? 'map' : 'selection' } },
+  });
 
   if (!draft.timeTemplate.templateId.trim()) {
-    return {
-      plan: null,
-      report: {
-        ok: false,
-        errors: [
-          enrichFeasibilityIssue({
-            code: 'MISSING_TEMPLATE_TASKS',
-            severity: 'error',
-            message: '尚未選擇時間模板',
-          }),
-        ],
-        warnings: [],
-      },
-    };
+    return dataIssue('尚未選擇時間模板', 'MISSING_TEMPLATE_TASKS');
   }
 
   const templateDetail = await fetchTimeTemplateDetail(
@@ -94,17 +107,9 @@ export async function runShiftScheduleEngineForDraft(
    * 先前地圖欄位空白時會改用系統啟用地圖，再不行就退回某一張內建地圖；載入失敗則改用空路網繼續排。
    * 兩種退路都拿掉了：沒選、選的版本不存在、載入失敗，一律停在生成前講清楚，不換地圖、不用空路網。
    */
-  const dataError = (message: string): GenerateShiftScheduleResult => ({
-    plan: null,
-    report: {
-      ok: false,
-      errors: [enrichFeasibilityIssue({ code: 'SCHEDULE_DATA_INCOMPLETE', severity: 'error', message })],
-      warnings: [],
-    },
-  });
   const fromDraft = draft.routeGroups.mapId?.trim();
   if (!fromDraft) {
-    return dataError('尚未在路線群組選擇地圖：請回路線群組選一張可用的地圖。系統不會自動改用其他地圖。');
+    return dataIssue('尚未在路線群組選擇地圖：請回路線群組選一張可用的地圖。系統不會自動改用其他地圖。');
   }
   const mapId = resolveMapId(fromDraft);
   let mapDocument: Awaited<ReturnType<typeof resolveParsedMapForPlatform>>;
@@ -112,16 +117,16 @@ export async function runShiftScheduleEngineForDraft(
     mapDocument = await resolveParsedMapForPlatform(mapId);
   } catch (mapError) {
     console.warn('[schedule-engine] 地圖載入失敗', mapError);
-    return dataError(`路線群組選的地圖「${fromDraft}」載入失敗：請確認地圖仍存在並已發布，或回路線群組重新選擇。`);
+    return dataIssue(`路線群組選的地圖「${fromDraft}」載入失敗：請確認地圖仍存在並已發布，或回路線群組重新選擇。`);
   }
   if (!mapDocument) {
-    return dataError(`路線群組選的地圖「${fromDraft}」找不到（可能已刪除或版本不存在）：請回路線群組重新選擇。`);
+    return dataIssue(`路線群組選的地圖「${fromDraft}」找不到（可能已刪除或版本不存在）：請回路線群組重新選擇。`);
   }
   const pointTopology = mapDocument.pointTopology ?? emptyPointTopology();
   const areas: MapAreaObject[] = mapDocument.areas ?? [];
   const firstTripOrigins = buildMaintenanceFirstTripOriginsFromTopology(pointTopology);
 
-  const engineInput = {
+  const engineInput: GenerateShiftScheduleInput = {
     shiftId,
     draft,
     templateBody,
@@ -134,6 +139,54 @@ export async function runShiftScheduleEngineForDraft(
     pointTopology,
     areas,
   };
+  return { ok: true, engineInput, mapId, firstTripOrigins, maintenanceTaskBody, parsed };
+}
+
+/**
+ * 路線群組選圖／改路線當下的必要資料檢查（白皮書 MAP-02、MAP-03）。
+ *
+ * 跟正式生成用同一個輸入組裝與同一支 {@link checkScheduleInputData}；結果連同資料指紋存進草稿，
+ * 生成前再比對一次指紋（MAP-04）。不生成、不寫 log。
+ */
+export async function checkDraftScheduleData(
+  draft: ShiftScheduleCreateDraft,
+  options: { backendUrl?: string } = {},
+): Promise<ScheduleDataCheckRecord> {
+  const selectionKey = resolveScheduleDataSelectionKey(draft);
+  const checkedAt = new Date().toISOString();
+  const built = await buildScheduleEngineInputForDraft(draft, options);
+  if (!built.ok) {
+    return {
+      selectionKey,
+      fingerprint: '',
+      mapId: draft.routeGroups.mapId.trim(),
+      checkedAt,
+      ok: false,
+      issues: [{ message: built.issue.message, scope: String(built.issue.detail?.scope ?? 'map') }],
+    };
+  }
+  const issues = checkScheduleInputData(built.engineInput);
+  return {
+    selectionKey,
+    fingerprint: fingerprintScheduleEngineInput(built.engineInput),
+    mapId: built.mapId,
+    checkedAt,
+    ok: issues.length === 0,
+    issues: issues.map((issue) => ({ message: issue.message, scope: String(issue.detail?.scope ?? '') })),
+  };
+}
+
+export async function runShiftScheduleEngineForDraft(
+  draft: ShiftScheduleCreateDraft,
+  options: RunShiftScheduleEngineOptions = {},
+): Promise<GenerateShiftScheduleResult> {
+  const { shiftId, backendUrl } = options;
+
+  const built = await buildScheduleEngineInputForDraft(draft, { shiftId, backendUrl });
+  if (!built.ok) {
+    return { plan: null, report: { ok: false, errors: [enrichFeasibilityIssue(built.issue)], warnings: [] } };
+  }
+  const { engineInput, mapId, firstTripOrigins, maintenanceTaskBody, parsed } = built;
 
   /**
    * 開發輔助：把<strong>完整引擎輸入</strong>原封不動寫成 log 檔，供本機重放。
@@ -157,8 +210,10 @@ export async function runShiftScheduleEngineForDraft(
     maxBytes: 9_000_000,
   });
 
-  // 生成前的必要資料檢查（白皮書 MAP-02、MAP-03）：缺什麼就停在這裡講清楚，不帶著缺漏去排
-  const dataIssues = checkScheduleInputData(engineInput);
+  // 生成前的必要資料檢查（白皮書 MAP-02、MAP-03）：缺什麼就停在這裡講清楚，不帶著缺漏去排；
+  // 資料齊全也要是路線群組檢查過的那一版（MAP-04），檢查後被改過就重查
+  const versionIssue = verifyScheduleDataVersion(draft, engineInput);
+  const dataIssues = [...checkScheduleInputData(engineInput), ...(versionIssue ? [versionIssue] : [])];
   const result: GenerateShiftScheduleResult = dataIssues.length > 0
     ? { plan: null, report: { ok: false, errors: dataIssues.map((issue) => enrichFeasibilityIssue(issue)), warnings: [] } }
     : await runScheduleEngineInBackground(engineInput, { signal: options.signal, onProgress: options.onProgress });

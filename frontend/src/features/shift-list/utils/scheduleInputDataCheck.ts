@@ -14,8 +14,8 @@ import type { FeasibilityIssue } from './schedule-engine/types';
  * 正式生成入口與重播工具在跑引擎之前先過這一關；缺任何一項就不生成，講清楚缺什麼、到哪裡補。
  * 不猜值、不當 0 秒、不改使用者資料。
  *
- * 分兩類：
- * - 整張地圖的必要結構（路網拓樸、路段）——缺了這張圖就不能用。
+ * 分兩類（detail.scope）：
+ * - map：整張地圖的必要結構（路網拓樸、路段、路段端點）——缺了這張圖就不能用。選圖當下就先看這一類。
  * - 本次選取內容（選的路線、整備設施、模板用到的整備類型）——換個選法可能可以。
  *
  * 「本次必要行駛時間」只看這一次真的會用到的連線：模板用到的每一類整備，它的設施與正線路線的
@@ -45,6 +45,18 @@ export function checkScheduleInputData(input: GenerateShiftScheduleInput): Feasi
   }
   if (topology.edges.length === 0) {
     push(`地圖「${groups.mapId}」的路網拓樸沒有任何路段：請到地圖編輯連接路段並填行駛時間。`, { scope: 'map', mapId: groups.mapId });
+    return issues;
+  }
+  // 路段兩端都要是路網上的節點（刪了節點卻留下路段，找路時會走到不存在的點）
+  const nodeIds = new Set(topology.nodes.map((item) => item.id));
+  const dangling = topology.edges.filter((item) => !nodeIds.has(item.fromNodeId) || !nodeIds.has(item.toNodeId));
+  if (dangling.length > 0) {
+    push(
+      `地圖「${groups.mapId}」有 ${dangling.length} 段路段的端點不在路網上`
+        + `（${dangling.slice(0, 5).map((item) => `${item.fromNodeId} → ${item.toNodeId}`).join('、')}${dangling.length > 5 ? '…' : ''}）：`
+        + '請到地圖編輯刪除或重新連接這些路段。',
+      { scope: 'map', mapId: groups.mapId, edgeIds: dangling.map((item) => item.id) },
+    );
     return issues;
   }
 

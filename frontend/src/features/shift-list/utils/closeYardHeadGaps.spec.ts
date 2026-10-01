@@ -80,7 +80,7 @@ describe('closeYardHeadGaps：候選空位檢查要看實際離開時刻，不�
   });
 
   it('別列車真的已經離開（出場移動緊接著開）：格子確實空著，待命正常往前接', () => {
-    // exit2 緊接在 charge2 結束後開（t=95.5，間隔 30 秒，在 60 秒門檻內不算滯留）
+    // exit2 緊接在 charge2 結束後開（t=95.5）：row2 在 t=95.5 離格，[100,110) 確實空著
     const result = closeYardHeadGaps({ timelines: timelines(95.5) });
     const row1 = result.timelines.find((t) => t.row === 1)!;
     const charge1 = row1.blocks.find((b) => b.id === 'charge1')!;
@@ -94,5 +94,98 @@ describe('closeYardHeadGaps：候選空位檢查要看實際離開時刻，不�
     const charge1 = result.timelines.find((t) => t.row === 1)!.blocks.find((b) => b.id === 'charge1')!;
     assert.equal(result.closed, 0);
     assert.equal(charge1.plannedStartMinute, 110, '充電照原訂時刻開始');
+  });
+});
+
+/**
+ * 2026-09-30 重播實錄（時間線 7）：充電 E2 15:06:40–16:00 結束，E2 → E4 的零長度轉場為了
+ * 閃轉折點挪到 16:01，待命照規則順延到 16:01 開始。三張卡同一刻開始，待命排在轉場卡前面時，
+ * 舊版把「前一張」認成充電、待命拉回 16:00，留下兩張 16:01 的移動卡——車 16:01 才離開 E2，
+ * 班表卻說它 16:00 已在 E4 待命（VEHICLE_LOCATION_DISCONTINUITY）。
+ */
+describe('closeYardHeadGaps：待命只能從車真正抵達的那一刻開始', () => {
+  function shiftedTransfer(order: 'standby-first' | 'moves-first'): GeneratedScheduleTimeline[] {
+    const charge = block({
+      id: 'charge', timelineRow: 7, taskType: 'charging', source: 'template_bar',
+      plannedStartMinute: 906.67, plannedEndMinute: 960,
+      yardFacilityNodeId: 'E2', yardFacilityLabel: 'E2',
+    });
+    const standby = block({
+      id: 'standby', timelineRow: 7, taskType: 'standby', source: 'template_bar',
+      plannedStartMinute: 961, plannedEndMinute: 1020,
+      yardFacilityNodeId: 'E4', yardFacilityLabel: 'E4',
+    });
+    const out = block({
+      id: 'out', timelineRow: 7, taskType: 'dispatch', source: 'yard_exit_move',
+      plannedStartMinute: 961, plannedEndMinute: 961, yardExitFacilityNodeId: 'E2',
+    });
+    const into = block({
+      id: 'in', timelineRow: 7, taskType: 'dispatch', source: 'yard_entry_move',
+      plannedStartMinute: 961, plannedEndMinute: 961, yardExitFacilityNodeId: 'E4',
+    });
+    return [{
+      row: 7,
+      blocks: order === 'standby-first' ? [charge, standby, out, into] : [charge, out, into, standby],
+    }];
+  }
+
+  for (const order of ['standby-first', 'moves-first'] as const) {
+    it(`轉場被挪到跟待命同一刻（卡片順序 ${order}）：待命不拉回、移動卡不動`, () => {
+      const result = closeYardHeadGaps({ timelines: shiftedTransfer(order) });
+      const blocks = result.timelines[0]!.blocks;
+      const byId = (id: string) => blocks.find((b) => b.id === id)!;
+      assert.equal(result.closed, 0);
+      assert.equal(byId('standby').plannedStartMinute, 961, '車 16:01 才到 E4');
+      assert.equal(byId('out').plannedStartMinute, 961, '閃轉折點的位移不能被抵銷');
+      assert.equal(byId('in').plannedStartMinute, 961);
+    });
+  }
+
+  it('前一張停在別格、中間沒有移動卡：車還沒過來，不拉', () => {
+    const result = closeYardHeadGaps({
+      timelines: [{
+        row: 1,
+        blocks: [
+          block({
+            id: 'charge', timelineRow: 1, taskType: 'charging', source: 'template_bar',
+            plannedStartMinute: 0, plannedEndMinute: 100, yardFacilityNodeId: 'E2',
+          }),
+          block({
+            id: 'standby', timelineRow: 1, taskType: 'standby', source: 'template_bar',
+            plannedStartMinute: 110, plannedEndMinute: 160, yardFacilityNodeId: 'E4',
+          }),
+        ],
+      }],
+    });
+    assert.equal(result.closed, 0);
+    assert.equal(result.timelines[0]!.blocks.find((b) => b.id === 'standby')!.plannedStartMinute, 110);
+  });
+
+  it('零長度轉場緊接在前一段結束：待命接到抵達時刻', () => {
+    const result = closeYardHeadGaps({
+      timelines: [{
+        row: 1,
+        blocks: [
+          block({
+            id: 'charge', timelineRow: 1, taskType: 'charging', source: 'template_bar',
+            plannedStartMinute: 0, plannedEndMinute: 100, yardFacilityNodeId: 'E2',
+          }),
+          block({
+            id: 'out', timelineRow: 1, taskType: 'dispatch', source: 'yard_exit_move',
+            plannedStartMinute: 100, plannedEndMinute: 100, yardExitFacilityNodeId: 'E2',
+          }),
+          block({
+            id: 'in', timelineRow: 1, taskType: 'dispatch', source: 'yard_entry_move',
+            plannedStartMinute: 100, plannedEndMinute: 100, yardExitFacilityNodeId: 'E4',
+          }),
+          block({
+            id: 'standby', timelineRow: 1, taskType: 'standby', source: 'template_bar',
+            plannedStartMinute: 110, plannedEndMinute: 160, yardFacilityNodeId: 'E4',
+          }),
+        ],
+      }],
+    });
+    assert.equal(result.closed, 1);
+    assert.equal(result.timelines[0]!.blocks.find((b) => b.id === 'standby')!.plannedStartMinute, 100);
   });
 });

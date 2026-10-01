@@ -44,6 +44,7 @@ var GROUP_TITLE = {
   ROUTE_ROTATION_OVER_TURNAROUND: "\u8DEF\u7DDA\u7D44\u5408\u8D85\u904E\u6298\u8FD4\u6642\u9650",
   ROTATION_CYCLE_INCOMPLETE: "\u672A\u8DD1\u5B8C\u4E00\u6574\u8F2A",
   MAINTENANCE_DISPATCH_UNREACHABLE: "\u7565\u904E\u9032\u5834\u8F09\u5BA2",
+  ENTRY_SERVICE_INSERTED: "\u6574\u5099\u5F8C\u5DF2\u63D2\u5165\u8ABF\u5EA6\u8F09\u5BA2",
   STATION_BERTH_RELIEF_INSERTED: "\u5DF2\u5B89\u6392\u66FF\u4EE3\u8DEF\u7DDA\u8B93\u51FA\u7AD9\u4F4D",
   YARD_EXIT_STATION_MISMATCH: "\u6574\u5099\u51FA\u5834\u7AD9\u63A5\u4E0D\u4E0A",
   MAINTENANCE_TRANSFER_UNRESOLVED: "\u6574\u5099\u8F49\u5834\u5361\u6392\u4E0D\u51FA\u4F86",
@@ -99,6 +100,7 @@ var DOC_ANCHOR = {
   ROUTE_ROTATION_OVER_TURNAROUND: { id: "s3", label: "\xA73 \u5B8C\u6574\u6D41\u6C34\u7DDA" },
   ROTATION_CYCLE_INCOMPLETE: { id: "s1", label: "\xA71 \u6838\u5FC3\u539F\u5247\uFF08\u670D\u5F9E\u9806\u5E8F\uFF09" },
   MAINTENANCE_DISPATCH_UNREACHABLE: { id: "s10", label: "\xA710 \u9032\u5834\u8F09\u5BA2" },
+  ENTRY_SERVICE_INSERTED: { id: "s10", label: "\xA710 \u9032\u5834\u8F09\u5BA2" },
   STATION_BERTH_RELIEF_INSERTED: { id: "s8", label: "\xA78 \u7AD9\u4F4D\u7D04\u675F\u6C7A\u7B56" },
   YARD_EXIT_STATION_MISMATCH: { id: "s10", label: "\xA710 \u6574\u5099\u5F8C\u7684\u8ABF\u5EA6\u71DF\u904B\u73ED\u6B21" },
   MAINTENANCE_TRANSFER_UNRESOLVED: { id: "s10", label: "\xA710 \u6574\u5099\u5F8C\u7684\u8ABF\u5EA6\u71DF\u904B\u73ED\u6B21" },
@@ -254,6 +256,10 @@ var DEFAULT_META = {
   ROTATION_CYCLE_INCOMPLETE: {
     kind: "limit",
     guidance: "\u5F15\u64CE\u5BE7\u9858\u64A4\u672A\u6210\u8F2A\u53BB\u7A0B\uFF0C\u4E5F\u4E0D\u786C\u585E\u9055\u898F\u56DE\u7A0B\u3002\u53EF\u8A66\uFF1A\u52A0\u5927\u6574\u5099\u5207\u5165\u9918\u88D5\u3001\u52A0\u5217\u6578\u3001\u7565\u964D\u6062\u5FA9\uFF0F\u63DB\u7DDA\uFF0C\u6216\u653E\u5BEC\u8A72\u6642\u6BB5\u73ED\u8DDD\u3002"
+  },
+  ENTRY_SERVICE_INSERTED: {
+    kind: "policy",
+    guidance: "\u6574\u5099\u505A\u5B8C\uFF0C\u8ECA\u505C\u7684\u51FA\u5834\u7AD9\u4E0D\u662F\u4E0B\u4E00\u73ED\u8D77\u9EDE\uFF0C\u6240\u4EE5\u63D2\u4E86\u4E00\u4E32\u8F09\u5BA2\u73ED\u6B21\u628A\u8ECA\u9001\u904E\u53BB\u3002\u8A0A\u606F\u5BEB\u51FA\u5F9E\u54EA\u4E00\u6BB5\u6574\u5099\u51FA\u4F86\u3001\u5728\u54EA\u4E00\u7AD9\u52A0\u5165\uFF08\u53EF\u80FD\u662F\u8DEF\u7DDA\u4E2D\u9014\uFF09\u3001\u670D\u52D9\u54EA\u4E9B\u7AD9\u3001\u63A5\u54EA\u4E00\u73ED\uFF1B\u52A0\u5165\u7AD9\u4E4B\u524D\u7684\u7AD9\u6C92\u6709\u670D\u52D9\u3002\u9EDE\u9078\u53EF\u8DF3\u5230\u90A3\u5F35\u5361\u3002"
   },
   MAINTENANCE_DISPATCH_UNREACHABLE: {
     kind: "policy",
@@ -836,6 +842,59 @@ function daySegmentOverlapSeconds(aStartSecond, aEndSecond, bStartSecond, bEndSe
   return total;
 }
 
+// src/features/shift-list/utils/joinedRouteSegment.ts
+var segmentCache = /* @__PURE__ */ new WeakMap();
+var joinedSegments = /* @__PURE__ */ new WeakSet();
+function buildJoinedRouteSegment(route, index) {
+  let byIndex = segmentCache.get(route);
+  if (byIndex?.has(index)) return byIndex.get(index) ?? null;
+  const segment = computeJoinedRouteSegment(route, index);
+  if (!byIndex) {
+    byIndex = /* @__PURE__ */ new Map();
+    segmentCache.set(route, byIndex);
+  }
+  byIndex.set(index, segment);
+  if (segment) joinedSegments.add(segment);
+  return segment;
+}
+function computeJoinedRouteSegment(route, index) {
+  if (!Number.isInteger(index) || index <= 0 || index >= route.stationIds.length - 1) return null;
+  if (route.stationDwells.length !== route.stationIds.length) return null;
+  const stationIds = route.stationIds.slice(index);
+  const legs = route.stationLegTravels ?? [];
+  let avg = 0;
+  let min = 0;
+  const pickedLegs = [];
+  for (let k = 0; k < stationIds.length - 1; k += 1) {
+    const leg = legs.find((item) => item.fromStationId === stationIds[k] && item.toStationId === stationIds[k + 1]);
+    const legAvg = leg?.avgTravelTimeSeconds ?? leg?.minTravelTimeSeconds;
+    const legMin = leg?.minTravelTimeSeconds ?? leg?.avgTravelTimeSeconds;
+    if (!leg || legAvg == null || legMin == null || legAvg <= 0 || legMin <= 0) return null;
+    avg += legAvg;
+    min += legMin;
+    pickedLegs.push(leg);
+  }
+  const dwells = route.stationDwells.slice(index).map((dwell, k) => k === 0 ? { ...dwell, dwellSeconds: 0, dwellRequired: false } : { ...dwell });
+  return {
+    ...route,
+    stationIds,
+    stationDwells: dwells,
+    stationLegTravels: pickedLegs,
+    avgTravelTimeSeconds: avg,
+    minTravelTimeSeconds: min
+  };
+}
+function isJoinedRouteSegment(route) {
+  return joinedSegments.has(route);
+}
+function routeForJoinedBlock(block, route) {
+  const stationId = block.entryJoinedAtStationId?.trim();
+  if (route == null || !stationId || isJoinedRouteSegment(route)) return route;
+  const index = route.stationIds.findIndex((id) => id.trim() === stationId);
+  if (index <= 0) return route;
+  return buildJoinedRouteSegment(route, index) ?? route;
+}
+
 // src/features/shift-list/utils/buildBlockStationDepartures.ts
 function resolveLegBounds(legs, legIndex, preferredTravel, fallbackMinTravel) {
   const leg = legs?.[legIndex];
@@ -850,6 +909,7 @@ function resolveLegBounds(legs, legIndex, preferredTravel, fallbackMinTravel) {
   return { minTravel, avgTravel, maxTravel };
 }
 function resolveBlockStationTimingPlan(block, route) {
+  route = routeForJoinedBlock(block, route);
   const dwellInputs = resolveBlockStationDwellInputs(block, route);
   if (!dwellInputs) return null;
   const { stations, dwellSlackSeconds: slackSeconds } = dwellInputs;
@@ -858,8 +918,9 @@ function resolveBlockStationTimingPlan(block, route) {
     if (mode === "no_stop" || mode === "line_change") return 0;
     return Math.max(0, station.dwellSeconds ?? 0);
   });
+  const extraDwells = resolveBlockStationExtraDwellSeconds(block, stations);
   const dwells = stations.map(
-    (station, index) => applyStationDwellWithSlack(station, slackSeconds, index)
+    (station, index) => applyStationDwellWithSlack(station, slackSeconds, index) + (extraDwells[index] ?? 0)
   );
   const dwellTotal = dwells.reduce((sum, value) => sum + value, 0);
   const startSecond = snapUpToClockAlignSeconds(minuteToSecond(block.plannedStartMinute));
@@ -978,14 +1039,25 @@ function resolveBlockDwellSlackBreakdown(block, route) {
   const explicit = typeof block.dwellSlackSeconds === "number" && Number.isFinite(block.dwellSlackSeconds);
   const baseSlackSeconds = explicit ? normalizeDwellSlackSeconds(block.dwellSlackSeconds) : hasStationOverride ? 0 : normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
   const addedSeconds = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
+  const perStationAdded = block.dwellSlackAdjustment?.stationIndex != null ? 0 : addedSeconds;
   return {
     baseSlackSeconds,
     addedSeconds,
-    effectiveSlackSeconds: baseSlackSeconds + addedSeconds,
+    effectiveSlackSeconds: baseSlackSeconds + perStationAdded,
     source: explicit || hasStationOverride ? "block" : "route"
   };
 }
+function resolveBlockStationExtraDwellSeconds(block, stations) {
+  const extra = stations.map(() => 0);
+  const adjustment = block.dwellSlackAdjustment;
+  const index = adjustment?.stationIndex;
+  if (adjustment == null || index == null || index < 0 || index >= stations.length) return extra;
+  if (applyStationDwellWithSlack(stations[index], 1, index) <= 0) return extra;
+  extra[index] = Math.max(0, Math.round(adjustment.addedSeconds));
+  return extra;
+}
 function resolveBlockStationDwellInputs(block, route) {
+  route = routeForJoinedBlock(block, route);
   const stationSource = block.stationDwells && block.stationDwells.length > 0 ? block.stationDwells : route?.stationDwells;
   if (!stationSource || stationSource.length === 0) return null;
   return {
@@ -1045,11 +1117,11 @@ function resolveRouteForBlock(block, selectedRoutes) {
     const byInstance = selectedRoutes.find(
       (route) => resolveSelectedRouteInstanceId(route) === instanceId
     );
-    if (byInstance) return byInstance;
+    if (byInstance) return routeForJoinedBlock(block, byInstance);
   }
   if (block.routeId) {
     const byId = selectedRoutes.find((route) => route.routeId === block.routeId);
-    if (byId) return byId;
+    if (byId) return routeForJoinedBlock(block, byId);
   }
   if (block.routeName) {
     const byName = selectedRoutes.find((route) => route.routeName === block.routeName);

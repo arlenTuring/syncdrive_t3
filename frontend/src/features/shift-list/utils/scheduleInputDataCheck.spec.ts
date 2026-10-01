@@ -67,6 +67,25 @@ describe('生成前的必要資料檢查（白皮書 MAP-01～03）', () => {
     assert.match(messages(checkScheduleInputData(input({ topology: topology({ edges: [] }) }))), /沒有任何路段/);
   });
 
+  it('選圖當下先看地圖本身：路段端點不在路網上就擋，歸在地圖（scope=map），還沒選路線也照樣檢查', () => {
+    const topo = topology();
+    topo.edges.push(edge('n-a', 'ghost', 30));
+    const issues = checkScheduleInputData(input({ topology: topo }));
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0]!.detail?.scope, 'map');
+    assert.match(issues[0]!.message, /n-a → ghost/);
+    const noRoutes = input({ topology: topo });
+    noRoutes.draft.routeGroups.selectedRoutes = [];
+    assert.equal(checkScheduleInputData(noRoutes)[0]!.detail?.scope, 'map', '地圖本身的問題先報，不被「還沒選路線」蓋掉');
+  });
+
+  it('地圖本身沒問題、還沒選路線：只報本次選取（scope=selection）', () => {
+    const noRoutes = input();
+    noRoutes.draft.routeGroups.selectedRoutes = [];
+    const issues = checkScheduleInputData(noRoutes);
+    assert.deepEqual(issues.map((issue) => issue.detail?.scope), ['selection']);
+  });
+
   it('路線上的站在路網找不到：指出第幾站', () => {
     assert.match(messages(checkScheduleInputData(input({ stations: ['st-a', 'st-x'] }))), /第 2 站「st-x」/);
   });

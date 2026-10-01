@@ -2434,6 +2434,7 @@ validateTimelineCapacity   ← 多為 warning</pre>
       <tr><td><code>MAINTENANCE_ENTRY_EARLY_BLOCKED</code></td><td>warn</td><td>本來可以提早進廠，設施被佔只好晚進。代價是車在正線站位上多等，那段時間它佔著停靠點（見 §10.5）</td><td><code>generate.ts</code></td></tr>
       <tr><td><code>FACILITY_SLOT_COLLISION</code></td><td>error</td><td>同一個設施格同時被兩台車佔用。以「車實際還在裡面」為準——整備做完到開走之間車仍佔著那一格，時間軸上就是那張<strong>暫停卡</strong>（<code>source: 'hold'</code>）。補暫停卡之前這段帳上是空的，兩台車同格量不出來（見 §6）</td><td><code>validate.ts</code></td></tr>
       <tr><td><code>FACILITY_HANDOVER_GAP</code></td><td>warn</td><td>兩台車在同一個設施格交接，中間不足「2 × 碰撞保護時間」——與站位同一套規則，留給兩台車移動的差異緩衝（見 §6）。本場域 60 秒為必須遵守的安全間隔：<strong>擋發布</strong>，求解時插卡階段由進格方讓出</td><td><code>validate.ts</code></td></tr>
+<tr><td><code>ENTRY_SERVICE_INSERTED</code></td><td>warn</td><td>整備後插入調度載客（含從路線中途加入）：出場設施、加入站、服務站、接哪一班（DISPATCH-05）</td><td><code>insertMaintenanceEntryServiceTrips.ts</code></td></tr>
 <tr><td><code>STATION_BERTH_RELIEF_INSERTED</code></td><td>warn</td><td>跑完一輪空等會撞別列車，已沿次要邊插入站位讓渡（見 §8.2）</td><td><code>relievePlatformIdleWithSecondaryEdge.ts</code></td></tr>
       <tr><td><code>GEOMETRY_NOT_CONVERGED</code></td><td>warn</td><td>站位求解、讓渡、班距修復會互相影響，跑滿輪數仍在變動，沒到不動點（見 §3）</td><td><code>generate.ts</code></td></tr>
       <tr><td><code>MAINTENANCE_WORK_SHORTENED</code></td><td>warn</td><td>入廠晚到或轉場移動讓整備晚開始、結束不動，工作時間變短；晚開始不超過整備設定的讓渡餘裕、剩餘工作不少於設定的作業時長，逐筆揭露（2026-09-29 起作業類整備不再被出廠截短尾巴）</td><td><code>insertMaintenanceTransferCards.ts</code></td></tr>

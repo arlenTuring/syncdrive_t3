@@ -10,8 +10,8 @@ node_modules/
 .dev/
 backend/logs/
 
-# 地圖庫 API 發佈快取（由編輯器 PUT，模擬器 GET）
-backend/data/published-maps/*.json
+# 地圖庫 API 發佈快取（由編輯器 PUT，模擬器 GET）：納入版控。
+# 雲端的排班驗收要讀使用者實際發布的地圖，排除的話 git push 永遠帶不上去。
 
 # shell 暫存（磁碟滿時可能殘留）
 sh-thd-*
