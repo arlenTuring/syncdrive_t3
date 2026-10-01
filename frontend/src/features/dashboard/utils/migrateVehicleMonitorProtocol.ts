@@ -24,6 +24,9 @@ import { inferInvalidateTagsFromSql } from './inferInvalidateTagsFromSql';
 
 const DS_INTERNAL = 'default-internal';
 
+/** 車輛狀態名冊多久重查一次（秒） */
+export const VEHICLE_STATUS_REFRESH_INTERVAL = 1;
+
 const MAINT_ZONE_FROM_SQL = /WHERE\s+fs\.zone\s*=\s*'(整備-[^']+)'/;
 
 /** 舊版整備分布 SQL 將保養／維修格位標籤寫死為 M1/M2 */
@@ -127,9 +130,33 @@ export function patchMainlineFleetStatusWidget(plane: DashboardPlane): Dashboard
   };
 }
 
+/** 圖台標題「班距 03:00」原本是寫死的文字；改接營運指標（時間模板目前時段的目標班距） */
+export function isUnboundHeadwayText(child: ChildWidget): boolean {
+  if (child.type !== 'text') return false;
+  const text = child as TextWidget;
+  return /^\s*班距/.test(text.content ?? '') && !text.dataUrl && !text.sqlQuery?.trim() && !text.mqttTopic;
+}
+
+/** 圖台標題「正線營運 X / Y」還沒接上查詢 */
+export function isUnboundFleetText(child: ChildWidget): boolean {
+  if (child.type !== 'text') return false;
+  const text = child as TextWidget;
+  return !!text.content?.includes('正線營運') && !text.sqlQuery?.includes('mainline_fleet_line');
+}
+
 function patchFleetTextChild(child: ChildWidget): ChildWidget {
   if (child.type !== 'text') return child;
   const text = child as TextWidget;
+  if (isUnboundHeadwayText(child)) {
+    return {
+      ...text,
+      dataUrl: CAPACITY_SUMMARY_URL,
+      valueField: 'headway_line',
+      refreshMode: 'event',
+      refreshInterval: 0,
+      invalidateTags: [...OPERATION_METRICS_INVALIDATE_TAGS],
+    };
+  }
   if (text.valueField === 'mainline_fleet_line' && text.dataSourceId) {
     return {
       ...text,
@@ -303,6 +330,8 @@ export function patchVehicleMonitorBadgeProtocol(plane: DashboardPlane): Dashboa
       return {
         ...el,
         sqlQuery: VEHICLE_STATUS_ROW_SQL,
+        // 位置快照後端每秒寫入；原本由 resolveBuiltinGroupSql 依群組名稱偷偷改成 1 秒，現在寫進綁定
+        refreshInterval: VEHICLE_STATUS_REFRESH_INTERVAL,
         children: (el.children ?? []).map((child) =>
           patchVehicleMonitorBadgeMqtt(migrateChildWidgetGenerics(child)),
         ),
@@ -357,7 +386,10 @@ function canvasNeedsEventDrivenRefresh(el: CanvasElementProps): boolean {
 export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
   const vehicleStatus = plane.elements.find((el) => el.label === '車輛狀態' && el.isGroup);
   if (vehicleStatus && (
-    !(vehicleStatus.sqlQuery ?? '').includes("scheduleOutput'->'plan'->'timelines")
+    (vehicleStatus.refreshInterval ?? 0) === 0
+    // 舊版查詢沒有健康資料時一律補 'OK'，畫面看起來全部正常，其實是沒資料
+    || (vehicleStatus.sqlQuery ?? '').includes("COALESCE(m.overall_health, 'OK')")
+    || !(vehicleStatus.sqlQuery ?? '').includes("scheduleOutput'->'plan'->'timelines")
     || !(vehicleStatus.sqlQuery ?? '').includes('position_updated_at')
   )) {
     return true;
@@ -374,6 +406,11 @@ export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
     }
   }
   if (needsVehicleMonitorBadgeProtocolFix(plane)) return true;
+  if (planeHasLegacyLiteralDefaults(plane)) return true;
+  if (plane.elements.some((el) => (el.children ?? []).some((child) =>
+    isUnboundHeadwayText(child) || isUnboundFleetText(child) || operationMetricsUrlFor(child) !== null))) {
+    return true;
+  }
   if (needsShiftPanelsSimulationSqlFix(plane)) return true;
   if (isStaleMaintenanceSlotSqlOnPlane(plane)) return true;
   if (canvasNeedsEventDrivenRefreshOnPlane(plane)) return true;
@@ -510,8 +547,50 @@ export function patchOperationMetricsSources(plane: DashboardPlane): DashboardPl
   return changed ? { ...plane, elements } : plane;
 }
 
+/**
+ * 舊版查詢／綁定裡「沒資料就補一個值」的地方：
+ * - 事件列表分類沒填時一律寫「線控」→ 改「未分類」
+ * - 車輛狀態量表綁了遙測 MQTT，還同時讀 vehicle_monitor_demo 示範表的 demo_speed／demo_load
+ *   （沒資料時是 0）→ 拿掉，只認 MQTT
+ */
+const LEGACY_EVENT_CATEGORY_DEFAULT = "COALESCE(category_label, '線控')";
+const EVENT_CATEGORY_DEFAULT = "COALESCE(category_label, '未分類')";
+
+function childHasLegacyLiteralDefault(child: ChildWidget): boolean {
+  const w = child as { sqlQuery?: string; mqttTopic?: string; valueField?: string };
+  if (w.sqlQuery?.includes(LEGACY_EVENT_CATEGORY_DEFAULT)) return true;
+  return child.type === 'gauge' && !!w.mqttTopic && /^demo_/.test(w.valueField ?? '');
+}
+
+export function planeHasLegacyLiteralDefaults(plane: DashboardPlane): boolean {
+  return plane.elements.some((el) =>
+    !!el.sqlQuery?.includes(LEGACY_EVENT_CATEGORY_DEFAULT)
+    || (el.children ?? []).some(childHasLegacyLiteralDefault));
+}
+
+export function patchLegacyLiteralDefaults(plane: DashboardPlane): DashboardPlane {
+  if (!planeHasLegacyLiteralDefaults(plane)) return plane;
+  const fixSql = (sql: string | undefined) =>
+    sql?.split(LEGACY_EVENT_CATEGORY_DEFAULT).join(EVENT_CATEGORY_DEFAULT);
+  return {
+    ...plane,
+    elements: plane.elements.map((el) => ({
+      ...el,
+      ...(el.sqlQuery ? { sqlQuery: fixSql(el.sqlQuery) } : {}),
+      children: (el.children ?? []).map((child) => {
+        if (!childHasLegacyLiteralDefault(child)) return child;
+        const w = child as ChildWidget & { sqlQuery?: string; valueField?: string; mqttTopic?: string };
+        if (child.type === 'gauge' && w.mqttTopic && /^demo_/.test(w.valueField ?? '')) {
+          return { ...w, valueField: '' } as ChildWidget;
+        }
+        return { ...w, sqlQuery: fixSql(w.sqlQuery) } as ChildWidget;
+      }),
+    })),
+  };
+}
+
 export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlane {
-  return patchEventDrivenSqlRefresh(
+  return patchLegacyLiteralDefaults(patchEventDrivenSqlRefresh(
     patchOperationMetricsSources(
     patchVehicleDistributionSource(
     patchMaintenanceDistributionWidget(
@@ -531,5 +610,5 @@ export function patchDashboardRuntimeFixes(plane: DashboardPlane): DashboardPlan
     ),
     ),
     ),
-  );
+  ));
 }

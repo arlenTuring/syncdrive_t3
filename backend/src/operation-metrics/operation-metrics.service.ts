@@ -8,6 +8,7 @@ import {
   countPlannedPassengerTrips,
   DAY_MINUTES,
   formatClock,
+  formatHeadway,
   mergeDepartureLeads,
   nextSegment,
   perVehiclePphpd,
@@ -93,6 +94,9 @@ export class OperationMetricsService {
       next_val: next?.pphpd ?? 0,
       next_hint: next ? formatClock(next.startMinute) : '—',
       segment_label: current?.label ?? '',
+      // 目前時段的目標班距：部署班表綁定的時間模板裡，這個時段屬性設定的班距
+      headway_seconds: current?.headwaySeconds ?? null,
+      headway_line: `班距 ${formatHeadway(current?.headwaySeconds ?? null)}`,
     };
   }
 

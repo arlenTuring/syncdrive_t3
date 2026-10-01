@@ -1,22 +1,32 @@
-import { shiftTripScheduleFromCode, tripStartMinutesFromCode } from '../constants/vtmsVehiclePool';
+/*
+ * 正線班次卡欄位。
+ *
+ * <h3>這裡不再自己生資料</h3>
+ * 原本 SQL 沒給的欄位會用寫死的值補：站名一律 N2W下行／T3下行／S2W下行、方向看班次代號
+ * 第一個字母、發車時間從代號 D1133 拆出來、到站倒數也從代號算。畫面上看起來每張卡都
+ * 有值，但那些值不是任何資料來源給的，使用者沒辦法查核，資料斷了也看不出來。
+ *
+ * 現在只做兩件事：
+ * 1. 依車端 MQTT（operation/update）覆寫即時欄位（狀態、下一站、剩餘到站）；
+ * 2. 依狀態套卡片樣式（顏色是樣式，不是資料）。
+ * SQL 與 MQTT 都沒給的欄位就留空，卡片顯示「—」。每個欄位從哪裡來，列在
+ * {@link MAINLINE_ROW_FIELD_ORIGINS}，屬性面板照它顯示。
+ */
 
-/** 正線三站軌道：上行 station_6→station_4→station_1、下行 station_2→station_3→station_5 */
-export function mainlineStationTriplet(tripCode: string): [string, string, string] {
-  const isUp = tripCode.trim().toUpperCase().startsWith('U');
-  return isUp ? ['station_6', 'station_4', 'station_1'] : ['station_2', 'station_3', 'station_5'];
-}
-
-/** 班次卡軌道標籤（人類可讀別名） */
-export function mainlineStationDisplayTriplet(tripCode: string): [string, string, string] {
-  const isUp = tripCode.trim().toUpperCase().startsWith('U');
-  return isUp ? ['S2W上行', 'T3上行', 'N2W上行'] : ['N2W下行', 'T3下行', 'S2W下行'];
-}
+/** 正線班次列：前端依 MQTT 覆寫的欄位與其來源（屬性面板的資料來源說明照這份顯示） */
+export const MAINLINE_ROW_FIELD_ORIGINS: Record<string, string> = {
+  order_status: 'MQTT operation/update 的 order_status／vehicle_phase；沒有 MQTT 時用 SQL',
+  status_label: '依 order_status 與 SQL delay_minutes 判定（待發／準時／延誤／故障）',
+  next_station: 'MQTT current_leg.target_station_id，對照這一列 SQL route_stations 的站名；對不到就保留 SQL 值',
+  eta_remain: '執行中：MQTT current_leg.eta_seconds；待發：SQL trip_start_minutes 距現在的時間',
+  trip_code: 'MQTT trip_code；沒有 MQTT 時用 SQL',
+  vehicle_code: 'MQTT vehicle_code；沒有 MQTT 時用 SQL',
+};
 
 /**
  * 這一列自己帶的站序裡，某個 station_id 叫什麼名字。
  *
- * route_stations 是 SQL 從訂單 payload 取出來的真站序（每一班不同，站數 2 到 5 都有），
- * 比下面那組寫死的三站可靠。
+ * route_stations 是 SQL 從訂單 payload 取出來的真站序（每一班不同，站數 2 到 5 都有）。
  */
 function stationNameFromRouteStations(
   row: Record<string, unknown>,
@@ -52,45 +62,6 @@ function stationNameFromRouteStations(
   }
 }
 
-/** MQTT / SQL 的 station_id → 班次卡顯示用站名 */
-export function resolveMainlineStationDisplayName(
-  stationId: string,
-  tripCode: string,
-): string {
-  const id = String(stationId ?? '').trim();
-  if (!id) return '';
-  const ids = mainlineStationTriplet(tripCode);
-  const names = mainlineStationDisplayTriplet(tripCode);
-  const idx = ids.indexOf(id);
-  return idx >= 0 ? names[idx] : id;
-}
-
-/**
- * 只有班次代號時判方向。
- *
- * 舊代號是 U0830／D0830，第一個字母就是方向。排班引擎改發路線代號：NT1337 是
- * N2W 開往 T3、ST1338 是 S2W 開往 T3。正線由北到南是 N2W → T3 → S2W，往南走是下行，
- * 往北走是上行，所以比較前後兩站在這條線上的順序就知道方向。
- *
- * 這是沒有訂單資料時的退路；有 SQL 算好的 direction_label 就不會走到這裡。
- */
-export function mainlineTripCodeIsUp(tripCode: string): boolean {
-  const code = tripCode.trim().toUpperCase();
-  if (code.startsWith('U')) return true;
-  if (code.startsWith('D')) return false;
-  const order = 'NTS';
-  const from = order.indexOf(code.charAt(0));
-  const to = order.indexOf(code.charAt(1));
-  if (from < 0 || to < 0 || from === to) return false;
-  return to < from;
-}
-
-export function mainlineRouteStationsJson(tripCode: string): string {
-  const ids = mainlineStationTriplet(tripCode);
-  const names = mainlineStationDisplayTriplet(tripCode);
-  return JSON.stringify(ids.map((station_id, i) => ({ name: names[i], station_id })));
-}
-
 export function formatMainlineEtaMmSs(totalSeconds: number): string {
   const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
   const m = Math.floor(total / 60);
@@ -98,22 +69,15 @@ export function formatMainlineEtaMmSs(totalSeconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function minutesUntilDeparture(tripCode: string, nowMs = Date.now()): number | null {
-  const start = tripStartMinutesFromCode(tripCode);
-  if (start === null) return null;
+/** 距 SQL 給的發車分鐘（當日 0 點起算的分鐘數）還有幾分鐘；SQL 沒給就是 null */
+function minutesUntilDeparture(row: Record<string, unknown>, nowMs = Date.now()): number | null {
+  const raw = row.trip_start_minutes;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const start = Number(raw);
+  if (!Number.isFinite(start)) return null;
   const now = new Date(nowMs);
   const nowMin = now.getHours() * 60 + now.getMinutes();
   return Math.max(0, start - nowMin);
-}
-
-function fillTripScheduleFields(row: Record<string, unknown>) {
-  if (row.depart_time != null && row.depart_time !== '' && row.end_time != null && row.end_time !== '') {
-    return;
-  }
-  const schedule = shiftTripScheduleFromCode(String(row.trip_code ?? ''));
-  if (!schedule) return;
-  if (row.depart_time == null || row.depart_time === '') row.depart_time = schedule.depart_time;
-  if (row.end_time == null || row.end_time === '') row.end_time = schedule.end_time;
 }
 
 /** 待發：灰框灰字；進行中：綠；故障：紅；延誤：橘 */
@@ -163,23 +127,17 @@ function isMainlineProcessingPhase(phase: string, orderStatus: string): boolean 
   );
 }
 
-function applyPendingFields(row: Record<string, unknown>, tripCode: string) {
-  const [fallbackOrigin] = mainlineStationDisplayTriplet(tripCode);
-  const sqlOrigin = String(row.next_station ?? '').trim();
+function applyPendingFields(row: Record<string, unknown>) {
   row.order_status = 'PENDING';
   Object.assign(row, MAINLINE_PENDING_STYLE);
   row.station_label = '下一站';
   row.eta_label = '剩餘到站';
-  // SQL 已經從班表算出起站的話就用它，寫死的三站只是舊班次代號的備援。
-  row.next_station = sqlOrigin || fallbackOrigin;
+  // 待發的下一站就是 SQL 從班表算出來的起站；SQL 沒給就留空。
   row.segment_index = 0;
   row.segment_remain_pct = 100;
   row.route_progress = 0;
-  const mins = minutesUntilDeparture(tripCode);
-  row.eta_remain =
-    mins !== null
-      ? formatMainlineEtaMmSs(mins * 60)
-      : String(row.eta_remain ?? '00:00');
+  const mins = minutesUntilDeparture(row);
+  if (mins !== null) row.eta_remain = formatMainlineEtaMmSs(mins * 60);
   if (!row.operation_action) row.operation_action = 'music';
   if (!row.icon_bg_color) row.icon_bg_color = '#52525b';
 }
@@ -199,28 +157,13 @@ function applyProcessingFields(
   row.station_label = '下一站';
   row.eta_label = '剩餘到站';
   const leg = readLeg(mqttPayload);
-  const tripCode = String(row.trip_code ?? mqttPayload?.trip_code ?? '').trim().toUpperCase();
-  if (leg?.target_station_id && tripCode) {
+  if (leg?.target_station_id) {
     /*
-     * 車端回報的是 station_id（t3_u 這種），要換成站名才能放上卡片。
-     *
-     * 先查這一列自己的站序；查不到再走寫死的三站對照，那份只認得 station_1…station_6。
-     * 兩邊都對不上時 resolveMainlineStationDisplayName 會原樣回傳 id——畫面上就會看到
-     * 「下一站 t3_u」，那是對照表沒涵蓋到的訊號，不是資料壞掉。
+     * 車端回報的是 station_id（t3_u 這種），要換成站名才能放上卡片：查這一列 SQL 自己的
+     * 站序（route_stations）。查不到就<strong>不要動</strong>這一欄——station_id 是給機器看的
+     * 識別碼，SQL 算出來的那個值至少是人看得懂的站名。
      */
-    const targetId = String(leg.target_station_id);
-    const ids = mainlineStationTriplet(tripCode);
-    const idx = ids.indexOf(targetId);
-    const alias =
-      stationNameFromRouteStations(row, targetId)
-      ?? (idx >= 0 ? mainlineStationDisplayTriplet(tripCode)[idx] : null);
-    /*
-     * 查不到站名就<strong>不要動</strong>這一欄。
-     *
-     * 原本查不到會把 station_id 原樣填進去，畫面上就是「下一站 s2w_d2u_go...」——
-     * 那是給機器看的識別碼，不是站名。SQL 算出來的那個值至少是人看得懂的站名，
-     * 寧可留著它。
-     */
+    const alias = stationNameFromRouteStations(row, String(leg.target_station_id));
     if (alias) row.next_station = alias;
   }
   if (legEtaSeconds !== undefined) {
@@ -245,34 +188,8 @@ export function enrichMainlineShiftFields(
   const tripCode = String(next.trip_code ?? mqttPayload?.trip_code ?? '').trim().toUpperCase();
   if (tripCode) {
     next.trip_code = tripCode;
-    /*
-     * 方向與站序：SQL 算得出來就用 SQL 的。
-     *
-     * 這裡原本無條件用 tripCode.startsWith('U') 判方向，再把三站覆蓋成寫死的
-     * N2W下行／T3下行／S2W下行。那是舊班次代號（U0830／D0830）的規則；排班引擎現在
-     * 發的是 NT1337、ST1338 這種路線代號，沒有一個以 U 開頭，所以每一張卡都被寫成
-     * 「下行」，站名也全部一樣——連往 T3上行 的班次都是。
-     *
-     * SQL 那邊是從訂單 payload 的起站名與站序取的，逐班不同，該以它為準。
-     */
-    if (!String(next.direction_label ?? '').trim()) {
-      const isUp = mainlineTripCodeIsUp(tripCode);
-      next.direction_label = isUp ? '上行' : '下行';
-      next.direction_pill_bg = isUp ? '#51A2FF' : '#8E51FF';
-      next.direction_pill_color = '#FFFFFF';
-    }
-    if (!String(next.st_a ?? '').trim()) {
-      const [stA, stB, stC] = mainlineStationDisplayTriplet(tripCode);
-      next.st_a = stA;
-      next.st_b = stB;
-      next.st_c = stC;
-    }
-    if (!next.route_stations || next.route_stations === '[]') {
-      next.route_stations = mainlineRouteStationsJson(tripCode);
-    }
+    // 方向、站序、發車與結束時間都以 SQL 為準；SQL 沒給就留空，不從班次代號推。
   }
-
-  fillTripScheduleFields(next);
 
   const orderStatus = String(mqttPayload?.order_status ?? next.order_status ?? '').toUpperCase();
   const phase = String(mqttPayload?.vehicle_phase ?? '').toUpperCase();
@@ -287,7 +204,7 @@ export function enrichMainlineShiftFields(
   }
 
   if (phase === 'AWAITING_DEPARTURE' || orderStatus === 'PENDING') {
-    applyPendingFields(next, tripCode);
+    applyPendingFields(next);
     return next;
   }
 
@@ -296,7 +213,7 @@ export function enrichMainlineShiftFields(
     return next;
   }
 
-  applyProcessingFields(next, mqttPayload, legEtaSeconds);
+  // 狀態不明（SQL 與 MQTT 都沒給）：不替它判「準時」，照 SQL 原樣顯示。
   return next;
 }
 
@@ -331,23 +248,20 @@ export function resolveMainlineStatusStyleFromLabel(
   return null;
 }
 
-/** 從 MQTT 組最小正線列（SQL 名冊尚未寫入時） */
+/**
+ * 從 MQTT 組最小正線列（SQL 名冊尚未寫入時）。
+ *
+ * 只放 MQTT 真的有的欄位；站序、方向、發車時間 MQTT 沒有，就留空等 SQL。
+ */
 export function buildMainlineRowFromMqtt(payload: Record<string, unknown>): Record<string, unknown> {
   const tripCode = String(payload.trip_code ?? '').trim().toUpperCase();
   const vehicleCode = String(payload.vehicle_code ?? '');
   const orderId = String(payload.order_id ?? '');
-  const [stA, stB, stC] = mainlineStationDisplayTriplet(tripCode);
   return enrichMainlineShiftFields({
     shift_key: orderId,
     order_id: orderId,
     vehicle_code: vehicleCode,
     trip_code: tripCode,
-    trip_header: `${tripCode} ${vehicleCode}`,
-    st_a: stA,
-    st_b: stB,
-    st_c: stC,
-    route_stations: mainlineRouteStationsJson(tripCode),
-    delay_minutes: 0,
-    eta_delay: '',
+    trip_header: `${tripCode} ${vehicleCode}`.trim(),
   }, payload);
 }

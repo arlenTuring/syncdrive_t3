@@ -41,17 +41,12 @@ const MAINTENANCE_SECTION_ICONS: Record<string, string> = {
   mobile: presetIconUrl('facility/park.png'),
 };
 
-const MOCK_MAINTENANCE_DISTRIBUTION: DistributionView = {
-  activeCategories: 3,
-  totalCategories: 5,
-  message: null,
-  categories: [
-    { key: 'charging', label: '充電', occupiedCount: 1, slots: ['E1', 'E2', 'E3', 'E4'].map((code) => ({ code, occupied: code === 'E2', vehicleCode: null })) },
-    { key: 'carWash', label: '洗車', occupiedCount: 0, slots: [{ code: 'W1', occupied: false, vehicleCode: null }] },
-    { key: 'maintenance', label: '保養', occupiedCount: 1, slots: ['M3', 'M4'].map((code) => ({ code, occupied: code === 'M3', vehicleCode: null })) },
-    { key: 'preTrip', label: '行檢', occupiedCount: 0, slots: ['M1', 'M2'].map((code) => ({ code, occupied: false, vehicleCode: null })) },
-    { key: 'mobile', label: '待命', occupiedCount: 2, slots: ['D1', 'D2', 'D3', 'D4', 'D5'].map((code) => ({ code, occupied: code === 'D1' || code === 'D3', vehicleCode: null })) },
-  ],
+/** 編輯模式沒有資料：顯示空的分佈（原本是一組寫死的格位與佔用示範，已移除） */
+const EMPTY_MAINTENANCE_DISTRIBUTION: DistributionView = {
+  activeCategories: 0,
+  totalCategories: 0,
+  message: '無資料',
+  categories: [],
 };
 
 function parseDistribution(row: Record<string, unknown> | undefined): DistributionView | null {
@@ -158,7 +153,7 @@ export function MaintenanceDistributionWidgetView({ widget }: { widget: Maintena
 
   const live = useMemo(() => parseDistribution(data[0]), [data]);
   const isEditPreview = shouldShowEditPreview(isEditMode, hasBinding, Boolean(live?.categories.length));
-  const view = isEditPreview ? MOCK_MAINTENANCE_DISTRIBUTION : live;
+  const view = isEditPreview ? EMPTY_MAINTENANCE_DISTRIBUTION : live;
 
   const columns = Math.max(1, widget.columns ?? 2);
   const titleFs = widget.titleFontSize ?? 16;

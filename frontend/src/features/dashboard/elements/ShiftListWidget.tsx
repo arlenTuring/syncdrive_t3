@@ -55,9 +55,10 @@ function InlineRouteTrack({ row, isMainline }: { row: ShiftRow; isMainline: bool
     segCount > 0 ? ((completedSegs + currentSegProgress) / segCount) * 100 : Number(row.route_progress ?? 0);
   const pct = Math.min(100, Math.max(0, rawPct));
 
+  // 站名只用 SQL 給的；沒給就顯示「—」，不補寫死的站名
   const stations = isMainline
-    ? [row.st_a ?? 'S2W', row.st_b ?? 'T3', row.st_c ?? 'N2W']
-    : [row.st_a ?? 'S2W', row.st_c ?? '整備站'];
+    ? [row.st_a ?? '—', row.st_b ?? '—', row.st_c ?? '—']
+    : [row.st_a ?? '—', row.st_c ?? '—'];
 
   const stationPcts = isMainline ? [0, 50, 100] : [0, 100];
 

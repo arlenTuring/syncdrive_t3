@@ -62,7 +62,7 @@ LIMIT 1 OFFSET GREATEST(0, COALESCE({${indexVar}}, 0)::int)
 export const EVENT_CENTER_LIST_SQL = `
 SELECT
   event_id,
-  COALESCE(category_label, '線控') AS category,
+  COALESCE(category_label, '未分類') AS category,
   vehicle_code,
   CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,
   to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,
@@ -389,13 +389,13 @@ SELECT
     ELSE COALESCE(m.trip_badge_color, '#f3e8ff')
   END AS trip_badge_color,
   COALESCE(m.badge_outline, '0') AS badge_outline,
-  COALESCE(m.overall_health, 'OK') AS overall_health,
+  m.overall_health AS overall_health,
   COALESCE(m.alert_message, '') AS alert_message,
   COALESCE(m.card_border_color, '#00c897') AS card_border_color,
-  COALESCE(m.status_computing, 'OK') AS status_computing,
-  COALESCE(m.status_sensing, 'OK') AS status_sensing,
-  COALESCE(m.status_communication, 'OK') AS status_communication,
-  COALESCE(m.status_chassis, 'OK') AS status_chassis,
+  m.status_computing AS status_computing,
+  m.status_sensing AS status_sensing,
+  m.status_communication AS status_communication,
+  m.status_chassis AS status_chassis,
   COALESCE(NULLIF(TRIM(m.segment_label), ''), '—') AS segment_label,
   CASE WHEN m.location_kind = 'FACILITY' THEN NULLIF(TRIM(m.segment_label), '') END AS yard_slot_id,
   COALESCE(m.demo_speed, 0)::numeric AS demo_speed,

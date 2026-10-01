@@ -1,5 +1,6 @@
 import {
   buildShiftCenterSummary,
+  formatHeadway,
   mergeDepartureLeads,
   nextSegment,
   pphpdAt,
@@ -49,6 +50,23 @@ describe('operation-metrics', () => {
     expect(segmentAt(segments, 2 * 60)?.pphpd).toBe(700);
     expect(nextSegment(segments, 8 * 60)).toMatchObject({ startMinute: 600, pphpd: 700 });
     expect(nextSegment(segments, 12 * 60)).toMatchObject({ startMinute: 7 * 60 + 1440, pphpd: 1400 });
+  });
+
+  it('時段班距：取時間模板時段屬性的 headwaySeconds，沒設就是 null 並顯示「—」', () => {
+    const segments = templateSegments({
+      attributes: [
+        { id: 'a', name: '離峰', capacityPphpd: 700, headwaySeconds: 360 },
+        { id: 'b', name: '尖峰', capacityPphpd: 1400 },
+      ],
+      intervals: [
+        { startTime: '07:00', endTime: '10:00', attributeId: 'b', name: '早尖峰' },
+        { startTime: '10:00', endTime: '07:00', attributeId: 'a', name: '離峰' },
+      ],
+    });
+    expect(segmentAt(segments, 12 * 60)?.headwaySeconds).toBe(360);
+    expect(formatHeadway(segmentAt(segments, 12 * 60)?.headwaySeconds ?? null)).toBe('06:00');
+    expect(segmentAt(segments, 8 * 60)?.headwaySeconds).toBeNull();
+    expect(formatHeadway(null)).toBe('—');
   });
 
   it('班次中心：完成＝END；延誤＝晚結束、故障、進行中已超過計畫結束', () => {

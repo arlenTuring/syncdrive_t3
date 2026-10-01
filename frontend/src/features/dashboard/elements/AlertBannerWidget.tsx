@@ -5,7 +5,7 @@ import { useWidgetData } from './useWidgetData';
 import { useMqttData } from './useMqttData';
 import { useVariables, interpolateVariables, type VariableMap } from '../VariableContext';
 import { useEditMode } from '../context/EditModeContext';
-import { FIELD_PREVIEW_SAMPLES, isVariableTemplate } from '../utils/widgetEditPreview';
+import { isVariableTemplate } from '../utils/widgetEditPreview';
 import {
   createEmptyAlertRule,
   evaluateActiveAlertRules,
@@ -20,11 +20,8 @@ const DEFAULT_CAROUSEL_MS = 3200;
 function resolveAlertDisplayText(content: string, variables: VariableMap, isEditMode: boolean): string {
   const interpolated = interpolateVariables(content, variables);
   if (!isEditMode) return interpolated;
-  const withSamples = interpolated.replace(/\{([^{}]+)\}/g, (match, key) => {
-    const sample = FIELD_PREVIEW_SAMPLES[key.trim()];
-    return sample ?? match;
-  });
-  return withSamples.trim() || '警示預覽';
+  // 編輯模式：有資料就顯示資料，沒有就留著 {欄位名}，不換成示範文字
+  return interpolated.trim() || '（無警示）';
 }
 
 /** 依元件高度與列數推算字級，不超出每列可用高度 */

@@ -21,6 +21,7 @@ import {
   VEHICLE_BEHAVIOR_ACTION_CATALOG,
 } from '../vehicle-editor/constants/behaviorActionCatalog';
 import { WidgetDataBindingSettings } from './elements/WidgetDataBindingSettings';
+import { WidgetDataLineageCard } from './components/WidgetDataLineageCard';
 import { createEmptyAlertRule, coerceAlertRule, getEditorAlertRules } from './utils/alertTrigger';
 import { resolveFreshness, FRESHNESS_POLICY_OPTIONS } from './utils/resolveFreshness';
 import type { FreshnessPolicy } from './types';
@@ -3278,6 +3279,8 @@ interface Props {
   onEnterEditTabListCell?: (tabId: string, columnId: string) => void;
   /** 雙畫板子畫布：選取中間閘道設定區 */
   dualGateSettingsActive?: boolean;
+  /** 選取元件所在的群組（子畫布或樣板編輯中）；資料來源卡依它說明 {欄位} 從哪裡來 */
+  dataContextGroup?: CanvasElementProps | null;
 }
 
 export function PropertiesPanel({
@@ -3297,6 +3300,7 @@ export function PropertiesPanel({
   onEnterEditVehicleContainer,
   onEnterEditTabListCell,
   dualGateSettingsActive,
+  dataContextGroup = null,
 }: Props) {
   const { t } = useTranslation();
   const { issueMap } = useBindingHealth();
@@ -3382,7 +3386,9 @@ export function PropertiesPanel({
             </p>
           </div>
         ) : selectedChild ? (
-          (() => {
+          <React.Fragment key={selectedChild.id}>
+          <WidgetDataLineageCard widget={selectedChild} group={dataContextGroup ?? editingGroup ?? null} />
+          {(() => {
             const props = { w: selectedChild, onUpdate: onUpdateChild, onDelete: onDeleteChild };
             switch (selectedChild.type) {
               case 'text':           return <TextSettings {...props as any} editingGroup={editingGroup} />;
@@ -3431,7 +3437,8 @@ export function PropertiesPanel({
                   </div>
                 );
             }
-          })()
+          })()}
+          </React.Fragment>
         ) : editingTabListColumn ? (
           <p className="text-zinc-500 text-xs leading-relaxed px-1 py-6 text-center">
             {t('dashboard.properties.cellTemplateEmpty')}

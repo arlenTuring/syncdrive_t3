@@ -1,6 +1,14 @@
-/** 整備任務：一卡一種；示範模式車已在目標格，軌道仍顯示 S2W→格位兩站 */
-export const MAINTENANCE_ORIGIN = 'S2W';
+/**
+ * 整備班表卡欄位。
+ *
+ * 原本 SQL 沒給的欄位會用寫死的值補：起站一律 S2W、站序固定兩站、進度一律 100%、
+ * 完成預估一律 00:30:00、發車時間用「現在」、結束時間用「現在 + 30 分」、任務類型看格位
+ * 代號第一個字母猜。那些值不是任何資料來源給的，使用者沒辦法查核。
+ *
+ * 現在只依車端 MQTT 覆寫它真的有回報的欄位，其餘照 SQL；兩邊都沒有就留空。
+ */
 
+/** 依格位代號開頭字母猜任務類型（僅供車輛監控徽章沿用；班表卡不再用它補值） */
 export function maintTypeLabelFromSlot(slotId: string): string {
   const slot = slotId.trim().toUpperCase();
   if (slot.startsWith('E')) return '充電';
@@ -11,30 +19,13 @@ export function maintTypeLabelFromSlot(slotId: string): string {
   return '整備';
 }
 
-export function maintenanceDemoOrderId(vehicleCode: string, yardSlotId: string): string {
-  const vehicle = vehicleCode.trim().toUpperCase();
-  const slot = yardSlotId.trim().toUpperCase();
-  return slot ? `DEMO-ORD-${vehicle}-${slot}` : `DEMO-ORD-${vehicle}`;
-}
-
-/** 兩站：S2W(0%) → 目標整備格(100%) */
-export function maintenanceRouteStationsJson(slotId: string): string {
-  const slot = slotId.trim();
-  if (!slot) return '[]';
-  return JSON.stringify([
-    { name: MAINTENANCE_ORIGIN, remain_pct: 0 },
-    { name: slot, remain_pct: 100 },
-  ]);
-}
-
-/** 已在目標格：第 0 段剩餘 0%（車在終點站） */
-export function maintenanceProgressFields(): {
-  segment_index: number;
-  segment_remain_pct: number;
-  route_progress: number;
-} {
-  return { segment_index: 0, segment_remain_pct: 0, route_progress: 100 };
-}
+/** 整備班表列：前端依 MQTT 覆寫的欄位與其來源（屬性面板的資料來源說明照這份顯示） */
+export const MAINTENANCE_ROW_FIELD_ORIGINS: Record<string, string> = {
+  next_station: 'MQTT operation/update 的 yard_slot_id；沒有 MQTT 時用 SQL',
+  maint_type_label: 'MQTT maint_type_label；沒有 MQTT 時用 SQL',
+  eta_remain: 'MQTT current_leg.eta_seconds；沒有 MQTT 時用 SQL',
+  status_label: 'SQL；SQL 沒給時依 order_status 判定（PENDING 停留中、PROCESSING 進行中）',
+};
 
 /** 整備卡正常態（綠）；故障／逾時告警邏輯尚未上線前一律使用 */
 export const MAINTENANCE_CARD_NORMAL_STYLE = {
@@ -64,13 +55,8 @@ export function applyMaintenanceCardNormalStyle(row: Record<string, unknown>): v
   Object.assign(row, MAINTENANCE_CARD_NORMAL_STYLE);
 }
 
-export function applyMaintenanceVehicleAndLabelStyle(
-  row: Record<string, unknown>,
-  yardSlot?: string,
-): void {
-  const label = String(
-    row.maint_type_label ?? (yardSlot ? maintTypeLabelFromSlot(yardSlot) : ''),
-  ).trim();
+export function applyMaintenanceVehicleAndLabelStyle(row: Record<string, unknown>): void {
+  const label = String(row.maint_type_label ?? '').trim();
   row.icon_bg_color = MAINTENANCE_VEHICLE_ICON_BG_NORMAL;
   if (label) row.maint_type_color = maintTypeLabelColor(label);
 }
@@ -82,12 +68,7 @@ function formatMaintEtaSeconds(sec: number): string {
   return `${String(m).padStart(2, '0')}:${s.toFixed(1).padStart(4, '0')}`;
 }
 
-function formatHmFromMs(ms: number): string {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/** 整備班表卡：車已在目標格，補齊站點／時間等欄位 */
+/** 整備班表卡：依車端 MQTT 覆寫即時欄位，其餘照 SQL */
 export function enrichMaintenanceShiftFields(
   row: Record<string, unknown>,
   mqttPayload?: Record<string, unknown> | null,
@@ -96,53 +77,19 @@ export function enrichMaintenanceShiftFields(
   const next = { ...row };
   next.line_kind = 'MAINTENANCE';
 
-  const yardSlot = String(
-    mqttPayload?.yard_slot_id ?? next.st_c ?? next.yard_slot_id ?? next.next_station ?? '',
-  ).trim();
-
-  if (yardSlot) {
-    next.st_a = MAINTENANCE_ORIGIN;
-    next.st_b = yardSlot;
-    next.st_c = yardSlot;
-    next.next_station = yardSlot;
-    next.route_stations = maintenanceRouteStationsJson(yardSlot);
-    if (mqttPayload?.maint_type_label) {
-      next.maint_type_label = mqttPayload.maint_type_label;
-    } else if (!next.maint_type_label) {
-      next.maint_type_label = maintTypeLabelFromSlot(yardSlot);
-    }
-  }
-
-  Object.assign(next, maintenanceProgressFields());
+  const mqttSlot = String(mqttPayload?.yard_slot_id ?? '').trim();
+  if (mqttSlot) next.next_station = mqttSlot;
+  if (mqttPayload?.maint_type_label) next.maint_type_label = mqttPayload.maint_type_label;
+  if (legEtaSeconds !== undefined) next.eta_remain = formatMaintEtaSeconds(legEtaSeconds);
 
   const orderStatus = String(mqttPayload?.order_status ?? next.order_status ?? '').toUpperCase();
-  next.station_label = '整備站點';
-  if (!next.eta_label) {
-    next.eta_label = '完成預估';
-  }
-  if (!next.eta_remain || next.eta_remain === '') {
-    if (legEtaSeconds !== undefined) {
-      next.eta_remain = formatMaintEtaSeconds(legEtaSeconds);
-    } else {
-      next.eta_remain = '00:30:00';
-    }
-  }
-
-  const ts = Number(mqttPayload?.timestamp ?? mqttPayload?.sim_timestamp);
-  const nowHm = Number.isFinite(ts) ? formatHmFromMs(ts) : formatHmFromMs(Date.now());
-  if (!next.depart_time || next.depart_time === '') next.depart_time = nowHm;
-  if (!next.end_time || next.end_time === '') {
-    const baseMs = Number.isFinite(ts) ? ts : Date.now();
-    next.end_time = formatHmFromMs(baseMs + 30 * 60 * 1000);
-  }
-
   if (!next.status_label) {
     if (orderStatus === 'PENDING') next.status_label = '停留中';
-    else next.status_label = '進行中';
+    else if (orderStatus === 'PROCESSING') next.status_label = '進行中';
   }
 
   applyMaintenanceCardNormalStyle(next);
-  applyMaintenanceVehicleAndLabelStyle(next, yardSlot);
+  applyMaintenanceVehicleAndLabelStyle(next);
 
   return next;
 }

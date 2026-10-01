@@ -14,7 +14,7 @@ import {
   shouldShowNormalPanel,
 } from '../utils/dualCanvas';
 import { DualCanvasDefaultView } from './DualCanvasDefaultView';
-import { buildTemplatePreviewRow } from '../utils/groupTemplateContext';
+import { useShiftSourcePostProcessors } from '../hooks/useShiftSourcePostProcessors';
 import { useOperationMqttShiftOverlay } from '../hooks/useOperationMqttShiftOverlay';
 import { useShiftFleetMqttMap } from '../context/ShiftFleetMqttContext';
 import {
@@ -38,20 +38,18 @@ function buildVariables(
   element: CanvasElementProps,
   row: Record<string, unknown> | null,
   index: number,
-  isEditMode: boolean,
 ) {
-  const previewRow = isEditMode && row === null ? buildTemplatePreviewRow(index) : null;
-  const effectiveRow = row ?? previewRow;
+  // 沒有列（未接資料來源的預覽）就只放索引變數；不再注入示範列，欄位會顯示成 {欄位名}
   const varName = element.variableName || 'item';
   const indexMode = (element.groupVariableMode ?? 'row') === 'index';
   const varValue = indexMode
     ? index
     : row
       ? (element.iteratorField ? row[element.iteratorField] : index)
-      : previewRow?.[element.iteratorField || varName] ?? index;
+      : index;
   const variables: Record<string, unknown> = { [varName]: varValue };
-  if (!indexMode && effectiveRow) {
-    Object.entries(effectiveRow).forEach(([k, v]) => { variables[k] = v; });
+  if (!indexMode && row) {
+    Object.entries(row).forEach(([k, v]) => { variables[k] = v; });
   }
   return variables;
 }
@@ -230,7 +228,7 @@ function TemplateInstance({
   const liveRow = useOperationMqttShiftOverlay(vehicleCode, row, useLiveMqtt);
   const variables = useMemo(
     () => {
-      const built = buildVariables(element, row, index, isEditMode);
+      const built = buildVariables(element, row, index);
       if (!useLiveMqtt) return built;
       return { ...built, ...liveRow };
     },
@@ -659,13 +657,7 @@ function GenericSlotsGroupView({
    * 'mainline-mqtt-merge' 這個字串，只是原封查表。正線班次來源設定
    * `postProcessId: 'mainline-mqtt-merge'` 才會套用；其他群組／其他來源不受影響。
    */
-  const fleetMqtt = useShiftFleetMqttMap();
-  const sourcePostProcessors = useMemo(
-    () => ({
-      'mainline-mqtt-merge': (rows: Record<string, unknown>[]) => mergeMainlineShiftRoster(rows, fleetMqtt),
-    }),
-    [fleetMqtt],
-  );
+  const sourcePostProcessors = useShiftSourcePostProcessors();
 
   const { fetchers, slots, pendingCount, isInitialLoading, templatesBySlot } = useGenericGroupSlots(config, capacity, {
     sourcePostProcessors,
@@ -880,7 +872,8 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
   const fleetMqtt = useShiftFleetMqttMap();
   const dataRows = hasDataSource && data.length > 0 ? data : [];
   const mergedRows = useMemo(() => {
-    if (!isShiftRoster || isEditMode || isPreviewMode) return dataRows;
+    // 編輯模式也合併 MQTT：編輯畫面看到的值要跟執行畫面同一份
+    if (!isShiftRoster || isPreviewMode) return dataRows;
     if (element.label === '正線班次') {
       return mergeMainlineShiftRoster(dataRows, fleetMqtt);
     }
@@ -888,7 +881,7 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
       return mergeMaintenanceShiftRoster(dataRows, fleetMqtt);
     }
     return dataRows;
-  }, [isShiftRoster, isEditMode, isPreviewMode, element.label, dataRows, fleetMqtt]);
+  }, [isShiftRoster, isPreviewMode, element.label, dataRows, fleetMqtt]);
   const isEmpty = hasDataSource && !loading && mergedRows.length === 0;
   const rows: (Record<string, unknown> | null)[] = isPreviewMode ? [null] : mergedRows;
 

@@ -41,145 +41,6 @@ export function applyTabListContentFontSize(
   };
 }
 
-// ─── 預覽模擬資料（編輯模式無資料時使用） ──────────────────────────────────
-
-function buildMockPreviewRowsMainline(t: (key: string) => string): Record<string, unknown>[] {
-  const down = t('dashboard.tabListChrome.mockDown');
-  const up = t('dashboard.tabListChrome.mockUp');
-  const onTime = t('dashboard.tabListChrome.mockOnTime');
-  return [
-  {
-    shift_key: 'D0954',
-    trip_code: 'D0954',
-    direction_label: down,
-    direction_pill_bg: '#1e3a8a',
-    direction_pill_color: '#93c5fd',
-    vehicle_code: 'PMS01',
-    route_progress: 35,
-    segment_index: 0,
-    segment_remain_pct: 30,
-    status_label: t('dashboard.tabListChrome.mockDelayed'),
-    status_bg: '#451a03',
-    status_color: '#fb923c',
-    depart_time: '09:54 → 09:59 (+5)',
-    st_a: 'S2W',
-    st_b: 'T3',
-    st_c: 'N2W',
-  },
-  {
-    shift_key: 'U1000',
-    trip_code: 'U1000',
-    direction_label: up,
-    direction_pill_bg: '#1e3a8a',
-    direction_pill_color: '#93c5fd',
-    vehicle_code: 'PMS02',
-    route_progress: 85,
-    segment_index: 1,
-    segment_remain_pct: 30,
-    status_label: onTime,
-    status_bg: '#052e16',
-    status_color: '#4ade80',
-    depart_time: '10:00 → 10:00',
-    st_a: 'S2W',
-    st_b: 'T3',
-    st_c: 'N2W',
-  },
-  {
-    shift_key: 'D1006',
-    trip_code: 'D1006',
-    direction_label: down,
-    direction_pill_bg: '#1e3a8a',
-    direction_pill_color: '#93c5fd',
-    vehicle_code: 'PMS03',
-    route_progress: 25,
-    segment_index: 0,
-    segment_remain_pct: 50,
-    status_label: onTime,
-    status_bg: '#052e16',
-    status_color: '#4ade80',
-    depart_time: '10:06',
-    st_a: 'S2W',
-    st_b: 'T3',
-    st_c: 'N2W',
-  },
-  {
-    shift_key: 'U1012',
-    trip_code: 'U1012',
-    direction_label: up,
-    direction_pill_bg: '#1e3a8a',
-    direction_pill_color: '#93c5fd',
-    vehicle_code: 'PMS04',
-    route_progress: 75,
-    segment_index: 1,
-    segment_remain_pct: 50,
-    status_label: onTime,
-    status_bg: '#052e16',
-    status_color: '#4ade80',
-    depart_time: '10:12',
-    st_a: 'S2W',
-    st_b: 'T3',
-    st_c: 'N2W',
-  },
-  {
-    shift_key: 'D1018',
-    trip_code: 'D1018',
-    direction_label: down,
-    direction_pill_bg: '#1e3a8a',
-    direction_pill_color: '#93c5fd',
-    vehicle_code: 'PMS05',
-    route_progress: 30,
-    segment_index: 0,
-    segment_remain_pct: 40,
-    status_label: onTime,
-    status_bg: '#052e16',
-    status_color: '#4ade80',
-    depart_time: '10:18',
-    st_a: 'S2W',
-    st_b: 'T3',
-    st_c: 'N2W',
-  },
-];
-}
-
-function buildMockPreviewRowsMaintenance(t: (key: string) => string): Record<string, unknown>[] {
-  const prepStation = t('dashboard.tabListChrome.mockPrepStation');
-  return [
-  {
-    shift_key: 'M0900',
-    trip_code: 'M0900',
-    maint_type_label: t('dashboard.tabListChrome.mockPeriodicMaint'),
-    maint_type_bg: '#422006',
-    maint_type_color: '#fdba74',
-    vehicle_code: 'PMS06',
-    route_progress: 40,
-    segment_index: 0,
-    segment_remain_pct: 60,
-    status_label: t('dashboard.tabListChrome.mockPreparing'),
-    status_bg: '#3f2c06',
-    status_color: '#facc15',
-    depart_time: '09:00 ~ 11:30',
-    st_a: 'S2W',
-    st_c: prepStation,
-  },
-  {
-    shift_key: 'M1030',
-    trip_code: 'M1030',
-    maint_type_label: t('dashboard.tabListChrome.mockDailyInspect'),
-    maint_type_bg: '#1e293b',
-    maint_type_color: '#94a3b8',
-    vehicle_code: 'PMS07',
-    route_progress: 90,
-    segment_index: 0,
-    segment_remain_pct: 10,
-    status_label: t('dashboard.tabListChrome.mockAlmostDone'),
-    status_bg: '#052e16',
-    status_color: '#4ade80',
-    depart_time: '10:30 ~ 11:15',
-    st_a: 'S2W',
-    st_c: prepStation,
-  },
-];
-}
 
 // ─── 單一單元格渲染器 ─────────────────────────────────────────────────────────
 
@@ -349,18 +210,11 @@ export function TabListWidgetView({
     return String(row.schedule_name ?? row.name ?? '');
   }, [scheduleState.data]);
 
-  // 列資料解析（無資料且在編輯模式時顯示 Mock 預覽）
-  const rows = useMemo(() => {
-    if (queryState.data && queryState.data.length > 0) {
-      return queryState.data as Record<string, unknown>[];
-    }
-    if (isEditMode) {
-      return effectiveTabId.includes('maint')
-        ? buildMockPreviewRowsMaintenance(t)
-        : buildMockPreviewRowsMainline(t);
-    }
-    return [];
-  }, [queryState.data, isEditMode, effectiveTabId, t]);
+  // 列資料只來自 SQL；編輯模式也不放示範列——沒資料就讓人看到沒資料
+  const rows = useMemo(
+    () => (queryState.data ?? []) as Record<string, unknown>[],
+    [queryState.data],
+  );
 
   const fs = widget.fontSize ?? 13;
   const bodyTextColor = widget.textColor ?? '#cbd5e1';
@@ -576,6 +430,13 @@ export function TabListWidgetView({
             </thead>
             {/* 表身 (資料重複列) */}
             <tbody>
+              {isEditMode && rows.length === 0 && (
+                <tr>
+                  <td colSpan={Math.max(1, columns.length)} style={{ padding: 12, textAlign: 'center', color: '#64748b', fontSize: fs }}>
+                    {t('dashboard.tabListChrome.noData')}
+                  </td>
+                </tr>
+              )}
               {rows.map((row, i) => (
                 <tr
                   key={String(row.shift_key ?? row.id ?? `row-${i}`)}

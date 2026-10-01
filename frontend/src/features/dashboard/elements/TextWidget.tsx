@@ -20,7 +20,6 @@ import {
   normalizeValueFieldKey,
 } from '../utils/widgetEditPreview';
 import * as LucideIcons from 'lucide-react';
-import { resolveBuiltinFleetSql, MAINLINE_FLEET_REFRESH_INTERVAL } from '../utils/resolveBuiltinGroupSql';
 import {
   resolveTextHorizontalAlign,
   resolveTextVerticalAlign,
@@ -36,15 +35,14 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
   const verticalAlign = resolveTextVerticalAlign(widget.verticalAlign);
 
   // 1. 資料讀取
-  const fleetSql = resolveBuiltinFleetSql(widget.content, widget.valueField);
   const sqlData = useWidgetData({
-    dataSourceId: fleetSql ? (widget.dataSourceId || 'default-internal') : widget.dataSourceId,
-    sqlQuery: fleetSql ?? widget.sqlQuery,
-    dataUrl: fleetSql ? undefined : widget.dataUrl,
-    refreshInterval: fleetSql ? MAINLINE_FLEET_REFRESH_INTERVAL : widget.refreshInterval,
-    ...(fleetSql
-      ? {}
-      : { refreshMode: widget.refreshMode, invalidateTags: widget.invalidateTags, freshnessPolicy: widget.freshnessPolicy }),
+    dataSourceId: widget.dataSourceId,
+    sqlQuery: widget.sqlQuery,
+    dataUrl: widget.dataUrl,
+    refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    invalidateTags: widget.invalidateTags,
+    freshnessPolicy: widget.freshnessPolicy,
   });
 
   const resolvedMqttTopic = widget.mqttTopic
@@ -120,11 +118,6 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
       rawValue = extractMqttWrappedValue(mqttData.data);
       displayValue = mqttScalar;
     }
-  } else if (fleetSql && !widget.colorOnlyField && sqlData.data.length > 0) {
-    rawValue = sqlData.data[0].mainline_fleet_line ?? sqlData.data[0].content;
-    if (rawValue !== undefined && rawValue !== null) {
-      displayValue = String(rawValue);
-    }
   } else if (widget.valueField && !widget.colorOnlyField && variables[widget.valueField] !== undefined) {
     rawValue = variables[widget.valueField];
     displayValue = String(rawValue);
@@ -158,7 +151,6 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
 
   const hasLiveData = mqttData.data !== null
     || sqlData.data.length > 0
-    || (fleetSql && sqlData.data.length > 0)
     || (widget.valueField !== undefined && variables[widget.valueField] !== undefined)
     || (contentVarKey !== undefined && variables[contentVarKey] !== undefined)
     || interpolatedFromVars;
