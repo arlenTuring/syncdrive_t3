@@ -27,7 +27,14 @@ export const DAY_MINUTES = 24 * 60;
 
 export type RouteInfo = { routeId: string; routeCode: string | null; directionKey: string };
 
-export type TemplateSegment = { startMinute: number; endMinute: number; label: string; pphpd: number };
+export type TemplateSegment = {
+  startMinute: number;
+  endMinute: number;
+  label: string;
+  pphpd: number;
+  /** 時段屬性設定的目標班距（秒）；模板沒設就是 null */
+  headwaySeconds: number | null;
+};
 
 export type DepartureLead = { directionKey: string; atSecond: number };
 
@@ -88,6 +95,7 @@ export function templateSegments(templateBody: Record<string, unknown> | null): 
       endMinute: end,
       label: str(interval.name) ?? str(attr?.name) ?? '',
       pphpd: Number(attr?.capacityPphpd) || 0,
+      headwaySeconds: Number(attr?.headwaySeconds) > 0 ? Number(attr?.headwaySeconds) : null,
     });
   }
   return segments.sort((a, b) => a.startMinute - b.startMinute);
@@ -251,4 +259,11 @@ export function buildShiftCenterSummary(args: {
     remaining_line: pct >= 100 ? '' : `剩餘${remaining}班次`,
     shift_name: args.shiftName,
   };
+}
+
+/** 班距秒數 → 「MM:SS」；沒有設定時回「—」 */
+export function formatHeadway(seconds: number | null): string {
+  if (seconds == null || !(seconds > 0)) return '—';
+  const total = Math.round(seconds);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }

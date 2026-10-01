@@ -1,5 +1,5 @@
 import { getByPath } from '../../dashboard/utils/jsonPath';
-import { FIELD_PREVIEW_SAMPLES, normalizeValueFieldKey } from '../../dashboard/utils/widgetEditPreview';
+import { normalizeValueFieldKey } from '../../dashboard/utils/widgetEditPreview';
 
 export function readFieldFromRecord(
   data: Record<string, unknown> | null,
@@ -46,7 +46,6 @@ export function resolveVehicleTextDisplay(
   const formatted = formatFieldDisplay(readVehicleTextField(data, key));
   if (formatted) return formatted;
   if (!isEditMode) return '';
-  if (FIELD_PREVIEW_SAMPLES[key]) return FIELD_PREVIEW_SAMPLES[key];
   return `{${key}}`;
 }
 

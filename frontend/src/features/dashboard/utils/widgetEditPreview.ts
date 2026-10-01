@@ -1,72 +1,16 @@
 import { useEditMode } from '../context/EditModeContext';
 import type { ChildWidget, RouteStation } from '../types';
 
-/** 依 valueField 推斷的編輯預覽示範 */
-export const FIELD_PREVIEW_SAMPLES: Record<string, string> = {
-  category: '線控',
-  vehicle_code: 'PMS01',
-  message: '防鎖死煞車系統故障',
-  sub_label: 'PMS02',
-  severity: 'warning',
-  trip_code: 'S0000',
-  next_station: 'E2',
-  eta_remain: '00:30:00',
-  eta_delay: '+2分',
-  eta_label: '完成預估',
-  direction_label: '上行',
-  maint_type_label: '充電',
-  depart_time: '00:00',
-  end_time: '00:00',
-  badge_label: 'D0852',
-  segment_label: 'D12',
-  shift_key: 'SHIFT-01',
-  total_events: '12',
-  unprocessed_events: '3',
-  processed_events: '9',
-  total_shifts: '24',
-  completed_shifts: '18',
-  live_val: '856',
-  target_val: '1200',
-  avail_val: '200',
-  next_val: '920',
-  avail_hint: '可調度2輛',
-  next_hint: '08:53',
-  battery_level: '78',
-  speed: '32',
-  demo_speed: '17.1',
-  demo_load: '82',
-  alert_message: 'Warn msg',
-  status: 'RUNNING',
-  achievement_pct: '75',
-  achievement_line: '達成了 75%',
-  remaining_line: '剩餘9班次',
-  progress_pct: '68',
-  ontime_pct: '92.3',
-  ontime_badge: '準點率 92.3%',
-  total_count: '313',
-  completed_count: '53',
-  delayed_count: '1',
-  abnormal_count: '0',
-  cancelled_count: '0',
-  total_pill: '總共 313',
-  completed_pill: '完成 53',
-  mode_label: '正常營運',
-  mode_level: 'Level 1',
-  schedule_meta: '當前班表 執行於 00:00',
-  status_label: '進行中',
-  status_code: 'RUNNING',
-  schedule_name: '高運量班表',
-  reviewer_name: 'Jack',
-  period_1: '凌晨時段 班距 540 秒 運量 400 pphp',
-  period_2: '離峰時段 班距 360 秒 運量 600 pphp',
-  period_3: '尖峰時段 班距 180 秒 運量 1,200 pphp',
-  event_title: '降級運轉事件',
-  event_level: 'Level 2',
-  event_date: '2027.05.01',
-  event_time: '10:00:00',
-  empty_hint: '無更多事件',
-};
-
+/*
+ * 編輯模式的「沒有資料」顯示。
+ *
+ * 這裡原本有一張 FIELD_PREVIEW_SAMPLES：欄位名稱對到一個示範值（trip_code → S0000、
+ * eta_remain → 00:30:00、vehicle_code → PMS01…），還有 MOCK_SEGMENT_PREVIEW 等示範陣列。
+ * 元件綁了資料但沒拿到值時，編輯畫面就顯示那些示範值——看起來像真的，使用者沒辦法分辨
+ * 「資料正常」跟「資料根本沒接上」。
+ *
+ * 現在沒有資料就顯示欄位名稱（{trip_code}）或空狀態，外框角標寫「無資料」。
+ */
 const TYPE_PREVIEW_LABELS: Partial<Record<ChildWidget['type'], string>> = {
   'stat-card': 'KPI 預覽',
   gauge: '儀表預覽',
@@ -87,32 +31,11 @@ const TYPE_PREVIEW_LABELS: Partial<Record<ChildWidget['type'], string>> = {
   clock: '時鐘',
 };
 
-export const MOCK_SEGMENT_PREVIEW = [
-  { status: 'IN_SERVICE', pct: 36.4, count: 4 },
-  { status: 'MAINTENANCE', pct: 45.5, count: 5 },
-  { status: 'STANDBY', pct: 18.1, count: 2 },
-];
-
-export const MOCK_SLOT_PREVIEW = [
-  { label: '01', status: 'OCCUPIED' },
-  { label: '02', status: 'AVAILABLE' },
-  { label: '03', status: 'CHARGING' },
-  { label: '04', status: 'OCCUPIED' },
-  { label: '05', status: 'AVAILABLE' },
-  { label: '06', status: 'OCCUPIED' },
-];
-
-export const MOCK_ROUTE_STATIONS: RouteStation[] = [
-  { id: 'pv-0', name: '起點', value: 0 },
-  { id: 'pv-1', name: '中站', value: 50, remainPct: 42 },
-  { id: 'pv-2', name: '終點', value: 100 },
-];
-
-export const MOCK_DATABASE_PREVIEW = [
-  { col_a: '示範 A', col_b: '123' },
-  { col_a: '示範 B', col_b: '456' },
-  { col_a: '示範 C', col_b: '789' },
-];
+/** 編輯模式沒有資料時的空陣列（原本是示範資料，已移除；保留名稱讓呼叫端不用改形狀） */
+export const MOCK_SEGMENT_PREVIEW: { status: string; pct: number; count: number }[] = [];
+export const MOCK_SLOT_PREVIEW: { label: string; status: string }[] = [];
+export const MOCK_ROUTE_STATIONS: RouteStation[] = [];
+export const MOCK_DATABASE_PREVIEW: Record<string, unknown>[] = [];
 
 export function widgetHasDataBinding(w: {
   dataSourceId?: string;
@@ -172,11 +95,7 @@ export function resolveWidgetEditPreview(opts: {
   if (title && !isVariableTemplate(title)) return title;
 
   const field = normalizeValueFieldKey(opts.valueField);
-  if (field && FIELD_PREVIEW_SAMPLES[field]) {
-    return FIELD_PREVIEW_SAMPLES[field];
-  }
-
-  if (field) return `[${field}]`;
+  if (field) return `{${field}}`;
 
   if (opts.type && TYPE_PREVIEW_LABELS[opts.type]) {
     return TYPE_PREVIEW_LABELS[opts.type]!;
@@ -197,30 +116,21 @@ export function resolveNumericEditPreview(opts: {
     const n = Number(String(content).replace(/%$/, ''));
     if (!Number.isNaN(n)) return n;
   }
-  const field = opts.valueField?.trim();
-  if (field && FIELD_PREVIEW_SAMPLES[field]) {
-    const n = Number(String(FIELD_PREVIEW_SAMPLES[field]).replace(/%$/, ''));
-    if (!Number.isNaN(n)) return n;
-  }
+  // 沒有資料：停在最小值（空的量表／進度條），不放一個看起來像真的示範數字
   if (opts.fallback !== undefined) return opts.fallback;
-  const min = opts.min ?? 0;
-  const max = opts.max ?? 100;
-  return Math.round(min + (max - min) * 0.62);
+  return opts.min ?? 0;
 }
 
-/** 依元件標題／類型取得編輯預覽標籤（圖表、色塊外框等） */
+/** 編輯模式沒有資料時外框角標：寫明「無資料」與綁定的欄位 */
 export function resolveWidgetPreviewLabel(widget: {
   content?: string;
   title?: string;
   label?: string;
   type?: ChildWidget['type'];
+  valueField?: string;
 }): string {
-  return resolveWidgetEditPreview({
-    content: widget.content,
-    title: widget.title,
-    label: widget.label,
-    type: widget.type,
-  });
+  const field = normalizeValueFieldKey(widget.valueField);
+  return field ? `無資料 · ${field}` : '無資料';
 }
 
 export function useIsEditMode(): boolean {

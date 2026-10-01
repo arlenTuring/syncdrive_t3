@@ -312,7 +312,9 @@ export function GaugeWidget({ widget }: Props) {
       rawValue = Number(cell);
       hasValue = !Number.isNaN(rawValue);
     }
-  } else if (widget.valueField) {
+  } else if (widget.valueField && !(widget.mqttDataSourceId && widget.mqttTopic)) {
+    // 綁了 MQTT 就以 MQTT 為準：還沒收到訊息就顯示離線，不拿群組列裡的欄位（例如
+    // vehicle_monitor_demo 示範表的 demo_speed，沒資料時是 0）冒充即時值。
     const direct = variables[widget.valueField];
     if (direct !== undefined && direct !== null && direct !== '') {
       rawValue = Number(direct);

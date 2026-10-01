@@ -531,17 +531,24 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
 
   const sqlRow = data.data[0] ?? null;
 
+  // 綁了遙測 MQTT 就只認 MQTT；沒綁才退回群組列欄位。都沒有就顯示「—」，不顯示 0。
+  const useRowFallback = !widget.mqttTelemetryTopic;
   let speed = 0;
   let load = 0;
-  if (variables.demo_speed !== undefined && variables.demo_speed !== null) {
+  let speedFound = false;
+  if (useRowFallback && variables.demo_speed !== undefined && variables.demo_speed !== null && String(variables.demo_speed) !== '') {
     speed = Number(variables.demo_speed);
+    speedFound = true;
   }
-  if (variables.demo_load !== undefined && variables.demo_load !== null) {
+  if (useRowFallback && variables.demo_load !== undefined && variables.demo_load !== null) {
     load = Number(variables.demo_load);
   }
   if (telPayload && widget.telemetrySpeedPath) {
     const v = getByPath(telPayload, widget.telemetrySpeedPath);
-    if (v !== undefined && v !== null) speed = Number(v);
+    if (v !== undefined && v !== null) {
+      speed = Number(v);
+      speedFound = true;
+    }
   }
   if (telPayload && widget.telemetryBatteryPath) {
     const v = getByPath(telPayload, widget.telemetryBatteryPath);
@@ -575,18 +582,15 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
   const alertField = widget.alertMessageField ?? 'alert_message';
   const overall = String(
     healthPayload
-      ? (healthPayload[healthField] ?? getByPath(healthPayload, healthField) ?? 'OK')
-      : (variables[healthField] ?? 'OK'),
+      ? (healthPayload[healthField] ?? getByPath(healthPayload, healthField) ?? '')
+      : (variables[healthField] ?? ''),
   ).toUpperCase();
   const alertMessage = String(
     healthPayload
       ? (healthPayload[alertField] ?? '')
       : (variables[alertField] ?? ''),
   ).trim();
-  const speedDash =
-    variables.demo_speed === null
-    || variables.demo_speed === undefined
-    || String(variables.demo_speed) === '';
+  const speedDash = !speedFound;
   const borderColor =
     overall === 'ERROR' ? '#ef4444' : overall === 'WARNING' ? '#fb923c' : 'rgba(45,212,191,0.55)';
 
@@ -602,10 +606,10 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
     })
     : title;
   const renderSpeed = isEditPreview
-    ? resolveNumericEditPreview({ valueField: 'speed', fallback: 32, max: 80 })
+    ? resolveNumericEditPreview({ valueField: 'speed' })
     : speed;
   const renderLoad = isEditPreview
-    ? resolveNumericEditPreview({ valueField: 'battery_level', fallback: 78 })
+    ? resolveNumericEditPreview({ valueField: 'battery_level' })
     : load;
   const renderTripCode = isEditPreview && !tripCode.trim()
     ? resolveWidgetEditPreview({ valueField: 'trip_code', type: 'unit-telemetry-card' })
@@ -613,7 +617,7 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
   const renderSeg = isEditPreview && segDisplay === '—'
     ? resolveWidgetEditPreview({ valueField: 'segment_label', type: 'unit-telemetry-card' })
     : segDisplay;
-  const renderSpeedDash = isEditPreview ? false : speedDash;
+  const renderSpeedDash = speedDash;
   const previewWrap = (node: React.ReactNode) => (
     <WidgetEditPreviewOutline
       active={isEditPreview}

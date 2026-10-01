@@ -29,9 +29,11 @@ import { DemoSimulationProvider } from './context/DemoSimulationContext';
 import { VehicleFleetMqttProvider } from './context/VehicleFleetMqttContext';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 import {
-  buildGroupIndexPreviewVariables,
+  buildGroupPreviewVariables,
   computeSubcanvasEditPlane,
 } from './utils/groupTemplateContext';
+import { GroupPreviewRowsProbe, type GroupPreviewRowsState } from './elements/GroupPreviewRowsProbe';
+import { GroupPreviewRowPicker } from './components/GroupPreviewRowPicker';
 import {
   TEMPLATE_CANVAS_DEFAULT,
   TEMPLATE_CANVAS_NORMAL,
@@ -578,10 +580,43 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   }
 
   const subcanvasEdit = editingGroup ? computeSubcanvasEditPlane(editingGroup) : null;
-  const groupPreviewVariables = useMemo(
-    () => (editingGroup ? buildGroupIndexPreviewVariables(editingGroup) : {}),
-    [editingGroup?.id, editingGroup?.variableName, editingGroup?.groupVariableMode, editingGroup?.iteratorField],
+  /*
+   * 子畫布／樣板編輯時的預覽資料：群組真實資料（跟執行畫面同一條資料管線）的第 N 列。
+   * 沒有資料就沒有列，畫布上的欄位顯示 {欄位名}，不再補示範值。
+   */
+  const previewGroup = isEditingTemplate ? editingTemplateGroup : (editingGroup ?? null);
+  const previewProbeKey = previewGroup ? `${previewGroup.id}:${isEditingTemplate ? editingTemplateId ?? '' : ''}` : '';
+  // 換群組／換樣板時，前一個群組的列與選到第幾列都不算數（依 key 對，不在 effect 裡清）
+  const [previewRowsByKey, setPreviewRowsByKey] = useState<{ key: string; state: GroupPreviewRowsState }>({
+    key: '',
+    state: { rows: [], loading: true, error: null },
+  });
+  const previewRowsState: GroupPreviewRowsState = previewRowsByKey.key === previewProbeKey
+    ? previewRowsByKey.state
+    : { rows: [], loading: true, error: null };
+  const setPreviewRowsState = useCallback(
+    (state: GroupPreviewRowsState) => setPreviewRowsByKey({ key: previewProbeKey, state }),
+    [previewProbeKey],
   );
+  const [previewRowPick, setPreviewRowPick] = useState<{ key: string; index: number }>({ key: '', index: 0 });
+  const previewRowIndex = previewRowPick.key === previewProbeKey ? previewRowPick.index : 0;
+  const setPreviewRowIndex = useCallback(
+    (index: number) => setPreviewRowPick({ key: previewProbeKey, index }),
+    [previewProbeKey],
+  );
+  const previewRow = previewRowsState.rows[Math.min(previewRowIndex, previewRowsState.rows.length - 1)] ?? null;
+  const groupPreviewVariables = useMemo(
+    () => (previewGroup ? buildGroupPreviewVariables(previewGroup, previewRow, previewRowIndex) : {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [previewGroup?.id, previewGroup?.variableName, previewGroup?.groupVariableMode, previewGroup?.iteratorField, previewRow, previewRowIndex],
+  );
+  const previewRowPicker = previewGroup ? (
+    <GroupPreviewRowPicker
+      state={previewRowsState}
+      rowIndex={previewRowIndex}
+      onChangeRowIndex={setPreviewRowIndex}
+    />
+  ) : null;
 
   const recordPropertyHistory = useCallback(() => {
     if (propertyHistoryRecordedRef.current) return;
@@ -1179,6 +1214,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             ) : (
               <span className="text-xs font-bold text-purple-300">{editingTemplateDef?.name ?? ''}</span>
             )}
+            {previewRowPicker}
           </>
         ) : editingGroup ? (
           <>
@@ -1200,6 +1236,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <div className="text-sm font-bold text-cyan-400 truncate max-w-[200px]">
               {t('dashboard.subcanvas', { label: editingGroup.label })}
             </div>
+            {previewRowPicker}
             <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-zinc-700 bg-zinc-800/80 p-0.5">
               <button
                 type="button"
@@ -1409,7 +1446,15 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
       {/* ── 主要內容 ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <VariableProvider variables={editingGroup ? groupPreviewVariables : {}}>
+        {previewGroup && (
+          <GroupPreviewRowsProbe
+            key={previewProbeKey}
+            group={previewGroup}
+            templateId={isEditingTemplate ? editingTemplateId : null}
+            onChange={setPreviewRowsState}
+          />
+        )}
+        <VariableProvider variables={previewGroup ? groupPreviewVariables : {}}>
         {editingVehicleContainer && editingVehicleContainerWidget ? (
           <div className="flex min-h-0 flex-1">
             <VehicleEditorEmbed
@@ -1584,6 +1629,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           editingGroupLabel={editingGroup?.label}
           editingGroup={editingGroup}
           dualGateSettingsActive={dualGatePanel}
+          dataContextGroup={previewGroup}
           selectedElement={panelSelectedElement}
           selectedChild={panelSelectedChild}
           selectedChildCount={activeSelectedChildIds.length}

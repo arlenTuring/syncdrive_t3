@@ -1,5 +1,5 @@
 import type { VariableMap } from '../VariableContext';
-import { maintTypeLabelColor, maintTypeLabelFromSlot } from './maintenanceTaskModel';
+import { maintTypeLabelColor } from './maintenanceTaskModel';
 
 /** 正線班次：路線代號（1–3 大寫字母）+ 4 位時分，例如 ST1450、TN1415。 */
 const SHIFT_TRIP_CODE_RE = /^[A-Z]{1,3}\d{4}$/;
@@ -92,17 +92,6 @@ function isMaintenanceOrder(ctx: Record<string, unknown>): boolean {
   return pri === ORDER_PRIORITY_MAINT;
 }
 
-const MAINT_YARD_SLOT_RE = /^[EPWHMP]\d/i;
-
-function inferMaintLabelFromSlot(ctx: Record<string, unknown>, variables: VariableMap): string {
-  const slot =
-    readStr(ctx, 'yard_slot_id')
-    || readStr(variables, 'yard_slot_id')
-    || readStr(variables, 'segment_label')
-    || readStr(variables, 'next_station');
-  if (!slot || !MAINT_YARD_SLOT_RE.test(slot)) return '';
-  return maintTypeLabelFromSlot(slot);
-}
 
 function maintenanceBadgeFromLabel(
   ctx: Record<string, unknown>,
@@ -212,11 +201,8 @@ export function resolveVehicleMonitorBadge(
     }
   }
 
-  const inferred = inferMaintLabelFromSlot(ctx, variables);
-  if (inferred) {
-    return maintenanceBadgeFromLabel(ctx, inferred);
-  }
-
+  // 沒有訂單、沒有任務標籤時不顯示徽章。原本會看車停在哪一格、用格位代號開頭字母
+  // （E→充電、W→洗車…）猜任務類型——那是猜的，不是任何資料來源說的。
   return EMPTY_BADGE;
 }
 
