@@ -86,7 +86,7 @@ export function clearDashboardCanvasCache(): boolean {
   return hadDashboardCache
 }
 
-/** 寫入內建 3840×1080 範例大屏（由應用程式設定「還原兩個圖台範例」呼叫） */
+/** 寫入內建 3840×1080 範例大屏。 */
 export function restoreDashboardExampleToLocalStorage(): boolean {
   try {
     const demo = {

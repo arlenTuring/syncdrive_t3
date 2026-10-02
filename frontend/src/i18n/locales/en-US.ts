@@ -93,12 +93,11 @@ const enUS: DeepStringify<typeof zhTW> = {
     renamePageHint: '{{name}} (double-click to rename)',
     removePage: 'Remove page',
     removePageAria: 'Remove {{name}}',
-    appSettings: 'App settings',
     renamePageInput: 'Rename page',
     attachDashboard: {
       title: 'Add page',
       emptyTitle: 'No dashboards available to attach',
-      emptyHint: 'Create or import a plane in Dashboard Management first',
+      emptyHint: 'Create or import a plane in System Foundation → Advanced Management → Dashboard Management first',
       selectPlane: 'Load dashboard plane',
       pageName: 'Page name',
       pageNamePlaceholder: 'e.g. Shift deployment overview',
@@ -117,6 +116,12 @@ const enUS: DeepStringify<typeof zhTW> = {
   systemFoundation: {
     tabHealth: 'System Health',
     tabSettings: 'System Settings',
+    tabAdvanced: 'Advanced Management',
+    advanced: {
+      dashboard: 'Dashboard Management',
+      data: 'Data Management',
+      dataPending: 'Data management will be enabled in the next stage',
+    },
     refreshNow: 'Refresh now',
     liveResources: 'Live resource status',
     filterThresholds: 'Monitoring thresholds',

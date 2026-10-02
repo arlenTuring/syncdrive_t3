@@ -19,12 +19,16 @@ import { HealthTrendChart } from './components/HealthTrendChart'
 import { ThresholdSettingsDialog } from './components/ThresholdSettingsDialog'
 import { SystemFoundationSettingsPanel } from './components/SystemFoundationSettingsPanel'
 import {
+  AdvancedManagementPanel,
+  type AdvancedManagementSection,
+} from './components/AdvancedManagementPanel'
+import {
   createDefaultThresholdSettings,
   resolveWarnThreshold,
   type MonitoringThresholdSettings,
 } from './thresholdSettings'
 
-type TabKey = 'health' | 'settings'
+type TabKey = 'health' | 'settings' | 'advanced'
 
 const RANGE_OPTIONS: Array<{ id: HealthHistoryRange; labelKey: string }> = [
   { id: '1h', labelKey: 'systemFoundation.range1h' },
@@ -42,9 +46,15 @@ function fmtTemp(n: number | null): string {
   return `${Math.round(n)} °C`
 }
 
-export function SystemFoundationPage() {
+export function SystemFoundationPage({
+  initialTab = 'health',
+  initialAdvancedSection = 'dashboard',
+}: {
+  initialTab?: TabKey
+  initialAdvancedSection?: AdvancedManagementSection
+}) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<TabKey>('health')
+  const [tab, setTab] = useState<TabKey>(initialTab)
   const [range, setRange] = useState<HealthHistoryRange>('6h')
   const [snapshot, setSnapshot] = useState<SystemHealthSnapshot | null>(null)
   const [points, setPoints] = useState<HistoryPoint[]>([])
@@ -89,7 +99,7 @@ export function SystemFoundationPage() {
   return (
     <div
       className={`flex h-full min-h-0 flex-col gap-4 p-5 ${
-        tab === 'settings' ? 'overflow-hidden' : 'overflow-auto'
+        tab === 'health' ? 'overflow-auto' : 'overflow-hidden'
       }`}
     >
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800/80">
@@ -98,6 +108,7 @@ export function SystemFoundationPage() {
             [
               { id: 'health' as const, label: t('systemFoundation.tabHealth') },
               { id: 'settings' as const, label: t('systemFoundation.tabSettings') },
+              { id: 'advanced' as const, label: t('systemFoundation.tabAdvanced') },
             ]
           ).map((item) => {
             const active = tab === item.id
@@ -133,7 +144,9 @@ export function SystemFoundationPage() {
         ) : null}
       </div>
 
-      {tab === 'settings' ? (
+      {tab === 'advanced' ? (
+        <AdvancedManagementPanel initialSection={initialAdvancedSection} />
+      ) : tab === 'settings' ? (
         <SystemFoundationSettingsPanel />
       ) : (
         <>

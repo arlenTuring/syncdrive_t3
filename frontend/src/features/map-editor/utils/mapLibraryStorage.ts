@@ -263,7 +263,7 @@ export async function refreshStaleBuiltinMapEntries(
 
 /**
  * 讀取地圖庫。僅在 localStorage 完全空白時種子內建範例；
- * 刪除項目後不會自動補回（請用應用程式設定「還原圖台範例」重載內建地圖）。
+ * 刪除項目後不會自動補回；需要時請重新匯入或建立地圖。
  */
 /**
  * 從後端把地圖庫補回來。

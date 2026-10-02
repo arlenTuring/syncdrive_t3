@@ -38,7 +38,6 @@ const VTMS_MARK_SRC = '/logo.svg';
 type ScheduleModuleSidebarProps = {
   activeView: string;
   onViewChange: (view: ShellView | string) => void;
-  onOpenSettings?: () => void;
   adminMode?: boolean;
   moduleDashboardPages?: ModuleDashboardPage[];
   onAddModuleDashboard?: (moduleId: string) => void;
@@ -120,7 +119,6 @@ function VtmsMark({ className }: { className?: string }) {
 export function ScheduleModuleSidebar({
   activeView,
   onViewChange,
-  onOpenSettings,
   adminMode = false,
   moduleDashboardPages = [],
   onAddModuleDashboard,
@@ -492,34 +490,6 @@ export function ScheduleModuleSidebar({
           collapsed ? 'px-1.5' : 'px-2'
         }`}
       >
-        {onOpenSettings ? (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className={`flex w-full items-center rounded-lg text-[14px] text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 ${
-              collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2.5'
-            }`}
-            title={t('shell.appSettings')}
-          >
-            <Settings className="size-[18px] shrink-0" />
-            {!collapsed ? <span>{t('shell.appSettings')}</span> : null}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => onViewChange('dashboard')}
-          className={`flex w-full items-center rounded-lg text-[14px] transition ${
-            collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2.5'
-          } ${
-            activeView === 'dashboard'
-              ? 'bg-[#1a3a5c] font-medium text-white'
-              : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
-          }`}
-          title={t('nav.items.dashboard')}
-        >
-          <LayoutDashboard className="size-[18px] shrink-0" />
-          {!collapsed ? <span>{t('nav.items.dashboard')}</span> : null}
-        </button>
         <button
           type="button"
           disabled
