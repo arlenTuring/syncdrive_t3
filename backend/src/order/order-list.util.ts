@@ -154,6 +154,6 @@ export function matchesTab(order: OperationOrder, tab: ShiftTab): boolean {
     return lineKind === 'MAINTENANCE';
   }
   if (lineKind === 'MAINTENANCE') return false;
-  if (lineKind === 'MAINLINE' || lineKind === 'TEST') return true;
+  if (lineKind === 'MAINLINE' || lineKind === 'TRANSITION' || lineKind === 'TEST') return true;
   return SHIFT_TRIP_PATTERN.test(order.tripCode ?? '');
 }

@@ -110,10 +110,12 @@ export function needsShiftPanelsSimulationSqlFix(plane: DashboardPlane): boolean
       if (sql.includes('rs.remain_pct')) return true;
       if (sql.includes("'T3' AS st_b")) return true;
       if (!sql.includes('station_display_name')) return true;
+      if (!sql.includes('business_kind')) return true;
     }
     if (label === '整備班表') {
-      if (!sql.includes("scheduleOutput'->'plan'->'timelines")) return true;
-      if (!sql.includes('current_blocks')) return true;
+      if (!sql.includes('FROM operation_orders o')) return true;
+      if (sql.includes("'PMS' || LPAD(row_no")) return true;
+      if (sql.includes("'進行中' AS status_label")) return true;
     }
   }
   return false;
@@ -232,13 +234,13 @@ function patchVehicleDistributionSegmentBar(children: ChildWidget[]): ChildWidge
   });
 }
 
-/** 整備班表卡：故障告警邏輯未上線前，外框／狀態徽章預設改為綠色 */
+/** 整備班表卡：沒有實際訂單狀態時使用中性色，不假造正常或進行中。 */
 function patchMaintenanceCardTemplateDefaults(children: ChildWidget[]): ChildWidget[] {
   return children.map((child) => {
     if (child.type === 'color-block') {
       const cb = child as ColorBlockWidget;
       if (cb.bindBorderColorVar === 'card_border_color' && cb.borderColor === '#FB2C36') {
-        return { ...cb, borderColor: '#009966' };
+        return { ...cb, borderColor: '#52525b' };
       }
     }
     if (child.type === 'status-badge') {
@@ -246,8 +248,8 @@ function patchMaintenanceCardTemplateDefaults(children: ChildWidget[]): ChildWid
       if (sb.variableBgKey === 'status_bg' && sb.defaultTextColor === '#FF6467') {
         return {
           ...sb,
-          defaultBgColor: 'rgba(0, 212, 146, 0.3)',
-          defaultTextColor: '#00BC7D',
+          defaultBgColor: '#27272a',
+          defaultTextColor: '#a1a1aa',
         };
       }
     }
@@ -261,7 +263,34 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
     ...plane,
     elements: plane.elements.map((el) => {
       if (el.label === '正線班次' && el.isGroup) {
-        return { ...el, sqlQuery: MAINLINE_SHIFTS_SQL, refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL };
+        return {
+          ...el,
+          sqlQuery: MAINLINE_SHIFTS_SQL,
+          refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
+          genericGroup: {
+            enabled: true,
+            sources: [{
+              id: 'shift-roster',
+              label: '正線與過渡班次',
+              dataSourceId: el.dataSourceId,
+              sqlQuery: MAINLINE_SHIFTS_SQL,
+              refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
+              refreshMode: 'event',
+              invalidateTags: ['table:operation_orders', 'domain:mainline_shifts'],
+              itemIdField: 'shift_key',
+            }],
+            itemIdField: 'shift_key',
+            arrangeMode: 'priority',
+            defaultPriority: 0,
+            priorityRules: [
+              { id: 'shift-emergency', priority: 1000, conditions: [{ field: 'order_status', operator: 'eq', value: 'FAULTED' }] },
+              { id: 'shift-mainline', priority: 300, conditions: [{ field: 'business_kind', operator: 'eq', value: 'MAINLINE' }] },
+              { id: 'shift-transition', priority: 200, conditions: [{ field: 'business_kind', operator: 'eq', value: 'TRANSITION' }] },
+              { id: 'shift-maintenance', priority: 100, conditions: [{ field: 'business_kind', operator: 'eq', value: 'MAINTENANCE' }] },
+            ],
+            capacityConfig: { capacity: el.slotCount ?? 6 },
+          },
+        };
       }
       if (el.label === '整備班表' && el.isGroup) {
         return {
@@ -389,8 +418,8 @@ export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
     (vehicleStatus.refreshInterval ?? 0) === 0
     // 舊版查詢沒有健康資料時一律補 'OK'，畫面看起來全部正常，其實是沒資料
     || (vehicleStatus.sqlQuery ?? '').includes("COALESCE(m.overall_health, 'OK')")
-    || !(vehicleStatus.sqlQuery ?? '').includes("scheduleOutput'->'plan'->'timelines")
-    || !(vehicleStatus.sqlQuery ?? '').includes('position_updated_at')
+    || !(vehicleStatus.sqlQuery ?? '').includes('FROM operation_orders o')
+    || (vehicleStatus.sqlQuery ?? '').includes("scheduleOutput'->'plan'->'timelines")
   )) {
     return true;
   }

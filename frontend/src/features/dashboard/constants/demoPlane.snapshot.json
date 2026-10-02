@@ -1402,7 +1402,30 @@
       "refreshInterval": 0,
       "refreshMode": "event",
       "variableName": "row",
-      "iteratorField": "shift_key"
+      "iteratorField": "shift_key",
+      "genericGroup": {
+        "enabled": true,
+        "sources": [{
+          "id": "shift-roster",
+          "label": "正線與過渡班次",
+          "dataSourceId": "default-internal",
+          "sqlQuery": "SELECT * FROM operation_orders WHERE false",
+          "refreshInterval": 30,
+          "refreshMode": "event",
+          "invalidateTags": ["table:operation_orders", "domain:mainline_shifts"],
+          "itemIdField": "shift_key"
+        }],
+        "itemIdField": "shift_key",
+        "arrangeMode": "priority",
+        "defaultPriority": 0,
+        "priorityRules": [
+          { "id": "shift-emergency", "priority": 1000, "conditions": [{ "field": "order_status", "operator": "eq", "value": "FAULTED" }] },
+          { "id": "shift-mainline", "priority": 300, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "MAINLINE" }] },
+          { "id": "shift-transition", "priority": 200, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "TRANSITION" }] },
+          { "id": "shift-maintenance", "priority": 100, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "MAINTENANCE" }] }
+        ],
+        "capacityConfig": { "capacity": 6 }
+      }
     },
     {
       "id": "a5c5qox",

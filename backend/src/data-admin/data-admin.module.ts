@@ -8,9 +8,10 @@ import { LiveDataResetService } from './live-data-reset.service';
 import { RedisModule } from '../redis/redis.module';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { DemoSimulationModule } from '../demo/demo-simulation.module';
+import { DispatchModule } from '../dispatch/dispatch.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DataAdminAudit]), RedisModule, MqttModule, DemoSimulationModule],
+  imports: [TypeOrmModule.forFeature([DataAdminAudit]), RedisModule, MqttModule, DemoSimulationModule, DispatchModule],
   controllers: [DataAdminController],
   providers: [DataAdminService, DataAdminGuard, LiveDataResetService],
 })

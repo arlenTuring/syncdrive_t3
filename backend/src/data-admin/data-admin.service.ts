@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { DataAdminAudit } from '../database/entities/data-admin-audit.entity';
 import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
+import { requireSingleStatement } from './single-statement';
 
 export type AdminQueryMode = 'read' | 'write';
 
@@ -18,10 +19,6 @@ export type ExecuteAdminQuery = {
 type QueryContext = { operatorId: string; sourceIp?: string };
 
 const SENSITIVE_FUNCTIONS = /\b(pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|dblink|copy)\b/i;
-
-export function stripTerminalSemicolon(sql: string): string {
-  return sql.trim().replace(/;\s*$/, '');
-}
 
 export function planContainsWrite(plan: unknown): boolean {
   if (!plan || typeof plan !== 'object') return false;
@@ -151,12 +148,17 @@ export class DataAdminService {
   }
 
   async execute(input: ExecuteAdminQuery, context: QueryContext) {
-    const sql = stripTerminalSemicolon(input.sql ?? '');
-    if (!sql) throw new BadRequestException('SQL 不可為空');
+    const requestId = input.requestId?.trim() || randomUUID();
+    let sql: string;
+    try {
+      sql = requireSingleStatement(input.sql ?? '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException({ message, requestId, database: { committed: false, rolledBack: false } });
+    }
     if (SENSITIVE_FUNCTIONS.test(sql)) throw new BadRequestException('SQL 包含禁止使用的伺服器函數');
     const limit = Math.min(Math.max(Math.trunc(input.limit ?? 200), 1), 1000);
     const timeoutMs = Math.min(Math.max(Math.trunc(input.timeoutMs ?? 8000), 250), 30000);
-    const requestId = input.requestId?.trim() || randomUUID();
     if (this.active.has(requestId)) throw new BadRequestException('requestId 已在執行中');
 
     const runner = this.dataSource.createQueryRunner();
@@ -172,6 +174,7 @@ export class DataAdminService {
 
       const explained = await runner.query(`EXPLAIN (FORMAT JSON) ${sql}`);
       const plan = explained[0]?.['QUERY PLAN']?.[0]?.Plan;
+      if (!plan) throw new BadRequestException(`無法解析 SQL 執行計畫（request ID：${requestId}）`);
       const isWrite = planContainsWrite(plan);
       const affectedRelations = [...collectPlanRelations(plan)];
       if (input.mode === 'write' && !isWrite) {
@@ -188,16 +191,26 @@ export class DataAdminService {
       const truncated = input.mode === 'read' && records.length > limit;
       const rows = truncated ? records.slice(0, limit) : records;
       await runner.commitTransaction();
+      const warnings: string[] = [];
       if (input.mode === 'write') {
-        const tags = affectedRelations.map((name) => `table:${name}`);
-        this.invalidation.emit(tags, 'data_admin_write');
-        if (affectedRelations.includes('operation_orders')) {
-          this.invalidation.emitOrderLifecycle(undefined, [DS_TAGS.EVENT_CENTER]);
+        try {
+          const tags = affectedRelations.map((name) => `table:${name}`);
+          this.invalidation.emit(tags, 'data_admin_write');
+          if (affectedRelations.includes('operation_orders')) {
+            this.invalidation.emitOrderLifecycle(undefined, [DS_TAGS.EVENT_CENTER]);
+          }
+        } catch (error) {
+          warnings.push(`資料已提交，但更新通知失敗：${error instanceof Error ? error.message : String(error)}`);
         }
       }
-      await this.writeAudit(context, requestId, input.mode, sql, 'SUCCESS', rows.length, null);
+      try {
+        await this.writeAudit(context, requestId, input.mode, sql, 'SUCCESS', rows.length, null);
+      } catch (error) {
+        warnings.push(`資料已提交，但稽核紀錄失敗：${error instanceof Error ? error.message : String(error)}`);
+      }
       return {
-        requestId,
+        requestId, operation: input.mode === 'write' ? '執行 SQL（寫入）' : '執行 SQL（唯讀）',
+        startedAt, finishedAt: Date.now(), database: { committed: true, rolledBack: false }, warnings,
         rows,
         rowCount: rows.length,
         affected: queryResult.affected ?? rows.length,
@@ -206,10 +219,17 @@ export class DataAdminService {
         durationMs: Date.now() - startedAt,
       };
     } catch (error) {
-      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      let rolledBack = false;
+      if (runner.isTransactionActive) {
+        await runner.rollbackTransaction();
+        rolledBack = true;
+      }
       const message = error instanceof Error ? error.message : String(error);
-      await this.writeAudit(context, requestId, input.mode, sql, 'FAILED', null, message);
-      throw error;
+      await this.writeAudit(context, requestId, input.mode, sql, 'FAILED', null, message).catch(() => undefined);
+      throw new BadRequestException({
+        message: `SQL 執行失敗，本次資料變更${rolledBack ? '已回滾' : '未提交'}（request ID：${requestId}）`,
+        requestId, reason: message, database: { committed: false, rolledBack },
+      });
     } finally {
       this.active.delete(requestId);
       await runner.release();

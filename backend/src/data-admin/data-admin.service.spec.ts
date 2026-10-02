@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import type { DataSource, QueryRunner, Repository } from 'typeorm';
 import { DataAdminAudit } from '../database/entities/data-admin-audit.entity';
-import { DataAdminService, planContainsWrite, stripTerminalSemicolon } from './data-admin.service';
+import { DataAdminService, planContainsWrite } from './data-admin.service';
 
 const invalidation = { emit: jest.fn(), emitOrderLifecycle: jest.fn() };
 
@@ -11,20 +11,14 @@ describe('DataAdminService SQL safeguards', () => {
     expect(planContainsWrite({ 'Node Type': 'Seq Scan' })).toBe(false);
   });
 
-  it('only removes one terminal semicolon and leaves multiple statements for PostgreSQL to reject', () => {
-    expect(stripTerminalSemicolon('SELECT 1;')).toBe('SELECT 1');
-    expect(stripTerminalSemicolon('SELECT 1; DELETE FROM orders;')).toBe('SELECT 1; DELETE FROM orders');
-  });
-
-  it('rolls back when EXPLAIN rejects multiple statements', async () => {
+  it('rejects multiple statements before opening a transaction', async () => {
     const runner = {
       connect: jest.fn(),
       startTransaction: jest.fn(),
       query: jest.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ pid: 123 }])
-        .mockRejectedValueOnce(new Error('cannot insert multiple commands into a prepared statement')),
+        .mockResolvedValueOnce([{ pid: 123 }]),
       commitTransaction: jest.fn(),
       rollbackTransaction: jest.fn(),
       release: jest.fn(),
@@ -40,8 +34,9 @@ describe('DataAdminService SQL safeguards', () => {
     await expect(service.execute(
       { sql: 'SELECT 1; DELETE FROM operation_orders', mode: 'read' },
       { operatorId: 'supervisor' },
-    )).rejects.toThrow('multiple commands');
-    expect(runner.rollbackTransaction).toHaveBeenCalledTimes(1);
+    )).rejects.toThrow('一次只能執行一個 SQL statement');
+    expect(runner.connect).not.toHaveBeenCalled();
+    expect(runner.rollbackTransaction).not.toHaveBeenCalled();
     expect(runner.commitTransaction).not.toHaveBeenCalled();
   });
 

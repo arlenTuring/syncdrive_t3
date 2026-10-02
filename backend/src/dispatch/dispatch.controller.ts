@@ -95,11 +95,11 @@ export class DispatchController {
   @ApiOperation({
     summary: '線上開關',
     description:
-      '停用時保留既有訂單，只是不再發新的。重啟後回到 DISPATCH_ENABLED 的值。',
+      '停用時保留既有訂單，只是不再發新的。狀態保存於資料庫，重啟後不會自行恢復。',
   })
-  setEnabled(@Body() body: { enabled?: boolean }): Record<string, unknown> {
+  async setEnabled(@Body() body: { enabled?: boolean }): Promise<Record<string, unknown>> {
     const enabled = body?.enabled !== false;
-    this.engine.setEnabled(enabled);
+    await this.engine.setEnabled(enabled);
     return { enabled };
   }
 }

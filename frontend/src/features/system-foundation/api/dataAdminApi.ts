@@ -20,7 +20,8 @@ async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message = Array.isArray(body.message) ? body.message.join('、') : body.message
-    throw new Error(message || `資料管理請求失敗（${response.status}）`)
+    const suffix = [body.reason, body.requestId ? `request ID：${body.requestId}` : ''].filter(Boolean).join('；')
+    throw new Error(`${message || `資料管理請求失敗（${response.status}）`}${suffix ? `；${suffix}` : ''}`)
   }
   return body as T
 }
@@ -64,6 +65,11 @@ export type DataAdminResult = {
   truncated?: boolean
   affected?: number
   durationMs?: number
+  operation?: string
+  startedAt?: number
+  finishedAt?: number
+  database?: { committed: boolean; rolledBack: boolean }
+  warnings?: string[]
 }
 
 export type OrderCleanupPreview = {
@@ -91,11 +97,19 @@ export type LiveResetPreview = {
 }
 
 export type LiveResetResult = {
+  requestId?: string
+  status?: 'completed' | 'partial' | 'failed'
+  operation?: string
+  startedAt?: number
+  finishedAt?: number
   vehicleCodes: string[]
   paused?: boolean
   resumed?: boolean
   note?: string
-  steps?: Array<{ id: string; status: 'completed' | 'failed' | 'skipped'; detail: string }>
+  database?: { committed: boolean; rolledBack: boolean }
+  dispatchPaused?: boolean
+  liveInputPaused?: boolean
+  steps?: Array<{ id: string; status: 'completed' | 'failed' | 'skipped' | 'not_run'; detail: string }>
 }
 
 export async function fetchLiveResetPreview(account: DemoAccount) {

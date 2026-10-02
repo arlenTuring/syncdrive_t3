@@ -102,9 +102,6 @@ export function DataManagementPanel() {
       const preview = await fetchLiveResetPreview(account)
       setLiveResetPreview(preview)
       setLiveResetScope(preview.vehicleCodes.join(', '))
-      setSql(preview.sql)
-      setMode('write')
-      setResult(null)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     }
@@ -115,9 +112,10 @@ export function DataManagementPanel() {
   }
 
   async function runLiveReset() {
-    if (!window.confirm('將依預覽分步清除所選範圍的即時測試資料，並保持來源暫停。是否繼續？')) return
+    if (!window.confirm('將停用調度與即時寫入，並清除所選範圍的訂單、明細、遙測及快照；班表定義會保留。是否繼續？')) return
     setLoading(true)
     setError('')
+    setLiveResetResult(null)
     try {
       setLiveResetResult(await executeLiveReset(account, resetScope()))
     } catch (caught) {
@@ -154,6 +152,7 @@ export function DataManagementPanel() {
     setActiveRequestId(requestId)
     setLoading(true)
     setError('')
+    setResult(null)
     try {
       setResult(await executeDataAdminSql(account, { sql, mode, requestId }))
     } catch (caught) {
@@ -242,9 +241,9 @@ export function DataManagementPanel() {
           </div>
         )}
         <div className="shrink-0 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs">
-          <div className="flex items-center gap-2"><strong>重置即時測試資料</strong><button type="button" onClick={() => void previewLiveReset()} className="rounded border border-sky-800 px-2 py-1 text-sky-300">產生預覽與 SQL</button>{liveResetPreview && <><button type="button" disabled={loading} onClick={() => void runLiveReset()} className="rounded border border-rose-800 px-2 py-1 text-rose-300">執行分步重置</button><button type="button" onClick={() => void resumeLiveInputs()} className="rounded border border-emerald-800 px-2 py-1 text-emerald-300">恢復接收</button></>}</div>
-          {liveResetPreview && <div className="mt-2 space-y-1 text-zinc-400"><label className="block">車輛範圍<input value={liveResetScope} onChange={(event) => setLiveResetScope(event.target.value)} className="ml-2 w-2/3 rounded border border-zinc-700 bg-black px-2 py-1" /></label><div>非 SQL 操作：{liveResetPreview.actions.join(' → ')}</div><div>Redis：{liveResetPreview.redisKeys.length} 個明確 key；Broker Topic：{liveResetPreview.mqttTopics.length} 個（未確認 retained 時不清除）</div><div className="text-amber-300">{liveResetPreview.warnings.join('；')}</div><div>保留：{liveResetPreview.preserved.join('、')}</div></div>}
-          {liveResetResult?.steps && <div className="mt-2 space-y-1">{liveResetResult.steps.map((step) => <div key={step.id} className={step.status === 'failed' ? 'text-rose-300' : step.status === 'skipped' ? 'text-amber-300' : 'text-emerald-300'}>{step.id}：{step.status} — {step.detail}</div>)}</div>}
+          <div className="flex items-center gap-2"><strong>完整重置測試資料</strong><button type="button" onClick={() => void previewLiveReset()} className="rounded border border-sky-800 px-2 py-1 text-sky-300">檢查作用範圍</button>{liveResetPreview && <><button type="button" disabled={loading} onClick={() => void runLiveReset()} className="rounded border border-rose-800 px-2 py-1 text-rose-300">執行完整重置</button><button type="button" onClick={() => void resumeLiveInputs()} className="rounded border border-emerald-800 px-2 py-1 text-emerald-300">只恢復 MQTT 接收</button></>}</div>
+          {liveResetPreview && <div className="mt-2 space-y-1 text-zinc-400"><label className="block">車輛範圍<input value={liveResetScope} onChange={(event) => setLiveResetScope(event.target.value)} className="ml-2 w-2/3 rounded border border-zinc-700 bg-black px-2 py-1" /></label><div>完整重置步驟：{liveResetPreview.actions.join(' → ')}</div><div>Redis：{liveResetPreview.redisKeys.length} 個明確 key；Broker Topic：{liveResetPreview.mqttTopics.length} 個（未確認 retained 時不清除）</div><div className="text-amber-300">{liveResetPreview.warnings.join('；')}</div><div>保留：{liveResetPreview.preserved.join('、')}</div><details><summary className="cursor-pointer text-zinc-500">查看單一交易 SQL</summary><pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap bg-black p-2 text-[10px] text-emerald-300">{liveResetPreview.sql}</pre></details></div>}
+          {liveResetResult?.steps && <div className="mt-2 space-y-1"><div>{liveResetResult.operation}／{liveResetResult.status}／request ID：{liveResetResult.requestId}／資料庫：{liveResetResult.database?.committed ? '已提交' : liveResetResult.database?.rolledBack ? '已回滾' : '未提交'}／調度：{liveResetResult.dispatchPaused ? '已暫停' : '狀態未知'}</div>{liveResetResult.steps.map((step) => <div key={step.id} className={step.status === 'failed' ? 'text-rose-300' : step.status === 'skipped' || step.status === 'not_run' ? 'text-amber-300' : 'text-emerald-300'}>{step.id}：{step.status} — {step.detail}</div>)}</div>}
           {liveResetResult?.resumed && <div className="mt-2 text-emerald-300">{liveResetResult.note}</div>}
         </div>
         {error && <div role="alert" className="shrink-0 rounded border border-rose-800 bg-rose-950/50 px-3 py-2 text-xs text-rose-200">{error}</div>}
@@ -252,8 +251,9 @@ export function DataManagementPanel() {
           <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 px-2 py-2 text-xs">
             <button type="button" onClick={() => setResultView('table')} className={resultView === 'table' ? 'text-sky-300' : 'text-zinc-500'}>表格</button>
             <button type="button" onClick={() => setResultView('json')} className={resultView === 'json' ? 'text-sky-300' : 'text-zinc-500'}>JSON</button>
-            <span className="ml-auto text-zinc-500">{result ? `${result.rowCount} 列／影響 ${result.affected ?? result.rowCount} 筆／${result.durationMs ?? 0} ms${result.truncated ? '（已達上限）' : ''}` : '尚未執行'}</span>
+            <span className="ml-auto text-zinc-500">{result ? `${result.operation ?? '執行 SQL'}／${result.requestId}／${result.rowCount} 列／影響 ${result.affected ?? result.rowCount} 筆／${result.durationMs ?? 0} ms${result.truncated ? '（已達上限）' : ''}` : '尚未執行'}</span>
           </div>
+          {result?.warnings?.map((warning) => <div key={warning} className="border-b border-amber-900 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">{warning}</div>)}
           <div className="min-h-0 flex-1 overflow-auto">
             {resultView === 'json' ? (
               <pre className="p-3 text-xs text-zinc-300">{JSON.stringify(result?.rows ?? [], null, 2)}</pre>
