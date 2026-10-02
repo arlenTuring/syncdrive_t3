@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import DashboardEditor from '../../dashboard'
+import { DataManagementPanel } from './DataManagementPanel'
 
 export type AdvancedManagementSection = 'dashboard' | 'data'
 
@@ -33,11 +34,7 @@ export function AdvancedManagementPanel({
       <div className="min-h-0 flex-1 overflow-hidden">
         {section === 'dashboard' ? (
           <DashboardEditor />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-            {t('systemFoundation.advanced.dataPending')}
-          </div>
-        )}
+        ) : <DataManagementPanel />}
       </div>
     </div>
   )

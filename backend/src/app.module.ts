@@ -70,6 +70,8 @@ import { DashboardPlaneModule } from './dashboard-plane/dashboard-plane.module';
 import { DevLogModule } from './dev-log/dev-log.module';
 import { SystemHealthModule } from './system-health/system-health.module';
 import { DatabaseInitService } from './database/database-init.service';
+import { DataAdminAudit } from './database/entities/data-admin-audit.entity';
+import { DataAdminModule } from './data-admin/data-admin.module';
 
 @Module({
   imports: [
@@ -105,6 +107,7 @@ import { DatabaseInitService } from './database/database-init.service';
           MapEntity, MapVersion, MediaSchedule,
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
+          DataAdminAudit,
           // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
           PartnerApiKey,
         ],
@@ -160,6 +163,7 @@ import { DatabaseInitService } from './database/database-init.service';
     DevLogModule,
     PartnerAccessModule,
     SystemHealthModule,
+    DataAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],
