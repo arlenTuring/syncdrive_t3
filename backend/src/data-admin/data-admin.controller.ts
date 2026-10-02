@@ -2,11 +2,15 @@ import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nest
 import type { Request } from 'express';
 import { DataAdminGuard } from './data-admin.guard';
 import { DataAdminService, type ExecuteAdminQuery } from './data-admin.service';
+import { LiveDataResetService } from './live-data-reset.service';
 
 @Controller('syncdrive-api/data-admin')
 @UseGuards(DataAdminGuard)
 export class DataAdminController {
-  constructor(private readonly service: DataAdminService) {}
+  constructor(
+    private readonly service: DataAdminService,
+    private readonly liveReset: LiveDataResetService,
+  ) {}
 
   @Get('metadata')
   metadata() {
@@ -22,6 +26,11 @@ export class DataAdminController {
     return this.service.sample(schema, table, Number(limit ?? 20));
   }
 
+  @Get('previews/order-cleanup')
+  orderCleanupPreview() {
+    return this.service.orderCleanupPreview();
+  }
+
   @Post('execute')
   execute(@Body() body: ExecuteAdminQuery, @Req() request: Request) {
     return this.service.execute(body, {
@@ -33,5 +42,20 @@ export class DataAdminController {
   @Post('executions/:requestId/cancel')
   cancel(@Param('requestId') requestId: string) {
     return this.service.cancel(requestId);
+  }
+
+  @Get('live-reset/preview')
+  liveResetPreview() {
+    return this.liveReset.preview();
+  }
+
+  @Post('live-reset/execute')
+  liveResetExecute(@Body() body: { vehicleCodes: string[] }) {
+    return this.liveReset.execute(body.vehicleCodes);
+  }
+
+  @Post('live-reset/resume')
+  liveResetResume(@Body() body: { vehicleCodes: string[] }) {
+    return this.liveReset.resume(body.vehicleCodes);
   }
 }

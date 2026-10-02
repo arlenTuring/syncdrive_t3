@@ -24,6 +24,7 @@ export class MqttService {
   private vehiclePositionDirty = false;
   /** 各車上一次通知時的訂單顯示狀態；沒變就不通知 */
   private readonly lastOrderDisplayKeyByVehicle = new Map<string, string>();
+  private readonly pausedLiveInputs = new Set<string>();
 
   constructor(
     @InjectRepository(CommandLog)
@@ -40,6 +41,28 @@ export class MqttService {
     private readonly mapService: MapService,
     private readonly dataSource: DataSource,
   ) {}
+
+  pauseLiveInputs(vehicleCodes: string[]): void {
+    vehicleCodes.forEach((code) => this.pausedLiveInputs.add(code));
+  }
+
+  resumeLiveInputs(vehicleCodes: string[]): void {
+    vehicleCodes.forEach((code) => this.pausedLiveInputs.delete(code));
+  }
+
+  isLiveInputPaused(vehicleCode: string): boolean {
+    return this.pausedLiveInputs.has(vehicleCode);
+  }
+
+  clearLiveCaches(vehicleCodes: string[]): void {
+    vehicleCodes.forEach((code) => {
+      this.operationSyncCache.delete(code);
+      this.lastFacilityByVehicle.delete(code);
+      this.lastLocationByVehicle.delete(code);
+      this.lastOrderDisplayKeyByVehicle.delete(code);
+    });
+    this.vehiclePositionDirty = false;
+  }
 
   /**
    * 每筆 telemetry 都由中心端依啟用圖資判定位置，並覆寫一車一筆的 DB 快照。

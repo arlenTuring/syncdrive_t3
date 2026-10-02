@@ -32,6 +32,8 @@ export type DataAdminMetadata = {
     port?: number
     database?: string
     schema: string
+    databaseUser?: string
+    isSuperuser: boolean
   }
   tables: Array<{ schema: string; name: string; estimated_rows: string }>
   columns: Array<{
@@ -60,6 +62,64 @@ export type DataAdminResult = {
   rowCount: number
   columns: string[]
   truncated?: boolean
+  affected?: number
+  durationMs?: number
+}
+
+export type OrderCleanupPreview = {
+  statusCounts: Array<{ status: string; count: number }>
+  relatedCounts: Record<string, number>
+  preserved: string[]
+}
+
+export async function fetchOrderCleanupPreview(account: DemoAccount) {
+  return readResponse<OrderCleanupPreview>(
+    await fetch(`${apiBase()}/syncdrive-api/data-admin/previews/order-cleanup`, {
+      headers: adminHeaders(account),
+    }),
+  )
+}
+
+export type LiveResetPreview = {
+  vehicleCodes: string[]
+  sql: string
+  redisKeys: string[]
+  mqttTopics: string[]
+  actions: string[]
+  preserved: string[]
+  warnings: string[]
+}
+
+export type LiveResetResult = {
+  vehicleCodes: string[]
+  paused?: boolean
+  resumed?: boolean
+  note?: string
+  steps?: Array<{ id: string; status: 'completed' | 'failed' | 'skipped'; detail: string }>
+}
+
+export async function fetchLiveResetPreview(account: DemoAccount) {
+  return readResponse<LiveResetPreview>(
+    await fetch(`${apiBase()}/syncdrive-api/data-admin/live-reset/preview`, {
+      headers: adminHeaders(account),
+    }),
+  )
+}
+
+export async function executeLiveReset(account: DemoAccount, vehicleCodes: string[]) {
+  return readResponse<LiveResetResult>(
+    await fetch(`${apiBase()}/syncdrive-api/data-admin/live-reset/execute`, {
+      method: 'POST', headers: adminHeaders(account), body: JSON.stringify({ vehicleCodes }),
+    }),
+  )
+}
+
+export async function resumeLiveReset(account: DemoAccount, vehicleCodes: string[]) {
+  return readResponse<LiveResetResult>(
+    await fetch(`${apiBase()}/syncdrive-api/data-admin/live-reset/resume`, {
+      method: 'POST', headers: adminHeaders(account), body: JSON.stringify({ vehicleCodes }),
+    }),
+  )
 }
 
 export async function fetchDataAdminMetadata(account: DemoAccount) {

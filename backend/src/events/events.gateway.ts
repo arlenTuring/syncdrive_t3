@@ -58,4 +58,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   broadcastDatasourceInvalidate(payload: { tags: string[]; at: number; reason?: string }) {
     this.server.emit('datasource/invalidate', payload);
   }
+
+  broadcastLiveStateReset(payload: { vehicleCodes: string[]; at: number }) {
+    this.server.emit('live-state/reset', payload);
+  }
 }

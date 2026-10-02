@@ -20,5 +20,6 @@ import { SlotStatus_ } from '../database/entities/slot-status.entity';
   ],
   providers: [MqttService, TelemetryWriteQueue],
   controllers: [MqttController],
+  exports: [MqttService, TelemetryWriteQueue],
 })
 export class MqttModule {}

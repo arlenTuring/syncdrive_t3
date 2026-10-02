@@ -43,6 +43,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
+    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
     await this.redisService.setTelemetry(vehicleCode, data);
     await this.mqttService.updateVehicleLivePosition(vehicleCode, data);
@@ -59,6 +60,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
+    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
     const { degraded, previousHealth } = await this.redisService.setHealth(vehicleCode, data);
 
@@ -86,6 +88,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
+    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
     const enriched = await this.mqttService.enrichWithFacilityLocation(vehicleCode, data);
 

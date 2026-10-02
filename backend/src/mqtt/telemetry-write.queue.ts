@@ -16,12 +16,28 @@ export class TelemetryWriteQueue implements OnModuleDestroy {
   private readonly queue: TelemetryQueueItem[] = [];
   private draining = false;
   private readonly batchSize = 80;
+  private readonly pausedVehicles = new Set<string>();
 
   constructor(private readonly mqttService: MqttService) {}
 
   enqueue(vehicleCode: string, payload: Record<string, unknown>) {
+    if (this.pausedVehicles.has(vehicleCode)) return;
     this.queue.push({ vehicleCode, payload });
     void this.drain();
+  }
+
+  async pauseAndDiscard(vehicleCodes: string[]): Promise<number> {
+    vehicleCodes.forEach((code) => this.pausedVehicles.add(code));
+    while (this.draining) await new Promise((resolve) => setTimeout(resolve, 10));
+    const before = this.queue.length;
+    for (let index = this.queue.length - 1; index >= 0; index -= 1) {
+      if (this.pausedVehicles.has(this.queue[index].vehicleCode)) this.queue.splice(index, 1);
+    }
+    return before - this.queue.length;
+  }
+
+  resume(vehicleCodes: string[]): void {
+    vehicleCodes.forEach((code) => this.pausedVehicles.delete(code));
   }
 
   async onModuleDestroy() {

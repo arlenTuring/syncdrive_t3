@@ -55,6 +55,10 @@ export class DataAdminService {
   ) {}
 
   async metadata() {
+    const connection = await this.dataSource.query(`
+      SELECT current_user AS database_user,
+             COALESCE((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false) AS is_superuser
+    `);
     const tables = await this.dataSource.query(`
       SELECT t.table_schema AS schema, t.table_name AS name,
              COALESCE(s.n_live_tup, 0)::bigint AS estimated_rows
@@ -99,10 +103,39 @@ export class DataAdminService {
         port: options.port,
         database: options.database,
         schema: options.schema ?? 'public',
+        databaseUser: connection[0]?.database_user,
+        isSuperuser: Boolean(connection[0]?.is_superuser),
       },
       tables,
       columns,
       constraints,
+    };
+  }
+
+  async orderCleanupPreview() {
+    const statusCounts = await this.dataSource.query(`
+      SELECT status, count(*)::int AS count
+      FROM operation_orders
+      GROUP BY status
+      ORDER BY status
+    `);
+    const relatedCounts = await this.dataSource.query(`
+      SELECT
+        (SELECT count(*)::int FROM order_action_states s WHERE EXISTS (
+          SELECT 1 FROM operation_orders o WHERE o.order_id = s.order_id
+        )) AS order_action_states,
+        (SELECT count(*)::int FROM order_events e WHERE EXISTS (
+          SELECT 1 FROM operation_orders o WHERE o.order_id = e.order_id
+        )) AS order_events,
+        (SELECT count(*)::int FROM operation_orders) AS operation_orders
+    `);
+    return {
+      statusCounts,
+      relatedCounts: relatedCounts[0],
+      preserved: [
+        'operation_shifts', 'time_templates', 'operation_routes', 'maintenance_tasks',
+        'maps', 'map_versions', 'vehicles', 'accounts', 'partner_api_keys', 'dashboard_planes',
+      ],
     };
   }
 
@@ -127,6 +160,7 @@ export class DataAdminService {
     if (this.active.has(requestId)) throw new BadRequestException('requestId 已在執行中');
 
     const runner = this.dataSource.createQueryRunner();
+    const startedAt = Date.now();
     let backendPid = 0;
     try {
       await runner.connect();
@@ -147,11 +181,12 @@ export class DataAdminService {
         throw new BadRequestException('唯讀模式不可執行寫入語句');
       }
 
-      const result = input.mode === 'read'
-        ? await runner.query(`SELECT * FROM (${sql}) AS admin_query_result LIMIT ${limit + 1}`)
-        : await runner.query(sql);
-      const truncated = input.mode === 'read' && result.length > limit;
-      const rows = truncated ? result.slice(0, limit) : result;
+      const queryResult = input.mode === 'read'
+        ? await runner.query(`SELECT * FROM (${sql}) AS admin_query_result LIMIT ${limit + 1}`, [], true)
+        : await runner.query(sql, [], true);
+      const records = queryResult.records ?? [];
+      const truncated = input.mode === 'read' && records.length > limit;
+      const rows = truncated ? records.slice(0, limit) : records;
       await runner.commitTransaction();
       if (input.mode === 'write') {
         const tags = affectedRelations.map((name) => `table:${name}`);
@@ -165,8 +200,10 @@ export class DataAdminService {
         requestId,
         rows,
         rowCount: rows.length,
+        affected: queryResult.affected ?? rows.length,
         columns: rows[0] ? Object.keys(rows[0]) : [],
         truncated,
+        durationMs: Date.now() - startedAt,
       };
     } catch (error) {
       if (runner.isTransactionActive) await runner.rollbackTransaction();
